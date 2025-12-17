@@ -91,9 +91,11 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 				Address:       input.AdvancedPoolHooks,
 				Args: []advanced_pool_hooks.CCVConfigArg{
 					{
-						RemoteChainSelector: input.RemoteChainSelector,
-						OutboundCCVs:        outboundCCVs,
-						InboundCCVs:         inboundCCVs,
+						RemoteChainSelector:             input.RemoteChainSelector,
+						OutboundCCVs:                    outboundCCVs,
+						OutboundCCVsToAddAboveThreshold: []common.Address{},
+						InboundCCVs:                     inboundCCVs,
+						InboundCCVsToAddAboveThreshold:  []common.Address{},
 					},
 				},
 			})

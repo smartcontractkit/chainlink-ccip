@@ -167,5 +167,19 @@ func convertRemoteChainConfig(
 		}
 		outCfg.InboundCCVs = append(outCfg.InboundCCVs, fullCCVRef.Address)
 	}
+	for _, ccvRef := range inCfg.OutboundCCVsToAddAboveThreshold {
+		fullCCVRef, err := datastore_utils.FindAndFormatRef(e.DataStore, ccvRef, chainSelector, datastore_utils.FullRef)
+		if err != nil {
+			return outCfg, fmt.Errorf("failed to resolve outbound CCV to add above threshold ref %s: %w", datastore_utils.SprintRef(ccvRef), err)
+		}
+		outCfg.OutboundCCVsToAddAboveThreshold = append(outCfg.OutboundCCVsToAddAboveThreshold, fullCCVRef.Address)
+	}
+	for _, ccvRef := range inCfg.InboundCCVsToAddAboveThreshold {
+		fullCCVRef, err := datastore_utils.FindAndFormatRef(e.DataStore, ccvRef, chainSelector, datastore_utils.FullRef)
+		if err != nil {
+			return outCfg, fmt.Errorf("failed to resolve inbound CCV to add above threshold ref %s: %w", datastore_utils.SprintRef(ccvRef), err)
+		}
+		outCfg.InboundCCVsToAddAboveThreshold = append(outCfg.InboundCCVsToAddAboveThreshold, fullCCVRef.Address)
+	}
 	return outCfg, nil
 }

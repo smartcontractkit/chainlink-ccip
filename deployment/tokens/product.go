@@ -75,6 +75,10 @@ type RemoteChainConfig[R any, CCV any] struct {
 	OutboundCCVs []CCV
 	// InboundCCVs specifies the verifiers to apply to inbound traffic.
 	InboundCCVs []CCV
+	// OutboundCCVsToAddAboveThreshold specifies the verifiers to apply to outbound traffic above the threshold.
+	OutboundCCVsToAddAboveThreshold []CCV
+	// InboundCCVsToAddAboveThreshold specifies the verifiers to apply to inbound traffic above the threshold.
+	InboundCCVsToAddAboveThreshold []CCV
 	// TokenTransferFeeConfig specifies the desired token transfer fee configuration for this remote chain.
 	TokenTransferFeeConfig TokenTransferFeeConfig
 }
