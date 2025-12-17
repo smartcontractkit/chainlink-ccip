@@ -5,12 +5,10 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/executor"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/onramp"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/versioned_verifier_resolver"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -35,8 +33,6 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 		// Create inputs for each operation
 		offRampArgs := make([]offramp.SourceChainConfigArgs, 0, len(input.RemoteChains))
 		onRampArgs := make([]onramp.DestChainConfigArgs, 0, len(input.RemoteChains))
-		committeeVerifierRemoteChainConfigArgs := make([]committee_verifier.RemoteChainConfigArgs, 0, len(input.RemoteChains))
-		committeeVerifierAllowlistArgs := make([]committee_verifier.AllowlistConfigArgs, 0, len(input.RemoteChains))
 		feeQuoterArgs := make([]fee_quoter.DestChainConfigArgs, 0, len(input.RemoteChains))
 		gasPriceUpdates := make([]fee_quoter.GasPriceUpdate, 0, len(input.RemoteChains))
 		onRampAdds := make([]router.OnRamp, 0, len(input.RemoteChains))
@@ -55,10 +51,9 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 				Router:              common.HexToAddress(input.Router),
 				SourceChainSelector: remoteSelector,
 				IsEnabled:           remoteConfig.AllowTrafficFrom,
-				// TODO: Update deployment pkg to allow for multiple onRamps
-				OnRamps:          [][]byte{remoteConfig.OnRamp},
-				DefaultCCV:       defaultInboundCCVs,
-				LaneMandatedCCVs: laneMandatedInboundCCVs,
+				OnRamps:             remoteConfig.OnRamps,
+				DefaultCCV:          defaultInboundCCVs,
+				LaneMandatedCCVs:    laneMandatedInboundCCVs,
 			})
 			defaultOutboundCCVs := make([]common.Address, 0, len(remoteConfig.DefaultOutboundCCVs))
 			for _, ccv := range remoteConfig.DefaultOutboundCCVs {
@@ -77,29 +72,6 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 				LaneMandatedCCVs:     laneMandatedOutboundCCVs,
 				DefaultExecutor:      common.HexToAddress(remoteConfig.DefaultExecutor),
 				OffRamp:              remoteConfig.OffRamp,
-			})
-			committeeVerifierRemoteChainConfigArgs = append(committeeVerifierRemoteChainConfigArgs, committee_verifier.RemoteChainConfigArgs{
-				Router:              common.HexToAddress(input.Router),
-				RemoteChainSelector: remoteSelector,
-				// TODO: Update deployment pkg to use RemoteChainConfig instead of DestChainConfig
-				AllowlistEnabled:   remoteConfig.CommitteeVerifierDestChainConfig.AllowlistEnabled,
-				FeeUSDCents:        remoteConfig.CommitteeVerifierDestChainConfig.FeeUSDCents,
-				GasForVerification: remoteConfig.CommitteeVerifierDestChainConfig.GasForVerification,
-				PayloadSizeBytes:   remoteConfig.CommitteeVerifierDestChainConfig.PayloadSizeBytes,
-			})
-			addedAllowlistedSenders := make([]common.Address, 0, len(remoteConfig.CommitteeVerifierDestChainConfig.AddedAllowlistedSenders))
-			for _, sender := range remoteConfig.CommitteeVerifierDestChainConfig.AddedAllowlistedSenders {
-				addedAllowlistedSenders = append(addedAllowlistedSenders, common.HexToAddress(sender))
-			}
-			removedAllowlistedSenders := make([]common.Address, 0, len(remoteConfig.CommitteeVerifierDestChainConfig.RemovedAllowlistedSenders))
-			for _, sender := range remoteConfig.CommitteeVerifierDestChainConfig.RemovedAllowlistedSenders {
-				removedAllowlistedSenders = append(removedAllowlistedSenders, common.HexToAddress(sender))
-			}
-			committeeVerifierAllowlistArgs = append(committeeVerifierAllowlistArgs, committee_verifier.AllowlistConfigArgs{
-				AllowlistEnabled:          remoteConfig.CommitteeVerifierDestChainConfig.AllowlistEnabled,
-				AddedAllowlistedSenders:   addedAllowlistedSenders,
-				RemovedAllowlistedSenders: removedAllowlistedSenders,
-				DestChainSelector:         remoteSelector,
 			})
 			feeQuoterArgs = append(feeQuoterArgs, fee_quoter.DestChainConfigArgs{
 				DestChainSelector: remoteSelector,
@@ -149,61 +121,6 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 		}
 		writes = append(writes, onRampReport.Output)
 
-		for _, committeeVerifier := range input.CommitteeVerifiers {
-			// ApplyRemoteChainConfigUpdates on each CommitteeVerifier
-			committeeVerifierReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.ApplyRemoteChainConfigUpdates, chain, contract.FunctionInput[[]committee_verifier.RemoteChainConfigArgs]{
-				ChainSelector: chain.Selector,
-				Address:       common.HexToAddress(committeeVerifier.Implementation),
-				Args:          committeeVerifierRemoteChainConfigArgs,
-			})
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to apply remote chain config updates to CommitteeVerifier(%s) on chain %s: %w", committeeVerifier, chain, err)
-			}
-			writes = append(writes, committeeVerifierReport.Output)
-
-			// ApplyInboundImplementationUpdates on each CommitteeVerifierResolver, first fetching the version tag
-			versionTagReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.GetVersionTag, chain, contract.FunctionInput[any]{
-				ChainSelector: chain.Selector,
-				Address:       common.HexToAddress(committeeVerifier.Implementation),
-			})
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to get version tag from CommitteeVerifier(%s) on chain %s: %w", committeeVerifier, chain, err)
-			}
-			inboundImplementationArgs := []versioned_verifier_resolver.InboundImplementationArgs{
-				{
-					Version:  versionTagReport.Output,
-					Verifier: common.HexToAddress(committeeVerifier.Implementation),
-				},
-			}
-			applyInboundUpdatesReport, err := cldf_ops.ExecuteOperation(b, versioned_verifier_resolver.ApplyInboundImplementationUpdates, chain, contract.FunctionInput[[]versioned_verifier_resolver.InboundImplementationArgs]{
-				ChainSelector: chain.Selector,
-				Address:       common.HexToAddress(committeeVerifier.Resolver),
-				Args:          inboundImplementationArgs,
-			})
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to apply inbound implementation updates to CommitteeVerifierResolver(%s) on chain %s: %w", committeeVerifier.Resolver, chain, err)
-			}
-			writes = append(writes, applyInboundUpdatesReport.Output)
-
-			// ApplyOutboundImplementationUpdates on each CommitteeVerifierResolver
-			outboundImplementationArgs := make([]versioned_verifier_resolver.OutboundImplementationArgs, 0, len(input.RemoteChains))
-			for remoteChainSelector := range input.RemoteChains {
-				outboundImplementationArgs = append(outboundImplementationArgs, versioned_verifier_resolver.OutboundImplementationArgs{
-					DestChainSelector: remoteChainSelector,
-					Verifier:          common.HexToAddress(committeeVerifier.Implementation),
-				})
-			}
-			applyOutboundUpdatesReport, err := cldf_ops.ExecuteOperation(b, versioned_verifier_resolver.ApplyOutboundImplementationUpdates, chain, contract.FunctionInput[[]versioned_verifier_resolver.OutboundImplementationArgs]{
-				ChainSelector: chain.Selector,
-				Address:       common.HexToAddress(committeeVerifier.Resolver),
-				Args:          outboundImplementationArgs,
-			})
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to apply outbound implementation updates to CommitteeVerifierResolver(%s) on chain %s: %w", committeeVerifier.Resolver, chain, err)
-			}
-			writes = append(writes, applyOutboundUpdatesReport.Output)
-		}
-
 		// ApplyDestChainUpdates on each Executor
 		for ExecutorAddr, destChainSelectorsToAdd := range destChainSelectorsPerExecutor {
 			ExecutorReport, err := cldf_ops.ExecuteOperation(b, executor.ApplyDestChainUpdates, chain, contract.FunctionInput[executor.ApplyDestChainUpdatesArgs]{
@@ -217,19 +134,6 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to apply dest chain config updates to Executor(%s) on chain %s: %w", ExecutorAddr, chain, err)
 			}
 			writes = append(writes, ExecutorReport.Output)
-		}
-
-		// ApplyAllowlistUpdates on CommitteeVerifier
-		for _, committeeVerifier := range input.CommitteeVerifiers {
-			committeeVerifierAllowlistReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.ApplyAllowlistUpdates, chain, contract.FunctionInput[[]committee_verifier.AllowlistConfigArgs]{
-				ChainSelector: chain.Selector,
-				Address:       common.HexToAddress(committeeVerifier.Implementation),
-				Args:          committeeVerifierAllowlistArgs,
-			})
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to apply allowlist updates to CommitteeVerifier(%s) on chain %s: %w", committeeVerifier, chain, err)
-			}
-			writes = append(writes, committeeVerifierAllowlistReport.Output)
 		}
 
 		// ApplyDestChainConfigUpdates on FeeQuoter
@@ -275,9 +179,22 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
 		}
+		batchOps := []mcms_types.BatchOperation{batchOp}
+
+		for _, committeeVerifier := range input.CommitteeVerifiers {
+			committeeVerifierReport, err := cldf_ops.ExecuteSequence(b, ConfigureCommitteeVerifierForLanes, chains, ConfigureCommitteeVerifierForLanesInput{
+				ChainSelector:           chain.Selector,
+				Router:                  input.Router,
+				CommitteeVerifierConfig: committeeVerifier,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to configure committee verifier for lanes: %w", err)
+			}
+			batchOps = append(batchOps, committeeVerifierReport.Output.BatchOps...)
+		}
 
 		return sequences.OnChainOutput{
-			BatchOps: []mcms_types.BatchOperation{batchOp},
+			BatchOps: batchOps,
 		}, nil
 	},
 )

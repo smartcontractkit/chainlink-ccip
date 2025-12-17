@@ -39,15 +39,17 @@ func CreateBasicExecutorDestChainConfig() adapters.ExecutorDestChainConfig {
 	}
 }
 
-// CreateBasicCommitteeVerifierDestChainConfig creates a basic committee verifier dest chain config with reasonable defaults for testing
-func CreateBasicCommitteeVerifierDestChainConfig() adapters.CommitteeVerifierDestChainConfig {
-	return adapters.CommitteeVerifierDestChainConfig{
-		AllowlistEnabled:          false,
-		AddedAllowlistedSenders:   nil,
-		RemovedAllowlistedSenders: nil,
-		FeeUSDCents:               50,
-		GasForVerification:        50_000,
-		PayloadSizeBytes:          6*64 + 2*32,
+// CreateBasicCommitteeVerifierRemoteChainConfig creates a basic committee verifier remote chain config with reasonable defaults for testing
+func CreateBasicCommitteeVerifierRemoteChainConfig() adapters.CommitteeVerifierRemoteChainConfig {
+	return adapters.CommitteeVerifierRemoteChainConfig{
+		AllowlistEnabled:   false,
+		FeeUSDCents:        50,
+		GasForVerification: 50_000,
+		PayloadSizeBytes:   6*64 + 2*32,
+		SignatureConfig: adapters.CommitteeVerifierSignatureQuorumConfig{
+			Signers:   []string{common.HexToAddress("0x01").String()},
+			Threshold: 1,
+		},
 	}
 }
 

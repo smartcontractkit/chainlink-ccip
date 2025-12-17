@@ -54,6 +54,30 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 		}
 		writes := make([]contract.WriteOutput, 0)
 
+		// Update token transfer fee configuration for the remote chain
+		applyTokenTransferFeeConfigUpdatesReport, err := cldf_ops.ExecuteOperation(b, token_pool.ApplyTokenTransferFeeConfigUpdates, chain, evm_contract.FunctionInput[token_pool.TokenTransferFeeConfigArgs]{
+			ChainSelector: input.ChainSelector,
+			Address:       input.TokenPoolAddress,
+			Args: token_pool.TokenTransferFeeConfigArgs{
+				TokenTransferFeeConfigUpdates: []token_pool.TokenTransferFeeConfigUpdate{
+					{
+						DestChainSelector:                      input.RemoteChainSelector,
+						DestGasOverhead:                        input.RemoteChainConfig.TokenTransferFeeConfig.DestGasOverhead,
+						DestBytesOverhead:                      input.RemoteChainConfig.TokenTransferFeeConfig.DestBytesOverhead,
+						DefaultBlockConfirmationFeeUSDCents:    input.RemoteChainConfig.TokenTransferFeeConfig.DefaultFinalityFeeUSDCents,
+						CustomBlockConfirmationFeeUSDCents:     input.RemoteChainConfig.TokenTransferFeeConfig.CustomFinalityFeeUSDCents,
+						DefaultBlockConfirmationTransferFeeBps: input.RemoteChainConfig.TokenTransferFeeConfig.DefaultFinalityTransferFeeBps,
+						CustomBlockConfirmationTransferFeeBps:  input.RemoteChainConfig.TokenTransferFeeConfig.CustomFinalityTransferFeeBps,
+						IsEnabled:                              input.RemoteChainConfig.TokenTransferFeeConfig.IsEnabled,
+					},
+				},
+			},
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to apply token transfer fee config updates: %w", err)
+		}
+		writes = append(writes, applyTokenTransferFeeConfigUpdatesReport.Output)
+
 		// Set the requested CCVs
 		inboundCCVs := make([]common.Address, len(input.RemoteChainConfig.InboundCCVs))
 		for i, addr := range input.RemoteChainConfig.InboundCCVs {
@@ -111,37 +135,19 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 
 			// Only proceed further if we do NOT need to remove and re-add the chain
 			if len(removes) == 0 {
-				// Check existing rate limiters
-				rateLimiterStateReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetCurrentRateLimiterState, chain, evm_contract.FunctionInput[token_pool.GetCurrentRateLimiterStateArgs]{
-					ChainSelector: input.ChainSelector,
-					Address:       input.TokenPoolAddress,
-					Args: token_pool.GetCurrentRateLimiterStateArgs{
-						RemoteChainSelector:     input.RemoteChainSelector,
-						CustomBlockConfirmation: false,
-					},
-				})
+				// Check and update default finality rate limiters
+				defaultFinalityRateLimitersReport, err := maybeUpdateRateLimiters(b, chain, input, false)
 				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to get rate limiter state: %w", err)
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to maybe update rate limiters: %w", err)
 				}
-				currentStates := rateLimiterStateReport.Output
-				// Update the rate limiters if they do not match the desired config
-				if !rateLimiterConfigsEqual(currentStates.InboundRateLimiterState, input.RemoteChainConfig.InboundRateLimiterConfig) || !rateLimiterConfigsEqual(currentStates.OutboundRateLimiterState, input.RemoteChainConfig.OutboundRateLimiterConfig) {
-					setInboundRateLimiterReport, err := cldf_ops.ExecuteOperation(b, token_pool.SetRateLimitConfig, chain, evm_contract.FunctionInput[[]token_pool.SetRateLimitConfigArg]{
-						ChainSelector: input.ChainSelector,
-						Address:       input.TokenPoolAddress,
-						Args: []token_pool.SetRateLimitConfigArg{
-							{
-								RemoteChainSelector:       input.RemoteChainSelector,
-								InboundRateLimiterConfig:  input.RemoteChainConfig.InboundRateLimiterConfig,
-								OutboundRateLimiterConfig: input.RemoteChainConfig.OutboundRateLimiterConfig,
-							},
-						},
-					})
-					if err != nil {
-						return sequences.OnChainOutput{}, fmt.Errorf("failed to set inbound rate limiter config: %w", err)
-					}
-					writes = append(writes, setInboundRateLimiterReport.Output)
+				writes = append(writes, defaultFinalityRateLimitersReport)
+
+				// Check and update custom finality rate limiters
+				customFinalityRateLimitersReport, err := maybeUpdateRateLimiters(b, chain, input, true)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to maybe update rate limiters: %w", err)
 				}
+				writes = append(writes, customFinalityRateLimitersReport)
 
 				// Check existing remote pools
 				getRemotePoolsReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetRemotePools, chain, evm_contract.FunctionInput[uint64]{
@@ -193,8 +199,8 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 							common.LeftPadBytes(input.RemoteChainConfig.RemotePool, 32),
 						},
 						RemoteTokenAddress:        common.LeftPadBytes(input.RemoteChainConfig.RemoteToken, 32),
-						OutboundRateLimiterConfig: input.RemoteChainConfig.OutboundRateLimiterConfig,
-						InboundRateLimiterConfig:  input.RemoteChainConfig.InboundRateLimiterConfig,
+						OutboundRateLimiterConfig: input.RemoteChainConfig.DefaultFinalityOutboundRateLimiterConfig,
+						InboundRateLimiterConfig:  input.RemoteChainConfig.DefaultFinalityInboundRateLimiterConfig,
 					},
 				},
 			},
@@ -212,6 +218,56 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 		return sequences.OnChainOutput{BatchOps: []mcms_types.BatchOperation{batchOp}}, nil
 	},
 )
+
+// maybeUpdateRateLimiters checks and updates the rate limiters for a given remote chain if they do not match the desired config.
+func maybeUpdateRateLimiters(b operations.Bundle, chain evm.Chain, input ConfigureTokenPoolForRemoteChainInput, customBlockConfirmation bool) (output evm_contract.WriteOutput, err error) {
+	var desiredInboundRateLimiterConfig tokens.RateLimiterConfig
+	var desiredOutboundRateLimiterConfig tokens.RateLimiterConfig
+	if customBlockConfirmation {
+		desiredInboundRateLimiterConfig = input.RemoteChainConfig.CustomFinalityInboundRateLimiterConfig
+		desiredOutboundRateLimiterConfig = input.RemoteChainConfig.CustomFinalityOutboundRateLimiterConfig
+	} else {
+		desiredInboundRateLimiterConfig = input.RemoteChainConfig.DefaultFinalityInboundRateLimiterConfig
+		desiredOutboundRateLimiterConfig = input.RemoteChainConfig.DefaultFinalityOutboundRateLimiterConfig
+	}
+
+	// Check existing rate limiters
+	rateLimiterStateReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetCurrentRateLimiterState, chain, evm_contract.FunctionInput[token_pool.GetCurrentRateLimiterStateArgs]{
+		ChainSelector: input.ChainSelector,
+		Address:       input.TokenPoolAddress,
+		Args: token_pool.GetCurrentRateLimiterStateArgs{
+			RemoteChainSelector:     input.RemoteChainSelector,
+			CustomBlockConfirmation: customBlockConfirmation,
+		},
+	})
+	if err != nil {
+		return contract.WriteOutput{}, fmt.Errorf("failed to get rate limiter state: %w", err)
+	}
+	currentStates := rateLimiterStateReport.Output
+
+	// Update the rate limiters if they do not match the desired config
+	if !rateLimiterConfigsEqual(currentStates.InboundRateLimiterState, desiredInboundRateLimiterConfig) ||
+		!rateLimiterConfigsEqual(currentStates.OutboundRateLimiterState, desiredOutboundRateLimiterConfig) {
+		setInboundRateLimiterReport, err := cldf_ops.ExecuteOperation(b, token_pool.SetRateLimitConfig, chain, evm_contract.FunctionInput[[]token_pool.SetRateLimitConfigArg]{
+			ChainSelector: input.ChainSelector,
+			Address:       input.TokenPoolAddress,
+			Args: []token_pool.SetRateLimitConfigArg{
+				{
+					RemoteChainSelector:       input.RemoteChainSelector,
+					CustomBlockConfirmation:   customBlockConfirmation,
+					InboundRateLimiterConfig:  desiredInboundRateLimiterConfig,
+					OutboundRateLimiterConfig: desiredOutboundRateLimiterConfig,
+				},
+			},
+		})
+		if err != nil {
+			return contract.WriteOutput{}, fmt.Errorf("failed to set inbound rate limiter config: %w", err)
+		}
+		return setInboundRateLimiterReport.Output, nil
+	}
+
+	return contract.WriteOutput{}, nil
+}
 
 // rateLimiterConfigsEqual returns true if the current rate limiter config on-chain matches the desired config.
 func rateLimiterConfigsEqual(current tp_bindings.RateLimiterTokenBucket, desired tokens.RateLimiterConfig) bool {

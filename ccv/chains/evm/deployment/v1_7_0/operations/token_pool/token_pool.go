@@ -358,3 +358,14 @@ var GetToken = contract.NewRead(contract.ReadParams[any, common.Address, *token_
 		return tokenPool.GetToken(opts)
 	},
 })
+
+var GetAdvancedPoolHooks = contract.NewRead(contract.ReadParams[any, common.Address, *token_pool.TokenPool]{
+	Name:         "token-pool:get-advanced-pool-hooks",
+	Version:      semver.MustParse("1.7.0"),
+	Description:  "Gets the advanced pool hooks address on a TokenPool",
+	ContractType: ContractType,
+	NewContract:  token_pool.NewTokenPool,
+	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.CallOpts, args any) (common.Address, error) {
+		return tokenPool.GetAdvancedPoolHooks(opts)
+	},
+})

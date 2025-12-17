@@ -133,12 +133,22 @@ func TestTokenAdapter(t *testing.T) {
 						Version:   remotePoolVersion,
 						Qualifier: "TEST",
 					},
-					InboundRateLimiterConfig: tokens.RateLimiterConfig{
+					DefaultFinalityInboundRateLimiterConfig: tokens.RateLimiterConfig{
 						IsEnabled: true,
 						Rate:      big.NewInt(10),
 						Capacity:  big.NewInt(100),
 					},
-					OutboundRateLimiterConfig: tokens.RateLimiterConfig{
+					DefaultFinalityOutboundRateLimiterConfig: tokens.RateLimiterConfig{
+						IsEnabled: true,
+						Rate:      big.NewInt(10),
+						Capacity:  big.NewInt(100),
+					},
+					CustomFinalityInboundRateLimiterConfig: tokens.RateLimiterConfig{
+						IsEnabled: true,
+						Rate:      big.NewInt(10),
+						Capacity:  big.NewInt(100),
+					},
+					CustomFinalityOutboundRateLimiterConfig: tokens.RateLimiterConfig{
 						IsEnabled: true,
 						Rate:      big.NewInt(10),
 						Capacity:  big.NewInt(100),
@@ -265,12 +275,18 @@ func TestTokenAdapter(t *testing.T) {
 					})
 					require.NoError(t, err, "Failed to get rate limiter config from token pool")
 					currentStates := rateLimiterStateReport.Output
-					require.Equal(t, getRemoteChainConfig(nil, nil).InboundRateLimiterConfig.IsEnabled, currentStates.InboundRateLimiterState.IsEnabled, "Inbound rate limiter enabled state should match")
-					require.Equal(t, getRemoteChainConfig(nil, nil).InboundRateLimiterConfig.Rate, currentStates.InboundRateLimiterState.Rate, "Inbound rate limiter rate should match")
-					require.Equal(t, getRemoteChainConfig(nil, nil).InboundRateLimiterConfig.Capacity, currentStates.InboundRateLimiterState.Capacity, "Inbound rate limiter capacity should match")
-					require.Equal(t, getRemoteChainConfig(nil, nil).OutboundRateLimiterConfig.IsEnabled, currentStates.OutboundRateLimiterState.IsEnabled, "Outbound rate limiter enabled state should match")
-					require.Equal(t, getRemoteChainConfig(nil, nil).OutboundRateLimiterConfig.Rate, currentStates.OutboundRateLimiterState.Rate, "Outbound rate limiter rate should match")
-					require.Equal(t, getRemoteChainConfig(nil, nil).OutboundRateLimiterConfig.Capacity, currentStates.OutboundRateLimiterState.Capacity, "Outbound rate limiter capacity should match")
+					require.Equal(t, getRemoteChainConfig(nil, nil).DefaultFinalityInboundRateLimiterConfig.IsEnabled, currentStates.InboundRateLimiterState.IsEnabled, "Inbound rate limiter enabled state should match")
+					require.Equal(t, getRemoteChainConfig(nil, nil).DefaultFinalityInboundRateLimiterConfig.Rate, currentStates.InboundRateLimiterState.Rate, "Inbound rate limiter rate should match")
+					require.Equal(t, getRemoteChainConfig(nil, nil).DefaultFinalityInboundRateLimiterConfig.Capacity, currentStates.InboundRateLimiterState.Capacity, "Inbound rate limiter capacity should match")
+					require.Equal(t, getRemoteChainConfig(nil, nil).DefaultFinalityOutboundRateLimiterConfig.IsEnabled, currentStates.OutboundRateLimiterState.IsEnabled, "Outbound rate limiter enabled state should match")
+					require.Equal(t, getRemoteChainConfig(nil, nil).DefaultFinalityOutboundRateLimiterConfig.Rate, currentStates.OutboundRateLimiterState.Rate, "Outbound rate limiter rate should match")
+					require.Equal(t, getRemoteChainConfig(nil, nil).DefaultFinalityOutboundRateLimiterConfig.Capacity, currentStates.OutboundRateLimiterState.Capacity, "Outbound rate limiter capacity should match")
+					require.Equal(t, getRemoteChainConfig(nil, nil).CustomFinalityInboundRateLimiterConfig.IsEnabled, currentStates.InboundRateLimiterState.IsEnabled, "Inbound rate limiter enabled state should match")
+					require.Equal(t, getRemoteChainConfig(nil, nil).CustomFinalityInboundRateLimiterConfig.Rate, currentStates.InboundRateLimiterState.Rate, "Inbound rate limiter rate should match")
+					require.Equal(t, getRemoteChainConfig(nil, nil).CustomFinalityInboundRateLimiterConfig.Capacity, currentStates.InboundRateLimiterState.Capacity, "Inbound rate limiter capacity should match")
+					require.Equal(t, getRemoteChainConfig(nil, nil).CustomFinalityOutboundRateLimiterConfig.IsEnabled, currentStates.OutboundRateLimiterState.IsEnabled, "Outbound rate limiter enabled state should match")
+					require.Equal(t, getRemoteChainConfig(nil, nil).CustomFinalityOutboundRateLimiterConfig.Rate, currentStates.OutboundRateLimiterState.Rate, "Outbound rate limiter rate should match")
+					require.Equal(t, getRemoteChainConfig(nil, nil).CustomFinalityOutboundRateLimiterConfig.Capacity, currentStates.OutboundRateLimiterState.Capacity, "Outbound rate limiter capacity should match")
 				}
 
 				// Chain A has a 1.7.0 token pool so should have set CCVs

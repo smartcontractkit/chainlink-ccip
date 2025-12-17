@@ -3,6 +3,7 @@ package sequences_test
 import (
 	"testing"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/v2"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/committee_verifier"
@@ -90,27 +91,35 @@ func TestConfigureChainForLanes(t *testing.T) {
 					ChainSelector: chainSelector,
 					Router:        routerAddress,
 					OnRamp:        onRamp,
-					CommitteeVerifiers: []adapters.CommitteeVerifier[string]{
+					CommitteeVerifiers: []adapters.CommitteeVerifierConfig[string, datastore.AddressRef]{
 						{
-							Implementation: committeeVerifier,
-							Resolver:       committeeVerifierResolver,
+							CommitteeVerifier: committeeVerifier,
+							SupportingContracts: []datastore.AddressRef{
+								{
+									Address: committeeVerifierResolver,
+									Type:    datastore.ContractType(committee_verifier.ResolverType),
+									Version: semver.MustParse("1.7.0"),
+								},
+							},
+							RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
+								remoteChainSelector: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
+							},
 						},
 					},
 					FeeQuoter: feeQuoter,
 					OffRamp:   offRamp,
 					RemoteChains: map[uint64]adapters.RemoteChainConfig[[]byte, string]{
 						remoteChainSelector: {
-							AllowTrafficFrom:                 true,
-							OnRamp:                           ccipMessageSource,
-							OffRamp:                          ccipMessageDest,
-							DefaultInboundCCVs:               []string{committeeVerifier},
-							DefaultOutboundCCVs:              []string{committeeVerifier},
-							DefaultExecutor:                  executorAddress,
-							CommitteeVerifierDestChainConfig: testsetup.CreateBasicCommitteeVerifierDestChainConfig(),
-							FeeQuoterDestChainConfig:         testsetup.CreateBasicFeeQuoterDestChainConfig(),
-							ExecutorDestChainConfig:          testsetup.CreateBasicExecutorDestChainConfig(),
-							AddressBytesLength:               20,
-							BaseExecutionGasCost:             80_000,
+							AllowTrafficFrom:         true,
+							OnRamps:                  [][]byte{ccipMessageSource},
+							OffRamp:                  ccipMessageDest,
+							DefaultInboundCCVs:       []string{committeeVerifier},
+							DefaultOutboundCCVs:      []string{committeeVerifier},
+							DefaultExecutor:          executorAddress,
+							FeeQuoterDestChainConfig: testsetup.CreateBasicFeeQuoterDestChainConfig(),
+							ExecutorDestChainConfig:  testsetup.CreateBasicExecutorDestChainConfig(),
+							AddressBytesLength:       20,
+							BaseExecutionGasCost:     80_000,
 						},
 					},
 				},

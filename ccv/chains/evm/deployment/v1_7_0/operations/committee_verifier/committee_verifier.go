@@ -45,9 +45,11 @@ type WithdrawFeeTokensArgs struct {
 
 type RemoteChainConfig = committee_verifier.GetRemoteChainConfig
 
+type SignatureConfig = committee_verifier.SignatureQuorumValidatorSignatureConfig
+
 type SignatureConfigArgs struct {
 	SourceChainSelectorsToRemove []uint64
-	SignatureConfigUpdates       []committee_verifier.SignatureQuorumValidatorSignatureConfig
+	SignatureConfigUpdates       []SignatureConfig
 }
 
 var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
