@@ -129,6 +129,7 @@ func convertRemoteChainConfig(
 		DefaultFinalityOutboundRateLimiterConfig: inCfg.DefaultFinalityOutboundRateLimiterConfig,
 		CustomFinalityInboundRateLimiterConfig:   inCfg.CustomFinalityInboundRateLimiterConfig,
 		CustomFinalityOutboundRateLimiterConfig:  inCfg.CustomFinalityOutboundRateLimiterConfig,
+		TokenTransferFeeConfig:                   inCfg.TokenTransferFeeConfig,
 	}
 	if inCfg.RemotePool != nil {
 		fullRemotePoolRef, err := datastore_utils.FindAndFormatRef(e.DataStore, *inCfg.RemotePool, remoteChainSelector, datastore_utils.FullRef)

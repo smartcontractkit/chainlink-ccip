@@ -12,6 +12,7 @@ OPTIMIZE_RUNS_TOKEN_POOL=50000
 OPTIMIZE_RUNS_LARGE_TOKEN_POOL=15000
 OPTIMIZE_RUNS_USDC=2000
 OPTIMIZE_RUNS_ONRAMP=20000
+OPTIMIZE_RUNS_OFFRAMP=20000
 
 PROJECT="ccip"
 FOUNDRY_PROJECT_SUFFIX="-compile"
@@ -72,6 +73,9 @@ function getOptimizations() {
         ;;
       "OnRamp")
         optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_ONRAMP"
+        ;;
+      "OffRamp")
+        optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_OFFRAMP"
         ;;
     esac
 

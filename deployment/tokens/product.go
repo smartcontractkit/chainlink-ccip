@@ -38,6 +38,24 @@ type RateLimiterConfig struct {
 	Rate *big.Int
 }
 
+// TokenTransferFeeConfig specifies configuration for a token transfer fee on a token pool.
+type TokenTransferFeeConfig struct {
+	// DestGasOverhead is the gas overhead for the token transfer.
+	DestGasOverhead uint32
+	// DestBytesOverhead is the bytes overhead for the token transfer.
+	DestBytesOverhead uint32
+	// DefaultFinalityFeeUSDCents is the flat fee for a default finality transfer.
+	DefaultFinalityFeeUSDCents uint32
+	// CustomFinalityFeeUSDCents is the flat fee for a custom finality transfer.
+	CustomFinalityFeeUSDCents uint32
+	// DefaultFinalityTransferFeeBps is the bps fee for a default finality transfer.
+	DefaultFinalityTransferFeeBps uint16
+	// CustomFinalityTransferFeeBps is the bps fee for a custom finality transfer.
+	CustomFinalityTransferFeeBps uint16
+	// IsEnabled is whether the token transfer fee config is enabled.
+	IsEnabled bool
+}
+
 // RemoteChainConfig specifies configuration for a remote chain on a token pool.
 type RemoteChainConfig[R any, CCV any] struct {
 	// The token on the remote chain.
@@ -57,6 +75,8 @@ type RemoteChainConfig[R any, CCV any] struct {
 	OutboundCCVs []CCV
 	// InboundCCVs specifies the verifiers to apply to inbound traffic.
 	InboundCCVs []CCV
+	// TokenTransferFeeConfig specifies the desired token transfer fee configuration for this remote chain.
+	TokenTransferFeeConfig TokenTransferFeeConfig
 }
 
 // ConfigureTokenForTransfersInput is the input for the ConfigureTokenForTransfers sequence.
