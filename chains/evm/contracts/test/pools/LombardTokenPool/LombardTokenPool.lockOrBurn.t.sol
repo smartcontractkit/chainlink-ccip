@@ -7,9 +7,9 @@ import {Pool} from "../../../libraries/Pool.sol";
 import {LombardTokenPool} from "../../../pools/Lombard/LombardTokenPool.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {LombardTokenPoolHelper} from "../../helpers/LombardTokenPoolHelper.sol";
-import {LombardTokenPoolSetup} from "./LombardTokenPoolSetup.t.sol";
 
-import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
+import {MockLombardAdapter} from "../../mocks/MockLombardAdapter.sol";
+import {LombardTokenPoolSetup} from "./LombardTokenPoolSetup.t.sol";
 
 contract LombardTokenPool_lockOrBurn is LombardTokenPoolSetup {
   bytes32 internal constant L_CHAIN_ID = bytes32("LCHAIN");
@@ -82,10 +82,11 @@ contract LombardTokenPool_lockOrBurn is LombardTokenPoolSetup {
     );
 
     assertEq(out.destTokenAddress, abi.encode(s_remoteToken));
+    assertEq(s_token.balanceOf(address(s_bridge)), amount);
   }
 
   function test_lockOrBurn_V1_UsesAdapterWhenConfigured() public {
-    address tokenAdapter = makeAddr("adapter");
+    address tokenAdapter = address(new MockLombardAdapter(address(s_bridge), address(s_token)));
     uint256 amount = 1e18;
 
     changePrank(OWNER);
@@ -101,15 +102,9 @@ contract LombardTokenPool_lockOrBurn is LombardTokenPoolSetup {
     );
     _applyChainUpdates(address(adapterPool));
 
-    vm.mockCall(
-      tokenAdapter,
-      abi.encodeCall(IERC20.transferFrom, (address(adapterPool), address(s_bridge), amount)),
-      abi.encode(true)
-    );
-
-    bytes32 remoteTokenId = bytes32(uint256(uint160(s_initialRemoteToken)));
+    bytes32 destToken = bytes32(uint256(uint160(s_initialRemoteToken)));
     adapterPool.setPath(DEST_CHAIN_SELECTOR, L_CHAIN_ID, abi.encode(s_initialRemotePool));
-    s_bridge.setAllowedDestinationToken(L_CHAIN_ID, tokenAdapter, remoteTokenId);
+    s_bridge.setAllowedDestinationToken(L_CHAIN_ID, tokenAdapter, destToken);
     changePrank(s_allowedOnRamp);
 
     deal(address(s_token), address(adapterPool), amount);
@@ -148,6 +143,7 @@ contract LombardTokenPool_lockOrBurn is LombardTokenPoolSetup {
     );
 
     assertEq(out.destTokenAddress, abi.encode(s_initialRemoteToken));
+    assertEq(s_token.balanceOf(address(s_bridge)), amount);
   }
 
   function test_lockOrBurn_V2_RevertWhen_OutboundImplementationNotFoundForVerifier() public {

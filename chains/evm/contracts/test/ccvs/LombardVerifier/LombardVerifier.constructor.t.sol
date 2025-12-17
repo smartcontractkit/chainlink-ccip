@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {IBridgeV2} from "../../../interfaces/lombard/IBridgeV3.sol";
+import {IBridgeV2} from "../../../interfaces/lombard/IBridgeV2.sol";
 import {IBridgeV3} from "../../../interfaces/lombard/IBridgeV3.sol";
 
 import {LombardVerifier} from "../../../ccvs/LombardVerifier.sol";
