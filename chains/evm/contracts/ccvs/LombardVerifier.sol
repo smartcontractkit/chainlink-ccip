@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {ICrossChainVerifierV1} from "../interfaces/ICrossChainVerifierV1.sol";
-import {IBridgeV2} from "../interfaces/lombard/IBridgeV2.sol";
+import {IBridgeV3} from "../interfaces/lombard/IBridgeV3.sol";
 import {IMailbox} from "../interfaces/lombard/IMailbox.sol";
 
 import {Internal} from "../libraries/Internal.sol";
@@ -73,7 +73,7 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
   /// @notice Supported bridge message version.
   uint8 internal constant SUPPORTED_BRIDGE_MSG_VERSION = 1;
   /// @notice The address of bridge contract.
-  IBridgeV2 public immutable i_bridge;
+  IBridgeV3 public immutable i_bridge;
 
   /// @notice Set of supported tokens for cross-chain transfers. Even if an adapter is used, the source token must be
   /// added to the supported tokens set, not the adapter.
@@ -83,7 +83,7 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
   /// @notice Mapping of CCIP chain selector to chain specific config.
   mapping(uint64 chainSelector => Path path) internal s_chainSelectorToPath;
 
-  constructor(IBridgeV2 bridge, string[] memory storageLocation, address rmn) BaseVerifier(storageLocation, rmn) {
+  constructor(IBridgeV3 bridge, string[] memory storageLocation, address rmn) BaseVerifier(storageLocation, rmn) {
     if (address(bridge) == address(0)) {
       revert ZeroBridge();
     }

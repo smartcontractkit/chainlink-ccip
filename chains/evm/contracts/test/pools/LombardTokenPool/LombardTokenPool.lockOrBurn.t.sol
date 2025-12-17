@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {IBridgeV1} from "../../../interfaces/lombard/IBridgeV1.sol";
+import {IBridgeV2} from "../../../interfaces/lombard/IBridgeV2.sol";
 
 import {Pool} from "../../../libraries/Pool.sol";
 import {LombardTokenPool} from "../../../pools/Lombard/LombardTokenPool.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {LombardTokenPoolHelper} from "../../helpers/LombardTokenPoolHelper.sol";
+
+import {MockLombardAdapter} from "../../mocks/MockLombardAdapter.sol";
 import {LombardTokenPoolSetup} from "./LombardTokenPoolSetup.t.sol";
 
 contract LombardTokenPool_lockOrBurn is LombardTokenPoolSetup {
@@ -49,7 +51,7 @@ contract LombardTokenPool_lockOrBurn is LombardTokenPoolSetup {
     vm.expectCall(
       address(s_bridge),
       abi.encodeCall(
-        IBridgeV1.deposit,
+        IBridgeV2.deposit,
         (
           L_CHAIN_ID,
           address(s_token),
@@ -80,10 +82,12 @@ contract LombardTokenPool_lockOrBurn is LombardTokenPoolSetup {
     );
 
     assertEq(out.destTokenAddress, abi.encode(s_remoteToken));
+    assertEq(s_token.balanceOf(address(s_bridge)), amount);
   }
 
   function test_lockOrBurn_V1_UsesAdapterWhenConfigured() public {
-    address tokenAdapter = makeAddr("adapter");
+    address tokenAdapter = address(new MockLombardAdapter(address(s_bridge), address(s_token)));
+    uint256 amount = 1e18;
 
     changePrank(OWNER);
     LombardTokenPoolHelper adapterPool = new LombardTokenPoolHelper(
@@ -98,18 +102,17 @@ contract LombardTokenPool_lockOrBurn is LombardTokenPoolSetup {
     );
     _applyChainUpdates(address(adapterPool));
 
-    bytes32 remoteTokenId = bytes32(uint256(uint160(s_initialRemoteToken)));
+    bytes32 destToken = bytes32(uint256(uint160(s_initialRemoteToken)));
     adapterPool.setPath(DEST_CHAIN_SELECTOR, L_CHAIN_ID, abi.encode(s_initialRemotePool));
-    s_bridge.setAllowedDestinationToken(L_CHAIN_ID, tokenAdapter, remoteTokenId);
+    s_bridge.setAllowedDestinationToken(L_CHAIN_ID, tokenAdapter, destToken);
     changePrank(s_allowedOnRamp);
 
-    uint256 amount = 1e18;
     deal(address(s_token), address(adapterPool), amount);
 
     vm.expectCall(
       address(s_bridge),
       abi.encodeCall(
-        IBridgeV1.deposit,
+        IBridgeV2.deposit,
         (
           L_CHAIN_ID,
           tokenAdapter,
@@ -140,6 +143,7 @@ contract LombardTokenPool_lockOrBurn is LombardTokenPoolSetup {
     );
 
     assertEq(out.destTokenAddress, abi.encode(s_initialRemoteToken));
+    assertEq(s_token.balanceOf(address(s_bridge)), amount);
   }
 
   function test_lockOrBurn_V2_RevertWhen_OutboundImplementationNotFoundForVerifier() public {
