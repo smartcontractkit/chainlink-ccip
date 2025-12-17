@@ -175,7 +175,7 @@ contract OnRamp_addressEncodingCompatibility is OnRampSetup {
     });
 
     Pool.LockOrBurnInV1 memory expectedInput = Pool.LockOrBurnInV1({
-      receiver: abi.encodePacked(tokenReceiver),
+      receiver: abi.encode(tokenReceiver), // Pool now receives raw format (32 bytes if ABI-encoded)
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       originalSender: STRANGER,
       amount: 1e18,
@@ -307,6 +307,18 @@ contract OnRamp_addressEncodingCompatibility is OnRampSetup {
   function test_forwardFromRouter_RevertWhen_TokenReceiverPaddingNonZero() public {
     _setDestChainAddressLength(EVM_ADDRESS_LENGTH);
     bytes memory bad = abi.encode(bytes32(type(uint256).max));
+    address token = s_sourceFeeToken;
+    address pool = makeAddr("mockPool");
+    address destToken = makeAddr("destToken");
+
+    vm.mockCall(address(s_tokenAdminRegistry), abi.encodeCall(s_tokenAdminRegistry.getPool, (token)), abi.encode(pool));
+    vm.mockCall(pool, abi.encodeCall(IERC165(pool).supportsInterface, (Pool.CCIP_POOL_V1)), abi.encode(true));
+    vm.mockCall(pool, abi.encodeCall(IERC165(pool).supportsInterface, (type(IPoolV2).interfaceId)), abi.encode(false));
+
+    // Mock pool.lockOrBurn to succeed (validation happens after pool call when setting tokenReceiver in message)
+    Pool.LockOrBurnOutV1 memory poolReturnData =
+      Pool.LockOrBurnOutV1({destTokenAddress: abi.encode(destToken), destPoolData: abi.encode("poolData")});
+    vm.mockCall(pool, abi.encodeWithSelector(IPoolV1.lockOrBurn.selector), abi.encode(poolReturnData));
 
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = ExtraArgsCodec.GenericExtraArgsV3({
       ccvs: new address[](0),
@@ -319,23 +331,42 @@ contract OnRamp_addressEncodingCompatibility is OnRampSetup {
       tokenArgs: ""
     });
 
+    Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
+    tokenAmounts[0] = Client.EVMTokenAmount({token: token, amount: 1e18});
+
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
       receiver: abi.encode(makeAddr("receiver")),
       data: "",
-      tokenAmounts: new Client.EVMTokenAmount[](0),
+      tokenAmounts: tokenAmounts,
       feeToken: s_sourceFeeToken,
       extraArgs: ExtraArgsCodec._encodeGenericExtraArgsV3(extraArgs)
     });
 
+    uint256 fee = s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
+    deal(s_sourceFeeToken, address(s_onRamp), fee);
+    deal(token, address(s_onRamp), 1e18);
+
     vm.startPrank(address(s_sourceRouter));
     vm.expectRevert(abi.encodeWithSelector(OnRamp.InvalidDestChainAddress.selector, bad));
-    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, STRANGER);
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, fee, STRANGER);
     vm.stopPrank();
   }
 
   function test_forwardFromRouter_RevertWhen_TokenReceiverLengthNotDestOr32() public {
     _setDestChainAddressLength(EVM_ADDRESS_LENGTH);
     bytes memory wrongLen = bytes("wronglengthhere!"); // 17 bytes
+    address token = s_sourceFeeToken;
+    address pool = makeAddr("mockPool");
+    address destToken = makeAddr("destToken");
+
+    vm.mockCall(address(s_tokenAdminRegistry), abi.encodeCall(s_tokenAdminRegistry.getPool, (token)), abi.encode(pool));
+    vm.mockCall(pool, abi.encodeCall(IERC165(pool).supportsInterface, (Pool.CCIP_POOL_V1)), abi.encode(true));
+    vm.mockCall(pool, abi.encodeCall(IERC165(pool).supportsInterface, (type(IPoolV2).interfaceId)), abi.encode(false));
+
+    // Mock pool.lockOrBurn to succeed (validation happens after pool call when setting tokenReceiver in message)
+    Pool.LockOrBurnOutV1 memory poolReturnData =
+      Pool.LockOrBurnOutV1({destTokenAddress: abi.encode(destToken), destPoolData: abi.encode("poolData")});
+    vm.mockCall(pool, abi.encodeWithSelector(IPoolV1.lockOrBurn.selector), abi.encode(poolReturnData));
 
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = ExtraArgsCodec.GenericExtraArgsV3({
       ccvs: new address[](0),
@@ -348,17 +379,24 @@ contract OnRamp_addressEncodingCompatibility is OnRampSetup {
       tokenArgs: ""
     });
 
+    Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
+    tokenAmounts[0] = Client.EVMTokenAmount({token: token, amount: 1e18});
+
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
       receiver: abi.encode(makeAddr("receiver")),
       data: "",
-      tokenAmounts: new Client.EVMTokenAmount[](0),
+      tokenAmounts: tokenAmounts,
       feeToken: s_sourceFeeToken,
       extraArgs: ExtraArgsCodec._encodeGenericExtraArgsV3(extraArgs)
     });
 
+    uint256 fee = s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
+    deal(s_sourceFeeToken, address(s_onRamp), fee);
+    deal(token, address(s_onRamp), 1e18);
+
     vm.startPrank(address(s_sourceRouter));
     vm.expectRevert(abi.encodeWithSelector(OnRamp.InvalidDestChainAddress.selector, wrongLen));
-    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, STRANGER);
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, fee, STRANGER);
     vm.stopPrank();
   }
 

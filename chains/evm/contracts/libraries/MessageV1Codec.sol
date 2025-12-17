@@ -95,13 +95,13 @@ library MessageV1Codec {
   ///
   /// Variable length fields.
   ///
-  ///   uint8 onRampAddressLength;  Length of the onRamp Address in bytes.
-  ///   bytes onRampAddress;        Source Chain OnRamp as unpadded bytes.
-  ///   uint8 offRampAddressLength; Length of the offRamp Address in bytes.
+  ///   uint8 onRampAddressLength;  Length of the padded onRamp Address in bytes.
+  ///   bytes onRampAddress;        Source Chain OnRamp as padded bytes.
+  ///   uint8 offRampAddressLength; Length of the unpadded offRamp Address in bytes.
   ///   bytes offRampAddress;       Destination Chain OffRamp as unpadded bytes.
-  ///   uint8 senderLength;         Length of the Sender Address in bytes.
-  ///   bytes sender;               Sender address as unpadded bytes.
-  ///   uint8 receiverLength;       Length of the Receiver Address in bytes.
+  ///   uint8 senderLength;         Length of the padded Sender Address in bytes.
+  ///   bytes sender;               Sender address as padded bytes.
+  ///   uint8 receiverLength;       Length of the unpadded Receiver Address in bytes.
   ///   bytes receiver;             Receiver address on the destination chain as unpadded bytes.
   ///   uint16 destBlobLength;      Length of the Destination Blob in bytes.
   ///   bytes destBlob;             Destination chain-specific blob that contains data required for execution e.g.

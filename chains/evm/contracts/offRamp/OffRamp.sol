@@ -88,7 +88,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     IRouter router; // ────────────╮ Local router to use for messages coming from this source chain.
     uint64 sourceChainSelector; // │ Source chain selector of the config to update.
     bool isEnabled; // ────────────╯ Flag whether the source chain is enabled or not.
-    bytes[] onRamps; // OnRamp address on the source chain.
+    bytes[] onRamps; // OnRamp address on the source chain. For EVM source chains, these should be abi-encoded (32 bytes).
     address[] defaultCCV; // Default CCV to use for messages from this source chain.
     address[] laneMandatedCCVs; // Required CCV to use for all messages from this source chain.
   }
@@ -708,7 +708,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       sourceDenominatedAmount: sourceTokenAmount.amount,
       localToken: localToken,
       remoteChainSelector: sourceChainSelector,
-      // If the source pool is from an evm, the bytes are already abi encoded.
+      // The source chain has encoded this in the expected format.
       sourcePoolAddress: sourceTokenAmount.sourcePoolAddress,
       sourcePoolData: sourceTokenAmount.extraData,
       // All use cases that use offchain token data in IPoolV1 have to upgrade to the modular security interface.

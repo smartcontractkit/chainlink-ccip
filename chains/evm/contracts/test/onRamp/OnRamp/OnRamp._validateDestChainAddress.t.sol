@@ -110,10 +110,6 @@ contract OnRamp_validateDestChainAddress is OnRampSetup {
     assertEq(validated, expected);
   }
 
-  // ================================================================
-  // │                          Reverts                             │
-  // ================================================================
-
   function test_validateDestChainAddress_RevertWhen_NonZeroPadding() public {
     uint8 addressBytesLength = 20;
     bytes memory paddedAddress = new bytes(32);
