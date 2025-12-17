@@ -89,8 +89,8 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     uint64 sourceChainSelector; // │ Source chain selector of the config to update.
     bool isEnabled; // ────────────╯ Flag whether the source chain is enabled or not.
     bytes[] onRamps; // OnRamp address on the source chain. For EVM source chains, these should be abi-encoded (32 bytes).
-    address[] defaultCCV; // Default CCV to use for messages from this source chain.
-    address[] laneMandatedCCVs; // Required CCV to use for all messages from this source chain.
+    address[] defaultCCVs; // Default CCVs to use for messages from this source chain.
+    address[] laneMandatedCCVs; // Required CCVs to use for all messages from this source chain.
   }
 
   // STATIC CONFIG
@@ -227,7 +227,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   function _callWithGasBuffer(
     bytes memory payload
   ) internal returns (bool success, bytes memory retData) {
-    // allocate retData memory ahead of time
+    // allocate retData memory ahead of time.
     retData = new bytes(Internal.MAX_RET_BYTES);
     uint16 maxReturnBytes = Internal.MAX_RET_BYTES;
 
@@ -239,16 +239,16 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     uint256 gasLimit = gasLeft - MAX_GAS_BUFFER_TO_UPDATE_STATE;
 
     assembly {
-      // call and return whether we succeeded. ignore return data
-      // call(gas, addr, value, argsOffset, argsLength, retOffset, retLength)
+      // Call and return whether we succeeded.
+      // call(gas, addr, value, argsOffset, argsLength, retOffset, retLength).
       success := call(gasLimit, address(), 0, add(payload, 0x20), mload(payload), 0x0, 0x0)
 
-      // limit our copy to maxReturnBytes bytes
+      // Limit our copy to maxReturnBytes bytes.
       let toCopy := returndatasize()
       if gt(toCopy, maxReturnBytes) { toCopy := maxReturnBytes }
-      // Store the length of the copied bytes
+      // Store the length of the copied bytes.
       mstore(retData, toCopy)
-      // copy the bytes from retData[0:_toCopy]
+      // copy the bytes from retData[0:_toCopy].
       returndatacopy(add(retData, 0x20), 0x0, toCopy)
     }
     return (success, retData);
@@ -268,7 +268,8 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   ) external {
     if (msg.sender != address(this)) revert CanOnlySelfCall();
 
-    // We track the balance of the receiver prior to verification because a verifier may be responsible for releasing or minting the token.
+    // We track the balance of the receiver prior to verification because a verifier may be responsible for releasing or
+    // minting the token.
     uint256 balancePre = 0;
     if (message.tokenTransfer.length > 0) {
       if (message.tokenTransfer[0].destTokenAddress.length != 20) {
@@ -677,19 +678,19 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// token is unknown to the registry, the offRamp will revert. The tx, and the tokens, can be retrieved by registering
   /// the token on this chain, and re-trying the msg.
   /// @dev Returns the local pool address so that the registry doesn't have to be queried again by executeSingleMessage.
-  /// @param sourceTokenAmount Amount and source data of the token to be released/minted.
+  /// @param tokenTransfer Amount and source data of the token to be released/minted.
   /// @param originalSender The message sender on the source chain.
   /// @param sourceChainSelector The remote source chain selector
   /// @param blockConfirmationRequested Requested block confirmation.
   function _releaseOrMintSingleToken(
-    MessageV1Codec.TokenTransferV1 memory sourceTokenAmount,
+    MessageV1Codec.TokenTransferV1 memory tokenTransfer,
     bytes memory originalSender,
     uint64 sourceChainSelector,
     uint16 blockConfirmationRequested
   ) internal returns (Client.EVMTokenAmount memory destTokenAmount, address localPoolAddress) {
-    address receiver = address(bytes20(sourceTokenAmount.tokenReceiver));
+    address receiver = address(bytes20(tokenTransfer.tokenReceiver));
 
-    address localToken = address(bytes20(sourceTokenAmount.destTokenAddress));
+    address localToken = address(bytes20(tokenTransfer.destTokenAddress));
     // We check with the token admin registry if the token has a pool on this chain.
     localPoolAddress = ITokenAdminRegistry(i_tokenAdminRegistry).getPool(localToken);
     // This will call the supportsInterface through the ERC165Checker, and not directly on the pool address.
@@ -705,12 +706,12 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     Pool.ReleaseOrMintInV1 memory releaseOrMintInput = Pool.ReleaseOrMintInV1({
       originalSender: originalSender,
       receiver: receiver,
-      sourceDenominatedAmount: sourceTokenAmount.amount,
+      sourceDenominatedAmount: tokenTransfer.amount,
       localToken: localToken,
       remoteChainSelector: sourceChainSelector,
       // The source chain has encoded this in the expected format.
-      sourcePoolAddress: sourceTokenAmount.sourcePoolAddress,
-      sourcePoolData: sourceTokenAmount.extraData,
+      sourcePoolAddress: tokenTransfer.sourcePoolAddress,
+      sourcePoolData: tokenTransfer.extraData,
       // All use cases that use offchain token data in IPoolV1 have to upgrade to the modular security interface.
       offchainTokenData: ""
     });
@@ -781,6 +782,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   }
 
   /// @notice Returns all source chain configs.
+  /// @return sourceChainSelectors The supported source chain selectors.
   /// @return sourceChainConfigs The source chain configs corresponding to all the supported chain selectors.
   function getAllSourceChainConfigs() external view returns (uint64[] memory, SourceChainConfig[] memory) {
     SourceChainConfig[] memory sourceChainConfigs = new SourceChainConfig[](s_sourceChainSelectors.length());
@@ -803,12 +805,12 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       if (configUpdate.sourceChainSelector == 0) {
         revert ZeroChainSelectorNotAllowed();
       }
-      if (address(configUpdate.router) == address(0) || configUpdate.defaultCCV.length == 0) {
+      if (address(configUpdate.router) == address(0) || configUpdate.defaultCCVs.length == 0) {
         revert ZeroAddressNotAllowed();
       }
 
-      for (uint256 j = 0; j < configUpdate.defaultCCV.length; ++j) {
-        if (configUpdate.defaultCCV[j] == address(0)) {
+      for (uint256 j = 0; j < configUpdate.defaultCCVs.length; ++j) {
+        if (configUpdate.defaultCCVs[j] == address(0)) {
           revert ZeroAddressNotAllowed();
         }
       }
@@ -817,7 +819,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
           revert ZeroAddressNotAllowed();
         }
       }
-      CCVConfigValidation._validateDefaultAndMandatedCCVs(configUpdate.defaultCCV, configUpdate.laneMandatedCCVs);
+      CCVConfigValidation._validateDefaultAndMandatedCCVs(configUpdate.defaultCCVs, configUpdate.laneMandatedCCVs);
 
       SourceChainConfig storage currentConfig = s_sourceChainConfigs[configUpdate.sourceChainSelector];
       EnumerableSet.Bytes32Set storage allowedOnRampHashes = s_allowedOnRampHashes[configUpdate.sourceChainSelector];
@@ -839,7 +841,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       currentConfig.onRamps = configUpdate.onRamps;
       currentConfig.isEnabled = configUpdate.isEnabled;
       currentConfig.router = configUpdate.router;
-      currentConfig.defaultCCVs = configUpdate.defaultCCV;
+      currentConfig.defaultCCVs = configUpdate.defaultCCVs;
       currentConfig.laneMandatedCCVs = configUpdate.laneMandatedCCVs;
 
       // We don't need to check the return value, as inserting the item twice has no effect.

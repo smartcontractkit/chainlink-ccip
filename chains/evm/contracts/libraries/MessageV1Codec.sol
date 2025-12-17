@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.4;
 
-/// @notice Library for CCIP MessageV1 encoding/decoding operations.
+/// @notice Library for CCIP MessageV1 encoding/decoding operations. This format is fully chain agnostic and will be
+/// used for all supported chains. All chains will be able to `keccak(encodedMessageV1)` to get a message ID.
 /// @dev This library handles the complete V1 message format protocol including:
 /// - MessageV1 and TokenTransferV1 struct definitions.
 /// - Encoding/decoding functions with comprehensive error handling.
@@ -37,6 +38,7 @@ library MessageV1Codec {
   enum EncodingErrorLocation {
     // Message-level components.
     MESSAGE_MIN_SIZE,
+    MESSAGE_ONRAMP_ADDRESS_LENGTH,
     MESSAGE_ONRAMP_ADDRESS_CONTENT,
     MESSAGE_OFFRAMP_ADDRESS_LENGTH,
     MESSAGE_OFFRAMP_ADDRESS_CONTENT,
@@ -82,7 +84,7 @@ library MessageV1Codec {
     ENCODE_TOKEN_EXTRA_DATA_LENGTH
   }
 
-  /// @notice Message format used in the v1 protocol.
+  /// @notice Chain agnostic message format used in the v1 protocol.
   /// Static length fields.
   ///   uint8 version;              Version, for future use and backwards compatibility.
   ///   uint64 sourceChainSelector; Source Chain Selector.
@@ -430,7 +432,7 @@ library MessageV1Codec {
 
       // onRampAddressLength and onRampAddress.
       uint256 offset = 67;
-      if (offset >= encoded.length) revert InvalidDataLength(EncodingErrorLocation.MESSAGE_ONRAMP_ADDRESS_CONTENT);
+      if (offset >= encoded.length) revert InvalidDataLength(EncodingErrorLocation.MESSAGE_ONRAMP_ADDRESS_LENGTH);
       uint8 onRampAddressLength = uint8(encoded[offset++]);
       if (offset + onRampAddressLength > encoded.length) {
         revert InvalidDataLength(EncodingErrorLocation.MESSAGE_ONRAMP_ADDRESS_CONTENT);

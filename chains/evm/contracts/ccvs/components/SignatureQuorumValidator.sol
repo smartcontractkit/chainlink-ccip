@@ -11,8 +11,8 @@ contract SignatureQuorumValidator is Ownable2StepMsgSender {
   using EnumerableSet for EnumerableSet.Bytes32Set;
 
   /// @param sourceChainSelector The selector of the source chain.
-  /// @param signers List of valid signers of which only `threshold` are required to sign each report.
-  /// @param threshold The number of signatures required for a report to be valid.
+  /// @param signers List of valid signers of which only `threshold` are required to sign each hash.
+  /// @param threshold The number of signatures required for a hash to be valid.
   event SignatureConfigSet(uint64 indexed sourceChainSelector, address[] signers, uint8 threshold);
 
   error InvalidSignatureConfig();
@@ -25,8 +25,8 @@ contract SignatureQuorumValidator is Ownable2StepMsgSender {
 
   /// @dev Struct that contains the signer configuration
   struct SignerConfig {
-    EnumerableSet.AddressSet signers; // List of valid signers of which only `threshold` are required to sign each report.
-    uint8 threshold; // The number of signatures required for a report to be valid.
+    EnumerableSet.AddressSet signers; // List of valid signers of which only `threshold` are required to sign each hash.
+    uint8 threshold; // The number of signatures required for a hash to be valid.
   }
 
   struct SignatureConfig {
@@ -49,9 +49,9 @@ contract SignatureQuorumValidator is Ownable2StepMsgSender {
     i_chainID = block.chainid;
   }
 
-  /// @notice Validates the signatures of a given report hash. IMPORTANT: the signatures must be provided in order of
-  /// their signer addresses. This is required to efficiently check for duplicated signatures. If any signature is out
-  /// of order, this function will revert with `NonOrderedOrNonUniqueSignatures`.
+  /// @notice Validates the signatures of a given hash. IMPORTANT: the signatures must be provided in order of their
+  /// signer addresses. This is required to efficiently check for duplicated signatures. If any signature is out of
+  /// order, this function will revert with `NonOrderedOrNonUniqueSignatures`.
   /// @param sourceChainSelector The selector of the source chain.
   /// @param signedHash The hash that is signed.
   /// @param signatures The concatenated signatures to validate. Each signature is 64 bytes long, consisting of r
@@ -65,8 +65,8 @@ contract SignatureQuorumValidator is Ownable2StepMsgSender {
       revert SourceNotConfigured(sourceChainSelector);
     }
 
-    // If the cached chainID at time of deployment doesn't match the current chainID, we reject all signed reports.
-    // This avoids a (rare) scenario where chain A forks into chain A and A', and a report signed on A is replayed on A'.
+    // If the cached chainID at time of deployment doesn't match the current chainID, we reject all signed hashes.
+    // This avoids a (rare) scenario where chain A forks into chain A and A', and a hash signed on A is replayed on A'.
     if (i_chainID != block.chainid) revert ForkedChain(i_chainID, block.chainid);
 
     uint256 numberOfSignatures = signatures.length / SIGNATURE_LENGTH;

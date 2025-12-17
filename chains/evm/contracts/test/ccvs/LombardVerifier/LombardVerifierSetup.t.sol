@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {IRouter} from "../../../interfaces/IRouter.sol";
-import {IBridgeV2} from "../../../interfaces/lombard/IBridgeV2.sol";
+import {IBridgeV3} from "../../../interfaces/lombard/IBridgeV3.sol";
 
 import {LombardVerifier} from "../../../ccvs/LombardVerifier.sol";
 import {BaseVerifier} from "../../../ccvs/components/BaseVerifier.sol";
@@ -34,10 +34,11 @@ contract LombardVerifierSetup is BaseVerifierSetup {
     s_mockMailbox.setMessageId(abi.encodePacked(VERSION_TAG_V1_7_0, bytes32(0)));
 
     s_lombardVerifier =
-      new LombardVerifier(IBridgeV2(address(s_mockBridge)), s_storageLocations, address(s_mockRMNRemote));
+      new LombardVerifier(IBridgeV3(address(s_mockBridge)), s_storageLocations, address(s_mockRMNRemote));
 
     // Deploy test token and add it as a supported token.
     s_testToken = new BurnMintERC20("Test Token", "TEST", 18, 0, 0);
+    deal(address(s_testToken), address(s_lombardVerifier), TRANSFER_AMOUNT);
     LombardVerifier.SupportedTokenArgs[] memory tokensToAdd = new LombardVerifier.SupportedTokenArgs[](1);
     tokensToAdd[0] = LombardVerifier.SupportedTokenArgs({localToken: address(s_testToken), localAdapter: address(0)});
     s_lombardVerifier.updateSupportedTokens(new address[](0), tokensToAdd);

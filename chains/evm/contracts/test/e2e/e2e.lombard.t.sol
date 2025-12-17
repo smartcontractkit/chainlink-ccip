@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {IBridgeV3} from "../../interfaces/lombard/IBridgeV3.sol";
+
 import {Router} from "../../Router.sol";
 import {CommitteeVerifier} from "../../ccvs/CommitteeVerifier.sol";
 import {LombardVerifier} from "../../ccvs/LombardVerifier.sol";
 import {VersionedVerifierResolver} from "../../ccvs/VersionedVerifierResolver.sol";
 import {BaseVerifier} from "../../ccvs/components/BaseVerifier.sol";
-import {IBridgeV1} from "../../interfaces/lombard/IBridgeV1.sol";
-import {IBridgeV2} from "../../interfaces/lombard/IBridgeV2.sol";
 import {Client} from "../../libraries/Client.sol";
 import {Internal} from "../../libraries/Internal.sol";
 import {MessageV1Codec} from "../../libraries/MessageV1Codec.sol";
@@ -106,9 +106,9 @@ contract e2e_lombard is OnRampSetup {
     s_lombardBridge = new MockLombardBridge();
 
     s_sourceLombardVerifier =
-      new LombardVerifier(IBridgeV2(address(s_lombardBridge)), new string[](0), address(s_mockRMNRemote));
+      new LombardVerifier(IBridgeV3(address(s_lombardBridge)), new string[](0), address(s_mockRMNRemote));
     s_destLombardVerifier =
-      new LombardVerifier(IBridgeV2(address(s_lombardBridge)), new string[](0), address(s_mockRMNRemote));
+      new LombardVerifier(IBridgeV3(address(s_lombardBridge)), new string[](0), address(s_mockRMNRemote));
 
     s_sourceLombardVerifier.applyRemoteChainConfigUpdates(destChainConfigs);
     s_sourceLombardVerifier.setPath(
@@ -181,7 +181,7 @@ contract e2e_lombard is OnRampSetup {
     s_sourceLombardPool = new LombardTokenPool(
       IERC20Metadata(s_sourceFeeToken),
       s_lombardCCV,
-      IBridgeV1(address(s_lombardBridge)),
+      IBridgeV3(address(s_lombardBridge)),
       address(0),
       address(hooks),
       address(s_mockRMNRemote),
@@ -191,7 +191,7 @@ contract e2e_lombard is OnRampSetup {
     s_destLombardPool = new LombardTokenPool(
       IERC20Metadata(s_destFeeToken),
       s_lombardCCV,
-      IBridgeV1(address(s_lombardBridge)),
+      IBridgeV3(address(s_lombardBridge)),
       address(0),
       address(hooks),
       address(s_mockRMNRemote),
@@ -290,7 +290,7 @@ contract e2e_lombard is OnRampSetup {
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       isEnabled: true,
       onRamps: onRamps,
-      defaultCCV: defaultDestCCVs,
+      defaultCCVs: defaultDestCCVs,
       laneMandatedCCVs: new address[](0)
     });
     s_offRamp.applySourceChainConfigUpdates(sourceChainUpdates);
@@ -305,7 +305,7 @@ contract e2e_lombard is OnRampSetup {
     deal(s_sourceFeeToken, s_defaultExecutor, 1);
   }
 
-  function testE2eLombard() public {
+  function test_e2e_Lombard() public {
     vm.pauseGasMetering();
     uint64 expectedMsgNum = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).messageNumber + 1;
 
