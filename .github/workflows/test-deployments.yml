@@ -1,6 +1,7 @@
 name: "Test Deployments"
-permissions:
-  contents: read
+concurrency:
+  group: deployments-${{ github.ref }}
+  cancel-in-progress: true
 
 on:
   pull_request:
