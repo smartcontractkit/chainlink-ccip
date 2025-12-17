@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/Masterminds/semver/v3"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
@@ -16,10 +17,12 @@ import (
 type TokenExpansionInput struct {
 	// per-chain configuration for token expansion
 	TokenExpansionInputPerChain map[uint64]TokenExpansionInputPerChain `yaml:"token-expansion-input-per-chain" json:"tokenExpansionInputPerChain"`
+	ChainAdapterVersion         *semver.Version                        `yaml:"chain-adapter-version" json:"chainAdapterVersion"`
 	MCMS                        mcms.Input                             `yaml:"mcms,omitempty" json:"mcms,omitempty"`
 }
 
 type TokenExpansionInputPerChain struct {
+	TokenPoolVersion *semver.Version  `yaml:"token-pool-version" json:"tokenPoolVersion"`
 	DeployTokenInput DeployTokenInput `yaml:"deploy-token-input" json:"deployTokenInput"`
 	// only necessary if we want to specifically query for a token pool with a given type + qualifier
 	TokenPoolQualifier string `yaml:"token-pool-qualifier" json:"tokenPoolQualifier"`
@@ -112,7 +115,7 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 			if err != nil {
 				return cldf.ChangesetOutput{}, err
 			}
-			tokenPoolAdapter, exists := tokenPoolRegistry.GetTokenAdapter(family, &TokenAdminRegistryVersion)
+			tokenPoolAdapter, exists := tokenPoolRegistry.GetTokenAdapter(family, cfg.ChainAdapterVersion)
 			if !exists {
 				return cldf.ChangesetOutput{}, fmt.Errorf("no TokenPoolAdapter registered for chain family '%s'", family)
 			}

@@ -370,6 +370,83 @@ var UpsertRateLimitsBurnMint = operations.NewOperation(
 		return sequences.OnChainOutput{}, nil
 	})
 
+var TransferOwnership = operations.NewOperation(
+	"burnmint:transfer-ownership",
+	common_utils.Version_1_6_0,
+	"Transfers ownership of the BurnMintTokenPool token mint PDA to a new authority",
+	func(b operations.Bundle, chain cldf_solana.Chain, input TokenPoolTransferOwnershipInput) (sequences.OnChainOutput, error) {
+		burnmint_token_pool.SetProgramID(input.Program)
+		authority := GetAuthorityBurnMint(chain, input.Program, input.TokenMint)
+		if authority != input.CurrentOwner {
+			return sequences.OnChainOutput{}, fmt.Errorf("current owner %s does not match on-chain authority %s", input.CurrentOwner.String(), authority.String())
+		}
+		tokenPoolConfigPDA, _ := tokens.TokenPoolConfigAddress(input.TokenMint, input.Program)
+		ixn, err := burnmint_token_pool.NewTransferOwnershipInstruction(
+			input.NewOwner,
+			tokenPoolConfigPDA,
+			input.TokenMint,
+			authority,
+		).ValidateAndBuild()
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to build add dest chain instruction: %w", err)
+		}
+		if authority != chain.DeployerKey.PublicKey() {
+			batches, err := utils.BuildMCMSBatchOperation(
+				chain.Selector,
+				[]solana.Instruction{ixn},
+				input.Program.String(),
+				common_utils.BurnMintTokenPool.String(),
+			)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute or create batch: %w", err)
+			}
+			return sequences.OnChainOutput{BatchOps: []types.BatchOperation{batches}}, nil
+		}
+
+		err = chain.Confirm([]solana.Instruction{ixn})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm transfer ownership: %w", err)
+		}
+		return sequences.OnChainOutput{}, nil
+	},
+)
+
+var AcceptOwnership = operations.NewOperation(
+	"burnmint:accept-ownership",
+	common_utils.Version_1_6_0,
+	"Accepts ownership of the BurnMintTokenPool token mint PDA",
+	func(b operations.Bundle, chain cldf_solana.Chain, input TokenPoolTransferOwnershipInput) (sequences.OnChainOutput, error) {
+		burnmint_token_pool.SetProgramID(input.Program)
+		tokenPoolConfigPDA, _ := tokens.TokenPoolConfigAddress(input.TokenMint, input.Program)
+		ixn, err := burnmint_token_pool.NewAcceptOwnershipInstruction(
+			tokenPoolConfigPDA,
+			input.TokenMint,
+			input.NewOwner,
+		).ValidateAndBuild()
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to build add dest chain instruction: %w", err)
+		}
+		if input.NewOwner != chain.DeployerKey.PublicKey() {
+			batches, err := utils.BuildMCMSBatchOperation(
+				chain.Selector,
+				[]solana.Instruction{ixn},
+				input.Program.String(),
+				common_utils.BurnMintTokenPool.String(),
+			)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute or create batch: %w", err)
+			}
+			return sequences.OnChainOutput{BatchOps: []types.BatchOperation{batches}}, nil
+		}
+
+		err = chain.Confirm([]solana.Instruction{ixn})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm accept ownership: %w", err)
+		}
+		return sequences.OnChainOutput{}, nil
+	},
+)
+
 type Params struct {
 	TokenPool solana.PublicKey
 	TokenMint solana.PublicKey

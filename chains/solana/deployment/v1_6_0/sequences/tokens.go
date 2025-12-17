@@ -8,6 +8,7 @@ import (
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/router"
 	tokenpoolops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/token_pools"
 	tokensops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/tokens"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 	tokenapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
@@ -125,9 +126,12 @@ func (a *SolanaAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokenapi.De
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get RMN remote address: %w", err)
 			}
 
+			tokenMint := solana.MustPublicKeyFromBase58(tokenAddr.Address)
+			tokenPool := solana.MustPublicKeyFromBase58(tokenPoolAddr.Address)
+
 			deployOut, err := operations.ExecuteOperation(b, op, chains.SolanaChains()[chain.Selector], tokenpoolops.Params{
-				TokenPool:      solana.MustPublicKeyFromBase58(tokenPoolAddr.Address),
-				TokenMint:      solana.MustPublicKeyFromBase58(tokenAddr.Address),
+				TokenPool:      tokenPool,
+				TokenMint:      tokenMint,
 				TokenProgramID: tokenProgramId,
 				Router:         solana.PublicKeyFromBytes(routerAddr),
 				RMNRemote:      solana.PublicKeyFromBytes(rmnRemoteAddr),
@@ -137,6 +141,60 @@ func (a *SolanaAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokenapi.De
 			}
 			result.Addresses = append(result.Addresses, deployOut.Output.Addresses...)
 			result.BatchOps = append(result.BatchOps, deployOut.Output.BatchOps...)
+
+			poolSigner, _ := tokens.TokenPoolSignerAddress(tokenMint, tokenPool)
+
+			// ata for token pool
+			tokenPoolATA, _, err := tokens.FindAssociatedTokenAddress(tokenProgramId, tokenMint, poolSigner)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to find associated token address for token pool: %w", err)
+			}
+
+			// Check if the ATA is already initialized
+			_, err = chain.Client.GetAccountInfo(b.GetContext(), tokenPoolATA)
+			if err != nil { // it means that the ATA does not exist
+				ixn, _, err := tokens.CreateAssociatedTokenAccount(
+					tokenProgramId,
+					tokenMint,
+					poolSigner,
+					chain.DeployerKey.PublicKey(),
+				)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to create the instruction to create associated token account for tokenpool (mint: %s, pool: %s): %w", tokenMint.String(), tokenPool.String(), err)
+				}
+				if err := chain.Confirm([]solana.Instruction{ixn}); err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to create associated token account for tokenpool (mint: %s, pool: %s): %w", tokenMint.String(), tokenPool.String(), err)
+				}
+			}
+
+			mintAuthority := utils.GetTokenMintAuthority(chain, tokenMint)
+			// make pool mint_authority for token, if necessary
+			if input.PoolType == common_utils.BurnMintTokenPool.String() && tokenMint != solana.SolMint {
+				if mintAuthority.String() == chain.DeployerKey.PublicKey().String() {
+					ixn, err := tokens.SetTokenMintAuthority(
+						tokenProgramId,
+						poolSigner,
+						tokenMint,
+						chain.DeployerKey.PublicKey(),
+					)
+					if err != nil {
+						return sequences.OnChainOutput{}, fmt.Errorf("failed to generate instructions: %w", err)
+					}
+					if err := chain.Confirm([]solana.Instruction{ixn}); err != nil {
+						return sequences.OnChainOutput{}, fmt.Errorf("failed to set mint authority: %w", err)
+					}
+					b.Logger.Infow("Setting mint authority", "poolSigner", poolSigner.String())
+				} else {
+					b.Logger.Warnw("Token's mint authority is not with deployer key, skipping setting poolSigner as mint authority",
+						"poolType", input.PoolType, "mintAuthority", tokenMint,
+						"deployer", chain.DeployerKey.PublicKey().String(), "poolSigner", poolSigner.String())
+				}
+			} else {
+				b.Logger.Warnw("PoolType is not a BurnMintTokenPool, skipping setting poolSigner as mint authority",
+					"poolType", input.PoolType, "mintAuthority", tokenMint,
+					"deployer", chain.DeployerKey.PublicKey().String(), "poolSigner", poolSigner.String())
+			}
+
 			return result, nil
 		},
 	)
@@ -245,6 +303,7 @@ func (a *SolanaAdapter) SetPool() *cldf_ops.Sequence[tokenapi.SetPoolInput, sequ
 				TokenMint:      solana.MustPublicKeyFromBase58(tokenAddr.Address),
 				TokenPool:      solana.MustPublicKeyFromBase58(tokenPoolAddr.Address),
 				TokenProgramID: tokenProgramId,
+				TokenPoolType:  input.PoolType,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to set token pool: %w", err)
@@ -255,6 +314,7 @@ func (a *SolanaAdapter) SetPool() *cldf_ops.Sequence[tokenapi.SetPoolInput, sequ
 		},
 	)
 }
+
 func (a *SolanaAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokenapi.UpdateAuthoritiesInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return nil
 }

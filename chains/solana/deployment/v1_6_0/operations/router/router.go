@@ -313,9 +313,13 @@ var SetPool = operations.NewOperation(
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to create lookup table: %w", err)
 			}
+			// link the token + token pool lookup table + token mint
+			labels := datastore.NewLabelSet(input.TokenPool.String())
+			labels.Add(input.TokenPoolType)
 			addresses = append(addresses, datastore.AddressRef{
 				Address:       table.String(),
 				ChainSelector: chain.Selector,
+				Labels:        labels,
 				Type:          datastore.ContractType(TokenPoolLookupTableType),
 				Version:       Version,
 				Qualifier:     input.TokenMint.String(),
@@ -695,6 +699,7 @@ type PoolParams struct {
 	TokenProgramID       solana.PublicKey
 	TokenPool            solana.PublicKey
 	TokenPoolLookupTable solana.PublicKey
+	TokenPoolType        string
 }
 
 type TokenAdminRegistryParams struct {
