@@ -54,7 +54,7 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   /// @notice The arguments required to update a remote domain.
   struct SetDomainArgs {
     bytes32 allowedCallerOnDest; // Address allowed to call receiveMessage on the domain (i.e. the MessageTransmitterProxy).
-    bytes32 allowedCallerOnSource; // Address allowed to call depositForBurn on the domain (i.e. the TokenMessengerProxy).
+    bytes32 allowedCallerOnSource; // Address allowed to call depositForBurn on the domain.
     bytes32 mintRecipientOnDest; // Address to mint USDC to on the destination chain.
     uint64 chainSelector; // The corresponding CCIP destination chain selector for the domain.
     uint32 domainIdentifier; // Unique domain ID used across CCTP.
@@ -72,7 +72,7 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   /// @dev Zero is a valid domain identifier.
   struct Domain {
     bytes32 allowedCallerOnDest; // Address allowed to call receiveMessage on the domain (i.e. the MessageTransmitterProxy).
-    bytes32 allowedCallerOnSource; // Address allowed to call depositForBurn on the domain (i.e. the TokenMessengerProxy).
+    bytes32 allowedCallerOnSource; // Address allowed to call depositForBurn on the domain.
     bytes32 mintRecipientOnDest; // Address to mint USDC to on the destination chain.
     uint32 domainIdentifier; // ─╮ Unique domain ID used across CCTP.
     bool enabled; // ────────────╯ Whether or not the domain is enabled.
@@ -150,7 +150,7 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   CCTPMessageTransmitterProxy private immutable i_messageTransmitterProxy;
   /// @notice The token messenger, which is used on source to send USDC over CCTP.
   /// @dev The token messenger calls into the message transmitter after burning USDC and forming the app-specific message body.
-  ITokenMessenger private immutable i_tokenMessenger; // TODO: Update to TokenMessengerProxy when available.
+  ITokenMessenger private immutable i_tokenMessenger;
   /// @notice The local domain identifier, i.e. a CCTP-specific identifier for the chain to which this contract is deployed.
   uint32 private immutable i_localDomainIdentifier;
 

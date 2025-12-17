@@ -112,6 +112,8 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
     address requiredCCV = makeAddr("requiredCCV");
 
     message.receiver = abi.encodePacked(receiver);
+    // Make this NOT a token-only transfer so receiver CCVs are queried.
+    message.ccipReceiveGasLimit = 100_000;
 
     // Set up receiver to require a specific CCV.
     _setGetCCVsReturnData(receiver, SOURCE_CHAIN_SELECTOR, _arrayOf(requiredCCV), new address[](0), 0);
@@ -211,6 +213,9 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
   function test_executeSingleMessage_RevertWhen_OptionalCCVQuorumNotReached() public {
     MessageV1Codec.MessageV1 memory message = _getMessage();
     address receiver = address(bytes20(message.receiver));
+
+    // Make this NOT a token-only transfer so receiver CCVs are queried.
+    message.ccipReceiveGasLimit = 100_000;
 
     address optionalCCV2 = makeAddr("optionalCCV2");
     address[] memory optionalCCVs = new address[](2);

@@ -167,7 +167,9 @@ contract OffRamp_execute is OffRampSetup {
 
     // Update report to use malicious CCV.
     MessageV1Codec.MessageV1 memory message = _getMessage();
-    (bytes memory encodedMessage,,) = _getReportComponents(message);
+    // Make this NOT a token-only transfer so receiver CCVs are queried.
+    message.ccipReceiveGasLimit = 100_000;
+    bytes memory encodedMessage = MessageV1Codec._encodeMessageV1(message);
 
     address[] memory ccvs = new address[](2);
     ccvs[0] = address(maliciousCCV);

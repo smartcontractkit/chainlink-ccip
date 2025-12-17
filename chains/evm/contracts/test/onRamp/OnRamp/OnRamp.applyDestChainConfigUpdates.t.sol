@@ -22,6 +22,7 @@ contract OnRamp_applyDestChainConfigUpdates is OnRampSetup {
       router: router,
       addressBytesLength: EVM_ADDRESS_LENGTH,
       networkFeeUSDCents: NETWORK_FEE_USD_CENTS,
+      tokenReceiverAllowed: false,
       baseExecutionGasCost: BASE_EXEC_GAS_COST,
       defaultCCVs: defaultCCVs,
       laneMandatedCCVs: laneMandated,
@@ -30,15 +31,7 @@ contract OnRamp_applyDestChainConfigUpdates is OnRampSetup {
     });
 
     vm.expectEmit();
-    emit OnRamp.DestChainConfigSet(
-      NEW_DEST_SELECTOR,
-      0,
-      IRouter(router),
-      defaultCCVs,
-      laneMandated,
-      defaultExecutor,
-      abi.encodePacked(address(s_offRampOnRemoteChain))
-    );
+    emit OnRamp.DestChainConfigSet(NEW_DEST_SELECTOR, 0, args[0]);
     s_onRamp.applyDestChainConfigUpdates(args);
 
     OnRamp.DestChainConfig memory cfg = s_onRamp.getDestChainConfig(NEW_DEST_SELECTOR);
@@ -62,6 +55,7 @@ contract OnRamp_applyDestChainConfigUpdates is OnRampSetup {
       router: s_sourceRouter,
       addressBytesLength: NON_EVM_ADDRESS_LENGTH,
       networkFeeUSDCents: NETWORK_FEE_USD_CENTS,
+      tokenReceiverAllowed: false,
       baseExecutionGasCost: BASE_EXEC_GAS_COST,
       defaultCCVs: defaultCCVs,
       laneMandatedCCVs: new address[](0),
@@ -83,6 +77,7 @@ contract OnRamp_applyDestChainConfigUpdates is OnRampSetup {
       router: IRouter(address(0)),
       addressBytesLength: EVM_ADDRESS_LENGTH,
       networkFeeUSDCents: NETWORK_FEE_USD_CENTS,
+      tokenReceiverAllowed: false,
       baseExecutionGasCost: BASE_EXEC_GAS_COST,
       defaultCCVs: defaultCCVs,
       laneMandatedCCVs: new address[](0),
@@ -106,6 +101,7 @@ contract OnRamp_applyDestChainConfigUpdates is OnRampSetup {
       router: s_sourceRouter,
       addressBytesLength: 0,
       networkFeeUSDCents: NETWORK_FEE_USD_CENTS,
+      tokenReceiverAllowed: false,
       baseExecutionGasCost: BASE_EXEC_GAS_COST,
       defaultCCVs: defaultCCVs,
       laneMandatedCCVs: new address[](0),
@@ -126,6 +122,7 @@ contract OnRamp_applyDestChainConfigUpdates is OnRampSetup {
       router: s_sourceRouter,
       addressBytesLength: EVM_ADDRESS_LENGTH,
       networkFeeUSDCents: NETWORK_FEE_USD_CENTS,
+      tokenReceiverAllowed: false,
       baseExecutionGasCost: BASE_EXEC_GAS_COST,
       defaultCCVs: defaultCCVs,
       laneMandatedCCVs: new address[](0),
@@ -146,6 +143,7 @@ contract OnRamp_applyDestChainConfigUpdates is OnRampSetup {
       router: s_sourceRouter,
       addressBytesLength: EVM_ADDRESS_LENGTH,
       networkFeeUSDCents: NETWORK_FEE_USD_CENTS,
+      tokenReceiverAllowed: false,
       baseExecutionGasCost: BASE_EXEC_GAS_COST,
       defaultCCVs: defaultCCVs,
       laneMandatedCCVs: new address[](0),
@@ -167,6 +165,7 @@ contract OnRamp_applyDestChainConfigUpdates is OnRampSetup {
       router: s_sourceRouter,
       addressBytesLength: EVM_ADDRESS_LENGTH,
       networkFeeUSDCents: NETWORK_FEE_USD_CENTS,
+      tokenReceiverAllowed: false,
       baseExecutionGasCost: BASE_EXEC_GAS_COST,
       defaultCCVs: defaultCCVs,
       laneMandatedCCVs: new address[](0),
@@ -187,6 +186,7 @@ contract OnRamp_applyDestChainConfigUpdates is OnRampSetup {
       router: s_sourceRouter,
       addressBytesLength: EVM_ADDRESS_LENGTH,
       networkFeeUSDCents: NETWORK_FEE_USD_CENTS,
+      tokenReceiverAllowed: false,
       baseExecutionGasCost: 0,
       defaultCCVs: defaultCCVs,
       laneMandatedCCVs: new address[](0),
