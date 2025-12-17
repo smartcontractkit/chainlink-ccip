@@ -24,39 +24,15 @@ func makeFirstPassInput(chainSel uint64, remoteChainSel uint64, tokenPoolAddress
 		AdvancedPoolHooks:   advancedPoolHooksAddress,
 		RemoteChainSelector: remoteChainSel,
 		RemoteChainConfig: tokens_core.RemoteChainConfig[[]byte, string]{
-			RemoteToken: common.LeftPadBytes(common.FromHex("0x123"), 32),
-			RemotePool:  common.LeftPadBytes(common.FromHex("0x456"), 32),
-			DefaultFinalityInboundRateLimiterConfig: tokens_core.RateLimiterConfig{
-				IsEnabled: true,
-				Capacity:  big.NewInt(2000),
-				Rate:      big.NewInt(200),
-			},
-			DefaultFinalityOutboundRateLimiterConfig: tokens_core.RateLimiterConfig{
-				IsEnabled: true,
-				Capacity:  big.NewInt(1000),
-				Rate:      big.NewInt(100),
-			},
-			CustomFinalityInboundRateLimiterConfig: tokens_core.RateLimiterConfig{
-				IsEnabled: true,
-				Capacity:  big.NewInt(3000),
-				Rate:      big.NewInt(300),
-			},
-			CustomFinalityOutboundRateLimiterConfig: tokens_core.RateLimiterConfig{
-				IsEnabled: true,
-				Capacity:  big.NewInt(2000),
-				Rate:      big.NewInt(200),
-			},
-			OutboundCCVs: []string{"0x789"},
-			InboundCCVs:  []string{"0xabc"},
-			TokenTransferFeeConfig: tokens_core.TokenTransferFeeConfig{
-				IsEnabled:                     true,
-				DestGasOverhead:               100,
-				DestBytesOverhead:             100,
-				DefaultFinalityFeeUSDCents:    100,
-				CustomFinalityFeeUSDCents:     100,
-				DefaultFinalityTransferFeeBps: 100,
-				CustomFinalityTransferFeeBps:  100,
-			},
+			RemoteToken:                              common.LeftPadBytes(common.FromHex("0x123"), 32),
+			RemotePool:                               common.LeftPadBytes(common.FromHex("0x456"), 32),
+			DefaultFinalityInboundRateLimiterConfig:  testsetup.CreateRateLimiterConfig(200, 2000),
+			DefaultFinalityOutboundRateLimiterConfig: testsetup.CreateRateLimiterConfig(100, 1000),
+			CustomFinalityInboundRateLimiterConfig:   testsetup.CreateRateLimiterConfig(300, 3000),
+			CustomFinalityOutboundRateLimiterConfig:  testsetup.CreateRateLimiterConfig(200, 2000),
+			OutboundCCVs:                             []string{"0x789"},
+			InboundCCVs:                              []string{"0xabc"},
+			TokenTransferFeeConfig:                   testsetup.CreateBasicTokenTransferFeeConfig(),
 		},
 	}
 }

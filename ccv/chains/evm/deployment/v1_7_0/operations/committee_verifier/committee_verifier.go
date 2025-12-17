@@ -1,6 +1,8 @@
 package committee_verifier
 
 import (
+	"fmt"
+
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -161,5 +163,24 @@ var GetVersionTag = contract.NewRead(contract.ReadParams[any, [4]byte, *committe
 	NewContract:  committee_verifier.NewCommitteeVerifier,
 	CallContract: func(committeeVerifier *committee_verifier.CommitteeVerifier, opts *bind.CallOpts, args any) ([4]byte, error) {
 		return committeeVerifier.VersionTag(opts)
+	},
+})
+
+var GetSignatureConfig = contract.NewRead(contract.ReadParams[uint64, SignatureConfig, *committee_verifier.CommitteeVerifier]{
+	Name:         "committee-verifier:get-signature-config",
+	Version:      semver.MustParse("1.7.0"),
+	Description:  "Gets the signature configuration for a given source chain selector",
+	ContractType: ContractType,
+	NewContract:  committee_verifier.NewCommitteeVerifier,
+	CallContract: func(committeeVerifier *committee_verifier.CommitteeVerifier, opts *bind.CallOpts, args uint64) (SignatureConfig, error) {
+		signers, threshold, err := committeeVerifier.GetSignatureConfig(opts, args)
+		if err != nil {
+			return SignatureConfig{}, fmt.Errorf("failed to get signature configuration for source chain selector %d: %w", args, err)
+		}
+		return SignatureConfig{
+			Signers:             signers,
+			Threshold:           threshold,
+			SourceChainSelector: args,
+		}, nil
 	},
 })

@@ -77,7 +77,7 @@ var DeployTokenAndPool = cldf_ops.NewSequence(
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy burn mint token pool to %s: %w", chain, err)
 			}
 			addresses = append(addresses, deployTokenPoolReport.Output.Addresses...)
-		/* TODO: Enable when the lockbox is finalized
+		/* TODO @kylesmartin: Enable when the lockbox is finalized
 		case lock_release_token_pool.IsSupported(deployment.ContractType(input.DeployTokenPoolInput.TokenPoolType), input.DeployTokenPoolInput.TokenPoolVersion):
 			deployTokenPoolReport, err := cldf_ops.ExecuteSequence(b, DeployLockReleaseTokenPool, chain, input.DeployTokenPoolInput)
 			if err != nil {
