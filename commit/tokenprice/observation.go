@@ -38,18 +38,18 @@ func (p *processor) Observation(
 	)
 
 	operations := asynclib.AsyncNoErrOperationsMap{
-		"observeFeedTokenPrices": func(ctx context.Context, l logger.Logger) {
+		opObserveFeedTokenPrices: func(ctx context.Context, l logger.Logger) {
 			feedTokenPrices = p.obs.observeFeedTokenPrices(ctx, l)
 		},
-		"observeFeeQuoterTokenUpdates": func(ctx context.Context, l logger.Logger) {
+		opObserveFeeQuoterTokenUpdates: func(ctx context.Context, l logger.Logger) {
 			feeQuoterUpdates = p.obs.observeFeeQuoterTokenUpdates(ctx, l)
 		},
-		"observeFChain": func(_ context.Context, l logger.Logger) {
+		opObserveFChain: func(_ context.Context, l logger.Logger) {
 			fChain = p.observeFChain(l)
 		},
 	}
 
-	asynclib.WaitForAllNoErrOperations(ctx, p.offChainCfg.TokenPriceAsyncObserverSyncTimeout.Duration(), operations, lggr)
+	p.runner.Run(ctx, p.offChainCfg.TokenPriceAsyncObserverSyncTimeout.Duration(), operations, lggr)
 	now := time.Now().UTC()
 
 	lggr.Infow(

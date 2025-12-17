@@ -46,21 +46,21 @@ func (p *processor) Observation(
 	)
 
 	operations := asynclib.AsyncNoErrOperationsMap{
-		"getChainsFeeComponents": func(ctx context.Context, l logger.Logger) {
+		opGetChainsFeeComponents: func(ctx context.Context, l logger.Logger) {
 			feeComponents = p.obs.getChainsFeeComponents(ctx, l)
 		},
-		"getNativeTokenPrices": func(ctx context.Context, l logger.Logger) {
+		opGetNativeTokenPrices: func(ctx context.Context, l logger.Logger) {
 			nativeTokenPrices = p.obs.getNativeTokenPrices(ctx, l)
 		},
-		"getChainFeePriceUpdates": func(ctx context.Context, l logger.Logger) {
+		opGetChainFeePriceUpdates: func(ctx context.Context, l logger.Logger) {
 			chainFeeUpdates = p.obs.getChainFeePriceUpdates(ctx, l)
 		},
-		"observeFChain": func(_ context.Context, l logger.Logger) {
+		opObserveFChain: func(_ context.Context, l logger.Logger) {
 			fChain = p.observeFChain(l)
 		},
 	}
 
-	asynclib.WaitForAllNoErrOperations(ctx, p.cfg.ChainFeeAsyncObserverSyncTimeout, operations, lggr)
+	p.runner.Run(ctx, p.cfg.ChainFeeAsyncObserverSyncTimeout, operations, lggr)
 	now := time.Now().UTC()
 
 	chainsWithNativeTokenPrices := mapset.NewSet(slices.Collect(maps.Keys(feeComponents))...).

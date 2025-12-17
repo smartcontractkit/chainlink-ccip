@@ -9,12 +9,32 @@ import (
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/asynclib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	pkgreader "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
+)
+
+const (
+	opObserveFeedTokenPrices       = "observeFeedTokenPrices"
+	opObserveFeeQuoterTokenUpdates = "observeFeeQuoterTokenUpdates"
+	opObserveFChain                = "observeFChain"
+
+	// pool sizes are set to 1 to avoid blocking the runner if one operation blocks forever.
+	poolSizeObserveFeedTokenPrices       = 1
+	poolSizeObserveFeeQuoterTokenUpdates = 1
+	poolSizeObserveFChain                = 1
+)
+
+var (
+	poolSizePerOp = map[string]int{
+		opObserveFeedTokenPrices:       poolSizeObserveFeedTokenPrices,
+		opObserveFeeQuoterTokenUpdates: poolSizeObserveFeeQuoterTokenUpdates,
+		opObserveFChain:                poolSizeObserveFChain,
+	}
 )
 
 type processor struct {
@@ -29,6 +49,11 @@ type processor struct {
 	metricsReporter  plugincommon.MetricsReporter
 	fRoleDON         int
 	obs              observer
+
+	// the same runner is used for operations across rounds just in case
+	// we run into a situation where a particular operation blocks forever
+	// and we keep enqueuing it, which could cause a goroutine leak.
+	runner *asynclib.AsyncOpsRunner
 }
 
 func NewProcessor(
@@ -60,6 +85,13 @@ func NewProcessor(
 	} else {
 		obs = baseObs
 	}
+
+	runner, err := asynclib.NewAsyncOpsRunner(poolSizePerOp)
+	if err != nil {
+		lggr.Errorw("failed to create async ops runner", "err", err)
+		return nil
+	}
+
 	p := &processor{
 		oracleID:         oracleID,
 		lggr:             lggr,
@@ -71,6 +103,7 @@ func NewProcessor(
 		fRoleDON:         fRoleDON,
 		metricsReporter:  metricsReporter,
 		obs:              obs,
+		runner:           runner,
 	}
 	return plugincommon.NewTrackedProcessor(lggr, p, processorsLabel, metricsReporter)
 }
