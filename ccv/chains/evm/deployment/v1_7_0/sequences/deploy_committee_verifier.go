@@ -9,13 +9,11 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/proxy"
 	proxy_latest "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/proxy"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 )
@@ -42,16 +40,16 @@ var DeployCommitteeVerifier = cldf_ops.NewSequence(
 	"deploy-committee-verifier",
 	semver.MustParse("1.7.0"),
 	"Deploys the CommitteeVerifier contract",
-	func(b operations.Bundle, chain evm.Chain, input DeployCommitteeVerifierInput) (output sequences.OnChainOutput, err error) {
+	func(b cldf_ops.Bundle, chain evm.Chain, input DeployCommitteeVerifierInput) (output sequences.OnChainOutput, err error) {
 		addresses := make([]datastore.AddressRef, 0)
-		writes := make([]contract.WriteOutput, 0)
+		writes := make([]contract_utils.WriteOutput, 0)
 
 		// Deploy CommitteeVerifier
 		var qualifierPtr *string
 		if input.Params.Qualifier != "" {
 			qualifierPtr = &input.Params.Qualifier
 		}
-		committeeVerifierRef, err := contract_utils.MaybeDeployContract(b, committee_verifier.Deploy, chain, contract.DeployInput[committee_verifier.ConstructorArgs]{
+		committeeVerifierRef, err := contract_utils.MaybeDeployContract(b, committee_verifier.Deploy, chain, contract_utils.DeployInput[committee_verifier.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(committee_verifier.ContractType, *input.Params.Version),
 			ChainSelector:  chain.Selector,
 			Args: committee_verifier.ConstructorArgs{
@@ -70,7 +68,7 @@ var DeployCommitteeVerifier = cldf_ops.NewSequence(
 		addresses = append(addresses, committeeVerifierRef)
 
 		// Deploy CommitteeVerifierResolver
-		committeeVerifierResolverRef, err := contract_utils.MaybeDeployContract(b, committee_verifier.DeployResolver, chain, contract.DeployInput[committee_verifier.ResolverConstructorArgs]{
+		committeeVerifierResolverRef, err := contract_utils.MaybeDeployContract(b, committee_verifier.DeployResolver, chain, contract_utils.DeployInput[committee_verifier.ResolverConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(committee_verifier.ResolverType, *semver.MustParse("1.7.0")),
 			ChainSelector:  chain.Selector,
 			Args:           committee_verifier.ResolverConstructorArgs{},
@@ -106,7 +104,7 @@ var DeployCommitteeVerifier = cldf_ops.NewSequence(
 			}
 		} else {
 			// Otherwise, just deploy the CommitteeVerifierResolverProxy
-			committeeVerifierResolverProxyRef, err := contract_utils.MaybeDeployContract(b, committee_verifier.DeployResolverProxy, chain, contract.DeployInput[committee_verifier.ResolverProxyConstructorArgs]{
+			committeeVerifierResolverProxyRef, err := contract_utils.MaybeDeployContract(b, committee_verifier.DeployResolverProxy, chain, contract_utils.DeployInput[committee_verifier.ResolverProxyConstructorArgs]{
 				TypeAndVersion: deployment.NewTypeAndVersion(committee_verifier.ResolverProxyType, *semver.MustParse("1.7.0")),
 				ChainSelector:  chain.Selector,
 				Args: committee_verifier.ResolverProxyConstructorArgs{
@@ -120,7 +118,7 @@ var DeployCommitteeVerifier = cldf_ops.NewSequence(
 			addresses = append(addresses, committeeVerifierResolverProxyRef)
 		}
 
-		batchOp, err := contract.NewBatchOperationFromWrites(writes)
+		batchOp, err := contract_utils.NewBatchOperationFromWrites(writes)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
 		}
@@ -135,17 +133,17 @@ var DeployCommitteeVerifier = cldf_ops.NewSequence(
 // to ensure deterministic addresses. It computes the expected address, deploys and transfers
 // ownership to the deployer key, then accepts ownership.
 func deployResolverProxyViaCREATE2(
-	b operations.Bundle,
+	b cldf_ops.Bundle,
 	chain evm.Chain,
 	input DeployCommitteeVerifierInput,
 	committeeVerifierResolverRef datastore.AddressRef,
-) ([]datastore.AddressRef, []contract.WriteOutput, error) {
+) ([]datastore.AddressRef, []contract_utils.WriteOutput, error) {
 	addresses := make([]datastore.AddressRef, 0)
-	writes := make([]contract.WriteOutput, 0)
+	writes := make([]contract_utils.WriteOutput, 0)
 
 	// Deploy CommitteeVerifierResolverProxy via CREATE2Factory to ensure deterministic addresses.
 	// Fetch and save the expected address of the CommitteeVerifierResolverProxy.
-	expectedAddressReport, err := cldf_ops.ExecuteOperation(b, create2_factory.ComputeAddress, chain, contract.FunctionInput[create2_factory.ComputeAddressArgs]{
+	expectedAddressReport, err := cldf_ops.ExecuteOperation(b, create2_factory.ComputeAddress, chain, contract_utils.FunctionInput[create2_factory.ComputeAddressArgs]{
 		Address:       input.CREATE2Factory,
 		ChainSelector: chain.Selector,
 		Args: create2_factory.ComputeAddressArgs{
@@ -166,7 +164,7 @@ func deployResolverProxyViaCREATE2(
 		Version:       semver.MustParse("1.7.0"),
 	})
 	// Then, actually deploy and transfer ownership of the CommitteeVerifierResolverProxy to the deployer key.
-	deployAndTransferResolverProxyReport, err := cldf_ops.ExecuteOperation(b, create2_factory.CreateAndTransferOwnership, chain, contract.FunctionInput[create2_factory.CreateAndTransferOwnershipArgs]{
+	deployAndTransferResolverProxyReport, err := cldf_ops.ExecuteOperation(b, create2_factory.CreateAndTransferOwnership, chain, contract_utils.FunctionInput[create2_factory.CreateAndTransferOwnershipArgs]{
 		ChainSelector: chain.Selector,
 		Address:       input.CREATE2Factory,
 		Args: create2_factory.CreateAndTransferOwnershipArgs{
@@ -184,7 +182,7 @@ func deployResolverProxyViaCREATE2(
 	}
 	writes = append(writes, deployAndTransferResolverProxyReport.Output)
 	// Finally, accept ownership of the CommitteeVerifierResolverProxy
-	acceptOwnershipReport, err := cldf_ops.ExecuteOperation(b, proxy.AcceptOwnership, chain, contract.FunctionInput[proxy.AcceptOwnershipArgs]{
+	acceptOwnershipReport, err := cldf_ops.ExecuteOperation(b, proxy.AcceptOwnership, chain, contract_utils.FunctionInput[proxy.AcceptOwnershipArgs]{
 		ChainSelector: chain.Selector,
 		Address:       common.HexToAddress(expectedAddressReport.Output.Hex()),
 		Args: proxy.AcceptOwnershipArgs{

@@ -14,7 +14,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
-	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 )
@@ -23,7 +22,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 	"configure-chain-for-lanes",
 	semver.MustParse("1.7.0"),
 	"Configures an EVM chain as a source & destination for multiple remote chains",
-	func(b operations.Bundle, chains cldf_chain.BlockChains, input adapters.ConfigureChainForLanesInput) (output sequences.OnChainOutput, err error) {
+	func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input adapters.ConfigureChainForLanesInput) (output sequences.OnChainOutput, err error) {
 		writes := make([]contract.WriteOutput, 0)
 		chain, ok := chains.EVMChains()[input.ChainSelector]
 		if !ok {
