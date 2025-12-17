@@ -14,7 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 )
 
-type AsyncNoErrOperationsMap map[string]func(ctx context.Context, l logger.Logger)
+type AsyncNoErrOperationsMap map[string]func(ctx context.Context, l logger.Logger) any
 
 // WaitForAllNoErrOperations spawns goroutines for each operation in the map and waits for
 // all of them to finish. It creates a child context with a timeout to ensure that the operations
@@ -24,7 +24,7 @@ func WaitForAllNoErrOperations(
 	timeout time.Duration,
 	operations AsyncNoErrOperationsMap,
 	lggr logger.Logger,
-) {
+) map[string]any {
 	callCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
@@ -32,17 +32,23 @@ func WaitForAllNoErrOperations(
 
 	var wg sync.WaitGroup
 	wg.Add(len(operations))
+	var mu sync.Mutex
+	results := make(map[string]any)
 
 	for opName, op := range operations {
-		go func(opName string, op func(context.Context, logger.Logger)) {
+		go func(opName string, op func(context.Context, logger.Logger) any) {
 			defer wg.Done()
 			tStart := time.Now()
-			op(callCtx, logger.With(lggr, "opID", opName))
+			res := op(callCtx, logger.With(lggr, "opID", opName))
+			mu.Lock()
+			results[opName] = res
+			mu.Unlock()
 			lggr.Debugw("observing goroutine finished", "opID", opName, "duration", time.Since(tStart))
 		}(opName, op)
 	}
 
 	wg.Wait()
+	return results
 }
 
 // AsyncOpsRunner is a runner that runs operations asynchronously in a pool
@@ -81,16 +87,21 @@ func (a *AsyncOpsRunner) Run(
 	timeout time.Duration,
 	operations AsyncNoErrOperationsMap,
 	lggr logger.Logger,
-) {
+) map[string]any {
 	callCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	lggr.Debugw("running operations", "timeout", timeout, "opIDs", slices.Collect(maps.Keys(operations)))
 
+	type result struct {
+		opID string
+		val  any
+	}
+
 	// We use a buffered channel to avoid blocking the worker goroutines if this function
 	// returns early (e.g. due to context cancellation). We also avoid closing the channel
 	// to prevent "send on closed channel" panics in the workers.
-	doneCh := make(chan struct{}, len(operations))
+	doneCh := make(chan result, len(operations))
 	// numExpectedTasks may not equal len(operations) if some operations are skipped due to config errors
 	// or if the pool is full.
 	numExpectedTasks := 0
@@ -103,11 +114,13 @@ func (a *AsyncOpsRunner) Run(
 		}
 
 		err := p.Submit(func() {
-			defer func() {
-				doneCh <- struct{}{}
-			}()
 			tStart := time.Now()
-			opFunc(callCtx, logger.With(lggr, "opID", opID))
+			// Execute the operation and capture the result
+			res := opFunc(callCtx, logger.With(lggr, "opID", opID))
+
+			// Send the result to the channel. This will never block because the channel is buffered.
+			doneCh <- result{opID: opID, val: res}
+
 			lggr.Debugw("operation finished", "opID", opID, "duration", time.Since(tStart))
 		})
 		if err != nil {
@@ -121,9 +134,11 @@ func (a *AsyncOpsRunner) Run(
 		numExpectedTasks++
 	}
 
+	results := make(map[string]any)
+
 	if numExpectedTasks == 0 {
 		lggr.Infow("no tasks to run, returning early")
-		return
+		return results
 	}
 
 	// wait for the context to be canceled or everything to return
@@ -134,17 +149,18 @@ func (a *AsyncOpsRunner) Run(
 			lggr.Infow("async ops runner ctx done, potentially not all tasks complete",
 				"err", callCtx.Err(),
 				"tasksDone", tasksDone)
-			return
-		case _, ok := <-doneCh:
+			return results
+		case res, ok := <-doneCh:
 			if !ok {
 				// channel closed - shouldn't happen because we don't close it.
 				lggr.Errorw("async ops runner doneCh closed, this should not happen! Returning early.")
-				return
+				return results
 			}
+			results[res.opID] = res.val
 			tasksDone++
 			if tasksDone == numExpectedTasks {
 				lggr.Infow("async ops runner done all tasks, returning")
-				return
+				return results
 			} else {
 				lggr.Infow("async ops runner task done",
 					"tasksDone", tasksDone,
@@ -152,4 +168,16 @@ func (a *AsyncOpsRunner) Run(
 			}
 		}
 	}
+}
+
+// Extract is a helper to extract and convert a value from the results map.
+// If the key is missing or the value is not of type T, it returns the zero value of T.
+func Extract[T any](results map[string]any, key string) T {
+	var ret T
+	if val, ok := results[key]; ok {
+		if typed, ok := val.(T); ok {
+			ret = typed
+		}
+	}
+	return ret
 }

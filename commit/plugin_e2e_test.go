@@ -1002,12 +1002,14 @@ func defaultNodeParams(t *testing.T) SetupNodeParams {
 			arbAddr: arbInfo,
 			ethAddr: ethInfo,
 		},
-		PriceFeedChainSelector:          sourceEvmChain1,
-		InflightPriceCheckRetries:       10,
-		MerkleRootAsyncObserverDisabled: true, // we want to keep it disabled since this test is deterministic
-		ChainFeeAsyncObserverDisabled:   true,
-		TokenPriceAsyncObserverDisabled: true,
-		DonBreakingChangesVersion:       pluginconfig.DonBreakingChangesVersion1RoleDonSupport,
+		PriceFeedChainSelector:             sourceEvmChain1,
+		InflightPriceCheckRetries:          10,
+		MerkleRootAsyncObserverDisabled:    true, // we want to keep it disabled since this test is deterministic
+		ChainFeeAsyncObserverDisabled:      true,
+		TokenPriceAsyncObserverDisabled:    true,
+		ChainFeeAsyncObserverSyncTimeout:   10 * time.Second,
+		TokenPriceAsyncObserverSyncTimeout: *commonconfig.MustNewDuration(10 * time.Second),
+		DonBreakingChangesVersion:          pluginconfig.DonBreakingChangesVersion1RoleDonSupport,
 	}
 
 	reportingCfg := ocr3types.ReportingPluginConfig{F: 1, ConfigDigest: digest}

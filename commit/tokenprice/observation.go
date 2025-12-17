@@ -38,19 +38,23 @@ func (p *processor) Observation(
 	)
 
 	operations := asynclib.AsyncNoErrOperationsMap{
-		opObserveFeedTokenPrices: func(ctx context.Context, l logger.Logger) {
-			feedTokenPrices = p.obs.observeFeedTokenPrices(ctx, l)
+		opObserveFeedTokenPrices: func(ctx context.Context, l logger.Logger) any {
+			return p.obs.observeFeedTokenPrices(ctx, l)
 		},
-		opObserveFeeQuoterTokenUpdates: func(ctx context.Context, l logger.Logger) {
-			feeQuoterUpdates = p.obs.observeFeeQuoterTokenUpdates(ctx, l)
+		opObserveFeeQuoterTokenUpdates: func(ctx context.Context, l logger.Logger) any {
+			return p.obs.observeFeeQuoterTokenUpdates(ctx, l)
 		},
-		opObserveFChain: func(_ context.Context, l logger.Logger) {
-			fChain = p.observeFChain(l)
+		opObserveFChain: func(_ context.Context, l logger.Logger) any {
+			return p.observeFChain(l)
 		},
 	}
 
-	p.runner.Run(ctx, p.offChainCfg.TokenPriceAsyncObserverSyncTimeout.Duration(), operations, lggr)
+	results := p.runner.Run(ctx, p.offChainCfg.TokenPriceAsyncObserverSyncTimeout.Duration(), operations, lggr)
 	now := time.Now().UTC()
+
+	feedTokenPrices = asynclib.Extract[cciptypes.TokenPriceMap](results, opObserveFeedTokenPrices)
+	feeQuoterUpdates = asynclib.Extract[map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig](results, opObserveFeeQuoterTokenUpdates)
+	fChain = asynclib.Extract[map[cciptypes.ChainSelector]int](results, opObserveFChain)
 
 	lggr.Infow(
 		"observed token prices",

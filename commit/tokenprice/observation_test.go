@@ -14,6 +14,7 @@ import (
 
 	"github.com/smartcontractkit/libocr/commontypes"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
@@ -189,5 +190,6 @@ var defaultCfg = pluginconfig.CommitOffchainConfig{
 	},
 	PriceFeedChainSelector: feedChainSel,
 	// Have this disabled for testing purposes
-	TokenPriceAsyncObserverDisabled: true,
+	TokenPriceAsyncObserverDisabled:    true,
+	TokenPriceAsyncObserverSyncTimeout: *config.MustNewDuration(time.Second * 10),
 }

@@ -19,15 +19,17 @@ func TestWaitForAllNoErrOperations_AllOpsRun(t *testing.T) {
 	var calledOps []string
 
 	ops := AsyncNoErrOperationsMap{
-		"op1": func(_ context.Context, _ logger.Logger) {
+		"op1": func(_ context.Context, _ logger.Logger) any {
 			mu.Lock()
 			defer mu.Unlock()
 			calledOps = append(calledOps, "op1")
+			return nil
 		},
-		"op2": func(_ context.Context, _ logger.Logger) {
+		"op2": func(_ context.Context, _ logger.Logger) any {
 			mu.Lock()
 			defer mu.Unlock()
 			calledOps = append(calledOps, "op2")
+			return nil
 		},
 	}
 
@@ -44,11 +46,12 @@ func TestWaitForAllNoErrOperations_ContextTimeoutRespected(t *testing.T) {
 	start := time.Now()
 
 	ops := AsyncNoErrOperationsMap{
-		"slowOp": func(ctx context.Context, _ logger.Logger) {
+		"slowOp": func(ctx context.Context, _ logger.Logger) any {
 			select {
 			case <-ctx.Done():
 			case <-time.After(24 * time.Hour):
 			}
+			return nil
 		},
 	}
 
@@ -66,10 +69,11 @@ func TestWaitForAllNoErrOperations_ContextIsPropagated(t *testing.T) {
 	done := make(chan struct{})
 
 	ops := AsyncNoErrOperationsMap{
-		"checkCtx": func(ctx context.Context, _ logger.Logger) {
+		"checkCtx": func(ctx context.Context, _ logger.Logger) any {
 			_, ok := ctx.Deadline()
 			assert.True(t, ok, "context should have a deadline")
 			close(done)
+			return nil
 		},
 	}
 
@@ -99,10 +103,11 @@ func TestAsyncOpsRunner_TimeoutRespected(t *testing.T) {
 	lggr := logger.Nop()
 
 	// Define a hanging operation that ignores the context
-	hangingOp := func(_ context.Context, _ logger.Logger) {
+	hangingOp := func(_ context.Context, _ logger.Logger) any {
 		// Simulate work that takes much longer than the timeout
 		// and deliberately ignores ctx.Done()
 		time.Sleep(2 * time.Second)
+		return nil
 	}
 
 	ops := AsyncNoErrOperationsMap{
@@ -130,8 +135,9 @@ func TestAsyncOpsRunner_NormalCompletion(t *testing.T) {
 	lggr := logger.Nop()
 
 	// Define a fast operation
-	fastOp := func(_ context.Context, _ logger.Logger) {
+	fastOp := func(_ context.Context, _ logger.Logger) any {
 		time.Sleep(10 * time.Millisecond)
+		return nil
 	}
 
 	ops := AsyncNoErrOperationsMap{
@@ -158,9 +164,10 @@ func TestAsyncOpsRunner_PoolFullDoesNotBlock(t *testing.T) {
 	// 1. Start a long-running task that occupies the pool
 	// We use a channel to signal when it's running to avoid race conditions with sleep
 	startedCh := make(chan struct{})
-	blockingOp := func(_ context.Context, _ logger.Logger) {
+	blockingOp := func(_ context.Context, _ logger.Logger) any {
 		close(startedCh)
 		time.Sleep(500 * time.Millisecond) // Occupy the worker
+		return nil
 	}
 
 	// Launch it in a separate goroutine so we can try to schedule another one immediately
@@ -182,7 +189,7 @@ func TestAsyncOpsRunner_PoolFullDoesNotBlock(t *testing.T) {
 	// Because of our "continue" fix, Run should just skip this task and return immediately
 	// since there are no other tasks to wait for.
 	start := time.Now()
-	ops := AsyncNoErrOperationsMap{"op1": func(ctx context.Context, l logger.Logger) {}}
+	ops := AsyncNoErrOperationsMap{"op1": func(ctx context.Context, l logger.Logger) any { return nil }}
 
 	// This should return quickly, NOT block waiting for the first op to finish
 	runner.Run(context.Background(), 2*time.Second, ops, lggr)

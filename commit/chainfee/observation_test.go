@@ -21,11 +21,13 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/asynclib"
 	plugincommon2 "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/mocks/internal_/plugincommon"
 	reader2 "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
 	"github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
 	reader3 "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
 func Test_processor_Observation(t *testing.T) {
@@ -125,6 +127,14 @@ func Test_processor_Observation(t *testing.T) {
 			lggr := logger.Test(t)
 			ctx := t.Context()
 
+			runner, err := asynclib.NewAsyncOpsRunner(map[string]int{
+				opGetChainsFeeComponents:  1,
+				opGetNativeTokenPrices:    1,
+				opGetChainFeePriceUpdates: 1,
+				opObserveFChain:           1,
+			})
+			require.NoError(t, err)
+
 			p := &processor{
 				lggr:            lggr,
 				chainSupport:    cs,
@@ -134,6 +144,10 @@ func Test_processor_Observation(t *testing.T) {
 				homeChain:       homeChain,
 				metricsReporter: plugincommon2.NoopReporter{},
 				obs:             newBaseObserver(ccipReader, tc.dstChain, oracleID, cs),
+				cfg: pluginconfig.CommitOffchainConfig{
+					ChainFeeAsyncObserverSyncTimeout: 10 * time.Second,
+				},
+				runner: runner,
 			}
 
 			supportedSet := mapset.NewSet(tc.supportedChains...)
@@ -336,6 +350,14 @@ func Test_unique_chain_filter_in_Observation(t *testing.T) {
 			lggr := logger.Test(t)
 			ctx := t.Context()
 
+			runner, err := asynclib.NewAsyncOpsRunner(map[string]int{
+				opGetChainsFeeComponents:  1,
+				opGetNativeTokenPrices:    1,
+				opGetChainFeePriceUpdates: 1,
+				opObserveFChain:           1,
+			})
+			require.NoError(t, err)
+
 			p := &processor{
 				lggr:            lggr,
 				chainSupport:    cs,
@@ -345,6 +367,10 @@ func Test_unique_chain_filter_in_Observation(t *testing.T) {
 				homeChain:       homeChain,
 				metricsReporter: plugincommon2.NoopReporter{},
 				obs:             newBaseObserver(ccipReader, tc.dstChain, oracleID, cs),
+				cfg: pluginconfig.CommitOffchainConfig{
+					ChainFeeAsyncObserverSyncTimeout: 10 * time.Second,
+				},
+				runner: runner,
 			}
 
 			supportedSet := mapset.NewSet(tc.supportedChains...)

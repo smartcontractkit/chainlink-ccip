@@ -46,22 +46,27 @@ func (p *processor) Observation(
 	)
 
 	operations := asynclib.AsyncNoErrOperationsMap{
-		opGetChainsFeeComponents: func(ctx context.Context, l logger.Logger) {
-			feeComponents = p.obs.getChainsFeeComponents(ctx, l)
+		opGetChainsFeeComponents: func(ctx context.Context, l logger.Logger) any {
+			return p.obs.getChainsFeeComponents(ctx, l)
 		},
-		opGetNativeTokenPrices: func(ctx context.Context, l logger.Logger) {
-			nativeTokenPrices = p.obs.getNativeTokenPrices(ctx, l)
+		opGetNativeTokenPrices: func(ctx context.Context, l logger.Logger) any {
+			return p.obs.getNativeTokenPrices(ctx, l)
 		},
-		opGetChainFeePriceUpdates: func(ctx context.Context, l logger.Logger) {
-			chainFeeUpdates = p.obs.getChainFeePriceUpdates(ctx, l)
+		opGetChainFeePriceUpdates: func(ctx context.Context, l logger.Logger) any {
+			return p.obs.getChainFeePriceUpdates(ctx, l)
 		},
-		opObserveFChain: func(_ context.Context, l logger.Logger) {
-			fChain = p.observeFChain(l)
+		opObserveFChain: func(_ context.Context, l logger.Logger) any {
+			return p.observeFChain(l)
 		},
 	}
 
-	p.runner.Run(ctx, p.cfg.ChainFeeAsyncObserverSyncTimeout, operations, lggr)
+	results := p.runner.Run(ctx, p.cfg.ChainFeeAsyncObserverSyncTimeout, operations, lggr)
 	now := time.Now().UTC()
+
+	feeComponents = asynclib.Extract[map[cciptypes.ChainSelector]types.ChainFeeComponents](results, opGetChainsFeeComponents)
+	nativeTokenPrices = asynclib.Extract[map[cciptypes.ChainSelector]cciptypes.BigInt](results, opGetNativeTokenPrices)
+	chainFeeUpdates = asynclib.Extract[map[cciptypes.ChainSelector]Update](results, opGetChainFeePriceUpdates)
+	fChain = asynclib.Extract[map[cciptypes.ChainSelector]int](results, opObserveFChain)
 
 	chainsWithNativeTokenPrices := mapset.NewSet(slices.Collect(maps.Keys(feeComponents))...).
 		Intersect(
