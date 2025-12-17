@@ -180,6 +180,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   }
 
   /// @inheritdoc IPoolV1
+  /// @param token The token address to check.
   function isSupportedToken(
     address token
   ) public view virtual returns (bool) {
@@ -234,6 +235,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   }
 
   /// @notice Updates the advanced pool hook.
+  /// @param newHook The new advanced pool hooks contract.
   function updateAdvancedPoolHooks(
     IAdvancedPoolHooks newHook
   ) public onlyOwner {
@@ -242,6 +244,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   }
 
   /// @notice Signals which version of the pool interface is supported.
+  /// @param interfaceId The interface identifier, as specified in ERC-165.
   function supportsInterface(
     bytes4 interfaceId
   ) public pure virtual override returns (bool) {
@@ -256,6 +259,9 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   /// @inheritdoc IPoolV2
   /// @dev The _validateLockOrBurn check is an essential security check.
   /// @dev The _getFee function deducts the fee from the amount and returns the amount after fee deduction.
+  /// @param lockOrBurnIn Encoded data fields for the processing of tokens on the source chain.
+  /// @param blockConfirmationRequested Requested block confirmation.
+  /// @param tokenArgs Additional token arguments.
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
     uint16 blockConfirmationRequested,
@@ -285,6 +291,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   /// @inheritdoc IPoolV1
   /// @dev The _validateLockOrBurn check is an essential security check.
   /// @dev _getFee is not called in this legacy method, so the full amount is locked or burned.
+  /// @param lockOrBurnIn Encoded data fields for the processing of tokens on the source chain.
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
   ) public virtual returns (Pool.LockOrBurnOutV1 memory lockOrBurnOutV1) {
@@ -307,6 +314,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   /// @notice Contains the specific lock or burn token logic for a pool.
   /// @dev overriding this method allows us to create pools with different lock/burn signatures
   /// without duplicating the underlying logic.
+  /// @param amount The amount of tokens to lock or burn.
   function _lockOrBurn(
     uint256 amount
   ) internal virtual {}
@@ -317,6 +325,8 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
 
   /// @inheritdoc IPoolV2
   /// @dev The _validateReleaseOrMint check is an essential security check.
+  /// @param releaseOrMintIn Encoded data fields for the processing of tokens on the destination chain.
+  /// @param blockConfirmationRequested Requested block confirmation.
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
     uint16 blockConfirmationRequested
@@ -342,6 +352,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
 
   /// @inheritdoc IPoolV1
   /// @dev calls IPoolV2.releaseOrMint with default finality.
+  /// @param releaseOrMintIn Encoded data fields for the processing of tokens on the destination chain.
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
@@ -351,6 +362,8 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   /// @notice Contains the specific release or mint token logic for a pool.
   /// @dev overriding this method allows us to create pools with different release/mint signatures
   /// without duplicating the underlying logic.
+  /// @param receiver The address to receive the tokens.
+  /// @param amount The amount of tokens to release or mint.
   function _releaseOrMint(address receiver, uint256 amount) internal virtual {}
 
   // ================================================================
@@ -365,6 +378,8 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   /// - preflight checks hooks (if enabled)
   /// @param lockOrBurnIn The input to validate.
   /// @param blockConfirmationRequested The minimum block confirmation requested by the message. A value of zero is used for default finality.
+  /// @param tokenArgs Additional token arguments passed in by the sender of the message.
+  /// @param feeAmount The fee amount deducted from the transfer amount.
   /// @dev This function should always be called before executing a lock or burn. Not doing so would allow
   /// for various exploits.
   function _validateLockOrBurn(
@@ -554,6 +569,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   }
 
   /// @inheritdoc IPoolV2
+  /// @param remoteChainSelector Remote chain selector.
   function getRemoteToken(
     uint64 remoteChainSelector
   ) public view returns (bytes memory) {
@@ -574,6 +590,8 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   /// @notice Removes the remote pool address for a given chain selector.
   /// @dev All inflight txs from the remote pool will be rejected after it is removed. To ensure no loss of funds, there
   /// should be no inflight txs from the given pool.
+  /// @param remoteChainSelector The remote chain selector.
+  /// @param remotePoolAddress The remote pool address to remove.
   function removeRemotePool(uint64 remoteChainSelector, bytes calldata remotePoolAddress) external onlyOwner {
     if (!isSupportedChain(remoteChainSelector)) revert NonExistentChain(remoteChainSelector);
 
@@ -585,6 +603,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   }
 
   /// @inheritdoc IPoolV1
+  /// @param remoteChainSelector The remote chain selector to check.
   function isSupportedChain(
     uint64 remoteChainSelector
   ) public view returns (bool) {
@@ -705,6 +724,8 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   /// CCIP round time. For simplicity, a 5-10% buffer should be sufficient in most cases.
 
   /// @notice Consumes outbound rate limiting capacity in this pool.
+  /// @param remoteChainSelector The remote chain selector.
+  /// @param amount The amount of tokens consumed.
   function _consumeOutboundRateLimit(uint64 remoteChainSelector, uint256 amount) internal virtual {
     s_remoteChainConfigs[remoteChainSelector].outboundRateLimiterConfig._consume(amount, address(i_token));
 
@@ -712,6 +733,8 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   }
 
   /// @notice Consumes inbound rate limiting capacity in this pool.
+  /// @param remoteChainSelector The remote chain selector.
+  /// @param amount The amount of tokens consumed.
   function _consumeInboundRateLimit(uint64 remoteChainSelector, uint256 amount) internal virtual {
     s_remoteChainConfigs[remoteChainSelector].inboundRateLimiterConfig._consume(amount, address(i_token));
 
@@ -719,6 +742,8 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   }
 
   /// @notice Consumes custom block confirmation outbound rate limiting capacity in this pool.
+  /// @param remoteChainSelector The remote chain selector.
+  /// @param amount The amount of tokens consumed.
   function _consumeCustomBlockConfirmationOutboundRateLimit(
     uint64 remoteChainSelector,
     uint256 amount
@@ -733,6 +758,8 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   }
 
   /// @notice Consumes custom block confirmation inbound rate limiting capacity in this pool.
+  /// @param remoteChainSelector The remote chain selector.
+  /// @param amount The amount of tokens consumed.
   function _consumeCustomBlockConfirmationInboundRateLimit(uint64 remoteChainSelector, uint256 amount) internal virtual {
     s_inboundRateLimiterConfig[remoteChainSelector]._consume(amount, address(i_token));
 
@@ -816,6 +843,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   /// not receive calls from the ramps directly, instead receiving them from a proxy contract. In that
   /// situation this function must be overridden and the ramp-check removed and replaced with a different
   /// access-control scheme.
+  /// @param remoteChainSelector The remote chain selector.
   function _onlyOnRamp(
     uint64 remoteChainSelector
   ) internal view virtual {
@@ -829,6 +857,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   /// not receive calls from the ramps directly, instead receiving them from a proxy contract. In that
   /// situation this function must be overridden and the ramp-check removed and replaced with a different
   /// access-control scheme.
+  /// @param remoteChainSelector The remote chain selector.
   function _onlyOffRamp(
     uint64 remoteChainSelector
   ) internal view virtual {
@@ -845,8 +874,11 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
 
   /// @notice Returns the set of required CCVs for transfers in a specific direction.
   /// @dev This function delegates to AdvancedPoolHooks if configured, otherwise returns an empty array.
+  /// @param localToken The address of the local token.
   /// @param remoteChainSelector The remote chain selector for this transfer.
   /// @param amount The amount being transferred.
+  /// @param blockConfirmationRequested Requested block confirmation.
+  /// @param extraData Direction-specific payload forwarded by the caller (e.g. token args or source pool data).
   /// @param direction The direction of the transfer (Inbound or Outbound).
   /// @return requiredCCVs Set of required CCV addresses.
   function getRequiredCCVs(
@@ -921,6 +953,8 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
 
   /// @inheritdoc IPoolV2
   /// @notice Returns the pool fee parameters that will apply to a transfer.
+  /// @param destChainSelector The destination lane selector.
+  /// @param blockConfirmationRequested Requested block confirmation.
   function getFee(
     address, // localToken
     uint64 destChainSelector,

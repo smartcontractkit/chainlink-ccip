@@ -70,6 +70,7 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
   }
 
   /// @notice Locks the token in the pool
+  /// @param lockOrBurnIn The lock or burn input parameters.
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
   ) public virtual override returns (Pool.LockOrBurnOutV1 memory out) {
@@ -102,6 +103,7 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
   /// @dev The _validateReleaseOrMint check is an essential security check
   /// @dev If the releaseOrMintIn amount is greater than available liquidity, the function will revert as a security
   /// measure to prevent funds from a Silo being released by another chain.
+  /// @param releaseOrMintIn The release or mint input parameters.
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {

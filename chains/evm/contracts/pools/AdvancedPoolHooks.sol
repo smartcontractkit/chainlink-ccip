@@ -69,6 +69,7 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, Ownable2StepMsgSender {
   }
 
   /// @inheritdoc IAdvancedPoolHooks
+  /// @param lockOrBurnIn The lock or burn input parameters.
   function preflightCheck(Pool.LockOrBurnInV1 calldata lockOrBurnIn, uint16, bytes calldata) external view {
     checkAllowList(lockOrBurnIn.originalSender);
   }
@@ -113,6 +114,8 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, Ownable2StepMsgSender {
   }
 
   /// @notice Internal version of applyAllowListUpdates to allow for reuse in the constructor.
+  /// @param removes The addresses to be removed.
+  /// @param adds The addresses to be added.
   function _applyAllowListUpdates(address[] memory removes, address[] memory adds) internal {
     if (!i_allowlistEnabled) revert AllowListNotEnabled();
 
@@ -141,6 +144,7 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, Ownable2StepMsgSender {
   /// If the array includes address(0), it indicates that the default CCV should be used alongside any other specified CCVs.
   /// @dev Additional CCVs should only be configured for transfers above the threshold amount and should not duplicate base CCVs.
   /// Base CCVs are always required, while add-above-threshold CCVs are only required when the transfer amount exceeds the threshold.
+  /// @param ccvConfigArgs The CCV configuration updates to apply.
   function applyCCVConfigUpdates(
     CCVConfigArg[] calldata ccvConfigArgs
   ) external onlyOwner {
