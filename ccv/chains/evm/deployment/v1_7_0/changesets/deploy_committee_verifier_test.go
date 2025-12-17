@@ -11,8 +11,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/rmn"
 	cs_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -23,10 +23,10 @@ import (
 
 func basicDeployCommitteeVerifierParams() sequences.CommitteeVerifierParams {
 	return sequences.CommitteeVerifierParams{
-		Version:         semver.MustParse("1.7.0"),
-		FeeAggregator:   common.HexToAddress("0x02"),
-		AllowlistAdmin:  common.HexToAddress("0x03"),
-		StorageLocation: "https://test.chain.link.fake",
+		Version:          semver.MustParse("1.7.0"),
+		FeeAggregator:    common.HexToAddress("0x02"),
+		AllowlistAdmin:   common.HexToAddress("0x03"),
+		StorageLocations: []string{"https://test.chain.link.fake"},
 	}
 }
 
@@ -37,6 +37,14 @@ func TestDeployCommitteeVerifier_VerifyPreconditions(t *testing.T) {
 	require.NoError(t, err, "Failed to create test environment")
 	require.NotNil(t, e, "Environment should be created")
 	ds := datastore.NewMemoryDataStore()
+	rmnAddressRef := datastore.AddressRef{
+		ChainSelector: 5009297550715157269,
+		Type:          datastore.ContractType(rmn.ContractType),
+		Version:       semver.MustParse("1.7.0"),
+		Address:       common.HexToAddress("0x01").Hex(),
+	}
+	err = ds.Addresses().Add(rmnAddressRef)
+	require.NoError(t, err)
 	e.DataStore = ds.Seal()
 
 	tests := []struct {
@@ -52,6 +60,7 @@ func TestDeployCommitteeVerifier_VerifyPreconditions(t *testing.T) {
 					ChainSel:       5009297550715157269,
 					CREATE2Factory: common.HexToAddress("0x01"),
 					Params:         basicDeployCommitteeVerifierParams(),
+					RMN:            rmnAddressRef,
 				},
 			},
 		},
@@ -82,7 +91,13 @@ func TestDeployCommitteeVerifier_Apply_MultipleQualifiersOnSameChain(t *testing.
 		Version:       semver.MustParse("1.7.0"),
 		Address:       common.HexToAddress("0x01").Hex(),
 	}
-	create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[5009297550715157269], contract.DeployInput[create2_factory.ConstructorArgs]{
+	rmnAddressRef := datastore.AddressRef{
+		ChainSelector: 5009297550715157269,
+		Type:          datastore.ContractType(rmn.ContractType),
+		Version:       semver.MustParse("1.7.0"),
+		Address:       common.HexToAddress("0x02").Hex(),
+	}
+	create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[5009297550715157269], contract_utils.DeployInput[create2_factory.ConstructorArgs]{
 		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
 		ChainSelector:  5009297550715157269,
 		Args: create2_factory.ConstructorArgs{
@@ -94,7 +109,7 @@ func TestDeployCommitteeVerifier_Apply_MultipleQualifiersOnSameChain(t *testing.
 	// Ensure environment has an initial (empty) datastore
 	ds := datastore.NewMemoryDataStore()
 	require.NoError(t, ds.Addresses().Add(fqAddressRef))
-
+	require.NoError(t, ds.Addresses().Add(rmnAddressRef))
 	e.DataStore = ds.Seal()
 
 	mcmsRegistry := cs_core.NewMCMSReaderRegistry()
@@ -108,6 +123,7 @@ func TestDeployCommitteeVerifier_Apply_MultipleQualifiersOnSameChain(t *testing.
 			ChainSel:       5009297550715157269,
 			CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
 			Params:         paramsAlpha,
+			RMN:            rmnAddressRef,
 		},
 	})
 	require.NoError(t, err, "First apply failed")
@@ -128,8 +144,6 @@ func TestDeployCommitteeVerifier_Apply_MultipleQualifiersOnSameChain(t *testing.
 	require.True(t, ok, "committee verifier (alpha) not found in first run output")
 	alphaResolver, ok := find(addrs1, datastore.ContractType(committee_verifier.ResolverType), "alpha")
 	require.True(t, ok, "committee verifier resolver (alpha) not found in first run output")
-	alphaResolverProxy, ok := find(addrs1, datastore.ContractType(committee_verifier.ResolverProxyType), "alpha")
-	require.True(t, ok, "committee verifier resolver proxy (alpha) not found in first run output")
 
 	// 2) Second run with qualifier "beta"; seed env with first run addresses so they are considered existing
 	dsSeed := datastore.NewMemoryDataStore()
@@ -137,6 +151,7 @@ func TestDeployCommitteeVerifier_Apply_MultipleQualifiersOnSameChain(t *testing.
 		require.NoError(t, dsSeed.Addresses().Add(r))
 	}
 	require.NoError(t, dsSeed.Addresses().Add(fqAddressRef))
+	require.NoError(t, dsSeed.Addresses().Add(rmnAddressRef))
 	e.DataStore = dsSeed.Seal()
 
 	paramsBeta := basicDeployCommitteeVerifierParams()
@@ -147,6 +162,7 @@ func TestDeployCommitteeVerifier_Apply_MultipleQualifiersOnSameChain(t *testing.
 			ChainSel:       5009297550715157269,
 			CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
 			Params:         paramsBeta,
+			RMN:            rmnAddressRef,
 		},
 	})
 	require.NoError(t, err, "Second apply failed")
@@ -157,13 +173,10 @@ func TestDeployCommitteeVerifier_Apply_MultipleQualifiersOnSameChain(t *testing.
 	require.True(t, ok, "committee verifier (beta) not found in second run output")
 	betaResolver, ok := find(addrs2, datastore.ContractType(committee_verifier.ResolverType), "beta")
 	require.True(t, ok, "committee verifier resolver (beta) not found in second run output")
-	betaResolverProxy, ok := find(addrs2, datastore.ContractType(committee_verifier.ResolverProxyType), "beta")
-	require.True(t, ok, "committee verifier resolver proxy (beta) not found in second run output")
 
 	// Ensure addresses differ across qualifiers
 	require.NotEqual(t, alphaCV.Address, betaCV.Address, "expected different CommitteeVerifier addresses for different qualifiers")
 	require.NotEqual(t, alphaResolver.Address, betaResolver.Address, "expected different CommitteeVerifierResolver addresses for different qualifiers")
-	require.NotEqual(t, alphaResolverProxy.Address, betaResolverProxy.Address, "expected different CommitteeVerifierResolverProxy addresses for different qualifiers")
 
 	// 3) Third run re-using qualifier "alpha" should be idempotent (returns existing alpha addresses)
 	dsUnion := datastore.NewMemoryDataStore()
@@ -174,6 +187,7 @@ func TestDeployCommitteeVerifier_Apply_MultipleQualifiersOnSameChain(t *testing.
 		require.NoError(t, dsUnion.Addresses().Add(r))
 	}
 	require.NoError(t, dsUnion.Addresses().Add(fqAddressRef))
+	require.NoError(t, dsUnion.Addresses().Add(rmnAddressRef))
 	e.DataStore = dsUnion.Seal()
 
 	out3, err := changesets.DeployCommitteeVerifier(mcmsRegistry).Apply(*e, cs_core.WithMCMS[changesets.DeployCommitteeVerifierCfg]{
@@ -182,6 +196,7 @@ func TestDeployCommitteeVerifier_Apply_MultipleQualifiersOnSameChain(t *testing.
 			ChainSel:       5009297550715157269,
 			CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
 			Params:         paramsAlpha, // same qualifier as first run
+			RMN:            rmnAddressRef,
 		},
 	})
 	require.NoError(t, err, "Third apply (repeat qualifier) failed")
@@ -192,11 +207,8 @@ func TestDeployCommitteeVerifier_Apply_MultipleQualifiersOnSameChain(t *testing.
 	require.True(t, ok)
 	reAlphaResolver, ok := find(addrs3, datastore.ContractType(committee_verifier.ResolverType), "alpha")
 	require.True(t, ok)
-	reAlphaResolverProxy, ok := find(addrs3, datastore.ContractType(committee_verifier.ResolverProxyType), "alpha")
-	require.True(t, ok)
 
 	// Should return the same addresses as first run for the same qualifier
 	require.Equal(t, alphaCV.Address, reAlphaCV.Address, "expected same CommitteeVerifier address when reusing qualifier")
 	require.Equal(t, alphaResolver.Address, reAlphaResolver.Address, "expected same CommitteeVerifierResolver address when reusing qualifier")
-	require.Equal(t, alphaResolverProxy.Address, reAlphaResolverProxy.Address, "expected same CommitteeVerifierResolverProxy address when reusing qualifier")
 }

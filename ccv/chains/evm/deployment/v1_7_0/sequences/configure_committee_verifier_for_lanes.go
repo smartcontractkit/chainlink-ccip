@@ -6,6 +6,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/committee_verifier"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/versioned_verifier_resolver"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
@@ -35,6 +36,7 @@ var ConfigureCommitteeVerifierForLanes = cldf_ops.NewSequence(
 		remoteChainConfigArgs := make([]committee_verifier.RemoteChainConfigArgs, 0, len(input.RemoteChains))
 		allowlistArgs := make([]committee_verifier.AllowlistConfigArgs, 0, len(input.RemoteChains))
 		signatureConfigs := make([]committee_verifier.SignatureConfig, 0, len(input.RemoteChains))
+		outboundImplementationArgs := make([]versioned_verifier_resolver.OutboundImplementationArgs, 0, len(input.RemoteChains))
 
 		for remoteSelector, remoteConfig := range input.RemoteChains {
 			remoteChainConfigArgs = append(remoteChainConfigArgs, committee_verifier.RemoteChainConfigArgs{
@@ -67,6 +69,10 @@ var ConfigureCommitteeVerifierForLanes = cldf_ops.NewSequence(
 				SourceChainSelector: remoteSelector,
 				Threshold:           remoteConfig.SignatureConfig.Threshold,
 				Signers:             signers,
+			})
+			outboundImplementationArgs = append(outboundImplementationArgs, versioned_verifier_resolver.OutboundImplementationArgs{
+				DestChainSelector: remoteSelector,
+				Verifier:          common.HexToAddress(input.CommitteeVerifier),
 			})
 		}
 
@@ -104,6 +110,50 @@ var ConfigureCommitteeVerifierForLanes = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to apply signature configs to CommitteeVerifier on chain %s: %w", chain, err)
 		}
 		writes = append(writes, committeeVerifierSignatureConfigReport.Output)
+
+		// Expect that SupportingContracts defines exactly one contract of type VersionedVerifierResolver
+		if len(input.SupportingContracts) != 1 {
+			return sequences.OnChainOutput{}, fmt.Errorf("expected SupportingContracts to define exactly one contract")
+		}
+		versionedVerifierResolver := input.SupportingContracts[0]
+		if versionedVerifierResolver.Type != datastore.ContractType(committee_verifier.ResolverType) {
+			return sequences.OnChainOutput{}, fmt.Errorf("expected SupportingContracts to define exactly one contract of type VersionedVerifierResolver")
+		}
+
+		// Apply inbound implementation updates on CommitteeVerifierResolver
+		// Get the version tag from the CommitteeVerifier
+		committeeVerifierVersionTagReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.GetVersionTag, chain, contract.FunctionInput[any]{
+			ChainSelector: chain.Selector,
+			Address:       common.HexToAddress(input.CommitteeVerifier),
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to get version tag from CommitteeVerifier on chain %s: %w", chain, err)
+		}
+		committeeVerifierResolverInboundImplementationUpdatesReport, err := cldf_ops.ExecuteOperation(b, versioned_verifier_resolver.ApplyInboundImplementationUpdates, chain, contract.FunctionInput[[]versioned_verifier_resolver.InboundImplementationArgs]{
+			ChainSelector: chain.Selector,
+			Address:       common.HexToAddress(versionedVerifierResolver.Address),
+			Args: []versioned_verifier_resolver.InboundImplementationArgs{
+				{
+					Version:  committeeVerifierVersionTagReport.Output,
+					Verifier: common.HexToAddress(input.CommitteeVerifier),
+				},
+			},
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to apply inbound implementation updates to CommitteeVerifierResolver on chain %s: %w", chain, err)
+		}
+		writes = append(writes, committeeVerifierResolverInboundImplementationUpdatesReport.Output)
+
+		// Apply outbound implementation updates on CommitteeVerifierResolver
+		committeeVerifierResolverOutboundImplementationUpdatesReport, err := cldf_ops.ExecuteOperation(b, versioned_verifier_resolver.ApplyOutboundImplementationUpdates, chain, contract.FunctionInput[[]versioned_verifier_resolver.OutboundImplementationArgs]{
+			ChainSelector: chain.Selector,
+			Address:       common.HexToAddress(versionedVerifierResolver.Address),
+			Args:          outboundImplementationArgs,
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to apply outbound implementation updates to CommitteeVerifierResolver on chain %s: %w", chain, err)
+		}
+		writes = append(writes, committeeVerifierResolverOutboundImplementationUpdatesReport.Output)
 
 		batchOps, err := contract.NewBatchOperationFromWrites(writes)
 		if err != nil {

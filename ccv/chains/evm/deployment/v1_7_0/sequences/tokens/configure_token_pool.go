@@ -49,19 +49,19 @@ var ConfigureTokenPool = cldf_ops.NewSequence(
 		if len(input.AllowList) != 0 {
 			allowListEnabledReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.GetAllowListEnabled, chain, evm_contract.FunctionInput[any]{
 				ChainSelector: input.ChainSelector,
-				Address:       input.TokenPoolAddress,
+				Address:       input.AdvancedPoolHooks,
 			})
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to get allow-list status from advanced pool hooks with address %s on %s: %w", input.TokenPoolAddress, chain, err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get allow-list status from advanced pool hooks with address %s on %s: %w", input.AdvancedPoolHooks, chain, err)
 			}
 			if allowListEnabledReport.Output {
 				// Allow-list is enabled, so we first check the current allow-list
 				currentAllowListReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.GetAllowList, chain, evm_contract.FunctionInput[any]{
 					ChainSelector: input.ChainSelector,
-					Address:       input.TokenPoolAddress,
+					Address:       input.AdvancedPoolHooks,
 				})
 				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to get current allow-list from advanced pool hooks with address %s on %s: %w", input.TokenPoolAddress, chain, err)
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to get current allow-list from advanced pool hooks with address %s on %s: %w", input.AdvancedPoolHooks, chain, err)
 				}
 				adds, removes := makeAllowListUpdates(currentAllowListReport.Output, input.AllowList)
 
@@ -69,14 +69,14 @@ var ConfigureTokenPool = cldf_ops.NewSequence(
 				if len(adds) != 0 || len(removes) != 0 {
 					applyAllowListUpdatesReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.ApplyAllowlistUpdates, chain, evm_contract.FunctionInput[advanced_pool_hooks.AllowlistUpdatesArgs]{
 						ChainSelector: input.ChainSelector,
-						Address:       input.TokenPoolAddress,
+						Address:       input.AdvancedPoolHooks,
 						Args: advanced_pool_hooks.AllowlistUpdatesArgs{
 							Adds:    adds,
 							Removes: removes,
 						},
 					})
 					if err != nil {
-						return sequences.OnChainOutput{}, fmt.Errorf("failed to apply allow-list updates to advanced pool hooks with address %s on %s: %w", input.TokenPoolAddress, chain, err)
+						return sequences.OnChainOutput{}, fmt.Errorf("failed to apply allow-list updates to advanced pool hooks with address %s on %s: %w", input.AdvancedPoolHooks, chain, err)
 					}
 					writes = append(writes, applyAllowListUpdatesReport.Output)
 				}
@@ -87,19 +87,19 @@ var ConfigureTokenPool = cldf_ops.NewSequence(
 		if input.ThresholdAmountForAdditionalCCVs != nil {
 			currentThresholdAmountReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.GetThresholdAmount, chain, evm_contract.FunctionInput[any]{
 				ChainSelector: input.ChainSelector,
-				Address:       input.TokenPoolAddress,
+				Address:       input.AdvancedPoolHooks,
 			})
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to get current threshold amount for additional CCVs on advanced pool hooks with address %s on %s: %w", input.TokenPoolAddress, chain, err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get current threshold amount for additional CCVs on advanced pool hooks with address %s on %s: %w", input.AdvancedPoolHooks, chain, err)
 			}
 			if currentThresholdAmountReport.Output != input.ThresholdAmountForAdditionalCCVs {
 				setThresholdAmountReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.SetThresholdAmount, chain, evm_contract.FunctionInput[*big.Int]{
 					ChainSelector: input.ChainSelector,
-					Address:       input.TokenPoolAddress,
+					Address:       input.AdvancedPoolHooks,
 					Args:          input.ThresholdAmountForAdditionalCCVs,
 				})
 				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to set threshold amount for additional CCVs on advanced pool hooks with address %s on %s: %w", input.TokenPoolAddress, chain, err)
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to set threshold amount for additional CCVs on advanced pool hooks with address %s on %s: %w", input.AdvancedPoolHooks, chain, err)
 				}
 				writes = append(writes, setThresholdAmountReport.Output)
 			}

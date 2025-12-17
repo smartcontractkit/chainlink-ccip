@@ -28,8 +28,9 @@ func TestConfigurePool(t *testing.T) {
 			makeInput: func(tokenAndPoolReport operations.SequenceReport[tokens.DeployTokenAndPoolInput, seq_core.OnChainOutput]) tokens.ConfigureTokenPoolInput {
 				threshold := big.NewInt(123)
 				return tokens.ConfigureTokenPoolInput{
-					ChainSelector:    tokenAndPoolReport.Input.DeployTokenPoolInput.ChainSel,
-					TokenPoolAddress: common.HexToAddress(tokenAndPoolReport.Output.Addresses[1].Address),
+					ChainSelector:     tokenAndPoolReport.Input.DeployTokenPoolInput.ChainSel,
+					TokenPoolAddress:  common.HexToAddress(tokenAndPoolReport.Output.Addresses[1].Address),
+					AdvancedPoolHooks: common.HexToAddress(tokenAndPoolReport.Output.Addresses[2].Address),
 					AllowList: []common.Address{
 						common.HexToAddress("0x07"),
 						common.HexToAddress("0x08"),
@@ -112,7 +113,7 @@ func TestConfigurePool(t *testing.T) {
 				e.BlockChains.EVMChains()[chainSel],
 				contract.FunctionInput[any]{
 					ChainSelector: chainSel,
-					Address:       input.TokenPoolAddress,
+					Address:       input.AdvancedPoolHooks,
 				},
 			)
 			require.NoError(t, err, "ExecuteOperation should not error")

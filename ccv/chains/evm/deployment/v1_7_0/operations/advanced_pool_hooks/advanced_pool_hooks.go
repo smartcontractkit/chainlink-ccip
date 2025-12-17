@@ -65,7 +65,7 @@ var ApplyAllowlistUpdates = contract.NewWrite(contract.WriteParams[AllowlistUpda
 	IsAllowedCaller: contract.OnlyOwner[*advanced_pool_hooks.AdvancedPoolHooks, AllowlistUpdatesArgs],
 	Validate:        func(AllowlistUpdatesArgs) error { return nil },
 	CallContract: func(advancedPoolHooks *advanced_pool_hooks.AdvancedPoolHooks, opts *bind.TransactOpts, args AllowlistUpdatesArgs) (*types.Transaction, error) {
-		return advancedPoolHooks.ApplyAllowListUpdates(opts, args.Adds, args.Removes)
+		return advancedPoolHooks.ApplyAllowListUpdates(opts, args.Removes, args.Adds)
 	},
 })
 

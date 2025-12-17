@@ -70,6 +70,9 @@ func (c DeployTokenPoolInput) Validate(chain evm.Chain) error {
 	if c.ConstructorArgs.Router == (common.Address{}) {
 		return errors.New("router address must be defined")
 	}
+	if c.ThresholdAmountForAdditionalCCVs == nil {
+		return errors.New("threshold amount for additional ccvs must be defined")
+	}
 
 	return nil
 }

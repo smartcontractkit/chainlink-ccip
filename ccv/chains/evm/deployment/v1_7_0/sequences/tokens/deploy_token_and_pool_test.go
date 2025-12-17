@@ -43,11 +43,12 @@ func basicDeployTokenAndPoolInput(chainReport operations.SequenceReport[sequence
 			Name:      "Test Token",
 		},
 		DeployTokenPoolInput: tokens.DeployTokenPoolInput{
-			ChainSel:         chainReport.Input.ChainSelector,
-			TokenPoolType:    datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
-			TokenPoolVersion: semver.MustParse("1.7.0"),
-			TokenSymbol:      "TEST",
-			RateLimitAdmin:   common.HexToAddress("0x01"),
+			ChainSel:                         chainReport.Input.ChainSelector,
+			TokenPoolType:                    datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
+			TokenPoolVersion:                 semver.MustParse("1.7.0"),
+			TokenSymbol:                      "TEST",
+			RateLimitAdmin:                   common.HexToAddress("0x01"),
+			ThresholdAmountForAdditionalCCVs: big.NewInt(1e18),
 			ConstructorArgs: tokens.ConstructorArgs{
 				LocalTokenDecimals: 18,
 				Allowlist: []common.Address{
@@ -109,7 +110,7 @@ func TestDeployTokenAndPool(t *testing.T) {
 			require.NoError(t, err, "ExecuteSequence should not error")
 			require.Len(t, poolReport.Output.BatchOps, 1, "Expected 1 batch operation in output")
 			require.Len(t, poolReport.Output.BatchOps[0].Transactions, 0, "Expected 0 transactions in batch operation")
-			require.Len(t, poolReport.Output.Addresses, 2, "Expected 2 addresses in output")
+			require.Len(t, poolReport.Output.Addresses, 3, "Expected 3 addresses in output (pool, token, advanced pool hooks)")
 			tokenAddress := poolReport.Output.Addresses[0].Address
 			poolAddress := poolReport.Output.Addresses[1].Address
 

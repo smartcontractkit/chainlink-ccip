@@ -57,7 +57,7 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 			basicDeployTokenAndPoolInput(chainReport),
 		)
 		require.NoError(t, err, "ExecuteSequence should not error")
-		require.Len(t, tokenAndPoolReport.Output.Addresses, 2, "Expected 2 addresses (token and pool)")
+		require.Len(t, tokenAndPoolReport.Output.Addresses, 3, "Expected 3 addresses (token, pool, advanced pool hooks)")
 
 		tokenAddress := tokenAndPoolReport.Output.Addresses[0].Address
 		tokenPoolAddress := tokenAndPoolReport.Output.Addresses[1].Address
@@ -102,6 +102,15 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 						Capacity:  big.NewInt(700),
 						Rate:      big.NewInt(70),
 					},
+					TokenTransferFeeConfig: tokens_core.TokenTransferFeeConfig{
+						IsEnabled:                     true,
+						DestGasOverhead:               100,
+						DestBytesOverhead:             100,
+						DefaultFinalityFeeUSDCents:    100,
+						CustomFinalityFeeUSDCents:     100,
+						DefaultFinalityTransferFeeBps: 100,
+						CustomFinalityTransferFeeBps:  100,
+					},
 				},
 				remoteChainSel2: {
 					RemoteToken: common.LeftPadBytes(common.FromHex("0x321"), 32),
@@ -127,6 +136,15 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 						IsEnabled: true,
 						Capacity:  big.NewInt(900),
 						Rate:      big.NewInt(90),
+					},
+					TokenTransferFeeConfig: tokens_core.TokenTransferFeeConfig{
+						IsEnabled:                     true,
+						DestGasOverhead:               100,
+						DestBytesOverhead:             100,
+						DefaultFinalityFeeUSDCents:    100,
+						CustomFinalityFeeUSDCents:     100,
+						DefaultFinalityTransferFeeBps: 100,
+						CustomFinalityTransferFeeBps:  100,
 					},
 				},
 			},
@@ -168,8 +186,10 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 
 		customFinalityInboundRateLimiterConfig := input.RemoteChains[remoteChainSel1].CustomFinalityInboundRateLimiterConfig
 		customFinalityOutboundRateLimiterConfig := input.RemoteChains[remoteChainSel1].CustomFinalityOutboundRateLimiterConfig
-
 		assertCustomBlockConfirmationBucket(t, tp, remoteChainSel1, &customFinalityInboundRateLimiterConfig, &customFinalityOutboundRateLimiterConfig)
+
+		customFinalityInboundRateLimiterConfig = input.RemoteChains[remoteChainSel2].CustomFinalityInboundRateLimiterConfig
+		customFinalityOutboundRateLimiterConfig = input.RemoteChains[remoteChainSel2].CustomFinalityOutboundRateLimiterConfig
 		assertCustomBlockConfirmationBucket(t, tp, remoteChainSel2, &customFinalityInboundRateLimiterConfig, &customFinalityOutboundRateLimiterConfig)
 
 		// Verify token registration in token admin registry
@@ -232,7 +252,7 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 			basicDeployTokenAndPoolInput(chainReport),
 		)
 		require.NoError(t, err, "ExecuteSequence should not error")
-		require.Len(t, tokenAndPoolReport.Output.Addresses, 2, "Expected 2 addresses (token and pool)")
+		require.Len(t, tokenAndPoolReport.Output.Addresses, 3, "Expected 3 addresses (token, pool, advanced pool hooks)")
 
 		tokenPoolAddress := tokenAndPoolReport.Output.Addresses[1].Address
 
@@ -273,6 +293,15 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 						IsEnabled: true,
 						Capacity:  big.NewInt(222),
 						Rate:      big.NewInt(22),
+					},
+					TokenTransferFeeConfig: tokens_core.TokenTransferFeeConfig{
+						IsEnabled:                     true,
+						DestGasOverhead:               100,
+						DestBytesOverhead:             100,
+						DefaultFinalityFeeUSDCents:    100,
+						CustomFinalityFeeUSDCents:     100,
+						DefaultFinalityTransferFeeBps: 100,
+						CustomFinalityTransferFeeBps:  100,
 					},
 				},
 			},
@@ -352,7 +381,7 @@ func assertCustomBlockConfirmationBucket(
 	require.NotNil(t, expectedOutbound, "expected outbound rate limiter config must be provided for selector %d", remoteChainSel)
 	require.NotNil(t, expectedInbound, "expected inbound rate limiter config must be provided for selector %d", remoteChainSel)
 
-	states, err := tp.GetCurrentRateLimiterState(nil, remoteChainSel, false)
+	states, err := tp.GetCurrentRateLimiterState(nil, remoteChainSel, true)
 	require.NoError(t, err, "Failed to get custom block confirmation buckets for selector %d", remoteChainSel)
 
 	assertBucketMatchesConfig(t, states.OutboundRateLimiterState, *expectedOutbound)

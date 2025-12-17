@@ -61,7 +61,6 @@ func TestTokenAdapter(t *testing.T) {
 			mcmsRegistry := changesets.NewMCMSReaderRegistry()
 			tokenAdapterRegistry := tokens.NewTokenAdapterRegistry()
 			tokenAdapterRegistry.RegisterTokenAdapter("evm", semver.MustParse("1.7.0"), &adapters.TokenAdapter{})
-			tokenAdapterRegistry.RegisterTokenAdapter("evm", semver.MustParse("1.6.1"), &adapters.TokenAdapter{})
 
 			// On each chain, deploy chain contracts & a token + token pool
 			ds := datastore.NewMemoryDataStore()
@@ -76,11 +75,7 @@ func TestTokenAdapter(t *testing.T) {
 				err = ds.Merge(deployChainOut.DataStore.Seal())
 				require.NoError(t, err, "Failed to merge datastore from DeployChainContracts changeset")
 
-				// Deploy a 1.7.0 on chain A and a legacy 1.6.1 on chain B
 				version := semver.MustParse("1.7.0")
-				if chainSel == chainB {
-					version = semver.MustParse("1.6.1")
-				}
 
 				e.DataStore = ds.Seal()
 				deployTokenAndPoolOut, err := v1_7_0.DeployTokenAndPool(mcmsRegistry).Apply(*e, changesets.WithMCMS[v1_7_0.DeployTokenAndPoolCfg]{
@@ -93,11 +88,12 @@ func TestTokenAdapter(t *testing.T) {
 							MaxSupply: big.NewInt(10_000_000),
 							Name:      "TEST",
 						},
-						ChainSel:           chainSel,
-						TokenPoolType:      datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
-						TokenPoolVersion:   version,
-						TokenSymbol:        "TEST",
-						LocalTokenDecimals: 18,
+						ChainSel:                         chainSel,
+						TokenPoolType:                    datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
+						TokenPoolVersion:                 version,
+						TokenSymbol:                      "TEST",
+						LocalTokenDecimals:               18,
+						ThresholdAmountForAdditionalCCVs: big.NewInt(1e18),
 						Router: datastore.AddressRef{
 							ChainSelector: chainSel,
 							Type:          datastore.ContractType(router.ContractType),
@@ -153,6 +149,15 @@ func TestTokenAdapter(t *testing.T) {
 						Rate:      big.NewInt(10),
 						Capacity:  big.NewInt(100),
 					},
+					TokenTransferFeeConfig: tokens.TokenTransferFeeConfig{
+						IsEnabled:                     true,
+						DestGasOverhead:               100,
+						DestBytesOverhead:             100,
+						DefaultFinalityFeeUSDCents:    100,
+						CustomFinalityFeeUSDCents:     100,
+						DefaultFinalityTransferFeeBps: 100,
+						CustomFinalityTransferFeeBps:  100,
+					},
 					OutboundCCVs: ccvs,
 					InboundCCVs:  ccvs,
 				}
@@ -172,7 +177,7 @@ func TestTokenAdapter(t *testing.T) {
 							Version: semver.MustParse("1.5.0"),
 						},
 						RemoteChains: map[uint64]tokens.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
-							chainB: getRemoteChainConfig(semver.MustParse("1.6.1"), []datastore.AddressRef{
+							chainB: getRemoteChainConfig(semver.MustParse("1.7.0"), []datastore.AddressRef{
 								{
 									Type:    datastore.ContractType(committee_verifier.ContractType),
 									Version: semver.MustParse("1.7.0"),
@@ -184,7 +189,7 @@ func TestTokenAdapter(t *testing.T) {
 						ChainSelector: chainB,
 						TokenPoolRef: datastore.AddressRef{
 							Type:      datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
-							Version:   semver.MustParse("1.6.1"),
+							Version:   semver.MustParse("1.7.0"),
 							Qualifier: "TEST",
 						},
 						RegistryRef: datastore.AddressRef{
@@ -209,9 +214,6 @@ func TestTokenAdapter(t *testing.T) {
 				evmChain := e.BlockChains.EVMChains()[chainSel]
 
 				version := semver.MustParse("1.7.0")
-				if chainSel == chainB {
-					version = semver.MustParse("1.6.1")
-				}
 
 				tokenPoolAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 					ChainSelector: chainSel,

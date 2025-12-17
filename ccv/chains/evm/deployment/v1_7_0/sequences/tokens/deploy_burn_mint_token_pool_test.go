@@ -44,11 +44,12 @@ func TestDeployTokenPool(t *testing.T) {
 					}
 				}
 				return tokens.DeployTokenPoolInput{
-					ChainSel:         chainReport.Input.ChainSelector,
-					TokenPoolType:    datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
-					TokenPoolVersion: semver.MustParse("1.7.0"),
-					TokenSymbol:      tokenReport.Input.Args.Symbol,
-					RateLimitAdmin:   common.HexToAddress("0x01"),
+					ChainSel:                         chainReport.Input.ChainSelector,
+					TokenPoolType:                    datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
+					TokenPoolVersion:                 semver.MustParse("1.7.0"),
+					TokenSymbol:                      tokenReport.Input.Args.Symbol,
+					RateLimitAdmin:                   common.HexToAddress("0x01"),
+					ThresholdAmountForAdditionalCCVs: big.NewInt(1e18),
 					ConstructorArgs: tokens.ConstructorArgs{
 						Token:              common.HexToAddress(tokenReport.Output.Address),
 						LocalTokenDecimals: 18,
@@ -100,7 +101,8 @@ func TestDeployTokenPool(t *testing.T) {
 			desc: "incorrect chain selector",
 			makeInput: func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc677.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) tokens.DeployTokenPoolInput {
 				return tokens.DeployTokenPoolInput{
-					ChainSel: 1,
+					ChainSel:                         1,
+					ThresholdAmountForAdditionalCCVs: big.NewInt(1e18),
 				}
 			},
 			expectedErr: "chain selector 1 does not match chain",
@@ -109,7 +111,8 @@ func TestDeployTokenPool(t *testing.T) {
 			desc: "token symbol not defined",
 			makeInput: func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc677.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) tokens.DeployTokenPoolInput {
 				return tokens.DeployTokenPoolInput{
-					ChainSel: chainReport.Input.ChainSelector,
+					ChainSel:                         chainReport.Input.ChainSelector,
+					ThresholdAmountForAdditionalCCVs: big.NewInt(1e18),
 				}
 			},
 			expectedErr: "token symbol must be defined",
@@ -118,8 +121,9 @@ func TestDeployTokenPool(t *testing.T) {
 			desc: "token pool type not defined",
 			makeInput: func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc677.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) tokens.DeployTokenPoolInput {
 				return tokens.DeployTokenPoolInput{
-					ChainSel:    chainReport.Input.ChainSelector,
-					TokenSymbol: tokenReport.Input.Args.Symbol,
+					ChainSel:                         chainReport.Input.ChainSelector,
+					TokenSymbol:                      tokenReport.Input.Args.Symbol,
+					ThresholdAmountForAdditionalCCVs: big.NewInt(1e18),
 				}
 			},
 			expectedErr: "token pool type must be defined",
@@ -128,9 +132,10 @@ func TestDeployTokenPool(t *testing.T) {
 			desc: "token pool version not defined",
 			makeInput: func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc677.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) tokens.DeployTokenPoolInput {
 				return tokens.DeployTokenPoolInput{
-					ChainSel:      chainReport.Input.ChainSelector,
-					TokenSymbol:   tokenReport.Input.Args.Symbol,
-					TokenPoolType: datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
+					ChainSel:                         chainReport.Input.ChainSelector,
+					TokenSymbol:                      tokenReport.Input.Args.Symbol,
+					ThresholdAmountForAdditionalCCVs: big.NewInt(1e18),
+					TokenPoolType:                    datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
 				}
 			},
 			expectedErr: "token pool version must be defined",
@@ -139,10 +144,11 @@ func TestDeployTokenPool(t *testing.T) {
 			desc: "token address not defined",
 			makeInput: func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc677.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) tokens.DeployTokenPoolInput {
 				return tokens.DeployTokenPoolInput{
-					ChainSel:         chainReport.Input.ChainSelector,
-					TokenSymbol:      tokenReport.Input.Args.Symbol,
-					TokenPoolType:    datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
-					TokenPoolVersion: semver.MustParse("1.7.0"),
+					ChainSel:                         chainReport.Input.ChainSelector,
+					TokenSymbol:                      tokenReport.Input.Args.Symbol,
+					TokenPoolType:                    datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
+					ThresholdAmountForAdditionalCCVs: big.NewInt(1e18),
+					TokenPoolVersion:                 semver.MustParse("1.7.0"),
 				}
 			},
 			expectedErr: "token address must be defined",
@@ -151,10 +157,11 @@ func TestDeployTokenPool(t *testing.T) {
 			desc: "rmn proxy address not defined",
 			makeInput: func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc677.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) tokens.DeployTokenPoolInput {
 				return tokens.DeployTokenPoolInput{
-					ChainSel:         chainReport.Input.ChainSelector,
-					TokenSymbol:      tokenReport.Input.Args.Symbol,
-					TokenPoolType:    datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
-					TokenPoolVersion: semver.MustParse("1.7.0"),
+					ChainSel:                         chainReport.Input.ChainSelector,
+					TokenSymbol:                      tokenReport.Input.Args.Symbol,
+					TokenPoolType:                    datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
+					TokenPoolVersion:                 semver.MustParse("1.7.0"),
+					ThresholdAmountForAdditionalCCVs: big.NewInt(1e18),
 					ConstructorArgs: tokens.ConstructorArgs{
 						Token: common.HexToAddress(tokenReport.Output.Address),
 					},
@@ -172,10 +179,11 @@ func TestDeployTokenPool(t *testing.T) {
 					}
 				}
 				return tokens.DeployTokenPoolInput{
-					ChainSel:         chainReport.Input.ChainSelector,
-					TokenSymbol:      tokenReport.Input.Args.Symbol,
-					TokenPoolType:    datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
-					TokenPoolVersion: semver.MustParse("1.7.0"),
+					ChainSel:                         chainReport.Input.ChainSelector,
+					TokenSymbol:                      tokenReport.Input.Args.Symbol,
+					TokenPoolType:                    datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
+					TokenPoolVersion:                 semver.MustParse("1.7.0"),
+					ThresholdAmountForAdditionalCCVs: big.NewInt(1e18),
 					ConstructorArgs: tokens.ConstructorArgs{
 						Token:    common.HexToAddress(tokenReport.Output.Address),
 						RMNProxy: rmnProxyAddress,

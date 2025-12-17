@@ -19,10 +19,10 @@ import (
 
 func basicParams() sequences.CommitteeVerifierParams {
 	return sequences.CommitteeVerifierParams{
-		Version:         semver.MustParse("1.7.0"),
-		FeeAggregator:   common.HexToAddress("0x02"),
-		AllowlistAdmin:  common.HexToAddress("0x03"),
-		StorageLocation: "https://test.chain.link.fake",
+		Version:          semver.MustParse("1.7.0"),
+		FeeAggregator:    common.HexToAddress("0x02"),
+		AllowlistAdmin:   common.HexToAddress("0x03"),
+		StorageLocations: []string{"https://test.chain.link.fake"},
 	}
 }
 
@@ -67,6 +67,7 @@ func TestDeployCommitteeVerifier_Idempotency(t *testing.T) {
 					ChainSelector:     chainSelector,
 					ExistingAddresses: test.existingAddresses,
 					Params:            params,
+					RMN:               common.HexToAddress("0x01"),
 				},
 			)
 			require.NoError(t, err, "ExecuteSequence should not error")
@@ -75,9 +76,8 @@ func TestDeployCommitteeVerifier_Idempotency(t *testing.T) {
 
 			// Expect both contract types to be present
 			exists := map[deployment.ContractType]bool{
-				deployment.ContractType(committee_verifier.ContractType):      false,
-				deployment.ContractType(committee_verifier.ResolverType):      false,
-				deployment.ContractType(committee_verifier.ResolverProxyType): false,
+				deployment.ContractType(committee_verifier.ContractType): false,
+				deployment.ContractType(committee_verifier.ResolverType): false,
 			}
 			for _, addr := range report.Output.Addresses {
 				exists[deployment.ContractType(addr.Type)] = true
@@ -131,6 +131,7 @@ func TestDeployCommitteeVerifier_Idempotency_WithPredeployedCommitteeVerifier(t 
 			CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
 			ChainSelector:  chainSelector,
 			Params:         params,
+			RMN:            common.HexToAddress("0x01"),
 		},
 	)
 	require.NoError(t, err, "Failed to pre-deploy CommitteeVerifier stack")
@@ -145,15 +146,15 @@ func TestDeployCommitteeVerifier_Idempotency_WithPredeployedCommitteeVerifier(t 
 			ChainSelector:     chainSelector,
 			ExistingAddresses: deployReport.Output.Addresses,
 			Params:            params,
+			RMN:               common.HexToAddress("0x01"),
 		},
 	)
 	require.NoError(t, err, "ExecuteSequence should not error with pre-deployed address")
 
 	// Expect all contract types to be present
 	exists := map[deployment.ContractType]bool{
-		deployment.ContractType(committee_verifier.ContractType):      false,
-		deployment.ContractType(committee_verifier.ResolverType):      false,
-		deployment.ContractType(committee_verifier.ResolverProxyType): false,
+		deployment.ContractType(committee_verifier.ContractType): false,
+		deployment.ContractType(committee_verifier.ResolverType): false,
 	}
 	for _, addr := range redundantReport.Output.Addresses {
 		exists[deployment.ContractType(addr.Type)] = true
@@ -209,6 +210,7 @@ func TestDeployCommitteeVerifier_MultipleDeployments(t *testing.T) {
 				ChainSelector:     evmChain.Selector,
 				ExistingAddresses: nil,
 				Params:            params,
+				RMN:               common.HexToAddress("0x01"),
 			}
 
 			report, err := operations.ExecuteSequence(e.OperationsBundle, sequences.DeployCommitteeVerifier, evmChain, input)
@@ -262,6 +264,7 @@ func TestDeployCommitteeVerifier_MultipleDeployments(t *testing.T) {
 					ChainSelector:     chainSel,
 					ExistingAddresses: nil,
 					Params:            params,
+					RMN:               common.HexToAddress("0x01"),
 				}
 
 				report, execErr := operations.ExecuteSequence(e.OperationsBundle, sequences.DeployCommitteeVerifier, evmChain, input)
@@ -314,6 +317,7 @@ func TestDeployCommitteeVerifier_MultipleQualifiersOnSameChain(t *testing.T) {
 			ChainSelector:     chainSel,
 			ExistingAddresses: nil,
 			Params:            paramsAlpha,
+			RMN:               common.HexToAddress("0x01"),
 		},
 	)
 	require.NoError(t, err)
@@ -332,8 +336,6 @@ func TestDeployCommitteeVerifier_MultipleQualifiersOnSameChain(t *testing.T) {
 	require.True(t, ok)
 	alphaResolver, ok := find(addrs1, datastore.ContractType(committee_verifier.ResolverType), "alpha")
 	require.True(t, ok)
-	alphaResolverProxy, ok := find(addrs1, datastore.ContractType(committee_verifier.ResolverProxyType), "alpha")
-	require.True(t, ok)
 
 	// Second run with qualifier "beta", passing previous addresses as existing
 	paramsBeta := basicParams()
@@ -347,6 +349,7 @@ func TestDeployCommitteeVerifier_MultipleQualifiersOnSameChain(t *testing.T) {
 			ChainSelector:     chainSel,
 			ExistingAddresses: addrs1,
 			Params:            paramsBeta,
+			RMN:               common.HexToAddress("0x01"),
 		},
 	)
 	require.NoError(t, err)
@@ -356,12 +359,9 @@ func TestDeployCommitteeVerifier_MultipleQualifiersOnSameChain(t *testing.T) {
 	require.True(t, ok)
 	betaResolver, ok := find(addrs2, datastore.ContractType(committee_verifier.ResolverType), "beta")
 	require.True(t, ok)
-	betaResolverProxy, ok := find(addrs2, datastore.ContractType(committee_verifier.ResolverProxyType), "beta")
-	require.True(t, ok)
 
 	require.NotEqual(t, alphaCV.Address, betaCV.Address, "expected different addresses for different qualifiers")
 	require.NotEqual(t, alphaResolver.Address, betaResolver.Address, "expected different addresses for different qualifiers")
-	require.NotEqual(t, alphaResolverProxy.Address, betaResolverProxy.Address, "expected different addresses for different qualifiers")
 
 	// Third run reusing qualifier "alpha" should return the same alpha addresses
 	report3, err := operations.ExecuteSequence(
@@ -373,6 +373,7 @@ func TestDeployCommitteeVerifier_MultipleQualifiersOnSameChain(t *testing.T) {
 			ChainSelector:     chainSel,
 			ExistingAddresses: append(addrs1, addrs2...),
 			Params:            paramsAlpha,
+			RMN:               common.HexToAddress("0x01"),
 		},
 	)
 	require.NoError(t, err)
@@ -382,10 +383,7 @@ func TestDeployCommitteeVerifier_MultipleQualifiersOnSameChain(t *testing.T) {
 	require.True(t, ok)
 	reAlphaResolver, ok := find(addrs3, datastore.ContractType(committee_verifier.ResolverType), "alpha")
 	require.True(t, ok)
-	reAlphaResolverProxy, ok := find(addrs3, datastore.ContractType(committee_verifier.ResolverProxyType), "alpha")
-	require.True(t, ok)
 
 	require.Equal(t, alphaCV.Address, reAlphaCV.Address, "expected same address when reusing qualifier")
 	require.Equal(t, alphaResolver.Address, reAlphaResolver.Address, "expected same address when reusing qualifier")
-	require.Equal(t, alphaResolverProxy.Address, reAlphaResolverProxy.Address, "expected same address when reusing qualifier")
 }

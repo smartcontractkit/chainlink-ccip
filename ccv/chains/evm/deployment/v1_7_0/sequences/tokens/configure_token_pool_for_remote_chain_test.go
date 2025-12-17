@@ -17,10 +17,11 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
-func makeFirstPassInput(chainSel uint64, remoteChainSel uint64, tokenPoolAddress common.Address) tokens.ConfigureTokenPoolForRemoteChainInput {
+func makeFirstPassInput(chainSel uint64, remoteChainSel uint64, tokenPoolAddress common.Address, advancedPoolHooksAddress common.Address) tokens.ConfigureTokenPoolForRemoteChainInput {
 	return tokens.ConfigureTokenPoolForRemoteChainInput{
 		ChainSelector:       chainSel,
 		TokenPoolAddress:    tokenPoolAddress,
+		AdvancedPoolHooks:   advancedPoolHooksAddress,
 		RemoteChainSelector: remoteChainSel,
 		RemoteChainConfig: tokens_core.RemoteChainConfig[[]byte, string]{
 			RemoteToken: common.LeftPadBytes(common.FromHex("0x123"), 32),
@@ -35,8 +36,27 @@ func makeFirstPassInput(chainSel uint64, remoteChainSel uint64, tokenPoolAddress
 				Capacity:  big.NewInt(1000),
 				Rate:      big.NewInt(100),
 			},
+			CustomFinalityInboundRateLimiterConfig: tokens_core.RateLimiterConfig{
+				IsEnabled: true,
+				Capacity:  big.NewInt(3000),
+				Rate:      big.NewInt(300),
+			},
+			CustomFinalityOutboundRateLimiterConfig: tokens_core.RateLimiterConfig{
+				IsEnabled: true,
+				Capacity:  big.NewInt(2000),
+				Rate:      big.NewInt(200),
+			},
 			OutboundCCVs: []string{"0x789"},
 			InboundCCVs:  []string{"0xabc"},
+			TokenTransferFeeConfig: tokens_core.TokenTransferFeeConfig{
+				IsEnabled:                     true,
+				DestGasOverhead:               100,
+				DestBytesOverhead:             100,
+				DefaultFinalityFeeUSDCents:    100,
+				CustomFinalityFeeUSDCents:     100,
+				DefaultFinalityTransferFeeBps: 100,
+				CustomFinalityTransferFeeBps:  100,
+			},
 		},
 	}
 }
@@ -87,7 +107,7 @@ func checkTokenPoolConfigForRemoteChain(t *testing.T, e *deployment.Environment,
 func TestConfigureTokenPoolForRemoteChain(t *testing.T) {
 	tests := []struct {
 		desc                string
-		makeSecondPassInput func(chainSel uint64, remoteChainSel uint64, tokenPoolAddress common.Address) tokens.ConfigureTokenPoolForRemoteChainInput
+		makeSecondPassInput func(chainSel uint64, remoteChainSel uint64, tokenPoolAddress common.Address, advancedPoolHooksAddress common.Address) tokens.ConfigureTokenPoolForRemoteChainInput
 	}{
 		{
 			desc: "initial configuration",
@@ -95,8 +115,8 @@ func TestConfigureTokenPoolForRemoteChain(t *testing.T) {
 
 		{
 			desc: "update rate limits on second pass",
-			makeSecondPassInput: func(chainSel uint64, remoteChainSel uint64, tokenPoolAddress common.Address) tokens.ConfigureTokenPoolForRemoteChainInput {
-				secondPassInput := makeFirstPassInput(chainSel, remoteChainSel, tokenPoolAddress)
+			makeSecondPassInput: func(chainSel uint64, remoteChainSel uint64, tokenPoolAddress common.Address, advancedPoolHooksAddress common.Address) tokens.ConfigureTokenPoolForRemoteChainInput {
+				secondPassInput := makeFirstPassInput(chainSel, remoteChainSel, tokenPoolAddress, advancedPoolHooksAddress)
 				secondPassInput.RemoteChainConfig.DefaultFinalityInboundRateLimiterConfig.Capacity = big.NewInt(6000)
 				secondPassInput.RemoteChainConfig.DefaultFinalityInboundRateLimiterConfig.Rate = big.NewInt(600)
 				secondPassInput.RemoteChainConfig.DefaultFinalityOutboundRateLimiterConfig.Capacity = big.NewInt(5000)
@@ -106,32 +126,32 @@ func TestConfigureTokenPoolForRemoteChain(t *testing.T) {
 		},
 		{
 			desc: "update remote token on second pass",
-			makeSecondPassInput: func(chainSel uint64, remoteChainSel uint64, tokenPoolAddress common.Address) tokens.ConfigureTokenPoolForRemoteChainInput {
-				secondPassInput := makeFirstPassInput(chainSel, remoteChainSel, tokenPoolAddress)
+			makeSecondPassInput: func(chainSel uint64, remoteChainSel uint64, tokenPoolAddress common.Address, advancedPoolHooksAddress common.Address) tokens.ConfigureTokenPoolForRemoteChainInput {
+				secondPassInput := makeFirstPassInput(chainSel, remoteChainSel, tokenPoolAddress, advancedPoolHooksAddress)
 				secondPassInput.RemoteChainConfig.RemoteToken = common.LeftPadBytes(common.FromHex("0x101"), 32)
 				return secondPassInput
 			},
 		},
 		{
 			desc: "update remote pool on second pass",
-			makeSecondPassInput: func(chainSel uint64, remoteChainSel uint64, tokenPoolAddress common.Address) tokens.ConfigureTokenPoolForRemoteChainInput {
-				secondPassInput := makeFirstPassInput(chainSel, remoteChainSel, tokenPoolAddress)
+			makeSecondPassInput: func(chainSel uint64, remoteChainSel uint64, tokenPoolAddress common.Address, advancedPoolHooksAddress common.Address) tokens.ConfigureTokenPoolForRemoteChainInput {
+				secondPassInput := makeFirstPassInput(chainSel, remoteChainSel, tokenPoolAddress, advancedPoolHooksAddress)
 				secondPassInput.RemoteChainConfig.RemotePool = common.LeftPadBytes(common.FromHex("0x202"), 32)
 				return secondPassInput
 			},
 		},
 		{
 			desc: "update inbound CCVs on second pass",
-			makeSecondPassInput: func(chainSel uint64, remoteChainSel uint64, tokenPoolAddress common.Address) tokens.ConfigureTokenPoolForRemoteChainInput {
-				secondPassInput := makeFirstPassInput(chainSel, remoteChainSel, tokenPoolAddress)
+			makeSecondPassInput: func(chainSel uint64, remoteChainSel uint64, tokenPoolAddress common.Address, advancedPoolHooksAddress common.Address) tokens.ConfigureTokenPoolForRemoteChainInput {
+				secondPassInput := makeFirstPassInput(chainSel, remoteChainSel, tokenPoolAddress, advancedPoolHooksAddress)
 				secondPassInput.RemoteChainConfig.InboundCCVs = []string{"0x789", "0x790"}
 				return secondPassInput
 			},
 		},
 		{
 			desc: "update outbound CCVs on second pass",
-			makeSecondPassInput: func(chainSel uint64, remoteChainSel uint64, tokenPoolAddress common.Address) tokens.ConfigureTokenPoolForRemoteChainInput {
-				secondPassInput := makeFirstPassInput(chainSel, remoteChainSel, tokenPoolAddress)
+			makeSecondPassInput: func(chainSel uint64, remoteChainSel uint64, tokenPoolAddress common.Address, advancedPoolHooksAddress common.Address) tokens.ConfigureTokenPoolForRemoteChainInput {
+				secondPassInput := makeFirstPassInput(chainSel, remoteChainSel, tokenPoolAddress, advancedPoolHooksAddress)
 				secondPassInput.RemoteChainConfig.OutboundCCVs = []string{"0x789", "0x790"}
 				return secondPassInput
 			},
@@ -169,8 +189,9 @@ func TestConfigureTokenPoolForRemoteChain(t *testing.T) {
 			)
 			require.NoError(t, err, "ExecuteSequence should not error")
 			tokenPoolAddress := common.HexToAddress(tokenAndPoolReport.Output.Addresses[1].Address)
+			advancedPoolHooksAddress := common.HexToAddress(tokenAndPoolReport.Output.Addresses[2].Address)
 
-			firstPassInput := makeFirstPassInput(chainSel, remoteChainSel, tokenPoolAddress)
+			firstPassInput := makeFirstPassInput(chainSel, remoteChainSel, tokenPoolAddress, advancedPoolHooksAddress)
 			_, err = operations.ExecuteSequence(
 				e.OperationsBundle,
 				tokens.ConfigureTokenPoolForRemoteChain,
@@ -186,6 +207,7 @@ func TestConfigureTokenPoolForRemoteChain(t *testing.T) {
 					chainSel,
 					remoteChainSel,
 					tokenPoolAddress,
+					advancedPoolHooksAddress,
 				)
 
 				_, err = operations.ExecuteSequence(

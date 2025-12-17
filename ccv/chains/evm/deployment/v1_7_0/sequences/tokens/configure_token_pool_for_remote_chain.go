@@ -88,7 +88,7 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 		if len(inboundCCVs) > 0 || len(outboundCCVs) > 0 {
 			setCCVsReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.ApplyCCVConfigUpdates, chain, evm_contract.FunctionInput[[]advanced_pool_hooks.CCVConfigArg]{
 				ChainSelector: input.ChainSelector,
-				Address:       input.TokenPoolAddress,
+				Address:       input.AdvancedPoolHooks,
 				Args: []advanced_pool_hooks.CCVConfigArg{
 					{
 						RemoteChainSelector: input.RemoteChainSelector,
@@ -207,6 +207,12 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to apply chain updates: %w", err)
 		}
 		writes = append(writes, applyChainUpdatesReport.Output)
+		// Check and update custom finality rate limiters
+		customFinalityRateLimitersReport, err := maybeUpdateRateLimiters(b, chain, input, true)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to maybe update rate limiters: %w", err)
+		}
+		writes = append(writes, customFinalityRateLimitersReport)
 
 		batchOp, err := evm_contract.NewBatchOperationFromWrites(writes)
 		if err != nil {
