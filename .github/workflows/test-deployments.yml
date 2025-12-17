@@ -37,14 +37,6 @@ jobs:
             run_crosschain_deployment:
               - 'integration-tests/deployment/**'
 
-  setup-solana:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Install Solana CLI
-        run: |
-          sh -c "$(curl -sSfL https://release.anza.xyz/stable/install)" # always use latest stable release from solana
-          echo "PATH=$HOME/.local/share/solana/install/active_release/bin:$PATH" >> $GITHUB_ENV
-
   setup-go:
     runs-on: ubuntu-latest
     steps:
@@ -96,7 +88,7 @@ jobs:
         run: go test ./...
 
   test-deployments-crosschain:
-    needs: [detect_deployments_changes, setup-go, setup-solana]
+    needs: [detect_deployments_changes, setup-go]
     if: |-
       ${{
         needs.detect_deployments_changes.outputs.run_crosschain_deployment == 'true' ||
@@ -109,5 +101,9 @@ jobs:
         working-directory: integration-tests/deployment
     steps:
       - uses: actions/checkout@v4
+      - name: Install Solana CLI
+        run: |
+          sh -c "$(curl -sSfL https://release.anza.xyz/stable/install)" # always use latest stable release from solana
+          echo "PATH=$HOME/.local/share/solana/install/active_release/bin:$PATH" >> $GITHUB_ENV
       - name: Run tests
         run: go test ./...
