@@ -53,7 +53,7 @@ contract OffRampSetup is BaseTest {
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       isEnabled: isEnabled,
       onRamps: onRamps,
-      defaultCCV: defaultCCVs,
+      defaultCCVs: defaultCCVs,
       laneMandatedCCVs: laneMandatedCCVs
     });
     s_offRamp.applySourceChainConfigUpdates(updates);

@@ -25,6 +25,7 @@ contract BurnMintTokenPool is BurnMintTokenPoolAbstract, ITypeAndVersion {
   ) TokenPool(token, localTokenDecimals, advancedPoolHooks, rmnProxy, router) {}
 
   /// @inheritdoc TokenPool
+  /// @param amount The amount of tokens to burn from the pool.
   function _lockOrBurn(
     uint256 amount
   ) internal virtual override {

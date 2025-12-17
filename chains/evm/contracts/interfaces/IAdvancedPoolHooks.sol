@@ -30,8 +30,11 @@ interface IAdvancedPoolHooks {
   ) external;
 
   /// @notice Returns the set of required CCVs for transfers in a specific direction.
+  /// @param localToken The address of the local token.
   /// @param remoteChainSelector The remote chain selector for this transfer.
   /// @param amount The amount being transferred.
+  /// @param blockConfirmationRequested Requested block confirmation.
+  /// @param extraData Direction-specific payload forwarded by the caller (e.g. token args or source pool data).
   /// @param direction The direction of the transfer (Inbound or Outbound).
   /// @return requiredCCVs Set of required CCV addresses.
   function getRequiredCCVs(
