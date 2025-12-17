@@ -11,7 +11,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/advanced_pool_hooks"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/token_pool"
 	tp_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 
 	mcms_types "github.com/smartcontractkit/mcms/types"
@@ -19,7 +18,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
-	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
@@ -48,11 +46,11 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 	"configure-token-pool-for-remote-chain",
 	semver.MustParse("1.7.0"),
 	"Configures a token pool on an EVM chain for transfers with other chains",
-	func(b operations.Bundle, chain evm.Chain, input ConfigureTokenPoolForRemoteChainInput) (output sequences.OnChainOutput, err error) {
+	func(b cldf_ops.Bundle, chain evm.Chain, input ConfigureTokenPoolForRemoteChainInput) (output sequences.OnChainOutput, err error) {
 		if err := input.Validate(chain); err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("invalid input: %w", err)
 		}
-		writes := make([]contract.WriteOutput, 0)
+		writes := make([]evm_contract.WriteOutput, 0)
 
 		// Update token transfer fee configuration for the remote chain
 		applyTokenTransferFeeConfigUpdatesReport, err := cldf_ops.ExecuteOperation(b, token_pool.ApplyTokenTransferFeeConfigUpdates, chain, evm_contract.FunctionInput[token_pool.TokenTransferFeeConfigArgs]{
@@ -177,7 +175,7 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 				}
 
 				// Return early as no further action is required
-				batchOp, err := contract.NewBatchOperationFromWrites(writes)
+				batchOp, err := evm_contract.NewBatchOperationFromWrites(writes)
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
 				}
@@ -210,7 +208,7 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 		}
 		writes = append(writes, applyChainUpdatesReport.Output)
 
-		batchOp, err := contract.NewBatchOperationFromWrites(writes)
+		batchOp, err := evm_contract.NewBatchOperationFromWrites(writes)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
 		}
@@ -220,7 +218,7 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 )
 
 // maybeUpdateRateLimiters checks and updates the rate limiters for a given remote chain if they do not match the desired config.
-func maybeUpdateRateLimiters(b operations.Bundle, chain evm.Chain, input ConfigureTokenPoolForRemoteChainInput, customBlockConfirmation bool) (output evm_contract.WriteOutput, err error) {
+func maybeUpdateRateLimiters(b cldf_ops.Bundle, chain evm.Chain, input ConfigureTokenPoolForRemoteChainInput, customBlockConfirmation bool) (output evm_contract.WriteOutput, err error) {
 	var desiredInboundRateLimiterConfig tokens.RateLimiterConfig
 	var desiredOutboundRateLimiterConfig tokens.RateLimiterConfig
 	if customBlockConfirmation {
@@ -241,7 +239,7 @@ func maybeUpdateRateLimiters(b operations.Bundle, chain evm.Chain, input Configu
 		},
 	})
 	if err != nil {
-		return contract.WriteOutput{}, fmt.Errorf("failed to get rate limiter state: %w", err)
+		return evm_contract.WriteOutput{}, fmt.Errorf("failed to get rate limiter state: %w", err)
 	}
 	currentStates := rateLimiterStateReport.Output
 
@@ -261,12 +259,12 @@ func maybeUpdateRateLimiters(b operations.Bundle, chain evm.Chain, input Configu
 			},
 		})
 		if err != nil {
-			return contract.WriteOutput{}, fmt.Errorf("failed to set inbound rate limiter config: %w", err)
+			return evm_contract.WriteOutput{}, fmt.Errorf("failed to set inbound rate limiter config: %w", err)
 		}
 		return setInboundRateLimiterReport.Output, nil
 	}
 
-	return contract.WriteOutput{}, nil
+	return evm_contract.WriteOutput{}, nil
 }
 
 // rateLimiterConfigsEqual returns true if the current rate limiter config on-chain matches the desired config.

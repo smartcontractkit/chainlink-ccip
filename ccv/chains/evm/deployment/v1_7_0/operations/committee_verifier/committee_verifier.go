@@ -23,6 +23,7 @@ type DynamicConfig = committee_verifier.CommitteeVerifierDynamicConfig
 type ConstructorArgs struct {
 	DynamicConfig   DynamicConfig
 	StorageLocation string
+	RMN             common.Address
 }
 
 type ResolverConstructorArgs struct{}

@@ -34,6 +34,7 @@ type DeployCommitteeVerifierInput struct {
 	ChainSelector     uint64
 	ExistingAddresses []datastore.AddressRef
 	CREATE2Factory    common.Address
+	RMN               common.Address
 	Params            CommitteeVerifierParams
 }
 
@@ -59,6 +60,7 @@ var DeployCommitteeVerifier = cldf_ops.NewSequence(
 					AllowlistAdmin: input.Params.AllowlistAdmin,
 				},
 				StorageLocation: input.Params.StorageLocation,
+				RMN:             input.RMN,
 			},
 			Qualifier: qualifierPtr,
 		}, input.ExistingAddresses)
