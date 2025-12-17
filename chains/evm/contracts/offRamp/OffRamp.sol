@@ -522,9 +522,15 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
           if (optionalThreshold > 0) {
             --optionalThreshold;
           }
-        } else {
-          ++j;
+          // If we've removed the last optional element, exit the inner loop to avoid underflow.
+          if (newOptionalLength <= i) {
+            break;
+          }
+          // Re-scan the swapped-in element against the full required list.
+          j = 0;
+          continue;
         }
+        ++j;
       }
     }
 
