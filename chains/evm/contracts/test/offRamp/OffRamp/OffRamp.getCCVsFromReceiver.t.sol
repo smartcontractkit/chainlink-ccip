@@ -50,7 +50,7 @@ contract OffRamp_getCCVsFromReceiver is OffRampSetup {
       s_offRamp.getCCVsFromReceiver(SOURCE_CHAIN_SELECTOR, address(receiver));
 
     assertEq(requiredFromReceiver.length, 1);
-    assertEq(requiredFromReceiver[0], s_defaultCCV);
+    assertEq(requiredFromReceiver[0], address(0));
     assertEq(optionalFromReceiver.length, 0);
     assertEq(optionalThresholdRequested, 0);
   }
@@ -62,7 +62,7 @@ contract OffRamp_getCCVsFromReceiver is OffRampSetup {
       s_offRamp.getCCVsFromReceiver(SOURCE_CHAIN_SELECTOR, eoa);
 
     assertEq(requiredFromReceiver.length, 1);
-    assertEq(requiredFromReceiver[0], s_defaultCCV);
+    assertEq(requiredFromReceiver[0], address(0));
     assertEq(optionalFromReceiver.length, 0);
     assertEq(optionalThresholdRequested, 0);
   }
@@ -75,7 +75,7 @@ contract OffRamp_getCCVsFromReceiver is OffRampSetup {
       s_offRamp.getCCVsFromReceiver(SOURCE_CHAIN_SELECTOR, contractAddress);
 
     assertEq(requiredFromReceiver.length, 1);
-    assertEq(requiredFromReceiver[0], s_defaultCCV);
+    assertEq(requiredFromReceiver[0], address(0));
     assertEq(optionalFromReceiver.length, 0);
     assertEq(optionalThresholdRequested, 0);
   }
