@@ -123,6 +123,7 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
     if (verifierImpl == address(0)) {
       revert OutboundImplementationNotFoundForVerifier();
     }
+    // We forward the whole amount to the verifier; the verifier accrues fees and super.lockOrBurn returns the post-fee destTokenAmount.
     i_token.safeTransfer(verifierImpl, lockOrBurnIn.amount);
     return super.lockOrBurn(lockOrBurnIn, blockConfirmationRequested, tokenArgs);
   }
