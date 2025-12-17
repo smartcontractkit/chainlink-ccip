@@ -99,7 +99,7 @@ func TestAsyncOpsRunner_TimeoutRespected(t *testing.T) {
 	lggr := logger.Nop()
 
 	// Define a hanging operation that ignores the context
-	hangingOp := func(_ context.Context, l logger.Logger) {
+	hangingOp := func(_ context.Context, _ logger.Logger) {
 		// Simulate work that takes much longer than the timeout
 		// and deliberately ignores ctx.Done()
 		time.Sleep(2 * time.Second)
@@ -130,7 +130,7 @@ func TestAsyncOpsRunner_NormalCompletion(t *testing.T) {
 	lggr := logger.Nop()
 
 	// Define a fast operation
-	fastOp := func(_ context.Context, l logger.Logger) {
+	fastOp := func(_ context.Context, _ logger.Logger) {
 		time.Sleep(10 * time.Millisecond)
 	}
 
@@ -158,7 +158,7 @@ func TestAsyncOpsRunner_PoolFullDoesNotBlock(t *testing.T) {
 	// 1. Start a long-running task that occupies the pool
 	// We use a channel to signal when it's running to avoid race conditions with sleep
 	startedCh := make(chan struct{})
-	blockingOp := func(_ context.Context, l logger.Logger) {
+	blockingOp := func(_ context.Context, _ logger.Logger) {
 		close(startedCh)
 		time.Sleep(500 * time.Millisecond) // Occupy the worker
 	}

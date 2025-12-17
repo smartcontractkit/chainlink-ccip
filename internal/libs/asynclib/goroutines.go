@@ -131,7 +131,9 @@ func (a *AsyncOpsRunner) Run(
 	for {
 		select {
 		case <-callCtx.Done():
-			lggr.Infow("async ops runner ctx done, potentially not all tasks complete", "err", callCtx.Err(), "tasksDone", tasksDone)
+			lggr.Infow("async ops runner ctx done, potentially not all tasks complete",
+				"err", callCtx.Err(),
+				"tasksDone", tasksDone)
 			return
 		case _, ok := <-doneCh:
 			if !ok {
