@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
 	"sync"
 	"time"
 
@@ -50,9 +52,10 @@ type AsyncOpsRunner struct {
 }
 
 // NewAsyncOpsRunner creates a new AsyncOpsRunner. It returns an error if the pools cannot be created.
+// poolSizePerOp is a map of operation IDs to pool sizes.
 func NewAsyncOpsRunner(poolSizePerOp map[string]int) (*AsyncOpsRunner, error) {
 	r := &AsyncOpsRunner{pools: make(map[string]*ants.Pool)}
-	for opName, poolSize := range poolSizePerOp {
+	for opID, poolSize := range poolSizePerOp {
 		if poolSize <= 0 {
 			return nil, fmt.Errorf("pool size must be greater than 0, got %d", poolSize)
 		}
@@ -65,7 +68,7 @@ func NewAsyncOpsRunner(poolSizePerOp map[string]int) (*AsyncOpsRunner, error) {
 			return nil, err
 		}
 
-		r.pools[opName] = p
+		r.pools[opID] = p
 	}
 
 	return r, nil
@@ -82,7 +85,7 @@ func (a *AsyncOpsRunner) Run(
 	callCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	lggr.Debugw("spawning goroutines", "timeout", timeout)
+	lggr.Debugw("running operations", "timeout", timeout, "opIDs", slices.Collect(maps.Keys(operations)))
 
 	// We use a buffered channel to avoid blocking the worker goroutines if this function
 	// returns early (e.g. due to context cancellation). We also avoid closing the channel
@@ -91,11 +94,11 @@ func (a *AsyncOpsRunner) Run(
 	// numExpectedTasks may not equal len(operations) if some operations are skipped due to config errors
 	// or if the pool is full.
 	numExpectedTasks := 0
-	for opName, opFunc := range operations {
-		p, ok := a.pools[opName]
+	for opID, opFunc := range operations {
+		p, ok := a.pools[opID]
 		if !ok {
 			// don't have a pool for this op, probably config error
-			lggr.Warnw("pool not found for op, config error?", "op", "opName")
+			lggr.Warnw("pool not found for op, config error?", "opID", opID)
 			continue
 		}
 
@@ -104,14 +107,14 @@ func (a *AsyncOpsRunner) Run(
 				doneCh <- struct{}{}
 			}()
 			tStart := time.Now()
-			opFunc(callCtx, logger.With(lggr, "opID", opName))
-			lggr.Debugw("observing goroutine finished", "opID", opName, "duration", time.Since(tStart))
+			opFunc(callCtx, logger.With(lggr, "opID", opID))
+			lggr.Debugw("operation finished", "opID", opID, "duration", time.Since(tStart))
 		})
 		if err != nil {
 			if errors.Is(err, ants.ErrPoolOverload) {
-				lggr.Errorw("couldn't start worker for op, pool is full", "op", opName, "err", err)
+				lggr.Errorw("couldn't start worker for op, pool is full", "opID", opID, "err", err)
 			} else {
-				lggr.Errorw("couldn't start worker for op, some other error", "op", opName, "err", err)
+				lggr.Errorw("couldn't start worker for op, some other error", "opID", opID, "err", err)
 			}
 			continue
 		}
@@ -128,7 +131,7 @@ func (a *AsyncOpsRunner) Run(
 	for {
 		select {
 		case <-callCtx.Done():
-			lggr.Infow("async ops runner ctx done, potentially not all tasks complete", "err", callCtx.Err())
+			lggr.Infow("async ops runner ctx done, potentially not all tasks complete", "err", callCtx.Err(), "tasksDone", tasksDone)
 			return
 		case _, ok := <-doneCh:
 			if !ok {
