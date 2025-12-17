@@ -15,7 +15,8 @@ import (
 )
 
 type ManualRegistrationInput struct {
-	ChainSelector        uint64 `yaml:"chain-selector" json:"chainSelector"`
+	ChainSelector        uint64          `yaml:"chain-selector" json:"chainSelector"`
+	ChainAdapterVersion  *semver.Version `yaml:"chain-adapter-version" json:"chainAdapterVersion"`
 	ExistingAddresses    []datastore.AddressRef
 	MCMS                 mcms.Input          `yaml:"mcms,omitempty" json:"mcms,omitempty"`
 	RegisterTokenConfigs RegisterTokenConfig `yaml:"register-token-configs" json:"registerTokenConfigs"`
@@ -33,9 +34,6 @@ type SVMExtraArgs struct {
 	CustomerMintAuthorities []solana.PublicKey `yaml:"customer-mint-authorities,omitempty" json:"customerMintAuthorities,omitempty"`
 	SkipTokenPoolInit       bool               `yaml:"skip-token-pool-init" json:"skipTokenPoolInit"`
 }
-
-// TODO: Check if this is correct
-var TokenAdminRegistryVersion = *semver.MustParse("1.6.0")
 
 // ConfigureTokensForTransfers returns a changeset that configures tokens on multiple chains for transfers with other chains.
 func ManualRegistration() cldf.ChangeSetV2[ManualRegistrationInput] {
@@ -60,7 +58,7 @@ func manualRegistrationApply() func(cldf.Environment, ManualRegistrationInput) (
 		if err != nil {
 			return cldf.ChangesetOutput{}, err
 		}
-		tokenPoolAdapter, exists := tokenPoolRegistry.GetTokenAdapter(family, &TokenAdminRegistryVersion)
+		tokenPoolAdapter, exists := tokenPoolRegistry.GetTokenAdapter(family, cfg.ChainAdapterVersion)
 		if !exists {
 			return cldf.ChangesetOutput{}, fmt.Errorf("no TokenPoolAdapter registered for chain family '%s'", family)
 		}
