@@ -144,8 +144,9 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 		// Deploy CCTPTokenPool if needed
 		if input.TokenPools.CCTPV2PoolWithCCV == "" {
 			cctpTokenPoolReport, err := cldf_ops.ExecuteOperation(b, cctp_token_pool.Deploy, chain, contract_utils.DeployInput[cctp_token_pool.ConstructorArgs]{
-				ChainSelector: chain.Selector,
-				Qualifier:     &cctpQualifier,
+				ChainSelector:  chain.Selector,
+				TypeAndVersion: deployment.NewTypeAndVersion(cctp_token_pool.ContractType, *semver.MustParse("1.7.0")),
+				Qualifier:      &cctpQualifier,
 				Args: cctp_token_pool.ConstructorArgs{
 					Token:              common.HexToAddress(input.USDCToken),
 					LocalTokenDecimals: localTokenDecimals,
@@ -224,6 +225,7 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 			usdcTokenPoolProxyReport, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_proxy.Deploy, chain, contract_utils.DeployInput[usdc_token_pool_proxy.ConstructorArgs]{
 				TypeAndVersion: deployment.NewTypeAndVersion(usdc_token_pool_proxy.ContractType, *semver.MustParse("1.7.0")),
 				ChainSelector:  chain.Selector,
+				Qualifier:      &cctpQualifier,
 				Args: usdc_token_pool_proxy.ConstructorArgs{
 					Token: common.HexToAddress(input.USDCToken),
 					Pools: usdc_token_pool_proxy.USDCTokenPoolProxyPoolAddresses{
@@ -265,6 +267,7 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 			} else {
 				cctpVerifierResolverReport, err := cldf_ops.ExecuteOperation(b, versioned_verifier_resolver.Deploy, chain, contract_utils.DeployInput[versioned_verifier_resolver.ConstructorArgs]{
 					TypeAndVersion: deployment.NewTypeAndVersion(cctp_verifier.ResolverType, *semver.MustParse("1.7.0")),
+					Qualifier:      &cctpQualifier,
 					ChainSelector:  chain.Selector,
 				})
 				if err != nil {
@@ -355,6 +358,7 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 				MintRecipientOnDest:   convertAddressToBytes32(common.HexToAddress(remoteChain.RemoteDomain.MintRecipientOnDest)),
 				DomainIdentifier:      remoteChain.RemoteDomain.DomainIdentifier,
 				Enabled:               remoteChain.RemoteDomain.Enabled,
+				ChainSelector:         remoteChainSelector,
 			})
 			remoteChainConfigArgs = append(remoteChainConfigArgs, cctp_verifier.RemoteChainConfigArgs{
 				Router:              common.HexToAddress(input.Router),
