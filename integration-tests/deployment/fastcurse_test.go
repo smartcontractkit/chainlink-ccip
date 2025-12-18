@@ -19,7 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
+	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	routerops1_2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	adaptersv1_5_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/adapters"
 	rmnops1_5 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/rmn"
@@ -28,7 +28,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/rmn_contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/rmn_remote"
 	soladapterv1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/adapters"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/fastcurse"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
@@ -190,8 +189,6 @@ func TestFastCurseSolanaAndEVM(t *testing.T) {
 	}
 
 	// deploy mcms
-	evmDeployer := &adapters.EVMDeployer{}
-	dReg.RegisterDeployer(chainsel.FamilyEVM, deploy.MCMSVersion, evmDeployer)
 	cs := deploy.DeployMCMS(dReg, nil)
 	evmChain1 := env.BlockChains.EVMChains()[chain1]
 	evmChain2 := env.BlockChains.EVMChains()[chain2]
@@ -266,14 +263,7 @@ func TestFastCurseSolanaAndEVM(t *testing.T) {
 	}
 
 	// register chain adapter
-	cr := deploy.GetTransferOwnershipRegistry()
-	evmAdapter := &adapters.EVMTransferOwnershipAdapter{}
-	cr.RegisterAdapter(chainsel.FamilyEVM, transferOwnershipInput.AdapterVersion, evmAdapter)
-	mcmsRegistry := changesets.GetRegistry()
-	evmMCMSReader := &adapters.EVMMCMSReader{}
-	mcmsRegistry.RegisterMCMSReader(chainsel.FamilyEVM, evmMCMSReader)
-	mcmsRegistry.RegisterMCMSReader(chainsel.FamilySolana, &sequences.SolanaAdapter{})
-	transferOwnershipChangeset := deploy.TransferOwnershipChangeset(cr, mcmsRegistry)
+	transferOwnershipChangeset := deploy.TransferOwnershipChangeset(deploy.GetTransferOwnershipRegistry(), changesets.GetRegistry())
 	output, err = transferOwnershipChangeset.Apply(*env, transferOwnershipInput)
 	require.NoError(t, err)
 	require.Greater(t, len(output.Reports), 0)
@@ -312,33 +302,10 @@ func TestFastCurseSolanaAndEVM(t *testing.T) {
 			Description:          "Curse proposal for fast curse test",
 		},
 	}
-	curseReg := fastcurse.GetCurseRegistry()
 	adv1_6_0 := adaptersv1_6_0.NewCurseAdapter()
 	adv1_5_0 := adaptersv1_5_0.NewCurseAdapter()
-	crInput1_6_0 := fastcurse.CurseRegistryInput{
-		CursingFamily:       chainsel.FamilyEVM,
-		CursingVersion:      semver.MustParse("1.6.0"),
-		CurseAdapter:        adaptersv1_6_0.NewCurseAdapter(),
-		CurseSubjectAdapter: adaptersv1_6_0.NewCurseAdapter(),
-	}
-	crInput1_5_0 := fastcurse.CurseRegistryInput{
-		CursingFamily:       chainsel.FamilyEVM,
-		CursingVersion:      semver.MustParse("1.5.0"),
-		CurseAdapter:        adaptersv1_5_0.NewCurseAdapter(),
-		CurseSubjectAdapter: adaptersv1_5_0.NewCurseAdapter(),
-	}
-	crInputSol_1_6_0 := fastcurse.CurseRegistryInput{
-		CursingFamily:       chainsel.FamilySolana,
-		CursingVersion:      semver.MustParse("1.6.0"),
-		CurseAdapter:        soladapterv1_6_0.NewCurseAdapter(),
-		CurseSubjectAdapter: soladapterv1_6_0.NewCurseAdapter(),
-	}
 
-	curseReg.RegisterNewCurse(crInput1_6_0)
-	curseReg.RegisterNewCurse(crInput1_5_0)
-	curseReg.RegisterNewCurse(crInputSol_1_6_0)
-
-	curseChangeset := fastcurse.CurseChangeset(curseReg, mcmsRegistry)
+	curseChangeset := fastcurse.CurseChangeset(fastcurse.GetCurseRegistry(), changesets.GetRegistry())
 	output, err = curseChangeset.Apply(*env, curseCfg)
 	require.NoError(t, err)
 	require.Greater(t, len(output.Reports), 0)
@@ -393,7 +360,7 @@ func TestFastCurseSolanaAndEVM(t *testing.T) {
 	// Now uncurse the subjects
 	// reset the operation bundle to clear any cached values
 	env.OperationsBundle = cldf_ops.NewBundle(env.GetContext, env.Logger, cldf_ops.NewMemoryReporter())
-	uncurseChangeset := fastcurse.UncurseChangeset(curseReg, mcmsRegistry)
+	uncurseChangeset := fastcurse.UncurseChangeset(fastcurse.GetCurseRegistry(), changesets.GetRegistry())
 	output, err = uncurseChangeset.Apply(*env, curseCfg)
 	require.NoError(t, err)
 	require.Greater(t, len(output.Reports), 0)

@@ -8,6 +8,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	chainsel "github.com/smartcontractkit/chain-selectors"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -72,7 +73,6 @@ func (ca *CurseAdapter) Initialize(e cldf.Environment, selector uint64) error {
 }
 
 func (ca *CurseAdapter) IsSubjectCursedOnChain(e cldf.Environment, selector uint64, subject api.Subject) (bool, error) {
-	// locate rmn address on chain
 	rmnAddr, ok := ca.rmnAddressCache[selector]
 	if !ok {
 		return false, fmt.Errorf("no RMN address cached for chain %d", selector)
@@ -85,10 +85,13 @@ func (ca *CurseAdapter) IsSubjectCursedOnChain(e cldf.Environment, selector uint
 	if err != nil {
 		return false, fmt.Errorf("failed to instantiate RMN contract at %s on chain %d: %w", rmnAddr.String(), chain.Selector, err)
 	}
-	// check if chain is globally cursed
-	return rmnC.IsCursed(&bind.CallOpts{
+	curseProgress, err := rmnC.GetCurseProgress(&bind.CallOpts{
 		Context: e.GetContext(),
 	}, subject)
+	if err != nil {
+		return false, fmt.Errorf("failed to get curse progress for subject %x on chain %d: %w", subject, chain.Selector, err)
+	}
+	return curseProgress.Cursed, nil
 }
 
 func (ca *CurseAdapter) IsChainConnectedToTargetChain(e cldf.Environment, selector uint64, targetSel uint64) (bool, error) {
@@ -242,10 +245,13 @@ func (ca *CurseAdapter) ListConnectedChains(e cldf.Environment, selector uint64)
 		if offRamp.OffRamp == (common.Address{}) {
 			continue // skip uninitialized off-ramps
 		}
-		// if chain is non-evm, skip ( TODO: support non-evm chains later)
-		_, exists := e.BlockChains.EVMChains()[offRamp.SourceChainSelector]
-		if !exists {
-			continue
+		// get family of connected chain and check if the adapter supports it
+		family, err := chainsel.GetSelectorFamily(offRamp.SourceChainSelector)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get selector family for connected chain %d: %w", offRamp.SourceChainSelector, err)
+		}
+		if !api.GetCurseRegistry().IsFamilyRegistered(family) {
+			continue // skip unsupported chain families
 		}
 		connectedChains = append(connectedChains, offRamp.SourceChainSelector)
 	}
