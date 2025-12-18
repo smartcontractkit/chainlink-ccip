@@ -5,8 +5,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	mcms_types "github.com/smartcontractkit/mcms/types"
-
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils"
+	
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	rmnproxyops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
@@ -23,6 +22,7 @@ import (
 	v1_6_1_lock_release_token_pool "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/lock_release_token_pool"
 	v1_6_1_siloed_lock_release_token_pool "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/siloed_lock_release_token_pool"
 	tokenapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
+	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
@@ -33,7 +33,7 @@ import (
 
 var DeployTokenPool = cldf_ops.NewSequence(
 	"deploy-token-pool",
-	utils.Version_1_6_1,
+	common_utils.Version_1_6_1,
 	"Deploy given type of token pool contracts",
 	func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokenapi.DeployTokenPoolInput) (sequences.OnChainOutput, error) {
 		if input.TokenPoolVersion == nil {
