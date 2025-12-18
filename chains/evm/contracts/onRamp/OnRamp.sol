@@ -319,6 +319,10 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       if (implAddress == address(0)) {
         revert DestinationChainNotSupportedByCCV(resolvedExtraArgs.ccvs[i], destChainSelector);
       }
+      // NOTE: this verifier blob is *not* the same as the verifier data that will be delivered to the destination chain.
+      // This field is meant for the offchain verifier. The verifier *may* submit this data as part of the verifier data
+      // on the destination chain, but it may also choose to submit different data or no data at all. This means there
+      // should be no check on the length of this and the CCV bytes overhead, as there is no relationship between the two.
       eventData.verifierBlobs[i] = ICrossChainVerifierV1(implAddress).forwardToVerifier(
         newMessage, messageId, message.feeToken, feeTokenAmount, resolvedExtraArgs.ccvArgs[i]
       );

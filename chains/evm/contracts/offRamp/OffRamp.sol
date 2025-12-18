@@ -856,7 +856,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// @return transformedMessage modified message
   function _beforeExecuteSingleMessage(
     MessageV1Codec.MessageV1 memory message
-  ) internal virtual returns (MessageV1Codec.MessageV1 memory transformedMessage) {
+  ) internal view virtual returns (MessageV1Codec.MessageV1 memory transformedMessage) {
     return message;
   }
 }
