@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {IOwner} from "../../../interfaces/IOwner.sol";
-import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
 
 import {Router} from "../../../Router.sol";
 import {RateLimiter} from "../../../libraries/RateLimiter.sol";
