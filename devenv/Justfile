@@ -1,4 +1,3 @@
-set fallback
 
 # Default: show available recipes
 default:
@@ -10,6 +9,29 @@ clean:
 # Install pre-commit hooks
 pre-commit:
     pre-commit install
+
+# Network-specific implementation repository prefix
+REPO_BASE := "https://github.com/smartcontractkit/chainlink-"
+
+# Download chainlink implementations for devenv
+# Usage: just download-implementations ton solana
+download-implementations *ARGS:
+    #!/usr/bin/env bash
+    set -e
+
+    for product in {{ARGS}}; do
+        repo_url={{REPO_BASE}}$product
+        target_dir="../../chainlink-$product"
+
+        echo "Downloading $product to $target_dir..."
+
+        if [ -d "$target_dir" ]; then
+            echo "Directory $target_dir already exists, skipping..."
+        else
+            git clone "$repo_url" "$target_dir"
+            echo "Successfully downloaded $product"
+        fi
+    done
 
 # Clone and build job-distributor Docker image
 build-jd-docker:

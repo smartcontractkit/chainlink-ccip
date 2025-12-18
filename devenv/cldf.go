@@ -16,9 +16,10 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	ccipEVM "github.com/smartcontractkit/chainlink-ccip/devenv/chainimpl/ccip-evm"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldf_evm_provider "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/provider"
-	ccipEVM "github.com/smartcontractkit/chainlink-ccip/devenv/chainimpl/ccip-evm"
+	ccipTON "github.com/smartcontractkit/chainlink-ton/devenv-impl"
 )
 
 type CLDF struct {
@@ -65,7 +66,7 @@ func NewCLDFOperationsEnvironment(bc []*blockchain.Input, dataStore datastore.Da
 						PreferredURLScheme: rpcclient.URLSchemePreferenceHTTP,
 					},
 				},
-				ConfirmFunctor: cldf_evm_provider.ConfirmFuncGeth(1 * time.Minute, cldf_evm_provider.WithTickInterval(5*time.Millisecond)),
+				ConfirmFunctor: cldf_evm_provider.ConfirmFuncGeth(1*time.Minute, cldf_evm_provider.WithTickInterval(5*time.Millisecond)),
 			},
 		).Initialize(context.Background())
 		if err != nil {
@@ -113,10 +114,8 @@ func NewCCIPImplFromNetwork(typ string) (CCIP16ProductConfiguration, error) {
 	case "aptos":
 		panic("implement Aptos")
 	case "ton":
-		panic("implement TON")
+		return ccipTON.NewEmptyCCIP16TON(), nil
 	default:
 		return nil, errors.New("unknown devenv network type " + typ)
 	}
 }
-
-
