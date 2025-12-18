@@ -266,7 +266,7 @@ contract cctp_e2e is OnRampSetup {
     });
 
     vm.resumeGasMetering();
-    s_offRamp.execute(encodedMessage, ccvAddresses, verifierResults);
+    s_offRamp.execute(encodedMessage, ccvAddresses, verifierResults, 0);
   }
 
   function _deployCCTPSetup(
