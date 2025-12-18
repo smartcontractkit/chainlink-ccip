@@ -3,9 +3,9 @@ package factory_burn_mint_erc20
 import (
 	"math/big"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/factory_burn_mint_erc20"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -24,11 +24,11 @@ type ConstructorArgs struct {
 
 var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Name:             "factory_burn_mint_erc20:deploy",
-	Version:          semver.MustParse("1.0.0"),
+	Version:          utils.Version_1_0_0,
 	Description:      "Deploys the FactoryBurnMintERC20 Token contract",
 	ContractMetadata: factory_burn_mint_erc20.FactoryBurnMintERC20MetaData,
 	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
-		cldf_deployment.NewTypeAndVersion(ContractType, *semver.MustParse("1.0.0")).String(): {
+		cldf_deployment.NewTypeAndVersion(ContractType, *utils.Version_1_0_0).String(): {
 			EVM: common.FromHex(factory_burn_mint_erc20.FactoryBurnMintERC20Bin),
 		},
 	},

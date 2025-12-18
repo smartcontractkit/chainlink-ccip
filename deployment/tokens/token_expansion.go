@@ -5,7 +5,7 @@ import (
 	"math/big"
 
 	"github.com/Masterminds/semver/v3"
-	"github.com/ethereum/go-ethereum/common"
+
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
@@ -50,9 +50,12 @@ type DeployTokenInput struct {
 	// Address to be set as the CCIP admin on the token contract
 	// who will be allowed to register the token pool for this token in the TokenAdminRegistry
 	// if not specified, defaults to the timelock address
-	CCIPAdmin common.Address `yaml:"ccip-admin" json:"ccipAdmin"`
+	// Use string to keep this struct chain-agnostic (EVM uses hex, Solana uses base58, etc.)
+	CCIPAdmin string `yaml:"ccip-admin" json:"ccipAdmin"`
 	// Customer admin who will be granted admin rights on the token
-	ExternalAdmin common.Address `yaml:"external-admin" json:"externalAdmin"`
+	// For EVM, expect to have only one Admin address to be passed on whereas Solana may have multiple multisig signers.
+	// Use string to keep this struct chain-agnostic (EVM uses hex, Solana uses base58, etc.)
+	ExternalAdmin []string `yaml:"external-admin" json:"externalAdmin"`
 	// list of addresses who may need special processing in order to send tokens
 	// e.g. for Solana, addresses that need associated token accounts created
 	Senders []string `yaml:"senders" json:"senders"`
@@ -69,9 +72,10 @@ type DeployTokenInput struct {
 	ExistingDataStore datastore.DataStore
 }
 type DeployTokenPoolInput struct {
-	TokenSymbol        string `yaml:"token-symbol" json:"tokenSymbol"`
-	TokenPoolQualifier string `yaml:"token-pool-qualifier" json:"tokenPoolQualifier"`
-	PoolType           string `yaml:"pool-type" json:"poolType"`
+	TokenSymbol        string          `yaml:"token-symbol" json:"tokenSymbol"`
+	TokenPoolQualifier string          `yaml:"token-pool-qualifier" json:"tokenPoolQualifier"`
+	PoolType           string          `yaml:"pool-type" json:"poolType"`
+	TokenPoolVersion   *semver.Version `yaml:"token-pool-version" json:"tokenPoolVersion"`
 	// below are not specified by the user, filled in by the deployment system to pass to chain operations
 	ChainSelector     uint64
 	ExistingDataStore datastore.DataStore
@@ -105,7 +109,25 @@ func TokenExpansion() cldf.ChangeSetV2[TokenExpansionInput] {
 
 func tokenExpansionVerify() func(cldf.Environment, TokenExpansionInput) error {
 	return func(e cldf.Environment, cfg TokenExpansionInput) error {
-		// TODO: implement
+		tokenPoolRegistry := GetTokenAdapterRegistry()
+		for selector, input := range cfg.TokenExpansionInputPerChain {
+			family, err := chain_selectors.GetSelectorFamily(selector)
+			if err != nil {
+				return fmt.Errorf("not a valid selector: %v", err)
+			}
+			tokenPoolAdapter, exists := tokenPoolRegistry.GetTokenAdapter(family, cfg.ChainAdapterVersion)
+			if !exists {
+				return fmt.Errorf("no TokenPoolAdapter registered for chain family '%s'", family)
+			}
+			// deploy token
+			deployTokenInput := input.DeployTokenInput
+			deployTokenInput.ExistingDataStore = e.DataStore
+			deployTokenInput.ChainSelector = selector
+			err = tokenPoolAdapter.DeployTokenVerify(input)
+			if err != nil {
+				return fmt.Errorf("failed to verify deploy token input for chain selector %d: %w", selector, err)
+			}
+		}
 		return nil
 	}
 }
