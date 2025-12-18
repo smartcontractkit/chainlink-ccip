@@ -69,6 +69,13 @@ func CreateBasicTokenTransferFeeConfig() tokens.TokenTransferFeeConfig {
 
 // CreateRateLimiterConfig creates a rate limiter config
 func CreateRateLimiterConfig(rate int64, capacity int64) tokens.RateLimiterConfig {
+	if rate == 0 && capacity == 0 {
+		return tokens.RateLimiterConfig{
+			IsEnabled: false,
+			Rate:      big.NewInt(0),
+			Capacity:  big.NewInt(0),
+		}
+	}
 	return tokens.RateLimiterConfig{
 		IsEnabled: true,
 		Rate:      big.NewInt(rate),

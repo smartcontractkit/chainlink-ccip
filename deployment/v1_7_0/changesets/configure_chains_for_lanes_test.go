@@ -235,16 +235,16 @@ func TestConfigureChainsForLanes_Apply(t *testing.T) {
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
-						CommitteeVerifiers: []adapters.CommitteeVerifierConfig[datastore.AddressRef, datastore.AddressRef]{
+						CommitteeVerifiers: []adapters.CommitteeVerifierConfig[datastore.AddressRef]{
 							{
-								CommitteeVerifier: datastore.AddressRef{
-									Type:          "CommitteeVerifier",
-									Version:       semver.MustParse("1.0.0"),
-									ChainSelector: 5009297550715157269,
-								},
-								SupportingContracts: []datastore.AddressRef{
+								CommitteeVerifier: []datastore.AddressRef{
 									{
 										Type:          "CommitteeVerifierResolver",
+										Version:       semver.MustParse("1.0.0"),
+										ChainSelector: 5009297550715157269,
+									},
+									{
+										Type:          "CommitteeVerifier",
 										Version:       semver.MustParse("1.0.0"),
 										ChainSelector: 5009297550715157269,
 									},
@@ -374,15 +374,15 @@ func TestConfigureChainsForLanes_Apply(t *testing.T) {
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
-						CommitteeVerifiers: []adapters.CommitteeVerifierConfig[datastore.AddressRef, datastore.AddressRef]{
+						CommitteeVerifiers: []adapters.CommitteeVerifierConfig[datastore.AddressRef]{
 							{
-								CommitteeVerifier: datastore.AddressRef{
-									Type:          "CommitteeVerifier",
-									Version:       semver.MustParse("1.0.0"),
-									ChainSelector: 5009297550715157269,
-									Qualifier:     "primary",
-								},
-								SupportingContracts: []datastore.AddressRef{
+								CommitteeVerifier: []datastore.AddressRef{
+									{
+										Type:          "CommitteeVerifier",
+										Version:       semver.MustParse("1.0.0"),
+										ChainSelector: 5009297550715157269,
+										Qualifier:     "primary",
+									},
 									{
 										Type:          "CommitteeVerifierResolver",
 										Version:       semver.MustParse("1.0.0"),
@@ -400,13 +400,13 @@ func TestConfigureChainsForLanes_Apply(t *testing.T) {
 								},
 							},
 							{
-								CommitteeVerifier: datastore.AddressRef{
-									Type:          "CommitteeVerifier",
-									Version:       semver.MustParse("1.0.0"),
-									ChainSelector: 5009297550715157269,
-									Qualifier:     "secondary",
-								},
-								SupportingContracts: []datastore.AddressRef{
+								CommitteeVerifier: []datastore.AddressRef{
+									{
+										Type:          "CommitteeVerifier",
+										Version:       semver.MustParse("1.0.0"),
+										ChainSelector: 5009297550715157269,
+										Qualifier:     "secondary",
+									},
 									{
 										Type:          "CommitteeVerifierResolver",
 										Version:       semver.MustParse("1.0.0"),
@@ -655,14 +655,14 @@ func TestConfigureChainsForLanes_Apply(t *testing.T) {
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
-						CommitteeVerifiers: []adapters.CommitteeVerifierConfig[datastore.AddressRef, datastore.AddressRef]{
+						CommitteeVerifiers: []adapters.CommitteeVerifierConfig[datastore.AddressRef]{
 							{
-								CommitteeVerifier: datastore.AddressRef{
-									Type:          "CommitteeVerifier",
-									Version:       semver.MustParse("1.0.0"),
-									ChainSelector: 5009297550715157269,
-								},
-								SupportingContracts: []datastore.AddressRef{
+								CommitteeVerifier: []datastore.AddressRef{
+									{
+										Type:          "CommitteeVerifier",
+										Version:       semver.MustParse("1.0.0"),
+										ChainSelector: 5009297550715157269,
+									},
 									{
 										Type:          "CommitteeVerifierResolver",
 										Version:       semver.MustParse("1.0.0"),
@@ -693,7 +693,7 @@ func TestConfigureChainsForLanes_Apply(t *testing.T) {
 				},
 				MCMS: lanesTest_BasicMCMSInput,
 			},
-			expectedSequenceErrorMsg: "failed to resolve committeeVerifier ref",
+			expectedSequenceErrorMsg: "failed to resolve CommitteeVerifier contract ref",
 		},
 		{
 			desc: "invalid chain selector",
