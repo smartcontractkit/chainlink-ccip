@@ -70,7 +70,6 @@ type RemoteDomain struct {
 
 type RemoteChainConfig struct {
 	tokens_core.RemoteChainConfig[[]byte, string]
-	AllowlistEnabled    bool
 	FeeUSDCents         uint16
 	GasForVerification  uint32
 	PayloadSizeBytes    uint32
@@ -363,7 +362,6 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 			remoteChainConfigArgs = append(remoteChainConfigArgs, cctp_verifier.RemoteChainConfigArgs{
 				Router:              common.HexToAddress(input.Router),
 				RemoteChainSelector: remoteChainSelector,
-				AllowlistEnabled:    remoteChain.AllowlistEnabled,
 				FeeUSDCents:         remoteChain.FeeUSDCents,
 				GasForVerification:  remoteChain.GasForVerification,
 				PayloadSizeBytes:    remoteChain.PayloadSizeBytes,

@@ -1,0 +1,289 @@
+package changesets_test
+
+import (
+	"context"
+	"errors"
+	"math/big"
+	"testing"
+
+	"github.com/Masterminds/semver/v3"
+	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
+	v1_7_0_changesets "github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/changesets"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	mcms_types "github.com/smartcontractkit/mcms/types"
+)
+
+type cctpTest_MockReader struct{}
+
+func (m *cctpTest_MockReader) GetChainMetadata(_ deployment.Environment, _ uint64, input mcms.Input) (mcms_types.ChainMetadata, error) {
+	return mcms_types.ChainMetadata{
+		MCMAddress:      input.MCMSAddressRef.Address,
+		StartingOpCount: 10,
+	}, nil
+}
+
+type cctpTest_MockCCTPChain struct {
+	sequenceErrorMsg string
+}
+
+// DeployCCTPChain returns a sequence that accepts resolved adapter input (with string addresses)
+func (m *cctpTest_MockCCTPChain) DeployCCTPChain() *cldf_ops.Sequence[adapters.DeployCCTPInput[string, []byte], sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return cldf_ops.NewSequence(
+		"mock-deploy-cctp-chain-sequence",
+		semver.MustParse("1.0.0"),
+		"Mock sequence for testing CCTP deployment",
+		func(bundle cldf_ops.Bundle, deps cldf_chain.BlockChains, input adapters.DeployCCTPInput[string, []byte]) (sequences.OnChainOutput, error) {
+			if m.sequenceErrorMsg != "" {
+				return sequences.OnChainOutput{}, errors.New(m.sequenceErrorMsg)
+			}
+			// In a real implementation, the adapter would convert adapter input to sequence input
+			// and execute the actual DeployCCTPChain sequence. For testing, we just return mock output.
+			return sequences.OnChainOutput{
+				Addresses: []datastore.AddressRef{
+					{
+						ChainSelector: input.ChainSelector,
+						Address:       input.USDCTokenPoolProxy,
+						Type:          datastore.ContractType("USDCTokenPoolProxy"),
+						Version:       semver.MustParse("1.7.0"),
+					},
+				},
+				BatchOps: []mcms_types.BatchOperation{},
+			}, nil
+		},
+	)
+}
+
+// AddressRefToBytes converts an AddressRef to bytes (for EVM, this is just the address bytes)
+func (m *cctpTest_MockCCTPChain) AddressRefToBytes(ref datastore.AddressRef) ([]byte, error) {
+	if ref.Address == "" {
+		return nil, errors.New("address is empty")
+	}
+	// For EVM, addresses are 20 bytes. In a real implementation, this would use go-ethereum's common.HexToAddress
+	// For testing, we'll just return a simple conversion
+	addrBytes := make([]byte, 20)
+	if len(ref.Address) >= 2 && ref.Address[:2] == "0x" {
+		// Simple hex decode for testing - in reality would use proper hex decoding
+		copy(addrBytes, []byte(ref.Address[2:42])) // Take first 20 bytes after 0x
+	}
+	return addrBytes, nil
+}
+
+var cctpTest_BasicMCMSInput = mcms.Input{
+	OverridePreviousRoot: true,
+	ValidUntil:           3759765795,
+	TimelockDelay:        mcms_types.MustParseDuration("1h"),
+	TimelockAction:       mcms_types.TimelockActionSchedule,
+	MCMSAddressRef: datastore.AddressRef{
+		Type:    "MCM",
+		Version: semver.MustParse("1.0.0"),
+	},
+	TimelockAddressRef: datastore.AddressRef{
+		Type:    "Timelock",
+		Version: semver.MustParse("1.0.0"),
+	},
+}
+
+func TestDeployCCTPChains_Apply(t *testing.T) {
+	tests := []struct {
+		desc                     string
+		makeDataStore            func(t *testing.T) *datastore.MemoryDataStore
+		cfg                      v1_7_0_changesets.DeployCCTPChainsConfig
+		expectedSequenceErrorMsg string
+		expectedError            string
+	}{
+		{
+			desc: "success - basic CCTP deployment",
+			makeDataStore: func(t *testing.T) *datastore.MemoryDataStore {
+				ds := datastore.NewMemoryDataStore()
+				chainSelector := uint64(5009297550715157269)
+				// Add required addresses to datastore
+				err := ds.Addresses().Add(datastore.AddressRef{
+					ChainSelector: chainSelector,
+					Address:       "0x1111111111111111111111111111111111111111",
+					Type:          datastore.ContractType("Router"),
+					Version:       semver.MustParse("1.0.0"),
+				})
+				require.NoError(t, err)
+				err = ds.Addresses().Add(datastore.AddressRef{
+					ChainSelector: chainSelector,
+					Address:       "0x2222222222222222222222222222222222222222",
+					Type:          datastore.ContractType("RMN"),
+					Version:       semver.MustParse("1.0.0"),
+				})
+				require.NoError(t, err)
+				err = ds.Addresses().Add(datastore.AddressRef{
+					ChainSelector: chainSelector,
+					Address:       "0x3333333333333333333333333333333333333333",
+					Type:          datastore.ContractType("TokenAdminRegistry"),
+					Version:       semver.MustParse("1.0.0"),
+				})
+				require.NoError(t, err)
+				err = ds.Addresses().Add(datastore.AddressRef{
+					ChainSelector: chainSelector,
+					Address:       "0x4444444444444444444444444444444444444444",
+					Type:          datastore.ContractType("MCM"),
+					Version:       semver.MustParse("1.0.0"),
+				})
+				require.NoError(t, err)
+				err = ds.Addresses().Add(datastore.AddressRef{
+					ChainSelector: chainSelector,
+					Address:       "0x5555555555555555555555555555555555555555",
+					Type:          datastore.ContractType("Timelock"),
+					Version:       semver.MustParse("1.0.0"),
+				})
+				require.NoError(t, err)
+				// Add CCTP-specific addresses
+				err = ds.Addresses().Add(datastore.AddressRef{
+					ChainSelector: chainSelector,
+					Address:       "0x6666666666666666666666666666666666666666",
+					Type:          datastore.ContractType("USDCTokenPoolProxy"),
+					Version:       semver.MustParse("1.7.0"),
+				})
+				require.NoError(t, err)
+				err = ds.Addresses().Add(datastore.AddressRef{
+					ChainSelector: chainSelector,
+					Address:       "0x7777777777777777777777777777777777777777",
+					Type:          datastore.ContractType("CCTPVerifier"),
+					Version:       semver.MustParse("1.7.0"),
+				})
+				require.NoError(t, err)
+				err = ds.Addresses().Add(datastore.AddressRef{
+					ChainSelector: chainSelector,
+					Address:       "0x8888888888888888888888888888888888888888",
+					Type:          datastore.ContractType("MessageTransmitterProxy"),
+					Version:       semver.MustParse("1.7.0"),
+				})
+				require.NoError(t, err)
+				return ds
+			},
+			cfg: v1_7_0_changesets.DeployCCTPChainsConfig{
+				Chains: []adapters.DeployCCTPInput[datastore.AddressRef, datastore.AddressRef]{
+					{
+						ChainSelector: 5009297550715157269,
+						TokenPools:    adapters.TokenPools[datastore.AddressRef]{
+							// Token pools are optional, can be empty
+						},
+						USDCTokenPoolProxy: datastore.AddressRef{
+							ChainSelector: 5009297550715157269,
+							Type:          datastore.ContractType("USDCTokenPoolProxy"),
+							Version:       semver.MustParse("1.7.0"),
+						},
+						CCTPVerifier: []datastore.AddressRef{
+							{
+								ChainSelector: 5009297550715157269,
+								Type:          datastore.ContractType("CCTPVerifier"),
+								Version:       semver.MustParse("1.7.0"),
+							},
+						},
+						MessageTransmitterProxy: datastore.AddressRef{
+							ChainSelector: 5009297550715157269,
+							Type:          datastore.ContractType("MessageTransmitterProxy"),
+							Version:       semver.MustParse("1.7.0"),
+						},
+						TokenAdminRegistry: datastore.AddressRef{
+							ChainSelector: 5009297550715157269,
+							Type:          datastore.ContractType("TokenAdminRegistry"),
+							Version:       semver.MustParse("1.0.0"),
+						},
+						TokenMessenger:                   "0x9999999999999999999999999999999999999999",
+						USDCToken:                        "0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+						MinFinalityValue:                 12,
+						StorageLocations:                 []string{"storage1", "storage2"},
+						RMN:                              datastore.AddressRef{ChainSelector: 5009297550715157269, Type: datastore.ContractType("RMN"), Version: semver.MustParse("1.0.0")},
+						Router:                           datastore.AddressRef{ChainSelector: 5009297550715157269, Type: datastore.ContractType("Router"), Version: semver.MustParse("1.0.0")},
+						Allowlist:                        []string{},
+						ThresholdAmountForAdditionalCCVs: big.NewInt(1000000),
+						RateLimitAdmin:                   "0xBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+						FeeAggregator:                    "0xCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC",
+						AllowlistAdmin:                   "0xDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD",
+						FastFinalityBps:                  100,
+						RemoteChains:                     make(map[uint64]adapters.RemoteCCTPChainConfig[datastore.AddressRef, datastore.AddressRef]),
+					},
+				},
+				MCMS: cctpTest_BasicMCMSInput,
+			},
+		},
+		{
+			desc: "error - no adapter registered",
+			makeDataStore: func(t *testing.T) *datastore.MemoryDataStore {
+				return datastore.NewMemoryDataStore()
+			},
+			cfg: v1_7_0_changesets.DeployCCTPChainsConfig{
+				Chains: []adapters.DeployCCTPInput[datastore.AddressRef, datastore.AddressRef]{
+					{
+						ChainSelector: 5009297550715157269,
+					},
+				},
+				MCMS: cctpTest_BasicMCMSInput,
+			},
+			expectedError: "no CCTP adapter registered",
+		},
+		{
+			desc: "error - sequence execution fails",
+			makeDataStore: func(t *testing.T) *datastore.MemoryDataStore {
+				return datastore.NewMemoryDataStore()
+			},
+			cfg: v1_7_0_changesets.DeployCCTPChainsConfig{
+				Chains: []adapters.DeployCCTPInput[datastore.AddressRef, datastore.AddressRef]{
+					{
+						ChainSelector: 5009297550715157269,
+					},
+				},
+				MCMS: cctpTest_BasicMCMSInput,
+			},
+			expectedSequenceErrorMsg: "sequence execution failed",
+			expectedError:            "failed to deploy CCTP on chain",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			// Create environment with datastore
+			ds := tt.makeDataStore(t)
+			lggr, err := logger.New()
+			require.NoError(t, err, "Failed to create logger")
+			bundle := cldf_ops.NewBundle(
+				func() context.Context { return context.Background() },
+				lggr,
+				cldf_ops.NewMemoryReporter(),
+			)
+			e := deployment.Environment{
+				OperationsBundle: bundle,
+				DataStore:        ds.Seal(),
+			}
+
+			cctpChainRegistry := adapters.NewCCTPChainRegistry()
+			mcmsRegistry := changesets.NewMCMSReaderRegistry()
+			mcmsRegistry.RegisterMCMSReader("evm", &cctpTest_MockReader{})
+
+			// Register mock adapter for successful tests
+			if tt.expectedError == "" || tt.expectedSequenceErrorMsg != "" {
+				mockAdapter := &cctpTest_MockCCTPChain{
+					sequenceErrorMsg: tt.expectedSequenceErrorMsg,
+				}
+				cctpChainRegistry.RegisterCCTPChain("evm", mockAdapter)
+			}
+
+			changeset := v1_7_0_changesets.DeployCCTPChains(cctpChainRegistry, mcmsRegistry)
+			output, err := changeset.Apply(e, tt.cfg)
+
+			if tt.expectedError != "" {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tt.expectedError)
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotNil(t, output)
+		})
+	}
+}

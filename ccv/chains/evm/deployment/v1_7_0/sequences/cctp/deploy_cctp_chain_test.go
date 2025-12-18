@@ -168,7 +168,6 @@ func TestDeployCCTPChain(t *testing.T) {
 	// Add a remote chain config for testing (CCTP V2 with CCV)
 	remoteChainSelector := uint64(4949039107694359620)
 	input.RemoteChains[remoteChainSelector] = RemoteChainConfig{
-		AllowlistEnabled:    false,
 		FeeUSDCents:         10,
 		GasForVerification:  100000,
 		PayloadSizeBytes:    1000,
@@ -209,7 +208,6 @@ func TestDeployCCTPChain(t *testing.T) {
 	require.NoError(t, err, "Failed to confirm BurnMintTokenPool deployment")
 
 	input.RemoteChains[lockReleaseChainSelector] = RemoteChainConfig{
-		AllowlistEnabled:    false,
 		FeeUSDCents:         20,
 		GasForVerification:  150000,
 		PayloadSizeBytes:    2000,
