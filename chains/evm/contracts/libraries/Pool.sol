@@ -17,7 +17,7 @@ library Pool {
   uint32 public constant CCIP_LOCK_OR_BURN_V1_RET_BYTES = 32;
 
   struct LockOrBurnInV1 {
-    bytes receiver; //  The recipient of the tokens on the destination chain, abi encoded.
+    bytes receiver; //  The recipient of the tokens on the destination chain. For EVM source chains, this is abi-encoded (32 bytes).
     uint64 remoteChainSelector; // ─╮ The chain ID of the destination chain.
     address originalSender; // ─────╯ The original sender of the tx on the source chain.
     uint256 amount; //  The amount of tokens to lock or burn, denominated in the source token's decimals.

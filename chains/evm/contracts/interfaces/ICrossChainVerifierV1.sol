@@ -48,6 +48,7 @@ interface ICrossChainVerifierV1 is IERC165 {
 
   /// @notice Message sending, verifier hook.
   /// @param message Decoded MessageV1 structure for the message being sent.
+  /// @dev message.sender is expected to be abi encoded.
   /// @param messageId The message ID of the message being sent.
   /// @param feeToken Fee token used for this message.
   /// @param feeTokenAmount Amount of fee token provided.
