@@ -201,8 +201,8 @@ contract OffRamp__getCCVsForMessage is OffRampSetup {
     tokenAmounts = new MessageV1Codec.TokenTransferV1[](1);
     tokenAmounts[0] = MessageV1Codec.TokenTransferV1({
       amount: 1,
-      sourcePoolAddress: abi.encodePacked(pool),
-      sourceTokenAddress: abi.encodePacked(sourceToken),
+      sourcePoolAddress: abi.encode(pool),
+      sourceTokenAddress: abi.encode(sourceToken),
       destTokenAddress: abi.encodePacked(token),
       tokenReceiver: abi.encodePacked(makeAddr("tokenReceiver")),
       extraData: ""

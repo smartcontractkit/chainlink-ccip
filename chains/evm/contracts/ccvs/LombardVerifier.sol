@@ -109,8 +109,8 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
       revert MustTransferTokens();
     }
 
-    // Casting is safe because we know the message sender must be an EVM address.
-    _assertSenderIsAllowed(message.destChainSelector, address(bytes20(message.sender)));
+    // Sender must be an abi enceded EVM address.
+    _assertSenderIsAllowed(message.destChainSelector, abi.decode(message.sender, (address)));
     return _callDepositOnBridge(message.tokenTransfer[0], message.destChainSelector, message.sender, messageId);
   }
 
@@ -126,7 +126,7 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
     }
 
     // Check if the token is supported. This CCV will only support Lombard tokens.
-    address sourceToken = address(bytes20(tokenTransfer.sourceTokenAddress));
+    address sourceToken = abi.decode(tokenTransfer.sourceTokenAddress, (address));
     if (!s_supportedTokens.contains(sourceToken)) {
       revert TokenNotSupported(sourceToken);
     }
@@ -145,7 +145,7 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
     (, bytes32 payloadHash) = i_bridge.deposit({
       destinationChain: path.lChainId,
       token: sourceToken,
-      sender: address(bytes20(sender)),
+      sender: abi.decode(sender, (address)),
       // Left pad receiver to 32 bytes if not already 32 bytes.
       recipient: Internal._leftPadBytesToBytes32(tokenTransfer.tokenReceiver),
       amount: tokenTransfer.amount,
