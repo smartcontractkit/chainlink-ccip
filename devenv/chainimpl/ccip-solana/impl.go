@@ -1,4 +1,4 @@
-package ccip_evm
+package ccip_solana
 
 import (
 	"context"
@@ -47,7 +47,7 @@ type AnyMsgSentEvent struct {
 	RawEvent any
 }
 
-type CCIP16EVM struct {
+type CCIP16Solana struct {
 	e                      *deployment.Environment
 	chainDetailsBySelector map[uint64]chainsel.ChainDetails
 	ethClients             map[uint64]*ethclient.Client
@@ -56,8 +56,8 @@ type CCIP16EVM struct {
 	msgSentEvents          []*AnyMsgSentEvent
 }
 
-func NewEmptyCCIP16EVM() *CCIP16EVM {
-	return &CCIP16EVM{
+func NewEmptyCCIP16Solana() *CCIP16Solana {
+	return &CCIP16Solana{
 		chainDetailsBySelector: make(map[uint64]chainsel.ChainDetails),
 		ethClients:             make(map[uint64]*ethclient.Client),
 		expectedSeqNumRange:    make(map[SourceDestPair]ccipocr3common.SeqNumRange),
@@ -66,15 +66,15 @@ func NewEmptyCCIP16EVM() *CCIP16EVM {
 	}
 }
 
-// NewCCIP16EVM creates new smart-contracts wrappers with utility functions for CCIP16EVM implementation.
-func NewCCIP16EVM(ctx context.Context, e *deployment.Environment) (*CCIP16EVM, error) {
+// NewCCIP16Solana creates new smart-contracts wrappers with utility functions for CCIP16Solana implementation.
+func NewCCIP16Solana(ctx context.Context, e *deployment.Environment) (*CCIP16Solana, error) {
 	_ = zerolog.Ctx(ctx)
-	out := NewEmptyCCIP16EVM()
+	out := NewEmptyCCIP16Solana()
 	out.e = e
 	return out, nil
 }
 
-func (m *CCIP16EVM) SetCLDF(e *deployment.Environment) {
+func (m *CCIP16Solana) SetCLDF(e *deployment.Environment) {
 	m.e = e
 }
 
@@ -123,7 +123,7 @@ func updatePrices(datastore datastore.DataStore, src, dest uint64, srcChain cldf
 	return nil
 }
 
-func (m *CCIP16EVM) SendMessage(ctx context.Context, src, dest uint64, fields any, opts any) error {
+func (m *CCIP16Solana) SendMessage(ctx context.Context, src, dest uint64, fields any, opts any) error {
 	l := zerolog.Ctx(ctx)
 	l.Info().Msg("Sending CCIP message")
 	a := &evmseqs.EVMAdapter{}
@@ -229,7 +229,7 @@ func (m *CCIP16EVM) SendMessage(ctx context.Context, src, dest uint64, fields an
 	}
 }
 
-func (m *CCIP16EVM) GetExpectedNextSequenceNumber(ctx context.Context, from, to uint64) (uint64, error) {
+func (m *CCIP16Solana) GetExpectedNextSequenceNumber(ctx context.Context, from, to uint64) (uint64, error) {
 	_ = zerolog.Ctx(ctx)
 	sourceDest := SourceDestPair{SourceChainSelector: from, DestChainSelector: to}
 	seqRange, ok := m.expectedSeqNumRange[sourceDest]
@@ -273,7 +273,7 @@ func (c *CommitReportTracker) allCommited(sourceChainSelector uint64) bool {
 }
 
 // WaitOneSentEventBySeqNo wait and fetch strictly one CCIPMessageSent event by selector and sequence number and selector.
-func (m *CCIP16EVM) WaitOneSentEventBySeqNo(ctx context.Context, from, to, seq uint64, timeout time.Duration) (any, error) {
+func (m *CCIP16Solana) WaitOneSentEventBySeqNo(ctx context.Context, from, to, seq uint64, timeout time.Duration) (any, error) {
 	l := zerolog.Ctx(ctx)
 	a := &evmseqs.EVMAdapter{}
 	offAddr, err := a.GetOffRampAddress(m.e.DataStore, to)
@@ -390,7 +390,7 @@ func executionStateToString(state uint8) string {
 }
 
 // WaitOneExecEventBySeqNo wait and fetch strictly one ExecutionStateChanged event by sequence number and selector.
-func (m *CCIP16EVM) WaitOneExecEventBySeqNo(ctx context.Context, from, to, seq uint64, timeout time.Duration) (any, error) {
+func (m *CCIP16Solana) WaitOneExecEventBySeqNo(ctx context.Context, from, to, seq uint64, timeout time.Duration) (any, error) {
 	l := zerolog.Ctx(ctx)
 	a := &evmseqs.EVMAdapter{}
 	offAddr, err := a.GetOffRampAddress(m.e.DataStore, to)
@@ -462,17 +462,17 @@ func getExecutionState(sourceSelector uint64, offRamp offramp.OffRampInterface, 
 	return scc, executionState
 }
 
-func (m *CCIP16EVM) GetEOAReceiverAddress(ctx context.Context, chainSelector uint64) ([]byte, error) {
+func (m *CCIP16Solana) GetEOAReceiverAddress(ctx context.Context, chainSelector uint64) ([]byte, error) {
 	_ = zerolog.Ctx(ctx)
 	return nil, nil
 }
 
-func (m *CCIP16EVM) GetTokenBalance(ctx context.Context, chainSelector uint64, address, tokenAddress []byte) (*big.Int, error) {
+func (m *CCIP16Solana) GetTokenBalance(ctx context.Context, chainSelector uint64, address, tokenAddress []byte) (*big.Int, error) {
 	_ = zerolog.Ctx(ctx)
 	return big.NewInt(0), nil
 }
 
-func (m *CCIP16EVM) ExposeMetrics(
+func (m *CCIP16Solana) ExposeMetrics(
 	ctx context.Context,
 	source, dest uint64,
 	chainIDs []string,
@@ -507,7 +507,7 @@ func (m *CCIP16EVM) ExposeMetrics(
 	return []string{}, reg, nil
 }
 
-func (m *CCIP16EVM) DeployLocalNetwork(ctx context.Context, bc *blockchain.Input) (*blockchain.Output, error) {
+func (m *CCIP16Solana) DeployLocalNetwork(ctx context.Context, bc *blockchain.Input) (*blockchain.Output, error) {
 	l := zerolog.Ctx(ctx)
 	l.Info().Msg("Deploying EVM networks")
 	out, err := blockchain.NewBlockchainNetwork(bc)
@@ -517,7 +517,7 @@ func (m *CCIP16EVM) DeployLocalNetwork(ctx context.Context, bc *blockchain.Input
 	return out, nil
 }
 
-func (m *CCIP16EVM) ConfigureNodes(ctx context.Context, bc *blockchain.Input) (string, error) {
+func (m *CCIP16Solana) ConfigureNodes(ctx context.Context, bc *blockchain.Input) (string, error) {
 	l := zerolog.Ctx(ctx)
 	l.Info().Msg("Configuring CL nodes")
 	name := fmt.Sprintf("node-evm-%s", uuid.New().String()[0:5])
@@ -543,19 +543,19 @@ func (m *CCIP16EVM) ConfigureNodes(ctx context.Context, bc *blockchain.Input) (s
 	), nil
 }
 
-func (m *CCIP16EVM) DeployContractsForSelector(ctx context.Context, env *deployment.Environment, cls []*simple_node_set.Input, selector uint64, ccipHomeSelector uint64, crAddr string) (datastore.DataStore, error) {
+func (m *CCIP16Solana) DeployContractsForSelector(ctx context.Context, env *deployment.Environment, cls []*simple_node_set.Input, selector uint64, ccipHomeSelector uint64, crAddr string) (datastore.DataStore, error) {
 	return devenvcommon.DeployContractsForSelector(ctx, env, cls, selector, ccipHomeSelector, crAddr)
 }
 
-func (m *CCIP16EVM) ConnectContractsWithSelectors(ctx context.Context, e *deployment.Environment, selector uint64, remoteSelectors []uint64) error {
+func (m *CCIP16Solana) ConnectContractsWithSelectors(ctx context.Context, e *deployment.Environment, selector uint64, remoteSelectors []uint64) error {
 	return devenvcommon.ConnectContractsWithSelectors(ctx, e, selector, remoteSelectors)
 }
 
-func (m *CCIP16EVM) ConfigureContractsForSelectors(ctx context.Context, e *deployment.Environment, cls []*simple_node_set.Input, ccipHomeSelector uint64, remoteSelectors []uint64) error {
+func (m *CCIP16Solana) ConfigureContractsForSelectors(ctx context.Context, e *deployment.Environment, cls []*simple_node_set.Input, ccipHomeSelector uint64, remoteSelectors []uint64) error {
 	return devenvcommon.ConfigureContractsForSelectors(ctx, e, cls, ccipHomeSelector, remoteSelectors)
 }
 
-func (m *CCIP16EVM) FundNodes(ctx context.Context, ns []*simple_node_set.Input, bc *blockchain.Input, linkAmount, nativeAmount *big.Int) error {
+func (m *CCIP16Solana) FundNodes(ctx context.Context, ns []*simple_node_set.Input, bc *blockchain.Input, linkAmount, nativeAmount *big.Int) error {
 	l := zerolog.Ctx(ctx)
 	l.Info().Msg("Funding CL nodes with ETH and LINK")
 	nodeClients, err := clclient.New(ns[0].Out.CLNodes)
