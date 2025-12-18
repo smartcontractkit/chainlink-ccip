@@ -515,19 +515,19 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
 
     // Remove duplicates between required and optional CCVs.
     uint256 newOptionalLength = optionalCCVs.length;
-    for (uint256 i = 0; i < newOptionalLength; ++i) {
-      for (uint256 j = 0; j < allRequiredCCVs.length;) {
-        if (optionalCCVs[i] == allRequiredCCVs[j]) {
+    for (uint256 i = 0; i < allRequiredCCVs.length; ++i) {
+      for (uint256 j = 0; j < newOptionalLength;) {
+        if (optionalCCVs[j] == allRequiredCCVs[i]) {
           // Remove the duplicate by replacing it with the last element and reducing the length of the array.
-          optionalCCVs[i] = optionalCCVs[--newOptionalLength];
+          optionalCCVs[j] = optionalCCVs[--newOptionalLength];
 
           // Since we moved one CCV from optional to required, we can reduce the threshold by one, but not below zero.
           if (optionalThreshold > 0) {
             --optionalThreshold;
           }
-        } else {
-          ++j;
+          continue;
         }
+        ++j;
       }
     }
 
