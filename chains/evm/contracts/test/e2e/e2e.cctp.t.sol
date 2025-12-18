@@ -104,7 +104,7 @@ contract cctp_e2e is OnRampSetup {
     defaultDestCCVs[0] = address(s_destCCTPSetup.verifierResolver);
 
     bytes[] memory onRamps = new bytes[](1);
-    onRamps[0] = abi.encodePacked(s_onRamp);
+    onRamps[0] = abi.encode(s_onRamp);
 
     OffRamp.SourceChainConfigArgs[] memory sourceChainUpdates = new OffRamp.SourceChainConfigArgs[](1);
     sourceChainUpdates[0] = OffRamp.SourceChainConfigArgs({
@@ -112,7 +112,7 @@ contract cctp_e2e is OnRampSetup {
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       isEnabled: true,
       onRamps: onRamps,
-      defaultCCV: defaultDestCCVs,
+      defaultCCVs: defaultDestCCVs,
       laneMandatedCCVs: new address[](0)
     });
     s_offRamp.applySourceChainConfigUpdates(sourceChainUpdates);

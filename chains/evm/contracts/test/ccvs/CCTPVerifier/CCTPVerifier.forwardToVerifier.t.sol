@@ -182,7 +182,9 @@ contract CCTPVerifier_forwardToVerifier is CCTPVerifierSetup {
     s_cctpVerifier.applyAllowlistUpdates(allowlistConfigs);
 
     vm.startPrank(s_onRamp);
-    vm.expectRevert(abi.encodeWithSelector(BaseVerifier.SenderNotAllowed.selector, address(bytes20(message.sender))));
+    vm.expectRevert(
+      abi.encodeWithSelector(BaseVerifier.SenderNotAllowed.selector, abi.decode(message.sender, (address)))
+    );
     s_cctpVerifier.forwardToVerifier(message, messageId, s_sourceFeeTokens[0], 0, "");
   }
 
@@ -243,16 +245,16 @@ contract CCTPVerifier_forwardToVerifier is CCTPVerifierSetup {
     message.tokenTransfer = new MessageV1Codec.TokenTransferV1[](2);
     message.tokenTransfer[0] = MessageV1Codec.TokenTransferV1({
       amount: TRANSFER_AMOUNT,
-      sourcePoolAddress: abi.encodePacked(makeAddr("sourcePool")),
-      sourceTokenAddress: abi.encodePacked(address(s_USDCToken)),
+      sourcePoolAddress: abi.encode(makeAddr("sourcePool")),
+      sourceTokenAddress: abi.encode(address(s_USDCToken)),
       destTokenAddress: abi.encodePacked(makeAddr("destToken")),
       tokenReceiver: s_tokenReceiver,
       extraData: "extra data"
     });
     message.tokenTransfer[1] = MessageV1Codec.TokenTransferV1({
       amount: TRANSFER_AMOUNT,
-      sourcePoolAddress: abi.encodePacked(makeAddr("sourcePool")),
-      sourceTokenAddress: abi.encodePacked(address(s_USDCToken)),
+      sourcePoolAddress: abi.encode(makeAddr("sourcePool")),
+      sourceTokenAddress: abi.encode(address(s_USDCToken)),
       destTokenAddress: abi.encodePacked(makeAddr("destToken")),
       tokenReceiver: s_tokenReceiver,
       extraData: "extra data"
@@ -275,7 +277,7 @@ contract CCTPVerifier_forwardToVerifier is CCTPVerifierSetup {
     );
 
     vm.startPrank(s_onRamp);
-    vm.expectRevert(abi.encodeWithSelector(CCTPVerifier.InvalidToken.selector, abi.encodePacked(invalidToken)));
+    vm.expectRevert(abi.encodeWithSelector(CCTPVerifier.InvalidToken.selector, abi.encode(invalidToken)));
     s_cctpVerifier.forwardToVerifier(message, messageId, s_sourceFeeTokens[0], 0, "");
   }
 

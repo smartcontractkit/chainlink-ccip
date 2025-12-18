@@ -218,8 +218,8 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
     bytes calldata verifierArgs
   ) external returns (bytes memory verifierReturnData) {
     _assertNotCursedByRMN(message.destChainSelector);
-    // For EVM, sender is expected to be 20 bytes.
-    _assertSenderIsAllowed(message.destChainSelector, address(bytes20(message.sender)));
+    // For EVM, sender is expected to be abi encoded.
+    _assertSenderIsAllowed(message.destChainSelector, abi.decode(message.sender, (address)));
 
     Domain storage domain = s_chainToDomain[message.destChainSelector];
     if (!domain.enabled) revert UnknownDomain(message.destChainSelector);
@@ -229,7 +229,7 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
 
     MessageV1Codec.TokenTransferV1 memory tokenTransfer = message.tokenTransfer[0];
     // The address of the token transferred must correspond to USDC.
-    if (address(bytes20(tokenTransfer.sourceTokenAddress)) != address(i_usdcToken)) {
+    if (abi.decode(tokenTransfer.sourceTokenAddress, (address)) != address(i_usdcToken)) {
       revert InvalidToken(tokenTransfer.sourceTokenAddress);
     }
 

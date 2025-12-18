@@ -74,7 +74,7 @@ contract OnRamp_getExecutionFee is OnRampSetup {
 
     assertEq(receipt.issuer, s_customExecutor, "Issuer should be the executor");
     assertEq(receipt.destGasLimit, BASE_EXEC_GAS_COST + GAS_LIMIT, "Gas limit should include base cost");
-    assertEq(receipt.feeTokenAmount, EXECUTOR_FEE_USD_CENTS, "Fee should match executor fee");
+    assertEq(receipt.feeTokenAmount, EXECUTOR_FEE_USD_CENTS, "Fee should match executor quote (USD cents)");
     assertEq(receipt.extraArgs, extraArgs.executorArgs, "Extra args should match");
   }
 

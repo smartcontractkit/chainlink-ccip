@@ -25,6 +25,7 @@ contract BurnMintWithLockReleaseFlagTokenPool is BurnMintTokenPool {
   /// @dev The _validateLockOrBurn check is an essential security check
   /// @dev Performs the exact same functionality as BurnMintTokenPool, but returns the LOCK_RELEASE_FLAG
   /// as the destPoolData to signal to the remote pool to release tokens instead of minting them.
+  /// @param lockOrBurnIn Encoded data fields for the processing of tokens on the source chain.
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
   ) public override returns (Pool.LockOrBurnOutV1 memory) {
@@ -49,6 +50,7 @@ contract BurnMintWithLockReleaseFlagTokenPool is BurnMintTokenPool {
 
   /// @notice Mint tokens from the pool to the recipient
   /// @dev The _validateReleaseOrMint check is an essential security check
+  /// @param releaseOrMintIn Encoded data fields for the processing of tokens on the destination chain.
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {

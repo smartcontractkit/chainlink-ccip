@@ -909,7 +909,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
     /// fromTokenAmount:   1e18      // 1 ETH
     /// ETH:               2_000e18
     /// LINK:              15e18
-    /// return:            1e18 * 2_000e18 / 15e18 = 133e18 (133 LINK)
+    /// Result:            1e18 * 2_000e18 / 15e18 = 133e18 (133 LINK)
     return (fromTokenAmount * getValidatedTokenPrice(fromToken)) / getValidatedTokenPrice(toToken);
   }
 
