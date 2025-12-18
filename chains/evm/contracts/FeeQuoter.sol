@@ -19,6 +19,10 @@ import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/Enumera
 ///   - Store the price of a token in USD allowing the owner or priceUpdater to update this value.
 ///   - Manage chain specific fee calculations.
 /// The authorized callers in the contract represent the fee price updaters.
+/// @dev Previous iterations of the FeeQuoter had the concept of price staleness. That no longer exists: all prices
+/// remain valid until they're overwritten. It's the responsibility of the price updater to ensure prices are updated
+/// frequently enough to reflect market conditions. This is intentional to allow for static prices for certain assets,
+/// and to have a variable update frequency based on the asset.
 contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndVersion {
   using EnumerableSet for EnumerableSet.AddressSet;
   using USDPriceWith18Decimals for uint224;
