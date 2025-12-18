@@ -86,7 +86,7 @@ type DeployCCTPInput[LocalContract any, RemoteContract any] struct {
 	// USDCTokenPoolProxy is the address of the USDCTokenPoolProxy contract.
 	USDCTokenPoolProxy LocalContract
 	// CCTPVerifier is set of addresses comprising the CCTPVerifier system.
-	CCTPVerifier []LocalContract
+	CCTPVerifier []datastore.AddressRef
 	// MessageTransmitterProxy is the address of the MessageTransmitterProxy contract.
 	MessageTransmitterProxy LocalContract
 	// TokenAdminRegistry is the address of the TokenAdminRegistry contract.

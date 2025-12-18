@@ -137,13 +137,13 @@ func resolveDeployCCTPChainInput(
 		out.USDCTokenPoolProxy = usdctokenPoolProxy.Address
 	}
 
-	cctpVerifier := make([]string, 0, len(adapterInput.CCTPVerifier))
+	cctpVerifier := make([]datastore.AddressRef, 0, len(adapterInput.CCTPVerifier))
 	for _, ref := range adapterInput.CCTPVerifier {
 		fullRef, err := datastore_utils.FindAndFormatRef(e.DataStore, ref, chainSelector, datastore_utils.FullRef)
 		if err != nil {
 			return adapters.DeployCCTPInput[string, []byte]{}, fmt.Errorf("failed to resolve CCTPVerifier for chain selector %d: %w", chainSelector, err)
 		}
-		cctpVerifier = append(cctpVerifier, fullRef.Address)
+		cctpVerifier = append(cctpVerifier, fullRef)
 	}
 	out.CCTPVerifier = cctpVerifier
 
