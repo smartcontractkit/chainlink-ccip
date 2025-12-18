@@ -18,6 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
 	ccipocr3common "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -25,10 +26,13 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 
+	"github.com/gagliardetto/solana-go"
+	solRpc "github.com/gagliardetto/solana-go/rpc"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	evmseqs "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
 	devenvcommon "github.com/smartcontractkit/chainlink-ccip/devenv/chainimpl"
+	"github.com/smartcontractkit/chainlink-ccip/devenv/changesets"
 	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 )
 
@@ -478,38 +482,12 @@ func (m *CCIP16Solana) ExposeMetrics(
 	chainIDs []string,
 	wsURLs []string,
 ) ([]string, *prometheus.Registry, error) {
-	msgSentTotal.Reset()
-	msgExecTotal.Reset()
-	srcDstLatency.Reset()
-
-	reg := prometheus.NewRegistry()
-	reg.MustRegister(msgSentTotal, msgExecTotal, srcDstLatency)
-
-	lp := NewLokiPusher()
-	err := ProcessLaneEvents(ctx, m, lp, &LaneStreamConfig{
-		FromSelector:      source,
-		ToSelector:        dest,
-		AggregatorAddress: "localhost:50051",
-		AggregatorSince:   0,
-	})
-	if err != nil {
-		return nil, nil, err
-	}
-	err = ProcessLaneEvents(ctx, m, lp, &LaneStreamConfig{
-		FromSelector:      dest,
-		ToSelector:        source,
-		AggregatorAddress: "localhost:50051",
-		AggregatorSince:   0,
-	})
-	if err != nil {
-		return nil, nil, err
-	}
-	return []string{}, reg, nil
+	return nil, nil, nil
 }
 
 func (m *CCIP16Solana) DeployLocalNetwork(ctx context.Context, bc *blockchain.Input) (*blockchain.Output, error) {
 	l := zerolog.Ctx(ctx)
-	l.Info().Msg("Deploying EVM networks")
+	l.Info().Msg("Deploying Solana networks")
 	out, err := blockchain.NewBlockchainNetwork(bc)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create blockchain network: %w", err)
@@ -519,26 +497,47 @@ func (m *CCIP16Solana) DeployLocalNetwork(ctx context.Context, bc *blockchain.In
 
 func (m *CCIP16Solana) ConfigureNodes(ctx context.Context, bc *blockchain.Input) (string, error) {
 	l := zerolog.Ctx(ctx)
-	l.Info().Msg("Configuring CL nodes")
-	name := fmt.Sprintf("node-evm-%s", uuid.New().String()[0:5])
-	finality := 1
+	l.Info().Msg("Configuring CL nodes for solana")
+	name := fmt.Sprintf("node-solana-%s", uuid.New().String()[0:5])
 	return fmt.Sprintf(`
-       [[EVM]]
-       LogPollInterval = '1s'
-       BlockBackfillDepth = 100
-       ChainID = '%s'
-       MinIncomingConfirmations = 1
-       MinContractPayment = '0.0000001 link'
-       FinalityDepth = %d
+	[[Solana]]
+	ChainID = '%s'
+	Enabled = true
+	TxRetryTimeout = '90s'
+	TxConfirmTimeout = '5m'
+	TxExpirationRebroadcast = true
+	TxRetentionTimeout = '8h'
+	FeeBumpPeriod = '0s'
+	FeeEstimatorMode = 'blockhistory'
+	ComputeUnitPriceMin = 1
+	ComputeUnitPriceMax = 500000
+	BlockHistorySize = 150
+	LogPollerStartingLookback = '24h'
 
-       [[EVM.Nodes]]
-       Name = '%s'
-       WsUrl = '%s'
-       HttpUrl = '%s'`,
+	[Solana.MultiNode]
+	Enabled = true
+	SyncThreshold = 170
+	PollFailureThreshold = 5
+	PollInterval = "15s"
+	NewHeadsPollInterval = "5s"
+	SelectionMode = "PriorityLevel"
+	LeaseDuration = "1m"
+	NodeIsSyncingEnabled = false
+	FinalizedBlockPollInterval = "5s"
+	EnforceRepeatableRead = true
+	DeathDeclarationDelay = "20s"
+	NodeNoNewHeadsThreshold = "20s"
+	NoNewFinalizedHeadsThreshold = "20s"
+	FinalityTagEnabled = true
+	FinalityDepth = 0
+	FinalizedBlockOffset = 50
+	VerifyChainID = true
+
+	[[Solana.Nodes]]
+	Name = '%s'
+	URL = '%s'`,
 		bc.ChainID,
-		finality,
 		name,
-		bc.Out.Nodes[0].InternalWSUrl,
 		bc.Out.Nodes[0].InternalHTTPUrl,
 	), nil
 }
@@ -555,37 +554,30 @@ func (m *CCIP16Solana) ConfigureContractsForSelectors(ctx context.Context, e *de
 	return devenvcommon.ConfigureContractsForSelectors(ctx, e, cls, ccipHomeSelector, remoteSelectors)
 }
 
-func (m *CCIP16Solana) FundNodes(ctx context.Context, ns []*simple_node_set.Input, bc *blockchain.Input, linkAmount, nativeAmount *big.Int) error {
+func (m *CCIP16Solana) FundNodes(ctx context.Context, ns []*simple_node_set.Input, bc *blockchain.Input, linkAmount, nativeAmount *big.Int) ([]clclient.NodeKeysBundle, error) {
 	l := zerolog.Ctx(ctx)
 	l.Info().Msg("Funding CL nodes with ETH and LINK")
 	nodeClients, err := clclient.New(ns[0].Out.CLNodes)
 	if err != nil {
-		return fmt.Errorf("connecting to CL nodes: %w", err)
+		return nil, fmt.Errorf("connecting to CL nodes: %w", err)
 	}
-	ethKeyAddressesSrc := make([]string, 0)
-	for i, nc := range nodeClients {
-		addrSrc, err := nc.ReadPrimaryETHKey(bc.ChainID)
-		if err != nil {
-			return fmt.Errorf("getting primary ETH key from OCR node %d (src chain): %w", i, err)
-		}
-		ethKeyAddressesSrc = append(ethKeyAddressesSrc, addrSrc.Attributes.Address)
-		l.Info().
-			Int("Idx", i).
-			Str("ETHKeySrc", addrSrc.Attributes.Address).
-			Msg("Node info")
-	}
-	clientSrc, _, _, err := ETHClient(ctx, bc.Out.Nodes[0].ExternalWSUrl, &GasSettings{
-		FeeCapMultiplier: 2,
-		TipCapMultiplier: 2,
-	})
+	nkb, err := changesets.CreateNodeKeysBundle(nodeClients, bc.Type, bc.ChainID)
 	if err != nil {
-		return fmt.Errorf("could not create basic eth client: %w", err)
+		return nil, fmt.Errorf("creating node keys bundle: %w", err)
 	}
-	for _, addr := range ethKeyAddressesSrc {
-		a, _ := nativeAmount.Float64()
-		if err := FundNodeEIP1559(ctx, clientSrc, getNetworkPrivateKey(), addr, a); err != nil {
-			return fmt.Errorf("failed to fund CL nodes on src chain: %w", err)
-		}
+	var keys []solana.PublicKey
+	for _, nk := range nkb {
+		keys = append(keys, solana.MustPublicKeyFromBase58(nk.TXKey.Data.Attributes.PublicKey))
 	}
-	return nil
+	client := solRpc.New(bc.Out.Nodes[0].ExternalHTTPUrl)
+	err = utils.FundSolanaAccounts(
+		ctx,
+		keys,
+		10,
+		client,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("funding solana accounts: %w", err)
+	}
+	return nkb, nil
 }

@@ -519,7 +519,7 @@ func (m *CCIP16EVM) DeployLocalNetwork(ctx context.Context, bc *blockchain.Input
 
 func (m *CCIP16EVM) ConfigureNodes(ctx context.Context, bc *blockchain.Input) (string, error) {
 	l := zerolog.Ctx(ctx)
-	l.Info().Msg("Configuring CL nodes")
+	l.Info().Msg("Configuring CL nodes for evm")
 	name := fmt.Sprintf("node-evm-%s", uuid.New().String()[0:5])
 	finality := 1
 	return fmt.Sprintf(`
@@ -555,18 +555,18 @@ func (m *CCIP16EVM) ConfigureContractsForSelectors(ctx context.Context, e *deplo
 	return devenvcommon.ConfigureContractsForSelectors(ctx, e, cls, ccipHomeSelector, remoteSelectors)
 }
 
-func (m *CCIP16EVM) FundNodes(ctx context.Context, ns []*simple_node_set.Input, bc *blockchain.Input, linkAmount, nativeAmount *big.Int) error {
+func (m *CCIP16EVM) FundNodes(ctx context.Context, ns []*simple_node_set.Input, bc *blockchain.Input, linkAmount, nativeAmount *big.Int) ([]clclient.NodeKeysBundle, error) {
 	l := zerolog.Ctx(ctx)
 	l.Info().Msg("Funding CL nodes with ETH and LINK")
 	nodeClients, err := clclient.New(ns[0].Out.CLNodes)
 	if err != nil {
-		return fmt.Errorf("connecting to CL nodes: %w", err)
+		return nil, fmt.Errorf("connecting to CL nodes: %w", err)
 	}
 	ethKeyAddressesSrc := make([]string, 0)
 	for i, nc := range nodeClients {
 		addrSrc, err := nc.ReadPrimaryETHKey(bc.ChainID)
 		if err != nil {
-			return fmt.Errorf("getting primary ETH key from OCR node %d (src chain): %w", i, err)
+			return nil, fmt.Errorf("getting primary ETH key from OCR node %d (src chain): %w", i, err)
 		}
 		ethKeyAddressesSrc = append(ethKeyAddressesSrc, addrSrc.Attributes.Address)
 		l.Info().
@@ -579,13 +579,14 @@ func (m *CCIP16EVM) FundNodes(ctx context.Context, ns []*simple_node_set.Input, 
 		TipCapMultiplier: 2,
 	})
 	if err != nil {
-		return fmt.Errorf("could not create basic eth client: %w", err)
+		return nil, fmt.Errorf("could not create basic eth client: %w", err)
 	}
 	for _, addr := range ethKeyAddressesSrc {
 		a, _ := nativeAmount.Float64()
 		if err := FundNodeEIP1559(ctx, clientSrc, getNetworkPrivateKey(), addr, a); err != nil {
-			return fmt.Errorf("failed to fund CL nodes on src chain: %w", err)
+			return nil, fmt.Errorf("failed to fund CL nodes on src chain: %w", err)
 		}
 	}
-	return nil
+	// EVM does not need to create and return NodeKeysBundle
+	return nil, nil
 }

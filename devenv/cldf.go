@@ -3,11 +3,14 @@ package ccip
 import (
 	"context"
 	"errors"
+	"path/filepath"
 	"sync"
 	"time"
 
 	"go.uber.org/zap"
 
+	"github.com/Masterminds/semver/v3"
+	"github.com/gagliardetto/solana-go"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/provider/rpcclient"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -15,11 +18,14 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 
+	solRpc "github.com/gagliardetto/solana-go/rpc"
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
 	ccipEVM "github.com/smartcontractkit/chainlink-ccip/devenv/chainimpl/ccip-evm"
+	ccipSolana "github.com/smartcontractkit/chainlink-ccip/devenv/chainimpl/ccip-solana"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldf_evm_provider "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/provider"
-	ccipTON "github.com/smartcontractkit/chainlink-ton/devenv-impl"
+	cldf_solana_provider "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana/provider"
 )
 
 type CLDF struct {
@@ -39,40 +45,92 @@ func (c *CLDF) AddAddresses(addresses string) {
 }
 
 func NewCLDFOperationsEnvironment(bc []*blockchain.Input, dataStore datastore.DataStore) ([]uint64, *deployment.Environment, error) {
+	runningDS := datastore.NewMemoryDataStore()
+	err := runningDS.Merge(dataStore)
+	if err != nil {
+		return nil, nil, err
+	}
 	providers := make([]cldf_chain.BlockChain, 0)
 	selectors := make([]uint64, 0)
 	for _, b := range bc {
-		chainID := b.Out.ChainID
-		rpcWSURL := b.Out.Nodes[0].ExternalWSUrl
-		rpcHTTPURL := b.Out.Nodes[0].ExternalHTTPUrl
+		if b.Type == "anvil" || b.Type == "geth" {
+			chainID := b.Out.ChainID
+			rpcWSURL := b.Out.Nodes[0].ExternalWSUrl
+			rpcHTTPURL := b.Out.Nodes[0].ExternalHTTPUrl
 
-		d, err := chainsel.GetChainDetailsByChainIDAndFamily(chainID, chainsel.FamilyEVM)
-		if err != nil {
-			return nil, nil, err
-		}
-		selectors = append(selectors, d.ChainSelector)
+			d, err := chainsel.GetChainDetailsByChainIDAndFamily(chainID, chainsel.FamilyEVM)
+			if err != nil {
+				return nil, nil, err
+			}
+			selectors = append(selectors, d.ChainSelector)
 
-		p, err := cldf_evm_provider.NewRPCChainProvider(
-			d.ChainSelector,
-			cldf_evm_provider.RPCChainProviderConfig{
-				DeployerTransactorGen: cldf_evm_provider.TransactorFromRaw(
-					getNetworkPrivateKey(),
-				),
-				RPCs: []rpcclient.RPC{
-					{
-						Name:               "default",
-						WSURL:              rpcWSURL,
-						HTTPURL:            rpcHTTPURL,
-						PreferredURLScheme: rpcclient.URLSchemePreferenceHTTP,
+			p, err := cldf_evm_provider.NewRPCChainProvider(
+				d.ChainSelector,
+				cldf_evm_provider.RPCChainProviderConfig{
+					DeployerTransactorGen: cldf_evm_provider.TransactorFromRaw(
+						getNetworkPrivateKey(),
+					),
+					RPCs: []rpcclient.RPC{
+						{
+							Name:               "default",
+							WSURL:              rpcWSURL,
+							HTTPURL:            rpcHTTPURL,
+							PreferredURLScheme: rpcclient.URLSchemePreferenceHTTP,
+						},
 					},
+					ConfirmFunctor: cldf_evm_provider.ConfirmFuncGeth(1*time.Minute, cldf_evm_provider.WithTickInterval(5*time.Millisecond)),
 				},
-				ConfirmFunctor: cldf_evm_provider.ConfirmFuncGeth(1*time.Minute, cldf_evm_provider.WithTickInterval(5*time.Millisecond)),
-			},
-		).Initialize(context.Background())
-		if err != nil {
-			return nil, nil, err
+			).Initialize(context.Background())
+			if err != nil {
+				return nil, nil, err
+			}
+			providers = append(providers, p)
+		} else if b.Type == "solana" {
+			chainID := b.ChainID
+			rpcHTTPURL := b.Out.Nodes[0].ExternalHTTPUrl
+			rpcWSURL := b.Out.Nodes[0].ExternalWSUrl
+			programsPath, err := filepath.Abs(b.ContractsDir)
+			if err != nil {
+				return nil, nil, err
+			}
+
+			d, err := chainsel.GetChainDetailsByChainIDAndFamily(chainID, chainsel.FamilySolana)
+			if err != nil {
+				return nil, nil, err
+			}
+
+			selectors = append(selectors, d.ChainSelector)
+			deployerKey, err := solana.NewRandomPrivateKey()
+			if err != nil {
+				return nil, nil, err
+			}
+			err = PreloadSolanaEnvironment(runningDS, programsPath, d.ChainSelector)
+			if err != nil {
+				return nil, nil, err
+			}
+
+			p, err := cldf_solana_provider.NewRPCChainProvider(
+				d.ChainSelector,
+				cldf_solana_provider.RPCChainProviderConfig{
+					HTTPURL:        rpcHTTPURL,
+					WSURL:          rpcWSURL,
+					DeployerKeyGen: cldf_solana_provider.PrivateKeyFromRaw(deployerKey.String()),
+					ProgramsPath:   programsPath,
+					KeypairDirPath: programsPath, // Use the same path for keypair storage
+				},
+			).Initialize(context.Background())
+			client := solRpc.New(rpcHTTPURL)
+			err = utils.FundSolanaAccounts(
+				context.Background(),
+				[]solana.PublicKey{deployerKey.PublicKey()},
+				10,
+				client,
+			)
+			if err != nil {
+				return nil, nil, err
+			}
+			providers = append(providers, p)
 		}
-		providers = append(providers, p)
 	}
 
 	blockchains := cldf_chain.NewBlockChainsFromSlice(providers)
@@ -89,7 +147,7 @@ func NewCLDFOperationsEnvironment(bc []*blockchain.Input, dataStore datastore.Da
 		GetContext:  func() context.Context { return context.Background() },
 		Logger:      lggr,
 		BlockChains: blockchains,
-		DataStore:   dataStore,
+		DataStore:   runningDS.Seal(),
 	}
 	return selectors, &e, nil
 }
@@ -108,14 +166,76 @@ func NewCCIPImplFromNetwork(typ string) (CCIP16ProductConfiguration, error) {
 	case "anvil", "geth":
 		return ccipEVM.NewEmptyCCIP16EVM(), nil
 	case "solana":
-		panic("implement Solana")
+		return ccipSolana.NewEmptyCCIP16Solana(), nil
 	case "sui":
 		panic("implement Sui")
 	case "aptos":
 		panic("implement Aptos")
 	case "ton":
-		return ccipTON.NewEmptyCCIP16TON(), nil
+		return nil, nil
 	default:
 		return nil, errors.New("unknown devenv network type " + typ)
 	}
+}
+
+var solanaProgramIDs = map[string]string{
+	"ccip_router": "Ccip842gzYHhvdDkSyi2YVCoAWPbYJoApMFzSxQroE9C",
+	// "test_token_pool":           "JuCcZ4smxAYv9QHJ36jshA7pA3FuQ3vQeWLUeAtZduJ",
+	// "burnmint_token_pool":       "41FGToCmdaWa1dgZLKFAjvmx6e6AjVTX7SVRibvsMGVB",
+	// "lockrelease_token_pool":    "8eqh8wppT9c5rw4ERqNCffvU6cNFJWff9WmkcYtmGiqC",
+	"fee_quoter": "FeeQPGkKDeRV1MgoYfMH6L8o3KeuYjwUZrgn4LRKfjHi",
+	// "test_ccip_receiver":        "EvhgrPhTDt4LcSPS2kfJgH6T6XWZ6wT3X9ncDGLT1vui",
+	"ccip_offramp":      "offqSMQWgQud6WJz694LRzkeN5kMYpCHTpXQr3Rkcjm",
+	"mcm":               "5vNJx78mz7KVMjhuipyr9jKBKcMrKYGdjGkgE4LUmjKk",
+	"timelock":          "DoajfR5tK24xVw51fWcawUZWhAXD8yrBJVacc13neVQA",
+	"access_controller": "6KsN58MTnRQ8FfPaXHiFPPFGDRioikj9CdPvPxZJdCjb",
+	// "external_program_cpi_stub": "2zZwzyptLqwFJFEFxjPvrdhiGpH9pJ3MfrrmZX6NTKxm",
+	"rmn_remote": "RmnXLft1mSEwDgMKu2okYuHkiazxntFFcZFrrcXxYg7",
+	// "cctp_token_pool":           "CCiTPESGEevd7TBU8EGBKrcxuRq7jx3YtW6tPidnscaZ",
+}
+
+var solanaContracts = map[string]datastore.ContractType{
+	"ccip_router":       datastore.ContractType("Router"),
+	"fee_quoter":        datastore.ContractType("FeeQuoter"),
+	"ccip_offramp":      datastore.ContractType("OffRamp"),
+	"rmn_remote":        datastore.ContractType("RMNRemote"),
+	"mcm":               datastore.ContractType(utils.McmProgramType),
+	"timelock":          datastore.ContractType(utils.TimelockProgramType),
+	"access_controller": datastore.ContractType(utils.AccessControllerProgramType),
+}
+
+func PreloadSolanaEnvironment(ds *datastore.MemoryDataStore, programsPath string, chainSelector uint64) error {
+	err := utils.DownloadSolanaCCIPProgramArtifacts(context.Background(), programsPath, utils.VersionToShortCommitSHA[utils.VersionSolanaV0_1_1])
+	if err != nil {
+		return err
+	}
+	err = populateDatastore(ds.AddressRefStore, solanaContracts, semver.MustParse("1.6.0"), "", chainSelector)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// Populates datastore with the predeployed program addresses
+// pass map [programName]:ContractType of contracts to populate datastore with
+func populateDatastore(ds *datastore.MemoryAddressRefStore, contracts map[string]datastore.ContractType, version *semver.Version, qualifier string, chainSel uint64) error {
+	for programName, programID := range solanaProgramIDs {
+		ct, ok := contracts[programName]
+		if !ok {
+			continue
+		}
+
+		err := ds.Add(datastore.AddressRef{
+			Address:       programID,
+			ChainSelector: chainSel,
+			Qualifier:     qualifier,
+			Type:          ct,
+			Version:       version,
+		})
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

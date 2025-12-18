@@ -9,6 +9,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	"github.com/smartcontractkit/chainlink-testing-framework/framework/clclient"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 
 	nodeset "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
@@ -74,5 +75,5 @@ type OffChainConfigurable interface {
 	ConfigureNodes(ctx context.Context, blockchain *blockchain.Input) (string, error)
 	// FundNodes Fund Chainlink nodes for some amount of native/LINK currency
 	// using chain-specific clients or CLDF
-	FundNodes(ctx context.Context, cls []*nodeset.Input, bc *blockchain.Input, linkAmount, nativeAmount *big.Int) error
+	FundNodes(ctx context.Context, cls []*nodeset.Input, bc *blockchain.Input, linkAmount, nativeAmount *big.Int) ([]clclient.NodeKeysBundle, error)
 }

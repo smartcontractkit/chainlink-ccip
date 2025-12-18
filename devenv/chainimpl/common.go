@@ -8,9 +8,11 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/gagliardetto/solana-go"
 	"github.com/rs/zerolog"
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/rmn_home"
+	_ "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	lanesapi "github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
@@ -44,11 +46,17 @@ func DeployContractsForSelector(ctx context.Context, env *deployment.Environment
 
 	dReg := deployops.GetRegistry()
 	version := semver.MustParse("1.6.0")
+	mint, _ := solana.NewRandomPrivateKey()
 	out, err := deployops.DeployContracts(dReg).Apply(*env, deployops.ContractDeploymentConfig{
 		MCMS: mcms.Input{},
 		Chains: map[uint64]deployops.ContractDeploymentConfigPerChain{
 			selector: {
 				Version: version,
+				// LINK TOKEN CONFIG
+				// token private key used to deploy the LINK token. Solana: base58 encoded private key
+				TokenPrivKey: mint.String(),
+				// token decimals used to deploy the LINK token
+				TokenDecimals: 9,
 				// FEE QUOTER CONFIG
 				MaxFeeJuelsPerMsg:            big.NewInt(0).Mul(big.NewInt(200), big.NewInt(1e18)),
 				TokenPriceStalenessThreshold: uint32(24 * 60 * 60),

@@ -158,8 +158,7 @@ func NewEnvironment() (*Cfg, error) {
 		nodeSpec.Node.TestConfigOverrides = allConfigs
 	}
 	Plog.Info().Msg("Nodes network configuration is generated")
-	
-	
+
 	prodJDImage := os.Getenv("JD_IMAGE")
 
 	if in.JD != nil {
@@ -186,12 +185,24 @@ func NewEnvironment() (*Cfg, error) {
 		return nil, fmt.Errorf("failed to create new shared db node set: %w", err)
 	}
 
+	nodeKeyBundles := make(map[string][]clclient.NodeKeysBundle, 0)
 	// deploy all the contracts
 	for i, impl := range impls {
-		if err := impl.FundNodes(ctx, in.NodeSets, in.Blockchains[i], big.NewInt(1), big.NewInt(5)); err != nil {
-			return nil, err
+		nkb, err := impl.FundNodes(ctx, in.NodeSets, in.Blockchains[i], big.NewInt(1), big.NewInt(5))
+		if err != nil {
+			return nil, fmt.Errorf("funding nodes: %w", err)
 		}
-		networkInfo, err := chainsel.GetChainDetailsByChainIDAndFamily(in.Blockchains[i].ChainID, chainsel.FamilyEVM)
+		var family string
+		switch in.Blockchains[i].Type {
+		case "anvil", "geth":
+			family = chainsel.FamilyEVM
+		case "solana":
+			family = chainsel.FamilySolana
+			nodeKeyBundles[family] = nkb
+		default:
+			return nil, fmt.Errorf("unsupported blockchain type: %s", in.Blockchains[i].Type)
+		}
+		networkInfo, err := chainsel.GetChainDetailsByChainIDAndFamily(in.Blockchains[i].ChainID, family)
 		if err != nil {
 			return nil, err
 		}
@@ -256,6 +267,12 @@ func NewEnvironment() (*Cfg, error) {
 		return nil, fmt.Errorf("reading worker node P2P keys: %w", err)
 	}
 	bootstrapId := changesets.MustPeerIDFromString(bootstrapP2PKeys.Data[0].Attributes.PeerID)
+	ocrKeyBundleIDs := map[string]string{
+		"evm": bootstrapKeys.Data[0].ID,
+	}
+	for family, nkb := range nodeKeyBundles {
+		ocrKeyBundleIDs[family] = nkb[0].OCR2Key.Data.ID
+	}
 	raw, err := NewCCIPSpecToml(SpecArgs{
 		P2PV2Bootstrappers:     []string{},
 		CapabilityVersion:      "v1.0.0",
@@ -276,7 +293,7 @@ func NewEnvironment() (*Cfg, error) {
 		return nil, fmt.Errorf("creating CCIP job: %w", err)
 	}
 	L.Info().Str("Node", bootstrapNode.Config.URL).Any("Job", job).Msg("Created CCIP job")
-	for _, node := range workerNodes {
+	for i, node := range workerNodes {
 		nodeP2PIds, err := node.MustReadP2PKeys()
 		if err != nil {
 			return nil, fmt.Errorf("reading worker node P2P keys: %w", err)
@@ -284,6 +301,13 @@ func NewEnvironment() (*Cfg, error) {
 		ocrKeys, err := node.MustReadOCR2Keys()
 		if err != nil {
 			return nil, fmt.Errorf("reading worker node OCR keys: %w", err)
+		}
+		ocrKeyBundleIDs := map[string]string{
+			"evm": ocrKeys.Data[0].ID,
+		}
+		// offset by 1 because bootstrap is 0
+		for family, nkb := range nodeKeyBundles {
+			ocrKeyBundleIDs[family] = nkb[i+1].OCR2Key.Data.ID
 		}
 		L.Info().Str("OCRKeys", fmt.Sprintf("%+v", ocrKeys)).Msg("Read OCR keys for worker node")
 		L.Info().Str("BootstrapPeerID", bootstrapId.String()).Str("BootstrapIP", bootstrapNode.InternalIP()).Msg("Preparing CCIP job spec for worker node")

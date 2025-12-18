@@ -8,8 +8,6 @@ import (
 	"time"
 
 	"github.com/go-resty/resty/v2"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/rs/zerolog"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/offramp"
@@ -32,21 +30,21 @@ const (
 /*
 Prometheus metrics.
 */
-var (
-	msgSentTotal = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "msg_sent_total",
-		Help: "Total number of CCIP messages sent",
-	}, []string{"from", "to"})
-	msgExecTotal = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "msg_exec_total",
-		Help: "Total number of CCIP messages executed",
-	}, []string{"from", "to"})
-	srcDstLatency = promauto.NewHistogramVec(prometheus.HistogramOpts{
-		Name:    "msg_src_dst_duration_seconds",
-		Help:    "Total duration of processing message from src to dst chain",
-		Buckets: []float64{1, 2, 5, 10, 15, 20, 30, 45, 60, 90, 120, 180, 240, 300, 400, 500},
-	}, []string{"from", "to"})
-)
+// var (
+// 	msgSentTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+// 		Name: "msg_sent_total",
+// 		Help: "Total number of CCIP messages sent",
+// 	}, []string{"from", "to"})
+// 	msgExecTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+// 		Name: "msg_exec_total",
+// 		Help: "Total number of CCIP messages executed",
+// 	}, []string{"from", "to"})
+// 	srcDstLatency = promauto.NewHistogramVec(prometheus.HistogramOpts{
+// 		Name:    "msg_src_dst_duration_seconds",
+// 		Help:    "Total duration of processing message from src to dst chain",
+// 		Buckets: []float64{1, 2, 5, 10, 15, 20, 30, 45, 60, 90, 120, 180, 240, 300, 400, 500},
+// 	}, []string{"from", "to"})
+// )
 
 // LaneStreamConfig contains contracts to collect events from and selectors for queries.
 type LaneStreamConfig struct {
