@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
+
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
 
@@ -53,7 +54,11 @@ var (
 )
 
 var (
+	Version_1_0_0 = semver.MustParse("1.0.0")
+	Version_1_5_0 = semver.MustParse("1.5.0")
+	Version_1_5_1 = semver.MustParse("1.5.1")
 	Version_1_6_0 = semver.MustParse("1.6.0")
+	Version_1_6_1 = semver.MustParse("1.6.1")
 )
 
 func NewRegistererID(chainFamily string, version *semver.Version) string {
