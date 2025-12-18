@@ -505,10 +505,51 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     //
     // For example, token-only USDC transfers can use only CCTP (without committee verification), since CCTP is fully
     // trusted for that token flow.
-    if (resolvedArgs.ccvs.length == 0 && !(isTokenTransferWithoutData && resolvedArgs.gasLimit == 0)) {
-      resolvedArgs.ccvs = destChainConfig.defaultCCVs;
-      resolvedArgs.ccvArgs = new bytes[](resolvedArgs.ccvs.length);
+    bool isPureTokenTransfer = isTokenTransferWithoutData && resolvedArgs.gasLimit == 0;
+    bool encounteredZeroPlaceholder = false;
+
+    // Allocate for worst-case size (user + defaults) and trim later.
+    address[] memory mergedCCVs = new address[](resolvedArgs.ccvs.length + destChainConfig.defaultCCVs.length);
+    bytes[] memory mergedCCVArgs = new bytes[](mergedCCVs.length);
+    uint256 writeIndex = 0;
+
+    for (uint256 i = 0; i < resolvedArgs.ccvs.length; ++i) {
+      address ccv = resolvedArgs.ccvs[i];
+      if (ccv == address(0)) {
+        encounteredZeroPlaceholder = true;
+        continue;
+      }
+      mergedCCVs[writeIndex] = ccv;
+      mergedCCVArgs[writeIndex++] = resolvedArgs.ccvArgs[i];
     }
+
+    bool shouldApplyDefaultCCVs = !isPureTokenTransfer && (encounteredZeroPlaceholder || resolvedArgs.ccvs.length == 0);
+
+    if (shouldApplyDefaultCCVs) {
+      for (uint256 i = 0; i < destChainConfig.defaultCCVs.length; ++i) {
+        address defaultCCV = destChainConfig.defaultCCVs[i];
+        bool found = false;
+        for (uint256 j = 0; j < writeIndex; ++j) {
+          if (mergedCCVs[j] == defaultCCV) {
+            found = true;
+            break;
+          }
+        }
+        if (found) continue;
+        mergedCCVs[writeIndex] = defaultCCV;
+        mergedCCVArgs[writeIndex++] = "";
+      }
+    }
+
+    if (writeIndex != mergedCCVs.length) {
+      assembly {
+        mstore(mergedCCVs, writeIndex)
+        mstore(mergedCCVArgs, writeIndex)
+      }
+    }
+
+    resolvedArgs.ccvs = mergedCCVs;
+    resolvedArgs.ccvArgs = mergedCCVArgs;
 
     // Normalize and validate tokenReceiver if specified.
     if (resolvedArgs.tokenReceiver.length != 0) {

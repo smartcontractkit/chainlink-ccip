@@ -100,6 +100,48 @@ contract OnRamp_parseExtraArgsWithDefaults is OnRampSetup {
     assertEq(s_defaultExecutor, result.executor);
   }
 
+  function test_parseExtraArgsWithDefaults_PlaceholderAddsMissingDefaultsKeepsUserArgs() public {
+    address userProvidedDefault = s_defaultCCVs[0];
+    address userCCV = makeAddr("userCCV");
+
+    address[] memory ccvs = new address[](3);
+    ccvs[0] = address(0); // placeholder to request defaults
+    ccvs[1] = userProvidedDefault; // already part of defaults, but with custom args
+    ccvs[2] = userCCV;
+
+    bytes[] memory ccvArgs = new bytes[](3);
+    ccvArgs[0] = "placeholderIgnored";
+    ccvArgs[1] = "userDefaultArgs";
+    ccvArgs[2] = "userArgs";
+
+    ExtraArgsCodec.GenericExtraArgsV3 memory inputArgs = ExtraArgsCodec.GenericExtraArgsV3({
+      ccvs: ccvs,
+      ccvArgs: ccvArgs,
+      blockConfirmations: 0,
+      gasLimit: GAS_LIMIT,
+      executor: s_defaultExecutor,
+      executorArgs: "",
+      tokenReceiver: "",
+      tokenArgs: ""
+    });
+
+    ExtraArgsCodec.GenericExtraArgsV3 memory result = s_OnRampHelper.parseExtraArgsWithDefaults(
+      DEST_CHAIN_SELECTOR, s_destChainConfig, ExtraArgsCodec._encodeGenericExtraArgsV3(inputArgs), false
+    );
+
+    address[] memory expectedCCVs = new address[](3);
+    expectedCCVs[0] = userProvidedDefault; // preserved with user args
+    expectedCCVs[1] = userCCV;
+    expectedCCVs[2] = s_defaultCCVs[1]; // missing default appended with empty args
+
+    bytes[] memory expectedArgs = new bytes[](3);
+    expectedArgs[0] = "userDefaultArgs";
+    expectedArgs[1] = "userArgs";
+    expectedArgs[2] = "";
+
+    _assertCCVArraysEqual(result.ccvs, result.ccvArgs, expectedCCVs, expectedArgs);
+  }
+
   // TODO Sui/SVM
   function test_parseExtraArgsWithDefaults_OldExtraArgs() public view {
     // Use GenericExtraArgsV2 format.
@@ -148,6 +190,41 @@ contract OnRamp_parseExtraArgsWithDefaults is OnRampSetup {
 
     assertEq(result.ccvs.length, 0, "Should not inject default CCVs for token-only transfer");
     assertEq(result.ccvArgs.length, 0, "Should not inject default CCV args for token-only transfer");
+  }
+
+  function test_parseExtraArgsWithDefaults_PlaceholderIgnoredForPureTokenTransferButKeepsUserCCVs() public {
+    address userCCV = makeAddr("userCCV");
+
+    address[] memory ccvs = new address[](2);
+    ccvs[0] = address(0); // placeholder
+    ccvs[1] = userCCV;
+
+    bytes[] memory ccvArgs = new bytes[](2);
+    ccvArgs[0] = "placeholderIgnored";
+    ccvArgs[1] = "userArgs";
+
+    ExtraArgsCodec.GenericExtraArgsV3 memory inputArgs = ExtraArgsCodec.GenericExtraArgsV3({
+      ccvs: ccvs,
+      ccvArgs: ccvArgs,
+      blockConfirmations: 0,
+      gasLimit: 0, // pure token transfer
+      executor: s_defaultExecutor,
+      executorArgs: "",
+      tokenReceiver: "",
+      tokenArgs: ""
+    });
+
+    ExtraArgsCodec.GenericExtraArgsV3 memory result = s_OnRampHelper.parseExtraArgsWithDefaults(
+      DEST_CHAIN_SELECTOR, s_destChainConfig, ExtraArgsCodec._encodeGenericExtraArgsV3(inputArgs), true
+    );
+
+    address[] memory expectedCCVs = new address[](1);
+    expectedCCVs[0] = userCCV;
+
+    bytes[] memory expectedArgs = new bytes[](1);
+    expectedArgs[0] = "userArgs";
+
+    _assertCCVArraysEqual(result.ccvs, result.ccvArgs, expectedCCVs, expectedArgs);
   }
 
   function test_parseExtraArgsWithDefaults_LegacyDoesNotAddDefaults_IsTokenTransferWithoutDataAndGasLimitZero()
