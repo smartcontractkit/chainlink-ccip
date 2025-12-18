@@ -44,14 +44,6 @@ func ParseTypeAndVersion(tvStr string) (string, string, error) {
 	return typeAndVersionValues[0], typeAndVersionValues[1], nil
 }
 
-var (
-	Version_1_0_0 = semver.MustParse("1.0.0")
-	Version_1_5_0 = semver.MustParse("1.5.0")
-	Version_1_5_1 = semver.MustParse("1.5.1")
-	Version_1_6_0 = semver.MustParse("1.6.0")
-	Version_1_6_1 = semver.MustParse("1.6.1")
-)
-
 // ValidateEVMAddress validates that a non-empty string is a valid Ethereum hex address.
 // Returns nil if the address is empty (optional field) or valid.
 func ValidateEVMAddress(addr string, fieldName string) error {

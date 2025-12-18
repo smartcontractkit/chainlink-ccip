@@ -16,6 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/erc677"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/factory_burn_mint_erc20"
 	tokenapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
+	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
@@ -26,7 +27,7 @@ import (
 
 var DeployToken = cldf_ops.NewSequence(
 	"deploy-token",
-	utils.Version_1_0_0,
+	common_utils.Version_1_0_0,
 	"Deploy given type of token contracts",
 	func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokenapi.DeployTokenInput) (sequences.OnChainOutput, error) {
 		// Validate EVM addresses from chain-agnostic input
@@ -58,7 +59,7 @@ var DeployToken = cldf_ops.NewSequence(
 		switch input.Type {
 		case erc20.ContractType:
 			tokenRef, err = contract.MaybeDeployContract(b, erc20.Deploy, chain, contract.DeployInput[erc20.ConstructorArgs]{
-				TypeAndVersion: deployment.NewTypeAndVersion(erc20.ContractType, *utils.Version_1_0_0),
+				TypeAndVersion: deployment.NewTypeAndVersion(erc20.ContractType, *common_utils.Version_1_0_0),
 				ChainSelector:  chain.Selector,
 				Args: erc20.ConstructorArgs{
 					Name:   input.Name,
@@ -72,7 +73,7 @@ var DeployToken = cldf_ops.NewSequence(
 
 		case erc677.ContractType:
 			tokenRef, err = contract.MaybeDeployContract(b, erc677.Deploy, chain, contract.DeployInput[erc677.ConstructorArgs]{
-				TypeAndVersion: deployment.NewTypeAndVersion(erc677.ContractType, *utils.Version_1_0_0),
+				TypeAndVersion: deployment.NewTypeAndVersion(erc677.ContractType, *common_utils.Version_1_0_0),
 				ChainSelector:  chain.Selector,
 				Args: erc677.ConstructorArgs{
 					Name:   input.Name,
@@ -86,7 +87,7 @@ var DeployToken = cldf_ops.NewSequence(
 
 		case burn_mint_erc20.ContractType:
 			tokenRef, err = contract.MaybeDeployContract(b, burn_mint_erc20.Deploy, chain, contract.DeployInput[burn_mint_erc20.ConstructorArgs]{
-				TypeAndVersion: deployment.NewTypeAndVersion(burn_mint_erc20.ContractType, *utils.Version_1_0_0),
+				TypeAndVersion: deployment.NewTypeAndVersion(burn_mint_erc20.ContractType, *common_utils.Version_1_0_0),
 				ChainSelector:  chain.Selector,
 				Args: burn_mint_erc20.ConstructorArgs{
 					Name:      input.Name,
@@ -103,7 +104,7 @@ var DeployToken = cldf_ops.NewSequence(
 
 		case burn_mint_erc677.ContractType:
 			tokenRef, err = contract.MaybeDeployContract(b, burn_mint_erc677.Deploy, chain, contract.DeployInput[burn_mint_erc677.ConstructorArgs]{
-				TypeAndVersion: deployment.NewTypeAndVersion(burn_mint_erc677.ContractType, *utils.Version_1_0_0),
+				TypeAndVersion: deployment.NewTypeAndVersion(burn_mint_erc677.ContractType, *common_utils.Version_1_0_0),
 				ChainSelector:  chain.Selector,
 				Args: burn_mint_erc677.ConstructorArgs{
 					Name:      input.Name,
@@ -119,7 +120,7 @@ var DeployToken = cldf_ops.NewSequence(
 
 		case factory_burn_mint_erc20.ContractType:
 			tokenRef, err = contract.MaybeDeployContract(b, factory_burn_mint_erc20.Deploy, chain, contract.DeployInput[factory_burn_mint_erc20.ConstructorArgs]{
-				TypeAndVersion: deployment.NewTypeAndVersion(factory_burn_mint_erc20.ContractType, *utils.Version_1_0_0),
+				TypeAndVersion: deployment.NewTypeAndVersion(factory_burn_mint_erc20.ContractType, *common_utils.Version_1_0_0),
 				ChainSelector:  chain.Selector,
 				Args: factory_burn_mint_erc20.ConstructorArgs{
 					Name:      input.Name,
@@ -137,7 +138,7 @@ var DeployToken = cldf_ops.NewSequence(
 
 		case burn_mint_erc20_with_drip.ContractType:
 			tokenRef, err = contract.MaybeDeployContract(b, burn_mint_erc20_with_drip.Deploy, chain, contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs]{
-				TypeAndVersion: deployment.NewTypeAndVersion(burn_mint_erc20_with_drip.ContractType, *utils.Version_1_0_0),
+				TypeAndVersion: deployment.NewTypeAndVersion(burn_mint_erc20_with_drip.ContractType, *common_utils.Version_1_0_0),
 				ChainSelector:  chain.Selector,
 				Args: burn_mint_erc20_with_drip.ConstructorArgs{
 					Name:      input.Name,

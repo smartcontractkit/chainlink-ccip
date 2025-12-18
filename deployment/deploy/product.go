@@ -31,6 +31,7 @@ type Deployer interface {
 	// Concretely, this is useful for Solana where the timelock initialization is separate from the MCM deployment
 	FinalizeDeployMCMS() *cldf_ops.Sequence[MCMSDeploymentConfigPerChainWithAddress, sequences.OnChainOutput, cldf_chain.BlockChains]
 	SetOCR3Config() *cldf_ops.Sequence[SetOCR3ConfigInput, sequences.OnChainOutput, cldf_chain.BlockChains]
+	GrantAdminRoleToTimelock() *cldf_ops.Sequence[GrantAdminRoleToTimelockConfigPerChainWithSelector, sequences.OnChainOutput, cldf_chain.BlockChains]
 }
 
 type DeployerRegistry struct {
