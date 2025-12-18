@@ -76,6 +76,10 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
     assertEq(poolAddress, s_tokenAdminRegistry.getPool(tokenAddress), "Token Pool should be set");
     assertEq(IOwner(tokenAddress).owner(), OWNER, "Token should be owned by the owner");
     assertEq(IOwner(poolAddress).owner(), OWNER, "Token should be owned by the owner");
+
+    // Pool should have mint/burn roles granted during deployment.
+    assertTrue(FactoryBurnMintERC20(tokenAddress).isMinter(poolAddress), "pool should be minter");
+    assertTrue(FactoryBurnMintERC20(tokenAddress).isBurner(poolAddress), "pool should be burner");
   }
 
   function test_createTokenPool_WithNoExistingRemoteContracts_predict() public {
@@ -184,16 +188,9 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
       "New Token Address should have been deployed correctly"
     );
 
-    // Check that the token pool has the correct permissions
-    vm.startPrank(poolAddress);
-    IBurnMintERC20(tokenAddress).mint(poolAddress, 1e18);
-
-    assertEq(1e18, IBurnMintERC20(tokenAddress).balanceOf(poolAddress), "Balance should be 1e18");
-
-    IBurnMintERC20(tokenAddress).burn(1e18);
-    assertEq(0, IBurnMintERC20(tokenAddress).balanceOf(poolAddress), "Balance should be 0");
-
-    vm.stopPrank();
+    // Pool should have mint/burn roles granted during deployment.
+    assertTrue(FactoryBurnMintERC20(tokenAddress).isMinter(poolAddress), "pool should be minter");
+    assertTrue(FactoryBurnMintERC20(tokenAddress).isBurner(poolAddress), "pool should be burner");
 
     assertEq(s_tokenAdminRegistry.getPool(tokenAddress), poolAddress, "Token Pool should be set");
 
@@ -453,6 +450,10 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
       address(newLocalToken),
       "Token Address should have been set"
     );
+
+    // Mint/burn roles should NOT be granted on lock/release pools.
+    assertFalse(FactoryBurnMintERC20(address(newLocalToken)).isMinter(poolAddress), "pool should not be minter");
+    assertFalse(FactoryBurnMintERC20(address(newLocalToken)).isBurner(poolAddress), "pool should not be burner");
 
     LockReleaseTokenPool(poolAddress).setRebalancer(OWNER);
     assertEq(OWNER, LockReleaseTokenPool(poolAddress).getRebalancer(), "Rebalancer should be set");
