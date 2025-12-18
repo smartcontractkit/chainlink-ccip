@@ -73,9 +73,17 @@ type DeployTokenInput struct {
 }
 type DeployTokenPoolInput struct {
 	TokenSymbol        string          `yaml:"token-symbol" json:"tokenSymbol"`
+	TokenDecimals      uint8           `yaml:"token-decimals" json:"tokenDecimals"`
 	TokenPoolQualifier string          `yaml:"token-pool-qualifier" json:"tokenPoolQualifier"`
 	PoolType           string          `yaml:"pool-type" json:"poolType"`
 	TokenPoolVersion   *semver.Version `yaml:"token-pool-version" json:"tokenPoolVersion"`
+	Allowlist          []string        `yaml:"allowlist" json:"allowlist"`
+	// AcceptLiquidity is used by LockReleaseTokenPool (v1.5.1 only) to indicate
+	// whether the pool should accept liquidity from liquidity providers
+	AcceptLiquidity *bool `yaml:"accept-liquidity" json:"acceptLiquidity"`
+	// BurnAddress is used by BurnToAddressMintTokenPool to specify the address
+	// where tokens will be burned to
+	BurnAddress string `yaml:"burn-address" json:"burnAddress"`
 	// below are not specified by the user, filled in by the deployment system to pass to chain operations
 	ChainSelector     uint64
 	ExistingDataStore datastore.DataStore
