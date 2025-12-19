@@ -20,6 +20,14 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
+const (
+	// Operation names for async observations made in the Observation method.
+	// These are used as keys in the runningOps map as well as the results map returned by ExecuteAsyncOperations.
+	opObserveFeedTokenPrices       = "observeFeedTokenPrices"
+	opObserveFeeQuoterTokenUpdates = "observeFeeQuoterTokenUpdates"
+	opObserveFChain                = "observeFChain"
+)
+
 func (p *processor) Observation(
 	ctx context.Context,
 	prevOutcome Outcome,
@@ -32,23 +40,23 @@ func (p *processor) Observation(
 	}
 
 	operations := map[string]asynclib.AsyncOperation{
-		OpObserveFeedTokenPrices: asynclib.WrapWithSingleFlight(
+		opObserveFeedTokenPrices: asynclib.WrapWithSingleFlight(
 			&p.runningOps,
-			OpObserveFeedTokenPrices,
+			opObserveFeedTokenPrices,
 			func(ctx context.Context, l logger.Logger) any {
 				return p.obs.observeFeedTokenPrices(ctx, l)
 			},
 		),
-		OpObserveFeeQuoterTokenUpdates: asynclib.WrapWithSingleFlight(
+		opObserveFeeQuoterTokenUpdates: asynclib.WrapWithSingleFlight(
 			&p.runningOps,
-			OpObserveFeeQuoterTokenUpdates,
+			opObserveFeeQuoterTokenUpdates,
 			func(ctx context.Context, l logger.Logger) any {
 				return p.obs.observeFeeQuoterTokenUpdates(ctx, l)
 			},
 		),
-		OpObserveFChain: asynclib.WrapWithSingleFlight(
+		opObserveFChain: asynclib.WrapWithSingleFlight(
 			&p.runningOps,
-			OpObserveFChain,
+			opObserveFChain,
 			func(_ context.Context, l logger.Logger) any {
 				return p.observeFChain(l)
 			},
@@ -69,13 +77,13 @@ func (p *processor) Observation(
 		feeQuoterUpdates map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig
 	)
 
-	if val, ok := results[OpObserveFeedTokenPrices]; ok {
+	if val, ok := results[opObserveFeedTokenPrices]; ok {
 		feedTokenPrices = val.(cciptypes.TokenPriceMap)
 	}
-	if val, ok := results[OpObserveFeeQuoterTokenUpdates]; ok {
+	if val, ok := results[opObserveFeeQuoterTokenUpdates]; ok {
 		feeQuoterUpdates = val.(map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig)
 	}
-	if val, ok := results[OpObserveFChain]; ok {
+	if val, ok := results[opObserveFChain]; ok {
 		fChain = val.(map[cciptypes.ChainSelector]int)
 	}
 

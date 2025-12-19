@@ -20,6 +20,15 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 )
 
+const (
+	// Operation names for async observations made in the Observation method.
+	// These are used as keys in the runningOps map as well as the results map returned by ExecuteAsyncOperations.
+	opGetChainsFeeComponents  = "getChainsFeeComponents"
+	opGetNativeTokenPrices    = "getNativeTokenPrices"
+	opGetChainFeePriceUpdates = "getChainFeePriceUpdates"
+	opObserveFChain           = "observeFChain"
+)
+
 // Observation will make several calls to fetch:
 // - chain fee components
 // - native token prices
@@ -39,30 +48,30 @@ func (p *processor) Observation(
 	}
 
 	operations := map[string]asynclib.AsyncOperation{
-		OpGetChainsFeeComponents: asynclib.WrapWithSingleFlight(
+		opGetChainsFeeComponents: asynclib.WrapWithSingleFlight(
 			&p.runningOps,
-			OpGetChainsFeeComponents,
+			opGetChainsFeeComponents,
 			func(ctx context.Context, l logger.Logger) any {
 				return p.obs.getChainsFeeComponents(ctx, l)
 			},
 		),
-		OpGetNativeTokenPrices: asynclib.WrapWithSingleFlight(
+		opGetNativeTokenPrices: asynclib.WrapWithSingleFlight(
 			&p.runningOps,
-			OpGetNativeTokenPrices,
+			opGetNativeTokenPrices,
 			func(ctx context.Context, l logger.Logger) any {
 				return p.obs.getNativeTokenPrices(ctx, l)
 			},
 		),
-		OpGetChainFeePriceUpdates: asynclib.WrapWithSingleFlight(
+		opGetChainFeePriceUpdates: asynclib.WrapWithSingleFlight(
 			&p.runningOps,
-			OpGetChainFeePriceUpdates,
+			opGetChainFeePriceUpdates,
 			func(ctx context.Context, l logger.Logger) any {
 				return p.obs.getChainFeePriceUpdates(ctx, l)
 			},
 		),
-		OpObserveFChain: asynclib.WrapWithSingleFlight(
+		opObserveFChain: asynclib.WrapWithSingleFlight(
 			&p.runningOps,
-			OpObserveFChain,
+			opObserveFChain,
 			func(_ context.Context, l logger.Logger) any {
 				return p.observeFChain(l)
 			},
@@ -79,16 +88,16 @@ func (p *processor) Observation(
 		fChain            map[cciptypes.ChainSelector]int
 	)
 
-	if val, ok := results[OpGetChainsFeeComponents]; ok {
+	if val, ok := results[opGetChainsFeeComponents]; ok {
 		feeComponents = val.(map[cciptypes.ChainSelector]types.ChainFeeComponents)
 	}
-	if val, ok := results[OpGetNativeTokenPrices]; ok {
+	if val, ok := results[opGetNativeTokenPrices]; ok {
 		nativeTokenPrices = val.(map[cciptypes.ChainSelector]cciptypes.BigInt)
 	}
-	if val, ok := results[OpGetChainFeePriceUpdates]; ok {
+	if val, ok := results[opGetChainFeePriceUpdates]; ok {
 		chainFeeUpdates = val.(map[cciptypes.ChainSelector]Update)
 	}
-	if val, ok := results[OpObserveFChain]; ok {
+	if val, ok := results[opObserveFChain]; ok {
 		fChain = val.(map[cciptypes.ChainSelector]int)
 	}
 

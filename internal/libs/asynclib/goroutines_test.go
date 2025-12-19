@@ -51,7 +51,7 @@ func TestExecuteAsyncOperations_ContextTimeoutRespected(t *testing.T) {
 			case <-ctx.Done():
 				return nil
 			case <-time.After(24 * time.Hour):
-				return "done"
+				return "done1"
 			}
 		},
 	}
@@ -75,7 +75,7 @@ func TestExecuteAsyncOperations_ContextIsPropagated(t *testing.T) {
 			_, ok := ctx.Deadline()
 			assert.True(t, ok, "context should have a deadline")
 			close(done)
-			return "done"
+			return "done2"
 		},
 	}
 
@@ -106,7 +106,7 @@ func TestExecuteAsyncOperations_HangingOpReturns(t *testing.T) {
 		"hangingOp": func(ctx context.Context, _ logger.Logger) any {
 			// This op ignores ctx and sleeps for a long time
 			time.Sleep(24 * time.Hour)
-			return "done"
+			return "done3"
 		},
 	}
 
@@ -175,7 +175,7 @@ func TestExecuteAsyncOperations_InfiniteWait(t *testing.T) {
 	ops := map[string]AsyncOperation{
 		"op1": func(_ context.Context, _ logger.Logger) any {
 			time.Sleep(200 * time.Millisecond)
-			return "done"
+			return "done4"
 		},
 	}
 
@@ -183,7 +183,7 @@ func TestExecuteAsyncOperations_InfiniteWait(t *testing.T) {
 	results := ExecuteAsyncOperations(ctx, 0, ops, lggr)
 
 	assert.Equal(t, 1, len(results))
-	assert.Equal(t, "done", results["op1"])
+	assert.Equal(t, "done4", results["op1"])
 }
 
 func TestExecuteAsyncOperations_PanicRecovered(t *testing.T) {
