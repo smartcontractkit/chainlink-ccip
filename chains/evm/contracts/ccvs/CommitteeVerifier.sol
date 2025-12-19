@@ -103,9 +103,8 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
       // The version is included so that a resolver can return the correct verifier implementation on destination.
       // The version must be signed, otherwise any version could be inserted post-signatures.
       keccak256(bytes.concat(verifierVersion, messageHash)),
-      verifierResults[
-        VERIFIER_VERSION_BYTES + SIGNATURE_LENGTH_BYTES:
-          VERIFIER_VERSION_BYTES + SIGNATURE_LENGTH_BYTES + signatureLength
+      verifierResults[VERIFIER_VERSION_BYTES
+          + SIGNATURE_LENGTH_BYTES:VERIFIER_VERSION_BYTES + SIGNATURE_LENGTH_BYTES + signatureLength
       ]
     );
   }

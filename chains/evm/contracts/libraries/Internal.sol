@@ -122,7 +122,10 @@ library Internal {
 
   /// @notice This methods provides validation for parsing abi encoded addresses by ensuring the address is within the
   /// bounds of [minValue, uint256.max]. If it isn't it will revert with an Invalid32ByteAddress error.
-  function _validate32ByteAddress(bytes memory encodedAddress, uint256 minValue) internal pure {
+  function _validate32ByteAddress(
+    bytes memory encodedAddress,
+    uint256 minValue
+  ) internal pure {
     if (encodedAddress.length != 32) revert Invalid32ByteAddress(encodedAddress);
     if (minValue > 0) {
       if (abi.decode(encodedAddress, (uint256)) < minValue) {

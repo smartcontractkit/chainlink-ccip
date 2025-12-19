@@ -41,9 +41,7 @@ contract BurnMintTokenPool_lockOrBurn is BurnMintTokenPoolSetup {
 
     vm.expectEmit();
     emit TokenPool.OutboundRateLimitConsumed({
-      remoteChainSelector: DEST_CHAIN_SELECTOR,
-      token: address(s_token),
-      amount: burnAmount
+      remoteChainSelector: DEST_CHAIN_SELECTOR, token: address(s_token), amount: burnAmount
     });
 
     vm.expectEmit();
@@ -83,9 +81,7 @@ contract BurnMintTokenPool_lockOrBurn is BurnMintTokenPoolSetup {
 
     vm.expectEmit();
     emit TokenPool.OutboundRateLimitConsumed({
-      remoteChainSelector: DEST_CHAIN_SELECTOR,
-      token: address(s_token),
-      amount: burnAmount
+      remoteChainSelector: DEST_CHAIN_SELECTOR, token: address(s_token), amount: burnAmount
     });
 
     vm.expectEmit();

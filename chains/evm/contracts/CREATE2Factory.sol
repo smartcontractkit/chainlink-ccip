@@ -48,7 +48,11 @@ contract CREATE2Factory is ITypeAndVersion, Ownable2StepMsgSender {
   /// @param salt The salt used to ensure a unique deployment.
   /// @param calls Any calls to perform post-deployment.
   /// @return contractAddress The address of the contract deployed.
-  function createAndCall(bytes calldata creationCode, bytes32 salt, bytes[] memory calls) external returns (address) {
+  function createAndCall(
+    bytes calldata creationCode,
+    bytes32 salt,
+    bytes[] memory calls
+  ) external returns (address) {
     return _createAndCall(creationCode, salt, calls);
   }
 
@@ -57,7 +61,11 @@ contract CREATE2Factory is ITypeAndVersion, Ownable2StepMsgSender {
   /// @param salt The salt used to ensure a unique deployment.
   /// @param calls Any calls to perform post-deployment.
   /// @return contractAddress The address of the contract deployed.
-  function _createAndCall(bytes calldata creationCode, bytes32 salt, bytes[] memory calls) internal returns (address) {
+  function _createAndCall(
+    bytes calldata creationCode,
+    bytes32 salt,
+    bytes[] memory calls
+  ) internal returns (address) {
     if (!s_allowList.contains(msg.sender)) {
       revert CallerNotAllowed(msg.sender);
     }
@@ -81,7 +89,11 @@ contract CREATE2Factory is ITypeAndVersion, Ownable2StepMsgSender {
   /// @param salt The salt used to ensure a unique deployment.
   /// @param to The address to transfer ownership to.
   /// @return contractAddress The address of the contract deployed.
-  function createAndTransferOwnership(bytes calldata creationCode, bytes32 salt, address to) external returns (address) {
+  function createAndTransferOwnership(
+    bytes calldata creationCode,
+    bytes32 salt,
+    address to
+  ) external returns (address) {
     bytes[] memory calls = new bytes[](1);
     calls[0] = abi.encodeWithSelector(IOwnable.transferOwnership.selector, to);
     return _createAndCall(creationCode, salt, calls);
@@ -91,14 +103,20 @@ contract CREATE2Factory is ITypeAndVersion, Ownable2StepMsgSender {
   /// @param creationCode The creation code of the contract.
   /// @param salt The salt used to ensure a unique deployment.
   /// @return contractAddress The address that would result from the deployment.
-  function computeAddress(bytes memory creationCode, bytes32 salt) external view returns (address) {
+  function computeAddress(
+    bytes memory creationCode,
+    bytes32 salt
+  ) external view returns (address) {
     return Create2.computeAddress(salt, keccak256(creationCode), address(this));
   }
 
   /// @notice Updates the addresses that are allowed to call createAndCall.
   /// @param adds Array of addresses to add.
   /// @param removes Array of addresses to remove.
-  function applyAllowListUpdates(address[] calldata removes, address[] calldata adds) external onlyOwner {
+  function applyAllowListUpdates(
+    address[] calldata removes,
+    address[] calldata adds
+  ) external onlyOwner {
     _applyAllowListUpdates(removes, adds);
   }
 
@@ -106,7 +124,10 @@ contract CREATE2Factory is ITypeAndVersion, Ownable2StepMsgSender {
   /// @dev Internal helper for applyAllowListUpdates and constructor.
   /// @param adds Array of addresses to add.
   /// @param removes Array of addresses to remove.
-  function _applyAllowListUpdates(address[] memory removes, address[] memory adds) internal {
+  function _applyAllowListUpdates(
+    address[] memory removes,
+    address[] memory adds
+  ) internal {
     for (uint256 i = 0; i < removes.length; ++i) {
       if (s_allowList.remove(removes[i])) {
         emit CallerRemoved(removes[i]);

@@ -185,7 +185,10 @@ library MessageV1Codec {
   /// @param ccvs Array of CCV (Cross-Chain Verifier) addresses.
   /// @param executor Address of the executor.
   /// @return hash The keccak256 hash of the encoded CCVs and executor.
-  function _computeCCVAndExecutorHash(address[] memory ccvs, address executor) internal pure returns (bytes32) {
+  function _computeCCVAndExecutorHash(
+    address[] memory ccvs,
+    address executor
+  ) internal pure returns (bytes32) {
     uint256 encodedLength = 1 + ccvs.length * 20 + 20;
     // We overprovision the bytes array to avoid out of bounds writes. Since we write EVM addresses which are 20 bytes,
     // and the size of a write is 32 bytes, the maximum out of bounds we can have is 12 bytes.
@@ -315,7 +318,9 @@ library MessageV1Codec {
       offset += tokenReceiverLength;
 
       // extraDataLength and extraData.
-      if (offset + 2 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.TOKEN_TRANSFER_EXTRA_DATA_LENGTH);
+      if (offset + 2 > encoded.length) {
+        revert InvalidDataLength(EncodingErrorLocation.TOKEN_TRANSFER_EXTRA_DATA_LENGTH);
+      }
       uint16 extraDataLength = uint16(bytes2(encoded[offset:offset + 2]));
       offset += 2;
       if (offset + extraDataLength > encoded.length) {

@@ -53,9 +53,7 @@ contract OnRamp_setDynamicConfig is OnRampSetup {
 
   function test_SetDynamicConfig_RevertWhen_OnlyCallableByOwner() public {
     OnRamp.DynamicConfig memory newConfig = OnRamp.DynamicConfig({
-      feeQuoter: makeAddr("feeQuoter"),
-      reentrancyGuardEntered: false,
-      feeAggregator: makeAddr("feeAggregator")
+      feeQuoter: makeAddr("feeQuoter"), reentrancyGuardEntered: false, feeAggregator: makeAddr("feeAggregator")
     });
 
     vm.startPrank(STRANGER);
@@ -65,9 +63,7 @@ contract OnRamp_setDynamicConfig is OnRampSetup {
 
   function test_SetDynamicConfig_RevertWhen_InvalidConfig_ZeroFeeQuoter() public {
     OnRamp.DynamicConfig memory newConfig = OnRamp.DynamicConfig({
-      feeQuoter: address(0),
-      reentrancyGuardEntered: false,
-      feeAggregator: makeAddr("feeAggregator")
+      feeQuoter: address(0), reentrancyGuardEntered: false, feeAggregator: makeAddr("feeAggregator")
     });
 
     vm.expectRevert(OnRamp.InvalidConfig.selector);
@@ -75,8 +71,9 @@ contract OnRamp_setDynamicConfig is OnRampSetup {
   }
 
   function test_SetDynamicConfig_RevertWhen_InvalidConfig_ZeroFeeAggregator() public {
-    OnRamp.DynamicConfig memory newConfig =
-      OnRamp.DynamicConfig({feeQuoter: makeAddr("feeQuoter"), reentrancyGuardEntered: false, feeAggregator: address(0)});
+    OnRamp.DynamicConfig memory newConfig = OnRamp.DynamicConfig({
+      feeQuoter: makeAddr("feeQuoter"), reentrancyGuardEntered: false, feeAggregator: address(0)
+    });
 
     vm.expectRevert(OnRamp.InvalidConfig.selector);
     s_onRamp.setDynamicConfig(newConfig);
@@ -84,9 +81,7 @@ contract OnRamp_setDynamicConfig is OnRampSetup {
 
   function test_SetDynamicConfig_RevertWhen_InvalidConfig_ReentrancyGuardSet() public {
     OnRamp.DynamicConfig memory newConfig = OnRamp.DynamicConfig({
-      feeQuoter: makeAddr("feeQuoter"),
-      reentrancyGuardEntered: true,
-      feeAggregator: makeAddr("feeAggregator")
+      feeQuoter: makeAddr("feeQuoter"), reentrancyGuardEntered: true, feeAggregator: makeAddr("feeAggregator")
     });
 
     vm.expectRevert(OnRamp.InvalidConfig.selector);

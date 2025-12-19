@@ -161,7 +161,11 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// @param encodedMessage The message that is being executed, encoded as bytes.
   /// @param ccvs CCVs that attested to the message. Must match the CCVs specified by the receiver and token pool.
   /// @param verifierResults CCV-specific data used to verify the message. Must be same length as ccvs array.
-  function execute(bytes calldata encodedMessage, address[] calldata ccvs, bytes[] calldata verifierResults) external {
+  function execute(
+    bytes calldata encodedMessage,
+    address[] calldata ccvs,
+    bytes[] calldata verifierResults
+  ) external {
     if (s_reentrancyGuardEntered) revert ReentrancyGuardReentrantCall();
     s_reentrancyGuardEntered = true;
 
@@ -200,12 +204,8 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     // Two valid cases here, we either have never touched this message before, or we tried to execute and failed. This
     // check protects against reentry and re-execution because the other state is IN_PROGRESS which should not be
     // allowed to execute.
-    if (
-      !(
-        originalState == Internal.MessageExecutionState.UNTOUCHED
-          || originalState == Internal.MessageExecutionState.FAILURE
-      )
-    ) {
+    if (!(originalState == Internal.MessageExecutionState.UNTOUCHED
+          || originalState == Internal.MessageExecutionState.FAILURE)) {
       revert SkippedAlreadyExecutedMessage(messageId, message.sourceChainSelector, message.messageNumber);
     }
 
@@ -294,16 +294,15 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       );
 
       for (uint256 i = 0; i < ccvsToQuery.length; ++i) {
-        address implAddress =
-          ICrossChainVerifierResolver(ccvsToQuery[i]).getInboundImplementation(verifierResults[verifierResultsIndex[i]]);
+        address implAddress = ICrossChainVerifierResolver(ccvsToQuery[i])
+          .getInboundImplementation(verifierResults[verifierResultsIndex[i]]);
         if (implAddress == address(0)) {
           revert InboundImplementationNotFound(ccvsToQuery[i], verifierResults[verifierResultsIndex[i]]);
         }
-        ICrossChainVerifierV1(implAddress).verifyMessage({
-          message: message,
-          messageId: messageId,
-          verifierResults: verifierResults[verifierResultsIndex[i]]
-        });
+        ICrossChainVerifierV1(implAddress)
+          .verifyMessage({
+            message: message, messageId: messageId, verifierResults: verifierResults[verifierResultsIndex[i]]
+          });
       }
     }
 
@@ -328,18 +327,19 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     // Short circuit if we don't need to call the receiver.
     if (isTokenOnlyTransfer) return;
 
-    (bool success, bytes memory returnData,) = s_sourceChainConfigs[message.sourceChainSelector].router.routeMessage(
-      Client.Any2EVMMessage({
-        messageId: messageId,
-        sourceChainSelector: message.sourceChainSelector,
-        sender: message.sender,
-        data: message.data,
-        destTokenAmounts: destTokenAmounts
-      }),
-      i_gasForCallExactCheck,
-      message.ccipReceiveGasLimit,
-      receiver
-    );
+    (bool success, bytes memory returnData,) = s_sourceChainConfigs[message.sourceChainSelector].router
+      .routeMessage(
+        Client.Any2EVMMessage({
+          messageId: messageId,
+          sourceChainSelector: message.sourceChainSelector,
+          sender: message.sender,
+          data: message.data,
+          destTokenAmounts: destTokenAmounts
+        }),
+        i_gasForCallExactCheck,
+        message.ccipReceiveGasLimit,
+        receiver
+      );
 
     // If CCIP receiver execution is not successful, revert the call including token transfers.
     if (!success) revert ReceiverError(returnData);
@@ -653,9 +653,8 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     address pool = ITokenAdminRegistry(i_tokenAdminRegistry).getPool(localToken);
 
     if (pool._supportsInterfaceReverting(type(IPoolV2).interfaceId)) {
-      requiredCCV = IPoolV2(pool).getRequiredCCVs(
-        localToken, sourceChainSelector, amount, finality, extraData, IPoolV2.MessageDirection.Inbound
-      );
+      requiredCCV = IPoolV2(pool)
+        .getRequiredCCVs(localToken, sourceChainSelector, amount, finality, extraData, IPoolV2.MessageDirection.Inbound);
       CCVConfigValidation._assertNoDuplicates(requiredCCV);
     }
 
@@ -746,7 +745,10 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// @param receiver The address to check the balance of.
   /// @param token The token address.
   /// @return balance The balance of the receiver.
-  function _getBalanceOfReceiver(address receiver, address token) internal view returns (uint256) {
+  function _getBalanceOfReceiver(
+    address receiver,
+    address token
+  ) internal view returns (uint256) {
     try IERC20(token).balanceOf(receiver) returns (uint256 balance_) {
       // If the call succeeds, we return the balance and the gas left.
       return (balance_);
