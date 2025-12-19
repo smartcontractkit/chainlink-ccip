@@ -8,20 +8,19 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 )
 
-type AsyncNoErrOperationsMap map[string]func(ctx context.Context, l logger.Logger)
+type AsyncOperation func(ctx context.Context, l logger.Logger) any
 
-// WaitForAllNoErrOperations spawns goroutines for each operation in the map and waits for
-// all of them to finish. It creates a child context with a timeout to ensure that the operations
-// do not run indefinitely.
-// If the timeout is reached, the function returns, even if some operations are still running.
-// This is to prevent the caller from blocking forever if an operation hangs and does not respect the context.
-// If timeout is 0, no timeout is applied (waits indefinitely or until parent context is cancelled).
-func WaitForAllNoErrOperations(
+// ExecuteAsyncOperations spawns goroutines for each operation in the map and waits for
+// all of them to finish or for the timeout to expire.
+// It returns a map of results for operations that completed successfully within the timeout.
+// If an operation times out, it will not be present in the returned map.
+// If timeout is 0, no timeout is applied.
+func ExecuteAsyncOperations(
 	ctx context.Context,
 	timeout time.Duration,
-	operations AsyncNoErrOperationsMap,
+	operations map[string]AsyncOperation,
 	lggr logger.Logger,
-) {
+) map[string]any {
 	var callCtx context.Context
 	var cancel context.CancelFunc
 
@@ -34,49 +33,75 @@ func WaitForAllNoErrOperations(
 
 	lggr.Debugw("spawning goroutines", "timeout", timeout)
 
-	var wg sync.WaitGroup
-	wg.Add(len(operations))
+	type result struct {
+		name string
+		val  any
+	}
+
+	resultsChan := make(chan result, len(operations))
 
 	for opName, op := range operations {
-		go func(opName string, op func(context.Context, logger.Logger)) {
-			defer wg.Done()
+		go func(name string, operation AsyncOperation) {
 			tStart := time.Now()
-			op(callCtx, logger.With(lggr, "opID", opName))
-			lggr.Debugw("observing goroutine finished", "opID", opName, "duration", time.Since(tStart))
+			val := operation(callCtx, logger.With(lggr, "opID", name))
+			lggr.Debugw("observing goroutine finished", "opID", name, "duration", time.Since(tStart))
+			resultsChan <- result{name: name, val: val}
 		}(opName, op)
 	}
 
-	done := make(chan struct{})
-	go func() {
-		wg.Wait()
-		close(done)
-	}()
+	resultsMap := make(map[string]any)
+	completed := 0
 
-	select {
-	case <-done:
-		return
-	case <-callCtx.Done():
-		if timeout > 0 && callCtx.Err() == context.DeadlineExceeded {
-			lggr.Warnw("WaitForAllNoErrOperations timed out before all operations completed; this indicates a bug in one of the operations not respecting context cancellation", "timeout", timeout)
+	for completed < len(operations) {
+		select {
+		case res := <-resultsChan:
+			if res.val != nil {
+				resultsMap[res.name] = res.val
+			}
+			completed++
+		case <-callCtx.Done():
+			if timeout > 0 && callCtx.Err() == context.DeadlineExceeded {
+				lggr.Warnw("ExecuteAsyncOperations timed out before all operations completed", "timeout", timeout, "completed", completed, "total", len(operations))
+			}
+			return resultsMap
 		}
-		return
 	}
+
+	return resultsMap
 }
 
 // WrapWithSingleFlight ensures that an operation does not overlap with its previous execution.
 // It uses a sync.Map to track currently running operations by name.
-// If an operation with the same name is already running, the new call returns immediately.
+// If an operation with the same name is already running, the new call returns immediately with nil.
 func WrapWithSingleFlight(
 	runningOps *sync.Map,
 	name string,
-	op func(context.Context, logger.Logger),
-) func(context.Context, logger.Logger) {
-	return func(ctx context.Context, l logger.Logger) {
+	op AsyncOperation,
+) AsyncOperation {
+	return func(ctx context.Context, l logger.Logger) any {
 		if _, loaded := runningOps.LoadOrStore(name, true); loaded {
 			l.Warnw("skipping operation because previous run is still active", "opID", name)
-			return
+			return nil
 		}
 		defer runningOps.Delete(name)
-		op(ctx, l)
+		return op(ctx, l)
 	}
+}
+
+// Deprecated: Use ExecuteAsyncOperations instead.
+// WaitForAllNoErrOperations is kept for backward compatibility but implemented using ExecuteAsyncOperations.
+func WaitForAllNoErrOperations(
+	ctx context.Context,
+	timeout time.Duration,
+	operations map[string]func(context.Context, logger.Logger),
+	lggr logger.Logger,
+) {
+	newOps := make(map[string]AsyncOperation)
+	for k, v := range operations {
+		newOps[k] = func(ctx context.Context, l logger.Logger) any {
+			v(ctx, l)
+			return nil
+		}
+	}
+	ExecuteAsyncOperations(ctx, timeout, newOps, lggr)
 }

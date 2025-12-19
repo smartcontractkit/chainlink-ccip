@@ -31,52 +31,48 @@ func (p *processor) Observation(
 		p.obs.invalidateCaches(ctx, lggr)
 	}
 
-	var (
-		mu               sync.Mutex
-		fChain           map[cciptypes.ChainSelector]int
-		feedTokenPrices  cciptypes.TokenPriceMap
-		feeQuoterUpdates map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig
-	)
-
-	operations := asynclib.AsyncNoErrOperationsMap{
+	operations := map[string]asynclib.AsyncOperation{
 		OpObserveFeedTokenPrices: asynclib.WrapWithSingleFlight(
 			&p.runningOps,
 			OpObserveFeedTokenPrices,
-			func(ctx context.Context, l logger.Logger) {
-				val := p.obs.observeFeedTokenPrices(ctx, l)
-				mu.Lock()
-				defer mu.Unlock()
-				feedTokenPrices = val
+			func(ctx context.Context, l logger.Logger) any {
+				return p.obs.observeFeedTokenPrices(ctx, l)
 			},
 		),
 		OpObserveFeeQuoterTokenUpdates: asynclib.WrapWithSingleFlight(
 			&p.runningOps,
 			OpObserveFeeQuoterTokenUpdates,
-			func(ctx context.Context, l logger.Logger) {
-				val := p.obs.observeFeeQuoterTokenUpdates(ctx, l)
-				mu.Lock()
-				defer mu.Unlock()
-				feeQuoterUpdates = val
+			func(ctx context.Context, l logger.Logger) any {
+				return p.obs.observeFeeQuoterTokenUpdates(ctx, l)
 			},
 		),
 		OpObserveFChain: asynclib.WrapWithSingleFlight(
 			&p.runningOps,
 			OpObserveFChain,
-			func(_ context.Context, l logger.Logger) {
-				val := p.observeFChain(l)
-				mu.Lock()
-				defer mu.Unlock()
-				fChain = val
+			func(_ context.Context, l logger.Logger) any {
+				return p.observeFChain(l)
 			},
 		),
 	}
 
-	asynclib.WaitForAllNoErrOperations(ctx, p.offChainCfg.TokenPriceAsyncObserverSyncTimeout.Duration(), operations, lggr)
-
-	mu.Lock()
-	defer mu.Unlock()
-
+	results := asynclib.ExecuteAsyncOperations(ctx, p.offChainCfg.TokenPriceAsyncObserverSyncTimeout.Duration(), operations, lggr)
 	now := time.Now().UTC()
+
+	var (
+		fChain           map[cciptypes.ChainSelector]int
+		feedTokenPrices  cciptypes.TokenPriceMap
+		feeQuoterUpdates map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig
+	)
+
+	if val, ok := results[OpObserveFeedTokenPrices]; ok {
+		feedTokenPrices = val.(cciptypes.TokenPriceMap)
+	}
+	if val, ok := results[OpObserveFeeQuoterTokenUpdates]; ok {
+		feeQuoterUpdates = val.(map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig)
+	}
+	if val, ok := results[OpObserveFChain]; ok {
+		fChain = val.(map[cciptypes.ChainSelector]int)
+	}
 
 	lggr.Infow(
 		"observed token prices",

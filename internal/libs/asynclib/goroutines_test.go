@@ -17,7 +17,7 @@ func TestWaitForAllNoErrOperations_AllOpsRun(t *testing.T) {
 	var mu sync.Mutex
 	var calledOps []string
 
-	ops := AsyncNoErrOperationsMap{
+	ops := map[string]func(context.Context, logger.Logger){
 		"op1": func(_ context.Context, _ logger.Logger) {
 			mu.Lock()
 			defer mu.Unlock()
@@ -42,7 +42,7 @@ func TestWaitForAllNoErrOperations_ContextTimeoutRespected(t *testing.T) {
 	lggr := logger.Test(t)
 	start := time.Now()
 
-	ops := AsyncNoErrOperationsMap{
+	ops := map[string]func(context.Context, logger.Logger){
 		"slowOp": func(ctx context.Context, _ logger.Logger) {
 			select {
 			case <-ctx.Done():
@@ -64,7 +64,7 @@ func TestWaitForAllNoErrOperations_ContextIsPropagated(t *testing.T) {
 
 	done := make(chan struct{})
 
-	ops := AsyncNoErrOperationsMap{
+	ops := map[string]func(context.Context, logger.Logger){
 		"checkCtx": func(ctx context.Context, _ logger.Logger) {
 			_, ok := ctx.Deadline()
 			assert.True(t, ok, "context should have a deadline")
@@ -86,7 +86,7 @@ func TestWaitForAllNoErrOperations_NoOps(t *testing.T) {
 	lggr := logger.Test(t)
 
 	// should not panic or block
-	WaitForAllNoErrOperations(ctx, 500*time.Millisecond, AsyncNoErrOperationsMap{}, lggr)
+	WaitForAllNoErrOperations(ctx, 500*time.Millisecond, map[string]func(context.Context, logger.Logger){}, lggr)
 }
 
 func TestWaitForAllNoErrOperations_HangingOpReturns(t *testing.T) {
@@ -94,7 +94,7 @@ func TestWaitForAllNoErrOperations_HangingOpReturns(t *testing.T) {
 	lggr := logger.Test(t)
 	start := time.Now()
 
-	ops := AsyncNoErrOperationsMap{
+	ops := map[string]func(context.Context, logger.Logger){
 		"hangingOp": func(ctx context.Context, _ logger.Logger) {
 			// This op ignores ctx and sleeps for a long time
 			time.Sleep(24 * time.Hour)
