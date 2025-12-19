@@ -42,7 +42,7 @@ func TestExecuteAsyncOperations_AllOpsRun(t *testing.T) {
 
 func TestExecuteAsyncOperations_ContextTimeoutRespected(t *testing.T) {
 	ctx := context.Background()
-	lggr := logger.Test(t)
+	lggr := logger.Nop()
 	start := time.Now()
 
 	ops := map[string]AsyncOperation{
@@ -99,7 +99,7 @@ func TestExecuteAsyncOperations_NoOps(t *testing.T) {
 
 func TestExecuteAsyncOperations_HangingOpReturns(t *testing.T) {
 	ctx := context.Background()
-	lggr := logger.Test(t)
+	lggr := logger.Nop()
 	start := time.Now()
 
 	ops := map[string]AsyncOperation{
