@@ -161,4 +161,25 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
     vm.expectRevert(abi.encodeWithSelector(OnRamp.InsufficientFeeTokenAmount.selector));
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, fee - 1, STRANGER);
   }
+
+  function test_forwardFromRouter_RevertWhen_CanOnlySendOneTokenPerMessage() public {
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+
+    message.tokenAmounts = new Client.EVMTokenAmount[](2);
+    message.tokenAmounts[0] = Client.EVMTokenAmount({token: makeAddr("token1"), amount: 123 ether});
+    message.tokenAmounts[1] = Client.EVMTokenAmount({token: makeAddr("token2"), amount: 456 ether});
+
+    vm.expectRevert(abi.encodeWithSelector(OnRamp.CanOnlySendOneTokenPerMessage.selector));
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 1e17, STRANGER);
+  }
+
+  function test_forwardFromRouter_RevertWhen_UnsupportedToken() public {
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+
+    message.tokenAmounts = new Client.EVMTokenAmount[](1);
+    message.tokenAmounts[0] = Client.EVMTokenAmount({token: makeAddr("unsupportedToken"), amount: 123 ether});
+
+    vm.expectRevert(abi.encodeWithSelector(OnRamp.UnsupportedToken.selector, message.tokenAmounts[0].token));
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 1e17, STRANGER);
+  }
 }

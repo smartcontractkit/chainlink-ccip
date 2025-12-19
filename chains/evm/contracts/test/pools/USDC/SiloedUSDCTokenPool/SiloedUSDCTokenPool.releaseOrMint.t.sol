@@ -92,19 +92,10 @@ contract SiloedUSDCTokenPool_releaseOrMint is SiloedUSDCTokenPoolSetup {
     s_usdcTokenPool.excludeTokensFromBurn(SOURCE_CHAIN_SELECTOR, excludedAmount);
     vm.stopPrank();
 
-    // Execute the migration to mark the chain as migrated
-    vm.startPrank(circleMigrator);
-    s_usdcTokenPool.burnLockedUSDC();
-    vm.stopPrank();
-
-    // Verify the chain is now migrated and tokens are excluded
-    assertEq(s_usdcTokenPool.getExcludedTokensByChain(SOURCE_CHAIN_SELECTOR), excludedAmount);
-
+    // Calling releaseOrMint before the burn event should subtract from total token balance and excluded tokens.
     uint256 releaseAmount = 200e6; // Amount to release (less than excluded amount)
     address localToken = address(s_USDCToken);
     bytes memory sourcePoolAddress = abi.encode(SOURCE_CHAIN_USDC_POOL);
-
-    vm.startPrank(s_routerAllowedOffRamp);
 
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = Pool.ReleaseOrMintInV1({
       originalSender: s_originalSender,
@@ -117,13 +108,30 @@ contract SiloedUSDCTokenPool_releaseOrMint is SiloedUSDCTokenPoolSetup {
       offchainTokenData: ""
     });
 
+    vm.startPrank(s_routerAllowedOffRamp);
     Pool.ReleaseOrMintOutV1 memory result = s_usdcTokenPool.releaseOrMint(releaseOrMintIn);
 
+    uint256 availableTokens = s_usdcTokenPool.getAvailableTokens(SOURCE_CHAIN_SELECTOR);
+    assertEq(availableTokens, 1000e6 - releaseAmount);
+    uint256 newExcludedAmount = s_usdcTokenPool.getExcludedTokensByChain(SOURCE_CHAIN_SELECTOR);
+    assertEq(newExcludedAmount, excludedAmount - releaseAmount);
+
+    // Execute the migration to mark the chain as migrated
+    vm.startPrank(circleMigrator);
+    s_usdcTokenPool.burnLockedUSDC();
+    vm.stopPrank();
+
+    // Verify the chain is now migrated and tokens are still excluded
+    assertEq(s_usdcTokenPool.getExcludedTokensByChain(SOURCE_CHAIN_SELECTOR), newExcludedAmount);
+
+    vm.startPrank(s_routerAllowedOffRamp);
+    result = s_usdcTokenPool.releaseOrMint(releaseOrMintIn);
+
     assertEq(result.destinationAmount, releaseAmount);
-    assertEq(s_USDCToken.balanceOf(s_recipient), releaseAmount);
+    assertEq(s_USDCToken.balanceOf(s_recipient), releaseAmount * 2); // There were two releases
 
     // Verify that the excluded tokens were reduced by the release amount
-    uint256 remainingExcludedTokens = excludedAmount - releaseAmount;
+    uint256 remainingExcludedTokens = newExcludedAmount - releaseAmount;
     assertEq(s_usdcTokenPool.getExcludedTokensByChain(SOURCE_CHAIN_SELECTOR), remainingExcludedTokens);
 
     vm.stopPrank();
