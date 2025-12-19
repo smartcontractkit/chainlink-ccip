@@ -87,21 +87,3 @@ func WrapWithSingleFlight(
 		return op(ctx, l)
 	}
 }
-
-// Deprecated: Use ExecuteAsyncOperations instead.
-// WaitForAllNoErrOperations is kept for backward compatibility but implemented using ExecuteAsyncOperations.
-func WaitForAllNoErrOperations(
-	ctx context.Context,
-	timeout time.Duration,
-	operations map[string]func(context.Context, logger.Logger),
-	lggr logger.Logger,
-) {
-	newOps := make(map[string]AsyncOperation)
-	for k, v := range operations {
-		newOps[k] = func(ctx context.Context, l logger.Logger) any {
-			v(ctx, l)
-			return nil
-		}
-	}
-	ExecuteAsyncOperations(ctx, timeout, newOps, lggr)
-}

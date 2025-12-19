@@ -11,68 +11,75 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 )
 
-func TestWaitForAllNoErrOperations_AllOpsRun(t *testing.T) {
+func TestExecuteAsyncOperations_AllOpsRun(t *testing.T) {
 	ctx := context.Background()
 	lggr := logger.Test(t)
 	var mu sync.Mutex
 	var calledOps []string
 
-	ops := map[string]func(context.Context, logger.Logger){
-		"op1": func(_ context.Context, _ logger.Logger) {
+	ops := map[string]AsyncOperation{
+		"op1": func(_ context.Context, _ logger.Logger) any {
 			mu.Lock()
 			defer mu.Unlock()
 			calledOps = append(calledOps, "op1")
+			return "op1"
 		},
-		"op2": func(_ context.Context, _ logger.Logger) {
+		"op2": func(_ context.Context, _ logger.Logger) any {
 			mu.Lock()
 			defer mu.Unlock()
 			calledOps = append(calledOps, "op2")
+			return "op2"
 		},
 	}
 
-	WaitForAllNoErrOperations(ctx, 2*time.Second, ops, lggr)
+	results := ExecuteAsyncOperations(ctx, 2*time.Second, ops, lggr)
 
 	mu.Lock()
 	defer mu.Unlock()
 	assert.ElementsMatch(t, []string{"op1", "op2"}, calledOps)
+	assert.Equal(t, 2, len(results))
 }
 
-func TestWaitForAllNoErrOperations_ContextTimeoutRespected(t *testing.T) {
+func TestExecuteAsyncOperations_ContextTimeoutRespected(t *testing.T) {
 	ctx := context.Background()
 	lggr := logger.Test(t)
 	start := time.Now()
 
-	ops := map[string]func(context.Context, logger.Logger){
-		"slowOp": func(ctx context.Context, _ logger.Logger) {
+	ops := map[string]AsyncOperation{
+		"slowOp": func(ctx context.Context, _ logger.Logger) any {
 			select {
 			case <-ctx.Done():
+				return nil
 			case <-time.After(24 * time.Hour):
+				return "done"
 			}
 		},
 	}
 
 	timeout := 100 * time.Millisecond
-	WaitForAllNoErrOperations(ctx, timeout, ops, lggr)
+	results := ExecuteAsyncOperations(ctx, timeout, ops, lggr)
 
 	elapsed := time.Since(start)
 	assert.LessOrEqual(t, elapsed.Milliseconds(), int64(500), "timeout not respected")
+	assert.Empty(t, results)
 }
 
-func TestWaitForAllNoErrOperations_ContextIsPropagated(t *testing.T) {
+func TestExecuteAsyncOperations_ContextIsPropagated(t *testing.T) {
 	ctx := context.Background()
 	lggr := logger.Test(t)
 
 	done := make(chan struct{})
 
-	ops := map[string]func(context.Context, logger.Logger){
-		"checkCtx": func(ctx context.Context, _ logger.Logger) {
+	ops := map[string]AsyncOperation{
+		"checkCtx": func(ctx context.Context, _ logger.Logger) any {
 			_, ok := ctx.Deadline()
 			assert.True(t, ok, "context should have a deadline")
 			close(done)
+			return "done"
 		},
 	}
 
-	WaitForAllNoErrOperations(ctx, 500*time.Millisecond, ops, lggr)
+	ExecuteAsyncOperations(ctx, 500*time.Millisecond, ops, lggr)
 
 	select {
 	case <-done:
@@ -81,29 +88,32 @@ func TestWaitForAllNoErrOperations_ContextIsPropagated(t *testing.T) {
 	}
 }
 
-func TestWaitForAllNoErrOperations_NoOps(t *testing.T) {
+func TestExecuteAsyncOperations_NoOps(t *testing.T) {
 	ctx := context.Background()
 	lggr := logger.Test(t)
 
 	// should not panic or block
-	WaitForAllNoErrOperations(ctx, 500*time.Millisecond, map[string]func(context.Context, logger.Logger){}, lggr)
+	results := ExecuteAsyncOperations(ctx, 500*time.Millisecond, map[string]AsyncOperation{}, lggr)
+	assert.Empty(t, results)
 }
 
-func TestWaitForAllNoErrOperations_HangingOpReturns(t *testing.T) {
+func TestExecuteAsyncOperations_HangingOpReturns(t *testing.T) {
 	ctx := context.Background()
 	lggr := logger.Test(t)
 	start := time.Now()
 
-	ops := map[string]func(context.Context, logger.Logger){
-		"hangingOp": func(ctx context.Context, _ logger.Logger) {
+	ops := map[string]AsyncOperation{
+		"hangingOp": func(ctx context.Context, _ logger.Logger) any {
 			// This op ignores ctx and sleeps for a long time
 			time.Sleep(24 * time.Hour)
+			return "done"
 		},
 	}
 
 	timeout := 100 * time.Millisecond
-	WaitForAllNoErrOperations(ctx, timeout, ops, lggr)
+	results := ExecuteAsyncOperations(ctx, timeout, ops, lggr)
 
 	elapsed := time.Since(start)
 	assert.LessOrEqual(t, elapsed.Milliseconds(), int64(500), "timeout not respected even with hanging op")
+	assert.Empty(t, results)
 }
