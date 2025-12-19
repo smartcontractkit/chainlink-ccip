@@ -49,7 +49,10 @@ library CCVConfigValidation {
     }
   }
 
-  function _assertNoDuplicatedBetweenLists(address[] memory listA, address[] memory listB) internal pure {
+  function _assertNoDuplicatedBetweenLists(
+    address[] memory listA,
+    address[] memory listB
+  ) internal pure {
     uint256 lengthA = listA.length;
     uint256 lengthB = listB.length;
     for (uint256 i = 0; i < lengthA; ++i) {

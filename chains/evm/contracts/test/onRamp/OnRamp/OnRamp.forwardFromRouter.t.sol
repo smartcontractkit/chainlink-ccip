@@ -190,8 +190,7 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
       localToken: token
     });
     Pool.LockOrBurnOutV1 memory returnData = Pool.LockOrBurnOutV1({
-      destTokenAddress: abi.encode(address(s_destTokenBySourceToken[token])),
-      destPoolData: new bytes(actualBytes)
+      destTokenAddress: abi.encode(address(s_destTokenBySourceToken[token])), destPoolData: new bytes(actualBytes)
     });
     vm.mockCall(
       pool, abi.encodeWithSelector(IPoolV2.lockOrBurn.selector, expectedInput, 0, ""), abi.encode(returnData, amount)
