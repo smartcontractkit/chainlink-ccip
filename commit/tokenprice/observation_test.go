@@ -14,6 +14,7 @@ import (
 
 	"github.com/smartcontractkit/libocr/commontypes"
 
+	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
@@ -190,4 +191,87 @@ var defaultCfg = pluginconfig.CommitOffchainConfig{
 	PriceFeedChainSelector: feedChainSel,
 	// Have this disabled for testing purposes
 	TokenPriceAsyncObserverDisabled: true,
+}
+
+func Test_processor_Observation_PreventsOverlappingOps(t *testing.T) {
+	ctx := context.Background()
+	lggr := logger.Test(t)
+	oracleID := commontypes.OracleID(1)
+
+	// 1. Setup Processor
+	chainSupport := common_mock.NewMockChainSupport(t)
+	tokenPriceReader := readerpkg_mock.NewMockPriceReader(t)
+	homeChain := readermock.NewMockHomeChain(t)
+
+	cfg := defaultCfg
+	cfg.TokenPriceAsyncObserverSyncTimeout = *commonconfig.MustNewDuration(100 * time.Millisecond)
+
+	p := NewProcessor(
+		oracleID,
+		lggr,
+		cfg,
+		destChainSel,
+		chainSupport,
+		tokenPriceReader,
+		homeChain,
+		f,
+		plugincommon.NoopReporter{},
+	)
+
+	// 2. Setup Mocks
+	// Common mocks for both calls
+	chainSupport.EXPECT().SupportedChains(mock.Anything).Return(
+		mapset.NewSet(feedChainSel, destChainSel), nil,
+	).Maybe()
+	chainSupport.EXPECT().SupportsDestChain(mock.Anything).Return(true, nil).Maybe()
+
+	// Mocks for other operations (return immediately/empty)
+	// We need these because Observation calls other operations too.
+	// FeedTokenPrices is the one we will make hang.
+	tokenPriceReader.
+		EXPECT().
+		GetFeeQuoterTokenUpdates(mock.Anything, mock.Anything, mock.Anything).
+		Return(
+			map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig{}, nil,
+		).Maybe()
+	homeChain.EXPECT().GetFChain().Return(
+		map[cciptypes.ChainSelector]int{}, nil,
+	).Maybe()
+
+	// 3. Setup the HANGING Mock for FeedTokenPrices
+	// This should only be called ONCE. If overlap protection fails, it might be called twice.
+	opStarted := make(chan struct{})
+	tokenPriceReader.EXPECT().GetFeedPricesUSD(mock.Anything, mock.Anything).
+		Run(func(_ context.Context, _ []cciptypes.UnknownEncodedAddress) {
+			close(opStarted)
+			// Simulate hang
+			time.Sleep(1 * time.Hour)
+		}).
+		Return(cciptypes.TokenPriceMap{}, nil).
+		Once()
+
+	// 4. Run First Observation (will hang then timeout)
+	go func() {
+		_, _ = p.Observation(ctx, Outcome{}, Query{})
+	}()
+
+	// Wait for the operation to start
+	select {
+	case <-opStarted:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for op to start")
+	}
+
+	// Wait for Observation to timeout and return (approx 100ms)
+	time.Sleep(200 * time.Millisecond)
+
+	// 5. Run Second Observation
+	// This should SKIP GetFeedPricesUSD because it's still running.
+	// If it doesn't skip, the mock will fail (because .Once() was specified) or it will hang again (if we didn't mock Once).
+	obs, err := p.Observation(ctx, Outcome{}, Query{})
+	require.NoError(t, err)
+
+	// Verify that we got a result (even if empty) and didn't block
+	// Note: obs.FeedTokenPrices will be empty because the second call skipped fetching it.
+	require.Empty(t, obs.FeedTokenPrices)
 }
