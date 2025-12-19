@@ -3,7 +3,6 @@ package ccip
 import (
 	"context"
 	"errors"
-	"fmt"
 	"path/filepath"
 	"sync"
 	"time"
