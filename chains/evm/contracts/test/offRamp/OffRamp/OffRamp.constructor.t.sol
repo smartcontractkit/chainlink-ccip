@@ -52,10 +52,7 @@ contract OffRamp_constructor is BaseTest {
 
   function test_constructor_RevertWhen_ZeroChainSelectorNotAllowed() public {
     OffRamp.StaticConfig memory config = OffRamp.StaticConfig({
-      localChainSelector: 0,
-      gasForCallExactCheck: 5000,
-      rmnRemote: s_mockRMNRemote,
-      tokenAdminRegistry: address(0x123)
+      localChainSelector: 0, gasForCallExactCheck: 5000, rmnRemote: s_mockRMNRemote, tokenAdminRegistry: address(0x123)
     });
 
     vm.expectRevert(OffRamp.ZeroChainSelectorNotAllowed.selector);

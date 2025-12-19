@@ -106,7 +106,10 @@ contract OffRampSetup is BaseTest {
   /// @notice Convenience function to set up a receiver that returns empty CCVs (falls back to defaults).
   /// @param receiver The receiver address to set up.
   /// @param sourceChainSelector The source chain selector for getCCVs mock.
-  function _setGetCCVsReturnData(address receiver, uint64 sourceChainSelector) internal {
+  function _setGetCCVsReturnData(
+    address receiver,
+    uint64 sourceChainSelector
+  ) internal {
     _setGetCCVsReturnData(receiver, sourceChainSelector, new address[](0), new address[](0), 0);
   }
 }

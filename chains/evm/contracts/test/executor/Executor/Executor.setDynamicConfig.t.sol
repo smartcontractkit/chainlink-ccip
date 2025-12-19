@@ -8,9 +8,7 @@ import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2
 contract Executor_setDynamicConfig is ExecutorSetup {
   function test_setDynamicConfig() public {
     Executor.DynamicConfig memory newConfig = Executor.DynamicConfig({
-      feeAggregator: makeAddr("newFeeAggregator"),
-      minBlockConfirmations: 123,
-      ccvAllowlistEnabled: false
+      feeAggregator: makeAddr("newFeeAggregator"), minBlockConfirmations: 123, ccvAllowlistEnabled: false
     });
 
     vm.expectEmit();

@@ -14,9 +14,7 @@ contract OnRamp_constructor is OnRampSetup {
     });
 
     OnRamp.DynamicConfig memory dynamicConfig = OnRamp.DynamicConfig({
-      feeQuoter: address(s_feeQuoter),
-      reentrancyGuardEntered: false,
-      feeAggregator: FEE_AGGREGATOR
+      feeQuoter: address(s_feeQuoter), reentrancyGuardEntered: false, feeAggregator: FEE_AGGREGATOR
     });
 
     OnRamp proxy = new OnRamp(staticConfig, dynamicConfig);
@@ -35,14 +33,10 @@ contract OnRamp_constructor is OnRampSetup {
   function test_constructor_RevertWhen_StaticConfigInvalid() public {
     // Zero chainSelector.
     OnRamp.StaticConfig memory staticConfigZeroChainSelector = OnRamp.StaticConfig({
-      chainSelector: 0,
-      rmnRemote: s_mockRMNRemote,
-      tokenAdminRegistry: address(s_tokenAdminRegistry)
+      chainSelector: 0, rmnRemote: s_mockRMNRemote, tokenAdminRegistry: address(s_tokenAdminRegistry)
     });
     OnRamp.DynamicConfig memory dynamicConfigValid = OnRamp.DynamicConfig({
-      feeQuoter: address(s_feeQuoter),
-      reentrancyGuardEntered: false,
-      feeAggregator: FEE_AGGREGATOR
+      feeQuoter: address(s_feeQuoter), reentrancyGuardEntered: false, feeAggregator: FEE_AGGREGATOR
     });
     vm.expectRevert(OnRamp.InvalidConfig.selector);
     new OnRamp(staticConfigZeroChainSelector, dynamicConfigValid);
@@ -58,9 +52,7 @@ contract OnRamp_constructor is OnRampSetup {
 
     // Zero tokenAdminRegistry.
     OnRamp.StaticConfig memory staticConfigZeroTokenAdminRegistry = OnRamp.StaticConfig({
-      chainSelector: SOURCE_CHAIN_SELECTOR,
-      rmnRemote: s_mockRMNRemote,
-      tokenAdminRegistry: address(0)
+      chainSelector: SOURCE_CHAIN_SELECTOR, rmnRemote: s_mockRMNRemote, tokenAdminRegistry: address(0)
     });
     vm.expectRevert(OnRamp.InvalidConfig.selector);
     new OnRamp(staticConfigZeroTokenAdminRegistry, dynamicConfigValid);
@@ -87,9 +79,7 @@ contract OnRamp_constructor is OnRampSetup {
 
     // reentrancyGuardEntered == true
     OnRamp.DynamicConfig memory dynamicConfig2 = OnRamp.DynamicConfig({
-      feeQuoter: address(s_feeQuoter),
-      reentrancyGuardEntered: true,
-      feeAggregator: FEE_AGGREGATOR
+      feeQuoter: address(s_feeQuoter), reentrancyGuardEntered: true, feeAggregator: FEE_AGGREGATOR
     });
     vm.expectRevert(OnRamp.InvalidConfig.selector);
     new OnRamp(staticConfig, dynamicConfig2);

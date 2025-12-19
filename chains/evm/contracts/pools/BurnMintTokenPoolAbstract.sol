@@ -11,7 +11,10 @@ abstract contract BurnMintTokenPoolAbstract is TokenPool {
   /// without duplicating the underlying logic.
   /// @param receiver The address to receive the tokens.
   /// @param amount The amount of tokens to be minted.
-  function _releaseOrMint(address receiver, uint256 amount) internal virtual override {
+  function _releaseOrMint(
+    address receiver,
+    uint256 amount
+  ) internal virtual override {
     IBurnMintERC20(address(i_token)).mint(receiver, amount);
   }
 }

@@ -16,5 +16,8 @@ interface IBridgeV2 {
     bytes32 destinationCaller
   ) external payable returns (uint256, bytes32);
 
-  function getAllowedDestinationToken(bytes32 destinationChain, address sourceToken) external view returns (bytes32);
+  function getAllowedDestinationToken(
+    bytes32 destinationChain,
+    address sourceToken
+  ) external view returns (bytes32);
 }

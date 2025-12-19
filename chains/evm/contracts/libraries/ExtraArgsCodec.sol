@@ -43,7 +43,6 @@ library ExtraArgsCodec {
     ENCODE_TOKEN_ARGS_LENGTH, // 12
     ENCODE_SVM_ACCOUNTS_LENGTH, // 13
     ENCODE_SUI_OBJECT_IDS_LENGTH // 14
-
   }
 
   /// @notice GenericExtraArgsV3 encoding format used for CCIP messages.
@@ -121,7 +120,10 @@ library ExtraArgsCodec {
   /// @param gasLimit The gas limit for the callback on the destination chain.
   /// @param blockConfirmations The user requested number of block confirmations.
   /// @return encoded The encoded extra args as bytes. These are ready to be passed into CCIP functions.
-  function _getBasicEncodedExtraArgsV3(uint32 gasLimit, uint16 blockConfirmations) internal pure returns (bytes memory) {
+  function _getBasicEncodedExtraArgsV3(
+    uint32 gasLimit,
+    uint16 blockConfirmations
+  ) internal pure returns (bytes memory) {
     return abi.encodePacked(GENERIC_EXTRA_ARGS_V3_TAG, gasLimit, blockConfirmations, bytes7(0));
   }
 
@@ -256,7 +258,10 @@ library ExtraArgsCodec {
   /// @param ptr The memory pointer where to start writing.
   /// @param addr The address to write.
   /// @return newPtr The updated memory pointer after writing.
-  function _writeUint8PrefixedAddress(uint256 ptr, address addr) private pure returns (uint256 newPtr) {
+  function _writeUint8PrefixedAddress(
+    uint256 ptr,
+    address addr
+  ) private pure returns (uint256 newPtr) {
     assembly {
       let addrLength := mul(iszero(iszero(addr)), 20)
       // Write address length (1 byte).
@@ -279,7 +284,10 @@ library ExtraArgsCodec {
   /// @param ptr The memory pointer where to start writing.
   /// @param data The bytes data to write.
   /// @return newPtr The updated memory pointer after writing.
-  function _writeUint16PrefixedBytes(uint256 ptr, bytes memory data) private pure returns (uint256 newPtr) {
+  function _writeUint16PrefixedBytes(
+    uint256 ptr,
+    bytes memory data
+  ) private pure returns (uint256 newPtr) {
     uint256 dataLength = data.length;
     assembly {
       // Write length (2 bytes, big endian).
@@ -308,7 +316,10 @@ library ExtraArgsCodec {
   /// @param ptr The memory pointer where to start writing.
   /// @param data The bytes data to write.
   /// @return newPtr The updated memory pointer after writing.
-  function _writeUint8PrefixedBytes(uint256 ptr, bytes memory data) private pure returns (uint256 newPtr) {
+  function _writeUint8PrefixedBytes(
+    uint256 ptr,
+    bytes memory data
+  ) private pure returns (uint256 newPtr) {
     uint256 dataLength = data.length;
     assembly {
       // Write length (1 byte).
