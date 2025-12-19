@@ -15,6 +15,12 @@ const (
 	feeComponentsLabel     = "feeComponents"
 	nativeTokenPricesLabel = "nativeTokenPrices"
 	chainFeeUpdatesLabel   = "chainFeeUpdates"
+
+	// Operation names for async observation
+	OpGetChainsFeeComponents  = "getChainsFeeComponents"
+	OpGetNativeTokenPrices    = "getNativeTokenPrices"
+	OpGetChainFeePriceUpdates = "getChainFeePriceUpdates"
+	OpObserveFChain           = "observeFChain"
 )
 
 type Query struct {

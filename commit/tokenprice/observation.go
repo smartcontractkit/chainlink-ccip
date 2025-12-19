@@ -32,24 +32,50 @@ func (p *processor) Observation(
 	}
 
 	var (
+		mu               sync.Mutex
 		fChain           map[cciptypes.ChainSelector]int
 		feedTokenPrices  cciptypes.TokenPriceMap
 		feeQuoterUpdates map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig
 	)
 
 	operations := asynclib.AsyncNoErrOperationsMap{
-		"observeFeedTokenPrices": func(ctx context.Context, l logger.Logger) {
-			feedTokenPrices = p.obs.observeFeedTokenPrices(ctx, l)
-		},
-		"observeFeeQuoterTokenUpdates": func(ctx context.Context, l logger.Logger) {
-			feeQuoterUpdates = p.obs.observeFeeQuoterTokenUpdates(ctx, l)
-		},
-		"observeFChain": func(_ context.Context, l logger.Logger) {
-			fChain = p.observeFChain(l)
-		},
+		OpObserveFeedTokenPrices: asynclib.WrapWithSingleFlight(
+			&p.runningOps,
+			OpObserveFeedTokenPrices,
+			func(ctx context.Context, l logger.Logger) {
+				val := p.obs.observeFeedTokenPrices(ctx, l)
+				mu.Lock()
+				defer mu.Unlock()
+				feedTokenPrices = val
+			},
+		),
+		OpObserveFeeQuoterTokenUpdates: asynclib.WrapWithSingleFlight(
+			&p.runningOps,
+			OpObserveFeeQuoterTokenUpdates,
+			func(ctx context.Context, l logger.Logger) {
+				val := p.obs.observeFeeQuoterTokenUpdates(ctx, l)
+				mu.Lock()
+				defer mu.Unlock()
+				feeQuoterUpdates = val
+			},
+		),
+		OpObserveFChain: asynclib.WrapWithSingleFlight(
+			&p.runningOps,
+			OpObserveFChain,
+			func(_ context.Context, l logger.Logger) {
+				val := p.observeFChain(l)
+				mu.Lock()
+				defer mu.Unlock()
+				fChain = val
+			},
+		),
 	}
 
 	asynclib.WaitForAllNoErrOperations(ctx, p.offChainCfg.TokenPriceAsyncObserverSyncTimeout.Duration(), operations, lggr)
+
+	mu.Lock()
+	defer mu.Unlock()
+
 	now := time.Now().UTC()
 
 	lggr.Infow(

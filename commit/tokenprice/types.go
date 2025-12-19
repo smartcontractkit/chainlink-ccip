@@ -12,6 +12,11 @@ const (
 	tokenPricesLabel           = "tokenPrices"
 	feedTokenPricesLabel       = "feedTokenPrices"
 	feeQuoterTokenUpdatesLabel = "feeQuoterTokenUpdates"
+
+	// Operation names for async observation
+	OpObserveFeedTokenPrices       = "observeFeedTokenPrices"
+	OpObserveFeeQuoterTokenUpdates = "observeFeeQuoterTokenUpdates"
+	OpObserveFChain                = "observeFChain"
 )
 
 type Query struct {

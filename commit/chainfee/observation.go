@@ -5,6 +5,7 @@ import (
 	"maps"
 	"math/big"
 	"slices"
+	"sync"
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -39,6 +40,7 @@ func (p *processor) Observation(
 	}
 
 	var (
+		mu                sync.Mutex
 		feeComponents     map[cciptypes.ChainSelector]types.ChainFeeComponents
 		nativeTokenPrices map[cciptypes.ChainSelector]cciptypes.BigInt
 		chainFeeUpdates   map[cciptypes.ChainSelector]Update
@@ -46,21 +48,53 @@ func (p *processor) Observation(
 	)
 
 	operations := asynclib.AsyncNoErrOperationsMap{
-		"getChainsFeeComponents": func(ctx context.Context, l logger.Logger) {
-			feeComponents = p.obs.getChainsFeeComponents(ctx, l)
-		},
-		"getNativeTokenPrices": func(ctx context.Context, l logger.Logger) {
-			nativeTokenPrices = p.obs.getNativeTokenPrices(ctx, l)
-		},
-		"getChainFeePriceUpdates": func(ctx context.Context, l logger.Logger) {
-			chainFeeUpdates = p.obs.getChainFeePriceUpdates(ctx, l)
-		},
-		"observeFChain": func(_ context.Context, l logger.Logger) {
-			fChain = p.observeFChain(l)
-		},
+		OpGetChainsFeeComponents: asynclib.WrapWithSingleFlight(
+			&p.runningOps,
+			OpGetChainsFeeComponents,
+			func(ctx context.Context, l logger.Logger) {
+				val := p.obs.getChainsFeeComponents(ctx, l)
+				mu.Lock()
+				defer mu.Unlock()
+				feeComponents = val
+			},
+		),
+		OpGetNativeTokenPrices: asynclib.WrapWithSingleFlight(
+			&p.runningOps,
+			OpGetNativeTokenPrices,
+			func(ctx context.Context, l logger.Logger) {
+				val := p.obs.getNativeTokenPrices(ctx, l)
+				mu.Lock()
+				defer mu.Unlock()
+				nativeTokenPrices = val
+			},
+		),
+		OpGetChainFeePriceUpdates: asynclib.WrapWithSingleFlight(
+			&p.runningOps,
+			OpGetChainFeePriceUpdates,
+			func(ctx context.Context, l logger.Logger) {
+				val := p.obs.getChainFeePriceUpdates(ctx, l)
+				mu.Lock()
+				defer mu.Unlock()
+				chainFeeUpdates = val
+			},
+		),
+		OpObserveFChain: asynclib.WrapWithSingleFlight(
+			&p.runningOps,
+			OpObserveFChain,
+			func(_ context.Context, l logger.Logger) {
+				val := p.observeFChain(l)
+				mu.Lock()
+				defer mu.Unlock()
+				fChain = val
+			},
+		),
 	}
 
 	asynclib.WaitForAllNoErrOperations(ctx, p.cfg.ChainFeeAsyncObserverSyncTimeout, operations, lggr)
+
+	mu.Lock()
+	defer mu.Unlock()
+
 	now := time.Now().UTC()
 
 	chainsWithNativeTokenPrices := mapset.NewSet(slices.Collect(maps.Keys(feeComponents))...).

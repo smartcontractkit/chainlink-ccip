@@ -88,3 +88,22 @@ func TestWaitForAllNoErrOperations_NoOps(t *testing.T) {
 	// should not panic or block
 	WaitForAllNoErrOperations(ctx, 500*time.Millisecond, AsyncNoErrOperationsMap{}, lggr)
 }
+
+func TestWaitForAllNoErrOperations_HangingOpReturns(t *testing.T) {
+	ctx := context.Background()
+	lggr := logger.Test(t)
+	start := time.Now()
+
+	ops := AsyncNoErrOperationsMap{
+		"hangingOp": func(ctx context.Context, _ logger.Logger) {
+			// This op ignores ctx and sleeps for a long time
+			time.Sleep(24 * time.Hour)
+		},
+	}
+
+	timeout := 100 * time.Millisecond
+	WaitForAllNoErrOperations(ctx, timeout, ops, lggr)
+
+	elapsed := time.Since(start)
+	assert.LessOrEqual(t, elapsed.Milliseconds(), int64(500), "timeout not respected even with hanging op")
+}

@@ -1,6 +1,7 @@
 package chainfee
 
 import (
+	"context"
 	"maps"
 	"math/big"
 	"math/rand"
@@ -26,6 +27,7 @@ import (
 	reader2 "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
 	"github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
 	reader3 "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
 func Test_processor_Observation(t *testing.T) {
@@ -394,4 +396,82 @@ func Test_unique_chain_filter_in_Observation(t *testing.T) {
 			)
 		})
 	}
+}
+
+func Test_processor_Observation_PreventsOverlappingOps(t *testing.T) {
+	cs := plugincommon.NewMockChainSupport(t)
+	ccipReader := reader.NewMockCCIPReader(t)
+	homeChain := reader2.NewMockHomeChain(t)
+	oracleID := commontypes.OracleID(rand.Int() % 255)
+	lggr := logger.Test(t)
+	ctx := t.Context()
+
+	// 1. Setup Processor
+	p := &processor{
+		lggr:            lggr,
+		chainSupport:    cs,
+		destChain:       1,
+		ccipReader:      ccipReader,
+		oracleID:        oracleID,
+		homeChain:       homeChain,
+		metricsReporter: plugincommon2.NoopReporter{},
+		obs:             newBaseObserver(ccipReader, 1, oracleID, cs),
+		// Set a short timeout so the first Observation call returns quickly even if op hangs
+		cfg: pluginconfig.CommitOffchainConfig{
+			ChainFeeAsyncObserverSyncTimeout: 100 * time.Millisecond,
+		},
+	}
+
+	// 2. Setup Mocks
+	supportedSet := mapset.NewSet(ccipocr3.ChainSelector(2))
+	cs.EXPECT().DestChain().Return(ccipocr3.ChainSelector(1)).Maybe()
+	cs.EXPECT().SupportedChains(oracleID).Return(supportedSet, nil).Maybe()
+	cs.EXPECT().KnownSourceChainsSlice().Return([]ccipocr3.ChainSelector{2}, nil).Maybe()
+	cs.EXPECT().SupportsDestChain(oracleID).Return(true, nil).Maybe()
+
+	srcChainsCfg := map[ccipocr3.ChainSelector]reader3.StaticSourceChainConfig{
+		2: {IsEnabled: true},
+	}
+	ccipReader.EXPECT().GetOffRampSourceChainsConfig(mock.Anything, mock.Anything).Return(srcChainsCfg, nil).Maybe()
+
+	// Mocks for other operations (return immediately/empty)
+	ccipReader.EXPECT().GetWrappedNativeTokenPriceUSD(mock.Anything, mock.Anything).Return(map[ccipocr3.ChainSelector]ccipocr3.BigInt{}).Maybe()
+	ccipReader.EXPECT().GetChainFeePriceUpdate(mock.Anything, mock.Anything).Return(map[ccipocr3.ChainSelector]ccipocr3.TimestampedBig{}).Maybe()
+	homeChain.EXPECT().GetFChain().Return(map[ccipocr3.ChainSelector]int{}, nil).Maybe()
+
+	// 3. Setup the HANGING Mock
+	// This should only be called ONCE. If overlap protection fails, it might be called twice.
+	opStarted := make(chan struct{})
+	ccipReader.EXPECT().GetChainsFeeComponents(mock.Anything, mock.Anything).
+		Run(func(_ context.Context, _ []ccipocr3.ChainSelector) {
+			close(opStarted)
+			// Simulate hang
+			time.Sleep(1 * time.Hour)
+		}).
+		Return(map[ccipocr3.ChainSelector]types.ChainFeeComponents{}).
+		Once()
+
+	// 4. Run First Observation (will hang then timeout)
+	go func() {
+		_, _ = p.Observation(ctx, Outcome{}, Query{})
+	}()
+
+	// Wait for the operation to start
+	select {
+	case <-opStarted:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for op to start")
+	}
+
+	// Wait for Observation to timeout and return (approx 100ms)
+	time.Sleep(200 * time.Millisecond)
+
+	// 5. Run Second Observation
+	// This should SKIP GetChainsFeeComponents because it's still running.
+	// If it doesn't skip, the mock will fail (because .Once() was specified) or it will hang again.
+	obs, err := p.Observation(ctx, Outcome{}, Query{})
+	require.NoError(t, err)
+
+	// Verify that we got a result (even if empty fee components) and didn't block
+	require.NotNil(t, obs)
 }
