@@ -65,7 +65,7 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
     );
 
     // Apply remote chain config updates.
-    CCTPVerifier.RemoteChainConfigArgs[] memory remoteChainConfigArgs = new CCTPVerifier.RemoteChainConfigArgs[](1);
+    BaseVerifier.RemoteChainConfigArgs[] memory remoteChainConfigArgs = new BaseVerifier.RemoteChainConfigArgs[](1);
     remoteChainConfigArgs[0] = BaseVerifier.RemoteChainConfigArgs({
       router: s_router,
       remoteChainSelector: DEST_CHAIN_SELECTOR,
@@ -122,8 +122,8 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
     MessageV1Codec.TokenTransferV1[] memory tokenTransfer = new MessageV1Codec.TokenTransferV1[](1);
     tokenTransfer[0] = MessageV1Codec.TokenTransferV1({
       amount: amount,
-      sourcePoolAddress: abi.encodePacked(makeAddr("sourcePool")),
-      sourceTokenAddress: abi.encodePacked(sourceTokenAddress),
+      sourcePoolAddress: abi.encode(makeAddr("sourcePool")),
+      sourceTokenAddress: abi.encode(sourceTokenAddress),
       destTokenAddress: abi.encodePacked(sourceTokenAddress),
       tokenReceiver: tokenReceiver,
       extraData: "extra data"
@@ -137,9 +137,9 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
       ccipReceiveGasLimit: 200_000,
       finality: finality,
       ccvAndExecutorHash: bytes32(0),
-      onRampAddress: abi.encodePacked(address(0x1111111111111111111111111111111111111111)),
+      onRampAddress: abi.encode(address(0x1111111111111111111111111111111111111111)),
       offRampAddress: abi.encodePacked(address(0x2222222222222222222222222222222222222222)),
-      sender: abi.encodePacked(address(0x3333333333333333333333333333333333333333)),
+      sender: abi.encode(address(0x3333333333333333333333333333333333333333)),
       receiver: tokenReceiver,
       destBlob: "",
       tokenTransfer: tokenTransfer,

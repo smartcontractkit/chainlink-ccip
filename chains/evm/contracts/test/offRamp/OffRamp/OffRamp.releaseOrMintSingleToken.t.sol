@@ -138,8 +138,8 @@ contract OffRamp_releaseOrMintSingleToken is TokenPoolSetup {
   function _buildTokenTransfer() internal view returns (MessageV1Codec.TokenTransferV1 memory) {
     return MessageV1Codec.TokenTransferV1({
       amount: 1 ether,
-      sourcePoolAddress: abi.encodePacked(s_initialRemotePool),
-      sourceTokenAddress: abi.encodePacked(s_initialRemoteToken),
+      sourcePoolAddress: abi.encode(s_initialRemotePool),
+      sourceTokenAddress: abi.encode(s_initialRemoteToken),
       destTokenAddress: abi.encodePacked(address(s_token)),
       tokenReceiver: abi.encodePacked(s_receiver),
       extraData: abi.encode(18)

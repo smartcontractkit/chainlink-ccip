@@ -88,7 +88,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     IRouter router; // ────────────╮ Local router to use for messages coming from this source chain.
     uint64 sourceChainSelector; // │ Source chain selector of the config to update.
     bool isEnabled; // ────────────╯ Flag whether the source chain is enabled or not.
-    bytes[] onRamps; // OnRamp address on the source chain.
+    bytes[] onRamps; // OnRamp address on the source chain. For EVM source chains, these should be abi-encoded (32 bytes).
     address[] defaultCCVs; // Default CCVs to use for messages from this source chain.
     address[] laneMandatedCCVs; // Required CCVs to use for all messages from this source chain.
   }
@@ -275,7 +275,9 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       if (message.tokenTransfer[0].destTokenAddress.length != 20) {
         revert Internal.InvalidEVMAddress(message.tokenTransfer[0].destTokenAddress);
       }
-
+      if (message.tokenTransfer[0].tokenReceiver.length != 20) {
+        revert Internal.InvalidEVMAddress(message.tokenTransfer[0].tokenReceiver);
+      }
       balancePre = _getBalanceOfReceiver(
         address(bytes20(message.tokenTransfer[0].tokenReceiver)),
         address(bytes20(message.tokenTransfer[0].destTokenAddress))
@@ -513,19 +515,19 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
 
     // Remove duplicates between required and optional CCVs.
     uint256 newOptionalLength = optionalCCVs.length;
-    for (uint256 i = 0; i < newOptionalLength; ++i) {
-      for (uint256 j = 0; j < allRequiredCCVs.length;) {
-        if (optionalCCVs[i] == allRequiredCCVs[j]) {
+    for (uint256 i = 0; i < allRequiredCCVs.length; ++i) {
+      for (uint256 j = 0; j < newOptionalLength;) {
+        if (optionalCCVs[j] == allRequiredCCVs[i]) {
           // Remove the duplicate by replacing it with the last element and reducing the length of the array.
-          optionalCCVs[i] = optionalCCVs[--newOptionalLength];
+          optionalCCVs[j] = optionalCCVs[--newOptionalLength];
 
           // Since we moved one CCV from optional to required, we can reduce the threshold by one, but not below zero.
           if (optionalThreshold > 0) {
             --optionalThreshold;
           }
-        } else {
-          ++j;
+          continue;
         }
+        ++j;
       }
     }
 
@@ -707,10 +709,8 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       sourceDenominatedAmount: tokenTransfer.amount,
       localToken: localToken,
       remoteChainSelector: sourceChainSelector,
-      // This re-encodes the address as bytes, but now with the zero prefix to make it 32 bytes long.
-      // We have to cast it to an address to ensure the bytes are padded on the left with zeros, bytes objects get
-      // padded on the right.
-      sourcePoolAddress: abi.encode(address(bytes20(tokenTransfer.sourcePoolAddress))),
+      // The source chain has encoded this in the expected format.
+      sourcePoolAddress: tokenTransfer.sourcePoolAddress,
       sourcePoolData: tokenTransfer.extraData,
       // All use cases that use offchain token data in IPoolV1 have to upgrade to the modular security interface.
       offchainTokenData: ""
