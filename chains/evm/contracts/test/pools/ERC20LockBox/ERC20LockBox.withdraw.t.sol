@@ -6,7 +6,7 @@ import {ERC20LockBoxSetup} from "./ERC20LockBoxSetup.t.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
 contract ERC20LockBox_withdraw is ERC20LockBoxSetup {
-  function testFuzz_withdraw_Success(
+  function testFuzz_withdraw(
     uint256 amount
   ) public {
     vm.assume(amount != 0);
