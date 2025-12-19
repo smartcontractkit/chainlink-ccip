@@ -55,7 +55,12 @@ func (p *processor) Observation(
 		),
 	}
 
-	results := asynclib.ExecuteAsyncOperations(ctx, p.offChainCfg.TokenPriceAsyncObserverSyncTimeout.Duration(), operations, lggr)
+	results := asynclib.ExecuteAsyncOperations(
+		ctx,
+		p.offChainCfg.TokenPriceAsyncObserverSyncTimeout.Duration(),
+		operations,
+		lggr,
+	)
 	now := time.Now().UTC()
 
 	var (

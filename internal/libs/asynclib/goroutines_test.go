@@ -117,3 +117,71 @@ func TestExecuteAsyncOperations_HangingOpReturns(t *testing.T) {
 	assert.LessOrEqual(t, elapsed.Milliseconds(), int64(500), "timeout not respected even with hanging op")
 	assert.Empty(t, results)
 }
+
+func TestExecuteAsyncOperations_PartialSuccess(t *testing.T) {
+	ctx := context.Background()
+	lggr := logger.Nop()
+
+	ops := map[string]AsyncOperation{
+		"fastOp": func(_ context.Context, _ logger.Logger) any {
+			return "success"
+		},
+		"slowOp": func(ctx context.Context, _ logger.Logger) any {
+			// This simulates an operation that takes longer than the timeout
+			select {
+			case <-ctx.Done():
+				return nil // or return "partial" but context cancellation usually means incomplete
+			case <-time.After(2 * time.Second):
+				return "too_slow"
+			}
+		},
+	}
+
+	// Timeout shorter than slowOp but enough for fastOp
+	timeout := 100 * time.Millisecond
+	results := ExecuteAsyncOperations(ctx, timeout, ops, lggr)
+
+	assert.Equal(t, 1, len(results), "expected only one successful operation")
+	assert.Equal(t, "success", results["fastOp"])
+	_, exists := results["slowOp"]
+	assert.False(t, exists, "slowOp should not be in results")
+}
+
+func TestExecuteAsyncOperations_NilResultIgnored(t *testing.T) {
+	ctx := context.Background()
+	lggr := logger.Test(t)
+
+	ops := map[string]AsyncOperation{
+		"nilOp": func(_ context.Context, _ logger.Logger) any {
+			return nil
+		},
+		"validOp": func(_ context.Context, _ logger.Logger) any {
+			return "value"
+		},
+	}
+
+	results := ExecuteAsyncOperations(ctx, 500*time.Millisecond, ops, lggr)
+
+	assert.Equal(t, 1, len(results))
+	assert.Equal(t, "value", results["validOp"])
+	_, exists := results["nilOp"]
+	assert.False(t, exists, "nilOp result should be ignored")
+}
+
+func TestExecuteAsyncOperations_InfiniteWait(t *testing.T) {
+	ctx := context.Background()
+	lggr := logger.Test(t)
+
+	ops := map[string]AsyncOperation{
+		"op1": func(_ context.Context, _ logger.Logger) any {
+			time.Sleep(200 * time.Millisecond)
+			return "done"
+		},
+	}
+
+	// 0 timeout means wait indefinitely (or until parent context cancels)
+	results := ExecuteAsyncOperations(ctx, 0, ops, lggr)
+
+	assert.Equal(t, 1, len(results))
+	assert.Equal(t, "done", results["op1"])
+}

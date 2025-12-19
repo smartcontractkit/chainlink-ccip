@@ -432,12 +432,27 @@ func Test_processor_Observation_PreventsOverlappingOps(t *testing.T) {
 	srcChainsCfg := map[ccipocr3.ChainSelector]reader3.StaticSourceChainConfig{
 		2: {IsEnabled: true},
 	}
-	ccipReader.EXPECT().GetOffRampSourceChainsConfig(mock.Anything, mock.Anything).Return(srcChainsCfg, nil).Maybe()
+	ccipReader.
+		EXPECT().
+		GetOffRampSourceChainsConfig(mock.Anything, mock.Anything).
+		Return(srcChainsCfg, nil).Maybe()
 
 	// Mocks for other operations (return immediately/empty)
-	ccipReader.EXPECT().GetWrappedNativeTokenPriceUSD(mock.Anything, mock.Anything).Return(map[ccipocr3.ChainSelector]ccipocr3.BigInt{}).Maybe()
-	ccipReader.EXPECT().GetChainFeePriceUpdate(mock.Anything, mock.Anything).Return(map[ccipocr3.ChainSelector]ccipocr3.TimestampedBig{}).Maybe()
-	homeChain.EXPECT().GetFChain().Return(map[ccipocr3.ChainSelector]int{}, nil).Maybe()
+	ccipReader.
+		EXPECT().
+		GetWrappedNativeTokenPriceUSD(mock.Anything, mock.Anything).
+		Return(map[ccipocr3.ChainSelector]ccipocr3.BigInt{}).
+		Maybe()
+	ccipReader.
+		EXPECT().
+		GetChainFeePriceUpdate(mock.Anything, mock.Anything).
+		Return(map[ccipocr3.ChainSelector]ccipocr3.TimestampedBig{}).
+		Maybe()
+	homeChain.
+		EXPECT().
+		GetFChain().
+		Return(map[ccipocr3.ChainSelector]int{}, nil).
+		Maybe()
 
 	// 3. Setup the HANGING Mock
 	// This should only be called ONCE. If overlap protection fails, it might be called twice.

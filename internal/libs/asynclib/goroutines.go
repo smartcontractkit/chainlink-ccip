@@ -2,6 +2,8 @@ package asynclib
 
 import (
 	"context"
+	"maps"
+	"slices"
 	"sync"
 	"time"
 
@@ -21,8 +23,10 @@ func ExecuteAsyncOperations(
 	operations map[string]AsyncOperation,
 	lggr logger.Logger,
 ) map[string]any {
-	var callCtx context.Context
-	var cancel context.CancelFunc
+	var (
+		callCtx context.Context
+		cancel  context.CancelFunc
+	)
 
 	if timeout > 0 {
 		callCtx, cancel = context.WithTimeout(ctx, timeout)
@@ -61,7 +65,14 @@ func ExecuteAsyncOperations(
 			completed++
 		case <-callCtx.Done():
 			if timeout > 0 && callCtx.Err() == context.DeadlineExceeded {
-				lggr.Warnw("ExecuteAsyncOperations timed out before all operations completed", "timeout", timeout, "completed", completed, "total", len(operations))
+				lggr.Warnw(
+					"ExecuteAsyncOperations timed out before all operations completed!!!"+
+						"This indicates a potential issue in one of the operations.",
+					"timeout", timeout,
+					"completed", completed,
+					"total", len(operations),
+					"operations", slices.Collect(maps.Keys(operations)),
+				)
 			}
 			return resultsMap
 		}
