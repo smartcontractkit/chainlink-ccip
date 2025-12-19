@@ -9,6 +9,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 
+	chainsel "github.com/smartcontractkit/chain-selectors"
 	ccip "github.com/smartcontractkit/chainlink-ccip/devenv"
 )
 
@@ -24,13 +25,24 @@ func TestE2ESmoke(t *testing.T) {
 
 	selectors, e, err := ccip.NewCLDFOperationsEnvironment(in.Blockchains, in.CLDF.DataStore)
 	require.NoError(t, err)
+	selectorsToImpl := make(map[uint64]ccip.CCIP16ProductConfiguration)
 
-	impls := make([]ccip.CCIP16ProductConfiguration, 0)
 	for _, bc := range in.Blockchains {
 		i, err := ccip.NewCCIPImplFromNetwork(bc.Out.Type)
 		require.NoError(t, err)
 		i.SetCLDF(e)
-		impls = append(impls, i)
+		var family string
+		switch bc.Type {
+		case "anvil", "geth":
+			family = chainsel.FamilyEVM
+		case "solana":
+			family = chainsel.FamilySolana
+		default:
+			panic("unsupported blockchain type")
+		}
+		networkInfo, err := chainsel.GetChainDetailsByChainIDAndFamily(bc.ChainID, family)
+		require.NoError(t, err)
+		selectorsToImpl[networkInfo.ChainSelector] = i
 	}
 
 	t.Cleanup(func() {
@@ -38,38 +50,46 @@ func TestE2ESmoke(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("EVM<>EVM test CCIP trasfers", func(t *testing.T) {
+	t.Run("Test CCIP trasfers", func(t *testing.T) {
 		type testcase struct {
 			name         string
 			fromSelector uint64
 			toSelector   uint64
-			implOne      ccip.CCIP16ProductConfiguration
-			implTwo      ccip.CCIP16ProductConfiguration
 		}
 
 		tcs := []testcase{
 			{
-				name:         "src->dst msg execution eoa receiver",
+				name:         "evm->evm msg execution eoa receiver",
 				fromSelector: selectors[0],
 				toSelector:   selectors[1],
-				implOne:      impls[0],
-				implTwo:      impls[1],
 			},
 			{
-				name:         "dst->src msg execution eoa receiver",
+				name:         "evm->evm msg execution eoa receiver",
 				fromSelector: selectors[1],
 				toSelector:   selectors[0],
-				implOne:      impls[0],
-				implTwo:      impls[1],
+			},
+			{
+				name:         "evm->svm msg execution eoa receiver",
+				fromSelector: selectors[0],
+				toSelector:   selectors[2],
+			},
+			{
+				name:         "svm->evm msg execution eoa receiver",
+				fromSelector: selectors[2],
+				toSelector:   selectors[0],
 			},
 		}
 		for _, tc := range tcs {
 			t.Run(tc.name, func(t *testing.T) {
 				t.Logf("Testing CCIP message from chain %d to chain %d", tc.fromSelector, tc.toSelector)
-				tc.implOne.SendMessage(t.Context(), tc.fromSelector, tc.toSelector, nil, nil)
-				tc.implOne.WaitOneSentEventBySeqNo(t.Context(), tc.fromSelector, tc.toSelector, 0, 4*time.Minute)
-				tc.implOne.WaitOneExecEventBySeqNo(t.Context(), tc.fromSelector, tc.toSelector, 0, 4*time.Minute)
-				// tc.implTwo.SendMessage(..)
+				fromImpl := selectorsToImpl[tc.fromSelector]
+				toImpl := selectorsToImpl[tc.toSelector]
+				err := fromImpl.SendMessage(t.Context(), tc.fromSelector, tc.toSelector, nil, nil)
+				require.NoError(t, err)
+				_, err = toImpl.WaitOneSentEventBySeqNo(t.Context(), tc.fromSelector, tc.toSelector, 0, 2*time.Minute)
+				require.NoError(t, err)
+				_, err = toImpl.WaitOneExecEventBySeqNo(t.Context(), tc.fromSelector, tc.toSelector, 0, 2*time.Minute)
+				require.NoError(t, err)
 			})
 		}
 	})

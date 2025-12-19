@@ -14,7 +14,7 @@ import (
 	"github.com/pelletier/go-toml/v2"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"github.com/smartcontractkit/chainlink-ccip/devenv/changesets"
+	devenvcommon "github.com/smartcontractkit/chainlink-ccip/devenv/common"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	capabilities_registry "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
@@ -276,7 +276,7 @@ func NewEnvironment() (*Cfg, error) {
 	if err != nil {
 		return nil, fmt.Errorf("reading worker node P2P keys: %w", err)
 	}
-	bootstrapId := changesets.MustPeerIDFromString(bootstrapP2PKeys.Data[0].Attributes.PeerID)
+	bootstrapId := devenvcommon.MustPeerIDFromString(bootstrapP2PKeys.Data[0].Attributes.PeerID)
 	ocrKeyBundleIDs := map[string]string{
 		"evm": bootstrapKeys.Data[0].ID,
 	}
@@ -320,7 +320,7 @@ func NewEnvironment() (*Cfg, error) {
 		L.Info().Str("OCRKeys", fmt.Sprintf("%+v", ocrKeys)).Msg("Read OCR keys for worker node")
 		L.Info().Str("BootstrapPeerID", bootstrapId.String()).Str("BootstrapIP", bootstrapNode.InternalIP()).Msg("Preparing CCIP job spec for worker node")
 		L.Info().Str("WorkerPeerID", nodeP2PIds.Data[0].Attributes.PeerID).Str("WorkerNode", node.Config.URL).Msg("Preparing CCIP job spec for worker node")
-		id := changesets.MustPeerIDFromString(nodeP2PIds.Data[0].Attributes.PeerID)
+		id := devenvcommon.MustPeerIDFromString(nodeP2PIds.Data[0].Attributes.PeerID)
 		raw, err := NewCCIPSpecToml(SpecArgs{
 			P2PV2Bootstrappers: []string{
 				fmt.Sprintf("%s@%s", strings.TrimPrefix(bootstrapId.String(), "p2p_"), "don-node0:6690"),

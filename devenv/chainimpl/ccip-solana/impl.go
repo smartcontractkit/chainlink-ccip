@@ -5,21 +5,26 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/Masterminds/semver/v3"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/onramp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/fee_quoter"
+	ata "github.com/gagliardetto/solana-go/programs/associated-token-account"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_offramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	ccipocr3common "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -30,11 +35,13 @@ import (
 	"github.com/gagliardetto/solana-go"
 	solRpc "github.com/gagliardetto/solana-go/rpc"
 	chainsel "github.com/smartcontractkit/chain-selectors"
-	evmseqs "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
-	devenvcommon "github.com/smartcontractkit/chainlink-ccip/devenv/chainimpl"
-	"github.com/smartcontractkit/chainlink-ccip/devenv/changesets"
-	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	solconfig "github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
+	solanaseqs "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
+	solccip "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/ccip"
+	solCommonUtil "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
+	devenvcommon "github.com/smartcontractkit/chainlink-ccip/devenv/common"
+	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
 )
 
 type CCIP16Solana struct {
@@ -64,47 +71,60 @@ func (m *CCIP16Solana) SetCLDF(e *deployment.Environment) {
 	m.e = e
 }
 
-func updatePrices(datastore datastore.DataStore, src, dest uint64, srcChain cldf_evm.Chain) error {
-	a := &evmseqs.EVMAdapter{}
-	fqAddr, err := a.GetFQAddress(datastore, src)
+func updatePrices(ds datastore.DataStore, src, dest uint64, srcChain cldf_solana.Chain) error {
+	a := &solanaseqs.SolanaAdapter{}
+	fqAddr, err := a.GetFQAddress(ds, src)
 	if err != nil {
 		return fmt.Errorf("failed to get fee quoter address: %w", err)
 	}
-	fq, err := fee_quoter.NewFeeQuoter(
-		common.BytesToAddress(fqAddr),
-		srcChain.Client)
+	linkAddr, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
+		ChainSelector: src,
+		Type:          datastore.ContractType("LINK"),
+	}, src, datastore_utils.FullRef)
 	if err != nil {
-		return fmt.Errorf("failed to create fee quoter instance: %w", err)
+		return fmt.Errorf("failed to get LINK address: %w", err)
 	}
-	feeTokens, err := fq.GetFeeTokens(nil)
-	if err != nil {
-		return fmt.Errorf("failed to get fee tokens from fee quoter: %w", err)
-	}
-	sender := srcChain.DeployerKey
-	tx, err := fq.UpdatePrices(sender, fee_quoter.InternalPriceUpdates{
-		TokenPriceUpdates: []fee_quoter.InternalTokenPriceUpdate{
+	fqID := solana.PublicKeyFromBytes(fqAddr)
+	fee_quoter.SetProgramID(solana.PublicKeyFromBytes(fqAddr))
+	fqAllowedPriceUpdaterPDA, _, _ := state.FindFqAllowedPriceUpdaterPDA(srcChain.DeployerKey.PublicKey(), fqID)
+	feeQuoterConfigPDA, _, _ := state.FindFqConfigPDA(fqID)
+	ixn := fee_quoter.NewUpdatePricesInstruction(
+		[]fee_quoter.TokenPriceUpdate{
 			{
-				SourceToken: feeTokens[0],
-				UsdPerToken: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(2000)),
+				SourceToken: solana.WrappedSol,
+				UsdPerToken: [28]uint8{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 46, 117, 223, 115, 252, 225, 110, 70, 208, 64, 0, 0},
 			},
 			{
-				SourceToken: feeTokens[1],
-				UsdPerToken: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(2000)),
+				SourceToken: solana.MustPublicKeyFromBase58(linkAddr.Address),
+				UsdPerToken: [28]uint8{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 46, 117, 223, 115, 252, 225, 110, 70, 208, 64, 0, 0},
 			},
 		},
-		GasPriceUpdates: []fee_quoter.InternalGasPriceUpdate{
+		[]fee_quoter.GasPriceUpdate{
 			{
 				DestChainSelector: dest,
-				UsdPerUnitGas:     big.NewInt(20000e9),
+				UsdPerUnitGas:     solCommonUtil.To28BytesBE(1),
 			},
 		},
-	})
+		srcChain.DeployerKey.PublicKey(),
+		fqAllowedPriceUpdaterPDA,
+		feeQuoterConfigPDA,
+	)
+	billingTokenConfigPDA, _, _ := state.FindFqBillingTokenConfigPDA(solana.WrappedSol, fqID)
+	ixn.Append(solana.Meta(billingTokenConfigPDA).WRITE())
+	billingTokenConfigPDA, _, _ = state.FindFqBillingTokenConfigPDA(solana.MustPublicKeyFromBase58(linkAddr.Address), fqID)
+	ixn.Append(solana.Meta(billingTokenConfigPDA).WRITE())
+	fqDestPDA, _, _ := state.FindFqDestChainPDA(dest, fqID)
+	ixn.Append(solana.Meta(fqDestPDA).WRITE())
+	ix, err := ixn.ValidateAndBuild()
+	if err != nil {
+		return fmt.Errorf("failed to validate and build instruction: %w", err)
+	}
+	err = srcChain.Confirm([]solana.Instruction{ix})
+	if err != nil {
+		return fmt.Errorf("failed to confirm get fee tokens transaction: %w", err)
+	}
 	if err != nil {
 		return fmt.Errorf("failed to update prices: %w", err)
-	}
-	_, err = srcChain.Confirm(tx)
-	if err != nil {
-		return fmt.Errorf("failed to confirm update prices transaction: %w", err)
 	}
 	return nil
 }
@@ -112,107 +132,157 @@ func updatePrices(datastore datastore.DataStore, src, dest uint64, srcChain cldf
 func (m *CCIP16Solana) SendMessage(ctx context.Context, src, dest uint64, fields any, opts any) error {
 	l := zerolog.Ctx(ctx)
 	l.Info().Msg("Sending CCIP message")
-	a := &evmseqs.EVMAdapter{}
+	a := &solanaseqs.SolanaAdapter{}
 	receiver := common.LeftPadBytes(common.HexToAddress("0xdead").Bytes(), 32)
-	msg := router.ClientEVM2AnyMessage{
+	msg := ccip_router.SVM2AnyMessage{
 		Receiver:     receiver,
 		Data:         []byte("hello eoa"),
 		TokenAmounts: nil,
-		FeeToken:     common.HexToAddress("0x0"),
+		FeeToken:     solana.PublicKey{},
 		ExtraArgs:    nil,
 	}
-	const errCodeInsufficientFee = "0x07da6ee6"
-	const cannotDecodeErrorReason = "could not decode error reason"
-	const errMsgMissingTrieNode = "missing trie node"
-	sender := m.e.BlockChains.EVMChains()[src].DeployerKey
-	defer func() { sender.Value = nil }()
 	rAddr, err := a.GetRouterAddress(m.e.DataStore, src)
 	if err != nil {
 		return fmt.Errorf("failed to get router address: %w", err)
 	}
-	r, err := router.NewRouter(
-		common.BytesToAddress(rAddr),
-		m.e.BlockChains.EVMChains()[src].Client)
+	fqAddr, err := a.GetFQAddress(m.e.DataStore, src)
 	if err != nil {
-		return fmt.Errorf("failed to create router instance: %w", err)
+		return fmt.Errorf("failed to get fee quoter address: %w", err)
 	}
-	onRampAddr, err := r.GetOnRamp(nil, dest)
+	rmnAddr, err := datastore_utils.FindAndFormatRef(m.e.DataStore, datastore.AddressRef{
+		ChainSelector: src,
+		Type:          datastore.ContractType("RMNRemote"),
+	}, src, datastore_utils.FullRef)
 	if err != nil {
-		return fmt.Errorf("failed to get onramp address: %w", err)
+		return fmt.Errorf("failed to get RMNRemote address: %w", err)
 	}
-	onRamp, err := onramp.NewOnRamp(
-		onRampAddr,
-		m.e.BlockChains.EVMChains()[src].Client)
+	linkAddr, err := datastore_utils.FindAndFormatRef(m.e.DataStore, datastore.AddressRef{
+		ChainSelector: src,
+		Type:          datastore.ContractType("LINK"),
+	}, src, datastore_utils.FullRef)
 	if err != nil {
-		return fmt.Errorf("failed to create onramp instance: %w", err)
+		return fmt.Errorf("failed to get LINK address: %w", err)
 	}
+	fqID := solana.PublicKeyFromBytes(fqAddr)
+	routerID := solana.PublicKeyFromBytes(rAddr)
+	ccip_router.SetProgramID(routerID)
 	l.Info().Msg("Got contract instances, preparing to send CCIP message")
-	err = updatePrices(m.e.DataStore, src, dest, m.e.BlockChains.EVMChains()[src])
+	err = updatePrices(m.e.DataStore, src, dest, m.e.BlockChains.SolanaChains()[src])
 	if err != nil {
 		return fmt.Errorf("failed to update prices: %w", err)
 	}
+	feeToken := solana.SolMint
+	sender := m.e.BlockChains.SolanaChains()[src].DeployerKey
+	destinationChainStatePDA, err := state.FindDestChainStatePDA(dest, routerID)
+	noncePDA, err := state.FindNoncePDA(dest, sender.PublicKey(), routerID)
+	linkFqBillingConfigPDA, _, _ := state.FindFqBillingTokenConfigPDA(solana.MustPublicKeyFromBase58(linkAddr.Address), fqID)
+	feeTokenFqBillingConfigPDA, _, _ := state.FindFqBillingTokenConfigPDA(feeToken, fqID)
+	billingSignerPDA, _, _ := state.FindFeeBillingSignerPDA(routerID)
+	feeTokenReceiverATA, _, _ := tokens.FindAssociatedTokenAddress(solana.TokenProgramID, feeToken, billingSignerPDA)
+	fqDestChainPDA, _, _ := state.FindFqDestChainPDA(dest, fqID)
+	rmnRemoteCursesPDA, _, _ := state.FindRMNRemoteCursesPDA(solana.MustPublicKeyFromBase58(rmnAddr.Address))
+	routerConfig, _, _ := state.FindConfigPDA(routerID)
+	fqConfig, _, _ := state.FindConfigPDA(fqID)
+	rmnConfig, _, _ := state.FindConfigPDA(solana.MustPublicKeyFromBase58(rmnAddr.Address))
 
-	var retryCount int
-	for {
-		fee, err := r.GetFee(&bind.CallOpts{Context: ctx}, dest, msg)
-		if err != nil {
-			return fmt.Errorf("failed to get EVM fee: %w", deployment.MaybeDataErr(err))
-		}
+	base := ccip_router.NewCcipSendInstruction(
+		dest,
+		msg,
+		[]byte{}, // starting indices for accounts, calculated later
+		routerConfig,
+		destinationChainStatePDA,
+		noncePDA,
+		sender.PublicKey(),
+		solana.SystemProgramID,
+		solana.TokenProgramID,
+		feeToken,
+		solana.PublicKey{},
+		feeTokenReceiverATA,
+		billingSignerPDA,
+		fqID,
+		fqConfig,
+		fqDestChainPDA,
+		feeTokenFqBillingConfigPDA,
+		linkFqBillingConfigPDA,
+		solana.MustPublicKeyFromBase58(rmnAddr.Address),
+		rmnRemoteCursesPDA,
+		rmnConfig,
+	)
 
-		sender.Value = fee
+	addressTables := map[solana.PublicKey]solana.PublicKeySlice{}
 
-		tx, err := r.CcipSend(sender, dest, msg)
-		if err != nil {
-			return fmt.Errorf("failed to send CCIP message: %w", err)
-		}
+	tokenIndexes := []byte{}
 
-		blockNum, err := m.e.BlockChains.EVMChains()[src].Confirm(tx)
-		if err != nil {
-			if strings.Contains(err.Error(), errCodeInsufficientFee) {
-				// Don't count insufficient fee as part of the retry count
-				// because this is expected and we need to adjust the fee
-				continue
-			} else if strings.Contains(err.Error(), cannotDecodeErrorReason) ||
-				strings.Contains(err.Error(), errMsgMissingTrieNode) {
-				// If the error reason cannot be decoded, we retry to avoid transient issues. The retry behavior is disabled by default
-				// It is configured in the CCIPSendReqConfig.
-				// This retry was originally added to solve transient failure in end to end tests
-				if retryCount >= 5 {
-					return fmt.Errorf("failed to confirm CCIP message after %d retries: %w", retryCount, deployment.MaybeDataErr(err))
-				}
-				retryCount++
-				continue
-			}
+	// set config.FeeQuoterProgram and CcipRouterProgram since they point to wrong addresses
+	solconfig.FeeQuoterProgram = fqID
+	solconfig.CcipRouterProgram = routerID
 
-			return fmt.Errorf("failed to confirm CCIP message: %w", deployment.MaybeDataErr(err))
-		}
-		it, err := onRamp.FilterCCIPMessageSent(&bind.FilterOpts{
-			Start:   blockNum,
-			End:     &blockNum,
-			Context: context.Background(),
-		}, []uint64{dest}, []uint64{})
-		if err != nil {
-			return fmt.Errorf("failed to filter CCIPMessageSent events: %w", err)
-		}
+	base.SetTokenIndexes(tokenIndexes)
 
-		if !it.Next() {
-			return fmt.Errorf("no CCIP message sent event found")
-		}
-
-		sourceDest := devenvcommon.SourceDestPair{SourceChainSelector: src, DestChainSelector: dest}
-		m.common.MsgSentEvents = append(m.common.MsgSentEvents, &devenvcommon.AnyMsgSentEvent{
-			SequenceNumber: it.Event.SequenceNumber,
-			RawEvent:       it.Event,
-		})
-		m.common.ExpectedSeqNumRange[sourceDest] = ccipocr3common.SeqNumRange{
-			ccipocr3common.SeqNum(m.common.MsgSentEvents[0].SequenceNumber),
-			ccipocr3common.SeqNum(m.common.MsgSentEvents[len(m.common.MsgSentEvents)-1].SequenceNumber)}
-		m.common.ExpectedSeqNumExec[sourceDest] = append(
-			m.common.ExpectedSeqNumExec[sourceDest],
-			it.Event.SequenceNumber)
-
-		return nil
+	tempIx, err := base.ValidateAndBuild()
+	if err != nil {
+		return err
 	}
+	ixData, err := tempIx.Data()
+	if err != nil {
+		return fmt.Errorf("failed to extract data payload from router ccip send instruction: %w", err)
+	}
+	ix := solana.NewInstruction(routerID, tempIx.Accounts(), ixData)
+
+	// for some reason onchain doesn't see extraAccounts
+
+	ixs := []solana.Instruction{ix}
+	result, err := solCommonUtil.SendAndConfirmWithLookupTables(ctx, m.e.BlockChains.SolanaChains()[src].Client, ixs, *sender, solconfig.DefaultCommitment, addressTables, solCommonUtil.AddComputeUnitLimit(400_000))
+	if err != nil {
+		return fmt.Errorf("failed to send and confirm transaction: %w", err)
+	}
+
+	// check CCIP event
+	ccipMessageSentEvent := solccip.EventCCIPMessageSent{}
+	printEvents := true
+	err = solCommonUtil.ParseEvent(result.Meta.LogMessages, "CCIPMessageSent", &ccipMessageSentEvent, printEvents)
+	if err != nil {
+		return err
+	}
+
+	if len(msg.TokenAmounts) != len(ccipMessageSentEvent.Message.TokenAmounts) {
+		return errors.New("token amounts mismatch")
+	}
+
+	// TODO: fee bumping?
+
+	transactionID := "N/A"
+	if tx, err := result.Transaction.GetTransaction(); err != nil {
+		m.e.Logger.Warnf("could not obtain transaction details (err = %s)", err.Error())
+	} else if len(tx.Signatures) == 0 {
+		m.e.Logger.Warnf("transaction has no signatures: %v", tx)
+	} else {
+		transactionID = tx.Signatures[0].String()
+	}
+
+	m.e.Logger.Infof("CCIP message (id %s) sent from chain selector %d to chain selector %d tx %s seqNum %d nonce %d sender %s",
+		common.Bytes2Hex(ccipMessageSentEvent.Message.Header.MessageId[:]),
+		src,
+		dest,
+		transactionID,
+		ccipMessageSentEvent.SequenceNumber,
+		ccipMessageSentEvent.Message.Header.Nonce,
+		ccipMessageSentEvent.Message.Sender.String(),
+	)
+
+	sourceDest := devenvcommon.SourceDestPair{SourceChainSelector: src, DestChainSelector: dest}
+	m.common.MsgSentEvents = append(m.common.MsgSentEvents, &devenvcommon.AnyMsgSentEvent{
+		SequenceNumber: ccipMessageSentEvent.SequenceNumber,
+		RawEvent:       ccipMessageSentEvent,
+	})
+	m.common.ExpectedSeqNumRange[sourceDest] = ccipocr3common.SeqNumRange{
+		ccipocr3common.SeqNum(m.common.MsgSentEvents[0].SequenceNumber),
+		ccipocr3common.SeqNum(m.common.MsgSentEvents[0].SequenceNumber)}
+	m.common.ExpectedSeqNumExec[sourceDest] = append(
+		m.common.ExpectedSeqNumExec[sourceDest],
+		ccipMessageSentEvent.SequenceNumber)
+
+	return nil
 }
 
 func (m *CCIP16Solana) GetExpectedNextSequenceNumber(ctx context.Context, from, to uint64) (uint64, error) {
@@ -261,96 +331,150 @@ func (c *CommitReportTracker) allCommited(sourceChainSelector uint64) bool {
 // WaitOneSentEventBySeqNo wait and fetch strictly one CCIPMessageSent event by selector and sequence number and selector.
 func (m *CCIP16Solana) WaitOneSentEventBySeqNo(ctx context.Context, from, to, seq uint64, timeout time.Duration) (any, error) {
 	l := zerolog.Ctx(ctx)
-	a := &evmseqs.EVMAdapter{}
+	a := &solanaseqs.SolanaAdapter{}
 	offAddr, err := a.GetOffRampAddress(m.e.DataStore, to)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get off ramp address: %w", err)
-	}
-	offRamp, err := offramp.NewOffRamp(
-		common.BytesToAddress(offAddr),
-		m.e.BlockChains.EVMChains()[to].Client)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create off ramp instance: %w", err)
 	}
 	sourceDest := devenvcommon.SourceDestPair{SourceChainSelector: from, DestChainSelector: to}
 	seqRange, ok := m.common.ExpectedSeqNumRange[sourceDest]
 	if !ok {
 		return nil, fmt.Errorf("no expected sequence number range for source-dest pair %v", sourceDest)
 	}
-
 	seenMessages := NewCommitReportTracker(from, seqRange)
+	done := make(chan any)
+	defer close(done)
+	sink, errCh := solEventEmitter[solCommonUtil.EventCommitReportAccepted](ctx, m.e.BlockChains.SolanaChains()[to].Client, solana.PublicKeyFromBytes(offAddr), consts.EventNameCommitReportAccepted, 0, done, time.NewTicker(2*time.Second))
 
-	verifyCommitReport := func(report *offramp.OffRampCommitReportAccepted) bool {
-		processRoots := func(roots []offramp.InternalMerkleRoot) bool {
-			for _, mr := range roots {
-				l.Info().Msgf(
-					"Received commit report for [%d, %d] on selector %d from source selector %d expected seq nr range %s, token prices: %v",
-					mr.MinSeqNr, mr.MaxSeqNr, to, from, seqRange.String(), report.PriceUpdates.TokenPriceUpdates,
-				)
-				fmt.Printf(
-					"Received commit report for [%d, %d] on selector %d from source selector %d expected seq nr range %s, token prices: %v\n",
-					mr.MinSeqNr, mr.MaxSeqNr, to, from, seqRange.String(), report.PriceUpdates.TokenPriceUpdates,
-				)
-				seenMessages.visitCommitReport(from, mr.MinSeqNr, mr.MaxSeqNr)
-
-				if mr.SourceChainSelector == from &&
-					uint64(seqRange.Start()) >= mr.MinSeqNr &&
-					uint64(seqRange.End()) <= mr.MaxSeqNr {
-					l.Info().Msgf(
-						"All sequence numbers committed in a single report [%d, %d]",
-						seqRange.Start(), seqRange.End(),
-					)
-					return true
-				}
-
-				if seenMessages.allCommited(from) {
-					l.Info().Msgf(
-						"All sequence numbers already committed from range [%d, %d]",
-						seqRange.Start(), seqRange.End(),
-					)
-					return true
-				}
-			}
-			return false
-		}
-
-		return processRoots(report.BlessedMerkleRoots) || processRoots(report.UnblessedMerkleRoots)
-	}
-
-	// defer subscription.Unsubscribe()
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
-	ticker := time.NewTicker(2 * time.Second)
-	defer ticker.Stop()
+
 	for {
 		select {
-		case <-ctx.Done():
-			return nil, nil
-		case <-ticker.C:
-			l.Info().Msgf("Waiting for commit report on chain selector %d from source selector %d expected seq nr range %s",
-				to, from, seqRange.String())
-
-			// Need to do this because the subscription sometimes fails to get the event.
-			iter, err := offRamp.FilterCommitReportAccepted(&bind.FilterOpts{
-				Context: ctx,
-			})
-
-			// In some test case the test ends while the filter is still running resulting in a context.Canceled error.
-			if err != nil && !errors.Is(err, context.Canceled) {
-				return nil, fmt.Errorf("error filtering CommitReportAccepted: %w", err)
+		case eventWithTxn := <-sink:
+			commitEvent := eventWithTxn.Event
+			// if merkle root is zero, it only contains price updates
+			if commitEvent.Report == nil {
+				l.Info().Msg("Skipping commit report with nil report")
+				continue
 			}
-			for iter.Next() {
-				event := iter.Event
-				verified := verifyCommitReport(event)
-				if verified {
-					return event, nil
-				}
+			if commitEvent.Report.SourceChainSelector != from {
+				l.Info().Uint64("SourceChainSelector", commitEvent.Report.SourceChainSelector).Msg("Skipping commit report from different source chain selector")
+				return nil, fmt.Errorf("unexpected source chain selector in commit report: got %d, want %d", commitEvent.Report.SourceChainSelector, from)
+			}
+
+			// TODO: this logic is duplicated with verifyCommitReport, share
+			mr := commitEvent.Report
+			seenMessages.visitCommitReport(mr.SourceChainSelector, mr.MinSeqNr, mr.MaxSeqNr)
+			if mr.SourceChainSelector == from &&
+				uint64(seqRange.Start()) >= mr.MinSeqNr &&
+				uint64(seqRange.End()) <= mr.MaxSeqNr {
+				l.Info().Msgf("All sequence numbers committed in a single report [%d, %d]", seqRange.Start(), seqRange.End())
+				return true, nil
+			}
+
+			if seenMessages.allCommited(from) {
+				l.Info().Msgf("All sequence numbers already committed from range [%d, %d]", seqRange.Start(), seqRange.End())
+				return true, nil
+			}
+		case err := <-errCh:
+			if err != nil {
+				return false, fmt.Errorf("error while fetching commit report events: %w", err)
 			}
 		case <-timer.C:
-			return nil, fmt.Errorf("timed out after waiting for commit report on chain selector %d from source selector %d expected seq nr range %s",
+			return false, fmt.Errorf("timed out after waiting for commit report on chain selector %d from source selector %d expected seq nr range %s",
 				to, from, seqRange.String())
 		}
 	}
+}
+
+type EventWithTxn[T any] struct {
+	Event T
+	Txn   *solRpc.GetTransactionResult
+}
+
+// Scan for events referencing address
+func solEventEmitter[T any](ctx context.Context, client *solRpc.Client, address solana.PublicKey, eventType string, startSlot uint64, done chan any, ticker *time.Ticker) (<-chan EventWithTxn[T], <-chan error) {
+	ch := make(chan EventWithTxn[T])
+	errorCh := make(chan error)
+	go func() {
+		defer ticker.Stop()
+		var until solana.Signature
+		for {
+			select {
+			case <-done:
+				return
+			case <-ticker.C:
+				// Scan for transactions referencing the address
+				txSigs, err := client.GetSignaturesForAddressWithOpts(
+					ctx,
+					address,
+					&solRpc.GetSignaturesForAddressOpts{
+						Commitment: solRpc.CommitmentConfirmed,
+						Until:      until,
+					},
+				)
+				if err != nil {
+					errorCh <- err
+					return
+				}
+
+				if len(txSigs) == 0 {
+					continue
+				}
+
+				// values are returned ordered newest to oldest, so we replay them backwards
+				for _, txSig := range slices.Backward(txSigs) {
+					if txSig.Err != nil {
+						// We're not interested in failed transactions.
+						continue
+					}
+					if txSig.Slot < startSlot {
+						// Skip any signatures that are before the starting slot
+						continue
+					}
+					v := uint64(0) // v0 = latest, supports address table lookups
+					tx, err := client.GetTransaction(
+						ctx,
+						txSig.Signature,
+						&solRpc.GetTransactionOpts{
+							Commitment:                     solRpc.CommitmentConfirmed,
+							Encoding:                       solana.EncodingBase64,
+							MaxSupportedTransactionVersion: &v,
+						},
+					)
+					if err != nil {
+						errorCh <- err
+						return
+					}
+
+					events, err := solCommonUtil.ParseMultipleEvents[T](tx.Meta.LogMessages, eventType, solconfig.PrintEvents)
+					if err != nil && strings.Contains(err.Error(), "event not found") {
+						continue
+					}
+					if err != nil {
+						errorCh <- err
+						return
+					}
+
+					for _, event := range events {
+						select {
+						case ch <- EventWithTxn[T]{
+							Event: event,
+							Txn:   tx,
+						}:
+						case <-done:
+							return
+						}
+					}
+				}
+				// next scan should stop at the newest signature we've received
+				until = txSigs[0].Signature
+			}
+		}
+	}()
+
+	return ch, errorCh
 }
 
 const (
@@ -378,17 +502,12 @@ func executionStateToString(state uint8) string {
 // WaitOneExecEventBySeqNo wait and fetch strictly one ExecutionStateChanged event by sequence number and selector.
 func (m *CCIP16Solana) WaitOneExecEventBySeqNo(ctx context.Context, from, to, seq uint64, timeout time.Duration) (any, error) {
 	l := zerolog.Ctx(ctx)
-	a := &evmseqs.EVMAdapter{}
+	a := &solanaseqs.SolanaAdapter{}
 	offAddr, err := a.GetOffRampAddress(m.e.DataStore, to)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get off ramp address: %w", err)
 	}
-	offRamp, err := offramp.NewOffRamp(
-		common.BytesToAddress(offAddr),
-		m.e.BlockChains.EVMChains()[to].Client)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create off ramp instance: %w", err)
-	}
+	offRampAddress := solana.PublicKeyFromBytes(offAddr)
 	sourceDest := devenvcommon.SourceDestPair{SourceChainSelector: from, DestChainSelector: to}
 	seqRange, ok := m.common.ExpectedSeqNumRange[sourceDest]
 	if !ok {
@@ -401,37 +520,38 @@ func (m *CCIP16Solana) WaitOneExecEventBySeqNo(ctx context.Context, from, to, se
 		seqNrsToWatch[uint64(seqNr)] = struct{}{}
 	}
 
-	// defer subscription.Unsubscribe()
+	done := make(chan any)
+	sink, errCh := solEventEmitter[solccip.EventExecutionStateChanged](ctx, m.e.BlockChains.SolanaChains()[to].Client, offRampAddress, consts.EventNameExecutionStateChanged, 0, done, time.NewTicker(2*time.Second))
+
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
-	ticker := time.NewTicker(2 * time.Second)
-	defer ticker.Stop()
+
 	for {
 		select {
-		case <-ctx.Done():
-			return nil, nil
-		case <-ticker.C:
-			for expectedSeqNr := range seqNrsToWatch {
-				scc, executionState := getExecutionState(from, offRamp, expectedSeqNr)
-				l.Info().Msgf("Waiting for ExecutionStateChanged on chain %d (offramp %s) from chain %d with expected sequence number %d, current onchain minSeqNr: %d, execution state: %s",
-					to, offRamp.Address().String(), from, expectedSeqNr, scc.MinSeqNr, executionStateToString(executionState))
-				fmt.Printf("Waiting for ExecutionStateChanged on chain %d (offramp %s) from chain %d with expected sequence number %d, current onchain minSeqNr: %d, execution state: %s\n",
-					to, offRamp.Address().String(), from, expectedSeqNr, scc.MinSeqNr, executionStateToString(executionState))
-				if executionState == EXECUTION_STATE_SUCCESS || executionState == EXECUTION_STATE_FAILURE {
-					l.Info().Msgf("Observed %s execution state on chain %d (offramp %s) from chain %d with expected sequence number %d",
-						executionStateToString(executionState), to, offRamp.Address().String(), from, expectedSeqNr)
-					fmt.Printf("Observed %s execution state on chain %d (offramp %s) from chain %d with expected sequence number %d\n",
-						executionStateToString(executionState), to, offRamp.Address().String(), from, expectedSeqNr)
-					executionStates[expectedSeqNr] = int(executionState)
-					delete(seqNrsToWatch, expectedSeqNr)
-					if len(seqNrsToWatch) == 0 {
-						return executionStates, nil
-					}
+		case eventWithTxn := <-sink:
+			execEvent := eventWithTxn.Event
+			// TODO: share with EVM
+			_, found := seqNrsToWatch[execEvent.SequenceNumber]
+			if found && execEvent.SourceChainSelector == from {
+				l.Log().Msgf("Received ExecutionStateChanged (state %s) on chain %d (offramp %s) from chain %d with expected sequence number %d",
+					execEvent.State.String(), to, offRampAddress.String(), from, execEvent.SequenceNumber)
+				if execEvent.State == ccip_offramp.InProgress_MessageExecutionState {
+					// skip the in progress state, executed event should follow
+					continue
 				}
+				executionStates[execEvent.SequenceNumber] = int(execEvent.State)
+				delete(seqNrsToWatch, execEvent.SequenceNumber)
+				if len(seqNrsToWatch) == 0 {
+					return executionStates, nil
+				}
+			}
+		case err := <-errCh:
+			if err != nil {
+				return nil, fmt.Errorf("error while fetching execution state changed events: %w", err)
 			}
 		case <-timer.C:
 			return nil, fmt.Errorf("timed out waiting for ExecutionStateChanged on chain %d (offramp %s) from chain %d with expected sequence numbers %+v",
-				to, offRamp.Address().String(), from, seqNrsToWatch)
+				to, offRampAddress.String(), from, seqRange)
 		}
 	}
 }
@@ -492,24 +612,25 @@ var solanaProgramIDs = map[string]string{
 	"burnmint_token_pool":    "41FGToCmdaWa1dgZLKFAjvmx6e6AjVTX7SVRibvsMGVB",
 	"lockrelease_token_pool": "8eqh8wppT9c5rw4ERqNCffvU6cNFJWff9WmkcYtmGiqC",
 	"fee_quoter":             "FeeQPGkKDeRV1MgoYfMH6L8o3KeuYjwUZrgn4LRKfjHi",
-	// "test_ccip_receiver":        "EvhgrPhTDt4LcSPS2kfJgH6T6XWZ6wT3X9ncDGLT1vui",
-	"ccip_offramp":      "offqSMQWgQud6WJz694LRzkeN5kMYpCHTpXQr3Rkcjm",
-	"mcm":               "5vNJx78mz7KVMjhuipyr9jKBKcMrKYGdjGkgE4LUmjKk",
-	"timelock":          "DoajfR5tK24xVw51fWcawUZWhAXD8yrBJVacc13neVQA",
-	"access_controller": "6KsN58MTnRQ8FfPaXHiFPPFGDRioikj9CdPvPxZJdCjb",
+	"test_ccip_receiver":     "EvhgrPhTDt4LcSPS2kfJgH6T6XWZ6wT3X9ncDGLT1vui",
+	"ccip_offramp":           "offqSMQWgQud6WJz694LRzkeN5kMYpCHTpXQr3Rkcjm",
+	"mcm":                    "5vNJx78mz7KVMjhuipyr9jKBKcMrKYGdjGkgE4LUmjKk",
+	"timelock":               "DoajfR5tK24xVw51fWcawUZWhAXD8yrBJVacc13neVQA",
+	"access_controller":      "6KsN58MTnRQ8FfPaXHiFPPFGDRioikj9CdPvPxZJdCjb",
 	// "external_program_cpi_stub": "2zZwzyptLqwFJFEFxjPvrdhiGpH9pJ3MfrrmZX6NTKxm",
 	"rmn_remote": "RmnXLft1mSEwDgMKu2okYuHkiazxntFFcZFrrcXxYg7",
 	// "cctp_token_pool":           "CCiTPESGEevd7TBU8EGBKrcxuRq7jx3YtW6tPidnscaZ",
 }
 
 var solanaContracts = map[string]datastore.ContractType{
-	"ccip_router":       datastore.ContractType("Router"),
-	"fee_quoter":        datastore.ContractType("FeeQuoter"),
-	"ccip_offramp":      datastore.ContractType("OffRamp"),
-	"rmn_remote":        datastore.ContractType("RMNRemote"),
-	"mcm":               datastore.ContractType(utils.McmProgramType),
-	"timelock":          datastore.ContractType(utils.TimelockProgramType),
-	"access_controller": datastore.ContractType(utils.AccessControllerProgramType),
+	"ccip_router":        datastore.ContractType("Router"),
+	"fee_quoter":         datastore.ContractType("FeeQuoter"),
+	"ccip_offramp":       datastore.ContractType("OffRamp"),
+	"rmn_remote":         datastore.ContractType("RMNRemote"),
+	"mcm":                datastore.ContractType(utils.McmProgramType),
+	"timelock":           datastore.ContractType(utils.TimelockProgramType),
+	"access_controller":  datastore.ContractType(utils.AccessControllerProgramType),
+	"test_ccip_receiver": datastore.ContractType("TestReceiver"),
 }
 
 func PreloadSolanaEnvironment(programsPath string, chainSelector uint64) error {
@@ -564,23 +685,7 @@ func (m *CCIP16Solana) ConfigureNodes(ctx context.Context, bc *blockchain.Input)
 	LogPollerStartingLookback = '24h'
 
 	[Solana.MultiNode]
-	Enabled = true
-	SyncThreshold = 170
-	PollFailureThreshold = 5
-	PollInterval = "15s"
-	NewHeadsPollInterval = "5s"
-	SelectionMode = "PriorityLevel"
-	LeaseDuration = "1m"
-	NodeIsSyncingEnabled = false
-	FinalizedBlockPollInterval = "5s"
-	EnforceRepeatableRead = true
-	DeathDeclarationDelay = "20s"
-	NodeNoNewHeadsThreshold = "20s"
-	NoNewFinalizedHeadsThreshold = "20s"
-	FinalityTagEnabled = true
-	FinalityDepth = 0
-	FinalizedBlockOffset = 50
-	VerifyChainID = true
+	VerifyChainID = false
 
 	[[Solana.Nodes]]
 	Name = '%s'
@@ -599,7 +704,84 @@ func (m *CCIP16Solana) DeployContractsForSelector(ctx context.Context, env *depl
 		return nil, err
 	}
 	env.DataStore = ds.Seal()
-	return devenvcommon.DeployContractsForSelector(ctx, env, cls, selector, ccipHomeSelector, crAddr)
+	outds, err := devenvcommon.DeployContractsForSelector(ctx, env, cls, selector, ccipHomeSelector, crAddr)
+	if err != nil {
+		return nil, err
+	}
+	// post contract setup for testing
+	a := &solanaseqs.SolanaAdapter{}
+	linkAddr, err := datastore_utils.FindAndFormatRef(outds, datastore.AddressRef{
+		ChainSelector: selector,
+		Type:          datastore.ContractType("LINK"),
+	}, selector, datastore_utils.FullRef)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get LINK address: %w", err)
+	}
+	fqAddr, err := a.GetFQAddress(outds, selector)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get fee quoter address: %w", err)
+	}
+	routerAddr, err := a.GetRouterAddress(outds, selector)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get router address: %w", err)
+	}
+	chain := env.BlockChains.SolanaChains()[selector]
+	fqID := solana.PublicKeyFromBytes(fqAddr)
+	routerID := solana.PublicKeyFromBytes(routerAddr)
+	fee_quoter.SetProgramID(solana.PublicKeyFromBytes(fqAddr))
+	fqAllowedPriceUpdaterPDA, _, _ := state.FindFqAllowedPriceUpdaterPDA(chain.DeployerKey.PublicKey(), fqID)
+	feeQuoterConfigPDA, _, _ := state.FindFqConfigPDA(fqID)
+	ixn, err := fee_quoter.NewAddPriceUpdaterInstruction(
+		chain.DeployerKey.PublicKey(),
+		fqAllowedPriceUpdaterPDA,
+		feeQuoterConfigPDA,
+		chain.DeployerKey.PublicKey(),
+		solana.SystemProgramID,
+	).ValidateAndBuild()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get fee tokens from fee quoter: %w", err)
+	}
+	err = chain.Confirm([]solana.Instruction{ixn})
+	if err != nil {
+		return nil, fmt.Errorf("failed to add price updater: %w", err)
+	}
+	for _, tokenPubKey := range []solana.PublicKey{
+		solana.WrappedSol,
+		solana.MustPublicKeyFromBase58(linkAddr.Address),
+	} {
+		billingTokenConfig := fee_quoter.BillingTokenConfig{
+			Enabled: true,
+			Mint:    tokenPubKey,
+			UsdPerToken: fee_quoter.TimestampedPackedU224{
+				Timestamp: time.Now().Unix(),
+				Value:     [28]uint8{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 46, 117, 223, 115, 252, 225, 110, 70, 208, 64, 0, 0},
+			},
+			PremiumMultiplierWeiPerEth: 1e18,
+		}
+		tokenBillingPDA, _, _ := state.FindFqBillingTokenConfigPDA(tokenPubKey, fqID)
+		// we dont need to handle test router here because we explicitly create this and token Receiver for test router
+		billingSignerPDA, _, _ := state.FindFeeBillingSignerPDA(routerID)
+		tokenProgramID := solana.TokenProgramID
+		tokenReceiver, _, _ := tokens.FindAssociatedTokenAddress(tokenProgramID, tokenPubKey, billingSignerPDA)
+		feeQuoterConfigPDA, _, _ := state.FindFqConfigPDA(fqID)
+		ixn, err := fee_quoter.NewAddBillingTokenConfigInstruction(
+			billingTokenConfig,
+			feeQuoterConfigPDA,
+			tokenBillingPDA,
+			tokenProgramID,
+			tokenPubKey,
+			tokenReceiver,
+			chain.DeployerKey.PublicKey(),
+			billingSignerPDA,
+			ata.ProgramID,
+			solana.SystemProgramID,
+		).ValidateAndBuild()
+		err = chain.Confirm([]solana.Instruction{ixn})
+		if err != nil {
+			return nil, fmt.Errorf("failed to add price updater: %w", err)
+		}
+	}
+	return outds, nil
 }
 
 func (m *CCIP16Solana) ConnectContractsWithSelectors(ctx context.Context, e *deployment.Environment, selector uint64, remoteSelectors []uint64) error {
@@ -617,7 +799,7 @@ func (m *CCIP16Solana) FundNodes(ctx context.Context, ns []*simple_node_set.Inpu
 	if err != nil {
 		return nil, fmt.Errorf("connecting to CL nodes: %w", err)
 	}
-	nkb, err := changesets.CreateNodeKeysBundle(nodeClients, bc.Type, bc.ChainID)
+	nkb, err := devenvcommon.CreateNodeKeysBundle(nodeClients, bc.Type, bc.ChainID)
 	if err != nil {
 		return nil, fmt.Errorf("creating node keys bundle: %w", err)
 	}

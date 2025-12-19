@@ -45,6 +45,7 @@ var DeployLINK = operations.NewOperation(
 		return datastore.AddressRef{
 			ChainSelector: chain.Selector,
 			Address:       input.TokenPrivKey.PublicKey().String(),
+			Version:       Version,
 			Type:          datastore.ContractType(LinkContractType),
 		}, nil
 	},

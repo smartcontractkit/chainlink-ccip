@@ -3,6 +3,7 @@ package ccip
 import (
 	"context"
 	"errors"
+	"os"
 	"path/filepath"
 	"sync"
 	"time"
@@ -93,6 +94,10 @@ func NewCLDFOperationsEnvironment(bc []*blockchain.Input, dataStore datastore.Da
 				return nil, nil, err
 			}
 
+			if err := os.MkdirAll(programsPath, 0o755); err != nil {
+				return nil, nil, err
+			}
+
 			d, err := chainsel.GetChainDetailsByChainIDAndFamily(chainID, chainsel.FamilySolana)
 			if err != nil {
 				return nil, nil, err
@@ -111,6 +116,9 @@ func NewCLDFOperationsEnvironment(bc []*blockchain.Input, dataStore datastore.Da
 					KeypairDirPath: programsPath, // Use the same path for keypair storage
 				},
 			).Initialize(context.Background())
+			if err != nil {
+				return nil, nil, err
+			}
 			client := solRpc.New(rpcHTTPURL)
 			err = utils.FundSolanaAccounts(
 				context.Background(),

@@ -1,4 +1,4 @@
-package changesets
+package common
 
 import (
 	"bytes"
@@ -164,7 +164,7 @@ func applyAddDonAndSetCandidateChangesetConfig(e deployment.Environment, cfg Add
 	capRegAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 		ChainSelector: cfg.HomeChainSelector,
 		Type:          datastore.ContractType(utils.CapabilitiesRegistry),
-		Version:       semver.MustParse("1.6.0"),
+		Version:       semver.MustParse("1.0.0"),
 	}, cfg.HomeChainSelector, datastore_utils.FullRef)
 	if err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("finding CapabilitiesRegistry address: %w", err)
@@ -576,7 +576,7 @@ func applySetCandidateChangesetConfig(e deployment.Environment, cfg SetCandidate
 	capRegAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 		ChainSelector: cfg.HomeChainSelector,
 		Type:          datastore.ContractType(utils.CapabilitiesRegistry),
-		Version:       semver.MustParse("1.6.0"),
+		Version:       semver.MustParse("1.0.0"),
 	}, cfg.HomeChainSelector, datastore_utils.FullRef)
 	if err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("finding CapabilitiesRegistry address: %w", err)
@@ -792,7 +792,7 @@ func applyPromoteCandidateChangesetConfig(e deployment.Environment, cfg PromoteC
 	capRegAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 		ChainSelector: cfg.HomeChainSelector,
 		Type:          datastore.ContractType(utils.CapabilitiesRegistry),
-		Version:       semver.MustParse("1.6.0"),
+		Version:       semver.MustParse("1.0.0"),
 	}, cfg.HomeChainSelector, datastore_utils.FullRef)
 	if err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("finding CapabilitiesRegistry address: %w", err)

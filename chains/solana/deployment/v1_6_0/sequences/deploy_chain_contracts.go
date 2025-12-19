@@ -12,6 +12,7 @@ import (
 	offrampops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/offramp"
 	rmnremoteops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/rmn_remote"
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/router"
+	testreceiverops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/test_receiver"
 	tokensops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
@@ -182,6 +183,12 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to extend OffRamp lookup table: %w", err)
 		}
 
+		// deploy test receiver contract
+		receiverRef, err := operations.ExecuteOperation(b, testreceiverops.Deploy, chain, input.ExistingAddresses)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy TestReceiver: %w", err)
+		}
+		addresses = append(addresses, receiverRef.Output)
 		return sequences.OnChainOutput{
 			Addresses: addresses,
 		}, nil

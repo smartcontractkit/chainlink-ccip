@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/gagliardetto/solana-go"
 	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
@@ -28,7 +29,10 @@ import (
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	evmseqs "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
-	devenvcommon "github.com/smartcontractkit/chainlink-ccip/devenv/chainimpl"
+	msg_hasher163 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/message_hasher"
+	solccip "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/ccip"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
+	devenvcommon "github.com/smartcontractkit/chainlink-ccip/devenv/common"
 	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 )
 
@@ -108,13 +112,51 @@ func (m *CCIP16EVM) SendMessage(ctx context.Context, src, dest uint64, fields an
 	l := zerolog.Ctx(ctx)
 	l.Info().Msg("Sending CCIP message")
 	a := &evmseqs.EVMAdapter{}
-	receiver := common.LeftPadBytes(common.HexToAddress("0xdead").Bytes(), 32)
+	var receiver []byte
+	family, err := chainsel.GetSelectorFamily(dest)
+	if err != nil {
+		return fmt.Errorf("failed to get chain family: %w", err)
+	}
+	var extraArgs []byte
+	switch family {
+	case chainsel.FamilyEVM:
+		receiver = common.LeftPadBytes(common.HexToAddress("0xdead").Bytes(), 32)
+	case chainsel.FamilySolana:
+		receiverAddr, err := datastore_utils.FindAndFormatRef(m.e.DataStore, datastore.AddressRef{
+			ChainSelector: dest,
+			Type:          datastore.ContractType("TestReceiver"),
+		}, dest, datastore_utils.FullRef)
+		if err != nil {
+			return fmt.Errorf("failed to get TestReceiver address: %w", err)
+		}
+		receiverProgram := solana.MustPublicKeyFromBase58(receiverAddr.Address)
+		receiver = receiverProgram.Bytes()
+		receiverTargetAccountPDA, _, _ := solana.FindProgramAddress([][]byte{[]byte("counter")}, receiverProgram)
+		receiverExternalExecutionConfigPDA, _, _ := solana.FindProgramAddress([][]byte{[]byte("external_execution_config")}, receiverProgram)
+		accounts := [][32]byte{
+			receiverExternalExecutionConfigPDA,
+			receiverTargetAccountPDA,
+			solana.SystemProgramID,
+		}
+
+		extraArgs, err = devenvcommon.SerializeClientSVMExtraArgsV1(msg_hasher163.ClientSVMExtraArgsV1{
+			AccountIsWritableBitmap:  solccip.GenerateBitMapForIndexes([]int{0, 1}),
+			Accounts:                 accounts,
+			ComputeUnits:             80_000,
+			AllowOutOfOrderExecution: true,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to serialize SVM extra args: %w", err)
+		}
+	default:
+		return fmt.Errorf("unsupported chain family: %s", family)
+	}
 	msg := router.ClientEVM2AnyMessage{
 		Receiver:     receiver,
 		Data:         []byte("hello eoa"),
 		TokenAmounts: nil,
 		FeeToken:     common.HexToAddress("0x0"),
-		ExtraArgs:    nil,
+		ExtraArgs:    extraArgs,
 	}
 	const errCodeInsufficientFee = "0x07da6ee6"
 	const cannotDecodeErrorReason = "could not decode error reason"

@@ -25,7 +25,7 @@ type AddDONOpInput struct {
 
 var AddDON = contract.NewWrite(contract.WriteParams[AddDONOpInput, *capabilities_registry.CapabilitiesRegistry]{
 	Name:            "capabilities-registry:add-don",
-	Version:         Version,
+	Version:         semver.MustParse("1.0.0"),
 	Description:     "Adds a new DON to the CapabilitiesRegistry",
 	ContractType:    utils.CapabilitiesRegistry,
 	ContractABI:     capabilities_registry.CapabilitiesRegistryABI,
@@ -47,7 +47,7 @@ type UpdateDONOpInput struct {
 
 var UpdateDON = contract.NewWrite(contract.WriteParams[UpdateDONOpInput, *capabilities_registry.CapabilitiesRegistry]{
 	Name:            "capabilities-registry:update-don",
-	Version:         Version,
+	Version:         semver.MustParse("1.0.0"),
 	Description:     "Updates an existing DON in the CapabilitiesRegistry",
 	ContractType:    utils.CapabilitiesRegistry,
 	ContractABI:     capabilities_registry.CapabilitiesRegistryABI,

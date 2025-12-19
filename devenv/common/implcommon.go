@@ -1,4 +1,4 @@
-package chainimpl
+package common
 
 import (
 	"context"
@@ -20,7 +20,6 @@ import (
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	changesetscore "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
-	"github.com/smartcontractkit/chainlink-ccip/devenv/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/devenv/sequences"
 	ccipocr3common "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -125,7 +124,7 @@ func DeployContractsForSelector(ctx context.Context, env *deployment.Environment
 				return nil, fmt.Errorf("reading worker node P2P keys: %w", err)
 			}
 			l.Info().Str("Node", node.Config.URL).Str("PeerID", nodeP2PIds.Data[0].Attributes.PeerID).Msg("Adding reader peer ID")
-			id := changesets.MustPeerIDFromString(nodeP2PIds.Data[0].Attributes.PeerID)
+			id := MustPeerIDFromString(nodeP2PIds.Data[0].Attributes.PeerID)
 			readers = append(readers, id)
 			l.Info().Msgf("peerID: %+v", id)
 			l.Info().Msgf("peer ID from bytes: %s", id.Raw())
@@ -135,7 +134,7 @@ func DeployContractsForSelector(ctx context.Context, env *deployment.Environment
 		if !ok {
 			return nil, fmt.Errorf("evm chain not found for selector %d", selector)
 		}
-		ccipHomeOut, err := changesets.DeployHomeChain.Apply(*env, sequences.DeployHomeChainConfig{
+		ccipHomeOut, err := DeployHomeChain.Apply(*env, sequences.DeployHomeChainConfig{
 			HomeChainSel: selector,
 			CapReg:       common.HexToAddress(crAddr),
 			RMNStaticConfig: rmn_home.RMNHomeStaticConfig{
@@ -162,7 +161,7 @@ func DeployContractsForSelector(ctx context.Context, env *deployment.Environment
 			datastore.AddressRef{
 				ChainSelector: selector,
 				Type:          datastore.ContractType(utils.CapabilitiesRegistry),
-				Version:       semver.MustParse("1.6.0"),
+				Version:       semver.MustParse("1.0.0"),
 				Address:       crAddr,
 			},
 		)
@@ -226,9 +225,9 @@ func ConfigureContractsForSelectors(ctx context.Context, e *deployment.Environme
 	e.OperationsBundle = bundle
 
 	// Build the CCIPHome chain configs.
-	chainConfigs := make(map[uint64]changesets.ChainConfig)
-	commitOCRConfigs := make(map[uint64]changesets.CCIPOCRParams)
-	execOCRConfigs := make(map[uint64]changesets.CCIPOCRParams)
+	chainConfigs := make(map[uint64]ChainConfig)
+	commitOCRConfigs := make(map[uint64]CCIPOCRParams)
+	execOCRConfigs := make(map[uint64]CCIPOCRParams)
 	nodeClients, err := clclient.New(cls[0].Out.CLNodes)
 	if err != nil {
 		return fmt.Errorf("connecting to CL nodes: %w", err)
@@ -242,43 +241,43 @@ func ConfigureContractsForSelectors(ctx context.Context, e *deployment.Environme
 			return fmt.Errorf("reading worker node P2P keys: %w", err)
 		}
 		l.Info().Str("Node", node.Config.URL).Str("PeerID", nodeP2PIds.Data[0].Attributes.PeerID).Msg("Adding reader peer ID")
-		id := changesets.MustPeerIDFromString(nodeP2PIds.Data[0].Attributes.PeerID)
+		id := MustPeerIDFromString(nodeP2PIds.Data[0].Attributes.PeerID)
 		readers = append(readers, id)
 	}
 	for _, chain := range remoteSelectors {
-		ocrOverride := func(ocrParams changesets.CCIPOCRParams) changesets.CCIPOCRParams {
+		ocrOverride := func(ocrParams CCIPOCRParams) CCIPOCRParams {
 			if ocrParams.CommitOffChainConfig != nil {
 				ocrParams.CommitOffChainConfig.RMNEnabled = false
 			}
 			return ocrParams
 		}
-		commitOCRConfigs[chain] = changesets.DeriveOCRParamsForCommit(changesets.SimulationTest, ccipHomeSelector, nil, ocrOverride)
-		execOCRConfigs[chain] = changesets.DeriveOCRParamsForExec(changesets.SimulationTest, nil, ocrOverride)
+		commitOCRConfigs[chain] = DeriveOCRParamsForCommit(SimulationTest, ccipHomeSelector, nil, ocrOverride)
+		execOCRConfigs[chain] = DeriveOCRParamsForExec(SimulationTest, nil, ocrOverride)
 
 		l.Info().Msgf("setting readers for chain %d to %v due to no topology", chain, len(readers))
-		chainConfigs[chain] = changesets.ChainConfig{
+		chainConfigs[chain] = ChainConfig{
 			Readers: readers,
 			FChain:  uint8(len(readers) / 3),
 			EncodableChainConfig: chainconfig.ChainConfig{
 				GasPriceDeviationPPB:      ccipocr3common.BigInt{Int: big.NewInt(1000)},
 				DAGasPriceDeviationPPB:    ccipocr3common.BigInt{Int: big.NewInt(1000)},
-				OptimisticConfirmations:   changesets.OptimisticConfirmations,
+				OptimisticConfirmations:   OptimisticConfirmations,
 				ChainFeeDeviationDisabled: false,
 			},
 		}
 	}
 
-	_, err = changesets.UpdateChainConfig.Apply(*e, changesets.UpdateChainConfigConfig{
+	_, err = UpdateChainConfig.Apply(*e, UpdateChainConfigConfig{
 		HomeChainSelector: ccipHomeSelector,
 		RemoteChainAdds:   chainConfigs,
 	})
 	if err != nil {
 		return fmt.Errorf("updating chain config for selector %d: %w", ccipHomeSelector, err)
 	}
-	_, err = changesets.AddDONAndSetCandidate.Apply(*e, changesets.AddDonAndSetCandidateChangesetConfig{
+	_, err = AddDONAndSetCandidate.Apply(*e, AddDonAndSetCandidateChangesetConfig{
 		HomeChainSelector: ccipHomeSelector,
 		FeedChainSelector: ccipHomeSelector,
-		PluginInfo: changesets.SetCandidatePluginInfo{
+		PluginInfo: SetCandidatePluginInfo{
 			OCRConfigPerRemoteChainSelector: commitOCRConfigs,
 			PluginType:                      ccipocr3common.PluginTypeCCIPCommit,
 		},
@@ -288,10 +287,10 @@ func ConfigureContractsForSelectors(ctx context.Context, e *deployment.Environme
 	if err != nil {
 		return fmt.Errorf("adding DON and setting candidate for selector %d: %w", ccipHomeSelector, err)
 	}
-	_, err = changesets.SetCandidate.Apply(*e, changesets.SetCandidateChangesetConfig{
+	_, err = SetCandidate.Apply(*e, SetCandidateChangesetConfig{
 		HomeChainSelector: ccipHomeSelector,
 		FeedChainSelector: ccipHomeSelector,
-		PluginInfo: []changesets.SetCandidatePluginInfo{
+		PluginInfo: []SetCandidatePluginInfo{
 			{
 				OCRConfigPerRemoteChainSelector: execOCRConfigs,
 				PluginType:                      ccipocr3common.PluginTypeCCIPExec,
@@ -303,9 +302,9 @@ func ConfigureContractsForSelectors(ctx context.Context, e *deployment.Environme
 	if err != nil {
 		return fmt.Errorf("setting candidate for selector %d: %w", ccipHomeSelector, err)
 	}
-	_, err = changesets.PromoteCandidate.Apply(*e, changesets.PromoteCandidateChangesetConfig{
+	_, err = PromoteCandidate.Apply(*e, PromoteCandidateChangesetConfig{
 		HomeChainSelector: ccipHomeSelector,
-		PluginInfo: []changesets.PromoteCandidatePluginInfo{
+		PluginInfo: []PromoteCandidatePluginInfo{
 			{
 				PluginType:           ccipocr3common.PluginTypeCCIPCommit,
 				RemoteChainSelectors: remoteSelectors,

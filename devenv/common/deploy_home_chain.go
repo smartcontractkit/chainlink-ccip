@@ -1,4 +1,4 @@
-package changesets
+package common
 
 import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"

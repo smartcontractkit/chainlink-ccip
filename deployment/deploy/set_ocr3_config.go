@@ -69,7 +69,7 @@ func ocr3ConfigArgs(e cldf.Environment, homeChainSelector uint64, chainSelector 
 	crAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 		ChainSelector: homeChainSelector,
 		Type:          datastore.ContractType(utils.CapabilitiesRegistry),
-		Version:       &OCR3Version,
+		Version:       semver.MustParse("1.0.0"),
 	}, homeChainSelector, datastore_utils.FullRef)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find CapabilitiesRegistry address in datastore: %w", err)
