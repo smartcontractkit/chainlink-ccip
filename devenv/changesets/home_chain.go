@@ -19,6 +19,7 @@ import (
 	evmseqs "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/ccip_home"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/rmn_home"
+	solanaSeqs "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/devenv/sequences"
@@ -150,8 +151,9 @@ type AddDonAndSetCandidateChangesetConfig struct {
 
 	// Only set one plugin at a time while you are adding the DON for the first time.
 	// For subsequent SetCandidate call use SetCandidateChangeset as that fetches the already added DONID and sets the candidate.
-	PluginInfo    SetCandidatePluginInfo      `json:"pluginInfo"`
-	NonBootstraps []*clclient.ChainlinkClient `json:"nonBootstraps"`
+	PluginInfo     SetCandidatePluginInfo               `json:"pluginInfo"`
+	NonBootstraps  []*clclient.ChainlinkClient          `json:"nonBootstraps"`
+	NodeKeyBundles map[string][]clclient.NodeKeysBundle `json:"nodeKeyBundles"`
 }
 
 func validateAddDonAndSetCandidateChangesetConfig(e deployment.Environment, cfg AddDonAndSetCandidateChangesetConfig) error {
@@ -221,11 +223,27 @@ func applyAddDonAndSetCandidateChangesetConfig(e deployment.Environment, cfg Add
 
 	dons := make([]sequences.DONAddition, len(cfg.PluginInfo.OCRConfigPerRemoteChainSelector))
 	i := 0
-	a := &evmseqs.EVMAdapter{}
 	for chainSelector, params := range cfg.PluginInfo.OCRConfigPerRemoteChainSelector {
-		offRampAddress, err := a.GetOffRampAddress(e.DataStore, chainSelector)
+		family, err := chain_selectors.GetSelectorFamily(chainSelector)
 		if err != nil {
-			return deployment.ChangesetOutput{}, err
+			return deployment.ChangesetOutput{}, fmt.Errorf("getting chain family for selector %d: %w", chainSelector, err)
+		}
+		var offRampAddress []byte
+		switch family {
+		case chain_selectors.FamilyEVM:
+			a := &evmseqs.EVMAdapter{}
+			offRampAddress, err = a.GetOffRampAddress(e.DataStore, chainSelector)
+			if err != nil {
+				return deployment.ChangesetOutput{}, err
+			}
+		case chain_selectors.FamilySolana:
+			a := &solanaSeqs.SolanaAdapter{}
+			offRampAddress, err = a.GetOffRampAddress(e.DataStore, chainSelector)
+			if err != nil {
+				return deployment.ChangesetOutput{}, err
+			}
+		default:
+			return deployment.ChangesetOutput{}, fmt.Errorf("unsupported chain family %s for selector %d", family, chainSelector)
 		}
 		newDONArgs, err := BuildOCR3ConfigForCCIPHome(
 			ccipHome,
@@ -237,6 +255,7 @@ func applyAddDonAndSetCandidateChangesetConfig(e deployment.Environment, cfg Add
 			params.OCRParameters,
 			params.CommitOffChainConfig,
 			params.ExecuteOffChainConfig,
+			cfg.NodeKeyBundles,
 		)
 		if err != nil {
 			return deployment.ChangesetOutput{}, err
@@ -284,8 +303,9 @@ func BuildOCR3ConfigForCCIPHome(
 	ocrParams OCRParameters,
 	commitOffchainCfg *pluginconfig.CommitOffchainConfig,
 	execOffchainCfg *pluginconfig.ExecuteOffchainConfig,
+	nodeKeyBundles map[string][]clclient.NodeKeysBundle,
 ) (map[ccipocr3.PluginType]ccip_home.CCIPHomeOCR3Config, error) {
-	schedule, oracles, err := getOracleIdentities(nodes, destSelector)
+	schedule, oracles, err := getOracleIdentities(nodes, nodeKeyBundles, destSelector)
 	if err != nil {
 		return nil, err
 	}
@@ -439,40 +459,64 @@ func BuildOCR3ConfigForCCIPHome(
 	return ocr3Configs, nil
 }
 
-func getOracleIdentities(clClients []*clclient.ChainlinkClient, destSelector uint64) ([]int, []confighelper.OracleIdentityExtra, error) { //nolint:gocritic
+func getOracleIdentities(clClients []*clclient.ChainlinkClient, nodeKeyBundles map[string][]clclient.NodeKeysBundle, destSelector uint64) ([]int, []confighelper.OracleIdentityExtra, error) { //nolint:gocritic
 	s := make([]int, len(clClients))
 	oracleIdentities := make([]confighelper.OracleIdentityExtra, len(clClients))
-	sharedSecretEncryptionPublicKeys := make([]ocrtypes.ConfigEncryptionPublicKey, len(clClients))
 	eg := &errgroup.Group{}
 	for i, cl := range clClients {
 		eg.Go(func() error {
-			destId, err := chain_selectors.GetChainIDFromSelector(destSelector)
-			if err != nil {
-				return err
-			}
-			addrSrc, err := cl.ReadPrimaryETHKey(destId)
-			if err != nil {
-				return err
-			}
-			ocr2Keys, err := cl.MustReadOCR2Keys()
-			if err != nil {
-				return err
-			}
-			var ocr2Config clclient.OCR2KeyAttributes
-			for _, key := range ocr2Keys.Data {
-				if key.Attributes.ChainType == "evm" {
-					ocr2Config = key.Attributes
-					break
-				}
-			}
-
 			keys, err := cl.MustReadP2PKeys()
 			if err != nil {
 				return err
 			}
 			id := MustPeerIDFromString(keys.Data[0].Attributes.PeerID)
 
-			offchainPkBytes, err := hex.DecodeString(strings.TrimPrefix(ocr2Config.OffChainPublicKey, "ocr2off_evm_"))
+			family, err := chain_selectors.GetSelectorFamily(destSelector)
+			if err != nil {
+				return err
+			}
+			var addr, offPrefix, onPrefix, cfgPrefix string
+			var ocr2Config clclient.OCR2KeyAttributes
+			switch family {
+			case chain_selectors.FamilyEVM:
+				destId, err := chain_selectors.GetChainIDFromSelector(destSelector)
+				if err != nil {
+					return err
+				}
+				addrSrc, err := cl.ReadPrimaryETHKey(destId)
+				if err != nil {
+					return err
+				}
+				addr = addrSrc.Attributes.Address
+				ocr2Keys, err := cl.MustReadOCR2Keys()
+				if err != nil {
+					return err
+				}
+
+				for _, key := range ocr2Keys.Data {
+					if key.Attributes.ChainType == "evm" {
+						ocr2Config = key.Attributes
+						break
+					}
+				}
+				offPrefix = "ocr2off_evm_"
+				onPrefix = "ocr2on_evm_"
+				cfgPrefix = "ocr2cfg_evm_"
+			case chain_selectors.FamilySolana:
+				// offset by 1 as first bundle is bootstrap node
+				bundle := nodeKeyBundles[family][i+1]
+				addr = bundle.TXKey.Data.Attributes.PublicKey
+				ocrKey := bundle.OCR2Key
+				fmt.Println("GOT OCR2 KEY %+v", ocrKey)
+				ocr2Config = ocrKey.Data.Attributes
+				offPrefix = "ocr2off_solana_"
+				onPrefix = "ocr2on_solana_"
+				cfgPrefix = "ocr2cfg_solana_"
+			default:
+				return fmt.Errorf("unsupported chain family %s for selector %d", family, destSelector)
+			}
+
+			offchainPkBytes, err := hex.DecodeString(strings.TrimPrefix(ocr2Config.OffChainPublicKey, offPrefix))
 			if err != nil {
 				return err
 			}
@@ -481,7 +525,7 @@ func getOracleIdentities(clClients []*clclient.ChainlinkClient, destSelector uin
 			if n != ed25519.PublicKeySize {
 				return fmt.Errorf("wrong number of elements copied")
 			}
-			configPkBytes, err := hex.DecodeString(strings.TrimPrefix(ocr2Config.ConfigPublicKey, "ocr2cfg_evm_"))
+			configPkBytes, err := hex.DecodeString(strings.TrimPrefix(ocr2Config.ConfigPublicKey, cfgPrefix))
 			if err != nil {
 				return err
 			}
@@ -490,17 +534,16 @@ func getOracleIdentities(clClients []*clclient.ChainlinkClient, destSelector uin
 			if n != ed25519.PublicKeySize {
 				return fmt.Errorf("wrong number of elements copied")
 			}
-			onchainPkBytes, err := hex.DecodeString(strings.TrimPrefix(ocr2Config.OnChainPublicKey, "ocr2on_evm_"))
+			onchainPkBytes, err := hex.DecodeString(strings.TrimPrefix(ocr2Config.OnChainPublicKey, onPrefix))
 			if err != nil {
 				return err
 			}
-			sharedSecretEncryptionPublicKeys[i] = configPkBytesFixed
 			oracleIdentities[i] = confighelper.OracleIdentityExtra{
 				OracleIdentity: confighelper.OracleIdentity{
 					OnchainPublicKey:  onchainPkBytes,
 					OffchainPublicKey: offchainPkBytesFixed,
 					PeerID:            id.Raw(),
-					TransmitAccount:   ocrtypes.Account(addrSrc.Attributes.Address),
+					TransmitAccount:   ocrtypes.Account(addr),
 				},
 				ConfigEncryptionPublicKey: configPkBytesFixed,
 			}
@@ -520,8 +563,9 @@ type SetCandidateChangesetConfig struct {
 	HomeChainSelector uint64 `json:"homeChainSelector"`
 	FeedChainSelector uint64 `json:"feedChainSelector"`
 
-	PluginInfo    []SetCandidatePluginInfo    `json:"pluginInfo"`
-	NonBootstraps []*clclient.ChainlinkClient `json:"nonBootstraps"`
+	PluginInfo     []SetCandidatePluginInfo             `json:"pluginInfo"`
+	NonBootstraps  []*clclient.ChainlinkClient          `json:"nonBootstraps"`
+	NodeKeyBundles map[string][]clclient.NodeKeysBundle `json:"nodeKeyBundles"`
 }
 
 func validateSetCandidateChangesetConfig(e deployment.Environment, cfg SetCandidateChangesetConfig) error {
@@ -576,7 +620,6 @@ func applySetCandidateChangesetConfig(e deployment.Environment, cfg SetCandidate
 
 	pluginInfos := make([]string, 0)
 	dons := make([]sequences.DONUpdate, 0)
-	a := &evmseqs.EVMAdapter{}
 	chainToDonIDs := make(map[uint64]uint32)
 	for _, plugin := range cfg.PluginInfo {
 		for chainSelector := range plugin.OCRConfigPerRemoteChainSelector {
@@ -609,9 +652,26 @@ func applySetCandidateChangesetConfig(e deployment.Environment, cfg SetCandidate
 	for _, plugin := range cfg.PluginInfo {
 		pluginInfos = append(pluginInfos, plugin.String())
 		for chainSelector, params := range plugin.OCRConfigPerRemoteChainSelector {
-			offRampAddress, err := a.GetOffRampAddress(e.DataStore, chainSelector)
+			family, err := chain_selectors.GetSelectorFamily(chainSelector)
 			if err != nil {
-				return deployment.ChangesetOutput{}, err
+				return deployment.ChangesetOutput{}, fmt.Errorf("getting chain family for selector %d: %w", chainSelector, err)
+			}
+			var offRampAddress []byte
+			switch family {
+			case chain_selectors.FamilyEVM:
+				a := &evmseqs.EVMAdapter{}
+				offRampAddress, err = a.GetOffRampAddress(e.DataStore, chainSelector)
+				if err != nil {
+					return deployment.ChangesetOutput{}, err
+				}
+			case chain_selectors.FamilySolana:
+				a := &solanaSeqs.SolanaAdapter{}
+				offRampAddress, err = a.GetOffRampAddress(e.DataStore, chainSelector)
+				if err != nil {
+					return deployment.ChangesetOutput{}, err
+				}
+			default:
+				return deployment.ChangesetOutput{}, fmt.Errorf("unsupported chain family %s for selector %d", family, chainSelector)
 			}
 			newDONArgs, err := BuildOCR3ConfigForCCIPHome(
 				ccipHome,
@@ -623,6 +683,7 @@ func applySetCandidateChangesetConfig(e deployment.Environment, cfg SetCandidate
 				params.OCRParameters,
 				params.CommitOffChainConfig,
 				params.ExecuteOffChainConfig,
+				cfg.NodeKeyBundles,
 			)
 			if err != nil {
 				return deployment.ChangesetOutput{}, err

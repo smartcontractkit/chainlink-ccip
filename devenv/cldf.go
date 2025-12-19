@@ -3,13 +3,13 @@ package ccip
 import (
 	"context"
 	"errors"
+	"fmt"
 	"path/filepath"
 	"sync"
 	"time"
 
 	"go.uber.org/zap"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/gagliardetto/solana-go"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/provider/rpcclient"
@@ -100,14 +100,7 @@ func NewCLDFOperationsEnvironment(bc []*blockchain.Input, dataStore datastore.Da
 			}
 
 			selectors = append(selectors, d.ChainSelector)
-			deployerKey, err := solana.NewRandomPrivateKey()
-			if err != nil {
-				return nil, nil, err
-			}
-			err = PreloadSolanaEnvironment(runningDS, programsPath, d.ChainSelector)
-			if err != nil {
-				return nil, nil, err
-			}
+			deployerKey := solana.MustPrivateKeyFromBase58("jW5nUtGGFzLA9kfgn6xWG497SdToPLqB8g485HrvFxK727iZNzKJu95JnuRWfNGKTTFsnoXMKcxG1TS76Skab2y")
 
 			p, err := cldf_solana_provider.NewRPCChainProvider(
 				d.ChainSelector,
@@ -176,66 +169,4 @@ func NewCCIPImplFromNetwork(typ string) (CCIP16ProductConfiguration, error) {
 	default:
 		return nil, errors.New("unknown devenv network type " + typ)
 	}
-}
-
-var solanaProgramIDs = map[string]string{
-	"ccip_router": "Ccip842gzYHhvdDkSyi2YVCoAWPbYJoApMFzSxQroE9C",
-	// "test_token_pool":           "JuCcZ4smxAYv9QHJ36jshA7pA3FuQ3vQeWLUeAtZduJ",
-	// "burnmint_token_pool":       "41FGToCmdaWa1dgZLKFAjvmx6e6AjVTX7SVRibvsMGVB",
-	// "lockrelease_token_pool":    "8eqh8wppT9c5rw4ERqNCffvU6cNFJWff9WmkcYtmGiqC",
-	"fee_quoter": "FeeQPGkKDeRV1MgoYfMH6L8o3KeuYjwUZrgn4LRKfjHi",
-	// "test_ccip_receiver":        "EvhgrPhTDt4LcSPS2kfJgH6T6XWZ6wT3X9ncDGLT1vui",
-	"ccip_offramp":      "offqSMQWgQud6WJz694LRzkeN5kMYpCHTpXQr3Rkcjm",
-	"mcm":               "5vNJx78mz7KVMjhuipyr9jKBKcMrKYGdjGkgE4LUmjKk",
-	"timelock":          "DoajfR5tK24xVw51fWcawUZWhAXD8yrBJVacc13neVQA",
-	"access_controller": "6KsN58MTnRQ8FfPaXHiFPPFGDRioikj9CdPvPxZJdCjb",
-	// "external_program_cpi_stub": "2zZwzyptLqwFJFEFxjPvrdhiGpH9pJ3MfrrmZX6NTKxm",
-	"rmn_remote": "RmnXLft1mSEwDgMKu2okYuHkiazxntFFcZFrrcXxYg7",
-	// "cctp_token_pool":           "CCiTPESGEevd7TBU8EGBKrcxuRq7jx3YtW6tPidnscaZ",
-}
-
-var solanaContracts = map[string]datastore.ContractType{
-	"ccip_router":       datastore.ContractType("Router"),
-	"fee_quoter":        datastore.ContractType("FeeQuoter"),
-	"ccip_offramp":      datastore.ContractType("OffRamp"),
-	"rmn_remote":        datastore.ContractType("RMNRemote"),
-	"mcm":               datastore.ContractType(utils.McmProgramType),
-	"timelock":          datastore.ContractType(utils.TimelockProgramType),
-	"access_controller": datastore.ContractType(utils.AccessControllerProgramType),
-}
-
-func PreloadSolanaEnvironment(ds *datastore.MemoryDataStore, programsPath string, chainSelector uint64) error {
-	err := utils.DownloadSolanaCCIPProgramArtifacts(context.Background(), programsPath, utils.VersionToShortCommitSHA[utils.VersionSolanaV0_1_1])
-	if err != nil {
-		return err
-	}
-	err = populateDatastore(ds.AddressRefStore, solanaContracts, semver.MustParse("1.6.0"), "", chainSelector)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// Populates datastore with the predeployed program addresses
-// pass map [programName]:ContractType of contracts to populate datastore with
-func populateDatastore(ds *datastore.MemoryAddressRefStore, contracts map[string]datastore.ContractType, version *semver.Version, qualifier string, chainSel uint64) error {
-	for programName, programID := range solanaProgramIDs {
-		ct, ok := contracts[programName]
-		if !ok {
-			continue
-		}
-
-		err := ds.Add(datastore.AddressRef{
-			Address:       programID,
-			ChainSelector: chainSel,
-			Qualifier:     qualifier,
-			Type:          ct,
-			Version:       version,
-		})
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
 }

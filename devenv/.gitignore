@@ -6,4 +6,5 @@ go.work
 go.work.sum
 
 # solana
+artifacts/
 *.so

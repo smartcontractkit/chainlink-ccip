@@ -128,6 +128,7 @@ func NewEnvironment() (*Cfg, error) {
 	}
 	L.Info().Any("Selectors", selectors).Msg("Deploying for chain selectors")
 	ds := datastore.NewMemoryDataStore()
+	ds.Merge(e.DataStore)
 
 	// Deploy Capabilities Registry
 	crAddr, tx, _, err := capabilities_registry.DeployCapabilitiesRegistry(
@@ -226,14 +227,23 @@ func NewEnvironment() (*Cfg, error) {
 	}
 	e.DataStore = ds.Seal()
 
-	err = impls[0].ConfigureContractsForSelectors(ctx, e, in.NodeSets, CCIPHomeChain, selectors)
+	err = impls[0].ConfigureContractsForSelectors(ctx, e, in.NodeSets, nodeKeyBundles, CCIPHomeChain, selectors)
 	if err != nil {
 		return nil, err
 	}
 
 	// connect all the contracts together (on-ramps, off-ramps)
 	for i, impl := range impls {
-		networkInfo, err := chainsel.GetChainDetailsByChainIDAndFamily(in.Blockchains[i].ChainID, chainsel.FamilyEVM)
+		var family string
+		switch in.Blockchains[i].Type {
+		case "anvil", "geth":
+			family = chainsel.FamilyEVM
+		case "solana":
+			family = chainsel.FamilySolana
+		default:
+			return nil, fmt.Errorf("unsupported blockchain type: %s", in.Blockchains[i].Type)
+		}
+		networkInfo, err := chainsel.GetChainDetailsByChainIDAndFamily(in.Blockchains[i].ChainID, family)
 		if err != nil {
 			return nil, err
 		}
@@ -277,12 +287,10 @@ func NewEnvironment() (*Cfg, error) {
 		P2PV2Bootstrappers:     []string{},
 		CapabilityVersion:      "v1.0.0",
 		CapabilityLabelledName: "ccip",
-		OCRKeyBundleIDs: map[string]string{
-			"evm": bootstrapKeys.Data[0].ID,
-		},
-		P2PKeyID:     bootstrapId.String(),
-		RelayConfigs: nil,
-		PluginConfig: map[string]any{},
+		OCRKeyBundleIDs:        ocrKeyBundleIDs,
+		P2PKeyID:               bootstrapId.String(),
+		RelayConfigs:           nil,
+		PluginConfig:           map[string]any{},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("creating CCIP job spec: %w", err)
@@ -319,12 +327,10 @@ func NewEnvironment() (*Cfg, error) {
 			},
 			CapabilityVersion:      "v1.0.0",
 			CapabilityLabelledName: "ccip",
-			OCRKeyBundleIDs: map[string]string{
-				"evm": ocrKeys.Data[0].ID,
-			},
-			P2PKeyID:     id.String(),
-			RelayConfigs: nil,
-			PluginConfig: map[string]any{},
+			OCRKeyBundleIDs:        ocrKeyBundleIDs,
+			P2PKeyID:               id.String(),
+			RelayConfigs:           nil,
+			PluginConfig:           map[string]any{},
 		})
 		if err != nil {
 			return nil, fmt.Errorf("creating CCIP job spec: %w", err)

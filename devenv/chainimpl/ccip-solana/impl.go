@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -36,37 +37,18 @@ import (
 	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 )
 
-var ccipMessageSentTopic = onramp.OnRampCCIPMessageSent{}.Topic()
-
-type SourceDestPair struct {
-	SourceChainSelector uint64
-	DestChainSelector   uint64
-}
-
-type AnyMsgSentEvent struct {
-	SequenceNumber uint64
-	// RawEvent contains the raw event depending on the chain:
-	//  EVM:   *onramp.OnRampCCIPMessageSent
-	//  Aptos: module_onramp.CCIPMessageSent
-	RawEvent any
-}
-
 type CCIP16Solana struct {
 	e                      *deployment.Environment
 	chainDetailsBySelector map[uint64]chainsel.ChainDetails
 	ethClients             map[uint64]*ethclient.Client
-	expectedSeqNumRange    map[SourceDestPair]ccipocr3common.SeqNumRange
-	expectedSeqNumExec     map[SourceDestPair][]uint64
-	msgSentEvents          []*AnyMsgSentEvent
+	common                 *devenvcommon.Common
 }
 
 func NewEmptyCCIP16Solana() *CCIP16Solana {
 	return &CCIP16Solana{
 		chainDetailsBySelector: make(map[uint64]chainsel.ChainDetails),
 		ethClients:             make(map[uint64]*ethclient.Client),
-		expectedSeqNumRange:    make(map[SourceDestPair]ccipocr3common.SeqNumRange),
-		expectedSeqNumExec:     make(map[SourceDestPair][]uint64),
-		msgSentEvents:          make([]*AnyMsgSentEvent, 0),
+		common:                 devenvcommon.NewCommon(),
 	}
 }
 
@@ -217,16 +199,16 @@ func (m *CCIP16Solana) SendMessage(ctx context.Context, src, dest uint64, fields
 			return fmt.Errorf("no CCIP message sent event found")
 		}
 
-		sourceDest := SourceDestPair{SourceChainSelector: src, DestChainSelector: dest}
-		m.msgSentEvents = append(m.msgSentEvents, &AnyMsgSentEvent{
+		sourceDest := devenvcommon.SourceDestPair{SourceChainSelector: src, DestChainSelector: dest}
+		m.common.MsgSentEvents = append(m.common.MsgSentEvents, &devenvcommon.AnyMsgSentEvent{
 			SequenceNumber: it.Event.SequenceNumber,
 			RawEvent:       it.Event,
 		})
-		m.expectedSeqNumRange[sourceDest] = ccipocr3common.SeqNumRange{
-			ccipocr3common.SeqNum(m.msgSentEvents[0].SequenceNumber),
-			ccipocr3common.SeqNum(m.msgSentEvents[len(m.msgSentEvents)-1].SequenceNumber)}
-		m.expectedSeqNumExec[sourceDest] = append(
-			m.expectedSeqNumExec[sourceDest],
+		m.common.ExpectedSeqNumRange[sourceDest] = ccipocr3common.SeqNumRange{
+			ccipocr3common.SeqNum(m.common.MsgSentEvents[0].SequenceNumber),
+			ccipocr3common.SeqNum(m.common.MsgSentEvents[len(m.common.MsgSentEvents)-1].SequenceNumber)}
+		m.common.ExpectedSeqNumExec[sourceDest] = append(
+			m.common.ExpectedSeqNumExec[sourceDest],
 			it.Event.SequenceNumber)
 
 		return nil
@@ -235,8 +217,8 @@ func (m *CCIP16Solana) SendMessage(ctx context.Context, src, dest uint64, fields
 
 func (m *CCIP16Solana) GetExpectedNextSequenceNumber(ctx context.Context, from, to uint64) (uint64, error) {
 	_ = zerolog.Ctx(ctx)
-	sourceDest := SourceDestPair{SourceChainSelector: from, DestChainSelector: to}
-	seqRange, ok := m.expectedSeqNumRange[sourceDest]
+	sourceDest := devenvcommon.SourceDestPair{SourceChainSelector: from, DestChainSelector: to}
+	seqRange, ok := m.common.ExpectedSeqNumRange[sourceDest]
 	if !ok {
 		return 0, fmt.Errorf("no expected sequence number range for source-dest pair %v", sourceDest)
 	}
@@ -290,8 +272,8 @@ func (m *CCIP16Solana) WaitOneSentEventBySeqNo(ctx context.Context, from, to, se
 	if err != nil {
 		return nil, fmt.Errorf("failed to create off ramp instance: %w", err)
 	}
-	sourceDest := SourceDestPair{SourceChainSelector: from, DestChainSelector: to}
-	seqRange, ok := m.expectedSeqNumRange[sourceDest]
+	sourceDest := devenvcommon.SourceDestPair{SourceChainSelector: from, DestChainSelector: to}
+	seqRange, ok := m.common.ExpectedSeqNumRange[sourceDest]
 	if !ok {
 		return nil, fmt.Errorf("no expected sequence number range for source-dest pair %v", sourceDest)
 	}
@@ -407,8 +389,8 @@ func (m *CCIP16Solana) WaitOneExecEventBySeqNo(ctx context.Context, from, to, se
 	if err != nil {
 		return nil, fmt.Errorf("failed to create off ramp instance: %w", err)
 	}
-	sourceDest := SourceDestPair{SourceChainSelector: from, DestChainSelector: to}
-	seqRange, ok := m.expectedSeqNumRange[sourceDest]
+	sourceDest := devenvcommon.SourceDestPair{SourceChainSelector: from, DestChainSelector: to}
+	seqRange, ok := m.common.ExpectedSeqNumRange[sourceDest]
 	if !ok {
 		return nil, fmt.Errorf("no expected sequence number range for source-dest pair %v", sourceDest)
 	}
@@ -488,11 +470,78 @@ func (m *CCIP16Solana) ExposeMetrics(
 func (m *CCIP16Solana) DeployLocalNetwork(ctx context.Context, bc *blockchain.Input) (*blockchain.Output, error) {
 	l := zerolog.Ctx(ctx)
 	l.Info().Msg("Deploying Solana networks")
+	d, err := chainsel.GetChainDetailsByChainIDAndFamily(bc.ChainID, chainsel.FamilySolana)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get chain details: %w", err)
+	}
+	err = PreloadSolanaEnvironment(bc.ContractsDir, d.ChainSelector)
+	if err != nil {
+		return nil, fmt.Errorf("failed to preload Solana environment: %w", err)
+	}
+	bc.SolanaPrograms = solanaProgramIDs
 	out, err := blockchain.NewBlockchainNetwork(bc)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create blockchain network: %w", err)
 	}
 	return out, nil
+}
+
+var solanaProgramIDs = map[string]string{
+	"ccip_router": "Ccip842gzYHhvdDkSyi2YVCoAWPbYJoApMFzSxQroE9C",
+	// "test_token_pool":           "JuCcZ4smxAYv9QHJ36jshA7pA3FuQ3vQeWLUeAtZduJ",
+	"burnmint_token_pool":    "41FGToCmdaWa1dgZLKFAjvmx6e6AjVTX7SVRibvsMGVB",
+	"lockrelease_token_pool": "8eqh8wppT9c5rw4ERqNCffvU6cNFJWff9WmkcYtmGiqC",
+	"fee_quoter":             "FeeQPGkKDeRV1MgoYfMH6L8o3KeuYjwUZrgn4LRKfjHi",
+	// "test_ccip_receiver":        "EvhgrPhTDt4LcSPS2kfJgH6T6XWZ6wT3X9ncDGLT1vui",
+	"ccip_offramp":      "offqSMQWgQud6WJz694LRzkeN5kMYpCHTpXQr3Rkcjm",
+	"mcm":               "5vNJx78mz7KVMjhuipyr9jKBKcMrKYGdjGkgE4LUmjKk",
+	"timelock":          "DoajfR5tK24xVw51fWcawUZWhAXD8yrBJVacc13neVQA",
+	"access_controller": "6KsN58MTnRQ8FfPaXHiFPPFGDRioikj9CdPvPxZJdCjb",
+	// "external_program_cpi_stub": "2zZwzyptLqwFJFEFxjPvrdhiGpH9pJ3MfrrmZX6NTKxm",
+	"rmn_remote": "RmnXLft1mSEwDgMKu2okYuHkiazxntFFcZFrrcXxYg7",
+	// "cctp_token_pool":           "CCiTPESGEevd7TBU8EGBKrcxuRq7jx3YtW6tPidnscaZ",
+}
+
+var solanaContracts = map[string]datastore.ContractType{
+	"ccip_router":       datastore.ContractType("Router"),
+	"fee_quoter":        datastore.ContractType("FeeQuoter"),
+	"ccip_offramp":      datastore.ContractType("OffRamp"),
+	"rmn_remote":        datastore.ContractType("RMNRemote"),
+	"mcm":               datastore.ContractType(utils.McmProgramType),
+	"timelock":          datastore.ContractType(utils.TimelockProgramType),
+	"access_controller": datastore.ContractType(utils.AccessControllerProgramType),
+}
+
+func PreloadSolanaEnvironment(programsPath string, chainSelector uint64) error {
+	err := utils.DownloadSolanaCCIPProgramArtifacts(context.Background(), programsPath, utils.VersionToShortCommitSHA[utils.VersionSolanaV0_1_1])
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// Populates datastore with the predeployed program addresses
+// pass map [programName]:ContractType of contracts to populate datastore with
+func populateDatastore(ds *datastore.MemoryAddressRefStore, contracts map[string]datastore.ContractType, version *semver.Version, qualifier string, chainSel uint64) error {
+	for programName, programID := range solanaProgramIDs {
+		ct, ok := contracts[programName]
+		if !ok {
+			continue
+		}
+
+		err := ds.Add(datastore.AddressRef{
+			Address:       programID,
+			ChainSelector: chainSel,
+			Qualifier:     qualifier,
+			Type:          ct,
+			Version:       version,
+		})
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (m *CCIP16Solana) ConfigureNodes(ctx context.Context, bc *blockchain.Input) (string, error) {
@@ -543,6 +592,13 @@ func (m *CCIP16Solana) ConfigureNodes(ctx context.Context, bc *blockchain.Input)
 }
 
 func (m *CCIP16Solana) DeployContractsForSelector(ctx context.Context, env *deployment.Environment, cls []*simple_node_set.Input, selector uint64, ccipHomeSelector uint64, crAddr string) (datastore.DataStore, error) {
+	ds := datastore.NewMemoryDataStore()
+	ds.Merge(env.DataStore)
+	err := populateDatastore(ds.AddressRefStore, solanaContracts, semver.MustParse("1.6.0"), "", selector)
+	if err != nil {
+		return nil, err
+	}
+	env.DataStore = ds.Seal()
 	return devenvcommon.DeployContractsForSelector(ctx, env, cls, selector, ccipHomeSelector, crAddr)
 }
 
@@ -550,8 +606,8 @@ func (m *CCIP16Solana) ConnectContractsWithSelectors(ctx context.Context, e *dep
 	return devenvcommon.ConnectContractsWithSelectors(ctx, e, selector, remoteSelectors)
 }
 
-func (m *CCIP16Solana) ConfigureContractsForSelectors(ctx context.Context, e *deployment.Environment, cls []*simple_node_set.Input, ccipHomeSelector uint64, remoteSelectors []uint64) error {
-	return devenvcommon.ConfigureContractsForSelectors(ctx, e, cls, ccipHomeSelector, remoteSelectors)
+func (m *CCIP16Solana) ConfigureContractsForSelectors(ctx context.Context, e *deployment.Environment, cls []*simple_node_set.Input, nodeKeyBundles map[string][]clclient.NodeKeysBundle, ccipHomeSelector uint64, remoteSelectors []uint64) error {
+	return devenvcommon.ConfigureContractsForSelectors(ctx, e, cls, nodeKeyBundles, ccipHomeSelector, remoteSelectors)
 }
 
 func (m *CCIP16Solana) FundNodes(ctx context.Context, ns []*simple_node_set.Input, bc *blockchain.Input, linkAmount, nativeAmount *big.Int) ([]clclient.NodeKeysBundle, error) {
