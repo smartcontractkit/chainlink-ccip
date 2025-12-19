@@ -9,6 +9,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
+	pingpongdapp "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/ping_pong_dapp"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 
@@ -83,6 +84,18 @@ func (a *EVMAdapter) GetRouterAddress(ds datastore.DataStore, chainSelector uint
 		ChainSelector: chainSelector,
 		Type:          datastore.ContractType(router.ContractType),
 		Version:       router.Version,
+	}, chainSelector, evm_datastore_utils.ToByteArray)
+	if err != nil {
+		return nil, err
+	}
+	return addr, nil
+}
+
+func (a *EVMAdapter) GetPingPongDemoAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error) {
+	addr, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
+		ChainSelector: chainSelector,
+		Type:          datastore.ContractType(pingpongdapp.ContractType),
+		Version:       pingpongdapp.Version,
 	}, chainSelector, evm_datastore_utils.ToByteArray)
 	if err != nil {
 		return nil, err

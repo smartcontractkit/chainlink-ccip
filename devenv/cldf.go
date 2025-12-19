@@ -16,9 +16,9 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	ccipEVM "github.com/smartcontractkit/chainlink-ccip/devenv/chainimpl/ccip-evm"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldf_evm_provider "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/provider"
-	ccipEVM "github.com/smartcontractkit/chainlink-ccip/devenv/chainimpl/ccip-evm"
 )
 
 type CLDF struct {
@@ -51,11 +51,17 @@ func NewCLDFOperationsEnvironment(bc []*blockchain.Input, dataStore datastore.Da
 		}
 		selectors = append(selectors, d.ChainSelector)
 
+		// Use default Anvil key for local chain 1337, otherwise use PRIVATE_KEY env var
+		privateKey := getNetworkPrivateKey()
+		if chainID == "1337" {
+			privateKey = DefaultAnvilKey
+		}
+
 		p, err := cldf_evm_provider.NewRPCChainProvider(
 			d.ChainSelector,
 			cldf_evm_provider.RPCChainProviderConfig{
 				DeployerTransactorGen: cldf_evm_provider.TransactorFromRaw(
-					getNetworkPrivateKey(),
+					privateKey,
 				),
 				RPCs: []rpcclient.RPC{
 					{
@@ -65,7 +71,7 @@ func NewCLDFOperationsEnvironment(bc []*blockchain.Input, dataStore datastore.Da
 						PreferredURLScheme: rpcclient.URLSchemePreferenceHTTP,
 					},
 				},
-				ConfirmFunctor: cldf_evm_provider.ConfirmFuncGeth(1 * time.Minute, cldf_evm_provider.WithTickInterval(5*time.Millisecond)),
+				ConfirmFunctor: cldf_evm_provider.ConfirmFuncGeth(1*time.Minute, cldf_evm_provider.WithTickInterval(5*time.Millisecond)),
 			},
 		).Initialize(context.Background())
 		if err != nil {
@@ -118,5 +124,3 @@ func NewCCIPImplFromNetwork(typ string) (CCIP16ProductConfiguration, error) {
 		return nil, errors.New("unknown devenv network type " + typ)
 	}
 }
-
-

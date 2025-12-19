@@ -158,8 +158,7 @@ func NewEnvironment() (*Cfg, error) {
 		nodeSpec.Node.TestConfigOverrides = allConfigs
 	}
 	Plog.Info().Msg("Nodes network configuration is generated")
-	
-	
+
 	prodJDImage := os.Getenv("JD_IMAGE")
 
 	if in.JD != nil {
@@ -188,7 +187,12 @@ func NewEnvironment() (*Cfg, error) {
 
 	// deploy all the contracts
 	for i, impl := range impls {
-		if err := impl.FundNodes(ctx, in.NodeSets, in.Blockchains[i], big.NewInt(1), big.NewInt(5)); err != nil {
+		// FundNodes expects amounts in ETH/LINK units (not wei) - it converts internally
+		// Use big.Float to preserve decimal precision (e.g., 0.1 ETH)
+		linkAmount := big.NewFloat(in.CLNodesFundingLink)
+		nativeAmount := big.NewFloat(in.CLNodesFundingETH)
+
+		if err := impl.FundNodes(ctx, in.NodeSets, in.Blockchains[i], linkAmount, nativeAmount); err != nil {
 			return nil, err
 		}
 		networkInfo, err := chainsel.GetChainDetailsByChainIDAndFamily(in.Blockchains[i].ChainID, chainsel.FamilyEVM)
@@ -233,6 +237,12 @@ func NewEnvironment() (*Cfg, error) {
 			}
 		}
 		err = impl.ConnectContractsWithSelectors(ctx, e, networkInfo.ChainSelector, selsToConnect)
+		if err != nil {
+			return nil, err
+		}
+
+		// Link PingPongDemo contracts between this chain and remote chains
+		err = impl.LinkPingPongContracts(ctx, e, networkInfo.ChainSelector, selsToConnect)
 		if err != nil {
 			return nil, err
 		}

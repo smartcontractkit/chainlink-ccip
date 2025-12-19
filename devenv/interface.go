@@ -62,6 +62,9 @@ type OnChainConfigurable interface {
 	ConfigureContractsForSelectors(ctx context.Context, e *deployment.Environment, cls []*nodeset.Input, ccipHomeSelector uint64, remoteSelectors []uint64) error
 	// ConnectContractsWithSelectors connects this chain onRamp to one or multiple offRamps for remote selectors (other chains)
 	ConnectContractsWithSelectors(ctx context.Context, e *deployment.Environment, selector uint64, remoteSelectors []uint64) error
+	// LinkPingPongContracts links PingPongDemo contracts between this chain and remote chains
+	// by setting counterpart chain selectors and addresses
+	LinkPingPongContracts(ctx context.Context, e *deployment.Environment, selector uint64, remoteSelectors []uint64) error
 }
 
 // OffChainConfigurable defines methods that allows to
@@ -74,5 +77,6 @@ type OffChainConfigurable interface {
 	ConfigureNodes(ctx context.Context, blockchain *blockchain.Input) (string, error)
 	// FundNodes Fund Chainlink nodes for some amount of native/LINK currency
 	// using chain-specific clients or CLDF
-	FundNodes(ctx context.Context, cls []*nodeset.Input, bc *blockchain.Input, linkAmount, nativeAmount *big.Int) error
+	// linkAmount and nativeAmount are in ETH/LINK units (not wei)
+	FundNodes(ctx context.Context, cls []*nodeset.Input, bc *blockchain.Input, linkAmount, nativeAmount *big.Float) error
 }
