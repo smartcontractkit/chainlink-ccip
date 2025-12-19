@@ -591,6 +591,8 @@ func (m *CCIP16EVM) DeployContractsForSelector(ctx context.Context, env *deploym
 				// OFFRAMP CONFIG
 				PermissionLessExecutionThresholdSeconds: uint32((20 * time.Minute).Seconds()),
 				GasForCallExactCheck:                    uint16(5000),
+				// PING PONG DAPP
+				DeployPingPongDapp: true,
 			},
 		},
 	})
@@ -713,6 +715,15 @@ func (m *CCIP16EVM) LinkPingPongContracts(ctx context.Context, e *deployment.Env
 	l := zerolog.Ctx(ctx)
 	l.Info().Uint64("FromSelector", selector).Any("ToSelectors", remoteSelectors).Msg("Linking PingPongDemo contracts")
 
+	a := &evmseqs.EVMAdapter{}
+
+	// Get the PingPongDemo address on this chain - if not deployed, skip linking
+	localPingPongAddr, err := a.GetPingPongDemoAddress(e.DataStore, selector)
+	if err != nil {
+		l.Info().Uint64("Selector", selector).Msg("PingPongDemo not deployed on this chain, skipping linking")
+		return nil
+	}
+
 	bundle := operations.NewBundle(
 		func() context.Context { return context.Background() },
 		e.Logger,
@@ -720,21 +731,14 @@ func (m *CCIP16EVM) LinkPingPongContracts(ctx context.Context, e *deployment.Env
 	)
 	e.OperationsBundle = bundle
 
-	a := &evmseqs.EVMAdapter{}
-
-	// Get the PingPongDemo address on this chain
-	localPingPongAddr, err := a.GetPingPongDemoAddress(e.DataStore, selector)
-	if err != nil {
-		return fmt.Errorf("failed to get PingPongDemo address for selector %d: %w", selector, err)
-	}
-
 	chain := e.BlockChains.EVMChains()[selector]
 
 	for _, remoteSelector := range remoteSelectors {
-		// Get the PingPongDemo address on the remote chain
+		// Get the PingPongDemo address on the remote chain - if not deployed, skip this pair
 		remotePingPongAddr, err := a.GetPingPongDemoAddress(e.DataStore, remoteSelector)
 		if err != nil {
-			return fmt.Errorf("failed to get PingPongDemo address for remote selector %d: %w", remoteSelector, err)
+			l.Info().Uint64("RemoteSelector", remoteSelector).Msg("PingPongDemo not deployed on remote chain, skipping this pair")
+			continue
 		}
 
 		// CCIP requires addresses to be 32-byte left-padded for cross-chain messaging

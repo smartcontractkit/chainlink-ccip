@@ -260,45 +260,47 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		}
 		addresses = append(addresses, onRampRef)
 
-		// Deploy Ping Pong Dapp
-		pingPongDappRef, err := contract.MaybeDeployContract(b, pingpongdappops.Deploy, chain, contract.DeployInput[pingpongdappops.ConstructorArgs]{
-			TypeAndVersion: deployment.NewTypeAndVersion(pingpongdappops.ContractType, *pingpongdappops.Version),
-			ChainSelector:  chain.Selector,
-			Args: pingpongdappops.ConstructorArgs{
-				Router:   common.HexToAddress(routerRef.Address),
-				FeeToken: common.HexToAddress(linkRef.Address),
-			},
-		}, input.ExistingAddresses)
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy Ping Pong Dapp: %w", err)
-		}
-		addresses = append(addresses, pingPongDappRef)
+		// Deploy Ping Pong Dapp (optional - only when DeployPingPongDapp is true)
+		if input.DeployPingPongDapp {
+			pingPongDappRef, err := contract.MaybeDeployContract(b, pingpongdappops.Deploy, chain, contract.DeployInput[pingpongdappops.ConstructorArgs]{
+				TypeAndVersion: deployment.NewTypeAndVersion(pingpongdappops.ContractType, *pingpongdappops.Version),
+				ChainSelector:  chain.Selector,
+				Args: pingpongdappops.ConstructorArgs{
+					Router:   common.HexToAddress(routerRef.Address),
+					FeeToken: common.HexToAddress(linkRef.Address),
+				},
+			}, input.ExistingAddresses)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy Ping Pong Dapp: %w", err)
+			}
+			addresses = append(addresses, pingPongDappRef)
 
-		// Fund Ping Pong Dapp with LINK tokens for cross-chain message fees
-		// First, grant mint role to the deployer
-		_, err = cldf_ops.ExecuteOperation(b, link.GrantMintRole, chain, contract.FunctionInput[link.GrantMintRoleArgs]{
-			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(linkRef.Address),
-			Args: link.GrantMintRoleArgs{
-				Minter: chain.DeployerKey.From,
-			},
-		})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to grant mint role for LINK: %w", err)
-		}
+			// Fund Ping Pong Dapp with LINK tokens for cross-chain message fees
+			// First, grant mint role to the deployer
+			_, err = cldf_ops.ExecuteOperation(b, link.GrantMintRole, chain, contract.FunctionInput[link.GrantMintRoleArgs]{
+				ChainSelector: chain.Selector,
+				Address:       common.HexToAddress(linkRef.Address),
+				Args: link.GrantMintRoleArgs{
+					Minter: chain.DeployerKey.From,
+				},
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to grant mint role for LINK: %w", err)
+			}
 
-		// Mint 20 LINK (20 * 10^18 wei) directly to the PingPongDemo contract
-		pingPongFundingAmount := new(big.Int).Mul(big.NewInt(20), new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil))
-		_, err = cldf_ops.ExecuteOperation(b, link.Mint, chain, contract.FunctionInput[link.MintArgs]{
-			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(linkRef.Address),
-			Args: link.MintArgs{
-				To:     common.HexToAddress(pingPongDappRef.Address),
-				Amount: pingPongFundingAmount,
-			},
-		})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to mint LINK to Ping Pong Dapp: %w", err)
+			// Mint 20 LINK (20 * 10^18 wei) directly to the PingPongDemo contract
+			pingPongFundingAmount := new(big.Int).Mul(big.NewInt(20), new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil))
+			_, err = cldf_ops.ExecuteOperation(b, link.Mint, chain, contract.FunctionInput[link.MintArgs]{
+				ChainSelector: chain.Selector,
+				Address:       common.HexToAddress(linkRef.Address),
+				Args: link.MintArgs{
+					To:     common.HexToAddress(pingPongDappRef.Address),
+					Amount: pingPongFundingAmount,
+				},
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to mint LINK to Ping Pong Dapp: %w", err)
+			}
 		}
 
 		// Add Authorized Caller to NonceManager

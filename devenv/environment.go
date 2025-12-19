@@ -187,7 +187,7 @@ func NewEnvironment() (*Cfg, error) {
 
 	// deploy all the contracts
 	for i, impl := range impls {
-		// FundNodes expects amounts in ETH/LINK units (not wei) - it converts internally
+		// FundNodes expects amounts in ETH/LINK units - it converts internally
 		// Use big.Float to preserve decimal precision (e.g., 0.1 ETH)
 		linkAmount := big.NewFloat(in.CLNodesFundingLink)
 		nativeAmount := big.NewFloat(in.CLNodesFundingETH)
