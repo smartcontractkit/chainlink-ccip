@@ -185,3 +185,26 @@ func TestExecuteAsyncOperations_InfiniteWait(t *testing.T) {
 	assert.Equal(t, 1, len(results))
 	assert.Equal(t, "done", results["op1"])
 }
+
+func TestExecuteAsyncOperations_PanicRecovered(t *testing.T) {
+	ctx := context.Background()
+	lggr := logger.Test(t)
+	start := time.Now()
+
+	ops := map[string]AsyncOperation{
+		"panicOp": func(_ context.Context, _ logger.Logger) any {
+			panic("oops")
+		},
+		"validOp": func(_ context.Context, _ logger.Logger) any {
+			return "value"
+		},
+	}
+
+	// Long timeout to ensure we don't return due to timeout but due to completion (including panic recovery)
+	results := ExecuteAsyncOperations(ctx, 5*time.Second, ops, lggr)
+
+	elapsed := time.Since(start)
+	assert.Less(t, elapsed.Milliseconds(), int64(1000), "should return immediately after panic, not wait for timeout")
+	assert.Equal(t, 1, len(results))
+	assert.Equal(t, "value", results["validOp"])
+}

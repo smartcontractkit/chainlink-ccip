@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 )
 
@@ -43,12 +45,23 @@ func ExecuteAsyncOperations(
 	}
 
 	resultsChan := make(chan result, len(operations))
+	pendingOps := make(map[string]struct{}, len(operations))
 
 	for opName, op := range operations {
+		pendingOps[opName] = struct{}{}
 		go func(name string, operation AsyncOperation) {
+			defer func() {
+				if r := recover(); r != nil {
+					lggr.Errorw("AsyncOperation panicked", "opName", name, "panic", r)
+					resultsChan <- result{name: name, val: nil}
+				}
+			}()
+
+			opID := uuid.New().String()
+			l := logger.With(lggr, "opName", name, "opID", opID)
 			tStart := time.Now()
-			val := operation(callCtx, logger.With(lggr, "opID", name))
-			lggr.Debugw("observing goroutine finished", "opID", name, "duration", time.Since(tStart))
+			val := operation(callCtx, l)
+			l.Debugw("observing goroutine finished", "duration", time.Since(tStart))
 			resultsChan <- result{name: name, val: val}
 		}(opName, op)
 	}
@@ -59,19 +72,22 @@ func ExecuteAsyncOperations(
 	for completed < len(operations) {
 		select {
 		case res := <-resultsChan:
+			delete(pendingOps, res.name)
 			if res.val != nil {
 				resultsMap[res.name] = res.val
 			}
 			completed++
 		case <-callCtx.Done():
-			if timeout > 0 && callCtx.Err() == context.DeadlineExceeded {
+			if timeout > 0 && callCtx.Err() != nil {
 				lggr.Warnw(
-					"ExecuteAsyncOperations timed out before all operations completed!!!"+
+					"ExecuteAsyncOperations's context is done before all operations completed!!!"+
 						"This indicates a potential issue in one of the operations.",
 					"timeout", timeout,
 					"completed", completed,
 					"total", len(operations),
-					"operations", slices.Collect(maps.Keys(operations)),
+					"ctxErr", callCtx.Err(),
+					"allOperations", slices.Collect(maps.Keys(operations)),
+					"pendingOperations", slices.Collect(maps.Keys(pendingOps)),
 				)
 			}
 			return resultsMap
@@ -91,7 +107,7 @@ func WrapWithSingleFlight(
 ) AsyncOperation {
 	return func(ctx context.Context, l logger.Logger) any {
 		if _, loaded := runningOps.LoadOrStore(name, true); loaded {
-			l.Warnw("skipping operation because previous run is still active", "opID", name)
+			l.Warnw("skipping operation because previous run is still active", "opName", name)
 			return nil
 		}
 		defer runningOps.Delete(name)
