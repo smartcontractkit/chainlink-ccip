@@ -29,7 +29,6 @@ interface IEVM2AnyOnRampClient {
 
   /// @notice Send a message to the remote chain.
   /// @dev only callable by the Router.
-  /// @dev approve() must have already been called on the token using the this ramp address as the spender.
   /// @dev if the contract is paused, this function will revert.
   /// @param destChainSelector The destination chain selector.
   /// @param message Message struct to send.
