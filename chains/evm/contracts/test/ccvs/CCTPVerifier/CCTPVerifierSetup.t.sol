@@ -65,7 +65,7 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
     );
 
     // Apply remote chain config updates.
-    CCTPVerifier.RemoteChainConfigArgs[] memory remoteChainConfigArgs = new CCTPVerifier.RemoteChainConfigArgs[](1);
+    BaseVerifier.RemoteChainConfigArgs[] memory remoteChainConfigArgs = new BaseVerifier.RemoteChainConfigArgs[](1);
     remoteChainConfigArgs[0] = BaseVerifier.RemoteChainConfigArgs({
       router: s_router,
       remoteChainSelector: DEST_CHAIN_SELECTOR,
