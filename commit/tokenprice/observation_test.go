@@ -267,7 +267,8 @@ func Test_processor_Observation_PreventsOverlappingOps(t *testing.T) {
 
 	// 5. Run Second Observation
 	// This should SKIP GetFeedPricesUSD because it's still running.
-	// If it doesn't skip, the mock will fail (because .Once() was specified) or it will hang again (if we didn't mock Once).
+	// If it doesn't skip, the mock will fail (because .Once() was specified)
+	// or it will hang again (if we didn't mock Once).
 	obs, err := p.Observation(ctx, Outcome{}, Query{})
 	require.NoError(t, err)
 
