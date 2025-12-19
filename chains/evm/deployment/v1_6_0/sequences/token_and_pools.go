@@ -1,6 +1,7 @@
 package sequences
 
 import (
+	tokseq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/sequences"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
@@ -18,6 +19,7 @@ func (a *EVMAdapter) AddressRefToBytes(ref datastore.AddressRef) ([]byte, error)
 	// TODO implement me
 	return nil, nil
 }
+
 func (a *EVMAdapter) DeriveTokenAddress(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) ([]byte, error) {
 	// TODO implement me
 	return nil, nil
@@ -29,10 +31,10 @@ func (a *EVMAdapter) ManualRegistration() *cldf_ops.Sequence[tokensapi.ManualReg
 }
 
 func (a *EVMAdapter) DeployToken() *cldf_ops.Sequence[tokensapi.DeployTokenInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
-	return DeployToken
+	return tokseq.DeployToken
 }
 
-func (a *EVMAdapter) DeployTokenVerify(in any) error {
+func (a *EVMAdapter) DeployTokenVerify(in tokensapi.IN) error {
 	// TODO implement me
 	return nil
 }

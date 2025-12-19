@@ -12,14 +12,21 @@ import (
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
 
-var ContractType cldf_deployment.ContractType = "TokenAdminRegistry"
-var Version *semver.Version = semver.MustParse("1.5.0")
+var (
+	ContractType cldf_deployment.ContractType = "TokenAdminRegistry"
+	Version      *semver.Version              = semver.MustParse("1.5.0")
+)
 
 type ConstructorArgs struct{}
 
 type TokenConfig = token_admin_registry.TokenAdminRegistryTokenConfig
 
 type ProposeAdministratorArgs struct {
+	TokenAddress  common.Address
+	Administrator common.Address
+}
+
+type TransferAdminRoleArgs struct {
 	TokenAddress  common.Address
 	Administrator common.Address
 }
@@ -67,6 +74,26 @@ var ProposeAdministrator = contract.NewWrite(contract.WriteParams[ProposeAdminis
 	Validate: func(ProposeAdministratorArgs) error { return nil },
 	CallContract: func(tokenAdminRegistry *token_admin_registry.TokenAdminRegistry, opts *bind.TransactOpts, args ProposeAdministratorArgs) (*types.Transaction, error) {
 		return tokenAdminRegistry.ProposeAdministrator(opts, args.TokenAddress, args.Administrator)
+	},
+})
+
+var TransferAdminRole = contract.NewWrite(contract.WriteParams[TransferAdminRoleArgs, *token_admin_registry.TokenAdminRegistry]{
+	Name:         "token-admin-registry:transfer-admin-role",
+	Version:      semver.MustParse("1.5.0"),
+	Description:  "Transfers the admin role for a token on the TokenAdminRegistry contract",
+	ContractType: ContractType,
+	ContractABI:  token_admin_registry.TokenAdminRegistryABI,
+	NewContract:  token_admin_registry.NewTokenAdminRegistry,
+	IsAllowedCaller: func(contract *token_admin_registry.TokenAdminRegistry, opts *bind.CallOpts, caller common.Address, input TransferAdminRoleArgs) (bool, error) {
+		tokenConfig, err := contract.GetTokenConfig(opts, input.TokenAddress)
+		if err != nil {
+			return false, fmt.Errorf("failed to get token config: %w", err)
+		}
+		return tokenConfig.Administrator == caller, nil
+	},
+	Validate: func(TransferAdminRoleArgs) error { return nil },
+	CallContract: func(tokenAdminRegistry *token_admin_registry.TokenAdminRegistry, opts *bind.TransactOpts, args TransferAdminRoleArgs) (*types.Transaction, error) {
+		return tokenAdminRegistry.TransferAdminRole(opts, args.TokenAddress, args.Administrator)
 	},
 })
 
