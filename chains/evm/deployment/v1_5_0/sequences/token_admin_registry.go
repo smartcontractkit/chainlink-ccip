@@ -26,7 +26,7 @@ type ManualRegistrationSequenceInput struct {
 var ManualRegistrationSequence = operations.NewSequence(
 	"token-admin-registry:manual-registration",
 	semver.MustParse("1.5.0"),
-	"Set or transfer token administrators on the TokenAdminRegistry 1.5.0 contract across multiple EVM chains",
+	"Transfer or propose admin role for a token in the TokenAdminRegistry contract",
 	func(b operations.Bundle, chains cldf_chain.BlockChains, input ManualRegistrationSequenceInput) (sequences.OnChainOutput, error) {
 		chain, ok := chains.EVMChains()[input.ChainSelector]
 		if !ok {
