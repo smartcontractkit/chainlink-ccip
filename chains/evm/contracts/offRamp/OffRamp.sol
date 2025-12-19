@@ -197,8 +197,8 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       revert Internal.InvalidEVMAddress(message.receiver);
     }
     // gasLimitOverride == 0 means "no override" (use message.ccipReceiveGasLimit).
-    // A non-zero override must not exceed the message-provided gas limit.
-    if (gasLimitOverride != 0 && gasLimitOverride > message.ccipReceiveGasLimit) {
+    // A non-zero override must not be lower than the message-provided gas limit.
+    if (gasLimitOverride != 0 && gasLimitOverride < message.ccipReceiveGasLimit) {
       revert InvalidGasLimitOverride(message.ccipReceiveGasLimit, gasLimitOverride);
     }
 
@@ -355,6 +355,10 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     );
   }
 
+  /// @notice Calls the receiver contract via the Router.
+  /// @param message The message to call the receiver for.
+  /// @param receiver The receiver address.
+  /// @param gasLimit The gas limit to use for the call.
   function _callReceiver(Client.Any2EVMMessage memory message, address receiver, uint32 gasLimit) internal {
     (bool success, bytes memory returnData,) = s_sourceChainConfigs[message.sourceChainSelector].router.routeMessage(
       message, i_gasForCallExactCheck, gasLimit, receiver

@@ -3,8 +3,10 @@ pragma solidity ^0.8.24;
 
 import {ICrossChainVerifierResolver} from "../../../interfaces/ICrossChainVerifierResolver.sol";
 import {ICrossChainVerifierV1} from "../../../interfaces/ICrossChainVerifierV1.sol";
+import {IRouter} from "../../../interfaces/IRouter.sol";
 
 import {Router} from "../../../Router.sol";
+import {Client} from "../../../libraries/Client.sol";
 import {Internal} from "../../../libraries/Internal.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {OffRamp} from "../../../offRamp/OffRamp.sol";
@@ -148,6 +150,83 @@ contract OffRamp_execute is OffRampSetup {
     assertEq(
       uint256(Internal.MessageExecutionState.SUCCESS), uint256(s_offRamp.getExecutionState(keccak256(encodedMessage)))
     );
+  }
+
+  function test_execute_UsesGasLimitOverrideWhenGreaterThanMessageGasLimit() public {
+    MessageV1Codec.MessageV1 memory message = _getMessage();
+
+    // Force the receiver call path.
+    message.ccipReceiveGasLimit = 100_000;
+
+    address receiver = makeAddr("receiver");
+    message.receiver = abi.encodePacked(receiver);
+    _setGetCCVsReturnData(receiver, SOURCE_CHAIN_SELECTOR);
+
+    // Set OffRamp as a valid OffRamp on the Router.
+    Router.OffRamp[] memory newRamps = new Router.OffRamp[](1);
+    newRamps[0] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_SELECTOR, offRamp: address(s_offRamp)});
+    s_sourceRouter.applyRampUpdates(new Router.OnRamp[](0), new Router.OffRamp[](0), newRamps);
+
+    (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory verifierResults) = _getReportComponents(message);
+    bytes32 messageId = keccak256(encodedMessage);
+
+    // Mock verifier for this specific message.
+    vm.mockCall(
+      s_defaultCCV,
+      abi.encodeCall(ICrossChainVerifierV1.verifyMessage, (message, messageId, verifierResults[0])),
+      abi.encode(true)
+    );
+
+    uint32 overrideGas = message.ccipReceiveGasLimit * 2;
+    Client.Any2EVMMessage memory any2EVMMessage = Client.Any2EVMMessage({
+      messageId: messageId,
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
+      sender: message.sender,
+      data: message.data,
+      destTokenAmounts: new Client.EVMTokenAmount[](0)
+    });
+
+    vm.expectCall(
+      address(s_sourceRouter),
+      abi.encodeCall(IRouter.routeMessage, (any2EVMMessage, GAS_FOR_CALL_EXACT_CHECK, overrideGas, receiver))
+    );
+
+    s_gasBoundedExecuteCaller.callExecute(encodedMessage, ccvs, verifierResults, PLENTY_OF_GAS, overrideGas);
+
+    // Verify final state is SUCCESS.
+    assertEq(uint256(Internal.MessageExecutionState.SUCCESS), uint256(s_offRamp.getExecutionState(messageId)));
+  }
+
+  function test_execute_RevertWhen_GasLimitOverrideLessThanMessageGasLimit() public {
+    MessageV1Codec.MessageV1 memory message = _getMessage();
+
+    // Force the receiver call path.
+    message.ccipReceiveGasLimit = 100_000;
+
+    address receiver = makeAddr("receiver");
+    message.receiver = abi.encodePacked(receiver);
+    _setGetCCVsReturnData(receiver, SOURCE_CHAIN_SELECTOR);
+
+    // Set OffRamp as a valid OffRamp on the Router.
+    Router.OffRamp[] memory newRamps = new Router.OffRamp[](1);
+    newRamps[0] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_SELECTOR, offRamp: address(s_offRamp)});
+    s_sourceRouter.applyRampUpdates(new Router.OnRamp[](0), new Router.OffRamp[](0), newRamps);
+
+    (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory verifierResults) = _getReportComponents(message);
+    bytes32 messageId = keccak256(encodedMessage);
+
+    // Mock verifier for this specific message.
+    vm.mockCall(
+      s_defaultCCV,
+      abi.encodeCall(ICrossChainVerifierV1.verifyMessage, (message, messageId, verifierResults[0])),
+      abi.encode(true)
+    );
+
+    uint32 overrideGas = message.ccipReceiveGasLimit - 1;
+    vm.expectRevert(
+      abi.encodeWithSelector(OffRamp.InvalidGasLimitOverride.selector, message.ccipReceiveGasLimit, overrideGas)
+    );
+    s_gasBoundedExecuteCaller.callExecute(encodedMessage, ccvs, verifierResults, PLENTY_OF_GAS, overrideGas);
   }
 
   function test_execute_RunsOutOfGasAndSetsStateToFailure() public {
