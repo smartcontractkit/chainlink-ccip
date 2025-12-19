@@ -84,7 +84,12 @@ abstract contract MultiTokenPool is IPoolV1, Ownable2StepMsgSender {
   EnumerableSet.UintSet internal s_remoteChainSelectors;
   mapping(address token => mapping(uint64 remoteChainSelector => RemoteChainConfig)) internal s_remoteChainConfigs;
 
-  constructor(IERC20[] memory token, address[] memory allowlist, address rmnProxy, address router) {
+  constructor(
+    IERC20[] memory token,
+    address[] memory allowlist,
+    address rmnProxy,
+    address router
+  ) {
     if (router == address(0) || rmnProxy == address(0)) revert ZeroAddressNotAllowed();
     for (uint256 i = 0; i < token.length; ++i) {
       s_tokens.add(address(token[i]));
@@ -208,14 +213,20 @@ abstract contract MultiTokenPool is IPoolV1, Ownable2StepMsgSender {
   /// @notice Gets the pool address on the remote chain.
   /// @param remoteChainSelector Remote chain selector.
   /// @dev To support non-evm chains, this value is encoded into bytes
-  function getRemotePool(address token, uint64 remoteChainSelector) public view returns (bytes memory) {
+  function getRemotePool(
+    address token,
+    uint64 remoteChainSelector
+  ) public view returns (bytes memory) {
     return s_remoteChainConfigs[token][remoteChainSelector].remotePoolAddress;
   }
 
   /// @notice Gets the token address on the remote chain.
   /// @param remoteChainSelector Remote chain selector.
   /// @dev To support non-evm chains, this value is encoded into bytes
-  function getRemoteToken(address token, uint64 remoteChainSelector) public view returns (bytes memory) {
+  function getRemoteToken(
+    address token,
+    uint64 remoteChainSelector
+  ) public view returns (bytes memory) {
     return s_remoteChainConfigs[token][remoteChainSelector].remoteTokenAddress;
   }
 
@@ -259,7 +270,10 @@ abstract contract MultiTokenPool is IPoolV1, Ownable2StepMsgSender {
   /// @dev Only callable by the owner
   /// @param chains A list of chains and their new permission status & rate limits. Rate limits
   /// are only used when the chain is being added through `allowed` being true.
-  function applyChainUpdates(address token, ChainUpdate[] calldata chains) external virtual onlyOwner {
+  function applyChainUpdates(
+    address token,
+    ChainUpdate[] calldata chains
+  ) external virtual onlyOwner {
     for (uint256 i = 0; i < chains.length; ++i) {
       ChainUpdate memory update = chains[i];
 
@@ -316,12 +330,20 @@ abstract contract MultiTokenPool is IPoolV1, Ownable2StepMsgSender {
   // ================================================================
 
   /// @notice Consumes outbound rate limiting capacity in this pool
-  function _consumeOutboundRateLimit(address token, uint64 remoteChainSelector, uint256 amount) internal {
+  function _consumeOutboundRateLimit(
+    address token,
+    uint64 remoteChainSelector,
+    uint256 amount
+  ) internal {
     s_remoteChainConfigs[token][remoteChainSelector].outboundRateLimiterConfig._consume(amount, token);
   }
 
   /// @notice Consumes inbound rate limiting capacity in this pool
-  function _consumeInboundRateLimit(address token, uint64 remoteChainSelector, uint256 amount) internal {
+  function _consumeInboundRateLimit(
+    address token,
+    uint64 remoteChainSelector,
+    uint256 amount
+  ) internal {
     s_remoteChainConfigs[token][remoteChainSelector].inboundRateLimiterConfig._consume(amount, token);
   }
 
@@ -353,7 +375,9 @@ abstract contract MultiTokenPool is IPoolV1, Ownable2StepMsgSender {
     RateLimiter.Config memory outboundConfig,
     RateLimiter.Config memory inboundConfig
   ) internal {
-    if (!isSupportedChain(remoteChainSelector)) revert NonExistentChain(remoteChainSelector);
+    if (!isSupportedChain(remoteChainSelector)) {
+      revert NonExistentChain(remoteChainSelector);
+    }
 
     s_remoteChainConfigs[token][remoteChainSelector].outboundRateLimiterConfig._setTokenBucketConfig(outboundConfig);
     s_remoteChainConfigs[token][remoteChainSelector].inboundRateLimiterConfig._setTokenBucketConfig(inboundConfig);
@@ -409,12 +433,18 @@ abstract contract MultiTokenPool is IPoolV1, Ownable2StepMsgSender {
   /// @param removes The addresses to be removed.
   /// @param adds The addresses to be added.
   /// @dev allowlisting will be removed before public launch
-  function applyAllowListUpdates(address[] calldata removes, address[] calldata adds) external onlyOwner {
+  function applyAllowListUpdates(
+    address[] calldata removes,
+    address[] calldata adds
+  ) external onlyOwner {
     _applyAllowListUpdates(removes, adds);
   }
 
   /// @notice Internal version of applyAllowListUpdates to allow for reuse in the constructor.
-  function _applyAllowListUpdates(address[] memory removes, address[] memory adds) internal {
+  function _applyAllowListUpdates(
+    address[] memory removes,
+    address[] memory adds
+  ) internal {
     if (!i_allowlistEnabled) revert AllowListNotEnabled();
 
     for (uint256 i = 0; i < removes.length; ++i) {

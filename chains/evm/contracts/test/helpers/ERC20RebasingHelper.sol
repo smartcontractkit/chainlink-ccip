@@ -9,7 +9,10 @@ contract ERC20RebasingHelper is ERC20 {
 
   constructor() ERC20("Rebasing", "REB") {}
 
-  function mint(address to, uint256 amount) external {
+  function mint(
+    address to,
+    uint256 amount
+  ) external {
     if (!s_mintShouldBurn) {
       _mint(to, amount * s_multiplierPercentage / 100);
       return;

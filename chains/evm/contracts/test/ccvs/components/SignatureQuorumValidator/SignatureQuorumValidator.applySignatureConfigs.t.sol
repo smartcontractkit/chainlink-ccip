@@ -304,14 +304,10 @@ contract SignatureQuorumValidator_applySignatureConfigs is SignatureValidatorSet
 
     SignatureQuorumValidator.SignatureConfig[] memory updates = new SignatureQuorumValidator.SignatureConfig[](2);
     updates[0] = SignatureQuorumValidator.SignatureConfig({
-      sourceChainSelector: selectorB,
-      signers: _arrayOf(makeAddr("bSigner")),
-      threshold: 1
+      sourceChainSelector: selectorB, signers: _arrayOf(makeAddr("bSigner")), threshold: 1
     });
     updates[1] = SignatureQuorumValidator.SignatureConfig({
-      sourceChainSelector: selectorC,
-      signers: _arrayOf(makeAddr("cSigner")),
-      threshold: 1
+      sourceChainSelector: selectorC, signers: _arrayOf(makeAddr("cSigner")), threshold: 1
     });
     s_sigQuorumVerifier.applySignatureConfigs(new uint64[](0), updates);
 

@@ -20,7 +20,10 @@ contract RateLimiterHelper {
     });
   }
 
-  function consume(uint256 requestTokens, address tokenAddress) external {
+  function consume(
+    uint256 requestTokens,
+    address tokenAddress
+  ) external {
     s_rateLimiter._consume(requestTokens, tokenAddress);
   }
 

@@ -57,9 +57,7 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
       s_USDCToken,
       s_storageLocations,
       CCTPVerifier.DynamicConfig({
-        feeAggregator: FEE_AGGREGATOR,
-        allowlistAdmin: ALLOWLIST_ADMIN,
-        fastFinalityBps: CCTP_FAST_FINALITY_BPS
+        feeAggregator: FEE_AGGREGATOR, allowlistAdmin: ALLOWLIST_ADMIN, fastFinalityBps: CCTP_FAST_FINALITY_BPS
       }),
       address(s_mockRMNRemote)
     );

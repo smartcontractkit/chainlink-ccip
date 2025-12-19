@@ -20,8 +20,9 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     uint256 fee = s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
 
-    (bytes32 messageId, bytes memory encodedMessage, OnRamp.Receipt[] memory receipts, bytes[] memory verifierBlobs) =
-    _evmMessageToEvent({message: message, destChainSelector: DEST_CHAIN_SELECTOR, msgNum: 1, originalSender: STRANGER});
+    (bytes32 messageId, bytes memory encodedMessage, OnRamp.Receipt[] memory receipts, bytes[] memory verifierBlobs) = _evmMessageToEvent({
+      message: message, destChainSelector: DEST_CHAIN_SELECTOR, msgNum: 1, originalSender: STRANGER
+    });
 
     vm.expectEmit();
     emit OnRamp.CCIPMessageSent({
