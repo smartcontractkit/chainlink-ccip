@@ -141,8 +141,8 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
     MessageV1Codec.TokenTransferV1[] memory tokenAmounts = new MessageV1Codec.TokenTransferV1[](1);
     tokenAmounts[0] = MessageV1Codec.TokenTransferV1({
       amount: amount,
-      sourcePoolAddress: abi.encodePacked(pool),
-      sourceTokenAddress: abi.encodePacked(sourceToken),
+      sourcePoolAddress: abi.encode(pool),
+      sourceTokenAddress: abi.encode(sourceToken),
       destTokenAddress: abi.encodePacked(token),
       tokenReceiver: abi.encodePacked(tokenReceiver),
       extraData: ""
@@ -191,7 +191,7 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       isEnabled: true,
       onRamps: onRamps,
-      defaultCCV: _arrayOf(s_defaultCCV),
+      defaultCCVs: _arrayOf(s_defaultCCV),
       laneMandatedCCVs: _arrayOf(laneMandatedCCV)
     });
 
@@ -206,6 +206,54 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
     vm.startPrank(address(s_offRamp));
 
     vm.expectRevert(abi.encodeWithSelector(OffRamp.RequiredCCVMissing.selector, laneMandatedCCV));
+
+    s_offRamp.executeSingleMessage(message, messageId, ccvs, verifierResults);
+  }
+
+  function test_executeSingleMessage_RevertWhen_InvalidDestTokenAddressLength() public {
+    MessageV1Codec.MessageV1 memory message = _getMessage();
+    bytes memory invalidDestToken = new bytes(19); // not 20 bytes
+
+    MessageV1Codec.TokenTransferV1[] memory transfers = new MessageV1Codec.TokenTransferV1[](1);
+    transfers[0] = MessageV1Codec.TokenTransferV1({
+      amount: 1,
+      sourcePoolAddress: abi.encode(makeAddr("pool")),
+      sourceTokenAddress: abi.encode(makeAddr("sourceToken")),
+      destTokenAddress: invalidDestToken,
+      tokenReceiver: abi.encodePacked(makeAddr("receiver")),
+      extraData: ""
+    });
+    message.tokenTransfer = transfers;
+
+    bytes32 messageId = keccak256(MessageV1Codec._encodeMessageV1(message));
+    address[] memory ccvs = _arrayOf(s_defaultCCV);
+    bytes[] memory verifierResults = new bytes[](1);
+
+    vm.expectRevert(abi.encodeWithSelector(Internal.InvalidEVMAddress.selector, invalidDestToken));
+
+    s_offRamp.executeSingleMessage(message, messageId, ccvs, verifierResults);
+  }
+
+  function test_executeSingleMessage_RevertWhen_InvalidTokenReceiverLength() public {
+    MessageV1Codec.MessageV1 memory message = _getMessage();
+    bytes memory invalidTokenReceiver = new bytes(21); // not 20 bytes
+
+    MessageV1Codec.TokenTransferV1[] memory transfers = new MessageV1Codec.TokenTransferV1[](1);
+    transfers[0] = MessageV1Codec.TokenTransferV1({
+      amount: 1,
+      sourcePoolAddress: abi.encode(makeAddr("pool")),
+      sourceTokenAddress: abi.encode(makeAddr("sourceToken")),
+      destTokenAddress: abi.encodePacked(makeAddr("destToken")),
+      tokenReceiver: invalidTokenReceiver,
+      extraData: ""
+    });
+    message.tokenTransfer = transfers;
+
+    bytes32 messageId = keccak256(MessageV1Codec._encodeMessageV1(message));
+    address[] memory ccvs = _arrayOf(s_defaultCCV);
+    bytes[] memory verifierResults = new bytes[](1);
+
+    vm.expectRevert(abi.encodeWithSelector(Internal.InvalidEVMAddress.selector, invalidTokenReceiver));
 
     s_offRamp.executeSingleMessage(message, messageId, ccvs, verifierResults);
   }
@@ -272,8 +320,8 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
     MessageV1Codec.TokenTransferV1[] memory tokenAmounts = new MessageV1Codec.TokenTransferV1[](1);
     tokenAmounts[0] = MessageV1Codec.TokenTransferV1({
       amount: amount,
-      sourcePoolAddress: abi.encodePacked(makeAddr("pool1")),
-      sourceTokenAddress: abi.encodePacked(makeAddr("sourceToken1")),
+      sourcePoolAddress: abi.encode(makeAddr("pool1")),
+      sourceTokenAddress: abi.encode(makeAddr("sourceToken1")),
       destTokenAddress: abi.encodePacked(destToken),
       tokenReceiver: abi.encodePacked(tokenReceiver),
       extraData: ""
@@ -306,8 +354,8 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
     MessageV1Codec.TokenTransferV1[] memory tokenAmounts = new MessageV1Codec.TokenTransferV1[](1);
     tokenAmounts[0] = MessageV1Codec.TokenTransferV1({
       amount: amount,
-      sourcePoolAddress: abi.encodePacked(makeAddr("pool")),
-      sourceTokenAddress: abi.encodePacked(makeAddr("sourceToken")),
+      sourcePoolAddress: abi.encode(makeAddr("pool")),
+      sourceTokenAddress: abi.encode(makeAddr("sourceToken")),
       destTokenAddress: hex"1234", // Invalid length (not 20 bytes).
       tokenReceiver: abi.encodePacked(makeAddr("tokenReceiver")),
       extraData: ""
@@ -352,9 +400,9 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
       ccipReceiveGasLimit: 0,
       finality: 0,
       ccvAndExecutorHash: bytes32(0),
-      onRampAddress: abi.encodePacked(makeAddr("onRamp")),
+      onRampAddress: abi.encode(makeAddr("onRamp")),
       offRampAddress: abi.encodePacked(makeAddr("offRamp")),
-      sender: abi.encodePacked(makeAddr("sender")),
+      sender: abi.encode(makeAddr("sender")),
       receiver: abi.encodePacked(makeAddr("receiver")),
       destBlob: "",
       tokenTransfer: new MessageV1Codec.TokenTransferV1[](0),
@@ -388,8 +436,8 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
     MessageV1Codec.TokenTransferV1[] memory tokenAmounts = new MessageV1Codec.TokenTransferV1[](1);
     tokenAmounts[0] = MessageV1Codec.TokenTransferV1({
       amount: amount,
-      sourcePoolAddress: abi.encodePacked(pool),
-      sourceTokenAddress: abi.encodePacked(sourceToken),
+      sourcePoolAddress: abi.encode(pool),
+      sourceTokenAddress: abi.encode(sourceToken),
       destTokenAddress: abi.encodePacked(destToken),
       tokenReceiver: abi.encodePacked(tokenReceiver),
       extraData: ""

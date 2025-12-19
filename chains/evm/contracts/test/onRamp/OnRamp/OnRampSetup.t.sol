@@ -120,9 +120,9 @@ contract OnRampSetup is FeeQuoterFeeSetup {
       ccipReceiveGasLimit: GAS_LIMIT,
       finality: 0,
       ccvAndExecutorHash: MessageV1Codec._computeCCVAndExecutorHash(resolvedExtraArgs.ccvs, resolvedExtraArgs.executor),
-      onRampAddress: abi.encodePacked(address(s_onRamp)),
+      onRampAddress: abi.encode(address(s_onRamp)),
       offRampAddress: s_onRamp.getDestChainConfig(destChainSelector).offRamp,
-      sender: abi.encodePacked(originalSender),
+      sender: abi.encode(originalSender),
       receiver: abi.encodePacked(abi.decode(message.receiver, (address))),
       destBlob: "",
       tokenTransfer: new MessageV1Codec.TokenTransferV1[](message.tokenAmounts.length),
@@ -136,7 +136,8 @@ contract OnRampSetup is FeeQuoterFeeSetup {
     (receipts, messageV1.executionGasLimit,) =
       s_onRamp.getReceipts(destChainSelector, destChainConfig.networkFeeUSDCents, message, resolvedExtraArgs);
 
-    // Because getReceipts uses msg.sender to set the Router, we must override it here.
+    // `getReceipts` uses `msg.sender` as the issuer for the network-fee receipt.
+    // Since this helper calls it directly (not through the router), override the issuer to reflect the router address.
     receipts[receipts.length - 1].issuer = address(s_sourceRouter);
 
     return (
@@ -192,8 +193,8 @@ contract OnRampSetup is FeeQuoterFeeSetup {
       address token = message.tokenAmounts[i].token;
       messageV1.tokenTransfer[i] = MessageV1Codec.TokenTransferV1({
         amount: message.tokenAmounts[i].amount,
-        sourcePoolAddress: abi.encodePacked(s_sourcePoolByToken[token]),
-        sourceTokenAddress: abi.encodePacked(token),
+        sourcePoolAddress: abi.encode(s_sourcePoolByToken[token]),
+        sourceTokenAddress: abi.encode(token),
         destTokenAddress: abi.encodePacked(s_destTokenBySourceToken[token]),
         tokenReceiver: abi.encodePacked(abi.decode(message.receiver, (address))),
         extraData: s_extraDataByToken[token].length != 0

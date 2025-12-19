@@ -50,11 +50,11 @@ contract OffRamp_ensureCCVQuorumIsReached is OffRampSetup {
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       isEnabled: true,
       onRamps: onRamps,
-      defaultCCV: new address[](1),
+      defaultCCVs: new address[](1),
       laneMandatedCCVs: new address[](1)
     });
     configs[0].laneMandatedCCVs[0] = s_laneMandatedCCV;
-    configs[0].defaultCCV[0] = s_defaultCCV;
+    configs[0].defaultCCVs[0] = s_defaultCCV;
 
     s_offRamp.applySourceChainConfigUpdates(configs);
 
@@ -77,8 +77,8 @@ contract OffRamp_ensureCCVQuorumIsReached is OffRampSetup {
     MessageV1Codec.TokenTransferV1[] memory tokenTransfers = new MessageV1Codec.TokenTransferV1[](1);
     tokenTransfers[0] = MessageV1Codec.TokenTransferV1({
       amount: 100,
-      sourcePoolAddress: abi.encodePacked(s_destTokenPool),
-      sourceTokenAddress: abi.encodePacked(address(0x1111111111111111111111111111111111111111)),
+      sourcePoolAddress: abi.encode(s_destTokenPool),
+      sourceTokenAddress: abi.encode(address(0x1111111111111111111111111111111111111111)),
       destTokenAddress: abi.encodePacked(s_destToken),
       tokenReceiver: abi.encodePacked(address(21321)),
       extraData: ""

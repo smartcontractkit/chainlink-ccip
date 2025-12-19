@@ -55,6 +55,7 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
   /// @notice Locks the tokens in the lockBox.
   /// @dev The router has already transferred the full amount to this contract before calling lockOrBurn.
   /// For V1 the amount = full amount. For V2 the amount = destTokenAmount (after fees), and fees remain on this contract.
+  /// @param amount The amount of tokens to lock.
   function _lockOrBurn(
     uint256 amount
   ) internal virtual override {
@@ -75,6 +76,7 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
   /// @notice Sets the rebalancer address.
   /// @dev Address(0) can be used to disable the rebalancer.
   /// @dev Only callable by the owner.
+  /// @param rebalancer The new rebalancer address.
   function setRebalancer(
     address rebalancer
   ) external onlyOwner {

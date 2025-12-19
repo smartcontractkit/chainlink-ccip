@@ -80,7 +80,7 @@ contract OffRamp_execute is OffRampSetup {
       ccipReceiveGasLimit: 0,
       finality: 0,
       ccvAndExecutorHash: bytes32(0),
-      onRampAddress: ON_RAMP,
+      onRampAddress: s_onRamp,
       offRampAddress: abi.encodePacked(s_offRamp),
       sender: abi.encodePacked(makeAddr("sender")),
       receiver: abi.encodePacked(makeAddr("receiver")),
@@ -248,7 +248,7 @@ contract OffRamp_execute is OffRampSetup {
     defaultCCVs[0] = s_defaultCCV;
 
     // Configure source chain as disabled.
-    _applySourceConfig(ON_RAMP, false, defaultCCVs, new address[](0));
+    _applySourceConfig(s_onRamp, false, defaultCCVs, new address[](0));
 
     vm.expectRevert(abi.encodeWithSelector(OffRamp.SourceChainNotEnabled.selector, SOURCE_CHAIN_SELECTOR));
     MessageV1Codec.MessageV1 memory message = _getMessage();
@@ -290,7 +290,7 @@ contract OffRamp_execute is OffRampSetup {
 
     vm.startPrank(address(0));
     bytes[] memory onRamps = new bytes[](1);
-    onRamps[0] = ON_RAMP;
+    onRamps[0] = s_onRamp;
 
     OffRamp.SourceChainConfigArgs[] memory updates = new OffRamp.SourceChainConfigArgs[](1);
     updates[0] = OffRamp.SourceChainConfigArgs({
@@ -298,7 +298,7 @@ contract OffRamp_execute is OffRampSetup {
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       isEnabled: true,
       onRamps: onRamps,
-      defaultCCV: defaultCCVs,
+      defaultCCVs: defaultCCVs,
       laneMandatedCCVs: new address[](0)
     });
     OffRamp(offRampWithZeroBytes).applySourceChainConfigUpdates(updates);

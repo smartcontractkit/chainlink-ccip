@@ -72,4 +72,11 @@ contract OnRampHelper is OnRamp {
   function distributeFees(Client.EVM2AnyMessage calldata message, Receipt[] memory receipts) external {
     _distributeFees(message, receipts);
   }
+
+  function validateDestChainAddress(
+    bytes memory rawAddress,
+    uint8 addressBytesLength
+  ) external pure returns (bytes memory) {
+    return _validateDestChainAddress(rawAddress, addressBytesLength);
+  }
 }

@@ -57,6 +57,12 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
 
   /// @dev The authorized callers are set as empty since the USDCTokenPoolProxy is the only authorized caller,
   /// but cannot be deployed until after this contract. The allowed callers will be set after deployment.
+  /// @param token The token managed by this pool.
+  /// @param localTokenDecimals The number of decimals of the local token.
+  /// @param advancedPoolHooks Optional advanced pool hooks contract (can be address(0)).
+  /// @param rmnProxy The RMN proxy address.
+  /// @param router The router address.
+  /// @param lockBox The lock box address used to custody the token.
   constructor(
     IERC20 token,
     uint8 localTokenDecimals,
@@ -75,6 +81,7 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
   }
 
   /// @inheritdoc SiloedLockReleaseTokenPool
+  /// @param releaseOrMintIn The release or mint input parameters.
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
@@ -119,6 +126,8 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
   }
 
   /// @dev This function is overridden to prevent providing liquidity to a chain that has already been migrated, and thus should use CCTP-proper instead of a Lock/Release mechanism.
+  /// @param remoteChainSelector The remote chain selector.
+  /// @param amount The amount of tokens to provide.
   function _provideLiquidity(uint64 remoteChainSelector, uint256 amount) internal override {
     if (s_migratedChains.contains(remoteChainSelector)) {
       revert TokenLockingNotAllowedAfterMigration(remoteChainSelector);
@@ -133,6 +142,7 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
 
   /// @dev This function is overridden to remove the On-Ramp check, as this pool does not receive calls
   /// from the ramps directly, instead receiving them from a proxy contract first.
+  /// @param remoteChainSelector The remote chain selector.
   function _onlyOnRamp(
     uint64 remoteChainSelector
   ) internal view virtual override {
@@ -144,6 +154,7 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
 
   /// @dev This function is overridden to remove the Off-Ramp check, as this pool does not receive calls
   /// from the ramps directly, instead receiving them from a proxy contract first.
+  /// @param remoteChainSelector The remote chain selector.
   function _onlyOffRamp(
     uint64 remoteChainSelector
   ) internal view virtual override {
@@ -201,6 +212,7 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
   /// @notice Set the address of the circle-controlled wallet which will execute a CCTP lane migration
   /// @dev The function should only be invoked once the address has been confirmed by Circle prior to
   /// chain expansion.
+  /// @param migrator The Circle-controlled migrator address.
   function setCircleMigratorAddress(
     address migrator
   ) external onlyOwner {
@@ -215,6 +227,8 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
   /// an attestation on the source-chain to mint. In that instance it should use provided liquidity that was designated
   /// @dev This function should ONLY be called on the home chain, where tokens are locked, NOT on the remote chain
   /// and strict scrutiny should be applied to ensure that the amount of tokens excluded is accurate.
+  /// @param remoteChainSelector The remote chain selector.
+  /// @param amount The amount of tokens to exclude from burn.
   function excludeTokensFromBurn(uint64 remoteChainSelector, uint256 amount) external onlyOwner {
     if (s_proposedUSDCMigrationChain != remoteChainSelector) revert NoMigrationProposalPending();
 

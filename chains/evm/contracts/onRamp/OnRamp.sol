@@ -130,7 +130,10 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     address issuer; // ───────────╮
     uint32 destGasLimit; //       │ The gas limit for the actions taken on the destination chain for this entity.
     uint32 destBytesOverhead; // ─╯ The byte overhead for the actions taken on the destination chain for this entity.
-    uint256 feeTokenAmount; // The fee amount in the fee token for this entity.
+    // The fee amount for this entity, in smallest denomination of the fee token.
+    // NOTE: While building receipts in `_getReceipts`, this field is temporarily populated with a USD-cent value
+    // (and converted to fee token amount later in the same function).
+    uint256 feeTokenAmount;
     bytes extraArgs; // Extra args that have been passed in on the source chain. May be empty.
   }
 
@@ -199,7 +202,9 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
     DestChainConfig storage destChainConfig = s_destChainConfigs[destChainSelector];
 
-    // NOTE: assumes the message has already been validated through the getFee call.
+    // NOTE: The router is expected to call `getFee` prior to `forwardFromRouter`.
+    // This function still performs its own checks (e.g. router/originalSender, dest address validation, CCV list
+    // finalization) but relies on the router's pre-checks to avoid duplicating validation work.
     // Validate originalSender is set and allowed. Not validated in `getFee` since it is not user-driven.
     if (originalSender == address(0)) revert RouterMustSetOriginalSender();
     // Router address may be zero intentionally to pause, which should stop all messages.
@@ -222,12 +227,12 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       ccipReceiveGasLimit: resolvedExtraArgs.gasLimit,
       finality: resolvedExtraArgs.blockConfirmations,
       ccvAndExecutorHash: bytes32(0), // Will be set after CCV list is finalized.
-      onRampAddress: abi.encodePacked(address(this)),
-      offRampAddress: destChainConfig.offRamp,
-      sender: abi.encodePacked(originalSender),
-      receiver: validateDestChainAddress(message.receiver, destChainConfig.addressBytesLength),
+      onRampAddress: abi.encode(address(this)), // Source address, so abi encoded.
+      offRampAddress: destChainConfig.offRamp, // Dest address, so unpadded bytes.
+      sender: abi.encode(originalSender), // Source address, so abi encoded.
+      receiver: _validateDestChainAddress(message.receiver, destChainConfig.addressBytesLength), // Dest address, so unpadded bytes.
       // Executor args hold security critical execution args, like Solana accounts or Sui object IDs. Because of this,
-      // they have to part of the message that is signed off on by the verifiers.
+      // they have to be part of the message that is signed off on by the verifiers.
       destBlob: resolvedExtraArgs.executorArgs,
       tokenTransfer: new MessageV1Codec.TokenTransferV1[](message.tokenAmounts.length), //  values are populated with _lockOrBurnSingleToken.
       data: message.data
@@ -280,7 +285,10 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       newMessage.tokenTransfer[0] = _lockOrBurnSingleToken(
         message.tokenAmounts[0],
         destChainSelector,
-        resolvedExtraArgs.tokenReceiver.length > 0 ? resolvedExtraArgs.tokenReceiver : newMessage.receiver,
+        // At this point `resolvedExtraArgs.tokenReceiver` and `message.receiver` are the raw inputs provided by caller.
+        // The receiver is passed as-is to the TokenPool (which expects abi-encoded format for EVM source chains),
+        // then validated and trimmed to minimal bytes for destination chain encoding in the message.
+        resolvedExtraArgs.tokenReceiver.length > 0 ? resolvedExtraArgs.tokenReceiver : message.receiver,
         originalSender,
         resolvedExtraArgs.blockConfirmations,
         resolvedExtraArgs.tokenArgs
@@ -419,36 +427,40 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     return (ccvs, ccvArgs);
   }
 
-  /// @notice This function takes in a raw dest chain address and validates the address is valid for the destination
-  /// chain. User supplied addresses on EVM are always abi.encoded. This function strips the abi encoding to have a
-  /// chain agnostic address.
-  /// @param rawAddress The raw dest chain address provided by the user.
-  /// @param addressBytesLength The expected length of the address on the destination chain.
-  /// @return validatedAddress The validated dest chain address, stripped of any abi encoding.
-  function validateDestChainAddress(
-    bytes calldata rawAddress,
-    uint8 addressBytesLength
-  ) public pure returns (bytes memory validatedAddress) {
-    if (addressBytesLength < 32) {
-      // We have to account for padding as traditionally EVM addresses have been provided abi encoded.
-      if (rawAddress.length > 32) {
-        // If the expected length is smaller than 32 but the provided address is larger than 32, not even abi encoding
-        // can explain the difference. The address is invalid for this chain.
+  /// @notice Validates a destination-chain address and strips leading ABI padding for sub-32-byte addresses.
+  /// @dev Assumes `addressBytesLength < 32` only in the padded branch; otherwise length must match exactly.
+  /// @param rawAddress The address bytes (may be 32-byte ABI-encoded or exact-length raw bytes).
+  /// @param addressBytesLength The expected address length on the destination chain.
+  /// @return validatedAddress The validated address with any leading padding removed.
+  function _validateDestChainAddress(
+    bytes memory rawAddress,
+    uint256 addressBytesLength
+  ) internal pure returns (bytes memory validatedAddress) {
+    uint256 len = rawAddress.length;
+    if (addressBytesLength < 32 && len == 32) {
+      uint256 word;
+      // assembly equivalent: word = uint256(bytes32(rawAddress));
+      assembly {
+        word := mload(add(rawAddress, 32))
+      }
+      // Shift out the actual address bytes; any residue means non-zero padding.
+      if (word >> (addressBytesLength * 8) != 0) {
         revert InvalidDestChainAddress(rawAddress);
       }
-      if (rawAddress.length == 32) {
-        // abi encoding can explain this, now we need to check if the first (32 - addressBytesLength) bytes are zero. If
-        // so, we strip them and return the unencoded address.
-        if (bytes32(rawAddress[0:(32 - addressBytesLength)]) != bytes32(0)) {
-          revert InvalidDestChainAddress(rawAddress);
-        }
-        return rawAddress[(32 - addressBytesLength):];
+      validatedAddress = new bytes(addressBytesLength);
+      // assembly equivalent:
+      //  uint256 offset = 32 - addressBytesLength;
+      //  for (uint256 i = 0; i < addressBytesLength; ++i) {
+      //    validatedAddress[i] = rawAddress[offset + i];
+      //  }
+      assembly {
+        let shift := mul(sub(32, addressBytesLength), 8)
+        mstore(add(validatedAddress, 32), shl(shift, word))
       }
-      // If the rawAddress is smaller than 32 bytes we assume there's no padding involved and we fall back to the
-      // general check below that ensures the length must match exactly.
+      return validatedAddress;
     }
 
-    if (rawAddress.length != addressBytesLength) {
+    if (len != addressBytesLength) {
       revert InvalidDestChainAddress(rawAddress);
     }
     return rawAddress;
@@ -457,6 +469,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   /// @notice Parses and validates extra arguments, applying defaults from destination chain configuration.
   /// The function ensures all messages have the required CCVs and executor needed for processing,
   /// even when users don't explicitly specify them.
+  /// @dev `tokenReceiver` is NOT validated here, and is validated in `_lockOrBurnSingleToken`.
   /// @param destChainSelector The destination chain selector.
   /// @param destChainConfig Configuration for the destination chain including default values.
   /// @param extraArgs User-provided extra arguments in either V3 or legacy format.
@@ -511,8 +524,6 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       if (!destChainConfig.tokenReceiverAllowed) {
         revert TokenReceiverNotAllowed(destChainSelector);
       }
-      resolvedArgs.tokenReceiver =
-        this.validateDestChainAddress(resolvedArgs.tokenReceiver, destChainConfig.addressBytesLength);
     }
 
     // When users don't specify an executor, default executor is chosen.
@@ -600,6 +611,11 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       // executor. A zero executor would break backward compatibility and cause otherwise-valid traffic to revert.
       if (destChainConfigArg.defaultExecutor == address(0)) revert InvalidConfig();
       destChainConfig.defaultExecutor = destChainConfigArg.defaultExecutor;
+
+      // Make sure that offRamp length matches addressBytesLength.
+      if (destChainConfigArg.offRamp.length != destChainConfigArg.addressBytesLength) {
+        revert InvalidDestChainAddress(destChainConfigArg.offRamp);
+      }
       destChainConfig.offRamp = destChainConfigArg.offRamp;
 
       emit DestChainConfigSet(destChainSelector, destChainConfig.messageNumber, destChainConfigArg);
@@ -635,7 +651,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   /// @notice Uses a pool to lock or burn a token and returns MessageV1 token transfer data.
   /// @param tokenAndAmount Token address and amount to lock or burn.
   /// @param destChainSelector Target destination chain selector of the message.
-  /// @param receiver Message receiver.
+  /// @param receiver Message receiver in abi-encoded format (as expected by the pool on EVM source chains).
   /// @param originalSender Message sender.
   /// @param blockConfirmationRequested Requested block confirmation.
   /// @param tokenArgs Additional token arguments from the message.
@@ -692,12 +708,12 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
     return MessageV1Codec.TokenTransferV1({
       amount: destTokenAmount,
-      sourcePoolAddress: abi.encodePacked(address(sourcePool)),
-      sourceTokenAddress: abi.encodePacked(tokenAndAmount.token),
-      destTokenAddress: this.validateDestChainAddress(
+      sourcePoolAddress: abi.encode(sourcePool), // Source address, so abi encoded.
+      sourceTokenAddress: abi.encode(tokenAndAmount.token), // Source address, so abi encoded.
+      destTokenAddress: _validateDestChainAddress(
         poolReturnData.destTokenAddress, s_destChainConfigs[destChainSelector].addressBytesLength
-      ),
-      tokenReceiver: receiver,
+      ), // Dest address so unpadded bytes.
+      tokenReceiver: _validateDestChainAddress(receiver, s_destChainConfigs[destChainSelector].addressBytesLength), // Dest address so unpadded bytes.
       extraData: poolReturnData.destPoolData
     });
   }
@@ -825,7 +841,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     Client.EVM2AnyMessage calldata message,
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs
   ) internal view returns (Receipt[] memory receipts, uint32 gasLimitSum, uint256 feeTokenAmount) {
-    // Already ensure there's room for verifiers, token transfer, executor, and network fee.
+    // Preallocate receipts with room for: verifiers, token transfer (0 or 1), executor, and network fee.
     receipts = new Receipt[](extraArgs.ccvs.length + message.tokenAmounts.length + 2);
     uint32 bytesOverheadSum = 0;
 
@@ -868,7 +884,9 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
         extraArgs: extraArgs.tokenArgs
       });
 
-      // Try to call `IPoolV2.getFee` to fetch fee components if the pool supports IPoolV2.
+      // Try to call `IPoolV2.getFee` to fetch fee components if the pool supports IPoolV2. If the specified pool is not
+      // a contract, we want it to revert. Using `ERC165Checker` here would mean it doesn't revert, and it costs more
+      // gas.
       if (pool.supportsInterface(type(IPoolV2).interfaceId)) {
         (
           receipts[poolReceiptIndex].feeTokenAmount,

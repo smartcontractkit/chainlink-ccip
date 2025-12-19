@@ -36,6 +36,7 @@ contract CCTPMessageTransmitterProxy is Ownable2StepMsgSender, ITypeAndVersion {
   EnumerableSet.AddressSet private s_allowedCallers;
 
   /// @notice One-time cyclic dependency between TokenPool and MessageTransmitter.
+  /// @param tokenMessenger The Circle TokenMessenger used to resolve the local MessageTransmitter.
   constructor(
     ITokenMessenger tokenMessenger
   ) {

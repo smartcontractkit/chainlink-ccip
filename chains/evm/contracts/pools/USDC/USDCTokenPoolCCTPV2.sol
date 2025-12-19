@@ -51,6 +51,7 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
   /// The allowedCaller is preconfigured per destination domain and token pool version refer Domain struct.
   /// @dev Emits ITokenMessenger.DepositForBurn event.
   /// @dev Assumes caller has validated the destinationReceiver.
+  /// @param lockOrBurnIn Encoded data fields for the processing of tokens on the source chain.
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
   ) public virtual override returns (Pool.LockOrBurnOutV1 memory) {
@@ -119,6 +120,7 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
   }
 
   /// @inheritdoc USDCTokenPool
+  /// @param releaseOrMintIn Encoded data fields for the processing of tokens on the destination chain.
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
@@ -169,7 +171,7 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
   ///     * minFinalityThreshold       32         uint32    140
   ///     * finalityThresholdExecuted  32         uint32    144
   ///     * messageBody                dynamic    bytes     148
-
+  ///
   /// @dev Message Body for USDC.
   ///     * Field                 Bytes      Type       Index
   ///     * version               4          uint32     0
