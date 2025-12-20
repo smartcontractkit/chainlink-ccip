@@ -172,8 +172,8 @@ func (m *CCIP16Solana) SendMessage(ctx context.Context, src, dest uint64, fields
 	}
 	feeToken := solana.SolMint
 	sender := m.e.BlockChains.SolanaChains()[src].DeployerKey
-	destinationChainStatePDA, err := state.FindDestChainStatePDA(dest, routerID)
-	noncePDA, err := state.FindNoncePDA(dest, sender.PublicKey(), routerID)
+	destinationChainStatePDA, _ := state.FindDestChainStatePDA(dest, routerID)
+	noncePDA, _ := state.FindNoncePDA(dest, sender.PublicKey(), routerID)
 	linkFqBillingConfigPDA, _, _ := state.FindFqBillingTokenConfigPDA(solana.MustPublicKeyFromBase58(linkAddr.Address), fqID)
 	feeTokenFqBillingConfigPDA, _, _ := state.FindFqBillingTokenConfigPDA(feeToken, fqID)
 	billingSignerPDA, _, _ := state.FindFeeBillingSignerPDA(routerID)
@@ -779,6 +779,9 @@ func (m *CCIP16Solana) DeployContractsForSelector(ctx context.Context, env *depl
 			ata.ProgramID,
 			solana.SystemProgramID,
 		).ValidateAndBuild()
+		if err != nil {
+			return nil, fmt.Errorf("failed to build add billing token config instruction: %w", err)
+		}
 		err = chain.Confirm([]solana.Instruction{ixn})
 		if err != nil {
 			return nil, fmt.Errorf("failed to add price updater: %w", err)
