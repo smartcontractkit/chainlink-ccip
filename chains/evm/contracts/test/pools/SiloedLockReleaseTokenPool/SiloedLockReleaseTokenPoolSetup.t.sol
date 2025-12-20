@@ -55,9 +55,7 @@ contract SiloedLockReleaseTokenPoolSetup is BaseTest {
       abi.encodeWithSignature("getTokenConfig(address)", address(s_token)),
       abi.encode(
         TokenAdminRegistry.TokenConfig({
-          administrator: OWNER,
-          pendingAdministrator: address(0),
-          tokenPool: address(s_siloedLockReleaseTokenPool)
+          administrator: OWNER, pendingAdministrator: address(0), tokenPool: address(s_siloedLockReleaseTokenPool)
         })
       )
     );

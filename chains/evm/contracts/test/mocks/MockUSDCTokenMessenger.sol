@@ -14,7 +14,10 @@ contract MockUSDCTokenMessenger is ITokenMessenger {
 
   uint64 public s_nonce;
 
-  constructor(uint32 version, address transmitter) {
+  constructor(
+    uint32 version,
+    address transmitter
+  ) {
     i_messageBodyVersion = version;
     s_nonce = 1;
     i_transmitter = transmitter;

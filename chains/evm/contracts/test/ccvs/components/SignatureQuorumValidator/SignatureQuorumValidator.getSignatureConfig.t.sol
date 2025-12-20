@@ -2,7 +2,8 @@
 pragma solidity ^0.8.24;
 
 import {
-  SignatureQuorumValidator, SignatureQuorumValidatorHelper
+  SignatureQuorumValidator,
+  SignatureQuorumValidatorHelper
 } from "../../../helpers/SignatureQuorumValidatorHelper.sol";
 import {SignatureValidatorSetup} from "./SignatureValidatorSetup.t.sol";
 

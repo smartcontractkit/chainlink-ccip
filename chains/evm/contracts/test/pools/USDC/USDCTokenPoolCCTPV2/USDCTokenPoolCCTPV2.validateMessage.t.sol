@@ -37,8 +37,7 @@ contract USDCTokenPoolCCTPV2_validateMessage is USDCTokenPoolCCTPV2Setup {
     // Create valid source token data payload that matches the valid USDC message
     // This is used by tests that need to test payload validation failures
     s_validSourceTokenData = USDCSourcePoolDataCodec.SourceTokenDataPayloadV2({
-      sourceDomain: s_validUsdcMessage.sourceDomain,
-      depositHash: bytes32(0)
+      sourceDomain: s_validUsdcMessage.sourceDomain, depositHash: bytes32(0)
     });
   }
 

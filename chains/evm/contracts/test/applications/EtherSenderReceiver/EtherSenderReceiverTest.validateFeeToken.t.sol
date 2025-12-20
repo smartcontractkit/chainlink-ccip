@@ -10,11 +10,7 @@ contract EtherSenderReceiverTest_validateFeeToken is EtherSenderReceiverTestSetu
     Client.EVMTokenAmount[] memory tokenAmount = new Client.EVMTokenAmount[](1);
     tokenAmount[0] = Client.EVMTokenAmount({token: address(s_weth), amount: AMOUNT});
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
-      receiver: abi.encode(XCHAIN_RECEIVER),
-      data: "",
-      tokenAmounts: tokenAmount,
-      feeToken: address(0),
-      extraArgs: ""
+      receiver: abi.encode(XCHAIN_RECEIVER), data: "", tokenAmounts: tokenAmount, feeToken: address(0), extraArgs: ""
     });
 
     s_etherSenderReceiver.validateFeeToken{value: AMOUNT + 1}(message);

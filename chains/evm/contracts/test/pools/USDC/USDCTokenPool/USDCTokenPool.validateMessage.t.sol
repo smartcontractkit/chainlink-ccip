@@ -6,7 +6,10 @@ import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
 import {USDCTokenPoolSetup} from "./USDCTokenPoolSetup.t.sol";
 
 contract USDCTokenPool_validateMessage is USDCTokenPoolSetup {
-  function testFuzz_validateMessage_Success(uint32 sourceDomain, uint64 nonce) public view {
+  function testFuzz_validateMessage_Success(
+    uint32 sourceDomain,
+    uint64 nonce
+  ) public view {
     USDCMessage memory usdcMessage = USDCMessage({
       version: 0,
       sourceDomain: sourceDomain,
@@ -92,8 +95,7 @@ contract USDCTokenPool_validateMessage is USDCTokenPoolSetup {
     s_usdcTokenPool.validateMessage(
       _generateUSDCMessage(usdcMessage),
       USDCSourcePoolDataCodec.SourceTokenDataPayloadV1({
-        nonce: usdcMessage.nonce,
-        sourceDomain: usdcMessage.sourceDomain
+        nonce: usdcMessage.nonce, sourceDomain: usdcMessage.sourceDomain
       })
     );
   }
@@ -110,8 +112,10 @@ contract USDCTokenPool_validateMessage is USDCTokenPoolSetup {
       messageBody: bytes("")
     });
 
-    USDCSourcePoolDataCodec.SourceTokenDataPayloadV1 memory sourceTokenData = USDCSourcePoolDataCodec
-      .SourceTokenDataPayloadV1({nonce: usdcMessage.nonce, sourceDomain: usdcMessage.sourceDomain});
+    USDCSourcePoolDataCodec.SourceTokenDataPayloadV1 memory sourceTokenData =
+      USDCSourcePoolDataCodec.SourceTokenDataPayloadV1({
+        nonce: usdcMessage.nonce, sourceDomain: usdcMessage.sourceDomain
+      });
 
     bytes memory encodedUsdcMessage = _generateUSDCMessage(usdcMessage);
 
