@@ -22,7 +22,6 @@ import (
 	solanaSeqs "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
-	"github.com/smartcontractkit/chainlink-ccip/devenv/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -111,11 +110,11 @@ func applyUpdateChainConfig(e deployment.Environment, cfg UpdateChainConfigConfi
 	}
 	_, err = operations.ExecuteSequence(
 		e.OperationsBundle,
-		sequences.ApplyChainConfigUpdatesSequence,
-		sequences.DONSequenceDeps{
+		ApplyChainConfigUpdatesSequence,
+		DONSequenceDeps{
 			HomeChain: e.BlockChains.EVMChains()[cfg.HomeChainSelector],
 		},
-		sequences.ApplyChainConfigUpdatesSequenceInput{
+		ApplyChainConfigUpdatesSequenceInput{
 			CCIPHome:           ccipHome.Address(),
 			RemoteChainAdds:    adds,
 			RemoteChainRemoves: cfg.RemoteChainRemoves,
@@ -221,7 +220,7 @@ func applyAddDonAndSetCandidateChangesetConfig(e deployment.Environment, cfg Add
 		readers = append(readers, id)
 	}
 
-	dons := make([]sequences.DONAddition, len(cfg.PluginInfo.OCRConfigPerRemoteChainSelector))
+	dons := make([]DONAddition, len(cfg.PluginInfo.OCRConfigPerRemoteChainSelector))
 	i := 0
 	for chainSelector, params := range cfg.PluginInfo.OCRConfigPerRemoteChainSelector {
 		family, err := chain_selectors.GetSelectorFamily(chainSelector)
@@ -267,7 +266,7 @@ func applyAddDonAndSetCandidateChangesetConfig(e deployment.Environment, cfg Add
 				cfg.PluginInfo.PluginType.String())
 		}
 
-		dons[i] = sequences.DONAddition{
+		dons[i] = DONAddition{
 			ExpectedID:       expectedDonID,
 			PluginConfig:     pluginOCR3Config,
 			PeerIDs:          readers,
@@ -281,11 +280,11 @@ func applyAddDonAndSetCandidateChangesetConfig(e deployment.Environment, cfg Add
 
 	_, err = operations.ExecuteSequence(
 		e.OperationsBundle,
-		sequences.AddDONAndSetCandidateSequence,
-		sequences.DONSequenceDeps{
+		AddDONAndSetCandidateSequence,
+		DONSequenceDeps{
 			HomeChain: e.BlockChains.EVMChains()[cfg.HomeChainSelector],
 		},
-		sequences.AddDONAndSetCandidateSequenceInput{
+		AddDONAndSetCandidateSequenceInput{
 			CapabilitiesRegistry: capReg.Address(),
 			DONs:                 dons,
 		},
@@ -618,7 +617,7 @@ func applySetCandidateChangesetConfig(e deployment.Environment, cfg SetCandidate
 	}
 
 	pluginInfos := make([]string, 0)
-	dons := make([]sequences.DONUpdate, 0)
+	dons := make([]DONUpdate, 0)
 	chainToDonIDs := make(map[uint64]uint32)
 	for _, plugin := range cfg.PluginInfo {
 		for chainSelector := range plugin.OCRConfigPerRemoteChainSelector {
@@ -705,7 +704,7 @@ func applySetCandidateChangesetConfig(e deployment.Environment, cfg SetCandidate
 				e.Logger.Warnw("Overwriting existing candidate config", "digest", existingDigest, "donID", donID, "pluginType", config.PluginType)
 			}
 
-			dons = append(dons, sequences.DONUpdate{
+			dons = append(dons, DONUpdate{
 				ID:             donID,
 				PluginConfig:   config,
 				PeerIDs:        readers,
@@ -717,11 +716,11 @@ func applySetCandidateChangesetConfig(e deployment.Environment, cfg SetCandidate
 	}
 	_, err = operations.ExecuteSequence(
 		e.OperationsBundle,
-		sequences.SetCandidateSequence,
-		sequences.DONSequenceDeps{
+		SetCandidateSequence,
+		DONSequenceDeps{
 			HomeChain: e.BlockChains.EVMChains()[cfg.HomeChainSelector],
 		},
-		sequences.SetCandidateSequenceInput{
+		SetCandidateSequenceInput{
 			CapabilitiesRegistry: capReg.Address(),
 			DONs:                 dons,
 		},
@@ -737,7 +736,7 @@ func DonIDForChain(registry *capabilities_registry.CapabilitiesRegistry, ccipHom
 	var donIDs []uint32
 	for _, don := range dons {
 		if len(don.CapabilityConfigurations) == 1 &&
-			don.CapabilityConfigurations[0].CapabilityId == sequences.CCIPCapabilityID {
+			don.CapabilityConfigurations[0].CapabilityId == CCIPCapabilityID {
 			configs, err := ccipHome.GetAllConfigs(nil, don.Id, uint8(ccipocr3.PluginTypeCCIPCommit))
 			if err != nil {
 				return 0, fmt.Errorf("get all commit configs from cciphome: %w", err)
@@ -756,7 +755,7 @@ func DonIDForChain(registry *capabilities_registry.CapabilitiesRegistry, ccipHom
 
 	// more than one DON is an error
 	if len(donIDs) > 1 {
-		return 0, fmt.Errorf("more than one DON found for (chain selector %d, ccip capability id %x) pair", chainSelector, sequences.CCIPCapabilityID[:])
+		return 0, fmt.Errorf("more than one DON found for (chain selector %d, ccip capability id %x) pair", chainSelector, CCIPCapabilityID[:])
 	}
 
 	// no DON found - don ID of 0 indicates that (this is the case in the CR as well).
@@ -858,7 +857,7 @@ func applyPromoteCandidateChangesetConfig(e deployment.Environment, cfg PromoteC
 		}
 	}
 
-	dons := make([]sequences.DONUpdatePromotion, 0)
+	dons := make([]DONUpdatePromotion, 0)
 	var readers [][32]byte
 	for _, node := range cfg.NonBootstraps {
 		nodeP2PIds, err := node.MustReadP2PKeys()
@@ -883,7 +882,7 @@ func applyPromoteCandidateChangesetConfig(e deployment.Environment, cfg PromoteC
 			}
 			e.Logger.Infow("Promoting candidate for plugin "+plugin.PluginType.String(), "digest", digest)
 
-			dons = append(dons, sequences.DONUpdatePromotion{
+			dons = append(dons, DONUpdatePromotion{
 				ID:              donID,
 				PluginType:      uint8(plugin.PluginType),
 				ChainSelector:   allConfigs.CandidateConfig.Config.ChainSelector,
@@ -898,11 +897,11 @@ func applyPromoteCandidateChangesetConfig(e deployment.Environment, cfg PromoteC
 
 	_, err = operations.ExecuteSequence(
 		e.OperationsBundle,
-		sequences.PromoteCandidateSequence,
-		sequences.DONSequenceDeps{
+		PromoteCandidateSequence,
+		DONSequenceDeps{
 			HomeChain: e.BlockChains.EVMChains()[cfg.HomeChainSelector],
 		},
-		sequences.PromoteCandidateSequenceInput{
+		PromoteCandidateSequenceInput{
 			CapabilitiesRegistry: capReg.Address(),
 			DONs:                 dons,
 		},

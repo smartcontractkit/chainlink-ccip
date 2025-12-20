@@ -20,7 +20,6 @@ import (
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	changesetscore "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
-	"github.com/smartcontractkit/chainlink-ccip/devenv/sequences"
 	ccipocr3common "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -134,7 +133,7 @@ func DeployContractsForSelector(ctx context.Context, env *deployment.Environment
 		if !ok {
 			return nil, fmt.Errorf("evm chain not found for selector %d", selector)
 		}
-		ccipHomeOut, err := DeployHomeChain.Apply(*env, sequences.DeployHomeChainConfig{
+		ccipHomeOut, err := DeployHomeChain.Apply(*env, DeployHomeChainConfig{
 			HomeChainSel: selector,
 			CapReg:       common.HexToAddress(crAddr),
 			RMNStaticConfig: rmn_home.RMNHomeStaticConfig{

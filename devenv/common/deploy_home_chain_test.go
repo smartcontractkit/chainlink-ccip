@@ -5,7 +5,6 @@ import (
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/devenv/common"
-	"github.com/smartcontractkit/chainlink-ccip/devenv/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/rmn_home"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	capabilities_registry "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
@@ -21,7 +20,7 @@ func TestDeployHomeChain_Apply(t *testing.T) {
 	require.NoError(t, err, "Failed to create test environment")
 	require.NotNil(t, e, "Environment should be created")
 
-	out, err := common.DeployHomeChain.Apply(*e, sequences.DeployHomeChainConfig{
+	out, err := common.DeployHomeChain.Apply(*e, common.DeployHomeChainConfig{
 		HomeChainSel: chainSel,
 		RMNStaticConfig: rmn_home.RMNHomeStaticConfig{
 			Nodes:          []rmn_home.RMNHomeNode{},

@@ -4,19 +4,18 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	"github.com/smartcontractkit/chainlink-ccip/devenv/sequences"
 )
 
 var DeployHomeChain = deployment.CreateChangeSet(applyDeployHomeChain, validateDeployHomeChain)
 
-func validateDeployHomeChain(e deployment.Environment, cfg sequences.DeployHomeChainConfig) error {
+func validateDeployHomeChain(e deployment.Environment, cfg DeployHomeChainConfig) error {
 	return nil
 }
 
-func applyDeployHomeChain(e deployment.Environment, cfg sequences.DeployHomeChainConfig) (deployment.ChangesetOutput, error) {
+func applyDeployHomeChain(e deployment.Environment, cfg DeployHomeChainConfig) (deployment.ChangesetOutput, error) {
 	report, err := operations.ExecuteSequence(
 		e.OperationsBundle,
-		sequences.DeployHomeChain,
+		SeqDeployHomeChain,
 		e.BlockChains,
 		cfg,
 	)
