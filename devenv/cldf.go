@@ -172,8 +172,10 @@ func NewCCIPImplFromNetwork(typ string) (CCIP16ProductConfiguration, error) {
 	case "aptos":
 		panic("implement Aptos")
 	case "ton":
-		return nil, nil
+		panic("implement TON")
 	default:
 		return nil, errors.New("unknown devenv network type " + typ)
 	}
 }
+
+
