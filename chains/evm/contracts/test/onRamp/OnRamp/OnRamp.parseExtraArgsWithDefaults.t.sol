@@ -192,11 +192,11 @@ contract OnRamp_parseExtraArgsWithDefaults is OnRampSetup {
     assertEq(result.ccvArgs.length, 0, "Should not inject default CCV args for token-only transfer");
   }
 
-  function test_parseExtraArgsWithDefaults_PlaceholderIgnoredForPureTokenTransferButKeepsUserCCVs() public {
+  function test_parseExtraArgsWithDefaults_PlaceholderAddsDefaultsEvenForPureTokenTransfer() public {
     address userCCV = makeAddr("userCCV");
 
     address[] memory ccvs = new address[](2);
-    ccvs[0] = address(0); // placeholder
+    ccvs[0] = address(0); // placeholder - should trigger defaults even for pure token transfer
     ccvs[1] = userCCV;
 
     bytes[] memory ccvArgs = new bytes[](2);
@@ -218,11 +218,19 @@ contract OnRamp_parseExtraArgsWithDefaults is OnRampSetup {
       DEST_CHAIN_SELECTOR, s_destChainConfig, ExtraArgsCodec._encodeGenericExtraArgsV3(inputArgs), true
     );
 
-    address[] memory expectedCCVs = new address[](1);
+    // Zero placeholder should trigger defaults even for pure token transfer.
+    // Expected: userCCV + all default CCVs (excluding duplicates)
+    address[] memory expectedCCVs = new address[](1 + s_defaultCCVs.length);
     expectedCCVs[0] = userCCV;
+    for (uint256 i = 0; i < s_defaultCCVs.length; ++i) {
+      expectedCCVs[1 + i] = s_defaultCCVs[i];
+    }
 
-    bytes[] memory expectedArgs = new bytes[](1);
+    bytes[] memory expectedArgs = new bytes[](1 + s_defaultCCVs.length);
     expectedArgs[0] = "userArgs";
+    for (uint256 i = 0; i < s_defaultCCVs.length; ++i) {
+      expectedArgs[1 + i] = "";
+    }
 
     _assertCCVArraysEqual(result.ccvs, result.ccvArgs, expectedCCVs, expectedArgs);
   }
