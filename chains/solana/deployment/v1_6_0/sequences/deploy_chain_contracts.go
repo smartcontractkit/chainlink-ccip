@@ -189,6 +189,15 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy TestReceiver: %w", err)
 		}
 		addresses = append(addresses, receiverRef.Output)
+		// initialize test receiver contract
+		_, err = operations.ExecuteOperation(b, testreceiverops.Initialize, chain, testreceiverops.Params{
+			Router:   ccipRouterProgram,
+			Receiver: solana.MustPublicKeyFromBase58(receiverRef.Output.Address),
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to initialize TestReceiver: %w", err)
+		}
+
 		return sequences.OnChainOutput{
 			Addresses: addresses,
 		}, nil

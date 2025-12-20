@@ -38,10 +38,11 @@ type Params struct {
 }
 
 type ConnectChainsParams struct {
-	OffRamp             solana.PublicKey
-	RemoteChainSelector uint64
-	SourceOnRamp        []byte
-	EnabledAsSource     bool
+	OffRamp                   solana.PublicKey
+	RemoteChainSelector       uint64
+	SourceOnRamp              []byte
+	EnabledAsSource           bool
+	IsRMNVerificationDisabled bool
 }
 
 type SetOcr3Params struct {
@@ -155,6 +156,7 @@ var ConnectChains = operations.NewOperation(
 	Version,
 	"Connects the OffRamp 1.6.0 contract to other chains",
 	func(b operations.Bundle, chain cldf_solana.Chain, input ConnectChainsParams) (sequences.OnChainOutput, error) {
+		b.Logger.Infof("Connecting OffRamp to remote chain %+v", input)
 		ccip_offramp.SetProgramID(input.OffRamp)
 		isUpdate := false
 		authority := GetAuthority(chain, input.OffRamp)
@@ -163,21 +165,24 @@ var ConnectChains = operations.NewOperation(
 		var sourceChainAccount ccip_offramp.SourceChain
 		err := chain.GetAccountDataBorshInto(context.Background(), offRampSourceChainPDA, &sourceChainAccount)
 		if err == nil {
-			fmt.Println("Remote chain state account found:", sourceChainAccount)
+			b.Logger.Infof("Remote chain state account found: %+v", sourceChainAccount)
 			isUpdate = true
 		}
 		var onRampAddress ccip_offramp.OnRampAddress
 		copy(onRampAddress.Bytes[:], input.SourceOnRamp)
-		addressBytesLen := len(onRampAddress.Bytes)
+		addressBytesLen := len(input.SourceOnRamp)
 		if addressBytesLen < 0 || addressBytesLen > math.MaxUint32 {
 			return sequences.OnChainOutput{}, fmt.Errorf("invalid on ramp address length: %d", addressBytesLen)
 		}
 		onRampAddress.Len = uint32(addressBytesLen)
 		validSourceChainConfig := ccip_offramp.SourceChainConfig{
-			OnRamp:    onRampAddress,
-			IsEnabled: input.EnabledAsSource,
+			OnRamp:                    onRampAddress,
+			IsEnabled:                 input.EnabledAsSource,
+			IsRmnVerificationDisabled: input.IsRMNVerificationDisabled,
 		}
+		b.Logger.Infof("Source chain config to be set: %+v", validSourceChainConfig)
 		var ixn solana.Instruction
+		var addressRefs []datastore.AddressRef
 		batches := make([]types.BatchOperation, 0)
 		if isUpdate {
 			ixn, err = ccip_offramp.NewUpdateSourceChainConfigInstruction(
@@ -206,6 +211,13 @@ var ConnectChains = operations.NewOperation(
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to extend OffRamp lookup table: %w", err)
 			}
+			addressRefs = append(addressRefs, datastore.AddressRef{
+				Address:       offRampSourceChainPDA.String(),
+				ChainSelector: chain.Selector,
+				Type:          datastore.ContractType(SourceChainType),
+				Version:       Version,
+				Qualifier:     strconv.FormatUint(input.RemoteChainSelector, 10),
+			})
 		}
 		if authority != chain.DeployerKey.PublicKey() {
 			b, err := utils.BuildMCMSBatchOperation(
@@ -224,16 +236,9 @@ var ConnectChains = operations.NewOperation(
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm add price updater: %w", err)
 			}
 		}
-		sourceRef := datastore.AddressRef{
-			Address:       offRampSourceChainPDA.String(),
-			ChainSelector: chain.Selector,
-			Type:          datastore.ContractType(SourceChainType),
-			Version:       Version,
-			Qualifier:     strconv.FormatUint(input.RemoteChainSelector, 10),
-		}
 		return sequences.OnChainOutput{
 			BatchOps:  batches,
-			Addresses: []datastore.AddressRef{sourceRef},
+			Addresses: addressRefs,
 		}, nil
 	},
 )

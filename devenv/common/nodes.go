@@ -122,7 +122,6 @@ func CreateNodeKeysBundle(
 		var ocrKey *clclient.OCR2Key
 		for _, key := range existingOCR2Keys.Data {
 			if key.Attributes.ChainType == chainName {
-				fmt.Println("OCR2 key already exists for node:", key.Attributes.ChainType)
 				ocrKey = &clclient.OCR2Key{
 					Data: key,
 				}
