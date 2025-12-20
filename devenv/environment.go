@@ -186,7 +186,7 @@ func NewEnvironment() (*Cfg, error) {
 		return nil, fmt.Errorf("failed to create new shared db node set: %w", err)
 	}
 
-	nodeKeyBundles := make(map[string][]clclient.NodeKeysBundle, 0)
+	nodeKeyBundles := make(map[string]map[string]clclient.NodeKeysBundle, 0)
 	// deploy all the contracts
 	for i, impl := range impls {
 		nkb, err := impl.FundNodes(ctx, in.NodeSets, in.Blockchains[i], big.NewInt(1), big.NewInt(5))
@@ -281,8 +281,9 @@ func NewEnvironment() (*Cfg, error) {
 		"evm": bootstrapKeys.Data[0].ID,
 	}
 	for family, nkb := range nodeKeyBundles {
-		ocrKeyBundleIDs[family] = nkb[0].OCR2Key.Data.ID
+		ocrKeyBundleIDs[family] = nkb[bootstrapId.Raw()].OCR2Key.Data.ID
 	}
+	L.Info().Str("ocrKeyBundleIDs", fmt.Sprintf("%+v", ocrKeyBundleIDs)).Msg("Read OCR keys for bootstrap node")
 	raw, err := NewCCIPSpecToml(SpecArgs{
 		P2PV2Bootstrappers:     []string{},
 		CapabilityVersion:      "v1.0.0",
@@ -295,32 +296,29 @@ func NewEnvironment() (*Cfg, error) {
 	if err != nil {
 		return nil, fmt.Errorf("creating CCIP job spec: %w", err)
 	}
-	L.Info().Str("RawSpec", raw).Msg("Creating CCIP job on bootstrap node")
-	job, _, err := bootstrapNode.CreateJobRaw(raw)
+	_, _, err = bootstrapNode.CreateJobRaw(raw)
 	if err != nil {
 		return nil, fmt.Errorf("creating CCIP job: %w", err)
 	}
-	L.Info().Str("Node", bootstrapNode.Config.URL).Any("Job", job).Msg("Created CCIP job")
-	for i, node := range workerNodes {
+	for _, node := range workerNodes {
 		nodeP2PIds, err := node.MustReadP2PKeys()
 		if err != nil {
 			return nil, fmt.Errorf("reading worker node P2P keys: %w", err)
 		}
+		L.Info().Str("Node", node.Config.URL).Any("PeerIDs", nodeP2PIds).Msg("Adding worker peer ID")
 		ocrKeys, err := node.MustReadOCR2Keys()
 		if err != nil {
 			return nil, fmt.Errorf("reading worker node OCR keys: %w", err)
 		}
+		L.Info().Str("Node", node.Config.URL).Any("OCRKeys", ocrKeys).Msg("Adding worker OCR keys")
 		ocrKeyBundleIDs := map[string]string{
 			"evm": ocrKeys.Data[0].ID,
 		}
-		// offset by 1 because bootstrap is 0
-		for family, nkb := range nodeKeyBundles {
-			ocrKeyBundleIDs[family] = nkb[i+1].OCR2Key.Data.ID
-		}
-		L.Info().Str("OCRKeys", fmt.Sprintf("%+v", ocrKeys)).Msg("Read OCR keys for worker node")
-		L.Info().Str("BootstrapPeerID", bootstrapId.String()).Str("BootstrapIP", bootstrapNode.InternalIP()).Msg("Preparing CCIP job spec for worker node")
-		L.Info().Str("WorkerPeerID", nodeP2PIds.Data[0].Attributes.PeerID).Str("WorkerNode", node.Config.URL).Msg("Preparing CCIP job spec for worker node")
 		id := devenvcommon.MustPeerIDFromString(nodeP2PIds.Data[0].Attributes.PeerID)
+		for family, nkb := range nodeKeyBundles {
+			ocrKeyBundleIDs[family] = nkb[id.Raw()].OCR2Key.Data.ID
+		}
+		L.Info().Str("ocrKeyBundleIDs", fmt.Sprintf("%+v", ocrKeyBundleIDs)).Msg("Read OCR keys for worker node")
 		raw, err := NewCCIPSpecToml(SpecArgs{
 			P2PV2Bootstrappers: []string{
 				fmt.Sprintf("%s@%s", strings.TrimPrefix(bootstrapId.String(), "p2p_"), "don-node0:6690"),
@@ -336,11 +334,10 @@ func NewEnvironment() (*Cfg, error) {
 			return nil, fmt.Errorf("creating CCIP job spec: %w", err)
 		}
 		L.Info().Str("RawSpec", raw).Msg("Creating CCIP job on worker node")
-		job, _, err := node.CreateJobRaw(raw)
+		_, _, err = node.CreateJobRaw(raw)
 		if err != nil {
 			return nil, fmt.Errorf("creating CCIP job: %w", err)
 		}
-		L.Info().Str("Node", node.Config.URL).Any("Job", job).Msg("Created CCIP job")
 	}
 
 	tr.Record("[infra] deployed CL nodes")

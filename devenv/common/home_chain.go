@@ -151,9 +151,9 @@ type AddDonAndSetCandidateChangesetConfig struct {
 
 	// Only set one plugin at a time while you are adding the DON for the first time.
 	// For subsequent SetCandidate call use SetCandidateChangeset as that fetches the already added DONID and sets the candidate.
-	PluginInfo     SetCandidatePluginInfo               `json:"pluginInfo"`
-	NonBootstraps  []*clclient.ChainlinkClient          `json:"nonBootstraps"`
-	NodeKeyBundles map[string][]clclient.NodeKeysBundle `json:"nodeKeyBundles"`
+	PluginInfo     SetCandidatePluginInfo                        `json:"pluginInfo"`
+	NonBootstraps  []*clclient.ChainlinkClient                   `json:"nonBootstraps"`
+	NodeKeyBundles map[string]map[string]clclient.NodeKeysBundle `json:"nodeKeyBundles"`
 }
 
 func validateAddDonAndSetCandidateChangesetConfig(e deployment.Environment, cfg AddDonAndSetCandidateChangesetConfig) error {
@@ -303,7 +303,7 @@ func BuildOCR3ConfigForCCIPHome(
 	ocrParams OCRParameters,
 	commitOffchainCfg *pluginconfig.CommitOffchainConfig,
 	execOffchainCfg *pluginconfig.ExecuteOffchainConfig,
-	nodeKeyBundles map[string][]clclient.NodeKeysBundle,
+	nodeKeyBundles map[string]map[string]clclient.NodeKeysBundle,
 ) (map[ccipocr3.PluginType]ccip_home.CCIPHomeOCR3Config, error) {
 	schedule, oracles, err := getOracleIdentities(nodes, nodeKeyBundles, destSelector)
 	if err != nil {
@@ -459,7 +459,7 @@ func BuildOCR3ConfigForCCIPHome(
 	return ocr3Configs, nil
 }
 
-func getOracleIdentities(clClients []*clclient.ChainlinkClient, nodeKeyBundles map[string][]clclient.NodeKeysBundle, destSelector uint64) ([]int, []confighelper.OracleIdentityExtra, error) { //nolint:gocritic
+func getOracleIdentities(clClients []*clclient.ChainlinkClient, nodeKeyBundles map[string]map[string]clclient.NodeKeysBundle, destSelector uint64) ([]int, []confighelper.OracleIdentityExtra, error) { //nolint:gocritic
 	s := make([]int, len(clClients))
 	oracleIdentities := make([]confighelper.OracleIdentityExtra, len(clClients))
 	eg := &errgroup.Group{}
@@ -504,10 +504,9 @@ func getOracleIdentities(clClients []*clclient.ChainlinkClient, nodeKeyBundles m
 				cfgPrefix = "ocr2cfg_evm_"
 			case chain_selectors.FamilySolana:
 				// offset by 1 as first bundle is bootstrap node
-				bundle := nodeKeyBundles[family][i+1]
+				bundle := nodeKeyBundles[family][id.Raw()]
 				addr = bundle.TXKey.Data.Attributes.PublicKey
 				ocrKey := bundle.OCR2Key
-				fmt.Println("GOT OCR2 KEY %+v", ocrKey)
 				ocr2Config = ocrKey.Data.Attributes
 				offPrefix = "ocr2off_solana_"
 				onPrefix = "ocr2on_solana_"
@@ -563,9 +562,9 @@ type SetCandidateChangesetConfig struct {
 	HomeChainSelector uint64 `json:"homeChainSelector"`
 	FeedChainSelector uint64 `json:"feedChainSelector"`
 
-	PluginInfo     []SetCandidatePluginInfo             `json:"pluginInfo"`
-	NonBootstraps  []*clclient.ChainlinkClient          `json:"nonBootstraps"`
-	NodeKeyBundles map[string][]clclient.NodeKeysBundle `json:"nodeKeyBundles"`
+	PluginInfo     []SetCandidatePluginInfo                      `json:"pluginInfo"`
+	NonBootstraps  []*clclient.ChainlinkClient                   `json:"nonBootstraps"`
+	NodeKeyBundles map[string]map[string]clclient.NodeKeysBundle `json:"nodeKeyBundles"`
 }
 
 func validateSetCandidateChangesetConfig(e deployment.Environment, cfg SetCandidateChangesetConfig) error {

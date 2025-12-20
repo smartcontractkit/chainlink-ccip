@@ -107,28 +107,58 @@ func CreateNodeKeysBundle(
 	nodes []*clclient.ChainlinkClient,
 	chainName string,
 	chainID string,
-) ([]clclient.NodeKeysBundle, error) {
-	nkb := make([]clclient.NodeKeysBundle, 0)
+) (map[string]clclient.NodeKeysBundle, error) {
+	nkb := make(map[string]clclient.NodeKeysBundle)
 	for _, n := range nodes {
 		p2pkeys, err := n.MustReadP2PKeys()
 		if err != nil {
 			return nil, err
 		}
+		existingOCR2Keys, err := n.MustReadOCR2Keys()
+		if err != nil {
+			return nil, err
+		}
+		var txKey *clclient.TxKey
+		var ocrKey *clclient.OCR2Key
+		for _, key := range existingOCR2Keys.Data {
+			if key.Attributes.ChainType == chainName {
+				fmt.Println("OCR2 key already exists for node:", key.Attributes.ChainType)
+				ocrKey = &clclient.OCR2Key{
+					Data: key,
+				}
+				break
+			}
+		}
+		existingTxnKeys, _, err := n.ReadTxKeys(chainName)
+		if err != nil {
+			return nil, err
+		}
+		if len(existingTxnKeys.Data) > 1 {
+			return nil, fmt.Errorf("more than one txn key for chain %s on node %s", chainName, n.Config.URL)
+		} else if len(existingTxnKeys.Data) == 1 {
+			txKey = &clclient.TxKey{
+				Data: existingTxnKeys.Data[0],
+			}
+		}
 
 		peerID := p2pkeys.Data[0].Attributes.PeerID
-		txKey, _, err := n.CreateTxKey(chainName, chainID)
-		if err != nil {
-			return nil, err
+		if txKey == nil {
+			txKey, _, err = n.CreateTxKey(chainName, chainID)
+			if err != nil {
+				return nil, err
+			}
 		}
-		ocrKey, _, err := n.CreateOCR2Key(chainName)
-		if err != nil {
-			return nil, err
+		if ocrKey == nil {
+			ocrKey, _, err = n.CreateOCR2Key(chainName)
+			if err != nil {
+				return nil, err
+			}
 		}
-		nkb = append(nkb, clclient.NodeKeysBundle{
+		nkb[peerID] = clclient.NodeKeysBundle{
 			PeerID:  peerID,
 			OCR2Key: *ocrKey,
 			TXKey:   *txKey,
-		})
+		}
 	}
 	return nkb, nil
 }

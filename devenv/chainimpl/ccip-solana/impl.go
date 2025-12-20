@@ -17,7 +17,6 @@ import (
 	"github.com/rs/zerolog"
 
 	ata "github.com/gagliardetto/solana-go/programs/associated-token-account"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_router"
@@ -556,18 +555,6 @@ func (m *CCIP16Solana) WaitOneExecEventBySeqNo(ctx context.Context, from, to, se
 	}
 }
 
-func getExecutionState(sourceSelector uint64, offRamp offramp.OffRampInterface, expectedSeqNr uint64) (offramp.OffRampSourceChainConfig, uint8) {
-	scc, err := offRamp.GetSourceChainConfig(nil, sourceSelector)
-	if err != nil {
-		panic(fmt.Errorf("failed to get source chain config: %w", err))
-	}
-	executionState, err := offRamp.GetExecutionState(nil, sourceSelector, expectedSeqNr)
-	if err != nil {
-		panic(fmt.Errorf("failed to get execution state: %w", err))
-	}
-	return scc, executionState
-}
-
 func (m *CCIP16Solana) GetEOAReceiverAddress(ctx context.Context, chainSelector uint64) ([]byte, error) {
 	_ = zerolog.Ctx(ctx)
 	return nil, nil
@@ -686,6 +673,22 @@ func (m *CCIP16Solana) ConfigureNodes(ctx context.Context, bc *blockchain.Input)
 
 	[Solana.MultiNode]
 	VerifyChainID = false
+	Enabled = true
+	SyncThreshold = 170
+	PollFailureThreshold = 5
+	PollInterval = "15s"
+	NewHeadsPollInterval = "5s"
+	SelectionMode = "PriorityLevel"
+	LeaseDuration = "1m"
+	NodeIsSyncingEnabled = false
+	FinalizedBlockPollInterval = "5s"
+	EnforceRepeatableRead = true
+	DeathDeclarationDelay = "20s"
+	NodeNoNewHeadsThreshold = "20s"
+	NoNewFinalizedHeadsThreshold = "20s"
+	FinalityTagEnabled = true
+	FinalityDepth = 0
+	FinalizedBlockOffset = 50
 
 	[[Solana.Nodes]]
 	Name = '%s'
@@ -788,11 +791,11 @@ func (m *CCIP16Solana) ConnectContractsWithSelectors(ctx context.Context, e *dep
 	return devenvcommon.ConnectContractsWithSelectors(ctx, e, selector, remoteSelectors)
 }
 
-func (m *CCIP16Solana) ConfigureContractsForSelectors(ctx context.Context, e *deployment.Environment, cls []*simple_node_set.Input, nodeKeyBundles map[string][]clclient.NodeKeysBundle, ccipHomeSelector uint64, remoteSelectors []uint64) error {
+func (m *CCIP16Solana) ConfigureContractsForSelectors(ctx context.Context, e *deployment.Environment, cls []*simple_node_set.Input, nodeKeyBundles map[string]map[string]clclient.NodeKeysBundle, ccipHomeSelector uint64, remoteSelectors []uint64) error {
 	return devenvcommon.ConfigureContractsForSelectors(ctx, e, cls, nodeKeyBundles, ccipHomeSelector, remoteSelectors)
 }
 
-func (m *CCIP16Solana) FundNodes(ctx context.Context, ns []*simple_node_set.Input, bc *blockchain.Input, linkAmount, nativeAmount *big.Int) ([]clclient.NodeKeysBundle, error) {
+func (m *CCIP16Solana) FundNodes(ctx context.Context, ns []*simple_node_set.Input, bc *blockchain.Input, linkAmount, nativeAmount *big.Int) (map[string]clclient.NodeKeysBundle, error) {
 	l := zerolog.Ctx(ctx)
 	l.Info().Msg("Funding CL nodes with ETH and LINK")
 	nodeClients, err := clclient.New(ns[0].Out.CLNodes)

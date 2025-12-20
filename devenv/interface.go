@@ -60,7 +60,7 @@ type OnChainConfigurable interface {
 	// returns all the contract addresses and metadata as datastore.DataStore
 	DeployContractsForSelector(ctx context.Context, env *deployment.Environment, cls []*nodeset.Input, selector uint64, ccipHomeSelector uint64, crAddr string) (datastore.DataStore, error)
 	// ConnectContractsWithSelectors connects this chain onRamp to one or multiple offRamps for remote selectors (other chains)
-	ConfigureContractsForSelectors(ctx context.Context, e *deployment.Environment, cls []*nodeset.Input, nodeKeyBundles map[string][]clclient.NodeKeysBundle, ccipHomeSelector uint64, remoteSelectors []uint64) error
+	ConfigureContractsForSelectors(ctx context.Context, e *deployment.Environment, cls []*nodeset.Input, nodeKeyBundles map[string]map[string]clclient.NodeKeysBundle, ccipHomeSelector uint64, remoteSelectors []uint64) error
 	// ConnectContractsWithSelectors connects this chain onRamp to one or multiple offRamps for remote selectors (other chains)
 	ConnectContractsWithSelectors(ctx context.Context, e *deployment.Environment, selector uint64, remoteSelectors []uint64) error
 }
@@ -75,5 +75,5 @@ type OffChainConfigurable interface {
 	ConfigureNodes(ctx context.Context, blockchain *blockchain.Input) (string, error)
 	// FundNodes Fund Chainlink nodes for some amount of native/LINK currency
 	// using chain-specific clients or CLDF
-	FundNodes(ctx context.Context, cls []*nodeset.Input, bc *blockchain.Input, linkAmount, nativeAmount *big.Int) ([]clclient.NodeKeysBundle, error)
+	FundNodes(ctx context.Context, cls []*nodeset.Input, bc *blockchain.Input, linkAmount, nativeAmount *big.Int) (map[string]clclient.NodeKeysBundle, error)
 }

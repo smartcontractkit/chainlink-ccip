@@ -214,7 +214,7 @@ func ConnectContractsWithSelectors(ctx context.Context, e *deployment.Environmen
 	return nil
 }
 
-func ConfigureContractsForSelectors(ctx context.Context, e *deployment.Environment, cls []*simple_node_set.Input, nodeKeyBundles map[string][]clclient.NodeKeysBundle, ccipHomeSelector uint64, remoteSelectors []uint64) error {
+func ConfigureContractsForSelectors(ctx context.Context, e *deployment.Environment, cls []*simple_node_set.Input, nodeKeyBundles map[string]map[string]clclient.NodeKeysBundle, ccipHomeSelector uint64, remoteSelectors []uint64) error {
 	l := zerolog.Ctx(ctx)
 	l.Info().Uint64("HomeChainSelector", ccipHomeSelector).Msg("Configuring contracts for home chain selector")
 	bundle := operations.NewBundle(
@@ -240,7 +240,6 @@ func ConfigureContractsForSelectors(ctx context.Context, e *deployment.Environme
 		if err != nil {
 			return fmt.Errorf("reading worker node P2P keys: %w", err)
 		}
-		l.Info().Str("Node", node.Config.URL).Str("PeerID", nodeP2PIds.Data[0].Attributes.PeerID).Msg("Adding reader peer ID")
 		id := MustPeerIDFromString(nodeP2PIds.Data[0].Attributes.PeerID)
 		readers = append(readers, id)
 	}

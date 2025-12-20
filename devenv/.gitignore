@@ -4,7 +4,3 @@ env-out.toml
 dashboards/dummy.json
 go.work
 go.work.sum
-
-# solana
-artifacts/
-*.so

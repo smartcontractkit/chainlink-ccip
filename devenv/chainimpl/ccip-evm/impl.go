@@ -574,11 +574,11 @@ func (m *CCIP16EVM) ConnectContractsWithSelectors(ctx context.Context, e *deploy
 	return devenvcommon.ConnectContractsWithSelectors(ctx, e, selector, remoteSelectors)
 }
 
-func (m *CCIP16EVM) ConfigureContractsForSelectors(ctx context.Context, e *deployment.Environment, cls []*simple_node_set.Input, nodeKeyBundles map[string][]clclient.NodeKeysBundle, ccipHomeSelector uint64, remoteSelectors []uint64) error {
+func (m *CCIP16EVM) ConfigureContractsForSelectors(ctx context.Context, e *deployment.Environment, cls []*simple_node_set.Input, nodeKeyBundles map[string]map[string]clclient.NodeKeysBundle, ccipHomeSelector uint64, remoteSelectors []uint64) error {
 	return devenvcommon.ConfigureContractsForSelectors(ctx, e, cls, nodeKeyBundles, ccipHomeSelector, remoteSelectors)
 }
 
-func (m *CCIP16EVM) FundNodes(ctx context.Context, ns []*simple_node_set.Input, bc *blockchain.Input, linkAmount, nativeAmount *big.Int) ([]clclient.NodeKeysBundle, error) {
+func (m *CCIP16EVM) FundNodes(ctx context.Context, ns []*simple_node_set.Input, bc *blockchain.Input, linkAmount, nativeAmount *big.Int) (map[string]clclient.NodeKeysBundle, error) {
 	l := zerolog.Ctx(ctx)
 	l.Info().Msg("Funding CL nodes with ETH and LINK")
 	nodeClients, err := clclient.New(ns[0].Out.CLNodes)
