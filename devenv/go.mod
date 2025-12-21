@@ -23,7 +23,7 @@ require (
 	github.com/go-resty/resty/v2 v2.16.5
 	github.com/google/uuid v1.6.0
 	github.com/pelletier/go-toml/v2 v2.2.4
-	github.com/prometheus/client_golang v1.23.2
+	github.com/prometheus/client_golang v1.23.0
 	github.com/rs/zerolog v1.34.0
 	github.com/smartcontractkit/chain-selectors v1.0.85
 	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20251021190514-4e4a22b89e39
@@ -48,7 +48,7 @@ require (
 	golang.org/x/sync v0.18.0
 )
 
-require github.com/smartcontractkit/chainlink-ton/devenv-impl v0.0.0-20251221031152-8be58190e358
+require github.com/smartcontractkit/chainlink-ton/devenv-impl v0.0.0-20251221132201-19e7235e26c7
 
 require (
 	cloud.google.com/go/auth v0.14.1 // indirect
