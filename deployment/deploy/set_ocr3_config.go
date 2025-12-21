@@ -25,6 +25,9 @@ import (
 // OCR3 is specifically a 1.6.0 feature
 var OCR3Version = *semver.MustParse("1.6.0")
 
+// CapabilitiesRegistryVersion is specifically a 1.0.0 feature
+var CapabilitiesRegistryVersion = *semver.MustParse("1.0.0")
+
 type SetOCR3ConfigInput struct {
 	ChainSelector uint64
 	Datastore     datastore.DataStore
@@ -69,7 +72,7 @@ func ocr3ConfigArgs(e cldf.Environment, homeChainSelector uint64, chainSelector 
 	crAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 		ChainSelector: homeChainSelector,
 		Type:          datastore.ContractType(utils.CapabilitiesRegistry),
-		Version:       &OCR3Version,
+		Version:       &CapabilitiesRegistryVersion,
 	}, homeChainSelector, datastore_utils.FullRef)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find CapabilitiesRegistry address in datastore: %w", err)
