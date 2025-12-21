@@ -200,6 +200,9 @@ func NewEnvironment() (*Cfg, error) {
 		case "solana":
 			family = chainsel.FamilySolana
 			nodeKeyBundles[family] = nkb
+		case "ton":
+			family = chainsel.FamilyTon
+			nodeKeyBundles[family] = nkb
 		default:
 			return nil, fmt.Errorf("unsupported blockchain type: %s", in.Blockchains[i].Type)
 		}
@@ -240,6 +243,8 @@ func NewEnvironment() (*Cfg, error) {
 			family = chainsel.FamilyEVM
 		case "solana":
 			family = chainsel.FamilySolana
+		case "ton":
+			family = chainsel.FamilyTon
 		default:
 			return nil, fmt.Errorf("unsupported blockchain type: %s", in.Blockchains[i].Type)
 		}

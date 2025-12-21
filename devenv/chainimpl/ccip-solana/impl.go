@@ -11,7 +11,6 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
@@ -46,14 +45,12 @@ import (
 type CCIP16Solana struct {
 	e                      *deployment.Environment
 	chainDetailsBySelector map[uint64]chainsel.ChainDetails
-	ethClients             map[uint64]*ethclient.Client
 	common                 *devenvcommon.Common
 }
 
 func NewEmptyCCIP16Solana() *CCIP16Solana {
 	return &CCIP16Solana{
 		chainDetailsBySelector: make(map[uint64]chainsel.ChainDetails),
-		ethClients:             make(map[uint64]*ethclient.Client),
 		common:                 devenvcommon.NewCommon(),
 	}
 }

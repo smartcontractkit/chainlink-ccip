@@ -502,7 +502,6 @@ func getOracleIdentities(clClients []*clclient.ChainlinkClient, nodeKeyBundles m
 				onPrefix = "ocr2on_evm_"
 				cfgPrefix = "ocr2cfg_evm_"
 			case chain_selectors.FamilySolana:
-				// offset by 1 as first bundle is bootstrap node
 				bundle := nodeKeyBundles[family][id.Raw()]
 				addr = bundle.TXKey.Data.Attributes.PublicKey
 				ocrKey := bundle.OCR2Key
