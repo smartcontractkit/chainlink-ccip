@@ -13,7 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 )
 
-var Version *semver.Version = semver.MustParse("1.6.0")
+var Version *semver.Version = semver.MustParse("1.0.0")
 
 type AddDONOpInput struct {
 	Nodes                    [][32]byte
