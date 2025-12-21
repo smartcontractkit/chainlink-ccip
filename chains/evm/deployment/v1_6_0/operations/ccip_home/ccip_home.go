@@ -14,8 +14,8 @@ import (
 )
 
 var (
-	CCIPHomeVersion             *semver.Version = semver.MustParse("1.6.0")
-	CapabilitiesRegistryVersion *semver.Version = semver.MustParse("1.1.0")
+	CCIPHomeVersion             = semver.MustParse("1.6.0")
+	CapabilitiesRegistryVersion = semver.MustParse("1.1.0")
 )
 
 type AddDONOpInput struct {
