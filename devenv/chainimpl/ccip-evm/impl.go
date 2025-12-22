@@ -326,11 +326,7 @@ func (m *CCIP16EVM) WaitOneSentEventBySeqNo(ctx context.Context, from, to, seq u
 	if err != nil {
 		return nil, fmt.Errorf("failed to create off ramp instance: %w", err)
 	}
-	sourceDest := SourceDestPair{SourceChainSelector: from, DestChainSelector: to}
-	seqRange, ok := m.ExpectedSeqNumRange[sourceDest]
-	if !ok {
-		return nil, fmt.Errorf("no expected sequence number range for source-dest pair %v", sourceDest)
-	}
+	seqRange := ccipocr3common.SeqNumRange{ccipocr3common.SeqNum(seq), ccipocr3common.SeqNum(seq)}
 
 	seenMessages := NewCommitReportTracker(from, seqRange)
 
@@ -443,11 +439,7 @@ func (m *CCIP16EVM) WaitOneExecEventBySeqNo(ctx context.Context, from, to, seq u
 	if err != nil {
 		return nil, fmt.Errorf("failed to create off ramp instance: %w", err)
 	}
-	sourceDest := SourceDestPair{SourceChainSelector: from, DestChainSelector: to}
-	seqRange, ok := m.ExpectedSeqNumRange[sourceDest]
-	if !ok {
-		return nil, fmt.Errorf("no expected sequence number range for source-dest pair %v", sourceDest)
-	}
+	seqRange := ccipocr3common.SeqNumRange{ccipocr3common.SeqNum(seq), ccipocr3common.SeqNum(seq)}
 
 	executionStates := make(map[uint64]int)
 	seqNrsToWatch := make(map[uint64]struct{})

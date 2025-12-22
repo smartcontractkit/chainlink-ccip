@@ -57,9 +57,9 @@ type AnyMsgSentEvent struct {
 type CCIP16Solana struct {
 	e                      *deployment.Environment
 	chainDetailsBySelector map[uint64]chainsel.ChainDetails
-	ExpectedSeqNumRange map[SourceDestPair]ccipocr3common.SeqNumRange
-	ExpectedSeqNumExec  map[SourceDestPair][]uint64
-	MsgSentEvents       []*AnyMsgSentEvent
+	ExpectedSeqNumRange    map[SourceDestPair]ccipocr3common.SeqNumRange
+	ExpectedSeqNumExec     map[SourceDestPair][]uint64
+	MsgSentEvents          []*AnyMsgSentEvent
 }
 
 func NewEmptyCCIP16Solana() *CCIP16Solana {
@@ -345,11 +345,7 @@ func (m *CCIP16Solana) WaitOneSentEventBySeqNo(ctx context.Context, from, to, se
 	if err != nil {
 		return nil, fmt.Errorf("failed to get off ramp address: %w", err)
 	}
-	sourceDest := SourceDestPair{SourceChainSelector: from, DestChainSelector: to}
-	seqRange, ok := m.ExpectedSeqNumRange[sourceDest]
-	if !ok {
-		return nil, fmt.Errorf("no expected sequence number range for source-dest pair %v", sourceDest)
-	}
+	seqRange := ccipocr3common.SeqNumRange{ccipocr3common.SeqNum(seq), ccipocr3common.SeqNum(seq)}
 	seenMessages := NewCommitReportTracker(from, seqRange)
 	done := make(chan any)
 	defer close(done)
@@ -517,11 +513,7 @@ func (m *CCIP16Solana) WaitOneExecEventBySeqNo(ctx context.Context, from, to, se
 		return nil, fmt.Errorf("failed to get off ramp address: %w", err)
 	}
 	offRampAddress := solana.PublicKeyFromBytes(offAddr)
-	sourceDest := SourceDestPair{SourceChainSelector: from, DestChainSelector: to}
-	seqRange, ok := m.ExpectedSeqNumRange[sourceDest]
-	if !ok {
-		return nil, fmt.Errorf("no expected sequence number range for source-dest pair %v", sourceDest)
-	}
+	seqRange := ccipocr3common.SeqNumRange{ccipocr3common.SeqNum(seq), ccipocr3common.SeqNum(seq)}
 
 	executionStates := make(map[uint64]int)
 	seqNrsToWatch := make(map[uint64]struct{})

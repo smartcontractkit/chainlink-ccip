@@ -86,9 +86,11 @@ func TestE2ESmoke(t *testing.T) {
 				toImpl := selectorsToImpl[tc.toSelector]
 				err := fromImpl.SendMessage(t.Context(), tc.fromSelector, tc.toSelector, nil, nil)
 				require.NoError(t, err)
-				_, err = toImpl.WaitOneSentEventBySeqNo(t.Context(), tc.fromSelector, tc.toSelector, 0, 2*time.Minute)
+				seq, err := fromImpl.GetExpectedNextSequenceNumber(t.Context(), tc.fromSelector, tc.toSelector)
 				require.NoError(t, err)
-				_, err = toImpl.WaitOneExecEventBySeqNo(t.Context(), tc.fromSelector, tc.toSelector, 0, 2*time.Minute)
+				_, err = toImpl.WaitOneSentEventBySeqNo(t.Context(), tc.fromSelector, tc.toSelector, seq, 2*time.Minute)
+				require.NoError(t, err)
+				_, err = toImpl.WaitOneExecEventBySeqNo(t.Context(), tc.fromSelector, tc.toSelector, seq, 2*time.Minute)
 				require.NoError(t, err)
 			})
 		}
