@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"math/big"
-	"sync"
 	"time"
 
 	"github.com/Masterminds/semver/v3"
@@ -28,45 +27,6 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/clclient"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 )
-
-type Common struct {
-	ExpectedSeqNumRange map[SourceDestPair]ccipocr3common.SeqNumRange
-	ExpectedSeqNumExec  map[SourceDestPair][]uint64
-	MsgSentEvents       []*AnyMsgSentEvent
-}
-
-type SourceDestPair struct {
-	SourceChainSelector uint64
-	DestChainSelector   uint64
-}
-
-type AnyMsgSentEvent struct {
-	SequenceNumber uint64
-	// RawEvent contains the raw event depending on the chain:
-	//  EVM:   *onramp.OnRampCCIPMessageSent
-	//  Aptos: module_onramp.CCIPMessageSent
-	RawEvent any
-}
-
-var (
-	commonInstance *Common
-	once           sync.Once
-)
-
-/*
-NewCommon returns the singleton instance.
-The first call creates the object; subsequent calls just return the same pointer.
-*/
-func NewCommon() *Common {
-	once.Do(func() {
-		commonInstance = &Common{
-			ExpectedSeqNumRange: make(map[SourceDestPair]ccipocr3common.SeqNumRange),
-			ExpectedSeqNumExec:  make(map[SourceDestPair][]uint64),
-			MsgSentEvents:       make([]*AnyMsgSentEvent, 0),
-		}
-	})
-	return commonInstance
-}
 
 func DeployContractsForSelector(ctx context.Context, env *deployment.Environment, cls []*simple_node_set.Input, selector uint64, ccipHomeSelector uint64, crAddr string) (datastore.DataStore, error) {
 	l := zerolog.Ctx(ctx)

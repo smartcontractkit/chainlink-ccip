@@ -187,9 +187,17 @@ func NewEnvironment() (*Cfg, error) {
 	}
 
 	nodeKeyBundles := make(map[string]map[string]clclient.NodeKeysBundle, 0)
+	allNodeClients, err := clclient.New(in.NodeSets[0].Out.CLNodes)
+	if err != nil {
+		return nil, fmt.Errorf("connecting to CL nodes: %w", err)
+	}
 	// deploy all the contracts
 	for i, impl := range impls {
-		nkb, err := impl.FundNodes(ctx, in.NodeSets, in.Blockchains[i], big.NewInt(1), big.NewInt(5))
+		nkb, err := devenvcommon.CreateNodeKeysBundle(allNodeClients, in.Blockchains[i].Type, in.Blockchains[i].ChainID)
+		if err != nil {
+			return nil, fmt.Errorf("creating node keys bundle: %w", err)
+		}
+		err = impl.FundNodes(ctx, in.NodeSets, nkb, in.Blockchains[i], big.NewInt(1), big.NewInt(5))
 		if err != nil {
 			return nil, fmt.Errorf("funding nodes: %w", err)
 		}
@@ -211,7 +219,15 @@ func NewEnvironment() (*Cfg, error) {
 			return nil, err
 		}
 		L.Info().Uint64("Selector", networkInfo.ChainSelector).Msg("Deployed chain selector")
-		dsi, err := impl.DeployContractsForSelector(ctx, e, in.NodeSets, networkInfo.ChainSelector, CCIPHomeChain, crAddr.String())
+		err = impl.PreDeployContractsForSelector(ctx, e, in.NodeSets, networkInfo.ChainSelector, CCIPHomeChain, crAddr.String())
+		if err != nil {
+			return nil, err
+		}
+		dsi, err := devenvcommon.DeployContractsForSelector(ctx, e, in.NodeSets, networkInfo.ChainSelector, CCIPHomeChain, crAddr.String())
+		if err != nil {
+			return nil, err
+		}
+		err = impl.PostDeployContractsForSelector(ctx, e, in.NodeSets, networkInfo.ChainSelector, CCIPHomeChain, crAddr.String())
 		if err != nil {
 			return nil, err
 		}
@@ -230,13 +246,13 @@ func NewEnvironment() (*Cfg, error) {
 	}
 	e.DataStore = ds.Seal()
 
-	err = impls[0].ConfigureContractsForSelectors(ctx, e, in.NodeSets, nodeKeyBundles, CCIPHomeChain, selectors)
+	err = devenvcommon.ConfigureContractsForSelectors(ctx, e, in.NodeSets, nodeKeyBundles, CCIPHomeChain, selectors)
 	if err != nil {
 		return nil, err
 	}
 
 	// connect all the contracts together (on-ramps, off-ramps)
-	for i, impl := range impls {
+	for i, _ := range impls {
 		var family string
 		switch in.Blockchains[i].Type {
 		case "anvil", "geth":
@@ -258,7 +274,7 @@ func NewEnvironment() (*Cfg, error) {
 				selsToConnect = append(selsToConnect, sel)
 			}
 		}
-		err = impl.ConnectContractsWithSelectors(ctx, e, networkInfo.ChainSelector, selsToConnect)
+		err = devenvcommon.ConnectContractsWithSelectors(ctx, e, networkInfo.ChainSelector, selsToConnect)
 		if err != nil {
 			return nil, err
 		}
