@@ -76,6 +76,11 @@ type Cfg struct {
 	NodeSets           []*ns.Input         `toml:"nodesets"              validate:"required"`
 	CLNodesFundingETH  float64             `toml:"cl_nodes_funding_eth"`
 	CLNodesFundingLink float64             `toml:"cl_nodes_funding_link"`
+	// NodeConfigOverrides allows users to provide custom TOML configuration that will be
+	// appended to the generated node configuration. This is useful for testnets/mainnets
+	// where you need to customize settings like FinalityDepth, LogPollInterval, etc.
+	// The overrides are applied AFTER the auto-generated config, so they take precedence.
+	NodeConfigOverrides string `toml:"node_config_overrides"`
 }
 
 func checkKeys(in *Cfg) error {
@@ -153,13 +158,30 @@ func NewEnvironment() (*Cfg, error) {
 		}
 		clChainConfigs = append(clChainConfigs, clChainConfig)
 	}
-	allConfigs := strings.Join(clChainConfigs, "\n")
+	generatedConfigs := strings.Join(clChainConfigs, "\n")
+
+	// Apply configs to nodes, preserving user overrides
+	// Order of precedence (later overrides earlier):
+	// 1. Generated configs (common + chain-specific)
+	// 2. Top-level NodeConfigOverrides from Cfg
+	// 3. Per-node TestConfigOverrides from node specs
 	for _, nodeSpec := range in.NodeSets[0].NodeSpecs {
-		nodeSpec.Node.TestConfigOverrides = allConfigs
+		configParts := []string{generatedConfigs}
+
+		// Add top-level user overrides if provided
+		if in.NodeConfigOverrides != "" {
+			configParts = append(configParts, in.NodeConfigOverrides)
+		}
+
+		// Preserve per-node overrides if they were provided in the config file
+		if nodeSpec.Node.TestConfigOverrides != "" {
+			configParts = append(configParts, nodeSpec.Node.TestConfigOverrides)
+		}
+
+		nodeSpec.Node.TestConfigOverrides = strings.Join(configParts, "\n")
 	}
 	Plog.Info().Msg("Nodes network configuration is generated")
-	
-	
+
 	prodJDImage := os.Getenv("JD_IMAGE")
 
 	if in.JD != nil {
@@ -188,7 +210,12 @@ func NewEnvironment() (*Cfg, error) {
 
 	// deploy all the contracts
 	for i, impl := range impls {
-		if err := impl.FundNodes(ctx, in.NodeSets, in.Blockchains[i], big.NewInt(1), big.NewInt(5)); err != nil {
+		// FundNodes expects amounts in ETH/LINK units - it converts internally
+		// Use big.Float to preserve decimal precision (e.g., 0.1 ETH)
+		linkAmount := big.NewFloat(in.CLNodesFundingLink)
+		nativeAmount := big.NewFloat(in.CLNodesFundingETH)
+
+		if err := impl.FundNodes(ctx, in.NodeSets, in.Blockchains[i], linkAmount, nativeAmount); err != nil {
 			return nil, err
 		}
 		networkInfo, err := chainsel.GetChainDetailsByChainIDAndFamily(in.Blockchains[i].ChainID, chainsel.FamilyEVM)
@@ -233,6 +260,12 @@ func NewEnvironment() (*Cfg, error) {
 			}
 		}
 		err = impl.ConnectContractsWithSelectors(ctx, e, networkInfo.ChainSelector, selsToConnect)
+		if err != nil {
+			return nil, err
+		}
+
+		// Link PingPongDemo contracts between this chain and remote chains
+		err = impl.LinkPingPongContracts(ctx, e, networkInfo.ChainSelector, selsToConnect)
 		if err != nil {
 			return nil, err
 		}

@@ -32,6 +32,8 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	pingpongdapp "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/ping_pong_dapp"
 	evmseqs "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
@@ -534,20 +536,37 @@ func (m *CCIP16EVM) ConfigureNodes(ctx context.Context, bc *blockchain.Input) (s
 	l := zerolog.Ctx(ctx)
 	l.Info().Msg("Configuring CL nodes")
 	name := fmt.Sprintf("node-evm-%s", uuid.New().String()[0:5])
+
+	// Check if this is an external chain (user pre-configured the Out section in TOML)
+	// External chains are detected by checking if the URLs are external (not localhost/docker)
+	isExternalChain := bc.Out != nil && len(bc.Out.Nodes) > 0 &&
+		!strings.Contains(bc.Out.Nodes[0].InternalHTTPUrl, "host.docker.internal") &&
+		!strings.Contains(bc.Out.Nodes[0].InternalHTTPUrl, "localhost") &&
+		!strings.Contains(bc.Out.Nodes[0].InternalHTTPUrl, "blockchain-")
+
+	if isExternalChain {
+		// For external chains (testnets/mainnets), don't generate any EVM config.
+		// The user must provide the full [[EVM]] config including [[EVM.Nodes]] via node_config_overrides.
+		// This avoids duplicate ChainID errors when both auto-generated and user configs exist.
+		l.Info().Str("ChainID", bc.ChainID).Msg("External chain detected - skipping auto-generated EVM config (user provides via node_config_overrides)")
+		return "", nil
+	}
+
+	// For local chains, generate full EVM config
 	finality := 1
 	return fmt.Sprintf(`
-       [[EVM]]
-       LogPollInterval = '1s'
-       BlockBackfillDepth = 100
-       ChainID = '%s'
-       MinIncomingConfirmations = 1
-       MinContractPayment = '0.0000001 link'
-       FinalityDepth = %d
+[[EVM]]
+LogPollInterval = '1s'
+BlockBackfillDepth = 100
+ChainID = '%s'
+MinIncomingConfirmations = 1
+MinContractPayment = '0.0000001 link'
+FinalityDepth = %d
 
-       [[EVM.Nodes]]
-       Name = '%s'
-       WsUrl = '%s'
-       HttpUrl = '%s'`,
+[[EVM.Nodes]]
+Name = '%s'
+WSURL = '%s'
+HTTPURL = '%s'`,
 		bc.ChainID,
 		finality,
 		name,
@@ -589,6 +608,8 @@ func (m *CCIP16EVM) DeployContractsForSelector(ctx context.Context, env *deploym
 				// OFFRAMP CONFIG
 				PermissionLessExecutionThresholdSeconds: uint32((20 * time.Minute).Seconds()),
 				GasForCallExactCheck:                    uint16(5000),
+				// PING PONG DAPP
+				DeployPingPongDapp: true,
 			},
 		},
 	})
@@ -701,6 +722,63 @@ func (m *CCIP16EVM) ConnectContractsWithSelectors(ctx context.Context, e *deploy
 		err = updatePrices(e.DataStore, destSelector, selector, e.BlockChains.EVMChains()[destSelector])
 		if err != nil {
 			return fmt.Errorf("failed to update prices: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func (m *CCIP16EVM) LinkPingPongContracts(ctx context.Context, e *deployment.Environment, selector uint64, remoteSelectors []uint64) error {
+	l := zerolog.Ctx(ctx)
+	l.Info().Uint64("FromSelector", selector).Any("ToSelectors", remoteSelectors).Msg("Linking PingPongDemo contracts")
+
+	a := &evmseqs.EVMAdapter{}
+
+	// Get the PingPongDemo address on this chain - if not deployed, skip linking
+	localPingPongAddr, err := a.GetPingPongDemoAddress(e.DataStore, selector)
+	if err != nil {
+		l.Info().Uint64("Selector", selector).Msg("PingPongDemo not deployed on this chain, skipping linking")
+		return nil
+	}
+
+	bundle := operations.NewBundle(
+		func() context.Context { return context.Background() },
+		e.Logger,
+		operations.NewMemoryReporter(),
+	)
+	e.OperationsBundle = bundle
+
+	chain := e.BlockChains.EVMChains()[selector]
+
+	for _, remoteSelector := range remoteSelectors {
+		// Get the PingPongDemo address on the remote chain - if not deployed, skip this pair
+		remotePingPongAddr, err := a.GetPingPongDemoAddress(e.DataStore, remoteSelector)
+		if err != nil {
+			l.Info().Uint64("RemoteSelector", remoteSelector).Msg("PingPongDemo not deployed on remote chain, skipping this pair")
+			continue
+		}
+
+		// CCIP requires addresses to be 32-byte left-padded for cross-chain messaging
+		paddedRemoteAddr := common.LeftPadBytes(remotePingPongAddr, 32)
+
+		l.Info().
+			Uint64("LocalSelector", selector).
+			Uint64("RemoteSelector", remoteSelector).
+			Str("LocalPingPong", common.BytesToAddress(localPingPongAddr).Hex()).
+			Str("RemotePingPong", common.BytesToAddress(remotePingPongAddr).Hex()).
+			Msg("Setting counterpart for PingPongDemo")
+
+		// Set the counterpart on the local PingPongDemo contract
+		_, err = operations.ExecuteOperation(bundle, pingpongdapp.SetCounterpart, chain, contract.FunctionInput[pingpongdapp.SetCounterpartArgs]{
+			ChainSelector: selector,
+			Address:       common.BytesToAddress(localPingPongAddr),
+			Args: pingpongdapp.SetCounterpartArgs{
+				CounterpartChainSelector: remoteSelector,
+				CounterpartAddress:       paddedRemoteAddr,
+			},
+		})
+		if err != nil {
+			return fmt.Errorf("failed to set counterpart on PingPongDemo for selector %d -> %d: %w", selector, remoteSelector, err)
 		}
 	}
 
@@ -823,7 +901,7 @@ func (m *CCIP16EVM) ConfigureContractsForSelectors(ctx context.Context, e *deplo
 	return nil
 }
 
-func (m *CCIP16EVM) FundNodes(ctx context.Context, ns []*simple_node_set.Input, bc *blockchain.Input, linkAmount, nativeAmount *big.Int) error {
+func (m *CCIP16EVM) FundNodes(ctx context.Context, ns []*simple_node_set.Input, bc *blockchain.Input, linkAmount, nativeAmount *big.Float) error {
 	l := zerolog.Ctx(ctx)
 	l.Info().Msg("Funding CL nodes with ETH and LINK")
 	nodeClients, err := clclient.New(ns[0].Out.CLNodes)
@@ -849,9 +927,16 @@ func (m *CCIP16EVM) FundNodes(ctx context.Context, ns []*simple_node_set.Input, 
 	if err != nil {
 		return fmt.Errorf("could not create basic eth client: %w", err)
 	}
+	// Use default Anvil key for local chain 1337, otherwise use PRIVATE_KEY env var
+	privateKey := getNetworkPrivateKey()
+	if bc.ChainID == "1337" {
+		privateKey = DefaultAnvilKey
+	}
+
+	// nativeAmount is in ETH units - FundNodeEIP1559 converts to wei internally
+	nativeAmountFloat, _ := nativeAmount.Float64()
 	for _, addr := range ethKeyAddressesSrc {
-		a, _ := nativeAmount.Float64()
-		if err := FundNodeEIP1559(ctx, clientSrc, getNetworkPrivateKey(), addr, a); err != nil {
+		if err := FundNodeEIP1559(ctx, clientSrc, privateKey, addr, nativeAmountFloat); err != nil {
 			return fmt.Errorf("failed to fund CL nodes on src chain: %w", err)
 		}
 	}
