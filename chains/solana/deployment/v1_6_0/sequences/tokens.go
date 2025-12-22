@@ -81,7 +81,7 @@ func (a *SolanaAdapter) DeployToken() *cldf_ops.Sequence[tokenapi.DeployTokenInp
 		},
 	)
 }
-func (a *SolanaAdapter) DeployTokenVerify(in any) error {
+func (a *SolanaAdapter) DeployTokenVerify(e deployment.Environment, in any) error {
 	return nil
 }
 func (a *SolanaAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokenapi.DeployTokenPoolInput, sequences.OnChainOutput, cldf_chain.BlockChains] {

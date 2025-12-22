@@ -132,7 +132,7 @@ func (ma *transfersTest_MockTokenAdapter) DeployToken() *cldf_ops.Sequence[token
 	return &cldf_ops.Sequence[tokens.DeployTokenInput, sequences.OnChainOutput, cldf_chain.BlockChains]{}
 }
 
-func (ma *transfersTest_MockTokenAdapter) DeployTokenVerify(in any) error {
+func (ma *transfersTest_MockTokenAdapter) DeployTokenVerify(e deployment.Environment, in any) error {
 	return nil
 }
 
