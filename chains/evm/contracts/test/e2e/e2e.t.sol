@@ -186,6 +186,6 @@ contract e2e is OnRampSetup {
     });
 
     vm.resumeGasMetering();
-    s_offRamp.execute(encodedMessage, ccvAddresses, new bytes[](1));
+    s_offRamp.execute(encodedMessage, ccvAddresses, new bytes[](1), 0);
   }
 }

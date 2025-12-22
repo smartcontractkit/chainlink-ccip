@@ -48,6 +48,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   error TokenArgsNotSupportedOnPoolV1();
   error InsufficientFeeTokenAmount();
   error TokenReceiverNotAllowed(uint64 destChainSelector);
+  error SourceTokenDataTooLarge(address token, uint256 actualLength, uint32 maxLength);
 
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
   event DestChainConfigSet(uint64 indexed destChainSelector, uint64 messageNumber, DestChainConfigArgs config);
@@ -296,6 +297,14 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
         resolvedExtraArgs.blockConfirmations,
         resolvedExtraArgs.tokenArgs
       );
+
+      // Enforce that the token pool payload (`destPoolData` -> TokenTransferV1.extraData) is not larger than the
+      // bytes overhead that was quoted and paid for in the token transfer receipt.
+      uint32 maxExtraDataLength = eventData.receipts[resolvedExtraArgs.ccvs.length].destBytesOverhead;
+      uint256 actualExtraDataLength = newMessage.tokenTransfer[0].extraData.length;
+      if (actualExtraDataLength > maxExtraDataLength) {
+        revert SourceTokenDataTooLarge(message.tokenAmounts[0].token, actualExtraDataLength, maxExtraDataLength);
+      }
     }
 
     // 5. encode message and calculate messageId.
@@ -312,6 +321,10 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       if (implAddress == address(0)) {
         revert DestinationChainNotSupportedByCCV(resolvedExtraArgs.ccvs[i], destChainSelector);
       }
+      // NOTE: this verifier blob is *not* the same as the verifier data that will be delivered to the destination chain.
+      // This field is meant for the offchain verifier. The verifier *may* submit this data as part of the verifier data
+      // on the destination chain, but it may also choose to submit different data or no data at all. This means there
+      // should be no check on the length of this and the CCV bytes overhead, as there is no relationship between the two.
       eventData.verifierBlobs[i] = ICrossChainVerifierV1(implAddress)
         .forwardToVerifier(newMessage, messageId, message.feeToken, feeTokenAmount, resolvedExtraArgs.ccvArgs[i]);
     }

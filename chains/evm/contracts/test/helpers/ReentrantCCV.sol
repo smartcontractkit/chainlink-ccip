@@ -48,7 +48,7 @@ contract ReentrantCCV is ICrossChainVerifierV1, ICrossChainVerifierResolver {
     verifierResultsArray[0] = verifierResults;
 
     // This should trigger the reentrancy guard.
-    i_offRamp.execute(MessageV1Codec._encodeMessageV1(message), ccvs, verifierResultsArray);
+    i_offRamp.execute(MessageV1Codec._encodeMessageV1(message), ccvs, verifierResultsArray, 0);
   }
 
   function supportsInterface(

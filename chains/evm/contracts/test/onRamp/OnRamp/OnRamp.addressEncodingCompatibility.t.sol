@@ -178,7 +178,7 @@ contract OnRamp_addressEncodingCompatibility is OnRampSetup {
 
     Pool.LockOrBurnOutV1 memory poolReturnData = Pool.LockOrBurnOutV1({
       destTokenAddress: abi.encode(destToken), // 32 bytes
-      destPoolData: abi.encode("poolData")
+      destPoolData: ""
     });
 
     Pool.LockOrBurnInV1 memory expectedInput = Pool.LockOrBurnInV1({
@@ -324,7 +324,7 @@ contract OnRamp_addressEncodingCompatibility is OnRampSetup {
 
     // Mock pool.lockOrBurn to succeed (validation happens after pool call when setting tokenReceiver in message)
     Pool.LockOrBurnOutV1 memory poolReturnData =
-      Pool.LockOrBurnOutV1({destTokenAddress: abi.encode(destToken), destPoolData: abi.encode("poolData")});
+      Pool.LockOrBurnOutV1({destTokenAddress: abi.encode(destToken), destPoolData: ""});
     vm.mockCall(pool, abi.encodeWithSelector(IPoolV1.lockOrBurn.selector), abi.encode(poolReturnData));
 
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = ExtraArgsCodec.GenericExtraArgsV3({
@@ -372,7 +372,7 @@ contract OnRamp_addressEncodingCompatibility is OnRampSetup {
 
     // Mock pool.lockOrBurn to succeed (validation happens after pool call when setting tokenReceiver in message)
     Pool.LockOrBurnOutV1 memory poolReturnData =
-      Pool.LockOrBurnOutV1({destTokenAddress: abi.encode(destToken), destPoolData: abi.encode("poolData")});
+      Pool.LockOrBurnOutV1({destTokenAddress: abi.encode(destToken), destPoolData: ""});
     vm.mockCall(pool, abi.encodeWithSelector(IPoolV1.lockOrBurn.selector), abi.encode(poolReturnData));
 
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = ExtraArgsCodec.GenericExtraArgsV3({
