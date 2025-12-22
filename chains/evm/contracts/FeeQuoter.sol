@@ -146,16 +146,16 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
   ///     1 LINK = 15.00 USD per full token, each full token is 1e18 units -> 15 * 1e18 * 1e18 / 1e18 = 15e18.
   mapping(address token => Internal.TimestampedPackedUint224 price) private s_usdPerToken;
 
+  /// @dev Set of fee tokens that can be used to pay for fees. The keys of the mapping are the fee multipliers which
+  /// can be used to set a premium or discount for a specific fee token.
+  EnumerableSet.AddressSet private s_feeTokens;
+
   /// @dev The destination chain specific fee configs.
   mapping(uint64 destChainSelector => DestChainConfig destChainConfig) internal s_destChainConfigs;
 
   /// @dev The token transfer fee config that can be set by the owner or fee admin.
   mapping(uint64 destChainSelector => mapping(address token => TokenTransferFeeConfig tranferFeeConfig)) internal
     s_tokenTransferFeeConfig;
-
-  /// @dev Set of fee tokens that can be used to pay for fees. The keys of the mapping are the fee multipliers which
-  /// can be used to set a premium or discount for a specific fee token.
-  EnumerableSet.AddressSet private s_feeTokens;
 
   constructor(
     StaticConfig memory staticConfig,
@@ -260,6 +260,9 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
       if (s_feeTokens.remove(feeTokensToRemove[i])) {
         emit FeeTokenRemoved(feeTokensToRemove[i]);
       }
+
+      // Remote the price to invalidate it as a fee token.
+      delete s_usdPerToken[feeTokensToRemove[i]];
     }
     for (uint256 i = 0; i < feeTokensToAdd.length; ++i) {
       s_feeTokens.add(feeTokensToAdd[i]);
@@ -326,6 +329,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
 
     // Get the gas price and remove any upper bits that might be used to report calldata cost.
     Internal.TimestampedPackedUint224 memory price = s_usdPerUnitGasByDestChainSelector[destChainSelector];
+    // Only fee tokens have prices, meaning any token that is priced is a fee token.
     if (price.timestamp == 0) {
       revert NoGasPriceAvailable(destChainSelector);
     }

@@ -24,6 +24,7 @@ contract OnRamp_getExecutionFee is OnRampSetup {
       OnRamp.StaticConfig({
         chainSelector: SOURCE_CHAIN_SELECTOR,
         rmnRemote: s_mockRMNRemote,
+        maxUSDCentsPerMessage: MAX_USD_CENTS_PER_MESSAGE,
         tokenAdminRegistry: address(s_tokenAdminRegistry)
       }),
       OnRamp.DynamicConfig({

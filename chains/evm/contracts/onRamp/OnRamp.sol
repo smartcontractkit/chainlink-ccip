@@ -49,6 +49,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   error InsufficientFeeTokenAmount();
   error TokenReceiverNotAllowed(uint64 destChainSelector);
   error SourceTokenDataTooLarge(address token, uint256 actualLength, uint32 maxLength);
+  error FeeExceedsMaxAllowed(uint256 feeUSDCents, uint32 maxUSDCentsPerMessage);
 
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
   event DestChainConfigSet(uint64 indexed destChainSelector, uint64 messageNumber, DestChainConfigArgs config);
@@ -73,8 +74,9 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   /// @dev Struct that contains the static configuration.
   // solhint-disable-next-line gas-struct-packing
   struct StaticConfig {
-    uint64 chainSelector; // ────╮ Local chain selector.
-    IRMNRemote rmnRemote; // ────╯ RMN remote address.
+    uint64 chainSelector; // ─────────╮ Local chain selector.
+    IRMNRemote rmnRemote; //          │ RMN remote address.
+    uint32 maxUSDCentsPerMessage; // ─╯ Maximum USD cent value per message.
     address tokenAdminRegistry; // Token admin registry address.
   }
 
@@ -146,6 +148,8 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   IRMNRemote private immutable i_rmnRemote;
   /// @dev The address of the token admin registry.
   address private immutable i_tokenAdminRegistry;
+  /// @dev The maximum USD cent value per message. Used to reduce impact of potential misconfigurations.
+  uint32 internal immutable i_maxUSDCentsPerMsg;
 
   // DYNAMIC CONFIG
   /// @dev The dynamic config for the onRamp.
@@ -160,7 +164,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   ) {
     if (
       staticConfig.chainSelector == 0 || address(staticConfig.rmnRemote) == address(0)
-        || staticConfig.tokenAdminRegistry == address(0)
+        || staticConfig.tokenAdminRegistry == address(0) || staticConfig.maxUSDCentsPerMessage == 0
     ) {
       revert InvalidConfig();
     }
@@ -168,6 +172,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     i_localChainSelector = staticConfig.chainSelector;
     i_rmnRemote = staticConfig.rmnRemote;
     i_tokenAdminRegistry = staticConfig.tokenAdminRegistry;
+    i_maxUSDCentsPerMsg = staticConfig.maxUSDCentsPerMessage;
 
     _setDynamicConfig(dynamicConfig);
   }
@@ -559,7 +564,10 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   /// @return staticConfig the static configuration.
   function getStaticConfig() public view returns (StaticConfig memory) {
     return StaticConfig({
-      chainSelector: i_localChainSelector, rmnRemote: i_rmnRemote, tokenAdminRegistry: i_tokenAdminRegistry
+      chainSelector: i_localChainSelector,
+      rmnRemote: i_rmnRemote,
+      maxUSDCentsPerMessage: i_maxUSDCentsPerMsg,
+      tokenAdminRegistry: i_tokenAdminRegistry
     });
   }
 
@@ -973,6 +981,11 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       }
 
       feeTokenAmount += receipts[i].feeTokenAmount;
+    }
+
+    // Enforce max fee per message.
+    if (feeTokenAmount > (i_maxUSDCentsPerMsg * percentMultiplier * 1e34) / feeTokenPrice) {
+      revert FeeExceedsMaxAllowed(feeTokenAmount, i_maxUSDCentsPerMsg);
     }
 
     return (receipts, updatedGasLimitSum, feeTokenAmount);

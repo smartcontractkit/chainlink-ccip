@@ -19,6 +19,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
   uint32 internal constant POOL_FEE_USD_CENTS = 100; // $1.00
   uint32 internal constant POOL_GAS_OVERHEAD = 50000;
   uint32 internal constant POOL_BYTES_OVERHEAD = 128;
+  uint32 internal constant MAX_USD_CENTS_PER_MESSAGE = type(uint32).max;
 
   uint32 internal constant FEE_QUOTER_FEE_USD_CENTS = 50; // $0.50
   uint32 internal constant FEE_QUOTER_GAS_OVERHEAD = 30000;
@@ -43,6 +44,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
       OnRamp.StaticConfig({
         chainSelector: SOURCE_CHAIN_SELECTOR,
         rmnRemote: s_mockRMNRemote,
+        maxUSDCentsPerMessage: MAX_USD_CENTS_PER_MESSAGE,
         tokenAdminRegistry: address(s_tokenAdminRegistry)
       }),
       OnRamp.DynamicConfig({
