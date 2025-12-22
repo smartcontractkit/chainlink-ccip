@@ -119,9 +119,6 @@ func updatePrices(ds datastore.DataStore, src, dest uint64, srcChain cldf_solana
 	if err != nil {
 		return fmt.Errorf("failed to confirm get fee tokens transaction: %w", err)
 	}
-	if err != nil {
-		return fmt.Errorf("failed to update prices: %w", err)
-	}
 	return nil
 }
 
