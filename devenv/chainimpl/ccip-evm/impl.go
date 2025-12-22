@@ -536,20 +536,37 @@ func (m *CCIP16EVM) ConfigureNodes(ctx context.Context, bc *blockchain.Input) (s
 	l := zerolog.Ctx(ctx)
 	l.Info().Msg("Configuring CL nodes")
 	name := fmt.Sprintf("node-evm-%s", uuid.New().String()[0:5])
+
+	// Check if this is an external chain (user pre-configured the Out section in TOML)
+	// External chains are detected by checking if the URLs are external (not localhost/docker)
+	isExternalChain := bc.Out != nil && len(bc.Out.Nodes) > 0 &&
+		!strings.Contains(bc.Out.Nodes[0].InternalHTTPUrl, "host.docker.internal") &&
+		!strings.Contains(bc.Out.Nodes[0].InternalHTTPUrl, "localhost") &&
+		!strings.Contains(bc.Out.Nodes[0].InternalHTTPUrl, "blockchain-")
+
+	if isExternalChain {
+		// For external chains (testnets/mainnets), don't generate any EVM config.
+		// The user must provide the full [[EVM]] config including [[EVM.Nodes]] via node_config_overrides.
+		// This avoids duplicate ChainID errors when both auto-generated and user configs exist.
+		l.Info().Str("ChainID", bc.ChainID).Msg("External chain detected - skipping auto-generated EVM config (user provides via node_config_overrides)")
+		return "", nil
+	}
+
+	// For local chains, generate full EVM config
 	finality := 1
 	return fmt.Sprintf(`
-       [[EVM]]
-       LogPollInterval = '1s'
-       BlockBackfillDepth = 100
-       ChainID = '%s'
-       MinIncomingConfirmations = 1
-       MinContractPayment = '0.0000001 link'
-       FinalityDepth = %d
+[[EVM]]
+LogPollInterval = '1s'
+BlockBackfillDepth = 100
+ChainID = '%s'
+MinIncomingConfirmations = 1
+MinContractPayment = '0.0000001 link'
+FinalityDepth = %d
 
-       [[EVM.Nodes]]
-       Name = '%s'
-       WsUrl = '%s'
-       HttpUrl = '%s'`,
+[[EVM.Nodes]]
+Name = '%s'
+WSURL = '%s'
+HTTPURL = '%s'`,
 		bc.ChainID,
 		finality,
 		name,
