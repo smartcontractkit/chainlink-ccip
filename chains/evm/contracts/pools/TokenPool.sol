@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {IAdvancedPoolHooks} from "../interfaces/IAdvancedPoolHooks.sol";
 import {IPoolV1} from "../interfaces/IPool.sol";
+import {IPoolV1V2} from "../interfaces/IPoolV1V2.sol";
 import {IPoolV2} from "../interfaces/IPoolV2.sol";
 import {IRMN} from "../interfaces/IRMN.sol";
 import {IRouter} from "../interfaces/IRouter.sol";
@@ -34,7 +35,7 @@ import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/Enumera
 /// 0.000567 tokens.
 /// In the case of a burnMint pool on chain A, these funds are burned in the pool on chain A.
 /// In the case of a lockRelease pool on chain A, these funds accumulate in the pool on chain A.
-abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
+abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   using EnumerableSet for EnumerableSet.Bytes32Set;
   using EnumerableSet for EnumerableSet.UintSet;
   using RateLimiter for RateLimiter.TokenBucket;
