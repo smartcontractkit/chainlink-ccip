@@ -494,14 +494,27 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV2, ITypeAndVersion {
   /// @dev Instead of calling the pool, we take a shortcut and return the CCTPVerifier as required directly.
   function getRequiredCCVs(
     address, // localToken
-    uint64, // remoteChainSelector
+    uint64 remoteChainSelector,
     uint256, // amount
     uint16, // blockConfirmationRequested
     bytes calldata, // extraData
     MessageDirection // direction
   ) external view onlyWithCCVCompatiblePool returns (address[] memory requiredCCVs) {
+    if (s_lockOrBurnMechanism[remoteChainSelector] == LockOrBurnMechanism.INVALID_MECHANISM) {
+      revert NoLockOrBurnMechanismSet(remoteChainSelector);
+    }
+
+    // Common case: The lockOrBurn mechanism is CCTP V2 with CCV.
+    // In this case, we simply need to return the CCTP CCV.
     address[] memory ccvs = new address[](1);
-    ccvs[0] = address(i_cctpVerifier);
+    if (s_lockOrBurnMechanism[remoteChainSelector] == LockOrBurnMechanism.CCTP_V2_WITH_CCV) {
+      ccvs[0] = address(i_cctpVerifier);
+      return ccvs;
+    }
+
+    // If using lock-release, we can't specify CCTP because CCTP won't ultimately be called.
+    // Other CCTP mechanisms will never rely on CCVs and have no impact on the return value.
+    // Therefore, we return address(0) to indicate that default CCVs should be used for the lock-release mechanism.
     return ccvs;
   }
 

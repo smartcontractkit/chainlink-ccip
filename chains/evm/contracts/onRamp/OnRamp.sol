@@ -247,6 +247,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     {
       address[] memory poolRequiredCCVs = new address[](0);
       if (message.tokenAmounts.length != 0) {
+        if (message.tokenAmounts.length != 1) revert CanOnlySendOneTokenPerMessage();
         poolRequiredCCVs = _getCCVsForPool(
           destChainSelector,
           message.tokenAmounts[0].token,
@@ -285,7 +286,6 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     // 4. lockOrBurn.
 
     if (message.tokenAmounts.length != 0) {
-      if (message.tokenAmounts.length != 1) revert CanOnlySendOneTokenPerMessage();
       newMessage.tokenTransfer[0] = _lockOrBurnSingleToken(
         message.tokenAmounts[0],
         destChainSelector,
@@ -689,7 +689,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     // We don't have to check if it supports the pool version in a non-reverting way here because
     // if we revert here, there is no effect on CCIP. Therefore we directly call the supportsInterface
     // function and not through the ERC165Checker.
-    if (address(sourcePool) == address(0) || !sourcePool.supportsInterface(Pool.CCIP_POOL_V1)) {
+    if (!sourcePool.supportsInterface(Pool.CCIP_POOL_V1)) {
       revert UnsupportedToken(tokenAndAmount.token);
     }
 
@@ -755,6 +755,9 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   ) internal view returns (address[] memory requiredCCVs) {
     address[] memory defaultCCVs = s_destChainConfigs[destChainSelector].defaultCCVs;
     IPoolV1 pool = getPoolBySourceToken(destChainSelector, IERC20(token));
+    if (address(pool) == address(0)) {
+      revert UnsupportedToken(token);
+    }
 
     // Pool not specifying CCVs or lacking V2 support falls back to destination defaults so the lane still enforces a
     // minimum verifier set.
