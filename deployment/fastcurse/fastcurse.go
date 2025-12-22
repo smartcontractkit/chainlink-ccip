@@ -15,6 +15,7 @@ import (
 
 type GlobalCurseOnNetworkInput struct {
 	ChainSelectors map[uint64]*semver.Version
+	Force          bool
 	MCMS           mcms.Input
 }
 
@@ -66,6 +67,7 @@ func formCurseConfigForGlobalCurse(e cldf.Environment, cr *CurseRegistry, cfg Gl
 	// form the curse input for each chain selector
 	curseCfg := RMNCurseConfig{
 		CurseActions: make([]CurseActionInput, 0),
+		Force:        cfg.Force,
 		MCMS:         cfg.MCMS,
 	}
 	for chainSelector, version := range cfg.ChainSelectors {

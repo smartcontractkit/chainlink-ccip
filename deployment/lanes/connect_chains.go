@@ -27,7 +27,7 @@ func makeApply(laneRegistry *LaneAdapterRegistry, mcmsRegistry *changesets.MCMSR
 	return func(e cldf.Environment, cfg ConnectChainsConfig) (cldf.ChangesetOutput, error) {
 		batchOps := make([]mcms_types.BatchOperation, 0)
 		reports := make([]cldf_ops.Report[any, any], 0)
-
+		ds := datastore.NewMemoryDataStore()
 		for _, lane := range cfg.Lanes {
 			chainA, chainB := &lane.ChainA, &lane.ChainB
 			chainAFamily, err := chain_selectors.GetSelectorFamily(chainA.Selector)
@@ -76,6 +76,11 @@ func makeApply(laneRegistry *LaneAdapterRegistry, mcmsRegistry *changesets.MCMSR
 				}
 				batchOps = append(batchOps, configureLaneReport.Output.BatchOps...)
 				reports = append(reports, configureLaneReport.ExecutionReports...)
+				for _, r := range configureLaneReport.Output.Addresses {
+					if err := ds.Addresses().Add(r); err != nil {
+						return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %s on chain with selector %d to datastore: %w", r.Type, r.Version, r.Address, r.ChainSelector, err)
+					}
+				}
 
 				configureLaneReport, err = cldf_ops.ExecuteSequence(e.OperationsBundle, pair.destAdapter.ConfigureLaneLegAsDest(), e.BlockChains, UpdateLanesInput{
 					Source:       pair.src,
@@ -89,11 +94,17 @@ func makeApply(laneRegistry *LaneAdapterRegistry, mcmsRegistry *changesets.MCMSR
 				}
 				batchOps = append(batchOps, configureLaneReport.Output.BatchOps...)
 				reports = append(reports, configureLaneReport.ExecutionReports...)
+				for _, r := range configureLaneReport.Output.Addresses {
+					if err := ds.Addresses().Add(r); err != nil {
+						return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %s on chain with selector %d to datastore: %w", r.Type, r.Version, r.Address, r.ChainSelector, err)
+					}
+				}
 			}
 		}
 
 		return changesets.NewOutputBuilder(e, mcmsRegistry).
 			WithReports(reports).
+			WithDataStore(ds).
 			WithBatchOps(batchOps).
 			Build(cfg.MCMS)
 	}
