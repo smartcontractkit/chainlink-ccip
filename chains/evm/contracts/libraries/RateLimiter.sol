@@ -34,7 +34,11 @@ library RateLimiter {
   /// @param tokenAddress The token to consume capacity for, use 0x0 to indicate aggregate value capacity.
   /// @dev Reverts when requestTokens exceeds bucket capacity or available tokens in the bucket.
   /// @dev emits removal of requestTokens if requestTokens is > 0.
-  function _consume(TokenBucket storage s_bucket, uint256 requestTokens, address tokenAddress) internal {
+  function _consume(
+    TokenBucket storage s_bucket,
+    uint256 requestTokens,
+    address tokenAddress
+  ) internal {
     // If there is no value to remove or rate limiting is turned off, skip this step to reduce gas usage.
     if (!s_bucket.isEnabled || requestTokens == 0) {
       return;
@@ -91,7 +95,10 @@ library RateLimiter {
   /// @notice Sets the rate limited config.
   /// @param s_bucket The token bucket.
   /// @param config The new config.
-  function _setTokenBucketConfig(TokenBucket storage s_bucket, Config memory config) internal {
+  function _setTokenBucketConfig(
+    TokenBucket storage s_bucket,
+    Config memory config
+  ) internal {
     if (config.isEnabled) {
       if (config.rate > config.capacity) {
         revert InvalidRateLimitRate(config);
@@ -128,7 +135,10 @@ library RateLimiter {
   /// @param a first int.
   /// @param b second int.
   /// @return smallest.
-  function _min(uint256 a, uint256 b) internal pure returns (uint256) {
+  function _min(
+    uint256 a,
+    uint256 b
+  ) internal pure returns (uint256) {
     return a < b ? a : b;
   }
 }

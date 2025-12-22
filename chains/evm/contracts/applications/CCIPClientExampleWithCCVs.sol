@@ -40,7 +40,10 @@ contract CCIPClientExampleWithCCVs is CCIPClientExample {
   /// @notice CCV configurations by source chain selector.
   mapping(uint64 sourceChainSelector => CCVConfig ccvConfig) internal s_ccvConfigs;
 
-  constructor(IRouterClient router, IERC20 feeToken) CCIPClientExample(router, feeToken) {}
+  constructor(
+    IRouterClient router,
+    IERC20 feeToken
+  ) CCIPClientExample(router, feeToken) {}
 
   /// @notice Set CCV configurations for source chains.
   /// @param ccvConfigsToSet List of CCV configs to set.
@@ -74,9 +77,7 @@ contract CCIPClientExampleWithCCVs is CCIPClientExample {
         }
       }
       s_ccvConfigs[args.sourceChainSelector] = CCVConfig({
-        requiredCCVs: args.requiredCCVs,
-        optionalCCVs: args.optionalCCVs,
-        optionalThreshold: args.optionalThreshold
+        requiredCCVs: args.requiredCCVs, optionalCCVs: args.optionalCCVs, optionalThreshold: args.optionalThreshold
       });
       emit CCVConfigSet(args.sourceChainSelector, args.requiredCCVs, args.optionalCCVs, args.optionalThreshold);
     }

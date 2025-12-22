@@ -223,9 +223,8 @@ contract OffRamp_execute is OffRampSetup {
       abi.encodeWithSelector(CallWithExactGas.NOT_ENOUGH_GAS_FOR_CALL_SIG)
     );
 
-    GasBoundedExecuteCaller(Internal.GAS_ESTIMATION_SENDER).callExecute(
-      encodedMessage, ccvs, verifierResults, gasForCall
-    );
+    GasBoundedExecuteCaller(Internal.GAS_ESTIMATION_SENDER)
+      .callExecute(encodedMessage, ccvs, verifierResults, gasForCall);
   }
 
   function test_execute_RevertWhen_CursedByRMN() public {

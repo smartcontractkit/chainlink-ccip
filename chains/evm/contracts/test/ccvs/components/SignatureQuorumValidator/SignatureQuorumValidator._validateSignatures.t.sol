@@ -8,7 +8,10 @@ import {SignatureValidatorSetup} from "./SignatureValidatorSetup.t.sol";
 contract SignatureQuorumValidator_validateSignatures is SignatureValidatorSetup {
   bytes32 internal constant TEST_HASH = keccak256("test message");
 
-  function _createSignatures(uint256[] memory signerKeys, bytes32 hash) internal pure returns (bytes memory) {
+  function _createSignatures(
+    uint256[] memory signerKeys,
+    bytes32 hash
+  ) internal pure returns (bytes memory) {
     bytes memory signatures = "";
 
     for (uint256 i = 0; i < signerKeys.length; ++i) {

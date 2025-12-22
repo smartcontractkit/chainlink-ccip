@@ -59,7 +59,10 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, Ownable2StepMsgSender {
   /// @dev Stores verifier (CCV) requirements keyed by remote chain selector.
   mapping(uint64 remoteChainSelector => CCVConfig ccvConfig) internal s_verifierConfig;
 
-  constructor(address[] memory allowlist, uint256 thresholdAmountForAdditionalCCVs) {
+  constructor(
+    address[] memory allowlist,
+    uint256 thresholdAmountForAdditionalCCVs
+  ) {
     // Allowlist can be set as enabled or disabled at deployment time only to save hot-path gas.
     i_allowlistEnabled = allowlist.length > 0;
     if (i_allowlistEnabled) {
@@ -70,13 +73,21 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, Ownable2StepMsgSender {
 
   /// @inheritdoc IAdvancedPoolHooks
   /// @param lockOrBurnIn The lock or burn input parameters.
-  function preflightCheck(Pool.LockOrBurnInV1 calldata lockOrBurnIn, uint16, bytes calldata) external view {
+  function preflightCheck(
+    Pool.LockOrBurnInV1 calldata lockOrBurnIn,
+    uint16,
+    bytes calldata
+  ) external view {
     checkAllowList(lockOrBurnIn.originalSender);
   }
 
   /// @inheritdoc IAdvancedPoolHooks
   /// @dev No-op implementation.
-  function postFlightCheck(Pool.ReleaseOrMintInV1 calldata, uint256, uint16) external pure {}
+  function postFlightCheck(
+    Pool.ReleaseOrMintInV1 calldata,
+    uint256,
+    uint16
+  ) external pure {}
 
   // ================================================================
   // │                          Allowlist                           │
@@ -109,14 +120,20 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, Ownable2StepMsgSender {
   /// @notice Apply updates to the allow list.
   /// @param removes The addresses to be removed.
   /// @param adds The addresses to be added.
-  function applyAllowListUpdates(address[] calldata removes, address[] calldata adds) external onlyOwner {
+  function applyAllowListUpdates(
+    address[] calldata removes,
+    address[] calldata adds
+  ) external onlyOwner {
     _applyAllowListUpdates(removes, adds);
   }
 
   /// @notice Internal version of applyAllowListUpdates to allow for reuse in the constructor.
   /// @param removes The addresses to be removed.
   /// @param adds The addresses to be added.
-  function _applyAllowListUpdates(address[] memory removes, address[] memory adds) internal {
+  function _applyAllowListUpdates(
+    address[] memory removes,
+    address[] memory adds
+  ) internal {
     if (!i_allowlistEnabled) revert AllowListNotEnabled();
 
     for (uint256 i = 0; i < removes.length; ++i) {

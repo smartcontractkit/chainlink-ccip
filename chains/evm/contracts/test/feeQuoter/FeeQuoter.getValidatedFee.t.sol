@@ -564,10 +564,7 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
     msg_.receiver = abi.encode(0); // zero reciever
     msg_.extraArgs = Client._suiArgsToBytes(
       Client.SuiExtraArgsV1({
-        gasLimit: 0,
-        allowOutOfOrderExecution: true,
-        tokenReceiver: bytes32(0),
-        receiverObjectIds: new bytes32[](2)
+        gasLimit: 0, allowOutOfOrderExecution: true, tokenReceiver: bytes32(0), receiverObjectIds: new bytes32[](2)
       })
     );
     vm.expectRevert(abi.encodeWithSelector(FeeQuoter.TooManySuiExtraArgsReceiverObjectIds.selector, 2, 0));

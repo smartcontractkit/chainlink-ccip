@@ -98,7 +98,9 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
     // No excluded tokens is the common path, as it means no migration has occured yet, and any released
     // tokens should come from the stored token balance of previously deposited tokens.
     if (excludedTokens == 0) {
-      if (localAmount > remoteConfig.tokenBalance) revert InsufficientLiquidity(remoteConfig.tokenBalance, localAmount);
+      if (localAmount > remoteConfig.tokenBalance) {
+        revert InsufficientLiquidity(remoteConfig.tokenBalance, localAmount);
+      }
 
       remoteConfig.tokenBalance -= localAmount;
 
@@ -128,7 +130,10 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
   /// @dev This function is overridden to prevent providing liquidity to a chain that has already been migrated, and thus should use CCTP-proper instead of a Lock/Release mechanism.
   /// @param remoteChainSelector The remote chain selector.
   /// @param amount The amount of tokens to provide.
-  function _provideLiquidity(uint64 remoteChainSelector, uint256 amount) internal override {
+  function _provideLiquidity(
+    uint64 remoteChainSelector,
+    uint256 amount
+  ) internal override {
     if (s_migratedChains.contains(remoteChainSelector)) {
       revert TokenLockingNotAllowedAfterMigration(remoteChainSelector);
     }
@@ -229,7 +234,10 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
   /// and strict scrutiny should be applied to ensure that the amount of tokens excluded is accurate.
   /// @param remoteChainSelector The remote chain selector.
   /// @param amount The amount of tokens to exclude from burn.
-  function excludeTokensFromBurn(uint64 remoteChainSelector, uint256 amount) external onlyOwner {
+  function excludeTokensFromBurn(
+    uint64 remoteChainSelector,
+    uint256 amount
+  ) external onlyOwner {
     if (s_proposedUSDCMigrationChain != remoteChainSelector) revert NoMigrationProposalPending();
 
     s_tokensExcludedFromBurn[remoteChainSelector] += amount;

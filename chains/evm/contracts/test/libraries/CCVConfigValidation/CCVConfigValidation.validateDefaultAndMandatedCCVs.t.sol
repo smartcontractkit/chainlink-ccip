@@ -5,7 +5,10 @@ import {CCVConfigValidation} from "../../../libraries/CCVConfigValidation.sol";
 import {Test} from "forge-std/Test.sol";
 
 contract CCVConfigValidationTestHelper {
-  function validateDefaultAndMandatedCCVs(address[] memory defaultCCV, address[] memory laneMandatedCCVs) external pure {
+  function validateDefaultAndMandatedCCVs(
+    address[] memory defaultCCV,
+    address[] memory laneMandatedCCVs
+  ) external pure {
     CCVConfigValidation._validateDefaultAndMandatedCCVs(defaultCCV, laneMandatedCCVs);
   }
 }

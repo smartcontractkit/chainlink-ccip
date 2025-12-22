@@ -62,7 +62,10 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
     i_lockBox.deposit(0, amount);
   }
 
-  function _releaseOrMint(address receiver, uint256 amount) internal virtual override {
+  function _releaseOrMint(
+    address receiver,
+    uint256 amount
+  ) internal virtual override {
     // Release tokens from the lock box to the receiver.
     i_lockBox.withdraw(0, amount, receiver);
   }
@@ -122,7 +125,10 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
   /// liquidity. Finally, the remaining liquidity can be transferred to the new pool using this function one more time.
   /// @param from The address of the old pool.
   /// @param amount The amount of liquidity to transfer. If uint256.max is passed, all liquidity will be transferred.
-  function transferLiquidity(address from, uint256 amount) external onlyOwner {
+  function transferLiquidity(
+    address from,
+    uint256 amount
+  ) external onlyOwner {
     if (amount == type(uint256).max) {
       amount = i_token.balanceOf(from);
     }
