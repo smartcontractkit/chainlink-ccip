@@ -109,6 +109,9 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// relevant opcodes in callWithExactGas.
   uint16 internal immutable i_gasForCallExactCheck;
 
+  // At the top to pack it with the `owner` variable from Ownable2StepMsgSender.
+  bool private s_reentrancyGuardEntered;
+
   // DYNAMIC CONFIG
 
   /// @notice Set of source chain selectors.
@@ -122,8 +125,6 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   mapping(uint64 sourceChainSelector => EnumerableSet.Bytes32Set allowedOnRampHashes) private s_allowedOnRampHashes;
 
   // STATE
-
-  bool private s_reentrancyGuardEntered;
 
   /// Message state is tracked to ensure message can only be executed successfully once.
   mapping(bytes32 execStateKey => Internal.MessageExecutionState state) internal s_executionStates;
