@@ -761,7 +761,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     uint16 finality,
     bytes memory tokenArgs
   ) internal view returns (address[] memory requiredCCVs) {
-    address[] memory defaultCCVs = s_destChainConfigs[destChainSelector].defaultCCVs;
+    address[] storage defaultCCVs = s_destChainConfigs[destChainSelector].defaultCCVs;
     IPoolV1 pool = getPoolBySourceToken(destChainSelector, IERC20(token));
     if (address(pool) == address(0)) {
       revert UnsupportedToken(token);
