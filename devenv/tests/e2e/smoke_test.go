@@ -50,7 +50,7 @@ func TestE2ESmoke(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("Test CCIP trasfers", func(t *testing.T) {
+	t.Run("Test CCIP transfers", func(t *testing.T) {
 		type testcase struct {
 			name         string
 			fromSelector uint64
