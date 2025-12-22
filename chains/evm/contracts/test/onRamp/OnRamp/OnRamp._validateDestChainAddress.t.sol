@@ -35,11 +35,8 @@ contract OnRamp_validateDestChainAddress is OnRampSetup {
     bytes calldata rawAddress
   ) public view {
     vm.assume(rawAddress.length > 0);
-    vm.assume(rawAddress.length < type(uint8).max);
 
-    uint8 addressBytesLength = uint8(rawAddress.length);
-
-    bytes memory validated = s_OnRampHelper.validateDestChainAddress(rawAddress, addressBytesLength);
+    bytes memory validated = s_OnRampHelper.validateDestChainAddress(rawAddress, rawAddress.length);
 
     assertEq(rawAddress, validated);
   }
