@@ -42,9 +42,7 @@ contract TokenPoolV2_validateReleaseOrMint is AdvancedPoolHooksSetup {
 
     vm.expectEmit();
     emit TokenPool.InboundRateLimitConsumed({
-      remoteChainSelector: releaseOrMintIn.remoteChainSelector,
-      token: releaseOrMintIn.localToken,
-      amount: localAmount
+      remoteChainSelector: releaseOrMintIn.remoteChainSelector, token: releaseOrMintIn.localToken, amount: localAmount
     });
 
     vm.startPrank(s_allowedOffRamp);

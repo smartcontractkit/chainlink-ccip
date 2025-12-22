@@ -22,8 +22,9 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     uint256 fee = s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
 
-    (bytes32 messageId, bytes memory encodedMessage, OnRamp.Receipt[] memory receipts, bytes[] memory verifierBlobs) =
-    _evmMessageToEvent({message: message, destChainSelector: DEST_CHAIN_SELECTOR, msgNum: 1, originalSender: STRANGER});
+    (bytes32 messageId, bytes memory encodedMessage, OnRamp.Receipt[] memory receipts, bytes[] memory verifierBlobs) = _evmMessageToEvent({
+      message: message, destChainSelector: DEST_CHAIN_SELECTOR, msgNum: 1, originalSender: STRANGER
+    });
 
     vm.expectEmit();
     emit OnRamp.CCIPMessageSent({
@@ -189,8 +190,7 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
       localToken: token
     });
     Pool.LockOrBurnOutV1 memory returnData = Pool.LockOrBurnOutV1({
-      destTokenAddress: abi.encode(address(s_destTokenBySourceToken[token])),
-      destPoolData: new bytes(actualBytes)
+      destTokenAddress: abi.encode(address(s_destTokenBySourceToken[token])), destPoolData: new bytes(actualBytes)
     });
     vm.mockCall(
       pool, abi.encodeWithSelector(IPoolV2.lockOrBurn.selector, expectedInput, 0, ""), abi.encode(returnData, amount)

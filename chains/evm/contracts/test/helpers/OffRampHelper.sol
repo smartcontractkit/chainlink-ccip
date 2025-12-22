@@ -54,7 +54,10 @@ contract OffRampHelper is OffRamp {
     return _releaseOrMintSingleToken(tokenTransfer, originalSender, sourceChainSelector, finality);
   }
 
-  function getBalanceOfReceiver(address receiver, address token) external view returns (uint256) {
+  function getBalanceOfReceiver(
+    address receiver,
+    address token
+  ) external view returns (uint256) {
     return _getBalanceOfReceiver(receiver, token);
   }
 

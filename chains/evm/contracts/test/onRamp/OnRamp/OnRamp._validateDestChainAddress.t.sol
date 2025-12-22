@@ -17,9 +17,7 @@ contract OnRamp_validateDestChainAddress is OnRampSetup {
         tokenAdminRegistry: address(s_tokenAdminRegistry)
       }),
       OnRamp.DynamicConfig({
-        feeQuoter: address(s_feeQuoter),
-        reentrancyGuardEntered: false,
-        feeAggregator: FEE_AGGREGATOR
+        feeQuoter: address(s_feeQuoter), reentrancyGuardEntered: false, feeAggregator: FEE_AGGREGATOR
       })
     );
   }
@@ -37,6 +35,7 @@ contract OnRamp_validateDestChainAddress is OnRampSetup {
     bytes calldata rawAddress
   ) public view {
     vm.assume(rawAddress.length > 0);
+    vm.assume(rawAddress.length < type(uint8).max);
 
     uint8 addressBytesLength = uint8(rawAddress.length);
 
@@ -89,7 +88,10 @@ contract OnRamp_validateDestChainAddress is OnRampSetup {
     assertEq(rawAddress, validated);
   }
 
-  function testFuzz_validateDestChainAddress_PaddedNoOverflow(uint8 addressBytesLength, bytes32 tail) public view {
+  function testFuzz_validateDestChainAddress_PaddedNoOverflow(
+    uint8 addressBytesLength,
+    bytes32 tail
+  ) public view {
     addressBytesLength = uint8(bound(addressBytesLength, 0, 32));
 
     bytes memory padded = new bytes(32);

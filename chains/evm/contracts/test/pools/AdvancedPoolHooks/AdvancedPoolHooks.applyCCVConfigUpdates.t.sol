@@ -106,7 +106,9 @@ contract AdvancedPoolHooks_applyCCVConfigUpdates is AdvancedPoolHooksSetup {
     s_advancedPoolHooks.applyCCVConfigUpdates(configArgs);
   }
 
-  function test_applyCCVConfigUpdates_RevertWhen_OutboundCCVsToAddAboveThresholdSpecifiedButNoOutboundBaseCCVs() public {
+  function test_applyCCVConfigUpdates_RevertWhen_OutboundCCVsToAddAboveThresholdSpecifiedButNoOutboundBaseCCVs()
+    public
+  {
     AdvancedPoolHooks.CCVConfigArg[] memory configArgs = new AdvancedPoolHooks.CCVConfigArg[](1);
 
     address[] memory additionalOutbound = new address[](1);

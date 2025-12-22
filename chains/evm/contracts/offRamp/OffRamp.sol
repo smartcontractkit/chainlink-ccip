@@ -211,12 +211,8 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     // Two valid cases here, we either have never touched this message before, or we tried to execute and failed. This
     // check protects against reentry and re-execution because the other state is IN_PROGRESS which should not be
     // allowed to execute.
-    if (
-      !(
-        originalState == Internal.MessageExecutionState.UNTOUCHED
-          || originalState == Internal.MessageExecutionState.FAILURE
-      )
-    ) {
+    if (!(originalState == Internal.MessageExecutionState.UNTOUCHED
+          || originalState == Internal.MessageExecutionState.FAILURE)) {
       revert SkippedAlreadyExecutedMessage(messageId, message.sourceChainSelector, message.messageNumber);
     }
 
@@ -308,16 +304,15 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       );
 
       for (uint256 i = 0; i < ccvsToQuery.length; ++i) {
-        address implAddress =
-          ICrossChainVerifierResolver(ccvsToQuery[i]).getInboundImplementation(verifierResults[verifierResultsIndex[i]]);
+        address implAddress = ICrossChainVerifierResolver(ccvsToQuery[i])
+          .getInboundImplementation(verifierResults[verifierResultsIndex[i]]);
         if (implAddress == address(0)) {
           revert InboundImplementationNotFound(ccvsToQuery[i], verifierResults[verifierResultsIndex[i]]);
         }
-        ICrossChainVerifierV1(implAddress).verifyMessage({
-          message: message,
-          messageId: messageId,
-          verifierResults: verifierResults[verifierResultsIndex[i]]
-        });
+        ICrossChainVerifierV1(implAddress)
+          .verifyMessage({
+            message: message, messageId: messageId, verifierResults: verifierResults[verifierResultsIndex[i]]
+          });
       }
     }
 
@@ -359,10 +354,13 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// @param message The message to call the receiver for.
   /// @param receiver The receiver address.
   /// @param gasLimit The gas limit to use for the call.
-  function _callReceiver(Client.Any2EVMMessage memory message, address receiver, uint32 gasLimit) internal {
-    (bool success, bytes memory returnData,) = s_sourceChainConfigs[message.sourceChainSelector].router.routeMessage(
-      message, i_gasForCallExactCheck, gasLimit, receiver
-    );
+  function _callReceiver(
+    Client.Any2EVMMessage memory message,
+    address receiver,
+    uint32 gasLimit
+  ) internal {
+    (bool success, bytes memory returnData,) = s_sourceChainConfigs[message.sourceChainSelector].router
+      .routeMessage(message, i_gasForCallExactCheck, gasLimit, receiver);
 
     // If CCIP receiver execution is not successful, revert the call including token transfers.
     if (!success) revert ReceiverError(returnData);
@@ -676,9 +674,8 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     address pool = ITokenAdminRegistry(i_tokenAdminRegistry).getPool(localToken);
 
     if (pool._supportsInterfaceReverting(type(IPoolV2).interfaceId)) {
-      requiredCCV = IPoolV2(pool).getRequiredCCVs(
-        localToken, sourceChainSelector, amount, finality, extraData, IPoolV2.MessageDirection.Inbound
-      );
+      requiredCCV = IPoolV2(pool)
+        .getRequiredCCVs(localToken, sourceChainSelector, amount, finality, extraData, IPoolV2.MessageDirection.Inbound);
       CCVConfigValidation._assertNoDuplicates(requiredCCV);
     }
 
@@ -769,7 +766,10 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// @param receiver The address to check the balance of.
   /// @param token The token address.
   /// @return balance The balance of the receiver.
-  function _getBalanceOfReceiver(address receiver, address token) internal view returns (uint256) {
+  function _getBalanceOfReceiver(
+    address receiver,
+    address token
+  ) internal view returns (uint256) {
     try IERC20(token).balanceOf(receiver) returns (uint256 balance_) {
       // If the call succeeds, we return the balance and the gas left.
       return (balance_);

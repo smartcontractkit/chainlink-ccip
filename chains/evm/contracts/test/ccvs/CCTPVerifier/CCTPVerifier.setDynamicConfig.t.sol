@@ -34,9 +34,7 @@ contract CCTPVerifier_setDynamicConfig is CCTPVerifierSetup {
 
   function test_setDynamicConfig_RevertWhen_InvalidFastFinalityBps_Zero() public {
     CCTPVerifier.DynamicConfig memory newConfig = CCTPVerifier.DynamicConfig({
-      feeAggregator: makeAddr("feeAggregator2"),
-      allowlistAdmin: makeAddr("allowlistAdmin2"),
-      fastFinalityBps: 0
+      feeAggregator: makeAddr("feeAggregator2"), allowlistAdmin: makeAddr("allowlistAdmin2"), fastFinalityBps: 0
     });
 
     vm.expectRevert(abi.encodeWithSelector(CCTPVerifier.InvalidFastFinalityBps.selector, uint16(0)));
