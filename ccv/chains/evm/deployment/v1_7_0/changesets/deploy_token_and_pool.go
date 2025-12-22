@@ -32,8 +32,8 @@ type DeployTokenAndPoolCfg struct {
 	RateLimitAdmin common.Address
 	// TokenAddress is the address of the token for which the pool is being deployed.
 	TokenAddress common.Address
-	// LocalTokenDecimals is the number of decimals used by the token.
-	LocalTokenDecimals uint8
+	// Decimals is the number of decimals used by the token.
+	Decimals uint8
 	// Router is a reference to the desired router contract.
 	// Sometimes we may want to connect to a test router, other times a main router.
 	Router datastore.AddressRef
@@ -82,11 +82,11 @@ var DeployTokenAndPool = changesets.NewFromOnChainSequence(changesets.NewFromOnC
 				RateLimitAdmin:                   cfg.RateLimitAdmin,
 				ThresholdAmountForAdditionalCCVs: cfg.ThresholdAmountForAdditionalCCVs,
 				ConstructorArgs: tokens.ConstructorArgs{
-					Token:              cfg.TokenAddress,
-					LocalTokenDecimals: cfg.LocalTokenDecimals,
-					Allowlist:          cfg.Allowlist,
-					RMNProxy:           rmnProxy,
-					Router:             router,
+					Token:     cfg.TokenAddress,
+					Decimals:  cfg.Decimals,
+					Allowlist: cfg.Allowlist,
+					RMNProxy:  rmnProxy,
+					Router:    router,
 				},
 			},
 		}, nil

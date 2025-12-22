@@ -45,7 +45,7 @@ var DeployBurnMintTokenPool = cldf_ops.NewSequence(
 			TypeAndVersion: typeAndVersion,
 			Args: burn_mint_token_pool.ConstructorArgs{
 				Token:              input.ConstructorArgs.Token,
-				LocalTokenDecimals: input.ConstructorArgs.LocalTokenDecimals,
+				LocalTokenDecimals: input.ConstructorArgs.Decimals,
 				AdvancedPoolHooks:  common.HexToAddress(hooksDeployReport.Output.Address),
 				RMNProxy:           input.ConstructorArgs.RMNProxy,
 				Router:             input.ConstructorArgs.Router,

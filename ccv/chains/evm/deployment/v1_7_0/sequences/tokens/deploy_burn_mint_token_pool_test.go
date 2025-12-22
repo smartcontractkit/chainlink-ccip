@@ -51,8 +51,8 @@ func TestDeployTokenPool(t *testing.T) {
 					RateLimitAdmin:                   common.HexToAddress("0x01"),
 					ThresholdAmountForAdditionalCCVs: big.NewInt(1e18),
 					ConstructorArgs: tokens.ConstructorArgs{
-						Token:              common.HexToAddress(tokenReport.Output.Address),
-						LocalTokenDecimals: 18,
+						Token:    common.HexToAddress(tokenReport.Output.Address),
+						Decimals: 18,
 						Allowlist: []common.Address{
 							common.HexToAddress("0x02"),
 						},

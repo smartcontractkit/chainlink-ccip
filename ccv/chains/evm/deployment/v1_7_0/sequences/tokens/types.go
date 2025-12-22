@@ -14,8 +14,8 @@ import (
 type ConstructorArgs struct {
 	// Token is the token for which the pool is being deployed.
 	Token common.Address
-	// LocalTokenDecimals is the number of decimals used by the token.
-	LocalTokenDecimals uint8
+	// Decimals is the number of decimals used by the token.
+	Decimals uint8
 	// Allowlist is the list of addresses allowed to transfer the token.
 	Allowlist []common.Address
 	// RMNProxy is the RMN proxy contract.
