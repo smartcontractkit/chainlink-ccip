@@ -67,7 +67,10 @@ contract BaseTest is Test {
     vm.label(address(s_destRouter), "destRouter");
   }
 
-  function _setMockRMNChainCurse(uint64 chainSelector, bool isCursed) internal {
+  function _setMockRMNChainCurse(
+    uint64 chainSelector,
+    bool isCursed
+  ) internal {
     vm.mockCall(
       address(s_mockRMNRemote),
       abi.encodeWithSignature("isCursed(bytes16)", bytes16(uint128(chainSelector))),

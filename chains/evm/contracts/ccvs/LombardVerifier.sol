@@ -83,7 +83,11 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
   /// @notice Mapping of CCIP chain selector to chain specific config.
   mapping(uint64 chainSelector => Path path) internal s_chainSelectorToPath;
 
-  constructor(IBridgeV3 bridge, string[] memory storageLocation, address rmn) BaseVerifier(storageLocation, rmn) {
+  constructor(
+    IBridgeV3 bridge,
+    string[] memory storageLocation,
+    address rmn
+  ) BaseVerifier(storageLocation, rmn) {
     if (address(bridge) == address(0)) {
       revert ZeroBridge();
     }
@@ -160,7 +164,11 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
   /// @inheritdoc ICrossChainVerifierV1
   /// @dev ccvData format:
   /// [versionTag (4 bytes)][rawPayloadLength (2 bytes)][rawPayload (variable)][proofLength (2 bytes)][proof (variable)]
-  function verifyMessage(MessageV1Codec.MessageV1 calldata message, bytes32 messageId, bytes calldata ccvData) external {
+  function verifyMessage(
+    MessageV1Codec.MessageV1 calldata message,
+    bytes32 messageId,
+    bytes calldata ccvData
+  ) external {
     _assertNotCursedByRMN(message.sourceChainSelector);
     _onlyOffRamp(message.sourceChainSelector);
 
@@ -271,7 +279,11 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
   /// @param remoteChainSelector CCIP chain selector of remote chain.
   /// @param lChainId Lombard chain id of remote chain.
   /// @param allowedCaller The address of LombardVerifier on destination chain.
-  function setPath(uint64 remoteChainSelector, bytes32 lChainId, bytes32 allowedCaller) external onlyOwner {
+  function setPath(
+    uint64 remoteChainSelector,
+    bytes32 lChainId,
+    bytes32 allowedCaller
+  ) external onlyOwner {
     if (lChainId == bytes32(0)) {
       revert ZeroLombardChainId();
     }

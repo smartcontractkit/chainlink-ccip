@@ -48,7 +48,10 @@ contract CCTPMessageTransmitterProxy is Ownable2StepMsgSender, ITypeAndVersion {
   /// @param message The payload of the message being received.
   /// @param attestation The cryptographic proof validating the message.
   /// @return success A boolean indicating if the message was successfully processed.
-  function receiveMessage(bytes calldata message, bytes calldata attestation) external returns (bool success) {
+  function receiveMessage(
+    bytes calldata message,
+    bytes calldata attestation
+  ) external returns (bool success) {
     if (!s_allowedCallers.contains(msg.sender)) {
       revert Unauthorized(msg.sender);
     }

@@ -85,7 +85,10 @@ contract TokenAdminRegistry is ITokenAdminRegistry, ITypeAndVersion, Ownable2Ste
   /// @dev The function is paginated to avoid RPC timeouts.
   /// @dev The ordering is guaranteed to remain the same as it is not possible to remove tokens
   /// from s_tokens.
-  function getAllConfiguredTokens(uint64 startIndex, uint64 maxCount) external view returns (address[] memory tokens) {
+  function getAllConfiguredTokens(
+    uint64 startIndex,
+    uint64 maxCount
+  ) external view returns (address[] memory tokens) {
     uint256 numberOfTokens = s_tokens.length();
     if (startIndex >= numberOfTokens) {
       return tokens;
@@ -110,7 +113,10 @@ contract TokenAdminRegistry is ITokenAdminRegistry, ITypeAndVersion, Ownable2Ste
   /// from CCIP. Setting the pool to any other address enables the token on CCIP.
   /// @param localToken The token to set the pool for.
   /// @param pool The pool to set for the token.
-  function setPool(address localToken, address pool) external onlyTokenAdmin(localToken) {
+  function setPool(
+    address localToken,
+    address pool
+  ) external onlyTokenAdmin(localToken) {
     // The pool has to support the token, but we want to allow removing the pool, so we only check
     // if the pool supports the token if it is not address(0).
     if (pool != address(0) && !IPoolV1(pool).isSupportedToken(localToken)) {
@@ -132,7 +138,10 @@ contract TokenAdminRegistry is ITokenAdminRegistry, ITypeAndVersion, Ownable2Ste
   /// @param newAdmin The address to transfer the administrator role to. Can be address(0) to cancel
   /// a pending transfer.
   /// @dev The new admin must call `acceptAdminRole` to accept the role.
-  function transferAdminRole(address localToken, address newAdmin) external onlyTokenAdmin(localToken) {
+  function transferAdminRole(
+    address localToken,
+    address newAdmin
+  ) external onlyTokenAdmin(localToken) {
     TokenConfig storage config = s_tokenConfig[localToken];
     config.pendingAdministrator = newAdmin;
 
@@ -161,13 +170,19 @@ contract TokenAdminRegistry is ITokenAdminRegistry, ITypeAndVersion, Ownable2Ste
   // ================================================================
 
   /// @notice Public getter to check for permissions of an administrator
-  function isAdministrator(address localToken, address administrator) external view returns (bool) {
+  function isAdministrator(
+    address localToken,
+    address administrator
+  ) external view returns (bool) {
     return s_tokenConfig[localToken].administrator == administrator;
   }
 
   /// @inheritdoc ITokenAdminRegistry
   /// @dev Can only be called by a registry module.
-  function proposeAdministrator(address localToken, address administrator) external {
+  function proposeAdministrator(
+    address localToken,
+    address administrator
+  ) external {
     if (!isRegistryModule(msg.sender) && msg.sender != owner()) {
       revert OnlyRegistryModuleOrOwner(msg.sender);
     }

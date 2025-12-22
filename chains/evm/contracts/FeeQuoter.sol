@@ -248,7 +248,10 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
   /// @param feeTokensToRemove The addresses of the tokens which are no longer considered feeTokens.
   /// @param feeTokensToAdd The addresses of the tokens which are now considered fee tokens.
   /// and can be used to calculate fees.
-  function _applyFeeTokensUpdates(address[] memory feeTokensToRemove, address[] memory feeTokensToAdd) private {
+  function _applyFeeTokensUpdates(
+    address[] memory feeTokensToRemove,
+    address[] memory feeTokensToAdd
+  ) private {
     for (uint256 i = 0; i < feeTokensToRemove.length; ++i) {
       if (s_feeTokens.remove(feeTokensToRemove[i])) {
         emit FeeTokenRemoved(feeTokensToRemove[i]);
@@ -387,7 +390,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
 
       for (uint256 j = 0; j < tokenTransferFeeConfigArg.tokenTransferFeeConfigs.length; ++j) {
         TokenTransferFeeConfig memory tokenTransferFeeConfig =
-          tokenTransferFeeConfigArg.tokenTransferFeeConfigs[j].tokenTransferFeeConfig;
+        tokenTransferFeeConfigArg.tokenTransferFeeConfigs[j].tokenTransferFeeConfig;
         address token = tokenTransferFeeConfigArg.tokenTransferFeeConfigs[j].token;
 
         if (tokenTransferFeeConfig.destBytesOverhead < Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES) {
@@ -521,7 +524,8 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
         uint32(
           _parseGenericExtraArgsFromBytes(
             extraArgs, destChainConfig.defaultTxGasLimit, destChainConfig.maxPerMsgGasLimit
-          ).gasLimit
+          )
+          .gasLimit
         ),
         ""
       );
@@ -700,9 +704,11 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
         || destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_APTOS
         || destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_TVM
     ) {
-      gasLimit = _parseGenericExtraArgsFromBytes(
+      gasLimit =
+      _parseGenericExtraArgsFromBytes(
         message.extraArgs, destChainConfig.defaultTxGasLimit, destChainConfig.maxPerMsgGasLimit
-      ).gasLimit;
+      )
+      .gasLimit;
 
       _validateDestFamilyAddress(destChainConfig.chainFamilySelector, message.receiver, gasLimit);
     } else if (destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SUI) {
@@ -729,8 +735,8 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
         // The messaging accounts needed for CCIP receiver on SUI are:
         // message receiver,
         // plus remaining accounts specified in Sui extraArgs. Each account is 32 bytes.
-        suiExpandedDataLength +=
-          ((receiverObjectIdsLength + Client.SUI_MESSAGING_ACCOUNTS_OVERHEAD) * Client.SUI_ACCOUNT_BYTE_SIZE);
+        suiExpandedDataLength += ((receiverObjectIdsLength + Client.SUI_MESSAGING_ACCOUNTS_OVERHEAD)
+            * Client.SUI_ACCOUNT_BYTE_SIZE);
       }
 
       if (numberOfTokens > 0 && suiExtraArgsV1.tokenReceiver == bytes32(0)) {
@@ -784,8 +790,8 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
         // The messaging accounts needed for CCIP receiver on SVM are:
         // message receiver, offRamp PDA signer,
         // plus remaining accounts specified in SVM extraArgs. Each account is 32 bytes.
-        svmExpandedDataLength +=
-          ((accountsLength + Client.SVM_MESSAGING_ACCOUNTS_OVERHEAD) * Client.SVM_ACCOUNT_BYTE_SIZE);
+        svmExpandedDataLength += ((accountsLength + Client.SVM_MESSAGING_ACCOUNTS_OVERHEAD)
+            * Client.SVM_ACCOUNT_BYTE_SIZE);
       }
 
       if (numberOfTokens > 0 && svmExtraArgsV1.tokenReceiver == bytes32(0)) {

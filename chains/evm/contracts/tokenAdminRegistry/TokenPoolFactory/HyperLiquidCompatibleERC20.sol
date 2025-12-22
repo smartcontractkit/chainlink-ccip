@@ -66,7 +66,10 @@ contract HyperLiquidCompatibleERC20 is FactoryBurnMintERC20 {
   /// @param hipTokenId The id of the remote token.
   /// @param remoteTokenDecimals The decimals of the remote token.
   /// @dev While the zero address is not allowed, it is allowed for the remote token to have zero decimals.
-  function setRemoteToken(uint64 hipTokenId, uint8 remoteTokenDecimals) external onlyOwner {
+  function setRemoteToken(
+    uint64 hipTokenId,
+    uint8 remoteTokenDecimals
+  ) external onlyOwner {
     if (s_hypercoreTokenSystemAddress != address(0)) {
       revert RemoteTokenAlreadySet();
     }
@@ -102,7 +105,11 @@ contract HyperLiquidCompatibleERC20 is FactoryBurnMintERC20 {
   /// exceeds the available spot balance or if the precompile call fails.
   /// @param to The recipient address of the token transfer.
   /// @param amount The amount of tokens being transferred.
-  function _beforeTokenTransfer(address, address to, uint256 amount) internal virtual override {
+  function _beforeTokenTransfer(
+    address,
+    address to,
+    uint256 amount
+  ) internal virtual override {
     if (to == s_hypercoreTokenSystemAddress) {
       (bool success, bytes memory result) =
         SPOT_BALANCE_PRECOMPILE_ADDRESS.staticcall(abi.encode(to, s_hypercoreTokenSpotId));
@@ -129,7 +136,10 @@ contract HyperLiquidCompatibleERC20 is FactoryBurnMintERC20 {
   /// probably incorrect as that means the amount cannot be represented on this chain. If the local decimals have been
   /// wrongly configured, the token issuer could redeploy the pool with the correct decimals and manually re-execute the
   /// CCIP tx to fix the issue.
-  function _calculateLocalAmount(uint256 remoteAmount, uint8 remoteDecimals) internal view virtual returns (uint256) {
+  function _calculateLocalAmount(
+    uint256 remoteAmount,
+    uint8 remoteDecimals
+  ) internal view virtual returns (uint256) {
     uint8 localDecimals = decimals();
 
     if (remoteDecimals == localDecimals) {
