@@ -8,7 +8,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/burn_mint_token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
@@ -22,7 +21,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func basicDeployBurnMintTokenAndPoolInput(chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) tokens.DeployBurnMintTokenAndPoolInput {
+var thresholdAmountForAdditionalCCVs = big.NewInt(1e18)
+
+func basicDeployTokenAndPoolInput(chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) tokens.DeployTokenAndPoolInput {
 	var rmnProxyAddress common.Address
 	var routerAddress common.Address
 	for _, addr := range chainReport.Output.Addresses {
@@ -33,7 +34,7 @@ func basicDeployBurnMintTokenAndPoolInput(chainReport operations.SequenceReport[
 			routerAddress = common.HexToAddress(addr.Address)
 		}
 	}
-	return tokens.DeployBurnMintTokenAndPoolInput{
+	return tokens.DeployTokenAndPoolInput{
 		Accounts: map[common.Address]*big.Int{
 			common.HexToAddress("0x01"): big.NewInt(500_000),
 			common.HexToAddress("0x02"): big.NewInt(500_000),
@@ -44,13 +45,14 @@ func basicDeployBurnMintTokenAndPoolInput(chainReport operations.SequenceReport[
 			Name:      "Test Token",
 		},
 		DeployTokenPoolInput: tokens.DeployTokenPoolInput{
-			ChainSel:         chainReport.Input.ChainSelector,
-			TokenPoolType:    datastore.ContractType(burn_mint_token_pool.ContractType),
-			TokenPoolVersion: semver.MustParse("1.7.0"),
-			TokenSymbol:      "TEST",
-			RateLimitAdmin:   common.HexToAddress("0x01"),
-			ConstructorArgs: token_pool.ConstructorArgs{
-				LocalTokenDecimals: 18,
+			ChainSel:                         chainReport.Input.ChainSelector,
+			TokenPoolType:                    datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
+			TokenPoolVersion:                 semver.MustParse("1.7.0"),
+			TokenSymbol:                      "TEST",
+			RateLimitAdmin:                   common.HexToAddress("0x01"),
+			ThresholdAmountForAdditionalCCVs: thresholdAmountForAdditionalCCVs,
+			ConstructorArgs: tokens.ConstructorArgs{
+				Decimals: 18,
 				Allowlist: []common.Address{
 					common.HexToAddress("0x02"),
 				},
@@ -61,15 +63,15 @@ func basicDeployBurnMintTokenAndPoolInput(chainReport operations.SequenceReport[
 	}
 }
 
-func TestDeployBurnMintTokenAndPool(t *testing.T) {
+func TestDeployTokenAndPool(t *testing.T) {
 	tests := []struct {
 		desc        string
-		makeInput   func(chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) tokens.DeployBurnMintTokenAndPoolInput
+		makeInput   func(chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) tokens.DeployTokenAndPoolInput
 		expectedErr string
 	}{
 		{
 			desc:        "happy path",
-			makeInput:   basicDeployBurnMintTokenAndPoolInput,
+			makeInput:   basicDeployTokenAndPoolInput,
 			expectedErr: "",
 		},
 	}
@@ -98,7 +100,7 @@ func TestDeployBurnMintTokenAndPool(t *testing.T) {
 			input := test.makeInput(chainReport)
 			poolReport, err := operations.ExecuteSequence(
 				e.OperationsBundle,
-				tokens.DeployBurnMintTokenAndPool,
+				tokens.DeployTokenAndPool,
 				e.BlockChains.EVMChains()[chainSel],
 				input,
 			)
@@ -110,7 +112,7 @@ func TestDeployBurnMintTokenAndPool(t *testing.T) {
 			require.NoError(t, err, "ExecuteSequence should not error")
 			require.Len(t, poolReport.Output.BatchOps, 1, "Expected 1 batch operation in output")
 			require.Len(t, poolReport.Output.BatchOps[0].Transactions, 0, "Expected 0 transactions in batch operation")
-			require.Len(t, poolReport.Output.Addresses, 2, "Expected 2 addresses in output")
+			require.Len(t, poolReport.Output.Addresses, 3, "Expected 3 addresses in output (pool, token, advanced pool hooks)")
 			tokenAddress := poolReport.Output.Addresses[0].Address
 			poolAddress := poolReport.Output.Addresses[1].Address
 

@@ -81,7 +81,7 @@ contract OnRampHelper is OnRamp {
 
   function validateDestChainAddress(
     bytes memory rawAddress,
-    uint8 addressBytesLength
+    uint256 addressBytesLength
   ) external pure returns (bytes memory) {
     return _validateDestChainAddress(rawAddress, addressBytesLength);
   }

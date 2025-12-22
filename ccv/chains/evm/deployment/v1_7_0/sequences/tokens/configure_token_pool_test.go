@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/advanced_pool_hooks"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/tokens"
@@ -19,16 +20,17 @@ import (
 func TestConfigurePool(t *testing.T) {
 	tests := []struct {
 		desc        string
-		makeInput   func(tokenAndPoolReport operations.SequenceReport[tokens.DeployBurnMintTokenAndPoolInput, seq_core.OnChainOutput]) tokens.ConfigureTokenPoolInput
+		makeInput   func(tokenAndPoolReport operations.SequenceReport[tokens.DeployTokenAndPoolInput, seq_core.OnChainOutput]) tokens.ConfigureTokenPoolInput
 		expectedErr string
 	}{
 		{
 			desc: "happy path",
-			makeInput: func(tokenAndPoolReport operations.SequenceReport[tokens.DeployBurnMintTokenAndPoolInput, seq_core.OnChainOutput]) tokens.ConfigureTokenPoolInput {
+			makeInput: func(tokenAndPoolReport operations.SequenceReport[tokens.DeployTokenAndPoolInput, seq_core.OnChainOutput]) tokens.ConfigureTokenPoolInput {
 				threshold := big.NewInt(123)
 				return tokens.ConfigureTokenPoolInput{
-					ChainSelector:    tokenAndPoolReport.Input.DeployTokenPoolInput.ChainSel,
-					TokenPoolAddress: common.HexToAddress(tokenAndPoolReport.Output.Addresses[1].Address),
+					ChainSelector:     tokenAndPoolReport.Input.DeployTokenPoolInput.ChainSel,
+					TokenPoolAddress:  common.HexToAddress(tokenAndPoolReport.Output.Addresses[1].Address),
+					AdvancedPoolHooks: common.HexToAddress(tokenAndPoolReport.Output.Addresses[2].Address),
 					AllowList: []common.Address{
 						common.HexToAddress("0x07"),
 						common.HexToAddress("0x08"),
@@ -65,9 +67,9 @@ func TestConfigurePool(t *testing.T) {
 			// Deploy token and token pool
 			tokenAndPoolReport, err := operations.ExecuteSequence(
 				e.OperationsBundle,
-				tokens.DeployBurnMintTokenAndPool,
+				tokens.DeployTokenAndPool,
 				e.BlockChains.EVMChains()[chainSel],
-				basicDeployBurnMintTokenAndPoolInput(chainReport),
+				basicDeployTokenAndPoolInput(chainReport),
 			)
 			require.NoError(t, err, "ExecuteSequence should not error")
 
@@ -102,16 +104,16 @@ func TestConfigurePool(t *testing.T) {
 			)
 			require.NoError(t, err, "ExecuteOperation should not error")
 			require.Equal(t, input.RouterAddress, getDynamicConfigReport.Output.Router, "Expected router address to be the same as the deployed router")
-			require.Zero(t, getDynamicConfigReport.Output.ThresholdAmountForAdditionalCCVs.Cmp(input.ThresholdAmountForAdditionalCCVs))
+			require.Equal(t, input.RateLimitAdmin, getDynamicConfigReport.Output.RateLimitAdmin, "Expected rate limit admin address to be the same as the inputted rate limit admin")
 
 			// Check allowlist
 			getAllowlistReport, err := operations.ExecuteOperation(
 				testsetup.BundleWithFreshReporter(e.OperationsBundle),
-				token_pool.GetAllowList,
+				advanced_pool_hooks.GetAllowList,
 				e.BlockChains.EVMChains()[chainSel],
 				contract.FunctionInput[any]{
 					ChainSelector: chainSel,
-					Address:       input.TokenPoolAddress,
+					Address:       input.AdvancedPoolHooks,
 				},
 			)
 			require.NoError(t, err, "ExecuteOperation should not error")
@@ -121,18 +123,6 @@ func TestConfigurePool(t *testing.T) {
 			for _, addr := range getAllowlistReport.Output {
 				require.Contains(t, input.AllowList, addr, "Expected on-chain allowlist address to be in the inputted allowlist")
 			}
-			// Check rate limit admin
-			getRateLimitAdminReport, err := operations.ExecuteOperation(
-				testsetup.BundleWithFreshReporter(e.OperationsBundle),
-				token_pool.GetRateLimitAdmin,
-				e.BlockChains.EVMChains()[chainSel],
-				contract.FunctionInput[any]{
-					ChainSelector: chainSel,
-					Address:       input.TokenPoolAddress,
-				},
-			)
-			require.NoError(t, err, "ExecuteOperation should not error")
-			require.Equal(t, input.RateLimitAdmin, getRateLimitAdminReport.Output, "Expected rate limit admin address to be the same as the deployed rate limit admin")
 		})
 	}
 }

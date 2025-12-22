@@ -27,7 +27,7 @@ type ChainConfig struct {
 	OnRamp datastore.AddressRef
 	// The CommitteeVerifiers on the chain being configured.
 	// There can be multiple committee verifiers on a chain, each controlled by a different entity.
-	CommitteeVerifiers []adapters.CommitteeVerifier[datastore.AddressRef]
+	CommitteeVerifiers []adapters.CommitteeVerifierConfig[datastore.AddressRef, datastore.AddressRef]
 	// The FeeQuoter on the chain being configured.
 	FeeQuoter datastore.AddressRef
 	// The OffRamp on the chain being configured
@@ -70,19 +70,24 @@ func makeApply(chainFamilyRegistry *adapters.ChainFamilyRegistry, mcmsRegistry *
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve onRamp ref on chain with selector %d: %w", chain.ChainSelector, err)
 			}
-			committeeVerifiers := make([]adapters.CommitteeVerifier[string], 0, len(chain.CommitteeVerifiers))
+			committeeVerifiers := make([]adapters.CommitteeVerifierConfig[string, datastore.AddressRef], 0, len(chain.CommitteeVerifiers))
 			for _, verifier := range chain.CommitteeVerifiers {
-				committeeVerifier, err := datastore_utils.FindAndFormatRef(e.DataStore, verifier.Implementation, chain.ChainSelector, datastore_utils.FullRef)
+				committeeVerifier, err := datastore_utils.FindAndFormatRef(e.DataStore, verifier.CommitteeVerifier, chain.ChainSelector, datastore_utils.FullRef)
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve committeeVerifier ref on chain with selector %d: %w", chain.ChainSelector, err)
 				}
-				committeeVerifierResolver, err := datastore_utils.FindAndFormatRef(e.DataStore, verifier.Resolver, chain.ChainSelector, datastore_utils.FullRef)
-				if err != nil {
-					return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve committeeVerifier resolver ref on chain with selector %d: %w", chain.ChainSelector, err)
+				supportingContracts := make([]datastore.AddressRef, 0, len(verifier.SupportingContracts))
+				for _, supportingContract := range verifier.SupportingContracts {
+					supportingContract, err := datastore_utils.FindAndFormatRef(e.DataStore, supportingContract, chain.ChainSelector, datastore_utils.FullRef)
+					if err != nil {
+						return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve supportingContract ref on chain with selector %d: %w", chain.ChainSelector, err)
+					}
+					supportingContracts = append(supportingContracts, supportingContract)
 				}
-				committeeVerifiers = append(committeeVerifiers, adapters.CommitteeVerifier[string]{
-					Implementation: committeeVerifier.Address,
-					Resolver:       committeeVerifierResolver.Address,
+				committeeVerifiers = append(committeeVerifiers, adapters.CommitteeVerifierConfig[string, datastore.AddressRef]{
+					CommitteeVerifier:   committeeVerifier.Address,
+					SupportingContracts: supportingContracts,
+					RemoteChains:        verifier.RemoteChains,
 				})
 			}
 			feeQuoter, err := datastore_utils.FindAndFormatRef(e.DataStore, chain.FeeQuoter, chain.ChainSelector, datastore_utils.FullRef)
@@ -151,19 +156,22 @@ func convertRemoteChainConfig(
 	inCfg adapters.RemoteChainConfig[datastore.AddressRef, datastore.AddressRef],
 ) (adapters.RemoteChainConfig[[]byte, string], error) {
 	outCfg := adapters.RemoteChainConfig[[]byte, string]{
-		AllowTrafficFrom:                 inCfg.AllowTrafficFrom,
-		CommitteeVerifierDestChainConfig: inCfg.CommitteeVerifierDestChainConfig,
-		FeeQuoterDestChainConfig:         inCfg.FeeQuoterDestChainConfig,
-		ExecutorDestChainConfig:          inCfg.ExecutorDestChainConfig,
-		AddressBytesLength:               inCfg.AddressBytesLength,
-		BaseExecutionGasCost:             inCfg.BaseExecutionGasCost,
+		AllowTrafficFrom:         inCfg.AllowTrafficFrom,
+		FeeQuoterDestChainConfig: inCfg.FeeQuoterDestChainConfig,
+		ExecutorDestChainConfig:  inCfg.ExecutorDestChainConfig,
+		AddressBytesLength:       inCfg.AddressBytesLength,
+		BaseExecutionGasCost:     inCfg.BaseExecutionGasCost,
 	}
 
-	onRamp, err := datastore_utils.FindAndFormatRef(e.DataStore, inCfg.OnRamp, remoteChainSelector, remoteChainAdapter.AddressRefToBytes)
-	if err != nil {
-		return adapters.RemoteChainConfig[[]byte, string]{}, fmt.Errorf("failed to resolve onRamp ref on remote chain with selector %d: %w", remoteChainSelector, err)
+	onRamps := make([][]byte, 0, len(inCfg.OnRamps))
+	for _, onRamp := range inCfg.OnRamps {
+		onRamp, err := datastore_utils.FindAndFormatRef(e.DataStore, onRamp, remoteChainSelector, remoteChainAdapter.AddressRefToBytes)
+		if err != nil {
+			return adapters.RemoteChainConfig[[]byte, string]{}, fmt.Errorf("failed to resolve onRamp ref on remote chain with selector %d: %w", remoteChainSelector, err)
+		}
+		onRamps = append(onRamps, onRamp)
 	}
-	outCfg.OnRamp = onRamp
+	outCfg.OnRamps = onRamps
 
 	offRamp, err := datastore_utils.FindAndFormatRef(e.DataStore, inCfg.OffRamp, remoteChainSelector, remoteChainAdapter.AddressRefToBytes)
 	if err != nil {
