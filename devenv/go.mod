@@ -48,8 +48,6 @@ require (
 	golang.org/x/sync v0.18.0
 )
 
-require github.com/smartcontractkit/chainlink-ton/devenv-impl v0.0.0-20251221132201-19e7235e26c7
-
 require (
 	cloud.google.com/go/auth v0.14.1 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.7 // indirect

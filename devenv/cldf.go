@@ -26,7 +26,6 @@ import (
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldf_evm_provider "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/provider"
 	cldf_solana_provider "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana/provider"
-	ccipTON "github.com/smartcontractkit/chainlink-ton/devenv-impl"
 )
 
 type CLDF struct {
@@ -173,7 +172,7 @@ func NewCCIPImplFromNetwork(typ string) (CCIP16ProductConfiguration, error) {
 	case "aptos":
 		panic("implement Aptos")
 	case "ton":
-		return ccipTON.NewEmptyCCIP16TON(), nil
+		panic("implement TON")
 	default:
 		return nil, errors.New("unknown devenv network type " + typ)
 	}
