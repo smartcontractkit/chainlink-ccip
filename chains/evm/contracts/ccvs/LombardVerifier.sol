@@ -113,7 +113,7 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
       revert MustTransferTokens();
     }
 
-    // Sender must be an abi enceded EVM address.
+    // Sender must be an abi encoded EVM address.
     _assertSenderIsAllowed(message.destChainSelector, abi.decode(message.sender, (address)));
     return _callDepositOnBridge(message.tokenTransfer[0], message.destChainSelector, message.sender, messageId);
   }
