@@ -13,7 +13,10 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 )
 
-var Version *semver.Version = semver.MustParse("1.6.0")
+var (
+	CCIPHomeVersion             = semver.MustParse("1.6.0")
+	CapabilitiesRegistryVersion = semver.MustParse("1.0.0")
+)
 
 type AddDONOpInput struct {
 	Nodes                    [][32]byte
@@ -25,7 +28,7 @@ type AddDONOpInput struct {
 
 var AddDON = contract.NewWrite(contract.WriteParams[AddDONOpInput, *capabilities_registry.CapabilitiesRegistry]{
 	Name:            "capabilities-registry:add-don",
-	Version:         semver.MustParse("1.0.0"),
+	Version:         CapabilitiesRegistryVersion,
 	Description:     "Adds a new DON to the CapabilitiesRegistry",
 	ContractType:    utils.CapabilitiesRegistry,
 	ContractABI:     capabilities_registry.CapabilitiesRegistryABI,
@@ -47,7 +50,7 @@ type UpdateDONOpInput struct {
 
 var UpdateDON = contract.NewWrite(contract.WriteParams[UpdateDONOpInput, *capabilities_registry.CapabilitiesRegistry]{
 	Name:            "capabilities-registry:update-don",
-	Version:         semver.MustParse("1.0.0"),
+	Version:         CapabilitiesRegistryVersion,
 	Description:     "Updates an existing DON in the CapabilitiesRegistry",
 	ContractType:    utils.CapabilitiesRegistry,
 	ContractABI:     capabilities_registry.CapabilitiesRegistryABI,
@@ -66,7 +69,7 @@ type ApplyChainConfigUpdatesOpInput struct {
 
 var ApplyChainConfigUpdates = contract.NewWrite(contract.WriteParams[ApplyChainConfigUpdatesOpInput, *ccip_home.CCIPHome]{
 	Name:            "ccip-home:apply-chain-config-updates",
-	Version:         Version,
+	Version:         CCIPHomeVersion,
 	Description:     "Applies chain config updates to the CCIPHome contract",
 	ContractType:    utils.CCIPHome,
 	ContractABI:     ccip_home.CCIPHomeABI,
