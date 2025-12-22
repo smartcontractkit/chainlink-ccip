@@ -12,7 +12,7 @@ import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 contract RouterSetup is FeeQuoterSetup {
   address internal constant FEE_AGGREGATOR = 0xa33CDB32eAEce34F6affEfF4899cef45744EDea3;
   uint16 internal constant NETWORK_FEE_USD_CENTS = 1_00;
-  uint32 internal constant MAX_USD_CENTS_PER_MESSAGE = type(uint32).max;
+  uint32 internal constant MAX_USD_CENTS_PER_MESSAGE = 10_000; // $100.00
 
   OnRamp internal s_onRamp;
   address internal s_offRamp;

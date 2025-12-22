@@ -69,7 +69,8 @@ contract OnRamp_getExecutionFee is OnRampSetup {
       tokenArgs: "args"
     });
 
-    OnRamp.Receipt memory receipt = s_onRampHelper.getExecutionFee(DEST_CHAIN_SELECTOR, 0, 0, extraArgs);
+    OnRamp.Receipt memory receipt =
+      s_onRampHelper.getExecutionFee(DEST_CHAIN_SELECTOR, 0, 0, extraArgs, s_sourceFeeToken);
 
     assertEq(receipt.issuer, s_customExecutor, "Issuer should be the executor");
     assertEq(receipt.destGasLimit, BASE_EXEC_GAS_COST + GAS_LIMIT, "Gas limit should include base cost");
@@ -89,7 +90,8 @@ contract OnRamp_getExecutionFee is OnRampSetup {
       tokenArgs: "args with no executor"
     });
 
-    OnRamp.Receipt memory receipt = s_onRampHelper.getExecutionFee(DEST_CHAIN_SELECTOR, 0, 0, extraArgs);
+    OnRamp.Receipt memory receipt =
+      s_onRampHelper.getExecutionFee(DEST_CHAIN_SELECTOR, 0, 0, extraArgs, s_sourceFeeToken);
 
     assertEq(receipt.issuer, Client.NO_EXECUTION_ADDRESS, "Issuer should be NO_EXECUTION_ADDRESS");
     assertEq(receipt.destGasLimit, BASE_EXEC_GAS_COST + GAS_LIMIT, "Gas limit should still include base cost");
@@ -112,7 +114,7 @@ contract OnRamp_getExecutionFee is OnRampSetup {
     });
 
     OnRamp.Receipt memory receipt =
-      s_onRampHelper.getExecutionFee(DEST_CHAIN_SELECTOR, dataLength, numberOfTokens, extraArgs);
+      s_onRampHelper.getExecutionFee(DEST_CHAIN_SELECTOR, dataLength, numberOfTokens, extraArgs, s_sourceFeeToken);
 
     uint32 expectedOverhead = uint32(
       MessageV1Codec.MESSAGE_V1_EVM_SOURCE_BASE_SIZE + dataLength
@@ -137,7 +139,8 @@ contract OnRamp_getExecutionFee is OnRampSetup {
       tokenArgs: ""
     });
 
-    OnRamp.Receipt memory receipt = s_onRampHelper.getExecutionFee(DEST_CHAIN_SELECTOR, dataLength, 0, extraArgs);
+    OnRamp.Receipt memory receipt =
+      s_onRampHelper.getExecutionFee(DEST_CHAIN_SELECTOR, dataLength, 0, extraArgs, s_sourceFeeToken);
 
     uint32 expectedOverhead = uint32(
       MessageV1Codec.MESSAGE_V1_EVM_SOURCE_BASE_SIZE + dataLength + executorArgs.length
@@ -159,7 +162,8 @@ contract OnRamp_getExecutionFee is OnRampSetup {
       tokenArgs: ""
     });
 
-    OnRamp.Receipt memory receipt = s_onRampHelper.getExecutionFee(DEST_CHAIN_SELECTOR, 100, 0, extraArgs);
+    OnRamp.Receipt memory receipt =
+      s_onRampHelper.getExecutionFee(DEST_CHAIN_SELECTOR, 100, 0, extraArgs, s_sourceFeeToken);
 
     assertEq(receipt.destGasLimit, BASE_EXEC_GAS_COST, "Gas limit should only be base cost when user gas limit is 0");
   }

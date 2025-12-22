@@ -944,8 +944,9 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
     uint256 executorIndex = receipts.length - 2;
     // This includes the user callback gas limit.
-    receipts[executorIndex] =
-      _getExecutionFee(destChainSelector, message.data.length, message.tokenAmounts.length, extraArgs);
+    receipts[executorIndex] = _getExecutionFee(
+      destChainSelector, message.data.length, message.tokenAmounts.length, extraArgs, message.feeToken
+    );
 
     gasLimitSum += receipts[executorIndex].destGasLimit;
     bytesOverheadSum += receipts[executorIndex].destBytesOverhead;
@@ -984,7 +985,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     }
 
     // Enforce max fee per message.
-    if (feeTokenAmount > (i_maxUSDCentsPerMsg * percentMultiplier * 1e34) / feeTokenPrice) {
+    if (feeTokenAmount > (uint256(i_maxUSDCentsPerMsg) * 1e34) / feeTokenPrice) {
       revert FeeExceedsMaxAllowed(feeTokenAmount, i_maxUSDCentsPerMsg);
     }
 
@@ -1001,7 +1002,8 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     uint64 destChainSelector,
     uint256 dataLength,
     uint256 numberOfTokens,
-    ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs
+    ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs,
+    address feeToken
   ) internal view returns (Receipt memory) {
     DestChainConfig storage destChainConfig = s_destChainConfigs[destChainSelector];
     uint8 remoteChainAddressLengthBytes = destChainConfig.addressBytesLength;
@@ -1022,7 +1024,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       feeTokenAmount: extraArgs.executor == Client.NO_EXECUTION_ADDRESS
         ? 0
         : IExecutor(extraArgs.executor)
-          .getFee(destChainSelector, extraArgs.blockConfirmations, extraArgs.ccvs, extraArgs.executorArgs),
+          .getFee(destChainSelector, extraArgs.blockConfirmations, extraArgs.ccvs, extraArgs.executorArgs, feeToken),
       extraArgs: extraArgs.executorArgs
     });
   }

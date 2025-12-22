@@ -203,7 +203,8 @@ contract Executor is IExecutor, Ownable2StepMsgSender {
     uint64 destChainSelector,
     uint16 requestedBlockDepth,
     address[] calldata ccvs,
-    bytes calldata // extraArgs
+    bytes calldata, // extraArgs
+    address // feeToken
   ) external view virtual returns (uint16 usdCentsFee) {
     RemoteChainConfig memory remoteChainConfig = s_remoteChainConfigs[destChainSelector];
     if (!remoteChainConfig.enabled) {
