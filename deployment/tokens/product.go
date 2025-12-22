@@ -38,16 +38,22 @@ type RateLimiterConfig struct {
 	Rate *big.Int
 }
 
-// CustomBlockConfirmationRateLimiterConfig encapsulates rate limiter settings applied to
-// custom block confirmation transfers.
-type CustomBlockConfirmationRateLimiterConfig struct {
-	Inbound  RateLimiterConfig
-	Outbound RateLimiterConfig
-}
-
-// CustomBlockConfirmationConfig captures global custom block confirmation parameters for a token pool.
-type CustomBlockConfirmationConfig struct {
-	MinBlockConfirmation uint16
+// TokenTransferFeeConfig specifies configuration for a token transfer fee on a token pool.
+type TokenTransferFeeConfig struct {
+	// DestGasOverhead is the gas overhead for the token transfer.
+	DestGasOverhead uint32
+	// DestBytesOverhead is the bytes overhead for the token transfer.
+	DestBytesOverhead uint32
+	// DefaultFinalityFeeUSDCents is the flat fee for a default finality transfer.
+	DefaultFinalityFeeUSDCents uint32
+	// CustomFinalityFeeUSDCents is the flat fee for a custom finality transfer.
+	CustomFinalityFeeUSDCents uint32
+	// DefaultFinalityTransferFeeBps is the bps fee for a default finality transfer.
+	DefaultFinalityTransferFeeBps uint16
+	// CustomFinalityTransferFeeBps is the bps fee for a custom finality transfer.
+	CustomFinalityTransferFeeBps uint16
+	// IsEnabled is whether the token transfer fee config is enabled.
+	IsEnabled bool
 }
 
 // RemoteChainConfig specifies configuration for a remote chain on a token pool.
@@ -57,17 +63,24 @@ type RemoteChainConfig[R any, CCV any] struct {
 	RemoteToken R
 	// The token pool on the remote chain.
 	RemotePool R
-	// InboundRateLimiterConfig specifies the desired rate limiter configuration for inbound traffic.
-	InboundRateLimiterConfig RateLimiterConfig
-	// OutboundRateLimiterConfig specifies the desired rate limiter configuration for outbound traffic.
-	OutboundRateLimiterConfig RateLimiterConfig
+	// DefaultFinalityInboundRateLimiterConfig specifies the desired rate limiter configuration for default-finality inbound traffic.
+	DefaultFinalityInboundRateLimiterConfig RateLimiterConfig
+	// DefaultFinalityOutboundRateLimiterConfig specifies the desired rate limiter configuration for default-finality outbound traffic.
+	DefaultFinalityOutboundRateLimiterConfig RateLimiterConfig
+	// CustomFinalityInboundRateLimiterConfig specifies the desired rate limiter configuration for custom-finality inbound traffic.
+	CustomFinalityInboundRateLimiterConfig RateLimiterConfig
+	// CustomFinalityOutboundRateLimiterConfig specifies the desired rate limiter configuration for custom-finality outbound traffic.
+	CustomFinalityOutboundRateLimiterConfig RateLimiterConfig
 	// OutboundCCVs specifies the verifiers to apply to outbound traffic.
 	OutboundCCVs []CCV
 	// InboundCCVs specifies the verifiers to apply to inbound traffic.
 	InboundCCVs []CCV
-	// CustomBlockConfirmationConfig optionally overrides the rate limiter behaviour for
-	// transfers that request a custom block confirmation depth.
-	CustomBlockConfirmationConfig *CustomBlockConfirmationRateLimiterConfig
+	// OutboundCCVsToAddAboveThreshold specifies the verifiers to apply to outbound traffic above the threshold.
+	OutboundCCVsToAddAboveThreshold []CCV
+	// InboundCCVsToAddAboveThreshold specifies the verifiers to apply to inbound traffic above the threshold.
+	InboundCCVsToAddAboveThreshold []CCV
+	// TokenTransferFeeConfig specifies the desired token transfer fee configuration for this remote chain.
+	TokenTransferFeeConfig TokenTransferFeeConfig
 }
 
 // ConfigureTokenForTransfersInput is the input for the ConfigureTokenForTransfers sequence.
@@ -82,8 +95,10 @@ type ConfigureTokenForTransfersInput struct {
 	ExternalAdmin string
 	// RegistryAddress is the address of the contract on which the token pool must be registered.
 	RegistryAddress string
-	// CustomBlockConfirmationConfig optionally overrides global custom block confirmation parameters on the pool.
-	CustomBlockConfirmationConfig *CustomBlockConfirmationConfig
+	// FinalityValue is the value representing finality.
+	// This can be interpreted as # of block confirmations, an ID, or otherwise.
+	// Interpretation is left to each chain family.
+	FinalityValue uint16
 }
 
 // TokenAdapterRegistry maintains a registry of TokenAdapters.

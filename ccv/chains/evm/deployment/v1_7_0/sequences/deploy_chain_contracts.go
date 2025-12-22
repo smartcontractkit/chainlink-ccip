@@ -10,18 +10,15 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/executor"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/mock_receiver"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/onramp"
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
@@ -101,14 +98,14 @@ var DeployChainContracts = cldf_ops.NewSequence(
 	"deploy-chain-contracts",
 	semver.MustParse("1.7.0"),
 	"Deploys all required contracts for CCIP 1.7.0 to an EVM chain",
-	func(b operations.Bundle, chain evm.Chain, input DeployChainContractsInput) (output sequences.OnChainOutput, err error) {
+	func(b cldf_ops.Bundle, chain evm.Chain, input DeployChainContractsInput) (output sequences.OnChainOutput, err error) {
 		addresses := make([]datastore.AddressRef, 0)
-		writes := make([]contract.WriteOutput, 0)
+		writes := make([]contract_utils.WriteOutput, 0)
 
 		// TODO: Deploy MCMS (Timelock, MCM contracts) when MCMS support is needed.
 
 		// Deploy WETH
-		wethRef, err := contract_utils.MaybeDeployContract(b, weth.Deploy, chain, contract.DeployInput[weth.ConstructorArgs]{
+		wethRef, err := contract_utils.MaybeDeployContract(b, weth.Deploy, chain, contract_utils.DeployInput[weth.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(weth.ContractType, *semver.MustParse("1.0.0")),
 			ChainSelector:  chain.Selector,
 		}, input.ExistingAddresses)
@@ -118,7 +115,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, wethRef)
 
 		// Deploy LINK
-		linkRef, err := contract_utils.MaybeDeployContract(b, link.Deploy, chain, contract.DeployInput[link.ConstructorArgs]{
+		linkRef, err := contract_utils.MaybeDeployContract(b, link.Deploy, chain, contract_utils.DeployInput[link.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(link.ContractType, *semver.MustParse("1.0.0")),
 			ChainSelector:  chain.Selector,
 		}, input.ExistingAddresses)
@@ -128,7 +125,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, linkRef)
 
 		// Deploy RMNRemote
-		rmnRemoteRef, err := contract_utils.MaybeDeployContract(b, rmn_remote.Deploy, chain, contract.DeployInput[rmn_remote.ConstructorArgs]{
+		rmnRemoteRef, err := contract_utils.MaybeDeployContract(b, rmn_remote.Deploy, chain, contract_utils.DeployInput[rmn_remote.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(rmn_remote.ContractType, *input.ContractParams.RMNRemote.Version),
 			ChainSelector:  chain.Selector,
 			Args: rmn_remote.ConstructorArgs{
@@ -142,7 +139,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, rmnRemoteRef)
 
 		// Deploy RMNProxy
-		rmnProxyRef, err := contract_utils.MaybeDeployContract(b, rmn_proxy.Deploy, chain, contract.DeployInput[rmn_proxy.ConstructorArgs]{
+		rmnProxyRef, err := contract_utils.MaybeDeployContract(b, rmn_proxy.Deploy, chain, contract_utils.DeployInput[rmn_proxy.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(rmn_proxy.ContractType, *semver.MustParse("1.0.0")),
 			ChainSelector:  chain.Selector,
 			Args: rmn_proxy.ConstructorArgs{
@@ -158,7 +155,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		// Included in case the RMNRemote got deployed but the RMNProxy already existed.
 		// In this case, we would not have set the RMNRemote in the constructor.
 		// We would need to update the RMN on the existing RMNProxy.
-		setRMNReport, err := cldf_ops.ExecuteOperation(b, rmn_proxy.SetRMN, chain, contract.FunctionInput[rmn_proxy.SetRMNArgs]{
+		setRMNReport, err := cldf_ops.ExecuteOperation(b, rmn_proxy.SetRMN, chain, contract_utils.FunctionInput[rmn_proxy.SetRMNArgs]{
 			ChainSelector: chain.Selector,
 			Address:       common.HexToAddress(rmnProxyRef.Address),
 			Args: rmn_proxy.SetRMNArgs{
@@ -171,7 +168,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		writes = append(writes, setRMNReport.Output)
 
 		// Deploy Router
-		routerRef, err := contract_utils.MaybeDeployContract(b, router.Deploy, chain, contract.DeployInput[router.ConstructorArgs]{
+		routerRef, err := contract_utils.MaybeDeployContract(b, router.Deploy, chain, contract_utils.DeployInput[router.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(router.ContractType, *semver.MustParse("1.2.0")),
 			ChainSelector:  chain.Selector,
 			Args: router.ConstructorArgs{
@@ -185,7 +182,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, routerRef)
 
 		// Deploy TokenAdminRegistry
-		tokenAdminRegistryRef, err := contract_utils.MaybeDeployContract(b, token_admin_registry.Deploy, chain, contract.DeployInput[token_admin_registry.ConstructorArgs]{
+		tokenAdminRegistryRef, err := contract_utils.MaybeDeployContract(b, token_admin_registry.Deploy, chain, contract_utils.DeployInput[token_admin_registry.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(token_admin_registry.ContractType, *semver.MustParse("1.5.0")),
 			ChainSelector:  chain.Selector,
 		}, input.ExistingAddresses)
@@ -195,7 +192,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, tokenAdminRegistryRef)
 
 		// Deploy FeeQuoter
-		feeQuoterRef, err := contract_utils.MaybeDeployContract(b, fee_quoter.Deploy, chain, contract.DeployInput[fee_quoter.ConstructorArgs]{
+		feeQuoterRef, err := contract_utils.MaybeDeployContract(b, fee_quoter.Deploy, chain, contract_utils.DeployInput[fee_quoter.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(fee_quoter.ContractType, *input.ContractParams.FeeQuoter.Version),
 			ChainSelector:  chain.Selector,
 			Args: fee_quoter.ConstructorArgs{
@@ -223,7 +220,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, feeQuoterRef)
 
 		// Set initial prices on FeeQuoter
-		updatePricesReport, err := cldf_ops.ExecuteOperation(b, fee_quoter.UpdatePrices, chain, contract.FunctionInput[fee_quoter.PriceUpdates]{
+		updatePricesReport, err := cldf_ops.ExecuteOperation(b, fee_quoter.UpdatePrices, chain, contract_utils.FunctionInput[fee_quoter.PriceUpdates]{
 			ChainSelector: chain.Selector,
 			Address:       common.HexToAddress(feeQuoterRef.Address),
 			Args: fee_quoter.PriceUpdates{
@@ -245,7 +242,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		writes = append(writes, updatePricesReport.Output)
 
 		// Deploy OffRamp
-		offRampRef, err := contract_utils.MaybeDeployContract(b, offramp.Deploy, chain, contract.DeployInput[offramp.ConstructorArgs]{
+		offRampRef, err := contract_utils.MaybeDeployContract(b, offramp.Deploy, chain, contract_utils.DeployInput[offramp.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(offramp.ContractType, *input.ContractParams.OffRamp.Version),
 			ChainSelector:  chain.Selector,
 			Args: offramp.ConstructorArgs{
@@ -263,7 +260,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, offRampRef)
 
 		// Deploy OnRamp
-		onRampRef, err := contract_utils.MaybeDeployContract(b, onramp.Deploy, chain, contract.DeployInput[onramp.ConstructorArgs]{
+		onRampRef, err := contract_utils.MaybeDeployContract(b, onramp.Deploy, chain, contract_utils.DeployInput[onramp.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(onramp.ContractType, *input.ContractParams.OnRamp.Version),
 			ChainSelector:  chain.Selector,
 			Args: onramp.ConstructorArgs{
@@ -284,24 +281,19 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, onRampRef)
 
 		// TODO: validate prior to deploying that qualifiers are unique?
-		var committeeVerifierRefs []datastore.AddressRef
 		var committeeVerifierBatchOps []mcms_types.BatchOperation
 		for _, committeeVerifierParams := range input.ContractParams.CommitteeVerifiers {
-			report, err := operations.ExecuteSequence(b, DeployCommitteeVerifier, chain, DeployCommitteeVerifierInput{
+			report, err := cldf_ops.ExecuteSequence(b, DeployCommitteeVerifier, chain, DeployCommitteeVerifierInput{
 				ChainSelector:     chain.Selector,
 				CREATE2Factory:    input.CREATE2Factory,
 				ExistingAddresses: input.ExistingAddresses,
 				Params:            committeeVerifierParams,
+				RMN:               common.HexToAddress(rmnProxyRef.Address),
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CommitteeVerifier: %w", err)
 			}
 			addresses = append(addresses, report.Output.Addresses...)
-			for _, addr := range report.Output.Addresses {
-				if addr.Type == datastore.ContractType(committee_verifier.ContractType) {
-					committeeVerifierRefs = append(committeeVerifierRefs, addr)
-				}
-			}
 			committeeVerifierBatchOps = append(committeeVerifierBatchOps, report.Output.BatchOps...)
 		}
 
@@ -311,7 +303,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			if executorParam.Qualifier != "" {
 				qualifierPtr = &executorParam.Qualifier
 			}
-			executorRef, err := contract_utils.MaybeDeployContract(b, executor.Deploy, chain, contract.DeployInput[executor.ConstructorArgs]{
+			executorRef, err := contract_utils.MaybeDeployContract(b, executor.Deploy, chain, contract_utils.DeployInput[executor.ConstructorArgs]{
 				TypeAndVersion: deployment.NewTypeAndVersion(executor.ContractType, *executorParam.Version),
 				ChainSelector:  chain.Selector,
 				Args: executor.ConstructorArgs{
@@ -326,7 +318,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			addresses = append(addresses, executorRef)
 
 			// Deploy ExecutorProxy
-			executorProxyRef, err := contract_utils.MaybeDeployContract(b, executor.DeployProxy, chain, contract.DeployInput[executor.ProxyConstructorArgs]{
+			executorProxyRef, err := contract_utils.MaybeDeployContract(b, executor.DeployProxy, chain, contract_utils.DeployInput[executor.ProxyConstructorArgs]{
 				TypeAndVersion: deployment.NewTypeAndVersion(executor.ProxyType, *semver.MustParse("1.7.0")),
 				ChainSelector:  chain.Selector,
 				Args: executor.ProxyConstructorArgs{
@@ -349,7 +341,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			if mockReceiverParams.Qualifier != "" {
 				qualifierPtr = &mockReceiverParams.Qualifier
 			}
-			deployReceiverReport, err := operations.ExecuteOperation(b, mock_receiver.Deploy, chain, contract.DeployInput[mock_receiver.ConstructorArgs]{
+			deployReceiverReport, err := cldf_ops.ExecuteOperation(b, mock_receiver.Deploy, chain, contract_utils.DeployInput[mock_receiver.ConstructorArgs]{
 				TypeAndVersion: deployment.NewTypeAndVersion(mock_receiver.ContractType, *mockReceiverParams.Version),
 				ChainSelector:  chain.Selector,
 				Args: mock_receiver.ConstructorArgs{
@@ -366,7 +358,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		}
 
 		var batchOps []mcms_types.BatchOperation
-		batchOp, err := contract.NewBatchOperationFromWrites(writes)
+		batchOp, err := contract_utils.NewBatchOperationFromWrites(writes)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
 		}

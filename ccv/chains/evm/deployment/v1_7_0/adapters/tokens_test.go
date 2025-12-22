@@ -61,7 +61,6 @@ func TestTokenAdapter(t *testing.T) {
 			mcmsRegistry := changesets.NewMCMSReaderRegistry()
 			tokenAdapterRegistry := tokens.NewTokenAdapterRegistry()
 			tokenAdapterRegistry.RegisterTokenAdapter("evm", semver.MustParse("1.7.0"), &adapters.TokenAdapter{})
-			tokenAdapterRegistry.RegisterTokenAdapter("evm", semver.MustParse("1.6.1"), &adapters.TokenAdapter{})
 
 			// On each chain, deploy chain contracts & a token + token pool
 			ds := datastore.NewMemoryDataStore()
@@ -76,15 +75,9 @@ func TestTokenAdapter(t *testing.T) {
 				err = ds.Merge(deployChainOut.DataStore.Seal())
 				require.NoError(t, err, "Failed to merge datastore from DeployChainContracts changeset")
 
-				// Deploy a 1.7.0 on chain A and a legacy 1.6.1 on chain B
-				version := semver.MustParse("1.7.0")
-				if chainSel == chainB {
-					version = semver.MustParse("1.6.1")
-				}
-
 				e.DataStore = ds.Seal()
-				deployTokenAndPoolOut, err := v1_7_0.DeployBurnMintTokenAndPool(mcmsRegistry).Apply(*e, changesets.WithMCMS[v1_7_0.DeployBurnMintTokenAndPoolCfg]{
-					Cfg: v1_7_0.DeployBurnMintTokenAndPoolCfg{
+				deployTokenAndPoolOut, err := v1_7_0.DeployTokenAndPool(mcmsRegistry).Apply(*e, changesets.WithMCMS[v1_7_0.DeployTokenAndPoolCfg]{
+					Cfg: v1_7_0.DeployTokenAndPoolCfg{
 						Accounts: map[common.Address]*big.Int{
 							e.BlockChains.EVMChains()[chainSel].DeployerKey.From: big.NewInt(1_000_000),
 						},
@@ -93,22 +86,22 @@ func TestTokenAdapter(t *testing.T) {
 							MaxSupply: big.NewInt(10_000_000),
 							Name:      "TEST",
 						},
-						DeployTokenPoolCfg: v1_7_0.DeployTokenPoolCfg{
-							ChainSel:           chainSel,
-							TokenPoolType:      datastore.ContractType(burn_mint_token_pool.ContractType),
-							TokenPoolVersion:   version,
-							TokenSymbol:        "TEST",
-							LocalTokenDecimals: 18,
-							Router: datastore.AddressRef{
-								ChainSelector: chainSel,
-								Type:          datastore.ContractType(router.ContractType),
-								Version:       semver.MustParse("1.2.0"),
-							},
+						ChainSel:                         chainSel,
+						TokenPoolType:                    datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
+						TokenPoolVersion:                 semver.MustParse("1.7.0"),
+						TokenSymbol:                      "TEST",
+						Decimals:                         18,
+						ThresholdAmountForAdditionalCCVs: big.NewInt(1e18),
+						Router: datastore.AddressRef{
+							ChainSelector: chainSel,
+							Type:          datastore.ContractType(router.ContractType),
+							Version:       semver.MustParse("1.2.0"),
 						},
 					},
 				})
 				require.NoError(t, err, "Failed to apply DeployBurnMintTokenAndPool changeset")
 				err = ds.Merge(deployTokenAndPoolOut.DataStore.Seal())
+				require.NoError(t, err, "Failed to merge datastore from DeployTokenAndPool changeset")
 			}
 
 			// Overwrite datastore in the environment
@@ -130,22 +123,17 @@ func TestTokenAdapter(t *testing.T) {
 				return tokens.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
 					RemoteToken: remoteToken,
 					RemotePool: &datastore.AddressRef{
-						Type:      datastore.ContractType(burn_mint_token_pool.ContractType),
+						Type:      datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
 						Version:   remotePoolVersion,
 						Qualifier: "TEST",
 					},
-					InboundRateLimiterConfig: tokens.RateLimiterConfig{
-						IsEnabled: true,
-						Rate:      big.NewInt(10),
-						Capacity:  big.NewInt(100),
-					},
-					OutboundRateLimiterConfig: tokens.RateLimiterConfig{
-						IsEnabled: true,
-						Rate:      big.NewInt(10),
-						Capacity:  big.NewInt(100),
-					},
-					OutboundCCVs: ccvs,
-					InboundCCVs:  ccvs,
+					DefaultFinalityInboundRateLimiterConfig:  testsetup.CreateRateLimiterConfig(10, 100),
+					DefaultFinalityOutboundRateLimiterConfig: testsetup.CreateRateLimiterConfig(20, 200),
+					CustomFinalityInboundRateLimiterConfig:   testsetup.CreateRateLimiterConfig(30, 300),
+					CustomFinalityOutboundRateLimiterConfig:  testsetup.CreateRateLimiterConfig(40, 400),
+					TokenTransferFeeConfig:                   testsetup.CreateBasicTokenTransferFeeConfig(),
+					OutboundCCVs:                             ccvs,
+					InboundCCVs:                              ccvs,
 				}
 			}
 
@@ -154,7 +142,7 @@ func TestTokenAdapter(t *testing.T) {
 					{
 						ChainSelector: chainA,
 						TokenPoolRef: datastore.AddressRef{
-							Type:      datastore.ContractType(burn_mint_token_pool.ContractType),
+							Type:      datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
 							Version:   semver.MustParse("1.7.0"),
 							Qualifier: "TEST",
 						},
@@ -163,7 +151,7 @@ func TestTokenAdapter(t *testing.T) {
 							Version: semver.MustParse("1.5.0"),
 						},
 						RemoteChains: map[uint64]tokens.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
-							chainB: getRemoteChainConfig(semver.MustParse("1.6.1"), []datastore.AddressRef{
+							chainB: getRemoteChainConfig(semver.MustParse("1.7.0"), []datastore.AddressRef{
 								{
 									Type:    datastore.ContractType(committee_verifier.ContractType),
 									Version: semver.MustParse("1.7.0"),
@@ -174,8 +162,8 @@ func TestTokenAdapter(t *testing.T) {
 					{
 						ChainSelector: chainB,
 						TokenPoolRef: datastore.AddressRef{
-							Type:      datastore.ContractType(burn_mint_token_pool.ContractType),
-							Version:   semver.MustParse("1.6.1"),
+							Type:      datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
+							Version:   semver.MustParse("1.7.0"),
 							Qualifier: "TEST",
 						},
 						RegistryRef: datastore.AddressRef{
@@ -183,7 +171,12 @@ func TestTokenAdapter(t *testing.T) {
 							Version: semver.MustParse("1.5.0"),
 						},
 						RemoteChains: map[uint64]tokens.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
-							chainA: getRemoteChainConfig(semver.MustParse("1.7.0"), nil),
+							chainA: getRemoteChainConfig(semver.MustParse("1.7.0"), []datastore.AddressRef{
+								{
+									Type:    datastore.ContractType(committee_verifier.ContractType),
+									Version: semver.MustParse("1.7.0"),
+								},
+							}),
 						},
 					},
 				},
@@ -199,15 +192,10 @@ func TestTokenAdapter(t *testing.T) {
 			for _, chainSel := range []uint64{chainA, chainB} {
 				evmChain := e.BlockChains.EVMChains()[chainSel]
 
-				version := semver.MustParse("1.7.0")
-				if chainSel == chainB {
-					version = semver.MustParse("1.6.1")
-				}
-
 				tokenPoolAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 					ChainSelector: chainSel,
-					Type:          datastore.ContractType(burn_mint_token_pool.ContractType),
-					Version:       version,
+					Type:          datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
+					Version:       semver.MustParse("1.7.0"),
 					Qualifier:     "TEST",
 				}, chainSel, evm_datastore_utils.ToEVMAddress)
 				require.NoError(t, err, "Failed to find deployed token pool ref in datastore")
@@ -254,37 +242,61 @@ func TestTokenAdapter(t *testing.T) {
 				}
 				require.Equal(t, remoteChainSel, chainSupportReport.Output[0], "Remote chain in token pool should match expected")
 
-				// GetCurrentRateLimiterState is only available in version 1.7.0+
-				if version.GreaterThan(semver.MustParse("1.6.9")) || version.Equal(semver.MustParse("1.7.0")) {
-					rateLimiterStateReport, err := operations.ExecuteOperation(e.OperationsBundle, token_pool.GetCurrentRateLimiterState, evmChain, contract.FunctionInput[uint64]{
-						ChainSelector: chainSel,
-						Address:       tokenPoolAddr,
-						Args:          remoteChainSel,
-					})
-					require.NoError(t, err, "Failed to get rate limiter config from token pool")
-					currentStates := rateLimiterStateReport.Output
-					require.Equal(t, getRemoteChainConfig(nil, nil).InboundRateLimiterConfig.IsEnabled, currentStates.InboundRateLimiterState.IsEnabled, "Inbound rate limiter enabled state should match")
-					require.Equal(t, getRemoteChainConfig(nil, nil).InboundRateLimiterConfig.Rate, currentStates.InboundRateLimiterState.Rate, "Inbound rate limiter rate should match")
-					require.Equal(t, getRemoteChainConfig(nil, nil).InboundRateLimiterConfig.Capacity, currentStates.InboundRateLimiterState.Capacity, "Inbound rate limiter capacity should match")
-					require.Equal(t, getRemoteChainConfig(nil, nil).OutboundRateLimiterConfig.IsEnabled, currentStates.OutboundRateLimiterState.IsEnabled, "Outbound rate limiter enabled state should match")
-					require.Equal(t, getRemoteChainConfig(nil, nil).OutboundRateLimiterConfig.Rate, currentStates.OutboundRateLimiterState.Rate, "Outbound rate limiter rate should match")
-					require.Equal(t, getRemoteChainConfig(nil, nil).OutboundRateLimiterConfig.Capacity, currentStates.OutboundRateLimiterState.Capacity, "Outbound rate limiter capacity should match")
-				}
+				rateLimiterStateReport, err := operations.ExecuteOperation(e.OperationsBundle, token_pool.GetCurrentRateLimiterState, evmChain, contract.FunctionInput[token_pool.GetCurrentRateLimiterStateArgs]{
+					ChainSelector: chainSel,
+					Address:       tokenPoolAddr,
+					Args: token_pool.GetCurrentRateLimiterStateArgs{
+						RemoteChainSelector:     remoteChainSel,
+						CustomBlockConfirmation: false,
+					},
+				})
+				currentStates := rateLimiterStateReport.Output
+				require.NoError(t, err, "Failed to get rate limiter config from token pool")
+				require.Equal(t, getRemoteChainConfig(nil, nil).DefaultFinalityInboundRateLimiterConfig.IsEnabled, currentStates.InboundRateLimiterState.IsEnabled, "Inbound rate limiter enabled state should match")
+				require.Equal(t, getRemoteChainConfig(nil, nil).DefaultFinalityInboundRateLimiterConfig.Rate, currentStates.InboundRateLimiterState.Rate, "Inbound rate limiter rate should match")
+				require.Equal(t, getRemoteChainConfig(nil, nil).DefaultFinalityInboundRateLimiterConfig.Capacity, currentStates.InboundRateLimiterState.Capacity, "Inbound rate limiter capacity should match")
+				require.Equal(t, getRemoteChainConfig(nil, nil).DefaultFinalityOutboundRateLimiterConfig.IsEnabled, currentStates.OutboundRateLimiterState.IsEnabled, "Outbound rate limiter enabled state should match")
+				require.Equal(t, getRemoteChainConfig(nil, nil).DefaultFinalityOutboundRateLimiterConfig.Rate, currentStates.OutboundRateLimiterState.Rate, "Outbound rate limiter rate should match")
+				require.Equal(t, getRemoteChainConfig(nil, nil).DefaultFinalityOutboundRateLimiterConfig.Capacity, currentStates.OutboundRateLimiterState.Capacity, "Outbound rate limiter capacity should match")
 
-				// Chain A has a 1.7.0 token pool so should have set CCVs
-				if chainSel == chainA {
-					boundTokenPool, err := tp_bindings.NewTokenPool(tokenPoolAddr, evmChain.Client)
-					require.NoError(t, err, "Failed to instantiate token pool contract")
-					inboundCCVs, err := boundTokenPool.GetRequiredCCVs(nil, common.Address{}, remoteChainSel, big.NewInt(0), 0, []byte{}, inbound)
-					require.NoError(t, err, "Failed to get inbound CCVs from token pool")
-					require.Len(t, inboundCCVs, 1, "Number of inbound CCVs should match")
-					require.Equal(t, verifierAddr, inboundCCVs[0], "Inbound CCV address should match")
+				rateLimiterStateReport, err = operations.ExecuteOperation(e.OperationsBundle, token_pool.GetCurrentRateLimiterState, evmChain, contract.FunctionInput[token_pool.GetCurrentRateLimiterStateArgs]{
+					ChainSelector: chainSel,
+					Address:       tokenPoolAddr,
+					Args: token_pool.GetCurrentRateLimiterStateArgs{
+						RemoteChainSelector:     remoteChainSel,
+						CustomBlockConfirmation: true,
+					},
+				})
+				currentStates = rateLimiterStateReport.Output
+				require.NoError(t, err, "Failed to get rate limiter config from token pool")
+				require.Equal(t, getRemoteChainConfig(nil, nil).CustomFinalityInboundRateLimiterConfig.IsEnabled, currentStates.InboundRateLimiterState.IsEnabled, "Inbound rate limiter enabled state should match")
+				require.Equal(t, getRemoteChainConfig(nil, nil).CustomFinalityInboundRateLimiterConfig.Rate, currentStates.InboundRateLimiterState.Rate, "Inbound rate limiter rate should match")
+				require.Equal(t, getRemoteChainConfig(nil, nil).CustomFinalityInboundRateLimiterConfig.Capacity, currentStates.InboundRateLimiterState.Capacity, "Inbound rate limiter capacity should match")
+				require.Equal(t, getRemoteChainConfig(nil, nil).CustomFinalityOutboundRateLimiterConfig.IsEnabled, currentStates.OutboundRateLimiterState.IsEnabled, "Outbound rate limiter enabled state should match")
+				require.Equal(t, getRemoteChainConfig(nil, nil).CustomFinalityOutboundRateLimiterConfig.Rate, currentStates.OutboundRateLimiterState.Rate, "Outbound rate limiter rate should match")
+				require.Equal(t, getRemoteChainConfig(nil, nil).CustomFinalityOutboundRateLimiterConfig.Capacity, currentStates.OutboundRateLimiterState.Capacity, "Outbound rate limiter capacity should match")
 
-					outboundCCVs, err := boundTokenPool.GetRequiredCCVs(nil, common.Address{}, remoteChainSel, big.NewInt(0), 0, []byte{}, outbound)
-					require.NoError(t, err, "Failed to get outbound CCVs from token pool")
-					require.Len(t, outboundCCVs, 1, "Number of outbound CCVs should match")
-					require.Equal(t, verifierAddr, outboundCCVs[0], "Outbound CCV address should match")
-				}
+				boundTokenPool, err := tp_bindings.NewTokenPool(tokenPoolAddr, evmChain.Client)
+				require.NoError(t, err, "Failed to instantiate token pool contract")
+				inboundCCVs, err := boundTokenPool.GetRequiredCCVs(nil, common.Address{}, remoteChainSel, big.NewInt(0), 0, []byte{}, inbound)
+				require.NoError(t, err, "Failed to get inbound CCVs from token pool")
+				require.Len(t, inboundCCVs, 1, "Number of inbound CCVs should match")
+				require.Equal(t, verifierAddr, inboundCCVs[0], "Inbound CCV address should match")
+
+				outboundCCVs, err := boundTokenPool.GetRequiredCCVs(nil, common.Address{}, remoteChainSel, big.NewInt(0), 0, []byte{}, outbound)
+				require.NoError(t, err, "Failed to get outbound CCVs from token pool")
+				require.Len(t, outboundCCVs, 1, "Number of outbound CCVs should match")
+				require.Equal(t, verifierAddr, outboundCCVs[0], "Outbound CCV address should match")
+
+				tokenTransferFeeConfig, err := boundTokenPool.GetTokenTransferFeeConfig(nil, common.Address{}, remoteChainSel, 0, []byte{})
+				require.NoError(t, err, "Failed to get token transfer fee config from token pool")
+				require.Equal(t, getRemoteChainConfig(nil, nil).TokenTransferFeeConfig.IsEnabled, tokenTransferFeeConfig.IsEnabled, "Token transfer fee config enabled state should match")
+				require.Equal(t, getRemoteChainConfig(nil, nil).TokenTransferFeeConfig.DestGasOverhead, tokenTransferFeeConfig.DestGasOverhead, "Token transfer fee config dest gas overhead should match")
+				require.Equal(t, getRemoteChainConfig(nil, nil).TokenTransferFeeConfig.DestBytesOverhead, tokenTransferFeeConfig.DestBytesOverhead, "Token transfer fee config dest bytes overhead should match")
+				require.Equal(t, getRemoteChainConfig(nil, nil).TokenTransferFeeConfig.DefaultFinalityFeeUSDCents, tokenTransferFeeConfig.DefaultBlockConfirmationFeeUSDCents, "Token transfer fee config default finality fee USDCents should match")
+				require.Equal(t, getRemoteChainConfig(nil, nil).TokenTransferFeeConfig.CustomFinalityFeeUSDCents, tokenTransferFeeConfig.CustomBlockConfirmationFeeUSDCents, "Token transfer fee config custom finality fee USDCents should match")
+				require.Equal(t, getRemoteChainConfig(nil, nil).TokenTransferFeeConfig.DefaultFinalityTransferFeeBps, tokenTransferFeeConfig.DefaultBlockConfirmationTransferFeeBps, "Token transfer fee config default finality transfer fee BPS should match")
+				require.Equal(t, getRemoteChainConfig(nil, nil).TokenTransferFeeConfig.CustomFinalityTransferFeeBps, tokenTransferFeeConfig.CustomBlockConfirmationTransferFeeBps, "Token transfer fee config custom finality transfer fee BPS should match")
 			}
 		})
 	}
