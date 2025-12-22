@@ -641,7 +641,7 @@ func (m *CCIP16EVM) DeployContractsForSelector(ctx context.Context, env *deploym
 			datastore.AddressRef{
 				ChainSelector: selector,
 				Type:          datastore.ContractType(utils.CapabilitiesRegistry),
-				Version:       semver.MustParse("1.6.0"),
+				Version:       semver.MustParse("1.0.0"),
 				Address:       crAddr,
 			},
 		)
