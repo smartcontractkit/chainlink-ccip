@@ -103,7 +103,7 @@ func TestSetTokenTransferFeeV1_6_0(t *testing.T) {
 	srcLinkRef, err := output.DataStore.Addresses().Get(
 		datastore.NewAddressRefKey(src,
 			datastore.ContractType(tokensops.LinkContractType),
-			semver.MustParse("1.6.0"), // no version is needed for Solana LINK token
+			semver.MustParse("1.6.0"), // version 1.6.0 for Solana LINK token
 			"",                        // no qualifier is needed for Solana LINK token
 		),
 	)
