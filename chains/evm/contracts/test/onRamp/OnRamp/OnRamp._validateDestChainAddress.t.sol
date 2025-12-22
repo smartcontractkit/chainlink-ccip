@@ -34,7 +34,7 @@ contract OnRamp_validateDestChainAddress is OnRampSetup {
   function testFuzz_validateDestChainAddress_MatchesInputLength(
     bytes calldata rawAddress
   ) public view {
-    vm.assume(rawAddress.length > 0);
+    vm.assume(rawAddress.length > 0 && rawAddress.length <= type(uint8).max);
 
     uint8 addressBytesLength = uint8(rawAddress.length);
 
