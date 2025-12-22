@@ -12,19 +12,13 @@ interface IEVM2AnyOnRampClient {
   /// @param destChainSelector The destination chain selector.
   /// @param message The message to calculate the cost for.
   /// @return fee The calculated fee.
-  function getFee(
-    uint64 destChainSelector,
-    Client.EVM2AnyMessage calldata message
-  ) external view returns (uint256 fee);
+  function getFee(uint64 destChainSelector, Client.EVM2AnyMessage calldata message) external view returns (uint256 fee);
 
   /// @notice Get the pool for a specific token.
   /// @param destChainSelector The destination chain selector.
   /// @param sourceToken The source chain token to get the pool for.
   /// @return pool Token pool.
-  function getPoolBySourceToken(
-    uint64 destChainSelector,
-    IERC20 sourceToken
-  ) external view returns (IPoolV1);
+  function getPoolBySourceToken(uint64 destChainSelector, IERC20 sourceToken) external view returns (IPoolV1);
 
   /// @notice Gets a list of all supported source chain tokens.
   /// @param destChainSelector The destination chain selector.

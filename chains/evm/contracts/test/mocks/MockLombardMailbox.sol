@@ -10,11 +10,7 @@ contract MockLombardMailbox is IMailbox {
 
   bytes public s_lastRawPayload;
 
-  function setResult(
-    bytes32 payloadHash,
-    bool executed,
-    bytes calldata executionResult
-  ) external {
+  function setResult(bytes32 payloadHash, bool executed, bytes calldata executionResult) external {
     s_payloadHash = payloadHash;
     s_executed = executed;
     s_executionResult = executionResult;
@@ -33,10 +29,7 @@ contract MockLombardMailbox is IMailbox {
     s_executed = shouldSucceed;
   }
 
-  function deliverAndHandle(
-    bytes calldata rawPayload,
-    bytes calldata
-  ) external returns (bytes32, bool, bytes memory) {
+  function deliverAndHandle(bytes calldata rawPayload, bytes calldata) external returns (bytes32, bool, bytes memory) {
     s_lastRawPayload = rawPayload;
     bytes32 payloadHash = s_payloadHash != bytes32(0) ? s_payloadHash : keccak256(rawPayload);
     return (payloadHash, s_executed, s_executionResult);

@@ -17,13 +17,7 @@ contract FacadeClient {
 
   uint256 private s_msg_sequence = 1;
 
-  constructor(
-    address router,
-    uint64 destChainSelector,
-    IERC20 sourceToken,
-    IERC20 feeToken,
-    address receiver
-  ) {
+  constructor(address router, uint64 destChainSelector, IERC20 sourceToken, IERC20 feeToken, address receiver) {
     i_router = router;
     i_destChainSelector = destChainSelector;
     i_sourceToken = sourceToken;

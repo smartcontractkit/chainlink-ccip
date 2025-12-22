@@ -20,7 +20,12 @@ contract MessageV1Codec__decodeTokenTransferV1 is MessageV1CodecSetup {
 
   function test__decodeTokenTransferV1_EmptyFields() public view {
     MessageV1Codec.TokenTransferV1 memory originalTransfer = MessageV1Codec.TokenTransferV1({
-      amount: 0, sourcePoolAddress: "", sourceTokenAddress: "", destTokenAddress: "", tokenReceiver: "", extraData: ""
+      amount: 0,
+      sourcePoolAddress: "",
+      sourceTokenAddress: "",
+      destTokenAddress: "",
+      tokenReceiver: "",
+      extraData: ""
     });
 
     bytes memory encoded = MessageV1Codec._encodeTokenTransferV1(originalTransfer);

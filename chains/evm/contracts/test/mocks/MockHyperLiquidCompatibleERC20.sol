@@ -17,10 +17,7 @@ contract MockHyperLiquidCompatibleERC20 is HyperLiquidCompatibleERC20 {
   /// @param remoteAmount The amount on the remote chain
   /// @param remoteDecimals The decimals of the token on the remote chain
   /// @return The local amount
-  function calculateLocalAmount(
-    uint256 remoteAmount,
-    uint8 remoteDecimals
-  ) public view returns (uint256) {
+  function calculateLocalAmount(uint256 remoteAmount, uint8 remoteDecimals) public view returns (uint256) {
     return _calculateLocalAmount(remoteAmount, remoteDecimals);
   }
 }

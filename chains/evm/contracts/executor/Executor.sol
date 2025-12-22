@@ -60,10 +60,7 @@ contract Executor is IExecutor, Ownable2StepMsgSender {
   /// @notice The remote chain configurations for supported destination chains.
   mapping(uint64 remoteChainSelector => RemoteChainConfig) internal s_remoteChainConfigs;
 
-  constructor(
-    uint8 maxCCVsPerMsg,
-    DynamicConfig memory dynamicConfig
-  ) {
+  constructor(uint8 maxCCVsPerMsg, DynamicConfig memory dynamicConfig) {
     if (maxCCVsPerMsg == 0) {
       revert InvalidMaxPossibleCCVsPerMsg(maxCCVsPerMsg);
     }

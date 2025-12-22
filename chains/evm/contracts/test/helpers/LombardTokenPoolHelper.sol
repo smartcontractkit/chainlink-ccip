@@ -18,10 +18,7 @@ contract LombardTokenPoolHelper is LombardTokenPool {
     uint8 fallbackDecimals
   ) LombardTokenPool(token, verifier, bridge, adapter, advancedPoolHooks, rmnProxy, router, fallbackDecimals) {}
 
-  function getTokenDecimals(
-    IERC20Metadata token,
-    uint8 fallbackDecimals
-  ) external view returns (uint8) {
+  function getTokenDecimals(IERC20Metadata token, uint8 fallbackDecimals) external view returns (uint8) {
     return _getTokenDecimals(token, fallbackDecimals);
   }
 }

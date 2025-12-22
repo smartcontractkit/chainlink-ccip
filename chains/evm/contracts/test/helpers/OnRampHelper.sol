@@ -7,10 +7,7 @@ import {MessageV1Codec} from "../../libraries/MessageV1Codec.sol";
 import {OnRamp} from "../../onRamp/OnRamp.sol";
 
 contract OnRampHelper is OnRamp {
-  constructor(
-    StaticConfig memory staticConfig,
-    DynamicConfig memory dynamicConfig
-  ) OnRamp(staticConfig, dynamicConfig) {}
+  constructor(StaticConfig memory staticConfig, DynamicConfig memory dynamicConfig) OnRamp(staticConfig, dynamicConfig) {}
 
   /// @notice Exposes the internal _parseExtraArgsWithDefaults function for testing.
   function parseExtraArgsWithDefaults(
@@ -72,10 +69,7 @@ contract OnRampHelper is OnRamp {
     return _getReceipts(destChainSelector, networkFeeUSDCents, message, extraArgs);
   }
 
-  function distributeFees(
-    Client.EVM2AnyMessage calldata message,
-    Receipt[] memory receipts
-  ) external {
+  function distributeFees(Client.EVM2AnyMessage calldata message, Receipt[] memory receipts) external {
     _distributeFees(message, receipts);
   }
 

@@ -83,12 +83,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV2, ITypeAndVersion {
 
   string public constant override typeAndVersion = "USDCTokenPoolProxy 1.7.0-dev";
 
-  constructor(
-    IERC20 token,
-    PoolAddresses memory pools,
-    address router,
-    address cctpVerifier
-  ) {
+  constructor(IERC20 token, PoolAddresses memory pools, address router, address cctpVerifier) {
     // Note: It is not required that every pool address be set, as this proxy may be deployed on a chain which does not support a specific version of CCTP.
     // As a result only the token, router, and cctpVerifier are enforced to be non-zero.
     if (address(token) == address(0) || router == address(0) || cctpVerifier == address(0)) {
@@ -463,8 +458,9 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV2, ITypeAndVersion {
     onlyWithCCVCompatiblePool
     returns (uint256 feeUSDCents, uint32 destGasOverhead, uint32 destBytesOverhead, uint16 tokenFeeBps, bool isEnabled)
   {
-    return IPoolV2(s_pools.cctpV2PoolWithCCV)
-      .getFee(localToken, destChainSelector, amount, feeToken, blockConfirmationRequested, tokenArgs);
+    return IPoolV2(s_pools.cctpV2PoolWithCCV).getFee(
+      localToken, destChainSelector, amount, feeToken, blockConfirmationRequested, tokenArgs
+    );
   }
 
   /// @inheritdoc IPoolV2
@@ -478,8 +474,9 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV2, ITypeAndVersion {
     uint16 blockConfirmationRequested,
     bytes calldata tokenArgs
   ) external view onlyWithCCVCompatiblePool returns (TokenTransferFeeConfig memory feeConfig) {
-    return IPoolV2(s_pools.cctpV2PoolWithCCV)
-      .getTokenTransferFeeConfig(localToken, destChainSelector, blockConfirmationRequested, tokenArgs);
+    return IPoolV2(s_pools.cctpV2PoolWithCCV).getTokenTransferFeeConfig(
+      localToken, destChainSelector, blockConfirmationRequested, tokenArgs
+    );
   }
 
   /// @inheritdoc IPoolV2

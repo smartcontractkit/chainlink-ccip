@@ -95,10 +95,7 @@ contract MaybeRevertMessageReceiver is IAny2EVMMessageReceiver, IERC165 {
   /// @notice Allows the manager to withdraw ERC-20 tokens from the contract
   /// @param token The address of the ERC-20 token contract
   /// @param amount The amount of tokens to withdraw
-  function withdrawTokens(
-    address token,
-    uint256 amount
-  ) external onlyManager {
+  function withdrawTokens(address token, uint256 amount) external onlyManager {
     IERC20 erc20 = IERC20(token);
     uint256 balance = erc20.balanceOf(address(this));
     if (balance < amount) {

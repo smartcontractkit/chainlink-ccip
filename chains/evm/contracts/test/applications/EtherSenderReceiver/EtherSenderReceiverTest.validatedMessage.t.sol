@@ -15,7 +15,11 @@ contract EtherSenderReceiverTest_validatedMessage is EtherSenderReceiverTestSetu
       amount: AMOUNT
     });
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
-      receiver: abi.encode(XCHAIN_RECEIVER), data: data, tokenAmounts: tokenAmounts, feeToken: address(0), extraArgs: ""
+      receiver: abi.encode(XCHAIN_RECEIVER),
+      data: data,
+      tokenAmounts: tokenAmounts,
+      feeToken: address(0),
+      extraArgs: ""
     });
 
     Client.EVM2AnyMessage memory validatedMessage = s_etherSenderReceiver.validatedMessage(message);
@@ -33,7 +37,11 @@ contract EtherSenderReceiverTest_validatedMessage is EtherSenderReceiverTestSetu
     Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
     tokenAmounts[0] = Client.EVMTokenAmount({token: token, amount: AMOUNT});
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
-      receiver: abi.encode(XCHAIN_RECEIVER), data: "", tokenAmounts: tokenAmounts, feeToken: address(0), extraArgs: ""
+      receiver: abi.encode(XCHAIN_RECEIVER),
+      data: "",
+      tokenAmounts: tokenAmounts,
+      feeToken: address(0),
+      extraArgs: ""
     });
 
     Client.EVM2AnyMessage memory validatedMessage = s_etherSenderReceiver.validatedMessage(message);
@@ -52,7 +60,11 @@ contract EtherSenderReceiverTest_validatedMessage is EtherSenderReceiverTestSetu
       amount: AMOUNT
     });
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
-      receiver: abi.encode(XCHAIN_RECEIVER), data: "", tokenAmounts: tokenAmounts, feeToken: address(0), extraArgs: ""
+      receiver: abi.encode(XCHAIN_RECEIVER),
+      data: "",
+      tokenAmounts: tokenAmounts,
+      feeToken: address(0),
+      extraArgs: ""
     });
 
     Client.EVM2AnyMessage memory validatedMessage = s_etherSenderReceiver.validatedMessage(message);
@@ -94,7 +106,11 @@ contract EtherSenderReceiverTest_validatedMessage is EtherSenderReceiverTestSetu
       amount: AMOUNT
     });
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
-      receiver: abi.encode(XCHAIN_RECEIVER), data: "", tokenAmounts: tokenAmounts, feeToken: address(0), extraArgs: ""
+      receiver: abi.encode(XCHAIN_RECEIVER),
+      data: "",
+      tokenAmounts: tokenAmounts,
+      feeToken: address(0),
+      extraArgs: ""
     });
 
     Client.EVM2AnyMessage memory validatedMessage = s_etherSenderReceiver.validatedMessage(message);
@@ -138,7 +154,11 @@ contract EtherSenderReceiverTest_validatedMessage is EtherSenderReceiverTestSetu
     tokenAmounts[0] = Client.EVMTokenAmount({token: address(0), amount: AMOUNT});
     tokenAmounts[1] = Client.EVMTokenAmount({token: address(0), amount: AMOUNT});
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
-      receiver: abi.encode(XCHAIN_RECEIVER), data: "", tokenAmounts: tokenAmounts, feeToken: address(0), extraArgs: ""
+      receiver: abi.encode(XCHAIN_RECEIVER),
+      data: "",
+      tokenAmounts: tokenAmounts,
+      feeToken: address(0),
+      extraArgs: ""
     });
 
     vm.expectRevert(abi.encodeWithSelector(EtherSenderReceiver.InvalidTokenAmounts.selector, uint256(2)));

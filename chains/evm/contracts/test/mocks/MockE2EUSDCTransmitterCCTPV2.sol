@@ -43,11 +43,7 @@ contract MockE2EUSDCTransmitterCCTPV2 is IMessageTransmitterWithRelay {
    */
   event MessageReceived(bytes message, bytes attestation);
 
-  constructor(
-    uint32 _version,
-    uint32 _localDomain,
-    address token
-  ) {
+  constructor(uint32 _version, uint32 _localDomain, address token) {
     i_version = _version;
     i_localDomain = _localDomain;
     s_shouldSucceed = true;
@@ -69,10 +65,7 @@ contract MockE2EUSDCTransmitterCCTPV2 is IMessageTransmitterWithRelay {
   /// minFinalityThreshold       4              uint32    140
   /// finalityThresholdExecuted  4              uint32    144
   /// messageBody                dynamic        bytes     148
-  function receiveMessage(
-    bytes calldata message,
-    bytes calldata attestation
-  ) external returns (bool success) {
+  function receiveMessage(bytes calldata message, bytes calldata attestation) external returns (bool success) {
     // The receiver of the funds is the _mintRecipient in the following encoded format
     //   function _formatMessage(
     //    uint32 _version,             4

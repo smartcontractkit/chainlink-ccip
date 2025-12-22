@@ -35,10 +35,7 @@ interface IMessageTransmitter {
   /// signature verification will fail.***
   /// If incorrect number of signatures or duplicate signatures are supplied,
   /// signature verification will fail.
-  function receiveMessage(
-    bytes calldata message,
-    bytes calldata attestation
-  ) external returns (bool success);
+  function receiveMessage(bytes calldata message, bytes calldata attestation) external returns (bool success);
 
   /// Returns domain of chain on which the contract is deployed.
   /// @dev immutable

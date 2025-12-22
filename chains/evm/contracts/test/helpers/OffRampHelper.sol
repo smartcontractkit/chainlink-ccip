@@ -41,7 +41,7 @@ contract OffRampHelper is OffRamp {
 
   function beforeExecuteSingleMessage(
     MessageV1Codec.MessageV1 memory message
-  ) external returns (MessageV1Codec.MessageV1 memory) {
+  ) external view returns (MessageV1Codec.MessageV1 memory) {
     return _beforeExecuteSingleMessage(message);
   }
 
@@ -54,10 +54,7 @@ contract OffRampHelper is OffRamp {
     return _releaseOrMintSingleToken(tokenTransfer, originalSender, sourceChainSelector, finality);
   }
 
-  function getBalanceOfReceiver(
-    address receiver,
-    address token
-  ) external view returns (uint256) {
+  function getBalanceOfReceiver(address receiver, address token) external view returns (uint256) {
     return _getBalanceOfReceiver(receiver, token);
   }
 

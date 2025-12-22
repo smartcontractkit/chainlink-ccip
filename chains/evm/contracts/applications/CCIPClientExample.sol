@@ -44,18 +44,12 @@ contract CCIPClientExample is CCIPReceiver, Ownable2StepMsgSender {
   // one can simply key based on (chainSelector, messageType) instead of only chainSelector.
   mapping(uint64 destChainSelector => bytes extraArgsBytes) public s_chains;
 
-  constructor(
-    IRouterClient router,
-    IERC20 feeToken
-  ) CCIPReceiver(address(router)) {
+  constructor(IRouterClient router, IERC20 feeToken) CCIPReceiver(address(router)) {
     s_feeToken = feeToken;
     s_feeToken.approve(address(router), type(uint256).max);
   }
 
-  function enableChain(
-    uint64 chainSelector,
-    bytes memory extraArgs
-  ) external onlyOwner {
+  function enableChain(uint64 chainSelector, bytes memory extraArgs) external onlyOwner {
     s_chains[chainSelector] = extraArgs;
   }
 
@@ -94,10 +88,9 @@ contract CCIPClientExample is CCIPReceiver, Ownable2StepMsgSender {
       extraArgs: s_chains[destChainSelector],
       feeToken: address(0) // We leave the feeToken empty indicating we'll pay raw native.
     });
-    bytes32 messageId = IRouterClient(i_ccipRouter)
-    .ccipSend{value: IRouterClient(i_ccipRouter).getFee(destChainSelector, message)}(
-      destChainSelector, message
-    );
+    bytes32 messageId = IRouterClient(i_ccipRouter).ccipSend{
+      value: IRouterClient(i_ccipRouter).getFee(destChainSelector, message)
+    }(destChainSelector, message);
     emit MessageSent(messageId);
   }
 

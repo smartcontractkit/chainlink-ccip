@@ -17,9 +17,8 @@ contract USDCReaderTester {
     uint64 nonce,
     bytes calldata messageBody
   ) external {
-    bytes memory _message = _formatMessage(
-      version, sourceDomain, destinationDomain, nonce, sender, recipient, destinationCaller, messageBody
-    );
+    bytes memory _message =
+      _formatMessage(version, sourceDomain, destinationDomain, nonce, sender, recipient, destinationCaller, messageBody);
     emit MessageSent(_message);
   }
 

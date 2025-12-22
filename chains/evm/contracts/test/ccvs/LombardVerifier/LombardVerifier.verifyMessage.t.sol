@@ -11,10 +11,7 @@ import {LombardVerifierSetup} from "./LombardVerifierSetup.t.sol";
 contract LombardVerifier_verifyMessage is LombardVerifierSetup {
   /// @dev Encodes ccvData in the raw bytes format:
   /// [versionTag (4 bytes)][rawPayloadLength (2 bytes)][rawPayload][proofLength (2 bytes)][proof]
-  function _encodeCcvData(
-    bytes memory rawPayload,
-    bytes memory proof
-  ) internal pure returns (bytes memory) {
+  function _encodeCcvData(bytes memory rawPayload, bytes memory proof) internal pure returns (bytes memory) {
     return bytes.concat(
       VERSION_TAG_V1_7_0, bytes2(uint16(rawPayload.length)), rawPayload, bytes2(uint16(proof.length)), proof
     );

@@ -11,11 +11,7 @@ contract MockReceiverV2 is IAny2EVMMessageReceiverV2, IERC165 {
   address[] internal s_optional;
   uint8 internal s_threshold;
 
-  constructor(
-    address[] memory required,
-    address[] memory optional,
-    uint8 threshold
-  ) {
+  constructor(address[] memory required, address[] memory optional, uint8 threshold) {
     s_required = required;
     s_optional = optional;
     s_threshold = threshold;

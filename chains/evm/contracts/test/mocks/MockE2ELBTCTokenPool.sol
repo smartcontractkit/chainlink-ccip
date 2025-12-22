@@ -47,7 +47,8 @@ contract MockE2ELBTCTokenPool is TokenPool, ITypeAndVersion {
     });
 
     return Pool.LockOrBurnOutV1({
-      destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector), destPoolData: s_destPoolData
+      destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
+      destPoolData: s_destPoolData
     });
   }
 

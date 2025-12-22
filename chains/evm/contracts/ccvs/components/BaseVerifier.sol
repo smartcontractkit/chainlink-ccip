@@ -68,10 +68,7 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
   /// implement a way to update this value if needed.
   string[] internal s_storageLocations;
 
-  constructor(
-    string[] memory storageLocations,
-    address rmnAddress
-  ) {
+  constructor(string[] memory storageLocations, address rmnAddress) {
     _setStorageLocations(storageLocations);
 
     if (rmnAddress == address(0)) {
@@ -162,10 +159,7 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
     }
   }
 
-  function _assertSenderIsAllowed(
-    uint64 destChainSelector,
-    address sender
-  ) internal view virtual {
+  function _assertSenderIsAllowed(uint64 destChainSelector, address sender) internal view virtual {
     RemoteChainConfig storage chainConfig = _getRemoteChainConfig(destChainSelector);
     if (address(chainConfig.router) == address(0)) {
       revert RemoteChainNotSupported(destChainSelector);
@@ -255,10 +249,7 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
   /// @notice Withdraws the outstanding fee token balances to the fee aggregator.
   /// @param feeTokens The fee tokens to withdraw.
   /// @param feeAggregator The address to withdraw the fee tokens to.
-  function _withdrawFeeTokens(
-    address[] calldata feeTokens,
-    address feeAggregator
-  ) internal virtual {
+  function _withdrawFeeTokens(address[] calldata feeTokens, address feeAggregator) internal virtual {
     for (uint256 i = 0; i < feeTokens.length; ++i) {
       IERC20 feeToken = IERC20(feeTokens[i]);
       uint256 feeTokenBalance = feeToken.balanceOf(address(this));

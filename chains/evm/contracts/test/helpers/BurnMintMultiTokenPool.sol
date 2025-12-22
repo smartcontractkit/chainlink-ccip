@@ -28,7 +28,8 @@ contract BurnMintMultiTokenPool is MultiTokenPool {
     emit Burned(msg.sender, lockOrBurnIn.amount);
 
     return Pool.LockOrBurnOutV1({
-      destTokenAddress: getRemoteToken(lockOrBurnIn.localToken, lockOrBurnIn.remoteChainSelector), destPoolData: ""
+      destTokenAddress: getRemoteToken(lockOrBurnIn.localToken, lockOrBurnIn.remoteChainSelector),
+      destPoolData: ""
     });
   }
 

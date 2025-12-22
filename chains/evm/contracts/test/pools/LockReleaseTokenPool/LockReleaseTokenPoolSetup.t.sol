@@ -63,7 +63,9 @@ contract LockReleaseTokenPoolSetup is BaseTest {
       abi.encodeWithSignature("getTokenConfig(address)", address(s_token)),
       abi.encode(
         TokenAdminRegistry.TokenConfig({
-          administrator: OWNER, pendingAdministrator: address(0), tokenPool: address(s_lockReleaseTokenPool)
+          administrator: OWNER,
+          pendingAdministrator: address(0),
+          tokenPool: address(s_lockReleaseTokenPool)
         })
       )
     );
@@ -72,10 +74,14 @@ contract LockReleaseTokenPoolSetup is BaseTest {
     ERC20LockBox.AllowedCallerConfigArgs[] memory allowedCallers = new ERC20LockBox.AllowedCallerConfigArgs[](3);
     allowedCallers[0] = ERC20LockBox.AllowedCallerConfigArgs({token: address(s_token), caller: OWNER, allowed: true});
     allowedCallers[1] = ERC20LockBox.AllowedCallerConfigArgs({
-      token: address(s_token), caller: address(s_lockReleaseTokenPool), allowed: true
+      token: address(s_token),
+      caller: address(s_lockReleaseTokenPool),
+      allowed: true
     });
     allowedCallers[2] = ERC20LockBox.AllowedCallerConfigArgs({
-      token: address(s_token), caller: address(s_lockReleaseTokenPoolWithAllowList), allowed: true
+      token: address(s_token),
+      caller: address(s_lockReleaseTokenPoolWithAllowList),
+      allowed: true
     });
     s_lockBox.configureAllowedCallers(allowedCallers);
 

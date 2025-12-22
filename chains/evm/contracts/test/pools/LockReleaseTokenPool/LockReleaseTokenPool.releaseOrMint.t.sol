@@ -33,7 +33,9 @@ contract LockReleaseTokenPool_releaseOrMint is LockReleaseTokenPoolSetup {
 
     vm.expectEmit();
     emit TokenPool.InboundRateLimitConsumed({
-      remoteChainSelector: SOURCE_CHAIN_SELECTOR, token: address(s_token), amount: amount
+      remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+      token: address(s_token),
+      amount: amount
     });
 
     vm.expectEmit();
@@ -86,10 +88,7 @@ contract LockReleaseTokenPool_releaseOrMint is LockReleaseTokenPoolSetup {
     assertEq(s_token.balanceOf(recipient), amount);
   }
 
-  function testFuzz_releaseOrMint(
-    address recipient,
-    uint256 amount
-  ) public {
+  function testFuzz_releaseOrMint(address recipient, uint256 amount) public {
     // Since the owner already has tokens this would break the checks.
     vm.assume(recipient != OWNER);
     vm.assume(recipient != address(0));
@@ -103,7 +102,9 @@ contract LockReleaseTokenPool_releaseOrMint is LockReleaseTokenPoolSetup {
     // Amount is bounded to capacity, so it should always succeed.
     vm.expectEmit();
     emit TokenPool.InboundRateLimitConsumed({
-      remoteChainSelector: SOURCE_CHAIN_SELECTOR, token: address(s_token), amount: amount
+      remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+      token: address(s_token),
+      amount: amount
     });
 
     vm.expectEmit();

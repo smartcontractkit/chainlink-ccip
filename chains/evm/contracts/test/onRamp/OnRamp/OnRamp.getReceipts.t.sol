@@ -94,10 +94,7 @@ contract OnRamp_getReceipts is OnRampSetup {
     });
   }
 
-  function _mockVerifier(
-    address verifierAddress,
-    address implAddress
-  ) internal {
+  function _mockVerifier(address verifierAddress, address implAddress) internal {
     vm.mockCall(
       verifierAddress,
       abi.encodeCall(ICrossChainVerifierResolver.getOutboundImplementation, (DEST_CHAIN_SELECTOR, "")),
@@ -115,10 +112,7 @@ contract OnRamp_getReceipts is OnRampSetup {
     );
   }
 
-  function _expectedNetworkFee(
-    uint256 feeTokenPrice,
-    uint256 percentMultiplier
-  ) internal pure returns (uint256) {
+  function _expectedNetworkFee(uint256 feeTokenPrice, uint256 percentMultiplier) internal pure returns (uint256) {
     return (uint256(NETWORK_FEE_USD_CENTS) * percentMultiplier * 1e32) / feeTokenPrice;
   }
 

@@ -43,6 +43,7 @@ library ExtraArgsCodec {
     ENCODE_TOKEN_ARGS_LENGTH, // 12
     ENCODE_SVM_ACCOUNTS_LENGTH, // 13
     ENCODE_SUI_OBJECT_IDS_LENGTH // 14
+
   }
 
   /// @notice GenericExtraArgsV3 encoding format used for CCIP messages.
@@ -120,10 +121,7 @@ library ExtraArgsCodec {
   /// @param gasLimit The gas limit for the callback on the destination chain.
   /// @param blockConfirmations The user requested number of block confirmations.
   /// @return encoded The encoded extra args as bytes. These are ready to be passed into CCIP functions.
-  function _getBasicEncodedExtraArgsV3(
-    uint32 gasLimit,
-    uint16 blockConfirmations
-  ) internal pure returns (bytes memory) {
+  function _getBasicEncodedExtraArgsV3(uint32 gasLimit, uint16 blockConfirmations) internal pure returns (bytes memory) {
     return abi.encodePacked(GENERIC_EXTRA_ARGS_V3_TAG, gasLimit, blockConfirmations, bytes7(0));
   }
 
@@ -258,10 +256,7 @@ library ExtraArgsCodec {
   /// @param ptr The memory pointer where to start writing.
   /// @param addr The address to write.
   /// @return newPtr The updated memory pointer after writing.
-  function _writeUint8PrefixedAddress(
-    uint256 ptr,
-    address addr
-  ) private pure returns (uint256 newPtr) {
+  function _writeUint8PrefixedAddress(uint256 ptr, address addr) private pure returns (uint256 newPtr) {
     assembly {
       let addrLength := mul(iszero(iszero(addr)), 20)
       // Write address length (1 byte).
@@ -284,10 +279,7 @@ library ExtraArgsCodec {
   /// @param ptr The memory pointer where to start writing.
   /// @param data The bytes data to write.
   /// @return newPtr The updated memory pointer after writing.
-  function _writeUint16PrefixedBytes(
-    uint256 ptr,
-    bytes memory data
-  ) private pure returns (uint256 newPtr) {
+  function _writeUint16PrefixedBytes(uint256 ptr, bytes memory data) private pure returns (uint256 newPtr) {
     uint256 dataLength = data.length;
     assembly {
       // Write length (2 bytes, big endian).
@@ -316,10 +308,7 @@ library ExtraArgsCodec {
   /// @param ptr The memory pointer where to start writing.
   /// @param data The bytes data to write.
   /// @return newPtr The updated memory pointer after writing.
-  function _writeUint8PrefixedBytes(
-    uint256 ptr,
-    bytes memory data
-  ) private pure returns (uint256 newPtr) {
+  function _writeUint8PrefixedBytes(uint256 ptr, bytes memory data) private pure returns (uint256 newPtr) {
     uint256 dataLength = data.length;
     assembly {
       // Write length (1 byte).
@@ -348,9 +337,8 @@ library ExtraArgsCodec {
   ) internal pure returns (bytes memory encoded) {
     // Validate ccvs and ccvArgs arrays have the same length.
     uint256 ccvsLength = extraArgs.ccvs.length;
-    uint256 ccvArgsLength = extraArgs.ccvArgs.length;
-    if (ccvsLength != ccvArgsLength) {
-      revert CCVArrayLengthMismatch(ccvsLength, ccvArgsLength);
+    if (ccvsLength != extraArgs.ccvArgs.length) {
+      revert CCVArrayLengthMismatch(ccvsLength, extraArgs.ccvArgs.length);
     }
 
     // Validate field lengths.
@@ -371,8 +359,7 @@ library ExtraArgsCodec {
     }
 
     // Calculate executor length.
-    address executor = extraArgs.executor;
-    uint256 executorLength = executor == address(0) ? 0 : 20;
+    uint256 executorLength = extraArgs.executor == address(0) ? 0 : 20;
 
     // Calculate total CCV encoded size and validate.
     uint256 ccvsEncodedSize = 0;
@@ -396,32 +383,17 @@ library ExtraArgsCodec {
         + tokenArgsLength + 32
     );
 
+    bytes memory staticFields =
+      abi.encodePacked(GENERIC_EXTRA_ARGS_V3_TAG, extraArgs.gasLimit, extraArgs.blockConfirmations, uint8(ccvsLength));
+
     uint256 ptr;
     // This block is memory safe because it only writes to the allocated `encoded` bytes.
     assembly ("memory-safe") {
       ptr := add(encoded, 32) // Skip length prefix.
 
-      // Write tag (4 bytes, bytes are left aligned).
-      mstore(ptr, GENERIC_EXTRA_ARGS_V3_TAG)
-      ptr := add(ptr, 4)
-
-      // Load and write gas limit (4 bytes, big endian).
-      let gasLimit := mload(extraArgs)
-      mstore8(ptr, shr(24, gasLimit))
-      mstore8(add(ptr, 1), and(shr(16, gasLimit), 0xFF))
-      mstore8(add(ptr, 2), and(shr(8, gasLimit), 0xFF))
-      mstore8(add(ptr, 3), and(gasLimit, 0xFF))
-      ptr := add(ptr, 4)
-
-      // Load and write block confirmations (2 bytes, big endian).
-      let blockConfirmations := mload(add(extraArgs, 32))
-      mstore8(ptr, shr(8, blockConfirmations))
-      mstore8(add(ptr, 1), and(blockConfirmations, 0xFF))
-      ptr := add(ptr, 2)
-
-      // Write ccvs length (1 byte).
-      mstore8(ptr, ccvsLength)
-      ptr := add(ptr, 1)
+      // Write static-length fields.
+      mstore(ptr, mload(add(staticFields, 32)))
+      ptr := add(ptr, 11)
     }
 
     // Write CCVs data.

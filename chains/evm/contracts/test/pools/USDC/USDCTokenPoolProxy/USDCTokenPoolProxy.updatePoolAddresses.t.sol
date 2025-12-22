@@ -43,7 +43,10 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
 
   function test_updatePoolAddresses_RevertWhen_CCTPV1PoolDoesNotSupportIPoolV1() public {
     USDCTokenPoolProxy.PoolAddresses memory newPools = USDCTokenPoolProxy.PoolAddresses({
-      legacyCctpV1Pool: address(0), cctpV1Pool: s_newCctpV1Pool, cctpV2Pool: address(0), cctpV2PoolWithCCV: address(0)
+      legacyCctpV1Pool: address(0),
+      cctpV1Pool: s_newCctpV1Pool,
+      cctpV2Pool: address(0),
+      cctpV2PoolWithCCV: address(0)
     });
 
     changePrank(OWNER);
@@ -60,7 +63,10 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
 
   function test_updatePoolAddresses_RevertWhen_CCTPV2PoolDoesNotSupportIPoolV1() public {
     USDCTokenPoolProxy.PoolAddresses memory newPools = USDCTokenPoolProxy.PoolAddresses({
-      legacyCctpV1Pool: address(0), cctpV1Pool: address(0), cctpV2Pool: s_newCctpV2Pool, cctpV2PoolWithCCV: address(0)
+      legacyCctpV1Pool: address(0),
+      cctpV1Pool: address(0),
+      cctpV2Pool: s_newCctpV2Pool,
+      cctpV2PoolWithCCV: address(0)
     });
 
     changePrank(OWNER);

@@ -112,10 +112,7 @@ contract CommitteeVerifierSetup is BaseVerifierSetup {
   /// @param hash The hash to sign.
   /// @return r The r component of the signature.
   /// @return s The s component of the signature (adjusted for v=27).
-  function _signWithV27(
-    uint256 privateKey,
-    bytes32 hash
-  ) internal pure returns (bytes32 r, bytes32 s) {
+  function _signWithV27(uint256 privateKey, bytes32 hash) internal pure returns (bytes32 r, bytes32 s) {
     (uint8 v, bytes32 _r, bytes32 _s) = vm.sign(privateKey, hash);
 
     // SignatureQuorumValidator only supports sigs with v=27, so adjust if necessary.

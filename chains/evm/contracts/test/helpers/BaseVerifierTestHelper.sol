@@ -6,10 +6,7 @@ import {MessageV1Codec} from "../../libraries/MessageV1Codec.sol";
 
 /// @notice Test helper contract to expose BaseVerifier's internal functions for testing
 contract BaseVerifierTestHelper is BaseVerifier {
-  constructor(
-    string[] memory storageLocations,
-    address rmn
-  ) BaseVerifier(storageLocations, rmn) {}
+  constructor(string[] memory storageLocations, address rmn) BaseVerifier(storageLocations, rmn) {}
 
   function applyRemoteChainConfigUpdates(
     RemoteChainConfigArgs[] calldata destChainConfigArgs
@@ -23,17 +20,11 @@ contract BaseVerifierTestHelper is BaseVerifier {
     _applyAllowlistUpdates(allowlistConfigArgsItems);
   }
 
-  function withdrawFeeTokens(
-    address[] calldata feeTokens,
-    address feeAggregator
-  ) external {
+  function withdrawFeeTokens(address[] calldata feeTokens, address feeAggregator) external {
     _withdrawFeeTokens(feeTokens, feeAggregator);
   }
 
-  function assertSenderIsAllowed(
-    uint64 destChainSelector,
-    address sender
-  ) external view {
+  function assertSenderIsAllowed(uint64 destChainSelector, address sender) external view {
     _assertSenderIsAllowed(destChainSelector, sender);
   }
 

@@ -52,7 +52,8 @@ contract e2e is OnRampSetup {
     VersionedVerifierResolver.OutboundImplementationArgs[] memory outboundImpls =
       new VersionedVerifierResolver.OutboundImplementationArgs[](1);
     outboundImpls[0] = VersionedVerifierResolver.OutboundImplementationArgs({
-      destChainSelector: DEST_CHAIN_SELECTOR, verifier: address(s_sourceCommitteeVerifier)
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      verifier: address(s_sourceCommitteeVerifier)
     });
     srcVerifierResolver.applyOutboundImplementationUpdates(outboundImpls);
     s_userSpecifiedCCV = address(new Proxy(address(srcVerifierResolver)));
@@ -149,8 +150,12 @@ contract e2e is OnRampSetup {
     });
     message.tokenAmounts[0] = Client.EVMTokenAmount({token: s_sourceFeeToken, amount: 1e18});
 
-    (bytes32 messageId, bytes memory encodedMessage, OnRamp.Receipt[] memory receipts, bytes[] memory verifierBlobs) = _evmMessageToEvent({
-      message: message, destChainSelector: DEST_CHAIN_SELECTOR, msgNum: expectedMsgNum, originalSender: OWNER
+    (bytes32 messageId, bytes memory encodedMessage, OnRamp.Receipt[] memory receipts, bytes[] memory verifierBlobs) =
+    _evmMessageToEvent({
+      message: message,
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      msgNum: expectedMsgNum,
+      originalSender: OWNER
     });
     receipts[receipts.length - 1].issuer = address(s_sourceRouter);
     // committeeVerifier will return its versionTag, which we add here.
@@ -186,6 +191,6 @@ contract e2e is OnRampSetup {
     });
 
     vm.resumeGasMetering();
-    s_offRamp.execute(encodedMessage, ccvAddresses, new bytes[](1));
+    s_offRamp.execute(encodedMessage, ccvAddresses, new bytes[](1), 0);
   }
 }

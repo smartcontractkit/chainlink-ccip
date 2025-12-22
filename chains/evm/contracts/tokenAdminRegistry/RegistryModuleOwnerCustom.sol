@@ -65,10 +65,7 @@ contract RegistryModuleOwnerCustom is ITypeAndVersion {
   /// admin is equal to msg.sender.
   /// @param token The token to register the admin for.
   /// @param admin The caller must be the admin.
-  function _registerAdmin(
-    address token,
-    address admin
-  ) internal {
+  function _registerAdmin(address token, address admin) internal {
     if (admin != msg.sender) {
       revert CanOnlySelfRegister(admin, token);
     }

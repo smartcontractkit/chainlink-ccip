@@ -34,10 +34,12 @@ contract VersionedVerifierResolverSetup is BaseTest {
     VersionedVerifierResolver.OutboundImplementationArgs[] memory outboundImplementations =
       new VersionedVerifierResolver.OutboundImplementationArgs[](2);
     outboundImplementations[0] = VersionedVerifierResolver.OutboundImplementationArgs({
-      destChainSelector: INITIAL_DEST_CHAIN_SELECTOR_1, verifier: s_initialVerifier1
+      destChainSelector: INITIAL_DEST_CHAIN_SELECTOR_1,
+      verifier: s_initialVerifier1
     });
     outboundImplementations[1] = VersionedVerifierResolver.OutboundImplementationArgs({
-      destChainSelector: INITIAL_DEST_CHAIN_SELECTOR_2, verifier: s_initialVerifier2
+      destChainSelector: INITIAL_DEST_CHAIN_SELECTOR_2,
+      verifier: s_initialVerifier2
     });
     s_versionedVerifierResolver.applyOutboundImplementationUpdates(outboundImplementations);
   }

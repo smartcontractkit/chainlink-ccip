@@ -4,11 +4,7 @@ pragma solidity ^0.8.24;
 import {SignatureQuorumValidator} from "../../ccvs/components/SignatureQuorumValidator.sol";
 
 contract SignatureQuorumValidatorHelper is SignatureQuorumValidator {
-  function validateSignatures(
-    uint64 sourceChainSelector,
-    bytes32 reportHash,
-    bytes calldata signatures
-  ) external view {
+  function validateSignatures(uint64 sourceChainSelector, bytes32 reportHash, bytes calldata signatures) external view {
     _validateSignatures(sourceChainSelector, reportHash, signatures);
   }
 }

@@ -298,10 +298,7 @@ contract TokenPoolFactory is ITypeAndVersion {
   /// the token pool will not be able to be set in the token admin registry, and this function will revert.
   /// @param token The address of the token to set the pool for.
   /// @param pool The address of the pool to set in the token admin registry.
-  function _setTokenPoolInTokenAdminRegistry(
-    address token,
-    address pool
-  ) private {
+  function _setTokenPoolInTokenAdminRegistry(address token, address pool) private {
     i_registryModuleOwnerCustom.registerAdminViaOwner(token);
     i_tokenAdminRegistry.acceptAdminRole(token);
     i_tokenAdminRegistry.setPool(token, pool);

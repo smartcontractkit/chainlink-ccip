@@ -26,7 +26,9 @@ contract OnRamp_getCCVsForPool is OnRampSetup {
         tokenAdminRegistry: address(s_tokenAdminRegistry)
       }),
       OnRamp.DynamicConfig({
-        feeQuoter: address(s_feeQuoter), reentrancyGuardEntered: false, feeAggregator: FEE_AGGREGATOR
+        feeQuoter: address(s_feeQuoter),
+        reentrancyGuardEntered: false,
+        feeAggregator: FEE_AGGREGATOR
       })
     );
 

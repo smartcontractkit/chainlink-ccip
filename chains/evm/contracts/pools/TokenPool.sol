@@ -158,13 +158,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   /// @dev Optional token-transfer fee overrides keyed by destination chain selector.
   mapping(uint64 destChainSelector => TokenTransferFeeConfig tokenTransferFeeConfig) internal s_tokenTransferFeeConfig;
 
-  constructor(
-    IERC20 token,
-    uint8 localTokenDecimals,
-    address advancedPoolHooks,
-    address rmnProxy,
-    address router
-  ) {
+  constructor(IERC20 token, uint8 localTokenDecimals, address advancedPoolHooks, address rmnProxy, address router) {
     if (address(token) == address(0) || router == address(0) || rmnProxy == address(0)) {
       revert ZeroAddressInvalid();
     }
@@ -223,10 +217,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   /// @notice Sets the dynamic configuration for the pool.
   /// @param router The address of the router contract.
   /// @param rateLimitAdmin The address of the rate limiter admin.
-  function setDynamicConfig(
-    address router,
-    address rateLimitAdmin
-  ) public onlyOwner {
+  function setDynamicConfig(address router, address rateLimitAdmin) public onlyOwner {
     if (router == address(0)) revert ZeroAddressInvalid();
     s_router = IRouter(router);
     s_rateLimitAdmin = rateLimitAdmin;
@@ -290,7 +281,8 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
 
     return (
       Pool.LockOrBurnOutV1({
-        destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector), destPoolData: _encodeLocalDecimals()
+        destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
+        destPoolData: _encodeLocalDecimals()
       }),
       destTokenAmount
     );
@@ -314,7 +306,8 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     });
 
     return Pool.LockOrBurnOutV1({
-      destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector), destPoolData: _encodeLocalDecimals()
+      destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
+      destPoolData: _encodeLocalDecimals()
     });
   }
 
@@ -371,10 +364,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   /// without duplicating the underlying logic.
   /// @param receiver The address to receive the tokens.
   /// @param amount The amount of tokens to release or mint.
-  function _releaseOrMint(
-    address receiver,
-    uint256 amount
-  ) internal virtual {}
+  function _releaseOrMint(address receiver, uint256 amount) internal virtual {}
 
   // ================================================================
   // │                         Validation                           │
@@ -530,10 +520,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   /// probably incorrect as that means the amount cannot be represented on this chain. If the local decimals have been
   /// wrongly configured, the token issuer could redeploy the pool with the correct decimals and manually re-execute the
   /// CCIP tx to fix the issue.
-  function _calculateLocalAmount(
-    uint256 remoteAmount,
-    uint8 remoteDecimals
-  ) internal view virtual returns (uint256) {
+  function _calculateLocalAmount(uint256 remoteAmount, uint8 remoteDecimals) internal view virtual returns (uint256) {
     if (remoteDecimals == i_tokenDecimals) {
       return remoteAmount;
     }
@@ -581,10 +568,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   /// @notice Checks if the pool address is configured on the remote chain.
   /// @param remoteChainSelector Remote chain selector.
   /// @param remotePoolAddress The address of the remote pool.
-  function isRemotePool(
-    uint64 remoteChainSelector,
-    bytes memory remotePoolAddress
-  ) public view returns (bool) {
+  function isRemotePool(uint64 remoteChainSelector, bytes memory remotePoolAddress) public view returns (bool) {
     return s_remoteChainConfigs[remoteChainSelector].remotePools.contains(keccak256(remotePoolAddress));
   }
 
@@ -601,10 +585,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   /// pool. This function allows for multiple pools to be added for a single chain selector.
   /// @param remoteChainSelector The remote chain selector for which the remote pool address is being added.
   /// @param remotePoolAddress The address of the new remote pool.
-  function addRemotePool(
-    uint64 remoteChainSelector,
-    bytes calldata remotePoolAddress
-  ) external onlyOwner {
+  function addRemotePool(uint64 remoteChainSelector, bytes calldata remotePoolAddress) external onlyOwner {
     if (!isSupportedChain(remoteChainSelector)) revert NonExistentChain(remoteChainSelector);
 
     _setRemotePool(remoteChainSelector, remotePoolAddress);
@@ -615,10 +596,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   /// should be no inflight txs from the given pool.
   /// @param remoteChainSelector The remote chain selector.
   /// @param remotePoolAddress The remote pool address to remove.
-  function removeRemotePool(
-    uint64 remoteChainSelector,
-    bytes calldata remotePoolAddress
-  ) external onlyOwner {
+  function removeRemotePool(uint64 remoteChainSelector, bytes calldata remotePoolAddress) external onlyOwner {
     if (!isSupportedChain(remoteChainSelector)) revert NonExistentChain(remoteChainSelector);
 
     if (!s_remoteChainConfigs[remoteChainSelector].remotePools.remove(keccak256(remotePoolAddress))) {
@@ -709,10 +687,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   /// @notice Adds a pool address to the allowed remote token pools for a particular chain.
   /// @param remoteChainSelector The remote chain selector for which the remote pool address is being added.
   /// @param remotePoolAddress The address of the new remote pool.
-  function _setRemotePool(
-    uint64 remoteChainSelector,
-    bytes memory remotePoolAddress
-  ) internal {
+  function _setRemotePool(uint64 remoteChainSelector, bytes memory remotePoolAddress) internal {
     if (remotePoolAddress.length == 0) {
       revert ZeroAddressInvalid();
     }
@@ -755,10 +730,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   /// @notice Consumes outbound rate limiting capacity in this pool.
   /// @param remoteChainSelector The remote chain selector.
   /// @param amount The amount of tokens consumed.
-  function _consumeOutboundRateLimit(
-    uint64 remoteChainSelector,
-    uint256 amount
-  ) internal virtual {
+  function _consumeOutboundRateLimit(uint64 remoteChainSelector, uint256 amount) internal virtual {
     s_remoteChainConfigs[remoteChainSelector].outboundRateLimiterConfig._consume(amount, address(i_token));
 
     emit OutboundRateLimitConsumed({token: address(i_token), remoteChainSelector: remoteChainSelector, amount: amount});
@@ -767,10 +739,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   /// @notice Consumes inbound rate limiting capacity in this pool.
   /// @param remoteChainSelector The remote chain selector.
   /// @param amount The amount of tokens consumed.
-  function _consumeInboundRateLimit(
-    uint64 remoteChainSelector,
-    uint256 amount
-  ) internal virtual {
+  function _consumeInboundRateLimit(uint64 remoteChainSelector, uint256 amount) internal virtual {
     s_remoteChainConfigs[remoteChainSelector].inboundRateLimiterConfig._consume(amount, address(i_token));
 
     emit InboundRateLimitConsumed({token: address(i_token), remoteChainSelector: remoteChainSelector, amount: amount});
@@ -786,21 +755,22 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     s_outboundRateLimiterConfig[remoteChainSelector]._consume(amount, address(i_token));
 
     emit CustomBlockConfirmationOutboundRateLimitConsumed({
-      token: address(i_token), remoteChainSelector: remoteChainSelector, amount: amount
+      token: address(i_token),
+      remoteChainSelector: remoteChainSelector,
+      amount: amount
     });
   }
 
   /// @notice Consumes custom block confirmation inbound rate limiting capacity in this pool.
   /// @param remoteChainSelector The remote chain selector.
   /// @param amount The amount of tokens consumed.
-  function _consumeCustomBlockConfirmationInboundRateLimit(
-    uint64 remoteChainSelector,
-    uint256 amount
-  ) internal virtual {
+  function _consumeCustomBlockConfirmationInboundRateLimit(uint64 remoteChainSelector, uint256 amount) internal virtual {
     s_inboundRateLimiterConfig[remoteChainSelector]._consume(amount, address(i_token));
 
     emit CustomBlockConfirmationInboundRateLimitConsumed({
-      token: address(i_token), remoteChainSelector: remoteChainSelector, amount: amount
+      token: address(i_token),
+      remoteChainSelector: remoteChainSelector,
+      amount: amount
     });
   }
 
@@ -850,10 +820,12 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
         s_outboundRateLimiterConfig[remoteChainSelector]._setTokenBucketConfig(configArgs.outboundRateLimiterConfig);
         s_inboundRateLimiterConfig[remoteChainSelector]._setTokenBucketConfig(configArgs.inboundRateLimiterConfig);
       } else {
-        s_remoteChainConfigs[remoteChainSelector].outboundRateLimiterConfig
-          ._setTokenBucketConfig(configArgs.outboundRateLimiterConfig);
-        s_remoteChainConfigs[remoteChainSelector].inboundRateLimiterConfig
-          ._setTokenBucketConfig(configArgs.inboundRateLimiterConfig);
+        s_remoteChainConfigs[remoteChainSelector].outboundRateLimiterConfig._setTokenBucketConfig(
+          configArgs.outboundRateLimiterConfig
+        );
+        s_remoteChainConfigs[remoteChainSelector].inboundRateLimiterConfig._setTokenBucketConfig(
+          configArgs.inboundRateLimiterConfig
+        );
       }
 
       emit RateLimitConfigured(
@@ -1058,10 +1030,7 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
   /// and clears only accrued fees.
   /// @param feeTokens The token addresses to withdraw, including the pool token when applicable.
   /// @param recipient The address that should receive the withdrawn balances.
-  function withdrawFeeTokens(
-    address[] calldata feeTokens,
-    address recipient
-  ) external onlyOwner {
+  function withdrawFeeTokens(address[] calldata feeTokens, address recipient) external onlyOwner {
     for (uint256 i = 0; i < feeTokens.length; ++i) {
       uint256 feeTokenBalance = IERC20(feeTokens[i]).balanceOf(address(this));
       if (feeTokenBalance > 0) {

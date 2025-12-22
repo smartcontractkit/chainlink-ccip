@@ -34,10 +34,7 @@ contract MockE2EUSDCTokenMessenger is ITokenMessenger {
   // Local Message Transmitter responsible for sending and receiving messages to/from remote domains
   IMessageTransmitterWithRelay public immutable localMessageTransmitterWithRelay;
 
-  constructor(
-    uint32 version,
-    address transmitter
-  ) {
+  constructor(uint32 version, address transmitter) {
     i_messageBodyVersion = version;
     s_nonce = 1;
     i_transmitter = transmitter;

@@ -48,4 +48,14 @@ library CCVConfigValidation {
       }
     }
   }
+
+  function _assertNoDuplicatedBetweenLists(address[] memory listA, address[] memory listB) internal pure {
+    uint256 lengthA = listA.length;
+    uint256 lengthB = listB.length;
+    for (uint256 i = 0; i < lengthA; ++i) {
+      for (uint256 j = 0; j < lengthB; ++j) {
+        if (listA[i] == listB[j]) revert DuplicateCCVNotAllowed(listA[i]);
+      }
+    }
+  }
 }

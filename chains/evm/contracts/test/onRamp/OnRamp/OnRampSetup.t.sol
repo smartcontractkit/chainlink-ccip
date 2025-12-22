@@ -46,7 +46,9 @@ contract OnRampSetup is FeeQuoterFeeSetup {
         tokenAdminRegistry: address(s_tokenAdminRegistry)
       }),
       OnRamp.DynamicConfig({
-        feeQuoter: address(s_feeQuoter), reentrancyGuardEntered: false, feeAggregator: FEE_AGGREGATOR
+        feeQuoter: address(s_feeQuoter),
+        reentrancyGuardEntered: false,
+        feeAggregator: FEE_AGGREGATOR
       })
     );
     s_defaultCCV = address(new MockVerifier(""));

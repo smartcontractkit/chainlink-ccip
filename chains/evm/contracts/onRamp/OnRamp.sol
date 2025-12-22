@@ -48,6 +48,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   error TokenArgsNotSupportedOnPoolV1();
   error InsufficientFeeTokenAmount();
   error TokenReceiverNotAllowed(uint64 destChainSelector);
+  error SourceTokenDataTooLarge(address token, uint256 actualLength, uint32 maxLength);
 
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
   event DestChainConfigSet(uint64 indexed destChainSelector, uint64 messageNumber, DestChainConfigArgs config);
@@ -153,10 +154,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   /// @dev The destination chain specific configs.
   mapping(uint64 destChainSelector => DestChainConfig destChainConfig) internal s_destChainConfigs;
 
-  constructor(
-    StaticConfig memory staticConfig,
-    DynamicConfig memory dynamicConfig
-  ) {
+  constructor(StaticConfig memory staticConfig, DynamicConfig memory dynamicConfig) {
     if (
       staticConfig.chainSelector == 0 || address(staticConfig.rmnRemote) == address(0)
         || staticConfig.tokenAdminRegistry == address(0)
@@ -296,6 +294,14 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
         resolvedExtraArgs.blockConfirmations,
         resolvedExtraArgs.tokenArgs
       );
+
+      // Enforce that the token pool payload (`destPoolData` -> TokenTransferV1.extraData) is not larger than the
+      // bytes overhead that was quoted and paid for in the token transfer receipt.
+      uint32 maxExtraDataLength = eventData.receipts[resolvedExtraArgs.ccvs.length].destBytesOverhead;
+      uint256 actualExtraDataLength = newMessage.tokenTransfer[0].extraData.length;
+      if (actualExtraDataLength > maxExtraDataLength) {
+        revert SourceTokenDataTooLarge(message.tokenAmounts[0].token, actualExtraDataLength, maxExtraDataLength);
+      }
     }
 
     // 5. encode message and calculate messageId.
@@ -307,13 +313,19 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
     // 6. call each verifier.
     for (uint256 i = 0; i < resolvedExtraArgs.ccvs.length; ++i) {
-      address implAddress = ICrossChainVerifierResolver(resolvedExtraArgs.ccvs[i])
-        .getOutboundImplementation(destChainSelector, resolvedExtraArgs.ccvArgs[i]);
+      address implAddress = ICrossChainVerifierResolver(resolvedExtraArgs.ccvs[i]).getOutboundImplementation(
+        destChainSelector, resolvedExtraArgs.ccvArgs[i]
+      );
       if (implAddress == address(0)) {
         revert DestinationChainNotSupportedByCCV(resolvedExtraArgs.ccvs[i], destChainSelector);
       }
-      eventData.verifierBlobs[i] = ICrossChainVerifierV1(implAddress)
-        .forwardToVerifier(newMessage, messageId, message.feeToken, feeTokenAmount, resolvedExtraArgs.ccvArgs[i]);
+      // NOTE: this verifier blob is *not* the same as the verifier data that will be delivered to the destination chain.
+      // This field is meant for the offchain verifier. The verifier *may* submit this data as part of the verifier data
+      // on the destination chain, but it may also choose to submit different data or no data at all. This means there
+      // should be no check on the length of this and the CCV bytes overhead, as there is no relationship between the two.
+      eventData.verifierBlobs[i] = ICrossChainVerifierV1(implAddress).forwardToVerifier(
+        newMessage, messageId, message.feeToken, feeTokenAmount, resolvedExtraArgs.ccvArgs[i]
+      );
     }
 
     // 7. emit event.
@@ -336,10 +348,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   /// @dev Token pool receipt payments are routed to the pool only if it supports IPoolV2 interface.
   /// @param message The message containing the fee token and token transfer info.
   /// @param receipts The receipts to pay out, in protocol-defined order.
-  function _distributeFees(
-    Client.EVM2AnyMessage calldata message,
-    Receipt[] memory receipts
-  ) internal {
+  function _distributeFees(Client.EVM2AnyMessage calldata message, Receipt[] memory receipts) internal {
     IERC20 feeToken = IERC20(message.feeToken);
     uint256 tokenReceiptIndex = type(uint256).max;
     if (message.tokenAmounts.length > 0) {
@@ -546,7 +555,9 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   /// @return staticConfig the static configuration.
   function getStaticConfig() public view returns (StaticConfig memory) {
     return StaticConfig({
-      chainSelector: i_localChainSelector, rmnRemote: i_rmnRemote, tokenAdminRegistry: i_tokenAdminRegistry
+      chainSelector: i_localChainSelector,
+      rmnRemote: i_rmnRemote,
+      tokenAdminRegistry: i_tokenAdminRegistry
     });
   }
 
@@ -749,8 +760,9 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       return defaultCCVs;
     }
 
-    requiredCCVs = IPoolV2(address(pool))
-      .getRequiredCCVs(token, destChainSelector, amount, finality, tokenArgs, IPoolV2.MessageDirection.Outbound);
+    requiredCCVs = IPoolV2(address(pool)).getRequiredCCVs(
+      token, destChainSelector, amount, finality, tokenArgs, IPoolV2.MessageDirection.Outbound
+    );
 
     if (requiredCCVs.length == 0) {
       return defaultCCVs;
@@ -851,8 +863,9 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     uint32 bytesOverheadSum = 0;
 
     for (uint256 i = 0; i < extraArgs.ccvs.length; ++i) {
-      address implAddress = ICrossChainVerifierResolver(extraArgs.ccvs[i])
-        .getOutboundImplementation(destChainSelector, extraArgs.ccvArgs[i]);
+      address implAddress = ICrossChainVerifierResolver(extraArgs.ccvs[i]).getOutboundImplementation(
+        destChainSelector, extraArgs.ccvArgs[i]
+      );
       if (implAddress == address(0)) {
         revert DestinationChainNotSupportedByCCV(extraArgs.ccvs[i], destChainSelector);
       }
@@ -881,7 +894,11 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
       // issuer is set to the token pool address.
       receipts[poolReceiptIndex] = Receipt({
-        issuer: address(pool), destGasLimit: 0, destBytesOverhead: 0, feeTokenAmount: 0, extraArgs: extraArgs.tokenArgs
+        issuer: address(pool),
+        destGasLimit: 0,
+        destBytesOverhead: 0,
+        feeTokenAmount: 0,
+        extraArgs: extraArgs.tokenArgs
       });
 
       // Try to call `IPoolV2.getFee` to fetch fee components if the pool supports IPoolV2. If the specified pool is not
@@ -891,18 +908,17 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
         (
           receipts[poolReceiptIndex].feeTokenAmount,
           receipts[poolReceiptIndex].destGasLimit,
-          receipts[poolReceiptIndex].destBytesOverhead,,
+          receipts[poolReceiptIndex].destBytesOverhead,
+          ,
           hasCustomFeeConfig
-        ) =
-          IPoolV2(address(pool))
-            .getFee(
-              message.tokenAmounts[0].token,
-              destChainSelector,
-              message.tokenAmounts[0].amount,
-              message.feeToken,
-              extraArgs.blockConfirmations,
-              extraArgs.tokenArgs
-            );
+        ) = IPoolV2(address(pool)).getFee(
+          message.tokenAmounts[0].token,
+          destChainSelector,
+          message.tokenAmounts[0].amount,
+          message.feeToken,
+          extraArgs.blockConfirmations,
+          extraArgs.tokenArgs
+        );
       }
 
       // If the pool doesn't support IPoolV2 or config is disabled, fall back to FeeQuoter.
@@ -930,12 +946,17 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     // message. Third-party verifiers can pin on the router address even though the flat network fee stays on
     // the onRamp for later aggregation.
     receipts[receipts.length - 1] = Receipt({
-      issuer: msg.sender, destGasLimit: 0, destBytesOverhead: 0, feeTokenAmount: networkFeeUSDCents, extraArgs: ""
+      issuer: msg.sender,
+      destGasLimit: 0,
+      destBytesOverhead: 0,
+      feeTokenAmount: networkFeeUSDCents,
+      extraArgs: ""
     });
 
-    (uint32 updatedGasLimitSum, uint256 execCostInUSDCents, uint256 feeTokenPrice, uint256 percentMultiplier) = IFeeQuoter(
-        s_dynamicConfig.feeQuoter
-      ).quoteGasForExec(destChainSelector, gasLimitSum, bytesOverheadSum, message.feeToken);
+    (uint32 updatedGasLimitSum, uint256 execCostInUSDCents, uint256 feeTokenPrice, uint256 percentMultiplier) =
+    IFeeQuoter(s_dynamicConfig.feeQuoter).quoteGasForExec(
+      destChainSelector, gasLimitSum, bytesOverheadSum, message.feeToken
+    );
 
     // Transform the USD based fees into fee token amounts & sum them. For the executor, if the executor isn't
     // NO_EXECUTION_ADDRESS we also add the execution cost.
@@ -992,8 +1013,9 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       // Only bill a flat fee when automated execution is enabled.
       feeTokenAmount: extraArgs.executor == Client.NO_EXECUTION_ADDRESS
         ? 0
-        : IExecutor(extraArgs.executor)
-          .getFee(destChainSelector, extraArgs.blockConfirmations, extraArgs.ccvs, extraArgs.executorArgs),
+        : IExecutor(extraArgs.executor).getFee(
+          destChainSelector, extraArgs.blockConfirmations, extraArgs.ccvs, extraArgs.executorArgs
+        ),
       extraArgs: extraArgs.executorArgs
     });
   }

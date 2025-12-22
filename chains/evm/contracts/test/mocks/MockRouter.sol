@@ -151,10 +151,7 @@ contract MockCCIPRouter is IRouter, IRouterClient {
   }
 
   /// @notice Returns 0 as the fee is not supported in this mock contract.
-  function getFee(
-    uint64,
-    Client.EVM2AnyMessage memory
-  ) public view returns (uint256) {
+  function getFee(uint64, Client.EVM2AnyMessage memory) public view returns (uint256) {
     return s_mockFeeTokenAmount;
   }
 
