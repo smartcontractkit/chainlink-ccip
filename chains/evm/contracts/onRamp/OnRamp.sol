@@ -56,7 +56,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   event FeeTokenWithdrawn(address indexed feeAggregator, address indexed feeToken, uint256 amount);
   event CCIPMessageSent(
     uint64 indexed destChainSelector,
-    uint64 indexed messageNumber,
+    address indexed sender,
     bytes32 indexed messageId,
     address feeToken,
     bytes encodedMessage,
@@ -337,7 +337,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     // 7. emit event.
     emit CCIPMessageSent({
       destChainSelector: destChainSelector,
-      messageNumber: newMessage.messageNumber,
+      sender: originalSender,
       messageId: messageId,
       feeToken: message.feeToken,
       encodedMessage: eventData.encodedMessage,
