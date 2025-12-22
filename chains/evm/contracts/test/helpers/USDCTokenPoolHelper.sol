@@ -15,8 +15,11 @@ contract USDCTokenPoolHelper is USDCTokenPool {
     IBurnMintERC20 token,
     address advancedPoolHooks,
     address rmnProxy,
-    address router
-  ) USDCTokenPool(tokenMessenger, messageTransmitterProxy, token, advancedPoolHooks, rmnProxy, router, 0) {}
+    address router,
+    address feeAggregator
+  )
+    USDCTokenPool(tokenMessenger, messageTransmitterProxy, token, advancedPoolHooks, rmnProxy, router, 0, feeAggregator)
+  {}
 
   function validateMessage(
     bytes memory usdcMessage,

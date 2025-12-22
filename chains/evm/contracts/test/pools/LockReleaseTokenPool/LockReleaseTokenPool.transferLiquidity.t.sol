@@ -13,13 +13,21 @@ contract LockReleaseTokenPool_transferLiquidity is LockReleaseTokenPoolSetup {
     super.setUp();
 
     s_oldLockReleaseTokenPool = new LockReleaseTokenPool(
-      s_token, DEFAULT_TOKEN_DECIMALS, address(0), address(s_mockRMNRemote), address(s_sourceRouter), address(s_lockBox)
+      s_token,
+      DEFAULT_TOKEN_DECIMALS,
+      address(0),
+      address(s_mockRMNRemote),
+      address(s_sourceRouter),
+      address(s_lockBox),
+      s_feeAggregator
     );
 
     // Configure old pool as allowed caller in the lockBox.
     ERC20LockBox.AllowedCallerConfigArgs[] memory allowedCallers = new ERC20LockBox.AllowedCallerConfigArgs[](1);
     allowedCallers[0] = ERC20LockBox.AllowedCallerConfigArgs({
-      token: address(s_token), caller: address(s_oldLockReleaseTokenPool), allowed: true
+      token: address(s_token),
+      caller: address(s_oldLockReleaseTokenPool),
+      allowed: true
     });
     s_lockBox.configureAllowedCallers(allowedCallers);
 

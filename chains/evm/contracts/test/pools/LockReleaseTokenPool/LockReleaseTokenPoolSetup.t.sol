@@ -36,7 +36,13 @@ contract LockReleaseTokenPoolSetup is BaseTest {
     s_lockBox = new ERC20LockBox(address(s_tokenAdminRegistry));
 
     s_lockReleaseTokenPool = new LockReleaseTokenPool(
-      s_token, DEFAULT_TOKEN_DECIMALS, address(0), address(s_mockRMNRemote), address(s_sourceRouter), address(s_lockBox)
+      s_token,
+      DEFAULT_TOKEN_DECIMALS,
+      address(0),
+      address(s_mockRMNRemote),
+      address(s_sourceRouter),
+      address(s_lockBox),
+      s_feeAggregator
     );
 
     s_allowedList.push(vm.randomAddress());
@@ -48,7 +54,8 @@ contract LockReleaseTokenPoolSetup is BaseTest {
       address(advancedHooks),
       address(s_mockRMNRemote),
       address(s_sourceRouter),
-      address(s_lockBox)
+      address(s_lockBox),
+      s_feeAggregator
     );
 
     // Mock token admin registry calls for both pools.
@@ -63,7 +70,9 @@ contract LockReleaseTokenPoolSetup is BaseTest {
       abi.encodeWithSignature("getTokenConfig(address)", address(s_token)),
       abi.encode(
         TokenAdminRegistry.TokenConfig({
-          administrator: OWNER, pendingAdministrator: address(0), tokenPool: address(s_lockReleaseTokenPool)
+          administrator: OWNER,
+          pendingAdministrator: address(0),
+          tokenPool: address(s_lockReleaseTokenPool)
         })
       )
     );
@@ -72,10 +81,14 @@ contract LockReleaseTokenPoolSetup is BaseTest {
     ERC20LockBox.AllowedCallerConfigArgs[] memory allowedCallers = new ERC20LockBox.AllowedCallerConfigArgs[](3);
     allowedCallers[0] = ERC20LockBox.AllowedCallerConfigArgs({token: address(s_token), caller: OWNER, allowed: true});
     allowedCallers[1] = ERC20LockBox.AllowedCallerConfigArgs({
-      token: address(s_token), caller: address(s_lockReleaseTokenPool), allowed: true
+      token: address(s_token),
+      caller: address(s_lockReleaseTokenPool),
+      allowed: true
     });
     allowedCallers[2] = ERC20LockBox.AllowedCallerConfigArgs({
-      token: address(s_token), caller: address(s_lockReleaseTokenPoolWithAllowList), allowed: true
+      token: address(s_token),
+      caller: address(s_lockReleaseTokenPoolWithAllowList),
+      allowed: true
     });
     s_lockBox.configureAllowedCallers(allowedCallers);
 

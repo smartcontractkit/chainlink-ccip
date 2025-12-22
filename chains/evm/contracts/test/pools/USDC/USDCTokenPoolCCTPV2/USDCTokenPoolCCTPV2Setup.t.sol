@@ -20,7 +20,8 @@ contract USDCTokenPoolCCTPV2Setup is USDCSetup {
       s_USDCToken,
       address(0),
       address(s_mockRMNRemote),
-      address(s_router)
+      address(s_router),
+      s_feeAggregator
     );
 
     // Set the on and offramps as authorized callers for the pool.

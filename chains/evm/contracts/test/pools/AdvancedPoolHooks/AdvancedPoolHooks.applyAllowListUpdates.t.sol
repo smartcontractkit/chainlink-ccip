@@ -18,7 +18,12 @@ contract AdvancedPoolHooks_applyAllowListUpdates is TokenPoolSetup {
 
     s_advancedPoolHooks = new AdvancedPoolHooks(s_allowedSenders, 0);
     s_tokenPool = new TokenPoolHelper(
-      s_token, DEFAULT_TOKEN_DECIMALS, address(s_advancedPoolHooks), address(s_mockRMNRemote), address(s_sourceRouter)
+      s_token,
+      DEFAULT_TOKEN_DECIMALS,
+      address(s_advancedPoolHooks),
+      address(s_mockRMNRemote),
+      address(s_sourceRouter),
+      s_feeAggregator
     );
   }
 

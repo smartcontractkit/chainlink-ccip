@@ -27,7 +27,7 @@ contract OnRampTokenPoolReentrancy is RouterSetup {
       new FacadeClient(address(s_sourceRouter), DEST_CHAIN_SELECTOR, s_sourceToken, s_feeToken, i_receiver);
 
     s_maliciousTokenPool = new ReentrantMaliciousTokenPool(
-      address(s_facadeClient), s_sourceToken, address(s_mockRMNRemote), address(s_sourceRouter)
+      address(s_facadeClient), s_sourceToken, address(s_mockRMNRemote), address(s_sourceRouter), s_feeAggregator
     );
 
     bytes[] memory remotePoolAddresses = new bytes[](1);

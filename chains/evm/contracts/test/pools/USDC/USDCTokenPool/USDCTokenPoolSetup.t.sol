@@ -34,7 +34,8 @@ contract USDCTokenPoolSetup is USDCSetup {
       s_USDCToken,
       address(0),
       address(s_mockRMNRemote),
-      address(s_router)
+      address(s_router),
+      s_feeAggregator
     );
 
     CCTPMessageTransmitterProxy.AllowedCallerConfigArgs[] memory allowedCallerParams =
@@ -51,7 +52,8 @@ contract USDCTokenPoolSetup is USDCSetup {
       s_USDCToken,
       address(advancedHooks),
       address(s_mockRMNRemote),
-      address(s_router)
+      address(s_router),
+      s_feeAggregator
     );
 
     // Set the owner as an authorized caller for the pools

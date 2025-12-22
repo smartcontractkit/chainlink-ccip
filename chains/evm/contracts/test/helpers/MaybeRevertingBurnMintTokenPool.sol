@@ -16,8 +16,9 @@ contract MaybeRevertingBurnMintTokenPool is BurnMintTokenPool {
     uint8 localTokenDecimals,
     address advancedPoolHooks,
     address rmnProxy,
-    address router
-  ) BurnMintTokenPool(token, localTokenDecimals, advancedPoolHooks, rmnProxy, router) {}
+    address router,
+    address feeAggregator
+  ) BurnMintTokenPool(token, localTokenDecimals, advancedPoolHooks, rmnProxy, router, feeAggregator) {}
 
   function setShouldRevert(
     bytes calldata revertReason
@@ -61,10 +62,7 @@ contract MaybeRevertingBurnMintTokenPool is BurnMintTokenPool {
     return out;
   }
 
-  function _releaseOrMint(
-    address receiver,
-    uint256 amount
-  ) internal override {
+  function _releaseOrMint(address receiver, uint256 amount) internal override {
     IBurnMintERC20(address(i_token)).mint(receiver, amount);
   }
 
@@ -84,10 +82,7 @@ contract MaybeRevertingBurnMintTokenPool is BurnMintTokenPool {
     return out;
   }
 
-  function _calculateLocalAmount(
-    uint256 remoteAmount,
-    uint8 remoteDecimals
-  ) internal view override returns (uint256) {
+  function _calculateLocalAmount(uint256 remoteAmount, uint8 remoteDecimals) internal view override returns (uint256) {
     return super._calculateLocalAmount(remoteAmount, remoteDecimals) * s_releaseOrMintMultiplier;
   }
 }

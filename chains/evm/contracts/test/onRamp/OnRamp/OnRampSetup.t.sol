@@ -46,7 +46,9 @@ contract OnRampSetup is FeeQuoterFeeSetup {
         tokenAdminRegistry: address(s_tokenAdminRegistry)
       }),
       OnRamp.DynamicConfig({
-        feeQuoter: address(s_feeQuoter), reentrancyGuardEntered: false, feeAggregator: FEE_AGGREGATOR
+        feeQuoter: address(s_feeQuoter),
+        reentrancyGuardEntered: false,
+        feeAggregator: FEE_AGGREGATOR
       })
     );
     s_defaultCCV = address(new MockVerifier(""));
@@ -137,6 +139,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
     // `getReceipts` uses `msg.sender` as the issuer for the network-fee receipt.
     // Since this helper calls it directly (not through the router), override the issuer to reflect the router address.
     receipts[receipts.length - 1].issuer = address(s_sourceRouter);
+    receipts[receipts.length - 1].feeRecipient = address(s_sourceRouter);
 
     return (
       keccak256(MessageV1Codec._encodeMessageV1(messageV1)),

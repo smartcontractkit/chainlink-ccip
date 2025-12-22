@@ -81,7 +81,8 @@ contract e2e_lombard is OnRampSetup {
     VersionedVerifierResolver.OutboundImplementationArgs[] memory outboundImpls =
       new VersionedVerifierResolver.OutboundImplementationArgs[](1);
     outboundImpls[0] = VersionedVerifierResolver.OutboundImplementationArgs({
-      destChainSelector: DEST_CHAIN_SELECTOR, verifier: address(s_sourceCommitteeVerifier)
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      verifier: address(s_sourceCommitteeVerifier)
     });
     srcCommitteeResolver.applyOutboundImplementationUpdates(outboundImpls);
 
@@ -91,7 +92,8 @@ contract e2e_lombard is OnRampSetup {
     VersionedVerifierResolver.InboundImplementationArgs[] memory committeeInbound =
       new VersionedVerifierResolver.InboundImplementationArgs[](1);
     committeeInbound[0] = VersionedVerifierResolver.InboundImplementationArgs({
-      version: s_sourceCommitteeVerifier.versionTag(), verifier: address(s_destCommitteeVerifier)
+      version: s_sourceCommitteeVerifier.versionTag(),
+      verifier: address(s_destCommitteeVerifier)
     });
     srcCommitteeResolver.applyInboundImplementationUpdates(committeeInbound);
 
@@ -133,14 +135,16 @@ contract e2e_lombard is OnRampSetup {
     VersionedVerifierResolver.OutboundImplementationArgs[] memory lombardOutbound =
       new VersionedVerifierResolver.OutboundImplementationArgs[](1);
     lombardOutbound[0] = VersionedVerifierResolver.OutboundImplementationArgs({
-      destChainSelector: DEST_CHAIN_SELECTOR, verifier: address(s_sourceLombardVerifier)
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      verifier: address(s_sourceLombardVerifier)
     });
     lombardResolver.applyOutboundImplementationUpdates(lombardOutbound);
 
     VersionedVerifierResolver.InboundImplementationArgs[] memory lombardInbound =
       new VersionedVerifierResolver.InboundImplementationArgs[](1);
     lombardInbound[0] = VersionedVerifierResolver.InboundImplementationArgs({
-      version: LOMBARD_VERSION_TAG_V1_7_0, verifier: address(s_destLombardVerifier)
+      version: LOMBARD_VERSION_TAG_V1_7_0,
+      verifier: address(s_destLombardVerifier)
     });
     lombardResolver.applyInboundImplementationUpdates(lombardInbound);
 
@@ -182,7 +186,8 @@ contract e2e_lombard is OnRampSetup {
       address(hooks),
       address(s_mockRMNRemote),
       address(s_sourceRouter),
-      DEFAULT_TOKEN_DECIMALS
+      DEFAULT_TOKEN_DECIMALS,
+      s_feeAggregator
     );
     s_destLombardPool = new LombardTokenPool(
       IERC20Metadata(s_destFeeToken),
@@ -192,7 +197,8 @@ contract e2e_lombard is OnRampSetup {
       address(hooks),
       address(s_mockRMNRemote),
       address(s_destRouter),
-      DEFAULT_TOKEN_DECIMALS
+      DEFAULT_TOKEN_DECIMALS,
+      s_feeAggregator
     );
 
     // Update TokenSetup mappings used by the OnRampSetup helper functions.
@@ -317,8 +323,12 @@ contract e2e_lombard is OnRampSetup {
     });
     message.tokenAmounts[0] = Client.EVMTokenAmount({token: s_sourceFeeToken, amount: 1e18});
 
-    (bytes32 messageId, bytes memory encodedMessage, OnRamp.Receipt[] memory receipts, bytes[] memory verifierBlobs) = _evmMessageToEvent({
-      message: message, destChainSelector: DEST_CHAIN_SELECTOR, msgNum: expectedMsgNum, originalSender: OWNER
+    (bytes32 messageId, bytes memory encodedMessage, OnRamp.Receipt[] memory receipts, bytes[] memory verifierBlobs) =
+    _evmMessageToEvent({
+      message: message,
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      msgNum: expectedMsgNum,
+      originalSender: OWNER
     });
 
     // Committee verifier returns versionTag (first verifier blob).

@@ -14,7 +14,7 @@ contract BurnMintWithLockReleaseFlagTokenPoolSetup is BurnMintSetup {
     s_token = new BurnMintERC20("Chainlink Token", "LINK", 6, 0, 0);
 
     s_pool = new BurnMintWithLockReleaseFlagTokenPool(
-      s_token, 6, address(0), address(s_mockRMNRemote), address(s_sourceRouter)
+      s_token, 6, address(0), address(s_mockRMNRemote), address(s_sourceRouter), s_feeAggregator
     );
     s_token.grantMintAndBurnRoles(address(s_pool));
 

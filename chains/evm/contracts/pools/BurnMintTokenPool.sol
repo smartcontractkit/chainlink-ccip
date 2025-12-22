@@ -21,8 +21,9 @@ contract BurnMintTokenPool is BurnMintTokenPoolAbstract, ITypeAndVersion {
     uint8 localTokenDecimals,
     address advancedPoolHooks,
     address rmnProxy,
-    address router
-  ) TokenPool(token, localTokenDecimals, advancedPoolHooks, rmnProxy, router) {}
+    address router,
+    address feeAggregator
+  ) TokenPool(token, localTokenDecimals, advancedPoolHooks, rmnProxy, router, feeAggregator) {}
 
   /// @inheritdoc TokenPool
   /// @param amount The amount of tokens to burn from the pool.

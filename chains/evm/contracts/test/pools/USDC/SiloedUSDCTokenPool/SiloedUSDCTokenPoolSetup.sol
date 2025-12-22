@@ -32,7 +32,8 @@ contract SiloedUSDCTokenPoolSetup is USDCSetup {
       address(0), // allowlist
       address(s_mockRMNRemote), // rmnProxy
       address(s_router), // router
-      address(s_lockBox) // lockBox
+      address(s_lockBox), // lockBox
+      s_feeAggregator
     );
 
     address[] memory authorizedCallers = new address[](3);
@@ -61,10 +62,14 @@ contract SiloedUSDCTokenPoolSetup is USDCSetup {
     // Allow the router to call the releaseOrMint function for the token pool
     ERC20LockBox.AllowedCallerConfigArgs[] memory allowedCallers = new ERC20LockBox.AllowedCallerConfigArgs[](2);
     allowedCallers[0] = ERC20LockBox.AllowedCallerConfigArgs({
-      token: address(s_USDCToken), caller: address(s_routerAllowedOffRamp), allowed: true
+      token: address(s_USDCToken),
+      caller: address(s_routerAllowedOffRamp),
+      allowed: true
     });
     allowedCallers[1] = ERC20LockBox.AllowedCallerConfigArgs({
-      token: address(s_USDCToken), caller: address(s_routerAllowedOnRamp), allowed: true
+      token: address(s_USDCToken),
+      caller: address(s_routerAllowedOnRamp),
+      allowed: true
     });
     ERC20LockBox(s_lockBox).configureAllowedCallers(allowedCallers);
 
@@ -75,7 +80,8 @@ contract SiloedUSDCTokenPoolSetup is USDCSetup {
       address(0), // allowlist
       address(s_mockRMNRemote), // rmnProxy
       address(s_router), // router
-      address(s_lockBox) // lockBox
+      address(s_lockBox), // lockBox
+      s_feeAggregator
     );
 
     s_usdcTokenPoolTransferLiquidity.applyAuthorizedCallerUpdates(

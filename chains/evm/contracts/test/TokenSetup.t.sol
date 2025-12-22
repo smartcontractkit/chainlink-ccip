@@ -27,38 +27,34 @@ contract TokenSetup is BaseTest {
   mapping(address destToken => address destPool) internal s_destPoolByToken;
   mapping(address sourceToken => address destToken) internal s_destTokenBySourceToken;
 
-  function _deploySourceToken(
-    string memory tokenName,
-    uint256 dealAmount,
-    uint8 decimals
-  ) internal returns (address) {
+  function _deploySourceToken(string memory tokenName, uint256 dealAmount, uint8 decimals) internal returns (address) {
     BurnMintERC20 token = new BurnMintERC20(tokenName, tokenName, decimals, 0, 0);
     s_sourceTokens.push(address(token));
     deal(address(token), OWNER, dealAmount);
     return address(token);
   }
 
-  function _deployDestToken(
-    string memory tokenName,
-    uint256 dealAmount
-  ) internal returns (address) {
+  function _deployDestToken(string memory tokenName, uint256 dealAmount) internal returns (address) {
     BurnMintERC20 token = new BurnMintERC20(tokenName, tokenName, 18, 0, 0);
     s_destTokens.push(address(token));
     deal(address(token), OWNER, dealAmount);
     return address(token);
   }
 
-  function _deployLockReleasePool(
-    address token,
-    bool isSourcePool
-  ) internal {
+  function _deployLockReleasePool(address token, bool isSourcePool) internal {
     address router = address(s_sourceRouter);
     if (!isSourcePool) {
       router = address(s_destRouter);
     }
 
     LockReleaseTokenPool pool = new LockReleaseTokenPool(
-      IERC20(token), DEFAULT_TOKEN_DECIMALS, address(0), address(s_mockRMNRemote), router, address(s_lockBox)
+      IERC20(token),
+      DEFAULT_TOKEN_DECIMALS,
+      address(0),
+      address(s_mockRMNRemote),
+      router,
+      address(s_lockBox),
+      s_feeAggregator
     );
 
     if (isSourcePool) {
@@ -69,17 +65,14 @@ contract TokenSetup is BaseTest {
     }
   }
 
-  function _deployTokenAndBurnMintPool(
-    address token,
-    bool isSourcePool
-  ) internal {
+  function _deployTokenAndBurnMintPool(address token, bool isSourcePool) internal {
     address router = address(s_sourceRouter);
     if (!isSourcePool) {
       router = address(s_destRouter);
     }
 
     BurnMintTokenPool pool = new MaybeRevertingBurnMintTokenPool(
-      BurnMintERC20(token), DEFAULT_TOKEN_DECIMALS, address(0), address(s_mockRMNRemote), router
+      BurnMintERC20(token), DEFAULT_TOKEN_DECIMALS, address(0), address(s_mockRMNRemote), router, s_feeAggregator
     );
     BurnMintERC20(token).grantMintAndBurnRoles(address(pool));
 

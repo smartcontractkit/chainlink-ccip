@@ -24,8 +24,9 @@ contract MockE2ELBTCTokenPool is TokenPool, ITypeAndVersion {
     address advancedPoolHooks,
     address rmnProxy,
     address router,
-    bytes memory destPoolData
-  ) TokenPool(token, 8, advancedPoolHooks, rmnProxy, router) {
+    bytes memory destPoolData,
+    address feeAggregator
+  ) TokenPool(token, 8, advancedPoolHooks, rmnProxy, router, feeAggregator) {
     s_destPoolData = destPoolData;
   }
 
@@ -47,7 +48,8 @@ contract MockE2ELBTCTokenPool is TokenPool, ITypeAndVersion {
     });
 
     return Pool.LockOrBurnOutV1({
-      destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector), destPoolData: s_destPoolData
+      destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
+      destPoolData: s_destPoolData
     });
   }
 

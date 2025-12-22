@@ -33,8 +33,9 @@ contract CCTPTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
     address rmnProxy,
     address router,
     address cctpVerifier,
-    address[] memory allowedCallers
-  ) TokenPool(token, localTokenDecimals, address(0), rmnProxy, router) AuthorizedCallers(allowedCallers) {
+    address[] memory allowedCallers,
+    address feeAggregator
+  ) TokenPool(token, localTokenDecimals, address(0), rmnProxy, router, feeAggregator) AuthorizedCallers(allowedCallers) {
     i_cctpVerifier = ICrossChainVerifierResolver(cctpVerifier);
   }
 

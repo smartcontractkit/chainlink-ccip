@@ -34,7 +34,8 @@ contract LombardTokenPoolSetup is TokenPoolSetup {
       address(0),
       address(s_mockRMNRemote),
       address(s_sourceRouter),
-      DEFAULT_TOKEN_DECIMALS
+      DEFAULT_TOKEN_DECIMALS,
+      s_feeAggregator
     );
 
     // Configure remote chain.

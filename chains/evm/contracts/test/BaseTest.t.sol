@@ -15,6 +15,7 @@ import {Test} from "forge-std/Test.sol";
 contract BaseTest is Test {
   address internal constant OWNER = 0x00007e64E1fB0C487F25dd6D3601ff6aF8d32e4e;
   address internal constant STRANGER = address(999999);
+  address internal s_feeAggregator = makeAddr("feeAggregator");
 
   // Timing
   uint256 internal constant BLOCK_TIME = 1234567890;
@@ -67,10 +68,7 @@ contract BaseTest is Test {
     vm.label(address(s_destRouter), "destRouter");
   }
 
-  function _setMockRMNChainCurse(
-    uint64 chainSelector,
-    bool isCursed
-  ) internal {
+  function _setMockRMNChainCurse(uint64 chainSelector, bool isCursed) internal {
     vm.mockCall(
       address(s_mockRMNRemote),
       abi.encodeWithSignature("isCursed(bytes16)", bytes16(uint128(chainSelector))),

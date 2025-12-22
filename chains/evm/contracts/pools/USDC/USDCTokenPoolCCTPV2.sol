@@ -43,8 +43,20 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
     IERC20 token,
     address advancedPoolHooks,
     address rmnProxy,
-    address router
-  ) USDCTokenPool(tokenMessenger, cctpMessageTransmitterProxy, token, advancedPoolHooks, rmnProxy, router, 1) {}
+    address router,
+    address feeAggregator
+  )
+    USDCTokenPool(
+      tokenMessenger,
+      cctpMessageTransmitterProxy,
+      token,
+      advancedPoolHooks,
+      rmnProxy,
+      router,
+      1,
+      feeAggregator
+    )
+  {}
 
   /// @notice Burn tokens from the pool to initiate cross-chain transfer.
   /// @notice Outgoing messages (burn operations) are routed via `i_tokenMessenger.depositForBurn()`.
@@ -103,9 +115,7 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
     // Encode the source pool data with its version number. The version number is hard-coded to 1 to maintain
     // parity with the CCTP V2 version number.
     bytes memory sourcePoolData = USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV2(
-      USDCSourcePoolDataCodec.SourceTokenDataPayloadV2({
-        sourceDomain: i_localDomainIdentifier, depositHash: depositHash
-      })
+      USDCSourcePoolDataCodec.SourceTokenDataPayloadV2({sourceDomain: i_localDomainIdentifier, depositHash: depositHash})
     );
 
     emit LockedOrBurned({
@@ -116,7 +126,8 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
     });
 
     return Pool.LockOrBurnOutV1({
-      destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector), destPoolData: sourcePoolData
+      destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
+      destPoolData: sourcePoolData
     });
   }
 

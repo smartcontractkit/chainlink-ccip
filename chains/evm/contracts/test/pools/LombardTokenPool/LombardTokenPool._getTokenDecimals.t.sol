@@ -29,7 +29,8 @@ contract LombardTokenPool_getTokenDecimals is BaseTest {
       address(0),
       address(s_mockRMNRemote),
       address(s_sourceRouter),
-      18
+      18,
+      s_feeAggregator
     );
   }
 

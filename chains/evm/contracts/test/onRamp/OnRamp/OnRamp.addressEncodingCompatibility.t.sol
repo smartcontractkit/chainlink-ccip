@@ -15,8 +15,9 @@ import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165
 import {VmSafe} from "forge-std/Vm.sol";
 
 contract OnRamp_addressEncodingCompatibility is OnRampSetup {
-  bytes32 internal constant CCIP_MESSAGE_SENT_TOPIC =
-    keccak256("CCIPMessageSent(uint64,uint64,bytes32,address,bytes,(address,uint32,uint32,uint256,bytes)[],bytes[])");
+  bytes32 internal constant CCIP_MESSAGE_SENT_TOPIC = keccak256(
+    "CCIPMessageSent(uint64,uint64,bytes32,address,bytes,(address,address,uint32,uint32,uint256,bytes)[],bytes[])"
+  );
 
   function decode(
     bytes calldata encodedMessage
@@ -72,11 +73,7 @@ contract OnRamp_addressEncodingCompatibility is OnRampSetup {
     s_onRamp.applyDestChainConfigUpdates(args);
   }
 
-  function _expectTrimmed(
-    bytes memory actual,
-    address addr,
-    uint8 addressBytesLength
-  ) internal pure {
+  function _expectTrimmed(bytes memory actual, address addr, uint8 addressBytesLength) internal pure {
     assertEq(actual.length, addressBytesLength);
     if (addressBytesLength <= 20) {
       assertEq(actual, abi.encodePacked(addr));
@@ -88,10 +85,7 @@ contract OnRamp_addressEncodingCompatibility is OnRampSetup {
     }
   }
 
-  function _encodeAddressToLength(
-    address addr,
-    uint8 addressBytesLength
-  ) internal pure returns (bytes memory) {
+  function _encodeAddressToLength(address addr, uint8 addressBytesLength) internal pure returns (bytes memory) {
     if (addressBytesLength == 20) return abi.encodePacked(addr);
     if (addressBytesLength == 32) return abi.encode(addr);
 

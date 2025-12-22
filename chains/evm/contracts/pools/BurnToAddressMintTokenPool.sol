@@ -32,8 +32,9 @@ contract BurnToAddressMintTokenPool is BurnMintTokenPoolAbstract, ITypeAndVersio
     address advancedPoolHooks,
     address rmnProxy,
     address router,
-    address burnAddress
-  ) TokenPool(token, localTokenDecimals, advancedPoolHooks, rmnProxy, router) {
+    address burnAddress,
+    address feeAggregator
+  ) TokenPool(token, localTokenDecimals, advancedPoolHooks, rmnProxy, router, feeAggregator) {
     i_burnAddress = burnAddress;
   }
 

@@ -13,7 +13,13 @@ contract BurnToAddressMintTokenPoolSetup is BurnMintSetup {
     super.setUp();
 
     s_pool = new BurnToAddressMintTokenPool(
-      s_token, DEFAULT_TOKEN_DECIMALS, address(0), address(s_mockRMNRemote), address(s_sourceRouter), BURN_ADDRESS
+      s_token,
+      DEFAULT_TOKEN_DECIMALS,
+      address(0),
+      address(s_mockRMNRemote),
+      address(s_sourceRouter),
+      BURN_ADDRESS,
+      s_feeAggregator
     );
 
     s_token.grantMintAndBurnRoles(address(s_pool));

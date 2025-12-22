@@ -18,8 +18,9 @@ contract BurnMintWithLockReleaseFlagTokenPool is BurnMintTokenPool {
     uint8 localTokenDecimals,
     address advancedPoolHooks,
     address rmnProxy,
-    address router
-  ) BurnMintTokenPool(token, localTokenDecimals, advancedPoolHooks, rmnProxy, router) {}
+    address router,
+    address feeAggregator
+  ) BurnMintTokenPool(token, localTokenDecimals, advancedPoolHooks, rmnProxy, router, feeAggregator) {}
 
   /// @notice Burn the token in the pool
   /// @dev The _validateLockOrBurn check is an essential security check
@@ -43,7 +44,8 @@ contract BurnMintWithLockReleaseFlagTokenPool is BurnMintTokenPool {
 
     // LOCK_RELEASE_FLAG = bytes4(keccak256("NO_CCTP_USE_LOCK_RELEASE"))
     return Pool.LockOrBurnOutV1({
-      destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector), destPoolData: abi.encode(LOCK_RELEASE_FLAG)
+      destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
+      destPoolData: abi.encode(LOCK_RELEASE_FLAG)
     });
   }
 

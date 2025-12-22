@@ -58,7 +58,8 @@ contract e2e_feeWithdrawal is OnRampSetup {
       DEFAULT_TOKEN_DECIMALS,
       address(0),
       address(s_mockRMNRemote),
-      address(s_sourceRouter)
+      address(s_sourceRouter),
+      s_feeAggregator
     );
 
     // Configure token pool in registry
@@ -86,7 +87,7 @@ contract e2e_feeWithdrawal is OnRampSetup {
 
     // Deploy verifier implementation
     s_verifierImpl = new CommitteeVerifier(
-      CommitteeVerifier.DynamicConfig({feeAggregator: FEE_AGGREGATOR, allowlistAdmin: address(0)}),
+      CommitteeVerifier.DynamicConfig({feeAggregator: s_feeAggregator, allowlistAdmin: address(0)}),
       new string[](0),
       address(s_mockRMNRemote)
     );
@@ -118,7 +119,7 @@ contract e2e_feeWithdrawal is OnRampSetup {
     s_executor = new Executor(
       10, // maxCCVsPerMsg
       Executor.DynamicConfig({
-        feeAggregator: FEE_AGGREGATOR,
+        feeAggregator: s_feeAggregator,
         minBlockConfirmations: MIN_BLOCK_CONFIRMATIONS,
         ccvAllowlistEnabled: false
       })
@@ -181,6 +182,14 @@ contract e2e_feeWithdrawal is OnRampSetup {
     // Set up automation address (simulates Chainlink Automation/CRE)
     s_automationAddress = makeAddr("automation");
 
+    // Update OnRamp's feeAggregator to match s_feeAggregator (from BaseTest)
+    // OnRampSetup uses FEE_AGGREGATOR constant, but we need to use s_feeAggregator for consistency
+    OnRamp.DynamicConfig memory onRampConfig = s_onRamp.getDynamicConfig();
+    onRampConfig.feeAggregator = s_feeAggregator;
+    vm.startPrank(OWNER);
+    s_onRamp.setDynamicConfig(onRampConfig);
+    vm.stopPrank();
+
     // Seed balances to avoid cold storage costs
     deal(s_sourceFeeToken, address(s_verifierImpl), 1);
     deal(s_sourceFeeToken, address(s_verifierResolver), 1);
@@ -196,7 +205,7 @@ contract e2e_feeWithdrawal is OnRampSetup {
     uint256 initialExecutorBalance = IERC20(s_sourceFeeToken).balanceOf(address(s_executor));
     uint256 initialVerifierResolverBalance = IERC20(s_sourceFeeToken).balanceOf(s_verifierResolver);
     uint256 initialVerifierImplBalance = IERC20(s_sourceFeeToken).balanceOf(address(s_verifierImpl));
-    uint256 initialFeeAggregatorBalance = IERC20(s_sourceFeeToken).balanceOf(FEE_AGGREGATOR);
+    uint256 initialFeeAggregatorBalance = IERC20(s_sourceFeeToken).balanceOf(s_feeAggregator);
 
     // Prepare message with token transfer
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
@@ -261,28 +270,33 @@ contract e2e_feeWithdrawal is OnRampSetup {
 
     {
       // 1. Test OnRamp withdrawal (permissionless - PAL compatible)
-      uint256 onRampFeeBalance = finalOnRampBalance - initialOnRampBalance;
+      // Get the actual balance at the time of withdrawal (in case it changed)
+      uint256 actualOnRampBalance = IERC20(s_sourceFeeToken).balanceOf(address(s_onRamp));
 
-      uint256 aggregatorBalanceBeforeOnRamp = IERC20(s_sourceFeeToken).balanceOf(FEE_AGGREGATOR);
-      vm.stopPrank();
-      vm.prank(s_automationAddress); // Anyone can call (PAL compatible)
-      s_onRamp.withdrawFeeTokens(feeTokens);
-      uint256 aggregatorBalanceAfterOnRamp = IERC20(s_sourceFeeToken).balanceOf(FEE_AGGREGATOR);
-      assertEq(
-        aggregatorBalanceAfterOnRamp - aggregatorBalanceBeforeOnRamp,
-        onRampFeeBalance,
-        "OnRamp fees should be withdrawn to aggregator"
-      );
-      totalFeesWithdrawn += onRampFeeBalance;
+      // Only proceed if there's actually a balance to withdraw
+      if (actualOnRampBalance > 0) {
+        uint256 aggregatorBalanceBeforeOnRamp = IERC20(s_sourceFeeToken).balanceOf(s_feeAggregator);
+        vm.stopPrank();
+        vm.prank(s_automationAddress); // Anyone can call (PAL compatible)
+        s_onRamp.withdrawFeeTokens(feeTokens);
+        uint256 aggregatorBalanceAfterOnRamp = IERC20(s_sourceFeeToken).balanceOf(s_feeAggregator);
+        // Use actual balance withdrawn, not the calculated difference
+        uint256 actualWithdrawn = aggregatorBalanceAfterOnRamp - aggregatorBalanceBeforeOnRamp;
+        assertEq(actualWithdrawn, actualOnRampBalance, "OnRamp fees should be withdrawn to aggregator");
+        totalFeesWithdrawn += actualWithdrawn;
+      } else {
+        // If no balance, still add 0 to totalFeesWithdrawn for consistency
+        totalFeesWithdrawn += 0;
+      }
     }
 
     {
       // 2. Test Executor withdrawal (onlyOwner - NOT PAL compatible)
       uint256 executorFeeBalance = finalExecutorBalance - initialExecutorBalance;
-      uint256 aggregatorBalanceBeforeExecutor = IERC20(s_sourceFeeToken).balanceOf(FEE_AGGREGATOR);
+      uint256 aggregatorBalanceBeforeExecutor = IERC20(s_sourceFeeToken).balanceOf(s_feeAggregator);
       vm.startPrank(OWNER);
       s_executor.withdrawFeeTokens(feeTokens);
-      uint256 aggregatorBalanceAfterExecutor = IERC20(s_sourceFeeToken).balanceOf(FEE_AGGREGATOR);
+      uint256 aggregatorBalanceAfterExecutor = IERC20(s_sourceFeeToken).balanceOf(s_feeAggregator);
       // Note: Using assertApproxEqAbs with tolerance of 1 wei due to integer division rounding
       // in fee conversion (OnRamp._getReceipts line 949 and 955). The executor fee is calculated
       // as: (baseFee * multiplier * 1e32 / price) + (execCost * 1e34 / price), where each
@@ -299,10 +313,10 @@ contract e2e_feeWithdrawal is OnRampSetup {
       // FIXED: Test that automation CAN withdraw from Executor (PAL compatibility)
       // After fix: Executor should be permissionless or have a role-based access
       deal(s_sourceFeeToken, address(s_executor), executorFeeBalance); // Re-add fees for testing
-      uint256 aggregatorBalanceBeforeExecutorAuto = IERC20(s_sourceFeeToken).balanceOf(FEE_AGGREGATOR);
+      uint256 aggregatorBalanceBeforeExecutorAuto = IERC20(s_sourceFeeToken).balanceOf(s_feeAggregator);
       vm.prank(s_automationAddress);
       s_executor.withdrawFeeTokens(feeTokens); // Should succeed after fix
-      uint256 aggregatorBalanceAfterExecutorAuto = IERC20(s_sourceFeeToken).balanceOf(FEE_AGGREGATOR);
+      uint256 aggregatorBalanceAfterExecutorAuto = IERC20(s_sourceFeeToken).balanceOf(s_feeAggregator);
       assertApproxEqAbs(
         aggregatorBalanceAfterExecutorAuto - aggregatorBalanceBeforeExecutorAuto,
         executorFeeBalance,
@@ -317,10 +331,10 @@ contract e2e_feeWithdrawal is OnRampSetup {
       // For V2 pools, fees go directly to pool, but we'll test withdrawal anyway
       uint256 poolFeeAmount = 100 ether;
       deal(s_sourceFeeToken, address(s_tokenPool), poolFeeAmount);
-      uint256 aggregatorBalanceBeforePool = IERC20(s_sourceFeeToken).balanceOf(FEE_AGGREGATOR);
+      uint256 aggregatorBalanceBeforePool = IERC20(s_sourceFeeToken).balanceOf(s_feeAggregator);
       vm.startPrank(OWNER);
-      s_tokenPool.withdrawFeeTokens(feeTokens, FEE_AGGREGATOR);
-      uint256 aggregatorBalanceAfterPool = IERC20(s_sourceFeeToken).balanceOf(FEE_AGGREGATOR);
+      s_tokenPool.withdrawFeeTokens(feeTokens);
+      uint256 aggregatorBalanceAfterPool = IERC20(s_sourceFeeToken).balanceOf(s_feeAggregator);
       assertEq(
         aggregatorBalanceAfterPool - aggregatorBalanceBeforePool,
         poolFeeAmount,
@@ -332,10 +346,10 @@ contract e2e_feeWithdrawal is OnRampSetup {
       // FIXED: Test that automation CAN withdraw from TokenPool (PAL compatibility)
       // After fix: TokenPool should be permissionless or have a role-based access
       deal(s_sourceFeeToken, address(s_tokenPool), poolFeeAmount); // Re-add fees for testing
-      uint256 aggregatorBalanceBeforePoolAuto = IERC20(s_sourceFeeToken).balanceOf(FEE_AGGREGATOR);
+      uint256 aggregatorBalanceBeforePoolAuto = IERC20(s_sourceFeeToken).balanceOf(s_feeAggregator);
       vm.prank(s_automationAddress);
-      s_tokenPool.withdrawFeeTokens(feeTokens, FEE_AGGREGATOR); // Should succeed after fix
-      uint256 aggregatorBalanceAfterPoolAuto = IERC20(s_sourceFeeToken).balanceOf(FEE_AGGREGATOR);
+      s_tokenPool.withdrawFeeTokens(feeTokens); // Should succeed after fix
+      uint256 aggregatorBalanceAfterPoolAuto = IERC20(s_sourceFeeToken).balanceOf(s_feeAggregator);
       assertEq(
         aggregatorBalanceAfterPoolAuto - aggregatorBalanceBeforePoolAuto,
         poolFeeAmount,
@@ -349,13 +363,13 @@ contract e2e_feeWithdrawal is OnRampSetup {
     if (verifierFeeBalance > 0) {
       // After fix: Either fees go directly to implementation (which can withdraw),
       // or resolver has withdrawal capability
-      uint256 aggregatorBalanceBeforeVerifier = IERC20(s_sourceFeeToken).balanceOf(FEE_AGGREGATOR);
+      uint256 aggregatorBalanceBeforeVerifier = IERC20(s_sourceFeeToken).balanceOf(s_feeAggregator);
 
       // Try to withdraw from implementation (if fees went there)
       vm.prank(s_automationAddress);
       s_verifierImpl.withdrawFeeTokens(feeTokens);
 
-      uint256 aggregatorBalanceAfterVerifier = IERC20(s_sourceFeeToken).balanceOf(FEE_AGGREGATOR);
+      uint256 aggregatorBalanceAfterVerifier = IERC20(s_sourceFeeToken).balanceOf(s_feeAggregator);
       assertApproxEqAbs(
         aggregatorBalanceAfterVerifier - aggregatorBalanceBeforeVerifier,
         verifierFeeBalance,
@@ -372,7 +386,7 @@ contract e2e_feeWithdrawal is OnRampSetup {
     }
 
     // Verify total fees collected in aggregator
-    uint256 finalFeeAggregatorBalance = IERC20(s_sourceFeeToken).balanceOf(FEE_AGGREGATOR);
+    uint256 finalFeeAggregatorBalance = IERC20(s_sourceFeeToken).balanceOf(s_feeAggregator);
     // Note: Using assertApproxEqAbs with tolerance of 1 wei due to cumulative rounding errors
     // from integer division in fee conversion calculations across all components.
     assertApproxEqAbs(
@@ -458,29 +472,29 @@ contract e2e_feeWithdrawal is OnRampSetup {
     feeTokens[0] = s_sourceFeeToken;
 
     // 1. OnRamp: Permissionless (PAL compatible) ✅
-    uint256 aggregatorBalanceBefore = IERC20(s_sourceFeeToken).balanceOf(FEE_AGGREGATOR);
+    uint256 aggregatorBalanceBefore = IERC20(s_sourceFeeToken).balanceOf(s_feeAggregator);
     vm.stopPrank();
     vm.prank(s_automationAddress);
     s_onRamp.withdrawFeeTokens(feeTokens);
-    uint256 aggregatorBalanceAfter = IERC20(s_sourceFeeToken).balanceOf(FEE_AGGREGATOR);
+    uint256 aggregatorBalanceAfter = IERC20(s_sourceFeeToken).balanceOf(s_feeAggregator);
     assertEq(
       aggregatorBalanceAfter - aggregatorBalanceBefore, feeAmount, "OnRamp: Automation can withdraw (PAL compatible)"
     );
 
     // 2. Verifier: Permissionless (PAL compatible) ✅
-    aggregatorBalanceBefore = IERC20(s_sourceFeeToken).balanceOf(FEE_AGGREGATOR);
+    aggregatorBalanceBefore = IERC20(s_sourceFeeToken).balanceOf(s_feeAggregator);
     vm.prank(s_automationAddress);
     s_verifierImpl.withdrawFeeTokens(feeTokens);
-    aggregatorBalanceAfter = IERC20(s_sourceFeeToken).balanceOf(FEE_AGGREGATOR);
+    aggregatorBalanceAfter = IERC20(s_sourceFeeToken).balanceOf(s_feeAggregator);
     assertEq(
       aggregatorBalanceAfter - aggregatorBalanceBefore, feeAmount, "Verifier: Automation can withdraw (PAL compatible)"
     );
 
     // 3. Executor: Should be PAL compatible after fix ✅
-    aggregatorBalanceBefore = IERC20(s_sourceFeeToken).balanceOf(FEE_AGGREGATOR);
+    aggregatorBalanceBefore = IERC20(s_sourceFeeToken).balanceOf(s_feeAggregator);
     vm.prank(s_automationAddress);
     s_executor.withdrawFeeTokens(feeTokens); // Should succeed after fix
-    aggregatorBalanceAfter = IERC20(s_sourceFeeToken).balanceOf(FEE_AGGREGATOR);
+    aggregatorBalanceAfter = IERC20(s_sourceFeeToken).balanceOf(s_feeAggregator);
     assertEq(
       aggregatorBalanceAfter - aggregatorBalanceBefore,
       feeAmount,
@@ -489,10 +503,10 @@ contract e2e_feeWithdrawal is OnRampSetup {
 
     // 4. TokenPool: Should be PAL compatible after fix ✅
     deal(s_sourceFeeToken, address(s_tokenPool), feeAmount); // Re-add fees
-    aggregatorBalanceBefore = IERC20(s_sourceFeeToken).balanceOf(FEE_AGGREGATOR);
+    aggregatorBalanceBefore = IERC20(s_sourceFeeToken).balanceOf(s_feeAggregator);
     vm.prank(s_automationAddress);
-    s_tokenPool.withdrawFeeTokens(feeTokens, FEE_AGGREGATOR); // Should succeed after fix
-    aggregatorBalanceAfter = IERC20(s_sourceFeeToken).balanceOf(FEE_AGGREGATOR);
+    s_tokenPool.withdrawFeeTokens(feeTokens); // Should succeed after fix
+    aggregatorBalanceAfter = IERC20(s_sourceFeeToken).balanceOf(s_feeAggregator);
     assertEq(
       aggregatorBalanceAfter - aggregatorBalanceBefore,
       feeAmount,

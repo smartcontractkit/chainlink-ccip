@@ -15,7 +15,7 @@ contract BurnWithFromMintTokenPoolSetup is BurnMintSetup {
     super.setUp();
 
     s_pool = new BurnWithFromMintTokenPool(
-      s_token, DEFAULT_TOKEN_DECIMALS, address(0), address(s_mockRMNRemote), address(s_sourceRouter)
+      s_token, DEFAULT_TOKEN_DECIMALS, address(0), address(s_mockRMNRemote), address(s_sourceRouter), s_feeAggregator
     );
     s_token.grantMintAndBurnRoles(address(s_pool));
 
@@ -40,7 +40,9 @@ contract BurnWithFromMintTokenPool_lockOrBurn is BurnWithFromMintTokenPoolSetup 
 
     vm.expectEmit();
     emit TokenPool.OutboundRateLimitConsumed({
-      remoteChainSelector: DEST_CHAIN_SELECTOR, token: address(s_token), amount: amount
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      token: address(s_token),
+      amount: amount
     });
 
     vm.expectEmit();

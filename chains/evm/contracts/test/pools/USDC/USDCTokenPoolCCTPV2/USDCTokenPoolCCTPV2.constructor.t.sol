@@ -17,7 +17,8 @@ contract USDCTokenPoolCCTPV2_constructor is USDCTokenPoolCCTPV2Setup {
       s_USDCToken,
       address(0),
       address(s_mockRMNRemote),
-      address(s_router)
+      address(s_router),
+      s_feeAggregator
     );
   }
 
@@ -29,7 +30,8 @@ contract USDCTokenPoolCCTPV2_constructor is USDCTokenPoolCCTPV2Setup {
       s_USDCToken,
       address(0),
       address(s_mockRMNRemote),
-      address(s_router)
+      address(s_router),
+      s_feeAggregator
     );
   }
 
@@ -42,7 +44,8 @@ contract USDCTokenPoolCCTPV2_constructor is USDCTokenPoolCCTPV2Setup {
       s_USDCToken,
       address(0),
       address(s_mockRMNRemote),
-      address(s_router)
+      address(s_router),
+      s_feeAggregator
     );
   }
 
@@ -62,7 +65,8 @@ contract USDCTokenPoolCCTPV2_constructor is USDCTokenPoolCCTPV2Setup {
       s_USDCToken,
       address(0),
       address(s_mockRMNRemote),
-      address(s_router)
+      address(s_router),
+      s_feeAggregator
     );
   }
 
@@ -82,7 +86,8 @@ contract USDCTokenPoolCCTPV2_constructor is USDCTokenPoolCCTPV2Setup {
       s_USDCToken,
       address(0),
       address(s_mockRMNRemote),
-      address(s_router)
+      address(s_router),
+      s_feeAggregator
     );
   }
 }

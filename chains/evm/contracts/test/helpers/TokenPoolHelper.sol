@@ -13,8 +13,9 @@ contract TokenPoolHelper is TokenPool {
     uint8 localTokenDecimals,
     address advancedPoolHooks,
     address rmnProxy,
-    address router
-  ) TokenPool(token, localTokenDecimals, advancedPoolHooks, rmnProxy, router) {}
+    address router,
+    address feeAggregator
+  ) TokenPool(token, localTokenDecimals, advancedPoolHooks, rmnProxy, router, feeAggregator) {}
 
   function encodeLocalDecimals() external view returns (bytes memory) {
     return _encodeLocalDecimals();
@@ -26,10 +27,7 @@ contract TokenPoolHelper is TokenPool {
     return _parseRemoteDecimals(sourcePoolData);
   }
 
-  function calculateLocalAmount(
-    uint256 remoteAmount,
-    uint8 remoteDecimals
-  ) external view returns (uint256) {
+  function calculateLocalAmount(uint256 remoteAmount, uint8 remoteDecimals) external view returns (uint256) {
     return _calculateLocalAmount(remoteAmount, remoteDecimals);
   }
 
@@ -57,17 +55,11 @@ contract TokenPoolHelper is TokenPool {
     return localAmount;
   }
 
-  function applyFee(
-    Pool.LockOrBurnInV1 calldata lockOrBurnIn,
-    uint16 finality
-  ) external view returns (uint256) {
+  function applyFee(Pool.LockOrBurnInV1 calldata lockOrBurnIn, uint16 finality) external view returns (uint256) {
     return lockOrBurnIn.amount - _getFee(lockOrBurnIn, finality);
   }
 
-  function getFee(
-    Pool.LockOrBurnInV1 calldata lockOrBurnIn,
-    uint16 finality
-  ) external view returns (uint256) {
+  function getFee(Pool.LockOrBurnInV1 calldata lockOrBurnIn, uint16 finality) external view returns (uint256) {
     return _getFee(lockOrBurnIn, finality);
   }
 

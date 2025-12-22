@@ -15,8 +15,9 @@ contract CCTPTokenPoolSetup is USDCSetup {
     address[] memory allowedCallers = new address[](1);
     allowedCallers[0] = s_allowedCaller;
 
-    s_cctpTokenPool =
-      new CCTPTokenPool(s_USDCToken, 6, address(s_mockRMNRemote), address(s_router), s_cctpVerifier, allowedCallers);
+    s_cctpTokenPool = new CCTPTokenPool(
+      s_USDCToken, 6, address(s_mockRMNRemote), address(s_router), s_cctpVerifier, allowedCallers, s_feeAggregator
+    );
 
     _poolApplyChainUpdates(address(s_cctpTokenPool));
   }

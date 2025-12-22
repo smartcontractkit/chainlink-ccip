@@ -60,10 +60,7 @@ contract Executor is IExecutor, Ownable2StepMsgSender {
   /// @notice The remote chain configurations for supported destination chains.
   mapping(uint64 remoteChainSelector => RemoteChainConfig) internal s_remoteChainConfigs;
 
-  constructor(
-    uint8 maxCCVsPerMsg,
-    DynamicConfig memory dynamicConfig
-  ) {
+  constructor(uint8 maxCCVsPerMsg, DynamicConfig memory dynamicConfig) {
     if (maxCCVsPerMsg == 0) {
       revert InvalidMaxPossibleCCVsPerMsg(maxCCVsPerMsg);
     }
@@ -232,7 +229,7 @@ contract Executor is IExecutor, Ownable2StepMsgSender {
   /// @param feeTokens The fee tokens to withdraw.
   function withdrawFeeTokens(
     address[] calldata feeTokens
-  ) external virtual onlyOwner {
+  ) external virtual {
     address feeAggregator = s_dynamicConfig.feeAggregator;
     for (uint256 i = 0; i < feeTokens.length; ++i) {
       IERC20 feeToken = IERC20(feeTokens[i]);

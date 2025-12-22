@@ -68,9 +68,10 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
     address advancedPoolHooks,
     address rmnProxy,
     address router,
-    address lockBox
+    address lockBox,
+    address feeAggregator
   )
-    SiloedLockReleaseTokenPool(token, localTokenDecimals, advancedPoolHooks, rmnProxy, router, lockBox)
+    SiloedLockReleaseTokenPool(token, localTokenDecimals, advancedPoolHooks, rmnProxy, router, lockBox, feeAggregator)
     AuthorizedCallers(new address[](0))
   {}
 
@@ -127,10 +128,7 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
   /// @dev This function is overridden to prevent providing liquidity to a chain that has already been migrated, and thus should use CCTP-proper instead of a Lock/Release mechanism.
   /// @param remoteChainSelector The remote chain selector.
   /// @param amount The amount of tokens to provide.
-  function _provideLiquidity(
-    uint64 remoteChainSelector,
-    uint256 amount
-  ) internal override {
+  function _provideLiquidity(uint64 remoteChainSelector, uint256 amount) internal override {
     if (s_migratedChains.contains(remoteChainSelector)) {
       revert TokenLockingNotAllowedAfterMigration(remoteChainSelector);
     }
@@ -231,10 +229,7 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
   /// and strict scrutiny should be applied to ensure that the amount of tokens excluded is accurate.
   /// @param remoteChainSelector The remote chain selector.
   /// @param amount The amount of tokens to exclude from burn.
-  function excludeTokensFromBurn(
-    uint64 remoteChainSelector,
-    uint256 amount
-  ) external onlyOwner {
+  function excludeTokensFromBurn(uint64 remoteChainSelector, uint256 amount) external onlyOwner {
     if (s_proposedUSDCMigrationChain != remoteChainSelector) revert NoMigrationProposalPending();
 
     s_tokensExcludedFromBurn[remoteChainSelector] += amount;

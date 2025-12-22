@@ -12,10 +12,11 @@ contract TokenPool_constructor is TokenPoolSetup {
   function test_constructor() public view {
     assertEq(address(s_token), address(s_tokenPool.getToken()));
     assertEq(address(s_mockRMNRemote), s_tokenPool.getRmnProxy());
-    (address router, address rateLimitAdmin) = s_tokenPool.getDynamicConfig();
+    (address router, address rateLimitAdmin, address feeAggregator) = s_tokenPool.getDynamicConfig();
     assertEq(address(s_sourceRouter), router);
     assertEq(0, s_tokenPool.getMinBlockConfirmation());
     assertEq(address(0), rateLimitAdmin);
+    assertEq(s_feeAggregator, feeAggregator);
     assertEq(DEFAULT_TOKEN_DECIMALS, s_tokenPool.getTokenDecimals());
   }
 
@@ -24,7 +25,9 @@ contract TokenPool_constructor is TokenPoolSetup {
 
     vm.mockCallRevert(address(s_token), abi.encodeWithSelector(IERC20Metadata.decimals.selector), "decimals fails");
 
-    s_tokenPool = new TokenPoolHelper(s_token, decimals, address(0), address(s_mockRMNRemote), address(s_sourceRouter));
+    s_tokenPool = new TokenPoolHelper(
+      s_token, decimals, address(0), address(s_mockRMNRemote), address(s_sourceRouter), s_feeAggregator
+    );
 
     assertEq(s_tokenPool.getTokenDecimals(), decimals);
   }
@@ -35,7 +38,12 @@ contract TokenPool_constructor is TokenPoolSetup {
     vm.expectRevert(TokenPool.ZeroAddressInvalid.selector);
 
     s_tokenPool = new TokenPoolHelper(
-      IERC20(address(0)), DEFAULT_TOKEN_DECIMALS, address(0), address(s_mockRMNRemote), address(s_sourceRouter)
+      IERC20(address(0)),
+      DEFAULT_TOKEN_DECIMALS,
+      address(0),
+      address(s_mockRMNRemote),
+      address(s_sourceRouter),
+      s_feeAggregator
     );
   }
 
@@ -46,7 +54,8 @@ contract TokenPool_constructor is TokenPoolSetup {
       abi.encodeWithSelector(TokenPool.InvalidDecimalArgs.selector, invalidDecimals, DEFAULT_TOKEN_DECIMALS)
     );
 
-    s_tokenPool =
-      new TokenPoolHelper(s_token, invalidDecimals, address(0), address(s_mockRMNRemote), address(s_sourceRouter));
+    s_tokenPool = new TokenPoolHelper(
+      s_token, invalidDecimals, address(0), address(s_mockRMNRemote), address(s_sourceRouter), s_feeAggregator
+    );
   }
 }

@@ -15,7 +15,8 @@ contract USDCTokenPool_constructor is USDCTokenPoolSetup {
       address(0),
       address(s_mockRMNRemote),
       address(s_router),
-      0
+      0,
+      s_feeAggregator
     );
   }
 
@@ -28,7 +29,8 @@ contract USDCTokenPool_constructor is USDCTokenPoolSetup {
       address(0),
       address(s_mockRMNRemote),
       address(s_router),
-      0
+      0,
+      s_feeAggregator
     );
   }
 
@@ -42,7 +44,8 @@ contract USDCTokenPool_constructor is USDCTokenPoolSetup {
       address(0),
       address(s_mockRMNRemote),
       address(s_router),
-      1
+      1,
+      s_feeAggregator
     );
   }
 
@@ -60,7 +63,8 @@ contract USDCTokenPool_constructor is USDCTokenPoolSetup {
       address(0),
       address(s_mockRMNRemote),
       address(s_router),
-      1
+      1,
+      s_feeAggregator
     );
   }
 
@@ -80,7 +84,8 @@ contract USDCTokenPool_constructor is USDCTokenPoolSetup {
       address(0),
       address(s_mockRMNRemote),
       address(s_router),
-      0
+      0,
+      s_feeAggregator
     );
   }
 }

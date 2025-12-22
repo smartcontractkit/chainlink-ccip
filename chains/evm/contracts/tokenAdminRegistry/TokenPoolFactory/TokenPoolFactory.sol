@@ -49,6 +49,7 @@ contract TokenPoolFactory is ITypeAndVersion {
     address remoteRouter; // The router on the remote chain.
     address remoteRMNProxy; // The RMNProxy contract on the remote chain.
     address remoteLockBox; // The lockBox contract on the remote chain (for LOCK_RELEASE pools).
+    address remoteFeeAggregator; // The fee aggregator contract on the remote chain.
     uint8 remoteTokenDecimals; // The number of decimals for the token on the remote chain.
   }
 
@@ -60,6 +61,7 @@ contract TokenPoolFactory is ITypeAndVersion {
   address private immutable i_rmnProxy;
   address private immutable i_ccipRouter;
   address private immutable i_lockBox;
+  address private immutable i_feeAggregator;
 
   /// @notice Construct the TokenPoolFactory.
   /// @param tokenAdminRegistry The address of the token admin registry.
@@ -67,16 +69,18 @@ contract TokenPoolFactory is ITypeAndVersion {
   /// @param rmnProxy The address of the RMNProxy contract token pools will be deployed with.
   /// @param ccipRouter The address of the CCIPRouter contract token pools will be deployed with.
   /// @param lockBox The address of the ERC20LockBox contract for lock/release pools.
+  /// @param feeAggregator The address of the fee aggregator contract token pools will be deployed with.
   constructor(
     ITokenAdminRegistry tokenAdminRegistry,
     RegistryModuleOwnerCustom tokenAdminModule,
     address rmnProxy,
     address ccipRouter,
-    address lockBox
+    address lockBox,
+    address feeAggregator
   ) {
     if (
       address(tokenAdminRegistry) == address(0) || address(tokenAdminModule) == address(0) || rmnProxy == address(0)
-        || ccipRouter == address(0) || lockBox == address(0)
+        || ccipRouter == address(0) || lockBox == address(0) || feeAggregator == address(0)
     ) revert InvalidZeroAddress();
 
     i_tokenAdminRegistry = ITokenAdminRegistry(tokenAdminRegistry);
@@ -84,6 +88,7 @@ contract TokenPoolFactory is ITypeAndVersion {
     i_rmnProxy = rmnProxy;
     i_ccipRouter = ccipRouter;
     i_lockBox = lockBox;
+    i_feeAggregator = feeAggregator;
   }
 
   // ================================================================
@@ -231,12 +236,13 @@ contract TokenPoolFactory is ITypeAndVersion {
     }
 
     // Construct the initArgs for the token pool using the immutable contracts for CCIP on the local chain.
-    // LockRelease pools need lockBox, BurnMint pools don't.
+    // LockRelease pools need lockBox, BurnMint pools don't. Both need feeAggregator.
     bytes memory tokenPoolInitArgs;
     if (localPoolType == PoolType.LOCK_RELEASE) {
-      tokenPoolInitArgs = abi.encode(token, localTokenDecimals, address(0), i_rmnProxy, i_ccipRouter, i_lockBox);
+      tokenPoolInitArgs =
+        abi.encode(token, localTokenDecimals, address(0), i_rmnProxy, i_ccipRouter, i_lockBox, i_feeAggregator);
     } else {
-      tokenPoolInitArgs = abi.encode(token, localTokenDecimals, address(0), i_rmnProxy, i_ccipRouter);
+      tokenPoolInitArgs = abi.encode(token, localTokenDecimals, address(0), i_rmnProxy, i_ccipRouter, i_feeAggregator);
     }
 
     // Construct the deployment code from the initCode and the initArgs and then deploy.
@@ -268,25 +274,27 @@ contract TokenPoolFactory is ITypeAndVersion {
   ) private pure returns (bytes32) {
     bytes memory constructorParams;
 
-    // LockRelease pools have an additional lockBox parameter.
+    // LockRelease pools have an additional lockBox parameter. Both need feeAggregator.
     if (poolType == PoolType.LOCK_RELEASE) {
-      // constructor(address token, uint8 localTokenDecimals, address advancedPoolHooks, address rmnProxy, address router, address lockBox).
+      // constructor(address token, uint8 localTokenDecimals, address advancedPoolHooks, address rmnProxy, address router, address lockBox, address feeAggregator).
       constructorParams = abi.encode(
         remoteTokenAddress,
         remoteChainConfig.remoteTokenDecimals,
         address(0),
         remoteChainConfig.remoteRMNProxy,
         remoteChainConfig.remoteRouter,
-        remoteChainConfig.remoteLockBox
+        remoteChainConfig.remoteLockBox,
+        remoteChainConfig.remoteFeeAggregator
       );
     } else {
-      // constructor(address token, uint8 localTokenDecimals, address advancedPoolHooks, address rmnProxy, address router).
+      // constructor(address token, uint8 localTokenDecimals, address advancedPoolHooks, address rmnProxy, address router, address feeAggregator).
       constructorParams = abi.encode(
         remoteTokenAddress,
         remoteChainConfig.remoteTokenDecimals,
         address(0),
         remoteChainConfig.remoteRMNProxy,
-        remoteChainConfig.remoteRouter
+        remoteChainConfig.remoteRouter,
+        remoteChainConfig.remoteFeeAggregator
       );
     }
 
@@ -298,10 +306,7 @@ contract TokenPoolFactory is ITypeAndVersion {
   /// the token pool will not be able to be set in the token admin registry, and this function will revert.
   /// @param token The address of the token to set the pool for.
   /// @param pool The address of the pool to set in the token admin registry.
-  function _setTokenPoolInTokenAdminRegistry(
-    address token,
-    address pool
-  ) private {
+  function _setTokenPoolInTokenAdminRegistry(address token, address pool) private {
     i_registryModuleOwnerCustom.registerAdminViaOwner(token);
     i_tokenAdminRegistry.acceptAdminRole(token);
     i_tokenAdminRegistry.setPool(token, pool);

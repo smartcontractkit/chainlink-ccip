@@ -12,6 +12,7 @@ contract AdvancedPoolHooksSetup is BaseTest {
   BurnMintERC20 internal s_token;
   TokenPoolHelper internal s_tokenPool;
   AdvancedPoolHooks internal s_advancedPoolHooks;
+  address internal s_router = makeAddr("router");
   uint16 internal constant BPS_DIVIDER = 10_000;
   uint256 internal constant CCV_THRESHOLD_AMOUNT = 1000e18;
   address public s_sender = makeAddr("sender");
@@ -32,7 +33,12 @@ contract AdvancedPoolHooksSetup is BaseTest {
     s_advancedPoolHooks = new AdvancedPoolHooks(new address[](0), CCV_THRESHOLD_AMOUNT);
 
     s_tokenPool = new TokenPoolHelper(
-      s_token, DEFAULT_TOKEN_DECIMALS, address(s_advancedPoolHooks), address(s_mockRMNRemote), address(s_sourceRouter)
+      s_token,
+      DEFAULT_TOKEN_DECIMALS,
+      address(s_advancedPoolHooks),
+      address(s_mockRMNRemote),
+      address(s_sourceRouter),
+      s_feeAggregator
     );
 
     bytes[] memory remotePoolAddresses = new bytes[](1);

@@ -46,7 +46,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
 
     // Create the constructor params for the predicted pool.
     bytes memory poolCreationParams =
-      abi.encode(predictedTokenAddress, LOCAL_TOKEN_DECIMALS, address(0), s_rmnProxy, s_sourceRouter);
+      abi.encode(predictedTokenAddress, LOCAL_TOKEN_DECIMALS, address(0), s_rmnProxy, s_sourceRouter, s_feeAggregator);
 
     // Predict the address of the pool before we make the tx by using the init code and the params
     bytes memory predictedPoolInitCode = abi.encodePacked(s_poolInitCode, poolCreationParams);
@@ -88,7 +88,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
 
     // We want to deploy a new factory and Owner Module.
     TokenPoolFactory newTokenPoolFactory = new TokenPoolFactory(
-      newTokenAdminRegistry, newRegistryModule, s_rmnProxy, address(s_destRouter), address(s_lockBox)
+      newTokenAdminRegistry, newRegistryModule, s_rmnProxy, address(s_destRouter), address(s_lockBox), s_feeAggregator
     );
 
     newTokenAdminRegistry.addRegistryModule(address(newRegistryModule));
@@ -98,6 +98,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
       remoteRouter: address(s_destRouter),
       remoteRMNProxy: address(s_rmnProxy),
       remoteLockBox: address(s_lockBox),
+      remoteFeeAggregator: s_feeAggregator,
       remoteTokenDecimals: LOCAL_TOKEN_DECIMALS
     });
 
@@ -143,8 +144,9 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
       // Create the constructor params for the predicted pool.
       // The predictedTokenAddress is NOT abi-encoded since the raw evm-address
       // is used in the constructor params.
-      bytes memory predictedPoolCreationParams =
-        abi.encode(predictedTokenAddress, LOCAL_TOKEN_DECIMALS, address(0), s_rmnProxy, address(s_destRouter));
+      bytes memory predictedPoolCreationParams = abi.encode(
+        predictedTokenAddress, LOCAL_TOKEN_DECIMALS, address(0), s_rmnProxy, address(s_destRouter), s_feeAggregator
+      );
 
       // Take the init code and concat the destination params to it, the initCode shouldn't change.
       bytes memory predictedPoolInitCode = abi.encodePacked(s_poolInitCode, predictedPoolCreationParams);
@@ -231,7 +233,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
 
     // We want to deploy a new factory and Owner Module.
     TokenPoolFactory newTokenPoolFactory = new TokenPoolFactory(
-      newTokenAdminRegistry, newRegistryModule, s_rmnProxy, address(s_destRouter), address(s_lockBox)
+      newTokenAdminRegistry, newRegistryModule, s_rmnProxy, address(s_destRouter), address(s_lockBox), s_feeAggregator
     );
 
     newTokenAdminRegistry.addRegistryModule(address(newRegistryModule));
@@ -241,6 +243,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
       remoteRouter: address(s_destRouter),
       remoteRMNProxy: address(s_rmnProxy),
       remoteLockBox: address(s_lockBox),
+      remoteFeeAggregator: s_feeAggregator,
       remoteTokenDecimals: LOCAL_TOKEN_DECIMALS
     });
 
@@ -284,8 +287,9 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
     // Create the constructor params for the predicted pool
     // The predictedTokenAddress is NOT abi-encoded since the raw evm-address
     // is used in the constructor params
-    bytes memory predictedPoolCreationParams =
-      abi.encode(address(newRemoteToken), LOCAL_TOKEN_DECIMALS, address(0), s_rmnProxy, address(s_destRouter));
+    bytes memory predictedPoolCreationParams = abi.encode(
+      address(newRemoteToken), LOCAL_TOKEN_DECIMALS, address(0), s_rmnProxy, address(s_destRouter), s_feeAggregator
+    );
 
     // Take the init code and concat the destination params to it, the initCode shouldn't change
     bytes memory predictedPoolInitCode = abi.encodePacked(s_poolInitCode, predictedPoolCreationParams);
@@ -343,6 +347,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
         remoteRouter: address(0),
         remoteRMNProxy: address(0),
         remoteLockBox: address(0),
+        remoteFeeAggregator: address(0),
         remoteTokenDecimals: 0
       }), // remoteChainConfig
       TokenPoolFactory.PoolType.BURN_MINT, // poolType
@@ -395,7 +400,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
 
     // We want to deploy a new factory and Owner Module.
     TokenPoolFactory newTokenPoolFactory = new TokenPoolFactory(
-      newTokenAdminRegistry, newRegistryModule, s_rmnProxy, address(s_destRouter), address(s_lockBox)
+      newTokenAdminRegistry, newRegistryModule, s_rmnProxy, address(s_destRouter), address(s_lockBox), s_feeAggregator
     );
 
     newTokenAdminRegistry.addRegistryModule(address(newRegistryModule));
@@ -405,6 +410,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
       remoteRouter: address(s_destRouter),
       remoteRMNProxy: address(s_rmnProxy),
       remoteLockBox: address(s_lockBox),
+      remoteFeeAggregator: s_feeAggregator,
       remoteTokenDecimals: LOCAL_TOKEN_DECIMALS
     });
 
@@ -504,6 +510,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
         remoteRouter: address(0),
         remoteRMNProxy: address(0),
         remoteLockBox: address(0),
+        remoteFeeAggregator: address(0),
         remoteTokenDecimals: 0
       }), // remoteChainConfig
       TokenPoolFactory.PoolType.BURN_MINT, // poolType
@@ -561,7 +568,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
 
     // We want to deploy a new factory and Owner Module.
     TokenPoolFactory newTokenPoolFactory = new TokenPoolFactory(
-      newTokenAdminRegistry, newRegistryModule, s_rmnProxy, address(s_destRouter), address(s_lockBox)
+      newTokenAdminRegistry, newRegistryModule, s_rmnProxy, address(s_destRouter), address(s_lockBox), s_feeAggregator
     );
 
     newTokenAdminRegistry.addRegistryModule(address(newRegistryModule));
@@ -571,6 +578,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
       remoteRouter: address(s_destRouter),
       remoteRMNProxy: address(s_rmnProxy),
       remoteLockBox: address(s_lockBox),
+      remoteFeeAggregator: s_feeAggregator,
       remoteTokenDecimals: REMOTE_TOKEN_DECIMALS
     });
 
@@ -614,8 +622,9 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
     // Create the constructor params for the predicted pool
     // The predictedTokenAddress is NOT abi-encoded since the raw evm-address
     // is used in the constructor params
-    bytes memory predictedPoolCreationParams =
-      abi.encode(address(newRemoteToken), REMOTE_TOKEN_DECIMALS, address(0), s_rmnProxy, address(s_destRouter));
+    bytes memory predictedPoolCreationParams = abi.encode(
+      address(newRemoteToken), REMOTE_TOKEN_DECIMALS, address(0), s_rmnProxy, address(s_destRouter), s_feeAggregator
+    );
 
     // Take the init code and concat the destination params to it, the initCode shouldn't change
     bytes memory predictedPoolInitCode = abi.encodePacked(s_poolInitCode, predictedPoolCreationParams);

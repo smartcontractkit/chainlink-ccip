@@ -8,7 +8,6 @@ import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2
 contract TokenPoolV2_withdrawFee is AdvancedPoolHooksSetup {
   function test_withdrawFeeTokens() public {
     uint256 feeAmount = 20 ether;
-    address recipient = makeAddr("fee_recipient");
 
     s_token.transfer(address(s_tokenPool), feeAmount);
 
@@ -16,22 +15,11 @@ contract TokenPoolV2_withdrawFee is AdvancedPoolHooksSetup {
     feeTokens[0] = address(s_token);
 
     vm.expectEmit();
-    emit TokenPool.FeeTokenWithdrawn(recipient, address(s_token), feeAmount);
+    emit TokenPool.FeeTokenWithdrawn(s_feeAggregator, address(s_token), feeAmount);
 
-    s_tokenPool.withdrawFeeTokens(feeTokens, recipient);
+    s_tokenPool.withdrawFeeTokens(feeTokens);
 
-    assertEq(s_token.balanceOf(recipient), feeAmount);
+    assertEq(s_token.balanceOf(s_feeAggregator), feeAmount);
     assertEq(s_token.balanceOf(address(s_tokenPool)), 0);
-  }
-
-  function test_withdrawFeeTokens_RevtwertsWhen_OnlyCallableByOwner() public {
-    address recipient = makeAddr("fee_token_recipient");
-
-    vm.stopPrank();
-    vm.prank(STRANGER);
-    vm.expectRevert(Ownable2Step.OnlyCallableByOwner.selector);
-    address[] memory feeTokens = new address[](1);
-    feeTokens[0] = address(s_token);
-    s_tokenPool.withdrawFeeTokens(feeTokens, recipient);
   }
 }

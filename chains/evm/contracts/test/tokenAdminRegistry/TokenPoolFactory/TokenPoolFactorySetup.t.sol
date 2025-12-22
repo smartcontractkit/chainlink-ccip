@@ -33,7 +33,12 @@ contract TokenPoolFactorySetup is TokenAdminRegistrySetup {
     s_tokenAdminRegistry.addRegistryModule(address(s_registryModuleOwnerCustom));
 
     s_tokenPoolFactory = new TokenPoolFactory(
-      s_tokenAdminRegistry, s_registryModuleOwnerCustom, s_rmnProxy, address(s_sourceRouter), address(s_lockBox)
+      s_tokenAdminRegistry,
+      s_registryModuleOwnerCustom,
+      s_rmnProxy,
+      address(s_sourceRouter),
+      address(s_lockBox),
+      s_feeAggregator
     );
 
     // Create Init Code for BurnMintERC20 TestToken with 18 decimals and supply cap of max uint256 value
