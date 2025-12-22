@@ -75,7 +75,10 @@ contract USDCTokenPoolProxySetup is USDCSetup {
     s_usdcTokenPoolProxy.updateLockOrBurnMechanisms(remoteChainSelectors, mechanisms);
   }
 
-  function _enableERC165InterfaceChecks(address pool, bytes4 interfaceId) internal {
+  function _enableERC165InterfaceChecks(
+    address pool,
+    bytes4 interfaceId
+  ) internal {
     vm.mockCall(
       address(pool), abi.encodeWithSelector(IERC165.supportsInterface.selector, interfaceId), abi.encode(true)
     );

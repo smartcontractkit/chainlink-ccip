@@ -8,8 +8,7 @@ import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2
 contract CommitteeVerifier_setDynamicConfig is CommitteeVerifierSetup {
   function test_setDynamicConfig() public {
     CommitteeVerifier.DynamicConfig memory newConfig = CommitteeVerifier.DynamicConfig({
-      feeAggregator: makeAddr("feeAggregator2"),
-      allowlistAdmin: makeAddr("allowlistAdmin2")
+      feeAggregator: makeAddr("feeAggregator2"), allowlistAdmin: makeAddr("allowlistAdmin2")
     });
 
     vm.expectEmit();

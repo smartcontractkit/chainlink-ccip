@@ -65,10 +65,7 @@ contract LombardTokenPool_lockOrBurn is LombardTokenPoolSetup {
 
     vm.expectEmit();
     emit TokenPool.LockedOrBurned({
-      remoteChainSelector: DEST_CHAIN_SELECTOR,
-      token: address(s_token),
-      sender: OWNER,
-      amount: amount
+      remoteChainSelector: DEST_CHAIN_SELECTOR, token: address(s_token), sender: OWNER, amount: amount
     });
 
     Pool.LockOrBurnOutV1 memory out = s_pool.lockOrBurn(
@@ -126,10 +123,7 @@ contract LombardTokenPool_lockOrBurn is LombardTokenPoolSetup {
 
     vm.expectEmit();
     emit TokenPool.LockedOrBurned({
-      remoteChainSelector: DEST_CHAIN_SELECTOR,
-      token: address(s_token),
-      sender: OWNER,
-      amount: amount
+      remoteChainSelector: DEST_CHAIN_SELECTOR, token: address(s_token), sender: OWNER, amount: amount
     });
 
     Pool.LockOrBurnOutV1 memory out = adapterPool.lockOrBurn(

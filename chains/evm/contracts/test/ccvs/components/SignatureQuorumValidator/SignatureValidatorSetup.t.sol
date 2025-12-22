@@ -3,7 +3,8 @@ pragma solidity ^0.8.24;
 
 import {BaseTest} from "../../../BaseTest.t.sol";
 import {
-  SignatureQuorumValidator, SignatureQuorumValidatorHelper
+  SignatureQuorumValidator,
+  SignatureQuorumValidatorHelper
 } from "../../../helpers/SignatureQuorumValidatorHelper.sol";
 
 contract SignatureValidatorSetup is BaseTest {
@@ -61,7 +62,10 @@ contract SignatureValidatorSetup is BaseTest {
     return updates;
   }
 
-  function _assertAddressArraysEqual(address[] memory expected, address[] memory actual) internal pure {
+  function _assertAddressArraysEqual(
+    address[] memory expected,
+    address[] memory actual
+  ) internal pure {
     require(expected.length == actual.length, "length mismatch");
     for (uint256 i; i < expected.length; ++i) {
       require(expected[i] == actual[i], "signer mismatch");
@@ -110,7 +114,10 @@ contract SignatureValidatorSetup is BaseTest {
   /// @param hash The hash to sign
   /// @return r The r component of the signature
   /// @return s The s component of the signature (adjusted for v=27)
-  function _signWithV27(uint256 privateKey, bytes32 hash) internal pure returns (bytes32 r, bytes32 s) {
+  function _signWithV27(
+    uint256 privateKey,
+    bytes32 hash
+  ) internal pure returns (bytes32 r, bytes32 s) {
     (uint8 v, bytes32 _r, bytes32 _s) = vm.sign(privateKey, hash);
 
     // SignatureQuorumValidator only supports sigs with v=27, so adjust if necessary.

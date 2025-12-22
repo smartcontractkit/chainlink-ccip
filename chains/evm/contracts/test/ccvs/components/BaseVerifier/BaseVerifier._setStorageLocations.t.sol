@@ -84,7 +84,10 @@ contract BaseVerifier_setStorageLocations is BaseVerifierSetup {
 
   // Helpers
 
-  function _expectStorageLocationEvent(string[] memory oldLocations, string[] memory newLocations) internal {
+  function _expectStorageLocationEvent(
+    string[] memory oldLocations,
+    string[] memory newLocations
+  ) internal {
     vm.expectEmit(address(s_baseVerifier));
     emit BaseVerifier.StorageLocationsUpdated(oldLocations, newLocations);
   }
@@ -102,7 +105,11 @@ contract BaseVerifier_setStorageLocations is BaseVerifierSetup {
     return arr;
   }
 
-  function _three(string memory a, string memory b, string memory c) internal pure returns (string[] memory arr) {
+  function _three(
+    string memory a,
+    string memory b,
+    string memory c
+  ) internal pure returns (string[] memory arr) {
     arr = new string[](3);
     arr[0] = a;
     arr[1] = b;
@@ -110,7 +117,10 @@ contract BaseVerifier_setStorageLocations is BaseVerifierSetup {
     return arr;
   }
 
-  function _assertEq(string[] memory a, string[] memory b) internal pure {
+  function _assertEq(
+    string[] memory a,
+    string[] memory b
+  ) internal pure {
     assertEq(a.length, b.length);
     for (uint256 i; i < a.length; ++i) {
       assertEq(keccak256(bytes(a[i])), keccak256(bytes(b[i])));

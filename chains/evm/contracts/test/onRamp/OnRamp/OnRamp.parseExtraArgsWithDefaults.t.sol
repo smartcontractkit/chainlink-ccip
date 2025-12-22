@@ -24,9 +24,7 @@ contract OnRamp_parseExtraArgsWithDefaults is OnRampSetup {
         tokenAdminRegistry: address(s_tokenAdminRegistry)
       }),
       OnRamp.DynamicConfig({
-        feeQuoter: address(s_feeQuoter),
-        reentrancyGuardEntered: false,
-        feeAggregator: FEE_AGGREGATOR
+        feeQuoter: address(s_feeQuoter), reentrancyGuardEntered: false, feeAggregator: FEE_AGGREGATOR
       })
     );
 
@@ -138,7 +136,10 @@ contract OnRamp_parseExtraArgsWithDefaults is OnRampSetup {
     assertEq(s_defaultCCVs.length, result.ccvs.length);
   }
 
-  function test_parseExtraArgsWithDefaults_V3DoesNotAddDefaults_IsTokenTransferWithoutDataAndGasLimitZero() public view {
+  function test_parseExtraArgsWithDefaults_V3DoesNotAddDefaults_IsTokenTransferWithoutDataAndGasLimitZero()
+    public
+    view
+  {
     ExtraArgsCodec.GenericExtraArgsV3 memory inputArgs = _createV3ExtraArgs(new address[](0), new bytes[](0));
     inputArgs.gasLimit = 0;
 

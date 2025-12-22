@@ -11,7 +11,10 @@ contract EtherSenderReceiverTest_ccipSend is EtherSenderReceiverTestSetup {
   uint256 internal constant FEE_WEI = 121212;
   uint256 internal constant FEE_JUELS = 232323;
 
-  function testFuzz_ccipSend(uint256 feeFromRouter, uint256 feeSupplied) public {
+  function testFuzz_ccipSend(
+    uint256 feeFromRouter,
+    uint256 feeSupplied
+  ) public {
     // cap the fuzzer because OWNER only has a million ether.
     vm.assume(feeSupplied < 1_000_000 ether - AMOUNT);
 
@@ -21,11 +24,7 @@ contract EtherSenderReceiverTest_ccipSend is EtherSenderReceiverTestSetup {
       amount: AMOUNT
     });
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
-      receiver: abi.encode(XCHAIN_RECEIVER),
-      data: "",
-      tokenAmounts: tokenAmounts,
-      feeToken: address(0),
-      extraArgs: ""
+      receiver: abi.encode(XCHAIN_RECEIVER), data: "", tokenAmounts: tokenAmounts, feeToken: address(0), extraArgs: ""
     });
 
     Client.EVM2AnyMessage memory validatedMessage = s_etherSenderReceiver.validatedMessage(message);
@@ -54,7 +53,10 @@ contract EtherSenderReceiverTest_ccipSend is EtherSenderReceiverTestSetup {
     }
   }
 
-  function testFuzz_ccipSend_feeToken(uint256 feeFromRouter, uint256 feeSupplied) public {
+  function testFuzz_ccipSend_feeToken(
+    uint256 feeFromRouter,
+    uint256 feeSupplied
+  ) public {
     // cap the fuzzer because OWNER only has a million LINK.
     vm.assume(feeSupplied < 1_000_000 ether - AMOUNT);
 
@@ -160,11 +162,7 @@ contract EtherSenderReceiverTest_ccipSend is EtherSenderReceiverTestSetup {
       amount: AMOUNT
     });
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
-      receiver: abi.encode(XCHAIN_RECEIVER),
-      data: "",
-      tokenAmounts: tokenAmounts,
-      feeToken: address(0),
-      extraArgs: ""
+      receiver: abi.encode(XCHAIN_RECEIVER), data: "", tokenAmounts: tokenAmounts, feeToken: address(0), extraArgs: ""
     });
 
     Client.EVM2AnyMessage memory validatedMessage = s_etherSenderReceiver.validatedMessage(message);
@@ -186,11 +184,7 @@ contract EtherSenderReceiverTest_ccipSend is EtherSenderReceiverTestSetup {
       amount: AMOUNT
     });
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
-      receiver: abi.encode(XCHAIN_RECEIVER),
-      data: "",
-      tokenAmounts: tokenAmounts,
-      feeToken: address(0),
-      extraArgs: ""
+      receiver: abi.encode(XCHAIN_RECEIVER), data: "", tokenAmounts: tokenAmounts, feeToken: address(0), extraArgs: ""
     });
 
     Client.EVM2AnyMessage memory validatedMessage = s_etherSenderReceiver.validatedMessage(message);
@@ -223,11 +217,7 @@ contract EtherSenderReceiverTest_ccipSend is EtherSenderReceiverTestSetup {
       amount: AMOUNT
     });
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
-      receiver: abi.encode(XCHAIN_RECEIVER),
-      data: "",
-      tokenAmounts: tokenAmounts,
-      feeToken: address(0),
-      extraArgs: ""
+      receiver: abi.encode(XCHAIN_RECEIVER), data: "", tokenAmounts: tokenAmounts, feeToken: address(0), extraArgs: ""
     });
 
     Client.EVM2AnyMessage memory validatedMessage = s_etherSenderReceiver.validatedMessage(message);

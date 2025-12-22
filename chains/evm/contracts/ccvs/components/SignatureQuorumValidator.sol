@@ -58,7 +58,11 @@ contract SignatureQuorumValidator is Ownable2StepMsgSender {
   /// (32 bytes) and s (32 bytes). The signatures must be provided in order of their signer addresses. For example, if
   /// the signers are [A, B, C] with addresses [0x1, 0x2, 0x3], the signatures must be provided ordered as [A, B, C].
   /// @dev The v values are assumed to be 27 for all signatures, this can be achieved by using ECDSA malleability.
-  function _validateSignatures(uint64 sourceChainSelector, bytes32 signedHash, bytes calldata signatures) internal view {
+  function _validateSignatures(
+    uint64 sourceChainSelector,
+    bytes32 signedHash,
+    bytes calldata signatures
+  ) internal view {
     SignerConfig storage cfg = s_signerConfigs[sourceChainSelector];
     uint256 threshold = cfg.threshold;
     if (threshold == 0) {
@@ -112,9 +116,7 @@ contract SignatureQuorumValidator is Ownable2StepMsgSender {
       uint64 sourceChainSelector = uint64(sourceChainSelectorSet[i]);
       SignerConfig storage cfg = s_signerConfigs[sourceChainSelector];
       configs[i] = SignatureConfig({
-        sourceChainSelector: sourceChainSelector,
-        threshold: cfg.threshold,
-        signers: cfg.signers.values()
+        sourceChainSelector: sourceChainSelector, threshold: cfg.threshold, signers: cfg.signers.values()
       });
     }
 
