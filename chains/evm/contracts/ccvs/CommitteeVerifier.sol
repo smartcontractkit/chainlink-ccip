@@ -25,7 +25,7 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
 
   /// @dev Defines upgradeable configuration parameters.
   struct DynamicConfig {
-    address feeAggregator; // Entity capable of withdrawing fees.
+    address feeAggregator; // The entity receiving the withdrawn fees.
     address allowlistAdmin; // Entity capable adding or removing allowed senders.
   }
 
