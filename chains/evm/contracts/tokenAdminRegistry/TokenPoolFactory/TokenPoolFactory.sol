@@ -131,11 +131,7 @@ contract TokenPoolFactory is ITypeAndVersion {
     address token = Create2.deploy(0, salt, tokenInitCode);
 
     LocalPoolConfig memory localConfig = LocalPoolConfig({
-      token: token,
-      localTokenDecimals: localTokenDecimals,
-      localPoolType: localPoolType,
-      lockBox: lockBox,
-      salt: salt
+      token: token, localTokenDecimals: localTokenDecimals, localPoolType: localPoolType, lockBox: lockBox, salt: salt
     });
 
     // Deploy the token pool.
@@ -181,11 +177,7 @@ contract TokenPoolFactory is ITypeAndVersion {
     salt = keccak256(abi.encodePacked(salt, msg.sender));
 
     LocalPoolConfig memory localConfig = LocalPoolConfig({
-      token: token,
-      localTokenDecimals: localTokenDecimals,
-      localPoolType: localPoolType,
-      lockBox: lockBox,
-      salt: salt
+      token: token, localTokenDecimals: localTokenDecimals, localPoolType: localPoolType, lockBox: lockBox, salt: salt
     });
 
     // create the token pool and return the address.
@@ -319,7 +311,11 @@ contract TokenPoolFactory is ITypeAndVersion {
     });
   }
 
-  function _deployLockBox(address token, uint64 remoteChainSelector, bytes32 salt) private returns (address lockBox) {
+  function _deployLockBox(
+    address token,
+    uint64 remoteChainSelector,
+    bytes32 salt
+  ) private returns (address lockBox) {
     (address predicted, bytes memory creationCode) =
       _computeLockBoxAddress(token, remoteChainSelector, salt, address(this));
     lockBox = Create2.deploy(0, salt, creationCode);
@@ -339,7 +335,10 @@ contract TokenPoolFactory is ITypeAndVersion {
     return (predicted, creationCode);
   }
 
-  function _authorizePoolInLockBox(address lockBox, address pool) private {
+  function _authorizePoolInLockBox(
+    address lockBox,
+    address pool
+  ) private {
     ERC20LockBox lockBoxContract = ERC20LockBox(lockBox);
     // Skip if this factory is not the owner; user-supplied lockboxes must already authorize the pool.
     if (lockBoxContract.owner() != address(this)) {

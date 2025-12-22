@@ -112,9 +112,8 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
     }
 
     // Release to the recipient using the lockbox tied to the remote chain selector.
-    _getLockBox(releaseOrMintIn.remoteChainSelector).withdraw(
-      releaseOrMintIn.remoteChainSelector, localAmount, releaseOrMintIn.receiver
-    );
+    _getLockBox(releaseOrMintIn.remoteChainSelector)
+      .withdraw(releaseOrMintIn.remoteChainSelector, localAmount, releaseOrMintIn.receiver);
 
     emit ReleasedOrMinted({
       remoteChainSelector: releaseOrMintIn.remoteChainSelector,

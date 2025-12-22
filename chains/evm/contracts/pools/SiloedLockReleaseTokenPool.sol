@@ -421,7 +421,10 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
   ) internal pure virtual override {}
 
   /// @notice Configure lockboxes for chain selectors. Chain selector 0 represents the unsiloed lockbox.
-  function configureChainLockBoxes(uint64[] calldata chainSelectors, address[] calldata lockBoxes) external onlyOwner {
+  function configureChainLockBoxes(
+    uint64[] calldata chainSelectors,
+    address[] calldata lockBoxes
+  ) external onlyOwner {
     if (chainSelectors.length != lockBoxes.length) revert MismatchedArrayLengths();
     for (uint256 i = 0; i < chainSelectors.length; ++i) {
       address lockBox = lockBoxes[i];

@@ -32,7 +32,10 @@ contract ERC20LockBox is ITypeAndVersion, AuthorizedCallers {
 
   string public constant typeAndVersion = "ERC20LockBox 1.7.0-dev";
 
-  constructor(address token, uint64 remoteChainSelector) AuthorizedCallers(new address[](0)) {
+  constructor(
+    address token,
+    uint64 remoteChainSelector
+  ) AuthorizedCallers(new address[](0)) {
     if (token == address(0)) {
       revert ZeroAddressNotAllowed();
     }
@@ -49,7 +52,10 @@ contract ERC20LockBox is ITypeAndVersion, AuthorizedCallers {
   /// @param remoteChainSelector The chain selector this lockbox instance is bound to (0 for unsiloed).
   /// @dev This function does NOT support storing native tokens, as the token pool which handles native is expected to
   /// have wrapped it into an ERC20-compatibletoken first.
-  function deposit(uint64 remoteChainSelector, uint256 amount) external {
+  function deposit(
+    uint64 remoteChainSelector,
+    uint256 amount
+  ) external {
     _validateDepositWithdraw(remoteChainSelector, amount);
 
     i_token.safeTransferFrom(msg.sender, address(this), amount);
@@ -61,7 +67,11 @@ contract ERC20LockBox is ITypeAndVersion, AuthorizedCallers {
   /// @param amount The amount of tokens to withdraw.
   /// @param recipient The address that will receive the withdrawn tokens.
   /// @param remoteChainSelector The chain selector this lockbox instance is bound to (0 for unsiloed).
-  function withdraw(uint64 remoteChainSelector, uint256 amount, address recipient) external {
+  function withdraw(
+    uint64 remoteChainSelector,
+    uint256 amount,
+    address recipient
+  ) external {
     _validateDepositWithdraw(remoteChainSelector, amount);
 
     if (recipient == address(0)) {
@@ -80,7 +90,10 @@ contract ERC20LockBox is ITypeAndVersion, AuthorizedCallers {
 
   /// @notice Validates the deposit and withdraw functions.
   /// @param amount The amount of tokens to deposit or withdraw.
-  function _validateDepositWithdraw(uint64 remoteChainSelector, uint256 amount) internal view {
+  function _validateDepositWithdraw(
+    uint64 remoteChainSelector,
+    uint256 amount
+  ) internal view {
     if (amount == 0) {
       revert TokenAmountCannotBeZero();
     }
