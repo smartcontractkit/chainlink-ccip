@@ -45,8 +45,8 @@ func TestDeployTokenPool(t *testing.T) {
 		name                string
 		poolType            cldf.ContractType
 		poolVersion         *semver.Version
-		acceptLiquidity     *bool // only for LockReleaseTokenPool v1.5.1
-		burnAddress         string
+		acceptLiquidity     *bool  // only for LockReleaseTokenPool v1.5.1
+		burnAddress         string // only for BurnToAddress pools
 		allowlist           []string
 		expectedTypeVersion string
 	}{
@@ -101,6 +101,10 @@ func TestDeployTokenPool(t *testing.T) {
 			allowlist:           []string{"0x1111111111111111111111111111111111111111", "0x2222222222222222222222222222222222222222"},
 			expectedTypeVersion: "BurnMintTokenPool 1.6.1",
 		},
+		// NOTE: v1.6.0 external minter pools (BurnMintWithExternalMinterTokenPool, HybridWithExternalMinterTokenPool)
+		// are excluded from unit tests because they require a real minter contract (token governor) to be deployed.
+		// These pools should be tested in integration tests with proper minter contract setup.
+
 		// v1.5.1 pools (using same ContractType constants since they're identical strings)
 		{
 			name:                "BurnMintTokenPool_v1_5_1",
@@ -629,7 +633,7 @@ func deployTestToken(t *testing.T, chain evm.Chain, symbol string, decimals uint
 		symbol,
 		decimals,
 		big.NewInt(0).Mul(big.NewInt(1e9), big.NewInt(1e18)), // maxSupply: 1 billion
-		big.NewInt(0),                                        // preMint: 0
+		big.NewInt(0), // preMint: 0
 	)
 	require.NoError(t, err, "Failed to deploy test token")
 
