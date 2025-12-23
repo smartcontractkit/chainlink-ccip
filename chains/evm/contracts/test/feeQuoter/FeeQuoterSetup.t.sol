@@ -165,7 +165,6 @@ contract FeeQuoterSetup is TokenSetup {
     s_feeQuoter = new FeeQuoterHelper(
       FeeQuoter.StaticConfig({linkToken: s_sourceTokens[0], maxFeeJuelsPerMsg: MAX_MSG_FEES_JUELS}),
       priceUpdaters,
-      s_sourceFeeTokens,
       s_feeQuoterTokenTransferFeeConfigArgs,
       _generateFeeQuoterDestChainConfigArgs()
     );

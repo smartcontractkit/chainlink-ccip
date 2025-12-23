@@ -146,8 +146,9 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
   ///     1 LINK = 15.00 USD per full token, each full token is 1e18 units -> 15 * 1e18 * 1e18 / 1e18 = 15e18.
   mapping(address token => Internal.TimestampedPackedUint224 price) private s_usdPerToken;
 
-  /// @dev Set of fee tokens that can be used to pay for fees. The keys of the mapping are the fee multipliers which
-  /// can be used to set a premium or discount for a specific fee token.
+  /// @dev Set of fee tokens that can be used to pay for fees. Any token that has a price is considered a fee token,
+  /// which is why this set is updated when prices are pushed, not manually. Removals are manual and also clear out
+  /// the price.
   EnumerableSet.AddressSet private s_feeTokens;
 
   /// @dev The destination chain specific fee configs.
@@ -160,7 +161,6 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
   constructor(
     StaticConfig memory staticConfig,
     address[] memory priceUpdaters,
-    address[] memory feeTokens,
     TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs,
     DestChainConfigArgs[] memory destChainConfigArgs
   ) AuthorizedCallers(priceUpdaters) {
@@ -171,7 +171,6 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
     i_linkToken = staticConfig.linkToken;
     i_maxFeeJuelsPerMsg = staticConfig.maxFeeJuelsPerMsg;
 
-    _applyFeeTokensUpdates(new address[](0), feeTokens);
     _applyDestChainConfigUpdates(destChainConfigArgs);
     _applyTokenTransferFeeConfigUpdates(tokenTransferFeeConfigArgs, new TokenTransferFeeConfigRemoveArgs[](0));
   }
@@ -237,25 +236,11 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
     return s_feeTokens.values();
   }
 
-  /// @notice Add and remove tokens from feeTokens set.
+  /// @notice Removes tokens from feeTokens set.
   /// @param feeTokensToRemove The addresses of the tokens which are no longer considered feeTokens.
-  /// @param feeTokensToAdd The addresses of the tokens which are now considered fee tokens and can be used
-  /// to calculate fees.
-  function applyFeeTokensUpdates(
-    address[] memory feeTokensToRemove,
-    address[] memory feeTokensToAdd
+  function removeFeeTokens(
+    address[] memory feeTokensToRemove
   ) external onlyOwner {
-    _applyFeeTokensUpdates(feeTokensToRemove, feeTokensToAdd);
-  }
-
-  /// @notice Add and remove tokens from feeTokens set.
-  /// @param feeTokensToRemove The addresses of the tokens which are no longer considered feeTokens.
-  /// @param feeTokensToAdd The addresses of the tokens which are now considered fee tokens.
-  /// and can be used to calculate fees.
-  function _applyFeeTokensUpdates(
-    address[] memory feeTokensToRemove,
-    address[] memory feeTokensToAdd
-  ) private {
     for (uint256 i = 0; i < feeTokensToRemove.length; ++i) {
       if (s_feeTokens.remove(feeTokensToRemove[i])) {
         emit FeeTokenRemoved(feeTokensToRemove[i]);
@@ -263,10 +248,6 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
 
       // Remote the price to invalidate it as a fee token.
       delete s_usdPerToken[feeTokensToRemove[i]];
-    }
-    for (uint256 i = 0; i < feeTokensToAdd.length; ++i) {
-      s_feeTokens.add(feeTokensToAdd[i]);
-      emit FeeTokenAdded(feeTokensToAdd[i]);
     }
   }
 
@@ -287,6 +268,11 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
       Internal.TokenPriceUpdate memory update = priceUpdates.tokenPriceUpdates[i];
       s_usdPerToken[update.sourceToken] =
         Internal.TimestampedPackedUint224({value: update.usdPerToken, timestamp: uint32(block.timestamp)});
+
+      if (s_feeTokens.add(update.sourceToken)) {
+        emit FeeTokenAdded(update.sourceToken);
+      }
+
       emit UsdPerTokenUpdated(update.sourceToken, update.usdPerToken, block.timestamp);
     }
 
