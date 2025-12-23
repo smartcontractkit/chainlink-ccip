@@ -83,6 +83,9 @@ type DeployTokenPoolInput struct {
 	// BurnAddress is used by BurnToAddressMintTokenPool to specify the address
 	// where tokens will be burned to
 	BurnAddress string `yaml:"burn-address" json:"burnAddress"`
+	// ExternalMinter is used by BurnMintWithExternalMinterTokenPool kind of pools to specify the minter address
+	// ideally a token governor contract address
+	ExternalMinter string `yaml:"external-minter" json:"externalMinter"`
 	// below are not specified by the user, filled in by the deployment system to pass to chain operations
 	ChainSelector     uint64
 	ExistingDataStore datastore.DataStore
