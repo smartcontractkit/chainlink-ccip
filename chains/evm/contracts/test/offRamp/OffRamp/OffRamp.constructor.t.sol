@@ -58,4 +58,16 @@ contract OffRamp_constructor is BaseTest {
     vm.expectRevert(OffRamp.ZeroChainSelectorNotAllowed.selector);
     new OffRamp(config);
   }
+
+  function test_constructor_RevertWhen_GasCannotBeZero() public {
+    OffRamp.StaticConfig memory config = OffRamp.StaticConfig({
+      localChainSelector: DEST_CHAIN_SELECTOR,
+      gasForCallExactCheck: 0,
+      rmnRemote: s_mockRMNRemote,
+      tokenAdminRegistry: address(0x123)
+    });
+
+    vm.expectRevert(OffRamp.GasCannotBeZero.selector);
+    new OffRamp(config);
+  }
 }

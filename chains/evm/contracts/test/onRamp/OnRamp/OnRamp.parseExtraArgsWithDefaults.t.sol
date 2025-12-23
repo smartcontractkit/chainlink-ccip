@@ -99,7 +99,6 @@ contract OnRamp_parseExtraArgsWithDefaults is OnRampSetup {
     assertEq(s_defaultExecutor, result.executor);
   }
 
-  // TODO Sui/SVM
   function test_parseExtraArgsWithDefaults_OldExtraArgs() public view {
     // Use GenericExtraArgsV2 format.
     uint256 gasLimit = 300_000;

@@ -44,14 +44,6 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
     address tokenMessenger, address messageTransmitterProxy, address usdcToken, uint32 localDomainIdentifier
   );
 
-  /// @notice The static configuration.
-  struct StaticConfig {
-    address tokenMessenger; // The address of the token messenger.
-    address messageTransmitterProxy; // The address of the message transmitter proxy.
-    address usdcToken; // The address of the USDC token.
-    uint32 localDomainIdentifier; // The local domain identifier.
-  }
-
   /// @notice The arguments required to update a remote domain.
   struct SetDomainArgs {
     bytes32 allowedCallerOnDest; // Address allowed to call receiveMessage on the domain (i.e. the MessageTransmitterProxy).
@@ -345,14 +337,18 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   // ================================================================
 
   /// @notice Returns the static configuration.
-  /// @return staticConfig The static configuration.
-  function getStaticConfig() external view returns (StaticConfig memory staticConfig) {
-    return StaticConfig({
-      tokenMessenger: address(i_tokenMessenger),
-      messageTransmitterProxy: address(i_messageTransmitterProxy),
-      usdcToken: address(i_usdcToken),
-      localDomainIdentifier: i_localDomainIdentifier
-    });
+  /// @return tokenMessenger The address of the token messenger.
+  /// @return messageTransmitterProxy The address of the message transmitter proxy.
+  /// @return usdcToken The address of the USDC token.
+  /// @return localDomainIdentifier The local domain identifier.
+  function getStaticConfig()
+    external
+    view
+    returns (address tokenMessenger, address messageTransmitterProxy, address usdcToken, uint32 localDomainIdentifier)
+  {
+    return (
+      address(i_tokenMessenger), address(i_messageTransmitterProxy), address(i_usdcToken), i_localDomainIdentifier
+    );
   }
 
   /// @notice Returns the dynamic configuration.

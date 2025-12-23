@@ -49,6 +49,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   error InvalidOffRamp(address expected, bytes got);
   error InboundImplementationNotFound(address ccvAddress, bytes verifierResults);
   error InvalidGasLimitOverride(uint32 messageGasLimit, uint32 gasLimitOverride);
+  error GasCannotBeZero();
 
   /// @dev Atlas depends on various events, if changing, please notify Atlas.
   event StaticConfigSet(StaticConfig staticConfig);
@@ -139,11 +140,15 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     if (staticConfig.localChainSelector == 0) {
       revert ZeroChainSelectorNotAllowed();
     }
+    if (staticConfig.gasForCallExactCheck == 0) {
+      revert GasCannotBeZero();
+    }
 
     i_chainSelector = staticConfig.localChainSelector;
     i_rmnRemote = staticConfig.rmnRemote;
     i_tokenAdminRegistry = staticConfig.tokenAdminRegistry;
     i_gasForCallExactCheck = staticConfig.gasForCallExactCheck;
+
     emit StaticConfigSet(staticConfig);
   }
 
@@ -546,7 +551,9 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
           if (optionalThreshold > 0) {
             --optionalThreshold;
           }
-          continue;
+
+          // Break is safe because we asserted no duplicates in _getCCVsFromReceiver.
+          break;
         }
         ++j;
       }

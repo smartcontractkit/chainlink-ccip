@@ -97,8 +97,8 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     uint8 addressBytesLength; //   │ The length of an address on this chain in bytes, e.g. 20 for EVM, 32 for SVM.
     uint16 networkFeeUSDCents; //  │ Network fee in USD cents for messages to this destination chain.
     bool tokenReceiverAllowed; // ─╯ Whether specifying `tokenReceiver` in extraArgs is allowed at all.
-    uint32 baseExecutionGasCost; // Base gas cost for executing a message on the destination chain.
-    address defaultExecutor; // Default executor to use for messages to this destination chain.
+    uint32 baseExecutionGasCost; // ─╮ Base gas cost for executing a message on the destination chain.
+    address defaultExecutor; // ─────╯ Default executor to use for messages to this destination chain.
     address[] laneMandatedCCVs; // Required CCVs to use for all messages to this destination chain.
     address[] defaultCCVs; // Default CCVs to use for messages to this destination chain.
     bytes offRamp; // Destination OffRamp address, NOT abi encoded but raw bytes.

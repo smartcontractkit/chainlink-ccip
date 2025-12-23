@@ -32,11 +32,12 @@ contract CCTPVerifier_constructor is CCTPVerifierSetup {
     assertEq(s_USDCToken.allowance(address(s_cctpVerifier), address(s_mockTokenMessenger)), type(uint256).max);
 
     // Check the static configuration.
-    CCTPVerifier.StaticConfig memory staticConfig = s_cctpVerifier.getStaticConfig();
-    assertEq(staticConfig.tokenMessenger, address(s_mockTokenMessenger));
-    assertEq(staticConfig.messageTransmitterProxy, address(s_messageTransmitterProxy));
-    assertEq(staticConfig.usdcToken, address(s_USDCToken));
-    assertEq(staticConfig.localDomainIdentifier, LOCAL_DOMAIN_IDENTIFIER);
+    (address gotTokenMessenger, address gotMessageTransmitter, address gotUSDCToken, uint64 gotDomainId) =
+      s_cctpVerifier.getStaticConfig();
+    assertEq(gotTokenMessenger, address(s_mockTokenMessenger));
+    assertEq(gotMessageTransmitter, address(s_messageTransmitterProxy));
+    assertEq(gotUSDCToken, address(s_USDCToken));
+    assertEq(gotDomainId, LOCAL_DOMAIN_IDENTIFIER);
   }
 
   function test_constructor_RevertWhen_ZeroAddressNotAllowed_TokenMessengerIsZero() public {
