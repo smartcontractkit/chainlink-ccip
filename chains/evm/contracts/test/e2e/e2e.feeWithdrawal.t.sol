@@ -109,8 +109,7 @@ contract e2e_feeWithdrawal is OnRampSetup {
     VersionedVerifierResolver.OutboundImplementationArgs[] memory outboundImpls =
       new VersionedVerifierResolver.OutboundImplementationArgs[](1);
     outboundImpls[0] = VersionedVerifierResolver.OutboundImplementationArgs({
-      destChainSelector: DEST_CHAIN_SELECTOR,
-      verifier: address(s_verifierImpl)
+      destChainSelector: DEST_CHAIN_SELECTOR, verifier: address(s_verifierImpl)
     });
     verifierResolver.applyOutboundImplementationUpdates(outboundImpls);
     s_verifierResolver = address(new Proxy(address(verifierResolver)));
@@ -119,9 +118,7 @@ contract e2e_feeWithdrawal is OnRampSetup {
     s_executor = new Executor(
       10, // maxCCVsPerMsg
       Executor.DynamicConfig({
-        feeAggregator: s_feeAggregator,
-        minBlockConfirmations: MIN_BLOCK_CONFIRMATIONS,
-        ccvAllowlistEnabled: false
+        feeAggregator: s_feeAggregator, minBlockConfirmations: MIN_BLOCK_CONFIRMATIONS, ccvAllowlistEnabled: false
       })
     );
 

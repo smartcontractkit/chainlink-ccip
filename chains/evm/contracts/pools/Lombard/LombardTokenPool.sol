@@ -126,9 +126,8 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
     uint16 blockConfirmationRequested,
     bytes calldata tokenArgs
   ) public override returns (Pool.LockOrBurnOutV1 memory lockOrBurnOut, uint256 destTokenAmount) {
-    address verifierImpl = ICrossChainVerifierResolver(i_lombardVerifierResolver).getOutboundImplementation(
-      lockOrBurnIn.remoteChainSelector, ""
-    );
+    address verifierImpl = ICrossChainVerifierResolver(i_lombardVerifierResolver)
+      .getOutboundImplementation(lockOrBurnIn.remoteChainSelector, "");
     if (verifierImpl == address(0)) {
       revert OutboundImplementationNotFoundForVerifier();
     }
@@ -182,8 +181,7 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
     });
 
     return Pool.LockOrBurnOutV1({
-      destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
-      destPoolData: abi.encode(payloadHash)
+      destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector), destPoolData: abi.encode(payloadHash)
     });
   }
 
@@ -237,7 +235,11 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
   /// @param remoteChainSelector CCIP chain selector of remote chain.
   /// @param lChainId Lombard chain id of remote chain.
   /// @param allowedCaller The address of TokenPool on destination chain.
-  function setPath(uint64 remoteChainSelector, bytes32 lChainId, bytes calldata allowedCaller) external onlyOwner {
+  function setPath(
+    uint64 remoteChainSelector,
+    bytes32 lChainId,
+    bytes calldata allowedCaller
+  ) external onlyOwner {
     if (!isSupportedChain(remoteChainSelector)) {
       revert ChainNotSupported(remoteChainSelector);
     }
@@ -281,7 +283,10 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
   // │                        Internal utils                        │
   // ================================================================
 
-  function _getTokenDecimals(IERC20Metadata token, uint8 fallbackDecimals) internal view returns (uint8) {
+  function _getTokenDecimals(
+    IERC20Metadata token,
+    uint8 fallbackDecimals
+  ) internal view returns (uint8) {
     try token.decimals() returns (uint8 dec) {
       return dec;
     } catch {

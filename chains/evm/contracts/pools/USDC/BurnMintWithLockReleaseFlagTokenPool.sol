@@ -44,8 +44,7 @@ contract BurnMintWithLockReleaseFlagTokenPool is BurnMintTokenPool {
 
     // LOCK_RELEASE_FLAG = bytes4(keccak256("NO_CCTP_USE_LOCK_RELEASE"))
     return Pool.LockOrBurnOutV1({
-      destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
-      destPoolData: abi.encode(LOCK_RELEASE_FLAG)
+      destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector), destPoolData: abi.encode(LOCK_RELEASE_FLAG)
     });
   }
 

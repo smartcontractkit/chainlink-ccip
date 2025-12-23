@@ -19,13 +19,7 @@ contract USDCTokenPoolCCTPV2Helper is USDCTokenPoolCCTPV2 {
     address feeAggregator
   )
     USDCTokenPoolCCTPV2(
-      tokenMessenger,
-      messageTransmitterProxy,
-      token,
-      advancedPoolHooks,
-      rmnProxy,
-      router,
-      feeAggregator
+      tokenMessenger, messageTransmitterProxy, token, advancedPoolHooks, rmnProxy, router, feeAggregator
     )
   {}
 

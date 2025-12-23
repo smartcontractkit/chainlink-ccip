@@ -98,7 +98,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
     uint32 domainIdentifier; // ────────────╮ Unique domain ID
     bool enabled; //                        | Whether the domain is enabled
     bool useLegacySourcePoolDataFormat; // ─╯ Whether to use the legacy source pool data format for chains that
-      // have not yet been updated to the new source pool data format.
+    // have not yet been updated to the new source pool data format.
   }
 
   // A mapping of CCIP chain identifiers to destination domains
@@ -220,8 +220,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
     }
 
     return Pool.LockOrBurnOutV1({
-      destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
-      destPoolData: sourcePoolData
+      destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector), destPoolData: sourcePoolData
     });
   }
 
@@ -376,8 +375,16 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
   }
 
   /// @notice No-op override to purge the unused code path from the contract.
-  function _postFlightCheck(Pool.ReleaseOrMintInV1 calldata, uint256, uint16) internal pure virtual override {}
+  function _postFlightCheck(
+    Pool.ReleaseOrMintInV1 calldata,
+    uint256,
+    uint16
+  ) internal pure virtual override {}
 
   /// @notice No-op override to purge the unused code path from the contract.
-  function _preFlightCheck(Pool.LockOrBurnInV1 calldata, uint16, bytes memory) internal pure virtual override {}
+  function _preFlightCheck(
+    Pool.LockOrBurnInV1 calldata,
+    uint16,
+    bytes memory
+  ) internal pure virtual override {}
 }
