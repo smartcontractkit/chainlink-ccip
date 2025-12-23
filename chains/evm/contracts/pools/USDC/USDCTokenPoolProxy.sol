@@ -425,11 +425,11 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV2, ITypeAndVersion {
   /// @return newReleaseOrMintIn The new releaseOrMintIn struct.
   function _generateNewReleaseOrMintIn(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
-  ) internal pure returns (Pool.ReleaseOrMintInV1 memory) {
+  ) internal pure returns (Pool.ReleaseOrMintInV1 memory newReleaseOrMintIn) {
     // Copy the releaseOrMintIn struct to the newReleaseOrMintIn struct. We do this to avoid having to copy each field
     // individually, which would be more gas intensive, as only the sourcePoolData field is going to be modified, as well
     // as the releaseOrMintIn struct is calldata, which cannot be modified in place.
-    Pool.ReleaseOrMintInV1 memory newReleaseOrMintIn = releaseOrMintIn;
+    newReleaseOrMintIn = releaseOrMintIn;
 
     // While the legacy source pool data struct uses the same fields as the current source pool data struct, it is
     // was initially encoded using abi.encode(sourceTokenDataPayload) instead of the encoding scheme used in the
