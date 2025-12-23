@@ -17,32 +17,32 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, Ownable2StepMsgSender {
 
   error AllowListNotEnabled();
   error SenderNotAllowed(address sender);
-  error MustSpecifyUnderThresholdCCVsForAboveThresholdCCVs();
+  error MustSpecifyUnderThresholdCCVsForThresholdCCVs();
 
   event AllowListAdd(address sender);
   event AllowListRemove(address sender);
   event CCVConfigUpdated(
     uint64 indexed remoteChainSelector,
     address[] outboundCCVs,
-    address[] outboundCCVsToAddAboveThreshold,
+    address[] thresholdOutboundCCVs,
     address[] inboundCCVs,
-    address[] inboundCCVsToAddAboveThreshold
+    address[] thresholdInboundCCVs
   );
   event ThresholdAmountSet(uint256 thresholdAmount);
 
   struct CCVConfig {
     address[] outboundCCVs; // CCVs required for outgoing messages to the remote chain.
-    address[] outboundCCVsToAddAboveThreshold; // Additional CCVs that are required for outgoing messages above threshold to the remote chain.
+    address[] thresholdOutboundCCVs; // Additional CCVs that are required for outgoing messages after reaching the threshold amount.
     address[] inboundCCVs; // CCVs required for incoming messages from the remote chain.
-    address[] inboundCCVsToAddAboveThreshold; // Additional CCVs that are required for incoming messages above threshold from the remote chain.
+    address[] thresholdInboundCCVs; // Additional CCVs that are required for incoming messages after reaching the threshold amount.
   }
 
   struct CCVConfigArg {
     uint64 remoteChainSelector;
     address[] outboundCCVs;
-    address[] outboundCCVsToAddAboveThreshold;
+    address[] thresholdOutboundCCVs;
     address[] inboundCCVs;
-    address[] inboundCCVsToAddAboveThreshold;
+    address[] thresholdInboundCCVs;
   }
 
   /// @dev The immutable flag that indicates if the allowlist is access-controlled.
@@ -53,7 +53,7 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, Ownable2StepMsgSender {
   /// This can be used to ensure only token-issuer specified addresses can move tokens.
   EnumerableSet.AddressSet internal s_allowlist;
 
-  /// @dev Threshold token transfer amount above which additional CCVs are required.
+  /// @dev Threshold token transfer amount at which additional CCVs are required.
   /// Value of 0 means that there is no threshold and additional CCVs are not required for any transfer amount.
   uint256 internal s_thresholdAmountForAdditionalCCVs;
 
@@ -160,7 +160,7 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, Ownable2StepMsgSender {
 
   /// @notice Updates the CCV configuration for specified remote chains.
   /// If the array includes address(0), it indicates that the default CCV should be used alongside any other specified CCVs.
-  /// @dev Additional CCVs should only be configured for transfers above the threshold amount and should not duplicate base CCVs.
+  /// @dev Additional CCVs should only be configured for transfers at or above the threshold amount and should not duplicate base CCVs.
   /// Base CCVs are always required, while add-above-threshold CCVs are only required when the transfer amount exceeds the threshold.
   /// @param ccvConfigArgs The CCV configuration updates to apply.
   function applyCCVConfigUpdates(
@@ -169,9 +169,9 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, Ownable2StepMsgSender {
     for (uint256 i = 0; i < ccvConfigArgs.length; ++i) {
       uint64 remoteChainSelector = ccvConfigArgs[i].remoteChainSelector;
       address[] calldata outboundCCVs = ccvConfigArgs[i].outboundCCVs;
-      address[] calldata outboundCCVsToAddAboveThreshold = ccvConfigArgs[i].outboundCCVsToAddAboveThreshold;
+      address[] calldata thresholdOutboundCCVs = ccvConfigArgs[i].thresholdOutboundCCVs;
       address[] calldata inboundCCVs = ccvConfigArgs[i].inboundCCVs;
-      address[] calldata inboundCCVsToAddAboveThreshold = ccvConfigArgs[i].inboundCCVsToAddAboveThreshold;
+      address[] calldata thresholdInboundCCVs = ccvConfigArgs[i].thresholdInboundCCVs;
 
       // check for duplicates in outbound CCVs.
       CCVConfigValidation._assertNoDuplicates(outboundCCVs);
@@ -179,40 +179,40 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, Ownable2StepMsgSender {
       // check for duplicates in inbound CCVs.
       CCVConfigValidation._assertNoDuplicates(inboundCCVs);
 
-      if (outboundCCVsToAddAboveThreshold.length > 0) {
+      if (thresholdOutboundCCVs.length > 0) {
         // Must have base CCVs if specifying above-threshold CCVs. If the defaults are used below the threshold,
         // specify address(0) in the outboundCCVs array.
         if (outboundCCVs.length == 0) {
-          revert MustSpecifyUnderThresholdCCVsForAboveThresholdCCVs();
+          revert MustSpecifyUnderThresholdCCVsForThresholdCCVs();
         }
 
-        CCVConfigValidation._assertNoDuplicates(outboundCCVsToAddAboveThreshold);
-        CCVConfigValidation._assertNoDuplicatedBetweenLists(outboundCCVs, outboundCCVsToAddAboveThreshold);
+        CCVConfigValidation._assertNoDuplicates(thresholdOutboundCCVs);
+        CCVConfigValidation._assertNoDuplicatedBetweenLists(outboundCCVs, thresholdOutboundCCVs);
       }
 
-      if (inboundCCVsToAddAboveThreshold.length > 0) {
+      if (thresholdInboundCCVs.length > 0) {
         // Must have base CCVs if specifying above-threshold CCVs. If the defaults are used below the threshold,
         // specify address(0) in the inboundCCVs array.
         if (inboundCCVs.length == 0) {
-          revert MustSpecifyUnderThresholdCCVsForAboveThresholdCCVs();
+          revert MustSpecifyUnderThresholdCCVsForThresholdCCVs();
         }
 
-        CCVConfigValidation._assertNoDuplicates(inboundCCVsToAddAboveThreshold);
-        CCVConfigValidation._assertNoDuplicatedBetweenLists(inboundCCVs, inboundCCVsToAddAboveThreshold);
+        CCVConfigValidation._assertNoDuplicates(thresholdInboundCCVs);
+        CCVConfigValidation._assertNoDuplicatedBetweenLists(inboundCCVs, thresholdInboundCCVs);
       }
 
       s_verifierConfig[remoteChainSelector] = CCVConfig({
         outboundCCVs: outboundCCVs,
-        outboundCCVsToAddAboveThreshold: outboundCCVsToAddAboveThreshold,
+        thresholdOutboundCCVs: thresholdOutboundCCVs,
         inboundCCVs: inboundCCVs,
-        inboundCCVsToAddAboveThreshold: inboundCCVsToAddAboveThreshold
+        thresholdInboundCCVs: thresholdInboundCCVs
       });
       emit CCVConfigUpdated({
         remoteChainSelector: remoteChainSelector,
         outboundCCVs: outboundCCVs,
-        outboundCCVsToAddAboveThreshold: outboundCCVsToAddAboveThreshold,
+        thresholdOutboundCCVs: thresholdOutboundCCVs,
         inboundCCVs: inboundCCVs,
-        inboundCCVsToAddAboveThreshold: inboundCCVsToAddAboveThreshold
+        thresholdInboundCCVs: thresholdInboundCCVs
       });
     }
   }
@@ -234,9 +234,9 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, Ownable2StepMsgSender {
   ) external view returns (address[] memory requiredCCVs) {
     CCVConfig storage config = s_verifierConfig[remoteChainSelector];
     if (direction == IPoolV2.MessageDirection.Inbound) {
-      return _resolveRequiredCCVs(config.inboundCCVs, config.inboundCCVsToAddAboveThreshold, amount);
+      return _resolveRequiredCCVs(config.inboundCCVs, config.thresholdInboundCCVs, amount);
     }
-    return _resolveRequiredCCVs(config.outboundCCVs, config.outboundCCVsToAddAboveThreshold, amount);
+    return _resolveRequiredCCVs(config.outboundCCVs, config.thresholdOutboundCCVs, amount);
   }
 
   /// @notice Gets the threshold amount above which additional CCVs are required.

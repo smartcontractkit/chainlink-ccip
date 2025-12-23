@@ -5,6 +5,7 @@ import {ICrossChainVerifierV1} from "../interfaces/ICrossChainVerifierV1.sol";
 import {IMessageTransmitter} from "../pools/USDC/interfaces/IMessageTransmitter.sol";
 import {ITokenMessenger} from "../pools/USDC/interfaces/ITokenMessenger.sol";
 
+import {FeeTokenHandler} from "../libraries/FeeTokenHandler.sol";
 import {Internal} from "../libraries/Internal.sol";
 import {MessageV1Codec} from "../libraries/MessageV1Codec.sol";
 import {CCTPMessageTransmitterProxy} from "../pools/USDC/CCTPMessageTransmitterProxy.sol";
@@ -43,14 +44,6 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   event StaticConfigSet(
     address tokenMessenger, address messageTransmitterProxy, address usdcToken, uint32 localDomainIdentifier
   );
-
-  /// @notice The static configuration.
-  struct StaticConfig {
-    address tokenMessenger; // The address of the token messenger.
-    address messageTransmitterProxy; // The address of the message transmitter proxy.
-    address usdcToken; // The address of the USDC token.
-    uint32 localDomainIdentifier; // The local domain identifier.
-  }
 
   /// @notice The arguments required to update a remote domain.
   struct SetDomainArgs {
@@ -345,14 +338,18 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   // ================================================================
 
   /// @notice Returns the static configuration.
-  /// @return staticConfig The static configuration.
-  function getStaticConfig() external view returns (StaticConfig memory staticConfig) {
-    return StaticConfig({
-      tokenMessenger: address(i_tokenMessenger),
-      messageTransmitterProxy: address(i_messageTransmitterProxy),
-      usdcToken: address(i_usdcToken),
-      localDomainIdentifier: i_localDomainIdentifier
-    });
+  /// @return tokenMessenger The address of the token messenger.
+  /// @return messageTransmitterProxy The address of the message transmitter proxy.
+  /// @return usdcToken The address of the USDC token.
+  /// @return localDomainIdentifier The local domain identifier.
+  function getStaticConfig()
+    external
+    view
+    returns (address tokenMessenger, address messageTransmitterProxy, address usdcToken, uint32 localDomainIdentifier)
+  {
+    return (
+      address(i_tokenMessenger), address(i_messageTransmitterProxy), address(i_usdcToken), i_localDomainIdentifier
+    );
   }
 
   /// @notice Returns the dynamic configuration.
@@ -465,6 +462,6 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   function withdrawFeeTokens(
     address[] calldata feeTokens
   ) external {
-    _withdrawFeeTokens(feeTokens, s_dynamicConfig.feeAggregator);
+    FeeTokenHandler._withdrawFeeTokens(feeTokens, s_dynamicConfig.feeAggregator);
   }
 }

@@ -14,6 +14,7 @@ contract OnRamp_validateDestChainAddress is OnRampSetup {
       OnRamp.StaticConfig({
         chainSelector: SOURCE_CHAIN_SELECTOR,
         rmnRemote: s_mockRMNRemote,
+        maxUSDCentsPerMessage: MAX_USD_CENTS_PER_MESSAGE,
         tokenAdminRegistry: address(s_tokenAdminRegistry)
       }),
       OnRamp.DynamicConfig({
@@ -35,6 +36,8 @@ contract OnRamp_validateDestChainAddress is OnRampSetup {
     bytes calldata rawAddress
   ) public view {
     vm.assume(rawAddress.length > 0 && rawAddress.length <= type(uint8).max);
+    // `addressBytesLength` is a `uint8` in lane config, so avoid truncation for fuzzed inputs > 255 bytes.
+    vm.assume(rawAddress.length <= type(uint8).max);
 
     bytes memory validated = s_OnRampHelper.validateDestChainAddress(rawAddress, rawAddress.length);
 

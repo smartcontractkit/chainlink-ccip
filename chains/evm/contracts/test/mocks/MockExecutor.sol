@@ -12,7 +12,8 @@ contract MockExecutor is IExecutor {
     uint64, // destChainSelector,
     uint16, // requestedBlockDepth,
     address[] memory, // ccvs,
-    bytes memory // extraArgs
+    bytes memory, // extraArgs
+    address // feeToken
   ) external pure returns (uint16 usdCents) {
     return 0;
   }

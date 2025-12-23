@@ -233,7 +233,7 @@ contract OffRamp_execute is OffRampSetup {
     MessageV1Codec.MessageV1 memory message = _getMessage();
     (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory verifierResults) = _getReportComponents(message);
 
-    s_gasBoundedExecuteCaller.callExecute(encodedMessage, ccvs, verifierResults, 90000, 0);
+    s_gasBoundedExecuteCaller.callExecute(encodedMessage, ccvs, verifierResults, 70000, 0);
 
     // Verify final state is FAILURE.
     assertEq(

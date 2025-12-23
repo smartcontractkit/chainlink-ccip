@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {BaseVerifier} from "../../ccvs/components/BaseVerifier.sol";
+import {FeeTokenHandler} from "../../libraries/FeeTokenHandler.sol";
 import {MessageV1Codec} from "../../libraries/MessageV1Codec.sol";
 
 /// @notice Test helper contract to expose BaseVerifier's internal functions for testing
@@ -21,13 +22,6 @@ contract BaseVerifierTestHelper is BaseVerifier {
     AllowlistConfigArgs[] calldata allowlistConfigArgsItems
   ) external {
     _applyAllowlistUpdates(allowlistConfigArgsItems);
-  }
-
-  function withdrawFeeTokens(
-    address[] calldata feeTokens,
-    address feeAggregator
-  ) external {
-    _withdrawFeeTokens(feeTokens, feeAggregator);
   }
 
   function assertSenderIsAllowed(
@@ -62,5 +56,14 @@ contract BaseVerifierTestHelper is BaseVerifier {
     string[] memory storageLocations
   ) external {
     _setStorageLocations(storageLocations);
+  }
+
+  /// @notice Exposes FeeTokenHandler withdraw helper for tests.
+  /// @dev This mirrors the legacy `withdrawFeeTokens` API that used to live on contracts.
+  function withdrawFeeTokens(
+    address[] calldata feeTokens,
+    address feeAggregator
+  ) external {
+    FeeTokenHandler._withdrawFeeTokens(feeTokens, feeAggregator);
   }
 }
