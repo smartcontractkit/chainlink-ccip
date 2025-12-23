@@ -108,6 +108,8 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
     } else {
       if (localAmount > excludedTokens) revert InsufficientLiquidity(excludedTokens, localAmount);
       s_tokensExcludedFromBurn[releaseOrMintIn.remoteChainSelector] -= localAmount;
+      // During a proposed migration, the lockbox balance is the source of truth. Any release here reduces the
+      // lockbox balance, so burnLockedUSDC will not over-burn even without separate per-chain accounting.
     }
 
     // Release to the recipient using the lockbox tied to the remote chain selector.
