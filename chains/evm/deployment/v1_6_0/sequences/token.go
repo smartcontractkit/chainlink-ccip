@@ -3,6 +3,7 @@ package sequences
 import (
 	"fmt"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 
 	mcms_types "github.com/smartcontractkit/mcms/types"
@@ -21,6 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	bnm_erc20_bindings "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc20"
 )
 
 // tokenSupportsAdminRole returns true if the token type supports AccessControl admin roles.
@@ -178,20 +180,22 @@ var DeployToken = cldf_ops.NewSequence(
 		// Grant admin role to external admin if provided and token supports it
 		if len(input.ExternalAdmin) > 0 && tokenSupportsAdminRole(input.Type) {
 			// Read the default admin role
-			adminRoleReport, err := cldf_ops.ExecuteOperation(b, burn_mint_erc20.GetDefaultAdminRole, chain, contract.FunctionInput[any]{
-				ChainSelector: chain.Selector,
-				Address:       common.HexToAddress(tokenRef.Address),
-			})
+			token, err := bnm_erc20_bindings.NewBurnMintERC20(common.HexToAddress(tokenRef.Address), chain.Client)
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to get default admin role: %w", err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to instantiate BurnMintERC20 contract: %w", err)
 			}
+			role, err := token.DEFAULTADMINROLE(&bind.CallOpts{Context: b.GetContext()})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get default admin role constant: %w", err)
+			}
+
 			// Grant admin role to each external admin
 			for _, admin := range input.ExternalAdmin {
 				grantReport, err := cldf_ops.ExecuteOperation(b, burn_mint_erc20.GrantAdminRole, chain, contract.FunctionInput[burn_mint_erc20.RoleAssignment]{
 					ChainSelector: chain.Selector,
 					Address:       common.HexToAddress(tokenRef.Address),
 					Args: burn_mint_erc20.RoleAssignment{
-						Role: adminRoleReport.Output,
+						Role: role,
 						To:   common.HexToAddress(admin),
 					},
 				})
