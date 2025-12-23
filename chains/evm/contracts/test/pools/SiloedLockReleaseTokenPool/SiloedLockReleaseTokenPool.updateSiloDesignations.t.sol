@@ -95,6 +95,17 @@ contract SiloedLockReleaseTokenPool_updateSiloDesignations is SiloedLockReleaseT
     s_siloedLockReleaseTokenPool.updateSiloDesignations(new uint64[](0), adds);
   }
 
+  function test_updateSiloDesignations_RevertWhen_LockBoxNotConfigured() public {
+    uint64 missingSelector = DEST_CHAIN_SELECTOR + 9;
+    _applyChainUpdate(missingSelector);
+    SiloedLockReleaseTokenPool.SiloConfigUpdate[] memory adds = new SiloedLockReleaseTokenPool.SiloConfigUpdate[](1);
+    adds[0] = SiloedLockReleaseTokenPool.SiloConfigUpdate({remoteChainSelector: missingSelector, rebalancer: OWNER});
+
+    vm.expectRevert(abi.encodeWithSelector(SiloedLockReleaseTokenPool.LockBoxNotConfigured.selector, missingSelector));
+
+    s_siloedLockReleaseTokenPool.updateSiloDesignations(new uint64[](0), adds);
+  }
+
   function test_updateSiloDesignations_RevertWhen_InvalidZeroRebalancerAddress() public {
     ERC20LockBox lockBox = new ERC20LockBox(address(s_token));
     address[] memory allowedCallers = new address[](1);
@@ -116,5 +127,21 @@ contract SiloedLockReleaseTokenPool_updateSiloDesignations is SiloedLockReleaseT
     vm.expectRevert(abi.encodeWithSelector(TokenPool.ZeroAddressInvalid.selector));
 
     s_siloedLockReleaseTokenPool.updateSiloDesignations(new uint64[](0), adds);
+  }
+
+  function _applyChainUpdate(
+    uint64 remoteChainSelector
+  ) private {
+    bytes[] memory remotePoolAddresses = new bytes[](1);
+    remotePoolAddresses[0] = abi.encode(address(999));
+    TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](1);
+    chainUpdates[0] = TokenPool.ChainUpdate({
+      remoteChainSelector: remoteChainSelector,
+      remotePoolAddresses: remotePoolAddresses,
+      remoteTokenAddress: abi.encode(address(2)),
+      outboundRateLimiterConfig: _getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: _getInboundRateLimiterConfig()
+    });
+    s_siloedLockReleaseTokenPool.applyChainUpdates(new uint64[](0), chainUpdates);
   }
 }

@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {ERC20LockBox} from "../../../pools/ERC20LockBox.sol";
 import {ERC20LockBoxSetup} from "./ERC20LockBoxSetup.t.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
+import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
 contract ERC20LockBox_deposit is ERC20LockBoxSetup {
   function testFuzz_deposit_Success(
@@ -111,5 +112,17 @@ contract ERC20LockBox_deposit is ERC20LockBoxSetup {
     vm.expectRevert(ERC20LockBox.TokenAmountCannotBeZero.selector);
 
     s_erc20LockBox.deposit(address(s_token), 0, 0);
+  }
+
+  function test_deposit_RevertWhen_UnsupportedToken() public {
+    uint256 amount = 1000e18;
+    BurnMintERC20 unsupportedToken = new BurnMintERC20("BAD", "BAD", 18, 0, 0);
+
+    vm.startPrank(s_allowedCaller);
+    deal(address(unsupportedToken), s_allowedCaller, amount);
+    unsupportedToken.approve(address(s_erc20LockBox), amount);
+
+    vm.expectRevert(abi.encodeWithSelector(ERC20LockBox.UnsupportedToken.selector, address(unsupportedToken)));
+    s_erc20LockBox.deposit(address(unsupportedToken), 0, amount);
   }
 }
