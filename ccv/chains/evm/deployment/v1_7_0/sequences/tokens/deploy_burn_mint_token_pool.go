@@ -35,6 +35,7 @@ var DeployBurnMintTokenPool = cldf_ops.NewSequence(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy advanced pool hooks to %s: %w", chain, err)
 		}
+		hooksDeployReport.Output.Qualifier = input.TokenSymbol // Use the token symbol as the qualifier.
 
 		typeAndVersion := deployment.NewTypeAndVersion(
 			deployment.ContractType(input.TokenPoolType),
