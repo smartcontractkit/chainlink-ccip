@@ -5,6 +5,7 @@ import {IPoolV1} from "../../../interfaces/IPool.sol";
 import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
 import {ITokenAdminRegistry} from "../../../interfaces/ITokenAdminRegistry.sol";
 
+import {IBurnMintERC20} from "../../../interfaces/IBurnMintERC20.sol";
 import {Client} from "../../../libraries/Client.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {Pool} from "../../../libraries/Pool.sol";
@@ -23,7 +24,11 @@ contract OffRamp_releaseOrMintSingleToken is TokenPoolSetup {
     super.setUp();
 
     s_pool = new BurnMintTokenPool(
-      s_token, DEFAULT_TOKEN_DECIMALS, address(0), address(s_mockRMNRemote), address(s_sourceRouter)
+      IBurnMintERC20(address(s_token)),
+      DEFAULT_TOKEN_DECIMALS,
+      address(0),
+      address(s_mockRMNRemote),
+      address(s_sourceRouter)
     );
     s_token.grantMintAndBurnRoles(address(s_pool));
     _applyChainUpdates(address(s_pool));

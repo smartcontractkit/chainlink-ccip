@@ -7,6 +7,7 @@ import {USDCSetup} from "../USDCSetup.t.sol";
 
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
 contract SiloedUSDCTokenPoolSetup is USDCSetup {
   SiloedUSDCTokenPool internal s_usdcTokenPool;

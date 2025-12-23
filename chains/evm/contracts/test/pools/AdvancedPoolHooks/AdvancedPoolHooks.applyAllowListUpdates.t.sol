@@ -5,6 +5,7 @@ import {AdvancedPoolHooks} from "../../../pools/AdvancedPoolHooks.sol";
 import {TokenPoolHelper} from "../../helpers/TokenPoolHelper.sol";
 import {TokenPoolSetup} from "../TokenPool/TokenPoolSetup.t.sol";
 import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
 contract AdvancedPoolHooks_applyAllowListUpdates is TokenPoolSetup {
   address[] internal s_allowedSenders;
@@ -18,7 +19,11 @@ contract AdvancedPoolHooks_applyAllowListUpdates is TokenPoolSetup {
 
     s_advancedPoolHooks = new AdvancedPoolHooks(s_allowedSenders, 0);
     s_tokenPool = new TokenPoolHelper(
-      s_token, DEFAULT_TOKEN_DECIMALS, address(s_advancedPoolHooks), address(s_mockRMNRemote), address(s_sourceRouter)
+      s_tokenErc20,
+      DEFAULT_TOKEN_DECIMALS,
+      address(s_advancedPoolHooks),
+      address(s_mockRMNRemote),
+      address(s_sourceRouter)
     );
   }
 

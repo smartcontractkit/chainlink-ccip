@@ -8,6 +8,7 @@ import {USDCTokenPoolCCTPV2} from "../../../../pools/USDC/USDCTokenPoolCCTPV2.so
 
 import {MockUSDCTokenMessenger} from "../../../mocks/MockUSDCTokenMessenger.sol";
 import {USDCTokenPoolCCTPV2Setup} from "./USDCTokenPoolCCTPV2Setup.t.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
 contract USDCTokenPoolCCTPV2_constructor is USDCTokenPoolCCTPV2Setup {
   function test_constructor() public {

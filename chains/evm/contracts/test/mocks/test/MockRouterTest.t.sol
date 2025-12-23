@@ -4,8 +4,8 @@ import {Client} from "../../../libraries/Client.sol";
 import {TokenSetup} from "../../TokenSetup.t.sol";
 import {IRouterClient, MockCCIPRouter} from "../MockRouter.sol";
 
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/utils/SafeERC20.sol";
 
 contract MockRouterTest is TokenSetup {
   using SafeERC20 for IERC20;
@@ -60,7 +60,7 @@ contract MockRouterTest is TokenSetup {
 
     vm.startPrank(OWNER, OWNER);
 
-    IERC20(s_sourceFeeToken).safeApprove(address(mockRouter), type(uint256).max);
+    IERC20(s_sourceFeeToken).forceApprove(address(mockRouter), type(uint256).max);
 
     mockRouter.ccipSend(MOCK_CHAIN_SELECTOR, message);
   }

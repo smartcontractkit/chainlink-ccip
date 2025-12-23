@@ -5,8 +5,8 @@ import {TokenPool} from "../../../pools/TokenPool.sol";
 import {TokenPoolHelper} from "../../helpers/TokenPoolHelper.sol";
 import {TokenPoolSetup} from "./TokenPoolSetup.t.sol";
 
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
-import {IERC20Metadata} from "@openzeppelin/contracts@4.8.3/token/ERC20/extensions/IERC20Metadata.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts@5.3.0/token/ERC20/extensions/IERC20Metadata.sol";
 
 contract TokenPool_constructor is TokenPoolSetup {
   function test_constructor() public view {
@@ -24,7 +24,8 @@ contract TokenPool_constructor is TokenPoolSetup {
 
     vm.mockCallRevert(address(s_token), abi.encodeWithSelector(IERC20Metadata.decimals.selector), "decimals fails");
 
-    s_tokenPool = new TokenPoolHelper(s_token, decimals, address(0), address(s_mockRMNRemote), address(s_sourceRouter));
+    s_tokenPool =
+      new TokenPoolHelper(s_tokenErc20, decimals, address(0), address(s_mockRMNRemote), address(s_sourceRouter));
 
     assertEq(s_tokenPool.getTokenDecimals(), decimals);
   }
@@ -47,6 +48,6 @@ contract TokenPool_constructor is TokenPoolSetup {
     );
 
     s_tokenPool =
-      new TokenPoolHelper(s_token, invalidDecimals, address(0), address(s_mockRMNRemote), address(s_sourceRouter));
+      new TokenPoolHelper(s_tokenErc20, invalidDecimals, address(0), address(s_mockRMNRemote), address(s_sourceRouter));
   }
 }

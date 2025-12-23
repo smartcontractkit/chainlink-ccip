@@ -6,6 +6,7 @@ import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
 import {USDCTokenPoolCCTPV2Helper} from "../../../helpers/USDCTokenPoolCCTPV2Helper.sol";
 import {USDCSetup} from "../USDCSetup.t.sol";
 
+import {IBurnMintERC20} from "../../../../interfaces/IBurnMintERC20.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
 contract USDCTokenPoolCCTPV2Setup is USDCSetup {
@@ -17,7 +18,7 @@ contract USDCTokenPoolCCTPV2Setup is USDCSetup {
     s_usdcTokenPool = new USDCTokenPoolCCTPV2Helper(
       s_mockUSDCTokenMessenger,
       s_cctpMessageTransmitterProxy,
-      s_USDCToken,
+      IBurnMintERC20(address(s_USDCToken)),
       address(0),
       address(s_mockRMNRemote),
       address(s_router)

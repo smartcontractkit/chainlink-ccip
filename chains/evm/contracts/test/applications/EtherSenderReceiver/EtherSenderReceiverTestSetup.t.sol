@@ -7,14 +7,15 @@ import {ICCIPRouter} from "../../../applications/EtherSenderReceiver.sol";
 
 import {EtherSenderReceiverHelper} from "../../helpers/EtherSenderReceiverHelper.sol";
 
+import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 import {WETH9} from "@chainlink/contracts/src/v0.8/vendor/canonical-weth/WETH9.sol";
-import {ERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/ERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
 contract EtherSenderReceiverTestSetup is Test {
   EtherSenderReceiverHelper internal s_etherSenderReceiver;
   WETH9 internal s_weth;
   WETH9 internal s_someOtherWeth;
-  ERC20 internal s_linkToken;
+  IERC20 internal s_linkToken;
 
   address internal constant OWNER = 0x00007e64E1fB0C487F25dd6D3601ff6aF8d32e4e;
   address internal constant ROUTER = 0x0F3779ee3a832D10158073ae2F5e61ac7FBBF880;
@@ -24,7 +25,7 @@ contract EtherSenderReceiverTestSetup is Test {
   function setUp() public {
     vm.startPrank(OWNER);
 
-    s_linkToken = new ERC20("Chainlink Token", "LINK");
+    s_linkToken = IERC20(address(new BurnMintERC20("Chainlink Token", "LINK", 18, 0, 0)));
     s_someOtherWeth = new WETH9();
     s_weth = new WETH9();
     vm.mockCall(ROUTER, abi.encodeWithSelector(ICCIPRouter.getWrappedNative.selector), abi.encode(address(s_weth)));
