@@ -37,6 +37,8 @@ func TestE2ESmoke(t *testing.T) {
 			family = chainsel.FamilyEVM
 		case "solana":
 			family = chainsel.FamilySolana
+		case "ton":
+			family = chainsel.FamilyTon
 		default:
 			panic("unsupported blockchain type")
 		}

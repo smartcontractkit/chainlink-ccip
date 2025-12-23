@@ -26,6 +26,8 @@ import (
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldf_evm_provider "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/provider"
 	cldf_solana_provider "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana/provider"
+	cldf_ton_provider "github.com/smartcontractkit/chainlink-deployments-framework/chain/ton/provider"
+	ccipTon "github.com/smartcontractkit/chainlink-ton/devenv-impl"
 )
 
 type CLDF struct {
@@ -130,6 +132,30 @@ func NewCLDFOperationsEnvironment(bc []*blockchain.Input, dataStore datastore.Da
 				return nil, nil, err
 			}
 			providers = append(providers, p)
+		} else if b.Type == "ton" {
+			chainID := b.ChainID
+			rpcHTTPURL := b.Out.Nodes[0].ExternalHTTPUrl
+
+			d, err := chainsel.GetChainDetailsByChainIDAndFamily(chainID, chainsel.FamilyTon)
+			if err != nil {
+				return nil, nil, err
+			}
+			walletVersion := "V5R1"
+			deployerSignerGen := cldf_ton_provider.PrivateKeyRandom()
+
+			selectors = append(selectors, d.ChainSelector)
+			p, err := cldf_ton_provider.NewRPCChainProvider(
+				d.ChainSelector,
+				cldf_ton_provider.RPCChainProviderConfig{
+					HTTPURL:           rpcHTTPURL,
+					WalletVersion:     cldf_ton_provider.WalletVersion(walletVersion),
+					DeployerSignerGen: deployerSignerGen,
+				},
+			).Initialize(context.Background())
+			if err != nil {
+				return nil, nil, err
+			}
+			providers = append(providers, p)
 		}
 	}
 
@@ -172,10 +198,8 @@ func NewCCIPImplFromNetwork(typ string) (CCIP16ProductConfiguration, error) {
 	case "aptos":
 		panic("implement Aptos")
 	case "ton":
-		panic("implement TON")
+		return ccipTon.NewEmptyCCIP16TON(), nil
 	default:
 		return nil, errors.New("unknown devenv network type " + typ)
 	}
 }
-
-

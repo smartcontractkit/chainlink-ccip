@@ -20,6 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/ccip_home"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/rmn_home"
 	solanaSeqs "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
+	tonSeqs "github.com/smartcontractkit/chainlink-ton/deployment/ccip/1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
@@ -237,6 +238,12 @@ func applyAddDonAndSetCandidateChangesetConfig(e deployment.Environment, cfg Add
 			}
 		case chain_selectors.FamilySolana:
 			a := &solanaSeqs.SolanaAdapter{}
+			offRampAddress, err = a.GetOffRampAddress(e.DataStore, chainSelector)
+			if err != nil {
+				return deployment.ChangesetOutput{}, err
+			}
+		case chain_selectors.FamilyTon:
+			a := &tonSeqs.TonAdapter{}
 			offRampAddress, err = a.GetOffRampAddress(e.DataStore, chainSelector)
 			if err != nil {
 				return deployment.ChangesetOutput{}, err
@@ -509,6 +516,14 @@ func getOracleIdentities(clClients []*clclient.ChainlinkClient, nodeKeyBundles m
 				offPrefix = "ocr2off_solana_"
 				onPrefix = "ocr2on_solana_"
 				cfgPrefix = "ocr2cfg_solana_"
+			case chain_selectors.FamilyTon:
+				bundle := nodeKeyBundles[family][id.Raw()]
+				addr = bundle.TXKey.Data.Attributes.PublicKey
+				ocrKey := bundle.OCR2Key
+				ocr2Config = ocrKey.Data.Attributes
+				offPrefix = "ocr2off_ton_"
+				onPrefix = "ocr2on_ton_"
+				cfgPrefix = "ocr2cfg_ton_"
 			default:
 				return fmt.Errorf("unsupported chain family %s for selector %d", family, destSelector)
 			}
@@ -663,6 +678,12 @@ func applySetCandidateChangesetConfig(e deployment.Environment, cfg SetCandidate
 				}
 			case chain_selectors.FamilySolana:
 				a := &solanaSeqs.SolanaAdapter{}
+				offRampAddress, err = a.GetOffRampAddress(e.DataStore, chainSelector)
+				if err != nil {
+					return deployment.ChangesetOutput{}, err
+				}
+			case chain_selectors.FamilyTon:
+				a := &tonSeqs.TonAdapter{}
 				offRampAddress, err = a.GetOffRampAddress(e.DataStore, chainSelector)
 				if err != nil {
 					return deployment.ChangesetOutput{}, err
