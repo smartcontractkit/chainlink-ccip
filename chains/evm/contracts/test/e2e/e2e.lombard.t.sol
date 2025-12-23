@@ -168,16 +168,16 @@ contract e2e_lombard is OnRampSetup {
     ccvConfigs[0] = AdvancedPoolHooks.CCVConfigArg({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       outboundCCVs: required,
-      outboundCCVsToAddAboveThreshold: new address[](0),
+      thresholdOutboundCCVs: new address[](0),
       inboundCCVs: new address[](0),
-      inboundCCVsToAddAboveThreshold: new address[](0)
+      thresholdInboundCCVs: new address[](0)
     });
     ccvConfigs[1] = AdvancedPoolHooks.CCVConfigArg({
       remoteChainSelector: SOURCE_CHAIN_SELECTOR,
       outboundCCVs: new address[](0),
-      outboundCCVsToAddAboveThreshold: new address[](0),
+      thresholdOutboundCCVs: new address[](0),
       inboundCCVs: required,
-      inboundCCVsToAddAboveThreshold: new address[](0)
+      thresholdInboundCCVs: new address[](0)
     });
     hooks.applyCCVConfigUpdates(ccvConfigs);
 

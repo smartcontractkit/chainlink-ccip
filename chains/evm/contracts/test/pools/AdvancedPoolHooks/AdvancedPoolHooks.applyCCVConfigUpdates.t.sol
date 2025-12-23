@@ -23,18 +23,18 @@ contract AdvancedPoolHooks_applyCCVConfigUpdates is AdvancedPoolHooksSetup {
     configArgs[0] = AdvancedPoolHooks.CCVConfigArg({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       outboundCCVs: outboundCCVs,
-      outboundCCVsToAddAboveThreshold: new address[](0),
+      thresholdOutboundCCVs: new address[](0),
       inboundCCVs: inboundCCVs,
-      inboundCCVsToAddAboveThreshold: new address[](0)
+      thresholdInboundCCVs: new address[](0)
     });
 
     vm.expectEmit();
     emit AdvancedPoolHooks.CCVConfigUpdated({
       remoteChainSelector: configArgs[0].remoteChainSelector,
       outboundCCVs: configArgs[0].outboundCCVs,
-      outboundCCVsToAddAboveThreshold: configArgs[0].outboundCCVsToAddAboveThreshold,
+      thresholdOutboundCCVs: configArgs[0].thresholdOutboundCCVs,
       inboundCCVs: configArgs[0].inboundCCVs,
-      inboundCCVsToAddAboveThreshold: configArgs[0].inboundCCVsToAddAboveThreshold
+      thresholdInboundCCVs: configArgs[0].thresholdInboundCCVs
     });
     s_advancedPoolHooks.applyCCVConfigUpdates(configArgs);
 
@@ -75,9 +75,9 @@ contract AdvancedPoolHooks_applyCCVConfigUpdates is AdvancedPoolHooksSetup {
     configArgs[0] = AdvancedPoolHooks.CCVConfigArg({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       outboundCCVs: duplicateOutbound,
-      outboundCCVsToAddAboveThreshold: new address[](0),
+      thresholdOutboundCCVs: new address[](0),
       inboundCCVs: validInbound,
-      inboundCCVsToAddAboveThreshold: new address[](0)
+      thresholdInboundCCVs: new address[](0)
     });
 
     vm.expectRevert(abi.encodeWithSelector(CCVConfigValidation.DuplicateCCVNotAllowed.selector, s_ccv1));
@@ -97,18 +97,16 @@ contract AdvancedPoolHooks_applyCCVConfigUpdates is AdvancedPoolHooksSetup {
     configArgs[0] = AdvancedPoolHooks.CCVConfigArg({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       outboundCCVs: validOutbound,
-      outboundCCVsToAddAboveThreshold: new address[](0),
+      thresholdOutboundCCVs: new address[](0),
       inboundCCVs: duplicateInbound,
-      inboundCCVsToAddAboveThreshold: new address[](0)
+      thresholdInboundCCVs: new address[](0)
     });
 
     vm.expectRevert(abi.encodeWithSelector(CCVConfigValidation.DuplicateCCVNotAllowed.selector, s_ccv2));
     s_advancedPoolHooks.applyCCVConfigUpdates(configArgs);
   }
 
-  function test_applyCCVConfigUpdates_RevertWhen_OutboundCCVsToAddAboveThresholdSpecifiedButNoOutboundBaseCCVs()
-    public
-  {
+  function test_applyCCVConfigUpdates_RevertWhen_ThresholdOutboundCCVsSpecifiedButNoOutboundBaseCCVs() public {
     AdvancedPoolHooks.CCVConfigArg[] memory configArgs = new AdvancedPoolHooks.CCVConfigArg[](1);
 
     address[] memory additionalOutbound = new address[](1);
@@ -117,16 +115,16 @@ contract AdvancedPoolHooks_applyCCVConfigUpdates is AdvancedPoolHooksSetup {
     configArgs[0] = AdvancedPoolHooks.CCVConfigArg({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       outboundCCVs: new address[](0),
-      outboundCCVsToAddAboveThreshold: additionalOutbound,
+      thresholdOutboundCCVs: additionalOutbound,
       inboundCCVs: new address[](0),
-      inboundCCVsToAddAboveThreshold: new address[](0)
+      thresholdInboundCCVs: new address[](0)
     });
 
-    vm.expectRevert(AdvancedPoolHooks.MustSpecifyUnderThresholdCCVsForAboveThresholdCCVs.selector);
+    vm.expectRevert(AdvancedPoolHooks.MustSpecifyUnderThresholdCCVsForThresholdCCVs.selector);
     s_advancedPoolHooks.applyCCVConfigUpdates(configArgs);
   }
 
-  function test_applyCCVConfigUpdates_RevertWhen_InboundCCVsToAddAboveThresholdSpecifiedButNoInboundBaseCCVs() public {
+  function test_applyCCVConfigUpdates_RevertWhen_ThresholdInboundCCVsSpecifiedButNoInboundBaseCCVs() public {
     AdvancedPoolHooks.CCVConfigArg[] memory configArgs = new AdvancedPoolHooks.CCVConfigArg[](1);
 
     address[] memory additionalInbound = new address[](1);
@@ -135,16 +133,16 @@ contract AdvancedPoolHooks_applyCCVConfigUpdates is AdvancedPoolHooksSetup {
     configArgs[0] = AdvancedPoolHooks.CCVConfigArg({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       outboundCCVs: new address[](0),
-      outboundCCVsToAddAboveThreshold: new address[](0),
+      thresholdOutboundCCVs: new address[](0),
       inboundCCVs: new address[](0),
-      inboundCCVsToAddAboveThreshold: additionalInbound
+      thresholdInboundCCVs: additionalInbound
     });
 
-    vm.expectRevert(AdvancedPoolHooks.MustSpecifyUnderThresholdCCVsForAboveThresholdCCVs.selector);
+    vm.expectRevert(AdvancedPoolHooks.MustSpecifyUnderThresholdCCVsForThresholdCCVs.selector);
     s_advancedPoolHooks.applyCCVConfigUpdates(configArgs);
   }
 
-  function test_applyCCVConfigUpdates_RevertWhen_DuplicateCCVBetweenOutboundLists() public {
+  function test_applyCCVConfigUpdates_RevertWhen_DuplicateCCVBetweenOutboundCCVsAndThresholdOutboundCCVs() public {
     AdvancedPoolHooks.CCVConfigArg[] memory configArgs = new AdvancedPoolHooks.CCVConfigArg[](1);
 
     address[] memory outboundBase = new address[](1);
@@ -156,16 +154,16 @@ contract AdvancedPoolHooks_applyCCVConfigUpdates is AdvancedPoolHooksSetup {
     configArgs[0] = AdvancedPoolHooks.CCVConfigArg({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       outboundCCVs: outboundBase,
-      outboundCCVsToAddAboveThreshold: outboundAdditional,
+      thresholdOutboundCCVs: outboundAdditional,
       inboundCCVs: new address[](0),
-      inboundCCVsToAddAboveThreshold: new address[](0)
+      thresholdInboundCCVs: new address[](0)
     });
 
     vm.expectRevert(abi.encodeWithSelector(CCVConfigValidation.DuplicateCCVNotAllowed.selector, s_ccv1));
     s_advancedPoolHooks.applyCCVConfigUpdates(configArgs);
   }
 
-  function test_applyCCVConfigUpdates_RevertWhen_DuplicateCCVBetweenInboundLists() public {
+  function test_applyCCVConfigUpdates_RevertWhen_DuplicateCCVBetweenInboundCCVsAndThresholdInboundCCVs() public {
     AdvancedPoolHooks.CCVConfigArg[] memory configArgs = new AdvancedPoolHooks.CCVConfigArg[](1);
 
     address[] memory inboundBase = new address[](1);
@@ -177,9 +175,9 @@ contract AdvancedPoolHooks_applyCCVConfigUpdates is AdvancedPoolHooksSetup {
     configArgs[0] = AdvancedPoolHooks.CCVConfigArg({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       outboundCCVs: new address[](0),
-      outboundCCVsToAddAboveThreshold: new address[](0),
+      thresholdOutboundCCVs: new address[](0),
       inboundCCVs: inboundBase,
-      inboundCCVsToAddAboveThreshold: inboundAdditional
+      thresholdInboundCCVs: inboundAdditional
     });
 
     vm.expectRevert(abi.encodeWithSelector(CCVConfigValidation.DuplicateCCVNotAllowed.selector, s_ccv2));
