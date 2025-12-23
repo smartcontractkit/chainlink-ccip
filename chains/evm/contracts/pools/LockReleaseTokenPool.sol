@@ -78,24 +78,12 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
     uint16 blockConfirmationRequested
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
-    uint256 localAmount = _calculateLocalAmount(
-      releaseOrMintIn.sourceDenominatedAmount, _parseRemoteDecimals(releaseOrMintIn.sourcePoolData)
-    );
-
-    _validateReleaseOrMint(releaseOrMintIn, localAmount, blockConfirmationRequested);
-
+    Pool.ReleaseOrMintOutV1 memory out = super.releaseOrMint(releaseOrMintIn, blockConfirmationRequested);
     // Release tokens from the lock box to the receiver.
-    i_lockBox.withdraw(address(i_token), releaseOrMintIn.remoteChainSelector, localAmount, releaseOrMintIn.receiver);
-
-    emit ReleasedOrMinted({
-      remoteChainSelector: releaseOrMintIn.remoteChainSelector,
-      token: address(i_token),
-      sender: msg.sender,
-      recipient: releaseOrMintIn.receiver,
-      amount: localAmount
-    });
-
-    return Pool.ReleaseOrMintOutV1({destinationAmount: localAmount});
+    i_lockBox.withdraw(
+      address(i_token), releaseOrMintIn.remoteChainSelector, out.destinationAmount, releaseOrMintIn.receiver
+    );
+    return out;
   }
 
   function releaseOrMint(
