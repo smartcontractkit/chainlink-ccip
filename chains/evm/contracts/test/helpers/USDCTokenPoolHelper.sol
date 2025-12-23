@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {IBurnMintERC20} from "../../interfaces/IBurnMintERC20.sol";
 import {ITokenMessenger} from "../../pools/USDC/interfaces/ITokenMessenger.sol";
 
 import {USDCSourcePoolDataCodec} from "../../libraries/USDCSourcePoolDataCodec.sol";
@@ -14,15 +13,11 @@ contract USDCTokenPoolHelper is USDCTokenPool {
   constructor(
     ITokenMessenger tokenMessenger,
     CCTPMessageTransmitterProxy messageTransmitterProxy,
-    IBurnMintERC20 token,
+    IERC20 token,
     address advancedPoolHooks,
     address rmnProxy,
     address router
-  )
-    USDCTokenPool(
-      tokenMessenger, messageTransmitterProxy, IERC20(address(token)), advancedPoolHooks, rmnProxy, router, 0
-    )
-  {}
+  ) USDCTokenPool(tokenMessenger, messageTransmitterProxy, token, advancedPoolHooks, rmnProxy, router, 0) {}
 
   function validateMessage(
     bytes memory usdcMessage,

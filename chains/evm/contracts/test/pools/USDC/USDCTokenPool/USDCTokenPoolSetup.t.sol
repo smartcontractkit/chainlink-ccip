@@ -10,7 +10,6 @@ import {MockE2EUSDCTransmitter} from "../../../mocks/MockE2EUSDCTransmitter.sol"
 import {MockUSDCTokenMessenger} from "../../../mocks/MockUSDCTokenMessenger.sol";
 import {USDCSetup} from "../USDCSetup.t.sol";
 
-import {IBurnMintERC20} from "../../../../interfaces/IBurnMintERC20.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
@@ -32,7 +31,7 @@ contract USDCTokenPoolSetup is USDCSetup {
     s_usdcTokenPool = new USDCTokenPoolHelper(
       s_mockUSDCTokenMessenger,
       s_cctpMessageTransmitterProxy,
-      IBurnMintERC20(address(s_USDCToken)),
+      s_USDCToken,
       address(0),
       address(s_mockRMNRemote),
       address(s_router)
@@ -49,7 +48,7 @@ contract USDCTokenPoolSetup is USDCSetup {
     s_usdcTokenPoolWithAllowList = new USDCTokenPoolHelper(
       s_mockUSDCTokenMessenger,
       s_cctpMessageTransmitterProxy,
-      IBurnMintERC20(address(s_USDCToken)),
+      s_USDCToken,
       address(advancedHooks),
       address(s_mockRMNRemote),
       address(s_router)

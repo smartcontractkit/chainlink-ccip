@@ -5,8 +5,8 @@ import {BaseTest} from "../../BaseTest.t.sol";
 import {LombardTokenPoolHelper} from "../../helpers/LombardTokenPoolHelper.sol";
 import {MockLombardBridge} from "../../mocks/MockLombardBridge.sol";
 import {MockVerifier} from "../../mocks/MockVerifier.sol";
-
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
+
 import {IERC20Metadata} from "@openzeppelin/contracts@5.3.0/token/ERC20/extensions/IERC20Metadata.sol";
 
 contract LombardTokenPool_getTokenDecimals is BaseTest {
