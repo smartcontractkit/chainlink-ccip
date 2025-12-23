@@ -537,9 +537,12 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     // trusted for that token flow.
     bool isTokenOnlyTransfer = isTokenTransferWithoutData && resolvedArgs.gasLimit == 0;
 
+    if (isTokenOnlyTransfer && resolvedArgs.ccvs.length == 0) {
+      return resolvedArgs;
+    }
     // if no CCVs are provided and it's not a token only transfer,
     // directly assign defaults without allocation overhead.
-    if (resolvedArgs.ccvs.length == 0 && !isTokenOnlyTransfer) {
+    else if (resolvedArgs.ccvs.length == 0 && !isTokenOnlyTransfer) {
       resolvedArgs.ccvs = destChainConfig.defaultCCVs;
       resolvedArgs.ccvArgs = new bytes[](destChainConfig.defaultCCVs.length);
     } else {
