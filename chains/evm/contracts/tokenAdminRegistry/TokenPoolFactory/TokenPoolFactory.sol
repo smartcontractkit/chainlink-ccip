@@ -212,14 +212,11 @@ contract TokenPoolFactory is ITypeAndVersion {
     if (localConfig.localPoolType == PoolType.LOCK_RELEASE) {
       localLockBox = localConfig.lockBox;
       if (localLockBox == address(0)) {
-        localLockBox = _deployLockBox(localConfig.token, 0, localConfig.salt);
+        localLockBox = _deployLockBox(localConfig.token, localConfig.salt);
       } else {
         ERC20LockBox lockBoxContract = ERC20LockBox(localLockBox);
         if (address(lockBoxContract.getToken()) != localConfig.token) {
           revert InvalidLockBoxToken(address(lockBoxContract.getToken()), localConfig.token);
-        }
-        if (lockBoxContract.getRemoteChainSelector() != 0) {
-          revert InvalidLockBoxChainSelector(lockBoxContract.getRemoteChainSelector());
         }
       }
       tokenPoolInitArgs = abi.encode(
@@ -273,12 +270,8 @@ contract TokenPoolFactory is ITypeAndVersion {
     // For lock/release pools, predict the remote lockbox if none is provided.
     if (remoteTokenPool.poolType == PoolType.LOCK_RELEASE && remoteLockBox == address(0)) {
       address decodedRemoteToken = abi.decode(remoteTokenPool.remoteTokenAddress, (address));
-      (remoteLockBox,) = _computeLockBoxAddress(
-        decodedRemoteToken,
-        remoteTokenPool.remoteChainSelector,
-        salt,
-        remoteTokenPool.remoteChainConfig.remotePoolFactory
-      );
+      (remoteLockBox,) =
+        _computeLockBoxAddress(decodedRemoteToken, salt, remoteTokenPool.remoteChainConfig.remotePoolFactory);
       remoteTokenPool.remoteChainConfig.remoteLockBox = remoteLockBox;
     }
 
@@ -313,11 +306,9 @@ contract TokenPoolFactory is ITypeAndVersion {
 
   function _deployLockBox(
     address token,
-    uint64 remoteChainSelector,
     bytes32 salt
   ) private returns (address lockBox) {
-    (address predicted, bytes memory creationCode) =
-      _computeLockBoxAddress(token, remoteChainSelector, salt, address(this));
+    (address predicted, bytes memory creationCode) = _computeLockBoxAddress(token, salt, address(this));
     lockBox = Create2.deploy(0, salt, creationCode);
     // If deployment fails Create2 reverts; address mismatch is impossible since salt and init code are deterministic.
     if (lockBox != predicted) revert InvalidZeroAddress();
@@ -326,11 +317,10 @@ contract TokenPoolFactory is ITypeAndVersion {
 
   function _computeLockBoxAddress(
     address token,
-    uint64 remoteChainSelector,
     bytes32 salt,
     address deployer
   ) private pure returns (address predicted, bytes memory creationCode) {
-    creationCode = abi.encodePacked(LOCKBOX_INIT_CODE, abi.encode(token, remoteChainSelector));
+    creationCode = abi.encodePacked(LOCKBOX_INIT_CODE, abi.encode(token, bytes32(0)));
     predicted = salt.computeAddress(keccak256(creationCode), deployer);
     return (predicted, creationCode);
   }
