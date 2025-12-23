@@ -63,6 +63,8 @@ func DeployContractsForSelector(ctx context.Context, env *deployment.Environment
 				// OFFRAMP CONFIG
 				PermissionLessExecutionThresholdSeconds: uint32((20 * time.Minute).Seconds()),
 				GasForCallExactCheck:                    uint16(5000),
+				// TON SPECIFIC CONFIG
+				ContractVersion: "08446f0afa54",
 			},
 		},
 	})

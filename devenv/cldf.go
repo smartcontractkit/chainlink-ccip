@@ -150,7 +150,7 @@ func NewCLDFOperationsEnvironment(bc []*blockchain.Input, dataStore datastore.Da
 			}
 
 			seed := wallet.NewSeed()
-			w, err := wallet.FromSeed(client, seed, wallet.V5R1Final)
+			w, err := wallet.FromSeed(client, seed, wallet.ConfigV5R1Final{NetworkGlobalID: wallet.MainnetGlobalID, Workchain: 0})
 			if err != nil {
 				return nil, nil, fmt.Errorf("failed to create TON wallet: %w", err)
 			}

@@ -8,6 +8,10 @@ replace (
 	github.com/smartcontractkit/chainlink-ccip/chains/solana => ../chains/solana
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment => ../chains/solana/deployment
 	github.com/smartcontractkit/chainlink-ccip/deployment => ../deployment
+
+	// local development
+	github.com/smartcontractkit/chainlink-ton/deployment => ../../chainlink-ton/deployment
+	github.com/smartcontractkit/chainlink-ton/devenv-impl => ../../chainlink-ton/devenv-impl
 )
 
 require (
@@ -49,7 +53,6 @@ require (
 )
 
 require (
-	github.com/smartcontractkit/chainlink-ton v0.0.0-20251222225825-082db6f6514f
 	github.com/smartcontractkit/chainlink-ton/deployment v0.0.0-20251223135314-831a334034e8
 	github.com/smartcontractkit/chainlink-ton/devenv-impl v0.0.0-20251223135314-831a334034e8
 )
@@ -338,6 +341,7 @@ require (
 	github.com/smartcontractkit/chainlink-sui v0.0.0-20251104205009-00bd79b81471 // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/lib/grafana v1.50.0 // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/seth v1.51.2 // indirect
+	github.com/smartcontractkit/chainlink-ton v0.0.0-20251222225825-082db6f6514f // indirect
 	github.com/smartcontractkit/chainlink-tron/relayer v0.0.11-0.20250908203554-5bd9d2fe9513 // indirect
 	github.com/smartcontractkit/freeport v0.1.3-0.20250716200817-cb5dfd0e369e // indirect
 	github.com/smartcontractkit/grpc-proxy v0.0.0-20240830132753-a7e17fec5ab7 // indirect
