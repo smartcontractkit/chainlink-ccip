@@ -47,9 +47,10 @@ contract OnRampHelper is OnRamp {
     uint64 destChainSelector,
     uint256 dataLength,
     uint256 numberOfTokens,
-    ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs
+    ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs,
+    address feeToken
   ) external view returns (Receipt memory) {
-    return _getExecutionFee(destChainSelector, dataLength, numberOfTokens, extraArgs);
+    return _getExecutionFee(destChainSelector, dataLength, numberOfTokens, extraArgs, feeToken);
   }
 
   function lockOrBurnSingleToken(

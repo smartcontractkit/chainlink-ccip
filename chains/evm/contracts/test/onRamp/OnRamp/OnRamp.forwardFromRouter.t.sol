@@ -29,7 +29,7 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
     vm.expectEmit();
     emit OnRamp.CCIPMessageSent({
       destChainSelector: DEST_CHAIN_SELECTOR,
-      messageNumber: 1,
+      sender: STRANGER,
       messageId: messageId,
       feeToken: s_sourceFeeToken,
       encodedMessage: encodedMessage,
@@ -75,7 +75,7 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
     vm.expectEmit();
     emit OnRamp.CCIPMessageSent({
       destChainSelector: DEST_CHAIN_SELECTOR,
-      messageNumber: destConfig.messageNumber,
+      sender: STRANGER,
       messageId: messageIdExpected,
       feeToken: s_sourceFeeToken,
       encodedMessage: encodedMessage,
@@ -96,7 +96,7 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
     vm.expectEmit();
     emit OnRamp.CCIPMessageSent({
       destChainSelector: DEST_CHAIN_SELECTOR,
-      messageNumber: destConfig.messageNumber,
+      sender: STRANGER,
       messageId: messageIdExpected,
       feeToken: s_sourceFeeToken,
       encodedMessage: encodedMessage,

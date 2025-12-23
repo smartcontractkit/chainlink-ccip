@@ -137,7 +137,7 @@ contract Router_ccipSend is RouterSetup {
     address[] memory feeTokens = new address[](1);
     feeTokens[0] = s_sourceTokens[1];
 
-    s_feeQuoter.applyFeeTokensUpdates(new address[](0), feeTokens);
+    s_feeQuoter.updatePrices(_getSingleTokenPriceUpdateStruct(feeTokens[0], 1e17));
 
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     message.feeToken = s_sourceTokens[1];

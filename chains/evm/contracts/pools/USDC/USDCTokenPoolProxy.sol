@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {ICrossChainVerifierResolver} from "../../interfaces/ICrossChainVerifierResolver.sol";
 import {IPoolV1} from "../../interfaces/IPool.sol";
+import {IPoolV1V2} from "../../interfaces/IPoolV1V2.sol";
 import {IPoolV2} from "../../interfaces/IPoolV2.sol";
 import {IRouter} from "../../interfaces/IRouter.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
@@ -34,7 +35,7 @@ import {ERC165Checker} from "@openzeppelin/contracts@5.3.0/utils/introspection/E
 ///     ├──→ CCTPV2Pool → MessageTransmitterProxy/TokenMessenger V2 → CCTPV2
 ///     ├──→ CCTPV2WithCCVPool → CCTPVerifier → MessageTransmitterProxy/TokenMessenger V2 → CCTPV2
 ///     └──→ SiloedUSDCTokenPool → ERC20LockBox
-contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV2, ITypeAndVersion {
+contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion {
   using SafeERC20 for IERC20;
   using ERC165Checker for address;
 

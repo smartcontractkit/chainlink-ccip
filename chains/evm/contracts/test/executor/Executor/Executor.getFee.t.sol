@@ -9,7 +9,7 @@ contract Executor_getFee is ExecutorSetup {
     address[] memory ccvAddresses = new address[](1);
     ccvAddresses[0] = INITIAL_CCV;
 
-    uint16 fee = s_executor.getFee(DEST_CHAIN_SELECTOR, 0, ccvAddresses, "");
+    uint16 fee = s_executor.getFee(DEST_CHAIN_SELECTOR, 0, ccvAddresses, "", s_sourceFeeToken);
 
     assertEq(DEFAULT_EXEC_FEE_USD_CENTS, fee);
   }
@@ -22,7 +22,7 @@ contract Executor_getFee is ExecutorSetup {
         Executor.Executor__RequestedBlockDepthTooLow.selector, requestedBlockDepth, MIN_BLOCK_CONFIRMATIONS
       )
     );
-    s_executor.getFee(DEST_CHAIN_SELECTOR, requestedBlockDepth, new address[](1), "");
+    s_executor.getFee(DEST_CHAIN_SELECTOR, requestedBlockDepth, new address[](1), "", s_sourceFeeToken);
   }
 
   function test_getFee_RevertWhen_InvalidDestChain() public {
@@ -30,7 +30,7 @@ contract Executor_getFee is ExecutorSetup {
     ccvAddresses[0] = INITIAL_CCV;
 
     vm.expectRevert(abi.encodeWithSelector(Executor.InvalidDestChain.selector, DEST_CHAIN_SELECTOR + 1));
-    s_executor.getFee(DEST_CHAIN_SELECTOR + 1, 0, ccvAddresses, "");
+    s_executor.getFee(DEST_CHAIN_SELECTOR + 1, 0, ccvAddresses, "", s_sourceFeeToken);
   }
 
   function test_getFee_RevertWhen_UnsupportedRequiredCCV() public {
@@ -39,7 +39,7 @@ contract Executor_getFee is ExecutorSetup {
     ccvAddresses[0] = unsupportedCCV;
 
     vm.expectRevert(abi.encodeWithSelector(Executor.InvalidCCV.selector, unsupportedCCV));
-    s_executor.getFee(DEST_CHAIN_SELECTOR, 0, ccvAddresses, "");
+    s_executor.getFee(DEST_CHAIN_SELECTOR, 0, ccvAddresses, "", s_sourceFeeToken);
   }
 
   function test_getFee_RevertWhen_ExceedsMaxCCVs() public {
@@ -48,6 +48,6 @@ contract Executor_getFee is ExecutorSetup {
     ccvAddresses[1] = INITIAL_CCV;
 
     vm.expectRevert(abi.encodeWithSelector(Executor.ExceedsMaxCCVs.selector, ccvAddresses.length, INITIAL_MAX_CCVS));
-    s_executor.getFee(DEST_CHAIN_SELECTOR, 0, ccvAddresses, "");
+    s_executor.getFee(DEST_CHAIN_SELECTOR, 0, ccvAddresses, "", s_sourceFeeToken);
   }
 }
