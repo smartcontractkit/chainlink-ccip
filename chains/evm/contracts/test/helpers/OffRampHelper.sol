@@ -7,9 +7,11 @@ import {MessageV1Codec} from "../../libraries/MessageV1Codec.sol";
 import {OffRamp} from "../../offRamp/OffRamp.sol";
 
 contract OffRampHelper is OffRamp {
+  uint64 internal constant DEFAULT_MAX_GAS_BUFFER_TO_UPDATE_STATE = 5000 + 5000 + 2000;
+
   constructor(
     OffRamp.StaticConfig memory staticConfig
-  ) OffRamp(staticConfig) {}
+  ) OffRamp(staticConfig, DEFAULT_MAX_GAS_BUFFER_TO_UPDATE_STATE) {}
 
   function ensureCCVQuorumIsReached(
     uint64 sourceChainSelector,

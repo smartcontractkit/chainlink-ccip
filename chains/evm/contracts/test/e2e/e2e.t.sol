@@ -22,6 +22,7 @@ contract e2e is OnRampSetup {
 
   address internal s_destVerifier;
   address internal s_userSpecifiedCCV;
+  address internal s_feeAggregator;
   CommitteeVerifier internal s_sourceCommitteeVerifier;
 
   function setUp() public virtual override {
@@ -55,7 +56,8 @@ contract e2e is OnRampSetup {
       destChainSelector: DEST_CHAIN_SELECTOR, verifier: address(s_sourceCommitteeVerifier)
     });
     srcVerifierResolver.applyOutboundImplementationUpdates(outboundImpls);
-    s_userSpecifiedCCV = address(new Proxy(address(srcVerifierResolver)));
+    s_feeAggregator = makeAddr("feeAggregator");
+    s_userSpecifiedCCV = address(new Proxy(address(srcVerifierResolver), s_feeAggregator));
 
     // OffRamp side
     s_offRamp = new OffRampHelper(
@@ -88,7 +90,7 @@ contract e2e is OnRampSetup {
     // On dest, we just use a mock verifier to bypass the signature requirement.
     // The mock verifier is also a resolver & always resolves to itself.
     // Eventually, we can replace with an actual committee verifier + resolver setup.
-    s_destVerifier = address(new Proxy(address(new MockVerifier(""))));
+    s_destVerifier = address(new Proxy(address(new MockVerifier("")), s_feeAggregator));
 
     address[] memory defaultDestCCVs = new address[](1);
     defaultDestCCVs[0] = s_destVerifier;

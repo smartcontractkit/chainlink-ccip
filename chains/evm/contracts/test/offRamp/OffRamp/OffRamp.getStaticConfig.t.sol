@@ -13,7 +13,7 @@ contract OffRamp_getStaticConfig is OffRampSetup {
       tokenAdminRegistry: makeAddr("newRegistry")
     });
 
-    OffRamp newAgg = new OffRamp(newConfig);
+    OffRamp newAgg = new OffRamp(newConfig, 1);
     OffRamp.StaticConfig memory returnedConfig = newAgg.getStaticConfig();
 
     assertEq(returnedConfig.localChainSelector, newConfig.localChainSelector);

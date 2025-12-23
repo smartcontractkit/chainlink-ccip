@@ -29,15 +29,15 @@ var (
 )
 
 var ProxyMetaData = &bind.MetaData{
-	ABI: "[{\"type\":\"constructor\",\"inputs\":[{\"name\":\"target\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"nonpayable\"},{\"type\":\"fallback\",\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"acceptOwnership\",\"inputs\":[],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"getTarget\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"owner\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"setTarget\",\"inputs\":[{\"name\":\"target\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"transferOwnership\",\"inputs\":[{\"name\":\"to\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"event\",\"name\":\"OwnershipTransferRequested\",\"inputs\":[{\"name\":\"from\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"to\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"OwnershipTransferred\",\"inputs\":[{\"name\":\"from\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"to\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"TargetUpdated\",\"inputs\":[{\"name\":\"oldTarget\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"newTarget\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"error\",\"name\":\"CannotTransferToSelf\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"MustBeProposedOwner\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"OnlyCallableByOwner\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"OwnerCannotBeZero\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"ZeroAddressNotAllowed\",\"inputs\":[]}]",
-	Bin: "0x6080346100e457601f61056038819003918201601f19168301916001600160401b038311848410176100e9578084926020946040528339810103126100e457516001600160a01b038116908190036100e45733156100d357600180546001600160a01b0319163317905580156100c257600280546001600160a01b03198116831790915560405191906001600160a01b03167f331faca2e54d546f21863baefddc0bc0b9fe7554216f8798e32574255571713f600080a361046090816101008239f35b6342bcdf7f60e11b60005260046000fd5b639b15e16f60e01b60005260046000fd5b600080fd5b634e487b7160e01b600052604160045260246000fdfe6080604052600436101561001a575b34156103cf575b600080fd5b60003560e01c8063776d1a011461006a57806379ba5097146100655780638da5cb5b14610060578063f00e6a2a1461005b5763f2fde38b0361000e57610308565b6102b6565b610264565b61017b565b346100155773ffffffffffffffffffffffffffffffffffffffff61008d3661012e565b610095610408565b1680156101045773ffffffffffffffffffffffffffffffffffffffff600254827fffffffffffffffffffffffff0000000000000000000000000000000000000000821617600255167f331faca2e54d546f21863baefddc0bc0b9fe7554216f8798e32574255571713f600080a3005b7f8579befe0000000000000000000000000000000000000000000000000000000060005260046000fd5b7ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc60209101126100155760043573ffffffffffffffffffffffffffffffffffffffff811681036100155790565b346100155760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126100155760005473ffffffffffffffffffffffffffffffffffffffff8116330361023a577fffffffffffffffffffffffff00000000000000000000000000000000000000006001549133828416176001551660005573ffffffffffffffffffffffffffffffffffffffff3391167f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0600080a3005b7f02b543c60000000000000000000000000000000000000000000000000000000060005260046000fd5b346100155760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261001557602073ffffffffffffffffffffffffffffffffffffffff60015416604051908152f35b346100155760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261001557602073ffffffffffffffffffffffffffffffffffffffff60025416604051908152f35b346100155773ffffffffffffffffffffffffffffffffffffffff61032b3661012e565b610333610408565b163381146103a557807fffffffffffffffffffffffff0000000000000000000000000000000000000000600054161760005573ffffffffffffffffffffffffffffffffffffffff600154167fed8889f560326eb138920d842192f0eb3dd22b4f139c87a2c57538e05bae1278600080a3005b7fdad89dca0000000000000000000000000000000000000000000000000000000060005260046000fd5b60008073ffffffffffffffffffffffffffffffffffffffff6002541636828037818036925af13d6000803e610403573d6000fd5b3d6000f35b73ffffffffffffffffffffffffffffffffffffffff60015416330361042957565b7f2b5c74de0000000000000000000000000000000000000000000000000000000060005260046000fdfea164736f6c634300081a000a",
+	ABI: "[{\"type\":\"constructor\",\"inputs\":[{\"name\":\"target\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"feeAggregator\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"nonpayable\"},{\"type\":\"fallback\",\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"acceptOwnership\",\"inputs\":[],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"getFeeAggregator\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getTarget\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"owner\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"setFeeAggregator\",\"inputs\":[{\"name\":\"feeAggregator\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setTarget\",\"inputs\":[{\"name\":\"target\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"transferOwnership\",\"inputs\":[{\"name\":\"to\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"withdrawFeeTokens\",\"inputs\":[{\"name\":\"feeTokens\",\"type\":\"address[]\",\"internalType\":\"address[]\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"event\",\"name\":\"FeeAggregatorUpdated\",\"inputs\":[{\"name\":\"oldFeeAggregator\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"newFeeAggregator\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"FeeTokenWithdrawn\",\"inputs\":[{\"name\":\"receiver\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"feeToken\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"OwnershipTransferRequested\",\"inputs\":[{\"name\":\"from\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"to\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"OwnershipTransferred\",\"inputs\":[{\"name\":\"from\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"to\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"TargetUpdated\",\"inputs\":[{\"name\":\"oldTarget\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"newTarget\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"error\",\"name\":\"CannotTransferToSelf\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"MustBeProposedOwner\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"OnlyCallableByOwner\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"OwnerCannotBeZero\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"ZeroAddressNotAllowed\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"ZeroAddressNotAllowed\",\"inputs\":[]}]",
+	Bin: "0x60803461014157601f610cfc38819003918201601f19168301916001600160401b0383118484101761014657808492604094855283398101031261014157610052602061004b8361015c565b920161015c565b90331561013057600180546001600160a01b031916331790556001600160a01b031690811561011f57600280546001600160a01b03198116841790915560405192906001600160a01b03167f331faca2e54d546f21863baefddc0bc0b9fe7554216f8798e32574255571713f600080a36001600160a01b0316801561011f57600380546001600160a01b0319811683179091556001600160a01b03167f5f93cfaedcfeead9f6922f03a6557cc9c40dd65f320e80dd4aa68fce736bf723600080a3610b8b90816101718239f35b6342bcdf7f60e11b60005260046000fd5b639b15e16f60e01b60005260046000fd5b600080fd5b634e487b7160e01b600052604160045260246000fd5b51906001600160a01b03821682036101415756fe6080604052600436101561001a575b3415610714575b600080fd5b60003560e01c806315b358e01461009a5780635cb80c5d14610095578063776d1a011461009057806379ba50971461008b5780638da5cb5b146100865780639cb406c914610081578063f00e6a2a1461007c5763f2fde38b0361000e576104cc565b61047a565b610428565b6103d6565b6102ed565b610226565b6101a9565b346100155760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126100155773ffffffffffffffffffffffffffffffffffffffff6004356100ea8161018b565b6100f261074d565b1680156101615773ffffffffffffffffffffffffffffffffffffffff600354827fffffffffffffffffffffffff0000000000000000000000000000000000000000821617600355167f5f93cfaedcfeead9f6922f03a6557cc9c40dd65f320e80dd4aa68fce736bf723600080a3005b7f8579befe0000000000000000000000000000000000000000000000000000000060005260046000fd5b73ffffffffffffffffffffffffffffffffffffffff81160361001557565b346100155760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126100155760043567ffffffffffffffff8111610015573660238201121561001557806004013567ffffffffffffffff8111610015573660248260051b8401011161001557602461022492016105c0565b005b346100155760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126100155773ffffffffffffffffffffffffffffffffffffffff6004356102768161018b565b61027e61074d565b1680156101615773ffffffffffffffffffffffffffffffffffffffff600254827fffffffffffffffffffffffff0000000000000000000000000000000000000000821617600255167f331faca2e54d546f21863baefddc0bc0b9fe7554216f8798e32574255571713f600080a3005b346100155760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126100155760005473ffffffffffffffffffffffffffffffffffffffff811633036103ac577fffffffffffffffffffffffff00000000000000000000000000000000000000006001549133828416176001551660005573ffffffffffffffffffffffffffffffffffffffff3391167f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0600080a3005b7f02b543c60000000000000000000000000000000000000000000000000000000060005260046000fd5b346100155760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261001557602073ffffffffffffffffffffffffffffffffffffffff60015416604051908152f35b346100155760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261001557602073ffffffffffffffffffffffffffffffffffffffff60035416604051908152f35b346100155760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261001557602073ffffffffffffffffffffffffffffffffffffffff60025416604051908152f35b346100155760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126100155773ffffffffffffffffffffffffffffffffffffffff60043561051c8161018b565b61052461074d565b1633811461059657807fffffffffffffffffffffffff0000000000000000000000000000000000000000600054161760005573ffffffffffffffffffffffffffffffffffffffff600154167fed8889f560326eb138920d842192f0eb3dd22b4f139c87a2c57538e05bae1278600080a3005b7fdad89dca0000000000000000000000000000000000000000000000000000000060005260046000fd5b73ffffffffffffffffffffffffffffffffffffffff600354169182156101615760005b8181106105f05750505050565b61061f610606610601838587610798565b6107d7565b73ffffffffffffffffffffffffffffffffffffffff1690565b6040517f70a0823100000000000000000000000000000000000000000000000000000000815230600482015290919073ffffffffffffffffffffffffffffffffffffffff831690602081602481855afa801561070f5760019488926000926106df575b5081610693575b50505050016105e3565b816106c37f508d7d183612c18fc339b42618912b9fa3239f631dd7ec0671f950200a0fa66e93856106d394610874565b6040519081529081906020820190565b0390a338858180610689565b61070191925060203d8111610708575b6106f98183610813565b810190610859565b9038610682565b503d6106ef565b610868565b60008073ffffffffffffffffffffffffffffffffffffffff6002541636828037818036925af13d6000803e610748573d6000fd5b3d6000f35b73ffffffffffffffffffffffffffffffffffffffff60015416330361076e57565b7f2b5c74de0000000000000000000000000000000000000000000000000000000060005260046000fd5b91908110156107a85760051b0190565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052603260045260246000fd5b356107e18161018b565b90565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052604160045260246000fd5b90601f7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0910116810190811067ffffffffffffffff82111761085457604052565b6107e4565b90816020910312610015575190565b6040513d6000823e3d90fd5b9073ffffffffffffffffffffffffffffffffffffffff6109469392604051938260208601947fa9059cbb0000000000000000000000000000000000000000000000000000000086521660248601526044850152604484526108d6606485610813565b166000806040938451956108ea8688610813565b602087527f5361666545524332303a206c6f772d6c6576656c2063616c6c206661696c65646020880152519082855af1903d1561096d573d61093761092e82610976565b94519485610813565b83523d6000602085013e610ab8565b805180610951575050565b816020806109669361096b95010191016109b0565b6109c8565b565b60609250610ab8565b67ffffffffffffffff811161085457601f017fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe01660200190565b90816020910312610015575180151581036100155790565b156109cf57565b60846040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152602a60248201527f5361666545524332303a204552433230206f7065726174696f6e20646964206e60448201527f6f742073756363656564000000000000000000000000000000000000000000006064820152fd5b15610a5a57565b60646040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601d60248201527f416464726573733a2063616c6c20746f206e6f6e2d636f6e74726163740000006044820152fd5b91929015610ad85750815115610acc575090565b6107e1903b1515610a53565b825190915015610aeb5750805190602001fd5b604051907f08c379a0000000000000000000000000000000000000000000000000000000008252602060048301528181519182602483015260005b838110610b665750507fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0601f836000604480968601015201168101030190fd5b60208282018101516044878401015285935001610b2656fea164736f6c634300081a000a",
 }
 
 var ProxyABI = ProxyMetaData.ABI
 
 var ProxyBin = ProxyMetaData.Bin
 
-func DeployProxy(auth *bind.TransactOpts, backend bind.ContractBackend, target common.Address) (common.Address, *types.Transaction, *Proxy, error) {
+func DeployProxy(auth *bind.TransactOpts, backend bind.ContractBackend, target common.Address, feeAggregator common.Address) (common.Address, *types.Transaction, *Proxy, error) {
 	parsed, err := ProxyMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -46,7 +46,7 @@ func DeployProxy(auth *bind.TransactOpts, backend bind.ContractBackend, target c
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
 
-	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(ProxyBin), backend, target)
+	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(ProxyBin), backend, target, feeAggregator)
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}
@@ -169,6 +169,28 @@ func (_Proxy *ProxyTransactorRaw) Transact(opts *bind.TransactOpts, method strin
 	return _Proxy.Contract.contract.Transact(opts, method, params...)
 }
 
+func (_Proxy *ProxyCaller) GetFeeAggregator(opts *bind.CallOpts) (common.Address, error) {
+	var out []interface{}
+	err := _Proxy.contract.Call(opts, &out, "getFeeAggregator")
+
+	if err != nil {
+		return *new(common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+
+	return out0, err
+
+}
+
+func (_Proxy *ProxySession) GetFeeAggregator() (common.Address, error) {
+	return _Proxy.Contract.GetFeeAggregator(&_Proxy.CallOpts)
+}
+
+func (_Proxy *ProxyCallerSession) GetFeeAggregator() (common.Address, error) {
+	return _Proxy.Contract.GetFeeAggregator(&_Proxy.CallOpts)
+}
+
 func (_Proxy *ProxyCaller) GetTarget(opts *bind.CallOpts) (common.Address, error) {
 	var out []interface{}
 	err := _Proxy.contract.Call(opts, &out, "getTarget")
@@ -225,6 +247,18 @@ func (_Proxy *ProxyTransactorSession) AcceptOwnership() (*types.Transaction, err
 	return _Proxy.Contract.AcceptOwnership(&_Proxy.TransactOpts)
 }
 
+func (_Proxy *ProxyTransactor) SetFeeAggregator(opts *bind.TransactOpts, feeAggregator common.Address) (*types.Transaction, error) {
+	return _Proxy.contract.Transact(opts, "setFeeAggregator", feeAggregator)
+}
+
+func (_Proxy *ProxySession) SetFeeAggregator(feeAggregator common.Address) (*types.Transaction, error) {
+	return _Proxy.Contract.SetFeeAggregator(&_Proxy.TransactOpts, feeAggregator)
+}
+
+func (_Proxy *ProxyTransactorSession) SetFeeAggregator(feeAggregator common.Address) (*types.Transaction, error) {
+	return _Proxy.Contract.SetFeeAggregator(&_Proxy.TransactOpts, feeAggregator)
+}
+
 func (_Proxy *ProxyTransactor) SetTarget(opts *bind.TransactOpts, target common.Address) (*types.Transaction, error) {
 	return _Proxy.contract.Transact(opts, "setTarget", target)
 }
@@ -249,6 +283,18 @@ func (_Proxy *ProxyTransactorSession) TransferOwnership(to common.Address) (*typ
 	return _Proxy.Contract.TransferOwnership(&_Proxy.TransactOpts, to)
 }
 
+func (_Proxy *ProxyTransactor) WithdrawFeeTokens(opts *bind.TransactOpts, feeTokens []common.Address) (*types.Transaction, error) {
+	return _Proxy.contract.Transact(opts, "withdrawFeeTokens", feeTokens)
+}
+
+func (_Proxy *ProxySession) WithdrawFeeTokens(feeTokens []common.Address) (*types.Transaction, error) {
+	return _Proxy.Contract.WithdrawFeeTokens(&_Proxy.TransactOpts, feeTokens)
+}
+
+func (_Proxy *ProxyTransactorSession) WithdrawFeeTokens(feeTokens []common.Address) (*types.Transaction, error) {
+	return _Proxy.Contract.WithdrawFeeTokens(&_Proxy.TransactOpts, feeTokens)
+}
+
 func (_Proxy *ProxyTransactor) Fallback(opts *bind.TransactOpts, calldata []byte) (*types.Transaction, error) {
 	return _Proxy.contract.RawTransact(opts, calldata)
 }
@@ -259,6 +305,279 @@ func (_Proxy *ProxySession) Fallback(calldata []byte) (*types.Transaction, error
 
 func (_Proxy *ProxyTransactorSession) Fallback(calldata []byte) (*types.Transaction, error) {
 	return _Proxy.Contract.Fallback(&_Proxy.TransactOpts, calldata)
+}
+
+type ProxyFeeAggregatorUpdatedIterator struct {
+	Event *ProxyFeeAggregatorUpdated
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *ProxyFeeAggregatorUpdatedIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(ProxyFeeAggregatorUpdated)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(ProxyFeeAggregatorUpdated)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *ProxyFeeAggregatorUpdatedIterator) Error() error {
+	return it.fail
+}
+
+func (it *ProxyFeeAggregatorUpdatedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type ProxyFeeAggregatorUpdated struct {
+	OldFeeAggregator common.Address
+	NewFeeAggregator common.Address
+	Raw              types.Log
+}
+
+func (_Proxy *ProxyFilterer) FilterFeeAggregatorUpdated(opts *bind.FilterOpts, oldFeeAggregator []common.Address, newFeeAggregator []common.Address) (*ProxyFeeAggregatorUpdatedIterator, error) {
+
+	var oldFeeAggregatorRule []interface{}
+	for _, oldFeeAggregatorItem := range oldFeeAggregator {
+		oldFeeAggregatorRule = append(oldFeeAggregatorRule, oldFeeAggregatorItem)
+	}
+	var newFeeAggregatorRule []interface{}
+	for _, newFeeAggregatorItem := range newFeeAggregator {
+		newFeeAggregatorRule = append(newFeeAggregatorRule, newFeeAggregatorItem)
+	}
+
+	logs, sub, err := _Proxy.contract.FilterLogs(opts, "FeeAggregatorUpdated", oldFeeAggregatorRule, newFeeAggregatorRule)
+	if err != nil {
+		return nil, err
+	}
+	return &ProxyFeeAggregatorUpdatedIterator{contract: _Proxy.contract, event: "FeeAggregatorUpdated", logs: logs, sub: sub}, nil
+}
+
+func (_Proxy *ProxyFilterer) WatchFeeAggregatorUpdated(opts *bind.WatchOpts, sink chan<- *ProxyFeeAggregatorUpdated, oldFeeAggregator []common.Address, newFeeAggregator []common.Address) (event.Subscription, error) {
+
+	var oldFeeAggregatorRule []interface{}
+	for _, oldFeeAggregatorItem := range oldFeeAggregator {
+		oldFeeAggregatorRule = append(oldFeeAggregatorRule, oldFeeAggregatorItem)
+	}
+	var newFeeAggregatorRule []interface{}
+	for _, newFeeAggregatorItem := range newFeeAggregator {
+		newFeeAggregatorRule = append(newFeeAggregatorRule, newFeeAggregatorItem)
+	}
+
+	logs, sub, err := _Proxy.contract.WatchLogs(opts, "FeeAggregatorUpdated", oldFeeAggregatorRule, newFeeAggregatorRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(ProxyFeeAggregatorUpdated)
+				if err := _Proxy.contract.UnpackLog(event, "FeeAggregatorUpdated", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_Proxy *ProxyFilterer) ParseFeeAggregatorUpdated(log types.Log) (*ProxyFeeAggregatorUpdated, error) {
+	event := new(ProxyFeeAggregatorUpdated)
+	if err := _Proxy.contract.UnpackLog(event, "FeeAggregatorUpdated", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type ProxyFeeTokenWithdrawnIterator struct {
+	Event *ProxyFeeTokenWithdrawn
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *ProxyFeeTokenWithdrawnIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(ProxyFeeTokenWithdrawn)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(ProxyFeeTokenWithdrawn)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *ProxyFeeTokenWithdrawnIterator) Error() error {
+	return it.fail
+}
+
+func (it *ProxyFeeTokenWithdrawnIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type ProxyFeeTokenWithdrawn struct {
+	Receiver common.Address
+	FeeToken common.Address
+	Amount   *big.Int
+	Raw      types.Log
+}
+
+func (_Proxy *ProxyFilterer) FilterFeeTokenWithdrawn(opts *bind.FilterOpts, receiver []common.Address, feeToken []common.Address) (*ProxyFeeTokenWithdrawnIterator, error) {
+
+	var receiverRule []interface{}
+	for _, receiverItem := range receiver {
+		receiverRule = append(receiverRule, receiverItem)
+	}
+	var feeTokenRule []interface{}
+	for _, feeTokenItem := range feeToken {
+		feeTokenRule = append(feeTokenRule, feeTokenItem)
+	}
+
+	logs, sub, err := _Proxy.contract.FilterLogs(opts, "FeeTokenWithdrawn", receiverRule, feeTokenRule)
+	if err != nil {
+		return nil, err
+	}
+	return &ProxyFeeTokenWithdrawnIterator{contract: _Proxy.contract, event: "FeeTokenWithdrawn", logs: logs, sub: sub}, nil
+}
+
+func (_Proxy *ProxyFilterer) WatchFeeTokenWithdrawn(opts *bind.WatchOpts, sink chan<- *ProxyFeeTokenWithdrawn, receiver []common.Address, feeToken []common.Address) (event.Subscription, error) {
+
+	var receiverRule []interface{}
+	for _, receiverItem := range receiver {
+		receiverRule = append(receiverRule, receiverItem)
+	}
+	var feeTokenRule []interface{}
+	for _, feeTokenItem := range feeToken {
+		feeTokenRule = append(feeTokenRule, feeTokenItem)
+	}
+
+	logs, sub, err := _Proxy.contract.WatchLogs(opts, "FeeTokenWithdrawn", receiverRule, feeTokenRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(ProxyFeeTokenWithdrawn)
+				if err := _Proxy.contract.UnpackLog(event, "FeeTokenWithdrawn", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_Proxy *ProxyFilterer) ParseFeeTokenWithdrawn(log types.Log) (*ProxyFeeTokenWithdrawn, error) {
+	event := new(ProxyFeeTokenWithdrawn)
+	if err := _Proxy.contract.UnpackLog(event, "FeeTokenWithdrawn", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
 }
 
 type ProxyOwnershipTransferRequestedIterator struct {
@@ -669,6 +988,14 @@ func (_Proxy *ProxyFilterer) ParseTargetUpdated(log types.Log) (*ProxyTargetUpda
 	return event, nil
 }
 
+func (ProxyFeeAggregatorUpdated) Topic() common.Hash {
+	return common.HexToHash("0x5f93cfaedcfeead9f6922f03a6557cc9c40dd65f320e80dd4aa68fce736bf723")
+}
+
+func (ProxyFeeTokenWithdrawn) Topic() common.Hash {
+	return common.HexToHash("0x508d7d183612c18fc339b42618912b9fa3239f631dd7ec0671f950200a0fa66e")
+}
+
 func (ProxyOwnershipTransferRequested) Topic() common.Hash {
 	return common.HexToHash("0xed8889f560326eb138920d842192f0eb3dd22b4f139c87a2c57538e05bae1278")
 }
@@ -686,17 +1013,35 @@ func (_Proxy *Proxy) Address() common.Address {
 }
 
 type ProxyInterface interface {
+	GetFeeAggregator(opts *bind.CallOpts) (common.Address, error)
+
 	GetTarget(opts *bind.CallOpts) (common.Address, error)
 
 	Owner(opts *bind.CallOpts) (common.Address, error)
 
 	AcceptOwnership(opts *bind.TransactOpts) (*types.Transaction, error)
 
+	SetFeeAggregator(opts *bind.TransactOpts, feeAggregator common.Address) (*types.Transaction, error)
+
 	SetTarget(opts *bind.TransactOpts, target common.Address) (*types.Transaction, error)
 
 	TransferOwnership(opts *bind.TransactOpts, to common.Address) (*types.Transaction, error)
 
+	WithdrawFeeTokens(opts *bind.TransactOpts, feeTokens []common.Address) (*types.Transaction, error)
+
 	Fallback(opts *bind.TransactOpts, calldata []byte) (*types.Transaction, error)
+
+	FilterFeeAggregatorUpdated(opts *bind.FilterOpts, oldFeeAggregator []common.Address, newFeeAggregator []common.Address) (*ProxyFeeAggregatorUpdatedIterator, error)
+
+	WatchFeeAggregatorUpdated(opts *bind.WatchOpts, sink chan<- *ProxyFeeAggregatorUpdated, oldFeeAggregator []common.Address, newFeeAggregator []common.Address) (event.Subscription, error)
+
+	ParseFeeAggregatorUpdated(log types.Log) (*ProxyFeeAggregatorUpdated, error)
+
+	FilterFeeTokenWithdrawn(opts *bind.FilterOpts, receiver []common.Address, feeToken []common.Address) (*ProxyFeeTokenWithdrawnIterator, error)
+
+	WatchFeeTokenWithdrawn(opts *bind.WatchOpts, sink chan<- *ProxyFeeTokenWithdrawn, receiver []common.Address, feeToken []common.Address) (event.Subscription, error)
+
+	ParseFeeTokenWithdrawn(log types.Log) (*ProxyFeeTokenWithdrawn, error)
 
 	FilterOwnershipTransferRequested(opts *bind.FilterOpts, from []common.Address, to []common.Address) (*ProxyOwnershipTransferRequestedIterator, error)
 
