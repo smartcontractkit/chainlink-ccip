@@ -17,7 +17,7 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
   using SafeERC20 for IERC20;
 
   error InsufficientLiquidity();
-  error InvalidLockBoxChainSelector(uint64 remoteChainSelector);
+  error InvalidLockBox();
 
   event LiquidityTransferred(address indexed from, uint256 amount);
   event LiquidityAdded(address indexed provider, uint256 indexed amount);
@@ -25,6 +25,7 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
   event RebalancerSet(address oldRebalancer, address newRebalancer);
 
   string public constant override typeAndVersion = "LockReleaseTokenPool 1.7.0-dev";
+  bytes32 internal constant LOCKBOX_DOMAIN = bytes32(0);
 
   /// @notice The address of the rebalancer.
   address internal s_rebalancer;
@@ -46,10 +47,9 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
     if (address(lockBoxContract.getToken()) != address(token)) {
       revert InvalidToken(address(lockBoxContract.getToken()));
     }
-    if (lockBoxContract.getRemoteChainSelector() != 0) {
-      revert InvalidLockBoxChainSelector(lockBoxContract.getRemoteChainSelector());
+    if (lockBoxContract.getLiquidityDomainId() != LOCKBOX_DOMAIN) {
+      revert InvalidLockBox();
     }
-
     token.safeApprove(lockBox, type(uint256).max);
     i_lockBox = lockBoxContract;
   }
@@ -61,7 +61,7 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
   function _lockOrBurn(
     uint256 amount
   ) internal virtual override {
-    i_lockBox.deposit(0, amount);
+    i_lockBox.deposit(0, address(i_token), LOCKBOX_DOMAIN, amount);
   }
 
   function _releaseOrMint(
@@ -69,7 +69,7 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
     uint256 amount
   ) internal virtual override {
     // Release tokens from the lock box to the receiver.
-    i_lockBox.withdraw(0, amount, receiver);
+    i_lockBox.withdraw(0, address(i_token), LOCKBOX_DOMAIN, amount, receiver);
   }
 
   /// @notice Gets rebalancer, can be address(0) if none is configured.
@@ -100,7 +100,7 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
     if (s_rebalancer != msg.sender) revert Unauthorized(msg.sender);
 
     i_token.safeTransferFrom(msg.sender, address(this), amount);
-    i_lockBox.deposit(0, amount);
+    i_lockBox.deposit(0, address(i_token), LOCKBOX_DOMAIN, amount);
     emit LiquidityAdded(msg.sender, amount);
   }
 
@@ -112,7 +112,7 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
     if (s_rebalancer != msg.sender) revert Unauthorized(msg.sender);
 
     // Withdraw the tokens directly from the lockbox to the rebalancer.
-    i_lockBox.withdraw(0, amount, msg.sender);
+    i_lockBox.withdraw(0, address(i_token), LOCKBOX_DOMAIN, amount, msg.sender);
     emit LiquidityRemoved(msg.sender, amount);
   }
 
