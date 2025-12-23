@@ -137,7 +137,7 @@ var GrantMintAndBurnRoles = contract.NewWrite(contract.WriteParams[common.Addres
 		}
 		return token.HasRole(opts, roleAdmin, caller)
 	},
-	Validate: func(RoleAssignment) error { return nil },
+	Validate: func(address common.Address) error { return nil },
 	CallContract: func(token *burn_mint_erc20.BurnMintERC20, opts *bind.TransactOpts, input common.Address) (*types.Transaction, error) {
 		return token.GrantMintAndBurnRoles(opts, input)
 	},
