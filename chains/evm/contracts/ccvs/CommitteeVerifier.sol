@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {ICrossChainVerifierV1} from "../interfaces/ICrossChainVerifierV1.sol";
 
+import {FeeTokenHandler} from "../libraries/FeeTokenHandler.sol";
 import {MessageV1Codec} from "../libraries/MessageV1Codec.sol";
 import {BaseVerifier} from "./components/BaseVerifier.sol";
 import {SignatureQuorumValidator} from "./components/SignatureQuorumValidator.sol";
@@ -25,7 +26,7 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
 
   /// @dev Defines upgradeable configuration parameters.
   struct DynamicConfig {
-    address feeAggregator; // Entity capable of withdrawing fees.
+    address feeAggregator; // The entity receiving the withdrawn fees.
     address allowlistAdmin; // Entity capable adding or removing allowed senders.
   }
 
@@ -225,6 +226,6 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
   function withdrawFeeTokens(
     address[] calldata feeTokens
   ) external {
-    _withdrawFeeTokens(feeTokens, s_dynamicConfig.feeAggregator);
+    FeeTokenHandler._withdrawFeeTokens(feeTokens, s_dynamicConfig.feeAggregator);
   }
 }

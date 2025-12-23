@@ -7,12 +7,28 @@ import {USDCTokenPoolProxy} from "../../../../pools/USDC/USDCTokenPoolProxy.sol"
 import {USDCTokenPoolProxySetup} from "./USDCTokenPoolProxySetup.t.sol";
 
 contract USDCTokenPoolProxy_getRequiredCCVs is USDCTokenPoolProxySetup {
-  function test_getRequiredCCVs() public view {
-    address[] memory requiredCCVs =
-      s_usdcTokenPoolProxy.getRequiredCCVs(address(0), uint64(1), 0, 0, "", IPoolV2.MessageDirection.Outbound);
+  function test_getRequiredCCVs_CCTPCCVRequired() public view {
+    address[] memory requiredCCVs = s_usdcTokenPoolProxy.getRequiredCCVs(
+      address(0), s_remoteCCTPChainSelector, 0, 0, "", IPoolV2.MessageDirection.Outbound
+    );
 
     assertEq(requiredCCVs.length, 1);
     assertEq(requiredCCVs[0], s_cctpVerifier);
+  }
+
+  function test_getRequiredCCVs_DefaultCCVsRequired() public view {
+    address[] memory requiredCCVs = s_usdcTokenPoolProxy.getRequiredCCVs(
+      address(0), s_remoteLockReleaseChainSelector, 0, 0, "", IPoolV2.MessageDirection.Outbound
+    );
+
+    assertEq(requiredCCVs.length, 1);
+    assertEq(requiredCCVs[0], address(0));
+  }
+
+  function test_getRequiredCCVs_RevertWhen_NoLockOrBurnMechanismSet() public {
+    uint64 unknownChainSelector = 898989;
+    vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.NoLockOrBurnMechanismSet.selector, unknownChainSelector));
+    s_usdcTokenPoolProxy.getRequiredCCVs(address(0), unknownChainSelector, 0, 0, "", IPoolV2.MessageDirection.Outbound);
   }
 
   function test_getRequiredCCVs_RevertWhen_NoCCVCompatiblePoolSet() public {

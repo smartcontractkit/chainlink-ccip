@@ -190,7 +190,7 @@ contract cctp_e2e is OnRampSetup {
     vm.expectEmit();
     emit OnRamp.CCIPMessageSent({
       destChainSelector: DEST_CHAIN_SELECTOR,
-      messageNumber: expectedMsgNum,
+      sender: OWNER,
       messageId: messageId,
       feeToken: s_sourceFeeToken,
       encodedMessage: encodedMessage,
@@ -261,7 +261,7 @@ contract cctp_e2e is OnRampSetup {
     });
 
     vm.resumeGasMetering();
-    s_offRamp.execute(encodedMessage, ccvAddresses, verifierResults);
+    s_offRamp.execute(encodedMessage, ccvAddresses, verifierResults, 0);
   }
 
   function _deployCCTPSetup(
@@ -428,6 +428,13 @@ contract cctp_e2e is OnRampSetup {
     uint64[] memory chainSelectors = new uint64[](1);
     chainSelectors[0] = DEST_CHAIN_SELECTOR;
     s_sourceCCTPSetup.tokenPoolProxy.updateLockOrBurnMechanisms(chainSelectors, mechanisms);
+
+    // Update lock or burn mechanism on the dest token pool proxy.
+    mechanisms = new USDCTokenPoolProxy.LockOrBurnMechanism[](1);
+    mechanisms[0] = USDCTokenPoolProxy.LockOrBurnMechanism.CCTP_V2_WITH_CCV;
+    chainSelectors = new uint64[](1);
+    chainSelectors[0] = SOURCE_CHAIN_SELECTOR;
+    s_destCCTPSetup.tokenPoolProxy.updateLockOrBurnMechanisms(chainSelectors, mechanisms);
 
     // Register CCTP token pool proxy on source token admin registry.
     TokenAdminRegistry(s_sourceCCTPSetup.tokenAdminRegistry)

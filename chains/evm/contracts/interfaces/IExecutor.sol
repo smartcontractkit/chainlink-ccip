@@ -16,6 +16,7 @@ interface IExecutor {
     uint64 destChainSelector,
     uint16 requestedBlockDepth,
     address[] memory ccvAddresses,
-    bytes memory extraArgs
+    bytes memory extraArgs,
+    address feeToken
   ) external view returns (uint16 usdCents);
 }

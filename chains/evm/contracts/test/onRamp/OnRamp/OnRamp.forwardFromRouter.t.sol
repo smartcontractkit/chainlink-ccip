@@ -2,8 +2,10 @@
 pragma solidity ^0.8.24;
 
 import {ICrossChainVerifierResolver} from "../../../interfaces/ICrossChainVerifierResolver.sol";
+import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
 import {Client} from "../../../libraries/Client.sol";
 import {ExtraArgsCodec} from "../../../libraries/ExtraArgsCodec.sol";
+import {Pool} from "../../../libraries/Pool.sol";
 import {OnRamp} from "../../../onRamp/OnRamp.sol";
 import {OnRampSetup} from "./OnRampSetup.t.sol";
 
@@ -27,7 +29,7 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
     vm.expectEmit();
     emit OnRamp.CCIPMessageSent({
       destChainSelector: DEST_CHAIN_SELECTOR,
-      messageNumber: 1,
+      sender: STRANGER,
       messageId: messageId,
       feeToken: s_sourceFeeToken,
       encodedMessage: encodedMessage,
@@ -73,7 +75,7 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
     vm.expectEmit();
     emit OnRamp.CCIPMessageSent({
       destChainSelector: DEST_CHAIN_SELECTOR,
-      messageNumber: destConfig.messageNumber,
+      sender: STRANGER,
       messageId: messageIdExpected,
       feeToken: s_sourceFeeToken,
       encodedMessage: encodedMessage,
@@ -94,7 +96,7 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
     vm.expectEmit();
     emit OnRamp.CCIPMessageSent({
       destChainSelector: DEST_CHAIN_SELECTOR,
-      messageNumber: destConfig.messageNumber,
+      sender: STRANGER,
       messageId: messageIdExpected,
       feeToken: s_sourceFeeToken,
       encodedMessage: encodedMessage,
@@ -161,5 +163,65 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
 
     vm.expectRevert(abi.encodeWithSelector(OnRamp.InsufficientFeeTokenAmount.selector));
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, fee - 1, STRANGER);
+  }
+
+  function test_forwardFromRouter_RevertWhen_CanOnlySendOneTokenPerMessage() public {
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+
+    message.tokenAmounts = new Client.EVMTokenAmount[](2);
+    message.tokenAmounts[0] = Client.EVMTokenAmount({token: makeAddr("token1"), amount: 123 ether});
+    message.tokenAmounts[1] = Client.EVMTokenAmount({token: makeAddr("token2"), amount: 456 ether});
+
+    vm.expectRevert(abi.encodeWithSelector(OnRamp.CanOnlySendOneTokenPerMessage.selector));
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 1e17, STRANGER);
+  }
+
+  function test_forwardFromRouter_RevertWhen_UnsupportedToken() public {
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+
+    message.tokenAmounts = new Client.EVMTokenAmount[](1);
+    message.tokenAmounts[0] = Client.EVMTokenAmount({token: makeAddr("unsupportedToken"), amount: 123 ether});
+
+    vm.expectRevert(abi.encodeWithSelector(OnRamp.UnsupportedToken.selector, message.tokenAmounts[0].token));
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 1e17, STRANGER);
+  }
+
+  function test_forwardFromRouter_RevertWhen_SourceTokenDataTooLarge() public {
+    address token = s_sourceTokens[0];
+    uint256 amount = 1 ether;
+    Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(token, amount);
+
+    uint32 paidBytesOverhead = 32;
+    uint256 actualBytes = uint256(paidBytesOverhead) + 1;
+    address pool = s_sourcePoolByToken[token];
+
+    // Make the pool quote a small destBytesOverhead in getFee (so this is what the sender "paid for").
+    vm.mockCall(
+      pool,
+      abi.encodeWithSelector(IPoolV2.getFee.selector, token, DEST_CHAIN_SELECTOR, amount, s_sourceFeeToken, 0, ""),
+      abi.encode(uint256(0), uint32(0), paidBytesOverhead, uint16(0), true)
+    );
+
+    // Make lockOrBurn return a larger destPoolData than was quoted.
+    Pool.LockOrBurnInV1 memory expectedInput = Pool.LockOrBurnInV1({
+      receiver: message.receiver,
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      originalSender: STRANGER,
+      amount: amount,
+      localToken: token
+    });
+    Pool.LockOrBurnOutV1 memory returnData = Pool.LockOrBurnOutV1({
+      destTokenAddress: abi.encode(address(s_destTokenBySourceToken[token])), destPoolData: new bytes(actualBytes)
+    });
+    vm.mockCall(
+      pool, abi.encodeWithSelector(IPoolV2.lockOrBurn.selector, expectedInput, 0, ""), abi.encode(returnData, amount)
+    );
+
+    // Quote fee and attempt send. The send should revert due to oversized pool payload.
+    uint256 fee = s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
+    vm.expectRevert(
+      abi.encodeWithSelector(OnRamp.SourceTokenDataTooLarge.selector, token, actualBytes, paidBytesOverhead)
+    );
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, fee, STRANGER);
   }
 }

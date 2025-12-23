@@ -103,10 +103,18 @@ contract e2e_lombard is OnRampSetup {
 
     s_lombardBridge = new MockLombardBridge();
 
-    s_sourceLombardVerifier =
-      new LombardVerifier(IBridgeV3(address(s_lombardBridge)), new string[](0), address(s_mockRMNRemote));
-    s_destLombardVerifier =
-      new LombardVerifier(IBridgeV3(address(s_lombardBridge)), new string[](0), address(s_mockRMNRemote));
+    s_sourceLombardVerifier = new LombardVerifier(
+      LombardVerifier.DynamicConfig({feeAggregator: address(1)}),
+      IBridgeV3(address(s_lombardBridge)),
+      new string[](0),
+      address(s_mockRMNRemote)
+    );
+    s_destLombardVerifier = new LombardVerifier(
+      LombardVerifier.DynamicConfig({feeAggregator: address(1)}),
+      IBridgeV3(address(s_lombardBridge)),
+      new string[](0),
+      address(s_mockRMNRemote)
+    );
 
     s_sourceLombardVerifier.applyRemoteChainConfigUpdates(destChainConfigs);
     s_sourceLombardVerifier.setPath(
@@ -160,16 +168,16 @@ contract e2e_lombard is OnRampSetup {
     ccvConfigs[0] = AdvancedPoolHooks.CCVConfigArg({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       outboundCCVs: required,
-      outboundCCVsToAddAboveThreshold: new address[](0),
+      thresholdOutboundCCVs: new address[](0),
       inboundCCVs: new address[](0),
-      inboundCCVsToAddAboveThreshold: new address[](0)
+      thresholdInboundCCVs: new address[](0)
     });
     ccvConfigs[1] = AdvancedPoolHooks.CCVConfigArg({
       remoteChainSelector: SOURCE_CHAIN_SELECTOR,
       outboundCCVs: new address[](0),
-      outboundCCVsToAddAboveThreshold: new address[](0),
+      thresholdOutboundCCVs: new address[](0),
       inboundCCVs: required,
-      inboundCCVsToAddAboveThreshold: new address[](0)
+      thresholdInboundCCVs: new address[](0)
     });
     hooks.applyCCVConfigUpdates(ccvConfigs);
 
@@ -332,7 +340,7 @@ contract e2e_lombard is OnRampSetup {
     vm.expectEmit();
     emit OnRamp.CCIPMessageSent({
       destChainSelector: DEST_CHAIN_SELECTOR,
-      messageNumber: expectedMsgNum,
+      sender: OWNER,
       messageId: messageId,
       feeToken: s_sourceFeeToken,
       encodedMessage: encodedMessage,
@@ -387,7 +395,7 @@ contract e2e_lombard is OnRampSetup {
     });
 
     vm.resumeGasMetering();
-    s_offRamp.execute(encodedMessage, ccvAddresses, verifierResults);
+    s_offRamp.execute(encodedMessage, ccvAddresses, verifierResults, 0);
   }
 
   // External so we can pass `bytes memory` as calldata (for MessageV1Codec._decodeMessageV1).

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {OnRamp} from "../../../onRamp/OnRamp.sol";
+import {FeeTokenHandler} from "../../../libraries/FeeTokenHandler.sol";
 import {OnRampSetup} from "./OnRampSetup.t.sol";
 
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
@@ -28,7 +28,7 @@ contract OnRamp_withdrawFeeTokens is OnRampSetup {
     feeTokens[0] = s_sourceFeeToken;
 
     vm.expectEmit();
-    emit OnRamp.FeeTokenWithdrawn(FEE_AGGREGATOR, s_sourceFeeToken, feeAmount);
+    emit FeeTokenHandler.FeeTokenWithdrawn(FEE_AGGREGATOR, s_sourceFeeToken, feeAmount);
 
     // Anyone can call withdrawFeeTokens since it's permissionless.
     vm.stopPrank();
@@ -60,9 +60,9 @@ contract OnRamp_withdrawFeeTokens is OnRampSetup {
     feeTokens[1] = token2;
 
     vm.expectEmit();
-    emit OnRamp.FeeTokenWithdrawn(FEE_AGGREGATOR, s_sourceFeeToken, feeAmount1);
+    emit FeeTokenHandler.FeeTokenWithdrawn(FEE_AGGREGATOR, s_sourceFeeToken, feeAmount1);
     vm.expectEmit();
-    emit OnRamp.FeeTokenWithdrawn(FEE_AGGREGATOR, token2, feeAmount2);
+    emit FeeTokenHandler.FeeTokenWithdrawn(FEE_AGGREGATOR, token2, feeAmount2);
 
     s_onRamp.withdrawFeeTokens(feeTokens);
 

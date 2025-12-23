@@ -148,8 +148,9 @@ contract OnRamp_getReceipts is OnRampSetup {
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = _createExtraArgs(ccvs);
 
     // Calculate the total gas limit for all expected receipts, as well as the bytes overhead.
-    OnRamp.Receipt memory execReceipt =
-      s_onRamp.getExecutionFee(DEST_CHAIN_SELECTOR, message.data.length, message.tokenAmounts.length, extraArgs);
+    OnRamp.Receipt memory execReceipt = s_onRamp.getExecutionFee(
+      DEST_CHAIN_SELECTOR, message.data.length, message.tokenAmounts.length, extraArgs, message.feeToken
+    );
     uint256 totalExpectedGas = (2 * VERIFIER_GAS) + POOL_GAS_OVERHEAD + execReceipt.destGasLimit;
     uint256 totalExpectedBytes = (2 * VERIFIER_BYTES) + POOL_BYTES_OVERHEAD + execReceipt.destBytesOverhead;
 

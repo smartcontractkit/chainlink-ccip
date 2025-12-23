@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {ICrossChainVerifierResolver} from "../../interfaces/ICrossChainVerifierResolver.sol";
 import {IPoolV1} from "../../interfaces/IPool.sol";
+import {IPoolV1V2} from "../../interfaces/IPoolV1V2.sol";
 import {IPoolV2} from "../../interfaces/IPoolV2.sol";
 import {IRouter} from "../../interfaces/IRouter.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
@@ -34,7 +35,7 @@ import {ERC165Checker} from "@openzeppelin/contracts@5.3.0/utils/introspection/E
 ///     ├──→ CCTPV2Pool → MessageTransmitterProxy/TokenMessenger V2 → CCTPV2
 ///     ├──→ CCTPV2WithCCVPool → CCTPVerifier → MessageTransmitterProxy/TokenMessenger V2 → CCTPV2
 ///     └──→ SiloedUSDCTokenPool → ERC20LockBox
-contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV2, ITypeAndVersion {
+contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion {
   using SafeERC20 for IERC20;
   using ERC165Checker for address;
 
@@ -494,14 +495,27 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV2, ITypeAndVersion {
   /// @dev Instead of calling the pool, we take a shortcut and return the CCTPVerifier as required directly.
   function getRequiredCCVs(
     address, // localToken
-    uint64, // remoteChainSelector
+    uint64 remoteChainSelector,
     uint256, // amount
     uint16, // blockConfirmationRequested
     bytes calldata, // extraData
     MessageDirection // direction
   ) external view onlyWithCCVCompatiblePool returns (address[] memory requiredCCVs) {
+    if (s_lockOrBurnMechanism[remoteChainSelector] == LockOrBurnMechanism.INVALID_MECHANISM) {
+      revert NoLockOrBurnMechanismSet(remoteChainSelector);
+    }
+
+    // Common case: The lockOrBurn mechanism is CCTP V2 with CCV.
+    // In this case, we simply need to return the CCTP CCV.
     address[] memory ccvs = new address[](1);
-    ccvs[0] = address(i_cctpVerifier);
+    if (s_lockOrBurnMechanism[remoteChainSelector] == LockOrBurnMechanism.CCTP_V2_WITH_CCV) {
+      ccvs[0] = address(i_cctpVerifier);
+      return ccvs;
+    }
+
+    // If using lock-release, we can't specify CCTP because CCTP won't ultimately be called.
+    // Other CCTP mechanisms will never rely on CCVs and have no impact on the return value.
+    // Therefore, we return address(0) to indicate that default CCVs should be used for the lock-release mechanism.
     return ccvs;
   }
 

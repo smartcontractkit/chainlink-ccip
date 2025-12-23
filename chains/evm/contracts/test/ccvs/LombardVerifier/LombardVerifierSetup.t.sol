@@ -33,8 +33,12 @@ contract LombardVerifierSetup is BaseVerifierSetup {
     // Set default execution result matching the version tag format.
     s_mockMailbox.setMessageId(abi.encodePacked(VERSION_TAG_V1_7_0, bytes32(0)));
 
-    s_lombardVerifier =
-      new LombardVerifier(IBridgeV3(address(s_mockBridge)), s_storageLocations, address(s_mockRMNRemote));
+    s_lombardVerifier = new LombardVerifier(
+      LombardVerifier.DynamicConfig({feeAggregator: FEE_AGGREGATOR}),
+      IBridgeV3(address(s_mockBridge)),
+      s_storageLocations,
+      address(s_mockRMNRemote)
+    );
 
     // Deploy test token and add it as a supported token.
     s_testToken = new BurnMintERC20("Test Token", "TEST", 18, 0, 0);

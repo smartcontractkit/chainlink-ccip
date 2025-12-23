@@ -8,7 +8,6 @@ import (
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
@@ -29,8 +28,10 @@ type TokenTransferConfig struct {
 	RegistryRef datastore.AddressRef
 	// RemoteChains specifies the remote chains to configure on the token pool.
 	RemoteChains map[uint64]RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]
-	// CustomBlockConfirmationConfig optionally overrides global custom block confirmation parameters on the pool.
-	CustomBlockConfirmationConfig *CustomBlockConfirmationConfig
+	// FinalityValue is the value representing finality.
+	// This can be interpreted as # of block confirmations, an ID, or otherwise.
+	// Interpretation is left to each chain family.
+	FinalityValue uint16
 }
 
 // ConfigureTokensForTransfersConfig is the configuration for the ConfigureTokensForTransfers changeset.
@@ -93,12 +94,12 @@ func makeApply(tokenRegistry *TokenAdapterRegistry, mcmsRegistry *changesets.MCM
 				}
 			}
 			configureTokenReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adapter.ConfigureTokenForTransfersSequence(), e.BlockChains, ConfigureTokenForTransfersInput{
-				ChainSelector:                 token.ChainSelector,
-				TokenPoolAddress:              tokenPool.Address,
-				RemoteChains:                  remoteChains,
-				ExternalAdmin:                 token.ExternalAdmin,
-				RegistryAddress:               registry.Address,
-				CustomBlockConfirmationConfig: token.CustomBlockConfirmationConfig,
+				ChainSelector:    token.ChainSelector,
+				TokenPoolAddress: tokenPool.Address,
+				RemoteChains:     remoteChains,
+				ExternalAdmin:    token.ExternalAdmin,
+				RegistryAddress:  registry.Address,
+				FinalityValue:    token.FinalityValue,
 			})
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to configure token pool on chain with selector %d: %w", token.ChainSelector, err)
@@ -116,16 +117,18 @@ func makeApply(tokenRegistry *TokenAdapterRegistry, mcmsRegistry *changesets.MCM
 }
 
 func convertRemoteChainConfig(
-	e deployment.Environment,
+	e cldf.Environment,
 	chainSelector uint64,
 	remoteAdapter TokenAdapter,
 	remoteChainSelector uint64,
 	inCfg RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef],
 ) (RemoteChainConfig[[]byte, string], error) {
 	outCfg := RemoteChainConfig[[]byte, string]{
-		InboundRateLimiterConfig:      inCfg.InboundRateLimiterConfig,
-		OutboundRateLimiterConfig:     inCfg.OutboundRateLimiterConfig,
-		CustomBlockConfirmationConfig: inCfg.CustomBlockConfirmationConfig,
+		DefaultFinalityInboundRateLimiterConfig:  inCfg.DefaultFinalityInboundRateLimiterConfig,
+		DefaultFinalityOutboundRateLimiterConfig: inCfg.DefaultFinalityOutboundRateLimiterConfig,
+		CustomFinalityInboundRateLimiterConfig:   inCfg.CustomFinalityInboundRateLimiterConfig,
+		CustomFinalityOutboundRateLimiterConfig:  inCfg.CustomFinalityOutboundRateLimiterConfig,
+		TokenTransferFeeConfig:                   inCfg.TokenTransferFeeConfig,
 	}
 	if inCfg.RemotePool != nil {
 		fullRemotePoolRef, err := datastore_utils.FindAndFormatRef(e.DataStore, *inCfg.RemotePool, remoteChainSelector, datastore_utils.FullRef)
@@ -162,6 +165,20 @@ func convertRemoteChainConfig(
 			return outCfg, fmt.Errorf("failed to resolve inbound CCV ref %s: %w", datastore_utils.SprintRef(ccvRef), err)
 		}
 		outCfg.InboundCCVs = append(outCfg.InboundCCVs, fullCCVRef.Address)
+	}
+	for _, ccvRef := range inCfg.OutboundCCVsToAddAboveThreshold {
+		fullCCVRef, err := datastore_utils.FindAndFormatRef(e.DataStore, ccvRef, chainSelector, datastore_utils.FullRef)
+		if err != nil {
+			return outCfg, fmt.Errorf("failed to resolve outbound CCV to add above threshold ref %s: %w", datastore_utils.SprintRef(ccvRef), err)
+		}
+		outCfg.OutboundCCVsToAddAboveThreshold = append(outCfg.OutboundCCVsToAddAboveThreshold, fullCCVRef.Address)
+	}
+	for _, ccvRef := range inCfg.InboundCCVsToAddAboveThreshold {
+		fullCCVRef, err := datastore_utils.FindAndFormatRef(e.DataStore, ccvRef, chainSelector, datastore_utils.FullRef)
+		if err != nil {
+			return outCfg, fmt.Errorf("failed to resolve inbound CCV to add above threshold ref %s: %w", datastore_utils.SprintRef(ccvRef), err)
+		}
+		outCfg.InboundCCVsToAddAboveThreshold = append(outCfg.InboundCCVsToAddAboveThreshold, fullCCVRef.Address)
 	}
 	return outCfg, nil
 }
