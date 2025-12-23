@@ -26,12 +26,12 @@ require (
 	github.com/prometheus/client_golang v1.23.0
 	github.com/rs/zerolog v1.34.0
 	github.com/smartcontractkit/chain-selectors v1.0.85
-	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20251027185542-babb09e5363e
+	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20251216154855-949167c7e9d1
 	github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment v0.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250908144012-8184001834b5
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment v0.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20251014191100-bad58388f0c9
-	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20251027185542-babb09e5363e
+	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20251222203705-84e93cab86b5
 	github.com/smartcontractkit/chainlink-common v0.9.6-0.20251023193345-8f2c4380a62c
 	github.com/smartcontractkit/chainlink-deployments-framework v0.72.0
 	github.com/smartcontractkit/chainlink-evm v0.3.3
@@ -49,8 +49,9 @@ require (
 )
 
 require (
-	github.com/smartcontractkit/chainlink-ton/deployment v0.0.0-20251222225825-082db6f6514f
-	github.com/smartcontractkit/chainlink-ton/devenv-impl v0.0.0-20251223001441-ff9a8e76c5d5
+	github.com/smartcontractkit/chainlink-ton v0.0.0-20251222225825-082db6f6514f
+	github.com/smartcontractkit/chainlink-ton/deployment v0.0.0-20251223130526-99a2464da04f
+	github.com/smartcontractkit/chainlink-ton/devenv-impl v0.0.0-20251223130526-99a2464da04f
 )
 
 require (
@@ -68,6 +69,7 @@ require (
 	github.com/Masterminds/sprig/v3 v3.3.0 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/ProjectZKM/Ziren/crates/go-runtime/zkvm_runtime v0.0.0-20251001021608-1fe7b43fc4d6 // indirect
+	github.com/TyphonHill/go-mermaid v1.0.0 // indirect
 	github.com/VictoriaMetrics/fastcache v1.13.0 // indirect
 	github.com/XSAM/otelsql v0.37.0 // indirect
 	github.com/alecthomas/units v0.0.0-20240927000941-0f3dac36c52b // indirect
@@ -336,7 +338,6 @@ require (
 	github.com/smartcontractkit/chainlink-sui v0.0.0-20251104205009-00bd79b81471 // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/lib/grafana v1.50.0 // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/seth v1.51.2 // indirect
-	github.com/smartcontractkit/chainlink-ton v0.0.0-20251222225825-082db6f6514f // indirect
 	github.com/smartcontractkit/chainlink-tron/relayer v0.0.11-0.20250908203554-5bd9d2fe9513 // indirect
 	github.com/smartcontractkit/freeport v0.1.3-0.20250716200817-cb5dfd0e369e // indirect
 	github.com/smartcontractkit/grpc-proxy v0.0.0-20240830132753-a7e17fec5ab7 // indirect

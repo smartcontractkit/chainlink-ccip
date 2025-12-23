@@ -800,14 +800,10 @@ func (m *CCIP16Solana) FundNodes(ctx context.Context, ns []*simple_node_set.Inpu
 		keys = append(keys, solana.MustPublicKeyFromBase58(nk.TXKey.Data.Attributes.PublicKey))
 	}
 	client := solRpc.New(bc.Out.Nodes[0].ExternalHTTPUrl)
-	err := utils.FundSolanaAccounts(
+	return  utils.FundSolanaAccounts(
 		ctx,
 		keys,
 		10,
 		client,
 	)
-	if err != nil {
-		return fmt.Errorf("funding solana accounts: %w", err)
-	}
-	return nil
 }

@@ -2,9 +2,12 @@ package ccip
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -17,17 +20,22 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
+	"github.com/xssnick/tonutils-go/address"
+	"github.com/xssnick/tonutils-go/liteclient"
+	"github.com/xssnick/tonutils-go/tlb"
+	"github.com/xssnick/tonutils-go/ton"
+	"github.com/xssnick/tonutils-go/ton/wallet"
 
-	solRpc "github.com/gagliardetto/solana-go/rpc"
 	chainsel "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
 	ccipEVM "github.com/smartcontractkit/chainlink-ccip/devenv/chainimpl/ccip-evm"
 	ccipSolana "github.com/smartcontractkit/chainlink-ccip/devenv/chainimpl/ccip-solana"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldf_evm_provider "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/provider"
 	cldf_solana_provider "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana/provider"
 	cldf_ton_provider "github.com/smartcontractkit/chainlink-deployments-framework/chain/ton/provider"
+	testutils "github.com/smartcontractkit/chainlink-ton/deployment/utils"
 	ccipTon "github.com/smartcontractkit/chainlink-ton/devenv-impl"
+	tonchain "github.com/smartcontractkit/chainlink-ton/pkg/ton/chain"
 )
 
 type CLDF struct {
@@ -121,16 +129,16 @@ func NewCLDFOperationsEnvironment(bc []*blockchain.Input, dataStore datastore.Da
 			if err != nil {
 				return nil, nil, err
 			}
-			client := solRpc.New(rpcHTTPURL)
-			err = utils.FundSolanaAccounts(
-				context.Background(),
-				[]solana.PublicKey{deployerKey.PublicKey()},
-				10,
-				client,
-			)
-			if err != nil {
-				return nil, nil, err
-			}
+			// client := solRpc.New(rpcHTTPURL)
+			// err = utils.FundSolanaAccounts(
+			// 	context.Background(),
+			// 	[]solana.PublicKey{deployerKey.PublicKey()},
+			// 	10,
+			// 	client,
+			// )
+			// if err != nil {
+			// 	return nil, nil, err
+			// }
 			providers = append(providers, p)
 		} else if b.Type == "ton" {
 			chainID := b.ChainID
@@ -140,8 +148,37 @@ func NewCLDFOperationsEnvironment(bc []*blockchain.Input, dataStore datastore.Da
 			if err != nil {
 				return nil, nil, err
 			}
+			var client *ton.APIClient
+			if strings.HasPrefix(rpcHTTPURL, "liteserver://") {
+				pool, err := tonchain.CreateLiteserverConnectionPool(context.Background(), rpcHTTPURL)
+				if err != nil {
+					return nil, nil, fmt.Errorf("failed to create liteserver connection pool: %w", err)
+				}
+				client = ton.NewAPIClient(pool, ton.ProofCheckPolicyFast)
+			}
+			// connect via config URL
+			cfg, err := liteclient.GetConfigFromUrl(context.Background(), rpcHTTPURL)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to get TON config: %w", err)
+			}
+			pool := liteclient.NewConnectionPool()
+			err = pool.AddConnectionsFromConfig(context.Background(), cfg)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to connect to TON: %w", err)
+			}
+			client = ton.NewAPIClient(pool, ton.ProofCheckPolicyFast)
+
+			seed := wallet.NewSeed()
+			w, err := wallet.FromSeed(client, seed, wallet.V5R1Final)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to create TON wallet: %w", err)
+			}
+			privateKey, err := wallet.SeedToPrivateKey(seed /*password=*/, "" /*isBIP39=*/, false)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to get private key from seed: %w", err)
+			}
 			walletVersion := "V5R1"
-			deployerSignerGen := cldf_ton_provider.PrivateKeyRandom()
+			deployerSignerGen := cldf_ton_provider.PrivateKeyFromRaw(hex.EncodeToString(privateKey))
 
 			selectors = append(selectors, d.ChainSelector)
 			p, err := cldf_ton_provider.NewRPCChainProvider(
@@ -155,6 +192,9 @@ func NewCLDFOperationsEnvironment(bc []*blockchain.Input, dataStore datastore.Da
 			if err != nil {
 				return nil, nil, err
 			}
+
+			testutils.FundWalletsNoT(client, []*address.Address{w.Address()}, []tlb.Coins{tlb.MustFromTON("1000")})
+
 			providers = append(providers, p)
 		}
 	}
