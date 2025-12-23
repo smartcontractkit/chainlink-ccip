@@ -24,7 +24,6 @@ contract SiloedLockReleaseTokenPoolSetup is BaseTest {
 
   address internal s_siloedDestPoolAddress = address(4245234524);
   uint64 internal constant SILOED_CHAIN_SELECTOR = DEST_CHAIN_SELECTOR + 1;
-  bytes32 internal constant SILO_DOMAIN_ID = bytes32(uint256(SILOED_CHAIN_SELECTOR));
 
   ERC20LockBox internal s_lockBox;
   ERC20LockBox internal s_siloLockBox;
@@ -34,8 +33,8 @@ contract SiloedLockReleaseTokenPoolSetup is BaseTest {
     s_token = new BurnMintERC20("LINK", "LNK", 18, 0, 0);
     deal(address(s_token), OWNER, type(uint256).max);
 
-    s_lockBox = new ERC20LockBox(address(s_token), bytes32(0));
-    s_siloLockBox = new ERC20LockBox(address(s_token), SILO_DOMAIN_ID);
+    s_lockBox = new ERC20LockBox(address(s_token));
+    s_siloLockBox = new ERC20LockBox(address(s_token));
 
     s_siloedLockReleaseTokenPool = new SiloedLockReleaseTokenPool(
       s_token, DEFAULT_TOKEN_DECIMALS, address(0), address(s_mockRMNRemote), address(s_sourceRouter), address(s_lockBox)

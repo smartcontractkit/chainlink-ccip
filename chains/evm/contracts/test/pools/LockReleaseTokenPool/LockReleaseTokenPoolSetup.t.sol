@@ -31,7 +31,7 @@ contract LockReleaseTokenPoolSetup is BaseTest {
     s_token = new BurnMintERC20("LINK", "LNK", 18, 0, 0);
     deal(address(s_token), OWNER, type(uint256).max);
 
-    s_lockBox = new ERC20LockBox(address(s_token), 0);
+    s_lockBox = new ERC20LockBox(address(s_token));
 
     s_lockReleaseTokenPool = new LockReleaseTokenPool(
       s_token, DEFAULT_TOKEN_DECIMALS, address(0), address(s_mockRMNRemote), address(s_sourceRouter), address(s_lockBox)

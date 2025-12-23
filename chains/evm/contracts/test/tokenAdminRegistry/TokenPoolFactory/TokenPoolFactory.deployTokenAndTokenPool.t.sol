@@ -401,7 +401,7 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
     vm.startPrank(OWNER);
     FactoryBurnMintERC20 token =
       new FactoryBurnMintERC20("TestToken", "TEST", LOCAL_TOKEN_DECIMALS, type(uint256).max, PREMINT_AMOUNT, OWNER);
-    ERC20LockBox userLockBox = new ERC20LockBox(address(token), 0);
+    ERC20LockBox userLockBox = new ERC20LockBox(address(token));
 
     address poolAddress = s_tokenPoolFactory.deployTokenPoolWithExistingToken(
       address(token),
@@ -446,8 +446,7 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
     );
 
     // Compute the deployed lockbox address to validate access configuration.
-    bytes memory lockBoxCreationCode =
-      abi.encodePacked(type(ERC20LockBox).creationCode, abi.encode(tokenAddress, uint64(0)));
+    bytes memory lockBoxCreationCode = abi.encodePacked(type(ERC20LockBox).creationCode, abi.encode(tokenAddress));
     address predictedLockBox = dynamicSalt.computeAddress(keccak256(lockBoxCreationCode), address(s_tokenPoolFactory));
 
     // Accept ownership of token/pool and configure rebalancer.
@@ -482,8 +481,8 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
     FactoryBurnMintERC20 newRemoteToken =
       new FactoryBurnMintERC20("TestToken", "TEST", 18, type(uint256).max, PREMINT_AMOUNT, OWNER);
 
-    ERC20LockBox localLockBox = new ERC20LockBox(address(newLocalToken), 0);
-    ERC20LockBox remoteLockBox = new ERC20LockBox(address(newRemoteToken), 0);
+    ERC20LockBox localLockBox = new ERC20LockBox(address(newLocalToken));
+    ERC20LockBox remoteLockBox = new ERC20LockBox(address(newRemoteToken));
 
     TokenPoolFactory.RemoteChainConfig memory remoteChainConfig = TokenPoolFactory.RemoteChainConfig({
       remotePoolFactory: address(newTokenPoolFactory),
@@ -766,7 +765,7 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
       new FactoryBurnMintERC20("TestToken", "TT", 6, type(uint256).max, PREMINT_AMOUNT, OWNER);
     FactoryBurnMintERC20 otherToken =
       new FactoryBurnMintERC20("TestToken", "TT", 6, type(uint256).max, PREMINT_AMOUNT, OWNER);
-    ERC20LockBox lockBox = new ERC20LockBox(address(otherToken), bytes32(uint256(99)));
+    ERC20LockBox lockBox = new ERC20LockBox(address(otherToken));
 
     TokenPoolFactory.RemoteTokenPoolInfo[] memory remotes = new TokenPoolFactory.RemoteTokenPoolInfo[](0);
     vm.expectRevert(

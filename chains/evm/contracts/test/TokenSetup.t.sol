@@ -168,7 +168,7 @@ contract TokenSetup is BaseTest {
   ) internal returns (ERC20LockBox) {
     ERC20LockBox lockBox = s_lockBoxes[token];
     if (address(lockBox) == address(0)) {
-      lockBox = new ERC20LockBox(token, 0);
+      lockBox = new ERC20LockBox(token);
       s_lockBoxes[token] = lockBox;
     }
     return lockBox;

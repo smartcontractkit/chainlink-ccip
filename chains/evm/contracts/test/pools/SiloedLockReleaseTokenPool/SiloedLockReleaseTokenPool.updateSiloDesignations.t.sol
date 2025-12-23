@@ -96,7 +96,7 @@ contract SiloedLockReleaseTokenPool_updateSiloDesignations is SiloedLockReleaseT
   }
 
   function test_updateSiloDesignations_RevertWhen_InvalidZeroRebalancerAddress() public {
-    ERC20LockBox lockBox = new ERC20LockBox(address(s_token), bytes32(uint256(DEST_CHAIN_SELECTOR)));
+    ERC20LockBox lockBox = new ERC20LockBox(address(s_token));
     address[] memory allowedCallers = new address[](1);
     allowedCallers[0] = address(s_siloedLockReleaseTokenPool);
     lockBox.applyAuthorizedCallerUpdates(

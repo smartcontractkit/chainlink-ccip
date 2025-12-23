@@ -374,9 +374,7 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
         revert InvalidToken(address(erc20LockBox.getToken()));
       }
       s_lockBoxes[lockBoxConfigs[i].remoteChainSelector] = erc20LockBox;
-      // Reset then set to max to avoid sticky non-zero allowance issues.
-      i_token.safeApprove(lockBox, 0);
-      i_token.safeApprove(lockBox, type(uint256).max);
+      i_token.approve(lockBox, type(uint256).max);
     }
   }
 

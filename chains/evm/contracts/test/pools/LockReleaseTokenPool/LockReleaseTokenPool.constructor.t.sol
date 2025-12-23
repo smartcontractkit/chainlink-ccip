@@ -9,7 +9,7 @@ import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/Bu
 contract LockReleaseTokenPool_constructor is BaseTest {
   function test_constructor() public {
     BurnMintERC20 token = new BurnMintERC20("T", "T", 18, 0, 0);
-    ERC20LockBox lockBox = new ERC20LockBox(address(token), 0);
+    ERC20LockBox lockBox = new ERC20LockBox(address(token));
 
     LockReleaseTokenPool pool = new LockReleaseTokenPool(
       token, DEFAULT_TOKEN_DECIMALS, address(0), address(s_mockRMNRemote), address(s_sourceRouter), address(lockBox)
@@ -18,15 +18,5 @@ contract LockReleaseTokenPool_constructor is BaseTest {
     assertEq(address(pool.getToken()), address(token));
     assertEq(address(pool.getRebalancer()), address(0));
     assertEq(pool.typeAndVersion(), "LockReleaseTokenPool 1.7.0-dev");
-  }
-
-  function test_constructor_RevertWhen_InvalidLockBox() public {
-    BurnMintERC20 token = new BurnMintERC20("T", "T", 18, 0, 0);
-    ERC20LockBox lockBox = new ERC20LockBox(address(token), bytes32(uint256(1)));
-
-    vm.expectRevert(abi.encodeWithSelector(LockReleaseTokenPool.InvalidLockBox.selector));
-    new LockReleaseTokenPool(
-      token, DEFAULT_TOKEN_DECIMALS, address(0), address(s_mockRMNRemote), address(s_sourceRouter), address(lockBox)
-    );
   }
 }

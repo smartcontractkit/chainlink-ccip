@@ -11,7 +11,6 @@ import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/Bu
 
 contract SiloedLockReleaseTokenPool_configureChainLockBoxes is BaseTest {
   uint64 internal constant SILOED_CHAIN_SELECTOR = DEST_CHAIN_SELECTOR + 5;
-  bytes32 internal constant SILO_DOMAIN_ID = bytes32(uint256(SILOED_CHAIN_SELECTOR));
 
   ERC20LockBox internal s_unsiloed;
   SiloedLockReleaseTokenPool internal s_pool;
@@ -22,7 +21,7 @@ contract SiloedLockReleaseTokenPool_configureChainLockBoxes is BaseTest {
     s_token = new BurnMintERC20("TKN", "T", 18, 0, 0);
     deal(address(s_token), OWNER, type(uint256).max);
 
-    s_unsiloed = new ERC20LockBox(address(s_token), bytes32(0));
+    s_unsiloed = new ERC20LockBox(address(s_token));
     s_pool = new SiloedLockReleaseTokenPool(
       s_token,
       DEFAULT_TOKEN_DECIMALS,
@@ -60,7 +59,7 @@ contract SiloedLockReleaseTokenPool_configureChainLockBoxes is BaseTest {
   }
 
   function test_configureChainLockBoxes() public {
-    ERC20LockBox siloLockBox = new ERC20LockBox(address(s_token), SILO_DOMAIN_ID);
+    ERC20LockBox siloLockBox = new ERC20LockBox(address(s_token));
     address[] memory allowedCallers = new address[](1);
     allowedCallers[0] = address(s_pool);
     siloLockBox.applyAuthorizedCallerUpdates(
@@ -91,22 +90,9 @@ contract SiloedLockReleaseTokenPool_configureChainLockBoxes is BaseTest {
     s_pool.provideSiloedLiquidity(SILOED_CHAIN_SELECTOR, 1e18);
   }
 
-  function test_configureChainLockBoxes_RevertWhen_InvalidLockBoxLiquidityDomain() public {
-    ERC20LockBox badLockBox = new ERC20LockBox(address(s_token), 0);
-    SiloedLockReleaseTokenPool.LockBoxConfig[] memory lockBoxes = new SiloedLockReleaseTokenPool.LockBoxConfig[](1);
-    lockBoxes[0] = SiloedLockReleaseTokenPool.LockBoxConfig({
-      remoteChainSelector: SILOED_CHAIN_SELECTOR, lockBox: address(badLockBox)
-    });
-
-    vm.expectRevert(
-      abi.encodeWithSelector(SiloedLockReleaseTokenPool.InvalidLockBoxLiquidityDomain.selector, bytes32(uint256(0)))
-    );
-    s_pool.configureLockBoxes(lockBoxes);
-  }
-
   function test_configureChainLockBoxes_RevertWhen_InvalidToken() public {
     address wrongToken = address(999);
-    ERC20LockBox invalidLockBox = new ERC20LockBox(wrongToken, SILO_DOMAIN_ID);
+    ERC20LockBox invalidLockBox = new ERC20LockBox(wrongToken);
     SiloedLockReleaseTokenPool.LockBoxConfig[] memory lockBoxes = new SiloedLockReleaseTokenPool.LockBoxConfig[](1);
     lockBoxes[0] = SiloedLockReleaseTokenPool.LockBoxConfig({
       remoteChainSelector: SILOED_CHAIN_SELECTOR, lockBox: address(invalidLockBox)

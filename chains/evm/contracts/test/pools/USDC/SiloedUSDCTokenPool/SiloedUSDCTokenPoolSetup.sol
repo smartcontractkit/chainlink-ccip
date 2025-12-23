@@ -15,15 +15,13 @@ contract SiloedUSDCTokenPoolSetup is USDCSetup {
   ERC20LockBox internal s_lockBox;
   ERC20LockBox internal s_sourceLockBox;
   ERC20LockBox internal s_destLockBox;
-  bytes32 internal constant SOURCE_DOMAIN_ID = bytes32(uint256(SOURCE_CHAIN_SELECTOR));
-  bytes32 internal constant DEST_DOMAIN_ID = bytes32(uint256(DEST_CHAIN_SELECTOR));
 
   function setUp() public virtual override {
     super.setUp();
 
-    s_lockBox = new ERC20LockBox(address(s_USDCToken), 0);
-    s_sourceLockBox = new ERC20LockBox(address(s_USDCToken), SOURCE_DOMAIN_ID);
-    s_destLockBox = new ERC20LockBox(address(s_USDCToken), DEST_DOMAIN_ID);
+    s_lockBox = new ERC20LockBox(address(s_USDCToken));
+    s_sourceLockBox = new ERC20LockBox(address(s_USDCToken));
+    s_destLockBox = new ERC20LockBox(address(s_USDCToken));
 
     s_usdcTokenPool = new SiloedUSDCTokenPool(
       s_USDCToken,

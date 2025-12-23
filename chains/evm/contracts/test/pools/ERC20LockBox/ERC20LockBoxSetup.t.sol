@@ -21,7 +21,7 @@ contract ERC20LockBoxSetup is BaseTest {
     deal(address(s_token), s_allowedCaller, type(uint256).max);
 
     // Deploy the ERC20 lock box (unsiloed selector = 0).
-    s_erc20LockBox = new ERC20LockBox(address(s_token), 0);
+    s_erc20LockBox = new ERC20LockBox(address(s_token));
 
     // Configure the allowed caller.
     address[] memory callers = new address[](1);
@@ -36,7 +36,7 @@ contract ERC20LockBoxSetup is BaseTest {
   ) internal {
     vm.startPrank(s_allowedCaller);
     s_token.approve(address(s_erc20LockBox), amount);
-    s_erc20LockBox.deposit(0, address(s_token), bytes32(0), amount);
+    s_erc20LockBox.deposit(address(s_token), 0, amount);
     vm.stopPrank();
   }
 }

@@ -10,7 +10,7 @@ import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/Bu
 contract SiloedLockReleaseTokenPool_constructor is BaseTest {
   function test_constructor() public {
     BurnMintERC20 token = new BurnMintERC20("TKN", "T", DEFAULT_TOKEN_DECIMALS, 0, 0);
-    ERC20LockBox lockBox = new ERC20LockBox(address(token), 0);
+    ERC20LockBox lockBox = new ERC20LockBox(address(token));
 
     SiloedLockReleaseTokenPool pool = new SiloedLockReleaseTokenPool(
       token, DEFAULT_TOKEN_DECIMALS, address(0), address(s_mockRMNRemote), address(s_sourceRouter), address(lockBox)
@@ -21,22 +21,10 @@ contract SiloedLockReleaseTokenPool_constructor is BaseTest {
     assertEq(pool.typeAndVersion(), "SiloedLockReleaseTokenPool 1.7.0-dev");
   }
 
-  function test_constructor_RevertWhen_InvalidLockBoxLiquidityDomain() public {
-    BurnMintERC20 token = new BurnMintERC20("TKN", "T", DEFAULT_TOKEN_DECIMALS, 0, 0);
-    ERC20LockBox lockBox = new ERC20LockBox(address(token), bytes32(uint256(5)));
-
-    vm.expectRevert(
-      abi.encodeWithSelector(SiloedLockReleaseTokenPool.InvalidLockBoxLiquidityDomain.selector, uint64(5))
-    );
-    new SiloedLockReleaseTokenPool(
-      token, DEFAULT_TOKEN_DECIMALS, address(0), address(s_mockRMNRemote), address(s_sourceRouter), address(lockBox)
-    );
-  }
-
   function test_constructor_RevertWhen_InvalidToken() public {
     BurnMintERC20 token = new BurnMintERC20("TKN", "T", DEFAULT_TOKEN_DECIMALS, 0, 0);
     BurnMintERC20 otherToken = new BurnMintERC20("OTH", "O", DEFAULT_TOKEN_DECIMALS, 0, 0);
-    ERC20LockBox lockBox = new ERC20LockBox(address(otherToken), 0);
+    ERC20LockBox lockBox = new ERC20LockBox(address(otherToken));
 
     vm.expectRevert(abi.encodeWithSelector(TokenPool.InvalidToken.selector, address(otherToken)));
     new SiloedLockReleaseTokenPool(

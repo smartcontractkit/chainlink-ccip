@@ -109,8 +109,7 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
     }
 
     // Release to the recipient using the lockbox tied to the remote chain selector.
-    lockbox
-      .withdraw(address(i_token), releaseOrMintIn.remoteChainSelector, localAmount, releaseOrMintIn.receiver);
+    lockbox.withdraw(address(i_token), releaseOrMintIn.remoteChainSelector, localAmount, releaseOrMintIn.receiver);
 
     emit ReleasedOrMinted({
       remoteChainSelector: releaseOrMintIn.remoteChainSelector,
@@ -267,8 +266,7 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
 
     ERC20LockBox lockBox = _getLockBox(burnChainSelector);
     // Burnable tokens is the total locked minus the amount excluded from burn
-    uint256 tokensToBurn =
-      i_token.balanceOf(address(lockBox)) - s_tokensExcludedFromBurn[burnChainSelector];
+    uint256 tokensToBurn = i_token.balanceOf(address(lockBox)) - s_tokensExcludedFromBurn[burnChainSelector];
 
     // The CCTP burn function will attempt to burn out of the contract that calls it, so we need to withdraw the tokens
     // from the lock box first otherwise the burn will revert.
