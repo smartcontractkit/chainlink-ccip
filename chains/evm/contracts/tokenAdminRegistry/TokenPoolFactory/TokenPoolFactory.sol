@@ -66,11 +66,10 @@ contract TokenPoolFactory is ITypeAndVersion {
 
   string public constant typeAndVersion = "TokenPoolFactory 1.6.0-dev";
   bytes private constant LOCKBOX_INIT_CODE = type(ERC20LockBox).creationCode;
-  address private immutable i_rmnProxy;
 
+  address private immutable i_rmnProxy;
   ITokenAdminRegistry private immutable i_tokenAdminRegistry;
   RegistryModuleOwnerCustom private immutable i_registryModuleOwnerCustom;
-
   address private immutable i_ccipRouter;
 
   /// @notice Construct the TokenPoolFactory.

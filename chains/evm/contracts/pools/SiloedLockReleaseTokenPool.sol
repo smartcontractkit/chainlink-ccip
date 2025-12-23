@@ -47,6 +47,7 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
   address internal s_rebalancer;
 
   /// @notice Lock boxes keyed by chain selector.
+  /// @dev The remoteChainSelector 0 is used to designate the shared lockbox for all non-siloed chains.
   mapping(uint64 remoteChainSelector => ERC20LockBox lockBox) internal s_lockBoxes;
 
   /// @notice The configuration for each chain that is siloed, or not. By default chains are not siloed.
@@ -161,6 +162,7 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     uint64[] calldata removes,
     SiloConfigUpdate[] calldata adds
   ) external onlyOwner {
+    ERC20LockBox sharedLockBox = _getLockBox(0);
     for (uint256 i = 0; i < removes.length; ++i) {
       if (!s_chainConfigs[removes[i]].isSiloed) revert ChainNotSiloed(removes[i]);
 
@@ -169,7 +171,7 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
 
       if (amountUnsiloed > 0) {
         chainLockBox.withdraw(address(i_token), removes[i], amountUnsiloed, address(this));
-        _getLockBox(0).deposit(address(i_token), 0, amountUnsiloed);
+        sharedLockBox.deposit(address(i_token), 0, amountUnsiloed);
       }
 
       delete s_chainConfigs[removes[i]];
@@ -378,6 +380,8 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     }
   }
 
+  /// @notice Gets the lockbox for a given remote chain selector.
+  /// @param remoteChainSelector The remote chain selector to get the lockbox for.
   function _getLockBox(
     uint64 remoteChainSelector
   ) internal view returns (ERC20LockBox) {
