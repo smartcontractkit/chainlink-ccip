@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 
@@ -21,9 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/xssnick/tonutils-go/address"
-	"github.com/xssnick/tonutils-go/liteclient"
 	"github.com/xssnick/tonutils-go/tlb"
-	"github.com/xssnick/tonutils-go/ton"
 	"github.com/xssnick/tonutils-go/ton/wallet"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
@@ -35,7 +32,6 @@ import (
 	cldf_ton_provider "github.com/smartcontractkit/chainlink-deployments-framework/chain/ton/provider"
 	testutils "github.com/smartcontractkit/chainlink-ton/deployment/utils"
 	ccipTon "github.com/smartcontractkit/chainlink-ton/devenv-impl"
-	tonchain "github.com/smartcontractkit/chainlink-ton/pkg/ton/chain"
 )
 
 type CLDF struct {
@@ -148,25 +144,10 @@ func NewCLDFOperationsEnvironment(bc []*blockchain.Input, dataStore datastore.Da
 			if err != nil {
 				return nil, nil, err
 			}
-			var client *ton.APIClient
-			if strings.HasPrefix(rpcHTTPURL, "liteserver://") {
-				pool, err := tonchain.CreateLiteserverConnectionPool(context.Background(), rpcHTTPURL)
-				if err != nil {
-					return nil, nil, fmt.Errorf("failed to create liteserver connection pool: %w", err)
-				}
-				client = ton.NewAPIClient(pool, ton.ProofCheckPolicyFast)
-			}
-			// connect via config URL
-			cfg, err := liteclient.GetConfigFromUrl(context.Background(), rpcHTTPURL)
+			client, err := testutils.CreateClient(context.Background(), rpcHTTPURL)
 			if err != nil {
-				return nil, nil, fmt.Errorf("failed to get TON config: %w", err)
+				return nil, nil, fmt.Errorf("failed to create TON client: %w", err)
 			}
-			pool := liteclient.NewConnectionPool()
-			err = pool.AddConnectionsFromConfig(context.Background(), cfg)
-			if err != nil {
-				return nil, nil, fmt.Errorf("failed to connect to TON: %w", err)
-			}
-			client = ton.NewAPIClient(pool, ton.ProofCheckPolicyFast)
 
 			seed := wallet.NewSeed()
 			w, err := wallet.FromSeed(client, seed, wallet.V5R1Final)

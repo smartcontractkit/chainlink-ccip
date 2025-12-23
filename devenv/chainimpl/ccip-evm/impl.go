@@ -615,5 +615,6 @@ func (m *CCIP16EVM) FundNodes(ctx context.Context, ns []*simple_node_set.Input, 
 			return fmt.Errorf("failed to fund CL nodes on src chain: %w", err)
 		}
 	}
+	// EVM does not need to create and return NodeKeysBundle
 	return nil
 }
