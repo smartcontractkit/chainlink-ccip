@@ -43,6 +43,11 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
   event PathRemoved(uint64 indexed remoteChainSelector, bytes32 indexed lChainId, bytes32 allowedCaller);
   event SupportedTokenRemoved(address token);
   event SupportedTokenSet(address localToken, address localAdapter);
+  event DynamicConfigSet(DynamicConfig dynamicConfig);
+
+  struct DynamicConfig {
+    address feeAggregator; // Address to which fees are withdrawn.
+  }
 
   struct Path {
     /// @notice The address that's allowed to call the bridge on the destination chain.
@@ -84,11 +89,15 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
   /// @notice Mapping of CCIP chain selector to chain specific config.
   mapping(uint64 chainSelector => Path path) internal s_chainSelectorToPath;
 
+  DynamicConfig private s_dynamicConfig;
+
   constructor(
+    DynamicConfig memory dynamicConfig,
     IBridgeV3 bridge,
     string[] memory storageLocation,
     address rmn
   ) BaseVerifier(storageLocation, rmn) {
+    _setDynamicConfig(dynamicConfig);
     if (address(bridge) == address(0)) {
       revert ZeroBridge();
     }
@@ -98,6 +107,28 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
     }
 
     i_bridge = bridge;
+  }
+
+  /// @notice Returns the dynamic config.
+  function getDynamicConfig() external view returns (DynamicConfig memory) {
+    return s_dynamicConfig;
+  }
+
+  /// @notice Sets the dynamic config.
+  function setDynamicConfig(
+    DynamicConfig memory dynamicConfig
+  ) external onlyOwner {
+    _setDynamicConfig(dynamicConfig);
+  }
+
+  function _setDynamicConfig(
+    DynamicConfig memory dynamicConfig
+  ) internal {
+    if (dynamicConfig.feeAggregator == address(0)) {
+      revert ZeroAddressNotAllowed();
+    }
+    s_dynamicConfig = dynamicConfig;
+    emit DynamicConfigSet(dynamicConfig);
   }
 
   /// @inheritdoc ICrossChainVerifierV1
@@ -330,7 +361,6 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
   function withdrawFeeTokens(
     address[] calldata feeTokens
   ) external {
-    // TODO
-    FeeTokenHandler._withdrawFeeTokens(feeTokens, address(0));
+    FeeTokenHandler._withdrawFeeTokens(feeTokens, s_dynamicConfig.feeAggregator);
   }
 }

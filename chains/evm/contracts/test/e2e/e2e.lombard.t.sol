@@ -103,10 +103,18 @@ contract e2e_lombard is OnRampSetup {
 
     s_lombardBridge = new MockLombardBridge();
 
-    s_sourceLombardVerifier =
-      new LombardVerifier(IBridgeV3(address(s_lombardBridge)), new string[](0), address(s_mockRMNRemote));
-    s_destLombardVerifier =
-      new LombardVerifier(IBridgeV3(address(s_lombardBridge)), new string[](0), address(s_mockRMNRemote));
+    s_sourceLombardVerifier = new LombardVerifier(
+      LombardVerifier.DynamicConfig({feeAggregator: address(1)}),
+      IBridgeV3(address(s_lombardBridge)),
+      new string[](0),
+      address(s_mockRMNRemote)
+    );
+    s_destLombardVerifier = new LombardVerifier(
+      LombardVerifier.DynamicConfig({feeAggregator: address(1)}),
+      IBridgeV3(address(s_lombardBridge)),
+      new string[](0),
+      address(s_mockRMNRemote)
+    );
 
     s_sourceLombardVerifier.applyRemoteChainConfigUpdates(destChainConfigs);
     s_sourceLombardVerifier.setPath(
