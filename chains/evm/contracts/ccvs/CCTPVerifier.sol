@@ -5,6 +5,7 @@ import {ICrossChainVerifierV1} from "../interfaces/ICrossChainVerifierV1.sol";
 import {IMessageTransmitter} from "../pools/USDC/interfaces/IMessageTransmitter.sol";
 import {ITokenMessenger} from "../pools/USDC/interfaces/ITokenMessenger.sol";
 
+import {FeeTokenHandler} from "../libraries/FeeTokenHandler.sol";
 import {Internal} from "../libraries/Internal.sol";
 import {MessageV1Codec} from "../libraries/MessageV1Codec.sol";
 import {CCTPMessageTransmitterProxy} from "../pools/USDC/CCTPMessageTransmitterProxy.sol";
@@ -461,6 +462,6 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   function withdrawFeeTokens(
     address[] calldata feeTokens
   ) external {
-    _withdrawFeeTokens(feeTokens, s_dynamicConfig.feeAggregator);
+    FeeTokenHandler._withdrawFeeTokens(feeTokens, s_dynamicConfig.feeAggregator);
   }
 }

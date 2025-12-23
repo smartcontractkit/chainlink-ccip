@@ -16,6 +16,7 @@ import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/I
 import {CCVConfigValidation} from "../libraries/CCVConfigValidation.sol";
 import {Client} from "../libraries/Client.sol";
 import {ExtraArgsCodec} from "../libraries/ExtraArgsCodec.sol";
+import {FeeTokenHandler} from "../libraries/FeeTokenHandler.sol";
 import {MessageV1Codec} from "../libraries/MessageV1Codec.sol";
 import {Pool} from "../libraries/Pool.sol";
 import {USDPriceWith18Decimals} from "../libraries/USDPriceWith18Decimals.sol";
@@ -53,7 +54,6 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
   event DestChainConfigSet(uint64 indexed destChainSelector, uint64 messageNumber, DestChainConfigArgs config);
-  event FeeTokenWithdrawn(address indexed feeAggregator, address indexed feeToken, uint256 amount);
   event CCIPMessageSent(
     uint64 indexed destChainSelector,
     address indexed sender,
@@ -1035,17 +1035,6 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   function withdrawFeeTokens(
     address[] calldata feeTokens
   ) external {
-    address feeAggregator = s_dynamicConfig.feeAggregator;
-
-    for (uint256 i = 0; i < feeTokens.length; ++i) {
-      IERC20 feeToken = IERC20(feeTokens[i]);
-      uint256 feeTokenBalance = feeToken.balanceOf(address(this));
-
-      if (feeTokenBalance > 0) {
-        feeToken.safeTransfer(feeAggregator, feeTokenBalance);
-
-        emit FeeTokenWithdrawn(feeAggregator, address(feeToken), feeTokenBalance);
-      }
-    }
+    FeeTokenHandler._withdrawFeeTokens(feeTokens, s_dynamicConfig.feeAggregator);
   }
 }

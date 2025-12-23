@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {TokenPool} from "../../../pools/TokenPool.sol";
+import {FeeTokenHandler} from "../../../libraries/FeeTokenHandler.sol";
 import {AdvancedPoolHooksSetup} from "../AdvancedPoolHooks/AdvancedPoolHooksSetup.t.sol";
 import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
 
@@ -16,7 +16,7 @@ contract TokenPoolV2_withdrawFee is AdvancedPoolHooksSetup {
     feeTokens[0] = address(s_token);
 
     vm.expectEmit();
-    emit TokenPool.FeeTokenWithdrawn(recipient, address(s_token), feeAmount);
+    emit FeeTokenHandler.FeeTokenWithdrawn(recipient, address(s_token), feeAmount);
 
     s_tokenPool.withdrawFeeTokens(feeTokens, recipient);
 

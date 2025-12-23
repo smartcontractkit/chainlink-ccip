@@ -5,6 +5,7 @@ import {ICrossChainVerifierV1} from "../interfaces/ICrossChainVerifierV1.sol";
 import {IBridgeV3} from "../interfaces/lombard/IBridgeV3.sol";
 import {IMailbox} from "../interfaces/lombard/IMailbox.sol";
 
+import {FeeTokenHandler} from "../libraries/FeeTokenHandler.sol";
 import {Internal} from "../libraries/Internal.sol";
 import {MessageV1Codec} from "../libraries/MessageV1Codec.sol";
 import {BaseVerifier} from "./components/BaseVerifier.sol";
@@ -317,5 +318,19 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
     RemoteChainConfigArgs[] calldata remoteChainConfigArgs
   ) external onlyOwner {
     _applyRemoteChainConfigUpdates(remoteChainConfigArgs);
+  }
+
+  // ================================================================
+  // │                             Fees                             │
+  // ================================================================
+
+  /// @notice Withdraws the outstanding fee token balances to the fee aggregator.
+  /// @param feeTokens The fee tokens to withdraw.
+  /// @dev This function can be permissionless as it only transfers tokens to the fee aggregator which is a trusted address.
+  function withdrawFeeTokens(
+    address[] calldata feeTokens
+  ) external {
+    // TODO
+    FeeTokenHandler._withdrawFeeTokens(feeTokens, address(0));
   }
 }
