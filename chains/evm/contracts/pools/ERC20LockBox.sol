@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {ILockBox} from "../interfaces/ILockBox.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
@@ -9,96 +10,101 @@ import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/utils/SafeERC20.sol";
 
 /// @title ERC20 Lock Box
-/// @notice Per-token/per-chain lockbox that holds ERC20 liquidity so pools can be upgraded without migrating funds.
-/// @dev Each lockbox is bound to one token and one remote chain selector:
-/// - Selector 0 represents unsiloed liquidity shared across non-siloed chains.
-/// - Non-zero selectors represent a specific remote chain for siloed flows.
-/// Only the owner can manage the allowlist; allowed callers (or the owner) can deposit/withdraw after the selector check.
-contract ERC20LockBox is ITypeAndVersion, AuthorizedCallers {
+/// @notice Per-token/per-domain lockbox that holds ERC20 liquidity so pools can be upgraded without migrating
+/// funds.
+/// @dev Each lockbox is bound to one token and one liquidity domain id. This implementation supports only a single token to be deposited in the lockbox.
+/// Only the owner can manage the allowlist; allowed callers (or the owner) can deposit/withdraw after the domain check.
+contract ERC20LockBox is ITypeAndVersion, ILockBox, AuthorizedCallers {
   using SafeERC20 for IERC20;
 
   error InsufficientBalance(uint256 requested, uint256 available);
   error TokenAmountCannotBeZero();
   error RecipientCannotBeZeroAddress();
-  error UnsupportedChainSelector(uint64 chainSelector);
+  error UnsupportedLiquidityDomain(bytes32 liquidityDomainId);
+  error UnsupportedToken(address token);
 
   event Deposit(address indexed token, address indexed depositor, uint256 amount);
   event Withdrawal(address indexed token, address indexed recipient, uint256 amount);
 
   /// @notice The token supported by this lockbox.
   IERC20 internal immutable i_token;
-  /// @notice Chain selector this lockbox is bound to (0 = unsiloed, non-zero = specific remote chain).
-  uint64 internal immutable i_remoteChainSelector;
+  /// @notice User defined liquidity domain this lockbox is bound to.
+  /// @dev This value helps pools route deposits/withdrawals to the correct lockbox for a given domain and prevents
+  /// mismatched calls by enforcing the expected domain id on each operation.
+  bytes32 internal immutable i_liquidityDomainId;
 
   string public constant typeAndVersion = "ERC20LockBox 1.7.0-dev";
 
   constructor(
     address token,
-    uint64 remoteChainSelector
+    bytes32 liquidityDomainId
   ) AuthorizedCallers(new address[](0)) {
     if (token == address(0)) {
       revert ZeroAddressNotAllowed();
     }
 
     i_token = IERC20(token);
-    i_remoteChainSelector = remoteChainSelector;
+    i_liquidityDomainId = liquidityDomainId;
   }
 
   /// @notice Deposits tokens into this contract. This eases the process of migrating tokens
   /// from a legacy token pool to a new one, since only the allowedCaller needs to be changed. Without it, the tokens
   /// would need to be manually withdrawn and re-deposited into the new token pool from a legacy pool, which is a
   /// time-consuming and error-prone process.
-  /// @param amount The amount of tokens to deposit.
-  /// @param remoteChainSelector The chain selector this lockbox instance is bound to (0 for unsiloed).
-  /// @dev This function does NOT support storing native tokens, as the token pool which handles native is expected to
-  /// have wrapped it into an ERC20-compatibletoken first.
+  /// @inheritdoc ILockBox
   function deposit(
-    uint64 remoteChainSelector,
+    uint64, // remoteChainSelector
+    address token,
+    bytes32 liquidityDomainId,
     uint256 amount
   ) external {
-    _validateDepositWithdraw(remoteChainSelector, amount);
+    _validateDepositWithdraw(token, liquidityDomainId, amount);
 
-    i_token.safeTransferFrom(msg.sender, address(this), amount);
+    IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
 
-    emit Deposit(address(i_token), msg.sender, amount);
+    emit Deposit(token, msg.sender, amount);
   }
 
-  /// @notice Withdraws tokens to a specific recipient.
-  /// @param amount The amount of tokens to withdraw.
-  /// @param recipient The address that will receive the withdrawn tokens.
-  /// @param remoteChainSelector The chain selector this lockbox instance is bound to (0 for unsiloed).
+  /// @inheritdoc ILockBox
   function withdraw(
-    uint64 remoteChainSelector,
+    uint64, // remoteChainSelector
+    address token,
+    bytes32 liquidityDomainId,
     uint256 amount,
     address recipient
   ) external {
-    _validateDepositWithdraw(remoteChainSelector, amount);
+    _validateDepositWithdraw(token, liquidityDomainId, amount);
 
     if (recipient == address(0)) {
       revert RecipientCannotBeZeroAddress();
     }
 
-    uint256 balance = i_token.balanceOf(address(this));
+    uint256 balance = IERC20(token).balanceOf(address(this));
     if (amount > balance) {
       revert InsufficientBalance(amount, balance);
     }
 
-    i_token.safeTransfer(recipient, amount);
+    IERC20(token).safeTransfer(recipient, amount);
 
-    emit Withdrawal(address(i_token), recipient, amount);
+    emit Withdrawal(token, recipient, amount);
   }
 
   /// @notice Validates the deposit and withdraw functions.
+  /// @param token The token being deposited/withdrawn.
   /// @param amount The amount of tokens to deposit or withdraw.
   function _validateDepositWithdraw(
-    uint64 remoteChainSelector,
+    address token,
+    bytes32 liquidityDomainId,
     uint256 amount
   ) internal view {
     if (amount == 0) {
       revert TokenAmountCannotBeZero();
     }
-    if (remoteChainSelector != i_remoteChainSelector) {
-      revert UnsupportedChainSelector(remoteChainSelector);
+    if (token != address(i_token)) {
+      revert UnsupportedToken(token);
+    }
+    if (liquidityDomainId != i_liquidityDomainId) {
+      revert UnsupportedLiquidityDomain(liquidityDomainId);
     }
     if (msg.sender != owner()) {
       _validateCaller();
@@ -111,9 +117,9 @@ contract ERC20LockBox is ITypeAndVersion, AuthorizedCallers {
     return i_token;
   }
 
-  /// @notice Gets the remote chain selector this lockbox is bound to.
-  /// @return remoteChainSelector The remote chain selector.
-  function getRemoteChainSelector() external view returns (uint64) {
-    return i_remoteChainSelector;
+  /// @notice Gets the liquidity domain id this lockbox is bound to.
+  /// @return liquidityDomainId The liquidity domain id.
+  function getLiquidityDomainId() external view returns (bytes32) {
+    return i_liquidityDomainId;
   }
 }
