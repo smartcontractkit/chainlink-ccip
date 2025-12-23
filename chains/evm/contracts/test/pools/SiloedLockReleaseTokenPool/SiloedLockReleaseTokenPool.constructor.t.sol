@@ -21,11 +21,13 @@ contract SiloedLockReleaseTokenPool_constructor is BaseTest {
     assertEq(pool.typeAndVersion(), "SiloedLockReleaseTokenPool 1.7.0-dev");
   }
 
-  function test_constructor_RevertWhen_InvalidLockBoxChainSelector() public {
+  function test_constructor_RevertWhen_InvalidLockBoxLiquidityDomain() public {
     BurnMintERC20 token = new BurnMintERC20("TKN", "T", DEFAULT_TOKEN_DECIMALS, 0, 0);
-    ERC20LockBox lockBox = new ERC20LockBox(address(token), 5);
+    ERC20LockBox lockBox = new ERC20LockBox(address(token), bytes32(uint256(5)));
 
-    vm.expectRevert(abi.encodeWithSelector(SiloedLockReleaseTokenPool.InvalidLockBoxChainSelector.selector, uint64(5)));
+    vm.expectRevert(
+      abi.encodeWithSelector(SiloedLockReleaseTokenPool.InvalidLockBoxLiquidityDomain.selector, uint64(5))
+    );
     new SiloedLockReleaseTokenPool(
       token, DEFAULT_TOKEN_DECIMALS, address(0), address(s_mockRMNRemote), address(s_sourceRouter), address(lockBox)
     );

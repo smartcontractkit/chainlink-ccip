@@ -10,7 +10,7 @@ contract ERC20LockBox_constructor is Test {
   function test_constructor() public {
     ERC20LockBox lockBox = new ERC20LockBox(address(3), 0);
     assertEq(address(lockBox.getToken()), address(3));
-    assertEq(lockBox.getRemoteChainSelector(), 0);
+    assertEq(lockBox.getLiquidityDomainId(), bytes32(0));
     assertEq(lockBox.typeAndVersion(), "ERC20LockBox 1.7.0-dev");
   }
 

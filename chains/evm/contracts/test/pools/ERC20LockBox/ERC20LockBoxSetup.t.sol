@@ -36,7 +36,7 @@ contract ERC20LockBoxSetup is BaseTest {
   ) internal {
     vm.startPrank(s_allowedCaller);
     s_token.approve(address(s_erc20LockBox), amount);
-    s_erc20LockBox.deposit(0, amount);
+    s_erc20LockBox.deposit(0, address(s_token), bytes32(0), amount);
     vm.stopPrank();
   }
 }

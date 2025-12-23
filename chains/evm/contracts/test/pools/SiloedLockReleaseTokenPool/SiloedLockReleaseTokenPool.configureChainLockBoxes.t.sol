@@ -11,6 +11,7 @@ import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/Bu
 
 contract SiloedLockReleaseTokenPool_configureChainLockBoxes is BaseTest {
   uint64 internal constant SILOED_CHAIN_SELECTOR = DEST_CHAIN_SELECTOR + 5;
+  bytes32 internal constant SILO_DOMAIN_ID = bytes32(uint256(SILOED_CHAIN_SELECTOR));
 
   ERC20LockBox internal s_unsiloed;
   SiloedLockReleaseTokenPool internal s_pool;
@@ -21,7 +22,7 @@ contract SiloedLockReleaseTokenPool_configureChainLockBoxes is BaseTest {
     s_token = new BurnMintERC20("TKN", "T", 18, 0, 0);
     deal(address(s_token), OWNER, type(uint256).max);
 
-    s_unsiloed = new ERC20LockBox(address(s_token), 0);
+    s_unsiloed = new ERC20LockBox(address(s_token), bytes32(0));
     s_pool = new SiloedLockReleaseTokenPool(
       s_token,
       DEFAULT_TOKEN_DECIMALS,
@@ -56,28 +57,27 @@ contract SiloedLockReleaseTokenPool_configureChainLockBoxes is BaseTest {
       inboundRateLimiterConfig: _getInboundRateLimiterConfig()
     });
     s_pool.applyChainUpdates(new uint64[](0), chainUpdates);
-
-    // mark chain as siloed
-    SiloedLockReleaseTokenPool.SiloConfigUpdate[] memory adds = new SiloedLockReleaseTokenPool.SiloConfigUpdate[](1);
-    adds[0] =
-      SiloedLockReleaseTokenPool.SiloConfigUpdate({remoteChainSelector: SILOED_CHAIN_SELECTOR, rebalancer: OWNER});
-    s_pool.updateSiloDesignations(new uint64[](0), adds);
-    s_pool.setSiloRebalancer(SILOED_CHAIN_SELECTOR, OWNER);
   }
 
   function test_configureChainLockBoxes() public {
-    ERC20LockBox siloLockBox = new ERC20LockBox(address(s_token), SILOED_CHAIN_SELECTOR);
+    ERC20LockBox siloLockBox = new ERC20LockBox(address(s_token), SILO_DOMAIN_ID);
     address[] memory allowedCallers = new address[](1);
     allowedCallers[0] = address(s_pool);
     siloLockBox.applyAuthorizedCallerUpdates(
       AuthorizedCallers.AuthorizedCallerArgs({addedCallers: allowedCallers, removedCallers: new address[](0)})
     );
 
-    uint64[] memory selectors = new uint64[](1);
-    selectors[0] = SILOED_CHAIN_SELECTOR;
-    address[] memory lockBoxes = new address[](1);
-    lockBoxes[0] = address(siloLockBox);
-    s_pool.configureChainLockBoxes(selectors, lockBoxes);
+    SiloedLockReleaseTokenPool.LockBoxConfig[] memory lockBoxes = new SiloedLockReleaseTokenPool.LockBoxConfig[](1);
+    lockBoxes[0] = SiloedLockReleaseTokenPool.LockBoxConfig({
+      remoteChainSelector: SILOED_CHAIN_SELECTOR, lockBox: address(siloLockBox)
+    });
+    s_pool.configureLockBoxes(lockBoxes);
+
+    SiloedLockReleaseTokenPool.SiloConfigUpdate[] memory adds = new SiloedLockReleaseTokenPool.SiloConfigUpdate[](1);
+    adds[0] =
+      SiloedLockReleaseTokenPool.SiloConfigUpdate({remoteChainSelector: SILOED_CHAIN_SELECTOR, rebalancer: OWNER});
+    s_pool.updateSiloDesignations(new uint64[](0), adds);
+    s_pool.setSiloRebalancer(SILOED_CHAIN_SELECTOR, OWNER);
 
     s_token.approve(address(s_pool), type(uint256).max);
     s_pool.provideSiloedLiquidity(SILOED_CHAIN_SELECTOR, 1e18);
@@ -87,43 +87,32 @@ contract SiloedLockReleaseTokenPool_configureChainLockBoxes is BaseTest {
 
   function test_configureChainLockBoxes_RevertWhen_LockBoxNotConfigured() public {
     s_token.approve(address(s_pool), type(uint256).max);
-    vm.expectRevert(
-      abi.encodeWithSelector(SiloedLockReleaseTokenPool.LockBoxNotConfigured.selector, SILOED_CHAIN_SELECTOR)
-    );
+    vm.expectRevert(abi.encodeWithSelector(SiloedLockReleaseTokenPool.ChainNotSiloed.selector, SILOED_CHAIN_SELECTOR));
     s_pool.provideSiloedLiquidity(SILOED_CHAIN_SELECTOR, 1e18);
   }
 
-  function test_configureChainLockBoxes_RevertWhen_InvalidLockBoxChainSelector() public {
+  function test_configureChainLockBoxes_RevertWhen_InvalidLockBoxLiquidityDomain() public {
     ERC20LockBox badLockBox = new ERC20LockBox(address(s_token), 0);
-    uint64[] memory selectors = new uint64[](1);
-    selectors[0] = SILOED_CHAIN_SELECTOR;
-    address[] memory lockBoxes = new address[](1);
-    lockBoxes[0] = address(badLockBox);
+    SiloedLockReleaseTokenPool.LockBoxConfig[] memory lockBoxes = new SiloedLockReleaseTokenPool.LockBoxConfig[](1);
+    lockBoxes[0] = SiloedLockReleaseTokenPool.LockBoxConfig({
+      remoteChainSelector: SILOED_CHAIN_SELECTOR, lockBox: address(badLockBox)
+    });
 
-    vm.expectRevert(abi.encodeWithSelector(SiloedLockReleaseTokenPool.InvalidLockBoxChainSelector.selector, uint64(0)));
-    s_pool.configureChainLockBoxes(selectors, lockBoxes);
-  }
-
-  function test_configureChainLockBoxes_RevertWhen_MismatchedArrayLengths() public {
-    uint64[] memory selectors = new uint64[](2);
-    selectors[0] = SILOED_CHAIN_SELECTOR;
-    selectors[1] = SILOED_CHAIN_SELECTOR + 1;
-    address[] memory lockBoxes = new address[](1);
-    lockBoxes[0] = address(s_unsiloed);
-
-    vm.expectRevert(TokenPool.MismatchedArrayLengths.selector);
-    s_pool.configureChainLockBoxes(selectors, lockBoxes);
+    vm.expectRevert(
+      abi.encodeWithSelector(SiloedLockReleaseTokenPool.InvalidLockBoxLiquidityDomain.selector, bytes32(uint256(0)))
+    );
+    s_pool.configureLockBoxes(lockBoxes);
   }
 
   function test_configureChainLockBoxes_RevertWhen_InvalidToken() public {
     address wrongToken = address(999);
-    ERC20LockBox invalidLockBox = new ERC20LockBox(wrongToken, SILOED_CHAIN_SELECTOR);
-    uint64[] memory selectors = new uint64[](1);
-    selectors[0] = SILOED_CHAIN_SELECTOR;
-    address[] memory lockBoxes = new address[](1);
-    lockBoxes[0] = address(invalidLockBox);
+    ERC20LockBox invalidLockBox = new ERC20LockBox(wrongToken, SILO_DOMAIN_ID);
+    SiloedLockReleaseTokenPool.LockBoxConfig[] memory lockBoxes = new SiloedLockReleaseTokenPool.LockBoxConfig[](1);
+    lockBoxes[0] = SiloedLockReleaseTokenPool.LockBoxConfig({
+      remoteChainSelector: SILOED_CHAIN_SELECTOR, lockBox: address(invalidLockBox)
+    });
 
     vm.expectRevert(abi.encodeWithSelector(TokenPool.InvalidToken.selector, wrongToken));
-    s_pool.configureChainLockBoxes(selectors, lockBoxes);
+    s_pool.configureLockBoxes(lockBoxes);
   }
 }

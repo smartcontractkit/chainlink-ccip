@@ -13,9 +13,6 @@ contract SiloedLockReleaseTokenPool_releaseOrMint is SiloedLockReleaseTokenPoolS
 
     IERC20(address(s_token)).approve(address(s_lockBox), type(uint256).max);
     IERC20(address(s_token)).approve(address(s_siloLockBox), type(uint256).max);
-
-    s_lockBox.deposit(0, 10e18);
-    s_siloLockBox.deposit(SILOED_CHAIN_SELECTOR, 10e18);
   }
 
   function test_ReleaseOrMint_SiloedChain() public {

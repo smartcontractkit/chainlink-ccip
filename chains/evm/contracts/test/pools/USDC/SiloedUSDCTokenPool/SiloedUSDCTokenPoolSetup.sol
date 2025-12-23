@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {ERC20LockBox} from "../../../../pools/ERC20LockBox.sol";
+import {SiloedLockReleaseTokenPool} from "../../../../pools/SiloedLockReleaseTokenPool.sol";
 import {SiloedUSDCTokenPool} from "../../../../pools/USDC/SiloedUSDCTokenPool.sol";
 import {USDCSetup} from "../USDCSetup.t.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
@@ -14,13 +15,15 @@ contract SiloedUSDCTokenPoolSetup is USDCSetup {
   ERC20LockBox internal s_lockBox;
   ERC20LockBox internal s_sourceLockBox;
   ERC20LockBox internal s_destLockBox;
+  bytes32 internal constant SOURCE_DOMAIN_ID = bytes32(uint256(SOURCE_CHAIN_SELECTOR));
+  bytes32 internal constant DEST_DOMAIN_ID = bytes32(uint256(DEST_CHAIN_SELECTOR));
 
   function setUp() public virtual override {
     super.setUp();
 
     s_lockBox = new ERC20LockBox(address(s_USDCToken), 0);
-    s_sourceLockBox = new ERC20LockBox(address(s_USDCToken), SOURCE_CHAIN_SELECTOR);
-    s_destLockBox = new ERC20LockBox(address(s_USDCToken), DEST_CHAIN_SELECTOR);
+    s_sourceLockBox = new ERC20LockBox(address(s_USDCToken), SOURCE_DOMAIN_ID);
+    s_destLockBox = new ERC20LockBox(address(s_USDCToken), DEST_DOMAIN_ID);
 
     s_usdcTokenPool = new SiloedUSDCTokenPool(
       s_USDCToken,
@@ -87,13 +90,14 @@ contract SiloedUSDCTokenPoolSetup is USDCSetup {
         AuthorizedCallers.AuthorizedCallerArgs({addedCallers: allowedCallers, removedCallers: new address[](0)})
       );
 
-    uint64[] memory selectors = new uint64[](2);
-    selectors[0] = SOURCE_CHAIN_SELECTOR;
-    selectors[1] = DEST_CHAIN_SELECTOR;
-    address[] memory lockBoxes = new address[](2);
-    lockBoxes[0] = address(s_sourceLockBox);
-    lockBoxes[1] = address(s_destLockBox);
-    s_usdcTokenPool.configureChainLockBoxes(selectors, lockBoxes);
-    s_usdcTokenPoolTransferLiquidity.configureChainLockBoxes(selectors, lockBoxes);
+    SiloedLockReleaseTokenPool.LockBoxConfig[] memory lockBoxes = new SiloedLockReleaseTokenPool.LockBoxConfig[](2);
+    lockBoxes[0] = SiloedLockReleaseTokenPool.LockBoxConfig({
+      remoteChainSelector: SOURCE_CHAIN_SELECTOR, lockBox: address(s_sourceLockBox)
+    });
+    lockBoxes[1] = SiloedLockReleaseTokenPool.LockBoxConfig({
+      remoteChainSelector: DEST_CHAIN_SELECTOR, lockBox: address(s_destLockBox)
+    });
+    s_usdcTokenPool.configureLockBoxes(lockBoxes);
+    s_usdcTokenPoolTransferLiquidity.configureLockBoxes(lockBoxes);
   }
 }

@@ -88,16 +88,17 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     // super.lockOrBurn will validate the lockOrBurnIn and revert if invalid.
     out = super.lockOrBurn(lockOrBurnIn);
 
-    // The zero chain selector is used to designate unsiloed chains. remoteChainSelector is set to 0 if the token is not
-    // siloed, and overwritten if the token is being locked for a siloed chain. Since the remote chain must be passed
-    // to the lock box's deposit function, this saves gas by only updating the remoteChainSelector if necessary for a
-    // siloed chain.
-    uint64 remoteChainSelector =
+    // lockBoxSelector chooses which lockbox holds liquidity for this transfer; unsiloed chains use selector 0.
+    uint64 lockBoxSelector =
       s_chainConfigs[lockOrBurnIn.remoteChainSelector].isSiloed ? lockOrBurnIn.remoteChainSelector : 0;
 
     // Transfer the tokens to the appropriate lock box.
-    _getLockBox(remoteChainSelector)
-      .deposit(remoteChainSelector, address(i_token), bytes32(uint256(remoteChainSelector)), lockOrBurnIn.amount);
+    _getLockBox(lockBoxSelector).deposit(
+      lockOrBurnIn.remoteChainSelector,
+      address(i_token),
+      bytes32(uint256(lockBoxSelector)),
+      lockOrBurnIn.amount
+    );
 
     return out;
   }

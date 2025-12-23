@@ -760,32 +760,13 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
     assertEq(IERC20Metadata(newRemoteToken).decimals(), REMOTE_TOKEN_DECIMALS, "Token Decimals should be 6");
   }
 
-  function test_deployTokenPoolWithExistingToken_RevertWhen_InvalidLockBoxChainSelector() public {
-    vm.startPrank(OWNER);
-    FactoryBurnMintERC20 token =
-      new FactoryBurnMintERC20("TestToken", "TT", 6, type(uint256).max, PREMINT_AMOUNT, OWNER);
-    ERC20LockBox lockBox = new ERC20LockBox(address(token), 99);
-
-    TokenPoolFactory.RemoteTokenPoolInfo[] memory remotes = new TokenPoolFactory.RemoteTokenPoolInfo[](0);
-    vm.expectRevert(abi.encodeWithSelector(TokenPoolFactory.InvalidLockBoxChainSelector.selector, uint64(99)));
-    s_tokenPoolFactory.deployTokenPoolWithExistingToken(
-      address(token),
-      LOCAL_TOKEN_DECIMALS,
-      TokenPoolFactory.PoolType.LOCK_RELEASE,
-      remotes,
-      LOCK_RELEASE_INIT_CODE,
-      address(lockBox),
-      FAKE_SALT
-    );
-  }
-
   function test_deployTokenPoolWithExistingToken_RevertWhen_InvalidLockBoxToken() public {
     vm.startPrank(OWNER);
     FactoryBurnMintERC20 token =
       new FactoryBurnMintERC20("TestToken", "TT", 6, type(uint256).max, PREMINT_AMOUNT, OWNER);
     FactoryBurnMintERC20 otherToken =
       new FactoryBurnMintERC20("TestToken", "TT", 6, type(uint256).max, PREMINT_AMOUNT, OWNER);
-    ERC20LockBox lockBox = new ERC20LockBox(address(otherToken), 99);
+    ERC20LockBox lockBox = new ERC20LockBox(address(otherToken), bytes32(uint256(99)));
 
     TokenPoolFactory.RemoteTokenPoolInfo[] memory remotes = new TokenPoolFactory.RemoteTokenPoolInfo[](0);
     vm.expectRevert(

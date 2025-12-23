@@ -20,7 +20,7 @@ contract ERC20LockBox_deposit is ERC20LockBoxSetup {
     vm.expectEmit();
     emit ERC20LockBox.Deposit(address(s_token), s_allowedCaller, amount);
 
-    s_erc20LockBox.deposit(0, amount);
+    s_erc20LockBox.deposit(0, address(s_token), bytes32(0), amount);
 
     vm.stopPrank();
 
@@ -39,13 +39,13 @@ contract ERC20LockBox_deposit is ERC20LockBoxSetup {
     // First deposit
     vm.expectEmit();
     emit ERC20LockBox.Deposit(address(s_token), s_allowedCaller, amount1);
-    s_erc20LockBox.deposit(0, amount1);
+    s_erc20LockBox.deposit(0, address(s_token), bytes32(0), amount1);
 
     // Second deposit
     vm.expectEmit();
     emit ERC20LockBox.Deposit(address(s_token), s_allowedCaller, amount2);
 
-    s_erc20LockBox.deposit(0, amount2);
+    s_erc20LockBox.deposit(0, address(s_token), bytes32(0), amount2);
 
     vm.stopPrank();
 
@@ -77,7 +77,7 @@ contract ERC20LockBox_deposit is ERC20LockBoxSetup {
     vm.expectEmit();
     emit ERC20LockBox.Deposit(address(s_token), caller1, amount);
 
-    s_erc20LockBox.deposit(0, amount);
+    s_erc20LockBox.deposit(0, address(s_token), bytes32(0), amount);
     vm.stopPrank();
 
     // Second caller deposits
@@ -87,7 +87,7 @@ contract ERC20LockBox_deposit is ERC20LockBoxSetup {
     vm.expectEmit();
     emit ERC20LockBox.Deposit(address(s_token), caller2, amount);
 
-    s_erc20LockBox.deposit(0, amount);
+    s_erc20LockBox.deposit(0, address(s_token), bytes32(0), amount);
     vm.stopPrank();
 
     // Verify balances
@@ -102,7 +102,7 @@ contract ERC20LockBox_deposit is ERC20LockBoxSetup {
     s_token.approve(address(s_erc20LockBox), amount);
     vm.expectRevert(abi.encodeWithSelector(AuthorizedCallers.UnauthorizedCaller.selector, STRANGER));
 
-    s_erc20LockBox.deposit(0, amount);
+    s_erc20LockBox.deposit(0, address(s_token), bytes32(0), amount);
   }
 
   function test_deposit_RevertWhen_TokenAmountCannotBeZero() public {
@@ -110,16 +110,16 @@ contract ERC20LockBox_deposit is ERC20LockBoxSetup {
     s_token.approve(address(s_erc20LockBox), 1);
     vm.expectRevert(ERC20LockBox.TokenAmountCannotBeZero.selector);
 
-    s_erc20LockBox.deposit(0, 0);
+    s_erc20LockBox.deposit(0, address(s_token), bytes32(0), 0);
   }
 
-  function test_deposit_RevertWhen_UnsupportedChainSelector() public {
+  function test_deposit_RevertWhen_UnsupportedLiquidityDomain() public {
     uint256 amount = 1000e18;
 
     vm.startPrank(s_allowedCaller);
     s_token.approve(address(s_erc20LockBox), amount);
 
-    vm.expectRevert(abi.encodeWithSelector(ERC20LockBox.UnsupportedChainSelector.selector, uint64(123)));
-    s_erc20LockBox.deposit(123, amount);
+    vm.expectRevert(abi.encodeWithSelector(ERC20LockBox.UnsupportedLiquidityDomain.selector, bytes32(uint256(123))));
+    s_erc20LockBox.deposit(0, address(s_token), bytes32(uint256(123)), amount);
   }
 }

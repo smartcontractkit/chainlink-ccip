@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {ERC20LockBox} from "../../../pools/ERC20LockBox.sol";
 import {SiloedLockReleaseTokenPool} from "../../../pools/SiloedLockReleaseTokenPool.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {SiloedLockReleaseTokenPoolSetup} from "./SiloedLockReleaseTokenPoolSetup.t.sol";
+
+import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
 contract SiloedLockReleaseTokenPool_updateSiloDesignations is SiloedLockReleaseTokenPoolSetup {
   function test_updateSiloDesignations() public {
@@ -58,9 +61,11 @@ contract SiloedLockReleaseTokenPool_updateSiloDesignations is SiloedLockReleaseT
 
   function test_updateSiloDesignations_RevertWhen_ChainNotSiloed() public {
     uint64[] memory removableChainSelectors = new uint64[](1);
-    removableChainSelectors[0] = DEST_CHAIN_SELECTOR;
+    removableChainSelectors[0] = SILOED_CHAIN_SELECTOR + 1;
 
-    vm.expectRevert(abi.encodeWithSelector(SiloedLockReleaseTokenPool.ChainNotSiloed.selector, DEST_CHAIN_SELECTOR));
+    vm.expectRevert(
+      abi.encodeWithSelector(SiloedLockReleaseTokenPool.ChainNotSiloed.selector, SILOED_CHAIN_SELECTOR + 1)
+    );
 
     s_siloedLockReleaseTokenPool.updateSiloDesignations(
       removableChainSelectors, new SiloedLockReleaseTokenPool.SiloConfigUpdate[](0)
@@ -91,6 +96,18 @@ contract SiloedLockReleaseTokenPool_updateSiloDesignations is SiloedLockReleaseT
   }
 
   function test_updateSiloDesignations_RevertWhen_InvalidZeroRebalancerAddress() public {
+    ERC20LockBox lockBox = new ERC20LockBox(address(s_token), bytes32(uint256(DEST_CHAIN_SELECTOR)));
+    address[] memory allowedCallers = new address[](1);
+    allowedCallers[0] = address(s_siloedLockReleaseTokenPool);
+    lockBox.applyAuthorizedCallerUpdates(
+      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: allowedCallers, removedCallers: new address[](0)})
+    );
+
+    SiloedLockReleaseTokenPool.LockBoxConfig[] memory lockBoxes = new SiloedLockReleaseTokenPool.LockBoxConfig[](1);
+    lockBoxes[0] =
+      SiloedLockReleaseTokenPool.LockBoxConfig({remoteChainSelector: DEST_CHAIN_SELECTOR, lockBox: address(lockBox)});
+    s_siloedLockReleaseTokenPool.configureLockBoxes(lockBoxes);
+
     SiloedLockReleaseTokenPool.SiloConfigUpdate[] memory adds = new SiloedLockReleaseTokenPool.SiloConfigUpdate[](1);
     adds[0] =
       SiloedLockReleaseTokenPool.SiloConfigUpdate({remoteChainSelector: DEST_CHAIN_SELECTOR, rebalancer: address(0)});

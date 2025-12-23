@@ -20,11 +20,11 @@ contract LockReleaseTokenPool_constructor is BaseTest {
     assertEq(pool.typeAndVersion(), "LockReleaseTokenPool 1.7.0-dev");
   }
 
-  function test_constructor_RevertWhen_InvalidLockBoxChainSelector() public {
+  function test_constructor_RevertWhen_InvalidLockBox() public {
     BurnMintERC20 token = new BurnMintERC20("T", "T", 18, 0, 0);
-    ERC20LockBox lockBox = new ERC20LockBox(address(token), 99);
+    ERC20LockBox lockBox = new ERC20LockBox(address(token), bytes32(uint256(1)));
 
-    vm.expectRevert(abi.encodeWithSelector(LockReleaseTokenPool.InvalidLockBoxChainSelector.selector, uint64(99)));
+    vm.expectRevert(abi.encodeWithSelector(LockReleaseTokenPool.InvalidLockBox.selector));
     new LockReleaseTokenPool(
       token, DEFAULT_TOKEN_DECIMALS, address(0), address(s_mockRMNRemote), address(s_sourceRouter), address(lockBox)
     );
