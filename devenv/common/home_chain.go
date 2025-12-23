@@ -20,7 +20,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/ccip_home"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/rmn_home"
 	solanaSeqs "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
-	tonSeqs "github.com/smartcontractkit/chainlink-ton/deployment/ccip/1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
@@ -31,6 +30,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	capabilities_registry "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/clclient"
+	tonSeqs "github.com/smartcontractkit/chainlink-ton/deployment/ccip/1_6_0/sequences"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/confighelper"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3confighelper"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
@@ -406,13 +406,13 @@ func BuildOCR3ConfigForCCIPHome(
 					return nil, fmt.Errorf("failed to decode SUI address '%s': %w", transmitter, err)
 				}
 			case chain_selectors.FamilyTon:
-				pk := address.MustParseAddr(string(transmitter))
-				if pk == nil || pk.IsAddrNone() {
-					return nil, fmt.Errorf("failed to parse TON address '%s'", transmitter)
+				k, err := hex.DecodeString(string(transmitter))
+				if err != nil {
+					return nil, fmt.Errorf("failed to decode public key: %w", err)
 				}
-				// TODO: this reimplements addrCodec's ToRawAddr helper
-				parsed = binary.BigEndian.AppendUint32(nil, uint32(pk.Workchain())) //nolint:gosec // G115
-				parsed = append(parsed, pk.Data()...)
+				addr := address.NewAddress(0, byte(0), k)
+				parsed = binary.BigEndian.AppendUint32(nil, uint32(addr.Workchain())) //nolint:gosec // G115
+				parsed = append(parsed, addr.Data()...)
 			case chain_selectors.FamilyAptos:
 				parsed, err = hex.DecodeString(strings.TrimPrefix(string(transmitter), "0x"))
 				if err != nil {

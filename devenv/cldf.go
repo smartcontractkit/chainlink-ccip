@@ -125,16 +125,6 @@ func NewCLDFOperationsEnvironment(bc []*blockchain.Input, dataStore datastore.Da
 			if err != nil {
 				return nil, nil, err
 			}
-			// client := solRpc.New(rpcHTTPURL)
-			// err = utils.FundSolanaAccounts(
-			// 	context.Background(),
-			// 	[]solana.PublicKey{deployerKey.PublicKey()},
-			// 	10,
-			// 	client,
-			// )
-			// if err != nil {
-			// 	return nil, nil, err
-			// }
 			providers = append(providers, p)
 		} else if b.Type == "ton" {
 			chainID := b.ChainID
@@ -174,8 +164,10 @@ func NewCLDFOperationsEnvironment(bc []*blockchain.Input, dataStore datastore.Da
 				return nil, nil, err
 			}
 
-			testutils.FundWalletsNoT(client, []*address.Address{w.Address()}, []tlb.Coins{tlb.MustFromTON("1000")})
-
+			err = testutils.FundWalletsNoT(client, []*address.Address{w.Address()}, []tlb.Coins{tlb.MustFromTON("1000")})
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to fund TON wallet: %w", err)
+			}
 			providers = append(providers, p)
 		}
 	}

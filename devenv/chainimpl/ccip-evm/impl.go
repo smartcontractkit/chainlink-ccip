@@ -15,6 +15,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
+	"github.com/xssnick/tonutils-go/address"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
@@ -34,6 +35,7 @@ import (
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	devenvcommon "github.com/smartcontractkit/chainlink-ccip/devenv/common"
 	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	"github.com/smartcontractkit/chainlink-ton/pkg/ccip/codec"
 )
 
 type SourceDestPair struct {
@@ -164,6 +166,30 @@ func (m *CCIP16EVM) SendMessage(ctx context.Context, src, dest uint64, fields an
 		})
 		if err != nil {
 			return fmt.Errorf("failed to serialize SVM extra args: %w", err)
+		}
+	case chainsel.FamilyTon:
+		receiverAddr, err := datastore_utils.FindAndFormatRef(m.e.DataStore, datastore.AddressRef{
+			ChainSelector: dest,
+			Type:          datastore.ContractType("Receiver"),
+		}, dest, datastore_utils.FullRef)
+		if err != nil {
+			return fmt.Errorf("failed to get TonReceiver address: %w", err)
+		}
+		tonreceiver, err := address.ParseAddr(receiverAddr.Address)
+		if err != nil {
+			return fmt.Errorf("failed to parse TON receiver address: %w", err)
+		}
+		ac := codec.NewAddressCodec()
+		receiver, err = ac.AddressStringToBytes(tonreceiver.String())
+		if err != nil {
+			return fmt.Errorf("failed to convert TON address to bytes: %w", err)
+		}
+		extraArgs, err = devenvcommon.SerializeClientGenericExtraArgsV2(msg_hasher163.ClientGenericExtraArgsV2{
+			GasLimit:                 new(big.Int).SetUint64(100_000_000), // 0.1 TON
+			AllowOutOfOrderExecution: false,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to serialize TON extra args: %w", err)
 		}
 	default:
 		return fmt.Errorf("unsupported chain family: %s", family)
