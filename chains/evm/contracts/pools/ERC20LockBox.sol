@@ -10,17 +10,15 @@ import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/utils/SafeERC20.sol";
 
 /// @title ERC20 Lock Box
-/// @notice Per-token/per-domain lockbox that holds ERC20 liquidity so pools can be upgraded without migrating
-/// funds.
-/// @dev Each lockbox is bound to one token and one liquidity domain id. This implementation supports only a single token to be deposited in the lockbox.
-/// Only the owner can manage the allowlist; allowed callers (or the owner) can deposit/withdraw after the domain check.
+/// @notice Per-token lockbox that holds ERC20 liquidity so pools can be upgraded without migrating funds.
+/// @dev This implementation supports only a single token to be deposited in the lockbox. Only the owner can manage the
+/// allowlist; allowed callers can deposit/withdraw.
 contract ERC20LockBox is ITypeAndVersion, ILockBox, AuthorizedCallers {
   using SafeERC20 for IERC20;
 
   error InsufficientBalance(uint256 requested, uint256 available);
   error TokenAmountCannotBeZero();
   error RecipientCannotBeZeroAddress();
-  error UnsupportedLiquidityDomain(bytes32 liquidityDomainId);
   error UnsupportedToken(address token);
 
   event Deposit(address indexed token, address indexed depositor, uint256 amount);
@@ -28,23 +26,16 @@ contract ERC20LockBox is ITypeAndVersion, ILockBox, AuthorizedCallers {
 
   /// @notice The token supported by this lockbox.
   IERC20 internal immutable i_token;
-  /// @notice User defined liquidity domain this lockbox is bound to.
-  /// @dev This value helps pools route deposits/withdrawals to the correct lockbox for a given domain and prevents
-  /// mismatched calls by enforcing the expected domain id on each operation.
-  bytes32 internal immutable i_liquidityDomainId;
-
   string public constant typeAndVersion = "ERC20LockBox 1.7.0-dev";
 
   constructor(
-    address token,
-    bytes32 liquidityDomainId
+    address token
   ) AuthorizedCallers(new address[](0)) {
     if (token == address(0)) {
       revert ZeroAddressNotAllowed();
     }
 
     i_token = IERC20(token);
-    i_liquidityDomainId = liquidityDomainId;
   }
 
   /// @notice Deposits tokens into this contract. This eases the process of migrating tokens
@@ -53,12 +44,11 @@ contract ERC20LockBox is ITypeAndVersion, ILockBox, AuthorizedCallers {
   /// time-consuming and error-prone process.
   /// @inheritdoc ILockBox
   function deposit(
-    uint64, // remoteChainSelector
     address token,
-    bytes32 liquidityDomainId,
+    uint64, // remoteChainSelector
     uint256 amount
   ) external {
-    _validateDepositWithdraw(token, liquidityDomainId, amount);
+    _validateDepositWithdraw(token, amount);
 
     IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
 
@@ -67,13 +57,12 @@ contract ERC20LockBox is ITypeAndVersion, ILockBox, AuthorizedCallers {
 
   /// @inheritdoc ILockBox
   function withdraw(
-    uint64, // remoteChainSelector
     address token,
-    bytes32 liquidityDomainId,
+    uint64, // remoteChainSelector
     uint256 amount,
     address recipient
   ) external {
-    _validateDepositWithdraw(token, liquidityDomainId, amount);
+    _validateDepositWithdraw(token, amount);
 
     if (recipient == address(0)) {
       revert RecipientCannotBeZeroAddress();
@@ -94,7 +83,6 @@ contract ERC20LockBox is ITypeAndVersion, ILockBox, AuthorizedCallers {
   /// @param amount The amount of tokens to deposit or withdraw.
   function _validateDepositWithdraw(
     address token,
-    bytes32 liquidityDomainId,
     uint256 amount
   ) internal view {
     if (amount == 0) {
@@ -103,23 +91,12 @@ contract ERC20LockBox is ITypeAndVersion, ILockBox, AuthorizedCallers {
     if (token != address(i_token)) {
       revert UnsupportedToken(token);
     }
-    if (liquidityDomainId != i_liquidityDomainId) {
-      revert UnsupportedLiquidityDomain(liquidityDomainId);
-    }
-    if (msg.sender != owner()) {
-      _validateCaller();
-    }
+    _validateCaller();
   }
 
   /// @notice Gets the token supported by this lockbox.
   /// @return token The ERC20 token.
   function getToken() external view returns (IERC20 token) {
     return i_token;
-  }
-
-  /// @notice Gets the liquidity domain id this lockbox is bound to.
-  /// @return liquidityDomainId The liquidity domain id.
-  function getLiquidityDomainId() external view returns (bytes32) {
-    return i_liquidityDomainId;
   }
 }
