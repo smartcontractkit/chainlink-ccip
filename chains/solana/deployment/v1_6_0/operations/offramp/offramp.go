@@ -26,7 +26,6 @@ import (
 var ContractType cldf_deployment.ContractType = "OffRamp"
 var SourceChainType cldf_deployment.ContractType = "RemoteSource"
 var ProgramName = "ccip_offramp"
-var ProgramSize = int(1.5 * 1024 * 1024)
 var Version *semver.Version = semver.MustParse("1.6.0")
 
 type Params struct {
@@ -61,8 +60,7 @@ var Deploy = operations.NewOperation(
 			ContractType,
 			Version,
 			"",
-			ProgramName,
-			ProgramSize)
+			ProgramName)
 	},
 )
 
@@ -222,7 +220,7 @@ var ConnectChains = operations.NewOperation(
 		} else {
 			err = chain.Confirm([]solana.Instruction{ixn})
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm add price updater: %w", err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm connect chains: %w", err)
 			}
 		}
 		sourceRef := datastore.AddressRef{
@@ -348,7 +346,7 @@ var TransferOwnership = operations.NewOperation(
 
 		err = chain.Confirm([]solana.Instruction{ixn})
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm add price updater: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm transfer ownership: %w", err)
 		}
 		return sequences.OnChainOutput{}, nil
 	},
@@ -383,7 +381,7 @@ var AcceptOwnership = operations.NewOperation(
 
 		err = chain.Confirm([]solana.Instruction{ixn})
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm add price updater: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm accept ownership: %w", err)
 		}
 		return sequences.OnChainOutput{}, nil
 	},

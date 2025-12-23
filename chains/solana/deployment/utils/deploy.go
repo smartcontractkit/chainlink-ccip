@@ -26,7 +26,6 @@ func MaybeDeployContract(
 	contractVersion *semver.Version,
 	contractQualifier string,
 	programName string,
-	programSize int,
 ) (datastore.AddressRef, error) {
 	for _, ref := range input {
 		if ref.Type == datastore.ContractType(contractType) &&
@@ -44,8 +43,7 @@ func MaybeDeployContract(
 	}
 	programID, err := chain.DeployProgram(b.Logger, cldf_solana.ProgramInfo{
 		Name:  programName,
-		Bytes: programSize,
-	}, false, true)
+	}, false, false)
 	if err != nil {
 		return datastore.AddressRef{}, err
 	}
