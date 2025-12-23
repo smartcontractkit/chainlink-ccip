@@ -6,7 +6,7 @@ import {OffRamp} from "../../../offRamp/OffRamp.sol";
 import {BaseTest} from "../../BaseTest.t.sol";
 
 contract OffRamp_constructor is BaseTest {
-  uint64 DEFAULT_MAX_GAS_BUFFER_TO_UPDATE_STATE = 5000 + 5000 + 2000;
+  uint64 internal constant DEFAULT_MAX_GAS_BUFFER_TO_UPDATE_STATE = 5000 + 5000 + 2000;
 
   function test_constructor() public {
     OffRamp.StaticConfig memory config = OffRamp.StaticConfig({

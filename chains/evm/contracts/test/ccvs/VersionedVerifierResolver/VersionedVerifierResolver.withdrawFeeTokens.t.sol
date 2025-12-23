@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {VersionedVerifierResolver} from "../../../ccvs/VersionedVerifierResolver.sol";
 import {FeeTokenHandler} from "../../../libraries/FeeTokenHandler.sol";
 import {VersionedVerifierResolverSetup} from "./VersionedVerifierResolverSetup.t.sol";
 
