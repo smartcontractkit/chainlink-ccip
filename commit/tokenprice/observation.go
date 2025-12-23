@@ -20,6 +20,14 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
+const (
+	// Operation names for async observations made in the Observation method.
+	// These are used as keys in the runningOps map as well as the results map returned by ExecuteAsyncOperations.
+	opObserveFeedTokenPrices       = "observeFeedTokenPrices"
+	opObserveFeeQuoterTokenUpdates = "observeFeeQuoterTokenUpdates"
+	opObserveFChain                = "observeFChain"
+)
+
 func (p *processor) Observation(
 	ctx context.Context,
 	prevOutcome Outcome,
@@ -31,26 +39,53 @@ func (p *processor) Observation(
 		p.obs.invalidateCaches(ctx, lggr)
 	}
 
+	operations := map[string]asynclib.AsyncOperation{
+		opObserveFeedTokenPrices: asynclib.WrapWithSingleFlight(
+			&p.runningOps,
+			opObserveFeedTokenPrices,
+			func(ctx context.Context, l logger.Logger) any {
+				return p.obs.observeFeedTokenPrices(ctx, l)
+			},
+		),
+		opObserveFeeQuoterTokenUpdates: asynclib.WrapWithSingleFlight(
+			&p.runningOps,
+			opObserveFeeQuoterTokenUpdates,
+			func(ctx context.Context, l logger.Logger) any {
+				return p.obs.observeFeeQuoterTokenUpdates(ctx, l)
+			},
+		),
+		opObserveFChain: asynclib.WrapWithSingleFlight(
+			&p.runningOps,
+			opObserveFChain,
+			func(_ context.Context, l logger.Logger) any {
+				return p.observeFChain(l)
+			},
+		),
+	}
+
+	results := asynclib.ExecuteAsyncOperations(
+		ctx,
+		p.offChainCfg.TokenPriceAsyncObserverSyncTimeout.Duration(),
+		operations,
+		lggr,
+	)
+	now := time.Now().UTC()
+
 	var (
 		fChain           map[cciptypes.ChainSelector]int
 		feedTokenPrices  cciptypes.TokenPriceMap
 		feeQuoterUpdates map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig
 	)
 
-	operations := asynclib.AsyncNoErrOperationsMap{
-		"observeFeedTokenPrices": func(ctx context.Context, l logger.Logger) {
-			feedTokenPrices = p.obs.observeFeedTokenPrices(ctx, l)
-		},
-		"observeFeeQuoterTokenUpdates": func(ctx context.Context, l logger.Logger) {
-			feeQuoterUpdates = p.obs.observeFeeQuoterTokenUpdates(ctx, l)
-		},
-		"observeFChain": func(_ context.Context, l logger.Logger) {
-			fChain = p.observeFChain(l)
-		},
+	if val, ok := results[opObserveFeedTokenPrices]; ok {
+		feedTokenPrices = val.(cciptypes.TokenPriceMap)
 	}
-
-	asynclib.WaitForAllNoErrOperations(ctx, p.offChainCfg.TokenPriceAsyncObserverSyncTimeout.Duration(), operations, lggr)
-	now := time.Now().UTC()
+	if val, ok := results[opObserveFeeQuoterTokenUpdates]; ok {
+		feeQuoterUpdates = val.(map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig)
+	}
+	if val, ok := results[opObserveFChain]; ok {
+		fChain = val.(map[cciptypes.ChainSelector]int)
+	}
 
 	lggr.Infow(
 		"observed token prices",

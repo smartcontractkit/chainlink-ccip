@@ -20,6 +20,15 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 )
 
+const (
+	// Operation names for async observations made in the Observation method.
+	// These are used as keys in the runningOps map as well as the results map returned by ExecuteAsyncOperations.
+	opGetChainsFeeComponents  = "getChainsFeeComponents"
+	opGetNativeTokenPrices    = "getNativeTokenPrices"
+	opGetChainFeePriceUpdates = "getChainFeePriceUpdates"
+	opObserveFChain           = "observeFChain"
+)
+
 // Observation will make several calls to fetch:
 // - chain fee components
 // - native token prices
@@ -38,6 +47,40 @@ func (p *processor) Observation(
 		p.obs.invalidateCaches(ctx, lggr)
 	}
 
+	operations := map[string]asynclib.AsyncOperation{
+		opGetChainsFeeComponents: asynclib.WrapWithSingleFlight(
+			&p.runningOps,
+			opGetChainsFeeComponents,
+			func(ctx context.Context, l logger.Logger) any {
+				return p.obs.getChainsFeeComponents(ctx, l)
+			},
+		),
+		opGetNativeTokenPrices: asynclib.WrapWithSingleFlight(
+			&p.runningOps,
+			opGetNativeTokenPrices,
+			func(ctx context.Context, l logger.Logger) any {
+				return p.obs.getNativeTokenPrices(ctx, l)
+			},
+		),
+		opGetChainFeePriceUpdates: asynclib.WrapWithSingleFlight(
+			&p.runningOps,
+			opGetChainFeePriceUpdates,
+			func(ctx context.Context, l logger.Logger) any {
+				return p.obs.getChainFeePriceUpdates(ctx, l)
+			},
+		),
+		opObserveFChain: asynclib.WrapWithSingleFlight(
+			&p.runningOps,
+			opObserveFChain,
+			func(_ context.Context, l logger.Logger) any {
+				return p.observeFChain(l)
+			},
+		),
+	}
+
+	results := asynclib.ExecuteAsyncOperations(ctx, p.cfg.ChainFeeAsyncObserverSyncTimeout, operations, lggr)
+	now := time.Now().UTC()
+
 	var (
 		feeComponents     map[cciptypes.ChainSelector]types.ChainFeeComponents
 		nativeTokenPrices map[cciptypes.ChainSelector]cciptypes.BigInt
@@ -45,23 +88,18 @@ func (p *processor) Observation(
 		fChain            map[cciptypes.ChainSelector]int
 	)
 
-	operations := asynclib.AsyncNoErrOperationsMap{
-		"getChainsFeeComponents": func(ctx context.Context, l logger.Logger) {
-			feeComponents = p.obs.getChainsFeeComponents(ctx, l)
-		},
-		"getNativeTokenPrices": func(ctx context.Context, l logger.Logger) {
-			nativeTokenPrices = p.obs.getNativeTokenPrices(ctx, l)
-		},
-		"getChainFeePriceUpdates": func(ctx context.Context, l logger.Logger) {
-			chainFeeUpdates = p.obs.getChainFeePriceUpdates(ctx, l)
-		},
-		"observeFChain": func(_ context.Context, l logger.Logger) {
-			fChain = p.observeFChain(l)
-		},
+	if val, ok := results[opGetChainsFeeComponents]; ok {
+		feeComponents = val.(map[cciptypes.ChainSelector]types.ChainFeeComponents)
 	}
-
-	asynclib.WaitForAllNoErrOperations(ctx, p.cfg.ChainFeeAsyncObserverSyncTimeout, operations, lggr)
-	now := time.Now().UTC()
+	if val, ok := results[opGetNativeTokenPrices]; ok {
+		nativeTokenPrices = val.(map[cciptypes.ChainSelector]cciptypes.BigInt)
+	}
+	if val, ok := results[opGetChainFeePriceUpdates]; ok {
+		chainFeeUpdates = val.(map[cciptypes.ChainSelector]Update)
+	}
+	if val, ok := results[opObserveFChain]; ok {
+		fChain = val.(map[cciptypes.ChainSelector]int)
+	}
 
 	chainsWithNativeTokenPrices := mapset.NewSet(slices.Collect(maps.Keys(feeComponents))...).
 		Intersect(

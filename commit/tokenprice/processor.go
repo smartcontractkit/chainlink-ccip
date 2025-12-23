@@ -3,6 +3,7 @@ package tokenprice
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/libocr/commontypes"
@@ -29,6 +30,9 @@ type processor struct {
 	metricsReporter  plugincommon.MetricsReporter
 	fRoleDON         int
 	obs              observer
+	// runningOps tracks which async operations are currently running to prevent
+	// spawning duplicate goroutines if an operation hangs.
+	runningOps sync.Map
 }
 
 func NewProcessor(
