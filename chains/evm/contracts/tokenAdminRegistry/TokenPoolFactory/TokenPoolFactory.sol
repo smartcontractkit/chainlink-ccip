@@ -320,7 +320,7 @@ contract TokenPoolFactory is ITypeAndVersion {
     bytes32 salt,
     address deployer
   ) private pure returns (address predicted, bytes memory creationCode) {
-    creationCode = abi.encodePacked(LOCKBOX_INIT_CODE, abi.encode(token, bytes32(0)));
+    creationCode = abi.encodePacked(LOCKBOX_INIT_CODE, abi.encode(token));
     predicted = salt.computeAddress(keccak256(creationCode), deployer);
     return (predicted, creationCode);
   }
