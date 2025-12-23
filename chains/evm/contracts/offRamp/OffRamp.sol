@@ -178,8 +178,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     if (i_rmnRemote.isCursed(bytes16(uint128(message.sourceChainSelector)))) {
       revert CursedByRMN(message.sourceChainSelector);
     }
-    SourceChainConfig storage sourceConfig = s_sourceChainConfigs[message.sourceChainSelector];
-    if (!sourceConfig.isEnabled) {
+    if (!s_sourceChainConfigs[message.sourceChainSelector].isEnabled) {
       revert SourceChainNotEnabled(message.sourceChainSelector);
     }
     if (!s_allowedOnRampHashes[message.sourceChainSelector].contains(keccak256(message.onRampAddress))) {
