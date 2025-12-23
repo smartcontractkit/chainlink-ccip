@@ -93,12 +93,10 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
       s_chainConfigs[lockOrBurnIn.remoteChainSelector].isSiloed ? lockOrBurnIn.remoteChainSelector : 0;
 
     // Transfer the tokens to the appropriate lock box.
-    _getLockBox(lockBoxSelector).deposit(
-      lockOrBurnIn.remoteChainSelector,
-      address(i_token),
-      bytes32(uint256(lockBoxSelector)),
-      lockOrBurnIn.amount
-    );
+    _getLockBox(lockBoxSelector)
+      .deposit(
+        lockOrBurnIn.remoteChainSelector, address(i_token), bytes32(uint256(lockBoxSelector)), lockOrBurnIn.amount
+      );
 
     return out;
   }
@@ -118,6 +116,7 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
 
     _validateReleaseOrMint(releaseOrMintIn, localAmount, WAIT_FOR_FINALITY);
 
+    // lockBoxSelector chooses which lockbox holds liquidity for this transfer; unsiloed chains use selector 0.
     uint64 lockBoxSelector =
       s_chainConfigs[releaseOrMintIn.remoteChainSelector].isSiloed ? releaseOrMintIn.remoteChainSelector : 0;
 
