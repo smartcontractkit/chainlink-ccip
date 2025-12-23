@@ -1,6 +1,7 @@
 package merkleroot
 
 import (
+	"maps"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
@@ -28,9 +29,7 @@ func TestValidateRootBlessings(t *testing.T) {
 	copyConfigWithOverride := func(chain cciptypes.ChainSelector,
 		override reader2.StaticSourceChainConfig) map[cciptypes.ChainSelector]reader2.StaticSourceChainConfig {
 		config := make(map[cciptypes.ChainSelector]reader2.StaticSourceChainConfig)
-		for k, v := range sourceChainConfig {
-			config[k] = v
-		}
+		maps.Copy(config, sourceChainConfig)
 		config[chain] = override
 		return config
 	}
