@@ -13,6 +13,7 @@ import {SafeERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/utils/SafeERC
 /// @notice A variation on Lock Release token pools where liquidity is shared among some chains, and stored independently
 /// for others. Chains which do not share liquidity are known as siloed chains.
 /// @dev This pool defines the ERC20LockBox liquidity domain id as bytes32(remoteChainSelector).
+/// For unsiloed chains, the liquidity domain id is bytes32(0).
 contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
   using SafeERC20 for IERC20;
 
