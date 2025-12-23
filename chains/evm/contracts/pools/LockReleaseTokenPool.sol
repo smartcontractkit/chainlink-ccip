@@ -41,7 +41,7 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
   ) TokenPool(token, localTokenDecimals, advancedPoolHooks, rmnProxy, router) {
     if (lockBox == address(0)) revert ZeroAddressInvalid();
 
-    token.forceApprove(lockBox, type(uint256).max);
+    token.approve(lockBox, type(uint256).max);
     i_lockBox = ERC20LockBox(lockBox);
   }
 

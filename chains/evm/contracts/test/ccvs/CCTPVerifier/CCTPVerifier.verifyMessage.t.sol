@@ -11,8 +11,6 @@ import {CCTPHelper} from "../../helpers/CCTPHelper.sol";
 import {MockE2EUSDCTransmitterCCTPV2} from "../../mocks/MockE2EUSDCTransmitterCCTPV2.sol";
 import {CCTPVerifierSetup} from "./CCTPVerifierSetup.t.sol";
 
-import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
-
 contract CCTPVerifier_verifyMessage is CCTPVerifierSetup {
   CCTPHelper.CCTPMessage internal s_baseCCTPMessage;
   address internal constant OFFRAMP = address(0x001001001001);

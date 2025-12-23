@@ -11,8 +11,7 @@ import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/Bu
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
 contract AdvancedPoolHooksSetup is BaseTest {
-  BurnMintERC20 internal s_token;
-  IERC20 internal s_tokenErc20;
+  IERC20 internal s_token;
   TokenPoolHelper internal s_tokenPool;
   AdvancedPoolHooks internal s_advancedPoolHooks;
   uint16 internal constant BPS_DIVIDER = 10_000;
@@ -28,19 +27,14 @@ contract AdvancedPoolHooksSetup is BaseTest {
 
   function setUp() public virtual override {
     super.setUp();
-    s_token = new BurnMintERC20("LINK", "LNK", 18, 0, 0);
-    s_tokenErc20 = IERC20(address(s_token));
+    s_token = IERC20(address(new BurnMintERC20("LINK", "LNK", 18, 0, 0)));
     deal(address(s_token), OWNER, type(uint256).max);
 
     // Create AdvancedPoolHooks with CCV threshold
     s_advancedPoolHooks = new AdvancedPoolHooks(new address[](0), CCV_THRESHOLD_AMOUNT);
 
     s_tokenPool = new TokenPoolHelper(
-      s_tokenErc20,
-      DEFAULT_TOKEN_DECIMALS,
-      address(s_advancedPoolHooks),
-      address(s_mockRMNRemote),
-      address(s_sourceRouter)
+      s_token, DEFAULT_TOKEN_DECIMALS, address(s_advancedPoolHooks), address(s_mockRMNRemote), address(s_sourceRouter)
     );
 
     bytes[] memory remotePoolAddresses = new bytes[](1);

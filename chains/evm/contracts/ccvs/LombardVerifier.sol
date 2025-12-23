@@ -12,15 +12,12 @@ import {BaseVerifier} from "./components/BaseVerifier.sol";
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
-import {IERC20Metadata} from "@openzeppelin/contracts@5.3.0/token/ERC20/extensions/IERC20Metadata.sol";
-import {SafeERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/utils/SafeERC20.sol";
 import {EnumerableMap} from "@openzeppelin/contracts@5.3.0/utils/structs/EnumerableMap.sol";
 import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/EnumerableSet.sol";
 
 contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
   using EnumerableMap for EnumerableMap.AddressToAddressMap;
   using EnumerableSet for EnumerableSet.UintSet;
-  using SafeERC20 for IERC20;
 
   error ZeroBridge();
   error ZeroLombardChainId();
@@ -268,7 +265,7 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
     for (uint256 i = 0; i < tokensToRemove.length; ++i) {
       address tokenToRemove = tokensToRemove[i];
       if (s_supportedTokens.remove(tokenToRemove)) {
-        IERC20(tokenToRemove).forceApprove(address(i_bridge), 0);
+        IERC20(tokenToRemove).approve(address(i_bridge), 0);
         emit SupportedTokenRemoved(tokenToRemove);
       }
     }
@@ -281,8 +278,7 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
       address entityToApprove = tokenToAdd.localAdapter != address(0) ? tokenToAdd.localAdapter : tokenToAdd.localToken;
 
       // Either the token or the adapter needs to be approved for bridge spend.
-      // Use forceApprove to safely overwrite any existing non-zero allowance.
-      IERC20(entityToApprove).forceApprove(address(i_bridge), type(uint256).max);
+      IERC20(entityToApprove).approve(address(i_bridge), type(uint256).max);
 
       emit SupportedTokenSet(tokenToAdd.localToken, tokenToAdd.localAdapter);
     }

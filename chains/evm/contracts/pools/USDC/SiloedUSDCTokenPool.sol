@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {IBurnMintERC20} from "../../interfaces/IBurnMintERC20.sol";
+
 import {Pool} from "../../libraries/Pool.sol";
 import {SiloedLockReleaseTokenPool} from "../SiloedLockReleaseTokenPool.sol";
-
-import {IBurnMintERC20} from "../../interfaces/IBurnMintERC20.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
+
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/EnumerableSet.sol";
 

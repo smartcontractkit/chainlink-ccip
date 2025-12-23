@@ -8,8 +8,6 @@ import {BaseVerifier} from "../../../ccvs/components/BaseVerifier.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {CCTPVerifierSetup} from "./CCTPVerifierSetup.t.sol";
 
-import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
-
 contract CCTPVerifier_forwardToVerifier is CCTPVerifierSetup {
   function setUp() public override {
     super.setUp();

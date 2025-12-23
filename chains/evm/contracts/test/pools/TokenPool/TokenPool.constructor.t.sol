@@ -24,8 +24,7 @@ contract TokenPool_constructor is TokenPoolSetup {
 
     vm.mockCallRevert(address(s_token), abi.encodeWithSelector(IERC20Metadata.decimals.selector), "decimals fails");
 
-    s_tokenPool =
-      new TokenPoolHelper(s_tokenErc20, decimals, address(0), address(s_mockRMNRemote), address(s_sourceRouter));
+    s_tokenPool = new TokenPoolHelper(s_token, decimals, address(0), address(s_mockRMNRemote), address(s_sourceRouter));
 
     assertEq(s_tokenPool.getTokenDecimals(), decimals);
   }
@@ -48,6 +47,6 @@ contract TokenPool_constructor is TokenPoolSetup {
     );
 
     s_tokenPool =
-      new TokenPoolHelper(s_tokenErc20, invalidDecimals, address(0), address(s_mockRMNRemote), address(s_sourceRouter));
+      new TokenPoolHelper(s_token, invalidDecimals, address(0), address(s_mockRMNRemote), address(s_sourceRouter));
   }
 }

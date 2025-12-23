@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {IBurnMintERC20} from "../../../interfaces/IBurnMintERC20.sol";
 import {BurnFromMintTokenPool} from "../../../pools/BurnFromMintTokenPool.sol";
 import {BurnMintSetup} from "../BurnMintTokenPool/BurnMintSetup.t.sol";
+import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
 contract BurnFromMintTokenPoolSetup is BurnMintSetup {
   BurnFromMintTokenPool internal s_pool;
@@ -18,7 +19,7 @@ contract BurnFromMintTokenPoolSetup is BurnMintSetup {
       address(s_mockRMNRemote),
       address(s_sourceRouter)
     );
-    s_token.grantMintAndBurnRoles(address(s_pool));
+    BurnMintERC20(address(s_token)).grantMintAndBurnRoles(address(s_pool));
 
     _applyChainUpdates(address(s_pool));
   }

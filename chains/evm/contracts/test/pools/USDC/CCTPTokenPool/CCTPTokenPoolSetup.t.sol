@@ -3,7 +3,6 @@ pragma solidity ^0.8.24;
 
 import {CCTPTokenPool} from "../../../../pools/USDC/CCTPTokenPool.sol";
 import {USDCSetup} from "../USDCSetup.t.sol";
-import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
 contract CCTPTokenPoolSetup is USDCSetup {
   CCTPTokenPool internal s_cctpTokenPool;

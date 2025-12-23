@@ -6,6 +6,7 @@ import {Pool} from "../../../libraries/Pool.sol";
 import {BurnMintTokenPool} from "../../../pools/BurnMintTokenPool.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {BurnMintSetup} from "./BurnMintSetup.t.sol";
+import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
@@ -22,7 +23,7 @@ contract BurnMintTokenPoolSetup is BurnMintSetup {
       address(s_mockRMNRemote),
       address(s_sourceRouter)
     );
-    s_token.grantMintAndBurnRoles(address(s_pool));
+    BurnMintERC20(address(s_token)).grantMintAndBurnRoles(address(s_pool));
 
     _applyChainUpdates(address(s_pool));
   }
