@@ -920,7 +920,13 @@ func (m *CCIP16EVM) FundNodes(ctx context.Context, ns []*simple_node_set.Input, 
 			Str("ETHKeySrc", addrSrc.Attributes.Address).
 			Msg("Node info")
 	}
-	clientSrc, _, _, err := ETHClient(ctx, bc.Out.Nodes[0].ExternalWSUrl, &GasSettings{
+	// Use WS URL if available, otherwise fallback to HTTP URL for HTTP-only mode
+	rpcURL := bc.Out.Nodes[0].ExternalWSUrl
+	if rpcURL == "" {
+		rpcURL = bc.Out.Nodes[0].ExternalHTTPUrl
+		l.Info().Str("URL", rpcURL).Msg("Using HTTP URL for ETH client (HTTP-only mode)")
+	}
+	clientSrc, _, _, err := ETHClient(ctx, rpcURL, &GasSettings{
 		FeeCapMultiplier: 2,
 		TipCapMultiplier: 2,
 	})
