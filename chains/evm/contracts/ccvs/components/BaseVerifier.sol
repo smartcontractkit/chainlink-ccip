@@ -207,6 +207,10 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
       RemoteChainConfig storage remoteChainConfig = s_remoteChainConfigs[allowlistConfigArgs.destChainSelector];
       remoteChainConfig.allowlistEnabled = allowlistConfigArgs.allowlistEnabled;
 
+      for (uint256 j = 0; j < allowlistConfigArgs.removedAllowlistedSenders.length; ++j) {
+        remoteChainConfig.allowedSendersList.remove(allowlistConfigArgs.removedAllowlistedSenders[j]);
+      }
+
       if (allowlistConfigArgs.addedAllowlistedSenders.length > 0) {
         if (allowlistConfigArgs.allowlistEnabled) {
           for (uint256 j = 0; j < allowlistConfigArgs.addedAllowlistedSenders.length; ++j) {
@@ -221,10 +225,6 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
         } else {
           revert InvalidAllowListRequest(allowlistConfigArgs.destChainSelector);
         }
-      }
-
-      for (uint256 j = 0; j < allowlistConfigArgs.removedAllowlistedSenders.length; ++j) {
-        remoteChainConfig.allowedSendersList.remove(allowlistConfigArgs.removedAllowlistedSenders[j]);
       }
 
       if (allowlistConfigArgs.removedAllowlistedSenders.length > 0) {
