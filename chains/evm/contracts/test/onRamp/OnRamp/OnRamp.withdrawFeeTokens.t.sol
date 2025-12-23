@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {FeeTokenHandler} from "../../../libraries/FeeTokenHandler.sol";
-import {OnRamp} from "../../../onRamp/OnRamp.sol";
 import {OnRampSetup} from "./OnRampSetup.t.sol";
 
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
