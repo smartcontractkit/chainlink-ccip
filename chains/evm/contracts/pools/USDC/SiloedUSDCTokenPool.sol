@@ -90,20 +90,19 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
 
     _validateReleaseOrMint(releaseOrMintIn, localAmount, WAIT_FOR_FINALITY);
 
-    // Save gas by using storage instead of memory as a value may need to be updated.
-    SiloConfig storage remoteConfig = s_chainConfigs[releaseOrMintIn.remoteChainSelector];
+    // lockBoxSelector chooses which lockbox holds liquidity for this transfer; unsiloed chains use selector 0.
+    uint64 lockBoxSelector =
+      s_chainConfigs[releaseOrMintIn.remoteChainSelector].isSiloed ? releaseOrMintIn.remoteChainSelector : 0;
 
     uint256 excludedTokens = s_tokensExcludedFromBurn[releaseOrMintIn.remoteChainSelector];
 
     // No excluded tokens is the common path, as it means no migration has occured yet, and any released
     // tokens should come from the stored token balance of previously deposited tokens.
     if (excludedTokens == 0) {
-      if (localAmount > remoteConfig.tokenBalance) {
-        revert InsufficientLiquidity(remoteConfig.tokenBalance, localAmount);
+      uint256 availableLiquidity = i_token.balanceOf(address(_getLockBox(lockBoxSelector)));
+      if (localAmount > availableLiquidity) {
+        revert InsufficientLiquidity(availableLiquidity, localAmount);
       }
-
-      remoteConfig.tokenBalance -= localAmount;
-
       // The existence of excluded tokens indicates a migration has occured on the chain, and that any tokens
       // being released should come from those excluded tokens reserved for processing inflight messages.
     } else {
@@ -112,8 +111,14 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
     }
 
     // Release to the recipient using the lockbox tied to the remote chain selector.
-    _getLockBox(releaseOrMintIn.remoteChainSelector)
-      .withdraw(releaseOrMintIn.remoteChainSelector, localAmount, releaseOrMintIn.receiver);
+    _getLockBox(lockBoxSelector)
+      .withdraw(
+        releaseOrMintIn.remoteChainSelector,
+        address(i_token),
+        bytes32(uint256(lockBoxSelector)),
+        localAmount,
+        releaseOrMintIn.receiver
+      );
 
     emit ReleasedOrMinted({
       remoteChainSelector: releaseOrMintIn.remoteChainSelector,
@@ -241,8 +246,10 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
 
     s_tokensExcludedFromBurn[remoteChainSelector] += amount;
 
+    // lockBoxSelector chooses which lockbox holds liquidity for this transfer; unsiloed chains use selector 0.
+    uint64 lockBoxSelector = s_chainConfigs[remoteChainSelector].isSiloed ? remoteChainSelector : 0;
     uint256 burnableAmountAfterExclusion =
-      s_chainConfigs[remoteChainSelector].tokenBalance - s_tokensExcludedFromBurn[remoteChainSelector];
+      i_token.balanceOf(address(_getLockBox(lockBoxSelector))) - s_tokensExcludedFromBurn[remoteChainSelector];
 
     emit TokensExcludedFromBurn(remoteChainSelector, amount, burnableAmountAfterExclusion);
   }
@@ -269,15 +276,19 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
     if (burnChainSelector == 0) revert NoMigrationProposalPending();
 
     // Burnable tokens is the total locked minus the amount excluded from burn
-    uint256 tokensToBurn = s_chainConfigs[burnChainSelector].tokenBalance - s_tokensExcludedFromBurn[burnChainSelector];
+    // lockBoxSelector chooses which lockbox holds liquidity for this transfer; unsiloed chains use selector 0.
+    uint64 lockBoxSelector = s_chainConfigs[burnChainSelector].isSiloed ? burnChainSelector : 0;
+    uint256 tokensToBurn =
+      i_token.balanceOf(address(_getLockBox(lockBoxSelector))) - s_tokensExcludedFromBurn[burnChainSelector];
 
     // The CCTP burn function will attempt to burn out of the contract that calls it, so we need to withdraw the tokens
     // from the lock box first otherwise the burn will revert.
-    ERC20LockBox lockBox = _getLockBox(burnChainSelector);
-    lockBox.withdraw(burnChainSelector, tokensToBurn, address(this));
+    ERC20LockBox lockBox = _getLockBox(lockBoxSelector);
+    lockBox.withdraw(
+      burnChainSelector, address(i_token), bytes32(uint256(lockBoxSelector)), tokensToBurn, address(this)
+    );
 
     // Even though USDC is a trusted call, ensure CEI by updating state first
-    delete s_chainConfigs[burnChainSelector].tokenBalance;
     delete s_proposedUSDCMigrationChain;
 
     // This should only be called after this contract has been granted a "zero allowance minter role" on USDC by Circle,
