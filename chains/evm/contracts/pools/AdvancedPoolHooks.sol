@@ -17,6 +17,7 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, Ownable2StepMsgSender {
 
   error AllowListNotEnabled();
   error SenderNotAllowed(address sender);
+  error MustSpecifyUnderThresholdCCVsForAboveThresholdCCVs();
 
   event AllowListAdd(address sender);
   event AllowListRemove(address sender);
@@ -174,11 +175,31 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, Ownable2StepMsgSender {
 
       // check for duplicates in outbound CCVs.
       CCVConfigValidation._assertNoDuplicates(outboundCCVs);
-      CCVConfigValidation._assertNoDuplicates(outboundCCVsToAddAboveThreshold);
 
       // check for duplicates in inbound CCVs.
       CCVConfigValidation._assertNoDuplicates(inboundCCVs);
-      CCVConfigValidation._assertNoDuplicates(inboundCCVsToAddAboveThreshold);
+
+      if (outboundCCVsToAddAboveThreshold.length > 0) {
+        // Must have base CCVs if specifying above-threshold CCVs. If the defaults are used below the threshold,
+        // specify address(0) in the outboundCCVs array.
+        if (outboundCCVs.length == 0) {
+          revert MustSpecifyUnderThresholdCCVsForAboveThresholdCCVs();
+        }
+
+        CCVConfigValidation._assertNoDuplicates(outboundCCVsToAddAboveThreshold);
+        CCVConfigValidation._assertNoDuplicatedBetweenLists(outboundCCVs, outboundCCVsToAddAboveThreshold);
+      }
+
+      if (inboundCCVsToAddAboveThreshold.length > 0) {
+        // Must have base CCVs if specifying above-threshold CCVs. If the defaults are used below the threshold,
+        // specify address(0) in the inboundCCVs array.
+        if (inboundCCVs.length == 0) {
+          revert MustSpecifyUnderThresholdCCVsForAboveThresholdCCVs();
+        }
+
+        CCVConfigValidation._assertNoDuplicates(inboundCCVsToAddAboveThreshold);
+        CCVConfigValidation._assertNoDuplicatedBetweenLists(inboundCCVs, inboundCCVsToAddAboveThreshold);
+      }
 
       s_verifierConfig[remoteChainSelector] = CCVConfig({
         outboundCCVs: outboundCCVs,

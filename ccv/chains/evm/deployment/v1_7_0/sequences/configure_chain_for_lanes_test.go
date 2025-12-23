@@ -3,6 +3,7 @@ package sequences_test
 import (
 	"testing"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/v2"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/committee_verifier"
@@ -90,27 +91,35 @@ func TestConfigureChainForLanes(t *testing.T) {
 					ChainSelector: chainSelector,
 					Router:        routerAddress,
 					OnRamp:        onRamp,
-					CommitteeVerifiers: []adapters.CommitteeVerifier[string]{
+					CommitteeVerifiers: []adapters.CommitteeVerifierConfig[string, datastore.AddressRef]{
 						{
-							Implementation: committeeVerifier,
-							Resolver:       committeeVerifierResolver,
+							CommitteeVerifier: committeeVerifier,
+							SupportingContracts: []datastore.AddressRef{
+								{
+									Address: committeeVerifierResolver,
+									Type:    datastore.ContractType(committee_verifier.ResolverType),
+									Version: semver.MustParse("1.7.0"),
+								},
+							},
+							RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
+								remoteChainSelector: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
+							},
 						},
 					},
 					FeeQuoter: feeQuoter,
 					OffRamp:   offRamp,
 					RemoteChains: map[uint64]adapters.RemoteChainConfig[[]byte, string]{
 						remoteChainSelector: {
-							AllowTrafficFrom:                 true,
-							OnRamp:                           ccipMessageSource,
-							OffRamp:                          ccipMessageDest,
-							DefaultInboundCCVs:               []string{committeeVerifier},
-							DefaultOutboundCCVs:              []string{committeeVerifier},
-							DefaultExecutor:                  executorAddress,
-							CommitteeVerifierDestChainConfig: testsetup.CreateBasicCommitteeVerifierDestChainConfig(),
-							FeeQuoterDestChainConfig:         testsetup.CreateBasicFeeQuoterDestChainConfig(),
-							ExecutorDestChainConfig:          testsetup.CreateBasicExecutorDestChainConfig(),
-							AddressBytesLength:               20,
-							BaseExecutionGasCost:             80_000,
+							AllowTrafficFrom:         true,
+							OnRamps:                  [][]byte{ccipMessageSource},
+							OffRamp:                  ccipMessageDest,
+							DefaultInboundCCVs:       []string{committeeVerifier},
+							DefaultOutboundCCVs:      []string{committeeVerifier},
+							DefaultExecutor:          executorAddress,
+							FeeQuoterDestChainConfig: testsetup.CreateBasicFeeQuoterDestChainConfig(),
+							ExecutorDestChainConfig:  testsetup.CreateBasicExecutorDestChainConfig(),
+							AddressBytesLength:       20,
+							BaseExecutionGasCost:     80_000,
 						},
 					},
 				},
@@ -143,7 +152,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 				Args:          remoteChainSelector,
 			})
 			require.NoError(t, err, "ExecuteOperation should not error")
-			require.Equal(t, ccipMessageSource, sourceChainConfig.Output.OnRamp, "OnRamp in source chain config should match OnRamp address")
+			require.Equal(t, ccipMessageSource, sourceChainConfig.Output.OnRamps[0], "OnRamp in source chain config should match OnRamp address")
 			require.Len(t, sourceChainConfig.Output.DefaultCCVs, 1, "There should be one DefaultCCV in source chain config")
 			require.Equal(t, committeeVerifier, sourceChainConfig.Output.DefaultCCVs[0].Hex(), "DefaultCCV in source chain config should match CommitteeVerifier address")
 			require.True(t, sourceChainConfig.Output.IsEnabled, "IsEnabled in source chain config should be true")
@@ -163,14 +172,25 @@ func TestConfigureChainForLanes(t *testing.T) {
 			require.Equal(t, committeeVerifier, destChainConfig.Output.DefaultCCVs[0].Hex(), "DefaultCCV in dest chain config should match CommitteeVerifier address")
 
 			// Check destChainConfig on CommitteeVerifier
-			committeeVerifierDestChainConfig, err := operations.ExecuteOperation(e.OperationsBundle, committee_verifier.GetDestChainConfig, evmChain, contract.FunctionInput[uint64]{
+			committeeVerifierRemoteChainConfig, err := operations.ExecuteOperation(e.OperationsBundle, committee_verifier.GetRemoteChainConfig, evmChain, contract.FunctionInput[uint64]{
 				ChainSelector: evmChain.Selector,
 				Address:       common.HexToAddress(committeeVerifier),
 				Args:          remoteChainSelector,
 			})
 			require.NoError(t, err, "ExecuteOperation should not error")
-			require.Equal(t, routerAddress, committeeVerifierDestChainConfig.Output.Router.Hex(), "Router in CommitteeVerifier dest chain config should match Router address")
-			require.False(t, committeeVerifierDestChainConfig.Output.AllowlistEnabled, "AllowlistEnabled in CommitteeVerifier dest chain config should be false")
+			require.Equal(t, routerAddress, committeeVerifierRemoteChainConfig.Output.Router.Hex(), "Router in CommitteeVerifier remote chain config should match Router address")
+			require.False(t, committeeVerifierRemoteChainConfig.Output.AllowlistEnabled, "AllowlistEnabled in CommitteeVerifier remote chain config should be false")
+
+			// Check signature quorum on CommitteeVerifier
+			signatureQuorumReport, err := operations.ExecuteOperation(e.OperationsBundle, committee_verifier.GetSignatureConfig, evmChain, contract.FunctionInput[uint64]{
+				ChainSelector: evmChain.Selector,
+				Address:       common.HexToAddress(committeeVerifier),
+				Args:          remoteChainSelector,
+			})
+			require.NoError(t, err, "ExecuteOperation should not error")
+			require.Equal(t, uint8(1), signatureQuorumReport.Output.Threshold, "Threshold in CommitteeVerifier signature config should be 1")
+			require.Equal(t, []common.Address{common.HexToAddress("0x01")}, signatureQuorumReport.Output.Signers, "Signers in CommitteeVerifier signature config should match")
+			require.Equal(t, remoteChainSelector, signatureQuorumReport.Output.SourceChainSelector, "Source chain selector in CommitteeVerifier signature config should match remote chain selector")
 
 			// Check outbound implementation on CommitteeVerifierResolver
 			boundResolver, err := versioned_verifier_resolver.NewVersionedVerifierResolver(common.HexToAddress(committeeVerifierResolver), evmChain.Client)

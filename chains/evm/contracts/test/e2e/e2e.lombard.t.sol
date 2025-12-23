@@ -387,7 +387,7 @@ contract e2e_lombard is OnRampSetup {
     });
 
     vm.resumeGasMetering();
-    s_offRamp.execute(encodedMessage, ccvAddresses, verifierResults);
+    s_offRamp.execute(encodedMessage, ccvAddresses, verifierResults, 0);
   }
 
   // External so we can pass `bytes memory` as calldata (for MessageV1Codec._decodeMessageV1).
