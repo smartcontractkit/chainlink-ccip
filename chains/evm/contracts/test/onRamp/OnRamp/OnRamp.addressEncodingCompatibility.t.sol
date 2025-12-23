@@ -16,7 +16,7 @@ import {VmSafe} from "forge-std/Vm.sol";
 
 contract OnRamp_addressEncodingCompatibility is OnRampSetup {
   bytes32 internal constant CCIP_MESSAGE_SENT_TOPIC =
-    keccak256("CCIPMessageSent(uint64,uint64,bytes32,address,bytes,(address,uint32,uint32,uint256,bytes)[],bytes[])");
+    keccak256("CCIPMessageSent(uint64,address,bytes32,address,bytes,(address,uint32,uint32,uint256,bytes)[],bytes[])");
 
   function decode(
     bytes calldata encodedMessage

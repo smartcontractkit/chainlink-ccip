@@ -16,6 +16,7 @@ import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/I
 import {CCVConfigValidation} from "../libraries/CCVConfigValidation.sol";
 import {Client} from "../libraries/Client.sol";
 import {ExtraArgsCodec} from "../libraries/ExtraArgsCodec.sol";
+import {FeeTokenHandler} from "../libraries/FeeTokenHandler.sol";
 import {MessageV1Codec} from "../libraries/MessageV1Codec.sol";
 import {Pool} from "../libraries/Pool.sol";
 import {USDPriceWith18Decimals} from "../libraries/USDPriceWith18Decimals.sol";
@@ -49,13 +50,13 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   error InsufficientFeeTokenAmount();
   error TokenReceiverNotAllowed(uint64 destChainSelector);
   error SourceTokenDataTooLarge(address token, uint256 actualLength, uint32 maxLength);
+  error FeeExceedsMaxAllowed(uint256 feeUSDCents, uint32 maxUSDCentsPerMessage);
 
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
   event DestChainConfigSet(uint64 indexed destChainSelector, uint64 messageNumber, DestChainConfigArgs config);
-  event FeeTokenWithdrawn(address indexed feeAggregator, address indexed feeToken, uint256 amount);
   event CCIPMessageSent(
     uint64 indexed destChainSelector,
-    uint64 indexed messageNumber,
+    address indexed sender,
     bytes32 indexed messageId,
     address feeToken,
     bytes encodedMessage,
@@ -73,8 +74,9 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   /// @dev Struct that contains the static configuration.
   // solhint-disable-next-line gas-struct-packing
   struct StaticConfig {
-    uint64 chainSelector; // ────╮ Local chain selector.
-    IRMNRemote rmnRemote; // ────╯ RMN remote address.
+    uint64 chainSelector; // ─────────╮ Local chain selector.
+    IRMNRemote rmnRemote; //          │ RMN remote address.
+    uint32 maxUSDCentsPerMessage; // ─╯ Maximum USD cent value per message.
     address tokenAdminRegistry; // Token admin registry address.
   }
 
@@ -95,8 +97,8 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     uint8 addressBytesLength; //   │ The length of an address on this chain in bytes, e.g. 20 for EVM, 32 for SVM.
     uint16 networkFeeUSDCents; //  │ Network fee in USD cents for messages to this destination chain.
     bool tokenReceiverAllowed; // ─╯ Whether specifying `tokenReceiver` in extraArgs is allowed at all.
-    uint32 baseExecutionGasCost; // Base gas cost for executing a message on the destination chain.
-    address defaultExecutor; // Default executor to use for messages to this destination chain.
+    uint32 baseExecutionGasCost; // ─╮ Base gas cost for executing a message on the destination chain.
+    address defaultExecutor; // ─────╯ Default executor to use for messages to this destination chain.
     address[] laneMandatedCCVs; // Required CCVs to use for all messages to this destination chain.
     address[] defaultCCVs; // Default CCVs to use for messages to this destination chain.
     bytes offRamp; // Destination OffRamp address, NOT abi encoded but raw bytes.
@@ -146,6 +148,8 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   IRMNRemote private immutable i_rmnRemote;
   /// @dev The address of the token admin registry.
   address private immutable i_tokenAdminRegistry;
+  /// @dev The maximum USD cent value per message. Used to reduce impact of potential misconfigurations.
+  uint32 internal immutable i_maxUSDCentsPerMsg;
 
   // DYNAMIC CONFIG
   /// @dev The dynamic config for the onRamp.
@@ -160,7 +164,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   ) {
     if (
       staticConfig.chainSelector == 0 || address(staticConfig.rmnRemote) == address(0)
-        || staticConfig.tokenAdminRegistry == address(0)
+        || staticConfig.tokenAdminRegistry == address(0) || staticConfig.maxUSDCentsPerMessage == 0
     ) {
       revert InvalidConfig();
     }
@@ -168,6 +172,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     i_localChainSelector = staticConfig.chainSelector;
     i_rmnRemote = staticConfig.rmnRemote;
     i_tokenAdminRegistry = staticConfig.tokenAdminRegistry;
+    i_maxUSDCentsPerMsg = staticConfig.maxUSDCentsPerMessage;
 
     _setDynamicConfig(dynamicConfig);
   }
@@ -332,7 +337,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     // 7. emit event.
     emit CCIPMessageSent({
       destChainSelector: destChainSelector,
-      messageNumber: newMessage.messageNumber,
+      sender: originalSender,
       messageId: messageId,
       feeToken: message.feeToken,
       encodedMessage: eventData.encodedMessage,
@@ -559,7 +564,10 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   /// @return staticConfig the static configuration.
   function getStaticConfig() public view returns (StaticConfig memory) {
     return StaticConfig({
-      chainSelector: i_localChainSelector, rmnRemote: i_rmnRemote, tokenAdminRegistry: i_tokenAdminRegistry
+      chainSelector: i_localChainSelector,
+      rmnRemote: i_rmnRemote,
+      maxUSDCentsPerMessage: i_maxUSDCentsPerMsg,
+      tokenAdminRegistry: i_tokenAdminRegistry
     });
   }
 
@@ -753,7 +761,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     uint16 finality,
     bytes memory tokenArgs
   ) internal view returns (address[] memory requiredCCVs) {
-    address[] memory defaultCCVs = s_destChainConfigs[destChainSelector].defaultCCVs;
+    address[] storage defaultCCVs = s_destChainConfigs[destChainSelector].defaultCCVs;
     IPoolV1 pool = getPoolBySourceToken(destChainSelector, IERC20(token));
     if (address(pool) == address(0)) {
       revert UnsupportedToken(token);
@@ -936,8 +944,9 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
     uint256 executorIndex = receipts.length - 2;
     // This includes the user callback gas limit.
-    receipts[executorIndex] =
-      _getExecutionFee(destChainSelector, message.data.length, message.tokenAmounts.length, extraArgs);
+    receipts[executorIndex] = _getExecutionFee(
+      destChainSelector, message.data.length, message.tokenAmounts.length, extraArgs, message.feeToken
+    );
 
     gasLimitSum += receipts[executorIndex].destGasLimit;
     bytesOverheadSum += receipts[executorIndex].destBytesOverhead;
@@ -975,6 +984,11 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       feeTokenAmount += receipts[i].feeTokenAmount;
     }
 
+    // Enforce max fee per message.
+    if (feeTokenAmount > (uint256(i_maxUSDCentsPerMsg) * 1e34) / feeTokenPrice) {
+      revert FeeExceedsMaxAllowed(feeTokenAmount, i_maxUSDCentsPerMsg);
+    }
+
     return (receipts, updatedGasLimitSum, feeTokenAmount);
   }
 
@@ -988,7 +1002,8 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     uint64 destChainSelector,
     uint256 dataLength,
     uint256 numberOfTokens,
-    ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs
+    ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs,
+    address feeToken
   ) internal view returns (Receipt memory) {
     DestChainConfig storage destChainConfig = s_destChainConfigs[destChainSelector];
     uint8 remoteChainAddressLengthBytes = destChainConfig.addressBytesLength;
@@ -1009,7 +1024,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       feeTokenAmount: extraArgs.executor == Client.NO_EXECUTION_ADDRESS
         ? 0
         : IExecutor(extraArgs.executor)
-          .getFee(destChainSelector, extraArgs.blockConfirmations, extraArgs.ccvs, extraArgs.executorArgs),
+          .getFee(destChainSelector, extraArgs.blockConfirmations, extraArgs.ccvs, extraArgs.executorArgs, feeToken),
       extraArgs: extraArgs.executorArgs
     });
   }
@@ -1020,17 +1035,6 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   function withdrawFeeTokens(
     address[] calldata feeTokens
   ) external {
-    address feeAggregator = s_dynamicConfig.feeAggregator;
-
-    for (uint256 i = 0; i < feeTokens.length; ++i) {
-      IERC20 feeToken = IERC20(feeTokens[i]);
-      uint256 feeTokenBalance = feeToken.balanceOf(address(this));
-
-      if (feeTokenBalance > 0) {
-        feeToken.safeTransfer(feeAggregator, feeTokenBalance);
-
-        emit FeeTokenWithdrawn(feeAggregator, address(feeToken), feeTokenBalance);
-      }
-    }
+    FeeTokenHandler._withdrawFeeTokens(feeTokens, s_dynamicConfig.feeAggregator);
   }
 }

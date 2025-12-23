@@ -103,11 +103,13 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
     i_bridge = bridge;
     i_lombardVerifierResolver = verifier;
     i_tokenAdapter = adapter;
+
     if (adapter != address(0)) {
       token.safeIncreaseAllowance(adapter, type(uint256).max);
     } else {
       token.safeIncreaseAllowance(address(bridge), type(uint256).max);
     }
+
     emit LombardConfigurationSet(verifier, address(bridge), adapter);
   }
 
@@ -130,8 +132,11 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
     if (verifierImpl == address(0)) {
       revert OutboundImplementationNotFoundForVerifier();
     }
-    // We forward the whole amount to the verifier; the verifier accrues fees and super.lockOrBurn returns the post-fee destTokenAmount.
+
+    // We forward the whole amount to the verifier; the verifier accrues fees and super.lockOrBurn returns the post-fee
+    // destTokenAmount.
     i_token.safeTransfer(verifierImpl, lockOrBurnIn.amount);
+
     return super.lockOrBurn(lockOrBurnIn, blockConfirmationRequested, tokenArgs);
   }
 
@@ -187,6 +192,9 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
   // ================================================================
   // │                      Release or Mint                         │
   // ================================================================
+
+  // The IPoolV2.releaseOrMint does various checks, but is a no-op by default. That's exactly the behaviour we need here
+  // because the minting is performed through the CCV. Therefore, we don't override at all.
 
   /// @notice Backwards compatible releaseOrMint for CCIP 1.5/1.6 lanes. Verifies the bridge payload proof.
   /// @param releaseOrMintIn The release or mint input parameters.

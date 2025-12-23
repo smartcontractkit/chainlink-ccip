@@ -49,6 +49,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   error InvalidOffRamp(address expected, bytes got);
   error InboundImplementationNotFound(address ccvAddress, bytes verifierResults);
   error InvalidGasLimitOverride(uint32 messageGasLimit, uint32 gasLimitOverride);
+  error GasCannotBeZero();
 
   /// @dev Atlas depends on various events, if changing, please notify Atlas.
   event StaticConfigSet(StaticConfig staticConfig);
@@ -109,6 +110,9 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// relevant opcodes in callWithExactGas.
   uint16 internal immutable i_gasForCallExactCheck;
 
+  // At the top to pack it with the `owner` variable from Ownable2StepMsgSender.
+  bool private s_reentrancyGuardEntered;
+
   // DYNAMIC CONFIG
 
   /// @notice Set of source chain selectors.
@@ -123,8 +127,6 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
 
   // STATE
 
-  bool private s_reentrancyGuardEntered;
-
   /// Message state is tracked to ensure message can only be executed successfully once.
   mapping(bytes32 execStateKey => Internal.MessageExecutionState state) internal s_executionStates;
 
@@ -138,11 +140,15 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     if (staticConfig.localChainSelector == 0) {
       revert ZeroChainSelectorNotAllowed();
     }
+    if (staticConfig.gasForCallExactCheck == 0) {
+      revert GasCannotBeZero();
+    }
 
     i_chainSelector = staticConfig.localChainSelector;
     i_rmnRemote = staticConfig.rmnRemote;
     i_tokenAdminRegistry = staticConfig.tokenAdminRegistry;
     i_gasForCallExactCheck = staticConfig.gasForCallExactCheck;
+
     emit StaticConfigSet(staticConfig);
   }
 
@@ -177,8 +183,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     if (i_rmnRemote.isCursed(bytes16(uint128(message.sourceChainSelector)))) {
       revert CursedByRMN(message.sourceChainSelector);
     }
-    SourceChainConfig storage sourceConfig = s_sourceChainConfigs[message.sourceChainSelector];
-    if (!sourceConfig.isEnabled) {
+    if (!s_sourceChainConfigs[message.sourceChainSelector].isEnabled) {
       revert SourceChainNotEnabled(message.sourceChainSelector);
     }
     if (!s_allowedOnRampHashes[message.sourceChainSelector].contains(keccak256(message.onRampAddress))) {
@@ -546,7 +551,9 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
           if (optionalThreshold > 0) {
             --optionalThreshold;
           }
-          continue;
+
+          // Break is safe because we asserted no duplicates in _getCCVsFromReceiver.
+          break;
         }
         ++j;
       }

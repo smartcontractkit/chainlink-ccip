@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {ICrossChainVerifierResolver} from "../../../interfaces/ICrossChainVerifierResolver.sol";
 import {ICrossChainVerifierV1} from "../../../interfaces/ICrossChainVerifierV1.sol";
 import {IExecutor} from "../../../interfaces/IExecutor.sol";
+import {IFeeQuoter} from "../../../interfaces/IFeeQuoter.sol";
 
 import {Client} from "../../../libraries/Client.sol";
 import {ExtraArgsCodec} from "../../../libraries/ExtraArgsCodec.sol";
@@ -18,7 +19,7 @@ contract OnRamp_getFee is OnRampSetup {
     super.setUp();
 
     _mockVerifierFee(s_defaultCCV, MOCKED_DEFAULT_CCV_FEE_USD_CENTS, DEFAULT_CCV_GAS_LIMIT, DEFAULT_CCV_PAYLOAD_SIZE);
-    _mockExecutorFee(s_defaultExecutor, MOCKED_DEFAULT_EXECUTOR_FEE_USD_CENTS, 0, 0);
+    _mockExecutorFee(s_defaultExecutor, MOCKED_DEFAULT_EXECUTOR_FEE_USD_CENTS);
   }
 
   function _mockVerifierFee(
@@ -41,15 +42,9 @@ contract OnRamp_getFee is OnRampSetup {
 
   function _mockExecutorFee(
     address executor,
-    uint16 feeUSDCents,
-    uint64 gasForVerification,
-    uint32 payloadSizeBytes
+    uint16 feeUSDCents
   ) internal {
-    vm.mockCall(
-      executor,
-      abi.encodeWithSelector(IExecutor.getFee.selector),
-      abi.encode(feeUSDCents, gasForVerification, payloadSizeBytes)
-    );
+    vm.mockCall(executor, abi.encodeWithSelector(IExecutor.getFee.selector), abi.encode(feeUSDCents));
   }
 
   function test_getFee_WithV3ExtraArgs_CustomCCV_SkipsDefaults() public {
@@ -114,7 +109,7 @@ contract OnRamp_getFee is OnRampSetup {
     uint16 differentExecutorFee = 300;
     uint16 differentVerifierFee = 200;
 
-    _mockExecutorFee(customExecutor, differentExecutorFee, 0, 0);
+    _mockExecutorFee(customExecutor, differentExecutorFee);
     _mockVerifierFee(verifier, differentVerifierFee, 0, 0);
 
     address[] memory ccvAddresses = new address[](1);
@@ -140,6 +135,32 @@ contract OnRamp_getFee is OnRampSetup {
 
     assertLt(feeAmount, 1e19);
     assertGt(feeAmount, 5e17);
+  }
+
+  function test_getFee_RevertWhen_ExceedsMaxFeePerMessage() public {
+    // Make verifier + executor fees to 0 so the test only targets the execution-cost component.
+    _mockVerifierFee(s_defaultCCV, 0, 0, 0);
+    _mockExecutorFee(s_defaultExecutor, 0);
+
+    uint256 premiumPercentMultiplier = 100;
+
+    // Make the call return the max amount for the gas cost. Then assert the protocol fee is more than 0, which causes
+    // the total fee to exceed the max allowed.
+    vm.mockCall(
+      address(s_feeQuoter),
+      abi.encodeWithSelector(IFeeQuoter.quoteGasForExec.selector),
+      abi.encode(uint32(0), MAX_USD_CENTS_PER_MESSAGE, uint256(1e18), premiumPercentMultiplier)
+    );
+
+    uint256 protocolFeeUsdCents = (uint256(NETWORK_FEE_USD_CENTS) * premiumPercentMultiplier) / 100;
+    assertGt(protocolFeeUsdCents, 0);
+
+    uint256 expectedFeeTokenAmount = ((MAX_USD_CENTS_PER_MESSAGE + protocolFeeUsdCents) * 1e34) / 1e18;
+
+    vm.expectRevert(
+      abi.encodeWithSelector(OnRamp.FeeExceedsMaxAllowed.selector, expectedFeeTokenAmount, MAX_USD_CENTS_PER_MESSAGE)
+    );
+    s_onRamp.getFee(DEST_CHAIN_SELECTOR, _generateEmptyMessage());
   }
 
   function test_getFee_RevertWhen_TokenReceiverNotAllowed() public {

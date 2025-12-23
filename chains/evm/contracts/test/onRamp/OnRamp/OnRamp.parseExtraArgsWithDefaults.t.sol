@@ -21,6 +21,7 @@ contract OnRamp_parseExtraArgsWithDefaults is OnRampSetup {
       OnRamp.StaticConfig({
         chainSelector: SOURCE_CHAIN_SELECTOR,
         rmnRemote: s_mockRMNRemote,
+        maxUSDCentsPerMessage: MAX_USD_CENTS_PER_MESSAGE,
         tokenAdminRegistry: address(s_tokenAdminRegistry)
       }),
       OnRamp.DynamicConfig({
@@ -98,7 +99,6 @@ contract OnRamp_parseExtraArgsWithDefaults is OnRampSetup {
     assertEq(s_defaultExecutor, result.executor);
   }
 
-  // TODO Sui/SVM
   function test_parseExtraArgsWithDefaults_OldExtraArgs() public view {
     // Use GenericExtraArgsV2 format.
     uint256 gasLimit = 300_000;

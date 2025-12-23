@@ -3,10 +3,12 @@ pragma solidity ^0.8.24;
 
 import {IAdvancedPoolHooks} from "../interfaces/IAdvancedPoolHooks.sol";
 import {IPoolV1} from "../interfaces/IPool.sol";
+import {IPoolV1V2} from "../interfaces/IPoolV1V2.sol";
 import {IPoolV2} from "../interfaces/IPoolV2.sol";
 import {IRMN} from "../interfaces/IRMN.sol";
 import {IRouter} from "../interfaces/IRouter.sol";
 
+import {FeeTokenHandler} from "../libraries/FeeTokenHandler.sol";
 import {Pool} from "../libraries/Pool.sol";
 import {RateLimiter} from "../libraries/RateLimiter.sol";
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
@@ -34,7 +36,7 @@ import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/Enumera
 /// 0.000567 tokens.
 /// In the case of a burnMint pool on chain A, these funds are burned in the pool on chain A.
 /// In the case of a lockRelease pool on chain A, these funds accumulate in the pool on chain A.
-abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
+abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   using EnumerableSet for EnumerableSet.Bytes32Set;
   using EnumerableSet for EnumerableSet.UintSet;
   using RateLimiter for RateLimiter.TokenBucket;
@@ -90,7 +92,6 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     RateLimiter.Config outboundRateLimiterConfig,
     RateLimiter.Config inboundRateLimiterConfig
   );
-  event FeeTokenWithdrawn(address indexed recipient, address indexed feeToken, uint256 amount);
   event MinBlockConfirmationSet(uint16 minBlockConfirmation);
   event AdvancedPoolHooksUpdated(IAdvancedPoolHooks oldHook, IAdvancedPoolHooks newHook);
 
@@ -1062,12 +1063,6 @@ abstract contract TokenPool is IPoolV2, Ownable2StepMsgSender {
     address[] calldata feeTokens,
     address recipient
   ) external onlyOwner {
-    for (uint256 i = 0; i < feeTokens.length; ++i) {
-      uint256 feeTokenBalance = IERC20(feeTokens[i]).balanceOf(address(this));
-      if (feeTokenBalance > 0) {
-        IERC20(feeTokens[i]).safeTransfer(recipient, feeTokenBalance);
-        emit FeeTokenWithdrawn(recipient, address(feeTokens[i]), feeTokenBalance);
-      }
-    }
+    FeeTokenHandler._withdrawFeeTokens(feeTokens, recipient);
   }
 }
