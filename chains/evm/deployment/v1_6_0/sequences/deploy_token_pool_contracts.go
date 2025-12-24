@@ -3,6 +3,7 @@ package sequences
 import (
 	"fmt"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
@@ -31,6 +32,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc20"
 )
 
 var DeployTokenPool = cldf_ops.NewSequence(
@@ -63,6 +65,16 @@ var DeployTokenPool = cldf_ops.NewSequence(
 		}, input.ChainSelector, datastore_utils.FullRef)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("token with symbol '%s' is not found in datastore, %v", input.TokenSymbol, err)
+		}
+
+		// get token decimals
+		token, err := burn_mint_erc20.NewBurnMintERC20(common.HexToAddress(tokenAddr.Address), chain.Client)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to instantiate token contract at address '%s': %w", tokenAddr.Address, err)
+		}
+		tokenDecimal, err := token.Decimals(&bind.CallOpts{Context: b.GetContext()})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to get token decimals for token at address '%s': %w", tokenAddr.Address, err)
 		}
 
 		// find the router address from the data store
@@ -105,7 +117,7 @@ var DeployTokenPool = cldf_ops.NewSequence(
 				ChainSelector:  chain.Selector,
 				Args: v1_6_1_burn_mint_token_pool.ConstructorArgs{
 					Token:              common.HexToAddress(tokenAddr.Address),
-					LocalTokenDecimals: input.TokenDecimals,
+					LocalTokenDecimals: tokenDecimal,
 					Allowlist:          allowlist,
 					RmnProxy:           common.HexToAddress(rmpProxyAddr.Address),
 					Router:             common.HexToAddress(routerAddr.Address),
@@ -122,7 +134,7 @@ var DeployTokenPool = cldf_ops.NewSequence(
 				ChainSelector:  chain.Selector,
 				Args: v1_6_1_burn_from_mint_token_pool.ConstructorArgs{
 					Token:              common.HexToAddress(tokenAddr.Address),
-					LocalTokenDecimals: input.TokenDecimals,
+					LocalTokenDecimals: tokenDecimal,
 					Allowlist:          allowlist,
 					RmnProxy:           common.HexToAddress(rmpProxyAddr.Address),
 					Router:             common.HexToAddress(routerAddr.Address),
@@ -139,7 +151,7 @@ var DeployTokenPool = cldf_ops.NewSequence(
 				ChainSelector:  chain.Selector,
 				Args: v1_6_1_burn_mint_with_lock_release_flag_token_pool.ConstructorArgs{
 					Token:              common.HexToAddress(tokenAddr.Address),
-					LocalTokenDecimals: input.TokenDecimals,
+					LocalTokenDecimals: tokenDecimal,
 					Allowlist:          allowlist,
 					RmnProxy:           common.HexToAddress(rmpProxyAddr.Address),
 					Router:             common.HexToAddress(routerAddr.Address),
@@ -156,7 +168,7 @@ var DeployTokenPool = cldf_ops.NewSequence(
 				ChainSelector:  chain.Selector,
 				Args: v1_6_1_burn_to_address_mint_token_pool.ConstructorArgs{
 					Token:              common.HexToAddress(tokenAddr.Address),
-					LocalTokenDecimals: input.TokenDecimals,
+					LocalTokenDecimals: tokenDecimal,
 					Allowlist:          allowlist,
 					RmnProxy:           common.HexToAddress(rmpProxyAddr.Address),
 					Router:             common.HexToAddress(routerAddr.Address),
@@ -174,7 +186,7 @@ var DeployTokenPool = cldf_ops.NewSequence(
 				ChainSelector:  chain.Selector,
 				Args: v1_6_1_burn_with_from_mint_token_pool.ConstructorArgs{
 					Token:              common.HexToAddress(tokenAddr.Address),
-					LocalTokenDecimals: input.TokenDecimals,
+					LocalTokenDecimals: tokenDecimal,
 					Allowlist:          allowlist,
 					RmnProxy:           common.HexToAddress(rmpProxyAddr.Address),
 					Router:             common.HexToAddress(routerAddr.Address),
@@ -191,7 +203,7 @@ var DeployTokenPool = cldf_ops.NewSequence(
 				ChainSelector:  chain.Selector,
 				Args: v1_6_1_lock_release_token_pool.ConstructorArgs{
 					Token:              common.HexToAddress(tokenAddr.Address),
-					LocalTokenDecimals: input.TokenDecimals,
+					LocalTokenDecimals: tokenDecimal,
 					Allowlist:          allowlist,
 					RmnProxy:           common.HexToAddress(rmpProxyAddr.Address),
 					Router:             common.HexToAddress(routerAddr.Address),
@@ -208,7 +220,7 @@ var DeployTokenPool = cldf_ops.NewSequence(
 				ChainSelector:  chain.Selector,
 				Args: v1_6_1_siloed_lock_release_token_pool.ConstructorArgs{
 					Token:              common.HexToAddress(tokenAddr.Address),
-					LocalTokenDecimals: input.TokenDecimals,
+					LocalTokenDecimals: tokenDecimal,
 					Allowlist:          allowlist,
 					RmnProxy:           common.HexToAddress(rmpProxyAddr.Address),
 					Router:             common.HexToAddress(routerAddr.Address),
@@ -227,7 +239,7 @@ var DeployTokenPool = cldf_ops.NewSequence(
 				Args: v1_6_0_burn_mint_with_external_minter_token_pool.ConstructorArgs{
 					Minter:             common.HexToAddress(input.ExternalMinter),
 					Token:              common.HexToAddress(tokenAddr.Address),
-					LocalTokenDecimals: input.TokenDecimals,
+					LocalTokenDecimals: tokenDecimal,
 					Allowlist:          allowlist,
 					RmnProxy:           common.HexToAddress(rmpProxyAddr.Address),
 					Router:             common.HexToAddress(routerAddr.Address),
@@ -245,7 +257,7 @@ var DeployTokenPool = cldf_ops.NewSequence(
 				Args: v1_6_0_hybrid_with_external_minter_token_pool.ConstructorArgs{
 					Minter:             common.HexToAddress(input.ExternalMinter),
 					Token:              common.HexToAddress(tokenAddr.Address),
-					LocalTokenDecimals: input.TokenDecimals,
+					LocalTokenDecimals: tokenDecimal,
 					Allowlist:          allowlist,
 					RmnProxy:           common.HexToAddress(rmpProxyAddr.Address),
 					Router:             common.HexToAddress(routerAddr.Address),
@@ -263,7 +275,7 @@ var DeployTokenPool = cldf_ops.NewSequence(
 				ChainSelector:  chain.Selector,
 				Args: v1_5_1_burn_mint_token_pool.ConstructorArgs{
 					Token:              common.HexToAddress(tokenAddr.Address),
-					LocalTokenDecimals: input.TokenDecimals,
+					LocalTokenDecimals: tokenDecimal,
 					Allowlist:          allowlist,
 					RmnProxy:           common.HexToAddress(rmpProxyAddr.Address),
 					Router:             common.HexToAddress(routerAddr.Address),
@@ -280,7 +292,7 @@ var DeployTokenPool = cldf_ops.NewSequence(
 				ChainSelector:  chain.Selector,
 				Args: v1_5_1_burn_from_mint_token_pool.ConstructorArgs{
 					Token:              common.HexToAddress(tokenAddr.Address),
-					LocalTokenDecimals: input.TokenDecimals,
+					LocalTokenDecimals: tokenDecimal,
 					Allowlist:          allowlist,
 					RmnProxy:           common.HexToAddress(rmpProxyAddr.Address),
 					Router:             common.HexToAddress(routerAddr.Address),
@@ -297,7 +309,7 @@ var DeployTokenPool = cldf_ops.NewSequence(
 				ChainSelector:  chain.Selector,
 				Args: v1_5_1_burn_to_address_mint_token_pool.ConstructorArgs{
 					Token:              common.HexToAddress(tokenAddr.Address),
-					LocalTokenDecimals: input.TokenDecimals,
+					LocalTokenDecimals: tokenDecimal,
 					Allowlist:          allowlist,
 					RmnProxy:           common.HexToAddress(rmpProxyAddr.Address),
 					Router:             common.HexToAddress(routerAddr.Address),
@@ -315,7 +327,7 @@ var DeployTokenPool = cldf_ops.NewSequence(
 				ChainSelector:  chain.Selector,
 				Args: v1_5_1_burn_with_from_mint_token_pool.ConstructorArgs{
 					Token:              common.HexToAddress(tokenAddr.Address),
-					LocalTokenDecimals: input.TokenDecimals,
+					LocalTokenDecimals: tokenDecimal,
 					Allowlist:          allowlist,
 					RmnProxy:           common.HexToAddress(rmpProxyAddr.Address),
 					Router:             common.HexToAddress(routerAddr.Address),
@@ -332,7 +344,7 @@ var DeployTokenPool = cldf_ops.NewSequence(
 				ChainSelector:  chain.Selector,
 				Args: v1_5_1_lock_release_token_pool.ConstructorArgs{
 					Token:              common.HexToAddress(tokenAddr.Address),
-					LocalTokenDecimals: input.TokenDecimals,
+					LocalTokenDecimals: tokenDecimal,
 					Allowlist:          allowlist,
 					RmnProxy:           common.HexToAddress(rmpProxyAddr.Address),
 					AcceptLiquidity:    *input.AcceptLiquidity,

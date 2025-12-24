@@ -197,7 +197,6 @@ func TestDeployTokenPool(t *testing.T) {
 			// Build input for DeployTokenPool sequence
 			input := tokenapi.DeployTokenPoolInput{
 				TokenSymbol:       tokenSymbol,
-				TokenDecimals:     tokenDecimals,
 				PoolType:          string(tc.poolType),
 				TokenPoolVersion:  tc.poolVersion,
 				Allowlist:         tc.allowlist,
@@ -351,7 +350,6 @@ func TestDeployTokenPool_AlreadyDeployed(t *testing.T) {
 
 	input := tokenapi.DeployTokenPoolInput{
 		TokenSymbol:       tokenSymbol,
-		TokenDecimals:     tokenDecimals,
 		PoolType:          string(poolType),
 		TokenPoolVersion:  utils.Version_1_6_1,
 		ChainSelector:     chainSelector,
@@ -384,7 +382,6 @@ func TestDeployTokenPool_MissingTokenPoolVersion(t *testing.T) {
 
 	input := tokenapi.DeployTokenPoolInput{
 		TokenSymbol:       "TEST",
-		TokenDecimals:     18,
 		PoolType:          string(burn_mint_token_pool.ContractType),
 		TokenPoolVersion:  nil, // Missing version
 		ChainSelector:     chainSelector,
@@ -448,7 +445,6 @@ func TestDeployTokenPool_UnsupportedPoolType(t *testing.T) {
 
 	input := tokenapi.DeployTokenPoolInput{
 		TokenSymbol:       tokenSymbol,
-		TokenDecimals:     tokenDecimals,
 		PoolType:          "UnsupportedPoolType",
 		TokenPoolVersion:  utils.Version_1_6_1,
 		ChainSelector:     chainSelector,
@@ -504,7 +500,6 @@ func TestDeployTokenPool_MissingRouter(t *testing.T) {
 
 	input := tokenapi.DeployTokenPoolInput{
 		TokenSymbol:       tokenSymbol,
-		TokenDecimals:     tokenDecimals,
 		PoolType:          string(burn_mint_token_pool.ContractType),
 		TokenPoolVersion:  utils.Version_1_6_1,
 		ChainSelector:     chainSelector,
@@ -560,7 +555,6 @@ func TestDeployTokenPool_MissingRMNProxy(t *testing.T) {
 
 	input := tokenapi.DeployTokenPoolInput{
 		TokenSymbol:       tokenSymbol,
-		TokenDecimals:     tokenDecimals,
 		PoolType:          string(burn_mint_token_pool.ContractType),
 		TokenPoolVersion:  utils.Version_1_6_1,
 		ChainSelector:     chainSelector,
@@ -611,7 +605,6 @@ func TestDeployTokenPool_MissingToken(t *testing.T) {
 
 	input := tokenapi.DeployTokenPoolInput{
 		TokenSymbol:       tokenSymbol, // Token not in datastore
-		TokenDecimals:     18,
 		PoolType:          string(burn_mint_token_pool.ContractType),
 		TokenPoolVersion:  utils.Version_1_6_1,
 		ChainSelector:     chainSelector,
