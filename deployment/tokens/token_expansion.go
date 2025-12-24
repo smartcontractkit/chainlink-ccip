@@ -5,13 +5,17 @@ import (
 	"math/big"
 
 	"github.com/Masterminds/semver/v3"
+
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
+	mcms_types "github.com/smartcontractkit/mcms/types"
+
+	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	mcms_types "github.com/smartcontractkit/mcms/types"
 )
 
 type TokenExpansionInput struct {
@@ -43,6 +47,13 @@ type DeployTokenInput struct {
 	Symbol   string   `yaml:"symbol" json:"symbol"`
 	Decimals uint8    `yaml:"decimals" json:"decimals"`
 	Supply   *big.Int `yaml:"supply" json:"supply"`
+	PreMint  *big.Int `yaml:"pre-mint" json:"preMint"`
+	// Customer admin who will be granted admin rights on the token
+	// For EVM, expect to have only one Admin address to be passed on whereas Solana may have multiple multisig signers.
+	// Use string to keep this struct chain-agnostic (EVM uses hex, Solana uses base58, etc.)
+	ExternalAdmin []string `yaml:"external-admin" json:"externalAdmin"`
+	// Address to be set as the CCIP admin on the token contract, defaults to the timelock address
+	CCIPAdmin string
 	// list of addresses who may need special processing in order to send tokens
 	// e.g. for Solana, addresses that need associated token accounts created
 	Senders []string `yaml:"senders" json:"senders"`
@@ -58,10 +69,12 @@ type DeployTokenInput struct {
 	ChainSelector     uint64
 	ExistingDataStore datastore.DataStore
 }
+
 type DeployTokenPoolInput struct {
-	TokenSymbol        string `yaml:"token-symbol" json:"tokenSymbol"`
-	TokenPoolQualifier string `yaml:"token-pool-qualifier" json:"tokenPoolQualifier"`
-	PoolType           string `yaml:"pool-type" json:"poolType"`
+	TokenSymbol        string          `yaml:"token-symbol" json:"tokenSymbol"`
+	TokenPoolQualifier string          `yaml:"token-pool-qualifier" json:"tokenPoolQualifier"`
+	PoolType           string          `yaml:"pool-type" json:"poolType"`
+	TokenPoolVersion   *semver.Version `yaml:"token-pool-version" json:"tokenPoolVersion"`
 	// below are not specified by the user, filled in by the deployment system to pass to chain operations
 	ChainSelector     uint64
 	ExistingDataStore datastore.DataStore
@@ -95,7 +108,25 @@ func TokenExpansion() cldf.ChangeSetV2[TokenExpansionInput] {
 
 func tokenExpansionVerify() func(cldf.Environment, TokenExpansionInput) error {
 	return func(e cldf.Environment, cfg TokenExpansionInput) error {
-		// TODO: implement
+		tokenPoolRegistry := GetTokenAdapterRegistry()
+		for selector, input := range cfg.TokenExpansionInputPerChain {
+			family, err := chain_selectors.GetSelectorFamily(selector)
+			if err != nil {
+				return fmt.Errorf("not a valid selector: %v", err)
+			}
+			tokenPoolAdapter, exists := tokenPoolRegistry.GetTokenAdapter(family, cfg.ChainAdapterVersion)
+			if !exists {
+				return fmt.Errorf("no TokenPoolAdapter registered for chain family '%s'", family)
+			}
+			// deploy token
+			deployTokenInput := input.DeployTokenInput
+			deployTokenInput.ExistingDataStore = e.DataStore
+			deployTokenInput.ChainSelector = selector
+			err = tokenPoolAdapter.DeployTokenVerify(e, input)
+			if err != nil {
+				return fmt.Errorf("failed to verify deploy token input for chain selector %d: %w", selector, err)
+			}
+		}
 		return nil
 	}
 }
@@ -119,10 +150,26 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 			if !exists {
 				return cldf.ChangesetOutput{}, fmt.Errorf("no TokenPoolAdapter registered for chain family '%s'", family)
 			}
+
 			// deploy token
 			deployTokenInput := input.DeployTokenInput
 			deployTokenInput.ExistingDataStore = e.DataStore
 			deployTokenInput.ChainSelector = selector
+			timelockAddr, err := datastore_utils.FindAndFormatRef(deployTokenInput.ExistingDataStore, datastore.AddressRef{
+				ChainSelector: deployTokenInput.ChainSelector,
+				Type:          datastore.ContractType(common_utils.RBACTimelock),
+				Qualifier:     cfg.MCMS.Qualifier,
+			}, deployTokenInput.ChainSelector, datastore_utils.FullRef)
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("couldn't find the RBACTimelock "+
+					"address in datastore for selector %v and qualifier %v %v", deployTokenInput.ChainSelector, cfg.MCMS.Qualifier, err)
+			}
+			// if token is deployed by CLL, set CCIP admin as RBACTimelock by default.
+			// If input has CCIPAdmin and which is external address, set that address as CCIPAdmin
+			// and we may not be able to register the token by CLL in that case.
+			if deployTokenInput.CCIPAdmin == "" {
+				deployTokenInput.CCIPAdmin = timelockAddr.Address
+			}
 			deployTokenReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, tokenPoolAdapter.DeployToken(), e.BlockChains, deployTokenInput)
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to manual register token and token pool %d: %w", selector, err)
