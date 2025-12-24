@@ -72,7 +72,6 @@ type DeployTokenInput struct {
 
 type DeployTokenPoolInput struct {
 	TokenSymbol        string          `yaml:"token-symbol" json:"tokenSymbol"`
-	TokenDecimals      uint8           `yaml:"token-decimals" json:"tokenDecimals"`
 	TokenPoolQualifier string          `yaml:"token-pool-qualifier" json:"tokenPoolQualifier"`
 	PoolType           string          `yaml:"pool-type" json:"poolType"`
 	TokenPoolVersion   *semver.Version `yaml:"token-pool-version" json:"tokenPoolVersion"`
