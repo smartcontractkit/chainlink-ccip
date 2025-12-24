@@ -1,0 +1,255 @@
+package sequences
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"math/big"
+
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
+
+	mcms_types "github.com/smartcontractkit/mcms/types"
+
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
+	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/erc20"
+
+	tg_bindings "github.com/smartcontractkit/ccip-contract-examples/chains/evm/gobindings/generated/latest/token_governor"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/token_governor"
+	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
+	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+)
+
+type DeployTokenGovernorInput struct {
+	Token               string   `yaml:"token" json:"token"`
+	InitialDelay        *big.Int `yaml:"initial-delay" json:"initialDelay"`
+	InitialDefaultAdmin string   `yaml:"initial-default-admin" json:"initialDefaultAdmin"`
+	// below are not specified by the user, filled in by the deployment system to pass to chain operations
+	ChainSelector     uint64
+	ExistingDataStore datastore.DataStore
+}
+
+type TokenGovernorRole uint8
+
+const (
+	RoleMinter TokenGovernorRole = iota
+	RoleBridgerMinterOrBurner
+	RoleBurner
+	RoleFreezer
+	RoleUnfreezer
+	RolePauser
+	RoleUnpauser
+	RoleRecovery
+	RoleCheckerAdmin
+	RoleDefaultAdmin
+)
+
+type TokenGovernorRoleChangesetConfig struct {
+	Tokens map[uint64]map[string]TokenGovernorGrantRole `yaml:"tokens" json:"tokens"`
+	MCMS   *mcms.Input                                  `yaml:"mcms,omitempty" json:"mcms,omitempty"`
+	// below are not specified by the user, filled in by the deployment system to pass to chain operations
+	ChainSelector     uint64
+	ExistingDataStore datastore.DataStore
+}
+
+type TokenGovernorGrantRole struct {
+	Role    TokenGovernorRole
+	Account common.Address
+}
+
+var DeployTokenGovernor = cldf_ops.NewSequence(
+	"deploy-token-governor",
+	common_utils.Version_1_0_0,
+	"Deploy token governor contract",
+	func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input DeployTokenGovernorInput) (sequences.OnChainOutput, error) {
+		addresses := make([]datastore.AddressRef, 0)
+		writes := make([]contract.WriteOutput, 0)
+		chain := chains.EVMChains()[input.ChainSelector]
+		var err error
+		var tokenGovernorRef datastore.AddressRef
+		tokenAddr, err := erc20.NewERC20(common.HexToAddress(input.Token), chain.Client)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to instantiate ERC20 token at %s: %w", input.Token, err)
+		}
+		symbol, err := tokenAddr.Symbol(&bind.CallOpts{Context: b.GetContext()})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to get symbol for ERC20 token at %s: %w", input.Token, err)
+		}
+		qualifier := symbol
+
+		tokenGovernorRef, err = contract.MaybeDeployContract(b, token_governor.Deploy, chain, contract.DeployInput[token_governor.ConstructorArgs]{
+			TypeAndVersion: token_governor.TypeAndVersion,
+			ChainSelector:  chain.Selector,
+			Args: token_governor.ConstructorArgs{
+				Token:               common.HexToAddress(input.Token),
+				InitialDelay:        input.InitialDelay,
+				InitialDefaultAdmin: chain.DeployerKey.From,
+			},
+			Qualifier: &qualifier,
+		}, nil)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy ERC20 token: %w", err)
+		}
+		addresses = append(addresses, tokenGovernorRef)
+
+		batchOp, err := contract.NewBatchOperationFromWrites(writes)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
+		}
+
+		return sequences.OnChainOutput{
+			Addresses: addresses,
+			BatchOps:  []mcms_types.BatchOperation{batchOp},
+		}, nil
+	},
+)
+
+var GrantRole = cldf_ops.NewSequence(
+	"GrantRole",
+	token_governor.Version,
+	"grants the given role to the given account on the given chains.",
+	func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input TokenGovernorRoleChangesetConfig) (sequences.OnChainOutput, error) {
+		writes := make([]contract.WriteOutput, 0)
+		for chainSelector, tokenMap := range input.Tokens {
+			chain, ok := chains.EVMChains()[chainSelector]
+			if !ok {
+				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", chainSelector)
+			}
+			for tokenSymbol, tokenGovernorRole := range tokenMap {
+				// get token governor address from datastore
+				tgAddr, err := GetTokenGovernor(input.ExistingDataStore, chainSelector, tokenSymbol)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to get token governor address for token %s on chain %d: %w", tokenSymbol, chainSelector, err)
+				}
+				// instantiate token governor
+				tg, err := tg_bindings.NewTokenGovernor(tgAddr, chain.Client)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to instantiate token governor at %s: %w", tgAddr.Hex(), err)
+				}
+				// get role bytes32 from token governor
+				role, err := GetRoleFromTokenGovernor(b.GetContext(), tg, tokenGovernorRole.Role)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to get role from token governor at %s: %w", tgAddr.Hex(), err)
+				}
+				// check if account already has role
+				hasRole, err := tg.HasRole(&bind.CallOpts{Context: b.GetContext()}, role, tokenGovernorRole.Account)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to check if account %s has role on token governor at %s: %w", tokenGovernorRole.Account.Hex(), tgAddr.Hex(), err)
+				}
+				if hasRole {
+					return sequences.OnChainOutput{}, fmt.Errorf("account %s already has role %s", tokenGovernorRole.Account.Hex(), tokenGovernorRole.Role)
+				}
+				// execute GrantRole operation
+				report, err := cldf_ops.ExecuteOperation(b, token_governor.GrantRole, chain, contract.FunctionInput[token_governor.RoleAssignment]{
+					ChainSelector: chain.Selector,
+					Address:       tgAddr,
+					Args: token_governor.RoleAssignment{
+						Role: role,
+						To:   tokenGovernorRole.Account,
+					},
+				})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to execute GrantRole on %s for token %s: %w", chain, tokenSymbol, err)
+				}
+				writes = append(writes, report.Output)
+			}
+		}
+
+		batch, err := contract.NewBatchOperationFromWrites(writes)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
+		}
+		return sequences.OnChainOutput{
+			BatchOps: []mcms_types.BatchOperation{batch},
+		}, nil
+	})
+
+func GetTokenGovernor(ds datastore.DataStore, chainSelector uint64, tokenSymbol string) (common.Address, error) {
+	// fetch token governor from the data store
+	tokenGovernorAddr, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
+		ChainSelector: chainSelector,
+		Type:          datastore.ContractType(token_governor.ContractType),
+		Qualifier:     tokenSymbol,
+	}, chainSelector, datastore_utils.FullRef)
+	if err != nil {
+		return common.Address{}, fmt.Errorf("token governor for token with symbol '%s' is not found in datastore, %v", tokenSymbol, err)
+	}
+	return common.HexToAddress(tokenGovernorAddr.Address), nil
+}
+
+// GetRoleFromTokenGovernor returns the role bytes32 from the token governor contract.
+func GetRoleFromTokenGovernor(ctx context.Context, tokenGovernor *tg_bindings.TokenGovernor, role TokenGovernorRole) ([32]byte, error) {
+	if tokenGovernor == nil {
+		return [32]byte{}, errors.New("token governor is nil")
+	}
+
+	switch role {
+	case RoleMinter:
+		r, err := tokenGovernor.MINTERROLE(&bind.CallOpts{Context: ctx})
+		if err != nil {
+			return [32]byte{}, fmt.Errorf("failed to fetch minter role: %w", err)
+		}
+		return r, nil
+	case RoleBridgerMinterOrBurner:
+		r, err := tokenGovernor.BRIDGEMINTERORBURNERROLE(&bind.CallOpts{Context: ctx})
+		if err != nil {
+			return [32]byte{}, fmt.Errorf("failed to fetch bridge minter or burner role: %w", err)
+		}
+		return r, nil
+	case RoleBurner:
+		r, err := tokenGovernor.BURNERROLE(&bind.CallOpts{Context: ctx})
+		if err != nil {
+			return [32]byte{}, fmt.Errorf("failed to fetch burner role: %w", err)
+		}
+		return r, nil
+	case RoleFreezer:
+		r, err := tokenGovernor.FREEZERROLE(&bind.CallOpts{Context: ctx})
+		if err != nil {
+			return [32]byte{}, fmt.Errorf("failed to fetch freezer role: %w", err)
+		}
+		return r, nil
+	case RoleUnfreezer:
+		r, err := tokenGovernor.UNFREEZERROLE(&bind.CallOpts{Context: ctx})
+		if err != nil {
+			return [32]byte{}, fmt.Errorf("failed to fetch unfreezer role: %w", err)
+		}
+		return r, nil
+	case RolePauser:
+		r, err := tokenGovernor.PAUSERROLE(&bind.CallOpts{Context: ctx})
+		if err != nil {
+			return [32]byte{}, fmt.Errorf("failed to fetch pauser role: %w", err)
+		}
+		return r, nil
+	case RoleUnpauser:
+		r, err := tokenGovernor.UNPAUSERROLE(&bind.CallOpts{Context: ctx})
+		if err != nil {
+			return [32]byte{}, fmt.Errorf("failed to fetch unpauser role: %w", err)
+		}
+		return r, nil
+	case RoleRecovery:
+		r, err := tokenGovernor.RECOVERYROLE(&bind.CallOpts{Context: ctx})
+		if err != nil {
+			return [32]byte{}, fmt.Errorf("failed to fetch recovery role: %w", err)
+		}
+		return r, nil
+	case RoleCheckerAdmin:
+		r, err := tokenGovernor.CHECKERADMINROLE(&bind.CallOpts{Context: ctx})
+		if err != nil {
+			return [32]byte{}, fmt.Errorf("failed to fetch checker admin role: %w", err)
+		}
+		return r, nil
+	case RoleDefaultAdmin:
+		r, err := tokenGovernor.DEFAULTADMINROLE(&bind.CallOpts{Context: ctx})
+		if err != nil {
+			return [32]byte{}, fmt.Errorf("failed to fetch default admin role: %w", err)
+		}
+		return r, nil
+	}
+
+	return [32]byte{}, nil
+}
