@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
+import {Pool} from "../libraries/Pool.sol";
 import {ERC20LockBox} from "./ERC20LockBox.sol";
 import {TokenPool} from "./TokenPool.sol";
 
@@ -41,26 +42,54 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
   ) TokenPool(token, localTokenDecimals, advancedPoolHooks, rmnProxy, router) {
     if (lockBox == address(0)) revert ZeroAddressInvalid();
 
+    ERC20LockBox lockBoxContract = ERC20LockBox(lockBox);
+    if (address(lockBoxContract.getToken()) != address(token)) {
+      revert InvalidToken(address(lockBoxContract.getToken()));
+    }
     token.safeApprove(lockBox, type(uint256).max);
-    i_lockBox = ERC20LockBox(lockBox);
+    i_lockBox = lockBoxContract;
   }
 
   /// @notice Locks the tokens in the lockBox.
   /// @dev The router has already transferred the full amount to this contract before calling lockOrBurn.
   /// For V1 the amount = full amount. For V2 the amount = destTokenAmount (after fees), and fees remain on this contract.
-  /// @param amount The amount of tokens to lock.
-  function _lockOrBurn(
-    uint256 amount
-  ) internal virtual override {
-    i_lockBox.deposit(address(i_token), amount);
+  /// @param lockOrBurnIn The lock or burn input parameters.
+  function lockOrBurn(
+    Pool.LockOrBurnInV1 calldata lockOrBurnIn
+  ) public virtual override returns (Pool.LockOrBurnOutV1 memory out) {
+    // super.lockOrBurn will validate the lockOrBurnIn and revert if invalid.
+    out = super.lockOrBurn(lockOrBurnIn);
+    i_lockBox.deposit(address(i_token), lockOrBurnIn.remoteChainSelector, lockOrBurnIn.amount);
+    return out;
   }
 
-  function _releaseOrMint(
-    address receiver,
-    uint256 amount
-  ) internal virtual override {
+  function lockOrBurn(
+    Pool.LockOrBurnInV1 calldata lockOrBurnIn,
+    uint16 blockConfirmationRequested,
+    bytes calldata tokenArgs
+  ) public virtual override returns (Pool.LockOrBurnOutV1 memory, uint256) {
+    (Pool.LockOrBurnOutV1 memory out, uint256 destTokenAmount) =
+      super.lockOrBurn(lockOrBurnIn, blockConfirmationRequested, tokenArgs);
+    i_lockBox.deposit(address(i_token), lockOrBurnIn.remoteChainSelector, destTokenAmount);
+    return (out, destTokenAmount);
+  }
+
+  function releaseOrMint(
+    Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
+    uint16 blockConfirmationRequested
+  ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
+    Pool.ReleaseOrMintOutV1 memory out = super.releaseOrMint(releaseOrMintIn, blockConfirmationRequested);
     // Release tokens from the lock box to the receiver.
-    i_lockBox.withdraw(address(i_token), amount, receiver);
+    i_lockBox.withdraw(
+      address(i_token), releaseOrMintIn.remoteChainSelector, out.destinationAmount, releaseOrMintIn.receiver
+    );
+    return out;
+  }
+
+  function releaseOrMint(
+    Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
+  ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
+    return releaseOrMint(releaseOrMintIn, WAIT_FOR_FINALITY);
   }
 
   /// @notice Gets rebalancer, can be address(0) if none is configured.
@@ -91,7 +120,7 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
     if (s_rebalancer != msg.sender) revert Unauthorized(msg.sender);
 
     i_token.safeTransferFrom(msg.sender, address(this), amount);
-    i_lockBox.deposit(address(i_token), amount);
+    i_lockBox.deposit(address(i_token), 0, amount);
     emit LiquidityAdded(msg.sender, amount);
   }
 
@@ -103,7 +132,7 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
     if (s_rebalancer != msg.sender) revert Unauthorized(msg.sender);
 
     // Withdraw the tokens directly from the lockbox to the rebalancer.
-    i_lockBox.withdraw(address(i_token), amount, msg.sender);
+    i_lockBox.withdraw(address(i_token), 0, amount, msg.sender);
     emit LiquidityRemoved(msg.sender, amount);
   }
 

@@ -46,7 +46,7 @@ contract SiloedUSDCTokenPool_burnLockedUSDC is SiloedUSDCTokenPoolSetup {
     );
 
     // Ensure that the tokens are properly locked
-    assertEq(s_USDCToken.balanceOf(address(s_lockBox)), amount, "Incorrect token amount in the tokenPool");
+    assertEq(s_USDCToken.balanceOf(address(s_destLockBox)), amount, "Incorrect token amount in the tokenPool");
 
     vm.startPrank(OWNER);
 

@@ -17,14 +17,14 @@ contract SiloedLockReleaseTokenPool_provideSiloedLiquidity is SiloedLockReleaseT
   function test_provideSiloedLiquidity() public {
     uint256 amount = 1e24;
 
-    deal(address(s_token), address(s_siloedLockReleaseTokenPool), amount);
+    deal(address(s_token), OWNER, amount);
 
     vm.expectEmit();
     emit SiloedLockReleaseTokenPool.LiquidityAdded(SILOED_CHAIN_SELECTOR, OWNER, amount);
 
     s_siloedLockReleaseTokenPool.provideSiloedLiquidity(SILOED_CHAIN_SELECTOR, amount);
 
-    assertEq(s_token.balanceOf(address(s_siloedLockReleaseTokenPool)), amount);
+    assertEq(s_token.balanceOf(address(s_siloLockBox)), amount);
     assertEq(s_siloedLockReleaseTokenPool.getAvailableTokens(SILOED_CHAIN_SELECTOR), amount);
 
     // Since the funds for the destination chain are not siloed, the locked token amount should not be increased
