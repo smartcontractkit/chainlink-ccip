@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import {IBridgeV2} from "../../interfaces/lombard/IBridgeV2.sol";
 
 import {LombardTokenPool} from "../../pools/Lombard/LombardTokenPool.sol";
-import {IERC20Metadata} from "@openzeppelin/contracts@4.8.3/token/ERC20/extensions/IERC20Metadata.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts@5.3.0/token/ERC20/extensions/IERC20Metadata.sol";
 
 contract LombardTokenPoolHelper is LombardTokenPool {
   constructor(

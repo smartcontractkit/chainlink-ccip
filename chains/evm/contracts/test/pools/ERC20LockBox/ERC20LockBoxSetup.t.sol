@@ -7,7 +7,7 @@ import {TokenAdminRegistry} from "../../../tokenAdminRegistry/TokenAdminRegistry
 import {BaseTest} from "../../BaseTest.t.sol";
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
 contract ERC20LockBoxSetup is BaseTest {
   IERC20 internal s_token;
@@ -19,7 +19,7 @@ contract ERC20LockBoxSetup is BaseTest {
 
   function setUp() public virtual override {
     super.setUp();
-    s_token = new BurnMintERC20("LINK", "LNK", 18, 0, 0);
+    s_token = IERC20(address(new BurnMintERC20("LINK", "LNK", 18, 0, 0)));
     deal(address(s_token), OWNER, type(uint256).max);
     deal(address(s_token), s_allowedCaller, type(uint256).max);
 

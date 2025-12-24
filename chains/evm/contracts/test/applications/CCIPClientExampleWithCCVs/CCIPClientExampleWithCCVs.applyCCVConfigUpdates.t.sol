@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import {CCIPClientExampleWithCCVs} from "../../../applications/CCIPClientExampleWithCCVs.sol";
 import {RouterSetup} from "../../Router/RouterSetup.t.sol";
 
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
 contract CCIPClientExampleWithCCVs_applyCCVConfigUpdates is RouterSetup {
   CCIPClientExampleWithCCVs internal s_client;

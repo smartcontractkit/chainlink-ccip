@@ -29,7 +29,7 @@ import {OnRampSetup} from "../onRamp/OnRamp/OnRampSetup.t.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
 contract cctp_e2e is OnRampSetup {
   uint32 private constant CCTP_VERSION = 1;
@@ -276,7 +276,7 @@ contract cctp_e2e is OnRampSetup {
     setup.router = router;
     setup.tokenAdminRegistry = tokenAdminRegistry;
     setup.verifierResolver = new VersionedVerifierResolver();
-    setup.token = new BurnMintERC20("USD Coin", "USDC", 6, 0, 0);
+    setup.token = IERC20(address(new BurnMintERC20("USD Coin", "USDC", 6, 0, 0)));
     setup.tokenPool = new CCTPTokenPool(
       IERC20(address(setup.token)), 6, rmn, router, address(setup.verifierResolver), new address[](0)
     );

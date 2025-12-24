@@ -4,8 +4,9 @@ pragma solidity ^0.8.24;
 import {Pool} from "../../libraries/Pool.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
 
+import {IBurnMintERC20} from "../../interfaces/IBurnMintERC20.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
-import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
 /// @notice MockE2ELBTCTokenPool is a token pool used for e2e tests. It allows to burn tokens unconditionally,
 /// while requires specific structure for offchain token data
@@ -25,7 +26,7 @@ contract MockE2ELBTCTokenPool is TokenPool, ITypeAndVersion {
     address rmnProxy,
     address router,
     bytes memory destPoolData
-  ) TokenPool(token, 8, advancedPoolHooks, rmnProxy, router) {
+  ) TokenPool(IERC20(address(token)), 8, advancedPoolHooks, rmnProxy, router) {
     s_destPoolData = destPoolData;
   }
 

@@ -6,7 +6,7 @@ import {IPoolV1} from "../../../../interfaces/IPool.sol";
 import {USDCTokenPoolProxy} from "../../../../pools/USDC/USDCTokenPoolProxy.sol";
 import {USDCSetup} from "../USDCSetup.t.sol";
 
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
 
 contract USDCTokenPoolProxy_constructor is USDCSetup {
@@ -60,7 +60,7 @@ contract USDCTokenPoolProxy_constructor is USDCSetup {
   function test_constructor_RevertWhen_RouterAddressIsZero() public {
     vm.expectRevert(USDCTokenPoolProxy.AddressCannotBeZero.selector);
     new USDCTokenPoolProxy(
-      IERC20(s_USDCToken), // Token
+      s_USDCToken, // Token
       USDCTokenPoolProxy.PoolAddresses({
         legacyCctpV1Pool: s_legacyCctpV1Pool,
         cctpV1Pool: s_cctpV1Pool,
@@ -75,7 +75,7 @@ contract USDCTokenPoolProxy_constructor is USDCSetup {
   function test_constructor_RevertWhen_CCTPVerifierAddressIsZero() public {
     vm.expectRevert(USDCTokenPoolProxy.AddressCannotBeZero.selector);
     new USDCTokenPoolProxy(
-      IERC20(s_USDCToken), // Token
+      s_USDCToken, // Token
       USDCTokenPoolProxy.PoolAddresses({
         legacyCctpV1Pool: s_legacyCctpV1Pool,
         cctpV1Pool: s_cctpV1Pool,

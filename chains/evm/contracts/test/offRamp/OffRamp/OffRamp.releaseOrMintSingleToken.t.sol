@@ -5,6 +5,7 @@ import {IPoolV1} from "../../../interfaces/IPool.sol";
 import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
 import {ITokenAdminRegistry} from "../../../interfaces/ITokenAdminRegistry.sol";
 
+import {IBurnMintERC20} from "../../../interfaces/IBurnMintERC20.sol";
 import {Client} from "../../../libraries/Client.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {Pool} from "../../../libraries/Pool.sol";
@@ -12,6 +13,7 @@ import {OffRamp} from "../../../offRamp/OffRamp.sol";
 import {BurnMintTokenPool} from "../../../pools/BurnMintTokenPool.sol";
 import {OffRampHelper} from "../../helpers/OffRampHelper.sol";
 import {TokenPoolSetup} from "../../pools/TokenPool/TokenPoolSetup.t.sol";
+import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
 contract OffRamp_releaseOrMintSingleToken is TokenPoolSetup {
   BurnMintTokenPool internal s_pool;
@@ -23,9 +25,13 @@ contract OffRamp_releaseOrMintSingleToken is TokenPoolSetup {
     super.setUp();
 
     s_pool = new BurnMintTokenPool(
-      s_token, DEFAULT_TOKEN_DECIMALS, address(0), address(s_mockRMNRemote), address(s_sourceRouter)
+      IBurnMintERC20(address(s_token)),
+      DEFAULT_TOKEN_DECIMALS,
+      address(0),
+      address(s_mockRMNRemote),
+      address(s_sourceRouter)
     );
-    s_token.grantMintAndBurnRoles(address(s_pool));
+    BurnMintERC20(address(s_token)).grantMintAndBurnRoles(address(s_pool));
     _applyChainUpdates(address(s_pool));
 
     s_offRamp = new OffRampHelper(

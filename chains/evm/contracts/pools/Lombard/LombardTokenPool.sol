@@ -9,9 +9,9 @@ import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/I
 import {Pool} from "../../libraries/Pool.sol";
 import {TokenPool} from "../TokenPool.sol";
 
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
-import {IERC20Metadata} from "@openzeppelin/contracts@4.8.3/token/ERC20/extensions/IERC20Metadata.sol";
-import {SafeERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts@5.3.0/token/ERC20/extensions/IERC20Metadata.sol";
+import {SafeERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/utils/SafeERC20.sol";
 
 /// @notice Lombard CCIP token pool.
 /// For v2 flows, token movement (burn/mint) is handled by the Lombard verifier,
@@ -105,9 +105,9 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
     i_tokenAdapter = adapter;
 
     if (adapter != address(0)) {
-      token.safeIncreaseAllowance(adapter, type(uint256).max);
+      token.approve(adapter, type(uint256).max);
     } else {
-      token.safeIncreaseAllowance(address(bridge), type(uint256).max);
+      token.approve(address(bridge), type(uint256).max);
     }
 
     emit LombardConfigurationSet(verifier, address(bridge), adapter);

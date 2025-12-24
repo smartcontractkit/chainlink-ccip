@@ -8,7 +8,7 @@ import {RouterSetup} from "../../Router/RouterSetup.t.sol";
 import {FacadeClient} from "./FacadeClient.sol";
 import {ReentrantMaliciousTokenPool} from "./ReentrantMaliciousTokenPool.sol";
 
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
 contract OnRampTokenPoolReentrancy is RouterSetup {
   FacadeClient internal s_facadeClient;

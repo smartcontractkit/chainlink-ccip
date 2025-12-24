@@ -5,13 +5,13 @@ import {Pool} from "../../../libraries/Pool.sol";
 import {SiloedLockReleaseTokenPool} from "../../../pools/SiloedLockReleaseTokenPool.sol";
 import {SiloedLockReleaseTokenPoolSetup} from "./SiloedLockReleaseTokenPoolSetup.t.sol";
 
-import {IERC20} from "@openzeppelin/contracts@4.8.3/interfaces/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
 contract SiloedLockReleaseTokenPool_releaseOrMint is SiloedLockReleaseTokenPoolSetup {
   function setUp() public override {
     super.setUp();
 
-    IERC20(address(s_token)).approve(address(s_lockBox), type(uint256).max);
+    s_token.approve(address(s_lockBox), type(uint256).max);
 
     s_lockBox.deposit(address(s_token), 10e18);
     s_lockBox.deposit(address(s_token), 10e18);

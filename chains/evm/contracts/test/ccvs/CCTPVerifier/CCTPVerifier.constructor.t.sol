@@ -8,7 +8,7 @@ import {BaseVerifier} from "../../../ccvs/components/BaseVerifier.sol";
 import {CCTPMessageTransmitterProxy} from "../../../pools/USDC/CCTPMessageTransmitterProxy.sol";
 import {CCTPVerifierSetup} from "./CCTPVerifierSetup.t.sol";
 
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
 contract CCTPVerifier_constructor is CCTPVerifierSetup {
   function test_constructor() public {

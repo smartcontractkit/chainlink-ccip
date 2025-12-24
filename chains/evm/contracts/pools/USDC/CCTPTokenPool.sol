@@ -12,7 +12,7 @@ import {USDCSourcePoolDataCodec} from "../../libraries/USDCSourcePoolDataCodec.s
 import {TokenPool} from "../TokenPool.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
 /// @notice CCTP token pool that delegates minting and burning responsibilities of USDC to the CCTPVerifier contract.
 /// @dev This pool does not mutate the token state.

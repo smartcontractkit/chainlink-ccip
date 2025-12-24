@@ -7,7 +7,7 @@ import {FeeQuoterSetup} from "../feeQuoter/FeeQuoterSetup.t.sol";
 import {MockExecutor} from "../mocks/MockExecutor.sol";
 import {MockVerifier} from "../mocks/MockVerifier.sol";
 
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
 contract RouterSetup is FeeQuoterSetup {
   address internal constant FEE_AGGREGATOR = 0xa33CDB32eAEce34F6affEfF4899cef45744EDea3;
