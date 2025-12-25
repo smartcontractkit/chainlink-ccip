@@ -11,6 +11,7 @@ import {CCTPHelper} from "../../helpers/CCTPHelper.sol";
 import {MockE2EUSDCTransmitterCCTPV2} from "../../mocks/MockE2EUSDCTransmitterCCTPV2.sol";
 import {MockUSDCTokenMessenger} from "../../mocks/MockUSDCTokenMessenger.sol";
 import {BaseVerifierSetup} from "../components/BaseVerifier/BaseVerifierSetup.t.sol";
+import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
 contract CCTPVerifierSetup is BaseVerifierSetup {
@@ -91,11 +92,11 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
     BurnMintERC20(address(s_USDCToken)).grantMintAndBurnRoles(address(s_mockMessageTransmitter));
 
     // Ensure that the verifier is allowed to call the message transmitter proxy.
-    CCTPMessageTransmitterProxy.AllowedCallerConfigArgs[] memory allowedCallerParams =
-      new CCTPMessageTransmitterProxy.AllowedCallerConfigArgs[](1);
-    allowedCallerParams[0] =
-      CCTPMessageTransmitterProxy.AllowedCallerConfigArgs({caller: address(s_cctpVerifier), allowed: true});
-    s_messageTransmitterProxy.configureAllowedCallers(allowedCallerParams);
+    address[] memory addedCallers = new address[](1);
+    addedCallers[0] = address(s_cctpVerifier);
+    s_messageTransmitterProxy.applyAuthorizedCallerUpdates(
+      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: addedCallers, removedCallers: new address[](0)})
+    );
   }
 
   function _createVerifierResults(

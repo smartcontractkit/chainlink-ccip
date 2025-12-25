@@ -6,6 +6,7 @@ import {USDCTokenPoolProxy} from "../../../../pools/USDC/USDCTokenPoolProxy.sol"
 import {USDCTokenPoolProxyHelper} from "../../../helpers/USDCTokenPoolProxyHelper.sol";
 import {USDCSetup} from "../USDCSetup.t.sol";
 
+import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
 
 contract USDCTokenPoolProxySetup is USDCSetup {
@@ -51,18 +52,14 @@ contract USDCTokenPoolProxySetup is USDCSetup {
     bytes[] memory sourcePoolAddresses = new bytes[](1);
     sourcePoolAddresses[0] = abi.encode(SOURCE_CHAIN_USDC_POOL);
 
-    // Configure allowed callers for the CCTP message transmitter proxy
-    CCTPMessageTransmitterProxy.AllowedCallerConfigArgs[] memory allowedCallerParams =
-      new CCTPMessageTransmitterProxy.AllowedCallerConfigArgs[](4);
-    allowedCallerParams[0] =
-      CCTPMessageTransmitterProxy.AllowedCallerConfigArgs({caller: address(s_cctpV1Pool), allowed: true});
-    allowedCallerParams[1] =
-      CCTPMessageTransmitterProxy.AllowedCallerConfigArgs({caller: address(s_cctpV2Pool), allowed: true});
-    allowedCallerParams[2] =
-      CCTPMessageTransmitterProxy.AllowedCallerConfigArgs({caller: address(s_lockReleasePool), allowed: true});
-    allowedCallerParams[3] =
-      CCTPMessageTransmitterProxy.AllowedCallerConfigArgs({caller: address(s_cctpV2PoolWithCCV), allowed: true});
-    s_cctpMessageTransmitterProxy.configureAllowedCallers(allowedCallerParams);
+    address[] memory addedCallers = new address[](4);
+    addedCallers[0] = address(s_cctpV1Pool);
+    addedCallers[1] = address(s_cctpV2Pool);
+    addedCallers[2] = address(s_lockReleasePool);
+    addedCallers[3] = address(s_cctpV2PoolWithCCV);
+    s_cctpMessageTransmitterProxy.applyAuthorizedCallerUpdates(
+      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: addedCallers, removedCallers: new address[](0)})
+    );
 
     // Configure the lockOrBurn mechanism for the remote chain selectors.
     uint64[] memory remoteChainSelectors = new uint64[](2);

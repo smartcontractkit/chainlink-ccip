@@ -374,11 +374,14 @@ contract cctp_e2e is OnRampSetup {
     s_destCCTPSetup.verifier.setDomains(sourceDomainArgs);
 
     // Set authorized callers on the message transmitter proxy on destination.
-    CCTPMessageTransmitterProxy.AllowedCallerConfigArgs[] memory allowedCallerParams =
-      new CCTPMessageTransmitterProxy.AllowedCallerConfigArgs[](1);
-    allowedCallerParams[0] =
-      CCTPMessageTransmitterProxy.AllowedCallerConfigArgs({caller: address(s_destCCTPSetup.verifier), allowed: true});
-    s_destCCTPSetup.messageTransmitterProxy.configureAllowedCallers(allowedCallerParams);
+    address[] memory mtProxyAuthorizedCallers = new address[](1);
+    mtProxyAuthorizedCallers[0] = address(s_destCCTPSetup.verifier);
+    s_destCCTPSetup.messageTransmitterProxy
+      .applyAuthorizedCallerUpdates(
+        AuthorizedCallers.AuthorizedCallerArgs({
+          addedCallers: mtProxyAuthorizedCallers, removedCallers: new address[](0)
+        })
+      );
 
     // Apply chain updates on the destination token pool.
     bytes[] memory remotePoolAddresses = new bytes[](1);
