@@ -103,6 +103,16 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
     i_cctpVerifier = ICrossChainVerifierResolver(cctpVerifier);
   }
 
+  /// @inheritdoc IPoolV1
+  /// @notice Lock or burn outgoing tokens to the correct pool based on the lock or burn mechanism.
+  /// @param lockOrBurnIn Encoded data fields for the processing of tokens on the source chain.
+  function lockOrBurn(
+    Pool.LockOrBurnInV1 calldata lockOrBurnIn
+  ) public virtual override returns (Pool.LockOrBurnOutV1 memory) {
+    (Pool.LockOrBurnOutV1 memory lockOrBurnOut,) = lockOrBurn(lockOrBurnIn, WAIT_FOR_FINALITY, "");
+    return lockOrBurnOut;
+  }
+
   /// @inheritdoc IPoolV2
   /// @notice Lock or burn outgoing tokens to the correct pool based on the lock or burn mechanism.
   /// @param lockOrBurnIn Encoded data fields for the processing of tokens on the source chain.
@@ -111,30 +121,8 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
     uint16 blockConfirmationRequested,
-    bytes calldata tokenArgs
-  ) public virtual returns (Pool.LockOrBurnOutV1 memory lockOrBurnOut, uint256 destTokenAmount) {
-    return _lockOrBurn(lockOrBurnIn, blockConfirmationRequested, tokenArgs);
-  }
-
-  /// @inheritdoc IPoolV1
-  /// @notice Lock or burn outgoing tokens to the correct pool based on the lock or burn mechanism.
-  /// @param lockOrBurnIn Encoded data fields for the processing of tokens on the source chain.
-  function lockOrBurn(
-    Pool.LockOrBurnInV1 calldata lockOrBurnIn
-  ) public virtual override returns (Pool.LockOrBurnOutV1 memory) {
-    (Pool.LockOrBurnOutV1 memory lockOrBurnOut,) = _lockOrBurn(lockOrBurnIn, WAIT_FOR_FINALITY, "");
-    return lockOrBurnOut;
-  }
-
-  /// @notice Lock or burn outgoing tokens to the correct pool based on the lock or burn mechanism.
-  /// @param lockOrBurnIn Encoded data fields for the processing of tokens on the source chain.
-  /// @param blockConfirmationRequested Requested block confirmation.
-  /// @param tokenArgs Additional token arguments.
-  function _lockOrBurn(
-    Pool.LockOrBurnInV1 calldata lockOrBurnIn,
-    uint16 blockConfirmationRequested,
     bytes memory tokenArgs
-  ) internal returns (Pool.LockOrBurnOutV1 memory lockOrBurnOut, uint256 destTokenAmount) {
+  ) public virtual returns (Pool.LockOrBurnOutV1 memory lockOrBurnOut, uint256 destTokenAmount) {
     // Since this contract does not inherit from the TokenPool contract, it must manually validate the caller as an onRamp.
     if (i_router.getOnRamp(lockOrBurnIn.remoteChainSelector) != msg.sender) {
       revert CallerIsNotARampOnRouter(msg.sender);
@@ -211,6 +199,14 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
       || interfaceId == Pool.CCIP_POOL_V1 || interfaceId == type(IERC165).interfaceId;
   }
 
+  /// @inheritdoc IPoolV1
+  /// @param releaseOrMintIn Encoded data fields for the processing of tokens on the destination chain.
+  function releaseOrMint(
+    Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
+  ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
+    return releaseOrMint(releaseOrMintIn, WAIT_FOR_FINALITY);
+  }
+
   /// @inheritdoc IPoolV2
   /// @param releaseOrMintIn Encoded data fields for the processing of tokens on the destination chain.
   /// @param blockConfirmationRequested Requested block confirmation.
@@ -281,14 +277,6 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
     }
 
     revert InvalidMessageVersion(version);
-  }
-
-  /// @inheritdoc IPoolV1
-  /// @param releaseOrMintIn Encoded data fields for the processing of tokens on the destination chain.
-  function releaseOrMint(
-    Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
-  ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
-    return releaseOrMint(releaseOrMintIn, WAIT_FOR_FINALITY);
   }
 
   /// @notice Update the pool addresses that this token pool will route a message to.
