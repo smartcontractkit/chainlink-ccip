@@ -7,7 +7,6 @@ import {IPoolV2} from "../../../../interfaces/IPoolV2.sol";
 
 import {Router} from "../../../../Router.sol";
 import {Pool} from "../../../../libraries/Pool.sol";
-import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
 import {USDCTokenPoolProxy} from "../../../../pools/USDC/USDCTokenPoolProxy.sol";
 import {USDCTokenPoolProxySetup} from "./USDCTokenPoolProxySetup.t.sol";
 
@@ -74,7 +73,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
 
     vm.mockCall(
       address(s_cctpV1Pool),
-      abi.encodeWithSelector(USDCTokenPool.lockOrBurn.selector, lockOrBurnIn),
+      abi.encodeWithSelector(IPoolV1.lockOrBurn.selector, lockOrBurnIn),
       abi.encode(expectedOutput)
     );
 
@@ -86,7 +85,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
 
     vm.startPrank(s_routerAllowedOnRamp);
 
-    vm.expectCall(address(s_cctpV1Pool), abi.encodeWithSelector(USDCTokenPool.lockOrBurn.selector, lockOrBurnIn));
+    vm.expectCall(address(s_cctpV1Pool), abi.encodeWithSelector(IPoolV1.lockOrBurn.selector, lockOrBurnIn));
 
     vm.expectCall(address(s_USDCToken), abi.encodeWithSelector(IERC20.transfer.selector, address(s_cctpV1Pool), amount));
 
@@ -176,7 +175,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
 
     vm.mockCall(
       address(s_lockReleasePool),
-      abi.encodeWithSelector(USDCTokenPool.lockOrBurn.selector, lockOrBurnIn),
+      abi.encodeWithSelector(IPoolV1.lockOrBurn.selector, lockOrBurnIn),
       abi.encode(expectedOutput)
     );
 

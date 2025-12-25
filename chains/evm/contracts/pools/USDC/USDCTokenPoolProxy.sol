@@ -2,16 +2,12 @@
 pragma solidity ^0.8.24;
 
 import {ICrossChainVerifierResolver} from "../../interfaces/ICrossChainVerifierResolver.sol";
-import {IPoolV1} from "../../interfaces/IPool.sol";
-import {IPoolV1V2} from "../../interfaces/IPoolV1V2.sol";
-import {IPoolV2} from "../../interfaces/IPoolV2.sol";
+import {IPoolV1, IPoolV1V2, IPoolV2} from "../../interfaces/IPoolV1V2.sol";
 import {IRouter} from "../../interfaces/IRouter.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 import {Pool} from "../../libraries/Pool.sol";
 import {USDCSourcePoolDataCodec} from "../../libraries/USDCSourcePoolDataCodec.sol";
-import {CCTPTokenPool} from "./CCTPTokenPool.sol";
-import {USDCTokenPool} from "./USDCTokenPool.sol";
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
@@ -33,7 +29,7 @@ import {ERC165Checker} from "@openzeppelin/contracts@5.3.0/utils/introspection/E
 ///     ├──→ LegacyCCTPV1Pool → CCTPV1
 ///     ├──→ CCTPV1Pool → MessageTransmitterProxy/TokenMessenger V1 → CCTPV1
 ///     ├──→ CCTPV2Pool → MessageTransmitterProxy/TokenMessenger V2 → CCTPV2
-///     ├──→ CCTPV2WithCCVPool → CCTPVerifier → MessageTransmitterProxy/TokenMessenger V2 → CCTPV2
+///     ├──→ CCTPTokenPool → CCTPVerifier → MessageTransmitterProxy/TokenMessenger V2 → CCTPV2
 ///     └──→ SiloedUSDCTokenPool → ERC20LockBox
 contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion {
   using SafeERC20 for IERC20;
@@ -53,6 +49,11 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
   event LockOrBurnMechanismUpdated(uint64 indexed remoteChainSelector, LockOrBurnMechanism mechanism);
   event PoolAddressesUpdated(PoolAddresses pools);
   event LockReleasePoolUpdated(uint64 indexed remoteChainSelector, address lockReleasePool);
+
+  struct MessageAndAttestation {
+    bytes message;
+    bytes attestation;
+  }
 
   struct PoolAddresses {
     address legacyCctpV1Pool; // A CCTP V1 token pool that did not utilize a message transmitter proxy.
@@ -162,7 +163,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
         revert ChainNotSupportedByVerifier(lockOrBurnIn.remoteChainSelector);
       }
       i_token.safeTransfer(verifierImpl, lockOrBurnIn.amount);
-      return CCTPTokenPool(pools.cctpV2PoolWithCCV).lockOrBurn(lockOrBurnIn, blockConfirmationRequested, tokenArgs);
+      return IPoolV2(pools.cctpV2PoolWithCCV).lockOrBurn(lockOrBurnIn, blockConfirmationRequested, tokenArgs);
     } else if (mechanism == LockOrBurnMechanism.CCTP_V2) {
       childPool = pools.cctpV2Pool;
     } else if (mechanism == LockOrBurnMechanism.CCTP_V1) {
@@ -180,7 +181,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
     // Transfer the tokens to the correct address, as this contract is only a proxy and will not perform the lock/burn itself.
     i_token.safeTransfer(childPool, lockOrBurnIn.amount);
 
-    return (USDCTokenPool(childPool).lockOrBurn(lockOrBurnIn), lockOrBurnIn.amount);
+    return (IPoolV1(childPool).lockOrBurn(lockOrBurnIn), lockOrBurnIn.amount);
   }
 
   /// @inheritdoc IPoolV1
@@ -227,19 +228,19 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
 
     // If the source pool data is the lock release flag, use the lock release pool set for the remote chain selector.
     if (version == USDCSourcePoolDataCodec.LOCK_RELEASE_FLAG) {
-      return USDCTokenPool(s_lockReleasePools[releaseOrMintIn.remoteChainSelector]).releaseOrMint(releaseOrMintIn);
+      return IPoolV1(s_lockReleasePools[releaseOrMintIn.remoteChainSelector]).releaseOrMint(releaseOrMintIn);
     }
 
     if (version == USDCSourcePoolDataCodec.CCTP_VERSION_1_TAG) {
-      return USDCTokenPool(s_pools.cctpV1Pool).releaseOrMint(releaseOrMintIn);
+      return IPoolV1(s_pools.cctpV1Pool).releaseOrMint(releaseOrMintIn);
     }
 
     if (version == USDCSourcePoolDataCodec.CCTP_VERSION_2_TAG) {
-      return USDCTokenPool(s_pools.cctpV2Pool).releaseOrMint(releaseOrMintIn);
+      return IPoolV1(s_pools.cctpV2Pool).releaseOrMint(releaseOrMintIn);
     }
 
     if (version == USDCSourcePoolDataCodec.CCTP_VERSION_2_CCV_TAG) {
-      return CCTPTokenPool(s_pools.cctpV2PoolWithCCV).releaseOrMint(releaseOrMintIn, blockConfirmationRequested);
+      return IPoolV2(s_pools.cctpV2PoolWithCCV).releaseOrMint(releaseOrMintIn, blockConfirmationRequested);
     }
 
     // In previous versions of the USDC Token Pool, the sourcePoolData only contained two fields, a uint64 and uint32.
@@ -266,7 +267,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
         // Note: Supporting this branch will require this proxy to be set as an offRamp in the router, which is a design
         // decision that is not ideal, but allows for a direct upgrade from the first version of the USDC Token Pool to
         // this version.
-        return USDCTokenPool(s_pools.legacyCctpV1Pool).releaseOrMint(releaseOrMintIn);
+        return IPoolV1(s_pools.legacyCctpV1Pool).releaseOrMint(releaseOrMintIn);
       } else {
         // Since the new pool and the inflight message should utilize the same version of CCTP, and would have the same
         // destinationCaller (the message transmitter proxy), we can route the message to the v1 pool, but we first
@@ -275,7 +276,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
 
         // Since the CCTP v1 pool will have this contract set as an allowed caller, no additional configurations are
         // needed to route the message to the v1 pool.
-        return USDCTokenPool(s_pools.cctpV1Pool).releaseOrMint(_generateNewReleaseOrMintIn(releaseOrMintIn));
+        return IPoolV1(s_pools.cctpV1Pool).releaseOrMint(_generateNewReleaseOrMintIn(releaseOrMintIn));
       }
     }
 
@@ -406,7 +407,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
       return false;
     }
 
-    bytes memory messageBytes = abi.decode(offChainTokenData, (USDCTokenPool.MessageAndAttestation)).message;
+    bytes memory messageBytes = abi.decode(offChainTokenData, (MessageAndAttestation)).message;
 
     bytes32 destinationCallerBytes32;
     assembly {
