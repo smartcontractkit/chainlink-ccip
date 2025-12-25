@@ -3,15 +3,15 @@ pragma solidity ^0.8.24;
 
 import {IMessageTransmitter} from "./interfaces/IMessageTransmitter.sol";
 import {ITokenMessenger} from "./interfaces/ITokenMessenger.sol";
+import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
-import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 /// @title CCTP Message Transmitter Proxy
 /// @notice A proxy contract for handling messages transmitted via the Cross Chain Transfer Protocol (CCTP).
 /// @dev This contract is responsible for sending messages to the `IMessageTransmitter` and ensuring only allowed callers can invoke it.
 contract CCTPMessageTransmitterProxy is AuthorizedCallers, ITypeAndVersion {
-  string public constant override typeAndVersion = "CCTPMessageTransmitterProxy 1.6.2";
+  string public constant override typeAndVersion = "CCTPMessageTransmitterProxy 1.7.0-dev";
 
   /// @notice Immutable reference to the `IMessageTransmitter` contract.
   IMessageTransmitter public immutable i_cctpTransmitter;
