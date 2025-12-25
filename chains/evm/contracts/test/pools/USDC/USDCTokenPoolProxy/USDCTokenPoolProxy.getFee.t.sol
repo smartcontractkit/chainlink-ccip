@@ -31,13 +31,17 @@ contract USDCTokenPoolProxy_getFee is USDCTokenPoolProxySetup {
   }
 
   function test_getFee_RevertWhen_NoCCVCompatiblePoolSet() public {
-    USDCTokenPoolProxy.PoolAddresses memory pools = s_usdcTokenPoolProxy.getPools();
-    pools.cctpV2PoolWithCCV = address(0);
-    _enableERC165InterfaceChecks(pools.cctpV2PoolWithCCV, type(IPoolV2).interfaceId);
-    _enableERC165InterfaceChecks(pools.cctpV2Pool, type(IPoolV1).interfaceId);
-    _enableERC165InterfaceChecks(pools.cctpV1Pool, type(IPoolV1).interfaceId);
-    _enableERC165InterfaceChecks(pools.legacyCctpV1Pool, type(IPoolV1).interfaceId);
-    s_usdcTokenPoolProxy.updatePoolAddresses(pools);
+    _enableERC165InterfaceChecks(s_cctpV2Pool, type(IPoolV1).interfaceId);
+    _enableERC165InterfaceChecks(s_cctpV1Pool, type(IPoolV1).interfaceId);
+    _enableERC165InterfaceChecks(s_legacyCctpV1Pool, type(IPoolV1).interfaceId);
+    s_usdcTokenPoolProxy.updatePoolAddresses(
+      USDCTokenPoolProxy.PoolAddresses({
+        legacyCctpV1Pool: s_legacyCctpV1Pool,
+        cctpV1Pool: s_cctpV1Pool,
+        cctpV2Pool: s_cctpV2Pool,
+        cctpV2PoolWithCCV: address(0)
+      })
+    );
 
     vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.CCVCompatiblePoolNotSet.selector));
     s_usdcTokenPoolProxy.getFee(address(0), 0, 0, address(0), 0, "");

@@ -274,18 +274,18 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
 
   function test_releaseOrMint_LegacyFormat_MessageTransmitterProxySupported() public {
     // Set the legacy pool address to zero to simulate a scenario where there are no legacy inflight messages
-    USDCTokenPoolProxy.PoolAddresses memory updatedPools = USDCTokenPoolProxy.PoolAddresses({
-      legacyCctpV1Pool: address(0), // Set to zero to indicate no legacy pool
-      cctpV1Pool: s_cctpV1Pool,
-      cctpV2Pool: s_cctpV2Pool,
-      cctpV2PoolWithCCV: s_cctpV2PoolWithCCV
-    });
-
     _enableERC165InterfaceChecks(s_cctpV1Pool, type(IPoolV1).interfaceId);
     _enableERC165InterfaceChecks(s_cctpV2Pool, type(IPoolV1).interfaceId);
     _enableERC165InterfaceChecks(s_cctpV2PoolWithCCV, type(IPoolV2).interfaceId);
 
-    s_usdcTokenPoolProxy.updatePoolAddresses(updatedPools);
+    s_usdcTokenPoolProxy.updatePoolAddresses(
+      USDCTokenPoolProxy.PoolAddresses({
+        legacyCctpV1Pool: address(0), // Set to zero to indicate no legacy pool
+        cctpV1Pool: s_cctpV1Pool,
+        cctpV2Pool: s_cctpV2Pool,
+        cctpV2PoolWithCCV: s_cctpV2PoolWithCCV
+      })
+    );
 
     // Arrange: Prepare test data for legacy format (64 bytes)
     uint256 testAmount = 1e6;
