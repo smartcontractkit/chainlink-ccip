@@ -31,8 +31,6 @@ import (
 
 func DeployContractsForSelector(ctx context.Context, env *deployment.Environment, cls []*simple_node_set.Input, selector uint64, ccipHomeSelector uint64, crAddr string) (datastore.DataStore, error) {
 	l := zerolog.Ctx(ctx)
-	l.Info().Msg("Configuring contracts for selector")
-	l.Info().Any("Selector", selector).Msg("Deploying for chain selectors")
 	runningDS := datastore.NewMemoryDataStore()
 
 	l.Info().Uint64("Selector", selector).Msg("Configuring per-chain contracts bundle")
@@ -85,11 +83,8 @@ func DeployContractsForSelector(ctx context.Context, env *deployment.Environment
 			if err != nil {
 				return nil, fmt.Errorf("reading worker node P2P keys: %w", err)
 			}
-			l.Info().Str("Node", node.Config.URL).Str("PeerID", nodeP2PIds.Data[0].Attributes.PeerID).Msg("Adding reader peer ID")
 			id := MustPeerIDFromString(nodeP2PIds.Data[0].Attributes.PeerID)
 			readers = append(readers, id)
-			l.Info().Msgf("peerID: %+v", id)
-			l.Info().Msgf("peer ID from bytes: %s", id.Raw())
 		}
 		// safe to get EVM chain as CCIP home is only deployed on EVM
 		chain, ok := env.BlockChains.EVMChains()[selector]
@@ -150,8 +145,8 @@ func ConnectContractsWithSelectors(ctx context.Context, e *deployment.Environmen
 	version := semver.MustParse("1.6.0")
 	chainA := lanesapi.ChainDefinition{
 		Selector:                 selector,
-		GasPrice:                 big.NewInt(1e9),
-		FeeQuoterDestChainConfig: lanesapi.DefaultFeeQuoterDestChainConfig(true, cciputils.GetSelectorHex(selector)),
+		GasPrice:                 lanesapi.DefaultGasPrice(selector),
+		FeeQuoterDestChainConfig: lanesapi.DefaultFeeQuoterDestChainConfig(true, selector),
 	}
 	for _, destSelector := range remoteSelectors {
 		destFamily, _ := chainsel.GetSelectorFamily(destSelector)
@@ -169,10 +164,9 @@ func ConnectContractsWithSelectors(ctx context.Context, e *deployment.Environmen
 		}
 		chainB := lanesapi.ChainDefinition{
 			Selector:                 destSelector,
-			GasPrice:                 big.NewInt(1e9),
-			FeeQuoterDestChainConfig: lanesapi.DefaultFeeQuoterDestChainConfig(true, cciputils.GetSelectorHex(destSelector)),
+			GasPrice:                 lanesapi.DefaultGasPrice(destSelector),
+			FeeQuoterDestChainConfig: lanesapi.DefaultFeeQuoterDestChainConfig(true, destSelector),
 		}
-		l.Info().Uint64("ChainASelector", chainA.Selector).Uint64("ChainBSelector", chainB.Selector).Msg("Connecting chain pairs")
 		_, err := lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.ConnectChainsConfig{
 			Lanes: []lanesapi.LaneConfig{
 				{
@@ -229,7 +223,6 @@ func ConfigureContractsForSelectors(ctx context.Context, e *deployment.Environme
 		commitOCRConfigs[chain] = DeriveOCRParamsForCommit(SimulationTest, ccipHomeSelector, nil, ocrOverride)
 		execOCRConfigs[chain] = DeriveOCRParamsForExec(SimulationTest, nil, ocrOverride)
 
-		l.Info().Msgf("setting readers for chain %d to %v due to no topology", chain, len(readers))
 		chainConfigs[chain] = ChainConfig{
 			Readers: readers,
 			FChain:  uint8(len(readers) / 3),

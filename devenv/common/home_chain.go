@@ -31,6 +31,7 @@ import (
 	capabilities_registry "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/clclient"
 	tonSeqs "github.com/smartcontractkit/chainlink-ton/deployment/ccip/1_6_0/sequences"
+	ccip_ton "github.com/smartcontractkit/chainlink-ton/devenv-impl"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/confighelper"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3confighelper"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
@@ -406,13 +407,13 @@ func BuildOCR3ConfigForCCIPHome(
 					return nil, fmt.Errorf("failed to decode SUI address '%s': %w", transmitter, err)
 				}
 			case chain_selectors.FamilyTon:
-				k, err := hex.DecodeString(string(transmitter))
-				if err != nil {
-					return nil, fmt.Errorf("failed to decode public key: %w", err)
+				pk := address.MustParseAddr(string(transmitter))
+				if pk == nil || pk.IsAddrNone() {
+					return nil, fmt.Errorf("failed to parse TON address '%s'", transmitter)
 				}
-				addr := address.NewAddress(0, byte(0), k)
-				parsed = binary.BigEndian.AppendUint32(nil, uint32(addr.Workchain())) //nolint:gosec // G115
-				parsed = append(parsed, addr.Data()...)
+				// TODO: this reimplements addrCodec's ToRawAddr helper
+				parsed = binary.BigEndian.AppendUint32(nil, uint32(pk.Workchain())) //nolint:gosec // G115
+				parsed = append(parsed, pk.Data()...)
 			case chain_selectors.FamilyAptos:
 				parsed, err = hex.DecodeString(strings.TrimPrefix(string(transmitter), "0x"))
 				if err != nil {
@@ -518,7 +519,10 @@ func getOracleIdentities(clClients []*clclient.ChainlinkClient, nodeKeyBundles m
 				cfgPrefix = "ocr2cfg_solana_"
 			case chain_selectors.FamilyTon:
 				bundle := nodeKeyBundles[family][id.Raw()]
-				addr = bundle.TXKey.Data.Attributes.PublicKey
+				addr, err = ccip_ton.GetNodeAddressFromBundle(&bundle)
+				if err != nil {
+					return err
+				}
 				ocrKey := bundle.OCR2Key
 				ocr2Config = ocrKey.Data.Attributes
 				offPrefix = "ocr2off_ton_"

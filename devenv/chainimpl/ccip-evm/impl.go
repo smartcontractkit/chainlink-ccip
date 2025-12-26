@@ -2,6 +2,7 @@ package ccip_evm
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
@@ -185,8 +186,8 @@ func (m *CCIP16EVM) SendMessage(ctx context.Context, src, dest uint64, fields an
 			return fmt.Errorf("failed to convert TON address to bytes: %w", err)
 		}
 		extraArgs, err = devenvcommon.SerializeClientGenericExtraArgsV2(msg_hasher163.ClientGenericExtraArgsV2{
-			GasLimit:                 new(big.Int).SetUint64(100_000_000), // 0.1 TON
-			AllowOutOfOrderExecution: false,
+			GasLimit:                 new(big.Int).SetUint64(100_000_000),
+			AllowOutOfOrderExecution: true,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to serialize TON extra args: %w", err)
@@ -290,6 +291,8 @@ func (m *CCIP16EVM) SendMessage(ctx context.Context, src, dest uint64, fields an
 		m.ExpectedSeqNumExec[sourceDest] = append(
 			m.ExpectedSeqNumExec[sourceDest],
 			it.Event.SequenceNumber)
+		messageID := hex.EncodeToString(it.Event.Message.Header.MessageId[:])
+		fmt.Printf("Sent CCIP message id %s seq %d from chain %d to chain %d\n", messageID, it.Event.SequenceNumber, src, dest)
 
 		return nil
 	}
