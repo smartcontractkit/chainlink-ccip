@@ -97,27 +97,13 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
     uint16 blockConfirmationRequested,
     bytes calldata tokenArgs
-  ) public virtual override returns (Pool.LockOrBurnOutV1 memory, uint256 destTokenAmount) {
-    uint256 feeAmount = _getFee(lockOrBurnIn, blockConfirmationRequested);
-    _validateLockOrBurn(lockOrBurnIn, blockConfirmationRequested, tokenArgs, feeAmount);
-    destTokenAmount = lockOrBurnIn.amount - feeAmount;
+  ) public virtual override returns (Pool.LockOrBurnOutV1 memory out, uint256 destTokenAmount) {
+    (out, destTokenAmount) = super.lockOrBurn(lockOrBurnIn, blockConfirmationRequested, tokenArgs);
 
     _getLockBox(lockOrBurnIn.remoteChainSelector)
       .deposit(address(i_token), lockOrBurnIn.remoteChainSelector, destTokenAmount);
 
-    emit LockedOrBurned({
-      remoteChainSelector: lockOrBurnIn.remoteChainSelector,
-      token: address(i_token),
-      sender: msg.sender,
-      amount: destTokenAmount
-    });
-
-    return (
-      Pool.LockOrBurnOutV1({
-        destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector), destPoolData: _encodeLocalDecimals()
-      }),
-      destTokenAmount
-    );
+    return (out, destTokenAmount);
   }
 
   /// @notice Release tokens from the pool to the recipient
