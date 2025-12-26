@@ -76,6 +76,7 @@ library MessageV1Codec {
     ENCODE_RECEIVER_LENGTH,
     ENCODE_DEST_BLOB_LENGTH,
     ENCODE_TOKEN_TRANSFER_ARRAY_LENGTH,
+    ENCODE_TOKEN_TRANSFER_LENGTH,
     ENCODE_DATA_LENGTH,
     ENCODE_TOKEN_SOURCE_POOL_LENGTH,
     ENCODE_TOKEN_SOURCE_TOKEN_LENGTH,
@@ -363,6 +364,9 @@ library MessageV1Codec {
     bytes memory encodedTokenTransfers;
     if (message.tokenTransfer.length > 0) {
       encodedTokenTransfers = _encodeTokenTransferV1(message.tokenTransfer[0]);
+      if (encodedTokenTransfers.length > type(uint16).max) {
+        revert InvalidDataLength(EncodingErrorLocation.ENCODE_TOKEN_TRANSFER_LENGTH);
+      }
     }
 
     // Encode in sections to avoid stack too deep errors.
