@@ -114,29 +114,7 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
-    // Calculate the local amount
-    uint256 localAmount = _calculateLocalAmount(
-      releaseOrMintIn.sourceDenominatedAmount, _parseRemoteDecimals(releaseOrMintIn.sourcePoolData)
-    );
-
-    _validateReleaseOrMint(releaseOrMintIn, localAmount, WAIT_FOR_FINALITY);
-
-    ERC20LockBox lockBox = _getLockBox(releaseOrMintIn.remoteChainSelector);
-    uint256 availableLiquidity = i_token.balanceOf(address(lockBox));
-    if (localAmount > availableLiquidity) revert InsufficientLiquidity(availableLiquidity, localAmount);
-
-    // Release to the recipient
-    lockBox.withdraw(address(i_token), releaseOrMintIn.remoteChainSelector, localAmount, releaseOrMintIn.receiver);
-
-    emit ReleasedOrMinted({
-      remoteChainSelector: releaseOrMintIn.remoteChainSelector,
-      token: address(i_token),
-      sender: msg.sender,
-      recipient: releaseOrMintIn.receiver,
-      amount: localAmount
-    });
-
-    return Pool.ReleaseOrMintOutV1({destinationAmount: localAmount});
+    return releaseOrMint(releaseOrMintIn, WAIT_FOR_FINALITY);
   }
 
   /// @notice Release tokens from the pool to the recipient with V2 parameters.
@@ -149,11 +127,8 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
     uint16 blockConfirmationRequested
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
-    uint256 localAmount = _calculateLocalAmount(
-      releaseOrMintIn.sourceDenominatedAmount, _parseRemoteDecimals(releaseOrMintIn.sourcePoolData)
-    );
-
-    _validateReleaseOrMint(releaseOrMintIn, localAmount, blockConfirmationRequested);
+    Pool.ReleaseOrMintOutV1 memory out = super.releaseOrMint(releaseOrMintIn, blockConfirmationRequested);
+    uint256 localAmount = out.destinationAmount;
 
     ERC20LockBox lockBox = _getLockBox(releaseOrMintIn.remoteChainSelector);
     uint256 availableLiquidity = i_token.balanceOf(address(lockBox));
@@ -161,15 +136,7 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
 
     lockBox.withdraw(address(i_token), releaseOrMintIn.remoteChainSelector, localAmount, releaseOrMintIn.receiver);
 
-    emit ReleasedOrMinted({
-      remoteChainSelector: releaseOrMintIn.remoteChainSelector,
-      token: address(i_token),
-      sender: msg.sender,
-      recipient: releaseOrMintIn.receiver,
-      amount: localAmount
-    });
-
-    return Pool.ReleaseOrMintOutV1({destinationAmount: localAmount});
+    return out;
   }
 
   /// @notice Returns the amount of tokens in the token pool that were siloed for a specific remote chain selector.
