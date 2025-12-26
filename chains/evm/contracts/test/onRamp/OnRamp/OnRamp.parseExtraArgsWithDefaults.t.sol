@@ -194,7 +194,7 @@ contract OnRamp_parseExtraArgsWithDefaults is OnRampSetup {
     assertEq(result.ccvArgs.length, 0, "Should not inject default CCV args for token-only transfer");
   }
 
-  function test_parseExtraArgsWithDefaults_PlaceholderAddsDefaultsEvenForPureTokenTransfer() public {
+  function test_parseExtraArgsWithDefaults_AddsDefaultsForPureTokenTransfer_PlaceholderInExtraArgs() public {
     address userCCV = makeAddr("userCCV");
 
     address[] memory ccvs = new address[](2);

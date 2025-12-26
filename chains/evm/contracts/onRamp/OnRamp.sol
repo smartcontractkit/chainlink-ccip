@@ -489,15 +489,6 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   }
 
   /// @notice Parses and validates extra arguments, applying defaults from destination chain configuration.
-  /// The function ensures all messages have the required CCVs and executor needed for processing,
-  /// even when users don't explicitly specify them.
-  /// @dev `tokenReceiver` is NOT validated here, and is validated in `_lockOrBurnSingleToken`.
-  /// @param destChainSelector The destination chain selector.
-  /// @param destChainConfig Configuration for the destination chain including default values.
-  /// @param extraArgs User-provided extra arguments in either V3 or legacy format.
-  /// @param isTokenTransferWithoutData Indicates if the message has no data but includes a token transfer. This is meant to
-  /// signal token-only transfers to avoid adding default CCVs when not needed.
-  /// @return resolvedArgs Complete EVMExtraArgsV3 struct with all defaults applied.
   function _parseExtraArgsWithDefaults(
     uint64 destChainSelector,
     DestChainConfig memory destChainConfig,
@@ -537,35 +528,50 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     // trusted for that token flow.
     bool isTokenOnlyTransfer = isTokenTransferWithoutData && resolvedArgs.gasLimit == 0;
 
-    if (isTokenOnlyTransfer && resolvedArgs.ccvs.length == 0) {
-      return resolvedArgs;
-    }
-    // if no CCVs are provided and it's not a token only transfer,
-    // directly assign defaults without allocation overhead.
-    else if (resolvedArgs.ccvs.length == 0 && !isTokenOnlyTransfer) {
+    // If there are no CCVs specified in the extraArgs,
+    // - For token-only transfers, return early after applying executor and tokenReceiver validation.
+    // - Otherwise, apply the default CCVs from the destination chain config.
+    if (resolvedArgs.ccvs.length == 0) {
+      if (isTokenOnlyTransfer) {
+        // Validate executor before returning to ensure consistency.
+        if (resolvedArgs.executor == address(0)) {
+          resolvedArgs.executor = destChainConfig.defaultExecutor;
+        }
+        // Validate tokenReceiver if exists.
+        if (resolvedArgs.tokenReceiver.length != 0 && !destChainConfig.tokenReceiverAllowed) {
+          revert TokenReceiverNotAllowed(destChainSelector);
+        }
+        return resolvedArgs;
+      }
+
       resolvedArgs.ccvs = destChainConfig.defaultCCVs;
       resolvedArgs.ccvArgs = new bytes[](destChainConfig.defaultCCVs.length);
     } else {
-      bool encounteredZeroPlaceholder = false;
-
-      // Allocate for worst-case size (user + defaults) and trim later.
-      address[] memory mergedCCVs = new address[](resolvedArgs.ccvs.length + destChainConfig.defaultCCVs.length);
-      bytes[] memory mergedCCVArgs = new bytes[](mergedCCVs.length);
-      uint256 writeIndex = 0;
-
-      // Filter out zero placeholders and collect non-zero CCVs.
+      bool hasZeroPlaceholder = false;
       for (uint256 i = 0; i < resolvedArgs.ccvs.length; ++i) {
-        address ccv = resolvedArgs.ccvs[i];
-        if (ccv == address(0)) {
-          encounteredZeroPlaceholder = true;
-          continue;
+        if (resolvedArgs.ccvs[i] == address(0)) {
+          hasZeroPlaceholder = true;
+          break;
         }
-        mergedCCVs[writeIndex] = ccv;
-        mergedCCVArgs[writeIndex++] = resolvedArgs.ccvArgs[i];
       }
 
-      // Apply defaults if a zero placeholder was encountered in the user CCV list.
-      if (encounteredZeroPlaceholder) {
+      if (hasZeroPlaceholder) {
+        // Allocate for worst-case size (user + defaults) and trim later.
+        address[] memory mergedCCVs = new address[](resolvedArgs.ccvs.length + destChainConfig.defaultCCVs.length);
+        bytes[] memory mergedCCVArgs = new bytes[](mergedCCVs.length);
+        uint256 writeIndex = 0;
+
+        // Filter out zero placeholders and collect non-zero CCVs.
+        for (uint256 i = 0; i < resolvedArgs.ccvs.length; ++i) {
+          address ccv = resolvedArgs.ccvs[i];
+          if (ccv == address(0)) {
+            continue;
+          }
+          mergedCCVs[writeIndex] = ccv;
+          mergedCCVArgs[writeIndex++] = resolvedArgs.ccvArgs[i];
+        }
+
+        // Apply defaults when a zero placeholder is encountered.
         for (uint256 i = 0; i < destChainConfig.defaultCCVs.length; ++i) {
           address defaultCCV = destChainConfig.defaultCCVs[i];
           bool found = false;
@@ -579,17 +585,17 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
           mergedCCVs[writeIndex] = defaultCCV;
           mergedCCVArgs[writeIndex++] = "";
         }
-      }
 
-      if (writeIndex != mergedCCVs.length) {
-        assembly {
-          mstore(mergedCCVs, writeIndex)
-          mstore(mergedCCVArgs, writeIndex)
+        if (writeIndex != mergedCCVs.length) {
+          assembly {
+            mstore(mergedCCVs, writeIndex)
+            mstore(mergedCCVArgs, writeIndex)
+          }
         }
-      }
 
-      resolvedArgs.ccvs = mergedCCVs;
-      resolvedArgs.ccvArgs = mergedCCVArgs;
+        resolvedArgs.ccvs = mergedCCVs;
+        resolvedArgs.ccvArgs = mergedCCVArgs;
+      }
     }
 
     // Normalize and validate tokenReceiver if specified.
