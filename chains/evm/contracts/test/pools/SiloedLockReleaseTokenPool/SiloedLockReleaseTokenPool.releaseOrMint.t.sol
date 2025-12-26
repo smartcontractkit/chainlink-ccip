@@ -98,6 +98,45 @@ contract SiloedLockReleaseTokenPool_releaseOrMint is SiloedLockReleaseTokenPoolS
     assertEq(s_siloedLockReleaseTokenPool.getUnsiloedLiquidity(), 0);
   }
 
+  function test_ReleaseOrMintV2_SiloedChain() public {
+    uint256 amount = 10e18;
+    address recipient = makeAddr("recipient");
+
+    deal(address(s_token), address(s_siloedLockReleaseTokenPool), amount);
+
+    vm.startPrank(s_allowedOnRamp);
+
+    s_siloedLockReleaseTokenPool.lockOrBurn(
+      Pool.LockOrBurnInV1({
+        originalSender: STRANGER,
+        receiver: bytes(""),
+        amount: amount,
+        remoteChainSelector: SILOED_CHAIN_SELECTOR,
+        localToken: address(s_token)
+      })
+    );
+
+    vm.startPrank(s_allowedOffRamp);
+
+    Pool.ReleaseOrMintOutV1 memory output = s_siloedLockReleaseTokenPool.releaseOrMint(
+      Pool.ReleaseOrMintInV1({
+        originalSender: bytes(""),
+        receiver: recipient,
+        sourceDenominatedAmount: amount,
+        localToken: address(s_token),
+        remoteChainSelector: SILOED_CHAIN_SELECTOR,
+        sourcePoolAddress: abi.encode(s_siloedDestPoolAddress),
+        sourcePoolData: "",
+        offchainTokenData: ""
+      }),
+      0
+    );
+
+    assertEq(output.destinationAmount, amount);
+    assertEq(s_token.balanceOf(recipient), amount);
+    assertEq(s_siloedLockReleaseTokenPool.getAvailableTokens(SILOED_CHAIN_SELECTOR), 0);
+  }
+
   // Reverts
 
   function test_ReleaseOrMint_RevertsWhen_InsufficientLiquidity_SiloedChain() public {

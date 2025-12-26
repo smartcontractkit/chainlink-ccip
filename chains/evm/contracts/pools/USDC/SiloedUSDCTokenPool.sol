@@ -85,10 +85,20 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
+    return releaseOrMint(releaseOrMintIn, WAIT_FOR_FINALITY);
+  }
+
+  /// @inheritdoc SiloedLockReleaseTokenPool
+  /// @param releaseOrMintIn The release or mint input parameters.
+  /// @param blockConfirmationRequested Requested block confirmation.
+  function releaseOrMint(
+    Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
+    uint16 blockConfirmationRequested
+  ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
     // Calculate the local amount. Since USDC is always 6 decimals, we can hard code the decimals to 6.
     uint256 localAmount = _calculateLocalAmount(releaseOrMintIn.sourceDenominatedAmount, 6);
 
-    _validateReleaseOrMint(releaseOrMintIn, localAmount, WAIT_FOR_FINALITY);
+    _validateReleaseOrMint(releaseOrMintIn, localAmount, blockConfirmationRequested);
 
     uint256 excludedTokens = s_tokensExcludedFromBurn[releaseOrMintIn.remoteChainSelector];
     ERC20LockBox lockbox = _getLockBox(releaseOrMintIn.remoteChainSelector);

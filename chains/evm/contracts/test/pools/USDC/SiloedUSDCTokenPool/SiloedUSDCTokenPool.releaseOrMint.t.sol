@@ -77,6 +77,36 @@ contract SiloedUSDCTokenPool_releaseOrMint is SiloedUSDCTokenPoolSetup {
     assertEq(s_usdcTokenPool.getAvailableTokens(SOURCE_CHAIN_SELECTOR), 0);
   }
 
+  function test_releaseOrMintV2_Success() public {
+    uint256 amount = 1000e6; // 1000 USDC (6 decimals)
+    uint256 localAmount = amount;
+    address localToken = address(s_USDCToken);
+
+    vm.startPrank(OWNER);
+    s_USDCToken.approve(address(s_usdcTokenPool), type(uint256).max);
+    s_usdcTokenPool.provideSiloedLiquidity(SOURCE_CHAIN_SELECTOR, amount);
+    vm.stopPrank();
+
+    vm.startPrank(s_routerAllowedOffRamp);
+
+    Pool.ReleaseOrMintInV1 memory releaseOrMintIn = Pool.ReleaseOrMintInV1({
+      originalSender: s_originalSender,
+      receiver: s_recipient,
+      sourceDenominatedAmount: amount,
+      localToken: localToken,
+      remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+      sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
+      sourcePoolData: abi.encode(LOCK_RELEASE_FLAG),
+      offchainTokenData: ""
+    });
+
+    Pool.ReleaseOrMintOutV1 memory result = s_usdcTokenPool.releaseOrMint(releaseOrMintIn, 0);
+
+    assertEq(result.destinationAmount, localAmount);
+    assertEq(s_USDCToken.balanceOf(s_recipient), localAmount);
+    assertEq(s_usdcTokenPool.getAvailableTokens(SOURCE_CHAIN_SELECTOR), 0);
+  }
+
   function test_releaseOrMint_SubtractsFromExcludedTokens() public {
     vm.startPrank(OWNER);
     s_usdcTokenPool.proposeCCTPMigration(SOURCE_CHAIN_SELECTOR);
@@ -133,8 +163,6 @@ contract SiloedUSDCTokenPool_releaseOrMint is SiloedUSDCTokenPoolSetup {
     // Verify that the excluded tokens were reduced by the release amount
     uint256 remainingExcludedTokens = newExcludedAmount - releaseAmount;
     assertEq(s_usdcTokenPool.getExcludedTokensByChain(SOURCE_CHAIN_SELECTOR), remainingExcludedTokens);
-
-    vm.stopPrank();
   }
 
   // Reverts
@@ -166,8 +194,6 @@ contract SiloedUSDCTokenPool_releaseOrMint is SiloedUSDCTokenPoolSetup {
       abi.encodeWithSelector(SiloedLockReleaseTokenPool.InsufficientLiquidity.selector, amount / 2, amount)
     );
     s_usdcTokenPool.releaseOrMint(releaseOrMintIn);
-
-    vm.stopPrank();
   }
 
   function test_releaseOrMint_RevertWhen_ChainNotSupported() public {
@@ -190,8 +216,6 @@ contract SiloedUSDCTokenPool_releaseOrMint is SiloedUSDCTokenPoolSetup {
 
     vm.expectRevert(abi.encodeWithSelector(TokenPool.ChainNotAllowed.selector, unsupportedChain));
     s_usdcTokenPool.releaseOrMint(releaseOrMintIn);
-
-    vm.stopPrank();
   }
 
   function test_releaseOrMint_RevertWhen_NotAllowedTokenPoolProxy() public {
@@ -226,7 +250,5 @@ contract SiloedUSDCTokenPool_releaseOrMint is SiloedUSDCTokenPoolSetup {
 
     vm.expectRevert(abi.encodeWithSelector(AuthorizedCallers.UnauthorizedCaller.selector, unauthorizedProxy));
     s_usdcTokenPool.releaseOrMint(releaseOrMintIn);
-
-    vm.stopPrank();
   }
 }
