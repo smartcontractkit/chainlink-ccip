@@ -246,14 +246,14 @@ func NewEnvironment() (*Cfg, error) {
 	}
 	e.DataStore = ds.Seal()
 
-	err = devenvcommon.ConfigureContractsForSelectors(ctx, e, in.NodeSets, nodeKeyBundles, CCIPHomeChain, selectors)
-	if err != nil {
-		return nil, err
-	}
-
 	err = CreateJobs(ctx, allNodeClients, nodeKeyBundles)
 	if err != nil {
 		return nil, fmt.Errorf("creating CCIP jobs: %w", err)
+	}
+
+	err = devenvcommon.ConfigureContractsForSelectors(ctx, e, in.NodeSets, nodeKeyBundles, CCIPHomeChain, selectors)
+	if err != nil {
+		return nil, err
 	}
 
 	// connect all the contracts together (on-ramps, off-ramps)
