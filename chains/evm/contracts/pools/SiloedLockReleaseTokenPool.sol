@@ -89,6 +89,37 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     return out;
   }
 
+  /// @notice Locks the token in the pool with V2 parameters.
+  /// @param lockOrBurnIn The lock or burn input parameters.
+  /// @param blockConfirmationRequested Requested block confirmation.
+  /// @param tokenArgs Additional token arguments.
+  function lockOrBurn(
+    Pool.LockOrBurnInV1 calldata lockOrBurnIn,
+    uint16 blockConfirmationRequested,
+    bytes calldata tokenArgs
+  ) public virtual override returns (Pool.LockOrBurnOutV1 memory, uint256 destTokenAmount) {
+    uint256 feeAmount = _getFee(lockOrBurnIn, blockConfirmationRequested);
+    _validateLockOrBurn(lockOrBurnIn, blockConfirmationRequested, tokenArgs, feeAmount);
+    destTokenAmount = lockOrBurnIn.amount - feeAmount;
+
+    _getLockBox(lockOrBurnIn.remoteChainSelector)
+      .deposit(address(i_token), lockOrBurnIn.remoteChainSelector, destTokenAmount);
+
+    emit LockedOrBurned({
+      remoteChainSelector: lockOrBurnIn.remoteChainSelector,
+      token: address(i_token),
+      sender: msg.sender,
+      amount: destTokenAmount
+    });
+
+    return (
+      Pool.LockOrBurnOutV1({
+        destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector), destPoolData: _encodeLocalDecimals()
+      }),
+      destTokenAmount
+    );
+  }
+
   /// @notice Release tokens from the pool to the recipient
   /// @dev The _validateReleaseOrMint check is an essential security check
   /// @dev If the releaseOrMintIn amount is greater than available liquidity, the function will revert as a security
@@ -109,6 +140,39 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     if (localAmount > availableLiquidity) revert InsufficientLiquidity(availableLiquidity, localAmount);
 
     // Release to the recipient
+    lockBox.withdraw(address(i_token), releaseOrMintIn.remoteChainSelector, localAmount, releaseOrMintIn.receiver);
+
+    emit ReleasedOrMinted({
+      remoteChainSelector: releaseOrMintIn.remoteChainSelector,
+      token: address(i_token),
+      sender: msg.sender,
+      recipient: releaseOrMintIn.receiver,
+      amount: localAmount
+    });
+
+    return Pool.ReleaseOrMintOutV1({destinationAmount: localAmount});
+  }
+
+  /// @notice Release tokens from the pool to the recipient with V2 parameters.
+  /// @dev The _validateReleaseOrMint check is an essential security check.
+  /// @dev If the releaseOrMintIn amount is greater than available liquidity, the function will revert as a security
+  /// measure to prevent funds from a Silo being released by another chain.
+  /// @param releaseOrMintIn The release or mint input parameters.
+  /// @param blockConfirmationRequested Requested block confirmation.
+  function releaseOrMint(
+    Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
+    uint16 blockConfirmationRequested
+  ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
+    uint256 localAmount = _calculateLocalAmount(
+      releaseOrMintIn.sourceDenominatedAmount, _parseRemoteDecimals(releaseOrMintIn.sourcePoolData)
+    );
+
+    _validateReleaseOrMint(releaseOrMintIn, localAmount, blockConfirmationRequested);
+
+    ERC20LockBox lockBox = _getLockBox(releaseOrMintIn.remoteChainSelector);
+    uint256 availableLiquidity = i_token.balanceOf(address(lockBox));
+    if (localAmount > availableLiquidity) revert InsufficientLiquidity(availableLiquidity, localAmount);
+
     lockBox.withdraw(address(i_token), releaseOrMintIn.remoteChainSelector, localAmount, releaseOrMintIn.receiver);
 
     emit ReleasedOrMinted({
