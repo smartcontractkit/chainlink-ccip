@@ -6,6 +6,9 @@ on:
 defaults:
   run:
     working-directory: devenv
+  
+env:
+  PARALLEL_E2E_TESTS: 'true'
 
 jobs:
   smoke:

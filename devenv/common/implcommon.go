@@ -4,13 +4,13 @@ import (
 	"context"
 	"fmt"
 	"math/big"
-	"sync"
 	"time"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gagliardetto/solana-go"
 	"github.com/rs/zerolog"
+	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/rmn_home"
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
@@ -29,49 +29,8 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 )
 
-type Common struct {
-	ExpectedSeqNumRange map[SourceDestPair]ccipocr3common.SeqNumRange
-	ExpectedSeqNumExec  map[SourceDestPair][]uint64
-	MsgSentEvents       []*AnyMsgSentEvent
-}
-
-type SourceDestPair struct {
-	SourceChainSelector uint64
-	DestChainSelector   uint64
-}
-
-type AnyMsgSentEvent struct {
-	SequenceNumber uint64
-	// RawEvent contains the raw event depending on the chain:
-	//  EVM:   *onramp.OnRampCCIPMessageSent
-	//  Aptos: module_onramp.CCIPMessageSent
-	RawEvent any
-}
-
-var (
-	commonInstance *Common
-	once           sync.Once
-)
-
-/*
-NewCommon returns the singleton instance.
-The first call creates the object; subsequent calls just return the same pointer.
-*/
-func NewCommon() *Common {
-	once.Do(func() {
-		commonInstance = &Common{
-			ExpectedSeqNumRange: make(map[SourceDestPair]ccipocr3common.SeqNumRange),
-			ExpectedSeqNumExec:  make(map[SourceDestPair][]uint64),
-			MsgSentEvents:       make([]*AnyMsgSentEvent, 0),
-		}
-	})
-	return commonInstance
-}
-
 func DeployContractsForSelector(ctx context.Context, env *deployment.Environment, cls []*simple_node_set.Input, selector uint64, ccipHomeSelector uint64, crAddr string) (datastore.DataStore, error) {
 	l := zerolog.Ctx(ctx)
-	l.Info().Msg("Configuring contracts for selector")
-	l.Info().Any("Selector", selector).Msg("Deploying for chain selectors")
 	runningDS := datastore.NewMemoryDataStore()
 
 	l.Info().Uint64("Selector", selector).Msg("Configuring per-chain contracts bundle")
@@ -103,6 +62,8 @@ func DeployContractsForSelector(ctx context.Context, env *deployment.Environment
 				// OFFRAMP CONFIG
 				PermissionLessExecutionThresholdSeconds: uint32((20 * time.Minute).Seconds()),
 				GasForCallExactCheck:                    uint16(5000),
+				// TON SPECIFIC CONFIG
+				ContractVersion: "08446f0afa54",
 			},
 		},
 	})
@@ -122,11 +83,8 @@ func DeployContractsForSelector(ctx context.Context, env *deployment.Environment
 			if err != nil {
 				return nil, fmt.Errorf("reading worker node P2P keys: %w", err)
 			}
-			l.Info().Str("Node", node.Config.URL).Str("PeerID", nodeP2PIds.Data[0].Attributes.PeerID).Msg("Adding reader peer ID")
 			id := MustPeerIDFromString(nodeP2PIds.Data[0].Attributes.PeerID)
 			readers = append(readers, id)
-			l.Info().Msgf("peerID: %+v", id)
-			l.Info().Msgf("peer ID from bytes: %s", id.Raw())
 		}
 		// safe to get EVM chain as CCIP home is only deployed on EVM
 		chain, ok := env.BlockChains.EVMChains()[selector]
@@ -181,21 +139,34 @@ func ConnectContractsWithSelectors(ctx context.Context, e *deployment.Environmen
 		operations.NewMemoryReporter(),
 	)
 	e.OperationsBundle = bundle
+	srcFamily, _ := chainsel.GetSelectorFamily(selector)
 
 	mcmsRegistry := changesetscore.GetRegistry()
 	version := semver.MustParse("1.6.0")
 	chainA := lanesapi.ChainDefinition{
 		Selector:                 selector,
-		GasPrice:                 big.NewInt(1e9),
-		FeeQuoterDestChainConfig: lanesapi.DefaultFeeQuoterDestChainConfig(true, cciputils.GetSelectorHex(selector)),
+		GasPrice:                 lanesapi.DefaultGasPrice(selector),
+		FeeQuoterDestChainConfig: lanesapi.DefaultFeeQuoterDestChainConfig(true, selector),
 	}
 	for _, destSelector := range remoteSelectors {
+		destFamily, _ := chainsel.GetSelectorFamily(destSelector)
+		if srcFamily == chainsel.FamilySolana {
+			if destFamily == chainsel.FamilyTon {
+				l.Info().Msg("Connecting Solana to TON is not supported yet")
+				continue
+			}
+
+		} else if srcFamily == chainsel.FamilyTon {
+			if destFamily == chainsel.FamilySolana {
+				l.Info().Msg("Connecting TON to Solana is not supported yet")
+				continue
+			}
+		}
 		chainB := lanesapi.ChainDefinition{
 			Selector:                 destSelector,
-			GasPrice:                 big.NewInt(1e9),
-			FeeQuoterDestChainConfig: lanesapi.DefaultFeeQuoterDestChainConfig(true, cciputils.GetSelectorHex(destSelector)),
+			GasPrice:                 lanesapi.DefaultGasPrice(destSelector),
+			FeeQuoterDestChainConfig: lanesapi.DefaultFeeQuoterDestChainConfig(true, destSelector),
 		}
-		l.Info().Uint64("ChainASelector", chainA.Selector).Uint64("ChainBSelector", chainB.Selector).Msg("Connecting chain pairs")
 		_, err := lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.ConnectChainsConfig{
 			Lanes: []lanesapi.LaneConfig{
 				{
@@ -252,7 +223,6 @@ func ConfigureContractsForSelectors(ctx context.Context, e *deployment.Environme
 		commitOCRConfigs[chain] = DeriveOCRParamsForCommit(SimulationTest, ccipHomeSelector, nil, ocrOverride)
 		execOCRConfigs[chain] = DeriveOCRParamsForExec(SimulationTest, nil, ocrOverride)
 
-		l.Info().Msgf("setting readers for chain %d to %v due to no topology", chain, len(readers))
 		chainConfigs[chain] = ChainConfig{
 			Readers: readers,
 			FChain:  uint8(len(readers) / 3),

@@ -1,7 +1,6 @@
 package changesets_test
 
 import (
-	"encoding/hex"
 	"math/big"
 	"testing"
 	"time"
@@ -21,7 +20,6 @@ import (
 
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	lanesapi "github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
-	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	fdeployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
 
@@ -163,17 +161,15 @@ func TestConnectChains_EVM2EVM_NoMCMS(t *testing.T) {
 		out.DataStore.Merge(e.DataStore)
 		e.DataStore = out.DataStore.Seal()
 	}
-	evmEncoded, err := hex.DecodeString(cciputils.EVMFamilySelector)
-	require.NoError(t, err, "Failed to decode EVM family selector")
 	chain1 := lanesapi.ChainDefinition{
 		Selector:                 chain_selectors.ETHEREUM_MAINNET.Selector,
 		GasPrice:                 big.NewInt(1e17),
-		FeeQuoterDestChainConfig: lanesapi.DefaultFeeQuoterDestChainConfig(true, evmEncoded),
+		FeeQuoterDestChainConfig: lanesapi.DefaultFeeQuoterDestChainConfig(true, chain_selectors.ETHEREUM_MAINNET.Selector),
 	}
 	chain2 := lanesapi.ChainDefinition{
 		Selector:                 chain_selectors.POLYGON_MAINNET.Selector,
 		GasPrice:                 big.NewInt(1e9),
-		FeeQuoterDestChainConfig: lanesapi.DefaultFeeQuoterDestChainConfig(true, evmEncoded),
+		FeeQuoterDestChainConfig: lanesapi.DefaultFeeQuoterDestChainConfig(true, chain_selectors.POLYGON_MAINNET.Selector),
 	}
 
 	_, err = lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.ConnectChainsConfig{
