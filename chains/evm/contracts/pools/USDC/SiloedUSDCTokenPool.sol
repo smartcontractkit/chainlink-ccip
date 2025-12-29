@@ -10,15 +10,6 @@ import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/I
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/EnumerableSet.sol";
 
-/// @dev The flag used to indicate that the source pool data is coming from a chain that does not have CCTP Support,
-/// and so the lock release pool should be used. The BurnMintWithLockReleaseTokenPool uses this flag as its source pool
-/// data to indicate that the tokens should be released from the lock release pool rather than attempting to be minted
-/// through CCTP.
-/// @dev The preimage is bytes4(keccak256("NO_CCTP_USE_LOCK_RELEASE")).
-/// Note: This will be removed in a following PR but is included here to prevent breaking changes to the
-/// BurnMintWithLockReleaseTokenPool.
-bytes4 constant LOCK_RELEASE_FLAG = 0xfa7c07de;
-
 /// @notice A token pool for USDC which inherits the Siloed token functionality while adding the CCTP migration functionality.
 /// @dev The CCTP migration functions have been previously audited. The code has been moved from its own contract
 /// to this, to maximize simplicity. The only difference is that custom balance tracking
@@ -90,15 +81,16 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
 
     _validateReleaseOrMint(releaseOrMintIn, localAmount, WAIT_FOR_FINALITY);
 
-    uint256 excludedTokens = s_tokensExcludedFromBurn[releaseOrMintIn.remoteChainSelector];
     ERC20LockBox lockbox = _getLockBox(releaseOrMintIn.remoteChainSelector);
+    uint256 availableLiquidity = i_token.balanceOf(address(lockbox));
+    if (localAmount > availableLiquidity) {
+      revert InsufficientLiquidity(availableLiquidity, localAmount);
+    }
+
+    uint256 excludedTokens = s_tokensExcludedFromBurn[releaseOrMintIn.remoteChainSelector];
     // No excluded tokens is the common path, as it means no migration has occured yet, and any released
     // tokens should come from the stored token balance of previously deposited tokens.
     if (excludedTokens == 0) {
-      uint256 availableLiquidity = i_token.balanceOf(address(lockbox));
-      if (localAmount > availableLiquidity) {
-        revert InsufficientLiquidity(availableLiquidity, localAmount);
-      }
       // The existence of excluded tokens indicates a migration has occured on the chain, and that any tokens
       // being released should come from those excluded tokens reserved for processing inflight messages.
     } else {

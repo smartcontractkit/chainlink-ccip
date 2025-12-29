@@ -16,7 +16,6 @@ contract LockReleaseTokenPool_constructor is BaseTest {
     );
 
     assertEq(address(pool.getToken()), address(token));
-    assertEq(address(pool.getRebalancer()), address(0));
     assertEq(pool.typeAndVersion(), "LockReleaseTokenPool 1.7.0-dev");
   }
 }

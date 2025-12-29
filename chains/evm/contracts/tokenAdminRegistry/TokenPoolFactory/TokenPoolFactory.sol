@@ -214,7 +214,7 @@ contract TokenPoolFactory is ITypeAndVersion {
         localLockBox = _deployLockBox(localConfig.token, localConfig.salt);
       } else {
         ERC20LockBox lockBoxContract = ERC20LockBox(localLockBox);
-        if (address(lockBoxContract.getToken()) != localConfig.token) {
+        if (!lockBoxContract.isTokenSupported(localConfig.token)) {
           revert InvalidLockBoxToken(address(lockBoxContract.getToken()), localConfig.token);
         }
       }

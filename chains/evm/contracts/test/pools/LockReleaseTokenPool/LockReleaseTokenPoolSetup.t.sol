@@ -71,7 +71,6 @@ contract LockReleaseTokenPoolSetup is BaseTest {
 
     s_lockReleaseTokenPool.applyChainUpdates(new uint64[](0), chainUpdate);
     s_lockReleaseTokenPoolWithAllowList.applyChainUpdates(new uint64[](0), chainUpdate);
-    s_lockReleaseTokenPool.setRebalancer(OWNER);
 
     s_token.approve(address(s_lockReleaseTokenPool), type(uint256).max);
 

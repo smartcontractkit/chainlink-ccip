@@ -23,4 +23,11 @@ interface ILockBox {
     uint256 amount,
     address recipient
   ) external;
+
+  /// @notice Returns whether the lockbox supports a token.
+  /// @param token The address of the token.
+  /// @return supported True if the token is supported.
+  function isTokenSupported(
+    address token
+  ) external view returns (bool);
 }

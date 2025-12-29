@@ -22,12 +22,8 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
   event LiquidityTransferred(address indexed from, uint256 amount);
   event LiquidityAdded(address indexed provider, uint256 indexed amount);
   event LiquidityRemoved(address indexed provider, uint256 indexed amount);
-  event RebalancerSet(address oldRebalancer, address newRebalancer);
 
   string public constant override typeAndVersion = "LockReleaseTokenPool 1.7.0-dev";
-
-  /// @notice The address of the rebalancer.
-  address internal s_rebalancer;
 
   /// @notice The lock box for the token pool.
   ERC20LockBox internal immutable i_lockBox;
@@ -43,8 +39,8 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
     if (lockBox == address(0)) revert ZeroAddressInvalid();
 
     ERC20LockBox lockBoxContract = ERC20LockBox(lockBox);
-    if (address(lockBoxContract.getToken()) != address(token)) {
-      revert InvalidToken(address(lockBoxContract.getToken()));
+    if (!lockBoxContract.isTokenSupported(address(token))) {
+      revert InvalidToken(address(token));
     }
     token.safeApprove(lockBox, type(uint256).max);
     i_lockBox = lockBoxContract;
@@ -90,73 +86,5 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
     return releaseOrMint(releaseOrMintIn, WAIT_FOR_FINALITY);
-  }
-
-  /// @notice Gets rebalancer, can be address(0) if none is configured.
-  /// @return The current liquidity manager.
-  function getRebalancer() external view returns (address) {
-    return s_rebalancer;
-  }
-
-  /// @notice Sets the rebalancer address.
-  /// @dev Address(0) can be used to disable the rebalancer.
-  /// @dev Only callable by the owner.
-  /// @param rebalancer The new rebalancer address.
-  function setRebalancer(
-    address rebalancer
-  ) external onlyOwner {
-    address oldRebalancer = s_rebalancer;
-
-    s_rebalancer = rebalancer;
-
-    emit RebalancerSet(oldRebalancer, rebalancer);
-  }
-
-  /// @notice Adds liquidity to the pool. The tokens should be approved first.
-  /// @param amount The amount of liquidity to provide.
-  function provideLiquidity(
-    uint256 amount
-  ) external {
-    if (s_rebalancer != msg.sender) revert Unauthorized(msg.sender);
-
-    i_token.safeTransferFrom(msg.sender, address(this), amount);
-    i_lockBox.deposit(address(i_token), 0, amount);
-    emit LiquidityAdded(msg.sender, amount);
-  }
-
-  /// @notice Removed liquidity to the pool. The tokens will be sent to msg.sender.
-  /// @param amount The amount of liquidity to remove.
-  function withdrawLiquidity(
-    uint256 amount
-  ) external {
-    if (s_rebalancer != msg.sender) revert Unauthorized(msg.sender);
-
-    // Withdraw the tokens directly from the lockbox to the rebalancer.
-    i_lockBox.withdraw(address(i_token), 0, amount, msg.sender);
-    emit LiquidityRemoved(msg.sender, amount);
-  }
-
-  /// @notice This function can be used to transfer liquidity from an older version of the pool to this pool. To do so
-  /// this pool will have to be set as the rebalancer in the older version of the pool. This allows it to transfer the
-  /// funds in the old pool to the new pool.
-  /// @dev When upgrading a LockRelease pool, this function can be called at the same time as the pool is changed in the
-  /// TokenAdminRegistry. This allows for a smooth transition of both liquidity and transactions to the new pool.
-  /// Alternatively, when no multicall is available, a portion of the funds can be transferred to the new pool before
-  /// changing which pool CCIP uses, to ensure both pools can operate. Then the pool should be changed in the
-  /// TokenAdminRegistry, which will activate the new pool. All new transactions will use the new pool and its
-  /// liquidity. Finally, the remaining liquidity can be transferred to the new pool using this function one more time.
-  /// @param from The address of the old pool.
-  /// @param amount The amount of liquidity to transfer. If uint256.max is passed, all liquidity will be transferred.
-  function transferLiquidity(
-    address from,
-    uint256 amount
-  ) external onlyOwner {
-    if (amount == type(uint256).max) {
-      amount = i_token.balanceOf(from);
-    }
-
-    LockReleaseTokenPool(from).withdrawLiquidity(amount);
-
-    emit LiquidityTransferred(from, amount);
   }
 }
