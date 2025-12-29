@@ -6,7 +6,7 @@ import {OffRamp} from "../../../offRamp/OffRamp.sol";
 import {BaseTest} from "../../BaseTest.t.sol";
 
 contract OffRamp_constructor is BaseTest {
-  uint64 internal constant DEFAULT_MAX_GAS_BUFFER_TO_UPDATE_STATE = 5000 + 5000 + 2000;
+  uint32 internal constant DEFAULT_MAX_GAS_BUFFER_TO_UPDATE_STATE = 5000 + 5000 + 2000;
 
   function test_constructor() public {
     OffRamp.StaticConfig memory config = OffRamp.StaticConfig({
@@ -70,7 +70,7 @@ contract OffRamp_constructor is BaseTest {
       tokenAdminRegistry: address(0x123)
     });
 
-    uint64 maxGasBufferToUpdateState = 1;
+    uint32 maxGasBufferToUpdateState = 1;
 
     vm.expectRevert(OffRamp.GasCannotBeZero.selector);
     new OffRamp(config, maxGasBufferToUpdateState);

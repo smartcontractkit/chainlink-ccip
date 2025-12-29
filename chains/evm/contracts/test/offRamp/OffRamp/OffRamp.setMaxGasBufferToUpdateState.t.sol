@@ -8,8 +8,8 @@ import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2
 
 contract OffRamp_setMaxGasBufferToUpdateState is OffRampSetup {
   function test_setMaxGasBufferToUpdateState() public {
-    uint64 oldMaxGasBufferToUpdateState = s_offRamp.getmaxGasBufferToUpdateState();
-    uint64 newMaxGasBufferToUpdateState = 15000;
+    uint32 oldMaxGasBufferToUpdateState = s_offRamp.getmaxGasBufferToUpdateState();
+    uint32 newMaxGasBufferToUpdateState = 15000;
 
     vm.expectEmit();
     emit OffRamp.MaxGasBufferToUpdateStateUpdated(oldMaxGasBufferToUpdateState, newMaxGasBufferToUpdateState);
