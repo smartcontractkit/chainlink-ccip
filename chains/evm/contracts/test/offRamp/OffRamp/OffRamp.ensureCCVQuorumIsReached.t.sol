@@ -11,7 +11,7 @@ import {OffRamp} from "../../../offRamp/OffRamp.sol";
 import {MockReceiverV2} from "../../mocks/MockReceiverV2.sol";
 import {OffRampSetup} from "./OffRampSetup.t.sol";
 
-import {IERC165} from "@openzeppelin/contracts@4.8.3/utils/introspection/IERC165.sol";
+import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
 
 using ERC165CheckerReverting for address;
 

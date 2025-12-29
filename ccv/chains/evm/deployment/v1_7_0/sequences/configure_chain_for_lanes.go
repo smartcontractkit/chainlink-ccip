@@ -46,11 +46,16 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 			for _, ccv := range remoteConfig.LaneMandatedInboundCCVs {
 				laneMandatedInboundCCVs = append(laneMandatedInboundCCVs, common.HexToAddress(ccv))
 			}
+			// Left-pad remoteConfig.OnRamps with zeros to the left to match the address bytes length
+			onRamps := make([][]byte, 0, len(remoteConfig.OnRamps))
+			for _, onRamp := range remoteConfig.OnRamps {
+				onRamps = append(onRamps, common.LeftPadBytes(onRamp, 32))
+			}
 			offRampArgs = append(offRampArgs, offramp.SourceChainConfigArgs{
 				Router:              common.HexToAddress(input.Router),
 				SourceChainSelector: remoteSelector,
 				IsEnabled:           remoteConfig.AllowTrafficFrom,
-				OnRamps:             remoteConfig.OnRamps,
+				OnRamps:             onRamps,
 				DefaultCCVs:         defaultInboundCCVs,
 				LaneMandatedCCVs:    laneMandatedInboundCCVs,
 			})

@@ -53,28 +53,30 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 		writes := make([]evm_contract.WriteOutput, 0)
 
 		// Update token transfer fee configuration for the remote chain
-		applyTokenTransferFeeConfigUpdatesReport, err := cldf_ops.ExecuteOperation(b, token_pool.ApplyTokenTransferFeeConfigUpdates, chain, evm_contract.FunctionInput[token_pool.TokenTransferFeeConfigArgs]{
-			ChainSelector: input.ChainSelector,
-			Address:       input.TokenPoolAddress,
-			Args: token_pool.TokenTransferFeeConfigArgs{
-				TokenTransferFeeConfigUpdates: []token_pool.TokenTransferFeeConfigUpdate{
-					{
-						DestChainSelector:                      input.RemoteChainSelector,
-						DestGasOverhead:                        input.RemoteChainConfig.TokenTransferFeeConfig.DestGasOverhead,
-						DestBytesOverhead:                      input.RemoteChainConfig.TokenTransferFeeConfig.DestBytesOverhead,
-						DefaultBlockConfirmationFeeUSDCents:    input.RemoteChainConfig.TokenTransferFeeConfig.DefaultFinalityFeeUSDCents,
-						CustomBlockConfirmationFeeUSDCents:     input.RemoteChainConfig.TokenTransferFeeConfig.CustomFinalityFeeUSDCents,
-						DefaultBlockConfirmationTransferFeeBps: input.RemoteChainConfig.TokenTransferFeeConfig.DefaultFinalityTransferFeeBps,
-						CustomBlockConfirmationTransferFeeBps:  input.RemoteChainConfig.TokenTransferFeeConfig.CustomFinalityTransferFeeBps,
-						IsEnabled:                              input.RemoteChainConfig.TokenTransferFeeConfig.IsEnabled,
+		if input.RemoteChainConfig.TokenTransferFeeConfig.IsEnabled {
+			applyTokenTransferFeeConfigUpdatesReport, err := cldf_ops.ExecuteOperation(b, token_pool.ApplyTokenTransferFeeConfigUpdates, chain, evm_contract.FunctionInput[token_pool.TokenTransferFeeConfigArgs]{
+				ChainSelector: input.ChainSelector,
+				Address:       input.TokenPoolAddress,
+				Args: token_pool.TokenTransferFeeConfigArgs{
+					TokenTransferFeeConfigUpdates: []token_pool.TokenTransferFeeConfigUpdate{
+						{
+							DestChainSelector:                      input.RemoteChainSelector,
+							DestGasOverhead:                        input.RemoteChainConfig.TokenTransferFeeConfig.DestGasOverhead,
+							DestBytesOverhead:                      input.RemoteChainConfig.TokenTransferFeeConfig.DestBytesOverhead,
+							DefaultBlockConfirmationFeeUSDCents:    input.RemoteChainConfig.TokenTransferFeeConfig.DefaultFinalityFeeUSDCents,
+							CustomBlockConfirmationFeeUSDCents:     input.RemoteChainConfig.TokenTransferFeeConfig.CustomFinalityFeeUSDCents,
+							DefaultBlockConfirmationTransferFeeBps: input.RemoteChainConfig.TokenTransferFeeConfig.DefaultFinalityTransferFeeBps,
+							CustomBlockConfirmationTransferFeeBps:  input.RemoteChainConfig.TokenTransferFeeConfig.CustomFinalityTransferFeeBps,
+							IsEnabled:                              input.RemoteChainConfig.TokenTransferFeeConfig.IsEnabled,
+						},
 					},
 				},
-			},
-		})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to apply token transfer fee config updates: %w", err)
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to apply token transfer fee config updates: %w", err)
+			}
+			writes = append(writes, applyTokenTransferFeeConfigUpdatesReport.Output)
 		}
-		writes = append(writes, applyTokenTransferFeeConfigUpdatesReport.Output)
 
 		// Set the requested CCVs
 		inboundCCVs := make([]common.Address, len(input.RemoteChainConfig.InboundCCVs))
