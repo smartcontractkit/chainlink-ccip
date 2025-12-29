@@ -494,6 +494,15 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   }
 
   /// @notice Parses and validates extra arguments, applying defaults from destination chain configuration.
+  /// The function ensures all messages have the required CCVs and executor needed for processing,
+  /// even when users don't explicitly specify them.
+  /// @dev `tokenReceiver` is NOT validated here, and is validated in `_lockOrBurnSingleToken`.
+  /// @param destChainSelector The destination chain selector.
+  /// @param destChainConfig Configuration for the destination chain including default values.
+  /// @param extraArgs User-provided extra arguments in either V3 or legacy format.
+  /// @param isTokenTransferWithoutData Indicates if the message has no data but includes a token transfer. This is meant to
+  /// signal token-only transfers to avoid adding default CCVs when not needed.
+  /// @return resolvedArgs Complete EVMExtraArgsV3 struct with all defaults applied.
   function _parseExtraArgsWithDefaults(
     uint64 destChainSelector,
     DestChainConfig memory destChainConfig,
@@ -770,7 +779,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       }
     }
 
-    // If the user provided CCVs, ensure no duplicates and resolve address(0).
+    // If the user provided CCVs, ensure no duplicates.
     CCVConfigValidation._assertNoDuplicates(userCCVs);
 
     uint256 userCCVsLength = userCCVs.length;
