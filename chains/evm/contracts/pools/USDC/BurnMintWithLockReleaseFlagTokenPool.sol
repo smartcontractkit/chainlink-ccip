@@ -13,6 +13,11 @@ import {LOCK_RELEASE_FLAG} from "./SiloedUSDCTokenPool.sol";
 /// @dev The only difference between this contract and BurnMintTokenPool is the destPoolData returns the
 /// abi-encoded LOCK_RELEASE_FLAG instead of the local token decimals.
 contract BurnMintWithLockReleaseFlagTokenPool is BurnMintTokenPool {
+  /// @notice Using a function because constant state variables cannot be overridden by child contracts.
+  function typeAndVersion() external pure override returns (string memory) {
+    return "BurnMintWithLockReleaseFlagTokenPool 1.7.0-dev";
+  }
+
   constructor(
     IBurnMintERC20 token,
     uint8 localTokenDecimals,
@@ -29,22 +34,26 @@ contract BurnMintWithLockReleaseFlagTokenPool is BurnMintTokenPool {
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
   ) public override returns (Pool.LockOrBurnOutV1 memory) {
-    uint256 feeAmount = _getFee(lockOrBurnIn, WAIT_FOR_FINALITY);
-    _validateLockOrBurn(lockOrBurnIn, WAIT_FOR_FINALITY, "", feeAmount);
+    Pool.LockOrBurnOutV1 memory out = super.lockOrBurn(lockOrBurnIn);
+    out.destPoolData = abi.encode(LOCK_RELEASE_FLAG);
+    return out;
+  }
 
-    _lockOrBurn(lockOrBurnIn.amount);
-
-    emit LockedOrBurned({
-      remoteChainSelector: lockOrBurnIn.remoteChainSelector,
-      token: address(i_token),
-      sender: msg.sender,
-      amount: lockOrBurnIn.amount
-    });
-
-    // LOCK_RELEASE_FLAG = bytes4(keccak256("NO_CCTP_USE_LOCK_RELEASE"))
-    return Pool.LockOrBurnOutV1({
-      destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector), destPoolData: abi.encode(LOCK_RELEASE_FLAG)
-    });
+  /// @notice Burn the token in the pool with V2 parameters.
+  /// @dev The _validateLockOrBurn check is an essential security check.
+  /// @dev Performs the exact same functionality as BurnMintTokenPool, but returns the LOCK_RELEASE_FLAG
+  /// as the destPoolData to signal to the remote pool to release tokens instead of minting them.
+  /// @param lockOrBurnIn Encoded data fields for the processing of tokens on the source chain.
+  /// @param blockConfirmationRequested Requested block confirmation.
+  /// @param tokenArgs Additional token arguments.
+  function lockOrBurn(
+    Pool.LockOrBurnInV1 calldata lockOrBurnIn,
+    uint16 blockConfirmationRequested,
+    bytes calldata tokenArgs
+  ) public override returns (Pool.LockOrBurnOutV1 memory out, uint256 destTokenAmount) {
+    (out, destTokenAmount) = super.lockOrBurn(lockOrBurnIn, blockConfirmationRequested, tokenArgs);
+    out.destPoolData = abi.encode(LOCK_RELEASE_FLAG);
+    return (out, destTokenAmount);
   }
 
   /// @notice Mint tokens from the pool to the recipient
@@ -53,13 +62,24 @@ contract BurnMintWithLockReleaseFlagTokenPool is BurnMintTokenPool {
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
+    return releaseOrMint(releaseOrMintIn, WAIT_FOR_FINALITY);
+  }
+
+  /// @notice Mint tokens from the pool to the recipient with V2 parameters.
+  /// @dev The _validateReleaseOrMint check is an essential security check.
+  /// @param releaseOrMintIn Encoded data fields for the processing of tokens on the destination chain.
+  /// @param blockConfirmationRequested Requested block confirmation.
+  function releaseOrMint(
+    Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
+    uint16 blockConfirmationRequested
+  ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
     // Since the remote token is always canonical USDC, the decimals should always be 6 for remote tokens,
     // which enables potentially local non-canonical USDC with different decimals to be minted.
     uint256 localAmount = _calculateLocalAmount(releaseOrMintIn.sourceDenominatedAmount, 6);
 
-    _validateReleaseOrMint(releaseOrMintIn, localAmount, WAIT_FOR_FINALITY);
+    _validateReleaseOrMint(releaseOrMintIn, localAmount, blockConfirmationRequested);
 
-    IBurnMintERC20(address(i_token)).mint(releaseOrMintIn.receiver, localAmount);
+    _releaseOrMint(releaseOrMintIn.receiver, localAmount);
 
     emit ReleasedOrMinted({
       remoteChainSelector: releaseOrMintIn.remoteChainSelector,
