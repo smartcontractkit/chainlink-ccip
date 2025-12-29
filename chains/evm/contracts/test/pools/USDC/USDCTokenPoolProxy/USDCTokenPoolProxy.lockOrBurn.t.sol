@@ -11,7 +11,7 @@ import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
 import {USDCTokenPoolProxy} from "../../../../pools/USDC/USDCTokenPoolProxy.sol";
 import {USDCTokenPoolProxySetup} from "./USDCTokenPoolProxySetup.t.sol";
 
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
 
 contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
@@ -228,7 +228,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
     assertEq(destTokenAmount, amount);
 
     // Ensure that the balance of the verifier impl has been updated
-    assertEq(IERC20(address(s_USDCToken)).balanceOf(verifierImpl), amount);
+    assertEq(s_USDCToken.balanceOf(verifierImpl), amount);
   }
 
   // Reverts

@@ -12,8 +12,8 @@ import {CCTPMessageTransmitterProxy} from "../pools/USDC/CCTPMessageTransmitterP
 import {BaseVerifier} from "./components/BaseVerifier.sol";
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/utils/SafeERC20.sol";
 
 /// @notice The CCTPVerifier creates USDC burn messages on source and delivers them on destination.
 /// @dev This verifier is for CCTP V2 and is not backwards compatible with CCTP V1.
@@ -193,7 +193,7 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
 
     // Approve the token messenger to burn the USDC token on behalf of this contract.
     // The USDC token pool will be responsible for forwarding USDC it receives from the router to this contract.
-    i_usdcToken.safeIncreaseAllowance(address(i_tokenMessenger), type(uint256).max);
+    i_usdcToken.approve(address(i_tokenMessenger), type(uint256).max);
 
     emit StaticConfigSet(
       address(i_tokenMessenger), address(i_messageTransmitterProxy), address(i_usdcToken), i_localDomainIdentifier
