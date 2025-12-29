@@ -7,7 +7,7 @@ import {BurnMintWithLockReleaseFlagTokenPoolSetup} from "./BurnMintWithLockRelea
 
 import {LOCK_RELEASE_FLAG} from "../../../pools/USDC/SiloedUSDCTokenPool.sol";
 
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
 contract BurnMintWithLockReleaseFlagTokenPool_lockOrBurn is BurnMintWithLockReleaseFlagTokenPoolSetup {
   function test_LockOrBurn_CorrectReturnData() public {

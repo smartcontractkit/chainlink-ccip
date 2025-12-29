@@ -11,7 +11,7 @@ import {OnRampHelper} from "../../helpers/OnRampHelper.sol";
 import {MockExecutor} from "../../mocks/MockExecutor.sol";
 import {MockVerifier} from "../../mocks/MockVerifier.sol";
 
-import {IERC20Metadata} from "@openzeppelin/contracts@4.8.3/token/ERC20/extensions/IERC20Metadata.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts@5.3.0/token/ERC20/extensions/IERC20Metadata.sol";
 
 contract OnRampSetup is FeeQuoterFeeSetup {
   address internal constant FEE_AGGREGATOR = 0xa33CDB32eAEce34F6affEfF4899cef45744EDea3;

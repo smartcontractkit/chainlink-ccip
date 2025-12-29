@@ -7,8 +7,10 @@ import {BaseTest} from "../../BaseTest.t.sol";
 import {TokenPoolHelper} from "../../helpers/TokenPoolHelper.sol";
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
+
 contract TokenPoolSetup is BaseTest {
-  BurnMintERC20 internal s_token;
+  IERC20 internal s_token;
   TokenPoolHelper internal s_tokenPool;
 
   address internal s_allowedOffRamp = makeAddr("allowed_offRamp");
@@ -19,7 +21,7 @@ contract TokenPoolSetup is BaseTest {
 
   function setUp() public virtual override {
     super.setUp();
-    s_token = new BurnMintERC20("LINK", "LNK", 18, 0, 0);
+    s_token = IERC20(address(new BurnMintERC20("LINK", "LNK", 18, 0, 0)));
     deal(address(s_token), OWNER, type(uint256).max);
 
     s_tokenPool = new TokenPoolHelper(
