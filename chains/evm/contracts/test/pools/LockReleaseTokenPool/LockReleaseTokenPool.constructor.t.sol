@@ -7,13 +7,20 @@ import {TokenPool} from "../../../pools/TokenPool.sol";
 import {BaseTest} from "../../BaseTest.t.sol";
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
+
 contract LockReleaseTokenPool_constructor is BaseTest {
   function test_constructor() public {
     BurnMintERC20 token = new BurnMintERC20("T", "T", 18, 0, 0);
     ERC20LockBox lockBox = new ERC20LockBox(address(token));
 
     LockReleaseTokenPool pool = new LockReleaseTokenPool(
-      token, DEFAULT_TOKEN_DECIMALS, address(0), address(s_mockRMNRemote), address(s_sourceRouter), address(lockBox)
+      IERC20(address(token)),
+      DEFAULT_TOKEN_DECIMALS,
+      address(0),
+      address(s_mockRMNRemote),
+      address(s_sourceRouter),
+      address(lockBox)
     );
 
     assertEq(address(pool.getToken()), address(token));
@@ -28,7 +35,7 @@ contract LockReleaseTokenPool_constructor is BaseTest {
 
     vm.expectRevert(abi.encodeWithSelector(TokenPool.InvalidToken.selector, address(invalidToken)));
     new LockReleaseTokenPool(
-      invalidToken,
+      IERC20(address(invalidToken)),
       DEFAULT_TOKEN_DECIMALS,
       address(0),
       address(s_mockRMNRemote),
