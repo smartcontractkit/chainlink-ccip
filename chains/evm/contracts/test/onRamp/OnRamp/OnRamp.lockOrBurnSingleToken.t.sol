@@ -165,4 +165,16 @@ contract OnRamp_lockOrBurnSingleToken is OnRampSetup {
       tokenAndAmount, DEST_CHAIN_SELECTOR, receiver, originalSender, finality, tokenArgs
     );
   }
+
+  function test_lockOrBurnSingleToken_RevertWhen_UnsupportedToken_PoolDoesNotSupportCCIPPoolV1() public {
+    // Mock the pool to NOT support CCIP_POOL_V1 interface
+    vm.mockCall(s_pool, abi.encodeCall(IERC165(s_pool).supportsInterface, (Pool.CCIP_POOL_V1)), abi.encode(false));
+
+    Client.EVMTokenAmount memory tokenAndAmount = Client.EVMTokenAmount({token: s_sourceToken, amount: 123 ether});
+
+    vm.expectRevert(abi.encodeWithSelector(OnRamp.UnsupportedToken.selector, s_sourceToken));
+    s_onRampHelper.lockOrBurnSingleToken(
+      tokenAndAmount, DEST_CHAIN_SELECTOR, abi.encodePacked(makeAddr("receiver")), makeAddr("sender"), 0, ""
+    );
+  }
 }
