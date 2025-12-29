@@ -15,7 +15,8 @@ import {IERC20Metadata} from "@openzeppelin/contracts@5.3.0/token/ERC20/extensio
 
 contract OnRampSetup is FeeQuoterFeeSetup {
   address internal constant FEE_AGGREGATOR = 0xa33CDB32eAEce34F6affEfF4899cef45744EDea3;
-  uint16 internal constant NETWORK_FEE_USD_CENTS = 1_00; // $1.00
+  uint16 internal constant MESSAGE_NETWORK_FEE_USD_CENTS = 1_00; // $1.00
+  uint16 internal constant TOKEN_NETWORK_FEE_USD_CENTS = 2_00; // $2.00
   uint32 internal constant POOL_FEE_USD_CENTS = 100; // $1.00
   uint32 internal constant POOL_GAS_OVERHEAD = 50000;
   uint32 internal constant POOL_BYTES_OVERHEAD = 128;
@@ -36,6 +37,12 @@ contract OnRampSetup is FeeQuoterFeeSetup {
   address internal s_defaultExecutor;
 
   mapping(address token => bytes extraData) internal s_extraDataByToken;
+
+  struct EventData {
+    ExtraArgsCodec.GenericExtraArgsV3 resolvedExtraArgs;
+    OnRamp.Receipt[] receipts;
+    uint32 executionGasLimit;
+  }
 
   function setUp() public virtual override {
     super.setUp();
@@ -62,7 +69,8 @@ contract OnRampSetup is FeeQuoterFeeSetup {
       destChainSelector: DEST_CHAIN_SELECTOR,
       router: s_sourceRouter,
       addressBytesLength: EVM_ADDRESS_LENGTH,
-      networkFeeUSDCents: NETWORK_FEE_USD_CENTS,
+      messageNetworkFeeUSDCents: MESSAGE_NETWORK_FEE_USD_CENTS,
+      tokenNetworkFeeUSDCents: TOKEN_NETWORK_FEE_USD_CENTS,
       tokenReceiverAllowed: false,
       baseExecutionGasCost: BASE_EXEC_GAS_COST,
       laneMandatedCCVs: new address[](0),
@@ -91,7 +99,8 @@ contract OnRampSetup is FeeQuoterFeeSetup {
   {
     OnRamp.DestChainConfig memory destChainConfig = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR);
 
-    ExtraArgsCodec.GenericExtraArgsV3 memory resolvedExtraArgs = s_onRamp.parseExtraArgsWithDefaults(
+    EventData memory eventData;
+    eventData.resolvedExtraArgs = s_onRamp.parseExtraArgsWithDefaults(
       destChainSelector,
       destChainConfig,
       message.extraArgs,
@@ -104,24 +113,35 @@ contract OnRampSetup is FeeQuoterFeeSetup {
         destChainSelector,
         message.tokenAmounts[0].token,
         message.tokenAmounts[0].amount,
-        resolvedExtraArgs.blockConfirmations,
-        resolvedExtraArgs.tokenArgs
+        eventData.resolvedExtraArgs.blockConfirmations,
+        eventData.resolvedExtraArgs.tokenArgs
       );
     }
-    (resolvedExtraArgs.ccvs, resolvedExtraArgs.ccvArgs) = s_onRamp.mergeCCVLists(
-      resolvedExtraArgs.ccvs, resolvedExtraArgs.ccvArgs, destChainConfig.laneMandatedCCVs, poolRequiredCCVs
+    (eventData.resolvedExtraArgs.ccvs, eventData.resolvedExtraArgs.ccvArgs) = s_onRamp.mergeCCVLists(
+      eventData.resolvedExtraArgs.ccvs,
+      eventData.resolvedExtraArgs.ccvArgs,
+      destChainConfig.laneMandatedCCVs,
+      poolRequiredCCVs
     );
+
+    uint16 networkFeeUSDCents = message.tokenAmounts.length == 0
+      ? destChainConfig.messageNetworkFeeUSDCents
+      : destChainConfig.tokenNetworkFeeUSDCents;
+    (eventData.receipts, eventData.executionGasLimit,) =
+      s_onRamp.getReceipts(destChainSelector, networkFeeUSDCents, message, eventData.resolvedExtraArgs);
 
     MessageV1Codec.MessageV1 memory messageV1 = MessageV1Codec.MessageV1({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       destChainSelector: destChainSelector,
       messageNumber: msgNum,
-      executionGasLimit: 0, // populated below.
+      executionGasLimit: eventData.executionGasLimit,
       ccipReceiveGasLimit: GAS_LIMIT,
       finality: 0,
-      ccvAndExecutorHash: MessageV1Codec._computeCCVAndExecutorHash(resolvedExtraArgs.ccvs, resolvedExtraArgs.executor),
+      ccvAndExecutorHash: MessageV1Codec._computeCCVAndExecutorHash(
+        eventData.resolvedExtraArgs.ccvs, eventData.resolvedExtraArgs.executor
+      ),
       onRampAddress: abi.encode(address(s_onRamp)),
-      offRampAddress: s_onRamp.getDestChainConfig(destChainSelector).offRamp,
+      offRampAddress: destChainConfig.offRamp,
       sender: abi.encode(originalSender),
       receiver: abi.encodePacked(abi.decode(message.receiver, (address))),
       destBlob: "",
@@ -133,18 +153,17 @@ contract OnRampSetup is FeeQuoterFeeSetup {
 
     _populateTokenTransfers(messageV1, message);
 
-    (receipts, messageV1.executionGasLimit,) =
-      s_onRamp.getReceipts(destChainSelector, destChainConfig.networkFeeUSDCents, message, resolvedExtraArgs);
-
     // `getReceipts` uses `msg.sender` as the issuer for the network-fee receipt.
     // Since this helper calls it directly (not through the router), override the issuer to reflect the router address.
-    receipts[receipts.length - 1].issuer = address(s_sourceRouter);
+    eventData.receipts[eventData.receipts.length - 1].issuer = address(s_sourceRouter);
+
+    receipts = eventData.receipts;
 
     return (
       keccak256(MessageV1Codec._encodeMessageV1(messageV1)),
       MessageV1Codec._encodeMessageV1(messageV1),
       receipts,
-      new bytes[](resolvedExtraArgs.ccvs.length)
+      new bytes[](eventData.resolvedExtraArgs.ccvs.length)
     );
   }
 
