@@ -59,7 +59,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
     address legacyCctpV1Pool; // A CCTP V1 token pool that did not utilize a message transmitter proxy.
     address cctpV1Pool;
     address cctpV2Pool;
-    address cctpV2PoolWithCCV;
+    address cctpTokenPool;
   }
 
   enum LockOrBurnMechanism {
@@ -81,7 +81,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
   address internal s_legacyCctpV1Pool;
   address internal s_cctpV1Pool;
   address internal s_cctpV2Pool;
-  address internal s_cctpV2PoolWithCCV;
+  address internal s_cctpTokenPool;
 
   /// @dev Constant representing the default finality.
   uint16 internal constant WAIT_FOR_FINALITY = 0;
@@ -104,7 +104,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
     s_legacyCctpV1Pool = pools.legacyCctpV1Pool;
     s_cctpV1Pool = pools.cctpV1Pool;
     s_cctpV2Pool = pools.cctpV2Pool;
-    s_cctpV2PoolWithCCV = pools.cctpV2PoolWithCCV;
+    s_cctpTokenPool = pools.cctpTokenPool;
     i_router = IRouter(router);
     i_cctpVerifier = ICrossChainVerifierResolver(cctpVerifier);
   }
@@ -145,7 +145,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
     address childPool;
     if (mechanism == LockOrBurnMechanism.CCTP_V2_WITH_CCV) {
       // CCV-compatible lockOrBurn path is completed within this if statement to avoid redundant checks.
-      address ccvPool = s_cctpV2PoolWithCCV;
+      address ccvPool = s_cctpTokenPool;
       if (ccvPool == address(0)) {
         revert NoLockOrBurnMechanismSet(lockOrBurnIn.remoteChainSelector);
       }
@@ -241,7 +241,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
     }
 
     if (version == USDCSourcePoolDataCodec.CCTP_VERSION_2_CCV_TAG) {
-      return IPoolV2(s_cctpV2PoolWithCCV).releaseOrMint(releaseOrMintIn, blockConfirmationRequested);
+      return IPoolV2(s_cctpTokenPool).releaseOrMint(releaseOrMintIn, blockConfirmationRequested);
     }
 
     // In previous versions of the USDC Token Pool, the sourcePoolData only contained two fields, a uint64 and uint32.
@@ -298,9 +298,9 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
       revert TokenPoolUnsupported(pools.cctpV2Pool);
     }
 
-    if (pools.cctpV2PoolWithCCV != address(0)) {
-      if (!pools.cctpV2PoolWithCCV.supportsInterface(type(IPoolV2).interfaceId)) {
-        revert TokenPoolUnsupported(pools.cctpV2PoolWithCCV);
+    if (pools.cctpTokenPool != address(0)) {
+      if (!pools.cctpTokenPool.supportsInterface(type(IPoolV2).interfaceId)) {
+        revert TokenPoolUnsupported(pools.cctpTokenPool);
       }
     }
 
@@ -312,7 +312,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
     s_legacyCctpV1Pool = pools.legacyCctpV1Pool;
     s_cctpV1Pool = pools.cctpV1Pool;
     s_cctpV2Pool = pools.cctpV2Pool;
-    s_cctpV2PoolWithCCV = pools.cctpV2PoolWithCCV;
+    s_cctpTokenPool = pools.cctpTokenPool;
 
     emit PoolAddressesUpdated(pools);
   }
@@ -324,7 +324,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
       legacyCctpV1Pool: s_legacyCctpV1Pool,
       cctpV1Pool: s_cctpV1Pool,
       cctpV2Pool: s_cctpV2Pool,
-      cctpV2PoolWithCCV: s_cctpV2PoolWithCCV
+      cctpTokenPool: s_cctpTokenPool
     });
   }
 
@@ -466,7 +466,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
     onlyWithCCVCompatiblePool
     returns (uint256 feeUSDCents, uint32 destGasOverhead, uint32 destBytesOverhead, uint16 tokenFeeBps, bool isEnabled)
   {
-    return IPoolV2(s_cctpV2PoolWithCCV)
+    return IPoolV2(s_cctpTokenPool)
       .getFee(localToken, destChainSelector, amount, feeToken, blockConfirmationRequested, tokenArgs);
   }
 
@@ -481,7 +481,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
     uint16 blockConfirmationRequested,
     bytes calldata tokenArgs
   ) external view onlyWithCCVCompatiblePool returns (TokenTransferFeeConfig memory feeConfig) {
-    return IPoolV2(s_cctpV2PoolWithCCV)
+    return IPoolV2(s_cctpTokenPool)
       .getTokenTransferFeeConfig(localToken, destChainSelector, blockConfirmationRequested, tokenArgs);
   }
 
@@ -490,7 +490,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
   function getRemoteToken(
     uint64 remoteChainSelector
   ) external view onlyWithCCVCompatiblePool returns (bytes memory) {
-    return IPoolV2(s_cctpV2PoolWithCCV).getRemoteToken(remoteChainSelector);
+    return IPoolV2(s_cctpTokenPool).getRemoteToken(remoteChainSelector);
   }
 
   /// @inheritdoc IPoolV2
@@ -523,7 +523,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
 
   /// @notice Ensures that a CCV-compatible pool is set.
   modifier onlyWithCCVCompatiblePool() {
-    if (s_cctpV2PoolWithCCV == address(0)) {
+    if (s_cctpTokenPool == address(0)) {
       revert CCVCompatiblePoolNotSet();
     }
     _;

@@ -13,7 +13,7 @@ contract USDCTokenPoolProxy_constructor is USDCSetup {
   address internal s_legacyCctpV1Pool = makeAddr("legacyCctpV1Pool");
   address internal s_cctpV1Pool = makeAddr("cctpV1Pool");
   address internal s_cctpV2Pool = makeAddr("cctpV2Pool");
-  address internal s_cctpV2PoolWithCCV = makeAddr("cctpV2PoolWithCCV");
+  address internal s_cctpTokenPool = makeAddr("cctpTokenPool");
   address internal s_lockReleasePool = makeAddr("lockReleasePool");
   address internal s_cctpVerifier = makeAddr("cctpVerifier");
 
@@ -25,7 +25,7 @@ contract USDCTokenPoolProxy_constructor is USDCSetup {
         legacyCctpV1Pool: s_legacyCctpV1Pool,
         cctpV1Pool: s_cctpV1Pool,
         cctpV2Pool: s_cctpV2Pool,
-        cctpV2PoolWithCCV: s_cctpV2PoolWithCCV
+        cctpTokenPool: s_cctpTokenPool
       }),
       address(s_router),
       address(s_cctpVerifier)
@@ -50,7 +50,7 @@ contract USDCTokenPoolProxy_constructor is USDCSetup {
         legacyCctpV1Pool: s_legacyCctpV1Pool,
         cctpV1Pool: s_cctpV1Pool,
         cctpV2Pool: s_cctpV2Pool,
-        cctpV2PoolWithCCV: s_cctpV2PoolWithCCV
+        cctpTokenPool: s_cctpTokenPool
       }),
       address(s_router),
       address(s_cctpVerifier)
@@ -65,7 +65,7 @@ contract USDCTokenPoolProxy_constructor is USDCSetup {
         legacyCctpV1Pool: s_legacyCctpV1Pool,
         cctpV1Pool: s_cctpV1Pool,
         cctpV2Pool: s_cctpV2Pool,
-        cctpV2PoolWithCCV: s_cctpV2PoolWithCCV
+        cctpTokenPool: s_cctpTokenPool
       }),
       address(0), // Router
       address(s_cctpVerifier)
@@ -80,7 +80,7 @@ contract USDCTokenPoolProxy_constructor is USDCSetup {
         legacyCctpV1Pool: s_legacyCctpV1Pool,
         cctpV1Pool: s_cctpV1Pool,
         cctpV2Pool: s_cctpV2Pool,
-        cctpV2PoolWithCCV: s_cctpV2PoolWithCCV
+        cctpTokenPool: s_cctpTokenPool
       }),
       address(s_router),
       address(0) // CCTP Verifier

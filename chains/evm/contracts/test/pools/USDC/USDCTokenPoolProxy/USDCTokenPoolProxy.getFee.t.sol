@@ -15,7 +15,7 @@ contract USDCTokenPoolProxy_getFee is USDCTokenPoolProxySetup {
 
   function test_getFee() public {
     vm.mockCall(
-      address(s_cctpV2PoolWithCCV),
+      address(s_cctpTokenPool),
       abi.encodeWithSelector(IPoolV2.getFee.selector, address(0), 0, 0, address(0), 0, ""),
       abi.encode(FEE_USD_CENTS, DEST_GAS_OVERHEAD, DEST_BYTES_OVERHEAD, TOKEN_FEE_BPS, IS_ENABLED)
     );
@@ -39,7 +39,7 @@ contract USDCTokenPoolProxy_getFee is USDCTokenPoolProxySetup {
         legacyCctpV1Pool: s_legacyCctpV1Pool,
         cctpV1Pool: s_cctpV1Pool,
         cctpV2Pool: s_cctpV2Pool,
-        cctpV2PoolWithCCV: address(0)
+        cctpTokenPool: address(0)
       })
     );
 

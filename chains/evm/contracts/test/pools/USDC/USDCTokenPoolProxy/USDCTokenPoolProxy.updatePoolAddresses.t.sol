@@ -27,7 +27,7 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
         legacyCctpV1Pool: s_legacyCctpV1Pool,
         cctpV1Pool: s_newCctpV1Pool,
         cctpV2Pool: s_newCctpV2Pool,
-        cctpV2PoolWithCCV: s_newCctpV2PoolWithCCV
+        cctpTokenPool: s_newCctpV2PoolWithCCV
       })
     );
 
@@ -45,7 +45,7 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
     vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.TokenPoolUnsupported.selector, s_newCctpV1Pool));
     s_usdcTokenPoolProxy.updatePoolAddresses(
       USDCTokenPoolProxy.PoolAddresses({
-        legacyCctpV1Pool: address(0), cctpV1Pool: s_newCctpV1Pool, cctpV2Pool: address(0), cctpV2PoolWithCCV: address(0)
+        legacyCctpV1Pool: address(0), cctpV1Pool: s_newCctpV1Pool, cctpV2Pool: address(0), cctpTokenPool: address(0)
       })
     );
 
@@ -54,7 +54,7 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
     changePrank(OWNER);
     s_usdcTokenPoolProxy.updatePoolAddresses(
       USDCTokenPoolProxy.PoolAddresses({
-        legacyCctpV1Pool: address(0), cctpV1Pool: s_newCctpV1Pool, cctpV2Pool: address(0), cctpV2PoolWithCCV: address(0)
+        legacyCctpV1Pool: address(0), cctpV1Pool: s_newCctpV1Pool, cctpV2Pool: address(0), cctpTokenPool: address(0)
       })
     );
 
@@ -66,7 +66,7 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
     vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.TokenPoolUnsupported.selector, s_newCctpV2Pool));
     s_usdcTokenPoolProxy.updatePoolAddresses(
       USDCTokenPoolProxy.PoolAddresses({
-        legacyCctpV1Pool: address(0), cctpV1Pool: address(0), cctpV2Pool: s_newCctpV2Pool, cctpV2PoolWithCCV: address(0)
+        legacyCctpV1Pool: address(0), cctpV1Pool: address(0), cctpV2Pool: s_newCctpV2Pool, cctpTokenPool: address(0)
       })
     );
 
@@ -75,7 +75,7 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
     changePrank(OWNER);
     s_usdcTokenPoolProxy.updatePoolAddresses(
       USDCTokenPoolProxy.PoolAddresses({
-        legacyCctpV1Pool: address(0), cctpV1Pool: address(0), cctpV2Pool: s_newCctpV2Pool, cctpV2PoolWithCCV: address(0)
+        legacyCctpV1Pool: address(0), cctpV1Pool: address(0), cctpV2Pool: s_newCctpV2Pool, cctpTokenPool: address(0)
       })
     );
 
@@ -90,7 +90,7 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
         legacyCctpV1Pool: address(0),
         cctpV1Pool: address(0),
         cctpV2Pool: address(0),
-        cctpV2PoolWithCCV: s_newCctpV2PoolWithCCV
+        cctpTokenPool: s_newCctpV2PoolWithCCV
       })
     );
 
@@ -102,7 +102,7 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
         legacyCctpV1Pool: address(0),
         cctpV1Pool: address(0),
         cctpV2Pool: address(0),
-        cctpV2PoolWithCCV: s_newCctpV2PoolWithCCV
+        cctpTokenPool: s_newCctpV2PoolWithCCV
       })
     );
   }
@@ -121,7 +121,7 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
         legacyCctpV1Pool: s_legacyCctpV1Pool,
         cctpV1Pool: s_newCctpV1Pool,
         cctpV2Pool: s_newCctpV2Pool,
-        cctpV2PoolWithCCV: s_newCctpV2PoolWithCCV
+        cctpTokenPool: s_newCctpV2PoolWithCCV
       })
     );
 
@@ -131,7 +131,7 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
         legacyCctpV1Pool: address(0),
         cctpV1Pool: s_newCctpV1Pool,
         cctpV2Pool: s_newCctpV2Pool,
-        cctpV2PoolWithCCV: s_newCctpV2PoolWithCCV
+        cctpTokenPool: s_newCctpV2PoolWithCCV
       })
     );
 
@@ -145,7 +145,7 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
         legacyCctpV1Pool: s_legacyCctpV1Pool,
         cctpV1Pool: s_newCctpV1Pool,
         cctpV2Pool: s_newCctpV2Pool,
-        cctpV2PoolWithCCV: s_newCctpV2PoolWithCCV
+        cctpTokenPool: s_newCctpV2PoolWithCCV
       })
     );
 

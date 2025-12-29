@@ -301,7 +301,7 @@ contract cctp_e2e is OnRampSetup {
         legacyCctpV1Pool: address(0),
         cctpV1Pool: address(0),
         cctpV2Pool: address(0),
-        cctpV2PoolWithCCV: address(setup.tokenPool)
+        cctpTokenPool: address(setup.tokenPool)
       }),
       router,
       address(setup.verifierResolver)

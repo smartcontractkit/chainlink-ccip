@@ -19,7 +19,7 @@ contract USDCTokenPoolProxy_getTokenTransferFeeConfig is USDCTokenPoolProxySetup
     });
 
     vm.mockCall(
-      address(s_cctpV2PoolWithCCV),
+      address(s_cctpTokenPool),
       abi.encodeWithSelector(IPoolV2.getTokenTransferFeeConfig.selector, address(0), uint64(1), uint16(0), ""),
       abi.encode(expectedFeeConfig)
     );
@@ -45,7 +45,7 @@ contract USDCTokenPoolProxy_getTokenTransferFeeConfig is USDCTokenPoolProxySetup
         legacyCctpV1Pool: s_legacyCctpV1Pool,
         cctpV1Pool: s_cctpV1Pool,
         cctpV2Pool: s_cctpV2Pool,
-        cctpV2PoolWithCCV: address(0)
+        cctpTokenPool: address(0)
       })
     );
 
