@@ -2,16 +2,18 @@
 pragma solidity ^0.8.24;
 
 import {ERC20LockBox} from "../../../pools/ERC20LockBox.sol";
+
+import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 import {Test} from "forge-std/Test.sol";
 
 contract ERC20LockBox_constructor is Test {
-  function test_Constructor_Success() public {
+  function test_constructor() public {
     ERC20LockBox lockBox = new ERC20LockBox(address(3));
-    assertEq(address(lockBox.i_tokenAdminRegistry()), address(3));
+    assertTrue(lockBox.isTokenSupported(address(3)));
   }
 
-  function test_Constructor_RevertWhen_TokenAdminRegistryIsZeroAddress() public {
-    vm.expectRevert(ERC20LockBox.ZeroAddressNotAllowed.selector);
+  function test_constructor_RevertWhen_TokenIsZeroAddress() public {
+    vm.expectRevert(AuthorizedCallers.ZeroAddressNotAllowed.selector);
     new ERC20LockBox(address(0));
   }
 }

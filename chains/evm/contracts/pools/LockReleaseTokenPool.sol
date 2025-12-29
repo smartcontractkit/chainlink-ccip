@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {ILockBox} from "../interfaces/ILockBox.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
-import {ERC20LockBox} from "./ERC20LockBox.sol";
+import {Pool} from "../libraries/Pool.sol";
 import {TokenPool} from "./TokenPool.sol";
 
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
@@ -21,15 +22,11 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
   event LiquidityTransferred(address indexed from, uint256 amount);
   event LiquidityAdded(address indexed provider, uint256 indexed amount);
   event LiquidityRemoved(address indexed provider, uint256 indexed amount);
-  event RebalancerSet(address oldRebalancer, address newRebalancer);
 
   string public constant override typeAndVersion = "LockReleaseTokenPool 1.7.0-dev";
 
-  /// @notice The address of the rebalancer.
-  address internal s_rebalancer;
-
   /// @notice The lock box for the token pool.
-  ERC20LockBox internal immutable i_lockBox;
+  ILockBox internal immutable i_lockBox;
 
   constructor(
     IERC20 token,
@@ -41,93 +38,53 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
   ) TokenPool(token, localTokenDecimals, advancedPoolHooks, rmnProxy, router) {
     if (lockBox == address(0)) revert ZeroAddressInvalid();
 
+    ILockBox lockBoxContract = ILockBox(lockBox);
+    if (!lockBoxContract.isTokenSupported(address(token))) {
+      revert InvalidToken(address(token));
+    }
     token.approve(lockBox, type(uint256).max);
-    i_lockBox = ERC20LockBox(lockBox);
+    i_lockBox = lockBoxContract;
   }
 
   /// @notice Locks the tokens in the lockBox.
   /// @dev The router has already transferred the full amount to this contract before calling lockOrBurn.
   /// For V1 the amount = full amount. For V2 the amount = destTokenAmount (after fees), and fees remain on this contract.
-  /// @param amount The amount of tokens to lock.
-  function _lockOrBurn(
-    uint256 amount
-  ) internal virtual override {
-    i_lockBox.deposit(address(i_token), amount);
+  /// @param lockOrBurnIn The lock or burn input parameters.
+  function lockOrBurn(
+    Pool.LockOrBurnInV1 calldata lockOrBurnIn
+  ) public virtual override returns (Pool.LockOrBurnOutV1 memory out) {
+    // super.lockOrBurn will validate the lockOrBurnIn and revert if invalid.
+    out = super.lockOrBurn(lockOrBurnIn);
+    i_lockBox.deposit(address(i_token), lockOrBurnIn.remoteChainSelector, lockOrBurnIn.amount);
+    return out;
   }
 
-  function _releaseOrMint(
-    address receiver,
-    uint256 amount
-  ) internal virtual override {
+  function lockOrBurn(
+    Pool.LockOrBurnInV1 calldata lockOrBurnIn,
+    uint16 blockConfirmationRequested,
+    bytes calldata tokenArgs
+  ) public virtual override returns (Pool.LockOrBurnOutV1 memory, uint256) {
+    (Pool.LockOrBurnOutV1 memory out, uint256 destTokenAmount) =
+      super.lockOrBurn(lockOrBurnIn, blockConfirmationRequested, tokenArgs);
+    i_lockBox.deposit(address(i_token), lockOrBurnIn.remoteChainSelector, destTokenAmount);
+    return (out, destTokenAmount);
+  }
+
+  function releaseOrMint(
+    Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
+    uint16 blockConfirmationRequested
+  ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
+    Pool.ReleaseOrMintOutV1 memory out = super.releaseOrMint(releaseOrMintIn, blockConfirmationRequested);
     // Release tokens from the lock box to the receiver.
-    i_lockBox.withdraw(address(i_token), amount, receiver);
+    i_lockBox.withdraw(
+      address(i_token), releaseOrMintIn.remoteChainSelector, out.destinationAmount, releaseOrMintIn.receiver
+    );
+    return out;
   }
 
-  /// @notice Gets rebalancer, can be address(0) if none is configured.
-  /// @return The current liquidity manager.
-  function getRebalancer() external view returns (address) {
-    return s_rebalancer;
-  }
-
-  /// @notice Sets the rebalancer address.
-  /// @dev Address(0) can be used to disable the rebalancer.
-  /// @dev Only callable by the owner.
-  /// @param rebalancer The new rebalancer address.
-  function setRebalancer(
-    address rebalancer
-  ) external onlyOwner {
-    address oldRebalancer = s_rebalancer;
-
-    s_rebalancer = rebalancer;
-
-    emit RebalancerSet(oldRebalancer, rebalancer);
-  }
-
-  /// @notice Adds liquidity to the pool. The tokens should be approved first.
-  /// @param amount The amount of liquidity to provide.
-  function provideLiquidity(
-    uint256 amount
-  ) external {
-    if (s_rebalancer != msg.sender) revert Unauthorized(msg.sender);
-
-    i_token.safeTransferFrom(msg.sender, address(this), amount);
-    i_lockBox.deposit(address(i_token), amount);
-    emit LiquidityAdded(msg.sender, amount);
-  }
-
-  /// @notice Removed liquidity to the pool. The tokens will be sent to msg.sender.
-  /// @param amount The amount of liquidity to remove.
-  function withdrawLiquidity(
-    uint256 amount
-  ) external {
-    if (s_rebalancer != msg.sender) revert Unauthorized(msg.sender);
-
-    // Withdraw the tokens directly from the lockbox to the rebalancer.
-    i_lockBox.withdraw(address(i_token), amount, msg.sender);
-    emit LiquidityRemoved(msg.sender, amount);
-  }
-
-  /// @notice This function can be used to transfer liquidity from an older version of the pool to this pool. To do so
-  /// this pool will have to be set as the rebalancer in the older version of the pool. This allows it to transfer the
-  /// funds in the old pool to the new pool.
-  /// @dev When upgrading a LockRelease pool, this function can be called at the same time as the pool is changed in the
-  /// TokenAdminRegistry. This allows for a smooth transition of both liquidity and transactions to the new pool.
-  /// Alternatively, when no multicall is available, a portion of the funds can be transferred to the new pool before
-  /// changing which pool CCIP uses, to ensure both pools can operate. Then the pool should be changed in the
-  /// TokenAdminRegistry, which will activate the new pool. All new transactions will use the new pool and its
-  /// liquidity. Finally, the remaining liquidity can be transferred to the new pool using this function one more time.
-  /// @param from The address of the old pool.
-  /// @param amount The amount of liquidity to transfer. If uint256.max is passed, all liquidity will be transferred.
-  function transferLiquidity(
-    address from,
-    uint256 amount
-  ) external onlyOwner {
-    if (amount == type(uint256).max) {
-      amount = i_token.balanceOf(from);
-    }
-
-    LockReleaseTokenPool(from).withdrawLiquidity(amount);
-
-    emit LiquidityTransferred(from, amount);
+  function releaseOrMint(
+    Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
+  ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
+    return releaseOrMint(releaseOrMintIn, WAIT_FOR_FINALITY);
   }
 }
