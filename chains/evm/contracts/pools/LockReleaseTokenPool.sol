@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {ILockBox} from "../interfaces/ILockBox.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 import {Pool} from "../libraries/Pool.sol";
-import {ERC20LockBox} from "./ERC20LockBox.sol";
 import {TokenPool} from "./TokenPool.sol";
 
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
@@ -26,7 +26,7 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
   string public constant override typeAndVersion = "LockReleaseTokenPool 1.7.0-dev";
 
   /// @notice The lock box for the token pool.
-  ERC20LockBox internal immutable i_lockBox;
+  ILockBox internal immutable i_lockBox;
 
   constructor(
     IERC20 token,
@@ -38,7 +38,7 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
   ) TokenPool(token, localTokenDecimals, advancedPoolHooks, rmnProxy, router) {
     if (lockBox == address(0)) revert ZeroAddressInvalid();
 
-    ERC20LockBox lockBoxContract = ERC20LockBox(lockBox);
+    ILockBox lockBoxContract = ILockBox(lockBox);
     if (!lockBoxContract.isTokenSupported(address(token))) {
       revert InvalidToken(address(token));
     }
