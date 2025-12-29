@@ -540,10 +540,11 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     //
     // For example, token-only USDC transfers can use only CCTP (without committee verification), since CCTP is fully
     // trusted for that token flow.
-    if (resolvedArgs.ccvs.length == 0 && !(isTokenTransferWithoutData && resolvedArgs.gasLimit == 0)) {
-      resolvedArgs.ccvs = destChainConfig.defaultCCVs;
-      resolvedArgs.ccvArgs = new bytes[](resolvedArgs.ccvs.length);
-    }
+    bool isTokenOnlyTransfer = isTokenTransferWithoutData && resolvedArgs.gasLimit == 0;
+
+    (resolvedArgs.ccvs, resolvedArgs.ccvArgs) = _resolveUserOrDefaultCCVs(
+      resolvedArgs.ccvs, resolvedArgs.ccvArgs, destChainConfig.defaultCCVs, isTokenOnlyTransfer
+    );
 
     // Normalize and validate tokenReceiver if specified.
     if (resolvedArgs.tokenReceiver.length != 0) {
@@ -749,6 +750,79 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       tokenReceiver: _validateDestChainAddress(receiver, s_destChainConfigs[destChainSelector].addressBytesLength), // Dest address so unpadded bytes.
       extraData: poolReturnData.destPoolData
     });
+  }
+
+  /// @notice Resolves the "user requested or default" CCV list for a message.
+  /// @dev Users can request the defaults by either:
+  /// - providing an empty CCV list, or
+  /// - including `address(0)` as a placeholder (which is removed from the final list).
+  /// @dev Default CCVs are never applied for pure token transfers (see `_parseExtraArgsWithDefaults`).
+  /// @param userCCVs User-provided CCVs (may contain `address(0)` placeholders).
+  /// @param userCCVArgs User-provided CCV arguments, parallel to userCCVs.
+  /// @param defaultCCVs Destination-chain default CCVs.
+  /// @param isTokenOnlyTransfer Whether this message is a token-only transfer, meaning it has no receiver callback on
+  /// the destination chain.
+  /// @return ccvs Final CCV list (user first, then defaults), with placeholders removed.
+  /// @return ccvArgs Final CCV args (parallel to ccvs). Defaults use empty args.
+  function _resolveUserOrDefaultCCVs(
+    address[] memory userCCVs,
+    bytes[] memory userCCVArgs,
+    address[] memory defaultCCVs,
+    bool isTokenOnlyTransfer
+  ) internal pure returns (address[] memory ccvs, bytes[] memory ccvArgs) {
+    // Fast path: no user CCVs provided.
+    if (userCCVs.length == 0) {
+      if (isTokenOnlyTransfer) {
+        return (new address[](0), new bytes[](0));
+      } else {
+        return (defaultCCVs, new bytes[](defaultCCVs.length));
+      }
+    }
+
+    // If the user provided CCVs, ensure no duplicates.
+    CCVConfigValidation._assertNoDuplicates(userCCVs);
+
+    uint256 userCCVsLength = userCCVs.length;
+
+    for (uint256 i = 0; i < userCCVsLength; ++i) {
+      // If we find a placeholder, we need to build the final list.
+      if (userCCVs[i] == address(0)) {
+        // Since we replace a placeholder, the final list is at most (userCCVsLength - 1 + defaultCCVs.length). The list
+        // could end up being smaller if there are duplicates between user CCVs and default CCVs.
+        ccvs = new address[](userCCVsLength - 1 + defaultCCVs.length);
+        ccvArgs = new bytes[](userCCVsLength - 1 + defaultCCVs.length);
+
+        uint256 finalCCVCount = 0;
+        for (uint256 j = 0; j < userCCVsLength; ++j) {
+          // We know there's at most one placeholder as we checked for duplicates earlier.
+          if (j == i) continue;
+          ccvs[finalCCVCount] = userCCVs[j];
+          ccvArgs[finalCCVCount++] = userCCVArgs[j];
+        }
+
+        for (uint256 k = 0; k < defaultCCVs.length; ++k) {
+          bool isDuplicate = false;
+          for (uint256 m = 0; m < finalCCVCount; ++m) {
+            if (ccvs[m] == defaultCCVs[k]) {
+              isDuplicate = true;
+              break;
+            }
+          }
+
+          if (isDuplicate) continue;
+          ccvs[finalCCVCount++] = defaultCCVs[k];
+        }
+        // Resize both arrays to the actual number of CCVs added.
+        assembly {
+          mstore(ccvs, finalCCVCount)
+          mstore(ccvArgs, finalCCVCount)
+        }
+
+        return (ccvs, ccvArgs);
+      }
+    }
+
+    return (userCCVs, userCCVArgs);
   }
 
   /// @notice Gets the required CCVs from the pool for token transfers.
