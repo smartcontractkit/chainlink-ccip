@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
-
 import {CCTPVerifier} from "../../../ccvs/CCTPVerifier.sol";
 import {BaseVerifier} from "../../../ccvs/components/BaseVerifier.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
@@ -14,12 +12,14 @@ import {BaseVerifierSetup} from "../components/BaseVerifier/BaseVerifierSetup.t.
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
+
 contract CCTPVerifierSetup is BaseVerifierSetup {
   CCTPVerifier internal s_cctpVerifier;
   MockUSDCTokenMessenger internal s_mockTokenMessenger;
   MockE2EUSDCTransmitterCCTPV2 internal s_mockMessageTransmitter;
   CCTPMessageTransmitterProxy internal s_messageTransmitterProxy;
-  IBurnMintERC20 internal s_USDCToken;
+  IERC20 internal s_USDCToken;
 
   bytes internal s_tokenReceiver;
   address internal s_tokenReceiverAddress;
@@ -46,7 +46,7 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
     s_tokenReceiver = abi.encode(s_tokenReceiverAddress);
 
     BurnMintERC20 usdcToken = new BurnMintERC20("USD Coin", "USDC", 6, 0, 0);
-    s_USDCToken = usdcToken;
+    s_USDCToken = IERC20(address(usdcToken));
 
     s_mockMessageTransmitter = new MockE2EUSDCTransmitterCCTPV2(1, LOCAL_DOMAIN_IDENTIFIER, address(s_USDCToken));
     s_mockTokenMessenger = new MockUSDCTokenMessenger(1, address(s_mockMessageTransmitter));

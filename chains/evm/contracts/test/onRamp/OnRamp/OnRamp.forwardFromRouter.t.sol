@@ -2,14 +2,23 @@
 pragma solidity ^0.8.24;
 
 import {ICrossChainVerifierResolver} from "../../../interfaces/ICrossChainVerifierResolver.sol";
+import {IFeeQuoter} from "../../../interfaces/IFeeQuoter.sol";
+import {IPoolV1} from "../../../interfaces/IPool.sol";
 import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
+
 import {Client} from "../../../libraries/Client.sol";
 import {ExtraArgsCodec} from "../../../libraries/ExtraArgsCodec.sol";
 import {Pool} from "../../../libraries/Pool.sol";
 import {OnRamp} from "../../../onRamp/OnRamp.sol";
 import {OnRampSetup} from "./OnRampSetup.t.sol";
 
+import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
+import {Vm} from "forge-std/Vm.sol";
+
 contract OnRamp_forwardFromRouter is OnRampSetup {
+  bytes32 internal constant CCIP_MESSAGE_SENT_TOPIC =
+    keccak256("CCIPMessageSent(uint64,address,bytes32,address,bytes,(address,uint32,uint32,uint256,bytes)[],bytes[])");
+
   function setUp() public virtual override {
     super.setUp();
 
@@ -125,6 +134,68 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
     assertEq(s_onRamp.getExpectedNextMessageNumber(DEST_CHAIN_SELECTOR), 2);
   }
 
+  function test_forwardFromRouter_UsesMessageNetworkFeeWhenNoTokens() public {
+    uint256 feeTokenPrice = 1e18;
+    uint256 percentMultiplier = 100;
+    vm.mockCall(
+      address(s_feeQuoter),
+      abi.encodeWithSelector(IFeeQuoter.quoteGasForExec.selector),
+      abi.encode(uint32(0), uint256(0), feeTokenPrice, percentMultiplier)
+    );
+
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    uint256 fee = s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
+
+    vm.recordLogs();
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, fee, STRANGER);
+    OnRamp.Receipt[] memory receipts = _getReceiptsFromLogs(vm.getRecordedLogs());
+
+    uint256 expectedFee = (uint256(MESSAGE_NETWORK_FEE_USD_CENTS) * percentMultiplier * 1e32) / feeTokenPrice;
+    assertEq(receipts[receipts.length - 1].feeTokenAmount, expectedFee);
+  }
+
+  function test_forwardFromRouter_UsesTokenNetworkFeeWhenTokens() public {
+    uint256 feeTokenPrice = 1e18;
+    uint256 percentMultiplier = 100;
+    vm.mockCall(
+      address(s_feeQuoter),
+      abi.encodeWithSelector(IFeeQuoter.quoteGasForExec.selector),
+      abi.encode(uint32(0), uint256(0), feeTokenPrice, percentMultiplier)
+    );
+
+    address token = s_sourceTokens[0];
+    address pool = s_sourcePoolByToken[token];
+    uint256 amount = 1 ether;
+    Pool.LockOrBurnInV1 memory expectedInput = Pool.LockOrBurnInV1({
+      receiver: abi.encode(OWNER),
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      originalSender: STRANGER,
+      amount: amount,
+      localToken: token
+    });
+    Pool.LockOrBurnOutV1 memory returnData =
+      Pool.LockOrBurnOutV1({destTokenAddress: abi.encode(address(s_destTokenBySourceToken[token])), destPoolData: ""});
+    vm.mockCall(pool, abi.encodeWithSelector(IPoolV1.lockOrBurn.selector, expectedInput), abi.encode(returnData));
+    vm.mockCall(
+      pool, abi.encodeWithSelector(IERC165.supportsInterface.selector, type(IPoolV2).interfaceId), abi.encode(false)
+    );
+    vm.mockCall(
+      address(s_feeQuoter),
+      abi.encodeCall(IFeeQuoter.getTokenTransferFee, (DEST_CHAIN_SELECTOR, token)),
+      abi.encode(uint256(0), uint32(0), uint32(0))
+    );
+
+    Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(token, amount);
+    uint256 fee = s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
+
+    vm.recordLogs();
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, fee, STRANGER);
+    OnRamp.Receipt[] memory receipts = _getReceiptsFromLogs(vm.getRecordedLogs());
+
+    uint256 expectedFee = (uint256(TOKEN_NETWORK_FEE_USD_CENTS) * percentMultiplier * 1e32) / feeTokenPrice;
+    assertEq(receipts[receipts.length - 1].feeTokenAmount, expectedFee);
+  }
+
   function test_forwardFromRouter_RevertWhen_RouterMustSetOriginalSender() public {
     vm.expectRevert(OnRamp.RouterMustSetOriginalSender.selector);
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, _generateEmptyMessage(), 1e17, address(0));
@@ -223,5 +294,17 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
       abi.encodeWithSelector(OnRamp.SourceTokenDataTooLarge.selector, token, actualBytes, paidBytesOverhead)
     );
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, fee, STRANGER);
+  }
+
+  function _getReceiptsFromLogs(
+    Vm.Log[] memory logs
+  ) private pure returns (OnRamp.Receipt[] memory receipts) {
+    for (uint256 i = 0; i < logs.length; ++i) {
+      if (logs[i].topics.length != 0 && logs[i].topics[0] == CCIP_MESSAGE_SENT_TOPIC) {
+        (,, receipts,) = abi.decode(logs[i].data, (address, bytes, OnRamp.Receipt[], bytes[]));
+        break;
+      }
+    }
+    return receipts;
   }
 }
