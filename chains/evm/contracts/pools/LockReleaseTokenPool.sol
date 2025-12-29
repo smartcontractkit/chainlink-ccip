@@ -7,8 +7,8 @@ import {Pool} from "../libraries/Pool.sol";
 import {ERC20LockBox} from "./ERC20LockBox.sol";
 import {TokenPool} from "./TokenPool.sol";
 
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/utils/SafeERC20.sol";
 
 /// @notice Token pool used for tokens on their native chain. This uses a lock and release mechanism.
 /// Because of lock/unlock requiring liquidity, this pool contract also has function to add and remove
@@ -42,7 +42,7 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
     if (!lockBoxContract.isTokenSupported(address(token))) {
       revert InvalidToken(address(token));
     }
-    token.safeApprove(lockBox, type(uint256).max);
+    token.approve(lockBox, type(uint256).max);
     i_lockBox = lockBoxContract;
   }
 

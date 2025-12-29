@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {IOwner} from "../../../interfaces/IOwner.sol";
-import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
 
 import {Router} from "../../../Router.sol";
 import {RateLimiter} from "../../../libraries/RateLimiter.sol";
@@ -20,7 +19,7 @@ import {TokenPoolFactorySetup} from "./TokenPoolFactorySetup.t.sol";
 
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
-import {IERC20Metadata} from "@openzeppelin/contracts@4.8.3/token/ERC20/extensions/IERC20Metadata.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts@5.3.0/token/ERC20/extensions/IERC20Metadata.sol";
 import {Create2} from "@openzeppelin/contracts@5.3.0/utils/Create2.sol";
 
 contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
@@ -81,6 +80,10 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
     assertEq(poolAddress, s_tokenAdminRegistry.getPool(tokenAddress), "Token Pool should be set");
     assertEq(IOwner(tokenAddress).owner(), OWNER, "Token should be owned by the owner");
     assertEq(IOwner(poolAddress).owner(), OWNER, "Token should be owned by the owner");
+
+    // Pool should have mint/burn roles granted during deployment.
+    assertTrue(FactoryBurnMintERC20(tokenAddress).isMinter(poolAddress), "pool should be minter");
+    assertTrue(FactoryBurnMintERC20(tokenAddress).isBurner(poolAddress), "pool should be burner");
   }
 
   function test_deployTokenAndTokenPool_WithNoExistingRemoteContracts_Predict() public {
@@ -190,16 +193,9 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
       "New Token Address should have been deployed correctly"
     );
 
-    // Check that the token pool has the correct permissions
-    vm.startPrank(poolAddress);
-    IBurnMintERC20(tokenAddress).mint(poolAddress, 1e18);
-
-    assertEq(1e18, IBurnMintERC20(tokenAddress).balanceOf(poolAddress), "Balance should be 1e18");
-
-    IBurnMintERC20(tokenAddress).burn(1e18);
-    assertEq(0, IBurnMintERC20(tokenAddress).balanceOf(poolAddress), "Balance should be 0");
-
-    vm.stopPrank();
+    // Pool should have mint/burn roles granted during deployment.
+    assertTrue(FactoryBurnMintERC20(tokenAddress).isMinter(poolAddress), "pool should be minter");
+    assertTrue(FactoryBurnMintERC20(tokenAddress).isBurner(poolAddress), "pool should be burner");
 
     assertEq(s_tokenAdminRegistry.getPool(tokenAddress), poolAddress, "Token Pool should be set");
 
@@ -738,7 +734,7 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
     // Check configs on the remote pool and remote token decimals
     assertEq(TokenPool(newPoolAddress).getTokenDecimals(), REMOTE_TOKEN_DECIMALS, "Token Decimals should be 6");
     assertEq(address(TokenPool(newPoolAddress).getToken()), address(newRemoteToken), "Token Address should be set");
-    assertEq(IERC20Metadata(newRemoteToken).decimals(), REMOTE_TOKEN_DECIMALS, "Token Decimals should be 6");
+    assertEq(IERC20Metadata(address(newRemoteToken)).decimals(), REMOTE_TOKEN_DECIMALS, "Token Decimals should be 6");
   }
 
   function test_deployTokenPoolWithExistingToken_RevertWhen_InvalidLockBoxToken() public {

@@ -8,15 +8,13 @@ import {BaseVerifier} from "../../../ccvs/components/BaseVerifier.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {CCTPVerifierSetup} from "./CCTPVerifierSetup.t.sol";
 
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
-
 contract CCTPVerifier_forwardToVerifier is CCTPVerifierSetup {
   function setUp() public override {
     super.setUp();
 
     // Send transfer amount to the verifier, mocking a transfer from the token pool.
     deal(address(s_USDCToken), address(s_cctpVerifier), TRANSFER_AMOUNT);
-    assertEq(IERC20(address(s_USDCToken)).balanceOf(address(s_cctpVerifier)), TRANSFER_AMOUNT);
+    assertEq(s_USDCToken.balanceOf(address(s_cctpVerifier)), TRANSFER_AMOUNT);
   }
 
   function test_forwardToVerifier_MintRecipientFromMessage() public {
