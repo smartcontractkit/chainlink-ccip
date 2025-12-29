@@ -11,8 +11,16 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
-// CommitteeVerifierDestChainConfig configures the CommitteeVerifier for a remote chain.
-type CommitteeVerifierDestChainConfig struct {
+// CommitteeVerifierSignatureQuorumConfig specifies the quorum required for any given message.
+type CommitteeVerifierSignatureQuorumConfig struct {
+	// Signers specifies valid signer addresses.
+	Signers []string
+	// Threshold specifies the number of signatures required for the message to be verified.
+	Threshold uint8
+}
+
+// CommitteeVerifierRemoteChainConfig configures the CommitteeVerifier for a remote chain.
+type CommitteeVerifierRemoteChainConfig struct {
 	// Whether to allow traffic TO the remote chain.
 	AllowlistEnabled bool
 	// Addresses that are allowed to send messages TO the remote chain.
@@ -25,6 +33,19 @@ type CommitteeVerifierDestChainConfig struct {
 	GasForVerification uint32
 	// The size of the CCV specific payload in bytes (used for billing).
 	PayloadSizeBytes uint32
+	// SignatureConfig specifies the signature configuration for the remote chain.
+	SignatureConfig CommitteeVerifierSignatureQuorumConfig
+}
+
+// CommitteeVerifierConfig configures a CommitteeVerifier contract.
+type CommitteeVerifierConfig[C any, S any] struct {
+	// CommitteeVerifier is a reference to the committee verifier contract on the chain being configured.
+	CommitteeVerifier C
+	// SupportingContracts specifies any required contract that supports the function of the committee verifier.
+	// e.g. A resolver contract that manages multiple committee verifier implementations.
+	SupportingContracts []S
+	// RemoteChains specifies the configuration for each remote chain supported by the committee verifier.
+	RemoteChains map[uint64]CommitteeVerifierRemoteChainConfig
 }
 
 // ExecutorDestChainConfig configures the Executor for a remote chain.
@@ -67,8 +88,8 @@ type FeeQuoterDestChainConfig struct {
 type RemoteChainConfig[RemoteContract any, LocalContract any] struct {
 	// Whether to allow traffic FROM this remote chain.
 	AllowTrafficFrom bool
-	// The OnRamp address on the remote chain.
-	OnRamp RemoteContract
+	// The OnRamp addresses on the remote chain.
+	OnRamps []RemoteContract
 	// The OffRamp address on the remote chain.
 	OffRamp RemoteContract
 	// The addresses of CCVs that will be applied to messages FROM this remote chain if no receiver is specified.
@@ -81,8 +102,6 @@ type RemoteChainConfig[RemoteContract any, LocalContract any] struct {
 	LaneMandatedOutboundCCVs []LocalContract
 	// The Executor address that will be used for messages TO this remote chain if none is specified.
 	DefaultExecutor LocalContract
-	// CommitteeVerifierDestChainConfig configures the CommitteeVerifier for this remote chain
-	CommitteeVerifierDestChainConfig CommitteeVerifierDestChainConfig
 	// FeeQuoterDestChainConfig configures the FeeQuoter for this remote chain
 	FeeQuoterDestChainConfig FeeQuoterDestChainConfig
 	// ExecutorDestChainConfig configures the Executor for this remote chain
@@ -91,13 +110,6 @@ type RemoteChainConfig[RemoteContract any, LocalContract any] struct {
 	AddressBytesLength uint8
 	// Execution gas cost, excluding pool/CCV/receiver gas.
 	BaseExecutionGasCost uint32
-}
-
-type CommitteeVerifier[Contract any] struct {
-	// Resolver is the contract responsible for directing traffic to the correct CommitteeVerifier implementation.
-	Resolver Contract
-	// Implementation is the actual CommitteeVerifier contract.
-	Implementation Contract
 }
 
 // ConfigureChainForLanesInput is the input for the ConfigureChainForLanes sequence.
@@ -110,9 +122,9 @@ type ConfigureChainForLanesInput struct {
 	// The OnRamp address on the chain being configured.
 	// Similarly, we assume that all connections will use the same OnRamp.
 	OnRamp string
-	// The CommitteeVerifier addresses on the chain being configured.
+	// The CommitteeVerifiers on the chain being configured.
 	// There can be multiple committee verifiers on a chain, each controlled by a different entity.
-	CommitteeVerifiers []CommitteeVerifier[string]
+	CommitteeVerifiers []CommitteeVerifierConfig[string, datastore.AddressRef]
 	// The FeeQuoter address on the chain being configured.
 	FeeQuoter string
 	// The OffRamp address on the chain being configured

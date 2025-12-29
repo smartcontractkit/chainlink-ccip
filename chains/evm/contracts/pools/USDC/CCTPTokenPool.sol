@@ -12,12 +12,13 @@ import {USDCSourcePoolDataCodec} from "../../libraries/USDCSourcePoolDataCodec.s
 import {TokenPool} from "../TokenPool.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
 /// @notice CCTP token pool that delegates minting and burning responsibilities of USDC to the CCTPVerifier contract.
-/// @dev This pool does not mutate the token state. It does not actually burn USDC via TokenMessenger on source or mint via MessageTransmitter on destination.
-/// It remains responsible for rate limiting and other validations while outsourcing token management to the CCTPVerifier contract.
-/// This token pool should never have a balance of USDC at any point during a transaction, otherwise funds will be lost.
+/// @dev This pool does not mutate the token state.
+/// @dev This pool does not burn USDC via TokenMessenger on source or mint via MessageTransmitter on destination.
+/// It remains responsible for rate limiting and other validations while outsourcing token management to the
+/// CCTPVerifier contract. This token pool should never have a balance of USDC at any point during a transaction.
 /// The caller of lockOrBurn is responsible for sending USDC to the CCTPVerifier contract instead.
 contract CCTPTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
   string public constant override typeAndVersion = "CCTPTokenPool 1.7.0-dev";
@@ -46,9 +47,6 @@ contract CCTPTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
   /// @dev The _validateLockOrBurn check is an essential security check.
   /// @dev The call to _lockOrBurn(amount) is omitted because this pool is not responsible for token management.
   /// LockedOrBurned is still emitted for consumers that expect it.
-  /// @param lockOrBurnIn Encoded data fields for the processing of tokens on the source chain.
-  /// @param blockConfirmationRequested Requested block confirmation.
-  /// @param tokenArgs Additional token arguments.
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
     uint16 blockConfirmationRequested,
@@ -77,8 +75,6 @@ contract CCTPTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
   /// @dev The _validateReleaseOrMint check is an essential security check.
   /// @dev The call to _releaseOrMint is omitted because this pool is not responsible for token management.
   /// ReleasedOrMinted is still emitted for consumers that expect it.
-  /// @param releaseOrMintIn Encoded data fields for the processing of tokens on the destination chain.
-  /// @param blockConfirmationRequested Requested block confirmation.
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
     uint16 blockConfirmationRequested

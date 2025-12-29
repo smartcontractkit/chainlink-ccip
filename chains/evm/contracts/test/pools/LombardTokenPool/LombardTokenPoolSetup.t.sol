@@ -7,6 +7,7 @@ import {LombardTokenPoolHelper} from "../../helpers/LombardTokenPoolHelper.sol";
 import {MockLombardBridge} from "../../mocks/MockLombardBridge.sol";
 import {MockVerifier} from "../../mocks/MockVerifier.sol";
 import {TokenPoolSetup} from "../TokenPool/TokenPoolSetup.t.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts@5.3.0/token/ERC20/extensions/IERC20Metadata.sol";
 
 contract LombardTokenPoolSetup is TokenPoolSetup {
   LombardTokenPoolHelper internal s_pool;
@@ -27,7 +28,7 @@ contract LombardTokenPoolSetup is TokenPoolSetup {
     s_bridge = new MockLombardBridge();
 
     s_pool = new LombardTokenPoolHelper(
-      s_token,
+      IERC20Metadata(address(s_token)),
       address(s_verifierResolver),
       s_bridge,
       address(0),

@@ -15,9 +15,8 @@ import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165
 import {VmSafe} from "forge-std/Vm.sol";
 
 contract OnRamp_addressEncodingCompatibility is OnRampSetup {
-  bytes32 internal constant CCIP_MESSAGE_SENT_TOPIC = keccak256(
-    "CCIPMessageSent(uint64,uint64,bytes32,address,bytes,(address,address,uint32,uint32,uint256,bytes)[],bytes[])"
-  );
+  bytes32 internal constant CCIP_MESSAGE_SENT_TOPIC =
+    keccak256("CCIPMessageSent(uint64,address,bytes32,address,bytes,(address,uint32,uint32,uint256,bytes)[],bytes[])");
 
   function decode(
     bytes calldata encodedMessage
@@ -61,7 +60,8 @@ contract OnRamp_addressEncodingCompatibility is OnRampSetup {
       destChainSelector: DEST_CHAIN_SELECTOR,
       router: s_sourceRouter,
       addressBytesLength: addressBytesLength,
-      networkFeeUSDCents: NETWORK_FEE_USD_CENTS,
+      messageNetworkFeeUSDCents: MESSAGE_NETWORK_FEE_USD_CENTS,
+      tokenNetworkFeeUSDCents: TOKEN_NETWORK_FEE_USD_CENTS,
       tokenReceiverAllowed: true,
       baseExecutionGasCost: BASE_EXEC_GAS_COST,
       laneMandatedCCVs: new address[](0),
@@ -179,7 +179,7 @@ contract OnRamp_addressEncodingCompatibility is OnRampSetup {
 
     Pool.LockOrBurnOutV1 memory poolReturnData = Pool.LockOrBurnOutV1({
       destTokenAddress: abi.encode(destToken), // 32 bytes
-      destPoolData: abi.encode("poolData")
+      destPoolData: ""
     });
 
     Pool.LockOrBurnInV1 memory expectedInput = Pool.LockOrBurnInV1({
@@ -325,7 +325,7 @@ contract OnRamp_addressEncodingCompatibility is OnRampSetup {
 
     // Mock pool.lockOrBurn to succeed (validation happens after pool call when setting tokenReceiver in message)
     Pool.LockOrBurnOutV1 memory poolReturnData =
-      Pool.LockOrBurnOutV1({destTokenAddress: abi.encode(destToken), destPoolData: abi.encode("poolData")});
+      Pool.LockOrBurnOutV1({destTokenAddress: abi.encode(destToken), destPoolData: ""});
     vm.mockCall(pool, abi.encodeWithSelector(IPoolV1.lockOrBurn.selector), abi.encode(poolReturnData));
 
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = ExtraArgsCodec.GenericExtraArgsV3({
@@ -373,7 +373,7 @@ contract OnRamp_addressEncodingCompatibility is OnRampSetup {
 
     // Mock pool.lockOrBurn to succeed (validation happens after pool call when setting tokenReceiver in message)
     Pool.LockOrBurnOutV1 memory poolReturnData =
-      Pool.LockOrBurnOutV1({destTokenAddress: abi.encode(destToken), destPoolData: abi.encode("poolData")});
+      Pool.LockOrBurnOutV1({destTokenAddress: abi.encode(destToken), destPoolData: ""});
     vm.mockCall(pool, abi.encodeWithSelector(IPoolV1.lockOrBurn.selector), abi.encode(poolReturnData));
 
     ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs = ExtraArgsCodec.GenericExtraArgsV3({
@@ -419,7 +419,8 @@ contract OnRamp_addressEncodingCompatibility is OnRampSetup {
       destChainSelector: DEST_CHAIN_SELECTOR,
       router: s_sourceRouter,
       addressBytesLength: EVM_ADDRESS_LENGTH,
-      networkFeeUSDCents: NETWORK_FEE_USD_CENTS,
+      messageNetworkFeeUSDCents: MESSAGE_NETWORK_FEE_USD_CENTS,
+      tokenNetworkFeeUSDCents: TOKEN_NETWORK_FEE_USD_CENTS,
       tokenReceiverAllowed: true,
       baseExecutionGasCost: BASE_EXEC_GAS_COST,
       laneMandatedCCVs: new address[](0),

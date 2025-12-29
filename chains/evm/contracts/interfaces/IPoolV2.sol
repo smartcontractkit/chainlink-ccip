@@ -1,13 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {IPoolV1} from "./IPool.sol";
-
 import {Pool} from "../libraries/Pool.sol";
 
 /// @notice Shared public interface for multiple V2 pool types.
 /// Each pool type handles a different child token model e.g. lock/release, mint/burn.
-interface IPoolV2 is IPoolV1 {
+interface IPoolV2 {
   struct TokenTransferFeeConfig {
     uint32 destGasOverhead; // ───────────────────────╮ Gas charged to execute the token transfer on the destination chain.
     uint32 destBytesOverhead; //                      │ Data availability bytes.

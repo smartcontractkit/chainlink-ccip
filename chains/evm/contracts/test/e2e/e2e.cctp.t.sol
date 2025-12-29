@@ -29,7 +29,7 @@ import {OnRampSetup} from "../onRamp/OnRamp/OnRampSetup.t.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
 contract cctp_e2e is OnRampSetup {
   uint32 private constant CCTP_VERSION = 1;
@@ -124,7 +124,8 @@ contract cctp_e2e is OnRampSetup {
       destChainSelector: DEST_CHAIN_SELECTOR,
       router: s_sourceRouter,
       addressBytesLength: EVM_ADDRESS_LENGTH,
-      networkFeeUSDCents: NETWORK_FEE_USD_CENTS,
+      messageNetworkFeeUSDCents: MESSAGE_NETWORK_FEE_USD_CENTS,
+      tokenNetworkFeeUSDCents: TOKEN_NETWORK_FEE_USD_CENTS,
       tokenReceiverAllowed: false,
       baseExecutionGasCost: BASE_EXEC_GAS_COST,
       laneMandatedCCVs: new address[](0),
@@ -189,7 +190,7 @@ contract cctp_e2e is OnRampSetup {
     vm.expectEmit();
     emit OnRamp.CCIPMessageSent({
       destChainSelector: DEST_CHAIN_SELECTOR,
-      messageNumber: expectedMsgNum,
+      sender: OWNER,
       messageId: messageId,
       feeToken: s_sourceFeeToken,
       encodedMessage: encodedMessage,
@@ -260,7 +261,7 @@ contract cctp_e2e is OnRampSetup {
     });
 
     vm.resumeGasMetering();
-    s_offRamp.execute(encodedMessage, ccvAddresses, verifierResults);
+    s_offRamp.execute(encodedMessage, ccvAddresses, verifierResults, 0);
   }
 
   function _deployCCTPSetup(
@@ -275,7 +276,7 @@ contract cctp_e2e is OnRampSetup {
     setup.router = router;
     setup.tokenAdminRegistry = tokenAdminRegistry;
     setup.verifierResolver = new VersionedVerifierResolver();
-    setup.token = new BurnMintERC20("USD Coin", "USDC", 6, 0, 0);
+    setup.token = IERC20(address(new BurnMintERC20("USD Coin", "USDC", 6, 0, 0)));
     setup.tokenPool = new CCTPTokenPool(
       IERC20(address(setup.token)), 6, rmn, router, address(setup.verifierResolver), new address[](0), s_feeAggregator
     );
@@ -427,6 +428,13 @@ contract cctp_e2e is OnRampSetup {
     uint64[] memory chainSelectors = new uint64[](1);
     chainSelectors[0] = DEST_CHAIN_SELECTOR;
     s_sourceCCTPSetup.tokenPoolProxy.updateLockOrBurnMechanisms(chainSelectors, mechanisms);
+
+    // Update lock or burn mechanism on the dest token pool proxy.
+    mechanisms = new USDCTokenPoolProxy.LockOrBurnMechanism[](1);
+    mechanisms[0] = USDCTokenPoolProxy.LockOrBurnMechanism.CCTP_V2_WITH_CCV;
+    chainSelectors = new uint64[](1);
+    chainSelectors[0] = SOURCE_CHAIN_SELECTOR;
+    s_destCCTPSetup.tokenPoolProxy.updateLockOrBurnMechanisms(chainSelectors, mechanisms);
 
     // Register CCTP token pool proxy on source token admin registry.
     TokenAdminRegistry(s_sourceCCTPSetup.tokenAdminRegistry)

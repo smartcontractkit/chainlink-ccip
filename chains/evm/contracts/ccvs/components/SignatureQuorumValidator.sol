@@ -38,6 +38,7 @@ contract SignatureQuorumValidator is Ownable2StepMsgSender {
   // STATIC CONFIG
   uint256 internal constant SIGNATURE_LENGTH = 64;
   uint256 internal constant SIGNATURE_COMPONENT_LENGTH = 32;
+  uint8 internal constant V_VALUE = 27; // We use ECDSA malleability to have all `v` values be 27.
 
   uint256 internal immutable i_chainID;
 
@@ -86,7 +87,7 @@ contract SignatureQuorumValidator is Ownable2StepMsgSender {
       // We use ECDSA malleability to only have signatures with a `v` value of 27.
       address signer = ecrecover(
         signedHash,
-        27,
+        V_VALUE,
         bytes32(signatures[offset:offset + SIGNATURE_COMPONENT_LENGTH]),
         bytes32(signatures[offset + SIGNATURE_COMPONENT_LENGTH:offset + SIGNATURE_LENGTH])
       );

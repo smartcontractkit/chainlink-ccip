@@ -24,7 +24,7 @@ import {OnRampSetup} from "../onRamp/OnRamp/OnRampSetup.t.sol";
 
 import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
 /// @title E2E Fee Withdrawal Test
 /// @notice Tests fee withdrawal from all components after a ccipSend
@@ -44,6 +44,7 @@ contract e2e_feeWithdrawal is OnRampSetup {
   TokenPoolHelper internal s_tokenPool;
   BurnMintERC20 internal s_testToken;
   address internal s_automationAddress; // Simulates Chainlink Automation/CRE
+  uint16 internal constant NETWORK_FEE_USD_CENTS = 200;
 
   function setUp() public virtual override {
     super.setUp();
@@ -138,11 +139,12 @@ contract e2e_feeWithdrawal is OnRampSetup {
       destChainSelector: DEST_CHAIN_SELECTOR,
       router: s_sourceRouter,
       addressBytesLength: EVM_ADDRESS_LENGTH,
-      networkFeeUSDCents: NETWORK_FEE_USD_CENTS,
       tokenReceiverAllowed: false,
+      messageNetworkFeeUSDCents: NETWORK_FEE_USD_CENTS,
+      tokenNetworkFeeUSDCents: NETWORK_FEE_USD_CENTS,
       baseExecutionGasCost: BASE_EXEC_GAS_COST,
-      laneMandatedCCVs: new address[](0),
       defaultCCVs: defaultSourceCCVs,
+      laneMandatedCCVs: new address[](0),
       defaultExecutor: address(s_executor),
       offRamp: abi.encodePacked(address(s_offRampOnRemoteChain))
     });
@@ -196,6 +198,10 @@ contract e2e_feeWithdrawal is OnRampSetup {
   /// @notice Test fee withdrawal from all components after ccipSend
   function test_FeeWithdrawal_AfterCcipSend() public {
     vm.pauseGasMetering();
+
+    // Ensure the test contract has fee tokens to pay for the transaction
+    // Router will transferFrom msg.sender (this test contract) to OnRamp
+    deal(s_sourceFeeToken, address(this), type(uint256).max);
 
     // Get initial balances
     uint256 initialOnRampBalance = IERC20(s_sourceFeeToken).balanceOf(address(s_onRamp));
@@ -399,6 +405,10 @@ contract e2e_feeWithdrawal is OnRampSetup {
   /// @notice Test that verifier fees go to implementation, not resolver (verifies the fix)
   function test_VerifierFeeIssue_FeesGoToImplementationNotResolver() public {
     vm.pauseGasMetering();
+
+    // Ensure the test contract has fee tokens to pay for the transaction
+    // Router will transferFrom msg.sender (this test contract) to OnRamp
+    deal(s_sourceFeeToken, address(this), type(uint256).max);
 
     // Get initial balances
     uint256 initialVerifierResolverBalance = IERC20(s_sourceFeeToken).balanceOf(s_verifierResolver);

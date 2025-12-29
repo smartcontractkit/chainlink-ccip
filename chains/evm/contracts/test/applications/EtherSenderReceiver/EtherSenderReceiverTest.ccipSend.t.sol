@@ -123,7 +123,7 @@ contract EtherSenderReceiverTest_ccipSend is EtherSenderReceiverTestSetup {
 
     s_weth.approve(address(s_etherSenderReceiver), FEE_WEI - 1);
 
-    vm.expectRevert("SafeERC20: low-level call failed");
+    vm.expectRevert();
     s_etherSenderReceiver.ccipSend{value: AMOUNT}(DESTINATION_CHAIN_SELECTOR, message);
   }
 

@@ -12,9 +12,9 @@ import {CCTPMessageTransmitterProxy} from "./CCTPMessageTransmitterProxy.sol";
 
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/utils/SafeERC20.sol";
-import {EnumerableSet} from "@openzeppelin/contracts@4.8.3/utils/structs/EnumerableSet.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/utils/SafeERC20.sol";
+import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/EnumerableSet.sol";
 
 /// @notice This pool mints and burns USDC tokens through the Cross Chain Transfer Protocol (CCTP).
 /*
@@ -148,7 +148,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
     i_localDomainIdentifier = transmitter.localDomain();
 
     // Allow the token messenger to burn tokens on behalf of this pool.
-    i_token.safeIncreaseAllowance(address(i_tokenMessenger), type(uint256).max);
+    i_token.approve(address(i_tokenMessenger), type(uint256).max);
 
     emit ConfigSet(address(tokenMessenger));
   }

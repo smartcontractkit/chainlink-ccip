@@ -32,15 +32,20 @@ func makeChainConfig(chainSelector uint64, remoteChainSelector uint64) v1_7_0_ch
 			Type:    datastore.ContractType(onramp.ContractType),
 			Version: semver.MustParse("1.7.0"),
 		},
-		CommitteeVerifiers: []adapters.CommitteeVerifier[datastore.AddressRef]{
+		CommitteeVerifiers: []adapters.CommitteeVerifierConfig[datastore.AddressRef, datastore.AddressRef]{
 			{
-				Implementation: datastore.AddressRef{
+				CommitteeVerifier: datastore.AddressRef{
 					Type:    datastore.ContractType(committee_verifier.ContractType),
 					Version: semver.MustParse("1.7.0"),
 				},
-				Resolver: datastore.AddressRef{
-					Type:    datastore.ContractType(committee_verifier.ResolverType),
-					Version: semver.MustParse("1.7.0"),
+				SupportingContracts: []datastore.AddressRef{
+					{
+						Type:    datastore.ContractType(committee_verifier.ResolverType),
+						Version: semver.MustParse("1.7.0"),
+					},
+				},
+				RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
+					remoteChainSelector: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
 				},
 			},
 		},
@@ -55,9 +60,11 @@ func makeChainConfig(chainSelector uint64, remoteChainSelector uint64) v1_7_0_ch
 		RemoteChains: map[uint64]adapters.RemoteChainConfig[datastore.AddressRef, datastore.AddressRef]{
 			remoteChainSelector: {
 				AllowTrafficFrom: true,
-				OnRamp: datastore.AddressRef{
-					Type:    datastore.ContractType(onramp.ContractType),
-					Version: semver.MustParse("1.7.0"),
+				OnRamps: []datastore.AddressRef{
+					{
+						Type:    datastore.ContractType(onramp.ContractType),
+						Version: semver.MustParse("1.7.0"),
+					},
 				},
 				OffRamp: datastore.AddressRef{
 					Type:    datastore.ContractType(offramp.ContractType),
@@ -80,11 +87,10 @@ func makeChainConfig(chainSelector uint64, remoteChainSelector uint64) v1_7_0_ch
 					Version:   semver.MustParse("1.7.0"),
 					Qualifier: "default",
 				},
-				CommitteeVerifierDestChainConfig: testsetup.CreateBasicCommitteeVerifierDestChainConfig(),
-				FeeQuoterDestChainConfig:         testsetup.CreateBasicFeeQuoterDestChainConfig(),
-				ExecutorDestChainConfig:          testsetup.CreateBasicExecutorDestChainConfig(),
-				AddressBytesLength:               20,
-				BaseExecutionGasCost:             80_000,
+				FeeQuoterDestChainConfig: testsetup.CreateBasicFeeQuoterDestChainConfig(),
+				ExecutorDestChainConfig:  testsetup.CreateBasicExecutorDestChainConfig(),
+				AddressBytesLength:       20,
+				BaseExecutionGasCost:     80_000,
 			},
 		},
 	}

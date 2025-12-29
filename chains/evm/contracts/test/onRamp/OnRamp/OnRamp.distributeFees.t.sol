@@ -7,7 +7,7 @@ import {Client} from "../../../libraries/Client.sol";
 import {OnRamp} from "../../../onRamp/OnRamp.sol";
 import {OnRampSetup} from "./OnRampSetup.t.sol";
 
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
 
 contract OnRamp_distributeFees is OnRampSetup {
@@ -72,15 +72,9 @@ contract OnRamp_distributeFees is OnRampSetup {
     if (withToken) {
       receipts = new OnRamp.Receipt[](4);
       receipts[0] = OnRamp.Receipt({
-        feeRecipient: s_verifier,
-        issuer: s_verifier,
-        destGasLimit: 0,
-        destBytesOverhead: 0,
-        feeTokenAmount: 1e16,
-        extraArgs: ""
+        issuer: s_verifier, destGasLimit: 0, destBytesOverhead: 0, feeTokenAmount: 1e16, extraArgs: ""
       });
       receipts[1] = OnRamp.Receipt({
-        feeRecipient: s_sourcePoolByToken[s_sourceTokens[0]],
         issuer: s_sourcePoolByToken[s_sourceTokens[0]],
         destGasLimit: 0,
         destBytesOverhead: 0,
@@ -88,48 +82,23 @@ contract OnRamp_distributeFees is OnRampSetup {
         extraArgs: ""
       });
       receipts[2] = OnRamp.Receipt({
-        feeRecipient: s_executor,
-        issuer: s_executor,
-        destGasLimit: 0,
-        destBytesOverhead: 0,
-        feeTokenAmount: 3e16,
-        extraArgs: ""
+        issuer: s_executor, destGasLimit: 0, destBytesOverhead: 0, feeTokenAmount: 3e16, extraArgs: ""
       });
       receipts[3] = OnRamp.Receipt({
-        feeRecipient: address(s_sourceRouter),
-        issuer: address(s_sourceRouter),
-        destGasLimit: 0,
-        destBytesOverhead: 0,
-        feeTokenAmount: 4e16,
-        extraArgs: ""
+        issuer: address(s_sourceRouter), destGasLimit: 0, destBytesOverhead: 0, feeTokenAmount: 4e16, extraArgs: ""
       });
       totalFee = receipts[0].feeTokenAmount + receipts[1].feeTokenAmount + receipts[2].feeTokenAmount
         + receipts[3].feeTokenAmount;
     } else {
       receipts = new OnRamp.Receipt[](3);
       receipts[0] = OnRamp.Receipt({
-        feeRecipient: s_verifier,
-        issuer: s_verifier,
-        destGasLimit: 0,
-        destBytesOverhead: 0,
-        feeTokenAmount: 1e17,
-        extraArgs: ""
+        issuer: s_verifier, destGasLimit: 0, destBytesOverhead: 0, feeTokenAmount: 1e17, extraArgs: ""
       });
       receipts[1] = OnRamp.Receipt({
-        feeRecipient: s_executor,
-        issuer: s_executor,
-        destGasLimit: 0,
-        destBytesOverhead: 0,
-        feeTokenAmount: 2e17,
-        extraArgs: ""
+        issuer: s_executor, destGasLimit: 0, destBytesOverhead: 0, feeTokenAmount: 2e17, extraArgs: ""
       });
       receipts[2] = OnRamp.Receipt({
-        feeRecipient: address(s_sourceRouter),
-        issuer: address(s_sourceRouter),
-        destGasLimit: 0,
-        destBytesOverhead: 0,
-        feeTokenAmount: 5e16,
-        extraArgs: ""
+        issuer: address(s_sourceRouter), destGasLimit: 0, destBytesOverhead: 0, feeTokenAmount: 5e16, extraArgs: ""
       });
       totalFee = receipts[0].feeTokenAmount + receipts[1].feeTokenAmount + receipts[2].feeTokenAmount;
     }

@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {IBurnMintERC20} from "../../interfaces/IBurnMintERC20.sol";
+
 import {Pool} from "../../libraries/Pool.sol";
 import {SiloedLockReleaseTokenPool} from "../SiloedLockReleaseTokenPool.sol";
-
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
-import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
+
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/EnumerableSet.sol";
 
 /// @dev The flag used to indicate that the source pool data is coming from a chain that does not have CCTP Support,
@@ -95,20 +96,26 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
 
     uint256 excludedTokens = s_tokensExcludedFromBurn[releaseOrMintIn.remoteChainSelector];
 
-    // No excluded tokens is the common path, as it means no migration has occured yet, and any released
-    // tokens should come from the stored token balance of previously deposited tokens.
     if (excludedTokens == 0) {
+      // No excluded tokens is the common path, as it means no migration has occured yet.
+      // Any released tokens should come from the stored token balance of previously deposited tokens.
       if (localAmount > remoteConfig.tokenBalance) {
         revert InsufficientLiquidity(remoteConfig.tokenBalance, localAmount);
       }
 
       remoteConfig.tokenBalance -= localAmount;
-
+    } else {
       // The existence of excluded tokens indicates a migration has occured on the chain, and that any tokens
       // being released should come from those excluded tokens reserved for processing inflight messages.
-    } else {
       if (localAmount > excludedTokens) revert InsufficientLiquidity(excludedTokens, localAmount);
       s_tokensExcludedFromBurn[releaseOrMintIn.remoteChainSelector] -= localAmount;
+
+      // If the migration is in a proposed state, then we should also decrement the total token balance for the remote chain.
+      // Otherwise, come time for burnLockedUSDC, we would over-burn tokens and excluded tokens would be lost.
+      // We don't check liquidity again, because excluded tokens will always be less than the total token balance while migration is proposed.
+      if (s_proposedUSDCMigrationChain == releaseOrMintIn.remoteChainSelector) {
+        remoteConfig.tokenBalance -= localAmount;
+      }
     }
 
     // Release to the recipient

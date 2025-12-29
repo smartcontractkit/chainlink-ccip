@@ -5,14 +5,15 @@ import {ICrossChainVerifierV1} from "../interfaces/ICrossChainVerifierV1.sol";
 import {IMessageTransmitter} from "../pools/USDC/interfaces/IMessageTransmitter.sol";
 import {ITokenMessenger} from "../pools/USDC/interfaces/ITokenMessenger.sol";
 
+import {FeeTokenHandler} from "../libraries/FeeTokenHandler.sol";
 import {Internal} from "../libraries/Internal.sol";
 import {MessageV1Codec} from "../libraries/MessageV1Codec.sol";
 import {CCTPMessageTransmitterProxy} from "../pools/USDC/CCTPMessageTransmitterProxy.sol";
 import {BaseVerifier} from "./components/BaseVerifier.sol";
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/utils/SafeERC20.sol";
 
 /// @notice The CCTPVerifier creates USDC burn messages on source and delivers them on destination.
 /// @dev This verifier is for CCTP V2 and is not backwards compatible with CCTP V1.
@@ -43,14 +44,6 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   event StaticConfigSet(
     address tokenMessenger, address messageTransmitterProxy, address usdcToken, uint32 localDomainIdentifier
   );
-
-  /// @notice The static configuration.
-  struct StaticConfig {
-    address tokenMessenger; // The address of the token messenger.
-    address messageTransmitterProxy; // The address of the message transmitter proxy.
-    address usdcToken; // The address of the USDC token.
-    uint32 localDomainIdentifier; // The local domain identifier.
-  }
 
   /// @notice The arguments required to update a remote domain.
   struct SetDomainArgs {
@@ -200,7 +193,7 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
 
     // Approve the token messenger to burn the USDC token on behalf of this contract.
     // The USDC token pool will be responsible for forwarding USDC it receives from the router to this contract.
-    i_usdcToken.safeIncreaseAllowance(address(i_tokenMessenger), type(uint256).max);
+    i_usdcToken.approve(address(i_tokenMessenger), type(uint256).max);
 
     emit StaticConfigSet(
       address(i_tokenMessenger), address(i_messageTransmitterProxy), address(i_usdcToken), i_localDomainIdentifier
@@ -345,14 +338,18 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   // ================================================================
 
   /// @notice Returns the static configuration.
-  /// @return staticConfig The static configuration.
-  function getStaticConfig() external view returns (StaticConfig memory staticConfig) {
-    return StaticConfig({
-      tokenMessenger: address(i_tokenMessenger),
-      messageTransmitterProxy: address(i_messageTransmitterProxy),
-      usdcToken: address(i_usdcToken),
-      localDomainIdentifier: i_localDomainIdentifier
-    });
+  /// @return tokenMessenger The address of the token messenger.
+  /// @return messageTransmitterProxy The address of the message transmitter proxy.
+  /// @return usdcToken The address of the USDC token.
+  /// @return localDomainIdentifier The local domain identifier.
+  function getStaticConfig()
+    external
+    view
+    returns (address tokenMessenger, address messageTransmitterProxy, address usdcToken, uint32 localDomainIdentifier)
+  {
+    return (
+      address(i_tokenMessenger), address(i_messageTransmitterProxy), address(i_usdcToken), i_localDomainIdentifier
+    );
   }
 
   /// @notice Returns the dynamic configuration.
@@ -465,6 +462,6 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   function withdrawFeeTokens(
     address[] calldata feeTokens
   ) external {
-    _withdrawFeeTokens(feeTokens, s_dynamicConfig.feeAggregator);
+    FeeTokenHandler._withdrawFeeTokens(feeTokens, s_dynamicConfig.feeAggregator);
   }
 }

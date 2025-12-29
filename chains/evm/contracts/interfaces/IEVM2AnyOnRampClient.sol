@@ -5,7 +5,7 @@ import {IPoolV1} from "./IPool.sol";
 
 import {Client} from "../libraries/Client.sol";
 
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
 interface IEVM2AnyOnRampClient {
   /// @notice Get the fee for a given ccip message.
@@ -35,7 +35,6 @@ interface IEVM2AnyOnRampClient {
 
   /// @notice Send a message to the remote chain.
   /// @dev only callable by the Router.
-  /// @dev approve() must have already been called on the token using the this ramp address as the spender.
   /// @dev if the contract is paused, this function will revert.
   /// @param destChainSelector The destination chain selector.
   /// @param message Message struct to send.

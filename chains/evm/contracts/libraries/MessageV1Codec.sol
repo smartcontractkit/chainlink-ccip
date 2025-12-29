@@ -76,6 +76,7 @@ library MessageV1Codec {
     ENCODE_RECEIVER_LENGTH,
     ENCODE_DEST_BLOB_LENGTH,
     ENCODE_TOKEN_TRANSFER_ARRAY_LENGTH,
+    ENCODE_TOKEN_TRANSFER_LENGTH,
     ENCODE_DATA_LENGTH,
     ENCODE_TOKEN_SOURCE_POOL_LENGTH,
     ENCODE_TOKEN_SOURCE_TOKEN_LENGTH,
@@ -358,37 +359,36 @@ library MessageV1Codec {
     }
     if (message.data.length > type(uint16).max) revert InvalidDataLength(EncodingErrorLocation.ENCODE_DATA_LENGTH);
 
-    // We need to partially encode it in three parts to avoid stack too deep issues.
-    bytes memory staticLengthSection = abi.encodePacked(
-      uint8(1), // version.
-      message.sourceChainSelector,
-      message.destChainSelector,
-      message.messageNumber,
-      message.executionGasLimit,
-      message.ccipReceiveGasLimit,
-      message.finality,
-      message.ccvAndExecutorHash
-    );
-
-    bytes memory dynamicLengthPart1 = abi.encodePacked(
-      uint8(message.onRampAddress.length),
-      message.onRampAddress,
-      uint8(message.offRampAddress.length),
-      message.offRampAddress,
-      uint8(message.sender.length),
-      message.sender
-    );
-
     // Encode token the transfer if present. We checked above that there is at most 1 token transfer.
     // We define it below the partial encoding to avoid stack too deep errors.
     bytes memory encodedTokenTransfers;
     if (message.tokenTransfer.length > 0) {
       encodedTokenTransfers = _encodeTokenTransferV1(message.tokenTransfer[0]);
+      if (encodedTokenTransfers.length > type(uint16).max) {
+        revert InvalidDataLength(EncodingErrorLocation.ENCODE_TOKEN_TRANSFER_LENGTH);
+      }
     }
 
+    // Encode in sections to avoid stack too deep errors.
     return abi.encodePacked(
-      staticLengthSection,
-      dynamicLengthPart1,
+      abi.encodePacked(
+        uint8(1), // version.
+        message.sourceChainSelector,
+        message.destChainSelector,
+        message.messageNumber,
+        message.executionGasLimit,
+        message.ccipReceiveGasLimit,
+        message.finality,
+        message.ccvAndExecutorHash
+      ),
+      abi.encodePacked(
+        uint8(message.onRampAddress.length),
+        message.onRampAddress,
+        uint8(message.offRampAddress.length),
+        message.offRampAddress,
+        uint8(message.sender.length),
+        message.sender
+      ),
       abi.encodePacked(
         uint8(message.receiver.length),
         message.receiver,

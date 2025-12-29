@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {Executor} from "../../../executor/Executor.sol";
+import {FeeTokenHandler} from "../../../libraries/FeeTokenHandler.sol";
 import {ExecutorSetup} from "./ExecutorSetup.t.sol";
 
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
 contract Executor_withdrawFeeTokens is ExecutorSetup {
   function test_withdrawFeeTokens() public {
@@ -23,7 +23,7 @@ contract Executor_withdrawFeeTokens is ExecutorSetup {
     feeTokens[0] = s_sourceFeeToken;
 
     vm.expectEmit();
-    emit Executor.FeeTokenWithdrawn(FEE_AGGREGATOR, s_sourceFeeToken, feeAmount);
+    emit FeeTokenHandler.FeeTokenWithdrawn(FEE_AGGREGATOR, s_sourceFeeToken, feeAmount);
     s_executor.withdrawFeeTokens(feeTokens);
 
     uint256 finalAggregatorBalance = IERC20(s_sourceFeeToken).balanceOf(FEE_AGGREGATOR);
@@ -51,9 +51,9 @@ contract Executor_withdrawFeeTokens is ExecutorSetup {
     feeTokens[1] = token2;
 
     vm.expectEmit();
-    emit Executor.FeeTokenWithdrawn(FEE_AGGREGATOR, s_sourceFeeToken, feeAmount1);
+    emit FeeTokenHandler.FeeTokenWithdrawn(FEE_AGGREGATOR, s_sourceFeeToken, feeAmount1);
     vm.expectEmit();
-    emit Executor.FeeTokenWithdrawn(FEE_AGGREGATOR, token2, feeAmount2);
+    emit FeeTokenHandler.FeeTokenWithdrawn(FEE_AGGREGATOR, token2, feeAmount2);
     s_executor.withdrawFeeTokens(feeTokens);
 
     uint256 finalAggregatorBalance1 = IERC20(s_sourceFeeToken).balanceOf(FEE_AGGREGATOR);

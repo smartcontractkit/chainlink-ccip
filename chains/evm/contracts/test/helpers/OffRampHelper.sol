@@ -41,7 +41,7 @@ contract OffRampHelper is OffRamp {
 
   function beforeExecuteSingleMessage(
     MessageV1Codec.MessageV1 memory message
-  ) external returns (MessageV1Codec.MessageV1 memory) {
+  ) external view returns (MessageV1Codec.MessageV1 memory) {
     return _beforeExecuteSingleMessage(message);
   }
 

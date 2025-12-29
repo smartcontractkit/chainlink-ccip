@@ -3,10 +3,11 @@ pragma solidity ^0.8.24;
 
 import {IExecutor} from "../interfaces/IExecutor.sol";
 
+import {FeeTokenHandler} from "../libraries/FeeTokenHandler.sol";
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/utils/SafeERC20.sol";
 import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/EnumerableSet.sol";
 
 /// @notice The Executor configures the supported destination chains and CCV limits for an executor.
@@ -27,7 +28,6 @@ contract Executor is IExecutor, Ownable2StepMsgSender {
   event CCVRemoved(address indexed ccv);
   event DestChainAdded(uint64 indexed destChainSelector, RemoteChainConfig config);
   event DestChainRemoved(uint64 indexed destChainSelector);
-  event FeeTokenWithdrawn(address indexed receiver, address indexed feeToken, uint256 amount);
   event ConfigSet(DynamicConfig dynamicConfig);
 
   struct RemoteChainConfig {
@@ -203,7 +203,8 @@ contract Executor is IExecutor, Ownable2StepMsgSender {
     uint64 destChainSelector,
     uint16 requestedBlockDepth,
     address[] calldata ccvs,
-    bytes calldata // extraArgs
+    bytes calldata, // extraArgs
+    address // feeToken
   ) external view virtual returns (uint16 usdCentsFee) {
     RemoteChainConfig memory remoteChainConfig = s_remoteChainConfigs[destChainSelector];
     if (!remoteChainConfig.enabled) {
@@ -233,16 +234,6 @@ contract Executor is IExecutor, Ownable2StepMsgSender {
   function withdrawFeeTokens(
     address[] calldata feeTokens
   ) external virtual {
-    address feeAggregator = s_dynamicConfig.feeAggregator;
-    for (uint256 i = 0; i < feeTokens.length; ++i) {
-      IERC20 feeToken = IERC20(feeTokens[i]);
-      uint256 feeTokenBalance = feeToken.balanceOf(address(this));
-
-      if (feeTokenBalance > 0) {
-        feeToken.safeTransfer(feeAggregator, feeTokenBalance);
-
-        emit FeeTokenWithdrawn(feeAggregator, address(feeToken), feeTokenBalance);
-      }
-    }
+    FeeTokenHandler._withdrawFeeTokens(feeTokens, s_dynamicConfig.feeAggregator);
   }
 }

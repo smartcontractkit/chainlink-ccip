@@ -7,6 +7,7 @@ import {Pool} from "../../../libraries/Pool.sol";
 import {LombardTokenPool} from "../../../pools/Lombard/LombardTokenPool.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {LombardTokenPoolHelper} from "../../helpers/LombardTokenPoolHelper.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts@5.3.0/token/ERC20/extensions/IERC20Metadata.sol";
 
 import {MockLombardAdapter} from "../../mocks/MockLombardAdapter.sol";
 import {LombardTokenPoolSetup} from "./LombardTokenPoolSetup.t.sol";
@@ -88,7 +89,7 @@ contract LombardTokenPool_lockOrBurn is LombardTokenPoolSetup {
 
     changePrank(OWNER);
     LombardTokenPoolHelper adapterPool = new LombardTokenPoolHelper(
-      s_token,
+      IERC20Metadata(address(s_token)),
       address(s_verifierResolver),
       s_bridge,
       tokenAdapter,
