@@ -419,6 +419,38 @@ pub fn validate_svm_address(address: &[u8], address_must_be_nonzero: bool) -> Re
         .map_err(|_| CommonCcipError::InvalidSVMAddress.into())
 }
 
+/// 36-byte TON address raw format:
+/// - [0]   flags
+/// - [1]   workchain_id
+/// - [2..34) account_id (32 bytes)
+/// - [34..36) crc16 (ignored here)
+pub fn validate_tvm_address(address: &[u8]) -> Result<()> {
+    require_eq!(address.len(), 36, CommonCcipError::InvalidTVMAddress);
+
+    // account_id starts at offset 2 and is 32 bytes long
+    let account_id: &[u8; 32] = address[2..34]
+        .try_into()
+        .expect("slice length is guaranteed to be 32");
+
+    require!(
+        account_id.iter().any(|b| *b != 0),
+        CommonCcipError::InvalidSVMAddress
+    );
+
+    Ok(())
+}
+
+pub fn validate_aptos_address(address: &[u8]) -> Result<()> {
+    require_eq!(address.len(), 32, CommonCcipError::InvalidAptosAddress);
+
+    require!(
+        address.iter().any(|b| *b != 0),
+        CommonCcipError::InvalidAptosAddress
+    );
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

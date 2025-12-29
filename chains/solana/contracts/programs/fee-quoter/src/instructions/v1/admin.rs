@@ -1,6 +1,9 @@
 use anchor_lang::prelude::*;
 
-use ccip_common::{CommonCcipError, CHAIN_FAMILY_SELECTOR_EVM, CHAIN_FAMILY_SELECTOR_SVM};
+use ccip_common::{
+    CommonCcipError, CHAIN_FAMILY_SELECTOR_APTOS, CHAIN_FAMILY_SELECTOR_EVM,
+    CHAIN_FAMILY_SELECTOR_SVM, CHAIN_FAMILY_SELECTOR_TVM,
+};
 
 use crate::context::{
     AcceptOwnership, AddBillingTokenConfig, AddDestChain, AddPriceUpdater, RemovePriceUpdater,
@@ -302,7 +305,10 @@ fn validate_dest_chain_config(dest_chain_selector: u64, config: &DestChainConfig
     require!(
         matches!(
             u32::from_be_bytes(config.chain_family_selector),
-            CHAIN_FAMILY_SELECTOR_EVM | CHAIN_FAMILY_SELECTOR_SVM
+            CHAIN_FAMILY_SELECTOR_EVM
+                | CHAIN_FAMILY_SELECTOR_SVM
+                | CHAIN_FAMILY_SELECTOR_TVM
+                | CHAIN_FAMILY_SELECTOR_APTOS
         ),
         CommonCcipError::InvalidChainFamilySelector
     );

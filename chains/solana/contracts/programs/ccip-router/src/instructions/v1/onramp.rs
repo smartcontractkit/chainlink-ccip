@@ -368,8 +368,12 @@ impl OnRamp for Impl {
 mod helpers {
     use anchor_lang::system_program;
     use ccip_common::{
-        v1::{validate_evm_address, validate_svm_address},
-        CommonCcipError, CHAIN_FAMILY_SELECTOR_EVM, CHAIN_FAMILY_SELECTOR_SVM,
+        v1::{
+            validate_aptos_address, validate_evm_address, validate_svm_address,
+            validate_tvm_address,
+        },
+        CommonCcipError, CHAIN_FAMILY_SELECTOR_APTOS, CHAIN_FAMILY_SELECTOR_EVM,
+        CHAIN_FAMILY_SELECTOR_SVM, CHAIN_FAMILY_SELECTOR_TVM,
     };
     use rmn_remote::state::CurseSubject;
 
@@ -584,6 +588,8 @@ mod helpers {
         match selector {
             CHAIN_FAMILY_SELECTOR_EVM => validate_evm_address(dest_token_address),
             CHAIN_FAMILY_SELECTOR_SVM => validate_svm_address(dest_token_address, true),
+            CHAIN_FAMILY_SELECTOR_TVM => validate_tvm_address(dest_token_address),
+            CHAIN_FAMILY_SELECTOR_APTOS => validate_aptos_address(dest_token_address),
             _ => Err(CommonCcipError::InvalidChainFamilySelector.into()),
         }
     }
