@@ -26,7 +26,7 @@ contract OffRamp_constructor is BaseTest {
     assertEq(returnedConfig.gasForCallExactCheck, config.gasForCallExactCheck);
     assertEq(address(returnedConfig.rmnRemote), address(config.rmnRemote));
     assertEq(returnedConfig.tokenAdminRegistry, config.tokenAdminRegistry);
-    assertEq(offRamp.getmaxGasBufferToUpdateState(), DEFAULT_MAX_GAS_BUFFER_TO_UPDATE_STATE);
+    assertEq(offRamp.getMaxGasBufferToUpdateState(), DEFAULT_MAX_GAS_BUFFER_TO_UPDATE_STATE);
   }
 
   function test_constructor_RevertWhen_ZeroAddressNotAllowed_RMNRemote() public {

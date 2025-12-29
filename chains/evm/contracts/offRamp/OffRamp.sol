@@ -808,7 +808,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   }
 
   /// @notice Returns the max gas buffer to update state.
-  function getmaxGasBufferToUpdateState() external view virtual returns (uint32) {
+  function getMaxGasBufferToUpdateState() external view virtual returns (uint32) {
     return s_maxGasBufferToUpdateState;
   }
 
