@@ -86,7 +86,8 @@ func CreateBasicContractParams() sequences.ContractParams {
 			Version: semver.MustParse("1.6.0"),
 		},
 		OffRamp: sequences.OffRampParams{
-			Version: semver.MustParse("1.7.0"),
+			Version:              semver.MustParse("1.7.0"),
+			GasForCallExactCheck: 5_000,
 		},
 		CommitteeVerifiers: []sequences.CommitteeVerifierParams{
 			{
@@ -97,8 +98,9 @@ func CreateBasicContractParams() sequences.ContractParams {
 			},
 		},
 		OnRamp: sequences.OnRampParams{
-			Version:       semver.MustParse("1.7.0"),
-			FeeAggregator: common.HexToAddress("0x01"),
+			Version:               semver.MustParse("1.7.0"),
+			FeeAggregator:         common.HexToAddress("0x01"),
+			MaxUSDCentsPerMessage: 100_00, // 100.00 USD
 		},
 		Executors: []sequences.ExecutorParams{
 			{
