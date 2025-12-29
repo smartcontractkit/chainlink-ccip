@@ -122,8 +122,10 @@ contract TokenPoolFactory is ITypeAndVersion {
     // Deploy the token pool.
     address pool = _createTokenPool(token, localTokenDecimals, localPoolType, remoteTokenPools, tokenPoolInitCode, salt);
 
-    // Grant the mint and burn roles to the pool for the token.
-    FactoryBurnMintERC20(token).grantMintAndBurnRoles(pool);
+    if (localPoolType == PoolType.BURN_MINT) {
+      // Grant the mint and burn roles to the pool for the token.
+      FactoryBurnMintERC20(token).grantMintAndBurnRoles(pool);
+    }
 
     // Set the token pool for token in the token admin registry since this contract is the token and pool owner.
     _setTokenPoolInTokenAdminRegistry(token, pool);
