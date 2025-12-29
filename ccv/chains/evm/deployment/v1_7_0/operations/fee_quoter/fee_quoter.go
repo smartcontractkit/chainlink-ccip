@@ -30,7 +30,6 @@ type TokenTransferFeeConfigRemoveArgs = fee_quoter.FeeQuoterTokenTransferFeeConf
 type ConstructorArgs struct {
 	StaticConfig               StaticConfig
 	PriceUpdaters              []common.Address
-	FeeTokens                  []common.Address
 	TokenTransferFeeConfigArgs []TokenTransferFeeConfigArgs
 	DestChainConfigArgs        []DestChainConfigArgs
 }
@@ -91,20 +90,6 @@ var ApplyDestChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]DestC
 	Validate:        func([]DestChainConfigArgs) error { return nil },
 	CallContract: func(feeQuoter *fee_quoter.FeeQuoter, opts *bind.TransactOpts, args []DestChainConfigArgs) (*types.Transaction, error) {
 		return feeQuoter.ApplyDestChainConfigUpdates(opts, transformDestChainConfigArgs(args))
-	},
-})
-
-var ApplyFeeTokensUpdates = contract.NewWrite(contract.WriteParams[ApplyFeeTokensUpdatesArgs, *fee_quoter.FeeQuoter]{
-	Name:            "fee-quoter-v2:apply-fee-tokens-updates",
-	Version:         semver.MustParse("1.7.0"),
-	Description:     "Applies updates to the fee tokens supported by the FeeQuoter",
-	ContractType:    ContractType,
-	ContractABI:     fee_quoter.FeeQuoterABI,
-	NewContract:     fee_quoter.NewFeeQuoter,
-	IsAllowedCaller: contract.OnlyOwner[*fee_quoter.FeeQuoter, ApplyFeeTokensUpdatesArgs],
-	Validate:        func(ApplyFeeTokensUpdatesArgs) error { return nil },
-	CallContract: func(feeQuoter *fee_quoter.FeeQuoter, opts *bind.TransactOpts, args ApplyFeeTokensUpdatesArgs) (*types.Transaction, error) {
-		return feeQuoter.ApplyFeeTokensUpdates(opts, args.FeeTokensToRemove, args.FeeTokensToAdd)
 	},
 })
 
