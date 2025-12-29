@@ -7,6 +7,7 @@ import {LombardTokenPool} from "../../../pools/Lombard/LombardTokenPool.sol";
 import {MockLombardBridge} from "../../mocks/MockLombardBridge.sol";
 import {MockVerifier} from "../../mocks/MockVerifier.sol";
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts@5.3.0/token/ERC20/extensions/IERC20Metadata.sol";
 import {Test} from "forge-std/Test.sol";
 
 contract LombardTokenPool_constructor is Test {
@@ -24,7 +25,9 @@ contract LombardTokenPool_constructor is Test {
 
   function test_constructor() public {
     address adapter = makeAddr("adapter");
-    LombardTokenPool pool = new LombardTokenPool(s_token, s_resolver, s_bridge, adapter, address(0), RMN, ROUTER, 18);
+    LombardTokenPool pool = new LombardTokenPool(
+      IERC20Metadata(address(s_token)), s_resolver, s_bridge, adapter, address(0), RMN, ROUTER, 18
+    );
 
     (address verifierResolver, address bridge, address tokenAdapter) = pool.getLombardConfig();
     assertEq(verifierResolver, s_resolver);
@@ -37,7 +40,9 @@ contract LombardTokenPool_constructor is Test {
   }
 
   function test_constructor_WithoutAdapterApprovesBridge() public {
-    LombardTokenPool pool = new LombardTokenPool(s_token, s_resolver, s_bridge, address(0), address(0), RMN, ROUTER, 18);
+    LombardTokenPool pool = new LombardTokenPool(
+      IERC20Metadata(address(s_token)), s_resolver, s_bridge, address(0), address(0), RMN, ROUTER, 18
+    );
 
     assertEq(s_token.allowance(address(pool), address(s_bridge)), type(uint256).max);
     assertEq(s_token.allowance(address(pool), address(0)), 0);
@@ -45,7 +50,9 @@ contract LombardTokenPool_constructor is Test {
 
   function test_constructor_ZeroVerifierNotAllowed() public {
     vm.expectRevert(LombardTokenPool.ZeroVerifierNotAllowed.selector);
-    new LombardTokenPool(s_token, address(0), s_bridge, address(0), address(0), RMN, ROUTER, 18);
+    new LombardTokenPool(
+      IERC20Metadata(address(s_token)), address(0), s_bridge, address(0), address(0), RMN, ROUTER, 18
+    );
   }
 
   function test_constructor_RevertsWhen_InvalidMessageVersion() public {
@@ -53,11 +60,15 @@ contract LombardTokenPool_constructor is Test {
     vm.mockCall(address(s_bridge), abi.encodeWithSelector(IBridgeV2.MSG_VERSION.selector), abi.encode(wrongVersion));
 
     vm.expectRevert(abi.encodeWithSelector(LombardTokenPool.InvalidMessageVersion.selector, 1, wrongVersion));
-    new LombardTokenPool(s_token, s_resolver, s_bridge, address(0), address(0), RMN, ROUTER, 18);
+    new LombardTokenPool(
+      IERC20Metadata(address(s_token)), s_resolver, s_bridge, address(0), address(0), RMN, ROUTER, 18
+    );
   }
 
   function test_constructor_RevertsWhen_ZeroBridge() public {
     vm.expectRevert(LombardTokenPool.ZeroBridge.selector);
-    new LombardTokenPool(s_token, s_resolver, IBridgeV2(address(0)), address(0), address(0), RMN, ROUTER, 18);
+    new LombardTokenPool(
+      IERC20Metadata(address(s_token)), s_resolver, IBridgeV2(address(0)), address(0), address(0), RMN, ROUTER, 18
+    );
   }
 }

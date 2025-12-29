@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {IBurnMintERC20} from "../interfaces/IBurnMintERC20.sol";
 import {BurnMintTokenPool} from "../pools/BurnMintTokenPool.sol";
 import {ERC20LockBox} from "../pools/ERC20LockBox.sol";
 import {LockReleaseTokenPool} from "../pools/LockReleaseTokenPool.sol";
@@ -10,7 +11,7 @@ import {BaseTest} from "./BaseTest.t.sol";
 import {MaybeRevertingBurnMintTokenPool} from "./helpers/MaybeRevertingBurnMintTokenPool.sol";
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
 contract TokenSetup is BaseTest {
   address[] internal s_sourceTokens;
@@ -79,7 +80,7 @@ contract TokenSetup is BaseTest {
     }
 
     BurnMintTokenPool pool = new MaybeRevertingBurnMintTokenPool(
-      BurnMintERC20(token), DEFAULT_TOKEN_DECIMALS, address(0), address(s_mockRMNRemote), router
+      IBurnMintERC20(address(token)), DEFAULT_TOKEN_DECIMALS, address(0), address(s_mockRMNRemote), router
     );
     BurnMintERC20(token).grantMintAndBurnRoles(address(pool));
 
