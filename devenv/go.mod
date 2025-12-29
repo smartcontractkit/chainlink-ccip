@@ -8,11 +8,11 @@ replace (
 	github.com/smartcontractkit/chainlink-ccip/chains/solana => ../chains/solana
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment => ../chains/solana/deployment
 	github.com/smartcontractkit/chainlink-ccip/deployment => ../deployment
-	
-	// local development
-	github.com/smartcontractkit/chainlink-ton/deployment => ../../chainlink-ton/deployment
-	github.com/smartcontractkit/chainlink-testing-framework/framework => ../../chainlink-testing-framework/framework
-	github.com/smartcontractkit/chainlink-ton/devenv-impl => ../../chainlink-ton/devenv-impl
+
+// local development
+// github.com/smartcontractkit/chainlink-ton/deployment => ../../chainlink-ton/deployment
+// github.com/smartcontractkit/chainlink-ton/devenv-impl => ../../chainlink-ton/devenv-impl
+// github.com/smartcontractkit/chainlink-testing-framework/framework => ../../chainlink-testing-framework/framework
 )
 
 require (
@@ -41,7 +41,7 @@ require (
 	github.com/smartcontractkit/chainlink-deployments-framework v0.72.0
 	github.com/smartcontractkit/chainlink-evm v0.3.3
 	github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20250808121824-2c3544aab8f3
-	github.com/smartcontractkit/chainlink-testing-framework/framework v0.12.1
+	github.com/smartcontractkit/chainlink-testing-framework/framework v0.12.3
 	github.com/smartcontractkit/chainlink-testing-framework/wasp v1.51.1
 	github.com/smartcontractkit/libocr v0.0.0-20250912173940-f3ab0246e23d
 	github.com/smartcontractkit/mcms v0.31.1
@@ -56,7 +56,7 @@ require (
 require (
 	github.com/smartcontractkit/chainlink-ton v0.0.0-20251222225825-082db6f6514f
 	github.com/smartcontractkit/chainlink-ton/deployment v0.0.0-20251223135314-831a334034e8
-	github.com/smartcontractkit/chainlink-ton/devenv-impl v0.0.0-20251223135314-831a334034e8
+	github.com/smartcontractkit/chainlink-ton/devenv-impl v0.0.0-20251229134236-dee172b250aa
 )
 
 require (
