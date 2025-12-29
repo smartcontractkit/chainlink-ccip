@@ -26,7 +26,7 @@ contract SiloedLockReleaseTokenPool_constructor is BaseTest {
     BurnMintERC20 otherToken = new BurnMintERC20("OTH", "O", DEFAULT_TOKEN_DECIMALS, 0, 0);
     ERC20LockBox lockBox = new ERC20LockBox(address(otherToken));
 
-    vm.expectRevert(abi.encodeWithSelector(TokenPool.InvalidToken.selector, address(otherToken)));
+    vm.expectRevert(abi.encodeWithSelector(TokenPool.InvalidToken.selector, address(token)));
     new SiloedLockReleaseTokenPool(
       token, DEFAULT_TOKEN_DECIMALS, address(0), address(s_mockRMNRemote), address(s_sourceRouter), address(lockBox)
     );

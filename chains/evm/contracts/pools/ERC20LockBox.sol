@@ -103,10 +103,4 @@ contract ERC20LockBox is ITypeAndVersion, ILockBox, AuthorizedCallers {
   ) external view returns (bool) {
     return address(i_token) == token;
   }
-
-  /// @notice Gets the token supported by this lockbox.
-  /// @return token The ERC20 token.
-  function getToken() external view returns (IERC20 token) {
-    return i_token;
-  }
 }

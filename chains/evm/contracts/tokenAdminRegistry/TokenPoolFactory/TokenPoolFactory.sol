@@ -23,7 +23,7 @@ contract TokenPoolFactory is ITypeAndVersion {
   using Create2 for bytes32;
 
   error InvalidZeroAddress();
-  error InvalidLockBoxToken(address lockBoxToken, address poolToken);
+  error InvalidLockBoxToken(address poolToken);
   error InvalidLockBoxChainSelector(uint64 lockBoxSelector);
 
   /// @notice The type of pool to deploy. Types may be expanded in future versions.
@@ -215,7 +215,7 @@ contract TokenPoolFactory is ITypeAndVersion {
       } else {
         ERC20LockBox lockBoxContract = ERC20LockBox(localLockBox);
         if (!lockBoxContract.isTokenSupported(localConfig.token)) {
-          revert InvalidLockBoxToken(address(lockBoxContract.getToken()), localConfig.token);
+          revert InvalidLockBoxToken(localConfig.token);
         }
       }
       tokenPoolInitArgs = abi.encode(

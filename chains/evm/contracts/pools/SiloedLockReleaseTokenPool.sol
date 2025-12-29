@@ -65,7 +65,7 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
 
     ERC20LockBox erc20LockBox = ERC20LockBox(lockBox);
     if (!erc20LockBox.isTokenSupported(address(token))) {
-      revert InvalidToken(address(erc20LockBox.getToken()));
+      revert InvalidToken(address(token));
     }
     token.safeApprove(lockBox, type(uint256).max);
     s_lockBoxes[0] = erc20LockBox;
@@ -375,7 +375,7 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
       if (lockBox == address(0)) revert ZeroAddressInvalid();
       ERC20LockBox erc20LockBox = ERC20LockBox(lockBox);
       if (!erc20LockBox.isTokenSupported(address(i_token))) {
-        revert InvalidToken(address(erc20LockBox.getToken()));
+        revert InvalidToken(address(i_token));
       }
       s_lockBoxes[lockBoxConfigs[i].remoteChainSelector] = erc20LockBox;
       i_token.approve(lockBox, type(uint256).max);

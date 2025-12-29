@@ -750,9 +750,7 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
     ERC20LockBox lockBox = new ERC20LockBox(address(otherToken));
 
     TokenPoolFactory.RemoteTokenPoolInfo[] memory remotes = new TokenPoolFactory.RemoteTokenPoolInfo[](0);
-    vm.expectRevert(
-      abi.encodeWithSelector(TokenPoolFactory.InvalidLockBoxToken.selector, address(otherToken), address(token))
-    );
+    vm.expectRevert(abi.encodeWithSelector(TokenPoolFactory.InvalidLockBoxToken.selector, address(token)));
     s_tokenPoolFactory.deployTokenPoolWithExistingToken(
       address(token),
       LOCAL_TOKEN_DECIMALS,

@@ -98,7 +98,7 @@ contract SiloedLockReleaseTokenPool_configureChainLockBoxes is BaseTest {
       remoteChainSelector: SILOED_CHAIN_SELECTOR, lockBox: address(invalidLockBox)
     });
 
-    vm.expectRevert(abi.encodeWithSelector(TokenPool.InvalidToken.selector, wrongToken));
+    vm.expectRevert(abi.encodeWithSelector(TokenPool.InvalidToken.selector, address(s_token)));
     s_pool.configureLockBoxes(lockBoxes);
   }
 }
