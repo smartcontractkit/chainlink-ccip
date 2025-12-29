@@ -84,7 +84,8 @@ contract OnRamp_getFee is OnRampSetup {
       destChainSelector: DEST_CHAIN_SELECTOR,
       router: s_sourceRouter,
       addressBytesLength: EVM_ADDRESS_LENGTH,
-      networkFeeUSDCents: NETWORK_FEE_USD_CENTS,
+      messageNetworkFeeUSDCents: MESSAGE_NETWORK_FEE_USD_CENTS,
+      tokenNetworkFeeUSDCents: TOKEN_NETWORK_FEE_USD_CENTS,
       tokenReceiverAllowed: false,
       baseExecutionGasCost: BASE_EXEC_GAS_COST,
       laneMandatedCCVs: laneMandatedCCVs,
@@ -152,7 +153,7 @@ contract OnRamp_getFee is OnRampSetup {
       abi.encode(uint32(0), MAX_USD_CENTS_PER_MESSAGE, uint256(1e18), premiumPercentMultiplier)
     );
 
-    uint256 protocolFeeUsdCents = (uint256(NETWORK_FEE_USD_CENTS) * premiumPercentMultiplier) / 100;
+    uint256 protocolFeeUsdCents = (uint256(MESSAGE_NETWORK_FEE_USD_CENTS) * premiumPercentMultiplier) / 100;
     assertGt(protocolFeeUsdCents, 0);
 
     uint256 expectedFeeTokenAmount = ((MAX_USD_CENTS_PER_MESSAGE + protocolFeeUsdCents) * 1e34) / 1e18;
@@ -183,7 +184,8 @@ contract OnRamp_getFee is OnRampSetup {
       destChainSelector: DEST_CHAIN_SELECTOR,
       router: existing.router,
       addressBytesLength: existing.addressBytesLength,
-      networkFeeUSDCents: existing.networkFeeUSDCents,
+      messageNetworkFeeUSDCents: existing.messageNetworkFeeUSDCents,
+      tokenNetworkFeeUSDCents: existing.tokenNetworkFeeUSDCents,
       tokenReceiverAllowed: true,
       baseExecutionGasCost: existing.baseExecutionGasCost,
       laneMandatedCCVs: existing.laneMandatedCCVs,
