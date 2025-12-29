@@ -2,9 +2,9 @@
 pragma solidity ^0.8.24;
 
 import {ERC20LockBox} from "../../../../pools/ERC20LockBox.sol";
+import {SiloedLockReleaseTokenPool} from "../../../../pools/SiloedLockReleaseTokenPool.sol";
 import {SiloedUSDCTokenPool} from "../../../../pools/USDC/SiloedUSDCTokenPool.sol";
 import {USDCSetup} from "../USDCSetup.t.sol";
-
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
@@ -13,18 +13,15 @@ contract SiloedUSDCTokenPoolSetup is USDCSetup {
   SiloedUSDCTokenPool internal s_usdcTokenPoolTransferLiquidity;
 
   ERC20LockBox internal s_lockBox;
+  ERC20LockBox internal s_sourceLockBox;
+  ERC20LockBox internal s_destLockBox;
 
   function setUp() public virtual override {
     super.setUp();
 
-    s_lockBox = new ERC20LockBox(address(s_tokenAdminRegistry));
-
-    // Mock the isAdministrator function to return true so that the owner can configure allowed callers for the lock box.
-    vm.mockCall(
-      address(s_tokenAdminRegistry),
-      abi.encodeWithSignature("isAdministrator(address,address)", address(s_USDCToken), OWNER),
-      abi.encode(true)
-    );
+    s_lockBox = new ERC20LockBox(address(s_USDCToken));
+    s_sourceLockBox = new ERC20LockBox(address(s_USDCToken));
+    s_destLockBox = new ERC20LockBox(address(s_USDCToken));
 
     s_usdcTokenPool = new SiloedUSDCTokenPool(
       s_USDCToken,
@@ -58,16 +55,6 @@ contract SiloedUSDCTokenPoolSetup is USDCSetup {
       abi.encode(address(s_usdcTokenPool))
     );
 
-    // Allow the router to call the releaseOrMint function for the token pool
-    ERC20LockBox.AllowedCallerConfigArgs[] memory allowedCallers = new ERC20LockBox.AllowedCallerConfigArgs[](2);
-    allowedCallers[0] = ERC20LockBox.AllowedCallerConfigArgs({
-      token: address(s_USDCToken), caller: address(s_routerAllowedOffRamp), allowed: true
-    });
-    allowedCallers[1] = ERC20LockBox.AllowedCallerConfigArgs({
-      token: address(s_USDCToken), caller: address(s_routerAllowedOnRamp), allowed: true
-    });
-    ERC20LockBox(s_lockBox).configureAllowedCallers(allowedCallers);
-
     // Allow the router to call the releaseOrMint function
     s_usdcTokenPoolTransferLiquidity = new SiloedUSDCTokenPool(
       s_USDCToken,
@@ -83,5 +70,32 @@ contract SiloedUSDCTokenPoolSetup is USDCSetup {
     );
 
     _poolApplyChainUpdates(address(s_usdcTokenPoolTransferLiquidity));
+
+    // Allow both pools to interact with the lockboxes.
+    address[] memory allowedCallers = new address[](2);
+    allowedCallers[0] = address(s_usdcTokenPool);
+    allowedCallers[1] = address(s_usdcTokenPoolTransferLiquidity);
+    ERC20LockBox(s_lockBox)
+      .applyAuthorizedCallerUpdates(
+        AuthorizedCallers.AuthorizedCallerArgs({addedCallers: allowedCallers, removedCallers: new address[](0)})
+      );
+    ERC20LockBox(s_sourceLockBox)
+      .applyAuthorizedCallerUpdates(
+        AuthorizedCallers.AuthorizedCallerArgs({addedCallers: allowedCallers, removedCallers: new address[](0)})
+      );
+    ERC20LockBox(s_destLockBox)
+      .applyAuthorizedCallerUpdates(
+        AuthorizedCallers.AuthorizedCallerArgs({addedCallers: allowedCallers, removedCallers: new address[](0)})
+      );
+
+    SiloedLockReleaseTokenPool.LockBoxConfig[] memory lockBoxes = new SiloedLockReleaseTokenPool.LockBoxConfig[](2);
+    lockBoxes[0] = SiloedLockReleaseTokenPool.LockBoxConfig({
+      remoteChainSelector: SOURCE_CHAIN_SELECTOR, lockBox: address(s_sourceLockBox)
+    });
+    lockBoxes[1] = SiloedLockReleaseTokenPool.LockBoxConfig({
+      remoteChainSelector: DEST_CHAIN_SELECTOR, lockBox: address(s_destLockBox)
+    });
+    s_usdcTokenPool.configureLockBoxes(lockBoxes);
+    s_usdcTokenPoolTransferLiquidity.configureLockBoxes(lockBoxes);
   }
 }

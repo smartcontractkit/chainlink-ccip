@@ -3,9 +3,8 @@ pragma solidity ^0.8.24;
 
 import {Pool} from "../../../libraries/Pool.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
+import {LOCK_RELEASE_FLAG} from "../../../pools/USDC/BurnMintWithLockReleaseFlagTokenPool.sol";
 import {BurnMintWithLockReleaseFlagTokenPoolSetup} from "./BurnMintWithLockReleaseFlagTokenPoolSetup.t.sol";
-
-import {LOCK_RELEASE_FLAG} from "../../../pools/USDC/SiloedUSDCTokenPool.sol";
 
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
