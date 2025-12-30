@@ -110,6 +110,20 @@ var SetPool = contract.NewWrite(contract.WriteParams[SetPoolArgs, *token_admin_r
 	},
 })
 
+var AddRegistryModule = contract.NewWrite(contract.WriteParams[common.Address, *token_admin_registry.TokenAdminRegistry]{
+	Name:            "token-admin-registry:add-registry-module",
+	Version:         semver.MustParse("1.5.0"),
+	Description:     "Adds a registry module to the TokenAdminRegistry contract",
+	ContractType:    ContractType,
+	ContractABI:     token_admin_registry.TokenAdminRegistryABI,
+	NewContract:     token_admin_registry.NewTokenAdminRegistry,
+	IsAllowedCaller: contract.OnlyOwner[*token_admin_registry.TokenAdminRegistry, common.Address],
+	Validate:        func(common.Address) error { return nil },
+	CallContract: func(tokenAdminRegistry *token_admin_registry.TokenAdminRegistry, opts *bind.TransactOpts, args common.Address) (*types.Transaction, error) {
+		return tokenAdminRegistry.AddRegistryModule(opts, args)
+	},
+})
+
 var Owner = contract.NewRead(contract.ReadParams[any, common.Address, *token_admin_registry.TokenAdminRegistry]{
 	Name:         "token-admin-registry:owner",
 	Version:      semver.MustParse("1.5.0"),
