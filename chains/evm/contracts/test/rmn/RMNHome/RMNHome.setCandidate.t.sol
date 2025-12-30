@@ -10,10 +10,7 @@ contract RMNHome_setCandidate is RMNHomeTestSetup {
   function test_setCandidate() public {
     Config memory config = _getBaseConfig();
     RMNHome.VersionedConfig memory versionedConfig = RMNHome.VersionedConfig({
-      version: 1,
-      staticConfig: config.staticConfig,
-      dynamicConfig: config.dynamicConfig,
-      configDigest: ZERO_DIGEST
+      version: 1, staticConfig: config.staticConfig, dynamicConfig: config.dynamicConfig, configDigest: ZERO_DIGEST
     });
 
     versionedConfig.configDigest = _getConfigDigest(abi.encode(versionedConfig.staticConfig), versionedConfig.version);

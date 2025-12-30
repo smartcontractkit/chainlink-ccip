@@ -11,7 +11,10 @@ import {RMNRemote} from "../../rmn/RMNRemote.sol";
 // solhint-disable-next-line
 interface EncodingUtils {
   /// @dev the RMN Report struct is used in integration / E2E tests.
-  function exposeRmnReport(bytes32 rmnReportVersion, RMNRemote.Report memory rmnReport) external;
+  function exposeRmnReport(
+    bytes32 rmnReportVersion,
+    RMNRemote.Report memory rmnReport
+  ) external;
 
   /// @dev the OCR3Config Config struct is used in integration / E2E tests.
   function exposeOCR3Config(

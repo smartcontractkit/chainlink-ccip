@@ -176,19 +176,22 @@ contract FastTransferTokenPool_withdrawPoolFees_Test is FastTransferTokenPoolSet
     s_pool.withdrawPoolFees(address(0));
   }
 
-  function _updateConfigWithPoolFee(uint16 fillerFeeBps, uint16 poolFeeBps) internal {
-    FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs memory laneConfigArgs = FastTransferTokenPoolAbstract
-      .DestChainConfigUpdateArgs({
-      remoteChainSelector: DEST_CHAIN_SELECTOR,
-      fastTransferFillerFeeBps: fillerFeeBps,
-      fastTransferPoolFeeBps: poolFeeBps,
-      fillerAllowlistEnabled: true,
-      destinationPool: destPoolAddress,
-      maxFillAmountPerRequest: MAX_FILL_AMOUNT_PER_REQUEST,
-      settlementOverheadGas: SETTLEMENT_GAS_OVERHEAD,
-      chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
-      customExtraArgs: ""
-    });
+  function _updateConfigWithPoolFee(
+    uint16 fillerFeeBps,
+    uint16 poolFeeBps
+  ) internal {
+    FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs memory laneConfigArgs =
+      FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs({
+        remoteChainSelector: DEST_CHAIN_SELECTOR,
+        fastTransferFillerFeeBps: fillerFeeBps,
+        fastTransferPoolFeeBps: poolFeeBps,
+        fillerAllowlistEnabled: true,
+        destinationPool: destPoolAddress,
+        maxFillAmountPerRequest: MAX_FILL_AMOUNT_PER_REQUEST,
+        settlementOverheadGas: SETTLEMENT_GAS_OVERHEAD,
+        chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
+        customExtraArgs: ""
+      });
 
     vm.prank(OWNER);
     s_pool.updateDestChainConfig(_singleConfigToList(laneConfigArgs));
@@ -199,7 +202,10 @@ contract FastTransferTokenPool_withdrawPoolFees_Test is FastTransferTokenPoolSet
     s_pool.updateFillerAllowList(fillersToAdd, new address[](0));
   }
 
-  function _accumulatePoolFees(uint16 fillerFeeBps, uint16 poolFeeBps) internal {
+  function _accumulatePoolFees(
+    uint16 fillerFeeBps,
+    uint16 poolFeeBps
+  ) internal {
     uint256 amountToFill = SOURCE_AMOUNT - (SOURCE_AMOUNT * (fillerFeeBps + poolFeeBps)) / 10_000;
     bytes32 fillId =
       s_pool.computeFillId(MESSAGE_ID, SOURCE_CHAIN_SELECTOR, amountToFill, SOURCE_DECIMALS, abi.encode(RECEIVER));

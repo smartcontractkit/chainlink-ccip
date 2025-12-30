@@ -12,8 +12,9 @@ contract CCIPHome_setCandidate is CCIPHomeTestSetup {
     CCIPHome.VersionedConfig memory versionedConfig =
       CCIPHome.VersionedConfig({version: 1, config: config, configDigest: ZERO_DIGEST});
 
-    versionedConfig.configDigest =
-      _getConfigDigest(DEFAULT_DON_ID, DEFAULT_PLUGIN_TYPE, abi.encode(versionedConfig.config), versionedConfig.version);
+    versionedConfig.configDigest = _getConfigDigest(
+      DEFAULT_DON_ID, DEFAULT_PLUGIN_TYPE, abi.encode(versionedConfig.config), versionedConfig.version
+    );
 
     vm.expectEmit();
     emit CCIPHome.ConfigSet(versionedConfig.configDigest, versionedConfig.version, versionedConfig.config);

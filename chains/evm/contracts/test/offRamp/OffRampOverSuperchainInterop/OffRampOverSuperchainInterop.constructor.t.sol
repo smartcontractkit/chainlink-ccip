@@ -30,8 +30,7 @@ contract OffRampOverSuperchainInterop_constructor is OffRampOverSuperchainIntero
     OffRampOverSuperchainInterop.ChainSelectorToChainIdConfigArgs[] memory chainIdConfigs =
       new OffRampOverSuperchainInterop.ChainSelectorToChainIdConfigArgs[](1);
     chainIdConfigs[0] = OffRampOverSuperchainInterop.ChainSelectorToChainIdConfigArgs({
-      chainSelector: SOURCE_CHAIN_SELECTOR_1,
-      chainId: CHAIN_ID_1
+      chainSelector: SOURCE_CHAIN_SELECTOR_1, chainId: CHAIN_ID_1
     });
 
     vm.expectEmit();

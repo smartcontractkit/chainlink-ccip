@@ -268,13 +268,19 @@ contract CCIPHome is Ownable2StepMsgSender, ITypeAndVersion, ICapabilityConfigur
 
   /// @notice Returns the active config digest for for a given key.
   /// @param donId The key of the plugin to get the config digests for.
-  function getActiveDigest(uint32 donId, Internal.OCRPluginType pluginType) public view returns (bytes32) {
+  function getActiveDigest(
+    uint32 donId,
+    Internal.OCRPluginType pluginType
+  ) public view returns (bytes32) {
     return s_configs[donId][pluginType][_getActiveIndex(donId, pluginType)].configDigest;
   }
 
   /// @notice Returns the candidate config digest for for a given key.
   /// @param donId The key of the plugin to get the config digests for.
-  function getCandidateDigest(uint32 donId, Internal.OCRPluginType pluginType) public view returns (bytes32) {
+  function getCandidateDigest(
+    uint32 donId,
+    Internal.OCRPluginType pluginType
+  ) public view returns (bytes32) {
     return s_configs[donId][pluginType][_getCandidateIndex(donId, pluginType)].configDigest;
   }
 
@@ -364,7 +370,11 @@ contract CCIPHome is Ownable2StepMsgSender, ITypeAndVersion, ICapabilityConfigur
   /// @notice Revokes a specific config by digest.
   /// @param donId The key of the plugin to revoke the config for.
   /// @param configDigest The digest of the config to revoke. This is done to prevent accidental revokes.
-  function revokeCandidate(uint32 donId, Internal.OCRPluginType pluginType, bytes32 configDigest) external {
+  function revokeCandidate(
+    uint32 donId,
+    Internal.OCRPluginType pluginType,
+    bytes32 configDigest
+  ) external {
     _onlySelfCall();
 
     if (configDigest == ZERO_DIGEST) {
@@ -430,23 +440,28 @@ contract CCIPHome is Ownable2StepMsgSender, ITypeAndVersion, ICapabilityConfigur
   ) internal view returns (bytes32) {
     return bytes32(
       PREFIX
-        | (
-          uint256(
+        | (uint256(
             keccak256(
               bytes.concat(
                 abi.encode(bytes32("EVM"), block.chainid, address(this), donId, pluginType, version), staticConfig
               )
             )
-          ) & ~PREFIX_MASK
-        )
+          )
+          & ~PREFIX_MASK)
     );
   }
 
-  function _getActiveIndex(uint32 donId, Internal.OCRPluginType pluginType) private view returns (uint32) {
+  function _getActiveIndex(
+    uint32 donId,
+    Internal.OCRPluginType pluginType
+  ) private view returns (uint32) {
     return s_activeConfigIndexes[donId][pluginType];
   }
 
-  function _getCandidateIndex(uint32 donId, Internal.OCRPluginType pluginType) private view returns (uint32) {
+  function _getCandidateIndex(
+    uint32 donId,
+    Internal.OCRPluginType pluginType
+  ) private view returns (uint32) {
     return s_activeConfigIndexes[donId][pluginType] ^ 1;
   }
 
@@ -544,7 +559,10 @@ contract CCIPHome is Ownable2StepMsgSender, ITypeAndVersion, ICapabilityConfigur
   /// @param pageIndex The page index.
   /// @param pageSize The page size.
   /// @return paginatedChainConfigs chain configurations.
-  function getAllChainConfigs(uint256 pageIndex, uint256 pageSize) external view returns (ChainConfigArgs[] memory) {
+  function getAllChainConfigs(
+    uint256 pageIndex,
+    uint256 pageSize
+  ) external view returns (ChainConfigArgs[] memory) {
     uint256 numberOfChains = s_remoteChainSelectors.length();
     uint256 startIndex = pageIndex * pageSize;
 

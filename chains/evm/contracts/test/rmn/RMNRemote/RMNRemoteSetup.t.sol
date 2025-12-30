@@ -61,7 +61,10 @@ contract RMNRemoteSetup is BaseTest {
 
   /// @notice generates n merkleRoots and matching valid signatures and populates them into
   /// the shared storage vars
-  function _generatePayloadAndSigs(uint256 numUpdates, uint256 numSigs) internal {
+  function _generatePayloadAndSigs(
+    uint256 numUpdates,
+    uint256 numSigs
+  ) internal {
     vm.assertTrue(numUpdates > 0, "need at least 1 dest lane update");
     vm.assertTrue(numSigs <= s_signerWallets.length, "cannot generate more sigs than signers");
 

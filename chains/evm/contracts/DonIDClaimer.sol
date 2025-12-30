@@ -85,7 +85,10 @@ contract DonIDClaimer is ITypeAndVersion, Ownable2StepMsgSender {
   /// @param senderAddress The address to be added or removed as an authorized deployer
   /// @param allowed Boolean indicating whether the address is authorized (true) or revoked (false)
   /// @dev Can only be called by an existing authorized deployer
-  function setAuthorizedDeployer(address senderAddress, bool allowed) external onlyOwner {
+  function setAuthorizedDeployer(
+    address senderAddress,
+    bool allowed
+  ) external onlyOwner {
     if (senderAddress == address(0)) revert ZeroAddressNotAllowed();
 
     if (allowed) {
