@@ -74,7 +74,7 @@ contract FactoryBurnMintERC20 is
   }
 
   /// @inheritdoc ITypeAndVersion
-  /// @notice Using a function because constant state variables cannot be overridden by child contracts.
+  /// @dev Using a function because constant state variables cannot be overridden by child contracts.
   function typeAndVersion() external pure virtual override returns (string memory) {
     return "FactoryBurnMintERC20 1.6.2";
   }

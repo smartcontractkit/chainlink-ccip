@@ -16,7 +16,7 @@ bytes4 constant LOCK_RELEASE_FLAG = 0xfa7c07de;
 /// @dev The only difference between this contract and BurnMintTokenPool is the destPoolData returns the
 /// abi-encoded LOCK_RELEASE_FLAG instead of the local token decimals.
 contract BurnMintWithLockReleaseFlagTokenPool is BurnMintTokenPool {
-  /// @notice Using a function because constant state variables cannot be overridden by child contracts.
+  /// @dev Using a function because constant state variables cannot be overridden by child contracts.
   function typeAndVersion() external pure override returns (string memory) {
     return "BurnMintWithLockReleaseFlagTokenPool 1.7.0-dev";
   }
