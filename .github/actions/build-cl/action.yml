@@ -1,0 +1,74 @@
+name: 'Build CL Node Image'
+description: 'Build Chainlink node image with plugins'
+
+inputs:
+  ton_ref:
+    description: 'Git ref (branch) of the TON relayer'
+    required: false
+  solana_ref:
+    description: 'Git ref (branch) of the Solana relayer'
+    required: false
+  ccip_ref:
+    description: 'Git ref (branch) of the CCIP repo'
+    required: false
+  chainlink_version:
+    description: 'Chainlink version to use (e.g., develop, gh ref, etc.)'
+    default: 'develop'
+    required: false
+
+runs:
+  using: "composite"
+  steps:
+    - name: Checkout Chainlink repository
+      uses: actions/checkout@v5
+      with:
+        repository: smartcontractkit/chainlink
+        ref: ${{ inputs.chainlink_version }}
+        path: chainlink-repo
+
+    - name: Setup path to go.mod
+      id: go-mod
+      shell: bash
+      env:
+        WORKSPACE: ${{ github.workspace }}
+      run: |
+        echo "path=${WORKSPACE}/chainlink-repo/go.mod" | tee -a "$GITHUB_OUTPUT"
+
+    - name: Set up Go
+      uses: actions/setup-go@v6 # v6
+      with:
+        go-version-file: ${{ steps.go-mod.outputs.path }}
+        cache: true
+
+    - name: Download Go modules
+      working-directory: ${{ github.workspace }}/chainlink-repo
+      shell: bash
+      run: go mod download
+    
+    - name: Upgrade relayer dependencies to specified commit
+      working-directory: ${{ github.workspace }}/chainlink-repo
+      shell: bash
+      run: |
+        if [ -n "${{ inputs.ton_ref }}" ]; then
+          go get github.com/smartcontractkit/chainlink-ton@${{ inputs.ton_ref }}
+        fi
+        if [ -n "${{ inputs.solana_ref }}" ]; then
+          go get github.com/smartcontractkit/chainlink-solana@${{ inputs.solana_ref }}
+        fi
+        if [ -n "${{ inputs.ccip_ref }}" ]; then
+          go get github.com/smartcontractkit/chainlink-ccip@${{ inputs.ccip_ref }}
+        fi
+        make gomodtidy
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
+
+    - name: Build and Load Docker Image
+      uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
+      with:
+        cache-from: type=gha,timeout=10m,scope=ccip-${{ runner.os }}-${{ runner.arch }}
+        cache-to: type=gha,timeout=10m,mode=max,ignore-error=true,scope=ccip-${{ runner.os }}-${{ runner.arch }}
+        context: ${{ github.workspace }}/chainlink-repo
+        file: ${{ github.workspace }}/chainlink-repo/plugins/chainlink.Dockerfile
+        load: true
+        tags: local

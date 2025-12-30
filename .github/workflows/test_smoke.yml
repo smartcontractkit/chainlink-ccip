@@ -1,6 +1,17 @@
 name: Smoke tests (devenv)
 
 on:
+  workflow_dispatch:
+    inputs:
+      ton_ref:
+        description: 'Git ref (branch) of the TON relayer'
+        required: false
+      chainlink_version:
+        description: 'Chainlink version to use (e.g., develop, gh ref, etc.)'
+        required: false
+      custom_config:
+        description: "Extra config file(s), e.g. ton.toml,sui.toml"
+        required: true
   pull_request:
   push:
     branches:
@@ -9,7 +20,7 @@ on:
 defaults:
   run:
     working-directory: devenv
-  
+
 env:
   PARALLEL_E2E_TESTS: 'true'
 
@@ -21,16 +32,31 @@ jobs:
     runs-on: ubuntu24.04-16cores-64GB
     strategy:
       matrix:
-        test: [
-          { name: "TestE2ESmoke", config: "env.toml" },
-          { name: "TestE2ESmoke", config: "env.toml,solana.toml" },
-        ]
+        test:
+        - name: TestE2ESmoke
+          config: "env.toml"                     # only the base config
+        - name: TestE2ESmoke
+          config: >-
+            ${{ 
+              join(
+                'env.toml,',
+                github.event_name == 'workflow_dispatch' &&
+                ( inputs.custom_config != '' && inputs.custom_config || 'solana.toml' )
+                || 'solana.toml'
+              )
+            }}
       fail-fast: false
     steps:
       - name: Checkout code
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           fetch-depth: 0
+      - name: Build CL Image For Ref
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.chainlink_version != '' }}
+        uses: ./.github/actions/build-cl
+        with:
+          ton_ref: ${{ github.event.inputs.ton_ref || '' }}
+          chainlink_version: ${{ github.event.inputs.chainlink_version }}
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
       - name: Install Just
@@ -59,6 +85,11 @@ jobs:
             devenv/go.sum
       - name: Download Go dependencies
         run: |
+          if [ -n "${{ inputs.ton_ref }}" ]; then
+            go get github.com/smartcontractkit/chainlink-ton/devenv-impl@${{ inputs.ton_ref }}
+            go get github.com/smartcontractkit/chainlink-ton/deployment@${{ inputs.ton_ref }}
+            go get github.com/smartcontractkit/chainlink-ton@${{ inputs.ton_ref }}
+          fi
           go mod download
       - name: Run CCIP environment with config
         env:

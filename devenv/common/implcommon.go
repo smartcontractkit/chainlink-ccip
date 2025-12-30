@@ -11,7 +11,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gagliardetto/solana-go"
 	"github.com/rs/zerolog"
-	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/rmn_home"
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
@@ -144,7 +143,6 @@ func ConnectContractsWithSelectors(ctx context.Context, e *deployment.Environmen
 		operations.NewMemoryReporter(),
 	)
 	e.OperationsBundle = bundle
-	srcFamily, _ := chainsel.GetSelectorFamily(selector)
 
 	mcmsRegistry := changesetscore.GetRegistry()
 	version := semver.MustParse("1.6.0")
@@ -154,19 +152,6 @@ func ConnectContractsWithSelectors(ctx context.Context, e *deployment.Environmen
 		FeeQuoterDestChainConfig: lanesapi.DefaultFeeQuoterDestChainConfig(true, selector),
 	}
 	for _, destSelector := range remoteSelectors {
-		destFamily, _ := chainsel.GetSelectorFamily(destSelector)
-		if srcFamily == chainsel.FamilySolana {
-			if destFamily == chainsel.FamilyTon {
-				l.Info().Msg("Connecting Solana to TON is not supported yet")
-				continue
-			}
-
-		} else if srcFamily == chainsel.FamilyTon {
-			if destFamily == chainsel.FamilySolana {
-				l.Info().Msg("Connecting TON to Solana is not supported yet")
-				continue
-			}
-		}
 		chainB := lanesapi.ChainDefinition{
 			Selector:                 destSelector,
 			GasPrice:                 lanesapi.DefaultGasPrice(destSelector),
