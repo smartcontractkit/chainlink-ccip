@@ -38,12 +38,9 @@ jobs:
         - name: TestE2ESmoke
           config: >-
             ${{ 
-              join(
-                'env.toml,',
                 github.event_name == 'workflow_dispatch' &&
-                ( inputs.custom_config != '' && inputs.custom_config || 'solana.toml' )
-                || 'solana.toml'
-              )
+                ( inputs.custom_config != '' && inputs.custom_config || 'env.toml,solana.toml' )
+                || 'env.toml,solana.toml'
             }}
       fail-fast: false
     steps:
