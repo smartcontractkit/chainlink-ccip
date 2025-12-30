@@ -98,37 +98,6 @@ library USDCSourcePoolDataCodec {
     return sourceTokenDataPayload;
   }
 
-  /// @notice Decodes the abi.encodePacked() source pool data into its corresponding SourceTokenDataPayload struct.
-  /// @param sourcePoolData The source pool data to decode in raw bytes.
-  /// @return sourceTokenDataPayload The decoded source token data payload.
-  function _decodeSourceTokenDataPayloadV1(
-    bytes memory sourcePoolData
-  ) internal pure returns (SourceTokenDataPayloadV1 memory sourceTokenDataPayload) {
-    bytes4 version;
-    uint64 nonce;
-    uint32 sourceDomain;
-
-    assembly {
-      // Load version (first 4 bytes of data, offset 32 to skip the length slot)
-      version := mload(add(sourcePoolData, 32))
-      // Load nonce (next 8 bytes, offset 36) - shift right by 192 bits to get left-most 8 bytes
-      // offset 36 = 32 (length slot) + 4 (uint64)
-      // shift right by 192 = 256 - 64 (uint64)
-      nonce := shr(192, mload(add(sourcePoolData, 36)))
-      // Load sourceDomain (next 4 bytes, offset 44) - shift right by 224 bits to get leftmost 4 bytes
-      // offset 44 = 32 (length slot) + 4 (bytes4) 8 (uint64)
-      // shift right by 224 = 256 - 32 (uint32)
-      sourceDomain := shr(224, mload(add(sourcePoolData, 44)))
-    }
-
-    if (version != CCTP_VERSION_1_TAG) revert InvalidVersion(version);
-
-    sourceTokenDataPayload.nonce = nonce;
-    sourceTokenDataPayload.sourceDomain = sourceDomain;
-
-    return sourceTokenDataPayload;
-  }
-
   /// @notice Calculates the deposit hash for the source pool data.
   /// @param sourceDomain The source domain of the message.
   /// @param amount The amount of the message.
