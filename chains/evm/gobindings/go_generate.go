@@ -1,5 +1,10 @@
 package ccip
 
+import (
+	_ "github.com/smartcontractkit/chainlink-evm/gethwrappers/helpers"
+	_ "github.com/smartcontractkit/chainlink-evm/gethwrappers/helpers/zksync"
+)
+
 //go:generate go run generation/generate/wrap.go ccip Router router latest
 //go:generate go run generation/generate/wrap.go ccip CCIPHome ccip_home latest
 //go:generate go run generation/generate/wrap.go ccip OnRamp onramp latest
@@ -54,3 +59,8 @@ package ccip
 // Superchain Interop
 //go:generate go run generation/generate/wrap.go ccip OnRampOverSuperchainInterop onramp_over_superchain_interop latest
 //go:generate go run generation/generate/wrap.go ccip OffRampOverSuperchainInterop offramp_over_superchain_interop latest
+
+//// //go:generate go run github.com/smartcontractkit/chainlink-evm/gethwrappers/helpers/generate workflow/dev ReserveManager reserve_manager
+
+// Extract bytecode and ABI from generated wrappers
+//go:generate go run github.com/smartcontractkit/chainlink-evm/gethwrappers/helpers/extract_bytecode -input=generated -bytecode=../bytecode -abi=../abi
