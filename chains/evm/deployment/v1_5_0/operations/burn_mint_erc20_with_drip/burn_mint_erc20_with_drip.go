@@ -15,6 +15,8 @@ import (
 
 var (
 	ContractType     cldf_deployment.ContractType = "BurnMintERC20WithDrip"
+	LINKContractType cldf_deployment.ContractType = "LINK"
+	Version                                       = semver.MustParse("1.5.0")
 	defaultAdminRole                              = [32]byte{}
 	burnRole                                      = crypto.Keccak256([]byte("BURNER_ROLE"))
 	mintRole                                      = crypto.Keccak256([]byte("MINTER_ROLE"))
@@ -32,11 +34,14 @@ type MintArgs struct {
 
 var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Name:             "burn-mint-erc20-with-drip:deploy",
-	Version:          semver.MustParse("1.0.0"),
+	Version:          Version,
 	Description:      "Deploys the BurnMintERC20WithDrip contract",
 	ContractMetadata: burn_mint_erc20_with_drip.BurnMintERC20WithDripMetaData,
 	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
-		cldf_deployment.NewTypeAndVersion(ContractType, *semver.MustParse("1.0.0")).String(): {
+		cldf_deployment.NewTypeAndVersion(ContractType, *Version).String(): {
+			EVM: common.FromHex(burn_mint_erc20_with_drip.BurnMintERC20WithDripBin),
+		},
+		cldf_deployment.NewTypeAndVersion(LINKContractType, *Version).String(): {
 			EVM: common.FromHex(burn_mint_erc20_with_drip.BurnMintERC20WithDripBin),
 		},
 	},
@@ -45,7 +50,7 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 
 var GrantMintAndBurnRoles = contract.NewWrite(contract.WriteParams[common.Address, *burn_mint_erc20_with_drip.BurnMintERC20WithDrip]{
 	Name:         "burn-mint-erc20-with-drip:grant-mint-and-burn-roles",
-	Version:      semver.MustParse("1.0.0"),
+	Version:      Version,
 	Description:  "Grants mint and burn roles on the token to an account",
 	ContractType: ContractType,
 	ContractABI:  burn_mint_erc20_with_drip.BurnMintERC20WithDripABI,
@@ -61,7 +66,7 @@ var GrantMintAndBurnRoles = contract.NewWrite(contract.WriteParams[common.Addres
 
 var RevokeBurnRole = contract.NewWrite(contract.WriteParams[common.Address, *burn_mint_erc20_with_drip.BurnMintERC20WithDrip]{
 	Name:         "burn-mint-erc20-with-drip:revoke-burn-role",
-	Version:      semver.MustParse("1.0.0"),
+	Version:      Version,
 	Description:  "Revokes the burn role on the token from an account",
 	ContractType: ContractType,
 	ContractABI:  burn_mint_erc20_with_drip.BurnMintERC20WithDripABI,
@@ -77,7 +82,7 @@ var RevokeBurnRole = contract.NewWrite(contract.WriteParams[common.Address, *bur
 
 var RevokeMintRole = contract.NewWrite(contract.WriteParams[common.Address, *burn_mint_erc20_with_drip.BurnMintERC20WithDrip]{
 	Name:         "burn-mint-erc20-with-drip:revoke-mint-role",
-	Version:      semver.MustParse("1.0.0"),
+	Version:      Version,
 	Description:  "Revokes the mint role on the token from an account",
 	ContractType: ContractType,
 	ContractABI:  burn_mint_erc20_with_drip.BurnMintERC20WithDripABI,
@@ -93,7 +98,7 @@ var RevokeMintRole = contract.NewWrite(contract.WriteParams[common.Address, *bur
 
 var Mint = contract.NewWrite(contract.WriteParams[MintArgs, *burn_mint_erc20_with_drip.BurnMintERC20WithDrip]{
 	Name:         "burn-mint-erc20-with-drip:mint",
-	Version:      semver.MustParse("1.0.0"),
+	Version:      Version,
 	Description:  "Mint tokens to an account",
 	ContractType: ContractType,
 	ContractABI:  burn_mint_erc20_with_drip.BurnMintERC20WithDripABI,
