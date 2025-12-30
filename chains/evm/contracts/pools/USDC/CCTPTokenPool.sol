@@ -150,4 +150,18 @@ contract CCTPTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
   function getCCTPVerifier() external view returns (address) {
     return address(i_cctpVerifier);
   }
+
+  /// @notice No-op override to purge the unused code path from the contract.
+  function _postFlightCheck(
+    Pool.ReleaseOrMintInV1 calldata,
+    uint256,
+    uint16
+  ) internal pure virtual override {}
+
+  /// @notice No-op override to purge the unused code path from the contract.
+  function _preFlightCheck(
+    Pool.LockOrBurnInV1 calldata,
+    uint16,
+    bytes memory
+  ) internal pure virtual override {}
 }

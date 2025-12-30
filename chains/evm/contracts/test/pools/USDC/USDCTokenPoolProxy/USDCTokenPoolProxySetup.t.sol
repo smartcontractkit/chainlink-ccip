@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {USDCTokenPoolProxy} from "../../../../pools/USDC/USDCTokenPoolProxy.sol";
-import {USDCTokenPoolProxyHelper} from "../../../helpers/USDCTokenPoolProxyHelper.sol";
 import {USDCSetup} from "../USDCSetup.t.sol";
 
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
@@ -20,7 +19,7 @@ contract USDCTokenPoolProxySetup is USDCSetup {
   uint64 internal s_remoteLockReleaseChainSelector = 12345;
   uint64 internal s_remoteCCTPChainSelector = 12346;
 
-  USDCTokenPoolProxyHelper internal s_usdcTokenPoolProxy;
+  USDCTokenPoolProxy internal s_usdcTokenPoolProxy;
 
   function setUp() public virtual override {
     super.setUp();
@@ -33,7 +32,7 @@ contract USDCTokenPoolProxySetup is USDCSetup {
     );
 
     // Deploy the proxy
-    s_usdcTokenPoolProxy = new USDCTokenPoolProxyHelper(
+    s_usdcTokenPoolProxy = new USDCTokenPoolProxy(
       s_USDCToken,
       USDCTokenPoolProxy.PoolAddresses({
         legacyCctpV1Pool: s_legacyCctpV1Pool,

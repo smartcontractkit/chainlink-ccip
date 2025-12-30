@@ -141,8 +141,6 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
       revert InvalidLockOrBurnMechanism(mechanism);
     }
 
-    // The child pool which will perform the lock/burn operation.
-    address childPool;
     if (mechanism == LockOrBurnMechanism.CCTP_V2_WITH_CCV) {
       // CCV-compatible lockOrBurn path is completed within this if statement to avoid redundant checks.
       address ccvPool = s_cctpTokenPool;
@@ -156,8 +154,14 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
         revert ChainNotSupportedByVerifier(lockOrBurnIn.remoteChainSelector);
       }
       i_token.safeTransfer(verifierImpl, lockOrBurnIn.amount);
+
       return IPoolV2(ccvPool).lockOrBurn(lockOrBurnIn, blockConfirmationRequested, tokenArgs);
-    } else if (mechanism == LockOrBurnMechanism.CCTP_V2) {
+    }
+
+    // The child pool which will perform the lock/burn operation.
+    address childPool;
+
+    if (mechanism == LockOrBurnMechanism.CCTP_V2) {
       childPool = s_cctpV2Pool;
     } else if (mechanism == LockOrBurnMechanism.CCTP_V1) {
       childPool = s_cctpV1Pool;
@@ -178,30 +182,19 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
   }
 
   /// @inheritdoc IPoolV1
-  /// @param remoteChainSelector The remote chain selector to check.
+  /// @dev If the outgoing mechanism is not set for a chain, then the chain is not supported because there cannot be a
+  /// lock or burn operation.
   function isSupportedChain(
     uint64 remoteChainSelector
   ) external view returns (bool) {
-    // If the outgoing mechanism is not set for a chain, then the chain is not supported because there cannot be a lock
-    // or burn operation.
     return s_lockOrBurnMechanism[remoteChainSelector] != LockOrBurnMechanism.INVALID_MECHANISM;
   }
 
   /// @inheritdoc IPoolV1
-  /// @param token The token address to check.
   function isSupportedToken(
     address token
   ) external view returns (bool) {
     return address(i_token) == token;
-  }
-
-  /// @notice Signals which version of the pool interface is supported
-  /// @param interfaceId The interface identifier, as specified in ERC-165.
-  function supportsInterface(
-    bytes4 interfaceId
-  ) public pure override returns (bool) {
-    return interfaceId == type(IPoolV2).interfaceId || interfaceId == type(IPoolV1).interfaceId
-      || interfaceId == Pool.CCIP_POOL_V1 || interfaceId == type(IERC165).interfaceId;
   }
 
   /// @inheritdoc IPoolV1
@@ -254,14 +247,14 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
     // routed to the CCTP V1 pool without first sanitizing the source pool data for proper formatting.
     // Note: It is possible for a future version of the source pool data to also be 64 bytes long. However, any future
     // version will have a version number in the first 4 bytes and will be routed to the proper pool before this check
-    // is reached. Therefore this branch will only be triggerd for messages using the legacy source pool data format.
+    // is reached. Therefore this branch will only be triggered for messages using the legacy source pool data format.
     if (releaseOrMintIn.sourcePoolData.length == 64) {
       // There are two possible scenarios for the legacy inflight messages:
       // 1. The legacy pool did not utilize a message transmitter proxy.
       // 2. The legacy pool utilized a message transmitter proxy, but the format of the sourcePoolTokenData was as described
       // in the comments above.
 
-      // In the first scenario, only the message's destinationCaller, I.E the legacy pool, can execute the mint, and so
+      // In the first scenario, only the message's destinationCaller, i.e. the legacy pool, can execute the mint, and so
       // the message needs to be routed to the legacy pool. In the second scenario, the destinationCaller will be the
       // message transmitter proxy, and the message needs to be routed to the appropriate V1-compatible pool.
       if (_checkForLegacyInflightMessages(releaseOrMintIn.offchainTokenData)) {
@@ -277,7 +270,19 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
 
         // Since the CCTP v1 pool will have this contract set as an allowed caller, no additional configurations are
         // needed to route the message to the v1 pool.
-        return IPoolV1(s_cctpV1Pool).releaseOrMint(_generateNewReleaseOrMintIn(releaseOrMintIn));
+
+        // Copy to memory to modify the sourcePoolData.
+        Pool.ReleaseOrMintInV1 memory newReleaseOrMintIn = releaseOrMintIn;
+        // While the legacy source pool data struct uses the same fields as the current source pool data struct, it is
+        // was initially encoded using abi.encode(sourceTokenDataPayload) instead of the encoding scheme used in the
+        // USDCSourcePoolDataCodec library, and without a version tag. Therefore, we need to decode the source pool data
+        // into a SourceTokenDataPayloadV1 struct and then re-encode it into a format that using the proper versioning
+        // scheme whereby the CCTP V1 pool can process the message.
+        newReleaseOrMintIn.sourcePoolData = USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV1(
+          abi.decode(releaseOrMintIn.sourcePoolData, (USDCSourcePoolDataCodec.SourceTokenDataPayloadV1))
+        );
+
+        return IPoolV1(s_cctpV1Pool).releaseOrMint(newReleaseOrMintIn);
       }
     }
 
@@ -421,31 +426,6 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
     return destinationCaller == legacyPool;
   }
 
-  /// @notice Converts a legacy sourcePoolData struct into a new format that can be used to release or mint USDC on the
-  /// previous pool. This is necessary because the sourcePoolData is stored in a different format in the previous pool,
-  /// and must be in a properly decodable format.
-  /// @param releaseOrMintIn The releaseOrMintIn struct to generate a new struct for.
-  /// @return newReleaseOrMintIn The new releaseOrMintIn struct.
-  function _generateNewReleaseOrMintIn(
-    Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
-  ) internal pure returns (Pool.ReleaseOrMintInV1 memory newReleaseOrMintIn) {
-    // Copy the releaseOrMintIn struct to the newReleaseOrMintIn struct. We do this to avoid having to copy each field
-    // individually, which would be more gas intensive, as only the sourcePoolData field is going to be modified, as well
-    // as the releaseOrMintIn struct is calldata, which cannot be modified in place.
-    newReleaseOrMintIn = releaseOrMintIn;
-
-    // While the legacy source pool data struct uses the same fields as the current source pool data struct, it is
-    // was initially encoded using abi.encode(sourceTokenDataPayload) instead of the encoding scheme used in the
-    // USDCSourcePoolDataCodec library, and without a version tag. Therefore, we need to decode the source pool data
-    // into a SourceTokenDataPayloadV1 struct and then re-encode it into a format that using the proper versioning
-    // scheme whereby the CCTP V1 pool can process the message.
-    newReleaseOrMintIn.sourcePoolData = USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV1(
-      abi.decode(releaseOrMintIn.sourcePoolData, (USDCSourcePoolDataCodec.SourceTokenDataPayloadV1))
-    );
-
-    return newReleaseOrMintIn;
-  }
-
   /// @inheritdoc IPoolV2
   /// @param localToken The local asset being transferred.
   /// @param destChainSelector The destination lane selector.
@@ -527,5 +507,13 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
       revert CCVCompatiblePoolNotSet();
     }
     _;
+  }
+
+  /// @inheritdoc IERC165
+  function supportsInterface(
+    bytes4 interfaceId
+  ) public pure override returns (bool) {
+    return interfaceId == type(IPoolV2).interfaceId || interfaceId == type(IPoolV1).interfaceId
+      || interfaceId == Pool.CCIP_POOL_V1 || interfaceId == type(IERC165).interfaceId;
   }
 }
