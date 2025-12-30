@@ -253,7 +253,7 @@ func TestConfigureChainsForLanes_Apply(t *testing.T) {
 									15971525489660198786: {
 										AllowlistEnabled:   false,
 										FeeUSDCents:        10,
-										GasForVerification: å100000,
+										GasForVerification: 100000,
 										PayloadSizeBytes:   256,
 									},
 								},
