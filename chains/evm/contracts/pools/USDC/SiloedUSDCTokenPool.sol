@@ -72,15 +72,8 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
     return "SiloedUSDCTokenPool 1.7.0-dev";
   }
 
-  /// @inheritdoc SiloedLockReleaseTokenPool
-  /// @param releaseOrMintIn The release or mint input parameters.
-  function releaseOrMint(
-    Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
-  ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
-    return releaseOrMint(releaseOrMintIn, WAIT_FOR_FINALITY);
-  }
-
-  /// @inheritdoc SiloedLockReleaseTokenPool
+  /// @notice Mint tokens from the pool to the recipient.
+  /// @dev Uses a fixed remote decimal of 6 for canonical USDC.
   /// @param releaseOrMintIn The release or mint input parameters.
   /// @param blockConfirmationRequested Requested block confirmation.
   function releaseOrMint(
@@ -111,7 +104,7 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
     // tokens should come from the stored token balance of previously deposited tokens.
 
     // Release to the recipient using the lockbox tied to the remote chain selector.
-    lockbox.withdraw(address(i_token), releaseOrMintIn.remoteChainSelector, localAmount, releaseOrMintIn.receiver);
+    _releaseOrMint(releaseOrMintIn.receiver, localAmount, releaseOrMintIn.remoteChainSelector);
 
     emit ReleasedOrMinted({
       remoteChainSelector: releaseOrMintIn.remoteChainSelector,

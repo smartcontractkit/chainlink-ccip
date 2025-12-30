@@ -2,8 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {ILockBox} from "../interfaces/ILockBox.sol";
-import {IPoolV1} from "../interfaces/IPool.sol";
-import {IPoolV2} from "../interfaces/IPoolV2.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 import {Pool} from "../libraries/Pool.sol";
@@ -78,58 +76,27 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     return "SiloedLockReleaseTokenPool 1.7.0-dev";
   }
 
-  /// @inheritdoc IPoolV1
-  /// @dev Deposits the full amount into the lockbox tied to the remote chain selector.
-  function lockOrBurn(
-    Pool.LockOrBurnInV1 calldata lockOrBurnIn
-  ) public virtual override returns (Pool.LockOrBurnOutV1 memory out) {
-    // super.lockOrBurn will validate the lockOrBurnIn and revert if invalid.
-    out = super.lockOrBurn(lockOrBurnIn);
-
-    // Transfer the tokens to the appropriate lock box.
-    _getLockBox(lockOrBurnIn.remoteChainSelector)
-      .deposit(address(i_token), lockOrBurnIn.remoteChainSelector, lockOrBurnIn.amount);
-
-    return out;
+  /// @inheritdoc TokenPool
+  /// @dev Deposits the amount into the lockbox configured for the remote chain selector.
+  function _lockOrBurn(
+    uint64 remoteChainSelector,
+    uint256 amount
+  ) internal override {
+    _getLockBox(remoteChainSelector).deposit(address(i_token), remoteChainSelector, amount);
   }
 
-  /// @inheritdoc IPoolV2
-  /// @dev Deposits the post-fee amount into the lockbox tied to the remote chain selector.
-  function lockOrBurn(
-    Pool.LockOrBurnInV1 calldata lockOrBurnIn,
-    uint16 blockConfirmationRequested,
-    bytes calldata tokenArgs
-  ) public virtual override returns (Pool.LockOrBurnOutV1 memory out, uint256 destTokenAmount) {
-    (out, destTokenAmount) = super.lockOrBurn(lockOrBurnIn, blockConfirmationRequested, tokenArgs);
-
-    _getLockBox(lockOrBurnIn.remoteChainSelector)
-      .deposit(address(i_token), lockOrBurnIn.remoteChainSelector, destTokenAmount);
-
-    return (out, destTokenAmount);
-  }
-
-  /// @inheritdoc IPoolV1
-  function releaseOrMint(
-    Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
-  ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
-    return releaseOrMint(releaseOrMintIn, WAIT_FOR_FINALITY);
-  }
-
-  /// @inheritdoc IPoolV2
-  /// @dev Withdraws from the lockbox tied to the remote chain selector after validation.
-  function releaseOrMint(
-    Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
-    uint16 blockConfirmationRequested
-  ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
-    Pool.ReleaseOrMintOutV1 memory out = super.releaseOrMint(releaseOrMintIn, blockConfirmationRequested);
-    uint256 localAmount = out.destinationAmount;
-
-    ILockBox lockBox = _getLockBox(releaseOrMintIn.remoteChainSelector);
+  /// @inheritdoc TokenPool
+  /// @dev Withdraws from the lockbox configured for the remote chain selector after a liquidity check.
+  function _releaseOrMint(
+    address receiver,
+    uint256 amount,
+    uint64 remoteChainSelector
+  ) internal override {
+    ILockBox lockBox = _getLockBox(remoteChainSelector);
     uint256 availableLiquidity = i_token.balanceOf(address(lockBox));
-    if (localAmount > availableLiquidity) revert InsufficientLiquidity(availableLiquidity, localAmount);
+    if (amount > availableLiquidity) revert InsufficientLiquidity(availableLiquidity, amount);
 
-    lockBox.withdraw(address(i_token), releaseOrMintIn.remoteChainSelector, localAmount, releaseOrMintIn.receiver);
-    return out;
+    lockBox.withdraw(address(i_token), remoteChainSelector, amount, receiver);
   }
 
   /// @notice Returns the amount of tokens in the token pool that were siloed for a specific remote chain selector.

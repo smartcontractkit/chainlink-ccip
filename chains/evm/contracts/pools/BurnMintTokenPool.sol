@@ -27,9 +27,9 @@ contract BurnMintTokenPool is BurnMintTokenPoolAbstract, ITypeAndVersion {
     address router
   ) TokenPool(token, localTokenDecimals, advancedPoolHooks, rmnProxy, router) {}
 
-  /// @inheritdoc TokenPool
-  /// @param amount The amount of tokens to burn from the pool.
+  /// @notice Burns tokens held by the pool.
   function _lockOrBurn(
+    uint64, // remoteChainSelector
     uint256 amount
   ) internal virtual override {
     IBurnMintERC20(address(i_token)).burn(amount);

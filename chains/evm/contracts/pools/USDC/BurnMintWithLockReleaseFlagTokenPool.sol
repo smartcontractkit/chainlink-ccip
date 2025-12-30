@@ -57,16 +57,7 @@ contract BurnMintWithLockReleaseFlagTokenPool is BurnMintTokenPool {
     return (out, destTokenAmount);
   }
 
-  /// @notice Mint tokens from the pool to the recipient
-  /// @dev The _validateReleaseOrMint check is an essential security check
-  /// @param releaseOrMintIn Encoded data fields for the processing of tokens on the destination chain.
-  function releaseOrMint(
-    Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
-  ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
-    return releaseOrMint(releaseOrMintIn, WAIT_FOR_FINALITY);
-  }
-
-  /// @notice Mint tokens from the pool to the recipient with V2 parameters.
+  /// @notice Mint tokens from the pool to the recipient.
   /// @dev The _validateReleaseOrMint check is an essential security check.
   /// @param releaseOrMintIn Encoded data fields for the processing of tokens on the destination chain.
   /// @param blockConfirmationRequested Requested block confirmation.
@@ -80,7 +71,7 @@ contract BurnMintWithLockReleaseFlagTokenPool is BurnMintTokenPool {
 
     _validateReleaseOrMint(releaseOrMintIn, localAmount, blockConfirmationRequested);
 
-    _releaseOrMint(releaseOrMintIn.receiver, localAmount);
+    _releaseOrMint(releaseOrMintIn.receiver, localAmount, releaseOrMintIn.remoteChainSelector);
 
     emit ReleasedOrMinted({
       remoteChainSelector: releaseOrMintIn.remoteChainSelector,
