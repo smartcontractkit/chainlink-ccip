@@ -52,7 +52,7 @@ func basicDeployTokenAndPoolInput(chainReport operations.SequenceReport[sequence
 			RateLimitAdmin:                   common.HexToAddress("0x01"),
 			ThresholdAmountForAdditionalCCVs: thresholdAmountForAdditionalCCVs,
 			ConstructorArgs: tokens.ConstructorArgs{
-				LocalTokenDecimals: 18,
+				Decimals: 18,
 				Allowlist: []common.Address{
 					common.HexToAddress("0x02"),
 				},

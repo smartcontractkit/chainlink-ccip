@@ -14,9 +14,9 @@ contract AdvancedPoolHooks_getRequiredCCVsOutbound is AdvancedPoolHooksSetup {
     configArgs[0] = AdvancedPoolHooks.CCVConfigArg({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       outboundCCVs: outboundCCVs,
-      outboundCCVsToAddAboveThreshold: new address[](0),
+      thresholdOutboundCCVs: new address[](0),
       inboundCCVs: new address[](0),
-      inboundCCVsToAddAboveThreshold: new address[](0)
+      thresholdInboundCCVs: new address[](0)
     });
 
     s_advancedPoolHooks.applyCCVConfigUpdates(configArgs);
@@ -29,20 +29,20 @@ contract AdvancedPoolHooks_getRequiredCCVsOutbound is AdvancedPoolHooksSetup {
     assertEq(storedOutbound[0], outboundCCVs[0]);
   }
 
-  function test_getRequiredCCVs_Outbound_WithCCVsToAddAboveThreshold() public {
+  function test_getRequiredCCVs_Outbound_WithThresholdOutboundCCVs() public {
     address[] memory outboundCCVs = new address[](1);
     outboundCCVs[0] = makeAddr("outboundCCV1");
 
-    address[] memory outboundCCVsToAddAboveThreshold = new address[](1);
-    outboundCCVsToAddAboveThreshold[0] = makeAddr("additionalOutboundCCV1");
+    address[] memory thresholdOutboundCCVs = new address[](1);
+    thresholdOutboundCCVs[0] = makeAddr("thresholdOutboundCCV1");
 
     AdvancedPoolHooks.CCVConfigArg[] memory configArgs = new AdvancedPoolHooks.CCVConfigArg[](1);
     configArgs[0] = AdvancedPoolHooks.CCVConfigArg({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       outboundCCVs: outboundCCVs,
-      outboundCCVsToAddAboveThreshold: outboundCCVsToAddAboveThreshold,
+      thresholdOutboundCCVs: thresholdOutboundCCVs,
       inboundCCVs: new address[](0),
-      inboundCCVsToAddAboveThreshold: new address[](0)
+      thresholdInboundCCVs: new address[](0)
     });
 
     s_advancedPoolHooks.applyCCVConfigUpdates(configArgs);
@@ -62,7 +62,7 @@ contract AdvancedPoolHooks_getRequiredCCVsOutbound is AdvancedPoolHooksSetup {
     );
     assertEq(storedOutboundAbove.length, 2);
     assertEq(storedOutboundAbove[0], outboundCCVs[0]);
-    assertEq(storedOutboundAbove[1], outboundCCVsToAddAboveThreshold[0]);
+    assertEq(storedOutboundAbove[1], thresholdOutboundCCVs[0]);
   }
 
   function test_getRequiredCCVs_Outbound_NoAdditionalCCVs() public {
@@ -73,9 +73,9 @@ contract AdvancedPoolHooks_getRequiredCCVsOutbound is AdvancedPoolHooksSetup {
     configArgs[0] = AdvancedPoolHooks.CCVConfigArg({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       outboundCCVs: outboundCCVs,
-      outboundCCVsToAddAboveThreshold: new address[](0),
+      thresholdOutboundCCVs: new address[](0),
       inboundCCVs: new address[](0),
-      inboundCCVsToAddAboveThreshold: new address[](0)
+      thresholdInboundCCVs: new address[](0)
     });
 
     s_advancedPoolHooks.applyCCVConfigUpdates(configArgs);
@@ -98,9 +98,9 @@ contract AdvancedPoolHooks_getRequiredCCVsOutbound is AdvancedPoolHooksSetup {
     configArgs[0] = AdvancedPoolHooks.CCVConfigArg({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       outboundCCVs: new address[](0),
-      outboundCCVsToAddAboveThreshold: new address[](0),
+      thresholdOutboundCCVs: new address[](0),
       inboundCCVs: inboundCCVs,
-      inboundCCVsToAddAboveThreshold: new address[](0)
+      thresholdInboundCCVs: new address[](0)
     });
 
     s_advancedPoolHooks.applyCCVConfigUpdates(configArgs);
@@ -113,20 +113,20 @@ contract AdvancedPoolHooks_getRequiredCCVsOutbound is AdvancedPoolHooksSetup {
     assertEq(storedInbound[0], inboundCCVs[0]);
   }
 
-  function test_getRequiredCCVs_Inbound_WithCCVsToAddAboveThreshold() public {
+  function test_getRequiredCCVs_Inbound_WithThresholdInboundCCVs() public {
     address[] memory inboundCCVs = new address[](1);
     inboundCCVs[0] = makeAddr("inboundCCV1");
 
-    address[] memory inboundCCVsToAddAboveThreshold = new address[](1);
-    inboundCCVsToAddAboveThreshold[0] = makeAddr("additionalInboundCCV1");
+    address[] memory thresholdInboundCCVs = new address[](1);
+    thresholdInboundCCVs[0] = makeAddr("thresholdInboundCCV1");
 
     AdvancedPoolHooks.CCVConfigArg[] memory configArgs = new AdvancedPoolHooks.CCVConfigArg[](1);
     configArgs[0] = AdvancedPoolHooks.CCVConfigArg({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       outboundCCVs: new address[](0),
-      outboundCCVsToAddAboveThreshold: new address[](0),
+      thresholdOutboundCCVs: new address[](0),
       inboundCCVs: inboundCCVs,
-      inboundCCVsToAddAboveThreshold: inboundCCVsToAddAboveThreshold
+      thresholdInboundCCVs: thresholdInboundCCVs
     });
 
     s_advancedPoolHooks.applyCCVConfigUpdates(configArgs);
@@ -146,7 +146,7 @@ contract AdvancedPoolHooks_getRequiredCCVsOutbound is AdvancedPoolHooksSetup {
     );
     assertEq(storedInboundAbove.length, 2);
     assertEq(storedInboundAbove[0], inboundCCVs[0]);
-    assertEq(storedInboundAbove[1], inboundCCVsToAddAboveThreshold[0]);
+    assertEq(storedInboundAbove[1], thresholdInboundCCVs[0]);
   }
 
   function test_getRequiredCCVs_Inbound_NoAdditionalCCVs() public {
@@ -157,9 +157,9 @@ contract AdvancedPoolHooks_getRequiredCCVsOutbound is AdvancedPoolHooksSetup {
     configArgs[0] = AdvancedPoolHooks.CCVConfigArg({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       outboundCCVs: new address[](0),
-      outboundCCVsToAddAboveThreshold: new address[](0),
+      thresholdOutboundCCVs: new address[](0),
       inboundCCVs: inboundCCVs,
-      inboundCCVsToAddAboveThreshold: new address[](0)
+      thresholdInboundCCVs: new address[](0)
     });
 
     s_advancedPoolHooks.applyCCVConfigUpdates(configArgs);

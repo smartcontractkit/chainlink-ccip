@@ -15,13 +15,14 @@ contract OffRampSetup is BaseTest {
   address internal s_defaultCCV;
   address internal s_tokenAdminRegistry;
 
-  bytes internal constant ON_RAMP = abi.encodePacked("onRamp");
+  bytes internal s_onRamp;
 
   function setUp() public virtual override {
     BaseTest.setUp();
 
     s_defaultCCV = makeAddr("defaultCCV");
     s_tokenAdminRegistry = makeAddr("tokenAdminRegistry");
+    s_onRamp = abi.encode(makeAddr("onRamp"));
 
     s_offRamp = new OffRampHelper(
       OffRamp.StaticConfig({
@@ -35,7 +36,7 @@ contract OffRampSetup is BaseTest {
     address[] memory defaultCCVs = new address[](1);
     defaultCCVs[0] = s_defaultCCV;
 
-    _applySourceConfig(ON_RAMP, true, defaultCCVs, new address[](0));
+    _applySourceConfig(s_onRamp, true, defaultCCVs, new address[](0));
   }
 
   function _applySourceConfig(
@@ -105,7 +106,10 @@ contract OffRampSetup is BaseTest {
   /// @notice Convenience function to set up a receiver that returns empty CCVs (falls back to defaults).
   /// @param receiver The receiver address to set up.
   /// @param sourceChainSelector The source chain selector for getCCVs mock.
-  function _setGetCCVsReturnData(address receiver, uint64 sourceChainSelector) internal {
+  function _setGetCCVsReturnData(
+    address receiver,
+    uint64 sourceChainSelector
+  ) internal {
     _setGetCCVsReturnData(receiver, sourceChainSelector, new address[](0), new address[](0), 0);
   }
 }

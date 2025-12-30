@@ -14,8 +14,8 @@ import {Internal} from "./libraries/Internal.sol";
 import {OwnerIsCreator} from "@chainlink/contracts/src/v0.8/shared/access/OwnerIsCreator.sol";
 import {CallWithExactGas} from "@chainlink/contracts/src/v0.8/shared/call/CallWithExactGas.sol";
 
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/utils/SafeERC20.sol";
 import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/EnumerableSet.sol";
 
 /// @title Router
@@ -63,7 +63,10 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
   // lookups for specific chain/offramp pairs.
   EnumerableSet.UintSet private s_chainSelectorAndOffRamps;
 
-  constructor(address wrappedNative, address armProxy) {
+  constructor(
+    address wrappedNative,
+    address armProxy
+  ) {
     // Zero address indicates unsupported auto-wrapping, therefore, unsupported
     // native fee token payments.
     s_wrappedNative = wrappedNative;
@@ -227,7 +230,10 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
   }
 
   /// @inheritdoc IRouter
-  function isOffRamp(uint64 sourceChainSelector, address offRamp) public view returns (bool) {
+  function isOffRamp(
+    uint64 sourceChainSelector,
+    address offRamp
+  ) public view returns (bool) {
     // We have to encode the sourceChainSelector and offRamp into a uint256 to use as a key in the set.
     return s_chainSelectorAndOffRamps.contains(_mergeChainSelectorAndOffRamp(sourceChainSelector, offRamp));
   }
@@ -275,7 +281,11 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
   /// @dev Must be onlyOwner to avoid malicious token contract calls.
   /// @param tokenAddress ERC20-token to recover
   /// @param to Destination address to send the tokens to.
-  function recoverTokens(address tokenAddress, address to, uint256 amount) external onlyOwner {
+  function recoverTokens(
+    address tokenAddress,
+    address to,
+    uint256 amount
+  ) external onlyOwner {
     if (to == address(0)) revert InvalidRecipientAddress(to);
 
     if (tokenAddress == address(0)) {

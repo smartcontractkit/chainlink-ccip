@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {IERC165} from "@openzeppelin/contracts@4.8.3/utils/introspection/IERC165.sol";
+import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
 
 /// @notice Library used to query support of an interface declared via {IERC165}.
 /// @dev These functions return the actual result of the query: they do not `revert` if an interface is not supported.
@@ -22,7 +22,10 @@ library ERC165CheckerReverting {
   /// @param account the contract to be queried for support.
   /// @param interfaceId the interface being checked for support.
   /// @return true if the contract at account indicates support of the interface with, false otherwise.
-  function _supportsInterfaceReverting(address account, bytes4 interfaceId) internal view returns (bool) {
+  function _supportsInterfaceReverting(
+    address account,
+    bytes4 interfaceId
+  ) internal view returns (bool) {
     // As a gas optimization, short circuit return false if interfaceId is not supported, as it is most likely interfaceId
     // to be unsupported by the target.
     return _supportsERC165InterfaceUncheckedReverting(account, interfaceId)
@@ -38,7 +41,10 @@ library ERC165CheckerReverting {
   /// @dev Assumes that account contains a contract that supports ERC165, otherwise
   /// the behavior of this method is undefined. This precondition can be checked.
   /// @dev Function will only revert if the minimum gas requirement is not met before the staticcall is performed.
-  function _supportsERC165InterfaceUncheckedReverting(address account, bytes4 interfaceId) internal view returns (bool) {
+  function _supportsERC165InterfaceUncheckedReverting(
+    address account,
+    bytes4 interfaceId
+  ) internal view returns (bool) {
     bytes memory encodedParams = abi.encodeWithSelector(IERC165.supportsInterface.selector, interfaceId);
 
     bool success;

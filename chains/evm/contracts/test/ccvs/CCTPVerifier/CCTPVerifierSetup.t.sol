@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
-
 import {CCTPVerifier} from "../../../ccvs/CCTPVerifier.sol";
 import {BaseVerifier} from "../../../ccvs/components/BaseVerifier.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
@@ -13,12 +11,14 @@ import {MockUSDCTokenMessenger} from "../../mocks/MockUSDCTokenMessenger.sol";
 import {BaseVerifierSetup} from "../components/BaseVerifier/BaseVerifierSetup.t.sol";
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
+
 contract CCTPVerifierSetup is BaseVerifierSetup {
   CCTPVerifier internal s_cctpVerifier;
   MockUSDCTokenMessenger internal s_mockTokenMessenger;
   MockE2EUSDCTransmitterCCTPV2 internal s_mockMessageTransmitter;
   CCTPMessageTransmitterProxy internal s_messageTransmitterProxy;
-  IBurnMintERC20 internal s_USDCToken;
+  IERC20 internal s_USDCToken;
 
   bytes internal s_tokenReceiver;
   address internal s_tokenReceiverAddress;
@@ -45,7 +45,7 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
     s_tokenReceiver = abi.encode(s_tokenReceiverAddress);
 
     BurnMintERC20 usdcToken = new BurnMintERC20("USD Coin", "USDC", 6, 0, 0);
-    s_USDCToken = usdcToken;
+    s_USDCToken = IERC20(address(usdcToken));
 
     s_mockMessageTransmitter = new MockE2EUSDCTransmitterCCTPV2(1, LOCAL_DOMAIN_IDENTIFIER, address(s_USDCToken));
     s_mockTokenMessenger = new MockUSDCTokenMessenger(1, address(s_mockMessageTransmitter));
@@ -57,15 +57,13 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
       s_USDCToken,
       s_storageLocations,
       CCTPVerifier.DynamicConfig({
-        feeAggregator: FEE_AGGREGATOR,
-        allowlistAdmin: ALLOWLIST_ADMIN,
-        fastFinalityBps: CCTP_FAST_FINALITY_BPS
+        feeAggregator: FEE_AGGREGATOR, allowlistAdmin: ALLOWLIST_ADMIN, fastFinalityBps: CCTP_FAST_FINALITY_BPS
       }),
       address(s_mockRMNRemote)
     );
 
     // Apply remote chain config updates.
-    CCTPVerifier.RemoteChainConfigArgs[] memory remoteChainConfigArgs = new CCTPVerifier.RemoteChainConfigArgs[](1);
+    BaseVerifier.RemoteChainConfigArgs[] memory remoteChainConfigArgs = new BaseVerifier.RemoteChainConfigArgs[](1);
     remoteChainConfigArgs[0] = BaseVerifier.RemoteChainConfigArgs({
       router: s_router,
       remoteChainSelector: DEST_CHAIN_SELECTOR,
@@ -122,8 +120,8 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
     MessageV1Codec.TokenTransferV1[] memory tokenTransfer = new MessageV1Codec.TokenTransferV1[](1);
     tokenTransfer[0] = MessageV1Codec.TokenTransferV1({
       amount: amount,
-      sourcePoolAddress: abi.encodePacked(makeAddr("sourcePool")),
-      sourceTokenAddress: abi.encodePacked(sourceTokenAddress),
+      sourcePoolAddress: abi.encode(makeAddr("sourcePool")),
+      sourceTokenAddress: abi.encode(sourceTokenAddress),
       destTokenAddress: abi.encodePacked(sourceTokenAddress),
       tokenReceiver: tokenReceiver,
       extraData: "extra data"
@@ -137,9 +135,9 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
       ccipReceiveGasLimit: 200_000,
       finality: finality,
       ccvAndExecutorHash: bytes32(0),
-      onRampAddress: abi.encodePacked(address(0x1111111111111111111111111111111111111111)),
+      onRampAddress: abi.encode(address(0x1111111111111111111111111111111111111111)),
       offRampAddress: abi.encodePacked(address(0x2222222222222222222222222222222222222222)),
-      sender: abi.encodePacked(address(0x3333333333333333333333333333333333333333)),
+      sender: abi.encode(address(0x3333333333333333333333333333333333333333)),
       receiver: tokenReceiver,
       destBlob: "",
       tokenTransfer: tokenTransfer,

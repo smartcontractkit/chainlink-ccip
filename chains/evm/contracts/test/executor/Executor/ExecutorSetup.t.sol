@@ -22,9 +22,7 @@ contract ExecutorSetup is BaseTest {
     super.setUp();
 
     Executor.DynamicConfig memory dynamicConfig = Executor.DynamicConfig({
-      feeAggregator: FEE_AGGREGATOR,
-      minBlockConfirmations: MIN_BLOCK_CONFIRMATIONS,
-      ccvAllowlistEnabled: true
+      feeAggregator: FEE_AGGREGATOR, minBlockConfirmations: MIN_BLOCK_CONFIRMATIONS, ccvAllowlistEnabled: true
     });
 
     s_executor = new Executor(INITIAL_MAX_CCVS, dynamicConfig);

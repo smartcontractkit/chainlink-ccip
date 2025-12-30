@@ -16,9 +16,9 @@
  */
 pragma solidity ^0.8.24;
 
+import {IBurnMintERC20} from "../../interfaces/IBurnMintERC20.sol";
 import {ITokenMessenger} from "../../pools/USDC/interfaces/ITokenMessenger.sol";
 import {IMessageTransmitterWithRelay} from "./interfaces/IMessageTransmitterWithRelay.sol";
-import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
 
 // This contract mocks both the ITokenMessenger and IMessageTransmitter
 // contracts involved with the Cross Chain Token Protocol.
@@ -34,7 +34,10 @@ contract MockE2EUSDCTokenMessenger is ITokenMessenger {
   // Local Message Transmitter responsible for sending and receiving messages to/from remote domains
   IMessageTransmitterWithRelay public immutable localMessageTransmitterWithRelay;
 
-  constructor(uint32 version, address transmitter) {
+  constructor(
+    uint32 version,
+    address transmitter
+  ) {
     i_messageBodyVersion = version;
     s_nonce = 1;
     i_transmitter = transmitter;

@@ -17,23 +17,23 @@ library MessageV1Codec {
   // 4 (ccipReceiveGasLimit) + 2 (finality) + 32 (ccvAndExecutorHash) + 1 (onRampLen) + 1 (offRampLen) +
   // 1 (senderLen) + 1 (receiverLen) + 2 (destBlobLen) + 2 (tokenTransferLen) + 2 (dataLen) = 77.
   uint256 public constant MESSAGE_V1_BASE_SIZE = 1 + 8 + 8 + 8 + 4 + 4 + 2 + 32 + 1 + 1 + 1 + 1 + 2 + 2 + 2;
-  // The base size plus 20 bytes for sender and 20 bytes for onRamp addresses.
+  // The base size plus 32 bytes for abi.encoded(sender) and 32 bytes for abi.encoded(onRamp) addresses.
   // To be added:
   // - receiver, offRamp and destBlob are dest chain specific.
   // - data is user specified.
   // - token transfer is optional and has variable size fields.
-  uint256 public constant MESSAGE_V1_EVM_SOURCE_BASE_SIZE = MESSAGE_V1_BASE_SIZE + 20 + 20;
+  uint256 public constant MESSAGE_V1_EVM_SOURCE_BASE_SIZE = MESSAGE_V1_BASE_SIZE + 32 + 32;
   uint256 public constant MESSAGE_V1_REMOTE_CHAIN_ADDRESSES = 2;
 
   // Base size of a TokenTransferV1 without variable length fields.
   // 1 (version) + 32 (amount) + 1 (sourcePoolLen) + 1 (sourceTokenLen) + 1 (destTokenLen) +
   // 1 (tokenReceiverLen) + 2 (extraDataLen).
   uint256 public constant TOKEN_TRANSFER_V1_BASE_SIZE = 1 + 32 + 1 + 1 + 1 + 1 + 2;
-  // The base size plus 20 bytes for sourcePool, 20 bytes for sourceToken.
+  // The base size plus 32 bytes for abi.encoded(sourcePool), 32 bytes for abi.encoded(sourceToken).
   // To be added:
   // - destToken is dest chain specific.
   // - extraData is a variable length field that is billed separately.
-  uint256 public constant TOKEN_TRANSFER_V1_EVM_SOURCE_BASE_SIZE = TOKEN_TRANSFER_V1_BASE_SIZE + 20 + 20;
+  uint256 public constant TOKEN_TRANSFER_V1_EVM_SOURCE_BASE_SIZE = TOKEN_TRANSFER_V1_BASE_SIZE + 32 + 32;
 
   enum EncodingErrorLocation {
     // Message-level components.
@@ -76,6 +76,7 @@ library MessageV1Codec {
     ENCODE_RECEIVER_LENGTH,
     ENCODE_DEST_BLOB_LENGTH,
     ENCODE_TOKEN_TRANSFER_ARRAY_LENGTH,
+    ENCODE_TOKEN_TRANSFER_LENGTH,
     ENCODE_DATA_LENGTH,
     ENCODE_TOKEN_SOURCE_POOL_LENGTH,
     ENCODE_TOKEN_SOURCE_TOKEN_LENGTH,
@@ -97,13 +98,13 @@ library MessageV1Codec {
   ///
   /// Variable length fields.
   ///
-  ///   uint8 onRampAddressLength;  Length of the onRamp Address in bytes.
-  ///   bytes onRampAddress;        Source Chain OnRamp as unpadded bytes.
-  ///   uint8 offRampAddressLength; Length of the offRamp Address in bytes.
+  ///   uint8 onRampAddressLength;  Length of the padded onRamp Address in bytes.
+  ///   bytes onRampAddress;        Source Chain OnRamp as padded bytes.
+  ///   uint8 offRampAddressLength; Length of the unpadded offRamp Address in bytes.
   ///   bytes offRampAddress;       Destination Chain OffRamp as unpadded bytes.
-  ///   uint8 senderLength;         Length of the Sender Address in bytes.
-  ///   bytes sender;               Sender address as unpadded bytes.
-  ///   uint8 receiverLength;       Length of the Receiver Address in bytes.
+  ///   uint8 senderLength;         Length of the padded Sender Address in bytes.
+  ///   bytes sender;               Sender address as padded bytes.
+  ///   uint8 receiverLength;       Length of the unpadded Receiver Address in bytes.
   ///   bytes receiver;             Receiver address on the destination chain as unpadded bytes.
   ///   uint16 destBlobLength;      Length of the Destination Blob in bytes.
   ///   bytes destBlob;             Destination chain-specific blob that contains data required for execution e.g.
@@ -113,10 +114,14 @@ library MessageV1Codec {
   ///   uint16 dataLength;          Length of the user specified data payload.
   ///   bytes data;                 Arbitrary data payload supplied by the message sender that is passed to the receiver.
   ///
-  /// @dev None of the fields are abi encoded as this storage layout is used for non-EVMs as well. That means if the
-  /// receiver is an EVM address, it is stored as 20 bytes without any padding.
-  /// @dev Inefficient struct packing does not matter as this is not a storage struct, and it it would ever be written
-  /// to storage it would be in its encoded form.
+  /// @dev Address encoding rules:
+  ///      - Source-side EVM addresses (onRamp, sender, sourcePoolAddress, sourceTokenAddress) are abi.encode(address)
+  ///        i.e. 32 bytes.
+  ///      - Destination-side addresses (offRampAddress, receiver, destTokenAddress, tokenReceiver) are length-prefixed
+  ///        and use the minimal bytes for the destination chain (20 bytes for EVM).
+  ///      - Other chain families follow their native byte-length expectations.
+  /// @dev Inefficient struct packing does not matter as this is not a storage struct, and if it were ever written to
+  ///      storage it would be in its encoded form.
   // solhint-disable-next-line gas-struct-packing
   struct MessageV1 {
     /// @notice Source Chain Selector.
@@ -138,13 +143,15 @@ library MessageV1Codec {
     // checked against anything.
     bytes32 ccvAndExecutorHash;
     // Variable length fields - must match wire format order.
-    // Source chain onRamp, NOT abi encoded but raw bytes. This means for EVM chains it is 20 bytes.
+    // Source chain onRamp, abi encoded for EVM chains.
     bytes onRampAddress;
-    // Destination chain offRamp, NOT abi encoded but raw bytes. This means for EVM chains it is 20 bytes.
+    // Destination chain offRamp, NOT abi encoded but raw bytes matching destination chains address byte length.
+    // This means for EVM chains it is 20 bytes.
     bytes offRampAddress;
-    // Source chain sender address, NOT abi encoded but raw bytes. This means for EVM chains it is 20 bytes.
+    // Source chain sender address, abi encoded for EVM chains.
     bytes sender;
-    // Destination chain receiver address, NOT abi encoded but raw bytes. This means for EVM chains it is 20 bytes.
+    // Destination chain receiver address, NOT abi encoded but raw bytes matching destination chains address byte length.
+    // This means for EVM chains it is 20 bytes.
     bytes receiver;
     // Destination specific blob that contains chain-family specific data.
     bytes destBlob;
@@ -156,12 +163,14 @@ library MessageV1Codec {
 
   struct TokenTransferV1 {
     uint256 amount; // Number of tokens.
-    // This can be relied upon by the destination pool to validate the source pool. NOT abi encoded but raw bytes. This
-    // means for EVM chains it is 20 bytes.
+    // This can be relied upon by the destination pool to validate the source pool. abi encoded for EVM chains.
     bytes sourcePoolAddress;
-    bytes sourceTokenAddress; // Address of source token, NOT abi encoded but raw bytes.
-    bytes destTokenAddress; // Address of destination token, NOT abi encoded but raw bytes.
-    // Token receiver address on the destination chain, NOT abi encoded but raw bytes. This means for EVM chains it is 20 bytes.
+    bytes sourceTokenAddress; // Address of source token, abi encoded for EVM chains.
+    // Address of destination token, NOT abi encoded but raw bytes matching destination chains address byte length.
+    // This means for EVM chains it is 20 bytes.
+    bytes destTokenAddress;
+    // Token receiver address on the destination chain, NOT abi encoded but raw bytes matching destination chains address byte length.
+    // This means for EVM chains it is 20 bytes.
     bytes tokenReceiver;
     // Optional pool data to be transferred to the destination chain. Be default this is capped at
     // CCIP_LOCK_OR_BURN_V1_RET_BYTES bytes. If more data is required, the TokenTransferFeeConfig.destBytesOverhead
@@ -177,7 +186,10 @@ library MessageV1Codec {
   /// @param ccvs Array of CCV (Cross-Chain Verifier) addresses.
   /// @param executor Address of the executor.
   /// @return hash The keccak256 hash of the encoded CCVs and executor.
-  function _computeCCVAndExecutorHash(address[] memory ccvs, address executor) internal pure returns (bytes32) {
+  function _computeCCVAndExecutorHash(
+    address[] memory ccvs,
+    address executor
+  ) internal pure returns (bytes32) {
     uint256 encodedLength = 1 + ccvs.length * 20 + 20;
     // We overprovision the bytes array to avoid out of bounds writes. Since we write EVM addresses which are 20 bytes,
     // and the size of a write is 32 bytes, the maximum out of bounds we can have is 12 bytes.
@@ -307,7 +319,9 @@ library MessageV1Codec {
       offset += tokenReceiverLength;
 
       // extraDataLength and extraData.
-      if (offset + 2 > encoded.length) revert InvalidDataLength(EncodingErrorLocation.TOKEN_TRANSFER_EXTRA_DATA_LENGTH);
+      if (offset + 2 > encoded.length) {
+        revert InvalidDataLength(EncodingErrorLocation.TOKEN_TRANSFER_EXTRA_DATA_LENGTH);
+      }
       uint16 extraDataLength = uint16(bytes2(encoded[offset:offset + 2]));
       offset += 2;
       if (offset + extraDataLength > encoded.length) {
@@ -345,37 +359,36 @@ library MessageV1Codec {
     }
     if (message.data.length > type(uint16).max) revert InvalidDataLength(EncodingErrorLocation.ENCODE_DATA_LENGTH);
 
-    // We need to partially encode it in three parts to avoid stack too deep issues.
-    bytes memory staticLengthSection = abi.encodePacked(
-      uint8(1), // version.
-      message.sourceChainSelector,
-      message.destChainSelector,
-      message.messageNumber,
-      message.executionGasLimit,
-      message.ccipReceiveGasLimit,
-      message.finality,
-      message.ccvAndExecutorHash
-    );
-
-    bytes memory dynamicLengthPart1 = abi.encodePacked(
-      uint8(message.onRampAddress.length),
-      message.onRampAddress,
-      uint8(message.offRampAddress.length),
-      message.offRampAddress,
-      uint8(message.sender.length),
-      message.sender
-    );
-
     // Encode token the transfer if present. We checked above that there is at most 1 token transfer.
     // We define it below the partial encoding to avoid stack too deep errors.
     bytes memory encodedTokenTransfers;
     if (message.tokenTransfer.length > 0) {
       encodedTokenTransfers = _encodeTokenTransferV1(message.tokenTransfer[0]);
+      if (encodedTokenTransfers.length > type(uint16).max) {
+        revert InvalidDataLength(EncodingErrorLocation.ENCODE_TOKEN_TRANSFER_LENGTH);
+      }
     }
 
+    // Encode in sections to avoid stack too deep errors.
     return abi.encodePacked(
-      staticLengthSection,
-      dynamicLengthPart1,
+      abi.encodePacked(
+        uint8(1), // version.
+        message.sourceChainSelector,
+        message.destChainSelector,
+        message.messageNumber,
+        message.executionGasLimit,
+        message.ccipReceiveGasLimit,
+        message.finality,
+        message.ccvAndExecutorHash
+      ),
+      abi.encodePacked(
+        uint8(message.onRampAddress.length),
+        message.onRampAddress,
+        uint8(message.offRampAddress.length),
+        message.offRampAddress,
+        uint8(message.sender.length),
+        message.sender
+      ),
       abi.encodePacked(
         uint8(message.receiver.length),
         message.receiver,

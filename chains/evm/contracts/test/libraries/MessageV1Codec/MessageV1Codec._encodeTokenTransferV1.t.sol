@@ -87,12 +87,7 @@ contract MessageV1Codec__encodeTokenTransferV1 is MessageV1CodecSetup {
 
   function test__encodeTokenTransferV1_EmptyAddresses() public view {
     MessageV1Codec.TokenTransferV1 memory tokenTransfer = MessageV1Codec.TokenTransferV1({
-      amount: 0,
-      sourcePoolAddress: "",
-      sourceTokenAddress: "",
-      destTokenAddress: "",
-      tokenReceiver: "",
-      extraData: ""
+      amount: 0, sourcePoolAddress: "", sourceTokenAddress: "", destTokenAddress: "", tokenReceiver: "", extraData: ""
     });
 
     bytes memory encoded = MessageV1Codec._encodeTokenTransferV1(tokenTransfer);

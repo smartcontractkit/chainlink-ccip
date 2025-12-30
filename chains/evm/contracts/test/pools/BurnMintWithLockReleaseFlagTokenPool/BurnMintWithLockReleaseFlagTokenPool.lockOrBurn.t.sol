@@ -3,11 +3,10 @@ pragma solidity ^0.8.24;
 
 import {Pool} from "../../../libraries/Pool.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
+import {LOCK_RELEASE_FLAG} from "../../../pools/USDC/BurnMintWithLockReleaseFlagTokenPool.sol";
 import {BurnMintWithLockReleaseFlagTokenPoolSetup} from "./BurnMintWithLockReleaseFlagTokenPoolSetup.t.sol";
 
-import {LOCK_RELEASE_FLAG} from "../../../pools/USDC/SiloedUSDCTokenPool.sol";
-
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
 contract BurnMintWithLockReleaseFlagTokenPool_lockOrBurn is BurnMintWithLockReleaseFlagTokenPoolSetup {
   function test_LockOrBurn_CorrectReturnData() public {
@@ -20,9 +19,7 @@ contract BurnMintWithLockReleaseFlagTokenPool_lockOrBurn is BurnMintWithLockRele
 
     vm.expectEmit();
     emit TokenPool.OutboundRateLimitConsumed({
-      remoteChainSelector: DEST_CHAIN_SELECTOR,
-      token: address(s_token),
-      amount: burnAmount
+      remoteChainSelector: DEST_CHAIN_SELECTOR, token: address(s_token), amount: burnAmount
     });
 
     vm.expectEmit();
@@ -52,5 +49,28 @@ contract BurnMintWithLockReleaseFlagTokenPool_lockOrBurn is BurnMintWithLockRele
     assertEq(s_token.balanceOf(address(s_pool)), 0);
 
     assertEq(bytes4(lockOrBurnOut.destPoolData), LOCK_RELEASE_FLAG);
+  }
+
+  function test_lockOrBurnV2_ReturnsLockReleaseFlag() public {
+    uint256 burnAmount = 5_000e18;
+
+    deal(address(s_token), address(s_pool), burnAmount);
+
+    vm.startPrank(s_allowedOnRamp);
+
+    (Pool.LockOrBurnOutV1 memory out, uint256 destTokenAmount) = s_pool.lockOrBurn(
+      Pool.LockOrBurnInV1({
+        originalSender: OWNER,
+        receiver: bytes(""),
+        amount: burnAmount,
+        remoteChainSelector: DEST_CHAIN_SELECTOR,
+        localToken: address(s_token)
+      }),
+      0,
+      ""
+    );
+
+    assertEq(destTokenAmount, burnAmount);
+    assertEq(bytes4(out.destPoolData), LOCK_RELEASE_FLAG);
   }
 }

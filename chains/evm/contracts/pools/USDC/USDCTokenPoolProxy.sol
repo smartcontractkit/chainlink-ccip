@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {ICrossChainVerifierResolver} from "../../interfaces/ICrossChainVerifierResolver.sol";
 import {IPoolV1} from "../../interfaces/IPool.sol";
+import {IPoolV1V2} from "../../interfaces/IPoolV1V2.sol";
 import {IPoolV2} from "../../interfaces/IPoolV2.sol";
 import {IRouter} from "../../interfaces/IRouter.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
@@ -13,10 +14,10 @@ import {CCTPTokenPool} from "./CCTPTokenPool.sol";
 import {USDCTokenPool} from "./USDCTokenPool.sol";
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/utils/SafeERC20.sol";
-import {IERC165} from "@openzeppelin/contracts@4.8.3/utils/introspection/IERC165.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/utils/SafeERC20.sol";
 import {ERC165Checker} from "@openzeppelin/contracts@5.3.0/utils/introspection/ERC165Checker.sol";
+import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
 
 /// @notice A token pool proxy for USDC that allows for routing of messages to the correct pool based on the correct
 /// lock or burn mechanism. This includes CCTP v1, CCTP v2, CCTP v2 with CCV, and lock release.
@@ -34,7 +35,7 @@ import {ERC165Checker} from "@openzeppelin/contracts@5.3.0/utils/introspection/E
 ///     ├──→ CCTPV2Pool → MessageTransmitterProxy/TokenMessenger V2 → CCTPV2
 ///     ├──→ CCTPV2WithCCVPool → CCTPVerifier → MessageTransmitterProxy/TokenMessenger V2 → CCTPV2
 ///     └──→ SiloedUSDCTokenPool → ERC20LockBox
-contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV2, ITypeAndVersion {
+contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion {
   using SafeERC20 for IERC20;
   using ERC165Checker for address;
 
@@ -83,7 +84,12 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV2, ITypeAndVersion {
 
   string public constant override typeAndVersion = "USDCTokenPoolProxy 1.7.0-dev";
 
-  constructor(IERC20 token, PoolAddresses memory pools, address router, address cctpVerifier) {
+  constructor(
+    IERC20 token,
+    PoolAddresses memory pools,
+    address router,
+    address cctpVerifier
+  ) {
     // Note: It is not required that every pool address be set, as this proxy may be deployed on a chain which does not support a specific version of CCTP.
     // As a result only the token, router, and cctpVerifier are enforced to be non-zero.
     if (address(token) == address(0) || router == address(0) || cctpVerifier == address(0)) {
@@ -458,9 +464,8 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV2, ITypeAndVersion {
     onlyWithCCVCompatiblePool
     returns (uint256 feeUSDCents, uint32 destGasOverhead, uint32 destBytesOverhead, uint16 tokenFeeBps, bool isEnabled)
   {
-    return IPoolV2(s_pools.cctpV2PoolWithCCV).getFee(
-      localToken, destChainSelector, amount, feeToken, blockConfirmationRequested, tokenArgs
-    );
+    return IPoolV2(s_pools.cctpV2PoolWithCCV)
+      .getFee(localToken, destChainSelector, amount, feeToken, blockConfirmationRequested, tokenArgs);
   }
 
   /// @inheritdoc IPoolV2
@@ -474,9 +479,8 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV2, ITypeAndVersion {
     uint16 blockConfirmationRequested,
     bytes calldata tokenArgs
   ) external view onlyWithCCVCompatiblePool returns (TokenTransferFeeConfig memory feeConfig) {
-    return IPoolV2(s_pools.cctpV2PoolWithCCV).getTokenTransferFeeConfig(
-      localToken, destChainSelector, blockConfirmationRequested, tokenArgs
-    );
+    return IPoolV2(s_pools.cctpV2PoolWithCCV)
+      .getTokenTransferFeeConfig(localToken, destChainSelector, blockConfirmationRequested, tokenArgs);
   }
 
   /// @inheritdoc IPoolV2
@@ -491,14 +495,27 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV2, ITypeAndVersion {
   /// @dev Instead of calling the pool, we take a shortcut and return the CCTPVerifier as required directly.
   function getRequiredCCVs(
     address, // localToken
-    uint64, // remoteChainSelector
+    uint64 remoteChainSelector,
     uint256, // amount
     uint16, // blockConfirmationRequested
     bytes calldata, // extraData
     MessageDirection // direction
   ) external view onlyWithCCVCompatiblePool returns (address[] memory requiredCCVs) {
+    if (s_lockOrBurnMechanism[remoteChainSelector] == LockOrBurnMechanism.INVALID_MECHANISM) {
+      revert NoLockOrBurnMechanismSet(remoteChainSelector);
+    }
+
+    // Common case: The lockOrBurn mechanism is CCTP V2 with CCV.
+    // In this case, we simply need to return the CCTP CCV.
     address[] memory ccvs = new address[](1);
-    ccvs[0] = address(i_cctpVerifier);
+    if (s_lockOrBurnMechanism[remoteChainSelector] == LockOrBurnMechanism.CCTP_V2_WITH_CCV) {
+      ccvs[0] = address(i_cctpVerifier);
+      return ccvs;
+    }
+
+    // If using lock-release, we can't specify CCTP because CCTP won't ultimately be called.
+    // Other CCTP mechanisms will never rely on CCVs and have no impact on the return value.
+    // Therefore, we return address(0) to indicate that default CCVs should be used for the lock-release mechanism.
     return ccvs;
   }
 

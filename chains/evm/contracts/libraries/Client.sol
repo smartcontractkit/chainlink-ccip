@@ -11,7 +11,7 @@ library Client {
   struct Any2EVMMessage {
     bytes32 messageId; // MessageId corresponding to ccipSend on source.
     uint64 sourceChainSelector; // Source chain selector.
-    bytes sender; // abi.decode(sender) if coming from an EVM chain.
+    bytes sender; // abi.encode(address) on EVM source chains; abi.decode(sender, (address)) to recover.
     bytes data; // payload sent in original message.
     EVMTokenAmount[] destTokenAmounts; // Tokens and their amounts in their destination chain representation.
   }

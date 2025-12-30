@@ -7,10 +7,40 @@ import {FeeQuoterSetup} from "./FeeQuoterSetup.t.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
 contract FeeQuoter_updatePrices is FeeQuoterSetup {
+  function test_updatePrices_AddsFeeTokenWhenTokenNotInSet() public {
+    address newFeeToken = vm.addr(999);
+    uint224 newFeeTokenPrice = 1e17;
+
+    Internal.PriceUpdates memory update = Internal.PriceUpdates({
+      tokenPriceUpdates: new Internal.TokenPriceUpdate[](1), gasPriceUpdates: new Internal.GasPriceUpdate[](0)
+    });
+    update.tokenPriceUpdates[0] = Internal.TokenPriceUpdate({sourceToken: newFeeToken, usdPerToken: newFeeTokenPrice});
+
+    uint256 beforeLen = s_feeQuoter.getFeeTokens().length;
+
+    vm.expectEmit();
+    emit FeeQuoter.FeeTokenAdded(newFeeToken);
+    vm.expectEmit();
+    emit FeeQuoter.UsdPerTokenUpdated(newFeeToken, newFeeTokenPrice, block.timestamp);
+
+    s_feeQuoter.updatePrices(update);
+
+    address[] memory afterFeeTokens = s_feeQuoter.getFeeTokens();
+    assertEq(afterFeeTokens.length, beforeLen + 1);
+
+    bool found;
+    for (uint256 i = 0; i < afterFeeTokens.length; ++i) {
+      if (afterFeeTokens[i] == newFeeToken) {
+        found = true;
+        break;
+      }
+    }
+    assertTrue(found);
+  }
+
   function test_updatePrices_onlyTokenPrice() public {
     Internal.PriceUpdates memory update = Internal.PriceUpdates({
-      tokenPriceUpdates: new Internal.TokenPriceUpdate[](1),
-      gasPriceUpdates: new Internal.GasPriceUpdate[](0)
+      tokenPriceUpdates: new Internal.TokenPriceUpdate[](1), gasPriceUpdates: new Internal.GasPriceUpdate[](0)
     });
     update.tokenPriceUpdates[0] = Internal.TokenPriceUpdate({sourceToken: s_sourceTokens[0], usdPerToken: 4e18});
 
@@ -26,8 +56,7 @@ contract FeeQuoter_updatePrices is FeeQuoterSetup {
 
   function test_updatePrices_onlyGasPrice() public {
     Internal.PriceUpdates memory update = Internal.PriceUpdates({
-      tokenPriceUpdates: new Internal.TokenPriceUpdate[](0),
-      gasPriceUpdates: new Internal.GasPriceUpdate[](1)
+      tokenPriceUpdates: new Internal.TokenPriceUpdate[](0), gasPriceUpdates: new Internal.GasPriceUpdate[](1)
     });
     update.gasPriceUpdates[0] =
       Internal.GasPriceUpdate({destChainSelector: DEST_CHAIN_SELECTOR, usdPerUnitGas: 2000e18});
@@ -48,7 +77,8 @@ contract FeeQuoter_updatePrices is FeeQuoterSetup {
     Internal.TokenPriceUpdate[] memory tokenPriceUpdates = new Internal.TokenPriceUpdate[](3);
     tokenPriceUpdates[0] = Internal.TokenPriceUpdate({sourceToken: s_sourceTokens[0], usdPerToken: 4e18});
     tokenPriceUpdates[1] = Internal.TokenPriceUpdate({sourceToken: s_sourceTokens[1], usdPerToken: 1800e18});
-    tokenPriceUpdates[2] = Internal.TokenPriceUpdate({sourceToken: address(12345), usdPerToken: 1e18});
+    address newFeeToken = vm.addr(999);
+    tokenPriceUpdates[2] = Internal.TokenPriceUpdate({sourceToken: newFeeToken, usdPerToken: 1e18});
 
     Internal.GasPriceUpdate[] memory gasPriceUpdates = new Internal.GasPriceUpdate[](3);
     gasPriceUpdates[0] = Internal.GasPriceUpdate({destChainSelector: DEST_CHAIN_SELECTOR, usdPerUnitGas: 2e6});
@@ -58,12 +88,20 @@ contract FeeQuoter_updatePrices is FeeQuoterSetup {
     Internal.PriceUpdates memory update =
       Internal.PriceUpdates({tokenPriceUpdates: tokenPriceUpdates, gasPriceUpdates: gasPriceUpdates});
 
-    for (uint256 i = 0; i < tokenPriceUpdates.length; ++i) {
-      vm.expectEmit();
-      emit FeeQuoter.UsdPerTokenUpdated(
-        update.tokenPriceUpdates[i].sourceToken, update.tokenPriceUpdates[i].usdPerToken, block.timestamp
-      );
-    }
+    vm.expectEmit();
+    emit FeeQuoter.UsdPerTokenUpdated(
+      update.tokenPriceUpdates[0].sourceToken, update.tokenPriceUpdates[0].usdPerToken, block.timestamp
+    );
+    vm.expectEmit();
+    emit FeeQuoter.UsdPerTokenUpdated(
+      update.tokenPriceUpdates[1].sourceToken, update.tokenPriceUpdates[1].usdPerToken, block.timestamp
+    );
+    vm.expectEmit();
+    emit FeeQuoter.FeeTokenAdded(newFeeToken);
+    vm.expectEmit();
+    emit FeeQuoter.UsdPerTokenUpdated(
+      update.tokenPriceUpdates[2].sourceToken, update.tokenPriceUpdates[2].usdPerToken, block.timestamp
+    );
     for (uint256 i = 0; i < gasPriceUpdates.length; ++i) {
       vm.expectEmit();
       emit FeeQuoter.UsdPerUnitGasUpdated(
@@ -88,8 +126,7 @@ contract FeeQuoter_updatePrices is FeeQuoterSetup {
 
   function test_updatePrices_updatableByAuthorizedCaller() public {
     Internal.PriceUpdates memory priceUpdates = Internal.PriceUpdates({
-      tokenPriceUpdates: new Internal.TokenPriceUpdate[](1),
-      gasPriceUpdates: new Internal.GasPriceUpdate[](0)
+      tokenPriceUpdates: new Internal.TokenPriceUpdate[](1), gasPriceUpdates: new Internal.GasPriceUpdate[](0)
     });
     priceUpdates.tokenPriceUpdates[0] = Internal.TokenPriceUpdate({sourceToken: s_sourceTokens[0], usdPerToken: 4e18});
 
@@ -129,8 +166,7 @@ contract FeeQuoter_updatePrices is FeeQuoterSetup {
 
   function test_updatePrices_RevertWhen_UnauthorizedCaller() public {
     Internal.PriceUpdates memory priceUpdates = Internal.PriceUpdates({
-      tokenPriceUpdates: new Internal.TokenPriceUpdate[](0),
-      gasPriceUpdates: new Internal.GasPriceUpdate[](0)
+      tokenPriceUpdates: new Internal.TokenPriceUpdate[](0), gasPriceUpdates: new Internal.GasPriceUpdate[](0)
     });
 
     vm.startPrank(STRANGER);

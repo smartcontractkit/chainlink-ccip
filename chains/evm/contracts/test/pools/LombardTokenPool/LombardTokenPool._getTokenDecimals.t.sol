@@ -3,12 +3,11 @@ pragma solidity ^0.8.24;
 
 import {BaseTest} from "../../BaseTest.t.sol";
 import {LombardTokenPoolHelper} from "../../helpers/LombardTokenPoolHelper.sol";
-
 import {MockLombardBridge} from "../../mocks/MockLombardBridge.sol";
 import {MockVerifier} from "../../mocks/MockVerifier.sol";
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
-import {IERC20Metadata} from "@openzeppelin/contracts@4.8.3/token/ERC20/extensions/IERC20Metadata.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts@5.3.0/token/ERC20/extensions/IERC20Metadata.sol";
 
 contract LombardTokenPool_getTokenDecimals is BaseTest {
   BurnMintERC20 internal s_token;
@@ -22,7 +21,7 @@ contract LombardTokenPool_getTokenDecimals is BaseTest {
     s_resolver = new MockVerifier("");
     s_bridge = new MockLombardBridge();
     s_helper = new LombardTokenPoolHelper(
-      s_token,
+      IERC20Metadata(address(s_token)),
       address(s_resolver),
       s_bridge,
       address(0),
@@ -34,7 +33,7 @@ contract LombardTokenPool_getTokenDecimals is BaseTest {
   }
 
   function test_getTokenDecimals_UsesTokenDecimals() public view {
-    uint8 dec = s_helper.getTokenDecimals(s_token, 6);
+    uint8 dec = s_helper.getTokenDecimals(IERC20Metadata(address(s_token)), 6);
     assertEq(dec, 18);
   }
 

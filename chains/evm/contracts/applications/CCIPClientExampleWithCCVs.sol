@@ -5,7 +5,7 @@ import {IRouterClient} from "../interfaces/IRouterClient.sol";
 
 import {CCIPClientExample} from "./CCIPClientExample.sol";
 
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
 /// @notice Example of a client that supports Cross Chain Verifiers (CCVs).
 /// @dev Each source chain can define its own CCV configuration, meaning that incoming traffic
@@ -40,7 +40,10 @@ contract CCIPClientExampleWithCCVs is CCIPClientExample {
   /// @notice CCV configurations by source chain selector.
   mapping(uint64 sourceChainSelector => CCVConfig ccvConfig) internal s_ccvConfigs;
 
-  constructor(IRouterClient router, IERC20 feeToken) CCIPClientExample(router, feeToken) {}
+  constructor(
+    IRouterClient router,
+    IERC20 feeToken
+  ) CCIPClientExample(router, feeToken) {}
 
   /// @notice Set CCV configurations for source chains.
   /// @param ccvConfigsToSet List of CCV configs to set.
@@ -52,7 +55,7 @@ contract CCIPClientExampleWithCCVs is CCIPClientExample {
       // If optionalThreshold > optionalCCVs.length, then it's impossible to satisfy the optional CCV requirement.
       // If optionalThreshold == optionalCCVs.length, then optional CCVs are essentially required.
       // They should instead be defined as required CCVs.
-      if (args.optionalThreshold >= args.optionalCCVs.length) {
+      if (args.optionalCCVs.length > 0 && args.optionalThreshold >= args.optionalCCVs.length) {
         revert InvalidOptionalThreshold(args.sourceChainSelector, args.optionalThreshold);
       }
       uint256 requiredCCVLength = args.requiredCCVs.length;
@@ -74,9 +77,7 @@ contract CCIPClientExampleWithCCVs is CCIPClientExample {
         }
       }
       s_ccvConfigs[args.sourceChainSelector] = CCVConfig({
-        requiredCCVs: args.requiredCCVs,
-        optionalCCVs: args.optionalCCVs,
-        optionalThreshold: args.optionalThreshold
+        requiredCCVs: args.requiredCCVs, optionalCCVs: args.optionalCCVs, optionalThreshold: args.optionalThreshold
       });
       emit CCVConfigSet(args.sourceChainSelector, args.requiredCCVs, args.optionalCCVs, args.optionalThreshold);
     }

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {IBurnMintERC20} from "../interfaces/IBurnMintERC20.sol";
 import {BurnMintTokenPool} from "../pools/BurnMintTokenPool.sol";
 import {ERC20LockBox} from "../pools/ERC20LockBox.sol";
 import {LockReleaseTokenPool} from "../pools/LockReleaseTokenPool.sol";
@@ -8,9 +9,10 @@ import {TokenPool} from "../pools/TokenPool.sol";
 import {TokenAdminRegistry} from "../tokenAdminRegistry/TokenAdminRegistry.sol";
 import {BaseTest} from "./BaseTest.t.sol";
 import {MaybeRevertingBurnMintTokenPool} from "./helpers/MaybeRevertingBurnMintTokenPool.sol";
+import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
 contract TokenSetup is BaseTest {
   address[] internal s_sourceTokens;
@@ -20,36 +22,54 @@ contract TokenSetup is BaseTest {
   address internal s_destFeeToken;
 
   TokenAdminRegistry internal s_tokenAdminRegistry;
-  ERC20LockBox internal s_lockBox;
+  mapping(address token => ERC20LockBox lockBox) internal s_lockBoxes;
 
   mapping(address sourceToken => address sourcePool) internal s_sourcePoolByToken;
   mapping(address sourceToken => address destPool) internal s_destPoolBySourceToken;
   mapping(address destToken => address destPool) internal s_destPoolByToken;
   mapping(address sourceToken => address destToken) internal s_destTokenBySourceToken;
 
-  function _deploySourceToken(string memory tokenName, uint256 dealAmount, uint8 decimals) internal returns (address) {
+  function _deploySourceToken(
+    string memory tokenName,
+    uint256 dealAmount,
+    uint8 decimals
+  ) internal returns (address) {
     BurnMintERC20 token = new BurnMintERC20(tokenName, tokenName, decimals, 0, 0);
     s_sourceTokens.push(address(token));
     deal(address(token), OWNER, dealAmount);
     return address(token);
   }
 
-  function _deployDestToken(string memory tokenName, uint256 dealAmount) internal returns (address) {
+  function _deployDestToken(
+    string memory tokenName,
+    uint256 dealAmount
+  ) internal returns (address) {
     BurnMintERC20 token = new BurnMintERC20(tokenName, tokenName, 18, 0, 0);
     s_destTokens.push(address(token));
     deal(address(token), OWNER, dealAmount);
     return address(token);
   }
 
-  function _deployLockReleasePool(address token, bool isSourcePool) internal {
+  function _deployLockReleasePool(
+    address token,
+    bool isSourcePool
+  ) internal {
     address router = address(s_sourceRouter);
     if (!isSourcePool) {
       router = address(s_destRouter);
     }
 
+    ERC20LockBox lockBox = _getOrDeployLockBox(token);
+
     LockReleaseTokenPool pool = new LockReleaseTokenPool(
-      IERC20(token), DEFAULT_TOKEN_DECIMALS, address(0), address(s_mockRMNRemote), router, address(s_lockBox)
+      IERC20(token), DEFAULT_TOKEN_DECIMALS, address(0), address(s_mockRMNRemote), router, address(lockBox)
     );
+
+    address[] memory authorizedCallers = new address[](1);
+    authorizedCallers[0] = address(pool);
+    AuthorizedCallers.AuthorizedCallerArgs memory args =
+      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: authorizedCallers, removedCallers: new address[](0)});
+    lockBox.applyAuthorizedCallerUpdates(args);
 
     if (isSourcePool) {
       s_sourcePoolByToken[address(token)] = address(pool);
@@ -59,14 +79,17 @@ contract TokenSetup is BaseTest {
     }
   }
 
-  function _deployTokenAndBurnMintPool(address token, bool isSourcePool) internal {
+  function _deployTokenAndBurnMintPool(
+    address token,
+    bool isSourcePool
+  ) internal {
     address router = address(s_sourceRouter);
     if (!isSourcePool) {
       router = address(s_destRouter);
     }
 
     BurnMintTokenPool pool = new MaybeRevertingBurnMintTokenPool(
-      BurnMintERC20(token), DEFAULT_TOKEN_DECIMALS, address(0), address(s_mockRMNRemote), router
+      IBurnMintERC20(address(token)), DEFAULT_TOKEN_DECIMALS, address(0), address(s_mockRMNRemote), router
     );
     BurnMintERC20(token).grantMintAndBurnRoles(address(pool));
 
@@ -87,7 +110,7 @@ contract TokenSetup is BaseTest {
     }
 
     s_tokenAdminRegistry = new TokenAdminRegistry();
-    s_lockBox = new ERC20LockBox(address(s_tokenAdminRegistry));
+    // lockboxes are deployed per token via _getOrDeployLockBox
 
     // Source tokens & pools
     address sourceLink = _deploySourceToken("sLINK", type(uint256).max, 18);
@@ -110,7 +133,8 @@ contract TokenSetup is BaseTest {
     s_destTokenBySourceToken[sourceEth] = destEth;
 
     // Float the dest link lock release pool with funds.
-    IERC20(destLink).transfer(address(s_lockBox), 1000 ether);
+    ERC20LockBox destLockBox = _getOrDeployLockBox(destLink);
+    IERC20(destLink).transfer(address(destLockBox), 1000 ether);
 
     // Set pools in the registry.
     for (uint256 i = 0; i < s_sourceTokens.length; ++i) {
@@ -138,12 +162,17 @@ contract TokenSetup is BaseTest {
         s_sourceTokens[i]
       );
     }
+  }
 
-    // Configure lockBox allowed callers for lock release pools.
-    ERC20LockBox.AllowedCallerConfigArgs[] memory allowedCallers = new ERC20LockBox.AllowedCallerConfigArgs[](2);
-    allowedCallers[0] = ERC20LockBox.AllowedCallerConfigArgs({token: sourceLink, caller: OWNER, allowed: true});
-    allowedCallers[1] = ERC20LockBox.AllowedCallerConfigArgs({token: destLink, caller: OWNER, allowed: true});
-    s_lockBox.configureAllowedCallers(allowedCallers);
+  function _getOrDeployLockBox(
+    address token
+  ) internal returns (ERC20LockBox) {
+    ERC20LockBox lockBox = s_lockBoxes[token];
+    if (address(lockBox) == address(0)) {
+      lockBox = new ERC20LockBox(token);
+      s_lockBoxes[token] = lockBox;
+    }
+    return lockBox;
   }
 
   function _setPool(

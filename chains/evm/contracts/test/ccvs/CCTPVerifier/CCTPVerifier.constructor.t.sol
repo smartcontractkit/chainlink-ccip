@@ -8,7 +8,7 @@ import {BaseVerifier} from "../../../ccvs/components/BaseVerifier.sol";
 import {CCTPMessageTransmitterProxy} from "../../../pools/USDC/CCTPMessageTransmitterProxy.sol";
 import {CCTPVerifierSetup} from "./CCTPVerifierSetup.t.sol";
 
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
 contract CCTPVerifier_constructor is CCTPVerifierSetup {
   function test_constructor() public {
@@ -23,9 +23,7 @@ contract CCTPVerifier_constructor is CCTPVerifierSetup {
       s_USDCToken,
       s_storageLocations,
       CCTPVerifier.DynamicConfig({
-        feeAggregator: FEE_AGGREGATOR,
-        allowlistAdmin: ALLOWLIST_ADMIN,
-        fastFinalityBps: CCTP_FAST_FINALITY_BPS
+        feeAggregator: FEE_AGGREGATOR, allowlistAdmin: ALLOWLIST_ADMIN, fastFinalityBps: CCTP_FAST_FINALITY_BPS
       }),
       address(s_mockRMNRemote)
     );
@@ -34,11 +32,12 @@ contract CCTPVerifier_constructor is CCTPVerifierSetup {
     assertEq(s_USDCToken.allowance(address(s_cctpVerifier), address(s_mockTokenMessenger)), type(uint256).max);
 
     // Check the static configuration.
-    CCTPVerifier.StaticConfig memory staticConfig = s_cctpVerifier.getStaticConfig();
-    assertEq(staticConfig.tokenMessenger, address(s_mockTokenMessenger));
-    assertEq(staticConfig.messageTransmitterProxy, address(s_messageTransmitterProxy));
-    assertEq(staticConfig.usdcToken, address(s_USDCToken));
-    assertEq(staticConfig.localDomainIdentifier, LOCAL_DOMAIN_IDENTIFIER);
+    (address gotTokenMessenger, address gotMessageTransmitter, address gotUSDCToken, uint64 gotDomainId) =
+      s_cctpVerifier.getStaticConfig();
+    assertEq(gotTokenMessenger, address(s_mockTokenMessenger));
+    assertEq(gotMessageTransmitter, address(s_messageTransmitterProxy));
+    assertEq(gotUSDCToken, address(s_USDCToken));
+    assertEq(gotDomainId, LOCAL_DOMAIN_IDENTIFIER);
   }
 
   function test_constructor_RevertWhen_ZeroAddressNotAllowed_TokenMessengerIsZero() public {
@@ -49,9 +48,7 @@ contract CCTPVerifier_constructor is CCTPVerifierSetup {
       s_USDCToken,
       s_storageLocations,
       CCTPVerifier.DynamicConfig({
-        feeAggregator: FEE_AGGREGATOR,
-        allowlistAdmin: ALLOWLIST_ADMIN,
-        fastFinalityBps: CCTP_FAST_FINALITY_BPS
+        feeAggregator: FEE_AGGREGATOR, allowlistAdmin: ALLOWLIST_ADMIN, fastFinalityBps: CCTP_FAST_FINALITY_BPS
       }),
       address(s_mockRMNRemote)
     );
@@ -65,9 +62,7 @@ contract CCTPVerifier_constructor is CCTPVerifierSetup {
       s_USDCToken,
       s_storageLocations,
       CCTPVerifier.DynamicConfig({
-        feeAggregator: FEE_AGGREGATOR,
-        allowlistAdmin: ALLOWLIST_ADMIN,
-        fastFinalityBps: CCTP_FAST_FINALITY_BPS
+        feeAggregator: FEE_AGGREGATOR, allowlistAdmin: ALLOWLIST_ADMIN, fastFinalityBps: CCTP_FAST_FINALITY_BPS
       }),
       address(s_mockRMNRemote)
     );
@@ -81,9 +76,7 @@ contract CCTPVerifier_constructor is CCTPVerifierSetup {
       IERC20(address(0)),
       s_storageLocations,
       CCTPVerifier.DynamicConfig({
-        feeAggregator: FEE_AGGREGATOR,
-        allowlistAdmin: ALLOWLIST_ADMIN,
-        fastFinalityBps: CCTP_FAST_FINALITY_BPS
+        feeAggregator: FEE_AGGREGATOR, allowlistAdmin: ALLOWLIST_ADMIN, fastFinalityBps: CCTP_FAST_FINALITY_BPS
       }),
       address(s_mockRMNRemote)
     );
@@ -100,9 +93,7 @@ contract CCTPVerifier_constructor is CCTPVerifierSetup {
       s_USDCToken,
       s_storageLocations,
       CCTPVerifier.DynamicConfig({
-        feeAggregator: FEE_AGGREGATOR,
-        allowlistAdmin: ALLOWLIST_ADMIN,
-        fastFinalityBps: CCTP_FAST_FINALITY_BPS
+        feeAggregator: FEE_AGGREGATOR, allowlistAdmin: ALLOWLIST_ADMIN, fastFinalityBps: CCTP_FAST_FINALITY_BPS
       }),
       address(s_mockRMNRemote)
     );
@@ -117,9 +108,7 @@ contract CCTPVerifier_constructor is CCTPVerifierSetup {
       s_USDCToken,
       s_storageLocations,
       CCTPVerifier.DynamicConfig({
-        feeAggregator: FEE_AGGREGATOR,
-        allowlistAdmin: ALLOWLIST_ADMIN,
-        fastFinalityBps: CCTP_FAST_FINALITY_BPS
+        feeAggregator: FEE_AGGREGATOR, allowlistAdmin: ALLOWLIST_ADMIN, fastFinalityBps: CCTP_FAST_FINALITY_BPS
       }),
       address(s_mockRMNRemote)
     );
@@ -142,9 +131,7 @@ contract CCTPVerifier_constructor is CCTPVerifierSetup {
       s_USDCToken,
       s_storageLocations,
       CCTPVerifier.DynamicConfig({
-        feeAggregator: FEE_AGGREGATOR,
-        allowlistAdmin: ALLOWLIST_ADMIN,
-        fastFinalityBps: CCTP_FAST_FINALITY_BPS
+        feeAggregator: FEE_AGGREGATOR, allowlistAdmin: ALLOWLIST_ADMIN, fastFinalityBps: CCTP_FAST_FINALITY_BPS
       }),
       address(s_mockRMNRemote)
     );
@@ -158,9 +145,7 @@ contract CCTPVerifier_constructor is CCTPVerifierSetup {
       s_USDCToken,
       s_storageLocations,
       CCTPVerifier.DynamicConfig({
-        feeAggregator: address(0),
-        allowlistAdmin: ALLOWLIST_ADMIN,
-        fastFinalityBps: CCTP_FAST_FINALITY_BPS
+        feeAggregator: address(0), allowlistAdmin: ALLOWLIST_ADMIN, fastFinalityBps: CCTP_FAST_FINALITY_BPS
       }),
       address(s_mockRMNRemote)
     );

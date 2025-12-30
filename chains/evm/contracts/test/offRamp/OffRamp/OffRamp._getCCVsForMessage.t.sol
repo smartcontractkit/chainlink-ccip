@@ -110,6 +110,36 @@ contract OffRamp__getCCVsForMessage is OffRampSetup {
     assertEq(s_ccvs.length(), requiredCCVs.length, "ccvs length mismatch");
   }
 
+  function test__getCCVsForMessage_DeduplicatesOptionalAgainstRequired() public {
+    address receiver = makeAddr("receiver");
+    address[] memory defaultCCVs = _onlyUniques(_arrayOf(makeAddr("default")));
+    _applySourceConfig(abi.encode(makeAddr("onRamp")), true, defaultCCVs, new address[](0));
+
+    address[] memory required = new address[](3);
+    required[0] = address(1);
+    required[1] = address(2);
+    required[2] = address(3);
+
+    address[] memory optional = new address[](2);
+    optional[0] = address(2);
+    optional[1] = address(1);
+
+    _setGetCCVsReturnData(receiver, SOURCE_CHAIN_SELECTOR, required, optional, 2);
+
+    MessageV1Codec.TokenTransferV1[] memory tokenAmounts = new MessageV1Codec.TokenTransferV1[](0);
+
+    (address[] memory requiredCCVs, address[] memory optionalCCVs, uint8 optionalThreshold) =
+      s_offRamp.__getCCVsForMessage(SOURCE_CHAIN_SELECTOR, receiver, tokenAmounts, 0, false);
+
+    assertEq(requiredCCVs.length, 3, "required length");
+    assertEq(requiredCCVs[0], required[0]);
+    assertEq(requiredCCVs[1], required[1]);
+    assertEq(requiredCCVs[2], required[2]);
+
+    assertEq(optionalCCVs.length, 0, "optional should be deduped away");
+    assertEq(optionalThreshold, 0, "optional threshold should decrement with duplicates");
+  }
+
   function _onlyUniques(
     address[] memory input
   ) internal pure returns (address[] memory output) {
@@ -171,8 +201,8 @@ contract OffRamp__getCCVsForMessage is OffRampSetup {
     tokenAmounts = new MessageV1Codec.TokenTransferV1[](1);
     tokenAmounts[0] = MessageV1Codec.TokenTransferV1({
       amount: 1,
-      sourcePoolAddress: abi.encodePacked(pool),
-      sourceTokenAddress: abi.encodePacked(sourceToken),
+      sourcePoolAddress: abi.encode(pool),
+      sourceTokenAddress: abi.encode(sourceToken),
       destTokenAddress: abi.encodePacked(token),
       tokenReceiver: abi.encodePacked(makeAddr("tokenReceiver")),
       extraData: ""

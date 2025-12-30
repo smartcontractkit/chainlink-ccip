@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {IBurnMintERC20} from "../interfaces/IBurnMintERC20.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
-import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
 
 import {BurnMintTokenPoolAbstract} from "./BurnMintTokenPoolAbstract.sol";
 import {TokenPool} from "./TokenPool.sol";
 
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/utils/SafeERC20.sol";
 
 /// @notice This pool mints and burns a 3rd-party token by sending tokens to an address which is unrecoverable.
 /// @dev The pool is designed to have an immutable burn address. If the tokens at the burn address become recoverable,
@@ -37,11 +37,10 @@ contract BurnToAddressMintTokenPool is BurnMintTokenPoolAbstract, ITypeAndVersio
     i_burnAddress = burnAddress;
   }
 
-  /// @inheritdoc TokenPool
   /// @notice Tokens are burned by sending to an address which can never transfer them,
   /// making the tokens unrecoverable without reducing the total supply.
-  /// @param amount The amount of tokens to burn from the pool.
   function _lockOrBurn(
+    uint64, // remoteChainSelector
     uint256 amount
   ) internal virtual override {
     i_token.safeTransfer(i_burnAddress, amount);

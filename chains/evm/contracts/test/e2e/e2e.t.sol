@@ -15,7 +15,7 @@ import {OffRampHelper} from "../helpers/OffRampHelper.sol";
 import {MockVerifier} from "../mocks/MockVerifier.sol";
 import {OnRampSetup} from "../onRamp/OnRamp/OnRampSetup.t.sol";
 
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
 contract e2e is OnRampSetup {
   OffRampHelper internal s_offRamp;
@@ -52,8 +52,7 @@ contract e2e is OnRampSetup {
     VersionedVerifierResolver.OutboundImplementationArgs[] memory outboundImpls =
       new VersionedVerifierResolver.OutboundImplementationArgs[](1);
     outboundImpls[0] = VersionedVerifierResolver.OutboundImplementationArgs({
-      destChainSelector: DEST_CHAIN_SELECTOR,
-      verifier: address(s_sourceCommitteeVerifier)
+      destChainSelector: DEST_CHAIN_SELECTOR, verifier: address(s_sourceCommitteeVerifier)
     });
     srcVerifierResolver.applyOutboundImplementationUpdates(outboundImpls);
     s_userSpecifiedCCV = address(new Proxy(address(srcVerifierResolver)));
@@ -74,7 +73,8 @@ contract e2e is OnRampSetup {
       destChainSelector: DEST_CHAIN_SELECTOR,
       router: s_sourceRouter,
       addressBytesLength: EVM_ADDRESS_LENGTH,
-      networkFeeUSDCents: NETWORK_FEE_USD_CENTS,
+      messageNetworkFeeUSDCents: MESSAGE_NETWORK_FEE_USD_CENTS,
+      tokenNetworkFeeUSDCents: TOKEN_NETWORK_FEE_USD_CENTS,
       tokenReceiverAllowed: false,
       baseExecutionGasCost: BASE_EXEC_GAS_COST,
       laneMandatedCCVs: new address[](0),
@@ -95,7 +95,7 @@ contract e2e is OnRampSetup {
     defaultDestCCVs[0] = s_destVerifier;
 
     bytes[] memory onRamps = new bytes[](1);
-    onRamps[0] = abi.encodePacked(s_onRamp);
+    onRamps[0] = abi.encode(s_onRamp);
 
     OffRamp.SourceChainConfigArgs[] memory updates = new OffRamp.SourceChainConfigArgs[](1);
     updates[0] = OffRamp.SourceChainConfigArgs({
@@ -119,7 +119,7 @@ contract e2e is OnRampSetup {
     deal(s_sourceFeeToken, s_defaultExecutor, 1);
   }
 
-  function test_e2e() public {
+  function test_e2e() public virtual {
     vm.pauseGasMetering();
     uint64 expectedMsgNum = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).messageNumber + 1;
 
@@ -150,12 +150,8 @@ contract e2e is OnRampSetup {
     });
     message.tokenAmounts[0] = Client.EVMTokenAmount({token: s_sourceFeeToken, amount: 1e18});
 
-    (bytes32 messageId, bytes memory encodedMessage, OnRamp.Receipt[] memory receipts, bytes[] memory verifierBlobs) =
-    _evmMessageToEvent({
-      message: message,
-      destChainSelector: DEST_CHAIN_SELECTOR,
-      msgNum: expectedMsgNum,
-      originalSender: OWNER
+    (bytes32 messageId, bytes memory encodedMessage, OnRamp.Receipt[] memory receipts, bytes[] memory verifierBlobs) = _evmMessageToEvent({
+      message: message, destChainSelector: DEST_CHAIN_SELECTOR, msgNum: expectedMsgNum, originalSender: OWNER
     });
     receipts[receipts.length - 1].issuer = address(s_sourceRouter);
     // committeeVerifier will return its versionTag, which we add here.
@@ -164,7 +160,7 @@ contract e2e is OnRampSetup {
     vm.expectEmit();
     emit OnRamp.CCIPMessageSent({
       destChainSelector: DEST_CHAIN_SELECTOR,
-      messageNumber: expectedMsgNum,
+      sender: OWNER,
       messageId: messageId,
       feeToken: s_sourceFeeToken,
       encodedMessage: encodedMessage,
@@ -191,6 +187,6 @@ contract e2e is OnRampSetup {
     });
 
     vm.resumeGasMetering();
-    s_offRamp.execute(encodedMessage, ccvAddresses, new bytes[](1));
+    s_offRamp.execute(encodedMessage, ccvAddresses, new bytes[](1), 0);
   }
 }

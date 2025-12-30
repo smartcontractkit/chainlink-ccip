@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/committee_verifier"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/versioned_verifier_resolver"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
@@ -58,6 +59,19 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 		},
 	},
 	Validate: func(ConstructorArgs) error { return nil },
+})
+
+var DeployResolver = contract.NewDeploy(contract.DeployParams[ResolverConstructorArgs]{
+	Name:             "committee-verifier-resolver:deploy",
+	Version:          semver.MustParse("1.7.0"),
+	Description:      "Deploys the CommitteeVerifierResolver contract",
+	ContractMetadata: versioned_verifier_resolver.VersionedVerifierResolverMetaData,
+	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
+		cldf_deployment.NewTypeAndVersion(ResolverType, *semver.MustParse("1.7.0")).String(): {
+			EVM: common.FromHex(versioned_verifier_resolver.VersionedVerifierResolverBin),
+		},
+	},
+	Validate: func(ResolverConstructorArgs) error { return nil },
 })
 
 var SetDynamicConfig = contract.NewWrite(contract.WriteParams[SetDynamicConfigArgs, *committee_verifier.CommitteeVerifier]{

@@ -1,13 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {IBurnMintERC20} from "../interfaces/IBurnMintERC20.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
-import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
 
 import {BurnMintTokenPoolAbstract} from "./BurnMintTokenPoolAbstract.sol";
 import {TokenPool} from "./TokenPool.sol";
-
-import {SafeERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/utils/SafeERC20.sol";
 
 /// @notice This pool mints and burns a 3rd-party token.
 /// @dev Pool whitelisting mode is set in the constructor and cannot be modified later.
@@ -16,8 +14,6 @@ import {SafeERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/utils/SafeERC
 /// If that is expected, please make sure the token's burner/minter roles are adjustable.
 /// @dev This contract is a variant of BurnMintTokenPool that uses `burn(from, amount)`.
 contract BurnWithFromMintTokenPool is BurnMintTokenPoolAbstract, ITypeAndVersion {
-  using SafeERC20 for IBurnMintERC20;
-
   string public constant override typeAndVersion = "BurnWithFromMintTokenPool 1.7.0-dev";
 
   constructor(
@@ -29,12 +25,12 @@ contract BurnWithFromMintTokenPool is BurnMintTokenPoolAbstract, ITypeAndVersion
   ) TokenPool(token, localTokenDecimals, advancedPoolHooks, rmnProxy, router) {
     // Some tokens allow burning from the sender without approval, but not all do.
     // To be safe, we approve the pool to burn from the pool.
-    token.safeIncreaseAllowance(address(this), type(uint256).max);
+    token.approve(address(this), type(uint256).max);
   }
 
-  /// @inheritdoc TokenPool
-  /// @param amount The amount of tokens to burn from the pool.
+  /// @notice Burns tokens held by the pool.
   function _lockOrBurn(
+    uint64, // remoteChainSelector
     uint256 amount
   ) internal virtual override {
     IBurnMintERC20(address(i_token)).burn(address(this), amount);

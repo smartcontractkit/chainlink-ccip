@@ -5,14 +5,15 @@ import {ICrossChainVerifierV1} from "../interfaces/ICrossChainVerifierV1.sol";
 import {IMessageTransmitter} from "../pools/USDC/interfaces/IMessageTransmitter.sol";
 import {ITokenMessenger} from "../pools/USDC/interfaces/ITokenMessenger.sol";
 
+import {FeeTokenHandler} from "../libraries/FeeTokenHandler.sol";
 import {Internal} from "../libraries/Internal.sol";
 import {MessageV1Codec} from "../libraries/MessageV1Codec.sol";
 import {CCTPMessageTransmitterProxy} from "../pools/USDC/CCTPMessageTransmitterProxy.sol";
 import {BaseVerifier} from "./components/BaseVerifier.sol";
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/utils/SafeERC20.sol";
 
 /// @notice The CCTPVerifier creates USDC burn messages on source and delivers them on destination.
 /// @dev This verifier is for CCTP V2 and is not backwards compatible with CCTP V1.
@@ -30,6 +31,7 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   error InvalidMessageVersion(uint32 expected, uint32 got);
   error InvalidToken(bytes token);
   error InvalidTokenTransferLength(uint256 length);
+  error InvalidVerifierArgsLength(uint256 length);
   error MaxFeeExceedsUint32(uint256 maxFee);
   error OnlyCallableByOwnerOrAllowlistAdmin();
   error ReceiveMessageCallFailed();
@@ -42,14 +44,6 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   event StaticConfigSet(
     address tokenMessenger, address messageTransmitterProxy, address usdcToken, uint32 localDomainIdentifier
   );
-
-  /// @notice The static configuration.
-  struct StaticConfig {
-    address tokenMessenger; // The address of the token messenger.
-    address messageTransmitterProxy; // The address of the message transmitter proxy.
-    address usdcToken; // The address of the USDC token.
-    uint32 localDomainIdentifier; // The local domain identifier.
-  }
 
   /// @notice The arguments required to update a remote domain.
   struct SetDomainArgs {
@@ -199,7 +193,7 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
 
     // Approve the token messenger to burn the USDC token on behalf of this contract.
     // The USDC token pool will be responsible for forwarding USDC it receives from the router to this contract.
-    i_usdcToken.safeIncreaseAllowance(address(i_tokenMessenger), type(uint256).max);
+    i_usdcToken.approve(address(i_tokenMessenger), type(uint256).max);
 
     emit StaticConfigSet(
       address(i_tokenMessenger), address(i_messageTransmitterProxy), address(i_usdcToken), i_localDomainIdentifier
@@ -214,11 +208,11 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
     bytes32 messageId,
     address, // feeToken
     uint256, // feeTokenAmount
-    bytes calldata // verifierArgs
+    bytes calldata verifierArgs
   ) external returns (bytes memory verifierReturnData) {
     _assertNotCursedByRMN(message.destChainSelector);
-    // For EVM, sender is expected to be 20 bytes.
-    _assertSenderIsAllowed(message.destChainSelector, address(bytes20(message.sender)));
+    // For EVM, sender is expected to be abi encoded.
+    _assertSenderIsAllowed(message.destChainSelector, abi.decode(message.sender, (address)));
 
     Domain storage domain = s_chainToDomain[message.destChainSelector];
     if (!domain.enabled) revert UnknownDomain(message.destChainSelector);
@@ -228,7 +222,7 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
 
     MessageV1Codec.TokenTransferV1 memory tokenTransfer = message.tokenTransfer[0];
     // The address of the token transferred must correspond to USDC.
-    if (address(bytes20(tokenTransfer.sourceTokenAddress)) != address(i_usdcToken)) {
+    if (abi.decode(tokenTransfer.sourceTokenAddress, (address)) != address(i_usdcToken)) {
       revert InvalidToken(tokenTransfer.sourceTokenAddress);
     }
 
@@ -247,20 +241,30 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
     }
 
     DepositForBurnParams memory params = DepositForBurnParams({
-      messageId: messageId,
-      finality: message.finality,
-      finalityThreshold: CCTP_STANDARD_FINALITY_THRESHOLD
+      messageId: messageId, finality: message.finality, finalityThreshold: CCTP_STANDARD_FINALITY_THRESHOLD
     });
 
+    // The maximum fee, taken on destination, is a portion of the total amount transferred.
     uint256 maxFee = 0;
     if (params.finality != 0) {
       params.finalityThreshold = CCTP_FAST_FINALITY_THRESHOLD;
 
-      // The maximum fee, taken on destination, is a percentage of the total amount transferred.
-      // We use bps to calculate the smallest possible value that we can set as the max fee.
-      // The bps values configured for each finality threshold on this chain must mirror those used by CCTP.
-      // CCTP defines different bps values for each chain.
-      maxFee = tokenTransfer.amount * s_dynamicConfig.fastFinalityBps / BPS_DIVIDER;
+      if (verifierArgs.length > 0) {
+        // We interpret verifierArgs as the max fee.
+        // CCTP defines bps offchain, so computing a max fee based on the API and inputting it into ccipSend
+        // is the best way to ensure that your max fee aligns with what CCTP will charge for your transfer.
+        if (verifierArgs.length != 32) revert InvalidVerifierArgsLength(verifierArgs.length);
+        maxFee = abi.decode(verifierArgs, (uint256));
+      } else {
+        // If no verifierArgs are provided, we compute the max fee according to the bps stored on this contract.
+        // The bps values stored on this contract should be kept in-sync with those used by CCTP.
+        // If out of sync, the following scenarios are possible:
+        // - If stored bps < actual bps, the user just gets a standard, free transfer.
+        // - If stored bps > actual bps, the user pays less on destination than they were expecting to.
+        // Neither scenario results in a user paying more than they were expecting to.
+        maxFee = tokenTransfer.amount * s_dynamicConfig.fastFinalityBps / BPS_DIVIDER;
+      }
+
       if (maxFee > type(uint32).max) revert MaxFeeExceedsUint32(maxFee);
     }
 
@@ -321,12 +325,10 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
     // Call into CCTP via the message transmitter proxy.
     // CCTP will validate signatures against the message before minting USDC.
     // Attestation occupies all bytes following the CCTP message.
-    if (
-      !i_messageTransmitterProxy.receiveMessage(
+    if (!i_messageTransmitterProxy.receiveMessage(
         verifierResults[VERIFIER_VERSION_SIZE:VERIFIER_VERSION_SIZE + CCTP_MESSAGE_SIZE],
         verifierResults[VERIFIER_VERSION_SIZE + CCTP_MESSAGE_SIZE:]
-      )
-    ) {
+      )) {
       revert ReceiveMessageCallFailed();
     }
   }
@@ -336,14 +338,18 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   // ================================================================
 
   /// @notice Returns the static configuration.
-  /// @return staticConfig The static configuration.
-  function getStaticConfig() external view returns (StaticConfig memory staticConfig) {
-    return StaticConfig({
-      tokenMessenger: address(i_tokenMessenger),
-      messageTransmitterProxy: address(i_messageTransmitterProxy),
-      usdcToken: address(i_usdcToken),
-      localDomainIdentifier: i_localDomainIdentifier
-    });
+  /// @return tokenMessenger The address of the token messenger.
+  /// @return messageTransmitterProxy The address of the message transmitter proxy.
+  /// @return usdcToken The address of the USDC token.
+  /// @return localDomainIdentifier The local domain identifier.
+  function getStaticConfig()
+    external
+    view
+    returns (address tokenMessenger, address messageTransmitterProxy, address usdcToken, uint32 localDomainIdentifier)
+  {
+    return (
+      address(i_tokenMessenger), address(i_messageTransmitterProxy), address(i_usdcToken), i_localDomainIdentifier
+    );
   }
 
   /// @notice Returns the dynamic configuration.
@@ -456,6 +462,6 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   function withdrawFeeTokens(
     address[] calldata feeTokens
   ) external {
-    _withdrawFeeTokens(feeTokens, s_dynamicConfig.feeAggregator);
+    FeeTokenHandler._withdrawFeeTokens(feeTokens, s_dynamicConfig.feeAggregator);
   }
 }

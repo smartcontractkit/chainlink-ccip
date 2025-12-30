@@ -140,7 +140,7 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
     address[] memory feeTokens = new address[](1);
     feeTokens[0] = s_sourceTokens[1];
 
-    s_feeQuoter.applyFeeTokensUpdates(new address[](0), feeTokens);
+    s_feeQuoter.updatePrices(_getSingleTokenPriceUpdateStruct(feeTokens[0], 1e17));
 
     FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
     destChainConfigArgs[0].destChainConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_SUI;
@@ -170,7 +170,7 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
     address[] memory feeTokens = new address[](1);
     feeTokens[0] = s_sourceTokens[1];
 
-    s_feeQuoter.applyFeeTokensUpdates(new address[](0), feeTokens);
+    s_feeQuoter.updatePrices(_getSingleTokenPriceUpdateStruct(feeTokens[0], 1e17));
 
     FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
     destChainConfigArgs[0].destChainConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_SUI;
@@ -199,7 +199,7 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
     address[] memory feeTokens = new address[](1);
     feeTokens[0] = s_sourceTokens[1];
 
-    s_feeQuoter.applyFeeTokensUpdates(new address[](0), feeTokens);
+    s_feeQuoter.updatePrices(_getSingleTokenPriceUpdateStruct(feeTokens[0], 1e17));
 
     FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
     destChainConfigArgs[0].destChainConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_SUI;
@@ -564,10 +564,7 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
     msg_.receiver = abi.encode(0); // zero reciever
     msg_.extraArgs = Client._suiArgsToBytes(
       Client.SuiExtraArgsV1({
-        gasLimit: 0,
-        allowOutOfOrderExecution: true,
-        tokenReceiver: bytes32(0),
-        receiverObjectIds: new bytes32[](2)
+        gasLimit: 0, allowOutOfOrderExecution: true, tokenReceiver: bytes32(0), receiverObjectIds: new bytes32[](2)
       })
     );
     vm.expectRevert(abi.encodeWithSelector(FeeQuoter.TooManySuiExtraArgsReceiverObjectIds.selector, 2, 0));

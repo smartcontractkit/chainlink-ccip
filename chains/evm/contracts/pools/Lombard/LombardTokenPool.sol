@@ -9,9 +9,9 @@ import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/I
 import {Pool} from "../../libraries/Pool.sol";
 import {TokenPool} from "../TokenPool.sol";
 
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
-import {IERC20Metadata} from "@openzeppelin/contracts@4.8.3/token/ERC20/extensions/IERC20Metadata.sol";
-import {SafeERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts@5.3.0/token/ERC20/extensions/IERC20Metadata.sol";
+import {SafeERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/utils/SafeERC20.sol";
 
 /// @notice Lombard CCIP token pool.
 /// For v2 flows, token movement (burn/mint) is handled by the Lombard verifier,
@@ -103,11 +103,13 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
     i_bridge = bridge;
     i_lombardVerifierResolver = verifier;
     i_tokenAdapter = adapter;
+
     if (adapter != address(0)) {
-      token.safeIncreaseAllowance(adapter, type(uint256).max);
+      token.approve(adapter, type(uint256).max);
     } else {
-      token.safeIncreaseAllowance(address(bridge), type(uint256).max);
+      token.approve(address(bridge), type(uint256).max);
     }
+
     emit LombardConfigurationSet(verifier, address(bridge), adapter);
   }
 
@@ -125,14 +127,16 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
     uint16 blockConfirmationRequested,
     bytes calldata tokenArgs
   ) public override returns (Pool.LockOrBurnOutV1 memory lockOrBurnOut, uint256 destTokenAmount) {
-    address verifierImpl = ICrossChainVerifierResolver(i_lombardVerifierResolver).getOutboundImplementation(
-      lockOrBurnIn.remoteChainSelector, ""
-    );
+    address verifierImpl = ICrossChainVerifierResolver(i_lombardVerifierResolver)
+      .getOutboundImplementation(lockOrBurnIn.remoteChainSelector, "");
     if (verifierImpl == address(0)) {
       revert OutboundImplementationNotFoundForVerifier();
     }
-    // We forward the whole amount to the verifier; the verifier accrues fees and super.lockOrBurn returns the post-fee destTokenAmount.
+
+    // We forward the whole amount to the verifier; the verifier accrues fees and super.lockOrBurn returns the post-fee
+    // destTokenAmount.
     i_token.safeTransfer(verifierImpl, lockOrBurnIn.amount);
+
     return super.lockOrBurn(lockOrBurnIn, blockConfirmationRequested, tokenArgs);
   }
 
@@ -181,14 +185,16 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
     });
 
     return Pool.LockOrBurnOutV1({
-      destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
-      destPoolData: abi.encode(payloadHash)
+      destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector), destPoolData: abi.encode(payloadHash)
     });
   }
 
   // ================================================================
   // │                      Release or Mint                         │
   // ================================================================
+
+  // The IPoolV2.releaseOrMint does various checks, but is a no-op by default. That's exactly the behaviour we need here
+  // because the minting is performed through the CCV. Therefore, we don't override at all.
 
   /// @notice Backwards compatible releaseOrMint for CCIP 1.5/1.6 lanes. Verifies the bridge payload proof.
   /// @param releaseOrMintIn The release or mint input parameters.
@@ -236,7 +242,11 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
   /// @param remoteChainSelector CCIP chain selector of remote chain.
   /// @param lChainId Lombard chain id of remote chain.
   /// @param allowedCaller The address of TokenPool on destination chain.
-  function setPath(uint64 remoteChainSelector, bytes32 lChainId, bytes calldata allowedCaller) external onlyOwner {
+  function setPath(
+    uint64 remoteChainSelector,
+    bytes32 lChainId,
+    bytes calldata allowedCaller
+  ) external onlyOwner {
     if (!isSupportedChain(remoteChainSelector)) {
       revert ChainNotSupported(remoteChainSelector);
     }
@@ -280,7 +290,10 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
   // │                        Internal utils                        │
   // ================================================================
 
-  function _getTokenDecimals(IERC20Metadata token, uint8 fallbackDecimals) internal view returns (uint8) {
+  function _getTokenDecimals(
+    IERC20Metadata token,
+    uint8 fallbackDecimals
+  ) internal view returns (uint8) {
     try token.decimals() returns (uint8 dec) {
       return dec;
     } catch {

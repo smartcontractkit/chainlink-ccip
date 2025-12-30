@@ -29,7 +29,7 @@ import {OnRampSetup} from "../onRamp/OnRamp/OnRampSetup.t.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
 contract cctp_e2e is OnRampSetup {
   uint32 private constant CCTP_VERSION = 1;
@@ -104,7 +104,7 @@ contract cctp_e2e is OnRampSetup {
     defaultDestCCVs[0] = address(s_destCCTPSetup.verifierResolver);
 
     bytes[] memory onRamps = new bytes[](1);
-    onRamps[0] = abi.encodePacked(s_onRamp);
+    onRamps[0] = abi.encode(s_onRamp);
 
     OffRamp.SourceChainConfigArgs[] memory sourceChainUpdates = new OffRamp.SourceChainConfigArgs[](1);
     sourceChainUpdates[0] = OffRamp.SourceChainConfigArgs({
@@ -125,7 +125,8 @@ contract cctp_e2e is OnRampSetup {
       destChainSelector: DEST_CHAIN_SELECTOR,
       router: s_sourceRouter,
       addressBytesLength: EVM_ADDRESS_LENGTH,
-      networkFeeUSDCents: NETWORK_FEE_USD_CENTS,
+      messageNetworkFeeUSDCents: MESSAGE_NETWORK_FEE_USD_CENTS,
+      tokenNetworkFeeUSDCents: TOKEN_NETWORK_FEE_USD_CENTS,
       tokenReceiverAllowed: false,
       baseExecutionGasCost: BASE_EXEC_GAS_COST,
       laneMandatedCCVs: new address[](0),
@@ -169,12 +170,8 @@ contract cctp_e2e is OnRampSetup {
     });
     message.tokenAmounts[0] = Client.EVMTokenAmount({token: address(s_sourceCCTPSetup.token), amount: amount}); // 1 USDC.
 
-    (bytes32 messageId, bytes memory encodedMessage, OnRamp.Receipt[] memory receipts, bytes[] memory verifierBlobs) =
-    _evmMessageToEvent({
-      message: message,
-      destChainSelector: DEST_CHAIN_SELECTOR,
-      msgNum: expectedMsgNum,
-      originalSender: OWNER
+    (bytes32 messageId, bytes memory encodedMessage, OnRamp.Receipt[] memory receipts, bytes[] memory verifierBlobs) = _evmMessageToEvent({
+      message: message, destChainSelector: DEST_CHAIN_SELECTOR, msgNum: expectedMsgNum, originalSender: OWNER
     });
 
     vm.expectEmit();
@@ -194,7 +191,7 @@ contract cctp_e2e is OnRampSetup {
     vm.expectEmit();
     emit OnRamp.CCIPMessageSent({
       destChainSelector: DEST_CHAIN_SELECTOR,
-      messageNumber: expectedMsgNum,
+      sender: OWNER,
       messageId: messageId,
       feeToken: s_sourceFeeToken,
       encodedMessage: encodedMessage,
@@ -231,8 +228,7 @@ contract cctp_e2e is OnRampSetup {
         expirationBlock: block.number + 1000
       }),
       hookData: CCTPHelper.CCTPMessageHookData({
-        verifierVersion: s_sourceCCTPSetup.verifier.versionTag(),
-        messageId: messageId
+        verifierVersion: s_sourceCCTPSetup.verifier.versionTag(), messageId: messageId
       })
     });
 
@@ -266,7 +262,7 @@ contract cctp_e2e is OnRampSetup {
     });
 
     vm.resumeGasMetering();
-    s_offRamp.execute(encodedMessage, ccvAddresses, verifierResults);
+    s_offRamp.execute(encodedMessage, ccvAddresses, verifierResults, 0);
   }
 
   function _deployCCTPSetup(
@@ -281,9 +277,10 @@ contract cctp_e2e is OnRampSetup {
     setup.router = router;
     setup.tokenAdminRegistry = tokenAdminRegistry;
     setup.verifierResolver = new VersionedVerifierResolver();
-    setup.token = new BurnMintERC20("USD Coin", "USDC", 6, 0, 0);
-    setup.tokenPool =
-      new CCTPTokenPool(IERC20(address(setup.token)), 6, rmn, router, address(setup.verifierResolver), new address[](0));
+    setup.token = IERC20(address(new BurnMintERC20("USD Coin", "USDC", 6, 0, 0)));
+    setup.tokenPool = new CCTPTokenPool(
+      IERC20(address(setup.token)), 6, rmn, router, address(setup.verifierResolver), new address[](0)
+    );
     setup.messageTransmitter =
       new MockE2EUSDCTransmitterCCTPV2(CCTP_VERSION, localDomainIdentifier, address(setup.token));
     setup.tokenMessenger = new MockUSDCTokenMessenger(CCTP_VERSION, address(setup.messageTransmitter));
@@ -294,9 +291,7 @@ contract cctp_e2e is OnRampSetup {
       IERC20(address(setup.token)),
       new string[](0),
       CCTPVerifier.DynamicConfig({
-        feeAggregator: s_feeAggregator,
-        allowlistAdmin: s_allowlistAdmin,
-        fastFinalityBps: CCTP_FAST_FINALITY_BPS
+        feeAggregator: s_feeAggregator, allowlistAdmin: s_allowlistAdmin, fastFinalityBps: CCTP_FAST_FINALITY_BPS
       }),
       rmn
     );
@@ -320,8 +315,7 @@ contract cctp_e2e is OnRampSetup {
     VersionedVerifierResolver.OutboundImplementationArgs[] memory outboundImpls =
       new VersionedVerifierResolver.OutboundImplementationArgs[](1);
     outboundImpls[0] = VersionedVerifierResolver.OutboundImplementationArgs({
-      destChainSelector: DEST_CHAIN_SELECTOR,
-      verifier: address(s_sourceCCTPSetup.verifier)
+      destChainSelector: DEST_CHAIN_SELECTOR, verifier: address(s_sourceCCTPSetup.verifier)
     });
     s_sourceCCTPSetup.verifierResolver.applyOutboundImplementationUpdates(outboundImpls);
 
@@ -329,8 +323,7 @@ contract cctp_e2e is OnRampSetup {
     VersionedVerifierResolver.InboundImplementationArgs[] memory inboundImpls =
       new VersionedVerifierResolver.InboundImplementationArgs[](1);
     inboundImpls[0] = VersionedVerifierResolver.InboundImplementationArgs({
-      version: s_destCCTPSetup.verifier.versionTag(),
-      verifier: address(s_destCCTPSetup.verifier)
+      version: s_destCCTPSetup.verifier.versionTag(), verifier: address(s_destCCTPSetup.verifier)
     });
     s_destCCTPSetup.verifierResolver.applyInboundImplementationUpdates(inboundImpls);
 
@@ -417,16 +410,18 @@ contract cctp_e2e is OnRampSetup {
     // Apply authorized callers on the source token pool.
     address[] memory authorizedCallers = new address[](1);
     authorizedCallers[0] = address(s_sourceCCTPSetup.tokenPoolProxy);
-    s_sourceCCTPSetup.tokenPool.applyAuthorizedCallerUpdates(
-      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: authorizedCallers, removedCallers: new address[](0)})
-    );
+    s_sourceCCTPSetup.tokenPool
+      .applyAuthorizedCallerUpdates(
+        AuthorizedCallers.AuthorizedCallerArgs({addedCallers: authorizedCallers, removedCallers: new address[](0)})
+      );
 
     // Apply authorized callers on the dest token pool.
     authorizedCallers = new address[](1);
     authorizedCallers[0] = address(s_destCCTPSetup.tokenPoolProxy);
-    s_destCCTPSetup.tokenPool.applyAuthorizedCallerUpdates(
-      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: authorizedCallers, removedCallers: new address[](0)})
-    );
+    s_destCCTPSetup.tokenPool
+      .applyAuthorizedCallerUpdates(
+        AuthorizedCallers.AuthorizedCallerArgs({addedCallers: authorizedCallers, removedCallers: new address[](0)})
+      );
 
     // Update lock or burn mechanism on the source token pool proxy.
     USDCTokenPoolProxy.LockOrBurnMechanism[] memory mechanisms = new USDCTokenPoolProxy.LockOrBurnMechanism[](1);
@@ -435,21 +430,25 @@ contract cctp_e2e is OnRampSetup {
     chainSelectors[0] = DEST_CHAIN_SELECTOR;
     s_sourceCCTPSetup.tokenPoolProxy.updateLockOrBurnMechanisms(chainSelectors, mechanisms);
 
+    // Update lock or burn mechanism on the dest token pool proxy.
+    mechanisms = new USDCTokenPoolProxy.LockOrBurnMechanism[](1);
+    mechanisms[0] = USDCTokenPoolProxy.LockOrBurnMechanism.CCTP_V2_WITH_CCV;
+    chainSelectors = new uint64[](1);
+    chainSelectors[0] = SOURCE_CHAIN_SELECTOR;
+    s_destCCTPSetup.tokenPoolProxy.updateLockOrBurnMechanisms(chainSelectors, mechanisms);
+
     // Register CCTP token pool proxy on source token admin registry.
-    TokenAdminRegistry(s_sourceCCTPSetup.tokenAdminRegistry).proposeAdministrator(
-      address(s_sourceCCTPSetup.token), OWNER
-    );
+    TokenAdminRegistry(s_sourceCCTPSetup.tokenAdminRegistry)
+      .proposeAdministrator(address(s_sourceCCTPSetup.token), OWNER);
     TokenAdminRegistry(s_sourceCCTPSetup.tokenAdminRegistry).acceptAdminRole(address(s_sourceCCTPSetup.token));
-    TokenAdminRegistry(s_sourceCCTPSetup.tokenAdminRegistry).setPool(
-      address(s_sourceCCTPSetup.token), address(s_sourceCCTPSetup.tokenPoolProxy)
-    );
+    TokenAdminRegistry(s_sourceCCTPSetup.tokenAdminRegistry)
+      .setPool(address(s_sourceCCTPSetup.token), address(s_sourceCCTPSetup.tokenPoolProxy));
 
     // Register CCTP token pool proxy on dest token admin registry.
     TokenAdminRegistry(s_destCCTPSetup.tokenAdminRegistry).proposeAdministrator(address(s_destCCTPSetup.token), OWNER);
     TokenAdminRegistry(s_destCCTPSetup.tokenAdminRegistry).acceptAdminRole(address(s_destCCTPSetup.token));
-    TokenAdminRegistry(s_destCCTPSetup.tokenAdminRegistry).setPool(
-      address(s_destCCTPSetup.token), address(s_destCCTPSetup.tokenPoolProxy)
-    );
+    TokenAdminRegistry(s_destCCTPSetup.tokenAdminRegistry)
+      .setPool(address(s_destCCTPSetup.token), address(s_destCCTPSetup.tokenPoolProxy));
 
     // Grant burn and mint roles on the source token to the source token messenger.
     BurnMintERC20(address(s_sourceCCTPSetup.token)).grantMintAndBurnRoles(address(s_sourceCCTPSetup.tokenMessenger));

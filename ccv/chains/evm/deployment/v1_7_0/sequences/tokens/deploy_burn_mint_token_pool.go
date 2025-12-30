@@ -31,6 +31,7 @@ var DeployBurnMintTokenPool = cldf_ops.NewSequence(
 				Allowlist:                        input.ConstructorArgs.Allowlist,
 				ThresholdAmountForAdditionalCCVs: input.ThresholdAmountForAdditionalCCVs,
 			},
+			Qualifier: &input.TokenSymbol,
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy advanced pool hooks to %s: %w", chain, err)
@@ -45,16 +46,16 @@ var DeployBurnMintTokenPool = cldf_ops.NewSequence(
 			TypeAndVersion: typeAndVersion,
 			Args: burn_mint_token_pool.ConstructorArgs{
 				Token:              input.ConstructorArgs.Token,
-				LocalTokenDecimals: input.ConstructorArgs.LocalTokenDecimals,
+				LocalTokenDecimals: input.ConstructorArgs.Decimals,
 				AdvancedPoolHooks:  common.HexToAddress(hooksDeployReport.Output.Address),
 				RMNProxy:           input.ConstructorArgs.RMNProxy,
 				Router:             input.ConstructorArgs.Router,
 			},
+			Qualifier: &input.TokenSymbol,
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy %s to %s: %w", typeAndVersion, chain, err)
 		}
-		tpDeployReport.Output.Qualifier = input.TokenSymbol // Use the token symbol as the qualifier.
 
 		configureReport, err := cldf_ops.ExecuteSequence(b, ConfigureTokenPool, chain, ConfigureTokenPoolInput{
 			ChainSelector:                    input.ChainSel,

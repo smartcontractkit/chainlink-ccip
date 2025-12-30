@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {ICrossChainVerifierV1} from "../interfaces/ICrossChainVerifierV1.sol";
 
+import {FeeTokenHandler} from "../libraries/FeeTokenHandler.sol";
 import {MessageV1Codec} from "../libraries/MessageV1Codec.sol";
 import {BaseVerifier} from "./components/BaseVerifier.sol";
 import {SignatureQuorumValidator} from "./components/SignatureQuorumValidator.sol";
@@ -25,7 +26,7 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
 
   /// @dev Defines upgradeable configuration parameters.
   struct DynamicConfig {
-    address feeAggregator; // Entity capable of withdrawing fees.
+    address feeAggregator; // The entity receiving the withdrawn fees.
     address allowlistAdmin; // Entity capable adding or removing allowed senders.
   }
 
@@ -65,8 +66,8 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
   ) external view returns (bytes memory verifierReturnData) {
     _assertNotCursedByRMN(message.destChainSelector);
 
-    // For EVM, sender is expected to be 20 bytes.
-    address senderAddress = address(bytes20(message.sender));
+    // For EVM, sender is abi encoded.
+    address senderAddress = abi.decode(message.sender, (address));
     _assertSenderIsAllowed(message.destChainSelector, senderAddress);
 
     return abi.encodePacked(VERSION_TAG_V1_7_0);
@@ -103,9 +104,8 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
       // The version is included so that a resolver can return the correct verifier implementation on destination.
       // The version must be signed, otherwise any version could be inserted post-signatures.
       keccak256(bytes.concat(verifierVersion, messageHash)),
-      verifierResults[
-        VERIFIER_VERSION_BYTES + SIGNATURE_LENGTH_BYTES:
-          VERIFIER_VERSION_BYTES + SIGNATURE_LENGTH_BYTES + signatureLength
+      verifierResults[VERIFIER_VERSION_BYTES
+          + SIGNATURE_LENGTH_BYTES:VERIFIER_VERSION_BYTES + SIGNATURE_LENGTH_BYTES + signatureLength
       ]
     );
   }
@@ -226,6 +226,6 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
   function withdrawFeeTokens(
     address[] calldata feeTokens
   ) external {
-    _withdrawFeeTokens(feeTokens, s_dynamicConfig.feeAggregator);
+    FeeTokenHandler._withdrawFeeTokens(feeTokens, s_dynamicConfig.feeAggregator);
   }
 }

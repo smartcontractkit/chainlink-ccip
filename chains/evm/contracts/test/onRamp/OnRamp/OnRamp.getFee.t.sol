@@ -4,11 +4,15 @@ pragma solidity ^0.8.24;
 import {ICrossChainVerifierResolver} from "../../../interfaces/ICrossChainVerifierResolver.sol";
 import {ICrossChainVerifierV1} from "../../../interfaces/ICrossChainVerifierV1.sol";
 import {IExecutor} from "../../../interfaces/IExecutor.sol";
+import {IFeeQuoter} from "../../../interfaces/IFeeQuoter.sol";
+import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
 
 import {Client} from "../../../libraries/Client.sol";
 import {ExtraArgsCodec} from "../../../libraries/ExtraArgsCodec.sol";
 import {OnRamp} from "../../../onRamp/OnRamp.sol";
 import {OnRampSetup} from "./OnRampSetup.t.sol";
+
+import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
 
 contract OnRamp_getFee is OnRampSetup {
   uint16 internal constant MOCKED_DEFAULT_CCV_FEE_USD_CENTS = 5_00;
@@ -18,7 +22,7 @@ contract OnRamp_getFee is OnRampSetup {
     super.setUp();
 
     _mockVerifierFee(s_defaultCCV, MOCKED_DEFAULT_CCV_FEE_USD_CENTS, DEFAULT_CCV_GAS_LIMIT, DEFAULT_CCV_PAYLOAD_SIZE);
-    _mockExecutorFee(s_defaultExecutor, MOCKED_DEFAULT_EXECUTOR_FEE_USD_CENTS, 0, 0);
+    _mockExecutorFee(s_defaultExecutor, MOCKED_DEFAULT_EXECUTOR_FEE_USD_CENTS);
   }
 
   function _mockVerifierFee(
@@ -41,15 +45,9 @@ contract OnRamp_getFee is OnRampSetup {
 
   function _mockExecutorFee(
     address executor,
-    uint16 feeUSDCents,
-    uint64 gasForVerification,
-    uint32 payloadSizeBytes
+    uint16 feeUSDCents
   ) internal {
-    vm.mockCall(
-      executor,
-      abi.encodeWithSelector(IExecutor.getFee.selector),
-      abi.encode(feeUSDCents, gasForVerification, payloadSizeBytes)
-    );
+    vm.mockCall(executor, abi.encodeWithSelector(IExecutor.getFee.selector), abi.encode(feeUSDCents));
   }
 
   function test_getFee_WithV3ExtraArgs_CustomCCV_SkipsDefaults() public {
@@ -89,7 +87,8 @@ contract OnRamp_getFee is OnRampSetup {
       destChainSelector: DEST_CHAIN_SELECTOR,
       router: s_sourceRouter,
       addressBytesLength: EVM_ADDRESS_LENGTH,
-      networkFeeUSDCents: NETWORK_FEE_USD_CENTS,
+      messageNetworkFeeUSDCents: MESSAGE_NETWORK_FEE_USD_CENTS,
+      tokenNetworkFeeUSDCents: TOKEN_NETWORK_FEE_USD_CENTS,
       tokenReceiverAllowed: false,
       baseExecutionGasCost: BASE_EXEC_GAS_COST,
       laneMandatedCCVs: laneMandatedCCVs,
@@ -114,7 +113,7 @@ contract OnRamp_getFee is OnRampSetup {
     uint16 differentExecutorFee = 300;
     uint16 differentVerifierFee = 200;
 
-    _mockExecutorFee(customExecutor, differentExecutorFee, 0, 0);
+    _mockExecutorFee(customExecutor, differentExecutorFee);
     _mockVerifierFee(verifier, differentVerifierFee, 0, 0);
 
     address[] memory ccvAddresses = new address[](1);
@@ -142,6 +141,32 @@ contract OnRamp_getFee is OnRampSetup {
     assertGt(feeAmount, 5e17);
   }
 
+  function test_getFee_RevertWhen_ExceedsMaxFeePerMessage() public {
+    // Make verifier + executor fees to 0 so the test only targets the execution-cost component.
+    _mockVerifierFee(s_defaultCCV, 0, 0, 0);
+    _mockExecutorFee(s_defaultExecutor, 0);
+
+    uint256 premiumPercentMultiplier = 100;
+
+    // Make the call return the max amount for the gas cost. Then assert the protocol fee is more than 0, which causes
+    // the total fee to exceed the max allowed.
+    vm.mockCall(
+      address(s_feeQuoter),
+      abi.encodeWithSelector(IFeeQuoter.quoteGasForExec.selector),
+      abi.encode(uint32(0), MAX_USD_CENTS_PER_MESSAGE, uint256(1e18), premiumPercentMultiplier)
+    );
+
+    uint256 protocolFeeUsdCents = (uint256(MESSAGE_NETWORK_FEE_USD_CENTS) * premiumPercentMultiplier) / 100;
+    assertGt(protocolFeeUsdCents, 0);
+
+    uint256 expectedFeeTokenAmount = ((MAX_USD_CENTS_PER_MESSAGE + protocolFeeUsdCents) * 1e34) / 1e18;
+
+    vm.expectRevert(
+      abi.encodeWithSelector(OnRamp.FeeExceedsMaxAllowed.selector, expectedFeeTokenAmount, MAX_USD_CENTS_PER_MESSAGE)
+    );
+    s_onRamp.getFee(DEST_CHAIN_SELECTOR, _generateEmptyMessage());
+  }
+
   function test_getFee_RevertWhen_TokenReceiverNotAllowed() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     message.receiver = abi.encode(OWNER);
@@ -162,7 +187,8 @@ contract OnRamp_getFee is OnRampSetup {
       destChainSelector: DEST_CHAIN_SELECTOR,
       router: existing.router,
       addressBytesLength: existing.addressBytesLength,
-      networkFeeUSDCents: existing.networkFeeUSDCents,
+      messageNetworkFeeUSDCents: existing.messageNetworkFeeUSDCents,
+      tokenNetworkFeeUSDCents: existing.tokenNetworkFeeUSDCents,
       tokenReceiverAllowed: true,
       baseExecutionGasCost: existing.baseExecutionGasCost,
       laneMandatedCCVs: existing.laneMandatedCCVs,
@@ -180,6 +206,55 @@ contract OnRamp_getFee is OnRampSetup {
 
     // Should not revert.
     s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
+  }
+
+  function test_getFee_UsesMessageNetworkFeeWhenNoTokens() public {
+    _mockVerifierFee(s_defaultCCV, 0, 0, 0);
+    _mockExecutorFee(s_defaultExecutor, 0);
+
+    uint256 feeTokenPrice = 1e18;
+    uint256 percentMultiplier = 100;
+    vm.mockCall(
+      address(s_feeQuoter),
+      abi.encodeWithSelector(IFeeQuoter.quoteGasForExec.selector),
+      abi.encode(uint32(0), uint256(0), feeTokenPrice, percentMultiplier)
+    );
+
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    uint256 fee = s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
+
+    uint256 expectedFee = (uint256(MESSAGE_NETWORK_FEE_USD_CENTS) * percentMultiplier * 1e32) / feeTokenPrice;
+    assertEq(fee, expectedFee);
+  }
+
+  function test_getFee_UsesTokenNetworkFeeWhenTokens() public {
+    _mockVerifierFee(s_defaultCCV, 0, 0, 0);
+    _mockExecutorFee(s_defaultExecutor, 0);
+
+    uint256 feeTokenPrice = 1e18;
+    uint256 percentMultiplier = 100;
+    vm.mockCall(
+      address(s_feeQuoter),
+      abi.encodeWithSelector(IFeeQuoter.quoteGasForExec.selector),
+      abi.encode(uint32(0), uint256(0), feeTokenPrice, percentMultiplier)
+    );
+
+    address token = s_sourceTokens[0];
+    address pool = s_sourcePoolByToken[token];
+    vm.mockCall(
+      pool, abi.encodeWithSelector(IERC165.supportsInterface.selector, type(IPoolV2).interfaceId), abi.encode(false)
+    );
+    vm.mockCall(
+      address(s_feeQuoter),
+      abi.encodeCall(IFeeQuoter.getTokenTransferFee, (DEST_CHAIN_SELECTOR, token)),
+      abi.encode(uint256(0), uint32(0), uint32(0))
+    );
+
+    Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(token, 1 ether);
+    uint256 fee = s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
+
+    uint256 expectedFee = (uint256(TOKEN_NETWORK_FEE_USD_CENTS) * percentMultiplier * 1e32) / feeTokenPrice;
+    assertEq(fee, expectedFee);
   }
 
   // Reverts

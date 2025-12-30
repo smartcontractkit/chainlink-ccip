@@ -48,6 +48,8 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   error InvalidOnRamp(bytes got);
   error InvalidOffRamp(address expected, bytes got);
   error InboundImplementationNotFound(address ccvAddress, bytes verifierResults);
+  error InvalidGasLimitOverride(uint32 messageGasLimit, uint32 gasLimitOverride);
+  error GasCannotBeZero();
 
   /// @dev Atlas depends on various events, if changing, please notify Atlas.
   event StaticConfigSet(StaticConfig staticConfig);
@@ -88,7 +90,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     IRouter router; // ────────────╮ Local router to use for messages coming from this source chain.
     uint64 sourceChainSelector; // │ Source chain selector of the config to update.
     bool isEnabled; // ────────────╯ Flag whether the source chain is enabled or not.
-    bytes[] onRamps; // OnRamp address on the source chain.
+    bytes[] onRamps; // OnRamp address on the source chain. For EVM source chains, these should be abi-encoded (32 bytes).
     address[] defaultCCVs; // Default CCVs to use for messages from this source chain.
     address[] laneMandatedCCVs; // Required CCVs to use for all messages from this source chain.
   }
@@ -108,6 +110,9 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// relevant opcodes in callWithExactGas.
   uint16 internal immutable i_gasForCallExactCheck;
 
+  // At the top to pack it with the `owner` variable from Ownable2StepMsgSender.
+  bool private s_reentrancyGuardEntered;
+
   // DYNAMIC CONFIG
 
   /// @notice Set of source chain selectors.
@@ -122,8 +127,6 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
 
   // STATE
 
-  bool private s_reentrancyGuardEntered;
-
   /// Message state is tracked to ensure message can only be executed successfully once.
   mapping(bytes32 execStateKey => Internal.MessageExecutionState state) internal s_executionStates;
 
@@ -137,11 +140,15 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     if (staticConfig.localChainSelector == 0) {
       revert ZeroChainSelectorNotAllowed();
     }
+    if (staticConfig.gasForCallExactCheck == 0) {
+      revert GasCannotBeZero();
+    }
 
     i_chainSelector = staticConfig.localChainSelector;
     i_rmnRemote = staticConfig.rmnRemote;
     i_tokenAdminRegistry = staticConfig.tokenAdminRegistry;
     i_gasForCallExactCheck = staticConfig.gasForCallExactCheck;
+
     emit StaticConfigSet(staticConfig);
   }
 
@@ -161,7 +168,12 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// @param encodedMessage The message that is being executed, encoded as bytes.
   /// @param ccvs CCVs that attested to the message. Must match the CCVs specified by the receiver and token pool.
   /// @param verifierResults CCV-specific data used to verify the message. Must be same length as ccvs array.
-  function execute(bytes calldata encodedMessage, address[] calldata ccvs, bytes[] calldata verifierResults) external {
+  function execute(
+    bytes calldata encodedMessage,
+    address[] calldata ccvs,
+    bytes[] calldata verifierResults,
+    uint32 gasLimitOverride
+  ) external {
     if (s_reentrancyGuardEntered) revert ReentrancyGuardReentrantCall();
     s_reentrancyGuardEntered = true;
 
@@ -171,8 +183,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     if (i_rmnRemote.isCursed(bytes16(uint128(message.sourceChainSelector)))) {
       revert CursedByRMN(message.sourceChainSelector);
     }
-    SourceChainConfig storage sourceConfig = s_sourceChainConfigs[message.sourceChainSelector];
-    if (!sourceConfig.isEnabled) {
+    if (!s_sourceChainConfigs[message.sourceChainSelector].isEnabled) {
       revert SourceChainNotEnabled(message.sourceChainSelector);
     }
     if (!s_allowedOnRampHashes[message.sourceChainSelector].contains(keccak256(message.onRampAddress))) {
@@ -190,6 +201,11 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     if (message.receiver.length != 20) {
       revert Internal.InvalidEVMAddress(message.receiver);
     }
+    // gasLimitOverride == 0 means "no override" (use message.ccipReceiveGasLimit).
+    // A non-zero override must not be lower than the message-provided gas limit.
+    if (gasLimitOverride != 0 && gasLimitOverride < message.ccipReceiveGasLimit) {
+      revert InvalidGasLimitOverride(message.ccipReceiveGasLimit, gasLimitOverride);
+    }
 
     /////// Original state checks ///////
 
@@ -200,12 +216,8 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     // Two valid cases here, we either have never touched this message before, or we tried to execute and failed. This
     // check protects against reentry and re-execution because the other state is IN_PROGRESS which should not be
     // allowed to execute.
-    if (
-      !(
-        originalState == Internal.MessageExecutionState.UNTOUCHED
-          || originalState == Internal.MessageExecutionState.FAILURE
-      )
-    ) {
+    if (!(originalState == Internal.MessageExecutionState.UNTOUCHED
+          || originalState == Internal.MessageExecutionState.FAILURE)) {
       revert SkippedAlreadyExecutedMessage(messageId, message.sourceChainSelector, message.messageNumber);
     }
 
@@ -213,8 +225,9 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
 
     s_executionStates[messageId] = Internal.MessageExecutionState.IN_PROGRESS;
 
-    (bool success, bytes memory err) =
-      _callWithGasBuffer(abi.encodeCall(this.executeSingleMessage, (message, messageId, ccvs, verifierResults)));
+    (bool success, bytes memory err) = _callWithGasBuffer(
+      abi.encodeCall(this.executeSingleMessage, (message, messageId, ccvs, verifierResults, gasLimitOverride))
+    );
     Internal.MessageExecutionState newState =
       success ? Internal.MessageExecutionState.SUCCESS : Internal.MessageExecutionState.FAILURE;
 
@@ -264,7 +277,8 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     MessageV1Codec.MessageV1 calldata message,
     bytes32 messageId,
     address[] calldata ccvs,
-    bytes[] calldata verifierResults
+    bytes[] calldata verifierResults,
+    uint32 gasLimitOverride
   ) external {
     if (msg.sender != address(this)) revert CanOnlySelfCall();
 
@@ -275,7 +289,9 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       if (message.tokenTransfer[0].destTokenAddress.length != 20) {
         revert Internal.InvalidEVMAddress(message.tokenTransfer[0].destTokenAddress);
       }
-
+      if (message.tokenTransfer[0].tokenReceiver.length != 20) {
+        revert Internal.InvalidEVMAddress(message.tokenTransfer[0].tokenReceiver);
+      }
       balancePre = _getBalanceOfReceiver(
         address(bytes20(message.tokenTransfer[0].tokenReceiver)),
         address(bytes20(message.tokenTransfer[0].destTokenAddress))
@@ -283,31 +299,33 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     }
 
     address receiver = address(bytes20(message.receiver));
-    bool isTokenOnlyTransfer = _isTokenOnlyTransfer(message.data.length, message.ccipReceiveGasLimit, receiver);
 
     /////// SECURITY CRITICAL CHECKS ///////
+    bool isTokenOnlyTransfer = _isTokenOnlyTransfer(message.data.length, message.ccipReceiveGasLimit, receiver);
+
     {
       (address[] memory ccvsToQuery, uint256[] memory verifierResultsIndex) = _ensureCCVQuorumIsReached(
         message.sourceChainSelector, receiver, message.tokenTransfer, message.finality, ccvs, isTokenOnlyTransfer
       );
 
       for (uint256 i = 0; i < ccvsToQuery.length; ++i) {
-        address implAddress =
-          ICrossChainVerifierResolver(ccvsToQuery[i]).getInboundImplementation(verifierResults[verifierResultsIndex[i]]);
+        address implAddress = ICrossChainVerifierResolver(ccvsToQuery[i])
+          .getInboundImplementation(verifierResults[verifierResultsIndex[i]]);
         if (implAddress == address(0)) {
           revert InboundImplementationNotFound(ccvsToQuery[i], verifierResults[verifierResultsIndex[i]]);
         }
-        ICrossChainVerifierV1(implAddress).verifyMessage({
-          message: message,
-          messageId: messageId,
-          verifierResults: verifierResults[verifierResultsIndex[i]]
-        });
+        ICrossChainVerifierV1(implAddress)
+          .verifyMessage({
+            message: message, messageId: messageId, verifierResults: verifierResults[verifierResultsIndex[i]]
+          });
       }
     }
 
-    Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](message.tokenTransfer.length);
+    Client.EVMTokenAmount[] memory tokenTransfer = new Client.EVMTokenAmount[](message.tokenTransfer.length);
+
     if (message.tokenTransfer.length > 0) {
-      (Client.EVMTokenAmount memory destTokenAmount, address localPoolAddress) = _releaseOrMintSingleToken(
+      address localPoolAddress;
+      (tokenTransfer[0], localPoolAddress) = _releaseOrMintSingleToken(
         message.tokenTransfer[0], message.sender, message.sourceChainSelector, message.finality
       );
 
@@ -315,29 +333,39 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       // If a lock-release pool is the receiver, balancePost - balancePre would not reflect the amount transferred.
       // Therefore, if the receiver is the token pool, we trust the value returned by the pool.
       // Otherwise, we trust balancePost - balancePre as the amount given to the receiver.
-      if (tokenReceiver == localPoolAddress) {
-        destTokenAmounts[0] = destTokenAmount;
-      } else {
-        uint256 balancePost = _getBalanceOfReceiver(tokenReceiver, destTokenAmount.token);
-        destTokenAmounts[0] = Client.EVMTokenAmount({token: destTokenAmount.token, amount: balancePost - balancePre});
+      if (tokenReceiver != localPoolAddress) {
+        uint256 balancePost = _getBalanceOfReceiver(tokenReceiver, tokenTransfer[0].token);
+        tokenTransfer[0].amount = balancePost - balancePre;
       }
     }
 
     // Short circuit if we don't need to call the receiver.
     if (isTokenOnlyTransfer) return;
 
-    (bool success, bytes memory returnData,) = s_sourceChainConfigs[message.sourceChainSelector].router.routeMessage(
+    _callReceiver(
       Client.Any2EVMMessage({
         messageId: messageId,
         sourceChainSelector: message.sourceChainSelector,
         sender: message.sender,
         data: message.data,
-        destTokenAmounts: destTokenAmounts
+        destTokenAmounts: tokenTransfer
       }),
-      i_gasForCallExactCheck,
-      message.ccipReceiveGasLimit,
-      receiver
+      receiver,
+      gasLimitOverride != 0 ? gasLimitOverride : message.ccipReceiveGasLimit
     );
+  }
+
+  /// @notice Calls the receiver contract via the Router.
+  /// @param message The message to call the receiver for.
+  /// @param receiver The receiver address.
+  /// @param gasLimit The gas limit to use for the call.
+  function _callReceiver(
+    Client.Any2EVMMessage memory message,
+    address receiver,
+    uint32 gasLimit
+  ) internal {
+    (bool success, bytes memory returnData,) = s_sourceChainConfigs[message.sourceChainSelector].router
+      .routeMessage(message, i_gasForCallExactCheck, gasLimit, receiver);
 
     // If CCIP receiver execution is not successful, revert the call including token transfers.
     if (!success) revert ReceiverError(returnData);
@@ -513,19 +541,21 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
 
     // Remove duplicates between required and optional CCVs.
     uint256 newOptionalLength = optionalCCVs.length;
-    for (uint256 i = 0; i < newOptionalLength; ++i) {
-      for (uint256 j = 0; j < allRequiredCCVs.length;) {
-        if (optionalCCVs[i] == allRequiredCCVs[j]) {
+    for (uint256 i = 0; i < allRequiredCCVs.length; ++i) {
+      for (uint256 j = 0; j < newOptionalLength;) {
+        if (optionalCCVs[j] == allRequiredCCVs[i]) {
           // Remove the duplicate by replacing it with the last element and reducing the length of the array.
-          optionalCCVs[i] = optionalCCVs[--newOptionalLength];
+          optionalCCVs[j] = optionalCCVs[--newOptionalLength];
 
           // Since we moved one CCV from optional to required, we can reduce the threshold by one, but not below zero.
           if (optionalThreshold > 0) {
             --optionalThreshold;
           }
-        } else {
-          ++j;
+
+          // Break is safe because we asserted no duplicates in _getCCVsFromReceiver.
+          break;
         }
+        ++j;
       }
     }
 
@@ -651,9 +681,8 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     address pool = ITokenAdminRegistry(i_tokenAdminRegistry).getPool(localToken);
 
     if (pool._supportsInterfaceReverting(type(IPoolV2).interfaceId)) {
-      requiredCCV = IPoolV2(pool).getRequiredCCVs(
-        localToken, sourceChainSelector, amount, finality, extraData, IPoolV2.MessageDirection.Inbound
-      );
+      requiredCCV = IPoolV2(pool)
+        .getRequiredCCVs(localToken, sourceChainSelector, amount, finality, extraData, IPoolV2.MessageDirection.Inbound);
       CCVConfigValidation._assertNoDuplicates(requiredCCV);
     }
 
@@ -707,10 +736,8 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       sourceDenominatedAmount: tokenTransfer.amount,
       localToken: localToken,
       remoteChainSelector: sourceChainSelector,
-      // This re-encodes the address as bytes, but now with the zero prefix to make it 32 bytes long.
-      // We have to cast it to an address to ensure the bytes are padded on the left with zeros, bytes objects get
-      // padded on the right.
-      sourcePoolAddress: abi.encode(address(bytes20(tokenTransfer.sourcePoolAddress))),
+      // The source chain has encoded this in the expected format.
+      sourcePoolAddress: tokenTransfer.sourcePoolAddress,
       sourcePoolData: tokenTransfer.extraData,
       // All use cases that use offchain token data in IPoolV1 have to upgrade to the modular security interface.
       offchainTokenData: ""
@@ -746,7 +773,10 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// @param receiver The address to check the balance of.
   /// @param token The token address.
   /// @return balance The balance of the receiver.
-  function _getBalanceOfReceiver(address receiver, address token) internal view returns (uint256) {
+  function _getBalanceOfReceiver(
+    address receiver,
+    address token
+  ) internal view returns (uint256) {
     try IERC20(token).balanceOf(receiver) returns (uint256 balance_) {
       // If the call succeeds, we return the balance and the gas left.
       return (balance_);
@@ -856,7 +886,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// @return transformedMessage modified message
   function _beforeExecuteSingleMessage(
     MessageV1Codec.MessageV1 memory message
-  ) internal virtual returns (MessageV1Codec.MessageV1 memory transformedMessage) {
+  ) internal view virtual returns (MessageV1Codec.MessageV1 memory transformedMessage) {
     return message;
   }
 }

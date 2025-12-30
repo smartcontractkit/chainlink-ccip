@@ -2,16 +2,14 @@
 pragma solidity ^0.8.24;
 
 import {Router} from "../../../Router.sol";
-
 import {ERC20LockBox} from "../../../pools/ERC20LockBox.sol";
 import {SiloedLockReleaseTokenPool} from "../../../pools/SiloedLockReleaseTokenPool.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {BaseTest} from "../../BaseTest.t.sol";
+import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
-import {TokenAdminRegistry} from "../../../tokenAdminRegistry/TokenAdminRegistry.sol";
-
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
 contract SiloedLockReleaseTokenPoolSetup is BaseTest {
   IERC20 internal s_token;
@@ -28,51 +26,34 @@ contract SiloedLockReleaseTokenPoolSetup is BaseTest {
   uint64 internal constant SILOED_CHAIN_SELECTOR = DEST_CHAIN_SELECTOR + 1;
 
   ERC20LockBox internal s_lockBox;
-  TokenAdminRegistry internal s_tokenAdminRegistry;
+  ERC20LockBox internal s_siloLockBox;
 
   function setUp() public virtual override {
     super.setUp();
-    s_token = new BurnMintERC20("LINK", "LNK", 18, 0, 0);
+    s_token = IERC20(address(new BurnMintERC20("LINK", "LNK", 18, 0, 0)));
     deal(address(s_token), OWNER, type(uint256).max);
 
-    s_tokenAdminRegistry = new TokenAdminRegistry();
-    s_lockBox = new ERC20LockBox(address(s_tokenAdminRegistry));
+    s_lockBox = new ERC20LockBox(address(s_token));
+    s_siloLockBox = new ERC20LockBox(address(s_token));
 
     s_siloedLockReleaseTokenPool = new SiloedLockReleaseTokenPool(
       s_token, DEFAULT_TOKEN_DECIMALS, address(0), address(s_mockRMNRemote), address(s_sourceRouter), address(s_lockBox)
     );
 
-    // Mock the token pool for the token to be the siloed lock release token pool so that we can test the allowed caller configuration
-    vm.mockCall(
-      address(s_tokenAdminRegistry),
-      abi.encodeWithSignature("getPool(address)", address(s_token)),
-      abi.encode(address(s_siloedLockReleaseTokenPool))
+    address[] memory allowedCallers = new address[](1);
+    allowedCallers[0] = address(s_siloedLockReleaseTokenPool);
+    s_lockBox.applyAuthorizedCallerUpdates(
+      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: allowedCallers, removedCallers: new address[](0)})
+    );
+    s_siloLockBox.applyAuthorizedCallerUpdates(
+      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: allowedCallers, removedCallers: new address[](0)})
     );
 
-    // Mock the token config for the token to be the siloed lock release token pool so that we can test the allowed caller configuration
-    vm.mockCall(
-      address(s_tokenAdminRegistry),
-      abi.encodeWithSignature("getTokenConfig(address)", address(s_token)),
-      abi.encode(
-        TokenAdminRegistry.TokenConfig({
-          administrator: OWNER,
-          pendingAdministrator: address(0),
-          tokenPool: address(s_siloedLockReleaseTokenPool)
-        })
-      )
-    );
-
-    // Set the owner as an administrator for the token so that it can configure the allowed callers
-    vm.mockCall(
-      address(s_tokenAdminRegistry),
-      abi.encodeWithSignature("isAdministrator(address,address)", address(s_token), OWNER),
-      abi.encode(true)
-    );
-
-    ERC20LockBox.AllowedCallerConfigArgs[] memory allowedCallers = new ERC20LockBox.AllowedCallerConfigArgs[](1);
-    allowedCallers[0] =
-      ERC20LockBox.AllowedCallerConfigArgs({token: address(s_token), caller: address(OWNER), allowed: true});
-    s_lockBox.configureAllowedCallers(allowedCallers);
+    SiloedLockReleaseTokenPool.LockBoxConfig[] memory lockBoxes = new SiloedLockReleaseTokenPool.LockBoxConfig[](1);
+    lockBoxes[0] = SiloedLockReleaseTokenPool.LockBoxConfig({
+      remoteChainSelector: SILOED_CHAIN_SELECTOR, lockBox: address(s_siloLockBox)
+    });
+    s_siloedLockReleaseTokenPool.configureLockBoxes(lockBoxes);
 
     // Set the rebalancer for the token pool
     s_siloedLockReleaseTokenPool.setRebalancer(OWNER);

@@ -8,14 +8,11 @@ import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/I
 
 import {Client} from "../../libraries/Client.sol";
 
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/utils/SafeERC20.sol";
 import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
 import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/EnumerableSet.sol";
 
 abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
   using EnumerableSet for EnumerableSet.AddressSet;
-  using SafeERC20 for IERC20;
 
   error CursedByRMN(uint64 destChainSelector);
   error InvalidRemoteChainConfig(uint64 remoteChainSelector);
@@ -26,7 +23,6 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
   error RemoteChainNotSupported(uint64 remoteChainSelector);
   error ZeroAddressNotAllowed();
 
-  event FeeTokenWithdrawn(address indexed receiver, address indexed feeToken, uint256 amount);
   event RemoteChainConfigSet(uint64 indexed remoteChainSelector, address router, bool allowlistEnabled);
   event AllowListSendersAdded(uint64 indexed destChainSelector, address[] senders);
   event AllowListSendersRemoved(uint64 indexed destChainSelector, address[] senders);
@@ -68,7 +64,10 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
   /// implement a way to update this value if needed.
   string[] internal s_storageLocations;
 
-  constructor(string[] memory storageLocations, address rmnAddress) {
+  constructor(
+    string[] memory storageLocations,
+    address rmnAddress
+  ) {
     _setStorageLocations(storageLocations);
 
     if (rmnAddress == address(0)) {
@@ -159,7 +158,10 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
     }
   }
 
-  function _assertSenderIsAllowed(uint64 destChainSelector, address sender) internal view virtual {
+  function _assertSenderIsAllowed(
+    uint64 destChainSelector,
+    address sender
+  ) internal view virtual {
     RemoteChainConfig storage chainConfig = _getRemoteChainConfig(destChainSelector);
     if (address(chainConfig.router) == address(0)) {
       revert RemoteChainNotSupported(destChainSelector);
@@ -201,6 +203,10 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
       RemoteChainConfig storage remoteChainConfig = s_remoteChainConfigs[allowlistConfigArgs.destChainSelector];
       remoteChainConfig.allowlistEnabled = allowlistConfigArgs.allowlistEnabled;
 
+      for (uint256 j = 0; j < allowlistConfigArgs.removedAllowlistedSenders.length; ++j) {
+        remoteChainConfig.allowedSendersList.remove(allowlistConfigArgs.removedAllowlistedSenders[j]);
+      }
+
       if (allowlistConfigArgs.addedAllowlistedSenders.length > 0) {
         if (allowlistConfigArgs.allowlistEnabled) {
           for (uint256 j = 0; j < allowlistConfigArgs.addedAllowlistedSenders.length; ++j) {
@@ -215,10 +221,6 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
         } else {
           revert InvalidAllowListRequest(allowlistConfigArgs.destChainSelector);
         }
-      }
-
-      for (uint256 j = 0; j < allowlistConfigArgs.removedAllowlistedSenders.length; ++j) {
-        remoteChainConfig.allowedSendersList.remove(allowlistConfigArgs.removedAllowlistedSenders[j]);
       }
 
       if (allowlistConfigArgs.removedAllowlistedSenders.length > 0) {
@@ -244,22 +246,6 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
       s_remoteChainConfigs[destChainSelector].gasForVerification,
       s_remoteChainConfigs[destChainSelector].payloadSizeBytes
     );
-  }
-
-  /// @notice Withdraws the outstanding fee token balances to the fee aggregator.
-  /// @param feeTokens The fee tokens to withdraw.
-  /// @param feeAggregator The address to withdraw the fee tokens to.
-  function _withdrawFeeTokens(address[] calldata feeTokens, address feeAggregator) internal virtual {
-    for (uint256 i = 0; i < feeTokens.length; ++i) {
-      IERC20 feeToken = IERC20(feeTokens[i]);
-      uint256 feeTokenBalance = feeToken.balanceOf(address(this));
-
-      if (feeTokenBalance > 0) {
-        feeToken.safeTransfer(feeAggregator, feeTokenBalance);
-
-        emit FeeTokenWithdrawn(feeAggregator, address(feeToken), feeTokenBalance);
-      }
-    }
   }
 
   function _assertNotCursedByRMN(

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {IBurnMintERC20} from "../../interfaces/IBurnMintERC20.sol";
 import {ITokenMessenger} from "../../pools/USDC/interfaces/ITokenMessenger.sol";
-import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
 
 // This contract mocks both the ITokenMessenger and IMessageTransmitter
 // contracts involved with the Cross Chain Token Protocol.
@@ -14,7 +14,10 @@ contract MockUSDCTokenMessenger is ITokenMessenger {
 
   uint64 public s_nonce;
 
-  constructor(uint32 version, address transmitter) {
+  constructor(
+    uint32 version,
+    address transmitter
+  ) {
     i_messageBodyVersion = version;
     s_nonce = 1;
     i_transmitter = transmitter;

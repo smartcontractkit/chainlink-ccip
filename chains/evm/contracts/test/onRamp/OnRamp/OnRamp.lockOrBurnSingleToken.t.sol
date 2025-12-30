@@ -26,12 +26,11 @@ contract OnRamp_lockOrBurnSingleToken is OnRampSetup {
       OnRamp.StaticConfig({
         chainSelector: SOURCE_CHAIN_SELECTOR,
         rmnRemote: s_mockRMNRemote,
+        maxUSDCentsPerMessage: MAX_USD_CENTS_PER_MESSAGE,
         tokenAdminRegistry: address(s_tokenAdminRegistry)
       }),
       OnRamp.DynamicConfig({
-        feeQuoter: address(s_feeQuoter),
-        reentrancyGuardEntered: false,
-        feeAggregator: FEE_AGGREGATOR
+        feeQuoter: address(s_feeQuoter), reentrancyGuardEntered: false, feeAggregator: FEE_AGGREGATOR
       })
     );
     address[] memory defaultCCVs = new address[](1);
@@ -42,7 +41,8 @@ contract OnRamp_lockOrBurnSingleToken is OnRampSetup {
       destChainSelector: DEST_CHAIN_SELECTOR,
       router: s_sourceRouter,
       addressBytesLength: EVM_ADDRESS_LENGTH,
-      networkFeeUSDCents: NETWORK_FEE_USD_CENTS,
+      messageNetworkFeeUSDCents: MESSAGE_NETWORK_FEE_USD_CENTS,
+      tokenNetworkFeeUSDCents: TOKEN_NETWORK_FEE_USD_CENTS,
       tokenReceiverAllowed: false,
       baseExecutionGasCost: BASE_EXEC_GAS_COST,
       laneMandatedCCVs: new address[](0),
@@ -94,8 +94,8 @@ contract OnRamp_lockOrBurnSingleToken is OnRampSetup {
     );
 
     assertEq(transfer.amount, destAmount);
-    assertEq(transfer.sourcePoolAddress, abi.encodePacked(address(s_pool)));
-    assertEq(transfer.sourceTokenAddress, abi.encodePacked(s_sourceToken));
+    assertEq(transfer.sourcePoolAddress, abi.encode(address(s_pool)));
+    assertEq(transfer.sourceTokenAddress, abi.encode(s_sourceToken));
     assertEq(transfer.destTokenAddress, abi.encodePacked(s_destToken));
     assertEq(transfer.tokenReceiver, receiver);
     assertEq(transfer.extraData, abi.encode("poolData"));
@@ -130,8 +130,8 @@ contract OnRamp_lockOrBurnSingleToken is OnRampSetup {
     );
 
     assertEq(transfer.amount, expectedInput.amount);
-    assertEq(transfer.sourcePoolAddress, abi.encodePacked(address(s_pool)));
-    assertEq(transfer.sourceTokenAddress, abi.encodePacked(s_sourceToken));
+    assertEq(transfer.sourcePoolAddress, abi.encode(address(s_pool)));
+    assertEq(transfer.sourceTokenAddress, abi.encode(s_sourceToken));
     assertEq(transfer.destTokenAddress, abi.encodePacked(s_destToken));
     assertEq(transfer.tokenReceiver, receiver);
     assertEq(transfer.extraData, abi.encode("poolData"));

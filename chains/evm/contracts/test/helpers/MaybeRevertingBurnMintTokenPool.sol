@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
+import {IBurnMintERC20} from "../../interfaces/IBurnMintERC20.sol";
 
 import {Pool} from "../../libraries/Pool.sol";
 import {BurnMintTokenPool} from "../../pools/BurnMintTokenPool.sol";
@@ -38,6 +38,7 @@ contract MaybeRevertingBurnMintTokenPool is BurnMintTokenPool {
   }
 
   function _lockOrBurn(
+    uint64, // remoteChainSelector
     uint256 amount
   ) internal override {
     IBurnMintERC20(address(i_token)).burn(amount);
@@ -61,7 +62,11 @@ contract MaybeRevertingBurnMintTokenPool is BurnMintTokenPool {
     return out;
   }
 
-  function _releaseOrMint(address receiver, uint256 amount) internal override {
+  function _releaseOrMint(
+    address receiver,
+    uint256 amount,
+    uint64 // remoteChainSelector
+  ) internal override {
     IBurnMintERC20(address(i_token)).mint(receiver, amount);
   }
 
@@ -81,7 +86,10 @@ contract MaybeRevertingBurnMintTokenPool is BurnMintTokenPool {
     return out;
   }
 
-  function _calculateLocalAmount(uint256 remoteAmount, uint8 remoteDecimals) internal view override returns (uint256) {
+  function _calculateLocalAmount(
+    uint256 remoteAmount,
+    uint8 remoteDecimals
+  ) internal view override returns (uint256) {
     return super._calculateLocalAmount(remoteAmount, remoteDecimals) * s_releaseOrMintMultiplier;
   }
 }

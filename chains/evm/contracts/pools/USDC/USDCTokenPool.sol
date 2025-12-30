@@ -12,9 +12,9 @@ import {CCTPMessageTransmitterProxy} from "./CCTPMessageTransmitterProxy.sol";
 
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/utils/SafeERC20.sol";
-import {EnumerableSet} from "@openzeppelin/contracts@4.8.3/utils/structs/EnumerableSet.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/utils/SafeERC20.sol";
+import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/EnumerableSet.sol";
 
 /// @notice This pool mints and burns USDC tokens through the Cross Chain Transfer Protocol (CCTP).
 /*
@@ -98,7 +98,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
     uint32 domainIdentifier; // ────────────╮ Unique domain ID
     bool enabled; //                        | Whether the domain is enabled
     bool useLegacySourcePoolDataFormat; // ─╯ Whether to use the legacy source pool data format for chains that
-      // have not yet been updated to the new source pool data format.
+    // have not yet been updated to the new source pool data format.
   }
 
   // A mapping of CCIP chain identifiers to destination domains
@@ -147,12 +147,12 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
     i_localDomainIdentifier = transmitter.localDomain();
 
     // Allow the token messenger to burn tokens on behalf of this pool.
-    i_token.safeIncreaseAllowance(address(i_tokenMessenger), type(uint256).max);
+    i_token.approve(address(i_tokenMessenger), type(uint256).max);
 
     emit ConfigSet(address(tokenMessenger));
   }
 
-  /// @notice Using a function because constant state variables cannot be overridden by child contracts.
+  /// @dev Using a function because constant state variables cannot be overridden by child contracts.
   function typeAndVersion() external pure virtual override returns (string memory) {
     return "USDCTokenPool 1.7.0-dev";
   }
@@ -219,8 +219,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
     }
 
     return Pool.LockOrBurnOutV1({
-      destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
-      destPoolData: sourcePoolData
+      destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector), destPoolData: sourcePoolData
     });
   }
 
@@ -375,8 +374,16 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
   }
 
   /// @notice No-op override to purge the unused code path from the contract.
-  function _postFlightCheck(Pool.ReleaseOrMintInV1 calldata, uint256, uint16) internal pure virtual override {}
+  function _postFlightCheck(
+    Pool.ReleaseOrMintInV1 calldata,
+    uint256,
+    uint16
+  ) internal pure virtual override {}
 
   /// @notice No-op override to purge the unused code path from the contract.
-  function _preFlightCheck(Pool.LockOrBurnInV1 calldata, uint16, bytes memory) internal pure virtual override {}
+  function _preFlightCheck(
+    Pool.LockOrBurnInV1 calldata,
+    uint16,
+    bytes memory
+  ) internal pure virtual override {}
 }

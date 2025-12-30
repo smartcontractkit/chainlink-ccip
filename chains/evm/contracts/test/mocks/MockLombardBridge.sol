@@ -61,11 +61,18 @@ contract MockLombardBridge is IBridgeV3 {
     return (1, keccak256(abi.encodePacked(block.timestamp, token)));
   }
 
-  function getAllowedDestinationToken(bytes32 destinationChain, address sourceToken) external view returns (bytes32) {
+  function getAllowedDestinationToken(
+    bytes32 destinationChain,
+    address sourceToken
+  ) external view returns (bytes32) {
     return s_allowedDestinationTokens[destinationChain][sourceToken];
   }
 
-  function setAllowedDestinationToken(bytes32 destinationChain, address sourceToken, bytes32 destinationToken) external {
+  function setAllowedDestinationToken(
+    bytes32 destinationChain,
+    address sourceToken,
+    bytes32 destinationToken
+  ) external {
     s_allowedDestinationTokens[destinationChain][sourceToken] = destinationToken;
   }
 }

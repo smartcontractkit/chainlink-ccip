@@ -11,7 +11,7 @@ import {OffRamp} from "../../../offRamp/OffRamp.sol";
 import {MockReceiverV2} from "../../mocks/MockReceiverV2.sol";
 import {OffRampSetup} from "./OffRampSetup.t.sol";
 
-import {IERC165} from "@openzeppelin/contracts@4.8.3/utils/introspection/IERC165.sol";
+import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
 
 using ERC165CheckerReverting for address;
 
@@ -77,8 +77,8 @@ contract OffRamp_ensureCCVQuorumIsReached is OffRampSetup {
     MessageV1Codec.TokenTransferV1[] memory tokenTransfers = new MessageV1Codec.TokenTransferV1[](1);
     tokenTransfers[0] = MessageV1Codec.TokenTransferV1({
       amount: 100,
-      sourcePoolAddress: abi.encodePacked(s_destTokenPool),
-      sourceTokenAddress: abi.encodePacked(address(0x1111111111111111111111111111111111111111)),
+      sourcePoolAddress: abi.encode(s_destTokenPool),
+      sourceTokenAddress: abi.encode(address(0x1111111111111111111111111111111111111111)),
       destTokenAddress: abi.encodePacked(s_destToken),
       tokenReceiver: abi.encodePacked(address(21321)),
       extraData: ""

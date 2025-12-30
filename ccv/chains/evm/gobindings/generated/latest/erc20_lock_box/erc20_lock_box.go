@@ -28,22 +28,21 @@ var (
 	_ = abi.ConvertType
 )
 
-type ERC20LockBoxAllowedCallerConfigArgs struct {
-	Token   common.Address
-	Caller  common.Address
-	Allowed bool
+type AuthorizedCallersAuthorizedCallerArgs struct {
+	AddedCallers   []common.Address
+	RemovedCallers []common.Address
 }
 
 var ERC20LockBoxMetaData = &bind.MetaData{
-	ABI: "[{\"type\":\"constructor\",\"inputs\":[{\"name\":\"tokenAdminRegistry\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"configureAllowedCallers\",\"inputs\":[{\"name\":\"configArgs\",\"type\":\"tuple[]\",\"internalType\":\"struct ERC20LockBox.AllowedCallerConfigArgs[]\",\"components\":[{\"name\":\"token\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"caller\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"allowed\",\"type\":\"bool\",\"internalType\":\"bool\"}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"deposit\",\"inputs\":[{\"name\":\"token\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"i_tokenAdminRegistry\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"contract TokenAdminRegistry\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"isAllowedCaller\",\"inputs\":[{\"name\":\"token\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"caller\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[{\"name\":\"allowed\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"typeAndVersion\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"string\",\"internalType\":\"string\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"withdraw\",\"inputs\":[{\"name\":\"token\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"recipient\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"event\",\"name\":\"AllowedCallerUpdated\",\"inputs\":[{\"name\":\"token\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"caller\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"allowed\",\"type\":\"bool\",\"indexed\":false,\"internalType\":\"bool\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"Deposit\",\"inputs\":[{\"name\":\"token\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"depositor\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"Withdrawal\",\"inputs\":[{\"name\":\"token\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"recipient\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"error\",\"name\":\"InsufficientBalance\",\"inputs\":[{\"name\":\"requested\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"available\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"type\":\"error\",\"name\":\"RecipientCannotBeZeroAddress\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"TokenAddressCannotBeZero\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"TokenAmountCannotBeZero\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"Unauthorized\",\"inputs\":[{\"name\":\"caller\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"ZeroAddressNotAllowed\",\"inputs\":[]}]",
-	Bin: "0x60a034608c57601f610eb238819003918201601f19168301916001600160401b03831184841017609157808492602094604052833981010312608c57516001600160a01b03811690819003608c578015607b57608052604051610e0a90816100a8823960805181818161011c015281816104ed01526109f30152f35b6342bcdf7f60e11b60005260046000fd5b600080fd5b634e487b7160e01b600052604160045260246000fdfe6080604052600436101561001257600080fd5b60003560e01c8063162d2edd14610477578063181f5a77146103fe57806347e7ef241461032257806369328dec146101405780638ca86f28146100d15763f901fa161461005e57600080fd5b346100cc5760407ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126100cc576100956108ed565b6024359073ffffffffffffffffffffffffffffffffffffffff821682036100cc576020916100c291610991565b6040519015158152f35b600080fd5b346100cc5760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126100cc57602060405173ffffffffffffffffffffffffffffffffffffffff7f0000000000000000000000000000000000000000000000000000000000000000168152f35b346100cc5760607ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126100cc576101776108ed565b6024356044359173ffffffffffffffffffffffffffffffffffffffff83168093036100cc576101a68282610b61565b82156102f85773ffffffffffffffffffffffffffffffffffffffff16906040517f70a08231000000000000000000000000000000000000000000000000000000008152306004820152602081602481865afa9081156102ec576000916102ba575b50808211610289575060207f2717ead6b9200dd235aad468c9809ea400fe33ac69b5bfaa6d3e90fc922b6398916102806040517fa9059cbb00000000000000000000000000000000000000000000000000000000848201528660248201528260448201526044815261027a606482610815565b85610bbf565b604051908152a3005b907fcf4791810000000000000000000000000000000000000000000000000000000060005260045260245260446000fd5b90506020813d6020116102e4575b816102d560209383610815565b810103126100cc575184610207565b3d91506102c8565b6040513d6000823e3d90fd5b7fd87070520000000000000000000000000000000000000000000000000000000060005260046000fd5b346100cc5760407ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126100cc576103596108ed565b73ffffffffffffffffffffffffffffffffffffffff6024359161037c8382610b61565b166103d06040517f23b872dd000000000000000000000000000000000000000000000000000000006020820152336024820152306044820152836064820152606481526103ca608482610815565b82610bbf565b6040519182527f5548c837ab068cf56a2c2479df0882a4922fd203edb7517321831d95078c5f6260203393a3005b346100cc5760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126100cc57610473604080519061043f8183610815565b601682527f45524332304c6f636b426f7820312e362e322d6465760000000000000000000060208301525191829182610885565b0390f35b346100cc5760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126100cc5760043567ffffffffffffffff81116100cc57366023820112156100cc57806004013567ffffffffffffffff81116100cc57602482019160243691606084020101116100cc577f000000000000000000000000000000000000000000000000000000000000000073ffffffffffffffffffffffffffffffffffffffff1660005b82811061052e57005b73ffffffffffffffffffffffffffffffffffffffff610556610551838688610910565b61094f565b169081156107eb576040517fbbe4f6db000000000000000000000000000000000000000000000000000000008152826004820152602081602481875afa9081156102ec5760009161079a575b50602073ffffffffffffffffffffffffffffffffffffffff916004604051809481937f8da5cb5b000000000000000000000000000000000000000000000000000000008352165afa80156102ec5760009061074b575b73ffffffffffffffffffffffffffffffffffffffff915016330361071d5761062c6020610626838789610910565b0161094f565b91604061063a838789610910565b0135908115158092036100cc576001938160005260006020528260ff60408060002060009073ffffffffffffffffffffffffffffffffffffffff8616825260205220541615150361068f575b50505001610525565b602073ffffffffffffffffffffffffffffffffffffffff7fb2cc4dde7f9044ba1999f7843e2f9cd1e4ce506f8cc2e16de26ce982bf113fa692846000526000835260408060002060009084841682528552207fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0081541660ff88161790556040519586521693a3858080610686565b7f8e4a23d6000000000000000000000000000000000000000000000000000000006000523360045260246000fd5b6020823d8211610792575b8161076360209383610815565b8101031261078f575061078a73ffffffffffffffffffffffffffffffffffffffff91610970565b6105f8565b80fd5b3d9150610756565b906020823d82116107e3575b816107b360209383610815565b8101031261078f575060206107dc73ffffffffffffffffffffffffffffffffffffffff92610970565b91506105a2565b3d91506107a6565b7f802c78a20000000000000000000000000000000000000000000000000000000060005260046000fd5b90601f7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0910116810190811067ffffffffffffffff82111761085657604052565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052604160045260246000fd5b9190916020815282519283602083015260005b8481106108d75750507fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0601f8460006040809697860101520116010190565b8060208092840101516040828601015201610898565b6004359073ffffffffffffffffffffffffffffffffffffffff821682036100cc57565b9190811015610920576060020190565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052603260045260246000fd5b3573ffffffffffffffffffffffffffffffffffffffff811681036100cc5790565b519073ffffffffffffffffffffffffffffffffffffffff821682036100cc57565b9073ffffffffffffffffffffffffffffffffffffffff604051927fcb67e3b1000000000000000000000000000000000000000000000000000000008452169182600482015260608160248173ffffffffffffffffffffffffffffffffffffffff7f0000000000000000000000000000000000000000000000000000000000000000165afa9081156102ec57600091610a9d575b50604073ffffffffffffffffffffffffffffffffffffffff9101511673ffffffffffffffffffffffffffffffffffffffff821614918215610a6457505090565b909150600052600060205273ffffffffffffffffffffffffffffffffffffffff6040600020911660005260205260ff6040600020541690565b6060813d606011610b59575b81610ab660609383610815565b81010312610b555760405191606083019083821067ffffffffffffffff831117610b28575091610b1d6040809373ffffffffffffffffffffffffffffffffffffffff958252610b0481610970565b8452610b1260208201610970565b602085015201610970565b828201529150610a24565b807f4e487b7100000000000000000000000000000000000000000000000000000000602492526041600452fd5b5080fd5b3d9150610aa9565b9073ffffffffffffffffffffffffffffffffffffffff8216156107eb5715610b9557610b8e903390610991565b1561071d57565b7f8b1fa9dd0000000000000000000000000000000000000000000000000000000060005260046000fd5b73ffffffffffffffffffffffffffffffffffffffff16604091600080845192610be88685610815565b602084527f5361666545524332303a206c6f772d6c6576656c2063616c6c206661696c6564602085015260208151910182865af13d15610d2c573d9067ffffffffffffffff821161085657610c7c9360207fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0601f8501160192610c6d87519485610815565b83523d6000602085013e610d35565b805180610c8857505050565b81602091810103126100cc57602001518015908115036100cc57610ca95750565b608490517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152602a60248201527f5361666545524332303a204552433230206f7065726174696f6e20646964206e60448201527f6f742073756363656564000000000000000000000000000000000000000000006064820152fd5b91610c7c926060915b91929015610db05750815115610d49575090565b3b15610d525790565b60646040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601d60248201527f416464726573733a2063616c6c20746f206e6f6e2d636f6e74726163740000006044820152fd5b825190915015610dc35750805190602001fd5b610df9906040519182917f08c379a000000000000000000000000000000000000000000000000000000000835260048301610885565b0390fdfea164736f6c634300081a000a",
+	ABI: "[{\"type\":\"constructor\",\"inputs\":[{\"name\":\"token\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"acceptOwnership\",\"inputs\":[],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"applyAuthorizedCallerUpdates\",\"inputs\":[{\"name\":\"authorizedCallerArgs\",\"type\":\"tuple\",\"internalType\":\"struct AuthorizedCallers.AuthorizedCallerArgs\",\"components\":[{\"name\":\"addedCallers\",\"type\":\"address[]\",\"internalType\":\"address[]\"},{\"name\":\"removedCallers\",\"type\":\"address[]\",\"internalType\":\"address[]\"}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"deposit\",\"inputs\":[{\"name\":\"token\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"getAllAuthorizedCallers\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address[]\",\"internalType\":\"address[]\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"isTokenSupported\",\"inputs\":[{\"name\":\"token\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"owner\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"transferOwnership\",\"inputs\":[{\"name\":\"to\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"typeAndVersion\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"string\",\"internalType\":\"string\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"withdraw\",\"inputs\":[{\"name\":\"token\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"recipient\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"event\",\"name\":\"AuthorizedCallerAdded\",\"inputs\":[{\"name\":\"caller\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"AuthorizedCallerRemoved\",\"inputs\":[{\"name\":\"caller\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"Deposit\",\"inputs\":[{\"name\":\"token\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"depositor\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"OwnershipTransferRequested\",\"inputs\":[{\"name\":\"from\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"to\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"OwnershipTransferred\",\"inputs\":[{\"name\":\"from\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"to\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"Withdrawal\",\"inputs\":[{\"name\":\"token\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"recipient\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"error\",\"name\":\"CannotTransferToSelf\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"InsufficientBalance\",\"inputs\":[{\"name\":\"requested\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"available\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"type\":\"error\",\"name\":\"MustBeProposedOwner\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"OnlyCallableByOwner\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"OwnerCannotBeZero\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"RecipientCannotBeZeroAddress\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"SafeERC20FailedOperation\",\"inputs\":[{\"name\":\"token\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"TokenAmountCannotBeZero\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"UnauthorizedCaller\",\"inputs\":[{\"name\":\"caller\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"UnsupportedToken\",\"inputs\":[{\"name\":\"token\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"ZeroAddressNotAllowed\",\"inputs\":[]}]",
+	Bin: "0x60a0604052346101d2576112f76020813803918261001c816101d7565b9384928339810103126101d257516001600160a01b038116908190036101d257602090610048826101d7565b9160008352600036813733156101c157600180546001600160a01b03191633179055610073816101d7565b60008152600036813760408051949085016001600160401b038111868210176101ab576040528452808285015260005b815181101561010a576001906001600160a01b036100c182856101fc565b5116846100cd8261023e565b6100da575b5050016100a3565b7fc3803387881faad271c47728894e3e36fac830ffc8602ca6fc07733cbda7758091604051908152a138846100d2565b5050915160005b8151811015610182576001600160a01b0361012c82846101fc565b5116908115610171577feb1b9b92e50b7f88f9ff25d56765095ac6e91540eee214906f4036a908ffbdef858361016360019561033c565b50604051908152a101610111565b6342bcdf7f60e11b60005260046000fd5b82801561017157608052604051610f5a908161039d82396080518181816105eb0152610b350152f35b634e487b7160e01b600052604160045260246000fd5b639b15e16f60e01b60005260046000fd5b600080fd5b6040519190601f01601f191682016001600160401b038111838210176101ab57604052565b80518210156102105760209160051b010190565b634e487b7160e01b600052603260045260246000fd5b80548210156102105760005260206000200190600090565b600081815260036020526040902054801561033557600019810181811161031f5760025460001981019190821161031f578082036102ce575b50505060025480156102b85760001901610292816002610226565b8154906000199060031b1b19169055600255600052600360205260006040812055600190565b634e487b7160e01b600052603160045260246000fd5b6103076102df6102f0936002610226565b90549060031b1c9283926002610226565b819391549060031b91821b91600019901b19161790565b90556000526003602052604060002055388080610277565b634e487b7160e01b600052601160045260246000fd5b5050600090565b8060005260036020526040600020541560001461039657600254680100000000000000008110156101ab5761037d6102f08260018594016002556002610226565b9055600254906000526003602052604060002055600190565b5060009056fe608080604052600436101561001357600080fd5b60003560e01c908163181f5a77146108e9575080632451a627146107fb57806374fd18ac1461061057806375151b631461058157806379ba5097146104985780638da5cb5b1461044657806391a2749a1461025c578063a36a7fee146101775763f2fde38b1461008257600080fd5b346101725760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126101725773ffffffffffffffffffffffffffffffffffffffff6100ce610a44565b6100d6610bf7565b1633811461014857807fffffffffffffffffffffffff0000000000000000000000000000000000000000600054161760005573ffffffffffffffffffffffffffffffffffffffff600154167fed8889f560326eb138920d842192f0eb3dd22b4f139c87a2c57538e05bae1278600080a3005b7fdad89dca0000000000000000000000000000000000000000000000000000000060005260046000fd5b600080fd5b346101725760607ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc360112610172576101ae610a44565b6101b6610a67565b5073ffffffffffffffffffffffffffffffffffffffff604435916101da8382610b02565b1661022e6040517f23b872dd00000000000000000000000000000000000000000000000000000000602082015233602482015230604482015283606482015260648152610228608482610a03565b82610c85565b6040519182527f5548c837ab068cf56a2c2479df0882a4922fd203edb7517321831d95078c5f6260203393a3005b346101725760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126101725760043567ffffffffffffffff81116101725760407ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc823603011261017257604051906102d6826109b8565b806004013567ffffffffffffffff8111610172576102fa9060043691840101610a7e565b825260248101359067ffffffffffffffff82116101725760046103209236920101610a7e565b6020820190815261032f610bf7565b519060005b82518110156103a7578073ffffffffffffffffffffffffffffffffffffffff61035f60019386610c42565b511661036a81610d28565b610376575b5001610334565b60207fc3803387881faad271c47728894e3e36fac830ffc8602ca6fc07733cbda7758091604051908152a18461036f565b505160005b81518110156104445773ffffffffffffffffffffffffffffffffffffffff6103d48284610c42565b511690811561041a577feb1b9b92e50b7f88f9ff25d56765095ac6e91540eee214906f4036a908ffbdef60208361040c600195610eed565b50604051908152a1016103ac565b7f8579befe0000000000000000000000000000000000000000000000000000000060005260046000fd5b005b346101725760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261017257602073ffffffffffffffffffffffffffffffffffffffff60015416604051908152f35b346101725760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126101725760005473ffffffffffffffffffffffffffffffffffffffff81163303610557577fffffffffffffffffffffffff00000000000000000000000000000000000000006001549133828416176001551660005573ffffffffffffffffffffffffffffffffffffffff3391167f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0600080a3005b7f02b543c60000000000000000000000000000000000000000000000000000000060005260046000fd5b346101725760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126101725760206105ba610a44565b73ffffffffffffffffffffffffffffffffffffffff604051911673ffffffffffffffffffffffffffffffffffffffff7f000000000000000000000000000000000000000000000000000000000000000016148152f35b346101725760807ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261017257610647610a44565b61064f610a67565b506044356064359173ffffffffffffffffffffffffffffffffffffffff83168093036101725761067f8282610b02565b82156107d15773ffffffffffffffffffffffffffffffffffffffff16906040517f70a08231000000000000000000000000000000000000000000000000000000008152306004820152602081602481865afa9081156107c557600091610793575b50808211610762575060207f2717ead6b9200dd235aad468c9809ea400fe33ac69b5bfaa6d3e90fc922b6398916107596040517fa9059cbb000000000000000000000000000000000000000000000000000000008482015286602482015282604482015260448152610753606482610a03565b85610c85565b604051908152a3005b907fcf4791810000000000000000000000000000000000000000000000000000000060005260045260245260446000fd5b90506020813d6020116107bd575b816107ae60209383610a03565b810103126101725751846106e0565b3d91506107a1565b6040513d6000823e3d90fd5b7fd87070520000000000000000000000000000000000000000000000000000000060005260046000fd5b346101725760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc360112610172576040518060206002549283815201809260026000527f405787fa12a823e0f2b7631cc41b3ba8828b3321ca811111fa75cd3aa3bb5ace9060005b8181106108d3575050508161087a910382610a03565b6040519182916020830190602084525180915260408301919060005b8181106108a4575050500390f35b825173ffffffffffffffffffffffffffffffffffffffff16845285945060209384019390920191600101610896565b8254845260209093019260019283019201610864565b346101725760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261017257610921816109b8565b601681527f45524332304c6f636b426f7820312e372e302d64657600000000000000000000602082015260405190602082528181519182602083015260005b8381106109a05750507fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0601f836000604080968601015201168101030190f35b60208282018101516040878401015285935001610960565b6040810190811067ffffffffffffffff8211176109d457604052565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052604160045260246000fd5b90601f7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0910116810190811067ffffffffffffffff8211176109d457604052565b6004359073ffffffffffffffffffffffffffffffffffffffff8216820361017257565b6024359067ffffffffffffffff8216820361017257565b81601f820112156101725780359167ffffffffffffffff83116109d4578260051b9160405193610ab16020850186610a03565b845260208085019382010191821161017257602001915b818310610ad55750505090565b823573ffffffffffffffffffffffffffffffffffffffff8116810361017257815260209283019201610ac8565b9015610bcd5773ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff7f0000000000000000000000000000000000000000000000000000000000000000168103610ba0575033600052600360205260406000205415610b7257565b7fd86ad9cf000000000000000000000000000000000000000000000000000000006000523360045260246000fd5b7fbf16aab60000000000000000000000000000000000000000000000000000000060005260045260246000fd5b7f8b1fa9dd0000000000000000000000000000000000000000000000000000000060005260046000fd5b73ffffffffffffffffffffffffffffffffffffffff600154163303610c1857565b7f2b5c74de0000000000000000000000000000000000000000000000000000000060005260046000fd5b8051821015610c565760209160051b010190565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052603260045260246000fd5b906000602091828151910182855af1156107c5576000513d610d07575073ffffffffffffffffffffffffffffffffffffffff81163b155b610cc35750565b73ffffffffffffffffffffffffffffffffffffffff907f5274afe7000000000000000000000000000000000000000000000000000000006000521660045260246000fd5b60011415610cbc565b8054821015610c565760005260206000200190600090565b6000818152600360205260409020548015610ee6577fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8101818111610eb757600254907fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8201918211610eb757808203610e48575b5050506002548015610e19577fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff01610dd6816002610d10565b7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff82549160031b1b19169055600255600052600360205260006040812055600190565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052603160045260246000fd5b610e9f610e59610e6a936002610d10565b90549060031b1c9283926002610d10565b81939154907fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff9060031b92831b921b19161790565b90556000526003602052604060002055388080610d9d565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052601160045260246000fd5b5050600090565b80600052600360205260406000205415600014610f4757600254680100000000000000008110156109d457610f2e610e6a8260018594016002556002610d10565b9055600254906000526003602052604060002055600190565b5060009056fea164736f6c634300081a000a",
 }
 
 var ERC20LockBoxABI = ERC20LockBoxMetaData.ABI
 
 var ERC20LockBoxBin = ERC20LockBoxMetaData.Bin
 
-func DeployERC20LockBox(auth *bind.TransactOpts, backend bind.ContractBackend, tokenAdminRegistry common.Address) (common.Address, *types.Transaction, *ERC20LockBox, error) {
+func DeployERC20LockBox(auth *bind.TransactOpts, backend bind.ContractBackend, token common.Address) (common.Address, *types.Transaction, *ERC20LockBox, error) {
 	parsed, err := ERC20LockBoxMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -52,7 +51,7 @@ func DeployERC20LockBox(auth *bind.TransactOpts, backend bind.ContractBackend, t
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
 
-	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(ERC20LockBoxBin), backend, tokenAdminRegistry)
+	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(ERC20LockBoxBin), backend, token)
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}
@@ -175,31 +174,31 @@ func (_ERC20LockBox *ERC20LockBoxTransactorRaw) Transact(opts *bind.TransactOpts
 	return _ERC20LockBox.Contract.contract.Transact(opts, method, params...)
 }
 
-func (_ERC20LockBox *ERC20LockBoxCaller) ITokenAdminRegistry(opts *bind.CallOpts) (common.Address, error) {
+func (_ERC20LockBox *ERC20LockBoxCaller) GetAllAuthorizedCallers(opts *bind.CallOpts) ([]common.Address, error) {
 	var out []interface{}
-	err := _ERC20LockBox.contract.Call(opts, &out, "i_tokenAdminRegistry")
+	err := _ERC20LockBox.contract.Call(opts, &out, "getAllAuthorizedCallers")
 
 	if err != nil {
-		return *new(common.Address), err
+		return *new([]common.Address), err
 	}
 
-	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+	out0 := *abi.ConvertType(out[0], new([]common.Address)).(*[]common.Address)
 
 	return out0, err
 
 }
 
-func (_ERC20LockBox *ERC20LockBoxSession) ITokenAdminRegistry() (common.Address, error) {
-	return _ERC20LockBox.Contract.ITokenAdminRegistry(&_ERC20LockBox.CallOpts)
+func (_ERC20LockBox *ERC20LockBoxSession) GetAllAuthorizedCallers() ([]common.Address, error) {
+	return _ERC20LockBox.Contract.GetAllAuthorizedCallers(&_ERC20LockBox.CallOpts)
 }
 
-func (_ERC20LockBox *ERC20LockBoxCallerSession) ITokenAdminRegistry() (common.Address, error) {
-	return _ERC20LockBox.Contract.ITokenAdminRegistry(&_ERC20LockBox.CallOpts)
+func (_ERC20LockBox *ERC20LockBoxCallerSession) GetAllAuthorizedCallers() ([]common.Address, error) {
+	return _ERC20LockBox.Contract.GetAllAuthorizedCallers(&_ERC20LockBox.CallOpts)
 }
 
-func (_ERC20LockBox *ERC20LockBoxCaller) IsAllowedCaller(opts *bind.CallOpts, token common.Address, caller common.Address) (bool, error) {
+func (_ERC20LockBox *ERC20LockBoxCaller) IsTokenSupported(opts *bind.CallOpts, token common.Address) (bool, error) {
 	var out []interface{}
-	err := _ERC20LockBox.contract.Call(opts, &out, "isAllowedCaller", token, caller)
+	err := _ERC20LockBox.contract.Call(opts, &out, "isTokenSupported", token)
 
 	if err != nil {
 		return *new(bool), err
@@ -211,12 +210,34 @@ func (_ERC20LockBox *ERC20LockBoxCaller) IsAllowedCaller(opts *bind.CallOpts, to
 
 }
 
-func (_ERC20LockBox *ERC20LockBoxSession) IsAllowedCaller(token common.Address, caller common.Address) (bool, error) {
-	return _ERC20LockBox.Contract.IsAllowedCaller(&_ERC20LockBox.CallOpts, token, caller)
+func (_ERC20LockBox *ERC20LockBoxSession) IsTokenSupported(token common.Address) (bool, error) {
+	return _ERC20LockBox.Contract.IsTokenSupported(&_ERC20LockBox.CallOpts, token)
 }
 
-func (_ERC20LockBox *ERC20LockBoxCallerSession) IsAllowedCaller(token common.Address, caller common.Address) (bool, error) {
-	return _ERC20LockBox.Contract.IsAllowedCaller(&_ERC20LockBox.CallOpts, token, caller)
+func (_ERC20LockBox *ERC20LockBoxCallerSession) IsTokenSupported(token common.Address) (bool, error) {
+	return _ERC20LockBox.Contract.IsTokenSupported(&_ERC20LockBox.CallOpts, token)
+}
+
+func (_ERC20LockBox *ERC20LockBoxCaller) Owner(opts *bind.CallOpts) (common.Address, error) {
+	var out []interface{}
+	err := _ERC20LockBox.contract.Call(opts, &out, "owner")
+
+	if err != nil {
+		return *new(common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+
+	return out0, err
+
+}
+
+func (_ERC20LockBox *ERC20LockBoxSession) Owner() (common.Address, error) {
+	return _ERC20LockBox.Contract.Owner(&_ERC20LockBox.CallOpts)
+}
+
+func (_ERC20LockBox *ERC20LockBoxCallerSession) Owner() (common.Address, error) {
+	return _ERC20LockBox.Contract.Owner(&_ERC20LockBox.CallOpts)
 }
 
 func (_ERC20LockBox *ERC20LockBoxCaller) TypeAndVersion(opts *bind.CallOpts) (string, error) {
@@ -241,44 +262,68 @@ func (_ERC20LockBox *ERC20LockBoxCallerSession) TypeAndVersion() (string, error)
 	return _ERC20LockBox.Contract.TypeAndVersion(&_ERC20LockBox.CallOpts)
 }
 
-func (_ERC20LockBox *ERC20LockBoxTransactor) ConfigureAllowedCallers(opts *bind.TransactOpts, configArgs []ERC20LockBoxAllowedCallerConfigArgs) (*types.Transaction, error) {
-	return _ERC20LockBox.contract.Transact(opts, "configureAllowedCallers", configArgs)
+func (_ERC20LockBox *ERC20LockBoxTransactor) AcceptOwnership(opts *bind.TransactOpts) (*types.Transaction, error) {
+	return _ERC20LockBox.contract.Transact(opts, "acceptOwnership")
 }
 
-func (_ERC20LockBox *ERC20LockBoxSession) ConfigureAllowedCallers(configArgs []ERC20LockBoxAllowedCallerConfigArgs) (*types.Transaction, error) {
-	return _ERC20LockBox.Contract.ConfigureAllowedCallers(&_ERC20LockBox.TransactOpts, configArgs)
+func (_ERC20LockBox *ERC20LockBoxSession) AcceptOwnership() (*types.Transaction, error) {
+	return _ERC20LockBox.Contract.AcceptOwnership(&_ERC20LockBox.TransactOpts)
 }
 
-func (_ERC20LockBox *ERC20LockBoxTransactorSession) ConfigureAllowedCallers(configArgs []ERC20LockBoxAllowedCallerConfigArgs) (*types.Transaction, error) {
-	return _ERC20LockBox.Contract.ConfigureAllowedCallers(&_ERC20LockBox.TransactOpts, configArgs)
+func (_ERC20LockBox *ERC20LockBoxTransactorSession) AcceptOwnership() (*types.Transaction, error) {
+	return _ERC20LockBox.Contract.AcceptOwnership(&_ERC20LockBox.TransactOpts)
 }
 
-func (_ERC20LockBox *ERC20LockBoxTransactor) Deposit(opts *bind.TransactOpts, token common.Address, amount *big.Int) (*types.Transaction, error) {
-	return _ERC20LockBox.contract.Transact(opts, "deposit", token, amount)
+func (_ERC20LockBox *ERC20LockBoxTransactor) ApplyAuthorizedCallerUpdates(opts *bind.TransactOpts, authorizedCallerArgs AuthorizedCallersAuthorizedCallerArgs) (*types.Transaction, error) {
+	return _ERC20LockBox.contract.Transact(opts, "applyAuthorizedCallerUpdates", authorizedCallerArgs)
 }
 
-func (_ERC20LockBox *ERC20LockBoxSession) Deposit(token common.Address, amount *big.Int) (*types.Transaction, error) {
-	return _ERC20LockBox.Contract.Deposit(&_ERC20LockBox.TransactOpts, token, amount)
+func (_ERC20LockBox *ERC20LockBoxSession) ApplyAuthorizedCallerUpdates(authorizedCallerArgs AuthorizedCallersAuthorizedCallerArgs) (*types.Transaction, error) {
+	return _ERC20LockBox.Contract.ApplyAuthorizedCallerUpdates(&_ERC20LockBox.TransactOpts, authorizedCallerArgs)
 }
 
-func (_ERC20LockBox *ERC20LockBoxTransactorSession) Deposit(token common.Address, amount *big.Int) (*types.Transaction, error) {
-	return _ERC20LockBox.Contract.Deposit(&_ERC20LockBox.TransactOpts, token, amount)
+func (_ERC20LockBox *ERC20LockBoxTransactorSession) ApplyAuthorizedCallerUpdates(authorizedCallerArgs AuthorizedCallersAuthorizedCallerArgs) (*types.Transaction, error) {
+	return _ERC20LockBox.Contract.ApplyAuthorizedCallerUpdates(&_ERC20LockBox.TransactOpts, authorizedCallerArgs)
 }
 
-func (_ERC20LockBox *ERC20LockBoxTransactor) Withdraw(opts *bind.TransactOpts, token common.Address, amount *big.Int, recipient common.Address) (*types.Transaction, error) {
-	return _ERC20LockBox.contract.Transact(opts, "withdraw", token, amount, recipient)
+func (_ERC20LockBox *ERC20LockBoxTransactor) Deposit(opts *bind.TransactOpts, token common.Address, arg1 uint64, amount *big.Int) (*types.Transaction, error) {
+	return _ERC20LockBox.contract.Transact(opts, "deposit", token, arg1, amount)
 }
 
-func (_ERC20LockBox *ERC20LockBoxSession) Withdraw(token common.Address, amount *big.Int, recipient common.Address) (*types.Transaction, error) {
-	return _ERC20LockBox.Contract.Withdraw(&_ERC20LockBox.TransactOpts, token, amount, recipient)
+func (_ERC20LockBox *ERC20LockBoxSession) Deposit(token common.Address, arg1 uint64, amount *big.Int) (*types.Transaction, error) {
+	return _ERC20LockBox.Contract.Deposit(&_ERC20LockBox.TransactOpts, token, arg1, amount)
 }
 
-func (_ERC20LockBox *ERC20LockBoxTransactorSession) Withdraw(token common.Address, amount *big.Int, recipient common.Address) (*types.Transaction, error) {
-	return _ERC20LockBox.Contract.Withdraw(&_ERC20LockBox.TransactOpts, token, amount, recipient)
+func (_ERC20LockBox *ERC20LockBoxTransactorSession) Deposit(token common.Address, arg1 uint64, amount *big.Int) (*types.Transaction, error) {
+	return _ERC20LockBox.Contract.Deposit(&_ERC20LockBox.TransactOpts, token, arg1, amount)
 }
 
-type ERC20LockBoxAllowedCallerUpdatedIterator struct {
-	Event *ERC20LockBoxAllowedCallerUpdated
+func (_ERC20LockBox *ERC20LockBoxTransactor) TransferOwnership(opts *bind.TransactOpts, to common.Address) (*types.Transaction, error) {
+	return _ERC20LockBox.contract.Transact(opts, "transferOwnership", to)
+}
+
+func (_ERC20LockBox *ERC20LockBoxSession) TransferOwnership(to common.Address) (*types.Transaction, error) {
+	return _ERC20LockBox.Contract.TransferOwnership(&_ERC20LockBox.TransactOpts, to)
+}
+
+func (_ERC20LockBox *ERC20LockBoxTransactorSession) TransferOwnership(to common.Address) (*types.Transaction, error) {
+	return _ERC20LockBox.Contract.TransferOwnership(&_ERC20LockBox.TransactOpts, to)
+}
+
+func (_ERC20LockBox *ERC20LockBoxTransactor) Withdraw(opts *bind.TransactOpts, token common.Address, arg1 uint64, amount *big.Int, recipient common.Address) (*types.Transaction, error) {
+	return _ERC20LockBox.contract.Transact(opts, "withdraw", token, arg1, amount, recipient)
+}
+
+func (_ERC20LockBox *ERC20LockBoxSession) Withdraw(token common.Address, arg1 uint64, amount *big.Int, recipient common.Address) (*types.Transaction, error) {
+	return _ERC20LockBox.Contract.Withdraw(&_ERC20LockBox.TransactOpts, token, arg1, amount, recipient)
+}
+
+func (_ERC20LockBox *ERC20LockBoxTransactorSession) Withdraw(token common.Address, arg1 uint64, amount *big.Int, recipient common.Address) (*types.Transaction, error) {
+	return _ERC20LockBox.Contract.Withdraw(&_ERC20LockBox.TransactOpts, token, arg1, amount, recipient)
+}
+
+type ERC20LockBoxAuthorizedCallerAddedIterator struct {
+	Event *ERC20LockBoxAuthorizedCallerAdded
 
 	contract *bind.BoundContract
 	event    string
@@ -289,7 +334,7 @@ type ERC20LockBoxAllowedCallerUpdatedIterator struct {
 	fail error
 }
 
-func (it *ERC20LockBoxAllowedCallerUpdatedIterator) Next() bool {
+func (it *ERC20LockBoxAuthorizedCallerAddedIterator) Next() bool {
 
 	if it.fail != nil {
 		return false
@@ -298,7 +343,7 @@ func (it *ERC20LockBoxAllowedCallerUpdatedIterator) Next() bool {
 	if it.done {
 		select {
 		case log := <-it.logs:
-			it.Event = new(ERC20LockBoxAllowedCallerUpdated)
+			it.Event = new(ERC20LockBoxAuthorizedCallerAdded)
 			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 				it.fail = err
 				return false
@@ -313,7 +358,7 @@ func (it *ERC20LockBoxAllowedCallerUpdatedIterator) Next() bool {
 
 	select {
 	case log := <-it.logs:
-		it.Event = new(ERC20LockBoxAllowedCallerUpdated)
+		it.Event = new(ERC20LockBoxAuthorizedCallerAdded)
 		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 			it.fail = err
 			return false
@@ -328,52 +373,32 @@ func (it *ERC20LockBoxAllowedCallerUpdatedIterator) Next() bool {
 	}
 }
 
-func (it *ERC20LockBoxAllowedCallerUpdatedIterator) Error() error {
+func (it *ERC20LockBoxAuthorizedCallerAddedIterator) Error() error {
 	return it.fail
 }
 
-func (it *ERC20LockBoxAllowedCallerUpdatedIterator) Close() error {
+func (it *ERC20LockBoxAuthorizedCallerAddedIterator) Close() error {
 	it.sub.Unsubscribe()
 	return nil
 }
 
-type ERC20LockBoxAllowedCallerUpdated struct {
-	Token   common.Address
-	Caller  common.Address
-	Allowed bool
-	Raw     types.Log
+type ERC20LockBoxAuthorizedCallerAdded struct {
+	Caller common.Address
+	Raw    types.Log
 }
 
-func (_ERC20LockBox *ERC20LockBoxFilterer) FilterAllowedCallerUpdated(opts *bind.FilterOpts, token []common.Address, caller []common.Address) (*ERC20LockBoxAllowedCallerUpdatedIterator, error) {
+func (_ERC20LockBox *ERC20LockBoxFilterer) FilterAuthorizedCallerAdded(opts *bind.FilterOpts) (*ERC20LockBoxAuthorizedCallerAddedIterator, error) {
 
-	var tokenRule []interface{}
-	for _, tokenItem := range token {
-		tokenRule = append(tokenRule, tokenItem)
-	}
-	var callerRule []interface{}
-	for _, callerItem := range caller {
-		callerRule = append(callerRule, callerItem)
-	}
-
-	logs, sub, err := _ERC20LockBox.contract.FilterLogs(opts, "AllowedCallerUpdated", tokenRule, callerRule)
+	logs, sub, err := _ERC20LockBox.contract.FilterLogs(opts, "AuthorizedCallerAdded")
 	if err != nil {
 		return nil, err
 	}
-	return &ERC20LockBoxAllowedCallerUpdatedIterator{contract: _ERC20LockBox.contract, event: "AllowedCallerUpdated", logs: logs, sub: sub}, nil
+	return &ERC20LockBoxAuthorizedCallerAddedIterator{contract: _ERC20LockBox.contract, event: "AuthorizedCallerAdded", logs: logs, sub: sub}, nil
 }
 
-func (_ERC20LockBox *ERC20LockBoxFilterer) WatchAllowedCallerUpdated(opts *bind.WatchOpts, sink chan<- *ERC20LockBoxAllowedCallerUpdated, token []common.Address, caller []common.Address) (event.Subscription, error) {
+func (_ERC20LockBox *ERC20LockBoxFilterer) WatchAuthorizedCallerAdded(opts *bind.WatchOpts, sink chan<- *ERC20LockBoxAuthorizedCallerAdded) (event.Subscription, error) {
 
-	var tokenRule []interface{}
-	for _, tokenItem := range token {
-		tokenRule = append(tokenRule, tokenItem)
-	}
-	var callerRule []interface{}
-	for _, callerItem := range caller {
-		callerRule = append(callerRule, callerItem)
-	}
-
-	logs, sub, err := _ERC20LockBox.contract.WatchLogs(opts, "AllowedCallerUpdated", tokenRule, callerRule)
+	logs, sub, err := _ERC20LockBox.contract.WatchLogs(opts, "AuthorizedCallerAdded")
 	if err != nil {
 		return nil, err
 	}
@@ -383,8 +408,8 @@ func (_ERC20LockBox *ERC20LockBoxFilterer) WatchAllowedCallerUpdated(opts *bind.
 			select {
 			case log := <-logs:
 
-				event := new(ERC20LockBoxAllowedCallerUpdated)
-				if err := _ERC20LockBox.contract.UnpackLog(event, "AllowedCallerUpdated", log); err != nil {
+				event := new(ERC20LockBoxAuthorizedCallerAdded)
+				if err := _ERC20LockBox.contract.UnpackLog(event, "AuthorizedCallerAdded", log); err != nil {
 					return err
 				}
 				event.Raw = log
@@ -405,9 +430,126 @@ func (_ERC20LockBox *ERC20LockBoxFilterer) WatchAllowedCallerUpdated(opts *bind.
 	}), nil
 }
 
-func (_ERC20LockBox *ERC20LockBoxFilterer) ParseAllowedCallerUpdated(log types.Log) (*ERC20LockBoxAllowedCallerUpdated, error) {
-	event := new(ERC20LockBoxAllowedCallerUpdated)
-	if err := _ERC20LockBox.contract.UnpackLog(event, "AllowedCallerUpdated", log); err != nil {
+func (_ERC20LockBox *ERC20LockBoxFilterer) ParseAuthorizedCallerAdded(log types.Log) (*ERC20LockBoxAuthorizedCallerAdded, error) {
+	event := new(ERC20LockBoxAuthorizedCallerAdded)
+	if err := _ERC20LockBox.contract.UnpackLog(event, "AuthorizedCallerAdded", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type ERC20LockBoxAuthorizedCallerRemovedIterator struct {
+	Event *ERC20LockBoxAuthorizedCallerRemoved
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *ERC20LockBoxAuthorizedCallerRemovedIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(ERC20LockBoxAuthorizedCallerRemoved)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(ERC20LockBoxAuthorizedCallerRemoved)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *ERC20LockBoxAuthorizedCallerRemovedIterator) Error() error {
+	return it.fail
+}
+
+func (it *ERC20LockBoxAuthorizedCallerRemovedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type ERC20LockBoxAuthorizedCallerRemoved struct {
+	Caller common.Address
+	Raw    types.Log
+}
+
+func (_ERC20LockBox *ERC20LockBoxFilterer) FilterAuthorizedCallerRemoved(opts *bind.FilterOpts) (*ERC20LockBoxAuthorizedCallerRemovedIterator, error) {
+
+	logs, sub, err := _ERC20LockBox.contract.FilterLogs(opts, "AuthorizedCallerRemoved")
+	if err != nil {
+		return nil, err
+	}
+	return &ERC20LockBoxAuthorizedCallerRemovedIterator{contract: _ERC20LockBox.contract, event: "AuthorizedCallerRemoved", logs: logs, sub: sub}, nil
+}
+
+func (_ERC20LockBox *ERC20LockBoxFilterer) WatchAuthorizedCallerRemoved(opts *bind.WatchOpts, sink chan<- *ERC20LockBoxAuthorizedCallerRemoved) (event.Subscription, error) {
+
+	logs, sub, err := _ERC20LockBox.contract.WatchLogs(opts, "AuthorizedCallerRemoved")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(ERC20LockBoxAuthorizedCallerRemoved)
+				if err := _ERC20LockBox.contract.UnpackLog(event, "AuthorizedCallerRemoved", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_ERC20LockBox *ERC20LockBoxFilterer) ParseAuthorizedCallerRemoved(log types.Log) (*ERC20LockBoxAuthorizedCallerRemoved, error) {
+	event := new(ERC20LockBoxAuthorizedCallerRemoved)
+	if err := _ERC20LockBox.contract.UnpackLog(event, "AuthorizedCallerRemoved", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log
@@ -551,6 +693,278 @@ func (_ERC20LockBox *ERC20LockBoxFilterer) ParseDeposit(log types.Log) (*ERC20Lo
 	return event, nil
 }
 
+type ERC20LockBoxOwnershipTransferRequestedIterator struct {
+	Event *ERC20LockBoxOwnershipTransferRequested
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *ERC20LockBoxOwnershipTransferRequestedIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(ERC20LockBoxOwnershipTransferRequested)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(ERC20LockBoxOwnershipTransferRequested)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *ERC20LockBoxOwnershipTransferRequestedIterator) Error() error {
+	return it.fail
+}
+
+func (it *ERC20LockBoxOwnershipTransferRequestedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type ERC20LockBoxOwnershipTransferRequested struct {
+	From common.Address
+	To   common.Address
+	Raw  types.Log
+}
+
+func (_ERC20LockBox *ERC20LockBoxFilterer) FilterOwnershipTransferRequested(opts *bind.FilterOpts, from []common.Address, to []common.Address) (*ERC20LockBoxOwnershipTransferRequestedIterator, error) {
+
+	var fromRule []interface{}
+	for _, fromItem := range from {
+		fromRule = append(fromRule, fromItem)
+	}
+	var toRule []interface{}
+	for _, toItem := range to {
+		toRule = append(toRule, toItem)
+	}
+
+	logs, sub, err := _ERC20LockBox.contract.FilterLogs(opts, "OwnershipTransferRequested", fromRule, toRule)
+	if err != nil {
+		return nil, err
+	}
+	return &ERC20LockBoxOwnershipTransferRequestedIterator{contract: _ERC20LockBox.contract, event: "OwnershipTransferRequested", logs: logs, sub: sub}, nil
+}
+
+func (_ERC20LockBox *ERC20LockBoxFilterer) WatchOwnershipTransferRequested(opts *bind.WatchOpts, sink chan<- *ERC20LockBoxOwnershipTransferRequested, from []common.Address, to []common.Address) (event.Subscription, error) {
+
+	var fromRule []interface{}
+	for _, fromItem := range from {
+		fromRule = append(fromRule, fromItem)
+	}
+	var toRule []interface{}
+	for _, toItem := range to {
+		toRule = append(toRule, toItem)
+	}
+
+	logs, sub, err := _ERC20LockBox.contract.WatchLogs(opts, "OwnershipTransferRequested", fromRule, toRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(ERC20LockBoxOwnershipTransferRequested)
+				if err := _ERC20LockBox.contract.UnpackLog(event, "OwnershipTransferRequested", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_ERC20LockBox *ERC20LockBoxFilterer) ParseOwnershipTransferRequested(log types.Log) (*ERC20LockBoxOwnershipTransferRequested, error) {
+	event := new(ERC20LockBoxOwnershipTransferRequested)
+	if err := _ERC20LockBox.contract.UnpackLog(event, "OwnershipTransferRequested", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type ERC20LockBoxOwnershipTransferredIterator struct {
+	Event *ERC20LockBoxOwnershipTransferred
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *ERC20LockBoxOwnershipTransferredIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(ERC20LockBoxOwnershipTransferred)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(ERC20LockBoxOwnershipTransferred)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *ERC20LockBoxOwnershipTransferredIterator) Error() error {
+	return it.fail
+}
+
+func (it *ERC20LockBoxOwnershipTransferredIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type ERC20LockBoxOwnershipTransferred struct {
+	From common.Address
+	To   common.Address
+	Raw  types.Log
+}
+
+func (_ERC20LockBox *ERC20LockBoxFilterer) FilterOwnershipTransferred(opts *bind.FilterOpts, from []common.Address, to []common.Address) (*ERC20LockBoxOwnershipTransferredIterator, error) {
+
+	var fromRule []interface{}
+	for _, fromItem := range from {
+		fromRule = append(fromRule, fromItem)
+	}
+	var toRule []interface{}
+	for _, toItem := range to {
+		toRule = append(toRule, toItem)
+	}
+
+	logs, sub, err := _ERC20LockBox.contract.FilterLogs(opts, "OwnershipTransferred", fromRule, toRule)
+	if err != nil {
+		return nil, err
+	}
+	return &ERC20LockBoxOwnershipTransferredIterator{contract: _ERC20LockBox.contract, event: "OwnershipTransferred", logs: logs, sub: sub}, nil
+}
+
+func (_ERC20LockBox *ERC20LockBoxFilterer) WatchOwnershipTransferred(opts *bind.WatchOpts, sink chan<- *ERC20LockBoxOwnershipTransferred, from []common.Address, to []common.Address) (event.Subscription, error) {
+
+	var fromRule []interface{}
+	for _, fromItem := range from {
+		fromRule = append(fromRule, fromItem)
+	}
+	var toRule []interface{}
+	for _, toItem := range to {
+		toRule = append(toRule, toItem)
+	}
+
+	logs, sub, err := _ERC20LockBox.contract.WatchLogs(opts, "OwnershipTransferred", fromRule, toRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(ERC20LockBoxOwnershipTransferred)
+				if err := _ERC20LockBox.contract.UnpackLog(event, "OwnershipTransferred", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_ERC20LockBox *ERC20LockBoxFilterer) ParseOwnershipTransferred(log types.Log) (*ERC20LockBoxOwnershipTransferred, error) {
+	event := new(ERC20LockBoxOwnershipTransferred)
+	if err := _ERC20LockBox.contract.UnpackLog(event, "OwnershipTransferred", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
 type ERC20LockBoxWithdrawalIterator struct {
 	Event *ERC20LockBoxWithdrawal
 
@@ -688,12 +1102,24 @@ func (_ERC20LockBox *ERC20LockBoxFilterer) ParseWithdrawal(log types.Log) (*ERC2
 	return event, nil
 }
 
-func (ERC20LockBoxAllowedCallerUpdated) Topic() common.Hash {
-	return common.HexToHash("0xb2cc4dde7f9044ba1999f7843e2f9cd1e4ce506f8cc2e16de26ce982bf113fa6")
+func (ERC20LockBoxAuthorizedCallerAdded) Topic() common.Hash {
+	return common.HexToHash("0xeb1b9b92e50b7f88f9ff25d56765095ac6e91540eee214906f4036a908ffbdef")
+}
+
+func (ERC20LockBoxAuthorizedCallerRemoved) Topic() common.Hash {
+	return common.HexToHash("0xc3803387881faad271c47728894e3e36fac830ffc8602ca6fc07733cbda77580")
 }
 
 func (ERC20LockBoxDeposit) Topic() common.Hash {
 	return common.HexToHash("0x5548c837ab068cf56a2c2479df0882a4922fd203edb7517321831d95078c5f62")
+}
+
+func (ERC20LockBoxOwnershipTransferRequested) Topic() common.Hash {
+	return common.HexToHash("0xed8889f560326eb138920d842192f0eb3dd22b4f139c87a2c57538e05bae1278")
+}
+
+func (ERC20LockBoxOwnershipTransferred) Topic() common.Hash {
+	return common.HexToHash("0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0")
 }
 
 func (ERC20LockBoxWithdrawal) Topic() common.Hash {
@@ -705,29 +1131,53 @@ func (_ERC20LockBox *ERC20LockBox) Address() common.Address {
 }
 
 type ERC20LockBoxInterface interface {
-	ITokenAdminRegistry(opts *bind.CallOpts) (common.Address, error)
+	GetAllAuthorizedCallers(opts *bind.CallOpts) ([]common.Address, error)
 
-	IsAllowedCaller(opts *bind.CallOpts, token common.Address, caller common.Address) (bool, error)
+	IsTokenSupported(opts *bind.CallOpts, token common.Address) (bool, error)
+
+	Owner(opts *bind.CallOpts) (common.Address, error)
 
 	TypeAndVersion(opts *bind.CallOpts) (string, error)
 
-	ConfigureAllowedCallers(opts *bind.TransactOpts, configArgs []ERC20LockBoxAllowedCallerConfigArgs) (*types.Transaction, error)
+	AcceptOwnership(opts *bind.TransactOpts) (*types.Transaction, error)
 
-	Deposit(opts *bind.TransactOpts, token common.Address, amount *big.Int) (*types.Transaction, error)
+	ApplyAuthorizedCallerUpdates(opts *bind.TransactOpts, authorizedCallerArgs AuthorizedCallersAuthorizedCallerArgs) (*types.Transaction, error)
 
-	Withdraw(opts *bind.TransactOpts, token common.Address, amount *big.Int, recipient common.Address) (*types.Transaction, error)
+	Deposit(opts *bind.TransactOpts, token common.Address, arg1 uint64, amount *big.Int) (*types.Transaction, error)
 
-	FilterAllowedCallerUpdated(opts *bind.FilterOpts, token []common.Address, caller []common.Address) (*ERC20LockBoxAllowedCallerUpdatedIterator, error)
+	TransferOwnership(opts *bind.TransactOpts, to common.Address) (*types.Transaction, error)
 
-	WatchAllowedCallerUpdated(opts *bind.WatchOpts, sink chan<- *ERC20LockBoxAllowedCallerUpdated, token []common.Address, caller []common.Address) (event.Subscription, error)
+	Withdraw(opts *bind.TransactOpts, token common.Address, arg1 uint64, amount *big.Int, recipient common.Address) (*types.Transaction, error)
 
-	ParseAllowedCallerUpdated(log types.Log) (*ERC20LockBoxAllowedCallerUpdated, error)
+	FilterAuthorizedCallerAdded(opts *bind.FilterOpts) (*ERC20LockBoxAuthorizedCallerAddedIterator, error)
+
+	WatchAuthorizedCallerAdded(opts *bind.WatchOpts, sink chan<- *ERC20LockBoxAuthorizedCallerAdded) (event.Subscription, error)
+
+	ParseAuthorizedCallerAdded(log types.Log) (*ERC20LockBoxAuthorizedCallerAdded, error)
+
+	FilterAuthorizedCallerRemoved(opts *bind.FilterOpts) (*ERC20LockBoxAuthorizedCallerRemovedIterator, error)
+
+	WatchAuthorizedCallerRemoved(opts *bind.WatchOpts, sink chan<- *ERC20LockBoxAuthorizedCallerRemoved) (event.Subscription, error)
+
+	ParseAuthorizedCallerRemoved(log types.Log) (*ERC20LockBoxAuthorizedCallerRemoved, error)
 
 	FilterDeposit(opts *bind.FilterOpts, token []common.Address, depositor []common.Address) (*ERC20LockBoxDepositIterator, error)
 
 	WatchDeposit(opts *bind.WatchOpts, sink chan<- *ERC20LockBoxDeposit, token []common.Address, depositor []common.Address) (event.Subscription, error)
 
 	ParseDeposit(log types.Log) (*ERC20LockBoxDeposit, error)
+
+	FilterOwnershipTransferRequested(opts *bind.FilterOpts, from []common.Address, to []common.Address) (*ERC20LockBoxOwnershipTransferRequestedIterator, error)
+
+	WatchOwnershipTransferRequested(opts *bind.WatchOpts, sink chan<- *ERC20LockBoxOwnershipTransferRequested, from []common.Address, to []common.Address) (event.Subscription, error)
+
+	ParseOwnershipTransferRequested(log types.Log) (*ERC20LockBoxOwnershipTransferRequested, error)
+
+	FilterOwnershipTransferred(opts *bind.FilterOpts, from []common.Address, to []common.Address) (*ERC20LockBoxOwnershipTransferredIterator, error)
+
+	WatchOwnershipTransferred(opts *bind.WatchOpts, sink chan<- *ERC20LockBoxOwnershipTransferred, from []common.Address, to []common.Address) (event.Subscription, error)
+
+	ParseOwnershipTransferred(log types.Log) (*ERC20LockBoxOwnershipTransferred, error)
 
 	FilterWithdrawal(opts *bind.FilterOpts, token []common.Address, recipient []common.Address) (*ERC20LockBoxWithdrawalIterator, error)
 

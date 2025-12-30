@@ -22,8 +22,8 @@ import {MockLombardMailbox} from "../mocks/MockLombardMailbox.sol";
 import {MockVerifier} from "../mocks/MockVerifier.sol";
 import {OnRampSetup} from "../onRamp/OnRamp/OnRampSetup.t.sol";
 
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
-import {IERC20Metadata} from "@openzeppelin/contracts@4.8.3/token/ERC20/extensions/IERC20Metadata.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts@5.3.0/token/ERC20/extensions/IERC20Metadata.sol";
 
 contract e2e_lombard is OnRampSetup {
   // Lombard version tag used by VersionedVerifierResolver inbound routing and LombardVerifier.verifyMessage parsing.
@@ -81,8 +81,7 @@ contract e2e_lombard is OnRampSetup {
     VersionedVerifierResolver.OutboundImplementationArgs[] memory outboundImpls =
       new VersionedVerifierResolver.OutboundImplementationArgs[](1);
     outboundImpls[0] = VersionedVerifierResolver.OutboundImplementationArgs({
-      destChainSelector: DEST_CHAIN_SELECTOR,
-      verifier: address(s_sourceCommitteeVerifier)
+      destChainSelector: DEST_CHAIN_SELECTOR, verifier: address(s_sourceCommitteeVerifier)
     });
     srcCommitteeResolver.applyOutboundImplementationUpdates(outboundImpls);
 
@@ -92,8 +91,7 @@ contract e2e_lombard is OnRampSetup {
     VersionedVerifierResolver.InboundImplementationArgs[] memory committeeInbound =
       new VersionedVerifierResolver.InboundImplementationArgs[](1);
     committeeInbound[0] = VersionedVerifierResolver.InboundImplementationArgs({
-      version: s_sourceCommitteeVerifier.versionTag(),
-      verifier: address(s_destCommitteeVerifier)
+      version: s_sourceCommitteeVerifier.versionTag(), verifier: address(s_destCommitteeVerifier)
     });
     srcCommitteeResolver.applyInboundImplementationUpdates(committeeInbound);
 
@@ -105,10 +103,18 @@ contract e2e_lombard is OnRampSetup {
 
     s_lombardBridge = new MockLombardBridge();
 
-    s_sourceLombardVerifier =
-      new LombardVerifier(IBridgeV3(address(s_lombardBridge)), new string[](0), address(s_mockRMNRemote));
-    s_destLombardVerifier =
-      new LombardVerifier(IBridgeV3(address(s_lombardBridge)), new string[](0), address(s_mockRMNRemote));
+    s_sourceLombardVerifier = new LombardVerifier(
+      LombardVerifier.DynamicConfig({feeAggregator: address(1)}),
+      IBridgeV3(address(s_lombardBridge)),
+      new string[](0),
+      address(s_mockRMNRemote)
+    );
+    s_destLombardVerifier = new LombardVerifier(
+      LombardVerifier.DynamicConfig({feeAggregator: address(1)}),
+      IBridgeV3(address(s_lombardBridge)),
+      new string[](0),
+      address(s_mockRMNRemote)
+    );
 
     s_sourceLombardVerifier.applyRemoteChainConfigUpdates(destChainConfigs);
     s_sourceLombardVerifier.setPath(
@@ -135,16 +141,14 @@ contract e2e_lombard is OnRampSetup {
     VersionedVerifierResolver.OutboundImplementationArgs[] memory lombardOutbound =
       new VersionedVerifierResolver.OutboundImplementationArgs[](1);
     lombardOutbound[0] = VersionedVerifierResolver.OutboundImplementationArgs({
-      destChainSelector: DEST_CHAIN_SELECTOR,
-      verifier: address(s_sourceLombardVerifier)
+      destChainSelector: DEST_CHAIN_SELECTOR, verifier: address(s_sourceLombardVerifier)
     });
     lombardResolver.applyOutboundImplementationUpdates(lombardOutbound);
 
     VersionedVerifierResolver.InboundImplementationArgs[] memory lombardInbound =
       new VersionedVerifierResolver.InboundImplementationArgs[](1);
     lombardInbound[0] = VersionedVerifierResolver.InboundImplementationArgs({
-      version: LOMBARD_VERSION_TAG_V1_7_0,
-      verifier: address(s_destLombardVerifier)
+      version: LOMBARD_VERSION_TAG_V1_7_0, verifier: address(s_destLombardVerifier)
     });
     lombardResolver.applyInboundImplementationUpdates(lombardInbound);
 
@@ -164,16 +168,16 @@ contract e2e_lombard is OnRampSetup {
     ccvConfigs[0] = AdvancedPoolHooks.CCVConfigArg({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       outboundCCVs: required,
-      outboundCCVsToAddAboveThreshold: new address[](0),
+      thresholdOutboundCCVs: new address[](0),
       inboundCCVs: new address[](0),
-      inboundCCVsToAddAboveThreshold: new address[](0)
+      thresholdInboundCCVs: new address[](0)
     });
     ccvConfigs[1] = AdvancedPoolHooks.CCVConfigArg({
       remoteChainSelector: SOURCE_CHAIN_SELECTOR,
       outboundCCVs: new address[](0),
-      outboundCCVsToAddAboveThreshold: new address[](0),
+      thresholdOutboundCCVs: new address[](0),
       inboundCCVs: required,
-      inboundCCVsToAddAboveThreshold: new address[](0)
+      thresholdInboundCCVs: new address[](0)
     });
     hooks.applyCCVConfigUpdates(ccvConfigs);
 
@@ -267,7 +271,8 @@ contract e2e_lombard is OnRampSetup {
       destChainSelector: DEST_CHAIN_SELECTOR,
       router: s_sourceRouter,
       addressBytesLength: EVM_ADDRESS_LENGTH,
-      networkFeeUSDCents: NETWORK_FEE_USD_CENTS,
+      messageNetworkFeeUSDCents: MESSAGE_NETWORK_FEE_USD_CENTS,
+      tokenNetworkFeeUSDCents: TOKEN_NETWORK_FEE_USD_CENTS,
       tokenReceiverAllowed: false,
       baseExecutionGasCost: BASE_EXEC_GAS_COST,
       laneMandatedCCVs: new address[](0),
@@ -282,7 +287,7 @@ contract e2e_lombard is OnRampSetup {
     defaultDestCCVs[0] = s_committeeCCV;
 
     bytes[] memory onRamps = new bytes[](1);
-    onRamps[0] = abi.encodePacked(s_onRamp);
+    onRamps[0] = abi.encode(s_onRamp);
 
     OffRamp.SourceChainConfigArgs[] memory sourceChainUpdates = new OffRamp.SourceChainConfigArgs[](1);
     sourceChainUpdates[0] = OffRamp.SourceChainConfigArgs({
@@ -321,12 +326,8 @@ contract e2e_lombard is OnRampSetup {
     });
     message.tokenAmounts[0] = Client.EVMTokenAmount({token: s_sourceFeeToken, amount: 1e18});
 
-    (bytes32 messageId, bytes memory encodedMessage, OnRamp.Receipt[] memory receipts, bytes[] memory verifierBlobs) =
-    _evmMessageToEvent({
-      message: message,
-      destChainSelector: DEST_CHAIN_SELECTOR,
-      msgNum: expectedMsgNum,
-      originalSender: OWNER
+    (bytes32 messageId, bytes memory encodedMessage, OnRamp.Receipt[] memory receipts, bytes[] memory verifierBlobs) = _evmMessageToEvent({
+      message: message, destChainSelector: DEST_CHAIN_SELECTOR, msgNum: expectedMsgNum, originalSender: OWNER
     });
 
     // Committee verifier returns versionTag (first verifier blob).
@@ -340,7 +341,7 @@ contract e2e_lombard is OnRampSetup {
     vm.expectEmit();
     emit OnRamp.CCIPMessageSent({
       destChainSelector: DEST_CHAIN_SELECTOR,
-      messageNumber: expectedMsgNum,
+      sender: OWNER,
       messageId: messageId,
       feeToken: s_sourceFeeToken,
       encodedMessage: encodedMessage,
@@ -395,7 +396,7 @@ contract e2e_lombard is OnRampSetup {
     });
 
     vm.resumeGasMetering();
-    s_offRamp.execute(encodedMessage, ccvAddresses, verifierResults);
+    s_offRamp.execute(encodedMessage, ccvAddresses, verifierResults, 0);
   }
 
   // External so we can pass `bytes memory` as calldata (for MessageV1Codec._decodeMessageV1).

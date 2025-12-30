@@ -8,7 +8,7 @@ import {Client} from "../libraries/Client.sol";
 import {CCIPReceiver} from "./CCIPReceiver.sol";
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
 /// @title PingPongDemo - A simple ping-pong contract for demonstrating cross-chain communication.
 contract PingPongDemo is CCIPReceiver, Ownable2StepMsgSender, ITypeAndVersion {
@@ -30,7 +30,10 @@ contract PingPongDemo is CCIPReceiver, Ownable2StepMsgSender, ITypeAndVersion {
   // Allowing out of order execution.
   bool private s_outOfOrderExecution;
 
-  constructor(address router, IERC20 feeToken) CCIPReceiver(router) {
+  constructor(
+    address router,
+    IERC20 feeToken
+  ) CCIPReceiver(router) {
     s_isPaused = false;
     s_feeToken = feeToken;
     s_feeToken.approve(address(router), type(uint256).max);
@@ -40,7 +43,10 @@ contract PingPongDemo is CCIPReceiver, Ownable2StepMsgSender, ITypeAndVersion {
     return "PingPongDemo 1.5.0";
   }
 
-  function setCounterpart(uint64 counterpartChainSelector, bytes calldata counterpartAddress) external onlyOwner {
+  function setCounterpart(
+    uint64 counterpartChainSelector,
+    bytes calldata counterpartAddress
+  ) external onlyOwner {
     s_counterpartChainSelector = counterpartChainSelector;
     s_counterpartAddress = counterpartAddress;
   }
@@ -63,7 +69,9 @@ contract PingPongDemo is CCIPReceiver, Ownable2StepMsgSender, ITypeAndVersion {
       data: abi.encode(pingPongCount),
       tokenAmounts: new Client.EVMTokenAmount[](0),
       extraArgs: Client._argsToBytes(
-        Client.GenericExtraArgsV2({gasLimit: uint256(DEFAULT_GAS_LIMIT), allowOutOfOrderExecution: s_outOfOrderExecution})
+        Client.GenericExtraArgsV2({
+          gasLimit: uint256(DEFAULT_GAS_LIMIT), allowOutOfOrderExecution: s_outOfOrderExecution
+        })
       ),
       feeToken: address(s_feeToken)
     });

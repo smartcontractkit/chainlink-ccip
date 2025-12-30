@@ -122,39 +122,42 @@ contract FeeQuoterSetup is TokenSetup {
 
     s_feeQuoterTokenTransferFeeConfigArgs.push();
     s_feeQuoterTokenTransferFeeConfigArgs[0].destChainSelector = DEST_CHAIN_SELECTOR;
-    s_feeQuoterTokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs.push(
-      FeeQuoter.TokenTransferFeeConfigSingleTokenArgs({
-        token: s_sourceFeeToken,
-        tokenTransferFeeConfig: FeeQuoter.TokenTransferFeeConfig({
-          feeUSDCents: 1_00, // 1 USD
-          destGasOverhead: 100_000,
-          destBytesOverhead: 32,
-          isEnabled: true
+    s_feeQuoterTokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs
+      .push(
+        FeeQuoter.TokenTransferFeeConfigSingleTokenArgs({
+          token: s_sourceFeeToken,
+          tokenTransferFeeConfig: FeeQuoter.TokenTransferFeeConfig({
+            feeUSDCents: 1_00, // 1 USD
+            destGasOverhead: 100_000,
+            destBytesOverhead: 32,
+            isEnabled: true
+          })
         })
-      })
-    );
-    s_feeQuoterTokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs.push(
-      FeeQuoter.TokenTransferFeeConfigSingleTokenArgs({
-        token: CUSTOM_TOKEN,
-        tokenTransferFeeConfig: FeeQuoter.TokenTransferFeeConfig({
-          feeUSDCents: 2_00, // 1 USD
-          destGasOverhead: 95_000,
-          destBytesOverhead: 200,
-          isEnabled: true
+      );
+    s_feeQuoterTokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs
+      .push(
+        FeeQuoter.TokenTransferFeeConfigSingleTokenArgs({
+          token: CUSTOM_TOKEN,
+          tokenTransferFeeConfig: FeeQuoter.TokenTransferFeeConfig({
+            feeUSDCents: 2_00, // 1 USD
+            destGasOverhead: 95_000,
+            destBytesOverhead: 200,
+            isEnabled: true
+          })
         })
-      })
-    );
-    s_feeQuoterTokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs.push(
-      FeeQuoter.TokenTransferFeeConfigSingleTokenArgs({
-        token: CUSTOM_TOKEN_2,
-        tokenTransferFeeConfig: FeeQuoter.TokenTransferFeeConfig({
-          feeUSDCents: 2_00, // 1 USD
-          destGasOverhead: 1,
-          destBytesOverhead: 200,
-          isEnabled: false
+      );
+    s_feeQuoterTokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs
+      .push(
+        FeeQuoter.TokenTransferFeeConfigSingleTokenArgs({
+          token: CUSTOM_TOKEN_2,
+          tokenTransferFeeConfig: FeeQuoter.TokenTransferFeeConfig({
+            feeUSDCents: 2_00, // 1 USD
+            destGasOverhead: 1,
+            destBytesOverhead: 200,
+            isEnabled: false
+          })
         })
-      })
-    );
+      );
 
     //setting up the destination token for CUSTOM_TOKEN_2 here as it is specific to these tests
     s_destTokenBySourceToken[CUSTOM_TOKEN_2] = address(bytes20(keccak256("CUSTOM_TOKEN_2_DEST")));
@@ -162,7 +165,6 @@ contract FeeQuoterSetup is TokenSetup {
     s_feeQuoter = new FeeQuoterHelper(
       FeeQuoter.StaticConfig({linkToken: s_sourceTokens[0], maxFeeJuelsPerMsg: MAX_MSG_FEES_JUELS}),
       priceUpdaters,
-      s_sourceFeeTokens,
       s_feeQuoterTokenTransferFeeConfigArgs,
       _generateFeeQuoterDestChainConfigArgs()
     );

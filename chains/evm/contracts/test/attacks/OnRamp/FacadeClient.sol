@@ -5,7 +5,7 @@ import {IRouterClient} from "../../../interfaces/IRouterClient.sol";
 
 import {Client} from "../../../libraries/Client.sol";
 
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
 /// @title FacadeClient - A simple proxy for calling Router
 contract FacadeClient {
@@ -17,7 +17,13 @@ contract FacadeClient {
 
   uint256 private s_msg_sequence = 1;
 
-  constructor(address router, uint64 destChainSelector, IERC20 sourceToken, IERC20 feeToken, address receiver) {
+  constructor(
+    address router,
+    uint64 destChainSelector,
+    IERC20 sourceToken,
+    IERC20 feeToken,
+    address receiver
+  ) {
     i_router = router;
     i_destChainSelector = destChainSelector;
     i_sourceToken = sourceToken;

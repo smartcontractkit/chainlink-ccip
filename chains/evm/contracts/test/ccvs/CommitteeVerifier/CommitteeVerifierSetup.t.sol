@@ -66,9 +66,9 @@ contract CommitteeVerifierSetup is BaseVerifierSetup {
       ccipReceiveGasLimit: 200_000,
       finality: 100,
       ccvAndExecutorHash: bytes32(0),
-      onRampAddress: abi.encodePacked(address(0x1111111111111111111111111111111111111111)),
+      onRampAddress: abi.encode(address(0x1111111111111111111111111111111111111111)),
       offRampAddress: abi.encodePacked(address(0x2222222222222222222222222222222222222222)),
-      sender: abi.encodePacked(address(0x3333333333333333333333333333333333333333)),
+      sender: abi.encode(address(0x3333333333333333333333333333333333333333)),
       receiver: abi.encodePacked(address(0x4444444444444444444444444444444444444444)),
       destBlob: "",
       tokenTransfer: new MessageV1Codec.TokenTransferV1[](0),
@@ -112,7 +112,10 @@ contract CommitteeVerifierSetup is BaseVerifierSetup {
   /// @param hash The hash to sign.
   /// @return r The r component of the signature.
   /// @return s The s component of the signature (adjusted for v=27).
-  function _signWithV27(uint256 privateKey, bytes32 hash) internal pure returns (bytes32 r, bytes32 s) {
+  function _signWithV27(
+    uint256 privateKey,
+    bytes32 hash
+  ) internal pure returns (bytes32 r, bytes32 s) {
     (uint8 v, bytes32 _r, bytes32 _s) = vm.sign(privateKey, hash);
 
     // SignatureQuorumValidator only supports sigs with v=27, so adjust if necessary.

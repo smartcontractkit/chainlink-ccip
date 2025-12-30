@@ -5,7 +5,7 @@ import {Pool} from "../../libraries/Pool.sol";
 import {RateLimiter} from "../../libraries/RateLimiter.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
 
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
 contract TokenPoolHelper is TokenPool {
   constructor(
@@ -26,7 +26,10 @@ contract TokenPoolHelper is TokenPool {
     return _parseRemoteDecimals(sourcePoolData);
   }
 
-  function calculateLocalAmount(uint256 remoteAmount, uint8 remoteDecimals) external view returns (uint256) {
+  function calculateLocalAmount(
+    uint256 remoteAmount,
+    uint8 remoteDecimals
+  ) external view returns (uint256) {
     return _calculateLocalAmount(remoteAmount, remoteDecimals);
   }
 
@@ -54,11 +57,17 @@ contract TokenPoolHelper is TokenPool {
     return localAmount;
   }
 
-  function applyFee(Pool.LockOrBurnInV1 calldata lockOrBurnIn, uint16 finality) external view returns (uint256) {
+  function applyFee(
+    Pool.LockOrBurnInV1 calldata lockOrBurnIn,
+    uint16 finality
+  ) external view returns (uint256) {
     return lockOrBurnIn.amount - _getFee(lockOrBurnIn, finality);
   }
 
-  function getFee(Pool.LockOrBurnInV1 calldata lockOrBurnIn, uint16 finality) external view returns (uint256) {
+  function getFee(
+    Pool.LockOrBurnInV1 calldata lockOrBurnIn,
+    uint16 finality
+  ) external view returns (uint256) {
     return _getFee(lockOrBurnIn, finality);
   }
 

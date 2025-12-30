@@ -14,9 +14,9 @@ contract MessageV1Codec__encodeMessageV1 is MessageV1CodecSetup {
       ccipReceiveGasLimit: 0,
       finality: 1000,
       ccvAndExecutorHash: bytes32(0),
-      onRampAddress: abi.encodePacked(makeAddr("onRamp")),
+      onRampAddress: abi.encode(makeAddr("onRamp")),
       offRampAddress: abi.encodePacked(makeAddr("offRamp")),
-      sender: abi.encodePacked(makeAddr("sender")),
+      sender: abi.encode(makeAddr("sender")),
       receiver: abi.encodePacked(makeAddr("receiver")),
       destBlob: "destination blob data",
       tokenTransfer: new MessageV1Codec.TokenTransferV1[](0),
@@ -33,8 +33,8 @@ contract MessageV1Codec__encodeMessageV1 is MessageV1CodecSetup {
     MessageV1Codec.TokenTransferV1[] memory tokenTransfers = new MessageV1Codec.TokenTransferV1[](1);
     tokenTransfers[0] = MessageV1Codec.TokenTransferV1({
       amount: 1000000,
-      sourcePoolAddress: abi.encodePacked(makeAddr("sourcePool")),
-      sourceTokenAddress: abi.encodePacked(makeAddr("sourceToken")),
+      sourcePoolAddress: abi.encode(makeAddr("sourcePool")),
+      sourceTokenAddress: abi.encode(makeAddr("sourceToken")),
       destTokenAddress: abi.encodePacked(makeAddr("destToken")),
       tokenReceiver: abi.encodePacked(makeAddr("tokenReceiver")),
       extraData: "token extra data"
@@ -48,7 +48,7 @@ contract MessageV1Codec__encodeMessageV1 is MessageV1CodecSetup {
       ccipReceiveGasLimit: 0,
       finality: 2000,
       ccvAndExecutorHash: bytes32(0),
-      onRampAddress: abi.encodePacked(makeAddr("onRamp")),
+      onRampAddress: abi.encode(makeAddr("onRamp")),
       offRampAddress: abi.encodePacked(makeAddr("offRamp")),
       sender: abi.encodePacked(makeAddr("sender")),
       receiver: abi.encodePacked(makeAddr("receiver")),
@@ -144,9 +144,9 @@ contract MessageV1Codec__encodeMessageV1 is MessageV1CodecSetup {
       ccipReceiveGasLimit: 0,
       finality: 0,
       ccvAndExecutorHash: bytes32(0),
-      onRampAddress: abi.encodePacked(address(0)),
+      onRampAddress: abi.encode(address(0)),
       offRampAddress: "",
-      sender: abi.encodePacked(address(0)),
+      sender: abi.encode(address(0)),
       receiver: "",
       destBlob: "",
       tokenTransfer: new MessageV1Codec.TokenTransferV1[](0),
@@ -244,6 +244,29 @@ contract MessageV1Codec__encodeMessageV1 is MessageV1CodecSetup {
       abi.encodeWithSelector(
         MessageV1Codec.InvalidDataLength.selector,
         MessageV1Codec.EncodingErrorLocation.ENCODE_TOKEN_TRANSFER_ARRAY_LENGTH
+      )
+    );
+    s_helper.encodeMessageV1(message);
+  }
+
+  function test__encodeMessageV1_RevertWhen_TokenTransferBlobTooLargeForLengthPrefix() public {
+    MessageV1Codec.MessageV1 memory message = _createBasicMessage();
+    message.tokenTransfer = new MessageV1Codec.TokenTransferV1[](1);
+
+    // Use realistic address-sized fields and max extraData, which pushes the encoded tokenTransfer blob beyond the
+    // uint16 length prefix capacity.
+    message.tokenTransfer[0] = MessageV1Codec.TokenTransferV1({
+      amount: 1,
+      sourcePoolAddress: abi.encodePacked(makeAddr("sourcePool")),
+      sourceTokenAddress: abi.encodePacked(makeAddr("sourceToken")),
+      destTokenAddress: abi.encodePacked(makeAddr("destToken")),
+      tokenReceiver: abi.encodePacked(makeAddr("tokenReceiver")),
+      extraData: new bytes(type(uint16).max)
+    });
+
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        MessageV1Codec.InvalidDataLength.selector, MessageV1Codec.EncodingErrorLocation.ENCODE_TOKEN_TRANSFER_LENGTH
       )
     );
     s_helper.encodeMessageV1(message);

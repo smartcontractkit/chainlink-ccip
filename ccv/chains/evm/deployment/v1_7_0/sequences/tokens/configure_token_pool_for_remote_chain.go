@@ -53,7 +53,7 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 		writes := make([]evm_contract.WriteOutput, 0)
 
 		// Update token transfer fee configuration for the remote chain
-		if !isTokenTransferFeeConfigZero(input.RemoteChainConfig.TokenTransferFeeConfig) {
+		if input.RemoteChainConfig.TokenTransferFeeConfig.IsEnabled {
 			applyTokenTransferFeeConfigUpdatesReport, err := cldf_ops.ExecuteOperation(b, token_pool.ApplyTokenTransferFeeConfigUpdates, chain, evm_contract.FunctionInput[token_pool.TokenTransferFeeConfigArgs]{
 				ChainSelector: input.ChainSelector,
 				Address:       input.TokenPoolAddress,
@@ -101,11 +101,11 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 				Address:       input.AdvancedPoolHooks,
 				Args: []advanced_pool_hooks.CCVConfigArg{
 					{
-						RemoteChainSelector:             input.RemoteChainSelector,
-						OutboundCCVs:                    outboundCCVs,
-						OutboundCCVsToAddAboveThreshold: outboundCCVsToAddAboveThreshold,
-						InboundCCVs:                     inboundCCVs,
-						InboundCCVsToAddAboveThreshold:  inboundCCVsToAddAboveThreshold,
+						RemoteChainSelector:   input.RemoteChainSelector,
+						OutboundCCVs:          outboundCCVs,
+						ThresholdOutboundCCVs: outboundCCVsToAddAboveThreshold,
+						InboundCCVs:           inboundCCVs,
+						ThresholdInboundCCVs:  inboundCCVsToAddAboveThreshold,
 					},
 				},
 			})
@@ -290,14 +290,4 @@ func rateLimiterConfigsEqual(current tp_bindings.RateLimiterTokenBucket, desired
 	return current.IsEnabled == desired.IsEnabled &&
 		current.Capacity == desired.Capacity &&
 		current.Rate == desired.Rate
-}
-
-func isTokenTransferFeeConfigZero(config tokens.TokenTransferFeeConfig) bool {
-	return config.DestGasOverhead == 0 &&
-		config.DestBytesOverhead == 0 &&
-		config.DefaultFinalityFeeUSDCents == 0 &&
-		config.CustomFinalityFeeUSDCents == 0 &&
-		config.DefaultFinalityTransferFeeBps == 0 &&
-		config.CustomFinalityTransferFeeBps == 0 &&
-		config.IsEnabled == false
 }

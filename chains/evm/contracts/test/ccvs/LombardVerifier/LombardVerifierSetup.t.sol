@@ -33,8 +33,12 @@ contract LombardVerifierSetup is BaseVerifierSetup {
     // Set default execution result matching the version tag format.
     s_mockMailbox.setMessageId(abi.encodePacked(VERSION_TAG_V1_7_0, bytes32(0)));
 
-    s_lombardVerifier =
-      new LombardVerifier(IBridgeV3(address(s_mockBridge)), s_storageLocations, address(s_mockRMNRemote));
+    s_lombardVerifier = new LombardVerifier(
+      LombardVerifier.DynamicConfig({feeAggregator: FEE_AGGREGATOR}),
+      IBridgeV3(address(s_mockBridge)),
+      s_storageLocations,
+      address(s_mockRMNRemote)
+    );
 
     // Deploy test token and add it as a supported token.
     s_testToken = new BurnMintERC20("Test Token", "TEST", 18, 0, 0);
@@ -71,8 +75,8 @@ contract LombardVerifierSetup is BaseVerifierSetup {
     MessageV1Codec.TokenTransferV1[] memory tokenTransfer = new MessageV1Codec.TokenTransferV1[](1);
     tokenTransfer[0] = MessageV1Codec.TokenTransferV1({
       amount: TRANSFER_AMOUNT,
-      sourcePoolAddress: abi.encodePacked(makeAddr("sourcePool")),
-      sourceTokenAddress: abi.encodePacked(sourceToken),
+      sourcePoolAddress: abi.encode(makeAddr("sourcePool")),
+      sourceTokenAddress: abi.encode(sourceToken),
       destTokenAddress: abi.encodePacked(makeAddr("destToken")),
       tokenReceiver: abi.encodePacked(receiver),
       extraData: ""
@@ -86,9 +90,9 @@ contract LombardVerifierSetup is BaseVerifierSetup {
       ccipReceiveGasLimit: GAS_LIMIT,
       finality: 0,
       ccvAndExecutorHash: bytes32(0),
-      onRampAddress: abi.encodePacked(s_onRamp),
+      onRampAddress: abi.encode(s_onRamp),
       offRampAddress: abi.encodePacked(s_offRamp),
-      sender: abi.encodePacked(OWNER),
+      sender: abi.encode(OWNER),
       receiver: abi.encodePacked(receiver),
       destBlob: "",
       tokenTransfer: tokenTransfer,

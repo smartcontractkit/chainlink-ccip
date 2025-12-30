@@ -42,9 +42,7 @@ contract TokenPoolV2_validateReleaseOrMint is AdvancedPoolHooksSetup {
 
     vm.expectEmit();
     emit TokenPool.InboundRateLimitConsumed({
-      remoteChainSelector: releaseOrMintIn.remoteChainSelector,
-      token: releaseOrMintIn.localToken,
-      amount: localAmount
+      remoteChainSelector: releaseOrMintIn.remoteChainSelector, token: releaseOrMintIn.localToken, amount: localAmount
     });
 
     vm.startPrank(s_allowedOffRamp);
@@ -111,7 +109,7 @@ contract TokenPoolV2_validateReleaseOrMint is AdvancedPoolHooksSetup {
       sourceDenominatedAmount: amount,
       localToken: address(s_token),
       sourcePoolAddress: abi.encode(s_initialRemotePool),
-      sourcePoolData: abi.encode(uint256(s_token.decimals())),
+      sourcePoolData: abi.encode(uint256(DEFAULT_TOKEN_DECIMALS)),
       offchainTokenData: ""
     });
   }

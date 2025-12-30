@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {BaseVerifier} from "../../../ccvs/components/BaseVerifier.sol";
+import {FeeTokenHandler} from "../../../libraries/FeeTokenHandler.sol";
 import {CommitteeVerifierSetup} from "./CommitteeVerifierSetup.t.sol";
 
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
 contract CommitteeVerifier_withdrawFeeTokens is CommitteeVerifierSetup {
   function setUp() public override {
@@ -28,7 +28,7 @@ contract CommitteeVerifier_withdrawFeeTokens is CommitteeVerifierSetup {
     feeTokens[0] = s_sourceFeeToken;
 
     vm.expectEmit();
-    emit BaseVerifier.FeeTokenWithdrawn(FEE_AGGREGATOR, s_sourceFeeToken, feeAmount);
+    emit FeeTokenHandler.FeeTokenWithdrawn(FEE_AGGREGATOR, s_sourceFeeToken, feeAmount);
 
     // Anyone can call withdrawFeeTokens since it's permissionless.
     vm.prank(STRANGER);
@@ -59,9 +59,9 @@ contract CommitteeVerifier_withdrawFeeTokens is CommitteeVerifierSetup {
     feeTokens[1] = token2;
 
     vm.expectEmit();
-    emit BaseVerifier.FeeTokenWithdrawn(FEE_AGGREGATOR, s_sourceFeeToken, feeAmount1);
+    emit FeeTokenHandler.FeeTokenWithdrawn(FEE_AGGREGATOR, s_sourceFeeToken, feeAmount1);
     vm.expectEmit();
-    emit BaseVerifier.FeeTokenWithdrawn(FEE_AGGREGATOR, token2, feeAmount2);
+    emit FeeTokenHandler.FeeTokenWithdrawn(FEE_AGGREGATOR, token2, feeAmount2);
 
     s_committeeVerifier.withdrawFeeTokens(feeTokens);
 

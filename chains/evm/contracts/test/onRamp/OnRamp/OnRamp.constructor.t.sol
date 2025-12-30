@@ -10,13 +10,12 @@ contract OnRamp_constructor is OnRampSetup {
     OnRamp.StaticConfig memory staticConfig = OnRamp.StaticConfig({
       chainSelector: SOURCE_CHAIN_SELECTOR,
       rmnRemote: s_mockRMNRemote,
+      maxUSDCentsPerMessage: MAX_USD_CENTS_PER_MESSAGE,
       tokenAdminRegistry: address(s_tokenAdminRegistry)
     });
 
     OnRamp.DynamicConfig memory dynamicConfig = OnRamp.DynamicConfig({
-      feeQuoter: address(s_feeQuoter),
-      reentrancyGuardEntered: false,
-      feeAggregator: FEE_AGGREGATOR
+      feeQuoter: address(s_feeQuoter), reentrancyGuardEntered: false, feeAggregator: FEE_AGGREGATOR
     });
 
     OnRamp proxy = new OnRamp(staticConfig, dynamicConfig);
@@ -24,6 +23,7 @@ contract OnRamp_constructor is OnRampSetup {
     OnRamp.StaticConfig memory gotStaticConfig = proxy.getStaticConfig();
     assertEq(gotStaticConfig.chainSelector, staticConfig.chainSelector);
     assertEq(address(gotStaticConfig.rmnRemote), address(staticConfig.rmnRemote));
+    assertEq(gotStaticConfig.maxUSDCentsPerMessage, staticConfig.maxUSDCentsPerMessage);
     assertEq(gotStaticConfig.tokenAdminRegistry, staticConfig.tokenAdminRegistry);
 
     OnRamp.DynamicConfig memory gotDynamicConfig = proxy.getDynamicConfig();
@@ -37,12 +37,11 @@ contract OnRamp_constructor is OnRampSetup {
     OnRamp.StaticConfig memory staticConfigZeroChainSelector = OnRamp.StaticConfig({
       chainSelector: 0,
       rmnRemote: s_mockRMNRemote,
+      maxUSDCentsPerMessage: MAX_USD_CENTS_PER_MESSAGE,
       tokenAdminRegistry: address(s_tokenAdminRegistry)
     });
     OnRamp.DynamicConfig memory dynamicConfigValid = OnRamp.DynamicConfig({
-      feeQuoter: address(s_feeQuoter),
-      reentrancyGuardEntered: false,
-      feeAggregator: FEE_AGGREGATOR
+      feeQuoter: address(s_feeQuoter), reentrancyGuardEntered: false, feeAggregator: FEE_AGGREGATOR
     });
     vm.expectRevert(OnRamp.InvalidConfig.selector);
     new OnRamp(staticConfigZeroChainSelector, dynamicConfigValid);
@@ -51,6 +50,7 @@ contract OnRamp_constructor is OnRampSetup {
     OnRamp.StaticConfig memory staticConfigZeroRMNRemote = OnRamp.StaticConfig({
       chainSelector: SOURCE_CHAIN_SELECTOR,
       rmnRemote: IRMNRemote(address(0)),
+      maxUSDCentsPerMessage: MAX_USD_CENTS_PER_MESSAGE,
       tokenAdminRegistry: address(s_tokenAdminRegistry)
     });
     vm.expectRevert(OnRamp.InvalidConfig.selector);
@@ -60,16 +60,28 @@ contract OnRamp_constructor is OnRampSetup {
     OnRamp.StaticConfig memory staticConfigZeroTokenAdminRegistry = OnRamp.StaticConfig({
       chainSelector: SOURCE_CHAIN_SELECTOR,
       rmnRemote: s_mockRMNRemote,
+      maxUSDCentsPerMessage: MAX_USD_CENTS_PER_MESSAGE,
       tokenAdminRegistry: address(0)
     });
     vm.expectRevert(OnRamp.InvalidConfig.selector);
     new OnRamp(staticConfigZeroTokenAdminRegistry, dynamicConfigValid);
+
+    // Zero maxUSDCentsPerMessage.
+    OnRamp.StaticConfig memory staticConfigZeroMaxUSDCentsPerMessage = OnRamp.StaticConfig({
+      chainSelector: SOURCE_CHAIN_SELECTOR,
+      rmnRemote: s_mockRMNRemote,
+      maxUSDCentsPerMessage: 0,
+      tokenAdminRegistry: address(s_tokenAdminRegistry)
+    });
+    vm.expectRevert(OnRamp.InvalidConfig.selector);
+    new OnRamp(staticConfigZeroMaxUSDCentsPerMessage, dynamicConfigValid);
   }
 
   function test_constructor_RevertWhen_DynamicConfigInvalid() public {
     OnRamp.StaticConfig memory staticConfig = OnRamp.StaticConfig({
       chainSelector: SOURCE_CHAIN_SELECTOR,
       rmnRemote: s_mockRMNRemote,
+      maxUSDCentsPerMessage: MAX_USD_CENTS_PER_MESSAGE,
       tokenAdminRegistry: address(s_tokenAdminRegistry)
     });
 
@@ -87,9 +99,7 @@ contract OnRamp_constructor is OnRampSetup {
 
     // reentrancyGuardEntered == true
     OnRamp.DynamicConfig memory dynamicConfig2 = OnRamp.DynamicConfig({
-      feeQuoter: address(s_feeQuoter),
-      reentrancyGuardEntered: true,
-      feeAggregator: FEE_AGGREGATOR
+      feeQuoter: address(s_feeQuoter), reentrancyGuardEntered: true, feeAggregator: FEE_AGGREGATOR
     });
     vm.expectRevert(OnRamp.InvalidConfig.selector);
     new OnRamp(staticConfig, dynamicConfig2);

@@ -23,7 +23,10 @@ contract USDCTokenPoolCCTPV2_releaseOrMint is USDCTokenPoolCCTPV2Setup {
     return abi.encodePacked(_version, _burnToken, _mintRecipient, _amount, _messageSender);
   }
 
-  function testFuzz_releaseOrMint_Success(address recipient, uint256 amount) public {
+  function testFuzz_releaseOrMint_Success(
+    address recipient,
+    uint256 amount
+  ) public {
     vm.assume(recipient != address(0) && recipient != address(s_USDCToken));
     amount = bound(amount, 0, _getInboundRateLimiterConfig().capacity);
 
@@ -65,8 +68,7 @@ contract USDCTokenPoolCCTPV2_releaseOrMint is USDCTokenPoolCCTPV2Setup {
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
       extraData: USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV2(
         USDCSourcePoolDataCodec.SourceTokenDataPayloadV2({
-          sourceDomain: SOURCE_DOMAIN_IDENTIFIER,
-          depositHash: calculatedDepositHash
+          sourceDomain: SOURCE_DOMAIN_IDENTIFIER, depositHash: calculatedDepositHash
         })
       ),
       destGasAmount: USDC_DEST_TOKEN_GAS
@@ -192,8 +194,7 @@ contract USDCTokenPoolCCTPV2_releaseOrMint is USDCTokenPoolCCTPV2Setup {
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
       extraData: USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV2(
         USDCSourcePoolDataCodec.SourceTokenDataPayloadV2({
-          sourceDomain: SOURCE_DOMAIN_IDENTIFIER,
-          depositHash: depositHash
+          sourceDomain: SOURCE_DOMAIN_IDENTIFIER, depositHash: depositHash
         })
       ),
       destGasAmount: USDC_DEST_TOKEN_GAS
@@ -292,8 +293,7 @@ contract USDCTokenPoolCCTPV2_releaseOrMint is USDCTokenPoolCCTPV2Setup {
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
       extraData: USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV2(
         USDCSourcePoolDataCodec.SourceTokenDataPayloadV2({
-          sourceDomain: SOURCE_DOMAIN_IDENTIFIER,
-          depositHash: invalidDepositHash
+          sourceDomain: SOURCE_DOMAIN_IDENTIFIER, depositHash: invalidDepositHash
         })
       ),
       destGasAmount: USDC_DEST_TOKEN_GAS

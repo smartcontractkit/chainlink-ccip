@@ -15,8 +15,10 @@ contract USDCTokenPoolProxySetup is USDCSetup {
   address internal s_cctpV2PoolWithCCV = makeAddr("cctpV2PoolWithCCV");
   address internal s_lockReleasePool = makeAddr("lockReleasePool");
   address internal s_mockTransmitterProxy = makeAddr("mockTransmitterProxy");
-  uint64 internal s_remoteLockReleaseChainSelector = 12345;
   address internal s_cctpVerifier = makeAddr("cctpVerifier");
+
+  uint64 internal s_remoteLockReleaseChainSelector = 12345;
+  uint64 internal s_remoteCCTPChainSelector = 12346;
 
   USDCTokenPoolProxyHelper internal s_usdcTokenPoolProxy;
 
@@ -61,9 +63,22 @@ contract USDCTokenPoolProxySetup is USDCSetup {
     allowedCallerParams[3] =
       CCTPMessageTransmitterProxy.AllowedCallerConfigArgs({caller: address(s_cctpV2PoolWithCCV), allowed: true});
     s_cctpMessageTransmitterProxy.configureAllowedCallers(allowedCallerParams);
+
+    // Configure the lockOrBurn mechanism for the remote chain selectors.
+    uint64[] memory remoteChainSelectors = new uint64[](2);
+    remoteChainSelectors[0] = s_remoteLockReleaseChainSelector;
+    remoteChainSelectors[1] = s_remoteCCTPChainSelector;
+
+    USDCTokenPoolProxy.LockOrBurnMechanism[] memory mechanisms = new USDCTokenPoolProxy.LockOrBurnMechanism[](2);
+    mechanisms[0] = USDCTokenPoolProxy.LockOrBurnMechanism.LOCK_RELEASE;
+    mechanisms[1] = USDCTokenPoolProxy.LockOrBurnMechanism.CCTP_V2_WITH_CCV;
+    s_usdcTokenPoolProxy.updateLockOrBurnMechanisms(remoteChainSelectors, mechanisms);
   }
 
-  function _enableERC165InterfaceChecks(address pool, bytes4 interfaceId) internal {
+  function _enableERC165InterfaceChecks(
+    address pool,
+    bytes4 interfaceId
+  ) internal {
     vm.mockCall(
       address(pool), abi.encodeWithSelector(IERC165.supportsInterface.selector, interfaceId), abi.encode(true)
     );

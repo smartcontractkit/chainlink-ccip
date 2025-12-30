@@ -3,12 +3,14 @@ pragma solidity ^0.8.24;
 
 import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
 
+import {IBurnMintERC20} from "../../../interfaces/IBurnMintERC20.sol";
 import {Pool} from "../../../libraries/Pool.sol";
 import {BurnMintTokenPool} from "../../../pools/BurnMintTokenPool.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {BurnMintSetup} from "./BurnMintSetup.t.sol";
+import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
 contract BurnMintTokenPoolSetup is BurnMintSetup {
   BurnMintTokenPool internal s_pool;
@@ -17,9 +19,13 @@ contract BurnMintTokenPoolSetup is BurnMintSetup {
     super.setUp();
 
     s_pool = new BurnMintTokenPool(
-      s_token, DEFAULT_TOKEN_DECIMALS, address(0), address(s_mockRMNRemote), address(s_sourceRouter)
+      IBurnMintERC20(address(s_token)),
+      DEFAULT_TOKEN_DECIMALS,
+      address(0),
+      address(s_mockRMNRemote),
+      address(s_sourceRouter)
     );
-    s_token.grantMintAndBurnRoles(address(s_pool));
+    BurnMintERC20(address(s_token)).grantMintAndBurnRoles(address(s_pool));
 
     _applyChainUpdates(address(s_pool));
   }
@@ -41,9 +47,7 @@ contract BurnMintTokenPool_lockOrBurn is BurnMintTokenPoolSetup {
 
     vm.expectEmit();
     emit TokenPool.OutboundRateLimitConsumed({
-      remoteChainSelector: DEST_CHAIN_SELECTOR,
-      token: address(s_token),
-      amount: burnAmount
+      remoteChainSelector: DEST_CHAIN_SELECTOR, token: address(s_token), amount: burnAmount
     });
 
     vm.expectEmit();
@@ -83,9 +87,7 @@ contract BurnMintTokenPool_lockOrBurn is BurnMintTokenPoolSetup {
 
     vm.expectEmit();
     emit TokenPool.OutboundRateLimitConsumed({
-      remoteChainSelector: DEST_CHAIN_SELECTOR,
-      token: address(s_token),
-      amount: burnAmount
+      remoteChainSelector: DEST_CHAIN_SELECTOR, token: address(s_token), amount: burnAmount
     });
 
     vm.expectEmit();
@@ -151,7 +153,7 @@ contract BurnMintTokenPool_lockOrBurn is BurnMintTokenPoolSetup {
     vm.startPrank(s_allowedOnRamp);
     s_pool.lockOrBurn(lockOrBurnIn);
 
-    assertEq(IERC20(s_token).balanceOf(address(s_pool)), 0); // No fees should be accumulated
+    assertEq(s_token.balanceOf(address(s_pool)), 0); // No fees should be accumulated
   }
 
   // Should not burn tokens if cursed.

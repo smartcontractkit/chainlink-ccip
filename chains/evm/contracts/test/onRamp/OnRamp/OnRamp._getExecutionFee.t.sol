@@ -24,12 +24,11 @@ contract OnRamp_getExecutionFee is OnRampSetup {
       OnRamp.StaticConfig({
         chainSelector: SOURCE_CHAIN_SELECTOR,
         rmnRemote: s_mockRMNRemote,
+        maxUSDCentsPerMessage: MAX_USD_CENTS_PER_MESSAGE,
         tokenAdminRegistry: address(s_tokenAdminRegistry)
       }),
       OnRamp.DynamicConfig({
-        feeQuoter: address(s_feeQuoter),
-        reentrancyGuardEntered: false,
-        feeAggregator: FEE_AGGREGATOR
+        feeQuoter: address(s_feeQuoter), reentrancyGuardEntered: false, feeAggregator: FEE_AGGREGATOR
       })
     );
 
@@ -43,7 +42,8 @@ contract OnRamp_getExecutionFee is OnRampSetup {
       destChainSelector: DEST_CHAIN_SELECTOR,
       router: s_sourceRouter,
       addressBytesLength: EVM_ADDRESS_LENGTH,
-      networkFeeUSDCents: NETWORK_FEE_USD_CENTS,
+      messageNetworkFeeUSDCents: MESSAGE_NETWORK_FEE_USD_CENTS,
+      tokenNetworkFeeUSDCents: TOKEN_NETWORK_FEE_USD_CENTS,
       tokenReceiverAllowed: false,
       baseExecutionGasCost: BASE_EXEC_GAS_COST,
       laneMandatedCCVs: new address[](0),
@@ -70,7 +70,8 @@ contract OnRamp_getExecutionFee is OnRampSetup {
       tokenArgs: "args"
     });
 
-    OnRamp.Receipt memory receipt = s_onRampHelper.getExecutionFee(DEST_CHAIN_SELECTOR, 0, 0, extraArgs);
+    OnRamp.Receipt memory receipt =
+      s_onRampHelper.getExecutionFee(DEST_CHAIN_SELECTOR, 0, 0, extraArgs, s_sourceFeeToken);
 
     assertEq(receipt.issuer, s_customExecutor, "Issuer should be the executor");
     assertEq(receipt.destGasLimit, BASE_EXEC_GAS_COST + GAS_LIMIT, "Gas limit should include base cost");
@@ -90,7 +91,8 @@ contract OnRamp_getExecutionFee is OnRampSetup {
       tokenArgs: "args with no executor"
     });
 
-    OnRamp.Receipt memory receipt = s_onRampHelper.getExecutionFee(DEST_CHAIN_SELECTOR, 0, 0, extraArgs);
+    OnRamp.Receipt memory receipt =
+      s_onRampHelper.getExecutionFee(DEST_CHAIN_SELECTOR, 0, 0, extraArgs, s_sourceFeeToken);
 
     assertEq(receipt.issuer, Client.NO_EXECUTION_ADDRESS, "Issuer should be NO_EXECUTION_ADDRESS");
     assertEq(receipt.destGasLimit, BASE_EXEC_GAS_COST + GAS_LIMIT, "Gas limit should still include base cost");
@@ -113,7 +115,7 @@ contract OnRamp_getExecutionFee is OnRampSetup {
     });
 
     OnRamp.Receipt memory receipt =
-      s_onRampHelper.getExecutionFee(DEST_CHAIN_SELECTOR, dataLength, numberOfTokens, extraArgs);
+      s_onRampHelper.getExecutionFee(DEST_CHAIN_SELECTOR, dataLength, numberOfTokens, extraArgs, s_sourceFeeToken);
 
     uint32 expectedOverhead = uint32(
       MessageV1Codec.MESSAGE_V1_EVM_SOURCE_BASE_SIZE + dataLength
@@ -138,7 +140,8 @@ contract OnRamp_getExecutionFee is OnRampSetup {
       tokenArgs: ""
     });
 
-    OnRamp.Receipt memory receipt = s_onRampHelper.getExecutionFee(DEST_CHAIN_SELECTOR, dataLength, 0, extraArgs);
+    OnRamp.Receipt memory receipt =
+      s_onRampHelper.getExecutionFee(DEST_CHAIN_SELECTOR, dataLength, 0, extraArgs, s_sourceFeeToken);
 
     uint32 expectedOverhead = uint32(
       MessageV1Codec.MESSAGE_V1_EVM_SOURCE_BASE_SIZE + dataLength + executorArgs.length
@@ -160,7 +163,8 @@ contract OnRamp_getExecutionFee is OnRampSetup {
       tokenArgs: ""
     });
 
-    OnRamp.Receipt memory receipt = s_onRampHelper.getExecutionFee(DEST_CHAIN_SELECTOR, 100, 0, extraArgs);
+    OnRamp.Receipt memory receipt =
+      s_onRampHelper.getExecutionFee(DEST_CHAIN_SELECTOR, 100, 0, extraArgs, s_sourceFeeToken);
 
     assertEq(receipt.destGasLimit, BASE_EXEC_GAS_COST, "Gas limit should only be base cost when user gas limit is 0");
   }

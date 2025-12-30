@@ -4,14 +4,18 @@ pragma solidity ^0.8.24;
 import {IAny2EVMMessageReceiver} from "../../interfaces/IAny2EVMMessageReceiver.sol";
 import {IAny2EVMMessageReceiverV2} from "../../interfaces/IAny2EVMMessageReceiverV2.sol";
 import {Client} from "../../libraries/Client.sol";
-import {IERC165} from "@openzeppelin/contracts@4.8.3/utils/introspection/IERC165.sol";
+import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
 
 contract MockReceiverV2 is IAny2EVMMessageReceiverV2, IERC165 {
   address[] internal s_required;
   address[] internal s_optional;
   uint8 internal s_threshold;
 
-  constructor(address[] memory required, address[] memory optional, uint8 threshold) {
+  constructor(
+    address[] memory required,
+    address[] memory optional,
+    uint8 threshold
+  ) {
     s_required = required;
     s_optional = optional;
     s_threshold = threshold;

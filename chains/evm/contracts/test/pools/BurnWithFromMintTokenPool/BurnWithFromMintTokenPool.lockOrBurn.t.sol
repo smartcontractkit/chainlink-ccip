@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {IBurnMintERC20} from "../../../interfaces/IBurnMintERC20.sol";
 import {Pool} from "../../../libraries/Pool.sol";
 import {BurnWithFromMintTokenPool} from "../../../pools/BurnWithFromMintTokenPool.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {BurnMintSetup} from "../BurnMintTokenPool/BurnMintSetup.t.sol";
+import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
 contract BurnWithFromMintTokenPoolSetup is BurnMintSetup {
   BurnWithFromMintTokenPool internal s_pool;
@@ -15,9 +17,13 @@ contract BurnWithFromMintTokenPoolSetup is BurnMintSetup {
     super.setUp();
 
     s_pool = new BurnWithFromMintTokenPool(
-      s_token, DEFAULT_TOKEN_DECIMALS, address(0), address(s_mockRMNRemote), address(s_sourceRouter)
+      IBurnMintERC20(address(s_token)),
+      DEFAULT_TOKEN_DECIMALS,
+      address(0),
+      address(s_mockRMNRemote),
+      address(s_sourceRouter)
     );
-    s_token.grantMintAndBurnRoles(address(s_pool));
+    BurnMintERC20(address(s_token)).grantMintAndBurnRoles(address(s_pool));
 
     _applyChainUpdates(address(s_pool));
   }
@@ -40,9 +46,7 @@ contract BurnWithFromMintTokenPool_lockOrBurn is BurnWithFromMintTokenPoolSetup 
 
     vm.expectEmit();
     emit TokenPool.OutboundRateLimitConsumed({
-      remoteChainSelector: DEST_CHAIN_SELECTOR,
-      token: address(s_token),
-      amount: amount
+      remoteChainSelector: DEST_CHAIN_SELECTOR, token: address(s_token), amount: amount
     });
 
     vm.expectEmit();

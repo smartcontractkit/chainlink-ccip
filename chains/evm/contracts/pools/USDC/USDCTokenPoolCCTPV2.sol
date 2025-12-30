@@ -9,7 +9,7 @@ import {TokenPool} from "../TokenPool.sol";
 import {CCTPMessageTransmitterProxy} from "./CCTPMessageTransmitterProxy.sol";
 import {USDCTokenPool} from "./USDCTokenPool.sol";
 
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
 /// @notice This pool mints and burns USDC tokens through the Cross Chain Transfer
 /// Protocol (CCTP) V2.
@@ -103,7 +103,9 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
     // Encode the source pool data with its version number. The version number is hard-coded to 1 to maintain
     // parity with the CCTP V2 version number.
     bytes memory sourcePoolData = USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV2(
-      USDCSourcePoolDataCodec.SourceTokenDataPayloadV2({sourceDomain: i_localDomainIdentifier, depositHash: depositHash})
+      USDCSourcePoolDataCodec.SourceTokenDataPayloadV2({
+        sourceDomain: i_localDomainIdentifier, depositHash: depositHash
+      })
     );
 
     emit LockedOrBurned({
@@ -114,8 +116,7 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
     });
 
     return Pool.LockOrBurnOutV1({
-      destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
-      destPoolData: sourcePoolData
+      destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector), destPoolData: sourcePoolData
     });
   }
 
@@ -190,7 +191,9 @@ contract USDCTokenPoolCCTPV2 is USDCTokenPool {
     bytes memory usdcMessage,
     USDCSourcePoolDataCodec.SourceTokenDataPayloadV2 memory sourceTokenData
   ) internal view {
-    if (usdcMessage.length < MIN_USDC_MESSAGE_LENGTH) revert InvalidMessageLength(usdcMessage.length);
+    if (usdcMessage.length < MIN_USDC_MESSAGE_LENGTH) {
+      revert InvalidMessageLength(usdcMessage.length);
+    }
 
     uint32 version;
     // solhint-disable-next-line no-inline-assembly

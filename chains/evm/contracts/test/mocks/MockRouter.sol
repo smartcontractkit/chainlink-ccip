@@ -9,8 +9,8 @@ import {Client} from "../../libraries/Client.sol";
 import {Internal} from "../../libraries/Internal.sol";
 import {CallWithExactGas} from "@chainlink/contracts/src/v0.8/shared/call/CallWithExactGas.sol";
 
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/utils/SafeERC20.sol";
 import {ERC165Checker} from "@openzeppelin/contracts@5.3.0/utils/introspection/ERC165Checker.sol";
 
 contract MockCCIPRouter is IRouter, IRouterClient {
@@ -151,7 +151,10 @@ contract MockCCIPRouter is IRouter, IRouterClient {
   }
 
   /// @notice Returns 0 as the fee is not supported in this mock contract.
-  function getFee(uint64, Client.EVM2AnyMessage memory) public view returns (uint256) {
+  function getFee(
+    uint64,
+    Client.EVM2AnyMessage memory
+  ) public view returns (uint256) {
     return s_mockFeeTokenAmount;
   }
 
@@ -170,7 +173,11 @@ contract MockCCIPRouter is IRouter, IRouterClient {
   }
 
   /// @notice Always returns true
-  function isOffRamp(uint64, /* sourceChainSelector */ address /* offRamp */ ) external pure returns (bool) {
+  function isOffRamp(
+    uint64,
+    /* sourceChainSelector */
+    address /* offRamp */
+  ) external pure returns (bool) {
     return true;
   }
 }

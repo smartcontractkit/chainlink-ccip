@@ -23,12 +23,11 @@ contract OnRamp_getCCVsForPool is OnRampSetup {
       OnRamp.StaticConfig({
         chainSelector: SOURCE_CHAIN_SELECTOR,
         rmnRemote: s_mockRMNRemote,
+        maxUSDCentsPerMessage: MAX_USD_CENTS_PER_MESSAGE,
         tokenAdminRegistry: address(s_tokenAdminRegistry)
       }),
       OnRamp.DynamicConfig({
-        feeQuoter: address(s_feeQuoter),
-        reentrancyGuardEntered: false,
-        feeAggregator: FEE_AGGREGATOR
+        feeQuoter: address(s_feeQuoter), reentrancyGuardEntered: false, feeAggregator: FEE_AGGREGATOR
       })
     );
 
@@ -41,7 +40,8 @@ contract OnRamp_getCCVsForPool is OnRampSetup {
       destChainSelector: DEST_CHAIN_SELECTOR,
       router: s_sourceRouter,
       addressBytesLength: EVM_ADDRESS_LENGTH,
-      networkFeeUSDCents: NETWORK_FEE_USD_CENTS,
+      messageNetworkFeeUSDCents: MESSAGE_NETWORK_FEE_USD_CENTS,
+      tokenNetworkFeeUSDCents: TOKEN_NETWORK_FEE_USD_CENTS,
       tokenReceiverAllowed: false,
       baseExecutionGasCost: BASE_EXEC_GAS_COST,
       laneMandatedCCVs: new address[](0),

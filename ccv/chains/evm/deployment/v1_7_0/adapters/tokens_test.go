@@ -90,7 +90,7 @@ func TestTokenAdapter(t *testing.T) {
 						TokenPoolType:                    datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
 						TokenPoolVersion:                 semver.MustParse("1.7.0"),
 						TokenSymbol:                      "TEST",
-						LocalTokenDecimals:               18,
+						Decimals:                         18,
 						ThresholdAmountForAdditionalCCVs: big.NewInt(1e18),
 						Router: datastore.AddressRef{
 							ChainSelector: chainSel,

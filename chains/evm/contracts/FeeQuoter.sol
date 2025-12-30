@@ -19,6 +19,10 @@ import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/Enumera
 ///   - Store the price of a token in USD allowing the owner or priceUpdater to update this value.
 ///   - Manage chain specific fee calculations.
 /// The authorized callers in the contract represent the fee price updaters.
+/// @dev Previous iterations of the FeeQuoter had the concept of price staleness. That no longer exists: all prices
+/// remain valid until they're overwritten. It's the responsibility of the price updater to ensure prices are updated
+/// frequently enough to reflect market conditions. This is intentional to allow for static prices for certain assets,
+/// and to have a variable update frequency based on the asset.
 contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndVersion {
   using EnumerableSet for EnumerableSet.AddressSet;
   using USDPriceWith18Decimals for uint224;
@@ -142,6 +146,11 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
   ///     1 LINK = 15.00 USD per full token, each full token is 1e18 units -> 15 * 1e18 * 1e18 / 1e18 = 15e18.
   mapping(address token => Internal.TimestampedPackedUint224 price) private s_usdPerToken;
 
+  /// @dev Set of fee tokens that can be used to pay for fees. Any token that has a price is considered a fee token,
+  /// which is why this set is updated when prices are pushed, not manually. Removals are manual and also clear out
+  /// the price.
+  EnumerableSet.AddressSet private s_feeTokens;
+
   /// @dev The destination chain specific fee configs.
   mapping(uint64 destChainSelector => DestChainConfig destChainConfig) internal s_destChainConfigs;
 
@@ -149,14 +158,9 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
   mapping(uint64 destChainSelector => mapping(address token => TokenTransferFeeConfig tranferFeeConfig)) internal
     s_tokenTransferFeeConfig;
 
-  /// @dev Set of fee tokens that can be used to pay for fees. The keys of the mapping are the fee multipliers which
-  /// can be used to set a premium or discount for a specific fee token.
-  EnumerableSet.AddressSet private s_feeTokens;
-
   constructor(
     StaticConfig memory staticConfig,
     address[] memory priceUpdaters,
-    address[] memory feeTokens,
     TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs,
     DestChainConfigArgs[] memory destChainConfigArgs
   ) AuthorizedCallers(priceUpdaters) {
@@ -167,7 +171,6 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
     i_linkToken = staticConfig.linkToken;
     i_maxFeeJuelsPerMsg = staticConfig.maxFeeJuelsPerMsg;
 
-    _applyFeeTokensUpdates(new address[](0), feeTokens);
     _applyDestChainConfigUpdates(destChainConfigArgs);
     _applyTokenTransferFeeConfigUpdates(tokenTransferFeeConfigArgs, new TokenTransferFeeConfigRemoveArgs[](0));
   }
@@ -233,30 +236,18 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
     return s_feeTokens.values();
   }
 
-  /// @notice Add and remove tokens from feeTokens set.
+  /// @notice Removes tokens from feeTokens set.
   /// @param feeTokensToRemove The addresses of the tokens which are no longer considered feeTokens.
-  /// @param feeTokensToAdd The addresses of the tokens which are now considered fee tokens and can be used
-  /// to calculate fees.
-  function applyFeeTokensUpdates(
-    address[] memory feeTokensToRemove,
-    address[] memory feeTokensToAdd
+  function removeFeeTokens(
+    address[] memory feeTokensToRemove
   ) external onlyOwner {
-    _applyFeeTokensUpdates(feeTokensToRemove, feeTokensToAdd);
-  }
-
-  /// @notice Add and remove tokens from feeTokens set.
-  /// @param feeTokensToRemove The addresses of the tokens which are no longer considered feeTokens.
-  /// @param feeTokensToAdd The addresses of the tokens which are now considered fee tokens.
-  /// and can be used to calculate fees.
-  function _applyFeeTokensUpdates(address[] memory feeTokensToRemove, address[] memory feeTokensToAdd) private {
     for (uint256 i = 0; i < feeTokensToRemove.length; ++i) {
       if (s_feeTokens.remove(feeTokensToRemove[i])) {
         emit FeeTokenRemoved(feeTokensToRemove[i]);
       }
-    }
-    for (uint256 i = 0; i < feeTokensToAdd.length; ++i) {
-      s_feeTokens.add(feeTokensToAdd[i]);
-      emit FeeTokenAdded(feeTokensToAdd[i]);
+
+      // Remote the price to invalidate it as a fee token.
+      delete s_usdPerToken[feeTokensToRemove[i]];
     }
   }
 
@@ -277,6 +268,11 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
       Internal.TokenPriceUpdate memory update = priceUpdates.tokenPriceUpdates[i];
       s_usdPerToken[update.sourceToken] =
         Internal.TimestampedPackedUint224({value: update.usdPerToken, timestamp: uint32(block.timestamp)});
+
+      if (s_feeTokens.add(update.sourceToken)) {
+        emit FeeTokenAdded(update.sourceToken);
+      }
+
       emit UsdPerTokenUpdated(update.sourceToken, update.usdPerToken, block.timestamp);
     }
 
@@ -319,6 +315,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
 
     // Get the gas price and remove any upper bits that might be used to report calldata cost.
     Internal.TimestampedPackedUint224 memory price = s_usdPerUnitGasByDestChainSelector[destChainSelector];
+    // Only fee tokens have prices, meaning any token that is priced is a fee token.
     if (price.timestamp == 0) {
       revert NoGasPriceAvailable(destChainSelector);
     }
@@ -387,7 +384,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
 
       for (uint256 j = 0; j < tokenTransferFeeConfigArg.tokenTransferFeeConfigs.length; ++j) {
         TokenTransferFeeConfig memory tokenTransferFeeConfig =
-          tokenTransferFeeConfigArg.tokenTransferFeeConfigs[j].tokenTransferFeeConfig;
+        tokenTransferFeeConfigArg.tokenTransferFeeConfigs[j].tokenTransferFeeConfig;
         address token = tokenTransferFeeConfigArg.tokenTransferFeeConfigs[j].token;
 
         if (tokenTransferFeeConfig.destBytesOverhead < Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES) {
@@ -521,7 +518,8 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
         uint32(
           _parseGenericExtraArgsFromBytes(
             extraArgs, destChainConfig.defaultTxGasLimit, destChainConfig.maxPerMsgGasLimit
-          ).gasLimit
+          )
+          .gasLimit
         ),
         ""
       );
@@ -700,9 +698,11 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
         || destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_APTOS
         || destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_TVM
     ) {
-      gasLimit = _parseGenericExtraArgsFromBytes(
+      gasLimit =
+      _parseGenericExtraArgsFromBytes(
         message.extraArgs, destChainConfig.defaultTxGasLimit, destChainConfig.maxPerMsgGasLimit
-      ).gasLimit;
+      )
+      .gasLimit;
 
       _validateDestFamilyAddress(destChainConfig.chainFamilySelector, message.receiver, gasLimit);
     } else if (destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SUI) {
@@ -729,8 +729,8 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
         // The messaging accounts needed for CCIP receiver on SUI are:
         // message receiver,
         // plus remaining accounts specified in Sui extraArgs. Each account is 32 bytes.
-        suiExpandedDataLength +=
-          ((receiverObjectIdsLength + Client.SUI_MESSAGING_ACCOUNTS_OVERHEAD) * Client.SUI_ACCOUNT_BYTE_SIZE);
+        suiExpandedDataLength += ((receiverObjectIdsLength + Client.SUI_MESSAGING_ACCOUNTS_OVERHEAD)
+            * Client.SUI_ACCOUNT_BYTE_SIZE);
       }
 
       if (numberOfTokens > 0 && suiExtraArgsV1.tokenReceiver == bytes32(0)) {
@@ -784,8 +784,8 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
         // The messaging accounts needed for CCIP receiver on SVM are:
         // message receiver, offRamp PDA signer,
         // plus remaining accounts specified in SVM extraArgs. Each account is 32 bytes.
-        svmExpandedDataLength +=
-          ((accountsLength + Client.SVM_MESSAGING_ACCOUNTS_OVERHEAD) * Client.SVM_ACCOUNT_BYTE_SIZE);
+        svmExpandedDataLength += ((accountsLength + Client.SVM_MESSAGING_ACCOUNTS_OVERHEAD)
+            * Client.SVM_ACCOUNT_BYTE_SIZE);
       }
 
       if (numberOfTokens > 0 && svmExtraArgsV1.tokenReceiver == bytes32(0)) {

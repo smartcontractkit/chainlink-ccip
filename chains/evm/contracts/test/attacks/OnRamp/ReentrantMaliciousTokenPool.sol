@@ -5,7 +5,7 @@ import {Pool} from "../../../libraries/Pool.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {FacadeClient} from "./FacadeClient.sol";
 
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
 contract ReentrantMaliciousTokenPool is TokenPool {
   address private immutable i_facade;
