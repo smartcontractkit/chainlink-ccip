@@ -80,17 +80,17 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
     uint16 blockConfirmationRequested
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
-    // Calculate the local amount. Since USDC is always 6 decimals, we can hard code the decimals to 6.
-    uint256 localAmount = _calculateLocalAmount(releaseOrMintIn.sourceDenominatedAmount, 6);
-
-    _validateReleaseOrMint(releaseOrMintIn, localAmount, blockConfirmationRequested);
+    // Since USDC is 6 decimals on all chains, we don't need to convert to a different denomination.
+    _validateReleaseOrMint(releaseOrMintIn, releaseOrMintIn.sourceDenominatedAmount, blockConfirmationRequested);
 
     uint256 excludedTokens = s_tokensExcludedFromBurn[releaseOrMintIn.remoteChainSelector];
     if (excludedTokens != 0) {
       // The existence of excluded tokens indicates a migration has occurred on the chain, and that any tokens
       // being released should come from those excluded tokens reserved for processing inflight messages.
-      if (localAmount > excludedTokens) revert InsufficientLiquidity(excludedTokens, localAmount);
-      s_tokensExcludedFromBurn[releaseOrMintIn.remoteChainSelector] -= localAmount;
+      if (releaseOrMintIn.sourceDenominatedAmount > excludedTokens) {
+        revert InsufficientLiquidity(excludedTokens, releaseOrMintIn.sourceDenominatedAmount);
+      }
+      s_tokensExcludedFromBurn[releaseOrMintIn.remoteChainSelector] -= releaseOrMintIn.sourceDenominatedAmount;
       // During a proposed migration, the lockbox balance is the source of truth. Any release here reduces the
       // lockbox balance, so burnLockedUSDC will not over-burn even without separate per-chain accounting.
     }
@@ -98,17 +98,19 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
     // tokens should come from the stored token balance of previously deposited tokens.
 
     // Release to the recipient using the lockbox tied to the remote chain selector.
-    _releaseOrMint(releaseOrMintIn.receiver, localAmount, releaseOrMintIn.remoteChainSelector);
+    _releaseOrMint(
+      releaseOrMintIn.receiver, releaseOrMintIn.sourceDenominatedAmount, releaseOrMintIn.remoteChainSelector
+    );
 
     emit ReleasedOrMinted({
       remoteChainSelector: releaseOrMintIn.remoteChainSelector,
       token: address(i_token),
       sender: msg.sender,
       recipient: releaseOrMintIn.receiver,
-      amount: localAmount
+      amount: releaseOrMintIn.sourceDenominatedAmount
     });
 
-    return Pool.ReleaseOrMintOutV1({destinationAmount: localAmount});
+    return Pool.ReleaseOrMintOutV1({destinationAmount: releaseOrMintIn.sourceDenominatedAmount});
   }
 
   /// @dev This function is overridden to prevent providing liquidity to a chain that has already been migrated, and thus should use CCTP-proper instead of a Lock/Release mechanism.

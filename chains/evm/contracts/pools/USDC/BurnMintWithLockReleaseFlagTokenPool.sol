@@ -58,22 +58,21 @@ contract BurnMintWithLockReleaseFlagTokenPool is BurnMintTokenPool {
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
     uint16 blockConfirmationRequested
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
-    // Since the remote token is always canonical USDC, the decimals should always be 6 for remote tokens,
-    // which enables potentially local non-canonical USDC with different decimals to be minted.
-    uint256 localAmount = _calculateLocalAmount(releaseOrMintIn.sourceDenominatedAmount, 6);
+    // Since USDC is 6 decimals on all chains, we don't need to convert to a different denomination.
+    _validateReleaseOrMint(releaseOrMintIn, releaseOrMintIn.sourceDenominatedAmount, blockConfirmationRequested);
 
-    _validateReleaseOrMint(releaseOrMintIn, localAmount, blockConfirmationRequested);
-
-    _releaseOrMint(releaseOrMintIn.receiver, localAmount, releaseOrMintIn.remoteChainSelector);
+    _releaseOrMint(
+      releaseOrMintIn.receiver, releaseOrMintIn.sourceDenominatedAmount, releaseOrMintIn.remoteChainSelector
+    );
 
     emit ReleasedOrMinted({
       remoteChainSelector: releaseOrMintIn.remoteChainSelector,
       token: address(i_token),
       sender: msg.sender,
       recipient: releaseOrMintIn.receiver,
-      amount: localAmount
+      amount: releaseOrMintIn.sourceDenominatedAmount
     });
 
-    return Pool.ReleaseOrMintOutV1({destinationAmount: localAmount});
+    return Pool.ReleaseOrMintOutV1({destinationAmount: releaseOrMintIn.sourceDenominatedAmount});
   }
 }
