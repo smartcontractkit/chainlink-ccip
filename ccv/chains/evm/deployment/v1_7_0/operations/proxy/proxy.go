@@ -45,3 +45,14 @@ var AcceptOwnership = contract.NewWrite(contract.WriteParams[AcceptOwnershipArgs
 		return proxy.AcceptOwnership(opts)
 	},
 })
+
+var GetTarget = contract.NewRead(contract.ReadParams[any, common.Address, *proxy.Proxy]{
+	Name:         "proxy:get-target",
+	Version:      semver.MustParse("1.7.0"),
+	Description:  "Gets the target address on the proxy",
+	ContractType: ContractType,
+	NewContract:  proxy.NewProxy,
+	CallContract: func(proxy *proxy.Proxy, opts *bind.CallOpts, args any) (common.Address, error) {
+		return proxy.GetTarget(opts)
+	},
+})

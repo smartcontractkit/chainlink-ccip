@@ -73,7 +73,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 					offRamp = addr.Address
 				case datastore.ContractType(committee_verifier.ContractType):
 					committeeVerifier = addr.Address
-				case datastore.ContractType(executor.ContractType):
+				case datastore.ContractType(executor.ProxyType):
 					executorAddress = addr.Address
 				case datastore.ContractType(committee_verifier.ResolverType):
 					committeeVerifierResolver = addr.Address

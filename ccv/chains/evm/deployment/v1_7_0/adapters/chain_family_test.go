@@ -83,7 +83,7 @@ func makeChainConfig(chainSelector uint64, remoteChainSelector uint64) v1_7_0_ch
 					},
 				},
 				DefaultExecutor: datastore.AddressRef{
-					Type:      datastore.ContractType(executor.ContractType),
+					Type:      datastore.ContractType(executor.ProxyType),
 					Version:   semver.MustParse("1.7.0"),
 					Qualifier: "default",
 				},
