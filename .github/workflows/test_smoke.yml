@@ -66,6 +66,7 @@ jobs:
         run: |
           cd cmd/ccip && go install . && cd -
           ccip u ${{ matrix.test.config }}
+          sleep 90s # wait for nodes to be ready, need a better way here
       - name: Run smoke test
         working-directory: devenv/tests/e2e
         run: |
