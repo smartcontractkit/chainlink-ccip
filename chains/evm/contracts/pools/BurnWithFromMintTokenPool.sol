@@ -28,9 +28,9 @@ contract BurnWithFromMintTokenPool is BurnMintTokenPoolAbstract, ITypeAndVersion
     token.approve(address(this), type(uint256).max);
   }
 
-  /// @inheritdoc TokenPool
-  /// @param amount The amount of tokens to burn from the pool.
+  /// @notice Burns tokens held by the pool.
   function _lockOrBurn(
+    uint64, // remoteChainSelector
     uint256 amount
   ) internal virtual override {
     IBurnMintERC20(address(i_token)).burn(address(this), amount);

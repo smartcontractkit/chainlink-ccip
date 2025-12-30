@@ -50,4 +50,27 @@ contract BurnMintWithLockReleaseFlagTokenPool_lockOrBurn is BurnMintWithLockRele
 
     assertEq(bytes4(lockOrBurnOut.destPoolData), LOCK_RELEASE_FLAG);
   }
+
+  function test_lockOrBurnV2_ReturnsLockReleaseFlag() public {
+    uint256 burnAmount = 5_000e18;
+
+    deal(address(s_token), address(s_pool), burnAmount);
+
+    vm.startPrank(s_allowedOnRamp);
+
+    (Pool.LockOrBurnOutV1 memory out, uint256 destTokenAmount) = s_pool.lockOrBurn(
+      Pool.LockOrBurnInV1({
+        originalSender: OWNER,
+        receiver: bytes(""),
+        amount: burnAmount,
+        remoteChainSelector: DEST_CHAIN_SELECTOR,
+        localToken: address(s_token)
+      }),
+      0,
+      ""
+    );
+
+    assertEq(destTokenAmount, burnAmount);
+    assertEq(bytes4(out.destPoolData), LOCK_RELEASE_FLAG);
+  }
 }

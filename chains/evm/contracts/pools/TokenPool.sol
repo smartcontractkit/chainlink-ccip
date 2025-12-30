@@ -280,7 +280,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
     uint256 feeAmount = _getFee(lockOrBurnIn, blockConfirmationRequested);
     _validateLockOrBurn(lockOrBurnIn, blockConfirmationRequested, tokenArgs, feeAmount);
     destTokenAmount = lockOrBurnIn.amount - feeAmount;
-    _lockOrBurn(destTokenAmount);
+    _lockOrBurn(lockOrBurnIn.remoteChainSelector, destTokenAmount);
 
     emit LockedOrBurned({
       remoteChainSelector: lockOrBurnIn.remoteChainSelector,
@@ -305,7 +305,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
   ) public virtual returns (Pool.LockOrBurnOutV1 memory lockOrBurnOutV1) {
     _validateLockOrBurn(lockOrBurnIn, WAIT_FOR_FINALITY, "", 0); // feeAmount is zero
-    _lockOrBurn(lockOrBurnIn.amount);
+    _lockOrBurn(lockOrBurnIn.remoteChainSelector, lockOrBurnIn.amount);
 
     emit LockedOrBurned({
       remoteChainSelector: lockOrBurnIn.remoteChainSelector,
@@ -322,8 +322,10 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   /// @notice Contains the specific lock or burn token logic for a pool.
   /// @dev overriding this method allows us to create pools with different lock/burn signatures
   /// without duplicating the underlying logic.
+  /// @param remoteChainSelector The selector of the remote chain.
   /// @param amount The amount of tokens to lock or burn.
   function _lockOrBurn(
+    uint64 remoteChainSelector,
     uint256 amount
   ) internal virtual {}
 
@@ -345,7 +347,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
 
     _validateReleaseOrMint(releaseOrMintIn, localAmount, blockConfirmationRequested);
 
-    _releaseOrMint(releaseOrMintIn.receiver, localAmount);
+    _releaseOrMint(releaseOrMintIn.receiver, localAmount, releaseOrMintIn.remoteChainSelector);
 
     emit ReleasedOrMinted({
       remoteChainSelector: releaseOrMintIn.remoteChainSelector,
@@ -372,9 +374,11 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   /// without duplicating the underlying logic.
   /// @param receiver The address to receive the tokens.
   /// @param amount The amount of tokens to release or mint.
+  /// @param remoteChainSelector The selector of the remote chain.
   function _releaseOrMint(
     address receiver,
-    uint256 amount
+    uint256 amount,
+    uint64 remoteChainSelector
   ) internal virtual {}
 
   // ================================================================

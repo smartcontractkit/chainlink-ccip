@@ -37,11 +37,10 @@ contract BurnToAddressMintTokenPool is BurnMintTokenPoolAbstract, ITypeAndVersio
     i_burnAddress = burnAddress;
   }
 
-  /// @inheritdoc TokenPool
   /// @notice Tokens are burned by sending to an address which can never transfer them,
   /// making the tokens unrecoverable without reducing the total supply.
-  /// @param amount The amount of tokens to burn from the pool.
   function _lockOrBurn(
+    uint64, // remoteChainSelector
     uint256 amount
   ) internal virtual override {
     i_token.safeTransfer(i_burnAddress, amount);

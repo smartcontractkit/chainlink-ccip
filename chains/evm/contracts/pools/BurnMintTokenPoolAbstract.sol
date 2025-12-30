@@ -9,11 +9,10 @@ abstract contract BurnMintTokenPoolAbstract is TokenPool {
   /// @notice Contains the specific release or mint token logic for a pool.
   /// @dev overriding this method allows us to create pools with different release/mint signatures
   /// without duplicating the underlying logic.
-  /// @param receiver The address to receive the tokens.
-  /// @param amount The amount of tokens to be minted.
   function _releaseOrMint(
     address receiver,
-    uint256 amount
+    uint256 amount,
+    uint64 // remoteChainSelector
   ) internal virtual override {
     IBurnMintERC20(address(i_token)).mint(receiver, amount);
   }
