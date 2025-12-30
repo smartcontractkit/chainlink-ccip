@@ -152,7 +152,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
     emit ConfigSet(address(tokenMessenger));
   }
 
-  /// @notice Using a function because constant state variables cannot be overridden by child contracts.
+  /// @dev Using a function because constant state variables cannot be overridden by child contracts.
   function typeAndVersion() external pure virtual override returns (string memory) {
     return "USDCTokenPool 1.7.0-dev";
   }

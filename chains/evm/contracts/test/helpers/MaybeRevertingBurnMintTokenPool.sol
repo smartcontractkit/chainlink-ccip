@@ -38,6 +38,7 @@ contract MaybeRevertingBurnMintTokenPool is BurnMintTokenPool {
   }
 
   function _lockOrBurn(
+    uint64, // remoteChainSelector
     uint256 amount
   ) internal override {
     IBurnMintERC20(address(i_token)).burn(amount);
@@ -63,7 +64,8 @@ contract MaybeRevertingBurnMintTokenPool is BurnMintTokenPool {
 
   function _releaseOrMint(
     address receiver,
-    uint256 amount
+    uint256 amount,
+    uint64 // remoteChainSelector
   ) internal override {
     IBurnMintERC20(address(i_token)).mint(receiver, amount);
   }

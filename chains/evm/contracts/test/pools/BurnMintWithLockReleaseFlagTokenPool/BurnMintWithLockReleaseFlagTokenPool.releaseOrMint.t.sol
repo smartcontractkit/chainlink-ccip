@@ -57,6 +57,30 @@ contract BurnMintWithLockReleaseFlagTokenPool_releaseOrMint is BurnMintWithLockR
 
     assertEq(s_token.balanceOf(receiver), amount);
   }
+
+  function test_releaseOrMintV2_LockReleaseFlagInSourcePoolData() public {
+    uint256 amount = 1e19;
+    address receiver = makeAddr("receiver_address_v2");
+
+    vm.startPrank(s_allowedOffRamp);
+
+    Pool.ReleaseOrMintOutV1 memory out = s_pool.releaseOrMint(
+      Pool.ReleaseOrMintInV1({
+        originalSender: bytes(""),
+        receiver: receiver,
+        sourceDenominatedAmount: amount,
+        localToken: address(s_token),
+        remoteChainSelector: DEST_CHAIN_SELECTOR,
+        sourcePoolAddress: abi.encode(s_initialRemotePool),
+        sourcePoolData: abi.encode(LOCK_RELEASE_FLAG),
+        offchainTokenData: ""
+      }),
+      0
+    );
+
+    assertEq(out.destinationAmount, amount);
+    assertEq(s_token.balanceOf(receiver), amount);
+  }
 }
 
 // TODO: Full E2E tests

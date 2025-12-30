@@ -41,7 +41,7 @@ contract HyperLiquidCompatibleERC20 is FactoryBurnMintERC20 {
     address newOwner
   ) FactoryBurnMintERC20(name, symbol, decimals, maxSupply, preMint, newOwner) {}
 
-  /// @notice Using a function because constant state variables cannot be overridden by child contracts.
+  /// @dev Using a function because constant state variables cannot be overridden by child contracts.
   function typeAndVersion() external pure virtual override returns (string memory) {
     return "HyperLiquidCompatibleERC20 1.6.2";
   }
