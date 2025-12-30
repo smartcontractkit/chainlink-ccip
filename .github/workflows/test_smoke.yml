@@ -11,7 +11,7 @@ on:
         required: false
       custom_config:
         description: "Extra config file(s), e.g. ton.toml,sui.toml"
-        required: true
+        required: false
   pull_request:
   push:
     branches:
@@ -54,6 +54,7 @@ jobs:
         with:
           repository: smartcontractkit/chainlink-ton
           ref: ${{ github.event.inputs.ton_ref }}
+          path: chainlink-ton
       - name: Build CL Image For Ref
         if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.chainlink_version != '' }}
         uses: ./.github/actions/build-cl
