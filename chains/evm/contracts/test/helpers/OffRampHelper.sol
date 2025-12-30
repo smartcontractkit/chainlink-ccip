@@ -11,7 +11,7 @@ contract OffRampHelper is OffRamp {
 
   constructor(
     OffRamp.StaticConfig memory staticConfig
-  ) OffRamp(staticConfig, DEFAULT_MAX_GAS_BUFFER_TO_UPDATE_STATE) {}
+  ) OffRamp(staticConfig) {}
 
   function ensureCCVQuorumIsReached(
     uint64 sourceChainSelector,

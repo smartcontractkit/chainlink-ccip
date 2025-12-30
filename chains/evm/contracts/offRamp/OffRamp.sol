@@ -69,7 +69,8 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     uint64 localChainSelector; // ──╮ Local chainSelector
     uint16 gasForCallExactCheck; // │ Gas for call exact check
     IRMNRemote rmnRemote; // ───────╯ RMN Verification Contract
-    address tokenAdminRegistry; // Token admin registry address
+    address tokenAdminRegistry; // ────────╮ Token admin registry address
+    uint32 maxGasBufferToUpdateState; // ──╯ Max Gas Buffer to Update State
   }
 
   /// @dev Per-chain source config (defining a lane from a Source Chain -> Dest OffRamp).
@@ -107,15 +108,14 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// We include this in the offRamp so that we can redeploy to adjust it should a hardfork change the gas costs of
   /// relevant opcodes in callWithExactGas.
   uint16 internal immutable i_gasForCallExactCheck;
+  /// @notice Gas buffer to update state.
+  // Example, 5k for updating the state + 5k for the event and misc costs.
+  uint32 internal i_maxGasBufferToUpdateState;
 
   // At the top to pack it with the `owner` variable from Ownable2StepMsgSender.
   bool private s_reentrancyGuardEntered;
 
   // DYNAMIC CONFIG
-
-  /// @notice Gas buffer to update state.
-  // Example, 5k for updating the state + 5k for the event and misc costs.
-  uint32 internal s_maxGasBufferToUpdateState;
 
   /// @notice Set of source chain selectors.
   EnumerableSet.UintSet internal s_sourceChainSelectors;
@@ -133,8 +133,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   mapping(bytes32 execStateKey => Internal.MessageExecutionState state) internal s_executionStates;
 
   constructor(
-    StaticConfig memory staticConfig,
-    uint32 maxGasBufferToUpdateState
+    StaticConfig memory staticConfig
   ) {
     if (address(staticConfig.rmnRemote) == address(0) || staticConfig.tokenAdminRegistry == address(0)) {
       revert ZeroAddressNotAllowed();
@@ -146,12 +145,15 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     if (staticConfig.gasForCallExactCheck == 0) {
       revert GasCannotBeZero();
     }
+    if (staticConfig.maxGasBufferToUpdateState == 0) {
+      revert GasCannotBeZero();
+    }
 
     i_chainSelector = staticConfig.localChainSelector;
     i_rmnRemote = staticConfig.rmnRemote;
     i_tokenAdminRegistry = staticConfig.tokenAdminRegistry;
     i_gasForCallExactCheck = staticConfig.gasForCallExactCheck;
-    _setMaxGasBufferToUpdateState(maxGasBufferToUpdateState);
+    i_maxGasBufferToUpdateState = staticConfig.maxGasBufferToUpdateState;
 
     emit StaticConfigSet(staticConfig);
   }
@@ -248,13 +250,12 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     retData = new bytes(Internal.MAX_RET_BYTES);
     uint16 maxReturnBytes = Internal.MAX_RET_BYTES;
 
-    uint256 gasBuffer = s_maxGasBufferToUpdateState;
     uint256 gasLeft = gasleft();
-    if (gasLeft <= gasBuffer) {
+    if (gasLeft <= i_maxGasBufferToUpdateState) {
       revert InsufficientGasToCompleteTx(bytes4(uint32(gasleft())));
     }
 
-    uint256 gasLimit = gasLeft - gasBuffer;
+    uint256 gasLimit = gasLeft - i_maxGasBufferToUpdateState;
 
     assembly {
       // Call and return whether we succeeded.
@@ -803,33 +804,9 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       localChainSelector: i_chainSelector,
       gasForCallExactCheck: i_gasForCallExactCheck,
       rmnRemote: i_rmnRemote,
-      tokenAdminRegistry: i_tokenAdminRegistry
+      tokenAdminRegistry: i_tokenAdminRegistry,
+      maxGasBufferToUpdateState: i_maxGasBufferToUpdateState
     });
-  }
-
-  /// @notice Returns the max gas buffer to update state.
-  function getMaxGasBufferToUpdateState() external view virtual returns (uint32) {
-    return s_maxGasBufferToUpdateState;
-  }
-
-  /// @notice Sets the max gas buffer to update state.
-  /// @param maxGasBufferToUpdateState The new max gas buffer value to update state (in gas units).
-  function setMaxGasBufferToUpdateState(
-    uint32 maxGasBufferToUpdateState
-  ) external virtual onlyOwner {
-    _setMaxGasBufferToUpdateState(maxGasBufferToUpdateState);
-  }
-
-  /// @dev Internal method that allows for reuse in constructor.
-  function _setMaxGasBufferToUpdateState(
-    uint32 maxGasBufferToUpdateState
-  ) internal virtual {
-    if (maxGasBufferToUpdateState == 0) {
-      revert GasCannotBeZero();
-    }
-    uint32 oldMaxGasBufferToUpdateState = s_maxGasBufferToUpdateState;
-    s_maxGasBufferToUpdateState = maxGasBufferToUpdateState;
-    emit MaxGasBufferToUpdateStateUpdated(oldMaxGasBufferToUpdateState, maxGasBufferToUpdateState);
   }
 
   /// @notice Returns the source chain config for the provided source chain selector.
