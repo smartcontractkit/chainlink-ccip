@@ -12,35 +12,15 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
-// Mechanism specifies the mechanism by which the CCTP message will be handled.
-type Mechanism string
-
-const (
-	CCTPV1Mechanism        Mechanism = "CCTP_V1"
-	CCTPV2Mechanism        Mechanism = "CCTP_V2"
-	LockReleaseMechanism   Mechanism = "LOCK_RELEASE"
-	CCTPV2WithCCVMechanism Mechanism = "CCTP_V2_WITH_CCV"
-)
-
-// IsValid checks if the mechanism is valid.
-func (m Mechanism) IsValid() bool {
-	switch m {
-	case CCTPV1Mechanism, CCTPV2Mechanism, LockReleaseMechanism, CCTPV2WithCCVMechanism:
-		return true
-	default:
-		return false
-	}
-}
-
 // RemoteDomain identifies CCTP-specific parameters for a remote chain.
-type RemoteDomain[Contract any] struct {
+type RemoteDomain[RemoteContract any] struct {
 	// AllowedCallerOnDest is the address allowed to trigger message reception on the remote domain.
-	AllowedCallerOnDest Contract
+	AllowedCallerOnDest RemoteContract
 	// AllowedCallerOnSource is the address expected to deposit tokens for burn on the remote chain.
-	AllowedCallerOnSource Contract
+	AllowedCallerOnSource RemoteContract
 	// MintRecipientOnDest is the address that will receive tokens on the remote domain.
 	// If not set, the tokens will be minted to the receiver of the CCIP message.
-	MintRecipientOnDest Contract
+	MintRecipientOnDest RemoteContract
 	// DomainIdentifier is the identifier of the remote domain.
 	DomainIdentifier uint32
 }
@@ -56,37 +36,21 @@ type RemoteCCTPChainConfig[LocalContract any, RemoteContract any] struct {
 	// PayloadSizeBytes is the size of the CCTP verification payload to be checked on the remote chain.
 	PayloadSizeBytes uint32
 	// LockOrBurnMechanism specifies the mechanism by which the CCTP message will be handled.
-	// i.e. CCTP V1, CCTP V2, lock-release, or CCTP V2 with CCVs.
-	LockOrBurnMechanism Mechanism
-	// LockRelease pool is the address of the lock-release pool used for funds sent to / received from the remote chain.
-	// Only required if the lock-release mechanism is used.
-	LockReleasePool LocalContract
+	// Each chain family may interpret this string differently.
+	LockOrBurnMechanism string
 	// RemoteDomain configures the CCTP-specific parameters for the remote chain.
 	RemoteDomain RemoteDomain[RemoteContract]
-}
-
-// TokenPools specifies all possible CCTP token pools that may exist on a given chain.
-type TokenPools[Contract any] struct {
-	// LegacyCCTPV1Pool is the address of the legacy CCTP V1 token pool.
-	LegacyCCTPV1Pool Contract
-	// CCTPV1Pool is the address of the CCTP V1 token pool.
-	CCTPV1Pool Contract
-	// CCTPV2Pool is the address of the CCTP V2 token pool.
-	CCTPV2Pool Contract
-	// CCTPV2PoolWithCCV is the address of the CCTP V2 token pool that uses CCVs.
-	CCTPV2PoolWithCCV Contract
 }
 
 // DeployCCTPInput specifies the input for the DeployCCTPChain sequence.
 type DeployCCTPInput[LocalContract any, RemoteContract any] struct {
 	// ChainSelector is the selector for the chain being deployed.
 	ChainSelector uint64
-	// TokenPools specifies all possible CCTP token pools that may exist on a given chain.
-	TokenPools TokenPools[LocalContract]
-	// USDCTokenPoolProxy is the address of the USDCTokenPoolProxy contract.
-	USDCTokenPoolProxy LocalContract
+	// TokenPool is the set of all contracts that comprise the token pool on this chain.
+	// i.e. Proxy and various implementations.
+	TokenPool []LocalContract
 	// CCTPVerifier is set of addresses comprising the CCTPVerifier system.
-	CCTPVerifier []datastore.AddressRef
+	CCTPVerifier []LocalContract
 	// MessageTransmitterProxy is the address of the MessageTransmitterProxy contract.
 	MessageTransmitterProxy LocalContract
 	// TokenAdminRegistry is the address of the TokenAdminRegistry contract.

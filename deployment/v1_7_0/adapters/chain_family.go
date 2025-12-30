@@ -38,9 +38,9 @@ type CommitteeVerifierRemoteChainConfig struct {
 }
 
 // CommitteeVerifierConfig configures a CommitteeVerifier contract.
-type CommitteeVerifierConfig[C any] struct {
+type CommitteeVerifierConfig[LocalContract any] struct {
 	// CommitteeVerifier is a set of addresses comprising the committee verifier system.
-	CommitteeVerifier []C
+	CommitteeVerifier []LocalContract
 	// RemoteChains specifies the configuration for each remote chain supported by the committee verifier.
 	RemoteChains map[uint64]CommitteeVerifierRemoteChainConfig
 }
@@ -83,8 +83,8 @@ type FeeQuoterDestChainConfig struct {
 
 // RemoteChainConfig defines the configuration for a remote chain.
 type RemoteChainConfig[RemoteContract any, LocalContract any] struct {
-	// Whether to allow traffic FROM this remote chain.
-	AllowTrafficFrom bool
+	// Whether to disable traffic FROM this remote chain.
+	DisableTrafficFrom bool
 	// The OnRamp addresses on the remote chain.
 	OnRamps []RemoteContract
 	// The OffRamp address on the remote chain.
@@ -121,7 +121,7 @@ type ConfigureChainForLanesInput struct {
 	OnRamp string
 	// The CommitteeVerifiers on the chain being configured.
 	// There can be multiple committee verifiers on a chain, each controlled by a different entity.
-	CommitteeVerifiers []CommitteeVerifierConfig[datastore.AddressRef]
+	CommitteeVerifiers []CommitteeVerifierConfig[string]
 	// The FeeQuoter address on the chain being configured.
 	FeeQuoter string
 	// The OffRamp address on the chain being configured

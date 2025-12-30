@@ -17,17 +17,17 @@ import (
 type TokenTransferConfig struct {
 	// ChainSelector identifies the chain on which the token lives.
 	ChainSelector uint64
-	// TokenPoolRef is a reference to the token pool in the datastore.
+	// TokenPool is a reference to the token pool in the datastore.
 	// Populate the reference as needed to match the desired token pool.
-	TokenPoolRef datastore.AddressRef
+	TokenPool datastore.AddressRef
 	// ExternalAdmin is specified when we want to propose an admin that we don't control.
 	// Leave empty to use internal administration.
 	ExternalAdmin string
-	// RegistryRef is a reference to the contract on which the token pool must be registered.
+	// Registry is a reference to the contract on which the token pool must be registered.
 	// Populate the reference as needed to match the desired registry.
-	RegistryRef datastore.AddressRef
+	Registry datastore.AddressRef
 	// RemoteChains specifies the remote chains to configure on the token pool.
-	RemoteChains map[uint64]RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]
+	RemoteChains map[uint64]RemoteChainConfig[datastore.AddressRef, datastore.AddressRef]
 	// MinFinalityValue is the minimum finality value required by the token pool.
 	// This can be interpreted as # of block confirmations, an ID, or otherwise.
 	// Interpretation is left to each chain family.
@@ -39,7 +39,7 @@ type ConfigureTokensForTransfersConfig struct {
 	// Tokens specifies the tokens to configure for cross-chain transfers.
 	Tokens []TokenTransferConfig
 	// MCMS configures the resulting proposal.
-	MCMS mcms.Input
+	MCMS *mcms.Input
 }
 
 // ConfigureTokensForTransfers returns a changeset that configures tokens on multiple chains for transfers with other chains.
@@ -49,7 +49,27 @@ func ConfigureTokensForTransfers(tokenRegistry *TokenAdapterRegistry, mcmsRegist
 
 func makeVerify(_ *TokenAdapterRegistry, _ *changesets.MCMSReaderRegistry) func(cldf.Environment, ConfigureTokensForTransfersConfig) error {
 	return func(e cldf.Environment, cfg ConfigureTokensForTransfersConfig) error {
-		// TODO: implement
+		if cfg.MCMS != nil {
+			err := cfg.MCMS.Validate()
+			if err != nil {
+				return fmt.Errorf("failed to validate MCMS input: %w", err)
+			}
+		}
+
+		for _, token := range cfg.Tokens {
+			if _, err := chain_selectors.GetSelectorFamily(token.ChainSelector); err != nil {
+				return err
+			}
+			if datastore_utils.IsAddressRefEmpty(token.TokenPool) {
+				return fmt.Errorf("token pool ref is empty for token on chain with selector %d", token.ChainSelector)
+			}
+			for remoteChainSelector := range token.RemoteChains {
+				if _, err := chain_selectors.GetSelectorFamily(remoteChainSelector); err != nil {
+					return fmt.Errorf("remote chain %d has unknown chain selector %d: %w", remoteChainSelector, remoteChainSelector, err)
+				}
+			}
+		}
+
 		return nil
 	}
 }
@@ -60,14 +80,21 @@ func makeApply(tokenRegistry *TokenAdapterRegistry, mcmsRegistry *changesets.MCM
 		reports := make([]cldf_ops.Report[any, any], 0)
 
 		for _, token := range cfg.Tokens {
-			tokenPool, err := datastore_utils.FindAndFormatRef(e.DataStore, token.TokenPoolRef, token.ChainSelector, datastore_utils.FullRef)
+			var input ConfigureTokenForTransfersInput
+
+			if !datastore_utils.IsAddressRefEmpty(token.Registry) {
+				registry, err := datastore_utils.FindAndFormatRef(e.DataStore, token.Registry, token.ChainSelector, datastore_utils.FullRef)
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve registry ref on chain with selector %d: %w", token.ChainSelector, err)
+				}
+				input.RegistryAddress = registry.Address
+			}
+
+			tokenPool, err := datastore_utils.FindAndFormatRef(e.DataStore, token.TokenPool, token.ChainSelector, datastore_utils.FullRef)
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve token pool ref on chain with selector %d: %w", token.ChainSelector, err)
 			}
-			registry, err := datastore_utils.FindAndFormatRef(e.DataStore, token.RegistryRef, token.ChainSelector, datastore_utils.FullRef)
-			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve registry ref on chain with selector %d: %w", token.ChainSelector, err)
-			}
+			input.TokenPoolAddress = tokenPool.Address
 
 			family, err := chain_selectors.GetSelectorFamily(token.ChainSelector)
 			if err != nil {
@@ -93,14 +120,13 @@ func makeApply(tokenRegistry *TokenAdapterRegistry, mcmsRegistry *changesets.MCM
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to process remote chain config for remote chain selector %d: %w", remoteChainSelector, err)
 				}
 			}
-			configureTokenReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adapter.ConfigureTokenForTransfersSequence(), e.BlockChains, ConfigureTokenForTransfersInput{
-				ChainSelector:    token.ChainSelector,
-				TokenPoolAddress: tokenPool.Address,
-				RemoteChains:     remoteChains,
-				ExternalAdmin:    token.ExternalAdmin,
-				RegistryAddress:  registry.Address,
-				MinFinalityValue: token.MinFinalityValue,
-			})
+
+			input.RemoteChains = remoteChains
+			input.ChainSelector = token.ChainSelector
+			input.ExternalAdmin = token.ExternalAdmin
+			input.MinFinalityValue = token.MinFinalityValue
+
+			configureTokenReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adapter.ConfigureTokenForTransfersSequence(), e.BlockChains, input)
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to configure token pool on chain with selector %d: %w", token.ChainSelector, err)
 			}
@@ -109,10 +135,15 @@ func makeApply(tokenRegistry *TokenAdapterRegistry, mcmsRegistry *changesets.MCM
 			reports = append(reports, configureTokenReport.ExecutionReports...)
 		}
 
+		var mcmsInput mcms.Input
+		if cfg.MCMS != nil {
+			mcmsInput = *cfg.MCMS
+		}
+
 		return changesets.NewOutputBuilder(e, mcmsRegistry).
 			WithReports(reports).
 			WithBatchOps(batchOps).
-			Build(cfg.MCMS)
+			Build(mcmsInput)
 	}
 }
 
@@ -121,7 +152,7 @@ func convertRemoteChainConfig(
 	chainSelector uint64,
 	remoteAdapter TokenAdapter,
 	remoteChainSelector uint64,
-	inCfg RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef],
+	inCfg RemoteChainConfig[datastore.AddressRef, datastore.AddressRef],
 ) (RemoteChainConfig[[]byte, string], error) {
 	outCfg := RemoteChainConfig[[]byte, string]{
 		DefaultFinalityInboundRateLimiterConfig:  inCfg.DefaultFinalityInboundRateLimiterConfig,
@@ -130,25 +161,25 @@ func convertRemoteChainConfig(
 		CustomFinalityOutboundRateLimiterConfig:  inCfg.CustomFinalityOutboundRateLimiterConfig,
 		TokenTransferFeeConfig:                   inCfg.TokenTransferFeeConfig,
 	}
-	if inCfg.RemotePool != nil {
-		fullRemotePoolRef, err := datastore_utils.FindAndFormatRef(e.DataStore, *inCfg.RemotePool, remoteChainSelector, datastore_utils.FullRef)
+	if !datastore_utils.IsAddressRefEmpty(inCfg.RemotePool) {
+		fullRemotePoolRef, err := datastore_utils.FindAndFormatRef(e.DataStore, inCfg.RemotePool, remoteChainSelector, datastore_utils.FullRef)
 		if err != nil {
-			return outCfg, fmt.Errorf("failed to resolve remote pool ref %s: %w", datastore_utils.SprintRef(*inCfg.RemotePool), err)
+			return outCfg, fmt.Errorf("failed to resolve remote pool ref %s: %w", datastore_utils.SprintRef(inCfg.RemotePool), err)
 		}
 		outCfg.RemotePool, err = remoteAdapter.AddressRefToBytes(fullRemotePoolRef)
 		if err != nil {
-			return outCfg, fmt.Errorf("failed to convert remote pool ref %s to bytes: %w", datastore_utils.SprintRef(*inCfg.RemotePool), err)
+			return outCfg, fmt.Errorf("failed to convert remote pool ref %s to bytes: %w", datastore_utils.SprintRef(inCfg.RemotePool), err)
 		}
 		// Can either provide the token reference directly or derive it from the pool reference.
-		if inCfg.RemoteToken != nil {
-			outCfg.RemoteToken, err = datastore_utils.FindAndFormatRef(e.DataStore, *inCfg.RemoteToken, remoteChainSelector, remoteAdapter.AddressRefToBytes)
+		if !datastore_utils.IsAddressRefEmpty(inCfg.RemoteToken) {
+			outCfg.RemoteToken, err = datastore_utils.FindAndFormatRef(e.DataStore, inCfg.RemoteToken, remoteChainSelector, remoteAdapter.AddressRefToBytes)
 			if err != nil {
-				return outCfg, fmt.Errorf("failed to resolve remote token ref %s: %w", datastore_utils.SprintRef(*inCfg.RemoteToken), err)
+				return outCfg, fmt.Errorf("failed to resolve remote token ref %s: %w", datastore_utils.SprintRef(inCfg.RemoteToken), err)
 			}
 		} else {
 			outCfg.RemoteToken, err = remoteAdapter.DeriveTokenAddress(e, remoteChainSelector, fullRemotePoolRef)
 			if err != nil {
-				return outCfg, fmt.Errorf("failed to get remote token address via pool ref (%s) for remote chain selector %d: %w", datastore_utils.SprintRef(*inCfg.RemotePool), remoteChainSelector, err)
+				return outCfg, fmt.Errorf("failed to get remote token address via pool ref (%s) for remote chain selector %d: %w", datastore_utils.SprintRef(inCfg.RemotePool), remoteChainSelector, err)
 			}
 		}
 	}

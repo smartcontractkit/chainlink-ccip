@@ -67,6 +67,16 @@ func findRef(ds datastore.DataStore, ref datastore.AddressRef) (datastore.Addres
 	return refs[0], nil
 }
 
+// IsAddressRefEmpty checks if an AddressRef is empty.
+func IsAddressRefEmpty(ref datastore.AddressRef) bool {
+	return ref.Address == "" &&
+		ref.Type == "" &&
+		ref.Version == nil &&
+		ref.Qualifier == "" &&
+		ref.ChainSelector == 0 &&
+		ref.Labels.Length() == 0
+}
+
 // FullRef returns the entire datastore.AddressRef
 func FullRef(ref datastore.AddressRef) (datastore.AddressRef, error) {
 	return ref, nil

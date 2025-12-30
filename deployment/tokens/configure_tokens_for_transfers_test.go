@@ -179,24 +179,24 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 				Tokens: []tokens.TokenTransferConfig{
 					{
 						ChainSelector: 5009297550715157269,
-						TokenPoolRef: datastore.AddressRef{
+						TokenPool: datastore.AddressRef{
 							Type:          "TokenPool",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
-						RegistryRef: datastore.AddressRef{
+						Registry: datastore.AddressRef{
 							Type:          "Registry",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
-						RemoteChains: map[uint64]tokens.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+						RemoteChains: map[uint64]tokens.RemoteChainConfig[datastore.AddressRef, datastore.AddressRef]{
 							15971525489660198786: {
-								RemoteToken: &datastore.AddressRef{
+								RemoteToken: datastore.AddressRef{
 									Type:          "Token",
 									Version:       semver.MustParse("1.0.0"),
 									ChainSelector: 15971525489660198786,
 								},
-								RemotePool: &datastore.AddressRef{
+								RemotePool: datastore.AddressRef{
 									Type:          "TokenPool",
 									Version:       semver.MustParse("1.0.0"),
 									ChainSelector: 15971525489660198786,
@@ -225,7 +225,7 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 						},
 					},
 				},
-				MCMS: basicMCMSInput,
+				MCMS: &basicMCMSInput,
 			},
 		},
 		{
@@ -237,20 +237,20 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 				Tokens: []tokens.TokenTransferConfig{
 					{
 						ChainSelector: 5009297550715157269,
-						TokenPoolRef: datastore.AddressRef{
+						TokenPool: datastore.AddressRef{
 							Type:          "TokenPool",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
-						RegistryRef: datastore.AddressRef{
+						Registry: datastore.AddressRef{
 							Type:          "Registry",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
-						RemoteChains: map[uint64]tokens.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+						RemoteChains: map[uint64]tokens.RemoteChainConfig[datastore.AddressRef, datastore.AddressRef]{
 							15971525489660198786: {
-								RemoteToken: nil, // This will trigger derivation
-								RemotePool: &datastore.AddressRef{
+								RemoteToken: datastore.AddressRef{}, // This will trigger derivation
+								RemotePool: datastore.AddressRef{
 									Type:          "TokenPool",
 									Version:       semver.MustParse("1.0.0"),
 									ChainSelector: 15971525489660198786,
@@ -279,7 +279,7 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 						},
 					},
 				},
-				MCMS: basicMCMSInput,
+				MCMS: &basicMCMSInput,
 			},
 			shouldDeriveToken: true,
 		},
@@ -301,19 +301,19 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 				Tokens: []tokens.TokenTransferConfig{
 					{
 						ChainSelector: 5009297550715157269,
-						TokenPoolRef: datastore.AddressRef{
+						TokenPool: datastore.AddressRef{
 							Type:          "TokenPool",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
-						RegistryRef: datastore.AddressRef{
+						Registry: datastore.AddressRef{
 							Type:          "Registry",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
 					},
 				},
-				MCMS: basicMCMSInput,
+				MCMS: &basicMCMSInput,
 			},
 			expectedSequenceErrorMsg: "failed to resolve token pool ref",
 		},
@@ -335,19 +335,19 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 				Tokens: []tokens.TokenTransferConfig{
 					{
 						ChainSelector: 5009297550715157269,
-						TokenPoolRef: datastore.AddressRef{
+						TokenPool: datastore.AddressRef{
 							Type:          "TokenPool",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
-						RegistryRef: datastore.AddressRef{
+						Registry: datastore.AddressRef{
 							Type:          "Registry",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
 					},
 				},
-				MCMS: basicMCMSInput,
+				MCMS: &basicMCMSInput,
 			},
 			expectedSequenceErrorMsg: "failed to resolve registry ref",
 		},
@@ -360,19 +360,19 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 				Tokens: []tokens.TokenTransferConfig{
 					{
 						ChainSelector: 0, // Invalid chain selector
-						TokenPoolRef: datastore.AddressRef{
+						TokenPool: datastore.AddressRef{
 							Type:          "TokenPool",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
-						RegistryRef: datastore.AddressRef{
+						Registry: datastore.AddressRef{
 							Type:          "Registry",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
 					},
 				},
-				MCMS: basicMCMSInput,
+				MCMS: &basicMCMSInput,
 			},
 			expectedSequenceErrorMsg: "unknown chain selector",
 		},
@@ -387,24 +387,24 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 				Tokens: []tokens.TokenTransferConfig{
 					{
 						ChainSelector: 5009297550715157269,
-						TokenPoolRef: datastore.AddressRef{
+						TokenPool: datastore.AddressRef{
 							Type:          "TokenPool",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
-						RegistryRef: datastore.AddressRef{
+						Registry: datastore.AddressRef{
 							Type:          "Registry",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
-						RemoteChains: map[uint64]tokens.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+						RemoteChains: map[uint64]tokens.RemoteChainConfig[datastore.AddressRef, datastore.AddressRef]{
 							15971525489660198786: {
-								RemoteToken: &datastore.AddressRef{
+								RemoteToken: datastore.AddressRef{
 									Type:          "Token",
 									Version:       semver.MustParse("1.0.0"),
 									ChainSelector: 15971525489660198786,
 								},
-								RemotePool: &datastore.AddressRef{
+								RemotePool: datastore.AddressRef{
 									Type:          "TokenPool",
 									Version:       semver.MustParse("1.0.0"),
 									ChainSelector: 15971525489660198786,
@@ -417,7 +417,7 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 						},
 					},
 				},
-				MCMS: basicMCMSInput,
+				MCMS: &basicMCMSInput,
 			},
 			expectedSequenceErrorMsg: "failed to resolve remote pool ref",
 		},
@@ -434,24 +434,24 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 				Tokens: []tokens.TokenTransferConfig{
 					{
 						ChainSelector: 5009297550715157269,
-						TokenPoolRef: datastore.AddressRef{
+						TokenPool: datastore.AddressRef{
 							Type:          "TokenPool",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
-						RegistryRef: datastore.AddressRef{
+						Registry: datastore.AddressRef{
 							Type:          "Registry",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
-						RemoteChains: map[uint64]tokens.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+						RemoteChains: map[uint64]tokens.RemoteChainConfig[datastore.AddressRef, datastore.AddressRef]{
 							15971525489660198786: {
-								RemoteToken: &datastore.AddressRef{
+								RemoteToken: datastore.AddressRef{
 									Type:          "Token",
 									Version:       semver.MustParse("1.0.0"),
 									ChainSelector: 15971525489660198786,
 								},
-								RemotePool: &datastore.AddressRef{
+								RemotePool: datastore.AddressRef{
 									Type:          "TokenPool",
 									Version:       semver.MustParse("1.0.0"),
 									ChainSelector: 15971525489660198786,
@@ -464,7 +464,7 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 						},
 					},
 				},
-				MCMS: basicMCMSInput,
+				MCMS: &basicMCMSInput,
 			},
 			expectedSequenceErrorMsg: "failed to resolve remote token ref",
 		},
@@ -477,20 +477,20 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 				Tokens: []tokens.TokenTransferConfig{
 					{
 						ChainSelector: 5009297550715157269,
-						TokenPoolRef: datastore.AddressRef{
+						TokenPool: datastore.AddressRef{
 							Type:          "TokenPool",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
-						RegistryRef: datastore.AddressRef{
+						Registry: datastore.AddressRef{
 							Type:          "Registry",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
-						RemoteChains: map[uint64]tokens.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+						RemoteChains: map[uint64]tokens.RemoteChainConfig[datastore.AddressRef, datastore.AddressRef]{
 							15971525489660198786: {
-								RemoteToken: nil, // Will trigger derivation which should fail
-								RemotePool: &datastore.AddressRef{
+								RemoteToken: datastore.AddressRef{}, // Will trigger derivation which should fail
+								RemotePool: datastore.AddressRef{
 									Type:          "TokenPool",
 									Version:       semver.MustParse("1.0.0"),
 									ChainSelector: 15971525489660198786,
@@ -503,7 +503,7 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 						},
 					},
 				},
-				MCMS: basicMCMSInput,
+				MCMS: &basicMCMSInput,
 			},
 			expectedTokenDerivationErrorMsg: "failed to derive remote token address",
 		},
@@ -516,24 +516,24 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 				Tokens: []tokens.TokenTransferConfig{
 					{
 						ChainSelector: 5009297550715157269,
-						TokenPoolRef: datastore.AddressRef{
+						TokenPool: datastore.AddressRef{
 							Type:          "TokenPool",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
-						RegistryRef: datastore.AddressRef{
+						Registry: datastore.AddressRef{
 							Type:          "Registry",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
-						RemoteChains: map[uint64]tokens.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+						RemoteChains: map[uint64]tokens.RemoteChainConfig[datastore.AddressRef, datastore.AddressRef]{
 							15971525489660198786: {
-								RemoteToken: &datastore.AddressRef{
+								RemoteToken: datastore.AddressRef{
 									Type:          "Token",
 									Version:       semver.MustParse("1.0.0"),
 									ChainSelector: 15971525489660198786,
 								},
-								RemotePool: &datastore.AddressRef{
+								RemotePool: datastore.AddressRef{
 									Type:          "TokenPool",
 									Version:       semver.MustParse("1.0.0"),
 									ChainSelector: 15971525489660198786,
@@ -546,7 +546,7 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 						},
 					},
 				},
-				MCMS: basicMCMSInput,
+				MCMS: &basicMCMSInput,
 			},
 			expectedSequenceErrorMsg: "sequence execution failed",
 		},
@@ -615,6 +615,328 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 					}
 					require.Equal(t, fmt.Sprintf("%d-token-pool", op.ChainSelector), op.Transactions[0].To)
 				}
+			}
+		})
+	}
+}
+
+func TestConfigureTokensForTransfers_VerifyPreconditions(t *testing.T) {
+	tests := []struct {
+		desc          string
+		cfg           tokens.ConfigureTokensForTransfersConfig
+		expectedError string
+	}{
+		{
+			desc: "success - valid configuration",
+			cfg: tokens.ConfigureTokensForTransfersConfig{
+				Tokens: []tokens.TokenTransferConfig{
+					{
+						ChainSelector: 5009297550715157269,
+						TokenPool: datastore.AddressRef{
+							Type:          "TokenPool",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
+						RemoteChains: map[uint64]tokens.RemoteChainConfig[datastore.AddressRef, datastore.AddressRef]{
+							15971525489660198786: {
+								RemoteToken: datastore.AddressRef{
+									Type:          "Token",
+									Version:       semver.MustParse("1.0.0"),
+									ChainSelector: 15971525489660198786,
+								},
+								RemotePool: datastore.AddressRef{
+									Type:          "TokenPool",
+									Version:       semver.MustParse("1.0.0"),
+									ChainSelector: 15971525489660198786,
+								},
+							},
+						},
+					},
+				},
+				MCMS: &basicMCMSInput,
+			},
+		},
+		{
+			desc: "success - no MCMS config",
+			cfg: tokens.ConfigureTokensForTransfersConfig{
+				Tokens: []tokens.TokenTransferConfig{
+					{
+						ChainSelector: 5009297550715157269,
+						TokenPool: datastore.AddressRef{
+							Type:          "TokenPool",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
+					},
+				},
+			},
+		},
+		{
+			desc: "failure - empty token pool ref",
+			cfg: tokens.ConfigureTokensForTransfersConfig{
+				Tokens: []tokens.TokenTransferConfig{
+					{
+						ChainSelector: 5009297550715157269,
+						TokenPool:     datastore.AddressRef{}, // Empty ref
+					},
+				},
+			},
+			expectedError: "token pool ref is empty for token on chain with selector",
+		},
+		{
+			desc: "failure - unknown chain selector for token",
+			cfg: tokens.ConfigureTokensForTransfersConfig{
+				Tokens: []tokens.TokenTransferConfig{
+					{
+						ChainSelector: 0, // Invalid chain selector
+						TokenPool: datastore.AddressRef{
+							Type:          "TokenPool",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 0,
+						},
+					},
+				},
+			},
+			expectedError: "unknown chain selector",
+		},
+		{
+			desc: "failure - unknown chain selector for remote chain",
+			cfg: tokens.ConfigureTokensForTransfersConfig{
+				Tokens: []tokens.TokenTransferConfig{
+					{
+						ChainSelector: 5009297550715157269,
+						TokenPool: datastore.AddressRef{
+							Type:          "TokenPool",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
+						RemoteChains: map[uint64]tokens.RemoteChainConfig[datastore.AddressRef, datastore.AddressRef]{
+							0: { // Invalid remote chain selector
+								RemoteToken: datastore.AddressRef{
+									Type:          "Token",
+									Version:       semver.MustParse("1.0.0"),
+									ChainSelector: 0,
+								},
+								RemotePool: datastore.AddressRef{
+									Type:          "TokenPool",
+									Version:       semver.MustParse("1.0.0"),
+									ChainSelector: 0,
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedError: "unknown chain selector",
+		},
+		{
+			desc: "failure - invalid MCMS timelock action",
+			cfg: tokens.ConfigureTokensForTransfersConfig{
+				Tokens: []tokens.TokenTransferConfig{
+					{
+						ChainSelector: 5009297550715157269,
+						TokenPool: datastore.AddressRef{
+							Type:          "TokenPool",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
+					},
+				},
+				MCMS: &mcms.Input{
+					OverridePreviousRoot: true,
+					ValidUntil:           3759765795,
+					TimelockDelay:        mcms_types.MustParseDuration("1h"),
+					TimelockAction:       "InvalidAction", // Invalid action
+					MCMSAddressRef: datastore.AddressRef{
+						Type:    "MCM",
+						Version: semver.MustParse("1.0.0"),
+					},
+					TimelockAddressRef: datastore.AddressRef{
+						Type:    "Timelock",
+						Version: semver.MustParse("1.0.0"),
+					},
+				},
+			},
+			expectedError: "failed to validate MCMS input",
+		},
+		{
+			desc: "failure - empty MCMS address ref",
+			cfg: tokens.ConfigureTokensForTransfersConfig{
+				Tokens: []tokens.TokenTransferConfig{
+					{
+						ChainSelector: 5009297550715157269,
+						TokenPool: datastore.AddressRef{
+							Type:          "TokenPool",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
+					},
+				},
+				MCMS: &mcms.Input{
+					OverridePreviousRoot: true,
+					ValidUntil:           3759765795,
+					TimelockDelay:        mcms_types.MustParseDuration("1h"),
+					TimelockAction:       mcms_types.TimelockActionSchedule,
+					MCMSAddressRef:       datastore.AddressRef{}, // Empty ref
+					TimelockAddressRef: datastore.AddressRef{
+						Type:    "Timelock",
+						Version: semver.MustParse("1.0.0"),
+					},
+				},
+			},
+			expectedError: "failed to validate MCMS input",
+		},
+		{
+			desc: "failure - empty timelock address ref",
+			cfg: tokens.ConfigureTokensForTransfersConfig{
+				Tokens: []tokens.TokenTransferConfig{
+					{
+						ChainSelector: 5009297550715157269,
+						TokenPool: datastore.AddressRef{
+							Type:          "TokenPool",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
+					},
+				},
+				MCMS: &mcms.Input{
+					OverridePreviousRoot: true,
+					ValidUntil:           3759765795,
+					TimelockDelay:        mcms_types.MustParseDuration("1h"),
+					TimelockAction:       mcms_types.TimelockActionSchedule,
+					MCMSAddressRef: datastore.AddressRef{
+						Type:    "MCM",
+						Version: semver.MustParse("1.0.0"),
+					},
+					TimelockAddressRef: datastore.AddressRef{}, // Empty ref
+				},
+			},
+			expectedError: "failed to validate MCMS input",
+		},
+		{
+			desc: "failure - zero valid until timestamp",
+			cfg: tokens.ConfigureTokensForTransfersConfig{
+				Tokens: []tokens.TokenTransferConfig{
+					{
+						ChainSelector: 5009297550715157269,
+						TokenPool: datastore.AddressRef{
+							Type:          "TokenPool",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
+					},
+				},
+				MCMS: &mcms.Input{
+					OverridePreviousRoot: true,
+					ValidUntil:           0, // Zero timestamp
+					TimelockDelay:        mcms_types.MustParseDuration("1h"),
+					TimelockAction:       mcms_types.TimelockActionSchedule,
+					MCMSAddressRef: datastore.AddressRef{
+						Type:    "MCM",
+						Version: semver.MustParse("1.0.0"),
+					},
+					TimelockAddressRef: datastore.AddressRef{
+						Type:    "Timelock",
+						Version: semver.MustParse("1.0.0"),
+					},
+				},
+			},
+			expectedError: "failed to validate MCMS input",
+		},
+		{
+			desc: "failure - multiple tokens with one having empty pool ref",
+			cfg: tokens.ConfigureTokensForTransfersConfig{
+				Tokens: []tokens.TokenTransferConfig{
+					{
+						ChainSelector: 5009297550715157269,
+						TokenPool: datastore.AddressRef{
+							Type:          "TokenPool",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
+					},
+					{
+						ChainSelector: 15971525489660198786,
+						TokenPool:     datastore.AddressRef{}, // Empty ref
+					},
+				},
+			},
+			expectedError: "token pool ref is empty for token on chain with selector",
+		},
+		{
+			desc: "failure - multiple remote chains with one having unknown selector",
+			cfg: tokens.ConfigureTokensForTransfersConfig{
+				Tokens: []tokens.TokenTransferConfig{
+					{
+						ChainSelector: 5009297550715157269,
+						TokenPool: datastore.AddressRef{
+							Type:          "TokenPool",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
+						RemoteChains: map[uint64]tokens.RemoteChainConfig[datastore.AddressRef, datastore.AddressRef]{
+							15971525489660198786: {
+								RemoteToken: datastore.AddressRef{
+									Type:          "Token",
+									Version:       semver.MustParse("1.0.0"),
+									ChainSelector: 15971525489660198786,
+								},
+								RemotePool: datastore.AddressRef{
+									Type:          "TokenPool",
+									Version:       semver.MustParse("1.0.0"),
+									ChainSelector: 15971525489660198786,
+								},
+							},
+							0: { // Invalid remote chain selector
+								RemoteToken: datastore.AddressRef{
+									Type:          "Token",
+									Version:       semver.MustParse("1.0.0"),
+									ChainSelector: 0,
+								},
+								RemotePool: datastore.AddressRef{
+									Type:          "TokenPool",
+									Version:       semver.MustParse("1.0.0"),
+									ChainSelector: 0,
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedError: "unknown chain selector",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.desc, func(t *testing.T) {
+			// Create token adapter registry and MCMS registry (not used in verify, but required for changeset creation)
+			tokenAdapterRegistry := tokens.NewTokenAdapterRegistry()
+			mcmsRegistry := changesets.NewMCMSReaderRegistry()
+
+			// Create changeset
+			changeset := tokens.ConfigureTokensForTransfers(tokenAdapterRegistry, mcmsRegistry)
+
+			// Create minimal environment (verify doesn't use datastore or other fields)
+			lggr, err := logger.New()
+			require.NoError(t, err, "Failed to create logger")
+			bundle := cldf_ops.NewBundle(
+				func() context.Context { return context.Background() },
+				lggr,
+				cldf_ops.NewMemoryReporter(),
+			)
+			e := deployment.Environment{
+				OperationsBundle: bundle,
+				DataStore:        datastore.NewMemoryDataStore().Seal(),
+			}
+
+			// Run verify
+			err = changeset.VerifyPreconditions(e, tt.cfg)
+			if tt.expectedError != "" {
+				require.Error(t, err)
+				require.ErrorContains(t, err, tt.expectedError)
+			} else {
+				require.NoError(t, err)
 			}
 		})
 	}

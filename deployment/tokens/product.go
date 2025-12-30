@@ -57,12 +57,12 @@ type TokenTransferFeeConfig struct {
 }
 
 // RemoteChainConfig specifies configuration for a remote chain on a token pool.
-type RemoteChainConfig[R any, CCV any] struct {
+type RemoteChainConfig[RemoteContract any, LocalContract any] struct {
 	// The token on the remote chain.
 	// If not provided, the token will be derived from the pool reference.
-	RemoteToken R
+	RemoteToken RemoteContract
 	// The token pool on the remote chain.
-	RemotePool R
+	RemotePool RemoteContract
 	// DefaultFinalityInboundRateLimiterConfig specifies the desired rate limiter configuration for default-finality inbound traffic.
 	DefaultFinalityInboundRateLimiterConfig RateLimiterConfig
 	// DefaultFinalityOutboundRateLimiterConfig specifies the desired rate limiter configuration for default-finality outbound traffic.
@@ -72,13 +72,13 @@ type RemoteChainConfig[R any, CCV any] struct {
 	// CustomFinalityOutboundRateLimiterConfig specifies the desired rate limiter configuration for custom-finality outbound traffic.
 	CustomFinalityOutboundRateLimiterConfig RateLimiterConfig
 	// OutboundCCVs specifies the verifiers to apply to outbound traffic.
-	OutboundCCVs []CCV
+	OutboundCCVs []LocalContract
 	// InboundCCVs specifies the verifiers to apply to inbound traffic.
-	InboundCCVs []CCV
+	InboundCCVs []LocalContract
 	// OutboundCCVsToAddAboveThreshold specifies the verifiers to apply to outbound traffic above the threshold.
-	OutboundCCVsToAddAboveThreshold []CCV
+	OutboundCCVsToAddAboveThreshold []LocalContract
 	// InboundCCVsToAddAboveThreshold specifies the verifiers to apply to inbound traffic above the threshold.
-	InboundCCVsToAddAboveThreshold []CCV
+	InboundCCVsToAddAboveThreshold []LocalContract
 	// TokenTransferFeeConfig specifies the desired token transfer fee configuration for this remote chain.
 	TokenTransferFeeConfig TokenTransferFeeConfig
 }
