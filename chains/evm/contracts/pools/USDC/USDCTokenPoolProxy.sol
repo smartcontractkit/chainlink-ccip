@@ -20,17 +20,6 @@ import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165
 /// @dev This contract will be listed in the Token Admin Registry as a token pool. All of the child pools which
 /// receive the messages should have this contract set as an authorized caller. It does not inherit from the base
 /// TokenPool contract but still implements the IPoolV2 interface.
-/// @dev This token pool should have minimal state, as it is only used to route messages to the correct
-/// pool. If more mechanisms are needed, such as a new CCTP version, then this contract should be updated
-/// to include the proper routing logic and reference the appropriate child pool.
-/// On/OffRamp
-///     ↓
-/// USDCPoolProxy
-///     ├──→ LegacyCCTPV1Pool → CCTPV1
-///     ├──→ CCTPV1Pool → MessageTransmitterProxy/TokenMessenger V1 → CCTPV1
-///     ├──→ CCTPV2Pool → MessageTransmitterProxy/TokenMessenger V2 → CCTPV2
-///     ├──→ CCTPTokenPool → CCTPVerifier → MessageTransmitterProxy/TokenMessenger V2 → CCTPV2
-///     └──→ SiloedUSDCTokenPool → ERC20LockBox
 contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion {
   using SafeERC20 for IERC20;
   using ERC165Checker for address;
@@ -60,6 +49,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
     address cctpV1Pool;
     address cctpV2Pool;
     address cctpTokenPool;
+    address siloedUsdCTokenPool;
   }
 
   enum LockOrBurnMechanism {
@@ -75,13 +65,23 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
   ICrossChainVerifierResolver private immutable i_cctpVerifier;
 
   mapping(uint64 remoteChainSelector => LockOrBurnMechanism mechanism) internal s_lockOrBurnMechanism;
-  mapping(uint64 remoteChainSelector => address lockReleasePool) internal s_lockReleasePools;
 
-  /// @dev The legacy CCTP V1, CCTP V1, CCTP V2, and CCTP V2 with CCV pools.
+  /// @dev This token pool should have minimal state, as it is only used to route messages to the correct
+  /// pool. If more mechanisms are needed, such as a new CCTP version, then this contract should be updated
+  /// to include the proper routing logic and reference the appropriate child pool.
+  /// On/OffRamp
+  ///     ↓
+  /// USDCPoolProxy
+  ///     ├──→ LegacyCCTPV1Pool → CCTPV1
+  ///     ├──→ CCTPV1Pool → MessageTransmitterProxy/TokenMessenger V1 → CCTPV1
+  ///     ├──→ CCTPV2Pool → MessageTransmitterProxy/TokenMessenger V2 → CCTPV2
+  ///     ├──→ CCTPTokenPool → CCTPVerifier → MessageTransmitterProxy/TokenMessenger V2 → CCTPV2
+  ///     └──→ SiloedUSDCTokenPool → ERC20LockBox
   address internal s_legacyCctpV1Pool;
   address internal s_cctpV1Pool;
   address internal s_cctpV2Pool;
   address internal s_cctpTokenPool;
+  address internal s_siloedUsdCTokenPool;
 
   /// @dev Constant representing the default finality.
   uint16 internal constant WAIT_FOR_FINALITY = 0;
@@ -101,12 +101,14 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
     }
 
     i_token = token;
+    i_router = IRouter(router);
+    i_cctpVerifier = ICrossChainVerifierResolver(cctpVerifier);
+
     s_legacyCctpV1Pool = pools.legacyCctpV1Pool;
     s_cctpV1Pool = pools.cctpV1Pool;
     s_cctpV2Pool = pools.cctpV2Pool;
     s_cctpTokenPool = pools.cctpTokenPool;
-    i_router = IRouter(router);
-    i_cctpVerifier = ICrossChainVerifierResolver(cctpVerifier);
+    s_siloedUsdCTokenPool = pools.siloedUsdCTokenPool;
   }
 
   /// @inheritdoc IPoolV1
@@ -166,7 +168,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
     } else if (mechanism == LockOrBurnMechanism.CCTP_V1) {
       childPool = s_cctpV1Pool;
     } else if (mechanism == LockOrBurnMechanism.LOCK_RELEASE) {
-      childPool = s_lockReleasePools[lockOrBurnIn.remoteChainSelector];
+      childPool = s_siloedUsdCTokenPool;
     }
 
     // If the destination pool is the zero address, then no mechanism has been configured for the outgoing tokens
@@ -222,7 +224,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
 
     // If the source pool data is the lock release flag, use the lock release pool set for the remote chain selector.
     if (version == USDCSourcePoolDataCodec.LOCK_RELEASE_FLAG) {
-      return IPoolV1(s_lockReleasePools[releaseOrMintIn.remoteChainSelector]).releaseOrMint(releaseOrMintIn);
+      return IPoolV1(s_siloedUsdCTokenPool).releaseOrMint(releaseOrMintIn);
     }
 
     if (version == USDCSourcePoolDataCodec.CCTP_VERSION_1_TAG) {
@@ -314,10 +316,18 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
       revert TokenPoolUnsupported(pools.legacyCctpV1Pool);
     }
 
+    // If the siloed USDC pool is being used, then it must support the IPoolV1 interface. If it is not, don't check it.
+    if (
+      pools.siloedUsdCTokenPool != address(0) && !pools.siloedUsdCTokenPool.supportsInterface(type(IPoolV1).interfaceId)
+    ) {
+      revert TokenPoolUnsupported(pools.siloedUsdCTokenPool);
+    }
+
     s_legacyCctpV1Pool = pools.legacyCctpV1Pool;
     s_cctpV1Pool = pools.cctpV1Pool;
     s_cctpV2Pool = pools.cctpV2Pool;
     s_cctpTokenPool = pools.cctpTokenPool;
+    s_siloedUsdCTokenPool = pools.siloedUsdCTokenPool;
 
     emit PoolAddressesUpdated(pools);
   }
@@ -329,7 +339,8 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
       legacyCctpV1Pool: s_legacyCctpV1Pool,
       cctpV1Pool: s_cctpV1Pool,
       cctpV2Pool: s_cctpV2Pool,
-      cctpTokenPool: s_cctpTokenPool
+      cctpTokenPool: s_cctpTokenPool,
+      siloedUsdCTokenPool: s_siloedUsdCTokenPool
     });
   }
 
@@ -358,43 +369,6 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
       s_lockOrBurnMechanism[remoteChainSelectors[i]] = mechanisms[i];
       emit LockOrBurnMechanismUpdated(remoteChainSelectors[i], mechanisms[i]);
     }
-  }
-
-  /// @notice Update the lock release pool addresses for a list of remote chain selectors.
-  /// @param remoteChainSelectors The remote chain selectors to update the lock release pool addresses for.
-  /// @param lockReleasePools The new lock release pool addresses for the given remote chain selectors.
-  function updateLockReleasePoolAddresses(
-    uint64[] calldata remoteChainSelectors,
-    address[] calldata lockReleasePools
-  ) external onlyOwner {
-    if (remoteChainSelectors.length != lockReleasePools.length) {
-      revert MismatchedArrayLengths();
-    }
-
-    for (uint256 i = 0; i < remoteChainSelectors.length; ++i) {
-      // If the token pool is being added, ensure that it supports the token pool v1 interface. If the pool is the zero address,
-      // then it is being removed, as a migration from L/R to CCTP, and therefore no check is needed, as it was
-      // already performed when originally added.
-      if (lockReleasePools[i] != address(0) && !lockReleasePools[i].supportsInterface(type(IPoolV1).interfaceId)) {
-        revert TokenPoolUnsupported(lockReleasePools[i]);
-      }
-
-      // Note: Since the lock release pool is only used for chains that do not have CCTP support, after a successful
-      // migration to CCTP, the lock release pool may no longer be needed, and therefore the zero address is
-      // a valid input and input validation is not required. It is also why no check for the mechanism being
-      // LOCK_RELEASE is performed either, as after a migration this may no longer be the case.
-      s_lockReleasePools[remoteChainSelectors[i]] = lockReleasePools[i];
-      emit LockReleasePoolUpdated(remoteChainSelectors[i], lockReleasePools[i]);
-    }
-  }
-
-  /// @notice Get the lock release pool address for a given remote chain selector.
-  /// @param remoteChainSelector The remote chain selector to get the lock release pool address for.
-  /// @return The lock release pool address for the given remote chain selector.
-  function getLockReleasePoolAddress(
-    uint64 remoteChainSelector
-  ) public view returns (address) {
-    return s_lockReleasePools[remoteChainSelector];
   }
 
   /// @notice Check if the releaseOrMintIn struct is an inflight message from a legacy pool that did not utilize a

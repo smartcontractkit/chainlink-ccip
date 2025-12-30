@@ -38,7 +38,8 @@ contract USDCTokenPoolProxySetup is USDCSetup {
         legacyCctpV1Pool: s_legacyCctpV1Pool,
         cctpV1Pool: s_cctpV1Pool,
         cctpV2Pool: s_cctpV2Pool,
-        cctpTokenPool: s_cctpTokenPool
+        cctpTokenPool: s_cctpTokenPool,
+        siloedUsdCTokenPool: address(0)
       }),
       address(s_router),
       address(s_cctpVerifier)

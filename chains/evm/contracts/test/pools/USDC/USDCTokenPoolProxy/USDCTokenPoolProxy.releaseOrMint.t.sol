@@ -23,14 +23,19 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
     bytes memory originalSender = abi.encode(s_sender);
     bytes memory offchainTokenData = "";
 
-    uint64[] memory remoteChainSelectors = new uint64[](1);
-    remoteChainSelectors[0] = SOURCE_CHAIN_SELECTOR;
-    address[] memory lockReleasePools = new address[](1);
-    lockReleasePools[0] = s_lockReleasePool;
-
     _enableERC165InterfaceChecks(s_lockReleasePool, type(IPoolV1).interfaceId);
 
-    s_usdcTokenPoolProxy.updateLockReleasePoolAddresses(remoteChainSelectors, lockReleasePools);
+    // Set the siloed pool via updatePoolAddresses - use a clean PoolAddresses struct
+    changePrank(OWNER);
+    s_usdcTokenPoolProxy.updatePoolAddresses(
+      USDCTokenPoolProxy.PoolAddresses({
+        legacyCctpV1Pool: address(0),
+        cctpV1Pool: address(0),
+        cctpV2Pool: address(0),
+        cctpTokenPool: address(0),
+        siloedUsdCTokenPool: s_lockReleasePool
+      })
+    );
 
     // Mock the router's isOffRamp function to return true
     vm.mockCall(
@@ -283,7 +288,8 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
         legacyCctpV1Pool: address(0), // Set to zero to indicate no legacy pool
         cctpV1Pool: s_cctpV1Pool,
         cctpV2Pool: s_cctpV2Pool,
-        cctpTokenPool: s_cctpTokenPool
+        cctpTokenPool: s_cctpTokenPool,
+        siloedUsdCTokenPool: address(0)
       })
     );
 

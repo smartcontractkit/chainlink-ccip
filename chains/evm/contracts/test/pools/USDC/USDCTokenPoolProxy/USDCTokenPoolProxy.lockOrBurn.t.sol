@@ -136,24 +136,19 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
 
     // The update function will check that the pool supports the IPoolV1 interface and IERC165 interface
     // so we need to mock those here.
-    vm.mockCall(
-      address(s_lockReleasePool),
-      abi.encodeWithSelector(IERC165.supportsInterface.selector, type(IPoolV1).interfaceId),
-      abi.encode(true)
-    );
+    _enableERC165InterfaceChecks(address(s_lockReleasePool), type(IPoolV1).interfaceId);
 
-    vm.mockCall(
-      address(s_lockReleasePool),
-      abi.encodeWithSelector(IERC165.supportsInterface.selector, type(IERC165).interfaceId),
-      abi.encode(true)
+    // Set the siloed pool via updatePoolAddresses - use a clean PoolAddresses struct
+    changePrank(OWNER);
+    s_usdcTokenPoolProxy.updatePoolAddresses(
+      USDCTokenPoolProxy.PoolAddresses({
+        legacyCctpV1Pool: address(0),
+        cctpV1Pool: address(0),
+        cctpV2Pool: address(0),
+        cctpTokenPool: address(0),
+        siloedUsdCTokenPool: address(s_lockReleasePool)
+      })
     );
-
-    // Set the the s_lockRelease pool for the LockRelease mechanism
-    uint64[] memory selectors = new uint64[](1);
-    selectors[0] = s_chainSelFoLockRelease;
-    address[] memory lockReleasePools = new address[](1);
-    lockReleasePools[0] = address(s_lockReleasePool);
-    s_usdcTokenPoolProxy.updateLockReleasePoolAddresses(selectors, lockReleasePools);
 
     vm.mockCall(
       address(s_router),
@@ -247,7 +242,8 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
         legacyCctpV1Pool: s_legacyCctpV1Pool,
         cctpV1Pool: s_cctpV1Pool,
         cctpV2Pool: s_cctpV2Pool,
-        cctpTokenPool: address(0)
+        cctpTokenPool: address(0),
+        siloedUsdCTokenPool: address(0)
       })
     );
 

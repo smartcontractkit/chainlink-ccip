@@ -39,7 +39,8 @@ contract USDCTokenPoolProxy_getFee is USDCTokenPoolProxySetup {
         legacyCctpV1Pool: s_legacyCctpV1Pool,
         cctpV1Pool: s_cctpV1Pool,
         cctpV2Pool: s_cctpV2Pool,
-        cctpTokenPool: address(0)
+        cctpTokenPool: address(0),
+        siloedUsdCTokenPool: address(0)
       })
     );
 
