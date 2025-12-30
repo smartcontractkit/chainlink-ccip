@@ -40,6 +40,7 @@ BurnMintWithLockReleaseFlagTokenPool_lockOrBurn:test_lockOrBurnV2_ReturnsLockRel
 BurnMintWithLockReleaseFlagTokenPool_releaseOrMint:test_releaseOrMintV2_LockReleaseFlagInSourcePoolData() (gas: 105760)
 BurnMintWithLockReleaseFlagTokenPool_releaseOrMint:test_releaseOrMint_EmptySourcePoolData() (gas: 107161)
 BurnMintWithLockReleaseFlagTokenPool_releaseOrMint:test_releaseOrMint_LockReleaseFlagInSourcePoolData() (gas: 107177)
+BurnMintWithLockReleaseFlagTokenPool_typeAndVersion:test_typeAndVersion() (gas: 10254)
 BurnToAddressMintTokenPool_lockOrBurn:test_LockOrBurn() (gas: 242176)
 BurnWithFromMintTokenPool_lockOrBurn:test_constructor() (gas: 21718)
 BurnWithFromMintTokenPool_lockOrBurn:test_lockOrBurn() (gas: 247501)
