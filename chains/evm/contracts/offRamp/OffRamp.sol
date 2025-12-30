@@ -110,7 +110,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   uint16 internal immutable i_gasForCallExactCheck;
   /// @notice Gas buffer to update state.
   // Example, 5k for updating the state + 5k for the event and misc costs.
-  uint32 internal i_maxGasBufferToUpdateState;
+  uint32 internal immutable i_maxGasBufferToUpdateState;
 
   // At the top to pack it with the `owner` variable from Ownable2StepMsgSender.
   bool private s_reentrancyGuardEntered;
