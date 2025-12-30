@@ -6,17 +6,18 @@ toolchain go1.24.6
 
 require (
 	github.com/deckarep/golang-set/v2 v2.6.0
-	github.com/ethereum/go-ethereum v1.15.3
+	github.com/ethereum/go-ethereum v1.16.2
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.22.0
 	github.com/prometheus/client_model v0.6.2
 	github.com/smartcontractkit/chain-selectors v1.0.67
 	github.com/smartcontractkit/chainlink-common v0.9.6-0.20250929154511-1f5fbda7ae76
+	github.com/smartcontractkit/chainlink-evm/gethwrappers/helpers v0.0.0-20251201175512-af04e919ebfb
 	github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go v0.0.0-20250131130834-15e0d4cde2a6
 	github.com/smartcontractkit/libocr v0.0.0-20250707144819-babe0ec4e358
 	github.com/stretchr/testify v1.10.0
-	github.com/zksync-sdk/zksync2-go v1.0.0
+	github.com/zksync-sdk/zksync2-go v1.1.0
 	go.opentelemetry.io/otel v1.37.0
 	go.opentelemetry.io/otel/metric v1.37.0
 	go.uber.org/multierr v1.11.0
@@ -44,11 +45,11 @@ require (
 	github.com/cloudevents/sdk-go/binding/format/protobuf/v2 v2.16.1 // indirect
 	github.com/cloudevents/sdk-go/v2 v2.16.1 // indirect
 	github.com/consensys/gnark-crypto v0.18.1 // indirect
+	github.com/crate-crypto/go-eth-kzg v1.3.0 // indirect
 	github.com/crate-crypto/go-ipa v0.0.0-20240724233137-53bbb0ceb27a // indirect
-	github.com/crate-crypto/go-kzg-4844 v1.1.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.3.0 // indirect
-	github.com/ethereum/c-kzg-4844 v1.0.3 // indirect
+	github.com/ethereum/c-kzg-4844/v2 v2.1.0 // indirect
 	github.com/ethereum/go-verkle v0.2.2 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.8 // indirect

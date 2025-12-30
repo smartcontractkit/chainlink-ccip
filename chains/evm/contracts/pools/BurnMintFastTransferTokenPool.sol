@@ -38,7 +38,10 @@ contract BurnMintFastTransferTokenPool is FastTransferTokenPoolAbstract {
   /// - FILLED - the receiver is the filler.
   /// @param amount The amount is always the entire amount, including the fee. That means the fee will go back to the
   /// requester of the transfer is the transfer status was NOT_FILLED, or to the filler if the status was FILLED.
-  function _releaseOrMint(address receiver, uint256 amount) internal virtual override {
+  function _releaseOrMint(
+    address receiver,
+    uint256 amount
+  ) internal virtual override {
     IBurnMintERC20(address(i_token)).mint(receiver, amount);
   }
 

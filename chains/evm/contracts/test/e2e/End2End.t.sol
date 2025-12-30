@@ -79,11 +79,11 @@ contract E2E is OnRampSetup, OffRampSetup {
     (
       // Deploy the new source chain onRamp
       // Outsource to shared helper function with OnRampSetup
-      s_onRamp2,
-      s_metadataHash2
-    ) = _deployOnRamp(
-      SOURCE_CHAIN_SELECTOR + 1, s_sourceRouter2, address(s_nonceManager2), address(s_tokenAdminRegistry2)
-    );
+      s_onRamp2, s_metadataHash2
+    ) =
+      _deployOnRamp(
+        SOURCE_CHAIN_SELECTOR + 1, s_sourceRouter2, address(s_nonceManager2), address(s_tokenAdminRegistry2)
+      );
 
     address[] memory authorizedCallers = new address[](1);
     authorizedCallers[0] = address(s_onRamp2);

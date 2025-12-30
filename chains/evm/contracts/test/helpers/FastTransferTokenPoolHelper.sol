@@ -23,18 +23,28 @@ contract FastTransferTokenPoolHelper is FastTransferTokenPoolAbstract {
   ) FastTransferTokenPoolAbstract(token, localTokenDecimals, allowlist, rmnProxy, router, sourceChainSelector) {}
 
   // Implementation of abstract functions
-  function _handleFastTransferLockOrBurn(uint64, address sender, uint256 amount) internal override {
+  function _handleFastTransferLockOrBurn(
+    uint64,
+    address sender,
+    uint256 amount
+  ) internal override {
     // For testing, we'll just transfer tokens from sender to this contract
     getToken().safeTransferFrom(sender, address(this), amount);
   }
 
   /// @notice Validates settlement prerequisites - simple implementation for testing
-  function _validateSettlement(uint64, bytes memory) internal view override {
+  function _validateSettlement(
+    uint64,
+    bytes memory
+  ) internal view override {
     // For testing, we'll do minimal validation
     // Real implementations would check RMN curse and source pool validation
   }
 
-  function _releaseOrMint(address receiver, uint256 amount) internal virtual override {
+  function _releaseOrMint(
+    address receiver,
+    uint256 amount
+  ) internal virtual override {
     getToken().safeTransfer(receiver, amount);
   }
 

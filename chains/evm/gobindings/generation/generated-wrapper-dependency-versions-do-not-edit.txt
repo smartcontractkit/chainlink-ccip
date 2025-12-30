@@ -1,4 +1,4 @@
-GETH_VERSION: 1.15.3
+GETH_VERSION: 1.16.2
 burn_from_mint_token_pool: ../solc/ccip/BurnFromMintTokenPool/BurnFromMintTokenPool.sol/BurnFromMintTokenPool.abi.json ../solc/ccip/BurnFromMintTokenPool/BurnFromMintTokenPool.sol/BurnFromMintTokenPool.bin 4d1365eeafb6edc657e618fb7868e4712914ef7a256c6ef1c74f3d0f79e77f9d
 burn_mint_token_pool: ../solc/ccip/BurnMintTokenPool/BurnMintTokenPool.sol/BurnMintTokenPool.abi.json ../solc/ccip/BurnMintTokenPool/BurnMintTokenPool.sol/BurnMintTokenPool.bin 56228bebbb4dec1f664ae27c0f06d43a86a4b564cf51c6969c81a30a1165c0a4
 burn_mint_with_lock_release_flag_token_pool: ../solc/ccip/BurnMintWithLockReleaseFlagTokenPool/BurnMintWithLockReleaseFlagTokenPool.sol/BurnMintWithLockReleaseFlagTokenPool.abi.json ../solc/ccip/BurnMintWithLockReleaseFlagTokenPool/BurnMintWithLockReleaseFlagTokenPool.sol/BurnMintWithLockReleaseFlagTokenPool.bin 4fa84bfd8fe0b6bfaa3450e199c591ac64cc202ed130b14b7b9904f0ea0e550a

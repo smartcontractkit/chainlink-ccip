@@ -30,7 +30,10 @@ contract PingPongDemo is CCIPReceiver, Ownable2StepMsgSender, ITypeAndVersion {
   // Allowing out of order execution.
   bool private s_outOfOrderExecution;
 
-  constructor(address router, IERC20 feeToken) CCIPReceiver(router) {
+  constructor(
+    address router,
+    IERC20 feeToken
+  ) CCIPReceiver(router) {
     s_isPaused = false;
     s_feeToken = feeToken;
     s_feeToken.approve(address(router), type(uint256).max);
@@ -40,7 +43,10 @@ contract PingPongDemo is CCIPReceiver, Ownable2StepMsgSender, ITypeAndVersion {
     return "PingPongDemo 1.5.0";
   }
 
-  function setCounterpart(uint64 counterpartChainSelector, bytes calldata counterpartAddress) external onlyOwner {
+  function setCounterpart(
+    uint64 counterpartChainSelector,
+    bytes calldata counterpartAddress
+  ) external onlyOwner {
     s_counterpartChainSelector = counterpartChainSelector;
     s_counterpartAddress = counterpartAddress;
   }
@@ -63,7 +69,9 @@ contract PingPongDemo is CCIPReceiver, Ownable2StepMsgSender, ITypeAndVersion {
       data: abi.encode(pingPongCount),
       tokenAmounts: new Client.EVMTokenAmount[](0),
       extraArgs: Client._argsToBytes(
-        Client.GenericExtraArgsV2({gasLimit: uint256(DEFAULT_GAS_LIMIT), allowOutOfOrderExecution: s_outOfOrderExecution})
+        Client.GenericExtraArgsV2({
+          gasLimit: uint256(DEFAULT_GAS_LIMIT), allowOutOfOrderExecution: s_outOfOrderExecution
+        })
       ),
       feeToken: address(s_feeToken)
     });
