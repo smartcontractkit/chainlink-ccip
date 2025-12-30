@@ -2,6 +2,8 @@
 pragma solidity ^0.8.24;
 
 import {ILockBox} from "../interfaces/ILockBox.sol";
+import {IPoolV1} from "../interfaces/IPool.sol";
+import {IPoolV2} from "../interfaces/IPoolV2.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 import {Pool} from "../libraries/Pool.sol";
@@ -76,8 +78,8 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     return "SiloedLockReleaseTokenPool 1.7.0-dev";
   }
 
-  /// @notice Locks the token in the pool
-  /// @param lockOrBurnIn The lock or burn input parameters.
+  /// @inheritdoc IPoolV1
+  /// @dev Deposits the full amount into the lockbox tied to the remote chain selector.
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
   ) public virtual override returns (Pool.LockOrBurnOutV1 memory out) {
@@ -91,10 +93,8 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     return out;
   }
 
-  /// @notice Locks the token in the pool with V2 parameters.
-  /// @param lockOrBurnIn The lock or burn input parameters.
-  /// @param blockConfirmationRequested Requested block confirmation.
-  /// @param tokenArgs Additional token arguments.
+  /// @inheritdoc IPoolV2
+  /// @dev Deposits the post-fee amount into the lockbox tied to the remote chain selector.
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
     uint16 blockConfirmationRequested,
@@ -108,23 +108,15 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     return (out, destTokenAmount);
   }
 
-  /// @notice Release tokens from the pool to the recipient
-  /// @dev The _validateReleaseOrMint check is an essential security check
-  /// @dev If the releaseOrMintIn amount is greater than available liquidity, the function will revert as a security
-  /// measure to prevent funds from a Silo being released by another chain.
-  /// @param releaseOrMintIn The release or mint input parameters.
+  /// @inheritdoc IPoolV1
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
     return releaseOrMint(releaseOrMintIn, WAIT_FOR_FINALITY);
   }
 
-  /// @notice Release tokens from the pool to the recipient with V2 parameters.
-  /// @dev The _validateReleaseOrMint check is an essential security check.
-  /// @dev If the releaseOrMintIn amount is greater than available liquidity, the function will revert as a security
-  /// measure to prevent funds from a Silo being released by another chain.
-  /// @param releaseOrMintIn The release or mint input parameters.
-  /// @param blockConfirmationRequested Requested block confirmation.
+  /// @inheritdoc IPoolV2
+  /// @dev Withdraws from the lockbox tied to the remote chain selector after validation.
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
     uint16 blockConfirmationRequested

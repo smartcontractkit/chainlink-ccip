@@ -2,6 +2,8 @@
 pragma solidity ^0.8.24;
 
 import {ILockBox} from "../interfaces/ILockBox.sol";
+import {IPoolV1} from "../interfaces/IPool.sol";
+import {IPoolV2} from "../interfaces/IPoolV2.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 import {Pool} from "../libraries/Pool.sol";
@@ -47,9 +49,7 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
   }
 
   /// @notice Locks the tokens in the lockBox.
-  /// @dev The router has already transferred the full amount to this contract before calling lockOrBurn.
-  /// For V1 the amount = full amount. For V2 the amount = destTokenAmount (after fees), and fees remain on this contract.
-  /// @param lockOrBurnIn The lock or burn input parameters.
+  /// @inheritdoc IPoolV1
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
   ) public virtual override returns (Pool.LockOrBurnOutV1 memory out) {
@@ -59,17 +59,22 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
     return out;
   }
 
+  /// @inheritdoc IPoolV2
+  /// @dev The router has already transferred the full amount to this contract before calling lockOrBurn.
+  /// For V2 the amount = destTokenAmount (after fees) which is deposited into the lockbox, and fees remain on this contract.
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
     uint16 blockConfirmationRequested,
     bytes calldata tokenArgs
   ) public virtual override returns (Pool.LockOrBurnOutV1 memory, uint256) {
+    // For V2 the lockbox receives the post-fee amount.
     (Pool.LockOrBurnOutV1 memory out, uint256 destTokenAmount) =
       super.lockOrBurn(lockOrBurnIn, blockConfirmationRequested, tokenArgs);
     i_lockBox.deposit(address(i_token), lockOrBurnIn.remoteChainSelector, destTokenAmount);
     return (out, destTokenAmount);
   }
 
+  /// @inheritdoc IPoolV2
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
     uint16 blockConfirmationRequested
@@ -82,6 +87,7 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
     return out;
   }
 
+  /// @inheritdoc IPoolV1
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
