@@ -9,7 +9,6 @@ import {BurnFromMintTokenPool} from "../../../pools/BurnFromMintTokenPool.sol";
 import {BurnMintTokenPool} from "../../../pools/BurnMintTokenPool.sol";
 import {ERC20LockBox} from "../../../pools/ERC20LockBox.sol";
 import {LockReleaseTokenPool} from "../../../pools/LockReleaseTokenPool.sol";
-
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {RegistryModuleOwnerCustom} from "../../../tokenAdminRegistry/RegistryModuleOwnerCustom.sol";
 import {TokenAdminRegistry} from "../../../tokenAdminRegistry/TokenAdminRegistry.sol";
@@ -18,7 +17,6 @@ import {TokenPoolFactory} from "../../../tokenAdminRegistry/TokenPoolFactory/Tok
 import {TokenPoolFactorySetup} from "./TokenPoolFactorySetup.t.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
-import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
 import {IERC20Metadata} from "@openzeppelin/contracts@5.3.0/token/ERC20/extensions/IERC20Metadata.sol";
 import {Create2} from "@openzeppelin/contracts@5.3.0/utils/Create2.sol";
@@ -748,29 +746,6 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
 
     TokenPoolFactory.RemoteTokenPoolInfo[] memory remotes = new TokenPoolFactory.RemoteTokenPoolInfo[](0);
     vm.expectRevert(abi.encodeWithSelector(TokenPoolFactory.InvalidLockBoxToken.selector, address(token)));
-    s_tokenPoolFactory.deployTokenPoolWithExistingToken(
-      address(token),
-      LOCAL_TOKEN_DECIMALS,
-      TokenPoolFactory.PoolType.LOCK_RELEASE,
-      remotes,
-      LOCK_RELEASE_INIT_CODE,
-      address(lockBox),
-      FAKE_SALT
-    );
-  }
-
-  function test_deployTokenPoolWithExistingToken_RevertWhen_InvalidLockBoxToken() public {
-    vm.startPrank(OWNER);
-    FactoryBurnMintERC20 token =
-      new FactoryBurnMintERC20("TestToken", "TT", 6, type(uint256).max, PREMINT_AMOUNT, OWNER);
-    FactoryBurnMintERC20 otherToken =
-      new FactoryBurnMintERC20("TestToken", "TT", 6, type(uint256).max, PREMINT_AMOUNT, OWNER);
-    ERC20LockBox lockBox = new ERC20LockBox(address(otherToken));
-
-    TokenPoolFactory.RemoteTokenPoolInfo[] memory remotes = new TokenPoolFactory.RemoteTokenPoolInfo[](0);
-    vm.expectRevert(
-      abi.encodeWithSelector(TokenPoolFactory.InvalidLockBoxToken.selector, address(otherToken), address(token))
-    );
     s_tokenPoolFactory.deployTokenPoolWithExistingToken(
       address(token),
       LOCAL_TOKEN_DECIMALS,

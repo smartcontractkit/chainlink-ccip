@@ -5,10 +5,8 @@ import {IBurnMintERC20} from "../../interfaces/IBurnMintERC20.sol";
 import {ILockBox} from "../../interfaces/ILockBox.sol";
 
 import {Pool} from "../../libraries/Pool.sol";
-import {ERC20LockBox} from "../ERC20LockBox.sol";
 import {SiloedLockReleaseTokenPool} from "../SiloedLockReleaseTokenPool.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
-
 
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/EnumerableSet.sol";
@@ -92,7 +90,7 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
     // Calculate the local amount. Since USDC is always 6 decimals, we can hard code the decimals to 6.
     uint256 localAmount = _calculateLocalAmount(releaseOrMintIn.sourceDenominatedAmount, 6);
 
-    _validateReleaseOrMint(releaseOrMintIn, localAmount, WAIT_FOR_FINALITY);
+    _validateReleaseOrMint(releaseOrMintIn, localAmount, blockConfirmationRequested);
 
     ILockBox lockbox = _getLockBox(releaseOrMintIn.remoteChainSelector);
     uint256 availableLiquidity = i_token.balanceOf(address(lockbox));
@@ -104,7 +102,6 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
     if (excludedTokens != 0) {
       // The existence of excluded tokens indicates a migration has occured on the chain, and that any tokens
       // being released should come from those excluded tokens reserved for processing inflight messages.
-    } else {
       if (localAmount > excludedTokens) revert InsufficientLiquidity(excludedTokens, localAmount);
       s_tokensExcludedFromBurn[releaseOrMintIn.remoteChainSelector] -= localAmount;
       // During a proposed migration, the lockbox balance is the source of truth. Any release here reduces the

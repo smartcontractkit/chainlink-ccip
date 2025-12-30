@@ -136,20 +136,7 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     uint256 availableLiquidity = i_token.balanceOf(address(lockBox));
     if (localAmount > availableLiquidity) revert InsufficientLiquidity(availableLiquidity, localAmount);
 
-    // Release to the recipient
     lockBox.withdraw(address(i_token), releaseOrMintIn.remoteChainSelector, localAmount, releaseOrMintIn.receiver);
-
-    emit ReleasedOrMinted({
-      remoteChainSelector: releaseOrMintIn.remoteChainSelector,
-      token: address(i_token),
-      sender: msg.sender,
-      recipient: releaseOrMintIn.receiver,
-      amount: localAmount
-    });
-
-    return Pool.ReleaseOrMintOutV1({destinationAmount: localAmount});
-    lockBox.withdraw(address(i_token), releaseOrMintIn.remoteChainSelector, localAmount, releaseOrMintIn.receiver);
-
     return out;
   }
 
