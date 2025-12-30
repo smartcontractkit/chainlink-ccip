@@ -6,6 +6,9 @@ on:
       ton_ref:
         description: 'Git ref (branch) of the TON relayer'
         required: false
+      contract_version:
+        description: 'Version of CCIP contracts to use'
+        required: false
       chainlink_version:
         description: 'Chainlink version to use (e.g., develop, gh ref, etc.)'
         required: false
@@ -23,6 +26,7 @@ defaults:
 
 env:
   PARALLEL_E2E_TESTS: 'true'
+  DEPLOY_CONTRACT_VERSION: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.contract_version || '' }}
 
 jobs:
   smoke:
