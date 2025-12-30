@@ -9,7 +9,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/link_token"
 	cs_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -82,8 +82,8 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 				ds := datastore.NewMemoryDataStore()
 				_ = ds.Addresses().Add(datastore.AddressRef{
 					ChainSelector: 5009297550715157269,
-					Type:          datastore.ContractType(burn_mint_erc20_with_drip.LINKContractType),
-					Version:       burn_mint_erc20_with_drip.Version,
+					Type:          datastore.ContractType(link_token.ContractType),
+					Version:       link_token.Version,
 					Address:       common.HexToAddress("0x01").Hex(),
 				})
 				_ = ds.Addresses().Add(datastore.AddressRef{
