@@ -100,9 +100,9 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 					TokenTransferFeeConfig:                   testsetup.CreateBasicTokenTransferFeeConfig(),
 				},
 			},
-			ExternalAdmin:   "", // Use internal admin
-			RegistryAddress: tokenAdminRegistryAddress,
-			FinalityValue:   12,
+			ExternalAdmin:    "", // Use internal admin
+			RegistryAddress:  tokenAdminRegistryAddress,
+			MinFinalityValue: 12,
 		}
 
 		// Execute the configure token for transfers sequence
@@ -134,7 +134,7 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 
 		minBlockConfirmation, err := tp.GetMinBlockConfirmation(nil)
 		require.NoError(t, err, "Failed to get configured min block confirmation")
-		require.Equal(t, input.FinalityValue, minBlockConfirmation, "Min block confirmation should match input")
+		require.Equal(t, input.MinFinalityValue, minBlockConfirmation, "Min block confirmation should match input")
 
 		customFinalityInboundRateLimiterConfig := input.RemoteChains[remoteChainSel1].CustomFinalityInboundRateLimiterConfig
 		customFinalityOutboundRateLimiterConfig := input.RemoteChains[remoteChainSel1].CustomFinalityOutboundRateLimiterConfig

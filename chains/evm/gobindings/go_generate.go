@@ -35,6 +35,7 @@ package ccip
 //go:generate go run generation/generate/wrap.go ccip USDCTokenPoolCCTPV2 usdc_token_pool_cctp_v2 latest
 //go:generate go run generation/generate/wrap.go ccip USDCTokenPoolProxy usdc_token_pool_proxy latest
 //go:generate go run generation/generate/wrap.go ccip BurnMintWithLockReleaseFlagTokenPool burn_mint_with_lock_release_flag_token_pool latest
+//go:generate go run generation/generate/wrap.go ccip CCTPTokenPool cctp_token_pool latest
 //go:generate go run generation/generate/wrap.go ccip LombardTokenPool lombard_token_pool latest
 //go:generate go run generation/generate/wrap.go ccip AdvancedPoolHooks advanced_pool_hooks latest
 
