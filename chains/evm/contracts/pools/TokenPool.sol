@@ -75,7 +75,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   event ChainRemoved(uint64 remoteChainSelector);
   event RemotePoolAdded(uint64 indexed remoteChainSelector, bytes remotePoolAddress);
   event RemotePoolRemoved(uint64 indexed remoteChainSelector, bytes remotePoolAddress);
-  event DynamicConfigSet(address router, address rateLimitAdmin);
+  event DynamicConfigSet(address router, address rateLimitAdmin, address feeAggregator);
   event OutboundRateLimitConsumed(uint64 indexed remoteChainSelector, address token, uint256 amount);
   event InboundRateLimitConsumed(uint64 indexed remoteChainSelector, address token, uint256 amount);
   event TokenTransferFeeConfigUpdated(uint64 indexed destChainSelector, TokenTransferFeeConfig tokenTransferFeeConfig);
@@ -158,6 +158,9 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   address internal s_rateLimitAdmin;
   /// @dev Optional token-transfer fee overrides keyed by destination chain selector.
   mapping(uint64 destChainSelector => TokenTransferFeeConfig tokenTransferFeeConfig) internal s_tokenTransferFeeConfig;
+  /// @notice The address of the fee aggregator.
+  /// @dev Constructor does not set this value so it is opt in only.
+  address internal s_feeAggregator;
 
   constructor(
     IERC20 token,
@@ -207,8 +210,13 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   }
 
   /// @notice Gets the pools dynamic configuration.
-  function getDynamicConfig() public view virtual returns (address router, address rateLimitAdmin) {
-    return (address(s_router), s_rateLimitAdmin);
+  function getDynamicConfig()
+    public
+    view
+    virtual
+    returns (address router, address rateLimitAdmin, address feeAggregator)
+  {
+    return (address(s_router), s_rateLimitAdmin, s_feeAggregator);
   }
 
   /// @notice Gets the minimum block confirmations required for custom finality transfers.
@@ -224,14 +232,17 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   /// @notice Sets the dynamic configuration for the pool.
   /// @param router The address of the router contract.
   /// @param rateLimitAdmin The address of the rate limiter admin.
+  /// @param feeAggregator The address where fees are sent.
   function setDynamicConfig(
     address router,
-    address rateLimitAdmin
+    address rateLimitAdmin,
+    address feeAggregator
   ) public onlyOwner {
     if (router == address(0)) revert ZeroAddressInvalid();
     s_router = IRouter(router);
     s_rateLimitAdmin = rateLimitAdmin;
-    emit DynamicConfigSet(router, rateLimitAdmin);
+    s_feeAggregator = feeAggregator;
+    emit DynamicConfigSet(router, rateLimitAdmin, feeAggregator);
   }
 
   /// @notice Sets the minimum block confirmations required for custom finality transfers.
@@ -1052,17 +1063,16 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
     }
   }
 
-  /// @notice Withdraws accrued fee token balances to the provided `recipient`.
+  /// @notice Withdraws accrued fee token balances to the provided `s_feeAggregator`.
+  /// @dev FeeTokenHandler will revert if `s_feeAggregator` is zero address.
   /// @dev Pools accrue fees directly on this contract. Lock/release pools send bridge liquidity to their ERC20 lockbox
   /// during the lock flow, which means any balance left on this contract represents fees that have accrued to the pool.
   /// Because user liquidity never resides on `address(this)` for lock/release pools, transferring the full contract balance is safe
   /// and clears only accrued fees.
   /// @param feeTokens The token addresses to withdraw, including the pool token when applicable.
-  /// @param recipient The address that should receive the withdrawn balances.
   function withdrawFeeTokens(
-    address[] calldata feeTokens,
-    address recipient
-  ) external onlyOwner {
-    FeeTokenHandler._withdrawFeeTokens(feeTokens, recipient);
+    address[] calldata feeTokens
+  ) external {
+    FeeTokenHandler._withdrawFeeTokens(feeTokens, s_feeAggregator);
   }
 }
