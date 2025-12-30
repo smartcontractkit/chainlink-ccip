@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"os"
 	"time"
 
 	"github.com/Masterminds/semver/v3"
@@ -44,6 +45,10 @@ func DeployContractsForSelector(ctx context.Context, env *deployment.Environment
 	dReg := deployops.GetRegistry()
 	version := semver.MustParse("1.6.0")
 	mint, _ := solana.NewRandomPrivateKey()
+	contractVersion := "08446f0afa54"
+	if os.Getenv("DEPLOY_CONTRACT_VERSION") != "" {
+		contractVersion = os.Getenv("DEPLOY_CONTRACT_VERSION")
+	}
 	out, err := deployops.DeployContracts(dReg).Apply(*env, deployops.ContractDeploymentConfig{
 		MCMS: mcms.Input{},
 		Chains: map[uint64]deployops.ContractDeploymentConfigPerChain{
@@ -63,7 +68,7 @@ func DeployContractsForSelector(ctx context.Context, env *deployment.Environment
 				PermissionLessExecutionThresholdSeconds: uint32((20 * time.Minute).Seconds()),
 				GasForCallExactCheck:                    uint16(5000),
 				// TON SPECIFIC CONFIG
-				ContractVersion: "08446f0afa54",
+				ContractVersion: contractVersion,
 			},
 		},
 	})

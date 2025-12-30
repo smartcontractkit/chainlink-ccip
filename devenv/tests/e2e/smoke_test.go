@@ -58,38 +58,20 @@ func TestE2ESmoke(t *testing.T) {
 		fromSelector uint64
 		toSelector   uint64
 	}
-
-	tcs := []testcase{
-		{
-			name:         "evm->evm msg execution eoa receiver",
-			fromSelector: selectors[0],
-			toSelector:   selectors[1],
-		},
-		{
-			name:         "evm->evm msg execution eoa receiver",
-			fromSelector: selectors[1],
-			toSelector:   selectors[0],
-		},
-		{
-			name:         "evm->svm msg execution eoa receiver",
-			fromSelector: selectors[0],
-			toSelector:   selectors[2],
-		},
-		{
-			name:         "svm->evm msg execution eoa receiver",
-			fromSelector: selectors[2],
-			toSelector:   selectors[0],
-		},
-		{
-			name:         "evm->tvm msg execution eoa receiver",
-			fromSelector: selectors[0],
-			toSelector:   selectors[3],
-		},
-		{
-			name:         "tvm->evm msg execution eoa receiver",
-			fromSelector: selectors[3],
-			toSelector:   selectors[0],
-		},
+	tcs := []testcase{}
+	for i := 0; i < len(selectors); i++ {
+		for j := 0; j < len(selectors); j++ {
+			if i == j {
+				continue
+			}
+			fromFamily, _ := chainsel.GetSelectorFamily(selectors[i])
+			toFamily, _ := chainsel.GetSelectorFamily(selectors[j])
+			tcs = append(tcs, testcase{
+				name:         fmt.Sprintf("msg execution eoa receiver from %s to %s", fromFamily, toFamily),
+				fromSelector: selectors[i],
+				toSelector:   selectors[j],
+			})
+		}
 	}
 
 	for _, tc := range tcs {

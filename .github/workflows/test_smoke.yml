@@ -1,7 +1,10 @@
 name: Smoke tests (devenv)
 
 on:
+  pull_request:
   push:
+    branches:
+      - 'main'
 
 defaults:
   run:
@@ -19,8 +22,8 @@ jobs:
     strategy:
       matrix:
         test: [
-          # if your suite has more than 10 e2e tests or is slower than 10m consider splitting it to another runner here
           { name: "TestE2ESmoke", config: "env.toml" },
+          { name: "TestE2ESmoke", config: "env.toml,solana.toml" },
         ]
       fail-fast: false
     steps:
