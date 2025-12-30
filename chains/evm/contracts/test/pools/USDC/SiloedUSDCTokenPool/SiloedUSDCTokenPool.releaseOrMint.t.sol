@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import {Pool} from "../../../../libraries/Pool.sol";
 import {SiloedLockReleaseTokenPool} from "../../../../pools/SiloedLockReleaseTokenPool.sol";
 import {TokenPool} from "../../../../pools/TokenPool.sol";
-import {LOCK_RELEASE_FLAG} from "../../../../pools/USDC/SiloedUSDCTokenPool.sol";
+import {LOCK_RELEASE_FLAG} from "../../../../pools/USDC/BurnMintWithLockReleaseFlagTokenPool.sol";
 import {SiloedUSDCTokenPoolSetup} from "./SiloedUSDCTokenPoolSetup.sol";
 
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";

@@ -57,8 +57,9 @@ type OffRampParams struct {
 }
 
 type OnRampParams struct {
-	Version       *semver.Version
-	FeeAggregator common.Address
+	Version               *semver.Version
+	FeeAggregator         common.Address
+	MaxUSDCentsPerMessage uint32
 }
 
 type FeeQuoterParams struct {
@@ -205,9 +206,6 @@ var DeployChainContracts = cldf_ops.NewSequence(
 					// TODO: Add Timelock here when MCMS support is needed.
 					chain.DeployerKey.From,
 				},
-				FeeTokens: []common.Address{
-					common.HexToAddress(linkRef.Address), common.HexToAddress(wethRef.Address),
-				},
 				// Skipped fields:
 				// - TokenPriceFeeds (will not be used in 1.7.0)
 				// - TokenTransferFeeConfigArgs (token+lane-specific config, set elsewhere)
@@ -265,9 +263,10 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			ChainSelector:  chain.Selector,
 			Args: onramp.ConstructorArgs{
 				StaticConfig: onramp.StaticConfig{
-					ChainSelector:      chain.Selector,
-					RmnRemote:          common.HexToAddress(rmnRemoteRef.Address),
-					TokenAdminRegistry: common.HexToAddress(tokenAdminRegistryRef.Address),
+					ChainSelector:         chain.Selector,
+					RmnRemote:             common.HexToAddress(rmnRemoteRef.Address),
+					TokenAdminRegistry:    common.HexToAddress(tokenAdminRegistryRef.Address),
+					MaxUSDCentsPerMessage: input.ContractParams.OnRamp.MaxUSDCentsPerMessage,
 				},
 				DynamicConfig: onramp.DynamicConfig{
 					FeeQuoter:     common.HexToAddress(feeQuoterRef.Address),

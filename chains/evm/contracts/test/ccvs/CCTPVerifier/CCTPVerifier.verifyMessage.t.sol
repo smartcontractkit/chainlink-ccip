@@ -11,8 +11,6 @@ import {CCTPHelper} from "../../helpers/CCTPHelper.sol";
 import {MockE2EUSDCTransmitterCCTPV2} from "../../mocks/MockE2EUSDCTransmitterCCTPV2.sol";
 import {CCTPVerifierSetup} from "./CCTPVerifierSetup.t.sol";
 
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
-
 contract CCTPVerifier_verifyMessage is CCTPVerifierSetup {
   CCTPHelper.CCTPMessage internal s_baseCCTPMessage;
   address internal constant OFFRAMP = address(0x001001001001);
@@ -77,7 +75,7 @@ contract CCTPVerifier_verifyMessage is CCTPVerifierSetup {
     bytes memory verifierResults = _createVerifierResults(s_cctpVerifier.versionTag(), s_baseCCTPMessage);
 
     // Ensure that the mint recipient has no tokens yet.
-    assertEq(IERC20(address(s_USDCToken)).balanceOf(s_tokenReceiverAddress), 0);
+    assertEq(s_USDCToken.balanceOf(s_tokenReceiverAddress), 0);
 
     vm.expectEmit();
     emit MockE2EUSDCTransmitterCCTPV2.MessageReceived(CCTPHelper._encodeCCTPMessage(s_baseCCTPMessage), new bytes(65));
@@ -86,7 +84,7 @@ contract CCTPVerifier_verifyMessage is CCTPVerifierSetup {
 
     // Ensure that the mint recipient received the tokens.
     // Mock transmitter always just mints 1 token.
-    assertEq(IERC20(address(s_USDCToken)).balanceOf(s_tokenReceiverAddress), 1);
+    assertEq(s_USDCToken.balanceOf(s_tokenReceiverAddress), 1);
   }
 
   function test_verifyMessage_RevertWhen_CursedByRMN() public {

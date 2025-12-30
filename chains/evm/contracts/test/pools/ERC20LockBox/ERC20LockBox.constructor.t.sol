@@ -9,8 +9,7 @@ import {Test} from "forge-std/Test.sol";
 contract ERC20LockBox_constructor is Test {
   function test_constructor() public {
     ERC20LockBox lockBox = new ERC20LockBox(address(3));
-    assertEq(address(lockBox.getToken()), address(3));
-    assertEq(lockBox.typeAndVersion(), "ERC20LockBox 1.7.0-dev");
+    assertTrue(lockBox.isTokenSupported(address(3)));
   }
 
   function test_constructor_RevertWhen_TokenIsZeroAddress() public {

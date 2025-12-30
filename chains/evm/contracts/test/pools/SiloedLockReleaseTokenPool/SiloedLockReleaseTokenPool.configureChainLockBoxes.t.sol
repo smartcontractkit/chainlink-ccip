@@ -9,6 +9,8 @@ import {BaseTest} from "../../BaseTest.t.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
+
 contract SiloedLockReleaseTokenPool_configureChainLockBoxes is BaseTest {
   uint64 internal constant SILOED_CHAIN_SELECTOR = DEST_CHAIN_SELECTOR + 5;
 
@@ -23,7 +25,7 @@ contract SiloedLockReleaseTokenPool_configureChainLockBoxes is BaseTest {
 
     s_unsiloed = new ERC20LockBox(address(s_token));
     s_pool = new SiloedLockReleaseTokenPool(
-      s_token,
+      IERC20(address(s_token)),
       DEFAULT_TOKEN_DECIMALS,
       address(0),
       address(s_mockRMNRemote),
@@ -98,7 +100,7 @@ contract SiloedLockReleaseTokenPool_configureChainLockBoxes is BaseTest {
       remoteChainSelector: SILOED_CHAIN_SELECTOR, lockBox: address(invalidLockBox)
     });
 
-    vm.expectRevert(abi.encodeWithSelector(TokenPool.InvalidToken.selector, wrongToken));
+    vm.expectRevert(abi.encodeWithSelector(TokenPool.InvalidToken.selector, address(s_token)));
     s_pool.configureLockBoxes(lockBoxes);
   }
 }

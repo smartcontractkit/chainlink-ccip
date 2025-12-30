@@ -1,23 +1,17 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {IBurnMintERC20} from "../../interfaces/IBurnMintERC20.sol";
+import {ILockBox} from "../../interfaces/ILockBox.sol";
+
 import {Pool} from "../../libraries/Pool.sol";
 import {ERC20LockBox} from "../ERC20LockBox.sol";
 import {SiloedLockReleaseTokenPool} from "../SiloedLockReleaseTokenPool.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
-import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
-import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/EnumerableSet.sol";
 
-/// @dev The flag used to indicate that the source pool data is coming from a chain that does not have CCTP Support,
-/// and so the lock release pool should be used. The BurnMintWithLockReleaseTokenPool uses this flag as its source pool
-/// data to indicate that the tokens should be released from the lock release pool rather than attempting to be minted
-/// through CCTP.
-/// @dev The preimage is bytes4(keccak256("NO_CCTP_USE_LOCK_RELEASE")).
-/// Note: This will be removed in a following PR but is included here to prevent breaking changes to the
-/// BurnMintWithLockReleaseTokenPool.
-bytes4 constant LOCK_RELEASE_FLAG = 0xfa7c07de;
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
+import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/EnumerableSet.sol";
 
 /// @notice A token pool for USDC which inherits the Siloed token functionality while adding the CCTP migration functionality.
 /// @dev The CCTP migration functions have been previously audited. The code has been moved from its own contract
@@ -98,17 +92,16 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
     // Calculate the local amount. Since USDC is always 6 decimals, we can hard code the decimals to 6.
     uint256 localAmount = _calculateLocalAmount(releaseOrMintIn.sourceDenominatedAmount, 6);
 
-    _validateReleaseOrMint(releaseOrMintIn, localAmount, blockConfirmationRequested);
+    _validateReleaseOrMint(releaseOrMintIn, localAmount, WAIT_FOR_FINALITY);
+
+    ILockBox lockbox = _getLockBox(releaseOrMintIn.remoteChainSelector);
+    uint256 availableLiquidity = i_token.balanceOf(address(lockbox));
+    if (localAmount > availableLiquidity) {
+      revert InsufficientLiquidity(availableLiquidity, localAmount);
+    }
 
     uint256 excludedTokens = s_tokensExcludedFromBurn[releaseOrMintIn.remoteChainSelector];
-    ERC20LockBox lockbox = _getLockBox(releaseOrMintIn.remoteChainSelector);
-    // No excluded tokens is the common path, as it means no migration has occured yet, and any released
-    // tokens should come from the stored token balance of previously deposited tokens.
-    if (excludedTokens == 0) {
-      uint256 availableLiquidity = i_token.balanceOf(address(lockbox));
-      if (localAmount > availableLiquidity) {
-        revert InsufficientLiquidity(availableLiquidity, localAmount);
-      }
+    if (excludedTokens != 0) {
       // The existence of excluded tokens indicates a migration has occured on the chain, and that any tokens
       // being released should come from those excluded tokens reserved for processing inflight messages.
     } else {
@@ -117,6 +110,8 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
       // During a proposed migration, the lockbox balance is the source of truth. Any release here reduces the
       // lockbox balance, so burnLockedUSDC will not over-burn even without separate per-chain accounting.
     }
+    // No excluded tokens is the common path, as it means no migration has occured yet, and any released
+    // tokens should come from the stored token balance of previously deposited tokens.
 
     // Release to the recipient using the lockbox tied to the remote chain selector.
     lockbox.withdraw(address(i_token), releaseOrMintIn.remoteChainSelector, localAmount, releaseOrMintIn.receiver);
@@ -274,7 +269,7 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
     uint64 burnChainSelector = s_proposedUSDCMigrationChain;
     if (burnChainSelector == 0) revert NoMigrationProposalPending();
 
-    ERC20LockBox lockBox = _getLockBox(burnChainSelector);
+    ILockBox lockBox = _getLockBox(burnChainSelector);
     // Burnable tokens is the total locked minus the amount excluded from burn
     uint256 tokensToBurn = i_token.balanceOf(address(lockBox)) - s_tokensExcludedFromBurn[burnChainSelector];
 

@@ -5,7 +5,7 @@ import {IRouterClient} from "../interfaces/IRouterClient.sol";
 
 import {CCIPClientExample} from "./CCIPClientExample.sol";
 
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
 /// @notice Example of a client that supports Cross Chain Verifiers (CCVs).
 /// @dev Each source chain can define its own CCV configuration, meaning that incoming traffic

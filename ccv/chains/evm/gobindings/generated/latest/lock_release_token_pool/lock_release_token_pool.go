@@ -378,28 +378,6 @@ func (_LockReleaseTokenPool *LockReleaseTokenPoolCallerSession) GetMinBlockConfi
 	return _LockReleaseTokenPool.Contract.GetMinBlockConfirmation(&_LockReleaseTokenPool.CallOpts)
 }
 
-func (_LockReleaseTokenPool *LockReleaseTokenPoolCaller) GetRebalancer(opts *bind.CallOpts) (common.Address, error) {
-	var out []interface{}
-	err := _LockReleaseTokenPool.contract.Call(opts, &out, "getRebalancer")
-
-	if err != nil {
-		return *new(common.Address), err
-	}
-
-	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
-
-	return out0, err
-
-}
-
-func (_LockReleaseTokenPool *LockReleaseTokenPoolSession) GetRebalancer() (common.Address, error) {
-	return _LockReleaseTokenPool.Contract.GetRebalancer(&_LockReleaseTokenPool.CallOpts)
-}
-
-func (_LockReleaseTokenPool *LockReleaseTokenPoolCallerSession) GetRebalancer() (common.Address, error) {
-	return _LockReleaseTokenPool.Contract.GetRebalancer(&_LockReleaseTokenPool.CallOpts)
-}
-
 func (_LockReleaseTokenPool *LockReleaseTokenPoolCaller) GetRemotePools(opts *bind.CallOpts, remoteChainSelector uint64) ([][]byte, error) {
 	var out []interface{}
 	err := _LockReleaseTokenPool.contract.Call(opts, &out, "getRemotePools", remoteChainSelector)
@@ -780,18 +758,6 @@ func (_LockReleaseTokenPool *LockReleaseTokenPoolTransactorSession) LockOrBurn0(
 	return _LockReleaseTokenPool.Contract.LockOrBurn0(&_LockReleaseTokenPool.TransactOpts, lockOrBurnIn, blockConfirmationRequested, tokenArgs)
 }
 
-func (_LockReleaseTokenPool *LockReleaseTokenPoolTransactor) ProvideLiquidity(opts *bind.TransactOpts, amount *big.Int) (*types.Transaction, error) {
-	return _LockReleaseTokenPool.contract.Transact(opts, "provideLiquidity", amount)
-}
-
-func (_LockReleaseTokenPool *LockReleaseTokenPoolSession) ProvideLiquidity(amount *big.Int) (*types.Transaction, error) {
-	return _LockReleaseTokenPool.Contract.ProvideLiquidity(&_LockReleaseTokenPool.TransactOpts, amount)
-}
-
-func (_LockReleaseTokenPool *LockReleaseTokenPoolTransactorSession) ProvideLiquidity(amount *big.Int) (*types.Transaction, error) {
-	return _LockReleaseTokenPool.Contract.ProvideLiquidity(&_LockReleaseTokenPool.TransactOpts, amount)
-}
-
 func (_LockReleaseTokenPool *LockReleaseTokenPoolTransactor) ReleaseOrMint(opts *bind.TransactOpts, releaseOrMintIn PoolReleaseOrMintInV1) (*types.Transaction, error) {
 	return _LockReleaseTokenPool.contract.Transact(opts, "releaseOrMint", releaseOrMintIn)
 }
@@ -864,30 +830,6 @@ func (_LockReleaseTokenPool *LockReleaseTokenPoolTransactorSession) SetRateLimit
 	return _LockReleaseTokenPool.Contract.SetRateLimitConfig(&_LockReleaseTokenPool.TransactOpts, rateLimitConfigArgs)
 }
 
-func (_LockReleaseTokenPool *LockReleaseTokenPoolTransactor) SetRebalancer(opts *bind.TransactOpts, rebalancer common.Address) (*types.Transaction, error) {
-	return _LockReleaseTokenPool.contract.Transact(opts, "setRebalancer", rebalancer)
-}
-
-func (_LockReleaseTokenPool *LockReleaseTokenPoolSession) SetRebalancer(rebalancer common.Address) (*types.Transaction, error) {
-	return _LockReleaseTokenPool.Contract.SetRebalancer(&_LockReleaseTokenPool.TransactOpts, rebalancer)
-}
-
-func (_LockReleaseTokenPool *LockReleaseTokenPoolTransactorSession) SetRebalancer(rebalancer common.Address) (*types.Transaction, error) {
-	return _LockReleaseTokenPool.Contract.SetRebalancer(&_LockReleaseTokenPool.TransactOpts, rebalancer)
-}
-
-func (_LockReleaseTokenPool *LockReleaseTokenPoolTransactor) TransferLiquidity(opts *bind.TransactOpts, from common.Address, amount *big.Int) (*types.Transaction, error) {
-	return _LockReleaseTokenPool.contract.Transact(opts, "transferLiquidity", from, amount)
-}
-
-func (_LockReleaseTokenPool *LockReleaseTokenPoolSession) TransferLiquidity(from common.Address, amount *big.Int) (*types.Transaction, error) {
-	return _LockReleaseTokenPool.Contract.TransferLiquidity(&_LockReleaseTokenPool.TransactOpts, from, amount)
-}
-
-func (_LockReleaseTokenPool *LockReleaseTokenPoolTransactorSession) TransferLiquidity(from common.Address, amount *big.Int) (*types.Transaction, error) {
-	return _LockReleaseTokenPool.Contract.TransferLiquidity(&_LockReleaseTokenPool.TransactOpts, from, amount)
-}
-
 func (_LockReleaseTokenPool *LockReleaseTokenPoolTransactor) TransferOwnership(opts *bind.TransactOpts, to common.Address) (*types.Transaction, error) {
 	return _LockReleaseTokenPool.contract.Transact(opts, "transferOwnership", to)
 }
@@ -922,18 +864,6 @@ func (_LockReleaseTokenPool *LockReleaseTokenPoolSession) WithdrawFeeTokens(feeT
 
 func (_LockReleaseTokenPool *LockReleaseTokenPoolTransactorSession) WithdrawFeeTokens(feeTokens []common.Address, recipient common.Address) (*types.Transaction, error) {
 	return _LockReleaseTokenPool.Contract.WithdrawFeeTokens(&_LockReleaseTokenPool.TransactOpts, feeTokens, recipient)
-}
-
-func (_LockReleaseTokenPool *LockReleaseTokenPoolTransactor) WithdrawLiquidity(opts *bind.TransactOpts, amount *big.Int) (*types.Transaction, error) {
-	return _LockReleaseTokenPool.contract.Transact(opts, "withdrawLiquidity", amount)
-}
-
-func (_LockReleaseTokenPool *LockReleaseTokenPoolSession) WithdrawLiquidity(amount *big.Int) (*types.Transaction, error) {
-	return _LockReleaseTokenPool.Contract.WithdrawLiquidity(&_LockReleaseTokenPool.TransactOpts, amount)
-}
-
-func (_LockReleaseTokenPool *LockReleaseTokenPoolTransactorSession) WithdrawLiquidity(amount *big.Int) (*types.Transaction, error) {
-	return _LockReleaseTokenPool.Contract.WithdrawLiquidity(&_LockReleaseTokenPool.TransactOpts, amount)
 }
 
 type LockReleaseTokenPoolAdvancedPoolHooksUpdatedIterator struct {
@@ -3111,124 +3041,6 @@ func (_LockReleaseTokenPool *LockReleaseTokenPoolFilterer) ParseRateLimitConfigu
 	return event, nil
 }
 
-type LockReleaseTokenPoolRebalancerSetIterator struct {
-	Event *LockReleaseTokenPoolRebalancerSet
-
-	contract *bind.BoundContract
-	event    string
-
-	logs chan types.Log
-	sub  ethereum.Subscription
-	done bool
-	fail error
-}
-
-func (it *LockReleaseTokenPoolRebalancerSetIterator) Next() bool {
-
-	if it.fail != nil {
-		return false
-	}
-
-	if it.done {
-		select {
-		case log := <-it.logs:
-			it.Event = new(LockReleaseTokenPoolRebalancerSet)
-			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-				it.fail = err
-				return false
-			}
-			it.Event.Raw = log
-			return true
-
-		default:
-			return false
-		}
-	}
-
-	select {
-	case log := <-it.logs:
-		it.Event = new(LockReleaseTokenPoolRebalancerSet)
-		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-			it.fail = err
-			return false
-		}
-		it.Event.Raw = log
-		return true
-
-	case err := <-it.sub.Err():
-		it.done = true
-		it.fail = err
-		return it.Next()
-	}
-}
-
-func (it *LockReleaseTokenPoolRebalancerSetIterator) Error() error {
-	return it.fail
-}
-
-func (it *LockReleaseTokenPoolRebalancerSetIterator) Close() error {
-	it.sub.Unsubscribe()
-	return nil
-}
-
-type LockReleaseTokenPoolRebalancerSet struct {
-	OldRebalancer common.Address
-	NewRebalancer common.Address
-	Raw           types.Log
-}
-
-func (_LockReleaseTokenPool *LockReleaseTokenPoolFilterer) FilterRebalancerSet(opts *bind.FilterOpts) (*LockReleaseTokenPoolRebalancerSetIterator, error) {
-
-	logs, sub, err := _LockReleaseTokenPool.contract.FilterLogs(opts, "RebalancerSet")
-	if err != nil {
-		return nil, err
-	}
-	return &LockReleaseTokenPoolRebalancerSetIterator{contract: _LockReleaseTokenPool.contract, event: "RebalancerSet", logs: logs, sub: sub}, nil
-}
-
-func (_LockReleaseTokenPool *LockReleaseTokenPoolFilterer) WatchRebalancerSet(opts *bind.WatchOpts, sink chan<- *LockReleaseTokenPoolRebalancerSet) (event.Subscription, error) {
-
-	logs, sub, err := _LockReleaseTokenPool.contract.WatchLogs(opts, "RebalancerSet")
-	if err != nil {
-		return nil, err
-	}
-	return event.NewSubscription(func(quit <-chan struct{}) error {
-		defer sub.Unsubscribe()
-		for {
-			select {
-			case log := <-logs:
-
-				event := new(LockReleaseTokenPoolRebalancerSet)
-				if err := _LockReleaseTokenPool.contract.UnpackLog(event, "RebalancerSet", log); err != nil {
-					return err
-				}
-				event.Raw = log
-
-				select {
-				case sink <- event:
-				case err := <-sub.Err():
-					return err
-				case <-quit:
-					return nil
-				}
-			case err := <-sub.Err():
-				return err
-			case <-quit:
-				return nil
-			}
-		}
-	}), nil
-}
-
-func (_LockReleaseTokenPool *LockReleaseTokenPoolFilterer) ParseRebalancerSet(log types.Log) (*LockReleaseTokenPoolRebalancerSet, error) {
-	event := new(LockReleaseTokenPoolRebalancerSet)
-	if err := _LockReleaseTokenPool.contract.UnpackLog(event, "RebalancerSet", log); err != nil {
-		return nil, err
-	}
-	event.Raw = log
-	return event, nil
-}
-
 type LockReleaseTokenPoolReleasedOrMintedIterator struct {
 	Event *LockReleaseTokenPoolReleasedOrMinted
 
@@ -3955,10 +3767,6 @@ func (LockReleaseTokenPoolRateLimitConfigured) Topic() common.Hash {
 	return common.HexToHash("0x41f7c8f7cfdad9350aa495e6c54cbbf750a07ab38a9098aed1256e30dd1682bb")
 }
 
-func (LockReleaseTokenPoolRebalancerSet) Topic() common.Hash {
-	return common.HexToHash("0x64187bd7b97e66658c91904f3021d7c28de967281d18b1a20742348afdd6a6b3")
-}
-
 func (LockReleaseTokenPoolReleasedOrMinted) Topic() common.Hash {
 	return common.HexToHash("0xfc5e3a5bddc11d92c2dc20fae6f7d5eb989f056be35239f7de7e86150609abc0")
 }
@@ -4000,8 +3808,6 @@ type LockReleaseTokenPoolInterface interface {
 
 	GetMinBlockConfirmation(opts *bind.CallOpts) (uint16, error)
 
-	GetRebalancer(opts *bind.CallOpts) (common.Address, error)
-
 	GetRemotePools(opts *bind.CallOpts, remoteChainSelector uint64) ([][]byte, error)
 
 	GetRemoteToken(opts *bind.CallOpts, remoteChainSelector uint64) ([]byte, error)
@@ -4042,8 +3848,6 @@ type LockReleaseTokenPoolInterface interface {
 
 	LockOrBurn0(opts *bind.TransactOpts, lockOrBurnIn PoolLockOrBurnInV1, blockConfirmationRequested uint16, tokenArgs []byte) (*types.Transaction, error)
 
-	ProvideLiquidity(opts *bind.TransactOpts, amount *big.Int) (*types.Transaction, error)
-
 	ReleaseOrMint(opts *bind.TransactOpts, releaseOrMintIn PoolReleaseOrMintInV1) (*types.Transaction, error)
 
 	ReleaseOrMint0(opts *bind.TransactOpts, releaseOrMintIn PoolReleaseOrMintInV1, blockConfirmationRequested uint16) (*types.Transaction, error)
@@ -4056,17 +3860,11 @@ type LockReleaseTokenPoolInterface interface {
 
 	SetRateLimitConfig(opts *bind.TransactOpts, rateLimitConfigArgs []TokenPoolRateLimitConfigArgs) (*types.Transaction, error)
 
-	SetRebalancer(opts *bind.TransactOpts, rebalancer common.Address) (*types.Transaction, error)
-
-	TransferLiquidity(opts *bind.TransactOpts, from common.Address, amount *big.Int) (*types.Transaction, error)
-
 	TransferOwnership(opts *bind.TransactOpts, to common.Address) (*types.Transaction, error)
 
 	UpdateAdvancedPoolHooks(opts *bind.TransactOpts, newHook common.Address) (*types.Transaction, error)
 
 	WithdrawFeeTokens(opts *bind.TransactOpts, feeTokens []common.Address, recipient common.Address) (*types.Transaction, error)
-
-	WithdrawLiquidity(opts *bind.TransactOpts, amount *big.Int) (*types.Transaction, error)
 
 	FilterAdvancedPoolHooksUpdated(opts *bind.FilterOpts) (*LockReleaseTokenPoolAdvancedPoolHooksUpdatedIterator, error)
 
@@ -4169,12 +3967,6 @@ type LockReleaseTokenPoolInterface interface {
 	WatchRateLimitConfigured(opts *bind.WatchOpts, sink chan<- *LockReleaseTokenPoolRateLimitConfigured, remoteChainSelector []uint64) (event.Subscription, error)
 
 	ParseRateLimitConfigured(log types.Log) (*LockReleaseTokenPoolRateLimitConfigured, error)
-
-	FilterRebalancerSet(opts *bind.FilterOpts) (*LockReleaseTokenPoolRebalancerSetIterator, error)
-
-	WatchRebalancerSet(opts *bind.WatchOpts, sink chan<- *LockReleaseTokenPoolRebalancerSet) (event.Subscription, error)
-
-	ParseRebalancerSet(log types.Log) (*LockReleaseTokenPoolRebalancerSet, error)
 
 	FilterReleasedOrMinted(opts *bind.FilterOpts, remoteChainSelector []uint64) (*LockReleaseTokenPoolReleasedOrMintedIterator, error)
 

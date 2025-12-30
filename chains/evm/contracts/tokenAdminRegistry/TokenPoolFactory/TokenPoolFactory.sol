@@ -23,7 +23,7 @@ contract TokenPoolFactory is ITypeAndVersion {
   using Create2 for bytes32;
 
   error InvalidZeroAddress();
-  error InvalidLockBoxToken(address lockBoxToken, address poolToken);
+  error InvalidLockBoxToken(address poolToken);
   error InvalidLockBoxChainSelector(uint64 lockBoxSelector);
 
   /// @notice The type of pool to deploy. Types may be expanded in future versions.
@@ -136,8 +136,10 @@ contract TokenPoolFactory is ITypeAndVersion {
     // Deploy the token pool.
     address pool = _createTokenPool(remoteTokenPools, tokenPoolInitCode, localConfig);
 
-    // Grant the mint and burn roles to the pool for the token.
-    FactoryBurnMintERC20(token).grantMintAndBurnRoles(pool);
+    if (localPoolType == PoolType.BURN_MINT) {
+      // Grant the mint and burn roles to the pool for the token.
+      FactoryBurnMintERC20(token).grantMintAndBurnRoles(pool);
+    }
 
     // Set the token pool for token in the token admin registry since this contract is the token and pool owner.
     _setTokenPoolInTokenAdminRegistry(token, pool);
@@ -214,8 +216,8 @@ contract TokenPoolFactory is ITypeAndVersion {
         localLockBox = _deployLockBox(localConfig.token, localConfig.salt);
       } else {
         ERC20LockBox lockBoxContract = ERC20LockBox(localLockBox);
-        if (address(lockBoxContract.getToken()) != localConfig.token) {
-          revert InvalidLockBoxToken(address(lockBoxContract.getToken()), localConfig.token);
+        if (!lockBoxContract.isTokenSupported(localConfig.token)) {
+          revert InvalidLockBoxToken(localConfig.token);
         }
       }
       tokenPoolInitArgs = abi.encode(

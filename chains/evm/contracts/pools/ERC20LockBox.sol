@@ -6,8 +6,8 @@ import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/I
 
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
-import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/utils/SafeERC20.sol";
 
 /// @title ERC20 Lock Box
 /// @notice Per-token lockbox that holds ERC20 liquidity so pools can be upgraded without migrating funds.
@@ -24,9 +24,10 @@ contract ERC20LockBox is ITypeAndVersion, ILockBox, AuthorizedCallers {
   event Deposit(address indexed token, address indexed depositor, uint256 amount);
   event Withdrawal(address indexed token, address indexed recipient, uint256 amount);
 
+  string public constant typeAndVersion = "ERC20LockBox 1.7.0-dev";
+
   /// @notice The token supported by this lockbox.
   IERC20 internal immutable i_token;
-  string public constant typeAndVersion = "ERC20LockBox 1.7.0-dev";
 
   constructor(
     address token
@@ -94,9 +95,12 @@ contract ERC20LockBox is ITypeAndVersion, ILockBox, AuthorizedCallers {
     _validateCaller();
   }
 
-  /// @notice Gets the token supported by this lockbox.
-  /// @return token The ERC20 token.
-  function getToken() external view returns (IERC20 token) {
-    return i_token;
+  /// @notice Returns whether the lockbox supports a token.
+  /// @param token The ERC20 token.
+  /// @return supported True if the token is supported.
+  function isTokenSupported(
+    address token
+  ) external view returns (bool) {
+    return address(i_token) == token;
   }
 }

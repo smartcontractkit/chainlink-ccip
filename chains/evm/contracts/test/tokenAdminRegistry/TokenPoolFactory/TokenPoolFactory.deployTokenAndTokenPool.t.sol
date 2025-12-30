@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {IOwner} from "../../../interfaces/IOwner.sol";
-import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
 
 import {Router} from "../../../Router.sol";
 import {RateLimiter} from "../../../libraries/RateLimiter.sol";
@@ -17,13 +16,11 @@ import {TokenAdminRegistry} from "../../../tokenAdminRegistry/TokenAdminRegistry
 import {FactoryBurnMintERC20} from "../../../tokenAdminRegistry/TokenPoolFactory/FactoryBurnMintERC20.sol";
 import {TokenPoolFactory} from "../../../tokenAdminRegistry/TokenPoolFactory/TokenPoolFactory.sol";
 import {TokenPoolFactorySetup} from "./TokenPoolFactorySetup.t.sol";
-
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
-
 import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
-import {IERC20Metadata} from "@openzeppelin/contracts@4.8.3/token/ERC20/extensions/IERC20Metadata.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts@5.3.0/token/ERC20/extensions/IERC20Metadata.sol";
 import {Create2} from "@openzeppelin/contracts@5.3.0/utils/Create2.sol";
 
 contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
@@ -84,6 +81,10 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
     assertEq(poolAddress, s_tokenAdminRegistry.getPool(tokenAddress), "Token Pool should be set");
     assertEq(IOwner(tokenAddress).owner(), OWNER, "Token should be owned by the owner");
     assertEq(IOwner(poolAddress).owner(), OWNER, "Token should be owned by the owner");
+
+    // Pool should have mint/burn roles granted during deployment.
+    assertTrue(FactoryBurnMintERC20(tokenAddress).isMinter(poolAddress), "pool should be minter");
+    assertTrue(FactoryBurnMintERC20(tokenAddress).isBurner(poolAddress), "pool should be burner");
   }
 
   function test_deployTokenAndTokenPool_WithNoExistingRemoteContracts_Predict() public {
@@ -193,16 +194,9 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
       "New Token Address should have been deployed correctly"
     );
 
-    // Check that the token pool has the correct permissions
-    vm.startPrank(poolAddress);
-    IBurnMintERC20(tokenAddress).mint(poolAddress, 1e18);
-
-    assertEq(1e18, IBurnMintERC20(tokenAddress).balanceOf(poolAddress), "Balance should be 1e18");
-
-    IBurnMintERC20(tokenAddress).burn(1e18);
-    assertEq(0, IBurnMintERC20(tokenAddress).balanceOf(poolAddress), "Balance should be 0");
-
-    vm.stopPrank();
+    // Pool should have mint/burn roles granted during deployment.
+    assertTrue(FactoryBurnMintERC20(tokenAddress).isMinter(poolAddress), "pool should be minter");
+    assertTrue(FactoryBurnMintERC20(tokenAddress).isBurner(poolAddress), "pool should be burner");
 
     assertEq(s_tokenAdminRegistry.getPool(tokenAddress), poolAddress, "Token Pool should be set");
 
@@ -416,19 +410,9 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
     // Ownership remains with the user since the factory should not take over user-provided lockboxes.
     assertEq(userLockBox.owner(), OWNER, "lockbox owner should remain user");
 
-    // Manually authorize the pool and verify liquidity flows through the lockbox.
-    address[] memory added = new address[](1);
-    added[0] = poolAddress;
-    userLockBox.applyAuthorizedCallerUpdates(
-      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: added, removedCallers: new address[](0)})
-    );
-
     Ownable2Step(poolAddress).acceptOwnership();
-    LockReleaseTokenPool(poolAddress).setRebalancer(OWNER);
-    token.approve(poolAddress, 1e18);
-    LockReleaseTokenPool(poolAddress).provideLiquidity(1e18);
 
-    assertEq(token.balanceOf(address(userLockBox)), 1e18, "lockbox should receive liquidity after manual auth");
+    assertEq(Ownable2Step(poolAddress).owner(), OWNER, "pool should be owned by owner");
   }
 
   function test_deployTokenAndTokenPool_LockRelease_AuthorizesPoolForLockBox() public {
@@ -452,14 +436,12 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
     // Accept ownership of token/pool and configure rebalancer.
     Ownable2Step(tokenAddress).acceptOwnership();
     Ownable2Step(poolAddress).acceptOwnership();
-    LockReleaseTokenPool(poolAddress).setRebalancer(OWNER);
 
-    // Provide liquidity should succeed because the pool was authorized on the lockbox by the factory.
-    BurnMintERC20 token = BurnMintERC20(tokenAddress);
-    token.approve(poolAddress, 1e18);
-    LockReleaseTokenPool(poolAddress).provideLiquidity(1e18);
-
-    assertEq(token.balanceOf(predictedLockBox), 1e18, "lockbox did not receive liquidity");
+    assertEq(
+      AuthorizedCallers(predictedLockBox).getAllAuthorizedCallers()[0],
+      poolAddress,
+      "pool should be authorized caller on lockbox"
+    );
   }
 
   function test_deployTokenPoolWithExistingToken_LockRelease_ExistingToken_Predict() public {
@@ -532,9 +514,6 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
       address(newLocalToken),
       "Token Address should have been set"
     );
-
-    LockReleaseTokenPool(poolAddress).setRebalancer(OWNER);
-    assertEq(OWNER, LockReleaseTokenPool(poolAddress).getRebalancer(), "Rebalancer should be set");
 
     // Deploy the Lock-Release Token Pool on the destination chain with the existing remote token
     (address newPoolAddress) = newTokenPoolFactory.deployTokenPoolWithExistingToken(
@@ -756,7 +735,28 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
     // Check configs on the remote pool and remote token decimals
     assertEq(TokenPool(newPoolAddress).getTokenDecimals(), REMOTE_TOKEN_DECIMALS, "Token Decimals should be 6");
     assertEq(address(TokenPool(newPoolAddress).getToken()), address(newRemoteToken), "Token Address should be set");
-    assertEq(IERC20Metadata(newRemoteToken).decimals(), REMOTE_TOKEN_DECIMALS, "Token Decimals should be 6");
+    assertEq(IERC20Metadata(address(newRemoteToken)).decimals(), REMOTE_TOKEN_DECIMALS, "Token Decimals should be 6");
+  }
+
+  function test_deployTokenPoolWithExistingToken_RevertWhen_InvalidLockBoxToken() public {
+    vm.startPrank(OWNER);
+    FactoryBurnMintERC20 token =
+      new FactoryBurnMintERC20("TestToken", "TT", 6, type(uint256).max, PREMINT_AMOUNT, OWNER);
+    FactoryBurnMintERC20 otherToken =
+      new FactoryBurnMintERC20("TestToken", "TT", 6, type(uint256).max, PREMINT_AMOUNT, OWNER);
+    ERC20LockBox lockBox = new ERC20LockBox(address(otherToken));
+
+    TokenPoolFactory.RemoteTokenPoolInfo[] memory remotes = new TokenPoolFactory.RemoteTokenPoolInfo[](0);
+    vm.expectRevert(abi.encodeWithSelector(TokenPoolFactory.InvalidLockBoxToken.selector, address(token)));
+    s_tokenPoolFactory.deployTokenPoolWithExistingToken(
+      address(token),
+      LOCAL_TOKEN_DECIMALS,
+      TokenPoolFactory.PoolType.LOCK_RELEASE,
+      remotes,
+      LOCK_RELEASE_INIT_CODE,
+      address(lockBox),
+      FAKE_SALT
+    );
   }
 
   function test_deployTokenPoolWithExistingToken_RevertWhen_InvalidLockBoxToken() public {
