@@ -25,6 +25,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/registry_module_owner_custom"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -191,6 +192,31 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, err
 		}
 		addresses = append(addresses, tokenAdminRegistryRef)
+
+		// Deploy RegistryModuleOwnerCustom
+		registryModuleOwnerCustomRef, err := contract_utils.MaybeDeployContract(b, registry_module_owner_custom.Deploy, chain, contract_utils.DeployInput[registry_module_owner_custom.ConstructorArgs]{
+			TypeAndVersion: deployment.NewTypeAndVersion(registry_module_owner_custom.ContractType, *semver.MustParse("1.6.0")),
+			ChainSelector:  chain.Selector,
+			Args: registry_module_owner_custom.ConstructorArgs{
+				TokenAdminRegistry: common.HexToAddress(tokenAdminRegistryRef.Address),
+			},
+		}, input.ExistingAddresses)
+		if err != nil {
+			return sequences.OnChainOutput{}, err
+		}
+		addresses = append(addresses, registryModuleOwnerCustomRef)
+
+		// Add RegistryModuleOwnerCustom to TokenAdminRegistry
+		addRegistryModuleReport, err := cldf_ops.ExecuteOperation(b, token_admin_registry.AddRegistryModule, chain, contract_utils.FunctionInput[common.Address]{
+			ChainSelector: chain.Selector,
+			Address:       common.HexToAddress(tokenAdminRegistryRef.Address),
+			Args:          common.HexToAddress(registryModuleOwnerCustomRef.Address),
+		})
+
+		if err != nil {
+			return sequences.OnChainOutput{}, err
+		}
+		writes = append(writes, addRegistryModuleReport.Output)
 
 		// Deploy FeeQuoter
 		feeQuoterRef, err := contract_utils.MaybeDeployContract(b, fee_quoter.Deploy, chain, contract_utils.DeployInput[fee_quoter.ConstructorArgs]{
