@@ -9,17 +9,18 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/link_token"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/1_5_0/burn_mint_erc20_with_drip"
 )
 
 var (
-	ContractType     cldf_deployment.ContractType = "BurnMintERC20WithDrip"
-	LINKContractType cldf_deployment.ContractType = "LINK"
-	Version                                       = semver.MustParse("1.5.0")
-	defaultAdminRole                              = [32]byte{}
-	burnRole                                      = crypto.Keccak256([]byte("BURNER_ROLE"))
-	mintRole                                      = crypto.Keccak256([]byte("MINTER_ROLE"))
+	ContractType cldf_deployment.ContractType = "BurnMintERC20WithDrip"
+	Version                                   = semver.MustParse("1.5.0")
+
+	DefaultAdminRole = [32]byte{}
+	BurnRole         = [32]byte(crypto.Keccak256([]byte("BURNER_ROLE")))
+	MintRole         = [32]byte(crypto.Keccak256([]byte("MINTER_ROLE")))
 )
 
 type ConstructorArgs struct {
@@ -41,7 +42,7 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 		cldf_deployment.NewTypeAndVersion(ContractType, *Version).String(): {
 			EVM: common.FromHex(burn_mint_erc20_with_drip.BurnMintERC20WithDripBin),
 		},
-		cldf_deployment.NewTypeAndVersion(LINKContractType, *Version).String(): {
+		cldf_deployment.NewTypeAndVersion(link_token.ContractType, *link_token.Version).String(): {
 			EVM: common.FromHex(burn_mint_erc20_with_drip.BurnMintERC20WithDripBin),
 		},
 	},
@@ -56,7 +57,7 @@ var GrantMintAndBurnRoles = contract.NewWrite(contract.WriteParams[common.Addres
 	ContractABI:  burn_mint_erc20_with_drip.BurnMintERC20WithDripABI,
 	NewContract:  burn_mint_erc20_with_drip.NewBurnMintERC20WithDrip,
 	IsAllowedCaller: func(contract *burn_mint_erc20_with_drip.BurnMintERC20WithDrip, opts *bind.CallOpts, caller common.Address, input common.Address) (bool, error) {
-		return contract.HasRole(opts, defaultAdminRole, caller)
+		return contract.HasRole(opts, DefaultAdminRole, caller)
 	},
 	Validate: func(common.Address) error { return nil },
 	CallContract: func(token *burn_mint_erc20_with_drip.BurnMintERC20WithDrip, opts *bind.TransactOpts, account common.Address) (*types.Transaction, error) {
@@ -72,11 +73,11 @@ var RevokeBurnRole = contract.NewWrite(contract.WriteParams[common.Address, *bur
 	ContractABI:  burn_mint_erc20_with_drip.BurnMintERC20WithDripABI,
 	NewContract:  burn_mint_erc20_with_drip.NewBurnMintERC20WithDrip,
 	IsAllowedCaller: func(contract *burn_mint_erc20_with_drip.BurnMintERC20WithDrip, opts *bind.CallOpts, caller common.Address, input common.Address) (bool, error) {
-		return contract.HasRole(opts, defaultAdminRole, caller)
+		return contract.HasRole(opts, DefaultAdminRole, caller)
 	},
 	Validate: func(common.Address) error { return nil },
 	CallContract: func(token *burn_mint_erc20_with_drip.BurnMintERC20WithDrip, opts *bind.TransactOpts, account common.Address) (*types.Transaction, error) {
-		return token.RevokeRole(opts, [32]byte(burnRole), account)
+		return token.RevokeRole(opts, [32]byte(BurnRole), account)
 	},
 })
 
@@ -88,11 +89,11 @@ var RevokeMintRole = contract.NewWrite(contract.WriteParams[common.Address, *bur
 	ContractABI:  burn_mint_erc20_with_drip.BurnMintERC20WithDripABI,
 	NewContract:  burn_mint_erc20_with_drip.NewBurnMintERC20WithDrip,
 	IsAllowedCaller: func(contract *burn_mint_erc20_with_drip.BurnMintERC20WithDrip, opts *bind.CallOpts, caller common.Address, input common.Address) (bool, error) {
-		return contract.HasRole(opts, defaultAdminRole, caller)
+		return contract.HasRole(opts, DefaultAdminRole, caller)
 	},
 	Validate: func(common.Address) error { return nil },
 	CallContract: func(token *burn_mint_erc20_with_drip.BurnMintERC20WithDrip, opts *bind.TransactOpts, account common.Address) (*types.Transaction, error) {
-		return token.RevokeRole(opts, [32]byte(mintRole), account)
+		return token.RevokeRole(opts, [32]byte(MintRole), account)
 	},
 })
 
@@ -104,7 +105,7 @@ var Mint = contract.NewWrite(contract.WriteParams[MintArgs, *burn_mint_erc20_wit
 	ContractABI:  burn_mint_erc20_with_drip.BurnMintERC20WithDripABI,
 	NewContract:  burn_mint_erc20_with_drip.NewBurnMintERC20WithDrip,
 	IsAllowedCaller: func(contract *burn_mint_erc20_with_drip.BurnMintERC20WithDrip, opts *bind.CallOpts, caller common.Address, input MintArgs) (bool, error) {
-		return contract.HasRole(opts, [32]byte(mintRole), caller)
+		return contract.HasRole(opts, [32]byte(MintRole), caller)
 	},
 	Validate: func(MintArgs) error { return nil },
 	CallContract: func(token *burn_mint_erc20_with_drip.BurnMintERC20WithDrip, opts *bind.TransactOpts, args MintArgs) (*types.Transaction, error) {

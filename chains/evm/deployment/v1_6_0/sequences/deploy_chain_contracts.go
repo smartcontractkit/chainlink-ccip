@@ -10,6 +10,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/link_token"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/nonce_manager"
@@ -64,7 +65,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 
 		// Deploy LINK
 		linkRef, err := contract.MaybeDeployContract(b, burn_mint_erc20_with_drip.Deploy, chain, contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs]{
-			TypeAndVersion: deployment.NewTypeAndVersion(burn_mint_erc20_with_drip.LINKContractType, *burn_mint_erc20_with_drip.Version),
+			TypeAndVersion: deployment.NewTypeAndVersion(link_token.ContractType, *link_token.Version),
 			ChainSelector:  chain.Selector,
 			Args: burn_mint_erc20_with_drip.ConstructorArgs{
 				Name:   "LINK",
