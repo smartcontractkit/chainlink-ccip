@@ -43,9 +43,6 @@ type DeployTokenAndPoolCfg struct {
 	Allowlist []common.Address
 	// Accounts is a map of account addresses to initial mint amounts.
 	Accounts map[common.Address]*big.Int
-	// TokenInfo is the information about the token to be deployed.
-	// Token symbol will be taken from DeployTokenPoolInput.TokenSymbol.
-	TokenInfo tokens.TokenInfo
 }
 
 func (c DeployTokenAndPoolCfg) ChainSelector() uint64 {
@@ -72,8 +69,7 @@ var DeployTokenAndPool = changesets.NewFromOnChainSequence(changesets.NewFromOnC
 		}
 
 		return tokens.DeployTokenAndPoolInput{
-			Accounts:  cfg.Accounts,
-			TokenInfo: cfg.TokenInfo,
+			Accounts: cfg.Accounts,
 			DeployTokenPoolInput: tokens.DeployTokenPoolInput{
 				ChainSel:                         cfg.ChainSel,
 				TokenPoolType:                    cfg.TokenPoolType,

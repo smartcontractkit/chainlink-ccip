@@ -25,7 +25,7 @@ require (
 	github.com/ethereum/go-ethereum v1.16.2
 	github.com/gagliardetto/solana-go v1.13.0
 	github.com/smartcontractkit/chain-selectors v1.0.72
-	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20251230171830-9280c2cf3751
+	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20251230175704-1f7919f3b3fa
 	github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment v0.1.1-solana.0.20251125153543-0b618525aa03
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20251021182606-ee6ba95227d7
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment v0.0.0-20251021182606-ee6ba95227d7
@@ -219,7 +219,7 @@ require (
 	github.com/smartcontractkit/chainlink-common v0.9.6-0.20250929154511-1f5fbda7ae76 // indirect
 	github.com/smartcontractkit/chainlink-common/pkg/chipingress v0.0.4 // indirect
 	github.com/smartcontractkit/chainlink-evm v0.3.3 // indirect
-	github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20250808121824-2c3544aab8f3 // indirect
+	github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20251222115927-36a18321243c // indirect
 	github.com/smartcontractkit/chainlink-protos/job-distributor v0.13.1 // indirect
 	github.com/smartcontractkit/chainlink-sui v0.0.0-20250916193659-4becc28a467f // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.10.30 // indirect

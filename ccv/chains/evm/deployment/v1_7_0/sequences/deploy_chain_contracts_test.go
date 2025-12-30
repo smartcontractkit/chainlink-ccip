@@ -16,10 +16,10 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
 	mock_recv_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/mock_receiver_v2"
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
@@ -44,8 +44,8 @@ func TestDeployChainContracts_Idempotency(t *testing.T) {
 			existingAddresses: []datastore.AddressRef{
 				{
 					ChainSelector: 5009297550715157269,
-					Type:          datastore.ContractType(link.ContractType),
-					Version:       semver.MustParse("1.0.0"),
+					Type:          datastore.ContractType(burn_mint_erc20_with_drip.LINKContractType),
+					Version:       burn_mint_erc20_with_drip.Version,
 					Address:       common.HexToAddress("0x01").Hex(),
 				},
 				{
@@ -83,20 +83,20 @@ func TestDeployChainContracts_Idempotency(t *testing.T) {
 			require.Len(t, report.Output.BatchOps[1].Transactions, 0, "Expected no transactions in second batch operation")
 
 			exists := map[deployment.ContractType]bool{
-				rmn_remote.ContractType:           false,
-				router.ContractType:               false,
-				executor.ContractType:             false,
-				link.ContractType:                 false,
-				weth.ContractType:                 false,
-				committee_verifier.ContractType:   false,
-				onramp.ContractType:               false,
-				offramp.ContractType:              false,
-				fee_quoter.ContractType:           false,
-				committee_verifier.ResolverType:   false,
-				rmn_proxy.ContractType:            false,
-				token_admin_registry.ContractType: false,
-				mock_receiver.ContractType:        false,
-				executor.ProxyType:                false,
+				rmn_remote.ContractType:                    false,
+				router.ContractType:                        false,
+				executor.ContractType:                      false,
+				burn_mint_erc20_with_drip.LINKContractType: false,
+				weth.ContractType:                          false,
+				committee_verifier.ContractType:            false,
+				onramp.ContractType:                        false,
+				offramp.ContractType:                       false,
+				fee_quoter.ContractType:                    false,
+				committee_verifier.ResolverType:            false,
+				rmn_proxy.ContractType:                     false,
+				token_admin_registry.ContractType:          false,
+				mock_receiver.ContractType:                 false,
+				executor.ProxyType:                         false,
 			}
 			for _, addr := range report.Output.Addresses {
 				exists[deployment.ContractType(addr.Type)] = true
