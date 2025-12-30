@@ -7,23 +7,27 @@ import {Router} from "../../../Router.sol";
 import {RateLimiter} from "../../../libraries/RateLimiter.sol";
 import {BurnFromMintTokenPool} from "../../../pools/BurnFromMintTokenPool.sol";
 import {BurnMintTokenPool} from "../../../pools/BurnMintTokenPool.sol";
+import {ERC20LockBox} from "../../../pools/ERC20LockBox.sol";
 import {LockReleaseTokenPool} from "../../../pools/LockReleaseTokenPool.sol";
+
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {RegistryModuleOwnerCustom} from "../../../tokenAdminRegistry/RegistryModuleOwnerCustom.sol";
 import {TokenAdminRegistry} from "../../../tokenAdminRegistry/TokenAdminRegistry.sol";
 import {FactoryBurnMintERC20} from "../../../tokenAdminRegistry/TokenPoolFactory/FactoryBurnMintERC20.sol";
 import {TokenPoolFactory} from "../../../tokenAdminRegistry/TokenPoolFactory/TokenPoolFactory.sol";
 import {TokenPoolFactorySetup} from "./TokenPoolFactorySetup.t.sol";
-import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
 
+import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
+import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts@5.3.0/token/ERC20/extensions/IERC20Metadata.sol";
 import {Create2} from "@openzeppelin/contracts@5.3.0/utils/Create2.sol";
 
-contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
+contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
   using Create2 for bytes32;
 
   uint8 private constant LOCAL_TOKEN_DECIMALS = 18;
   uint8 private constant REMOTE_TOKEN_DECIMALS = 6;
+  bytes private constant LOCK_RELEASE_INIT_CODE = type(LockReleaseTokenPool).creationCode;
 
   address internal s_burnMintOffRamp = makeAddr("burn_mint_offRamp");
 
@@ -35,7 +39,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
     s_sourceRouter.applyRampUpdates(new Router.OnRamp[](0), new Router.OffRamp[](0), offRampUpdates);
   }
 
-  function test_createTokenPool_WithNoExistingTokenOnRemoteChain() public {
+  function test_deployTokenAndTokenPool_WithNoExistingTokenOnRemoteChain() public {
     vm.startPrank(OWNER);
 
     bytes32 dynamicSalt = keccak256(abi.encodePacked(FAKE_SALT, OWNER));
@@ -59,6 +63,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
       TokenPoolFactory.PoolType.BURN_MINT,
       s_tokenInitCode,
       s_poolInitCode,
+      address(0),
       FAKE_SALT
     );
 
@@ -81,7 +86,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
     assertTrue(FactoryBurnMintERC20(tokenAddress).isBurner(poolAddress), "pool should be burner");
   }
 
-  function test_createTokenPool_WithNoExistingRemoteContracts_predict() public {
+  function test_deployTokenAndTokenPool_WithNoExistingRemoteContracts_Predict() public {
     vm.startPrank(OWNER);
     bytes32 dynamicSalt = keccak256(abi.encodePacked(FAKE_SALT, OWNER));
 
@@ -90,9 +95,8 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
     RegistryModuleOwnerCustom newRegistryModule = new RegistryModuleOwnerCustom(address(newTokenAdminRegistry));
 
     // We want to deploy a new factory and Owner Module.
-    TokenPoolFactory newTokenPoolFactory = new TokenPoolFactory(
-      newTokenAdminRegistry, newRegistryModule, s_rmnProxy, address(s_destRouter), address(s_lockBox)
-    );
+    TokenPoolFactory newTokenPoolFactory =
+      new TokenPoolFactory(newTokenAdminRegistry, newRegistryModule, s_rmnProxy, address(s_destRouter));
 
     newTokenAdminRegistry.addRegistryModule(address(newRegistryModule));
 
@@ -100,7 +104,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
       remotePoolFactory: address(newTokenPoolFactory),
       remoteRouter: address(s_destRouter),
       remoteRMNProxy: address(s_rmnProxy),
-      remoteLockBox: address(s_lockBox),
+      remoteLockBox: address(0),
       remoteTokenDecimals: LOCAL_TOKEN_DECIMALS
     });
 
@@ -132,6 +136,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
       TokenPoolFactory.PoolType.BURN_MINT,
       s_tokenInitCode, // Token Init Code
       s_poolInitCode, // Pool Init Code
+      address(0), // lockBox
       FAKE_SALT // Salt
     );
 
@@ -172,6 +177,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
       TokenPoolFactory.PoolType.BURN_MINT,
       s_tokenInitCode,
       s_poolInitCode,
+      address(0),
       FAKE_SALT
     );
 
@@ -214,7 +220,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
     assertEq(IOwner(poolAddress).owner(), OWNER, "Pool should be controlled by the OWNER");
   }
 
-  function test_createTokenPool_ExistingRemoteToken_AndPredictPool() public {
+  function test_deployTokenPoolWithExistingToken_ExistingRemoteToken_AndPredictPool() public {
     vm.startPrank(OWNER);
     bytes32 dynamicSalt = keccak256(abi.encodePacked(FAKE_SALT, OWNER));
 
@@ -226,9 +232,8 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
     RegistryModuleOwnerCustom newRegistryModule = new RegistryModuleOwnerCustom(address(newTokenAdminRegistry));
 
     // We want to deploy a new factory and Owner Module.
-    TokenPoolFactory newTokenPoolFactory = new TokenPoolFactory(
-      newTokenAdminRegistry, newRegistryModule, s_rmnProxy, address(s_destRouter), address(s_lockBox)
-    );
+    TokenPoolFactory newTokenPoolFactory =
+      new TokenPoolFactory(newTokenAdminRegistry, newRegistryModule, s_rmnProxy, address(s_destRouter));
 
     newTokenAdminRegistry.addRegistryModule(address(newRegistryModule));
 
@@ -236,7 +241,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
       remotePoolFactory: address(newTokenPoolFactory),
       remoteRouter: address(s_destRouter),
       remoteRMNProxy: address(s_rmnProxy),
-      remoteLockBox: address(s_lockBox),
+      remoteLockBox: address(0),
       remoteTokenDecimals: LOCAL_TOKEN_DECIMALS
     });
 
@@ -265,6 +270,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
       TokenPoolFactory.PoolType.BURN_MINT,
       s_tokenInitCode,
       s_poolInitCode,
+      address(0),
       FAKE_SALT
     );
 
@@ -305,6 +311,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
       TokenPoolFactory.PoolType.BURN_MINT,
       new TokenPoolFactory.RemoteTokenPoolInfo[](0),
       s_poolInitCode,
+      address(0),
       FAKE_SALT
     );
 
@@ -321,7 +328,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
     );
   }
 
-  function test_createTokenPool_WithRemoteTokenAndRemotePool() public {
+  function test_deployTokenAndTokenPool_WithRemoteTokenAndRemotePool() public {
     vm.startPrank(OWNER);
 
     bytes memory RANDOM_TOKEN_ADDRESS = abi.encode(makeAddr("RANDOM_TOKEN"));
@@ -353,6 +360,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
       TokenPoolFactory.PoolType.BURN_MINT,
       s_tokenInitCode,
       s_poolInitCode,
+      address(0),
       FAKE_SALT
     );
 
@@ -382,7 +390,60 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
     assertEq(IOwner(poolAddress).owner(), OWNER, "Token should be owned by the owner");
   }
 
-  function test_createTokenPoolLockRelease_ExistingToken_predict() public {
+  function test_deployTokenPoolWithExistingToken_LockRelease_UserLockBoxOwnershipPreserved() public {
+    vm.startPrank(OWNER);
+    FactoryBurnMintERC20 token =
+      new FactoryBurnMintERC20("TestToken", "TEST", LOCAL_TOKEN_DECIMALS, type(uint256).max, PREMINT_AMOUNT, OWNER);
+    ERC20LockBox userLockBox = new ERC20LockBox(address(token));
+
+    address poolAddress = s_tokenPoolFactory.deployTokenPoolWithExistingToken(
+      address(token),
+      LOCAL_TOKEN_DECIMALS,
+      TokenPoolFactory.PoolType.LOCK_RELEASE,
+      new TokenPoolFactory.RemoteTokenPoolInfo[](0),
+      LOCK_RELEASE_INIT_CODE,
+      address(userLockBox),
+      FAKE_SALT
+    );
+
+    // Ownership remains with the user since the factory should not take over user-provided lockboxes.
+    assertEq(userLockBox.owner(), OWNER, "lockbox owner should remain user");
+
+    Ownable2Step(poolAddress).acceptOwnership();
+
+    assertEq(Ownable2Step(poolAddress).owner(), OWNER, "pool should be owned by owner");
+  }
+
+  function test_deployTokenAndTokenPool_LockRelease_AuthorizesPoolForLockBox() public {
+    vm.startPrank(OWNER);
+    bytes32 dynamicSalt = keccak256(abi.encodePacked(FAKE_SALT, OWNER));
+
+    (address tokenAddress, address poolAddress) = s_tokenPoolFactory.deployTokenAndTokenPool(
+      new TokenPoolFactory.RemoteTokenPoolInfo[](0),
+      LOCAL_TOKEN_DECIMALS,
+      TokenPoolFactory.PoolType.LOCK_RELEASE,
+      s_tokenInitCode,
+      LOCK_RELEASE_INIT_CODE,
+      address(0),
+      FAKE_SALT
+    );
+
+    // Compute the deployed lockbox address to validate access configuration.
+    bytes memory lockBoxCreationCode = abi.encodePacked(type(ERC20LockBox).creationCode, abi.encode(tokenAddress));
+    address predictedLockBox = dynamicSalt.computeAddress(keccak256(lockBoxCreationCode), address(s_tokenPoolFactory));
+
+    // Accept ownership of token/pool and configure rebalancer.
+    Ownable2Step(tokenAddress).acceptOwnership();
+    Ownable2Step(poolAddress).acceptOwnership();
+
+    assertEq(
+      AuthorizedCallers(predictedLockBox).getAllAuthorizedCallers()[0],
+      poolAddress,
+      "pool should be authorized caller on lockbox"
+    );
+  }
+
+  function test_deployTokenPoolWithExistingToken_LockRelease_ExistingToken_Predict() public {
     vm.startPrank(OWNER);
 
     // We have to create a new factory, registry module, and token admin registry to simulate the other chain
@@ -390,25 +451,27 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
     RegistryModuleOwnerCustom newRegistryModule = new RegistryModuleOwnerCustom(address(newTokenAdminRegistry));
 
     // We want to deploy a new factory and Owner Module.
-    TokenPoolFactory newTokenPoolFactory = new TokenPoolFactory(
-      newTokenAdminRegistry, newRegistryModule, s_rmnProxy, address(s_destRouter), address(s_lockBox)
-    );
+    TokenPoolFactory newTokenPoolFactory =
+      new TokenPoolFactory(newTokenAdminRegistry, newRegistryModule, s_rmnProxy, address(s_destRouter));
 
     newTokenAdminRegistry.addRegistryModule(address(newRegistryModule));
-
-    TokenPoolFactory.RemoteChainConfig memory remoteChainConfig = TokenPoolFactory.RemoteChainConfig({
-      remotePoolFactory: address(newTokenPoolFactory),
-      remoteRouter: address(s_destRouter),
-      remoteRMNProxy: address(s_rmnProxy),
-      remoteLockBox: address(s_lockBox),
-      remoteTokenDecimals: LOCAL_TOKEN_DECIMALS
-    });
 
     FactoryBurnMintERC20 newLocalToken =
       new FactoryBurnMintERC20("TestToken", "TEST", 18, type(uint256).max, PREMINT_AMOUNT, OWNER);
 
     FactoryBurnMintERC20 newRemoteToken =
       new FactoryBurnMintERC20("TestToken", "TEST", 18, type(uint256).max, PREMINT_AMOUNT, OWNER);
+
+    ERC20LockBox localLockBox = new ERC20LockBox(address(newLocalToken));
+    ERC20LockBox remoteLockBox = new ERC20LockBox(address(newRemoteToken));
+
+    TokenPoolFactory.RemoteChainConfig memory remoteChainConfig = TokenPoolFactory.RemoteChainConfig({
+      remotePoolFactory: address(newTokenPoolFactory),
+      remoteRouter: address(s_destRouter),
+      remoteRMNProxy: address(s_rmnProxy),
+      remoteLockBox: address(remoteLockBox),
+      remoteTokenDecimals: LOCAL_TOKEN_DECIMALS
+    });
 
     // Create an array of remote pools where nothing exists yet, but we want to predict the address for
     // the new pool and token on DEST_CHAIN_SELECTOR
@@ -435,6 +498,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
       TokenPoolFactory.PoolType.LOCK_RELEASE,
       remoteTokenPools,
       type(LockReleaseTokenPool).creationCode,
+      address(localLockBox),
       FAKE_SALT
     );
 
@@ -450,13 +514,6 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
       "Token Address should have been set"
     );
 
-    // Mint/burn roles should NOT be granted on lock/release pools.
-    assertFalse(FactoryBurnMintERC20(address(newLocalToken)).isMinter(poolAddress), "pool should not be minter");
-    assertFalse(FactoryBurnMintERC20(address(newLocalToken)).isBurner(poolAddress), "pool should not be burner");
-
-    LockReleaseTokenPool(poolAddress).setRebalancer(OWNER);
-    assertEq(OWNER, LockReleaseTokenPool(poolAddress).getRebalancer(), "Rebalancer should be set");
-
     // Deploy the Lock-Release Token Pool on the destination chain with the existing remote token
     (address newPoolAddress) = newTokenPoolFactory.deployTokenPoolWithExistingToken(
       address(newRemoteToken),
@@ -464,7 +521,20 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
       TokenPoolFactory.PoolType.LOCK_RELEASE,
       new TokenPoolFactory.RemoteTokenPoolInfo[](0), // No existing remote pools
       type(LockReleaseTokenPool).creationCode, // Pool Init Code
+      address(remoteLockBox), // lockBox
       FAKE_SALT // Salt
+    );
+
+    // Allow both pools to interact with their respective lockboxes.
+    address[] memory allowedCallers = new address[](1);
+    allowedCallers[0] = poolAddress;
+    localLockBox.applyAuthorizedCallerUpdates(
+      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: allowedCallers, removedCallers: new address[](0)})
+    );
+
+    allowedCallers[0] = newPoolAddress;
+    remoteLockBox.applyAuthorizedCallerUpdates(
+      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: allowedCallers, removedCallers: new address[](0)})
     );
 
     assertEq(
@@ -486,7 +556,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
     );
   }
 
-  function test_createTokenPool_BurnFromMintTokenPool() public {
+  function test_deployTokenAndTokenPool_BurnFromMintTokenPool() public {
     vm.startPrank(OWNER);
 
     bytes memory RANDOM_TOKEN_ADDRESS = abi.encode(makeAddr("RANDOM_TOKEN"));
@@ -518,6 +588,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
       TokenPoolFactory.PoolType.BURN_MINT,
       s_tokenInitCode,
       s_poolInitCode,
+      address(0),
       FAKE_SALT
     );
 
@@ -547,7 +618,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
     assertEq(IOwner(poolAddress).owner(), OWNER, "Token should be owned by the owner");
   }
 
-  function test_createTokenPool_RemoteTokenHasDifferentDecimals() public {
+  function test_deployTokenAndTokenPool_RemoteTokenHasDifferentDecimals() public {
     vm.startPrank(OWNER);
     bytes32 dynamicSalt = keccak256(abi.encodePacked(FAKE_SALT, OWNER));
 
@@ -560,9 +631,8 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
     RegistryModuleOwnerCustom newRegistryModule = new RegistryModuleOwnerCustom(address(newTokenAdminRegistry));
 
     // We want to deploy a new factory and Owner Module.
-    TokenPoolFactory newTokenPoolFactory = new TokenPoolFactory(
-      newTokenAdminRegistry, newRegistryModule, s_rmnProxy, address(s_destRouter), address(s_lockBox)
-    );
+    TokenPoolFactory newTokenPoolFactory =
+      new TokenPoolFactory(newTokenAdminRegistry, newRegistryModule, s_rmnProxy, address(s_destRouter));
 
     newTokenAdminRegistry.addRegistryModule(address(newRegistryModule));
 
@@ -570,7 +640,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
       remotePoolFactory: address(newTokenPoolFactory),
       remoteRouter: address(s_destRouter),
       remoteRMNProxy: address(s_rmnProxy),
-      remoteLockBox: address(s_lockBox),
+      remoteLockBox: address(0),
       remoteTokenDecimals: REMOTE_TOKEN_DECIMALS
     });
 
@@ -599,6 +669,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
       TokenPoolFactory.PoolType.BURN_MINT,
       s_tokenInitCode,
       s_poolInitCode,
+      address(0),
       FAKE_SALT
     );
 
@@ -639,6 +710,7 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
       TokenPoolFactory.PoolType.BURN_MINT,
       new TokenPoolFactory.RemoteTokenPoolInfo[](0),
       s_poolInitCode,
+      address(0),
       FAKE_SALT
     );
 
@@ -663,5 +735,26 @@ contract TokenPoolFactory_createTokenPool is TokenPoolFactorySetup {
     assertEq(TokenPool(newPoolAddress).getTokenDecimals(), REMOTE_TOKEN_DECIMALS, "Token Decimals should be 6");
     assertEq(address(TokenPool(newPoolAddress).getToken()), address(newRemoteToken), "Token Address should be set");
     assertEq(IERC20Metadata(address(newRemoteToken)).decimals(), REMOTE_TOKEN_DECIMALS, "Token Decimals should be 6");
+  }
+
+  function test_deployTokenPoolWithExistingToken_RevertWhen_InvalidLockBoxToken() public {
+    vm.startPrank(OWNER);
+    FactoryBurnMintERC20 token =
+      new FactoryBurnMintERC20("TestToken", "TT", 6, type(uint256).max, PREMINT_AMOUNT, OWNER);
+    FactoryBurnMintERC20 otherToken =
+      new FactoryBurnMintERC20("TestToken", "TT", 6, type(uint256).max, PREMINT_AMOUNT, OWNER);
+    ERC20LockBox lockBox = new ERC20LockBox(address(otherToken));
+
+    TokenPoolFactory.RemoteTokenPoolInfo[] memory remotes = new TokenPoolFactory.RemoteTokenPoolInfo[](0);
+    vm.expectRevert(abi.encodeWithSelector(TokenPoolFactory.InvalidLockBoxToken.selector, address(token)));
+    s_tokenPoolFactory.deployTokenPoolWithExistingToken(
+      address(token),
+      LOCAL_TOKEN_DECIMALS,
+      TokenPoolFactory.PoolType.LOCK_RELEASE,
+      remotes,
+      LOCK_RELEASE_INIT_CODE,
+      address(lockBox),
+      FAKE_SALT
+    );
   }
 }

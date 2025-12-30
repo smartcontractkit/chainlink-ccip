@@ -5,7 +5,8 @@ import {IBurnMintERC20} from "../../interfaces/IBurnMintERC20.sol";
 
 import {Pool} from "../../libraries/Pool.sol";
 import {BurnMintTokenPool} from "../BurnMintTokenPool.sol";
-import {LOCK_RELEASE_FLAG} from "./SiloedUSDCTokenPool.sol";
+
+bytes4 constant LOCK_RELEASE_FLAG = 0xfa7c07de;
 
 /// @notice A standard BurnMintTokenPool with modified destPoolData so that the remote pool knows to release tokens
 /// instead of minting. This enables interoperability with HybridLockReleaseUSDCTokenPool which uses

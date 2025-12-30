@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {IBurnMintERC20} from "../../interfaces/IBurnMintERC20.sol";
+import {ILockBox} from "../../interfaces/ILockBox.sol";
 
 import {Pool} from "../../libraries/Pool.sol";
 import {SiloedLockReleaseTokenPool} from "../SiloedLockReleaseTokenPool.sol";
@@ -9,15 +10,6 @@ import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/Aut
 
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/EnumerableSet.sol";
-
-/// @dev The flag used to indicate that the source pool data is coming from a chain that does not have CCTP Support,
-/// and so the lock release pool should be used. The BurnMintWithLockReleaseTokenPool uses this flag as its source pool
-/// data to indicate that the tokens should be released from the lock release pool rather than attempting to be minted
-/// through CCTP.
-/// @dev The preimage is bytes4(keccak256("NO_CCTP_USE_LOCK_RELEASE")).
-/// Note: This will be removed in a following PR but is included here to prevent breaking changes to the
-/// BurnMintWithLockReleaseTokenPool.
-bytes4 constant LOCK_RELEASE_FLAG = 0xfa7c07de;
 
 /// @notice A token pool for USDC which inherits the Siloed token functionality while adding the CCTP migration functionality.
 /// @dev The CCTP migration functions have been previously audited. The code has been moved from its own contract
@@ -90,35 +82,26 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
 
     _validateReleaseOrMint(releaseOrMintIn, localAmount, WAIT_FOR_FINALITY);
 
-    // Save gas by using storage instead of memory as a value may need to be updated.
-    SiloConfig storage remoteConfig = s_chainConfigs[releaseOrMintIn.remoteChainSelector];
+    ILockBox lockbox = _getLockBox(releaseOrMintIn.remoteChainSelector);
+    uint256 availableLiquidity = i_token.balanceOf(address(lockbox));
+    if (localAmount > availableLiquidity) {
+      revert InsufficientLiquidity(availableLiquidity, localAmount);
+    }
 
     uint256 excludedTokens = s_tokensExcludedFromBurn[releaseOrMintIn.remoteChainSelector];
-
-    if (excludedTokens == 0) {
-      // No excluded tokens is the common path, as it means no migration has occured yet.
-      // Any released tokens should come from the stored token balance of previously deposited tokens.
-      if (localAmount > remoteConfig.tokenBalance) {
-        revert InsufficientLiquidity(remoteConfig.tokenBalance, localAmount);
-      }
-
-      remoteConfig.tokenBalance -= localAmount;
-    } else {
+    if (excludedTokens != 0) {
       // The existence of excluded tokens indicates a migration has occured on the chain, and that any tokens
       // being released should come from those excluded tokens reserved for processing inflight messages.
       if (localAmount > excludedTokens) revert InsufficientLiquidity(excludedTokens, localAmount);
       s_tokensExcludedFromBurn[releaseOrMintIn.remoteChainSelector] -= localAmount;
-
-      // If the migration is in a proposed state, then we should also decrement the total token balance for the remote chain.
-      // Otherwise, come time for burnLockedUSDC, we would over-burn tokens and excluded tokens would be lost.
-      // We don't check liquidity again, because excluded tokens will always be less than the total token balance while migration is proposed.
-      if (s_proposedUSDCMigrationChain == releaseOrMintIn.remoteChainSelector) {
-        remoteConfig.tokenBalance -= localAmount;
-      }
+      // During a proposed migration, the lockbox balance is the source of truth. Any release here reduces the
+      // lockbox balance, so burnLockedUSDC will not over-burn even without separate per-chain accounting.
     }
+    // No excluded tokens is the common path, as it means no migration has occured yet, and any released
+    // tokens should come from the stored token balance of previously deposited tokens.
 
-    // Release to the recipient
-    i_lockBox.withdraw(address(i_token), localAmount, releaseOrMintIn.receiver);
+    // Release to the recipient using the lockbox tied to the remote chain selector.
+    lockbox.withdraw(address(i_token), releaseOrMintIn.remoteChainSelector, localAmount, releaseOrMintIn.receiver);
 
     emit ReleasedOrMinted({
       remoteChainSelector: releaseOrMintIn.remoteChainSelector,
@@ -247,7 +230,7 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
     s_tokensExcludedFromBurn[remoteChainSelector] += amount;
 
     uint256 burnableAmountAfterExclusion =
-      s_chainConfigs[remoteChainSelector].tokenBalance - s_tokensExcludedFromBurn[remoteChainSelector];
+      i_token.balanceOf(address(_getLockBox(remoteChainSelector))) - s_tokensExcludedFromBurn[remoteChainSelector];
 
     emit TokensExcludedFromBurn(remoteChainSelector, amount, burnableAmountAfterExclusion);
   }
@@ -273,15 +256,15 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
     uint64 burnChainSelector = s_proposedUSDCMigrationChain;
     if (burnChainSelector == 0) revert NoMigrationProposalPending();
 
+    ILockBox lockBox = _getLockBox(burnChainSelector);
     // Burnable tokens is the total locked minus the amount excluded from burn
-    uint256 tokensToBurn = s_chainConfigs[burnChainSelector].tokenBalance - s_tokensExcludedFromBurn[burnChainSelector];
+    uint256 tokensToBurn = i_token.balanceOf(address(lockBox)) - s_tokensExcludedFromBurn[burnChainSelector];
 
     // The CCTP burn function will attempt to burn out of the contract that calls it, so we need to withdraw the tokens
     // from the lock box first otherwise the burn will revert.
-    i_lockBox.withdraw(address(i_token), tokensToBurn, address(this));
+    lockBox.withdraw(address(i_token), burnChainSelector, tokensToBurn, address(this));
 
     // Even though USDC is a trusted call, ensure CEI by updating state first
-    delete s_chainConfigs[burnChainSelector].tokenBalance;
     delete s_proposedUSDCMigrationChain;
 
     // This should only be called after this contract has been granted a "zero allowance minter role" on USDC by Circle,

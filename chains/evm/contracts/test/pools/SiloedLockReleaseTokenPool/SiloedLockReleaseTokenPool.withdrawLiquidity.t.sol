@@ -29,7 +29,7 @@ contract SiloedLockReleaseTokenPool_withdrawLiqudity is SiloedLockReleaseTokenPo
     s_siloedLockReleaseTokenPool.withdrawSiloedLiquidity(SILOED_CHAIN_SELECTOR, amount);
 
     assertEq(s_token.balanceOf(OWNER), balanceBefore);
-    assertEq(s_token.balanceOf(address(s_siloedLockReleaseTokenPool)), 0);
+    assertEq(s_token.balanceOf(address(s_siloLockBox)), 0);
     assertEq(s_siloedLockReleaseTokenPool.getAvailableTokens(SILOED_CHAIN_SELECTOR), 0);
     assertEq(s_siloedLockReleaseTokenPool.getUnsiloedLiquidity(), 0);
   }
@@ -51,7 +51,7 @@ contract SiloedLockReleaseTokenPool_withdrawLiqudity is SiloedLockReleaseTokenPo
     s_siloedLockReleaseTokenPool.withdrawLiquidity(amount);
 
     assertEq(s_token.balanceOf(OWNER), balanceBefore);
-    assertEq(s_token.balanceOf(address(s_siloedLockReleaseTokenPool)), 0);
+    assertEq(s_token.balanceOf(address(s_lockBox)), 0);
     assertEq(s_siloedLockReleaseTokenPool.getUnsiloedLiquidity(), 0);
     assertEq(s_siloedLockReleaseTokenPool.getAvailableTokens(DEST_CHAIN_SELECTOR), 0);
   }
