@@ -2,6 +2,8 @@
 pragma solidity ^0.8.24;
 
 import {IBurnMintERC20} from "../../interfaces/IBurnMintERC20.sol";
+import {IPoolV1} from "../../interfaces/IPool.sol";
+import {IPoolV2} from "../../interfaces/IPoolV2.sol";
 
 import {Pool} from "../../libraries/Pool.sol";
 import {BurnMintTokenPool} from "../BurnMintTokenPool.sol";
@@ -27,11 +29,9 @@ contract BurnMintWithLockReleaseFlagTokenPool is BurnMintTokenPool {
     address router
   ) BurnMintTokenPool(token, localTokenDecimals, advancedPoolHooks, rmnProxy, router) {}
 
-  /// @notice Burn the token in the pool
-  /// @dev The _validateLockOrBurn check is an essential security check
   /// @dev Performs the exact same functionality as BurnMintTokenPool, but returns the LOCK_RELEASE_FLAG
   /// as the destPoolData to signal to the remote pool to release tokens instead of minting them.
-  /// @param lockOrBurnIn Encoded data fields for the processing of tokens on the source chain.
+  /// @inheritdoc IPoolV1
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
   ) public override returns (Pool.LockOrBurnOutV1 memory) {
@@ -40,13 +40,9 @@ contract BurnMintWithLockReleaseFlagTokenPool is BurnMintTokenPool {
     return out;
   }
 
-  /// @notice Burn the token in the pool with V2 parameters.
-  /// @dev The _validateLockOrBurn check is an essential security check.
   /// @dev Performs the exact same functionality as BurnMintTokenPool, but returns the LOCK_RELEASE_FLAG
   /// as the destPoolData to signal to the remote pool to release tokens instead of minting them.
-  /// @param lockOrBurnIn Encoded data fields for the processing of tokens on the source chain.
-  /// @param blockConfirmationRequested Requested block confirmation.
-  /// @param tokenArgs Additional token arguments.
+  /// @inheritdoc IPoolV2
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
     uint16 blockConfirmationRequested,
@@ -57,10 +53,7 @@ contract BurnMintWithLockReleaseFlagTokenPool is BurnMintTokenPool {
     return (out, destTokenAmount);
   }
 
-  /// @notice Mint tokens from the pool to the recipient.
-  /// @dev The _validateReleaseOrMint check is an essential security check.
-  /// @param releaseOrMintIn Encoded data fields for the processing of tokens on the destination chain.
-  /// @param blockConfirmationRequested Requested block confirmation.
+  /// @inheritdoc IPoolV2
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
     uint16 blockConfirmationRequested
