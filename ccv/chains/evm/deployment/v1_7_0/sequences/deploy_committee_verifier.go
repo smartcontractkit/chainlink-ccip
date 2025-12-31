@@ -70,7 +70,7 @@ var DeployCommitteeVerifier = cldf_ops.NewSequence(
 			var resolverRef *datastore.AddressRef
 			for _, ref := range input.ExistingAddresses {
 				if ref.Type == datastore.ContractType(committee_verifier.ResolverType) &&
-					ref.Version.String() == semver.MustParse("1.7.0").String() &&
+					ref.Version.String() == committee_verifier.Version.String() &&
 					ref.Qualifier == input.Params.Qualifier {
 					resolverRef = &ref
 				}
@@ -82,7 +82,7 @@ var DeployCommitteeVerifier = cldf_ops.NewSequence(
 					ChainSelector:  input.ChainSelector,
 					Qualifier:      input.Params.Qualifier,
 					Type:           datastore.ContractType(committee_verifier.ResolverType),
-					Version:        semver.MustParse("1.7.0"),
+					Version:        committee_verifier.Version,
 					CREATE2Factory: input.CREATE2Factory,
 				})
 				if err != nil {
@@ -94,7 +94,7 @@ var DeployCommitteeVerifier = cldf_ops.NewSequence(
 		} else {
 			// Otherwise, just deploy the CommitteeVerifierResolver
 			committeeVerifierResolverRef, err := contract_utils.MaybeDeployContract(b, versioned_verifier_resolver.Deploy, chain, contract_utils.DeployInput[versioned_verifier_resolver.ConstructorArgs]{
-				TypeAndVersion: deployment.NewTypeAndVersion(committee_verifier.ResolverType, *semver.MustParse("1.7.0")),
+				TypeAndVersion: deployment.NewTypeAndVersion(committee_verifier.ResolverType, *committee_verifier.Version),
 				ChainSelector:  chain.Selector,
 				Qualifier:      qualifierPtr,
 			}, input.ExistingAddresses)

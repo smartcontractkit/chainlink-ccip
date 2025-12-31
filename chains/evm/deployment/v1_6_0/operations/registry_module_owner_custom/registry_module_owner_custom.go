@@ -18,7 +18,7 @@ type ConstructorArgs struct {
 
 var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Name:             "registry-module-owner-custom:deploy",
-	Version:          semver.MustParse("1.6.0"),
+	Version:          Version,
 	Description:      "Deploys the RegistryModuleOwnerCustom contract",
 	ContractMetadata: registry_module_owner_custom.RegistryModuleOwnerCustomMetaData,
 	BytecodeByTypeAndVersion: map[string]contract.Bytecode{

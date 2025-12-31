@@ -3,7 +3,6 @@ package sequences_test
 import (
 	"testing"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/v2"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/committee_verifier"
@@ -97,12 +96,12 @@ func TestConfigureChainForLanes(t *testing.T) {
 								{
 									Address: committeeVerifier,
 									Type:    datastore.ContractType(committee_verifier.ContractType),
-									Version: semver.MustParse("1.7.0"),
+									Version: committee_verifier.Version,
 								},
 								{
 									Address: committeeVerifierResolver,
 									Type:    datastore.ContractType(committee_verifier.ResolverType),
-									Version: semver.MustParse("1.7.0"),
+									Version: committee_verifier.Version,
 								},
 							},
 							RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{

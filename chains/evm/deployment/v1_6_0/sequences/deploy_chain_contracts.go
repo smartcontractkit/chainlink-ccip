@@ -55,7 +55,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 
 		// Deploy WETH
 		wethRef, err := contract.MaybeDeployContract(b, weth.Deploy, chain, contract.DeployInput[weth.ConstructorArgs]{
-			TypeAndVersion: deployment.NewTypeAndVersion(weth.ContractType, *semver.MustParse("1.0.0")),
+			TypeAndVersion: deployment.NewTypeAndVersion(weth.ContractType, *weth.Version),
 			ChainSelector:  chain.Selector,
 		}, input.ExistingAddresses)
 		if err != nil {
@@ -93,7 +93,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 
 		// Deploy RMNProxy
 		rmnProxyRef, err := contract.MaybeDeployContract(b, rmn_proxy.Deploy, chain, contract.DeployInput[rmn_proxy.ConstructorArgs]{
-			TypeAndVersion: deployment.NewTypeAndVersion(rmn_proxy.ContractType, *semver.MustParse("1.0.0")),
+			TypeAndVersion: deployment.NewTypeAndVersion(rmn_proxy.ContractType, *rmn_proxy.Version),
 			ChainSelector:  chain.Selector,
 			Args: rmn_proxy.ConstructorArgs{
 				RMN: common.HexToAddress(rmnRemoteRef.Address),

@@ -5,7 +5,6 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
@@ -80,7 +79,7 @@ func TestCREATE2Factory(t *testing.T) {
 		create2_factory.Deploy,
 		evmChains[chain1Sel],
 		contract.DeployInput[create2_factory.ConstructorArgs]{
-			TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
+			TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *create2_factory.Version),
 			ChainSelector:  chain1Sel,
 			Args: create2_factory.ConstructorArgs{
 				AllowList: []common.Address{evmChains[chain1Sel].DeployerKey.From},
@@ -109,7 +108,7 @@ func TestCREATE2Factory(t *testing.T) {
 		create2_factory.Deploy,
 		evmChains[chain2Sel],
 		contract.DeployInput[create2_factory.ConstructorArgs]{
-			TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
+			TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *create2_factory.Version),
 			ChainSelector:  chain2Sel,
 			Args: create2_factory.ConstructorArgs{
 				AllowList: []common.Address{prevChain2DeployerKey.From},

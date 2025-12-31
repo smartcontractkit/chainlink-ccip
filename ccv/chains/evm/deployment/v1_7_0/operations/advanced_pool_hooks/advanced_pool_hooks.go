@@ -85,7 +85,7 @@ var SetThresholdAmount = contract.NewWrite(contract.WriteParams[*big.Int, *advan
 
 var GetAllowListEnabled = contract.NewRead(contract.ReadParams[any, bool, *advanced_pool_hooks.AdvancedPoolHooks]{
 	Name:         "advanced-pool-hooks:get-allowlist-enabled",
-	Version:      semver.MustParse("1.7.0"),
+	Version:      Version,
 	Description:  "Gets whether the allowlist is enabled on the AdvancedPoolHooks contract",
 	ContractType: ContractType,
 	NewContract:  advanced_pool_hooks.NewAdvancedPoolHooks,
@@ -96,7 +96,7 @@ var GetAllowListEnabled = contract.NewRead(contract.ReadParams[any, bool, *advan
 
 var GetAllowList = contract.NewRead(contract.ReadParams[any, []common.Address, *advanced_pool_hooks.AdvancedPoolHooks]{
 	Name:         "advanced-pool-hooks:get-allowlist",
-	Version:      semver.MustParse("1.7.0"),
+	Version:      Version,
 	Description:  "Gets the allowlist on the AdvancedPoolHooks contract",
 	ContractType: ContractType,
 	NewContract:  advanced_pool_hooks.NewAdvancedPoolHooks,
@@ -107,7 +107,7 @@ var GetAllowList = contract.NewRead(contract.ReadParams[any, []common.Address, *
 
 var GetThresholdAmount = contract.NewRead(contract.ReadParams[any, *big.Int, *advanced_pool_hooks.AdvancedPoolHooks]{
 	Name:         "advanced-pool-hooks:get-threshold-amount",
-	Version:      semver.MustParse("1.7.0"),
+	Version:      Version,
 	Description:  "Gets the threshold amount above which additional CCVs are required",
 	ContractType: ContractType,
 	NewContract:  advanced_pool_hooks.NewAdvancedPoolHooks,

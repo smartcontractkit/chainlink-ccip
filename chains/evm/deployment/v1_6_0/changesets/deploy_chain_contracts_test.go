@@ -3,7 +3,6 @@ package changesets_test
 import (
 	"testing"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
@@ -91,7 +90,7 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 				_ = ds.Addresses().Add(datastore.AddressRef{
 					ChainSelector: chain_selectors.ETHEREUM_MAINNET.Selector,
 					Type:          datastore.ContractType(weth.ContractType),
-					Version:       semver.MustParse("1.0.0"),
+					Version:       weth.Version,
 					Address:       common.HexToAddress("0x02").Hex(),
 				})
 				return ds

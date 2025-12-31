@@ -12,6 +12,8 @@ import (
 
 var ContractType cldf_deployment.ContractType = "CCTPTokenPool"
 
+var Version = semver.MustParse("1.7.0")
+
 type ConstructorArgs struct {
 	Token              common.Address
 	LocalTokenDecimals uint8
@@ -25,11 +27,11 @@ type AuthorizedCallerArgs = cctp_token_pool.AuthorizedCallersAuthorizedCallerArg
 
 var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Name:             "cctp-token-pool:deploy",
-	Version:          semver.MustParse("1.7.0"),
+	Version:          Version,
 	Description:      "Deploys the CCTPTokenPool contract",
 	ContractMetadata: cctp_token_pool.CCTPTokenPoolMetaData,
 	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
-		cldf_deployment.NewTypeAndVersion(ContractType, *semver.MustParse("1.7.0")).String(): {
+		cldf_deployment.NewTypeAndVersion(ContractType, *Version).String(): {
 			EVM: common.FromHex(cctp_token_pool.CCTPTokenPoolBin),
 		},
 	},
@@ -38,7 +40,7 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 
 var ApplyAuthorizedCallerUpdates = contract.NewWrite(contract.WriteParams[AuthorizedCallerArgs, *cctp_token_pool.CCTPTokenPool]{
 	Name:            "cctp-token-pool:apply-authorized-caller-updates",
-	Version:         semver.MustParse("1.7.0"),
+	Version:         Version,
 	Description:     "Applies authorized caller updates on the CCTPTokenPool",
 	ContractType:    ContractType,
 	ContractABI:     cctp_token_pool.CCTPTokenPoolABI,

@@ -12,6 +12,8 @@ import (
 
 var ContractType cldf_deployment.ContractType = "OffRamp"
 
+var Version = semver.MustParse("1.7.0")
+
 type StaticConfig = offramp.OffRampStaticConfig
 
 type ConstructorArgs struct {
@@ -24,11 +26,11 @@ type SourceChainConfig = offramp.OffRampSourceChainConfig
 
 var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Name:             "off-ramp:deploy",
-	Version:          semver.MustParse("1.7.0"),
+	Version:          Version,
 	Description:      "Deploys the OffRamp contract",
 	ContractMetadata: offramp.OffRampMetaData,
 	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
-		cldf_deployment.NewTypeAndVersion(ContractType, *semver.MustParse("1.7.0")).String(): {
+		cldf_deployment.NewTypeAndVersion(ContractType, *Version).String(): {
 			EVM: common.FromHex(offramp.OffRampBin),
 		},
 	},
@@ -37,7 +39,7 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 
 var ApplySourceChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]SourceChainConfigArgs, *offramp.OffRamp]{
 	Name:            "off-ramp:apply-source-chain-config-updates",
-	Version:         semver.MustParse("1.7.0"),
+	Version:         Version,
 	Description:     "Applies updates to source chain configurations on the OffRamp",
 	ContractType:    ContractType,
 	ContractABI:     offramp.OffRampABI,
@@ -51,7 +53,7 @@ var ApplySourceChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]Sou
 
 var GetSourceChainConfig = contract.NewRead(contract.ReadParams[uint64, SourceChainConfig, *offramp.OffRamp]{
 	Name:         "off-ramp:get-source-chain-config",
-	Version:      semver.MustParse("1.7.0"),
+	Version:      Version,
 	Description:  "Gets the source chain configuration for a given source chain selector",
 	ContractType: ContractType,
 	NewContract:  offramp.NewOffRamp,

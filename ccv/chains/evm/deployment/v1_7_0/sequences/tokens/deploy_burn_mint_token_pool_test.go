@@ -4,7 +4,6 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/advanced_pool_hooks"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/burn_mint_token_pool"
@@ -46,7 +45,7 @@ func TestDeployTokenPool(t *testing.T) {
 				return tokens.DeployTokenPoolInput{
 					ChainSel:                         chainReport.Input.ChainSelector,
 					TokenPoolType:                    datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
-					TokenPoolVersion:                 semver.MustParse("1.7.0"),
+					TokenPoolVersion:                 burn_mint_token_pool.Version,
 					TokenSymbol:                      tokenReport.Input.Args.Symbol,
 					RateLimitAdmin:                   common.HexToAddress("0x01"),
 					ThresholdAmountForAdditionalCCVs: big.NewInt(1e18),
@@ -143,7 +142,7 @@ func TestDeployTokenPool(t *testing.T) {
 					ChainSel:         chainReport.Input.ChainSelector,
 					TokenSymbol:      tokenReport.Input.Args.Symbol,
 					TokenPoolType:    datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
-					TokenPoolVersion: semver.MustParse("1.7.0"),
+					TokenPoolVersion: burn_mint_token_pool.Version,
 				}
 			},
 			expectedErr: "token address must be defined",
@@ -155,7 +154,7 @@ func TestDeployTokenPool(t *testing.T) {
 					ChainSel:         chainReport.Input.ChainSelector,
 					TokenSymbol:      tokenReport.Input.Args.Symbol,
 					TokenPoolType:    datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
-					TokenPoolVersion: semver.MustParse("1.7.0"),
+					TokenPoolVersion: burn_mint_token_pool.Version,
 					ConstructorArgs: tokens.ConstructorArgs{
 						Token: common.HexToAddress(tokenReport.Output.Address),
 					},
@@ -176,7 +175,7 @@ func TestDeployTokenPool(t *testing.T) {
 					ChainSel:         chainReport.Input.ChainSelector,
 					TokenSymbol:      tokenReport.Input.Args.Symbol,
 					TokenPoolType:    datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
-					TokenPoolVersion: semver.MustParse("1.7.0"),
+					TokenPoolVersion: burn_mint_token_pool.Version,
 					ConstructorArgs: tokens.ConstructorArgs{
 						Token:    common.HexToAddress(tokenReport.Output.Address),
 						RMNProxy: rmnProxyAddress,
@@ -202,7 +201,7 @@ func TestDeployTokenPool(t *testing.T) {
 					ChainSel:         chainReport.Input.ChainSelector,
 					TokenSymbol:      tokenReport.Input.Args.Symbol,
 					TokenPoolType:    datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
-					TokenPoolVersion: semver.MustParse("1.7.0"),
+					TokenPoolVersion: burn_mint_token_pool.Version,
 					ConstructorArgs: tokens.ConstructorArgs{
 						Token:    common.HexToAddress(tokenReport.Output.Address),
 						RMNProxy: rmnProxyAddress,

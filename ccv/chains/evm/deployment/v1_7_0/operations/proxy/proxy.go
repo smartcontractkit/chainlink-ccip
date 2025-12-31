@@ -12,13 +12,15 @@ import (
 
 var ContractType cldf_deployment.ContractType = "Proxy"
 
+var Version = semver.MustParse("1.7.0")
+
 type AcceptOwnershipArgs struct {
 	IsProposedOwner bool
 }
 
 var SetTarget = contract.NewWrite(contract.WriteParams[common.Address, *proxy.Proxy]{
 	Name:            "proxy:set-target",
-	Version:         semver.MustParse("1.7.0"),
+	Version:         Version,
 	Description:     "Set the target address on the proxy",
 	ContractType:    ContractType,
 	ContractABI:     proxy.ProxyABI,
@@ -32,7 +34,7 @@ var SetTarget = contract.NewWrite(contract.WriteParams[common.Address, *proxy.Pr
 
 var AcceptOwnership = contract.NewWrite(contract.WriteParams[AcceptOwnershipArgs, *proxy.Proxy]{
 	Name:         "proxy:accept-ownership",
-	Version:      semver.MustParse("1.7.0"),
+	Version:      Version,
 	Description:  "Accept ownership of the proxy",
 	ContractType: ContractType,
 	ContractABI:  proxy.ProxyABI,
@@ -48,7 +50,7 @@ var AcceptOwnership = contract.NewWrite(contract.WriteParams[AcceptOwnershipArgs
 
 var GetTarget = contract.NewRead(contract.ReadParams[any, common.Address, *proxy.Proxy]{
 	Name:         "proxy:get-target",
-	Version:      semver.MustParse("1.7.0"),
+	Version:      Version,
 	Description:  "Gets the target address on the proxy",
 	ContractType: ContractType,
 	NewContract:  proxy.NewProxy,
