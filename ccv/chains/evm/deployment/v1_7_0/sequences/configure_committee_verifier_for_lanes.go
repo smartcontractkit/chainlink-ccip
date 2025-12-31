@@ -36,12 +36,12 @@ var ConfigureCommitteeVerifierForLanes = cldf_ops.NewSequence(
 
 		var committeeVerifier string
 		var committeeVerifierResolver string
-		typeAndVersionToAddress, err := type_and_version.MapUniqueTypeAndVersionToAddress(b, chain, input.CommitteeVerifier)
+		typeAndVersionToAddress, err := type_and_version.IndexAddressesByTypeAndVersion(b, chain, input.CommitteeVerifier)
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to map type and version to address for committee verifier: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to index addresses by type and version for committee verifier: %w", err)
 		}
 		committeeVerifier = typeAndVersionToAddress[deployment.NewTypeAndVersion(committee_verifier.ContractType, *committee_verifier.Version).String()]
-		committeeVerifierResolver = typeAndVersionToAddress[deployment.NewTypeAndVersion(committee_verifier.ResolverType, *committee_verifier.Version).String()]
+		committeeVerifierResolver = typeAndVersionToAddress[deployment.NewTypeAndVersion(versioned_verifier_resolver.ContractType, *versioned_verifier_resolver.Version).String()]
 
 		if committeeVerifier == "" {
 			return sequences.OnChainOutput{}, fmt.Errorf("committee verifier contract not found on chain %d", input.ChainSelector)

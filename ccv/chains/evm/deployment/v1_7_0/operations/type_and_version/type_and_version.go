@@ -10,15 +10,21 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+)
+
+const (
+	// devSuffix is the suffix for development versions.
+	devSuffix = "-dev"
 )
 
 // typeAndVersionABI is the ABI for the typeAndVersion function
 // function typeAndVersion() external view returns (string)
 var typeAndVersionABI = `[{"inputs":[],"name":"typeAndVersion","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"}]`
 
-var typeAndVersion = cldf_ops.NewOperation(
-	"type-and-version",
+var getTypeAndVersion = cldf_ops.NewOperation(
+	"get-type-and-version",
 	semver.MustParse("1.0.0"),
 	"Fetches the type and version of a contract",
 	func(b cldf_ops.Bundle, chain cldf_evm.Chain, input contract_utils.FunctionInput[any]) (output string, err error) {
@@ -60,25 +66,36 @@ var typeAndVersion = cldf_ops.NewOperation(
 	},
 )
 
-// MapUniqueTypeAndVersionToAddress maps typeAndVersion strings to addresses.
+// IndexAddressesByTypeAndVersion indexes addresses by type and version.
 // It expects the typeAndVersion string returned by each address to be unique.
-func MapUniqueTypeAndVersionToAddress(b cldf_ops.Bundle, chain cldf_evm.Chain, addresses []string) (map[string]string, error) {
+// It also removes the dev suffix from the version string, so dev versions are treated the same as non-dev versions.
+// This is to ensure that changesets can depend on non-dev versions while the contracts are still in development.
+func IndexAddressesByTypeAndVersion(b cldf_ops.Bundle, chain cldf_evm.Chain, addresses []string) (map[string]string, error) {
 	typeAndVersionToAddress := make(map[string]string)
 	for _, address := range addresses {
-		typeAndVersionReport, err := cldf_ops.ExecuteOperation(b, typeAndVersion, chain, contract_utils.FunctionInput[any]{
+		typeAndVersionReport, err := cldf_ops.ExecuteOperation(b, getTypeAndVersion, chain, contract_utils.FunctionInput[any]{
 			ChainSelector: chain.Selector,
 			Address:       common.HexToAddress(address),
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to get type and version of contract %s: %w", address, err)
 		}
-		if len(strings.Split(typeAndVersionReport.Output, " ")) != 2 {
+
+		typeAndVersionComponents := strings.Split(typeAndVersionReport.Output, " ")
+		if len(typeAndVersionComponents) != 2 {
 			return nil, fmt.Errorf("contract %s has invalid type and version: %s", address, typeAndVersionReport.Output)
 		}
-		if _, ok := typeAndVersionToAddress[typeAndVersionReport.Output]; ok {
-			return nil, fmt.Errorf("multiple contracts have the same type and version: %s", typeAndVersionReport.Output)
+
+		// Trim the version string to omit any dev suffix
+		typeAndVersion := deployment.NewTypeAndVersion(
+			deployment.ContractType(typeAndVersionComponents[0]),
+			*semver.MustParse(strings.TrimSuffix(typeAndVersionComponents[1], devSuffix)),
+		)
+
+		if _, ok := typeAndVersionToAddress[typeAndVersion.String()]; ok {
+			return nil, fmt.Errorf("multiple contracts have the same type and version: %s", typeAndVersion.String())
 		}
-		typeAndVersionToAddress[typeAndVersionReport.Output] = address
+		typeAndVersionToAddress[typeAndVersion.String()] = address
 	}
 
 	return typeAndVersionToAddress, nil
