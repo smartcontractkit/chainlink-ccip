@@ -35,11 +35,11 @@ type SetDomainArgs = cctp_verifier.CCTPVerifierSetDomainArgs
 
 var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Name:             "cctp-verifier:deploy",
-	Version:          semver.MustParse("1.7.0"),
+	Version:          Version,
 	Description:      "Deploys the CCTPVerifier contract",
 	ContractMetadata: cctp_verifier.CCTPVerifierMetaData,
 	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
-		cldf_deployment.NewTypeAndVersion(ContractType, *semver.MustParse("1.7.0")).String(): {
+		cldf_deployment.NewTypeAndVersion(ContractType, *Version).String(): {
 			EVM: common.FromHex(cctp_verifier.CCTPVerifierBin),
 		},
 	},
@@ -48,7 +48,7 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 
 var ApplyRemoteChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]RemoteChainConfigArgs, *cctp_verifier.CCTPVerifier]{
 	Name:            "cctp-verifier:apply-remote-chain-config-updates",
-	Version:         semver.MustParse("1.7.0"),
+	Version:         Version,
 	Description:     "Applies updates to remote chain configurations on the CCTPVerifier",
 	ContractType:    ContractType,
 	ContractABI:     cctp_verifier.CCTPVerifierABI,
@@ -62,7 +62,7 @@ var ApplyRemoteChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]Rem
 
 var SetDomains = contract.NewWrite(contract.WriteParams[[]SetDomainArgs, *cctp_verifier.CCTPVerifier]{
 	Name:            "cctp-verifier:set-domains",
-	Version:         semver.MustParse("1.7.0"),
+	Version:         Version,
 	Description:     "Sets domain configurations on the CCTPVerifier",
 	ContractType:    ContractType,
 	ContractABI:     cctp_verifier.CCTPVerifierABI,
@@ -76,7 +76,7 @@ var SetDomains = contract.NewWrite(contract.WriteParams[[]SetDomainArgs, *cctp_v
 
 var GetVersionTag = contract.NewRead(contract.ReadParams[any, [4]byte, *cctp_verifier.CCTPVerifier]{
 	Name:         "cctp-verifier:get-version-tag",
-	Version:      semver.MustParse("1.7.0"),
+	Version:      Version,
 	Description:  "Gets the version tag of the CCTPVerifier contract",
 	ContractType: ContractType,
 	NewContract:  cctp_verifier.NewCCTPVerifier,

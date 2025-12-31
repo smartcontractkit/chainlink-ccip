@@ -51,7 +51,7 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 		if input.TokenPools.CCTPV2PoolWithCCV == "" {
 			advancedPoolHooksReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.Deploy, chain, contract_utils.DeployInput[advanced_pool_hooks.ConstructorArgs]{
 				ChainSelector:  chain.Selector,
-				TypeAndVersion: deployment.NewTypeAndVersion(advanced_pool_hooks.ContractType, *semver.MustParse("1.7.0")),
+				TypeAndVersion: deployment.NewTypeAndVersion(advanced_pool_hooks.ContractType, *advanced_pool_hooks.Version),
 				Qualifier:      &cctpQualifier,
 				Args: advanced_pool_hooks.ConstructorArgs{
 					Allowlist:                        convertStringsToAddresses(input.Allowlist),
@@ -66,7 +66,7 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 
 			cctpTokenPoolReport, err := cldf_ops.ExecuteOperation(b, cctp_token_pool.Deploy, chain, contract_utils.DeployInput[cctp_token_pool.ConstructorArgs]{
 				ChainSelector:  chain.Selector,
-				TypeAndVersion: deployment.NewTypeAndVersion(cctp_token_pool.ContractType, *semver.MustParse("1.7.0")),
+				TypeAndVersion: deployment.NewTypeAndVersion(cctp_token_pool.ContractType, *cctp_token_pool.Version),
 				Qualifier:      &cctpQualifier,
 				Args: cctp_token_pool.ConstructorArgs{
 					Token:              common.HexToAddress(input.USDCToken),
@@ -111,7 +111,7 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 		// Deploy CCTPMessageTransmitterProxy if needed
 		if input.MessageTransmitterProxy == "" {
 			cctpMessageTransmitterProxyReport, err := cldf_ops.ExecuteOperation(b, cctp_message_transmitter_proxy.Deploy, chain, contract_utils.DeployInput[cctp_message_transmitter_proxy.ConstructorArgs]{
-				TypeAndVersion: deployment.NewTypeAndVersion(cctp_message_transmitter_proxy.ContractType, *semver.MustParse("1.7.0")),
+				TypeAndVersion: deployment.NewTypeAndVersion(cctp_message_transmitter_proxy.ContractType, *cctp_message_transmitter_proxy.Version),
 				ChainSelector:  chain.Selector,
 				Qualifier:      &cctpQualifier,
 				Args: cctp_message_transmitter_proxy.ConstructorArgs{
@@ -138,7 +138,7 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 		// Deploy CCTPVerifier if needed
 		if cctpVerifierAddress == (common.Address{}) {
 			cctpVerifierReport, err := cldf_ops.ExecuteOperation(b, cctp_verifier.Deploy, chain, contract_utils.DeployInput[cctp_verifier.ConstructorArgs]{
-				TypeAndVersion: deployment.NewTypeAndVersion(cctp_verifier.ContractType, *semver.MustParse("1.7.0")),
+				TypeAndVersion: deployment.NewTypeAndVersion(cctp_verifier.ContractType, *cctp_verifier.Version),
 				ChainSelector:  chain.Selector,
 				Qualifier:      &cctpQualifier,
 				Args: cctp_verifier.ConstructorArgs{
@@ -182,7 +182,7 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 				cctpVerifierResolverAddress = common.HexToAddress(deployVerifierResolverViaCREATE2Report.Output.Addresses[0].Address)
 			} else {
 				cctpVerifierResolverReport, err := cldf_ops.ExecuteOperation(b, versioned_verifier_resolver.Deploy, chain, contract_utils.DeployInput[versioned_verifier_resolver.ConstructorArgs]{
-					TypeAndVersion: deployment.NewTypeAndVersion(cctp_verifier.ResolverType, *semver.MustParse("1.7.0")),
+					TypeAndVersion: deployment.NewTypeAndVersion(cctp_verifier.ResolverType, *versioned_verifier_resolver.Version),
 					Qualifier:      &cctpQualifier,
 					ChainSelector:  chain.Selector,
 				})
@@ -197,7 +197,7 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 		// Deploy USDCTokenPoolProxy if needed
 		if input.USDCTokenPoolProxy == "" {
 			usdcTokenPoolProxyReport, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_proxy.Deploy, chain, contract_utils.DeployInput[usdc_token_pool_proxy.ConstructorArgs]{
-				TypeAndVersion: deployment.NewTypeAndVersion(usdc_token_pool_proxy.ContractType, *semver.MustParse("1.7.0")),
+				TypeAndVersion: deployment.NewTypeAndVersion(usdc_token_pool_proxy.ContractType, *usdc_token_pool_proxy.Version),
 				ChainSelector:  chain.Selector,
 				Qualifier:      &cctpQualifier,
 				Args: usdc_token_pool_proxy.ConstructorArgs{

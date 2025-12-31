@@ -4,7 +4,6 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/burn_mint_token_pool"
@@ -42,7 +41,7 @@ func basicDeployTokenAndPoolInput(chainReport operations.SequenceReport[sequence
 		DeployTokenPoolInput: tokens.DeployTokenPoolInput{
 			ChainSel:                         chainReport.Input.ChainSelector,
 			TokenPoolType:                    datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
-			TokenPoolVersion:                 semver.MustParse("1.7.0"),
+			TokenPoolVersion:                 burn_mint_token_pool.Version,
 			TokenSymbol:                      "TEST",
 			RateLimitAdmin:                   common.HexToAddress("0x01"),
 			ThresholdAmountForAdditionalCCVs: thresholdAmountForAdditionalCCVs,

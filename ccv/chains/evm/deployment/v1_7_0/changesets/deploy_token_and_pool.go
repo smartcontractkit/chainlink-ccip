@@ -58,7 +58,7 @@ var DeployTokenAndPool = changesets.NewFromOnChainSequence(changesets.NewFromOnC
 	ResolveInput: func(e cldf_deployment.Environment, cfg DeployTokenAndPoolCfg) (tokens.DeployTokenAndPoolInput, error) {
 		rmnProxy, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 			Type:    datastore.ContractType(rmn_proxy.ContractType),
-			Version: semver.MustParse("1.0.0"),
+			Version: rmn_proxy.Version,
 		}, cfg.ChainSel, evm_datastore_utils.ToEVMAddress)
 		if err != nil {
 			return tokens.DeployTokenAndPoolInput{}, fmt.Errorf("failed to resolve rmn proxy ref: %w", err)

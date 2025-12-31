@@ -45,7 +45,7 @@ func TestGetMockReceiverVerifiers(t *testing.T) {
 		{
 			ChainSelector: chainSelector,
 			Type:          datastore.ContractType(router.ContractType),
-			Version:       semver.MustParse("1.2.0"),
+			Version:       router.Version,
 			Address:       common.HexToAddress("0xAA").Hex(),
 		},
 		{

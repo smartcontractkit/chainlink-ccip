@@ -18,6 +18,8 @@ import (
 
 var ContractType cldf_deployment.ContractType = "CREATE2Factory"
 
+var Version = semver.MustParse("1.7.0")
+
 type ConstructorArgs struct {
 	AllowList []common.Address
 }
@@ -41,11 +43,11 @@ type ApplyAllowListUpdatesArgs struct {
 
 var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Name:             "create2-factory:deploy",
-	Version:          semver.MustParse("1.7.0"),
+	Version:          Version,
 	Description:      "Deploys the CREATE2Factory contract",
 	ContractMetadata: create2_factory.CREATE2FactoryMetaData,
 	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
-		cldf_deployment.NewTypeAndVersion(ContractType, *semver.MustParse("1.7.0")).String(): {
+		cldf_deployment.NewTypeAndVersion(ContractType, *Version).String(): {
 			EVM: common.FromHex(create2_factory.CREATE2FactoryBin),
 		},
 	},
@@ -54,7 +56,7 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 
 var CreateAndTransferOwnership = contract.NewWrite(contract.WriteParams[CreateAndTransferOwnershipArgs, *create2_factory.CREATE2Factory]{
 	Name:         "create2-factory:deploy-and-transfer-ownership",
-	Version:      semver.MustParse("1.7.0"),
+	Version:      Version,
 	Description:  "Deploys a contract with the given creation code + salt and transfers ownership to the given address",
 	ContractType: ContractType,
 	ContractABI:  create2_factory.CREATE2FactoryABI,
@@ -78,7 +80,7 @@ var CreateAndTransferOwnership = contract.NewWrite(contract.WriteParams[CreateAn
 
 var ComputeAddress = contract.NewRead(contract.ReadParams[ComputeAddressArgs, common.Address, *create2_factory.CREATE2Factory]{
 	Name:         "create2-factory:compute-address",
-	Version:      semver.MustParse("1.7.0"),
+	Version:      Version,
 	Description:  "Computes the address of a contract that will be deployed with the given creation code and salt",
 	ContractType: ContractType,
 	NewContract:  create2_factory.NewCREATE2Factory,
@@ -93,7 +95,7 @@ var ComputeAddress = contract.NewRead(contract.ReadParams[ComputeAddressArgs, co
 
 var ApplyAllowListUpdates = contract.NewWrite(contract.WriteParams[ApplyAllowListUpdatesArgs, *create2_factory.CREATE2Factory]{
 	Name:            "create2-factory:apply-allow-list-updates",
-	Version:         semver.MustParse("1.7.0"),
+	Version:         Version,
 	Description:     "Applies the allow list updates to the CREATE2Factory contract",
 	ContractType:    ContractType,
 	ContractABI:     create2_factory.CREATE2FactoryABI,

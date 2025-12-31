@@ -3,7 +3,6 @@ package sequences_test
 import (
 	"testing"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/v2"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/committee_verifier"
@@ -51,7 +50,7 @@ func TestDeployChainContracts_Idempotency(t *testing.T) {
 				{
 					ChainSelector: 5009297550715157269,
 					Type:          datastore.ContractType(weth.ContractType),
-					Version:       semver.MustParse("1.0.0"),
+					Version:       weth.Version,
 					Address:       common.HexToAddress("0x02").Hex(),
 				},
 			},
@@ -215,13 +214,13 @@ func TestDeployChainContracts_MultipleCommitteeVerifiersAndMultipleMockReceiverC
 	params := testsetup.CreateBasicContractParams()
 	params.CommitteeVerifiers = []sequences.CommitteeVerifierParams{
 		{
-			Version:          semver.MustParse("1.7.0"),
+			Version:          committee_verifier.Version,
 			FeeAggregator:    common.HexToAddress("0x01"),
 			StorageLocations: []string{"https://test.chain.link.fake"},
 			Qualifier:        "alpha",
 		},
 		{
-			Version:          semver.MustParse("1.7.0"),
+			Version:          committee_verifier.Version,
 			FeeAggregator:    common.HexToAddress("0x01"),
 			StorageLocations: []string{"https://test.chain.link.fake"},
 			Qualifier:        "beta",
@@ -229,36 +228,36 @@ func TestDeployChainContracts_MultipleCommitteeVerifiersAndMultipleMockReceiverC
 	}
 	params.MockReceivers = []sequences.MockReceiverParams{
 		{
-			Version: semver.MustParse("1.7.0"),
+			Version: mock_receiver.Version,
 			RequiredVerifiers: []datastore.AddressRef{
 				{
 					ChainSelector: chainSelector,
 					Type:          datastore.ContractType(committee_verifier.ContractType),
-					Version:       semver.MustParse("1.7.0"),
+					Version:       committee_verifier.Version,
 					Qualifier:     "alpha",
 				},
 				{
 					ChainSelector: chainSelector,
 					Type:          datastore.ContractType(committee_verifier.ContractType),
-					Version:       semver.MustParse("1.7.0"),
+					Version:       committee_verifier.Version,
 					Qualifier:     "beta",
 				},
 			},
 			Qualifier: "q1",
 		},
 		{
-			Version: semver.MustParse("1.7.0"),
+			Version: mock_receiver.Version,
 			RequiredVerifiers: []datastore.AddressRef{
 				{
 					Type:      datastore.ContractType(committee_verifier.ContractType),
-					Version:   semver.MustParse("1.7.0"),
+					Version:   committee_verifier.Version,
 					Qualifier: "alpha",
 				},
 			},
 			OptionalVerifiers: []datastore.AddressRef{
 				{
 					Type:      datastore.ContractType(committee_verifier.ContractType),
-					Version:   semver.MustParse("1.7.0"),
+					Version:   committee_verifier.Version,
 					Qualifier: "beta",
 				},
 			},
@@ -289,7 +288,7 @@ func TestDeployChainContracts_MultipleCommitteeVerifiersAndMultipleMockReceiverC
 	q1ReceiverRef, err := datastore_utils.FindAndFormatRef(sealed, datastore.AddressRef{
 		ChainSelector: chainSelector,
 		Type:          datastore.ContractType(mock_receiver.ContractType),
-		Version:       semver.MustParse("1.7.0"),
+		Version:       mock_receiver.Version,
 		Qualifier:     "q1",
 	}, chainSelector, evm_datastore_utils.ToEVMAddress)
 	require.NoError(t, err)
@@ -297,7 +296,7 @@ func TestDeployChainContracts_MultipleCommitteeVerifiersAndMultipleMockReceiverC
 	q2ReceiverRef, err := datastore_utils.FindAndFormatRef(sealed, datastore.AddressRef{
 		ChainSelector: chainSelector,
 		Type:          datastore.ContractType(mock_receiver.ContractType),
-		Version:       semver.MustParse("1.7.0"),
+		Version:       mock_receiver.Version,
 		Qualifier:     "q2",
 	}, chainSelector, evm_datastore_utils.ToEVMAddress)
 	require.NoError(t, err)

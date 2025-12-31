@@ -109,7 +109,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 
 		// Deploy WETH
 		wethRef, err := contract_utils.MaybeDeployContract(b, weth.Deploy, chain, contract_utils.DeployInput[weth.ConstructorArgs]{
-			TypeAndVersion: deployment.NewTypeAndVersion(weth.ContractType, *semver.MustParse("1.0.0")),
+			TypeAndVersion: deployment.NewTypeAndVersion(weth.ContractType, *weth.Version),
 			ChainSelector:  chain.Selector,
 		}, input.ExistingAddresses)
 		if err != nil {
@@ -147,7 +147,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 
 		// Deploy RMNProxy
 		rmnProxyRef, err := contract_utils.MaybeDeployContract(b, rmn_proxy.Deploy, chain, contract_utils.DeployInput[rmn_proxy.ConstructorArgs]{
-			TypeAndVersion: deployment.NewTypeAndVersion(rmn_proxy.ContractType, *semver.MustParse("1.0.0")),
+			TypeAndVersion: deployment.NewTypeAndVersion(rmn_proxy.ContractType, *rmn_proxy.Version),
 			ChainSelector:  chain.Selector,
 			Args: rmn_proxy.ConstructorArgs{
 				RMN: common.HexToAddress(rmnRemoteRef.Address),
@@ -176,7 +176,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 
 		// Deploy Router
 		routerRef, err := contract_utils.MaybeDeployContract(b, router.Deploy, chain, contract_utils.DeployInput[router.ConstructorArgs]{
-			TypeAndVersion: deployment.NewTypeAndVersion(router.ContractType, *semver.MustParse("1.2.0")),
+			TypeAndVersion: deployment.NewTypeAndVersion(router.ContractType, *router.Version),
 			ChainSelector:  chain.Selector,
 			Args: router.ConstructorArgs{
 				WrappedNative: common.HexToAddress(wethRef.Address),
@@ -190,7 +190,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 
 		// Deploy TokenAdminRegistry
 		tokenAdminRegistryRef, err := contract_utils.MaybeDeployContract(b, token_admin_registry.Deploy, chain, contract_utils.DeployInput[token_admin_registry.ConstructorArgs]{
-			TypeAndVersion: deployment.NewTypeAndVersion(token_admin_registry.ContractType, *semver.MustParse("1.5.0")),
+			TypeAndVersion: deployment.NewTypeAndVersion(token_admin_registry.ContractType, *token_admin_registry.Version),
 			ChainSelector:  chain.Selector,
 		}, input.ExistingAddresses)
 		if err != nil {
@@ -200,7 +200,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 
 		// Deploy RegistryModuleOwnerCustom
 		registryModuleOwnerCustomRef, err := contract_utils.MaybeDeployContract(b, registry_module_owner_custom.Deploy, chain, contract_utils.DeployInput[registry_module_owner_custom.ConstructorArgs]{
-			TypeAndVersion: deployment.NewTypeAndVersion(registry_module_owner_custom.ContractType, *semver.MustParse("1.6.0")),
+			TypeAndVersion: deployment.NewTypeAndVersion(registry_module_owner_custom.ContractType, *registry_module_owner_custom.Version),
 			ChainSelector:  chain.Selector,
 			Args: registry_module_owner_custom.ConstructorArgs{
 				TokenAdminRegistry: common.HexToAddress(tokenAdminRegistryRef.Address),
@@ -349,7 +349,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 
 			// Deploy ExecutorProxy
 			executorProxyRef, err := contract_utils.MaybeDeployContract(b, executor.DeployProxy, chain, contract_utils.DeployInput[executor.ProxyConstructorArgs]{
-				TypeAndVersion: deployment.NewTypeAndVersion(executor.ProxyType, *semver.MustParse("1.7.0")),
+				TypeAndVersion: deployment.NewTypeAndVersion(executor.ProxyType, *executor.Version),
 				ChainSelector:  chain.Selector,
 				Args: executor.ProxyConstructorArgs{
 					ExecutorAddress: common.HexToAddress(executorRef.Address),

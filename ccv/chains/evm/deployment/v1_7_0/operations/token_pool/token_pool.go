@@ -14,6 +14,8 @@ import (
 
 var ContractType cldf_deployment.ContractType = "TokenPool"
 
+var Version = semver.MustParse("1.7.0")
+
 type ChainUpdate struct {
 	RemoteChainSelector       uint64
 	RemotePoolAddresses       [][]byte
@@ -102,7 +104,7 @@ type TokenTransferFeeConfigArgs struct {
 
 var SetMinBlockConfirmation = contract.NewWrite(contract.WriteParams[uint16, *token_pool.TokenPool]{
 	Name:            "token-pool:set-min-block-confirmation",
-	Version:         semver.MustParse("1.7.0"),
+	Version:         Version,
 	Description:     "Sets the minimum block confirmation required for a TokenPool",
 	ContractType:    ContractType,
 	ContractABI:     token_pool.TokenPoolABI,
@@ -116,7 +118,7 @@ var SetMinBlockConfirmation = contract.NewWrite(contract.WriteParams[uint16, *to
 
 var ApplyChainUpdates = contract.NewWrite(contract.WriteParams[ApplyChainUpdatesArgs, *token_pool.TokenPool]{
 	Name:            "token-pool:apply-chain-updates",
-	Version:         semver.MustParse("1.7.0"),
+	Version:         Version,
 	Description:     "Applies chain updates to a TokenPool, enabling / disabling remote chains and setting rate limits",
 	ContractType:    ContractType,
 	ContractABI:     token_pool.TokenPoolABI,
@@ -140,7 +142,7 @@ var ApplyChainUpdates = contract.NewWrite(contract.WriteParams[ApplyChainUpdates
 
 var AddRemotePool = contract.NewWrite(contract.WriteParams[RemotePoolArgs, *token_pool.TokenPool]{
 	Name:            "token-pool:add-remote-pool",
-	Version:         semver.MustParse("1.7.0"),
+	Version:         Version,
 	Description:     "Adds a remote pool for a given chain selector to a TokenPool",
 	ContractType:    ContractType,
 	ContractABI:     token_pool.TokenPoolABI,
@@ -154,7 +156,7 @@ var AddRemotePool = contract.NewWrite(contract.WriteParams[RemotePoolArgs, *toke
 
 var RemoveRemotePool = contract.NewWrite(contract.WriteParams[RemotePoolArgs, *token_pool.TokenPool]{
 	Name:            "token-pool:remove-remote-pool",
-	Version:         semver.MustParse("1.7.0"),
+	Version:         Version,
 	Description:     "Removes a remote pool for a given chain selector from a TokenPool",
 	ContractType:    ContractType,
 	ContractABI:     token_pool.TokenPoolABI,
@@ -168,7 +170,7 @@ var RemoveRemotePool = contract.NewWrite(contract.WriteParams[RemotePoolArgs, *t
 
 var SetRateLimitConfig = contract.NewWrite(contract.WriteParams[[]SetRateLimitConfigArg, *token_pool.TokenPool]{
 	Name:            "token-pool:set-rate-limit-config",
-	Version:         semver.MustParse("1.7.0"),
+	Version:         Version,
 	Description:     "Sets the rate limit configs for existing remote chains on a TokenPool",
 	ContractType:    ContractType,
 	ContractABI:     token_pool.TokenPoolABI,
@@ -191,7 +193,7 @@ var SetRateLimitConfig = contract.NewWrite(contract.WriteParams[[]SetRateLimitCo
 
 var SetDynamicConfig = contract.NewWrite(contract.WriteParams[DynamicConfigArgs, *token_pool.TokenPool]{
 	Name:            "token-pool:set-dynamic-config",
-	Version:         semver.MustParse("1.7.0"),
+	Version:         Version,
 	Description:     "Sets the router and rate limit admin for a TokenPool",
 	ContractType:    ContractType,
 	ContractABI:     token_pool.TokenPoolABI,
@@ -205,7 +207,7 @@ var SetDynamicConfig = contract.NewWrite(contract.WriteParams[DynamicConfigArgs,
 
 var WithdrawFeeTokens = contract.NewWrite(contract.WriteParams[WithdrawFeeTokensArgs, *token_pool.TokenPool]{
 	Name:            "token-pool:withdraw-fee-tokens",
-	Version:         semver.MustParse("1.7.0"),
+	Version:         Version,
 	Description:     "Withdraws fee tokens to a recipient from a TokenPool",
 	ContractType:    ContractType,
 	ContractABI:     token_pool.TokenPoolABI,
@@ -219,7 +221,7 @@ var WithdrawFeeTokens = contract.NewWrite(contract.WriteParams[WithdrawFeeTokens
 
 var UpdateAdvancedPoolHooks = contract.NewWrite(contract.WriteParams[common.Address, *token_pool.TokenPool]{
 	Name:            "token-pool:update-advanced-pool-hooks",
-	Version:         semver.MustParse("1.7.0"),
+	Version:         Version,
 	Description:     "Updates the advanced pool hooks address on a TokenPool",
 	ContractType:    ContractType,
 	ContractABI:     token_pool.TokenPoolABI,
@@ -233,7 +235,7 @@ var UpdateAdvancedPoolHooks = contract.NewWrite(contract.WriteParams[common.Addr
 
 var ApplyTokenTransferFeeConfigUpdates = contract.NewWrite(contract.WriteParams[TokenTransferFeeConfigArgs, *token_pool.TokenPool]{
 	Name:            "token-pool:apply-token-transfer-fee-config-updates",
-	Version:         semver.MustParse("1.7.0"),
+	Version:         Version,
 	Description:     "Applies token transfer fee config updates to a TokenPool",
 	ContractType:    ContractType,
 	ContractABI:     token_pool.TokenPoolABI,
@@ -262,7 +264,7 @@ var ApplyTokenTransferFeeConfigUpdates = contract.NewWrite(contract.WriteParams[
 
 var GetDynamicConfig = contract.NewRead(contract.ReadParams[any, DynamicConfig, *token_pool.TokenPool]{
 	Name:         "token-pool:get-dynamic-config",
-	Version:      semver.MustParse("1.7.0"),
+	Version:      Version,
 	Description:  "Gets the router and rate limit admin configuration on a TokenPool",
 	ContractType: ContractType,
 	NewContract:  token_pool.NewTokenPool,
@@ -273,7 +275,7 @@ var GetDynamicConfig = contract.NewRead(contract.ReadParams[any, DynamicConfig, 
 
 var GetRMNProxy = contract.NewRead(contract.ReadParams[any, common.Address, *token_pool.TokenPool]{
 	Name:         "token-pool:get-rmn-proxy",
-	Version:      semver.MustParse("1.7.0"),
+	Version:      Version,
 	Description:  "Gets the RMN proxy address on a TokenPool",
 	ContractType: ContractType,
 	NewContract:  token_pool.NewTokenPool,
@@ -284,7 +286,7 @@ var GetRMNProxy = contract.NewRead(contract.ReadParams[any, common.Address, *tok
 
 var GetCurrentRateLimiterState = contract.NewRead(contract.ReadParams[GetCurrentRateLimiterStateArgs, RateLimiterStates, *token_pool.TokenPool]{
 	Name:         "token-pool:get-current-rate-limiter-state",
-	Version:      semver.MustParse("1.7.0"),
+	Version:      Version,
 	Description:  "Gets both outbound and inbound rate limiter states for a given remote chain selector",
 	ContractType: ContractType,
 	NewContract:  token_pool.NewTokenPool,
@@ -295,7 +297,7 @@ var GetCurrentRateLimiterState = contract.NewRead(contract.ReadParams[GetCurrent
 
 var GetMinBlockConfirmation = contract.NewRead(contract.ReadParams[any, uint16, *token_pool.TokenPool]{
 	Name:         "token-pool:get-configured-min-block-confirmation",
-	Version:      semver.MustParse("1.7.0"),
+	Version:      Version,
 	Description:  "Gets the globally configured minimum block confirmations for custom block confirmation transfers",
 	ContractType: ContractType,
 	NewContract:  token_pool.NewTokenPool,
@@ -306,7 +308,7 @@ var GetMinBlockConfirmation = contract.NewRead(contract.ReadParams[any, uint16, 
 
 var GetCurrentRateLimiterStateByRemoteChainSelector = contract.NewRead(contract.ReadParams[uint64, RateLimiterStates, *token_pool.TokenPool]{
 	Name:         "token-pool:get-current-rate-limiter-state-by-remote-chain-selector",
-	Version:      semver.MustParse("1.7.0"),
+	Version:      Version,
 	Description:  "Gets the outbound and inbound rate limiter states for a given remote chain selector",
 	ContractType: ContractType,
 	NewContract:  token_pool.NewTokenPool,
@@ -317,7 +319,7 @@ var GetCurrentRateLimiterStateByRemoteChainSelector = contract.NewRead(contract.
 
 var GetSupportedChains = contract.NewRead(contract.ReadParams[any, []uint64, *token_pool.TokenPool]{
 	Name:         "token-pool:supported-chains",
-	Version:      semver.MustParse("1.7.0"),
+	Version:      Version,
 	Description:  "Gets the list of supported remote chain selectors on a TokenPool",
 	ContractType: ContractType,
 	NewContract:  token_pool.NewTokenPool,
@@ -328,7 +330,7 @@ var GetSupportedChains = contract.NewRead(contract.ReadParams[any, []uint64, *to
 
 var GetRemotePools = contract.NewRead(contract.ReadParams[uint64, [][]byte, *token_pool.TokenPool]{
 	Name:         "token-pool:get-remote-pools",
-	Version:      semver.MustParse("1.7.0"),
+	Version:      Version,
 	Description:  "Gets the remote pool addresses for a given remote chain selector on a TokenPool",
 	ContractType: ContractType,
 	NewContract:  token_pool.NewTokenPool,
@@ -339,7 +341,7 @@ var GetRemotePools = contract.NewRead(contract.ReadParams[uint64, [][]byte, *tok
 
 var GetRemoteToken = contract.NewRead(contract.ReadParams[uint64, []byte, *token_pool.TokenPool]{
 	Name:         "token-pool:get-remote-token",
-	Version:      semver.MustParse("1.7.0"),
+	Version:      Version,
 	Description:  "Gets the remote pool address for a given remote chain selector on a TokenPool",
 	ContractType: ContractType,
 	NewContract:  token_pool.NewTokenPool,
@@ -350,7 +352,7 @@ var GetRemoteToken = contract.NewRead(contract.ReadParams[uint64, []byte, *token
 
 var GetToken = contract.NewRead(contract.ReadParams[any, common.Address, *token_pool.TokenPool]{
 	Name:         "token-pool:get-token",
-	Version:      semver.MustParse("1.7.0"),
+	Version:      Version,
 	Description:  "Gets the local token address for a TokenPool",
 	ContractType: ContractType,
 	NewContract:  token_pool.NewTokenPool,
@@ -361,7 +363,7 @@ var GetToken = contract.NewRead(contract.ReadParams[any, common.Address, *token_
 
 var GetAdvancedPoolHooks = contract.NewRead(contract.ReadParams[any, common.Address, *token_pool.TokenPool]{
 	Name:         "token-pool:get-advanced-pool-hooks",
-	Version:      semver.MustParse("1.7.0"),
+	Version:      Version,
 	Description:  "Gets the advanced pool hooks address on a TokenPool",
 	ContractType: ContractType,
 	NewContract:  token_pool.NewTokenPool,

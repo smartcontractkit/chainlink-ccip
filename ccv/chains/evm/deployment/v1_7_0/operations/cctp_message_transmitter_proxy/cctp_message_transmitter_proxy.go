@@ -12,6 +12,8 @@ import (
 
 var ContractType cldf_deployment.ContractType = "CCTPMessageTransmitterProxy"
 
+var Version = semver.MustParse("1.6.2")
+
 type ConstructorArgs struct {
 	TokenMessenger common.Address
 }
@@ -20,11 +22,11 @@ type AllowedCallerConfigArgs = cctp_message_transmitter_proxy.CCTPMessageTransmi
 
 var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Name:             "cctp-message-transmitter-proxy:deploy",
-	Version:          semver.MustParse("1.7.0"),
+	Version:          Version,
 	Description:      "Deploys the CCTPMessageTransmitterProxy contract",
 	ContractMetadata: cctp_message_transmitter_proxy.CCTPMessageTransmitterProxyMetaData,
 	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
-		cldf_deployment.NewTypeAndVersion(ContractType, *semver.MustParse("1.7.0")).String(): {
+		cldf_deployment.NewTypeAndVersion(ContractType, *Version).String(): {
 			EVM: common.FromHex(cctp_message_transmitter_proxy.CCTPMessageTransmitterProxyBin),
 		},
 	},
@@ -33,7 +35,7 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 
 var ConfigureAllowedCallers = contract.NewWrite(contract.WriteParams[[]AllowedCallerConfigArgs, *cctp_message_transmitter_proxy.CCTPMessageTransmitterProxy]{
 	Name:            "cctp-message-transmitter-proxy:configure-allowed-callers",
-	Version:         semver.MustParse("1.7.0"),
+	Version:         Version,
 	Description:     "Configures allowed callers on the CCTPMessageTransmitterProxy",
 	ContractType:    ContractType,
 	ContractABI:     cctp_message_transmitter_proxy.CCTPMessageTransmitterProxyABI,
