@@ -26,13 +26,11 @@ package ccip
 //go:generate go run generation/generate/wrap.go ccip BurnWithFromMintTokenPool burn_with_from_mint_token_pool latest
 //go:generate go run generation/generate/wrap.go ccip LockReleaseTokenPool lock_release_token_pool latest
 //go:generate go run generation/generate/wrap.go ccip TokenPool token_pool latest
-//go:generate go run generation/generate/wrap.go ccip USDCTokenPool usdc_token_pool latest
 //go:generate go run generation/generate/wrap.go ccip SiloedLockReleaseTokenPool siloed_lock_release_token_pool latest
 //go:generate go run generation/generate/wrap.go ccip BurnToAddressMintTokenPool burn_to_address_mint_token_pool latest
 //go:generate go run generation/generate/wrap.go ccip CCTPMessageTransmitterProxy cctp_message_transmitter_proxy latest
 //go:generate go run generation/generate/wrap.go ccip ERC20LockBox erc20_lock_box latest
 //go:generate go run generation/generate/wrap.go ccip SiloedUSDCTokenPool siloed_usdc_token_pool latest
-//go:generate go run generation/generate/wrap.go ccip USDCTokenPoolCCTPV2 usdc_token_pool_cctp_v2 latest
 //go:generate go run generation/generate/wrap.go ccip USDCTokenPoolProxy usdc_token_pool_proxy latest
 //go:generate go run generation/generate/wrap.go ccip BurnMintWithLockReleaseFlagTokenPool burn_mint_with_lock_release_flag_token_pool latest
 //go:generate go run generation/generate/wrap.go ccip CCTPTokenPool cctp_token_pool latest

@@ -7,7 +7,6 @@ import {IPoolV2} from "../../../../interfaces/IPoolV2.sol";
 
 import {Router} from "../../../../Router.sol";
 import {Pool} from "../../../../libraries/Pool.sol";
-import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
 import {USDCTokenPoolProxy} from "../../../../pools/USDC/USDCTokenPoolProxy.sol";
 import {USDCTokenPoolProxySetup} from "./USDCTokenPoolProxySetup.t.sol";
 
@@ -74,7 +73,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
 
     vm.mockCall(
       address(s_cctpV1Pool),
-      abi.encodeWithSelector(USDCTokenPool.lockOrBurn.selector, lockOrBurnIn),
+      abi.encodeWithSelector(IPoolV1.lockOrBurn.selector, lockOrBurnIn),
       abi.encode(expectedOutput)
     );
 
@@ -86,7 +85,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
 
     vm.startPrank(s_routerAllowedOnRamp);
 
-    vm.expectCall(address(s_cctpV1Pool), abi.encodeWithSelector(USDCTokenPool.lockOrBurn.selector, lockOrBurnIn));
+    vm.expectCall(address(s_cctpV1Pool), abi.encodeWithSelector(IPoolV1.lockOrBurn.selector, lockOrBurnIn));
 
     vm.expectCall(address(s_USDCToken), abi.encodeWithSelector(IERC20.transfer.selector, address(s_cctpV1Pool), amount));
 
@@ -137,24 +136,19 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
 
     // The update function will check that the pool supports the IPoolV1 interface and IERC165 interface
     // so we need to mock those here.
-    vm.mockCall(
-      address(s_lockReleasePool),
-      abi.encodeWithSelector(IERC165.supportsInterface.selector, type(IPoolV1).interfaceId),
-      abi.encode(true)
-    );
+    _enableERC165InterfaceChecks(address(s_lockReleasePool), type(IPoolV1).interfaceId);
 
-    vm.mockCall(
-      address(s_lockReleasePool),
-      abi.encodeWithSelector(IERC165.supportsInterface.selector, type(IERC165).interfaceId),
-      abi.encode(true)
+    // Set the siloed pool via updatePoolAddresses - use a clean PoolAddresses struct
+    changePrank(OWNER);
+    s_usdcTokenPoolProxy.updatePoolAddresses(
+      USDCTokenPoolProxy.PoolAddresses({
+        legacyCctpV1Pool: address(0),
+        cctpV1Pool: address(0),
+        cctpV2Pool: address(0),
+        cctpTokenPool: address(0),
+        siloedUsdCTokenPool: address(s_lockReleasePool)
+      })
     );
-
-    // Set the the s_lockRelease pool for the LockRelease mechanism
-    uint64[] memory selectors = new uint64[](1);
-    selectors[0] = s_chainSelFoLockRelease;
-    address[] memory lockReleasePools = new address[](1);
-    lockReleasePools[0] = address(s_lockReleasePool);
-    s_usdcTokenPoolProxy.updateLockReleasePoolAddresses(selectors, lockReleasePools);
 
     vm.mockCall(
       address(s_router),
@@ -176,7 +170,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
 
     vm.mockCall(
       address(s_lockReleasePool),
-      abi.encodeWithSelector(USDCTokenPool.lockOrBurn.selector, lockOrBurnIn),
+      abi.encodeWithSelector(IPoolV1.lockOrBurn.selector, lockOrBurnIn),
       abi.encode(expectedOutput)
     );
 
@@ -206,7 +200,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
       Pool.LockOrBurnOutV1({destTokenAddress: destTokenAddress, destPoolData: s_destPoolData});
 
     vm.mockCall(
-      address(s_cctpV2PoolWithCCV),
+      address(s_cctpTokenPool),
       abi.encodeWithSelector(IPoolV2.lockOrBurn.selector, lockOrBurnIn, 1, tokenArgs),
       abi.encode(Pool.LockOrBurnOutV1({destTokenAddress: destTokenAddress, destPoolData: s_destPoolData}), amount)
     );
@@ -239,13 +233,19 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
     remotePoolAddresses[0] = abi.encode(address(s_lockReleasePool));
 
     // Remove the CCTP V2 with CCV pool from stored pools
-    USDCTokenPoolProxy.PoolAddresses memory pools = s_usdcTokenPoolProxy.getPools();
-    pools.cctpV2PoolWithCCV = address(0);
-    _enableERC165InterfaceChecks(s_cctpV2PoolWithCCV, type(IPoolV1).interfaceId);
+    _enableERC165InterfaceChecks(s_cctpTokenPool, type(IPoolV1).interfaceId);
     _enableERC165InterfaceChecks(s_cctpV2Pool, type(IPoolV1).interfaceId);
     _enableERC165InterfaceChecks(s_cctpV1Pool, type(IPoolV1).interfaceId);
     _enableERC165InterfaceChecks(s_legacyCctpV1Pool, type(IPoolV1).interfaceId);
-    s_usdcTokenPoolProxy.updatePoolAddresses(pools);
+    s_usdcTokenPoolProxy.updatePoolAddresses(
+      USDCTokenPoolProxy.PoolAddresses({
+        legacyCctpV1Pool: s_legacyCctpV1Pool,
+        cctpV1Pool: s_cctpV1Pool,
+        cctpV2Pool: s_cctpV2Pool,
+        cctpTokenPool: address(0),
+        siloedUsdCTokenPool: address(0)
+      })
+    );
 
     vm.mockCall(
       address(s_router),

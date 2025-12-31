@@ -130,15 +130,13 @@ func resolveDeployCCTPChainInput(
 		out.TokenPool = append(out.TokenPool, resolvedTokenPoolContract.Address)
 	}
 
-	cctpVerifier := make([]string, 0, len(adapterInput.CCTPVerifier))
 	for _, ref := range adapterInput.CCTPVerifier {
 		resolvedCCTPVerifierContract, err := datastore_utils.FindAndFormatRef(e.DataStore, ref, chainSelector, datastore_utils.FullRef)
 		if err != nil {
 			return adapters.DeployCCTPInput[string, []byte]{}, fmt.Errorf("failed to resolve CCTPVerifier for chain selector %d: %w", chainSelector, err)
 		}
-		cctpVerifier = append(cctpVerifier, resolvedCCTPVerifierContract.Address)
+		out.CCTPVerifier = append(out.CCTPVerifier, resolvedCCTPVerifierContract.Address)
 	}
-	out.CCTPVerifier = cctpVerifier
 
 	if !datastore_utils.IsAddressRefEmpty(adapterInput.MessageTransmitterProxy) {
 		messageTransmitterProxy, err := datastore_utils.FindAndFormatRef(e.DataStore, adapterInput.MessageTransmitterProxy, chainSelector, datastore_utils.FullRef)
@@ -172,15 +170,14 @@ func resolveDeployCCTPChainInput(
 		out.Router = router.Address
 	}
 
-	remoteChains := make(map[uint64]adapters.RemoteCCTPChainConfig[string, []byte])
+	out.RemoteChains = make(map[uint64]adapters.RemoteCCTPChainConfig[string, []byte])
 	for remoteChainSelector, remoteChainCfg := range adapterInput.RemoteChains {
 		remoteChainCfg, err := resolveRemoteCCTPChainConfig(e, chainSelector, remoteChainSelector, remoteChainCfg, adapter)
 		if err != nil {
 			return adapters.DeployCCTPInput[string, []byte]{}, fmt.Errorf("failed to resolve RemoteCCTPChainConfig for remote chain selector %d: %w", remoteChainSelector, err)
 		}
-		remoteChains[remoteChainSelector] = remoteChainCfg
+		out.RemoteChains[remoteChainSelector] = remoteChainCfg
 	}
-	out.RemoteChains = remoteChains
 
 	return out, nil
 }

@@ -103,6 +103,24 @@ contract OffRamp_releaseOrMintSingleToken is TokenPoolSetup {
     s_offRamp.releaseOrMintSingleToken(tokenTransfer, expectedInput.originalSender, DEST_CHAIN_SELECTOR, 2);
   }
 
+  function test_releaseOrMintSingleToken_PropagatesPoolError_V1Pool() public {
+    // Mock pool to only support V1 interface
+    vm.mockCall(
+      address(s_pool), abi.encodeCall(s_pool.supportsInterface, (type(IPoolV2).interfaceId)), abi.encode(false)
+    );
+
+    Pool.ReleaseOrMintInV1 memory expectedInput = _buildReleaseInput();
+    MessageV1Codec.TokenTransferV1 memory tokenTransfer = _buildTokenTransfer();
+
+    bytes memory callData = abi.encodeWithSelector(IPoolV1.releaseOrMint.selector, expectedInput);
+    vm.expectCall(address(s_pool), callData);
+    bytes memory poolRevertData = abi.encode("pool-v1-error");
+    vm.mockCallRevert(address(s_pool), callData, poolRevertData);
+
+    vm.expectRevert(abi.encodeWithSelector(OffRamp.TokenHandlingError.selector, address(s_token), poolRevertData));
+    s_offRamp.releaseOrMintSingleToken(tokenTransfer, expectedInput.originalSender, DEST_CHAIN_SELECTOR, 0);
+  }
+
   function test_releaseOrMintSingleToken_RevertWhen_NotACompatiblePool_PoolAddressZero() public {
     vm.mockCall(
       address(s_tokenAdminRegistry),
