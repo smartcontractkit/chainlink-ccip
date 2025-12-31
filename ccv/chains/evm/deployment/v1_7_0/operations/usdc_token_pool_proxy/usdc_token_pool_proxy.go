@@ -57,17 +57,3 @@ var UpdateLockOrBurnMechanisms = contract.NewWrite(contract.WriteParams[UpdateLo
 		return proxy.UpdateLockOrBurnMechanisms(opts, args.RemoteChainSelectors, args.Mechanisms)
 	},
 })
-
-var UpdateLockReleasePoolAddresses = contract.NewWrite(contract.WriteParams[UpdateLockReleasePoolAddressesArgs, *usdc_token_pool_proxy.USDCTokenPoolProxy]{
-	Name:            "usdc-token-pool-proxy:update-lock-release-pool-addresses",
-	Version:         semver.MustParse("1.7.0"),
-	Description:     "Updates lock release pool addresses on the USDCTokenPoolProxy",
-	ContractType:    ContractType,
-	ContractABI:     usdc_token_pool_proxy.USDCTokenPoolProxyABI,
-	NewContract:     usdc_token_pool_proxy.NewUSDCTokenPoolProxy,
-	IsAllowedCaller: contract.OnlyOwner[*usdc_token_pool_proxy.USDCTokenPoolProxy, UpdateLockReleasePoolAddressesArgs],
-	Validate:        func(UpdateLockReleasePoolAddressesArgs) error { return nil },
-	CallContract: func(proxy *usdc_token_pool_proxy.USDCTokenPoolProxy, opts *bind.TransactOpts, args UpdateLockReleasePoolAddressesArgs) (*types.Transaction, error) {
-		return proxy.UpdateLockReleasePoolAddresses(opts, args.RemoteChainSelectors, args.LockReleasePools)
-	},
-})

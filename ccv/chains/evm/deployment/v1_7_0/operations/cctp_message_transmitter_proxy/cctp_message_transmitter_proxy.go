@@ -16,7 +16,7 @@ type ConstructorArgs struct {
 	TokenMessenger common.Address
 }
 
-type AllowedCallerConfigArgs = cctp_message_transmitter_proxy.CCTPMessageTransmitterProxyAllowedCallerConfigArgs
+type AuthorizedCallerArgs = cctp_message_transmitter_proxy.AuthorizedCallersAuthorizedCallerArgs
 
 var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Name:             "cctp-message-transmitter-proxy:deploy",
@@ -31,16 +31,16 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Validate: func(ConstructorArgs) error { return nil },
 })
 
-var ConfigureAllowedCallers = contract.NewWrite(contract.WriteParams[[]AllowedCallerConfigArgs, *cctp_message_transmitter_proxy.CCTPMessageTransmitterProxy]{
-	Name:            "cctp-message-transmitter-proxy:configure-allowed-callers",
+var ApplyAuthorizedCallerUpdates = contract.NewWrite(contract.WriteParams[AuthorizedCallerArgs, *cctp_message_transmitter_proxy.CCTPMessageTransmitterProxy]{
+	Name:            "cctp-message-transmitter-proxy:apply-authorized-caller-updates",
 	Version:         semver.MustParse("1.7.0"),
-	Description:     "Configures allowed callers on the CCTPMessageTransmitterProxy",
+	Description:     "Applies authorized caller updates on the CCTPMessageTransmitterProxy",
 	ContractType:    ContractType,
 	ContractABI:     cctp_message_transmitter_proxy.CCTPMessageTransmitterProxyABI,
 	NewContract:     cctp_message_transmitter_proxy.NewCCTPMessageTransmitterProxy,
-	IsAllowedCaller: contract.OnlyOwner[*cctp_message_transmitter_proxy.CCTPMessageTransmitterProxy, []AllowedCallerConfigArgs],
-	Validate:        func([]AllowedCallerConfigArgs) error { return nil },
-	CallContract: func(proxy *cctp_message_transmitter_proxy.CCTPMessageTransmitterProxy, opts *bind.TransactOpts, args []AllowedCallerConfigArgs) (*types.Transaction, error) {
-		return proxy.ConfigureAllowedCallers(opts, args)
+	IsAllowedCaller: contract.OnlyOwner[*cctp_message_transmitter_proxy.CCTPMessageTransmitterProxy, AuthorizedCallerArgs],
+	Validate:        func(AuthorizedCallerArgs) error { return nil },
+	CallContract: func(proxy *cctp_message_transmitter_proxy.CCTPMessageTransmitterProxy, opts *bind.TransactOpts, args AuthorizedCallerArgs) (*types.Transaction, error) {
+		return proxy.ApplyAuthorizedCallerUpdates(opts, args)
 	},
 })
