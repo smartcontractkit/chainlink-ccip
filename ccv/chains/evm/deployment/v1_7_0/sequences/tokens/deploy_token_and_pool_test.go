@@ -4,14 +4,17 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/burn_mint_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
 	seq_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
@@ -22,7 +25,7 @@ import (
 
 var thresholdAmountForAdditionalCCVs = big.NewInt(1e18)
 
-func basicDeployTokenAndPoolInput(chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) tokens.DeployTokenAndPoolInput {
+func basicDeployTokenAndPoolInput(chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput], isLockRelease bool) tokens.DeployTokenAndPoolInput {
 	var rmnProxyAddress common.Address
 	var routerAddress common.Address
 	for _, addr := range chainReport.Output.Addresses {
@@ -33,6 +36,17 @@ func basicDeployTokenAndPoolInput(chainReport operations.SequenceReport[sequence
 			routerAddress = common.HexToAddress(addr.Address)
 		}
 	}
+
+	var tokenPoolType datastore.ContractType
+	var tokenPoolVersion *semver.Version
+	if isLockRelease {
+		tokenPoolType = datastore.ContractType(lock_release_token_pool.ContractType)
+		tokenPoolVersion = lock_release_token_pool.Version
+	} else {
+		tokenPoolType = datastore.ContractType(burn_mint_token_pool.BurnMintContractType)
+		tokenPoolVersion = burn_mint_token_pool.Version
+	}
+
 	return tokens.DeployTokenAndPoolInput{
 		Accounts: map[common.Address]*big.Int{
 			common.HexToAddress("0x01"): big.NewInt(500_000),
@@ -40,8 +54,8 @@ func basicDeployTokenAndPoolInput(chainReport operations.SequenceReport[sequence
 		},
 		DeployTokenPoolInput: tokens.DeployTokenPoolInput{
 			ChainSel:                         chainReport.Input.ChainSelector,
-			TokenPoolType:                    datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
-			TokenPoolVersion:                 burn_mint_token_pool.Version,
+			TokenPoolType:                    tokenPoolType,
+			TokenPoolVersion:                 tokenPoolVersion,
 			TokenSymbol:                      "TEST",
 			RateLimitAdmin:                   common.HexToAddress("0x01"),
 			ThresholdAmountForAdditionalCCVs: thresholdAmountForAdditionalCCVs,
@@ -59,14 +73,19 @@ func basicDeployTokenAndPoolInput(chainReport operations.SequenceReport[sequence
 
 func TestDeployTokenAndPool(t *testing.T) {
 	tests := []struct {
-		desc        string
-		makeInput   func(chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) tokens.DeployTokenAndPoolInput
-		expectedErr string
+		desc          string
+		isLockRelease bool
+		expectedErr   string
 	}{
 		{
-			desc:        "happy path",
-			makeInput:   basicDeployTokenAndPoolInput,
-			expectedErr: "",
+			desc:          "happy path - burn mint token pool",
+			isLockRelease: false,
+			expectedErr:   "",
+		},
+		{
+			desc:          "happy path - lock release token pool",
+			isLockRelease: true,
+			expectedErr:   "",
 		},
 	}
 	for _, test := range tests {
@@ -91,7 +110,7 @@ func TestDeployTokenAndPool(t *testing.T) {
 			require.NoError(t, err, "ExecuteSequence should not error")
 
 			// Deploy token and token pool
-			input := test.makeInput(chainReport)
+			input := basicDeployTokenAndPoolInput(chainReport, test.isLockRelease)
 			poolReport, err := operations.ExecuteSequence(
 				e.OperationsBundle,
 				tokens.DeployTokenAndPool,
@@ -106,9 +125,17 @@ func TestDeployTokenAndPool(t *testing.T) {
 			require.NoError(t, err, "ExecuteSequence should not error")
 			require.Len(t, poolReport.Output.BatchOps, 1, "Expected 1 batch operation in output")
 			require.Len(t, poolReport.Output.BatchOps[0].Transactions, 0, "Expected 0 transactions in batch operation")
-			require.Len(t, poolReport.Output.Addresses, 3, "Expected 3 addresses in output (pool, token, advanced pool hooks)")
+
 			tokenAddress := poolReport.Output.Addresses[0].Address
-			// poolAddress := poolReport.Output.Addresses[1].Address
+			poolAddress := poolReport.Output.Addresses[1].Address
+
+			if test.isLockRelease {
+				// Lock release token pool returns 4 addresses: token, pool, hooks, lockBox
+				require.Len(t, poolReport.Output.Addresses, 4, "Expected 4 addresses in output (token, pool, hooks, lockBox)")
+			} else {
+				// Burn mint token pool returns 3 addresses: token, pool, hooks
+				require.Len(t, poolReport.Output.Addresses, 3, "Expected 3 addresses in output (token, pool, hooks)")
+			}
 
 			// Check token metadata
 			token, err := token_bindings.NewBurnMintERC20WithDrip(common.HexToAddress(tokenAddress), e.BlockChains.EVMChains()[chainSel].Client)
@@ -123,17 +150,24 @@ func TestDeployTokenAndPool(t *testing.T) {
 			require.NoError(t, err, "Decimals should not error")
 			require.Equal(t, uint8(18), decimals, "Expected token decimals to be 18")
 
+			// For burn mint token pools, check mint and burn roles
 			// Check token minters
-			/* TODO @kylesmartin: Add minter role to the token
-			minters, err := token.HasRole(&bind.CallOpts{Context: e.OperationsBundle.GetContext()}, burn_mint_erc20_with_drip.MINTER_ROLE)
-			require.NoError(t, err, "GetMinters should not error")
-			require.Equal(t, []common.Address{common.HexToAddress(poolAddress)}, minters, "Expected token pool to be the minter of the token")
+			hasMintRole, err := token.HasRole(&bind.CallOpts{Context: e.OperationsBundle.GetContext()}, burn_mint_erc20_with_drip.MintRole, common.HexToAddress(poolAddress))
+			require.NoError(t, err, "HasRole should not error")
+			require.True(t, hasMintRole, "Expected token pool to have the mint role")
 
 			// Check token burners
-			burners, err := token.GetBurners(&bind.CallOpts{Context: e.OperationsBundle.GetContext()})
-			require.NoError(t, err, "GetBurners should not error")
-			require.Equal(t, []common.Address{common.HexToAddress(poolAddress)}, burners, "Expected token pool to be the burner of the token")
-			*/
+			hasBurnRole, err := token.HasRole(&bind.CallOpts{Context: e.OperationsBundle.GetContext()}, burn_mint_erc20_with_drip.BurnRole, common.HexToAddress(poolAddress))
+			require.NoError(t, err, "HasRole should not error")
+			require.True(t, hasBurnRole, "Expected token pool to have the burn role")
+
+			// Ensure that the deployer key is not a minter or burner
+			hasMintRole, err = token.HasRole(&bind.CallOpts{Context: e.OperationsBundle.GetContext()}, burn_mint_erc20_with_drip.MintRole, e.BlockChains.EVMChains()[chainSel].DeployerKey.From)
+			require.NoError(t, err, "HasRole should not error")
+			require.False(t, hasMintRole, "Expected deployer key to not have the mint role")
+			hasBurnRole, err = token.HasRole(&bind.CallOpts{Context: e.OperationsBundle.GetContext()}, burn_mint_erc20_with_drip.BurnRole, e.BlockChains.EVMChains()[chainSel].DeployerKey.From)
+			require.NoError(t, err, "HasRole should not error")
+			require.False(t, hasBurnRole, "Expected deployer key to not have the burn role")
 
 			// Check balance of each account
 			for addr, amount := range input.Accounts {
