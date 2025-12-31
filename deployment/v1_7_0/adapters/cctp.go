@@ -58,9 +58,6 @@ type RemoteCCTPChainConfig[LocalContract any, RemoteContract any] struct {
 	// LockOrBurnMechanism specifies the mechanism by which the CCTP message will be handled.
 	// i.e. CCTP V1, CCTP V2, lock-release, or CCTP V2 with CCVs.
 	LockOrBurnMechanism Mechanism
-	// LockRelease pool is the address of the lock-release pool used for funds sent to / received from the remote chain.
-	// Only required if the lock-release mechanism is used.
-	LockReleasePool LocalContract
 	// RemoteDomain configures the CCTP-specific parameters for the remote chain.
 	RemoteDomain RemoteDomain[RemoteContract]
 }
@@ -75,6 +72,8 @@ type TokenPools[Contract any] struct {
 	CCTPV2Pool Contract
 	// CCTPV2PoolWithCCV is the address of the CCTP V2 token pool that uses CCVs.
 	CCTPV2PoolWithCCV Contract
+	// LockReleasePool is the address of the lock release token pool.
+	LockReleasePool Contract
 }
 
 // DeployCCTPInput specifies the input for the DeployCCTPChain sequence.
