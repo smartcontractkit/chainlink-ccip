@@ -5,9 +5,9 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/token_pool"
 	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	v1_5_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
@@ -34,36 +34,11 @@ var ConfigureTokenForTransfers = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get token address from token pool with address %s on %s: %w", input.TokenPoolAddress, chain, err)
 		}
 
-		// Configure minimum block confirmation
-		configureMinBlockConfirmationReport, err := cldf_ops.ExecuteOperation(b, token_pool.SetMinBlockConfirmation, chain, evm_contract.FunctionInput[uint16]{
-			ChainSelector: input.ChainSelector,
-			Address:       common.HexToAddress(input.TokenPoolAddress),
-			Args:          input.MinFinalityValue,
-		})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to configure minimum block confirmation for token pool with address %s on %s: %w", input.TokenPoolAddress, chain, err)
-		}
-		configureMinBlockConfirmationOps, err := evm_contract.NewBatchOperationFromWrites([]evm_contract.WriteOutput{configureMinBlockConfirmationReport.Output})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from write outputs: %w", err)
-		}
-		ops = append(ops, configureMinBlockConfirmationOps)
-
-		// Get the advanced pool hooks address
-		advancedPoolHooksAddress, err := cldf_ops.ExecuteOperation(b, token_pool.GetAdvancedPoolHooks, chain, evm_contract.FunctionInput[any]{
-			ChainSelector: input.ChainSelector,
-			Address:       common.HexToAddress(input.TokenPoolAddress),
-		})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to get advanced pool hooks address from token pool with address %s on %s: %w", input.TokenPoolAddress, chain, err)
-		}
-
 		// Configure token pool for each remote chain
 		for remoteChainSelector, remoteChainConfig := range input.RemoteChains {
 			configureTokenPoolForRemoteChainReport, err := cldf_ops.ExecuteSequence(b, ConfigureTokenPoolForRemoteChain, chain, ConfigureTokenPoolForRemoteChainInput{
 				ChainSelector:       input.ChainSelector,
 				TokenPoolAddress:    common.HexToAddress(input.TokenPoolAddress),
-				AdvancedPoolHooks:   advancedPoolHooksAddress.Output,
 				RemoteChainSelector: remoteChainSelector,
 				RemoteChainConfig:   remoteChainConfig,
 			})
