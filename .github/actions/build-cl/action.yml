@@ -49,8 +49,6 @@ runs:
       working-directory: ${{ github.workspace }}/chainlink-repo
       shell: bash
       run: |
-        gh auth setup-git
-        export GITHUB_TOKEN=$(gh auth token)
         export GOPRIVATE=github.com/smartcontractkit/*
         if [ -n "${{ inputs.ton_ref }}" ]; then
           go get github.com/smartcontractkit/chainlink-ton@${{ inputs.ton_ref }}
@@ -63,15 +61,15 @@ runs:
         fi
         make gomodtidy
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
+    # - name: Set up Docker Buildx
+    #   uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
 
-    - name: Build and Load Docker Image
-      uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
-      with:
-        cache-from: type=gha,timeout=10m,scope=ccip-${{ runner.os }}-${{ runner.arch }}
-        cache-to: type=gha,timeout=10m,mode=max,ignore-error=true,scope=ccip-${{ runner.os }}-${{ runner.arch }}
-        context: ${{ github.workspace }}/chainlink-repo
-        file: ${{ github.workspace }}/chainlink-repo/core/chainlink.Dockerfile
-        load: true
-        tags: local
+    # - name: Build and Load Docker Image
+    #   uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
+    #   with:
+    #     cache-from: type=gha,timeout=10m,scope=ccip-${{ runner.os }}-${{ runner.arch }}
+    #     cache-to: type=gha,timeout=10m,mode=max,ignore-error=true,scope=ccip-${{ runner.os }}-${{ runner.arch }}
+    #     context: ${{ github.workspace }}/chainlink-repo
+    #     file: ${{ github.workspace }}/chainlink-repo/plugins/chainlink.Dockerfile
+    #     load: true
+    #     tags: local
