@@ -38,7 +38,7 @@ var ConfigureTokenForTransfers = cldf_ops.NewSequence(
 		configureMinBlockConfirmationReport, err := cldf_ops.ExecuteOperation(b, token_pool.SetMinBlockConfirmation, chain, evm_contract.FunctionInput[uint16]{
 			ChainSelector: input.ChainSelector,
 			Address:       common.HexToAddress(input.TokenPoolAddress),
-			Args:          input.MinFinalityValue,
+			Args:          input.FinalityValue,
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to configure minimum block confirmation for token pool with address %s on %s: %w", input.TokenPoolAddress, chain, err)

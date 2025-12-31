@@ -27,7 +27,7 @@ type ChainConfig struct {
 	OnRamp datastore.AddressRef
 	// The CommitteeVerifiers on the chain being configured.
 	// There can be multiple committee verifiers on a chain, each controlled by a different entity.
-	CommitteeVerifiers []adapters.CommitteeVerifierConfig[datastore.AddressRef]
+	CommitteeVerifiers []adapters.CommitteeVerifierConfig[datastore.AddressRef, datastore.AddressRef]
 	// The FeeQuoter on the chain being configured.
 	FeeQuoter datastore.AddressRef
 	// The OffRamp on the chain being configured
@@ -70,20 +70,25 @@ func makeApply(chainFamilyRegistry *adapters.ChainFamilyRegistry, mcmsRegistry *
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve onRamp ref on chain with selector %d: %w", chain.ChainSelector, err)
 			}
-			committeeVerifiers := make([]adapters.CommitteeVerifierConfig[datastore.AddressRef], len(chain.CommitteeVerifiers))
-			for i, verifier := range chain.CommitteeVerifiers {
-				contracts := make([]datastore.AddressRef, 0, len(verifier.CommitteeVerifier))
-				for _, contract := range verifier.CommitteeVerifier {
-					contract, err := datastore_utils.FindAndFormatRef(e.DataStore, contract, chain.ChainSelector, datastore_utils.FullRef)
+			committeeVerifiers := make([]adapters.CommitteeVerifierConfig[string, datastore.AddressRef], 0, len(chain.CommitteeVerifiers))
+			for _, verifier := range chain.CommitteeVerifiers {
+				committeeVerifier, err := datastore_utils.FindAndFormatRef(e.DataStore, verifier.CommitteeVerifier, chain.ChainSelector, datastore_utils.FullRef)
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve committeeVerifier ref on chain with selector %d: %w", chain.ChainSelector, err)
+				}
+				supportingContracts := make([]datastore.AddressRef, 0, len(verifier.SupportingContracts))
+				for _, supportingContract := range verifier.SupportingContracts {
+					supportingContract, err := datastore_utils.FindAndFormatRef(e.DataStore, supportingContract, chain.ChainSelector, datastore_utils.FullRef)
 					if err != nil {
-						return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve CommitteeVerifier contract ref on chain with selector %d: %w", chain.ChainSelector, err)
+						return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve supportingContract ref on chain with selector %d: %w", chain.ChainSelector, err)
 					}
-					contracts = append(contracts, contract)
+					supportingContracts = append(supportingContracts, supportingContract)
 				}
-				committeeVerifiers[i] = adapters.CommitteeVerifierConfig[datastore.AddressRef]{
-					CommitteeVerifier: contracts,
-					RemoteChains:      verifier.RemoteChains,
-				}
+				committeeVerifiers = append(committeeVerifiers, adapters.CommitteeVerifierConfig[string, datastore.AddressRef]{
+					CommitteeVerifier:   committeeVerifier.Address,
+					SupportingContracts: supportingContracts,
+					RemoteChains:        verifier.RemoteChains,
+				})
 			}
 			feeQuoter, err := datastore_utils.FindAndFormatRef(e.DataStore, chain.FeeQuoter, chain.ChainSelector, datastore_utils.FullRef)
 			if err != nil {

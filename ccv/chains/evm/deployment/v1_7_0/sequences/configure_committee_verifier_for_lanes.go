@@ -19,7 +19,7 @@ import (
 type ConfigureCommitteeVerifierForLanesInput struct {
 	ChainSelector uint64
 	Router        string
-	adapters.CommitteeVerifierConfig[datastore.AddressRef]
+	adapters.CommitteeVerifierConfig[string, datastore.AddressRef]
 }
 
 var ConfigureCommitteeVerifierForLanes = cldf_ops.NewSequence(
@@ -31,23 +31,6 @@ var ConfigureCommitteeVerifierForLanes = cldf_ops.NewSequence(
 		chain, ok := chains.EVMChains()[input.ChainSelector]
 		if !ok {
 			return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found", input.ChainSelector)
-		}
-
-		var committeeVerifier string
-		var committeeVerifierResolver string
-		for _, addr := range input.CommitteeVerifier {
-			switch addr.Type {
-			case datastore.ContractType(committee_verifier.ContractType):
-				committeeVerifier = addr.Address
-			case datastore.ContractType(committee_verifier.ResolverType):
-				committeeVerifierResolver = addr.Address
-			}
-		}
-		if committeeVerifier == "" {
-			return sequences.OnChainOutput{}, fmt.Errorf("committee verifier contract not found on chain %d", input.ChainSelector)
-		}
-		if committeeVerifierResolver == "" {
-			return sequences.OnChainOutput{}, fmt.Errorf("committee verifier resolver contract not found on chain %d", input.ChainSelector)
 		}
 
 		remoteChainConfigArgs := make([]committee_verifier.RemoteChainConfigArgs, 0, len(input.RemoteChains))
@@ -89,14 +72,14 @@ var ConfigureCommitteeVerifierForLanes = cldf_ops.NewSequence(
 			})
 			outboundImplementationArgs = append(outboundImplementationArgs, versioned_verifier_resolver.OutboundImplementationArgs{
 				DestChainSelector: remoteSelector,
-				Verifier:          common.HexToAddress(committeeVerifier),
+				Verifier:          common.HexToAddress(input.CommitteeVerifier),
 			})
 		}
 
 		// ApplyRemoteChainConfigUpdates on CommitteeVerifier
 		committeeVerifierReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.ApplyRemoteChainConfigUpdates, chain, contract.FunctionInput[[]committee_verifier.RemoteChainConfigArgs]{
 			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(committeeVerifier),
+			Address:       common.HexToAddress(input.CommitteeVerifier),
 			Args:          remoteChainConfigArgs,
 		})
 		if err != nil {
@@ -107,7 +90,7 @@ var ConfigureCommitteeVerifierForLanes = cldf_ops.NewSequence(
 		// ApplyAllowlistUpdates on CommitteeVerifier
 		committeeVerifierAllowlistReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.ApplyAllowlistUpdates, chain, contract.FunctionInput[[]committee_verifier.AllowlistConfigArgs]{
 			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(committeeVerifier),
+			Address:       common.HexToAddress(input.CommitteeVerifier),
 			Args:          allowlistArgs,
 		})
 		if err != nil {
@@ -118,7 +101,7 @@ var ConfigureCommitteeVerifierForLanes = cldf_ops.NewSequence(
 		// ApplySignatureConfigs on CommitteeVerifier
 		committeeVerifierSignatureConfigReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.ApplySignatureConfigs, chain, contract.FunctionInput[committee_verifier.SignatureConfigArgs]{
 			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(committeeVerifier),
+			Address:       common.HexToAddress(input.CommitteeVerifier),
 			Args: committee_verifier.SignatureConfigArgs{
 				SignatureConfigUpdates: signatureConfigs,
 			},
@@ -128,22 +111,31 @@ var ConfigureCommitteeVerifierForLanes = cldf_ops.NewSequence(
 		}
 		writes = append(writes, committeeVerifierSignatureConfigReport.Output)
 
+		// Expect that SupportingContracts defines exactly one contract of type VersionedVerifierResolver
+		if len(input.SupportingContracts) != 1 {
+			return sequences.OnChainOutput{}, fmt.Errorf("expected SupportingContracts to define exactly one contract")
+		}
+		versionedVerifierResolver := input.SupportingContracts[0]
+		if versionedVerifierResolver.Type != datastore.ContractType(committee_verifier.ResolverType) {
+			return sequences.OnChainOutput{}, fmt.Errorf("expected SupportingContracts to define exactly one contract of type VersionedVerifierResolver")
+		}
+
 		// Apply inbound implementation updates on CommitteeVerifierResolver
 		// Get the version tag from the CommitteeVerifier
 		committeeVerifierVersionTagReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.GetVersionTag, chain, contract.FunctionInput[any]{
 			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(committeeVerifier),
+			Address:       common.HexToAddress(input.CommitteeVerifier),
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get version tag from CommitteeVerifier on chain %s: %w", chain, err)
 		}
 		committeeVerifierResolverInboundImplementationUpdatesReport, err := cldf_ops.ExecuteOperation(b, versioned_verifier_resolver.ApplyInboundImplementationUpdates, chain, contract.FunctionInput[[]versioned_verifier_resolver.InboundImplementationArgs]{
 			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(committeeVerifierResolver),
+			Address:       common.HexToAddress(versionedVerifierResolver.Address),
 			Args: []versioned_verifier_resolver.InboundImplementationArgs{
 				{
 					Version:  committeeVerifierVersionTagReport.Output,
-					Verifier: common.HexToAddress(committeeVerifier),
+					Verifier: common.HexToAddress(input.CommitteeVerifier),
 				},
 			},
 		})
@@ -155,7 +147,7 @@ var ConfigureCommitteeVerifierForLanes = cldf_ops.NewSequence(
 		// Apply outbound implementation updates on CommitteeVerifierResolver
 		committeeVerifierResolverOutboundImplementationUpdatesReport, err := cldf_ops.ExecuteOperation(b, versioned_verifier_resolver.ApplyOutboundImplementationUpdates, chain, contract.FunctionInput[[]versioned_verifier_resolver.OutboundImplementationArgs]{
 			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(committeeVerifierResolver),
+			Address:       common.HexToAddress(versionedVerifierResolver.Address),
 			Args:          outboundImplementationArgs,
 		})
 		if err != nil {

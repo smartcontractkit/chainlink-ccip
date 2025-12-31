@@ -28,10 +28,10 @@ type TokenTransferConfig struct {
 	RegistryRef datastore.AddressRef
 	// RemoteChains specifies the remote chains to configure on the token pool.
 	RemoteChains map[uint64]RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]
-	// MinFinalityValue is the minimum finality value required by the token pool.
+	// FinalityValue is the value representing finality.
 	// This can be interpreted as # of block confirmations, an ID, or otherwise.
 	// Interpretation is left to each chain family.
-	MinFinalityValue uint16
+	FinalityValue uint16
 }
 
 // ConfigureTokensForTransfersConfig is the configuration for the ConfigureTokensForTransfers changeset.
@@ -99,7 +99,7 @@ func makeApply(tokenRegistry *TokenAdapterRegistry, mcmsRegistry *changesets.MCM
 				RemoteChains:     remoteChains,
 				ExternalAdmin:    token.ExternalAdmin,
 				RegistryAddress:  registry.Address,
-				MinFinalityValue: token.MinFinalityValue,
+				FinalityValue:    token.FinalityValue,
 			})
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to configure token pool on chain with selector %d: %w", token.ChainSelector, err)

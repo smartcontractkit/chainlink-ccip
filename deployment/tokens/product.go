@@ -95,10 +95,10 @@ type ConfigureTokenForTransfersInput struct {
 	ExternalAdmin string
 	// RegistryAddress is the address of the contract on which the token pool must be registered.
 	RegistryAddress string
-	// MinFinalityValue is the minimum finality value required by the token pool.
+	// FinalityValue is the value representing finality.
 	// This can be interpreted as # of block confirmations, an ID, or otherwise.
 	// Interpretation is left to each chain family.
-	MinFinalityValue uint16
+	FinalityValue uint16
 }
 
 // TokenAdapterRegistry maintains a registry of TokenAdapters.
