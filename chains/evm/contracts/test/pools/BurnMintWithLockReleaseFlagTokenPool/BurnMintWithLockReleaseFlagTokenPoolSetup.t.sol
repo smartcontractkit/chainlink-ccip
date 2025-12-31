@@ -3,11 +3,11 @@ pragma solidity ^0.8.24;
 
 import {IBurnMintERC20} from "../../../interfaces/IBurnMintERC20.sol";
 import {BurnMintWithLockReleaseFlagTokenPool} from "../../../pools/USDC/BurnMintWithLockReleaseFlagTokenPool.sol";
-import {BurnMintSetup} from "../BurnMintTokenPool/BurnMintSetup.t.sol";
+import {TokenPoolSetup} from "../TokenPool/TokenPoolSetup.t.sol";
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
-contract BurnMintWithLockReleaseFlagTokenPoolSetup is BurnMintSetup {
+contract BurnMintWithLockReleaseFlagTokenPoolSetup is TokenPoolSetup {
   BurnMintWithLockReleaseFlagTokenPool internal s_pool;
 
   function setUp() public virtual override {

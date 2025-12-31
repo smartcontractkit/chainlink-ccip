@@ -3,10 +3,10 @@ pragma solidity ^0.8.24;
 
 import {IBurnMintERC20} from "../../../interfaces/IBurnMintERC20.sol";
 import {BurnToAddressMintTokenPool} from "../../../pools/BurnToAddressMintTokenPool.sol";
-import {BurnMintSetup} from "../BurnMintTokenPool/BurnMintSetup.t.sol";
+import {TokenPoolSetup} from "../TokenPool/TokenPoolSetup.t.sol";
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
-contract BurnToAddressMintTokenPoolSetup is BurnMintSetup {
+contract BurnToAddressMintTokenPoolSetup is TokenPoolSetup {
   BurnToAddressMintTokenPool internal s_pool;
 
   address public constant BURN_ADDRESS = address(0xdead);
