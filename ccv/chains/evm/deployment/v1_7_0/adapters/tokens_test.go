@@ -101,9 +101,9 @@ func TestTokenAdapter(t *testing.T) {
 			// Overwrite datastore in the environment
 			e.DataStore = ds.Seal()
 
-			var remoteToken *datastore.AddressRef
+			var remoteToken datastore.AddressRef
 			if test.deriveTokenAddress {
-				remoteToken = &datastore.AddressRef{
+				remoteToken = datastore.AddressRef{
 					Type:      datastore.ContractType(burn_mint_erc20_with_drip.ContractType),
 					Version:   burn_mint_erc20_with_drip.Version,
 					Qualifier: "TEST",
@@ -113,10 +113,10 @@ func TestTokenAdapter(t *testing.T) {
 			getRemoteChainConfig := func(
 				remotePoolVersion *semver.Version,
 				ccvs []datastore.AddressRef,
-			) tokens.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef] {
-				return tokens.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+			) tokens.RemoteChainConfig[datastore.AddressRef, datastore.AddressRef] {
+				return tokens.RemoteChainConfig[datastore.AddressRef, datastore.AddressRef]{
 					RemoteToken: remoteToken,
-					RemotePool: &datastore.AddressRef{
+					RemotePool: datastore.AddressRef{
 						Type:      datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
 						Version:   remotePoolVersion,
 						Qualifier: "TEST",
@@ -135,16 +135,16 @@ func TestTokenAdapter(t *testing.T) {
 				Tokens: []tokens.TokenTransferConfig{
 					{
 						ChainSelector: chainA,
-						TokenPoolRef: datastore.AddressRef{
+						TokenPool: datastore.AddressRef{
 							Type:      datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
 							Version:   burn_mint_token_pool.Version,
 							Qualifier: "TEST",
 						},
-						RegistryRef: datastore.AddressRef{
+						Registry: datastore.AddressRef{
 							Type:    datastore.ContractType(token_admin_registry.ContractType),
 							Version: token_admin_registry.Version,
 						},
-						RemoteChains: map[uint64]tokens.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+						RemoteChains: map[uint64]tokens.RemoteChainConfig[datastore.AddressRef, datastore.AddressRef]{
 							chainB: getRemoteChainConfig(burn_mint_token_pool.Version, []datastore.AddressRef{
 								{
 									Type:    datastore.ContractType(committee_verifier.ContractType),
@@ -155,16 +155,16 @@ func TestTokenAdapter(t *testing.T) {
 					},
 					{
 						ChainSelector: chainB,
-						TokenPoolRef: datastore.AddressRef{
+						TokenPool: datastore.AddressRef{
 							Type:      datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
 							Version:   burn_mint_token_pool.Version,
 							Qualifier: "TEST",
 						},
-						RegistryRef: datastore.AddressRef{
+						Registry: datastore.AddressRef{
 							Type:    datastore.ContractType(token_admin_registry.ContractType),
 							Version: token_admin_registry.Version,
 						},
-						RemoteChains: map[uint64]tokens.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+						RemoteChains: map[uint64]tokens.RemoteChainConfig[datastore.AddressRef, datastore.AddressRef]{
 							chainA: getRemoteChainConfig(burn_mint_token_pool.Version, []datastore.AddressRef{
 								{
 									Type:    datastore.ContractType(committee_verifier.ContractType),

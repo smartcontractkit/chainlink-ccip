@@ -90,20 +90,9 @@ func TestConfigureChainForLanes(t *testing.T) {
 					ChainSelector: chainSelector,
 					Router:        routerAddress,
 					OnRamp:        onRamp,
-					CommitteeVerifiers: []adapters.CommitteeVerifierConfig[datastore.AddressRef]{
+					CommitteeVerifiers: []adapters.CommitteeVerifierConfig[string]{
 						{
-							CommitteeVerifier: []datastore.AddressRef{
-								{
-									Address: committeeVerifier,
-									Type:    datastore.ContractType(committee_verifier.ContractType),
-									Version: committee_verifier.Version,
-								},
-								{
-									Address: committeeVerifierResolver,
-									Type:    datastore.ContractType(committee_verifier.ResolverType),
-									Version: committee_verifier.Version,
-								},
-							},
+							CommitteeVerifier: []string{committeeVerifier, committeeVerifierResolver},
 							RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
 								remoteChainSelector: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
 							},
@@ -113,7 +102,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 					OffRamp:   offRamp,
 					RemoteChains: map[uint64]adapters.RemoteChainConfig[[]byte, string]{
 						remoteChainSelector: {
-							AllowTrafficFrom:         true,
+							DisableTrafficFrom:       false,
 							OnRamps:                  [][]byte{ccipMessageSource},
 							OffRamp:                  ccipMessageDest,
 							DefaultInboundCCVs:       []string{committeeVerifier},

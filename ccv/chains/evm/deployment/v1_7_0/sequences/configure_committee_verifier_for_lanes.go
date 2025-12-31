@@ -6,12 +6,13 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/committee_verifier"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/type_and_version"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/versioned_verifier_resolver"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
-	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 )
@@ -19,7 +20,7 @@ import (
 type ConfigureCommitteeVerifierForLanesInput struct {
 	ChainSelector uint64
 	Router        string
-	adapters.CommitteeVerifierConfig[datastore.AddressRef]
+	adapters.CommitteeVerifierConfig[string]
 }
 
 var ConfigureCommitteeVerifierForLanes = cldf_ops.NewSequence(
@@ -35,14 +36,13 @@ var ConfigureCommitteeVerifierForLanes = cldf_ops.NewSequence(
 
 		var committeeVerifier string
 		var committeeVerifierResolver string
-		for _, addr := range input.CommitteeVerifier {
-			switch addr.Type {
-			case datastore.ContractType(committee_verifier.ContractType):
-				committeeVerifier = addr.Address
-			case datastore.ContractType(committee_verifier.ResolverType):
-				committeeVerifierResolver = addr.Address
-			}
+		typeAndVersionToAddress, err := type_and_version.MapUniqueTypeAndVersionToAddress(b, chain, input.CommitteeVerifier)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to map type and version to address for committee verifier: %w", err)
 		}
+		committeeVerifier = typeAndVersionToAddress[deployment.NewTypeAndVersion(committee_verifier.ContractType, *committee_verifier.Version).String()]
+		committeeVerifierResolver = typeAndVersionToAddress[deployment.NewTypeAndVersion(committee_verifier.ResolverType, *committee_verifier.Version).String()]
+
 		if committeeVerifier == "" {
 			return sequences.OnChainOutput{}, fmt.Errorf("committee verifier contract not found on chain %d", input.ChainSelector)
 		}

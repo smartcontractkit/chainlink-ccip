@@ -55,7 +55,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 			offRampArgs = append(offRampArgs, offramp.SourceChainConfigArgs{
 				Router:              common.HexToAddress(input.Router),
 				SourceChainSelector: remoteSelector,
-				IsEnabled:           remoteConfig.AllowTrafficFrom,
+				IsEnabled:           !remoteConfig.DisableTrafficFrom,
 				OnRamps:             onRamps,
 				DefaultCCVs:         defaultInboundCCVs,
 				LaneMandatedCCVs:    laneMandatedInboundCCVs,

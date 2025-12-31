@@ -58,7 +58,7 @@ func makeChainConfig(chainSelector uint64, remoteChainSelector uint64) v1_7_0_ch
 		},
 		RemoteChains: map[uint64]adapters.RemoteChainConfig[datastore.AddressRef, datastore.AddressRef]{
 			remoteChainSelector: {
-				AllowTrafficFrom: true,
+				DisableTrafficFrom: false,
 				OnRamps: []datastore.AddressRef{
 					{
 						Type:    datastore.ContractType(onramp.ContractType),
