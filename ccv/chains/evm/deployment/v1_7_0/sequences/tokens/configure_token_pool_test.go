@@ -69,7 +69,7 @@ func TestConfigurePool(t *testing.T) {
 				e.OperationsBundle,
 				tokens.DeployTokenAndPool,
 				e.BlockChains.EVMChains()[chainSel],
-				basicDeployTokenAndPoolInput(chainReport),
+				basicDeployTokenAndPoolInput(chainReport, false),
 			)
 			require.NoError(t, err, "ExecuteSequence should not error")
 

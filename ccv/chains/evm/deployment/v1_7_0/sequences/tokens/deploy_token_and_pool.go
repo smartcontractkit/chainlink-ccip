@@ -8,6 +8,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/burn_mint_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/lock_release_token_pool"
 	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -62,14 +63,12 @@ var DeployTokenAndPool = cldf_ops.NewSequence(
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy burn mint token pool to %s: %w", chain, err)
 			}
 			addresses = append(addresses, deployTokenPoolReport.Output.Addresses...)
-		/* TODO @kylesmartin: Enable when the lockbox is finalized
 		case lock_release_token_pool.IsSupported(deployment.ContractType(input.DeployTokenPoolInput.TokenPoolType), input.DeployTokenPoolInput.TokenPoolVersion):
 			deployTokenPoolReport, err := cldf_ops.ExecuteSequence(b, DeployLockReleaseTokenPool, chain, input.DeployTokenPoolInput)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy lock release token pool to %s: %w", chain, err)
 			}
 			addresses = append(addresses, deployTokenPoolReport.Output.Addresses...)
-		*/
 		default:
 			return sequences.OnChainOutput{}, fmt.Errorf("token pool type %s and version %s is not supported", input.DeployTokenPoolInput.TokenPoolType, input.DeployTokenPoolInput.TokenPoolVersion)
 		}

@@ -6,7 +6,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/advanced_pool_hooks"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/burn_mint_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/tokens"
@@ -23,7 +23,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestDeployTokenPool(t *testing.T) {
+func TestDeployLockReleaseTokenPool(t *testing.T) {
 	tests := []struct {
 		desc        string
 		makeInput   func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) tokens.DeployTokenPoolInput
@@ -44,8 +44,8 @@ func TestDeployTokenPool(t *testing.T) {
 				}
 				return tokens.DeployTokenPoolInput{
 					ChainSel:                         chainReport.Input.ChainSelector,
-					TokenPoolType:                    datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
-					TokenPoolVersion:                 burn_mint_token_pool.Version,
+					TokenPoolType:                    datastore.ContractType(lock_release_token_pool.ContractType),
+					TokenPoolVersion:                 lock_release_token_pool.Version,
 					TokenSymbol:                      tokenReport.Input.Args.Symbol,
 					RateLimitAdmin:                   common.HexToAddress("0x01"),
 					ThresholdAmountForAdditionalCCVs: big.NewInt(1e18),
@@ -96,7 +96,7 @@ func TestDeployTokenPool(t *testing.T) {
 				return tokens.DeployTokenPoolInput{
 					ChainSel:      chainReport.Input.ChainSelector,
 					TokenSymbol:   tokenReport.Input.Args.Symbol,
-					TokenPoolType: datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
+					TokenPoolType: datastore.ContractType(lock_release_token_pool.ContractType),
 				}
 			},
 			expectedErr: "token pool version must be defined",
@@ -107,8 +107,8 @@ func TestDeployTokenPool(t *testing.T) {
 				return tokens.DeployTokenPoolInput{
 					ChainSel:         chainReport.Input.ChainSelector,
 					TokenSymbol:      tokenReport.Input.Args.Symbol,
-					TokenPoolType:    datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
-					TokenPoolVersion: burn_mint_token_pool.Version,
+					TokenPoolType:    datastore.ContractType(lock_release_token_pool.ContractType),
+					TokenPoolVersion: lock_release_token_pool.Version,
 				}
 			},
 			expectedErr: "token address must be defined",
@@ -119,8 +119,8 @@ func TestDeployTokenPool(t *testing.T) {
 				return tokens.DeployTokenPoolInput{
 					ChainSel:         chainReport.Input.ChainSelector,
 					TokenSymbol:      tokenReport.Input.Args.Symbol,
-					TokenPoolType:    datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
-					TokenPoolVersion: burn_mint_token_pool.Version,
+					TokenPoolType:    datastore.ContractType(lock_release_token_pool.ContractType),
+					TokenPoolVersion: lock_release_token_pool.Version,
 					ConstructorArgs: tokens.ConstructorArgs{
 						Token: common.HexToAddress(tokenReport.Output.Address),
 					},
@@ -140,8 +140,8 @@ func TestDeployTokenPool(t *testing.T) {
 				return tokens.DeployTokenPoolInput{
 					ChainSel:         chainReport.Input.ChainSelector,
 					TokenSymbol:      tokenReport.Input.Args.Symbol,
-					TokenPoolType:    datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
-					TokenPoolVersion: burn_mint_token_pool.Version,
+					TokenPoolType:    datastore.ContractType(lock_release_token_pool.ContractType),
+					TokenPoolVersion: lock_release_token_pool.Version,
 					ConstructorArgs: tokens.ConstructorArgs{
 						Token:    common.HexToAddress(tokenReport.Output.Address),
 						RMNProxy: rmnProxyAddress,
@@ -166,8 +166,8 @@ func TestDeployTokenPool(t *testing.T) {
 				return tokens.DeployTokenPoolInput{
 					ChainSel:         chainReport.Input.ChainSelector,
 					TokenSymbol:      tokenReport.Input.Args.Symbol,
-					TokenPoolType:    datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
-					TokenPoolVersion: burn_mint_token_pool.Version,
+					TokenPoolType:    datastore.ContractType(lock_release_token_pool.ContractType),
+					TokenPoolVersion: lock_release_token_pool.Version,
 					ConstructorArgs: tokens.ConstructorArgs{
 						Token:    common.HexToAddress(tokenReport.Output.Address),
 						RMNProxy: rmnProxyAddress,
@@ -219,7 +219,7 @@ func TestDeployTokenPool(t *testing.T) {
 			input := test.makeInput(tokenReport, chainReport)
 			poolReport, err := operations.ExecuteSequence(
 				e.OperationsBundle,
-				tokens.DeployBurnMintTokenPool,
+				tokens.DeployLockReleaseTokenPool,
 				e.BlockChains.EVMChains()[chainSel],
 				input,
 			)
@@ -229,10 +229,11 @@ func TestDeployTokenPool(t *testing.T) {
 				return
 			}
 			require.NoError(t, err, "ExecuteSequence should not error")
-			require.Len(t, poolReport.Output.Addresses, 2, "Expected 2 addresses in output")
+			require.Len(t, poolReport.Output.Addresses, 3, "Expected 3 addresses in output (pool, hooks, lockBox)")
 
 			poolAddress := poolReport.Output.Addresses[0].Address
 			hooksAddress := poolReport.Output.Addresses[1].Address
+			lockBoxAddress := poolReport.Output.Addresses[2].Address
 
 			// Check token
 			getTokenReport, err := operations.ExecuteOperation(
@@ -304,6 +305,10 @@ func TestDeployTokenPool(t *testing.T) {
 			for _, addr := range getAllowlistReport.Output {
 				require.Contains(t, input.ConstructorArgs.Allowlist, addr, "Expected on-chain allowlist address to be in the inputted allowlist")
 			}
+
+			// Verify lock box address is present in output
+			require.NotEmpty(t, lockBoxAddress, "Expected lock box address to be present in output")
+			require.NotEqual(t, common.Address{}, common.HexToAddress(lockBoxAddress), "Expected lock box address to be non-zero")
 		})
 	}
 }
