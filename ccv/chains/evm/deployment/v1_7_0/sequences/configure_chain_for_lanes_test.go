@@ -91,10 +91,14 @@ func TestConfigureChainForLanes(t *testing.T) {
 					ChainSelector: chainSelector,
 					Router:        routerAddress,
 					OnRamp:        onRamp,
-					CommitteeVerifiers: []adapters.CommitteeVerifierConfig[string, datastore.AddressRef]{
+					CommitteeVerifiers: []adapters.CommitteeVerifierConfig[datastore.AddressRef]{
 						{
-							CommitteeVerifier: committeeVerifier,
-							SupportingContracts: []datastore.AddressRef{
+							CommitteeVerifier: []datastore.AddressRef{
+								{
+									Address: committeeVerifier,
+									Type:    datastore.ContractType(committee_verifier.ContractType),
+									Version: semver.MustParse("1.7.0"),
+								},
 								{
 									Address: committeeVerifierResolver,
 									Type:    datastore.ContractType(committee_verifier.ResolverType),

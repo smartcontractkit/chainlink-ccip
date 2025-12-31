@@ -32,13 +32,13 @@ func makeChainConfig(chainSelector uint64, remoteChainSelector uint64) v1_7_0_ch
 			Type:    datastore.ContractType(onramp.ContractType),
 			Version: semver.MustParse("1.7.0"),
 		},
-		CommitteeVerifiers: []adapters.CommitteeVerifierConfig[datastore.AddressRef, datastore.AddressRef]{
+		CommitteeVerifiers: []adapters.CommitteeVerifierConfig[datastore.AddressRef]{
 			{
-				CommitteeVerifier: datastore.AddressRef{
-					Type:    datastore.ContractType(committee_verifier.ContractType),
-					Version: semver.MustParse("1.7.0"),
-				},
-				SupportingContracts: []datastore.AddressRef{
+				CommitteeVerifier: []datastore.AddressRef{
+					{
+						Type:    datastore.ContractType(committee_verifier.ContractType),
+						Version: semver.MustParse("1.7.0"),
+					},
 					{
 						Type:    datastore.ContractType(committee_verifier.ResolverType),
 						Version: semver.MustParse("1.7.0"),
