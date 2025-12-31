@@ -70,6 +70,6 @@ runs:
         cache-from: type=gha,timeout=10m,scope=ccip-${{ runner.os }}-${{ runner.arch }}
         cache-to: type=gha,timeout=10m,mode=max,ignore-error=true,scope=ccip-${{ runner.os }}-${{ runner.arch }}
         context: ${{ github.workspace }}/chainlink-repo
-        file: ${{ github.workspace }}/chainlink-repo/plugins/chainlink.Dockerfile
+        file: ${{ github.workspace }}/chainlink-repo/core/chainlink.Dockerfile
         load: true
         tags: local
