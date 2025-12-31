@@ -49,7 +49,8 @@ runs:
       working-directory: ${{ github.workspace }}/chainlink-repo
       shell: bash
       run: |
-        export GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
+        gh auth setup-git
+        export GITHUB_TOKEN=$(gh auth token)
         export GOPRIVATE=github.com/smartcontractkit/*
         if [ -n "${{ inputs.ton_ref }}" ]; then
           go get github.com/smartcontractkit/chainlink-ton@${{ inputs.ton_ref }}
