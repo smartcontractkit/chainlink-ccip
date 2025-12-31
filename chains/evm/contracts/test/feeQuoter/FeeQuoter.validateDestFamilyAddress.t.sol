@@ -23,6 +23,19 @@ contract FeeQuoter_validateDestFamilyAddress is FeeQuoterSetup {
     s_feeQuoter.validateDestFamilyAddress(Internal.CHAIN_FAMILY_SELECTOR_SUI, abi.encode(type(uint208).max), 0);
   }
 
+  function test_validateDestFamilyAddress_TVM() public view {
+    // TVM addresses must be 36 bytes: 4 bytes (workchain_id as int32) + 32 bytes (accountId)
+    bytes memory validTVMAddress = new bytes(36);
+    // Set workchain_id (4 bytes, big-endian int32)
+    validTVMAddress[0] = 0x00;
+    validTVMAddress[1] = 0x00;
+    validTVMAddress[2] = 0x00;
+    validTVMAddress[3] = 0x00;
+    // Set accountId (32 bytes) - must be non-zero
+    validTVMAddress[4] = 0x01; // First byte of accountId
+    s_feeQuoter.validateDestFamilyAddress(Internal.CHAIN_FAMILY_SELECTOR_TVM, validTVMAddress, 0);
+  }
+
   // Reverts
 
   function test_validateDestFamilyAddress_RevertWhen_InvalidChainFamilySelector() public {

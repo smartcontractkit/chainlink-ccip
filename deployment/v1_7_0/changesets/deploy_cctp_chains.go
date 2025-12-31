@@ -129,6 +129,14 @@ func resolveDeployCCTPChainInput(
 		out.TokenPools.CCTPV2PoolWithCCV = cctpv2PoolWithCCV.Address
 	}
 
+	if addressRefExists(adapterInput.TokenPools.LockReleasePool) {
+		lockReleasePool, err := datastore_utils.FindAndFormatRef(e.DataStore, adapterInput.TokenPools.LockReleasePool, chainSelector, datastore_utils.FullRef)
+		if err != nil {
+			return adapters.DeployCCTPInput[string, []byte]{}, fmt.Errorf("failed to resolve LockReleasePool for chain selector %d: %w", chainSelector, err)
+		}
+		out.TokenPools.LockReleasePool = lockReleasePool.Address
+	}
+
 	if addressRefExists(adapterInput.USDCTokenPoolProxy) {
 		usdctokenPoolProxy, err := datastore_utils.FindAndFormatRef(e.DataStore, adapterInput.USDCTokenPoolProxy, chainSelector, datastore_utils.FullRef)
 		if err != nil {
@@ -214,14 +222,6 @@ func resolveRemoteCCTPChainConfig(
 		RemoteDomain: adapters.RemoteDomain[[]byte]{
 			DomainIdentifier: remoteChainCfg.RemoteDomain.DomainIdentifier,
 		},
-	}
-
-	if addressRefExists(remoteChainCfg.LockReleasePool) {
-		lockReleasePool, err := datastore_utils.FindAndFormatRef(e.DataStore, remoteChainCfg.LockReleasePool, localChainSelector, datastore_utils.FullRef)
-		if err != nil {
-			return adapters.RemoteCCTPChainConfig[string, []byte]{}, fmt.Errorf("failed to resolve LockReleasePool for chain selector %d: %w", localChainSelector, err)
-		}
-		out.LockReleasePool = lockReleasePool.Address
 	}
 
 	if addressRefExists(remoteChainCfg.RemoteDomain.AllowedCallerOnDest) {

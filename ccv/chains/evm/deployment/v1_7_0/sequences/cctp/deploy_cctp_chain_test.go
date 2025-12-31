@@ -12,7 +12,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/usdc_token_pool_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
-	burn_mint_token_pool_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/burn_mint_token_pool"
 	cctp_message_transmitter_proxy_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/cctp_message_transmitter_proxy"
 	cctp_token_pool_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/cctp_token_pool"
 	cctp_verifier_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/cctp_verifier"
@@ -169,51 +168,11 @@ func TestDeployCCTPChain(t *testing.T) {
 		GasForVerification:  100000,
 		PayloadSizeBytes:    1000,
 		LockOrBurnMechanism: adapters.CCTPV2WithCCVMechanism,
-		LockReleasePool:     "",
 		RemoteDomain: adapters.RemoteDomain[[]byte]{
 			AllowedCallerOnDest:   common.LeftPadBytes(common.HexToAddress("0x0D").Bytes(), 32),
 			AllowedCallerOnSource: common.LeftPadBytes(common.HexToAddress("0x0E").Bytes(), 32),
 			MintRecipientOnDest:   common.LeftPadBytes(common.HexToAddress("0x0F").Bytes(), 32),
 			DomainIdentifier:      1,
-		},
-		TokenPoolConfig: tokens.RemoteChainConfig[[]byte, string]{
-			RemotePool:                               common.LeftPadBytes(common.HexToAddress("0x1E").Bytes(), 32),
-			RemoteToken:                              common.LeftPadBytes(setup.USDCToken.Bytes(), 32),
-			DefaultFinalityInboundRateLimiterConfig:  testsetup.CreateRateLimiterConfig(0, 0),
-			DefaultFinalityOutboundRateLimiterConfig: testsetup.CreateRateLimiterConfig(0, 0),
-			CustomFinalityInboundRateLimiterConfig:   testsetup.CreateRateLimiterConfig(0, 0),
-			CustomFinalityOutboundRateLimiterConfig:  testsetup.CreateRateLimiterConfig(0, 0),
-		},
-	}
-
-	// Add a remote chain config with lock release mechanism
-	lockReleaseChainSelector := uint64(5719461335882077547)
-	// Deploy BurnMintTokenPool for lock release
-	// We just need the IPoolV1 check to pass
-	lockReleasePoolAddr, tx, _, err := burn_mint_token_pool_bindings.DeployBurnMintTokenPool(
-		chain.DeployerKey,
-		chain.Client,
-		setup.USDCToken,
-		6,                // localTokenDecimals
-		common.Address{}, // advancedPoolHooks (zero address)
-		setup.RMN,
-		setup.Router,
-	)
-	require.NoError(t, err, "Failed to deploy BurnMintTokenPool for lock release")
-	_, err = chain.Confirm(tx)
-	require.NoError(t, err, "Failed to confirm BurnMintTokenPool deployment")
-
-	input.RemoteChains[lockReleaseChainSelector] = adapters.RemoteCCTPChainConfig[string, []byte]{
-		FeeUSDCents:         20,
-		GasForVerification:  150000,
-		PayloadSizeBytes:    2000,
-		LockOrBurnMechanism: adapters.LockReleaseMechanism,
-		LockReleasePool:     lockReleasePoolAddr.Hex(),
-		RemoteDomain: adapters.RemoteDomain[[]byte]{
-			AllowedCallerOnDest:   common.LeftPadBytes(common.HexToAddress("0x1D").Bytes(), 32),
-			AllowedCallerOnSource: common.LeftPadBytes(common.HexToAddress("0x1E").Bytes(), 32),
-			MintRecipientOnDest:   common.LeftPadBytes(common.HexToAddress("0x1F").Bytes(), 32),
-			DomainIdentifier:      2,
 		},
 		TokenPoolConfig: tokens.RemoteChainConfig[[]byte, string]{
 			RemotePool:                               common.LeftPadBytes(common.HexToAddress("0x1E").Bytes(), 32),
@@ -292,7 +251,7 @@ func TestDeployCCTPChain(t *testing.T) {
 	// Check CCTPMessageTransmitterProxy authorized callers
 	cctpMessageTransmitterProxy, err := cctp_message_transmitter_proxy_bindings.NewCCTPMessageTransmitterProxy(cctpMessageTransmitterProxyAddr, chain.Client)
 	require.NoError(t, err, "Failed to instantiate CCTPMessageTransmitterProxy contract")
-	allowedCallers, err := cctpMessageTransmitterProxy.GetAllowedCallers(nil)
+	allowedCallers, err := cctpMessageTransmitterProxy.GetAllAuthorizedCallers(nil)
 	require.NoError(t, err, "Failed to get allowed callers from CCTPMessageTransmitterProxy")
 	require.Contains(t, allowedCallers, cctpVerifierAddr, "CCTPVerifier should be an allowed caller")
 
@@ -336,24 +295,6 @@ func TestDeployCCTPChain(t *testing.T) {
 	requiredCCVs, err := usdcTokenPoolProxy.GetRequiredCCVs(nil, setup.USDCToken, remoteChainSelector, big.NewInt(1e18), 1, []byte{}, 0)
 	require.NoError(t, err, "Failed to get required CCVs from USDCTokenPoolProxy")
 	require.Equal(t, []common.Address{cctpVerifierResolverAddr}, requiredCCVs, "Required CCVs should match")
-
-	// Check USDCTokenPoolProxy lock release pool address (should be zero for CCTP V2 with CCV)
-	lockReleasePool, err := usdcTokenPoolProxy.GetLockReleasePoolAddress(nil, remoteChainSelector)
-	require.NoError(t, err, "Failed to get lock release pool address from USDCTokenPoolProxy")
-	// LockReleasePool is empty in the test input, so it should be zero address
-	require.Equal(t, common.Address{}, lockReleasePool, "Lock release pool should be zero address when not set")
-
-	// Check lock release mechanism and pool for the lock release chain
-	lockReleaseMechanism, err := usdcTokenPoolProxy.GetLockOrBurnMechanism(nil, lockReleaseChainSelector)
-	require.NoError(t, err, "Failed to get lock or burn mechanism for lock release chain")
-	expectedLockReleaseMechanism, err := convertMechanismToUint8(adapters.LockReleaseMechanism)
-	require.NoError(t, err, "Failed to convert lock release mechanism to uint8")
-	require.Equal(t, expectedLockReleaseMechanism, uint8(lockReleaseMechanism), "Lock or burn mechanism should be LockRelease for lock release chain")
-
-	actualLockReleasePoolAddr, err := usdcTokenPoolProxy.GetLockReleasePoolAddress(nil, lockReleaseChainSelector)
-	require.NoError(t, err, "Failed to get lock release pool address for lock release chain")
-	require.NotEqual(t, common.Address{}, actualLockReleasePoolAddr, "Lock release pool should not be zero address")
-	require.Equal(t, lockReleasePoolAddr, actualLockReleasePoolAddr, "Lock release pool address should match the configured address")
 
 	// Check CCTPVerifier remote chain config
 	cctpVerifier, err := cctp_verifier_bindings.NewCCTPVerifier(cctpVerifierAddr, chain.Client)

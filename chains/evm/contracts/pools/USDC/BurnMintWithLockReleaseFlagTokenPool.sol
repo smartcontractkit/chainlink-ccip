@@ -34,8 +34,8 @@ contract BurnMintWithLockReleaseFlagTokenPool is BurnMintTokenPool {
   /// @inheritdoc IPoolV1
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
-  ) public override returns (Pool.LockOrBurnOutV1 memory) {
-    Pool.LockOrBurnOutV1 memory out = super.lockOrBurn(lockOrBurnIn);
+  ) public override returns (Pool.LockOrBurnOutV1 memory out) {
+    out = super.lockOrBurn(lockOrBurnIn);
     out.destPoolData = abi.encode(LOCK_RELEASE_FLAG);
     return out;
   }

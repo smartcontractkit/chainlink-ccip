@@ -203,10 +203,10 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 				Args: usdc_token_pool_proxy.ConstructorArgs{
 					Token: common.HexToAddress(input.USDCToken),
 					Pools: usdc_token_pool_proxy.USDCTokenPoolProxyPoolAddresses{
-						LegacyCctpV1Pool:  common.HexToAddress(input.TokenPools.LegacyCCTPV1Pool),
-						CctpV1Pool:        common.HexToAddress(input.TokenPools.CCTPV1Pool),
-						CctpV2Pool:        common.HexToAddress(input.TokenPools.CCTPV2Pool),
-						CctpV2PoolWithCCV: common.HexToAddress(input.TokenPools.CCTPV2PoolWithCCV),
+						LegacyCctpV1Pool: common.HexToAddress(input.TokenPools.LegacyCCTPV1Pool),
+						CctpV1Pool:       common.HexToAddress(input.TokenPools.CCTPV1Pool),
+						CctpV2Pool:       common.HexToAddress(input.TokenPools.CCTPV2Pool),
+						CctpTokenPool:    common.HexToAddress(input.TokenPools.CCTPV2PoolWithCCV),
 					},
 					Router:       common.HexToAddress(input.Router),
 					CCTPVerifier: cctpVerifierResolverAddress,
@@ -220,23 +220,22 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 		}
 
 		// Add CCTPVerifier as an authorized caller on the CCTPMessageTransmitterProxy
-		configureAllowedCallersReport, err := cldf_ops.ExecuteOperation(b, cctp_message_transmitter_proxy.ConfigureAllowedCallers, chain, contract_utils.FunctionInput[[]cctp_message_transmitter_proxy.AllowedCallerConfigArgs]{
+		verifierApplyAuthorizedCallerUpdatesReport, err := cldf_ops.ExecuteOperation(b, cctp_message_transmitter_proxy.ApplyAuthorizedCallerUpdates, chain, contract_utils.FunctionInput[cctp_message_transmitter_proxy.AuthorizedCallerArgs]{
 			ChainSelector: chain.Selector,
 			Address:       common.HexToAddress(input.MessageTransmitterProxy),
-			Args: []cctp_message_transmitter_proxy.AllowedCallerConfigArgs{
-				{
-					Caller:  cctpVerifierAddress,
-					Allowed: true,
+			Args: cctp_message_transmitter_proxy.AuthorizedCallerArgs{
+				AddedCallers: []common.Address{
+					cctpVerifierAddress,
 				},
 			},
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to apply authorized caller updates to message transmitter proxy: %w", err)
 		}
-		writes = append(writes, configureAllowedCallersReport.Output)
+		writes = append(writes, verifierApplyAuthorizedCallerUpdatesReport.Output)
 
 		// Add USDCTokenPoolProxy as an authorized caller on the CCTPTokenPool
-		applyAuthorizedCallerUpdatesReport, err := cldf_ops.ExecuteOperation(b, cctp_token_pool.ApplyAuthorizedCallerUpdates, chain, contract_utils.FunctionInput[cctp_token_pool.AuthorizedCallerArgs]{
+		poolApplyAuthorizedCallerUpdatesReport, err := cldf_ops.ExecuteOperation(b, cctp_token_pool.ApplyAuthorizedCallerUpdates, chain, contract_utils.FunctionInput[cctp_token_pool.AuthorizedCallerArgs]{
 			ChainSelector: chain.Selector,
 			Address:       common.HexToAddress(input.TokenPools.CCTPV2PoolWithCCV),
 			Args: cctp_token_pool.AuthorizedCallerArgs{
@@ -248,7 +247,7 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to apply authorized caller updates to CCTPTokenPool: %w", err)
 		}
-		writes = append(writes, applyAuthorizedCallerUpdatesReport.Output)
+		writes = append(writes, poolApplyAuthorizedCallerUpdatesReport.Output)
 
 		// Set inbound implementation on the CCTPVerifierResolver
 		committeeVerifierVersionTagReport, err := cldf_ops.ExecuteOperation(b, cctp_verifier.GetVersionTag, chain, contract_utils.FunctionInput[any]{
@@ -277,7 +276,6 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 		outboundImplementations := make([]versioned_verifier_resolver.OutboundImplementationArgs, 0)
 		remoteChainSelectors := make([]uint64, 0)
 		mechanisms := make([]uint8, 0)
-		lockReleasePools := make([]common.Address, 0)
 		setDomainArgs := make([]cctp_verifier.SetDomainArgs, 0)
 		remoteChainConfigArgs := make([]cctp_verifier.RemoteChainConfigArgs, 0)
 		for remoteChainSelector, remoteChain := range input.RemoteChains {
@@ -292,7 +290,6 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to convert lock or burn mechanism to uint8: %w", err)
 			}
 			mechanisms = append(mechanisms, mechanism)
-			lockReleasePools = append(lockReleasePools, common.HexToAddress(remoteChain.LockReleasePool))
 			allowedCallerOnDest, err := toBytes32(remoteChain.RemoteDomain.AllowedCallerOnDest)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to convert allowed caller on dest to bytes32: %w", err)
@@ -346,20 +343,6 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to update lock or burn mechanisms on USDCTokenPoolProxy: %w", err)
 		}
 		writes = append(writes, updateLockOrBurnMechanismsReport.Output)
-
-		// Update lock release pools on the USDCTokenPoolProxy
-		updateLockReleasePoolAddressesReport, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_proxy.UpdateLockReleasePoolAddresses, chain, contract_utils.FunctionInput[usdc_token_pool_proxy.UpdateLockReleasePoolAddressesArgs]{
-			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(input.USDCTokenPoolProxy),
-			Args: usdc_token_pool_proxy.UpdateLockReleasePoolAddressesArgs{
-				RemoteChainSelectors: remoteChainSelectors,
-				LockReleasePools:     lockReleasePools,
-			},
-		})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to update lock release pools on USDCTokenPoolProxy: %w", err)
-		}
-		writes = append(writes, updateLockReleasePoolAddressesReport.Output)
 
 		// Apply remote chain config updates on the CCTPVerifier
 		applyRemoteChainConfigUpdatesReport, err := cldf_ops.ExecuteOperation(b, cctp_verifier.ApplyRemoteChainConfigUpdates, chain, contract_utils.FunctionInput[[]cctp_verifier.RemoteChainConfigArgs]{
