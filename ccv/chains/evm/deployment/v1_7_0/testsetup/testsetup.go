@@ -142,6 +142,7 @@ func CreateBasicContractParams() sequences.ContractParams {
 			WETHPremiumMultiplierWeiPerEth: 1e18, // 1.0 ETH
 			USDPerLINK:                     usdPerLink,
 			USDPerWETH:                     usdPerWeth,
+			SetInitialPrices:               true,
 		},
 		MockReceivers: []sequences.MockReceiverParams{
 			{

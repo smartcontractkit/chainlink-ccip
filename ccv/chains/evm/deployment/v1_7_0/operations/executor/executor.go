@@ -97,10 +97,10 @@ var ApplyDestChainUpdates = contract.NewWrite(contract.WriteParams[ApplyDestChai
 		if err != nil {
 			return false, fmt.Errorf("failed to get dest chains: %w", err)
 		}
-		for _, activeDestChain := range activeDestChains {
+		for _, argsDestChainSelectorToAdd := range args.DestChainSelectorsToAdd {
 			found := false
-			for _, destChainToAdd := range args.DestChainSelectorsToAdd {
-				if activeDestChain.DestChainSelector == destChainToAdd.DestChainSelector {
+			for _, activeDestChain := range activeDestChains {
+				if activeDestChain.DestChainSelector == argsDestChainSelectorToAdd.DestChainSelector {
 					found = true
 					break
 				}
@@ -108,8 +108,10 @@ var ApplyDestChainUpdates = contract.NewWrite(contract.WriteParams[ApplyDestChai
 			if !found {
 				return false, nil
 			}
-			for _, destChainToRemove := range args.DestChainSelectorsToRemove {
-				if activeDestChain.DestChainSelector == destChainToRemove {
+		}
+		for _, argsDestChainSelectorToRemove := range args.DestChainSelectorsToRemove {
+			for _, activeDestChain := range activeDestChains {
+				if activeDestChain.DestChainSelector == argsDestChainSelectorToRemove {
 					return false, nil
 				}
 			}
