@@ -51,7 +51,7 @@ var ApplyCCVConfigUpdates = contract.NewWrite(contract.WriteParams[[]CCVConfigAr
 	ContractABI:     advanced_pool_hooks.AdvancedPoolHooksABI,
 	NewContract:     advanced_pool_hooks.NewAdvancedPoolHooks,
 	IsAllowedCaller: contract.OnlyOwner[*advanced_pool_hooks.AdvancedPoolHooks, []CCVConfigArg],
-	Validate: func(configs []CCVConfigArg) error {
+	Validate: func(advancedPoolHooks *advanced_pool_hooks.AdvancedPoolHooks, backend bind.ContractBackend, opts *bind.CallOpts, configs []CCVConfigArg) error {
 		for _, cfg := range configs {
 			// Ensure that OutboundCCVs has no duplicates.
 			if hasDuplicates(cfg.OutboundCCVs) {
@@ -93,7 +93,7 @@ var ApplyCCVConfigUpdates = contract.NewWrite(contract.WriteParams[[]CCVConfigAr
 
 		return nil
 	},
-	IsNoop: func(advancedPoolHooks *advanced_pool_hooks.AdvancedPoolHooks, opts *bind.CallOpts, caller common.Address, args []CCVConfigArg) (bool, error) {
+	IsNoop: func(advancedPoolHooks *advanced_pool_hooks.AdvancedPoolHooks, opts *bind.CallOpts, args []CCVConfigArg) (bool, error) {
 		// GetRequiredCCVs is not a reliable way to determine if the operation is a noop because it doesn't give a full picture of state.
 		// It just provides a list of required CCVs for given parameters. Therefore, we just check if the args are empty to determine if the operation is a noop.
 		return len(args) == 0, nil
@@ -111,7 +111,10 @@ var SetThresholdAmount = contract.NewWrite(contract.WriteParams[*big.Int, *advan
 	ContractABI:     advanced_pool_hooks.AdvancedPoolHooksABI,
 	NewContract:     advanced_pool_hooks.NewAdvancedPoolHooks,
 	IsAllowedCaller: contract.OnlyOwner[*advanced_pool_hooks.AdvancedPoolHooks, *big.Int],
-	IsNoop: func(advancedPoolHooks *advanced_pool_hooks.AdvancedPoolHooks, opts *bind.CallOpts, caller common.Address, args *big.Int) (bool, error) {
+	Validate: func(advancedPoolHooks *advanced_pool_hooks.AdvancedPoolHooks, backend bind.ContractBackend, opts *bind.CallOpts, args *big.Int) error {
+		return nil
+	},
+	IsNoop: func(advancedPoolHooks *advanced_pool_hooks.AdvancedPoolHooks, opts *bind.CallOpts, args *big.Int) (bool, error) {
 		if args == nil {
 			return true, nil
 		}
@@ -123,7 +126,6 @@ var SetThresholdAmount = contract.NewWrite(contract.WriteParams[*big.Int, *advan
 
 		return currentThresholdAmount.Cmp(args) == 0, nil
 	},
-	Validate: func(*big.Int) error { return nil },
 	CallContract: func(advancedPoolHooks *advanced_pool_hooks.AdvancedPoolHooks, opts *bind.TransactOpts, args *big.Int) (*types.Transaction, error) {
 		return advancedPoolHooks.SetThresholdAmount(opts, args)
 	},

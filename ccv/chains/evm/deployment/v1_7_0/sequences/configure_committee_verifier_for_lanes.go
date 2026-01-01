@@ -52,7 +52,6 @@ var ConfigureCommitteeVerifierForLanes = cldf_ops.NewSequence(
 		}
 
 		remoteChainConfigArgs := make([]committee_verifier.RemoteChainConfigArgs, 0, len(input.RemoteChains))
-		allowlistArgs := make([]committee_verifier.AllowlistConfigArgs, 0, len(input.RemoteChains))
 		signatureConfigs := make([]committee_verifier.SignatureConfig, 0, len(input.RemoteChains))
 		outboundImplementationArgs := make([]versioned_verifier_resolver.OutboundImplementationArgs, 0, len(input.RemoteChains))
 
@@ -73,12 +72,6 @@ var ConfigureCommitteeVerifierForLanes = cldf_ops.NewSequence(
 			for _, sender := range remoteConfig.RemovedAllowlistedSenders {
 				removedAllowlistedSenders = append(removedAllowlistedSenders, common.HexToAddress(sender))
 			}
-			allowlistArgs = append(allowlistArgs, committee_verifier.AllowlistConfigArgs{
-				AllowlistEnabled:          remoteConfig.AllowlistEnabled,
-				AddedAllowlistedSenders:   addedAllowlistedSenders,
-				RemovedAllowlistedSenders: removedAllowlistedSenders,
-				DestChainSelector:         remoteSelector,
-			})
 			signers := make([]common.Address, 0, len(remoteConfig.SignatureConfig.Signers))
 			for _, signer := range remoteConfig.SignatureConfig.Signers {
 				signers = append(signers, common.HexToAddress(signer))
@@ -104,17 +97,6 @@ var ConfigureCommitteeVerifierForLanes = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to apply remote chain config updates to CommitteeVerifier on chain %s: %w", chain, err)
 		}
 		writes = append(writes, committeeVerifierReport.Output)
-
-		// ApplyAllowlistUpdates on CommitteeVerifier
-		committeeVerifierAllowlistReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.ApplyAllowlistUpdates, chain, contract.FunctionInput[[]committee_verifier.AllowlistConfigArgs]{
-			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(committeeVerifier),
-			Args:          allowlistArgs,
-		})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to apply allowlist updates to CommitteeVerifier on chain %s: %w", chain, err)
-		}
-		writes = append(writes, committeeVerifierAllowlistReport.Output)
 
 		// ApplySignatureConfigs on CommitteeVerifier
 		committeeVerifierSignatureConfigReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.ApplySignatureConfigs, chain, contract.FunctionInput[committee_verifier.SignatureConfigArgs]{

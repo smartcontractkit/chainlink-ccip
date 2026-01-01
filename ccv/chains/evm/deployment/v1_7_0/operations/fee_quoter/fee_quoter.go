@@ -1,6 +1,7 @@
 package fee_quoter
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 
@@ -13,6 +14,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
+
+const minLockOrBurnRetBytes = 32
 
 var ContractType cldf_deployment.ContractType = "FeeQuoter"
 
@@ -75,7 +78,26 @@ var ApplyAuthorizedCallerUpdates = contract.NewWrite(contract.WriteParams[Author
 	ContractABI:     fee_quoter.FeeQuoterABI,
 	NewContract:     fee_quoter.NewFeeQuoter,
 	IsAllowedCaller: contract.OnlyOwner[*fee_quoter.FeeQuoter, AuthorizedCallerArgs],
-	Validate:        func(AuthorizedCallerArgs) error { return nil },
+	Validate: func(feeQuoter *fee_quoter.FeeQuoter, backend bind.ContractBackend, opts *bind.CallOpts, args AuthorizedCallerArgs) error {
+		for _, caller := range args.AddedCallers {
+			if caller == (common.Address{}) {
+				return errors.New("caller cannot be the zero address")
+			}
+		}
+		return nil
+	},
+	IsNoop: func(feeQuoter *fee_quoter.FeeQuoter, opts *bind.CallOpts, args AuthorizedCallerArgs) (bool, error) {
+		allowedCallers, err := feeQuoter.GetAllAuthorizedCallers(opts)
+		if err != nil {
+			return false, fmt.Errorf("failed to get all authorized callers: %w", err)
+		}
+		for _, caller := range args.AddedCallers {
+			if !slices.Contains(allowedCallers, caller) {
+				return false, nil
+			}
+		}
+		return true, nil
+	},
 	CallContract: func(feeQuoter *fee_quoter.FeeQuoter, opts *bind.TransactOpts, args AuthorizedCallerArgs) (*types.Transaction, error) {
 		return feeQuoter.ApplyAuthorizedCallerUpdates(opts, args)
 	},
@@ -89,7 +111,34 @@ var ApplyDestChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]DestC
 	ContractABI:     fee_quoter.FeeQuoterABI,
 	NewContract:     fee_quoter.NewFeeQuoter,
 	IsAllowedCaller: contract.OnlyOwner[*fee_quoter.FeeQuoter, []DestChainConfigArgs],
-	Validate:        func([]DestChainConfigArgs) error { return nil },
+	Validate: func(feeQuoter *fee_quoter.FeeQuoter, backend bind.ContractBackend, opts *bind.CallOpts, args []DestChainConfigArgs) error {
+		for _, arg := range args {
+			if arg.DestChainSelector == 0 {
+				return errors.New("dest chain selector cannot be 0")
+			}
+			if arg.DestChainConfig.DefaultTxGasLimit == 0 {
+				return errors.New("default tx gas limit cannot be 0")
+			}
+			if arg.DestChainConfig.DefaultTxGasLimit > arg.DestChainConfig.MaxPerMsgGasLimit {
+				return errors.New("default tx gas limit cannot be greater than max per msg gas limit")
+			}
+		}
+		return nil
+	},
+	IsNoop: func(feeQuoter *fee_quoter.FeeQuoter, opts *bind.CallOpts, args []DestChainConfigArgs) (bool, error) {
+		argsTransformed := transformDestChainConfigArgs(args)
+		for _, arg := range argsTransformed {
+			actualDestChainConfig, err := feeQuoter.GetDestChainConfig(opts, arg.DestChainSelector)
+			if err != nil {
+				return false, fmt.Errorf("failed to get dest chain config for dest chain selector %d: %w", arg.DestChainSelector, err)
+			}
+			if actualDestChainConfig != arg.DestChainConfig {
+				return false, nil
+			}
+		}
+
+		return true, nil
+	},
 	CallContract: func(feeQuoter *fee_quoter.FeeQuoter, opts *bind.TransactOpts, args []DestChainConfigArgs) (*types.Transaction, error) {
 		return feeQuoter.ApplyDestChainConfigUpdates(opts, transformDestChainConfigArgs(args))
 	},
@@ -103,7 +152,44 @@ var ApplyTokenTransferFeeConfigUpdates = contract.NewWrite(contract.WriteParams[
 	ContractABI:     fee_quoter.FeeQuoterABI,
 	NewContract:     fee_quoter.NewFeeQuoter,
 	IsAllowedCaller: contract.OnlyOwner[*fee_quoter.FeeQuoter, ApplyTokenTransferFeeConfigUpdatesArgs],
-	Validate:        func(ApplyTokenTransferFeeConfigUpdatesArgs) error { return nil },
+	Validate: func(feeQuoter *fee_quoter.FeeQuoter, backend bind.ContractBackend, opts *bind.CallOpts, args ApplyTokenTransferFeeConfigUpdatesArgs) error {
+		for _, arg := range args.TokenTransferFeeConfigArgs {
+			for _, tokenTransferFeeConfig := range arg.TokenTransferFeeConfigs {
+				if tokenTransferFeeConfig.TokenTransferFeeConfig.DestBytesOverhead < minLockOrBurnRetBytes {
+					return fmt.Errorf("dest bytes overhead cannot be less than %d", minLockOrBurnRetBytes)
+				}
+			}
+		}
+		return nil
+	},
+	IsNoop: func(feeQuoter *fee_quoter.FeeQuoter, opts *bind.CallOpts, args ApplyTokenTransferFeeConfigUpdatesArgs) (bool, error) {
+		for _, arg := range args.TokenTransferFeeConfigArgs {
+			for _, tokenTransferFeeConfig := range arg.TokenTransferFeeConfigs {
+				actualTokenTransferFeeConfig, err := feeQuoter.GetTokenTransferFee(opts, arg.DestChainSelector, tokenTransferFeeConfig.Token)
+				if err != nil {
+					return false, fmt.Errorf("failed to get token transfer fee for dest chain selector %d and token %s: %w", arg.DestChainSelector, tokenTransferFeeConfig.Token, err)
+				}
+				if actualTokenTransferFeeConfig.FeeUSDCents != tokenTransferFeeConfig.TokenTransferFeeConfig.FeeUSDCents ||
+					actualTokenTransferFeeConfig.DestGasOverhead != tokenTransferFeeConfig.TokenTransferFeeConfig.DestGasOverhead ||
+					actualTokenTransferFeeConfig.DestBytesOverhead != tokenTransferFeeConfig.TokenTransferFeeConfig.DestBytesOverhead {
+					return false, nil
+				}
+			}
+		}
+		for _, arg := range args.TokensToUseDefaultFeeConfigs {
+			actualTokenTransferFeeConfig, err := feeQuoter.GetTokenTransferFee(opts, arg.DestChainSelector, arg.Token)
+			if err != nil {
+				return false, fmt.Errorf("failed to get token transfer fee for dest chain selector %d and token %s: %w", arg.DestChainSelector, arg.Token, err)
+			}
+			if actualTokenTransferFeeConfig.FeeUSDCents != 0 ||
+				actualTokenTransferFeeConfig.DestGasOverhead != 0 ||
+				actualTokenTransferFeeConfig.DestBytesOverhead != 0 {
+				return false, nil
+			}
+		}
+
+		return true, nil
+	},
 	CallContract: func(feeQuoter *fee_quoter.FeeQuoter, opts *bind.TransactOpts, args ApplyTokenTransferFeeConfigUpdatesArgs) (*types.Transaction, error) {
 		return feeQuoter.ApplyTokenTransferFeeConfigUpdates(opts, args.TokenTransferFeeConfigArgs, args.TokensToUseDefaultFeeConfigs)
 	},
@@ -126,7 +212,31 @@ var UpdatePrices = contract.NewWrite(contract.WriteParams[PriceUpdates, *fee_quo
 		}
 		return false, nil
 	},
-	Validate: func(PriceUpdates) error { return nil },
+	Validate: func(feeQuoter *fee_quoter.FeeQuoter, backend bind.ContractBackend, opts *bind.CallOpts, args PriceUpdates) error {
+		return nil
+	},
+	IsNoop: func(feeQuoter *fee_quoter.FeeQuoter, opts *bind.CallOpts, args PriceUpdates) (bool, error) {
+		for _, arg := range args.TokenPriceUpdates {
+			actualTokenPrice, err := feeQuoter.GetTokenPrice(opts, arg.SourceToken)
+			if err != nil {
+				return false, fmt.Errorf("failed to get token price for source token %s: %w", arg.SourceToken, err)
+			}
+			if actualTokenPrice.Value.Cmp(arg.UsdPerToken) != 0 {
+				return false, nil
+			}
+		}
+		for _, arg := range args.GasPriceUpdates {
+			actualGasPrice, err := feeQuoter.GetDestinationChainGasPrice(opts, arg.DestChainSelector)
+			if err != nil {
+				return false, fmt.Errorf("failed to get gas price for dest chain selector %d: %w", arg.DestChainSelector, err)
+			}
+			if actualGasPrice.Value.Cmp(arg.UsdPerUnitGas) != 0 {
+				return false, nil
+			}
+		}
+
+		return true, nil
+	},
 	CallContract: func(feeQuoter *fee_quoter.FeeQuoter, opts *bind.TransactOpts, args PriceUpdates) (*types.Transaction, error) {
 		return feeQuoter.UpdatePrices(opts, args)
 	},

@@ -1,6 +1,10 @@
 package erc20_lock_box
 
 import (
+	"errors"
+	"fmt"
+	"slices"
+
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -40,7 +44,31 @@ var ApplyAuthorizedCallerUpdates = contract.NewWrite(contract.WriteParams[Author
 	ContractABI:     erc20_lock_box.ERC20LockBoxABI,
 	NewContract:     erc20_lock_box.NewERC20LockBox,
 	IsAllowedCaller: contract.OnlyOwner[*erc20_lock_box.ERC20LockBox, AuthorizedCallerArgs],
-	Validate:        func(AuthorizedCallerArgs) error { return nil },
+	Validate: func(erc20LockBox *erc20_lock_box.ERC20LockBox, backend bind.ContractBackend, opts *bind.CallOpts, args AuthorizedCallerArgs) error {
+		for _, caller := range args.AddedCallers {
+			if caller == (common.Address{}) {
+				return errors.New("caller cannot be the zero address")
+			}
+		}
+		return nil
+	},
+	IsNoop: func(erc20LockBox *erc20_lock_box.ERC20LockBox, opts *bind.CallOpts, args AuthorizedCallerArgs) (bool, error) {
+		allowedCallers, err := erc20LockBox.GetAllAuthorizedCallers(opts)
+		if err != nil {
+			return false, fmt.Errorf("failed to get all authorized callers: %w", err)
+		}
+		for _, caller := range args.AddedCallers {
+			if !slices.Contains(allowedCallers, caller) {
+				return false, nil
+			}
+		}
+		for _, caller := range args.RemovedCallers {
+			if slices.Contains(allowedCallers, caller) {
+				return false, nil
+			}
+		}
+		return true, nil
+	},
 	CallContract: func(erc20LockBox *erc20_lock_box.ERC20LockBox, opts *bind.TransactOpts, args AuthorizedCallerArgs) (*types.Transaction, error) {
 		return erc20LockBox.ApplyAuthorizedCallerUpdates(opts, args)
 	},

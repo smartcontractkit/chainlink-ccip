@@ -1,7 +1,10 @@
 package committee_verifier
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -70,7 +73,21 @@ var SetDynamicConfig = contract.NewWrite(contract.WriteParams[SetDynamicConfigAr
 	ContractABI:     committee_verifier.CommitteeVerifierABI,
 	NewContract:     committee_verifier.NewCommitteeVerifier,
 	IsAllowedCaller: contract.OnlyOwner[*committee_verifier.CommitteeVerifier, SetDynamicConfigArgs],
-	Validate:        func(SetDynamicConfigArgs) error { return nil },
+	Validate: func(committeeVerifier *committee_verifier.CommitteeVerifier, backend bind.ContractBackend, opts *bind.CallOpts, args SetDynamicConfigArgs) error {
+		if args.DynamicConfig.FeeAggregator == (common.Address{}) {
+			return errors.New("fee aggregator cannot be the zero address")
+		}
+
+		return nil
+	},
+	IsNoop: func(committeeVerifier *committee_verifier.CommitteeVerifier, opts *bind.CallOpts, args SetDynamicConfigArgs) (bool, error) {
+		currentDynamicConfig, err := committeeVerifier.GetDynamicConfig(opts)
+		if err != nil {
+			return false, fmt.Errorf("failed to get dynamic configuration: %w", err)
+		}
+
+		return currentDynamicConfig == args.DynamicConfig, nil
+	},
 	CallContract: func(committeeVerifier *committee_verifier.CommitteeVerifier, opts *bind.TransactOpts, args SetDynamicConfigArgs) (*types.Transaction, error) {
 		return committeeVerifier.SetDynamicConfig(opts, args.DynamicConfig)
 	},
@@ -84,35 +101,63 @@ var ApplyRemoteChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]Rem
 	ContractABI:     committee_verifier.CommitteeVerifierABI,
 	NewContract:     committee_verifier.NewCommitteeVerifier,
 	IsAllowedCaller: contract.OnlyOwner[*committee_verifier.CommitteeVerifier, []RemoteChainConfigArgs],
-	Validate:        func([]RemoteChainConfigArgs) error { return nil },
+	Validate: func(committeeVerifier *committee_verifier.CommitteeVerifier, backend bind.ContractBackend, opts *bind.CallOpts, args []RemoteChainConfigArgs) error {
+		for _, cfg := range args {
+			if cfg.RemoteChainSelector == 0 {
+				return errors.New("remote chain selector cannot be 0")
+			}
+			if cfg.GasForVerification == 0 {
+				return errors.New("gas for verification cannot be 0")
+			}
+		}
+
+		return nil
+	},
+	IsNoop: func(committeeVerifier *committee_verifier.CommitteeVerifier, opts *bind.CallOpts, args []RemoteChainConfigArgs) (bool, error) {
+		for _, cfg := range args {
+			remoteChainConfig, err := committeeVerifier.GetRemoteChainConfig(opts, cfg.RemoteChainSelector)
+			if err != nil {
+				return false, fmt.Errorf("failed to get remote chain config for remote chain selector %d: %w", cfg.RemoteChainSelector, err)
+			}
+			if remoteChainConfig.Router == (common.Address{}) {
+				return false, nil
+			}
+			feeConfig, err := committeeVerifier.GetFee(opts, cfg.RemoteChainSelector, committee_verifier.ClientEVM2AnyMessage{}, []byte{}, 0)
+			if err != nil {
+				return false, fmt.Errorf("failed to get fee for remote chain selector %d: %w", cfg.RemoteChainSelector, err)
+			}
+			if feeConfig.GasForVerification != cfg.GasForVerification ||
+				feeConfig.PayloadSizeBytes != cfg.PayloadSizeBytes ||
+				feeConfig.FeeUSDCents != cfg.FeeUSDCents ||
+				remoteChainConfig.Router != cfg.Router ||
+				remoteChainConfig.AllowlistEnabled != cfg.AllowlistEnabled {
+				return false, nil
+			}
+		}
+
+		return true, nil
+	},
 	CallContract: func(committeeVerifier *committee_verifier.CommitteeVerifier, opts *bind.TransactOpts, args []RemoteChainConfigArgs) (*types.Transaction, error) {
 		return committeeVerifier.ApplyRemoteChainConfigUpdates(opts, args)
 	},
 })
 
-var ApplyAllowlistUpdates = contract.NewWrite(contract.WriteParams[[]AllowlistConfigArgs, *committee_verifier.CommitteeVerifier]{
-	Name:            "committee-verifier:apply-allowlist-updates",
-	Version:         Version,
-	Description:     "Applies updates to the allowlist (those authorized to send messages) on the CommitteeVerifier",
-	ContractType:    ContractType,
-	ContractABI:     committee_verifier.CommitteeVerifierABI,
-	NewContract:     committee_verifier.NewCommitteeVerifier,
-	IsAllowedCaller: contract.OnlyOwner[*committee_verifier.CommitteeVerifier, []AllowlistConfigArgs],
-	Validate:        func([]AllowlistConfigArgs) error { return nil },
-	CallContract: func(committeeVerifier *committee_verifier.CommitteeVerifier, opts *bind.TransactOpts, args []AllowlistConfigArgs) (*types.Transaction, error) {
-		return committeeVerifier.ApplyAllowlistUpdates(opts, args)
-	},
-})
-
 var WithdrawFeeTokens = contract.NewWrite(contract.WriteParams[WithdrawFeeTokensArgs, *committee_verifier.CommitteeVerifier]{
-	Name:            "committee-verifier:withdraw-fee-tokens",
-	Version:         Version,
-	Description:     "Withdraws fee tokens from the CommitteeVerifier",
-	ContractType:    ContractType,
-	ContractABI:     committee_verifier.CommitteeVerifierABI,
-	NewContract:     committee_verifier.NewCommitteeVerifier,
-	IsAllowedCaller: contract.OnlyOwner[*committee_verifier.CommitteeVerifier, WithdrawFeeTokensArgs],
-	Validate:        func(WithdrawFeeTokensArgs) error { return nil },
+	Name:         "committee-verifier:withdraw-fee-tokens",
+	Version:      Version,
+	Description:  "Withdraws fee tokens from the CommitteeVerifier",
+	ContractType: ContractType,
+	ContractABI:  committee_verifier.CommitteeVerifierABI,
+	NewContract:  committee_verifier.NewCommitteeVerifier,
+	IsAllowedCaller: func(committeeVerifier *committee_verifier.CommitteeVerifier, opts *bind.CallOpts, caller common.Address, args WithdrawFeeTokensArgs) (bool, error) {
+		return true, nil
+	},
+	Validate: func(committeeVerifier *committee_verifier.CommitteeVerifier, backend bind.ContractBackend, opts *bind.CallOpts, args WithdrawFeeTokensArgs) error {
+		return nil
+	},
+	IsNoop: func(committeeVerifier *committee_verifier.CommitteeVerifier, opts *bind.CallOpts, args WithdrawFeeTokensArgs) (bool, error) {
+		return false, nil
+	},
 	CallContract: func(committeeVerifier *committee_verifier.CommitteeVerifier, opts *bind.TransactOpts, args WithdrawFeeTokensArgs) (*types.Transaction, error) {
 		return committeeVerifier.WithdrawFeeTokens(opts, args.FeeTokens)
 	},
@@ -126,7 +171,55 @@ var ApplySignatureConfigs = contract.NewWrite(contract.WriteParams[SignatureConf
 	ContractABI:     committee_verifier.CommitteeVerifierABI,
 	NewContract:     committee_verifier.NewCommitteeVerifier,
 	IsAllowedCaller: contract.OnlyOwner[*committee_verifier.CommitteeVerifier, SignatureConfigArgs],
-	Validate:        func(SignatureConfigArgs) error { return nil },
+	Validate: func(committeeVerifier *committee_verifier.CommitteeVerifier, backend bind.ContractBackend, opts *bind.CallOpts, args SignatureConfigArgs) error {
+		for _, cfg := range args.SignatureConfigUpdates {
+			if cfg.Threshold == 0 {
+				return errors.New("threshold cannot be 0")
+			}
+			if cfg.Threshold > uint8(len(cfg.Signers)) {
+				return errors.New("threshold cannot be greater than the number of signers")
+			}
+		}
+
+		return nil
+	},
+	IsNoop: func(committeeVerifier *committee_verifier.CommitteeVerifier, opts *bind.CallOpts, args SignatureConfigArgs) (bool, error) {
+		for _, cfg := range args.SignatureConfigUpdates {
+			signers, threshold, err := committeeVerifier.GetSignatureConfig(opts, cfg.SourceChainSelector)
+			if err != nil {
+				return false, fmt.Errorf("failed to get signature configuration for source chain selector %d: %w", cfg.SourceChainSelector, err)
+			}
+			if threshold != cfg.Threshold {
+				return false, nil
+			}
+			if len(signers) != len(cfg.Signers) {
+				return false, nil
+			}
+			slices.SortFunc(signers, func(a, b common.Address) int {
+				return bytes.Compare(a[:], b[:])
+			})
+			slices.SortFunc(cfg.Signers, func(a, b common.Address) int {
+				return bytes.Compare(a[:], b[:])
+			})
+			for i, signer := range signers {
+				if signer != cfg.Signers[i] {
+					return false, nil
+				}
+			}
+		}
+
+		for _, sourceChainSelector := range args.SourceChainSelectorsToRemove {
+			signers, threshold, err := committeeVerifier.GetSignatureConfig(opts, sourceChainSelector)
+			if err != nil {
+				return false, fmt.Errorf("failed to get signature configuration for source chain selector %d: %w", sourceChainSelector, err)
+			}
+			if len(signers) != 0 || threshold != 0 {
+				return false, nil
+			}
+		}
+
+		return true, nil
+	},
 	CallContract: func(committeeVerifier *committee_verifier.CommitteeVerifier, opts *bind.TransactOpts, args SignatureConfigArgs) (*types.Transaction, error) {
 		return committeeVerifier.ApplySignatureConfigs(opts, args.SourceChainSelectorsToRemove, args.SignatureConfigUpdates)
 	},

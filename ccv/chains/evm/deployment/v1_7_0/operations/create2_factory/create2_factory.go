@@ -68,7 +68,12 @@ var CreateAndTransferOwnership = contract.NewWrite(contract.WriteParams[CreateAn
 		}
 		return slices.Contains(allowList, caller), nil
 	},
-	Validate: func(CreateAndTransferOwnershipArgs) error { return nil },
+	Validate: func(contract *create2_factory.CREATE2Factory, backend bind.ContractBackend, opts *bind.CallOpts, input CreateAndTransferOwnershipArgs) error {
+		return nil
+	},
+	IsNoop: func(contract *create2_factory.CREATE2Factory, opts *bind.CallOpts, input CreateAndTransferOwnershipArgs) (bool, error) {
+		return false, nil
+	},
 	CallContract: func(contract *create2_factory.CREATE2Factory, opts *bind.TransactOpts, input CreateAndTransferOwnershipArgs) (*types.Transaction, error) {
 		creationCode, err := makeCreationCode(input.ABI, input.Bin, input.ConstructorArgs...)
 		if err != nil {
@@ -101,7 +106,26 @@ var ApplyAllowListUpdates = contract.NewWrite(contract.WriteParams[ApplyAllowLis
 	ContractABI:     create2_factory.CREATE2FactoryABI,
 	NewContract:     create2_factory.NewCREATE2Factory,
 	IsAllowedCaller: contract.OnlyOwner[*create2_factory.CREATE2Factory, ApplyAllowListUpdatesArgs],
-	Validate:        func(ApplyAllowListUpdatesArgs) error { return nil },
+	Validate: func(contract *create2_factory.CREATE2Factory, backend bind.ContractBackend, opts *bind.CallOpts, input ApplyAllowListUpdatesArgs) error {
+		return nil
+	},
+	IsNoop: func(contract *create2_factory.CREATE2Factory, opts *bind.CallOpts, input ApplyAllowListUpdatesArgs) (bool, error) {
+		allowList, err := contract.GetAllowList(opts)
+		if err != nil {
+			return false, fmt.Errorf("failed to get allow list: %w", err)
+		}
+		for _, addr := range input.Adds {
+			if !slices.Contains(allowList, addr) {
+				return false, nil
+			}
+		}
+		for _, addr := range input.Removes {
+			if slices.Contains(allowList, addr) {
+				return false, nil
+			}
+		}
+		return true, nil
+	},
 	CallContract: func(contract *create2_factory.CREATE2Factory, opts *bind.TransactOpts, input ApplyAllowListUpdatesArgs) (*types.Transaction, error) {
 		return contract.ApplyAllowListUpdates(opts, input.Removes, input.Adds)
 	},

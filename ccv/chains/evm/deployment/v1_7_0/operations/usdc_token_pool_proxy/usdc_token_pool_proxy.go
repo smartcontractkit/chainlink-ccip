@@ -1,6 +1,9 @@
 package usdc_token_pool_proxy
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -54,7 +57,30 @@ var UpdateLockOrBurnMechanisms = contract.NewWrite(contract.WriteParams[UpdateLo
 	ContractABI:     usdc_token_pool_proxy.USDCTokenPoolProxyABI,
 	NewContract:     usdc_token_pool_proxy.NewUSDCTokenPoolProxy,
 	IsAllowedCaller: contract.OnlyOwner[*usdc_token_pool_proxy.USDCTokenPoolProxy, UpdateLockOrBurnMechanismsArgs],
-	Validate:        func(UpdateLockOrBurnMechanismsArgs) error { return nil },
+	Validate: func(proxy *usdc_token_pool_proxy.USDCTokenPoolProxy, backend bind.ContractBackend, opts *bind.CallOpts, args UpdateLockOrBurnMechanismsArgs) error {
+		if len(args.RemoteChainSelectors) != len(args.Mechanisms) {
+			return errors.New("remote chain selectors and mechanisms must have the same length")
+		}
+		for _, mechanism := range args.Mechanisms {
+			if mechanism == 0 || mechanism > 4 {
+				return errors.New("invalid mechanism, must be [1-4] - CCTP_V1, CCTP_V2, LOCK_RELEASE, CCTP_V2_WITH_CCV")
+			}
+		}
+		return nil
+	},
+	IsNoop: func(proxy *usdc_token_pool_proxy.USDCTokenPoolProxy, opts *bind.CallOpts, args UpdateLockOrBurnMechanismsArgs) (bool, error) {
+		for i, arg := range args.RemoteChainSelectors {
+			actualMechanism, err := proxy.GetLockOrBurnMechanism(opts, arg)
+			if err != nil {
+				return false, fmt.Errorf("failed to get lock or burn mechanism for remote chain selector %d: %w", arg, err)
+			}
+			if actualMechanism != args.Mechanisms[i] {
+				return false, nil
+			}
+		}
+
+		return true, nil
+	},
 	CallContract: func(proxy *usdc_token_pool_proxy.USDCTokenPoolProxy, opts *bind.TransactOpts, args UpdateLockOrBurnMechanismsArgs) (*types.Transaction, error) {
 		return proxy.UpdateLockOrBurnMechanisms(opts, args.RemoteChainSelectors, args.Mechanisms)
 	},

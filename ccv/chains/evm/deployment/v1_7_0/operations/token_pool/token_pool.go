@@ -1,6 +1,9 @@
 package token_pool
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -11,6 +14,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
+
+const bpsDivider = 10000
 
 var ContractType cldf_deployment.ContractType = "TokenPool"
 
@@ -110,7 +115,16 @@ var SetMinBlockConfirmation = contract.NewWrite(contract.WriteParams[uint16, *to
 	ContractABI:     token_pool.TokenPoolABI,
 	NewContract:     token_pool.NewTokenPool,
 	IsAllowedCaller: contract.OnlyOwner[*token_pool.TokenPool, uint16],
-	Validate:        func(uint16) error { return nil },
+	Validate: func(tokenPool *token_pool.TokenPool, backend bind.ContractBackend, opts *bind.CallOpts, args uint16) error {
+		return nil
+	},
+	IsNoop: func(tokenPool *token_pool.TokenPool, opts *bind.CallOpts, args uint16) (bool, error) {
+		actualMinBlockConfirmation, err := tokenPool.GetMinBlockConfirmation(opts)
+		if err != nil {
+			return false, fmt.Errorf("failed to get min block confirmation: %w", err)
+		}
+		return actualMinBlockConfirmation == args, nil
+	},
 	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.TransactOpts, args uint16) (*types.Transaction, error) {
 		return tokenPool.SetMinBlockConfirmation(opts, args)
 	},
@@ -124,7 +138,12 @@ var ApplyChainUpdates = contract.NewWrite(contract.WriteParams[ApplyChainUpdates
 	ContractABI:     token_pool.TokenPoolABI,
 	NewContract:     token_pool.NewTokenPool,
 	IsAllowedCaller: contract.OnlyOwner[*token_pool.TokenPool, ApplyChainUpdatesArgs],
-	Validate:        func(ApplyChainUpdatesArgs) error { return nil },
+	Validate: func(tokenPool *token_pool.TokenPool, backend bind.ContractBackend, opts *bind.CallOpts, args ApplyChainUpdatesArgs) error {
+		return nil
+	},
+	IsNoop: func(tokenPool *token_pool.TokenPool, opts *bind.CallOpts, args ApplyChainUpdatesArgs) (bool, error) {
+		return false, nil
+	},
 	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.TransactOpts, args ApplyChainUpdatesArgs) (*types.Transaction, error) {
 		chainsToAdd := make([]token_pool.TokenPoolChainUpdate, len(args.ChainsToAdd))
 		for i, chain := range args.ChainsToAdd {
@@ -148,7 +167,23 @@ var AddRemotePool = contract.NewWrite(contract.WriteParams[RemotePoolArgs, *toke
 	ContractABI:     token_pool.TokenPoolABI,
 	NewContract:     token_pool.NewTokenPool,
 	IsAllowedCaller: contract.OnlyOwner[*token_pool.TokenPool, RemotePoolArgs],
-	Validate:        func(RemotePoolArgs) error { return nil },
+	Validate: func(tokenPool *token_pool.TokenPool, backend bind.ContractBackend, opts *bind.CallOpts, args RemotePoolArgs) error {
+		isSupportedChain, err := tokenPool.IsSupportedChain(opts, args.RemoteChainSelector)
+		if err != nil {
+			return fmt.Errorf("failed to check if chain is supported: %w", err)
+		}
+		if !isSupportedChain {
+			return fmt.Errorf("chain %d is not supported", args.RemoteChainSelector)
+		}
+		return nil
+	},
+	IsNoop: func(tokenPool *token_pool.TokenPool, opts *bind.CallOpts, args RemotePoolArgs) (bool, error) {
+		isRemotePool, err := tokenPool.IsRemotePool(opts, args.RemoteChainSelector, args.RemotePoolAddress)
+		if err != nil {
+			return false, fmt.Errorf("failed to check if pool is remote: %w", err)
+		}
+		return isRemotePool, nil
+	},
 	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.TransactOpts, args RemotePoolArgs) (*types.Transaction, error) {
 		return tokenPool.AddRemotePool(opts, args.RemoteChainSelector, args.RemotePoolAddress)
 	},
@@ -162,7 +197,23 @@ var RemoveRemotePool = contract.NewWrite(contract.WriteParams[RemotePoolArgs, *t
 	ContractABI:     token_pool.TokenPoolABI,
 	NewContract:     token_pool.NewTokenPool,
 	IsAllowedCaller: contract.OnlyOwner[*token_pool.TokenPool, RemotePoolArgs],
-	Validate:        func(RemotePoolArgs) error { return nil },
+	Validate: func(tokenPool *token_pool.TokenPool, backend bind.ContractBackend, opts *bind.CallOpts, args RemotePoolArgs) error {
+		isSupportedChain, err := tokenPool.IsSupportedChain(opts, args.RemoteChainSelector)
+		if err != nil {
+			return fmt.Errorf("failed to check if chain is supported: %w", err)
+		}
+		if !isSupportedChain {
+			return fmt.Errorf("chain %d is not supported", args.RemoteChainSelector)
+		}
+		return nil
+	},
+	IsNoop: func(tokenPool *token_pool.TokenPool, opts *bind.CallOpts, args RemotePoolArgs) (bool, error) {
+		isRemotePool, err := tokenPool.IsRemotePool(opts, args.RemoteChainSelector, args.RemotePoolAddress)
+		if err != nil {
+			return false, fmt.Errorf("failed to check if pool is remote: %w", err)
+		}
+		return !isRemotePool, nil
+	},
 	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.TransactOpts, args RemotePoolArgs) (*types.Transaction, error) {
 		return tokenPool.RemoveRemotePool(opts, args.RemoteChainSelector, args.RemotePoolAddress)
 	},
@@ -176,7 +227,32 @@ var SetRateLimitConfig = contract.NewWrite(contract.WriteParams[[]SetRateLimitCo
 	ContractABI:     token_pool.TokenPoolABI,
 	NewContract:     token_pool.NewTokenPool,
 	IsAllowedCaller: contract.OnlyOwner[*token_pool.TokenPool, []SetRateLimitConfigArg],
-	Validate:        func([]SetRateLimitConfigArg) error { return nil },
+	Validate: func(tokenPool *token_pool.TokenPool, backend bind.ContractBackend, opts *bind.CallOpts, args []SetRateLimitConfigArg) error {
+		for _, arg := range args {
+			isSupportedChain, err := tokenPool.IsSupportedChain(opts, arg.RemoteChainSelector)
+			if err != nil {
+				return fmt.Errorf("failed to check if chain is supported: %w", err)
+			}
+			if !isSupportedChain {
+				return fmt.Errorf("chain %d is not supported", arg.RemoteChainSelector)
+			}
+		}
+		return nil
+	},
+	IsNoop: func(tokenPool *token_pool.TokenPool, opts *bind.CallOpts, args []SetRateLimitConfigArg) (bool, error) {
+		for _, arg := range args {
+			currentRateLimiterState, err := tokenPool.GetCurrentRateLimiterState(opts, arg.RemoteChainSelector, arg.CustomBlockConfirmation)
+			if err != nil {
+				return false, fmt.Errorf("failed to get current rate limiter state: %w", err)
+			}
+			if !rateLimiterConfigsEqual(currentRateLimiterState.OutboundRateLimiterState, arg.OutboundRateLimiterConfig) ||
+				!rateLimiterConfigsEqual(currentRateLimiterState.InboundRateLimiterState, arg.InboundRateLimiterConfig) {
+				return false, nil
+			}
+		}
+
+		return true, nil
+	},
 	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.TransactOpts, args []SetRateLimitConfigArg) (*types.Transaction, error) {
 		rateLimitConfigArgs := make([]token_pool.TokenPoolRateLimitConfigArgs, 0, len(args))
 		for _, arg := range args {
@@ -199,7 +275,21 @@ var SetDynamicConfig = contract.NewWrite(contract.WriteParams[DynamicConfigArgs,
 	ContractABI:     token_pool.TokenPoolABI,
 	NewContract:     token_pool.NewTokenPool,
 	IsAllowedCaller: contract.OnlyOwner[*token_pool.TokenPool, DynamicConfigArgs],
-	Validate:        func(DynamicConfigArgs) error { return nil },
+	Validate: func(tokenPool *token_pool.TokenPool, backend bind.ContractBackend, opts *bind.CallOpts, args DynamicConfigArgs) error {
+		if args.Router == (common.Address{}) {
+			return errors.New("router cannot be zero address")
+		}
+
+		return nil
+	},
+	IsNoop: func(tokenPool *token_pool.TokenPool, opts *bind.CallOpts, args DynamicConfigArgs) (bool, error) {
+		currentDynamicConfig, err := tokenPool.GetDynamicConfig(opts)
+		if err != nil {
+			return false, fmt.Errorf("failed to get dynamic configuration: %w", err)
+		}
+
+		return currentDynamicConfig.Router == args.Router && currentDynamicConfig.RateLimitAdmin == args.RateLimitAdmin, nil
+	},
 	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.TransactOpts, args DynamicConfigArgs) (*types.Transaction, error) {
 		return tokenPool.SetDynamicConfig(opts, args.Router, args.RateLimitAdmin)
 	},
@@ -213,7 +303,12 @@ var WithdrawFeeTokens = contract.NewWrite(contract.WriteParams[WithdrawFeeTokens
 	ContractABI:     token_pool.TokenPoolABI,
 	NewContract:     token_pool.NewTokenPool,
 	IsAllowedCaller: contract.OnlyOwner[*token_pool.TokenPool, WithdrawFeeTokensArgs],
-	Validate:        func(WithdrawFeeTokensArgs) error { return nil },
+	Validate: func(tokenPool *token_pool.TokenPool, backend bind.ContractBackend, opts *bind.CallOpts, args WithdrawFeeTokensArgs) error {
+		return nil
+	},
+	IsNoop: func(tokenPool *token_pool.TokenPool, opts *bind.CallOpts, args WithdrawFeeTokensArgs) (bool, error) {
+		return false, nil
+	},
 	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.TransactOpts, args WithdrawFeeTokensArgs) (*types.Transaction, error) {
 		return tokenPool.WithdrawFeeTokens(opts, args.FeeTokens, args.Recipient)
 	},
@@ -227,7 +322,16 @@ var UpdateAdvancedPoolHooks = contract.NewWrite(contract.WriteParams[common.Addr
 	ContractABI:     token_pool.TokenPoolABI,
 	NewContract:     token_pool.NewTokenPool,
 	IsAllowedCaller: contract.OnlyOwner[*token_pool.TokenPool, common.Address],
-	Validate:        func(common.Address) error { return nil },
+	Validate: func(tokenPool *token_pool.TokenPool, backend bind.ContractBackend, opts *bind.CallOpts, args common.Address) error {
+		return nil
+	},
+	IsNoop: func(tokenPool *token_pool.TokenPool, opts *bind.CallOpts, args common.Address) (bool, error) {
+		currentAdvancedPoolHooks, err := tokenPool.GetAdvancedPoolHooks(opts)
+		if err != nil {
+			return false, fmt.Errorf("failed to get advanced pool hooks: %w", err)
+		}
+		return currentAdvancedPoolHooks == args, nil
+	},
 	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.TransactOpts, args common.Address) (*types.Transaction, error) {
 		return tokenPool.UpdateAdvancedPoolHooks(opts, args)
 	},
@@ -241,7 +345,52 @@ var ApplyTokenTransferFeeConfigUpdates = contract.NewWrite(contract.WriteParams[
 	ContractABI:     token_pool.TokenPoolABI,
 	NewContract:     token_pool.NewTokenPool,
 	IsAllowedCaller: contract.OnlyOwner[*token_pool.TokenPool, TokenTransferFeeConfigArgs],
-	Validate:        func(TokenTransferFeeConfigArgs) error { return nil },
+	Validate: func(tokenPool *token_pool.TokenPool, backend bind.ContractBackend, opts *bind.CallOpts, args TokenTransferFeeConfigArgs) error {
+		for _, arg := range args.TokenTransferFeeConfigUpdates {
+			if !arg.IsEnabled {
+				return errors.New("isEnabled cannot be false")
+			}
+			if arg.DefaultBlockConfirmationTransferFeeBps >= bpsDivider {
+				return errors.New("default block confirmation transfer fee bps cannot be greater than or equal to bps divider")
+			}
+			if arg.CustomBlockConfirmationTransferFeeBps >= bpsDivider {
+				return errors.New("custom block confirmation transfer fee bps cannot be greater than or equal to bps divider")
+			}
+			if arg.DestGasOverhead == 0 {
+				return errors.New("dest gas overhead cannot be 0")
+			}
+		}
+
+		return nil
+	},
+	IsNoop: func(tokenPool *token_pool.TokenPool, opts *bind.CallOpts, args TokenTransferFeeConfigArgs) (bool, error) {
+		for _, arg := range args.TokenTransferFeeConfigUpdates {
+			actualTokenTransferFeeConfig, err := tokenPool.GetTokenTransferFeeConfig(opts, common.Address{}, arg.DestChainSelector, 0, []byte{})
+			if err != nil {
+				return false, fmt.Errorf("failed to get token transfer fee config: %w", err)
+			}
+			if actualTokenTransferFeeConfig.DestGasOverhead != arg.DestGasOverhead ||
+				actualTokenTransferFeeConfig.DestBytesOverhead != arg.DestBytesOverhead ||
+				actualTokenTransferFeeConfig.DefaultBlockConfirmationFeeUSDCents != arg.DefaultBlockConfirmationFeeUSDCents ||
+				actualTokenTransferFeeConfig.CustomBlockConfirmationFeeUSDCents != arg.CustomBlockConfirmationFeeUSDCents ||
+				actualTokenTransferFeeConfig.DefaultBlockConfirmationTransferFeeBps != arg.DefaultBlockConfirmationTransferFeeBps ||
+				actualTokenTransferFeeConfig.CustomBlockConfirmationTransferFeeBps != arg.CustomBlockConfirmationTransferFeeBps ||
+				actualTokenTransferFeeConfig.IsEnabled != arg.IsEnabled {
+				return false, nil
+			}
+		}
+		for _, chainSelector := range args.DestChainSelectorsToRemove {
+			actualTokenTransferFeeConfig, err := tokenPool.GetTokenTransferFeeConfig(opts, common.Address{}, chainSelector, 0, []byte{})
+			if err != nil {
+				return false, fmt.Errorf("failed to get token transfer fee config: %w", err)
+			}
+			if actualTokenTransferFeeConfig != (token_pool.IPoolV2TokenTransferFeeConfig{}) {
+				return false, nil
+			}
+		}
+
+		return true, nil
+	},
 	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.TransactOpts, args TokenTransferFeeConfigArgs) (*types.Transaction, error) {
 		tokenTransferFeeConfigUpdates := make([]token_pool.TokenPoolTokenTransferFeeConfigArgs, 0, len(args.TokenTransferFeeConfigUpdates))
 		for _, arg := range args.TokenTransferFeeConfigUpdates {
@@ -371,3 +520,10 @@ var GetAdvancedPoolHooks = contract.NewRead(contract.ReadParams[any, common.Addr
 		return tokenPool.GetAdvancedPoolHooks(opts)
 	},
 })
+
+// rateLimiterConfigsEqual returns true if the current rate limiter config on-chain matches the desired config.
+func rateLimiterConfigsEqual(current token_pool.RateLimiterTokenBucket, desired tokens.RateLimiterConfig) bool {
+	return current.IsEnabled == desired.IsEnabled &&
+		current.Capacity == desired.Capacity &&
+		current.Rate == desired.Rate
+}

@@ -1,6 +1,9 @@
 package versioned_verifier_resolver
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -50,7 +53,28 @@ var ApplyInboundImplementationUpdates = contract.NewWrite(contract.WriteParams[[
 	ContractABI:     versioned_verifier_resolver.VersionedVerifierResolverABI,
 	NewContract:     versioned_verifier_resolver.NewVersionedVerifierResolver,
 	IsAllowedCaller: contract.OnlyOwner[*versioned_verifier_resolver.VersionedVerifierResolver, []InboundImplementationArgs],
-	Validate:        func([]InboundImplementationArgs) error { return nil },
+	Validate: func(resolver *versioned_verifier_resolver.VersionedVerifierResolver, backend bind.ContractBackend, opts *bind.CallOpts, args []InboundImplementationArgs) error {
+		for _, arg := range args {
+			if arg.Version == [4]byte{} {
+				return errors.New("version cannot be the zero")
+			}
+		}
+		return nil
+	},
+	IsNoop: func(resolver *versioned_verifier_resolver.VersionedVerifierResolver, opts *bind.CallOpts, args []InboundImplementationArgs) (bool, error) {
+		for _, arg := range args {
+			versionBytes := make([]byte, 4)
+			copy(versionBytes, arg.Version[:])
+			actualInboundImplementation, err := resolver.GetInboundImplementation(opts, versionBytes)
+			if err != nil {
+				return false, fmt.Errorf("failed to get inbound implementation for version %x: %w", arg.Version, err)
+			}
+			if actualInboundImplementation != arg.Verifier {
+				return false, nil
+			}
+		}
+		return false, nil
+	},
 	CallContract: func(resolver *versioned_verifier_resolver.VersionedVerifierResolver, opts *bind.TransactOpts, args []InboundImplementationArgs) (*types.Transaction, error) {
 		return resolver.ApplyInboundImplementationUpdates(opts, args)
 	},
@@ -64,7 +88,26 @@ var ApplyOutboundImplementationUpdates = contract.NewWrite(contract.WriteParams[
 	ContractABI:     versioned_verifier_resolver.VersionedVerifierResolverABI,
 	NewContract:     versioned_verifier_resolver.NewVersionedVerifierResolver,
 	IsAllowedCaller: contract.OnlyOwner[*versioned_verifier_resolver.VersionedVerifierResolver, []OutboundImplementationArgs],
-	Validate:        func([]OutboundImplementationArgs) error { return nil },
+	Validate: func(resolver *versioned_verifier_resolver.VersionedVerifierResolver, backend bind.ContractBackend, opts *bind.CallOpts, args []OutboundImplementationArgs) error {
+		for _, arg := range args {
+			if arg.DestChainSelector == 0 {
+				return errors.New("dest chain selector cannot be 0")
+			}
+		}
+		return nil
+	},
+	IsNoop: func(resolver *versioned_verifier_resolver.VersionedVerifierResolver, opts *bind.CallOpts, args []OutboundImplementationArgs) (bool, error) {
+		for _, arg := range args {
+			actualOutboundImplementation, err := resolver.GetOutboundImplementation(opts, arg.DestChainSelector, []byte{})
+			if err != nil {
+				return false, fmt.Errorf("failed to get outbound implementation for dest chain selector %d: %w", arg.DestChainSelector, err)
+			}
+			if actualOutboundImplementation != arg.Verifier {
+				return false, nil
+			}
+		}
+		return false, nil
+	},
 	CallContract: func(resolver *versioned_verifier_resolver.VersionedVerifierResolver, opts *bind.TransactOpts, args []OutboundImplementationArgs) (*types.Transaction, error) {
 		return resolver.ApplyOutboundImplementationUpdates(opts, args)
 	},
@@ -80,7 +123,12 @@ var AcceptOwnership = contract.NewWrite(contract.WriteParams[AcceptOwnershipArgs
 	IsAllowedCaller: func(resolver *versioned_verifier_resolver.VersionedVerifierResolver, opts *bind.CallOpts, caller common.Address, args AcceptOwnershipArgs) (bool, error) {
 		return args.IsProposedOwner, nil
 	},
-	Validate: func(AcceptOwnershipArgs) error { return nil },
+	Validate: func(resolver *versioned_verifier_resolver.VersionedVerifierResolver, backend bind.ContractBackend, opts *bind.CallOpts, args AcceptOwnershipArgs) error {
+		return nil
+	},
+	IsNoop: func(resolver *versioned_verifier_resolver.VersionedVerifierResolver, opts *bind.CallOpts, args AcceptOwnershipArgs) (bool, error) {
+		return false, nil
+	},
 	CallContract: func(resolver *versioned_verifier_resolver.VersionedVerifierResolver, opts *bind.TransactOpts, _ AcceptOwnershipArgs) (*types.Transaction, error) {
 		return resolver.AcceptOwnership(opts)
 	},

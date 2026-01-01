@@ -68,7 +68,6 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 				TypeAndVersion: deployment.NewTypeAndVersion(advanced_pool_hooks.ContractType, *advanced_pool_hooks.Version),
 				Qualifier:      &cctpQualifier,
 				Args: advanced_pool_hooks.ConstructorArgs{
-					Allowlist:                        convertStringsToAddresses(input.Allowlist),
 					ThresholdAmountForAdditionalCCVs: input.ThresholdAmountForAdditionalCCVs,
 				},
 			})
@@ -112,7 +111,6 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 			ChainSelector:                    input.ChainSelector,
 			TokenPoolAddress:                 common.HexToAddress(cctpTokenPoolAddress),
 			AdvancedPoolHooks:                common.HexToAddress(advancedPoolHooksAddress),
-			AllowList:                        convertStringsToAddresses(input.Allowlist),
 			RouterAddress:                    common.HexToAddress(input.Router),
 			ThresholdAmountForAdditionalCCVs: input.ThresholdAmountForAdditionalCCVs,
 			RateLimitAdmin:                   common.HexToAddress(input.RateLimitAdmin),

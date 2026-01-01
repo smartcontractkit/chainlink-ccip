@@ -76,7 +76,6 @@ var DeployLockReleaseTokenPool = cldf_ops.NewSequence(
 			TokenPoolAddress:                 common.HexToAddress(tpDeployReport.Output.Address),
 			RateLimitAdmin:                   input.RateLimitAdmin,
 			AdvancedPoolHooks:                common.HexToAddress(hooksDeployReport.Output.Address),
-			AllowList:                        input.ConstructorArgs.Allowlist,
 			RouterAddress:                    input.ConstructorArgs.Router,
 			ThresholdAmountForAdditionalCCVs: input.ThresholdAmountForAdditionalCCVs,
 		})

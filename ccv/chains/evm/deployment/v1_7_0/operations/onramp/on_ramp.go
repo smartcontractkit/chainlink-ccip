@@ -1,6 +1,10 @@
 package onramp
 
 import (
+	"bytes"
+	"fmt"
+	"slices"
+
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -56,7 +60,16 @@ var SetDynamicConfig = contract.NewWrite(contract.WriteParams[SetDynamicConfigAr
 	ContractABI:     onramp.OnRampABI,
 	NewContract:     onramp.NewOnRamp,
 	IsAllowedCaller: contract.OnlyOwner[*onramp.OnRamp, SetDynamicConfigArgs],
-	Validate:        func(SetDynamicConfigArgs) error { return nil },
+	Validate: func(onRamp *onramp.OnRamp, backend bind.ContractBackend, opts *bind.CallOpts, args SetDynamicConfigArgs) error {
+		return nil
+	},
+	IsNoop: func(onRamp *onramp.OnRamp, opts *bind.CallOpts, args SetDynamicConfigArgs) (bool, error) {
+		actualDynamicConfig, err := onRamp.GetDynamicConfig(opts)
+		if err != nil {
+			return false, fmt.Errorf("failed to get dynamic config: %w", err)
+		}
+		return actualDynamicConfig == args.DynamicConfig, nil
+	},
 	CallContract: func(onRamp *onramp.OnRamp, opts *bind.TransactOpts, args SetDynamicConfigArgs) (*types.Transaction, error) {
 		return onRamp.SetDynamicConfig(opts, args.DynamicConfig)
 	},
@@ -70,7 +83,44 @@ var ApplyDestChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]DestC
 	ContractABI:     onramp.OnRampABI,
 	NewContract:     onramp.NewOnRamp,
 	IsAllowedCaller: contract.OnlyOwner[*onramp.OnRamp, []DestChainConfigArgs],
-	Validate:        func([]DestChainConfigArgs) error { return nil },
+	Validate: func(onRamp *onramp.OnRamp, backend bind.ContractBackend, opts *bind.CallOpts, args []DestChainConfigArgs) error {
+		return nil
+	},
+	IsNoop: func(onRamp *onramp.OnRamp, opts *bind.CallOpts, args []DestChainConfigArgs) (bool, error) {
+		for _, arg := range args {
+			actualDestChainConfig, err := onRamp.GetDestChainConfig(opts, arg.DestChainSelector)
+			if err != nil {
+				return false, fmt.Errorf("failed to get dest chain config: %w", err)
+			}
+			if actualDestChainConfig.AddressBytesLength != arg.AddressBytesLength ||
+				actualDestChainConfig.TokenReceiverAllowed != arg.TokenReceiverAllowed ||
+				actualDestChainConfig.MessageNetworkFeeUSDCents != arg.MessageNetworkFeeUSDCents ||
+				actualDestChainConfig.TokenNetworkFeeUSDCents != arg.TokenNetworkFeeUSDCents ||
+				actualDestChainConfig.BaseExecutionGasCost != arg.BaseExecutionGasCost ||
+				actualDestChainConfig.DefaultExecutor != arg.DefaultExecutor ||
+				actualDestChainConfig.Router != arg.Router ||
+				!bytes.Equal(actualDestChainConfig.OffRamp, arg.OffRamp) {
+				return false, nil
+			}
+			slices.SortFunc(actualDestChainConfig.DefaultCCVs, func(a, b common.Address) int {
+				return bytes.Compare(a[:], b[:])
+			})
+			slices.SortFunc(actualDestChainConfig.LaneMandatedCCVs, func(a, b common.Address) int {
+				return bytes.Compare(a[:], b[:])
+			})
+			slices.SortFunc(arg.DefaultCCVs, func(a, b common.Address) int {
+				return bytes.Compare(a[:], b[:])
+			})
+			slices.SortFunc(arg.LaneMandatedCCVs, func(a, b common.Address) int {
+				return bytes.Compare(a[:], b[:])
+			})
+			if !slices.Equal(actualDestChainConfig.DefaultCCVs, arg.DefaultCCVs) ||
+				!slices.Equal(actualDestChainConfig.LaneMandatedCCVs, arg.LaneMandatedCCVs) {
+				return false, nil
+			}
+		}
+		return true, nil
+	},
 	CallContract: func(onRamp *onramp.OnRamp, opts *bind.TransactOpts, args []DestChainConfigArgs) (*types.Transaction, error) {
 		return onRamp.ApplyDestChainConfigUpdates(opts, args)
 	},
@@ -84,7 +134,12 @@ var WithdrawFeeTokens = contract.NewWrite(contract.WriteParams[WithdrawFeeTokens
 	ContractABI:     onramp.OnRampABI,
 	NewContract:     onramp.NewOnRamp,
 	IsAllowedCaller: contract.OnlyOwner[*onramp.OnRamp, WithdrawFeeTokensArgs],
-	Validate:        func(WithdrawFeeTokensArgs) error { return nil },
+	Validate: func(onRamp *onramp.OnRamp, backend bind.ContractBackend, opts *bind.CallOpts, args WithdrawFeeTokensArgs) error {
+		return nil
+	},
+	IsNoop: func(onRamp *onramp.OnRamp, opts *bind.CallOpts, args WithdrawFeeTokensArgs) (bool, error) {
+		return false, nil
+	},
 	CallContract: func(onRamp *onramp.OnRamp, opts *bind.TransactOpts, args WithdrawFeeTokensArgs) (*types.Transaction, error) {
 		return onRamp.WithdrawFeeTokens(opts, args.FeeTokens)
 	},
