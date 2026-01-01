@@ -41,65 +41,30 @@ var ConfigureTokenPool = cldf_ops.NewSequence(
 	func(b cldf_ops.Bundle, chain evm.Chain, input ConfigureTokenPoolInput) (output sequences.OnChainOutput, err error) {
 		writes := make([]evm_contract.WriteOutput, 0)
 
-		// Set threshold amount for additional CCVs (if necessary)
-		if input.ThresholdAmountForAdditionalCCVs != nil {
-			currentThresholdAmountReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.GetThresholdAmount, chain, evm_contract.FunctionInput[any]{
-				ChainSelector: input.ChainSelector,
-				Address:       input.AdvancedPoolHooks,
-			})
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to get current threshold amount for additional CCVs on advanced pool hooks with address %s on %s: %w", input.AdvancedPoolHooks, chain, err)
-			}
-			if currentThresholdAmountReport.Output != input.ThresholdAmountForAdditionalCCVs {
-				setThresholdAmountReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.SetThresholdAmount, chain, evm_contract.FunctionInput[*big.Int]{
-					ChainSelector: input.ChainSelector,
-					Address:       input.AdvancedPoolHooks,
-					Args:          input.ThresholdAmountForAdditionalCCVs,
-				})
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to set threshold amount for additional CCVs on advanced pool hooks with address %s on %s: %w", input.AdvancedPoolHooks, chain, err)
-				}
-				writes = append(writes, setThresholdAmountReport.Output)
-			}
+		// Set threshold amount for additional CCVs
+		setThresholdAmountReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.SetThresholdAmount, chain, evm_contract.FunctionInput[*big.Int]{
+			ChainSelector: input.ChainSelector,
+			Address:       input.AdvancedPoolHooks,
+			Args:          input.ThresholdAmountForAdditionalCCVs,
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to set threshold amount for additional CCVs on advanced pool hooks with address %s on %s: %w", input.AdvancedPoolHooks, chain, err)
 		}
+		writes = append(writes, setThresholdAmountReport.Output)
 
-		// Set dynamic config (if necessary)
-		if input.RouterAddress != (common.Address{}) || input.RateLimitAdmin != (common.Address{}) {
-			currentDynamicConfigReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetDynamicConfig, chain, evm_contract.FunctionInput[any]{
-				ChainSelector: input.ChainSelector,
-				Address:       input.TokenPoolAddress,
-			})
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to get current dynamic config from token pool with address %s on %s: %w", input.TokenPoolAddress, chain, err)
-			}
-
-			currentDynamicConfig := currentDynamicConfigReport.Output
-
-			desiredRouter := currentDynamicConfig.Router
-			if input.RouterAddress != (common.Address{}) {
-				desiredRouter = input.RouterAddress
-			}
-
-			desiredRateLimitAdmin := currentDynamicConfig.RateLimitAdmin
-			if input.RateLimitAdmin != (common.Address{}) {
-				desiredRateLimitAdmin = input.RateLimitAdmin
-			}
-
-			if desiredRouter != currentDynamicConfig.Router || desiredRateLimitAdmin != currentDynamicConfig.RateLimitAdmin {
-				setDynamicConfigReport, err := cldf_ops.ExecuteOperation(b, token_pool.SetDynamicConfig, chain, evm_contract.FunctionInput[token_pool.DynamicConfigArgs]{
-					ChainSelector: input.ChainSelector,
-					Address:       input.TokenPoolAddress,
-					Args: token_pool.DynamicConfigArgs{
-						Router:         desiredRouter,
-						RateLimitAdmin: desiredRateLimitAdmin,
-					},
-				})
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to set dynamic config on token pool with address %s on %s: %w", input.TokenPoolAddress, chain, err)
-				}
-				writes = append(writes, setDynamicConfigReport.Output)
-			}
+		// Set dynamic config
+		setDynamicConfigReport, err := cldf_ops.ExecuteOperation(b, token_pool.SetDynamicConfig, chain, evm_contract.FunctionInput[token_pool.DynamicConfigArgs]{
+			ChainSelector: input.ChainSelector,
+			Address:       input.TokenPoolAddress,
+			Args: token_pool.DynamicConfigArgs{
+				Router:         input.RouterAddress,
+				RateLimitAdmin: input.RateLimitAdmin,
+			},
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to set dynamic config on token pool with address %s on %s: %w", input.TokenPoolAddress, chain, err)
 		}
+		writes = append(writes, setDynamicConfigReport.Output)
 
 		batchOp, err := evm_contract.NewBatchOperationFromWrites(writes)
 		if err != nil {

@@ -262,8 +262,8 @@ func maybeUpdateRateLimiters(b cldf_ops.Bundle, chain evm.Chain, input Configure
 	currentStates := rateLimiterStateReport.Output
 
 	// Update the rate limiters if they do not match the desired config
-	if !rateLimiterConfigsEqual(currentStates.InboundRateLimiterState, desiredInboundRateLimiterConfig) ||
-		!rateLimiterConfigsEqual(currentStates.OutboundRateLimiterState, desiredOutboundRateLimiterConfig) {
+	if (desiredInboundRateLimiterConfig != (tokens.RateLimiterConfig{}) && !rateLimiterConfigsEqual(currentStates.InboundRateLimiterState, desiredInboundRateLimiterConfig)) ||
+		(desiredOutboundRateLimiterConfig != (tokens.RateLimiterConfig{}) && !rateLimiterConfigsEqual(currentStates.OutboundRateLimiterState, desiredOutboundRateLimiterConfig)) {
 		setInboundRateLimiterReport, err := cldf_ops.ExecuteOperation(b, token_pool.SetRateLimitConfig, chain, evm_contract.FunctionInput[[]token_pool.SetRateLimitConfigArg]{
 			ChainSelector: input.ChainSelector,
 			Address:       input.TokenPoolAddress,
