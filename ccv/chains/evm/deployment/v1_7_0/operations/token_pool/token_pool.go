@@ -139,6 +139,23 @@ var ApplyChainUpdates = contract.NewWrite(contract.WriteParams[ApplyChainUpdates
 	NewContract:     token_pool.NewTokenPool,
 	IsAllowedCaller: contract.OnlyOwner[*token_pool.TokenPool, ApplyChainUpdatesArgs],
 	Validate: func(tokenPool *token_pool.TokenPool, backend bind.ContractBackend, opts *bind.CallOpts, args ApplyChainUpdatesArgs) error {
+		for _, chain := range args.ChainsToAdd {
+			for _, remotePoolAddress := range chain.RemotePoolAddresses {
+				if len(remotePoolAddress) != 32 {
+					return errors.New("remote pool address must be 32 bytes")
+				}
+			}
+			if len(chain.RemoteTokenAddress) != 32 {
+				return errors.New("remote token address must be 32 bytes")
+			}
+			if chain.InboundRateLimiterConfig == (tokens.RateLimiterConfig{}) {
+				return errors.New("inbound rate limiter config cannot be empty")
+			}
+			if chain.OutboundRateLimiterConfig == (tokens.RateLimiterConfig{}) {
+				return errors.New("outbound rate limiter config cannot be empty")
+			}
+		}
+
 		return nil
 	},
 	IsNoop: func(tokenPool *token_pool.TokenPool, opts *bind.CallOpts, args ApplyChainUpdatesArgs) (bool, error) {
@@ -174,6 +191,9 @@ var AddRemotePool = contract.NewWrite(contract.WriteParams[RemotePoolArgs, *toke
 		}
 		if !isSupportedChain {
 			return fmt.Errorf("chain %d is not supported", args.RemoteChainSelector)
+		}
+		if len(args.RemotePoolAddress) != 32 {
+			return errors.New("remote pool address must be 32 bytes")
 		}
 		return nil
 	},
@@ -235,6 +255,12 @@ var SetRateLimitConfig = contract.NewWrite(contract.WriteParams[[]SetRateLimitCo
 			}
 			if !isSupportedChain {
 				return fmt.Errorf("chain %d is not supported", arg.RemoteChainSelector)
+			}
+			if arg.OutboundRateLimiterConfig == (tokens.RateLimiterConfig{}) {
+				return errors.New("outbound rate limiter config cannot be empty")
+			}
+			if arg.InboundRateLimiterConfig == (tokens.RateLimiterConfig{}) {
+				return errors.New("inbound rate limiter config cannot be empty")
 			}
 		}
 		return nil
