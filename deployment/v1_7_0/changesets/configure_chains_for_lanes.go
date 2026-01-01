@@ -34,6 +34,8 @@ type ChainConfig struct {
 	OffRamp datastore.AddressRef
 	// The configuration for each remote chain that we want to connect to.
 	RemoteChains map[uint64]adapters.RemoteChainConfig[datastore.AddressRef, datastore.AddressRef]
+	// The remote chains that we wish to disconnect from.
+	RemoteChainsToDisconnect []uint64
 }
 
 // ConfigureChainsForLanesConfig is the configuration for the ConfigureChainsForLanes changeset.
@@ -74,6 +76,7 @@ func makeVerify(_ *adapters.ChainFamilyRegistry, _ *changesets.MCMSReaderRegistr
 			if datastore_utils.IsAddressRefEmpty(chain.OffRamp) {
 				return fmt.Errorf("offRamp ref is empty for chain with selector %d", chain.ChainSelector)
 			}
+
 			for _, ccv := range chain.CommitteeVerifiers {
 				if len(ccv.CommitteeVerifier) == 0 {
 					return fmt.Errorf("committee verifier on chain with selector %d has no contracts", chain.ChainSelector)
@@ -87,6 +90,7 @@ func makeVerify(_ *adapters.ChainFamilyRegistry, _ *changesets.MCMSReaderRegistr
 					}
 				}
 			}
+
 			for remoteChainSelector, remoteChain := range chain.RemoteChains {
 				if _, err := chain_selectors.GetSelectorFamily(remoteChainSelector); err != nil {
 					return err
@@ -99,6 +103,12 @@ func makeVerify(_ *adapters.ChainFamilyRegistry, _ *changesets.MCMSReaderRegistr
 				}
 				if datastore_utils.IsAddressRefEmpty(remoteChain.DefaultExecutor) {
 					return fmt.Errorf("chain %d has empty default executor ref for remote chain %d", chain.ChainSelector, remoteChainSelector)
+				}
+			}
+
+			for _, remoteChainToDisconnect := range chain.RemoteChainsToDisconnect {
+				if _, err := chain_selectors.GetSelectorFamily(remoteChainToDisconnect); err != nil {
+					return err
 				}
 			}
 		}
@@ -172,13 +182,14 @@ func makeApply(chainFamilyRegistry *adapters.ChainFamilyRegistry, mcmsRegistry *
 				}
 			}
 			configureChainForLanesReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adapter.ConfigureChainForLanes(), e.BlockChains, adapters.ConfigureChainForLanesInput{
-				ChainSelector:      chain.ChainSelector,
-				Router:             router.Address,
-				OnRamp:             onRamp.Address,
-				CommitteeVerifiers: committeeVerifiers,
-				FeeQuoter:          feeQuoter.Address,
-				OffRamp:            offRamp.Address,
-				RemoteChains:       remoteChains,
+				ChainSelector:            chain.ChainSelector,
+				Router:                   router.Address,
+				OnRamp:                   onRamp.Address,
+				CommitteeVerifiers:       committeeVerifiers,
+				FeeQuoter:                feeQuoter.Address,
+				OffRamp:                  offRamp.Address,
+				RemoteChains:             remoteChains,
+				RemoteChainsToDisconnect: chain.RemoteChainsToDisconnect,
 			})
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to configure chain with selector %d: %w", chain.ChainSelector, err)

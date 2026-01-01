@@ -132,6 +132,8 @@ type ConfigureChainForLanesInput struct {
 	OffRamp string
 	// The configuration for each remote chain that we want to connect to.
 	RemoteChains map[uint64]RemoteChainConfig[[]byte, string]
+	// The remote chains that we wish to disconnect from.
+	RemoteChainsToDisconnect []uint64
 }
 
 // ChainFamily is a configurable chain family.
