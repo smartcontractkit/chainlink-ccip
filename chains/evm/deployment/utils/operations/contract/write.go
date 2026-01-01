@@ -50,6 +50,8 @@ type WriteParams[ARGS any, C any] struct {
 	NewContract func(address common.Address, backend bind.ContractBackend) (C, error)
 	// IsAllowedCaller is a function that checks if the caller is allowed to call the function.
 	IsAllowedCaller func(contract C, opts *bind.CallOpts, caller common.Address, input ARGS) (bool, error)
+	// IsNoop is a function that checks if the operation would be a no-op.
+	IsNoop func(contract C, opts *bind.CallOpts, caller common.Address, input ARGS) (bool, error)
 	// Validate is a function that validates the input arguments.
 	Validate func(input ARGS) error
 	// CallContract is a function that calls the desired write method on the contract.
@@ -90,11 +92,25 @@ func NewWrite[ARGS any, C any](params WriteParams[ARGS, C]) *operations.Operatio
 			if params.IsAllowedCaller == nil {
 				return WriteOutput{}, fmt.Errorf("isAllowedCaller function must be defined for %s", params.Name)
 			}
+			if params.IsNoop == nil {
+				return WriteOutput{}, fmt.Errorf("isNoop function must be defined for %s", params.Name)
+			}
 			// END Validation
 
 			boundContract, err := params.NewContract(input.Address, chain.Client)
 			if err != nil {
 				return WriteOutput{}, fmt.Errorf("failed to create contract instance for %s at %s on %s: %w", params.Name, input.Address, chain, err)
+			}
+			noop, err := params.IsNoop(boundContract, &bind.CallOpts{Context: b.GetContext()}, chain.DeployerKey.From, input.Args)
+			if err != nil {
+				return WriteOutput{}, fmt.Errorf("failed to check if %s is a noop against %s on %s: %w", params.Name, input.Address, chain, err)
+			}
+			if noop {
+				// Mark the operation as executed.
+				return WriteOutput{
+					ChainSelector: input.ChainSelector,
+					ExecInfo:      &ExecInfo{},
+				}, nil
 			}
 			allowed, err := params.IsAllowedCaller(boundContract, &bind.CallOpts{Context: b.GetContext()}, chain.DeployerKey.From, input.Args)
 			if err != nil {

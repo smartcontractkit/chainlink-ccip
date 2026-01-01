@@ -71,6 +71,8 @@ type FeeQuoterParams struct {
 	WETHPremiumMultiplierWeiPerEth uint64
 	USDPerLINK                     *big.Int
 	USDPerWETH                     *big.Int
+	SetInitialPrices               bool
+	PriceUpdaters                  []common.Address
 }
 
 type ExecutorParams struct {
@@ -105,8 +107,6 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses := make([]datastore.AddressRef, 0)
 		writes := make([]contract_utils.WriteOutput, 0)
 
-		// TODO: Deploy MCMS (Timelock, MCM contracts) when MCMS support is needed.
-
 		// Deploy WETH
 		wethRef, err := contract_utils.MaybeDeployContract(b, weth.Deploy, chain, contract_utils.DeployInput[weth.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(weth.ContractType, *weth.Version),
@@ -122,7 +122,8 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			TypeAndVersion: deployment.NewTypeAndVersion(link_token.ContractType, *link_token.Version),
 			ChainSelector:  chain.Selector,
 			Args: burn_mint_erc20_with_drip.ConstructorArgs{
-				Name:   "LINK",
+				// Aligns with https://etherscan.io/token/0x514910771af9ca656af840dff83e8264ecf986ca
+				Name:   "ChainLink Token",
 				Symbol: "LINK",
 			},
 		}, input.ExistingAddresses)
@@ -224,6 +225,10 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		writes = append(writes, addRegistryModuleReport.Output)
 
 		// Deploy FeeQuoter
+		// If setInitialPrices is true, add the deployer key to the price updaters
+		if input.ContractParams.FeeQuoter.SetInitialPrices {
+			input.ContractParams.FeeQuoter.PriceUpdaters = append(input.ContractParams.FeeQuoter.PriceUpdaters, chain.DeployerKey.From)
+		}
 		feeQuoterRef, err := contract_utils.MaybeDeployContract(b, fee_quoter.Deploy, chain, contract_utils.DeployInput[fee_quoter.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(fee_quoter.ContractType, *input.ContractParams.FeeQuoter.Version),
 			ChainSelector:  chain.Selector,
@@ -232,11 +237,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 					MaxFeeJuelsPerMsg: input.ContractParams.FeeQuoter.MaxFeeJuelsPerMsg,
 					LinkToken:         common.HexToAddress(linkRef.Address),
 				},
-				PriceUpdaters: []common.Address{
-					// Price updates via protocol are out of scope for initial launch.
-					// TODO: Add Timelock here when MCMS support is needed.
-					chain.DeployerKey.From,
-				},
+				PriceUpdaters: input.ContractParams.FeeQuoter.PriceUpdaters,
 				// Skipped fields:
 				// - TokenPriceFeeds (will not be used in 1.7.0)
 				// - TokenTransferFeeConfigArgs (token+lane-specific config, set elsewhere)
@@ -249,26 +250,41 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, feeQuoterRef)
 
 		// Set initial prices on FeeQuoter
-		updatePricesReport, err := cldf_ops.ExecuteOperation(b, fee_quoter.UpdatePrices, chain, contract_utils.FunctionInput[fee_quoter.PriceUpdates]{
-			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(feeQuoterRef.Address),
-			Args: fee_quoter.PriceUpdates{
-				TokenPriceUpdates: []fee_quoter.TokenPriceUpdate{
-					{
-						SourceToken: common.HexToAddress(linkRef.Address),
-						UsdPerToken: input.ContractParams.FeeQuoter.USDPerLINK,
-					},
-					{
-						SourceToken: common.HexToAddress(wethRef.Address),
-						UsdPerToken: input.ContractParams.FeeQuoter.USDPerWETH,
+		if input.ContractParams.FeeQuoter.SetInitialPrices {
+			updatePricesReport, err := cldf_ops.ExecuteOperation(b, fee_quoter.UpdatePrices, chain, contract_utils.FunctionInput[fee_quoter.PriceUpdates]{
+				ChainSelector: chain.Selector,
+				Address:       common.HexToAddress(feeQuoterRef.Address),
+				Args: fee_quoter.PriceUpdates{
+					TokenPriceUpdates: []fee_quoter.TokenPriceUpdate{
+						{
+							SourceToken: common.HexToAddress(linkRef.Address),
+							UsdPerToken: input.ContractParams.FeeQuoter.USDPerLINK,
+						},
+						{
+							SourceToken: common.HexToAddress(wethRef.Address),
+							UsdPerToken: input.ContractParams.FeeQuoter.USDPerWETH,
+						},
 					},
 				},
-			},
-		})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to set initial prices on FeeQuoter: %w", err)
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to set initial prices on FeeQuoter: %w", err)
+			}
+			writes = append(writes, updatePricesReport.Output)
+
+			// Remove the deployer key from the price updaters after performing the initial configuration
+			applyAuthorizedCallerUpdatesReport, err := cldf_ops.ExecuteOperation(b, fee_quoter.ApplyAuthorizedCallerUpdates, chain, contract_utils.FunctionInput[fee_quoter.AuthorizedCallerArgs]{
+				ChainSelector: chain.Selector,
+				Address:       common.HexToAddress(feeQuoterRef.Address),
+				Args: fee_quoter.AuthorizedCallerArgs{
+					RemovedCallers: []common.Address{chain.DeployerKey.From},
+				},
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to remove deployer key from price updaters: %w", err)
+			}
+			writes = append(writes, applyAuthorizedCallerUpdatesReport.Output)
 		}
-		writes = append(writes, updatePricesReport.Output)
 
 		// Deploy OffRamp
 		offRampRef, err := contract_utils.MaybeDeployContract(b, offramp.Deploy, chain, contract_utils.DeployInput[offramp.ConstructorArgs]{
