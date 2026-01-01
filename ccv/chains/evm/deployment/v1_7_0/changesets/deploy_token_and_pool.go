@@ -39,8 +39,6 @@ type DeployTokenAndPoolCfg struct {
 	Router datastore.AddressRef
 	// ThresholdAmountForAdditionalCCVs is the transfer amount above which additional CCVs are required.
 	ThresholdAmountForAdditionalCCVs *big.Int
-	// Allowlist is the list of addresses allowed to transfer the token.
-	Allowlist []common.Address
 	// Accounts is a map of account addresses to initial mint amounts.
 	Accounts map[common.Address]*big.Int
 }
@@ -78,11 +76,10 @@ var DeployTokenAndPool = changesets.NewFromOnChainSequence(changesets.NewFromOnC
 				RateLimitAdmin:                   cfg.RateLimitAdmin,
 				ThresholdAmountForAdditionalCCVs: cfg.ThresholdAmountForAdditionalCCVs,
 				ConstructorArgs: tokens.ConstructorArgs{
-					Token:     cfg.TokenAddress,
-					Decimals:  cfg.Decimals,
-					Allowlist: cfg.Allowlist,
-					RMNProxy:  rmnProxy,
-					Router:    router,
+					Token:    cfg.TokenAddress,
+					Decimals: cfg.Decimals,
+					RMNProxy: rmnProxy,
+					Router:   router,
 				},
 			},
 		}, nil

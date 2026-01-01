@@ -28,7 +28,6 @@ var DeployBurnMintTokenPool = cldf_ops.NewSequence(
 			ChainSelector:  input.ChainSel,
 			TypeAndVersion: deployment.NewTypeAndVersion(advanced_pool_hooks.ContractType, *advanced_pool_hooks.Version),
 			Args: advanced_pool_hooks.ConstructorArgs{
-				Allowlist:                        input.ConstructorArgs.Allowlist,
 				ThresholdAmountForAdditionalCCVs: input.ThresholdAmountForAdditionalCCVs,
 			},
 			Qualifier: &input.TokenSymbol,

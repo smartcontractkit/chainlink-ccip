@@ -6,6 +6,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/advanced_pool_hooks"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/erc20_lock_box"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
@@ -52,9 +53,6 @@ func TestDeployLockReleaseTokenPool(t *testing.T) {
 					ConstructorArgs: tokens.ConstructorArgs{
 						Token:    common.HexToAddress(tokenReport.Output.Address),
 						Decimals: 18,
-						Allowlist: []common.Address{
-							common.HexToAddress("0x02"),
-						},
 						RMNProxy: rmnProxyAddress,
 						Router:   routerAddress,
 					},
@@ -288,23 +286,19 @@ func TestDeployLockReleaseTokenPool(t *testing.T) {
 			require.NoError(t, err, "ExecuteOperation should not error")
 			require.Equal(t, input.ThresholdAmountForAdditionalCCVs, getThresholdAmountReport.Output, "Expected threshold amount for additional ccvs to be the same as the inputted threshold amount for additional ccvs")
 
-			// Check allowlist
-			getAllowlistReport, err := operations.ExecuteOperation(
+			// Check authorized callers on lock box
+			getAuthorizedCallersReport, err := operations.ExecuteOperation(
 				testsetup.BundleWithFreshReporter(e.OperationsBundle),
-				advanced_pool_hooks.GetAllowList,
+				erc20_lock_box.GetAllAuthorizedCallers,
 				e.BlockChains.EVMChains()[chainSel],
 				contract.FunctionInput[any]{
 					ChainSelector: chainSel,
-					Address:       common.HexToAddress(hooksAddress),
+					Address:       common.HexToAddress(lockBoxAddress),
 				},
 			)
 			require.NoError(t, err, "ExecuteOperation should not error")
-			for _, addr := range input.ConstructorArgs.Allowlist {
-				require.Contains(t, getAllowlistReport.Output, addr, "Expected inputted allowlist address to be in the on-chain allowlist")
-			}
-			for _, addr := range getAllowlistReport.Output {
-				require.Contains(t, input.ConstructorArgs.Allowlist, addr, "Expected on-chain allowlist address to be in the inputted allowlist")
-			}
+			require.Len(t, getAuthorizedCallersReport.Output, 1, "Expected 1 address in on-chain authorized callers")
+			require.Contains(t, getAuthorizedCallersReport.Output, common.HexToAddress(poolAddress), "Expected lock release token pool address to be in the on-chain authorized callers")
 
 			// Verify lock box address is present in output
 			require.NotEmpty(t, lockBoxAddress, "Expected lock box address to be present in output")

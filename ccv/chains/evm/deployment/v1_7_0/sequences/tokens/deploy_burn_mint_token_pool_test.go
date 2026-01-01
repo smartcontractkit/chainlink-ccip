@@ -52,9 +52,6 @@ func TestDeployTokenPool(t *testing.T) {
 					ConstructorArgs: tokens.ConstructorArgs{
 						Token:    common.HexToAddress(tokenReport.Output.Address),
 						Decimals: 18,
-						Allowlist: []common.Address{
-							common.HexToAddress("0x02"),
-						},
 						RMNProxy: rmnProxyAddress,
 						Router:   routerAddress,
 					},
@@ -286,24 +283,6 @@ func TestDeployTokenPool(t *testing.T) {
 			)
 			require.NoError(t, err, "ExecuteOperation should not error")
 			require.Equal(t, input.ThresholdAmountForAdditionalCCVs, getThresholdAmountReport.Output, "Expected threshold amount for additional ccvs to be the same as the inputted threshold amount for additional ccvs")
-
-			// Check allowlist
-			getAllowlistReport, err := operations.ExecuteOperation(
-				testsetup.BundleWithFreshReporter(e.OperationsBundle),
-				advanced_pool_hooks.GetAllowList,
-				e.BlockChains.EVMChains()[chainSel],
-				contract.FunctionInput[any]{
-					ChainSelector: chainSel,
-					Address:       common.HexToAddress(hooksAddress),
-				},
-			)
-			require.NoError(t, err, "ExecuteOperation should not error")
-			for _, addr := range input.ConstructorArgs.Allowlist {
-				require.Contains(t, getAllowlistReport.Output, addr, "Expected inputted allowlist address to be in the on-chain allowlist")
-			}
-			for _, addr := range getAllowlistReport.Output {
-				require.Contains(t, input.ConstructorArgs.Allowlist, addr, "Expected on-chain allowlist address to be in the inputted allowlist")
-			}
 		})
 	}
 }

@@ -61,9 +61,6 @@ func basicDeployTokenAndPoolInput(chainReport operations.SequenceReport[sequence
 			ThresholdAmountForAdditionalCCVs: thresholdAmountForAdditionalCCVs,
 			ConstructorArgs: tokens.ConstructorArgs{
 				Decimals: 18,
-				Allowlist: []common.Address{
-					common.HexToAddress("0x02"),
-				},
 				RMNProxy: rmnProxyAddress,
 				Router:   routerAddress,
 			},

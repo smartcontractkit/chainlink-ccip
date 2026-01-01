@@ -73,3 +73,14 @@ var ApplyAuthorizedCallerUpdates = contract.NewWrite(contract.WriteParams[Author
 		return erc20LockBox.ApplyAuthorizedCallerUpdates(opts, args)
 	},
 })
+
+var GetAllAuthorizedCallers = contract.NewRead(contract.ReadParams[any, []common.Address, *erc20_lock_box.ERC20LockBox]{
+	Name:         "erc20-lock-box:get-all-authorized-callers",
+	Version:      Version,
+	Description:  "Gets all authorized callers on the ERC20LockBox",
+	ContractType: ContractType,
+	NewContract:  erc20_lock_box.NewERC20LockBox,
+	CallContract: func(erc20LockBox *erc20_lock_box.ERC20LockBox, opts *bind.CallOpts, args any) ([]common.Address, error) {
+		return erc20LockBox.GetAllAuthorizedCallers(opts)
+	},
+})
