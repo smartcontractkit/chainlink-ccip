@@ -1,6 +1,8 @@
 package rmn_remote
 
 import (
+	"fmt"
+
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -45,7 +47,24 @@ var Curse = contract.NewWrite(contract.WriteParams[CurseArgs, *rmn_remote.RMNRem
 	ContractABI:     rmn_remote.RMNRemoteABI,
 	NewContract:     rmn_remote.NewRMNRemote,
 	IsAllowedCaller: contract.OnlyOwner[*rmn_remote.RMNRemote, CurseArgs],
-	Validate:        func(CurseArgs) error { return nil },
+	Validate: func(rmnRemote *rmn_remote.RMNRemote, backend bind.ContractBackend, opts *bind.CallOpts, args CurseArgs) error {
+		subjects, err := rmnRemote.GetCursedSubjects(opts)
+		if err != nil {
+			return fmt.Errorf("failed to get cursed subjects: %w", err)
+		}
+		for _, subject := range subjects {
+			for _, argSubject := range args.Subject {
+				if subject == argSubject {
+					return fmt.Errorf("subject %s is already cursed", subject)
+				}
+			}
+		}
+		return nil
+	},
+	IsNoop: func(rmnRemote *rmn_remote.RMNRemote, opts *bind.CallOpts, args CurseArgs) (bool, error) {
+		// No-ops not possible for this operation given the validation logic.
+		return false, nil
+	},
 	CallContract: func(rmnRemote *rmn_remote.RMNRemote, opts *bind.TransactOpts, args CurseArgs) (*types.Transaction, error) {
 		return rmnRemote.Curse0(opts, args.Subject)
 	},
@@ -59,7 +78,29 @@ var Uncurse = contract.NewWrite(contract.WriteParams[CurseArgs, *rmn_remote.RMNR
 	ContractABI:     rmn_remote.RMNRemoteABI,
 	NewContract:     rmn_remote.NewRMNRemote,
 	IsAllowedCaller: contract.OnlyOwner[*rmn_remote.RMNRemote, CurseArgs],
-	Validate:        func(CurseArgs) error { return nil },
+	Validate: func(rmnRemote *rmn_remote.RMNRemote, backend bind.ContractBackend, opts *bind.CallOpts, args CurseArgs) error {
+		subjects, err := rmnRemote.GetCursedSubjects(opts)
+		if err != nil {
+			return fmt.Errorf("failed to get cursed subjects: %w", err)
+		}
+		for _, argSubject := range args.Subject {
+			found := false
+			for _, subject := range subjects {
+				if subject == argSubject {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return fmt.Errorf("subject %s is not cursed", argSubject)
+			}
+		}
+		return nil
+	},
+	IsNoop: func(rmnRemote *rmn_remote.RMNRemote, opts *bind.CallOpts, args CurseArgs) (bool, error) {
+		// No-ops not possible for this operation given the validation logic.
+		return false, nil
+	},
 	CallContract: func(rmnRemote *rmn_remote.RMNRemote, opts *bind.TransactOpts, args CurseArgs) (*types.Transaction, error) {
 		return rmnRemote.Uncurse0(opts, args.Subject)
 	},

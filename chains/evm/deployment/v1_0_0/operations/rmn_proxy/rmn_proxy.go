@@ -1,6 +1,9 @@
 package rmn_proxy
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -43,7 +46,21 @@ var SetRMN = contract.NewWrite(contract.WriteParams[SetRMNArgs, *rmn_proxy_contr
 	ContractABI:     rmn_proxy_contract.RMNProxyABI,
 	NewContract:     rmn_proxy_contract.NewRMNProxy,
 	IsAllowedCaller: contract.OnlyOwner[*rmn_proxy_contract.RMNProxy, SetRMNArgs],
-	Validate:        func(SetRMNArgs) error { return nil },
+	Validate: func(rmnProxy *rmn_proxy_contract.RMNProxy, backend bind.ContractBackend, opts *bind.CallOpts, args SetRMNArgs) error {
+		if args.RMN == (common.Address{}) {
+			return errors.New("rmn address cannot be empty")
+		}
+
+		return nil
+	},
+	IsNoop: func(rmnProxy *rmn_proxy_contract.RMNProxy, opts *bind.CallOpts, args SetRMNArgs) (bool, error) {
+		currentRMN, err := rmnProxy.GetARM(opts)
+		if err != nil {
+			return false, fmt.Errorf("failed to get current rmn address on rmn proxy with address %s: %w", rmnProxy.Address(), err)
+		}
+
+		return currentRMN == args.RMN, nil
+	},
 	CallContract: func(rmnProxy *rmn_proxy_contract.RMNProxy, opts *bind.TransactOpts, args SetRMNArgs) (*types.Transaction, error) {
 		return rmnProxy.SetARM(opts, args.RMN)
 	},

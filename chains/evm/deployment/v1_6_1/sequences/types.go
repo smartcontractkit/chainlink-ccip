@@ -15,8 +15,6 @@ type ConstructorArgs struct {
 	Token common.Address
 	// Decimals is the number of decimals used by the token.
 	Decimals uint8
-	// Allowlist is the list of addresses allowed to transfer the token.
-	Allowlist []common.Address
 	// RMNProxy is the RMN proxy contract.
 	RMNProxy common.Address
 	// Router is the router contract.

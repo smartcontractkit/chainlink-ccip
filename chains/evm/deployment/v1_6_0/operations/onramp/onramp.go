@@ -46,7 +46,12 @@ var OnRampApplyDestChainConfigUpdates = contract.NewWrite(contract.WriteParams[[
 	ContractABI:     onramp.OnRampABI,
 	NewContract:     onramp.NewOnRamp,
 	IsAllowedCaller: contract.OnlyOwner[*onramp.OnRamp, []onramp.OnRampDestChainConfigArgs],
-	Validate:        func([]onramp.OnRampDestChainConfigArgs) error { return nil },
+	Validate: func(onRamp *onramp.OnRamp, backend bind.ContractBackend, opts *bind.CallOpts, args []onramp.OnRampDestChainConfigArgs) error {
+		return nil
+	},
+	IsNoop: func(onRamp *onramp.OnRamp, opts *bind.CallOpts, args []onramp.OnRampDestChainConfigArgs) (bool, error) {
+		return false, nil
+	},
 	CallContract: func(onRamp *onramp.OnRamp, opts *bind.TransactOpts, args []onramp.OnRampDestChainConfigArgs) (*types.Transaction, error) {
 		return onRamp.ApplyDestChainConfigUpdates(opts, args)
 	},

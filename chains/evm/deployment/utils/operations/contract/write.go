@@ -51,9 +51,9 @@ type WriteParams[ARGS any, C any] struct {
 	// IsAllowedCaller is a function that checks if the caller is allowed to call the function.
 	IsAllowedCaller func(contract C, opts *bind.CallOpts, caller common.Address, input ARGS) (bool, error)
 	// IsNoop is a function that checks if the operation would be a no-op.
-	IsNoop func(contract C, opts *bind.CallOpts, caller common.Address, input ARGS) (bool, error)
+	IsNoop func(contract C, opts *bind.CallOpts, input ARGS) (bool, error)
 	// Validate is a function that validates the input arguments.
-	Validate func(input ARGS) error
+	Validate func(contract C, backend bind.ContractBackend, opts *bind.CallOpts, input ARGS) error
 	// CallContract is a function that calls the desired write method on the contract.
 	CallContract func(contract C, opts *bind.TransactOpts, input ARGS) (*eth_types.Transaction, error)
 }
@@ -69,11 +69,6 @@ func NewWrite[ARGS any, C any](params WriteParams[ARGS, C]) *operations.Operatio
 		params.Description,
 		func(b operations.Bundle, chain evm.Chain, input FunctionInput[ARGS]) (WriteOutput, error) {
 			// BEGIN Validation
-			if params.Validate != nil {
-				if err := params.Validate(input.Args); err != nil {
-					return WriteOutput{}, fmt.Errorf("invalid args for %s: %w", params.Name, err)
-				}
-			}
 			if input.ChainSelector != chain.Selector {
 				return WriteOutput{}, fmt.Errorf("mismatch between inputted chain selector and selector defined within dependencies: %d != %d", input.ChainSelector, chain.Selector)
 			}
@@ -95,18 +90,24 @@ func NewWrite[ARGS any, C any](params WriteParams[ARGS, C]) *operations.Operatio
 			if params.IsNoop == nil {
 				return WriteOutput{}, fmt.Errorf("isNoop function must be defined for %s", params.Name)
 			}
+			if params.Validate == nil {
+				return WriteOutput{}, fmt.Errorf("validate function must be defined for %s", params.Name)
+			}
 			// END Validation
 
 			boundContract, err := params.NewContract(input.Address, chain.Client)
 			if err != nil {
 				return WriteOutput{}, fmt.Errorf("failed to create contract instance for %s at %s on %s: %w", params.Name, input.Address, chain, err)
 			}
-			noop, err := params.IsNoop(boundContract, &bind.CallOpts{Context: b.GetContext()}, chain.DeployerKey.From, input.Args)
+			if err := params.Validate(boundContract, chain.Client, &bind.CallOpts{Context: b.GetContext()}, input.Args); err != nil {
+				return WriteOutput{}, fmt.Errorf("invalid args for %s: %w", params.Name, err)
+			}
+			noop, err := params.IsNoop(boundContract, &bind.CallOpts{Context: b.GetContext()}, input.Args)
 			if err != nil {
 				return WriteOutput{}, fmt.Errorf("failed to check if %s is a noop against %s on %s: %w", params.Name, input.Address, chain, err)
 			}
 			if noop {
-				// Mark the operation as executed.
+				// Mark the operation as executed and return.
 				return WriteOutput{
 					ChainSelector: input.ChainSelector,
 					ExecInfo:      &ExecInfo{},

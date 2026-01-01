@@ -1,6 +1,7 @@
 package router
 
 import (
+	"fmt"
 	"math/big"
 
 	"github.com/Masterminds/semver/v3"
@@ -76,7 +77,57 @@ var ApplyRampUpdates = contract.NewWrite(contract.WriteParams[ApplyRampsUpdatesA
 	ContractABI:     router.RouterABI,
 	NewContract:     router.NewRouter,
 	IsAllowedCaller: contract.OnlyOwner[*router.Router, ApplyRampsUpdatesArgs],
-	Validate:        func(ApplyRampsUpdatesArgs) error { return nil },
+	Validate: func(router *router.Router, backend bind.ContractBackend, opts *bind.CallOpts, args ApplyRampsUpdatesArgs) error {
+		offRamps, err := router.GetOffRamps(opts)
+		if err != nil {
+			return fmt.Errorf("failed to get off ramps on router with address %s: %w", router.Address(), err)
+		}
+		for _, offRampRemoval := range args.OffRampRemoves {
+			exists := false
+			for _, offRamp := range offRamps {
+				if offRampRemoval.SourceChainSelector == offRamp.SourceChainSelector && offRampRemoval.OffRamp == offRamp.OffRamp {
+					exists = true
+					break
+				}
+			}
+			if !exists {
+				return fmt.Errorf("off ramp %s does not exist on router with address %s for source chain selector %d", offRampRemoval.OffRamp, router.Address(), offRampRemoval.SourceChainSelector)
+			}
+		}
+
+		return nil
+	},
+	IsNoop: func(router *router.Router, opts *bind.CallOpts, args ApplyRampsUpdatesArgs) (bool, error) {
+		offRamps, err := router.GetOffRamps(opts)
+		if err != nil {
+			return false, fmt.Errorf("failed to get off ramps on router with address %s: %w", router.Address(), err)
+		}
+
+		for _, offRampAdd := range args.OffRampAdds {
+			exists := false
+			for _, offRamp := range offRamps {
+				if offRampAdd.SourceChainSelector == offRamp.SourceChainSelector && offRampAdd.OffRamp == offRamp.OffRamp {
+					exists = true
+					break
+				}
+			}
+			if !exists {
+				return false, nil
+			}
+		}
+
+		for _, onRampUpdate := range args.OnRampUpdates {
+			onRamp, err := router.GetOnRamp(opts, onRampUpdate.DestChainSelector)
+			if err != nil {
+				return false, fmt.Errorf("failed to get on ramp on router with address %s for dest chain selector %d: %w", router.Address(), onRampUpdate.DestChainSelector, err)
+			}
+			if onRamp != onRampUpdate.OnRamp {
+				return false, nil
+			}
+		}
+
+		return true, nil
+	},
 	CallContract: func(router *router.Router, opts *bind.TransactOpts, args ApplyRampsUpdatesArgs) (*types.Transaction, error) {
 		return router.ApplyRampUpdates(opts, args.OnRampUpdates, args.OffRampRemoves, args.OffRampAdds)
 	},
@@ -90,7 +141,12 @@ var CCIPSend = contract.NewWrite(contract.WriteParams[CCIPSendArgs, *router.Rout
 	ContractABI:     router.RouterABI,
 	NewContract:     router.NewRouter,
 	IsAllowedCaller: contract.AllCallersAllowed[*router.Router, CCIPSendArgs],
-	Validate:        func(CCIPSendArgs) error { return nil },
+	Validate: func(router *router.Router, backend bind.ContractBackend, opts *bind.CallOpts, args CCIPSendArgs) error {
+		return nil
+	},
+	IsNoop: func(router *router.Router, opts *bind.CallOpts, args CCIPSendArgs) (bool, error) {
+		return false, nil
+	},
 	CallContract: func(router *router.Router, opts *bind.TransactOpts, args CCIPSendArgs) (*types.Transaction, error) {
 		opts.Value = args.Value
 		defer func() { opts.Value = nil }()

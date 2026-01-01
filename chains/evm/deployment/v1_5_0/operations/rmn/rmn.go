@@ -50,7 +50,12 @@ var Curse = contract.NewWrite(contract.WriteParams[CurseArgs, *rmn_contract.RMNC
 	ContractABI:     rmn_contract.RMNContractABI,
 	NewContract:     rmn_contract.NewRMNContract,
 	IsAllowedCaller: contract.OnlyOwner[*rmn_contract.RMNContract, CurseArgs],
-	Validate:        func(CurseArgs) error { return nil },
+	Validate: func(rmn *rmn_contract.RMNContract, backend bind.ContractBackend, opts *bind.CallOpts, args CurseArgs) error {
+		return nil
+	},
+	IsNoop: func(rmn *rmn_contract.RMNContract, opts *bind.CallOpts, args CurseArgs) (bool, error) {
+		return false, nil
+	},
 	CallContract: func(rmn *rmn_contract.RMNContract, opts *bind.TransactOpts, args CurseArgs) (*types.Transaction, error) {
 		return rmn.OwnerCurse(opts, args.CurseID, args.Subject)
 	},
@@ -64,7 +69,12 @@ var Uncurse = contract.NewWrite(contract.WriteParams[UncurseArgs, *rmn_contract.
 	ContractABI:     rmn_contract.RMNContractABI,
 	NewContract:     rmn_contract.NewRMNContract,
 	IsAllowedCaller: contract.OnlyOwner[*rmn_contract.RMNContract, UncurseArgs],
-	Validate:        func(UncurseArgs) error { return nil },
+	Validate: func(rmn *rmn_contract.RMNContract, backend bind.ContractBackend, opts *bind.CallOpts, args UncurseArgs) error {
+		return nil
+	},
+	IsNoop: func(rmn *rmn_contract.RMNContract, opts *bind.CallOpts, args UncurseArgs) (bool, error) {
+		return false, nil
+	},
 	CallContract: func(rmn *rmn_contract.RMNContract, opts *bind.TransactOpts, args UncurseArgs) (*types.Transaction, error) {
 		return rmn.OwnerUnvoteToCurse(opts, args.Requests)
 	},

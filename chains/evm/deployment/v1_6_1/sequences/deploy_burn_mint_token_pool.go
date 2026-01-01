@@ -33,7 +33,6 @@ var DeployBurnMintTokenPool = cldf_ops.NewSequence(
 			Args: burn_mint_token_pool.ConstructorArgs{
 				Token:              input.ConstructorArgs.Token,
 				LocalTokenDecimals: input.ConstructorArgs.Decimals,
-				Allowlist:          input.ConstructorArgs.Allowlist,
 				RMNProxy:           input.ConstructorArgs.RMNProxy,
 				Router:             input.ConstructorArgs.Router,
 			},
@@ -47,7 +46,6 @@ var DeployBurnMintTokenPool = cldf_ops.NewSequence(
 			ChainSelector:    input.ChainSel,
 			TokenPoolAddress: common.HexToAddress(tpDeployReport.Output.Address),
 			RateLimitAdmin:   input.RateLimitAdmin,
-			AllowList:        input.ConstructorArgs.Allowlist,
 			RouterAddress:    input.ConstructorArgs.Router,
 		})
 		if err != nil {

@@ -1,6 +1,7 @@
 package burn_mint_erc20_with_drip
 
 import (
+	"fmt"
 	"math/big"
 
 	"github.com/Masterminds/semver/v3"
@@ -59,7 +60,20 @@ var GrantMintAndBurnRoles = contract.NewWrite(contract.WriteParams[common.Addres
 	IsAllowedCaller: func(contract *burn_mint_erc20_with_drip.BurnMintERC20WithDrip, opts *bind.CallOpts, caller common.Address, input common.Address) (bool, error) {
 		return contract.HasRole(opts, DefaultAdminRole, caller)
 	},
-	Validate: func(common.Address) error { return nil },
+	Validate: func(token *burn_mint_erc20_with_drip.BurnMintERC20WithDrip, backend bind.ContractBackend, opts *bind.CallOpts, account common.Address) error {
+		return nil
+	},
+	IsNoop: func(token *burn_mint_erc20_with_drip.BurnMintERC20WithDrip, opts *bind.CallOpts, account common.Address) (bool, error) {
+		hasMintRole, err := token.HasRole(opts, [32]byte(MintRole), account)
+		if err != nil {
+			return false, fmt.Errorf("failed to check if account %s has mint role on token with address %s: %w", account, token.Address(), err)
+		}
+		hasBurnRole, err := token.HasRole(opts, [32]byte(BurnRole), account)
+		if err != nil {
+			return false, fmt.Errorf("failed to check if account %s has burn role on token with address %s: %w", account, token.Address(), err)
+		}
+		return hasMintRole && hasBurnRole, nil
+	},
 	CallContract: func(token *burn_mint_erc20_with_drip.BurnMintERC20WithDrip, opts *bind.TransactOpts, account common.Address) (*types.Transaction, error) {
 		return token.GrantMintAndBurnRoles(opts, account)
 	},
@@ -75,7 +89,16 @@ var RevokeBurnRole = contract.NewWrite(contract.WriteParams[common.Address, *bur
 	IsAllowedCaller: func(contract *burn_mint_erc20_with_drip.BurnMintERC20WithDrip, opts *bind.CallOpts, caller common.Address, input common.Address) (bool, error) {
 		return contract.HasRole(opts, DefaultAdminRole, caller)
 	},
-	Validate: func(common.Address) error { return nil },
+	Validate: func(token *burn_mint_erc20_with_drip.BurnMintERC20WithDrip, backend bind.ContractBackend, opts *bind.CallOpts, account common.Address) error {
+		return nil
+	},
+	IsNoop: func(token *burn_mint_erc20_with_drip.BurnMintERC20WithDrip, opts *bind.CallOpts, account common.Address) (bool, error) {
+		hasBurnRole, err := token.HasRole(opts, [32]byte(BurnRole), account)
+		if err != nil {
+			return false, fmt.Errorf("failed to check if account %s has burn role on token with address %s: %w", account, token.Address(), err)
+		}
+		return !hasBurnRole, nil
+	},
 	CallContract: func(token *burn_mint_erc20_with_drip.BurnMintERC20WithDrip, opts *bind.TransactOpts, account common.Address) (*types.Transaction, error) {
 		return token.RevokeRole(opts, [32]byte(BurnRole), account)
 	},
@@ -91,7 +114,16 @@ var RevokeMintRole = contract.NewWrite(contract.WriteParams[common.Address, *bur
 	IsAllowedCaller: func(contract *burn_mint_erc20_with_drip.BurnMintERC20WithDrip, opts *bind.CallOpts, caller common.Address, input common.Address) (bool, error) {
 		return contract.HasRole(opts, DefaultAdminRole, caller)
 	},
-	Validate: func(common.Address) error { return nil },
+	Validate: func(token *burn_mint_erc20_with_drip.BurnMintERC20WithDrip, backend bind.ContractBackend, opts *bind.CallOpts, account common.Address) error {
+		return nil
+	},
+	IsNoop: func(token *burn_mint_erc20_with_drip.BurnMintERC20WithDrip, opts *bind.CallOpts, account common.Address) (bool, error) {
+		hasMintRole, err := token.HasRole(opts, [32]byte(MintRole), account)
+		if err != nil {
+			return false, fmt.Errorf("failed to check if account %s has mint role on token with address %s: %w", account, token.Address(), err)
+		}
+		return !hasMintRole, nil
+	},
 	CallContract: func(token *burn_mint_erc20_with_drip.BurnMintERC20WithDrip, opts *bind.TransactOpts, account common.Address) (*types.Transaction, error) {
 		return token.RevokeRole(opts, [32]byte(MintRole), account)
 	},
@@ -107,7 +139,12 @@ var Mint = contract.NewWrite(contract.WriteParams[MintArgs, *burn_mint_erc20_wit
 	IsAllowedCaller: func(contract *burn_mint_erc20_with_drip.BurnMintERC20WithDrip, opts *bind.CallOpts, caller common.Address, input MintArgs) (bool, error) {
 		return contract.HasRole(opts, [32]byte(MintRole), caller)
 	},
-	Validate: func(MintArgs) error { return nil },
+	Validate: func(token *burn_mint_erc20_with_drip.BurnMintERC20WithDrip, backend bind.ContractBackend, opts *bind.CallOpts, args MintArgs) error {
+		return nil
+	},
+	IsNoop: func(token *burn_mint_erc20_with_drip.BurnMintERC20WithDrip, opts *bind.CallOpts, args MintArgs) (bool, error) {
+		return false, nil
+	},
 	CallContract: func(token *burn_mint_erc20_with_drip.BurnMintERC20WithDrip, opts *bind.TransactOpts, args MintArgs) (*types.Transaction, error) {
 		return token.Mint(opts, args.Account, args.Amount)
 	},

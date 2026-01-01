@@ -1,6 +1,7 @@
 package token_admin_registry
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
@@ -9,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_1/burn_mint_token_pool"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
 
@@ -62,9 +64,24 @@ var ProposeAdministrator = contract.NewWrite(contract.WriteParams[ProposeAdminis
 		if err != nil {
 			return false, fmt.Errorf("failed to get token config: %w", err)
 		}
+
 		return caller == owner && tokenConfig.Administrator == (common.Address{}), nil
 	},
-	Validate: func(ProposeAdministratorArgs) error { return nil },
+	Validate: func(tokenAdminRegistry *token_admin_registry.TokenAdminRegistry, backend bind.ContractBackend, opts *bind.CallOpts, args ProposeAdministratorArgs) error {
+		if args.Administrator == (common.Address{}) {
+			return errors.New("administrator cannot be empty")
+		}
+
+		return nil
+	},
+	IsNoop: func(tokenAdminRegistry *token_admin_registry.TokenAdminRegistry, opts *bind.CallOpts, args ProposeAdministratorArgs) (bool, error) {
+		tokenConfig, err := tokenAdminRegistry.GetTokenConfig(opts, args.TokenAddress)
+		if err != nil {
+			return false, fmt.Errorf("failed to get token config: %w", err)
+		}
+
+		return tokenConfig.PendingAdministrator == args.Administrator, nil
+	},
 	CallContract: func(tokenAdminRegistry *token_admin_registry.TokenAdminRegistry, opts *bind.TransactOpts, args ProposeAdministratorArgs) (*types.Transaction, error) {
 		return tokenAdminRegistry.ProposeAdministrator(opts, args.TokenAddress, args.Administrator)
 	},
@@ -82,9 +99,17 @@ var AcceptAdminRole = contract.NewWrite(contract.WriteParams[AcceptAdminRoleArgs
 		if err != nil {
 			return false, fmt.Errorf("failed to get token config: %w", err)
 		}
+
 		return tokenConfig.PendingAdministrator == caller, nil
 	},
-	Validate: func(AcceptAdminRoleArgs) error { return nil },
+	Validate: func(tokenAdminRegistry *token_admin_registry.TokenAdminRegistry, backend bind.ContractBackend, opts *bind.CallOpts, args AcceptAdminRoleArgs) error {
+		return nil
+	},
+	IsNoop: func(tokenAdminRegistry *token_admin_registry.TokenAdminRegistry, opts *bind.CallOpts, args AcceptAdminRoleArgs) (bool, error) {
+		// We don't know the admin that is attempting to accept the admin role in this context.
+		// Therefore, we cannot determine if the operation is a noop.
+		return false, nil
+	},
 	CallContract: func(tokenAdminRegistry *token_admin_registry.TokenAdminRegistry, opts *bind.TransactOpts, args AcceptAdminRoleArgs) (*types.Transaction, error) {
 		return tokenAdminRegistry.AcceptAdminRole(opts, args.TokenAddress)
 	},
@@ -102,9 +127,36 @@ var SetPool = contract.NewWrite(contract.WriteParams[SetPoolArgs, *token_admin_r
 		if err != nil {
 			return false, fmt.Errorf("failed to get token config: %w", err)
 		}
+
 		return tokenConfig.Administrator == caller, nil
 	},
-	Validate: func(SetPoolArgs) error { return nil },
+	Validate: func(tokenAdminRegistry *token_admin_registry.TokenAdminRegistry, backend bind.ContractBackend, opts *bind.CallOpts, args SetPoolArgs) error {
+		tokenPool, err := burn_mint_token_pool.NewBurnMintTokenPool(args.TokenPoolAddress, backend)
+		if err != nil {
+			return fmt.Errorf("failed to create token pool: %w", err)
+		}
+
+		if args.TokenPoolAddress != (common.Address{}) {
+			isSupportedToken, err := tokenPool.IsSupportedToken(opts, args.TokenAddress)
+			if err != nil {
+				return fmt.Errorf("failed to check if token pool supports token: %w", err)
+			}
+
+			if !isSupportedToken {
+				return fmt.Errorf("token pool %s does not support token %s", args.TokenPoolAddress, args.TokenAddress)
+			}
+		}
+
+		return nil
+	},
+	IsNoop: func(tokenAdminRegistry *token_admin_registry.TokenAdminRegistry, opts *bind.CallOpts, args SetPoolArgs) (bool, error) {
+		tokenConfig, err := tokenAdminRegistry.GetTokenConfig(opts, args.TokenAddress)
+		if err != nil {
+			return false, fmt.Errorf("failed to get token config: %w", err)
+		}
+
+		return tokenConfig.TokenPool == args.TokenPoolAddress, nil
+	},
 	CallContract: func(tokenAdminRegistry *token_admin_registry.TokenAdminRegistry, opts *bind.TransactOpts, args SetPoolArgs) (*types.Transaction, error) {
 		return tokenAdminRegistry.SetPool(opts, args.TokenAddress, args.TokenPoolAddress)
 	},
@@ -118,7 +170,17 @@ var AddRegistryModule = contract.NewWrite(contract.WriteParams[common.Address, *
 	ContractABI:     token_admin_registry.TokenAdminRegistryABI,
 	NewContract:     token_admin_registry.NewTokenAdminRegistry,
 	IsAllowedCaller: contract.OnlyOwner[*token_admin_registry.TokenAdminRegistry, common.Address],
-	Validate:        func(common.Address) error { return nil },
+	Validate: func(tokenAdminRegistry *token_admin_registry.TokenAdminRegistry, backend bind.ContractBackend, opts *bind.CallOpts, args common.Address) error {
+		return nil
+	},
+	IsNoop: func(tokenAdminRegistry *token_admin_registry.TokenAdminRegistry, opts *bind.CallOpts, args common.Address) (bool, error) {
+		isRegistryModule, err := tokenAdminRegistry.IsRegistryModule(opts, args)
+		if err != nil {
+			return false, fmt.Errorf("failed to check if registry module is registered: %w", err)
+		}
+
+		return isRegistryModule, nil
+	},
 	CallContract: func(tokenAdminRegistry *token_admin_registry.TokenAdminRegistry, opts *bind.TransactOpts, args common.Address) (*types.Transaction, error) {
 		return tokenAdminRegistry.AddRegistryModule(opts, args)
 	},

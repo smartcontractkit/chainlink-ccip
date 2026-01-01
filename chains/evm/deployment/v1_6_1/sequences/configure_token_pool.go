@@ -19,10 +19,6 @@ type ConfigureTokenPoolInput struct {
 	ChainSelector uint64
 	// TokenPoolAddress is the address of the token pool.
 	TokenPoolAddress common.Address
-	// AllowList is the list of addresses allowed to transfer tokens.
-	// If empty upon deployment, an allow-list can never be set.
-	// Likewise, if populated upon deployment, the allow-list can never be disabled.
-	AllowList []common.Address
 	// RouterAddress is the address of the Router contract on this chain.
 	// If left empty, setRouter will not be attempted.
 	RouterAddress common.Address
@@ -37,44 +33,6 @@ var ConfigureTokenPool = cldf_ops.NewSequence(
 	"Configures a token pool on an EVM chain",
 	func(b cldf_ops.Bundle, chain evm.Chain, input ConfigureTokenPoolInput) (output sequences.OnChainOutput, err error) {
 		writes := make([]evm_contract.WriteOutput, 0)
-
-		// First, check if the allow-list is enabled
-		if len(input.AllowList) != 0 {
-			allowListEnabledReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetAllowListEnabled, chain, evm_contract.FunctionInput[any]{
-				ChainSelector: input.ChainSelector,
-				Address:       input.TokenPoolAddress,
-			})
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to get allow-list status from token pool with address %s on %s: %w", input.TokenPoolAddress, chain, err)
-			}
-			if allowListEnabledReport.Output {
-				// Allow-list is enabled, so we first check the current allow-list
-				currentAllowListReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetAllowList, chain, evm_contract.FunctionInput[any]{
-					ChainSelector: input.ChainSelector,
-					Address:       input.TokenPoolAddress,
-				})
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to get current allow-list from token pool with address %s on %s: %w", input.TokenPoolAddress, chain, err)
-				}
-				adds, removes := makeAllowListUpdates(currentAllowListReport.Output, input.AllowList)
-
-				// Apply any updates to the allow-list if they exist
-				if len(adds) != 0 || len(removes) != 0 {
-					applyAllowListUpdatesReport, err := cldf_ops.ExecuteOperation(b, token_pool.ApplyAllowlistUpdates, chain, evm_contract.FunctionInput[token_pool.ApplyAllowListUpdatesArgs]{
-						ChainSelector: input.ChainSelector,
-						Address:       input.TokenPoolAddress,
-						Args: token_pool.ApplyAllowListUpdatesArgs{
-							Adds:    adds,
-							Removes: removes,
-						},
-					})
-					if err != nil {
-						return sequences.OnChainOutput{}, fmt.Errorf("failed to apply allow-list updates to token pool with address %s on %s: %w", input.TokenPoolAddress, chain, err)
-					}
-					writes = append(writes, applyAllowListUpdatesReport.Output)
-				}
-			}
-		}
 
 		// Set router if necessary
 		if input.RouterAddress != (common.Address{}) {

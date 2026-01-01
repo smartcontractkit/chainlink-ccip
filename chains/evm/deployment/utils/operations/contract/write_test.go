@@ -111,6 +111,14 @@ func TestWrite(t *testing.T) {
 			},
 			deployerAddress: common.HexToAddress("0x03"),
 		},
+		{
+			desc: "noop",
+			input: FunctionInput[int]{
+				ChainSelector: validChainSel,
+				Address:       address,
+				Args:          20,
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -123,7 +131,7 @@ func TestWrite(t *testing.T) {
 				ContractABI:     contractABI,
 				NewContract:     newTestContract,
 				IsAllowedCaller: OnlyOwner[*testContract, int],
-				Validate: func(input int) error {
+				Validate: func(contract *testContract, backend bind.ContractBackend, opts *bind.CallOpts, input int) error {
 					if input%2 != 0 {
 						return fmt.Errorf("input must be even")
 					}
@@ -131,6 +139,12 @@ func TestWrite(t *testing.T) {
 				},
 				CallContract: func(contract *testContract, opts *bind.TransactOpts, input int) (*types.Transaction, error) {
 					return contract.Write(opts, input)
+				},
+				IsNoop: func(contract *testContract, opts *bind.CallOpts, input int) (bool, error) {
+					if input == 20 {
+						return true, nil
+					}
+					return false, nil
 				},
 			})
 
@@ -161,17 +175,24 @@ func TestWrite(t *testing.T) {
 				require.Contains(t, err.Error(), test.expectedErr)
 			} else {
 				require.NoError(t, err, "Unexpected ExecuteOperation error")
-				if test.deployerAddress == OwnerAddress {
-					require.True(t, confirmed, "Expected transaction to be confirmed when called by owner")
-					require.True(t, report.Output.Executed(), "Expected Executed to be true when called by owner")
+				if test.input.Args == 20 {
+					require.Equal(t, report.Output, WriteOutput{
+						ChainSelector: validChainSel,
+						ExecInfo:      &ExecInfo{},
+					}, "Noop expected when input is 10")
 				} else {
-					require.False(t, confirmed, "Expected transaction to not be confirmed when not called by owner")
-					require.False(t, report.Output.Executed(), "Expected Executed to be false when not called by owner")
+					if test.deployerAddress == OwnerAddress {
+						require.True(t, confirmed, "Expected transaction to be confirmed when called by owner")
+						require.True(t, report.Output.Executed(), "Expected Executed to be true when called by owner")
+					} else {
+						require.False(t, confirmed, "Expected transaction to not be confirmed when not called by owner")
+						require.False(t, report.Output.Executed(), "Expected Executed to be false when not called by owner")
+					}
+					require.Equal(t, validChainSel, report.Output.ChainSelector, "Unexpected ChainSelector in output")
+					require.Equal(t, []byte{0xDE, 0xAD, 0xBE, 0xEF}, report.Output.Tx.Data, "Unexpected tx data in output")
+					require.Equal(t, address.Hex(), report.Output.Tx.To, "Unexpected to address in output")
+					require.Equal(t, string(testContractType), report.Output.Tx.ContractType, "Unexpected ContractType in output")
 				}
-				require.Equal(t, validChainSel, report.Output.ChainSelector, "Unexpected ChainSelector in output")
-				require.Equal(t, []byte{0xDE, 0xAD, 0xBE, 0xEF}, report.Output.Tx.Data, "Unexpected tx data in output")
-				require.Equal(t, address.Hex(), report.Output.Tx.To, "Unexpected to address in output")
-				require.Equal(t, string(testContractType), report.Output.Tx.ContractType, "Unexpected ContractType in output")
 			}
 		})
 	}

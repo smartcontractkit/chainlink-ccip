@@ -49,7 +49,12 @@ var FeeQuoterApplyDestChainConfigUpdates = contract.NewWrite(contract.WriteParam
 	ContractABI:     fee_quoter.FeeQuoterABI,
 	NewContract:     fee_quoter.NewFeeQuoter,
 	IsAllowedCaller: contract.OnlyOwner[*fee_quoter.FeeQuoter, []fee_quoter.FeeQuoterDestChainConfigArgs],
-	Validate:        func([]fee_quoter.FeeQuoterDestChainConfigArgs) error { return nil },
+	Validate: func(feeQuoter *fee_quoter.FeeQuoter, backend bind.ContractBackend, opts *bind.CallOpts, args []fee_quoter.FeeQuoterDestChainConfigArgs) error {
+		return nil
+	},
+	IsNoop: func(feeQuoter *fee_quoter.FeeQuoter, opts *bind.CallOpts, args []fee_quoter.FeeQuoterDestChainConfigArgs) (bool, error) {
+		return false, nil
+	},
 	CallContract: func(feeQuoter *fee_quoter.FeeQuoter, opts *bind.TransactOpts, args []fee_quoter.FeeQuoterDestChainConfigArgs) (*types.Transaction, error) {
 		return feeQuoter.ApplyDestChainConfigUpdates(opts, args)
 	},
@@ -63,7 +68,12 @@ var FeeQuoterUpdatePrices = contract.NewWrite(contract.WriteParams[fee_quoter.In
 	ContractABI:     fee_quoter.FeeQuoterABI,
 	NewContract:     fee_quoter.NewFeeQuoter,
 	IsAllowedCaller: contract.OnlyOwner[*fee_quoter.FeeQuoter, fee_quoter.InternalPriceUpdates],
-	Validate:        func(fee_quoter.InternalPriceUpdates) error { return nil },
+	Validate: func(feeQuoter *fee_quoter.FeeQuoter, backend bind.ContractBackend, opts *bind.CallOpts, args fee_quoter.InternalPriceUpdates) error {
+		return nil
+	},
+	IsNoop: func(feeQuoter *fee_quoter.FeeQuoter, opts *bind.CallOpts, args fee_quoter.InternalPriceUpdates) (bool, error) {
+		return false, nil
+	},
 	CallContract: func(feeQuoter *fee_quoter.FeeQuoter, opts *bind.TransactOpts, args fee_quoter.InternalPriceUpdates) (*types.Transaction, error) {
 		return feeQuoter.UpdatePrices(opts, args)
 	},

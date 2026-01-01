@@ -54,7 +54,12 @@ var OffRampApplySourceChainConfigUpdates = contract.NewWrite(contract.WriteParam
 	ContractABI:     offramp.OffRampABI,
 	NewContract:     offramp.NewOffRamp,
 	IsAllowedCaller: contract.OnlyOwner[*offramp.OffRamp, []offramp.OffRampSourceChainConfigArgs],
-	Validate:        func([]offramp.OffRampSourceChainConfigArgs) error { return nil },
+	Validate: func(offRamp *offramp.OffRamp, backend bind.ContractBackend, opts *bind.CallOpts, args []offramp.OffRampSourceChainConfigArgs) error {
+		return nil
+	},
+	IsNoop: func(offRamp *offramp.OffRamp, opts *bind.CallOpts, args []offramp.OffRampSourceChainConfigArgs) (bool, error) {
+		return false, nil
+	},
 	CallContract: func(offRamp *offramp.OffRamp, opts *bind.TransactOpts, args []offramp.OffRampSourceChainConfigArgs) (*types.Transaction, error) {
 		return offRamp.ApplySourceChainConfigUpdates(opts, args)
 	},

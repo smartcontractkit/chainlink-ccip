@@ -155,7 +155,12 @@ var OpEVMSetConfigMCM = contract.NewWrite(contract.WriteParams[OpSetConfigMCMInp
 	ContractType:    "ManyChainMultiSig",
 	NewContract:     bindings.NewManyChainMultiSig,
 	IsAllowedCaller: contract.OnlyOwner[*bindings.ManyChainMultiSig, OpSetConfigMCMInput],
-	Validate:        func(input OpSetConfigMCMInput) error { return nil },
+	Validate: func(mcm *bindings.ManyChainMultiSig, backend bind.ContractBackend, opts *bind.CallOpts, input OpSetConfigMCMInput) error {
+		return nil
+	},
+	IsNoop: func(mcm *bindings.ManyChainMultiSig, opts *bind.CallOpts, input OpSetConfigMCMInput) (bool, error) {
+		return false, nil
+	},
 	CallContract: func(mcm *bindings.ManyChainMultiSig, opts *bind.TransactOpts, input OpSetConfigMCMInput) (*types.Transaction, error) {
 		return mcm.SetConfig(
 			opts,
@@ -183,11 +188,14 @@ var OpGrantRoleTimelock = contract.NewWrite(contract.WriteParams[OpGrantRoleTime
 		// Check if caller has admin role of the role being granted
 		return contract.HasRole(opts, roleAdmin, caller)
 	},
-	Validate: func(input OpGrantRoleTimelockInput) error {
+	Validate: func(timelock *bindings.RBACTimelock, backend bind.ContractBackend, opts *bind.CallOpts, input OpGrantRoleTimelockInput) error {
 		if input.Account == (common.Address{}) {
 			return utils.ErrZeroAddress
 		}
 		return nil
+	},
+	IsNoop: func(timelock *bindings.RBACTimelock, opts *bind.CallOpts, input OpGrantRoleTimelockInput) (bool, error) {
+		return false, nil
 	},
 	CallContract: func(timelock *bindings.RBACTimelock, opts *bind.TransactOpts, input OpGrantRoleTimelockInput) (*types.Transaction, error) {
 		return timelock.GrantRole(opts, input.RoleID, input.Account)

@@ -1,6 +1,8 @@
 package advanced_pool_hooks
 
 import (
+	"errors"
+	"fmt"
 	"math/big"
 
 	"github.com/Masterminds/semver/v3"
@@ -49,23 +51,55 @@ var ApplyCCVConfigUpdates = contract.NewWrite(contract.WriteParams[[]CCVConfigAr
 	ContractABI:     advanced_pool_hooks.AdvancedPoolHooksABI,
 	NewContract:     advanced_pool_hooks.NewAdvancedPoolHooks,
 	IsAllowedCaller: contract.OnlyOwner[*advanced_pool_hooks.AdvancedPoolHooks, []CCVConfigArg],
-	Validate:        func([]CCVConfigArg) error { return nil },
+	Validate: func(configs []CCVConfigArg) error {
+		for _, cfg := range configs {
+			// Ensure that OutboundCCVs has no duplicates.
+			if hasDuplicates(cfg.OutboundCCVs) {
+				return errors.New("outbound CCVs must not contain duplicates")
+			}
+			// Ensure that InboundCCVs has no duplicates.
+			if hasDuplicates(cfg.InboundCCVs) {
+				return errors.New("inbound CCVs must not contain duplicates")
+			}
+
+			if len(cfg.ThresholdOutboundCCVs) > 0 {
+				if len(cfg.OutboundCCVs) == 0 {
+					return errors.New("threshold outbound CCVs must be specified when outbound CCVs are specified")
+				}
+				// Ensure that ThresholdOutboundCCVs has no duplicates.
+				if hasDuplicates(cfg.ThresholdOutboundCCVs) {
+					return errors.New("threshold outbound CCVs must not contain duplicates")
+				}
+				// Ensure that ThresholdOutboundCCVs and OutboundCCVs do not overlap.
+				if hasOverlap(cfg.OutboundCCVs, cfg.ThresholdOutboundCCVs) {
+					return errors.New("threshold outbound CCVs must not overlap with outbound CCVs")
+				}
+			}
+
+			if len(cfg.ThresholdInboundCCVs) > 0 {
+				if len(cfg.InboundCCVs) == 0 {
+					return errors.New("threshold inbound CCVs must be specified when inbound CCVs are specified")
+				}
+				// Ensure that ThresholdInboundCCVs has no duplicates.
+				if hasDuplicates(cfg.ThresholdInboundCCVs) {
+					return errors.New("threshold inbound CCVs must not contain duplicates")
+				}
+				// Ensure that ThresholdInboundCCVs and InboundCCVs do not overlap.
+				if hasOverlap(cfg.InboundCCVs, cfg.ThresholdInboundCCVs) {
+					return errors.New("threshold inbound CCVs must not overlap with inbound CCVs")
+				}
+			}
+		}
+
+		return nil
+	},
+	IsNoop: func(advancedPoolHooks *advanced_pool_hooks.AdvancedPoolHooks, opts *bind.CallOpts, caller common.Address, args []CCVConfigArg) (bool, error) {
+		// GetRequiredCCVs is not a reliable way to determine if the operation is a noop because it doesn't give a full picture of state.
+		// It just provides a list of required CCVs for given parameters. Therefore, we just check if the args are empty to determine if the operation is a noop.
+		return len(args) == 0, nil
+	},
 	CallContract: func(advancedPoolHooks *advanced_pool_hooks.AdvancedPoolHooks, opts *bind.TransactOpts, args []CCVConfigArg) (*types.Transaction, error) {
 		return advancedPoolHooks.ApplyCCVConfigUpdates(opts, args)
-	},
-})
-
-var ApplyAllowlistUpdates = contract.NewWrite(contract.WriteParams[AllowlistUpdatesArgs, *advanced_pool_hooks.AdvancedPoolHooks]{
-	Name:            "advanced-pool-hooks:apply-allowlist-updates",
-	Version:         Version,
-	Description:     "Applies allowlist updates to the AdvancedPoolHooks contract",
-	ContractType:    ContractType,
-	ContractABI:     advanced_pool_hooks.AdvancedPoolHooksABI,
-	NewContract:     advanced_pool_hooks.NewAdvancedPoolHooks,
-	IsAllowedCaller: contract.OnlyOwner[*advanced_pool_hooks.AdvancedPoolHooks, AllowlistUpdatesArgs],
-	Validate:        func(AllowlistUpdatesArgs) error { return nil },
-	CallContract: func(advancedPoolHooks *advanced_pool_hooks.AdvancedPoolHooks, opts *bind.TransactOpts, args AllowlistUpdatesArgs) (*types.Transaction, error) {
-		return advancedPoolHooks.ApplyAllowListUpdates(opts, args.Removes, args.Adds)
 	},
 })
 
@@ -77,7 +111,19 @@ var SetThresholdAmount = contract.NewWrite(contract.WriteParams[*big.Int, *advan
 	ContractABI:     advanced_pool_hooks.AdvancedPoolHooksABI,
 	NewContract:     advanced_pool_hooks.NewAdvancedPoolHooks,
 	IsAllowedCaller: contract.OnlyOwner[*advanced_pool_hooks.AdvancedPoolHooks, *big.Int],
-	Validate:        func(*big.Int) error { return nil },
+	IsNoop: func(advancedPoolHooks *advanced_pool_hooks.AdvancedPoolHooks, opts *bind.CallOpts, caller common.Address, args *big.Int) (bool, error) {
+		if args == nil {
+			return true, nil
+		}
+
+		currentThresholdAmount, err := advancedPoolHooks.GetThresholdAmount(opts)
+		if err != nil {
+			return false, fmt.Errorf("failed to get current threshold amount on advanced pool hooks with address %s: %w", advancedPoolHooks.Address(), err)
+		}
+
+		return currentThresholdAmount.Cmp(args) == 0, nil
+	},
+	Validate: func(*big.Int) error { return nil },
 	CallContract: func(advancedPoolHooks *advanced_pool_hooks.AdvancedPoolHooks, opts *bind.TransactOpts, args *big.Int) (*types.Transaction, error) {
 		return advancedPoolHooks.SetThresholdAmount(opts, args)
 	},
@@ -115,3 +161,25 @@ var GetThresholdAmount = contract.NewRead(contract.ReadParams[any, *big.Int, *ad
 		return advancedPoolHooks.GetThresholdAmount(opts)
 	},
 })
+
+func hasDuplicates(list []common.Address) bool {
+	seen := make(map[common.Address]bool)
+	for _, addr := range list {
+		if seen[addr] {
+			return true
+		}
+		seen[addr] = true
+	}
+	return false
+}
+
+func hasOverlap(listA, listB []common.Address) bool {
+	for _, addrA := range listA {
+		for _, addrB := range listB {
+			if addrA == addrB {
+				return true
+			}
+		}
+	}
+	return false
+}

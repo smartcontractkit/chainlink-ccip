@@ -64,7 +64,12 @@ var ApplyChainUpdates = contract.NewWrite(contract.WriteParams[ApplyChainUpdates
 	ContractABI:     burn_mint_token_pool.BurnMintTokenPoolABI,
 	NewContract:     burn_mint_token_pool.NewBurnMintTokenPool,
 	IsAllowedCaller: contract.OnlyOwner[*burn_mint_token_pool.BurnMintTokenPool, ApplyChainUpdatesArgs],
-	Validate:        func(ApplyChainUpdatesArgs) error { return nil },
+	Validate: func(tokenPool *burn_mint_token_pool.BurnMintTokenPool, backend bind.ContractBackend, opts *bind.CallOpts, args ApplyChainUpdatesArgs) error {
+		return nil
+	},
+	IsNoop: func(tokenPool *burn_mint_token_pool.BurnMintTokenPool, opts *bind.CallOpts, args ApplyChainUpdatesArgs) (bool, error) {
+		return false, nil
+	},
 	CallContract: func(tokenPool *burn_mint_token_pool.BurnMintTokenPool, opts *bind.TransactOpts, args ApplyChainUpdatesArgs) (*types.Transaction, error) {
 		chainsToAdd := make([]burn_mint_token_pool.TokenPoolChainUpdate, len(args.ChainsToAdd))
 		for i, chain := range args.ChainsToAdd {
@@ -88,7 +93,12 @@ var AddRemotePool = contract.NewWrite(contract.WriteParams[RemotePoolArgs, *burn
 	ContractABI:     burn_mint_token_pool.BurnMintTokenPoolABI,
 	NewContract:     burn_mint_token_pool.NewBurnMintTokenPool,
 	IsAllowedCaller: contract.OnlyOwner[*burn_mint_token_pool.BurnMintTokenPool, RemotePoolArgs],
-	Validate:        func(RemotePoolArgs) error { return nil },
+	Validate: func(tokenPool *burn_mint_token_pool.BurnMintTokenPool, backend bind.ContractBackend, opts *bind.CallOpts, args RemotePoolArgs) error {
+		return nil
+	},
+	IsNoop: func(tokenPool *burn_mint_token_pool.BurnMintTokenPool, opts *bind.CallOpts, args RemotePoolArgs) (bool, error) {
+		return false, nil
+	},
 	CallContract: func(tokenPool *burn_mint_token_pool.BurnMintTokenPool, opts *bind.TransactOpts, args RemotePoolArgs) (*types.Transaction, error) {
 		return tokenPool.AddRemotePool(opts, args.RemoteChainSelector, args.RemotePoolAddress)
 	},
@@ -102,7 +112,12 @@ var RemoveRemotePool = contract.NewWrite(contract.WriteParams[RemotePoolArgs, *b
 	ContractABI:     burn_mint_token_pool.BurnMintTokenPoolABI,
 	NewContract:     burn_mint_token_pool.NewBurnMintTokenPool,
 	IsAllowedCaller: contract.OnlyOwner[*burn_mint_token_pool.BurnMintTokenPool, RemotePoolArgs],
-	Validate:        func(RemotePoolArgs) error { return nil },
+	Validate: func(tokenPool *burn_mint_token_pool.BurnMintTokenPool, backend bind.ContractBackend, opts *bind.CallOpts, args RemotePoolArgs) error {
+		return nil
+	},
+	IsNoop: func(tokenPool *burn_mint_token_pool.BurnMintTokenPool, opts *bind.CallOpts, args RemotePoolArgs) (bool, error) {
+		return false, nil
+	},
 	CallContract: func(tokenPool *burn_mint_token_pool.BurnMintTokenPool, opts *bind.TransactOpts, args RemotePoolArgs) (*types.Transaction, error) {
 		return tokenPool.RemoveRemotePool(opts, args.RemoteChainSelector, args.RemotePoolAddress)
 	},
@@ -116,7 +131,12 @@ var SetRateLimitConfig = contract.NewWrite(contract.WriteParams[[]SetChainRateLi
 	ContractABI:     burn_mint_token_pool.BurnMintTokenPoolABI,
 	NewContract:     burn_mint_token_pool.NewBurnMintTokenPool,
 	IsAllowedCaller: contract.OnlyOwner[*burn_mint_token_pool.BurnMintTokenPool, []SetChainRateLimiterConfigArg],
-	Validate:        func([]SetChainRateLimiterConfigArg) error { return nil },
+	Validate: func(tokenPool *burn_mint_token_pool.BurnMintTokenPool, backend bind.ContractBackend, opts *bind.CallOpts, args []SetChainRateLimiterConfigArg) error {
+		return nil
+	},
+	IsNoop: func(tokenPool *burn_mint_token_pool.BurnMintTokenPool, opts *bind.CallOpts, args []SetChainRateLimiterConfigArg) (bool, error) {
+		return false, nil
+	},
 	CallContract: func(tokenPool *burn_mint_token_pool.BurnMintTokenPool, opts *bind.TransactOpts, args []SetChainRateLimiterConfigArg) (*types.Transaction, error) {
 		inboundRateLimitConfigs := make([]burn_mint_token_pool.RateLimiterConfig, 0, len(args))
 		outboundRateLimitConfigs := make([]burn_mint_token_pool.RateLimiterConfig, 0, len(args))
@@ -146,7 +166,12 @@ var SetRouter = contract.NewWrite(contract.WriteParams[common.Address, *burn_min
 	ContractABI:     burn_mint_token_pool.BurnMintTokenPoolABI,
 	NewContract:     burn_mint_token_pool.NewBurnMintTokenPool,
 	IsAllowedCaller: contract.OnlyOwner[*burn_mint_token_pool.BurnMintTokenPool, common.Address],
-	Validate:        func(common.Address) error { return nil },
+	Validate: func(tokenPool *burn_mint_token_pool.BurnMintTokenPool, backend bind.ContractBackend, opts *bind.CallOpts, args common.Address) error {
+		return nil
+	},
+	IsNoop: func(tokenPool *burn_mint_token_pool.BurnMintTokenPool, opts *bind.CallOpts, args common.Address) (bool, error) {
+		return false, nil
+	},
 	CallContract: func(tokenPool *burn_mint_token_pool.BurnMintTokenPool, opts *bind.TransactOpts, args common.Address) (*types.Transaction, error) {
 		return tokenPool.SetRouter(opts, args)
 	},
@@ -160,23 +185,14 @@ var SetRateLimitAdmin = contract.NewWrite(contract.WriteParams[common.Address, *
 	ContractABI:     burn_mint_token_pool.BurnMintTokenPoolABI,
 	NewContract:     burn_mint_token_pool.NewBurnMintTokenPool,
 	IsAllowedCaller: contract.OnlyOwner[*burn_mint_token_pool.BurnMintTokenPool, common.Address],
-	Validate:        func(common.Address) error { return nil },
+	Validate: func(tokenPool *burn_mint_token_pool.BurnMintTokenPool, backend bind.ContractBackend, opts *bind.CallOpts, args common.Address) error {
+		return nil
+	},
+	IsNoop: func(tokenPool *burn_mint_token_pool.BurnMintTokenPool, opts *bind.CallOpts, args common.Address) (bool, error) {
+		return false, nil
+	},
 	CallContract: func(tokenPool *burn_mint_token_pool.BurnMintTokenPool, opts *bind.TransactOpts, args common.Address) (*types.Transaction, error) {
 		return tokenPool.SetRateLimitAdmin(opts, args)
-	},
-})
-
-var ApplyAllowlistUpdates = contract.NewWrite(contract.WriteParams[ApplyAllowListUpdatesArgs, *burn_mint_token_pool.BurnMintTokenPool]{
-	Name:            "token-pool:apply-allowlist-updates",
-	Version:         Version,
-	Description:     "Applies allow list updates to a TokenPool",
-	ContractType:    ContractType,
-	ContractABI:     burn_mint_token_pool.BurnMintTokenPoolABI,
-	NewContract:     burn_mint_token_pool.NewBurnMintTokenPool,
-	IsAllowedCaller: contract.OnlyOwner[*burn_mint_token_pool.BurnMintTokenPool, ApplyAllowListUpdatesArgs],
-	Validate:        func(ApplyAllowListUpdatesArgs) error { return nil },
-	CallContract: func(tokenPool *burn_mint_token_pool.BurnMintTokenPool, opts *bind.TransactOpts, args ApplyAllowListUpdatesArgs) (*types.Transaction, error) {
-		return tokenPool.ApplyAllowListUpdates(opts, args.Removes, args.Adds)
 	},
 })
 

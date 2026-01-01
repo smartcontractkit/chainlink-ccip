@@ -42,7 +42,12 @@ var ApplyAuthorizedCallerUpdates = contract.NewWrite(contract.WriteParams[Author
 	ContractABI:     nonce_manager.NonceManagerABI,
 	NewContract:     nonce_manager.NewNonceManager,
 	IsAllowedCaller: contract.OnlyOwner[*nonce_manager.NonceManager, AuthorizedCallerArgs],
-	Validate:        func(AuthorizedCallerArgs) error { return nil },
+	Validate: func(nonceManager *nonce_manager.NonceManager, backend bind.ContractBackend, opts *bind.CallOpts, args AuthorizedCallerArgs) error {
+		return nil
+	},
+	IsNoop: func(nonceManager *nonce_manager.NonceManager, opts *bind.CallOpts, args AuthorizedCallerArgs) (bool, error) {
+		return false, nil
+	},
 	CallContract: func(nonceManager *nonce_manager.NonceManager, opts *bind.TransactOpts, args AuthorizedCallerArgs) (*types.Transaction, error) {
 		return nonceManager.ApplyAuthorizedCallerUpdates(opts, args)
 	},
@@ -56,7 +61,12 @@ var ApplyPreviousRampUpdates = contract.NewWrite(contract.WriteParams[[]Previous
 	ContractABI:     nonce_manager.NonceManagerABI,
 	NewContract:     nonce_manager.NewNonceManager,
 	IsAllowedCaller: contract.OnlyOwner[*nonce_manager.NonceManager, []PreviousRampsArgs],
-	Validate:        func([]PreviousRampsArgs) error { return nil },
+	Validate: func(nonceManager *nonce_manager.NonceManager, backend bind.ContractBackend, opts *bind.CallOpts, args []PreviousRampsArgs) error {
+		return nil
+	},
+	IsNoop: func(nonceManager *nonce_manager.NonceManager, opts *bind.CallOpts, args []PreviousRampsArgs) (bool, error) {
+		return false, nil
+	},
 	CallContract: func(nonceManager *nonce_manager.NonceManager, opts *bind.TransactOpts, args []PreviousRampsArgs) (*types.Transaction, error) {
 		return nonceManager.ApplyPreviousRampsUpdates(opts, args)
 	},
