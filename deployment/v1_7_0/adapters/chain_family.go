@@ -103,6 +103,10 @@ type RemoteChainConfig[RemoteContract any, LocalContract any] struct {
 	FeeQuoterDestChainConfig FeeQuoterDestChainConfig
 	// ExecutorDestChainConfig configures the Executor for this remote chain
 	ExecutorDestChainConfig ExecutorDestChainConfig
+	// Network fee in USD cents for messages without token transfers.
+	MessageNetworkFeeUSDCents uint16
+	// Network fee in USD cents for messages with token transfers.
+	TokenNetworkFeeUSDCents uint16
 	// Length of addresses on the destination chain, in bytes.
 	AddressBytesLength uint8
 	// Execution gas cost, excluding pool/CCV/receiver gas.
