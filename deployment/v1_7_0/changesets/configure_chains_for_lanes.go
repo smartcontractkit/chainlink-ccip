@@ -2,6 +2,7 @@ package changesets
 
 import (
 	"fmt"
+	"slices"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
@@ -82,6 +83,9 @@ func makeVerify(_ *adapters.ChainFamilyRegistry, _ *changesets.MCMSReaderRegistr
 					return fmt.Errorf("committee verifier on chain with selector %d has no contracts", chain.ChainSelector)
 				}
 				for remoteChainSelector, remoteChain := range ccv.RemoteChains {
+					if slices.Contains(chain.RemoteChainsToDisconnect, remoteChainSelector) {
+						return fmt.Errorf("committee verifier on chain %d with remote chain %d has remote chain %d in both RemoteChains and RemoteChainsToDisconnect", chain.ChainSelector, remoteChainSelector, remoteChainSelector)
+					}
 					if _, err := chain_selectors.GetSelectorFamily(remoteChainSelector); err != nil {
 						return err
 					}
@@ -92,6 +96,9 @@ func makeVerify(_ *adapters.ChainFamilyRegistry, _ *changesets.MCMSReaderRegistr
 			}
 
 			for remoteChainSelector, remoteChain := range chain.RemoteChains {
+				if slices.Contains(chain.RemoteChainsToDisconnect, remoteChainSelector) {
+					return fmt.Errorf("chain %d has remote chain %d in both RemoteChains and RemoteChainsToDisconnect", chain.ChainSelector, remoteChainSelector)
+				}
 				if _, err := chain_selectors.GetSelectorFamily(remoteChainSelector); err != nil {
 					return err
 				}

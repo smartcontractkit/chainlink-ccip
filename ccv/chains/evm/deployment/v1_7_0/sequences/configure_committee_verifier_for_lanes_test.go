@@ -330,3 +330,143 @@ func TestConfigureCommitteeVerifierForLanes_RevertWhen_InvalidSupportingContract
 		})
 	}
 }
+
+func TestConfigureCommitteeVerifierForLanes_RemoteChainsToDisconnect(t *testing.T) {
+	chainSelector := uint64(5009297550715157269)
+	remoteChainSelector1 := uint64(4356164186791070119)
+	remoteChainSelector2 := uint64(4949039107694359620)
+
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{chainSelector}),
+	)
+	require.NoError(t, err, "Failed to create environment")
+	require.NotNil(t, e, "Environment should be created")
+	evmChain := e.BlockChains.EVMChains()[chainSelector]
+
+	// Deploy chain contracts
+	deploymentReport, err := operations.ExecuteSequence(
+		e.OperationsBundle,
+		sequences.DeployChainContracts,
+		evmChain,
+		sequences.DeployChainContractsInput{
+			ChainSelector:  chainSelector,
+			ContractParams: testsetup.CreateBasicContractParams(),
+		},
+	)
+	require.NoError(t, err, "ExecuteSequence should not error")
+
+	var routerAddress string
+	var committeeVerifier string
+	var committeeVerifierResolver string
+	for _, addr := range deploymentReport.Output.Addresses {
+		switch addr.Type {
+		case datastore.ContractType(router.ContractType):
+			routerAddress = addr.Address
+		case datastore.ContractType(committee_verifier.ContractType):
+			committeeVerifier = addr.Address
+		case datastore.ContractType(committee_verifier.ResolverType):
+			committeeVerifierResolver = addr.Address
+		}
+	}
+
+	// First, configure both remote chains
+	_, err = operations.ExecuteSequence(
+		e.OperationsBundle,
+		sequences.ConfigureCommitteeVerifierForLanes,
+		e.BlockChains,
+		sequences.ConfigureCommitteeVerifierForLanesInput{
+			ChainSelector: chainSelector,
+			Router:        routerAddress,
+			CommitteeVerifierConfig: adapters.CommitteeVerifierConfig[string]{
+				CommitteeVerifier: []string{committeeVerifier, committeeVerifierResolver},
+				RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
+					remoteChainSelector1: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
+					remoteChainSelector2: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
+				},
+			},
+		},
+	)
+	require.NoError(t, err, "ExecuteSequence should not error")
+
+	// Verify both chains have signature configs
+	signatureConfig1, err := operations.ExecuteOperation(
+		testsetup.BundleWithFreshReporter(e.OperationsBundle),
+		committee_verifier.GetSignatureConfig,
+		evmChain,
+		contract.FunctionInput[uint64]{
+			ChainSelector: evmChain.Selector,
+			Address:       common.HexToAddress(committeeVerifier),
+			Args:          remoteChainSelector1,
+		},
+	)
+	require.NoError(t, err, "ExecuteOperation should not error")
+	require.Equal(t, remoteChainSelector1, signatureConfig1.Output.SourceChainSelector, "SourceChainSelector should match for chain 1")
+
+	signatureConfig2, err := operations.ExecuteOperation(
+		testsetup.BundleWithFreshReporter(e.OperationsBundle),
+		committee_verifier.GetSignatureConfig,
+		evmChain,
+		contract.FunctionInput[uint64]{
+			ChainSelector: evmChain.Selector,
+			Address:       common.HexToAddress(committeeVerifier),
+			Args:          remoteChainSelector2,
+		},
+	)
+	require.NoError(t, err, "ExecuteOperation should not error")
+	require.Equal(t, remoteChainSelector2, signatureConfig2.Output.SourceChainSelector, "SourceChainSelector should match for chain 2")
+
+	// Now disconnect remoteChainSelector1
+	_, err = operations.ExecuteSequence(
+		e.OperationsBundle,
+		sequences.ConfigureCommitteeVerifierForLanes,
+		e.BlockChains,
+		sequences.ConfigureCommitteeVerifierForLanesInput{
+			ChainSelector:            chainSelector,
+			Router:                   routerAddress,
+			RemoteChainsToDisconnect: []uint64{remoteChainSelector1},
+			CommitteeVerifierConfig: adapters.CommitteeVerifierConfig[string]{
+				CommitteeVerifier: []string{committeeVerifier, committeeVerifierResolver},
+				RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
+					remoteChainSelector2: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
+				},
+			},
+		},
+	)
+	require.NoError(t, err, "ExecuteSequence should not error")
+
+	// Verify remoteChainSelector1 signature config is removed
+	// Attempting to get signature config for disconnected chain should fail or return empty
+	signatureConfig1After, err := operations.ExecuteOperation(
+		testsetup.BundleWithFreshReporter(e.OperationsBundle),
+		committee_verifier.GetSignatureConfig,
+		evmChain,
+		contract.FunctionInput[uint64]{
+			ChainSelector: evmChain.Selector,
+			Address:       common.HexToAddress(committeeVerifier),
+			Args:          remoteChainSelector1,
+		},
+	)
+	// The signature config should be removed, so this should either error or return zero values
+	// Based on the contract implementation, it may revert or return zero values
+	if err == nil {
+		// If no error, verify it's been removed (zero threshold or empty signers)
+		require.True(t, signatureConfig1After.Output.Threshold == 0 || len(signatureConfig1After.Output.Signers) == 0,
+			"Signature config should be removed for disconnected chain")
+	}
+
+	// Verify remoteChainSelector2 signature config still exists
+	signatureConfig2After, err := operations.ExecuteOperation(
+		testsetup.BundleWithFreshReporter(e.OperationsBundle),
+		committee_verifier.GetSignatureConfig,
+		evmChain,
+		contract.FunctionInput[uint64]{
+			ChainSelector: evmChain.Selector,
+			Address:       common.HexToAddress(committeeVerifier),
+			Args:          remoteChainSelector2,
+		},
+	)
+	require.NoError(t, err, "ExecuteOperation should not error")
+	require.Equal(t, remoteChainSelector2, signatureConfig2After.Output.SourceChainSelector, "SourceChainSelector should still match for non-disconnected chain")
+	require.NotZero(t, signatureConfig2After.Output.Threshold, "Threshold should not be zero for non-disconnected chain")
+	require.NotEmpty(t, signatureConfig2After.Output.Signers, "Signers should not be empty for non-disconnected chain")
+}

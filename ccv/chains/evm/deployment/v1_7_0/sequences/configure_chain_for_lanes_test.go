@@ -267,3 +267,216 @@ func TestConfigureChainForLanes(t *testing.T) {
 		})
 	}
 }
+
+func TestConfigureChainForLanes_RemoteChainsToDisconnect(t *testing.T) {
+	chainSelector := uint64(5009297550715157269)
+	remoteChainSelector1 := uint64(4356164186791070119)
+	remoteChainSelector2 := uint64(4949039107694359620)
+
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{chainSelector}),
+	)
+	require.NoError(t, err, "Failed to create environment")
+	require.NotNil(t, e, "Environment should be created")
+	evmChain := e.BlockChains.EVMChains()[chainSelector]
+
+	// Deploy chain contracts
+	deploymentReport, err := operations.ExecuteSequence(
+		e.OperationsBundle,
+		sequences.DeployChainContracts,
+		evmChain,
+		sequences.DeployChainContractsInput{
+			ChainSelector:  chainSelector,
+			ContractParams: testsetup.CreateBasicContractParams(),
+		},
+	)
+	require.NoError(t, err, "ExecuteSequence should not error")
+
+	var routerAddress string
+	var onRamp string
+	var feeQuoter string
+	var offRamp string
+	var committeeVerifier string
+	var committeeVerifierResolver string
+	var executorAddress string
+	for _, addr := range deploymentReport.Output.Addresses {
+		switch addr.Type {
+		case datastore.ContractType(router.ContractType):
+			routerAddress = addr.Address
+		case datastore.ContractType(onramp.ContractType):
+			onRamp = addr.Address
+		case datastore.ContractType(fee_quoter.ContractType):
+			feeQuoter = addr.Address
+		case datastore.ContractType(offramp.ContractType):
+			offRamp = addr.Address
+		case datastore.ContractType(committee_verifier.ContractType):
+			committeeVerifier = addr.Address
+		case datastore.ContractType(executor.ProxyType):
+			executorAddress = addr.Address
+		case datastore.ContractType(committee_verifier.ResolverType):
+			committeeVerifierResolver = addr.Address
+		}
+	}
+	ccipMessageSource := common.HexToAddress("0x10").Bytes()
+	ccipMessageDest := common.HexToAddress("0x11").Bytes()
+
+	// First, configure both remote chains
+	_, err = operations.ExecuteSequence(
+		e.OperationsBundle,
+		sequences.ConfigureChainForLanes,
+		e.BlockChains,
+		adapters.ConfigureChainForLanesInput{
+			ChainSelector: chainSelector,
+			Router:        routerAddress,
+			OnRamp:        onRamp,
+			CommitteeVerifiers: []adapters.CommitteeVerifierConfig[string]{
+				{
+					CommitteeVerifier: []string{committeeVerifier, committeeVerifierResolver},
+					RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
+						remoteChainSelector1: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
+						remoteChainSelector2: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
+					},
+				},
+			},
+			FeeQuoter: feeQuoter,
+			OffRamp:   offRamp,
+			RemoteChains: map[uint64]adapters.RemoteChainConfig[[]byte, string]{
+				remoteChainSelector1: {
+					DisableTrafficFrom:       false,
+					OnRamps:                  [][]byte{ccipMessageSource},
+					OffRamp:                  ccipMessageDest,
+					DefaultInboundCCVs:       []string{committeeVerifier},
+					DefaultOutboundCCVs:      []string{committeeVerifier},
+					DefaultExecutor:          executorAddress,
+					FeeQuoterDestChainConfig: testsetup.CreateBasicFeeQuoterDestChainConfig(),
+					ExecutorDestChainConfig:  testsetup.CreateBasicExecutorDestChainConfig(),
+					AddressBytesLength:       20,
+					BaseExecutionGasCost:     80_000,
+				},
+				remoteChainSelector2: {
+					DisableTrafficFrom:       false,
+					OnRamps:                  [][]byte{ccipMessageSource},
+					OffRamp:                  ccipMessageDest,
+					DefaultInboundCCVs:       []string{committeeVerifier},
+					DefaultOutboundCCVs:      []string{committeeVerifier},
+					DefaultExecutor:          executorAddress,
+					FeeQuoterDestChainConfig: testsetup.CreateBasicFeeQuoterDestChainConfig(),
+					ExecutorDestChainConfig:  testsetup.CreateBasicExecutorDestChainConfig(),
+					AddressBytesLength:       20,
+					BaseExecutionGasCost:     80_000,
+				},
+			},
+		},
+	)
+	require.NoError(t, err, "ExecuteSequence should not error")
+
+	// Verify both chains are configured
+	onRampOnRouter1, err := operations.ExecuteOperation(e.OperationsBundle, router.GetOnRamp, evmChain, contract.FunctionInput[uint64]{
+		ChainSelector: evmChain.Selector,
+		Address:       common.HexToAddress(routerAddress),
+		Args:          remoteChainSelector1,
+	})
+	require.NoError(t, err, "ExecuteOperation should not error")
+	require.Equal(t, onRamp, onRampOnRouter1.Output.Hex(), "OnRamp address on router should match OnRamp address for chain 1")
+
+	onRampOnRouter2, err := operations.ExecuteOperation(e.OperationsBundle, router.GetOnRamp, evmChain, contract.FunctionInput[uint64]{
+		ChainSelector: evmChain.Selector,
+		Address:       common.HexToAddress(routerAddress),
+		Args:          remoteChainSelector2,
+	})
+	require.NoError(t, err, "ExecuteOperation should not error")
+	require.Equal(t, onRamp, onRampOnRouter2.Output.Hex(), "OnRamp address on router should match OnRamp address for chain 2")
+
+	offRampsOnRouter, err := operations.ExecuteOperation(e.OperationsBundle, router.GetOffRamps, evmChain, contract.FunctionInput[any]{
+		ChainSelector: evmChain.Selector,
+		Address:       common.HexToAddress(routerAddress),
+		Args:          nil,
+	})
+	require.NoError(t, err, "ExecuteOperation should not error")
+	require.Len(t, offRampsOnRouter.Output, 2, "There should be two OffRamps on the router")
+
+	executorDestChains, err := operations.ExecuteOperation(e.OperationsBundle, executor.GetDestChains, evmChain, contract.FunctionInput[any]{
+		ChainSelector: evmChain.Selector,
+		Address:       common.HexToAddress(executorAddress),
+		Args:          nil,
+	})
+	require.NoError(t, err, "ExecuteOperation should not error")
+	require.Len(t, executorDestChains.Output, 2, "There should be two dest chains on Executor")
+
+	// Now disconnect remoteChainSelector1
+	_, err = operations.ExecuteSequence(
+		e.OperationsBundle,
+		sequences.ConfigureChainForLanes,
+		e.BlockChains,
+		adapters.ConfigureChainForLanesInput{
+			ChainSelector: chainSelector,
+			Router:        routerAddress,
+			OnRamp:        onRamp,
+			CommitteeVerifiers: []adapters.CommitteeVerifierConfig[string]{
+				{
+					CommitteeVerifier: []string{committeeVerifier, committeeVerifierResolver},
+					RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
+						remoteChainSelector2: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
+					},
+				},
+			},
+			FeeQuoter: feeQuoter,
+			OffRamp:   offRamp,
+			RemoteChains: map[uint64]adapters.RemoteChainConfig[[]byte, string]{
+				remoteChainSelector2: {
+					DisableTrafficFrom:       false,
+					OnRamps:                  [][]byte{ccipMessageSource},
+					OffRamp:                  ccipMessageDest,
+					DefaultInboundCCVs:       []string{committeeVerifier},
+					DefaultOutboundCCVs:      []string{committeeVerifier},
+					DefaultExecutor:          executorAddress,
+					FeeQuoterDestChainConfig: testsetup.CreateBasicFeeQuoterDestChainConfig(),
+					ExecutorDestChainConfig:  testsetup.CreateBasicExecutorDestChainConfig(),
+					AddressBytesLength:       20,
+					BaseExecutionGasCost:     80_000,
+				},
+			},
+			RemoteChainsToDisconnect: []uint64{remoteChainSelector1},
+		},
+	)
+	require.NoError(t, err, "ExecuteSequence should not error")
+
+	// Verify remoteChainSelector1 is disconnected
+	// OnRamp should be zero address for disconnected chain
+	onRampOnRouter1After, err := operations.ExecuteOperation(testsetup.BundleWithFreshReporter(e.OperationsBundle), router.GetOnRamp, evmChain, contract.FunctionInput[uint64]{
+		ChainSelector: evmChain.Selector,
+		Address:       common.HexToAddress(routerAddress),
+		Args:          remoteChainSelector1,
+	})
+	require.NoError(t, err, "ExecuteOperation should not error")
+	require.Equal(t, common.Address{}, onRampOnRouter1After.Output, "OnRamp address on router should be zero address for disconnected chain")
+
+	// OnRamp should still be set for non-disconnected chain
+	onRampOnRouter2After, err := operations.ExecuteOperation(testsetup.BundleWithFreshReporter(e.OperationsBundle), router.GetOnRamp, evmChain, contract.FunctionInput[uint64]{
+		ChainSelector: evmChain.Selector,
+		Address:       common.HexToAddress(routerAddress),
+		Args:          remoteChainSelector2,
+	})
+	require.NoError(t, err, "ExecuteOperation should not error")
+	require.Equal(t, onRamp, onRampOnRouter2After.Output.Hex(), "OnRamp address on router should still match OnRamp address for non-disconnected chain")
+
+	// OffRamp should be removed for disconnected chain
+	offRampsOnRouterAfter, err := operations.ExecuteOperation(testsetup.BundleWithFreshReporter(e.OperationsBundle), router.GetOffRamps, evmChain, contract.FunctionInput[any]{
+		ChainSelector: evmChain.Selector,
+		Address:       common.HexToAddress(routerAddress),
+		Args:          nil,
+	})
+	require.NoError(t, err, "ExecuteOperation should not error")
+	require.Len(t, offRampsOnRouterAfter.Output, 1, "There should be one OffRamp on the router after disconnection")
+	require.Equal(t, remoteChainSelector2, offRampsOnRouterAfter.Output[0].SourceChainSelector, "Remaining OffRamp should be for non-disconnected chain")
+
+	// Executor should have removed the disconnected chain
+	executorDestChainsAfter, err := operations.ExecuteOperation(testsetup.BundleWithFreshReporter(e.OperationsBundle), executor.GetDestChains, evmChain, contract.FunctionInput[any]{
+		ChainSelector: evmChain.Selector,
+		Address:       common.HexToAddress(executorAddress),
+		Args:          nil,
+	})
+	require.NoError(t, err, "ExecuteOperation should not error")
+	require.Len(t, executorDestChainsAfter.Output, 1, "There should be one dest chain on Executor after disconnection")
+	require.Equal(t, remoteChainSelector2, executorDestChainsAfter.Output[0].DestChainSelector, "Remaining dest chain should be for non-disconnected chain")
+}

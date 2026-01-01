@@ -12,8 +12,8 @@ require (
 	github.com/aws/smithy-go v1.22.5
 	github.com/ethereum/go-ethereum v1.16.2
 	github.com/smartcontractkit/chain-selectors v1.0.72
-	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20251231213833-d16bf92d6d9d
-	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20251231213833-d16bf92d6d9d
+	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20260101145025-57863f4c81a8
+	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260101145025-57863f4c81a8
 	github.com/smartcontractkit/chainlink-common v0.9.6-0.20250929154511-1f5fbda7ae76
 	github.com/smartcontractkit/chainlink-deployments-framework v0.56.0
 	github.com/smartcontractkit/chainlink-evm v0.3.3

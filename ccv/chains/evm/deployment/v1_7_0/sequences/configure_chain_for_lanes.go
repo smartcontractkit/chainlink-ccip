@@ -5,6 +5,7 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
+	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/executor"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/offramp"
@@ -35,8 +36,9 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 		onRampArgs := make([]onramp.DestChainConfigArgs, 0, len(input.RemoteChains))
 		feeQuoterArgs := make([]fee_quoter.DestChainConfigArgs, 0, len(input.RemoteChains))
 		gasPriceUpdates := make([]fee_quoter.GasPriceUpdate, 0, len(input.RemoteChains))
-		onRampAdds := make([]router.OnRamp, 0, len(input.RemoteChains))
+		onRampUpdates := make([]router.OnRamp, 0, len(input.RemoteChains)+len(input.RemoteChainsToDisconnect))
 		offRampAdds := make([]router.OffRamp, 0, len(input.RemoteChains))
+		offRampRemoves := make([]router.OffRamp, 0, len(input.RemoteChainsToDisconnect))
 		destChainSelectorsPerExecutor := make(map[common.Address][]executor.RemoteChainConfigArgs)
 		for remoteSelector, remoteConfig := range input.RemoteChains {
 			defaultInboundCCVs := make([]common.Address, 0, len(remoteConfig.DefaultInboundCCVs))
@@ -68,15 +70,27 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 			for _, ccv := range remoteConfig.LaneMandatedOutboundCCVs {
 				laneMandatedOutboundCCVs = append(laneMandatedOutboundCCVs, common.HexToAddress(ccv))
 			}
+			family, err := chain_selectors.GetSelectorFamily(remoteSelector)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get selector family for remote chain selector %d: %w", remoteSelector, err)
+			}
+			tokenReceiverAllowed := true
+			if family == chain_selectors.FamilyEVM {
+				// On EVM chains, tokenReceiver and receiver can't be different
+				tokenReceiverAllowed = false
+			}
 			onRampArgs = append(onRampArgs, onramp.DestChainConfigArgs{
-				Router:               common.HexToAddress(input.Router),
-				DestChainSelector:    remoteSelector,
-				AddressBytesLength:   remoteConfig.AddressBytesLength,
-				BaseExecutionGasCost: remoteConfig.BaseExecutionGasCost,
-				DefaultCCVs:          defaultOutboundCCVs,
-				LaneMandatedCCVs:     laneMandatedOutboundCCVs,
-				DefaultExecutor:      common.HexToAddress(remoteConfig.DefaultExecutor), // The proxy address
-				OffRamp:              remoteConfig.OffRamp,
+				Router:                    common.HexToAddress(input.Router),
+				DestChainSelector:         remoteSelector,
+				AddressBytesLength:        remoteConfig.AddressBytesLength,
+				BaseExecutionGasCost:      remoteConfig.BaseExecutionGasCost,
+				TokenReceiverAllowed:      tokenReceiverAllowed,
+				MessageNetworkFeeUSDCents: remoteConfig.MessageNetworkFeeUSDCents,
+				TokenNetworkFeeUSDCents:   remoteConfig.TokenNetworkFeeUSDCents,
+				DefaultCCVs:               defaultOutboundCCVs,
+				LaneMandatedCCVs:          laneMandatedOutboundCCVs,
+				DefaultExecutor:           common.HexToAddress(remoteConfig.DefaultExecutor), // The proxy address
+				OffRamp:                   remoteConfig.OffRamp,
 			})
 			feeQuoterArgs = append(feeQuoterArgs, fee_quoter.DestChainConfigArgs{
 				DestChainSelector: remoteSelector,
@@ -86,7 +100,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 				DestChainSelector: remoteSelector,
 				UsdPerUnitGas:     remoteConfig.FeeQuoterDestChainConfig.USDPerUnitGas,
 			})
-			onRampAdds = append(onRampAdds, router.OnRamp{
+			onRampUpdates = append(onRampUpdates, router.OnRamp{
 				DestChainSelector: remoteSelector,
 				OnRamp:            common.HexToAddress(input.OnRamp),
 			})
@@ -108,6 +122,17 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 			destChainSelectorsPerExecutor[getTargetReport.Output] = append(destChainSelectorsPerExecutor[getTargetReport.Output], executor.RemoteChainConfigArgs{
 				DestChainSelector: remoteSelector,
 				Config:            remoteConfig.ExecutorDestChainConfig,
+			})
+		}
+
+		for _, remoteSelector := range input.RemoteChainsToDisconnect {
+			onRampUpdates = append(onRampUpdates, router.OnRamp{
+				DestChainSelector: remoteSelector,
+				OnRamp:            common.Address{}, // Zero address
+			})
+			offRampRemoves = append(offRampRemoves, router.OffRamp{
+				SourceChainSelector: remoteSelector,
+				OffRamp:             common.HexToAddress(input.OffRamp),
 			})
 		}
 
@@ -139,7 +164,8 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 				ChainSelector: chain.Selector,
 				Address:       executorAddr,
 				Args: executor.ApplyDestChainUpdatesArgs{
-					DestChainSelectorsToAdd: destChainSelectorsToAdd,
+					DestChainSelectorsToAdd:    destChainSelectorsToAdd,
+					DestChainSelectorsToRemove: input.RemoteChainsToDisconnect,
 				},
 			})
 			if err != nil {
@@ -177,9 +203,9 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 			ChainSelector: chain.Selector,
 			Address:       common.HexToAddress(input.Router),
 			Args: router.ApplyRampsUpdatesArgs{
-				OnRampUpdates:  onRampAdds,
-				OffRampRemoves: []router.OffRamp{}, // removals should be processed by a separate sequence responsible for disconnecting lanes
+				OnRampUpdates:  onRampUpdates,
 				OffRampAdds:    offRampAdds,
+				OffRampRemoves: offRampRemoves,
 			},
 		})
 		if err != nil {
@@ -195,9 +221,10 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 
 		for _, committeeVerifier := range input.CommitteeVerifiers {
 			committeeVerifierReport, err := cldf_ops.ExecuteSequence(b, ConfigureCommitteeVerifierForLanes, chains, ConfigureCommitteeVerifierForLanesInput{
-				ChainSelector:           chain.Selector,
-				Router:                  input.Router,
-				CommitteeVerifierConfig: committeeVerifier,
+				RemoteChainsToDisconnect: input.RemoteChainsToDisconnect,
+				ChainSelector:            chain.Selector,
+				Router:                   input.Router,
+				CommitteeVerifierConfig:  committeeVerifier,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to configure committee verifier for lanes: %w", err)

@@ -18,8 +18,9 @@ import (
 )
 
 type ConfigureCommitteeVerifierForLanesInput struct {
-	ChainSelector uint64
-	Router        string
+	ChainSelector            uint64
+	RemoteChainsToDisconnect []uint64
+	Router                   string
 	adapters.CommitteeVerifierConfig[string]
 }
 
@@ -120,7 +121,8 @@ var ConfigureCommitteeVerifierForLanes = cldf_ops.NewSequence(
 			ChainSelector: chain.Selector,
 			Address:       common.HexToAddress(committeeVerifier),
 			Args: committee_verifier.SignatureConfigArgs{
-				SignatureConfigUpdates: signatureConfigs,
+				SourceChainSelectorsToRemove: input.RemoteChainsToDisconnect,
+				SignatureConfigUpdates:       signatureConfigs,
 			},
 		})
 		if err != nil {
