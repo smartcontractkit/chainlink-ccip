@@ -41,7 +41,6 @@ var DeployLockReleaseTokenPool = cldf_ops.NewSequence(
 			ChainSelector:  input.ChainSel,
 			TypeAndVersion: deployment.NewTypeAndVersion(advanced_pool_hooks.ContractType, *advanced_pool_hooks.Version),
 			Args: advanced_pool_hooks.ConstructorArgs{
-				Allowlist:                        input.ConstructorArgs.Allowlist,
 				ThresholdAmountForAdditionalCCVs: input.ThresholdAmountForAdditionalCCVs,
 			},
 			Qualifier: &input.TokenSymbol,
@@ -76,7 +75,6 @@ var DeployLockReleaseTokenPool = cldf_ops.NewSequence(
 			TokenPoolAddress:                 common.HexToAddress(tpDeployReport.Output.Address),
 			RateLimitAdmin:                   input.RateLimitAdmin,
 			AdvancedPoolHooks:                common.HexToAddress(hooksDeployReport.Output.Address),
-			AllowList:                        input.ConstructorArgs.Allowlist,
 			RouterAddress:                    input.ConstructorArgs.Router,
 			ThresholdAmountForAdditionalCCVs: input.ThresholdAmountForAdditionalCCVs,
 		})
@@ -84,12 +82,14 @@ var DeployLockReleaseTokenPool = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to configure token pool with address %s on %s: %w", tpDeployReport.Output.Address, chain, err)
 		}
 
-		// Apply authorized caller updates to the lock box & add it to the list of batch operations.
+		// Add lock release token pool to the authorized callers of the lock box.
 		applyAuthorizedCallerUpdatesReport, err := cldf_ops.ExecuteOperation(b, erc20_lock_box.ApplyAuthorizedCallerUpdates, chain, evm_contract.FunctionInput[erc20_lock_box.AuthorizedCallerArgs]{
 			ChainSelector: input.ChainSel,
 			Address:       common.HexToAddress(lockBoxDeployReport.Output.Address),
 			Args: erc20_lock_box.AuthorizedCallerArgs{
-				AddedCallers: input.ConstructorArgs.Allowlist,
+				AddedCallers: []common.Address{
+					common.HexToAddress(tpDeployReport.Output.Address),
+				},
 			},
 		})
 		if err != nil {

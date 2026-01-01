@@ -98,7 +98,6 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 			ChainSelector:                    input.ChainSelector,
 			TokenPoolAddress:                 common.HexToAddress(input.TokenPools.CCTPV2PoolWithCCV),
 			AdvancedPoolHooks:                advancedPoolHooksAddress,
-			AllowList:                        convertStringsToAddresses(input.Allowlist),
 			RouterAddress:                    common.HexToAddress(input.Router),
 			ThresholdAmountForAdditionalCCVs: input.ThresholdAmountForAdditionalCCVs,
 			RateLimitAdmin:                   common.HexToAddress(input.RateLimitAdmin),
