@@ -186,9 +186,8 @@ func NewBatchOperationFromWrites(outs []WriteOutput) (mcms_types.BatchOperation,
 		if out.Executed() {
 			continue // Skip executed transactions, they should not be included.
 		}
-
 		if batchOp, exists := batchOps[out.ChainSelector]; !exists {
-			if i != 0 {
+			if len(batchOps) > 0 {
 				return mcms_types.BatchOperation{}, errors.New("failed to make batch operation: writes target multiple chains")
 			}
 			batchOps[out.ChainSelector] = mcms_types.BatchOperation{
