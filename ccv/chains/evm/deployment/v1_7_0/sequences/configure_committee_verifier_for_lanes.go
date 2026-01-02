@@ -21,7 +21,7 @@ type ConfigureCommitteeVerifierForLanesInput struct {
 	ChainSelector            uint64
 	RemoteChainsToDisconnect []uint64
 	Router                   string
-	adapters.CommitteeVerifierConfig[string]
+	adapters.CommitteeVerifierConfigWithSignatureConfigPerRemoteChain[string]
 }
 
 var ConfigureCommitteeVerifierForLanes = cldf_ops.NewSequence(

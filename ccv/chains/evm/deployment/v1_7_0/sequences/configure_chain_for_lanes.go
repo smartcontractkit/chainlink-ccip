@@ -224,7 +224,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 				RemoteChainsToDisconnect: input.RemoteChainsToDisconnect,
 				ChainSelector:            chain.Selector,
 				Router:                   input.Router,
-				CommitteeVerifierConfig:  committeeVerifier,
+				CommitteeVerifierConfigWithSignatureConfigPerRemoteChain: committeeVerifier,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to configure committee verifier for lanes: %w", err)

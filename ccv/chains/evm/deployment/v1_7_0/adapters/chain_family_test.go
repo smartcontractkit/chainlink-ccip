@@ -3,6 +3,7 @@ package adapters_test
 import (
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common"
 	evm_adapters "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/adapters"
 	v1_7_0 "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/committee_verifier"
@@ -12,6 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	v1_7_0_changesets "github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/changesets"
@@ -20,9 +22,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func makeChainConfig(chainSelector uint64, remoteChainSelector uint64) v1_7_0_changesets.ChainConfig {
+func makeChainConfig(remoteChainSelector uint64) v1_7_0_changesets.ChainConfig {
 	return v1_7_0_changesets.ChainConfig{
-		ChainSelector: chainSelector,
 		Router: datastore.AddressRef{
 			Type:    datastore.ContractType(router.ContractType),
 			Version: router.Version,
@@ -30,6 +31,10 @@ func makeChainConfig(chainSelector uint64, remoteChainSelector uint64) v1_7_0_ch
 		OnRamp: datastore.AddressRef{
 			Type:    datastore.ContractType(onramp.ContractType),
 			Version: onramp.Version,
+		},
+		RMN: datastore.AddressRef{
+			Type:    datastore.ContractType(rmn_remote.ContractType),
+			Version: rmn_remote.Version,
 		},
 		CommitteeVerifiers: []adapters.CommitteeVerifierConfig[datastore.AddressRef]{
 			{
@@ -43,8 +48,17 @@ func makeChainConfig(chainSelector uint64, remoteChainSelector uint64) v1_7_0_ch
 						Version: committee_verifier.Version,
 					},
 				},
+				SignatureConfig: adapters.CommitteeVerifierSignatureQuorumConfig{
+					Signers:   []string{common.HexToAddress("0x01").String()},
+					Threshold: 1,
+				},
 				RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
-					remoteChainSelector: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
+					remoteChainSelector: {
+						AllowlistEnabled:   false,
+						FeeUSDCents:        50,
+						GasForVerification: 50_000,
+						PayloadSizeBytes:   6*64 + 2*32,
+					},
 				},
 			},
 		},
@@ -135,12 +149,15 @@ func TestChainFamilyAdapter(t *testing.T) {
 			e.DataStore = ds.Seal()
 
 			// Configure chains for lanes
-			_, err = v1_7_0_changesets.ConfigureChainsForLanes(chainFamilyRegistry, mcmsRegistry).Apply(*e, v1_7_0_changesets.ConfigureChainsForLanesConfig{
-				Chains: []v1_7_0_changesets.ChainConfig{
-					makeChainConfig(chainA, chainB),
-					makeChainConfig(chainB, chainA),
+			in := v1_7_0_changesets.ConfigureChainsForLanesConfig{
+				Chains: map[uint64]v1_7_0_changesets.ChainConfig{
+					chainA: makeChainConfig(chainB),
+					chainB: makeChainConfig(chainA),
 				},
-			})
+			}
+			err = v1_7_0_changesets.ConfigureChainsForLanes(chainFamilyRegistry, mcmsRegistry).VerifyPreconditions(*e, in)
+			require.NoError(t, err, "Failed to verify preconditions for ConfigureChainsForLanes changeset")
+			_, err = v1_7_0_changesets.ConfigureChainsForLanes(chainFamilyRegistry, mcmsRegistry).Apply(*e, in)
 			require.NoError(t, err, "Failed to apply ConfigureChainsForLanes changeset")
 		})
 	}

@@ -222,9 +222,8 @@ func TestConfigureChainsForLanes_Apply(t *testing.T) {
 				return makeBaseChainDataStore(t, []uint64{5009297550715157269, 15971525489660198786})
 			},
 			cfg: v1_7_0_changesets.ConfigureChainsForLanesConfig{
-				Chains: []v1_7_0_changesets.ChainConfig{
-					{
-						ChainSelector: 5009297550715157269,
+				Chains: map[uint64]v1_7_0_changesets.ChainConfig{
+					5009297550715157269: {
 						Router: datastore.AddressRef{
 							Type:          "Router",
 							Version:       semver.MustParse("1.0.0"),
@@ -232,6 +231,11 @@ func TestConfigureChainsForLanes_Apply(t *testing.T) {
 						},
 						OnRamp: datastore.AddressRef{
 							Type:          "OnRamp",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
@@ -312,6 +316,99 @@ func TestConfigureChainsForLanes_Apply(t *testing.T) {
 							},
 						},
 					},
+					15971525489660198786: {
+						Router: datastore.AddressRef{
+							Type:          "Router",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 15971525489660198786,
+						},
+						OnRamp: datastore.AddressRef{
+							Type:          "OnRamp",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 15971525489660198786,
+						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 15971525489660198786,
+						},
+						FeeQuoter: datastore.AddressRef{
+							Type:          "FeeQuoter",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 15971525489660198786,
+						},
+						OffRamp: datastore.AddressRef{
+							Type:          "OffRamp",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 15971525489660198786,
+						},
+						CommitteeVerifiers: []adapters.CommitteeVerifierConfig[datastore.AddressRef]{
+							{
+								CommitteeVerifier: []datastore.AddressRef{
+									{
+										Type:          "CommitteeVerifierResolver",
+										Version:       semver.MustParse("1.0.0"),
+										ChainSelector: 15971525489660198786,
+									},
+									{
+										Type:          "CommitteeVerifier",
+										Version:       semver.MustParse("1.0.0"),
+										ChainSelector: 15971525489660198786,
+									},
+								},
+								RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
+									5009297550715157269: {
+										AllowlistEnabled:   false,
+										FeeUSDCents:        10,
+										GasForVerification: 100000,
+										PayloadSizeBytes:   256,
+									},
+								},
+							},
+						},
+						RemoteChains: map[uint64]adapters.RemoteChainConfig[datastore.AddressRef, datastore.AddressRef]{
+							5009297550715157269: {
+								DisableTrafficFrom: false,
+								OnRamps: []datastore.AddressRef{
+									{
+										Type:          "OnRamp",
+										Version:       semver.MustParse("1.0.0"),
+										ChainSelector: 5009297550715157269,
+									},
+								},
+								OffRamp: datastore.AddressRef{
+									Type:          "OffRamp",
+									Version:       semver.MustParse("1.0.0"),
+									ChainSelector: 5009297550715157269,
+								},
+								DefaultExecutor: datastore.AddressRef{
+									Type:          "Executor",
+									Version:       semver.MustParse("1.0.0"),
+									ChainSelector: 15971525489660198786,
+								},
+								FeeQuoterDestChainConfig: adapters.FeeQuoterDestChainConfig{
+									IsEnabled:                   true,
+									MaxDataBytes:                1000,
+									MaxPerMsgGasLimit:           3000000,
+									DestGasOverhead:             50000,
+									DestGasPerPayloadByteBase:   16,
+									ChainFamilySelector:         [4]byte{0x1, 0x2, 0x3, 0x4},
+									DefaultTokenFeeUSDCents:     5,
+									DefaultTokenDestGasOverhead: 10000,
+									DefaultTxGasLimit:           200000,
+									NetworkFeeUSDCents:          100,
+									LinkFeeMultiplierPercent:    90,
+									USDPerUnitGas:               big.NewInt(1e6),
+								},
+								ExecutorDestChainConfig: adapters.ExecutorDestChainConfig{
+									USDCentsFee: 20,
+									Enabled:     true,
+								},
+								BaseExecutionGasCost: 100000,
+								AddressBytesLength:   20,
+							},
+						},
+					},
 				},
 				MCMS: &lanesTest_BasicMCMSInput,
 			},
@@ -358,12 +455,50 @@ func TestConfigureChainsForLanes_Apply(t *testing.T) {
 					Qualifier:     "secondary",
 				})
 				require.NoError(t, err)
+				// Update the remote chain committee verifier to have a qualifier
+				remoteChainSelector := uint64(15971525489660198786)
+				err = ds.Addresses().Delete(datastore.NewAddressRefKey(remoteChainSelector, "CommitteeVerifier", semver.MustParse("1.0.0"), ""))
+				require.NoError(t, err)
+				err = ds.Addresses().Delete(datastore.NewAddressRefKey(remoteChainSelector, "CommitteeVerifierResolver", semver.MustParse("1.0.0"), ""))
+				require.NoError(t, err)
+				err = ds.Addresses().Add(datastore.AddressRef{
+					ChainSelector: remoteChainSelector,
+					Address:       fmt.Sprintf("%d-committee-verifier", remoteChainSelector),
+					Type:          datastore.ContractType("CommitteeVerifier"),
+					Version:       semver.MustParse("1.0.0"),
+					Qualifier:     "primary",
+				})
+				require.NoError(t, err)
+				err = ds.Addresses().Add(datastore.AddressRef{
+					ChainSelector: remoteChainSelector,
+					Address:       fmt.Sprintf("%d-committee-verifier-resolver", remoteChainSelector),
+					Type:          datastore.ContractType("CommitteeVerifierResolver"),
+					Version:       semver.MustParse("1.0.0"),
+					Qualifier:     "primary",
+				})
+				require.NoError(t, err)
+				// Add second committee verifier for remote chain
+				err = ds.Addresses().Add(datastore.AddressRef{
+					ChainSelector: remoteChainSelector,
+					Address:       fmt.Sprintf("%d-committee-verifier-2", remoteChainSelector),
+					Type:          datastore.ContractType("CommitteeVerifier"),
+					Version:       semver.MustParse("1.0.0"),
+					Qualifier:     "secondary",
+				})
+				require.NoError(t, err)
+				err = ds.Addresses().Add(datastore.AddressRef{
+					ChainSelector: remoteChainSelector,
+					Address:       fmt.Sprintf("%d-committee-verifier-resolver-2", remoteChainSelector),
+					Type:          datastore.ContractType("CommitteeVerifierResolver"),
+					Version:       semver.MustParse("1.0.0"),
+					Qualifier:     "secondary",
+				})
+				require.NoError(t, err)
 				return ds
 			},
 			cfg: v1_7_0_changesets.ConfigureChainsForLanesConfig{
-				Chains: []v1_7_0_changesets.ChainConfig{
-					{
-						ChainSelector: 5009297550715157269,
+				Chains: map[uint64]v1_7_0_changesets.ChainConfig{
+					5009297550715157269: {
 						Router: datastore.AddressRef{
 							Type:          "Router",
 							Version:       semver.MustParse("1.0.0"),
@@ -371,6 +506,11 @@ func TestConfigureChainsForLanes_Apply(t *testing.T) {
 						},
 						OnRamp: datastore.AddressRef{
 							Type:          "OnRamp",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
@@ -457,6 +597,125 @@ func TestConfigureChainsForLanes_Apply(t *testing.T) {
 							},
 						},
 					},
+					15971525489660198786: {
+						Router: datastore.AddressRef{
+							Type:          "Router",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 15971525489660198786,
+						},
+						OnRamp: datastore.AddressRef{
+							Type:          "OnRamp",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 15971525489660198786,
+						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 15971525489660198786,
+						},
+						FeeQuoter: datastore.AddressRef{
+							Type:          "FeeQuoter",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 15971525489660198786,
+						},
+						OffRamp: datastore.AddressRef{
+							Type:          "OffRamp",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 15971525489660198786,
+						},
+						CommitteeVerifiers: []adapters.CommitteeVerifierConfig[datastore.AddressRef]{
+							{
+								CommitteeVerifier: []datastore.AddressRef{
+									{
+										Type:          "CommitteeVerifier",
+										Version:       semver.MustParse("1.0.0"),
+										ChainSelector: 15971525489660198786,
+										Qualifier:     "primary",
+									},
+									{
+										Type:          "CommitteeVerifierResolver",
+										Version:       semver.MustParse("1.0.0"),
+										ChainSelector: 15971525489660198786,
+										Qualifier:     "primary",
+									},
+								},
+								RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
+									5009297550715157269: {
+										AllowlistEnabled:   false,
+										FeeUSDCents:        10,
+										GasForVerification: 100000,
+										PayloadSizeBytes:   256,
+									},
+								},
+							},
+							{
+								CommitteeVerifier: []datastore.AddressRef{
+									{
+										Type:          "CommitteeVerifier",
+										Version:       semver.MustParse("1.0.0"),
+										ChainSelector: 15971525489660198786,
+										Qualifier:     "secondary",
+									},
+									{
+										Type:          "CommitteeVerifierResolver",
+										Version:       semver.MustParse("1.0.0"),
+										Qualifier:     "secondary",
+										ChainSelector: 15971525489660198786,
+									},
+								},
+								RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
+									5009297550715157269: {
+										AllowlistEnabled:   false,
+										FeeUSDCents:        10,
+										GasForVerification: 100000,
+										PayloadSizeBytes:   256,
+									},
+								},
+							},
+						},
+						RemoteChains: map[uint64]adapters.RemoteChainConfig[datastore.AddressRef, datastore.AddressRef]{
+							5009297550715157269: {
+								DisableTrafficFrom: false,
+								OnRamps: []datastore.AddressRef{
+									{
+										Type:          "OnRamp",
+										Version:       semver.MustParse("1.0.0"),
+										ChainSelector: 5009297550715157269,
+									},
+								},
+								OffRamp: datastore.AddressRef{
+									Type:          "OffRamp",
+									Version:       semver.MustParse("1.0.0"),
+									ChainSelector: 5009297550715157269,
+								},
+								DefaultExecutor: datastore.AddressRef{
+									Type:          "Executor",
+									Version:       semver.MustParse("1.0.0"),
+									ChainSelector: 15971525489660198786,
+								},
+								FeeQuoterDestChainConfig: adapters.FeeQuoterDestChainConfig{
+									IsEnabled:                   true,
+									MaxDataBytes:                1000,
+									MaxPerMsgGasLimit:           3000000,
+									DestGasOverhead:             50000,
+									DestGasPerPayloadByteBase:   16,
+									ChainFamilySelector:         [4]byte{0x1, 0x2, 0x3, 0x4},
+									DefaultTokenFeeUSDCents:     5,
+									DefaultTokenDestGasOverhead: 10000,
+									DefaultTxGasLimit:           200000,
+									NetworkFeeUSDCents:          100,
+									LinkFeeMultiplierPercent:    90,
+									USDPerUnitGas:               big.NewInt(1e6),
+								},
+								ExecutorDestChainConfig: adapters.ExecutorDestChainConfig{
+									USDCentsFee: 20,
+									Enabled:     true,
+								},
+								BaseExecutionGasCost: 100000,
+								AddressBytesLength:   20,
+							},
+						},
+					},
 				},
 				MCMS: &lanesTest_BasicMCMSInput,
 			},
@@ -469,9 +728,8 @@ func TestConfigureChainsForLanes_Apply(t *testing.T) {
 				return ds
 			},
 			cfg: v1_7_0_changesets.ConfigureChainsForLanesConfig{
-				Chains: []v1_7_0_changesets.ChainConfig{
-					{
-						ChainSelector: 5009297550715157269,
+				Chains: map[uint64]v1_7_0_changesets.ChainConfig{
+					5009297550715157269: {
 						Router: datastore.AddressRef{
 							Type:          "Router",
 							Version:       semver.MustParse("1.0.0"),
@@ -479,6 +737,11 @@ func TestConfigureChainsForLanes_Apply(t *testing.T) {
 						},
 						OnRamp: datastore.AddressRef{
 							Type:          "OnRamp",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
@@ -513,9 +776,8 @@ func TestConfigureChainsForLanes_Apply(t *testing.T) {
 				return ds
 			},
 			cfg: v1_7_0_changesets.ConfigureChainsForLanesConfig{
-				Chains: []v1_7_0_changesets.ChainConfig{
-					{
-						ChainSelector: 5009297550715157269,
+				Chains: map[uint64]v1_7_0_changesets.ChainConfig{
+					5009297550715157269: {
 						Router: datastore.AddressRef{
 							Type:          "Router",
 							Version:       semver.MustParse("1.0.0"),
@@ -523,6 +785,11 @@ func TestConfigureChainsForLanes_Apply(t *testing.T) {
 						},
 						OnRamp: datastore.AddressRef{
 							Type:          "OnRamp",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
@@ -564,9 +831,8 @@ func TestConfigureChainsForLanes_Apply(t *testing.T) {
 				return ds
 			},
 			cfg: v1_7_0_changesets.ConfigureChainsForLanesConfig{
-				Chains: []v1_7_0_changesets.ChainConfig{
-					{
-						ChainSelector: 5009297550715157269,
+				Chains: map[uint64]v1_7_0_changesets.ChainConfig{
+					5009297550715157269: {
 						Router: datastore.AddressRef{
 							Type:          "Router",
 							Version:       semver.MustParse("1.0.0"),
@@ -574,6 +840,11 @@ func TestConfigureChainsForLanes_Apply(t *testing.T) {
 						},
 						OnRamp: datastore.AddressRef{
 							Type:          "OnRamp",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
@@ -603,9 +874,8 @@ func TestConfigureChainsForLanes_Apply(t *testing.T) {
 				return ds
 			},
 			cfg: v1_7_0_changesets.ConfigureChainsForLanesConfig{
-				Chains: []v1_7_0_changesets.ChainConfig{
-					{
-						ChainSelector: 5009297550715157269,
+				Chains: map[uint64]v1_7_0_changesets.ChainConfig{
+					5009297550715157269: {
 						Router: datastore.AddressRef{
 							Type:          "Router",
 							Version:       semver.MustParse("1.0.0"),
@@ -613,6 +883,11 @@ func TestConfigureChainsForLanes_Apply(t *testing.T) {
 						},
 						OnRamp: datastore.AddressRef{
 							Type:          "OnRamp",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
@@ -642,9 +917,8 @@ func TestConfigureChainsForLanes_Apply(t *testing.T) {
 				return ds
 			},
 			cfg: v1_7_0_changesets.ConfigureChainsForLanesConfig{
-				Chains: []v1_7_0_changesets.ChainConfig{
-					{
-						ChainSelector: 5009297550715157269,
+				Chains: map[uint64]v1_7_0_changesets.ChainConfig{
+					5009297550715157269: {
 						Router: datastore.AddressRef{
 							Type:          "Router",
 							Version:       semver.MustParse("1.0.0"),
@@ -652,6 +926,11 @@ func TestConfigureChainsForLanes_Apply(t *testing.T) {
 						},
 						OnRamp: datastore.AddressRef{
 							Type:          "OnRamp",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
@@ -690,6 +969,57 @@ func TestConfigureChainsForLanes_Apply(t *testing.T) {
 							ChainSelector: 5009297550715157269,
 						},
 					},
+					15971525489660198786: {
+						Router: datastore.AddressRef{
+							Type:          "Router",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 15971525489660198786,
+						},
+						OnRamp: datastore.AddressRef{
+							Type:          "OnRamp",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 15971525489660198786,
+						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 15971525489660198786,
+						},
+						FeeQuoter: datastore.AddressRef{
+							Type:          "FeeQuoter",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 15971525489660198786,
+						},
+						OffRamp: datastore.AddressRef{
+							Type:          "OffRamp",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 15971525489660198786,
+						},
+						CommitteeVerifiers: []adapters.CommitteeVerifierConfig[datastore.AddressRef]{
+							{
+								CommitteeVerifier: []datastore.AddressRef{
+									{
+										Type:          "CommitteeVerifier",
+										Version:       semver.MustParse("1.0.0"),
+										ChainSelector: 15971525489660198786,
+									},
+									{
+										Type:          "CommitteeVerifierResolver",
+										Version:       semver.MustParse("1.0.0"),
+										ChainSelector: 15971525489660198786,
+									},
+								},
+								RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
+									5009297550715157269: {
+										AllowlistEnabled:   false,
+										FeeUSDCents:        10,
+										GasForVerification: 100000,
+										PayloadSizeBytes:   256,
+									},
+								},
+							},
+						},
+					},
 				},
 				MCMS: &lanesTest_BasicMCMSInput,
 			},
@@ -701,9 +1031,8 @@ func TestConfigureChainsForLanes_Apply(t *testing.T) {
 				return makeBaseChainDataStore(t, []uint64{5009297550715157269})
 			},
 			cfg: v1_7_0_changesets.ConfigureChainsForLanesConfig{
-				Chains: []v1_7_0_changesets.ChainConfig{
-					{
-						ChainSelector: 0, // Invalid chain selector
+				Chains: map[uint64]v1_7_0_changesets.ChainConfig{
+					5009297550715157269: {
 						Router: datastore.AddressRef{
 							Type:          "Router",
 							Version:       semver.MustParse("1.0.0"),
@@ -711,6 +1040,11 @@ func TestConfigureChainsForLanes_Apply(t *testing.T) {
 						},
 						OnRamp: datastore.AddressRef{
 							Type:          "OnRamp",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
@@ -738,9 +1072,8 @@ func TestConfigureChainsForLanes_Apply(t *testing.T) {
 				return ds
 			},
 			cfg: v1_7_0_changesets.ConfigureChainsForLanesConfig{
-				Chains: []v1_7_0_changesets.ChainConfig{
-					{
-						ChainSelector: 5009297550715157269,
+				Chains: map[uint64]v1_7_0_changesets.ChainConfig{
+					5009297550715157269: {
 						Router: datastore.AddressRef{
 							Type:          "Router",
 							Version:       semver.MustParse("1.0.0"),
@@ -748,6 +1081,11 @@ func TestConfigureChainsForLanes_Apply(t *testing.T) {
 						},
 						OnRamp: datastore.AddressRef{
 							Type:          "OnRamp",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
@@ -799,9 +1137,8 @@ func TestConfigureChainsForLanes_Apply(t *testing.T) {
 				return ds
 			},
 			cfg: v1_7_0_changesets.ConfigureChainsForLanesConfig{
-				Chains: []v1_7_0_changesets.ChainConfig{
-					{
-						ChainSelector: 5009297550715157269,
+				Chains: map[uint64]v1_7_0_changesets.ChainConfig{
+					5009297550715157269: {
 						Router: datastore.AddressRef{
 							Type:          "Router",
 							Version:       semver.MustParse("1.0.0"),
@@ -809,6 +1146,11 @@ func TestConfigureChainsForLanes_Apply(t *testing.T) {
 						},
 						OnRamp: datastore.AddressRef{
 							Type:          "OnRamp",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
@@ -856,9 +1198,8 @@ func TestConfigureChainsForLanes_Apply(t *testing.T) {
 				return makeBaseChainDataStore(t, []uint64{5009297550715157269, 15971525489660198786})
 			},
 			cfg: v1_7_0_changesets.ConfigureChainsForLanesConfig{
-				Chains: []v1_7_0_changesets.ChainConfig{
-					{
-						ChainSelector: 5009297550715157269,
+				Chains: map[uint64]v1_7_0_changesets.ChainConfig{
+					5009297550715157269: {
 						Router: datastore.AddressRef{
 							Type:          "Router",
 							Version:       semver.MustParse("1.0.0"),
@@ -866,6 +1207,11 @@ func TestConfigureChainsForLanes_Apply(t *testing.T) {
 						},
 						OnRamp: datastore.AddressRef{
 							Type:          "OnRamp",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
@@ -977,9 +1323,8 @@ func TestConfigureChainsForLanes_VerifyPreconditions(t *testing.T) {
 		{
 			desc: "success - valid configuration",
 			cfg: v1_7_0_changesets.ConfigureChainsForLanesConfig{
-				Chains: []v1_7_0_changesets.ChainConfig{
-					{
-						ChainSelector: 5009297550715157269,
+				Chains: map[uint64]v1_7_0_changesets.ChainConfig{
+					5009297550715157269: {
 						Router: datastore.AddressRef{
 							Type:          "Router",
 							Version:       semver.MustParse("1.0.0"),
@@ -987,6 +1332,11 @@ func TestConfigureChainsForLanes_VerifyPreconditions(t *testing.T) {
 						},
 						OnRamp: datastore.AddressRef{
 							Type:          "OnRamp",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
@@ -1011,11 +1361,15 @@ func TestConfigureChainsForLanes_VerifyPreconditions(t *testing.T) {
 								},
 								RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
 									15971525489660198786: {
-										SignatureConfig: adapters.CommitteeVerifierSignatureQuorumConfig{
-											Signers:   []string{"signer1", "signer2", "signer3"},
-											Threshold: 2, // Valid: 2 <= 3
-										},
+										AllowlistEnabled:   false,
+										FeeUSDCents:        10,
+										GasForVerification: 100000,
+										PayloadSizeBytes:   256,
 									},
+								},
+								SignatureConfig: adapters.CommitteeVerifierSignatureQuorumConfig{
+									Signers:   []string{"signer1", "signer2", "signer3"},
+									Threshold: 2, // Valid: 2 <= 3
 								},
 							},
 						},
@@ -1041,6 +1395,56 @@ func TestConfigureChainsForLanes_VerifyPreconditions(t *testing.T) {
 							},
 						},
 					},
+					15971525489660198786: {
+						Router: datastore.AddressRef{
+							Type:          "Router",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 15971525489660198786,
+						},
+						OnRamp: datastore.AddressRef{
+							Type:          "OnRamp",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 15971525489660198786,
+						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 15971525489660198786,
+						},
+						FeeQuoter: datastore.AddressRef{
+							Type:          "FeeQuoter",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 15971525489660198786,
+						},
+						OffRamp: datastore.AddressRef{
+							Type:          "OffRamp",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 15971525489660198786,
+						},
+						CommitteeVerifiers: []adapters.CommitteeVerifierConfig[datastore.AddressRef]{
+							{
+								CommitteeVerifier: []datastore.AddressRef{
+									{
+										Type:          "CommitteeVerifier",
+										Version:       semver.MustParse("1.0.0"),
+										ChainSelector: 15971525489660198786,
+									},
+								},
+								RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
+									5009297550715157269: {
+										AllowlistEnabled:   false,
+										FeeUSDCents:        10,
+										GasForVerification: 100000,
+										PayloadSizeBytes:   256,
+									},
+								},
+								SignatureConfig: adapters.CommitteeVerifierSignatureQuorumConfig{
+									Signers:   []string{"signer1", "signer2", "signer3"},
+									Threshold: 2,
+								},
+							},
+						},
+					},
 				},
 				MCMS: &lanesTest_BasicMCMSInput,
 			},
@@ -1048,9 +1452,8 @@ func TestConfigureChainsForLanes_VerifyPreconditions(t *testing.T) {
 		{
 			desc: "success - no MCMS config",
 			cfg: v1_7_0_changesets.ConfigureChainsForLanesConfig{
-				Chains: []v1_7_0_changesets.ChainConfig{
-					{
-						ChainSelector: 5009297550715157269,
+				Chains: map[uint64]v1_7_0_changesets.ChainConfig{
+					5009297550715157269: {
 						Router: datastore.AddressRef{
 							Type:          "Router",
 							Version:       semver.MustParse("1.0.0"),
@@ -1058,6 +1461,11 @@ func TestConfigureChainsForLanes_VerifyPreconditions(t *testing.T) {
 						},
 						OnRamp: datastore.AddressRef{
 							Type:          "OnRamp",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
@@ -1078,12 +1486,16 @@ func TestConfigureChainsForLanes_VerifyPreconditions(t *testing.T) {
 		{
 			desc: "failure - empty router ref",
 			cfg: v1_7_0_changesets.ConfigureChainsForLanesConfig{
-				Chains: []v1_7_0_changesets.ChainConfig{
-					{
-						ChainSelector: 5009297550715157269,
-						Router:        datastore.AddressRef{}, // Empty ref
+				Chains: map[uint64]v1_7_0_changesets.ChainConfig{
+					5009297550715157269: {
+						Router: datastore.AddressRef{}, // Empty ref
 						OnRamp: datastore.AddressRef{
 							Type:          "OnRamp",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
@@ -1105,15 +1517,15 @@ func TestConfigureChainsForLanes_VerifyPreconditions(t *testing.T) {
 		{
 			desc: "failure - empty onRamp ref",
 			cfg: v1_7_0_changesets.ConfigureChainsForLanesConfig{
-				Chains: []v1_7_0_changesets.ChainConfig{
-					{
-						ChainSelector: 5009297550715157269,
+				Chains: map[uint64]v1_7_0_changesets.ChainConfig{
+					5009297550715157269: {
 						Router: datastore.AddressRef{
 							Type:          "Router",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
 						OnRamp: datastore.AddressRef{}, // Empty ref
+						RMN:    datastore.AddressRef{}, // Empty ref
 						FeeQuoter: datastore.AddressRef{
 							Type:          "FeeQuoter",
 							Version:       semver.MustParse("1.0.0"),
@@ -1132,9 +1544,8 @@ func TestConfigureChainsForLanes_VerifyPreconditions(t *testing.T) {
 		{
 			desc: "failure - empty feeQuoter ref",
 			cfg: v1_7_0_changesets.ConfigureChainsForLanesConfig{
-				Chains: []v1_7_0_changesets.ChainConfig{
-					{
-						ChainSelector: 5009297550715157269,
+				Chains: map[uint64]v1_7_0_changesets.ChainConfig{
+					5009297550715157269: {
 						Router: datastore.AddressRef{
 							Type:          "Router",
 							Version:       semver.MustParse("1.0.0"),
@@ -1142,6 +1553,11 @@ func TestConfigureChainsForLanes_VerifyPreconditions(t *testing.T) {
 						},
 						OnRamp: datastore.AddressRef{
 							Type:          "OnRamp",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
@@ -1159,9 +1575,8 @@ func TestConfigureChainsForLanes_VerifyPreconditions(t *testing.T) {
 		{
 			desc: "failure - empty offRamp ref",
 			cfg: v1_7_0_changesets.ConfigureChainsForLanesConfig{
-				Chains: []v1_7_0_changesets.ChainConfig{
-					{
-						ChainSelector: 5009297550715157269,
+				Chains: map[uint64]v1_7_0_changesets.ChainConfig{
+					5009297550715157269: {
 						Router: datastore.AddressRef{
 							Type:          "Router",
 							Version:       semver.MustParse("1.0.0"),
@@ -1169,6 +1584,11 @@ func TestConfigureChainsForLanes_VerifyPreconditions(t *testing.T) {
 						},
 						OnRamp: datastore.AddressRef{
 							Type:          "OnRamp",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
@@ -1186,28 +1606,32 @@ func TestConfigureChainsForLanes_VerifyPreconditions(t *testing.T) {
 		{
 			desc: "failure - unknown chain selector",
 			cfg: v1_7_0_changesets.ConfigureChainsForLanesConfig{
-				Chains: []v1_7_0_changesets.ChainConfig{
-					{
-						ChainSelector: 0, // Invalid chain selector
+				Chains: map[uint64]v1_7_0_changesets.ChainConfig{
+					0: { // Invalid chain selector
 						Router: datastore.AddressRef{
 							Type:          "Router",
 							Version:       semver.MustParse("1.0.0"),
-							ChainSelector: 5009297550715157269,
+							ChainSelector: 0,
 						},
 						OnRamp: datastore.AddressRef{
 							Type:          "OnRamp",
 							Version:       semver.MustParse("1.0.0"),
-							ChainSelector: 5009297550715157269,
+							ChainSelector: 0,
+						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 0,
 						},
 						FeeQuoter: datastore.AddressRef{
 							Type:          "FeeQuoter",
 							Version:       semver.MustParse("1.0.0"),
-							ChainSelector: 5009297550715157269,
+							ChainSelector: 0,
 						},
 						OffRamp: datastore.AddressRef{
 							Type:          "OffRamp",
 							Version:       semver.MustParse("1.0.0"),
-							ChainSelector: 5009297550715157269,
+							ChainSelector: 0,
 						},
 					},
 				},
@@ -1217,9 +1641,8 @@ func TestConfigureChainsForLanes_VerifyPreconditions(t *testing.T) {
 		{
 			desc: "failure - committee verifier has no contracts",
 			cfg: v1_7_0_changesets.ConfigureChainsForLanesConfig{
-				Chains: []v1_7_0_changesets.ChainConfig{
-					{
-						ChainSelector: 5009297550715157269,
+				Chains: map[uint64]v1_7_0_changesets.ChainConfig{
+					5009297550715157269: {
 						Router: datastore.AddressRef{
 							Type:          "Router",
 							Version:       semver.MustParse("1.0.0"),
@@ -1227,6 +1650,11 @@ func TestConfigureChainsForLanes_VerifyPreconditions(t *testing.T) {
 						},
 						OnRamp: datastore.AddressRef{
 							Type:          "OnRamp",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
@@ -1248,14 +1676,13 @@ func TestConfigureChainsForLanes_VerifyPreconditions(t *testing.T) {
 					},
 				},
 			},
-			expectedError: "committee verifier on chain with selector",
+			expectedError: "has no contracts",
 		},
 		{
 			desc: "failure - unknown remote chain selector in committee verifier",
 			cfg: v1_7_0_changesets.ConfigureChainsForLanesConfig{
-				Chains: []v1_7_0_changesets.ChainConfig{
-					{
-						ChainSelector: 5009297550715157269,
+				Chains: map[uint64]v1_7_0_changesets.ChainConfig{
+					5009297550715157269: {
 						Router: datastore.AddressRef{
 							Type:          "Router",
 							Version:       semver.MustParse("1.0.0"),
@@ -1263,6 +1690,11 @@ func TestConfigureChainsForLanes_VerifyPreconditions(t *testing.T) {
 						},
 						OnRamp: datastore.AddressRef{
 							Type:          "OnRamp",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
@@ -1287,25 +1719,28 @@ func TestConfigureChainsForLanes_VerifyPreconditions(t *testing.T) {
 								},
 								RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
 									0: { // Invalid remote chain selector
-										SignatureConfig: adapters.CommitteeVerifierSignatureQuorumConfig{
-											Signers:   []string{"signer1"},
-											Threshold: 1,
-										},
+										AllowlistEnabled:   false,
+										FeeUSDCents:        10,
+										GasForVerification: 100000,
+										PayloadSizeBytes:   256,
 									},
+								},
+								SignatureConfig: adapters.CommitteeVerifierSignatureQuorumConfig{
+									Signers:   []string{"signer1"},
+									Threshold: 1,
 								},
 							},
 						},
 					},
 				},
 			},
-			expectedError: "unknown chain selector",
+			expectedError: "remote chain 0 is not defined",
 		},
 		{
 			desc: "failure - threshold greater than number of signers",
 			cfg: v1_7_0_changesets.ConfigureChainsForLanesConfig{
-				Chains: []v1_7_0_changesets.ChainConfig{
-					{
-						ChainSelector: 5009297550715157269,
+				Chains: map[uint64]v1_7_0_changesets.ChainConfig{
+					5009297550715157269: {
 						Router: datastore.AddressRef{
 							Type:          "Router",
 							Version:       semver.MustParse("1.0.0"),
@@ -1313,6 +1748,11 @@ func TestConfigureChainsForLanes_VerifyPreconditions(t *testing.T) {
 						},
 						OnRamp: datastore.AddressRef{
 							Type:          "OnRamp",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
@@ -1337,25 +1777,78 @@ func TestConfigureChainsForLanes_VerifyPreconditions(t *testing.T) {
 								},
 								RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
 									15971525489660198786: {
-										SignatureConfig: adapters.CommitteeVerifierSignatureQuorumConfig{
-											Signers:   []string{"signer1", "signer2"}, // 2 signers
-											Threshold: 3,                              // Invalid: 3 > 2
-										},
+										AllowlistEnabled:   false,
+										FeeUSDCents:        10,
+										GasForVerification: 100000,
+										PayloadSizeBytes:   256,
 									},
+								},
+								SignatureConfig: adapters.CommitteeVerifierSignatureQuorumConfig{
+									Signers:   []string{"signer1", "signer2"}, // 2 signers
+									Threshold: 3,                              // Invalid: 3 > 2
+								},
+							},
+						},
+					},
+					15971525489660198786: {
+						Router: datastore.AddressRef{
+							Type:          "Router",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 15971525489660198786,
+						},
+						OnRamp: datastore.AddressRef{
+							Type:          "OnRamp",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 15971525489660198786,
+						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 15971525489660198786,
+						},
+						FeeQuoter: datastore.AddressRef{
+							Type:          "FeeQuoter",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 15971525489660198786,
+						},
+						OffRamp: datastore.AddressRef{
+							Type:          "OffRamp",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 15971525489660198786,
+						},
+						CommitteeVerifiers: []adapters.CommitteeVerifierConfig[datastore.AddressRef]{
+							{
+								CommitteeVerifier: []datastore.AddressRef{
+									{
+										Type:          "CommitteeVerifier",
+										Version:       semver.MustParse("1.0.0"),
+										ChainSelector: 15971525489660198786,
+									},
+								},
+								RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
+									5009297550715157269: {
+										AllowlistEnabled:   false,
+										FeeUSDCents:        10,
+										GasForVerification: 100000,
+										PayloadSizeBytes:   256,
+									},
+								},
+								SignatureConfig: adapters.CommitteeVerifierSignatureQuorumConfig{
+									Signers:   []string{"signer1", "signer2"},
+									Threshold: 1,
 								},
 							},
 						},
 					},
 				},
 			},
-			expectedError: "committee verifier on chain",
+			expectedError: "threshold greater than the number of signers",
 		},
 		{
 			desc: "failure - unknown remote chain selector in remote chains",
 			cfg: v1_7_0_changesets.ConfigureChainsForLanesConfig{
-				Chains: []v1_7_0_changesets.ChainConfig{
-					{
-						ChainSelector: 5009297550715157269,
+				Chains: map[uint64]v1_7_0_changesets.ChainConfig{
+					5009297550715157269: {
 						Router: datastore.AddressRef{
 							Type:          "Router",
 							Version:       semver.MustParse("1.0.0"),
@@ -1363,6 +1856,11 @@ func TestConfigureChainsForLanes_VerifyPreconditions(t *testing.T) {
 						},
 						OnRamp: datastore.AddressRef{
 							Type:          "OnRamp",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
@@ -1405,9 +1903,8 @@ func TestConfigureChainsForLanes_VerifyPreconditions(t *testing.T) {
 		{
 			desc: "failure - empty offRamp ref for remote chain",
 			cfg: v1_7_0_changesets.ConfigureChainsForLanesConfig{
-				Chains: []v1_7_0_changesets.ChainConfig{
-					{
-						ChainSelector: 5009297550715157269,
+				Chains: map[uint64]v1_7_0_changesets.ChainConfig{
+					5009297550715157269: {
 						Router: datastore.AddressRef{
 							Type:          "Router",
 							Version:       semver.MustParse("1.0.0"),
@@ -1415,6 +1912,11 @@ func TestConfigureChainsForLanes_VerifyPreconditions(t *testing.T) {
 						},
 						OnRamp: datastore.AddressRef{
 							Type:          "OnRamp",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
@@ -1453,9 +1955,8 @@ func TestConfigureChainsForLanes_VerifyPreconditions(t *testing.T) {
 		{
 			desc: "failure - no onRamps for remote chain",
 			cfg: v1_7_0_changesets.ConfigureChainsForLanesConfig{
-				Chains: []v1_7_0_changesets.ChainConfig{
-					{
-						ChainSelector: 5009297550715157269,
+				Chains: map[uint64]v1_7_0_changesets.ChainConfig{
+					5009297550715157269: {
 						Router: datastore.AddressRef{
 							Type:          "Router",
 							Version:       semver.MustParse("1.0.0"),
@@ -1463,6 +1964,11 @@ func TestConfigureChainsForLanes_VerifyPreconditions(t *testing.T) {
 						},
 						OnRamp: datastore.AddressRef{
 							Type:          "OnRamp",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
@@ -1499,9 +2005,8 @@ func TestConfigureChainsForLanes_VerifyPreconditions(t *testing.T) {
 		{
 			desc: "failure - empty default executor ref for remote chain",
 			cfg: v1_7_0_changesets.ConfigureChainsForLanesConfig{
-				Chains: []v1_7_0_changesets.ChainConfig{
-					{
-						ChainSelector: 5009297550715157269,
+				Chains: map[uint64]v1_7_0_changesets.ChainConfig{
+					5009297550715157269: {
 						Router: datastore.AddressRef{
 							Type:          "Router",
 							Version:       semver.MustParse("1.0.0"),
@@ -1509,6 +2014,11 @@ func TestConfigureChainsForLanes_VerifyPreconditions(t *testing.T) {
 						},
 						OnRamp: datastore.AddressRef{
 							Type:          "OnRamp",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
@@ -1547,9 +2057,8 @@ func TestConfigureChainsForLanes_VerifyPreconditions(t *testing.T) {
 		{
 			desc: "failure - invalid MCMS timelock action",
 			cfg: v1_7_0_changesets.ConfigureChainsForLanesConfig{
-				Chains: []v1_7_0_changesets.ChainConfig{
-					{
-						ChainSelector: 5009297550715157269,
+				Chains: map[uint64]v1_7_0_changesets.ChainConfig{
+					5009297550715157269: {
 						Router: datastore.AddressRef{
 							Type:          "Router",
 							Version:       semver.MustParse("1.0.0"),
@@ -1557,6 +2066,11 @@ func TestConfigureChainsForLanes_VerifyPreconditions(t *testing.T) {
 						},
 						OnRamp: datastore.AddressRef{
 							Type:          "OnRamp",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
@@ -1592,9 +2106,8 @@ func TestConfigureChainsForLanes_VerifyPreconditions(t *testing.T) {
 		{
 			desc: "failure - empty MCMS address ref",
 			cfg: v1_7_0_changesets.ConfigureChainsForLanesConfig{
-				Chains: []v1_7_0_changesets.ChainConfig{
-					{
-						ChainSelector: 5009297550715157269,
+				Chains: map[uint64]v1_7_0_changesets.ChainConfig{
+					5009297550715157269: {
 						Router: datastore.AddressRef{
 							Type:          "Router",
 							Version:       semver.MustParse("1.0.0"),
@@ -1602,6 +2115,11 @@ func TestConfigureChainsForLanes_VerifyPreconditions(t *testing.T) {
 						},
 						OnRamp: datastore.AddressRef{
 							Type:          "OnRamp",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
@@ -1634,9 +2152,8 @@ func TestConfigureChainsForLanes_VerifyPreconditions(t *testing.T) {
 		{
 			desc: "failure - empty timelock address ref",
 			cfg: v1_7_0_changesets.ConfigureChainsForLanesConfig{
-				Chains: []v1_7_0_changesets.ChainConfig{
-					{
-						ChainSelector: 5009297550715157269,
+				Chains: map[uint64]v1_7_0_changesets.ChainConfig{
+					5009297550715157269: {
 						Router: datastore.AddressRef{
 							Type:          "Router",
 							Version:       semver.MustParse("1.0.0"),
@@ -1644,6 +2161,11 @@ func TestConfigureChainsForLanes_VerifyPreconditions(t *testing.T) {
 						},
 						OnRamp: datastore.AddressRef{
 							Type:          "OnRamp",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
@@ -1676,9 +2198,8 @@ func TestConfigureChainsForLanes_VerifyPreconditions(t *testing.T) {
 		{
 			desc: "failure - zero valid until timestamp",
 			cfg: v1_7_0_changesets.ConfigureChainsForLanesConfig{
-				Chains: []v1_7_0_changesets.ChainConfig{
-					{
-						ChainSelector: 5009297550715157269,
+				Chains: map[uint64]v1_7_0_changesets.ChainConfig{
+					5009297550715157269: {
 						Router: datastore.AddressRef{
 							Type:          "Router",
 							Version:       semver.MustParse("1.0.0"),
@@ -1686,6 +2207,11 @@ func TestConfigureChainsForLanes_VerifyPreconditions(t *testing.T) {
 						},
 						OnRamp: datastore.AddressRef{
 							Type:          "OnRamp",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
