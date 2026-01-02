@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {FeeTokenHandler} from "../../../../libraries/FeeTokenHandler.sol";
-import {USDCTokenPoolProxy} from "../../../../pools/USDC/USDCTokenPoolProxy.sol";
 import {USDCTokenPoolProxySetup} from "./USDCTokenPoolProxySetup.t.sol";
 
 import {FactoryBurnMintERC20} from "../../../../tokenAdminRegistry/TokenPoolFactory/FactoryBurnMintERC20.sol";
