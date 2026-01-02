@@ -225,10 +225,6 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		writes = append(writes, addRegistryModuleReport.Output)
 
 		// Deploy FeeQuoter
-		// If setInitialPrices is true, add the deployer key to the price updaters
-		if input.ContractParams.FeeQuoter.SetInitialPrices {
-			input.ContractParams.FeeQuoter.PriceUpdaters = append(input.ContractParams.FeeQuoter.PriceUpdaters, chain.DeployerKey.From)
-		}
 		feeQuoterRef, err := contract_utils.MaybeDeployContract(b, fee_quoter.Deploy, chain, contract_utils.DeployInput[fee_quoter.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(fee_quoter.ContractType, *input.ContractParams.FeeQuoter.Version),
 			ChainSelector:  chain.Selector,
@@ -237,17 +233,34 @@ var DeployChainContracts = cldf_ops.NewSequence(
 					MaxFeeJuelsPerMsg: input.ContractParams.FeeQuoter.MaxFeeJuelsPerMsg,
 					LinkToken:         common.HexToAddress(linkRef.Address),
 				},
-				PriceUpdaters: input.ContractParams.FeeQuoter.PriceUpdaters,
 				// Skipped fields:
 				// - TokenPriceFeeds (will not be used in 1.7.0)
 				// - TokenTransferFeeConfigArgs (token+lane-specific config, set elsewhere)
 				// - DestChainConfigArgs (lane-specific config, set elsewhere)
+				// - PriceUpdaters (set separately to enable reconfiguration)
 			},
 		}, input.ExistingAddresses)
 		if err != nil {
 			return sequences.OnChainOutput{}, err
 		}
 		addresses = append(addresses, feeQuoterRef)
+
+		// Set price updaters on FeeQuoter
+		// If setInitialPrices is true, add the deployer key to the price updaters
+		if input.ContractParams.FeeQuoter.SetInitialPrices {
+			input.ContractParams.FeeQuoter.PriceUpdaters = append(input.ContractParams.FeeQuoter.PriceUpdaters, chain.DeployerKey.From)
+		}
+		setPriceUpdatersReport, err := cldf_ops.ExecuteOperation(b, fee_quoter.ApplyAuthorizedCallerUpdates, chain, contract_utils.FunctionInput[fee_quoter.AuthorizedCallerArgs]{
+			ChainSelector: chain.Selector,
+			Address:       common.HexToAddress(feeQuoterRef.Address),
+			Args: fee_quoter.AuthorizedCallerArgs{
+				AddedCallers: input.ContractParams.FeeQuoter.PriceUpdaters,
+			},
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to set price updaters on FeeQuoter: %w", err)
+		}
+		writes = append(writes, setPriceUpdatersReport.Output)
 
 		// Set initial prices on FeeQuoter
 		if input.ContractParams.FeeQuoter.SetInitialPrices {
@@ -271,20 +284,20 @@ var DeployChainContracts = cldf_ops.NewSequence(
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to set initial prices on FeeQuoter: %w", err)
 			}
 			writes = append(writes, updatePricesReport.Output)
-
-			// Remove the deployer key from the price updaters after performing the initial configuration
-			applyAuthorizedCallerUpdatesReport, err := cldf_ops.ExecuteOperation(b, fee_quoter.ApplyAuthorizedCallerUpdates, chain, contract_utils.FunctionInput[fee_quoter.AuthorizedCallerArgs]{
-				ChainSelector: chain.Selector,
-				Address:       common.HexToAddress(feeQuoterRef.Address),
-				Args: fee_quoter.AuthorizedCallerArgs{
-					RemovedCallers: []common.Address{chain.DeployerKey.From},
-				},
-			})
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to remove deployer key from price updaters: %w", err)
-			}
-			writes = append(writes, applyAuthorizedCallerUpdatesReport.Output)
 		}
+
+		// Ensure that the deployer key is removed from the price updaters
+		applyAuthorizedCallerUpdatesReport, err := cldf_ops.ExecuteOperation(b, fee_quoter.ApplyAuthorizedCallerUpdates, chain, contract_utils.FunctionInput[fee_quoter.AuthorizedCallerArgs]{
+			ChainSelector: chain.Selector,
+			Address:       common.HexToAddress(feeQuoterRef.Address),
+			Args: fee_quoter.AuthorizedCallerArgs{
+				RemovedCallers: []common.Address{chain.DeployerKey.From},
+			},
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to remove deployer key from price updaters: %w", err)
+		}
+		writes = append(writes, applyAuthorizedCallerUpdatesReport.Output)
 
 		// Deploy OffRamp
 		offRampRef, err := contract_utils.MaybeDeployContract(b, offramp.Deploy, chain, contract_utils.DeployInput[offramp.ConstructorArgs]{
@@ -326,7 +339,31 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		}
 		addresses = append(addresses, onRampRef)
 
-		// TODO: validate prior to deploying that qualifiers are unique?
+		// Set dynamic config on OnRamp (in case contract is already deployed)
+		setDynamicConfigReport, err := cldf_ops.ExecuteOperation(b, onramp.SetDynamicConfig, chain, contract_utils.FunctionInput[onramp.SetDynamicConfigArgs]{
+			ChainSelector: chain.Selector,
+			Address:       common.HexToAddress(onRampRef.Address),
+			Args: onramp.SetDynamicConfigArgs{
+				DynamicConfig: onramp.DynamicConfig{
+					FeeQuoter:     common.HexToAddress(feeQuoterRef.Address),
+					FeeAggregator: input.ContractParams.OnRamp.FeeAggregator,
+				},
+			},
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to set dynamic config on OnRamp: %w", err)
+		}
+		writes = append(writes, setDynamicConfigReport.Output)
+
+		// Ensure uniqueness of qualifiers for committee verifiers
+		qualifiers := make(map[string]struct{})
+		for _, committeeVerifierParams := range input.ContractParams.CommitteeVerifiers {
+			if _, exists := qualifiers[committeeVerifierParams.Qualifier]; exists {
+				return sequences.OnChainOutput{}, fmt.Errorf("duplicate qualifier '%s' found in committee verifiers", committeeVerifierParams.Qualifier)
+			}
+			qualifiers[committeeVerifierParams.Qualifier] = struct{}{}
+		}
+
 		var committeeVerifierBatchOps []mcms_types.BatchOperation
 		for _, committeeVerifierParams := range input.ContractParams.CommitteeVerifiers {
 			report, err := cldf_ops.ExecuteSequence(b, DeployCommitteeVerifier, chain, DeployCommitteeVerifierInput{
@@ -344,6 +381,14 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		}
 
 		// Deploy Executors
+		// Ensure uniqueness of qualifiers for executors
+		qualifiers = make(map[string]struct{})
+		for _, executorParams := range input.ContractParams.Executors {
+			if _, exists := qualifiers[executorParams.Qualifier]; exists {
+				return sequences.OnChainOutput{}, fmt.Errorf("duplicate qualifier '%s' found in executors", executorParams.Qualifier)
+			}
+			qualifiers[executorParams.Qualifier] = struct{}{}
+		}
 		for _, executorParam := range input.ContractParams.Executors {
 			var qualifierPtr *string
 			if executorParam.Qualifier != "" {

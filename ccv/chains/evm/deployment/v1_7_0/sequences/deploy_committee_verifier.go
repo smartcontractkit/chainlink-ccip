@@ -64,6 +64,33 @@ var DeployCommitteeVerifier = cldf_ops.NewSequence(
 		}
 		addresses = append(addresses, committeeVerifierRef)
 
+		// Set dynamic config on CommitteeVerifier (in case contract is already deployed)
+		setDynamicConfigReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.SetDynamicConfig, chain, contract_utils.FunctionInput[committee_verifier.SetDynamicConfigArgs]{
+			ChainSelector: chain.Selector,
+			Address:       common.HexToAddress(committeeVerifierRef.Address),
+			Args: committee_verifier.SetDynamicConfigArgs{
+				DynamicConfig: committee_verifier.DynamicConfig{
+					FeeAggregator:  input.Params.FeeAggregator,
+					AllowlistAdmin: input.Params.AllowlistAdmin,
+				},
+			},
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to set dynamic config on CommitteeVerifier: %w", err)
+		}
+		writes = append(writes, setDynamicConfigReport.Output)
+
+		// Set storage locations on CommitteeVerifier (in case contract is already deployed)
+		setStorageLocationsReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.UpdateStorageLocations, chain, contract_utils.FunctionInput[[]string]{
+			ChainSelector: chain.Selector,
+			Address:       common.HexToAddress(committeeVerifierRef.Address),
+			Args:          input.Params.StorageLocations,
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to set storage locations on CommitteeVerifier: %w", err)
+		}
+		writes = append(writes, setStorageLocationsReport.Output)
+
 		if input.CREATE2Factory != (common.Address{}) {
 			// Deployment flow via CREATE2Factory
 			// First, check if the CommitteeVerifierResolver already exists

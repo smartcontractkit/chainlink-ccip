@@ -62,6 +62,10 @@ var ApplySourceChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]Sou
 				actualSourceChainConfig.Router != arg.Router {
 				return false, nil
 			}
+			if len(actualSourceChainConfig.DefaultCCVs) != len(arg.DefaultCCVs) ||
+				len(actualSourceChainConfig.LaneMandatedCCVs) != len(arg.LaneMandatedCCVs) {
+				return false, nil
+			}
 			slices.SortFunc(actualSourceChainConfig.DefaultCCVs, func(a, b common.Address) int {
 				return bytes.Compare(a[:], b[:])
 			})

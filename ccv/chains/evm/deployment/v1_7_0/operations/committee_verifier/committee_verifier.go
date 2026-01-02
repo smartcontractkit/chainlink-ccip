@@ -201,10 +201,8 @@ var ApplySignatureConfigs = contract.NewWrite(contract.WriteParams[SignatureConf
 			slices.SortFunc(cfg.Signers, func(a, b common.Address) int {
 				return bytes.Compare(a[:], b[:])
 			})
-			for i, signer := range signers {
-				if signer != cfg.Signers[i] {
-					return false, nil
-				}
+			if !slices.Equal(signers, cfg.Signers) {
+				return false, nil
 			}
 		}
 
@@ -222,6 +220,37 @@ var ApplySignatureConfigs = contract.NewWrite(contract.WriteParams[SignatureConf
 	},
 	CallContract: func(committeeVerifier *committee_verifier.CommitteeVerifier, opts *bind.TransactOpts, args SignatureConfigArgs) (*types.Transaction, error) {
 		return committeeVerifier.ApplySignatureConfigs(opts, args.SourceChainSelectorsToRemove, args.SignatureConfigUpdates)
+	},
+})
+
+var UpdateStorageLocations = contract.NewWrite(contract.WriteParams[[]string, *committee_verifier.CommitteeVerifier]{
+	Name:            "committee-verifier:update-storage-locations",
+	Version:         Version,
+	Description:     "Updates the storage locations on the CommitteeVerifier",
+	ContractType:    ContractType,
+	ContractABI:     committee_verifier.CommitteeVerifierABI,
+	NewContract:     committee_verifier.NewCommitteeVerifier,
+	IsAllowedCaller: contract.OnlyOwner[*committee_verifier.CommitteeVerifier, []string],
+	Validate: func(committeeVerifier *committee_verifier.CommitteeVerifier, backend bind.ContractBackend, opts *bind.CallOpts, args []string) error {
+		return nil
+	},
+	IsNoop: func(committeeVerifier *committee_verifier.CommitteeVerifier, opts *bind.CallOpts, args []string) (bool, error) {
+		storageLocations, err := committeeVerifier.GetStorageLocations(opts)
+		if err != nil {
+			return false, fmt.Errorf("failed to get storage locations: %w", err)
+		}
+		if len(storageLocations) != len(args) {
+			return false, nil
+		}
+		slices.Sort(storageLocations)
+		slices.Sort(args)
+		if !slices.Equal(storageLocations, args) {
+			return false, nil
+		}
+		return true, nil
+	},
+	CallContract: func(committeeVerifier *committee_verifier.CommitteeVerifier, opts *bind.TransactOpts, args []string) (*types.Transaction, error) {
+		return committeeVerifier.UpdateStorageLocations(opts, args)
 	},
 })
 
