@@ -74,7 +74,7 @@ contract USDCTokenPoolProxy_withdrawFeeTokens is USDCTokenPoolProxySetup {
     address[] memory feeTokens = new address[](1);
     feeTokens[0] = address(s_feeToken1);
 
-    vm.expectRevert(USDCTokenPoolProxy.AddressCannotBeZero.selector);
+    vm.expectRevert(FeeTokenHandler.ZeroAddressNotAllowed.selector);
     s_usdcTokenPoolProxy.withdrawFeeTokens(feeTokens);
   }
 }

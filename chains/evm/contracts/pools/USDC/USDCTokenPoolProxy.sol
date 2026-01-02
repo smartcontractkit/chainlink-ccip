@@ -468,9 +468,6 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
   function withdrawFeeTokens(
     address[] calldata feeTokens
   ) external virtual {
-    if (s_feeAggregator == address(0)) {
-      revert AddressCannotBeZero();
-    }
     FeeTokenHandler._withdrawFeeTokens(feeTokens, s_feeAggregator);
   }
 }
