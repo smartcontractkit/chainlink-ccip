@@ -5,7 +5,6 @@ import {IBridgeV2} from "../../../interfaces/lombard/IBridgeV2.sol";
 import {IBridgeV3} from "../../../interfaces/lombard/IBridgeV3.sol";
 
 import {LombardVerifier} from "../../../ccvs/LombardVerifier.sol";
-import {BaseVerifier} from "../../../ccvs/components/BaseVerifier.sol";
 import {LombardVerifierSetup, MockLombardBridge} from "./LombardVerifierSetup.t.sol";
 
 contract LombardVerifier_constructor is LombardVerifierSetup {
