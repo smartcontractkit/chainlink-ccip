@@ -315,3 +315,36 @@ fn validate_dest_chain_config(dest_chain_selector: u64, config: &DestChainConfig
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::instructions::v1::messages::tests::sample_dest_chain;
+
+    #[test]
+    fn validate_dest_chain_config_accepts_tvm() {
+        let mut dest_chain = sample_dest_chain();
+        dest_chain.config.chain_family_selector = CHAIN_FAMILY_SELECTOR_TVM.to_be_bytes();
+
+        validate_dest_chain_config(dest_chain.chain_selector, &dest_chain.config).unwrap();
+    }
+
+    #[test]
+    fn validate_dest_chain_config_accepts_aptos() {
+        let mut dest_chain = sample_dest_chain();
+        dest_chain.config.chain_family_selector = CHAIN_FAMILY_SELECTOR_APTOS.to_be_bytes();
+
+        validate_dest_chain_config(dest_chain.chain_selector, &dest_chain.config).unwrap();
+    }
+
+    #[test]
+    fn validate_dest_chain_config_rejects_unknown_selector() {
+        let mut dest_chain = sample_dest_chain();
+        dest_chain.config.chain_family_selector = [0u8; 4];
+
+        assert_eq!(
+            validate_dest_chain_config(dest_chain.chain_selector, &dest_chain.config).unwrap_err(),
+            CommonCcipError::InvalidChainFamilySelector.into()
+        );
+    }
+}

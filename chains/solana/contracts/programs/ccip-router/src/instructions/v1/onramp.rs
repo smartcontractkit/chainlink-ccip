@@ -726,5 +726,79 @@ mod helpers {
                 CcipRouterError::SourceTokenDataTooLarge.into()
             );
         }
+
+        #[test]
+        fn validate_transfer_dest_address_aptos_rejects_all_zero() {
+            let selector = CHAIN_FAMILY_SELECTOR_APTOS.to_be_bytes();
+            let addr = [0u8; 32];
+            assert_eq!(
+                validate_transfer_dest_address(selector, &addr).unwrap_err(),
+                CommonCcipError::InvalidAptosAddress.into()
+            );
+        }
+
+        #[test]
+        fn validate_transfer_dest_address_tvm_rejects_zero_account_id() {
+            let selector = CHAIN_FAMILY_SELECTOR_TVM.to_be_bytes();
+
+            let mut addr = [0u8; 36];
+            addr[0] = 1;
+            addr[1] = 2;
+            // account id stays all-zero
+            assert_eq!(
+                validate_transfer_dest_address(selector, &addr).unwrap_err(),
+                CommonCcipError::InvalidTVMAddress.into()
+            );
+        }
+
+        #[test]
+        fn validate_transfer_dest_address_rejects_unknown_selector() {
+            let selector = [0u8; 4];
+            let addr = [1u8; 32];
+            assert_eq!(
+                validate_transfer_dest_address(selector, &addr).unwrap_err(),
+                CommonCcipError::InvalidChainFamilySelector.into()
+            );
+        }
+
+        #[test]
+        fn validate_transfer_dest_address_aptos_accepts_len_32_nonzero() {
+            let selector = CHAIN_FAMILY_SELECTOR_APTOS.to_be_bytes();
+            let addr = [1u8; 32];
+            validate_transfer_dest_address(selector, &addr).unwrap();
+        }
+
+        #[test]
+        fn validate_transfer_dest_address_aptos_rejects_wrong_len() {
+            let selector = CHAIN_FAMILY_SELECTOR_APTOS.to_be_bytes();
+            let addr = [1u8; 31];
+            assert_eq!(
+                validate_transfer_dest_address(selector, &addr).unwrap_err(),
+                CommonCcipError::InvalidAptosAddress.into()
+            );
+        }
+
+        #[test]
+        fn validate_transfer_dest_address_tvm_accepts_len_36_nonzero_account_id() {
+            let selector = CHAIN_FAMILY_SELECTOR_TVM.to_be_bytes();
+
+            // TVM address is 36 bytes. The first 2 bytes are typically workchain + flags, and bytes [2..34)
+            // are the 32-byte account id. Ensure the account id is non-zero.
+            let mut addr = [0u8; 36];
+            addr[0] = 1;
+            addr[1] = 2;
+            addr[2] = 1; // make account_id non-zero
+            validate_transfer_dest_address(selector, &addr).unwrap();
+        }
+
+        #[test]
+        fn validate_transfer_dest_address_tvm_rejects_wrong_len() {
+            let selector = CHAIN_FAMILY_SELECTOR_TVM.to_be_bytes();
+            let addr = [1u8; 35];
+            assert_eq!(
+                validate_transfer_dest_address(selector, &addr).unwrap_err(),
+                CommonCcipError::InvalidTVMAddress.into()
+            );
+        }
     }
 }
