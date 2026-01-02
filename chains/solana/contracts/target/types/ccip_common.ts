@@ -100,6 +100,16 @@ export type CcipCommon = {
       "code": 10010,
       "name": "InvalidSVMAddress",
       "msg": "Invalid SVM address"
+    },
+    {
+      "code": 10011,
+      "name": "InvalidTVMAddress",
+      "msg": "Invalid TVM address"
+    },
+    {
+      "code": 10012,
+      "name": "InvalidAptosAddress",
+      "msg": "Invalid Aptos address"
     }
   ]
 };
@@ -206,6 +216,16 @@ export const IDL: CcipCommon = {
       "code": 10010,
       "name": "InvalidSVMAddress",
       "msg": "Invalid SVM address"
+    },
+    {
+      "code": 10011,
+      "name": "InvalidTVMAddress",
+      "msg": "Invalid TVM address"
+    },
+    {
+      "code": 10012,
+      "name": "InvalidAptosAddress",
+      "msg": "Invalid Aptos address"
     }
   ]
 };
