@@ -234,6 +234,11 @@ func TestConfigureChainsForLanes_Apply(t *testing.T) {
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
 						CommitteeVerifiers: []adapters.CommitteeVerifierConfig[datastore.AddressRef]{
 							{
 								CommitteeVerifier: []datastore.AddressRef{
@@ -319,6 +324,11 @@ func TestConfigureChainsForLanes_Apply(t *testing.T) {
 						},
 						OnRamp: datastore.AddressRef{
 							Type:          "OnRamp",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 15971525489660198786,
+						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 15971525489660198786,
 						},
@@ -499,6 +509,11 @@ func TestConfigureChainsForLanes_Apply(t *testing.T) {
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
 						CommitteeVerifiers: []adapters.CommitteeVerifierConfig[datastore.AddressRef]{
 							{
 								CommitteeVerifier: []datastore.AddressRef{
@@ -590,6 +605,11 @@ func TestConfigureChainsForLanes_Apply(t *testing.T) {
 						},
 						OnRamp: datastore.AddressRef{
 							Type:          "OnRamp",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 15971525489660198786,
+						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 15971525489660198786,
 						},
@@ -720,6 +740,11 @@ func TestConfigureChainsForLanes_Apply(t *testing.T) {
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
 						FeeQuoter: datastore.AddressRef{
 							Type:          "FeeQuoter",
 							Version:       semver.MustParse("1.0.0"),
@@ -760,6 +785,11 @@ func TestConfigureChainsForLanes_Apply(t *testing.T) {
 						},
 						OnRamp: datastore.AddressRef{
 							Type:          "OnRamp",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
@@ -813,6 +843,11 @@ func TestConfigureChainsForLanes_Apply(t *testing.T) {
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
 						FeeQuoter: datastore.AddressRef{
 							Type:          "FeeQuoter",
 							Version:       semver.MustParse("1.0.0"),
@@ -851,6 +886,11 @@ func TestConfigureChainsForLanes_Apply(t *testing.T) {
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
 						FeeQuoter: datastore.AddressRef{
 							Type:          "FeeQuoter",
 							Version:       semver.MustParse("1.0.0"),
@@ -886,6 +926,11 @@ func TestConfigureChainsForLanes_Apply(t *testing.T) {
 						},
 						OnRamp: datastore.AddressRef{
 							Type:          "OnRamp",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
@@ -932,6 +977,11 @@ func TestConfigureChainsForLanes_Apply(t *testing.T) {
 						},
 						OnRamp: datastore.AddressRef{
 							Type:          "OnRamp",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 15971525489660198786,
+						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 15971525489660198786,
 						},
@@ -993,6 +1043,11 @@ func TestConfigureChainsForLanes_Apply(t *testing.T) {
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
 						FeeQuoter: datastore.AddressRef{
 							Type:          "FeeQuoter",
 							Version:       semver.MustParse("1.0.0"),
@@ -1026,6 +1081,11 @@ func TestConfigureChainsForLanes_Apply(t *testing.T) {
 						},
 						OnRamp: datastore.AddressRef{
 							Type:          "OnRamp",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
@@ -1089,6 +1149,11 @@ func TestConfigureChainsForLanes_Apply(t *testing.T) {
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
 						FeeQuoter: datastore.AddressRef{
 							Type:          "FeeQuoter",
 							Version:       semver.MustParse("1.0.0"),
@@ -1142,6 +1207,11 @@ func TestConfigureChainsForLanes_Apply(t *testing.T) {
 						},
 						OnRamp: datastore.AddressRef{
 							Type:          "OnRamp",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
@@ -1265,6 +1335,11 @@ func TestConfigureChainsForLanes_VerifyPreconditions(t *testing.T) {
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
 						FeeQuoter: datastore.AddressRef{
 							Type:          "FeeQuoter",
 							Version:       semver.MustParse("1.0.0"),
@@ -1331,6 +1406,11 @@ func TestConfigureChainsForLanes_VerifyPreconditions(t *testing.T) {
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 15971525489660198786,
 						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 15971525489660198786,
+						},
 						FeeQuoter: datastore.AddressRef{
 							Type:          "FeeQuoter",
 							Version:       semver.MustParse("1.0.0"),
@@ -1384,6 +1464,11 @@ func TestConfigureChainsForLanes_VerifyPreconditions(t *testing.T) {
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
 						FeeQuoter: datastore.AddressRef{
 							Type:          "FeeQuoter",
 							Version:       semver.MustParse("1.0.0"),
@@ -1406,6 +1491,11 @@ func TestConfigureChainsForLanes_VerifyPreconditions(t *testing.T) {
 						Router: datastore.AddressRef{}, // Empty ref
 						OnRamp: datastore.AddressRef{
 							Type:          "OnRamp",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
@@ -1435,6 +1525,7 @@ func TestConfigureChainsForLanes_VerifyPreconditions(t *testing.T) {
 							ChainSelector: 5009297550715157269,
 						},
 						OnRamp: datastore.AddressRef{}, // Empty ref
+						RMN:    datastore.AddressRef{}, // Empty ref
 						FeeQuoter: datastore.AddressRef{
 							Type:          "FeeQuoter",
 							Version:       semver.MustParse("1.0.0"),
@@ -1465,6 +1556,11 @@ func TestConfigureChainsForLanes_VerifyPreconditions(t *testing.T) {
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
 						FeeQuoter: datastore.AddressRef{}, // Empty ref
 						OffRamp: datastore.AddressRef{
 							Type:          "OffRamp",
@@ -1491,6 +1587,11 @@ func TestConfigureChainsForLanes_VerifyPreconditions(t *testing.T) {
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
 						FeeQuoter: datastore.AddressRef{
 							Type:          "FeeQuoter",
 							Version:       semver.MustParse("1.0.0"),
@@ -1514,6 +1615,11 @@ func TestConfigureChainsForLanes_VerifyPreconditions(t *testing.T) {
 						},
 						OnRamp: datastore.AddressRef{
 							Type:          "OnRamp",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 0,
+						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 0,
 						},
@@ -1544,6 +1650,11 @@ func TestConfigureChainsForLanes_VerifyPreconditions(t *testing.T) {
 						},
 						OnRamp: datastore.AddressRef{
 							Type:          "OnRamp",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
@@ -1579,6 +1690,11 @@ func TestConfigureChainsForLanes_VerifyPreconditions(t *testing.T) {
 						},
 						OnRamp: datastore.AddressRef{
 							Type:          "OnRamp",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
@@ -1635,6 +1751,11 @@ func TestConfigureChainsForLanes_VerifyPreconditions(t *testing.T) {
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
 						FeeQuoter: datastore.AddressRef{
 							Type:          "FeeQuoter",
 							Version:       semver.MustParse("1.0.0"),
@@ -1677,6 +1798,11 @@ func TestConfigureChainsForLanes_VerifyPreconditions(t *testing.T) {
 						},
 						OnRamp: datastore.AddressRef{
 							Type:          "OnRamp",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 15971525489660198786,
+						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 15971525489660198786,
 						},
@@ -1733,6 +1859,11 @@ func TestConfigureChainsForLanes_VerifyPreconditions(t *testing.T) {
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
 						FeeQuoter: datastore.AddressRef{
 							Type:          "FeeQuoter",
 							Version:       semver.MustParse("1.0.0"),
@@ -1784,6 +1915,11 @@ func TestConfigureChainsForLanes_VerifyPreconditions(t *testing.T) {
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
 						FeeQuoter: datastore.AddressRef{
 							Type:          "FeeQuoter",
 							Version:       semver.MustParse("1.0.0"),
@@ -1831,6 +1967,11 @@ func TestConfigureChainsForLanes_VerifyPreconditions(t *testing.T) {
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
 						FeeQuoter: datastore.AddressRef{
 							Type:          "FeeQuoter",
 							Version:       semver.MustParse("1.0.0"),
@@ -1873,6 +2014,11 @@ func TestConfigureChainsForLanes_VerifyPreconditions(t *testing.T) {
 						},
 						OnRamp: datastore.AddressRef{
 							Type:          "OnRamp",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
@@ -1923,6 +2069,11 @@ func TestConfigureChainsForLanes_VerifyPreconditions(t *testing.T) {
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
 						FeeQuoter: datastore.AddressRef{
 							Type:          "FeeQuoter",
 							Version:       semver.MustParse("1.0.0"),
@@ -1967,6 +2118,11 @@ func TestConfigureChainsForLanes_VerifyPreconditions(t *testing.T) {
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
 						FeeQuoter: datastore.AddressRef{
 							Type:          "FeeQuoter",
 							Version:       semver.MustParse("1.0.0"),
@@ -2008,6 +2164,11 @@ func TestConfigureChainsForLanes_VerifyPreconditions(t *testing.T) {
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
 						FeeQuoter: datastore.AddressRef{
 							Type:          "FeeQuoter",
 							Version:       semver.MustParse("1.0.0"),
@@ -2046,6 +2207,11 @@ func TestConfigureChainsForLanes_VerifyPreconditions(t *testing.T) {
 						},
 						OnRamp: datastore.AddressRef{
 							Type:          "OnRamp",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 5009297550715157269,
+						},
+						RMN: datastore.AddressRef{
+							Type:          "RMN",
 							Version:       semver.MustParse("1.0.0"),
 							ChainSelector: 5009297550715157269,
 						},

@@ -29,7 +29,9 @@ type ChainConfig struct {
 	CommitteeVerifiers []adapters.CommitteeVerifierConfig[datastore.AddressRef]
 	// The FeeQuoter on the chain being configured.
 	FeeQuoter datastore.AddressRef
-	// The OffRamp on the chain being configured
+	// The RMN contract on the chain being configured.
+	RMN datastore.AddressRef
+	// The OffRamp on the chain being configured.
 	OffRamp datastore.AddressRef
 	// The configuration for each remote chain that we want to connect to.
 	RemoteChains map[uint64]adapters.RemoteChainConfig[datastore.AddressRef, datastore.AddressRef]
@@ -74,6 +76,9 @@ func makeVerify(_ *adapters.ChainFamilyRegistry, _ *changesets.MCMSReaderRegistr
 			}
 			if datastore_utils.IsAddressRefEmpty(chain.OffRamp) {
 				return fmt.Errorf("offRamp ref is empty for chain with selector %d", chainSel)
+			}
+			if datastore_utils.IsAddressRefEmpty(chain.RMN) {
+				return fmt.Errorf("RMN ref is empty for chain with selector %d", chainSel)
 			}
 
 			for i, ccv := range chain.CommitteeVerifiers {
