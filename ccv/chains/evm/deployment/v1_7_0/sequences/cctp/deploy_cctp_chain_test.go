@@ -9,6 +9,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/cctp_message_transmitter_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/cctp_through_ccv_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/cctp_verifier"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/usdc_token_pool_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
@@ -20,6 +21,7 @@ import (
 	mock_usdc_token_transmitter "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/mock_usdc_token_transmitter"
 	usdc_token_pool_proxy_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/usdc_token_pool_proxy"
 	versioned_verifier_resolver_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/versioned_verifier_resolver"
+	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
@@ -49,6 +51,14 @@ func setupCCTPTestEnvironment(t *testing.T, e *deployment.Environment, chainSele
 	chain := e.BlockChains.EVMChains()[chainSelector]
 
 	// Deploy chain contracts
+	create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, chain, contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
+		ChainSelector:  chainSelector,
+		Args: create2_factory.ConstructorArgs{
+			AllowList: []common.Address{chain.DeployerKey.From},
+		},
+	}, nil)
+	require.NoError(t, err, "Failed to deploy CREATE2Factory")
 	chainReport, err := operations.ExecuteSequence(
 		e.OperationsBundle,
 		sequences.DeployChainContracts,
@@ -56,6 +66,7 @@ func setupCCTPTestEnvironment(t *testing.T, e *deployment.Environment, chainSele
 		sequences.DeployChainContractsInput{
 			ChainSelector:  chainSelector,
 			ContractParams: testsetup.CreateBasicContractParams(),
+			CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
 		},
 	)
 	require.NoError(t, err, "Failed to deploy chain contracts")
@@ -123,7 +134,16 @@ func setupCCTPTestEnvironment(t *testing.T, e *deployment.Environment, chainSele
 	}
 }
 
-func basicDeployCCTPInput(chainSelector uint64, setup cctpTestSetup, deployerAddr common.Address) adapters.DeployCCTPInput[string, []byte] {
+func basicDeployCCTPInput(t *testing.T, e *deployment.Environment, chainSelector uint64, setup cctpTestSetup) adapters.DeployCCTPInput[string, []byte] {
+	create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSelector], contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
+		ChainSelector:  chainSelector,
+		Args: create2_factory.ConstructorArgs{
+			AllowList: []common.Address{e.BlockChains.EVMChains()[chainSelector].DeployerKey.From},
+		},
+	}, nil)
+	require.NoError(t, err, "Failed to deploy CREATE2Factory")
+
 	return adapters.DeployCCTPInput[string, []byte]{
 		ChainSelector:                    chainSelector,
 		MessageTransmitterProxy:          "",
@@ -137,10 +157,10 @@ func basicDeployCCTPInput(chainSelector uint64, setup cctpTestSetup, deployerAdd
 		FastFinalityBps:                  100,
 		RMN:                              setup.RMN.Hex(),
 		Router:                           setup.Router.Hex(),
-		DeployerContract:                 "",
+		DeployerContract:                 create2FactoryRef.Address,
 		Allowlist:                        []string{common.HexToAddress("0x08").Hex()},
 		ThresholdAmountForAdditionalCCVs: big.NewInt(1e18),
-		RateLimitAdmin:                   deployerAddr.Hex(),
+		RateLimitAdmin:                   e.BlockChains.EVMChains()[chainSelector].DeployerKey.From.Hex(),
 		RemoteChains:                     make(map[uint64]adapters.RemoteCCTPChainConfig[string, []byte]),
 	}
 }
@@ -180,7 +200,7 @@ func TestDeployCCTPChain(t *testing.T) {
 		}, nil
 	}
 
-	input := basicDeployCCTPInput(chainSelector, setup, chain.DeployerKey.From)
+	input := basicDeployCCTPInput(t, e, chainSelector, setup)
 	// Add a remote chain config for testing (CCTP V2 with CCV)
 	remoteChainSelector := uint64(4949039107694359620)
 	input.RemoteChains[remoteChainSelector] = adapters.RemoteCCTPChainConfig[string, []byte]{

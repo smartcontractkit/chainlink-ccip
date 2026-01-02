@@ -113,35 +113,26 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 
 		// Deploy CCTPVerifierResolver if needed
 		if cctpVerifierResolverAddress == "" {
-			if input.DeployerContract != "" {
-				deployVerifierResolverViaCREATE2Report, err := cldf_ops.ExecuteSequence(b, v1_7_0_sequences.DeployVerifierResolverViaCREATE2, chain, v1_7_0_sequences.DeployVerifierResolverViaCREATE2Input{
-					ChainSelector:  input.ChainSelector,
-					Qualifier:      cctpQualifier,
-					Type:           datastore.ContractType(cctp_verifier.ResolverType),
-					Version:        cctp_verifier.Version,
-					CREATE2Factory: common.HexToAddress(input.DeployerContract),
-				})
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CommitteeVerifierResolver: %w", err)
-				}
-				addresses = append(addresses, deployVerifierResolverViaCREATE2Report.Output.Addresses...)
-				writes = append(writes, deployVerifierResolverViaCREATE2Report.Output.Writes...)
-				if len(deployVerifierResolverViaCREATE2Report.Output.Addresses) != 1 {
-					return sequences.OnChainOutput{}, fmt.Errorf("expected 1 CCTPVerifierResolver address, got %d", len(deployVerifierResolverViaCREATE2Report.Output.Addresses))
-				}
-				cctpVerifierResolverAddress = deployVerifierResolverViaCREATE2Report.Output.Addresses[0].Address
-			} else {
-				cctpVerifierResolverReport, err := cldf_ops.ExecuteOperation(b, versioned_verifier_resolver.Deploy, chain, contract_utils.DeployInput[versioned_verifier_resolver.ConstructorArgs]{
-					TypeAndVersion: deployment.NewTypeAndVersion(cctp_verifier.ResolverType, *versioned_verifier_resolver.Version),
-					Qualifier:      &cctpQualifier,
-					ChainSelector:  chain.Selector,
-				})
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CCTPVerifierResolver: %w", err)
-				}
-				addresses = append(addresses, cctpVerifierResolverReport.Output)
-				cctpVerifierResolverAddress = cctpVerifierResolverReport.Output.Address
+			if input.DeployerContract == "" {
+				return sequences.OnChainOutput{}, fmt.Errorf("deployer contract is required")
 			}
+
+			deployVerifierResolverViaCREATE2Report, err := cldf_ops.ExecuteSequence(b, v1_7_0_sequences.DeployVerifierResolverViaCREATE2, chain, v1_7_0_sequences.DeployVerifierResolverViaCREATE2Input{
+				ChainSelector:  input.ChainSelector,
+				Qualifier:      cctpQualifier,
+				Type:           datastore.ContractType(cctp_verifier.ResolverType),
+				Version:        cctp_verifier.Version,
+				CREATE2Factory: common.HexToAddress(input.DeployerContract),
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CommitteeVerifierResolver: %w", err)
+			}
+			addresses = append(addresses, deployVerifierResolverViaCREATE2Report.Output.Addresses...)
+			writes = append(writes, deployVerifierResolverViaCREATE2Report.Output.Writes...)
+			if len(deployVerifierResolverViaCREATE2Report.Output.Addresses) != 1 {
+				return sequences.OnChainOutput{}, fmt.Errorf("expected 1 CCTPVerifierResolver address, got %d", len(deployVerifierResolverViaCREATE2Report.Output.Addresses))
+			}
+			cctpVerifierResolverAddress = deployVerifierResolverViaCREATE2Report.Output.Addresses[0].Address
 		}
 
 		// Deploy CCTPTokenPool if needed
