@@ -13,24 +13,23 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
   address internal s_newCctpV2PoolWithCCV = makeAddr("newCctpV2PoolWithCCV");
   address internal s_newLockReleasePool = makeAddr("newLockReleasePool");
 
-  // Test successful pool address updates by owner
   function test_updatePoolAddresses() public {
     _enableERC165InterfaceChecks(s_newCctpV1Pool, type(IPoolV1).interfaceId);
     _enableERC165InterfaceChecks(s_newCctpV2Pool, type(IPoolV1).interfaceId);
     _enableERC165InterfaceChecks(s_newCctpV2PoolWithCCV, type(IPoolV2).interfaceId);
 
-    // Act: Update pool addresses as owner
-    changePrank(OWNER);
-    s_usdcTokenPoolProxy.updatePoolAddresses(
-      USDCTokenPoolProxy.PoolAddresses({
-        cctpV1Pool: s_newCctpV1Pool,
-        cctpV2Pool: s_newCctpV2Pool,
-        cctpTokenPool: s_newCctpV2PoolWithCCV,
-        siloedUsdcTokenPool: address(0)
-      })
-    );
+    USDCTokenPoolProxy.PoolAddresses memory expectedEvent = USDCTokenPoolProxy.PoolAddresses({
+      cctpV1Pool: s_newCctpV1Pool,
+      cctpV2Pool: s_newCctpV2Pool,
+      cctpTokenPool: s_newCctpV2PoolWithCCV,
+      siloedUsdcTokenPool: address(0)
+    });
 
-    // Assert: Verify all pool addresses were updated correctly
+    vm.expectEmit();
+    emit USDCTokenPoolProxy.PoolAddressesUpdated(expectedEvent);
+
+    s_usdcTokenPoolProxy.updatePoolAddresses(expectedEvent);
+
     USDCTokenPoolProxy.PoolAddresses memory updatedPools = s_usdcTokenPoolProxy.getPools();
     assertEq(updatedPools.cctpV1Pool, s_newCctpV1Pool);
     assertEq(updatedPools.cctpV2Pool, s_newCctpV2Pool);
@@ -38,8 +37,7 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
 
   // Reverts
 
-  function test_updatePoolAddresses_RevertWhen_CCTPV1PoolDoesNotSupportIPoolV1() public {
-    changePrank(OWNER);
+  function test_updatePoolAddresses_RevertWhen_TokenPoolUnsupported_CCTPV1PoolDoesNotSupportIPoolV1() public {
     vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.TokenPoolUnsupported.selector, s_newCctpV1Pool));
     s_usdcTokenPoolProxy.updatePoolAddresses(
       USDCTokenPoolProxy.PoolAddresses({
@@ -49,7 +47,6 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
 
     _enableERC165InterfaceChecks(s_newCctpV1Pool, type(IPoolV1).interfaceId);
 
-    changePrank(OWNER);
     s_usdcTokenPoolProxy.updatePoolAddresses(
       USDCTokenPoolProxy.PoolAddresses({
         cctpV1Pool: s_newCctpV1Pool, cctpV2Pool: address(0), cctpTokenPool: address(0), siloedUsdcTokenPool: address(0)
@@ -59,8 +56,7 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
     assertEq(s_usdcTokenPoolProxy.getPools().cctpV1Pool, s_newCctpV1Pool);
   }
 
-  function test_updatePoolAddresses_RevertWhen_CCTPV2PoolDoesNotSupportIPoolV1() public {
-    changePrank(OWNER);
+  function test_updatePoolAddresses_RevertWhen_TokenPoolUnsupported_CCTPV2PoolDoesNotSupportIPoolV1() public {
     vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.TokenPoolUnsupported.selector, s_newCctpV2Pool));
     s_usdcTokenPoolProxy.updatePoolAddresses(
       USDCTokenPoolProxy.PoolAddresses({
@@ -70,7 +66,6 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
 
     _enableERC165InterfaceChecks(s_newCctpV2Pool, type(IPoolV1).interfaceId);
 
-    changePrank(OWNER);
     s_usdcTokenPoolProxy.updatePoolAddresses(
       USDCTokenPoolProxy.PoolAddresses({
         cctpV1Pool: address(0), cctpV2Pool: s_newCctpV2Pool, cctpTokenPool: address(0), siloedUsdcTokenPool: address(0)
@@ -80,8 +75,7 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
     assertEq(s_usdcTokenPoolProxy.getPools().cctpV2Pool, s_newCctpV2Pool);
   }
 
-  function test_updatePoolAddresses_RevertWhen_CCTPV2PoolWithCCVDoesNotSupportIPoolV2() public {
-    changePrank(OWNER);
+  function test_updatePoolAddresses_RevertWhen_TokenPoolUnsupported_CCTPV2PoolWithCCVDoesNotSupportIPoolV2() public {
     vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.TokenPoolUnsupported.selector, s_newCctpV2PoolWithCCV));
     s_usdcTokenPoolProxy.updatePoolAddresses(
       USDCTokenPoolProxy.PoolAddresses({
@@ -94,7 +88,6 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
 
     _enableERC165InterfaceChecks(s_newCctpV2PoolWithCCV, type(IPoolV2).interfaceId);
 
-    changePrank(OWNER);
     s_usdcTokenPoolProxy.updatePoolAddresses(
       USDCTokenPoolProxy.PoolAddresses({
         cctpV1Pool: address(0),

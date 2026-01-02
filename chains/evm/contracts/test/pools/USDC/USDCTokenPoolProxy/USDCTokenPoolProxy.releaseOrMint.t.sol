@@ -26,7 +26,6 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
     _enableERC165InterfaceChecks(s_lockReleasePool, type(IPoolV1).interfaceId);
 
     // Set the siloed pool via updatePoolAddresses - use a clean PoolAddresses struct
-    changePrank(OWNER);
     s_usdcTokenPoolProxy.updatePoolAddresses(
       USDCTokenPoolProxy.PoolAddresses({
         cctpV1Pool: address(0),

@@ -29,7 +29,6 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
   error ChainNotSupportedByVerifier(uint64 remoteChainSelector);
   error InvalidLockOrBurnMechanism(LockOrBurnMechanism mechanism);
   error InvalidMessageVersion(bytes4 version);
-  error InvalidMessageLength(uint256 length);
   error MismatchedArrayLengths();
   error NoLockOrBurnMechanismSet(uint64 remoteChainSelector);
   error CallerIsNotARampOnRouter(address caller);
@@ -37,7 +36,6 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
 
   event LockOrBurnMechanismUpdated(uint64 indexed remoteChainSelector, LockOrBurnMechanism mechanism);
   event PoolAddressesUpdated(PoolAddresses pools);
-  event LockReleasePoolUpdated(uint64 indexed remoteChainSelector, address lockReleasePool);
 
   struct MessageAndAttestation {
     bytes message;
@@ -59,6 +57,11 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
     CCTP_V2_WITH_CCV
   }
 
+  string public constant override typeAndVersion = "USDCTokenPoolProxy 1.7.0-dev";
+
+  /// @dev Constant representing the default finality.
+  uint16 internal constant WAIT_FOR_FINALITY = 0;
+
   IERC20 internal immutable i_token;
   IRouter internal immutable i_router;
   ICrossChainVerifierResolver private immutable i_cctpVerifier;
@@ -79,11 +82,6 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
   address internal s_cctpV2Pool;
   address internal s_cctpTokenPool;
   address internal s_siloedUsdcTokenPool;
-
-  /// @dev Constant representing the default finality.
-  uint16 internal constant WAIT_FOR_FINALITY = 0;
-
-  string public constant override typeAndVersion = "USDCTokenPoolProxy 1.7.0-dev";
 
   constructor(
     IERC20 token,
@@ -264,7 +262,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
   }
 
   /// @notice Update the pool addresses that this token pool will route a message to.
-  /// @param pools The new pool addresses to update the token pool proxy with. Since the legacy CCTP V1 pool may not be
+  /// @param pools The new pool addresses to update the token pool proxy with. Since the pool variants may not be
   /// used, the zero address is a valid input and therefore input sanitization for it is not required.
   function updatePoolAddresses(
     PoolAddresses calldata pools
@@ -277,13 +275,10 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
       revert TokenPoolUnsupported(pools.cctpV2Pool);
     }
 
-    if (pools.cctpTokenPool != address(0)) {
-      if (!pools.cctpTokenPool.supportsInterface(type(IPoolV2).interfaceId)) {
-        revert TokenPoolUnsupported(pools.cctpTokenPool);
-      }
+    if (pools.cctpTokenPool != address(0) && !pools.cctpTokenPool.supportsInterface(type(IPoolV2).interfaceId)) {
+      revert TokenPoolUnsupported(pools.cctpTokenPool);
     }
 
-    // If the siloed USDC pool is being used, then it must support the IPoolV1 interface. If it is not, don't check it.
     if (
       pools.siloedUsdcTokenPool != address(0) && !pools.siloedUsdcTokenPool.supportsInterface(type(IPoolV1).interfaceId)
     ) {

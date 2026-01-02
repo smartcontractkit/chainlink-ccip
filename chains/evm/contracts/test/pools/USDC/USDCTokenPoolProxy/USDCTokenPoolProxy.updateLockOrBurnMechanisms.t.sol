@@ -23,7 +23,6 @@ contract USDCTokenPoolProxy_updateLockOrBurnMechanisms is USDCTokenPoolProxySetu
     mechanisms[1] = cctpV2Mechanism;
     mechanisms[2] = lockReleaseMechanism;
 
-    changePrank(OWNER);
     vm.expectEmit();
     emit USDCTokenPoolProxy.LockOrBurnMechanismUpdated(SOURCE_CHAIN_SELECTOR, cctpV1Mechanism);
     vm.expectEmit();
@@ -46,7 +45,6 @@ contract USDCTokenPoolProxy_updateLockOrBurnMechanisms is USDCTokenPoolProxySetu
     mechanisms[0] = USDCTokenPoolProxy.LockOrBurnMechanism.CCTP_V1;
     mechanisms[1] = USDCTokenPoolProxy.LockOrBurnMechanism.CCTP_V2;
 
-    changePrank(OWNER);
     vm.expectRevert(abi.encodeWithSelector(TokenPool.MismatchedArrayLengths.selector));
     s_usdcTokenPoolProxy.updateLockOrBurnMechanisms(chainSelectors, mechanisms);
   }
