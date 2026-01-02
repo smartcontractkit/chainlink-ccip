@@ -95,8 +95,6 @@ contract ERC20LockBox_withdraw is ERC20LockBoxSetup {
     emit ERC20LockBox.Withdrawal(address(s_token), s_recipient, amount);
 
     s_erc20LockBox.withdraw(address(s_token), 0, amount, s_recipient);
-
-    vm.stopPrank();
   }
 
   function test_withdraw_ToDifferentRecipients() public {
@@ -117,8 +115,6 @@ contract ERC20LockBox_withdraw is ERC20LockBoxSetup {
     vm.expectEmit();
     emit ERC20LockBox.Withdrawal(address(s_token), recipient2, amount);
     s_erc20LockBox.withdraw(address(s_token), 0, amount, recipient2);
-
-    vm.stopPrank();
 
     // Verify both recipients received tokens
     assertEq(s_token.balanceOf(recipient1), amount);

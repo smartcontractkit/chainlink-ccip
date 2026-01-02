@@ -104,7 +104,6 @@ contract TokenPoolV2_validateLockOrBurn is AdvancedPoolHooksSetup {
 
     vm.startPrank(s_allowedOnRamp);
     s_tokenPool.validateLockOrBurn(lockOrBurnIn, type(uint16).max, "", fee);
-    vm.stopPrank();
 
     (RateLimiter.TokenBucket memory outboundBucket,) = s_tokenPool.getCurrentRateLimiterState(DEST_CHAIN_SELECTOR, true);
     assertEq(outboundBucket.tokens, outboundFastConfig.capacity - expectedAmount);
@@ -138,7 +137,6 @@ contract TokenPoolV2_validateLockOrBurn is AdvancedPoolHooksSetup {
 
     vm.startPrank(s_allowedOnRamp);
     s_tokenPool.validateLockOrBurn(lockOrBurnIn, 0, "", fee);
-    vm.stopPrank();
 
     (RateLimiter.TokenBucket memory outboundBucket,) =
       s_tokenPool.getCurrentRateLimiterState(DEST_CHAIN_SELECTOR, false);

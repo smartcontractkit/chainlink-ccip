@@ -5,11 +5,11 @@ import {Pool} from "../../../../libraries/Pool.sol";
 import {USDCSourcePoolDataCodec} from "../../../../libraries/USDCSourcePoolDataCodec.sol";
 import {TokenPool} from "../../../../pools/TokenPool.sol";
 
-import {CCTPTokenPool} from "../../../../pools/USDC/CCTPTokenPool.sol";
-import {CCTPTokenPoolSetup} from "./CCTPTokenPoolSetup.t.sol";
+import {CCTPThroughCCVTokenPool} from "../../../../pools/USDC/CCTPThroughCCVTokenPool.sol";
+import {CCTPThroughCCVTokenPoolSetup} from "./CCTPThroughCCVTokenPoolSetup.t.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
-contract CCTPTokenPool_lockOrBurn is CCTPTokenPoolSetup {
+contract CCTPThroughCCVTokenPool_lockOrBurn is CCTPThroughCCVTokenPoolSetup {
   function test_lockOrBurn() public {
     Pool.LockOrBurnInV1 memory lockOrBurnIn = Pool.LockOrBurnInV1({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
@@ -29,7 +29,7 @@ contract CCTPTokenPool_lockOrBurn is CCTPTokenPoolSetup {
 
     vm.startPrank(s_allowedCaller);
     (Pool.LockOrBurnOutV1 memory lockOrBurnOut, uint256 destTokenAmount) =
-      s_cctpTokenPool.lockOrBurn(lockOrBurnIn, 0, "");
+      s_cctpThroughCCVTokenPool.lockOrBurn(lockOrBurnIn, 0, "");
 
     assertEq(destTokenAmount, lockOrBurnIn.amount);
     assertEq(lockOrBurnOut.destTokenAddress, abi.encode(DEST_CHAIN_USDC_TOKEN));
@@ -46,8 +46,8 @@ contract CCTPTokenPool_lockOrBurn is CCTPTokenPoolSetup {
     });
 
     vm.startPrank(s_allowedCaller);
-    vm.expectRevert(abi.encodeWithSelector(CCTPTokenPool.IPoolV1NotSupported.selector));
-    s_cctpTokenPool.lockOrBurn(lockOrBurnIn);
+    vm.expectRevert(abi.encodeWithSelector(CCTPThroughCCVTokenPool.IPoolV1NotSupported.selector));
+    s_cctpThroughCCVTokenPool.lockOrBurn(lockOrBurnIn);
   }
 
   function test_lockOrBurn_RevertWhen_InvalidCaller() public {
@@ -63,7 +63,7 @@ contract CCTPTokenPool_lockOrBurn is CCTPTokenPoolSetup {
 
     vm.startPrank(invalidCaller);
     vm.expectRevert(abi.encodeWithSelector(AuthorizedCallers.UnauthorizedCaller.selector, invalidCaller));
-    s_cctpTokenPool.lockOrBurn(lockOrBurnIn, 0, "");
+    s_cctpThroughCCVTokenPool.lockOrBurn(lockOrBurnIn, 0, "");
   }
 
   function test_lockOrBurn_RevertWhen_ChainNotAllowed() public {
@@ -79,6 +79,7 @@ contract CCTPTokenPool_lockOrBurn is CCTPTokenPoolSetup {
 
     vm.startPrank(s_allowedCaller);
     vm.expectRevert(abi.encodeWithSelector(TokenPool.ChainNotAllowed.selector, wrongChainSelector));
-    s_cctpTokenPool.lockOrBurn(lockOrBurnIn, 0, "");
+    s_cctpThroughCCVTokenPool.lockOrBurn(lockOrBurnIn, 0, "");
   }
 }
+

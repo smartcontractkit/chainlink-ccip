@@ -21,7 +21,7 @@ type DeployCCTPChainsConfig struct {
 	// Chains specifies the chains to deploy CCTP on.
 	Chains []adapters.DeployCCTPInput[datastore.AddressRef, datastore.AddressRef]
 	// MCMS configures the resulting proposal.
-	MCMS mcms.Input
+	MCMS *mcms.Input
 }
 
 // DeployCCTPChains returns a changeset that deploys CCTP contracts on chains.
@@ -31,7 +31,27 @@ func DeployCCTPChains(cctpChainRegistry *adapters.CCTPChainRegistry, mcmsRegistr
 
 func makeVerifyDeployCCTPChains(_ *adapters.CCTPChainRegistry, _ *changesets.MCMSReaderRegistry) func(cldf.Environment, DeployCCTPChainsConfig) error {
 	return func(e cldf.Environment, cfg DeployCCTPChainsConfig) error {
-		// TODO: implement
+		if cfg.MCMS != nil {
+			err := cfg.MCMS.Validate()
+			if err != nil {
+				return fmt.Errorf("failed to validate MCMS input: %w", err)
+			}
+		}
+
+		for _, chainCfg := range cfg.Chains {
+			if _, err := chain_selectors.GetSelectorFamily(chainCfg.ChainSelector); err != nil {
+				return err
+			}
+			if len(chainCfg.TokenPool) == 0 {
+				return fmt.Errorf("token pool is empty for chain with selector %d", chainCfg.ChainSelector)
+			}
+			for remoteChainSelector := range chainCfg.RemoteChains {
+				if _, err := chain_selectors.GetSelectorFamily(remoteChainSelector); err != nil {
+					return err
+				}
+			}
+		}
+
 		return nil
 	}
 }
@@ -67,10 +87,15 @@ func makeApplyDeployCCTPChains(cctpChainRegistry *adapters.CCTPChainRegistry, mc
 			reports = append(reports, deployCCTPChainReport.ExecutionReports...)
 		}
 
+		var mcmsInput mcms.Input
+		if cfg.MCMS != nil {
+			mcmsInput = *cfg.MCMS
+		}
+
 		return changesets.NewOutputBuilder(e, mcmsRegistry).
 			WithReports(reports).
 			WithBatchOps(batchOps).
-			Build(cfg.MCMS)
+			Build(mcmsInput)
 	}
 }
 
@@ -97,65 +122,23 @@ func resolveDeployCCTPChainInput(
 		AllowlistAdmin:                   adapterInput.AllowlistAdmin,
 	}
 
-	if addressRefExists(adapterInput.TokenPools.LegacyCCTPV1Pool) {
-		legacyCCTPV1Pool, err := datastore_utils.FindAndFormatRef(e.DataStore, adapterInput.TokenPools.LegacyCCTPV1Pool, chainSelector, datastore_utils.FullRef)
+	for _, tokenPoolContract := range adapterInput.TokenPool {
+		resolvedTokenPoolContract, err := datastore_utils.FindAndFormatRef(e.DataStore, tokenPoolContract, chainSelector, datastore_utils.FullRef)
 		if err != nil {
-			return adapters.DeployCCTPInput[string, []byte]{}, fmt.Errorf("failed to resolve LegacyCCTPV1Pool for chain selector %d: %w", chainSelector, err)
+			return adapters.DeployCCTPInput[string, []byte]{}, fmt.Errorf("failed to resolve TokenPool for chain selector %d: %w", chainSelector, err)
 		}
-		out.TokenPools.LegacyCCTPV1Pool = legacyCCTPV1Pool.Address
+		out.TokenPool = append(out.TokenPool, resolvedTokenPoolContract.Address)
 	}
 
-	if addressRefExists(adapterInput.TokenPools.CCTPV1Pool) {
-		cctpv1Pool, err := datastore_utils.FindAndFormatRef(e.DataStore, adapterInput.TokenPools.CCTPV1Pool, chainSelector, datastore_utils.FullRef)
-		if err != nil {
-			return adapters.DeployCCTPInput[string, []byte]{}, fmt.Errorf("failed to resolve CCTPV1Pool for chain selector %d: %w", chainSelector, err)
-		}
-		out.TokenPools.CCTPV1Pool = cctpv1Pool.Address
-	}
-
-	if addressRefExists(adapterInput.TokenPools.CCTPV2Pool) {
-		cctpv2Pool, err := datastore_utils.FindAndFormatRef(e.DataStore, adapterInput.TokenPools.CCTPV2Pool, chainSelector, datastore_utils.FullRef)
-		if err != nil {
-			return adapters.DeployCCTPInput[string, []byte]{}, fmt.Errorf("failed to resolve CCTPV2Pool for chain selector %d: %w", chainSelector, err)
-		}
-		out.TokenPools.CCTPV2Pool = cctpv2Pool.Address
-	}
-
-	if addressRefExists(adapterInput.TokenPools.CCTPV2PoolWithCCV) {
-		cctpv2PoolWithCCV, err := datastore_utils.FindAndFormatRef(e.DataStore, adapterInput.TokenPools.CCTPV2PoolWithCCV, chainSelector, datastore_utils.FullRef)
-		if err != nil {
-			return adapters.DeployCCTPInput[string, []byte]{}, fmt.Errorf("failed to resolve CCTPV2PoolWithCCV for chain selector %d: %w", chainSelector, err)
-		}
-		out.TokenPools.CCTPV2PoolWithCCV = cctpv2PoolWithCCV.Address
-	}
-
-	if addressRefExists(adapterInput.TokenPools.LockReleasePool) {
-		lockReleasePool, err := datastore_utils.FindAndFormatRef(e.DataStore, adapterInput.TokenPools.LockReleasePool, chainSelector, datastore_utils.FullRef)
-		if err != nil {
-			return adapters.DeployCCTPInput[string, []byte]{}, fmt.Errorf("failed to resolve LockReleasePool for chain selector %d: %w", chainSelector, err)
-		}
-		out.TokenPools.LockReleasePool = lockReleasePool.Address
-	}
-
-	if addressRefExists(adapterInput.USDCTokenPoolProxy) {
-		usdctokenPoolProxy, err := datastore_utils.FindAndFormatRef(e.DataStore, adapterInput.USDCTokenPoolProxy, chainSelector, datastore_utils.FullRef)
-		if err != nil {
-			return adapters.DeployCCTPInput[string, []byte]{}, fmt.Errorf("failed to resolve USDCTokenPoolProxy for chain selector %d: %w", chainSelector, err)
-		}
-		out.USDCTokenPoolProxy = usdctokenPoolProxy.Address
-	}
-
-	cctpVerifier := make([]datastore.AddressRef, 0, len(adapterInput.CCTPVerifier))
 	for _, ref := range adapterInput.CCTPVerifier {
-		fullRef, err := datastore_utils.FindAndFormatRef(e.DataStore, ref, chainSelector, datastore_utils.FullRef)
+		resolvedCCTPVerifierContract, err := datastore_utils.FindAndFormatRef(e.DataStore, ref, chainSelector, datastore_utils.FullRef)
 		if err != nil {
 			return adapters.DeployCCTPInput[string, []byte]{}, fmt.Errorf("failed to resolve CCTPVerifier for chain selector %d: %w", chainSelector, err)
 		}
-		cctpVerifier = append(cctpVerifier, fullRef)
+		out.CCTPVerifier = append(out.CCTPVerifier, resolvedCCTPVerifierContract.Address)
 	}
-	out.CCTPVerifier = cctpVerifier
 
-	if addressRefExists(adapterInput.MessageTransmitterProxy) {
+	if !datastore_utils.IsAddressRefEmpty(adapterInput.MessageTransmitterProxy) {
 		messageTransmitterProxy, err := datastore_utils.FindAndFormatRef(e.DataStore, adapterInput.MessageTransmitterProxy, chainSelector, datastore_utils.FullRef)
 		if err != nil {
 			return adapters.DeployCCTPInput[string, []byte]{}, fmt.Errorf("failed to resolve MessageTransmitterProxy for chain selector %d: %w", chainSelector, err)
@@ -163,7 +146,7 @@ func resolveDeployCCTPChainInput(
 		out.MessageTransmitterProxy = messageTransmitterProxy.Address
 	}
 
-	if addressRefExists(adapterInput.TokenAdminRegistry) {
+	if !datastore_utils.IsAddressRefEmpty(adapterInput.TokenAdminRegistry) {
 		tokenAdminRegistry, err := datastore_utils.FindAndFormatRef(e.DataStore, adapterInput.TokenAdminRegistry, chainSelector, datastore_utils.FullRef)
 		if err != nil {
 			return adapters.DeployCCTPInput[string, []byte]{}, fmt.Errorf("failed to resolve TokenAdminRegistry for chain selector %d: %w", chainSelector, err)
@@ -171,7 +154,7 @@ func resolveDeployCCTPChainInput(
 		out.TokenAdminRegistry = tokenAdminRegistry.Address
 	}
 
-	if addressRefExists(adapterInput.RMN) {
+	if !datastore_utils.IsAddressRefEmpty(adapterInput.RMN) {
 		rmn, err := datastore_utils.FindAndFormatRef(e.DataStore, adapterInput.RMN, chainSelector, datastore_utils.FullRef)
 		if err != nil {
 			return adapters.DeployCCTPInput[string, []byte]{}, fmt.Errorf("failed to resolve RMN for chain selector %d: %w", chainSelector, err)
@@ -179,7 +162,7 @@ func resolveDeployCCTPChainInput(
 		out.RMN = rmn.Address
 	}
 
-	if addressRefExists(adapterInput.Router) {
+	if !datastore_utils.IsAddressRefEmpty(adapterInput.Router) {
 		router, err := datastore_utils.FindAndFormatRef(e.DataStore, adapterInput.Router, chainSelector, datastore_utils.FullRef)
 		if err != nil {
 			return adapters.DeployCCTPInput[string, []byte]{}, fmt.Errorf("failed to resolve Router for chain selector %d: %w", chainSelector, err)
@@ -187,15 +170,14 @@ func resolveDeployCCTPChainInput(
 		out.Router = router.Address
 	}
 
-	remoteChains := make(map[uint64]adapters.RemoteCCTPChainConfig[string, []byte])
+	out.RemoteChains = make(map[uint64]adapters.RemoteCCTPChainConfig[string, []byte])
 	for remoteChainSelector, remoteChainCfg := range adapterInput.RemoteChains {
 		remoteChainCfg, err := resolveRemoteCCTPChainConfig(e, chainSelector, remoteChainSelector, remoteChainCfg, adapter)
 		if err != nil {
 			return adapters.DeployCCTPInput[string, []byte]{}, fmt.Errorf("failed to resolve RemoteCCTPChainConfig for remote chain selector %d: %w", remoteChainSelector, err)
 		}
-		remoteChains[remoteChainSelector] = remoteChainCfg
+		out.RemoteChains[remoteChainSelector] = remoteChainCfg
 	}
-	out.RemoteChains = remoteChains
 
 	return out, nil
 }
@@ -224,7 +206,7 @@ func resolveRemoteCCTPChainConfig(
 		},
 	}
 
-	if addressRefExists(remoteChainCfg.RemoteDomain.AllowedCallerOnDest) {
+	if !datastore_utils.IsAddressRefEmpty(remoteChainCfg.RemoteDomain.AllowedCallerOnDest) {
 		allowedCallerOnDest, err := datastore_utils.FindAndFormatRef(e.DataStore, remoteChainCfg.RemoteDomain.AllowedCallerOnDest, remoteChainSelector, adapter.AddressRefToBytes)
 		if err != nil {
 			return adapters.RemoteCCTPChainConfig[string, []byte]{}, fmt.Errorf("failed to resolve AllowedCallerOnDest for remote chain selector %d: %w", remoteChainSelector, err)
@@ -232,7 +214,7 @@ func resolveRemoteCCTPChainConfig(
 		out.RemoteDomain.AllowedCallerOnDest = allowedCallerOnDest
 	}
 
-	if addressRefExists(remoteChainCfg.RemoteDomain.AllowedCallerOnSource) {
+	if !datastore_utils.IsAddressRefEmpty(remoteChainCfg.RemoteDomain.AllowedCallerOnSource) {
 		allowedCallerOnSource, err := datastore_utils.FindAndFormatRef(e.DataStore, remoteChainCfg.RemoteDomain.AllowedCallerOnSource, remoteChainSelector, adapter.AddressRefToBytes)
 		if err != nil {
 			return adapters.RemoteCCTPChainConfig[string, []byte]{}, fmt.Errorf("failed to resolve AllowedCallerOnSource for remote chain selector %d: %w", remoteChainSelector, err)
@@ -240,7 +222,7 @@ func resolveRemoteCCTPChainConfig(
 		out.RemoteDomain.AllowedCallerOnSource = allowedCallerOnSource
 	}
 
-	if addressRefExists(remoteChainCfg.RemoteDomain.MintRecipientOnDest) {
+	if !datastore_utils.IsAddressRefEmpty(remoteChainCfg.RemoteDomain.MintRecipientOnDest) {
 		mintRecipientOnDest, err := datastore_utils.FindAndFormatRef(e.DataStore, remoteChainCfg.RemoteDomain.MintRecipientOnDest, remoteChainSelector, adapter.AddressRefToBytes)
 		if err != nil {
 			return adapters.RemoteCCTPChainConfig[string, []byte]{}, fmt.Errorf("failed to resolve MintRecipientOnDest for remote chain selector %d: %w", remoteChainSelector, err)
@@ -248,7 +230,7 @@ func resolveRemoteCCTPChainConfig(
 		out.RemoteDomain.MintRecipientOnDest = mintRecipientOnDest
 	}
 
-	if addressRefExists(remoteChainCfg.TokenPoolConfig.RemotePool) {
+	if !datastore_utils.IsAddressRefEmpty(remoteChainCfg.TokenPoolConfig.RemotePool) {
 		remotePool, err := datastore_utils.FindAndFormatRef(e.DataStore, remoteChainCfg.TokenPoolConfig.RemotePool, remoteChainSelector, adapter.AddressRefToBytes)
 		if err != nil {
 			return adapters.RemoteCCTPChainConfig[string, []byte]{}, fmt.Errorf("failed to resolve RemotePool for remote chain selector %d: %w", remoteChainSelector, err)
@@ -256,7 +238,7 @@ func resolveRemoteCCTPChainConfig(
 		out.TokenPoolConfig.RemotePool = remotePool
 	}
 
-	if addressRefExists(remoteChainCfg.TokenPoolConfig.RemoteToken) {
+	if !datastore_utils.IsAddressRefEmpty(remoteChainCfg.TokenPoolConfig.RemoteToken) {
 		remoteToken, err := datastore_utils.FindAndFormatRef(e.DataStore, remoteChainCfg.TokenPoolConfig.RemoteToken, remoteChainSelector, adapter.AddressRefToBytes)
 		if err != nil {
 			return adapters.RemoteCCTPChainConfig[string, []byte]{}, fmt.Errorf("failed to resolve RemoteToken for remote chain selector %d: %w", remoteChainSelector, err)
@@ -297,14 +279,4 @@ func resolveRemoteCCTPChainConfig(
 	}
 
 	return out, nil
-}
-
-// addressRefExists checks if an AddressRef is populated.
-func addressRefExists(ref datastore.AddressRef) bool {
-	return ref.Address != "" ||
-		ref.Type != "" ||
-		ref.Version != nil ||
-		ref.Qualifier != "" ||
-		ref.ChainSelector != 0 ||
-		ref.Labels.Length() != 0
 }

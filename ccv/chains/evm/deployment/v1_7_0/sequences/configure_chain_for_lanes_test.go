@@ -6,6 +6,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/v2"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/committee_verifier"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/executor"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/offramp"
@@ -15,9 +16,11 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/message_hasher"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/versioned_verifier_resolver"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/stretchr/testify/require"
@@ -42,12 +45,22 @@ func TestConfigureChainForLanes(t *testing.T) {
 			require.NotNil(t, e, "Environment should be created")
 			evmChain := e.BlockChains.EVMChains()[chainSelector]
 
+			create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, evmChain, contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+				TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
+				ChainSelector:  chainSelector,
+				Args: create2_factory.ConstructorArgs{
+					AllowList: []common.Address{evmChain.DeployerKey.From},
+				},
+			}, nil)
+			require.NoError(t, err, "Failed to deploy CREATE2Factory")
+
 			deploymentReport, err := operations.ExecuteSequence(
 				e.OperationsBundle,
 				sequences.DeployChainContracts,
 				evmChain,
 				sequences.DeployChainContractsInput{
 					ChainSelector:  chainSelector,
+					CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
 					ContractParams: testsetup.CreateBasicContractParams(),
 				},
 			)

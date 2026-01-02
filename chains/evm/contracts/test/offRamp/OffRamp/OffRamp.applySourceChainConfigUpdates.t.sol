@@ -140,7 +140,7 @@ contract OffRamp_applySourceChainConfigUpdates is OffRampSetup {
     s_offRamp.applySourceChainConfigUpdates(configs);
   }
 
-  function test_applySourceChainConfigUpdates_RevertWhen_ZeroAddressInDefaultCCVsArray() public {
+  function test_applySourceChainConfigUpdates_RevertWhen_ZeroAddressNotAllowed_ZeroAddressInDefaultCCVsArray() public {
     OffRamp.SourceChainConfigArgs[] memory configs = new OffRamp.SourceChainConfigArgs[](1);
     configs[0] = OffRamp.SourceChainConfigArgs({
       router: s_sourceRouter,
@@ -156,7 +156,7 @@ contract OffRamp_applySourceChainConfigUpdates is OffRampSetup {
     s_offRamp.applySourceChainConfigUpdates(configs);
   }
 
-  function test_applySourceChainConfigUpdates_RevertWhen_ZeroAddressInLaneMandatedCCVsArray() public {
+  function test_applySourceChainConfigUpdates_RevertWhen_ZeroAddressNotAllowed_ZeroInLaneMandatedCCVsArray() public {
     OffRamp.SourceChainConfigArgs[] memory configs = new OffRamp.SourceChainConfigArgs[](1);
     configs[0] = OffRamp.SourceChainConfigArgs({
       router: s_sourceRouter,
