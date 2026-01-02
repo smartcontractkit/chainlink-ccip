@@ -111,7 +111,7 @@ compileContract pools/USDC/CCTPMessageTransmitterProxy
 compileContract pools/USDC/SiloedUSDCTokenPool
 compileContract pools/USDC/USDCTokenPoolProxy
 compileContract pools/USDC/BurnMintWithLockReleaseFlagTokenPool
-compileContract pools/USDC/CCTPTokenPool
+compileContract pools/USDC/CCTPThroughCCVTokenPool
 compileContract pools/Lombard/LombardTokenPool
 compileContract pools/AdvancedPoolHooks
 

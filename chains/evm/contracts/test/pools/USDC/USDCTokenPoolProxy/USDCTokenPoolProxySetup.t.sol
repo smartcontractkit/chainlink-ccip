@@ -11,7 +11,7 @@ import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/Aut
 contract USDCTokenPoolProxySetup is USDCSetup {
   address internal s_cctpV1Pool = makeAddr("cctpV1Pool");
   address internal s_cctpV2Pool = makeAddr("cctpV2Pool");
-  address internal s_cctpTokenPool = makeAddr("cctpTokenPool");
+  address internal s_cctpThroughCCVTokenPool = makeAddr("cctpThroughCCVTokenPool");
   address internal s_lockReleasePool = makeAddr("lockReleasePool");
   address internal s_mockTransmitterProxy = makeAddr("mockTransmitterProxy");
   address internal s_cctpVerifier = makeAddr("cctpVerifier");
@@ -34,14 +34,14 @@ contract USDCTokenPoolProxySetup is USDCSetup {
     // Mock ERC165 interface checks for the pools.
     _enableERC165InterfaceChecks(s_cctpV1Pool, type(IPoolV1).interfaceId);
     _enableERC165InterfaceChecks(s_cctpV2Pool, type(IPoolV1).interfaceId);
-    _enableERC165InterfaceChecks(s_cctpTokenPool, type(IPoolV2).interfaceId);
+    _enableERC165InterfaceChecks(s_cctpThroughCCVTokenPool, type(IPoolV2).interfaceId);
 
     s_usdcTokenPoolProxy = new USDCTokenPoolProxy(
       s_USDCToken,
       USDCTokenPoolProxy.PoolAddresses({
         cctpV1Pool: s_cctpV1Pool,
         cctpV2Pool: s_cctpV2Pool,
-        cctpV2PoolWithCCV: s_cctpTokenPool,
+        cctpV2PoolWithCCV: s_cctpThroughCCVTokenPool,
         siloedLockReleasePool: address(0)
       }),
       address(s_router),
@@ -58,7 +58,7 @@ contract USDCTokenPoolProxySetup is USDCSetup {
     addedCallers[0] = address(s_cctpV1Pool);
     addedCallers[1] = address(s_cctpV2Pool);
     addedCallers[2] = address(s_lockReleasePool);
-    addedCallers[3] = address(s_cctpTokenPool);
+    addedCallers[3] = address(s_cctpThroughCCVTokenPool);
     s_cctpMessageTransmitterProxy.applyAuthorizedCallerUpdates(
       AuthorizedCallers.AuthorizedCallerArgs({addedCallers: addedCallers, removedCallers: new address[](0)})
     );

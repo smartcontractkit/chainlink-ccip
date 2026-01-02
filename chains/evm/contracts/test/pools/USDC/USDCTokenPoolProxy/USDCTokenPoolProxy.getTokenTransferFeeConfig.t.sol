@@ -19,7 +19,7 @@ contract USDCTokenPoolProxy_getTokenTransferFeeConfig is USDCTokenPoolProxySetup
     });
 
     vm.mockCall(
-      address(s_cctpTokenPool),
+      address(s_cctpThroughCCVTokenPool),
       abi.encodeWithSelector(IPoolV2.getTokenTransferFeeConfig.selector, address(0), uint64(1), uint16(0), ""),
       abi.encode(expectedFeeConfig)
     );

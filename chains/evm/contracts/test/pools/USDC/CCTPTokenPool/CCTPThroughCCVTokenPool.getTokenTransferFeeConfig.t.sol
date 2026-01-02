@@ -6,9 +6,9 @@ import {ICrossChainVerifierResolver} from "../../../../interfaces/ICrossChainVer
 import {CCTPVerifier} from "../../../../ccvs/CCTPVerifier.sol";
 import {IPoolV2} from "../../../../interfaces/IPoolV2.sol";
 import {TokenPool} from "../../../../pools/TokenPool.sol";
-import {CCTPTokenPoolSetup} from "./CCTPTokenPoolSetup.t.sol";
+import {CCTPThroughCCVTokenPoolSetup} from "./CCTPThroughCCVTokenPoolSetup.t.sol";
 
-contract CCTPTokenPool_getTokenTransferFeeConfig is CCTPTokenPoolSetup {
+contract CCTPThroughCCVTokenPool_getTokenTransferFeeConfig is CCTPThroughCCVTokenPoolSetup {
   address internal s_mockCCTPVerifier = makeAddr("mockCCTPVerifier");
   uint16 internal constant FAST_FINALITY_BPS = 2; // 0.02%
 
@@ -17,7 +17,7 @@ contract CCTPTokenPool_getTokenTransferFeeConfig is CCTPTokenPoolSetup {
 
     // Mock the resolver's getOutboundImplementation call.
     vm.mockCall(
-      address(s_cctpTokenPool.getCCTPVerifier()),
+      address(s_cctpThroughCCVTokenPool.getCCTPVerifier()),
       abi.encodeWithSelector(ICrossChainVerifierResolver.getOutboundImplementation.selector, DEST_CHAIN_SELECTOR),
       abi.encode(s_mockCCTPVerifier)
     );
@@ -50,11 +50,11 @@ contract CCTPTokenPool_getTokenTransferFeeConfig is CCTPTokenPoolSetup {
       TokenPool.TokenTransferFeeConfigArgs({destChainSelector: DEST_CHAIN_SELECTOR, tokenTransferFeeConfig: feeConfig});
 
     changePrank(OWNER);
-    s_cctpTokenPool.applyTokenTransferFeeConfigUpdates(feeConfigArgs, new uint64[](0));
+    s_cctpThroughCCVTokenPool.applyTokenTransferFeeConfigUpdates(feeConfigArgs, new uint64[](0));
 
     // Test getting the config with default finality.
     IPoolV2.TokenTransferFeeConfig memory returnedFeeConfig =
-      s_cctpTokenPool.getTokenTransferFeeConfig(address(s_USDCToken), DEST_CHAIN_SELECTOR, 0, "");
+      s_cctpThroughCCVTokenPool.getTokenTransferFeeConfig(address(s_USDCToken), DEST_CHAIN_SELECTOR, 0, "");
 
     assertEq(returnedFeeConfig.destGasOverhead, feeConfig.destGasOverhead);
     assertEq(returnedFeeConfig.destBytesOverhead, feeConfig.destBytesOverhead);
@@ -66,3 +66,4 @@ contract CCTPTokenPool_getTokenTransferFeeConfig is CCTPTokenPoolSetup {
     assertEq(returnedFeeConfig.isEnabled, feeConfig.isEnabled);
   }
 }
+

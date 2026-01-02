@@ -17,7 +17,7 @@ import {OffRamp} from "../../offRamp/OffRamp.sol";
 import {OnRamp} from "../../onRamp/OnRamp.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
 import {CCTPMessageTransmitterProxy} from "../../pools/USDC/CCTPMessageTransmitterProxy.sol";
-import {CCTPTokenPool} from "../../pools/USDC/CCTPTokenPool.sol";
+import {CCTPThroughCCVTokenPool} from "../../pools/USDC/CCTPThroughCCVTokenPool.sol";
 import {USDCTokenPoolProxy} from "../../pools/USDC/USDCTokenPoolProxy.sol";
 import {TokenAdminRegistry} from "../../tokenAdminRegistry/TokenAdminRegistry.sol";
 import {CCTPHelper} from "../helpers/CCTPHelper.sol";
@@ -48,7 +48,7 @@ contract cctp_e2e is OnRampSetup {
     address tokenAdminRegistry;
     VersionedVerifierResolver verifierResolver;
     CCTPVerifier verifier;
-    CCTPTokenPool tokenPool;
+    CCTPThroughCCVTokenPool tokenPool;
     MockUSDCTokenMessenger tokenMessenger;
     MockE2EUSDCTransmitterCCTPV2 messageTransmitter;
     CCTPMessageTransmitterProxy messageTransmitterProxy;
@@ -278,7 +278,7 @@ contract cctp_e2e is OnRampSetup {
     setup.tokenAdminRegistry = tokenAdminRegistry;
     setup.verifierResolver = new VersionedVerifierResolver();
     setup.token = IERC20(address(new BurnMintERC20("USD Coin", "USDC", 6, 0, 0)));
-    setup.tokenPool = new CCTPTokenPool(
+    setup.tokenPool = new CCTPThroughCCVTokenPool(
       IERC20(address(setup.token)), 6, rmn, router, address(setup.verifierResolver), new address[](0)
     );
     setup.messageTransmitter =

@@ -13,7 +13,7 @@ import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165
 contract USDCTokenPoolProxy_constructor is USDCSetup {
   address internal s_cctpV1Pool = makeAddr("cctpV1Pool");
   address internal s_cctpV2Pool = makeAddr("cctpV2Pool");
-  address internal s_cctpTokenPool = makeAddr("cctpTokenPool");
+  address internal s_cctpThroughCCVTokenPool = makeAddr("cctpThroughCCVTokenPool");
   address internal s_lockReleasePool = makeAddr("lockReleasePool");
   address internal s_cctpVerifier = makeAddr("cctpVerifier");
 
@@ -21,14 +21,14 @@ contract USDCTokenPoolProxy_constructor is USDCSetup {
     // Enable ERC165 for the pools.
     _enableERC165InterfaceChecks(s_cctpV1Pool, type(IPoolV1).interfaceId);
     _enableERC165InterfaceChecks(s_cctpV2Pool, type(IPoolV1).interfaceId);
-    _enableERC165InterfaceChecks(s_cctpTokenPool, type(IPoolV2).interfaceId);
+    _enableERC165InterfaceChecks(s_cctpThroughCCVTokenPool, type(IPoolV2).interfaceId);
 
     USDCTokenPoolProxy proxy = new USDCTokenPoolProxy(
       s_USDCToken,
       USDCTokenPoolProxy.PoolAddresses({
         cctpV1Pool: s_cctpV1Pool,
         cctpV2Pool: s_cctpV2Pool,
-        cctpV2PoolWithCCV: s_cctpTokenPool,
+        cctpV2PoolWithCCV: s_cctpThroughCCVTokenPool,
         siloedLockReleasePool: address(0)
       }),
       address(s_router),
@@ -52,7 +52,7 @@ contract USDCTokenPoolProxy_constructor is USDCSetup {
       USDCTokenPoolProxy.PoolAddresses({
         cctpV1Pool: s_cctpV1Pool,
         cctpV2Pool: s_cctpV2Pool,
-        cctpV2PoolWithCCV: s_cctpTokenPool,
+        cctpV2PoolWithCCV: s_cctpThroughCCVTokenPool,
         siloedLockReleasePool: address(0)
       }),
       address(s_router),
@@ -67,7 +67,7 @@ contract USDCTokenPoolProxy_constructor is USDCSetup {
       USDCTokenPoolProxy.PoolAddresses({
         cctpV1Pool: s_cctpV1Pool,
         cctpV2Pool: s_cctpV2Pool,
-        cctpV2PoolWithCCV: s_cctpTokenPool,
+        cctpV2PoolWithCCV: s_cctpThroughCCVTokenPool,
         siloedLockReleasePool: address(0)
       }),
       address(0), // Router
@@ -82,7 +82,7 @@ contract USDCTokenPoolProxy_constructor is USDCSetup {
       USDCTokenPoolProxy.PoolAddresses({
         cctpV1Pool: s_cctpV1Pool,
         cctpV2Pool: s_cctpV2Pool,
-        cctpV2PoolWithCCV: s_cctpTokenPool,
+        cctpV2PoolWithCCV: s_cctpThroughCCVTokenPool,
         siloedLockReleasePool: address(0)
       }),
       address(s_router),

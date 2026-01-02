@@ -42,7 +42,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
       USDCTokenPoolProxy.PoolAddresses({
         cctpV1Pool: s_cctpV1Pool,
         cctpV2Pool: s_cctpV2Pool,
-        cctpV2PoolWithCCV: s_cctpTokenPool,
+        cctpV2PoolWithCCV: s_cctpThroughCCVTokenPool,
         siloedLockReleasePool: s_lockReleasePool
       })
     );
@@ -211,7 +211,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
       Pool.LockOrBurnOutV1({destTokenAddress: destTokenAddress, destPoolData: s_destPoolData});
 
     vm.mockCall(
-      address(s_cctpTokenPool),
+      address(s_cctpThroughCCVTokenPool),
       abi.encodeWithSelector(IPoolV2.lockOrBurn.selector, lockOrBurnIn, 1, tokenArgs),
       abi.encode(Pool.LockOrBurnOutV1({destTokenAddress: destTokenAddress, destPoolData: s_destPoolData}), amount)
     );
@@ -244,7 +244,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
     remotePoolAddresses[0] = abi.encode(address(s_lockReleasePool));
 
     // Remove the CCTP V2 with CCV pool from stored pools.
-    _enableERC165InterfaceChecks(s_cctpTokenPool, type(IPoolV1).interfaceId);
+    _enableERC165InterfaceChecks(s_cctpThroughCCVTokenPool, type(IPoolV1).interfaceId);
     _enableERC165InterfaceChecks(s_cctpV2Pool, type(IPoolV1).interfaceId);
     _enableERC165InterfaceChecks(s_cctpV1Pool, type(IPoolV1).interfaceId);
     s_usdcTokenPoolProxy.updatePoolAddresses(
@@ -344,7 +344,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
       USDCTokenPoolProxy.PoolAddresses({
         cctpV1Pool: s_cctpV1Pool,
         cctpV2Pool: s_cctpV2Pool,
-        cctpV2PoolWithCCV: s_cctpTokenPool,
+        cctpV2PoolWithCCV: s_cctpThroughCCVTokenPool,
         siloedLockReleasePool: address(0)
       })
     );

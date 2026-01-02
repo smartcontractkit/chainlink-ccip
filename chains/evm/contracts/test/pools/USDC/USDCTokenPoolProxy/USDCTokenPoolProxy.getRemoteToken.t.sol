@@ -10,7 +10,7 @@ contract USDCTokenPoolProxy_getRemoteToken is USDCTokenPoolProxySetup {
   function test_getRemoteToken() public {
     bytes memory expectedRemoteToken = abi.encode(address(0x1234));
     vm.mockCall(
-      address(s_cctpTokenPool),
+      address(s_cctpThroughCCVTokenPool),
       abi.encodeWithSelector(IPoolV2.getRemoteToken.selector, uint64(1)),
       abi.encode(expectedRemoteToken)
     );

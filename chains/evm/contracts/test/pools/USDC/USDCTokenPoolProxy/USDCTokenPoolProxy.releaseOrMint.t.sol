@@ -146,7 +146,7 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
 
     // Expect the cctpV2PoolWithCCV's releaseOrMint to be called and return expectedOut.
     vm.mockCall(
-      address(s_cctpTokenPool),
+      address(s_cctpThroughCCVTokenPool),
       abi.encodeWithSelector(IPoolV2.releaseOrMint.selector, releaseOrMintIn, 0),
       abi.encode(expectedOut)
     );
@@ -205,13 +205,13 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
     // Set the legacy pool address to zero to simulate a scenario where there are no legacy inflight messages.
     _enableERC165InterfaceChecks(s_cctpV1Pool, type(IPoolV1).interfaceId);
     _enableERC165InterfaceChecks(s_cctpV2Pool, type(IPoolV1).interfaceId);
-    _enableERC165InterfaceChecks(s_cctpTokenPool, type(IPoolV2).interfaceId);
+    _enableERC165InterfaceChecks(s_cctpThroughCCVTokenPool, type(IPoolV2).interfaceId);
 
     s_usdcTokenPoolProxy.updatePoolAddresses(
       USDCTokenPoolProxy.PoolAddresses({
         cctpV1Pool: s_cctpV1Pool,
         cctpV2Pool: s_cctpV2Pool,
-        cctpV2PoolWithCCV: s_cctpTokenPool,
+        cctpV2PoolWithCCV: s_cctpThroughCCVTokenPool,
         siloedLockReleasePool: address(0)
       })
     );

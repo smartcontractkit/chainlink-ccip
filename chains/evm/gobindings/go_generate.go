@@ -19,22 +19,28 @@ package ccip
 //go:generate go run generation/generate/wrap.go ccip RMNProxy rmn_proxy_contract latest
 //go:generate go run generation/generate/wrap.go ccip RMNRemote rmn_remote latest
 //go:generate go run generation/generate/wrap.go ccip HyperLiquidCompatibleERC20 hyper_liquid_compatible_erc20 latest
+//go:generate go run generation/generate/wrap.go ccip EtherSenderReceiver ether_sender_receiver latest
 
 // Pools
+//go:generate go run generation/generate/wrap.go ccip TokenPool token_pool latest
+//go:generate go run generation/generate/wrap.go ccip AdvancedPoolHooks advanced_pool_hooks latest
+
 //go:generate go run generation/generate/wrap.go ccip BurnMintTokenPool burn_mint_token_pool latest
 //go:generate go run generation/generate/wrap.go ccip BurnFromMintTokenPool burn_from_mint_token_pool latest
 //go:generate go run generation/generate/wrap.go ccip BurnWithFromMintTokenPool burn_with_from_mint_token_pool latest
-//go:generate go run generation/generate/wrap.go ccip LockReleaseTokenPool lock_release_token_pool latest
-//go:generate go run generation/generate/wrap.go ccip TokenPool token_pool latest
-//go:generate go run generation/generate/wrap.go ccip SiloedLockReleaseTokenPool siloed_lock_release_token_pool latest
 //go:generate go run generation/generate/wrap.go ccip BurnToAddressMintTokenPool burn_to_address_mint_token_pool latest
-//go:generate go run generation/generate/wrap.go ccip CCTPMessageTransmitterProxy cctp_message_transmitter_proxy latest
+
+//go:generate go run generation/generate/wrap.go ccip LockReleaseTokenPool lock_release_token_pool latest
+//go:generate go run generation/generate/wrap.go ccip SiloedLockReleaseTokenPool siloed_lock_release_token_pool latest
 //go:generate go run generation/generate/wrap.go ccip ERC20LockBox erc20_lock_box latest
-//go:generate go run generation/generate/wrap.go ccip SiloedUSDCTokenPool siloed_usdc_token_pool latest
+
 //go:generate go run generation/generate/wrap.go ccip USDCTokenPoolProxy usdc_token_pool_proxy latest
+//go:generate go run generation/generate/wrap.go ccip CCTPThroughCCVTokenPool cctp_through_ccv_token_pool latest
+//go:generate go run generation/generate/wrap.go ccip CCTPMessageTransmitterProxy cctp_message_transmitter_proxy latest
+//go:generate go run generation/generate/wrap.go ccip SiloedUSDCTokenPool siloed_usdc_token_pool latest
 //go:generate go run generation/generate/wrap.go ccip BurnMintWithLockReleaseFlagTokenPool burn_mint_with_lock_release_flag_token_pool latest
+
 //go:generate go run generation/generate/wrap.go ccip LombardTokenPool lombard_token_pool latest
-//go:generate go run generation/generate/wrap.go ccip AdvancedPoolHooks advanced_pool_hooks latest
 
 // Helpers
 //go:generate go run generation/generate/wrap.go ccip MaybeRevertMessageReceiver maybe_revert_message_receiver latest
@@ -42,9 +48,7 @@ package ccip
 //go:generate go run generation/generate/wrap.go ccip PingPongDemo ping_pong_demo latest
 //go:generate go run generation/generate/wrap.go ccip MessageHasher message_hasher latest
 //go:generate go run generation/generate/wrap.go ccip USDCReaderTester usdc_reader_tester latest
-//go:generate go run generation/generate/wrap.go ccip EtherSenderReceiver ether_sender_receiver latest
 //go:generate go run generation/generate/wrap.go ccip MockE2EUSDCTokenMessenger mock_usdc_token_messenger latest
 //go:generate go run generation/generate/wrap.go ccip MockReceiverV2 mock_receiver_v2 latest
 //go:generate go run generation/generate/wrap.go ccip MockE2EUSDCTransmitter mock_usdc_token_transmitter latest
 //go:generate go run generation/generate/wrap.go ccip MockE2ELBTCTokenPool mock_lbtc_token_pool latest
-//go:generate go run generation/generate/wrap.go ccip MessageHasher message_hasher latest
