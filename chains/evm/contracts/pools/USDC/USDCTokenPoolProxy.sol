@@ -34,6 +34,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
   error NoLockOrBurnMechanismSet(uint64 remoteChainSelector);
   error CallerIsNotARampOnRouter(address caller);
   error TokenPoolUnsupported(address pool);
+  error MustSetPoolForMechanism(uint64 remoteChainSelector, LockOrBurnMechanism mechanism);
 
   event LockOrBurnMechanismUpdated(uint64 indexed remoteChainSelector, LockOrBurnMechanism mechanism);
   event PoolAddressesUpdated(PoolAddresses pools);
@@ -103,10 +104,23 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
     i_router = IRouter(router);
     i_cctpVerifier = ICrossChainVerifierResolver(cctpVerifier);
 
-    s_cctpV1Pool = pools.cctpV1Pool;
-    s_cctpV2Pool = pools.cctpV2Pool;
-    s_cctpV2PoolWithCCV = pools.cctpV2PoolWithCCV;
-    s_siloedLockReleasePool = pools.siloedLockReleasePool;
+    _updatePoolAddresses(pools);
+  }
+
+  /// @inheritdoc IPoolV1
+  /// @dev If the outgoing mechanism is not set for a chain, then the chain is not supported because there cannot be a
+  /// lock or burn operation.
+  function isSupportedChain(
+    uint64 remoteChainSelector
+  ) external view returns (bool) {
+    return s_lockOrBurnMechanism[remoteChainSelector] != LockOrBurnMechanism.INVALID_MECHANISM;
+  }
+
+  /// @inheritdoc IPoolV1
+  function isSupportedToken(
+    address token
+  ) external view returns (bool) {
+    return address(i_token) == token;
   }
 
   /// @inheritdoc IPoolV1
@@ -182,22 +196,6 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
   }
 
   /// @inheritdoc IPoolV1
-  /// @dev If the outgoing mechanism is not set for a chain, then the chain is not supported because there cannot be a
-  /// lock or burn operation.
-  function isSupportedChain(
-    uint64 remoteChainSelector
-  ) external view returns (bool) {
-    return s_lockOrBurnMechanism[remoteChainSelector] != LockOrBurnMechanism.INVALID_MECHANISM;
-  }
-
-  /// @inheritdoc IPoolV1
-  function isSupportedToken(
-    address token
-  ) external view returns (bool) {
-    return address(i_token) == token;
-  }
-
-  /// @inheritdoc IPoolV1
   /// @param releaseOrMintIn Encoded data fields for the processing of tokens on the destination chain.
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
@@ -224,15 +222,12 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
     if (version == USDCSourcePoolDataCodec.LOCK_RELEASE_FLAG) {
       return IPoolV1(s_siloedLockReleasePool).releaseOrMint(releaseOrMintIn);
     }
-
     if (version == USDCSourcePoolDataCodec.CCTP_VERSION_1_TAG) {
       return IPoolV1(s_cctpV1Pool).releaseOrMint(releaseOrMintIn);
     }
-
     if (version == USDCSourcePoolDataCodec.CCTP_VERSION_2_TAG) {
       return IPoolV1(s_cctpV2Pool).releaseOrMint(releaseOrMintIn);
     }
-
     if (version == USDCSourcePoolDataCodec.CCTP_VERSION_2_CCV_TAG) {
       return IPoolV2(s_cctpV2PoolWithCCV).releaseOrMint(releaseOrMintIn, blockConfirmationRequested);
     }
@@ -263,12 +258,20 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
     revert InvalidMessageVersion(version);
   }
 
-  /// @notice Update the pool addresses that this token pool will route a message to.
-  /// @param pools The new pool addresses to update the token pool proxy with. Since the pool variants may not be
-  /// used, the zero address is a valid input and therefore input sanitization for it is not required.
   function updatePoolAddresses(
     PoolAddresses calldata pools
   ) external onlyOwner {
+    _updatePoolAddresses(pools);
+  }
+
+  /// @notice Update the pool addresses that this token pool will route a message to.
+  /// @param pools The new pool addresses to update the token pool proxy with. Since the pool variants may not be
+  /// used, the zero address is a valid input and therefore input sanitization for it is not required.
+  /// @dev The owner is responsible for ensuring no pool is set to address(0) if there's any non-zero number of lanes
+  /// using that pool's mechanism. If it does happen, transactions can be stuck until the pool is updated again.
+  function _updatePoolAddresses(
+    PoolAddresses memory pools
+  ) internal {
     if (pools.cctpV1Pool != address(0) && !pools.cctpV1Pool.supportsInterface(type(IPoolV1).interfaceId)) {
       revert TokenPoolUnsupported(pools.cctpV1Pool);
     }
@@ -320,6 +323,8 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
   /// @notice Update the lock or burn mechanism for a list of remote chain selectors.
   /// @param remoteChainSelectors The remote chain selectors to update the lock or burn mechanism for.
   /// @param mechanisms The new lock or burn mechanisms for the given remote chain selectors.
+  /// @dev If a mechanism is set to LOCK_RELEASE, CCTP_V1, CCTP_V2, or CCTP_V2_WITH_CCV, the corresponding pool address
+  /// must be set, otherwise the update will revert.
   /// @dev Only callable by the owner.
   function updateLockOrBurnMechanisms(
     uint64[] calldata remoteChainSelectors,
@@ -330,8 +335,23 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
     }
 
     for (uint256 i = 0; i < remoteChainSelectors.length; ++i) {
-      s_lockOrBurnMechanism[remoteChainSelectors[i]] = mechanisms[i];
-      emit LockOrBurnMechanismUpdated(remoteChainSelectors[i], mechanisms[i]);
+      LockOrBurnMechanism mechanism = mechanisms[i];
+      s_lockOrBurnMechanism[remoteChainSelectors[i]] = mechanism;
+
+      if (mechanism == LockOrBurnMechanism.LOCK_RELEASE && s_siloedLockReleasePool == address(0)) {
+        revert MustSetPoolForMechanism(remoteChainSelectors[i], mechanism);
+      }
+      if (mechanism == LockOrBurnMechanism.CCTP_V1 && s_cctpV1Pool == address(0)) {
+        revert MustSetPoolForMechanism(remoteChainSelectors[i], mechanism);
+      }
+      if (mechanism == LockOrBurnMechanism.CCTP_V2 && s_cctpV2Pool == address(0)) {
+        revert MustSetPoolForMechanism(remoteChainSelectors[i], mechanism);
+      }
+      if (mechanism == LockOrBurnMechanism.CCTP_V2_WITH_CCV && s_cctpV2PoolWithCCV == address(0)) {
+        revert MustSetPoolForMechanism(remoteChainSelectors[i], mechanism);
+      }
+
+      emit LockOrBurnMechanismUpdated(remoteChainSelectors[i], mechanism);
     }
   }
 

@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {IPoolV1} from "../../../../interfaces/IPool.sol";
+import {IPoolV2} from "../../../../interfaces/IPoolV2.sol";
 import {USDCTokenPoolProxy} from "../../../../pools/USDC/USDCTokenPoolProxy.sol";
 import {USDCSetup} from "../USDCSetup.t.sol";
 
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
-import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
 
 contract USDCTokenPoolProxySetup is USDCSetup {
   address internal s_cctpV1Pool = makeAddr("cctpV1Pool");
@@ -30,7 +31,11 @@ contract USDCTokenPoolProxySetup is USDCSetup {
       abi.encode(s_mockTransmitterProxy)
     );
 
-    // Deploy the proxy.
+    // Mock ERC165 interface checks for the pools.
+    _enableERC165InterfaceChecks(s_cctpV1Pool, type(IPoolV1).interfaceId);
+    _enableERC165InterfaceChecks(s_cctpV2Pool, type(IPoolV1).interfaceId);
+    _enableERC165InterfaceChecks(s_cctpTokenPool, type(IPoolV2).interfaceId);
+
     s_usdcTokenPoolProxy = new USDCTokenPoolProxy(
       s_USDCToken,
       USDCTokenPoolProxy.PoolAddresses({
@@ -59,28 +64,12 @@ contract USDCTokenPoolProxySetup is USDCSetup {
     );
 
     // Configure the lockOrBurn mechanism for the remote chain selectors.
-    uint64[] memory remoteChainSelectors = new uint64[](2);
-    remoteChainSelectors[0] = s_remoteLockReleaseChainSelector;
-    remoteChainSelectors[1] = s_remoteCCTPChainSelector;
+    // Only configure mechanisms for pools that are set.
+    uint64[] memory remoteChainSelectors = new uint64[](1);
+    remoteChainSelectors[0] = s_remoteCCTPChainSelector;
 
-    USDCTokenPoolProxy.LockOrBurnMechanism[] memory mechanisms = new USDCTokenPoolProxy.LockOrBurnMechanism[](2);
-    mechanisms[0] = USDCTokenPoolProxy.LockOrBurnMechanism.LOCK_RELEASE;
-    mechanisms[1] = USDCTokenPoolProxy.LockOrBurnMechanism.CCTP_V2_WITH_CCV;
+    USDCTokenPoolProxy.LockOrBurnMechanism[] memory mechanisms = new USDCTokenPoolProxy.LockOrBurnMechanism[](1);
+    mechanisms[0] = USDCTokenPoolProxy.LockOrBurnMechanism.CCTP_V2_WITH_CCV;
     s_usdcTokenPoolProxy.updateLockOrBurnMechanisms(remoteChainSelectors, mechanisms);
-  }
-
-  function _enableERC165InterfaceChecks(
-    address pool,
-    bytes4 interfaceId
-  ) internal {
-    vm.mockCall(
-      address(pool), abi.encodeWithSelector(IERC165.supportsInterface.selector, interfaceId), abi.encode(true)
-    );
-
-    vm.mockCall(
-      address(pool),
-      abi.encodeWithSelector(IERC165.supportsInterface.selector, type(IERC165).interfaceId),
-      abi.encode(true)
-    );
   }
 }

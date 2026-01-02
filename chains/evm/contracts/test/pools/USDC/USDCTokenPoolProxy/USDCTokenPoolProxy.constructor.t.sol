@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {IPoolV1} from "../../../../interfaces/IPool.sol";
+import {IPoolV2} from "../../../../interfaces/IPoolV2.sol";
 
 import {USDCTokenPoolProxy} from "../../../../pools/USDC/USDCTokenPoolProxy.sol";
 import {USDCSetup} from "../USDCSetup.t.sol";
@@ -17,6 +18,11 @@ contract USDCTokenPoolProxy_constructor is USDCSetup {
   address internal s_cctpVerifier = makeAddr("cctpVerifier");
 
   function test_constructor() public {
+    // Enable ERC165 for the pools.
+    _enableERC165InterfaceChecks(s_cctpV1Pool, type(IPoolV1).interfaceId);
+    _enableERC165InterfaceChecks(s_cctpV2Pool, type(IPoolV1).interfaceId);
+    _enableERC165InterfaceChecks(s_cctpTokenPool, type(IPoolV2).interfaceId);
+
     USDCTokenPoolProxy proxy = new USDCTokenPoolProxy(
       s_USDCToken,
       USDCTokenPoolProxy.PoolAddresses({

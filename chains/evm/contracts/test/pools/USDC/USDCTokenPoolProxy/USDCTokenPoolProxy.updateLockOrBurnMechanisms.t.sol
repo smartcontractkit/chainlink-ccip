@@ -10,7 +10,7 @@ contract USDCTokenPoolProxy_updateLockOrBurnMechanisms is USDCTokenPoolProxySetu
     uint64 testChainSelector = 12345;
     USDCTokenPoolProxy.LockOrBurnMechanism cctpV1Mechanism = USDCTokenPoolProxy.LockOrBurnMechanism.CCTP_V1;
     USDCTokenPoolProxy.LockOrBurnMechanism cctpV2Mechanism = USDCTokenPoolProxy.LockOrBurnMechanism.CCTP_V2;
-    USDCTokenPoolProxy.LockOrBurnMechanism lockReleaseMechanism = USDCTokenPoolProxy.LockOrBurnMechanism.LOCK_RELEASE;
+    USDCTokenPoolProxy.LockOrBurnMechanism ccvMechanism = USDCTokenPoolProxy.LockOrBurnMechanism.CCTP_V2_WITH_CCV;
 
     uint64[] memory chainSelectors = new uint64[](3);
     chainSelectors[0] = SOURCE_CHAIN_SELECTOR;
@@ -20,19 +20,19 @@ contract USDCTokenPoolProxy_updateLockOrBurnMechanisms is USDCTokenPoolProxySetu
     USDCTokenPoolProxy.LockOrBurnMechanism[] memory mechanisms = new USDCTokenPoolProxy.LockOrBurnMechanism[](3);
     mechanisms[0] = cctpV1Mechanism;
     mechanisms[1] = cctpV2Mechanism;
-    mechanisms[2] = lockReleaseMechanism;
+    mechanisms[2] = ccvMechanism;
 
     vm.expectEmit();
     emit USDCTokenPoolProxy.LockOrBurnMechanismUpdated(SOURCE_CHAIN_SELECTOR, cctpV1Mechanism);
     vm.expectEmit();
     emit USDCTokenPoolProxy.LockOrBurnMechanismUpdated(DEST_CHAIN_SELECTOR, cctpV2Mechanism);
     vm.expectEmit();
-    emit USDCTokenPoolProxy.LockOrBurnMechanismUpdated(testChainSelector, lockReleaseMechanism);
+    emit USDCTokenPoolProxy.LockOrBurnMechanismUpdated(testChainSelector, ccvMechanism);
     s_usdcTokenPoolProxy.updateLockOrBurnMechanisms(chainSelectors, mechanisms);
 
     assertEq(uint8(s_usdcTokenPoolProxy.getLockOrBurnMechanism(SOURCE_CHAIN_SELECTOR)), uint8(cctpV1Mechanism));
     assertEq(uint8(s_usdcTokenPoolProxy.getLockOrBurnMechanism(DEST_CHAIN_SELECTOR)), uint8(cctpV2Mechanism));
-    assertEq(uint8(s_usdcTokenPoolProxy.getLockOrBurnMechanism(testChainSelector)), uint8(lockReleaseMechanism));
+    assertEq(uint8(s_usdcTokenPoolProxy.getLockOrBurnMechanism(testChainSelector)), uint8(ccvMechanism));
   }
 
   // Reverts
