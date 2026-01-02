@@ -10,7 +10,6 @@ import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
 
 contract USDCTokenPoolProxy_constructor is USDCSetup {
-  address internal s_legacyCctpV1Pool = makeAddr("legacyCctpV1Pool");
   address internal s_cctpV1Pool = makeAddr("cctpV1Pool");
   address internal s_cctpV2Pool = makeAddr("cctpV2Pool");
   address internal s_cctpTokenPool = makeAddr("cctpTokenPool");
@@ -22,18 +21,16 @@ contract USDCTokenPoolProxy_constructor is USDCSetup {
     USDCTokenPoolProxy proxy = new USDCTokenPoolProxy(
       s_USDCToken,
       USDCTokenPoolProxy.PoolAddresses({
-        legacyCctpV1Pool: s_legacyCctpV1Pool,
         cctpV1Pool: s_cctpV1Pool,
         cctpV2Pool: s_cctpV2Pool,
         cctpTokenPool: s_cctpTokenPool,
-        siloedUsdCTokenPool: address(0)
+        siloedUsdcTokenPool: address(0)
       }),
       address(s_router),
       address(s_cctpVerifier)
     );
 
     USDCTokenPoolProxy.PoolAddresses memory pools = proxy.getPools();
-    assertEq(pools.legacyCctpV1Pool, s_legacyCctpV1Pool);
     assertEq(pools.cctpV1Pool, s_cctpV1Pool);
     assertEq(pools.cctpV2Pool, s_cctpV2Pool);
 
@@ -48,11 +45,10 @@ contract USDCTokenPoolProxy_constructor is USDCSetup {
     new USDCTokenPoolProxy(
       IERC20(address(0)),
       USDCTokenPoolProxy.PoolAddresses({
-        legacyCctpV1Pool: s_legacyCctpV1Pool,
         cctpV1Pool: s_cctpV1Pool,
         cctpV2Pool: s_cctpV2Pool,
         cctpTokenPool: s_cctpTokenPool,
-        siloedUsdCTokenPool: address(0)
+        siloedUsdcTokenPool: address(0)
       }),
       address(s_router),
       address(s_cctpVerifier)
@@ -64,11 +60,10 @@ contract USDCTokenPoolProxy_constructor is USDCSetup {
     new USDCTokenPoolProxy(
       s_USDCToken, // Token
       USDCTokenPoolProxy.PoolAddresses({
-        legacyCctpV1Pool: s_legacyCctpV1Pool,
         cctpV1Pool: s_cctpV1Pool,
         cctpV2Pool: s_cctpV2Pool,
         cctpTokenPool: s_cctpTokenPool,
-        siloedUsdCTokenPool: address(0)
+        siloedUsdcTokenPool: address(0)
       }),
       address(0), // Router
       address(s_cctpVerifier)
@@ -80,11 +75,10 @@ contract USDCTokenPoolProxy_constructor is USDCSetup {
     new USDCTokenPoolProxy(
       s_USDCToken, // Token
       USDCTokenPoolProxy.PoolAddresses({
-        legacyCctpV1Pool: s_legacyCctpV1Pool,
         cctpV1Pool: s_cctpV1Pool,
         cctpV2Pool: s_cctpV2Pool,
         cctpTokenPool: s_cctpTokenPool,
-        siloedUsdCTokenPool: address(0)
+        siloedUsdcTokenPool: address(0)
       }),
       address(s_router),
       address(0) // CCTP Verifier

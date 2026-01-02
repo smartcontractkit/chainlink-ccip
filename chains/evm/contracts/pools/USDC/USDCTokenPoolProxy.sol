@@ -45,11 +45,10 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
   }
 
   struct PoolAddresses {
-    address legacyCctpV1Pool; // A CCTP V1 token pool that did not utilize a message transmitter proxy.
     address cctpV1Pool;
     address cctpV2Pool;
     address cctpTokenPool;
-    address siloedUsdCTokenPool;
+    address siloedUsdcTokenPool;
   }
 
   enum LockOrBurnMechanism {
@@ -72,16 +71,14 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
   /// On/OffRamp
   ///     ↓
   /// USDCPoolProxy
-  ///     ├──→ LegacyCCTPV1Pool → CCTPV1
   ///     ├──→ CCTPV1Pool → MessageTransmitterProxy/TokenMessenger V1 → CCTPV1
   ///     ├──→ CCTPV2Pool → MessageTransmitterProxy/TokenMessenger V2 → CCTPV2
   ///     ├──→ CCTPTokenPool → CCTPVerifier → MessageTransmitterProxy/TokenMessenger V2 → CCTPV2
   ///     └──→ SiloedUSDCTokenPool → ERC20LockBox
-  address internal s_legacyCctpV1Pool;
   address internal s_cctpV1Pool;
   address internal s_cctpV2Pool;
   address internal s_cctpTokenPool;
-  address internal s_siloedUsdCTokenPool;
+  address internal s_siloedUsdcTokenPool;
 
   /// @dev Constant representing the default finality.
   uint16 internal constant WAIT_FOR_FINALITY = 0;
@@ -104,11 +101,10 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
     i_router = IRouter(router);
     i_cctpVerifier = ICrossChainVerifierResolver(cctpVerifier);
 
-    s_legacyCctpV1Pool = pools.legacyCctpV1Pool;
     s_cctpV1Pool = pools.cctpV1Pool;
     s_cctpV2Pool = pools.cctpV2Pool;
     s_cctpTokenPool = pools.cctpTokenPool;
-    s_siloedUsdCTokenPool = pools.siloedUsdCTokenPool;
+    s_siloedUsdcTokenPool = pools.siloedUsdcTokenPool;
   }
 
   /// @inheritdoc IPoolV1
@@ -168,7 +164,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
     } else if (mechanism == LockOrBurnMechanism.CCTP_V1) {
       childPool = s_cctpV1Pool;
     } else if (mechanism == LockOrBurnMechanism.LOCK_RELEASE) {
-      childPool = s_siloedUsdCTokenPool;
+      childPool = s_siloedUsdcTokenPool;
     }
 
     // If the destination pool is the zero address, then no mechanism has been configured for the outgoing tokens
@@ -224,7 +220,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
 
     // If the source pool data is the lock release flag, use the lock release pool set for the remote chain selector.
     if (version == USDCSourcePoolDataCodec.LOCK_RELEASE_FLAG) {
-      return IPoolV1(s_siloedUsdCTokenPool).releaseOrMint(releaseOrMintIn);
+      return IPoolV1(s_siloedUsdcTokenPool).releaseOrMint(releaseOrMintIn);
     }
 
     if (version == USDCSourcePoolDataCodec.CCTP_VERSION_1_TAG) {
@@ -244,48 +240,24 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
     // packing like in storage. This means that a message originating from a previous version of the pool will have a
     // sourcePoolData that is 64 bytes long, indicating an inflight message originating from a previous version of
     // the USDC Token pool.
-    // This branch must come before a version check, because the first field would be a uint64 and thus if a version
-    // was attempted to be extracted from the first 4-bytes of a uint64, it would be 0, and thus the message would be
-    // routed to the CCTP V1 pool without first sanitizing the source pool data for proper formatting.
     // Note: It is possible for a future version of the source pool data to also be 64 bytes long. However, any future
     // version will have a version number in the first 4 bytes and will be routed to the proper pool before this check
     // is reached. Therefore this branch will only be triggered for messages using the legacy source pool data format.
     if (releaseOrMintIn.sourcePoolData.length == 64) {
-      // There are two possible scenarios for the legacy inflight messages:
-      // 1. The legacy pool did not utilize a message transmitter proxy.
-      // 2. The legacy pool utilized a message transmitter proxy, but the format of the sourcePoolTokenData was as described
-      // in the comments above.
+      // Since the CCTP v1 pool will have this contract set as an allowed caller, no additional configurations are
+      // needed to route the message to the v1 pool.
 
-      // In the first scenario, only the message's destinationCaller, i.e. the legacy pool, can execute the mint, and so
-      // the message needs to be routed to the legacy pool. In the second scenario, the destinationCaller will be the
-      // message transmitter proxy, and the message needs to be routed to the appropriate V1-compatible pool.
-      if (_checkForLegacyInflightMessages(releaseOrMintIn.offchainTokenData)) {
-        // Note: Supporting this branch will require this proxy to be set as an offRamp in the router, which is a design
-        // decision that is not ideal, but allows for a direct upgrade from the first version of the USDC Token Pool to
-        // this version.
-        return IPoolV1(s_legacyCctpV1Pool).releaseOrMint(releaseOrMintIn);
-      } else {
-        // Since the new pool and the inflight message should utilize the same version of CCTP, and would have the same
-        // destinationCaller (the message transmitter proxy), we can route the message to the v1 pool, but we first
-        // need to turn the source pool data into the new format, otherwise the decoding scheme will fail. Once there is
-        // confidence that no more messages are inflight, these branches can be safely removed.
+      Pool.ReleaseOrMintInV1 memory newReleaseOrMintIn = releaseOrMintIn;
+      // While the legacy source pool data struct uses the same fields as the current source pool data struct, it is
+      // was initially encoded using abi.encode(sourceTokenDataPayload) instead of the encoding scheme used in the
+      // USDCSourcePoolDataCodec library, and without a version tag. Therefore, we need to decode the source pool data
+      // into a SourceTokenDataPayloadV1 struct and then re-encode it into a format that using the proper versioning
+      // scheme whereby the CCTP V1 pool can process the message.
+      newReleaseOrMintIn.sourcePoolData = USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV1(
+        abi.decode(releaseOrMintIn.sourcePoolData, (USDCSourcePoolDataCodec.SourceTokenDataPayloadV1))
+      );
 
-        // Since the CCTP v1 pool will have this contract set as an allowed caller, no additional configurations are
-        // needed to route the message to the v1 pool.
-
-        // Copy to memory to modify the sourcePoolData.
-        Pool.ReleaseOrMintInV1 memory newReleaseOrMintIn = releaseOrMintIn;
-        // While the legacy source pool data struct uses the same fields as the current source pool data struct, it is
-        // was initially encoded using abi.encode(sourceTokenDataPayload) instead of the encoding scheme used in the
-        // USDCSourcePoolDataCodec library, and without a version tag. Therefore, we need to decode the source pool data
-        // into a SourceTokenDataPayloadV1 struct and then re-encode it into a format that using the proper versioning
-        // scheme whereby the CCTP V1 pool can process the message.
-        newReleaseOrMintIn.sourcePoolData = USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV1(
-          abi.decode(releaseOrMintIn.sourcePoolData, (USDCSourcePoolDataCodec.SourceTokenDataPayloadV1))
-        );
-
-        return IPoolV1(s_cctpV1Pool).releaseOrMint(newReleaseOrMintIn);
-      }
+      return IPoolV1(s_cctpV1Pool).releaseOrMint(newReleaseOrMintIn);
     }
 
     revert InvalidMessageVersion(version);
@@ -311,23 +283,17 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
       }
     }
 
-    // If the legacy CCTP V1 Pool is being used, then it must support the IPoolV1 interface. If it is not, don't check it.
-    if (pools.legacyCctpV1Pool != address(0) && !pools.legacyCctpV1Pool.supportsInterface(type(IPoolV1).interfaceId)) {
-      revert TokenPoolUnsupported(pools.legacyCctpV1Pool);
-    }
-
     // If the siloed USDC pool is being used, then it must support the IPoolV1 interface. If it is not, don't check it.
     if (
-      pools.siloedUsdCTokenPool != address(0) && !pools.siloedUsdCTokenPool.supportsInterface(type(IPoolV1).interfaceId)
+      pools.siloedUsdcTokenPool != address(0) && !pools.siloedUsdcTokenPool.supportsInterface(type(IPoolV1).interfaceId)
     ) {
-      revert TokenPoolUnsupported(pools.siloedUsdCTokenPool);
+      revert TokenPoolUnsupported(pools.siloedUsdcTokenPool);
     }
 
-    s_legacyCctpV1Pool = pools.legacyCctpV1Pool;
     s_cctpV1Pool = pools.cctpV1Pool;
     s_cctpV2Pool = pools.cctpV2Pool;
     s_cctpTokenPool = pools.cctpTokenPool;
-    s_siloedUsdCTokenPool = pools.siloedUsdCTokenPool;
+    s_siloedUsdcTokenPool = pools.siloedUsdcTokenPool;
 
     emit PoolAddressesUpdated(pools);
   }
@@ -336,11 +302,10 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
   /// @return The current pool addresses that this token pool will route a message to.
   function getPools() public view returns (PoolAddresses memory) {
     return PoolAddresses({
-      legacyCctpV1Pool: s_legacyCctpV1Pool,
       cctpV1Pool: s_cctpV1Pool,
       cctpV2Pool: s_cctpV2Pool,
       cctpTokenPool: s_cctpTokenPool,
-      siloedUsdCTokenPool: s_siloedUsdCTokenPool
+      siloedUsdcTokenPool: s_siloedUsdcTokenPool
     });
   }
 
@@ -369,35 +334,6 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
       s_lockOrBurnMechanism[remoteChainSelectors[i]] = mechanisms[i];
       emit LockOrBurnMechanismUpdated(remoteChainSelectors[i], mechanisms[i]);
     }
-  }
-
-  /// @notice Check if the releaseOrMintIn struct is an inflight message from a legacy pool that did not utilize a
-  /// message transmitter proxy.
-  /// @param offChainTokenData The off chain message and attestation needed to check for destinationCaller.
-  /// @return True if the releaseOrMintIn struct is an inflight message from a legacy pool that did not utilize a
-  /// message transmitter proxy, false otherwise.
-  function _checkForLegacyInflightMessages(
-    bytes calldata offChainTokenData
-  ) internal view virtual returns (bool) {
-    // Cache the legacy pool address to avoid multiple SLOADs.
-    address legacyPool = s_legacyCctpV1Pool;
-
-    // If the legacy pool without a proxy is not set, then there is no need to check the destinationCaller.
-    if (legacyPool == address(0)) {
-      return false;
-    }
-
-    bytes memory messageBytes = abi.decode(offChainTokenData, (MessageAndAttestation)).message;
-
-    bytes32 destinationCallerBytes32;
-    assembly {
-      // destinationCaller is a 32-byte word starting at position 84 in messageBytes body, so add 32 to skip the 1st word
-      // representing bytes length.
-      destinationCallerBytes32 := mload(add(messageBytes, 116)) // 84 + 32 = 116
-    }
-    address destinationCaller = address(uint160(uint256(destinationCallerBytes32)));
-
-    return destinationCaller == legacyPool;
   }
 
   /// @inheritdoc IPoolV2

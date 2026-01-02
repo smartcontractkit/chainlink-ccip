@@ -23,14 +23,9 @@ contract USDCTokenPoolProxy_getRemoteToken is USDCTokenPoolProxySetup {
   function test_getRemoteToken_RevertWhen_NoCCVCompatiblePoolSet() public {
     _enableERC165InterfaceChecks(s_cctpV2Pool, type(IPoolV1).interfaceId);
     _enableERC165InterfaceChecks(s_cctpV1Pool, type(IPoolV1).interfaceId);
-    _enableERC165InterfaceChecks(s_legacyCctpV1Pool, type(IPoolV1).interfaceId);
     s_usdcTokenPoolProxy.updatePoolAddresses(
       USDCTokenPoolProxy.PoolAddresses({
-        legacyCctpV1Pool: s_legacyCctpV1Pool,
-        cctpV1Pool: s_cctpV1Pool,
-        cctpV2Pool: s_cctpV2Pool,
-        cctpTokenPool: address(0),
-        siloedUsdCTokenPool: address(0)
+        cctpV1Pool: s_cctpV1Pool, cctpV2Pool: s_cctpV2Pool, cctpTokenPool: address(0), siloedUsdcTokenPool: address(0)
       })
     );
 

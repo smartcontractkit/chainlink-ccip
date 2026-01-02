@@ -142,11 +142,10 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
     changePrank(OWNER);
     s_usdcTokenPoolProxy.updatePoolAddresses(
       USDCTokenPoolProxy.PoolAddresses({
-        legacyCctpV1Pool: address(0),
         cctpV1Pool: address(0),
         cctpV2Pool: address(0),
         cctpTokenPool: address(0),
-        siloedUsdCTokenPool: address(s_lockReleasePool)
+        siloedUsdcTokenPool: address(s_lockReleasePool)
       })
     );
 
@@ -236,14 +235,9 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
     _enableERC165InterfaceChecks(s_cctpTokenPool, type(IPoolV1).interfaceId);
     _enableERC165InterfaceChecks(s_cctpV2Pool, type(IPoolV1).interfaceId);
     _enableERC165InterfaceChecks(s_cctpV1Pool, type(IPoolV1).interfaceId);
-    _enableERC165InterfaceChecks(s_legacyCctpV1Pool, type(IPoolV1).interfaceId);
     s_usdcTokenPoolProxy.updatePoolAddresses(
       USDCTokenPoolProxy.PoolAddresses({
-        legacyCctpV1Pool: s_legacyCctpV1Pool,
-        cctpV1Pool: s_cctpV1Pool,
-        cctpV2Pool: s_cctpV2Pool,
-        cctpTokenPool: address(0),
-        siloedUsdCTokenPool: address(0)
+        cctpV1Pool: s_cctpV1Pool, cctpV2Pool: s_cctpV2Pool, cctpTokenPool: address(0), siloedUsdcTokenPool: address(0)
       })
     );
 

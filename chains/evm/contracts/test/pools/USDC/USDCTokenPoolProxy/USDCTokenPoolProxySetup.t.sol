@@ -8,7 +8,6 @@ import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/Aut
 import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
 
 contract USDCTokenPoolProxySetup is USDCSetup {
-  address internal s_legacyCctpV1Pool = makeAddr("legacyCctpV1Pool");
   address internal s_cctpV1Pool = makeAddr("cctpV1Pool");
   address internal s_cctpV2Pool = makeAddr("cctpV2Pool");
   address internal s_cctpTokenPool = makeAddr("cctpTokenPool");
@@ -35,11 +34,10 @@ contract USDCTokenPoolProxySetup is USDCSetup {
     s_usdcTokenPoolProxy = new USDCTokenPoolProxy(
       s_USDCToken,
       USDCTokenPoolProxy.PoolAddresses({
-        legacyCctpV1Pool: s_legacyCctpV1Pool,
         cctpV1Pool: s_cctpV1Pool,
         cctpV2Pool: s_cctpV2Pool,
         cctpTokenPool: s_cctpTokenPool,
-        siloedUsdCTokenPool: address(0)
+        siloedUsdcTokenPool: address(0)
       }),
       address(s_router),
       address(s_cctpVerifier)

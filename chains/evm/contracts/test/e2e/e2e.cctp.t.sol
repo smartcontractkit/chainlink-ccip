@@ -298,11 +298,10 @@ contract cctp_e2e is OnRampSetup {
     setup.tokenPoolProxy = new USDCTokenPoolProxy(
       IERC20(address(setup.token)),
       USDCTokenPoolProxy.PoolAddresses({
-        legacyCctpV1Pool: address(0),
         cctpV1Pool: address(0),
         cctpV2Pool: address(0),
         cctpTokenPool: address(setup.tokenPool),
-        siloedUsdCTokenPool: address(0)
+        siloedUsdcTokenPool: address(0)
       }),
       router,
       address(setup.verifierResolver)
