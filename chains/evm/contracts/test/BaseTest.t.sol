@@ -16,16 +16,11 @@ contract BaseTest is Test {
   address internal constant OWNER = 0x00007e64E1fB0C487F25dd6D3601ff6aF8d32e4e;
   address internal constant STRANGER = address(999999);
 
-  // Timing
-  uint256 internal constant BLOCK_TIME = 1234567890;
-
   // Message info
   uint64 internal constant SOURCE_CHAIN_SELECTOR = 1;
   uint64 internal constant DEST_CHAIN_SELECTOR = 2;
   uint32 internal constant GAS_LIMIT = 200_000;
   uint32 internal constant BASE_EXEC_GAS_COST = 80_000;
-
-  bytes internal constant TOKEN_RECEIVER = abi.encodePacked(address(0x0000000000000000000000000000000000000001));
 
   uint32 internal constant DEFAULT_TOKEN_DEST_GAS_OVERHEAD = 90_000;
   uint8 internal constant DEFAULT_TOKEN_DECIMALS = 18;
@@ -50,9 +45,6 @@ contract BaseTest is Test {
     deal(OWNER, 1e20);
     vm.label(OWNER, "Owner");
     vm.label(STRANGER, "Stranger");
-
-    // Set the block time to a constant known value
-    vm.warp(BLOCK_TIME);
 
     // setup RMNRemote
     s_mockRMNRemote = IRMNRemote(makeAddr("MOCK RMN REMOTE"));
@@ -85,19 +77,6 @@ contract BaseTest is Test {
 
   function _getInboundRateLimiterConfig() internal pure returns (RateLimiter.Config memory) {
     return RateLimiter.Config({isEnabled: true, capacity: 222e30, rate: 1e18});
-  }
-
-  function _getSingleTokenPriceUpdateStruct(
-    address token,
-    uint224 price
-  ) internal pure returns (Internal.PriceUpdates memory) {
-    Internal.TokenPriceUpdate[] memory tokenPriceUpdates = new Internal.TokenPriceUpdate[](1);
-    tokenPriceUpdates[0] = Internal.TokenPriceUpdate({sourceToken: token, usdPerToken: price});
-
-    Internal.PriceUpdates memory priceUpdates =
-      Internal.PriceUpdates({tokenPriceUpdates: tokenPriceUpdates, gasPriceUpdates: new Internal.GasPriceUpdate[](0)});
-
-    return priceUpdates;
   }
 
   function _generateSourceTokenData() internal pure returns (Internal.SourceTokenData memory) {

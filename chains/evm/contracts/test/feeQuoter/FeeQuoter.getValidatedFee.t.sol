@@ -640,6 +640,23 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
     s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, msg_);
   }
 
+  function test_getValidatedFee_RevertWhen_InvalidChainFamilySelector() public {
+    // Set up a destination chain with an invalid chain family selector
+    FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
+    destChainConfigArgs[0].destChainConfig.chainFamilySelector = bytes4(0x01010101);
+
+    s_feeQuoter.applyDestChainConfigUpdates(destChainConfigArgs);
+
+    Client.EVM2AnyMessage memory msg_ = _generateEmptyMessage();
+
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        FeeQuoter.InvalidChainFamilySelector.selector, destChainConfigArgs[0].destChainConfig.chainFamilySelector
+      )
+    );
+    s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, msg_);
+  }
+
   function test_getValidatedFee_RevertWhen_UnsupportedNumOfTokensSui() public {
     FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
     destChainConfigArgs[0].destChainConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_SUI;

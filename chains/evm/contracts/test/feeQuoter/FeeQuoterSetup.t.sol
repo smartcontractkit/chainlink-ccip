@@ -244,6 +244,19 @@ contract FeeQuoterSetup is TokenSetup {
     assertEq(a.defaultTokenDestGasOverhead, b.defaultTokenDestGasOverhead);
     assertEq(a.defaultTxGasLimit, b.defaultTxGasLimit);
   }
+
+  function _getSingleTokenPriceUpdateStruct(
+    address token,
+    uint224 price
+  ) internal pure returns (Internal.PriceUpdates memory) {
+    Internal.TokenPriceUpdate[] memory tokenPriceUpdates = new Internal.TokenPriceUpdate[](1);
+    tokenPriceUpdates[0] = Internal.TokenPriceUpdate({sourceToken: token, usdPerToken: price});
+
+    Internal.PriceUpdates memory priceUpdates =
+      Internal.PriceUpdates({tokenPriceUpdates: tokenPriceUpdates, gasPriceUpdates: new Internal.GasPriceUpdate[](0)});
+
+    return priceUpdates;
+  }
 }
 
 contract FeeQuoterFeeSetup is FeeQuoterSetup {

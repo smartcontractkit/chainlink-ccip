@@ -3,44 +3,31 @@ pragma solidity ^0.8.24;
 
 import {IMessageTransmitter} from "./interfaces/IMessageTransmitter.sol";
 import {ITokenMessenger} from "./interfaces/ITokenMessenger.sol";
-
-import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
-import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/EnumerableSet.sol";
+
+import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
 /// @title CCTP Message Transmitter Proxy
 /// @notice A proxy contract for handling messages transmitted via the Cross Chain Transfer Protocol (CCTP).
 /// @dev This contract is responsible for sending messages to the `IMessageTransmitter` and ensuring only allowed callers can invoke it.
-contract CCTPMessageTransmitterProxy is Ownable2StepMsgSender, ITypeAndVersion {
-  using EnumerableSet for EnumerableSet.AddressSet;
+contract CCTPMessageTransmitterProxy is AuthorizedCallers, ITypeAndVersion {
+  string public constant override typeAndVersion = "CCTPMessageTransmitterProxy 1.7.0-dev";
 
-  /// @notice Error thrown when a function is called by an unauthorized address.
-  error Unauthorized(address caller);
-
-  /// @notice Emitted when an allowed caller is added.
-  event AllowedCallerAdded(address indexed caller);
-  /// @notice Emitted when an allowed caller is removed.
-  event AllowedCallerRemoved(address indexed caller);
-
-  string public constant override typeAndVersion = "CCTPMessageTransmitterProxy 1.6.2";
-
-  struct AllowedCallerConfigArgs {
-    address caller;
-    bool allowed;
-  }
+  error TransmitterCannotBeZero();
 
   /// @notice Immutable reference to the `IMessageTransmitter` contract.
   IMessageTransmitter public immutable i_cctpTransmitter;
-
-  /// @notice Enumerable set of addresses allowed to call `receiveMessage`.
-  EnumerableSet.AddressSet private s_allowedCallers;
 
   /// @notice One-time cyclic dependency between TokenPool and MessageTransmitter.
   /// @param tokenMessenger The Circle TokenMessenger used to resolve the local MessageTransmitter.
   constructor(
     ITokenMessenger tokenMessenger
-  ) {
+  ) AuthorizedCallers(new address[](0)) {
     i_cctpTransmitter = IMessageTransmitter(tokenMessenger.localMessageTransmitter());
+
+    if (address(i_cctpTransmitter) == address(0)) {
+      revert TransmitterCannotBeZero();
+    }
   }
 
   /// @notice Receives a message from the `IMessageTransmitter` contract and validates it.
@@ -51,43 +38,7 @@ contract CCTPMessageTransmitterProxy is Ownable2StepMsgSender, ITypeAndVersion {
   function receiveMessage(
     bytes calldata message,
     bytes calldata attestation
-  ) external returns (bool success) {
-    if (!s_allowedCallers.contains(msg.sender)) {
-      revert Unauthorized(msg.sender);
-    }
+  ) external onlyAuthorizedCallers returns (bool success) {
     return i_cctpTransmitter.receiveMessage(message, attestation);
-  }
-
-  /// @notice Configures the allowed callers for the `receiveMessage` function.
-  /// @param configArgs An array of `AllowedCallerConfigArgs` structs.
-  function configureAllowedCallers(
-    AllowedCallerConfigArgs[] calldata configArgs
-  ) external onlyOwner {
-    for (uint256 i = 0; i < configArgs.length; ++i) {
-      if (configArgs[i].allowed) {
-        if (s_allowedCallers.add(configArgs[i].caller)) {
-          emit AllowedCallerAdded(configArgs[i].caller);
-        }
-      } else {
-        if (s_allowedCallers.remove(configArgs[i].caller)) {
-          emit AllowedCallerRemoved(configArgs[i].caller);
-        }
-      }
-    }
-  }
-
-  /// @notice Checks if the caller is allowed to call the `receiveMessage` function.
-  /// @param caller The address to check.
-  /// @return allowed A boolean indicating if the caller is allowed.
-  function isAllowedCaller(
-    address caller
-  ) external view returns (bool allowed) {
-    return s_allowedCallers.contains(caller);
-  }
-
-  /// @notice Returns an array of all allowed callers.
-  /// @return allowedCallers An array of allowed caller addresses.
-  function getAllowedCallers() external view returns (address[] memory allowedCallers) {
-    return s_allowedCallers.values();
   }
 }
