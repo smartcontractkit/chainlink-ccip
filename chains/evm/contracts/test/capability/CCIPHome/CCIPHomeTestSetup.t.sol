@@ -45,15 +45,14 @@ contract CCIPHomeTestSetup is Test {
   ) internal view returns (bytes32) {
     return bytes32(
       (PREFIX & PREFIX_MASK)
-        | (
-          uint256(
+        | (uint256(
             keccak256(
               bytes.concat(
                 abi.encode(bytes32("EVM"), block.chainid, address(s_ccipHome), donId, pluginType, version), config
               )
             )
-          ) & ~PREFIX_MASK
-        )
+          )
+          & ~PREFIX_MASK)
     );
   }
 

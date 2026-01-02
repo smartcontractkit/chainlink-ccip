@@ -54,9 +54,7 @@ contract OnRamp_constructor is OnRampSetup {
     // Creating a DestChainConfig and setting allowlistEnabled : true
     OnRamp.DestChainConfigArgs[] memory destChainConfigs = new OnRamp.DestChainConfigArgs[](1);
     destChainConfigs[0] = OnRamp.DestChainConfigArgs({
-      destChainSelector: DEST_CHAIN_SELECTOR,
-      router: s_sourceRouter,
-      allowlistEnabled: true
+      destChainSelector: DEST_CHAIN_SELECTOR, router: s_sourceRouter, allowlistEnabled: true
     });
 
     vm.expectEmit();

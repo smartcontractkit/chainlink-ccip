@@ -102,8 +102,9 @@ contract BurnMintFastTransferTokenPool_ccipSendToken is BurnMintFastTransferToke
       receiver: abi.encode(RECEIVER)
     });
 
-    bytes32 settlementId =
-      s_pool.ccipSendToken(DEST_CHAIN_SELECTOR, TRANSFER_AMOUNT, maxFastTransferFee, abi.encode(RECEIVER), feeToken, "");
+    bytes32 settlementId = s_pool.ccipSendToken(
+      DEST_CHAIN_SELECTOR, TRANSFER_AMOUNT, maxFastTransferFee, abi.encode(RECEIVER), feeToken, ""
+    );
 
     assertEq(settlementId, MESSAGE_ID);
     assertEq(s_token.balanceOf(OWNER), balanceBefore - TRANSFER_AMOUNT - quote.ccipSettlementFee);

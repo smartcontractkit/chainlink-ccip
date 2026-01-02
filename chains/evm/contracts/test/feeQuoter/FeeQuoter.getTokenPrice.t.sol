@@ -29,8 +29,7 @@ contract FeeQuoter_getTokenPrice is FeeQuoterSetup {
     uint224 usdPerToken = 1e18;
 
     Internal.PriceUpdates memory update = Internal.PriceUpdates({
-      tokenPriceUpdates: new Internal.TokenPriceUpdate[](1),
-      gasPriceUpdates: new Internal.GasPriceUpdate[](0)
+      tokenPriceUpdates: new Internal.TokenPriceUpdate[](1), gasPriceUpdates: new Internal.GasPriceUpdate[](0)
     });
 
     update.tokenPriceUpdates[0] = Internal.TokenPriceUpdate({sourceToken: s_sourceTokens[0], usdPerToken: usdPerToken});

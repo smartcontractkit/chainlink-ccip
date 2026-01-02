@@ -14,11 +14,7 @@ contract OffRampOverSuperchainInteropHelper is OffRampOverSuperchainInterop {
     ChainSelectorToChainIdConfigArgs[] memory chainSelectorToChainIdConfigArgs
   )
     OffRampOverSuperchainInterop(
-      staticConfig,
-      dynamicConfig,
-      sourceChainConfigs,
-      crossL2Inbox,
-      chainSelectorToChainIdConfigArgs
+      staticConfig, dynamicConfig, sourceChainConfigs, crossL2Inbox, chainSelectorToChainIdConfigArgs
     )
   {}
 

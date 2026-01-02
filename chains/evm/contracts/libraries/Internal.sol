@@ -110,7 +110,10 @@ library Internal {
   /// @param original OffRamp message to hash.
   /// @param metadataHash Hash preimage to ensure global uniqueness.
   /// @return hashedMessage hashed message as a keccak256.
-  function _hash(Any2EVMRampMessage memory original, bytes32 metadataHash) internal pure returns (bytes32) {
+  function _hash(
+    Any2EVMRampMessage memory original,
+    bytes32 metadataHash
+  ) internal pure returns (bytes32) {
     // Fixed-size message fields are included in nested hash to reduce stack pressure.
     // This hashing scheme is also used by RMN. If changing it, please notify the RMN maintainers.
     return keccak256(
@@ -133,7 +136,10 @@ library Internal {
     );
   }
 
-  function _hash(EVM2AnyRampMessage memory original, bytes32 metadataHash) internal pure returns (bytes32) {
+  function _hash(
+    EVM2AnyRampMessage memory original,
+    bytes32 metadataHash
+  ) internal pure returns (bytes32) {
     // Fixed-size message fields are included in nested hash to reduce stack pressure.
     // This hashing scheme is also used by RMN. If changing it, please notify the RMN maintainers.
     return keccak256(
@@ -188,7 +194,10 @@ library Internal {
 
   /// @notice This methods provides validation for parsing abi encoded addresses by ensuring the address is within the
   /// bounds of [minValue, uint256.max]. If it isn't it will revert with an Invalid32ByteAddress error.
-  function _validate32ByteAddress(bytes memory encodedAddress, uint256 minValue) internal pure {
+  function _validate32ByteAddress(
+    bytes memory encodedAddress,
+    uint256 minValue
+  ) internal pure {
     if (encodedAddress.length != 32) revert Invalid32ByteAddress(encodedAddress);
     if (minValue > 0) {
       if (abi.decode(encodedAddress, (uint256)) < minValue) {

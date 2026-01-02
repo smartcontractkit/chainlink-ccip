@@ -20,5 +20,8 @@ interface IMessageInterceptor {
   /// @notice Intercepts & validates the given OnRamp message. Reverts on validation failure.
   /// @param destChainSelector remote destination chain selector where the message is being sent to.
   /// @param message to validate.
-  function onOutboundMessage(uint64 destChainSelector, Client.EVM2AnyMessage memory message) external;
+  function onOutboundMessage(
+    uint64 destChainSelector,
+    Client.EVM2AnyMessage memory message
+  ) external;
 }

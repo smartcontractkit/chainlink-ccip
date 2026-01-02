@@ -55,8 +55,7 @@ contract OffRampOverSuperchainInteropSetup is OffRampSetup {
     OffRampOverSuperchainInterop.ChainSelectorToChainIdConfigArgs[] memory chainIdConfigs =
       new OffRampOverSuperchainInterop.ChainSelectorToChainIdConfigArgs[](1);
     chainIdConfigs[0] = OffRampOverSuperchainInterop.ChainSelectorToChainIdConfigArgs({
-      chainSelector: SOURCE_CHAIN_SELECTOR_1,
-      chainId: CHAIN_ID_1
+      chainSelector: SOURCE_CHAIN_SELECTOR_1, chainId: CHAIN_ID_1
     });
 
     // Also deploy helper version for targeted testing
@@ -138,11 +137,7 @@ contract OffRampOverSuperchainInteropSetup is OffRampSetup {
     return (
       proofs,
       Identifier({
-        origin: ON_RAMP_ADDRESS,
-        blockNumber: blockNumber,
-        logIndex: logIndex,
-        timestamp: timestamp,
-        chainId: CHAIN_ID_1
+        origin: ON_RAMP_ADDRESS, blockNumber: blockNumber, logIndex: logIndex, timestamp: timestamp, chainId: CHAIN_ID_1
       })
     );
   }

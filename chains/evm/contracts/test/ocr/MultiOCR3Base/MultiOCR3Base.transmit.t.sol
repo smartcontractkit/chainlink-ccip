@@ -77,7 +77,10 @@ contract MultiOCR3Base_transmit is MultiOCR3BaseSetup {
     s_multiOCR3.transmitWithoutSignatures(reportContext, REPORT);
   }
 
-  function testFuzz_TransmitSignersWithSignatures_Success(uint8 F, uint64 randomAddressOffset) public {
+  function testFuzz_TransmitSignersWithSignatures_Success(
+    uint8 F,
+    uint64 randomAddressOffset
+  ) public {
     vm.pauseGasMetering();
 
     F = uint8(bound(F, 1, 3));
