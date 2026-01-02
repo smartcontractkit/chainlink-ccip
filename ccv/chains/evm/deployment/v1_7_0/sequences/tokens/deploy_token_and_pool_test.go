@@ -4,6 +4,7 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/burn_mint_token_pool"
@@ -14,6 +15,7 @@ import (
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
 	seq_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -120,7 +122,7 @@ func TestDeployTokenAndPool(t *testing.T) {
 			require.Len(t, poolReport.Output.BatchOps[0].Transactions, 0, "Expected 0 transactions in batch operation")
 			require.Len(t, poolReport.Output.Addresses, 3, "Expected 3 addresses in output (pool, token, advanced pool hooks)")
 			tokenAddress := poolReport.Output.Addresses[0].Address
-			// poolAddress := poolReport.Output.Addresses[1].Address
+			poolAddress := poolReport.Output.Addresses[1].Address
 
 			// Check token metadata
 			token, err := token_bindings.NewBurnMintERC20WithDrip(common.HexToAddress(tokenAddress), e.BlockChains.EVMChains()[chainSel].Client)
@@ -136,16 +138,14 @@ func TestDeployTokenAndPool(t *testing.T) {
 			require.Equal(t, uint8(18), decimals, "Expected token decimals to be 18")
 
 			// Check token minters
-			/* TODO @kylesmartin: Add minter role to the token
-			minters, err := token.HasRole(&bind.CallOpts{Context: e.OperationsBundle.GetContext()}, burn_mint_erc20_with_drip.MINTER_ROLE)
+			hasMintRole, err := token.HasRole(&bind.CallOpts{Context: e.OperationsBundle.GetContext()}, burn_mint_erc20_with_drip.MintRole, common.HexToAddress(poolAddress))
 			require.NoError(t, err, "GetMinters should not error")
-			require.Equal(t, []common.Address{common.HexToAddress(poolAddress)}, minters, "Expected token pool to be the minter of the token")
+			require.True(t, hasMintRole, "Expected token pool to be the minter of the token")
 
 			// Check token burners
-			burners, err := token.GetBurners(&bind.CallOpts{Context: e.OperationsBundle.GetContext()})
+			hasBurnRole, err := token.HasRole(&bind.CallOpts{Context: e.OperationsBundle.GetContext()}, burn_mint_erc20_with_drip.BurnRole, common.HexToAddress(poolAddress))
 			require.NoError(t, err, "GetBurners should not error")
-			require.Equal(t, []common.Address{common.HexToAddress(poolAddress)}, burners, "Expected token pool to be the burner of the token")
-			*/
+			require.True(t, hasBurnRole, "Expected token pool to be the burner of the token")
 
 			// Check balance of each account
 			for addr, amount := range input.Accounts {
