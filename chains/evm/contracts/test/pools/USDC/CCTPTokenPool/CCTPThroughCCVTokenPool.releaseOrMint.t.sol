@@ -5,11 +5,11 @@ import {Pool} from "../../../../libraries/Pool.sol";
 import {USDCSourcePoolDataCodec} from "../../../../libraries/USDCSourcePoolDataCodec.sol";
 import {TokenPool} from "../../../../pools/TokenPool.sol";
 
-import {CCTPTokenPool} from "../../../../pools/USDC/CCTPTokenPool.sol";
-import {CCTPTokenPoolSetup} from "./CCTPTokenPoolSetup.t.sol";
+import {CCTPThroughCCVTokenPool} from "../../../../pools/USDC/CCTPThroughCCVTokenPool.sol";
+import {CCTPThroughCCVTokenPoolSetup} from "./CCTPThroughCCVTokenPoolSetup.t.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
-contract CCTPTokenPool_releaseOrMint is CCTPTokenPoolSetup {
+contract CCTPThroughCCVTokenPool_releaseOrMint is CCTPThroughCCVTokenPoolSetup {
   function test_releaseOrMint() public {
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = Pool.ReleaseOrMintInV1({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
@@ -35,7 +35,7 @@ contract CCTPTokenPool_releaseOrMint is CCTPTokenPoolSetup {
     });
 
     vm.startPrank(s_allowedCaller);
-    Pool.ReleaseOrMintOutV1 memory actualOut = s_cctpTokenPool.releaseOrMint(releaseOrMintIn, 0);
+    Pool.ReleaseOrMintOutV1 memory actualOut = s_cctpThroughCCVTokenPool.releaseOrMint(releaseOrMintIn, 0);
 
     assertEq(actualOut.destinationAmount, expectedOut.destinationAmount);
   }
@@ -53,8 +53,8 @@ contract CCTPTokenPool_releaseOrMint is CCTPTokenPoolSetup {
     });
 
     vm.startPrank(s_allowedCaller);
-    vm.expectRevert(abi.encodeWithSelector(CCTPTokenPool.IPoolV1NotSupported.selector));
-    s_cctpTokenPool.releaseOrMint(releaseOrMintIn);
+    vm.expectRevert(abi.encodeWithSelector(CCTPThroughCCVTokenPool.IPoolV1NotSupported.selector));
+    s_cctpThroughCCVTokenPool.releaseOrMint(releaseOrMintIn);
   }
 
   function test_releaseOrMint_RevertWhen_InvalidCaller() public {
@@ -73,7 +73,7 @@ contract CCTPTokenPool_releaseOrMint is CCTPTokenPoolSetup {
     });
 
     vm.expectRevert(abi.encodeWithSelector(AuthorizedCallers.UnauthorizedCaller.selector, invalidCaller));
-    s_cctpTokenPool.releaseOrMint(releaseOrMintIn, 0);
+    s_cctpThroughCCVTokenPool.releaseOrMint(releaseOrMintIn, 0);
   }
 
   function test_releaseOrMint_RevertWhen_ChainNotAllowed() public {
@@ -92,6 +92,7 @@ contract CCTPTokenPool_releaseOrMint is CCTPTokenPoolSetup {
 
     vm.startPrank(s_allowedCaller);
     vm.expectRevert(abi.encodeWithSelector(TokenPool.ChainNotAllowed.selector, wrongChainSelector));
-    s_cctpTokenPool.releaseOrMint(releaseOrMintIn, 0);
+    s_cctpThroughCCVTokenPool.releaseOrMint(releaseOrMintIn, 0);
   }
 }
+

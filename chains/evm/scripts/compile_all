@@ -11,7 +11,7 @@ echo " └───────────────────────�
 OPTIMIZE_RUNS_TOKEN_POOL=50000
 OPTIMIZE_RUNS_LARGE_TOKEN_POOL=15000
 OPTIMIZE_RUNS_USDC=2000
-OPTIMIZE_RUNS_ONRAMP=2000
+OPTIMIZE_RUNS_ONRAMP=5000
 OPTIMIZE_RUNS_OFFRAMP=20000
 
 PROJECT="ccip"
@@ -62,12 +62,6 @@ function getOptimizations() {
       "SiloedLockReleaseTokenPool")
         optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_LARGE_TOKEN_POOL"
         ;;
-      "USDCTokenPool")
-        optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_LARGE_TOKEN_POOL"
-        ;;
-      "USDCTokenPoolCCTPV2")
-        optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_LARGE_TOKEN_POOL"
-        ;;
       "SiloedUSDCTokenPool")
         optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_USDC"
         ;;
@@ -111,15 +105,13 @@ compileContract pools/BurnFromMintTokenPool
 compileContract pools/BurnWithFromMintTokenPool
 compileContract pools/BurnToAddressMintTokenPool
 compileContract pools/TokenPool
-compileContract pools/USDC/USDCTokenPool
-compileContract pools/USDC/CCTPMessageTransmitterProxy
 compileContract pools/SiloedLockReleaseTokenPool
 compileContract pools/ERC20LockBox
+compileContract pools/USDC/CCTPMessageTransmitterProxy
 compileContract pools/USDC/SiloedUSDCTokenPool
-compileContract pools/USDC/USDCTokenPoolCCTPV2
 compileContract pools/USDC/USDCTokenPoolProxy
 compileContract pools/USDC/BurnMintWithLockReleaseFlagTokenPool
-compileContract pools/USDC/CCTPTokenPool
+compileContract pools/USDC/CCTPThroughCCVTokenPool
 compileContract pools/Lombard/LombardTokenPool
 compileContract pools/AdvancedPoolHooks
 

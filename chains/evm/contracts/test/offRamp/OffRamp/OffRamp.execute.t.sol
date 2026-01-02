@@ -433,6 +433,18 @@ contract OffRamp_execute is OffRampSetup {
     s_gasBoundedExecuteCaller.callExecute(encodedMessage, ccvs, verifierResults, PLENTY_OF_GAS, 0);
   }
 
+  function test_execute_RevertWhen_InvalidEVMAddress_Receiver() public {
+    MessageV1Codec.MessageV1 memory message = _getMessage();
+    // Set invalid receiver address (not 20 bytes).
+    bytes memory invalidReceiver = hex"1234567890"; // 5 bytes instead of 20
+    message.receiver = invalidReceiver;
+
+    (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory verifierResults) = _getReportComponents(message);
+
+    vm.expectRevert(abi.encodeWithSelector(Internal.InvalidEVMAddress.selector, invalidReceiver));
+    s_gasBoundedExecuteCaller.callExecute(encodedMessage, ccvs, verifierResults, PLENTY_OF_GAS, 0);
+  }
+
   function test_execute_RevertWhen_SkippedAlreadyExecutedMessage() public {
     MessageV1Codec.MessageV1 memory message = _getMessage();
     (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory verifierResults) = _getReportComponents(message);

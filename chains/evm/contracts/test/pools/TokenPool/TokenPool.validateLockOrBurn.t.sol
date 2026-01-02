@@ -20,6 +20,17 @@ contract TokenPoolV2_validateLockOrBurn is AdvancedPoolHooksSetup {
     s_tokenPool.validateLockOrBurn(lockOrBurnIn, 0, "", fee);
   }
 
+  function test_validateLockOrBurn_RevertWhen_InvalidToken() public {
+    address wrongToken = address(0x456);
+
+    Pool.LockOrBurnInV1 memory lockOrBurnIn = _buildLockOrBurnIn(1000e18);
+    lockOrBurnIn.localToken = wrongToken; // Invalid token address.
+
+    vm.expectRevert(abi.encodeWithSelector(TokenPool.InvalidToken.selector, wrongToken));
+    vm.startPrank(s_allowedOnRamp);
+    s_tokenPool.validateLockOrBurn(lockOrBurnIn, 0, "", 0);
+  }
+
   function test_validateLockOrBurn_WithFastFinality() public {
     uint16 minBlockConfirmation = 5;
     RateLimiter.Config memory outboundFastConfig = RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24});
@@ -93,7 +104,6 @@ contract TokenPoolV2_validateLockOrBurn is AdvancedPoolHooksSetup {
 
     vm.startPrank(s_allowedOnRamp);
     s_tokenPool.validateLockOrBurn(lockOrBurnIn, type(uint16).max, "", fee);
-    vm.stopPrank();
 
     (RateLimiter.TokenBucket memory outboundBucket,) = s_tokenPool.getCurrentRateLimiterState(DEST_CHAIN_SELECTOR, true);
     assertEq(outboundBucket.tokens, outboundFastConfig.capacity - expectedAmount);
@@ -127,7 +137,6 @@ contract TokenPoolV2_validateLockOrBurn is AdvancedPoolHooksSetup {
 
     vm.startPrank(s_allowedOnRamp);
     s_tokenPool.validateLockOrBurn(lockOrBurnIn, 0, "", fee);
-    vm.stopPrank();
 
     (RateLimiter.TokenBucket memory outboundBucket,) =
       s_tokenPool.getCurrentRateLimiterState(DEST_CHAIN_SELECTOR, false);

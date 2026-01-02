@@ -45,7 +45,6 @@ contract SiloedUSDCTokenPool_lockOrBurn is SiloedUSDCTokenPoolSetup {
 
     Pool.LockOrBurnOutV1 memory result = s_usdcTokenPool.lockOrBurn(lockOrBurnIn);
 
-    // Assert: Verify the result
     assertEq(s_usdcTokenPool.getAvailableTokens(DEST_CHAIN_SELECTOR), s_amount);
 
     // destPoolData is the local token decimals abi-encoded to 32 bytes
@@ -95,7 +94,6 @@ contract SiloedUSDCTokenPool_lockOrBurn is SiloedUSDCTokenPoolSetup {
 
     Pool.LockOrBurnOutV1 memory result2 = s_usdcTokenPool.lockOrBurn(lockOrBurnIn2);
 
-    // Assert: Verify the locked tokens accounting is updated correctly
     assertEq(s_usdcTokenPool.getAvailableTokens(DEST_CHAIN_SELECTOR), s_amount + amount2);
 
     // destPoolData is the local token decimals abi-encoded to 32 bytes

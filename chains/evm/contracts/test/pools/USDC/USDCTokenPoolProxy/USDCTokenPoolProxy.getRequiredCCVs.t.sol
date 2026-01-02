@@ -16,7 +16,16 @@ contract USDCTokenPoolProxy_getRequiredCCVs is USDCTokenPoolProxySetup {
     assertEq(requiredCCVs[0], s_cctpVerifier);
   }
 
-  function test_getRequiredCCVs_DefaultCCVsRequired() public view {
+  function test_getRequiredCCVs_DefaultCCVsRequired() public {
+    // Set up a mechanism that doesn't require a CCV (e.g., CCTP_V1).
+    uint64[] memory chainSelectors = new uint64[](1);
+    chainSelectors[0] = s_remoteLockReleaseChainSelector;
+
+    USDCTokenPoolProxy.LockOrBurnMechanism[] memory mechanisms = new USDCTokenPoolProxy.LockOrBurnMechanism[](1);
+    mechanisms[0] = USDCTokenPoolProxy.LockOrBurnMechanism.CCTP_V1;
+
+    s_usdcTokenPoolProxy.updateLockOrBurnMechanisms(chainSelectors, mechanisms);
+
     address[] memory requiredCCVs = s_usdcTokenPoolProxy.getRequiredCCVs(
       address(0), s_remoteLockReleaseChainSelector, 0, 0, "", IPoolV2.MessageDirection.Outbound
     );
@@ -32,13 +41,16 @@ contract USDCTokenPoolProxy_getRequiredCCVs is USDCTokenPoolProxySetup {
   }
 
   function test_getRequiredCCVs_RevertWhen_NoCCVCompatiblePoolSet() public {
-    USDCTokenPoolProxy.PoolAddresses memory pools = s_usdcTokenPoolProxy.getPools();
-    pools.cctpV2PoolWithCCV = address(0);
-    _enableERC165InterfaceChecks(pools.cctpV2PoolWithCCV, type(IPoolV2).interfaceId);
-    _enableERC165InterfaceChecks(pools.cctpV2Pool, type(IPoolV1).interfaceId);
-    _enableERC165InterfaceChecks(pools.cctpV1Pool, type(IPoolV1).interfaceId);
-    _enableERC165InterfaceChecks(pools.legacyCctpV1Pool, type(IPoolV1).interfaceId);
-    s_usdcTokenPoolProxy.updatePoolAddresses(pools);
+    _enableERC165InterfaceChecks(s_cctpV2Pool, type(IPoolV1).interfaceId);
+    _enableERC165InterfaceChecks(s_cctpV1Pool, type(IPoolV1).interfaceId);
+    s_usdcTokenPoolProxy.updatePoolAddresses(
+      USDCTokenPoolProxy.PoolAddresses({
+        cctpV1Pool: s_cctpV1Pool,
+        cctpV2Pool: s_cctpV2Pool,
+        cctpV2PoolWithCCV: address(0),
+        siloedLockReleasePool: address(0)
+      })
+    );
 
     vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.CCVCompatiblePoolNotSet.selector));
     s_usdcTokenPoolProxy.getRequiredCCVs(address(0), uint64(1), 0, 0, "", IPoolV2.MessageDirection.Outbound);

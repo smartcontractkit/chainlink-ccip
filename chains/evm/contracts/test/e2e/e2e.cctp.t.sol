@@ -17,7 +17,7 @@ import {OffRamp} from "../../offRamp/OffRamp.sol";
 import {OnRamp} from "../../onRamp/OnRamp.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
 import {CCTPMessageTransmitterProxy} from "../../pools/USDC/CCTPMessageTransmitterProxy.sol";
-import {CCTPTokenPool} from "../../pools/USDC/CCTPTokenPool.sol";
+import {CCTPThroughCCVTokenPool} from "../../pools/USDC/CCTPThroughCCVTokenPool.sol";
 import {USDCTokenPoolProxy} from "../../pools/USDC/USDCTokenPoolProxy.sol";
 import {TokenAdminRegistry} from "../../tokenAdminRegistry/TokenAdminRegistry.sol";
 import {CCTPHelper} from "../helpers/CCTPHelper.sol";
@@ -48,7 +48,7 @@ contract cctp_e2e is OnRampSetup {
     address tokenAdminRegistry;
     VersionedVerifierResolver verifierResolver;
     CCTPVerifier verifier;
-    CCTPTokenPool tokenPool;
+    CCTPThroughCCVTokenPool tokenPool;
     MockUSDCTokenMessenger tokenMessenger;
     MockE2EUSDCTransmitterCCTPV2 messageTransmitter;
     CCTPMessageTransmitterProxy messageTransmitterProxy;
@@ -278,7 +278,7 @@ contract cctp_e2e is OnRampSetup {
     setup.tokenAdminRegistry = tokenAdminRegistry;
     setup.verifierResolver = new VersionedVerifierResolver();
     setup.token = IERC20(address(new BurnMintERC20("USD Coin", "USDC", 6, 0, 0)));
-    setup.tokenPool = new CCTPTokenPool(
+    setup.tokenPool = new CCTPThroughCCVTokenPool(
       IERC20(address(setup.token)), 6, rmn, router, address(setup.verifierResolver), new address[](0)
     );
     setup.messageTransmitter =
@@ -298,10 +298,10 @@ contract cctp_e2e is OnRampSetup {
     setup.tokenPoolProxy = new USDCTokenPoolProxy(
       IERC20(address(setup.token)),
       USDCTokenPoolProxy.PoolAddresses({
-        legacyCctpV1Pool: address(0),
         cctpV1Pool: address(0),
         cctpV2Pool: address(0),
-        cctpV2PoolWithCCV: address(setup.tokenPool)
+        cctpV2PoolWithCCV: address(setup.tokenPool),
+        siloedLockReleasePool: address(0)
       }),
       router,
       address(setup.verifierResolver)
@@ -375,11 +375,14 @@ contract cctp_e2e is OnRampSetup {
     s_destCCTPSetup.verifier.setDomains(sourceDomainArgs);
 
     // Set authorized callers on the message transmitter proxy on destination.
-    CCTPMessageTransmitterProxy.AllowedCallerConfigArgs[] memory allowedCallerParams =
-      new CCTPMessageTransmitterProxy.AllowedCallerConfigArgs[](1);
-    allowedCallerParams[0] =
-      CCTPMessageTransmitterProxy.AllowedCallerConfigArgs({caller: address(s_destCCTPSetup.verifier), allowed: true});
-    s_destCCTPSetup.messageTransmitterProxy.configureAllowedCallers(allowedCallerParams);
+    address[] memory mtProxyAuthorizedCallers = new address[](1);
+    mtProxyAuthorizedCallers[0] = address(s_destCCTPSetup.verifier);
+    s_destCCTPSetup.messageTransmitterProxy
+      .applyAuthorizedCallerUpdates(
+        AuthorizedCallers.AuthorizedCallerArgs({
+          addedCallers: mtProxyAuthorizedCallers, removedCallers: new address[](0)
+        })
+      );
 
     // Apply chain updates on the destination token pool.
     bytes[] memory remotePoolAddresses = new bytes[](1);
@@ -425,14 +428,14 @@ contract cctp_e2e is OnRampSetup {
 
     // Update lock or burn mechanism on the source token pool proxy.
     USDCTokenPoolProxy.LockOrBurnMechanism[] memory mechanisms = new USDCTokenPoolProxy.LockOrBurnMechanism[](1);
-    mechanisms[0] = USDCTokenPoolProxy.LockOrBurnMechanism.CCTP_V2_WITH_CCV;
+    mechanisms[0] = USDCTokenPoolProxy.LockOrBurnMechanism.CCV;
     uint64[] memory chainSelectors = new uint64[](1);
     chainSelectors[0] = DEST_CHAIN_SELECTOR;
     s_sourceCCTPSetup.tokenPoolProxy.updateLockOrBurnMechanisms(chainSelectors, mechanisms);
 
     // Update lock or burn mechanism on the dest token pool proxy.
     mechanisms = new USDCTokenPoolProxy.LockOrBurnMechanism[](1);
-    mechanisms[0] = USDCTokenPoolProxy.LockOrBurnMechanism.CCTP_V2_WITH_CCV;
+    mechanisms[0] = USDCTokenPoolProxy.LockOrBurnMechanism.CCV;
     chainSelectors = new uint64[](1);
     chainSelectors[0] = SOURCE_CHAIN_SELECTOR;
     s_destCCTPSetup.tokenPoolProxy.updateLockOrBurnMechanisms(chainSelectors, mechanisms);
