@@ -20,7 +20,6 @@ contract OffRamp_releaseOrMintSingleToken is TokenPoolSetup {
   OffRampHelper internal s_offRamp;
   address internal s_tokenAdminRegistry = makeAddr("tokenAdminRegistry");
   address internal s_receiver = makeAddr("receiver");
-  uint32 internal constant DEFAULT_MAX_GAS_BUFFER_TO_UPDATE_STATE = 5000 + 5000 + 2000;
 
   function setUp() public override {
     super.setUp();

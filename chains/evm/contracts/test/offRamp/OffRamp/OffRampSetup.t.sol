@@ -14,7 +14,6 @@ contract OffRampSetup is BaseTest {
   OffRampHelper internal s_offRamp;
   address internal s_defaultCCV;
   address internal s_tokenAdminRegistry;
-  uint32 internal constant DEFAULT_MAX_GAS_BUFFER_TO_UPDATE_STATE = 5000 + 5000 + 2000;
 
   bytes internal s_onRamp;
 

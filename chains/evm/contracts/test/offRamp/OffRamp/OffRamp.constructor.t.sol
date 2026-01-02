@@ -6,8 +6,6 @@ import {OffRamp} from "../../../offRamp/OffRamp.sol";
 import {BaseTest} from "../../BaseTest.t.sol";
 
 contract OffRamp_constructor is BaseTest {
-  uint32 internal constant DEFAULT_MAX_GAS_BUFFER_TO_UPDATE_STATE = 5000 + 5000 + 2000;
-
   function test_constructor() public {
     OffRamp.StaticConfig memory config = OffRamp.StaticConfig({
       localChainSelector: DEST_CHAIN_SELECTOR,

@@ -29,7 +29,6 @@ contract OnRampSetup is FeeQuoterFeeSetup {
   uint32 internal constant VERIFIER_FEE_USD_CENTS = 200; // $2.00
   uint32 internal constant VERIFIER_GAS = 100000;
   uint32 internal constant VERIFIER_BYTES = 256;
-  uint32 internal constant DEFAULT_MAX_GAS_BUFFER_TO_UPDATE_STATE = 5000 + 5000 + 2000;
 
   OnRampHelper internal s_onRamp;
   OffRamp internal s_offRampOnRemoteChain = OffRamp(makeAddr("OffRampRemote"));

@@ -22,6 +22,7 @@ import {OnRampSetup} from "../onRamp/OnRamp/OnRampSetup.t.sol";
 
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
+import {VmSafe} from "forge-std/Vm.sol";
 
 /// @title E2E Fee Withdrawal Test
 /// @notice Tests fee withdrawal from all components after a ccipSend
@@ -52,6 +53,9 @@ contract e2e_feeWithdrawal is OnRampSetup {
   address internal s_automationAddress; // Simulates Chainlink Automation/CRE
   uint16 internal constant NETWORK_FEE_USD_CENTS = 200;
   address internal s_feeAggregator;
+
+  bytes32 internal constant CCIP_MESSAGE_SENT_TOPIC =
+    keccak256("CCIPMessageSent(uint64,address,bytes32,address,bytes,(address,uint32,uint32,uint256,bytes)[],bytes[])");
 
   function setUp() public virtual override {
     super.setUp();
@@ -214,17 +218,15 @@ contract e2e_feeWithdrawal is OnRampSetup {
     vm.startPrank(OWNER);
     s_onRamp.setDynamicConfig(onRampConfig);
     vm.stopPrank();
-  }
-
-  /// @notice Test fee withdrawal from all components after ccipSend
-  function test_FeeWithdrawal_AfterCcipSend() public {
-    vm.pauseGasMetering();
 
     // Ensure the test contract has fee tokens/test tokens to pay for the transaction
     // Router will transferFrom msg.sender (this test contract) to OnRamp
     deal(s_sourceFeeToken, address(this), type(uint256).max);
     deal(address(s_testToken), address(this), type(uint256).max);
+  }
 
+  /// @notice Test fee withdrawal from all components after ccipSend
+  function test_FeeWithdrawal_AfterCcipSend() public {
     // Get initial balances
     Balances memory initial = Balances({
       onRampBalance: IERC20(s_sourceFeeToken).balanceOf(address(s_onRamp)),
@@ -241,18 +243,7 @@ contract e2e_feeWithdrawal is OnRampSetup {
       data: "",
       tokenAmounts: new Client.EVMTokenAmount[](1),
       feeToken: s_sourceFeeToken,
-      extraArgs: ExtraArgsCodec._encodeGenericExtraArgsV3(
-        ExtraArgsCodec.GenericExtraArgsV3({
-          ccvs: new address[](0), // Use default CCV
-          ccvArgs: new bytes[](0),
-          blockConfirmations: 0,
-          gasLimit: GAS_LIMIT,
-          executor: address(0), // Use default executor
-          executorArgs: "",
-          tokenReceiver: "",
-          tokenArgs: ""
-        })
-      )
+      extraArgs: ""
     });
     message.tokenAmounts[0] = Client.EVMTokenAmount({token: address(s_testToken), amount: 1e18});
 
@@ -262,10 +253,20 @@ contract e2e_feeWithdrawal is OnRampSetup {
     // Also approve the token being transferred
     IERC20(address(s_testToken)).approve(address(s_sourceRouter), message.tokenAmounts[0].amount);
 
+    // Record logs to capture CCIPMessageSent event
+    vm.recordLogs();
+
     // Perform ccipSend
-    vm.resumeGasMetering();
     s_sourceRouter.ccipSend(DEST_CHAIN_SELECTOR, message);
-    vm.pauseGasMetering();
+
+    // Extract receipts from the CCIPMessageSent event
+    OnRamp.Receipt[] memory receipts = _getReceiptsFromLogs(vm.getRecordedLogs());
+
+    // Receipt order: verifiers..., token, executor, network fee (from OnRamp._getReceipts)
+    uint256 verifierReceiptIndex = 0; // First receipt is verifier
+    uint256 tokenReceiptIndex = receipts.length - 3; // Token receipt (if tokens present)
+    uint256 executorReceiptIndex = receipts.length - 2; // Executor receipt
+    uint256 networkFeeReceiptIndex = receipts.length - 1; // Network fee receipt (stays on OnRamp)
 
     // Check that fees were distributed
     // Get end balances
@@ -278,24 +279,37 @@ contract e2e_feeWithdrawal is OnRampSetup {
       feeAggregatorBalance: IERC20(s_sourceFeeToken).balanceOf(s_feeAggregator)
     });
 
-    // Network fee should remain on OnRamp
-    assertGt(end.onRampBalance, initial.onRampBalance, "Network fee should be on OnRamp");
+    // Network fee should remain on OnRamp (check against receipt)
+    assertEq(
+      end.onRampBalance - initial.onRampBalance,
+      receipts[networkFeeReceiptIndex].feeTokenAmount,
+      "Network fee should match receipt amount"
+    );
 
-    // Executor (proxy) should have received fee
-    assertGt(end.executorBalance, initial.executorBalance, "Executor proxy should have received fee");
+    // Executor (proxy) should have received fee (check against receipt)
+    assertEq(
+      end.executorBalance - initial.executorBalance,
+      receipts[executorReceiptIndex].feeTokenAmount,
+      "Executor fee should match receipt amount"
+    );
 
-    // Verifier fees should go to resolver (proxy), not implementation
-    assertGt(
-      end.verifierResolverBalance, initial.verifierResolverBalance, "Verifier fees should go to resolver (proxy)"
+    // Verifier fees should go to resolver (proxy), not implementation (check against receipt)
+    assertEq(
+      end.verifierResolverBalance - initial.verifierResolverBalance,
+      receipts[verifierReceiptIndex].feeTokenAmount,
+      "Verifier fee should match receipt amount"
     );
     assertEq(
       end.verifierImplBalance, initial.verifierImplBalance, "Verifier implementation should NOT receive fees directly"
     );
 
     // TokenPool (V2) should have received fees directly if pool fee config is enabled
-    // If pool fee config is disabled, OnRamp falls back to FeeQuoter but still transfers fees to pool
-    // Note: Pool fees may be 0 if FeeQuoter returns 0, but the mechanism should work
-    // We'll verify the withdrawal mechanism works regardless
+    // Check against receipt
+    assertEq(
+      end.tokenPoolBalance - initial.tokenPoolBalance,
+      receipts[tokenReceiptIndex].feeTokenAmount,
+      "TokenPool fee should match receipt amount"
+    );
 
     // Now test withdrawing fees from each component
 
@@ -303,84 +317,65 @@ contract e2e_feeWithdrawal is OnRampSetup {
     address[] memory feeTokens = new address[](1);
     feeTokens[0] = s_sourceFeeToken;
 
+    // Track aggregator balance between withdrawals (update after each check)
+    uint256 aggregatorBalance = IERC20(s_sourceFeeToken).balanceOf(s_feeAggregator);
+
+    vm.stopPrank();
+    vm.prank(s_automationAddress); // Anyone can call (PAL compatible)
     {
       // 1. Test OnRamp withdrawal (permissionless - PAL compatible)
-      // Get the actual balance at the time of withdrawal (in case it changed)
-      uint256 actualOnRampBalance = IERC20(s_sourceFeeToken).balanceOf(address(s_onRamp));
-
-      // Only proceed if there's actually a balance to withdraw
-      if (actualOnRampBalance > 0) {
-        uint256 aggregatorBalanceBeforeOnRamp = IERC20(s_sourceFeeToken).balanceOf(s_feeAggregator);
-        vm.stopPrank();
-        vm.prank(s_automationAddress); // Anyone can call (PAL compatible)
-        s_onRamp.withdrawFeeTokens(feeTokens);
-        uint256 aggregatorBalanceAfterOnRamp = IERC20(s_sourceFeeToken).balanceOf(s_feeAggregator);
-        // Use actual balance withdrawn, not the calculated difference
-        uint256 actualWithdrawn = aggregatorBalanceAfterOnRamp - aggregatorBalanceBeforeOnRamp;
-        assertEq(actualWithdrawn, actualOnRampBalance, "OnRamp fees should be withdrawn to aggregator");
-        totalFeesWithdrawn += actualWithdrawn;
-      } else {
-        // If no balance, still add 0 to totalFeesWithdrawn for consistency
-        totalFeesWithdrawn += 0;
-      }
+      // Withdraw network fee (check against receipt)
+      s_onRamp.withdrawFeeTokens(feeTokens);
+      uint256 newAggregatorBalance = IERC20(s_sourceFeeToken).balanceOf(s_feeAggregator);
+      uint256 actualWithdrawn = newAggregatorBalance - aggregatorBalance;
+      assertEq(
+        actualWithdrawn, receipts[networkFeeReceiptIndex].feeTokenAmount, "OnRamp fees should match receipt amount"
+      );
+      totalFeesWithdrawn += actualWithdrawn;
+      aggregatorBalance = newAggregatorBalance;
     }
 
     {
       // 2. Test Executor withdrawal (permissionless - PAL compatible)
-      // Fees go to executor proxy, which can withdraw them
-      uint256 executorFeeBalance = end.executorBalance - initial.executorBalance;
-      uint256 aggregatorBalanceBeforeExecutor = IERC20(s_sourceFeeToken).balanceOf(s_feeAggregator);
-      vm.stopPrank();
-      vm.prank(s_automationAddress); // Anyone can call (PAL compatible)
+      // Fees go to executor proxy, which can withdraw them (check against receipt)
       Proxy(s_executor).withdrawFeeTokens(feeTokens);
-      uint256 aggregatorBalanceAfterExecutor = IERC20(s_sourceFeeToken).balanceOf(s_feeAggregator);
-      // Use actual balance withdrawn, not the calculated difference
-      uint256 actualExecutorWithdrawn = aggregatorBalanceAfterExecutor - aggregatorBalanceBeforeExecutor;
-      assertEq(actualExecutorWithdrawn, executorFeeBalance, "Executor fees should be withdrawn to aggregator");
+      uint256 newAggregatorBalance = IERC20(s_sourceFeeToken).balanceOf(s_feeAggregator);
+      uint256 actualExecutorWithdrawn = newAggregatorBalance - aggregatorBalance;
+      assertEq(
+        actualExecutorWithdrawn,
+        receipts[executorReceiptIndex].feeTokenAmount,
+        "Executor fees should match receipt amount"
+      );
       totalFeesWithdrawn += actualExecutorWithdrawn;
+      aggregatorBalance = newAggregatorBalance;
     }
 
     {
       // 3. Test TokenPool withdrawal (permissionless - PAL compatible)
-      // For V2 pools, fees go directly to pool during _distributeFees
-      // Check if pool received fees from the actual transaction
-      uint256 poolFeeBalance = end.tokenPoolBalance - initial.tokenPoolBalance;
-
-      // If pool received fees from the transaction, test withdrawing them
-      // Otherwise, manually add fees to test the withdrawal mechanism
-      uint256 poolFeeAmount = poolFeeBalance > 0 ? poolFeeBalance : 100 ether;
-      if (poolFeeBalance == 0) {
-        // Pool didn't receive fees (likely because FeeQuoter returned 0 or pool config disabled)
-        // Manually add fees to test withdrawal mechanism
-        deal(s_sourceFeeToken, address(s_tokenPool), poolFeeAmount);
-      }
-
-      uint256 aggregatorBalanceBeforePool = IERC20(s_sourceFeeToken).balanceOf(s_feeAggregator);
-      uint256 actualPoolBalance = IERC20(s_sourceFeeToken).balanceOf(address(s_tokenPool));
-      vm.stopPrank();
-      vm.prank(s_automationAddress); // Anyone can call (PAL compatible)
+      // For V2 pools, fees go directly to pool during _distributeFees (check against receipt)
       s_tokenPool.withdrawFeeTokens(feeTokens);
-      uint256 aggregatorBalanceAfterPool = IERC20(s_sourceFeeToken).balanceOf(s_feeAggregator);
-      uint256 actualPoolWithdrawn = aggregatorBalanceAfterPool - aggregatorBalanceBeforePool;
-      assertEq(actualPoolWithdrawn, actualPoolBalance, "TokenPool fees should be withdrawn to aggregator");
+      uint256 newAggregatorBalance = IERC20(s_sourceFeeToken).balanceOf(s_feeAggregator);
+      uint256 actualPoolWithdrawn = newAggregatorBalance - aggregatorBalance;
+      assertEq(
+        actualPoolWithdrawn, receipts[tokenReceiptIndex].feeTokenAmount, "TokenPool fees should match receipt amount"
+      );
       totalFeesWithdrawn += actualPoolWithdrawn;
+      aggregatorBalance = newAggregatorBalance;
     }
 
     // 4. Test Verifier withdrawal (permissionless - PAL compatible)
-    // Fees go to resolver (proxy), which can withdraw them
-    uint256 verifierFeeBalance = end.verifierResolverBalance - initial.verifierResolverBalance;
-    if (verifierFeeBalance > 0) {
-      uint256 aggregatorBalanceBeforeVerifier = IERC20(s_sourceFeeToken).balanceOf(s_feeAggregator);
-
+    // Fees go to resolver (proxy), which can withdraw them (check against receipt)
+    if (receipts[verifierReceiptIndex].feeTokenAmount > 0) {
       // Withdraw from resolver (proxy) - Proxy has its own withdrawFeeTokens
-      vm.stopPrank();
-      vm.prank(s_automationAddress); // Anyone can call (PAL compatible)
       Proxy(s_verifierResolver).withdrawFeeTokens(feeTokens);
 
-      // Use actual balance withdrawn, not the calculated difference
-      uint256 actualVerifierWithdrawn =
-        IERC20(s_sourceFeeToken).balanceOf(s_feeAggregator) - aggregatorBalanceBeforeVerifier;
-      assertEq(actualVerifierWithdrawn, verifierFeeBalance, "Verifier fees should be withdrawable from resolver");
+      uint256 newAggregatorBalance = IERC20(s_sourceFeeToken).balanceOf(s_feeAggregator);
+      uint256 actualVerifierWithdrawn = newAggregatorBalance - aggregatorBalance;
+      assertEq(
+        actualVerifierWithdrawn,
+        receipts[verifierReceiptIndex].feeTokenAmount,
+        "Verifier fees should match receipt amount"
+      );
 
       // Verify no fees remain on resolver after withdrawal
       assertEq(
@@ -390,129 +385,32 @@ contract e2e_feeWithdrawal is OnRampSetup {
       );
 
       totalFeesWithdrawn += actualVerifierWithdrawn;
+      aggregatorBalance = newAggregatorBalance;
     }
 
-    // Verify total fees collected in aggregator
+    // Verify total fees collected in aggregator matches sum of receipts
     end.feeAggregatorBalance = IERC20(s_sourceFeeToken).balanceOf(s_feeAggregator);
+    uint256 expectedTotalFees = receipts[networkFeeReceiptIndex].feeTokenAmount
+      + receipts[executorReceiptIndex].feeTokenAmount + receipts[tokenReceiptIndex].feeTokenAmount
+      + receipts[verifierReceiptIndex].feeTokenAmount;
+
     assertEq(
       end.feeAggregatorBalance - initial.feeAggregatorBalance,
-      totalFeesWithdrawn,
-      "Total fees withdrawn should match sum of individual withdrawals"
+      expectedTotalFees,
+      "Total fees withdrawn should match sum of receipt amounts"
     );
-
-    vm.resumeGasMetering();
   }
 
-  /// @notice Test that verifier fees go to resolver (proxy), not implementation
-  function test_VerifierFeeIssue_FeesGoToResolverNotImplementation() public {
-    vm.pauseGasMetering();
-
-    // Ensure the test contract has fee tokens to pay for the transaction
-    // Router will transferFrom msg.sender (this test contract) to OnRamp
-    deal(s_sourceFeeToken, address(this), type(uint256).max);
-
-    // Get initial balances
-    uint256 initialVerifierResolverBalance = IERC20(s_sourceFeeToken).balanceOf(s_verifierResolver);
-    uint256 initialVerifierImplBalance = IERC20(s_sourceFeeToken).balanceOf(address(s_verifierImpl));
-
-    // Prepare message
-    Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
-      receiver: abi.encode(OWNER),
-      data: "",
-      tokenAmounts: new Client.EVMTokenAmount[](0),
-      feeToken: s_sourceFeeToken,
-      extraArgs: ExtraArgsCodec._encodeGenericExtraArgsV3(
-        ExtraArgsCodec.GenericExtraArgsV3({
-          ccvs: new address[](0),
-          ccvArgs: new bytes[](0),
-          blockConfirmations: 0,
-          gasLimit: GAS_LIMIT,
-          executor: address(0),
-          executorArgs: "",
-          tokenReceiver: "",
-          tokenArgs: ""
-        })
-      )
-    });
-
-    // Get fee and approve
-    uint256 fee = s_sourceRouter.getFee(DEST_CHAIN_SELECTOR, message);
-    IERC20(s_sourceFeeToken).approve(address(s_sourceRouter), fee);
-
-    // Perform ccipSend
-    vm.resumeGasMetering();
-    s_sourceRouter.ccipSend(DEST_CHAIN_SELECTOR, message);
-    vm.pauseGasMetering();
-
-    // Check balances
-    uint256 finalVerifierResolverBalance = IERC20(s_sourceFeeToken).balanceOf(s_verifierResolver);
-    uint256 finalVerifierImplBalance = IERC20(s_sourceFeeToken).balanceOf(address(s_verifierImpl));
-
-    // Fees should go to resolver (proxy), not implementation
-    assertGt(finalVerifierResolverBalance, initialVerifierResolverBalance, "Fees should go to resolver (proxy)");
-    assertEq(finalVerifierImplBalance, initialVerifierImplBalance, "Implementation should NOT receive fees directly");
-
-    // Verify that resolver is different from implementation
-    address implAddress =
-      ICrossChainVerifierResolver(s_verifierResolver).getOutboundImplementation(DEST_CHAIN_SELECTOR, "");
-    assertEq(implAddress, address(s_verifierImpl), "Resolver should resolve to implementation");
-    assertTrue(s_verifierResolver != address(s_verifierImpl), "Resolver and impl should be different");
-
-    vm.resumeGasMetering();
-  }
-
-  /// @notice Test PAL compatibility: permissionless vs onlyOwner
-  function test_PALCompatibility_PermissionlessVsOnlyOwner() public {
-    vm.pauseGasMetering();
-
-    // Give components some fees
-    uint256 feeAmount = 100 ether;
-    deal(s_sourceFeeToken, address(s_onRamp), feeAmount);
-    deal(s_sourceFeeToken, s_executor, feeAmount); // Proxy address
-    deal(s_sourceFeeToken, address(s_tokenPool), feeAmount);
-    deal(s_sourceFeeToken, s_verifierResolver, feeAmount);
-
-    address[] memory feeTokens = new address[](1);
-    feeTokens[0] = s_sourceFeeToken;
-
-    // 1. OnRamp: Permissionless (PAL compatible) ✅
-    uint256 aggregatorBalanceBefore = IERC20(s_sourceFeeToken).balanceOf(s_feeAggregator);
-    vm.stopPrank();
-    vm.prank(s_automationAddress);
-    s_onRamp.withdrawFeeTokens(feeTokens);
-    uint256 aggregatorBalanceAfter = IERC20(s_sourceFeeToken).balanceOf(s_feeAggregator);
-    assertEq(
-      aggregatorBalanceAfter - aggregatorBalanceBefore, feeAmount, "OnRamp: Automation can withdraw (PAL compatible)"
-    );
-
-    // 2. Verifier: Permissionless (PAL compatible) ✅
-    aggregatorBalanceBefore = IERC20(s_sourceFeeToken).balanceOf(s_feeAggregator);
-    vm.prank(s_automationAddress);
-    Proxy(s_verifierResolver).withdrawFeeTokens(feeTokens);
-    aggregatorBalanceAfter = IERC20(s_sourceFeeToken).balanceOf(s_feeAggregator);
-    assertEq(
-      aggregatorBalanceAfter - aggregatorBalanceBefore, feeAmount, "Verifier: Automation can withdraw (PAL compatible)"
-    );
-
-    // 3. Executor: Permissionless (PAL compatible) ✅
-    aggregatorBalanceBefore = IERC20(s_sourceFeeToken).balanceOf(s_feeAggregator);
-    vm.prank(s_automationAddress);
-    Proxy(s_executor).withdrawFeeTokens(feeTokens);
-    aggregatorBalanceAfter = IERC20(s_sourceFeeToken).balanceOf(s_feeAggregator);
-    assertEq(
-      aggregatorBalanceAfter - aggregatorBalanceBefore, feeAmount, "Executor: Automation can withdraw (PAL compatible)"
-    );
-
-    // 4. TokenPool: Permissionless (PAL compatible) ✅
-    deal(s_sourceFeeToken, address(s_tokenPool), feeAmount); // Re-add fees
-    aggregatorBalanceBefore = IERC20(s_sourceFeeToken).balanceOf(s_feeAggregator);
-    vm.prank(s_automationAddress);
-    s_tokenPool.withdrawFeeTokens(feeTokens);
-    aggregatorBalanceAfter = IERC20(s_sourceFeeToken).balanceOf(s_feeAggregator);
-    assertEq(
-      aggregatorBalanceAfter - aggregatorBalanceBefore, feeAmount, "TokenPool: Automation can withdraw (PAL compatible)"
-    );
-
-    vm.resumeGasMetering();
+  /// @notice Helper function to extract receipts from CCIPMessageSent event logs
+  function _getReceiptsFromLogs(
+    VmSafe.Log[] memory logs
+  ) private pure returns (OnRamp.Receipt[] memory receipts) {
+    for (uint256 i = 0; i < logs.length; ++i) {
+      if (logs[i].topics.length != 0 && logs[i].topics[0] == CCIP_MESSAGE_SENT_TOPIC) {
+        (,, receipts,) = abi.decode(logs[i].data, (address, bytes, OnRamp.Receipt[], bytes[]));
+        break;
+      }
+    }
+    return receipts;
   }
 }
