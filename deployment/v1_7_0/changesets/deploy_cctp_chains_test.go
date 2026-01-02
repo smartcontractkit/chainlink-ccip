@@ -51,7 +51,7 @@ func (m *cctpTest_MockCCTPChain) DeployCCTPChain() *cldf_ops.Sequence[adapters.D
 				Addresses: []datastore.AddressRef{
 					{
 						ChainSelector: input.ChainSelector,
-						Address:       input.USDCTokenPoolProxy,
+						Address:       input.TokenPool[0],
 						Type:          datastore.ContractType("USDCTokenPoolProxy"),
 						Version:       semver.MustParse("1.7.0"),
 					},
@@ -169,13 +169,12 @@ func TestDeployCCTPChains_Apply(t *testing.T) {
 				Chains: []adapters.DeployCCTPInput[datastore.AddressRef, datastore.AddressRef]{
 					{
 						ChainSelector: 5009297550715157269,
-						TokenPools:    adapters.TokenPools[datastore.AddressRef]{
-							// Token pools are optional, can be empty
-						},
-						USDCTokenPoolProxy: datastore.AddressRef{
-							ChainSelector: 5009297550715157269,
-							Type:          datastore.ContractType("USDCTokenPoolProxy"),
-							Version:       semver.MustParse("1.7.0"),
+						TokenPool: []datastore.AddressRef{
+							{
+								ChainSelector: 5009297550715157269,
+								Type:          datastore.ContractType("USDCTokenPoolProxy"),
+								Version:       semver.MustParse("1.7.0"),
+							},
 						},
 						CCTPVerifier: []datastore.AddressRef{
 							{
@@ -209,7 +208,7 @@ func TestDeployCCTPChains_Apply(t *testing.T) {
 						RemoteChains:                     make(map[uint64]adapters.RemoteCCTPChainConfig[datastore.AddressRef, datastore.AddressRef]),
 					},
 				},
-				MCMS: cctpTest_BasicMCMSInput,
+				MCMS: &cctpTest_BasicMCMSInput,
 			},
 		},
 		{
@@ -223,7 +222,7 @@ func TestDeployCCTPChains_Apply(t *testing.T) {
 						ChainSelector: 5009297550715157269,
 					},
 				},
-				MCMS: cctpTest_BasicMCMSInput,
+				MCMS: &cctpTest_BasicMCMSInput,
 			},
 			expectedError: "no CCTP adapter registered",
 		},
@@ -238,7 +237,7 @@ func TestDeployCCTPChains_Apply(t *testing.T) {
 						ChainSelector: 5009297550715157269,
 					},
 				},
-				MCMS: cctpTest_BasicMCMSInput,
+				MCMS: &cctpTest_BasicMCMSInput,
 			},
 			expectedSequenceErrorMsg: "sequence execution failed",
 			expectedError:            "failed to deploy CCTP on chain",
@@ -284,6 +283,304 @@ func TestDeployCCTPChains_Apply(t *testing.T) {
 
 			require.NoError(t, err)
 			require.NotNil(t, output)
+		})
+	}
+}
+
+func TestDeployCCTPChains_VerifyPreconditions(t *testing.T) {
+	tests := []struct {
+		desc          string
+		cfg           v1_7_0_changesets.DeployCCTPChainsConfig
+		expectedError string
+	}{
+		{
+			desc: "success - valid configuration",
+			cfg: v1_7_0_changesets.DeployCCTPChainsConfig{
+				Chains: []adapters.DeployCCTPInput[datastore.AddressRef, datastore.AddressRef]{
+					{
+						ChainSelector: 5009297550715157269,
+						TokenPool: []datastore.AddressRef{
+							{
+								ChainSelector: 5009297550715157269,
+								Type:          datastore.ContractType("USDCTokenPoolProxy"),
+								Version:       semver.MustParse("1.7.0"),
+							},
+						},
+						RemoteChains: map[uint64]adapters.RemoteCCTPChainConfig[datastore.AddressRef, datastore.AddressRef]{
+							15971525489660198786: {},
+						},
+					},
+				},
+				MCMS: &cctpTest_BasicMCMSInput,
+			},
+		},
+		{
+			desc: "success - no MCMS config",
+			cfg: v1_7_0_changesets.DeployCCTPChainsConfig{
+				Chains: []adapters.DeployCCTPInput[datastore.AddressRef, datastore.AddressRef]{
+					{
+						ChainSelector: 5009297550715157269,
+						TokenPool: []datastore.AddressRef{
+							{
+								ChainSelector: 5009297550715157269,
+								Type:          datastore.ContractType("USDCTokenPoolProxy"),
+								Version:       semver.MustParse("1.7.0"),
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			desc: "failure - empty token pool",
+			cfg: v1_7_0_changesets.DeployCCTPChainsConfig{
+				Chains: []adapters.DeployCCTPInput[datastore.AddressRef, datastore.AddressRef]{
+					{
+						ChainSelector: 5009297550715157269,
+						TokenPool:     []datastore.AddressRef{}, // Empty
+					},
+				},
+			},
+			expectedError: "token pool is empty for chain with selector",
+		},
+		{
+			desc: "failure - unknown chain selector",
+			cfg: v1_7_0_changesets.DeployCCTPChainsConfig{
+				Chains: []adapters.DeployCCTPInput[datastore.AddressRef, datastore.AddressRef]{
+					{
+						ChainSelector: 0, // Invalid chain selector
+						TokenPool: []datastore.AddressRef{
+							{
+								ChainSelector: 0,
+								Type:          datastore.ContractType("USDCTokenPoolProxy"),
+								Version:       semver.MustParse("1.7.0"),
+							},
+						},
+					},
+				},
+			},
+			expectedError: "unknown chain selector",
+		},
+		{
+			desc: "failure - unknown remote chain selector",
+			cfg: v1_7_0_changesets.DeployCCTPChainsConfig{
+				Chains: []adapters.DeployCCTPInput[datastore.AddressRef, datastore.AddressRef]{
+					{
+						ChainSelector: 5009297550715157269,
+						TokenPool: []datastore.AddressRef{
+							{
+								ChainSelector: 5009297550715157269,
+								Type:          datastore.ContractType("USDCTokenPoolProxy"),
+								Version:       semver.MustParse("1.7.0"),
+							},
+						},
+						RemoteChains: map[uint64]adapters.RemoteCCTPChainConfig[datastore.AddressRef, datastore.AddressRef]{
+							0: {}, // Invalid remote chain selector
+						},
+					},
+				},
+			},
+			expectedError: "unknown chain selector",
+		},
+		{
+			desc: "failure - invalid MCMS timelock action",
+			cfg: v1_7_0_changesets.DeployCCTPChainsConfig{
+				Chains: []adapters.DeployCCTPInput[datastore.AddressRef, datastore.AddressRef]{
+					{
+						ChainSelector: 5009297550715157269,
+						TokenPool: []datastore.AddressRef{
+							{
+								ChainSelector: 5009297550715157269,
+								Type:          datastore.ContractType("USDCTokenPoolProxy"),
+								Version:       semver.MustParse("1.7.0"),
+							},
+						},
+					},
+				},
+				MCMS: &mcms.Input{
+					OverridePreviousRoot: true,
+					ValidUntil:           3759765795,
+					TimelockDelay:        mcms_types.MustParseDuration("1h"),
+					TimelockAction:       "InvalidAction", // Invalid action
+					MCMSAddressRef: datastore.AddressRef{
+						Type:    "MCM",
+						Version: semver.MustParse("1.0.0"),
+					},
+					TimelockAddressRef: datastore.AddressRef{
+						Type:    "Timelock",
+						Version: semver.MustParse("1.0.0"),
+					},
+				},
+			},
+			expectedError: "failed to validate MCMS input",
+		},
+		{
+			desc: "failure - empty MCMS address ref",
+			cfg: v1_7_0_changesets.DeployCCTPChainsConfig{
+				Chains: []adapters.DeployCCTPInput[datastore.AddressRef, datastore.AddressRef]{
+					{
+						ChainSelector: 5009297550715157269,
+						TokenPool: []datastore.AddressRef{
+							{
+								ChainSelector: 5009297550715157269,
+								Type:          datastore.ContractType("USDCTokenPoolProxy"),
+								Version:       semver.MustParse("1.7.0"),
+							},
+						},
+					},
+				},
+				MCMS: &mcms.Input{
+					OverridePreviousRoot: true,
+					ValidUntil:           3759765795,
+					TimelockDelay:        mcms_types.MustParseDuration("1h"),
+					TimelockAction:       mcms_types.TimelockActionSchedule,
+					MCMSAddressRef:       datastore.AddressRef{}, // Empty ref
+					TimelockAddressRef: datastore.AddressRef{
+						Type:    "Timelock",
+						Version: semver.MustParse("1.0.0"),
+					},
+				},
+			},
+			expectedError: "failed to validate MCMS input",
+		},
+		{
+			desc: "failure - empty timelock address ref",
+			cfg: v1_7_0_changesets.DeployCCTPChainsConfig{
+				Chains: []adapters.DeployCCTPInput[datastore.AddressRef, datastore.AddressRef]{
+					{
+						ChainSelector: 5009297550715157269,
+						TokenPool: []datastore.AddressRef{
+							{
+								ChainSelector: 5009297550715157269,
+								Type:          datastore.ContractType("USDCTokenPoolProxy"),
+								Version:       semver.MustParse("1.7.0"),
+							},
+						},
+					},
+				},
+				MCMS: &mcms.Input{
+					OverridePreviousRoot: true,
+					ValidUntil:           3759765795,
+					TimelockDelay:        mcms_types.MustParseDuration("1h"),
+					TimelockAction:       mcms_types.TimelockActionSchedule,
+					MCMSAddressRef: datastore.AddressRef{
+						Type:    "MCM",
+						Version: semver.MustParse("1.0.0"),
+					},
+					TimelockAddressRef: datastore.AddressRef{}, // Empty ref
+				},
+			},
+			expectedError: "failed to validate MCMS input",
+		},
+		{
+			desc: "failure - zero valid until timestamp",
+			cfg: v1_7_0_changesets.DeployCCTPChainsConfig{
+				Chains: []adapters.DeployCCTPInput[datastore.AddressRef, datastore.AddressRef]{
+					{
+						ChainSelector: 5009297550715157269,
+						TokenPool: []datastore.AddressRef{
+							{
+								ChainSelector: 5009297550715157269,
+								Type:          datastore.ContractType("USDCTokenPoolProxy"),
+								Version:       semver.MustParse("1.7.0"),
+							},
+						},
+					},
+				},
+				MCMS: &mcms.Input{
+					OverridePreviousRoot: true,
+					ValidUntil:           0, // Zero timestamp
+					TimelockDelay:        mcms_types.MustParseDuration("1h"),
+					TimelockAction:       mcms_types.TimelockActionSchedule,
+					MCMSAddressRef: datastore.AddressRef{
+						Type:    "MCM",
+						Version: semver.MustParse("1.0.0"),
+					},
+					TimelockAddressRef: datastore.AddressRef{
+						Type:    "Timelock",
+						Version: semver.MustParse("1.0.0"),
+					},
+				},
+			},
+			expectedError: "failed to validate MCMS input",
+		},
+		{
+			desc: "failure - multiple chains with one having empty token pool",
+			cfg: v1_7_0_changesets.DeployCCTPChainsConfig{
+				Chains: []adapters.DeployCCTPInput[datastore.AddressRef, datastore.AddressRef]{
+					{
+						ChainSelector: 5009297550715157269,
+						TokenPool: []datastore.AddressRef{
+							{
+								ChainSelector: 5009297550715157269,
+								Type:          datastore.ContractType("USDCTokenPoolProxy"),
+								Version:       semver.MustParse("1.7.0"),
+							},
+						},
+					},
+					{
+						ChainSelector: 15971525489660198786,
+						TokenPool:     []datastore.AddressRef{}, // Empty
+					},
+				},
+			},
+			expectedError: "token pool is empty for chain with selector",
+		},
+		{
+			desc: "failure - multiple remote chains with one having unknown selector",
+			cfg: v1_7_0_changesets.DeployCCTPChainsConfig{
+				Chains: []adapters.DeployCCTPInput[datastore.AddressRef, datastore.AddressRef]{
+					{
+						ChainSelector: 5009297550715157269,
+						TokenPool: []datastore.AddressRef{
+							{
+								ChainSelector: 5009297550715157269,
+								Type:          datastore.ContractType("USDCTokenPoolProxy"),
+								Version:       semver.MustParse("1.7.0"),
+							},
+						},
+						RemoteChains: map[uint64]adapters.RemoteCCTPChainConfig[datastore.AddressRef, datastore.AddressRef]{
+							15971525489660198786: {},
+							0:                    {}, // Invalid remote chain selector
+						},
+					},
+				},
+			},
+			expectedError: "unknown chain selector",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.desc, func(t *testing.T) {
+			// Create CCTP chain registry and MCMS registry (not used in verify, but required for changeset creation)
+			cctpChainRegistry := adapters.NewCCTPChainRegistry()
+			mcmsRegistry := changesets.NewMCMSReaderRegistry()
+
+			// Create changeset
+			changeset := v1_7_0_changesets.DeployCCTPChains(cctpChainRegistry, mcmsRegistry)
+
+			// Create minimal environment (verify doesn't use datastore or other fields)
+			lggr, err := logger.New()
+			require.NoError(t, err, "Failed to create logger")
+			bundle := cldf_ops.NewBundle(
+				func() context.Context { return context.Background() },
+				lggr,
+				cldf_ops.NewMemoryReporter(),
+			)
+			e := deployment.Environment{
+				OperationsBundle: bundle,
+				DataStore:        datastore.NewMemoryDataStore().Seal(),
+			}
+
+			// Run verify
+			err = changeset.VerifyPreconditions(e, tt.cfg)
+			if tt.expectedError != "" {
+				require.Error(t, err)
+				require.ErrorContains(t, err, tt.expectedError)
+			} else {
+				require.NoError(t, err)
+			}
 		})
 	}
 }
