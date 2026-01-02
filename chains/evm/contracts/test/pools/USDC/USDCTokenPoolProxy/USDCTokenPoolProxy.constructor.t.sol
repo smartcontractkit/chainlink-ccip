@@ -17,7 +17,7 @@ contract USDCTokenPoolProxy_constructor is USDCSetup {
   address internal s_cctpVerifier = makeAddr("cctpVerifier");
 
   function test_constructor() public {
-    // Arrange: Define test constants
+    // Arrange: Define test constants.
     USDCTokenPoolProxy proxy = new USDCTokenPoolProxy(
       s_USDCToken,
       USDCTokenPoolProxy.PoolAddresses({

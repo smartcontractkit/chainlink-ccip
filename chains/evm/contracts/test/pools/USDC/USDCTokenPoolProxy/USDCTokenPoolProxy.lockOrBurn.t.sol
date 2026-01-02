@@ -25,7 +25,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
   function setUp() public virtual override {
     super.setUp();
 
-    // Set the OnRamp on the router for each of the chain selectors
+    // Set the OnRamp on the router for each of the chain selectors.
     Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](4);
     onRampUpdates[0] = Router.OnRamp({destChainSelector: s_chainSelForV1, onRamp: s_routerAllowedOnRamp});
     onRampUpdates[1] = Router.OnRamp({destChainSelector: s_chainSelForV2, onRamp: s_routerAllowedOnRamp});
@@ -33,7 +33,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
     onRampUpdates[3] = Router.OnRamp({destChainSelector: s_chainSelForCCV, onRamp: s_routerAllowedOnRamp});
     s_router.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), new Router.OffRamp[](0));
 
-    // Configure lock or burn mechanisms for different chains
+    // Configure lock or burn mechanisms for different chains.
     uint64[] memory chainSelectors = new uint64[](4);
     chainSelectors[0] = s_chainSelForV1;
     chainSelectors[1] = s_chainSelForV2;
@@ -67,7 +67,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
       localToken: address(s_USDCToken)
     });
 
-    // Mock the CCTP V1 pool's lockOrBurn to return expected output
+    // Mock the CCTP V1 pool's lockOrBurn to return expected output.
     Pool.LockOrBurnOutV1 memory expectedOutput =
       Pool.LockOrBurnOutV1({destTokenAddress: destTokenAddress, destPoolData: s_destPoolData});
 
@@ -96,7 +96,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
   }
 
   function test_lockOrBurn_CCTPV2() public {
-    // Arrange: Define test constants
+    // Arrange: Define test constants.
     uint256 amount = 200;
     bytes memory destTokenAddress = abi.encode(address(s_USDCToken));
 
@@ -114,7 +114,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
       abi.encode(Pool.LockOrBurnOutV1({destTokenAddress: destTokenAddress, destPoolData: s_destPoolData}))
     );
 
-    // Mock the CCTP V2 pool's lockOrBurn to return expected output
+    // Mock the CCTP V2 pool's lockOrBurn to return expected output.
     Pool.LockOrBurnOutV1 memory expectedOutput =
       Pool.LockOrBurnOutV1({destTokenAddress: destTokenAddress, destPoolData: s_destPoolData});
 
@@ -138,7 +138,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
     // so we need to mock those here.
     _enableERC165InterfaceChecks(address(s_lockReleasePool), type(IPoolV1).interfaceId);
 
-    // Set the siloed pool via updatePoolAddresses - use a clean PoolAddresses struct
+    // Set the siloed pool via updatePoolAddresses - use a clean PoolAddresses struct.
     s_usdcTokenPoolProxy.updatePoolAddresses(
       USDCTokenPoolProxy.PoolAddresses({
         cctpV1Pool: address(0),
@@ -162,7 +162,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
       localToken: address(s_USDCToken)
     });
 
-    // Mock the lock release pool's lockOrBurn to return expected output
+    // Mock the lock release pool's lockOrBurn to return expected output.
     Pool.LockOrBurnOutV1 memory expectedOutput =
       Pool.LockOrBurnOutV1({destTokenAddress: destTokenAddress, destPoolData: s_destPoolData});
 
@@ -219,7 +219,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
     assertEq(result.destPoolData, expectedOutput.destPoolData);
     assertEq(destTokenAmount, amount);
 
-    // Ensure that the balance of the verifier impl has been updated
+    // Ensure that the balance of the verifier impl has been updated.
     assertEq(s_USDCToken.balanceOf(verifierImpl), amount);
   }
 
@@ -230,7 +230,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
     bytes[] memory remotePoolAddresses = new bytes[](1);
     remotePoolAddresses[0] = abi.encode(address(s_lockReleasePool));
 
-    // Remove the CCTP V2 with CCV pool from stored pools
+    // Remove the CCTP V2 with CCV pool from stored pools.
     _enableERC165InterfaceChecks(s_cctpTokenPool, type(IPoolV1).interfaceId);
     _enableERC165InterfaceChecks(s_cctpV2Pool, type(IPoolV1).interfaceId);
     _enableERC165InterfaceChecks(s_cctpV1Pool, type(IPoolV1).interfaceId);
@@ -324,7 +324,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
   }
 
   function test_lockOrBurn_RevertWhen_NoLockOrBurnMechanismSet() public {
-    // Configure lock or burn mechanisms for different chains but do not set the lock release pool for the chain
+    // Configure lock or burn mechanisms for different chains but do not set the lock release pool for the chain.
     uint64[] memory chainSelectors = new uint64[](1);
     chainSelectors[0] = s_chainSelFoLockRelease;
 

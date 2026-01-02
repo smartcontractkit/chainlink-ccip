@@ -23,14 +23,14 @@ contract USDCTokenPoolProxySetup is USDCSetup {
   function setUp() public virtual override {
     super.setUp();
 
-    // Mock the transmitter proxy's receiveMessage function to return true
+    // Mock the transmitter proxy's receiveMessage function to return true.
     vm.mockCall(
       address(s_cctpV1Pool),
       abi.encodeWithSelector(bytes4(keccak256("i_messageTransmitterProxy()"))),
       abi.encode(s_mockTransmitterProxy)
     );
 
-    // Deploy the proxy
+    // Deploy the proxy.
     s_usdcTokenPoolProxy = new USDCTokenPoolProxy(
       s_USDCToken,
       USDCTokenPoolProxy.PoolAddresses({
@@ -43,7 +43,7 @@ contract USDCTokenPoolProxySetup is USDCSetup {
       address(s_cctpVerifier)
     );
 
-    // Deal some tokens to the proxy to test the transfer to the destination pool
+    // Deal some tokens to the proxy to test the transfer to the destination pool.
     deal(address(s_USDCToken), address(s_usdcTokenPoolProxy), 1000e6);
 
     bytes[] memory sourcePoolAddresses = new bytes[](1);
