@@ -12,13 +12,11 @@ import {OffRamp} from "../../offRamp/OffRamp.sol";
 import {OnRamp} from "../../onRamp/OnRamp.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
 import {OffRampHelper} from "../helpers/OffRampHelper.sol";
-
 import {TokenPoolHelper} from "../helpers/TokenPoolHelper.sol";
 import {MockVerifier} from "../mocks/MockVerifier.sol";
-
 import {OnRampSetup} from "../onRamp/OnRamp/OnRampSetup.t.sol";
-
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
+
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 import {VmSafe} from "forge-std/Vm.sol";
 
@@ -94,10 +92,8 @@ contract e2e_feeWithdrawal is OnRampSetup {
     // Set fee aggregator for TokenPool via setDynamicConfig
     vm.startPrank(OWNER);
     s_tokenPool.setDynamicConfig(address(s_sourceRouter), address(0), s_feeAggregator);
-    vm.stopPrank();
 
     // Set up router with onRamp
-    vm.startPrank(OWNER);
     Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](1);
     onRampUpdates[0] = Router.OnRamp({destChainSelector: DEST_CHAIN_SELECTOR, onRamp: address(s_onRamp)});
     s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), new Router.OffRamp[](0));
@@ -204,7 +200,6 @@ contract e2e_feeWithdrawal is OnRampSetup {
     offRampUpdates[0] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_SELECTOR, offRamp: address(s_offRamp)});
     vm.startPrank(OWNER);
     s_destRouter.applyRampUpdates(new Router.OnRamp[](0), new Router.OffRamp[](0), offRampUpdates);
-    vm.stopPrank();
 
     // Set up automation address (simulates Chainlink Automation/CRE)
     s_automationAddress = makeAddr("automation");
@@ -213,7 +208,6 @@ contract e2e_feeWithdrawal is OnRampSetup {
     // OnRampSetup uses FEE_AGGREGATOR constant, but we need to use s_feeAggregator for consistency
     OnRamp.DynamicConfig memory onRampConfig = s_onRamp.getDynamicConfig();
     onRampConfig.feeAggregator = s_feeAggregator;
-    vm.startPrank(OWNER);
     s_onRamp.setDynamicConfig(onRampConfig);
     vm.stopPrank();
 
@@ -319,7 +313,7 @@ contract e2e_feeWithdrawal is OnRampSetup {
     uint256 aggregatorBalance = IERC20(s_sourceFeeToken).balanceOf(s_feeAggregator);
 
     vm.stopPrank();
-    vm.prank(s_automationAddress); // Anyone can call (PAL compatible)
+    vm.startPrank(s_automationAddress); // Anyone can call (PAL compatible)
     {
       // 1. Test OnRamp withdrawal (permissionless - PAL compatible)
       // Withdraw network fee (check against receipt)
