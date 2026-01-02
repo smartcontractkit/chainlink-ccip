@@ -17,11 +17,6 @@ contract USDCTokenPoolProxy_setFeeAggregator is USDCTokenPoolProxySetup {
 
   // Reverts
 
-  function test_setFeeAggregator_RevertWhen_ZeroAddress() public {
-    vm.expectRevert(USDCTokenPoolProxy.AddressCannotBeZero.selector);
-    s_usdcTokenPoolProxy.setFeeAggregator(address(0));
-  }
-
   function test_setFeeAggregator_RevertWhen_CallerIsNotOwner() public {
     address nonOwner = makeAddr("nonOwner");
     address newFeeAggregator = makeAddr("newFeeAggregator");

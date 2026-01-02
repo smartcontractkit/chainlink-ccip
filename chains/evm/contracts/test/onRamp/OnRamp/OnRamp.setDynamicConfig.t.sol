@@ -70,15 +70,6 @@ contract OnRamp_setDynamicConfig is OnRampSetup {
     s_onRamp.setDynamicConfig(newConfig);
   }
 
-  function test_SetDynamicConfig_RevertWhen_InvalidConfig_ZeroFeeAggregator() public {
-    OnRamp.DynamicConfig memory newConfig = OnRamp.DynamicConfig({
-      feeQuoter: makeAddr("feeQuoter"), reentrancyGuardEntered: false, feeAggregator: address(0)
-    });
-
-    vm.expectRevert(OnRamp.InvalidConfig.selector);
-    s_onRamp.setDynamicConfig(newConfig);
-  }
-
   function test_SetDynamicConfig_RevertWhen_InvalidConfig_ReentrancyGuardSet() public {
     OnRamp.DynamicConfig memory newConfig = OnRamp.DynamicConfig({
       feeQuoter: makeAddr("feeQuoter"), reentrancyGuardEntered: true, feeAggregator: makeAddr("feeAggregator")

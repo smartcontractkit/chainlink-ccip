@@ -233,6 +233,8 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   /// @param router The address of the router contract.
   /// @param rateLimitAdmin The address of the rate limiter admin.
   /// @param feeAggregator The address where fees are sent.
+  /// @dev FeeTokenHandler will revert if feeAggregator is zero when withdrawing fees.
+  /// @dev A zero address fee aggregator is valid, and intentionally reverts calls to withdraw fee tokens.
   function setDynamicConfig(
     address router,
     address rateLimitAdmin,

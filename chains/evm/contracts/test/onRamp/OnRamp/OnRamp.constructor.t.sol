@@ -91,12 +91,6 @@ contract OnRamp_constructor is OnRampSetup {
     vm.expectRevert(OnRamp.InvalidConfig.selector);
     new OnRamp(staticConfig, dynamicConfig0);
 
-    // feeAggregator == address(0)
-    OnRamp.DynamicConfig memory dynamicConfig1 =
-      OnRamp.DynamicConfig({feeQuoter: address(s_feeQuoter), reentrancyGuardEntered: false, feeAggregator: address(0)});
-    vm.expectRevert(OnRamp.InvalidConfig.selector);
-    new OnRamp(staticConfig, dynamicConfig1);
-
     // reentrancyGuardEntered == true
     OnRamp.DynamicConfig memory dynamicConfig2 = OnRamp.DynamicConfig({
       feeQuoter: address(s_feeQuoter), reentrancyGuardEntered: true, feeAggregator: FEE_AGGREGATOR

@@ -113,18 +113,20 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
   }
 
   /// @notice Sets the dynamic config.
+  /// @param dynamicConfig The dynamic configuration.
+  /// @dev FeeTokenHandler will revert if feeAggregator is zero when withdrawing fees.
+  /// @dev A zero address fee aggregator is valid, and intentionally reverts calls to withdraw fee tokens.
   function setDynamicConfig(
     DynamicConfig memory dynamicConfig
   ) external onlyOwner {
     _setDynamicConfig(dynamicConfig);
   }
 
+  /// @dev FeeTokenHandler will revert if feeAggregator is zero when withdrawing fees.
+  /// @dev A zero address fee aggregator is valid, and intentionally reverts calls to withdraw fee tokens.
   function _setDynamicConfig(
     DynamicConfig memory dynamicConfig
   ) internal {
-    if (dynamicConfig.feeAggregator == address(0)) {
-      revert ZeroAddressNotAllowed();
-    }
     s_dynamicConfig = dynamicConfig;
     emit DynamicConfigSet(dynamicConfig);
   }

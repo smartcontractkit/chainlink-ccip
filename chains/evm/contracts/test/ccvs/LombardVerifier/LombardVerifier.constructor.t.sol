@@ -37,14 +37,4 @@ contract LombardVerifier_constructor is LombardVerifierSetup {
       address(s_mockRMNRemote)
     );
   }
-
-  function test_constructor_RevertWhen_ZeroFeeAggregator() public {
-    vm.expectRevert(BaseVerifier.ZeroAddressNotAllowed.selector);
-    new LombardVerifier(
-      LombardVerifier.DynamicConfig({feeAggregator: address(0)}),
-      IBridgeV3(address(s_mockBridge)),
-      s_storageLocations,
-      address(s_mockRMNRemote)
-    );
-  }
 }

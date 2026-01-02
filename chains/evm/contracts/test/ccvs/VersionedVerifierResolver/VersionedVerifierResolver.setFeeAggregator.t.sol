@@ -14,11 +14,6 @@ contract VersionedVerifierResolver_setFeeAggregator is VersionedVerifierResolver
     assertEq(s_versionedVerifierResolver.getFeeAggregator(), newFeeAggregator);
   }
 
-  function test_setFeeAggregator_RevertWhen_ZeroAddressNotAllowed() public {
-    vm.expectRevert(VersionedVerifierResolver.ZeroAddressNotAllowed.selector);
-    s_versionedVerifierResolver.setFeeAggregator(address(0));
-  }
-
   function test_setFeeAggregator_RevertWhen_OnlyCallableByOwner() public {
     vm.stopPrank();
 

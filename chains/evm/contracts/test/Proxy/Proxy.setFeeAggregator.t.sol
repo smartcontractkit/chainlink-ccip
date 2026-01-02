@@ -14,11 +14,6 @@ contract Proxy_setFeeAggregator is ProxySetup {
     assertEq(s_proxy.getFeeAggregator(), newFeeAggregator);
   }
 
-  function test_setFeeAggregator_RevertWhen_ZeroAddressNotAllowed() public {
-    vm.expectRevert(Proxy.ZeroAddressNotAllowed.selector);
-    s_proxy.setFeeAggregator(address(0));
-  }
-
   function test_setFeeAggregator_RevertWhen_OnlyCallableByOwner() public {
     vm.stopPrank();
 

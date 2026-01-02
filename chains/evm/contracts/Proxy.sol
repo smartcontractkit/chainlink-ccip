@@ -65,6 +65,8 @@ contract Proxy is Ownable2StepMsgSender {
 
   /// @notice Sets the address of the fee aggregator.
   /// @param feeAggregator The address of the new fee aggregator contract.
+  /// @dev FeeTokenHandler will revert if feeAggregator is zero when withdrawing fees.
+  /// @dev A zero address fee aggregator is valid, and intentionally reverts calls to withdraw fee tokens.
   function setFeeAggregator(
     address feeAggregator
   ) external virtual onlyOwner {
@@ -72,12 +74,11 @@ contract Proxy is Ownable2StepMsgSender {
   }
 
   /// @dev Internal method that allows for reuse in constructor.
+  /// @dev FeeTokenHandler will revert if feeAggregator is zero when withdrawing fees.
+  /// @dev A zero address fee aggregator is valid, and intentionally reverts calls to withdraw fee tokens.
   function _setFeeAggregator(
     address feeAggregator
   ) internal virtual {
-    if (feeAggregator == address(0)) {
-      revert ZeroAddressNotAllowed();
-    }
     address oldFeeAggregator = s_feeAggregator;
     s_feeAggregator = feeAggregator;
     emit FeeAggregatorUpdated(oldFeeAggregator, feeAggregator);
