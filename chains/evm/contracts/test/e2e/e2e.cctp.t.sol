@@ -300,8 +300,8 @@ contract cctp_e2e is OnRampSetup {
       USDCTokenPoolProxy.PoolAddresses({
         cctpV1Pool: address(0),
         cctpV2Pool: address(0),
-        cctpTokenPool: address(setup.tokenPool),
-        siloedUsdcTokenPool: address(0)
+        cctpV2PoolWithCCV: address(setup.tokenPool),
+        siloedLockReleasePool: address(0)
       }),
       router,
       address(setup.verifierResolver)

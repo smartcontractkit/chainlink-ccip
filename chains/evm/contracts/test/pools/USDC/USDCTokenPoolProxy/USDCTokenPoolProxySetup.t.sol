@@ -36,8 +36,8 @@ contract USDCTokenPoolProxySetup is USDCSetup {
       USDCTokenPoolProxy.PoolAddresses({
         cctpV1Pool: s_cctpV1Pool,
         cctpV2Pool: s_cctpV2Pool,
-        cctpTokenPool: s_cctpTokenPool,
-        siloedUsdcTokenPool: address(0)
+        cctpV2PoolWithCCV: s_cctpTokenPool,
+        siloedLockReleasePool: address(0)
       }),
       address(s_router),
       address(s_cctpVerifier)

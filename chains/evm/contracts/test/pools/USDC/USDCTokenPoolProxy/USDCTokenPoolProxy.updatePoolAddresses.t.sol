@@ -21,8 +21,8 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
     USDCTokenPoolProxy.PoolAddresses memory expectedEvent = USDCTokenPoolProxy.PoolAddresses({
       cctpV1Pool: s_newCctpV1Pool,
       cctpV2Pool: s_newCctpV2Pool,
-      cctpTokenPool: s_newCctpV2PoolWithCCV,
-      siloedUsdcTokenPool: address(0)
+      cctpV2PoolWithCCV: s_newCctpV2PoolWithCCV,
+      siloedLockReleasePool: address(0)
     });
 
     vm.expectEmit();
@@ -41,7 +41,10 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
     vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.TokenPoolUnsupported.selector, s_newCctpV1Pool));
     s_usdcTokenPoolProxy.updatePoolAddresses(
       USDCTokenPoolProxy.PoolAddresses({
-        cctpV1Pool: s_newCctpV1Pool, cctpV2Pool: address(0), cctpTokenPool: address(0), siloedUsdcTokenPool: address(0)
+        cctpV1Pool: s_newCctpV1Pool,
+        cctpV2Pool: address(0),
+        cctpV2PoolWithCCV: address(0),
+        siloedLockReleasePool: address(0)
       })
     );
 
@@ -49,7 +52,10 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
 
     s_usdcTokenPoolProxy.updatePoolAddresses(
       USDCTokenPoolProxy.PoolAddresses({
-        cctpV1Pool: s_newCctpV1Pool, cctpV2Pool: address(0), cctpTokenPool: address(0), siloedUsdcTokenPool: address(0)
+        cctpV1Pool: s_newCctpV1Pool,
+        cctpV2Pool: address(0),
+        cctpV2PoolWithCCV: address(0),
+        siloedLockReleasePool: address(0)
       })
     );
 
@@ -60,7 +66,10 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
     vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.TokenPoolUnsupported.selector, s_newCctpV2Pool));
     s_usdcTokenPoolProxy.updatePoolAddresses(
       USDCTokenPoolProxy.PoolAddresses({
-        cctpV1Pool: address(0), cctpV2Pool: s_newCctpV2Pool, cctpTokenPool: address(0), siloedUsdcTokenPool: address(0)
+        cctpV1Pool: address(0),
+        cctpV2Pool: s_newCctpV2Pool,
+        cctpV2PoolWithCCV: address(0),
+        siloedLockReleasePool: address(0)
       })
     );
 
@@ -68,7 +77,10 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
 
     s_usdcTokenPoolProxy.updatePoolAddresses(
       USDCTokenPoolProxy.PoolAddresses({
-        cctpV1Pool: address(0), cctpV2Pool: s_newCctpV2Pool, cctpTokenPool: address(0), siloedUsdcTokenPool: address(0)
+        cctpV1Pool: address(0),
+        cctpV2Pool: s_newCctpV2Pool,
+        cctpV2PoolWithCCV: address(0),
+        siloedLockReleasePool: address(0)
       })
     );
 
@@ -81,8 +93,8 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
       USDCTokenPoolProxy.PoolAddresses({
         cctpV1Pool: address(0),
         cctpV2Pool: address(0),
-        cctpTokenPool: s_newCctpV2PoolWithCCV,
-        siloedUsdcTokenPool: address(0)
+        cctpV2PoolWithCCV: s_newCctpV2PoolWithCCV,
+        siloedLockReleasePool: address(0)
       })
     );
 
@@ -92,8 +104,8 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
       USDCTokenPoolProxy.PoolAddresses({
         cctpV1Pool: address(0),
         cctpV2Pool: address(0),
-        cctpTokenPool: s_newCctpV2PoolWithCCV,
-        siloedUsdcTokenPool: address(0)
+        cctpV2PoolWithCCV: s_newCctpV2PoolWithCCV,
+        siloedLockReleasePool: address(0)
       })
     );
   }

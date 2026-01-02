@@ -35,7 +35,10 @@ contract USDCTokenPoolProxy_getFee is USDCTokenPoolProxySetup {
     _enableERC165InterfaceChecks(s_cctpV1Pool, type(IPoolV1).interfaceId);
     s_usdcTokenPoolProxy.updatePoolAddresses(
       USDCTokenPoolProxy.PoolAddresses({
-        cctpV1Pool: s_cctpV1Pool, cctpV2Pool: s_cctpV2Pool, cctpTokenPool: address(0), siloedUsdcTokenPool: address(0)
+        cctpV1Pool: s_cctpV1Pool,
+        cctpV2Pool: s_cctpV2Pool,
+        cctpV2PoolWithCCV: address(0),
+        siloedLockReleasePool: address(0)
       })
     );
 

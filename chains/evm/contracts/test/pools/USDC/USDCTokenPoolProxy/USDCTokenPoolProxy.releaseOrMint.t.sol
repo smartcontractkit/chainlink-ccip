@@ -17,7 +17,6 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
   bytes internal s_sourcePoolAddress = abi.encode(SOURCE_CHAIN_USDC_POOL);
 
   function test_releaseOrMint_LockReleaseFlag() public {
-    // Arrange: Prepare test data.
     uint256 testAmount = 1234;
     bytes memory lockReleaseFlag = abi.encodePacked(USDCSourcePoolDataCodec.LOCK_RELEASE_FLAG);
     bytes memory originalSender = abi.encode(s_sender);
@@ -30,8 +29,8 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
       USDCTokenPoolProxy.PoolAddresses({
         cctpV1Pool: address(0),
         cctpV2Pool: address(0),
-        cctpTokenPool: address(0),
-        siloedUsdcTokenPool: s_lockReleasePool
+        cctpV2PoolWithCCV: address(0),
+        siloedLockReleasePool: s_lockReleasePool
       })
     );
 
@@ -66,17 +65,12 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
       abi.encode(expectedOut)
     );
 
-    // Act: Call releaseOrMint on the proxy
     Pool.ReleaseOrMintOutV1 memory actualOut = s_usdcTokenPoolProxy.releaseOrMint(releaseOrMintIn);
 
-    // Assert: The output matches
     assertEq(actualOut.destinationAmount, expectedOut.destinationAmount);
-
-    vm.stopPrank();
   }
 
   function test_releaseOrMint_CCTPV1Flag() public {
-    // Arrange: Prepare test data.
     uint256 testAmount = 4321;
     bytes memory originalSender = abi.encode(s_sender);
 
@@ -115,17 +109,12 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
       abi.encode(expectedOut)
     );
 
-    // Act: Call releaseOrMint on the proxy.
     Pool.ReleaseOrMintOutV1 memory actualOut = s_usdcTokenPoolProxy.releaseOrMint(releaseOrMintIn);
 
-    // Assert: The output matches.
     assertEq(actualOut.destinationAmount, expectedOut.destinationAmount);
-
-    vm.stopPrank();
   }
 
   function test_releaseOrMint_CCTPV2_CCVFlag() public {
-    // Arrange: Prepare test data.
     uint256 testAmount = 5678;
     bytes memory originalSender = abi.encode(s_sender);
 
@@ -165,12 +154,9 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
     Pool.ReleaseOrMintOutV1 memory actualOut = s_usdcTokenPoolProxy.releaseOrMint(releaseOrMintIn);
 
     assertEq(actualOut.destinationAmount, expectedOut.destinationAmount);
-
-    vm.stopPrank();
   }
 
   function test_releaseOrMint_CCTPV2Flag() public {
-    // Arrange: Prepare test data.
     uint256 testAmount = 5678;
     bytes memory originalSender = abi.encode(s_sender);
 
@@ -213,8 +199,6 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
     Pool.ReleaseOrMintOutV1 memory actualOut = s_usdcTokenPoolProxy.releaseOrMint(releaseOrMintIn);
 
     assertEq(actualOut.destinationAmount, expectedOut.destinationAmount);
-
-    vm.stopPrank();
   }
 
   function test_releaseOrMint_LegacyFormat_MessageTransmitterProxySupported() public {
@@ -227,12 +211,11 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
       USDCTokenPoolProxy.PoolAddresses({
         cctpV1Pool: s_cctpV1Pool,
         cctpV2Pool: s_cctpV2Pool,
-        cctpTokenPool: s_cctpTokenPool,
-        siloedUsdcTokenPool: address(0)
+        cctpV2PoolWithCCV: s_cctpTokenPool,
+        siloedLockReleasePool: address(0)
       })
     );
 
-    // Arrange: Prepare test data for legacy format (64 bytes).
     uint256 testAmount = 1e6;
 
     USDCSourcePoolDataCodec.SourceTokenDataPayloadV1 memory legacySourcePoolData =
@@ -270,19 +253,14 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
     // and call the legacy pool with the converted data.
     vm.mockCall(address(s_cctpV1Pool), abi.encodeWithSelector(IPoolV1.releaseOrMint.selector), abi.encode(expectedOut));
 
-    // Act: Call releaseOrMint on the proxy.
     Pool.ReleaseOrMintOutV1 memory actualOut = s_usdcTokenPoolProxy.releaseOrMint(releaseOrMintIn);
 
-    // Assert: The output matches.
     assertEq(actualOut.destinationAmount, expectedOut.destinationAmount);
-
-    vm.stopPrank();
   }
 
   // Reverts
 
   function test_releaseOrMint_InvalidVersion() public {
-    // Arrange: Prepare test data.
     uint256 testAmount = 1234;
 
     bytes memory invalidSourcePoolData = abi.encodePacked(bytes4(uint32(2)), uint32(0), bytes32(hex"deafbeef"));
@@ -311,8 +289,6 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
 
     vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.InvalidMessageVersion.selector, bytes4(uint32(2))));
     s_usdcTokenPoolProxy.releaseOrMint(releaseOrMintIn);
-
-    vm.stopPrank();
   }
 
   function test_releaseOrMint_RevertWhen_CallerIsNotARampOnRouter() public {

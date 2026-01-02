@@ -7,7 +7,6 @@ import {USDCTokenPoolProxySetup} from "./USDCTokenPoolProxySetup.t.sol";
 
 contract USDCTokenPoolProxy_updateLockOrBurnMechanisms is USDCTokenPoolProxySetup {
   function test_updateLockOrBurnMechanisms() public {
-    // Arrange: Define test constants.
     uint64 testChainSelector = 12345;
     USDCTokenPoolProxy.LockOrBurnMechanism cctpV1Mechanism = USDCTokenPoolProxy.LockOrBurnMechanism.CCTP_V1;
     USDCTokenPoolProxy.LockOrBurnMechanism cctpV2Mechanism = USDCTokenPoolProxy.LockOrBurnMechanism.CCTP_V2;

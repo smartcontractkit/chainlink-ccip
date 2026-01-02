@@ -96,7 +96,6 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
   }
 
   function test_lockOrBurn_CCTPV2() public {
-    // Arrange: Define test constants.
     uint256 amount = 200;
     bytes memory destTokenAddress = abi.encode(address(s_USDCToken));
 
@@ -143,8 +142,8 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
       USDCTokenPoolProxy.PoolAddresses({
         cctpV1Pool: address(0),
         cctpV2Pool: address(0),
-        cctpTokenPool: address(0),
-        siloedUsdcTokenPool: address(s_lockReleasePool)
+        cctpV2PoolWithCCV: address(0),
+        siloedLockReleasePool: address(s_lockReleasePool)
       })
     );
 
@@ -236,7 +235,10 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
     _enableERC165InterfaceChecks(s_cctpV1Pool, type(IPoolV1).interfaceId);
     s_usdcTokenPoolProxy.updatePoolAddresses(
       USDCTokenPoolProxy.PoolAddresses({
-        cctpV1Pool: s_cctpV1Pool, cctpV2Pool: s_cctpV2Pool, cctpTokenPool: address(0), siloedUsdcTokenPool: address(0)
+        cctpV1Pool: s_cctpV1Pool,
+        cctpV2Pool: s_cctpV2Pool,
+        cctpV2PoolWithCCV: address(0),
+        siloedLockReleasePool: address(0)
       })
     );
 
@@ -288,7 +290,6 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
       blockConfirmationRequested,
       tokenArgs
     );
-    vm.stopPrank();
   }
 
   function test_lockOrBurn_RevertWhen_InvalidLockOrBurnMechanism() public {
