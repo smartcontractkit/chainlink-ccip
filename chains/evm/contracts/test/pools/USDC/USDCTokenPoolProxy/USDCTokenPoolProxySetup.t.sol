@@ -69,7 +69,7 @@ contract USDCTokenPoolProxySetup is USDCSetup {
     remoteChainSelectors[0] = s_remoteCCTPChainSelector;
 
     USDCTokenPoolProxy.LockOrBurnMechanism[] memory mechanisms = new USDCTokenPoolProxy.LockOrBurnMechanism[](1);
-    mechanisms[0] = USDCTokenPoolProxy.LockOrBurnMechanism.CCTP_V2_WITH_CCV;
+    mechanisms[0] = USDCTokenPoolProxy.LockOrBurnMechanism.CCV;
     s_usdcTokenPoolProxy.updateLockOrBurnMechanisms(remoteChainSelectors, mechanisms);
   }
 }

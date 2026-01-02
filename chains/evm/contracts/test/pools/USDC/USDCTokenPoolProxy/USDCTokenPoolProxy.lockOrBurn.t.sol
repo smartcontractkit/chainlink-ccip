@@ -58,7 +58,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
     mechanisms[0] = USDCTokenPoolProxy.LockOrBurnMechanism.CCTP_V1;
     mechanisms[1] = USDCTokenPoolProxy.LockOrBurnMechanism.CCTP_V2;
     mechanisms[2] = USDCTokenPoolProxy.LockOrBurnMechanism.LOCK_RELEASE;
-    mechanisms[3] = USDCTokenPoolProxy.LockOrBurnMechanism.CCTP_V2_WITH_CCV;
+    mechanisms[3] = USDCTokenPoolProxy.LockOrBurnMechanism.CCV;
 
     s_usdcTokenPoolProxy.updateLockOrBurnMechanisms(chainSelectors, mechanisms);
   }

@@ -56,7 +56,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
     CCTP_V1,
     CCTP_V2,
     LOCK_RELEASE,
-    CCTP_V2_WITH_CCV
+    CCV
   }
 
   string public constant override typeAndVersion = "USDCTokenPoolProxy 1.7.0-dev";
@@ -155,7 +155,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
       revert InvalidLockOrBurnMechanism(mechanism);
     }
 
-    if (mechanism == LockOrBurnMechanism.CCTP_V2_WITH_CCV) {
+    if (mechanism == LockOrBurnMechanism.CCV) {
       // CCV-compatible lockOrBurn path is completed within this if statement to avoid redundant checks.
       address ccvPool = s_cctpV2PoolWithCCV;
       if (ccvPool == address(0)) {
@@ -323,7 +323,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
   /// @notice Update the lock or burn mechanism for a list of remote chain selectors.
   /// @param remoteChainSelectors The remote chain selectors to update the lock or burn mechanism for.
   /// @param mechanisms The new lock or burn mechanisms for the given remote chain selectors.
-  /// @dev If a mechanism is set to LOCK_RELEASE, CCTP_V1, CCTP_V2, or CCTP_V2_WITH_CCV, the corresponding pool address
+  /// @dev If a mechanism is set to LOCK_RELEASE, CCTP_V1, CCTP_V2, or CCV, the corresponding pool address
   /// must be set, otherwise the update will revert.
   /// @dev Only callable by the owner.
   function updateLockOrBurnMechanisms(
@@ -347,7 +347,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
       if (mechanism == LockOrBurnMechanism.CCTP_V2 && s_cctpV2Pool == address(0)) {
         revert MustSetPoolForMechanism(remoteChainSelectors[i], mechanism);
       }
-      if (mechanism == LockOrBurnMechanism.CCTP_V2_WITH_CCV && s_cctpV2PoolWithCCV == address(0)) {
+      if (mechanism == LockOrBurnMechanism.CCV && s_cctpV2PoolWithCCV == address(0)) {
         revert MustSetPoolForMechanism(remoteChainSelectors[i], mechanism);
       }
 
@@ -419,7 +419,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
     // Common case: The lockOrBurn mechanism is CCTP V2 with CCV.
     // In this case, we simply need to return the CCTP CCV.
     address[] memory ccvs = new address[](1);
-    if (s_lockOrBurnMechanism[remoteChainSelector] == LockOrBurnMechanism.CCTP_V2_WITH_CCV) {
+    if (s_lockOrBurnMechanism[remoteChainSelector] == LockOrBurnMechanism.CCV) {
       ccvs[0] = address(i_cctpVerifier);
       return ccvs;
     }

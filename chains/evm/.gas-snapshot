@@ -608,7 +608,7 @@ USDCTokenPoolProxy_releaseOrMint:test_releaseOrMint_InvalidVersion() (gas: 31412
 USDCTokenPoolProxy_releaseOrMint:test_releaseOrMint_LegacyFormat_MessageTransmitterProxySupported() (gas: 75135)
 USDCTokenPoolProxy_releaseOrMint:test_releaseOrMint_LockReleaseFlag() (gas: 71903)
 USDCTokenPoolProxy_setFeeAggregator:test_setFeeAggregator() (gas: 36036)
-USDCTokenPoolProxy_updateLockOrBurnMechanisms:test_updateLockOrBurnMechanisms() (gas: 105503)
+USDCTokenPoolProxy_updateLockOrBurnMechanisms:test_updateLockOrBurnMechanisms() (gas: 105525)
 USDCTokenPoolProxy_updatePoolAddresses:test_updatePoolAddresses() (gas: 57032)
 USDCTokenPoolProxy_withdrawFeeTokens:test_withdrawFeeTokens() (gas: 430387)
 USDCTokenPoolProxy_withdrawFeeTokens:test_withdrawFeeTokens_CalledByNonOwner() (gas: 233501)

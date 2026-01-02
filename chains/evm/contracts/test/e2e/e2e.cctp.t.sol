@@ -428,14 +428,14 @@ contract cctp_e2e is OnRampSetup {
 
     // Update lock or burn mechanism on the source token pool proxy.
     USDCTokenPoolProxy.LockOrBurnMechanism[] memory mechanisms = new USDCTokenPoolProxy.LockOrBurnMechanism[](1);
-    mechanisms[0] = USDCTokenPoolProxy.LockOrBurnMechanism.CCTP_V2_WITH_CCV;
+    mechanisms[0] = USDCTokenPoolProxy.LockOrBurnMechanism.CCV;
     uint64[] memory chainSelectors = new uint64[](1);
     chainSelectors[0] = DEST_CHAIN_SELECTOR;
     s_sourceCCTPSetup.tokenPoolProxy.updateLockOrBurnMechanisms(chainSelectors, mechanisms);
 
     // Update lock or burn mechanism on the dest token pool proxy.
     mechanisms = new USDCTokenPoolProxy.LockOrBurnMechanism[](1);
-    mechanisms[0] = USDCTokenPoolProxy.LockOrBurnMechanism.CCTP_V2_WITH_CCV;
+    mechanisms[0] = USDCTokenPoolProxy.LockOrBurnMechanism.CCV;
     chainSelectors = new uint64[](1);
     chainSelectors[0] = SOURCE_CHAIN_SELECTOR;
     s_destCCTPSetup.tokenPoolProxy.updateLockOrBurnMechanisms(chainSelectors, mechanisms);
