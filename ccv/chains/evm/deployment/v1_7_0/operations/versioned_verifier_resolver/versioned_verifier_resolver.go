@@ -14,6 +14,8 @@ import (
 
 var ContractType cldf_deployment.ContractType = "VersionedVerifierResolver"
 
+var Version = semver.MustParse("1.7.0")
+
 type InboundImplementationArgs = versioned_verifier_resolver.VersionedVerifierResolverInboundImplementationArgs
 
 type OutboundImplementationArgs = versioned_verifier_resolver.VersionedVerifierResolverOutboundImplementationArgs
@@ -26,14 +28,14 @@ type ConstructorArgs struct{}
 
 var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Name:             "versioned-verifier-resolver:deploy",
-	Version:          semver.MustParse("1.7.0"),
+	Version:          Version,
 	Description:      "Deploys the VersionedVerifierResolver contract",
 	ContractMetadata: versioned_verifier_resolver.VersionedVerifierResolverMetaData,
 	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
-		cldf_deployment.NewTypeAndVersion(cctp_verifier.ResolverType, *semver.MustParse("1.7.0")).String(): {
+		cldf_deployment.NewTypeAndVersion(cctp_verifier.ResolverType, *Version).String(): {
 			EVM: common.FromHex(versioned_verifier_resolver.VersionedVerifierResolverBin),
 		},
-		cldf_deployment.NewTypeAndVersion(committee_verifier.ResolverType, *semver.MustParse("1.7.0")).String(): {
+		cldf_deployment.NewTypeAndVersion(committee_verifier.ResolverType, *Version).String(): {
 			EVM: common.FromHex(versioned_verifier_resolver.VersionedVerifierResolverBin),
 		},
 	},
@@ -42,7 +44,7 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 
 var ApplyInboundImplementationUpdates = contract.NewWrite(contract.WriteParams[[]InboundImplementationArgs, *versioned_verifier_resolver.VersionedVerifierResolver]{
 	Name:            "versioned-verifier-resolver:apply-inbound-implementation-updates",
-	Version:         semver.MustParse("1.7.0"),
+	Version:         Version,
 	Description:     "Updates verifier implementations for inbound traffic",
 	ContractType:    ContractType,
 	ContractABI:     versioned_verifier_resolver.VersionedVerifierResolverABI,
@@ -56,7 +58,7 @@ var ApplyInboundImplementationUpdates = contract.NewWrite(contract.WriteParams[[
 
 var ApplyOutboundImplementationUpdates = contract.NewWrite(contract.WriteParams[[]OutboundImplementationArgs, *versioned_verifier_resolver.VersionedVerifierResolver]{
 	Name:            "versioned-verifier-resolver:apply-outbound-implementation-updates",
-	Version:         semver.MustParse("1.7.0"),
+	Version:         Version,
 	Description:     "Updates verifier implementations for outbound traffic",
 	ContractType:    ContractType,
 	ContractABI:     versioned_verifier_resolver.VersionedVerifierResolverABI,
@@ -70,7 +72,7 @@ var ApplyOutboundImplementationUpdates = contract.NewWrite(contract.WriteParams[
 
 var AcceptOwnership = contract.NewWrite(contract.WriteParams[AcceptOwnershipArgs, *versioned_verifier_resolver.VersionedVerifierResolver]{
 	Name:         "versioned-verifier-resolver:accept-ownership",
-	Version:      semver.MustParse("1.7.0"),
+	Version:      Version,
 	Description:  "Accept ownership of the versioned verifier resolver",
 	ContractType: ContractType,
 	ContractABI:  versioned_verifier_resolver.VersionedVerifierResolverABI,

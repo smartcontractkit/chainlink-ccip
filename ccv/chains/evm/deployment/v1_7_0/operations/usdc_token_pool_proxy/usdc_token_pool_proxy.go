@@ -12,6 +12,8 @@ import (
 
 var ContractType cldf_deployment.ContractType = "USDCTokenPoolProxy"
 
+var Version = semver.MustParse("1.7.0")
+
 type ConstructorArgs struct {
 	Token        common.Address
 	Pools        USDCTokenPoolProxyPoolAddresses
@@ -33,11 +35,11 @@ type UpdateLockReleasePoolAddressesArgs struct {
 
 var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Name:             "usdc-token-pool-proxy:deploy",
-	Version:          semver.MustParse("1.7.0"),
+	Version:          Version,
 	Description:      "Deploys the USDCTokenPoolProxy contract",
 	ContractMetadata: usdc_token_pool_proxy.USDCTokenPoolProxyMetaData,
 	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
-		cldf_deployment.NewTypeAndVersion(ContractType, *semver.MustParse("1.7.0")).String(): {
+		cldf_deployment.NewTypeAndVersion(ContractType, *Version).String(): {
 			EVM: common.FromHex(usdc_token_pool_proxy.USDCTokenPoolProxyBin),
 		},
 	},
@@ -46,7 +48,7 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 
 var UpdateLockOrBurnMechanisms = contract.NewWrite(contract.WriteParams[UpdateLockOrBurnMechanismsArgs, *usdc_token_pool_proxy.USDCTokenPoolProxy]{
 	Name:            "usdc-token-pool-proxy:update-lock-or-burn-mechanisms",
-	Version:         semver.MustParse("1.7.0"),
+	Version:         Version,
 	Description:     "Updates lock or burn mechanisms on the USDCTokenPoolProxy",
 	ContractType:    ContractType,
 	ContractABI:     usdc_token_pool_proxy.USDCTokenPoolProxyABI,

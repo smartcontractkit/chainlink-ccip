@@ -7,13 +7,13 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/advanced_pool_hooks"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/cctp_message_transmitter_proxy"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/cctp_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/cctp_through_ccv_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/cctp_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/usdc_token_pool_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
 	cctp_message_transmitter_proxy_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/cctp_message_transmitter_proxy"
-	cctp_token_pool_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/cctp_token_pool"
+	cctp_through_ccv_token_pool_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/cctp_through_ccv_token_pool"
 	cctp_verifier_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/cctp_verifier"
 	mock_usdc_token_messenger "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/mock_usdc_token_messenger"
 	mock_usdc_token_transmitter "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/mock_usdc_token_transmitter"
@@ -121,15 +121,7 @@ func setupCCTPTestEnvironment(t *testing.T, e *deployment.Environment, chainSele
 
 func basicDeployCCTPInput(chainSelector uint64, setup cctpTestSetup, deployerAddr common.Address) adapters.DeployCCTPInput[string, []byte] {
 	return adapters.DeployCCTPInput[string, []byte]{
-		ChainSelector: chainSelector,
-		TokenPools: adapters.TokenPools[string]{
-			LegacyCCTPV1Pool:  "",
-			CCTPV1Pool:        "",
-			CCTPV2Pool:        "",
-			CCTPV2PoolWithCCV: "",
-		},
-		USDCTokenPoolProxy:               "",
-		CCTPVerifier:                     []datastore.AddressRef{},
+		ChainSelector:                    chainSelector,
 		MessageTransmitterProxy:          "",
 		TokenAdminRegistry:               setup.TokenAdminRegistry.Hex(),
 		TokenMessenger:                   setup.TokenMessenger.Hex(),
@@ -150,7 +142,7 @@ func basicDeployCCTPInput(chainSelector uint64, setup cctpTestSetup, deployerAdd
 }
 
 func TestDeployCCTPChain(t *testing.T) {
-	chainSelector := uint64(5009297550715157269)
+	chainSelector := uint64(3017758115101368649)
 	e, err := environment.New(t.Context(),
 		environment.WithEVMSimulated(t, []uint64{chainSelector}),
 	)
@@ -167,7 +159,7 @@ func TestDeployCCTPChain(t *testing.T) {
 		FeeUSDCents:         10,
 		GasForVerification:  100000,
 		PayloadSizeBytes:    1000,
-		LockOrBurnMechanism: adapters.CCTPV2WithCCVMechanism,
+		LockOrBurnMechanism: "CCTP_V2_WITH_CCV",
 		RemoteDomain: adapters.RemoteDomain[[]byte]{
 			AllowedCallerOnDest:   common.LeftPadBytes(common.HexToAddress("0x0D").Bytes(), 32),
 			AllowedCallerOnSource: common.LeftPadBytes(common.HexToAddress("0x0E").Bytes(), 32),
@@ -194,7 +186,7 @@ func TestDeployCCTPChain(t *testing.T) {
 
 	exists := map[deployment.ContractType]bool{
 		deployment.ContractType(advanced_pool_hooks.ContractType):            false,
-		deployment.ContractType(cctp_token_pool.ContractType):                false,
+		deployment.ContractType(cctp_through_ccv_token_pool.ContractType):    false,
 		deployment.ContractType(cctp_message_transmitter_proxy.ContractType): false,
 		deployment.ContractType(cctp_verifier.ContractType):                  false,
 		deployment.ContractType(usdc_token_pool_proxy.ContractType):          false,
@@ -211,7 +203,7 @@ func TestDeployCCTPChain(t *testing.T) {
 	var cctpTokenPoolAddr, cctpMessageTransmitterProxyAddr, cctpVerifierAddr, usdcTokenPoolProxyAddr, cctpVerifierResolverAddr common.Address
 	for _, addr := range report.Output.Addresses {
 		switch deployment.ContractType(addr.Type) {
-		case deployment.ContractType(cctp_token_pool.ContractType):
+		case deployment.ContractType(cctp_through_ccv_token_pool.ContractType):
 			cctpTokenPoolAddr = common.HexToAddress(addr.Address)
 		case deployment.ContractType(cctp_message_transmitter_proxy.ContractType):
 			cctpMessageTransmitterProxyAddr = common.HexToAddress(addr.Address)
@@ -231,7 +223,7 @@ func TestDeployCCTPChain(t *testing.T) {
 	require.NotEqual(t, common.Address{}, cctpVerifierResolverAddr, "CCTPVerifierResolver address should be set")
 
 	// Check CCTPTokenPool dynamic config
-	cctpTokenPool, err := cctp_token_pool_bindings.NewCCTPTokenPool(cctpTokenPoolAddr, chain.Client)
+	cctpTokenPool, err := cctp_through_ccv_token_pool_bindings.NewCCTPThroughCCVTokenPool(cctpTokenPoolAddr, chain.Client)
 	require.NoError(t, err, "Failed to instantiate CCTPTokenPool contract")
 	dynamicConfig, err := cctpTokenPool.GetDynamicConfig(nil)
 	require.NoError(t, err, "Failed to get dynamic config from CCTPTokenPool")
@@ -287,7 +279,7 @@ func TestDeployCCTPChain(t *testing.T) {
 	require.NoError(t, err, "Failed to instantiate USDCTokenPoolProxy contract")
 	mechanism, err := usdcTokenPoolProxy.GetLockOrBurnMechanism(nil, remoteChainSelector)
 	require.NoError(t, err, "Failed to get lock or burn mechanism from USDCTokenPoolProxy")
-	expectedMechanism, err := convertMechanismToUint8(adapters.CCTPV2WithCCVMechanism)
+	expectedMechanism, err := convertMechanismToUint8("CCTP_V2_WITH_CCV")
 	require.NoError(t, err, "Failed to convert mechanism to uint8")
 	require.Equal(t, expectedMechanism, uint8(mechanism), "Lock or burn mechanism should match")
 

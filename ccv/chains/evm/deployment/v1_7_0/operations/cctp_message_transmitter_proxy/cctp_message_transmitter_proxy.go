@@ -12,6 +12,8 @@ import (
 
 var ContractType cldf_deployment.ContractType = "CCTPMessageTransmitterProxy"
 
+var Version = semver.MustParse("1.7.0")
+
 type ConstructorArgs struct {
 	TokenMessenger common.Address
 }
@@ -20,11 +22,11 @@ type AuthorizedCallerArgs = cctp_message_transmitter_proxy.AuthorizedCallersAuth
 
 var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Name:             "cctp-message-transmitter-proxy:deploy",
-	Version:          semver.MustParse("1.7.0"),
+	Version:          Version,
 	Description:      "Deploys the CCTPMessageTransmitterProxy contract",
 	ContractMetadata: cctp_message_transmitter_proxy.CCTPMessageTransmitterProxyMetaData,
 	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
-		cldf_deployment.NewTypeAndVersion(ContractType, *semver.MustParse("1.7.0")).String(): {
+		cldf_deployment.NewTypeAndVersion(ContractType, *Version).String(): {
 			EVM: common.FromHex(cctp_message_transmitter_proxy.CCTPMessageTransmitterProxyBin),
 		},
 	},
@@ -33,7 +35,7 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 
 var ApplyAuthorizedCallerUpdates = contract.NewWrite(contract.WriteParams[AuthorizedCallerArgs, *cctp_message_transmitter_proxy.CCTPMessageTransmitterProxy]{
 	Name:            "cctp-message-transmitter-proxy:apply-authorized-caller-updates",
-	Version:         semver.MustParse("1.7.0"),
+	Version:         Version,
 	Description:     "Applies authorized caller updates on the CCTPMessageTransmitterProxy",
 	ContractType:    ContractType,
 	ContractABI:     cctp_message_transmitter_proxy.CCTPMessageTransmitterProxyABI,
