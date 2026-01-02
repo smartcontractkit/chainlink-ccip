@@ -90,10 +90,10 @@ func TestConfigureChainForLanes(t *testing.T) {
 					ChainSelector: chainSelector,
 					Router:        routerAddress,
 					OnRamp:        onRamp,
-					CommitteeVerifiers: []adapters.CommitteeVerifierConfig[string]{
+					CommitteeVerifiers: []adapters.CommitteeVerifierConfigWithSignatureConfigPerRemoteChain[string]{
 						{
 							CommitteeVerifier: []string{committeeVerifier, committeeVerifierResolver},
-							RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
+							RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfigWithSignatureConfig{
 								remoteChainSelector: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
 							},
 						},
@@ -329,10 +329,10 @@ func TestConfigureChainForLanes_RemoteChainsToDisconnect(t *testing.T) {
 			ChainSelector: chainSelector,
 			Router:        routerAddress,
 			OnRamp:        onRamp,
-			CommitteeVerifiers: []adapters.CommitteeVerifierConfig[string]{
+			CommitteeVerifiers: []adapters.CommitteeVerifierConfigWithSignatureConfigPerRemoteChain[string]{
 				{
 					CommitteeVerifier: []string{committeeVerifier, committeeVerifierResolver},
-					RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
+					RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfigWithSignatureConfig{
 						remoteChainSelector1: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
 						remoteChainSelector2: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
 					},
@@ -412,10 +412,10 @@ func TestConfigureChainForLanes_RemoteChainsToDisconnect(t *testing.T) {
 			ChainSelector: chainSelector,
 			Router:        routerAddress,
 			OnRamp:        onRamp,
-			CommitteeVerifiers: []adapters.CommitteeVerifierConfig[string]{
+			CommitteeVerifiers: []adapters.CommitteeVerifierConfigWithSignatureConfigPerRemoteChain[string]{
 				{
 					CommitteeVerifier: []string{committeeVerifier, committeeVerifierResolver},
-					RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
+					RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfigWithSignatureConfig{
 						remoteChainSelector2: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
 					},
 				},

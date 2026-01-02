@@ -45,12 +45,14 @@ func CreateBasicExecutorDestChainConfig() adapters.ExecutorDestChainConfig {
 }
 
 // CreateBasicCommitteeVerifierRemoteChainConfig creates a basic committee verifier remote chain config with reasonable defaults for testing
-func CreateBasicCommitteeVerifierRemoteChainConfig() adapters.CommitteeVerifierRemoteChainConfig {
-	return adapters.CommitteeVerifierRemoteChainConfig{
-		AllowlistEnabled:   false,
-		FeeUSDCents:        50,
-		GasForVerification: 50_000,
-		PayloadSizeBytes:   6*64 + 2*32,
+func CreateBasicCommitteeVerifierRemoteChainConfig() adapters.CommitteeVerifierRemoteChainConfigWithSignatureConfig {
+	return adapters.CommitteeVerifierRemoteChainConfigWithSignatureConfig{
+		CommitteeVerifierRemoteChainConfig: adapters.CommitteeVerifierRemoteChainConfig{
+			AllowlistEnabled:   false,
+			FeeUSDCents:        50,
+			GasForVerification: 50_000,
+			PayloadSizeBytes:   6*64 + 2*32,
+		},
 		SignatureConfig: adapters.CommitteeVerifierSignatureQuorumConfig{
 			Signers:   []string{common.HexToAddress("0x01").String()},
 			Threshold: 1,

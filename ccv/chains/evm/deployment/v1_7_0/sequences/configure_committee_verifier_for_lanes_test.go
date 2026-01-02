@@ -45,9 +45,9 @@ func TestConfigureCommitteeVerifierForLanes(t *testing.T) {
 				return sequences.ConfigureCommitteeVerifierForLanesInput{
 					ChainSelector: chainReport.Input.ChainSelector,
 					Router:        routerAddress,
-					CommitteeVerifierConfig: adapters.CommitteeVerifierConfig[string]{
+					CommitteeVerifierConfigWithSignatureConfigPerRemoteChain: adapters.CommitteeVerifierConfigWithSignatureConfigPerRemoteChain[string]{
 						CommitteeVerifier: []string{committeeVerifier, committeeVerifierResolver},
-						RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
+						RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfigWithSignatureConfig{
 							remoteChainSelector: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
 						},
 					},
@@ -76,9 +76,9 @@ func TestConfigureCommitteeVerifierForLanes(t *testing.T) {
 				return sequences.ConfigureCommitteeVerifierForLanesInput{
 					ChainSelector: chainReport.Input.ChainSelector,
 					Router:        routerAddress,
-					CommitteeVerifierConfig: adapters.CommitteeVerifierConfig[string]{
+					CommitteeVerifierConfigWithSignatureConfigPerRemoteChain: adapters.CommitteeVerifierConfigWithSignatureConfigPerRemoteChain[string]{
 						CommitteeVerifier: []string{committeeVerifier, committeeVerifierResolver},
-						RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
+						RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfigWithSignatureConfig{
 							remoteChainSelector1: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
 							remoteChainSelector2: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
 						},
@@ -110,9 +110,9 @@ func TestConfigureCommitteeVerifierForLanes(t *testing.T) {
 				return sequences.ConfigureCommitteeVerifierForLanesInput{
 					ChainSelector: chainReport.Input.ChainSelector,
 					Router:        routerAddress,
-					CommitteeVerifierConfig: adapters.CommitteeVerifierConfig[string]{
+					CommitteeVerifierConfigWithSignatureConfigPerRemoteChain: adapters.CommitteeVerifierConfigWithSignatureConfigPerRemoteChain[string]{
 						CommitteeVerifier: []string{committeeVerifier, committeeVerifierResolver},
-						RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
+						RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfigWithSignatureConfig{
 							remoteChainSelector: config,
 						},
 					},
@@ -256,9 +256,9 @@ func TestConfigureCommitteeVerifierForLanes_RevertWhen_InvalidSupportingContract
 				return sequences.ConfigureCommitteeVerifierForLanesInput{
 					ChainSelector: chainReport.Input.ChainSelector,
 					Router:        routerAddress,
-					CommitteeVerifierConfig: adapters.CommitteeVerifierConfig[string]{
+					CommitteeVerifierConfigWithSignatureConfigPerRemoteChain: adapters.CommitteeVerifierConfigWithSignatureConfigPerRemoteChain[string]{
 						CommitteeVerifier: []string{committeeVerifier},
-						RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
+						RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfigWithSignatureConfig{
 							remoteChainSelector: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
 						},
 					},
@@ -283,9 +283,9 @@ func TestConfigureCommitteeVerifierForLanes_RevertWhen_InvalidSupportingContract
 				return sequences.ConfigureCommitteeVerifierForLanesInput{
 					ChainSelector: chainReport.Input.ChainSelector,
 					Router:        routerAddress,
-					CommitteeVerifierConfig: adapters.CommitteeVerifierConfig[string]{
+					CommitteeVerifierConfigWithSignatureConfigPerRemoteChain: adapters.CommitteeVerifierConfigWithSignatureConfigPerRemoteChain[string]{
 						CommitteeVerifier: []string{committeeVerifier, routerAddress},
-						RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
+						RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfigWithSignatureConfig{
 							remoteChainSelector: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
 						},
 					},
@@ -377,9 +377,9 @@ func TestConfigureCommitteeVerifierForLanes_RemoteChainsToDisconnect(t *testing.
 		sequences.ConfigureCommitteeVerifierForLanesInput{
 			ChainSelector: chainSelector,
 			Router:        routerAddress,
-			CommitteeVerifierConfig: adapters.CommitteeVerifierConfig[string]{
+			CommitteeVerifierConfigWithSignatureConfigPerRemoteChain: adapters.CommitteeVerifierConfigWithSignatureConfigPerRemoteChain[string]{
 				CommitteeVerifier: []string{committeeVerifier, committeeVerifierResolver},
-				RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
+				RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfigWithSignatureConfig{
 					remoteChainSelector1: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
 					remoteChainSelector2: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
 				},
@@ -424,9 +424,9 @@ func TestConfigureCommitteeVerifierForLanes_RemoteChainsToDisconnect(t *testing.
 			ChainSelector:            chainSelector,
 			Router:                   routerAddress,
 			RemoteChainsToDisconnect: []uint64{remoteChainSelector1},
-			CommitteeVerifierConfig: adapters.CommitteeVerifierConfig[string]{
+			CommitteeVerifierConfigWithSignatureConfigPerRemoteChain: adapters.CommitteeVerifierConfigWithSignatureConfigPerRemoteChain[string]{
 				CommitteeVerifier: []string{committeeVerifier, committeeVerifierResolver},
-				RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
+				RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfigWithSignatureConfig{
 					remoteChainSelector2: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
 				},
 			},
