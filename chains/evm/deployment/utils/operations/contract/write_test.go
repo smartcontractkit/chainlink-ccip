@@ -320,6 +320,121 @@ func TestBatchOperationFromWrites(t *testing.T) {
 			},
 			expected: mcms_types.BatchOperation{},
 		},
+		{
+			desc: "first output executed, second output same chain",
+			outputs: []WriteOutput{
+				{
+					ChainSelector: 5009297550715157269,
+					Tx: mcms_types.Transaction{
+						To:               common.HexToAddress("0x01").Hex(),
+						Data:             common.Hex2Bytes("0xdeadbeef"),
+						AdditionalFields: []byte{0x7B, 0x7D}, // "{}" in bytes
+					},
+					ExecInfo: &ExecInfo{
+						Hash: "0xabc123",
+					},
+				},
+				{
+					ChainSelector: 5009297550715157269,
+					Tx: mcms_types.Transaction{
+						To:               common.HexToAddress("0x02").Hex(),
+						Data:             common.Hex2Bytes("0xcafebabe"),
+						AdditionalFields: []byte{0x7B, 0x7D}, // "{}" in bytes
+					},
+				},
+			},
+			expected: mcms_types.BatchOperation{
+				ChainSelector: 5009297550715157269,
+				Transactions: []mcms_types.Transaction{
+					{
+						To:               common.HexToAddress("0x02").Hex(),
+						Data:             common.Hex2Bytes("0xcafebabe"),
+						AdditionalFields: []byte{0x7B, 0x7D}, // "{}" in bytes
+					},
+				},
+			},
+		},
+		{
+			desc: "first output executed, second output different chain",
+			outputs: []WriteOutput{
+				{
+					ChainSelector: 5009297550715157269,
+					Tx: mcms_types.Transaction{
+						To:               common.HexToAddress("0x01").Hex(),
+						Data:             common.Hex2Bytes("0xdeadbeef"),
+						AdditionalFields: []byte{0x7B, 0x7D}, // "{}" in bytes
+					},
+					ExecInfo: &ExecInfo{
+						Hash: "0xabc123",
+					},
+				},
+				{
+					ChainSelector: 4340886533089894000,
+					Tx: mcms_types.Transaction{
+						To:               common.HexToAddress("0x02").Hex(),
+						Data:             common.Hex2Bytes("0xcafebabe"),
+						AdditionalFields: []byte{0x7B, 0x7D}, // "{}" in bytes
+					},
+				},
+			},
+			expected: mcms_types.BatchOperation{
+				ChainSelector: 4340886533089894000,
+				Transactions: []mcms_types.Transaction{
+					{
+						To:               common.HexToAddress("0x02").Hex(),
+						Data:             common.Hex2Bytes("0xcafebabe"),
+						AdditionalFields: []byte{0x7B, 0x7D}, // "{}" in bytes
+					},
+				},
+			},
+		},
+		{
+			desc: "multiple outputs with executed in between, same chain",
+			outputs: []WriteOutput{
+				{
+					ChainSelector: 5009297550715157269,
+					Tx: mcms_types.Transaction{
+						To:               common.HexToAddress("0x01").Hex(),
+						Data:             common.Hex2Bytes("0xdeadbeef"),
+						AdditionalFields: []byte{0x7B, 0x7D}, // "{}" in bytes
+					},
+				},
+				{
+					ChainSelector: 5009297550715157269,
+					Tx: mcms_types.Transaction{
+						To:               common.HexToAddress("0x02").Hex(),
+						Data:             common.Hex2Bytes("0xcafebabe"),
+						AdditionalFields: []byte{0x7B, 0x7D}, // "{}" in bytes
+					},
+					ExecInfo: &ExecInfo{
+						Hash: "0xabc123",
+					},
+				},
+				{
+					ChainSelector: 5009297550715157269,
+					Tx: mcms_types.Transaction{
+						To:               common.HexToAddress("0x03").Hex(),
+						Data:             common.Hex2Bytes("0x12345678"),
+						AdditionalFields: []byte{0x7B, 0x7D}, // "{}" in bytes
+					},
+				},
+			},
+			expected: mcms_types.BatchOperation{
+				ChainSelector: 5009297550715157269,
+				Transactions: []mcms_types.Transaction{
+					{
+						To:               common.HexToAddress("0x01").Hex(),
+						Data:             common.Hex2Bytes("0xdeadbeef"),
+						AdditionalFields: []byte{0x7B, 0x7D}, // "{}" in bytes
+					},
+					{
+						To:               common.HexToAddress("0x03").Hex(),
+						Data:             common.Hex2Bytes("0x12345678"),
+						AdditionalFields: []byte{0x7B, 0x7D}, // "{}" in bytes
+					},
+				},
+			},
+		},
 	}
 
 	for _, test := range tests {

@@ -33,16 +33,34 @@ type CommitteeVerifierRemoteChainConfig struct {
 	GasForVerification uint32
 	// The size of the CCV specific payload in bytes (used for billing).
 	PayloadSizeBytes uint32
-	// SignatureConfig specifies the signature configuration for the remote chain.
-	SignatureConfig CommitteeVerifierSignatureQuorumConfig
 }
 
 // CommitteeVerifierConfig configures a CommitteeVerifier contract.
 type CommitteeVerifierConfig[LocalContract any] struct {
 	// CommitteeVerifier is a set of addresses comprising the committee verifier system.
 	CommitteeVerifier []LocalContract
+	// SignatureConfig specifies the signature configuration for this chain as a source.
+	// Therefore, this signature configuration has to be applied on every destination chain that this source chain is connected to.
+	SignatureConfig CommitteeVerifierSignatureQuorumConfig
 	// RemoteChains specifies the configuration for each remote chain supported by the committee verifier.
 	RemoteChains map[uint64]CommitteeVerifierRemoteChainConfig
+}
+
+// CommitteeVerifierRemoteChainConfigWithSignatureConfig combines a CommitteeVerifierRemoteChainConfig with a signature configuration.
+// Used as input into the ConfigureCommitteeVerifierForLanes sequence.
+type CommitteeVerifierRemoteChainConfigWithSignatureConfig struct {
+	CommitteeVerifierRemoteChainConfig
+	// SignatureConfig specifies the signature configuration for the remote chain.
+	SignatureConfig CommitteeVerifierSignatureQuorumConfig
+}
+
+// CommitteeVerifierConfigWithSignatureConfigPerRemoteChain combines a CommitteeVerifierConfig with a signature configuration per remote chain.
+// Used as input into the ConfigureCommitteeVerifierForLanes sequence.
+type CommitteeVerifierConfigWithSignatureConfigPerRemoteChain[LocalContract any] struct {
+	// CommitteeVerifier is a set of addresses comprising the committee verifier system.
+	CommitteeVerifier []LocalContract
+	// RemoteChains specifies the configuration for each remote chain supported by the committee verifier.
+	RemoteChains map[uint64]CommitteeVerifierRemoteChainConfigWithSignatureConfig
 }
 
 // ExecutorDestChainConfig configures the Executor for a remote chain.
@@ -125,7 +143,7 @@ type ConfigureChainForLanesInput struct {
 	OnRamp string
 	// The CommitteeVerifiers on the chain being configured.
 	// There can be multiple committee verifiers on a chain, each controlled by a different entity.
-	CommitteeVerifiers []CommitteeVerifierConfig[string]
+	CommitteeVerifiers []CommitteeVerifierConfigWithSignatureConfigPerRemoteChain[string]
 	// The FeeQuoter address on the chain being configured.
 	FeeQuoter string
 	// The OffRamp address on the chain being configured

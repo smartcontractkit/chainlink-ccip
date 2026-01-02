@@ -18,8 +18,6 @@ import (
 
 // ChainConfig specifies configuration required for a chain to connect with other chains.
 type ChainConfig struct {
-	// The selector of the chain being configured.
-	ChainSelector uint64
 	// The Router on the chain being configured.
 	// We assume that all connections defined will use the same router, either test or production.
 	Router datastore.AddressRef
@@ -42,7 +40,7 @@ type ChainConfig struct {
 // ConfigureChainsForLanesConfig is the configuration for the ConfigureChainsForLanes changeset.
 type ConfigureChainsForLanesConfig struct {
 	// Chains specifies the chains to configure.
-	Chains []ChainConfig
+	Chains map[uint64]ChainConfig
 	// MCMS configures the resulting proposal.
 	MCMS *mcms.Input
 }
@@ -61,55 +59,63 @@ func makeVerify(_ *adapters.ChainFamilyRegistry, _ *changesets.MCMSReaderRegistr
 			}
 		}
 
-		for _, chain := range cfg.Chains {
-			if _, err := chain_selectors.GetSelectorFamily(chain.ChainSelector); err != nil {
+		for chainSel, chain := range cfg.Chains {
+			if _, err := chain_selectors.GetSelectorFamily(chainSel); err != nil {
 				return err
 			}
 			if datastore_utils.IsAddressRefEmpty(chain.Router) {
-				return fmt.Errorf("router ref is empty for chain with selector %d", chain.ChainSelector)
+				return fmt.Errorf("router ref is empty for chain with selector %d", chainSel)
 			}
 			if datastore_utils.IsAddressRefEmpty(chain.OnRamp) {
-				return fmt.Errorf("onRamp ref is empty for chain with selector %d", chain.ChainSelector)
+				return fmt.Errorf("onRamp ref is empty for chain with selector %d", chainSel)
 			}
 			if datastore_utils.IsAddressRefEmpty(chain.FeeQuoter) {
-				return fmt.Errorf("feeQuoter ref is empty for chain with selector %d", chain.ChainSelector)
+				return fmt.Errorf("feeQuoter ref is empty for chain with selector %d", chainSel)
 			}
 			if datastore_utils.IsAddressRefEmpty(chain.OffRamp) {
-				return fmt.Errorf("offRamp ref is empty for chain with selector %d", chain.ChainSelector)
+				return fmt.Errorf("offRamp ref is empty for chain with selector %d", chainSel)
 			}
 
-			for _, ccv := range chain.CommitteeVerifiers {
+			for i, ccv := range chain.CommitteeVerifiers {
 				if len(ccv.CommitteeVerifier) == 0 {
-					return fmt.Errorf("committee verifier on chain with selector %d has no contracts", chain.ChainSelector)
+					return fmt.Errorf("committee verifier on chain with selector %d has no contracts", chainSel)
 				}
-				for remoteChainSelector, remoteChain := range ccv.RemoteChains {
+				if int(ccv.SignatureConfig.Threshold) > len(ccv.SignatureConfig.Signers) {
+					return fmt.Errorf("source chain %d for committee verifier at index %d has threshold greater than the number of signers", chainSel, i)
+				}
+
+				for remoteChainSelector := range ccv.RemoteChains {
+					// Ensure that the remote chain exists and defines the same number of committee verifiers
+					if _, ok := cfg.Chains[remoteChainSelector]; !ok {
+						return fmt.Errorf("remote chain %d is not defined", remoteChainSelector)
+					}
+					if len(cfg.Chains[remoteChainSelector].CommitteeVerifiers) != len(chain.CommitteeVerifiers) {
+						return fmt.Errorf("chains %d and %d have different number of committee verifiers", remoteChainSelector, chainSel)
+					}
 					if slices.Contains(chain.RemoteChainsToDisconnect, remoteChainSelector) {
-						return fmt.Errorf("committee verifier on chain %d with remote chain %d has remote chain %d in both RemoteChains and RemoteChainsToDisconnect", chain.ChainSelector, remoteChainSelector, remoteChainSelector)
+						return fmt.Errorf("committee verifier on chain %d with remote chain %d has remote chain %d in both RemoteChains and RemoteChainsToDisconnect", chainSel, remoteChainSelector, remoteChainSelector)
 					}
 					if _, err := chain_selectors.GetSelectorFamily(remoteChainSelector); err != nil {
 						return err
-					}
-					if int(remoteChain.SignatureConfig.Threshold) > len(remoteChain.SignatureConfig.Signers) {
-						return fmt.Errorf("committee verifier on chain %d with remote chain %d has threshold greater than the number of signers", chain.ChainSelector, remoteChainSelector)
 					}
 				}
 			}
 
 			for remoteChainSelector, remoteChain := range chain.RemoteChains {
 				if slices.Contains(chain.RemoteChainsToDisconnect, remoteChainSelector) {
-					return fmt.Errorf("chain %d has remote chain %d in both RemoteChains and RemoteChainsToDisconnect", chain.ChainSelector, remoteChainSelector)
+					return fmt.Errorf("chain %d has remote chain %d in both RemoteChains and RemoteChainsToDisconnect", chainSel, remoteChainSelector)
 				}
 				if _, err := chain_selectors.GetSelectorFamily(remoteChainSelector); err != nil {
 					return err
 				}
 				if datastore_utils.IsAddressRefEmpty(remoteChain.OffRamp) {
-					return fmt.Errorf("chain %d has empty offRamp ref for remote chain %d", chain.ChainSelector, remoteChainSelector)
+					return fmt.Errorf("chain %d has empty offRamp ref for remote chain %d", chainSel, remoteChainSelector)
 				}
 				if len(remoteChain.OnRamps) == 0 {
-					return fmt.Errorf("chain %d has no onRamps for remote chain %d", chain.ChainSelector, remoteChainSelector)
+					return fmt.Errorf("chain %d has no onRamps for remote chain %d", chainSel, remoteChainSelector)
 				}
 				if datastore_utils.IsAddressRefEmpty(remoteChain.DefaultExecutor) {
-					return fmt.Errorf("chain %d has empty default executor ref for remote chain %d", chain.ChainSelector, remoteChainSelector)
+					return fmt.Errorf("chain %d has empty default executor ref for remote chain %d", chainSel, remoteChainSelector)
 				}
 			}
 
@@ -129,43 +135,50 @@ func makeApply(chainFamilyRegistry *adapters.ChainFamilyRegistry, mcmsRegistry *
 		batchOps := make([]mcms_types.BatchOperation, 0)
 		reports := make([]cldf_ops.Report[any, any], 0)
 
-		for _, chain := range cfg.Chains {
-			router, err := datastore_utils.FindAndFormatRef(e.DataStore, chain.Router, chain.ChainSelector, datastore_utils.FullRef)
+		for chainSel, chain := range cfg.Chains {
+			router, err := datastore_utils.FindAndFormatRef(e.DataStore, chain.Router, chainSel, datastore_utils.FullRef)
 			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve router ref on chain with selector %d: %w", chain.ChainSelector, err)
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve router ref on chain with selector %d: %w", chainSel, err)
 			}
-			onRamp, err := datastore_utils.FindAndFormatRef(e.DataStore, chain.OnRamp, chain.ChainSelector, datastore_utils.FullRef)
+			onRamp, err := datastore_utils.FindAndFormatRef(e.DataStore, chain.OnRamp, chainSel, datastore_utils.FullRef)
 			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve onRamp ref on chain with selector %d: %w", chain.ChainSelector, err)
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve onRamp ref on chain with selector %d: %w", chainSel, err)
 			}
-			feeQuoter, err := datastore_utils.FindAndFormatRef(e.DataStore, chain.FeeQuoter, chain.ChainSelector, datastore_utils.FullRef)
+			feeQuoter, err := datastore_utils.FindAndFormatRef(e.DataStore, chain.FeeQuoter, chainSel, datastore_utils.FullRef)
 			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve feeQuoter ref on chain with selector %d: %w", chain.ChainSelector, err)
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve feeQuoter ref on chain with selector %d: %w", chainSel, err)
 			}
-			offRamp, err := datastore_utils.FindAndFormatRef(e.DataStore, chain.OffRamp, chain.ChainSelector, datastore_utils.FullRef)
+			offRamp, err := datastore_utils.FindAndFormatRef(e.DataStore, chain.OffRamp, chainSel, datastore_utils.FullRef)
 			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve offRamp ref on chain with selector %d: %w", chain.ChainSelector, err)
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve offRamp ref on chain with selector %d: %w", chainSel, err)
 			}
 
-			committeeVerifiers := make([]adapters.CommitteeVerifierConfig[string], len(chain.CommitteeVerifiers))
+			committeeVerifiers := make([]adapters.CommitteeVerifierConfigWithSignatureConfigPerRemoteChain[string], len(chain.CommitteeVerifiers))
 			for i, verifier := range chain.CommitteeVerifiers {
 				contracts := make([]string, 0, len(verifier.CommitteeVerifier))
 				for _, contract := range verifier.CommitteeVerifier {
-					contract, err := datastore_utils.FindAndFormatRef(e.DataStore, contract, chain.ChainSelector, datastore_utils.FullRef)
+					contract, err := datastore_utils.FindAndFormatRef(e.DataStore, contract, chainSel, datastore_utils.FullRef)
 					if err != nil {
-						return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve CommitteeVerifier contract ref on chain with selector %d: %w", chain.ChainSelector, err)
+						return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve CommitteeVerifier contract ref on chain with selector %d: %w", chainSel, err)
 					}
 					contracts = append(contracts, contract.Address)
 				}
-				committeeVerifiers[i] = adapters.CommitteeVerifierConfig[string]{
+				remoteChains := make(map[uint64]adapters.CommitteeVerifierRemoteChainConfigWithSignatureConfig, len(verifier.RemoteChains))
+				for remoteChainSelector, remoteChain := range verifier.RemoteChains {
+					remoteChains[remoteChainSelector] = adapters.CommitteeVerifierRemoteChainConfigWithSignatureConfig{
+						CommitteeVerifierRemoteChainConfig: remoteChain,
+						SignatureConfig:                    cfg.Chains[remoteChainSelector].CommitteeVerifiers[i].SignatureConfig,
+					}
+				}
+				committeeVerifiers[i] = adapters.CommitteeVerifierConfigWithSignatureConfigPerRemoteChain[string]{
 					CommitteeVerifier: contracts,
-					RemoteChains:      verifier.RemoteChains,
+					RemoteChains:      remoteChains,
 				}
 			}
 
-			family, err := chain_selectors.GetSelectorFamily(chain.ChainSelector)
+			family, err := chain_selectors.GetSelectorFamily(chainSel)
 			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to get chain family for chain selector %d: %w", chain.ChainSelector, err)
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to get chain family for chain selector %d: %w", chainSel, err)
 			}
 			adapter, ok := chainFamilyRegistry.GetChainFamily(family)
 			if !ok {
@@ -183,13 +196,13 @@ func makeApply(chainFamilyRegistry *adapters.ChainFamilyRegistry, mcmsRegistry *
 					return cldf.ChangesetOutput{}, fmt.Errorf("no remote adapter registered for remote chain family '%s'", remoteFamily)
 				}
 
-				remoteChains[remoteChainSelector], err = convertRemoteChainConfig(e, chain.ChainSelector, remoteChainSelector, remoteAdapter, inCfg)
+				remoteChains[remoteChainSelector], err = convertRemoteChainConfig(e, chainSel, remoteChainSelector, remoteAdapter, inCfg)
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to process remote chain config for selector %d: %w", remoteChainSelector, err)
 				}
 			}
 			configureChainForLanesReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adapter.ConfigureChainForLanes(), e.BlockChains, adapters.ConfigureChainForLanesInput{
-				ChainSelector:            chain.ChainSelector,
+				ChainSelector:            chainSel,
 				Router:                   router.Address,
 				OnRamp:                   onRamp.Address,
 				CommitteeVerifiers:       committeeVerifiers,
@@ -199,7 +212,7 @@ func makeApply(chainFamilyRegistry *adapters.ChainFamilyRegistry, mcmsRegistry *
 				RemoteChainsToDisconnect: chain.RemoteChainsToDisconnect,
 			})
 			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to configure chain with selector %d: %w", chain.ChainSelector, err)
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to configure chain with selector %d: %w", chainSel, err)
 			}
 
 			batchOps = append(batchOps, configureChainForLanesReport.Output.BatchOps...)
