@@ -20,8 +20,8 @@ import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 /// It remains responsible for rate limiting and other validations while outsourcing token management to the
 /// CCTPVerifier contract. This token pool should never have a balance of USDC at any point during a transaction.
 /// The caller of lockOrBurn is responsible for sending USDC to the CCTPVerifier contract instead.
-contract CCTPTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
-  string public constant override typeAndVersion = "CCTPTokenPool 1.7.0-dev";
+contract CCTPThroughCCVTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
+  string public constant override typeAndVersion = "CCTPThroughCCVTokenPool 1.7.0-dev";
 
   error IPoolV1NotSupported();
 

@@ -15,7 +15,7 @@ contract USDCTokenPoolProxy_getFee is USDCTokenPoolProxySetup {
 
   function test_getFee() public {
     vm.mockCall(
-      address(s_cctpTokenPool),
+      address(s_cctpThroughCCVTokenPool),
       abi.encodeWithSelector(IPoolV2.getFee.selector, address(0), 0, 0, address(0), 0, ""),
       abi.encode(FEE_USD_CENTS, DEST_GAS_OVERHEAD, DEST_BYTES_OVERHEAD, TOKEN_FEE_BPS, IS_ENABLED)
     );
@@ -33,14 +33,12 @@ contract USDCTokenPoolProxy_getFee is USDCTokenPoolProxySetup {
   function test_getFee_RevertWhen_NoCCVCompatiblePoolSet() public {
     _enableERC165InterfaceChecks(s_cctpV2Pool, type(IPoolV1).interfaceId);
     _enableERC165InterfaceChecks(s_cctpV1Pool, type(IPoolV1).interfaceId);
-    _enableERC165InterfaceChecks(s_legacyCctpV1Pool, type(IPoolV1).interfaceId);
     s_usdcTokenPoolProxy.updatePoolAddresses(
       USDCTokenPoolProxy.PoolAddresses({
-        legacyCctpV1Pool: s_legacyCctpV1Pool,
         cctpV1Pool: s_cctpV1Pool,
         cctpV2Pool: s_cctpV2Pool,
-        cctpTokenPool: address(0),
-        siloedUsdCTokenPool: address(0)
+        cctpV2PoolWithCCV: address(0),
+        siloedLockReleasePool: address(0)
       })
     );
 
