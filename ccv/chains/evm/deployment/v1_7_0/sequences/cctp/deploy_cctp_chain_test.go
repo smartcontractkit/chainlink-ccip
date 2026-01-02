@@ -4,14 +4,15 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/advanced_pool_hooks"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/cctp_message_transmitter_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/cctp_through_ccv_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/cctp_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/usdc_token_pool_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/burn_mint_token_pool"
 	cctp_message_transmitter_proxy_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/cctp_message_transmitter_proxy"
 	cctp_through_ccv_token_pool_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/cctp_through_ccv_token_pool"
 	cctp_verifier_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/cctp_verifier"
@@ -22,12 +23,15 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
+	v1_6_1_burn_mint_token_pool "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_1/burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	burn_mint_erc20_bindings "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc20"
 	"github.com/stretchr/testify/require"
 )
@@ -142,7 +146,7 @@ func basicDeployCCTPInput(chainSelector uint64, setup cctpTestSetup, deployerAdd
 }
 
 func TestDeployCCTPChain(t *testing.T) {
-	chainSelector := uint64(3017758115101368649)
+	chainSelector := uint64(5009297550715157269)
 	e, err := environment.New(t.Context(),
 		environment.WithEVMSimulated(t, []uint64{chainSelector}),
 	)
@@ -152,6 +156,30 @@ func TestDeployCCTPChain(t *testing.T) {
 
 	setup := setupCCTPTestEnvironment(t, e, chainSelector)
 	chain := e.BlockChains.EVMChains()[chainSelector]
+
+	cctpV2Pool, tx, _, err := burn_mint_token_pool.DeployBurnMintTokenPool(chain.DeployerKey, chain.Client, setup.USDCToken, 6, common.Address{}, setup.RMN, setup.Router)
+	require.NoError(t, err, "Failed to deploy CCTP V2 pool")
+	_, err = e.BlockChains.EVMChains()[chainSelector].Confirm(tx)
+	require.NoError(t, err, "Failed to confirm CCTP V2 pool deployment")
+
+	cctpV1Pool, tx, _, err := v1_6_1_burn_mint_token_pool.DeployBurnMintTokenPool(chain.DeployerKey, chain.Client, setup.USDCToken, 6, []common.Address{}, setup.RMN, setup.Router)
+	require.NoError(t, err, "Failed to deploy CCTP V1 pool")
+	_, err = e.BlockChains.EVMChains()[chainSelector].Confirm(tx)
+	require.NoError(t, err, "Failed to confirm CCTP V1 pool deployment")
+
+	siloedUSDCTokenPool, tx, _, err := v1_6_1_burn_mint_token_pool.DeployBurnMintTokenPool(chain.DeployerKey, chain.Client, setup.USDCToken, 6, []common.Address{}, setup.RMN, setup.Router)
+	require.NoError(t, err, "Failed to deploy Siloed USDCTokenPool pool")
+	_, err = e.BlockChains.EVMChains()[chainSelector].Confirm(tx)
+	require.NoError(t, err, "Failed to confirm Siloed USDCTokenPool pool deployment")
+
+	indexAddressesByTypeAndVersion = func(_ cldf_ops.Bundle, _ evm.Chain, _ []string) (map[string]string, error) {
+		return map[string]string{
+			deployment.NewTypeAndVersion("USDCTokenPool", *semver.MustParse("1.6.4")).String():       cctpV1Pool.Hex(),
+			deployment.NewTypeAndVersion("USDCTokenPoolCCTPV2", *semver.MustParse("1.6.4")).String(): cctpV2Pool.Hex(),
+			deployment.NewTypeAndVersion("SiloedUSDCTokenPool", *semver.MustParse("1.7.0")).String(): siloedUSDCTokenPool.Hex(),
+		}, nil
+	}
+
 	input := basicDeployCCTPInput(chainSelector, setup, chain.DeployerKey.From)
 	// Add a remote chain config for testing (CCTP V2 with CCV)
 	remoteChainSelector := uint64(4949039107694359620)
@@ -185,7 +213,6 @@ func TestDeployCCTPChain(t *testing.T) {
 	require.NoError(t, err, "ExecuteSequence should not error")
 
 	exists := map[deployment.ContractType]bool{
-		deployment.ContractType(advanced_pool_hooks.ContractType):            false,
 		deployment.ContractType(cctp_through_ccv_token_pool.ContractType):    false,
 		deployment.ContractType(cctp_message_transmitter_proxy.ContractType): false,
 		deployment.ContractType(cctp_verifier.ContractType):                  false,
@@ -282,6 +309,13 @@ func TestDeployCCTPChain(t *testing.T) {
 	expectedMechanism, err := convertMechanismToUint8("CCTP_V2_WITH_CCV")
 	require.NoError(t, err, "Failed to convert mechanism to uint8")
 	require.Equal(t, expectedMechanism, uint8(mechanism), "Lock or burn mechanism should match")
+
+	// Check USDCTokenPoolProxy pools
+	pools, err := usdcTokenPoolProxy.GetPools(nil)
+	require.NoError(t, err, "Failed to get pools from USDCTokenPoolProxy")
+	require.Equal(t, cctpV1Pool, pools.CctpV1Pool, "CCTP V1 pool should match")
+	require.Equal(t, cctpV2Pool, pools.CctpV2Pool, "CCTP V2 pool should match")
+	require.Equal(t, siloedUSDCTokenPool, pools.SiloedLockReleasePool, "Siloed LockRelease pool should match")
 
 	// Check USDCTokenPoolProxy required CCVs
 	requiredCCVs, err := usdcTokenPoolProxy.GetRequiredCCVs(nil, setup.USDCToken, remoteChainSelector, big.NewInt(1e18), 1, []byte{}, 0)

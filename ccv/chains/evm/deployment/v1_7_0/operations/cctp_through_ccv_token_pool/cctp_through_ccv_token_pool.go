@@ -17,9 +17,9 @@ var Version = semver.MustParse("1.7.0")
 type ConstructorArgs struct {
 	Token              common.Address
 	LocalTokenDecimals uint8
-	AdvancedPoolHooks  common.Address
 	RMNProxy           common.Address
 	Router             common.Address
+	CCTPVerifier       common.Address
 	AllowedCallers     []common.Address
 }
 
