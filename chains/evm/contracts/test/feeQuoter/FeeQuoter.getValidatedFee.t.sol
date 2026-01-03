@@ -149,8 +149,8 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
       uint32 tokenGasOverhead = 0;
       uint32 tokenBytesOverhead = 0;
       for (uint256 j = 0; j < message.tokenAmounts.length; ++j) {
-        tokenGasOverhead +=
-          s_feeQuoter.getTokenTransferFeeConfig(DEST_CHAIN_SELECTOR, message.tokenAmounts[j].token).destGasOverhead;
+        tokenGasOverhead += s_feeQuoter.getTokenTransferFeeConfig(DEST_CHAIN_SELECTOR, message.tokenAmounts[j].token)
+        .destGasOverhead;
         uint32 destBytesOverhead =
           s_feeQuoter.getTokenTransferFeeConfig(DEST_CHAIN_SELECTOR, message.tokenAmounts[j].token).destBytesOverhead;
         tokenBytesOverhead += destBytesOverhead == 0 ? uint32(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES) : destBytesOverhead;
@@ -162,8 +162,8 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
       uint256 gasFeeUSD;
 
       {
-        uint256 gasUsed = customGasLimit + DEST_GAS_OVERHEAD
-          + (message.data.length + tokenTransferBytesOverhead) * DEST_GAS_PER_PAYLOAD_BYTE_BASE + tokenGasOverhead;
+        uint256 gasUsed = customGasLimit + DEST_GAS_OVERHEAD + (message.data.length + tokenTransferBytesOverhead)
+          * DEST_GAS_PER_PAYLOAD_BYTE_BASE + tokenGasOverhead;
 
         gasFeeUSD = gasUsed * destChainConfig.gasMultiplierWeiPerEth * USD_PER_GAS;
       }
@@ -183,7 +183,10 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
     }
   }
 
-  function testFuzz_getValidatedFee_EnforceOutOfOrder(bool enforce, bool allowOutOfOrderExecution) public {
+  function testFuzz_getValidatedFee_EnforceOutOfOrder(
+    bool enforce,
+    bool allowOutOfOrderExecution
+  ) public {
     // Update config to enforce allowOutOfOrderExecution = defaultVal.
     vm.stopPrank();
     vm.startPrank(OWNER);

@@ -158,7 +158,10 @@ contract FeeQuoter_getTokenTransferCost is FeeQuoterFeeSetup {
     assertEq(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES, destBytesOverhead);
   }
 
-  function testFuzz_TokenTransferFeeDuplicateTokens_Success(uint256 transfers, uint256 amount) public view {
+  function testFuzz_TokenTransferFeeDuplicateTokens_Success(
+    uint256 transfers,
+    uint256 amount
+  ) public view {
     // It shouldn't be possible to pay materially lower fees by splitting up the transfers.
     // Note it is possible to pay higher fees since the minimum fees are added.
     FeeQuoter.DestChainConfig memory destChainConfig = s_feeQuoter.getDestChainConfig(DEST_CHAIN_SELECTOR);
@@ -241,8 +244,9 @@ contract FeeQuoter_getTokenTransferCost is FeeQuoterFeeSetup {
     );
     uint256 token1USDWei = _configUSDCentToWei(DEFAULT_TOKEN_FEE_USD_CENTS);
 
-    (feeUSDWei, destGasOverhead, destBytesOverhead) =
-      s_feeQuoter.getTokenTransferCost(DEST_CHAIN_SELECTOR, message.feeToken, s_wrappedTokenPrice, message.tokenAmounts);
+    (feeUSDWei, destGasOverhead, destBytesOverhead) = s_feeQuoter.getTokenTransferCost(
+      DEST_CHAIN_SELECTOR, message.feeToken, s_wrappedTokenPrice, message.tokenAmounts
+    );
     expectedFeeUSDWei = token0USDWei + token1USDWei + _configUSDCentToWei(tokenTransferFeeConfigs[2].minFeeUSDCents);
 
     assertEq(expectedFeeUSDWei, feeUSDWei, "wrong feeUSDWei 2");
@@ -252,8 +256,9 @@ contract FeeQuoter_getTokenTransferCost is FeeQuoterFeeSetup {
     // Set 2nd token transfer to a large amount that is higher than maxFeeUSD
     message.tokenAmounts[2] = Client.EVMTokenAmount({token: testTokens[2], amount: 1e36});
 
-    (feeUSDWei, destGasOverhead, destBytesOverhead) =
-      s_feeQuoter.getTokenTransferCost(DEST_CHAIN_SELECTOR, message.feeToken, s_wrappedTokenPrice, message.tokenAmounts);
+    (feeUSDWei, destGasOverhead, destBytesOverhead) = s_feeQuoter.getTokenTransferCost(
+      DEST_CHAIN_SELECTOR, message.feeToken, s_wrappedTokenPrice, message.tokenAmounts
+    );
     expectedFeeUSDWei = token0USDWei + token1USDWei + _configUSDCentToWei(tokenTransferFeeConfigs[2].maxFeeUSDCents);
 
     assertEq(expectedFeeUSDWei, feeUSDWei, "wrong feeUSDWei 3");
@@ -261,11 +266,17 @@ contract FeeQuoter_getTokenTransferCost is FeeQuoterFeeSetup {
     assertEq(expectedTotalBytes, destBytesOverhead, "wrong destBytesOverhead 3");
   }
 
-  function _applyBpsRatio(uint256 tokenAmount, uint16 ratio) internal pure returns (uint256) {
+  function _applyBpsRatio(
+    uint256 tokenAmount,
+    uint16 ratio
+  ) internal pure returns (uint256) {
     return (tokenAmount * ratio) / 1e5;
   }
 
-  function _calcUSDValueFromTokenAmount(uint224 tokenPrice, uint256 tokenAmount) internal pure returns (uint256) {
+  function _calcUSDValueFromTokenAmount(
+    uint224 tokenPrice,
+    uint256 tokenAmount
+  ) internal pure returns (uint256) {
     return (tokenPrice * tokenAmount) / 1e18;
   }
 }

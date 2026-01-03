@@ -172,8 +172,7 @@ contract FeeQuoter_getValidatedTokenPrice is FeeQuoterSetup {
     address sourceToken = _initialiseSingleTokenPriceFeed();
     MockV3Aggregator(s_dataFeedByToken[sourceToken]).updateAnswer(0);
     Internal.PriceUpdates memory priceUpdates = Internal.PriceUpdates({
-      tokenPriceUpdates: new Internal.TokenPriceUpdate[](1),
-      gasPriceUpdates: new Internal.GasPriceUpdate[](0)
+      tokenPriceUpdates: new Internal.TokenPriceUpdate[](1), gasPriceUpdates: new Internal.GasPriceUpdate[](0)
     });
     priceUpdates.tokenPriceUpdates[0] = Internal.TokenPriceUpdate({sourceToken: sourceToken, usdPerToken: 0});
 

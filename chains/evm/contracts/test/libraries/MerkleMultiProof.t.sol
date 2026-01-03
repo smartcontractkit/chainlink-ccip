@@ -64,7 +64,10 @@ contract MerkleMultiProofTest is Test {
     assertEq(expectedRoot, root);
   }
 
-  function testFuzz_MerkleRoot2(bytes32 left, bytes32 right) public pure {
+  function testFuzz_MerkleRoot2(
+    bytes32 left,
+    bytes32 right
+  ) public pure {
     bytes32[] memory leaves = new bytes32[](2);
     leaves[0] = left;
     leaves[1] = right;
@@ -91,7 +94,11 @@ contract MerkleMultiProofTest is Test {
     assertEq(root, expectedRoot);
   }
 
-  function testFuzz_MerkleMulti1of4(bytes32 leaf1, bytes32 proof1, bytes32 proof2) public pure {
+  function testFuzz_MerkleMulti1of4(
+    bytes32 leaf1,
+    bytes32 proof1,
+    bytes32 proof2
+  ) public pure {
     bytes32[] memory leaves = new bytes32[](1);
     leaves[0] = leaf1;
     bytes32[] memory proofs = new bytes32[](2);
@@ -106,7 +113,12 @@ contract MerkleMultiProofTest is Test {
     assertEq(MerkleMultiProof._merkleRoot(leaves, proofs, 0), result);
   }
 
-  function testFuzz_MerkleMulti2of4(bytes32 leaf1, bytes32 leaf2, bytes32 proof1, bytes32 proof2) public pure {
+  function testFuzz_MerkleMulti2of4(
+    bytes32 leaf1,
+    bytes32 leaf2,
+    bytes32 proof1,
+    bytes32 proof2
+  ) public pure {
     bytes32[] memory leaves = new bytes32[](2);
     leaves[0] = leaf1;
     leaves[1] = leaf2;
@@ -124,7 +136,12 @@ contract MerkleMultiProofTest is Test {
     assertEq(MerkleMultiProof._merkleRoot(leaves, proofs, 4), finalResult);
   }
 
-  function testFuzz_MerkleMulti3of4(bytes32 leaf1, bytes32 leaf2, bytes32 leaf3, bytes32 proof) public pure {
+  function testFuzz_MerkleMulti3of4(
+    bytes32 leaf1,
+    bytes32 leaf2,
+    bytes32 leaf3,
+    bytes32 proof
+  ) public pure {
     bytes32[] memory leaves = new bytes32[](3);
     leaves[0] = leaf1;
     leaves[1] = leaf2;
@@ -142,7 +159,12 @@ contract MerkleMultiProofTest is Test {
     assertEq(MerkleMultiProof._merkleRoot(leaves, proofs, 5), finalResult);
   }
 
-  function testFuzz_MerkleMulti4of4(bytes32 leaf1, bytes32 leaf2, bytes32 leaf3, bytes32 leaf4) public pure {
+  function testFuzz_MerkleMulti4of4(
+    bytes32 leaf1,
+    bytes32 leaf2,
+    bytes32 leaf3,
+    bytes32 leaf4
+  ) public pure {
     bytes32[] memory leaves = new bytes32[](4);
     leaves[0] = leaf1;
     leaves[1] = leaf2;

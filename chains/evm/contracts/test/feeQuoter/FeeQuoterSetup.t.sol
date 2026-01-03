@@ -139,45 +139,48 @@ contract FeeQuoterSetup is TokenSetup {
 
     s_feeQuoterTokenTransferFeeConfigArgs.push();
     s_feeQuoterTokenTransferFeeConfigArgs[0].destChainSelector = DEST_CHAIN_SELECTOR;
-    s_feeQuoterTokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs.push(
-      FeeQuoter.TokenTransferFeeConfigSingleTokenArgs({
-        token: s_sourceFeeToken,
-        tokenTransferFeeConfig: FeeQuoter.TokenTransferFeeConfig({
-          minFeeUSDCents: 1_00, // 1 USD
-          maxFeeUSDCents: 1000_00, // 1,000 USD
-          deciBps: 2_5, // 2.5 bps, or 0.025%
-          destGasOverhead: 100_000,
-          destBytesOverhead: 32,
-          isEnabled: true
+    s_feeQuoterTokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs
+      .push(
+        FeeQuoter.TokenTransferFeeConfigSingleTokenArgs({
+          token: s_sourceFeeToken,
+          tokenTransferFeeConfig: FeeQuoter.TokenTransferFeeConfig({
+            minFeeUSDCents: 1_00, // 1 USD
+            maxFeeUSDCents: 1000_00, // 1,000 USD
+            deciBps: 2_5, // 2.5 bps, or 0.025%
+            destGasOverhead: 100_000,
+            destBytesOverhead: 32,
+            isEnabled: true
+          })
         })
-      })
-    );
-    s_feeQuoterTokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs.push(
-      FeeQuoter.TokenTransferFeeConfigSingleTokenArgs({
-        token: CUSTOM_TOKEN,
-        tokenTransferFeeConfig: FeeQuoter.TokenTransferFeeConfig({
-          minFeeUSDCents: 2_00, // 1 USD
-          maxFeeUSDCents: 2000_00, // 1,000 USD
-          deciBps: 10_0, // 10 bps, or 0.1%
-          destGasOverhead: 95_000,
-          destBytesOverhead: 200,
-          isEnabled: true
+      );
+    s_feeQuoterTokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs
+      .push(
+        FeeQuoter.TokenTransferFeeConfigSingleTokenArgs({
+          token: CUSTOM_TOKEN,
+          tokenTransferFeeConfig: FeeQuoter.TokenTransferFeeConfig({
+            minFeeUSDCents: 2_00, // 1 USD
+            maxFeeUSDCents: 2000_00, // 1,000 USD
+            deciBps: 10_0, // 10 bps, or 0.1%
+            destGasOverhead: 95_000,
+            destBytesOverhead: 200,
+            isEnabled: true
+          })
         })
-      })
-    );
-    s_feeQuoterTokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs.push(
-      FeeQuoter.TokenTransferFeeConfigSingleTokenArgs({
-        token: CUSTOM_TOKEN_2,
-        tokenTransferFeeConfig: FeeQuoter.TokenTransferFeeConfig({
-          minFeeUSDCents: 2_00, // 1 USD
-          maxFeeUSDCents: 2000_00, // 1,000 USD
-          deciBps: 10_0, // 10 bps, or 0.1%
-          destGasOverhead: 1,
-          destBytesOverhead: 200,
-          isEnabled: false
+      );
+    s_feeQuoterTokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs
+      .push(
+        FeeQuoter.TokenTransferFeeConfigSingleTokenArgs({
+          token: CUSTOM_TOKEN_2,
+          tokenTransferFeeConfig: FeeQuoter.TokenTransferFeeConfig({
+            minFeeUSDCents: 2_00, // 1 USD
+            maxFeeUSDCents: 2000_00, // 1,000 USD
+            deciBps: 10_0, // 10 bps, or 0.1%
+            destGasOverhead: 1,
+            destBytesOverhead: 200,
+            isEnabled: false
+          })
         })
-      })
-    );
+      );
 
     //setting up the destination token for CUSTOM_TOKEN_2 here as it is specific to these tests
     s_destTokenBySourceToken[CUSTOM_TOKEN_2] = address(bytes20(keccak256("CUSTOM_TOKEN_2_DEST")));
@@ -198,7 +201,11 @@ contract FeeQuoterSetup is TokenSetup {
     s_feeQuoter.updatePrices(priceUpdates);
   }
 
-  function _deployTokenPriceDataFeed(address token, uint8 decimals, int256 initialAnswer) internal returns (address) {
+  function _deployTokenPriceDataFeed(
+    address token,
+    uint8 decimals,
+    int256 initialAnswer
+  ) internal returns (address) {
     MockV3Aggregator dataFeed = new MockV3Aggregator(decimals, initialAnswer);
     s_dataFeedByToken[token] = address(dataFeed);
     return address(dataFeed);
@@ -228,9 +235,7 @@ contract FeeQuoterSetup is TokenSetup {
     return FeeQuoter.TokenPriceFeedUpdate({
       sourceToken: sourceToken,
       feedConfig: FeeQuoter.TokenPriceFeedConfig({
-        dataFeedAddress: dataFeedAddress,
-        tokenDecimals: tokenDecimals,
-        isEnabled: true
+        dataFeedAddress: dataFeedAddress, tokenDecimals: tokenDecimals, isEnabled: true
       })
     });
   }
