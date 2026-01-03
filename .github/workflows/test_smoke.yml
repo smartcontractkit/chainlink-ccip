@@ -19,24 +19,6 @@ on:
         description: "Extra config file(s), e.g. ton.toml,sui.toml"
         required: false
         type: string
-  workflow_call:
-    inputs:
-      ton_ref:
-        description: 'Git ref (branch) of the TON relayer'
-        required: false
-        type: string
-      contract_version:
-        description: 'Version of CCIP contracts to use'
-        required: false
-        type: string
-      chainlink_version:
-        description: 'Chainlink version to use (e.g., develop, gh ref, etc.)'
-        required: false
-        type: string
-      custom_config:
-        description: "Extra config file(s), e.g. ton.toml,sui.toml"
-        required: false
-        type: string
   pull_request:
   push:
     branches:
