@@ -40,18 +40,18 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
     address[] memory addFillers = new address[](1);
     addFillers[0] = s_filler;
 
-    FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs memory laneConfigArgs = FastTransferTokenPoolAbstract
-      .DestChainConfigUpdateArgs({
-      remoteChainSelector: chainSelector,
-      fastTransferFillerFeeBps: FAST_FEE_FILLER_BPS,
-      fastTransferPoolFeeBps: 0,
-      fillerAllowlistEnabled: true,
-      destinationPool: destPoolAddress,
-      maxFillAmountPerRequest: MAX_FILL_AMOUNT_PER_REQUEST,
-      settlementOverheadGas: settlementGas,
-      chainFamilySelector: chainFamily,
-      customExtraArgs: extraArgs
-    });
+    FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs memory laneConfigArgs =
+      FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs({
+        remoteChainSelector: chainSelector,
+        fastTransferFillerFeeBps: FAST_FEE_FILLER_BPS,
+        fastTransferPoolFeeBps: 0,
+        fillerAllowlistEnabled: true,
+        destinationPool: destPoolAddress,
+        maxFillAmountPerRequest: MAX_FILL_AMOUNT_PER_REQUEST,
+        settlementOverheadGas: settlementGas,
+        chainFamilySelector: chainFamily,
+        customExtraArgs: extraArgs
+      });
     s_pool.updateDestChainConfig(_singleConfigToList(laneConfigArgs));
     s_pool.updateFillerAllowList(addFillers, new address[](0));
 
@@ -104,7 +104,10 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
     });
   }
 
-  function _executeTest(TestParams memory params, bytes memory extraArgs) internal {
+  function _executeTest(
+    TestParams memory params,
+    bytes memory extraArgs
+  ) internal {
     _setupMocks(params.mockMessageId);
 
     Client.EVM2AnyMessage memory message = _createMessage(params, extraArgs);
@@ -550,21 +553,24 @@ contract FastTransferTokenPool_ccipSendToken_Test is FastTransferTokenPoolSetup 
     s_pool.ccipSendToken{value: 1 ether}(DEST_CHAIN_SELECTOR, SOURCE_AMOUNT, userMaxFeeLimit, receiver, address(0), "");
   }
 
-  function _updateConfigWithPoolFee(uint16 fillerFeeBps, uint16 poolFeeBps) internal {
+  function _updateConfigWithPoolFee(
+    uint16 fillerFeeBps,
+    uint16 poolFeeBps
+  ) internal {
     vm.stopPrank();
 
-    FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs memory laneConfigArgs = FastTransferTokenPoolAbstract
-      .DestChainConfigUpdateArgs({
-      remoteChainSelector: DEST_CHAIN_SELECTOR,
-      fastTransferFillerFeeBps: fillerFeeBps,
-      fastTransferPoolFeeBps: poolFeeBps,
-      fillerAllowlistEnabled: true,
-      destinationPool: destPoolAddress,
-      maxFillAmountPerRequest: MAX_FILL_AMOUNT_PER_REQUEST,
-      settlementOverheadGas: SETTLEMENT_GAS_OVERHEAD,
-      chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
-      customExtraArgs: ""
-    });
+    FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs memory laneConfigArgs =
+      FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs({
+        remoteChainSelector: DEST_CHAIN_SELECTOR,
+        fastTransferFillerFeeBps: fillerFeeBps,
+        fastTransferPoolFeeBps: poolFeeBps,
+        fillerAllowlistEnabled: true,
+        destinationPool: destPoolAddress,
+        maxFillAmountPerRequest: MAX_FILL_AMOUNT_PER_REQUEST,
+        settlementOverheadGas: SETTLEMENT_GAS_OVERHEAD,
+        chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
+        customExtraArgs: ""
+      });
     vm.prank(OWNER);
     s_pool.updateDestChainConfig(_singleConfigToList(laneConfigArgs));
 

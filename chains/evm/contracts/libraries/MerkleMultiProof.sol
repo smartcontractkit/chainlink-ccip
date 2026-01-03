@@ -95,12 +95,18 @@ library MerkleMultiProof {
   }
 
   /// @notice Hashes two bytes32 objects in their given order, prepended by the INTERNAL_DOMAIN_SEPARATOR.
-  function _hashInternalNode(bytes32 left, bytes32 right) private pure returns (bytes32 hash) {
+  function _hashInternalNode(
+    bytes32 left,
+    bytes32 right
+  ) private pure returns (bytes32 hash) {
     return keccak256(abi.encode(INTERNAL_DOMAIN_SEPARATOR, left, right));
   }
 
   /// @notice Hashes two bytes32 objects. The order is taken into account, using the lower value first.
-  function _hashPair(bytes32 a, bytes32 b) private pure returns (bytes32) {
+  function _hashPair(
+    bytes32 a,
+    bytes32 b
+  ) private pure returns (bytes32) {
     return a < b ? _hashInternalNode(a, b) : _hashInternalNode(b, a);
   }
 }

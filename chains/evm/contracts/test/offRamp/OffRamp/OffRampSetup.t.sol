@@ -63,7 +63,10 @@ contract OffRampSetup is FeeQuoterSetup, MultiOCR3BaseSetup {
     _deployOffRamp(s_mockRMNRemote, s_inboundNonceManager);
   }
 
-  function _deployOffRamp(IRMNRemote rmnRemote, NonceManager nonceManager) internal {
+  function _deployOffRamp(
+    IRMNRemote rmnRemote,
+    NonceManager nonceManager
+  ) internal {
     OffRamp.SourceChainConfigArgs[] memory sourceChainConfigs = new OffRamp.SourceChainConfigArgs[](0);
 
     s_offRamp = new OffRampHelper(
@@ -104,9 +107,10 @@ contract OffRampSetup is FeeQuoterSetup, MultiOCR3BaseSetup {
 
     address[] memory authorizedCallers = new address[](1);
     authorizedCallers[0] = address(s_offRamp);
-    NonceManager(nonceManager).applyAuthorizedCallerUpdates(
-      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: authorizedCallers, removedCallers: new address[](0)})
-    );
+    NonceManager(nonceManager)
+      .applyAuthorizedCallerUpdates(
+        AuthorizedCallers.AuthorizedCallerArgs({addedCallers: authorizedCallers, removedCallers: new address[](0)})
+      );
 
     address[] memory priceUpdaters = new address[](1);
     priceUpdaters[0] = address(s_offRamp);
@@ -170,9 +174,7 @@ contract OffRampSetup is FeeQuoterSetup, MultiOCR3BaseSetup {
     address feeQuoter
   ) internal pure returns (OffRamp.DynamicConfig memory) {
     return OffRamp.DynamicConfig({
-      feeQuoter: feeQuoter,
-      permissionLessExecutionThresholdSeconds: 60 * 60,
-      messageInterceptor: address(0)
+      feeQuoter: feeQuoter, permissionLessExecutionThresholdSeconds: 60 * 60, messageInterceptor: address(0)
     });
   }
 
@@ -325,7 +327,10 @@ contract OffRampSetup is FeeQuoterSetup, MultiOCR3BaseSetup {
     return gasLimits;
   }
 
-  function _assertSameConfig(OffRamp.DynamicConfig memory a, OffRamp.DynamicConfig memory b) public pure {
+  function _assertSameConfig(
+    OffRamp.DynamicConfig memory a,
+    OffRamp.DynamicConfig memory b
+  ) public pure {
     assertEq(a.permissionLessExecutionThresholdSeconds, b.permissionLessExecutionThresholdSeconds);
     assertEq(a.messageInterceptor, b.messageInterceptor);
     assertEq(a.feeQuoter, b.feeQuoter);
@@ -374,7 +379,10 @@ contract OffRampSetup is FeeQuoterSetup, MultiOCR3BaseSetup {
     );
   }
 
-  function _commit(OffRamp.CommitReport memory commitReport, uint64 sequenceNumber) internal {
+  function _commit(
+    OffRamp.CommitReport memory commitReport,
+    uint64 sequenceNumber
+  ) internal {
     bytes32[2] memory reportContext = [s_configDigestCommit, bytes32(uint256(sequenceNumber))];
 
     (bytes32[] memory rs, bytes32[] memory ss,, bytes32 rawVs) =
@@ -478,8 +486,7 @@ contract OffRampSetup is FeeQuoterSetup, MultiOCR3BaseSetup {
 
   function _getEmptyPriceUpdates() internal pure returns (Internal.PriceUpdates memory priceUpdates) {
     return Internal.PriceUpdates({
-      tokenPriceUpdates: new Internal.TokenPriceUpdate[](0),
-      gasPriceUpdates: new Internal.GasPriceUpdate[](0)
+      tokenPriceUpdates: new Internal.TokenPriceUpdate[](0), gasPriceUpdates: new Internal.GasPriceUpdate[](0)
     });
   }
 }

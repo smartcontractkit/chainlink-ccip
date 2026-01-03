@@ -28,12 +28,18 @@ contract MultiOCR3Helper is MultiOCR3Base {
   }
 
   /// @dev transmit function with no signatures
-  function transmitWithoutSignatures(bytes32[2] calldata reportContext, bytes calldata report) external {
+  function transmitWithoutSignatures(
+    bytes32[2] calldata reportContext,
+    bytes calldata report
+  ) external {
     bytes32[] memory emptySigs = new bytes32[](0);
     _transmit(s_transmitOcrPluginType, reportContext, report, emptySigs, emptySigs, bytes32(""));
   }
 
-  function getOracle(uint8 ocrPluginType, address oracleAddress) external view returns (Oracle memory) {
+  function getOracle(
+    uint8 ocrPluginType,
+    address oracleAddress
+  ) external view returns (Oracle memory) {
     return s_oracles[ocrPluginType][oracleAddress];
   }
 

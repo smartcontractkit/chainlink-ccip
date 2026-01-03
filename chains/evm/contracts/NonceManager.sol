@@ -59,11 +59,17 @@ contract NonceManager is INonceManager, AuthorizedCallers, ITypeAndVersion {
   /// @param destChainSelector The destination chain selector.
   /// @param sender The sender address.
   /// @return outboundNonce The outbound nonce.
-  function getOutboundNonce(uint64 destChainSelector, address sender) external view returns (uint64) {
+  function getOutboundNonce(
+    uint64 destChainSelector,
+    address sender
+  ) external view returns (uint64) {
     return _getOutboundNonce(destChainSelector, sender);
   }
 
-  function _getOutboundNonce(uint64 destChainSelector, address sender) private view returns (uint64) {
+  function _getOutboundNonce(
+    uint64 destChainSelector,
+    address sender
+  ) private view returns (uint64) {
     uint64 outboundNonce = s_outboundNonces[destChainSelector][sender];
 
     // When introducing the NonceManager with existing lanes, we still want to have sequential nonces.
@@ -104,11 +110,17 @@ contract NonceManager is INonceManager, AuthorizedCallers, ITypeAndVersion {
   /// @param sourceChainSelector The source chain selector.
   /// @param sender The encoded sender address.
   /// @return inboundNonce The inbound nonce.
-  function getInboundNonce(uint64 sourceChainSelector, bytes calldata sender) external view returns (uint64) {
+  function getInboundNonce(
+    uint64 sourceChainSelector,
+    bytes calldata sender
+  ) external view returns (uint64) {
     return _getInboundNonce(sourceChainSelector, sender);
   }
 
-  function _getInboundNonce(uint64 sourceChainSelector, bytes calldata sender) private view returns (uint64) {
+  function _getInboundNonce(
+    uint64 sourceChainSelector,
+    bytes calldata sender
+  ) private view returns (uint64) {
     uint64 inboundNonce = s_inboundNonces[sourceChainSelector][sender];
 
     // When introducing the NonceManager with existing lanes, we still want to have sequential nonces. Referencing the

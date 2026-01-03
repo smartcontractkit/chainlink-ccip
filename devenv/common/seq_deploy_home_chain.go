@@ -1,4 +1,4 @@
-package sequences
+package common
 
 import (
 	"bytes"
@@ -13,7 +13,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/ccip_home"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/rmn_home"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
@@ -83,13 +82,7 @@ type DeployHomeChainConfig struct {
 	NodeP2PIDsPerNodeOpAdmin map[string][][32]byte
 }
 
-type ChainConfig struct {
-	Readers              [][32]byte              `json:"readers"`
-	FChain               uint8                   `json:"fChain"`
-	EncodableChainConfig chainconfig.ChainConfig `json:"encodableChainConfig"`
-}
-
-var DeployHomeChain = cldf_ops.NewSequence(
+var SeqDeployHomeChain = cldf_ops.NewSequence(
 	"deploy-home-chain",
 	semver.MustParse("1.6.0"),
 	"Deploys CCIP Home and Capabilities Registry contracts to the home chain.",

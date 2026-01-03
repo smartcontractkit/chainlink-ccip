@@ -11,16 +11,13 @@ contract OffRampOverSuperchainInterop_applyChainSelectorToChainIdConfigUpdates i
     OffRampOverSuperchainInterop.ChainSelectorToChainIdConfigArgs[] memory chainSelectorsUpdates =
       new OffRampOverSuperchainInterop.ChainSelectorToChainIdConfigArgs[](3);
     chainSelectorsUpdates[0] = OffRampOverSuperchainInterop.ChainSelectorToChainIdConfigArgs({
-      chainSelector: SOURCE_CHAIN_SELECTOR_1,
-      chainId: CHAIN_ID_1
+      chainSelector: SOURCE_CHAIN_SELECTOR_1, chainId: CHAIN_ID_1
     });
     chainSelectorsUpdates[1] = OffRampOverSuperchainInterop.ChainSelectorToChainIdConfigArgs({
-      chainSelector: SOURCE_CHAIN_SELECTOR_2,
-      chainId: CHAIN_ID_2
+      chainSelector: SOURCE_CHAIN_SELECTOR_2, chainId: CHAIN_ID_2
     });
     chainSelectorsUpdates[2] = OffRampOverSuperchainInterop.ChainSelectorToChainIdConfigArgs({
-      chainSelector: SOURCE_CHAIN_SELECTOR_3,
-      chainId: CHAIN_ID_3
+      chainSelector: SOURCE_CHAIN_SELECTOR_3, chainId: CHAIN_ID_3
     });
 
     vm.expectEmit();
@@ -43,8 +40,7 @@ contract OffRampOverSuperchainInterop_applyChainSelectorToChainIdConfigUpdates i
     OffRampOverSuperchainInterop.ChainSelectorToChainIdConfigArgs[] memory initialConfig =
       new OffRampOverSuperchainInterop.ChainSelectorToChainIdConfigArgs[](1);
     initialConfig[0] = OffRampOverSuperchainInterop.ChainSelectorToChainIdConfigArgs({
-      chainSelector: SOURCE_CHAIN_SELECTOR_2,
-      chainId: CHAIN_ID_2
+      chainSelector: SOURCE_CHAIN_SELECTOR_2, chainId: CHAIN_ID_2
     });
     s_offRampOverSuperchainInterop.applyChainSelectorToChainIdConfigUpdates(new uint64[](0), initialConfig);
 
@@ -57,12 +53,10 @@ contract OffRampOverSuperchainInterop_applyChainSelectorToChainIdConfigUpdates i
     OffRampOverSuperchainInterop.ChainSelectorToChainIdConfigArgs[] memory chainSelectorsUpdates =
       new OffRampOverSuperchainInterop.ChainSelectorToChainIdConfigArgs[](2);
     chainSelectorsUpdates[0] = OffRampOverSuperchainInterop.ChainSelectorToChainIdConfigArgs({
-      chainSelector: SOURCE_CHAIN_SELECTOR_2,
-      chainId: CHAIN_ID_2 + 1
+      chainSelector: SOURCE_CHAIN_SELECTOR_2, chainId: CHAIN_ID_2 + 1
     });
     chainSelectorsUpdates[1] = OffRampOverSuperchainInterop.ChainSelectorToChainIdConfigArgs({
-      chainSelector: SOURCE_CHAIN_SELECTOR_3,
-      chainId: CHAIN_ID_3
+      chainSelector: SOURCE_CHAIN_SELECTOR_3, chainId: CHAIN_ID_3
     });
 
     vm.expectEmit();

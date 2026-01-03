@@ -245,7 +245,8 @@ contract OffRamp_releaseOrMintTokens is OffRampSetup {
 
     try s_offRamp.releaseOrMintTokens(
       sourceTokenAmounts, abi.encode(OWNER), OWNER, SOURCE_CHAIN_SELECTOR_1, new bytes[](1), new uint32[](0)
-    ) {} catch (bytes memory reason) {
+    ) {}
+    catch (bytes memory reason) {
       // Any revert should be a TokenHandlingError, InvalidEVMAddress, InvalidDataLength or NoContract as those are caught by the offramp
       assertTrue(
         bytes4(reason) == OffRamp.TokenHandlingError.selector || bytes4(reason) == Internal.InvalidEVMAddress.selector
