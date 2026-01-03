@@ -90,14 +90,12 @@ contract e2e_feeWithdrawal is OnRampSetup {
     s_tokenPool.applyChainUpdates(new uint64[](0), chainUpdate);
 
     // Set fee aggregator for TokenPool via setDynamicConfig
-    vm.startPrank(OWNER);
     s_tokenPool.setDynamicConfig(address(s_sourceRouter), address(0), s_feeAggregator);
 
     // Set up router with onRamp
     Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](1);
     onRampUpdates[0] = Router.OnRamp({destChainSelector: DEST_CHAIN_SELECTOR, onRamp: address(s_onRamp)});
     s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), new Router.OffRamp[](0));
-    vm.stopPrank();
 
     // Deploy verifier implementation
     s_verifierImpl = new CommitteeVerifier(
@@ -167,9 +165,7 @@ contract e2e_feeWithdrawal is OnRampSetup {
       defaultExecutor: s_executor,
       offRamp: abi.encodePacked(address(s_offRampOnRemoteChain))
     });
-    vm.startPrank(OWNER);
     s_onRamp.applyDestChainConfigUpdates(destChainConfigArgs);
-    vm.stopPrank();
 
     // Set up OffRamp
     s_offRamp = new OffRampHelper(
@@ -198,7 +194,6 @@ contract e2e_feeWithdrawal is OnRampSetup {
     s_offRamp.applySourceChainConfigUpdates(updates);
     Router.OffRamp[] memory offRampUpdates = new Router.OffRamp[](1);
     offRampUpdates[0] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_SELECTOR, offRamp: address(s_offRamp)});
-    vm.startPrank(OWNER);
     s_destRouter.applyRampUpdates(new Router.OnRamp[](0), new Router.OffRamp[](0), offRampUpdates);
 
     // Set up automation address (simulates Chainlink Automation/CRE)
@@ -209,7 +204,6 @@ contract e2e_feeWithdrawal is OnRampSetup {
     OnRamp.DynamicConfig memory onRampConfig = s_onRamp.getDynamicConfig();
     onRampConfig.feeAggregator = s_feeAggregator;
     s_onRamp.setDynamicConfig(onRampConfig);
-    vm.stopPrank();
 
     // Ensure the test contract has fee tokens/test tokens to pay for the transaction
     // Router will transferFrom msg.sender (this test contract) to OnRamp
