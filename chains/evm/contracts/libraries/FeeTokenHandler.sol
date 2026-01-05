@@ -7,15 +7,19 @@ import {SafeERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/utils/SafeERC
 library FeeTokenHandler {
   using SafeERC20 for IERC20;
 
+  error ZeroAddressNotAllowed();
+
   event FeeTokenWithdrawn(address indexed receiver, address indexed feeToken, uint256 amount);
 
   /// @notice Withdraws the outstanding fee token balances to the fee aggregator.
   /// @param feeTokens The fee tokens to withdraw.
-  /// @param feeAggregator The address to withdraw the fee tokens to.
+  /// @param feeAggregator The address to withdraw the fee tokens to, cannot be the zero address.
   function _withdrawFeeTokens(
     address[] calldata feeTokens,
     address feeAggregator
   ) internal {
+    if (feeAggregator == address(0)) revert ZeroAddressNotAllowed();
+
     for (uint256 i = 0; i < feeTokens.length; ++i) {
       IERC20 feeToken = IERC20(feeTokens[i]);
       uint256 feeTokenBalance = feeToken.balanceOf(address(this));

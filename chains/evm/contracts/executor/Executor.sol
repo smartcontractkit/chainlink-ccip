@@ -128,6 +128,8 @@ contract Executor is IExecutor, Ownable2StepMsgSender {
 
   /// @notice Sets the dynamic configuration.
   /// @param dynamicConfig The dynamic configuration.
+  /// @dev FeeTokenHandler will revert if feeAggregator is zero when withdrawing fees.
+  /// @dev A zero address fee aggregator is valid, and intentionally reverts calls to withdraw fee tokens.
   function setDynamicConfig(
     DynamicConfig memory dynamicConfig
   ) external virtual onlyOwner {
@@ -136,12 +138,11 @@ contract Executor is IExecutor, Ownable2StepMsgSender {
 
   /// @notice Internal function to set the dynamic configuration.
   /// @param dynamicConfig The dynamic configuration.
+  /// @dev FeeTokenHandler will revert if feeAggregator is zero when withdrawing fees.
+  /// @dev A zero address fee aggregator is valid, and intentionally reverts calls to withdraw fee tokens.
   function _setDynamicConfig(
     DynamicConfig memory dynamicConfig
   ) internal {
-    if (dynamicConfig.feeAggregator == address(0)) {
-      revert InvalidConfig();
-    }
     // Zero is a valid value for minBlockConfirmations, indicating that finality is requested.
     s_dynamicConfig = dynamicConfig;
 

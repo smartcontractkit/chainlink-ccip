@@ -7,9 +7,9 @@ import {BaseTest} from "../BaseTest.t.sol";
 contract ProxySetup is BaseTest {
   Proxy internal s_proxy;
 
-  function setUp() public override {
+  function setUp() public virtual override {
     super.setUp();
 
-    s_proxy = new Proxy(makeAddr("MockTarget"));
+    s_proxy = new Proxy(makeAddr("MockTarget"), makeAddr("MockFeeAggregator"));
   }
 }
