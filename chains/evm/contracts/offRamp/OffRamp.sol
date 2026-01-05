@@ -482,13 +482,16 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       (requiredReceiverCCVs, optionalCCVs, optionalThreshold) = _getCCVsFromReceiver(sourceChainSelector, receiver);
     }
 
-    address[] memory laneMandatedCCVs = s_sourceChainConfigs[sourceChainSelector].laneMandatedCCVs;
+    address[] storage laneMandatedCCVs = s_sourceChainConfigs[sourceChainSelector].laneMandatedCCVs;
     address[] storage defaultCCVs = s_sourceChainConfigs[sourceChainSelector].defaultCCVs;
 
+    // Save lengths in memory to avoid multiple storage reads. This is safe as the logic below does not modify the arrays.
+    uint256 laneMandatedCCVsLength = laneMandatedCCVs.length;
+    uint256 defaultCCVsLength = defaultCCVs.length;
+
     // We allocate the memory for all possible CCVs upfront to avoid multiple allocations.
-    address[] memory allRequiredCCVs = new address[](
-      requiredReceiverCCVs.length + requiredPoolCCVs.length + laneMandatedCCVs.length + defaultCCVs.length
-    );
+    address[] memory allRequiredCCVs =
+      new address[](requiredReceiverCCVs.length + requiredPoolCCVs.length + laneMandatedCCVsLength + defaultCCVsLength);
 
     uint256 index = 0;
     for (uint256 i = 0; i < requiredReceiverCCVs.length; ++i) {
@@ -499,15 +502,14 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       allRequiredCCVs[index++] = requiredPoolCCVs[i];
     }
 
-    for (uint256 i = 0; i < laneMandatedCCVs.length; ++i) {
+    for (uint256 i = 0; i < laneMandatedCCVsLength; ++i) {
       allRequiredCCVs[index++] = laneMandatedCCVs[i];
     }
 
     // Add defaults if any address(0) was found.
     for (uint256 i = 0; i < index; ++i) {
       if (allRequiredCCVs[i] == address(0)) {
-        uint256 numberOfDefaults = defaultCCVs.length;
-        for (uint256 j = 0; j < numberOfDefaults; ++j) {
+        for (uint256 j = 0; j < defaultCCVsLength; ++j) {
           allRequiredCCVs[index++] = defaultCCVs[j];
         }
         // Break to ensure they're only added once.
