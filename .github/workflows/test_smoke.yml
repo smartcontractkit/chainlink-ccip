@@ -63,6 +63,13 @@ jobs:
           repository: smartcontractkit/chainlink-ton
           ref: ${{ github.event.inputs.ton_ref }}
           path: chainlink-ton
+      - name: Build TON Contracts
+        if: ${{ github.event_name == 'workflow_dispatch'  && github.event.inputs.contract_version == 'local' }}
+        run: |
+          pushd chainlink-ton/contracts
+          nix develop .#contracts -c yarn && yarn build
+          popd
+          mv chainlink-ton/contracts/build/ ./contracts/build/
       - name: Build CL Image For Ref
         if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.chainlink_version != '' }}
         uses: ./.github/actions/build-cl
