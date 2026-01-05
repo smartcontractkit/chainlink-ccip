@@ -124,6 +124,17 @@ var AddRegistryModule = contract.NewWrite(contract.WriteParams[common.Address, *
 	},
 })
 
+var IsRegistryModule = contract.NewRead(contract.ReadParams[common.Address, bool, *token_admin_registry.TokenAdminRegistry]{
+	Name:         "token-admin-registry:is-registry-module",
+	Version:      Version,
+	Description:  "Checks if an address is a registry module in the TokenAdminRegistry contract",
+	ContractType: ContractType,
+	NewContract:  token_admin_registry.NewTokenAdminRegistry,
+	CallContract: func(tokenAdminRegistry *token_admin_registry.TokenAdminRegistry, opts *bind.CallOpts, args common.Address) (bool, error) {
+		return tokenAdminRegistry.IsRegistryModule(opts, args)
+	},
+})
+
 var Owner = contract.NewRead(contract.ReadParams[any, common.Address, *token_admin_registry.TokenAdminRegistry]{
 	Name:         "token-admin-registry:owner",
 	Version:      Version,
