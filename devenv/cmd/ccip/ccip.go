@@ -14,8 +14,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 
-	ccipEVM "github.com/smartcontractkit/chainlink-ccip/devenv/chainimpl/ccip-evm"
 	ccipde "github.com/smartcontractkit/chainlink-ccip/devenv"
+	ccipEVM "github.com/smartcontractkit/chainlink-ccip/devenv/chainimpl/ccip-evm"
 )
 
 const (
@@ -39,52 +39,76 @@ var rootCmd = &cobra.Command{
 	},
 }
 
-var restartCmd = &cobra.Command{
-	Use:     "restart",
-	Aliases: []string{"r"},
-	Args:    cobra.RangeArgs(0, 1),
-	Short:   "Restart development environment, remove apps and apply default configuration again",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		var configFile string
-		if len(args) > 0 {
-			configFile = args[0]
-		} else {
-			configFile = "env.toml"
-		}
-		framework.L.Info().Str("Config", configFile).Msg("Reconfiguring development environment")
-		_ = os.Setenv("CTF_CONFIGS", configFile)
-		_ = os.Setenv("TESTCONTAINERS_RYUK_DISABLED", "true")
-		framework.L.Info().Msg("Tearing down the development environment")
-		err := framework.RemoveTestContainers()
-		if err != nil {
-			return fmt.Errorf("failed to clean Docker resources: %w", err)
-		}
-		_, err = ccipde.NewEnvironment()
-		return err
-	},
+func restartCmd() *cobra.Command {
+	var (
+		forked bool
+	)
+	cmd := &cobra.Command{
+		Use:     "restart",
+		Aliases: []string{"r"},
+		Args:    cobra.RangeArgs(0, 1),
+		Short:   "Restart development environment, remove apps and apply default configuration again",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			var configFile string
+			if len(args) > 0 {
+				configFile = args[0]
+			} else {
+				configFile = "env.toml"
+			}
+			framework.L.Info().Str("Config", configFile).Msg("Reconfiguring development environment")
+			_ = os.Setenv("CTF_CONFIGS", configFile)
+			_ = os.Setenv("TESTCONTAINERS_RYUK_DISABLED", "true")
+			framework.L.Info().Msg("Tearing down the development environment")
+			err := framework.RemoveTestContainers()
+			if err != nil {
+				return fmt.Errorf("failed to clean Docker resources: %w", err)
+			}
+			if forked {
+				framework.L.Info().Msg("Starting forked development environment")
+				_, err = ccipde.NewForkedEnvironment()
+				return err
+			}
+			_, err = ccipde.NewEnvironment()
+			return err
+		},
+	}
+	cmd.Flags().BoolVarP(&forked, "forked", "f", false, "Use forked environment (through anvil) configuration")
+	return cmd
 }
 
-var upCmd = &cobra.Command{
-	Use:     "up",
-	Aliases: []string{"u"},
-	Short:   "Spin up the development environment",
-	Args:    cobra.RangeArgs(0, 1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		var configFile string
-		if len(args) > 0 {
-			configFile = args[0]
-		} else {
-			configFile = "env.toml"
-		}
-		framework.L.Info().Str("Config", configFile).Msg("Creating development environment")
-		_ = os.Setenv("CTF_CONFIGS", configFile)
-		_ = os.Setenv("TESTCONTAINERS_RYUK_DISABLED", "true")
-		_, err := ccipde.NewEnvironment()
-		if err != nil {
-			return err
-		}
-		return nil
-	},
+func upCmd() *cobra.Command {
+	var (
+		forked bool
+	)
+	cmd := &cobra.Command{
+		Use:     "up",
+		Aliases: []string{"u"},
+		Short:   "Spin up the development environment",
+		Args:    cobra.RangeArgs(0, 1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			var configFile string
+			if len(args) > 0 {
+				configFile = args[0]
+			} else {
+				configFile = "env.toml"
+			}
+			framework.L.Info().Str("Config", configFile).Msg("Creating development environment")
+			_ = os.Setenv("CTF_CONFIGS", configFile)
+			_ = os.Setenv("TESTCONTAINERS_RYUK_DISABLED", "true")
+			if forked {
+				framework.L.Info().Msg("Starting forked development environment")
+				_, err := ccipde.NewForkedEnvironment()
+				return err
+			}
+			_, err := ccipde.NewEnvironment()
+			if err != nil {
+				return err
+			}
+			return nil
+		},
+	}
+	cmd.Flags().BoolVarP(&forked, "forked", "f", false, "Use forked environment (through anvil) configuration")
+	return cmd
 }
 
 var downCmd = &cobra.Command{
@@ -333,8 +357,8 @@ func init() {
 	rootCmd.AddCommand(obsCmd)
 
 	// main env commands
-	rootCmd.AddCommand(upCmd)
-	rootCmd.AddCommand(restartCmd)
+	rootCmd.AddCommand(upCmd())
+	rootCmd.AddCommand(restartCmd())
 	rootCmd.AddCommand(downCmd)
 
 	// utility

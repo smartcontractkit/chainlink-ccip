@@ -14,13 +14,14 @@ import (
 	"github.com/pelletier/go-toml/v2"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	devenvcommon "github.com/smartcontractkit/chainlink-ccip/devenv/common"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	capabilities_registry "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/clclient"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/jd"
+
+	devenvcommon "github.com/smartcontractkit/chainlink-ccip/devenv/common"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
@@ -76,6 +77,14 @@ type Cfg struct {
 	NodeSets           []*ns.Input         `toml:"nodesets"              validate:"required"`
 	CLNodesFundingETH  float64             `toml:"cl_nodes_funding_eth"`
 	CLNodesFundingLink float64             `toml:"cl_nodes_funding_link"`
+	ForkedEnvConfig    *ForkedEnvConfig    `toml:"forked_env_config"`
+}
+
+type ForkedEnvConfig struct {
+	ForkURL           string `toml:"fork_url"`
+	HomeChainSelector uint64 `toml:"home_chain_selector"`
+	CLDRootPath       string `toml:"cld_root_path"`
+	CLDEnvironment    string `toml:"cld_environment"`
 }
 
 func checkKeys(in *Cfg) error {
