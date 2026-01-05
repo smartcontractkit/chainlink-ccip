@@ -73,8 +73,7 @@ jobs:
           pushd ../chainlink-ton/contracts
           nix develop .#contracts -c yarn && yarn build
           popd
-          ls -ltr ../chainlink-ton/contracts/
-          mv ../chainlink-ton/contracts/build/ ../contracts/build
+          mkdir -p ../contracts && mv ../chainlink-ton/contracts/build/ ../contracts/build
       - name: Build CL Image For Ref
         if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.chainlink_version != '' }}
         uses: ./.github/actions/build-cl
