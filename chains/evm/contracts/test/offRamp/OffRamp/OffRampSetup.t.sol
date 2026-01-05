@@ -29,7 +29,8 @@ contract OffRampSetup is BaseTest {
         localChainSelector: DEST_CHAIN_SELECTOR,
         gasForCallExactCheck: GAS_FOR_CALL_EXACT_CHECK,
         rmnRemote: s_mockRMNRemote,
-        tokenAdminRegistry: s_tokenAdminRegistry
+        tokenAdminRegistry: s_tokenAdminRegistry,
+        maxGasBufferToUpdateState: DEFAULT_MAX_GAS_BUFFER_TO_UPDATE_STATE
       })
     );
 

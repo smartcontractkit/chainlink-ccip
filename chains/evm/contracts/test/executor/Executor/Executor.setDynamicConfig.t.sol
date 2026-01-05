@@ -32,12 +32,4 @@ contract Executor_setDynamicConfig is ExecutorSetup {
     vm.expectRevert(abi.encodeWithSelector(Ownable2Step.OnlyCallableByOwner.selector));
     s_executor.setDynamicConfig(newConfig);
   }
-
-  function test_setDynamicConfig_RevertWhen_InvalidConfig() public {
-    Executor.DynamicConfig memory invalidConfig =
-      Executor.DynamicConfig({feeAggregator: address(0), minBlockConfirmations: 0, ccvAllowlistEnabled: false});
-
-    vm.expectRevert(Executor.InvalidConfig.selector);
-    s_executor.setDynamicConfig(invalidConfig);
-  }
 }

@@ -27,13 +27,4 @@ contract CommitteeVerifier_constructor is CommitteeVerifierSetup {
     assertEq(storageLocations.length, 1);
     assertEq(storageLocations[0], storageLocations[0]);
   }
-
-  // Reverts
-
-  function test_constructor_RevertWhen_InvalidConfig_FeeAggregatorZeroAddress() public {
-    vm.expectRevert(CommitteeVerifier.InvalidConfig.selector);
-    new CommitteeVerifier(
-      _createDynamicConfigArgs(address(0), ALLOWLIST_ADMIN), s_storageLocations, address(s_mockRMNRemote)
-    );
-  }
 }

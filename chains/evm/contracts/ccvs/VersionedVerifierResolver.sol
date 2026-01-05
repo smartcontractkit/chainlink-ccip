@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {ICrossChainVerifierResolver} from "../interfaces/ICrossChainVerifierResolver.sol";
+import {FeeTokenHandler} from "../libraries/FeeTokenHandler.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
@@ -18,11 +19,13 @@ contract VersionedVerifierResolver is ICrossChainVerifierResolver, ITypeAndVersi
   error InvalidVerifierResultsLength();
   error InvalidDestChainSelector(uint64 destChainSelector);
   error InvalidVersion(bytes4 version);
+  error ZeroAddressNotAllowed();
 
   event InboundImplementationRemoved(bytes4 version);
   event OutboundImplementationRemoved(uint64 destChainSelector);
   event InboundImplementationUpdated(bytes4 version, address prevImpl, address newImpl);
   event OutboundImplementationUpdated(uint64 destChainSelector, address prevImpl, address newImpl);
+  event FeeAggregatorUpdated(address indexed oldFeeAggregator, address indexed newFeeAggregator);
 
   struct InboundImplementationArgs {
     bytes4 version; // ────╮ Verifier version.
@@ -44,6 +47,9 @@ contract VersionedVerifierResolver is ICrossChainVerifierResolver, ITypeAndVersi
   mapping(uint64 destChainSelector => address version) private s_destChainToOutboundImplementation;
   /// @notice all supported destination chains.
   EnumerableSet.UintSet private s_supportedDestChains;
+
+  /// @notice The address fees are sent to.
+  address internal s_feeAggregator;
 
   /// @inheritdoc ICrossChainVerifierResolver
   function getInboundImplementation(
@@ -131,5 +137,43 @@ contract VersionedVerifierResolver is ICrossChainVerifierResolver, ITypeAndVersi
       s_supportedDestChains.add(implementation.destChainSelector);
       emit OutboundImplementationUpdated(implementation.destChainSelector, previous, implementation.verifier);
     }
+  }
+
+  // ================================================================
+  // │                        Fee Aggregator                        │
+  // ================================================================
+
+  /// @notice Returns the address of the fee aggregator.
+  function getFeeAggregator() external view virtual returns (address) {
+    return s_feeAggregator;
+  }
+
+  /// @notice Sets the address of the fee aggregator.
+  /// @param feeAggregator The address of the new fee aggregator contract.
+  /// @dev FeeTokenHandler will revert if feeAggregator is zero when withdrawing fees.
+  /// @dev A zero address fee aggregator is valid, and intentionally reverts calls to withdraw fee tokens.
+  function setFeeAggregator(
+    address feeAggregator
+  ) external virtual onlyOwner {
+    _setFeeAggregator(feeAggregator);
+  }
+
+  /// @dev Internal method that allows for reuse in constructor.
+  /// @dev FeeTokenHandler will revert if feeAggregator is zero when withdrawing fees.
+  /// @dev A zero address fee aggregator is valid, and intentionally reverts calls to withdraw fee tokens.
+  function _setFeeAggregator(
+    address feeAggregator
+  ) internal virtual {
+    address oldFeeAggregator = s_feeAggregator;
+    s_feeAggregator = feeAggregator;
+    emit FeeAggregatorUpdated(oldFeeAggregator, feeAggregator);
+  }
+
+  /// @notice Withdraws the outstanding fee token balances to the fee aggregator.
+  /// @param feeTokens The fee tokens to withdraw.
+  function withdrawFeeTokens(
+    address[] calldata feeTokens
+  ) external virtual {
+    FeeTokenHandler._withdrawFeeTokens(feeTokens, s_feeAggregator);
   }
 }

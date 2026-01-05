@@ -454,12 +454,13 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
     return s_feeAggregator;
   }
 
+  /// @notice Sets the address of the fee aggregator.
+  /// @param feeAggregator The address of the new fee aggregator contract.
+  /// @dev FeeTokenHandler will revert if feeAggregator is zero when withdrawing fees.
+  /// @dev A zero address fee aggregator is valid, and intentionally reverts calls to withdraw fee tokens.
   function setFeeAggregator(
     address feeAggregator
   ) external onlyOwner {
-    if (feeAggregator == address(0)) {
-      revert AddressCannotBeZero();
-    }
     s_feeAggregator = feeAggregator;
   }
 
@@ -468,9 +469,6 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
   function withdrawFeeTokens(
     address[] calldata feeTokens
   ) external virtual {
-    if (s_feeAggregator == address(0)) {
-      revert AddressCannotBeZero();
-    }
     FeeTokenHandler._withdrawFeeTokens(feeTokens, s_feeAggregator);
   }
 }
