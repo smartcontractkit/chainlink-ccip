@@ -45,12 +45,12 @@ func DeployContractsForSelector(ctx context.Context, env *deployment.Environment
 	version := semver.MustParse("1.6.0")
 	mint, _ := solana.NewRandomPrivateKey()
 	// Usually set in the GH workflow
-	// If not set, defaults to "local" which uses the locally built contracts
+	// If not set, defaults to a known working commit hash
 	// If set to a specific version, fetches from https://github.com/smartcontractkit/chainlink-ton/releases
 	// Directory needs to exist at ../contracts/build relative to chainlink-ccip/devenv for TON
 	contractVersion := os.Getenv("DEPLOY_CONTRACT_VERSION")
 	if contractVersion == "" {
-		contractVersion = "local"
+		contractVersion = "a60d19e33dc8" // Jan 5, 2026 commit hash
 	}
 	out, err := deployops.DeployContracts(dReg).Apply(*env, deployops.ContractDeploymentConfig{
 		MCMS: mcms.Input{},
