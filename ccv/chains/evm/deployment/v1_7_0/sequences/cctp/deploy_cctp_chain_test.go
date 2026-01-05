@@ -6,19 +6,14 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/cctp_message_transmitter_proxy"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/cctp_through_ccv_token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/cctp_verifier"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/usdc_token_pool_proxy"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
+	"github.com/stretchr/testify/require"
+
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/burn_mint_token_pool"
 	cctp_message_transmitter_proxy_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/cctp_message_transmitter_proxy"
 	cctp_through_ccv_token_pool_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/cctp_through_ccv_token_pool"
 	cctp_verifier_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/cctp_verifier"
-	mock_usdc_token_messenger "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/mock_usdc_token_messenger"
-	mock_usdc_token_transmitter "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/mock_usdc_token_transmitter"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/mock_usdc_token_messenger"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/mock_usdc_token_transmitter"
 	usdc_token_pool_proxy_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/usdc_token_pool_proxy"
 	versioned_verifier_resolver_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/versioned_verifier_resolver"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
@@ -35,7 +30,14 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	burn_mint_erc20_bindings "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc20"
-	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/cctp_message_transmitter_proxy"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/cctp_through_ccv_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/cctp_verifier"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/usdc_token_pool_proxy"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
 )
 
 type cctpTestSetup struct {
@@ -51,13 +53,19 @@ func setupCCTPTestEnvironment(t *testing.T, e *deployment.Environment, chainSele
 	chain := e.BlockChains.EVMChains()[chainSelector]
 
 	// Deploy chain contracts
-	create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, chain, contract_utils.DeployInput[create2_factory.ConstructorArgs]{
-		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
-		ChainSelector:  chainSelector,
-		Args: create2_factory.ConstructorArgs{
-			AllowList: []common.Address{chain.DeployerKey.From},
+	create2FactoryRef, err := contract_utils.MaybeDeployContract(
+		e.OperationsBundle,
+		create2_factory.Deploy,
+		chain,
+		contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+			TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
+			ChainSelector:  chainSelector,
+			Args: create2_factory.ConstructorArgs{
+				AllowList: []common.Address{chain.DeployerKey.From},
+			},
 		},
-	}, nil)
+		nil,
+	)
 	require.NoError(t, err, "Failed to deploy CREATE2Factory")
 	chainReport, err := operations.ExecuteSequence(
 		e.OperationsBundle,
@@ -95,7 +103,7 @@ func setupCCTPTestEnvironment(t *testing.T, e *deployment.Environment, chainSele
 		"USDC",
 		6,             // decimals
 		big.NewInt(0), // maxSupply
-		big.NewInt(0), // premintAmount
+		big.NewInt(0), // pre-mint amount
 	)
 	require.NoError(t, err, "Failed to deploy USDC token")
 	_, err = chain.Confirm(tx)
@@ -233,11 +241,11 @@ func TestDeployCCTPChain(t *testing.T) {
 	require.NoError(t, err, "ExecuteSequence should not error")
 
 	exists := map[deployment.ContractType]bool{
-		deployment.ContractType(cctp_through_ccv_token_pool.ContractType):    false,
-		deployment.ContractType(cctp_message_transmitter_proxy.ContractType): false,
-		deployment.ContractType(cctp_verifier.ContractType):                  false,
-		deployment.ContractType(usdc_token_pool_proxy.ContractType):          false,
-		deployment.ContractType(cctp_verifier.ResolverType):                  false,
+		cctp_through_ccv_token_pool.ContractType:    false,
+		cctp_message_transmitter_proxy.ContractType: false,
+		cctp_verifier.ContractType:                  false,
+		usdc_token_pool_proxy.ContractType:          false,
+		cctp_verifier.ResolverType:                  false,
 	}
 	for _, addr := range report.Output.Addresses {
 		exists[deployment.ContractType(addr.Type)] = true
@@ -250,15 +258,15 @@ func TestDeployCCTPChain(t *testing.T) {
 	var cctpTokenPoolAddr, cctpMessageTransmitterProxyAddr, cctpVerifierAddr, usdcTokenPoolProxyAddr, cctpVerifierResolverAddr common.Address
 	for _, addr := range report.Output.Addresses {
 		switch deployment.ContractType(addr.Type) {
-		case deployment.ContractType(cctp_through_ccv_token_pool.ContractType):
+		case cctp_through_ccv_token_pool.ContractType:
 			cctpTokenPoolAddr = common.HexToAddress(addr.Address)
-		case deployment.ContractType(cctp_message_transmitter_proxy.ContractType):
+		case cctp_message_transmitter_proxy.ContractType:
 			cctpMessageTransmitterProxyAddr = common.HexToAddress(addr.Address)
-		case deployment.ContractType(cctp_verifier.ContractType):
+		case cctp_verifier.ContractType:
 			cctpVerifierAddr = common.HexToAddress(addr.Address)
-		case deployment.ContractType(usdc_token_pool_proxy.ContractType):
+		case usdc_token_pool_proxy.ContractType:
 			usdcTokenPoolProxyAddr = common.HexToAddress(addr.Address)
-		case deployment.ContractType(cctp_verifier.ResolverType):
+		case cctp_verifier.ResolverType:
 			cctpVerifierResolverAddr = common.HexToAddress(addr.Address)
 		}
 	}
