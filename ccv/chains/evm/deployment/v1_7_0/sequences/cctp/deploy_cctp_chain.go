@@ -164,6 +164,7 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 			TokenPoolAddress: common.HexToAddress(cctpTokenPoolAddress),
 			RouterAddress:    common.HexToAddress(input.Router),
 			RateLimitAdmin:   common.HexToAddress(input.RateLimitAdmin),
+			FeeAggregator:    common.HexToAddress(input.FeeAggregator),
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to configure token pool: %w", err)
@@ -208,6 +209,19 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 			}
 			addresses = append(addresses, usdcTokenPoolProxyReport.Output)
 			usdcTokenPoolProxyAddress = usdcTokenPoolProxyReport.Output.Address
+
+			// Set the fee aggregator on the USDCTokenPoolProxy
+			setFeeAggregatorReport, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_proxy.SetFeeAggregator, chain, contract_utils.FunctionInput[usdc_token_pool_proxy.SetFeeAggregatorArgs]{
+				ChainSelector: chain.Selector,
+				Address:       common.HexToAddress(usdcTokenPoolProxyAddress),
+				Args: usdc_token_pool_proxy.SetFeeAggregatorArgs{
+					FeeAggregator: common.HexToAddress(input.FeeAggregator),
+				},
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to set fee aggregator on USDCTokenPoolProxy: %w", err)
+			}
+			writes = append(writes, setFeeAggregatorReport.Output)
 		}
 
 		// Add CCTPVerifier as an authorized caller on the CCTPMessageTransmitterProxy

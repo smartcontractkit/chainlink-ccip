@@ -50,6 +50,7 @@ func basicDeployTokenAndPoolInput(chainReport operations.SequenceReport[sequence
 			TokenSymbol:                      "TEST",
 			RateLimitAdmin:                   common.HexToAddress("0x01"),
 			ThresholdAmountForAdditionalCCVs: thresholdAmountForAdditionalCCVs,
+			FeeAggregator:                    common.HexToAddress("0x03"),
 			ConstructorArgs: tokens.ConstructorArgs{
 				Decimals: 18,
 				Allowlist: []common.Address{

@@ -25,6 +25,7 @@ type ConstructorArgs struct {
 
 type ProxyConstructorArgs struct {
 	ExecutorAddress common.Address
+	FeeAggregator   common.Address
 }
 
 type ApplyDestChainUpdatesArgs struct {
