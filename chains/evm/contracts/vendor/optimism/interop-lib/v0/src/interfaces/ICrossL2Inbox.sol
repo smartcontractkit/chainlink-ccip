@@ -31,11 +31,17 @@ interface ICrossL2Inbox {
   ///         process it in a custom way.
   /// @param _id      Identifier of the message.
   /// @param _msgHash Hash of the message payload to call target with.
-  function validateMessage(Identifier calldata _id, bytes32 _msgHash) external;
+  function validateMessage(
+    Identifier calldata _id,
+    bytes32 _msgHash
+  ) external;
 
   /// @notice Calculates a custom checksum for a cross chain message `Identifier` and `msgHash`.
   /// @param _id The identifier of the message.
   /// @param _msgHash The hash of the message.
   /// @return checksum_ The checksum of the message.
-  function calculateChecksum(Identifier memory _id, bytes32 _msgHash) external pure returns (bytes32 checksum_);
+  function calculateChecksum(
+    Identifier memory _id,
+    bytes32 _msgHash
+  ) external pure returns (bytes32 checksum_);
 }

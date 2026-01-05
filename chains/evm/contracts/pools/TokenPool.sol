@@ -122,7 +122,13 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
   /// @dev Can be address(0) if none is configured.
   address internal s_rateLimitAdmin;
 
-  constructor(IERC20 token, uint8 localTokenDecimals, address[] memory allowlist, address rmnProxy, address router) {
+  constructor(
+    IERC20 token,
+    uint8 localTokenDecimals,
+    address[] memory allowlist,
+    address rmnProxy,
+    address router
+  ) {
     if (address(token) == address(0) || router == address(0) || rmnProxy == address(0)) {
       revert ZeroAddressInvalid();
     }
@@ -214,8 +220,7 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
     });
 
     return Pool.LockOrBurnOutV1({
-      destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
-      destPoolData: _encodeLocalDecimals()
+      destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector), destPoolData: _encodeLocalDecimals()
     });
   }
 
@@ -259,7 +264,10 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
   /// @notice Contains the specific release or mint token logic for a pool.
   /// @dev overriding this method allows us to create pools with different release/mint signatures
   /// without duplicating the underlying logic.
-  function _releaseOrMint(address receiver, uint256 amount) internal virtual {}
+  function _releaseOrMint(
+    address receiver,
+    uint256 amount
+  ) internal virtual {}
 
   // ================================================================
   // │                         Validation                           │
@@ -295,7 +303,10 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
   /// @param localAmount The local amount to be released or minted.
   /// @dev This function should always be called before executing a release or mint. Not doing so would allow
   /// for various exploits.
-  function _validateReleaseOrMint(Pool.ReleaseOrMintInV1 calldata releaseOrMintIn, uint256 localAmount) internal {
+  function _validateReleaseOrMint(
+    Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
+    uint256 localAmount
+  ) internal {
     if (!isSupportedToken(releaseOrMintIn.localToken)) revert InvalidToken(releaseOrMintIn.localToken);
     if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(releaseOrMintIn.remoteChainSelector)))) revert CursedByRMN();
     _onlyOffRamp(releaseOrMintIn.remoteChainSelector);
@@ -346,7 +357,10 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
   /// probably incorrect as that means the amount cannot be represented on this chain. If the local decimals have been
   /// wrongly configured, the token issuer could redeploy the pool with the correct decimals and manually re-execute the
   /// CCIP tx to fix the issue.
-  function _calculateLocalAmount(uint256 remoteAmount, uint8 remoteDecimals) internal view virtual returns (uint256) {
+  function _calculateLocalAmount(
+    uint256 remoteAmount,
+    uint8 remoteDecimals
+  ) internal view virtual returns (uint256) {
     if (remoteDecimals == i_tokenDecimals) {
       return remoteAmount;
     }
@@ -394,7 +408,10 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
   /// @notice Checks if the pool address is configured on the remote chain.
   /// @param remoteChainSelector Remote chain selector.
   /// @param remotePoolAddress The address of the remote pool.
-  function isRemotePool(uint64 remoteChainSelector, bytes memory remotePoolAddress) public view returns (bool) {
+  function isRemotePool(
+    uint64 remoteChainSelector,
+    bytes memory remotePoolAddress
+  ) public view returns (bool) {
     return s_remoteChainConfigs[remoteChainSelector].remotePools.contains(keccak256(remotePoolAddress));
   }
 
@@ -412,7 +429,10 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
   /// pool. This function allows for multiple pools to be added for a single chain selector.
   /// @param remoteChainSelector The remote chain selector for which the remote pool address is being added.
   /// @param remotePoolAddress The address of the new remote pool.
-  function addRemotePool(uint64 remoteChainSelector, bytes calldata remotePoolAddress) external onlyOwner {
+  function addRemotePool(
+    uint64 remoteChainSelector,
+    bytes calldata remotePoolAddress
+  ) external onlyOwner {
     if (!isSupportedChain(remoteChainSelector)) revert NonExistentChain(remoteChainSelector);
 
     _setRemotePool(remoteChainSelector, remotePoolAddress);
@@ -421,7 +441,10 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
   /// @notice Removes the remote pool address for a given chain selector.
   /// @dev All inflight txs from the remote pool will be rejected after it is removed. To ensure no loss of funds, there
   /// should be no inflight txs from the given pool.
-  function removeRemotePool(uint64 remoteChainSelector, bytes calldata remotePoolAddress) external onlyOwner {
+  function removeRemotePool(
+    uint64 remoteChainSelector,
+    bytes calldata remotePoolAddress
+  ) external onlyOwner {
     if (!isSupportedChain(remoteChainSelector)) revert NonExistentChain(remoteChainSelector);
 
     if (!s_remoteChainConfigs[remoteChainSelector].remotePools.remove(keccak256(remotePoolAddress))) {
@@ -526,7 +549,10 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
   /// @notice Adds a pool address to the allowed remote token pools for a particular chain.
   /// @param remoteChainSelector The remote chain selector for which the remote pool address is being added.
   /// @param remotePoolAddress The address of the new remote pool.
-  function _setRemotePool(uint64 remoteChainSelector, bytes memory remotePoolAddress) internal {
+  function _setRemotePool(
+    uint64 remoteChainSelector,
+    bytes memory remotePoolAddress
+  ) internal {
     if (remotePoolAddress.length == 0) {
       revert ZeroAddressInvalid();
     }
@@ -582,14 +608,20 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
   }
 
   /// @notice Consumes outbound rate limiting capacity in this pool
-  function _consumeOutboundRateLimit(uint64 remoteChainSelector, uint256 amount) internal {
+  function _consumeOutboundRateLimit(
+    uint64 remoteChainSelector,
+    uint256 amount
+  ) internal {
     s_remoteChainConfigs[remoteChainSelector].outboundRateLimiterConfig._consume(amount, address(i_token));
 
     emit OutboundRateLimitConsumed({token: address(i_token), remoteChainSelector: remoteChainSelector, amount: amount});
   }
 
   /// @notice Consumes inbound rate limiting capacity in this pool
-  function _consumeInboundRateLimit(uint64 remoteChainSelector, uint256 amount) internal {
+  function _consumeInboundRateLimit(
+    uint64 remoteChainSelector,
+    uint256 amount
+  ) internal {
     s_remoteChainConfigs[remoteChainSelector].inboundRateLimiterConfig._consume(amount, address(i_token));
 
     emit InboundRateLimitConsumed({token: address(i_token), remoteChainSelector: remoteChainSelector, amount: amount});
@@ -716,12 +748,18 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
   /// @notice Apply updates to the allow list.
   /// @param removes The addresses to be removed.
   /// @param adds The addresses to be added.
-  function applyAllowListUpdates(address[] calldata removes, address[] calldata adds) external onlyOwner {
+  function applyAllowListUpdates(
+    address[] calldata removes,
+    address[] calldata adds
+  ) external onlyOwner {
     _applyAllowListUpdates(removes, adds);
   }
 
   /// @notice Internal version of applyAllowListUpdates to allow for reuse in the constructor.
-  function _applyAllowListUpdates(address[] memory removes, address[] memory adds) internal {
+  function _applyAllowListUpdates(
+    address[] memory removes,
+    address[] memory adds
+  ) internal {
     if (!i_allowlistEnabled) revert AllowListNotEnabled();
 
     for (uint256 i = 0; i < removes.length; ++i) {

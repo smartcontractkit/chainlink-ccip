@@ -26,9 +26,7 @@ contract USDCTokenPoolCCTPV2_lockOrBurn is USDCTokenPoolCCTPV2Setup {
 
     vm.expectEmit();
     emit TokenPool.OutboundRateLimitConsumed({
-      remoteChainSelector: DEST_CHAIN_SELECTOR,
-      token: address(s_USDCToken),
-      amount: amount
+      remoteChainSelector: DEST_CHAIN_SELECTOR, token: address(s_USDCToken), amount: amount
     });
 
     vm.expectEmit();
@@ -91,9 +89,7 @@ contract USDCTokenPoolCCTPV2_lockOrBurn is USDCTokenPoolCCTPV2Setup {
 
     vm.expectEmit();
     emit TokenPool.OutboundRateLimitConsumed({
-      remoteChainSelector: DEST_CHAIN_SELECTOR,
-      token: address(s_USDCToken),
-      amount: amount
+      remoteChainSelector: DEST_CHAIN_SELECTOR, token: address(s_USDCToken), amount: amount
     });
 
     vm.expectEmit();
@@ -158,7 +154,10 @@ contract USDCTokenPoolCCTPV2_lockOrBurn is USDCTokenPoolCCTPV2Setup {
     );
   }
 
-  function testFuzz_lockOrBurn_Success(bytes32 destinationReceiver, uint256 amount) public {
+  function testFuzz_lockOrBurn_Success(
+    bytes32 destinationReceiver,
+    uint256 amount
+  ) public {
     vm.assume(destinationReceiver != bytes32(0));
     amount = bound(amount, 1, _getOutboundRateLimiterConfig().capacity);
     s_USDCToken.transfer(address(s_usdcTokenPool), amount);
@@ -168,9 +167,7 @@ contract USDCTokenPoolCCTPV2_lockOrBurn is USDCTokenPoolCCTPV2Setup {
 
     vm.expectEmit();
     emit TokenPool.OutboundRateLimitConsumed({
-      remoteChainSelector: DEST_CHAIN_SELECTOR,
-      token: address(s_USDCToken),
-      amount: amount
+      remoteChainSelector: DEST_CHAIN_SELECTOR, token: address(s_USDCToken), amount: amount
     });
 
     vm.expectEmit();

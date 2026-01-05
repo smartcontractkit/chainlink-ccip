@@ -59,23 +59,6 @@ func checkBidirectionalLaneConnectivity(
 	offRampOnSrcAddr, err := solanaAdapter.GetOffRampAddress(e.DataStore, solanaChain.Selector)
 	require.NoError(t, err, "must get offRamp from srcAdapter")
 
-	// Validate EVM PDAs are set
-	offRampEvmSourceChainPDA, _, _ = state.FindOfframpSourceChainPDA(evmChain.Selector, solana.PublicKeyFromBytes(offRampOnSrcAddr))
-	err = e.BlockChains.SolanaChains()[solanaChain.Selector].GetAccountDataBorshInto(e.GetContext(), offRampEvmSourceChainPDA, &offRampSourceChain)
-	require.NoError(t, err)
-	require.Equal(t, !disable, offRampSourceChain.Config.IsEnabled)
-
-	evmDestChainStatePDA, _ = state.FindDestChainStatePDA(evmChain.Selector, solana.PublicKeyFromBytes(routerOnSrcAddr))
-	err = e.BlockChains.SolanaChains()[solanaChain.Selector].GetAccountDataBorshInto(e.GetContext(), evmDestChainStatePDA, &destChainStateAccount)
-	require.NoError(t, err)
-	require.Equal(t, solanaChain.AllowListEnabled, destChainStateAccount.Config.AllowListEnabled)
-
-	fqEvmDestChainPDA, _, _ = state.FindFqDestChainPDA(evmChain.Selector, solana.PublicKeyFromBytes(feeQuoterOnSrcAddr))
-	err = e.BlockChains.SolanaChains()[solanaChain.Selector].GetAccountDataBorshInto(e.GetContext(), fqEvmDestChainPDA, &destChainFqAccount)
-	require.NoError(t, err, "failed to get account info")
-	require.Equal(t, !disable, destChainFqAccount.Config.IsEnabled)
-	require.Equal(t, solanasequences.TranslateFQ(evmChain.FeeQuoterDestChainConfig), destChainFqAccount.Config)
-
 	// EVM Validation
 	feeQuoterOnDestAddr, err := evmAdapter.GetFQAddress(e.DataStore, evmChain.Selector)
 	require.NoError(t, err, "must get feeQuoter from srcAdapter")
@@ -97,6 +80,25 @@ func checkBidirectionalLaneConnectivity(
 	routerOnDest, err := router.NewRouter(common.BytesToAddress(routerOnDestAddr), e.BlockChains.EVMChains()[evmChain.Selector].Client)
 	require.NoError(t, err, "must instantiate router")
 
+	// Validate EVM PDAs are set
+	offRampEvmSourceChainPDA, _, _ = state.FindOfframpSourceChainPDA(evmChain.Selector, solana.PublicKeyFromBytes(offRampOnSrcAddr))
+	err = e.BlockChains.SolanaChains()[solanaChain.Selector].GetAccountDataBorshInto(e.GetContext(), offRampEvmSourceChainPDA, &offRampSourceChain)
+	require.NoError(t, err)
+	require.Equal(t, !disable, offRampSourceChain.Config.IsEnabled)
+	require.Equal(t, common.BytesToAddress(onRampDestAddr).Hex(), common.BytesToAddress(offRampSourceChain.Config.OnRamp.Bytes[:offRampSourceChain.Config.OnRamp.Len]).Hex())
+
+	evmDestChainStatePDA, _ = state.FindDestChainStatePDA(evmChain.Selector, solana.PublicKeyFromBytes(routerOnSrcAddr))
+	err = e.BlockChains.SolanaChains()[solanaChain.Selector].GetAccountDataBorshInto(e.GetContext(), evmDestChainStatePDA, &destChainStateAccount)
+	require.NoError(t, err)
+	require.Equal(t, solanaChain.AllowListEnabled, destChainStateAccount.Config.AllowListEnabled)
+
+	fqEvmDestChainPDA, _, _ = state.FindFqDestChainPDA(evmChain.Selector, solana.PublicKeyFromBytes(feeQuoterOnSrcAddr))
+	err = e.BlockChains.SolanaChains()[solanaChain.Selector].GetAccountDataBorshInto(e.GetContext(), fqEvmDestChainPDA, &destChainFqAccount)
+	require.NoError(t, err, "failed to get account info")
+	require.Equal(t, !disable, destChainFqAccount.Config.IsEnabled)
+	require.Equal(t, solanasequences.TranslateFQ(evmChain.FeeQuoterDestChainConfig), destChainFqAccount.Config)
+
+	// Validate EVM onRamp/OffRamp/Router/FeeQuoter state
 	destChainConfig, err := onRampDest.GetDestChainConfig(nil, solanaChain.Selector)
 	require.NoError(t, err, "must get dest chain config from onRamp")
 	routerAddr := routerOnDestAddr

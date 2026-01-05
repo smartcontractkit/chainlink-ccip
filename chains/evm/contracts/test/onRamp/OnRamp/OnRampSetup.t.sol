@@ -223,9 +223,10 @@ contract OnRampSetup is FeeQuoterFeeSetup {
     address[] memory authorizedCallers = new address[](1);
     authorizedCallers[0] = address(onRamp);
 
-    NonceManager(nonceManager).applyAuthorizedCallerUpdates(
-      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: authorizedCallers, removedCallers: new address[](0)})
-    );
+    NonceManager(nonceManager)
+      .applyAuthorizedCallerUpdates(
+        AuthorizedCallers.AuthorizedCallerArgs({addedCallers: authorizedCallers, removedCallers: new address[](0)})
+      );
 
     return (
       onRamp,

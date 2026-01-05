@@ -38,6 +38,7 @@ type MCMSDeploymentConfigPerChain struct {
 	Label            *string          `json:"label"`
 	Qualifier        *string          `json:"qualifier"`
 	TimelockAdmin    common.Address   `json:"timelockAdmin"`
+	ContractVersion  string           `json:"contractVersion"`
 }
 
 type MCMSDeploymentConfigPerChainWithAddress struct {
