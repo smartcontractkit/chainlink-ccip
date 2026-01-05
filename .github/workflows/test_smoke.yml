@@ -56,6 +56,10 @@ jobs:
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           fetch-depth: 0
+      - name: Install Nix
+        uses: cachix/install-nix-action@02a151ada4993995686f9ed4f1be7cfbb229e56f # v31
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
       - name: Checkout Chainlink TON
         if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.ton_ref != '' }}
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -66,10 +70,10 @@ jobs:
       - name: Build TON Contracts
         if: ${{ github.event_name == 'workflow_dispatch'  && github.event.inputs.contract_version == 'local' }}
         run: |
-          pushd chainlink-ton/contracts
+          pushd ../chainlink-ton/contracts
           nix develop .#contracts -c yarn && yarn build
           popd
-          mv chainlink-ton/contracts/build/ ./contracts/build/
+          mv ../chainlink-ton/contracts/build/ ./contracts/build/
       - name: Build CL Image For Ref
         if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.chainlink_version != '' }}
         uses: ./.github/actions/build-cl
