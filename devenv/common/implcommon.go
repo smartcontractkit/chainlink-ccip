@@ -178,7 +178,7 @@ func ConnectContractsWithSelectors(ctx context.Context, e *deployment.Environmen
 	return nil
 }
 
-func ConfigureContractsForSelectors(ctx context.Context, e *deployment.Environment, cls []*simple_node_set.Input, nodeKeyBundles map[string]map[string]clclient.NodeKeysBundle, ccipHomeSelector uint64, remoteSelectors []uint64) error {
+func AddNodesToContracts(ctx context.Context, e *deployment.Environment, cls []*simple_node_set.Input, nodeKeyBundles map[string]map[string]clclient.NodeKeysBundle, ccipHomeSelector uint64, remoteSelectors []uint64) error {
 	l := zerolog.Ctx(ctx)
 	l.Info().Uint64("HomeChainSelector", ccipHomeSelector).Msg("Configuring contracts for home chain selector")
 	bundle := operations.NewBundle(

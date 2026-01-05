@@ -251,7 +251,7 @@ func NewEnvironment() (*Cfg, error) {
 		return nil, fmt.Errorf("creating CCIP jobs: %w", err)
 	}
 
-	err = devenvcommon.ConfigureContractsForSelectors(ctx, e, in.NodeSets, nodeKeyBundles, CCIPHomeChain, selectors)
+	err = devenvcommon.AddNodesToContracts(ctx, e, in.NodeSets, nodeKeyBundles, CCIPHomeChain, selectors)
 	if err != nil {
 		return nil, err
 	}
