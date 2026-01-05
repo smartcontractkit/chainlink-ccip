@@ -12,10 +12,11 @@ contract TokenPool_constructor is TokenPoolSetup {
   function test_constructor() public view {
     assertEq(address(s_token), address(s_tokenPool.getToken()));
     assertEq(address(s_mockRMNRemote), s_tokenPool.getRmnProxy());
-    (address router, address rateLimitAdmin) = s_tokenPool.getDynamicConfig();
+    (address router, address rateLimitAdmin, address feeAggregator) = s_tokenPool.getDynamicConfig();
     assertEq(address(s_sourceRouter), router);
     assertEq(0, s_tokenPool.getMinBlockConfirmation());
     assertEq(address(0), rateLimitAdmin);
+    assertEq(address(0), feeAggregator);
     assertEq(DEFAULT_TOKEN_DECIMALS, s_tokenPool.getTokenDecimals());
   }
 

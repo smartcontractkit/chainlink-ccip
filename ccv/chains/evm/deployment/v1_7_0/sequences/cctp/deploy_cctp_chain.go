@@ -7,15 +7,6 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/cctp_message_transmitter_proxy"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/cctp_through_ccv_token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/cctp_verifier"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/siloed_usdc_token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/type_and_version"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/usdc_token_pool_proxy"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/versioned_verifier_resolver"
-	v1_7_0_sequences "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
-	tokens_sequences "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/tokens"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	tokens_core "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -25,6 +16,16 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
+
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/cctp_message_transmitter_proxy"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/cctp_through_ccv_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/cctp_verifier"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/siloed_usdc_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/type_and_version"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/usdc_token_pool_proxy"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/versioned_verifier_resolver"
+	v1_7_0_sequences "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
+	tokens_sequences "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/tokens"
 )
 
 var indexAddressesByTypeAndVersion = type_and_version.IndexAddressesByTypeAndVersion
@@ -180,9 +181,9 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 			if cctpV2PoolAddress == "" {
 				return sequences.OnChainOutput{}, fmt.Errorf("cctp v2 pool with type and version %s not found", deployment.NewTypeAndVersion(cctpV2ContractType, *prevVersion).String())
 			}
-			// Siloed lock release pool is required on Ethereum mainnet and Ethereum testnet sepolia
+			// Siloed lock release pool is required on Ethereum mainnet and Ethereum testnet Sepolia
 			siloedLockReleasePoolAddress := poolTypeAndVersionToAddr[deployment.NewTypeAndVersion(siloed_usdc_token_pool.ContractType, *siloed_usdc_token_pool.Version).String()]
-			if siloedLockReleasePoolAddress == "" && input.ChainSelector == chain_selectors.ETHEREUM_MAINNET.Selector || input.ChainSelector == chain_selectors.ETHEREUM_TESTNET_SEPOLIA.Selector {
+			if siloedLockReleasePoolAddress == "" && (input.ChainSelector == chain_selectors.ETHEREUM_MAINNET.Selector || input.ChainSelector == chain_selectors.ETHEREUM_TESTNET_SEPOLIA.Selector) {
 				return sequences.OnChainOutput{}, fmt.Errorf("siloed lock release pool with type and version %s not found", deployment.NewTypeAndVersion(siloed_usdc_token_pool.ContractType, *siloed_usdc_token_pool.Version).String())
 			}
 
@@ -280,15 +281,15 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to convert lock or burn mechanism to uint8: %w", err)
 			}
 			mechanisms = append(mechanisms, mechanism)
-			allowedCallerOnDest, err := toBytes32(remoteChain.RemoteDomain.AllowedCallerOnDest)
+			allowedCallerOnDest, err := toBytes32LeftPad(remoteChain.RemoteDomain.AllowedCallerOnDest)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to convert allowed caller on dest to bytes32: %w", err)
 			}
-			allowedCallerOnSource, err := toBytes32(remoteChain.RemoteDomain.AllowedCallerOnSource)
+			allowedCallerOnSource, err := toBytes32LeftPad(remoteChain.RemoteDomain.AllowedCallerOnSource)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to convert allowed caller on source to bytes32: %w", err)
 			}
-			mintRecipientOnDest, err := toBytes32(remoteChain.RemoteDomain.MintRecipientOnDest)
+			mintRecipientOnDest, err := toBytes32LeftPad(remoteChain.RemoteDomain.MintRecipientOnDest)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to convert mint recipient on dest to bytes32: %w", err)
 			}
@@ -389,12 +390,12 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 	},
 )
 
-func toBytes32(b []byte) ([32]byte, error) {
+func toBytes32LeftPad(b []byte) ([32]byte, error) {
 	if len(b) > 32 {
 		return [32]byte{}, errors.New("byte slice is too long")
 	}
 	var result [32]byte
-	copy(result[:], b)
+	copy(result[32-len(b):], b)
 	return result, nil
 }
 

@@ -10,7 +10,8 @@ contract OffRamp_getStaticConfig is OffRampSetup {
       localChainSelector: 999999,
       gasForCallExactCheck: 10000,
       rmnRemote: s_mockRMNRemote,
-      tokenAdminRegistry: makeAddr("newRegistry")
+      tokenAdminRegistry: makeAddr("newRegistry"),
+      maxGasBufferToUpdateState: DEFAULT_MAX_GAS_BUFFER_TO_UPDATE_STATE
     });
 
     OffRamp newAgg = new OffRamp(newConfig);
@@ -20,5 +21,6 @@ contract OffRamp_getStaticConfig is OffRampSetup {
     assertEq(returnedConfig.gasForCallExactCheck, newConfig.gasForCallExactCheck);
     assertEq(address(returnedConfig.rmnRemote), address(newConfig.rmnRemote));
     assertEq(returnedConfig.tokenAdminRegistry, newConfig.tokenAdminRegistry);
+    assertEq(returnedConfig.maxGasBufferToUpdateState, newConfig.maxGasBufferToUpdateState);
   }
 }

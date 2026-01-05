@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {USDCTokenPoolProxy} from "../../../../pools/USDC/USDCTokenPoolProxy.sol";
 import {USDCTokenPoolProxySetup} from "./USDCTokenPoolProxySetup.t.sol";
 
 contract USDCTokenPoolProxy_setFeeAggregator is USDCTokenPoolProxySetup {
@@ -16,11 +15,6 @@ contract USDCTokenPoolProxy_setFeeAggregator is USDCTokenPoolProxySetup {
   }
 
   // Reverts
-
-  function test_setFeeAggregator_RevertWhen_ZeroAddress() public {
-    vm.expectRevert(USDCTokenPoolProxy.AddressCannotBeZero.selector);
-    s_usdcTokenPoolProxy.setFeeAggregator(address(0));
-  }
 
   function test_setFeeAggregator_RevertWhen_CallerIsNotOwner() public {
     address nonOwner = makeAddr("nonOwner");

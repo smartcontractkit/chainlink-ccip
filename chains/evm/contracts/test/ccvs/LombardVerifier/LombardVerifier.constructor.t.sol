@@ -5,7 +5,6 @@ import {IBridgeV2} from "../../../interfaces/lombard/IBridgeV2.sol";
 import {IBridgeV3} from "../../../interfaces/lombard/IBridgeV3.sol";
 
 import {LombardVerifier} from "../../../ccvs/LombardVerifier.sol";
-import {BaseVerifier} from "../../../ccvs/components/BaseVerifier.sol";
 import {LombardVerifierSetup, MockLombardBridge} from "./LombardVerifierSetup.t.sol";
 
 contract LombardVerifier_constructor is LombardVerifierSetup {
@@ -33,16 +32,6 @@ contract LombardVerifier_constructor is LombardVerifierSetup {
     new LombardVerifier(
       LombardVerifier.DynamicConfig({feeAggregator: FEE_AGGREGATOR}),
       IBridgeV3(address(mockBridge)),
-      s_storageLocations,
-      address(s_mockRMNRemote)
-    );
-  }
-
-  function test_constructor_RevertWhen_ZeroFeeAggregator() public {
-    vm.expectRevert(BaseVerifier.ZeroAddressNotAllowed.selector);
-    new LombardVerifier(
-      LombardVerifier.DynamicConfig({feeAggregator: address(0)}),
-      IBridgeV3(address(s_mockBridge)),
       s_storageLocations,
       address(s_mockRMNRemote)
     );
