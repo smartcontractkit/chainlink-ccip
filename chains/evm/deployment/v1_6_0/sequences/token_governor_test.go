@@ -31,7 +31,7 @@ func deployTestTokenForGovernor(t *testing.T, chain evm.Chain, symbol string, de
 		symbol,
 		decimals,
 		big.NewInt(0).Mul(big.NewInt(1e9), big.NewInt(1e18)), // maxSupply: 1 billion
-		big.NewInt(0),                                        // preMint: 0
+		big.NewInt(0), // preMint: 0
 	)
 	require.NoError(t, err, "Failed to deploy test token")
 	_, err = deployment.ConfirmIfNoError(chain, tx, err)
@@ -165,7 +165,7 @@ func TestGrantRevokeRenounceRole(t *testing.T) {
 
 	// Test GrantRole - grant MINTER_ROLE to testAccount
 	t.Run("GrantRole", func(t *testing.T) {
-		grantInput := TokenGovernorRoleChangesetConfig{
+		grantInput := TokenGovernorRoleInput{
 			Tokens: map[uint64]map[string]TokenGovernorGrantRole{
 				chainSelector: {
 					tokenSymbol: {
@@ -174,7 +174,6 @@ func TestGrantRevokeRenounceRole(t *testing.T) {
 					},
 				},
 			},
-			ChainSelector:     chainSelector,
 			ExistingDataStore: e.DataStore,
 		}
 
@@ -192,7 +191,7 @@ func TestGrantRevokeRenounceRole(t *testing.T) {
 
 	// Test RevokeRole - revoke MINTER_ROLE from testAccount
 	t.Run("RevokeRole", func(t *testing.T) {
-		revokeInput := TokenGovernorRoleChangesetConfig{
+		revokeInput := TokenGovernorRoleInput{
 			Tokens: map[uint64]map[string]TokenGovernorGrantRole{
 				chainSelector: {
 					tokenSymbol: {
@@ -201,7 +200,6 @@ func TestGrantRevokeRenounceRole(t *testing.T) {
 					},
 				},
 			},
-			ChainSelector:     chainSelector,
 			ExistingDataStore: e.DataStore,
 		}
 
@@ -220,7 +218,7 @@ func TestGrantRevokeRenounceRole(t *testing.T) {
 	// Test RenounceRole - deployer renounces MINTER_ROLE
 	t.Run("RenounceRole", func(t *testing.T) {
 		// First grant MINTER role to deployer so we can renounce it
-		grantInput := TokenGovernorRoleChangesetConfig{
+		grantInput := TokenGovernorRoleInput{
 			Tokens: map[uint64]map[string]TokenGovernorGrantRole{
 				chainSelector: {
 					tokenSymbol: {
@@ -229,7 +227,6 @@ func TestGrantRevokeRenounceRole(t *testing.T) {
 					},
 				},
 			},
-			ChainSelector:     chainSelector,
 			ExistingDataStore: e.DataStore,
 		}
 		_, err := cldf_ops.ExecuteSequence(e.OperationsBundle, GrantRole, e.BlockChains, grantInput)
@@ -243,7 +240,7 @@ func TestGrantRevokeRenounceRole(t *testing.T) {
 		require.True(t, hasRoleBefore, "Deployer should have MINTER_ROLE before renounce")
 
 		// Now renounce the role
-		renounceInput := TokenGovernorRoleChangesetConfig{
+		renounceInput := TokenGovernorRoleInput{
 			Tokens: map[uint64]map[string]TokenGovernorGrantRole{
 				chainSelector: {
 					tokenSymbol: {
@@ -252,7 +249,6 @@ func TestGrantRevokeRenounceRole(t *testing.T) {
 					},
 				},
 			},
-			ChainSelector:     chainSelector,
 			ExistingDataStore: e.DataStore,
 		}
 		_, err = cldf_ops.ExecuteSequence(e.OperationsBundle, RenounceRole, e.BlockChains, renounceInput)
@@ -327,9 +323,11 @@ func TestTransferAndAcceptOwnership(t *testing.T) {
 
 	// Step 1: Transfer ownership to the new owner
 	transferInput := TokenGovernorOwnershipInput{
-		TokenSymbol:       tokenSymbol,
-		NewOwner:          newOwnerAddr,
-		ChainSelector:     chainSelector,
+		Tokens: map[uint64]map[string]common.Address{
+			chainSelector: {
+				tokenSymbol: newOwnerAddr,
+			},
+		},
 		ExistingDataStore: e.DataStore,
 	}
 
@@ -406,9 +404,11 @@ func TestTransferOwnership_SameOwner(t *testing.T) {
 
 	// Test validation: Transfer ownership to same owner should fail
 	transferInputSameOwner := TokenGovernorOwnershipInput{
-		TokenSymbol:       tokenSymbol,
-		NewOwner:          chain.DeployerKey.From, // Same as current owner
-		ChainSelector:     chainSelector,
+		Tokens: map[uint64]map[string]common.Address{
+			chainSelector: {
+				tokenSymbol: chain.DeployerKey.From, // Same as current owner
+			},
+		},
 		ExistingDataStore: e.DataStore,
 	}
 
@@ -476,10 +476,12 @@ func TestBeginAndAcceptDefaultAdminTransfer(t *testing.T) {
 	newAdminAddr := chain.Users[0].From
 
 	// Step 1: Begin default admin transfer to the new admin address
-	beginInput := TokenGovernorDefaultAdminInput{
-		TokenSymbol:       tokenSymbol,
-		NewAdminOwner:     newAdminAddr,
-		ChainSelector:     chainSelector,
+	beginInput := TokenGovernorOwnershipInput{
+		Tokens: map[uint64]map[string]common.Address{
+			chainSelector: {
+				tokenSymbol: newAdminAddr,
+			},
+		},
 		ExistingDataStore: e.DataStore,
 	}
 
@@ -562,10 +564,12 @@ func TestBeginDefaultAdminTransfer_AlreadyAdmin(t *testing.T) {
 	e.DataStore = ds.Seal()
 
 	// Try to begin admin transfer to the current admin (should fail)
-	beginInput := TokenGovernorDefaultAdminInput{
-		TokenSymbol:       tokenSymbol,
-		NewAdminOwner:     chain.DeployerKey.From, // Same as current admin
-		ChainSelector:     chainSelector,
+	beginInput := TokenGovernorOwnershipInput{
+		Tokens: map[uint64]map[string]common.Address{
+			chainSelector: {
+				tokenSymbol: chain.DeployerKey.From, // Same as current admin
+			},
+		},
 		ExistingDataStore: e.DataStore,
 	}
 
@@ -616,7 +620,7 @@ func TestGrantRole_AlreadyHasRole(t *testing.T) {
 	testAccount := common.HexToAddress("0x4444444444444444444444444444444444444444")
 
 	// Grant role first time
-	grantInput := TokenGovernorRoleChangesetConfig{
+	grantInput := TokenGovernorRoleInput{
 		Tokens: map[uint64]map[string]TokenGovernorGrantRole{
 			chainSelector: {
 				tokenSymbol: {
@@ -625,7 +629,6 @@ func TestGrantRole_AlreadyHasRole(t *testing.T) {
 				},
 			},
 		},
-		ChainSelector:     chainSelector,
 		ExistingDataStore: e.DataStore,
 	}
 	_, err = cldf_ops.ExecuteSequence(e.OperationsBundle, GrantRole, e.BlockChains, grantInput)
@@ -679,7 +682,7 @@ func TestRevokeRole_DoesNotHaveRole(t *testing.T) {
 	testAccount := common.HexToAddress("0x5555555555555555555555555555555555555555")
 
 	// Try to revoke role that account doesn't have (should fail)
-	revokeInput := TokenGovernorRoleChangesetConfig{
+	revokeInput := TokenGovernorRoleInput{
 		Tokens: map[uint64]map[string]TokenGovernorGrantRole{
 			chainSelector: {
 				tokenSymbol: {
@@ -688,7 +691,6 @@ func TestRevokeRole_DoesNotHaveRole(t *testing.T) {
 				},
 			},
 		},
-		ChainSelector:     chainSelector,
 		ExistingDataStore: e.DataStore,
 	}
 	_, err = cldf_ops.ExecuteSequence(e.OperationsBundle, RevokeRole, e.BlockChains, revokeInput)

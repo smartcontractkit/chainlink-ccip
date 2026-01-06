@@ -11,30 +11,32 @@ import (
 
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
-	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/erc20"
-
 	tg_bindings "github.com/smartcontractkit/ccip-contract-examples/chains/evm/gobindings/generated/latest/token_governor"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/token_governor"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/erc20"
 )
 
+// DeployTokenGovernorInput is the input for deploying a TokenGovernor contract
 type DeployTokenGovernorInput struct {
-	Token               string   `yaml:"token" json:"token"`
-	InitialDelay        *big.Int `yaml:"initial-delay" json:"initialDelay"`
-	InitialDefaultAdmin string   `yaml:"initial-default-admin" json:"initialDefaultAdmin"`
+	Token               string      `yaml:"token" json:"token"`
+	InitialDelay        *big.Int    `yaml:"initial-delay" json:"initialDelay"`
+	InitialDefaultAdmin string      `yaml:"initial-default-admin" json:"initialDefaultAdmin"`
+	MCMS                *mcms.Input `yaml:"mcms,omitempty" json:"mcms,omitempty"`
 	// below are not specified by the user, filled in by the deployment system to pass to chain operations
 	ChainSelector     uint64
 	ExistingDataStore datastore.DataStore
 }
 
+// TokenGovernorRole represents a role that can be assigned in the TokenGovernor contract
 type TokenGovernorRole uint8
 
 const (
@@ -50,275 +52,27 @@ const (
 	RoleDefaultAdmin
 )
 
-type TokenGovernorRoleChangesetConfig struct {
-	Tokens map[uint64]map[string]TokenGovernorGrantRole `yaml:"tokens" json:"tokens"`
-	MCMS   *mcms.Input                                  `yaml:"mcms,omitempty" json:"mcms,omitempty"`
-	// below are not specified by the user, filled in by the deployment system to pass to chain operations
-	ChainSelector     uint64
-	ExistingDataStore datastore.DataStore
-}
-
-// TokenGovernorOwnershipInput is the input for ownership transfer sequences
-type TokenGovernorOwnershipInput struct {
-	TokenSymbol string         `yaml:"token-symbol" json:"tokenSymbol"`
-	NewOwner    common.Address `yaml:"new-owner" json:"newOwner"`
-	// below are not specified by the user, filled in by the deployment system to pass to chain operations
-	ChainSelector     uint64
-	ExistingDataStore datastore.DataStore
-}
-
-// TokenGovernorDefaultAdminInput is the input for default admin transfer sequences
-type TokenGovernorDefaultAdminInput struct {
-	TokenSymbol   string         `yaml:"token-symbol" json:"tokenSymbol"`
-	NewAdminOwner common.Address `yaml:"new-admin-owner" json:"newAdminOwner"`
-	// below are not specified by the user, filled in by the deployment system to pass to chain operations
-	ChainSelector     uint64
-	ExistingDataStore datastore.DataStore
-}
-
+// TokenGovernorGrantRole represents a role assignment to an account
 type TokenGovernorGrantRole struct {
 	Role    TokenGovernorRole
 	Account common.Address
 }
 
-var DeployTokenGovernor = cldf_ops.NewSequence(
-	"deploy-token-governor",
-	common_utils.Version_1_0_0,
-	"Deploy token governor contract",
-	func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input DeployTokenGovernorInput) (sequences.OnChainOutput, error) {
-		addresses := make([]datastore.AddressRef, 0)
-		writes := make([]contract.WriteOutput, 0)
-		chain := chains.EVMChains()[input.ChainSelector]
-		var err error
-		var tokenGovernorRef datastore.AddressRef
-		tokenAddr, err := erc20.NewERC20(common.HexToAddress(input.Token), chain.Client)
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to instantiate ERC20 token at %s: %w", input.Token, err)
-		}
-		symbol, err := tokenAddr.Symbol(&bind.CallOpts{Context: b.GetContext()})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to get symbol for ERC20 token at %s: %w", input.Token, err)
-		}
-		qualifier := symbol
+// TokenGovernorRoleInput is the input for role management sequences
+type TokenGovernorRoleInput struct {
+	Tokens map[uint64]map[string]TokenGovernorGrantRole `yaml:"tokens" json:"tokens"`
+	MCMS   *mcms.Input                                  `yaml:"mcms,omitempty" json:"mcms,omitempty"`
+	// below are not specified by the user, filled in by the deployment system to pass to chain operations
+	ExistingDataStore datastore.DataStore
+}
 
-		tokenGovernorRef, err = contract.MaybeDeployContract(b, token_governor.Deploy, chain, contract.DeployInput[token_governor.ConstructorArgs]{
-			TypeAndVersion: token_governor.TypeAndVersion,
-			ChainSelector:  chain.Selector,
-			Args: token_governor.ConstructorArgs{
-				Token:               common.HexToAddress(input.Token),
-				InitialDelay:        input.InitialDelay,
-				InitialDefaultAdmin: chain.DeployerKey.From,
-			},
-			Qualifier: &qualifier,
-		}, nil)
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy ERC20 token: %w", err)
-		}
-		addresses = append(addresses, tokenGovernorRef)
-
-		batchOp, err := contract.NewBatchOperationFromWrites(writes)
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
-		}
-
-		return sequences.OnChainOutput{
-			Addresses: addresses,
-			BatchOps:  []mcms_types.BatchOperation{batchOp},
-		}, nil
-	},
-)
-
-var GrantRole = cldf_ops.NewSequence(
-	"GrantRole",
-	token_governor.Version,
-	"grants the given role to the given account on the given chains.",
-	func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input TokenGovernorRoleChangesetConfig) (sequences.OnChainOutput, error) {
-		writes := make([]contract.WriteOutput, 0)
-		for chainSelector, tokenMap := range input.Tokens {
-			chain, ok := chains.EVMChains()[chainSelector]
-			if !ok {
-				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", chainSelector)
-			}
-			for tokenSymbol, tokenGovernorRole := range tokenMap {
-				// get token governor address from datastore
-				tgAddr, err := GetTokenGovernor(input.ExistingDataStore, chainSelector, tokenSymbol)
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to get token governor address for token %s on chain %d: %w", tokenSymbol, chainSelector, err)
-				}
-				// instantiate token governor
-				tg, err := tg_bindings.NewTokenGovernor(tgAddr, chain.Client)
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to instantiate token governor at %s: %w", tgAddr.Hex(), err)
-				}
-				// get role bytes32 from token governor
-				role, err := GetRoleFromTokenGovernor(b.GetContext(), tg, tokenGovernorRole.Role)
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to get role from token governor at %s: %w", tgAddr.Hex(), err)
-				}
-				// check if account already has role
-				hasRole, err := tg.HasRole(&bind.CallOpts{Context: b.GetContext()}, role, tokenGovernorRole.Account)
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to check if account %s has role on token governor at %s: %w", tokenGovernorRole.Account.Hex(), tgAddr.Hex(), err)
-				}
-				if hasRole {
-					return sequences.OnChainOutput{}, fmt.Errorf("account %s already has role %d", tokenGovernorRole.Account.Hex(), tokenGovernorRole.Role)
-				}
-				// execute GrantRole operation
-				report, err := cldf_ops.ExecuteOperation(b, token_governor.GrantRole, chain, contract.FunctionInput[token_governor.RoleAssignment]{
-					ChainSelector: chain.Selector,
-					Address:       tgAddr,
-					Args: token_governor.RoleAssignment{
-						Role: role,
-						To:   tokenGovernorRole.Account,
-					},
-				})
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to execute GrantRole on %s for token %s: %w", chain, tokenSymbol, err)
-				}
-				writes = append(writes, report.Output)
-			}
-		}
-
-		batch, err := contract.NewBatchOperationFromWrites(writes)
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
-		}
-		return sequences.OnChainOutput{
-			BatchOps: []mcms_types.BatchOperation{batch},
-		}, nil
-	})
-
-var RevokeRole = cldf_ops.NewSequence(
-	"RevokeRole",
-	token_governor.Version,
-	"revokes the given role to the given account on the given chains.",
-	func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input TokenGovernorRoleChangesetConfig) (sequences.OnChainOutput, error) {
-		writes := make([]contract.WriteOutput, 0)
-		for chainSelector, tokenMap := range input.Tokens {
-			chain, ok := chains.EVMChains()[chainSelector]
-			if !ok {
-				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", chainSelector)
-			}
-			for tokenSymbol, tokenGovernorRole := range tokenMap {
-				// get token governor address from datastore
-				tgAddr, err := GetTokenGovernor(input.ExistingDataStore, chainSelector, tokenSymbol)
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to get token governor address for token %s on chain %d: %w", tokenSymbol, chainSelector, err)
-				}
-				// instantiate token governor
-				tg, err := tg_bindings.NewTokenGovernor(tgAddr, chain.Client)
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to instantiate token governor at %s: %w", tgAddr.Hex(), err)
-				}
-				// get role bytes32 from token governor
-				role, err := GetRoleFromTokenGovernor(b.GetContext(), tg, tokenGovernorRole.Role)
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to get role from token governor at %s: %w", tgAddr.Hex(), err)
-				}
-				// check if account already has role
-				hasRole, err := tg.HasRole(&bind.CallOpts{Context: b.GetContext()}, role, tokenGovernorRole.Account)
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to check if account %s has role on token governor at %s: %w", tokenGovernorRole.Account.Hex(), tgAddr.Hex(), err)
-				}
-				if !hasRole {
-					return sequences.OnChainOutput{}, fmt.Errorf("account %s doesn't has role %d", tokenGovernorRole.Account.Hex(), tokenGovernorRole.Role)
-				}
-				// execute RevokeRole operation
-				report, err := cldf_ops.ExecuteOperation(b, token_governor.RevokeRole, chain, contract.FunctionInput[token_governor.RoleAssignment]{
-					ChainSelector: chain.Selector,
-					Address:       tgAddr,
-					Args: token_governor.RoleAssignment{
-						Role: role,
-						To:   tokenGovernorRole.Account,
-					},
-				})
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to execute RevokeRole on %s for token %s: %w", chain, tokenSymbol, err)
-				}
-				writes = append(writes, report.Output)
-			}
-		}
-
-		batch, err := contract.NewBatchOperationFromWrites(writes)
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
-		}
-		return sequences.OnChainOutput{
-			BatchOps: []mcms_types.BatchOperation{batch},
-		}, nil
-	})
-
-var RenounceRole = cldf_ops.NewSequence(
-	"RenounceRole",
-	token_governor.Version,
-	"renounce the given role to the given account on the given chains.",
-	func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input TokenGovernorRoleChangesetConfig) (sequences.OnChainOutput, error) {
-		writes := make([]contract.WriteOutput, 0)
-		for chainSelector, tokenMap := range input.Tokens {
-			chain, ok := chains.EVMChains()[chainSelector]
-			if !ok {
-				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", chainSelector)
-			}
-			for tokenSymbol, tokenGovernorRole := range tokenMap {
-				// get token governor address from datastore
-				tgAddr, err := GetTokenGovernor(input.ExistingDataStore, chainSelector, tokenSymbol)
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to get token governor address for token %s on chain %d: %w", tokenSymbol, chainSelector, err)
-				}
-				// instantiate token governor
-				tg, err := tg_bindings.NewTokenGovernor(tgAddr, chain.Client)
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to instantiate token governor at %s: %w", tgAddr.Hex(), err)
-				}
-				// get role bytes32 from token governor
-				role, err := GetRoleFromTokenGovernor(b.GetContext(), tg, tokenGovernorRole.Role)
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to get role from token governor at %s: %w", tgAddr.Hex(), err)
-				}
-				// check if account already has role
-				hasRole, err := tg.HasRole(&bind.CallOpts{Context: b.GetContext()}, role, tokenGovernorRole.Account)
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to check if account %s has role on token governor at %s: %w", tokenGovernorRole.Account.Hex(), tgAddr.Hex(), err)
-				}
-				if !hasRole {
-					return sequences.OnChainOutput{}, fmt.Errorf("account %s doesn't has role %d", tokenGovernorRole.Account.Hex(), tokenGovernorRole.Role)
-				}
-				// execute RevokeRole operation
-				report, err := cldf_ops.ExecuteOperation(b, token_governor.RenounceRole, chain, contract.FunctionInput[token_governor.RoleAssignment]{
-					ChainSelector: chain.Selector,
-					Address:       tgAddr,
-					Args: token_governor.RoleAssignment{
-						Role: role,
-						To:   tokenGovernorRole.Account,
-					},
-				})
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to execute RenounceRole on %s for token %s: %w", chain, tokenSymbol, err)
-				}
-				writes = append(writes, report.Output)
-			}
-		}
-
-		batch, err := contract.NewBatchOperationFromWrites(writes)
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
-		}
-		return sequences.OnChainOutput{
-			BatchOps: []mcms_types.BatchOperation{batch},
-		}, nil
-	})
-
-func GetTokenGovernor(ds datastore.DataStore, chainSelector uint64, tokenSymbol string) (common.Address, error) {
-	// fetch token governor from the data store
-	tokenGovernorAddr, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
-		ChainSelector: chainSelector,
-		Type:          datastore.ContractType(token_governor.ContractType),
-		Qualifier:     tokenSymbol,
-	}, chainSelector, datastore_utils.FullRef)
-	if err != nil {
-		return common.Address{}, fmt.Errorf("token governor for token with symbol '%s' is not found in datastore, %v", tokenSymbol, err)
-	}
-	return common.HexToAddress(tokenGovernorAddr.Address), nil
+// TokenGovernorOwnershipInput is the input for ownership transfer sequences and default admin transfer sequences
+// Tokens is a map of chain selector -> token symbol -> owner info/admin info
+type TokenGovernorOwnershipInput struct {
+	Tokens map[uint64]map[string]common.Address `yaml:"tokens" json:"tokens"`
+	MCMS   *mcms.Input                          `yaml:"mcms,omitempty" json:"mcms,omitempty"`
+	// below are not specified by the user, filled in by the deployment system to pass to chain operations
+	ExistingDataStore datastore.DataStore
 }
 
 // GetRoleFromTokenGovernor returns the role bytes32 from the token governor contract.
@@ -393,48 +147,293 @@ func GetRoleFromTokenGovernor(ctx context.Context, tokenGovernor *tg_bindings.To
 	return [32]byte{}, nil
 }
 
+var DeployTokenGovernor = cldf_ops.NewSequence(
+	"deploy-token-governor",
+	common_utils.Version_1_0_0,
+	"Deploy token governor contract",
+	func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input DeployTokenGovernorInput) (sequences.OnChainOutput, error) {
+		addresses := make([]datastore.AddressRef, 0)
+		writes := make([]contract.WriteOutput, 0)
+		chain := chains.EVMChains()[input.ChainSelector]
+		var err error
+		var tokenGovernorRef datastore.AddressRef
+		tokenAddr, err := erc20.NewERC20(common.HexToAddress(input.Token), chain.Client)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to instantiate ERC20 token at %s: %w", input.Token, err)
+		}
+		symbol, err := tokenAddr.Symbol(&bind.CallOpts{Context: b.GetContext()})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to get symbol for ERC20 token at %s: %w", input.Token, err)
+		}
+		qualifier := symbol
+
+		tokenGovernorRef, err = contract.MaybeDeployContract(b, token_governor.Deploy, chain, contract.DeployInput[token_governor.ConstructorArgs]{
+			TypeAndVersion: token_governor.TypeAndVersion,
+			ChainSelector:  chain.Selector,
+			Args: token_governor.ConstructorArgs{
+				Token:               common.HexToAddress(input.Token),
+				InitialDelay:        input.InitialDelay,
+				InitialDefaultAdmin: chain.DeployerKey.From,
+			},
+			Qualifier: &qualifier,
+		}, nil)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy TokenGovernor: %w", err)
+		}
+		addresses = append(addresses, tokenGovernorRef)
+
+		batchOp, err := contract.NewBatchOperationFromWrites(writes)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
+		}
+
+		return sequences.OnChainOutput{
+			Addresses: addresses,
+			BatchOps:  []mcms_types.BatchOperation{batchOp},
+		}, nil
+	},
+)
+
+var GrantRole = cldf_ops.NewSequence(
+	"GrantRole",
+	token_governor.Version,
+	"grants the given role to the given account on the given chains.",
+	func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input TokenGovernorRoleInput) (sequences.OnChainOutput, error) {
+		writes := make([]contract.WriteOutput, 0)
+		for chainSelector, tokenMap := range input.Tokens {
+			chain, ok := chains.EVMChains()[chainSelector]
+			if !ok {
+				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", chainSelector)
+			}
+			for tokenSymbol, tokenGovernorRole := range tokenMap {
+				// get token governor address from datastore
+				tgAddr, err := GetTokenGovernor(input.ExistingDataStore, chainSelector, tokenSymbol)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to get token governor address for token %s on chain %d: %w", tokenSymbol, chainSelector, err)
+				}
+				// instantiate token governor
+				tg, err := tg_bindings.NewTokenGovernor(tgAddr, chain.Client)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to instantiate token governor at %s: %w", tgAddr.Hex(), err)
+				}
+				// get role bytes32 from token governor
+				role, err := GetRoleFromTokenGovernor(b.GetContext(), tg, tokenGovernorRole.Role)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to get role from token governor at %s: %w", tgAddr.Hex(), err)
+				}
+				// check if account already has role
+				hasRole, err := tg.HasRole(&bind.CallOpts{Context: b.GetContext()}, role, tokenGovernorRole.Account)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to check if account %s has role on token governor at %s: %w", tokenGovernorRole.Account.Hex(), tgAddr.Hex(), err)
+				}
+				if hasRole {
+					return sequences.OnChainOutput{}, fmt.Errorf("account %s already has role %d", tokenGovernorRole.Account.Hex(), int(tokenGovernorRole.Role))
+				}
+				// execute GrantRole operation
+				report, err := cldf_ops.ExecuteOperation(b, token_governor.GrantRole, chain, contract.FunctionInput[token_governor.RoleAssignment]{
+					ChainSelector: chain.Selector,
+					Address:       tgAddr,
+					Args: token_governor.RoleAssignment{
+						Role: role,
+						To:   tokenGovernorRole.Account,
+					},
+				})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to execute GrantRole on chain %d for token %s: %w", chainSelector, tokenSymbol, err)
+				}
+				writes = append(writes, report.Output)
+			}
+		}
+
+		batch, err := contract.NewBatchOperationFromWrites(writes)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
+		}
+		return sequences.OnChainOutput{
+			BatchOps: []mcms_types.BatchOperation{batch},
+		}, nil
+	})
+
+var RevokeRole = cldf_ops.NewSequence(
+	"RevokeRole",
+	token_governor.Version,
+	"revokes the given role to the given account on the given chains.",
+	func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input TokenGovernorRoleInput) (sequences.OnChainOutput, error) {
+		writes := make([]contract.WriteOutput, 0)
+		for chainSelector, tokenMap := range input.Tokens {
+			chain, ok := chains.EVMChains()[chainSelector]
+			if !ok {
+				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", chainSelector)
+			}
+			for tokenSymbol, tokenGovernorRole := range tokenMap {
+				// get token governor address from datastore
+				tgAddr, err := GetTokenGovernor(input.ExistingDataStore, chainSelector, tokenSymbol)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to get token governor address for token %s on chain %d: %w", tokenSymbol, chainSelector, err)
+				}
+				// instantiate token governor
+				tg, err := tg_bindings.NewTokenGovernor(tgAddr, chain.Client)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to instantiate token governor at %s: %w", tgAddr.Hex(), err)
+				}
+				// get role bytes32 from token governor
+				role, err := GetRoleFromTokenGovernor(b.GetContext(), tg, tokenGovernorRole.Role)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to get role from token governor at %s: %w", tgAddr.Hex(), err)
+				}
+				// check if account already has role
+				hasRole, err := tg.HasRole(&bind.CallOpts{Context: b.GetContext()}, role, tokenGovernorRole.Account)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to check if account %s has role on token governor at %s: %w", tokenGovernorRole.Account.Hex(), tgAddr.Hex(), err)
+				}
+				if !hasRole {
+					return sequences.OnChainOutput{}, fmt.Errorf("account %s doesn't have role %d", tokenGovernorRole.Account.Hex(), int(tokenGovernorRole.Role))
+				}
+				// execute RevokeRole operation
+				report, err := cldf_ops.ExecuteOperation(b, token_governor.RevokeRole, chain, contract.FunctionInput[token_governor.RoleAssignment]{
+					ChainSelector: chain.Selector,
+					Address:       tgAddr,
+					Args: token_governor.RoleAssignment{
+						Role: role,
+						To:   tokenGovernorRole.Account,
+					},
+				})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to execute RevokeRole on chain %d for token %s: %w", chainSelector, tokenSymbol, err)
+				}
+				writes = append(writes, report.Output)
+			}
+		}
+
+		batch, err := contract.NewBatchOperationFromWrites(writes)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
+		}
+		return sequences.OnChainOutput{
+			BatchOps: []mcms_types.BatchOperation{batch},
+		}, nil
+	})
+
+var RenounceRole = cldf_ops.NewSequence(
+	"RenounceRole",
+	token_governor.Version,
+	"renounce the given role to the given account on the given chains.",
+	func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input TokenGovernorRoleInput) (sequences.OnChainOutput, error) {
+		writes := make([]contract.WriteOutput, 0)
+		for chainSelector, tokenMap := range input.Tokens {
+			chain, ok := chains.EVMChains()[chainSelector]
+			if !ok {
+				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", chainSelector)
+			}
+			for tokenSymbol, tokenGovernorRole := range tokenMap {
+				// get token governor address from datastore
+				tgAddr, err := GetTokenGovernor(input.ExistingDataStore, chainSelector, tokenSymbol)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to get token governor address for token %s on chain %d: %w", tokenSymbol, chainSelector, err)
+				}
+				// instantiate token governor
+				tg, err := tg_bindings.NewTokenGovernor(tgAddr, chain.Client)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to instantiate token governor at %s: %w", tgAddr.Hex(), err)
+				}
+				// get role bytes32 from token governor
+				role, err := GetRoleFromTokenGovernor(b.GetContext(), tg, tokenGovernorRole.Role)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to get role from token governor at %s: %w", tgAddr.Hex(), err)
+				}
+				// check if account already has role
+				hasRole, err := tg.HasRole(&bind.CallOpts{Context: b.GetContext()}, role, tokenGovernorRole.Account)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to check if account %s has role on token governor at %s: %w", tokenGovernorRole.Account.Hex(), tgAddr.Hex(), err)
+				}
+				if !hasRole {
+					return sequences.OnChainOutput{}, fmt.Errorf("account %s doesn't have role %d", tokenGovernorRole.Account.Hex(), int(tokenGovernorRole.Role))
+				}
+				// execute RenounceRole operation
+				report, err := cldf_ops.ExecuteOperation(b, token_governor.RenounceRole, chain, contract.FunctionInput[token_governor.RoleAssignment]{
+					ChainSelector: chain.Selector,
+					Address:       tgAddr,
+					Args: token_governor.RoleAssignment{
+						Role: role,
+						To:   tokenGovernorRole.Account,
+					},
+				})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to execute RenounceRole on chain %d for token %s: %w", chainSelector, tokenSymbol, err)
+				}
+				writes = append(writes, report.Output)
+			}
+		}
+
+		batch, err := contract.NewBatchOperationFromWrites(writes)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
+		}
+		return sequences.OnChainOutput{
+			BatchOps: []mcms_types.BatchOperation{batch},
+		}, nil
+	})
+
+func GetTokenGovernor(ds datastore.DataStore, chainSelector uint64, tokenSymbol string) (common.Address, error) {
+	// fetch token governor from the data store
+	tokenGovernorAddr, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
+		ChainSelector: chainSelector,
+		Type:          datastore.ContractType(token_governor.ContractType),
+		Qualifier:     tokenSymbol,
+	}, chainSelector, datastore_utils.FullRef)
+	if err != nil {
+		return common.Address{}, fmt.Errorf("token governor for token with symbol '%s' is not found in datastore, %v", tokenSymbol, err)
+	}
+	return common.HexToAddress(tokenGovernorAddr.Address), nil
+}
+
 var TransferOwnership = cldf_ops.NewSequence(
 	"TransferOwnership",
 	token_governor.Version,
 	"transfers ownership of TokenGovernor to a new owner (requires acceptance by new owner).",
 	func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input TokenGovernorOwnershipInput) (sequences.OnChainOutput, error) {
 		writes := make([]contract.WriteOutput, 0)
-		chain, ok := chains.EVMChains()[input.ChainSelector]
-		if !ok {
-			return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
-		}
 
-		// get token governor address from datastore
-		tgAddr, err := GetTokenGovernor(input.ExistingDataStore, input.ChainSelector, input.TokenSymbol)
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to get token governor address for token %s on chain %d: %w", input.TokenSymbol, input.ChainSelector, err)
-		}
+		for chainSelector, tokenMap := range input.Tokens {
+			chain, ok := chains.EVMChains()[chainSelector]
+			if !ok {
+				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", chainSelector)
+			}
 
-		// instantiate token governor
-		tg, err := tg_bindings.NewTokenGovernor(tgAddr, chain.Client)
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to instantiate token governor at %s: %w", tgAddr.Hex(), err)
-		}
+			for tokenSymbol, newOwner := range tokenMap {
+				// get token governor address from datastore
+				tgAddr, err := GetTokenGovernor(input.ExistingDataStore, chainSelector, tokenSymbol)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to get token governor address for token %s on chain %d: %w", tokenSymbol, chainSelector, err)
+				}
 
-		// verify current owner
-		currentOwner, err := tg.Owner(&bind.CallOpts{Context: b.GetContext()})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to get current owner: %w", err)
-		}
-		if currentOwner == input.NewOwner {
-			return sequences.OnChainOutput{}, fmt.Errorf("new owner %s is already the current owner", input.NewOwner.Hex())
-		}
+				// instantiate token governor
+				tg, err := tg_bindings.NewTokenGovernor(tgAddr, chain.Client)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to instantiate token governor at %s: %w", tgAddr.Hex(), err)
+				}
 
-		// execute TransferOwnership operation
-		report, err := cldf_ops.ExecuteOperation(b, token_governor.TransferOwnership, chain, contract.FunctionInput[common.Address]{
-			ChainSelector: chain.Selector,
-			Address:       tgAddr,
-			Args:          input.NewOwner,
-		})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to execute TransferOwnership for token %s: %w", input.TokenSymbol, err)
+				// verify current owner
+				currentOwner, err := tg.Owner(&bind.CallOpts{Context: b.GetContext()})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to get current owner: %w", err)
+				}
+				if currentOwner == newOwner {
+					return sequences.OnChainOutput{}, fmt.Errorf("new owner %s is already the current owner for token %s on chain %d", newOwner.Hex(), tokenSymbol, chainSelector)
+				}
+
+				// execute TransferOwnership operation
+				report, err := cldf_ops.ExecuteOperation(b, token_governor.TransferOwnership, chain, contract.FunctionInput[common.Address]{
+					ChainSelector: chain.Selector,
+					Address:       tgAddr,
+					Args:          newOwner,
+				})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to execute TransferOwnership for token %s on chain %d: %w", tokenSymbol, chainSelector, err)
+				}
+				writes = append(writes, report.Output)
+			}
 		}
-		writes = append(writes, report.Output)
 
 		batch, err := contract.NewBatchOperationFromWrites(writes)
 		if err != nil {
@@ -451,27 +450,32 @@ var AcceptOwnership = cldf_ops.NewSequence(
 	"accepts ownership of TokenGovernor",
 	func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input TokenGovernorOwnershipInput) (sequences.OnChainOutput, error) {
 		writes := make([]contract.WriteOutput, 0)
-		chain, ok := chains.EVMChains()[input.ChainSelector]
-		if !ok {
-			return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
-		}
 
-		// get token governor address from datastore
-		tgAddr, err := GetTokenGovernor(input.ExistingDataStore, input.ChainSelector, input.TokenSymbol)
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to get token governor address for token %s on chain %d: %w", input.TokenSymbol, input.ChainSelector, err)
-		}
+		for chainSelector, tokenMap := range input.Tokens {
+			chain, ok := chains.EVMChains()[chainSelector]
+			if !ok {
+				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", chainSelector)
+			}
 
-		// execute AcceptOwnership operation
-		report, err := cldf_ops.ExecuteOperation(b, token_governor.AcceptOwnership, chain, contract.FunctionInput[common.Address]{
-			ChainSelector: chain.Selector,
-			Address:       tgAddr,
-			Args:          input.NewOwner, // not used by the operation but required for type
-		})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to execute AcceptOwnership of the token %s: %w", input.TokenSymbol, err)
+			for tokenSymbol, newOwner := range tokenMap {
+				// get token governor address from datastore
+				tgAddr, err := GetTokenGovernor(input.ExistingDataStore, chainSelector, tokenSymbol)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to get token governor address for token %s on chain %d: %w", tokenSymbol, chainSelector, err)
+				}
+
+				// execute AcceptOwnership operation
+				report, err := cldf_ops.ExecuteOperation(b, token_governor.AcceptOwnership, chain, contract.FunctionInput[common.Address]{
+					ChainSelector: chain.Selector,
+					Address:       tgAddr,
+					Args:          newOwner,
+				})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to execute AcceptOwnership for token %s on chain %d: %w", tokenSymbol, chainSelector, err)
+				}
+				writes = append(writes, report.Output)
+			}
 		}
-		writes = append(writes, report.Output)
 
 		batch, err := contract.NewBatchOperationFromWrites(writes)
 		if err != nil {
@@ -486,44 +490,49 @@ var BeginDefaultAdminTransfer = cldf_ops.NewSequence(
 	"BeginDefaultAdminTransfer",
 	token_governor.Version,
 	"begins the transfer of default admin role to a new admin (requires acceptance by new admin after delay).",
-	func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input TokenGovernorDefaultAdminInput) (sequences.OnChainOutput, error) {
+	func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input TokenGovernorOwnershipInput) (sequences.OnChainOutput, error) {
 		writes := make([]contract.WriteOutput, 0)
-		chain, ok := chains.EVMChains()[input.ChainSelector]
-		if !ok {
-			return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
-		}
 
-		// get token governor address from datastore
-		tgAddr, err := GetTokenGovernor(input.ExistingDataStore, input.ChainSelector, input.TokenSymbol)
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to get token governor address for token %s on chain %d: %w", input.TokenSymbol, input.ChainSelector, err)
-		}
+		for chainSelector, tokenMap := range input.Tokens {
+			chain, ok := chains.EVMChains()[chainSelector]
+			if !ok {
+				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", chainSelector)
+			}
 
-		// instantiate token governor
-		tg, err := tg_bindings.NewTokenGovernor(tgAddr, chain.Client)
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to instantiate token governor at %s: %w", tgAddr.Hex(), err)
-		}
+			for tokenSymbol, newAdmin := range tokenMap {
+				// get token governor address from datastore
+				tgAddr, err := GetTokenGovernor(input.ExistingDataStore, chainSelector, tokenSymbol)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to get token governor address for token %s on chain %d: %w", tokenSymbol, chainSelector, err)
+				}
 
-		// verify current default admin
-		currentAdmin, err := tg.DefaultAdmin(&bind.CallOpts{Context: b.GetContext()})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to get current default admin: %w", err)
-		}
-		if currentAdmin == input.NewAdminOwner {
-			return sequences.OnChainOutput{}, fmt.Errorf("new admin %s is already the current default admin", input.NewAdminOwner.Hex())
-		}
+				// instantiate token governor
+				tg, err := tg_bindings.NewTokenGovernor(tgAddr, chain.Client)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to instantiate token governor at %s: %w", tgAddr.Hex(), err)
+				}
 
-		// execute BeginDefaultAdminTransfer operation
-		report, err := cldf_ops.ExecuteOperation(b, token_governor.BeginDefaultAdminTransfer, chain, contract.FunctionInput[common.Address]{
-			ChainSelector: chain.Selector,
-			Address:       tgAddr,
-			Args:          input.NewAdminOwner,
-		})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to execute BeginDefaultAdminTransfer for token %s: %w", input.TokenSymbol, err)
+				// verify current default admin
+				currentAdmin, err := tg.DefaultAdmin(&bind.CallOpts{Context: b.GetContext()})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to get current default admin: %w", err)
+				}
+				if currentAdmin == newAdmin {
+					return sequences.OnChainOutput{}, fmt.Errorf("new admin %s is already the current default admin for token %s on chain %d", newAdmin.Hex(), tokenSymbol, chainSelector)
+				}
+
+				// execute BeginDefaultAdminTransfer operation
+				report, err := cldf_ops.ExecuteOperation(b, token_governor.BeginDefaultAdminTransfer, chain, contract.FunctionInput[common.Address]{
+					ChainSelector: chain.Selector,
+					Address:       tgAddr,
+					Args:          newAdmin,
+				})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to execute BeginDefaultAdminTransfer for token %s on chain %d: %w", tokenSymbol, chainSelector, err)
+				}
+				writes = append(writes, report.Output)
+			}
 		}
-		writes = append(writes, report.Output)
 
 		batch, err := contract.NewBatchOperationFromWrites(writes)
 		if err != nil {
@@ -538,29 +547,34 @@ var AcceptDefaultAdminTransfer = cldf_ops.NewSequence(
 	"AcceptDefaultAdminTransfer",
 	token_governor.Version,
 	"accepts the pending default admin role transfer (must be called by the pending admin after delay).",
-	func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input TokenGovernorDefaultAdminInput) (sequences.OnChainOutput, error) {
+	func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input TokenGovernorOwnershipInput) (sequences.OnChainOutput, error) {
 		writes := make([]contract.WriteOutput, 0)
-		chain, ok := chains.EVMChains()[input.ChainSelector]
-		if !ok {
-			return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
-		}
 
-		// get token governor address from datastore
-		tgAddr, err := GetTokenGovernor(input.ExistingDataStore, input.ChainSelector, input.TokenSymbol)
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to get token governor address for token %s on chain %d: %w", input.TokenSymbol, input.ChainSelector, err)
-		}
+		for chainSelector, tokenMap := range input.Tokens {
+			chain, ok := chains.EVMChains()[chainSelector]
+			if !ok {
+				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", chainSelector)
+			}
 
-		// execute AcceptDefaultAdminTransfer operation
-		report, err := cldf_ops.ExecuteOperation(b, token_governor.AcceptDefaultAdminTransfer, chain, contract.FunctionInput[common.Address]{
-			ChainSelector: chain.Selector,
-			Address:       tgAddr,
-			Args:          input.NewAdminOwner, // not used by the operation but required for type
-		})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to execute AcceptDefaultAdminTransfer for token %s: %w", input.TokenSymbol, err)
+			for tokenSymbol, admin := range tokenMap {
+				// get token governor address from datastore
+				tgAddr, err := GetTokenGovernor(input.ExistingDataStore, chainSelector, tokenSymbol)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to get token governor address for token %s on chain %d: %w", tokenSymbol, chainSelector, err)
+				}
+
+				// execute AcceptDefaultAdminTransfer operation
+				report, err := cldf_ops.ExecuteOperation(b, token_governor.AcceptDefaultAdminTransfer, chain, contract.FunctionInput[common.Address]{
+					ChainSelector: chain.Selector,
+					Address:       tgAddr,
+					Args:          admin,
+				})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to execute AcceptDefaultAdminTransfer for token %s on chain %d: %w", tokenSymbol, chainSelector, err)
+				}
+				writes = append(writes, report.Output)
+			}
 		}
-		writes = append(writes, report.Output)
 
 		batch, err := contract.NewBatchOperationFromWrites(writes)
 		if err != nil {
