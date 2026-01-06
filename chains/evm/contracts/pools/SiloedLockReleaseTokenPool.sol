@@ -72,6 +72,20 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     return i_token.balanceOf(address(_getLockBox(remoteChainSelector)));
   }
 
+  /// @notice Returns all configured lockboxes for supported chains.
+  /// @return lockBoxConfigs Array of lockbox configurations for all supported chains.
+  /// @dev Only returns lockboxes for chains that have been configured. Chains without
+  /// a configured lockbox will have address(0) as the lockBox address.
+  function getAllLockBoxConfigs() external view returns (LockBoxConfig[] memory lockBoxConfigs) {
+    uint64[] memory supportedChains = getSupportedChains();
+    lockBoxConfigs = new LockBoxConfig[](supportedChains.length);
+    for (uint256 i = 0; i < supportedChains.length; ++i) {
+      lockBoxConfigs[i] =
+        LockBoxConfig({remoteChainSelector: supportedChains[i], lockBox: address(s_lockBoxes[supportedChains[i]])});
+    }
+    return lockBoxConfigs;
+  }
+
   /// @notice No-op override to purge the unused code path from the contract.
   function _postFlightCheck(
     Pool.ReleaseOrMintInV1 calldata,

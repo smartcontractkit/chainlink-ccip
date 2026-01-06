@@ -8,7 +8,7 @@ contract SiloedLockReleaseTokenPool_getAvailableTokens is SiloedLockReleaseToken
   function test_getAvailableTokens_ReturnsLockBoxBalance() public {
     uint256 amount = 1e24;
 
-    // Directly fund the lockbox to simulate available liquidity
+    // Directly fund the lockbox to simulate available liquidity.
     deal(address(s_token), address(s_lockBox), amount);
 
     assertEq(s_siloedLockReleaseTokenPool.getAvailableTokens(DEST_CHAIN_SELECTOR), amount);

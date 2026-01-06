@@ -49,7 +49,7 @@ contract SiloedLockReleaseTokenPoolSetup is BaseTest {
       AuthorizedCallers.AuthorizedCallerArgs({addedCallers: allowedCallers, removedCallers: new address[](0)})
     );
 
-    // Configure lockboxes for both chains
+    // Configure lockboxes for both chains.
     SiloedLockReleaseTokenPool.LockBoxConfig[] memory lockBoxes = new SiloedLockReleaseTokenPool.LockBoxConfig[](3);
     lockBoxes[0] =
       SiloedLockReleaseTokenPool.LockBoxConfig({remoteChainSelector: DEST_CHAIN_SELECTOR, lockBox: address(s_lockBox)});

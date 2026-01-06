@@ -22,7 +22,7 @@ contract SiloedLockReleaseTokenPool_releaseOrMint is SiloedLockReleaseTokenPoolS
 
     vm.startPrank(s_allowedOnRamp);
 
-    // Lock funds so that they can be released without underflowing the internal accounting
+    // Lock funds so that they can be released without underflowing the internal accounting.
     s_siloedLockReleaseTokenPool.lockOrBurn(
       Pool.LockOrBurnInV1({
         originalSender: STRANGER,
@@ -62,7 +62,7 @@ contract SiloedLockReleaseTokenPool_releaseOrMint is SiloedLockReleaseTokenPoolS
     deal(address(s_token), address(s_siloedLockReleaseTokenPool), amount);
     vm.startPrank(s_allowedOnRamp);
 
-    // Lock funds so they can be released later
+    // Lock funds so they can be released later.
     s_siloedLockReleaseTokenPool.lockOrBurn(
       Pool.LockOrBurnInV1({
         originalSender: STRANGER,
@@ -141,10 +141,10 @@ contract SiloedLockReleaseTokenPool_releaseOrMint is SiloedLockReleaseTokenPoolS
     uint256 releaseAmount = 10e18;
     uint256 liquidityAmount = releaseAmount - 1;
 
-    // Provide some liquidity via locking (simulates a previous lockOrBurn)
+    // Provide some liquidity via locking (simulates a previous lockOrBurn).
     deal(address(s_token), address(s_siloLockBox), liquidityAmount);
 
-    // Since amount to release is greater than provided liquidity, the function should revert
+    // Since amount to release is greater than provided liquidity, the function should revert.
     vm.expectRevert(
       abi.encodeWithSelector(SiloedLockReleaseTokenPool.InsufficientLiquidity.selector, liquidityAmount, releaseAmount)
     );
@@ -169,10 +169,10 @@ contract SiloedLockReleaseTokenPool_releaseOrMint is SiloedLockReleaseTokenPoolS
     uint256 releaseAmount = 10e18;
     uint256 liquidityAmount = releaseAmount - 1;
 
-    // Provide some liquidity via direct transfer to lockbox
+    // Provide some liquidity via direct transfer to lockbox.
     deal(address(s_token), address(s_lockBox), liquidityAmount);
 
-    // Since amount to release is greater than provided liquidity, the function should revert
+    // Since amount to release is greater than provided liquidity, the function should revert.
     vm.expectRevert(
       abi.encodeWithSelector(SiloedLockReleaseTokenPool.InsufficientLiquidity.selector, liquidityAmount, releaseAmount)
     );
