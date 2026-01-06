@@ -49,7 +49,7 @@ func IsSupported(tokenPoolType deployment.ContractType, version *semver.Version)
 
 var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Name:                     "burn-mint-token-pool:deploy",
-	Version:                  semver.MustParse("1.7.0"),
+	Version:                  Version,
 	Description:              "Deploys the various BurnMintTokenPool contracts",
 	ContractMetadata:         burn_mint_token_pool.BurnMintTokenPoolMetaData,
 	BytecodeByTypeAndVersion: bytecodeByTypeAndVersion,

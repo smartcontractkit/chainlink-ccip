@@ -15,12 +15,13 @@ import (
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
 	seq_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	token_bindings "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc677"
+	token_bindings "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/1_5_0/burn_mint_erc20_with_drip"
 	"github.com/stretchr/testify/require"
 )
 
@@ -42,18 +43,14 @@ func basicDeployTokenAndPoolInput(chainReport operations.SequenceReport[sequence
 			common.HexToAddress("0x01"): big.NewInt(500_000),
 			common.HexToAddress("0x02"): big.NewInt(500_000),
 		},
-		TokenInfo: tokens.TokenInfo{
-			Decimals:  18,
-			MaxSupply: big.NewInt(1_000_000),
-			Name:      "Test Token",
-		},
 		DeployTokenPoolInput: tokens.DeployTokenPoolInput{
 			ChainSel:                         chainReport.Input.ChainSelector,
 			TokenPoolType:                    datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
-			TokenPoolVersion:                 semver.MustParse("1.7.0"),
+			TokenPoolVersion:                 burn_mint_token_pool.Version,
 			TokenSymbol:                      "TEST",
 			RateLimitAdmin:                   common.HexToAddress("0x01"),
 			ThresholdAmountForAdditionalCCVs: thresholdAmountForAdditionalCCVs,
+			FeeAggregator:                    common.HexToAddress("0x03"),
 			ConstructorArgs: tokens.ConstructorArgs{
 				Decimals: 18,
 				Allowlist: []common.Address{
@@ -129,30 +126,27 @@ func TestDeployTokenAndPool(t *testing.T) {
 			poolAddress := poolReport.Output.Addresses[1].Address
 
 			// Check token metadata
-			token, err := token_bindings.NewBurnMintERC677(common.HexToAddress(tokenAddress), e.BlockChains.EVMChains()[chainSel].Client)
+			token, err := token_bindings.NewBurnMintERC20WithDrip(common.HexToAddress(tokenAddress), e.BlockChains.EVMChains()[chainSel].Client)
 			require.NoError(t, err, "NewBurnMintERC677 should not error")
 			name, err := token.Name(&bind.CallOpts{Context: e.OperationsBundle.GetContext()})
 			require.NoError(t, err, "Name should not error")
-			require.Equal(t, input.TokenInfo.Name, name, "Expected token name to be the same as the deployed token")
+			require.Equal(t, input.DeployTokenPoolInput.TokenSymbol, name, "Expected token name to be the same as the deployed token")
 			symbol, err := token.Symbol(&bind.CallOpts{Context: e.OperationsBundle.GetContext()})
 			require.NoError(t, err, "Symbol should not error")
 			require.Equal(t, input.DeployTokenPoolInput.TokenSymbol, symbol, "Expected token symbol to be the same as the deployed token")
 			decimals, err := token.Decimals(&bind.CallOpts{Context: e.OperationsBundle.GetContext()})
 			require.NoError(t, err, "Decimals should not error")
-			require.Equal(t, input.TokenInfo.Decimals, decimals, "Expected token decimals to be the same as the deployed token")
-			totalSupply, err := token.TotalSupply(&bind.CallOpts{Context: e.OperationsBundle.GetContext()})
-			require.NoError(t, err, "TotalSupply should not error")
-			require.Equal(t, input.TokenInfo.MaxSupply, totalSupply, "Expected token total supply to be the same as the deployed token")
+			require.Equal(t, uint8(18), decimals, "Expected token decimals to be 18")
 
 			// Check token minters
-			minters, err := token.GetMinters(&bind.CallOpts{Context: e.OperationsBundle.GetContext()})
+			hasMintRole, err := token.HasRole(&bind.CallOpts{Context: e.OperationsBundle.GetContext()}, burn_mint_erc20_with_drip.MintRole, common.HexToAddress(poolAddress))
 			require.NoError(t, err, "GetMinters should not error")
-			require.Equal(t, []common.Address{common.HexToAddress(poolAddress)}, minters, "Expected token pool to be the minter of the token")
+			require.True(t, hasMintRole, "Expected token pool to be the minter of the token")
 
 			// Check token burners
-			burners, err := token.GetBurners(&bind.CallOpts{Context: e.OperationsBundle.GetContext()})
+			hasBurnRole, err := token.HasRole(&bind.CallOpts{Context: e.OperationsBundle.GetContext()}, burn_mint_erc20_with_drip.BurnRole, common.HexToAddress(poolAddress))
 			require.NoError(t, err, "GetBurners should not error")
-			require.Equal(t, []common.Address{common.HexToAddress(poolAddress)}, burners, "Expected token pool to be the burner of the token")
+			require.True(t, hasBurnRole, "Expected token pool to be the burner of the token")
 
 			// Check balance of each account
 			for addr, amount := range input.Accounts {

@@ -16,6 +16,8 @@ import (
 
 var ContractType cldf_deployment.ContractType = "FeeQuoter"
 
+var Version = semver.MustParse("1.7.0")
+
 type StaticConfig = fee_quoter.FeeQuoterStaticConfig
 
 type DestChainConfigArgs struct {
@@ -54,11 +56,11 @@ type PriceUpdates = fee_quoter.InternalPriceUpdates
 
 var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Name:             "fee-quoter-v2:deploy",
-	Version:          semver.MustParse("1.7.0"),
+	Version:          Version,
 	Description:      "Deploys the FeeQuoter contract",
 	ContractMetadata: fee_quoter.FeeQuoterMetaData,
 	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
-		cldf_deployment.NewTypeAndVersion(ContractType, *semver.MustParse("1.7.0")).String(): {
+		cldf_deployment.NewTypeAndVersion(ContractType, *Version).String(): {
 			EVM: common.FromHex(fee_quoter.FeeQuoterBin),
 		},
 	},
@@ -67,7 +69,7 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 
 var ApplyAuthorizedCallerUpdates = contract.NewWrite(contract.WriteParams[AuthorizedCallerArgs, *fee_quoter.FeeQuoter]{
 	Name:            "fee-quoter-v2:apply-authorized-caller-updates",
-	Version:         semver.MustParse("1.7.0"),
+	Version:         Version,
 	Description:     "Updates authorized price updaters on the FeeQuoter contract",
 	ContractType:    ContractType,
 	ContractABI:     fee_quoter.FeeQuoterABI,
@@ -81,7 +83,7 @@ var ApplyAuthorizedCallerUpdates = contract.NewWrite(contract.WriteParams[Author
 
 var ApplyDestChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]DestChainConfigArgs, *fee_quoter.FeeQuoter]{
 	Name:            "fee-quoter-v2:apply-dest-chain-config-updates",
-	Version:         semver.MustParse("1.7.0"),
+	Version:         Version,
 	Description:     "Applies updates to destination chain configurations on the FeeQuoter",
 	ContractType:    ContractType,
 	ContractABI:     fee_quoter.FeeQuoterABI,
@@ -95,7 +97,7 @@ var ApplyDestChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]DestC
 
 var ApplyTokenTransferFeeConfigUpdates = contract.NewWrite(contract.WriteParams[ApplyTokenTransferFeeConfigUpdatesArgs, *fee_quoter.FeeQuoter]{
 	Name:            "fee-quoter-v2:apply-token-transfer-fee-config-updates",
-	Version:         semver.MustParse("1.7.0"),
+	Version:         Version,
 	Description:     "Applies updates to the token transfer fee configurations on the FeeQuoter",
 	ContractType:    ContractType,
 	ContractABI:     fee_quoter.FeeQuoterABI,
@@ -109,7 +111,7 @@ var ApplyTokenTransferFeeConfigUpdates = contract.NewWrite(contract.WriteParams[
 
 var UpdatePrices = contract.NewWrite(contract.WriteParams[PriceUpdates, *fee_quoter.FeeQuoter]{
 	Name:         "fee-quoter-v2:update-prices",
-	Version:      semver.MustParse("1.7.0"),
+	Version:      Version,
 	Description:  "Updates token prices on the FeeQuoter",
 	ContractType: ContractType,
 	ContractABI:  fee_quoter.FeeQuoterABI,

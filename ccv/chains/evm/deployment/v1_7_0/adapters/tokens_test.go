@@ -14,14 +14,13 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/token_pool"
-	evm_tokens "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
 	tp_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/token_pool"
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc677"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
@@ -96,21 +95,16 @@ func TestTokenAdapter(t *testing.T) {
 						Accounts: map[common.Address]*big.Int{
 							e.BlockChains.EVMChains()[chainSel].DeployerKey.From: big.NewInt(1_000_000),
 						},
-						TokenInfo: evm_tokens.TokenInfo{
-							Decimals:  18,
-							MaxSupply: big.NewInt(10_000_000),
-							Name:      "TEST",
-						},
 						ChainSel:                         chainSel,
 						TokenPoolType:                    datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
-						TokenPoolVersion:                 semver.MustParse("1.7.0"),
+						TokenPoolVersion:                 burn_mint_token_pool.Version,
 						TokenSymbol:                      "TEST",
 						Decimals:                         18,
 						ThresholdAmountForAdditionalCCVs: big.NewInt(1e18),
 						Router: datastore.AddressRef{
 							ChainSelector: chainSel,
 							Type:          datastore.ContractType(router.ContractType),
-							Version:       semver.MustParse("1.2.0"),
+							Version:       router.Version,
 						},
 					},
 				})
@@ -125,8 +119,8 @@ func TestTokenAdapter(t *testing.T) {
 			var remoteToken *datastore.AddressRef
 			if test.deriveTokenAddress {
 				remoteToken = &datastore.AddressRef{
-					Type:      datastore.ContractType(burn_mint_erc677.ContractType),
-					Version:   semver.MustParse("1.0.0"),
+					Type:      datastore.ContractType(burn_mint_erc20_with_drip.ContractType),
+					Version:   burn_mint_erc20_with_drip.Version,
 					Qualifier: "TEST",
 				}
 			}
@@ -158,18 +152,18 @@ func TestTokenAdapter(t *testing.T) {
 						ChainSelector: chainA,
 						TokenPoolRef: datastore.AddressRef{
 							Type:      datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
-							Version:   semver.MustParse("1.7.0"),
+							Version:   burn_mint_token_pool.Version,
 							Qualifier: "TEST",
 						},
 						RegistryRef: datastore.AddressRef{
 							Type:    datastore.ContractType(token_admin_registry.ContractType),
-							Version: semver.MustParse("1.5.0"),
+							Version: token_admin_registry.Version,
 						},
 						RemoteChains: map[uint64]tokens.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
-							chainB: getRemoteChainConfig(semver.MustParse("1.7.0"), []datastore.AddressRef{
+							chainB: getRemoteChainConfig(burn_mint_token_pool.Version, []datastore.AddressRef{
 								{
 									Type:    datastore.ContractType(committee_verifier.ContractType),
-									Version: semver.MustParse("1.7.0"),
+									Version: committee_verifier.Version,
 								},
 							}),
 						},
@@ -178,18 +172,18 @@ func TestTokenAdapter(t *testing.T) {
 						ChainSelector: chainB,
 						TokenPoolRef: datastore.AddressRef{
 							Type:      datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
-							Version:   semver.MustParse("1.7.0"),
+							Version:   burn_mint_token_pool.Version,
 							Qualifier: "TEST",
 						},
 						RegistryRef: datastore.AddressRef{
 							Type:    datastore.ContractType(token_admin_registry.ContractType),
-							Version: semver.MustParse("1.5.0"),
+							Version: token_admin_registry.Version,
 						},
 						RemoteChains: map[uint64]tokens.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
-							chainA: getRemoteChainConfig(semver.MustParse("1.7.0"), []datastore.AddressRef{
+							chainA: getRemoteChainConfig(burn_mint_token_pool.Version, []datastore.AddressRef{
 								{
 									Type:    datastore.ContractType(committee_verifier.ContractType),
-									Version: semver.MustParse("1.7.0"),
+									Version: committee_verifier.Version,
 								},
 							}),
 						},
@@ -210,27 +204,27 @@ func TestTokenAdapter(t *testing.T) {
 				tokenPoolAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 					ChainSelector: chainSel,
 					Type:          datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
-					Version:       semver.MustParse("1.7.0"),
+					Version:       burn_mint_token_pool.Version,
 					Qualifier:     "TEST",
 				}, chainSel, evm_datastore_utils.ToEVMAddress)
 				require.NoError(t, err, "Failed to find deployed token pool ref in datastore")
 				tokenAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 					ChainSelector: chainSel,
-					Type:          datastore.ContractType(burn_mint_erc677.ContractType),
-					Version:       semver.MustParse("1.0.0"),
+					Type:          datastore.ContractType(burn_mint_erc20_with_drip.ContractType),
+					Version:       burn_mint_erc20_with_drip.Version,
 					Qualifier:     "TEST",
 				}, chainSel, evm_datastore_utils.ToEVMAddress)
 				require.NoError(t, err, "Failed to find deployed token ref in datastore")
 				registryAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 					ChainSelector: chainSel,
 					Type:          datastore.ContractType(token_admin_registry.ContractType),
-					Version:       semver.MustParse("1.5.0"),
+					Version:       token_admin_registry.Version,
 				}, chainSel, evm_datastore_utils.ToEVMAddress)
 				require.NoError(t, err, "Failed to find deployed registry ref in datastore")
 				verifierAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 					ChainSelector: chainSel,
 					Type:          datastore.ContractType(committee_verifier.ContractType),
-					Version:       semver.MustParse("1.7.0"),
+					Version:       committee_verifier.Version,
 				}, chainSel, evm_datastore_utils.ToEVMAddress)
 				require.NoError(t, err, "Failed to find deployed verifier ref in datastore")
 

@@ -54,12 +54,12 @@ func TestConfigureCommitteeVerifierForLanes(t *testing.T) {
 							{
 								Address: committeeVerifier,
 								Type:    datastore.ContractType(committee_verifier.ContractType),
-								Version: semver.MustParse("1.7.0"),
+								Version: committee_verifier.Version,
 							},
 							{
 								Address: committeeVerifierResolver,
 								Type:    datastore.ContractType(committee_verifier.ResolverType),
-								Version: semver.MustParse("1.7.0"),
+								Version: committee_verifier.Version,
 							},
 						},
 						RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
@@ -96,12 +96,12 @@ func TestConfigureCommitteeVerifierForLanes(t *testing.T) {
 							{
 								Address: committeeVerifier,
 								Type:    datastore.ContractType(committee_verifier.ContractType),
-								Version: semver.MustParse("1.7.0"),
+								Version: committee_verifier.Version,
 							},
 							{
 								Address: committeeVerifierResolver,
 								Type:    datastore.ContractType(committee_verifier.ResolverType),
-								Version: semver.MustParse("1.7.0"),
+								Version: committee_verifier.Version,
 							},
 						},
 						RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
@@ -141,12 +141,12 @@ func TestConfigureCommitteeVerifierForLanes(t *testing.T) {
 							{
 								Address: committeeVerifier,
 								Type:    datastore.ContractType(committee_verifier.ContractType),
-								Version: semver.MustParse("1.7.0"),
+								Version: committee_verifier.Version,
 							},
 							{
 								Address: committeeVerifierResolver,
 								Type:    datastore.ContractType(committee_verifier.ResolverType),
-								Version: semver.MustParse("1.7.0"),
+								Version: committee_verifier.Version,
 							},
 						},
 						RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
@@ -307,7 +307,7 @@ func TestConfigureCommitteeVerifierForLanes_RevertWhen_InvalidSupportingContract
 							{
 								Address: committeeVerifier,
 								Type:    datastore.ContractType(committee_verifier.ContractType),
-								Version: semver.MustParse("1.7.0"),
+								Version: committee_verifier.Version,
 							},
 						},
 						RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
@@ -340,12 +340,12 @@ func TestConfigureCommitteeVerifierForLanes_RevertWhen_InvalidSupportingContract
 							{
 								Address: committeeVerifier,
 								Type:    datastore.ContractType(committee_verifier.ContractType),
-								Version: semver.MustParse("1.7.0"),
+								Version: committee_verifier.Version,
 							},
 							{
 								Address: routerAddress,
 								Type:    datastore.ContractType(router.ContractType),
-								Version: semver.MustParse("1.2.0"),
+								Version: router.Version,
 							},
 						},
 						RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{

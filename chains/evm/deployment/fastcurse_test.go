@@ -4,7 +4,6 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/aws/smithy-go/ptr"
 	"github.com/ethereum/go-ethereum/common"
 	chainsel "github.com/smartcontractkit/chain-selectors"
@@ -39,7 +38,7 @@ func TestFastCurse(t *testing.T) {
 	// deploy RMN 1.5 on chain1 and RMN 1.6 on chain2, set up routers, etc.
 	chain := env.BlockChains.EVMChains()[chain1]
 	deployRMNOp, err := cldf_ops.ExecuteOperation(bundle, rmnops1_5.Deploy, chain, contract.DeployInput[rmnops1_5.ConstructorArgs]{
-		TypeAndVersion: deployment.NewTypeAndVersion(rmnops1_5.ContractType, *semver.MustParse("1.5.0")),
+		TypeAndVersion: deployment.NewTypeAndVersion(rmnops1_5.ContractType, *rmnops1_5.Version),
 		ChainSelector:  chain.Selector,
 		Args: rmnops1_5.ConstructorArgs{
 			RMNConfig: rmn_contract.RMNConfig{
@@ -61,14 +60,14 @@ func TestFastCurse(t *testing.T) {
 	ds := datastore.NewMemoryDataStore()
 	require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
 		Type:          datastore.ContractType(rmnops1_5.ContractType),
-		Version:       semver.MustParse("1.5.0"),
+		Version:       rmnops1_5.Version,
 		ChainSelector: chain1,
 		Address:       deployRMNOp.Output.Address,
 	}))
 	// deploy RMNRemote 1.6 on chain2
 	chain = env.BlockChains.EVMChains()[chain2]
 	deployRMNRemoteOp, err := cldf_ops.ExecuteOperation(bundle, rmnremoteops1_6.Deploy, chain, contract.DeployInput[rmnremoteops1_6.ConstructorArgs]{
-		TypeAndVersion: deployment.NewTypeAndVersion(rmnremoteops1_6.ContractType, *semver.MustParse("1.6.0")),
+		TypeAndVersion: deployment.NewTypeAndVersion(rmnremoteops1_6.ContractType, *rmnremoteops1_6.Version),
 		ChainSelector:  chain.Selector,
 		Args: rmnremoteops1_6.ConstructorArgs{
 			LocalChainSelector: chain.Selector,
@@ -78,7 +77,7 @@ func TestFastCurse(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
 		Type:          datastore.ContractType(rmnremoteops1_6.ContractType),
-		Version:       semver.MustParse("1.6.0"),
+		Version:       rmnremoteops1_6.Version,
 		ChainSelector: chain2,
 		Address:       deployRMNRemoteOp.Output.Address,
 	}))
@@ -91,7 +90,7 @@ func TestFastCurse(t *testing.T) {
 
 		deployRouterOp, err := cldf_ops.ExecuteOperation(bundle, routerops1_2.Deploy, evmChain, contract.DeployInput[routerops1_2.ConstructorArgs]{
 			ChainSelector:  evmChain.Selector,
-			TypeAndVersion: deployment.NewTypeAndVersion(routerops1_2.ContractType, *semver.MustParse("1.2.0")),
+			TypeAndVersion: deployment.NewTypeAndVersion(routerops1_2.ContractType, *routerops1_2.Version),
 			Args: routerops1_2.ConstructorArgs{
 				WrappedNative: wNative,
 				RMNProxy:      rmnProxy,
@@ -100,7 +99,7 @@ func TestFastCurse(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
 			Type:          datastore.ContractType(routerops1_2.ContractType),
-			Version:       semver.MustParse("1.2.0"),
+			Version:       routerops1_2.Version,
 			ChainSelector: sel,
 			Address:       deployRouterOp.Output.Address,
 		}))

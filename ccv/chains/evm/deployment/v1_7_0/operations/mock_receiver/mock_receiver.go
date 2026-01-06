@@ -10,6 +10,8 @@ import (
 
 var ContractType cldf_deployment.ContractType = "MockReceiver"
 
+var Version = semver.MustParse("1.7.0")
+
 type ConstructorArgs struct {
 	RequiredVerifiers []common.Address
 	OptionalVerifiers []common.Address
@@ -18,11 +20,11 @@ type ConstructorArgs struct {
 
 var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Name:             "mock-receiver-v2:deploy",
-	Version:          semver.MustParse("1.7.0"),
+	Version:          Version,
 	Description:      "Deploys the MockReceiverV2 contract",
 	ContractMetadata: mock_receiver_v2.MockReceiverV2MetaData,
 	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
-		cldf_deployment.NewTypeAndVersion(ContractType, *semver.MustParse("1.7.0")).String(): {
+		cldf_deployment.NewTypeAndVersion(ContractType, *Version).String(): {
 			EVM: common.FromHex(mock_receiver_v2.MockReceiverV2Bin),
 		},
 	},
