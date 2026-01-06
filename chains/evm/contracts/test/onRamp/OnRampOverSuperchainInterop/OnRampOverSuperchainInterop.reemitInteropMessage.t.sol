@@ -11,7 +11,10 @@ import {OnRampOverSuperchainInteropSetup} from "./OnRampOverSuperchainInteropSet
 import {IERC20} from "@openzeppelin/contracts@4.8.3/token/ERC20/IERC20.sol";
 
 contract OnRampOverSuperchainInterop_reemitInteropMessage is OnRampOverSuperchainInteropSetup {
-  function _forwardFromRouter(Client.EVM2AnyMessage memory message, uint256 feeAmount) internal {
+  function _forwardFromRouter(
+    Client.EVM2AnyMessage memory message,
+    uint256 feeAmount
+  ) internal {
     // First send a basic message to populate the storage
     vm.stopPrank(); // Stop OWNER prank
     vm.startPrank(address(s_sourceRouter));
@@ -76,9 +79,7 @@ contract OnRampOverSuperchainInterop_reemitInteropMessage is OnRampOverSuperchai
     vm.prank(OWNER);
     OnRamp.DestChainConfigArgs[] memory destChainConfigArgs = new OnRamp.DestChainConfigArgs[](1);
     destChainConfigArgs[0] = OnRamp.DestChainConfigArgs({
-      destChainSelector: DEST_CHAIN_SELECTOR,
-      router: s_sourceRouter,
-      allowlistEnabled: true
+      destChainSelector: DEST_CHAIN_SELECTOR, router: s_sourceRouter, allowlistEnabled: true
     });
     s_onRampOverSuperchainInterop.applyDestChainConfigUpdates(destChainConfigArgs);
 

@@ -53,7 +53,7 @@ contract ERC20LockBox is ITypeAndVersion {
   /// without requiring the token pool owner's approval.
   mapping(address token => mapping(address caller => bool isAllowed)) internal s_allowedCallers;
 
-  string public constant typeAndVersion = "ERC20LockBox 1.6.2-dev";
+  string public constant typeAndVersion = "ERC20LockBox 1.6.4";
 
   constructor(
     address tokenAdminRegistry
@@ -72,7 +72,10 @@ contract ERC20LockBox is ITypeAndVersion {
   /// @param amount The amount of tokens to deposit.
   /// @dev This function does NOT support storing native tokens, as the token pool which handles native is expected to
   /// have wrapped it into an ERC20-compatibletoken first.
-  function deposit(address token, uint256 amount) external {
+  function deposit(
+    address token,
+    uint256 amount
+  ) external {
     _validateDepositWithdraw(token, amount);
 
     IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
@@ -84,7 +87,11 @@ contract ERC20LockBox is ITypeAndVersion {
   /// @param token The address of the ERC20 token to withdraw.
   /// @param amount The amount of tokens to withdraw.
   /// @param recipient The address that will receive the withdrawn tokens.
-  function withdraw(address token, uint256 amount, address recipient) external {
+  function withdraw(
+    address token,
+    uint256 amount,
+    address recipient
+  ) external {
     _validateDepositWithdraw(token, amount);
 
     if (recipient == address(0)) {
@@ -150,7 +157,10 @@ contract ERC20LockBox is ITypeAndVersion {
   /// @notice Validates the deposit and withdraw functions.
   /// @param token The address of the ERC20 token.
   /// @param amount The amount of tokens to deposit or withdraw.
-  function _validateDepositWithdraw(address token, uint256 amount) internal view {
+  function _validateDepositWithdraw(
+    address token,
+    uint256 amount
+  ) internal view {
     if (token == address(0)) {
       revert TokenAddressCannotBeZero();
     }
@@ -168,7 +178,10 @@ contract ERC20LockBox is ITypeAndVersion {
   /// @param token The address of the ERC20 token.
   /// @param caller The address to check.
   /// @return allowed True if the address is allowed, false otherwise.
-  function isAllowedCaller(address token, address caller) public view returns (bool allowed) {
+  function isAllowedCaller(
+    address token,
+    address caller
+  ) public view returns (bool allowed) {
     TokenAdminRegistry.TokenConfig memory tokenConfig = i_tokenAdminRegistry.getTokenConfig(token);
 
     // The caller is allowed if they are the token pool or a specially allowed caller.

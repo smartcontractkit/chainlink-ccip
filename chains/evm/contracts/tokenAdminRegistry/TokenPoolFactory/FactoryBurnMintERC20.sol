@@ -3,6 +3,8 @@ pragma solidity ^0.8.24;
 
 import {IGetCCIPAdmin} from "../../interfaces/IGetCCIPAdmin.sol";
 import {IOwnable} from "@chainlink/contracts/src/v0.8/shared/interfaces/IOwnable.sol";
+
+import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
 
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
@@ -16,7 +18,14 @@ import {EnumerableSet} from "@openzeppelin/contracts@5.0.2/utils/structs/Enumera
 /// @notice A basic ERC20 compatible token contract with burn and minting roles.
 /// @dev The constructor has been modified to support the deployment pattern used by a factory contract.
 /// @dev The total supply can be limited during deployment.
-contract FactoryBurnMintERC20 is IBurnMintERC20, IGetCCIPAdmin, IERC165, ERC20Burnable, Ownable2StepMsgSender {
+contract FactoryBurnMintERC20 is
+  IBurnMintERC20,
+  IGetCCIPAdmin,
+  IERC165,
+  ERC20Burnable,
+  Ownable2StepMsgSender,
+  ITypeAndVersion
+{
   using EnumerableSet for EnumerableSet.AddressSet;
 
   error SenderNotMinter(address sender);
@@ -58,10 +67,16 @@ contract FactoryBurnMintERC20 is IBurnMintERC20, IGetCCIPAdmin, IERC165, ERC20Bu
 
     s_ccipAdmin = newOwner;
 
-    if (preMint > maxSupply_) revert MaxSupplyExceeded(preMint);
+    if (preMint > maxSupply_ && maxSupply_ != 0) revert MaxSupplyExceeded(preMint);
 
     // Mint the initial supply to the new Owner, saving gas by not calling if the mint amount is zero
     if (preMint != 0) _mint(newOwner, preMint);
+  }
+
+  /// @inheritdoc ITypeAndVersion
+  /// @notice Using a function because constant state variables cannot be overridden by child contracts.
+  function typeAndVersion() external pure virtual override returns (string memory) {
+    return "FactoryBurnMintERC20 1.6.2";
   }
 
   /// @inheritdoc IERC165
@@ -89,13 +104,21 @@ contract FactoryBurnMintERC20 is IBurnMintERC20, IGetCCIPAdmin, IERC165, ERC20Bu
 
   /// @dev Uses OZ ERC20 _transfer to disallow sending to address(0).
   /// @dev Disallows sending to address(this)
-  function _transfer(address from, address to, uint256 amount) internal virtual override validAddress(to) {
+  function _transfer(
+    address from,
+    address to,
+    uint256 amount
+  ) internal virtual override validAddress(to) {
     super._transfer(from, to, amount);
   }
 
   /// @dev Uses OZ ERC20 _approve to disallow approving for address(0).
   /// @dev Disallows approving for address(this)
-  function _approve(address owner, address spender, uint256 amount) internal virtual override validAddress(spender) {
+  function _approve(
+    address owner,
+    address spender,
+    uint256 amount
+  ) internal virtual override validAddress(spender) {
     super._approve(owner, spender, amount);
   }
 
@@ -103,14 +126,20 @@ contract FactoryBurnMintERC20 is IBurnMintERC20, IGetCCIPAdmin, IERC165, ERC20Bu
   /// @param spender the account being approved to spend on the users' behalf.
   /// @param subtractedValue the amount being removed from the approval.
   /// @return success Bool to return if the approval was successfully decreased.
-  function decreaseApproval(address spender, uint256 subtractedValue) external returns (bool success) {
+  function decreaseApproval(
+    address spender,
+    uint256 subtractedValue
+  ) external returns (bool success) {
     return decreaseAllowance(spender, subtractedValue);
   }
 
   /// @dev Exists to be backwards compatible with the older naming convention.
   /// @param spender the account being approved to spend on the users' behalf.
   /// @param addedValue the amount being added to the approval.
-  function increaseApproval(address spender, uint256 addedValue) external {
+  function increaseApproval(
+    address spender,
+    uint256 addedValue
+  ) external {
     increaseAllowance(spender, addedValue);
   }
 
@@ -130,14 +159,20 @@ contract FactoryBurnMintERC20 is IBurnMintERC20, IGetCCIPAdmin, IERC165, ERC20Bu
   /// @inheritdoc IBurnMintERC20
   /// @dev Alias for BurnFrom for compatibility with the older naming convention.
   /// @dev Uses burnFrom for all validation & logic.
-  function burn(address account, uint256 amount) public virtual override {
+  function burn(
+    address account,
+    uint256 amount
+  ) public virtual override {
     burnFrom(account, amount);
   }
 
   /// @inheritdoc ERC20Burnable
   /// @dev Uses OZ ERC20 _burn to disallow burning from address(0).
   /// @dev Decreases the total supply.
-  function burnFrom(address account, uint256 amount) public override(IBurnMintERC20, ERC20Burnable) onlyBurner {
+  function burnFrom(
+    address account,
+    uint256 amount
+  ) public override(IBurnMintERC20, ERC20Burnable) onlyBurner {
     super.burnFrom(account, amount);
   }
 
@@ -145,7 +180,10 @@ contract FactoryBurnMintERC20 is IBurnMintERC20, IGetCCIPAdmin, IERC165, ERC20Bu
   /// @dev Uses OZ ERC20 _mint to disallow minting to address(0).
   /// @dev Disallows minting to address(this)
   /// @dev Increases the total supply.
-  function mint(address account, uint256 amount) external override onlyMinter validAddress(account) {
+  function mint(
+    address account,
+    uint256 amount
+  ) external override onlyMinter validAddress(account) {
     if (i_maxSupply != 0 && totalSupply() + amount > i_maxSupply) revert MaxSupplyExceeded(totalSupply() + amount);
 
     _mint(account, amount);

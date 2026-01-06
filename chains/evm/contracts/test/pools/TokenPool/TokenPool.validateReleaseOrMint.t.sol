@@ -48,9 +48,7 @@ contract TokenPool_validateReleaseOrMint is TokenPoolSetup {
 
     vm.expectEmit();
     emit TokenPool.InboundRateLimitConsumed({
-      remoteChainSelector: releaseOrMintIn.remoteChainSelector,
-      token: releaseOrMintIn.localToken,
-      amount: localAmount
+      remoteChainSelector: releaseOrMintIn.remoteChainSelector, token: releaseOrMintIn.localToken, amount: localAmount
     });
 
     s_tokenPool.validateReleaseOrMint(releaseOrMintIn, localAmount);

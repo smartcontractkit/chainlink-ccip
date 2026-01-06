@@ -3,13 +3,14 @@ package metrics
 import (
 	"context"
 	"fmt"
+	"maps"
+	"slices"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
-	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/beholder"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -96,6 +97,10 @@ var (
 		Name: "ccip_exec_latest_round_id",
 		Help: "The latest round ID observed by the exec plugin",
 	}, []string{"source_network_name", "dest_network_name", "plugin"})
+	promLooppCCIPProviderSupported = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "ccip_exec_loopp_ccip_provider_supported",
+		Help: "Tracks whether LOOPP CCIP provider is supported for each chain family (1 = supported, 0 = not supported)",
+	}, []string{"chain_family"})
 )
 
 type PromReporter struct {
@@ -112,6 +117,7 @@ type PromReporter struct {
 	processorLatencyHistogram *prometheus.HistogramVec
 	processorErrors           *prometheus.CounterVec
 	latestRoundID             *prometheus.GaugeVec
+	looppProviderSupported    *prometheus.GaugeVec
 	// Beholder reporters
 	bhProcessorLatencyHistogram metric.Int64Histogram
 	bhLatencyHistogram          metric.Int64Histogram
@@ -120,6 +126,7 @@ type PromReporter struct {
 	bhSequenceNumbers           metric.Int64Gauge
 	beholderProcessorErrors     metric.Int64Counter
 	bhExecLatestRound           metric.Int64Gauge
+	bhLooppProviderSupported    metric.Int64Gauge
 }
 
 func NewPromReporter(
@@ -158,6 +165,10 @@ func NewPromReporter(
 	if err != nil {
 		return nil, fmt.Errorf("failed to register ccip_exec_latest_round_id gauge: %w", err)
 	}
+	looppProviderSupported, err := bhClient.Meter.Int64Gauge("ccip_exec_loopp_ccip_provider_supported")
+	if err != nil {
+		return nil, fmt.Errorf("failed to register ccip_exec_loopp_ccip_provider_supported gauge: %w", err)
+	}
 
 	return &PromReporter{
 		lggr:        lggr,
@@ -172,6 +183,7 @@ func NewPromReporter(
 		processorLatencyHistogram: PromExecProcessorLatencyHistogram,
 		processorErrors:           PromExecProcessorErrors,
 		latestRoundID:             PromExecLatestRoundID,
+		looppProviderSupported:    promLooppCCIPProviderSupported,
 
 		bhLatencyHistogram:          latencyHistogram,
 		bhProcessorLatencyHistogram: processorLatencyHistogram,
@@ -180,6 +192,7 @@ func NewPromReporter(
 		bhSequenceNumbers:           sequenceNumbers,
 		beholderProcessorErrors:     processorErrors,
 		bhExecLatestRound:           execLatestRoundID,
+		bhLooppProviderSupported:    looppProviderSupported,
 	}, nil
 }
 
@@ -187,7 +200,7 @@ func (p *PromReporter) TrackObservation(obs exectypes.Observation, state exectyp
 	p.trackOutputStats(obs, state, plugincommon.ObservationMethod)
 
 	for sourceChainSelector, cr := range obs.Messages {
-		maxSeqNr := pickHighestSeqNr(maps.Keys(cr))
+		maxSeqNr := pickHighestSeqNr(slices.Collect(maps.Keys(cr)))
 		p.trackMaxSequenceNumber(sourceChainSelector, maxSeqNr, plugincommon.ObservationMethod)
 		p.trackLatestRoundID(round, sourceChainSelector, plugincommon.OutcomeMethod)
 	}
@@ -372,4 +385,17 @@ func pickHighestSeqNr(seqNrs []cciptypes.SeqNum) int {
 		}
 	}
 	return int(seqNr)
+}
+
+func (p *PromReporter) TrackLooppProviderSupported(looppCCIPProviderSupported map[string]bool) {
+	for chainFamily, supported := range looppCCIPProviderSupported {
+		value := float64(0)
+		if supported {
+			value = 1
+		}
+		p.looppProviderSupported.WithLabelValues(chainFamily).Set(value)
+		p.bhLooppProviderSupported.Record(context.Background(), int64(value), metric.WithAttributes(
+			attribute.String("chain_family", chainFamily),
+		))
+	}
 }

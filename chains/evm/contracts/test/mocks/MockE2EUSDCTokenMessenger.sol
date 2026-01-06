@@ -33,7 +33,10 @@ contract MockE2EUSDCTokenMessenger is ITokenMessenger {
   // Local Message Transmitter responsible for sending and receiving messages to/from remote domains
   IMessageTransmitterWithRelay public immutable localMessageTransmitterWithRelay;
 
-  constructor(uint32 version, address transmitter) {
+  constructor(
+    uint32 version,
+    address transmitter
+  ) {
     i_messageBodyVersion = version;
     s_nonce = 1;
     i_transmitter = transmitter;
@@ -121,6 +124,13 @@ contract MockE2EUSDCTokenMessenger is ITokenMessenger {
 
   function localMessageTransmitter() external view returns (address) {
     return i_transmitter;
+  }
+
+  /// @dev This function is only available for CCTP V2
+  function getMinFeeAmount(
+    uint256
+  ) external pure returns (uint256) {
+    return 0;
   }
 
   /**

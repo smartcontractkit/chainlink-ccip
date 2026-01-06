@@ -1,0 +1,99 @@
+name: IDL Compatibility Check
+
+on:
+  pull_request:
+    paths:
+      - "chains/solana/contracts/target/idl/base_token_pool.json"
+      - "chains/solana/contracts/target/idl/burnmint_token_pool.json"
+      - "chains/solana/contracts/target/idl/lockrelease_token_pool.json"
+      - "chains/solana/contracts/target/idl/ccip_common.json"
+      - "chains/solana/contracts/target/idl/ccip_offramp.json"
+      - "chains/solana/contracts/target/idl/ccip_router.json"
+      - "chains/solana/contracts/target/idl/cctp_token_pool.json"
+      - "chains/solana/contracts/target/idl/fee_quoter.json"
+      - "chains/solana/contracts/target/idl/rmn_remote.json"
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+jobs:
+  check-idl-changes:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Check for bypass label
+        id: check-bypass
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const { data: labels } = await github.rest.issues.listLabelsOnIssue({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number
+            });
+
+            if (labels.some(label => label.name === 'idl-check-confirmed')) {
+              console.log('IDL check bypass label found');
+              return true;
+            }
+
+            return false;
+
+      - name: List changed IDL files
+        id: changed-files
+        run: |
+          # Only check specific files to reduce noise
+          CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }} HEAD -- \
+            chains/solana/contracts/target/idl/base_token_pool.json \
+            chains/solana/contracts/target/idl/ccip_common.json \
+            chains/solana/contracts/target/idl/ccip_offramp.json \
+            chains/solana/contracts/target/idl/ccip_router.json \
+            chains/solana/contracts/target/idl/cctp_token_pool.json \
+            chains/solana/contracts/target/idl/fee_quoter.json \
+            chains/solana/contracts/target/idl/rmn_remote.json | tr '\n' ' ')
+          echo "files=$CHANGED_FILES" >> $GITHUB_OUTPUT
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+
+      - name: Comment on PR
+        if: steps.check-bypass.outputs.result != 'true'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const changedFiles = `${{ steps.changed-files.outputs.files }}`.trim().split(' ').filter(Boolean);
+
+            if (changedFiles.length === 0) {
+              console.log('No monitored IDL files changed');
+              return;
+            }
+
+            const filesList = changedFiles.map(file => `- \`${file}\``).join('\n');
+            const commentBody = [
+              '## ⚠️ IDL Compatibility Check Required ⚠️',
+              '',
+              '### Changes detected in IDL files:',
+              filesList,
+              '',
+              '⚠️ **IMPORTANT**: Please verify that these changes maintain compatibility with our observability pipeline!',
+              '',
+              '#### To bypass this check:',
+              '- Add the `idl-check-confirmed` label to this PR'
+            ].join('\n');
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: commentBody
+            });
+
+      - name: Fail if no bypass
+        if: steps.check-bypass.outputs.result != 'true' && steps.changed-files.outputs.files != ''
+        run: |
+          echo "::error::IDL changes detected - Please confirm compatibility with observability pipeline"
+          exit 1

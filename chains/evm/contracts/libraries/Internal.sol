@@ -110,7 +110,10 @@ library Internal {
   /// @param original OffRamp message to hash.
   /// @param metadataHash Hash preimage to ensure global uniqueness.
   /// @return hashedMessage hashed message as a keccak256.
-  function _hash(Any2EVMRampMessage memory original, bytes32 metadataHash) internal pure returns (bytes32) {
+  function _hash(
+    Any2EVMRampMessage memory original,
+    bytes32 metadataHash
+  ) internal pure returns (bytes32) {
     // Fixed-size message fields are included in nested hash to reduce stack pressure.
     // This hashing scheme is also used by RMN. If changing it, please notify the RMN maintainers.
     return keccak256(
@@ -133,7 +136,10 @@ library Internal {
     );
   }
 
-  function _hash(EVM2AnyRampMessage memory original, bytes32 metadataHash) internal pure returns (bytes32) {
+  function _hash(
+    EVM2AnyRampMessage memory original,
+    bytes32 metadataHash
+  ) internal pure returns (bytes32) {
     // Fixed-size message fields are included in nested hash to reduce stack pressure.
     // This hashing scheme is also used by RMN. If changing it, please notify the RMN maintainers.
     return keccak256(
@@ -169,6 +175,10 @@ library Internal {
   // https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/doc/account.md#function-create_framework_reserved_account-1
   uint256 public constant APTOS_PRECOMPILE_SPACE = 0x0b;
 
+  // According to the Sui docs, a set of non-contiguous addresses below 0xdee9 are reserved for system use.
+  // https://github.com/MystenLabs/sui/blob/54ae98508569804127bd73d84aa2fb816bdea402/crates/sui-types/src/lib.rs#L141
+  uint256 public constant SUI_PRECOMPILE_SPACE = 0xdee9;
+
   /// @notice This methods provides validation for parsing abi encoded addresses by ensuring the address is within the
   /// EVM address space. If it isn't it will revert with an InvalidEVMAddress error, which we can catch and handle
   /// more gracefully than a revert from abi.decode.
@@ -184,7 +194,10 @@ library Internal {
 
   /// @notice This methods provides validation for parsing abi encoded addresses by ensuring the address is within the
   /// bounds of [minValue, uint256.max]. If it isn't it will revert with an Invalid32ByteAddress error.
-  function _validate32ByteAddress(bytes memory encodedAddress, uint256 minValue) internal pure {
+  function _validate32ByteAddress(
+    bytes memory encodedAddress,
+    uint256 minValue
+  ) internal pure {
     if (encodedAddress.length != 32) revert Invalid32ByteAddress(encodedAddress);
     if (minValue > 0) {
       if (abi.decode(encodedAddress, (uint256)) < minValue) {

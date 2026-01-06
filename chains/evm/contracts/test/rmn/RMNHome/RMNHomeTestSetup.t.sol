@@ -36,14 +36,18 @@ contract RMNHomeTestSetup is Test {
   uint256 private constant PREFIX_MASK = type(uint256).max << (256 - 16); // 0xFFFF00..00
   uint256 private constant PREFIX = 0x000b << (256 - 16); // 0x000b00..00
 
-  function _getConfigDigest(bytes memory staticConfig, uint32 version) internal view returns (bytes32) {
+  function _getConfigDigest(
+    bytes memory staticConfig,
+    uint32 version
+  ) internal view returns (bytes32) {
     return bytes32(
       (PREFIX & PREFIX_MASK)
-        | (
-          uint256(
-            keccak256(bytes.concat(abi.encode(bytes32("EVM"), block.chainid, address(s_rmnHome), version), staticConfig))
-          ) & ~PREFIX_MASK
-        )
+        | (uint256(
+            keccak256(
+              bytes.concat(abi.encode(bytes32("EVM"), block.chainid, address(s_rmnHome), version), staticConfig)
+            )
+          )
+          & ~PREFIX_MASK)
     );
   }
 }

@@ -6,7 +6,7 @@ import {SiloedUSDCTokenPool} from "../../../../pools/USDC/SiloedUSDCTokenPool.so
 import {USDCSetup} from "../USDCSetup.t.sol";
 
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
-import {BurnMintERC677} from "@chainlink/contracts/src/v0.8/shared/token/ERC677/BurnMintERC677.sol";
+import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
 contract SiloedUSDCTokenPoolSetup is USDCSetup {
   SiloedUSDCTokenPool internal s_usdcTokenPool;
@@ -43,7 +43,7 @@ contract SiloedUSDCTokenPoolSetup is USDCSetup {
       AuthorizedCallers.AuthorizedCallerArgs({addedCallers: authorizedCallers, removedCallers: new address[](0)})
     );
 
-    BurnMintERC677(address(s_USDCToken)).grantBurnRole(address(s_usdcTokenPool));
+    BurnMintERC20(address(s_USDCToken)).grantMintAndBurnRoles(address(s_usdcTokenPool));
 
     s_tokenAdminRegistry.proposeAdministrator(address(s_USDCToken), OWNER);
     s_tokenAdminRegistry.acceptAdminRole(address(s_USDCToken));
@@ -61,14 +61,10 @@ contract SiloedUSDCTokenPoolSetup is USDCSetup {
     // Allow the router to call the releaseOrMint function for the token pool
     ERC20LockBox.AllowedCallerConfigArgs[] memory allowedCallers = new ERC20LockBox.AllowedCallerConfigArgs[](2);
     allowedCallers[0] = ERC20LockBox.AllowedCallerConfigArgs({
-      token: address(s_USDCToken),
-      caller: address(s_routerAllowedOffRamp),
-      allowed: true
+      token: address(s_USDCToken), caller: address(s_routerAllowedOffRamp), allowed: true
     });
     allowedCallers[1] = ERC20LockBox.AllowedCallerConfigArgs({
-      token: address(s_USDCToken),
-      caller: address(s_routerAllowedOnRamp),
-      allowed: true
+      token: address(s_USDCToken), caller: address(s_routerAllowedOnRamp), allowed: true
     });
     ERC20LockBox(s_lockBox).configureAllowedCallers(allowedCallers);
 

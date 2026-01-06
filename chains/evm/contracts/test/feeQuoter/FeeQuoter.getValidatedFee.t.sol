@@ -149,8 +149,8 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
       uint32 tokenGasOverhead = 0;
       uint32 tokenBytesOverhead = 0;
       for (uint256 j = 0; j < message.tokenAmounts.length; ++j) {
-        tokenGasOverhead +=
-          s_feeQuoter.getTokenTransferFeeConfig(DEST_CHAIN_SELECTOR, message.tokenAmounts[j].token).destGasOverhead;
+        tokenGasOverhead += s_feeQuoter.getTokenTransferFeeConfig(DEST_CHAIN_SELECTOR, message.tokenAmounts[j].token)
+        .destGasOverhead;
         uint32 destBytesOverhead =
           s_feeQuoter.getTokenTransferFeeConfig(DEST_CHAIN_SELECTOR, message.tokenAmounts[j].token).destBytesOverhead;
         tokenBytesOverhead += destBytesOverhead == 0 ? uint32(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES) : destBytesOverhead;
@@ -162,8 +162,8 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
       uint256 gasFeeUSD;
 
       {
-        uint256 gasUsed = customGasLimit + DEST_GAS_OVERHEAD
-          + (message.data.length + tokenTransferBytesOverhead) * DEST_GAS_PER_PAYLOAD_BYTE_BASE + tokenGasOverhead;
+        uint256 gasUsed = customGasLimit + DEST_GAS_OVERHEAD + (message.data.length + tokenTransferBytesOverhead)
+          * DEST_GAS_PER_PAYLOAD_BYTE_BASE + tokenGasOverhead;
 
         gasFeeUSD = gasUsed * destChainConfig.gasMultiplierWeiPerEth * USD_PER_GAS;
       }
@@ -183,7 +183,10 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
     }
   }
 
-  function testFuzz_getValidatedFee_EnforceOutOfOrder(bool enforce, bool allowOutOfOrderExecution) public {
+  function testFuzz_getValidatedFee_EnforceOutOfOrder(
+    bool enforce,
+    bool allowOutOfOrderExecution
+  ) public {
     // Update config to enforce allowOutOfOrderExecution = defaultVal.
     vm.stopPrank();
     vm.startPrank(OWNER);
@@ -271,7 +274,7 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
 
     msg_.data = bytes("hello sui from evm");
     msg_.tokenAmounts = new Client.EVMTokenAmount[](1);
-    msg_.receiver = abi.encodePacked(bytes32(uint256(0xdeadbeef))); // mock Sui object ID
+    msg_.receiver = abi.encode(0xdeadbeef); // mock Sui object ID
     msg_.extraArgs = Client._suiArgsToBytes(
       Client.SuiExtraArgsV1({
         gasLimit: 100_000,
@@ -300,7 +303,7 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
     Client.EVM2AnyMessage memory msg_ = _generateEmptyMessage2Sui();
 
     msg_.tokenAmounts = new Client.EVMTokenAmount[](1);
-    msg_.receiver = abi.encodePacked(bytes32(uint256(0))); // zero reciever
+    msg_.receiver = abi.encode(0); // zero reciever
     msg_.extraArgs = Client._suiArgsToBytes(
       Client.SuiExtraArgsV1({
         gasLimit: 0,
@@ -330,7 +333,7 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
 
     msg_.data = bytes("hello sui from evm");
     msg_.tokenAmounts = new Client.EVMTokenAmount[](0);
-    msg_.receiver = abi.encodePacked(bytes32(uint256(0xdeadbeef))); // zero reciever
+    msg_.receiver = abi.encode(0xdeadbeef); // zero reciever
     msg_.extraArgs = Client._suiArgsToBytes(
       Client.SuiExtraArgsV1({
         gasLimit: 100_000,
@@ -351,7 +354,7 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
 
     Client.EVM2AnyMessage memory m = _generateEmptyMessage2Sui();
     m.data = bytes("msg");
-    m.receiver = abi.encodePacked(bytes32(uint256(Internal.APTOS_PRECOMPILE_SPACE))); // boundary OK
+    m.receiver = abi.encode(Internal.SUI_PRECOMPILE_SPACE); // boundary OK
     m.extraArgs = Client._suiArgsToBytes(
       Client.SuiExtraArgsV1({
         gasLimit: 1,
@@ -372,7 +375,7 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
     s_feeQuoter.applyDestChainConfigUpdates(a);
 
     Client.EVM2AnyMessage memory m = _generateEmptyMessage2Sui();
-    m.receiver = abi.encodePacked(bytes32(uint256(Internal.APTOS_PRECOMPILE_SPACE))); // valid
+    m.receiver = abi.encode(Internal.SUI_PRECOMPILE_SPACE); // valid
     m.extraArgs = Client._suiArgsToBytes(
       Client.SuiExtraArgsV1({
         gasLimit: 5, // triggers address threshold path
@@ -669,7 +672,7 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
     Client.EVM2AnyMessage memory msg_ = _generateEmptyMessage2Sui();
 
     msg_.tokenAmounts = new Client.EVMTokenAmount[](1);
-    msg_.receiver = abi.encodePacked(bytes32(uint256(0))); // zero reciever
+    msg_.receiver = abi.encode(0); // zero reciever
     msg_.extraArgs = Client._suiArgsToBytes(
       Client.SuiExtraArgsV1({
         gasLimit: 0,
@@ -691,7 +694,7 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
     Client.EVM2AnyMessage memory msg_ = _generateEmptyMessage2Sui();
 
     msg_.tokenAmounts = new Client.EVMTokenAmount[](1);
-    msg_.receiver = abi.encodePacked(bytes32(uint256(0))); // zero reciever
+    msg_.receiver = abi.encode(0); // zero reciever
     msg_.extraArgs = Client._suiArgsToBytes(
       Client.SuiExtraArgsV1({
         gasLimit: 0,
@@ -713,7 +716,7 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
     Client.EVM2AnyMessage memory msg_ = _generateEmptyMessage2Sui();
 
     msg_.tokenAmounts = new Client.EVMTokenAmount[](1);
-    msg_.receiver = abi.encodePacked(bytes32(uint256(0xdeadbeef)));
+    msg_.receiver = abi.encode(0xdeadbeef);
     msg_.extraArgs = Client._suiArgsToBytes(
       Client.SuiExtraArgsV1({
         gasLimit: 0,
@@ -741,7 +744,7 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
 
     msg_.tokenAmounts = new Client.EVMTokenAmount[](0);
     msg_.data = new bytes(dataSize);
-    msg_.receiver = abi.encodePacked(bytes32(uint256(0xdeadbeef)));
+    msg_.receiver = abi.encode(0xdeadbeef);
     msg_.extraArgs = Client._suiArgsToBytes(
       Client.SuiExtraArgsV1({
         gasLimit: 0,
@@ -763,7 +766,7 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
     Client.EVM2AnyMessage memory msg_ = _generateEmptyMessage2Sui();
 
     msg_.tokenAmounts = new Client.EVMTokenAmount[](MAX_TOKENS_LENGTH + 1);
-    msg_.receiver = abi.encodePacked(bytes32(uint256(0xdeadbeef))); // zero reciever
+    msg_.receiver = abi.encode(0xdeadbeef); // zero reciever
     msg_.extraArgs = Client._suiArgsToBytes(
       Client.SuiExtraArgsV1({
         gasLimit: 0,
@@ -787,7 +790,7 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
     Client.EVM2AnyMessage memory msg_ = _generateEmptyMessage2Sui();
 
     msg_.tokenAmounts = new Client.EVMTokenAmount[](1);
-    msg_.receiver = abi.encodePacked(bytes32(uint256(0xdeadbeef))); // zero reciever
+    msg_.receiver = abi.encode(0xdeadbeef); // zero reciever
     msg_.extraArgs = Client._suiArgsToBytes(
       Client.SuiExtraArgsV1({
         gasLimit: MAX_GAS_LIMIT + 1,
@@ -809,7 +812,7 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
     Client.EVM2AnyMessage memory msg_ = _generateEmptyMessage2Sui();
 
     msg_.tokenAmounts = new Client.EVMTokenAmount[](1);
-    msg_.receiver = abi.encodePacked(bytes32(uint256(0xdeadbeef))); // zero reciever
+    msg_.receiver = abi.encode(0xdeadbeef); // zero reciever
     msg_.extraArgs = new bytes(0);
 
     vm.expectRevert(abi.encodeWithSelector(FeeQuoter.InvalidExtraArgsData.selector));
@@ -849,7 +852,7 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
     Client.EVM2AnyMessage memory msg_ = _generateEmptyMessage2Sui();
 
     msg_.tokenAmounts = new Client.EVMTokenAmount[](1);
-    msg_.receiver = abi.encodePacked(bytes32(uint256(0xdeadbeef))); // zero reciever
+    msg_.receiver = abi.encode(0xdeadbeef); // zero reciever
     msg_.extraArgs = Client._suiArgsToBytes(
       Client.SuiExtraArgsV1({
         gasLimit: 100000,
@@ -872,7 +875,7 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
 
     msg_.tokenAmounts = new Client.EVMTokenAmount[](0);
     msg_.data = new bytes(1);
-    msg_.receiver = abi.encodePacked(bytes32(uint256(0)));
+    msg_.receiver = abi.encode(0);
     msg_.extraArgs = Client._suiArgsToBytes(
       Client.SuiExtraArgsV1({
         gasLimit: 0,
@@ -892,7 +895,7 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
 
     Client.EVM2AnyMessage memory m = _generateEmptyMessage2Sui();
     m.data = bytes("msg");
-    m.receiver = abi.encodePacked(bytes32(uint256(Internal.APTOS_PRECOMPILE_SPACE - 1))); // in precompile space
+    m.receiver = abi.encode(Internal.SUI_PRECOMPILE_SPACE - 1); // in precompile space
     m.extraArgs = Client._suiArgsToBytes(
       Client.SuiExtraArgsV1({
         gasLimit: 1,
@@ -905,7 +908,7 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
     vm.expectRevert(
       abi.encodeWithSelector(
         Internal.Invalid32ByteAddress.selector,
-        abi.encodePacked(bytes32(uint256(10))) // returns `bytes`
+        abi.encode(Internal.SUI_PRECOMPILE_SPACE - 1) // returns `bytes`
       )
     );
 

@@ -18,12 +18,10 @@ contract CCIPHome_applyChainConfigUpdates is CCIPHomeTestSetup {
     chainReaders[0] = keccak256(abi.encode(1));
     CCIPHome.ChainConfigArgs[] memory adds = new CCIPHome.ChainConfigArgs[](2);
     adds[0] = CCIPHome.ChainConfigArgs({
-      chainSelector: 1,
-      chainConfig: CCIPHome.ChainConfig({readers: chainReaders, fChain: 1, config: bytes("config1")})
+      chainSelector: 1, chainConfig: CCIPHome.ChainConfig({readers: chainReaders, fChain: 1, config: bytes("config1")})
     });
     adds[1] = CCIPHome.ChainConfigArgs({
-      chainSelector: 2,
-      chainConfig: CCIPHome.ChainConfig({readers: chainReaders, fChain: 1, config: bytes("config2")})
+      chainSelector: 2, chainConfig: CCIPHome.ChainConfig({readers: chainReaders, fChain: 1, config: bytes("config2")})
     });
     INodeInfoProvider.NodeInfo[] memory nodeInfos = new INodeInfoProvider.NodeInfo[](1);
     nodeInfos[0] = INodeInfoProvider.NodeInfo({
@@ -59,12 +57,10 @@ contract CCIPHome_applyChainConfigUpdates is CCIPHomeTestSetup {
     chainReaders[0] = keccak256(abi.encode(1));
     CCIPHome.ChainConfigArgs[] memory adds = new CCIPHome.ChainConfigArgs[](2);
     adds[0] = CCIPHome.ChainConfigArgs({
-      chainSelector: 1,
-      chainConfig: CCIPHome.ChainConfig({readers: chainReaders, fChain: 1, config: bytes("config1")})
+      chainSelector: 1, chainConfig: CCIPHome.ChainConfig({readers: chainReaders, fChain: 1, config: bytes("config1")})
     });
     adds[1] = CCIPHome.ChainConfigArgs({
-      chainSelector: 2,
-      chainConfig: CCIPHome.ChainConfig({readers: chainReaders, fChain: 1, config: bytes("config2")})
+      chainSelector: 2, chainConfig: CCIPHome.ChainConfig({readers: chainReaders, fChain: 1, config: bytes("config2")})
     });
     INodeInfoProvider.NodeInfo[] memory nodeInfos = new INodeInfoProvider.NodeInfo[](1);
     nodeInfos[0] = INodeInfoProvider.NodeInfo({
@@ -112,12 +108,10 @@ contract CCIPHome_applyChainConfigUpdates is CCIPHomeTestSetup {
 
     CCIPHome.ChainConfigArgs[] memory adds = new CCIPHome.ChainConfigArgs[](2);
     adds[0] = CCIPHome.ChainConfigArgs({
-      chainSelector: 1,
-      chainConfig: CCIPHome.ChainConfig({readers: chainReaders, fChain: 1, config: bytes("config1")})
+      chainSelector: 1, chainConfig: CCIPHome.ChainConfig({readers: chainReaders, fChain: 1, config: bytes("config1")})
     });
     adds[1] = CCIPHome.ChainConfigArgs({
-      chainSelector: 2,
-      chainConfig: CCIPHome.ChainConfig({readers: chainReaders, fChain: 1, config: bytes("config2")})
+      chainSelector: 2, chainConfig: CCIPHome.ChainConfig({readers: chainReaders, fChain: 1, config: bytes("config2")})
     });
 
     INodeInfoProvider.NodeInfo[] memory nodeInfos = new INodeInfoProvider.NodeInfo[](1);
@@ -194,8 +188,7 @@ contract CCIPHome_applyChainConfigUpdates is CCIPHomeTestSetup {
     chainReaders[0] = keccak256(abi.encode(1));
     CCIPHome.ChainConfigArgs[] memory adds = new CCIPHome.ChainConfigArgs[](2);
     adds[0] = CCIPHome.ChainConfigArgs({
-      chainSelector: 1,
-      chainConfig: CCIPHome.ChainConfig({readers: chainReaders, fChain: 1, config: bytes("config1")})
+      chainSelector: 1, chainConfig: CCIPHome.ChainConfig({readers: chainReaders, fChain: 1, config: bytes("config1")})
     });
     adds[1] = CCIPHome.ChainConfigArgs({
       chainSelector: 2,

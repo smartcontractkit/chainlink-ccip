@@ -14,7 +14,10 @@ contract MockUSDCTokenMessenger is ITokenMessenger {
 
   uint64 public s_nonce;
 
-  constructor(uint32 version, address transmitter) {
+  constructor(
+    uint32 version,
+    address transmitter
+  ) {
     i_messageBodyVersion = version;
     s_nonce = 1;
     i_transmitter = transmitter;
@@ -74,5 +77,12 @@ contract MockUSDCTokenMessenger is ITokenMessenger {
 
   function localMessageTransmitter() external view returns (address) {
     return i_transmitter;
+  }
+
+  /// @dev This function is only available for CCTP V2
+  function getMinFeeAmount(
+    uint256
+  ) external pure returns (uint256) {
+    return 0;
   }
 }

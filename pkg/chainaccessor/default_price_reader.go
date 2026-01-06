@@ -107,33 +107,21 @@ func normalizePrice(price *big.Int, decimals uint8) *big.Int {
 
 func (l *DefaultAccessor) GetFeeQuoterTokenUpdates(
 	ctx context.Context,
-	tokens []ccipocr3.UnknownEncodedAddress,
-	chain ccipocr3.ChainSelector,
+	tokenBytes []ccipocr3.UnknownAddress,
 ) (map[ccipocr3.UnknownEncodedAddress]ccipocr3.TimestampedUnixBig, error) {
 	lggr := logutil.WithContextValues(ctx, l.lggr)
-	byteTokens := make([][]byte, 0, len(tokens))
-	for _, token := range tokens {
-		tokenAddressBytes, err := l.addrCodec.AddressStringToBytes(string(token), chain)
-		if err != nil {
-			lggr.Warnw("failed to convert token address to bytes", "token", token, "err", err)
-			continue
-		}
-
-		byteTokens = append(byteTokens, tokenAddressBytes)
-	}
-
 	feeQuoterAddress, err := l.GetContractAddress(consts.ContractNameFeeQuoter)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get fee quoter address: %w", err)
 	}
 
-	feeQuoterAddressStr, err := l.addrCodec.AddressBytesToString(feeQuoterAddress[:], chain)
+	feeQuoterAddressStr, err := l.addrCodec.AddressBytesToString(feeQuoterAddress[:], l.chainSelector)
 	if err != nil {
-		lggr.Warnw("failed to convert fee quoter address to string", "chain", chain, "err", err)
+		lggr.Warnw("failed to convert fee quoter address to string", "chain", l.chainSelector, "err", err)
 		return make(map[ccipocr3.UnknownEncodedAddress]ccipocr3.TimestampedUnixBig), nil
 	}
 
-	updates := make([]ccipocr3.TimestampedUnixBig, len(tokens))
+	updates := make([]ccipocr3.TimestampedUnixBig, len(tokenBytes))
 	boundContract := types.BoundContract{
 		Address: feeQuoterAddressStr,
 		Name:    consts.ContractNameFeeQuoter,
@@ -147,7 +135,7 @@ func (l *DefaultAccessor) GetFeeQuoterTokenUpdates(
 			boundContract.ReadIdentifier(consts.MethodNameFeeQuoterGetTokenPrices),
 			primitives.Unconfirmed,
 			map[string]any{
-				"tokens": byteTokens,
+				"tokens": tokenBytes,
 			},
 			&updates,
 		); err != nil {
@@ -155,16 +143,19 @@ func (l *DefaultAccessor) GetFeeQuoterTokenUpdates(
 	}
 
 	updateMap := make(map[ccipocr3.UnknownEncodedAddress]ccipocr3.TimestampedUnixBig)
-	for i, token := range tokens {
-		// token not available on fee quoter
-		if updates[i].Timestamp == 0 || updates[i].Value == nil || updates[i].Value.Cmp(big.NewInt(0)) == 0 {
-			lggr.Debugw("empty fee quoter update found",
-				"chain", chain,
-				"token", token,
-			)
+	for i, token := range tokenBytes {
+		tokenAddressStr, err := l.addrCodec.AddressBytesToString(token[:], l.chainSelector)
+		if err != nil {
+			lggr.Errorw("failed to convert token address to string", "token", token, "chain", l.chainSelector, "err", err)
 			continue
 		}
-		updateMap[token] = updates[i]
+
+		// token not available on fee quoter
+		if updates[i].Timestamp == 0 || updates[i].Value == nil || updates[i].Value.Cmp(big.NewInt(0)) == 0 {
+			lggr.Debugw("empty fee quoter update found", "chain", l.chainSelector, "token", tokenAddressStr)
+			continue
+		}
+		updateMap[ccipocr3.UnknownEncodedAddress(tokenAddressStr)] = updates[i]
 	}
 
 	return updateMap, nil

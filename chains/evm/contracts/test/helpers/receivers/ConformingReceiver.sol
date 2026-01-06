@@ -7,7 +7,10 @@ import {Client} from "../../../libraries/Client.sol";
 contract ConformingReceiver is CCIPReceiver {
   event MessageReceived();
 
-  constructor(address router, address feeToken) CCIPReceiver(router) {}
+  constructor(
+    address router,
+    address feeToken
+  ) CCIPReceiver(router) {}
 
   function _ccipReceive(
     Client.Any2EVMMessage memory

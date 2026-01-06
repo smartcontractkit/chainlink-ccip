@@ -2,8 +2,7 @@ package exectypes
 
 import (
 	"context"
-
-	"golang.org/x/exp/maps"
+	"maps"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 

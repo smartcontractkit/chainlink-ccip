@@ -39,7 +39,6 @@ contract FeeQuoter_constructor is FeeQuoterSetup {
     _assertFeeQuoterStaticConfigsEqual(s_feeQuoter.getStaticConfig(), staticConfig);
     assertEq(feeTokens, s_feeQuoter.getFeeTokens());
     assertEq(priceUpdaters, s_feeQuoter.getAllAuthorizedCallers());
-    assertEq(s_feeQuoter.typeAndVersion(), "FeeQuoter 1.6.3-dev");
 
     _assertTokenPriceFeedConfigEquality(
       tokenPriceFeedUpdates[0].feedConfig, s_feeQuoter.getTokenPriceFeedConfig(s_sourceTokens[0])
@@ -80,9 +79,7 @@ contract FeeQuoter_constructor is FeeQuoterSetup {
 
   function test_RevertWhen_InvalidStalenessThreshold() public {
     FeeQuoter.StaticConfig memory staticConfig = FeeQuoter.StaticConfig({
-      linkToken: s_sourceTokens[0],
-      maxFeeJuelsPerMsg: MAX_MSG_FEES_JUELS,
-      tokenPriceStalenessThreshold: 0
+      linkToken: s_sourceTokens[0], maxFeeJuelsPerMsg: MAX_MSG_FEES_JUELS, tokenPriceStalenessThreshold: 0
     });
 
     vm.expectRevert(FeeQuoter.InvalidStaticConfig.selector);
@@ -100,9 +97,7 @@ contract FeeQuoter_constructor is FeeQuoterSetup {
 
   function test_RevertWhen_InvalidLinkTokenEqZeroAddress() public {
     FeeQuoter.StaticConfig memory staticConfig = FeeQuoter.StaticConfig({
-      linkToken: address(0),
-      maxFeeJuelsPerMsg: MAX_MSG_FEES_JUELS,
-      tokenPriceStalenessThreshold: uint32(TWELVE_HOURS)
+      linkToken: address(0), maxFeeJuelsPerMsg: MAX_MSG_FEES_JUELS, tokenPriceStalenessThreshold: uint32(TWELVE_HOURS)
     });
 
     vm.expectRevert(FeeQuoter.InvalidStaticConfig.selector);
@@ -120,9 +115,7 @@ contract FeeQuoter_constructor is FeeQuoterSetup {
 
   function test_RevertWhen_InvalidMaxFeeJuelsPerMsg() public {
     FeeQuoter.StaticConfig memory staticConfig = FeeQuoter.StaticConfig({
-      linkToken: s_sourceTokens[0],
-      maxFeeJuelsPerMsg: 0,
-      tokenPriceStalenessThreshold: uint32(TWELVE_HOURS)
+      linkToken: s_sourceTokens[0], maxFeeJuelsPerMsg: 0, tokenPriceStalenessThreshold: uint32(TWELVE_HOURS)
     });
 
     vm.expectRevert(FeeQuoter.InvalidStaticConfig.selector);

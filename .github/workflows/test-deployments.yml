@@ -1,0 +1,104 @@
+name: "Test Deployments"
+permissions:
+  contents: read
+
+on:
+  pull_request:
+  merge_group:
+  push:
+    branches:
+      - 'main'
+
+jobs:
+  detect_deployments_changes:
+    runs-on: ubuntu-latest
+    outputs:
+      run_solana_deployment: ${{ steps.filter.outputs.run_solana_deployment }}
+      run_evm_deployment: ${{ steps.filter.outputs.run_evm_deployment }}
+      run_deployment: ${{ steps.filter.outputs.run_deployment }}
+      run_crosschain_deployment: ${{ steps.filter.outputs.run_crosschain_deployment }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Detect changes
+        uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
+        id: filter
+        with:
+          list-files: "shell"
+          filters: |
+            run_deployment:
+              - 'deployment/**'
+            run_evm_deployment:
+              - 'chains/evm/gobindings/generated/**'
+              - 'chains/evm/deployment/**'
+            run_solana_deployment:
+              - 'chains/solana/gobindings/generated/**'
+              - 'chains/solana/deployment/**'
+            run_crosschain_deployment:
+              - 'integration-tests/deployment/**'
+
+  setup-go:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Determine Go version
+        id: go_version
+        run: echo "GO_VERSION=$(cat go.mod |grep "^go"|cut -d' ' -f 2)" >> $GITHUB_ENV
+      - name: Setup Go ${{ env.GO_VERSION }}
+        uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Display Go version
+        run: go version
+
+  test-evm-deployments:
+    needs: [detect_deployments_changes, setup-go]
+    if: ${{ needs.detect_deployments_changes.outputs.run_evm_deployment == 'true' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: chains/evm/deployment
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run tests
+        run: go test ./...
+
+  test-solana-deployments:
+    needs: [detect_deployments_changes, setup-go]
+    if: ${{ needs.detect_deployments_changes.outputs.run_solana_deployment == 'true' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: chains/solana/deployment
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run tests
+        run: go test ./...
+
+  test-deployments:
+    needs: [detect_deployments_changes, setup-go]
+    if: ${{ needs.detect_deployments_changes.outputs.run_deployment == 'true' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: deployment
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run tests
+        run: go test ./...
+
+  test-deployments-crosschain:
+    needs: [detect_deployments_changes, setup-go]
+    if: |-
+      ${{
+        needs.detect_deployments_changes.outputs.run_crosschain_deployment == 'true' ||
+        needs.detect_deployments_changes.outputs.run_evm_deployment == 'true' ||
+        needs.detect_deployments_changes.outputs.run_solana_deployment == 'true'
+      }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: integration-tests/deployment
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run tests
+        run: go test ./...

@@ -6,12 +6,12 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
 	"sort"
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
-
-	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
@@ -87,7 +87,7 @@ func (p *Plugin) Reports(
 
 	transmissionSchedule, err := plugincommon.GetTransmissionSchedule(
 		p.chainSupport,
-		maps.Keys(p.oracleIDToP2PID),
+		slices.Collect(maps.Keys(p.oracleIDToP2PID)),
 		p.offchainCfg.TransmissionDelayMultiplier,
 	)
 	if err != nil {

@@ -184,6 +184,7 @@ func ImproveAbigenOutput(path string, abiPath string) {
 	fileNode = writeInterface(contractName, fileNode)
 	bs = generateCode(fset, fileNode)
 	bs = addHeader(bs)
+	bs = fixABIInternalTypes(bs)
 
 	err = os.WriteFile(path, bs, 0600)
 	if err != nil {
@@ -523,6 +524,20 @@ func writeInterface(contractName string, fileNode *ast.File) *ast.File {
 
 func addHeader(code []byte) []byte {
 	return ConcatBytes([]byte(headerComment), code)
+}
+
+// fixABIInternalTypes fixes malformed internalType fields in embedded ABI JSON strings.
+// When abigen compacts the JSON, it removes spaces after colons, causing "contract IERC20"
+// to become "contractIERC20". This function restores the proper spacing.
+func fixABIInternalTypes(code []byte) []byte {
+	// Pattern matches: internalType":"<keyword><CapitalLetter>
+	// where keyword is "contract", "struct", or "enum"
+	// This regex finds cases where there's no space between the keyword and the type name
+	pattern := regexp.MustCompile(`(internalType\\":\\")(contract|struct|enum)([A-Z])`)
+
+	// Replace with a space between the keyword and the type name
+	// $1 = 'internalType":"', $2 = keyword (contract/struct/enum), $3 = capital letter
+	return pattern.ReplaceAll(code, []byte(`${1}${2} ${3}`))
 }
 
 func ConcatBytes(bufs ...[]byte) []byte {

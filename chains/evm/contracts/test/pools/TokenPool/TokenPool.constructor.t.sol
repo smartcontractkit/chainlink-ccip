@@ -45,7 +45,8 @@ contract TokenPool_constructor is TokenPoolSetup {
       abi.encodeWithSelector(TokenPool.InvalidDecimalArgs.selector, invalidDecimals, DEFAULT_TOKEN_DECIMALS)
     );
 
-    s_tokenPool =
-      new TokenPoolHelper(s_token, invalidDecimals, new address[](0), address(s_mockRMNRemote), address(s_sourceRouter));
+    s_tokenPool = new TokenPoolHelper(
+      s_token, invalidDecimals, new address[](0), address(s_mockRMNRemote), address(s_sourceRouter)
+    );
   }
 }

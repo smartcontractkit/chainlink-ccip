@@ -10,13 +10,13 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"maps"
 	"math/rand"
 	"slices"
 	"sort"
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
-	"golang.org/x/exp/maps"
 	"google.golang.org/protobuf/proto"
 
 	typconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
@@ -585,7 +585,7 @@ func chainsWithSufficientObservationResponses(
 			continue
 		}
 
-		mostVotedRootVotes := slices.Max(maps.Values(countsPerRoot))
+		mostVotedRootVotes := slices.Max(slices.Collect(maps.Values(countsPerRoot)))
 		if consensus.LtFPlusOne(fObserve, mostVotedRootVotes) {
 			lggr.Infow("chain skipped, maximally voted root doesn't have enough votes",
 				"chain", sourceChain,

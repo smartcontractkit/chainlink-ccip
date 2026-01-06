@@ -20,7 +20,10 @@ contract CCIPHome__validateConfig is CCIPHomeTestSetup {
     return _addChainConfig(numNodes, 1);
   }
 
-  function _makeBytes32Array(uint256 length, uint256 seed) internal pure returns (bytes32[] memory arr) {
+  function _makeBytes32Array(
+    uint256 length,
+    uint256 seed
+  ) internal pure returns (bytes32[] memory arr) {
     arr = new bytes32[](length);
     for (uint256 i = 0; i < length; i++) {
       arr[i] = keccak256(abi.encode(i, 1, seed));
@@ -28,7 +31,10 @@ contract CCIPHome__validateConfig is CCIPHomeTestSetup {
     return arr;
   }
 
-  function _makeBytesArray(uint256 length, uint256 seed) internal pure returns (bytes[] memory arr) {
+  function _makeBytesArray(
+    uint256 length,
+    uint256 seed
+  ) internal pure returns (bytes[] memory arr) {
     arr = new bytes[](length);
     for (uint256 i = 0; i < length; i++) {
       arr[i] = abi.encode(keccak256(abi.encode(i, 1, seed)));
@@ -36,7 +42,10 @@ contract CCIPHome__validateConfig is CCIPHomeTestSetup {
     return arr;
   }
 
-  function _addChainConfig(uint256 numNodes, uint8 fChain) internal returns (CCIPHome.OCR3Node[] memory nodes) {
+  function _addChainConfig(
+    uint256 numNodes,
+    uint8 fChain
+  ) internal returns (CCIPHome.OCR3Node[] memory nodes) {
     bytes32[] memory p2pIds = _makeBytes32Array(numNodes, 0);
     bytes[] memory signers = _makeBytesArray(numNodes, 10);
     bytes[] memory transmitters = _makeBytesArray(numNodes, 20);
@@ -64,8 +73,7 @@ contract CCIPHome__validateConfig is CCIPHomeTestSetup {
     // Add chain selector for chain 1.
     CCIPHome.ChainConfigArgs[] memory adds = new CCIPHome.ChainConfigArgs[](1);
     adds[0] = CCIPHome.ChainConfigArgs({
-      chainSelector: 1,
-      chainConfig: CCIPHome.ChainConfig({readers: p2pIds, fChain: fChain, config: bytes("config1")})
+      chainSelector: 1, chainConfig: CCIPHome.ChainConfig({readers: p2pIds, fChain: fChain, config: bytes("config1")})
     });
 
     vm.expectEmit();
@@ -75,7 +83,10 @@ contract CCIPHome__validateConfig is CCIPHomeTestSetup {
     return nodes;
   }
 
-  function _getCorrectOCR3Config(uint8 numNodes, uint8 FRoleDON) internal returns (CCIPHome.OCR3Config memory) {
+  function _getCorrectOCR3Config(
+    uint8 numNodes,
+    uint8 FRoleDON
+  ) internal returns (CCIPHome.OCR3Config memory) {
     CCIPHome.OCR3Node[] memory nodes = _addChainConfig(numNodes);
 
     return CCIPHome.OCR3Config({

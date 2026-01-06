@@ -10,7 +10,7 @@ snapshot-diff: ## Make a snapshot for a specific product.
 
 .PHONY: foundry
 foundry: ## Install foundry.
-	foundryup --install v1.2.0
+	foundryup --install v1.5.1
 
 # it may be necessary to install libusb on your machine as a dependency for this script to work
 .PHONY: foundry-zksync
@@ -58,3 +58,7 @@ abigen: ## Build & install abigen.
 .PHONY: mockery
 mockery: $(mockery) ## Install mockery.
 	go install github.com/vektra/mockery/v2@v2.52.3
+
+.PHONY: extract-bytecode-abi
+extract-bytecode-abi: ## Extract bytecode and abi from versioned gobindings to bytecode and abi directories
+	cd gobindings && go run ./cmd/extract_bytecode/main.go

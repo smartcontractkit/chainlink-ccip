@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	sel "github.com/smartcontractkit/chain-selectors"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
@@ -77,6 +78,8 @@ func NewUSDCMessageReader(
 	ctx context.Context,
 	lggr logger.Logger,
 	tokensConfig map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig,
+	looppCCIPProviderSupported map[string]bool, // chainFamily -> supported
+	chainAccessors map[cciptypes.ChainSelector]cciptypes.ChainAccessor,
 	contractReaders map[cciptypes.ChainSelector]contractreader.Extended,
 	addrCodec cciptypes.AddressCodec,
 ) (USDCMessageReader, error) {
@@ -124,24 +127,33 @@ func NewUSDCMessageReader(
 				return nil, err
 			}
 
-			// Bind the 3rd party MessageTransmitter contract, this is where CCTP MessageSent events are emitted.
-			_, err = bindReaderContract(
-				ctx,
-				lggr,
-				contractReaders,
-				chainSelector,
-				consts.ContractNameUSDCTokenPool,
-				bytesAddress,
-				addrCodec,
-			)
+			// TODO: feature flag usdcReader via CR or ChainAccessor using NewSolanaUSDCReaderAccessor()
+			var sr USDCMessageReader
+			if looppCCIPProviderSupported[sel.FamilySolana] {
+				sr, err = NewSolanaUSDCReaderAccessor(
+					ctx,
+					lggr,
+					chainAccessors,
+					addrCodec,
+					chainSelector,
+					bytesAddress,
+				)
+			} else {
+				sr, err = NewSolanaUSDCReader(
+					ctx,
+					lggr,
+					contractReaders,
+					addrCodec,
+					chainSelector,
+					bytesAddress,
+				)
+			}
+
 			if err != nil {
 				return nil, err
 			}
 
-			readers[chainSelector] = solanaUSDCMessageReader{
-				lggr:           lggr,
-				contractReader: contractReaders[chainSelector],
-			}
+			readers[chainSelector] = sr
 		case sel.FamilySui:
 			// Bind the TokenPool contract, the contract re-emits the USDC MessageSent event along with other metadata.
 			bytesAddress, err := addrCodec.AddressStringToBytes(token.SourceMessageTransmitterAddr, chainSelector)
@@ -178,8 +190,6 @@ func NewUSDCMessageReader(
 	}, nil
 }
 
-// Deprecated
-// TODO(NONEVM-1865): Remove once the chainAccessor is passed down here from the factory. Then use accessor.Sync().
 func bindReaderContract[T contractreader.ContractReaderFacade](
 	ctx context.Context,
 	lggr logger.Logger,

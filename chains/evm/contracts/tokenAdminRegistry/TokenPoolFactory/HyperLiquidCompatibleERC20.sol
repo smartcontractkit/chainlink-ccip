@@ -40,6 +40,11 @@ contract HyperLiquidCompatibleERC20 is FactoryBurnMintERC20 {
     address newOwner
   ) FactoryBurnMintERC20(name, symbol, decimals, maxSupply, preMint, newOwner) {}
 
+  /// @notice Using a function because constant state variables cannot be overridden by child contracts.
+  function typeAndVersion() external pure virtual override returns (string memory) {
+    return "HyperLiquidCompatibleERC20 1.6.2";
+  }
+
   /// @notice Sets the hyperEVMLinker address.
   /// @param newLinker The address of the hyperEVMLinker.
   function setHyperEVMLinker(
@@ -60,7 +65,10 @@ contract HyperLiquidCompatibleERC20 is FactoryBurnMintERC20 {
   /// @param hipTokenId The id of the remote token.
   /// @param remoteTokenDecimals The decimals of the remote token.
   /// @dev While the zero address is not allowed, it is allowed for the remote token to have zero decimals.
-  function setRemoteToken(uint64 hipTokenId, uint8 remoteTokenDecimals) external onlyOwner {
+  function setRemoteToken(
+    uint64 hipTokenId,
+    uint8 remoteTokenDecimals
+  ) external onlyOwner {
     if (s_hypercoreTokenSystemAddress != address(0)) {
       revert RemoteTokenAlreadySet();
     }
@@ -86,19 +94,21 @@ contract HyperLiquidCompatibleERC20 is FactoryBurnMintERC20 {
     }
     return hyperEVMLinker;
   }
-  /**
-   * @notice Overrides the standard ERC20 transfer hook to add a balance check before bridging tokens to HyperCore.
-   * @dev This internal hook intercepts transfers to the `hypercoreTokenSystemAddress`. Before allowing the transfer,
-   * it performs a `staticcall` to the `SPOT_BALANCE_PRECOMPILE_ADDRESS` to fetch the system address's current
-   * spot balance on HyperCore. It then compares this remote balance (normalized to local decimals) with the transfer
-   * amount. This check prevents users from losing funds by ensuring the bridge destination on HyperCore has
-   * sufficient liquidity before the HyperEVM-side transfer occurs. The function reverts if the transfer amount
-   * exceeds the available spot balance or if the precompile call fails.
-   * @param to The recipient address of the token transfer.
-   * @param amount The amount of tokens being transferred.
-   */
 
-  function _beforeTokenTransfer(address, address to, uint256 amount) internal virtual override {
+  /// @notice Overrides the standard ERC20 transfer hook to add a balance check before bridging tokens to HyperCore.
+  /// @dev This internal hook intercepts transfers to the `hypercoreTokenSystemAddress`. Before allowing the transfer,
+  /// it performs a `staticcall` to the `SPOT_BALANCE_PRECOMPILE_ADDRESS` to fetch the system address's current
+  /// spot balance on HyperCore. It then compares this remote balance (normalized to local decimals) with the transfer
+  /// amount. This check prevents users from losing funds by ensuring the bridge destination on HyperCore has
+  /// sufficient liquidity before the HyperEVM-side transfer occurs. The function reverts if the transfer amount
+  /// exceeds the available spot balance or if the precompile call fails.
+  /// @param to The recipient address of the token transfer.
+  /// @param amount The amount of tokens being transferred.
+  function _beforeTokenTransfer(
+    address,
+    address to,
+    uint256 amount
+  ) internal virtual override {
     if (to == s_hypercoreTokenSystemAddress) {
       (bool success, bytes memory result) =
         SPOT_BALANCE_PRECOMPILE_ADDRESS.staticcall(abi.encode(to, s_hypercoreTokenSpotId));
@@ -125,7 +135,10 @@ contract HyperLiquidCompatibleERC20 is FactoryBurnMintERC20 {
   /// probably incorrect as that means the amount cannot be represented on this chain. If the local decimals have been
   /// wrongly configured, the token issuer could redeploy the pool with the correct decimals and manually re-execute the
   /// CCIP tx to fix the issue.
-  function _calculateLocalAmount(uint256 remoteAmount, uint8 remoteDecimals) internal view virtual returns (uint256) {
+  function _calculateLocalAmount(
+    uint256 remoteAmount,
+    uint8 remoteDecimals
+  ) internal view virtual returns (uint256) {
     uint8 localDecimals = decimals();
 
     if (remoteDecimals == localDecimals) {

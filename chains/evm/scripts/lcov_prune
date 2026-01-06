@@ -9,12 +9,6 @@ exclusion_list_ccip=(
   "contracts/libraries/USDPriceWith18Decimals.sol"
   "contracts/applications/CCIPClientExample.sol"
   "contracts/test/*"
-
-  # Ignored for initial development of the skeleton
-  "contracts/onRamp/CCVProxy.sol"
-  "contracts/ccvs/CommitteeVerifier.sol"
-  "contracts/offRamp/CCVAggregator.sol"
-  "contracts/FeeQuoterV2.sol"
 )
 
 echo "Excluding the following files"

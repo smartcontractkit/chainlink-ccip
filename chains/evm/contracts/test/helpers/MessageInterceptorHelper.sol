@@ -9,7 +9,10 @@ contract MessageInterceptorHelper is IMessageInterceptor {
 
   constructor() {}
 
-  function setMessageIdValidationState(bytes32 messageId, bool isInvalid) external {
+  function setMessageIdValidationState(
+    bytes32 messageId,
+    bool isInvalid
+  ) external {
     s_invalidMessageIds[messageId] = isInvalid;
   }
 
@@ -23,7 +26,10 @@ contract MessageInterceptorHelper is IMessageInterceptor {
   }
 
   /// @inheritdoc IMessageInterceptor
-  function onOutboundMessage(uint64, Client.EVM2AnyMessage calldata message) external view {
+  function onOutboundMessage(
+    uint64,
+    Client.EVM2AnyMessage calldata message
+  ) external view {
     if (s_invalidMessageIds[keccak256(abi.encode(message))]) {
       revert MessageValidationError(bytes("Invalid message"));
     }

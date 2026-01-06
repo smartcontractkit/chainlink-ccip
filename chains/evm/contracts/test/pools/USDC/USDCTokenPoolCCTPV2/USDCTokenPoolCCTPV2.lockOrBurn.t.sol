@@ -5,8 +5,11 @@ import {ITokenMessenger} from "../../../../pools/USDC/interfaces/ITokenMessenger
 
 import {Router} from "../../../../Router.sol";
 import {Pool} from "../../../../libraries/Pool.sol";
+
+import {USDCSourcePoolDataCodec} from "../../../../libraries/USDCSourcePoolDataCodec.sol";
 import {TokenPool} from "../../../../pools/TokenPool.sol";
 import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
+import {USDCTokenPoolCCTPV2} from "../../../../pools/USDC/USDCTokenPoolCCTPV2.sol";
 import {USDCTokenPoolCCTPV2Setup} from "./USDCTokenPoolCCTPV2Setup.t.sol";
 
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
@@ -23,9 +26,7 @@ contract USDCTokenPoolCCTPV2_lockOrBurn is USDCTokenPoolCCTPV2Setup {
 
     vm.expectEmit();
     emit TokenPool.OutboundRateLimitConsumed({
-      remoteChainSelector: DEST_CHAIN_SELECTOR,
-      token: address(s_USDCToken),
-      amount: amount
+      remoteChainSelector: DEST_CHAIN_SELECTOR, token: address(s_USDCToken), amount: amount
     });
 
     vm.expectEmit();
@@ -60,26 +61,9 @@ contract USDCTokenPoolCCTPV2_lockOrBurn is USDCTokenPoolCCTPV2Setup {
       })
     );
 
-    USDCTokenPool.SourceTokenDataPayload memory sourceTokenDataPayload =
-      abi.decode(poolReturnDataV1.destPoolData, (USDCTokenPool.SourceTokenDataPayload));
-    assertEq(sourceTokenDataPayload.nonce, 0, "nonce is incorrect");
+    USDCSourcePoolDataCodec.SourceTokenDataPayloadV2 memory sourceTokenDataPayload =
+      USDCSourcePoolDataCodec._decodeSourceTokenDataPayloadV2(poolReturnDataV1.destPoolData);
     assertEq(sourceTokenDataPayload.sourceDomain, DEST_DOMAIN_IDENTIFIER, "sourceDomain is incorrect");
-    assertEq(
-      uint8(sourceTokenDataPayload.cctpVersion), uint8(USDCTokenPool.CCTPVersion.CCTP_V2), "cctpVersion is incorrect"
-    );
-    assertEq(sourceTokenDataPayload.amount, amount, "amount is incorrect");
-    assertEq(
-      sourceTokenDataPayload.destinationDomain, expectedDomain.domainIdentifier, "destinationDomain is incorrect"
-    );
-    assertEq(sourceTokenDataPayload.mintRecipient, receiver, "mintRecipient is incorrect");
-    assertEq(sourceTokenDataPayload.burnToken, address(s_USDCToken), "burnToken is incorrect");
-    assertEq(sourceTokenDataPayload.destinationCaller, expectedDomain.allowedCaller, "destinationCaller is incorrect");
-    assertEq(sourceTokenDataPayload.maxFee, s_usdcTokenPool.MAX_FEE(), "maxFee is incorrect");
-    assertEq(
-      sourceTokenDataPayload.minFinalityThreshold,
-      s_usdcTokenPool.FINALITY_THRESHOLD(),
-      "minFinalityThreshold is incorrect"
-    );
   }
 
   function test_lockOrBurn_MintRecipientOverride() public {
@@ -97,16 +81,15 @@ contract USDCTokenPoolCCTPV2_lockOrBurn is USDCTokenPoolCCTPV2Setup {
       mintRecipient: extraMintRecipient,
       domainIdentifier: expectedDomain.domainIdentifier,
       destChainSelector: DEST_CHAIN_SELECTOR,
-      enabled: expectedDomain.enabled
+      enabled: expectedDomain.enabled,
+      useLegacySourcePoolDataFormat: false
     });
     vm.startPrank(OWNER);
     s_usdcTokenPool.setDomains(updates);
 
     vm.expectEmit();
     emit TokenPool.OutboundRateLimitConsumed({
-      remoteChainSelector: DEST_CHAIN_SELECTOR,
-      token: address(s_USDCToken),
-      amount: amount
+      remoteChainSelector: DEST_CHAIN_SELECTOR, token: address(s_USDCToken), amount: amount
     });
 
     vm.expectEmit();
@@ -143,11 +126,38 @@ contract USDCTokenPoolCCTPV2_lockOrBurn is USDCTokenPoolCCTPV2Setup {
       })
     );
 
-    uint64 nonce = abi.decode(poolReturnDataV1.destPoolData, (uint64));
-    assertEq(nonce, 0);
+    USDCSourcePoolDataCodec.SourceTokenDataPayloadV2 memory sourceTokenDataPayload =
+      USDCSourcePoolDataCodec._decodeSourceTokenDataPayloadV2(poolReturnDataV1.destPoolData);
+
+    assertEq(sourceTokenDataPayload.sourceDomain, DEST_DOMAIN_IDENTIFIER, "sourceDomain is incorrect");
   }
 
-  function testFuzz_lockOrBurn_Success(bytes32 destinationReceiver, uint256 amount) public {
+  function test_lockOrBurn_MinFeeNotSupported() public {
+    bytes32 receiver = bytes32(uint256(uint160(STRANGER)));
+    uint256 amount = 1000;
+    s_USDCToken.transfer(address(s_usdcTokenPool), amount);
+
+    vm.startPrank(s_routerAllowedOnRamp);
+
+    vm.mockCallRevert(
+      address(s_mockUSDCTokenMessenger), abi.encodeWithSelector(ITokenMessenger.getMinFeeAmount.selector), ""
+    );
+
+    s_usdcTokenPool.lockOrBurn(
+      Pool.LockOrBurnInV1({
+        originalSender: OWNER,
+        receiver: abi.encodePacked(receiver),
+        amount: amount,
+        remoteChainSelector: DEST_CHAIN_SELECTOR,
+        localToken: address(s_USDCToken)
+      })
+    );
+  }
+
+  function testFuzz_lockOrBurn_Success(
+    bytes32 destinationReceiver,
+    uint256 amount
+  ) public {
     vm.assume(destinationReceiver != bytes32(0));
     amount = bound(amount, 1, _getOutboundRateLimiterConfig().capacity);
     s_USDCToken.transfer(address(s_usdcTokenPool), amount);
@@ -157,9 +167,7 @@ contract USDCTokenPoolCCTPV2_lockOrBurn is USDCTokenPoolCCTPV2Setup {
 
     vm.expectEmit();
     emit TokenPool.OutboundRateLimitConsumed({
-      remoteChainSelector: DEST_CHAIN_SELECTOR,
-      token: address(s_USDCToken),
-      amount: amount
+      remoteChainSelector: DEST_CHAIN_SELECTOR, token: address(s_USDCToken), amount: amount
     });
 
     vm.expectEmit();
@@ -194,8 +202,9 @@ contract USDCTokenPoolCCTPV2_lockOrBurn is USDCTokenPoolCCTPV2Setup {
       })
     );
 
-    uint64 nonce = abi.decode(poolReturnDataV1.destPoolData, (uint64));
-    assertEq(nonce, 0);
+    USDCSourcePoolDataCodec.SourceTokenDataPayloadV2 memory sourceTokenDataPayload =
+      USDCSourcePoolDataCodec._decodeSourceTokenDataPayloadV2(poolReturnDataV1.destPoolData);
+    assertEq(sourceTokenDataPayload.sourceDomain, DEST_DOMAIN_IDENTIFIER, "sourceDomain is incorrect");
     assertEq(poolReturnDataV1.destTokenAddress, abi.encode(DEST_CHAIN_USDC_TOKEN));
   }
 
@@ -268,6 +277,35 @@ contract USDCTokenPoolCCTPV2_lockOrBurn is USDCTokenPoolCCTPV2Setup {
       Pool.LockOrBurnInV1({
         originalSender: OWNER,
         receiver: invalidReceiver,
+        amount: amount,
+        remoteChainSelector: DEST_CHAIN_SELECTOR,
+        localToken: address(s_USDCToken)
+      })
+    );
+  }
+
+  function test_lockOrBurn_RevertWhen_InvalidMinFee() public {
+    bytes32 receiver = bytes32(uint256(uint160(STRANGER)));
+
+    vm.startPrank(s_routerAllowedOnRamp);
+    uint256 amount = 1000;
+
+    vm.mockCall(
+      address(s_mockUSDCTokenMessenger),
+      abi.encodeWithSelector(ITokenMessenger.getMinFeeAmount.selector),
+      abi.encode(s_usdcTokenPool.MAX_FEE() + 1)
+    );
+
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        USDCTokenPoolCCTPV2.InvalidMinFee.selector, s_usdcTokenPool.MAX_FEE(), s_usdcTokenPool.MAX_FEE() + 1
+      )
+    );
+
+    s_usdcTokenPool.lockOrBurn(
+      Pool.LockOrBurnInV1({
+        originalSender: OWNER,
+        receiver: abi.encodePacked(receiver),
         amount: amount,
         remoteChainSelector: DEST_CHAIN_SELECTOR,
         localToken: address(s_USDCToken)

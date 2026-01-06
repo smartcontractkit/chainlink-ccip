@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {FeeQuoterV2} from "../../FeeQuoterV2.sol";
+import {FeeQuoter} from "../../FeeQuoter.sol";
 import {Client} from "../../libraries/Client.sol";
 
-contract FeeQuoterHelper is FeeQuoterV2 {
+contract FeeQuoterHelper is FeeQuoter {
   constructor(
     StaticConfig memory staticConfig,
     address[] memory priceUpdaters,
@@ -14,7 +14,7 @@ contract FeeQuoterHelper is FeeQuoterV2 {
     PremiumMultiplierWeiPerEthArgs[] memory premiumMultiplierWeiPerEthArgs,
     DestChainConfigArgs[] memory destChainConfigArgs
   )
-    FeeQuoterV2(
+    FeeQuoter(
       staticConfig,
       priceUpdaters,
       feeTokens,

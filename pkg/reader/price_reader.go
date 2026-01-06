@@ -61,6 +61,17 @@ func (pr *priceReader) GetFeeQuoterTokenUpdates(
 ) (map[ccipocr3.UnknownEncodedAddress]ccipocr3.TimestampedBig, error) {
 	lggr := logutil.WithContextValues(ctx, pr.lggr)
 
+	tokensBytes := make([]ccipocr3.UnknownAddress, 0, len(tokens))
+	for _, token := range tokens {
+		tokenAddressBytes, err := pr.addressCodec.AddressStringToBytes(string(token), chain)
+		if err != nil {
+			lggr.Warnw("failed to convert token address to bytes", "token", token, "err", err)
+			continue
+		}
+
+		tokensBytes = append(tokensBytes, tokenAddressBytes)
+	}
+
 	accessor, err := getChainAccessor(pr.chainAccessors, chain)
 	if err != nil {
 		// Don't return an error if the chain accessor is not found, just log warning and return nil
@@ -68,7 +79,7 @@ func (pr *priceReader) GetFeeQuoterTokenUpdates(
 		return nil, nil
 	}
 
-	updates, err := accessor.GetFeeQuoterTokenUpdates(ctx, tokens, chain)
+	updates, err := accessor.GetFeeQuoterTokenUpdates(ctx, tokensBytes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get fee quoter token updates: %w", err)
 	}

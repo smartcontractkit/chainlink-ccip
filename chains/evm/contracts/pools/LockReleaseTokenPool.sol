@@ -22,7 +22,7 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
   event LiquidityRemoved(address indexed provider, uint256 indexed amount);
   event RebalancerSet(address oldRebalancer, address newRebalancer);
 
-  string public constant override typeAndVersion = "LockReleaseTokenPool 1.6.3-dev";
+  string public constant override typeAndVersion = "LockReleaseTokenPool 1.6.x-dev";
 
   /// @notice The address of the rebalancer.
   address internal s_rebalancer;
@@ -35,7 +35,10 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
     address router
   ) TokenPool(token, localTokenDecimals, allowlist, rmnProxy, router) {}
 
-  function _releaseOrMint(address receiver, uint256 amount) internal virtual override {
+  function _releaseOrMint(
+    address receiver,
+    uint256 amount
+  ) internal virtual override {
     i_token.safeTransfer(receiver, amount);
   }
 
@@ -92,7 +95,10 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
   /// liquidity. Finally, the remaining liquidity can be transferred to the new pool using this function one more time.
   /// @param from The address of the old pool.
   /// @param amount The amount of liquidity to transfer. If uint256.max is passed, all liquidity will be transferred.
-  function transferLiquidity(address from, uint256 amount) external onlyOwner {
+  function transferLiquidity(
+    address from,
+    uint256 amount
+  ) external onlyOwner {
     if (amount == type(uint256).max) {
       amount = i_token.balanceOf(from);
     }
