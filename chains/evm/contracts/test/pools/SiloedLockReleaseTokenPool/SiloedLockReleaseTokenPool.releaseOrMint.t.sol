@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {Pool} from "../../../libraries/Pool.sol";
-import {SiloedLockReleaseTokenPool} from "../../../pools/SiloedLockReleaseTokenPool.sol";
 import {SiloedLockReleaseTokenPoolSetup} from "./SiloedLockReleaseTokenPoolSetup.t.sol";
 
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
@@ -33,7 +32,7 @@ contract SiloedLockReleaseTokenPool_releaseOrMint is SiloedLockReleaseTokenPoolS
       })
     );
 
-    assertEq(s_siloedLockReleaseTokenPool.getAvailableTokens(SILOED_CHAIN_SELECTOR), amount);
+    assertEq(s_token.balanceOf(address(s_siloLockBox)), amount);
 
     vm.startPrank(s_allowedOffRamp);
 
@@ -53,7 +52,7 @@ contract SiloedLockReleaseTokenPool_releaseOrMint is SiloedLockReleaseTokenPoolS
       })
     );
 
-    assertEq(s_siloedLockReleaseTokenPool.getAvailableTokens(SILOED_CHAIN_SELECTOR), 0);
+    assertEq(s_token.balanceOf(address(s_siloLockBox)), 0);
   }
 
   function test_ReleaseOrMint_UnsiloedChain() public {
@@ -73,7 +72,7 @@ contract SiloedLockReleaseTokenPool_releaseOrMint is SiloedLockReleaseTokenPoolS
       })
     );
 
-    assertEq(s_siloedLockReleaseTokenPool.getAvailableTokens(SOURCE_CHAIN_SELECTOR), amount);
+    assertEq(s_token.balanceOf(address(s_lockBox)), amount);
 
     vm.startPrank(s_allowedOffRamp);
 
@@ -93,7 +92,7 @@ contract SiloedLockReleaseTokenPool_releaseOrMint is SiloedLockReleaseTokenPoolS
       })
     );
 
-    assertEq(s_siloedLockReleaseTokenPool.getAvailableTokens(SOURCE_CHAIN_SELECTOR), 0);
+    assertEq(s_token.balanceOf(address(s_lockBox)), 0);
   }
 
   function test_ReleaseOrMintV2_SiloedChain() public {
@@ -132,64 +131,6 @@ contract SiloedLockReleaseTokenPool_releaseOrMint is SiloedLockReleaseTokenPoolS
 
     assertEq(output.destinationAmount, amount);
     assertEq(s_token.balanceOf(recipient), amount);
-    assertEq(s_siloedLockReleaseTokenPool.getAvailableTokens(SILOED_CHAIN_SELECTOR), 0);
-  }
-
-  // Reverts
-
-  function test_ReleaseOrMint_RevertsWhen_InsufficientLiquidity_SiloedChain() public {
-    uint256 releaseAmount = 10e18;
-    uint256 liquidityAmount = releaseAmount - 1;
-
-    // Provide some liquidity via locking (simulates a previous lockOrBurn).
-    deal(address(s_token), address(s_siloLockBox), liquidityAmount);
-
-    // Since amount to release is greater than provided liquidity, the function should revert.
-    vm.expectRevert(
-      abi.encodeWithSelector(SiloedLockReleaseTokenPool.InsufficientLiquidity.selector, liquidityAmount, releaseAmount)
-    );
-
-    vm.startPrank(s_allowedOffRamp);
-
-    s_siloedLockReleaseTokenPool.releaseOrMint(
-      Pool.ReleaseOrMintInV1({
-        originalSender: bytes(""),
-        receiver: OWNER,
-        sourceDenominatedAmount: releaseAmount,
-        localToken: address(s_token),
-        remoteChainSelector: SILOED_CHAIN_SELECTOR,
-        sourcePoolAddress: abi.encode(s_siloedDestPoolAddress),
-        sourcePoolData: "",
-        offchainTokenData: ""
-      })
-    );
-  }
-
-  function test_ReleaseOrMint_RevertsWhen_InsufficientLiquidity_UnsiloedChain() public {
-    uint256 releaseAmount = 10e18;
-    uint256 liquidityAmount = releaseAmount - 1;
-
-    // Provide some liquidity via direct transfer to lockbox.
-    deal(address(s_token), address(s_lockBox), liquidityAmount);
-
-    // Since amount to release is greater than provided liquidity, the function should revert.
-    vm.expectRevert(
-      abi.encodeWithSelector(SiloedLockReleaseTokenPool.InsufficientLiquidity.selector, liquidityAmount, releaseAmount)
-    );
-
-    vm.startPrank(s_allowedOffRamp);
-
-    s_siloedLockReleaseTokenPool.releaseOrMint(
-      Pool.ReleaseOrMintInV1({
-        originalSender: bytes(""),
-        receiver: OWNER,
-        sourceDenominatedAmount: releaseAmount,
-        localToken: address(s_token),
-        remoteChainSelector: SOURCE_CHAIN_SELECTOR,
-        sourcePoolAddress: abi.encode(s_siloedDestPoolAddress),
-        sourcePoolData: "",
-        offchainTokenData: ""
-      })
-    );
+    assertEq(s_token.balanceOf(address(s_siloLockBox)), 0);
   }
 }

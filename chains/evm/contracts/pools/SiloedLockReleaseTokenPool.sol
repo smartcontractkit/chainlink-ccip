@@ -15,7 +15,6 @@ import {EnumerableMap} from "@openzeppelin/contracts@5.3.0/utils/structs/Enumera
 contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
   using EnumerableMap for EnumerableMap.UintToAddressMap;
 
-  error InsufficientLiquidity(uint256 availableLiquidity, uint256 requestedAmount);
   error LockBoxNotConfigured(uint64 remoteChainSelector);
 
   struct LockBoxConfig {
@@ -56,20 +55,7 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     uint256 amount,
     uint64 remoteChainSelector
   ) internal override {
-    ILockBox lockBox = getLockBox(remoteChainSelector);
-    uint256 availableLiquidity = i_token.balanceOf(address(lockBox));
-    if (amount > availableLiquidity) revert InsufficientLiquidity(availableLiquidity, amount);
-
-    lockBox.withdraw(address(i_token), remoteChainSelector, amount, receiver);
-  }
-
-  /// @notice Returns the amount of tokens in the lock box for a given remote chain selector.
-  /// @param remoteChainSelector the remote chain selector to get the lock box for.
-  /// @return lockedTokens The tokens locked into the lock box for the given selector.
-  function getAvailableTokens(
-    uint64 remoteChainSelector
-  ) external view returns (uint256) {
-    return i_token.balanceOf(address(getLockBox(remoteChainSelector)));
+    getLockBox(remoteChainSelector).withdraw(address(i_token), remoteChainSelector, amount, receiver);
   }
 
   /// @notice Returns all configured lockboxes.

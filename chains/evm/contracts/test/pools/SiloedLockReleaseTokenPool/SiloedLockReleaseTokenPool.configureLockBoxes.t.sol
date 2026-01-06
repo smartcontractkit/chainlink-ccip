@@ -61,20 +61,7 @@ contract SiloedLockReleaseTokenPool_configureLockBoxes is BaseTest {
     });
     s_pool.configureLockBoxes(lockBoxes);
 
-    // Verify lockbox is configured by checking available tokens (should be 0 initially).
-    assertEq(s_pool.getAvailableTokens(SILOED_CHAIN_SELECTOR), 0);
-
-    // Add some tokens to the lockbox and verify.
-    deal(address(s_token), address(siloLockBox), 1e18);
-    assertEq(s_pool.getAvailableTokens(SILOED_CHAIN_SELECTOR), 1e18);
-  }
-
-  function test_configureLockBoxes_RevertWhen_LockBoxNotConfigured() public {
-    // Without configuring a lockbox, getAvailableTokens should revert.
-    vm.expectRevert(
-      abi.encodeWithSelector(SiloedLockReleaseTokenPool.LockBoxNotConfigured.selector, SILOED_CHAIN_SELECTOR)
-    );
-    s_pool.getAvailableTokens(SILOED_CHAIN_SELECTOR);
+    assertEq(address(s_pool.getLockBox(SILOED_CHAIN_SELECTOR)), address(siloLockBox));
   }
 
   function test_configureLockBoxes_RevertWhen_InvalidToken() public {

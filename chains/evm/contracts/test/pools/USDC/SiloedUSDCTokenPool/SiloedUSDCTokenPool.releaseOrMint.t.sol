@@ -2,11 +2,10 @@
 pragma solidity ^0.8.24;
 
 import {Pool} from "../../../../libraries/Pool.sol";
-import {SiloedLockReleaseTokenPool} from "../../../../pools/SiloedLockReleaseTokenPool.sol";
 import {TokenPool} from "../../../../pools/TokenPool.sol";
 import {LOCK_RELEASE_FLAG} from "../../../../pools/USDC/BurnMintWithLockReleaseFlagTokenPool.sol";
+import {SiloedUSDCTokenPool} from "../../../../pools/USDC/SiloedUSDCTokenPool.sol";
 import {SiloedUSDCTokenPoolSetup} from "./SiloedUSDCTokenPoolSetup.sol";
-
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
 contract SiloedUSDCTokenPool_releaseOrMint is SiloedUSDCTokenPoolSetup {
@@ -63,7 +62,7 @@ contract SiloedUSDCTokenPool_releaseOrMint is SiloedUSDCTokenPoolSetup {
 
     assertEq(result.destinationAmount, localAmount);
     assertEq(s_USDCToken.balanceOf(s_recipient), localAmount);
-    assertEq(s_usdcTokenPool.getAvailableTokens(SOURCE_CHAIN_SELECTOR), 0);
+    assertEq(s_USDCToken.balanceOf(address(s_sourceLockBox)), 0);
   }
 
   function test_releaseOrMintV2_Success() public {
@@ -88,7 +87,7 @@ contract SiloedUSDCTokenPool_releaseOrMint is SiloedUSDCTokenPoolSetup {
 
     assertEq(result.destinationAmount, localAmount);
     assertEq(s_USDCToken.balanceOf(s_recipient), localAmount);
-    assertEq(s_usdcTokenPool.getAvailableTokens(SOURCE_CHAIN_SELECTOR), 0);
+    assertEq(s_USDCToken.balanceOf(address(s_sourceLockBox)), 0);
   }
 
   function test_releaseOrMint_SubtractsFromExcludedTokens() public {
@@ -123,7 +122,7 @@ contract SiloedUSDCTokenPool_releaseOrMint is SiloedUSDCTokenPoolSetup {
     vm.startPrank(s_routerAllowedOffRamp);
     Pool.ReleaseOrMintOutV1 memory result = s_usdcTokenPool.releaseOrMint(releaseOrMintIn);
 
-    uint256 availableTokens = s_usdcTokenPool.getAvailableTokens(SOURCE_CHAIN_SELECTOR);
+    uint256 availableTokens = s_USDCToken.balanceOf(address(s_sourceLockBox));
     assertEq(availableTokens, DEFAULT_LIQUIDITY - releaseAmount);
     uint256 newExcludedAmount = s_usdcTokenPool.getExcludedTokensByChain(SOURCE_CHAIN_SELECTOR);
     assertEq(newExcludedAmount, excludedAmount - releaseAmount);
@@ -148,32 +147,6 @@ contract SiloedUSDCTokenPool_releaseOrMint is SiloedUSDCTokenPoolSetup {
   }
 
   // Reverts
-
-  function test_releaseOrMint_RevertWhen_InsufficientLiquidity() public {
-    uint256 amount = DEFAULT_LIQUIDITY;
-    address localToken = address(s_USDCToken);
-
-    // Override setUp liquidity with insufficient amount.
-    deal(address(s_USDCToken), address(s_sourceLockBox), amount / 2);
-
-    vm.startPrank(s_routerAllowedOffRamp);
-
-    Pool.ReleaseOrMintInV1 memory releaseOrMintIn = Pool.ReleaseOrMintInV1({
-      originalSender: s_originalSender,
-      receiver: s_recipient,
-      sourceDenominatedAmount: amount,
-      localToken: localToken,
-      remoteChainSelector: SOURCE_CHAIN_SELECTOR,
-      sourcePoolAddress: s_sourcePoolAddress,
-      sourcePoolData: abi.encode(LOCK_RELEASE_FLAG),
-      offchainTokenData: ""
-    });
-
-    vm.expectRevert(
-      abi.encodeWithSelector(SiloedLockReleaseTokenPool.InsufficientLiquidity.selector, amount / 2, amount)
-    );
-    s_usdcTokenPool.releaseOrMint(releaseOrMintIn);
-  }
 
   function test_releaseOrMint_RevertWhen_InsufficientLiquidity_InsufficientExcludedTokens() public {
     // Propose a CCTP migration to enable excluded tokens tracking.
@@ -203,7 +176,7 @@ contract SiloedUSDCTokenPool_releaseOrMint is SiloedUSDCTokenPoolSetup {
 
     // Should revert because excluded tokens (100e6) < release amount (200e6).
     vm.expectRevert(
-      abi.encodeWithSelector(SiloedLockReleaseTokenPool.InsufficientLiquidity.selector, excludedAmount, releaseAmount)
+      abi.encodeWithSelector(SiloedUSDCTokenPool.InsufficientLiquidity.selector, excludedAmount, releaseAmount)
     );
     s_usdcTokenPool.releaseOrMint(releaseOrMintIn);
   }

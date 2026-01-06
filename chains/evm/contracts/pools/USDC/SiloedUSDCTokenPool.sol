@@ -35,6 +35,7 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
   error NoMigrationProposalPending();
   error ChainAlreadyMigrated(uint64 remoteChainSelector);
   error TokenLockingNotAllowedAfterMigration(uint64 remoteChainSelector);
+  error InsufficientLiquidity(uint256 availableLiquidity, uint256 requestedAmount);
 
   /// @notice The address of the circle-controlled wallet which will execute a CCTP lane migration
   address internal s_circleUSDCMigrator;

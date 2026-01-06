@@ -72,7 +72,7 @@ contract SiloedUSDCTokenPool_burnLockedUSDC is SiloedUSDCTokenPoolSetup {
     // Ensure the proposal slot was cleared and there's no tokens locked for the destination chain anymore
     assertEq(s_usdcTokenPool.getCurrentProposedCCTPChainMigration(), 0);
     assertEq(
-      s_usdcTokenPool.getAvailableTokens(DEST_CHAIN_SELECTOR),
+      s_USDCToken.balanceOf(address(s_destLockBox)),
       0,
       "No tokens should be locked for DEST_CHAIN_SELECTOR after CCTP-approved burn"
     );
