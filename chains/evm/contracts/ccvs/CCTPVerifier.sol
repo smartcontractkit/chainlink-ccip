@@ -74,8 +74,8 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
 
   /// @notice Dynamic configuration for this chain.
   struct DynamicConfig {
-    address feeAggregator; // ──╮ Address to which fees are withdrawn.
-    address allowlistAdmin; //  | Address permitted to update the allowlist (in addition to the owner).
+    address feeAggregator; //     Address to which fees are withdrawn.
+    address allowlistAdmin; // ─╮ Address permitted to update the allowlist (in addition to the owner).
     uint16 fastFinalityBps; // ─╯ Basis points charged for fast finality on destination.
   }
 
@@ -360,6 +360,8 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
 
   /// @notice Sets the dynamic configuration.
   /// @param dynamicConfig The dynamic configuration.
+  /// @dev FeeTokenHandler will revert if feeAggregator is zero when withdrawing fees.
+  /// @dev A zero address fee aggregator is valid, and intentionally reverts calls to withdraw fee tokens.
   function setDynamicConfig(
     DynamicConfig memory dynamicConfig
   ) external onlyOwner {
@@ -368,10 +370,11 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
 
   /// @notice Sets the dynamic configuration.
   /// @param dynamicConfig The dynamic configuration.
+  /// @dev FeeTokenHandler will revert if feeAggregator is zero when withdrawing fees.
+  /// @dev A zero address fee aggregator is valid, and intentionally reverts calls to withdraw fee tokens.
   function _setDynamicConfig(
     DynamicConfig memory dynamicConfig
   ) private {
-    if (dynamicConfig.feeAggregator == address(0)) revert ZeroAddressNotAllowed();
     if (dynamicConfig.fastFinalityBps == 0 || dynamicConfig.fastFinalityBps > BPS_DIVIDER) {
       revert InvalidFastFinalityBps(dynamicConfig.fastFinalityBps);
     }

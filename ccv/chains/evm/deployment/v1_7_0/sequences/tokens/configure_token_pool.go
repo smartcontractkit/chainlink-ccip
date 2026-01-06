@@ -6,13 +6,14 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/advanced_pool_hooks"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/token_pool"
 	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
+
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/advanced_pool_hooks"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/token_pool"
 )
 
 // ConfigureTokenPoolInput is the input for the ConfigureTokenPool sequence.
@@ -32,6 +33,8 @@ type ConfigureTokenPoolInput struct {
 	// RateLimitAdmin is an additional address allowed to set rate limiters.
 	// If left empty, setRateLimitAdmin will not be attempted.
 	RateLimitAdmin common.Address
+	// FeeAggregator is the address that will receive fee tokens when WithdrawFeeTokens is called.
+	FeeAggregator common.Address
 }
 
 var ConfigureTokenPool = cldf_ops.NewSequence(
@@ -50,7 +53,7 @@ var ConfigureTokenPool = cldf_ops.NewSequence(
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get current threshold amount for additional CCVs on advanced pool hooks with address %s on %s: %w", input.AdvancedPoolHooks, chain, err)
 			}
-			if currentThresholdAmountReport.Output != input.ThresholdAmountForAdditionalCCVs {
+			if currentThresholdAmountReport.Output.Cmp(input.ThresholdAmountForAdditionalCCVs) != 0 {
 				setThresholdAmountReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.SetThresholdAmount, chain, evm_contract.FunctionInput[*big.Int]{
 					ChainSelector: input.ChainSelector,
 					Address:       input.AdvancedPoolHooks,
@@ -64,7 +67,7 @@ var ConfigureTokenPool = cldf_ops.NewSequence(
 		}
 
 		// Set dynamic config (if necessary)
-		if input.RouterAddress != (common.Address{}) || input.RateLimitAdmin != (common.Address{}) {
+		if input.RouterAddress != (common.Address{}) || input.RateLimitAdmin != (common.Address{}) || input.FeeAggregator != (common.Address{}) {
 			currentDynamicConfigReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetDynamicConfig, chain, evm_contract.FunctionInput[any]{
 				ChainSelector: input.ChainSelector,
 				Address:       input.TokenPoolAddress,
@@ -85,13 +88,19 @@ var ConfigureTokenPool = cldf_ops.NewSequence(
 				desiredRateLimitAdmin = input.RateLimitAdmin
 			}
 
-			if desiredRouter != currentDynamicConfig.Router || desiredRateLimitAdmin != currentDynamicConfig.RateLimitAdmin {
+			desiredFeeAggregator := currentDynamicConfig.FeeAggregator
+			if input.FeeAggregator != (common.Address{}) {
+				desiredFeeAggregator = input.FeeAggregator
+			}
+
+			if desiredRouter != currentDynamicConfig.Router || desiredRateLimitAdmin != currentDynamicConfig.RateLimitAdmin || desiredFeeAggregator != currentDynamicConfig.FeeAggregator {
 				setDynamicConfigReport, err := cldf_ops.ExecuteOperation(b, token_pool.SetDynamicConfig, chain, evm_contract.FunctionInput[token_pool.DynamicConfigArgs]{
 					ChainSelector: input.ChainSelector,
 					Address:       input.TokenPoolAddress,
 					Args: token_pool.DynamicConfigArgs{
 						Router:         desiredRouter,
 						RateLimitAdmin: desiredRateLimitAdmin,
+						FeeAggregator:  desiredFeeAggregator,
 					},
 				})
 				if err != nil {

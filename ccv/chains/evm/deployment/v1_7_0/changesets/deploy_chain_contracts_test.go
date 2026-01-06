@@ -5,13 +5,16 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/changesets"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
+	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/link_token"
 	cs_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/stretchr/testify/require"
 )
@@ -110,11 +113,21 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 			e.DataStore = ds.Seal() // Override datastore in environment to include existing addresses
 
 			mcmsRegistry := cs_core.NewMCMSReaderRegistry()
+			create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[5009297550715157269], contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+				TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
+				ChainSelector:  5009297550715157269,
+				Args: create2_factory.ConstructorArgs{
+					AllowList: []common.Address{e.BlockChains.EVMChains()[5009297550715157269].DeployerKey.From},
+				},
+			}, nil)
+			require.NoError(t, err, "Failed to deploy CREATE2Factory")
+
 			out, err := changesets.DeployChainContracts(mcmsRegistry).Apply(*e, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
 				MCMS: mcms.Input{},
 				Cfg: changesets.DeployChainContractsCfg{
-					ChainSel: 5009297550715157269,
-					Params:   testsetup.CreateBasicContractParams(),
+					ChainSel:       5009297550715157269,
+					CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
+					Params:         testsetup.CreateBasicContractParams(),
 				},
 			})
 			require.NoError(t, err, "Failed to apply DeployChainContracts changeset")

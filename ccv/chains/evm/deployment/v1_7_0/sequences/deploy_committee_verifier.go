@@ -1,12 +1,12 @@
 package sequences
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/committee_verifier"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/versioned_verifier_resolver"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
@@ -64,44 +64,35 @@ var DeployCommitteeVerifier = cldf_ops.NewSequence(
 		}
 		addresses = append(addresses, committeeVerifierRef)
 
-		if input.CREATE2Factory != (common.Address{}) {
-			// Deployment flow via CREATE2Factory
-			// First, check if the CommitteeVerifierResolver already exists
-			var resolverRef *datastore.AddressRef
-			for _, ref := range input.ExistingAddresses {
-				if ref.Type == datastore.ContractType(committee_verifier.ResolverType) &&
-					ref.Version.String() == committee_verifier.Version.String() &&
-					ref.Qualifier == input.Params.Qualifier {
-					resolverRef = &ref
-				}
+		if input.CREATE2Factory == (common.Address{}) {
+			return sequences.OnChainOutput{}, errors.New("committee verifier requires CREATE2Factory")
+		}
+		// Deployment flow via CREATE2Factory
+		// First, check if the CommitteeVerifierResolver already exists
+		var resolverRef *datastore.AddressRef
+		for _, ref := range input.ExistingAddresses {
+			if ref.Type == datastore.ContractType(committee_verifier.ResolverType) &&
+				ref.Version.String() == committee_verifier.Version.String() &&
+				ref.Qualifier == input.Params.Qualifier {
+				resolverRef = &ref
 			}
-			if resolverRef != nil {
-				addresses = append(addresses, *resolverRef)
-			} else {
-				deployVerifierResolverViaCREATE2Report, err := cldf_ops.ExecuteSequence(b, DeployVerifierResolverViaCREATE2, chain, DeployVerifierResolverViaCREATE2Input{
-					ChainSelector:  input.ChainSelector,
-					Qualifier:      input.Params.Qualifier,
-					Type:           datastore.ContractType(committee_verifier.ResolverType),
-					Version:        committee_verifier.Version,
-					CREATE2Factory: input.CREATE2Factory,
-				})
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CommitteeVerifierResolver: %w", err)
-				}
-				addresses = append(addresses, deployVerifierResolverViaCREATE2Report.Output.Addresses...)
-				writes = append(writes, deployVerifierResolverViaCREATE2Report.Output.Writes...)
-			}
+		}
+		if resolverRef != nil {
+			addresses = append(addresses, *resolverRef)
 		} else {
 			// Otherwise, just deploy the CommitteeVerifierResolver
 			committeeVerifierResolverRef, err := contract_utils.MaybeDeployContract(b, versioned_verifier_resolver.Deploy, chain, contract_utils.DeployInput[versioned_verifier_resolver.ConstructorArgs]{
 				TypeAndVersion: deployment.NewTypeAndVersion(committee_verifier.ResolverType, *committee_verifier.Version),
 				ChainSelector:  chain.Selector,
+				CREATE2Factory: input.CREATE2Factory,
+				Type:           datastore.ContractType(committee_verifier.ResolverType),
 				Qualifier:      qualifierPtr,
 			}, input.ExistingAddresses)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CommitteeVerifierResolver: %w", err)
 			}
-			addresses = append(addresses, committeeVerifierResolverRef)
+			addresses = append(addresses, deployVerifierResolverViaCREATE2Report.Output.Addresses...)
+			writes = append(writes, deployVerifierResolverViaCREATE2Report.Output.Writes...)
 		}
 
 		batchOp, err := contract_utils.NewBatchOperationFromWrites(writes)

@@ -72,7 +72,7 @@ contract TokenPoolV2_validateLockOrBurn is AdvancedPoolHooksSetup {
     });
 
     vm.startPrank(OWNER);
-    s_tokenPool.setDynamicConfig(address(s_sourceRouter), address(0));
+    s_tokenPool.setDynamicConfig(address(s_sourceRouter), address(0), address(0));
     // Enable custom block confirmation handling so consumption emits.
     s_tokenPool.setMinBlockConfirmation(1);
     s_tokenPool.setRateLimitConfig(rateLimitArgs);
@@ -104,7 +104,6 @@ contract TokenPoolV2_validateLockOrBurn is AdvancedPoolHooksSetup {
 
     vm.startPrank(s_allowedOnRamp);
     s_tokenPool.validateLockOrBurn(lockOrBurnIn, type(uint16).max, "", fee);
-    vm.stopPrank();
 
     (RateLimiter.TokenBucket memory outboundBucket,) = s_tokenPool.getCurrentRateLimiterState(DEST_CHAIN_SELECTOR, true);
     assertEq(outboundBucket.tokens, outboundFastConfig.capacity - expectedAmount);
@@ -138,7 +137,6 @@ contract TokenPoolV2_validateLockOrBurn is AdvancedPoolHooksSetup {
 
     vm.startPrank(s_allowedOnRamp);
     s_tokenPool.validateLockOrBurn(lockOrBurnIn, 0, "", fee);
-    vm.stopPrank();
 
     (RateLimiter.TokenBucket memory outboundBucket,) =
       s_tokenPool.getCurrentRateLimiterState(DEST_CHAIN_SELECTOR, false);

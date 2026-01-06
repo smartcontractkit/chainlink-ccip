@@ -13,11 +13,6 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/executor"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/fee_quoter"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/mock_receiver"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/offramp"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/onramp"
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
@@ -30,6 +25,12 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
+
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/executor"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/mock_receiver"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/offramp"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/onramp"
 )
 
 type MockReceiverParams struct {
@@ -54,8 +55,9 @@ type RMNRemoteParams struct {
 }
 
 type OffRampParams struct {
-	Version              *semver.Version
-	GasForCallExactCheck uint16
+	Version                   *semver.Version
+	GasForCallExactCheck      uint16
+	MaxGasBufferToUpdateState uint32
 }
 
 type OnRampParams struct {
@@ -212,16 +214,19 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, registryModuleOwnerCustomRef)
 
 		// Add RegistryModuleOwnerCustom to TokenAdminRegistry
-		addRegistryModuleReport, err := cldf_ops.ExecuteOperation(b, token_admin_registry.AddRegistryModule, chain, contract_utils.FunctionInput[common.Address]{
-			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(tokenAdminRegistryRef.Address),
-			Args:          common.HexToAddress(registryModuleOwnerCustomRef.Address),
-		})
-
+		addRegistryModuleReport, hasOnchainDiff, err := MaybeRegisterModuleOnTokenAdminRegistry(
+			b,
+			chain,
+			common.HexToAddress(tokenAdminRegistryRef.Address),
+			common.HexToAddress(registryModuleOwnerCustomRef.Address),
+		)
 		if err != nil {
 			return sequences.OnChainOutput{}, err
 		}
-		writes = append(writes, addRegistryModuleReport.Output)
+		// Only append to writes if a transaction was actually created (i.e., module wasn't already registered).
+		if hasOnchainDiff {
+			writes = append(writes, addRegistryModuleReport)
+		}
 
 		// Deploy FeeQuoter
 		feeQuoterRef, err := contract_utils.MaybeDeployContract(b, fee_quoter.Deploy, chain, contract_utils.DeployInput[fee_quoter.ConstructorArgs]{
@@ -276,10 +281,11 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			ChainSelector:  chain.Selector,
 			Args: offramp.ConstructorArgs{
 				StaticConfig: offramp.StaticConfig{
-					LocalChainSelector:   chain.Selector,
-					RmnRemote:            common.HexToAddress(rmnProxyRef.Address),
-					GasForCallExactCheck: input.ContractParams.OffRamp.GasForCallExactCheck,
-					TokenAdminRegistry:   common.HexToAddress(tokenAdminRegistryRef.Address),
+					LocalChainSelector:        chain.Selector,
+					RmnRemote:                 common.HexToAddress(rmnProxyRef.Address),
+					GasForCallExactCheck:      input.ContractParams.OffRamp.GasForCallExactCheck,
+					TokenAdminRegistry:        common.HexToAddress(tokenAdminRegistryRef.Address),
+					MaxGasBufferToUpdateState: input.ContractParams.OffRamp.MaxGasBufferToUpdateState,
 				},
 			},
 		}, input.ExistingAddresses)
@@ -353,6 +359,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 				ChainSelector:  chain.Selector,
 				Args: executor.ProxyConstructorArgs{
 					ExecutorAddress: common.HexToAddress(executorRef.Address),
+					FeeAggregator:   executorParam.DynamicConfig.FeeAggregator,
 				},
 				Qualifier: qualifierPtr,
 			}, input.ExistingAddresses)
@@ -454,4 +461,41 @@ func getMockReceiverVerifiers(
 			mockReceiverParams.OptionalVerifiers)
 	}
 	return requiredVerifiers, optionalVerifiers, nil
+}
+
+// MaybeRegisterModuleOnTokenAdminRegistry checks if a module is already registered on the TokenAdminRegistry,
+// and if not, adds it as a registry module.
+// Returns the write output and a boolean indicating whether a write operation was performed.
+func MaybeRegisterModuleOnTokenAdminRegistry(
+	b cldf_ops.Bundle,
+	chain evm.Chain,
+	tokenAdminRegistryAddress common.Address,
+	moduleAddress common.Address,
+) (contract_utils.WriteOutput, bool, error) {
+	// Check if the module is already registered.
+	isRegisteredReport, err := cldf_ops.ExecuteOperation(b, token_admin_registry.IsRegistryModule, chain, contract_utils.FunctionInput[common.Address]{
+		ChainSelector: chain.Selector,
+		Address:       tokenAdminRegistryAddress,
+		Args:          moduleAddress,
+	})
+	if err != nil {
+		return contract_utils.WriteOutput{}, false, fmt.Errorf("failed to check if module is registered: %w", err)
+	}
+
+	// If already registered, return without performing a write.
+	if isRegisteredReport.Output {
+		return contract_utils.WriteOutput{}, false, nil
+	}
+
+	// Add the module to the registry.
+	addRegistryModuleReport, err := cldf_ops.ExecuteOperation(b, token_admin_registry.AddRegistryModule, chain, contract_utils.FunctionInput[common.Address]{
+		ChainSelector: chain.Selector,
+		Address:       tokenAdminRegistryAddress,
+		Args:          moduleAddress,
+	})
+	if err != nil {
+		return contract_utils.WriteOutput{}, false, fmt.Errorf("failed to add registry module: %w", err)
+	}
+
+	return addRegistryModuleReport.Output, true, nil
 }

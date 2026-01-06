@@ -6,6 +6,7 @@ import {IPoolV1, IPoolV1V2, IPoolV2} from "../../interfaces/IPoolV1V2.sol";
 import {IRouter} from "../../interfaces/IRouter.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
+import {FeeTokenHandler} from "../../libraries/FeeTokenHandler.sol";
 import {Pool} from "../../libraries/Pool.sol";
 import {USDCSourcePoolDataCodec} from "../../libraries/USDCSourcePoolDataCodec.sol";
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
@@ -29,15 +30,14 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
   error ChainNotSupportedByVerifier(uint64 remoteChainSelector);
   error InvalidLockOrBurnMechanism(LockOrBurnMechanism mechanism);
   error InvalidMessageVersion(bytes4 version);
-  error InvalidMessageLength(uint256 length);
   error MismatchedArrayLengths();
   error NoLockOrBurnMechanismSet(uint64 remoteChainSelector);
   error CallerIsNotARampOnRouter(address caller);
   error TokenPoolUnsupported(address pool);
+  error MustSetPoolForMechanism(uint64 remoteChainSelector, LockOrBurnMechanism mechanism);
 
   event LockOrBurnMechanismUpdated(uint64 indexed remoteChainSelector, LockOrBurnMechanism mechanism);
   event PoolAddressesUpdated(PoolAddresses pools);
-  event LockReleasePoolUpdated(uint64 indexed remoteChainSelector, address lockReleasePool);
 
   struct MessageAndAttestation {
     bytes message;
@@ -45,11 +45,10 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
   }
 
   struct PoolAddresses {
-    address legacyCctpV1Pool; // A CCTP V1 token pool that did not utilize a message transmitter proxy.
     address cctpV1Pool;
     address cctpV2Pool;
-    address cctpTokenPool;
-    address siloedUsdCTokenPool;
+    address cctpV2PoolWithCCV;
+    address siloedLockReleasePool;
   }
 
   enum LockOrBurnMechanism {
@@ -57,8 +56,13 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
     CCTP_V1,
     CCTP_V2,
     LOCK_RELEASE,
-    CCTP_V2_WITH_CCV
+    CCV
   }
+
+  string public constant override typeAndVersion = "USDCTokenPoolProxy 1.7.0-dev";
+
+  /// @dev Constant representing the default finality.
+  uint16 internal constant WAIT_FOR_FINALITY = 0;
 
   IERC20 internal immutable i_token;
   IRouter internal immutable i_router;
@@ -72,21 +76,17 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
   /// On/OffRamp
   ///     ↓
   /// USDCPoolProxy
-  ///     ├──→ LegacyCCTPV1Pool → CCTPV1
   ///     ├──→ CCTPV1Pool → MessageTransmitterProxy/TokenMessenger V1 → CCTPV1
   ///     ├──→ CCTPV2Pool → MessageTransmitterProxy/TokenMessenger V2 → CCTPV2
-  ///     ├──→ CCTPTokenPool → CCTPVerifier → MessageTransmitterProxy/TokenMessenger V2 → CCTPV2
-  ///     └──→ SiloedUSDCTokenPool → ERC20LockBox
-  address internal s_legacyCctpV1Pool;
+  ///     ├──→ cctpV2PoolWithCCV → CCTPVerifier → MessageTransmitterProxy/TokenMessenger V2 → CCTPV2
+  ///     └──→ siloedLockReleasePool → ERC20LockBox
   address internal s_cctpV1Pool;
   address internal s_cctpV2Pool;
-  address internal s_cctpTokenPool;
-  address internal s_siloedUsdCTokenPool;
+  address internal s_cctpV2PoolWithCCV;
+  address internal s_siloedLockReleasePool;
 
-  /// @dev Constant representing the default finality.
-  uint16 internal constant WAIT_FOR_FINALITY = 0;
-
-  string public constant override typeAndVersion = "USDCTokenPoolProxy 1.7.0-dev";
+  /// @notice The address that receives withdrawn fee tokens.
+  address internal s_feeAggregator;
 
   constructor(
     IERC20 token,
@@ -104,11 +104,23 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
     i_router = IRouter(router);
     i_cctpVerifier = ICrossChainVerifierResolver(cctpVerifier);
 
-    s_legacyCctpV1Pool = pools.legacyCctpV1Pool;
-    s_cctpV1Pool = pools.cctpV1Pool;
-    s_cctpV2Pool = pools.cctpV2Pool;
-    s_cctpTokenPool = pools.cctpTokenPool;
-    s_siloedUsdCTokenPool = pools.siloedUsdCTokenPool;
+    _updatePoolAddresses(pools);
+  }
+
+  /// @inheritdoc IPoolV1
+  /// @dev If the outgoing mechanism is not set for a chain, then the chain is not supported because there cannot be a
+  /// lock or burn operation.
+  function isSupportedChain(
+    uint64 remoteChainSelector
+  ) external view returns (bool) {
+    return s_lockOrBurnMechanism[remoteChainSelector] != LockOrBurnMechanism.INVALID_MECHANISM;
+  }
+
+  /// @inheritdoc IPoolV1
+  function isSupportedToken(
+    address token
+  ) external view returns (bool) {
+    return address(i_token) == token;
   }
 
   /// @inheritdoc IPoolV1
@@ -143,9 +155,9 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
       revert InvalidLockOrBurnMechanism(mechanism);
     }
 
-    if (mechanism == LockOrBurnMechanism.CCTP_V2_WITH_CCV) {
+    if (mechanism == LockOrBurnMechanism.CCV) {
       // CCV-compatible lockOrBurn path is completed within this if statement to avoid redundant checks.
-      address ccvPool = s_cctpTokenPool;
+      address ccvPool = s_cctpV2PoolWithCCV;
       if (ccvPool == address(0)) {
         revert NoLockOrBurnMechanismSet(lockOrBurnIn.remoteChainSelector);
       }
@@ -168,7 +180,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
     } else if (mechanism == LockOrBurnMechanism.CCTP_V1) {
       childPool = s_cctpV1Pool;
     } else if (mechanism == LockOrBurnMechanism.LOCK_RELEASE) {
-      childPool = s_siloedUsdCTokenPool;
+      childPool = s_siloedLockReleasePool;
     }
 
     // If the destination pool is the zero address, then no mechanism has been configured for the outgoing tokens
@@ -181,22 +193,6 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
     i_token.safeTransfer(childPool, lockOrBurnIn.amount);
 
     return (IPoolV1(childPool).lockOrBurn(lockOrBurnIn), lockOrBurnIn.amount);
-  }
-
-  /// @inheritdoc IPoolV1
-  /// @dev If the outgoing mechanism is not set for a chain, then the chain is not supported because there cannot be a
-  /// lock or burn operation.
-  function isSupportedChain(
-    uint64 remoteChainSelector
-  ) external view returns (bool) {
-    return s_lockOrBurnMechanism[remoteChainSelector] != LockOrBurnMechanism.INVALID_MECHANISM;
-  }
-
-  /// @inheritdoc IPoolV1
-  function isSupportedToken(
-    address token
-  ) external view returns (bool) {
-    return address(i_token) == token;
   }
 
   /// @inheritdoc IPoolV1
@@ -224,79 +220,58 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
 
     // If the source pool data is the lock release flag, use the lock release pool set for the remote chain selector.
     if (version == USDCSourcePoolDataCodec.LOCK_RELEASE_FLAG) {
-      return IPoolV1(s_siloedUsdCTokenPool).releaseOrMint(releaseOrMintIn);
+      return IPoolV1(s_siloedLockReleasePool).releaseOrMint(releaseOrMintIn);
     }
-
     if (version == USDCSourcePoolDataCodec.CCTP_VERSION_1_TAG) {
       return IPoolV1(s_cctpV1Pool).releaseOrMint(releaseOrMintIn);
     }
-
     if (version == USDCSourcePoolDataCodec.CCTP_VERSION_2_TAG) {
       return IPoolV1(s_cctpV2Pool).releaseOrMint(releaseOrMintIn);
     }
-
     if (version == USDCSourcePoolDataCodec.CCTP_VERSION_2_CCV_TAG) {
-      return IPoolV2(s_cctpTokenPool).releaseOrMint(releaseOrMintIn, blockConfirmationRequested);
+      return IPoolV2(s_cctpV2PoolWithCCV).releaseOrMint(releaseOrMintIn, blockConfirmationRequested);
     }
 
-    // In previous versions of the USDC Token Pool, the sourcePoolData only contained two fields, a uint64 and uint32.
-    // For structs stored only in memory, the compiler assigns each field to its own 32-byte slot, instead of tightly
-    // packing like in storage. This means that a message originating from a previous version of the pool will have a
-    // sourcePoolData that is 64 bytes long, indicating an inflight message originating from a previous version of
-    // the USDC Token pool.
-    // This branch must come before a version check, because the first field would be a uint64 and thus if a version
-    // was attempted to be extracted from the first 4-bytes of a uint64, it would be 0, and thus the message would be
-    // routed to the CCTP V1 pool without first sanitizing the source pool data for proper formatting.
+    // In previous versions of the USDC Token Pool, the sourcePoolData only contained abi encoded (uint64, uint32).
+    // This means that a message originating from a previous version of the pool will have a sourcePoolData that is 64
+    // bytes long, indicating an inflight message originating from a previous version of the USDC Token pool.
     // Note: It is possible for a future version of the source pool data to also be 64 bytes long. However, any future
     // version will have a version number in the first 4 bytes and will be routed to the proper pool before this check
     // is reached. Therefore this branch will only be triggered for messages using the legacy source pool data format.
     if (releaseOrMintIn.sourcePoolData.length == 64) {
-      // There are two possible scenarios for the legacy inflight messages:
-      // 1. The legacy pool did not utilize a message transmitter proxy.
-      // 2. The legacy pool utilized a message transmitter proxy, but the format of the sourcePoolTokenData was as described
-      // in the comments above.
+      // Since the CCTP v1 pool will have this contract set as an allowed caller, no additional configurations are
+      // needed to route the message to the v1 pool.
 
-      // In the first scenario, only the message's destinationCaller, i.e. the legacy pool, can execute the mint, and so
-      // the message needs to be routed to the legacy pool. In the second scenario, the destinationCaller will be the
-      // message transmitter proxy, and the message needs to be routed to the appropriate V1-compatible pool.
-      if (_checkForLegacyInflightMessages(releaseOrMintIn.offchainTokenData)) {
-        // Note: Supporting this branch will require this proxy to be set as an offRamp in the router, which is a design
-        // decision that is not ideal, but allows for a direct upgrade from the first version of the USDC Token Pool to
-        // this version.
-        return IPoolV1(s_legacyCctpV1Pool).releaseOrMint(releaseOrMintIn);
-      } else {
-        // Since the new pool and the inflight message should utilize the same version of CCTP, and would have the same
-        // destinationCaller (the message transmitter proxy), we can route the message to the v1 pool, but we first
-        // need to turn the source pool data into the new format, otherwise the decoding scheme will fail. Once there is
-        // confidence that no more messages are inflight, these branches can be safely removed.
+      Pool.ReleaseOrMintInV1 memory newReleaseOrMintIn = releaseOrMintIn;
+      // While the legacy source pool data struct uses the same fields as the current source pool data struct, it is
+      // was initially encoded using abi.encode(sourceTokenDataPayload) instead of the encoding scheme used in the
+      // USDCSourcePoolDataCodec library, and without a version tag. Therefore, we need to decode the source pool data
+      // into a SourceTokenDataPayloadV1 struct and then re-encode it into a format that using the proper versioning
+      // scheme whereby the CCTP V1 pool can process the message.
+      newReleaseOrMintIn.sourcePoolData = USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV1(
+        abi.decode(releaseOrMintIn.sourcePoolData, (USDCSourcePoolDataCodec.SourceTokenDataPayloadV1))
+      );
 
-        // Since the CCTP v1 pool will have this contract set as an allowed caller, no additional configurations are
-        // needed to route the message to the v1 pool.
-
-        // Copy to memory to modify the sourcePoolData.
-        Pool.ReleaseOrMintInV1 memory newReleaseOrMintIn = releaseOrMintIn;
-        // While the legacy source pool data struct uses the same fields as the current source pool data struct, it is
-        // was initially encoded using abi.encode(sourceTokenDataPayload) instead of the encoding scheme used in the
-        // USDCSourcePoolDataCodec library, and without a version tag. Therefore, we need to decode the source pool data
-        // into a SourceTokenDataPayloadV1 struct and then re-encode it into a format that using the proper versioning
-        // scheme whereby the CCTP V1 pool can process the message.
-        newReleaseOrMintIn.sourcePoolData = USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV1(
-          abi.decode(releaseOrMintIn.sourcePoolData, (USDCSourcePoolDataCodec.SourceTokenDataPayloadV1))
-        );
-
-        return IPoolV1(s_cctpV1Pool).releaseOrMint(newReleaseOrMintIn);
-      }
+      return IPoolV1(s_cctpV1Pool).releaseOrMint(newReleaseOrMintIn);
     }
 
     revert InvalidMessageVersion(version);
   }
 
-  /// @notice Update the pool addresses that this token pool will route a message to.
-  /// @param pools The new pool addresses to update the token pool proxy with. Since the legacy CCTP V1 pool may not be
-  /// used, the zero address is a valid input and therefore input sanitization for it is not required.
   function updatePoolAddresses(
     PoolAddresses calldata pools
   ) external onlyOwner {
+    _updatePoolAddresses(pools);
+  }
+
+  /// @notice Update the pool addresses that this token pool will route a message to.
+  /// @param pools The new pool addresses to update the token pool proxy with. Since the pool variants may not be
+  /// used, the zero address is a valid input and therefore input sanitization for it is not required.
+  /// @dev The owner is responsible for ensuring no pool is set to address(0) if there's any non-zero number of lanes
+  /// using that pool's mechanism. If it does happen, transactions can be stuck until the pool is updated again.
+  function _updatePoolAddresses(
+    PoolAddresses memory pools
+  ) internal {
     if (pools.cctpV1Pool != address(0) && !pools.cctpV1Pool.supportsInterface(type(IPoolV1).interfaceId)) {
       revert TokenPoolUnsupported(pools.cctpV1Pool);
     }
@@ -305,29 +280,22 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
       revert TokenPoolUnsupported(pools.cctpV2Pool);
     }
 
-    if (pools.cctpTokenPool != address(0)) {
-      if (!pools.cctpTokenPool.supportsInterface(type(IPoolV2).interfaceId)) {
-        revert TokenPoolUnsupported(pools.cctpTokenPool);
-      }
+    if (pools.cctpV2PoolWithCCV != address(0) && !pools.cctpV2PoolWithCCV.supportsInterface(type(IPoolV2).interfaceId))
+    {
+      revert TokenPoolUnsupported(pools.cctpV2PoolWithCCV);
     }
 
-    // If the legacy CCTP V1 Pool is being used, then it must support the IPoolV1 interface. If it is not, don't check it.
-    if (pools.legacyCctpV1Pool != address(0) && !pools.legacyCctpV1Pool.supportsInterface(type(IPoolV1).interfaceId)) {
-      revert TokenPoolUnsupported(pools.legacyCctpV1Pool);
-    }
-
-    // If the siloed USDC pool is being used, then it must support the IPoolV1 interface. If it is not, don't check it.
     if (
-      pools.siloedUsdCTokenPool != address(0) && !pools.siloedUsdCTokenPool.supportsInterface(type(IPoolV1).interfaceId)
+      pools.siloedLockReleasePool != address(0)
+        && !pools.siloedLockReleasePool.supportsInterface(type(IPoolV1).interfaceId)
     ) {
-      revert TokenPoolUnsupported(pools.siloedUsdCTokenPool);
+      revert TokenPoolUnsupported(pools.siloedLockReleasePool);
     }
 
-    s_legacyCctpV1Pool = pools.legacyCctpV1Pool;
     s_cctpV1Pool = pools.cctpV1Pool;
     s_cctpV2Pool = pools.cctpV2Pool;
-    s_cctpTokenPool = pools.cctpTokenPool;
-    s_siloedUsdCTokenPool = pools.siloedUsdCTokenPool;
+    s_cctpV2PoolWithCCV = pools.cctpV2PoolWithCCV;
+    s_siloedLockReleasePool = pools.siloedLockReleasePool;
 
     emit PoolAddressesUpdated(pools);
   }
@@ -336,11 +304,10 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
   /// @return The current pool addresses that this token pool will route a message to.
   function getPools() public view returns (PoolAddresses memory) {
     return PoolAddresses({
-      legacyCctpV1Pool: s_legacyCctpV1Pool,
       cctpV1Pool: s_cctpV1Pool,
       cctpV2Pool: s_cctpV2Pool,
-      cctpTokenPool: s_cctpTokenPool,
-      siloedUsdCTokenPool: s_siloedUsdCTokenPool
+      cctpV2PoolWithCCV: s_cctpV2PoolWithCCV,
+      siloedLockReleasePool: s_siloedLockReleasePool
     });
   }
 
@@ -356,6 +323,8 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
   /// @notice Update the lock or burn mechanism for a list of remote chain selectors.
   /// @param remoteChainSelectors The remote chain selectors to update the lock or burn mechanism for.
   /// @param mechanisms The new lock or burn mechanisms for the given remote chain selectors.
+  /// @dev If a mechanism is set to LOCK_RELEASE, CCTP_V1, CCTP_V2, or CCV, the corresponding pool address
+  /// must be set, otherwise the update will revert.
   /// @dev Only callable by the owner.
   function updateLockOrBurnMechanisms(
     uint64[] calldata remoteChainSelectors,
@@ -366,38 +335,24 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
     }
 
     for (uint256 i = 0; i < remoteChainSelectors.length; ++i) {
-      s_lockOrBurnMechanism[remoteChainSelectors[i]] = mechanisms[i];
-      emit LockOrBurnMechanismUpdated(remoteChainSelectors[i], mechanisms[i]);
+      LockOrBurnMechanism mechanism = mechanisms[i];
+      s_lockOrBurnMechanism[remoteChainSelectors[i]] = mechanism;
+
+      if (mechanism == LockOrBurnMechanism.LOCK_RELEASE && s_siloedLockReleasePool == address(0)) {
+        revert MustSetPoolForMechanism(remoteChainSelectors[i], mechanism);
+      }
+      if (mechanism == LockOrBurnMechanism.CCTP_V1 && s_cctpV1Pool == address(0)) {
+        revert MustSetPoolForMechanism(remoteChainSelectors[i], mechanism);
+      }
+      if (mechanism == LockOrBurnMechanism.CCTP_V2 && s_cctpV2Pool == address(0)) {
+        revert MustSetPoolForMechanism(remoteChainSelectors[i], mechanism);
+      }
+      if (mechanism == LockOrBurnMechanism.CCV && s_cctpV2PoolWithCCV == address(0)) {
+        revert MustSetPoolForMechanism(remoteChainSelectors[i], mechanism);
+      }
+
+      emit LockOrBurnMechanismUpdated(remoteChainSelectors[i], mechanism);
     }
-  }
-
-  /// @notice Check if the releaseOrMintIn struct is an inflight message from a legacy pool that did not utilize a
-  /// message transmitter proxy.
-  /// @param offChainTokenData The off chain message and attestation needed to check for destinationCaller.
-  /// @return True if the releaseOrMintIn struct is an inflight message from a legacy pool that did not utilize a
-  /// message transmitter proxy, false otherwise.
-  function _checkForLegacyInflightMessages(
-    bytes calldata offChainTokenData
-  ) internal view virtual returns (bool) {
-    // Cache the legacy pool address to avoid multiple SLOADs.
-    address legacyPool = s_legacyCctpV1Pool;
-
-    // If the legacy pool without a proxy is not set, then there is no need to check the destinationCaller.
-    if (legacyPool == address(0)) {
-      return false;
-    }
-
-    bytes memory messageBytes = abi.decode(offChainTokenData, (MessageAndAttestation)).message;
-
-    bytes32 destinationCallerBytes32;
-    assembly {
-      // destinationCaller is a 32-byte word starting at position 84 in messageBytes body, so add 32 to skip the 1st word
-      // representing bytes length.
-      destinationCallerBytes32 := mload(add(messageBytes, 116)) // 84 + 32 = 116
-    }
-    address destinationCaller = address(uint160(uint256(destinationCallerBytes32)));
-
-    return destinationCaller == legacyPool;
   }
 
   /// @inheritdoc IPoolV2
@@ -420,7 +375,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
     onlyWithCCVCompatiblePool
     returns (uint256 feeUSDCents, uint32 destGasOverhead, uint32 destBytesOverhead, uint16 tokenFeeBps, bool isEnabled)
   {
-    return IPoolV2(s_cctpTokenPool)
+    return IPoolV2(s_cctpV2PoolWithCCV)
       .getFee(localToken, destChainSelector, amount, feeToken, blockConfirmationRequested, tokenArgs);
   }
 
@@ -435,7 +390,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
     uint16 blockConfirmationRequested,
     bytes calldata tokenArgs
   ) external view onlyWithCCVCompatiblePool returns (TokenTransferFeeConfig memory feeConfig) {
-    return IPoolV2(s_cctpTokenPool)
+    return IPoolV2(s_cctpV2PoolWithCCV)
       .getTokenTransferFeeConfig(localToken, destChainSelector, blockConfirmationRequested, tokenArgs);
   }
 
@@ -444,7 +399,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
   function getRemoteToken(
     uint64 remoteChainSelector
   ) external view onlyWithCCVCompatiblePool returns (bytes memory) {
-    return IPoolV2(s_cctpTokenPool).getRemoteToken(remoteChainSelector);
+    return IPoolV2(s_cctpV2PoolWithCCV).getRemoteToken(remoteChainSelector);
   }
 
   /// @inheritdoc IPoolV2
@@ -464,7 +419,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
     // Common case: The lockOrBurn mechanism is CCTP V2 with CCV.
     // In this case, we simply need to return the CCTP CCV.
     address[] memory ccvs = new address[](1);
-    if (s_lockOrBurnMechanism[remoteChainSelector] == LockOrBurnMechanism.CCTP_V2_WITH_CCV) {
+    if (s_lockOrBurnMechanism[remoteChainSelector] == LockOrBurnMechanism.CCV) {
       ccvs[0] = address(i_cctpVerifier);
       return ccvs;
     }
@@ -477,7 +432,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
 
   /// @notice Ensures that a CCV-compatible pool is set.
   modifier onlyWithCCVCompatiblePool() {
-    if (s_cctpTokenPool == address(0)) {
+    if (s_cctpV2PoolWithCCV == address(0)) {
       revert CCVCompatiblePoolNotSet();
     }
     _;
@@ -489,5 +444,31 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
   ) public pure override returns (bool) {
     return interfaceId == type(IPoolV2).interfaceId || interfaceId == type(IPoolV1).interfaceId
       || interfaceId == Pool.CCIP_POOL_V1 || interfaceId == type(IERC165).interfaceId;
+  }
+
+  // ================================================================
+  // │                     Fee token withdrawal                     │
+  // ================================================================
+
+  function getFeeAggregator() external view returns (address) {
+    return s_feeAggregator;
+  }
+
+  /// @notice Sets the address of the fee aggregator.
+  /// @param feeAggregator The address of the new fee aggregator contract.
+  /// @dev FeeTokenHandler will revert if feeAggregator is zero when withdrawing fees.
+  /// @dev A zero address fee aggregator is valid, and intentionally reverts calls to withdraw fee tokens.
+  function setFeeAggregator(
+    address feeAggregator
+  ) external onlyOwner {
+    s_feeAggregator = feeAggregator;
+  }
+
+  /// @notice Withdraws the outstanding fee token balances to the fee aggregator.
+  /// @param feeTokens The fee tokens to withdraw.
+  function withdrawFeeTokens(
+    address[] calldata feeTokens
+  ) external virtual {
+    FeeTokenHandler._withdrawFeeTokens(feeTokens, s_feeAggregator);
   }
 }

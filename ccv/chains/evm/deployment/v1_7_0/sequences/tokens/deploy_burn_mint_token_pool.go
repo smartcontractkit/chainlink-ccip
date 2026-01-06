@@ -5,14 +5,15 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/advanced_pool_hooks"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/burn_mint_token_pool"
 	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/advanced_pool_hooks"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/burn_mint_token_pool"
 )
 
 var DeployBurnMintTokenPool = cldf_ops.NewSequence(
@@ -63,6 +64,7 @@ var DeployBurnMintTokenPool = cldf_ops.NewSequence(
 			AdvancedPoolHooks:                common.HexToAddress(hooksDeployReport.Output.Address),
 			RouterAddress:                    input.ConstructorArgs.Router,
 			ThresholdAmountForAdditionalCCVs: input.ThresholdAmountForAdditionalCCVs,
+			FeeAggregator:                    input.FeeAggregator,
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to configure token pool with address %s on %s: %w", tpDeployReport.Output.Address, chain, err)

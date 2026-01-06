@@ -61,9 +61,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     bytes returnData
   );
   event SourceChainConfigSet(uint64 indexed sourceChainSelector, SourceChainConfigArgs sourceConfig);
-
-  // 5k for updating the state + 5k for the event and misc costs.
-  uint256 internal constant MAX_GAS_BUFFER_TO_UPDATE_STATE = 5000 + 5000 + 2000;
+  event MaxGasBufferToUpdateStateUpdated(uint32 oldMaxGasBufferToUpdateState, uint32 newMaxGasBufferToUpdateState);
 
   /// @dev Struct that contains the static configuration. The individual components are stored as immutable variables.
   // solhint-disable-next-line gas-struct-packing
@@ -71,7 +69,8 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     uint64 localChainSelector; // ──╮ Local chainSelector
     uint16 gasForCallExactCheck; // │ Gas for call exact check
     IRMNRemote rmnRemote; // ───────╯ RMN Verification Contract
-    address tokenAdminRegistry; // Token admin registry address
+    address tokenAdminRegistry; // ────────╮ Token admin registry address
+    uint32 maxGasBufferToUpdateState; // ──╯ Max Gas Buffer to Update State
   }
 
   /// @dev Per-chain source config (defining a lane from a Source Chain -> Dest OffRamp).
@@ -109,6 +108,9 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// We include this in the offRamp so that we can redeploy to adjust it should a hardfork change the gas costs of
   /// relevant opcodes in callWithExactGas.
   uint16 internal immutable i_gasForCallExactCheck;
+  /// @notice Gas buffer to update state.
+  // Example, 5k for updating the state + 5k for the event and misc costs.
+  uint32 internal immutable i_maxGasBufferToUpdateState;
 
   // At the top to pack it with the `owner` variable from Ownable2StepMsgSender.
   bool private s_reentrancyGuardEntered;
@@ -143,11 +145,15 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     if (staticConfig.gasForCallExactCheck == 0) {
       revert GasCannotBeZero();
     }
+    if (staticConfig.maxGasBufferToUpdateState == 0) {
+      revert GasCannotBeZero();
+    }
 
     i_chainSelector = staticConfig.localChainSelector;
     i_rmnRemote = staticConfig.rmnRemote;
     i_tokenAdminRegistry = staticConfig.tokenAdminRegistry;
     i_gasForCallExactCheck = staticConfig.gasForCallExactCheck;
+    i_maxGasBufferToUpdateState = staticConfig.maxGasBufferToUpdateState;
 
     emit StaticConfigSet(staticConfig);
   }
@@ -245,11 +251,11 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     uint16 maxReturnBytes = Internal.MAX_RET_BYTES;
 
     uint256 gasLeft = gasleft();
-    if (gasLeft <= MAX_GAS_BUFFER_TO_UPDATE_STATE) {
+    if (gasLeft <= i_maxGasBufferToUpdateState) {
       revert InsufficientGasToCompleteTx(bytes4(uint32(gasleft())));
     }
 
-    uint256 gasLimit = gasLeft - MAX_GAS_BUFFER_TO_UPDATE_STATE;
+    uint256 gasLimit = gasLeft - i_maxGasBufferToUpdateState;
 
     assembly {
       // Call and return whether we succeeded.
@@ -476,13 +482,16 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       (requiredReceiverCCVs, optionalCCVs, optionalThreshold) = _getCCVsFromReceiver(sourceChainSelector, receiver);
     }
 
-    address[] memory laneMandatedCCVs = s_sourceChainConfigs[sourceChainSelector].laneMandatedCCVs;
+    address[] storage laneMandatedCCVs = s_sourceChainConfigs[sourceChainSelector].laneMandatedCCVs;
     address[] storage defaultCCVs = s_sourceChainConfigs[sourceChainSelector].defaultCCVs;
 
+    // Save lengths in memory to avoid multiple storage reads. This is safe as the logic below does not modify the arrays.
+    uint256 laneMandatedCCVsLength = laneMandatedCCVs.length;
+    uint256 defaultCCVsLength = defaultCCVs.length;
+
     // We allocate the memory for all possible CCVs upfront to avoid multiple allocations.
-    address[] memory allRequiredCCVs = new address[](
-      requiredReceiverCCVs.length + requiredPoolCCVs.length + laneMandatedCCVs.length + defaultCCVs.length
-    );
+    address[] memory allRequiredCCVs =
+      new address[](requiredReceiverCCVs.length + requiredPoolCCVs.length + laneMandatedCCVsLength + defaultCCVsLength);
 
     uint256 index = 0;
     for (uint256 i = 0; i < requiredReceiverCCVs.length; ++i) {
@@ -493,15 +502,14 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       allRequiredCCVs[index++] = requiredPoolCCVs[i];
     }
 
-    for (uint256 i = 0; i < laneMandatedCCVs.length; ++i) {
+    for (uint256 i = 0; i < laneMandatedCCVsLength; ++i) {
       allRequiredCCVs[index++] = laneMandatedCCVs[i];
     }
 
     // Add defaults if any address(0) was found.
     for (uint256 i = 0; i < index; ++i) {
       if (allRequiredCCVs[i] == address(0)) {
-        uint256 numberOfDefaults = defaultCCVs.length;
-        for (uint256 j = 0; j < numberOfDefaults; ++j) {
+        for (uint256 j = 0; j < defaultCCVsLength; ++j) {
           allRequiredCCVs[index++] = defaultCCVs[j];
         }
         // Break to ensure they're only added once.
@@ -798,7 +806,8 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       localChainSelector: i_chainSelector,
       gasForCallExactCheck: i_gasForCallExactCheck,
       rmnRemote: i_rmnRemote,
-      tokenAdminRegistry: i_tokenAdminRegistry
+      tokenAdminRegistry: i_tokenAdminRegistry,
+      maxGasBufferToUpdateState: i_maxGasBufferToUpdateState
     });
   }
 

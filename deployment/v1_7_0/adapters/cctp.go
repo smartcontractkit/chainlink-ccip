@@ -33,14 +33,14 @@ func (m Mechanism) IsValid() bool {
 }
 
 // RemoteDomain identifies CCTP-specific parameters for a remote chain.
-type RemoteDomain[Contract any] struct {
+type RemoteDomain[RemoteContract any] struct {
 	// AllowedCallerOnDest is the address allowed to trigger message reception on the remote domain.
-	AllowedCallerOnDest Contract
+	AllowedCallerOnDest RemoteContract
 	// AllowedCallerOnSource is the address expected to deposit tokens for burn on the remote chain.
-	AllowedCallerOnSource Contract
+	AllowedCallerOnSource RemoteContract
 	// MintRecipientOnDest is the address that will receive tokens on the remote domain.
 	// If not set, the tokens will be minted to the receiver of the CCIP message.
-	MintRecipientOnDest Contract
+	MintRecipientOnDest RemoteContract
 	// DomainIdentifier is the identifier of the remote domain.
 	DomainIdentifier uint32
 }
@@ -85,7 +85,7 @@ type DeployCCTPInput[LocalContract any, RemoteContract any] struct {
 	// USDCTokenPoolProxy is the address of the USDCTokenPoolProxy contract.
 	USDCTokenPoolProxy LocalContract
 	// CCTPVerifier is set of addresses comprising the CCTPVerifier system.
-	CCTPVerifier []datastore.AddressRef
+	CCTPVerifier []LocalContract
 	// MessageTransmitterProxy is the address of the MessageTransmitterProxy contract.
 	MessageTransmitterProxy LocalContract
 	// TokenAdminRegistry is the address of the TokenAdminRegistry contract.

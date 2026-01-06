@@ -18,7 +18,8 @@ contract OffRamp_getBalanceOfReceiver is OffRampSetup {
         localChainSelector: SOURCE_CHAIN_SELECTOR,
         gasForCallExactCheck: GAS_FOR_CALL_EXACT_CHECK,
         rmnRemote: s_mockRMNRemote,
-        tokenAdminRegistry: address(s_tokenAdminRegistry)
+        tokenAdminRegistry: address(s_tokenAdminRegistry),
+        maxGasBufferToUpdateState: DEFAULT_MAX_GAS_BUFFER_TO_UPDATE_STATE
       })
     );
   }

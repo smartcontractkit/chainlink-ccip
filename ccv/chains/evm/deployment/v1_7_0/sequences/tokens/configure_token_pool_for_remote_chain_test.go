@@ -4,13 +4,16 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
 	tp_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/token_pool"
+	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	tokens_core "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
@@ -159,12 +162,21 @@ func TestConfigureTokenPoolForRemoteChain(t *testing.T) {
 			require.NotNil(t, e, "Environment should be created")
 
 			// Deploy chain
+			create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+				TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
+				ChainSelector:  chainSel,
+				Args: create2_factory.ConstructorArgs{
+					AllowList: []common.Address{e.BlockChains.EVMChains()[chainSel].DeployerKey.From},
+				},
+			}, nil)
+			require.NoError(t, err, "Failed to deploy CREATE2Factory")
 			chainReport, err := operations.ExecuteSequence(
 				e.OperationsBundle,
 				sequences.DeployChainContracts,
 				e.BlockChains.EVMChains()[chainSel],
 				sequences.DeployChainContractsInput{
 					ChainSelector:  chainSel,
+					CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
 					ContractParams: testsetup.CreateBasicContractParams(),
 				},
 			)

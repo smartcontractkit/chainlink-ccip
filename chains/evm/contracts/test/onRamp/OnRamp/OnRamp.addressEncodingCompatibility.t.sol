@@ -285,7 +285,6 @@ contract OnRamp_addressEncodingCompatibility is OnRampSetup {
     vm.startPrank(address(s_sourceRouter));
     vm.expectRevert(abi.encodeWithSelector(OnRamp.InvalidDestChainAddress.selector, bad));
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, STRANGER);
-    vm.stopPrank();
   }
 
   function test_forwardFromRouter_RevertWhen_ReceiverLengthNotDestOr32() public {
@@ -297,7 +296,6 @@ contract OnRamp_addressEncodingCompatibility is OnRampSetup {
     vm.startPrank(address(s_sourceRouter));
     vm.expectRevert(abi.encodeWithSelector(OnRamp.InvalidDestChainAddress.selector, message.receiver));
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, STRANGER);
-    vm.stopPrank();
   }
 
   function test_forwardFromRouter_RevertWhen_ReceiverShortFor32ByteChain() public {
@@ -309,7 +307,6 @@ contract OnRamp_addressEncodingCompatibility is OnRampSetup {
     vm.startPrank(address(s_sourceRouter));
     vm.expectRevert(abi.encodeWithSelector(OnRamp.InvalidDestChainAddress.selector, message.receiver));
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, STRANGER);
-    vm.stopPrank();
   }
 
   function test_forwardFromRouter_RevertWhen_TokenReceiverPaddingNonZero() public {
@@ -357,7 +354,6 @@ contract OnRamp_addressEncodingCompatibility is OnRampSetup {
     vm.startPrank(address(s_sourceRouter));
     vm.expectRevert(abi.encodeWithSelector(OnRamp.InvalidDestChainAddress.selector, bad));
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, fee, STRANGER);
-    vm.stopPrank();
   }
 
   function test_forwardFromRouter_RevertWhen_TokenReceiverLengthNotDestOr32() public {
@@ -405,7 +401,6 @@ contract OnRamp_addressEncodingCompatibility is OnRampSetup {
     vm.startPrank(address(s_sourceRouter));
     vm.expectRevert(abi.encodeWithSelector(OnRamp.InvalidDestChainAddress.selector, wrongLen));
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, fee, STRANGER);
-    vm.stopPrank();
   }
 
   function test_applyDestChainConfigUpdates_RevertWhen_OffRampLengthMismatch() public {

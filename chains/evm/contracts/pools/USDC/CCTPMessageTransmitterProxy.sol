@@ -13,6 +13,8 @@ import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/Aut
 contract CCTPMessageTransmitterProxy is AuthorizedCallers, ITypeAndVersion {
   string public constant override typeAndVersion = "CCTPMessageTransmitterProxy 1.7.0-dev";
 
+  error TransmitterCannotBeZero();
+
   /// @notice Immutable reference to the `IMessageTransmitter` contract.
   IMessageTransmitter public immutable i_cctpTransmitter;
 
@@ -22,6 +24,10 @@ contract CCTPMessageTransmitterProxy is AuthorizedCallers, ITypeAndVersion {
     ITokenMessenger tokenMessenger
   ) AuthorizedCallers(new address[](0)) {
     i_cctpTransmitter = IMessageTransmitter(tokenMessenger.localMessageTransmitter());
+
+    if (address(i_cctpTransmitter) == address(0)) {
+      revert TransmitterCannotBeZero();
+    }
   }
 
   /// @notice Receives a message from the `IMessageTransmitter` contract and validates it.

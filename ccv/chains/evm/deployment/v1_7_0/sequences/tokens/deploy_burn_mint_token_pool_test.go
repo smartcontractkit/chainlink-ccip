@@ -7,11 +7,13 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/advanced_pool_hooks"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/burn_mint_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
@@ -49,6 +51,7 @@ func TestDeployTokenPool(t *testing.T) {
 					TokenSymbol:                      tokenReport.Input.Args.Symbol,
 					RateLimitAdmin:                   common.HexToAddress("0x01"),
 					ThresholdAmountForAdditionalCCVs: big.NewInt(1e18),
+					FeeAggregator:                    common.HexToAddress("0x03"),
 					ConstructorArgs: tokens.ConstructorArgs{
 						Token:    common.HexToAddress(tokenReport.Output.Address),
 						Decimals: 18,
@@ -185,6 +188,14 @@ func TestDeployTokenPool(t *testing.T) {
 			require.NotNil(t, e, "Environment should be created")
 
 			// Deploy chain
+			create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+				TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
+				ChainSelector:  chainSel,
+				Args: create2_factory.ConstructorArgs{
+					AllowList: []common.Address{e.BlockChains.EVMChains()[chainSel].DeployerKey.From},
+				},
+			}, nil)
+			require.NoError(t, err, "Failed to deploy CREATE2Factory")
 			chainReport, err := operations.ExecuteSequence(
 				e.OperationsBundle,
 				sequences.DeployChainContracts,
@@ -192,6 +203,7 @@ func TestDeployTokenPool(t *testing.T) {
 				sequences.DeployChainContractsInput{
 					ChainSelector:  chainSel,
 					ContractParams: testsetup.CreateBasicContractParams(),
+					CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
 				},
 			)
 			require.NoError(t, err, "ExecuteSequence should not error")

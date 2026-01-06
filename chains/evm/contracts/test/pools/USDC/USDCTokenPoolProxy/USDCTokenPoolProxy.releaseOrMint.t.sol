@@ -17,7 +17,6 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
   bytes internal s_sourcePoolAddress = abi.encode(SOURCE_CHAIN_USDC_POOL);
 
   function test_releaseOrMint_LockReleaseFlag() public {
-    // Arrange: Prepare test data
     uint256 testAmount = 1234;
     bytes memory lockReleaseFlag = abi.encodePacked(USDCSourcePoolDataCodec.LOCK_RELEASE_FLAG);
     bytes memory originalSender = abi.encode(s_sender);
@@ -25,19 +24,17 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
 
     _enableERC165InterfaceChecks(s_lockReleasePool, type(IPoolV1).interfaceId);
 
-    // Set the siloed pool via updatePoolAddresses - use a clean PoolAddresses struct
-    changePrank(OWNER);
+    // Set the siloed pool via updatePoolAddresses - use a clean PoolAddresses struct.
     s_usdcTokenPoolProxy.updatePoolAddresses(
       USDCTokenPoolProxy.PoolAddresses({
-        legacyCctpV1Pool: address(0),
         cctpV1Pool: address(0),
         cctpV2Pool: address(0),
-        cctpTokenPool: address(0),
-        siloedUsdCTokenPool: s_lockReleasePool
+        cctpV2PoolWithCCV: address(0),
+        siloedLockReleasePool: s_lockReleasePool
       })
     );
 
-    // Mock the router's isOffRamp function to return true
+    // Mock the router's isOffRamp function to return true.
     vm.mockCall(
       address(s_router),
       abi.encodeWithSelector(Router.isOffRamp.selector, SOURCE_CHAIN_SELECTOR, s_routerAllowedOffRamp),
@@ -46,7 +43,7 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
 
     vm.startPrank(s_routerAllowedOffRamp);
 
-    // Prepare input with LOCK_RELEASE_FLAG in sourcePoolData
+    // Prepare input with LOCK_RELEASE_FLAG in sourcePoolData.
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = Pool.ReleaseOrMintInV1({
       remoteChainSelector: SOURCE_CHAIN_SELECTOR,
       originalSender: originalSender,
@@ -61,24 +58,19 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
     // Prepare expected output
     Pool.ReleaseOrMintOutV1 memory expectedOut = Pool.ReleaseOrMintOutV1({destinationAmount: testAmount});
 
-    // Expect the lockReleasePool's releaseOrMint to be called and return expectedOut
+    // Expect the lockReleasePool's releaseOrMint to be called and return expectedOut.
     vm.mockCall(
       address(s_lockReleasePool),
       abi.encodeWithSelector(IPoolV1.releaseOrMint.selector, releaseOrMintIn),
       abi.encode(expectedOut)
     );
 
-    // Act: Call releaseOrMint on the proxy
     Pool.ReleaseOrMintOutV1 memory actualOut = s_usdcTokenPoolProxy.releaseOrMint(releaseOrMintIn);
 
-    // Assert: The output matches
     assertEq(actualOut.destinationAmount, expectedOut.destinationAmount);
-
-    vm.stopPrank();
   }
 
   function test_releaseOrMint_CCTPV1Flag() public {
-    // Arrange: Prepare test data
     uint256 testAmount = 4321;
     bytes memory originalSender = abi.encode(s_sender);
 
@@ -87,7 +79,7 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
     );
     bytes memory offChainTokenData = "";
 
-    // Mock the router's isOffRamp function to return true
+    // Mock the router's isOffRamp function to return true.
     vm.mockCall(
       address(s_router),
       abi.encodeWithSelector(Router.isOffRamp.selector, SOURCE_CHAIN_SELECTOR, s_routerAllowedOffRamp),
@@ -96,7 +88,7 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
 
     vm.startPrank(s_routerAllowedOffRamp);
 
-    // Prepare input with CCTP_V1_FLAG in sourcePoolData (version 0 in offchainTokenData)
+    // Prepare input with CCTP_V1_FLAG in sourcePoolData (version 0 in offchainTokenData).
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = Pool.ReleaseOrMintInV1({
       remoteChainSelector: SOURCE_CHAIN_SELECTOR,
       originalSender: originalSender,
@@ -110,31 +102,26 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
 
     Pool.ReleaseOrMintOutV1 memory expectedOut = Pool.ReleaseOrMintOutV1({destinationAmount: testAmount});
 
-    // Expect the cctpV1Pool's releaseOrMint to be called and return expectedOut
+    // Expect the cctpV1Pool's releaseOrMint to be called and return expectedOut.
     vm.mockCall(
       address(s_cctpV1Pool),
       abi.encodeWithSelector(IPoolV1.releaseOrMint.selector, releaseOrMintIn),
       abi.encode(expectedOut)
     );
 
-    // Act: Call releaseOrMint on the proxy
     Pool.ReleaseOrMintOutV1 memory actualOut = s_usdcTokenPoolProxy.releaseOrMint(releaseOrMintIn);
 
-    // Assert: The output matches
     assertEq(actualOut.destinationAmount, expectedOut.destinationAmount);
-
-    vm.stopPrank();
   }
 
   function test_releaseOrMint_CCTPV2_CCVFlag() public {
-    // Arrange: Prepare test data
     uint256 testAmount = 5678;
     bytes memory originalSender = abi.encode(s_sender);
 
     bytes memory sourcePoolData = abi.encodePacked(USDCSourcePoolDataCodec.CCTP_VERSION_2_CCV_TAG);
     bytes memory offChainTokenData = "";
 
-    // Mock the router's isOffRamp function to return true
+    // Mock the router's isOffRamp function to return true.
     vm.mockCall(
       address(s_router),
       abi.encodeWithSelector(Router.isOffRamp.selector, SOURCE_CHAIN_SELECTOR, s_routerAllowedOffRamp),
@@ -143,7 +130,7 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
 
     vm.startPrank(s_routerAllowedOffRamp);
 
-    // Prepare input with CCTP_V2_FLAG in sourcePoolData
+    // Prepare input with CCTP_V2_FLAG in sourcePoolData.
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = Pool.ReleaseOrMintInV1({
       remoteChainSelector: SOURCE_CHAIN_SELECTOR,
       originalSender: originalSender,
@@ -157,9 +144,9 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
 
     Pool.ReleaseOrMintOutV1 memory expectedOut = Pool.ReleaseOrMintOutV1({destinationAmount: testAmount});
 
-    // Expect the cctpV2PoolWithCCV's releaseOrMint to be called and return expectedOut
+    // Expect the cctpV2PoolWithCCV's releaseOrMint to be called and return expectedOut.
     vm.mockCall(
-      address(s_cctpTokenPool),
+      address(s_cctpThroughCCVTokenPool),
       abi.encodeWithSelector(IPoolV2.releaseOrMint.selector, releaseOrMintIn, 0),
       abi.encode(expectedOut)
     );
@@ -167,12 +154,9 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
     Pool.ReleaseOrMintOutV1 memory actualOut = s_usdcTokenPoolProxy.releaseOrMint(releaseOrMintIn);
 
     assertEq(actualOut.destinationAmount, expectedOut.destinationAmount);
-
-    vm.stopPrank();
   }
 
   function test_releaseOrMint_CCTPV2Flag() public {
-    // Arrange: Prepare test data
     uint256 testAmount = 5678;
     bytes memory originalSender = abi.encode(s_sender);
 
@@ -181,7 +165,7 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
     );
     bytes memory offChainTokenData = "";
 
-    // Mock the router's isOffRamp function to return true
+    // Mock the router's isOffRamp function to return true.
     vm.mockCall(
       address(s_router),
       abi.encodeWithSelector(Router.isOffRamp.selector, SOURCE_CHAIN_SELECTOR, s_routerAllowedOffRamp),
@@ -190,7 +174,7 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
 
     vm.startPrank(s_routerAllowedOffRamp);
 
-    // Prepare input with CCTP_V2_FLAG in sourcePoolData
+    // Prepare input with CCTP_V2_FLAG in sourcePoolData.
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = Pool.ReleaseOrMintInV1({
       remoteChainSelector: SOURCE_CHAIN_SELECTOR,
       originalSender: originalSender,
@@ -205,7 +189,7 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
 
     Pool.ReleaseOrMintOutV1 memory expectedOut = Pool.ReleaseOrMintOutV1({destinationAmount: testAmount});
 
-    // Expect the cctpV2Pool's releaseOrMint to be called and return expectedOut
+    // Expect the cctpV2Pool's releaseOrMint to be called and return expectedOut.
     vm.mockCall(
       address(s_cctpV2Pool),
       abi.encodeWithSelector(IPoolV1.releaseOrMint.selector, releaseOrMintIn),
@@ -215,85 +199,23 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
     Pool.ReleaseOrMintOutV1 memory actualOut = s_usdcTokenPoolProxy.releaseOrMint(releaseOrMintIn);
 
     assertEq(actualOut.destinationAmount, expectedOut.destinationAmount);
-
-    vm.stopPrank();
-  }
-
-  function test_releaseOrMint_LegacyFormat_MessageTransmitterProxyNotSupported() public {
-    uint256 testAmount = 1e6;
-
-    bytes memory legacySourcePoolDataBytes =
-      abi.encode(USDCSourcePoolDataCodec.SourceTokenDataPayloadV1({nonce: 12345, sourceDomain: 67890}));
-
-    USDCMessage memory usdcMessage = USDCMessage({
-      version: 0,
-      sourceDomain: uint32(0),
-      destinationDomain: uint32(0),
-      nonce: uint64(0),
-      sender: bytes32(0),
-      recipient: bytes32(0),
-      destinationCaller: bytes32(uint256(uint160(s_legacyCctpV1Pool))),
-      messageBody: ""
-    });
-
-    bytes memory message = _generateUSDCMessage(usdcMessage);
-    bytes memory attestation = bytes("attestation bytes");
-
-    bytes memory offChainTokenData =
-      abi.encode(USDCTokenPoolProxy.MessageAndAttestation({message: message, attestation: attestation}));
-
-    vm.startPrank(s_routerAllowedOffRamp);
-
-    // Prepare input with legacy 64-byte sourcePoolData
-    Pool.ReleaseOrMintInV1 memory releaseOrMintIn = Pool.ReleaseOrMintInV1({
-      remoteChainSelector: SOURCE_CHAIN_SELECTOR,
-      originalSender: abi.encode(s_sender),
-      receiver: s_receiver,
-      sourceDenominatedAmount: testAmount,
-      localToken: address(s_USDCToken),
-      sourcePoolData: legacySourcePoolDataBytes, // 64 bytes: uint64 + uint32
-      sourcePoolAddress: s_sourcePoolAddress,
-      offchainTokenData: offChainTokenData
-    });
-
-    // Prepare expected output
-    Pool.ReleaseOrMintOutV1 memory expectedOut = Pool.ReleaseOrMintOutV1({destinationAmount: testAmount});
-
-    // Expect the legacy pool's releaseOrMint to be called with the converted format
-    // The _generateNewReleaseOrMintIn function will convert the legacy format to the new format
-    // and call the legacy pool with the converted data
-    vm.mockCall(
-      address(s_legacyCctpV1Pool), abi.encodeWithSelector(IPoolV1.releaseOrMint.selector), abi.encode(expectedOut)
-    );
-
-    vm.expectCall(address(s_legacyCctpV1Pool), abi.encodeWithSelector(IPoolV1.releaseOrMint.selector, releaseOrMintIn));
-
-    // Act: Call releaseOrMint on the proxy
-    Pool.ReleaseOrMintOutV1 memory actualOut = s_usdcTokenPoolProxy.releaseOrMint(releaseOrMintIn);
-
-    // Assert: The output matches
-    assertEq(actualOut.destinationAmount, expectedOut.destinationAmount);
-
-    vm.stopPrank();
   }
 
   function test_releaseOrMint_LegacyFormat_MessageTransmitterProxySupported() public {
-    // Set the legacy pool address to zero to simulate a scenario where there are no legacy inflight messages
+    // Set the legacy pool address to zero to simulate a scenario where there are no legacy inflight messages.
     _enableERC165InterfaceChecks(s_cctpV1Pool, type(IPoolV1).interfaceId);
     _enableERC165InterfaceChecks(s_cctpV2Pool, type(IPoolV1).interfaceId);
-    _enableERC165InterfaceChecks(s_cctpTokenPool, type(IPoolV2).interfaceId);
+    _enableERC165InterfaceChecks(s_cctpThroughCCVTokenPool, type(IPoolV2).interfaceId);
 
     s_usdcTokenPoolProxy.updatePoolAddresses(
       USDCTokenPoolProxy.PoolAddresses({
-        legacyCctpV1Pool: address(0), // Set to zero to indicate no legacy pool
         cctpV1Pool: s_cctpV1Pool,
         cctpV2Pool: s_cctpV2Pool,
-        cctpTokenPool: s_cctpTokenPool,
-        siloedUsdCTokenPool: address(0)
+        cctpV2PoolWithCCV: s_cctpThroughCCVTokenPool,
+        siloedLockReleasePool: address(0)
       })
     );
 
-    // Arrange: Prepare test data for legacy format (64 bytes)
     uint256 testAmount = 1e6;
 
     USDCSourcePoolDataCodec.SourceTokenDataPayloadV1 memory legacySourcePoolData =
@@ -301,7 +223,7 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
 
     bytes memory legacySourcePoolDataBytes = abi.encode(legacySourcePoolData);
 
-    // Mock the CCTP V1 pool's i_localDomainIdentifier to return a test domain
+    // Mock the CCTP V1 pool's i_localDomainIdentifier to return a test domain.
     uint32 testLocalDomain = 12345;
     vm.mockCall(
       address(s_cctpV1Pool),
@@ -311,7 +233,7 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
 
     vm.startPrank(s_routerAllowedOffRamp);
 
-    // Prepare input with legacy 64-byte sourcePoolData
+    // Prepare input with legacy 64-byte sourcePoolData.
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = Pool.ReleaseOrMintInV1({
       remoteChainSelector: SOURCE_CHAIN_SELECTOR,
       originalSender: abi.encode(s_sender),
@@ -323,34 +245,29 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
       offchainTokenData: ""
     });
 
-    // Prepare expected output
+    // Prepare expected output.
     Pool.ReleaseOrMintOutV1 memory expectedOut = Pool.ReleaseOrMintOutV1({destinationAmount: testAmount});
 
-    // Expect the legacy pool's releaseOrMint to be called with the converted format
+    // Expect the legacy pool's releaseOrMint to be called with the converted format.
     // The _generateNewReleaseOrMintIn function will convert the legacy format to the new format
-    // and call the legacy pool with the converted data
+    // and call the legacy pool with the converted data.
     vm.mockCall(address(s_cctpV1Pool), abi.encodeWithSelector(IPoolV1.releaseOrMint.selector), abi.encode(expectedOut));
 
-    // Act: Call releaseOrMint on the proxy
     Pool.ReleaseOrMintOutV1 memory actualOut = s_usdcTokenPoolProxy.releaseOrMint(releaseOrMintIn);
 
-    // Assert: The output matches
     assertEq(actualOut.destinationAmount, expectedOut.destinationAmount);
-
-    vm.stopPrank();
   }
 
   // Reverts
 
   function test_releaseOrMint_InvalidVersion() public {
-    // Arrange: Prepare test data
     uint256 testAmount = 1234;
 
     bytes memory invalidSourcePoolData = abi.encodePacked(bytes4(uint32(2)), uint32(0), bytes32(hex"deafbeef"));
 
     bytes memory offChainTokenData = "";
 
-    // Mock the router's isOffRamp function to return true
+    // Mock the router's isOffRamp function to return true.
     vm.mockCall(
       address(s_router),
       abi.encodeWithSelector(Router.isOffRamp.selector, SOURCE_CHAIN_SELECTOR, s_routerAllowedOffRamp),
@@ -372,8 +289,6 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
 
     vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.InvalidMessageVersion.selector, bytes4(uint32(2))));
     s_usdcTokenPoolProxy.releaseOrMint(releaseOrMintIn);
-
-    vm.stopPrank();
   }
 
   function test_releaseOrMint_RevertWhen_CallerIsNotARampOnRouter() public {
@@ -381,7 +296,7 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
 
     vm.startPrank(unauthorized);
 
-    // Prepare input with CCTP_V1_FLAG in sourcePoolData (version 0 in offchainTokenData)
+    // Prepare input with CCTP_V1_FLAG in sourcePoolData (version 0 in offchainTokenData).
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = Pool.ReleaseOrMintInV1({
       remoteChainSelector: SOURCE_CHAIN_SELECTOR,
       originalSender: abi.encode(s_sender),

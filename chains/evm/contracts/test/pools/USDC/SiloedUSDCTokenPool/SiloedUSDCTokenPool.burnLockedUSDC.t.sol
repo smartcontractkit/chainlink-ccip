@@ -122,8 +122,8 @@ contract SiloedUSDCTokenPool_burnLockedUSDC is SiloedUSDCTokenPoolSetup {
   function test_burnLockedUSDC_RevertWhen_NoMigrationProposalPending() public {
     vm.startPrank(OWNER);
     s_usdcTokenPool.setCircleMigratorAddress(CIRCLE);
-    vm.stopPrank();
 
+    vm.stopPrank();
     vm.startPrank(CIRCLE);
 
     vm.expectRevert(abi.encodeWithSelector(SiloedUSDCTokenPool.NoMigrationProposalPending.selector));
@@ -165,6 +165,5 @@ contract SiloedUSDCTokenPool_burnLockedUSDC is SiloedUSDCTokenPoolSetup {
       abi.encodeWithSelector(SiloedUSDCTokenPool.TokenLockingNotAllowedAfterMigration.selector, DEST_CHAIN_SELECTOR)
     );
     s_usdcTokenPool.provideSiloedLiquidity(DEST_CHAIN_SELECTOR, 500e6);
-    vm.stopPrank();
   }
 }
