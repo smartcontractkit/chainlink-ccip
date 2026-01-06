@@ -2,5 +2,10 @@ blockscout/
 compose/
 env-out.toml
 dashboards/dummy.json
+<<<<<<< HEAD
 env-*-out.toml
 env.*.toml
+=======
+go.work
+go.work.sum
+>>>>>>> main

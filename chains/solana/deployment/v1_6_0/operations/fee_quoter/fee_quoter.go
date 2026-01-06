@@ -44,8 +44,7 @@ var Deploy = operations.NewOperation(
 			ContractType,
 			Version,
 			"",
-			ProgramName,
-			ProgramSize)
+			ProgramName)
 	},
 )
 
@@ -135,7 +134,7 @@ var ConnectChains = operations.NewOperation(
 		var destChainStateAccount fee_quoter.DestChain
 		err := chain.GetAccountDataBorshInto(context.Background(), fqRemoteChainPDA, &destChainStateAccount)
 		if err == nil {
-			fmt.Println("Remote chain state account found:", destChainStateAccount)
+			b.Logger.Infof("Remote chain state account found: %+v", destChainStateAccount)
 			isUpdate = true
 		}
 		var ixn solana.Instruction

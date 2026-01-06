@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {KeystoneFeedsPermissionHandler} from "@chainlink/contracts/src/v0.8/keystone/KeystoneFeedsPermissionHandler.sol";
+import {
+  KeystoneFeedsPermissionHandler
+} from "@chainlink/contracts/src/v0.8/keystone/KeystoneFeedsPermissionHandler.sol";
 
 import {FeeQuoter} from "../../FeeQuoter.sol";
 import {FeeQuoterSetup} from "./FeeQuoterSetup.t.sol";
@@ -118,9 +120,7 @@ contract FeeQuoter_onReport is FeeQuoterSetup {
 
     //create a stale report
     report[0] = FeeQuoter.ReceivedCCIPFeedReport({
-      token: s_onReportTestToken1,
-      price: 4e18,
-      timestamp: uint32(block.timestamp - 1)
+      token: s_onReportTestToken1, price: 4e18, timestamp: uint32(block.timestamp - 1)
     });
 
     //record logs to check no events were emitted

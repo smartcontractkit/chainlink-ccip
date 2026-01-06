@@ -21,9 +21,7 @@ contract USDCTokenPoolProxy_constructor is USDCSetup {
     USDCTokenPoolProxy proxy = new USDCTokenPoolProxy(
       s_USDCToken,
       USDCTokenPoolProxy.PoolAddresses({
-        legacyCctpV1Pool: s_legacyCctpV1Pool,
-        cctpV1Pool: s_cctpV1Pool,
-        cctpV2Pool: s_cctpV2Pool
+        legacyCctpV1Pool: s_legacyCctpV1Pool, cctpV1Pool: s_cctpV1Pool, cctpV2Pool: s_cctpV2Pool
       }),
       address(s_router)
     );
@@ -46,9 +44,7 @@ contract USDCTokenPoolProxy_constructor is USDCSetup {
     new USDCTokenPoolProxy(
       IERC20(address(0)),
       USDCTokenPoolProxy.PoolAddresses({
-        legacyCctpV1Pool: s_legacyCctpV1Pool,
-        cctpV1Pool: s_cctpV1Pool,
-        cctpV2Pool: address(0)
+        legacyCctpV1Pool: s_legacyCctpV1Pool, cctpV1Pool: s_cctpV1Pool, cctpV2Pool: address(0)
       }),
       address(s_router)
     );
@@ -59,9 +55,7 @@ contract USDCTokenPoolProxy_constructor is USDCSetup {
     new USDCTokenPoolProxy(
       IERC20(s_USDCToken), // Token
       USDCTokenPoolProxy.PoolAddresses({
-        legacyCctpV1Pool: s_legacyCctpV1Pool,
-        cctpV1Pool: s_cctpV1Pool,
-        cctpV2Pool: address(0)
+        legacyCctpV1Pool: s_legacyCctpV1Pool, cctpV1Pool: s_cctpV1Pool, cctpV2Pool: address(0)
       }),
       address(0) // Router
     );

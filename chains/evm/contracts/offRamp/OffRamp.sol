@@ -232,10 +232,8 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     uint64 sequenceNumber
   ) public view returns (Internal.MessageExecutionState) {
     return Internal.MessageExecutionState(
-      (
-        _getSequenceNumberBitmap(sourceChainSelector, sequenceNumber)
-          >> ((sequenceNumber % 128) * MESSAGE_EXECUTION_STATE_BIT_WIDTH)
-      ) & MESSAGE_EXECUTION_STATE_MASK
+      (_getSequenceNumberBitmap(sourceChainSelector, sequenceNumber)
+          >> ((sequenceNumber % 128) * MESSAGE_EXECUTION_STATE_BIT_WIDTH)) & MESSAGE_EXECUTION_STATE_MASK
     );
   }
 
@@ -336,7 +334,10 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   /// @notice Transmit function for execution reports. The function takes no signatures, and expects the exec plugin
   /// type to be configured with no signatures.
   /// @param report serialized execution report.
-  function execute(bytes32[2] calldata reportContext, bytes calldata report) external {
+  function execute(
+    bytes32[2] calldata reportContext,
+    bytes calldata report
+  ) external {
     _batchExecute(abi.decode(report, (Internal.ExecutionReport[])), new GasLimitOverride[][](0));
 
     bytes32[] memory emptySigs = new bytes32[](0);
@@ -405,12 +406,8 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
       // Two valid cases here, we either have never touched this message before, or we tried to execute and failed. This
       // check protects against reentry and re-execution because the other state is IN_PROGRESS which should not be
       // allowed to execute.
-      if (
-        !(
-          originalState == Internal.MessageExecutionState.UNTOUCHED
-            || originalState == Internal.MessageExecutionState.FAILURE
-        )
-      ) {
+      if (!(originalState == Internal.MessageExecutionState.UNTOUCHED
+            || originalState == Internal.MessageExecutionState.FAILURE)) {
         // If the message has already been executed, we skip it. We want to not revert on race conditions between
         // executing parties. This will allow us to open up manual exec while also attempting with the DON, without
         // reverting an entire DON batch when a user manually executes while the tx is inflight.
@@ -450,11 +447,8 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
       if (message.header.nonce != 0) {
         if (originalState == Internal.MessageExecutionState.UNTOUCHED) {
           // If a nonce is not incremented, that means it was skipped, and we can ignore the message.
-          if (
-            !INonceManager(i_nonceManager).incrementInboundNonce(
-              sourceChainSelector, message.header.nonce, message.sender
-            )
-          ) continue;
+          if (!INonceManager(i_nonceManager)
+              .incrementInboundNonce(sourceChainSelector, message.header.nonce, message.sender)) continue;
         }
       }
 
@@ -602,8 +596,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
         || !message.receiver._supportsInterfaceReverting(type(IAny2EVMMessageReceiver).interfaceId)
     ) return;
 
-    (bool success, bytes memory returnData,) = s_sourceChainConfigs[message.header.sourceChainSelector]
-      .router
+    (bool success, bytes memory returnData,) = s_sourceChainConfigs[message.header.sourceChainSelector].router
       .routeMessage(any2EvmMessage, i_gasForCallExactCheck, message.gasLimit, message.receiver);
     // If CCIP receiver execution is not successful, revert the call including token transfers.
     if (!success) revert ReceiverError(returnData);
@@ -651,8 +644,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     // (compatible) pool contract. _callWithExactGasSafeReturnData will check if the location contains a contract. If it
     // doesn't it reverts with a known error. We call the pool with exact gas  to increase resistance against malicious
     // tokens or token pools. We protect against return data bombs by capping the return data size at MAX_RET_BYTES.
-    (bool success, bytes memory returnData, uint256 gasUsedReleaseOrMint) = CallWithExactGas
-      ._callWithExactGasSafeReturnData(
+    (bool success, bytes memory returnData, uint256 gasUsedReleaseOrMint) = CallWithExactGas._callWithExactGasSafeReturnData(
       abi.encodeCall(
         IPoolV1.releaseOrMint,
         Pool.ReleaseOrMintInV1({
@@ -826,7 +818,10 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   /// some future point where the root will be blessed.
   /// @param root The merkle root to commit.
   /// @param isBlessed The blessing status of the root.
-  function _commitRoot(Internal.MerkleRoot memory root, bool isBlessed) internal {
+  function _commitRoot(
+    Internal.MerkleRoot memory root,
+    bool isBlessed
+  ) internal {
     uint64 sourceChainSelector = root.sourceChainSelector;
 
     if (i_rmnRemote.isCursed(bytes16(uint128(sourceChainSelector)))) {
@@ -872,7 +867,10 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   /// @param sourceChainSelector The source chain selector.
   /// @param root The merkle root to check the commit status for.
   /// @return timestamp The timestamp of the committed root or zero in the case that it was never committed.
-  function getMerkleRoot(uint64 sourceChainSelector, bytes32 root) external view returns (uint256) {
+  function getMerkleRoot(
+    uint64 sourceChainSelector,
+    bytes32 root
+  ) external view returns (uint256) {
     return s_roots[sourceChainSelector][root];
   }
 

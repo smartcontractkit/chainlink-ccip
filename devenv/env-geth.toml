@@ -9,3 +9,9 @@
   chain_id = "2337"
   port = "8555"
   type = "geth"
+
+[[blockchains]]
+  container_name = "solana-chain"
+  chain_id = "22222222222222222222222222222222222222222222"
+  port = "8565"
+  type = "solana"

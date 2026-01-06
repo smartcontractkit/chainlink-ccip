@@ -17,7 +17,10 @@ contract MockCrossL2Inbox is ICrossL2Inbox {
   mapping(bytes32 identifierHash => mapping(bytes32 msgHash => bool success)) public s_validationSuccesses;
   mapping(bytes32 identifierHash => mapping(bytes32 msgHash => string revertMessage)) public s_validationErrors;
 
-  function validateMessage(Identifier calldata identifier, bytes32 msgHash) external {
+  function validateMessage(
+    Identifier calldata identifier,
+    bytes32 msgHash
+  ) external {
     s_validateMessageCalls.push(ValidateMessageCall({identifier: identifier, msgHash: msgHash}));
 
     bytes32 idHash = keccak256(abi.encode(identifier));
@@ -35,12 +38,19 @@ contract MockCrossL2Inbox is ICrossL2Inbox {
     revert UnexpectedCall(idHash, msgHash);
   }
 
-  function setValidationSuccess(Identifier memory identifier, bytes32 msgHash) external {
+  function setValidationSuccess(
+    Identifier memory identifier,
+    bytes32 msgHash
+  ) external {
     bytes32 idHash = keccak256(abi.encode(identifier));
     s_validationSuccesses[idHash][msgHash] = true;
   }
 
-  function setValidationError(Identifier memory identifier, bytes32 msgHash, string memory revertMessage) external {
+  function setValidationError(
+    Identifier memory identifier,
+    bytes32 msgHash,
+    string memory revertMessage
+  ) external {
     bytes32 idHash = keccak256(abi.encode(identifier));
     s_validationErrors[idHash][msgHash] = revertMessage;
   }
@@ -59,7 +69,10 @@ contract MockCrossL2Inbox is ICrossL2Inbox {
     delete s_validateMessageCalls;
   }
 
-  function calculateChecksum(Identifier memory identifier, bytes32 msgHash) external pure returns (bytes32 checksum_) {
+  function calculateChecksum(
+    Identifier memory identifier,
+    bytes32 msgHash
+  ) external pure returns (bytes32 checksum_) {
     return keccak256(abi.encode(identifier, msgHash));
   }
 }

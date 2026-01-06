@@ -26,7 +26,10 @@ contract OffRampHelper is OffRamp, IgnoreContractSize {
     _setExecutionState(sourceChainSelector, sequenceNumber, state);
   }
 
-  function getExecutionStateBitMap(uint64 sourceChainSelector, uint64 bitmapIndex) public view returns (uint256) {
+  function getExecutionStateBitMap(
+    uint64 sourceChainSelector,
+    uint64 bitmapIndex
+  ) public view returns (uint256) {
     return s_executionStates[sourceChainSelector][bitmapIndex];
   }
 
@@ -99,12 +102,19 @@ contract OffRampHelper is OffRamp, IgnoreContractSize {
   }
 
   /// @dev Test helper to override _verify result for easier exec testing
-  function setVerifyOverrideResult(uint64 sourceChainSelector, uint256 overrideTimestamp) external {
+  function setVerifyOverrideResult(
+    uint64 sourceChainSelector,
+    uint256 overrideTimestamp
+  ) external {
     s_sourceChainVerificationOverride[sourceChainSelector] = overrideTimestamp;
   }
 
   /// @dev Test helper to directly set a root's timestamp
-  function setRootTimestamp(uint64 sourceChainSelector, bytes32 root, uint256 timestamp) external {
+  function setRootTimestamp(
+    uint64 sourceChainSelector,
+    bytes32 root,
+    uint256 timestamp
+  ) external {
     s_roots[sourceChainSelector][root] = timestamp;
   }
 

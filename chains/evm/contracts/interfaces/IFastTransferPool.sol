@@ -9,7 +9,6 @@ interface IFastTransferPool {
     NOT_FILLED, // Request has not been filled yet.
     FILLED, // Request has been filled by a filler.
     SETTLED // Request has been settled via CCIP.
-
   }
 
   /// @notice Quote struct containing fee information.

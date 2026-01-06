@@ -242,8 +242,8 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     bool isOutOfOrderExecution;
     bytes memory tokenReceiver;
     (newMessage.feeValueJuels, isOutOfOrderExecution, newMessage.extraArgs, tokenReceiver) = IFeeQuoter(
-      s_dynamicConfig.feeQuoter
-    ).processMessageArgs(destChainSelector, message.feeToken, feeTokenAmount, message.extraArgs, message.receiver);
+        s_dynamicConfig.feeQuoter
+      ).processMessageArgs(destChainSelector, message.feeToken, feeTokenAmount, message.extraArgs, message.receiver);
 
     Client.EVMTokenAmount[] memory tokenAmounts = message.tokenAmounts;
     // Lock / burn the tokens as last step. TokenPools may not always be trusted.
@@ -252,9 +252,8 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
         _lockOrBurnSingleToken(tokenAmounts[i], destChainSelector, tokenReceiver, originalSender);
     }
 
-    bytes[] memory destExecDataPerToken = IFeeQuoter(s_dynamicConfig.feeQuoter).processPoolReturnData(
-      destChainSelector, newMessage.tokenAmounts, tokenAmounts
-    );
+    bytes[] memory destExecDataPerToken = IFeeQuoter(s_dynamicConfig.feeQuoter)
+      .processPoolReturnData(destChainSelector, newMessage.tokenAmounts, tokenAmounts);
     newMessage.header.nonce = isOutOfOrderExecution
       ? 0
       : INonceManager(i_nonceManager).getIncrementedOutboundNonce(destChainSelector, originalSender);
@@ -498,7 +497,11 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   // ================================================================
 
   /// @inheritdoc IEVM2AnyOnRampClient
-  function getPoolBySourceToken(uint64, /*destChainSelector*/ IERC20 sourceToken) public view returns (IPoolV1) {
+  function getPoolBySourceToken(
+    uint64,
+    /*destChainSelector*/
+    IERC20 sourceToken
+  ) public view returns (IPoolV1) {
     return IPoolV1(ITokenAdminRegistry(i_tokenAdminRegistry).getPool(address(sourceToken)));
   }
 

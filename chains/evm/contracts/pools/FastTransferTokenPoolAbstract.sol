@@ -395,7 +395,10 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   /// @notice Validates the send request parameters. Can be overridden by derived contracts to add additional checks.
   /// @param destinationChainSelector The destination chain selector.
   /// @dev Checks if the destination chain is allowed, if the sender is allowed, and if the RMN curse applies.
-  function _validateSendRequest(uint64 destinationChainSelector, bytes calldata receiver) internal view virtual {
+  function _validateSendRequest(
+    uint64 destinationChainSelector,
+    bytes calldata receiver
+  ) internal view virtual {
     _validateBytesNotEmptyOrZero(receiver);
 
     if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(destinationChainSelector)))) revert CursedByRMN();
@@ -438,7 +441,10 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   /// @notice Validates settlement prerequisites. Can be overridden by derived contracts to add additional checks.
   /// @param sourceChainSelector The source chain selector.
   /// @param sourcePoolAddress The source pool address.
-  function _validateSettlement(uint64 sourceChainSelector, bytes memory sourcePoolAddress) internal view virtual {
+  function _validateSettlement(
+    uint64 sourceChainSelector,
+    bytes memory sourcePoolAddress
+  ) internal view virtual {
     if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(sourceChainSelector)))) revert CursedByRMN();
     //Validates that the source pool address is configured on this pool.
     if (!isRemotePool(sourceChainSelector, sourcePoolAddress)) {
@@ -455,7 +461,11 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   /// function to handle the transfer in a different way.
   /// @param sender The sender address.
   /// @param amount The amount to transfer.
-  function _handleFastTransferLockOrBurn(uint64, address sender, uint256 amount) internal virtual {
+  function _handleFastTransferLockOrBurn(
+    uint64,
+    address sender,
+    uint256 amount
+  ) internal virtual {
     // Since this is a fast transfer, the Router doesn't forward the tokens to the pool.
     getToken().safeTransferFrom(sender, address(this), amount);
     // Use the normal burn logic once the tokens are in the pool.
@@ -468,7 +478,12 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   /// @param filler The address of the filler.
   /// @param receiver The address of the receiver.
   /// @param amount The amount to transfer in local denomination.
-  function _handleFastFill(bytes32, address filler, address receiver, uint256 amount) internal virtual {
+  function _handleFastFill(
+    bytes32,
+    address filler,
+    address receiver,
+    uint256 amount
+  ) internal virtual {
     getToken().safeTransferFrom(filler, receiver, amount);
   }
 
@@ -478,7 +493,12 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   /// for handling slow fills.
   /// @param localSettlementAmount The amount to settle in local token.
   /// @param receiver The receiver address.
-  function _handleSlowFill(bytes32, uint64, uint256 localSettlementAmount, address receiver) internal virtual {
+  function _handleSlowFill(
+    bytes32,
+    uint64,
+    uint256 localSettlementAmount,
+    address receiver
+  ) internal virtual {
     _releaseOrMint(receiver, localSettlementAmount);
   }
 

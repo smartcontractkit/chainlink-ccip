@@ -16,9 +16,7 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
   function test_updatePoolAddresses() public {
     // Arrange: Define test constants
     USDCTokenPoolProxy.PoolAddresses memory newPools = USDCTokenPoolProxy.PoolAddresses({
-      legacyCctpV1Pool: s_legacyCctpV1Pool,
-      cctpV1Pool: s_newCctpV1Pool,
-      cctpV2Pool: s_newCctpV2Pool
+      legacyCctpV1Pool: s_legacyCctpV1Pool, cctpV1Pool: s_newCctpV1Pool, cctpV2Pool: s_newCctpV2Pool
     });
 
     _enableERC165InterfaceChecks(s_newCctpV1Pool, type(IPoolV1).interfaceId);
@@ -40,9 +38,7 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
 
   function test_updatePoolAddresses_RevertWhen_CCTPV1PoolDoesNotSupportIPoolV1() public {
     USDCTokenPoolProxy.PoolAddresses memory newPools = USDCTokenPoolProxy.PoolAddresses({
-      legacyCctpV1Pool: address(0),
-      cctpV1Pool: s_newCctpV1Pool,
-      cctpV2Pool: address(0)
+      legacyCctpV1Pool: address(0), cctpV1Pool: s_newCctpV1Pool, cctpV2Pool: address(0)
     });
 
     changePrank(OWNER);
@@ -59,9 +55,7 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
 
   function test_updatePoolAddresses_RevertWhen_CCTPV2PoolDoesNotSupportIPoolV1() public {
     USDCTokenPoolProxy.PoolAddresses memory newPools = USDCTokenPoolProxy.PoolAddresses({
-      legacyCctpV1Pool: address(0),
-      cctpV1Pool: address(0),
-      cctpV2Pool: s_newCctpV2Pool
+      legacyCctpV1Pool: address(0), cctpV1Pool: address(0), cctpV2Pool: s_newCctpV2Pool
     });
 
     changePrank(OWNER);
@@ -78,9 +72,7 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
 
   function test_updatePoolAddresses_RevertWhen_LegacyPoolDoesNotSupportIPoolV1() public {
     USDCTokenPoolProxy.PoolAddresses memory newPools = USDCTokenPoolProxy.PoolAddresses({
-      legacyCctpV1Pool: s_legacyCctpV1Pool,
-      cctpV1Pool: s_newCctpV1Pool,
-      cctpV2Pool: s_newCctpV2Pool
+      legacyCctpV1Pool: s_legacyCctpV1Pool, cctpV1Pool: s_newCctpV1Pool, cctpV2Pool: s_newCctpV2Pool
     });
 
     // Enable the V1 and V2 pools to support the IPoolV1 interface
@@ -108,7 +100,10 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
     assertEq(s_usdcTokenPoolProxy.getPools().legacyCctpV1Pool, s_legacyCctpV1Pool);
   }
 
-  function _enableERC165InterfaceChecks(address pool, bytes4 interfaceId) internal {
+  function _enableERC165InterfaceChecks(
+    address pool,
+    bytes4 interfaceId
+  ) internal {
     vm.mockCall(
       address(pool), abi.encodeWithSelector(IERC165.supportsInterface.selector, interfaceId), abi.encode(true)
     );

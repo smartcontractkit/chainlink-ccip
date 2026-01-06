@@ -17,7 +17,10 @@ contract OnRampOverSuperchainInterop_extractGasLimit is OnRampOverSuperchainInte
     assertEq(expectedGasLimit, s_onRampOverSuperchainInterop.extractGasLimit(extraArgs));
   }
 
-  function testFuzz_extractGasLimit_VariousGasLimitAndDataSize(uint256 gasLimit, uint256 length) public view {
+  function testFuzz_extractGasLimit_VariousGasLimitAndDataSize(
+    uint256 gasLimit,
+    uint256 length
+  ) public view {
     length = bound(length, 0, 10_000);
 
     assertEq(

@@ -9,9 +9,12 @@ import {Client} from "./libraries/Client.sol";
 import {Internal} from "./libraries/Internal.sol";
 import {Pool} from "./libraries/Pool.sol";
 import {USDPriceWith18Decimals} from "./libraries/USDPriceWith18Decimals.sol";
-import {KeystoneFeedsPermissionHandler} from "@chainlink/contracts/src/v0.8/keystone/KeystoneFeedsPermissionHandler.sol";
-import {KeystoneFeedDefaultMetadataLib} from
-  "@chainlink/contracts/src/v0.8/keystone/lib/KeystoneFeedDefaultMetadataLib.sol";
+import {
+  KeystoneFeedsPermissionHandler
+} from "@chainlink/contracts/src/v0.8/keystone/KeystoneFeedsPermissionHandler.sol";
+import {
+  KeystoneFeedDefaultMetadataLib
+} from "@chainlink/contracts/src/v0.8/keystone/lib/KeystoneFeedDefaultMetadataLib.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 
@@ -436,7 +439,10 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   /// @param feeTokensToRemove The addresses of the tokens which are no longer considered feeTokens.
   /// @param feeTokensToAdd The addresses of the tokens which are now considered fee tokens.
   /// and can be used to calculate fees.
-  function _applyFeeTokensUpdates(address[] memory feeTokensToRemove, address[] memory feeTokensToAdd) private {
+  function _applyFeeTokensUpdates(
+    address[] memory feeTokensToRemove,
+    address[] memory feeTokensToAdd
+  ) private {
     for (uint256 i = 0; i < feeTokensToRemove.length; ++i) {
       if (s_feeTokens.remove(feeTokensToRemove[i])) {
         emit FeeTokenRemoved(feeTokensToRemove[i]);
@@ -515,7 +521,10 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   /// @dev This function is called to process incoming price feed data.
   /// @param metadata Arbitrary metadata associated with the report (not used in this implementation).
   /// @param report Encoded report containing an array of `ReceivedCCIPFeedReport` structs.
-  function onReport(bytes calldata metadata, bytes calldata report) external {
+  function onReport(
+    bytes calldata metadata,
+    bytes calldata report
+  ) external {
     (bytes10 workflowName, address workflowOwner, bytes2 reportName) = metadata._extractMetadataInfo();
 
     _validateReportPermission(msg.sender, workflowOwner, workflowName, reportName);
@@ -633,10 +642,11 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
     // Total USD fee is in 36 decimals, feeTokenPrice is in 18 decimals USD for 1e18 smallest token denominations.
     // The result is the fee in the feeTokens smallest denominations (e.g. wei for ETH).
     // uint112(packedGasPrice) = executionGasPrice
-    return (
-      totalDestChainGas * uint112(packedGasPrice) * destChainConfig.gasMultiplierWeiPerEth + premiumFeeUSDWei
-        + dataAvailabilityCostUSD36Decimals
-    ) / feeTokenPrice;
+    return (totalDestChainGas
+        * uint112(packedGasPrice)
+        * destChainConfig.gasMultiplierWeiPerEth
+        + premiumFeeUSDWei
+        + dataAvailabilityCostUSD36Decimals) / feeTokenPrice;
   }
 
   /// @notice Sets the fee configuration for a token.
@@ -843,7 +853,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
 
       for (uint256 j = 0; j < tokenTransferFeeConfigArg.tokenTransferFeeConfigs.length; ++j) {
         TokenTransferFeeConfig memory tokenTransferFeeConfig =
-          tokenTransferFeeConfigArg.tokenTransferFeeConfigs[j].tokenTransferFeeConfig;
+        tokenTransferFeeConfigArg.tokenTransferFeeConfigs[j].tokenTransferFeeConfig;
         address token = tokenTransferFeeConfigArg.tokenTransferFeeConfigs[j].token;
 
         if (tokenTransferFeeConfig.minFeeUSDCents >= tokenTransferFeeConfig.maxFeeUSDCents) {
@@ -1039,12 +1049,14 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
         || destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_APTOS
         || destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_TVM
     ) {
-      gasLimit = _parseGenericExtraArgsFromBytes(
+      gasLimit =
+      _parseGenericExtraArgsFromBytes(
         message.extraArgs,
         destChainConfig.defaultTxGasLimit,
         destChainConfig.maxPerMsgGasLimit,
         destChainConfig.enforceOutOfOrder
-      ).gasLimit;
+      )
+      .gasLimit;
 
       _validateDestFamilyAddress(destChainConfig.chainFamilySelector, message.receiver, gasLimit);
     } else if (destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SUI) {
@@ -1072,8 +1084,8 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
         // The messaging accounts needed for CCIP receiver on SUI are:
         // message receiver,
         // plus remaining accounts specified in Sui extraArgs. Each account is 32 bytes.
-        suiExpandedDataLength +=
-          ((receiverObjectIdsLength + Client.SUI_MESSAGING_ACCOUNTS_OVERHEAD) * Client.SUI_ACCOUNT_BYTE_SIZE);
+        suiExpandedDataLength += ((receiverObjectIdsLength + Client.SUI_MESSAGING_ACCOUNTS_OVERHEAD)
+            * Client.SUI_ACCOUNT_BYTE_SIZE);
       }
 
       if (numberOfTokens > 0 && suiExtraArgsV1.tokenReceiver == bytes32(0)) {
@@ -1128,8 +1140,8 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
         // The messaging accounts needed for CCIP receiver on SVM are:
         // message receiver, offRamp PDA signer,
         // plus remaining accounts specified in SVM extraArgs. Each account is 32 bytes.
-        svmExpandedDataLength +=
-          ((accountsLength + Client.SVM_MESSAGING_ACCOUNTS_OVERHEAD) * Client.SVM_ACCOUNT_BYTE_SIZE);
+        svmExpandedDataLength += ((accountsLength + Client.SVM_MESSAGING_ACCOUNTS_OVERHEAD)
+            * Client.SVM_ACCOUNT_BYTE_SIZE);
       }
 
       if (numberOfTokens > 0 && svmExtraArgsV1.tokenReceiver == bytes32(0)) {
@@ -1229,7 +1241,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
         true,
         abi.encode(
           _parseSuiExtraArgsFromBytes(extraArgs, destChainConfig.maxPerMsgGasLimit, destChainConfig.enforceOutOfOrder)
-            .tokenReceiver
+          .tokenReceiver
         )
       );
     }
@@ -1242,7 +1254,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
         true,
         abi.encode(
           _parseSVMExtraArgsFromBytes(extraArgs, destChainConfig.maxPerMsgGasLimit, destChainConfig.enforceOutOfOrder)
-            .tokenReceiver
+          .tokenReceiver
         )
       );
     }
@@ -1322,13 +1334,11 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
       if (
         destChainSelector == 0 || destChainConfig.defaultTxGasLimit == 0
           || destChainConfig.defaultTxGasLimit > destChainConfig.maxPerMsgGasLimit
-          || (
-            destChainConfig.chainFamilySelector != Internal.CHAIN_FAMILY_SELECTOR_EVM
-              && destChainConfig.chainFamilySelector != Internal.CHAIN_FAMILY_SELECTOR_SVM
-              && destChainConfig.chainFamilySelector != Internal.CHAIN_FAMILY_SELECTOR_APTOS
-              && destChainConfig.chainFamilySelector != Internal.CHAIN_FAMILY_SELECTOR_SUI
-              && destChainConfig.chainFamilySelector != Internal.CHAIN_FAMILY_SELECTOR_TVM
-          )
+          || (destChainConfig.chainFamilySelector != Internal.CHAIN_FAMILY_SELECTOR_EVM
+            && destChainConfig.chainFamilySelector != Internal.CHAIN_FAMILY_SELECTOR_SVM
+            && destChainConfig.chainFamilySelector != Internal.CHAIN_FAMILY_SELECTOR_APTOS
+            && destChainConfig.chainFamilySelector != Internal.CHAIN_FAMILY_SELECTOR_SUI
+            && destChainConfig.chainFamilySelector != Internal.CHAIN_FAMILY_SELECTOR_TVM)
       ) {
         revert InvalidDestChainConfig(destChainSelector);
       }

@@ -63,7 +63,8 @@ contract OnRampOverSuperchainInterop is OnRamp {
     // between validated logData and message content.
     // What is emitted at source is verified as the final message format used in execution.
     Internal.Any2EVMRampMessage memory interopMessage = Internal.Any2EVMRampMessage({
-      header: Internal.RampMessageHeader({ // deep copy, because we will be setting the messageId later
+      header: // deep copy, because we will be setting the messageId later
+      Internal.RampMessageHeader({
         messageId: "",
         sourceChainSelector: message.header.sourceChainSelector,
         destChainSelector: message.header.destChainSelector,
