@@ -6,13 +6,13 @@ import (
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
-	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
 func ValidateSendRequestedEvent(
-	ev *SendRequestedEvent, source, dest cciptypes.ChainSelector, seqNumRange cciptypes.SeqNumRange,
+	ev *cciptypes.SendRequestedEvent, source, dest cciptypes.ChainSelector, seqNumRange cciptypes.SeqNumRange,
 ) error {
 	if ev == nil {
 		return fmt.Errorf("send requested event is nil")
@@ -63,8 +63,8 @@ func ValidateSendRequestedEvent(
 
 func validateCommitReportAcceptedEvent(
 	seq types.Sequence, gteTimestamp time.Time,
-) (*CommitReportAcceptedEvent, error) {
-	ev, is := (seq.Data).(*CommitReportAcceptedEvent)
+) (*cciptypes.CommitReportAcceptedEvent, error) {
+	ev, is := (seq.Data).(*cciptypes.CommitReportAcceptedEvent)
 	if !is {
 		return nil, fmt.Errorf("unexpected type %T while expecting a commit report", seq)
 	}
@@ -100,7 +100,7 @@ func validateCommitReportAcceptedEvent(
 	return ev, nil
 }
 
-func validateMerkleRoots(merkleRoots []MerkleRoot) error {
+func validateMerkleRoots(merkleRoots []cciptypes.MerkleRoot) error {
 	seenRoots := mapset.NewSet[cciptypes.Bytes32]()
 
 	for _, mr := range merkleRoots {
@@ -133,7 +133,7 @@ func validateMerkleRoots(merkleRoots []MerkleRoot) error {
 }
 
 func validateExecutionStateChangedEvent(
-	ev *ExecutionStateChangedEvent, rangesByChain map[cciptypes.ChainSelector][]cciptypes.SeqNumRange) error {
+	ev *cciptypes.ExecutionStateChangedEvent, rangesByChain map[cciptypes.ChainSelector][]cciptypes.SeqNumRange) error {
 	if ev == nil {
 		return fmt.Errorf("execution state changed event is nil")
 	}
