@@ -95,7 +95,7 @@ var ConfigureTokenPool = cldf_ops.NewSequence(
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get current threshold amount for additional CCVs on advanced pool hooks with address %s on %s: %w", input.AdvancedPoolHooks, chain, err)
 			}
-			if currentThresholdAmountReport.Output != input.ThresholdAmountForAdditionalCCVs {
+			if currentThresholdAmountReport.Output.Cmp(input.ThresholdAmountForAdditionalCCVs) != 0 {
 				setThresholdAmountReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.SetThresholdAmount, chain, evm_contract.FunctionInput[*big.Int]{
 					ChainSelector: input.ChainSelector,
 					Address:       input.AdvancedPoolHooks,
