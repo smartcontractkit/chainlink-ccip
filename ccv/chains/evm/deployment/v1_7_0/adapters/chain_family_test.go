@@ -30,22 +30,22 @@ func makeChainConfig(chainSelector uint64, remoteChainSelector uint64) v1_7_0_ch
 		ChainSelector: chainSelector,
 		Router: datastore.AddressRef{
 			Type:    datastore.ContractType(router.ContractType),
-			Version: semver.MustParse("1.2.0"),
+			Version: router.Version,
 		},
 		OnRamp: datastore.AddressRef{
 			Type:    datastore.ContractType(onramp.ContractType),
-			Version: semver.MustParse("1.7.0"),
+			Version: onramp.Version,
 		},
 		CommitteeVerifiers: []adapters.CommitteeVerifierConfig[datastore.AddressRef]{
 			{
 				CommitteeVerifier: []datastore.AddressRef{
 					{
 						Type:    datastore.ContractType(committee_verifier.ContractType),
-						Version: semver.MustParse("1.7.0"),
+						Version: committee_verifier.Version,
 					},
 					{
 						Type:    datastore.ContractType(committee_verifier.ResolverType),
-						Version: semver.MustParse("1.7.0"),
+						Version: committee_verifier.Version,
 					},
 				},
 				RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
@@ -55,11 +55,11 @@ func makeChainConfig(chainSelector uint64, remoteChainSelector uint64) v1_7_0_ch
 		},
 		FeeQuoter: datastore.AddressRef{
 			Type:    datastore.ContractType(fee_quoter.ContractType),
-			Version: semver.MustParse("1.7.0"),
+			Version: fee_quoter.Version,
 		},
 		OffRamp: datastore.AddressRef{
 			Type:    datastore.ContractType(offramp.ContractType),
-			Version: semver.MustParse("1.7.0"),
+			Version: offramp.Version,
 		},
 		RemoteChains: map[uint64]adapters.RemoteChainConfig[datastore.AddressRef, datastore.AddressRef]{
 			remoteChainSelector: {
@@ -67,28 +67,28 @@ func makeChainConfig(chainSelector uint64, remoteChainSelector uint64) v1_7_0_ch
 				OnRamps: []datastore.AddressRef{
 					{
 						Type:    datastore.ContractType(onramp.ContractType),
-						Version: semver.MustParse("1.7.0"),
+						Version: onramp.Version,
 					},
 				},
 				OffRamp: datastore.AddressRef{
 					Type:    datastore.ContractType(offramp.ContractType),
-					Version: semver.MustParse("1.7.0"),
+					Version: offramp.Version,
 				},
 				DefaultInboundCCVs: []datastore.AddressRef{
 					{
 						Type:    datastore.ContractType(committee_verifier.ContractType),
-						Version: semver.MustParse("1.7.0"),
+						Version: committee_verifier.Version,
 					},
 				},
 				DefaultOutboundCCVs: []datastore.AddressRef{
 					{
 						Type:    datastore.ContractType(committee_verifier.ContractType),
-						Version: semver.MustParse("1.7.0"),
+						Version: committee_verifier.Version,
 					},
 				},
 				DefaultExecutor: datastore.AddressRef{
-					Type:      datastore.ContractType(executor.ContractType),
-					Version:   semver.MustParse("1.7.0"),
+					Type:      datastore.ContractType(executor.ProxyType),
+					Version:   executor.Version,
 					Qualifier: "default",
 				},
 				FeeQuoterDestChainConfig: testsetup.CreateBasicFeeQuoterDestChainConfig(),

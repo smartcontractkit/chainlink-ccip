@@ -38,7 +38,7 @@ func (ca *CurseAdapter) Initialize(e cldf.Environment) error {
 	for _, chain := range e.BlockChains.EVMChains() {
 		rmnAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 			Type:    datastore.ContractType(ops.ContractType),
-			Version: semver.MustParse("1.6.0"),
+			Version: ops.Version,
 		}, chain.ChainSelector(), evmds.ToEVMAddress)
 		if err != nil {
 			return err
@@ -47,7 +47,7 @@ func (ca *CurseAdapter) Initialize(e cldf.Environment) error {
 
 		routerAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 			Type:    datastore.ContractType(routerops.ContractType),
-			Version: semver.MustParse("1.2.0"),
+			Version: routerops.Version,
 		}, chain.ChainSelector(), evmds.ToEVMAddress)
 		if err != nil {
 			return err

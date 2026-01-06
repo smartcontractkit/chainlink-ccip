@@ -9,13 +9,13 @@ require (
 	github.com/Masterminds/semver/v3 v3.4.0
 	github.com/ethereum/go-ethereum v1.16.5
 	github.com/smartcontractkit/chain-selectors v1.0.72
-	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20260102164736-8e4139c12021
-	github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm v0.0.0-20260102164736-8e4139c12021
-	github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment v0.0.0-20260102164736-8e4139c12021
-	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260102164736-8e4139c12021
+	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20260105131055-ee589ab48167
+	github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm v0.0.0-20260105131055-ee589ab48167
+	github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment v0.0.0-20260105131055-ee589ab48167
+	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260105131055-ee589ab48167
 	github.com/smartcontractkit/chainlink-common v0.9.6-0.20250929154511-1f5fbda7ae76
 	github.com/smartcontractkit/chainlink-deployments-framework v0.56.0
-	github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20250808121824-2c3544aab8f3
+	github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20251222115927-36a18321243c
 	github.com/smartcontractkit/mcms v0.25.0
 	github.com/stretchr/testify v1.11.1
 )

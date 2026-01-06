@@ -18,10 +18,10 @@ import (
 	mock_recv_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/mock_receiver_v2"
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/link_token"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
@@ -46,14 +46,14 @@ func TestDeployChainContracts_Idempotency(t *testing.T) {
 			existingAddresses: []datastore.AddressRef{
 				{
 					ChainSelector: 5009297550715157269,
-					Type:          datastore.ContractType(link.ContractType),
-					Version:       semver.MustParse("1.0.0"),
+					Type:          datastore.ContractType(link_token.ContractType),
+					Version:       link_token.Version,
 					Address:       common.HexToAddress("0x01").Hex(),
 				},
 				{
 					ChainSelector: 5009297550715157269,
 					Type:          datastore.ContractType(weth.ContractType),
-					Version:       semver.MustParse("1.0.0"),
+					Version:       weth.Version,
 					Address:       common.HexToAddress("0x02").Hex(),
 				},
 			},
@@ -97,7 +97,7 @@ func TestDeployChainContracts_Idempotency(t *testing.T) {
 				rmn_remote.ContractType:           false,
 				router.ContractType:               false,
 				executor.ContractType:             false,
-				link.ContractType:                 false,
+				link_token.ContractType:           false,
 				weth.ContractType:                 false,
 				committee_verifier.ContractType:   false,
 				onramp.ContractType:               false,
@@ -244,13 +244,13 @@ func TestDeployChainContracts_MultipleCommitteeVerifiersAndMultipleMockReceiverC
 	params := testsetup.CreateBasicContractParams()
 	params.CommitteeVerifiers = []sequences.CommitteeVerifierParams{
 		{
-			Version:          semver.MustParse("1.7.0"),
+			Version:          committee_verifier.Version,
 			FeeAggregator:    common.HexToAddress("0x01"),
 			StorageLocations: []string{"https://test.chain.link.fake"},
 			Qualifier:        "alpha",
 		},
 		{
-			Version:          semver.MustParse("1.7.0"),
+			Version:          committee_verifier.Version,
 			FeeAggregator:    common.HexToAddress("0x01"),
 			StorageLocations: []string{"https://test.chain.link.fake"},
 			Qualifier:        "beta",
@@ -258,36 +258,36 @@ func TestDeployChainContracts_MultipleCommitteeVerifiersAndMultipleMockReceiverC
 	}
 	params.MockReceivers = []sequences.MockReceiverParams{
 		{
-			Version: semver.MustParse("1.7.0"),
+			Version: mock_receiver.Version,
 			RequiredVerifiers: []datastore.AddressRef{
 				{
 					ChainSelector: chainSelector,
 					Type:          datastore.ContractType(committee_verifier.ContractType),
-					Version:       semver.MustParse("1.7.0"),
+					Version:       committee_verifier.Version,
 					Qualifier:     "alpha",
 				},
 				{
 					ChainSelector: chainSelector,
 					Type:          datastore.ContractType(committee_verifier.ContractType),
-					Version:       semver.MustParse("1.7.0"),
+					Version:       committee_verifier.Version,
 					Qualifier:     "beta",
 				},
 			},
 			Qualifier: "q1",
 		},
 		{
-			Version: semver.MustParse("1.7.0"),
+			Version: mock_receiver.Version,
 			RequiredVerifiers: []datastore.AddressRef{
 				{
 					Type:      datastore.ContractType(committee_verifier.ContractType),
-					Version:   semver.MustParse("1.7.0"),
+					Version:   committee_verifier.Version,
 					Qualifier: "alpha",
 				},
 			},
 			OptionalVerifiers: []datastore.AddressRef{
 				{
 					Type:      datastore.ContractType(committee_verifier.ContractType),
-					Version:   semver.MustParse("1.7.0"),
+					Version:   committee_verifier.Version,
 					Qualifier: "beta",
 				},
 			},
@@ -327,7 +327,7 @@ func TestDeployChainContracts_MultipleCommitteeVerifiersAndMultipleMockReceiverC
 	q1ReceiverRef, err := datastore_utils.FindAndFormatRef(sealed, datastore.AddressRef{
 		ChainSelector: chainSelector,
 		Type:          datastore.ContractType(mock_receiver.ContractType),
-		Version:       semver.MustParse("1.7.0"),
+		Version:       mock_receiver.Version,
 		Qualifier:     "q1",
 	}, chainSelector, evm_datastore_utils.ToEVMAddress)
 	require.NoError(t, err)
@@ -335,7 +335,7 @@ func TestDeployChainContracts_MultipleCommitteeVerifiersAndMultipleMockReceiverC
 	q2ReceiverRef, err := datastore_utils.FindAndFormatRef(sealed, datastore.AddressRef{
 		ChainSelector: chainSelector,
 		Type:          datastore.ContractType(mock_receiver.ContractType),
-		Version:       semver.MustParse("1.7.0"),
+		Version:       mock_receiver.Version,
 		Qualifier:     "q2",
 	}, chainSelector, evm_datastore_utils.ToEVMAddress)
 	require.NoError(t, err)

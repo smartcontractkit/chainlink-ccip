@@ -6,8 +6,6 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/stretchr/testify/require"
-
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/burn_mint_token_pool"
 	cctp_message_transmitter_proxy_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/cctp_message_transmitter_proxy"
 	cctp_through_ccv_token_pool_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/cctp_through_ccv_token_pool"
@@ -30,6 +28,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	burn_mint_erc20_bindings "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc20"
+	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/cctp_message_transmitter_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/cctp_through_ccv_token_pool"
@@ -53,19 +52,13 @@ func setupCCTPTestEnvironment(t *testing.T, e *deployment.Environment, chainSele
 	chain := e.BlockChains.EVMChains()[chainSelector]
 
 	// Deploy chain contracts
-	create2FactoryRef, err := contract_utils.MaybeDeployContract(
-		e.OperationsBundle,
-		create2_factory.Deploy,
-		chain,
-		contract_utils.DeployInput[create2_factory.ConstructorArgs]{
-			TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
-			ChainSelector:  chainSelector,
-			Args: create2_factory.ConstructorArgs{
-				AllowList: []common.Address{chain.DeployerKey.From},
-			},
+	create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, chain, contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
+		ChainSelector:  chainSelector,
+		Args: create2_factory.ConstructorArgs{
+			AllowList: []common.Address{chain.DeployerKey.From},
 		},
-		nil,
-	)
+	}, nil)
 	require.NoError(t, err, "Failed to deploy CREATE2Factory")
 	chainReport, err := operations.ExecuteSequence(
 		e.OperationsBundle,

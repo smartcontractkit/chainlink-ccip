@@ -33,6 +33,10 @@ type UpdateLockReleasePoolAddressesArgs struct {
 	LockReleasePools     []common.Address
 }
 
+type SetFeeAggregatorArgs struct {
+	FeeAggregator common.Address
+}
+
 var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Name:             "usdc-token-pool-proxy:deploy",
 	Version:          Version,
@@ -57,5 +61,19 @@ var UpdateLockOrBurnMechanisms = contract.NewWrite(contract.WriteParams[UpdateLo
 	Validate:        func(UpdateLockOrBurnMechanismsArgs) error { return nil },
 	CallContract: func(proxy *usdc_token_pool_proxy.USDCTokenPoolProxy, opts *bind.TransactOpts, args UpdateLockOrBurnMechanismsArgs) (*types.Transaction, error) {
 		return proxy.UpdateLockOrBurnMechanisms(opts, args.RemoteChainSelectors, args.Mechanisms)
+	},
+})
+
+var SetFeeAggregator = contract.NewWrite(contract.WriteParams[SetFeeAggregatorArgs, *usdc_token_pool_proxy.USDCTokenPoolProxy]{
+	Name:            "usdc-token-pool-proxy:set-fee-aggregator",
+	Version:         Version,
+	Description:     "Sets the fee aggregator address on the USDCTokenPoolProxy",
+	ContractType:    ContractType,
+	ContractABI:     usdc_token_pool_proxy.USDCTokenPoolProxyABI,
+	NewContract:     usdc_token_pool_proxy.NewUSDCTokenPoolProxy,
+	IsAllowedCaller: contract.OnlyOwner[*usdc_token_pool_proxy.USDCTokenPoolProxy, SetFeeAggregatorArgs],
+	Validate:        func(SetFeeAggregatorArgs) error { return nil },
+	CallContract: func(proxy *usdc_token_pool_proxy.USDCTokenPoolProxy, opts *bind.TransactOpts, args SetFeeAggregatorArgs) (*types.Transaction, error) {
+		return proxy.SetFeeAggregator(opts, args.FeeAggregator)
 	},
 })

@@ -86,7 +86,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 					offRamp = addr.Address
 				case datastore.ContractType(committee_verifier.ContractType):
 					committeeVerifier = addr.Address
-				case datastore.ContractType(executor.ContractType):
+				case datastore.ContractType(executor.ProxyType):
 					executorAddress = addr.Address
 				case datastore.ContractType(committee_verifier.ResolverType):
 					committeeVerifierResolver = addr.Address
@@ -110,12 +110,12 @@ func TestConfigureChainForLanes(t *testing.T) {
 								{
 									Address: committeeVerifier,
 									Type:    datastore.ContractType(committee_verifier.ContractType),
-									Version: semver.MustParse("1.7.0"),
+									Version: committee_verifier.Version,
 								},
 								{
 									Address: committeeVerifierResolver,
 									Type:    datastore.ContractType(committee_verifier.ResolverType),
-									Version: semver.MustParse("1.7.0"),
+									Version: committee_verifier.Version,
 								},
 							},
 							RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{

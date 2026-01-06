@@ -3,7 +3,6 @@ package create2_factory_test
 import (
 	"testing"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/changesets/create2_factory"
 	create2_factory_ops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
@@ -35,7 +34,7 @@ func TestConfigureCREATE2Factory_Apply(t *testing.T) {
 		chain,
 		contract.DeployInput[create2_factory_ops.ConstructorArgs]{
 			ChainSelector:  chainSel,
-			TypeAndVersion: deployment.NewTypeAndVersion(create2_factory_ops.ContractType, *semver.MustParse("1.7.0")),
+			TypeAndVersion: deployment.NewTypeAndVersion(create2_factory_ops.ContractType, *create2_factory_ops.Version),
 			Args: create2_factory_ops.ConstructorArgs{
 				AllowList: initialAllowList,
 			},
@@ -94,7 +93,7 @@ func TestConfigureCREATE2Factory_Apply(t *testing.T) {
 					CREATE2Factory: datastore.AddressRef{
 						ChainSelector: chainSel,
 						Type:          datastore.ContractType(create2_factory_ops.ContractType),
-						Version:       semver.MustParse("1.7.0"),
+						Version:       create2_factory_ops.Version,
 					},
 					AllowListAdds:    test.allowListAdds,
 					AllowListRemoves: test.allowListRemoves,
@@ -123,7 +122,7 @@ func TestConfigureCREATE2Factory_ContractNotFound(t *testing.T) {
 			CREATE2Factory: datastore.AddressRef{
 				ChainSelector: chainSel,
 				Type:          datastore.ContractType(create2_factory_ops.ContractType),
-				Version:       semver.MustParse("1.7.0"),
+				Version:       create2_factory_ops.Version,
 			},
 			AllowListAdds: []common.Address{
 				common.HexToAddress("0x1234567890123456789012345678901234567890"),
@@ -149,7 +148,7 @@ func TestConfigureCREATE2Factory_InvalidChain(t *testing.T) {
 			CREATE2Factory: datastore.AddressRef{
 				ChainSelector: 99999999,
 				Type:          datastore.ContractType(create2_factory_ops.ContractType),
-				Version:       semver.MustParse("1.7.0"),
+				Version:       create2_factory_ops.Version,
 			},
 			AllowListAdds: []common.Address{
 				common.HexToAddress("0x1234567890123456789012345678901234567890"),
@@ -176,7 +175,7 @@ func TestConfigureCREATE2Factory_EmptyUpdates(t *testing.T) {
 		chain,
 		contract.DeployInput[create2_factory_ops.ConstructorArgs]{
 			ChainSelector:  chainSel,
-			TypeAndVersion: deployment.NewTypeAndVersion(create2_factory_ops.ContractType, *semver.MustParse("1.7.0")),
+			TypeAndVersion: deployment.NewTypeAndVersion(create2_factory_ops.ContractType, *create2_factory_ops.Version),
 			Args: create2_factory_ops.ConstructorArgs{
 				AllowList: []common.Address{chain.DeployerKey.From},
 			},
@@ -198,7 +197,7 @@ func TestConfigureCREATE2Factory_EmptyUpdates(t *testing.T) {
 			CREATE2Factory: datastore.AddressRef{
 				ChainSelector: chainSel,
 				Type:          datastore.ContractType(create2_factory_ops.ContractType),
-				Version:       semver.MustParse("1.7.0"),
+				Version:       create2_factory_ops.Version,
 			},
 			AllowListAdds:    []common.Address{},
 			AllowListRemoves: []common.Address{},

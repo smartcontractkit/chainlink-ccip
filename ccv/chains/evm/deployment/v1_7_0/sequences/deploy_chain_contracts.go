@@ -13,21 +13,24 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
+	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
+	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/link_token"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/registry_module_owner_custom"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
+
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/executor"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/mock_receiver"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/onramp"
-	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
-	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
-	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
 type MockReceiverParams struct {
@@ -52,8 +55,9 @@ type RMNRemoteParams struct {
 }
 
 type OffRampParams struct {
-	Version              *semver.Version
-	GasForCallExactCheck uint16
+	Version                   *semver.Version
+	GasForCallExactCheck      uint16
+	MaxGasBufferToUpdateState uint32
 }
 
 type OnRampParams struct {
@@ -107,7 +111,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 
 		// Deploy WETH
 		wethRef, err := contract_utils.MaybeDeployContract(b, weth.Deploy, chain, contract_utils.DeployInput[weth.ConstructorArgs]{
-			TypeAndVersion: deployment.NewTypeAndVersion(weth.ContractType, *semver.MustParse("1.0.0")),
+			TypeAndVersion: deployment.NewTypeAndVersion(weth.ContractType, *weth.Version),
 			ChainSelector:  chain.Selector,
 		}, input.ExistingAddresses)
 		if err != nil {
@@ -116,9 +120,13 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, wethRef)
 
 		// Deploy LINK
-		linkRef, err := contract_utils.MaybeDeployContract(b, link.Deploy, chain, contract_utils.DeployInput[link.ConstructorArgs]{
-			TypeAndVersion: deployment.NewTypeAndVersion(link.ContractType, *semver.MustParse("1.0.0")),
+		linkRef, err := contract_utils.MaybeDeployContract(b, burn_mint_erc20_with_drip.Deploy, chain, contract_utils.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs]{
+			TypeAndVersion: deployment.NewTypeAndVersion(link_token.ContractType, *link_token.Version),
 			ChainSelector:  chain.Selector,
+			Args: burn_mint_erc20_with_drip.ConstructorArgs{
+				Name:   "LINK",
+				Symbol: "LINK",
+			},
 		}, input.ExistingAddresses)
 		if err != nil {
 			return sequences.OnChainOutput{}, err
@@ -141,7 +149,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 
 		// Deploy RMNProxy
 		rmnProxyRef, err := contract_utils.MaybeDeployContract(b, rmn_proxy.Deploy, chain, contract_utils.DeployInput[rmn_proxy.ConstructorArgs]{
-			TypeAndVersion: deployment.NewTypeAndVersion(rmn_proxy.ContractType, *semver.MustParse("1.0.0")),
+			TypeAndVersion: deployment.NewTypeAndVersion(rmn_proxy.ContractType, *rmn_proxy.Version),
 			ChainSelector:  chain.Selector,
 			Args: rmn_proxy.ConstructorArgs{
 				RMN: common.HexToAddress(rmnRemoteRef.Address),
@@ -170,7 +178,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 
 		// Deploy Router
 		routerRef, err := contract_utils.MaybeDeployContract(b, router.Deploy, chain, contract_utils.DeployInput[router.ConstructorArgs]{
-			TypeAndVersion: deployment.NewTypeAndVersion(router.ContractType, *semver.MustParse("1.2.0")),
+			TypeAndVersion: deployment.NewTypeAndVersion(router.ContractType, *router.Version),
 			ChainSelector:  chain.Selector,
 			Args: router.ConstructorArgs{
 				WrappedNative: common.HexToAddress(wethRef.Address),
@@ -184,13 +192,41 @@ var DeployChainContracts = cldf_ops.NewSequence(
 
 		// Deploy TokenAdminRegistry
 		tokenAdminRegistryRef, err := contract_utils.MaybeDeployContract(b, token_admin_registry.Deploy, chain, contract_utils.DeployInput[token_admin_registry.ConstructorArgs]{
-			TypeAndVersion: deployment.NewTypeAndVersion(token_admin_registry.ContractType, *semver.MustParse("1.5.0")),
+			TypeAndVersion: deployment.NewTypeAndVersion(token_admin_registry.ContractType, *token_admin_registry.Version),
 			ChainSelector:  chain.Selector,
 		}, input.ExistingAddresses)
 		if err != nil {
 			return sequences.OnChainOutput{}, err
 		}
 		addresses = append(addresses, tokenAdminRegistryRef)
+
+		// Deploy RegistryModuleOwnerCustom
+		registryModuleOwnerCustomRef, err := contract_utils.MaybeDeployContract(b, registry_module_owner_custom.Deploy, chain, contract_utils.DeployInput[registry_module_owner_custom.ConstructorArgs]{
+			TypeAndVersion: deployment.NewTypeAndVersion(registry_module_owner_custom.ContractType, *registry_module_owner_custom.Version),
+			ChainSelector:  chain.Selector,
+			Args: registry_module_owner_custom.ConstructorArgs{
+				TokenAdminRegistry: common.HexToAddress(tokenAdminRegistryRef.Address),
+			},
+		}, input.ExistingAddresses)
+		if err != nil {
+			return sequences.OnChainOutput{}, err
+		}
+		addresses = append(addresses, registryModuleOwnerCustomRef)
+
+		// Add RegistryModuleOwnerCustom to TokenAdminRegistry
+		addRegistryModuleReport, hasOnchainDiff, err := MaybeRegisterModuleOnTokenAdminRegistry(
+			b,
+			chain,
+			common.HexToAddress(tokenAdminRegistryRef.Address),
+			common.HexToAddress(registryModuleOwnerCustomRef.Address),
+		)
+		if err != nil {
+			return sequences.OnChainOutput{}, err
+		}
+		// Only append to writes if a transaction was actually created (i.e., module wasn't already registered).
+		if hasOnchainDiff {
+			writes = append(writes, addRegistryModuleReport)
+		}
 
 		// Deploy FeeQuoter
 		feeQuoterRef, err := contract_utils.MaybeDeployContract(b, fee_quoter.Deploy, chain, contract_utils.DeployInput[fee_quoter.ConstructorArgs]{
@@ -245,10 +281,11 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			ChainSelector:  chain.Selector,
 			Args: offramp.ConstructorArgs{
 				StaticConfig: offramp.StaticConfig{
-					LocalChainSelector:   chain.Selector,
-					RmnRemote:            common.HexToAddress(rmnProxyRef.Address),
-					GasForCallExactCheck: input.ContractParams.OffRamp.GasForCallExactCheck,
-					TokenAdminRegistry:   common.HexToAddress(tokenAdminRegistryRef.Address),
+					LocalChainSelector:        chain.Selector,
+					RmnRemote:                 common.HexToAddress(rmnProxyRef.Address),
+					GasForCallExactCheck:      input.ContractParams.OffRamp.GasForCallExactCheck,
+					TokenAdminRegistry:        common.HexToAddress(tokenAdminRegistryRef.Address),
+					MaxGasBufferToUpdateState: input.ContractParams.OffRamp.MaxGasBufferToUpdateState,
 				},
 			},
 		}, input.ExistingAddresses)
@@ -318,10 +355,11 @@ var DeployChainContracts = cldf_ops.NewSequence(
 
 			// Deploy ExecutorProxy
 			executorProxyRef, err := contract_utils.MaybeDeployContract(b, executor.DeployProxy, chain, contract_utils.DeployInput[executor.ProxyConstructorArgs]{
-				TypeAndVersion: deployment.NewTypeAndVersion(executor.ProxyType, *semver.MustParse("1.7.0")),
+				TypeAndVersion: deployment.NewTypeAndVersion(executor.ProxyType, *executor.Version),
 				ChainSelector:  chain.Selector,
 				Args: executor.ProxyConstructorArgs{
 					ExecutorAddress: common.HexToAddress(executorRef.Address),
+					FeeAggregator:   executorParam.DynamicConfig.FeeAggregator,
 				},
 				Qualifier: qualifierPtr,
 			}, input.ExistingAddresses)
@@ -423,4 +461,41 @@ func getMockReceiverVerifiers(
 			mockReceiverParams.OptionalVerifiers)
 	}
 	return requiredVerifiers, optionalVerifiers, nil
+}
+
+// MaybeRegisterModuleOnTokenAdminRegistry checks if a module is already registered on the TokenAdminRegistry,
+// and if not, adds it as a registry module.
+// Returns the write output and a boolean indicating whether a write operation was performed.
+func MaybeRegisterModuleOnTokenAdminRegistry(
+	b cldf_ops.Bundle,
+	chain evm.Chain,
+	tokenAdminRegistryAddress common.Address,
+	moduleAddress common.Address,
+) (contract_utils.WriteOutput, bool, error) {
+	// Check if the module is already registered.
+	isRegisteredReport, err := cldf_ops.ExecuteOperation(b, token_admin_registry.IsRegistryModule, chain, contract_utils.FunctionInput[common.Address]{
+		ChainSelector: chain.Selector,
+		Address:       tokenAdminRegistryAddress,
+		Args:          moduleAddress,
+	})
+	if err != nil {
+		return contract_utils.WriteOutput{}, false, fmt.Errorf("failed to check if module is registered: %w", err)
+	}
+
+	// If already registered, return without performing a write.
+	if isRegisteredReport.Output {
+		return contract_utils.WriteOutput{}, false, nil
+	}
+
+	// Add the module to the registry.
+	addRegistryModuleReport, err := cldf_ops.ExecuteOperation(b, token_admin_registry.AddRegistryModule, chain, contract_utils.FunctionInput[common.Address]{
+		ChainSelector: chain.Selector,
+		Address:       tokenAdminRegistryAddress,
+		Args:          moduleAddress,
+	})
+	if err != nil {
+		return contract_utils.WriteOutput{}, false, fmt.Errorf("failed to add registry module: %w", err)
+	}
+
+	return addRegistryModuleReport.Output, true, nil
 }
