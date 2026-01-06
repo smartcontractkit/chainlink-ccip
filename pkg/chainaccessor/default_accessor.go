@@ -1046,7 +1046,8 @@ func (l *DefaultAccessor) processMerkleRoots(
 	return blessedMerkleRoots, unblessedMerkleRoots
 }
 
-func (l *DefaultAccessor) processPriceUpdates(priceUpdates cciptypes.AccessorPriceUpdates) (cciptypes.PriceUpdates, error) {
+func (l *DefaultAccessor) processPriceUpdates(priceUpdates cciptypes.AccessorPriceUpdates) (
+	cciptypes.PriceUpdates, error) {
 	lggr := l.lggr
 	updates := cciptypes.PriceUpdates{
 		TokenPriceUpdates: make([]cciptypes.TokenPrice, 0),
