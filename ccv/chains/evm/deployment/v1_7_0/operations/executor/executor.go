@@ -16,6 +16,8 @@ var ContractType cldf_deployment.ContractType = "Executor"
 
 var ProxyType cldf_deployment.ContractType = "ExecutorProxy"
 
+var Version = semver.MustParse("1.7.0")
+
 type ConstructorArgs struct {
 	MaxCCVsPerMsg uint8
 	DynamicConfig executor.ExecutorDynamicConfig
@@ -23,6 +25,7 @@ type ConstructorArgs struct {
 
 type ProxyConstructorArgs struct {
 	ExecutorAddress common.Address
+	FeeAggregator   common.Address
 }
 
 type ApplyDestChainUpdatesArgs struct {
@@ -45,11 +48,11 @@ type SetDynamicConfigArgs = executor.ExecutorDynamicConfig
 
 var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Name:             "executor:deploy",
-	Version:          semver.MustParse("1.7.0"),
+	Version:          Version,
 	Description:      "Deploys the Executor contract",
 	ContractMetadata: executor.ExecutorMetaData,
 	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
-		cldf_deployment.NewTypeAndVersion(ContractType, *semver.MustParse("1.7.0")).String(): {
+		cldf_deployment.NewTypeAndVersion(ContractType, *Version).String(): {
 			EVM: common.FromHex(executor.ExecutorBin),
 		},
 	},
@@ -58,11 +61,11 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 
 var DeployProxy = contract.NewDeploy(contract.DeployParams[ProxyConstructorArgs]{
 	Name:             "executor-proxy:deploy",
-	Version:          semver.MustParse("1.7.0"),
+	Version:          Version,
 	Description:      "Deploys the ExecutorProxy contract",
 	ContractMetadata: proxy.ProxyMetaData,
 	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
-		cldf_deployment.NewTypeAndVersion(ProxyType, *semver.MustParse("1.7.0")).String(): {
+		cldf_deployment.NewTypeAndVersion(ProxyType, *Version).String(): {
 			EVM: common.FromHex(proxy.ProxyBin),
 		},
 	},
@@ -71,7 +74,7 @@ var DeployProxy = contract.NewDeploy(contract.DeployParams[ProxyConstructorArgs]
 
 var ApplyDestChainUpdates = contract.NewWrite(contract.WriteParams[ApplyDestChainUpdatesArgs, *executor.Executor]{
 	Name:            "executor:apply-dest-chain-updates",
-	Version:         semver.MustParse("1.7.0"),
+	Version:         Version,
 	Description:     "Applies updates to supported destination chains on the Executor",
 	ContractType:    ContractType,
 	ContractABI:     executor.ExecutorABI,
@@ -95,7 +98,7 @@ var ApplyDestChainUpdates = contract.NewWrite(contract.WriteParams[ApplyDestChai
 
 var ApplyAllowedCCVUpdates = contract.NewWrite(contract.WriteParams[ApplyAllowedCCVUpdatesArgs, *executor.Executor]{
 	Name:            "executor:apply-allowed-ccv-updates",
-	Version:         semver.MustParse("1.7.0"),
+	Version:         Version,
 	Description:     "Applies updates to the CCV allowlist on the Executor",
 	ContractType:    ContractType,
 	ContractABI:     executor.ExecutorABI,
@@ -109,7 +112,7 @@ var ApplyAllowedCCVUpdates = contract.NewWrite(contract.WriteParams[ApplyAllowed
 
 var SetDynamicConfig = contract.NewWrite(contract.WriteParams[SetDynamicConfigArgs, *executor.Executor]{
 	Name:            "executor:set-min-block-confirmations",
-	Version:         semver.MustParse("1.7.0"),
+	Version:         Version,
 	Description:     "Sets the minimum block confirmations on the Executor",
 	ContractType:    ContractType,
 	ContractABI:     executor.ExecutorABI,
@@ -123,7 +126,7 @@ var SetDynamicConfig = contract.NewWrite(contract.WriteParams[SetDynamicConfigAr
 
 var GetDestChains = contract.NewRead(contract.ReadParams[any, []executor.ExecutorRemoteChainConfigArgs, *executor.Executor]{
 	Name:         "executor:get-dest-chains",
-	Version:      semver.MustParse("1.7.0"),
+	Version:      Version,
 	Description:  "Gets the supported destination chains on the Executor",
 	ContractType: ContractType,
 	NewContract:  executor.NewExecutor,

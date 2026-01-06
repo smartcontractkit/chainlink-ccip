@@ -40,6 +40,8 @@ type DeployTokenPoolInput struct {
 	RateLimitAdmin common.Address
 	// ThresholdAmountForAdditionalCCVs is the transfer amount above which additional CCVs are required.
 	ThresholdAmountForAdditionalCCVs *big.Int
+	// FeeAggregator is the address that will receive fee tokens when WithdrawFeeTokens is called.
+	FeeAggregator common.Address
 	// ConstructorArgs are the constructor arguments for the token pool.
 	ConstructorArgs ConstructorArgs
 }
@@ -73,6 +75,7 @@ func (c DeployTokenPoolInput) Validate(chain evm.Chain) error {
 	if c.ThresholdAmountForAdditionalCCVs == nil {
 		return errors.New("threshold amount for additional ccvs must be defined")
 	}
+	// Fee aggregator can be zero address; it's optional
 
 	return nil
 }

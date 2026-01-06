@@ -12,13 +12,15 @@ import (
 
 var ContractType cldf_deployment.ContractType = "Proxy"
 
+var Version = semver.MustParse("1.7.0")
+
 type AcceptOwnershipArgs struct {
 	IsProposedOwner bool
 }
 
 var SetTarget = contract.NewWrite(contract.WriteParams[common.Address, *proxy.Proxy]{
 	Name:            "proxy:set-target",
-	Version:         semver.MustParse("1.7.0"),
+	Version:         Version,
 	Description:     "Set the target address on the proxy",
 	ContractType:    ContractType,
 	ContractABI:     proxy.ProxyABI,
@@ -32,7 +34,7 @@ var SetTarget = contract.NewWrite(contract.WriteParams[common.Address, *proxy.Pr
 
 var AcceptOwnership = contract.NewWrite(contract.WriteParams[AcceptOwnershipArgs, *proxy.Proxy]{
 	Name:         "proxy:accept-ownership",
-	Version:      semver.MustParse("1.7.0"),
+	Version:      Version,
 	Description:  "Accept ownership of the proxy",
 	ContractType: ContractType,
 	ContractABI:  proxy.ProxyABI,
@@ -43,5 +45,16 @@ var AcceptOwnership = contract.NewWrite(contract.WriteParams[AcceptOwnershipArgs
 	Validate: func(AcceptOwnershipArgs) error { return nil },
 	CallContract: func(proxy *proxy.Proxy, opts *bind.TransactOpts, _ AcceptOwnershipArgs) (*types.Transaction, error) {
 		return proxy.AcceptOwnership(opts)
+	},
+})
+
+var GetTarget = contract.NewRead(contract.ReadParams[any, common.Address, *proxy.Proxy]{
+	Name:         "proxy:get-target",
+	Version:      Version,
+	Description:  "Gets the target address on the proxy",
+	ContractType: ContractType,
+	NewContract:  proxy.NewProxy,
+	CallContract: func(proxy *proxy.Proxy, opts *bind.CallOpts, args any) (common.Address, error) {
+		return proxy.GetTarget(opts)
 	},
 })

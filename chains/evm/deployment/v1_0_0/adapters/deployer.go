@@ -88,7 +88,7 @@ func (d *EVMDeployer) DeployMCMS() *cldf_ops.Sequence[ccipapi.MCMSDeploymentConf
 			timelockAddr, err := contract.MaybeDeployContract(b, ops.OpDeployTimelock, evmChain, contract.DeployInput[ops.OpDeployTimelockInput]{
 				ChainSelector:  in.ChainSelector,
 				Qualifier:      in.Qualifier,
-				TypeAndVersion: cldf.NewTypeAndVersion(utils.RBACTimelock, *semver.MustParse("1.0.0")),
+				TypeAndVersion: cldf.NewTypeAndVersion(utils.RBACTimelock, *ops.MCMSVersion),
 				Args: ops.OpDeployTimelockInput{
 					TimelockMinDelay: in.TimelockMinDelay,
 					Proposers:        []common.Address{common.HexToAddress(proposerAddr.Address)},
@@ -107,7 +107,7 @@ func (d *EVMDeployer) DeployMCMS() *cldf_ops.Sequence[ccipapi.MCMSDeploymentConf
 			callProxyAddr, err := contract.MaybeDeployContract(b, ops.OpDeployCallProxy, evmChain, contract.DeployInput[ops.OpDeployCallProxyInput]{
 				ChainSelector:  in.ChainSelector,
 				Qualifier:      in.Qualifier,
-				TypeAndVersion: cldf.NewTypeAndVersion(utils.CallProxy, *semver.MustParse("1.0.0")),
+				TypeAndVersion: cldf.NewTypeAndVersion(utils.CallProxy, *ops.MCMSVersion),
 				Args: ops.OpDeployCallProxyInput{
 					TimelockAddress: common.HexToAddress(timelockAddr.Address),
 				},
