@@ -34,9 +34,14 @@ import (
 	solRpc "github.com/gagliardetto/solana-go/rpc"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	solconfig "github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
+	fqops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/fee_quoter"
+	offrampops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/offramp"
+	rmnremoteops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/rmn_remote"
+	routerops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/router"
 	solanaseqs "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
 	solccip "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/ccip"
 	solCommonUtil "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
+	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	devenvcommon "github.com/smartcontractkit/chainlink-ccip/devenv/common"
 	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
@@ -588,30 +593,32 @@ func (m *CCIP16Solana) DeployLocalNetwork(ctx context.Context, bc *blockchain.In
 }
 
 var solanaProgramIDs = map[string]string{
-	"ccip_router": "Ccip842gzYHhvdDkSyi2YVCoAWPbYJoApMFzSxQroE9C",
-	// "test_token_pool":           "JuCcZ4smxAYv9QHJ36jshA7pA3FuQ3vQeWLUeAtZduJ",
-	"burnmint_token_pool":    "41FGToCmdaWa1dgZLKFAjvmx6e6AjVTX7SVRibvsMGVB",
-	"lockrelease_token_pool": "8eqh8wppT9c5rw4ERqNCffvU6cNFJWff9WmkcYtmGiqC",
-	"fee_quoter":             "FeeQPGkKDeRV1MgoYfMH6L8o3KeuYjwUZrgn4LRKfjHi",
-	"test_ccip_receiver":     "EvhgrPhTDt4LcSPS2kfJgH6T6XWZ6wT3X9ncDGLT1vui",
-	"ccip_offramp":           "offqSMQWgQud6WJz694LRzkeN5kMYpCHTpXQr3Rkcjm",
-	"mcm":                    "5vNJx78mz7KVMjhuipyr9jKBKcMrKYGdjGkgE4LUmjKk",
-	"timelock":               "DoajfR5tK24xVw51fWcawUZWhAXD8yrBJVacc13neVQA",
-	"access_controller":      "6KsN58MTnRQ8FfPaXHiFPPFGDRioikj9CdPvPxZJdCjb",
-	// "external_program_cpi_stub": "2zZwzyptLqwFJFEFxjPvrdhiGpH9pJ3MfrrmZX6NTKxm",
-	"rmn_remote": "RmnXLft1mSEwDgMKu2okYuHkiazxntFFcZFrrcXxYg7",
-	// "cctp_token_pool":           "CCiTPESGEevd7TBU8EGBKrcxuRq7jx3YtW6tPidnscaZ",
+	"ccip_router":               "Ccip842gzYHhvdDkSyi2YVCoAWPbYJoApMFzSxQroE9C",
+	"test_token_pool":           "JuCcZ4smxAYv9QHJ36jshA7pA3FuQ3vQeWLUeAtZduJ",
+	"burnmint_token_pool":       "41FGToCmdaWa1dgZLKFAjvmx6e6AjVTX7SVRibvsMGVB",
+	"lockrelease_token_pool":    "8eqh8wppT9c5rw4ERqNCffvU6cNFJWff9WmkcYtmGiqC",
+	"fee_quoter":                "FeeQPGkKDeRV1MgoYfMH6L8o3KeuYjwUZrgn4LRKfjHi",
+	"test_ccip_receiver":        "EvhgrPhTDt4LcSPS2kfJgH6T6XWZ6wT3X9ncDGLT1vui",
+	"ccip_offramp":              "offqSMQWgQud6WJz694LRzkeN5kMYpCHTpXQr3Rkcjm",
+	"mcm":                       "5vNJx78mz7KVMjhuipyr9jKBKcMrKYGdjGkgE4LUmjKk",
+	"timelock":                  "DoajfR5tK24xVw51fWcawUZWhAXD8yrBJVacc13neVQA",
+	"access_controller":         "6KsN58MTnRQ8FfPaXHiFPPFGDRioikj9CdPvPxZJdCjb",
+	"external_program_cpi_stub": "2zZwzyptLqwFJFEFxjPvrdhiGpH9pJ3MfrrmZX6NTKxm",
+	"rmn_remote":                "RmnXLft1mSEwDgMKu2okYuHkiazxntFFcZFrrcXxYg7",
+	"cctp_token_pool":           "CCiTPESGEevd7TBU8EGBKrcxuRq7jx3YtW6tPidnscaZ",
 }
 
 var solanaContracts = map[string]datastore.ContractType{
-	"ccip_router":        datastore.ContractType("Router"),
-	"fee_quoter":         datastore.ContractType("FeeQuoter"),
-	"ccip_offramp":       datastore.ContractType("OffRamp"),
-	"rmn_remote":         datastore.ContractType("RMNRemote"),
-	"mcm":                datastore.ContractType(utils.McmProgramType),
-	"timelock":           datastore.ContractType(utils.TimelockProgramType),
-	"access_controller":  datastore.ContractType(utils.AccessControllerProgramType),
-	"test_ccip_receiver": datastore.ContractType("TestReceiver"),
+	"ccip_router":            datastore.ContractType(routerops.ContractType),
+	"fee_quoter":             datastore.ContractType(fqops.ContractType),
+	"ccip_offramp":           datastore.ContractType(offrampops.ContractType),
+	"rmn_remote":             datastore.ContractType(rmnremoteops.ContractType),
+	"mcm":                    datastore.ContractType(utils.McmProgramType),
+	"timelock":               datastore.ContractType(utils.TimelockProgramType),
+	"access_controller":      datastore.ContractType(utils.AccessControllerProgramType),
+	"burnmint_token_pool":    datastore.ContractType(common_utils.BurnMintTokenPool),
+	"lockrelease_token_pool": datastore.ContractType(common_utils.LockReleaseTokenPool),
+	"test_ccip_receiver":     datastore.ContractType("TestReceiver"),
 }
 
 func PreloadSolanaEnvironment(programsPath string, chainSelector uint64) error {
