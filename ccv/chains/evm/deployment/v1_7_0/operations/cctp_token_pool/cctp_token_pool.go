@@ -1,11 +1,11 @@
-package cctp_token_pool
+package cctp_through_ccv_token_pool
 
 import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/cctp_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/cctp_through_ccv_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
@@ -23,31 +23,31 @@ type ConstructorArgs struct {
 	AllowedCallers     []common.Address
 }
 
-type AuthorizedCallerArgs = cctp_token_pool.AuthorizedCallersAuthorizedCallerArgs
+type AuthorizedCallerArgs = cctp_through_ccv_token_pool.AuthorizedCallersAuthorizedCallerArgs
 
 var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Name:             "cctp-token-pool:deploy",
 	Version:          Version,
 	Description:      "Deploys the CCTPTokenPool contract",
-	ContractMetadata: cctp_token_pool.CCTPTokenPoolMetaData,
+	ContractMetadata: cctp_through_ccv_token_pool.CCTPThroughCCVTokenPoolMetaData,
 	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
 		cldf_deployment.NewTypeAndVersion(ContractType, *Version).String(): {
-			EVM: common.FromHex(cctp_token_pool.CCTPTokenPoolBin),
+			EVM: common.FromHex(cctp_through_ccv_token_pool.CCTPThroughCCVTokenPoolBin),
 		},
 	},
 	Validate: func(ConstructorArgs) error { return nil },
 })
 
-var ApplyAuthorizedCallerUpdates = contract.NewWrite(contract.WriteParams[AuthorizedCallerArgs, *cctp_token_pool.CCTPTokenPool]{
+var ApplyAuthorizedCallerUpdates = contract.NewWrite(contract.WriteParams[AuthorizedCallerArgs, *cctp_through_ccv_token_pool.CCTPThroughCCVTokenPool]{
 	Name:            "cctp-token-pool:apply-authorized-caller-updates",
 	Version:         Version,
 	Description:     "Applies authorized caller updates on the CCTPTokenPool",
 	ContractType:    ContractType,
-	ContractABI:     cctp_token_pool.CCTPTokenPoolABI,
-	NewContract:     cctp_token_pool.NewCCTPTokenPool,
-	IsAllowedCaller: contract.OnlyOwner[*cctp_token_pool.CCTPTokenPool, AuthorizedCallerArgs],
+	ContractABI:     cctp_through_ccv_token_pool.CCTPThroughCCVTokenPoolABI,
+	NewContract:     cctp_through_ccv_token_pool.NewCCTPThroughCCVTokenPool,
+	IsAllowedCaller: contract.OnlyOwner[*cctp_through_ccv_token_pool.CCTPThroughCCVTokenPool, AuthorizedCallerArgs],
 	Validate:        func(AuthorizedCallerArgs) error { return nil },
-	CallContract: func(cctpTokenPool *cctp_token_pool.CCTPTokenPool, opts *bind.TransactOpts, args AuthorizedCallerArgs) (*types.Transaction, error) {
+	CallContract: func(cctpTokenPool *cctp_through_ccv_token_pool.CCTPThroughCCVTokenPool, opts *bind.TransactOpts, args AuthorizedCallerArgs) (*types.Transaction, error) {
 		return cctpTokenPool.ApplyAuthorizedCallerUpdates(opts, args)
 	},
 })

@@ -6,7 +6,7 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/committee_verifier"
+
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
@@ -14,6 +14,8 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
+
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/committee_verifier"
 )
 
 type CommitteeVerifierParams struct {
@@ -80,14 +82,13 @@ var DeployCommitteeVerifier = cldf_ops.NewSequence(
 		if resolverRef != nil {
 			addresses = append(addresses, *resolverRef)
 		} else {
-			// Otherwise, just deploy the CommitteeVerifierResolver
-			committeeVerifierResolverRef, err := contract_utils.MaybeDeployContract(b, versioned_verifier_resolver.Deploy, chain, contract_utils.DeployInput[versioned_verifier_resolver.ConstructorArgs]{
-				TypeAndVersion: deployment.NewTypeAndVersion(committee_verifier.ResolverType, *committee_verifier.Version),
-				ChainSelector:  chain.Selector,
-				CREATE2Factory: input.CREATE2Factory,
+			deployVerifierResolverViaCREATE2Report, err := cldf_ops.ExecuteSequence(b, DeployVerifierResolverViaCREATE2, chain, DeployVerifierResolverViaCREATE2Input{
+				ChainSelector:  input.ChainSelector,
+				Qualifier:      input.Params.Qualifier,
 				Type:           datastore.ContractType(committee_verifier.ResolverType),
-				Qualifier:      qualifierPtr,
-			}, input.ExistingAddresses)
+				Version:        committee_verifier.Version,
+				CREATE2Factory: input.CREATE2Factory,
+			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CommitteeVerifierResolver: %w", err)
 			}
