@@ -8,12 +8,12 @@ import {Pool} from "../libraries/Pool.sol";
 import {TokenPool} from "./TokenPool.sol";
 
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/utils/SafeERC20.sol";
+import {EnumerableMap} from "@openzeppelin/contracts@5.3.0/utils/structs/EnumerableMap.sol";
 
 /// @notice A variation on Lock Release token pools where liquidity is shared among some chains, and stored independently
 /// for others. Chains which do not share liquidity are known as siloed chains.
 contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
-  using SafeERC20 for IERC20;
+  using EnumerableMap for EnumerableMap.UintToAddressMap;
 
   error InsufficientLiquidity(uint256 availableLiquidity, uint256 requestedAmount);
   error LockBoxNotConfigured(uint64 remoteChainSelector);
@@ -25,7 +25,7 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
 
   /// @notice Lock boxes keyed by chain selector.
   /// @dev We can have a many-to-one mapping of remote chain selectors to lock boxes. This allows for chains to share or isolate liquidity.
-  mapping(uint64 remoteChainSelector => ILockBox lockBox) internal s_lockBoxes;
+  EnumerableMap.UintToAddressMap internal s_lockBoxes;
 
   constructor(
     IERC20 token,
@@ -46,7 +46,7 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     uint64 remoteChainSelector,
     uint256 amount
   ) internal override {
-    _getLockBox(remoteChainSelector).deposit(address(i_token), remoteChainSelector, amount);
+    getLockBox(remoteChainSelector).deposit(address(i_token), remoteChainSelector, amount);
   }
 
   /// @inheritdoc TokenPool
@@ -56,7 +56,7 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     uint256 amount,
     uint64 remoteChainSelector
   ) internal override {
-    ILockBox lockBox = _getLockBox(remoteChainSelector);
+    ILockBox lockBox = getLockBox(remoteChainSelector);
     uint256 availableLiquidity = i_token.balanceOf(address(lockBox));
     if (amount > availableLiquidity) revert InsufficientLiquidity(availableLiquidity, amount);
 
@@ -69,21 +69,46 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
   function getAvailableTokens(
     uint64 remoteChainSelector
   ) external view returns (uint256) {
-    return i_token.balanceOf(address(_getLockBox(remoteChainSelector)));
+    return i_token.balanceOf(address(getLockBox(remoteChainSelector)));
   }
 
-  /// @notice Returns all configured lockboxes for supported chains.
-  /// @return lockBoxConfigs Array of lockbox configurations for all supported chains.
-  /// @dev Only returns lockboxes for chains that have been configured. Chains without
-  /// a configured lockbox will have address(0) as the lockBox address.
+  /// @notice Returns all configured lockboxes.
+  /// @return lockBoxConfigs Array of all configured lockbox configurations.
   function getAllLockBoxConfigs() external view returns (LockBoxConfig[] memory lockBoxConfigs) {
-    uint64[] memory supportedChains = getSupportedChains();
-    lockBoxConfigs = new LockBoxConfig[](supportedChains.length);
-    for (uint256 i = 0; i < supportedChains.length; ++i) {
-      lockBoxConfigs[i] =
-        LockBoxConfig({remoteChainSelector: supportedChains[i], lockBox: address(s_lockBoxes[supportedChains[i]])});
+    uint256 length = s_lockBoxes.length();
+    lockBoxConfigs = new LockBoxConfig[](length);
+    for (uint256 i = 0; i < length; ++i) {
+      (uint256 chainSelector, address lockBox) = s_lockBoxes.at(i);
+      lockBoxConfigs[i] = LockBoxConfig({remoteChainSelector: uint64(chainSelector), lockBox: lockBox});
     }
     return lockBoxConfigs;
+  }
+
+  /// @notice Configure lockboxes.
+  /// @param lockBoxConfigs The lockbox configurations to set.
+  function configureLockBoxes(
+    LockBoxConfig[] calldata lockBoxConfigs
+  ) external onlyOwner {
+    for (uint256 i = 0; i < lockBoxConfigs.length; ++i) {
+      address lockBox = lockBoxConfigs[i].lockBox;
+      if (lockBox == address(0)) revert ZeroAddressInvalid();
+      ILockBox lockBoxContract = ILockBox(lockBox);
+      if (!lockBoxContract.isTokenSupported(address(i_token))) {
+        revert InvalidToken(address(i_token));
+      }
+      s_lockBoxes.set(lockBoxConfigs[i].remoteChainSelector, lockBox);
+      i_token.approve(lockBox, type(uint256).max);
+    }
+  }
+
+  /// @notice Gets the lockbox for a given remote chain selector.
+  /// @param remoteChainSelector The remote chain selector to get the lockbox for.
+  function getLockBox(
+    uint64 remoteChainSelector
+  ) public view returns (ILockBox) {
+    (bool exists, address lockBox) = s_lockBoxes.tryGet(uint256(remoteChainSelector));
+    if (!exists) revert LockBoxNotConfigured(remoteChainSelector);
+    return ILockBox(lockBox);
   }
 
   /// @notice No-op override to purge the unused code path from the contract.
@@ -99,31 +124,4 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     uint16,
     bytes memory
   ) internal pure virtual override {}
-
-  /// @notice Configure lockboxes.
-  /// @param lockBoxConfigs The lockbox configurations to set.
-  function configureLockBoxes(
-    LockBoxConfig[] calldata lockBoxConfigs
-  ) external onlyOwner {
-    for (uint256 i = 0; i < lockBoxConfigs.length; ++i) {
-      address lockBox = lockBoxConfigs[i].lockBox;
-      if (lockBox == address(0)) revert ZeroAddressInvalid();
-      ILockBox lockBoxContract = ILockBox(lockBox);
-      if (!lockBoxContract.isTokenSupported(address(i_token))) {
-        revert InvalidToken(address(i_token));
-      }
-      s_lockBoxes[lockBoxConfigs[i].remoteChainSelector] = lockBoxContract;
-      i_token.approve(lockBox, type(uint256).max);
-    }
-  }
-
-  /// @notice Gets the lockbox for a given remote chain selector.
-  /// @param remoteChainSelector The remote chain selector to get the lockbox for.
-  function _getLockBox(
-    uint64 remoteChainSelector
-  ) internal view returns (ILockBox) {
-    ILockBox lockBox = s_lockBoxes[remoteChainSelector];
-    if (address(lockBox) == address(0)) revert LockBoxNotConfigured(remoteChainSelector);
-    return lockBox;
-  }
 }

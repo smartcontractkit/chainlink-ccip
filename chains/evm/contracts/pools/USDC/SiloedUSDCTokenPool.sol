@@ -210,7 +210,7 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
     s_tokensExcludedFromBurn[remoteChainSelector] += amount;
 
     uint256 burnableAmountAfterExclusion =
-      i_token.balanceOf(address(_getLockBox(remoteChainSelector))) - s_tokensExcludedFromBurn[remoteChainSelector];
+      i_token.balanceOf(address(getLockBox(remoteChainSelector))) - s_tokensExcludedFromBurn[remoteChainSelector];
 
     emit TokensExcludedFromBurn(remoteChainSelector, amount, burnableAmountAfterExclusion);
   }
@@ -236,7 +236,7 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
     uint64 burnChainSelector = s_proposedUSDCMigrationChain;
     if (burnChainSelector == 0) revert NoMigrationProposalPending();
 
-    ILockBox lockBox = _getLockBox(burnChainSelector);
+    ILockBox lockBox = getLockBox(burnChainSelector);
     // Burnable tokens is the total locked minus the amount excluded from burn
     uint256 tokensToBurn = i_token.balanceOf(address(lockBox)) - s_tokensExcludedFromBurn[burnChainSelector];
 
