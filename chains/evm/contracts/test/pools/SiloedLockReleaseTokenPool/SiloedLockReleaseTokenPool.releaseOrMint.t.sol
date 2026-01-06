@@ -62,7 +62,7 @@ contract SiloedLockReleaseTokenPool_releaseOrMint is SiloedLockReleaseTokenPoolS
     deal(address(s_token), address(s_siloedLockReleaseTokenPool), amount);
     vm.startPrank(s_allowedOnRamp);
 
-    // Lock funds for unsiloed chain so they can be released later
+    // Lock funds so they can be released later
     s_siloedLockReleaseTokenPool.lockOrBurn(
       Pool.LockOrBurnInV1({
         originalSender: STRANGER,
@@ -74,7 +74,6 @@ contract SiloedLockReleaseTokenPool_releaseOrMint is SiloedLockReleaseTokenPoolS
     );
 
     assertEq(s_siloedLockReleaseTokenPool.getAvailableTokens(SOURCE_CHAIN_SELECTOR), amount);
-    assertEq(s_siloedLockReleaseTokenPool.getUnsiloedLiquidity(), amount);
 
     vm.startPrank(s_allowedOffRamp);
 
@@ -95,7 +94,6 @@ contract SiloedLockReleaseTokenPool_releaseOrMint is SiloedLockReleaseTokenPoolS
     );
 
     assertEq(s_siloedLockReleaseTokenPool.getAvailableTokens(SOURCE_CHAIN_SELECTOR), 0);
-    assertEq(s_siloedLockReleaseTokenPool.getUnsiloedLiquidity(), 0);
   }
 
   function test_ReleaseOrMintV2_SiloedChain() public {
@@ -143,7 +141,8 @@ contract SiloedLockReleaseTokenPool_releaseOrMint is SiloedLockReleaseTokenPoolS
     uint256 releaseAmount = 10e18;
     uint256 liquidityAmount = releaseAmount - 1;
 
-    s_siloedLockReleaseTokenPool.provideSiloedLiquidity(SILOED_CHAIN_SELECTOR, liquidityAmount);
+    // Provide some liquidity via locking (simulates a previous lockOrBurn)
+    deal(address(s_token), address(s_siloLockBox), liquidityAmount);
 
     // Since amount to release is greater than provided liquidity, the function should revert
     vm.expectRevert(
@@ -170,8 +169,8 @@ contract SiloedLockReleaseTokenPool_releaseOrMint is SiloedLockReleaseTokenPoolS
     uint256 releaseAmount = 10e18;
     uint256 liquidityAmount = releaseAmount - 1;
 
-    // Call the provide liquidity function which provides to unsiloed chains.
-    s_siloedLockReleaseTokenPool.provideLiquidity(liquidityAmount);
+    // Provide some liquidity via direct transfer to lockbox
+    deal(address(s_token), address(s_lockBox), liquidityAmount);
 
     // Since amount to release is greater than provided liquidity, the function should revert
     vm.expectRevert(
