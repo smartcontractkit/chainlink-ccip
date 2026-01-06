@@ -15,8 +15,7 @@ import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/Enumera
 /// @dev The CCTP migration functions have been previously audited. The code has been moved from its own contract
 /// to this, to maximize simplicity. The only difference is that custom balance tracking
 /// has been removed and instead is now inherited from the SiloedLockReleaseTokenPool.
-/// @dev While this technically supports unsiloed chains, as inherited from the parent contract,
-/// it is not recommended to use them. All chains should be siloed, otherwise the chain will not be
+/// @dev All chains should be siloed, otherwise the chain will not be
 /// able to migrate to CCTP in the future, due to the inability to manage the token
 /// balances under CCTP accounting rules defined at:
 /// https://github.com/circlefin/stablecoin-evm/blob/master/doc/bridged_USDC_standard.md
@@ -54,16 +53,14 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
   /// @param advancedPoolHooks Optional advanced pool hooks contract (can be address(0)).
   /// @param rmnProxy The RMN proxy address.
   /// @param router The router address.
-  /// @param lockBox The lock box address used to custody the token.
   constructor(
     IERC20 token,
     uint8 localTokenDecimals,
     address advancedPoolHooks,
     address rmnProxy,
-    address router,
-    address lockBox
+    address router
   )
-    SiloedLockReleaseTokenPool(token, localTokenDecimals, advancedPoolHooks, rmnProxy, router, lockBox)
+    SiloedLockReleaseTokenPool(token, localTokenDecimals, advancedPoolHooks, rmnProxy, router)
     AuthorizedCallers(new address[](0))
   {}
 
@@ -113,20 +110,6 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
     return Pool.ReleaseOrMintOutV1({destinationAmount: releaseOrMintIn.sourceDenominatedAmount});
   }
 
-  /// @dev This function is overridden to prevent providing liquidity to a chain that has already been migrated, and thus should use CCTP-proper instead of a Lock/Release mechanism.
-  /// @param remoteChainSelector The remote chain selector.
-  /// @param amount The amount of tokens to provide.
-  function _provideLiquidity(
-    uint64 remoteChainSelector,
-    uint256 amount
-  ) internal override {
-    if (s_migratedChains.contains(remoteChainSelector)) {
-      revert TokenLockingNotAllowedAfterMigration(remoteChainSelector);
-    }
-
-    super._provideLiquidity(remoteChainSelector, amount);
-  }
-
   // ================================================================
   // │                           Access                             │
   // ================================================================
@@ -171,8 +154,6 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
     // Prevent overwriting existing migration proposals until the current one is finished
     if (s_proposedUSDCMigrationChain != 0) revert ExistingMigrationProposal();
     if (s_migratedChains.contains(remoteChainSelector)) revert ChainAlreadyMigrated(remoteChainSelector);
-    if (remoteChainSelector == 0) revert SiloedLockReleaseTokenPool.InvalidChainSelector(0);
-
     s_proposedUSDCMigrationChain = remoteChainSelector;
 
     emit CCTPMigrationProposed(remoteChainSelector);
