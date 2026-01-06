@@ -12,11 +12,7 @@ contract SiloedLockReleaseTokenPool_constructor is BaseTest {
     BurnMintERC20 token = new BurnMintERC20("TKN", "T", DEFAULT_TOKEN_DECIMALS, 0, 0);
 
     SiloedLockReleaseTokenPool pool = new SiloedLockReleaseTokenPool(
-      IERC20(address(token)),
-      DEFAULT_TOKEN_DECIMALS,
-      address(0),
-      address(s_mockRMNRemote),
-      address(s_sourceRouter)
+      IERC20(address(token)), DEFAULT_TOKEN_DECIMALS, address(0), address(s_mockRMNRemote), address(s_sourceRouter)
     );
 
     assertEq(address(pool.getToken()), address(token));

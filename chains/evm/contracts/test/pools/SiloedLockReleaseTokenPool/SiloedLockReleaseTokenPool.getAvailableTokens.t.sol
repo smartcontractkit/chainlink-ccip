@@ -16,9 +16,7 @@ contract SiloedLockReleaseTokenPool_getAvailableTokens is SiloedLockReleaseToken
   }
 
   function test_getAvailableTokens_RevertWhen_LockBoxNotConfigured() public {
-    vm.expectRevert(
-      abi.encodeWithSelector(SiloedLockReleaseTokenPool.LockBoxNotConfigured.selector, type(uint64).max)
-    );
+    vm.expectRevert(abi.encodeWithSelector(SiloedLockReleaseTokenPool.LockBoxNotConfigured.selector, type(uint64).max));
 
     s_siloedLockReleaseTokenPool.getAvailableTokens(type(uint64).max);
   }

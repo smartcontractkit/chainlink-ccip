@@ -33,8 +33,7 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     address advancedPoolHooks,
     address rmnProxy,
     address router
-  ) TokenPool(token, localTokenDecimals, advancedPoolHooks, rmnProxy, router) {
-  }
+  ) TokenPool(token, localTokenDecimals, advancedPoolHooks, rmnProxy, router) {}
 
   /// @dev Using a function because constant state variables cannot be overridden by child contracts.
   function typeAndVersion() external pure virtual override returns (string memory) {

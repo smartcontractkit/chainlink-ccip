@@ -51,9 +51,8 @@ contract SiloedLockReleaseTokenPoolSetup is BaseTest {
 
     // Configure lockboxes for both chains
     SiloedLockReleaseTokenPool.LockBoxConfig[] memory lockBoxes = new SiloedLockReleaseTokenPool.LockBoxConfig[](3);
-    lockBoxes[0] = SiloedLockReleaseTokenPool.LockBoxConfig({
-      remoteChainSelector: DEST_CHAIN_SELECTOR, lockBox: address(s_lockBox)
-    });
+    lockBoxes[0] =
+      SiloedLockReleaseTokenPool.LockBoxConfig({remoteChainSelector: DEST_CHAIN_SELECTOR, lockBox: address(s_lockBox)});
     lockBoxes[1] = SiloedLockReleaseTokenPool.LockBoxConfig({
       remoteChainSelector: SILOED_CHAIN_SELECTOR, lockBox: address(s_siloLockBox)
     });
