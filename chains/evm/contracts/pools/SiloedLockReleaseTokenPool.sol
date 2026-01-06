@@ -106,7 +106,7 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
   function getLockBox(
     uint64 remoteChainSelector
   ) public view returns (ILockBox) {
-    (bool exists, address lockBox) = s_lockBoxes.tryGet(uint256(remoteChainSelector));
+    (bool exists, address lockBox) = s_lockBoxes.tryGet(remoteChainSelector);
     if (!exists) revert LockBoxNotConfigured(remoteChainSelector);
     return ILockBox(lockBox);
   }

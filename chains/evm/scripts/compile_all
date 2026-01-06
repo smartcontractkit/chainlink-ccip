@@ -9,10 +9,8 @@ echo " └───────────────────────�
 # The offRamp uses a specific lower optimization runs value. All other contracts use the default value
 # as specified in the foundry.toml.
 OPTIMIZE_RUNS_TOKEN_POOL=50000
-OPTIMIZE_RUNS_LARGE_TOKEN_POOL=15000
-OPTIMIZE_RUNS_USDC=2000
 OPTIMIZE_RUNS_ONRAMP=5000
-OPTIMIZE_RUNS_OFFRAMP=20000
+OPTIMIZE_RUNS_OFFRAMP=30000
 
 PROJECT="ccip"
 FOUNDRY_PROJECT_SUFFIX="-compile"
@@ -59,12 +57,6 @@ function getOptimizations() {
     fi
 
     case $contract_name in
-      "SiloedLockReleaseTokenPool")
-        optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_LARGE_TOKEN_POOL"
-        ;;
-      "SiloedUSDCTokenPool")
-        optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_USDC"
-        ;;
       "OnRamp")
         optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_ONRAMP"
         ;;
