@@ -724,3 +724,105 @@ func TestDefaultAdminChangesetValidation(t *testing.T) {
 		require.Contains(t, err.Error(), "new admin owner address must be provided")
 	})
 }
+
+// TestAcceptOwnershipChangesetValidation tests the AcceptOwnershipChangeset validation
+func TestAcceptOwnershipChangesetValidation(t *testing.T) {
+	t.Parallel()
+
+	evmChains := []uint64{
+		chain_selectors.ETHEREUM_MAINNET.Selector,
+	}
+
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, evmChains),
+	)
+	require.NoError(t, err, "Failed to create test environment")
+
+	cs := changesets.AcceptOwnershipChangeset()
+
+	t.Run("empty tokens map", func(t *testing.T) {
+		input := sequences.TokenGovernorOwnershipInput{
+			Tokens: map[uint64]map[string]common.Address{},
+		}
+		err := cs.VerifyPreconditions(*e, input)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "tokens map must be provided")
+	})
+
+	t.Run("nonexistent chain", func(t *testing.T) {
+		input := sequences.TokenGovernorOwnershipInput{
+			Tokens: map[uint64]map[string]common.Address{
+				999999: {
+					"TEST": common.HexToAddress("0x1111111111111111111111111111111111111111"),
+				},
+			},
+		}
+		err := cs.VerifyPreconditions(*e, input)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "chain with selector 999999 does not exist")
+	})
+
+	t.Run("zero new owner address", func(t *testing.T) {
+		input := sequences.TokenGovernorOwnershipInput{
+			Tokens: map[uint64]map[string]common.Address{
+				chain_selectors.ETHEREUM_MAINNET.Selector: {
+					"TEST": common.Address{},
+				},
+			},
+		}
+		err := cs.VerifyPreconditions(*e, input)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "new owner address must be provided")
+	})
+}
+
+// TestAcceptDefaultAdminTransferChangesetValidation tests the AcceptDefaultAdminTransferChangeset validation
+func TestAcceptDefaultAdminTransferChangesetValidation(t *testing.T) {
+	t.Parallel()
+
+	evmChains := []uint64{
+		chain_selectors.ETHEREUM_MAINNET.Selector,
+	}
+
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, evmChains),
+	)
+	require.NoError(t, err, "Failed to create test environment")
+
+	cs := changesets.AcceptDefaultAdminTransferChangeset()
+
+	t.Run("empty tokens map", func(t *testing.T) {
+		input := sequences.TokenGovernorOwnershipInput{
+			Tokens: map[uint64]map[string]common.Address{},
+		}
+		err := cs.VerifyPreconditions(*e, input)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "tokens map must be provided")
+	})
+
+	t.Run("nonexistent chain", func(t *testing.T) {
+		input := sequences.TokenGovernorOwnershipInput{
+			Tokens: map[uint64]map[string]common.Address{
+				999999: {
+					"TEST": common.HexToAddress("0x1111111111111111111111111111111111111111"),
+				},
+			},
+		}
+		err := cs.VerifyPreconditions(*e, input)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "chain with selector 999999 does not exist")
+	})
+
+	t.Run("zero admin address", func(t *testing.T) {
+		input := sequences.TokenGovernorOwnershipInput{
+			Tokens: map[uint64]map[string]common.Address{
+				chain_selectors.ETHEREUM_MAINNET.Selector: {
+					"TEST": common.Address{},
+				},
+			},
+		}
+		err := cs.VerifyPreconditions(*e, input)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "new admin owner address must be provided")
+	})
+}

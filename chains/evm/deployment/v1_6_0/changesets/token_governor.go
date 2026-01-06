@@ -204,6 +204,11 @@ func TransferOwnershipChangeset() cldf.ChangeSetV2[sequences.TokenGovernorOwners
 	return cldf.CreateChangeSet(transferOwnershipApply(), transferOwnershipVerify())
 }
 
+// AcceptOwnershipChangeset returns a changeset that accepts ownership of the TokenGovernor contract
+func AcceptOwnershipChangeset() cldf.ChangeSetV2[sequences.TokenGovernorOwnershipInput] {
+	return cldf.CreateChangeSet(acceptOwnershipApply(), acceptOwnershipVerify())
+}
+
 func transferOwnershipApply() func(cldf.Environment, sequences.TokenGovernorOwnershipInput) (cldf.ChangesetOutput, error) {
 	return func(e cldf.Environment, input sequences.TokenGovernorOwnershipInput) (cldf.ChangesetOutput, error) {
 		batchOps := make([]mcms_types.BatchOperation, 0)
@@ -252,6 +257,38 @@ func transferOwnershipVerify() func(cldf.Environment, sequences.TokenGovernorOwn
 		}
 		return nil
 	}
+}
+
+func acceptOwnershipApply() func(cldf.Environment, sequences.TokenGovernorOwnershipInput) (cldf.ChangesetOutput, error) {
+	return func(e cldf.Environment, input sequences.TokenGovernorOwnershipInput) (cldf.ChangesetOutput, error) {
+		batchOps := make([]mcms_types.BatchOperation, 0)
+		reports := make([]cldf_ops.Report[any, any], 0)
+
+		// Prepare sequence input
+		input.ExistingDataStore = e.DataStore
+
+		report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, sequences.AcceptOwnership, e.BlockChains, input)
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to accept ownership: %w", err)
+		}
+
+		batchOps = append(batchOps, report.Output.BatchOps...)
+		reports = append(reports, report.ExecutionReports...)
+
+		mcmsInput := mcms.Input{}
+		if input.MCMS != nil {
+			mcmsInput = *input.MCMS
+		}
+
+		return changesets.NewOutputBuilder(e, nil).
+			WithReports(reports).
+			WithBatchOps(batchOps).
+			Build(mcmsInput)
+	}
+}
+
+func acceptOwnershipVerify() func(cldf.Environment, sequences.TokenGovernorOwnershipInput) error {
+	return transferOwnershipVerify()
 }
 
 // BeginDefaultAdminTransferChangeset returns a changeset that begins the transfer of default admin role
