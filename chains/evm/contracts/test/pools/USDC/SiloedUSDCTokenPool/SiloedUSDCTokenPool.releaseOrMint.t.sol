@@ -153,7 +153,7 @@ contract SiloedUSDCTokenPool_releaseOrMint is SiloedUSDCTokenPoolSetup {
     uint256 amount = DEFAULT_LIQUIDITY;
     address localToken = address(s_USDCToken);
 
-    // Override setUp liquidity with insufficient amount
+    // Override setUp liquidity with insufficient amount.
     deal(address(s_USDCToken), address(s_sourceLockBox), amount / 2);
 
     vm.startPrank(s_routerAllowedOffRamp);
@@ -171,6 +171,39 @@ contract SiloedUSDCTokenPool_releaseOrMint is SiloedUSDCTokenPoolSetup {
 
     vm.expectRevert(
       abi.encodeWithSelector(SiloedLockReleaseTokenPool.InsufficientLiquidity.selector, amount / 2, amount)
+    );
+    s_usdcTokenPool.releaseOrMint(releaseOrMintIn);
+  }
+
+  function test_releaseOrMint_RevertWhen_InsufficientLiquidity_InsufficientExcludedTokens() public {
+    // Propose a CCTP migration to enable excluded tokens tracking.
+    vm.startPrank(OWNER);
+    s_usdcTokenPool.proposeCCTPMigration(SOURCE_CHAIN_SELECTOR);
+
+    // Exclude only a small amount of tokens from burn.
+    uint256 excludedAmount = 100e6;
+    s_usdcTokenPool.excludeTokensFromBurn(SOURCE_CHAIN_SELECTOR, excludedAmount);
+    vm.stopPrank();
+
+    // Try to release more than the excluded amount.
+    uint256 releaseAmount = 200e6;
+
+    vm.startPrank(s_routerAllowedOffRamp);
+
+    Pool.ReleaseOrMintInV1 memory releaseOrMintIn = Pool.ReleaseOrMintInV1({
+      originalSender: s_originalSender,
+      receiver: s_recipient,
+      sourceDenominatedAmount: releaseAmount,
+      localToken: address(s_USDCToken),
+      remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+      sourcePoolAddress: s_sourcePoolAddress,
+      sourcePoolData: abi.encode(LOCK_RELEASE_FLAG),
+      offchainTokenData: ""
+    });
+
+    // Should revert because excluded tokens (100e6) < release amount (200e6).
+    vm.expectRevert(
+      abi.encodeWithSelector(SiloedLockReleaseTokenPool.InsufficientLiquidity.selector, excludedAmount, releaseAmount)
     );
     s_usdcTokenPool.releaseOrMint(releaseOrMintIn);
   }
