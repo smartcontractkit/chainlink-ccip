@@ -4,7 +4,6 @@ pragma solidity ^0.8.24;
 import {IPoolV2} from "../../../../interfaces/IPoolV2.sol";
 
 import {Pool} from "../../../../libraries/Pool.sol";
-import {SiloedLockReleaseTokenPool} from "../../../../pools/SiloedLockReleaseTokenPool.sol";
 import {TokenPool} from "../../../../pools/TokenPool.sol";
 import {SiloedUSDCTokenPoolSetup} from "./SiloedUSDCTokenPoolSetup.sol";
 
