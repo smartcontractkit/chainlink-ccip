@@ -148,15 +148,13 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
       s_tokenAdminRegistry.getPool(s_sourceTokens[0]),
       abi.encodeCall(
         IPoolV1.lockOrBurn,
-        (
-          Pool.LockOrBurnInV1({
+        (Pool.LockOrBurnInV1({
             receiver: message.receiver,
             remoteChainSelector: DEST_CHAIN_SELECTOR,
             originalSender: OWNER,
             amount: 1000,
             localToken: s_sourceTokens[0]
-          })
-        )
+          }))
       )
     );
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
@@ -192,15 +190,13 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
       s_tokenAdminRegistry.getPool(s_sourceTokens[0]),
       abi.encodeCall(
         IPoolV1.lockOrBurn,
-        (
-          Pool.LockOrBurnInV1({
+        (Pool.LockOrBurnInV1({
             receiver: abi.encode(svmTokenReceiver), // For SVM, the receiver is the SVMExtraArgsV1.tokenReceiver
             remoteChainSelector: DEST_CHAIN_SELECTOR,
             originalSender: OWNER,
             amount: 1000,
             localToken: s_sourceTokens[0]
-          })
-        )
+          }))
       )
     );
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
@@ -293,7 +289,11 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
   }
 
   // Make sure any valid sender, receiver and feeAmount can be handled.
-  function testFuzz_ForwardFromRouter_Success(address originalSender, address receiver, uint96 feeTokenAmount) public {
+  function testFuzz_ForwardFromRouter_Success(
+    address originalSender,
+    address receiver,
+    uint96 feeTokenAmount
+  ) public {
     // To avoid RouterMustSetOriginalSender
     vm.assume(originalSender != address(0));
     vm.assume(uint160(receiver) >= Internal.EVM_PRECOMPILE_SPACE);

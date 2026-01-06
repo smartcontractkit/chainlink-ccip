@@ -19,7 +19,10 @@ contract OnRampOverSuperchainInteropHelper is OnRampOverSuperchainInterop {
   }
 
   /// @notice Helper function to access the sent interop message hash storage for testing
-  function getSentInteropMessageHash(uint64 destChainSelector, uint64 sequenceNumber) public view returns (bytes32) {
+  function getSentInteropMessageHash(
+    uint64 destChainSelector,
+    uint64 sequenceNumber
+  ) public view returns (bytes32) {
     return s_sentInteropMessageHashes[destChainSelector][sequenceNumber];
   }
 }

@@ -1,4 +1,4 @@
-package sequences
+package common
 
 import (
 	"fmt"

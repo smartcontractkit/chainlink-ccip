@@ -37,9 +37,10 @@ contract OnRampWithMessageTransformer_executeSingleMessage is OnRampSetup {
     address[] memory authorizedCallers = new address[](1);
     authorizedCallers[0] = address(s_onRampWithMessageTransformer);
 
-    NonceManager(s_outboundNonceManager).applyAuthorizedCallerUpdates(
-      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: authorizedCallers, removedCallers: new address[](0)})
-    );
+    NonceManager(s_outboundNonceManager)
+      .applyAuthorizedCallerUpdates(
+        AuthorizedCallers.AuthorizedCallerArgs({addedCallers: authorizedCallers, removedCallers: new address[](0)})
+      );
 
     Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](1);
     onRampUpdates[0] =

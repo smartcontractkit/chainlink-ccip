@@ -81,7 +81,10 @@ contract RMNRemote is Ownable2StepMsgSender, ITypeAndVersion, IRMNRemote, IRMN {
   mapping(address signer => bool exists) private s_signers; // for more gas efficient verify.
 
   /// @param localChainSelector the chain selector of the chain this contract is deployed to.
-  constructor(uint64 localChainSelector, IRMN legacyRMN) {
+  constructor(
+    uint64 localChainSelector,
+    IRMN legacyRMN
+  ) {
     if (localChainSelector == 0) revert ZeroValueNotAllowed();
     i_localChainSelector = localChainSelector;
 

@@ -102,7 +102,7 @@ var ConnectChains = operations.NewOperation(
 		var destChainAccount ccip_router.DestChain
 		err := chain.GetAccountDataBorshInto(context.Background(), routerDestChainPDA, &destChainAccount)
 		if err == nil {
-			fmt.Println("Remote chain state account found:", destChainAccount)
+			b.Logger.Infof("Remote chain state account found: %+v", destChainAccount)
 			isUpdate = true
 		}
 		destChainConfig := ccip_router.DestChainConfig{
@@ -110,6 +110,7 @@ var ConnectChains = operations.NewOperation(
 			AllowListEnabled: input.AllowlistEnabled,
 		}
 		var ixn solana.Instruction
+		var addressRefs []datastore.AddressRef
 		batches := make([]types.BatchOperation, 0)
 		if isUpdate {
 			ixn, err = ccip_router.NewUpdateDestChainConfigInstruction(
@@ -139,13 +140,13 @@ var ConnectChains = operations.NewOperation(
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to extend OffRamp lookup table: %w", err)
 			}
-		}
-		sourceRef := datastore.AddressRef{
-			Address:       routerDestChainPDA.String(),
-			ChainSelector: chain.Selector,
-			Type:          datastore.ContractType(DestChainType),
-			Version:       Version,
-			Qualifier:     strconv.FormatUint(input.RemoteChainSelector, 10),
+			addressRefs = append(addressRefs, datastore.AddressRef{
+				Address:       routerDestChainPDA.String(),
+				ChainSelector: chain.Selector,
+				Type:          datastore.ContractType(DestChainType),
+				Version:       Version,
+				Qualifier:     strconv.FormatUint(input.RemoteChainSelector, 10),
+			})
 		}
 		if authority != chain.DeployerKey.PublicKey() {
 			b, err := utils.BuildMCMSBatchOperation(
@@ -166,7 +167,7 @@ var ConnectChains = operations.NewOperation(
 		}
 		return sequences.OnChainOutput{
 			BatchOps:  batches,
-			Addresses: []datastore.AddressRef{sourceRef},
+			Addresses: addressRefs,
 		}, nil
 	},
 )
@@ -182,7 +183,7 @@ var AddOffRamp = operations.NewOperation(
 		offRampSourceChainPDA, _, _ := state.FindOfframpSourceChainPDA(input.RemoteChainSelector, input.OffRamp)
 		err := chain.GetAccountDataBorshInto(context.Background(), offRampSourceChainPDA, &sourceChainAccount)
 		if err == nil {
-			b.Logger.Info("Remote chain state account found:", sourceChainAccount)
+			b.Logger.Infof("Remote chain state account found: %+v", sourceChainAccount)
 			return sequences.OnChainOutput{}, nil
 		}
 		routerConfigPDA, _, _ := state.FindConfigPDA(input.Router)

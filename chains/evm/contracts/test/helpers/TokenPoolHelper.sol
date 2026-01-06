@@ -28,7 +28,10 @@ contract TokenPoolHelper is TokenPool {
     return _parseRemoteDecimals(sourcePoolData);
   }
 
-  function calculateLocalAmount(uint256 remoteAmount, uint8 remoteDecimals) external view returns (uint256) {
+  function calculateLocalAmount(
+    uint256 remoteAmount,
+    uint8 remoteDecimals
+  ) external view returns (uint256) {
     return _calculateLocalAmount(remoteAmount, remoteDecimals);
   }
 
@@ -38,7 +41,10 @@ contract TokenPoolHelper is TokenPool {
     _validateLockOrBurn(lockOrBurnIn);
   }
 
-  function validateReleaseOrMint(Pool.ReleaseOrMintInV1 calldata releaseOrMintIn, uint256 localAmount) external {
+  function validateReleaseOrMint(
+    Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
+    uint256 localAmount
+  ) external {
     _validateReleaseOrMint(releaseOrMintIn, localAmount);
   }
 

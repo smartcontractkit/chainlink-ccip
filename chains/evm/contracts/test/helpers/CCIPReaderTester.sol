@@ -24,7 +24,10 @@ contract CCIPReaderTester {
   /// @notice Sets the sequence number in the onRamp
   /// @param destChainSelector The destination chain selector
   /// @param sequenceNumber The sequence number
-  function setDestChainSeqNr(uint64 destChainSelector, uint64 sequenceNumber) external {
+  function setDestChainSeqNr(
+    uint64 destChainSelector,
+    uint64 sequenceNumber
+  ) external {
     s_destChainSeqNrs[destChainSelector] = sequenceNumber;
   }
 
@@ -32,11 +35,18 @@ contract CCIPReaderTester {
   /// @param sourceChainSelector The source chain selector.
   /// @param sender The encoded sender address.
   /// @return inboundNonce The inbound nonce.
-  function getInboundNonce(uint64 sourceChainSelector, bytes calldata sender) external view returns (uint64) {
+  function getInboundNonce(
+    uint64 sourceChainSelector,
+    bytes calldata sender
+  ) external view returns (uint64) {
     return s_senderNonce[sourceChainSelector][sender];
   }
 
-  function setInboundNonce(uint64 sourceChainSelector, uint64 testNonce, bytes calldata sender) external {
+  function setInboundNonce(
+    uint64 sourceChainSelector,
+    uint64 testNonce,
+    bytes calldata sender
+  ) external {
     s_senderNonce[sourceChainSelector][sender] = testNonce;
   }
 
@@ -66,7 +76,10 @@ contract CCIPReaderTester {
     return s_latestPriceSequenceNumber;
   }
 
-  function emitCCIPMessageSent(uint64 destChainSelector, Internal.EVM2AnyRampMessage memory message) external {
+  function emitCCIPMessageSent(
+    uint64 destChainSelector,
+    Internal.EVM2AnyRampMessage memory message
+  ) external {
     emit OnRamp.CCIPMessageSent(destChainSelector, message.header.sequenceNumber, message);
   }
 

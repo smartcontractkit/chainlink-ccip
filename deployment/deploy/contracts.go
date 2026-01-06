@@ -44,6 +44,8 @@ type ContractDeploymentConfigPerChain struct {
 	MessageInterceptor string
 	// RMN REMOTE CONFIG
 	LegacyRMN string
+	// CONTRACT VERSION
+	ContractVersion string
 }
 
 type ContractDeploymentConfigPerChainWithAddress struct {

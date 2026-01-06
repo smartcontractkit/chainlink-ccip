@@ -1,10 +1,13 @@
 package utils
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
+
+	chain_selectors "github.com/smartcontractkit/chain-selectors"
 
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
@@ -44,7 +47,26 @@ const (
 	SVMFamilySelector   = "1e10bdc4"
 	AptosFamilySelector = "ac77ffec"
 	TVMFamilySelector   = "647e2ba9"
+	SuiFamilySelector   = "c4e05953"
 )
+
+func GetSelectorHex(selector uint64) []byte {
+	destFamily, _ := chain_selectors.GetSelectorFamily(selector)
+	var familySelector []byte
+	switch destFamily {
+	case chain_selectors.FamilyEVM:
+		familySelector, _ = hex.DecodeString(EVMFamilySelector)
+	case chain_selectors.FamilySolana:
+		familySelector, _ = hex.DecodeString(SVMFamilySelector)
+	case chain_selectors.FamilyAptos:
+		familySelector, _ = hex.DecodeString(AptosFamilySelector)
+	case chain_selectors.FamilyTon:
+		familySelector, _ = hex.DecodeString(TVMFamilySelector)
+	case chain_selectors.FamilySui:
+		familySelector, _ = hex.DecodeString(SuiFamilySelector)
+	}
+	return familySelector
+}
 
 var (
 	ErrZeroAddress         = errors.New("address cannot be zero address")

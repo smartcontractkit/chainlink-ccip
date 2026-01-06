@@ -199,7 +199,10 @@ abstract contract MultiOCR3Base is ITypeAndVersion, Ownable2StepMsgSender {
   /// @notice Clears oracle roles for the provided oracle addresses.
   /// @param ocrPluginType OCR plugin type to clear roles for.
   /// @param oracleAddresses Oracle addresses to clear roles for.
-  function _clearOracleRoles(uint8 ocrPluginType, address[] memory oracleAddresses) internal {
+  function _clearOracleRoles(
+    uint8 ocrPluginType,
+    address[] memory oracleAddresses
+  ) internal {
     for (uint256 i = 0; i < oracleAddresses.length; ++i) {
       delete s_oracles[ocrPluginType][oracleAddresses[i]];
     }
@@ -209,7 +212,11 @@ abstract contract MultiOCR3Base is ITypeAndVersion, Ownable2StepMsgSender {
   /// @param ocrPluginType OCR plugin type to assign roles for.
   /// @param oracleAddresses Oracle addresses to assign roles to.
   /// @param role Role to assign.
-  function _assignOracleRoles(uint8 ocrPluginType, address[] memory oracleAddresses, Role role) internal {
+  function _assignOracleRoles(
+    uint8 ocrPluginType,
+    address[] memory oracleAddresses,
+    Role role
+  ) internal {
     for (uint256 i = 0; i < oracleAddresses.length; ++i) {
       address oracle = oracleAddresses[i];
       if (s_oracles[ocrPluginType][oracle].role != Role.Unset) {
@@ -250,8 +257,8 @@ abstract contract MultiOCR3Base is ITypeAndVersion, Ownable2StepMsgSender {
 
       if (configInfo.isSignatureVerificationEnabled) {
         // 32 bytes per entry in _rs, _ss
-        expectedDataLength +=
-          TRANSMIT_MSGDATA_EXTRA_CONSTANT_LENGTH_COMPONENT_FOR_SIGNATURES + rs.length * 32 + ss.length * 32;
+        expectedDataLength += TRANSMIT_MSGDATA_EXTRA_CONSTANT_LENGTH_COMPONENT_FOR_SIGNATURES + rs.length * 32
+          + ss.length * 32;
       }
 
       if (msg.data.length != expectedDataLength) revert WrongMessageLength(expectedDataLength, msg.data.length);
@@ -269,12 +276,8 @@ abstract contract MultiOCR3Base is ITypeAndVersion, Ownable2StepMsgSender {
     {
       Oracle memory transmitter = s_oracles[ocrPluginType][msg.sender];
       // Check that sender is authorized to report.
-      if (
-        !(
-          transmitter.role == Role.Transmitter
-            && msg.sender == s_ocrConfigs[ocrPluginType].transmitters[transmitter.index]
-        )
-      ) {
+      if (!(transmitter.role == Role.Transmitter
+            && msg.sender == s_ocrConfigs[ocrPluginType].transmitters[transmitter.index])) {
         if (msg.sender != Internal.GAS_ESTIMATION_SENDER) {
           revert UnauthorizedTransmitter();
         }
