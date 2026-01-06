@@ -34,7 +34,6 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
   error ExistingMigrationProposal();
   error NoMigrationProposalPending();
   error ChainAlreadyMigrated(uint64 remoteChainSelector);
-  error TokenLockingNotAllowedAfterMigration(uint64 remoteChainSelector);
   error InsufficientLiquidity(uint256 availableLiquidity, uint256 requestedAmount);
 
   /// @notice The address of the circle-controlled wallet which will execute a CCTP lane migration
@@ -83,8 +82,8 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
 
     uint256 excludedTokens = s_tokensExcludedFromBurn[releaseOrMintIn.remoteChainSelector];
     if (excludedTokens != 0) {
-      // The existence of excluded tokens indicates a migration has occurred on the chain, and that any tokens
-      // being released should come from those excluded tokens reserved for processing inflight messages.
+      // The existence of excluded tokens indicates a migration has been proposed or executed for this chain.
+      // During this period, any tokens being released should come from those excluded tokens reserved for processing inflight messages.
       if (releaseOrMintIn.sourceDenominatedAmount > excludedTokens) {
         revert InsufficientLiquidity(excludedTokens, releaseOrMintIn.sourceDenominatedAmount);
       }
