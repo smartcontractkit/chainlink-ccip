@@ -58,61 +58,7 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 		}
 
 		// Deploy CCTPTokenPool & advanced pool hooks if needed
-		var advancedPoolHooksAddress common.Address
-		if input.TokenPools.CCTPV2PoolWithCCV == "" {
-			advancedPoolHooksReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.Deploy, chain, contract_utils.DeployInput[advanced_pool_hooks.ConstructorArgs]{
-				ChainSelector:  chain.Selector,
-				TypeAndVersion: deployment.NewTypeAndVersion(advanced_pool_hooks.ContractType, *advanced_pool_hooks.Version),
-				Qualifier:      &cctpQualifier,
-				Args: advanced_pool_hooks.ConstructorArgs{
-					Allowlist:                        convertStringsToAddresses(input.Allowlist),
-					ThresholdAmountForAdditionalCCVs: input.ThresholdAmountForAdditionalCCVs,
-				},
-			})
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy AdvancedPoolHooks: %w", err)
-			}
-			addresses = append(addresses, advancedPoolHooksReport.Output)
-			advancedPoolHooksAddress = common.HexToAddress(advancedPoolHooksReport.Output.Address)
-
-			cctpTokenPoolReport, err := cldf_ops.ExecuteOperation(b, cctp_token_pool.Deploy, chain, contract_utils.DeployInput[cctp_token_pool.ConstructorArgs]{
-				ChainSelector:  chain.Selector,
-				TypeAndVersion: deployment.NewTypeAndVersion(cctp_token_pool.ContractType, *cctp_token_pool.Version),
-				Qualifier:      &cctpQualifier,
-				Args: cctp_token_pool.ConstructorArgs{
-					Token:              common.HexToAddress(input.USDCToken),
-					LocalTokenDecimals: localTokenDecimals,
-					AdvancedPoolHooks:  advancedPoolHooksAddress,
-					RMNProxy:           common.HexToAddress(input.RMN),
-					Router:             common.HexToAddress(input.Router),
-				},
-			})
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CCTPTokenPool: %w", err)
-			}
-			addresses = append(addresses, cctpTokenPoolReport.Output)
-			input.TokenPools.CCTPV2PoolWithCCV = cctpTokenPoolReport.Output.Address
-		} else {
-			// Fetch the advanced pool hooks address from the token pool
-			advancedPoolHooksAddressReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetAdvancedPoolHooks, chain, contract_utils.FunctionInput[any]{
-				ChainSelector: input.ChainSelector,
-				Address:       common.HexToAddress(input.TokenPools.CCTPV2PoolWithCCV),
-			})
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to get advanced pool hooks address from token pool with address %s on %s: %w", input.TokenPools.CCTPV2PoolWithCCV, chain, err)
-			}
-			advancedPoolHooksAddress = advancedPoolHooksAddressReport.Output
-		}
-
-		// Configure token pool
-		configureTokenPoolReport, err := cldf_ops.ExecuteSequence(b, tokens_sequences.ConfigureTokenPool, chain, tokens_sequences.ConfigureTokenPoolInput{
-			ChainSelector:                    input.ChainSelector,
-			TokenPoolAddress:                 common.HexToAddress(input.TokenPools.CCTPV2PoolWithCCV),
-			AdvancedPoolHooks:                advancedPoolHooksAddress,
-			RouterAddress:                    common.HexToAddress(input.Router),
-			ThresholdAmountForAdditionalCCVs: input.ThresholdAmountForAdditionalCCVs,
-			RateLimitAdmin:                   common.HexToAddress(input.RateLimitAdmin),
-		})
+		poolTypeAndVersionToAddr, err := indexAddressesByTypeAndVersion(b, chain, input.TokenPool)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to index addresses by type and version: %w", err)
 		}
