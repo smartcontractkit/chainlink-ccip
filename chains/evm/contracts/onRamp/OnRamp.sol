@@ -904,6 +904,9 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     if (address(destChainConfig.router) == address(0)) {
       revert DestinationChainNotSupported(destChainSelector);
     }
+    if (message.tokenAmounts.length > 1) {
+      revert CanOnlySendOneTokenPerMessage();
+    }
 
     ExtraArgsCodec.GenericExtraArgsV3 memory resolvedExtraArgs = _parseExtraArgsWithDefaults(
       destChainSelector,
