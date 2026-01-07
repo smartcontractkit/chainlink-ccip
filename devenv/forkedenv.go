@@ -109,12 +109,15 @@ func NewForkedEnvironment() (*Cfg, error) {
 	if err != nil {
 		return nil, fmt.Errorf("creating CLDF operations environment: %w", err)
 	}
+
 	L.Info().Any("Selectors", selectors).Msg("Deploying for chain selectors")
 
 	// get Capability Registry Address
 	refs := e.DataStore.Addresses().Filter(
 		datastore.AddressRefByType(datastore.ContractType(utils.CapabilitiesRegistry)),
-		datastore.AddressRefByVersion(semver.MustParse("1.0.0")))
+		datastore.AddressRefByVersion(semver.MustParse("1.0.0")),
+		datastore.AddressRefByChainSelector(in.ForkedEnvConfig.HomeChainSelector),
+	)
 	if len(refs) != 1 {
 		return nil, fmt.Errorf("expected exactly one CapabilitiesRegistry address ref for version 1.1.0, found %d %+v", len(refs), refs)
 	}
@@ -138,6 +141,7 @@ func NewForkedEnvironment() (*Cfg, error) {
 		return nil, fmt.Errorf("unexpected capabilities registry type and version: %s", tv)
 	}
 
+	L.Info().Str("CapabilitiesRegistry", crRef).Str("TypeAndVersion", tv).Msg("Connected to Capabilities Registry")
 	tr.Record("[infra] deploying blockchains")
 
 	clChainConfigs := make([]string, 0)
