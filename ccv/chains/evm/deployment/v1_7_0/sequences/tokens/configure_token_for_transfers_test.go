@@ -67,7 +67,7 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 			e.OperationsBundle,
 			tokens.DeployTokenAndPool,
 			e.BlockChains.EVMChains()[chainSel],
-			basicDeployTokenAndPoolInput(chainReport),
+			basicDeployTokenAndPoolInput(chainReport, false),
 		)
 		require.NoError(t, err, "ExecuteSequence should not error")
 		require.Len(t, tokenAndPoolReport.Output.Addresses, 3, "Expected 3 addresses (token, pool, advanced pool hooks)")
@@ -223,7 +223,7 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 			e.OperationsBundle,
 			tokens.DeployTokenAndPool,
 			e.BlockChains.EVMChains()[chainSel],
-			basicDeployTokenAndPoolInput(chainReport),
+			basicDeployTokenAndPoolInput(chainReport, false),
 		)
 		require.NoError(t, err, "ExecuteSequence should not error")
 		require.Len(t, tokenAndPoolReport.Output.Addresses, 3, "Expected 3 addresses (token, pool, advanced pool hooks)")

@@ -5,24 +5,36 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/advanced_pool_hooks"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/erc20_lock_box"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/lock_release_token_pool"
 	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/advanced_pool_hooks"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/burn_mint_token_pool"
+	mcms_types "github.com/smartcontractkit/mcms/types"
 )
 
-var DeployBurnMintTokenPool = cldf_ops.NewSequence(
-	"deploy-burn-mint-token-pool",
+var DeployLockReleaseTokenPool = cldf_ops.NewSequence(
+	"deploy-lock-release-token-pool",
 	semver.MustParse("1.7.0"),
-	"Deploys a burn mint token pool to an EVM chain",
+	"Deploys a lock release token pool to an EVM chain",
 	func(b cldf_ops.Bundle, chain evm.Chain, input DeployTokenPoolInput) (output sequences.OnChainOutput, err error) {
 		if err := input.Validate(chain); err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("invalid input: %w", err)
+		}
+
+		lockBoxDeployReport, err := cldf_ops.ExecuteOperation(b, erc20_lock_box.Deploy, chain, evm_contract.DeployInput[erc20_lock_box.ConstructorArgs]{
+			ChainSelector:  input.ChainSel,
+			TypeAndVersion: deployment.NewTypeAndVersion(erc20_lock_box.ContractType, *erc20_lock_box.Version),
+			Args: erc20_lock_box.ConstructorArgs{
+				Token: input.ConstructorArgs.Token,
+			},
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy ERC20 lock box to %s: %w", chain, err)
 		}
 
 		hooksDeployReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.Deploy, chain, evm_contract.DeployInput[advanced_pool_hooks.ConstructorArgs]{
@@ -41,15 +53,16 @@ var DeployBurnMintTokenPool = cldf_ops.NewSequence(
 			deployment.ContractType(input.TokenPoolType),
 			*input.TokenPoolVersion,
 		)
-		tpDeployReport, err := cldf_ops.ExecuteOperation(b, burn_mint_token_pool.Deploy, chain, evm_contract.DeployInput[burn_mint_token_pool.ConstructorArgs]{
+		tpDeployReport, err := cldf_ops.ExecuteOperation(b, lock_release_token_pool.Deploy, chain, evm_contract.DeployInput[lock_release_token_pool.ConstructorArgs]{
 			ChainSelector:  input.ChainSel,
 			TypeAndVersion: typeAndVersion,
-			Args: burn_mint_token_pool.ConstructorArgs{
+			Args: lock_release_token_pool.ConstructorArgs{
 				Token:              input.ConstructorArgs.Token,
 				LocalTokenDecimals: input.ConstructorArgs.Decimals,
 				AdvancedPoolHooks:  common.HexToAddress(hooksDeployReport.Output.Address),
 				RMNProxy:           input.ConstructorArgs.RMNProxy,
 				Router:             input.ConstructorArgs.Router,
+				LockBox:            common.HexToAddress(lockBoxDeployReport.Output.Address),
 			},
 			Qualifier: &input.TokenSymbol,
 		})
@@ -64,15 +77,37 @@ var DeployBurnMintTokenPool = cldf_ops.NewSequence(
 			AdvancedPoolHooks:                common.HexToAddress(hooksDeployReport.Output.Address),
 			RouterAddress:                    input.ConstructorArgs.Router,
 			ThresholdAmountForAdditionalCCVs: input.ThresholdAmountForAdditionalCCVs,
-			FeeAggregator:                    input.FeeAggregator,
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to configure token pool with address %s on %s: %w", tpDeployReport.Output.Address, chain, err)
 		}
 
+		// Add lock release token pool to the authorized callers of the lock box.
+		applyAuthorizedCallerUpdatesReport, err := cldf_ops.ExecuteOperation(b, erc20_lock_box.ApplyAuthorizedCallerUpdates, chain, evm_contract.FunctionInput[erc20_lock_box.AuthorizedCallerArgs]{
+			ChainSelector: input.ChainSel,
+			Address:       common.HexToAddress(lockBoxDeployReport.Output.Address),
+			Args: erc20_lock_box.AuthorizedCallerArgs{
+				AddedCallers: []common.Address{
+					common.HexToAddress(tpDeployReport.Output.Address),
+				},
+			},
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to apply authorized caller updates to lock box on %s: %w", chain, err)
+		}
+		batchOp, err := evm_contract.NewBatchOperationFromWrites([]evm_contract.WriteOutput{applyAuthorizedCallerUpdatesReport.Output})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
+		}
+		configureReport.Output.BatchOps = append(configureReport.Output.BatchOps, []mcms_types.BatchOperation{batchOp}...)
+
 		return sequences.OnChainOutput{
-			Addresses: []datastore.AddressRef{tpDeployReport.Output, hooksDeployReport.Output},
-			BatchOps:  configureReport.Output.BatchOps,
+			Addresses: []datastore.AddressRef{
+				tpDeployReport.Output,
+				hooksDeployReport.Output,
+				lockBoxDeployReport.Output,
+			},
+			BatchOps: configureReport.Output.BatchOps,
 		}, nil
 	},
 )

@@ -187,7 +187,7 @@ func TestConfigureTokenPoolForRemoteChain(t *testing.T) {
 				e.OperationsBundle,
 				tokens.DeployTokenAndPool,
 				e.BlockChains.EVMChains()[chainSel],
-				basicDeployTokenAndPoolInput(chainReport),
+				basicDeployTokenAndPoolInput(chainReport, false),
 			)
 			require.NoError(t, err, "ExecuteSequence should not error")
 			tokenPoolAddress := common.HexToAddress(tokenAndPoolReport.Output.Addresses[1].Address)
