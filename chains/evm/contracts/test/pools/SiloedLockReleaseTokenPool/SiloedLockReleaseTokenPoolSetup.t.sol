@@ -37,7 +37,7 @@ contract SiloedLockReleaseTokenPoolSetup is BaseTest {
     s_siloLockBox = new ERC20LockBox(address(s_token));
 
     s_siloedLockReleaseTokenPool = new SiloedLockReleaseTokenPool(
-      s_token, DEFAULT_TOKEN_DECIMALS, address(0), address(s_mockRMNRemote), address(s_sourceRouter), address(s_lockBox)
+      s_token, DEFAULT_TOKEN_DECIMALS, address(0), address(s_mockRMNRemote), address(s_sourceRouter)
     );
 
     address[] memory allowedCallers = new address[](1);
@@ -49,14 +49,17 @@ contract SiloedLockReleaseTokenPoolSetup is BaseTest {
       AuthorizedCallers.AuthorizedCallerArgs({addedCallers: allowedCallers, removedCallers: new address[](0)})
     );
 
-    SiloedLockReleaseTokenPool.LockBoxConfig[] memory lockBoxes = new SiloedLockReleaseTokenPool.LockBoxConfig[](1);
-    lockBoxes[0] = SiloedLockReleaseTokenPool.LockBoxConfig({
+    // Configure lockboxes for both chains.
+    SiloedLockReleaseTokenPool.LockBoxConfig[] memory lockBoxes = new SiloedLockReleaseTokenPool.LockBoxConfig[](3);
+    lockBoxes[0] =
+      SiloedLockReleaseTokenPool.LockBoxConfig({remoteChainSelector: DEST_CHAIN_SELECTOR, lockBox: address(s_lockBox)});
+    lockBoxes[1] = SiloedLockReleaseTokenPool.LockBoxConfig({
       remoteChainSelector: SILOED_CHAIN_SELECTOR, lockBox: address(s_siloLockBox)
     });
+    lockBoxes[2] = SiloedLockReleaseTokenPool.LockBoxConfig({
+      remoteChainSelector: SOURCE_CHAIN_SELECTOR, lockBox: address(s_lockBox)
+    });
     s_siloedLockReleaseTokenPool.configureLockBoxes(lockBoxes);
-
-    // Set the rebalancer for the token pool
-    s_siloedLockReleaseTokenPool.setRebalancer(OWNER);
 
     s_token.approve(address(s_siloedLockReleaseTokenPool), type(uint256).max);
 
@@ -103,18 +106,5 @@ contract SiloedLockReleaseTokenPoolSetup is BaseTest {
     onRampUpdates[2] = Router.OnRamp({destChainSelector: SOURCE_CHAIN_SELECTOR, onRamp: s_allowedOnRamp});
 
     s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), offRampUpdates);
-
-    // Apply Siloeing Rules
-    SiloedLockReleaseTokenPool.SiloConfigUpdate[] memory adds = new SiloedLockReleaseTokenPool.SiloConfigUpdate[](1);
-
-    adds[0] =
-      SiloedLockReleaseTokenPool.SiloConfigUpdate({remoteChainSelector: SILOED_CHAIN_SELECTOR, rebalancer: OWNER});
-
-    s_siloedLockReleaseTokenPool.updateSiloDesignations(new uint64[](0), adds);
-
-    assertTrue(s_siloedLockReleaseTokenPool.isSiloed(SILOED_CHAIN_SELECTOR));
-    assertFalse(s_siloedLockReleaseTokenPool.isSiloed(DEST_CHAIN_SELECTOR));
-
-    s_siloedLockReleaseTokenPool.setSiloRebalancer(SILOED_CHAIN_SELECTOR, OWNER);
   }
 }
