@@ -11,7 +11,7 @@ replace (
 
 // local development
 // github.com/smartcontractkit/chainlink-ton/deployment => ../../chainlink-ton/deployment
-// github.com/smartcontractkit/chainlink-ton/devenv-impl => ../../chainlink-ton/devenv-impl
+// github.com/smartcontractkit/chainlink-ton/devenv => ../../chainlink-ton/devenv
 // github.com/smartcontractkit/chainlink-testing-framework/framework => ../../chainlink-testing-framework/framework
 )
 
@@ -54,9 +54,9 @@ require (
 )
 
 require (
-	github.com/smartcontractkit/chainlink-ton v0.0.0-20251222225825-082db6f6514f
-	github.com/smartcontractkit/chainlink-ton/deployment v0.0.0-20251223135314-831a334034e8
-	github.com/smartcontractkit/chainlink-ton/devenv-impl v0.0.0-20251229134236-dee172b250aa
+	github.com/smartcontractkit/chainlink-ton v0.0.0-20260107180454-60fb48f21d44
+	github.com/smartcontractkit/chainlink-ton/deployment v0.0.0-20260107180454-60fb48f21d44
+	github.com/smartcontractkit/chainlink-ton/devenv v0.0.0-20260107180454-60fb48f21d44
 )
 
 require (
