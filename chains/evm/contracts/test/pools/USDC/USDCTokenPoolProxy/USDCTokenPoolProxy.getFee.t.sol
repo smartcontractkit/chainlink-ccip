@@ -130,4 +130,33 @@ contract USDCTokenPoolProxy_getFee is USDCTokenPoolProxySetup {
     assertEq(tokenFeeBps, 0);
     assertEq(isEnabled, false);
   }
+
+  function test_getFee_RevertWhen_InvalidLockOrBurnMechanism_NoMechanismSet() public {
+    // Use a chain selector that has no mechanism configured
+    uint64 unconfiguredChainSelector = 99999;
+
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        USDCTokenPoolProxy.InvalidLockOrBurnMechanism.selector, USDCTokenPoolProxy.LockOrBurnMechanism.INVALID_MECHANISM
+      )
+    );
+    s_usdcTokenPoolProxy.getFee(address(0), unconfiguredChainSelector, 0, address(0), 0, "");
+  }
+
+  function test_getFee_RevertWhen_InvalidLockOrBurnMechanism_OldMechanism() public {
+    // Configure an old mechanism (CCTP_V1) that is not supported by getFee
+    uint64[] memory remoteChainSelectors = new uint64[](1);
+    remoteChainSelectors[0] = s_remoteLockReleaseChainSelector;
+
+    USDCTokenPoolProxy.LockOrBurnMechanism[] memory mechanisms = new USDCTokenPoolProxy.LockOrBurnMechanism[](1);
+    mechanisms[0] = USDCTokenPoolProxy.LockOrBurnMechanism.CCTP_V1;
+    s_usdcTokenPoolProxy.updateLockOrBurnMechanisms(remoteChainSelectors, mechanisms);
+
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        USDCTokenPoolProxy.InvalidLockOrBurnMechanism.selector, USDCTokenPoolProxy.LockOrBurnMechanism.CCTP_V1
+      )
+    );
+    s_usdcTokenPoolProxy.getFee(address(0), s_remoteLockReleaseChainSelector, 0, address(0), 0, "");
+  }
 }
