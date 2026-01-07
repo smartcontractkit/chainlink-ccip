@@ -2,29 +2,23 @@
 pragma solidity ^0.8.24;
 
 import {Pool} from "../../../../libraries/Pool.sol";
-import {SiloedLockReleaseTokenPool} from "../../../../pools/SiloedLockReleaseTokenPool.sol";
 import {TokenPool} from "../../../../pools/TokenPool.sol";
 import {LOCK_RELEASE_FLAG} from "../../../../pools/USDC/BurnMintWithLockReleaseFlagTokenPool.sol";
+import {SiloedUSDCTokenPool} from "../../../../pools/USDC/SiloedUSDCTokenPool.sol";
 import {SiloedUSDCTokenPoolSetup} from "./SiloedUSDCTokenPoolSetup.sol";
-
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
 contract SiloedUSDCTokenPool_releaseOrMint is SiloedUSDCTokenPoolSetup {
   bytes internal s_originalSender = abi.encode(makeAddr("sender"));
   bytes internal s_sourcePoolAddress = abi.encode(SOURCE_CHAIN_USDC_POOL);
   address internal s_recipient = makeAddr("recipient");
+  uint256 internal constant DEFAULT_LIQUIDITY = 1000e6;
 
   function setUp() public virtual override {
     super.setUp();
 
-    // Set up silo designation for the test chain
-    vm.startPrank(OWNER);
-    uint64[] memory removes = new uint64[](0);
-    SiloedLockReleaseTokenPool.SiloConfigUpdate[] memory adds = new SiloedLockReleaseTokenPool.SiloConfigUpdate[](1);
-    adds[0] =
-      SiloedLockReleaseTokenPool.SiloConfigUpdate({remoteChainSelector: SOURCE_CHAIN_SELECTOR, rebalancer: OWNER});
-    s_usdcTokenPool.updateSiloDesignations(removes, adds);
-    vm.stopPrank();
+    // Provide default liquidity to the source lockbox
+    deal(address(s_USDCToken), address(s_sourceLockBox), DEFAULT_LIQUIDITY);
 
     // Mock the router's isOffRamp function to return true for the allowed off ramp
     vm.mockCall(
@@ -37,16 +31,10 @@ contract SiloedUSDCTokenPool_releaseOrMint is SiloedUSDCTokenPoolSetup {
   }
 
   function test_releaseOrMint_Success() public {
-    uint256 amount = 1000e6; // 1000 USDC (6 decimals)
-    uint256 localAmount = amount; // Same amount since USDC has 6 decimals
+    uint256 amount = DEFAULT_LIQUIDITY;
+    uint256 localAmount = amount;
     address localToken = address(s_USDCToken);
     bytes memory sourcePoolAddress = abi.encode(SOURCE_CHAIN_USDC_POOL);
-
-    // Provide liquidity to the siloed pool
-    vm.startPrank(OWNER);
-    s_USDCToken.approve(address(s_usdcTokenPool), type(uint256).max);
-    s_usdcTokenPool.provideSiloedLiquidity(SOURCE_CHAIN_SELECTOR, amount);
-    vm.stopPrank();
 
     vm.startPrank(s_routerAllowedOffRamp);
 
@@ -74,18 +62,13 @@ contract SiloedUSDCTokenPool_releaseOrMint is SiloedUSDCTokenPoolSetup {
 
     assertEq(result.destinationAmount, localAmount);
     assertEq(s_USDCToken.balanceOf(s_recipient), localAmount);
-    assertEq(s_usdcTokenPool.getAvailableTokens(SOURCE_CHAIN_SELECTOR), 0);
+    assertEq(s_USDCToken.balanceOf(address(s_sourceLockBox)), 0);
   }
 
   function test_releaseOrMintV2_Success() public {
-    uint256 amount = 1000e6; // 1000 USDC (6 decimals)
+    uint256 amount = DEFAULT_LIQUIDITY;
     uint256 localAmount = amount;
     address localToken = address(s_USDCToken);
-
-    vm.startPrank(OWNER);
-    s_USDCToken.approve(address(s_usdcTokenPool), type(uint256).max);
-    s_usdcTokenPool.provideSiloedLiquidity(SOURCE_CHAIN_SELECTOR, amount);
-    vm.stopPrank();
 
     vm.startPrank(s_routerAllowedOffRamp);
 
@@ -104,7 +87,7 @@ contract SiloedUSDCTokenPool_releaseOrMint is SiloedUSDCTokenPoolSetup {
 
     assertEq(result.destinationAmount, localAmount);
     assertEq(s_USDCToken.balanceOf(s_recipient), localAmount);
-    assertEq(s_usdcTokenPool.getAvailableTokens(SOURCE_CHAIN_SELECTOR), 0);
+    assertEq(s_USDCToken.balanceOf(address(s_sourceLockBox)), 0);
   }
 
   function test_releaseOrMint_SubtractsFromExcludedTokens() public {
@@ -115,10 +98,8 @@ contract SiloedUSDCTokenPool_releaseOrMint is SiloedUSDCTokenPoolSetup {
     address circleMigrator = makeAddr("circleMigrator");
     s_usdcTokenPool.setCircleMigratorAddress(circleMigrator);
 
-    // Provide liquidity and exclude some tokens from burn
+    // Exclude some tokens from burn (liquidity already provided in setUp)
     uint256 excludedAmount = 500e6;
-    s_USDCToken.approve(address(s_usdcTokenPool), type(uint256).max);
-    s_usdcTokenPool.provideSiloedLiquidity(SOURCE_CHAIN_SELECTOR, 1000e6);
     s_usdcTokenPool.excludeTokensFromBurn(SOURCE_CHAIN_SELECTOR, excludedAmount);
     vm.stopPrank();
 
@@ -141,8 +122,8 @@ contract SiloedUSDCTokenPool_releaseOrMint is SiloedUSDCTokenPoolSetup {
     vm.startPrank(s_routerAllowedOffRamp);
     Pool.ReleaseOrMintOutV1 memory result = s_usdcTokenPool.releaseOrMint(releaseOrMintIn);
 
-    uint256 availableTokens = s_usdcTokenPool.getAvailableTokens(SOURCE_CHAIN_SELECTOR);
-    assertEq(availableTokens, 1000e6 - releaseAmount);
+    uint256 availableTokens = s_USDCToken.balanceOf(address(s_sourceLockBox));
+    assertEq(availableTokens, DEFAULT_LIQUIDITY - releaseAmount);
     uint256 newExcludedAmount = s_usdcTokenPool.getExcludedTokensByChain(SOURCE_CHAIN_SELECTOR);
     assertEq(newExcludedAmount, excludedAmount - releaseAmount);
 
@@ -167,37 +148,41 @@ contract SiloedUSDCTokenPool_releaseOrMint is SiloedUSDCTokenPoolSetup {
 
   // Reverts
 
-  function test_releaseOrMint_RevertWhen_InsufficientLiquidity() public {
-    uint256 amount = 1000e6;
-    address localToken = address(s_USDCToken);
-
-    // Provide insufficient liquidity to the siloed pool
+  function test_releaseOrMint_RevertWhen_InsufficientLiquidity_InsufficientExcludedTokens() public {
+    // Propose a CCTP migration to enable excluded tokens tracking.
     vm.startPrank(OWNER);
-    s_USDCToken.approve(address(s_usdcTokenPool), type(uint256).max);
-    s_usdcTokenPool.provideSiloedLiquidity(SOURCE_CHAIN_SELECTOR, amount / 2); // Only half the required amount
+    s_usdcTokenPool.proposeCCTPMigration(SOURCE_CHAIN_SELECTOR);
+
+    // Exclude only a small amount of tokens from burn.
+    uint256 excludedAmount = 100e6;
+    s_usdcTokenPool.excludeTokensFromBurn(SOURCE_CHAIN_SELECTOR, excludedAmount);
     vm.stopPrank();
+
+    // Try to release more than the excluded amount.
+    uint256 releaseAmount = 200e6;
 
     vm.startPrank(s_routerAllowedOffRamp);
 
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = Pool.ReleaseOrMintInV1({
       originalSender: s_originalSender,
       receiver: s_recipient,
-      sourceDenominatedAmount: amount,
-      localToken: localToken,
+      sourceDenominatedAmount: releaseAmount,
+      localToken: address(s_USDCToken),
       remoteChainSelector: SOURCE_CHAIN_SELECTOR,
       sourcePoolAddress: s_sourcePoolAddress,
       sourcePoolData: abi.encode(LOCK_RELEASE_FLAG),
       offchainTokenData: ""
     });
 
+    // Should revert because excluded tokens (100e6) < release amount (200e6).
     vm.expectRevert(
-      abi.encodeWithSelector(SiloedLockReleaseTokenPool.InsufficientLiquidity.selector, amount / 2, amount)
+      abi.encodeWithSelector(SiloedUSDCTokenPool.InsufficientLiquidity.selector, excludedAmount, releaseAmount)
     );
     s_usdcTokenPool.releaseOrMint(releaseOrMintIn);
   }
 
   function test_releaseOrMint_RevertWhen_ChainNotSupported() public {
-    uint256 amount = 1000e6;
+    uint256 amount = DEFAULT_LIQUIDITY;
     address localToken = address(s_USDCToken);
     uint64 unsupportedChain = 999999999; // Chain that's not configured
 
@@ -219,14 +204,8 @@ contract SiloedUSDCTokenPool_releaseOrMint is SiloedUSDCTokenPoolSetup {
   }
 
   function test_releaseOrMint_RevertWhen_NotAllowedTokenPoolProxy() public {
-    uint256 amount = 1000e6;
+    uint256 amount = DEFAULT_LIQUIDITY;
     address unauthorizedProxy = makeAddr("unauthorizedProxy");
-
-    // Provide liquidity to the siloed pool
-    vm.startPrank(OWNER);
-    s_USDCToken.approve(address(s_usdcTokenPool), type(uint256).max);
-    s_usdcTokenPool.provideSiloedLiquidity(SOURCE_CHAIN_SELECTOR, amount);
-    vm.stopPrank();
 
     // Mock the router's isOffRamp function to return true for the unauthorized proxy
     vm.mockCall(

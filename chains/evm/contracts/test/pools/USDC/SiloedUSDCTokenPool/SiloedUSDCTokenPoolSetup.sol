@@ -28,8 +28,7 @@ contract SiloedUSDCTokenPoolSetup is USDCSetup {
       6, // localTokenDecimals
       address(0), // allowlist
       address(s_mockRMNRemote), // rmnProxy
-      address(s_router), // router
-      address(s_lockBox) // lockBox
+      address(s_router) // router
     );
 
     address[] memory authorizedCallers = new address[](3);
@@ -61,8 +60,7 @@ contract SiloedUSDCTokenPoolSetup is USDCSetup {
       6, // localTokenDecimals
       address(0), // allowlist
       address(s_mockRMNRemote), // rmnProxy
-      address(s_router), // router
-      address(s_lockBox) // lockBox
+      address(s_router) // router
     );
 
     s_usdcTokenPoolTransferLiquidity.applyAuthorizedCallerUpdates(

@@ -11,7 +11,6 @@ contract SiloedLockReleaseTokenPool_lockOrBurn is SiloedLockReleaseTokenPoolSetu
   uint256 public constant AMOUNT = 10e18;
 
   function test_lockOrBurn_SiloedFunds() public {
-    assertTrue(s_siloedLockReleaseTokenPool.isSiloed(SILOED_CHAIN_SELECTOR));
     deal(address(s_token), address(s_siloedLockReleaseTokenPool), AMOUNT);
 
     vm.startPrank(s_allowedOnRamp);
@@ -39,14 +38,12 @@ contract SiloedLockReleaseTokenPool_lockOrBurn is SiloedLockReleaseTokenPoolSetu
       })
     );
 
-    assertEq(s_siloedLockReleaseTokenPool.getAvailableTokens(SILOED_CHAIN_SELECTOR), AMOUNT);
+    assertEq(s_token.balanceOf(address(s_siloedLockReleaseTokenPool.getLockBox(SILOED_CHAIN_SELECTOR))), AMOUNT);
   }
 
   function test_lockOrBurn_UnsiloedFunds() public {
     vm.startPrank(s_allowedOnRamp);
     deal(address(s_token), address(s_siloedLockReleaseTokenPool), AMOUNT);
-
-    assertFalse(s_siloedLockReleaseTokenPool.isSiloed(DEST_CHAIN_SELECTOR));
 
     vm.expectEmit();
     emit TokenPool.OutboundRateLimitConsumed({
@@ -71,7 +68,7 @@ contract SiloedLockReleaseTokenPool_lockOrBurn is SiloedLockReleaseTokenPoolSetu
       })
     );
 
-    assertEq(s_siloedLockReleaseTokenPool.getAvailableTokens(DEST_CHAIN_SELECTOR), AMOUNT);
+    assertEq(s_token.balanceOf(address(s_lockBox)), AMOUNT);
   }
 
   function test_lockOrBurnV2_SiloedFundsWithFee() public {

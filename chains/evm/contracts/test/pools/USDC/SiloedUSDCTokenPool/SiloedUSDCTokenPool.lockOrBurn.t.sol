@@ -4,7 +4,6 @@ pragma solidity ^0.8.24;
 import {IPoolV2} from "../../../../interfaces/IPoolV2.sol";
 
 import {Pool} from "../../../../libraries/Pool.sol";
-import {SiloedLockReleaseTokenPool} from "../../../../pools/SiloedLockReleaseTokenPool.sol";
 import {TokenPool} from "../../../../pools/TokenPool.sol";
 import {SiloedUSDCTokenPoolSetup} from "./SiloedUSDCTokenPoolSetup.sol";
 
@@ -21,13 +20,6 @@ contract SiloedUSDCTokenPool_lockOrBurn is SiloedUSDCTokenPoolSetup {
     // Deposit 1e12 USDC into the pool so that it can be transferred to the lock box
     deal(address(s_USDCToken), address(s_usdcTokenPool), 1e18);
 
-    // Set up silo designation for the test chain
-    vm.startPrank(OWNER);
-    uint64[] memory removes = new uint64[](0);
-    SiloedLockReleaseTokenPool.SiloConfigUpdate[] memory adds = new SiloedLockReleaseTokenPool.SiloConfigUpdate[](1);
-    adds[0] = SiloedLockReleaseTokenPool.SiloConfigUpdate({remoteChainSelector: DEST_CHAIN_SELECTOR, rebalancer: OWNER});
-    s_usdcTokenPool.updateSiloDesignations(removes, adds);
-    vm.stopPrank();
     vm.startPrank(s_routerAllowedOnRamp);
   }
 
@@ -45,7 +37,7 @@ contract SiloedUSDCTokenPool_lockOrBurn is SiloedUSDCTokenPoolSetup {
 
     Pool.LockOrBurnOutV1 memory result = s_usdcTokenPool.lockOrBurn(lockOrBurnIn);
 
-    assertEq(s_usdcTokenPool.getAvailableTokens(DEST_CHAIN_SELECTOR), s_amount);
+    assertEq(s_USDCToken.balanceOf(address(s_destLockBox)), s_amount);
 
     // destPoolData is the local token decimals abi-encoded to 32 bytes
     assertEq(result.destPoolData.length, 32);
@@ -63,7 +55,7 @@ contract SiloedUSDCTokenPool_lockOrBurn is SiloedUSDCTokenPoolSetup {
     Pool.LockOrBurnOutV1 memory result = s_usdcTokenPool.lockOrBurn(lockOrBurnIn);
 
     // Assert: Verify the locked tokens accounting is updated
-    assertEq(s_usdcTokenPool.getAvailableTokens(DEST_CHAIN_SELECTOR), s_amount);
+    assertEq(s_USDCToken.balanceOf(address(s_destLockBox)), s_amount);
 
     // destPoolData is the local token decimals abi-encoded to 32 bytes
     assertEq(result.destPoolData.length, 32);
@@ -94,14 +86,14 @@ contract SiloedUSDCTokenPool_lockOrBurn is SiloedUSDCTokenPoolSetup {
 
     Pool.LockOrBurnOutV1 memory result2 = s_usdcTokenPool.lockOrBurn(lockOrBurnIn2);
 
-    assertEq(s_usdcTokenPool.getAvailableTokens(DEST_CHAIN_SELECTOR), s_amount + amount2);
+    assertEq(s_USDCToken.balanceOf(address(s_destLockBox)), s_amount + amount2);
 
     // destPoolData is the local token decimals abi-encoded to 32 bytes
     assertEq(result1.destPoolData.length, 32);
     assertEq(result2.destPoolData.length, 32);
   }
 
-  function test_lockOrBurn_UpdatesSiloedTokensAccounting() public {
+  function test_lockOrBurn_UpdatesTokensAccounting() public {
     Pool.LockOrBurnInV1 memory lockOrBurnIn = Pool.LockOrBurnInV1({
       receiver: s_receiver,
       remoteChainSelector: DEST_CHAIN_SELECTOR,
@@ -112,8 +104,7 @@ contract SiloedUSDCTokenPool_lockOrBurn is SiloedUSDCTokenPoolSetup {
 
     Pool.LockOrBurnOutV1 memory result = s_usdcTokenPool.lockOrBurn(lockOrBurnIn);
 
-    assertEq(s_usdcTokenPool.getAvailableTokens(DEST_CHAIN_SELECTOR), s_amount);
-    assertTrue(s_usdcTokenPool.isSiloed(DEST_CHAIN_SELECTOR));
+    assertEq(s_USDCToken.balanceOf(address(s_destLockBox)), s_amount);
 
     assertEq(result.destPoolData.length, 32);
   }
