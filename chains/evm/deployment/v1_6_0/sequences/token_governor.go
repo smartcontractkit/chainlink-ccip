@@ -36,26 +36,24 @@ type DeployTokenGovernorInput struct {
 	ExistingDataStore datastore.DataStore
 }
 
-// TokenGovernorRole represents a role that can be assigned in the TokenGovernor contract
-type TokenGovernorRole uint8
-
-const (
-	RoleMinter TokenGovernorRole = iota
-	RoleBridgerMinterOrBurner
-	RoleBurner
-	RoleFreezer
-	RoleUnfreezer
-	RolePauser
-	RoleUnpauser
-	RoleRecovery
-	RoleCheckerAdmin
-	RoleDefaultAdmin
-)
+// ValidRoles lists all valid role strings for TokenGovernor
+var ValidRoles = []string{
+	"minter",
+	"bridge_minter_or_burner",
+	"burner",
+	"freezer",
+	"unfreezer",
+	"pauser",
+	"unpauser",
+	"recovery",
+	"checker_admin",
+	"default_admin",
+}
 
 // TokenGovernorGrantRole represents a role assignment to an account
 type TokenGovernorGrantRole struct {
-	Role    TokenGovernorRole
-	Account common.Address
+	Role    string         `yaml:"role" json:"role"` // e.g., "minter", "burner", "pauser"
+	Account common.Address `yaml:"account" json:"account"`
 }
 
 // TokenGovernorRoleInput is the input for role management sequences
@@ -76,75 +74,76 @@ type TokenGovernorOwnershipInput struct {
 }
 
 // GetRoleFromTokenGovernor returns the role bytes32 from the token governor contract.
-func GetRoleFromTokenGovernor(ctx context.Context, tokenGovernor *tg_bindings.TokenGovernor, role TokenGovernorRole) ([32]byte, error) {
+// Valid role strings: minter, bridge_minter_or_burner, burner, freezer, unfreezer, pauser, unpauser, recovery, checker_admin, default_admin
+func GetRoleFromTokenGovernor(ctx context.Context, tokenGovernor *tg_bindings.TokenGovernor, role string) ([32]byte, error) {
 	if tokenGovernor == nil {
 		return [32]byte{}, errors.New("token governor is nil")
 	}
 
 	switch role {
-	case RoleMinter:
+	case "minter":
 		r, err := tokenGovernor.MINTERROLE(&bind.CallOpts{Context: ctx})
 		if err != nil {
 			return [32]byte{}, fmt.Errorf("failed to fetch minter role: %w", err)
 		}
 		return r, nil
-	case RoleBridgerMinterOrBurner:
+	case "bridge_minter_or_burner":
 		r, err := tokenGovernor.BRIDGEMINTERORBURNERROLE(&bind.CallOpts{Context: ctx})
 		if err != nil {
 			return [32]byte{}, fmt.Errorf("failed to fetch bridge minter or burner role: %w", err)
 		}
 		return r, nil
-	case RoleBurner:
+	case "burner":
 		r, err := tokenGovernor.BURNERROLE(&bind.CallOpts{Context: ctx})
 		if err != nil {
 			return [32]byte{}, fmt.Errorf("failed to fetch burner role: %w", err)
 		}
 		return r, nil
-	case RoleFreezer:
+	case "freezer":
 		r, err := tokenGovernor.FREEZERROLE(&bind.CallOpts{Context: ctx})
 		if err != nil {
 			return [32]byte{}, fmt.Errorf("failed to fetch freezer role: %w", err)
 		}
 		return r, nil
-	case RoleUnfreezer:
+	case "unfreezer":
 		r, err := tokenGovernor.UNFREEZERROLE(&bind.CallOpts{Context: ctx})
 		if err != nil {
 			return [32]byte{}, fmt.Errorf("failed to fetch unfreezer role: %w", err)
 		}
 		return r, nil
-	case RolePauser:
+	case "pauser":
 		r, err := tokenGovernor.PAUSERROLE(&bind.CallOpts{Context: ctx})
 		if err != nil {
 			return [32]byte{}, fmt.Errorf("failed to fetch pauser role: %w", err)
 		}
 		return r, nil
-	case RoleUnpauser:
+	case "unpauser":
 		r, err := tokenGovernor.UNPAUSERROLE(&bind.CallOpts{Context: ctx})
 		if err != nil {
 			return [32]byte{}, fmt.Errorf("failed to fetch unpauser role: %w", err)
 		}
 		return r, nil
-	case RoleRecovery:
+	case "recovery":
 		r, err := tokenGovernor.RECOVERYROLE(&bind.CallOpts{Context: ctx})
 		if err != nil {
 			return [32]byte{}, fmt.Errorf("failed to fetch recovery role: %w", err)
 		}
 		return r, nil
-	case RoleCheckerAdmin:
+	case "checker_admin":
 		r, err := tokenGovernor.CHECKERADMINROLE(&bind.CallOpts{Context: ctx})
 		if err != nil {
 			return [32]byte{}, fmt.Errorf("failed to fetch checker admin role: %w", err)
 		}
 		return r, nil
-	case RoleDefaultAdmin:
+	case "default_admin":
 		r, err := tokenGovernor.DEFAULTADMINROLE(&bind.CallOpts{Context: ctx})
 		if err != nil {
 			return [32]byte{}, fmt.Errorf("failed to fetch default admin role: %w", err)
 		}
 		return r, nil
+	default:
+		return [32]byte{}, fmt.Errorf("unknown role: %s. Valid roles: minter, bridge_minter_or_burner, burner, freezer, unfreezer, pauser, unpauser, recovery, checker_admin, default_admin", role)
 	}
-
-	return [32]byte{}, nil
 }
 
 var DeployTokenGovernor = cldf_ops.NewSequence(
@@ -216,7 +215,7 @@ var GrantRole = cldf_ops.NewSequence(
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to instantiate token governor at %s: %w", tgAddr.Hex(), err)
 				}
-				// get role bytes32 from token governor
+				// get role bytes32 from token governor (validates role string internally)
 				role, err := GetRoleFromTokenGovernor(b.GetContext(), tg, tokenGovernorRole.Role)
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to get role from token governor at %s: %w", tgAddr.Hex(), err)
@@ -227,7 +226,7 @@ var GrantRole = cldf_ops.NewSequence(
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to check if account %s has role on token governor at %s: %w", tokenGovernorRole.Account.Hex(), tgAddr.Hex(), err)
 				}
 				if hasRole {
-					return sequences.OnChainOutput{}, fmt.Errorf("account %s already has role %d", tokenGovernorRole.Account.Hex(), int(tokenGovernorRole.Role))
+					return sequences.OnChainOutput{}, fmt.Errorf("account %s already has role %s", tokenGovernorRole.Account.Hex(), tokenGovernorRole.Role)
 				}
 				// execute GrantRole operation
 				report, err := cldf_ops.ExecuteOperation(b, token_governor.GrantRole, chain, contract.FunctionInput[token_governor.RoleAssignment]{
@@ -276,7 +275,7 @@ var RevokeRole = cldf_ops.NewSequence(
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to instantiate token governor at %s: %w", tgAddr.Hex(), err)
 				}
-				// get role bytes32 from token governor
+				// get role bytes32 from token governor (validates role string internally)
 				role, err := GetRoleFromTokenGovernor(b.GetContext(), tg, tokenGovernorRole.Role)
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to get role from token governor at %s: %w", tgAddr.Hex(), err)
@@ -287,7 +286,7 @@ var RevokeRole = cldf_ops.NewSequence(
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to check if account %s has role on token governor at %s: %w", tokenGovernorRole.Account.Hex(), tgAddr.Hex(), err)
 				}
 				if !hasRole {
-					return sequences.OnChainOutput{}, fmt.Errorf("account %s doesn't have role %d", tokenGovernorRole.Account.Hex(), int(tokenGovernorRole.Role))
+					return sequences.OnChainOutput{}, fmt.Errorf("account %s doesn't have role %s", tokenGovernorRole.Account.Hex(), tokenGovernorRole.Role)
 				}
 				// execute RevokeRole operation
 				report, err := cldf_ops.ExecuteOperation(b, token_governor.RevokeRole, chain, contract.FunctionInput[token_governor.RoleAssignment]{
@@ -336,7 +335,7 @@ var RenounceRole = cldf_ops.NewSequence(
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to instantiate token governor at %s: %w", tgAddr.Hex(), err)
 				}
-				// get role bytes32 from token governor
+				// get role bytes32 from token governor (validates role string internally)
 				role, err := GetRoleFromTokenGovernor(b.GetContext(), tg, tokenGovernorRole.Role)
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to get role from token governor at %s: %w", tgAddr.Hex(), err)
@@ -347,7 +346,7 @@ var RenounceRole = cldf_ops.NewSequence(
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to check if account %s has role on token governor at %s: %w", tokenGovernorRole.Account.Hex(), tgAddr.Hex(), err)
 				}
 				if !hasRole {
-					return sequences.OnChainOutput{}, fmt.Errorf("account %s doesn't have role %d", tokenGovernorRole.Account.Hex(), int(tokenGovernorRole.Role))
+					return sequences.OnChainOutput{}, fmt.Errorf("account %s doesn't have role %s", tokenGovernorRole.Account.Hex(), tokenGovernorRole.Role)
 				}
 				// execute RenounceRole operation
 				report, err := cldf_ops.ExecuteOperation(b, token_governor.RenounceRole, chain, contract.FunctionInput[token_governor.RoleAssignment]{

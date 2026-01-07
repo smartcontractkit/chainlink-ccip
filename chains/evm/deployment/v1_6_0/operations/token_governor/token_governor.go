@@ -128,11 +128,11 @@ var TransferOwnership = contract.NewWrite(contract.WriteParams[common.Address, *
 	ContractABI:  token_governor.TokenGovernorABI,
 	NewContract:  token_governor.NewTokenGovernor,
 	IsAllowedCaller: func(tg *token_governor.TokenGovernor, opts *bind.CallOpts, caller common.Address, input common.Address) (bool, error) {
-		defaultAdmin, err := tg.DefaultAdmin(opts)
+		owner, err := tg.Owner(opts)
 		if err != nil {
 			return false, err
 		}
-		return defaultAdmin == caller, nil
+		return owner == caller, nil
 	},
 	Validate: func(common.Address) error {
 		return nil

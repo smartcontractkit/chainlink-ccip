@@ -212,7 +212,7 @@ func TestGrantRoleChangeset(t *testing.T) {
 		Tokens: map[uint64]map[string]sequences.TokenGovernorGrantRole{
 			chainSelector: {
 				tokenSymbol: {
-					Role:    sequences.RoleMinter,
+					Role:    "minter",
 					Account: newAccount,
 				},
 			},
@@ -279,7 +279,7 @@ func TestRevokeRoleChangeset(t *testing.T) {
 		Tokens: map[uint64]map[string]sequences.TokenGovernorGrantRole{
 			chainSelector: {
 				tokenSymbol: {
-					Role:    sequences.RoleMinter,
+					Role:    "minter",
 					Account: newAccount,
 				},
 			},
@@ -301,7 +301,7 @@ func TestRevokeRoleChangeset(t *testing.T) {
 		Tokens: map[uint64]map[string]sequences.TokenGovernorGrantRole{
 			chainSelector: {
 				tokenSymbol: {
-					Role:    sequences.RoleMinter,
+					Role:    "minter",
 					Account: newAccount,
 				},
 			},
@@ -361,7 +361,7 @@ func TestRenounceRoleChangeset(t *testing.T) {
 		Tokens: map[uint64]map[string]sequences.TokenGovernorGrantRole{
 			chainSelector: {
 				tokenSymbol: {
-					Role:    sequences.RoleMinter,
+					Role:    "minter",
 					Account: chain.DeployerKey.From,
 				},
 			},
@@ -383,7 +383,7 @@ func TestRenounceRoleChangeset(t *testing.T) {
 		Tokens: map[uint64]map[string]sequences.TokenGovernorGrantRole{
 			chainSelector: {
 				tokenSymbol: {
-					Role:    sequences.RoleMinter,
+					Role:    "minter",
 					Account: chain.DeployerKey.From,
 				},
 			},
@@ -553,7 +553,7 @@ func TestRoleChangesetValidation(t *testing.T) {
 			Tokens: map[uint64]map[string]sequences.TokenGovernorGrantRole{
 				999999: {
 					"TEST": {
-						Role:    sequences.RoleMinter,
+						Role:    "minter",
 						Account: common.HexToAddress("0x1111111111111111111111111111111111111111"),
 					},
 				},
@@ -569,7 +569,7 @@ func TestRoleChangesetValidation(t *testing.T) {
 			Tokens: map[uint64]map[string]sequences.TokenGovernorGrantRole{
 				chain_selectors.ETHEREUM_MAINNET.Selector: {
 					"": {
-						Role:    sequences.RoleMinter,
+						Role:    "minter",
 						Account: common.HexToAddress("0x1111111111111111111111111111111111111111"),
 					},
 				},
@@ -585,7 +585,7 @@ func TestRoleChangesetValidation(t *testing.T) {
 			Tokens: map[uint64]map[string]sequences.TokenGovernorGrantRole{
 				chain_selectors.ETHEREUM_MAINNET.Selector: {
 					"TEST": {
-						Role:    sequences.RoleMinter,
+						Role:    "minter",
 						Account: common.Address{},
 					},
 				},
@@ -594,6 +594,38 @@ func TestRoleChangesetValidation(t *testing.T) {
 		err := grantCS.VerifyPreconditions(*e, input)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "account address must be provided")
+	})
+
+	t.Run("invalid role string", func(t *testing.T) {
+		input := sequences.TokenGovernorRoleInput{
+			Tokens: map[uint64]map[string]sequences.TokenGovernorGrantRole{
+				chain_selectors.ETHEREUM_MAINNET.Selector: {
+					"TEST": {
+						Role:    "invalid_role",
+						Account: common.HexToAddress("0x1111111111111111111111111111111111111111"),
+					},
+				},
+			},
+		}
+		err := grantCS.VerifyPreconditions(*e, input)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "invalid role")
+	})
+
+	t.Run("empty role string", func(t *testing.T) {
+		input := sequences.TokenGovernorRoleInput{
+			Tokens: map[uint64]map[string]sequences.TokenGovernorGrantRole{
+				chain_selectors.ETHEREUM_MAINNET.Selector: {
+					"TEST": {
+						Role:    "",
+						Account: common.HexToAddress("0x1111111111111111111111111111111111111111"),
+					},
+				},
+			},
+		}
+		err := grantCS.VerifyPreconditions(*e, input)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "role must be provided")
 	})
 }
 
