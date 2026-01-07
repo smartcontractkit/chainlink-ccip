@@ -2,21 +2,27 @@ package ccip
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
+	"net/url"
 	"os"
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/cld/domain"
+	capabilities_registry "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/clclient"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/jd"
 	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	devenvcommon "github.com/smartcontractkit/chainlink-ccip/devenv/common"
 )
 
@@ -24,8 +30,8 @@ func checkForkedEnvIsSet(in *Cfg) error {
 	if in.ForkedEnvConfig == nil {
 		return errors.New("forked_env_config is not set in the configuration")
 	}
-	if in.ForkedEnvConfig.ForkURL == "" {
-		return errors.New("fork_url is not set in the forked_env_config configuration")
+	if len(in.ForkedEnvConfig.ForkURLs) == 0 {
+		return errors.New("fork_urls are not set in the forked_env_config configuration")
 	}
 	if in.ForkedEnvConfig.CLDRootPath == "" {
 		return errors.New("cld_root_path is not set in the forked_env_config configuration")
@@ -40,8 +46,19 @@ func checkForkedEnvIsSet(in *Cfg) error {
 		if bc.Type != "anvil" {
 			return fmt.Errorf("blockchain %s is not supported in forked environment, only anvil is supported", bc.Type)
 		}
-		in.Blockchains[i].DockerCmdParamsOverrides = append(in.Blockchains[i].DockerCmdParamsOverrides,
-			"--fork-url "+in.ForkedEnvConfig.ForkURL)
+		forkURL, ok := in.ForkedEnvConfig.ForkURLs[bc.ChainID]
+		if !ok || forkURL == "" {
+			return fmt.Errorf("fork_url for chain_id %s is not set in the forked_env_config configuration", bc.ChainID)
+		}
+		u, err := url.Parse(forkURL)
+		if err != nil {
+			return fmt.Errorf("invalid fork_url for chain_id %s: %w", bc.ChainID, err)
+		}
+		if u.Scheme == "" || u.Host == "" {
+			return fmt.Errorf("invalid fork_url for chain_id %s: %s", bc.ChainID, forkURL)
+		}
+		in.Blockchains[i].DockerCmdParamsOverrides = append([]string{"--fork-url", in.ForkedEnvConfig.ForkURLs[bc.ChainID]},
+			in.Blockchains[i].DockerCmdParamsOverrides...)
 	}
 	return nil
 }
@@ -60,9 +77,7 @@ func NewForkedEnvironment() (*Cfg, error) {
 	if err := checkForkedEnvIsSet(in); err != nil {
 		return nil, err
 	}
-	if err := checkKeys(in); err != nil {
-		return nil, err
-	}
+
 	impls := make([]CCIP16ProductConfiguration, 0)
 	for _, bc := range in.Blockchains {
 		impl, err := NewCCIPImplFromNetwork(bc.Type)
@@ -82,7 +97,8 @@ func NewForkedEnvironment() (*Cfg, error) {
 	cldRootPath := in.ForkedEnvConfig.CLDRootPath
 	cldEnvKey := in.ForkedEnvConfig.CLDEnvironment
 	L.Info().Str("CLDPath", cldRootPath).Str("CLDEnvKey", cldEnvKey).Msg("Loading CLDF data store from configuration")
-	envDir := domain.NewEnvDir(cldRootPath, CLDDomain, cldEnvKey)
+	ccipDomain := domain.NewDomain(cldRootPath, CLDDomain)
+	envDir := ccipDomain.EnvDir(cldEnvKey)
 	ds, err := envDir.DataStore()
 	if err != nil {
 		return nil, fmt.Errorf("loading CLD data store from env dir: %w", err)
@@ -97,12 +113,30 @@ func NewForkedEnvironment() (*Cfg, error) {
 
 	// get Capability Registry Address
 	refs := e.DataStore.Addresses().Filter(
-		datastore.AddressRefByType("CapabilitiesRegistry"),
-		datastore.AddressRefByVersion(semver.MustParse("1.1.0")))
+		datastore.AddressRefByType(datastore.ContractType(utils.CapabilitiesRegistry)),
+		datastore.AddressRefByVersion(semver.MustParse("1.0.0")))
 	if len(refs) != 1 {
 		return nil, fmt.Errorf("expected exactly one CapabilitiesRegistry address ref for version 1.1.0, found %d %+v", len(refs), refs)
 	}
 	crRef := refs[0].Address
+
+	// check if addresses exist
+	homeChainSelector := in.ForkedEnvConfig.HomeChainSelector
+	if _, ok := e.BlockChains.EVMChains()[homeChainSelector]; !ok {
+		return nil, fmt.Errorf("home chain selector %d not found in env evm chains %+v", homeChainSelector, e.BlockChains.EVMChains())
+	}
+	homechain := e.BlockChains.EVMChains()[homeChainSelector].Client
+	capReg, err := capabilities_registry.NewCapabilitiesRegistry(common.HexToAddress(crRef), homechain)
+	if err != nil {
+		return nil, fmt.Errorf("creating capabilities registry instance: %w", err)
+	}
+	tv, err := capReg.TypeAndVersion(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		return nil, fmt.Errorf("getting capabilities registry type and version: %w", err)
+	}
+	if !strings.Contains(tv, "CapabilitiesRegistry") {
+		return nil, fmt.Errorf("unexpected capabilities registry type and version: %s", tv)
+	}
 
 	tr.Record("[infra] deploying blockchains")
 
@@ -134,6 +168,7 @@ func NewForkedEnvironment() (*Cfg, error) {
 			if err != nil {
 				return nil, fmt.Errorf("failed to create JD service: %w", err)
 			}
+			Plog.Info().Msg("JD service is created")
 		}
 	} else {
 		Plog.Warn().Msg("No JD configuration provided, skipping JD service startup")
@@ -146,27 +181,29 @@ func NewForkedEnvironment() (*Cfg, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new shared db node set: %w", err)
 	}
+
 	nodeKeyBundles := make(map[string]map[string]clclient.NodeKeysBundle, 0)
 	for i, impl := range impls {
 		nkb, err := impl.FundNodes(ctx, in.NodeSets, in.Blockchains[i], big.NewInt(1), big.NewInt(5))
 		if err != nil {
 			return nil, fmt.Errorf("funding nodes: %w", err)
 		}
-		var family string
-		switch in.Blockchains[i].Type {
-		case "anvil", "geth":
-			family = chainsel.FamilyEVM
-		case "solana":
-			family = chainsel.FamilySolana
-			nodeKeyBundles[family] = nkb
-		case "ton":
-			family = chainsel.FamilyTon
-			nodeKeyBundles[family] = nkb
-		default:
+		if in.Blockchains[i].Type != "anvil" {
 			return nil, fmt.Errorf("unsupported blockchain type: %s", in.Blockchains[i].Type)
 		}
+		nodeKeyBundles[chainsel.FamilyEVM] = nkb
 	}
-	err = impls[0].ConfigureContractsForSelectors(ctx, e, in.NodeSets, nodeKeyBundles, CCIPHomeChain, selectors)
+	addresses, err := e.DataStore.Addresses().Fetch()
+	if err != nil {
+		return nil, err
+	}
+	a, err := json.Marshal(addresses)
+	if err != nil {
+		return nil, err
+	}
+	in.CLDF.AddAddresses(string(a))
+
+	err = impls[0].ConfigureContractsForSelectors(ctx, e, in.NodeSets, nodeKeyBundles, homeChainSelector, selectors)
 	if err != nil {
 		return nil, err
 	}

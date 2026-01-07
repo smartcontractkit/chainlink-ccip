@@ -52,6 +52,8 @@ func restartCmd() *cobra.Command {
 			var configFile string
 			if len(args) > 0 {
 				configFile = args[0]
+			} else if forked {
+				configFile = "forked-env.toml"
 			} else {
 				configFile = "env.toml"
 			}
@@ -72,7 +74,7 @@ func restartCmd() *cobra.Command {
 			return err
 		},
 	}
-	cmd.Flags().BoolVarP(&forked, "forked", "f", false, "Use forked environment (through anvil) configuration")
+	cmd.Flags().BoolVarP(&forked, "forked", "k", false, "Use forked environment (through anvil) configuration")
 	return cmd
 }
 
@@ -89,6 +91,8 @@ func upCmd() *cobra.Command {
 			var configFile string
 			if len(args) > 0 {
 				configFile = args[0]
+			} else if forked {
+				configFile = "forked-env.toml"
 			} else {
 				configFile = "env.toml"
 			}
@@ -107,7 +111,7 @@ func upCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().BoolVarP(&forked, "forked", "f", false, "Use forked environment (through anvil) configuration")
+	cmd.Flags().BoolVarP(&forked, "forked", "k", false, "Use forked environment (through anvil) configuration")
 	return cmd
 }
 

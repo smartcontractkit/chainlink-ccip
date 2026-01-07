@@ -81,10 +81,10 @@ type Cfg struct {
 }
 
 type ForkedEnvConfig struct {
-	ForkURL           string `toml:"fork_url"`
-	HomeChainSelector uint64 `toml:"home_chain_selector"`
-	CLDRootPath       string `toml:"cld_root_path"`
-	CLDEnvironment    string `toml:"cld_environment"`
+	ForkURLs          map[string]string `toml:"fork_urls_by_chain_id"`
+	HomeChainSelector uint64            `toml:"home_chain_selector"`
+	CLDRootPath       string            `toml:"cld_root_path"`
+	CLDEnvironment    string            `toml:"cld_environment"`
 }
 
 func checkKeys(in *Cfg) error {
