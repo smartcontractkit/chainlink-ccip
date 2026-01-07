@@ -187,8 +187,16 @@ func NewForkedEnvironment() (*Cfg, error) {
 	}
 
 	nodeKeyBundles := make(map[string]map[string]clclient.NodeKeysBundle, 0)
+	allNodeClients, err := clclient.New(in.NodeSets[0].Out.CLNodes)
+	if err != nil {
+		return nil, fmt.Errorf("connecting to CL nodes: %w", err)
+	}
 	for i, impl := range impls {
-		nkb, err := impl.FundNodes(ctx, in.NodeSets, in.Blockchains[i], big.NewInt(1), big.NewInt(5))
+		nkb, err := devenvcommon.CreateNodeKeysBundle(allNodeClients, in.Blockchains[i].Type, in.Blockchains[i].ChainID)
+		if err != nil {
+			return nil, fmt.Errorf("creating node keys bundle: %w", err)
+		}
+		err = impl.FundNodes(ctx, in.NodeSets, nkb, in.Blockchains[i], big.NewInt(1), big.NewInt(5))
 		if err != nil {
 			return nil, fmt.Errorf("funding nodes: %w", err)
 		}
@@ -207,7 +215,7 @@ func NewForkedEnvironment() (*Cfg, error) {
 	}
 	in.CLDF.AddAddresses(string(a))
 
-	err = impls[0].ConfigureContractsForSelectors(ctx, e, in.NodeSets, nodeKeyBundles, homeChainSelector, selectors)
+	err = devenvcommon.AddNodesToContracts(ctx, e, in.NodeSets, nodeKeyBundles, homeChainSelector, selectors)
 	if err != nil {
 		return nil, err
 	}
