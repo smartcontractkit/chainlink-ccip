@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"fmt"
+	"os"
 	"testing"
 	"time"
 
@@ -37,6 +38,8 @@ func TestE2ESmoke(t *testing.T) {
 			family = chainsel.FamilyEVM
 		case "solana":
 			family = chainsel.FamilySolana
+		case "ton":
+			family = chainsel.FamilyTon
 		default:
 			panic("unsupported blockchain type")
 		}
@@ -50,47 +53,46 @@ func TestE2ESmoke(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("Test CCIP transfers", func(t *testing.T) {
-		type testcase struct {
-			name         string
-			fromSelector uint64
-			toSelector   uint64
-		}
-
-		tcs := []testcase{
-			{
-				name:         "evm->evm msg execution eoa receiver",
-				fromSelector: selectors[0],
-				toSelector:   selectors[1],
-			},
-			{
-				name:         "evm->evm msg execution eoa receiver",
-				fromSelector: selectors[1],
-				toSelector:   selectors[0],
-			},
-			{
-				name:         "evm->svm msg execution eoa receiver",
-				fromSelector: selectors[0],
-				toSelector:   selectors[2],
-			},
-			{
-				name:         "svm->evm msg execution eoa receiver",
-				fromSelector: selectors[2],
-				toSelector:   selectors[0],
-			},
-		}
-		for _, tc := range tcs {
-			t.Run(tc.name, func(t *testing.T) {
-				t.Logf("Testing CCIP message from chain %d to chain %d", tc.fromSelector, tc.toSelector)
-				fromImpl := selectorsToImpl[tc.fromSelector]
-				toImpl := selectorsToImpl[tc.toSelector]
-				err := fromImpl.SendMessage(t.Context(), tc.fromSelector, tc.toSelector, nil, nil)
-				require.NoError(t, err)
-				_, err = toImpl.WaitOneSentEventBySeqNo(t.Context(), tc.fromSelector, tc.toSelector, 0, 2*time.Minute)
-				require.NoError(t, err)
-				_, err = toImpl.WaitOneExecEventBySeqNo(t.Context(), tc.fromSelector, tc.toSelector, 0, 2*time.Minute)
-				require.NoError(t, err)
+	type testcase struct {
+		name         string
+		fromSelector uint64
+		toSelector   uint64
+	}
+	tcs := []testcase{}
+	for i := 0; i < len(selectors); i++ {
+		for j := 0; j < len(selectors); j++ {
+			if i == j {
+				continue
+			}
+			fromFamily, _ := chainsel.GetSelectorFamily(selectors[i])
+			toFamily, _ := chainsel.GetSelectorFamily(selectors[j])
+			tcs = append(tcs, testcase{
+				name:         fmt.Sprintf("msg execution eoa receiver from %s to %s", fromFamily, toFamily),
+				fromSelector: selectors[i],
+				toSelector:   selectors[j],
 			})
 		}
-	})
+	}
+
+	for _, tc := range tcs {
+		// Capture the loop variable so each goroutine gets its own copy.
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			if os.Getenv("PARALLEL_E2E_TESTS") == "true" {
+				t.Parallel()
+			}
+
+			t.Logf("Testing CCIP message from chain %d to chain %d", tc.fromSelector, tc.toSelector)
+			fromImpl := selectorsToImpl[tc.fromSelector]
+			toImpl := selectorsToImpl[tc.toSelector]
+			err := fromImpl.SendMessage(t.Context(), tc.fromSelector, tc.toSelector, nil, nil)
+			require.NoError(t, err)
+			seq, err := fromImpl.GetExpectedNextSequenceNumber(t.Context(), tc.fromSelector, tc.toSelector)
+			require.NoError(t, err)
+			_, err = toImpl.WaitOneSentEventBySeqNo(t.Context(), tc.fromSelector, tc.toSelector, seq, 1*time.Minute)
+			require.NoError(t, err)
+			_, err = toImpl.WaitOneExecEventBySeqNo(t.Context(), tc.fromSelector, tc.toSelector, seq, 1*time.Minute)
+			require.NoError(t, err)
+		})
+	}
 }
