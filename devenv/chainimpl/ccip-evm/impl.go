@@ -2,13 +2,13 @@ package ccip_evm
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
 	"strings"
 	"time"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -16,17 +16,15 @@ import (
 	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
+	"github.com/xssnick/tonutils-go/address"
 
-	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/rmn_home"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/fee_quoter"
 	ccipocr3common "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	capabilities_registry "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/clclient"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
@@ -38,28 +36,41 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
 	msg_hasher163 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/message_hasher"
 	solccip "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/ccip"
-	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
-	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
-	changesetscore "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	devenvcommon "github.com/smartcontractkit/chainlink-ccip/devenv/common"
 	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	"github.com/smartcontractkit/chainlink-ton/pkg/ccip/codec"
 )
+
+type SourceDestPair struct {
+	SourceChainSelector uint64
+	DestChainSelector   uint64
+}
+
+type AnyMsgSentEvent struct {
+	SequenceNumber uint64
+	// RawEvent contains the raw event depending on the chain:
+	//  EVM:   *onramp.OnRampCCIPMessageSent
+	//  Aptos: module_onramp.CCIPMessageSent
+	RawEvent any
+}
 
 type CCIP16EVM struct {
 	e                      *deployment.Environment
 	chainDetailsBySelector map[uint64]chainsel.ChainDetails
 	ethClients             map[uint64]*ethclient.Client
-	common                 *devenvcommon.Common
+	ExpectedSeqNumRange    map[SourceDestPair]ccipocr3common.SeqNumRange
+	ExpectedSeqNumExec     map[SourceDestPair][]uint64
+	MsgSentEvents          []*AnyMsgSentEvent
 }
 
 func NewEmptyCCIP16EVM() *CCIP16EVM {
 	return &CCIP16EVM{
 		chainDetailsBySelector: make(map[uint64]chainsel.ChainDetails),
 		ethClients:             make(map[uint64]*ethclient.Client),
-		common:                 devenvcommon.NewCommon(),
+		ExpectedSeqNumRange:    make(map[SourceDestPair]ccipocr3common.SeqNumRange),
+		ExpectedSeqNumExec:     make(map[SourceDestPair][]uint64),
+		MsgSentEvents:          make([]*AnyMsgSentEvent, 0),
 	}
 }
 
@@ -160,6 +171,30 @@ func (m *CCIP16EVM) SendMessage(ctx context.Context, src, dest uint64, fields an
 		if err != nil {
 			return fmt.Errorf("failed to serialize SVM extra args: %w", err)
 		}
+	case chainsel.FamilyTon:
+		receiverAddr, err := datastore_utils.FindAndFormatRef(m.e.DataStore, datastore.AddressRef{
+			ChainSelector: dest,
+			Type:          datastore.ContractType("Receiver"),
+		}, dest, datastore_utils.FullRef)
+		if err != nil {
+			return fmt.Errorf("failed to get TonReceiver address: %w", err)
+		}
+		tonreceiver, err := address.ParseAddr(receiverAddr.Address)
+		if err != nil {
+			return fmt.Errorf("failed to parse TON receiver address: %w", err)
+		}
+		ac := codec.NewAddressCodec()
+		receiver, err = ac.AddressStringToBytes(tonreceiver.String())
+		if err != nil {
+			return fmt.Errorf("failed to convert TON address to bytes: %w", err)
+		}
+		extraArgs, err = devenvcommon.SerializeClientGenericExtraArgsV2(msg_hasher163.ClientGenericExtraArgsV2{
+			GasLimit:                 new(big.Int).SetUint64(100_000_000),
+			AllowOutOfOrderExecution: true,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to serialize TON extra args: %w", err)
+		}
 	default:
 		return fmt.Errorf("unsupported chain family: %s", family)
 	}
@@ -248,17 +283,19 @@ func (m *CCIP16EVM) SendMessage(ctx context.Context, src, dest uint64, fields an
 			return fmt.Errorf("no CCIP message sent event found")
 		}
 
-		sourceDest := devenvcommon.SourceDestPair{SourceChainSelector: src, DestChainSelector: dest}
-		m.common.MsgSentEvents = append(m.common.MsgSentEvents, &devenvcommon.AnyMsgSentEvent{
+		sourceDest := SourceDestPair{SourceChainSelector: src, DestChainSelector: dest}
+		m.MsgSentEvents = append(m.MsgSentEvents, &AnyMsgSentEvent{
 			SequenceNumber: it.Event.SequenceNumber,
 			RawEvent:       it.Event,
 		})
-		m.common.ExpectedSeqNumRange[sourceDest] = ccipocr3common.SeqNumRange{
-			ccipocr3common.SeqNum(m.common.MsgSentEvents[0].SequenceNumber),
-			ccipocr3common.SeqNum(m.common.MsgSentEvents[len(m.common.MsgSentEvents)-1].SequenceNumber)}
-		m.common.ExpectedSeqNumExec[sourceDest] = append(
-			m.common.ExpectedSeqNumExec[sourceDest],
+		m.ExpectedSeqNumRange[sourceDest] = ccipocr3common.SeqNumRange{
+			ccipocr3common.SeqNum(m.MsgSentEvents[0].SequenceNumber),
+			ccipocr3common.SeqNum(m.MsgSentEvents[len(m.MsgSentEvents)-1].SequenceNumber)}
+		m.ExpectedSeqNumExec[sourceDest] = append(
+			m.ExpectedSeqNumExec[sourceDest],
 			it.Event.SequenceNumber)
+		messageID := hex.EncodeToString(it.Event.Message.Header.MessageId[:])
+		fmt.Printf("Sent CCIP message id %s seq %d from chain %d to chain %d\n", messageID, it.Event.SequenceNumber, src, dest)
 
 		return nil
 	}
@@ -266,8 +303,8 @@ func (m *CCIP16EVM) SendMessage(ctx context.Context, src, dest uint64, fields an
 
 func (m *CCIP16EVM) GetExpectedNextSequenceNumber(ctx context.Context, from, to uint64) (uint64, error) {
 	_ = zerolog.Ctx(ctx)
-	sourceDest := devenvcommon.SourceDestPair{SourceChainSelector: from, DestChainSelector: to}
-	seqRange, ok := m.common.ExpectedSeqNumRange[sourceDest]
+	sourceDest := SourceDestPair{SourceChainSelector: from, DestChainSelector: to}
+	seqRange, ok := m.ExpectedSeqNumRange[sourceDest]
 	if !ok {
 		return 0, fmt.Errorf("no expected sequence number range for source-dest pair %v", sourceDest)
 	}
@@ -321,11 +358,7 @@ func (m *CCIP16EVM) WaitOneSentEventBySeqNo(ctx context.Context, from, to, seq u
 	if err != nil {
 		return nil, fmt.Errorf("failed to create off ramp instance: %w", err)
 	}
-	sourceDest := devenvcommon.SourceDestPair{SourceChainSelector: from, DestChainSelector: to}
-	seqRange, ok := m.common.ExpectedSeqNumRange[sourceDest]
-	if !ok {
-		return nil, fmt.Errorf("no expected sequence number range for source-dest pair %v", sourceDest)
-	}
+	seqRange := ccipocr3common.SeqNumRange{ccipocr3common.SeqNum(seq), ccipocr3common.SeqNum(seq)}
 
 	seenMessages := NewCommitReportTracker(from, seqRange)
 
@@ -438,11 +471,7 @@ func (m *CCIP16EVM) WaitOneExecEventBySeqNo(ctx context.Context, from, to, seq u
 	if err != nil {
 		return nil, fmt.Errorf("failed to create off ramp instance: %w", err)
 	}
-	sourceDest := devenvcommon.SourceDestPair{SourceChainSelector: from, DestChainSelector: to}
-	seqRange, ok := m.common.ExpectedSeqNumRange[sourceDest]
-	if !ok {
-		return nil, fmt.Errorf("no expected sequence number range for source-dest pair %v", sourceDest)
-	}
+	seqRange := ccipocr3common.SeqNumRange{ccipocr3common.SeqNum(seq), ccipocr3common.SeqNum(seq)}
 
 	executionStates := make(map[uint64]int)
 	seqNrsToWatch := make(map[uint64]struct{})
@@ -595,109 +624,16 @@ HTTPURL = '%s'`,
 	), nil
 }
 
-func (m *CCIP16EVM) DeployContractsForSelector(ctx context.Context, env *deployment.Environment, cls []*simple_node_set.Input, selector uint64, ccipHomeSelector uint64, crAddr string) (datastore.DataStore, error) {
-	l := zerolog.Ctx(ctx)
-	l.Info().Msg("Configuring contracts for selector")
-	l.Info().Any("Selector", selector).Msg("Deploying for chain selectors")
-	runningDS := datastore.NewMemoryDataStore()
-
-	l.Info().Uint64("Selector", selector).Msg("Configuring per-chain contracts bundle")
-	bundle := operations.NewBundle(
-		func() context.Context { return context.Background() },
-		env.Logger,
-		operations.NewMemoryReporter(),
-	)
-	env.OperationsBundle = bundle
-
-	chain, ok := env.BlockChains.EVMChains()[selector]
-	if !ok {
-		return nil, fmt.Errorf("evm chain not found for selector %d", selector)
-	}
-	dReg := deployops.GetRegistry()
-	version := semver.MustParse("1.6.0")
-	out, err := deployops.DeployContracts(dReg).Apply(*env, deployops.ContractDeploymentConfig{
-		MCMS: mcms.Input{},
-		Chains: map[uint64]deployops.ContractDeploymentConfigPerChain{
-			chain.Selector: {
-				Version: version,
-				// FEE QUOTER CONFIG
-				MaxFeeJuelsPerMsg:            big.NewInt(0).Mul(big.NewInt(200), big.NewInt(1e18)),
-				TokenPriceStalenessThreshold: uint32(24 * 60 * 60),
-				LinkPremiumMultiplier:        9e17, // 0.9 ETH
-				NativeTokenPremiumMultiplier: 1e18, // 1.0 ETH
-				// OFFRAMP CONFIG
-				PermissionLessExecutionThresholdSeconds: uint32((20 * time.Minute).Seconds()),
-				GasForCallExactCheck:                    uint16(5000),
-				// PING PONG DAPP - deploy for cross-chain testing
-				DeployPingPongDapp: true,
-			},
-		},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to deploy contracts: %w", err)
-	}
-	nodeClients, err := clclient.New(cls[0].Out.CLNodes)
-	if err != nil {
-		return nil, fmt.Errorf("connecting to CL nodes: %w", err)
-	}
-	// bootstrap is 0
-	workerNodes := nodeClients[1:]
-	if selector == ccipHomeSelector {
-		var readers [][32]byte
-		for _, node := range workerNodes {
-			nodeP2PIds, err := node.MustReadP2PKeys()
-			if err != nil {
-				return nil, fmt.Errorf("reading worker node P2P keys: %w", err)
-			}
-			l.Info().Str("Node", node.Config.URL).Str("PeerID", nodeP2PIds.Data[0].Attributes.PeerID).Msg("Adding reader peer ID")
-			id := devenvcommon.MustPeerIDFromString(nodeP2PIds.Data[0].Attributes.PeerID)
-			readers = append(readers, id)
-			l.Info().Msgf("peerID: %+v", id)
-			l.Info().Msgf("peer ID from bytes: %s", id.Raw())
-		}
-		ccipHomeOut, err := devenvcommon.DeployHomeChain.Apply(*env, devenvcommon.DeployHomeChainConfig{
-			HomeChainSel: selector,
-			CapReg:       common.HexToAddress(crAddr),
-			RMNStaticConfig: rmn_home.RMNHomeStaticConfig{
-				Nodes:          []rmn_home.RMNHomeNode{},
-				OffchainConfig: []byte("static config"),
-			},
-			RMNDynamicConfig: rmn_home.RMNHomeDynamicConfig{
-				SourceChains:   []rmn_home.RMNHomeSourceChain{},
-				OffchainConfig: []byte("dynamic config"),
-			},
-			NodeOperators: []capabilities_registry.CapabilitiesRegistryNodeOperator{
-				{
-					Admin: chain.DeployerKey.From,
-					Name:  "NodeOperator",
-				},
-			},
-			NodeP2PIDsPerNodeOpAdmin: map[string][][32]byte{"NodeOperator": readers},
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to deploy home chain contracts: %w", err)
-		}
-		out.DataStore.Merge(ccipHomeOut.DataStore.Seal())
-		out.DataStore.Addresses().Add(
-			datastore.AddressRef{
-				ChainSelector: selector,
-				Type:          datastore.ContractType(utils.CapabilitiesRegistry),
-				Version:       semver.MustParse("1.0.0"),
-				Address:       crAddr,
-			},
-		)
-	}
-
-	env.DataStore = out.DataStore.Seal()
-	runningDS.Merge(env.DataStore)
-
-	return runningDS.Seal(), nil
+func (m *CCIP16EVM) PreDeployContractsForSelector(ctx context.Context, env *deployment.Environment, cls []*simple_node_set.Input, selector uint64, ccipHomeSelector uint64, crAddr string) error {
+	return nil
 }
 
-func (m *CCIP16EVM) ConnectContractsWithSelectors(ctx context.Context, e *deployment.Environment, selector uint64, remoteSelectors []uint64) error {
-	return devenvcommon.ConnectContractsWithSelectors(ctx, e, selector, remoteSelectors)
+func (m *CCIP16EVM) PostDeployContractsForSelector(ctx context.Context, env *deployment.Environment, cls []*simple_node_set.Input, selector uint64, ccipHomeSelector uint64, crAddr string) error {
+	return nil
 }
 
+// LinkPingPongContracts links PingPongDemo contracts between this chain and remote chains
+// by setting counterpart chain selectors and addresses
 func (m *CCIP16EVM) LinkPingPongContracts(ctx context.Context, e *deployment.Environment, selector uint64, remoteSelectors []uint64) error {
 	l := zerolog.Ctx(ctx)
 	l.Info().Uint64("FromSelector", selector).Any("ToSelectors", remoteSelectors).Msg("Linking PingPongDemo contracts")
@@ -755,136 +691,18 @@ func (m *CCIP16EVM) LinkPingPongContracts(ctx context.Context, e *deployment.Env
 	return nil
 }
 
-func (m *CCIP16EVM) ConfigureContractsForSelectors(ctx context.Context, e *deployment.Environment, cls []*simple_node_set.Input, nodeKeyBundles map[string]map[string]clclient.NodeKeysBundle, ccipHomeSelector uint64, remoteSelectors []uint64) error {
-	l := zerolog.Ctx(ctx)
-	l.Info().Uint64("HomeChainSelector", ccipHomeSelector).Msg("Configuring contracts for home chain selector")
-	bundle := operations.NewBundle(
-		func() context.Context { return context.Background() },
-		e.Logger,
-		operations.NewMemoryReporter(),
-	)
-	e.OperationsBundle = bundle
-
-	// Build the CCIPHome chain configs.
-	chainConfigs := make(map[uint64]devenvcommon.ChainConfig)
-	commitOCRConfigs := make(map[uint64]devenvcommon.CCIPOCRParams)
-	execOCRConfigs := make(map[uint64]devenvcommon.CCIPOCRParams)
-	nodeClients, err := clclient.New(cls[0].Out.CLNodes)
-	if err != nil {
-		return fmt.Errorf("connecting to CL nodes: %w", err)
-	}
-	// bootstrap is 0
-	workerNodes := nodeClients[1:]
-	var readers [][32]byte
-	for _, node := range workerNodes {
-		nodeP2PIds, err := node.MustReadP2PKeys()
-		if err != nil {
-			return fmt.Errorf("reading worker node P2P keys: %w", err)
-		}
-		l.Info().Str("Node", node.Config.URL).Str("PeerID", nodeP2PIds.Data[0].Attributes.PeerID).Msg("Adding reader peer ID")
-		id := devenvcommon.MustPeerIDFromString(nodeP2PIds.Data[0].Attributes.PeerID)
-		readers = append(readers, id)
-	}
-	for _, chain := range remoteSelectors {
-		ocrOverride := func(ocrParams devenvcommon.CCIPOCRParams) devenvcommon.CCIPOCRParams {
-			if ocrParams.CommitOffChainConfig != nil {
-				ocrParams.CommitOffChainConfig.RMNEnabled = false
-			}
-			return ocrParams
-		}
-		commitOCRConfigs[chain] = devenvcommon.DeriveOCRParamsForCommit(devenvcommon.SimulationTest, ccipHomeSelector, nil, ocrOverride)
-		execOCRConfigs[chain] = devenvcommon.DeriveOCRParamsForExec(devenvcommon.SimulationTest, nil, ocrOverride)
-
-		l.Info().Msgf("setting readers for chain %d to %v due to no topology", chain, len(readers))
-		chainConfigs[chain] = devenvcommon.ChainConfig{
-			Readers: readers,
-			FChain:  uint8(len(readers) / 3),
-			EncodableChainConfig: chainconfig.ChainConfig{
-				GasPriceDeviationPPB:      ccipocr3common.BigInt{Int: big.NewInt(1000)},
-				DAGasPriceDeviationPPB:    ccipocr3common.BigInt{Int: big.NewInt(1000)},
-				OptimisticConfirmations:   devenvcommon.OptimisticConfirmations,
-				ChainFeeDeviationDisabled: false,
-			},
-		}
-	}
-
-	_, err = devenvcommon.UpdateChainConfig.Apply(*e, devenvcommon.UpdateChainConfigConfig{
-		HomeChainSelector: ccipHomeSelector,
-		RemoteChainAdds:   chainConfigs,
-	})
-	if err != nil {
-		return fmt.Errorf("updating chain config for selector %d: %w", ccipHomeSelector, err)
-	}
-	_, err = devenvcommon.AddDONAndSetCandidate.Apply(*e, devenvcommon.AddDonAndSetCandidateChangesetConfig{
-		HomeChainSelector: ccipHomeSelector,
-		FeedChainSelector: ccipHomeSelector,
-		PluginInfo: devenvcommon.SetCandidatePluginInfo{
-			OCRConfigPerRemoteChainSelector: commitOCRConfigs,
-			PluginType:                      ccipocr3common.PluginTypeCCIPCommit,
-		},
-		NonBootstraps:  workerNodes,
-		NodeKeyBundles: nodeKeyBundles,
-	})
-	if err != nil {
-		return fmt.Errorf("adding DON and setting candidate for selector %d: %w", ccipHomeSelector, err)
-	}
-	_, err = devenvcommon.SetCandidate.Apply(*e, devenvcommon.SetCandidateChangesetConfig{
-		HomeChainSelector: ccipHomeSelector,
-		FeedChainSelector: ccipHomeSelector,
-		PluginInfo: []devenvcommon.SetCandidatePluginInfo{
-			{
-				OCRConfigPerRemoteChainSelector: execOCRConfigs,
-				PluginType:                      ccipocr3common.PluginTypeCCIPExec,
-			},
-		},
-		NonBootstraps:  workerNodes,
-		NodeKeyBundles: nodeKeyBundles,
-	})
-	if err != nil {
-		return fmt.Errorf("setting candidate for selector %d: %w", ccipHomeSelector, err)
-	}
-	_, err = devenvcommon.PromoteCandidate.Apply(*e, devenvcommon.PromoteCandidateChangesetConfig{
-		HomeChainSelector: ccipHomeSelector,
-		PluginInfo: []devenvcommon.PromoteCandidatePluginInfo{
-			{
-				PluginType:           ccipocr3common.PluginTypeCCIPCommit,
-				RemoteChainSelectors: remoteSelectors,
-			},
-			{
-				PluginType:           ccipocr3common.PluginTypeCCIPExec,
-				RemoteChainSelectors: remoteSelectors,
-			},
-		},
-		NonBootstraps: workerNodes,
-	})
-	if err != nil {
-		return fmt.Errorf("promoting candidate for selector %d: %w", ccipHomeSelector, err)
-	}
-	dReg := deployops.GetRegistry()
-	mcmsRegistry := changesetscore.GetRegistry()
-	_, err = deployops.SetOCR3Config(dReg, mcmsRegistry).Apply(*e, deployops.SetOCR3ConfigArgs{
-		HomeChainSel:    ccipHomeSelector,
-		RemoteChainSels: remoteSelectors,
-		ConfigType:      cciputils.ConfigTypeActive,
-	})
-	if err != nil {
-		return fmt.Errorf("setting OCR3 config for selector %d: %w", ccipHomeSelector, err)
-	}
-	return nil
-}
-
-func (m *CCIP16EVM) FundNodes(ctx context.Context, ns []*simple_node_set.Input, bc *blockchain.Input, linkAmount, nativeAmount *big.Int) (map[string]clclient.NodeKeysBundle, error) {
+func (m *CCIP16EVM) FundNodes(ctx context.Context, ns []*simple_node_set.Input, nodeKeyBundles map[string]clclient.NodeKeysBundle, bc *blockchain.Input, linkAmount, nativeAmount *big.Int) error {
 	l := zerolog.Ctx(ctx)
 	l.Info().Msg("Funding CL nodes with ETH and LINK")
 	nodeClients, err := clclient.New(ns[0].Out.CLNodes)
 	if err != nil {
-		return nil, fmt.Errorf("connecting to CL nodes: %w", err)
+		return fmt.Errorf("connecting to CL nodes: %w", err)
 	}
 	ethKeyAddressesSrc := make([]string, 0)
 	for i, nc := range nodeClients {
 		addrSrc, err := nc.ReadPrimaryETHKey(bc.ChainID)
 		if err != nil {
-			return nil, fmt.Errorf("getting primary ETH key from OCR node %d (src chain): %w", i, err)
+			return fmt.Errorf("getting primary ETH key from OCR node %d (src chain): %w", i, err)
 		}
 		ethKeyAddressesSrc = append(ethKeyAddressesSrc, addrSrc.Attributes.Address)
 		l.Info().
@@ -903,7 +721,7 @@ func (m *CCIP16EVM) FundNodes(ctx context.Context, ns []*simple_node_set.Input, 
 		TipCapMultiplier: 2,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("could not create basic eth client: %w", err)
+		return fmt.Errorf("could not create basic eth client: %w", err)
 	}
 	// Use default Anvil key for local chain 1337, otherwise use PRIVATE_KEY env var
 	privateKey := getNetworkPrivateKey()
@@ -918,9 +736,8 @@ func (m *CCIP16EVM) FundNodes(ctx context.Context, ns []*simple_node_set.Input, 
 
 	for _, addr := range ethKeyAddressesSrc {
 		if err := FundNodeEIP1559(ctx, clientSrc, privateKey, addr, nativeAmountETH); err != nil {
-			return nil, fmt.Errorf("failed to fund CL nodes on src chain: %w", err)
+			return fmt.Errorf("failed to fund CL nodes on src chain: %w", err)
 		}
 	}
-	// EVM does not need to create and return NodeKeysBundle
-	return nil, nil
+	return nil
 }

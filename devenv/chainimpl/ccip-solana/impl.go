@@ -38,20 +38,36 @@ import (
 	solccip "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/ccip"
 	solCommonUtil "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
-	devenvcommon "github.com/smartcontractkit/chainlink-ccip/devenv/common"
 	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
 )
+
+type SourceDestPair struct {
+	SourceChainSelector uint64
+	DestChainSelector   uint64
+}
+
+type AnyMsgSentEvent struct {
+	SequenceNumber uint64
+	// RawEvent contains the raw event depending on the chain:
+	//  EVM:   *onramp.OnRampCCIPMessageSent
+	//  Aptos: module_onramp.CCIPMessageSent
+	RawEvent any
+}
 
 type CCIP16Solana struct {
 	e                      *deployment.Environment
 	chainDetailsBySelector map[uint64]chainsel.ChainDetails
-	common                 *devenvcommon.Common
+	ExpectedSeqNumRange    map[SourceDestPair]ccipocr3common.SeqNumRange
+	ExpectedSeqNumExec     map[SourceDestPair][]uint64
+	MsgSentEvents          []*AnyMsgSentEvent
 }
 
 func NewEmptyCCIP16Solana() *CCIP16Solana {
 	return &CCIP16Solana{
 		chainDetailsBySelector: make(map[uint64]chainsel.ChainDetails),
-		common:                 devenvcommon.NewCommon(),
+		ExpectedSeqNumRange:    make(map[SourceDestPair]ccipocr3common.SeqNumRange),
+		ExpectedSeqNumExec:     make(map[SourceDestPair][]uint64),
+		MsgSentEvents:          make([]*AnyMsgSentEvent, 0),
 	}
 }
 
@@ -263,16 +279,16 @@ func (m *CCIP16Solana) SendMessage(ctx context.Context, src, dest uint64, fields
 		ccipMessageSentEvent.Message.Sender.String(),
 	)
 
-	sourceDest := devenvcommon.SourceDestPair{SourceChainSelector: src, DestChainSelector: dest}
-	m.common.MsgSentEvents = append(m.common.MsgSentEvents, &devenvcommon.AnyMsgSentEvent{
+	sourceDest := SourceDestPair{SourceChainSelector: src, DestChainSelector: dest}
+	m.MsgSentEvents = append(m.MsgSentEvents, &AnyMsgSentEvent{
 		SequenceNumber: ccipMessageSentEvent.SequenceNumber,
 		RawEvent:       ccipMessageSentEvent,
 	})
-	m.common.ExpectedSeqNumRange[sourceDest] = ccipocr3common.SeqNumRange{
-		ccipocr3common.SeqNum(m.common.MsgSentEvents[0].SequenceNumber),
-		ccipocr3common.SeqNum(m.common.MsgSentEvents[0].SequenceNumber)}
-	m.common.ExpectedSeqNumExec[sourceDest] = append(
-		m.common.ExpectedSeqNumExec[sourceDest],
+	m.ExpectedSeqNumRange[sourceDest] = ccipocr3common.SeqNumRange{
+		ccipocr3common.SeqNum(m.MsgSentEvents[0].SequenceNumber),
+		ccipocr3common.SeqNum(m.MsgSentEvents[0].SequenceNumber)}
+	m.ExpectedSeqNumExec[sourceDest] = append(
+		m.ExpectedSeqNumExec[sourceDest],
 		ccipMessageSentEvent.SequenceNumber)
 
 	return nil
@@ -280,8 +296,8 @@ func (m *CCIP16Solana) SendMessage(ctx context.Context, src, dest uint64, fields
 
 func (m *CCIP16Solana) GetExpectedNextSequenceNumber(ctx context.Context, from, to uint64) (uint64, error) {
 	_ = zerolog.Ctx(ctx)
-	sourceDest := devenvcommon.SourceDestPair{SourceChainSelector: from, DestChainSelector: to}
-	seqRange, ok := m.common.ExpectedSeqNumRange[sourceDest]
+	sourceDest := SourceDestPair{SourceChainSelector: from, DestChainSelector: to}
+	seqRange, ok := m.ExpectedSeqNumRange[sourceDest]
 	if !ok {
 		return 0, fmt.Errorf("no expected sequence number range for source-dest pair %v", sourceDest)
 	}
@@ -329,11 +345,7 @@ func (m *CCIP16Solana) WaitOneSentEventBySeqNo(ctx context.Context, from, to, se
 	if err != nil {
 		return nil, fmt.Errorf("failed to get off ramp address: %w", err)
 	}
-	sourceDest := devenvcommon.SourceDestPair{SourceChainSelector: from, DestChainSelector: to}
-	seqRange, ok := m.common.ExpectedSeqNumRange[sourceDest]
-	if !ok {
-		return nil, fmt.Errorf("no expected sequence number range for source-dest pair %v", sourceDest)
-	}
+	seqRange := ccipocr3common.SeqNumRange{ccipocr3common.SeqNum(seq), ccipocr3common.SeqNum(seq)}
 	seenMessages := NewCommitReportTracker(from, seqRange)
 	done := make(chan any)
 	defer close(done)
@@ -501,11 +513,7 @@ func (m *CCIP16Solana) WaitOneExecEventBySeqNo(ctx context.Context, from, to, se
 		return nil, fmt.Errorf("failed to get off ramp address: %w", err)
 	}
 	offRampAddress := solana.PublicKeyFromBytes(offAddr)
-	sourceDest := devenvcommon.SourceDestPair{SourceChainSelector: from, DestChainSelector: to}
-	seqRange, ok := m.common.ExpectedSeqNumRange[sourceDest]
-	if !ok {
-		return nil, fmt.Errorf("no expected sequence number range for source-dest pair %v", sourceDest)
-	}
+	seqRange := ccipocr3common.SeqNumRange{ccipocr3common.SeqNum(seq), ccipocr3common.SeqNum(seq)}
 
 	executionStates := make(map[uint64]int)
 	seqNrsToWatch := make(map[uint64]struct{})
@@ -693,34 +701,34 @@ func (m *CCIP16Solana) ConfigureNodes(ctx context.Context, bc *blockchain.Input)
 	), nil
 }
 
-func (m *CCIP16Solana) DeployContractsForSelector(ctx context.Context, env *deployment.Environment, cls []*simple_node_set.Input, selector uint64, ccipHomeSelector uint64, crAddr string) (datastore.DataStore, error) {
+func (m *CCIP16Solana) PreDeployContractsForSelector(ctx context.Context, env *deployment.Environment, cls []*simple_node_set.Input, selector uint64, ccipHomeSelector uint64, crAddr string) error {
 	ds := datastore.NewMemoryDataStore()
 	ds.Merge(env.DataStore)
 	err := populateDatastore(ds.AddressRefStore, solanaContracts, semver.MustParse("1.6.0"), "", selector)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	env.DataStore = ds.Seal()
-	outds, err := devenvcommon.DeployContractsForSelector(ctx, env, cls, selector, ccipHomeSelector, crAddr)
-	if err != nil {
-		return nil, err
-	}
+	return nil
+}
+
+func (m *CCIP16Solana) PostDeployContractsForSelector(ctx context.Context, env *deployment.Environment, cls []*simple_node_set.Input, selector uint64, ccipHomeSelector uint64, crAddr string) error {
 	// post contract setup for testing
 	a := &solanaseqs.SolanaAdapter{}
-	linkAddr, err := datastore_utils.FindAndFormatRef(outds, datastore.AddressRef{
+	linkAddr, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
 		ChainSelector: selector,
 		Type:          datastore.ContractType("LINK"),
 	}, selector, datastore_utils.FullRef)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get LINK address: %w", err)
+		return fmt.Errorf("failed to get LINK address: %w", err)
 	}
-	fqAddr, err := a.GetFQAddress(outds, selector)
+	fqAddr, err := a.GetFQAddress(env.DataStore, selector)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get fee quoter address: %w", err)
+		return fmt.Errorf("failed to get fee quoter address: %w", err)
 	}
-	routerAddr, err := a.GetRouterAddress(outds, selector)
+	routerAddr, err := a.GetRouterAddress(env.DataStore, selector)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get router address: %w", err)
+		return fmt.Errorf("failed to get router address: %w", err)
 	}
 	chain := env.BlockChains.SolanaChains()[selector]
 	fqID := solana.PublicKeyFromBytes(fqAddr)
@@ -736,11 +744,11 @@ func (m *CCIP16Solana) DeployContractsForSelector(ctx context.Context, env *depl
 		solana.SystemProgramID,
 	).ValidateAndBuild()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get fee tokens from fee quoter: %w", err)
+		return fmt.Errorf("failed to get fee tokens from fee quoter: %w", err)
 	}
 	err = chain.Confirm([]solana.Instruction{ixn})
 	if err != nil {
-		return nil, fmt.Errorf("failed to add price updater: %w", err)
+		return fmt.Errorf("failed to add price updater: %w", err)
 	}
 	for _, tokenPubKey := range []solana.PublicKey{
 		solana.WrappedSol,
@@ -774,18 +782,14 @@ func (m *CCIP16Solana) DeployContractsForSelector(ctx context.Context, env *depl
 			solana.SystemProgramID,
 		).ValidateAndBuild()
 		if err != nil {
-			return nil, fmt.Errorf("failed to build add billing token config instruction: %w", err)
+			return fmt.Errorf("failed to build add billing token config instruction: %w", err)
 		}
 		err = chain.Confirm([]solana.Instruction{ixn})
 		if err != nil {
-			return nil, fmt.Errorf("failed to add price updater: %w", err)
+			return fmt.Errorf("failed to add price updater: %w", err)
 		}
 	}
-	return outds, nil
-}
-
-func (m *CCIP16Solana) ConnectContractsWithSelectors(ctx context.Context, e *deployment.Environment, selector uint64, remoteSelectors []uint64) error {
-	return devenvcommon.ConnectContractsWithSelectors(ctx, e, selector, remoteSelectors)
+	return nil
 }
 
 func (m *CCIP16Solana) LinkPingPongContracts(ctx context.Context, e *deployment.Environment, selector uint64, remoteSelectors []uint64) error {
@@ -793,34 +797,18 @@ func (m *CCIP16Solana) LinkPingPongContracts(ctx context.Context, e *deployment.
 	return nil
 }
 
-func (m *CCIP16Solana) ConfigureContractsForSelectors(ctx context.Context, e *deployment.Environment, cls []*simple_node_set.Input, nodeKeyBundles map[string]map[string]clclient.NodeKeysBundle, ccipHomeSelector uint64, remoteSelectors []uint64) error {
-	return devenvcommon.ConfigureContractsForSelectors(ctx, e, cls, nodeKeyBundles, ccipHomeSelector, remoteSelectors)
-}
-
-func (m *CCIP16Solana) FundNodes(ctx context.Context, ns []*simple_node_set.Input, bc *blockchain.Input, linkAmount, nativeAmount *big.Int) (map[string]clclient.NodeKeysBundle, error) {
+func (m *CCIP16Solana) FundNodes(ctx context.Context, ns []*simple_node_set.Input, nodeKeyBundles map[string]clclient.NodeKeysBundle, bc *blockchain.Input, linkAmount, nativeAmount *big.Int) error {
 	l := zerolog.Ctx(ctx)
 	l.Info().Msg("Funding CL nodes with ETH and LINK")
-	nodeClients, err := clclient.New(ns[0].Out.CLNodes)
-	if err != nil {
-		return nil, fmt.Errorf("connecting to CL nodes: %w", err)
-	}
-	nkb, err := devenvcommon.CreateNodeKeysBundle(nodeClients, bc.Type, bc.ChainID)
-	if err != nil {
-		return nil, fmt.Errorf("creating node keys bundle: %w", err)
-	}
 	var keys []solana.PublicKey
-	for _, nk := range nkb {
+	for _, nk := range nodeKeyBundles {
 		keys = append(keys, solana.MustPublicKeyFromBase58(nk.TXKey.Data.Attributes.PublicKey))
 	}
 	client := solRpc.New(bc.Out.Nodes[0].ExternalHTTPUrl)
-	err = utils.FundSolanaAccounts(
+	return utils.FundSolanaAccounts(
 		ctx,
 		keys,
 		10,
 		client,
 	)
-	if err != nil {
-		return nil, fmt.Errorf("funding solana accounts: %w", err)
-	}
-	return nkb, nil
 }

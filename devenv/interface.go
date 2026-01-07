@@ -7,7 +7,6 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/clclient"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
@@ -56,15 +55,14 @@ type Chains interface {
 // OnChainConfigurable defines methods that allows devenv to
 // deploy, configure Chainlink product and connect on-chain part with other chains.
 type OnChainConfigurable interface {
-	// DeployContractsForSelector configures contracts for chain X
-	// returns all the contract addresses and metadata as datastore.DataStore
-	DeployContractsForSelector(ctx context.Context, env *deployment.Environment, cls []*nodeset.Input, selector uint64, ccipHomeSelector uint64, crAddr string) (datastore.DataStore, error)
-	// ConnectContractsWithSelectors connects this chain onRamp to one or multiple offRamps for remote selectors (other chains)
-	ConfigureContractsForSelectors(ctx context.Context, e *deployment.Environment, cls []*nodeset.Input, nodeKeyBundles map[string]map[string]clclient.NodeKeysBundle, ccipHomeSelector uint64, remoteSelectors []uint64) error
-	// ConnectContractsWithSelectors connects this chain onRamp to one or multiple offRamps for remote selectors (other chains)
-	ConnectContractsWithSelectors(ctx context.Context, e *deployment.Environment, selector uint64, remoteSelectors []uint64) error
+	// PreDeployContractsForSelector is any pre-deployment steps required before deploying contracts for a selector
+	// Actual deployment is done by the common CCIP code
+	PreDeployContractsForSelector(ctx context.Context, env *deployment.Environment, cls []*nodeset.Input, selector uint64, ccipHomeSelector uint64, crAddr string) error
+	// PostDeployContractsForSelector is any post-deployment steps required after deploying contracts for a selector
+	// Actual deployment is done by the common CCIP code
+	PostDeployContractsForSelector(ctx context.Context, env *deployment.Environment, cls []*nodeset.Input, selector uint64, ccipHomeSelector uint64, crAddr string) error
 	// LinkPingPongContracts links PingPongDemo contracts between this chain and remote chains
-	// by setting counterpart chain selectors and addresses
+	// by setting counterpart chain selectors and addresses (EVM only, no-op for other chains)
 	LinkPingPongContracts(ctx context.Context, e *deployment.Environment, selector uint64, remoteSelectors []uint64) error
 }
 
@@ -78,6 +76,5 @@ type OffChainConfigurable interface {
 	ConfigureNodes(ctx context.Context, blockchain *blockchain.Input) (string, error)
 	// FundNodes Fund Chainlink nodes for some amount of native/LINK currency
 	// using chain-specific clients or CLDF
-	// nativeAmount is in wei units
-	FundNodes(ctx context.Context, cls []*nodeset.Input, bc *blockchain.Input, linkAmount, nativeAmount *big.Int) (map[string]clclient.NodeKeysBundle, error)
+	FundNodes(ctx context.Context, cls []*nodeset.Input, nodeKeyBundles map[string]clclient.NodeKeysBundle, bc *blockchain.Input, linkAmount, nativeAmount *big.Int) error
 }

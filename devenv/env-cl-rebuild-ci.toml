@@ -9,35 +9,35 @@
   [[nodesets.node_specs]]
 
     [nodesets.node_specs.node]
-      docker_ctx = "../../chainlink"
+      docker_ctx = "../chainlink-repo"
       docker_file = "core/chainlink.Dockerfile"
 
   [[nodesets.node_specs]]
 
     [nodesets.node_specs.node]
-      docker_ctx = "../../chainlink"
+      docker_ctx = "../chainlink-repo"
       docker_file = "core/chainlink.Dockerfile"
 
   [[nodesets.node_specs]]
 
     [nodesets.node_specs.node]
-      docker_ctx = "../../chainlink"
+      docker_ctx = "../chainlink-repo"
       docker_file = "core/chainlink.Dockerfile"
 
   [[nodesets.node_specs]]
 
     [nodesets.node_specs.node]
-      docker_ctx = "../../chainlink"
-      docker_file = "core/chainlink.Dockerfile"
-  
-  [[nodesets.node_specs]]
-
-    [nodesets.node_specs.node]
-      docker_ctx = "../../chainlink"
+      docker_ctx = "../chainlink-repo"
       docker_file = "core/chainlink.Dockerfile"
   
   [[nodesets.node_specs]]
 
     [nodesets.node_specs.node]
-      docker_ctx = "../../chainlink"
+      docker_ctx = "../chainlink-repo"
+      docker_file = "core/chainlink.Dockerfile"
+  
+  [[nodesets.node_specs]]
+
+    [nodesets.node_specs.node]
+      docker_ctx = "../chainlink-repo"
       docker_file = "core/chainlink.Dockerfile"
