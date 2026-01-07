@@ -16,12 +16,12 @@ contract USDCTokenPoolProxy_getFee is USDCTokenPoolProxySetup {
   function test_getFee() public {
     vm.mockCall(
       address(s_cctpThroughCCVTokenPool),
-      abi.encodeWithSelector(IPoolV2.getFee.selector, address(0), 0, 0, address(0), 0, ""),
+      abi.encodeWithSelector(IPoolV2.getFee.selector, address(0), s_remoteCCTPChainSelector, 0, address(0), 0, ""),
       abi.encode(FEE_USD_CENTS, DEST_GAS_OVERHEAD, DEST_BYTES_OVERHEAD, TOKEN_FEE_BPS, IS_ENABLED)
     );
 
     (uint256 usdFeeCents, uint32 destGasOverhead, uint32 destBytesOverhead, uint16 tokenFeeBps, bool isEnabled) =
-      s_usdcTokenPoolProxy.getFee(address(0), 0, 0, address(0), 0, "");
+      s_usdcTokenPoolProxy.getFee(address(0), s_remoteCCTPChainSelector, 0, address(0), 0, "");
 
     assertEq(usdFeeCents, FEE_USD_CENTS);
     assertEq(destGasOverhead, DEST_GAS_OVERHEAD);
@@ -30,7 +30,7 @@ contract USDCTokenPoolProxy_getFee is USDCTokenPoolProxySetup {
     assertEq(isEnabled, IS_ENABLED);
   }
 
-  function test_getFee_RevertWhen_NoCCVCompatiblePoolSet() public {
+  function test_getFee_RevertWhen_MustSetPoolForMechanism() public {
     _enableERC165InterfaceChecks(s_cctpV2Pool, type(IPoolV1).interfaceId);
     _enableERC165InterfaceChecks(s_cctpV1Pool, type(IPoolV1).interfaceId);
     s_usdcTokenPoolProxy.updatePoolAddresses(
@@ -42,7 +42,92 @@ contract USDCTokenPoolProxy_getFee is USDCTokenPoolProxySetup {
       })
     );
 
-    vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.CCVCompatiblePoolNotSet.selector));
-    s_usdcTokenPoolProxy.getFee(address(0), 0, 0, address(0), 0, "");
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        USDCTokenPoolProxy.MustSetPoolForMechanism.selector,
+        s_remoteCCTPChainSelector,
+        USDCTokenPoolProxy.LockOrBurnMechanism.CCV
+      )
+    );
+    s_usdcTokenPoolProxy.getFee(address(0), s_remoteCCTPChainSelector, 0, address(0), 0, "");
+  }
+
+  function test_getFee_SiloedPool() public {
+    // Configure the siloed lock/release pool
+    _enableERC165InterfaceChecks(s_lockReleasePool, type(IPoolV1).interfaceId);
+    s_usdcTokenPoolProxy.updatePoolAddresses(
+      USDCTokenPoolProxy.PoolAddresses({
+        cctpV1Pool: s_cctpV1Pool,
+        cctpV2Pool: s_cctpV2Pool,
+        cctpV2PoolWithCCV: s_cctpThroughCCVTokenPool,
+        siloedLockReleasePool: s_lockReleasePool
+      })
+    );
+
+    // Configure LOCK_RELEASE mechanism for the remote chain
+    uint64[] memory remoteChainSelectors = new uint64[](1);
+    remoteChainSelectors[0] = s_remoteLockReleaseChainSelector;
+
+    USDCTokenPoolProxy.LockOrBurnMechanism[] memory mechanisms = new USDCTokenPoolProxy.LockOrBurnMechanism[](1);
+    mechanisms[0] = USDCTokenPoolProxy.LockOrBurnMechanism.LOCK_RELEASE;
+    s_usdcTokenPoolProxy.updateLockOrBurnMechanisms(remoteChainSelectors, mechanisms);
+
+    // Mock the siloed pool's getFee to return specific values
+    vm.mockCall(
+      address(s_lockReleasePool),
+      abi.encodeWithSelector(
+        IPoolV2.getFee.selector, address(0), s_remoteLockReleaseChainSelector, 0, address(0), 0, ""
+      ),
+      abi.encode(FEE_USD_CENTS, DEST_GAS_OVERHEAD, DEST_BYTES_OVERHEAD, TOKEN_FEE_BPS, IS_ENABLED)
+    );
+
+    (uint256 usdFeeCents, uint32 destGasOverhead, uint32 destBytesOverhead, uint16 tokenFeeBps, bool isEnabled) =
+      s_usdcTokenPoolProxy.getFee(address(0), s_remoteLockReleaseChainSelector, 0, address(0), 0, "");
+
+    assertEq(usdFeeCents, FEE_USD_CENTS);
+    assertEq(destGasOverhead, DEST_GAS_OVERHEAD);
+    assertEq(destBytesOverhead, DEST_BYTES_OVERHEAD);
+    assertEq(tokenFeeBps, TOKEN_FEE_BPS);
+    assertEq(isEnabled, IS_ENABLED);
+  }
+
+  function test_getFee_SiloedPoolFallback() public {
+    // Configure the siloed lock/release pool
+    _enableERC165InterfaceChecks(s_lockReleasePool, type(IPoolV1).interfaceId);
+    s_usdcTokenPoolProxy.updatePoolAddresses(
+      USDCTokenPoolProxy.PoolAddresses({
+        cctpV1Pool: s_cctpV1Pool,
+        cctpV2Pool: s_cctpV2Pool,
+        cctpV2PoolWithCCV: s_cctpThroughCCVTokenPool,
+        siloedLockReleasePool: s_lockReleasePool
+      })
+    );
+
+    // Configure LOCK_RELEASE mechanism for the remote chain
+    uint64[] memory remoteChainSelectors = new uint64[](1);
+    remoteChainSelectors[0] = s_remoteLockReleaseChainSelector;
+
+    USDCTokenPoolProxy.LockOrBurnMechanism[] memory mechanisms = new USDCTokenPoolProxy.LockOrBurnMechanism[](1);
+    mechanisms[0] = USDCTokenPoolProxy.LockOrBurnMechanism.LOCK_RELEASE;
+    s_usdcTokenPoolProxy.updateLockOrBurnMechanisms(remoteChainSelectors, mechanisms);
+
+    // Mock the siloed pool's getFee to revert (simulating an older pool without IPoolV2.getFee)
+    vm.mockCallRevert(
+      address(s_lockReleasePool),
+      abi.encodeWithSelector(
+        IPoolV2.getFee.selector, address(0), s_remoteLockReleaseChainSelector, 0, address(0), 0, ""
+      ),
+      ""
+    );
+
+    // When the siloed pool doesn't support getFee, the proxy returns zeros
+    (uint256 usdFeeCents, uint32 destGasOverhead, uint32 destBytesOverhead, uint16 tokenFeeBps, bool isEnabled) =
+      s_usdcTokenPoolProxy.getFee(address(0), s_remoteLockReleaseChainSelector, 0, address(0), 0, "");
+
+    assertEq(usdFeeCents, 0);
+    assertEq(destGasOverhead, 0);
+    assertEq(destBytesOverhead, 0);
+    assertEq(tokenFeeBps, 0);
+    assertEq(isEnabled, false);
   }
 }

@@ -372,11 +372,38 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
   )
     external
     view
-    onlyWithCCVCompatiblePool
     returns (uint256 feeUSDCents, uint32 destGasOverhead, uint32 destBytesOverhead, uint16 tokenFeeBps, bool isEnabled)
   {
-    return IPoolV2(s_cctpV2PoolWithCCV)
-      .getFee(localToken, destChainSelector, amount, feeToken, blockConfirmationRequested, tokenArgs);
+    // There are only two valid mechanisms when calling getFee, as getFee is only called on pools v1.7.0 and later.
+    // Therefore, the only valid mechanisms are CCTP with CCV and Lock/Release.
+    LockOrBurnMechanism mechanism = s_lockOrBurnMechanism[destChainSelector];
+
+    if (mechanism == LockOrBurnMechanism.CCV) {
+      if (s_cctpV2PoolWithCCV == address(0)) {
+        revert MustSetPoolForMechanism(destChainSelector, LockOrBurnMechanism.CCV);
+      }
+      return IPoolV2(s_cctpV2PoolWithCCV)
+        .getFee(localToken, destChainSelector, amount, feeToken, blockConfirmationRequested, tokenArgs);
+    }
+
+    // Siloed pools might be older than v1.7
+    if (mechanism == LockOrBurnMechanism.LOCK_RELEASE) {
+      try IPoolV2(s_siloedLockReleasePool)
+        .getFee(localToken, destChainSelector, amount, feeToken, blockConfirmationRequested, tokenArgs) returns (
+        uint256 feeUSDCentsRet,
+        uint32 destGasOverheadRet,
+        uint32 destBytesOverheadRet,
+        uint16 tokenFeeBpsRet,
+        bool isEnabledRet
+      ) {
+        return (feeUSDCentsRet, destGasOverheadRet, destBytesOverheadRet, tokenFeeBpsRet, isEnabledRet);
+      } catch {
+        return (0, 0, 0, 0, false);
+      }
+    }
+
+    // If an old mechanism is set, or none at all, revert.
+    revert InvalidLockOrBurnMechanism(mechanism);
   }
 
   /// @inheritdoc IPoolV2
