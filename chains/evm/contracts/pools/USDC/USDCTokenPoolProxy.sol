@@ -362,6 +362,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
   /// @param feeToken The token used to pay feeUSDCents.
   /// @param blockConfirmationRequested Requested block confirmation.
   /// @param tokenArgs Opaque token arguments supplied by the caller.
+  // solhint-disable-next-line chainlink-solidity/explicit-returns
   function getFee(
     address localToken,
     uint64 destChainSelector,
