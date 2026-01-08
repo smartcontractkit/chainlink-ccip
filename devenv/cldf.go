@@ -70,11 +70,17 @@ func NewCLDFOperationsEnvironment(bc []*blockchain.Input, dataStore datastore.Da
 			}
 			selectors = append(selectors, d.ChainSelector)
 
+			// Use default Anvil key for local chain 1337, otherwise use PRIVATE_KEY env var
+			privateKey := getNetworkPrivateKey()
+			if chainID == "1337" {
+				privateKey = DefaultAnvilKey
+			}
+
 			p, err := cldf_evm_provider.NewRPCChainProvider(
 				d.ChainSelector,
 				cldf_evm_provider.RPCChainProviderConfig{
 					DeployerTransactorGen: cldf_evm_provider.TransactorFromRaw(
-						getNetworkPrivateKey(),
+						privateKey,
 					),
 					RPCs: []rpcclient.RPC{
 						{
