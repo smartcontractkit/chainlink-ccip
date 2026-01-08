@@ -3,6 +3,8 @@ package sequences
 import (
 	"fmt"
 	"math/big"
+	"strings"
+	"time"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
@@ -289,17 +291,36 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			}
 
 			// Mint 20 LINK (20 * 10^18 wei) directly to the PingPongDemo contract
+			// Retry with backoff for external networks where grant confirmation may take time
 			pingPongFundingAmount := new(big.Int).Mul(big.NewInt(20), new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil))
-			_, err = cldf_ops.ExecuteOperation(b, link.Mint, chain, contract.FunctionInput[link.MintArgs]{
+			mintInput := contract.FunctionInput[link.MintArgs]{
 				ChainSelector: chain.Selector,
 				Address:       common.HexToAddress(linkRef.Address),
 				Args: link.MintArgs{
 					To:     common.HexToAddress(pingPongDappRef.Address),
 					Amount: pingPongFundingAmount,
 				},
-			})
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to mint LINK to Ping Pong Dapp: %w", err)
+			}
+
+			maxRetries := 5
+			retryDelay := 3 * time.Second
+			var mintErr error
+			for attempt := 1; attempt <= maxRetries; attempt++ {
+				_, mintErr = cldf_ops.ExecuteOperation(b, link.Mint, chain, mintInput)
+				if mintErr == nil {
+					break
+				}
+				// Only retry on SenderNotMinter error (minter role not yet confirmed)
+				if !strings.Contains(mintErr.Error(), "SenderNotMinter") {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to mint LINK to Ping Pong Dapp: %w", mintErr)
+				}
+				if attempt < maxRetries {
+					b.Logger.Warnf("Mint failed with SenderNotMinter (attempt %d/%d), retrying in %v...", attempt, maxRetries, retryDelay)
+					time.Sleep(retryDelay)
+				}
+			}
+			if mintErr != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to mint LINK to Ping Pong Dapp after %d retries: %w", maxRetries, mintErr)
 			}
 		}
 

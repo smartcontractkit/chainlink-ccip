@@ -792,11 +792,6 @@ func (m *CCIP16Solana) PostDeployContractsForSelector(ctx context.Context, env *
 	return nil
 }
 
-func (m *CCIP16Solana) LinkPingPongContracts(ctx context.Context, e *deployment.Environment, selector uint64, remoteSelectors []uint64) error {
-	// PingPong contracts not yet implemented for Solana
-	return nil
-}
-
 func (m *CCIP16Solana) FundNodes(ctx context.Context, ns []*simple_node_set.Input, nodeKeyBundles map[string]clclient.NodeKeysBundle, bc *blockchain.Input, linkAmount, nativeAmount *big.Int) error {
 	l := zerolog.Ctx(ctx)
 	l.Info().Msg("Funding CL nodes with ETH and LINK")

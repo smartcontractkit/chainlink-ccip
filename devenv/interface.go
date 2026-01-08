@@ -61,9 +61,6 @@ type OnChainConfigurable interface {
 	// PostDeployContractsForSelector is any post-deployment steps required after deploying contracts for a selector
 	// Actual deployment is done by the common CCIP code
 	PostDeployContractsForSelector(ctx context.Context, env *deployment.Environment, cls []*nodeset.Input, selector uint64, ccipHomeSelector uint64, crAddr string) error
-	// LinkPingPongContracts links PingPongDemo contracts between this chain and remote chains
-	// by setting counterpart chain selectors and addresses (EVM only, no-op for other chains)
-	LinkPingPongContracts(ctx context.Context, e *deployment.Environment, selector uint64, remoteSelectors []uint64) error
 }
 
 // OffChainConfigurable defines methods that allows to

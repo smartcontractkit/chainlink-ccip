@@ -215,7 +215,8 @@ func NewEnvironment() (*Cfg, error) {
 		return nil, fmt.Errorf("connecting to CL nodes: %w", err)
 	}
 
-	// Convert funding amounts from ETH/LINK units (float64) to wei (big.Int)
+	// Convert funding amounts from user-friendly units (ETH/LINK) to smallest units (wei)
+	// This is done at environment level as a convenience conversion
 	ethFloat := big.NewFloat(in.CLNodesFundingETH)
 	weiFloat := new(big.Float).Mul(ethFloat, big.NewFloat(1e18))
 	nativeAmount, _ := weiFloat.Int(nil)
@@ -293,7 +294,7 @@ func NewEnvironment() (*Cfg, error) {
 	}
 
 	// connect all the contracts together (on-ramps, off-ramps)
-	for i, impl := range impls {
+	for i := range impls {
 		var family string
 		switch in.Blockchains[i].Type {
 		case "anvil", "geth":
@@ -316,12 +317,6 @@ func NewEnvironment() (*Cfg, error) {
 			}
 		}
 		err = devenvcommon.ConnectContractsWithSelectors(ctx, e, networkInfo.ChainSelector, selsToConnect)
-		if err != nil {
-			return nil, err
-		}
-
-		// Link PingPongDemo contracts between this chain and remote chains
-		err = impl.LinkPingPongContracts(ctx, e, networkInfo.ChainSelector, selsToConnect)
 		if err != nil {
 			return nil, err
 		}

@@ -177,6 +177,12 @@ func ConnectContractsWithSelectors(ctx context.Context, e *deployment.Environmen
 		}
 	}
 
+	// Configure PingPong contracts (silently skips chains that don't support it)
+	err := lanesapi.ConfigurePingPongForLanes(*e, lanesapi.GetPingPongAdapterRegistry(), version, selector, remoteSelectors)
+	if err != nil {
+		return fmt.Errorf("configuring PingPong for selector %d: %w", selector, err)
+	}
+
 	return nil
 }
 

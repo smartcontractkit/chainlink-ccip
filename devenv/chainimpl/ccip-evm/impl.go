@@ -24,14 +24,11 @@ import (
 	ccipocr3common "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/clclient"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	pingpongdapp "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/ping_pong_dapp"
 	evmseqs "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
 	msg_hasher163 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/message_hasher"
@@ -632,65 +629,6 @@ func (m *CCIP16EVM) PostDeployContractsForSelector(ctx context.Context, env *dep
 	return nil
 }
 
-// LinkPingPongContracts links PingPongDemo contracts between this chain and remote chains
-// by setting counterpart chain selectors and addresses
-func (m *CCIP16EVM) LinkPingPongContracts(ctx context.Context, e *deployment.Environment, selector uint64, remoteSelectors []uint64) error {
-	l := zerolog.Ctx(ctx)
-	l.Info().Uint64("FromSelector", selector).Any("ToSelectors", remoteSelectors).Msg("Linking PingPongDemo contracts")
-
-	a := &evmseqs.EVMAdapter{}
-
-	// Get the PingPongDemo address on this chain - if not deployed, skip linking
-	localPingPongAddr, err := a.GetPingPongDemoAddress(e.DataStore, selector)
-	if err != nil {
-		l.Info().Uint64("Selector", selector).Msg("PingPongDemo not deployed on this chain, skipping linking")
-		return nil
-	}
-
-	bundle := operations.NewBundle(
-		func() context.Context { return context.Background() },
-		e.Logger,
-		operations.NewMemoryReporter(),
-	)
-	e.OperationsBundle = bundle
-
-	chain := e.BlockChains.EVMChains()[selector]
-
-	for _, remoteSelector := range remoteSelectors {
-		// Get the PingPongDemo address on the remote chain - if not deployed, skip this pair
-		remotePingPongAddr, err := a.GetPingPongDemoAddress(e.DataStore, remoteSelector)
-		if err != nil {
-			l.Info().Uint64("RemoteSelector", remoteSelector).Msg("PingPongDemo not deployed on remote chain, skipping this pair")
-			continue
-		}
-
-		// CCIP requires addresses to be 32-byte left-padded for cross-chain messaging
-		paddedRemoteAddr := common.LeftPadBytes(remotePingPongAddr, 32)
-
-		l.Info().
-			Uint64("LocalSelector", selector).
-			Uint64("RemoteSelector", remoteSelector).
-			Str("LocalPingPong", common.BytesToAddress(localPingPongAddr).Hex()).
-			Str("RemotePingPong", common.BytesToAddress(remotePingPongAddr).Hex()).
-			Msg("Setting counterpart for PingPongDemo")
-
-		// Set the counterpart on the local PingPongDemo contract
-		_, err = operations.ExecuteOperation(bundle, pingpongdapp.SetCounterpart, chain, contract.FunctionInput[pingpongdapp.SetCounterpartArgs]{
-			ChainSelector: selector,
-			Address:       common.BytesToAddress(localPingPongAddr),
-			Args: pingpongdapp.SetCounterpartArgs{
-				CounterpartChainSelector: remoteSelector,
-				CounterpartAddress:       paddedRemoteAddr,
-			},
-		})
-		if err != nil {
-			return fmt.Errorf("failed to set counterpart on PingPongDemo for selector %d -> %d: %w", selector, remoteSelector, err)
-		}
-	}
-
-	return nil
-}
-
 func (m *CCIP16EVM) FundNodes(ctx context.Context, ns []*simple_node_set.Input, nodeKeyBundles map[string]clclient.NodeKeysBundle, bc *blockchain.Input, linkAmount, nativeAmount *big.Int) error {
 	l := zerolog.Ctx(ctx)
 	l.Info().Msg("Funding CL nodes with ETH and LINK")
@@ -729,7 +667,7 @@ func (m *CCIP16EVM) FundNodes(ctx context.Context, ns []*simple_node_set.Input, 
 		privateKey = DefaultAnvilKey
 	}
 
-	// nativeAmount is in wei - FundNodeEIP1559 expects amount in ETH so convert
+	// nativeAmount is in wei - convert to ETH for FundNodeEIP1559
 	nativeAmountFloat := new(big.Float).SetInt(nativeAmount)
 	nativeAmountFloat.Quo(nativeAmountFloat, big.NewFloat(1e18))
 	nativeAmountETH, _ := nativeAmountFloat.Float64()
