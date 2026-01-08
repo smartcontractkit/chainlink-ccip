@@ -110,7 +110,7 @@ jobs:
         run: |
           export GOPRIVATE=github.com/smartcontractkit/*
           if [ -n "${{ inputs.ton_ref }}" ]; then
-            go get github.com/smartcontractkit/chainlink-ton/devenv-impl@${{ inputs.ton_ref }}
+            go get github.com/smartcontractkit/chainlink-ton/devenv@${{ inputs.ton_ref }}
             go get github.com/smartcontractkit/chainlink-ton/deployment@${{ inputs.ton_ref }}
             go get github.com/smartcontractkit/chainlink-ton@${{ inputs.ton_ref }}
           fi

@@ -30,7 +30,8 @@ import (
 	cldf_solana_provider "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana/provider"
 	cldf_ton_provider "github.com/smartcontractkit/chainlink-deployments-framework/chain/ton/provider"
 	testutils "github.com/smartcontractkit/chainlink-ton/deployment/utils"
-	ccipTon "github.com/smartcontractkit/chainlink-ton/devenv-impl"
+
+	ccipTon "github.com/smartcontractkit/chainlink-ton/devenv"
 
 	ccipEVM "github.com/smartcontractkit/chainlink-ccip/devenv/chainimpl/ccip-evm"
 	ccipSolana "github.com/smartcontractkit/chainlink-ccip/devenv/chainimpl/ccip-solana"
