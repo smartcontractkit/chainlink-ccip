@@ -215,15 +215,14 @@ func NewEnvironment() (*Cfg, error) {
 		return nil, fmt.Errorf("connecting to CL nodes: %w", err)
 	}
 
-	// Convert funding amounts from user-friendly units (ETH/LINK) to smallest units (wei)
-	// This is done at environment level as a convenience conversion
-	ethFloat := big.NewFloat(in.CLNodesFundingETH)
-	weiFloat := new(big.Float).Mul(ethFloat, big.NewFloat(1e18))
-	nativeAmount, _ := weiFloat.Int(nil)
-
-	linkFloat := big.NewFloat(in.CLNodesFundingLink)
-	linkWeiFloat := new(big.Float).Mul(linkFloat, big.NewFloat(1e18))
-	linkAmount, _ := linkWeiFloat.Int(nil)
+	// Pass funding amounts as-is (in native units like ETH, SOL, TON)
+	// Each chain implementation handles its own unit conversion:
+	// - EVM: ETH -> wei (×10^18)
+	// - Solana: SOL -> lamports (×10^9)
+	// - TON: TON -> nanotons (×10^9)
+	// Using big.Int with the integer part; fractional units handled by each impl
+	nativeAmount := big.NewInt(int64(in.CLNodesFundingETH))
+	linkAmount := big.NewInt(int64(in.CLNodesFundingLink))
 
 	// deploy all the contracts
 	for i, impl := range impls {

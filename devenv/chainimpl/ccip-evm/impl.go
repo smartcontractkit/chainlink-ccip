@@ -667,10 +667,9 @@ func (m *CCIP16EVM) FundNodes(ctx context.Context, ns []*simple_node_set.Input, 
 		privateKey = DefaultAnvilKey
 	}
 
-	// nativeAmount is in wei - convert to ETH for FundNodeEIP1559
-	nativeAmountFloat := new(big.Float).SetInt(nativeAmount)
-	nativeAmountFloat.Quo(nativeAmountFloat, big.NewFloat(1e18))
-	nativeAmountETH, _ := nativeAmountFloat.Float64()
+	// nativeAmount is in ETH units (integer) - use directly for FundNodeEIP1559
+	// EVM-specific conversion: FundNodeEIP1559 expects ETH as float64
+	nativeAmountETH := float64(nativeAmount.Int64())
 
 	for _, addr := range ethKeyAddressesSrc {
 		if err := FundNodeEIP1559(ctx, clientSrc, privateKey, addr, nativeAmountETH); err != nil {
