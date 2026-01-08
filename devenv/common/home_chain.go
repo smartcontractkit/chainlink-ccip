@@ -762,7 +762,7 @@ func DonIDForChain(registry *capabilities_registry.CapabilitiesRegistry, ccipHom
 		return 0, fmt.Errorf("get next don id from capability registry: %w", err)
 	}
 
-	var donIDs []uint32
+	var donID uint32
 	for donId := uint32(1); donId < nextDonID; donId++ {
 		don, err := registry.GetDON(&bind.CallOpts{
 			Context: context.Background(),
@@ -801,18 +801,13 @@ func DonIDForChain(registry *capabilities_registry.CapabilitiesRegistry, ccipHom
 				return 0, fmt.Errorf("get candidate config from cciphome: %w", err)
 			}
 			if activeConfig.VersionedConfig.Config.ChainSelector == chainSelector || candidateConfig.VersionedConfig.Config.ChainSelector == chainSelector {
-				donIDs = append(donIDs, don.Id)
+				donID = don.Id
 				break
 			}
 		}
 	}
 
-	// no DON found - don ID of 0 indicates that (this is the case in the CR as well).
-	if len(donIDs) == 0 {
-		return 0, nil
-	}
-	// DON found - return it.
-	return donIDs[0], nil
+	return donID, nil
 }
 
 type PromoteCandidatePluginInfo struct {
