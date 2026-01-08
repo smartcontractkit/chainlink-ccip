@@ -199,13 +199,13 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
 
   /// @notice Gets the IERC20 token that this pool can lock or burn.
   /// @return token The IERC20 token representation.
-  function getToken() public view returns (IERC20 token) {
+  function getToken() public view virtual returns (IERC20 token) {
     return i_token;
   }
 
   /// @notice Get RMN proxy address.
   /// @return rmnProxy Address of RMN proxy.
-  function getRmnProxy() public view returns (address rmnProxy) {
+  function getRmnProxy() public view virtual returns (address rmnProxy) {
     return i_rmnProxy;
   }
 
@@ -220,12 +220,12 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   }
 
   /// @notice Gets the minimum block confirmations required for custom finality transfers.
-  function getMinBlockConfirmation() public view returns (uint16 minBlockConfirmation) {
+  function getMinBlockConfirmation() public view virtual returns (uint16 minBlockConfirmation) {
     return s_minBlockConfirmation;
   }
 
   /// @notice Gets the advanced pool hook contract address used by this pool.
-  function getAdvancedPoolHooks() public view returns (IAdvancedPoolHooks advancedPoolHook) {
+  function getAdvancedPoolHooks() public view virtual returns (IAdvancedPoolHooks advancedPoolHook) {
     return s_advancedPoolHooks;
   }
 
@@ -239,7 +239,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
     address router,
     address rateLimitAdmin,
     address feeAggregator
-  ) public onlyOwner {
+  ) public virtual onlyOwner {
     if (router == address(0)) revert ZeroAddressInvalid();
     s_router = IRouter(router);
     s_rateLimitAdmin = rateLimitAdmin;
@@ -251,7 +251,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   /// @param minBlockConfirmation The minimum block confirmations required for custom finality transfers.
   function setMinBlockConfirmation(
     uint16 minBlockConfirmation
-  ) public onlyOwner {
+  ) public virtual onlyOwner {
     // Since 0 means default finality it is a valid value.
     s_minBlockConfirmation = minBlockConfirmation;
     emit MinBlockConfirmationSet(minBlockConfirmation);
@@ -261,7 +261,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   /// @param newHook The new advanced pool hooks contract.
   function updateAdvancedPoolHooks(
     IAdvancedPoolHooks newHook
-  ) public onlyOwner {
+  ) public virtual onlyOwner {
     emit AdvancedPoolHooksUpdated(s_advancedPoolHooks, newHook);
     s_advancedPoolHooks = newHook;
   }
@@ -415,7 +415,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
     uint16 blockConfirmationRequested,
     bytes memory tokenArgs,
     uint256 feeAmount
-  ) internal {
+  ) internal virtual {
     if (!isSupportedToken(lockOrBurnIn.localToken)) {
       revert InvalidToken(lockOrBurnIn.localToken);
     }
@@ -473,7 +473,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
     uint256 localAmount,
     uint16 blockConfirmationRequested
-  ) internal {
+  ) internal virtual {
     if (!isSupportedToken(releaseOrMintIn.localToken)) {
       revert InvalidToken(releaseOrMintIn.localToken);
     }
@@ -585,7 +585,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   /// @dev To support non-evm chains, this value is encoded into bytes
   function getRemotePools(
     uint64 remoteChainSelector
-  ) public view returns (bytes[] memory) {
+  ) public view virtual returns (bytes[] memory) {
     bytes32[] memory remotePoolHashes = s_remoteChainConfigs[remoteChainSelector].remotePools.values();
 
     bytes[] memory remotePools = new bytes[](remotePoolHashes.length);
@@ -602,7 +602,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   function isRemotePool(
     uint64 remoteChainSelector,
     bytes memory remotePoolAddress
-  ) public view returns (bool) {
+  ) public view virtual returns (bool) {
     return s_remoteChainConfigs[remoteChainSelector].remotePools.contains(keccak256(remotePoolAddress));
   }
 
@@ -610,7 +610,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   /// @param remoteChainSelector Remote chain selector.
   function getRemoteToken(
     uint64 remoteChainSelector
-  ) public view returns (bytes memory) {
+  ) public view virtual returns (bytes memory) {
     return s_remoteChainConfigs[remoteChainSelector].remoteTokenAddress;
   }
 
@@ -622,7 +622,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   function addRemotePool(
     uint64 remoteChainSelector,
     bytes calldata remotePoolAddress
-  ) external onlyOwner {
+  ) external virtual onlyOwner {
     if (!isSupportedChain(remoteChainSelector)) revert NonExistentChain(remoteChainSelector);
 
     _setRemotePool(remoteChainSelector, remotePoolAddress);
@@ -636,7 +636,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   function removeRemotePool(
     uint64 remoteChainSelector,
     bytes calldata remotePoolAddress
-  ) external onlyOwner {
+  ) external virtual onlyOwner {
     if (!isSupportedChain(remoteChainSelector)) revert NonExistentChain(remoteChainSelector);
 
     if (!s_remoteChainConfigs[remoteChainSelector].remotePools.remove(keccak256(remotePoolAddress))) {
@@ -650,13 +650,13 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   /// @param remoteChainSelector The remote chain selector to check.
   function isSupportedChain(
     uint64 remoteChainSelector
-  ) public view returns (bool) {
+  ) public view virtual returns (bool) {
     return s_remoteChainSelectors.contains(remoteChainSelector);
   }
 
   /// @notice Get list of allowed chains
   /// @return list of chains.
-  function getSupportedChains() public view returns (uint64[] memory) {
+  function getSupportedChains() public view virtual returns (uint64[] memory) {
     uint256[] memory uint256ChainSelectors = s_remoteChainSelectors.values();
     uint64[] memory chainSelectors = new uint64[](uint256ChainSelectors.length);
     for (uint256 i = 0; i < uint256ChainSelectors.length; ++i) {
@@ -730,7 +730,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   function _setRemotePool(
     uint64 remoteChainSelector,
     bytes memory remotePoolAddress
-  ) internal {
+  ) internal virtual {
     if (remotePoolAddress.length == 0) {
       revert ZeroAddressInvalid();
     }
@@ -833,6 +833,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   )
     external
     view
+    virtual
     returns (
       RateLimiter.TokenBucket memory outboundRateLimiterState,
       RateLimiter.TokenBucket memory inboundRateLimiterState
@@ -1078,7 +1079,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   /// @param feeTokens The token addresses to withdraw, including the pool token when applicable.
   function withdrawFeeTokens(
     address[] calldata feeTokens
-  ) external {
+  ) external virtual {
     FeeTokenHandler._withdrawFeeTokens(feeTokens, s_feeAggregator);
   }
 }
