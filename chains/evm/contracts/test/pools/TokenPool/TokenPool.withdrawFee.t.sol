@@ -53,13 +53,14 @@ contract TokenPoolV2_withdrawFee is AdvancedPoolHooksSetup {
     feeTokens[1] = token2;
 
     vm.prank(OWNER);
-    s_tokenPool.setDynamicConfig(makeAddr("router"), makeAddr("rateLimitAdmin"), recipient);
+    s_tokenPool.setDynamicConfig(makeAddr("router"), makeAddr("rateLimitAdmin"), feeAdmin);
 
     vm.expectEmit();
     emit FeeTokenHandler.FeeTokenWithdrawn(recipient, address(s_token), feeAmount1);
     vm.expectEmit();
     emit FeeTokenHandler.FeeTokenWithdrawn(recipient, token2, feeAmount2);
 
+    vm.prank(feeAdmin);
     s_tokenPool.withdrawFeeTokens(feeTokens, recipient);
 
     assertEq(s_token.balanceOf(recipient), feeAmount1);
@@ -118,14 +119,14 @@ contract TokenPoolV2_withdrawFee is AdvancedPoolHooksSetup {
     s_tokenPool.setDynamicConfig(makeAddr("router"), makeAddr("rateLimitAdmin"), feeAdmin);
 
     vm.expectEmit();
-    emit FeeTokenHandler.FeeTokenWithdrawn(recipient, address(s_token), feeAmount);
+    emit FeeTokenHandler.FeeTokenWithdrawn(recipient, address(s_token), feeAmount / 2);
     vm.prank(feeAdmin);
     s_tokenPool.withdrawFeeTokens(feeTokens, recipient);
 
     deal(address(s_token), address(s_tokenPool), feeAmount / 2);
 
     vm.expectEmit();
-    emit FeeTokenHandler.FeeTokenWithdrawn(recipient, address(s_token), feeAmount);
+    emit FeeTokenHandler.FeeTokenWithdrawn(recipient, address(s_token), feeAmount / 2);
     vm.prank(OWNER);
     s_tokenPool.withdrawFeeTokens(feeTokens, recipient);
 
@@ -134,7 +135,6 @@ contract TokenPoolV2_withdrawFee is AdvancedPoolHooksSetup {
 
   function test_withdrawFeeTokens_RevertsWhen_CalledByNonOwnerOrFeeAdmin() public {
     uint256 feeAmount = 20 ether;
-    address feeAdmin = makeAddr("fee_admin");
     address recipient = makeAddr("fee_recipient");
 
     deal(address(s_token), address(s_tokenPool), feeAmount);
