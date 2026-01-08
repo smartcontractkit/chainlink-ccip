@@ -55,9 +55,9 @@ require (
 )
 
 require (
-	github.com/smartcontractkit/chainlink-ton v0.0.0-20260108141727-83cd9c776db6
-	github.com/smartcontractkit/chainlink-ton/deployment v0.0.0-20260108141727-83cd9c776db6
-	github.com/smartcontractkit/chainlink-ton/devenv v0.0.0-20260108141727-83cd9c776db6
+	github.com/smartcontractkit/chainlink-ton v0.0.0-20260108144125-ff33142094ad
+	github.com/smartcontractkit/chainlink-ton/deployment v0.0.0-20260108144125-ff33142094ad
+	github.com/smartcontractkit/chainlink-ton/devenv v0.0.0-20260108144125-ff33142094ad
 )
 
 require (
