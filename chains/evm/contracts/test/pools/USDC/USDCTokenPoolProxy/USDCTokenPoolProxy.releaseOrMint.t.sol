@@ -74,9 +74,7 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
     uint256 testAmount = 4321;
     bytes memory originalSender = abi.encode(s_sender);
 
-    bytes memory sourcePoolData = USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV1(
-      USDCSourcePoolDataCodec.SourceTokenDataPayloadV1({nonce: 0, sourceDomain: 0})
-    );
+    bytes memory sourcePoolData = abi.encodePacked(USDCSourcePoolDataCodec.CCTP_VERSION_1_TAG, uint64(0), uint32(0));
     bytes memory offChainTokenData = "";
 
     // Mock the router's isOffRamp function to return true.
@@ -160,9 +158,8 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
     uint256 testAmount = 5678;
     bytes memory originalSender = abi.encode(s_sender);
 
-    bytes memory sourcePoolData = USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV2(
-      USDCSourcePoolDataCodec.SourceTokenDataPayloadV2({sourceDomain: 0, depositHash: bytes32(hex"deafbeef")})
-    );
+    bytes memory sourcePoolData =
+      abi.encodePacked(USDCSourcePoolDataCodec.CCTP_VERSION_2_TAG, uint32(0), bytes32(hex"1029384756"));
     bytes memory offChainTokenData = "";
 
     // Mock the router's isOffRamp function to return true.
@@ -218,10 +215,7 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
 
     uint256 testAmount = 1e6;
 
-    USDCSourcePoolDataCodec.SourceTokenDataPayloadV1 memory legacySourcePoolData =
-      USDCSourcePoolDataCodec.SourceTokenDataPayloadV1({nonce: 12345, sourceDomain: 67890});
-
-    bytes memory legacySourcePoolDataBytes = abi.encode(legacySourcePoolData);
+    bytes memory legacySourcePoolDataBytes = abi.encode(uint64(1234), uint32(67890));
 
     // Mock the CCTP V1 pool's i_localDomainIdentifier to return a test domain.
     uint32 testLocalDomain = 12345;
