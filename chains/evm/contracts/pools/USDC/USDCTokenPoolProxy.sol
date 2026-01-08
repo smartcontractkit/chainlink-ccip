@@ -389,20 +389,9 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
 
     // Siloed pools might be older than v1.7
     if (mechanism == LockOrBurnMechanism.LOCK_RELEASE) {
-      try IPoolV2(s_siloedLockReleasePool)
-        .getFee(localToken, destChainSelector, amount, feeToken, blockConfirmationRequested, tokenArgs) returns (
-        uint256 feeUSDCentsRet,
-        uint32 destGasOverheadRet,
-        uint32 destBytesOverheadRet,
-        uint16 tokenFeeBpsRet,
-        bool isEnabledRet
-      ) {
-        return (feeUSDCentsRet, destGasOverheadRet, destBytesOverheadRet, tokenFeeBpsRet, isEnabledRet);
-      } catch {
-        return (0, 0, 0, 0, false);
-      }
+      return IPoolV2(s_siloedLockReleasePool)
+        .getFee(localToken, destChainSelector, amount, feeToken, blockConfirmationRequested, tokenArgs);
     }
-
     // If an old mechanism is set, or none at all, revert.
     revert InvalidLockOrBurnMechanism(mechanism);
   }
