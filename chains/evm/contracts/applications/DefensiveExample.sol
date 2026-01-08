@@ -39,7 +39,10 @@ contract DefensiveExample is CCIPClientExample {
   // This is used to simulate a revert in the processMessage function.
   bool internal s_simRevert = false;
 
-  constructor(IRouterClient router, IERC20 feeToken) CCIPClientExample(router, feeToken) {}
+  constructor(
+    IRouterClient router,
+    IERC20 feeToken
+  ) CCIPClientExample(router, feeToken) {}
 
   /// @notice The entrypoint for the CCIP router to call. This function should
   /// never revert, all errors should be handled internally in this contract.
@@ -82,7 +85,10 @@ contract DefensiveExample is CCIPClientExample {
   /// @notice This function is callable by the owner when a message has failed  to unblock the tokens
   /// that are associated with that message.
   /// @dev This function is only callable by the owner.
-  function retryFailedMessage(bytes32 messageId, address tokenReceiver) external onlyOwner {
+  function retryFailedMessage(
+    bytes32 messageId,
+    address tokenReceiver
+  ) external onlyOwner {
     if (s_failedMessages.get(messageId) != uint256(ErrorCode.BASIC)) revert MessageNotFailed(messageId);
     // Set the error code to 0 to disallow reentry and retry the same failed message multiple times.
     s_failedMessages.set(messageId, uint256(ErrorCode.RESOLVED));

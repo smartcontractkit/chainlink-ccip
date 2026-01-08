@@ -50,8 +50,7 @@ var AccessControllerDeploy = operations.NewOperation(
 			utils.AccessControllerProgramType,
 			common_utils.Version_1_6_0,
 			"",
-			AccessControllerProgramName,
-			AccessControllerProgramSize)
+			AccessControllerProgramName)
 	},
 )
 
@@ -67,8 +66,7 @@ var TimelockDeploy = operations.NewOperation(
 			utils.TimelockProgramType,
 			common_utils.Version_1_6_0,
 			"",
-			TimelockProgramName,
-			TimelockProgramSize)
+			TimelockProgramName)
 	},
 )
 
@@ -84,8 +82,7 @@ var McmDeploy = operations.NewOperation(
 			utils.McmProgramType,
 			common_utils.Version_1_6_0,
 			"",
-			McmProgramName,
-			McmProgramSize)
+			McmProgramName)
 	},
 )
 

@@ -1,4 +1,4 @@
-package changesets
+package common
 
 import (
 	"fmt"

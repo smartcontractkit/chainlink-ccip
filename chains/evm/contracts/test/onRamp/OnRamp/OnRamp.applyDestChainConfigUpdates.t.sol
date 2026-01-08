@@ -23,17 +23,13 @@ contract OnRamp_applyDestChainConfigUpdates is OnRampSetup {
     // supports updating and adding lanes simultaneously
     configArgs = new OnRamp.DestChainConfigArgs[](2);
     configArgs[0] = OnRamp.DestChainConfigArgs({
-      destChainSelector: DEST_CHAIN_SELECTOR,
-      router: s_sourceRouter,
-      allowlistEnabled: false
+      destChainSelector: DEST_CHAIN_SELECTOR, router: s_sourceRouter, allowlistEnabled: false
     });
     uint64 newDestChainSelector = 99999;
     address newRouter = makeAddr("newRouter");
 
     configArgs[1] = OnRamp.DestChainConfigArgs({
-      destChainSelector: newDestChainSelector,
-      router: IRouter(newRouter),
-      allowlistEnabled: false
+      destChainSelector: newDestChainSelector, router: IRouter(newRouter), allowlistEnabled: false
     });
 
     vm.expectEmit();
@@ -65,9 +61,7 @@ contract OnRamp_applyAllowlistUpdates is OnRampSetup {
   function test_applyAllowlistUpdates() public {
     OnRamp.DestChainConfigArgs[] memory configArgs = new OnRamp.DestChainConfigArgs[](2);
     configArgs[0] = OnRamp.DestChainConfigArgs({
-      destChainSelector: DEST_CHAIN_SELECTOR,
-      router: s_sourceRouter,
-      allowlistEnabled: false
+      destChainSelector: DEST_CHAIN_SELECTOR, router: s_sourceRouter, allowlistEnabled: false
     });
     configArgs[1] =
       OnRamp.DestChainConfigArgs({destChainSelector: 9999, router: IRouter(address(9999)), allowlistEnabled: false});
@@ -165,9 +159,7 @@ contract OnRamp_applyAllowlistUpdates is OnRampSetup {
   function test_RevertWhen_applyAllowlistUpdates() public {
     OnRamp.DestChainConfigArgs[] memory configArgs = new OnRamp.DestChainConfigArgs[](2);
     configArgs[0] = OnRamp.DestChainConfigArgs({
-      destChainSelector: DEST_CHAIN_SELECTOR,
-      router: s_sourceRouter,
-      allowlistEnabled: false
+      destChainSelector: DEST_CHAIN_SELECTOR, router: s_sourceRouter, allowlistEnabled: false
     });
     configArgs[1] =
       OnRamp.DestChainConfigArgs({destChainSelector: 9999, router: IRouter(address(9999)), allowlistEnabled: false});

@@ -44,8 +44,7 @@ var Deploy = operations.NewOperation(
 			ContractType,
 			Version,
 			"",
-			ProgramName,
-			ProgramSize)
+			ProgramName)
 	},
 )
 
@@ -135,7 +134,7 @@ var ConnectChains = operations.NewOperation(
 		var destChainStateAccount fee_quoter.DestChain
 		err := chain.GetAccountDataBorshInto(context.Background(), fqRemoteChainPDA, &destChainStateAccount)
 		if err == nil {
-			fmt.Println("Remote chain state account found:", destChainStateAccount)
+			b.Logger.Infof("Remote chain state account found: %+v", destChainStateAccount)
 			isUpdate = true
 		}
 		var ixn solana.Instruction
@@ -181,7 +180,7 @@ var ConnectChains = operations.NewOperation(
 		}
 		err = chain.Confirm([]solana.Instruction{ixn})
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm add price updater: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm add dest chain instruction: %w", err)
 		}
 		return sequences.OnChainOutput{}, nil
 	},
@@ -221,7 +220,7 @@ var TransferOwnership = operations.NewOperation(
 
 		err = chain.Confirm([]solana.Instruction{ixn})
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm add price updater: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm transfer ownership instruction: %w", err)
 		}
 		return sequences.OnChainOutput{}, nil
 	},
@@ -256,7 +255,7 @@ var AcceptOwnership = operations.NewOperation(
 
 		err = chain.Confirm([]solana.Instruction{ixn})
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm add price updater: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm accept ownership instruction: %w", err)
 		}
 		return sequences.OnChainOutput{}, nil
 	},

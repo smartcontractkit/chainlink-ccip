@@ -74,18 +74,18 @@ contract BurnMintFastTransferTokenPoolSetup is BaseTest {
     address[] memory addFillers = new address[](1);
     addFillers[0] = s_filler;
 
-    FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs memory laneConfigArgs = FastTransferTokenPoolAbstract
-      .DestChainConfigUpdateArgs({
-      remoteChainSelector: DEST_CHAIN_SELECTOR,
-      fastTransferFillerFeeBps: FAST_FEE_FILLER_BPS,
-      fastTransferPoolFeeBps: 0, // No pool fee for this test
-      fillerAllowlistEnabled: true,
-      destinationPool: abi.encode(s_remoteBurnMintPool),
-      maxFillAmountPerRequest: FILL_AMOUNT_MAX,
-      settlementOverheadGas: SETTLEMENT_GAS_OVERHEAD,
-      chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
-      customExtraArgs: ""
-    });
+    FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs memory laneConfigArgs =
+      FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs({
+        remoteChainSelector: DEST_CHAIN_SELECTOR,
+        fastTransferFillerFeeBps: FAST_FEE_FILLER_BPS,
+        fastTransferPoolFeeBps: 0, // No pool fee for this test
+        fillerAllowlistEnabled: true,
+        destinationPool: abi.encode(s_remoteBurnMintPool),
+        maxFillAmountPerRequest: FILL_AMOUNT_MAX,
+        settlementOverheadGas: SETTLEMENT_GAS_OVERHEAD,
+        chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
+        customExtraArgs: ""
+      });
 
     s_pool.updateDestChainConfig(_singleConfigToList(laneConfigArgs));
     s_pool.updateFillerAllowList(addFillers, new address[](0));

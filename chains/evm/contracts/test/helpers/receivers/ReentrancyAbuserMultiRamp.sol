@@ -13,7 +13,10 @@ contract ReentrancyAbuserMultiRamp is CCIPReceiver {
   Internal.ExecutionReport internal s_payload;
   OffRamp internal s_offRamp;
 
-  constructor(address router, OffRamp offRamp) CCIPReceiver(router) {
+  constructor(
+    address router,
+    OffRamp offRamp
+  ) CCIPReceiver(router) {
     s_offRamp = offRamp;
   }
 

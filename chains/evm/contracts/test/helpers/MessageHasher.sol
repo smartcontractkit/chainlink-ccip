@@ -8,7 +8,10 @@ import {Internal} from "../../libraries/Internal.sol";
 /// and encode various preimages for the final hash of the message.
 /// @dev This is only deployed in tests and is not part of the production contracts.
 contract MessageHasher {
-  function hash(Internal.Any2EVMRampMessage memory message, bytes memory onRamp) public pure returns (bytes32) {
+  function hash(
+    Internal.Any2EVMRampMessage memory message,
+    bytes memory onRamp
+  ) public pure returns (bytes32) {
     return Internal._hash(
       message,
       keccak256(

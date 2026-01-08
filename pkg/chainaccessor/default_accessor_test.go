@@ -384,8 +384,8 @@ func TestDefaultAccessor_GetSourceChainsConfig(t *testing.T) {
 }
 
 // Helper function to create a valid SendRequestedEvent for testing
-func createValidSendRequestedEvent(seqNum cciptypes.SeqNum) *SendRequestedEvent {
-	return &SendRequestedEvent{
+func createValidSendRequestedEvent(seqNum cciptypes.SeqNum) *cciptypes.SendRequestedEvent {
+	return &cciptypes.SendRequestedEvent{
 		DestChainSelector: chainB,
 		SequenceNumber:    seqNum,
 		Message: cciptypes.Message{
