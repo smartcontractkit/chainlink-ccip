@@ -107,6 +107,11 @@ func NewCLDFOperationsEnvironment(bc []*blockchain.Input, dataStore datastore.Da
 						},
 					},
 					ConfirmFunctor: cldf_evm_provider.ConfirmFuncGeth(1*time.Minute, cldf_evm_provider.WithTickInterval(5*time.Millisecond)),
+					ClientOpts: []func(client *rpcclient.MultiClient){
+						func(client *rpcclient.MultiClient) {
+							client.RetryConfig.Timeout = 1 * time.Minute
+						},
+					},
 				},
 			).Initialize(context.Background())
 			if err != nil {

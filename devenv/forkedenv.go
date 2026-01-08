@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -57,14 +58,19 @@ func checkForkedEnvIsSet(in *Cfg) error {
 		if u.Scheme == "" || u.Host == "" {
 			return fmt.Errorf("invalid fork_url for chain_id %s: %s", bc.ChainID, forkURL)
 		}
-		in.Blockchains[i].DockerCmdParamsOverrides = append([]string{"--fork-url", in.ForkedEnvConfig.ForkURLs[bc.ChainID]},
-			in.Blockchains[i].DockerCmdParamsOverrides...)
+		forkedArgs := []string{"--fork-url", in.ForkedEnvConfig.ForkURLs[bc.ChainID]}
+		if in.ForkedEnvConfig.ForkBlockNumbers != nil && in.ForkedEnvConfig.ForkBlockNumbers[bc.ChainID] != 0 {
+			forkedArgs = append(forkedArgs, "--fork-block-number", fmt.Sprintf("%d", in.ForkedEnvConfig.ForkBlockNumbers[bc.ChainID]))
+		}
+		forkedArgs = append(forkedArgs, "--timeout", "180000")
+		in.Blockchains[i].DockerCmdParamsOverrides = append(forkedArgs, in.Blockchains[i].DockerCmdParamsOverrides...)
 	}
 	return nil
 }
 
 func NewForkedEnvironment() (*Cfg, error) {
-	ctx := context.Background()
+	ctx, cancelFunc := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancelFunc()
 	tr := NewTimeTracker(Plog)
 	ctx = L.WithContext(ctx)
 	if err := framework.DefaultNetwork(nil); err != nil {

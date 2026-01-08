@@ -6,7 +6,7 @@ cl_nodes_funding_link = 50
 [[blockchains]]
 container_name = "ethereum-mainnet"
 chain_id = "1"
-docker_cmd_params = ["-b", "1", "--mixed-mining", "--slots-in-an-epoch", "1"]
+#docker_cmd_params = ["-b", "1", "--mixed-mining", "--slots-in-an-epoch", "1"]
 image = "ghcr.io/foundry-rs/foundry:latest"
 port = "8545"
 type = "anvil"
@@ -14,7 +14,7 @@ type = "anvil"
 [[blockchains]]
 container_name = "binance-smart-chain"
 chain_id = "56"
-docker_cmd_params = ["-b", "1", "--mixed-mining", "--slots-in-an-epoch", "1"]
+#docker_cmd_params = ["-b", "1", "--mixed-mining", "--slots-in-an-epoch", "1"]
 image = "ghcr.io/foundry-rs/foundry:latest"
 port = "8555"
 type = "anvil"
