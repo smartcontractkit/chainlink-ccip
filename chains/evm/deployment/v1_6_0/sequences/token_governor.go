@@ -26,6 +26,34 @@ import (
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/erc20"
 )
 
+// Role represents a valid role string for TokenGovernor
+type Role string
+
+// Valid role constants for TokenGovernor
+const (
+	RoleMinter             Role = "minter"
+	RoleBridgeMinterBurner Role = "bridge_minter_or_burner"
+	RoleBurner             Role = "burner"
+	RoleFreezer            Role = "freezer"
+	RoleUnfreezer          Role = "unfreezer"
+	RolePauser             Role = "pauser"
+	RoleUnpauser           Role = "unpauser"
+	RoleRecovery           Role = "recovery"
+	RoleCheckerAdmin       Role = "checker_admin"
+	RoleDefaultAdmin       Role = "default_admin"
+)
+
+// IsValid checks if the role is a valid TokenGovernor role
+func (r Role) IsValid() bool {
+	switch r {
+	case RoleMinter, RoleBridgeMinterBurner, RoleBurner, RoleFreezer, RoleUnfreezer,
+		RolePauser, RoleUnpauser, RoleRecovery, RoleCheckerAdmin, RoleDefaultAdmin:
+		return true
+	default:
+		return false
+	}
+}
+
 // DeployTokenGovernorInput is the input for deploying a TokenGovernor contract
 type DeployTokenGovernorInput struct {
 	Token               string      `yaml:"token" json:"token"`
@@ -35,20 +63,6 @@ type DeployTokenGovernorInput struct {
 	// below are not specified by the user, filled in by the deployment system to pass to chain operations
 	ChainSelector     uint64
 	ExistingDataStore datastore.DataStore
-}
-
-// ValidRoles lists all valid role strings for TokenGovernor
-var ValidRoles = []string{
-	"minter",
-	"bridge_minter_or_burner",
-	"burner",
-	"freezer",
-	"unfreezer",
-	"pauser",
-	"unpauser",
-	"recovery",
-	"checker_admin",
-	"default_admin",
 }
 
 // TokenGovernorGrantRole represents a role assignment to an account

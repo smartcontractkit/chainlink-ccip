@@ -118,9 +118,9 @@ func grantRoleVerify() func(cldf.Environment, sequences.TokenGovernorRoleInput) 
 				if roleConfig.Role == "" {
 					return fmt.Errorf("role must be provided for token %s on chain %d", tokenSymbol, chainSelector)
 				}
-				// Validate the role string
-				if !isValidRole(roleConfig.Role) {
-					return fmt.Errorf("invalid role '%s' for token %s on chain %d. Valid roles: %v", roleConfig.Role, tokenSymbol, chainSelector, sequences.ValidRoles)
+				// Validate the role string using the Role type
+				if !sequences.Role(roleConfig.Role).IsValid() {
+					return fmt.Errorf("invalid role '%s' for token %s on chain %d", roleConfig.Role, tokenSymbol, chainSelector)
 				}
 				if roleConfig.Account == (common.Address{}) {
 					return fmt.Errorf("account address must be provided for token %s on chain %d", tokenSymbol, chainSelector)
@@ -129,16 +129,6 @@ func grantRoleVerify() func(cldf.Environment, sequences.TokenGovernorRoleInput) 
 		}
 		return nil
 	}
-}
-
-// isValidRole checks if the given role string is valid
-func isValidRole(role string) bool {
-	for _, validRole := range sequences.ValidRoles {
-		if role == validRole {
-			return true
-		}
-	}
-	return false
 }
 
 // RevokeRoleChangeset returns a changeset that revokes a role from an account on the TokenGovernor contract

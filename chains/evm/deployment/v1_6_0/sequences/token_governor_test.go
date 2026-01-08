@@ -677,12 +677,16 @@ func TestGetRoleFromTokenGovernor(t *testing.T) {
 	require.NoError(t, err, "Failed to create TokenGovernor binding")
 
 	// Test all valid roles
-	for _, role := range ValidRoles {
-		t.Run(role, func(t *testing.T) {
-			roleBytes, err := GetRoleFromTokenGovernor(t.Context(), tg, role)
+	allRoles := []Role{
+		RoleMinter, RoleBridgeMinterBurner, RoleBurner, RoleFreezer, RoleUnfreezer,
+		RolePauser, RoleUnpauser, RoleRecovery, RoleCheckerAdmin, RoleDefaultAdmin,
+	}
+	for _, role := range allRoles {
+		t.Run(string(role), func(t *testing.T) {
+			roleBytes, err := GetRoleFromTokenGovernor(t.Context(), tg, string(role))
 			require.NoError(t, err, "Failed to get role %s", role)
 			// Note: DEFAULT_ADMIN_ROLE is 0x00...00 by design in OpenZeppelin's AccessControl
-			if role != "default_admin" {
+			if role != RoleDefaultAdmin {
 				require.NotEqual(t, [32]byte{}, roleBytes, "Role bytes should not be zero for %s", role)
 			}
 			t.Logf("  %s: 0x%x", role, roleBytes)
