@@ -33,13 +33,11 @@ optimizer_runs = 80_000
 via_ir = true
 
 additional_compiler_profiles = [
-    { name = "no-via-ir", via_ir = false },
     { name = "onRamp", optimizer_runs = 5000 },
     { name = "offRamp", optimizer_runs = 30_000 },
     { name = "pools", optimizer_runs = 50_000 },
 ]
 compilation_restrictions = [
-    { paths = "contracts/test/**", via-ir = false },
     { paths = "contracts/onRamp/OnRamp.sol", optimizer_runs = 5000 },
     { paths = "contracts/offRamp/OffRamp.sol", optimizer_runs = 30_000 },
     { paths = "contracts/pools/**", optimizer_runs = 50_000 },

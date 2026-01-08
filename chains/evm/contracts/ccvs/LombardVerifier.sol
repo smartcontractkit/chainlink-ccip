@@ -30,6 +30,7 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
   error InvalidCCVVersion(bytes4 expected, bytes4 actual);
   error TokenNotSupported(address token);
   error MustTransferTokens();
+  error InvalidVerifierResults();
 
   /// @param remoteChainSelector CCIP selector of destination chain.
   /// @param lChainId The chain id of destination chain by Lombard Multi Chain Id conversion.
@@ -79,8 +80,8 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
   /// @notice The address of bridge contract.
   IBridgeV3 public immutable i_bridge;
 
-  /// @notice Set of supported tokens for cross-chain transfers. Even if an adapter is used, the source token must be
-  /// added to the supported tokens set, not the adapter.
+  /// @notice Mapping of supported tokens to adapters, where adapters may be address(0). Even if an adapter is used, the
+  /// source token must be added to the supported tokens set.
   EnumerableMap.AddressToAddressMap internal s_supportedTokens;
   /// @notice Set of supported chains for cross-chain transfers.
   EnumerableSet.UintSet internal s_supportedChains;
@@ -209,13 +210,24 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
       revert InvalidCCVVersion(VERSION_TAG_V1_7_0, versionPrefix);
     }
 
+    if (ccvData.length < PAYLOAD_START_INDEX) {
+      revert InvalidVerifierResults();
+    }
     uint256 rawPayloadLength = uint16(bytes2(ccvData[VERSION_TAG_SIZE:PAYLOAD_START_INDEX]));
-    bytes calldata rawPayload = ccvData[PAYLOAD_START_INDEX:PAYLOAD_START_INDEX + rawPayloadLength];
+
+    if (ccvData.length < PAYLOAD_START_INDEX + rawPayloadLength + RAW_PAYLOAD_LENGTH_SIZE) {
+      revert InvalidVerifierResults();
+    }
 
     uint256 proofDataStartIndex = PAYLOAD_START_INDEX + rawPayloadLength;
+    bytes calldata rawPayload = ccvData[PAYLOAD_START_INDEX:proofDataStartIndex];
 
     uint256 proofLength = uint16(bytes2(ccvData[proofDataStartIndex:proofDataStartIndex + RAW_PAYLOAD_LENGTH_SIZE]));
     uint256 proofStartIndex = proofDataStartIndex + RAW_PAYLOAD_LENGTH_SIZE;
+
+    if (ccvData.length < proofStartIndex + proofLength) {
+      revert InvalidVerifierResults();
+    }
     bytes calldata proof = ccvData[proofStartIndex:proofStartIndex + proofLength];
 
     (, bool executed, bytes memory bridgedMessage) = IMailbox(i_bridge.mailbox()).deliverAndHandle(rawPayload, proof);
@@ -266,8 +278,15 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
   ) external onlyOwner {
     for (uint256 i = 0; i < tokensToRemove.length; ++i) {
       address tokenToRemove = tokensToRemove[i];
+      address adapter = s_supportedTokens.get(tokenToRemove);
+
       if (s_supportedTokens.remove(tokenToRemove)) {
-        IERC20(tokenToRemove).approve(address(i_bridge), 0);
+        // Reset bridge allowance for either the adapter or the token.
+        if (adapter != address(0)) {
+          IERC20(adapter).approve(address(i_bridge), 0);
+        } else {
+          IERC20(tokenToRemove).approve(address(i_bridge), 0);
+        }
         emit SupportedTokenRemoved(tokenToRemove);
       }
     }

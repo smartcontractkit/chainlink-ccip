@@ -24,6 +24,7 @@ contract CCTPThroughCCVTokenPool is TokenPool, ITypeAndVersion, AuthorizedCaller
   string public constant override typeAndVersion = "CCTPThroughCCVTokenPool 1.7.0-dev";
 
   error IPoolV1NotSupported();
+  error CCVNotSetOnResolver(address resolver);
 
   /// @notice The CCTP verifier.
   ICrossChainVerifierResolver internal immutable i_cctpVerifier;
@@ -119,6 +120,10 @@ contract CCTPThroughCCVTokenPool is TokenPool, ITypeAndVersion, AuthorizedCaller
     TokenTransferFeeConfig memory transferFeeConfig = s_tokenTransferFeeConfig[destChainSelector];
 
     address verifierImpl = i_cctpVerifier.getOutboundImplementation(destChainSelector, "");
+    if (verifierImpl == address(0)) {
+      revert CCVNotSetOnResolver(address(i_cctpVerifier));
+    }
+
     CCTPVerifier.DynamicConfig memory dynamicConfig = CCTPVerifier(verifierImpl).getDynamicConfig();
     transferFeeConfig.customBlockConfirmationTransferFeeBps = dynamicConfig.fastFinalityBps;
 
