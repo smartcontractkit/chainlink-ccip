@@ -144,11 +144,11 @@ func FundNodeEIP1559(ctx context.Context, c *ethclient.Client, pkey, recipientAd
 	if err != nil {
 		return err
 	}
-	err = c.SendTransaction(context.Background(), signedTx)
+	err = c.SendTransaction(ctx, signedTx)
 	if err != nil {
 		return err
 	}
-	if _, err := bind.WaitMined(context.Background(), c, signedTx); err != nil {
+	if _, err := bind.WaitMined(ctx, c, signedTx); err != nil {
 		return err
 	}
 	l.Info().Str("Wei", amountWei.String()).Msg("Funded with ETH")

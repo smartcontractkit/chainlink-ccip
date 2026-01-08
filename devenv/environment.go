@@ -14,13 +14,14 @@ import (
 	"github.com/pelletier/go-toml/v2"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	devenvcommon "github.com/smartcontractkit/chainlink-ccip/devenv/common"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	capabilities_registry "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/clclient"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/jd"
+
+	devenvcommon "github.com/smartcontractkit/chainlink-ccip/devenv/common"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
@@ -80,7 +81,16 @@ type Cfg struct {
 	// appended to the generated node configuration. This is useful for testnets/mainnets
 	// where you need to customize settings like FinalityDepth, LogPollInterval, etc.
 	// The overrides are applied AFTER the auto-generated config, so they take precedence.
-	NodeConfigOverrides string `toml:"node_config_overrides"`
+	NodeConfigOverrides string           `toml:"node_config_overrides"`
+	ForkedEnvConfig     *ForkedEnvConfig `toml:"forked_env_config"`
+}
+
+type ForkedEnvConfig struct {
+	ForkURLs          map[string]string `toml:"fork_urls_by_chain_id"`
+	ForkBlockNumbers  map[string]uint64 `toml:"fork_block_numbers_by_chain_id"`
+	HomeChainSelector uint64            `toml:"home_chain_selector"`
+	CLDRootPath       string            `toml:"cld_root_path"`
+	CLDEnvironment    string            `toml:"cld_environment"`
 }
 
 func checkKeys(in *Cfg) error {
