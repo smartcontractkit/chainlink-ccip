@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.20;
 
 import {Client} from "../libraries/Client.sol";
 import {MessageV1Codec} from "../libraries/MessageV1Codec.sol";
