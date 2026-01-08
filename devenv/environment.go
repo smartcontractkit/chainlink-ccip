@@ -76,6 +76,11 @@ type Cfg struct {
 	NodeSets           []*ns.Input         `toml:"nodesets"              validate:"required"`
 	CLNodesFundingETH  float64             `toml:"cl_nodes_funding_eth"`
 	CLNodesFundingLink float64             `toml:"cl_nodes_funding_link"`
+	// NodeConfigOverrides allows users to provide custom TOML configuration that will be
+	// appended to the generated node configuration. This is useful for testnets/mainnets
+	// where you need to customize settings like FinalityDepth, LogPollInterval, etc.
+	// The overrides are applied AFTER the auto-generated config, so they take precedence.
+	NodeConfigOverrides string `toml:"node_config_overrides"`
 }
 
 func checkKeys(in *Cfg) error {
@@ -154,9 +159,27 @@ func NewEnvironment() (*Cfg, error) {
 		}
 		clChainConfigs = append(clChainConfigs, clChainConfig)
 	}
-	allConfigs := strings.Join(clChainConfigs, "\n")
+	generatedConfigs := strings.Join(clChainConfigs, "\n")
+
+	// Apply configs to nodes, preserving user overrides
+	// Order of precedence (later overrides earlier):
+	// 1. Generated configs (common + chain-specific)
+	// 2. Top-level NodeConfigOverrides from Cfg
+	// 3. Per-node TestConfigOverrides from node specs
 	for _, nodeSpec := range in.NodeSets[0].NodeSpecs {
-		nodeSpec.Node.TestConfigOverrides = allConfigs
+		configParts := []string{generatedConfigs}
+
+		// Add top-level user overrides if provided
+		if in.NodeConfigOverrides != "" {
+			configParts = append(configParts, in.NodeConfigOverrides)
+		}
+
+		// Preserve per-node overrides if they were provided in the config file
+		if nodeSpec.Node.TestConfigOverrides != "" {
+			configParts = append(configParts, nodeSpec.Node.TestConfigOverrides)
+		}
+
+		nodeSpec.Node.TestConfigOverrides = strings.Join(configParts, "\n")
 	}
 	Plog.Info().Msg("Nodes network configuration is generated")
 
@@ -191,13 +214,26 @@ func NewEnvironment() (*Cfg, error) {
 	if err != nil {
 		return nil, fmt.Errorf("connecting to CL nodes: %w", err)
 	}
+
+	// Pass funding amounts as-is (in native units like ETH, SOL, TON)
+	// Each chain implementation handles its own unit conversion:
+	// - EVM: ETH -> wei (×10^18)
+	// - Solana: SOL -> lamports (×10^9)
+	// - TON: TON -> nanotons (×10^9)
+	// Using big.Int with the integer part; fractional units handled by each impl
+	nativeAmount := big.NewInt(int64(in.CLNodesFundingETH))
+	linkAmount := big.NewInt(int64(in.CLNodesFundingLink))
+
 	// deploy all the contracts
 	for i, impl := range impls {
+		// Create node key bundles for this chain type
 		nkb, err := devenvcommon.CreateNodeKeysBundle(allNodeClients, in.Blockchains[i].Type, in.Blockchains[i].ChainID)
 		if err != nil {
 			return nil, fmt.Errorf("creating node keys bundle: %w", err)
 		}
-		err = impl.FundNodes(ctx, in.NodeSets, nkb, in.Blockchains[i], big.NewInt(1), big.NewInt(5))
+
+		// Fund nodes with native token
+		err = impl.FundNodes(ctx, in.NodeSets, nkb, in.Blockchains[i], linkAmount, nativeAmount)
 		if err != nil {
 			return nil, fmt.Errorf("funding nodes: %w", err)
 		}
@@ -257,7 +293,7 @@ func NewEnvironment() (*Cfg, error) {
 	}
 
 	// connect all the contracts together (on-ramps, off-ramps)
-	for i, _ := range impls {
+	for i := range impls {
 		var family string
 		switch in.Blockchains[i].Type {
 		case "anvil", "geth":
