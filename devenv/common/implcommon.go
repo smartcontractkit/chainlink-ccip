@@ -73,6 +73,8 @@ func DeployContractsForSelector(ctx context.Context, env *deployment.Environment
 				GasForCallExactCheck:                    uint16(5000),
 				// TON SPECIFIC CONFIG
 				ContractVersion: contractVersion,
+				// PING PONG DEMO - deploy for cross-chain testing
+				DeployPingPongDapp: true,
 			},
 		},
 	})
@@ -174,6 +176,12 @@ func ConnectContractsWithSelectors(ctx context.Context, e *deployment.Environmen
 		if err != nil {
 			return fmt.Errorf("connecting chains %d and %d: %w", chainA.Selector, chainB.Selector, err)
 		}
+	}
+
+	// Configure PingPong contracts (silently skips chains that don't support it)
+	err := lanesapi.ConfigurePingPongForLanes(*e, lanesapi.GetPingPongAdapterRegistry(), version, selector, remoteSelectors)
+	if err != nil {
+		return fmt.Errorf("configuring PingPong for selector %d: %w", selector, err)
 	}
 
 	return nil

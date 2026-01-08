@@ -2,15 +2,20 @@ package sequences
 
 import (
 	"github.com/Masterminds/semver/v3"
+	"github.com/ethereum/go-ethereum/common"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
+	pingpongdapp "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/ping_pong_dapp"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
+	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	ccipapi "github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
@@ -22,6 +27,7 @@ func init() {
 		panic(err)
 	}
 	ccipapi.GetLaneAdapterRegistry().RegisterLaneAdapter(chain_selectors.FamilyEVM, v, &EVMAdapter{})
+	ccipapi.GetPingPongAdapterRegistry().RegisterPingPongAdapter(chain_selectors.FamilyEVM, v, &EVMAdapter{})
 	deployops.GetRegistry().RegisterDeployer(chain_selectors.FamilyEVM, v, &EVMAdapter{})
 	deployops.GetTransferOwnershipRegistry().RegisterAdapter(chain_selectors.FamilyEVM, v, &EVMAdapter{})
 }
@@ -89,3 +95,50 @@ func (a *EVMAdapter) GetRouterAddress(ds datastore.DataStore, chainSelector uint
 	}
 	return addr, nil
 }
+
+func (a *EVMAdapter) GetPingPongDemoAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error) {
+	addr, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
+		ChainSelector: chainSelector,
+		Type:          datastore.ContractType(pingpongdapp.ContractType),
+		Version:       pingpongdapp.Version,
+	}, chainSelector, evm_datastore_utils.ToByteArray)
+	if err != nil {
+		return nil, err
+	}
+	return addr, nil
+}
+
+// ConfigurePingPong returns a sequence that configures PingPong for a lane.
+func (a *EVMAdapter) ConfigurePingPong() *operations.Sequence[ccipapi.PingPongInput, ccipapi.PingPongOutput, cldf_chain.BlockChains] {
+	return ConfigurePingPongSequence
+}
+
+// ConfigurePingPongSequence is the sequence for configuring PingPong between two EVM chains.
+var ConfigurePingPongSequence = operations.NewSequence(
+	"ConfigurePingPong",
+	semver.MustParse("1.0.0"),
+	"Configures PingPong counterpart for a lane between two chains",
+	func(b operations.Bundle, chains cldf_chain.BlockChains, input ccipapi.PingPongInput) (ccipapi.PingPongOutput, error) {
+		b.Logger.Infof("EVM Configuring PingPong counterpart. src: %d, dest: %d", input.SourceSelector, input.DestSelector)
+
+		chain := chains.EVMChains()[input.SourceSelector]
+
+		// CCIP requires addresses to be 32-byte left-padded for cross-chain messaging
+		paddedDestAddr := common.LeftPadBytes(input.DestPingPongAddr, 32)
+
+		_, err := operations.ExecuteOperation(b, pingpongdapp.SetCounterpart, chain, contract.FunctionInput[pingpongdapp.SetCounterpartArgs]{
+			ChainSelector: input.SourceSelector,
+			Address:       common.BytesToAddress(input.SourcePingPongAddr),
+			Args: pingpongdapp.SetCounterpartArgs{
+				CounterpartChainSelector: input.DestSelector,
+				CounterpartAddress:       paddedDestAddr,
+			},
+		})
+		if err != nil {
+			return ccipapi.PingPongOutput{}, err
+		}
+
+		b.Logger.Infof("PingPong counterpart set for lane %d -> %d", input.SourceSelector, input.DestSelector)
+		return ccipapi.PingPongOutput{}, nil
+	},
+)
