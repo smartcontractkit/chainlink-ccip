@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -80,7 +81,7 @@ func GetRoleFromTokenGovernor(ctx context.Context, tokenGovernor *tg_bindings.To
 		return [32]byte{}, errors.New("token governor is nil")
 	}
 
-	switch role {
+	switch strings.ToLower(role) {
 	case "minter":
 		r, err := tokenGovernor.MINTERROLE(&bind.CallOpts{Context: ctx})
 		if err != nil {
