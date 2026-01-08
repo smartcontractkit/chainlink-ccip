@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gagliardetto/solana-go"
 	"github.com/rs/zerolog"
+	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/rmn_home"
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
@@ -140,6 +141,27 @@ func DeployContractsForSelector(ctx context.Context, env *deployment.Environment
 	return runningDS.Seal(), nil
 }
 
+// getTokenPricesForChain returns the token prices for fee tokens on a chain.
+// Uses the optional TokenPriceProvider interface - only chains that implement it (like EVM) provide prices.
+func getTokenPricesForChain(ds datastore.DataStore, selector uint64, version *semver.Version) map[string]*big.Int {
+	family, err := chain_selectors.GetSelectorFamily(selector)
+	if err != nil {
+		return make(map[string]*big.Int)
+	}
+
+	adapter, exists := lanesapi.GetLaneAdapterRegistry().GetLaneAdapter(family, version)
+	if !exists {
+		return make(map[string]*big.Int)
+	}
+
+	// Check if adapter implements TokenPriceProvider (optional interface)
+	if priceProvider, ok := adapter.(lanesapi.TokenPriceProvider); ok {
+		return priceProvider.GetDefaultTokenPrices(ds, selector)
+	}
+
+	return make(map[string]*big.Int)
+}
+
 func ConnectContractsWithSelectors(ctx context.Context, e *deployment.Environment, selector uint64, remoteSelectors []uint64) error {
 	l := zerolog.Ctx(ctx)
 	l.Info().Uint64("FromSelector", selector).Any("ToSelectors", remoteSelectors).Msg("Connecting contracts with selectors")
@@ -152,16 +174,25 @@ func ConnectContractsWithSelectors(ctx context.Context, e *deployment.Environmen
 
 	mcmsRegistry := changesetscore.GetRegistry()
 	version := semver.MustParse("1.6.0")
+
+	// Get token prices for the source chain - uses the LaneAdapter for chain-specific logic
+	chainATokenPrices := getTokenPricesForChain(e.DataStore, selector, version)
+
 	chainA := lanesapi.ChainDefinition{
 		Selector:                 selector,
 		GasPrice:                 lanesapi.DefaultGasPrice(selector),
 		FeeQuoterDestChainConfig: lanesapi.DefaultFeeQuoterDestChainConfig(true, selector),
+		TokenPrices:              chainATokenPrices,
 	}
 	for _, destSelector := range remoteSelectors {
+		// Get token prices for the destination chain - uses the LaneAdapter for chain-specific logic
+		chainBTokenPrices := getTokenPricesForChain(e.DataStore, destSelector, version)
+
 		chainB := lanesapi.ChainDefinition{
 			Selector:                 destSelector,
 			GasPrice:                 lanesapi.DefaultGasPrice(destSelector),
 			FeeQuoterDestChainConfig: lanesapi.DefaultFeeQuoterDestChainConfig(true, destSelector),
+			TokenPrices:              chainBTokenPrices,
 		}
 		_, err := lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.ConnectChainsConfig{
 			Lanes: []lanesapi.LaneConfig{
