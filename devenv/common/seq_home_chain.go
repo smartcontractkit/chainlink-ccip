@@ -6,14 +6,16 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
+	mcms_types "github.com/smartcontractkit/mcms/types"
+
+	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	capabilities_registry "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	cciphomeops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/ccip_home"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/ccip_home"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
-	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
-	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	capabilities_registry "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
 )
 
 var CCIPHomeABI *abi.ABI
@@ -263,9 +265,9 @@ var ApplyChainConfigUpdatesSequence = operations.NewSequence(
 		if len(currentBatch.RemoteChainRemoves) > 0 || len(currentBatch.RemoteChainAdds) > 0 {
 			batches = append(batches, currentBatch)
 		}
-
+		writes := make([]contract.WriteOutput, 0)
 		for _, batch := range batches {
-			_, err := operations.ExecuteOperation(
+			out, err := operations.ExecuteOperation(
 				b,
 				cciphomeops.ApplyChainConfigUpdates,
 				deps.HomeChain,
@@ -278,9 +280,15 @@ var ApplyChainConfigUpdatesSequence = operations.NewSequence(
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute ApplyChainConfigUpdatesOp on CCIPHome: %w", err)
 			}
+			writes = append(writes, out.Output)
 		}
-
-		return sequences.OnChainOutput{}, nil
+		batch, err := contract.NewBatchOperationFromWrites(writes)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
+		}
+		return sequences.OnChainOutput{
+			BatchOps: []mcms_types.BatchOperation{batch},
+		}, nil
 	})
 
 func maybeSaveCurrentBatch(

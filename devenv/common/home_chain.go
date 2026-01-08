@@ -15,14 +15,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gagliardetto/solana-go"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
-	evmseqs "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/ccip_home"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/rmn_home"
-	solanaSeqs "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
-	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
-	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -37,6 +29,17 @@ import (
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"github.com/xssnick/tonutils-go/address"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
+	evmseqs "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/ccip_home"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/rmn_home"
+	solanaSeqs "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
 type ChainConfig struct {
@@ -49,6 +52,7 @@ type UpdateChainConfigConfig struct {
 	HomeChainSelector  uint64                 `json:"homeChainSelector"`
 	RemoteChainRemoves []uint64               `json:"remoteChainRemoves"`
 	RemoteChainAdds    map[uint64]ChainConfig `json:"remoteChainAdds"`
+	MCMS               mcms.Input             `json:"mcmsConfig"`
 }
 
 var UpdateChainConfig = deployment.CreateChangeSet(applyUpdateChainConfig, validateUpdateChainConfig)
@@ -110,7 +114,7 @@ func applyUpdateChainConfig(e deployment.Environment, cfg UpdateChainConfigConfi
 			ChainConfig:   chainConfig,
 		})
 	}
-	_, err = operations.ExecuteSequence(
+	result, err := operations.ExecuteSequence(
 		e.OperationsBundle,
 		ApplyChainConfigUpdatesSequence,
 		DONSequenceDeps{
@@ -123,7 +127,11 @@ func applyUpdateChainConfig(e deployment.Environment, cfg UpdateChainConfigConfi
 			BatchSize:          4, // Conservative batch size to avoid exceeding gas limits (TODO: Make this configurable)
 		},
 	)
-	return deployment.ChangesetOutput{}, err
+	mcmsReg := mcms.getMCMSRegistry(e, cfg.HomeChainSelector
+	return changesets.NewOutputBuilder(e, mcmsRegistry).
+		WithReports(result.ExecutionReports).
+		WithBatchOps(result.Output.BatchOps).
+		Build(cfg.MCMS)
 }
 
 func isChainConfigEqual(a, b ccip_home.CCIPHomeChainConfig) bool {
