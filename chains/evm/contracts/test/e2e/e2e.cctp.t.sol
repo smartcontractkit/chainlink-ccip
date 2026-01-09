@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.24;
 
 import {IRouter} from "../../interfaces/IRouter.sol";
 import {ITokenMessenger} from "../../pools/USDC/interfaces/ITokenMessenger.sol";
@@ -67,7 +67,8 @@ contract cctp_e2e is OnRampSetup {
         localChainSelector: DEST_CHAIN_SELECTOR,
         gasForCallExactCheck: GAS_FOR_CALL_EXACT_CHECK,
         rmnRemote: s_mockRMNRemote,
-        tokenAdminRegistry: address(s_tokenAdminRegistry)
+        tokenAdminRegistry: address(s_tokenAdminRegistry),
+        maxGasBufferToUpdateState: DEFAULT_MAX_GAS_BUFFER_TO_UPDATE_STATE
       })
     );
 

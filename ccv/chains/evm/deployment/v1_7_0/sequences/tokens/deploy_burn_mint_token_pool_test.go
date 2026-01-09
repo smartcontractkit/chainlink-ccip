@@ -8,14 +8,16 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/advanced_pool_hooks"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/burn_mint_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc677"
+	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
 	seq_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -27,12 +29,12 @@ import (
 func TestDeployTokenPool(t *testing.T) {
 	tests := []struct {
 		desc        string
-		makeInput   func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc677.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) tokens.DeployTokenPoolInput
+		makeInput   func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) tokens.DeployTokenPoolInput
 		expectedErr string
 	}{
 		{
 			desc: "happy path",
-			makeInput: func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc677.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) tokens.DeployTokenPoolInput {
+			makeInput: func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) tokens.DeployTokenPoolInput {
 				var rmnProxyAddress common.Address
 				var routerAddress common.Address
 				for _, addr := range chainReport.Output.Addresses {
@@ -46,16 +48,14 @@ func TestDeployTokenPool(t *testing.T) {
 				return tokens.DeployTokenPoolInput{
 					ChainSel:                         chainReport.Input.ChainSelector,
 					TokenPoolType:                    datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
-					TokenPoolVersion:                 semver.MustParse("1.7.0"),
+					TokenPoolVersion:                 burn_mint_token_pool.Version,
 					TokenSymbol:                      tokenReport.Input.Args.Symbol,
 					RateLimitAdmin:                   common.HexToAddress("0x01"),
 					ThresholdAmountForAdditionalCCVs: big.NewInt(1e18),
+					FeeAggregator:                    common.HexToAddress("0x03"),
 					ConstructorArgs: tokens.ConstructorArgs{
 						Token:    common.HexToAddress(tokenReport.Output.Address),
 						Decimals: 18,
-						Allowlist: []common.Address{
-							common.HexToAddress("0x02"),
-						},
 						RMNProxy: rmnProxyAddress,
 						Router:   routerAddress,
 					},
@@ -63,43 +63,9 @@ func TestDeployTokenPool(t *testing.T) {
 			},
 			expectedErr: "",
 		},
-		/* TODO @kylesmartin: Enable when the lockbox is finalized
-		{
-			desc: "happy path with lock release token pool",
-			makeInput: func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc677.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) tokens.DeployTokenPoolInput {
-				var rmnProxyAddress common.Address
-				var routerAddress common.Address
-				for _, addr := range chainReport.Output.Addresses {
-					if addr.Type == datastore.ContractType(rmn_proxy.ContractType) {
-						rmnProxyAddress = common.HexToAddress(addr.Address)
-					}
-					if addr.Type == datastore.ContractType(router.ContractType) {
-						routerAddress = common.HexToAddress(addr.Address)
-					}
-				}
-				return tokens.DeployTokenPoolInput{
-					ChainSel:         chainReport.Input.ChainSelector,
-					TokenPoolType:    datastore.ContractType(lock_release_token_pool.ContractType),
-					TokenPoolVersion: semver.MustParse("1.7.0"),
-					TokenSymbol:      tokenReport.Input.Args.Symbol,
-					RateLimitAdmin:   common.HexToAddress("0x01"),
-					ConstructorArgs: tokens.ConstructorArgs{
-						Token:              common.HexToAddress(tokenReport.Output.Address),
-						LocalTokenDecimals: 18,
-						Allowlist: []common.Address{
-							common.HexToAddress("0x02"),
-						},
-						RMNProxy: rmnProxyAddress,
-						Router:   routerAddress,
-					},
-				}
-			},
-			expectedErr: "",
-		},
-		*/
 		{
 			desc: "incorrect chain selector",
-			makeInput: func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc677.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) tokens.DeployTokenPoolInput {
+			makeInput: func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) tokens.DeployTokenPoolInput {
 				return tokens.DeployTokenPoolInput{
 					ChainSel: 1,
 				}
@@ -108,7 +74,7 @@ func TestDeployTokenPool(t *testing.T) {
 		},
 		{
 			desc: "token symbol not defined",
-			makeInput: func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc677.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) tokens.DeployTokenPoolInput {
+			makeInput: func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) tokens.DeployTokenPoolInput {
 				return tokens.DeployTokenPoolInput{
 					ChainSel: chainReport.Input.ChainSelector,
 				}
@@ -117,7 +83,7 @@ func TestDeployTokenPool(t *testing.T) {
 		},
 		{
 			desc: "token pool type not defined",
-			makeInput: func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc677.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) tokens.DeployTokenPoolInput {
+			makeInput: func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) tokens.DeployTokenPoolInput {
 				return tokens.DeployTokenPoolInput{
 					ChainSel:    chainReport.Input.ChainSelector,
 					TokenSymbol: tokenReport.Input.Args.Symbol,
@@ -127,7 +93,7 @@ func TestDeployTokenPool(t *testing.T) {
 		},
 		{
 			desc: "token pool version not defined",
-			makeInput: func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc677.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) tokens.DeployTokenPoolInput {
+			makeInput: func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) tokens.DeployTokenPoolInput {
 				return tokens.DeployTokenPoolInput{
 					ChainSel:      chainReport.Input.ChainSelector,
 					TokenSymbol:   tokenReport.Input.Args.Symbol,
@@ -138,24 +104,24 @@ func TestDeployTokenPool(t *testing.T) {
 		},
 		{
 			desc: "token address not defined",
-			makeInput: func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc677.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) tokens.DeployTokenPoolInput {
+			makeInput: func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) tokens.DeployTokenPoolInput {
 				return tokens.DeployTokenPoolInput{
 					ChainSel:         chainReport.Input.ChainSelector,
 					TokenSymbol:      tokenReport.Input.Args.Symbol,
 					TokenPoolType:    datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
-					TokenPoolVersion: semver.MustParse("1.7.0"),
+					TokenPoolVersion: burn_mint_token_pool.Version,
 				}
 			},
 			expectedErr: "token address must be defined",
 		},
 		{
 			desc: "rmn proxy address not defined",
-			makeInput: func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc677.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) tokens.DeployTokenPoolInput {
+			makeInput: func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) tokens.DeployTokenPoolInput {
 				return tokens.DeployTokenPoolInput{
 					ChainSel:         chainReport.Input.ChainSelector,
 					TokenSymbol:      tokenReport.Input.Args.Symbol,
 					TokenPoolType:    datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
-					TokenPoolVersion: semver.MustParse("1.7.0"),
+					TokenPoolVersion: burn_mint_token_pool.Version,
 					ConstructorArgs: tokens.ConstructorArgs{
 						Token: common.HexToAddress(tokenReport.Output.Address),
 					},
@@ -165,7 +131,7 @@ func TestDeployTokenPool(t *testing.T) {
 		},
 		{
 			desc: "router address not defined",
-			makeInput: func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc677.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) tokens.DeployTokenPoolInput {
+			makeInput: func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) tokens.DeployTokenPoolInput {
 				var rmnProxyAddress common.Address
 				for _, addr := range chainReport.Output.Addresses {
 					if addr.Type == datastore.ContractType(rmn_proxy.ContractType) {
@@ -176,7 +142,7 @@ func TestDeployTokenPool(t *testing.T) {
 					ChainSel:         chainReport.Input.ChainSelector,
 					TokenSymbol:      tokenReport.Input.Args.Symbol,
 					TokenPoolType:    datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
-					TokenPoolVersion: semver.MustParse("1.7.0"),
+					TokenPoolVersion: burn_mint_token_pool.Version,
 					ConstructorArgs: tokens.ConstructorArgs{
 						Token:    common.HexToAddress(tokenReport.Output.Address),
 						RMNProxy: rmnProxyAddress,
@@ -187,7 +153,7 @@ func TestDeployTokenPool(t *testing.T) {
 		},
 		{
 			desc: "threshold amount for additional ccvs not defined",
-			makeInput: func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc677.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) tokens.DeployTokenPoolInput {
+			makeInput: func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) tokens.DeployTokenPoolInput {
 				var rmnProxyAddress common.Address
 				var routerAddress common.Address
 				for _, addr := range chainReport.Output.Addresses {
@@ -202,7 +168,7 @@ func TestDeployTokenPool(t *testing.T) {
 					ChainSel:         chainReport.Input.ChainSelector,
 					TokenSymbol:      tokenReport.Input.Args.Symbol,
 					TokenPoolType:    datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
-					TokenPoolVersion: semver.MustParse("1.7.0"),
+					TokenPoolVersion: burn_mint_token_pool.Version,
 					ConstructorArgs: tokens.ConstructorArgs{
 						Token:    common.HexToAddress(tokenReport.Output.Address),
 						RMNProxy: rmnProxyAddress,
@@ -223,6 +189,14 @@ func TestDeployTokenPool(t *testing.T) {
 			require.NotNil(t, e, "Environment should be created")
 
 			// Deploy chain
+			create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+				TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
+				ChainSelector:  chainSel,
+				Args: create2_factory.ConstructorArgs{
+					AllowList: []common.Address{e.BlockChains.EVMChains()[chainSel].DeployerKey.From},
+				},
+			}, nil)
+			require.NoError(t, err, "Failed to deploy CREATE2Factory")
 			chainReport, err := operations.ExecuteSequence(
 				e.OperationsBundle,
 				sequences.DeployChainContracts,
@@ -230,6 +204,7 @@ func TestDeployTokenPool(t *testing.T) {
 				sequences.DeployChainContractsInput{
 					ChainSelector:  chainSel,
 					ContractParams: testsetup.CreateBasicContractParams(),
+					CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
 				},
 			)
 			require.NoError(t, err, "ExecuteSequence should not error")
@@ -237,16 +212,14 @@ func TestDeployTokenPool(t *testing.T) {
 			// Deploy token
 			tokenReport, err := operations.ExecuteOperation(
 				e.OperationsBundle,
-				burn_mint_erc677.Deploy,
+				burn_mint_erc20_with_drip.Deploy,
 				e.BlockChains.EVMChains()[chainSel],
-				contract.DeployInput[burn_mint_erc677.ConstructorArgs]{
+				contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs]{
 					ChainSelector:  chainSel,
-					TypeAndVersion: deployment.NewTypeAndVersion(burn_mint_erc677.ContractType, *semver.MustParse("1.0.0")),
-					Args: burn_mint_erc677.ConstructorArgs{
-						Name:      "Test Token",
-						Symbol:    "TEST",
-						Decimals:  18,
-						MaxSupply: big.NewInt(1_000_000),
+					TypeAndVersion: deployment.NewTypeAndVersion(burn_mint_erc20_with_drip.ContractType, *burn_mint_erc20_with_drip.Version),
+					Args: burn_mint_erc20_with_drip.ConstructorArgs{
+						Name:   "Test Token",
+						Symbol: "TEST",
 					},
 				},
 			)
@@ -323,24 +296,6 @@ func TestDeployTokenPool(t *testing.T) {
 			)
 			require.NoError(t, err, "ExecuteOperation should not error")
 			require.Equal(t, input.ThresholdAmountForAdditionalCCVs, getThresholdAmountReport.Output, "Expected threshold amount for additional ccvs to be the same as the inputted threshold amount for additional ccvs")
-
-			// Check allowlist
-			getAllowlistReport, err := operations.ExecuteOperation(
-				testsetup.BundleWithFreshReporter(e.OperationsBundle),
-				advanced_pool_hooks.GetAllowList,
-				e.BlockChains.EVMChains()[chainSel],
-				contract.FunctionInput[any]{
-					ChainSelector: chainSel,
-					Address:       common.HexToAddress(hooksAddress),
-				},
-			)
-			require.NoError(t, err, "ExecuteOperation should not error")
-			for _, addr := range input.ConstructorArgs.Allowlist {
-				require.Contains(t, getAllowlistReport.Output, addr, "Expected inputted allowlist address to be in the on-chain allowlist")
-			}
-			for _, addr := range getAllowlistReport.Output {
-				require.Contains(t, input.ConstructorArgs.Allowlist, addr, "Expected on-chain allowlist address to be in the inputted allowlist")
-			}
 		})
 	}
 }

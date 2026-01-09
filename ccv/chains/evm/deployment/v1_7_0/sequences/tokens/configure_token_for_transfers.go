@@ -16,7 +16,7 @@ import (
 )
 
 var ConfigureTokenForTransfers = cldf_ops.NewSequence(
-	"configure-token",
+	"configure-token-for-transfers",
 	semver.MustParse("1.7.0"),
 	"Configures a token on an EVM chain for usage with CCIP",
 	func(b cldf_ops.Bundle, chains chain.BlockChains, input tokens.ConfigureTokenForTransfersInput) (output sequences.OnChainOutput, err error) {
@@ -38,7 +38,7 @@ var ConfigureTokenForTransfers = cldf_ops.NewSequence(
 		configureMinBlockConfirmationReport, err := cldf_ops.ExecuteOperation(b, token_pool.SetMinBlockConfirmation, chain, evm_contract.FunctionInput[uint16]{
 			ChainSelector: input.ChainSelector,
 			Address:       common.HexToAddress(input.TokenPoolAddress),
-			Args:          input.FinalityValue,
+			Args:          input.MinFinalityValue,
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to configure minimum block confirmation for token pool with address %s on %s: %w", input.TokenPoolAddress, chain, err)

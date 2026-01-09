@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {FeeTokenHandler} from "../../../../libraries/FeeTokenHandler.sol";
-import {USDCTokenPoolProxy} from "../../../../pools/USDC/USDCTokenPoolProxy.sol";
 import {USDCTokenPoolProxySetup} from "./USDCTokenPoolProxySetup.t.sol";
 
 import {FactoryBurnMintERC20} from "../../../../tokenAdminRegistry/TokenPoolFactory/FactoryBurnMintERC20.sol";
@@ -74,7 +73,7 @@ contract USDCTokenPoolProxy_withdrawFeeTokens is USDCTokenPoolProxySetup {
     address[] memory feeTokens = new address[](1);
     feeTokens[0] = address(s_feeToken1);
 
-    vm.expectRevert(USDCTokenPoolProxy.AddressCannotBeZero.selector);
+    vm.expectRevert(FeeTokenHandler.ZeroAddressNotAllowed.selector);
     s_usdcTokenPoolProxy.withdrawFeeTokens(feeTokens);
   }
 }

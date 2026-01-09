@@ -3,15 +3,20 @@ package testsetup
 import (
 	"math/big"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/committee_verifier"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/executor"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/committee_verifier"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/executor"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/mock_receiver"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/offramp"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/onramp"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 )
 
 // CreateBasicFeeQuoterDestChainConfig creates a basic fee quoter dest chain config with reasonable defaults for testing
@@ -69,6 +74,13 @@ func CreateBasicTokenTransferFeeConfig() tokens.TokenTransferFeeConfig {
 
 // CreateRateLimiterConfig creates a rate limiter config
 func CreateRateLimiterConfig(rate int64, capacity int64) tokens.RateLimiterConfig {
+	if rate == 0 && capacity == 0 {
+		return tokens.RateLimiterConfig{
+			IsEnabled: false,
+			Rate:      big.NewInt(0),
+			Capacity:  big.NewInt(0),
+		}
+	}
 	return tokens.RateLimiterConfig{
 		IsEnabled: true,
 		Rate:      big.NewInt(rate),
@@ -83,28 +95,29 @@ func CreateBasicContractParams() sequences.ContractParams {
 
 	return sequences.ContractParams{
 		RMNRemote: sequences.RMNRemoteParams{
-			Version: semver.MustParse("1.6.0"),
+			Version: rmn_remote.Version,
 		},
 		OffRamp: sequences.OffRampParams{
-			Version:              semver.MustParse("1.7.0"),
-			GasForCallExactCheck: 5_000,
+			Version:                   offramp.Version,
+			GasForCallExactCheck:      5_000,
+			MaxGasBufferToUpdateState: 12_000,
 		},
 		CommitteeVerifiers: []sequences.CommitteeVerifierParams{
 			{
-				Version:          semver.MustParse("1.7.0"),
+				Version:          committee_verifier.Version,
 				FeeAggregator:    common.HexToAddress("0x01"),
 				StorageLocations: []string{"https://test.chain.link.fake"},
 				Qualifier:        "alpha",
 			},
 		},
 		OnRamp: sequences.OnRampParams{
-			Version:               semver.MustParse("1.7.0"),
+			Version:               onramp.Version,
 			FeeAggregator:         common.HexToAddress("0x01"),
 			MaxUSDCentsPerMessage: 100_00, // 100.00 USD
 		},
 		Executors: []sequences.ExecutorParams{
 			{
-				Version:       semver.MustParse("1.7.0"),
+				Version:       executor.Version,
 				MaxCCVsPerMsg: 10,
 				DynamicConfig: executor.SetDynamicConfigArgs{
 					FeeAggregator:         common.HexToAddress("0x01"),
@@ -114,7 +127,7 @@ func CreateBasicContractParams() sequences.ContractParams {
 				Qualifier: "default",
 			},
 			{
-				Version:       semver.MustParse("1.7.0"),
+				Version:       executor.Version,
 				MaxCCVsPerMsg: 10,
 				DynamicConfig: executor.SetDynamicConfigArgs{
 					FeeAggregator:         common.HexToAddress("0x01"),
@@ -125,7 +138,7 @@ func CreateBasicContractParams() sequences.ContractParams {
 			},
 		},
 		FeeQuoter: sequences.FeeQuoterParams{
-			Version:                        semver.MustParse("1.7.0"),
+			Version:                        fee_quoter.Version,
 			MaxFeeJuelsPerMsg:              big.NewInt(0).Mul(big.NewInt(2e2), big.NewInt(1e18)),
 			LINKPremiumMultiplierWeiPerEth: 9e17, // 0.9 ETH
 			WETHPremiumMultiplierWeiPerEth: 1e18, // 1.0 ETH
@@ -134,12 +147,12 @@ func CreateBasicContractParams() sequences.ContractParams {
 		},
 		MockReceivers: []sequences.MockReceiverParams{
 			{
-				Version: semver.MustParse("1.7.0"),
+				Version: mock_receiver.Version,
 				RequiredVerifiers: []datastore.AddressRef{
 					{
 						// ChainSelector we don't know here but should still work.
 						Type:      datastore.ContractType(committee_verifier.ContractType),
-						Version:   semver.MustParse("1.7.0"),
+						Version:   committee_verifier.Version,
 						Qualifier: "alpha",
 					},
 				},

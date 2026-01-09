@@ -61,9 +61,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     bytes returnData
   );
   event SourceChainConfigSet(uint64 indexed sourceChainSelector, SourceChainConfigArgs sourceConfig);
-
-  // 5k for updating the state + 5k for the event and misc costs.
-  uint256 internal constant MAX_GAS_BUFFER_TO_UPDATE_STATE = 5000 + 5000 + 2000;
+  event MaxGasBufferToUpdateStateUpdated(uint32 oldMaxGasBufferToUpdateState, uint32 newMaxGasBufferToUpdateState);
 
   /// @dev Struct that contains the static configuration. The individual components are stored as immutable variables.
   // solhint-disable-next-line gas-struct-packing
@@ -71,7 +69,8 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     uint64 localChainSelector; // ──╮ Local chainSelector
     uint16 gasForCallExactCheck; // │ Gas for call exact check
     IRMNRemote rmnRemote; // ───────╯ RMN Verification Contract
-    address tokenAdminRegistry; // Token admin registry address
+    address tokenAdminRegistry; // ────────╮ Token admin registry address
+    uint32 maxGasBufferToUpdateState; // ──╯ Max Gas Buffer to Update State
   }
 
   /// @dev Per-chain source config (defining a lane from a Source Chain -> Dest OffRamp).
@@ -109,6 +108,9 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// We include this in the offRamp so that we can redeploy to adjust it should a hardfork change the gas costs of
   /// relevant opcodes in callWithExactGas.
   uint16 internal immutable i_gasForCallExactCheck;
+  /// @notice Gas buffer to update state.
+  // Example, 5k for updating the state + 5k for the event and misc costs.
+  uint32 internal immutable i_maxGasBufferToUpdateState;
 
   // At the top to pack it with the `owner` variable from Ownable2StepMsgSender.
   bool private s_reentrancyGuardEntered;
@@ -143,11 +145,15 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     if (staticConfig.gasForCallExactCheck == 0) {
       revert GasCannotBeZero();
     }
+    if (staticConfig.maxGasBufferToUpdateState == 0) {
+      revert GasCannotBeZero();
+    }
 
     i_chainSelector = staticConfig.localChainSelector;
     i_rmnRemote = staticConfig.rmnRemote;
     i_tokenAdminRegistry = staticConfig.tokenAdminRegistry;
     i_gasForCallExactCheck = staticConfig.gasForCallExactCheck;
+    i_maxGasBufferToUpdateState = staticConfig.maxGasBufferToUpdateState;
 
     emit StaticConfigSet(staticConfig);
   }
@@ -158,6 +164,10 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
 
   /// @notice Returns the current execution state of a message.
   /// @return executionState The current execution state of the message.
+  /// @dev The execution state `FAILURE` cannot be relied upon to mean that the message execution failed due to an error
+  /// in the message processing. It can also have failed due to an incorrect `execute` call. Providing incorrect proofs
+  /// would also lead to a FAILURE state, even though the message itself might be valid, and may have valid proofs
+  /// available.
   function getExecutionState(
     bytes32 messageId
   ) public view returns (Internal.MessageExecutionState) {
@@ -177,8 +187,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     if (s_reentrancyGuardEntered) revert ReentrancyGuardReentrantCall();
     s_reentrancyGuardEntered = true;
 
-    MessageV1Codec.MessageV1 memory message =
-      _beforeExecuteSingleMessage(MessageV1Codec._decodeMessageV1(encodedMessage));
+    MessageV1Codec.MessageV1 memory message = MessageV1Codec._decodeMessageV1(encodedMessage);
 
     if (i_rmnRemote.isCursed(bytes16(uint128(message.sourceChainSelector)))) {
       revert CursedByRMN(message.sourceChainSelector);
@@ -237,6 +246,10 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     s_reentrancyGuardEntered = false;
   }
 
+  /// @notice Calls a function with gas left minus a buffer to update state. This is done to capture out-of-gas errors
+  /// and still be able to update the message state accordingly.
+  /// @param payload The payload to call.
+  /// @dev The target of the call it always address(this).
   function _callWithGasBuffer(
     bytes memory payload
   ) internal returns (bool success, bytes memory retData) {
@@ -245,11 +258,11 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     uint16 maxReturnBytes = Internal.MAX_RET_BYTES;
 
     uint256 gasLeft = gasleft();
-    if (gasLeft <= MAX_GAS_BUFFER_TO_UPDATE_STATE) {
+    if (gasLeft <= i_maxGasBufferToUpdateState) {
       revert InsufficientGasToCompleteTx(bytes4(uint32(gasleft())));
     }
 
-    uint256 gasLimit = gasLeft - MAX_GAS_BUFFER_TO_UPDATE_STATE;
+    uint256 gasLimit = gasLeft - i_maxGasBufferToUpdateState;
 
     assembly {
       // Call and return whether we succeeded.
@@ -269,10 +282,14 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
 
   /// @notice Executes a single message.
   /// @param message The message that will be executed.
-  /// @dev We make this external and callable by the contract itself, in order to try/catch
-  /// its execution and enforce atomicity among successful message processing and token transfer.
+  /// @param messageId The ID of the message.
+  /// @param ccvs CCVs that attested to the message.
+  /// @param verifierResults CCV-specific data used to verify the message. Must be same length as ccvs array.
+  /// @param gasLimitOverride Gas limit override for the CCIP receive call.
+  /// @dev We make this external and callable by the contract itself, in order to try/catch its execution and enforce
+  /// atomicity among successful message processing and token transfer.
   /// @dev We use ERC-165 to check for the ccipReceive interface to permit sending tokens to contracts, for example
-  /// smart contract wallets, without an associated message.
+  /// smart contract wallets, without calling the receiver contract.
   function executeSingleMessage(
     MessageV1Codec.MessageV1 calldata message,
     bytes32 messageId,
@@ -476,13 +493,16 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       (requiredReceiverCCVs, optionalCCVs, optionalThreshold) = _getCCVsFromReceiver(sourceChainSelector, receiver);
     }
 
-    address[] memory laneMandatedCCVs = s_sourceChainConfigs[sourceChainSelector].laneMandatedCCVs;
+    address[] storage laneMandatedCCVs = s_sourceChainConfigs[sourceChainSelector].laneMandatedCCVs;
     address[] storage defaultCCVs = s_sourceChainConfigs[sourceChainSelector].defaultCCVs;
 
+    // Save lengths in memory to avoid multiple storage reads. This is safe as the logic below does not modify the arrays.
+    uint256 laneMandatedCCVsLength = laneMandatedCCVs.length;
+    uint256 defaultCCVsLength = defaultCCVs.length;
+
     // We allocate the memory for all possible CCVs upfront to avoid multiple allocations.
-    address[] memory allRequiredCCVs = new address[](
-      requiredReceiverCCVs.length + requiredPoolCCVs.length + laneMandatedCCVs.length + defaultCCVs.length
-    );
+    address[] memory allRequiredCCVs =
+      new address[](requiredReceiverCCVs.length + requiredPoolCCVs.length + laneMandatedCCVsLength + defaultCCVsLength);
 
     uint256 index = 0;
     for (uint256 i = 0; i < requiredReceiverCCVs.length; ++i) {
@@ -493,15 +513,14 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       allRequiredCCVs[index++] = requiredPoolCCVs[i];
     }
 
-    for (uint256 i = 0; i < laneMandatedCCVs.length; ++i) {
+    for (uint256 i = 0; i < laneMandatedCCVsLength; ++i) {
       allRequiredCCVs[index++] = laneMandatedCCVs[i];
     }
 
     // Add defaults if any address(0) was found.
     for (uint256 i = 0; i < index; ++i) {
       if (allRequiredCCVs[i] == address(0)) {
-        uint256 numberOfDefaults = defaultCCVs.length;
-        for (uint256 j = 0; j < numberOfDefaults; ++j) {
+        for (uint256 j = 0; j < defaultCCVsLength; ++j) {
           allRequiredCCVs[index++] = defaultCCVs[j];
         }
         // Break to ensure they're only added once.
@@ -798,7 +817,8 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       localChainSelector: i_chainSelector,
       gasForCallExactCheck: i_gasForCallExactCheck,
       rmnRemote: i_rmnRemote,
-      tokenAdminRegistry: i_tokenAdminRegistry
+      tokenAdminRegistry: i_tokenAdminRegistry,
+      maxGasBufferToUpdateState: i_maxGasBufferToUpdateState
     });
   }
 
@@ -879,14 +899,5 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
 
       emit SourceChainConfigSet(configUpdate.sourceChainSelector, configUpdate);
     }
-  }
-
-  /// @notice hook for applying custom logic to the input message before executeSingleMessage()
-  /// @param message initial message
-  /// @return transformedMessage modified message
-  function _beforeExecuteSingleMessage(
-    MessageV1Codec.MessageV1 memory message
-  ) internal view virtual returns (MessageV1Codec.MessageV1 memory transformedMessage) {
-    return message;
   }
 }

@@ -35,6 +35,8 @@ type Role struct {
 	Name string
 }
 
+var MCMSVersion *semver.Version = semver.MustParse("1.0.0")
+
 type OpDeployTimelockInput struct {
 	TimelockMinDelay *big.Int         `json:"timelockMinDelay"`
 	Admin            common.Address   `json:"admin"`
@@ -82,11 +84,11 @@ type OwnershipTranferable interface {
 
 var OpDeployTimelock = contract.NewDeploy(contract.DeployParams[OpDeployTimelockInput]{
 	Name:             "evm-timelock:deploy",
-	Version:          semver.MustParse("1.0.0"),
+	Version:          MCMSVersion,
 	Description:      "Deploys Timelock contract on the specified EVM chain",
 	ContractMetadata: bindings.RBACTimelockMetaData,
 	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
-		cldf_deployment.NewTypeAndVersion(utils.RBACTimelock, *semver.MustParse("1.0.0")).String(): {
+		cldf_deployment.NewTypeAndVersion(utils.RBACTimelock, *MCMSVersion).String(): {
 			EVM: common.FromHex(bindings.RBACTimelockBin),
 		},
 	},
@@ -95,11 +97,11 @@ var OpDeployTimelock = contract.NewDeploy(contract.DeployParams[OpDeployTimelock
 
 var OpDeployBypasserMCM = contract.NewDeploy(contract.DeployParams[struct{}]{
 	Name:             "evm-bypasser-mcm:deploy",
-	Version:          semver.MustParse("1.0.0"),
+	Version:          MCMSVersion,
 	Description:      "Deploys Bypasser MCM contract",
 	ContractMetadata: bindings.ManyChainMultiSigMetaData,
 	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
-		cldf_deployment.NewTypeAndVersion(utils.BypasserManyChainMultisig, *semver.MustParse("1.0.0")).String(): {
+		cldf_deployment.NewTypeAndVersion(utils.BypasserManyChainMultisig, *MCMSVersion).String(): {
 			EVM: common.FromHex(bindings.ManyChainMultiSigBin),
 		},
 	},
@@ -108,11 +110,11 @@ var OpDeployBypasserMCM = contract.NewDeploy(contract.DeployParams[struct{}]{
 
 var OpDeployCancellerMCM = contract.NewDeploy(contract.DeployParams[struct{}]{
 	Name:             "evm-canceller-mcm:deploy",
-	Version:          semver.MustParse("1.0.0"),
+	Version:          MCMSVersion,
 	Description:      "Deploys Canceller MCM contract",
 	ContractMetadata: bindings.ManyChainMultiSigMetaData,
 	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
-		cldf_deployment.NewTypeAndVersion(utils.CancellerManyChainMultisig, *semver.MustParse("1.0.0")).String(): {
+		cldf_deployment.NewTypeAndVersion(utils.CancellerManyChainMultisig, *MCMSVersion).String(): {
 			EVM: common.FromHex(bindings.ManyChainMultiSigBin),
 		},
 	},
@@ -121,11 +123,11 @@ var OpDeployCancellerMCM = contract.NewDeploy(contract.DeployParams[struct{}]{
 
 var OpDeployProposerMCM = contract.NewDeploy(contract.DeployParams[struct{}]{
 	Name:             "evm-proposer-mcm:deploy",
-	Version:          semver.MustParse("1.0.0"),
+	Version:          MCMSVersion,
 	Description:      "Deploys Proposer MCM contract",
 	ContractMetadata: bindings.ManyChainMultiSigMetaData,
 	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
-		cldf_deployment.NewTypeAndVersion(utils.ProposerManyChainMultisig, *semver.MustParse("1.0.0")).String(): {
+		cldf_deployment.NewTypeAndVersion(utils.ProposerManyChainMultisig, *MCMSVersion).String(): {
 			EVM: common.FromHex(bindings.ManyChainMultiSigBin),
 		},
 	},
@@ -134,11 +136,11 @@ var OpDeployProposerMCM = contract.NewDeploy(contract.DeployParams[struct{}]{
 
 var OpDeployCallProxy = contract.NewDeploy(contract.DeployParams[OpDeployCallProxyInput]{
 	Name:             "evm-call-proxy:deploy",
-	Version:          semver.MustParse("1.0.0"),
+	Version:          MCMSVersion,
 	Description:      "Deploys CallProxy contract on the specified EVM chain",
 	ContractMetadata: bindings.CallProxyMetaData,
 	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
-		cldf_deployment.NewTypeAndVersion(utils.CallProxy, *semver.MustParse("1.0.0")).String(): {
+		cldf_deployment.NewTypeAndVersion(utils.CallProxy, *MCMSVersion).String(): {
 			EVM: common.FromHex(bindings.CallProxyBin),
 		},
 	},
@@ -147,7 +149,7 @@ var OpDeployCallProxy = contract.NewDeploy(contract.DeployParams[OpDeployCallPro
 
 var OpEVMSetConfigMCM = contract.NewWrite(contract.WriteParams[OpSetConfigMCMInput, *bindings.ManyChainMultiSig]{
 	Name:            "evm-mcm-set-config",
-	Version:         semver.MustParse("1.0.0"),
+	Version:         MCMSVersion,
 	Description:     "Sets Config on the deployed MCM contract",
 	ContractABI:     bindings.ManyChainMultiSigABI,
 	ContractType:    "ManyChainMultiSig",
@@ -168,7 +170,7 @@ var OpEVMSetConfigMCM = contract.NewWrite(contract.WriteParams[OpSetConfigMCMInp
 
 var OpGrantRoleTimelock = contract.NewWrite(contract.WriteParams[OpGrantRoleTimelockInput, *bindings.RBACTimelock]{
 	Name:         "evm-timelock-grant-role",
-	Version:      semver.MustParse("1.0.0"),
+	Version:      MCMSVersion,
 	Description:  "Grants role on the deployed Timelock contract",
 	ContractABI:  bindings.RBACTimelockABI,
 	ContractType: "RBACTimelock",
@@ -194,7 +196,7 @@ var OpGrantRoleTimelock = contract.NewWrite(contract.WriteParams[OpGrantRoleTime
 
 var OpTransferOwnership = operations.NewOperation(
 	"evm-transfer-ownership",
-	semver.MustParse("1.0.0"),
+	MCMSVersion,
 	"Transfer ownership of an ownable contract to the specified address",
 	func(b operations.Bundle, deps OpEVMOwnershipDeps, in OpTransferOwnershipInput) (contract.WriteOutput, error) {
 		currentOwner, err := deps.OwnableC.Owner(&bind.CallOpts{
@@ -272,7 +274,7 @@ var OpTransferOwnership = operations.NewOperation(
 
 var OpAcceptOwnership = operations.NewOperation(
 	"evm-accept-ownership",
-	semver.MustParse("1.0.0"),
+	MCMSVersion,
 	"Accepts ownership of an ownable contract Via the Timelock contract",
 	func(b operations.Bundle, deps OpEVMOwnershipDeps, in OpTransferOwnershipInput) (contract.WriteOutput, error) {
 		var opts *bind.TransactOpts

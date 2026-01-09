@@ -160,7 +160,7 @@ func (ca *CurseAdapter) Uncurse() *cldf_ops.Sequence[api.CurseInput, sequences.O
 func routerAddressOnChain(e cldf.Environment, selector uint64) (common.Address, error) {
 	routerRef := datastore.AddressRef{
 		Type:    datastore.ContractType(routerops.ContractType),
-		Version: semver.MustParse("1.2.0"),
+		Version: routerops.Version,
 	}
 	routerAddrRef, err := datastore_utils.FindAndFormatRef(e.DataStore, routerRef, selector, evmds.ToEVMAddress)
 	if err != nil {
@@ -173,7 +173,7 @@ func routerAddressOnChain(e cldf.Environment, selector uint64) (common.Address, 
 func rmnAddressOnChain(e cldf.Environment, selector uint64) (common.Address, error) {
 	rmnRef := datastore.AddressRef{
 		Type:    datastore.ContractType(ops.ContractType),
-		Version: semver.MustParse("1.6.0"),
+		Version: ops.Version,
 	}
 	rmnAddrRef, err := datastore_utils.FindAndFormatRef(e.DataStore, rmnRef, selector, evmds.ToEVMAddress)
 	if err != nil {

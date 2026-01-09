@@ -3,7 +3,6 @@ package changesets_test
 import (
 	"testing"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/committee_verifier"
@@ -23,7 +22,7 @@ import (
 
 func basicDeployCommitteeVerifierParams() sequences.CommitteeVerifierParams {
 	return sequences.CommitteeVerifierParams{
-		Version:          semver.MustParse("1.7.0"),
+		Version:          committee_verifier.Version,
 		FeeAggregator:    common.HexToAddress("0x02"),
 		AllowlistAdmin:   common.HexToAddress("0x03"),
 		StorageLocations: []string{"https://test.chain.link.fake"},
@@ -40,7 +39,7 @@ func TestDeployCommitteeVerifier_VerifyPreconditions(t *testing.T) {
 	rmnAddressRef := datastore.AddressRef{
 		ChainSelector: 5009297550715157269,
 		Type:          datastore.ContractType(rmn.ContractType),
-		Version:       semver.MustParse("1.7.0"),
+		Version:       rmn.Version,
 		Address:       common.HexToAddress("0x01").Hex(),
 	}
 	err = ds.Addresses().Add(rmnAddressRef)
@@ -88,17 +87,17 @@ func TestDeployCommitteeVerifier_Apply_MultipleQualifiersOnSameChain(t *testing.
 	fqAddressRef := datastore.AddressRef{
 		ChainSelector: 5009297550715157269,
 		Type:          datastore.ContractType(fee_quoter.ContractType),
-		Version:       semver.MustParse("1.7.0"),
+		Version:       fee_quoter.Version,
 		Address:       common.HexToAddress("0x01").Hex(),
 	}
 	rmnAddressRef := datastore.AddressRef{
 		ChainSelector: 5009297550715157269,
 		Type:          datastore.ContractType(rmn.ContractType),
-		Version:       semver.MustParse("1.7.0"),
+		Version:       rmn.Version,
 		Address:       common.HexToAddress("0x02").Hex(),
 	}
 	create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[5009297550715157269], contract_utils.DeployInput[create2_factory.ConstructorArgs]{
-		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
+		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *create2_factory.Version),
 		ChainSelector:  5009297550715157269,
 		Args: create2_factory.ConstructorArgs{
 			AllowList: []common.Address{e.BlockChains.EVMChains()[5009297550715157269].DeployerKey.From},

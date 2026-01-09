@@ -11,7 +11,8 @@ contract OffRamp_constructor is BaseTest {
       localChainSelector: DEST_CHAIN_SELECTOR,
       gasForCallExactCheck: 5000,
       rmnRemote: s_mockRMNRemote,
-      tokenAdminRegistry: address(0x123)
+      tokenAdminRegistry: address(0x123),
+      maxGasBufferToUpdateState: DEFAULT_MAX_GAS_BUFFER_TO_UPDATE_STATE
     });
 
     vm.expectEmit();
@@ -24,6 +25,7 @@ contract OffRamp_constructor is BaseTest {
     assertEq(returnedConfig.gasForCallExactCheck, config.gasForCallExactCheck);
     assertEq(address(returnedConfig.rmnRemote), address(config.rmnRemote));
     assertEq(returnedConfig.tokenAdminRegistry, config.tokenAdminRegistry);
+    assertEq(returnedConfig.maxGasBufferToUpdateState, DEFAULT_MAX_GAS_BUFFER_TO_UPDATE_STATE);
   }
 
   function test_constructor_RevertWhen_ZeroAddressNotAllowed_RMNRemote() public {
@@ -31,7 +33,8 @@ contract OffRamp_constructor is BaseTest {
       localChainSelector: DEST_CHAIN_SELECTOR,
       gasForCallExactCheck: 5000,
       rmnRemote: IRMNRemote(address(0)),
-      tokenAdminRegistry: address(0x123)
+      tokenAdminRegistry: address(0x123),
+      maxGasBufferToUpdateState: DEFAULT_MAX_GAS_BUFFER_TO_UPDATE_STATE
     });
 
     vm.expectRevert(OffRamp.ZeroAddressNotAllowed.selector);
@@ -43,7 +46,8 @@ contract OffRamp_constructor is BaseTest {
       localChainSelector: DEST_CHAIN_SELECTOR,
       gasForCallExactCheck: 5000,
       rmnRemote: s_mockRMNRemote,
-      tokenAdminRegistry: address(0)
+      tokenAdminRegistry: address(0),
+      maxGasBufferToUpdateState: DEFAULT_MAX_GAS_BUFFER_TO_UPDATE_STATE
     });
 
     vm.expectRevert(OffRamp.ZeroAddressNotAllowed.selector);
@@ -52,7 +56,11 @@ contract OffRamp_constructor is BaseTest {
 
   function test_constructor_RevertWhen_ZeroChainSelectorNotAllowed() public {
     OffRamp.StaticConfig memory config = OffRamp.StaticConfig({
-      localChainSelector: 0, gasForCallExactCheck: 5000, rmnRemote: s_mockRMNRemote, tokenAdminRegistry: address(0x123)
+      localChainSelector: 0,
+      gasForCallExactCheck: 5000,
+      rmnRemote: s_mockRMNRemote,
+      tokenAdminRegistry: address(0x123),
+      maxGasBufferToUpdateState: DEFAULT_MAX_GAS_BUFFER_TO_UPDATE_STATE
     });
 
     vm.expectRevert(OffRamp.ZeroChainSelectorNotAllowed.selector);
@@ -64,9 +72,15 @@ contract OffRamp_constructor is BaseTest {
       localChainSelector: DEST_CHAIN_SELECTOR,
       gasForCallExactCheck: 0,
       rmnRemote: s_mockRMNRemote,
-      tokenAdminRegistry: address(0x123)
+      tokenAdminRegistry: address(0x123),
+      maxGasBufferToUpdateState: DEFAULT_MAX_GAS_BUFFER_TO_UPDATE_STATE
     });
 
+    vm.expectRevert(OffRamp.GasCannotBeZero.selector);
+    new OffRamp(config);
+
+    config.gasForCallExactCheck = 1;
+    config.maxGasBufferToUpdateState = 0;
     vm.expectRevert(OffRamp.GasCannotBeZero.selector);
     new OffRamp(config);
   }

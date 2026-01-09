@@ -4,17 +4,21 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/advanced_pool_hooks"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	seq_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
+	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
+	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	seq_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
-	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
-	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	"github.com/stretchr/testify/require"
 )
 
 func TestConfigurePool(t *testing.T) {
@@ -28,13 +32,9 @@ func TestConfigurePool(t *testing.T) {
 			makeInput: func(tokenAndPoolReport operations.SequenceReport[tokens.DeployTokenAndPoolInput, seq_core.OnChainOutput]) tokens.ConfigureTokenPoolInput {
 				threshold := big.NewInt(123)
 				return tokens.ConfigureTokenPoolInput{
-					ChainSelector:     tokenAndPoolReport.Input.DeployTokenPoolInput.ChainSel,
-					TokenPoolAddress:  common.HexToAddress(tokenAndPoolReport.Output.Addresses[1].Address),
-					AdvancedPoolHooks: common.HexToAddress(tokenAndPoolReport.Output.Addresses[2].Address),
-					AllowList: []common.Address{
-						common.HexToAddress("0x07"),
-						common.HexToAddress("0x08"),
-					},
+					ChainSelector:                    tokenAndPoolReport.Input.DeployTokenPoolInput.ChainSel,
+					TokenPoolAddress:                 common.HexToAddress(tokenAndPoolReport.Output.Addresses[1].Address),
+					AdvancedPoolHooks:                common.HexToAddress(tokenAndPoolReport.Output.Addresses[2].Address),
 					RouterAddress:                    common.HexToAddress("0x09"),
 					ThresholdAmountForAdditionalCCVs: threshold,
 					RateLimitAdmin:                   common.HexToAddress("0x10"),
@@ -53,6 +53,14 @@ func TestConfigurePool(t *testing.T) {
 			require.NotNil(t, e, "Environment should be created")
 
 			// Deploy chain
+			create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+				TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
+				ChainSelector:  chainSel,
+				Args: create2_factory.ConstructorArgs{
+					AllowList: []common.Address{e.BlockChains.EVMChains()[chainSel].DeployerKey.From},
+				},
+			}, nil)
+			require.NoError(t, err, "Failed to deploy CREATE2Factory")
 			chainReport, err := operations.ExecuteSequence(
 				e.OperationsBundle,
 				sequences.DeployChainContracts,
@@ -60,6 +68,7 @@ func TestConfigurePool(t *testing.T) {
 				sequences.DeployChainContractsInput{
 					ChainSelector:  chainSel,
 					ContractParams: testsetup.CreateBasicContractParams(),
+					CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
 				},
 			)
 			require.NoError(t, err, "ExecuteSequence should not error")
@@ -69,7 +78,7 @@ func TestConfigurePool(t *testing.T) {
 				e.OperationsBundle,
 				tokens.DeployTokenAndPool,
 				e.BlockChains.EVMChains()[chainSel],
-				basicDeployTokenAndPoolInput(chainReport),
+				basicDeployTokenAndPoolInput(chainReport, false),
 			)
 			require.NoError(t, err, "ExecuteSequence should not error")
 
@@ -105,24 +114,6 @@ func TestConfigurePool(t *testing.T) {
 			require.NoError(t, err, "ExecuteOperation should not error")
 			require.Equal(t, input.RouterAddress, getDynamicConfigReport.Output.Router, "Expected router address to be the same as the deployed router")
 			require.Equal(t, input.RateLimitAdmin, getDynamicConfigReport.Output.RateLimitAdmin, "Expected rate limit admin address to be the same as the inputted rate limit admin")
-
-			// Check allowlist
-			getAllowlistReport, err := operations.ExecuteOperation(
-				testsetup.BundleWithFreshReporter(e.OperationsBundle),
-				advanced_pool_hooks.GetAllowList,
-				e.BlockChains.EVMChains()[chainSel],
-				contract.FunctionInput[any]{
-					ChainSelector: chainSel,
-					Address:       input.AdvancedPoolHooks,
-				},
-			)
-			require.NoError(t, err, "ExecuteOperation should not error")
-			for _, addr := range input.AllowList {
-				require.Contains(t, getAllowlistReport.Output, addr, "Expected inputted allowlist address to be in the on-chain allowlist")
-			}
-			for _, addr := range getAllowlistReport.Output {
-				require.Contains(t, input.AllowList, addr, "Expected on-chain allowlist address to be in the inputted allowlist")
-			}
 		})
 	}
 }

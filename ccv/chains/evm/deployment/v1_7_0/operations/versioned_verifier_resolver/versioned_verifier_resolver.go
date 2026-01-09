@@ -5,12 +5,16 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/cctp_verifier"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/versioned_verifier_resolver"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
 
 var ContractType cldf_deployment.ContractType = "VersionedVerifierResolver"
+
+var Version = semver.MustParse("1.7.0")
 
 type InboundImplementationArgs = versioned_verifier_resolver.VersionedVerifierResolverInboundImplementationArgs
 
@@ -20,9 +24,27 @@ type AcceptOwnershipArgs struct {
 	IsProposedOwner bool
 }
 
+type ConstructorArgs struct{}
+
+var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
+	Name:             "versioned-verifier-resolver:deploy",
+	Version:          Version,
+	Description:      "Deploys the VersionedVerifierResolver contract",
+	ContractMetadata: versioned_verifier_resolver.VersionedVerifierResolverMetaData,
+	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
+		cldf_deployment.NewTypeAndVersion(cctp_verifier.ResolverType, *Version).String(): {
+			EVM: common.FromHex(versioned_verifier_resolver.VersionedVerifierResolverBin),
+		},
+		cldf_deployment.NewTypeAndVersion(committee_verifier.ResolverType, *Version).String(): {
+			EVM: common.FromHex(versioned_verifier_resolver.VersionedVerifierResolverBin),
+		},
+	},
+	Validate: func(ConstructorArgs) error { return nil },
+})
+
 var ApplyInboundImplementationUpdates = contract.NewWrite(contract.WriteParams[[]InboundImplementationArgs, *versioned_verifier_resolver.VersionedVerifierResolver]{
 	Name:            "versioned-verifier-resolver:apply-inbound-implementation-updates",
-	Version:         semver.MustParse("1.7.0"),
+	Version:         Version,
 	Description:     "Updates verifier implementations for inbound traffic",
 	ContractType:    ContractType,
 	ContractABI:     versioned_verifier_resolver.VersionedVerifierResolverABI,
@@ -36,7 +58,7 @@ var ApplyInboundImplementationUpdates = contract.NewWrite(contract.WriteParams[[
 
 var ApplyOutboundImplementationUpdates = contract.NewWrite(contract.WriteParams[[]OutboundImplementationArgs, *versioned_verifier_resolver.VersionedVerifierResolver]{
 	Name:            "versioned-verifier-resolver:apply-outbound-implementation-updates",
-	Version:         semver.MustParse("1.7.0"),
+	Version:         Version,
 	Description:     "Updates verifier implementations for outbound traffic",
 	ContractType:    ContractType,
 	ContractABI:     versioned_verifier_resolver.VersionedVerifierResolverABI,
@@ -50,7 +72,7 @@ var ApplyOutboundImplementationUpdates = contract.NewWrite(contract.WriteParams[
 
 var AcceptOwnership = contract.NewWrite(contract.WriteParams[AcceptOwnershipArgs, *versioned_verifier_resolver.VersionedVerifierResolver]{
 	Name:         "versioned-verifier-resolver:accept-ownership",
-	Version:      semver.MustParse("1.7.0"),
+	Version:      Version,
 	Description:  "Accept ownership of the versioned verifier resolver",
 	ContractType: ContractType,
 	ContractABI:  versioned_verifier_resolver.VersionedVerifierResolverABI,

@@ -5,17 +5,21 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/executor"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/fee_quoter"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/offramp"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/onramp"
+
+	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	mcms_types "github.com/smartcontractkit/mcms/types"
+
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
-	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
-	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	mcms_types "github.com/smartcontractkit/mcms/types"
+
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/executor"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/offramp"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/onramp"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/proxy"
 )
 
 var ConfigureChainForLanes = cldf_ops.NewSequence(
@@ -74,7 +78,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 				BaseExecutionGasCost: remoteConfig.BaseExecutionGasCost,
 				DefaultCCVs:          defaultOutboundCCVs,
 				LaneMandatedCCVs:     laneMandatedOutboundCCVs,
-				DefaultExecutor:      common.HexToAddress(remoteConfig.DefaultExecutor),
+				DefaultExecutor:      common.HexToAddress(remoteConfig.DefaultExecutor), // The proxy address
 				OffRamp:              remoteConfig.OffRamp,
 			})
 			feeQuoterArgs = append(feeQuoterArgs, fee_quoter.DestChainConfigArgs{
@@ -94,10 +98,17 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 				OffRamp:             common.HexToAddress(input.OffRamp),
 			})
 			defaultExecutor := common.HexToAddress(remoteConfig.DefaultExecutor)
-			if destChainSelectorsPerExecutor[defaultExecutor] == nil {
-				destChainSelectorsPerExecutor[defaultExecutor] = []executor.RemoteChainConfigArgs{}
+			getTargetReport, err := cldf_ops.ExecuteOperation(b, proxy.GetTarget, chain, contract.FunctionInput[any]{
+				ChainSelector: chain.Selector,
+				Address:       defaultExecutor,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get target address of Executor(%s) on chain %s: %w", defaultExecutor, chain, err)
 			}
-			destChainSelectorsPerExecutor[defaultExecutor] = append(destChainSelectorsPerExecutor[defaultExecutor], executor.RemoteChainConfigArgs{
+			if destChainSelectorsPerExecutor[getTargetReport.Output] == nil {
+				destChainSelectorsPerExecutor[getTargetReport.Output] = []executor.RemoteChainConfigArgs{}
+			}
+			destChainSelectorsPerExecutor[getTargetReport.Output] = append(destChainSelectorsPerExecutor[getTargetReport.Output], executor.RemoteChainConfigArgs{
 				DestChainSelector: remoteSelector,
 				Config:            remoteConfig.ExecutorDestChainConfig,
 			})
@@ -126,18 +137,18 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 		writes = append(writes, onRampReport.Output)
 
 		// ApplyDestChainUpdates on each Executor
-		for ExecutorAddr, destChainSelectorsToAdd := range destChainSelectorsPerExecutor {
-			ExecutorReport, err := cldf_ops.ExecuteOperation(b, executor.ApplyDestChainUpdates, chain, contract.FunctionInput[executor.ApplyDestChainUpdatesArgs]{
+		for executorAddr, destChainSelectorsToAdd := range destChainSelectorsPerExecutor {
+			executorReport, err := cldf_ops.ExecuteOperation(b, executor.ApplyDestChainUpdates, chain, contract.FunctionInput[executor.ApplyDestChainUpdatesArgs]{
 				ChainSelector: chain.Selector,
-				Address:       ExecutorAddr,
+				Address:       executorAddr,
 				Args: executor.ApplyDestChainUpdatesArgs{
 					DestChainSelectorsToAdd: destChainSelectorsToAdd,
 				},
 			})
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to apply dest chain config updates to Executor(%s) on chain %s: %w", ExecutorAddr, chain, err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to apply dest chain config updates to Executor(%s) on chain %s: %w", executorAddr, chain, err)
 			}
-			writes = append(writes, ExecutorReport.Output)
+			writes = append(writes, executorReport.Output)
 		}
 
 		// ApplyDestChainConfigUpdates on FeeQuoter

@@ -325,6 +325,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     eventData.verifierBlobs = new bytes[](resolvedExtraArgs.ccvs.length);
 
     // 6. call each verifier.
+
     for (uint256 i = 0; i < resolvedExtraArgs.ccvs.length; ++i) {
       address implAddress = ICrossChainVerifierResolver(resolvedExtraArgs.ccvs[i])
         .getOutboundImplementation(destChainSelector, resolvedExtraArgs.ccvArgs[i]);
@@ -340,6 +341,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     }
 
     // 7. emit event.
+
     emit CCIPMessageSent({
       destChainSelector: destChainSelector,
       sender: originalSender,
@@ -585,6 +587,8 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
   /// @notice Sets the dynamic configuration.
   /// @param dynamicConfig The configuration.
+  /// @dev FeeTokenHandler will revert if feeAggregator is zero when withdrawing fees.
+  /// @dev A zero address fee aggregator is valid, and intentionally reverts calls to withdraw fee tokens.
   function setDynamicConfig(
     DynamicConfig memory dynamicConfig
   ) external onlyOwner {
@@ -593,13 +597,12 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
   /// @notice Internal version of setDynamicConfig to allow for reuse in the constructor.
   /// @param dynamicConfig The configuration.
+  /// @dev FeeTokenHandler will revert if feeAggregator is zero when withdrawing fees.
+  /// @dev A zero address fee aggregator is valid, and intentionally reverts calls to withdraw fee tokens.
   function _setDynamicConfig(
     DynamicConfig memory dynamicConfig
   ) internal {
-    if (
-      dynamicConfig.feeQuoter == address(0) || dynamicConfig.feeAggregator == address(0)
-        || dynamicConfig.reentrancyGuardEntered
-    ) revert InvalidConfig();
+    if (dynamicConfig.feeQuoter == address(0) || dynamicConfig.reentrancyGuardEntered) revert InvalidConfig();
 
     s_dynamicConfig = dynamicConfig;
 
@@ -902,6 +905,9 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     DestChainConfig storage destChainConfig = s_destChainConfigs[destChainSelector];
     if (address(destChainConfig.router) == address(0)) {
       revert DestinationChainNotSupported(destChainSelector);
+    }
+    if (message.tokenAmounts.length > 1) {
+      revert CanOnlySendOneTokenPerMessage();
     }
 
     ExtraArgsCodec.GenericExtraArgsV3 memory resolvedExtraArgs = _parseExtraArgsWithDefaults(

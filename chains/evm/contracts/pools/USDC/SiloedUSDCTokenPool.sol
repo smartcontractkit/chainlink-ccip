@@ -15,8 +15,7 @@ import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/Enumera
 /// @dev The CCTP migration functions have been previously audited. The code has been moved from its own contract
 /// to this, to maximize simplicity. The only difference is that custom balance tracking
 /// has been removed and instead is now inherited from the SiloedLockReleaseTokenPool.
-/// @dev While this technically supports unsiloed chains, as inherited from the parent contract,
-/// it is not recommended to use them. All chains should be siloed, otherwise the chain will not be
+/// @dev All chains should be siloed, otherwise the chain will not be
 /// able to migrate to CCTP in the future, due to the inability to manage the token
 /// balances under CCTP accounting rules defined at:
 /// https://github.com/circlefin/stablecoin-evm/blob/master/doc/bridged_USDC_standard.md
@@ -35,7 +34,7 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
   error ExistingMigrationProposal();
   error NoMigrationProposalPending();
   error ChainAlreadyMigrated(uint64 remoteChainSelector);
-  error TokenLockingNotAllowedAfterMigration(uint64 remoteChainSelector);
+  error InsufficientLiquidity(uint256 availableLiquidity, uint256 requestedAmount);
 
   /// @notice The address of the circle-controlled wallet which will execute a CCTP lane migration
   address internal s_circleUSDCMigrator;
@@ -54,16 +53,14 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
   /// @param advancedPoolHooks Optional advanced pool hooks contract (can be address(0)).
   /// @param rmnProxy The RMN proxy address.
   /// @param router The router address.
-  /// @param lockBox The lock box address used to custody the token.
   constructor(
     IERC20 token,
     uint8 localTokenDecimals,
     address advancedPoolHooks,
     address rmnProxy,
-    address router,
-    address lockBox
+    address router
   )
-    SiloedLockReleaseTokenPool(token, localTokenDecimals, advancedPoolHooks, rmnProxy, router, lockBox)
+    SiloedLockReleaseTokenPool(token, localTokenDecimals, advancedPoolHooks, rmnProxy, router)
     AuthorizedCallers(new address[](0))
   {}
 
@@ -85,8 +82,8 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
 
     uint256 excludedTokens = s_tokensExcludedFromBurn[releaseOrMintIn.remoteChainSelector];
     if (excludedTokens != 0) {
-      // The existence of excluded tokens indicates a migration has occurred on the chain, and that any tokens
-      // being released should come from those excluded tokens reserved for processing inflight messages.
+      // The existence of excluded tokens indicates a migration has been proposed or executed for this chain.
+      // During this period, any tokens being released should come from those excluded tokens reserved for processing inflight messages.
       if (releaseOrMintIn.sourceDenominatedAmount > excludedTokens) {
         revert InsufficientLiquidity(excludedTokens, releaseOrMintIn.sourceDenominatedAmount);
       }
@@ -111,20 +108,6 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
     });
 
     return Pool.ReleaseOrMintOutV1({destinationAmount: releaseOrMintIn.sourceDenominatedAmount});
-  }
-
-  /// @dev This function is overridden to prevent providing liquidity to a chain that has already been migrated, and thus should use CCTP-proper instead of a Lock/Release mechanism.
-  /// @param remoteChainSelector The remote chain selector.
-  /// @param amount The amount of tokens to provide.
-  function _provideLiquidity(
-    uint64 remoteChainSelector,
-    uint256 amount
-  ) internal override {
-    if (s_migratedChains.contains(remoteChainSelector)) {
-      revert TokenLockingNotAllowedAfterMigration(remoteChainSelector);
-    }
-
-    super._provideLiquidity(remoteChainSelector, amount);
   }
 
   // ================================================================
@@ -171,8 +154,6 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
     // Prevent overwriting existing migration proposals until the current one is finished
     if (s_proposedUSDCMigrationChain != 0) revert ExistingMigrationProposal();
     if (s_migratedChains.contains(remoteChainSelector)) revert ChainAlreadyMigrated(remoteChainSelector);
-    if (remoteChainSelector == 0) revert SiloedLockReleaseTokenPool.InvalidChainSelector(0);
-
     s_proposedUSDCMigrationChain = remoteChainSelector;
 
     emit CCTPMigrationProposed(remoteChainSelector);
@@ -229,7 +210,7 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
     s_tokensExcludedFromBurn[remoteChainSelector] += amount;
 
     uint256 burnableAmountAfterExclusion =
-      i_token.balanceOf(address(_getLockBox(remoteChainSelector))) - s_tokensExcludedFromBurn[remoteChainSelector];
+      i_token.balanceOf(address(getLockBox(remoteChainSelector))) - s_tokensExcludedFromBurn[remoteChainSelector];
 
     emit TokensExcludedFromBurn(remoteChainSelector, amount, burnableAmountAfterExclusion);
   }
@@ -255,7 +236,7 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
     uint64 burnChainSelector = s_proposedUSDCMigrationChain;
     if (burnChainSelector == 0) revert NoMigrationProposalPending();
 
-    ILockBox lockBox = _getLockBox(burnChainSelector);
+    ILockBox lockBox = getLockBox(burnChainSelector);
     // Burnable tokens is the total locked minus the amount excluded from burn
     uint256 tokensToBurn = i_token.balanceOf(address(lockBox)) - s_tokensExcludedFromBurn[burnChainSelector];
 

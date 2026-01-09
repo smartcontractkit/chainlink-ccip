@@ -122,6 +122,8 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
 
   /// @notice Sets the dynamic configuration.
   /// @param dynamicConfig The configuration.
+  /// @dev FeeTokenHandler will revert if feeAggregator is zero when withdrawing fees.
+  /// @dev A zero address fee aggregator is valid, and intentionally reverts calls to withdraw fee tokens.
   function setDynamicConfig(
     DynamicConfig memory dynamicConfig
   ) external onlyOwner {
@@ -129,11 +131,11 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
   }
 
   /// @notice Internal version of setDynamicConfig to allow for reuse in the constructor.
+  /// @dev FeeTokenHandler will revert if feeAggregator is zero when withdrawing fees.
+  /// @dev A zero address fee aggregator is valid, and intentionally reverts calls to withdraw fee tokens.
   function _setDynamicConfig(
     DynamicConfig memory dynamicConfig
   ) internal {
-    if (dynamicConfig.feeAggregator == address(0)) revert InvalidConfig();
-
     s_dynamicConfig = dynamicConfig;
 
     emit ConfigSet(dynamicConfig);

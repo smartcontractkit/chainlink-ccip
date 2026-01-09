@@ -12,6 +12,8 @@ import (
 
 var ContractType cldf_deployment.ContractType = "OnRamp"
 
+var Version = semver.MustParse("1.7.0")
+
 type StaticConfig = onramp.OnRampStaticConfig
 
 type DynamicConfig = onramp.OnRampDynamicConfig
@@ -35,11 +37,11 @@ type DestChainConfig = onramp.OnRampDestChainConfig
 
 var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Name:             "on-ramp:deploy",
-	Version:          semver.MustParse("1.7.0"),
+	Version:          Version,
 	Description:      "Deploys the OnRamp contract",
 	ContractMetadata: onramp.OnRampMetaData,
 	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
-		cldf_deployment.NewTypeAndVersion(ContractType, *semver.MustParse("1.7.0")).String(): {
+		cldf_deployment.NewTypeAndVersion(ContractType, *Version).String(): {
 			EVM: common.FromHex(onramp.OnRampBin),
 		},
 	},
@@ -48,7 +50,7 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 
 var SetDynamicConfig = contract.NewWrite(contract.WriteParams[SetDynamicConfigArgs, *onramp.OnRamp]{
 	Name:            "on-ramp:set-dynamic-config",
-	Version:         semver.MustParse("1.7.0"),
+	Version:         Version,
 	Description:     "Sets the dynamic configuration on the OnRamp",
 	ContractType:    ContractType,
 	ContractABI:     onramp.OnRampABI,
@@ -62,7 +64,7 @@ var SetDynamicConfig = contract.NewWrite(contract.WriteParams[SetDynamicConfigAr
 
 var ApplyDestChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]DestChainConfigArgs, *onramp.OnRamp]{
 	Name:            "on-ramp:apply-dest-chain-config-updates",
-	Version:         semver.MustParse("1.7.0"),
+	Version:         Version,
 	Description:     "Applies updates to destination chain configuration on the OnRamp",
 	ContractType:    ContractType,
 	ContractABI:     onramp.OnRampABI,
@@ -76,7 +78,7 @@ var ApplyDestChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]DestC
 
 var WithdrawFeeTokens = contract.NewWrite(contract.WriteParams[WithdrawFeeTokensArgs, *onramp.OnRamp]{
 	Name:            "on-ramp:withdraw-fee-tokens",
-	Version:         semver.MustParse("1.7.0"),
+	Version:         Version,
 	Description:     "Withdraws fee tokens from the OnRamp",
 	ContractType:    ContractType,
 	ContractABI:     onramp.OnRampABI,
@@ -90,7 +92,7 @@ var WithdrawFeeTokens = contract.NewWrite(contract.WriteParams[WithdrawFeeTokens
 
 var GetDestChainConfig = contract.NewRead(contract.ReadParams[uint64, DestChainConfig, *onramp.OnRamp]{
 	Name:         "on-ramp:get-dest-chain-config",
-	Version:      semver.MustParse("1.7.0"),
+	Version:      Version,
 	Description:  "Gets the destination chain configuration for a given destination chain selector",
 	ContractType: ContractType,
 	NewContract:  onramp.NewOnRamp,

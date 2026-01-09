@@ -75,7 +75,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   event ChainRemoved(uint64 remoteChainSelector);
   event RemotePoolAdded(uint64 indexed remoteChainSelector, bytes remotePoolAddress);
   event RemotePoolRemoved(uint64 indexed remoteChainSelector, bytes remotePoolAddress);
-  event DynamicConfigSet(address router, address rateLimitAdmin);
+  event DynamicConfigSet(address router, address rateLimitAdmin, address feeAggregator);
   event OutboundRateLimitConsumed(uint64 indexed remoteChainSelector, address token, uint256 amount);
   event InboundRateLimitConsumed(uint64 indexed remoteChainSelector, address token, uint256 amount);
   event TokenTransferFeeConfigUpdated(uint64 indexed destChainSelector, TokenTransferFeeConfig tokenTransferFeeConfig);
@@ -137,10 +137,10 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
 
   /// @dev The address of the router.
   IRouter internal s_router;
-  /// @dev Optional advanced pool hooks contract for additional features like allowlists and CCV management.
-  IAdvancedPoolHooks internal s_advancedPoolHooks;
   /// @dev Minimum block confirmation on the source chain, 0 means the default finality.
   uint16 internal s_minBlockConfirmation;
+  /// @dev Optional advanced pool hooks contract for additional features like allowlists and CCV management.
+  IAdvancedPoolHooks internal s_advancedPoolHooks;
   // Separate buckets provide isolated rate limits for transfers with custom block confirmation, as their risk profiles differ from default transfers.
   mapping(uint64 remoteChainSelector => RateLimiter.TokenBucket tokenBucketOutbound) internal
     s_outboundRateLimiterConfig;
@@ -158,6 +158,9 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   address internal s_rateLimitAdmin;
   /// @dev Optional token-transfer fee overrides keyed by destination chain selector.
   mapping(uint64 destChainSelector => TokenTransferFeeConfig tokenTransferFeeConfig) internal s_tokenTransferFeeConfig;
+  /// @notice The address of the fee aggregator.
+  /// @dev Constructor does not set this value so it is opt in only.
+  address internal s_feeAggregator;
 
   constructor(
     IERC20 token,
@@ -196,49 +199,59 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
 
   /// @notice Gets the IERC20 token that this pool can lock or burn.
   /// @return token The IERC20 token representation.
-  function getToken() public view returns (IERC20 token) {
+  function getToken() public view virtual returns (IERC20 token) {
     return i_token;
   }
 
   /// @notice Get RMN proxy address.
   /// @return rmnProxy Address of RMN proxy.
-  function getRmnProxy() public view returns (address rmnProxy) {
+  function getRmnProxy() public view virtual returns (address rmnProxy) {
     return i_rmnProxy;
   }
 
   /// @notice Gets the pools dynamic configuration.
-  function getDynamicConfig() public view virtual returns (address router, address rateLimitAdmin) {
-    return (address(s_router), s_rateLimitAdmin);
+  function getDynamicConfig()
+    public
+    view
+    virtual
+    returns (address router, address rateLimitAdmin, address feeAggregator)
+  {
+    return (address(s_router), s_rateLimitAdmin, s_feeAggregator);
   }
 
   /// @notice Gets the minimum block confirmations required for custom finality transfers.
-  function getMinBlockConfirmation() public view returns (uint16 minBlockConfirmation) {
+  function getMinBlockConfirmation() public view virtual returns (uint16 minBlockConfirmation) {
     return s_minBlockConfirmation;
   }
 
   /// @notice Gets the advanced pool hook contract address used by this pool.
-  function getAdvancedPoolHooks() public view returns (IAdvancedPoolHooks advancedPoolHook) {
+  function getAdvancedPoolHooks() public view virtual returns (IAdvancedPoolHooks advancedPoolHook) {
     return s_advancedPoolHooks;
   }
 
   /// @notice Sets the dynamic configuration for the pool.
   /// @param router The address of the router contract.
   /// @param rateLimitAdmin The address of the rate limiter admin.
+  /// @param feeAggregator The address where fees are sent.
+  /// @dev FeeTokenHandler will revert if feeAggregator is zero when withdrawing fees.
+  /// @dev A zero address fee aggregator is valid, and intentionally reverts calls to withdraw fee tokens.
   function setDynamicConfig(
     address router,
-    address rateLimitAdmin
-  ) public onlyOwner {
+    address rateLimitAdmin,
+    address feeAggregator
+  ) public virtual onlyOwner {
     if (router == address(0)) revert ZeroAddressInvalid();
     s_router = IRouter(router);
     s_rateLimitAdmin = rateLimitAdmin;
-    emit DynamicConfigSet(router, rateLimitAdmin);
+    s_feeAggregator = feeAggregator;
+    emit DynamicConfigSet(router, rateLimitAdmin, feeAggregator);
   }
 
   /// @notice Sets the minimum block confirmations required for custom finality transfers.
   /// @param minBlockConfirmation The minimum block confirmations required for custom finality transfers.
   function setMinBlockConfirmation(
     uint16 minBlockConfirmation
-  ) public onlyOwner {
+  ) public virtual onlyOwner {
     // Since 0 means default finality it is a valid value.
     s_minBlockConfirmation = minBlockConfirmation;
     emit MinBlockConfirmationSet(minBlockConfirmation);
@@ -248,7 +261,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   /// @param newHook The new advanced pool hooks contract.
   function updateAdvancedPoolHooks(
     IAdvancedPoolHooks newHook
-  ) public onlyOwner {
+  ) public virtual onlyOwner {
     emit AdvancedPoolHooksUpdated(s_advancedPoolHooks, newHook);
     s_advancedPoolHooks = newHook;
   }
@@ -402,7 +415,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
     uint16 blockConfirmationRequested,
     bytes memory tokenArgs,
     uint256 feeAmount
-  ) internal {
+  ) internal virtual {
     if (!isSupportedToken(lockOrBurnIn.localToken)) {
       revert InvalidToken(lockOrBurnIn.localToken);
     }
@@ -460,7 +473,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
     uint256 localAmount,
     uint16 blockConfirmationRequested
-  ) internal {
+  ) internal virtual {
     if (!isSupportedToken(releaseOrMintIn.localToken)) {
       revert InvalidToken(releaseOrMintIn.localToken);
     }
@@ -572,7 +585,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   /// @dev To support non-evm chains, this value is encoded into bytes
   function getRemotePools(
     uint64 remoteChainSelector
-  ) public view returns (bytes[] memory) {
+  ) public view virtual returns (bytes[] memory) {
     bytes32[] memory remotePoolHashes = s_remoteChainConfigs[remoteChainSelector].remotePools.values();
 
     bytes[] memory remotePools = new bytes[](remotePoolHashes.length);
@@ -589,7 +602,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   function isRemotePool(
     uint64 remoteChainSelector,
     bytes memory remotePoolAddress
-  ) public view returns (bool) {
+  ) public view virtual returns (bool) {
     return s_remoteChainConfigs[remoteChainSelector].remotePools.contains(keccak256(remotePoolAddress));
   }
 
@@ -597,7 +610,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   /// @param remoteChainSelector Remote chain selector.
   function getRemoteToken(
     uint64 remoteChainSelector
-  ) public view returns (bytes memory) {
+  ) public view virtual returns (bytes memory) {
     return s_remoteChainConfigs[remoteChainSelector].remoteTokenAddress;
   }
 
@@ -609,7 +622,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   function addRemotePool(
     uint64 remoteChainSelector,
     bytes calldata remotePoolAddress
-  ) external onlyOwner {
+  ) external virtual onlyOwner {
     if (!isSupportedChain(remoteChainSelector)) revert NonExistentChain(remoteChainSelector);
 
     _setRemotePool(remoteChainSelector, remotePoolAddress);
@@ -623,7 +636,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   function removeRemotePool(
     uint64 remoteChainSelector,
     bytes calldata remotePoolAddress
-  ) external onlyOwner {
+  ) external virtual onlyOwner {
     if (!isSupportedChain(remoteChainSelector)) revert NonExistentChain(remoteChainSelector);
 
     if (!s_remoteChainConfigs[remoteChainSelector].remotePools.remove(keccak256(remotePoolAddress))) {
@@ -637,13 +650,13 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   /// @param remoteChainSelector The remote chain selector to check.
   function isSupportedChain(
     uint64 remoteChainSelector
-  ) public view returns (bool) {
+  ) public view virtual returns (bool) {
     return s_remoteChainSelectors.contains(remoteChainSelector);
   }
 
   /// @notice Get list of allowed chains
   /// @return list of chains.
-  function getSupportedChains() public view returns (uint64[] memory) {
+  function getSupportedChains() public view virtual returns (uint64[] memory) {
     uint256[] memory uint256ChainSelectors = s_remoteChainSelectors.values();
     uint64[] memory chainSelectors = new uint64[](uint256ChainSelectors.length);
     for (uint256 i = 0; i < uint256ChainSelectors.length; ++i) {
@@ -717,7 +730,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   function _setRemotePool(
     uint64 remoteChainSelector,
     bytes memory remotePoolAddress
-  ) internal {
+  ) internal virtual {
     if (remotePoolAddress.length == 0) {
       revert ZeroAddressInvalid();
     }
@@ -820,6 +833,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   )
     external
     view
+    virtual
     returns (
       RateLimiter.TokenBucket memory outboundRateLimiterState,
       RateLimiter.TokenBucket memory inboundRateLimiterState
@@ -1056,17 +1070,16 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
     }
   }
 
-  /// @notice Withdraws accrued fee token balances to the provided `recipient`.
+  /// @notice Withdraws accrued fee token balances to the provided `s_feeAggregator`.
+  /// @dev FeeTokenHandler will revert if `s_feeAggregator` is zero address.
   /// @dev Pools accrue fees directly on this contract. Lock/release pools send bridge liquidity to their ERC20 lockbox
   /// during the lock flow, which means any balance left on this contract represents fees that have accrued to the pool.
   /// Because user liquidity never resides on `address(this)` for lock/release pools, transferring the full contract balance is safe
   /// and clears only accrued fees.
   /// @param feeTokens The token addresses to withdraw, including the pool token when applicable.
-  /// @param recipient The address that should receive the withdrawn balances.
   function withdrawFeeTokens(
-    address[] calldata feeTokens,
-    address recipient
-  ) external onlyOwner {
-    FeeTokenHandler._withdrawFeeTokens(feeTokens, recipient);
+    address[] calldata feeTokens
+  ) external virtual {
+    FeeTokenHandler._withdrawFeeTokens(feeTokens, s_feeAggregator);
   }
 }

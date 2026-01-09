@@ -8,7 +8,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/committee_verifier"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/versioned_verifier_resolver"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
@@ -16,6 +15,8 @@ import (
 var ContractType cldf_deployment.ContractType = "CommitteeVerifier"
 
 var ResolverType cldf_deployment.ContractType = "CommitteeVerifierResolver"
+
+var Version = semver.MustParse("1.7.0")
 
 type DynamicConfig = committee_verifier.CommitteeVerifierDynamicConfig
 
@@ -50,33 +51,20 @@ type SignatureConfigArgs struct {
 
 var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Name:             "committee-verifier:deploy",
-	Version:          semver.MustParse("1.7.0"),
+	Version:          Version,
 	Description:      "Deploys the CommitteeVerifier contract",
 	ContractMetadata: committee_verifier.CommitteeVerifierMetaData,
 	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
-		cldf_deployment.NewTypeAndVersion(ContractType, *semver.MustParse("1.7.0")).String(): {
+		cldf_deployment.NewTypeAndVersion(ContractType, *Version).String(): {
 			EVM: common.FromHex(committee_verifier.CommitteeVerifierBin),
 		},
 	},
 	Validate: func(ConstructorArgs) error { return nil },
 })
 
-var DeployResolver = contract.NewDeploy(contract.DeployParams[ResolverConstructorArgs]{
-	Name:             "committee-verifier-resolver:deploy",
-	Version:          semver.MustParse("1.7.0"),
-	Description:      "Deploys the CommitteeVerifierResolver contract",
-	ContractMetadata: versioned_verifier_resolver.VersionedVerifierResolverMetaData,
-	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
-		cldf_deployment.NewTypeAndVersion(ResolverType, *semver.MustParse("1.7.0")).String(): {
-			EVM: common.FromHex(versioned_verifier_resolver.VersionedVerifierResolverBin),
-		},
-	},
-	Validate: func(ResolverConstructorArgs) error { return nil },
-})
-
 var SetDynamicConfig = contract.NewWrite(contract.WriteParams[SetDynamicConfigArgs, *committee_verifier.CommitteeVerifier]{
 	Name:            "committee-verifier:set-dynamic-config",
-	Version:         semver.MustParse("1.7.0"),
+	Version:         Version,
 	Description:     "Sets the dynamic configuration on the CommitteeVerifier",
 	ContractType:    ContractType,
 	ContractABI:     committee_verifier.CommitteeVerifierABI,
@@ -90,7 +78,7 @@ var SetDynamicConfig = contract.NewWrite(contract.WriteParams[SetDynamicConfigAr
 
 var ApplyRemoteChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]RemoteChainConfigArgs, *committee_verifier.CommitteeVerifier]{
 	Name:            "committee-verifier:apply-remote-chain-config-updates",
-	Version:         semver.MustParse("1.7.0"),
+	Version:         Version,
 	Description:     "Applies updates to remote chain configurations on the CommitteeVerifier",
 	ContractType:    ContractType,
 	ContractABI:     committee_verifier.CommitteeVerifierABI,
@@ -104,7 +92,7 @@ var ApplyRemoteChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]Rem
 
 var ApplyAllowlistUpdates = contract.NewWrite(contract.WriteParams[[]AllowlistConfigArgs, *committee_verifier.CommitteeVerifier]{
 	Name:            "committee-verifier:apply-allowlist-updates",
-	Version:         semver.MustParse("1.7.0"),
+	Version:         Version,
 	Description:     "Applies updates to the allowlist (those authorized to send messages) on the CommitteeVerifier",
 	ContractType:    ContractType,
 	ContractABI:     committee_verifier.CommitteeVerifierABI,
@@ -118,7 +106,7 @@ var ApplyAllowlistUpdates = contract.NewWrite(contract.WriteParams[[]AllowlistCo
 
 var WithdrawFeeTokens = contract.NewWrite(contract.WriteParams[WithdrawFeeTokensArgs, *committee_verifier.CommitteeVerifier]{
 	Name:            "committee-verifier:withdraw-fee-tokens",
-	Version:         semver.MustParse("1.7.0"),
+	Version:         Version,
 	Description:     "Withdraws fee tokens from the CommitteeVerifier",
 	ContractType:    ContractType,
 	ContractABI:     committee_verifier.CommitteeVerifierABI,
@@ -132,7 +120,7 @@ var WithdrawFeeTokens = contract.NewWrite(contract.WriteParams[WithdrawFeeTokens
 
 var ApplySignatureConfigs = contract.NewWrite(contract.WriteParams[SignatureConfigArgs, *committee_verifier.CommitteeVerifier]{
 	Name:            "committee-verifier:apply-signature-configs",
-	Version:         semver.MustParse("1.7.0"),
+	Version:         Version,
 	Description:     "Applies the signature configurations on the CommitteeVerifier",
 	ContractType:    ContractType,
 	ContractABI:     committee_verifier.CommitteeVerifierABI,
@@ -146,7 +134,7 @@ var ApplySignatureConfigs = contract.NewWrite(contract.WriteParams[SignatureConf
 
 var GetRemoteChainConfig = contract.NewRead(contract.ReadParams[uint64, RemoteChainConfig, *committee_verifier.CommitteeVerifier]{
 	Name:         "committee-verifier:get-remote-chain-config",
-	Version:      semver.MustParse("1.7.0"),
+	Version:      Version,
 	Description:  "Gets the remote chain configuration for a given remote chain selector",
 	ContractType: ContractType,
 	NewContract:  committee_verifier.NewCommitteeVerifier,
@@ -157,7 +145,7 @@ var GetRemoteChainConfig = contract.NewRead(contract.ReadParams[uint64, RemoteCh
 
 var GetVersionTag = contract.NewRead(contract.ReadParams[any, [4]byte, *committee_verifier.CommitteeVerifier]{
 	Name:         "committee-verifier:get-version-tag",
-	Version:      semver.MustParse("1.7.0"),
+	Version:      Version,
 	Description:  "Gets the version tag of the CommitteeVerifier contract",
 	ContractType: ContractType,
 	NewContract:  committee_verifier.NewCommitteeVerifier,
@@ -168,7 +156,7 @@ var GetVersionTag = contract.NewRead(contract.ReadParams[any, [4]byte, *committe
 
 var GetSignatureConfig = contract.NewRead(contract.ReadParams[uint64, SignatureConfig, *committee_verifier.CommitteeVerifier]{
 	Name:         "committee-verifier:get-signature-config",
-	Version:      semver.MustParse("1.7.0"),
+	Version:      Version,
 	Description:  "Gets the signature configuration for a given source chain selector",
 	ContractType: ContractType,
 	NewContract:  committee_verifier.NewCommitteeVerifier,

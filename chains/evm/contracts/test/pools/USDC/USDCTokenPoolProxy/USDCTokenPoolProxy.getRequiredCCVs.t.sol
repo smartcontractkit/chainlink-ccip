@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {IPoolV1} from "../../../../interfaces/IPool.sol";
 import {IPoolV2} from "../../../../interfaces/IPoolV2.sol";
 import {USDCTokenPoolProxy} from "../../../../pools/USDC/USDCTokenPoolProxy.sol";
 import {USDCTokenPoolProxySetup} from "./USDCTokenPoolProxySetup.t.sol";
@@ -38,21 +37,5 @@ contract USDCTokenPoolProxy_getRequiredCCVs is USDCTokenPoolProxySetup {
     uint64 unknownChainSelector = 898989;
     vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.NoLockOrBurnMechanismSet.selector, unknownChainSelector));
     s_usdcTokenPoolProxy.getRequiredCCVs(address(0), unknownChainSelector, 0, 0, "", IPoolV2.MessageDirection.Outbound);
-  }
-
-  function test_getRequiredCCVs_RevertWhen_NoCCVCompatiblePoolSet() public {
-    _enableERC165InterfaceChecks(s_cctpV2Pool, type(IPoolV1).interfaceId);
-    _enableERC165InterfaceChecks(s_cctpV1Pool, type(IPoolV1).interfaceId);
-    s_usdcTokenPoolProxy.updatePoolAddresses(
-      USDCTokenPoolProxy.PoolAddresses({
-        cctpV1Pool: s_cctpV1Pool,
-        cctpV2Pool: s_cctpV2Pool,
-        cctpV2PoolWithCCV: address(0),
-        siloedLockReleasePool: address(0)
-      })
-    );
-
-    vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.CCVCompatiblePoolNotSet.selector));
-    s_usdcTokenPoolProxy.getRequiredCCVs(address(0), uint64(1), 0, 0, "", IPoolV2.MessageDirection.Outbound);
   }
 }

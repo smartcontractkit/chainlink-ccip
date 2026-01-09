@@ -8,15 +8,17 @@ contract TokenPoolWithAllowList_setDynamicConfig is AdvancedPoolHooksSetup {
   function test_setDynamicConfig() public {
     address newRouter = makeAddr("newRouter");
     address newRateLimitAdmin = makeAddr("newRateLimitAdmin");
+    address newFeeAggregator = makeAddr("newFeeAggregator");
 
     vm.expectEmit();
-    emit TokenPool.DynamicConfigSet(newRouter, newRateLimitAdmin);
+    emit TokenPool.DynamicConfigSet(newRouter, newRateLimitAdmin, newFeeAggregator);
 
-    s_tokenPool.setDynamicConfig(newRouter, newRateLimitAdmin);
+    s_tokenPool.setDynamicConfig(newRouter, newRateLimitAdmin, newFeeAggregator);
 
-    (address router, address rateLimitAdmin) = s_tokenPool.getDynamicConfig();
+    (address router, address rateLimitAdmin, address feeAggregator) = s_tokenPool.getDynamicConfig();
     assertEq(newRouter, router);
     assertEq(newRateLimitAdmin, rateLimitAdmin);
+    assertEq(newFeeAggregator, feeAggregator);
   }
 
   // Reverts
@@ -26,6 +28,6 @@ contract TokenPoolWithAllowList_setDynamicConfig is AdvancedPoolHooksSetup {
 
     vm.expectRevert(TokenPool.ZeroAddressInvalid.selector);
 
-    s_tokenPool.setDynamicConfig(newRouter, address(0));
+    s_tokenPool.setDynamicConfig(newRouter, address(0), address(0));
   }
 }

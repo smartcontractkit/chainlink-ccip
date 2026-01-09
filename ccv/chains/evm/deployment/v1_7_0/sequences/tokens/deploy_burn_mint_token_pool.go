@@ -5,14 +5,15 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/advanced_pool_hooks"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/burn_mint_token_pool"
 	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/advanced_pool_hooks"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/burn_mint_token_pool"
 )
 
 var DeployBurnMintTokenPool = cldf_ops.NewSequence(
@@ -28,7 +29,6 @@ var DeployBurnMintTokenPool = cldf_ops.NewSequence(
 			ChainSelector:  input.ChainSel,
 			TypeAndVersion: deployment.NewTypeAndVersion(advanced_pool_hooks.ContractType, *advanced_pool_hooks.Version),
 			Args: advanced_pool_hooks.ConstructorArgs{
-				Allowlist:                        input.ConstructorArgs.Allowlist,
 				ThresholdAmountForAdditionalCCVs: input.ThresholdAmountForAdditionalCCVs,
 			},
 			Qualifier: &input.TokenSymbol,
@@ -62,9 +62,9 @@ var DeployBurnMintTokenPool = cldf_ops.NewSequence(
 			TokenPoolAddress:                 common.HexToAddress(tpDeployReport.Output.Address),
 			RateLimitAdmin:                   input.RateLimitAdmin,
 			AdvancedPoolHooks:                common.HexToAddress(hooksDeployReport.Output.Address),
-			AllowList:                        input.ConstructorArgs.Allowlist,
 			RouterAddress:                    input.ConstructorArgs.Router,
 			ThresholdAmountForAdditionalCCVs: input.ThresholdAmountForAdditionalCCVs,
+			FeeAggregator:                    input.FeeAggregator,
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to configure token pool with address %s on %s: %w", tpDeployReport.Output.Address, chain, err)

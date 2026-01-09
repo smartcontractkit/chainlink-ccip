@@ -23,11 +23,11 @@ type PreviousRampsArgs = nonce_manager.NonceManagerPreviousRampsArgs
 
 var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Name:             "nonce-manager:deploy",
-	Version:          semver.MustParse("1.6.0"),
+	Version:          Version,
 	Description:      "Deploys the NonceManager contract",
 	ContractMetadata: nonce_manager.NonceManagerMetaData,
 	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
-		cldf_deployment.NewTypeAndVersion(ContractType, *semver.MustParse("1.6.0")).String(): {
+		cldf_deployment.NewTypeAndVersion(ContractType, *Version).String(): {
 			EVM: common.FromHex(nonce_manager.NonceManagerBin),
 		},
 	},
@@ -36,7 +36,7 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 
 var ApplyAuthorizedCallerUpdates = contract.NewWrite(contract.WriteParams[AuthorizedCallerArgs, *nonce_manager.NonceManager]{
 	Name:            "nonce-manager:apply-authorized-caller-updates",
-	Version:         semver.MustParse("1.6.0"),
+	Version:         Version,
 	Description:     "Applies updates to the list of authorized callers on the NonceManager",
 	ContractType:    ContractType,
 	ContractABI:     nonce_manager.NonceManagerABI,
@@ -50,7 +50,7 @@ var ApplyAuthorizedCallerUpdates = contract.NewWrite(contract.WriteParams[Author
 
 var ApplyPreviousRampUpdates = contract.NewWrite(contract.WriteParams[[]PreviousRampsArgs, *nonce_manager.NonceManager]{
 	Name:            "nonce-manager:apply-previous-ramp-updates",
-	Version:         semver.MustParse("1.6.0"),
+	Version:         Version,
 	Description:     "Applies updates to the list of previous ramps on the NonceManager",
 	ContractType:    ContractType,
 	ContractABI:     nonce_manager.NonceManagerABI,
