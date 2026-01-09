@@ -24,10 +24,6 @@ type ConfigureTokenPoolInput struct {
 	TokenPoolAddress common.Address
 	// AdvancedPoolHooks is the address of the AdvancedPoolHooks contract.
 	AdvancedPoolHooks common.Address
-	// AllowList is the list of addresses allowed to transfer tokens.
-	// If empty upon deployment, an allow-list can never be set.
-	// Likewise, if populated upon deployment, the allow-list can never be disabled.
-	AllowList []common.Address
 	// RouterAddress is the address of the Router contract on this chain.
 	// If left empty, setRouter will not be attempted.
 	RouterAddress common.Address
@@ -47,44 +43,6 @@ var ConfigureTokenPool = cldf_ops.NewSequence(
 	"Configures a token pool on an EVM chain",
 	func(b cldf_ops.Bundle, chain evm.Chain, input ConfigureTokenPoolInput) (output sequences.OnChainOutput, err error) {
 		writes := make([]evm_contract.WriteOutput, 0)
-
-		// First, check if the allow-list is enabled
-		if len(input.AllowList) != 0 {
-			allowListEnabledReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.GetAllowListEnabled, chain, evm_contract.FunctionInput[any]{
-				ChainSelector: input.ChainSelector,
-				Address:       input.AdvancedPoolHooks,
-			})
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to get allow-list status from advanced pool hooks with address %s on %s: %w", input.AdvancedPoolHooks, chain, err)
-			}
-			if allowListEnabledReport.Output {
-				// Allow-list is enabled, so we first check the current allow-list
-				currentAllowListReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.GetAllowList, chain, evm_contract.FunctionInput[any]{
-					ChainSelector: input.ChainSelector,
-					Address:       input.AdvancedPoolHooks,
-				})
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to get current allow-list from advanced pool hooks with address %s on %s: %w", input.AdvancedPoolHooks, chain, err)
-				}
-				adds, removes := makeAllowListUpdates(currentAllowListReport.Output, input.AllowList)
-
-				// Apply any updates to the allow-list if they exist
-				if len(adds) != 0 || len(removes) != 0 {
-					applyAllowListUpdatesReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.ApplyAllowlistUpdates, chain, evm_contract.FunctionInput[advanced_pool_hooks.AllowlistUpdatesArgs]{
-						ChainSelector: input.ChainSelector,
-						Address:       input.AdvancedPoolHooks,
-						Args: advanced_pool_hooks.AllowlistUpdatesArgs{
-							Adds:    adds,
-							Removes: removes,
-						},
-					})
-					if err != nil {
-						return sequences.OnChainOutput{}, fmt.Errorf("failed to apply allow-list updates to advanced pool hooks with address %s on %s: %w", input.AdvancedPoolHooks, chain, err)
-					}
-					writes = append(writes, applyAllowListUpdatesReport.Output)
-				}
-			}
-		}
 
 		// Set threshold amount for additional CCVs (if necessary)
 		if input.ThresholdAmountForAdditionalCCVs != nil {

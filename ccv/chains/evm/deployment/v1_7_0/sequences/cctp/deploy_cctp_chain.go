@@ -57,6 +57,7 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found", input.ChainSelector)
 		}
 
+		// Deploy CCTPTokenPool & advanced pool hooks if needed
 		poolTypeAndVersionToAddr, err := indexAddressesByTypeAndVersion(b, chain, input.TokenPool)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to index addresses by type and version: %w", err)

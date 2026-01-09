@@ -8,17 +8,16 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/advanced_pool_hooks"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/token_pool"
 	tp_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/token_pool"
 	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-
-	mcms_types "github.com/smartcontractkit/mcms/types"
-
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	mcms_types "github.com/smartcontractkit/mcms/types"
+
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/advanced_pool_hooks"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/token_pool"
 )
 
 // ConfigureTokenPoolForRemoteChainInput is the input for the ConfigureTokenPoolForRemoteChain sequence.
@@ -150,14 +149,18 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to maybe update rate limiters: %w", err)
 				}
-				writes = append(writes, defaultFinalityRateLimitersReport)
+				if defaultFinalityRateLimitersReport != nil {
+					writes = append(writes, *defaultFinalityRateLimitersReport)
+				}
 
 				// Check and update custom finality rate limiters
 				customFinalityRateLimitersReport, err := maybeUpdateRateLimiters(b, chain, input, true)
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to maybe update rate limiters: %w", err)
 				}
-				writes = append(writes, customFinalityRateLimitersReport)
+				if customFinalityRateLimitersReport != nil {
+					writes = append(writes, *customFinalityRateLimitersReport)
+				}
 
 				// Check existing remote pools
 				getRemotePoolsReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetRemotePools, chain, evm_contract.FunctionInput[uint64]{
@@ -224,7 +227,9 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to maybe update rate limiters: %w", err)
 		}
-		writes = append(writes, customFinalityRateLimitersReport)
+		if customFinalityRateLimitersReport != nil {
+			writes = append(writes, *customFinalityRateLimitersReport)
+		}
 
 		batchOp, err := evm_contract.NewBatchOperationFromWrites(writes)
 		if err != nil {
@@ -235,8 +240,9 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 	},
 )
 
-// maybeUpdateRateLimiters checks and updates the rate limiters for a given remote chain if they do not match the desired config.
-func maybeUpdateRateLimiters(b cldf_ops.Bundle, chain evm.Chain, input ConfigureTokenPoolForRemoteChainInput, customBlockConfirmation bool) (output evm_contract.WriteOutput, err error) {
+// maybeUpdateRateLimiters checks and updates the rate limiters for a given remote chain if they do not match the
+// desired config. Returns nil if no update is needed.
+func maybeUpdateRateLimiters(b cldf_ops.Bundle, chain evm.Chain, input ConfigureTokenPoolForRemoteChainInput, customBlockConfirmation bool) (*evm_contract.WriteOutput, error) {
 	var desiredInboundRateLimiterConfig tokens.RateLimiterConfig
 	var desiredOutboundRateLimiterConfig tokens.RateLimiterConfig
 	if customBlockConfirmation {
@@ -257,7 +263,7 @@ func maybeUpdateRateLimiters(b cldf_ops.Bundle, chain evm.Chain, input Configure
 		},
 	})
 	if err != nil {
-		return evm_contract.WriteOutput{}, fmt.Errorf("failed to get rate limiter state: %w", err)
+		return nil, fmt.Errorf("failed to get rate limiter state: %w", err)
 	}
 	currentStates := rateLimiterStateReport.Output
 
@@ -277,17 +283,17 @@ func maybeUpdateRateLimiters(b cldf_ops.Bundle, chain evm.Chain, input Configure
 			},
 		})
 		if err != nil {
-			return evm_contract.WriteOutput{}, fmt.Errorf("failed to set inbound rate limiter config: %w", err)
+			return nil, fmt.Errorf("failed to set rate limiters config: %w", err)
 		}
-		return setInboundRateLimiterReport.Output, nil
+		return &setInboundRateLimiterReport.Output, nil
 	}
 
-	return evm_contract.WriteOutput{}, nil
+	return nil, nil
 }
 
 // rateLimiterConfigsEqual returns true if the current rate limiter config on-chain matches the desired config.
 func rateLimiterConfigsEqual(current tp_bindings.RateLimiterTokenBucket, desired tokens.RateLimiterConfig) bool {
 	return current.IsEnabled == desired.IsEnabled &&
-		current.Capacity == desired.Capacity &&
-		current.Rate == desired.Rate
+		current.Capacity.Cmp(desired.Capacity) == 0 &&
+		current.Rate.Cmp(desired.Rate) == 0
 }
