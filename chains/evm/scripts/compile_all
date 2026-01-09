@@ -6,6 +6,11 @@ echo " ┌───────────────────────�
 echo " │          Compiling CCIP contracts...         │"
 echo " └──────────────────────────────────────────────┘"
 
+# The offRamp uses a specific lower optimization runs value. All other contracts use the default value
+# as specified in the foundry.toml.
+OPTIMIZE_RUNS_TOKEN_POOL=50000
+OPTIMIZE_RUNS_ONRAMP=5000
+OPTIMIZE_RUNS_OFFRAMP=30000
 
 PROJECT="ccip"
 FOUNDRY_PROJECT_SUFFIX="-compile"
@@ -27,6 +32,7 @@ compileContract() {
   else
     local command
     command="forge $args \
+    $(getOptimizations "$1" "$contract") \
     --extra-output-files bin abi metadata \
     --build-info \
     --build-info-path $dir/build \
@@ -38,6 +44,30 @@ compileContract() {
     mv $(find $dir/build -type f -name '*.json' ! -name 'build.json') $dir/build/build.json
   fi
 }
+
+# Define optimization overrides in this function. Anything that is not an override will use the default value
+# as specified in the foundry.toml.
+function getOptimizations() {
+    local contract_path=$1
+    local contract_name=$2
+    local optimize_runs_override=""
+
+    if [[ $contract_path == pools/* ]]; then
+        optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_TOKEN_POOL"
+    fi
+
+    case $contract_name in
+      "OnRamp")
+        optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_ONRAMP"
+        ;;
+      "OffRamp")
+        optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_OFFRAMP"
+        ;;
+    esac
+
+    echo "$optimize_runs_override"
+}
+
 
 compileContract Proxy
 compileContract CREATE2Factory
