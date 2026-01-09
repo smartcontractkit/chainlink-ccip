@@ -45,7 +45,15 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     uint64 remoteChainSelector,
     uint256 amount
   ) internal override {
-    getLockBox(remoteChainSelector).deposit(address(i_token), remoteChainSelector, amount);
+    ILockBox lockBox = getLockBox(remoteChainSelector);
+
+    // Lockboxes trust pools but pools don't necessarily trust lockboxes, so we need to approve each time.
+    i_token.approve(address(lockBox), amount);
+    lockBox.deposit(address(i_token), remoteChainSelector, amount);
+    // We reset to 0 to reduce the risk of dangling approvals being exploited. It should already be 0 but just in case.
+    if (i_token.allowance(address(this), address(lockBox)) != 0) {
+      i_token.approve(address(lockBox), 0);
+    }
   }
 
   /// @inheritdoc TokenPool
@@ -78,12 +86,11 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     for (uint256 i = 0; i < lockBoxConfigs.length; ++i) {
       address lockBox = lockBoxConfigs[i].lockBox;
       if (lockBox == address(0)) revert ZeroAddressInvalid();
-      ILockBox lockBoxContract = ILockBox(lockBox);
-      if (!lockBoxContract.isTokenSupported(address(i_token))) {
+
+      if (!ILockBox(lockBox).isTokenSupported(address(i_token))) {
         revert InvalidToken(address(i_token));
       }
       s_lockBoxes.set(lockBoxConfigs[i].remoteChainSelector, lockBox);
-      i_token.approve(lockBox, type(uint256).max);
     }
   }
 

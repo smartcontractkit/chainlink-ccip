@@ -39,14 +39,11 @@ vendor/
 *.log
 
 # misc
-.DS_Store
 .envrc
 .env*
 .dbenv
 .direnv
-.idea
 .vscode/
-*.iml
 debug.env
 operator_ui/install
 .devenv
@@ -60,3 +57,4 @@ dockercfg
 env
 credentials.env
 gcr_creds.env
+/.cursorrules
