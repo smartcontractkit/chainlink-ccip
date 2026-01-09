@@ -9,15 +9,13 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
-
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/burn_mint_token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/lock_release_token_pool"
 )
 
 // DeployTokenAndPoolInput is the input for the DeployBurnMintTokenAndPool sequence.
@@ -62,12 +60,6 @@ var DeployTokenAndPool = cldf_ops.NewSequence(
 			deployTokenPoolReport, err := cldf_ops.ExecuteSequence(b, DeployBurnMintTokenPool, chain, input.DeployTokenPoolInput)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy burn mint token pool to %s: %w", chain, err)
-			}
-			addresses = append(addresses, deployTokenPoolReport.Output.Addresses...)
-		case lock_release_token_pool.IsSupported(deployment.ContractType(input.DeployTokenPoolInput.TokenPoolType), input.DeployTokenPoolInput.TokenPoolVersion):
-			deployTokenPoolReport, err := cldf_ops.ExecuteSequence(b, DeployLockReleaseTokenPool, chain, input.DeployTokenPoolInput)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy lock release token pool to %s: %w", chain, err)
 			}
 			addresses = append(addresses, deployTokenPoolReport.Output.Addresses...)
 		default:

@@ -9,13 +9,12 @@ import (
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	evm_seq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
+	tokens "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/tokens"
 )
 
 type DeployTokenAndPoolCfg struct {
@@ -38,12 +37,10 @@ type DeployTokenAndPoolCfg struct {
 	// Router is a reference to the desired router contract.
 	// Sometimes we may want to connect to a test router, other times a main router.
 	Router datastore.AddressRef
-	// ThresholdAmountForAdditionalCCVs is the transfer amount above which additional CCVs are required.
-	ThresholdAmountForAdditionalCCVs *big.Int
+	// Allowlist is the list of addresses allowed to transfer the token.
+	Allowlist []common.Address
 	// Accounts is a map of account addresses to initial mint amounts.
 	Accounts map[common.Address]*big.Int
-	// FeeAggregator is the address that will receive fee tokens when WithdrawFeeTokens is called.
-	FeeAggregator common.Address
 }
 
 func (c DeployTokenAndPoolCfg) ChainSelector() uint64 {
@@ -72,18 +69,17 @@ var DeployTokenAndPool = changesets.NewFromOnChainSequence(changesets.NewFromOnC
 		return tokens.DeployTokenAndPoolInput{
 			Accounts: cfg.Accounts,
 			DeployTokenPoolInput: tokens.DeployTokenPoolInput{
-				ChainSel:                         cfg.ChainSel,
-				TokenPoolType:                    cfg.TokenPoolType,
-				TokenPoolVersion:                 cfg.TokenPoolVersion,
-				TokenSymbol:                      cfg.TokenSymbol,
-				RateLimitAdmin:                   cfg.RateLimitAdmin,
-				ThresholdAmountForAdditionalCCVs: cfg.ThresholdAmountForAdditionalCCVs,
-				FeeAggregator:                    cfg.FeeAggregator,
+				ChainSel:         cfg.ChainSel,
+				TokenPoolType:    cfg.TokenPoolType,
+				TokenPoolVersion: cfg.TokenPoolVersion,
+				TokenSymbol:      cfg.TokenSymbol,
+				RateLimitAdmin:   cfg.RateLimitAdmin,
 				ConstructorArgs: tokens.ConstructorArgs{
-					Token:    cfg.TokenAddress,
-					Decimals: cfg.Decimals,
-					RMNProxy: rmnProxy,
-					Router:   router,
+					Token:     cfg.TokenAddress,
+					Decimals:  cfg.Decimals,
+					Allowlist: cfg.Allowlist,
+					RMNProxy:  rmnProxy,
+					Router:    router,
 				},
 			},
 		}, nil
