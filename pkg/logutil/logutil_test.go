@@ -24,7 +24,7 @@ func TestLogWrapper(t *testing.T) {
 	digest[0] = 1
 	digest[31] = 31
 
-	expected := map[string]interface{}{
+	expected := map[string]any{
 		donIDLoggerKey:        donID,
 		oracleIDLoggerKey:     oracleID,
 		pluginLoggerKey:       "TestPlugin",
@@ -56,7 +56,7 @@ func TestLogCopy(t *testing.T) {
 	digest[0] = 1
 	digest[31] = 31
 
-	expected := map[string]interface{}{
+	expected := map[string]any{
 		donIDLoggerKey:        donID,
 		oracleIDLoggerKey:     oracleID,
 		pluginLoggerKey:       "TestPlugin",

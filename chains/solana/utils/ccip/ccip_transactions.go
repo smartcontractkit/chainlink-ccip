@@ -78,7 +78,7 @@ func AttestCCTP(message []byte, attesters []eth.Signer) ([]byte, error) {
 }
 
 func ethAddressSorter(a, b [20]byte) int {
-	for i := 0; i < 20; i++ {
+	for i := range 20 {
 		if a[i] < b[i] {
 			return -1
 		} else if a[i] > b[i] {

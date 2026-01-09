@@ -172,7 +172,7 @@ func deployZkContractImpl(
 	client *clients.Client,
 	wallet *accounts.Wallet,
 	parsedABI *abi.ABI,
-	args ...interface{},
+	args ...any,
 ) (common.Address, error) {
 	var calldata []byte
 	var err error
@@ -210,7 +210,7 @@ func deployZkContractImpl(
 }
 
 // arrayify converts a struct or pointer to struct into a slice of its field values.
-func arrayify[ARGS any](args ARGS) ([]interface{}, error) {
+func arrayify[ARGS any](args ARGS) ([]any, error) {
 	v := reflect.ValueOf(args)
 	if v.Kind() == reflect.Ptr {
 		v = v.Elem()
@@ -219,7 +219,7 @@ func arrayify[ARGS any](args ARGS) ([]interface{}, error) {
 		return nil, fmt.Errorf("expected struct or pointer to struct, got %s", v.Kind())
 	}
 
-	result := make([]interface{}, v.NumField())
+	result := make([]any, v.NumField())
 	for i := 0; i < v.NumField(); i++ {
 		result[i] = v.Field(i).Interface()
 	}

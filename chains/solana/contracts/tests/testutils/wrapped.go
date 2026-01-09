@@ -119,13 +119,13 @@ func MakeAnyToSVMMessage(t *testing.T, tokenReceiver solana.PublicKey, evmChainS
 	return msg, hash
 }
 
-func MustMarshalBorsh(t *testing.T, v interface{}) []byte {
+func MustMarshalBorsh(t *testing.T, v any) []byte {
 	bz, err := bin.MarshalBorsh(v)
 	require.NoError(t, err)
 	return bz
 }
 
-func MustSerializeExtraArgs(t *testing.T, data interface{}, tag string) []byte {
+func MustSerializeExtraArgs(t *testing.T, data any, tag string) []byte {
 	b, err := ccip.SerializeExtraArgs(data, tag)
 	require.NoError(t, err)
 	return b

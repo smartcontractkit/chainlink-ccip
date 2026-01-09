@@ -17,14 +17,14 @@ var OwnerAddress = common.HexToAddress("0x02")
 // Implements rpc.DataError from go-ethereum/rpc
 // Enables ABI decoding of revert reasons
 type rpcError struct {
-	Data interface{}
+	Data any
 }
 
 func (e *rpcError) Error() string {
 	return ""
 }
 
-func (e *rpcError) ErrorData() interface{} {
+func (e *rpcError) ErrorData() any {
 	return e.Data
 }
 

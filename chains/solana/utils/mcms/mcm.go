@@ -96,7 +96,7 @@ func PadString32(input string) ([32]byte, error) {
 
 func UnpadString32(input [32]byte) string {
 	startPos := 0
-	for i := 0; i < len(input); i++ {
+	for i := range len(input) {
 		if input[i] != 0 {
 			startPos = i
 			break
@@ -223,10 +223,7 @@ func GetAppendSignersIxs(signerAddresses [][20]uint8, msigID [32]byte, multisigC
 	}
 	ixs := make([]solana.Instruction, 0)
 	for i := 0; i < len(signerAddresses); i += chunkSize {
-		end := i + chunkSize
-		if end > len(signerAddresses) {
-			end = len(signerAddresses)
-		}
+		end := min(i+chunkSize, len(signerAddresses))
 		appendIx, appendErr := mcm.NewAppendSignersInstruction(
 			msigID,
 			signerAddresses[i:end],
@@ -294,10 +291,7 @@ func GetAppendSignaturesIxs(signatures []mcm.Signature, msigID [32]byte, root [3
 	}
 	ixs := make([]solana.Instruction, 0)
 	for i := 0; i < len(signatures); i += chunkSize {
-		end := i + chunkSize
-		if end > len(signatures) {
-			end = len(signatures)
-		}
+		end := min(i+chunkSize, len(signatures))
 		appendIx, appendErr := mcm.NewAppendSignaturesInstruction(
 			msigID,
 			root,

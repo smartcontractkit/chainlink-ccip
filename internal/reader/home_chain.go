@@ -136,7 +136,7 @@ func (r *homeChainPoller) fetchAndSetConfigs(ctx context.Context) error {
 			ctx,
 			r.ccipConfigBoundContract.ReadIdentifier(consts.MethodNameGetAllChainConfigs),
 			primitives.Unconfirmed,
-			map[string]interface{}{
+			map[string]any{
 				"pageIndex": pageIndex,
 				"pageSize":  defaultConfigPageSize,
 			},

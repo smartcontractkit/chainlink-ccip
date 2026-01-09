@@ -181,7 +181,7 @@ func TestOutcome_EmptyObservations(t *testing.T) {
 
 	// Prepare attributed observations with only minimal data
 	aos := make([]plugincommon.AttributedObservation[Observation], numOracles)
-	for i := 0; i < numOracles; i++ {
+	for i := range numOracles {
 		obs := Observation{
 			FChain:    fChains,
 			Timestamp: ts,

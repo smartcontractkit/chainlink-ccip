@@ -258,6 +258,6 @@ func MessageWithTokensAndExtraData16(t *testing.T, tokenPoolAddr ...string) ccip
 
 func bytes32From(address string, idx int) []byte {
 	hasher := hashutil.NewKeccak()
-	hash := hasher.Hash([]byte(fmt.Sprintf("%s%d", address, idx)))
+	hash := hasher.Hash(fmt.Appendf(nil, "%s%d", address, idx))
 	return hash[:]
 }

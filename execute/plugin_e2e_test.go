@@ -296,7 +296,7 @@ func TestCommitReportCacheOptimization(t *testing.T) {
 
 	// Add a mix of empty reports (no Merkle roots) and reports with Merkle roots
 	// First add empty reports - these should be filtered out by the cache
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		currentTimestamp = currentTimestamp.Add(time.Second)
 		baseBlockNumber++
 		emptyReport := cciptypes.CommitPluginReportWithMeta{

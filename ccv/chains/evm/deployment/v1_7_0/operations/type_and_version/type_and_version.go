@@ -46,7 +46,7 @@ var getTypeAndVersion = cldf_ops.NewOperation(
 		boundContract := bind.NewBoundContract(input.Address, parsedABI, chain.Client, chain.Client, chain.Client)
 
 		// Make the call - boundContract.Call handles packing/unpacking automatically
-		var result []interface{}
+		var result []any
 		err = boundContract.Call(&bind.CallOpts{Context: b.GetContext()}, &result, "typeAndVersion")
 		if err != nil {
 			return "", fmt.Errorf("failed to call typeAndVersion on contract %s: %w", input.Address, err)

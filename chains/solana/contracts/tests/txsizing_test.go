@@ -36,11 +36,11 @@ func failOnExcessOnlyWithTables(tables map[solana.PublicKey]solana.PublicKeySlic
 	return len(tables) > 0
 }
 
-func toTableEntries(t interface{}) solana.PublicKeySlice {
+func toTableEntries(t any) solana.PublicKeySlice {
 	fields := reflect.VisibleFields(reflect.TypeOf(t))
 	entries := make(solana.PublicKeySlice, 0, len(fields))
 	for _, field := range fields {
-		if field.Type == reflect.TypeOf(solana.PublicKey{}) {
+		if field.Type == reflect.TypeFor[solana.PublicKey]() {
 			entries = append(entries, reflect.ValueOf(t).FieldByName(field.Name).Interface().(solana.PublicKey))
 		}
 	}

@@ -551,7 +551,6 @@ func TestDeployCCTPChains_VerifyPreconditions(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.desc, func(t *testing.T) {
 			// Create CCTP chain registry and MCMS registry (not used in verify, but required for changeset creation)
 			cctpChainRegistry := adapters.NewCCTPChainRegistry()

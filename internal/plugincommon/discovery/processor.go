@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"maps"
 	"slices"
-	"sort"
 	"sync/atomic"
 	"time"
 
@@ -121,7 +120,7 @@ func (cdp *ContractDiscoveryProcessor) getSupportedChains() ([]cciptypes.ChainSe
 	}
 
 	supportedChainsSlice := supportedChains.ToSlice()
-	sort.Slice(supportedChainsSlice, func(i, j int) bool { return supportedChainsSlice[i] < supportedChainsSlice[j] })
+	slices.Sort(supportedChainsSlice)
 	return supportedChainsSlice, nil
 }
 

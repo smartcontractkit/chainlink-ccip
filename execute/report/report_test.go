@@ -250,7 +250,7 @@ func makeTestCommitReport(
 		}
 	}
 	var messages []cciptypes.Message
-	for i := 0; i < numMessages; i++ {
+	for i := range numMessages {
 		var msg cciptypes.Message
 		if zeroNonces {
 			msg = makeMessage(
@@ -286,7 +286,7 @@ func makeTestCommitReport(
 			TokenData: []exectypes.TokenData{
 				{
 					Ready: true,
-					Data:  []byte(fmt.Sprintf("data %d", i)),
+					Data:  fmt.Appendf(nil, "data %d", i),
 				},
 			},
 		}

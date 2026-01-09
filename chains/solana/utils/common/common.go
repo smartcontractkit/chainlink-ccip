@@ -70,7 +70,7 @@ func Map[T, V any](ts []T, fn func(T) V) []V {
 
 func Discriminator(namespace, name string) []byte {
 	h := sha256.New()
-	h.Write([]byte(fmt.Sprintf("%s:%s", namespace, name)))
+	h.Write(fmt.Appendf(nil, "%s:%s", namespace, name))
 	return h.Sum(nil)[:8]
 }
 

@@ -211,7 +211,7 @@ func Test_HTTPClient_Cooldown(t *testing.T) {
 	require.EqualError(t, err, tokendata.ErrUnknownResponse.Error())
 
 	// First rate-limit activates cooldown and other requests should return rate limit immediately
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		_, _, err = client.Get(t.Context(), cciptypes.Bytes32{1, 2, 3}.String())
 		require.EqualError(t, err, tokendata.ErrRateLimit.Error())
 	}

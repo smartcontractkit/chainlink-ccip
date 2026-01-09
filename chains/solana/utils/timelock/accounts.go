@@ -68,7 +68,7 @@ func mustCreateRoleAccounts(num int) []solana.PrivateKey {
 		panic("num should be between 1 and 64")
 	}
 	accounts := make([]solana.PrivateKey, num)
-	for i := 0; i < num; i++ {
+	for i := range num {
 		accounts[i] = mustPrivateKey()
 	}
 	return accounts

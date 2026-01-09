@@ -146,7 +146,7 @@ var defaultChainConfig = reader.ChainConfig{
 // sameObs returns n observations with the same observation but from different oracle ids
 func sameObs(n int, obs Observation) []plugincommon.AttributedObservation[Observation] {
 	aos := make([]plugincommon.AttributedObservation[Observation], n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		aos[i] = plugincommon.AttributedObservation[Observation]{OracleID: commontypes.OracleID(i), Observation: obs}
 	}
 	return aos
@@ -352,7 +352,7 @@ func TestProcessor_Outcome(t *testing.T) {
 			name: "Empty Observations with only FChain and TimestampNow",
 			aos: func() []plugincommon.AttributedObservation[Observation] {
 				aos := make([]plugincommon.AttributedObservation[Observation], numOracles)
-				for i := 0; i < numOracles; i++ {
+				for i := range numOracles {
 					aos[i] = plugincommon.AttributedObservation[Observation]{
 						OracleID: commontypes.OracleID(i),
 						Observation: Observation{

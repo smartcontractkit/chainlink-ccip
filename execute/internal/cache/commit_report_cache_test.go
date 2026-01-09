@@ -501,7 +501,7 @@ func TestCommitReportCache_RefreshCache_ConcurrentCalls(t *testing.T) {
 	wg.Add(numGoroutines)
 
 	var initialReports []ccipocr3.CommitPluginReportWithMeta
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		initialReports = append(initialReports, ccipocr3.CommitPluginReportWithMeta{
 			Report: ccipocr3.CommitPluginReport{
 				BlessedMerkleRoots: []ccipocr3.MerkleRootChain{
@@ -516,7 +516,7 @@ func TestCommitReportCache_RefreshCache_ConcurrentCalls(t *testing.T) {
 		mock.Anything, mock.AnythingOfType("time.Time"), primitives.Finalized, DefaultMaxCommitReportsToFetch,
 	).Return(initialReports, nil)
 
-	for i := 0; i < numGoroutines; i++ {
+	for i := range numGoroutines {
 		go func(_ int) {
 			defer wg.Done()
 			err := cache.RefreshCache(context.Background())

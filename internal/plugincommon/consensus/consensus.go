@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"cmp"
+	"slices"
 	"sort"
 	"time"
 
@@ -132,7 +133,7 @@ func GetOrderedConsensus[K comparable, T cmp.Ordered](
 			continue
 		}
 
-		sort.Slice(items, func(i, j int) bool { return items[i] < items[j] })
+		slices.Sort(items)
 		result[key] = items[minThresh]
 	}
 	return result

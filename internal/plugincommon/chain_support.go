@@ -2,7 +2,7 @@ package plugincommon
 
 import (
 	"fmt"
-	"sort"
+	"slices"
 
 	mapset "github.com/deckarep/golang-set/v2"
 
@@ -73,7 +73,7 @@ func (c ccipChainSupport) KnownSourceChainsSlice() ([]cciptypes.ChainSelector, e
 	}
 
 	allChains := allChainsSet.ToSlice()
-	sort.Slice(allChains, func(i, j int) bool { return allChains[i] < allChains[j] })
+	slices.Sort(allChains)
 
 	sourceChains := slicelib.Filter(allChains, func(ch cciptypes.ChainSelector) bool { return ch != c.destChain })
 

@@ -3,7 +3,7 @@ package inmem
 import (
 	"context"
 	"math/big"
-	"sort"
+	"slices"
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -124,7 +124,7 @@ func (r InMemoryCCIPReader) ExecutedMessages(
 		}
 
 		unqSeqNums := mapset.NewSet(seqNums...).ToSlice()
-		sort.Slice(unqSeqNums, func(i, j int) bool { return unqSeqNums[i] < unqSeqNums[j] })
+		slices.Sort(unqSeqNums)
 		ret[source] = unqSeqNums
 	}
 	return ret, nil
