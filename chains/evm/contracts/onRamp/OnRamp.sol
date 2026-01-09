@@ -325,6 +325,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     eventData.verifierBlobs = new bytes[](resolvedExtraArgs.ccvs.length);
 
     // 6. call each verifier.
+
     for (uint256 i = 0; i < resolvedExtraArgs.ccvs.length; ++i) {
       address implAddress = ICrossChainVerifierResolver(resolvedExtraArgs.ccvs[i])
         .getOutboundImplementation(destChainSelector, resolvedExtraArgs.ccvArgs[i]);
@@ -340,6 +341,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     }
 
     // 7. emit event.
+
     emit CCIPMessageSent({
       destChainSelector: destChainSelector,
       sender: originalSender,

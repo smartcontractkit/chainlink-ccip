@@ -187,8 +187,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     if (s_reentrancyGuardEntered) revert ReentrancyGuardReentrantCall();
     s_reentrancyGuardEntered = true;
 
-    MessageV1Codec.MessageV1 memory message =
-      _beforeExecuteSingleMessage(MessageV1Codec._decodeMessageV1(encodedMessage));
+    MessageV1Codec.MessageV1 memory message = MessageV1Codec._decodeMessageV1(encodedMessage);
 
     if (i_rmnRemote.isCursed(bytes16(uint128(message.sourceChainSelector)))) {
       revert CursedByRMN(message.sourceChainSelector);
@@ -900,14 +899,5 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
 
       emit SourceChainConfigSet(configUpdate.sourceChainSelector, configUpdate);
     }
-  }
-
-  /// @notice hook for applying custom logic to the input message before executeSingleMessage()
-  /// @param message initial message
-  /// @return transformedMessage modified message
-  function _beforeExecuteSingleMessage(
-    MessageV1Codec.MessageV1 memory message
-  ) internal view virtual returns (MessageV1Codec.MessageV1 memory transformedMessage) {
-    return message;
   }
 }

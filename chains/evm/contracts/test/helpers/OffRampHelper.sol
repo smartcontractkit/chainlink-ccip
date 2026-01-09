@@ -39,12 +39,6 @@ contract OffRampHelper is OffRamp {
     return _getCCVsFromPool(localToken, sourceChainSelector, amount, finality, extraData);
   }
 
-  function beforeExecuteSingleMessage(
-    MessageV1Codec.MessageV1 memory message
-  ) external view returns (MessageV1Codec.MessageV1 memory) {
-    return _beforeExecuteSingleMessage(message);
-  }
-
   function releaseOrMintSingleToken(
     MessageV1Codec.TokenTransferV1 memory tokenTransfer,
     bytes memory originalSender,
