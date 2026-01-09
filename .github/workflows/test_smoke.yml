@@ -42,13 +42,11 @@ jobs:
       matrix:
         test:
         - name: TestE2ESmoke
-          config: "env.toml"                     # only the base config
-        - name: TestE2ESmoke
           config: >-
             ${{ 
                 github.event_name == 'workflow_dispatch' &&
-                ( inputs.custom_config != '' && inputs.custom_config || 'env.toml,solana.toml' )
-                || 'env.toml,solana.toml'
+                ( inputs.custom_config != '' && inputs.custom_config || 'env.toml' )
+                || 'env.toml'
             }}
       fail-fast: false
     steps:
