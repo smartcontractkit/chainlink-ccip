@@ -51,7 +51,9 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     i_token.approve(address(lockBox), amount);
     lockBox.deposit(address(i_token), remoteChainSelector, amount);
     // We reset to 0 to reduce the risk of dangling approvals being exploited. It should already be 0 but just in case.
-    i_token.approve(address(lockBox), 0);
+    if (i_token.allowance(address(this), address(lockBox)) != 0) {
+      i_token.approve(address(lockBox), 0);
+    }
   }
 
   /// @inheritdoc TokenPool

@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {IPoolV1} from "../../../../interfaces/IPool.sol";
 import {IPoolV2} from "../../../../interfaces/IPoolV2.sol";
 import {USDCTokenPoolProxy} from "../../../../pools/USDC/USDCTokenPoolProxy.sol";
 import {USDCTokenPoolProxySetup} from "./USDCTokenPoolProxySetup.t.sol";
