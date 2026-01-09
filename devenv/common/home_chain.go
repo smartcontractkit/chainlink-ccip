@@ -133,6 +133,9 @@ func applyUpdateChainConfig(e deployment.Environment, cfg UpdateChainConfigConfi
 			BatchSize:          4, // Conservative batch size to avoid exceeding gas limits (TODO: Make this configurable)
 		},
 	)
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("applying chain config updates: %w", err)
+	}
 	mcmsReg := changesets.GetRegistry()
 	// since we are only using evm here
 	mcmsReg.RegisterMCMSReader(chain_selectors.FamilyEVM, &adapters.EVMMCMSReader{})
@@ -314,6 +317,9 @@ func applyAddDonAndSetCandidateChangesetConfig(e deployment.Environment, cfg Add
 			DONs:                 dons,
 		},
 	)
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("adding DON and setting candidate: %w", err)
+	}
 	mcmsReg := changesets.GetRegistry()
 	mcmsReg.RegisterMCMSReader(chain_selectors.FamilyEVM, &adapters.EVMMCMSReader{})
 	return changesets.NewOutputBuilder(e, mcmsReg).
@@ -772,6 +778,9 @@ func applySetCandidateChangesetConfig(e deployment.Environment, cfg SetCandidate
 			DONs:                 dons,
 		},
 	)
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("setting candidate config: %w", err)
+	}
 	mcmsReg := changesets.GetRegistry()
 	mcmsReg.RegisterMCMSReader(chain_selectors.FamilyEVM, &adapters.EVMMCMSReader{})
 	return changesets.NewOutputBuilder(e, mcmsReg).
@@ -976,6 +985,9 @@ func applyPromoteCandidateChangesetConfig(e deployment.Environment, cfg PromoteC
 			DONs:                 dons,
 		},
 	)
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("promoting candidate config: %w", err)
+	}
 	mcmsReg := changesets.GetRegistry()
 	mcmsReg.RegisterMCMSReader(chain_selectors.FamilyEVM, &adapters.EVMMCMSReader{})
 	return changesets.NewOutputBuilder(e, mcmsReg).
