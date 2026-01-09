@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"maps"
 
 	sel "github.com/smartcontractkit/chain-selectors"
 
@@ -231,9 +232,7 @@ func AllAvailableDomains() map[uint64]uint32 {
 	}
 
 	destDomains := make(map[uint64]uint32)
-	for k, v := range CCTPDestDomains {
-		destDomains[k] = v
-	}
+	maps.Copy(destDomains, CCTPDestDomains)
 
 	for i, chainID := range chainIDs {
 		chainSelector, _ := sel.SelectorFromChainId(chainID)
