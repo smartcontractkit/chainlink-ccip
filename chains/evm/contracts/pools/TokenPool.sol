@@ -138,10 +138,10 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
 
   /// @dev The address of the router.
   IRouter internal s_router;
-  /// @dev Optional advanced pool hooks contract for additional features like allowlists and CCV management.
-  IAdvancedPoolHooks internal s_advancedPoolHooks;
   /// @dev Minimum block confirmation on the source chain, 0 means the default finality.
   uint16 internal s_minBlockConfirmation;
+  /// @dev Optional advanced pool hooks contract for additional features like allowlists and CCV management.
+  IAdvancedPoolHooks internal s_advancedPoolHooks;
   // Separate buckets provide isolated rate limits for transfers with custom block confirmation, as their risk profiles differ from default transfers.
   mapping(uint64 remoteChainSelector => RateLimiter.TokenBucket tokenBucketOutbound) internal
     s_outboundRateLimiterConfig;
