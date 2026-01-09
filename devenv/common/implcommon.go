@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/big"
 	"os"
@@ -17,6 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	capabilities_registry "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/clclient"
+	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
@@ -28,6 +30,7 @@ import (
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	changesetscore "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
+	ccip_evm "github.com/smartcontractkit/chainlink-ccip/devenv/chainimpl/ccip-evm"
 )
 
 func DeployContractsForSelector(ctx context.Context, env *deployment.Environment, cls []*simple_node_set.Input, selector uint64, ccipHomeSelector uint64, crAddr string) (datastore.DataStore, error) {
@@ -187,7 +190,15 @@ func ConnectContractsWithSelectors(ctx context.Context, e *deployment.Environmen
 	return nil
 }
 
-func AddNodesToContracts(ctx context.Context, e *deployment.Environment, cls []*simple_node_set.Input, nodeKeyBundles map[string]map[string]clclient.NodeKeysBundle, ccipHomeSelector uint64, remoteSelectors []uint64) error {
+func AddNodesToContracts(
+	ctx context.Context,
+	e *deployment.Environment,
+	cls []*simple_node_set.Input,
+	nodeKeyBundles map[string]map[string]clclient.NodeKeysBundle,
+	ccipHomeSelector uint64, remoteSelectors []uint64,
+	homeChainType string,
+	bcs []*blockchain.Input,
+) error {
 	l := zerolog.Ctx(ctx)
 	l.Info().Uint64("HomeChainSelector", ccipHomeSelector).Msg("Configuring contracts for home chain selector")
 	bundle := operations.NewBundle(
@@ -246,7 +257,7 @@ func AddNodesToContracts(ctx context.Context, e *deployment.Environment, cls []*
 		return fmt.Errorf("updating chain config for selector %d: %w", ccipHomeSelector, err)
 	}
 
-	_, err = AddDONAndSetCandidate.Apply(*e, AddDonAndSetCandidateChangesetConfig{
+	csOut, err := AddDONAndSetCandidate.Apply(*e, AddDonAndSetCandidateChangesetConfig{
 		HomeChainSelector: ccipHomeSelector,
 		FeedChainSelector: ccipHomeSelector,
 		PluginInfo: SetCandidatePluginInfo{
@@ -259,7 +270,17 @@ func AddNodesToContracts(ctx context.Context, e *deployment.Environment, cls []*
 	if err != nil {
 		return fmt.Errorf("adding DON and setting candidate for selector %d: %w", ccipHomeSelector, err)
 	}
-	_, err = SetCandidate.Apply(*e, SetCandidateChangesetConfig{
+	if len(csOut.MCMSTimelockProposals) > 0 {
+		if homeChainType != blockchain.TypeAnvil {
+			return errors.New("timelock proposals are only supported on Anvil home chains in tests")
+		}
+		err = ccip_evm.ProcessMCMSProposalsWithTimelockForAnvil(ctx, bcs, csOut.MCMSTimelockProposals)
+		if err != nil {
+			return fmt.Errorf("processing MCMS timelock proposals for adding DON and setting candidate for selector %d: %w", ccipHomeSelector, err)
+		}
+		e.Logger.Info("Successfully added DON and set candidate for commit OCR through proposal execution")
+	}
+	csOut, err = SetCandidate.Apply(*e, SetCandidateChangesetConfig{
 		HomeChainSelector: ccipHomeSelector,
 		FeedChainSelector: ccipHomeSelector,
 		PluginInfo: []SetCandidatePluginInfo{
@@ -274,7 +295,17 @@ func AddNodesToContracts(ctx context.Context, e *deployment.Environment, cls []*
 	if err != nil {
 		return fmt.Errorf("setting candidate for selector %d: %w", ccipHomeSelector, err)
 	}
-	_, err = PromoteCandidate.Apply(*e, PromoteCandidateChangesetConfig{
+	if len(csOut.MCMSTimelockProposals) > 0 {
+		if homeChainType != blockchain.TypeAnvil {
+			return errors.New("timelock proposals are only supported on Anvil home chains in tests")
+		}
+		err = ccip_evm.ProcessMCMSProposalsWithTimelockForAnvil(ctx, bcs, csOut.MCMSTimelockProposals)
+		if err != nil {
+			return fmt.Errorf("processing MCMS timelock proposals for setting candidate: %w", err)
+		}
+		e.Logger.Info("Successfully set candidate for exec OCR through proposal execution")
+	}
+	csOut, err = PromoteCandidate.Apply(*e, PromoteCandidateChangesetConfig{
 		HomeChainSelector: ccipHomeSelector,
 		PluginInfo: []PromoteCandidatePluginInfo{
 			{
@@ -291,15 +322,35 @@ func AddNodesToContracts(ctx context.Context, e *deployment.Environment, cls []*
 	if err != nil {
 		return fmt.Errorf("promoting candidate for selector %d: %w", ccipHomeSelector, err)
 	}
+	if len(csOut.MCMSTimelockProposals) > 0 {
+		if homeChainType != blockchain.TypeAnvil {
+			return errors.New("timelock proposals are only supported on Anvil home chains in tests")
+		}
+		err = ccip_evm.ProcessMCMSProposalsWithTimelockForAnvil(ctx, bcs, csOut.MCMSTimelockProposals)
+		if err != nil {
+			return fmt.Errorf("processing MCMS timelock proposals for promoting candidate: %w", err)
+		}
+		e.Logger.Info("Successfully promoted candidate through proposal execution")
+	}
 	dReg := deployops.GetRegistry()
 	mcmsRegistry := changesetscore.GetRegistry()
-	_, err = deployops.SetOCR3Config(dReg, mcmsRegistry).Apply(*e, deployops.SetOCR3ConfigArgs{
+	csOut, err = deployops.SetOCR3Config(dReg, mcmsRegistry).Apply(*e, deployops.SetOCR3ConfigArgs{
 		HomeChainSel:    ccipHomeSelector,
 		RemoteChainSels: remoteSelectors,
 		ConfigType:      cciputils.ConfigTypeActive,
 	})
 	if err != nil {
 		return fmt.Errorf("setting OCR3 config for selector %d: %w", ccipHomeSelector, err)
+	}
+	if len(csOut.MCMSTimelockProposals) > 0 {
+		if homeChainType != blockchain.TypeAnvil {
+			return errors.New("timelock proposals are only supported on Anvil home chains in tests")
+		}
+		err = ccip_evm.ProcessMCMSProposalsWithTimelockForAnvil(ctx, bcs, csOut.MCMSTimelockProposals)
+		if err != nil {
+			return fmt.Errorf("processing MCMS timelock proposals for setting ocr3 config: %w", err)
+		}
+		e.Logger.Info("Successfully set OCR3 config through proposal execution")
 	}
 	return nil
 }

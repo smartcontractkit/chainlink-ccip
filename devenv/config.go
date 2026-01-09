@@ -39,6 +39,7 @@ const (
 )
 
 var CCIPHomeChain = chain_selectors.GETH_TESTNET.Selector
+var CCIPHomeChainID = chain_selectors.GETH_TESTNET.EvmChainID
 var L = log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).Level(zerolog.InfoLevel)
 
 // Load loads TOML configurations from a list of paths, i.e. env.toml,overrides.toml

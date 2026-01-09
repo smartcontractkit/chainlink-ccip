@@ -20,6 +20,7 @@ import (
 	capabilities_registry "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/clclient"
+	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/jd"
 	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 
@@ -62,7 +63,7 @@ func checkForkedEnvIsSet(in *Cfg) error {
 		if in.ForkedEnvConfig.ForkBlockNumbers != nil && in.ForkedEnvConfig.ForkBlockNumbers[bc.ChainID] != 0 {
 			forkedArgs = append(forkedArgs, "--fork-block-number", fmt.Sprintf("%d", in.ForkedEnvConfig.ForkBlockNumbers[bc.ChainID]))
 		}
-		forkedArgs = append(forkedArgs, "--timeout", "180000")
+		forkedArgs = append(forkedArgs, "--timeout", "180000", "--auto-impersonate")
 		in.Blockchains[i].DockerCmdParamsOverrides = append(forkedArgs, in.Blockchains[i].DockerCmdParamsOverrides...)
 	}
 	return nil
@@ -221,7 +222,7 @@ func NewForkedEnvironment() (*Cfg, error) {
 	}
 	in.CLDF.AddAddresses(string(a))
 
-	err = devenvcommon.AddNodesToContracts(ctx, e, in.NodeSets, nodeKeyBundles, homeChainSelector, selectors)
+	err = devenvcommon.AddNodesToContracts(ctx, e, in.NodeSets, nodeKeyBundles, homeChainSelector, selectors, blockchain.TypeAnvil, in.Blockchains)
 	if err != nil {
 		return nil, err
 	}
