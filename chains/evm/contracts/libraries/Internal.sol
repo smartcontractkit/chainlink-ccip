@@ -138,7 +138,7 @@ library Internal {
   /// @dev The encodedAddress is expected to be the 36-byte raw representation:
   /// - 1 byte: flags (isBounceable, isTestnetOnly, etc.)
   /// - 1 byte: workchain_id (0x00 for BaseChain, 0xff for MasterChain)
-  /// - 32 bytes: account_id
+  /// - 32 bytes: account_id (must be non-zero)
   /// - 2 bytes: CRC16 checksum(computationally heavy, validation omitted for simplicity)
   /// @param encodedAddress The 36-byte TON address.
   function _validateTVMAddress(

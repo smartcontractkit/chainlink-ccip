@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.20;
 
 import {Pool} from "../libraries/Pool.sol";
 
+import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
+
 /// @notice Shared public interface for multiple V2 pool types.
 /// Each pool type handles a different child token model e.g. lock/release, mint/burn.
-interface IPoolV2 {
+interface IPoolV2 is IERC165 {
   struct TokenTransferFeeConfig {
     uint32 destGasOverhead; // ───────────────────────╮ Gas charged to execute the token transfer on the destination chain.
     uint32 destBytesOverhead; //                      │ Data availability bytes.

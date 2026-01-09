@@ -210,10 +210,12 @@ contract TokenPoolFactory is ITypeAndVersion {
     // LockRelease pools need lockBox, BurnMint pools don't.
     bytes memory tokenPoolInitArgs;
     address localLockBox;
+    bool deployedLockBox = false;
     if (localConfig.localPoolType == PoolType.LOCK_RELEASE) {
       localLockBox = localConfig.lockBox;
       if (localLockBox == address(0)) {
         localLockBox = _deployLockBox(localConfig.token, localConfig.salt);
+        deployedLockBox = true;
       } else {
         ERC20LockBox lockBoxContract = ERC20LockBox(localLockBox);
         if (!lockBoxContract.isTokenSupported(localConfig.token)) {
@@ -235,17 +237,13 @@ contract TokenPoolFactory is ITypeAndVersion {
     TokenPool(poolAddress).applyChainUpdates(new uint64[](0), chainUpdates);
 
     // Authorize the new pool to interact with the local lockbox and transfer ownership to the caller for future admin.
-    if (localConfig.localPoolType == PoolType.LOCK_RELEASE) {
-      ERC20LockBox lockBoxContract = ERC20LockBox(localLockBox);
-      // We check the owner as user supplied lockboxes can be different.
-      if (lockBoxContract.owner() == address(this)) {
-        _authorizePoolInLockBox(localLockBox, poolAddress);
-        lockBoxContract.transferOwnership(msg.sender);
-      }
+    if (deployedLockBox) {
+      _authorizePoolInLockBox(localLockBox, poolAddress);
+      ERC20LockBox(localLockBox).transferOwnership(msg.sender);
     }
 
     // Begin the 2 step ownership transfer of the token pool to the msg.sender.
-    IOwnable(poolAddress).transferOwnership(address(msg.sender));
+    IOwnable(poolAddress).transferOwnership(msg.sender);
 
     return poolAddress;
   }
