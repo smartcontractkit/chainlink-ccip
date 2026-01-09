@@ -7,6 +7,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/type_and_version"
 )
 
@@ -41,4 +42,16 @@ func ParseTypeAndVersion(tvStr string) (string, string, error) {
 		return "", "", fmt.Errorf("invalid type and version %s", tvStr)
 	}
 	return typeAndVersionValues[0], typeAndVersionValues[1], nil
+}
+
+// ValidateEVMAddress validates that a non-empty string is a valid Ethereum hex address.
+// Returns nil if the address is empty (optional field) or valid.
+func ValidateEVMAddress(addr string, fieldName string) error {
+	if addr == "" {
+		return nil // empty is allowed for optional fields
+	}
+	if !common.IsHexAddress(addr) {
+		return fmt.Errorf("invalid Ethereum address for %s: %q", fieldName, addr)
+	}
+	return nil
 }

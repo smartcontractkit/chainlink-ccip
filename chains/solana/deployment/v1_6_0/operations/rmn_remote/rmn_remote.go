@@ -21,7 +21,6 @@ import (
 
 var ContractType cldf_deployment.ContractType = "RMNRemote"
 var ProgramName = "rmn_remote"
-var ProgramSize = 3 * 1024 * 1024
 var Version *semver.Version = semver.MustParse("1.6.0")
 
 type CurseInput struct {

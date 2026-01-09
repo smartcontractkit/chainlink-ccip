@@ -6,7 +6,9 @@ import (
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
+
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
+
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
 
@@ -23,6 +25,11 @@ const (
 	CapabilitiesRegistry       cldf.ContractType = "CapabilitiesRegistry"
 	CCIPHome                   cldf.ContractType = "CCIPHome"
 	RMNHome                    cldf.ContractType = "RMNHome"
+	BurnMintTokenPool          cldf.ContractType = "BurnMintTokenPool"
+	LockReleaseTokenPool       cldf.ContractType = "LockReleaseTokenPool"
+	TokenPoolLookupTable       cldf.ContractType = "TokenPoolLookupTable"
+	BurnWithFromMintTokenPool  cldf.ContractType = "BurnWithFromMintTokenPool"
+	BurnFromMintTokenPool      cldf.ContractType = "BurnFromMintTokenPool"
 	// CLL Identifiers
 	CLLQualifier         = "CLLCCIP"
 	RMNTimelockQualifier = "RMNMCMS"
@@ -69,7 +76,11 @@ var (
 )
 
 var (
+	Version_1_0_0 = semver.MustParse("1.0.0")
+	Version_1_5_0 = semver.MustParse("1.5.0")
+	Version_1_5_1 = semver.MustParse("1.5.1")
 	Version_1_6_0 = semver.MustParse("1.6.0")
+	Version_1_6_1 = semver.MustParse("1.6.1")
 )
 
 func NewRegistererID(chainFamily string, version *semver.Version) string {

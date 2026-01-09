@@ -29,13 +29,10 @@ import (
 
 var (
 	AccessControllerProgramName = "access_controller"
-	AccessControllerProgramSize = 1 * 1024 * 1024
 
 	TimelockProgramName = "timelock"
-	TimelockProgramSize = 1 * 1024 * 1024
 
 	McmProgramName = "mcm"
-	McmProgramSize = 1 * 1024 * 1024
 )
 
 var AccessControllerDeploy = operations.NewOperation(
