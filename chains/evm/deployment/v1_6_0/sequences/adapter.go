@@ -102,14 +102,15 @@ func (a *EVMAdapter) GetRouterAddress(ds datastore.DataStore, chainSelector uint
 
 // GetDefaultTokenPrices returns default fee token prices for EVM chains.
 // This looks up LINK and WETH tokens from the datastore and returns a default
-// price for local/test environments. The price is kept low to minimize fees during testing.
+// price for local/test environments.
 // Returns a map of token address (hex string) to USD price (18 decimals).
 func (a *EVMAdapter) GetDefaultTokenPrices(ds datastore.DataStore, chainSelector uint64) map[string]*big.Int {
 	prices := make(map[string]*big.Int)
 
-	// Default price: $0.01 per token (1e16) - kept very low for minimal test fees
-	// In production, real oracle prices would be used
-	defaultPrice := big.NewInt(1e16)
+	// Default price: $20 per token (20 * 1e18)
+	// Realistic price for LINK/WETH in test environments
+	// Combined with low gas price (~$1 USD fee), this gives ~0.05 LINK per send
+	defaultPrice := new(big.Int).Mul(big.NewInt(20), big.NewInt(1e18))
 
 	// Look up LINK token address
 	linkRefs := ds.Addresses().Filter(
