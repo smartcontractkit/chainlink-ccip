@@ -2,6 +2,7 @@ package common
 
 import (
 	"bytes"
+	"context"
 	"crypto/ed25519"
 	"encoding/binary"
 	"encoding/hex"
@@ -31,15 +32,19 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
+
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
+
 	evmseqs "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/ccip_home"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/rmn_home"
 	solanaSeqs "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
+
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
+
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
@@ -78,7 +83,7 @@ func applyUpdateChainConfig(e deployment.Environment, cfg UpdateChainConfigConfi
 		common.HexToAddress(ccipHomeAddr.Address),
 		e.BlockChains.EVMChains()[cfg.HomeChainSelector].Client)
 	if err != nil {
-		return deployment.ChangesetOutput{}, fmt.Errorf("finding CCIPHome address: %w", err)
+		return deployment.ChangesetOutput{}, fmt.Errorf("creating CCIPHome instance: %w", err)
 	}
 
 	// Create mapping of all removals to check if we are removing and re-adding chains
@@ -776,42 +781,59 @@ func applySetCandidateChangesetConfig(e deployment.Environment, cfg SetCandidate
 }
 
 func DonIDForChain(registry *capabilities_registry.CapabilitiesRegistry, ccipHome *ccip_home.CCIPHome, chainSelector uint64) (uint32, error) {
-	dons, err := registry.GetDONs(nil)
+	nextDonID, err := registry.GetNextDONId(&bind.CallOpts{
+		Context: context.Background(),
+	})
 	if err != nil {
-		return 0, fmt.Errorf("get Dons from capability registry: %w", err)
+		return 0, fmt.Errorf("get next don id from capability registry: %w", err)
 	}
-	var donIDs []uint32
-	for _, don := range dons {
+
+	var donID uint32
+	for donId := uint32(1); donId < nextDonID; donId++ {
+		don, err := registry.GetDON(&bind.CallOpts{
+			Context: context.Background(),
+		}, donId)
+		if err != nil {
+			return 0, fmt.Errorf("get don %d from capability registry: %w", donId, err)
+		}
 		if len(don.CapabilityConfigurations) == 1 &&
 			don.CapabilityConfigurations[0].CapabilityId == CCIPCapabilityID {
-			configs, err := ccipHome.GetAllConfigs(nil, don.Id, uint8(ccipocr3.PluginTypeCCIPCommit))
+			// Another possible way is to query GetAllConfigs from CCIPHome, but the return data for that would be more expensive.
+			// So we first filter DONs by checking if they have only CCIP capability in the capability registry.
+			// Then we fetch the config digests from CCIPHome to check the chain selector.
+			// This requires multiple calls, but those are cheaper than fetching all configs in one call.
+			digests, err := ccipHome.GetConfigDigests(nil, don.Id, uint8(ccipocr3.PluginTypeCCIPCommit))
 			if err != nil {
-				return 0, fmt.Errorf("get all commit configs from cciphome: %w", err)
+				return 0, fmt.Errorf("get commit config digests from cciphome: %w", err)
 			}
-			if configs.ActiveConfig.ConfigDigest == [32]byte{} && configs.CandidateConfig.ConfigDigest == [32]byte{} {
-				configs, err = ccipHome.GetAllConfigs(nil, don.Id, uint8(ccipocr3.PluginTypeCCIPExec))
+			pluginType := uint8(ccipocr3.PluginTypeCCIPCommit)
+			if digests.ActiveConfigDigest == [32]byte{} && digests.CandidateConfigDigest == [32]byte{} {
+				digests, err = ccipHome.GetConfigDigests(nil, don.Id, uint8(ccipocr3.PluginTypeCCIPExec))
 				if err != nil {
-					return 0, fmt.Errorf("get all exec configs from cciphome: %w", err)
+					return 0, fmt.Errorf("get exec config digests from cciphome: %w", err)
 				}
+				pluginType = uint8(ccipocr3.PluginTypeCCIPExec)
 			}
-			if configs.ActiveConfig.Config.ChainSelector == chainSelector || configs.CandidateConfig.Config.ChainSelector == chainSelector {
-				donIDs = append(donIDs, don.Id)
+			activeConfig, err := ccipHome.GetConfig(&bind.CallOpts{
+				Context: context.Background(),
+			}, don.Id, pluginType, digests.ActiveConfigDigest)
+			if err != nil {
+				return 0, fmt.Errorf("get active config from cciphome: %w", err)
+			}
+			candidateConfig, err := ccipHome.GetConfig(&bind.CallOpts{
+				Context: context.Background(),
+			}, don.Id, pluginType, digests.CandidateConfigDigest)
+			if err != nil {
+				return 0, fmt.Errorf("get candidate config from cciphome: %w", err)
+			}
+			if activeConfig.VersionedConfig.Config.ChainSelector == chainSelector || candidateConfig.VersionedConfig.Config.ChainSelector == chainSelector {
+				donID = don.Id
+				break
 			}
 		}
 	}
 
-	// more than one DON is an error
-	if len(donIDs) > 1 {
-		return 0, fmt.Errorf("more than one DON found for (chain selector %d, ccip capability id %x) pair", chainSelector, CCIPCapabilityID[:])
-	}
-
-	// no DON found - don ID of 0 indicates that (this is the case in the CR as well).
-	if len(donIDs) == 0 {
-		return 0, nil
-	}
-
-	// DON found - return it.
-	return donIDs[0], nil
+	return donID, nil
 }
 
 type PromoteCandidatePluginInfo struct {
