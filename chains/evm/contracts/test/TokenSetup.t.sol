@@ -8,7 +8,6 @@ import {LockReleaseTokenPool} from "../pools/LockReleaseTokenPool.sol";
 import {TokenPool} from "../pools/TokenPool.sol";
 import {TokenAdminRegistry} from "../tokenAdminRegistry/TokenAdminRegistry.sol";
 import {BaseTest} from "./BaseTest.t.sol";
-import {MaybeRevertingBurnMintTokenPool} from "./helpers/MaybeRevertingBurnMintTokenPool.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
@@ -22,12 +21,13 @@ contract TokenSetup is BaseTest {
   address internal s_destFeeToken;
 
   TokenAdminRegistry internal s_tokenAdminRegistry;
-  mapping(address token => ERC20LockBox lockBox) internal s_lockBoxes;
 
   mapping(address sourceToken => address sourcePool) internal s_sourcePoolByToken;
   mapping(address sourceToken => address destPool) internal s_destPoolBySourceToken;
   mapping(address destToken => address destPool) internal s_destPoolByToken;
   mapping(address sourceToken => address destToken) internal s_destTokenBySourceToken;
+
+  mapping(address token => ERC20LockBox lockBox) internal s_lockBoxes;
 
   function _deploySourceToken(
     string memory tokenName,
@@ -59,7 +59,8 @@ contract TokenSetup is BaseTest {
       router = address(s_destRouter);
     }
 
-    ERC20LockBox lockBox = _getOrDeployLockBox(token);
+    ERC20LockBox lockBox = new ERC20LockBox(token);
+    s_lockBoxes[token] = lockBox;
 
     LockReleaseTokenPool pool = new LockReleaseTokenPool(
       IERC20(token), DEFAULT_TOKEN_DECIMALS, address(0), address(s_mockRMNRemote), router, address(lockBox)
@@ -88,7 +89,7 @@ contract TokenSetup is BaseTest {
       router = address(s_destRouter);
     }
 
-    BurnMintTokenPool pool = new MaybeRevertingBurnMintTokenPool(
+    BurnMintTokenPool pool = new BurnMintTokenPool(
       IBurnMintERC20(address(token)), DEFAULT_TOKEN_DECIMALS, address(0), address(s_mockRMNRemote), router
     );
     BurnMintERC20(token).grantMintAndBurnRoles(address(pool));
@@ -110,7 +111,6 @@ contract TokenSetup is BaseTest {
     }
 
     s_tokenAdminRegistry = new TokenAdminRegistry();
-    // lockboxes are deployed per token via _getOrDeployLockBox
 
     // Source tokens & pools
     address sourceLink = _deploySourceToken("sLINK", type(uint256).max, 18);
@@ -133,8 +133,7 @@ contract TokenSetup is BaseTest {
     s_destTokenBySourceToken[sourceEth] = destEth;
 
     // Float the dest link lock release pool with funds.
-    ERC20LockBox destLockBox = _getOrDeployLockBox(destLink);
-    IERC20(destLink).transfer(address(destLockBox), 1000 ether);
+    IERC20(destLink).transfer(address(s_lockBoxes[destLink]), 1000 ether);
 
     // Set pools in the registry.
     for (uint256 i = 0; i < s_sourceTokens.length; ++i) {
@@ -162,17 +161,6 @@ contract TokenSetup is BaseTest {
         s_sourceTokens[i]
       );
     }
-  }
-
-  function _getOrDeployLockBox(
-    address token
-  ) internal returns (ERC20LockBox) {
-    ERC20LockBox lockBox = s_lockBoxes[token];
-    if (address(lockBox) == address(0)) {
-      lockBox = new ERC20LockBox(token);
-      s_lockBoxes[token] = lockBox;
-    }
-    return lockBox;
   }
 
   function _setPool(
