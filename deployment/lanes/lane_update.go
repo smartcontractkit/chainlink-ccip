@@ -128,5 +128,8 @@ func DefaultGasPrice(selector uint64) *big.Int {
 	case chain_selectors.FamilyTon:
 		return big.NewInt(2.12e9) // 1 TON ~2.13 USD -> 1 nanoTON = 2.13e−9 USD -> 1 nanoTON expressed in 1e18 (1 USD) = 2.13e9
 	}
-	return big.NewInt(1e15)
+	// Gas price in USD (18 decimals) per unit of gas
+	// 2e12 = $0.000002 per gas unit
+	// With ~500,000 gas, this results in ~$1 USD fee per message
+	return big.NewInt(2e12)
 }
