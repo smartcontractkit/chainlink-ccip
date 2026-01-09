@@ -29,7 +29,6 @@ defaults:
     working-directory: devenv
 
 env:
-  PARALLEL_E2E_TESTS: 'true'
   DEPLOY_CONTRACT_VERSION: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.contract_version || '' }}
 
 jobs:
