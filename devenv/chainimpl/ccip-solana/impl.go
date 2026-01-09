@@ -365,7 +365,7 @@ func (m *CCIP16Solana) WaitOneSentEventBySeqNo(ctx context.Context, from, to, se
 			}
 			if commitEvent.Report.SourceChainSelector != from {
 				l.Info().Uint64("SourceChainSelector", commitEvent.Report.SourceChainSelector).Msg("Skipping commit report from different source chain selector")
-				return nil, fmt.Errorf("unexpected source chain selector in commit report: got %d, want %d", commitEvent.Report.SourceChainSelector, from)
+				continue
 			}
 
 			// TODO: this logic is duplicated with verifyCommitReport, share
