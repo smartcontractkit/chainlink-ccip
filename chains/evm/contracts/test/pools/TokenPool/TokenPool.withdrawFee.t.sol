@@ -9,14 +9,19 @@ import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/Bu
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
 contract TokenPoolV2_withdrawFee is AdvancedPoolHooksSetup {
+  address internal s_feeAdmin;
+
   function setUp() public override {
     super.setUp();
     vm.stopPrank();
+    s_feeAdmin = makeAddr("fee_admin");
+
+    vm.prank(OWNER);
+    s_tokenPool.setDynamicConfig(makeAddr("router"), makeAddr("rateLimitAdmin"), s_feeAdmin);
   }
 
   function test_withdrawFeeTokens() public {
     uint256 feeAmount = 20 ether;
-    address feeAdmin = makeAddr("fee_admin");
     address recipient = makeAddr("fee_recipient");
 
     deal(address(s_token), address(s_tokenPool), feeAmount);
@@ -24,13 +29,10 @@ contract TokenPoolV2_withdrawFee is AdvancedPoolHooksSetup {
     address[] memory feeTokens = new address[](1);
     feeTokens[0] = address(s_token);
 
-    vm.prank(OWNER);
-    s_tokenPool.setDynamicConfig(makeAddr("router"), makeAddr("rateLimitAdmin"), feeAdmin);
-
     vm.expectEmit();
     emit FeeTokenHandler.FeeTokenWithdrawn(recipient, address(s_token), feeAmount);
 
-    vm.prank(feeAdmin);
+    vm.prank(s_feeAdmin);
     s_tokenPool.withdrawFeeTokens(feeTokens, recipient);
 
     assertEq(s_token.balanceOf(recipient), feeAmount);
@@ -40,7 +42,6 @@ contract TokenPoolV2_withdrawFee is AdvancedPoolHooksSetup {
   function test_withdrawFeeTokens_MultipleTokens() public {
     uint256 feeAmount1 = 20 ether;
     uint256 feeAmount2 = 10 ether;
-    address feeAdmin = makeAddr("fee_admin");
     address recipient = makeAddr("fee_recipient");
 
     address token2 = address(new BurnMintERC20("Token2", "TK2", 18, 0, 0));
@@ -52,15 +53,12 @@ contract TokenPoolV2_withdrawFee is AdvancedPoolHooksSetup {
     feeTokens[0] = address(s_token);
     feeTokens[1] = token2;
 
-    vm.prank(OWNER);
-    s_tokenPool.setDynamicConfig(makeAddr("router"), makeAddr("rateLimitAdmin"), feeAdmin);
-
     vm.expectEmit();
     emit FeeTokenHandler.FeeTokenWithdrawn(recipient, address(s_token), feeAmount1);
     vm.expectEmit();
     emit FeeTokenHandler.FeeTokenWithdrawn(recipient, token2, feeAmount2);
 
-    vm.prank(feeAdmin);
+    vm.prank(s_feeAdmin);
     s_tokenPool.withdrawFeeTokens(feeTokens, recipient);
 
     assertEq(s_token.balanceOf(recipient), feeAmount1);
@@ -72,8 +70,7 @@ contract TokenPoolV2_withdrawFee is AdvancedPoolHooksSetup {
   function test_withdrawFeeTokens_UpdateFeeAdmin() public {
     uint256 feeAmount1 = 20 ether;
     uint256 feeAmount2 = 10 ether;
-    address feeAdmin1 = makeAddr("fee_admin1");
-    address feeAdmin2 = makeAddr("fee_admin2");
+    address newFeeAdmin = makeAddr("new_fee_admin");
     address recipient = makeAddr("fee_recipient");
 
     deal(address(s_token), address(s_tokenPool), feeAmount1);
@@ -81,13 +78,9 @@ contract TokenPoolV2_withdrawFee is AdvancedPoolHooksSetup {
     address[] memory feeTokens = new address[](1);
     feeTokens[0] = address(s_token);
 
-    // Set initial fee admin
-    vm.prank(OWNER);
-    s_tokenPool.setDynamicConfig(makeAddr("router"), makeAddr("rateLimitAdmin"), feeAdmin1);
-
     vm.expectEmit();
     emit FeeTokenHandler.FeeTokenWithdrawn(recipient, address(s_token), feeAmount1);
-    vm.prank(feeAdmin1);
+    vm.prank(s_feeAdmin);
     s_tokenPool.withdrawFeeTokens(feeTokens, recipient);
 
     assertEq(s_token.balanceOf(recipient), feeAmount1);
@@ -95,11 +88,11 @@ contract TokenPoolV2_withdrawFee is AdvancedPoolHooksSetup {
     // Add more fees and update fee admin
     deal(address(s_token), address(s_tokenPool), feeAmount2);
     vm.prank(OWNER);
-    s_tokenPool.setDynamicConfig(makeAddr("router"), makeAddr("rateLimitAdmin"), feeAdmin2);
+    s_tokenPool.setDynamicConfig(makeAddr("router"), makeAddr("rateLimitAdmin"), newFeeAdmin);
 
     vm.expectEmit();
     emit FeeTokenHandler.FeeTokenWithdrawn(recipient, address(s_token), feeAmount2);
-    vm.prank(feeAdmin2);
+    vm.prank(newFeeAdmin);
     s_tokenPool.withdrawFeeTokens(feeTokens, recipient);
 
     assertEq(s_token.balanceOf(recipient) - feeAmount1, feeAmount2);
@@ -107,7 +100,6 @@ contract TokenPoolV2_withdrawFee is AdvancedPoolHooksSetup {
 
   function test_withdrawFeeTokens_CallableByOwnerAndFeeAdmin() public {
     uint256 feeAmount = 20 ether;
-    address feeAdmin = makeAddr("fee_admin");
     address recipient = makeAddr("fee_recipient");
 
     deal(address(s_token), address(s_tokenPool), feeAmount / 2);
@@ -115,12 +107,9 @@ contract TokenPoolV2_withdrawFee is AdvancedPoolHooksSetup {
     address[] memory feeTokens = new address[](1);
     feeTokens[0] = address(s_token);
 
-    vm.prank(OWNER);
-    s_tokenPool.setDynamicConfig(makeAddr("router"), makeAddr("rateLimitAdmin"), feeAdmin);
-
     vm.expectEmit();
     emit FeeTokenHandler.FeeTokenWithdrawn(recipient, address(s_token), feeAmount / 2);
-    vm.prank(feeAdmin);
+    vm.prank(s_feeAdmin);
     s_tokenPool.withdrawFeeTokens(feeTokens, recipient);
 
     deal(address(s_token), address(s_tokenPool), feeAmount / 2);
