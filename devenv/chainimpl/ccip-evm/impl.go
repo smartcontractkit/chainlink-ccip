@@ -586,9 +586,9 @@ func (m *CCIP16EVM) ConfigureNodes(ctx context.Context, bc *blockchain.Input) (s
 	// Check if this is an external chain (user pre-configured the Out section in TOML)
 	// External chains are detected by checking if the URLs are external (not localhost/docker)
 	isExternalChain := bc.Out != nil && len(bc.Out.Nodes) > 0 &&
-		!strings.Contains(bc.Out.Nodes[0].InternalHTTPUrl, "host.docker.internal") &&
-		!strings.Contains(bc.Out.Nodes[0].InternalHTTPUrl, "localhost") &&
-		!strings.Contains(bc.Out.Nodes[0].InternalHTTPUrl, "blockchain-")
+		!strings.Contains(bc.Out.Nodes[0].ExternalHTTPUrl, "host.docker.internal") &&
+		!strings.Contains(bc.Out.Nodes[0].ExternalHTTPUrl, "localhost") &&
+		!strings.Contains(bc.Out.Nodes[0].ExternalHTTPUrl, "127.0.0.1")
 
 	if isExternalChain {
 		// For external chains (testnets/mainnets), don't generate any EVM config.

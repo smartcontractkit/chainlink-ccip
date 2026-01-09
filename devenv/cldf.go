@@ -24,15 +24,30 @@ import (
 	"github.com/xssnick/tonutils-go/ton/wallet"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
-	ccipEVM "github.com/smartcontractkit/chainlink-ccip/devenv/chainimpl/ccip-evm"
-	ccipSolana "github.com/smartcontractkit/chainlink-ccip/devenv/chainimpl/ccip-solana"
+
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldf_evm_provider "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/provider"
 	cldf_solana_provider "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana/provider"
 	cldf_ton_provider "github.com/smartcontractkit/chainlink-deployments-framework/chain/ton/provider"
 	testutils "github.com/smartcontractkit/chainlink-ton/deployment/utils"
-	ccipTon "github.com/smartcontractkit/chainlink-ton/devenv-impl"
+
+	ccipTon "github.com/smartcontractkit/chainlink-ton/devenv"
+
+	ccipEVM "github.com/smartcontractkit/chainlink-ccip/devenv/chainimpl/ccip-evm"
+	ccipSolana "github.com/smartcontractkit/chainlink-ccip/devenv/chainimpl/ccip-solana"
 )
+
+type initOptions struct {
+	DataStore datastore.DataStore
+}
+
+type InitOption func(*initOptions)
+
+func WithDataStore(ds datastore.DataStore) InitOption {
+	return func(opts *initOptions) {
+		opts.DataStore = ds
+	}
+}
 
 type CLDF struct {
 	mu        sync.Mutex          `toml:"-"`
@@ -40,8 +55,16 @@ type CLDF struct {
 	DataStore datastore.DataStore `toml:"-"`
 }
 
-func (c *CLDF) Init() {
-	c.DataStore = datastore.NewMemoryDataStore().Seal()
+func (c *CLDF) Init(opts ...InitOption) {
+	options := &initOptions{}
+	for _, o := range opts {
+		o(options)
+	}
+	if options.DataStore != nil {
+		c.DataStore = options.DataStore
+	} else {
+		c.DataStore = datastore.NewMemoryDataStore().Seal()
+	}
 }
 
 func (c *CLDF) AddAddresses(addresses string) {
@@ -91,6 +114,11 @@ func NewCLDFOperationsEnvironment(bc []*blockchain.Input, dataStore datastore.Da
 						},
 					},
 					ConfirmFunctor: cldf_evm_provider.ConfirmFuncGeth(1*time.Minute, cldf_evm_provider.WithTickInterval(5*time.Millisecond)),
+					ClientOpts: []func(client *rpcclient.MultiClient){
+						func(client *rpcclient.MultiClient) {
+							client.RetryConfig.Timeout = 1 * time.Minute
+						},
+					},
 				},
 			).Initialize(context.Background())
 			if err != nil {
