@@ -290,7 +290,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// @dev We make this external and callable by the contract itself, in order to try/catch its execution and enforce
   /// atomicity among successful message processing and token transfer.
   /// @dev We use ERC-165 to check for the ccipReceive interface to permit sending tokens to contracts, for example
-  /// smart contract wallets, without an calling the receiver contract.
+  /// smart contract wallets, without calling the receiver contract.
   function executeSingleMessage(
     MessageV1Codec.MessageV1 calldata message,
     bytes32 messageId,

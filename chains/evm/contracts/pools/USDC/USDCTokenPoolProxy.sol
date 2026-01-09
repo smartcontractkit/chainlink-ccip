@@ -26,7 +26,6 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
   using ERC165Checker for address;
 
   error AddressCannotBeZero();
-  error CCVCompatiblePoolNotSet();
   error ChainNotSupportedByVerifier(uint64 remoteChainSelector);
   error InvalidLockOrBurnMechanism(LockOrBurnMechanism mechanism);
   error InvalidMessageVersion(bytes4 version);
@@ -375,25 +374,15 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
     view
     returns (uint256 feeUSDCents, uint32 destGasOverhead, uint32 destBytesOverhead, uint16 tokenFeeBps, bool isEnabled)
   {
-    // There are only two valid mechanisms when calling getFee, as getFee is only called on pools v1.7.0 and later.
-    // Therefore, the only valid mechanisms are CCTP with CCV and Lock/Release.
-    LockOrBurnMechanism mechanism = s_lockOrBurnMechanism[destChainSelector];
+    (address pool, bool isPoolV2) = _getPoolForMechanism(destChainSelector);
 
-    if (mechanism == LockOrBurnMechanism.CCV) {
-      if (s_cctpV2PoolWithCCV == address(0)) {
-        revert MustSetPoolForMechanism(destChainSelector, LockOrBurnMechanism.CCV);
-      }
-      return IPoolV2(s_cctpV2PoolWithCCV)
-        .getFee(localToken, destChainSelector, amount, feeToken, blockConfirmationRequested, tokenArgs);
+    if (isPoolV2) {
+      return
+        IPoolV2(pool).getFee(localToken, destChainSelector, amount, feeToken, blockConfirmationRequested, tokenArgs);
     }
 
-    // Siloed pools might be older than v1.7
-    if (mechanism == LockOrBurnMechanism.LOCK_RELEASE) {
-      return IPoolV2(s_siloedLockReleasePool)
-        .getFee(localToken, destChainSelector, amount, feeToken, blockConfirmationRequested, tokenArgs);
-    }
     // If an old mechanism is set, or none at all, revert.
-    revert InvalidLockOrBurnMechanism(mechanism);
+    revert InvalidLockOrBurnMechanism(s_lockOrBurnMechanism[destChainSelector]);
   }
 
   /// @inheritdoc IPoolV2
@@ -406,17 +395,56 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
     uint64 destChainSelector,
     uint16 blockConfirmationRequested,
     bytes calldata tokenArgs
-  ) external view onlyWithCCVCompatiblePool returns (TokenTransferFeeConfig memory feeConfig) {
-    return IPoolV2(s_cctpV2PoolWithCCV)
-      .getTokenTransferFeeConfig(localToken, destChainSelector, blockConfirmationRequested, tokenArgs);
+  ) external view returns (TokenTransferFeeConfig memory feeConfig) {
+    (address pool, bool isPoolV2) = _getPoolForMechanism(destChainSelector);
+
+    if (isPoolV2) {
+      return
+        IPoolV2(pool).getTokenTransferFeeConfig(localToken, destChainSelector, blockConfirmationRequested, tokenArgs);
+    }
+
+    // For any other mechanism, return default empty config.
+    return feeConfig;
+  }
+
+  /// @notice Get the pool address for a given remote chain selector.
+  /// @param remoteChainSelector The remote chain selector to get the pool address for.
+  /// @return pool The pool address for the given remote chain selector.
+  /// @return isPoolV2 Whether the pool is a V2 pool.
+  function _getPoolForMechanism(
+    uint64 remoteChainSelector
+  ) internal view returns (address pool, bool isPoolV2) {
+    LockOrBurnMechanism mechanism = s_lockOrBurnMechanism[remoteChainSelector];
+    if (mechanism == LockOrBurnMechanism.INVALID_MECHANISM) {
+      revert InvalidLockOrBurnMechanism(mechanism);
+    }
+
+    if (mechanism == LockOrBurnMechanism.CCV) {
+      pool = s_cctpV2PoolWithCCV;
+      isPoolV2 = true;
+    } else if (mechanism == LockOrBurnMechanism.CCTP_V2) {
+      pool = s_cctpV2Pool;
+    } else if (mechanism == LockOrBurnMechanism.CCTP_V1) {
+      pool = s_cctpV1Pool;
+    } else if (mechanism == LockOrBurnMechanism.LOCK_RELEASE) {
+      pool = s_siloedLockReleasePool;
+      isPoolV2 = true;
+    }
+
+    if (pool == address(0)) {
+      revert MustSetPoolForMechanism(remoteChainSelector, mechanism);
+    }
+    return (pool, isPoolV2);
   }
 
   /// @inheritdoc IPoolV2
   /// @param remoteChainSelector Remote chain selector.
   function getRemoteToken(
     uint64 remoteChainSelector
-  ) external view onlyWithCCVCompatiblePool returns (bytes memory) {
-    return IPoolV2(s_cctpV2PoolWithCCV).getRemoteToken(remoteChainSelector);
+  ) external view returns (bytes memory) {
+    (address pool,) = _getPoolForMechanism(remoteChainSelector);
+
+    return IPoolV2(pool).getRemoteToken(remoteChainSelector);
   }
 
   /// @inheritdoc IPoolV2
@@ -428,7 +456,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
     uint16, // blockConfirmationRequested
     bytes calldata, // extraData
     MessageDirection // direction
-  ) external view onlyWithCCVCompatiblePool returns (address[] memory requiredCCVs) {
+  ) external view returns (address[] memory requiredCCVs) {
     if (s_lockOrBurnMechanism[remoteChainSelector] == LockOrBurnMechanism.INVALID_MECHANISM) {
       revert NoLockOrBurnMechanismSet(remoteChainSelector);
     }
@@ -445,14 +473,6 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
     // Other CCTP mechanisms will never rely on CCVs and have no impact on the return value.
     // Therefore, we return address(0) to indicate that default CCVs should be used for the lock-release mechanism.
     return ccvs;
-  }
-
-  /// @notice Ensures that a CCV-compatible pool is set.
-  modifier onlyWithCCVCompatiblePool() {
-    if (s_cctpV2PoolWithCCV == address(0)) {
-      revert CCVCompatiblePoolNotSet();
-    }
-    _;
   }
 
   /// @inheritdoc IERC165

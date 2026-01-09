@@ -53,7 +53,7 @@ contract USDCTokenPoolProxy_getFee is USDCTokenPoolProxySetup {
   }
 
   function test_getFee_SiloedPool() public {
-    // Configure the siloed lock/release pool
+    // Configure the siloed lock/release pool.
     _enableERC165InterfaceChecks(s_lockReleasePool, type(IPoolV1).interfaceId);
     s_usdcTokenPoolProxy.updatePoolAddresses(
       USDCTokenPoolProxy.PoolAddresses({
@@ -64,7 +64,7 @@ contract USDCTokenPoolProxy_getFee is USDCTokenPoolProxySetup {
       })
     );
 
-    // Configure LOCK_RELEASE mechanism for the remote chain
+    // Configure LOCK_RELEASE mechanism for the remote chain.
     uint64[] memory remoteChainSelectors = new uint64[](1);
     remoteChainSelectors[0] = s_remoteLockReleaseChainSelector;
 
@@ -72,7 +72,7 @@ contract USDCTokenPoolProxy_getFee is USDCTokenPoolProxySetup {
     mechanisms[0] = USDCTokenPoolProxy.LockOrBurnMechanism.LOCK_RELEASE;
     s_usdcTokenPoolProxy.updateLockOrBurnMechanisms(remoteChainSelectors, mechanisms);
 
-    // Mock the siloed pool's getFee to return specific values
+    // Mock the siloed pool's getFee to return specific values.
     vm.mockCall(
       address(s_lockReleasePool),
       abi.encodeWithSelector(
@@ -92,7 +92,7 @@ contract USDCTokenPoolProxy_getFee is USDCTokenPoolProxySetup {
   }
 
   function test_getFee_RevertWhen_InvalidLockOrBurnMechanism_NoMechanismSet() public {
-    // Use a chain selector that has no mechanism configured
+    // Use a chain selector that has no mechanism configured.
     uint64 unconfiguredChainSelector = 99999;
 
     vm.expectRevert(
@@ -104,7 +104,7 @@ contract USDCTokenPoolProxy_getFee is USDCTokenPoolProxySetup {
   }
 
   function test_getFee_RevertWhen_InvalidLockOrBurnMechanism_OldMechanism() public {
-    // Configure an old mechanism (CCTP_V1) that is not supported by getFee
+    // Configure an old mechanism (CCTP_V1) that is not supported by getFee.
     uint64[] memory remoteChainSelectors = new uint64[](1);
     remoteChainSelectors[0] = s_remoteLockReleaseChainSelector;
 
