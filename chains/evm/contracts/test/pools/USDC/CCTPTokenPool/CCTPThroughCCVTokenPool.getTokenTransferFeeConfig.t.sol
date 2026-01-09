@@ -6,6 +6,7 @@ import {ICrossChainVerifierResolver} from "../../../../interfaces/ICrossChainVer
 import {CCTPVerifier} from "../../../../ccvs/CCTPVerifier.sol";
 import {IPoolV2} from "../../../../interfaces/IPoolV2.sol";
 import {TokenPool} from "../../../../pools/TokenPool.sol";
+import {CCTPThroughCCVTokenPool} from "../../../../pools/USDC/CCTPThroughCCVTokenPool.sol";
 import {CCTPThroughCCVTokenPoolSetup} from "./CCTPThroughCCVTokenPoolSetup.t.sol";
 
 contract CCTPThroughCCVTokenPool_getTokenTransferFeeConfig is CCTPThroughCCVTokenPoolSetup {
@@ -64,6 +65,22 @@ contract CCTPThroughCCVTokenPool_getTokenTransferFeeConfig is CCTPThroughCCVToke
     // Custom block confirmation transfer fee bps should be overridden by the CCTPVerifier's fast finality bps.
     assertEq(returnedFeeConfig.customBlockConfirmationTransferFeeBps, FAST_FINALITY_BPS);
     assertEq(returnedFeeConfig.isEnabled, feeConfig.isEnabled);
+  }
+
+  function test_getTokenTransferFeeConfig_RevertWhen_CCVNotSetOnResolver() public {
+    // Mock the resolver's getOutboundImplementation call to return address(0).
+    vm.mockCall(
+      address(s_cctpThroughCCVTokenPool.getCCTPVerifier()),
+      abi.encodeWithSelector(ICrossChainVerifierResolver.getOutboundImplementation.selector, DEST_CHAIN_SELECTOR),
+      abi.encode(address(0))
+    );
+
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        CCTPThroughCCVTokenPool.CCVNotSetOnResolver.selector, address(s_cctpThroughCCVTokenPool.getCCTPVerifier())
+      )
+    );
+    s_cctpThroughCCVTokenPool.getTokenTransferFeeConfig(address(s_USDCToken), DEST_CHAIN_SELECTOR, 0, "");
   }
 }
 

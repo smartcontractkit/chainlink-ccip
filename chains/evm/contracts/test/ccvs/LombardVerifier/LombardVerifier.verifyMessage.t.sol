@@ -109,4 +109,47 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
     vm.expectRevert(abi.encodeWithSelector(BaseVerifier.CursedByRMN.selector, message.sourceChainSelector));
     s_lombardVerifier.verifyMessage(message, messageId, _encodeCcvData("", ""));
   }
+
+  function test_verifyMessage_RevertWhen_InvalidVerifierResults_CcvDataTooShortForPayloadLengthField() public {
+    vm.startPrank(s_offRamp);
+
+    // ccvData with only 5 bytes (needs at least 6: 4 for version tag + 2 for rawPayloadLength).
+    bytes memory tooShortCcvData = bytes.concat(VERSION_TAG_V1_7_0, bytes1(0x00));
+
+    vm.expectRevert(LombardVerifier.InvalidVerifierResults.selector);
+    s_lombardVerifier.verifyMessage(_createBasicMessageV1(DEST_CHAIN_SELECTOR), bytes32(0), tooShortCcvData);
+  }
+
+  function test_verifyMessage_RevertWhen_InvalidVerifierResults_CcvDataTooShortForProofLengthField() public {
+    vm.startPrank(s_offRamp);
+
+    // ccvData with version tag (4) + rawPayloadLength (2) claiming 10 bytes of raw payload,
+    // but only providing 5 bytes of raw payload and no proof length field.
+    // Total: 4 + 2 + 5 = 11 bytes, but needs at least 4 + 2 + 10 + 2 = 18 bytes.
+    bytes memory tooShortCcvData = bytes.concat(
+      VERSION_TAG_V1_7_0,
+      bytes2(uint16(10)), // rawPayloadLength = 10
+      bytes5(0) // only 5 bytes instead of 10 + 2 for proof length
+    );
+
+    vm.expectRevert(LombardVerifier.InvalidVerifierResults.selector);
+    s_lombardVerifier.verifyMessage(_createBasicMessageV1(DEST_CHAIN_SELECTOR), bytes32(0), tooShortCcvData);
+  }
+
+  function test_verifyMessage_RevertWhen_InvalidVerifierResults_CcvDataTooShortForProof() public {
+    vm.startPrank(s_offRamp);
+
+    // ccvData with version tag (4) + rawPayloadLength (2) + rawPayload (0) + proofLength (2) claiming 10 bytes,
+    // but only providing 5 bytes of proof.
+    // Total: 4 + 2 + 0 + 2 + 5 = 13 bytes, but needs at least 4 + 2 + 0 + 2 + 10 = 18 bytes.
+    bytes memory tooShortCcvData = bytes.concat(
+      VERSION_TAG_V1_7_0,
+      bytes2(uint16(0)), // rawPayloadLength = 0
+      bytes2(uint16(10)), // proofLength = 10
+      bytes5(0) // only 5 bytes instead of 10
+    );
+
+    vm.expectRevert(LombardVerifier.InvalidVerifierResults.selector);
+    s_lombardVerifier.verifyMessage(_createBasicMessageV1(DEST_CHAIN_SELECTOR), bytes32(0), tooShortCcvData);
+  }
 }

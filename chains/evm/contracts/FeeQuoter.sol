@@ -85,7 +85,6 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
 
   /// @dev Struct to hold the configs and its destination chain selector. Same as DestChainConfig but with the
   /// destChainSelector so that an array of these can be passed in the constructor and applyDestChainConfigUpdates.
-  /// solhint-disable-next-line gas-struct-packing
   struct DestChainConfigArgs {
     uint64 destChainSelector; // Destination chain selector.
     DestChainConfig destChainConfig; // Config to update for the chain selector.

@@ -11,16 +11,16 @@ contract USDCTokenPoolProxy_getRemoteToken is USDCTokenPoolProxySetup {
     bytes memory expectedRemoteToken = abi.encode(address(0x1234));
     vm.mockCall(
       address(s_cctpThroughCCVTokenPool),
-      abi.encodeWithSelector(IPoolV2.getRemoteToken.selector, uint64(1)),
+      abi.encodeWithSelector(IPoolV2.getRemoteToken.selector, s_remoteCCTPChainSelector),
       abi.encode(expectedRemoteToken)
     );
 
-    bytes memory remoteToken = s_usdcTokenPoolProxy.getRemoteToken(1);
+    bytes memory remoteToken = s_usdcTokenPoolProxy.getRemoteToken(s_remoteCCTPChainSelector);
 
     assertEq(remoteToken, expectedRemoteToken);
   }
 
-  function test_getRemoteToken_RevertWhen_NoCCVCompatiblePoolSet() public {
+  function test_getRemoteToken_RevertWhen_MustSetPoolForMechanism() public {
     _enableERC165InterfaceChecks(s_cctpV2Pool, type(IPoolV1).interfaceId);
     _enableERC165InterfaceChecks(s_cctpV1Pool, type(IPoolV1).interfaceId);
     s_usdcTokenPoolProxy.updatePoolAddresses(
@@ -32,7 +32,13 @@ contract USDCTokenPoolProxy_getRemoteToken is USDCTokenPoolProxySetup {
       })
     );
 
-    vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.CCVCompatiblePoolNotSet.selector));
-    s_usdcTokenPoolProxy.getRemoteToken(1);
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        USDCTokenPoolProxy.MustSetPoolForMechanism.selector,
+        s_remoteCCTPChainSelector,
+        USDCTokenPoolProxy.LockOrBurnMechanism.CCV
+      )
+    );
+    s_usdcTokenPoolProxy.getRemoteToken(s_remoteCCTPChainSelector);
   }
 }

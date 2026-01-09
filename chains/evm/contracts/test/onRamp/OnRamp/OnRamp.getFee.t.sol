@@ -288,4 +288,12 @@ contract OnRamp_getFee is OnRampSetup {
     );
     s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
   }
+
+  function test_getFee_RevertWhen_CanOnlySendOneTokenPerMessage() public {
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    message.tokenAmounts = new Client.EVMTokenAmount[](2);
+
+    vm.expectRevert(abi.encodeWithSelector(OnRamp.CanOnlySendOneTokenPerMessage.selector));
+    s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
+  }
 }
