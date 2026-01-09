@@ -31,6 +31,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	evmseqs "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/ccip_home"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/rmn_home"
@@ -127,8 +128,10 @@ func applyUpdateChainConfig(e deployment.Environment, cfg UpdateChainConfigConfi
 			BatchSize:          4, // Conservative batch size to avoid exceeding gas limits (TODO: Make this configurable)
 		},
 	)
-	mcmsReg := mcms.getMCMSRegistry(e, cfg.HomeChainSelector
-	return changesets.NewOutputBuilder(e, mcmsRegistry).
+	mcmsReg := changesets.GetRegistry()
+	// since we are only using evm here
+	mcmsReg.RegisterMCMSReader(chain_selectors.FamilyEVM, &adapters.EVMMCMSReader{})
+	return changesets.NewOutputBuilder(e, mcmsReg).
 		WithReports(result.ExecutionReports).
 		WithBatchOps(result.Output.BatchOps).
 		Build(cfg.MCMS)
@@ -163,6 +166,7 @@ type AddDonAndSetCandidateChangesetConfig struct {
 	PluginInfo     SetCandidatePluginInfo                        `json:"pluginInfo"`
 	NonBootstraps  []*clclient.ChainlinkClient                   `json:"nonBootstraps"`
 	NodeKeyBundles map[string]map[string]clclient.NodeKeysBundle `json:"nodeKeyBundles"`
+	MCMS           mcms.Input                                    `json:"mcmsConfig"`
 }
 
 func validateAddDonAndSetCandidateChangesetConfig(e deployment.Environment, cfg AddDonAndSetCandidateChangesetConfig) error {
@@ -294,7 +298,7 @@ func applyAddDonAndSetCandidateChangesetConfig(e deployment.Environment, cfg Add
 		expectedDonID++
 	}
 
-	_, err = operations.ExecuteSequence(
+	result, err := operations.ExecuteSequence(
 		e.OperationsBundle,
 		AddDONAndSetCandidateSequence,
 		DONSequenceDeps{
@@ -305,7 +309,12 @@ func applyAddDonAndSetCandidateChangesetConfig(e deployment.Environment, cfg Add
 			DONs:                 dons,
 		},
 	)
-	return deployment.ChangesetOutput{}, err
+	mcmsReg := changesets.GetRegistry()
+	mcmsReg.RegisterMCMSReader(chain_selectors.FamilyEVM, &adapters.EVMMCMSReader{})
+	return changesets.NewOutputBuilder(e, mcmsReg).
+		WithReports(result.ExecutionReports).
+		WithBatchOps(result.Output.BatchOps).
+		Build(cfg.MCMS)
 }
 
 func BuildOCR3ConfigForCCIPHome(
@@ -590,6 +599,7 @@ type SetCandidateChangesetConfig struct {
 	PluginInfo     []SetCandidatePluginInfo                      `json:"pluginInfo"`
 	NonBootstraps  []*clclient.ChainlinkClient                   `json:"nonBootstraps"`
 	NodeKeyBundles map[string]map[string]clclient.NodeKeysBundle `json:"nodeKeyBundles"`
+	MCMS           mcms.Input                                    `json:"mcmsConfig"`
 }
 
 func validateSetCandidateChangesetConfig(e deployment.Environment, cfg SetCandidateChangesetConfig) error {
@@ -746,7 +756,7 @@ func applySetCandidateChangesetConfig(e deployment.Environment, cfg SetCandidate
 			})
 		}
 	}
-	_, err = operations.ExecuteSequence(
+	result, err := operations.ExecuteSequence(
 		e.OperationsBundle,
 		SetCandidateSequence,
 		DONSequenceDeps{
@@ -757,7 +767,12 @@ func applySetCandidateChangesetConfig(e deployment.Environment, cfg SetCandidate
 			DONs:                 dons,
 		},
 	)
-	return deployment.ChangesetOutput{}, err
+	mcmsReg := changesets.GetRegistry()
+	mcmsReg.RegisterMCMSReader(chain_selectors.FamilyEVM, &adapters.EVMMCMSReader{})
+	return changesets.NewOutputBuilder(e, mcmsReg).
+		WithReports(result.ExecutionReports).
+		WithBatchOps(result.Output.BatchOps).
+		Build(cfg.MCMS)
 }
 
 func DonIDForChain(registry *capabilities_registry.CapabilitiesRegistry, ccipHome *ccip_home.CCIPHome, chainSelector uint64) (uint32, error) {
@@ -812,6 +827,7 @@ type PromoteCandidateChangesetConfig struct {
 
 	PluginInfo    []PromoteCandidatePluginInfo `json:"pluginInfo"`
 	NonBootstraps []*clclient.ChainlinkClient  `json:"nonBootstraps"`
+	MCMS          mcms.Input                   `json:"mcmsConfig"`
 }
 
 func validatePromoteCandidateChangesetConfig(e deployment.Environment, cfg PromoteCandidateChangesetConfig) error {
@@ -927,7 +943,7 @@ func applyPromoteCandidateChangesetConfig(e deployment.Environment, cfg PromoteC
 		}
 	}
 
-	_, err = operations.ExecuteSequence(
+	result, err := operations.ExecuteSequence(
 		e.OperationsBundle,
 		PromoteCandidateSequence,
 		DONSequenceDeps{
@@ -938,5 +954,10 @@ func applyPromoteCandidateChangesetConfig(e deployment.Environment, cfg PromoteC
 			DONs:                 dons,
 		},
 	)
-	return deployment.ChangesetOutput{}, err
+	mcmsReg := changesets.GetRegistry()
+	mcmsReg.RegisterMCMSReader(chain_selectors.FamilyEVM, &adapters.EVMMCMSReader{})
+	return changesets.NewOutputBuilder(e, mcmsReg).
+		WithReports(result.ExecutionReports).
+		WithBatchOps(result.Output.BatchOps).
+		Build(cfg.MCMS)
 }

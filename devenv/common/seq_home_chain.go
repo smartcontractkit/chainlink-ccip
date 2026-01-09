@@ -52,6 +52,7 @@ var AddDONAndSetCandidateSequence = operations.NewSequence(
 	semver.MustParse("1.0.0"),
 	"Adds commit / exec DONs for chains and sets their candidates on CCIPHome",
 	func(b operations.Bundle, deps DONSequenceDeps, input AddDONAndSetCandidateSequenceInput) (sequences.OnChainOutput, error) {
+		var writes []contract.WriteOutput
 		for _, don := range input.DONs {
 			encodedSetCandidateCall, err := CCIPHomeABI.Pack(
 				"setCandidate",
@@ -63,7 +64,7 @@ var AddDONAndSetCandidateSequence = operations.NewSequence(
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to pack set candidate call: %w", err)
 			}
-			_, err = operations.ExecuteOperation(
+			out, err := operations.ExecuteOperation(
 				b,
 				cciphomeops.AddDON,
 				deps.HomeChain,
@@ -86,9 +87,15 @@ var AddDONAndSetCandidateSequence = operations.NewSequence(
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute AddDON for chain with selector %d and plugin type %s: %w", don.PluginConfig.ChainSelector, don.PluginConfig.PluginType, err)
 			}
+			writes = append(writes, out.Output)
 		}
-
-		return sequences.OnChainOutput{}, nil
+		batch, err := contract.NewBatchOperationFromWrites(writes)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
+		}
+		return sequences.OnChainOutput{
+			BatchOps: []mcms_types.BatchOperation{batch},
+		}, nil
 	})
 
 type DONUpdate struct {
@@ -111,6 +118,7 @@ var SetCandidateSequence = operations.NewSequence(
 	semver.MustParse("1.0.0"),
 	"Updates candidates for existing commit / exec DONs across multiple chains",
 	func(b operations.Bundle, deps DONSequenceDeps, input SetCandidateSequenceInput) (sequences.OnChainOutput, error) {
+		var writes []contract.WriteOutput
 		for _, don := range input.DONs {
 			encodedSetCandidateCall, err := CCIPHomeABI.Pack(
 				"setCandidate",
@@ -122,7 +130,7 @@ var SetCandidateSequence = operations.NewSequence(
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to pack set candidate call: %w", err)
 			}
-			_, err = operations.ExecuteOperation(
+			out, err := operations.ExecuteOperation(
 				b,
 				cciphomeops.UpdateDON,
 				deps.HomeChain,
@@ -146,9 +154,15 @@ var SetCandidateSequence = operations.NewSequence(
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute UpdateDON for chain with selector %d and plugin type %s: %w", don.PluginConfig.ChainSelector, don.PluginConfig.PluginType, err)
 			}
+			writes = append(writes, out.Output)
 		}
-
-		return sequences.OnChainOutput{}, nil
+		batch, err := contract.NewBatchOperationFromWrites(writes)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
+		}
+		return sequences.OnChainOutput{
+			BatchOps: []mcms_types.BatchOperation{batch},
+		}, nil
 	})
 
 type DONUpdatePromotion struct {
@@ -173,7 +187,7 @@ var PromoteCandidateSequence = operations.NewSequence(
 	semver.MustParse("1.0.0"),
 	"Promote candidates for existing commit / exec DONs across multiple chains",
 	func(b operations.Bundle, deps DONSequenceDeps, input PromoteCandidateSequenceInput) (sequences.OnChainOutput, error) {
-
+		var writes []contract.WriteOutput
 		for _, don := range input.DONs {
 			encodedPromoteCandidateCall, err := CCIPHomeABI.Pack(
 				"promoteCandidateAndRevokeActive",
@@ -185,7 +199,7 @@ var PromoteCandidateSequence = operations.NewSequence(
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to pack promote candidate call: %w", err)
 			}
-			_, err = operations.ExecuteOperation(
+			out, err := operations.ExecuteOperation(
 				b,
 				cciphomeops.UpdateDON,
 				deps.HomeChain,
@@ -209,9 +223,15 @@ var PromoteCandidateSequence = operations.NewSequence(
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute UpdateDONOp for chain with selector %d and plugin type %s: %w", don.ChainSelector, don.PluginType, err)
 			}
+			writes = append(writes, out.Output)
 		}
-
-		return sequences.OnChainOutput{}, nil
+		batch, err := contract.NewBatchOperationFromWrites(writes)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
+		}
+		return sequences.OnChainOutput{
+			BatchOps: []mcms_types.BatchOperation{batch},
+		}, nil
 	})
 
 type ApplyChainConfigUpdatesSequenceInput struct {
