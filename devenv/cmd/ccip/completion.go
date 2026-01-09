@@ -74,6 +74,7 @@ func getSubCommands(parent string) []prompt.Suggest {
 	case "restart":
 		return []prompt.Suggest{
 			{Text: "env.toml", Description: "Spin up Anvil <> Anvil local chains, all services, 4 CL nodes"},
+			{Text: "-k forked-env.toml", Description: "Spin up ethereum local fork <> binance local fork through Anvil, all services, 4 CL nodes"},
 			{Text: "env.toml,env-cl-rebuild.toml", Description: "(Rebuild local CL Docker image) Spin up Anvil <> Anvil local chains, all services, 4 CL nodes"},
 			{Text: "env.toml,env-geth.toml", Description: "Spin up Geth <> Geth local chains (clique), all services, 4 CL nodes"},
 		}

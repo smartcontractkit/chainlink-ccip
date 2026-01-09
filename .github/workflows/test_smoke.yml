@@ -1,11 +1,35 @@
 name: Smoke tests (devenv)
 
 on:
+  workflow_dispatch:
+    inputs:
+      ton_ref:
+        description: 'Git ref (branch) of the TON relayer'
+        required: false
+        type: string
+      contract_version:
+        description: 'Version of CCIP contracts to use'
+        required: false
+        type: string
+      chainlink_version:
+        description: 'Chainlink version to use (e.g., develop, gh ref, etc.)'
+        required: false
+        type: string
+      custom_config:
+        description: "Extra config file(s), e.g. ton.toml,sui.toml"
+        required: false
+        type: string
+  pull_request:
   push:
+    branches:
+      - 'main'
 
 defaults:
   run:
     working-directory: devenv
+
+env:
+  DEPLOY_CONTRACT_VERSION: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.contract_version || '' }}
 
 jobs:
   smoke:
@@ -15,16 +39,44 @@ jobs:
     runs-on: ubuntu24.04-16cores-64GB
     strategy:
       matrix:
-        test: [
-          # if your suite has more than 10 e2e tests or is slower than 10m consider splitting it to another runner here
-          { name: "TestE2ESmoke", config: "env.toml" },
-        ]
+        test:
+        - name: TestE2ESmoke
+          config: >-
+            ${{ 
+                github.event_name == 'workflow_dispatch' &&
+                ( inputs.custom_config != '' && inputs.custom_config || 'env.toml' )
+                || 'env.toml'
+            }}
       fail-fast: false
     steps:
       - name: Checkout code
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           fetch-depth: 0
+      - name: Install Nix
+        uses: cachix/install-nix-action@02a151ada4993995686f9ed4f1be7cfbb229e56f # v31
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+      - name: Checkout Chainlink TON
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.ton_ref != '' }}
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          repository: smartcontractkit/chainlink-ton
+          ref: ${{ github.event.inputs.ton_ref }}
+          path: chainlink-ton
+      - name: Build TON Contracts
+        if: ${{ github.event_name == 'workflow_dispatch'  && github.event.inputs.contract_version == 'local' }}
+        run: |
+          pushd ../chainlink-ton/contracts
+          nix develop .#contracts -c yarn && yarn build
+          popd
+          mkdir -p ../contracts && mv ../chainlink-ton/contracts/build/ ../contracts/build
+      - name: Build CL Image For Ref
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.chainlink_version != '' }}
+        uses: ./.github/actions/build-cl
+        with:
+          ton_ref: ${{ github.event.inputs.ton_ref || '' }}
+          chainlink_version: ${{ github.event.inputs.chainlink_version }}
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
       - name: Install Just
@@ -53,6 +105,12 @@ jobs:
             devenv/go.sum
       - name: Download Go dependencies
         run: |
+          export GOPRIVATE=github.com/smartcontractkit/*
+          if [ -n "${{ inputs.ton_ref }}" ]; then
+            go get github.com/smartcontractkit/chainlink-ton/devenv@${{ inputs.ton_ref }}
+            go get github.com/smartcontractkit/chainlink-ton/deployment@${{ inputs.ton_ref }}
+            go get github.com/smartcontractkit/chainlink-ton@${{ inputs.ton_ref }}
+          fi
           go mod download
       - name: Run CCIP environment with config
         env:
@@ -60,6 +118,7 @@ jobs:
         run: |
           cd cmd/ccip && go install . && cd -
           ccip u ${{ matrix.test.config }}
+          sleep 120 # wait for nodes to be ready, need a better way here
       - name: Run smoke test
         working-directory: devenv/tests/e2e
         run: |

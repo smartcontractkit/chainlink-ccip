@@ -1,7 +1,6 @@
 package deployment
 
 import (
-	"encoding/hex"
 	"math/big"
 	"testing"
 	"time"
@@ -191,19 +190,15 @@ func TestConnectChains_EVM2SVM_NoMCMS(t *testing.T) {
 	// TODO: EVM doesn't work with a non-zero timelock delay
 	// DeployMCMS(t, e, chain_selectors.ETHEREUM_MAINNET.Selector)
 	// EVMTransferOwnership(t, e, chain_selectors.ETHEREUM_MAINNET.Selector)
-	evmEncoded, err := hex.DecodeString(cciputils.EVMFamilySelector)
-	require.NoError(t, err, "Failed to decode EVM family selector")
-	svmEncoded, err := hex.DecodeString(cciputils.SVMFamilySelector)
-	require.NoError(t, err, "Failed to decode SVM family selector")
 	chain1 := lanesapi.ChainDefinition{
 		Selector:                 chain_selectors.SOLANA_MAINNET.Selector,
 		GasPrice:                 big.NewInt(1e17),
-		FeeQuoterDestChainConfig: lanesapi.DefaultFeeQuoterDestChainConfig(true, svmEncoded),
+		FeeQuoterDestChainConfig: lanesapi.DefaultFeeQuoterDestChainConfig(true, chain_selectors.SOLANA_MAINNET.Selector),
 	}
 	chain2 := lanesapi.ChainDefinition{
 		Selector:                 chain_selectors.ETHEREUM_MAINNET.Selector,
 		GasPrice:                 big.NewInt(1e9),
-		FeeQuoterDestChainConfig: lanesapi.DefaultFeeQuoterDestChainConfig(true, evmEncoded),
+		FeeQuoterDestChainConfig: lanesapi.DefaultFeeQuoterDestChainConfig(true, chain_selectors.ETHEREUM_MAINNET.Selector),
 	}
 
 	connectOut, err := lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.ConnectChainsConfig{
