@@ -8,16 +8,15 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 
-	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/token_pool"
 	tp_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_1/burn_mint_token_pool"
-
-	mcms_types "github.com/smartcontractkit/mcms/types"
-
-	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	mcms_types "github.com/smartcontractkit/mcms/types"
+
+	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
 // ConfigureTokenPoolForRemoteChainInput is the input for the ConfigureTokenPoolForRemoteChain sequence.
@@ -204,6 +203,6 @@ func maybeUpdateRateLimiters(b cldf_ops.Bundle, chain evm.Chain, input Configure
 // rateLimiterConfigsEqual returns true if the current rate limiter config on-chain matches the desired config.
 func rateLimiterConfigsEqual(current tp_bindings.RateLimiterTokenBucket, desired tokens.RateLimiterConfig) bool {
 	return current.IsEnabled == desired.IsEnabled &&
-		current.Capacity == desired.Capacity &&
-		current.Rate == desired.Rate
+		current.Capacity.Cmp(desired.Capacity) == 0 &&
+		current.Rate.Cmp(desired.Rate) == 0
 }
