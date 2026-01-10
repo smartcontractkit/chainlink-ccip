@@ -2,15 +2,22 @@
 pragma solidity ^0.8.24;
 
 import {FeeTokenHandler} from "../../../libraries/FeeTokenHandler.sol";
+import {TokenPool} from "../../../pools/TokenPool.sol";
 import {AdvancedPoolHooksSetup} from "../AdvancedPoolHooks/AdvancedPoolHooksSetup.t.sol";
 
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
 contract TokenPoolV2_withdrawFee is AdvancedPoolHooksSetup {
+  address internal s_feeAdmin;
+
   function setUp() public override {
     super.setUp();
     vm.stopPrank();
+    s_feeAdmin = makeAddr("fee_admin");
+
+    vm.prank(OWNER);
+    s_tokenPool.setDynamicConfig(makeAddr("router"), makeAddr("rateLimitAdmin"), s_feeAdmin);
   }
 
   function test_withdrawFeeTokens() public {
@@ -22,36 +29,11 @@ contract TokenPoolV2_withdrawFee is AdvancedPoolHooksSetup {
     address[] memory feeTokens = new address[](1);
     feeTokens[0] = address(s_token);
 
-    vm.prank(OWNER);
-    s_tokenPool.setDynamicConfig(makeAddr("router"), makeAddr("rateLimitAdmin"), recipient);
-
     vm.expectEmit();
     emit FeeTokenHandler.FeeTokenWithdrawn(recipient, address(s_token), feeAmount);
 
-    s_tokenPool.withdrawFeeTokens(feeTokens);
-
-    assertEq(s_token.balanceOf(recipient), feeAmount);
-    assertEq(s_token.balanceOf(address(s_tokenPool)), 0);
-  }
-
-  function test_withdrawFeeTokens_Permissionless() public {
-    uint256 feeAmount = 20 ether;
-    address recipient = makeAddr("fee_recipient");
-
-    deal(address(s_token), address(s_tokenPool), feeAmount);
-
-    address[] memory feeTokens = new address[](1);
-    feeTokens[0] = address(s_token);
-
-    vm.prank(OWNER);
-    s_tokenPool.setDynamicConfig(makeAddr("router"), makeAddr("rateLimitAdmin"), recipient);
-
-    vm.expectEmit();
-    emit FeeTokenHandler.FeeTokenWithdrawn(recipient, address(s_token), feeAmount);
-
-    // Anyone can call withdrawFeeTokens since it's permissionless.
-    vm.prank(STRANGER);
-    s_tokenPool.withdrawFeeTokens(feeTokens);
+    vm.prank(s_feeAdmin);
+    s_tokenPool.withdrawFeeTokens(feeTokens, recipient);
 
     assertEq(s_token.balanceOf(recipient), feeAmount);
     assertEq(s_token.balanceOf(address(s_tokenPool)), 0);
@@ -71,15 +53,13 @@ contract TokenPoolV2_withdrawFee is AdvancedPoolHooksSetup {
     feeTokens[0] = address(s_token);
     feeTokens[1] = token2;
 
-    vm.prank(OWNER);
-    s_tokenPool.setDynamicConfig(makeAddr("router"), makeAddr("rateLimitAdmin"), recipient);
-
     vm.expectEmit();
     emit FeeTokenHandler.FeeTokenWithdrawn(recipient, address(s_token), feeAmount1);
     vm.expectEmit();
     emit FeeTokenHandler.FeeTokenWithdrawn(recipient, token2, feeAmount2);
 
-    s_tokenPool.withdrawFeeTokens(feeTokens);
+    vm.prank(s_feeAdmin);
+    s_tokenPool.withdrawFeeTokens(feeTokens, recipient);
 
     assertEq(s_token.balanceOf(recipient), feeAmount1);
     assertEq(IERC20(token2).balanceOf(recipient), feeAmount2);
@@ -87,44 +67,72 @@ contract TokenPoolV2_withdrawFee is AdvancedPoolHooksSetup {
     assertEq(IERC20(token2).balanceOf(address(s_tokenPool)), 0);
   }
 
-  function test_withdrawFeeTokens_UpdateFeeAggregator() public {
+  function test_withdrawFeeTokens_UpdateFeeAdmin() public {
     uint256 feeAmount1 = 20 ether;
     uint256 feeAmount2 = 10 ether;
-    address recipient1 = makeAddr("fee_recipient1");
-    address recipient2 = makeAddr("fee_recipient2");
+    address newFeeAdmin = makeAddr("new_fee_admin");
+    address recipient = makeAddr("fee_recipient");
 
     deal(address(s_token), address(s_tokenPool), feeAmount1);
 
     address[] memory feeTokens = new address[](1);
     feeTokens[0] = address(s_token);
 
-    // Set initial fee aggregator
-    vm.prank(OWNER);
-    s_tokenPool.setDynamicConfig(makeAddr("router"), makeAddr("rateLimitAdmin"), recipient1);
-
     vm.expectEmit();
-    emit FeeTokenHandler.FeeTokenWithdrawn(recipient1, address(s_token), feeAmount1);
-    s_tokenPool.withdrawFeeTokens(feeTokens);
+    emit FeeTokenHandler.FeeTokenWithdrawn(recipient, address(s_token), feeAmount1);
+    vm.prank(s_feeAdmin);
+    s_tokenPool.withdrawFeeTokens(feeTokens, recipient);
 
-    assertEq(s_token.balanceOf(recipient1), feeAmount1);
+    assertEq(s_token.balanceOf(recipient), feeAmount1);
 
-    // Add more fees and update fee aggregator
+    // Add more fees and update fee admin
     deal(address(s_token), address(s_tokenPool), feeAmount2);
     vm.prank(OWNER);
-    s_tokenPool.setDynamicConfig(makeAddr("router"), makeAddr("rateLimitAdmin"), recipient2);
+    s_tokenPool.setDynamicConfig(makeAddr("router"), makeAddr("rateLimitAdmin"), newFeeAdmin);
 
     vm.expectEmit();
-    emit FeeTokenHandler.FeeTokenWithdrawn(recipient2, address(s_token), feeAmount2);
-    s_tokenPool.withdrawFeeTokens(feeTokens);
+    emit FeeTokenHandler.FeeTokenWithdrawn(recipient, address(s_token), feeAmount2);
+    vm.prank(newFeeAdmin);
+    s_tokenPool.withdrawFeeTokens(feeTokens, recipient);
 
-    assertEq(s_token.balanceOf(recipient2), feeAmount2);
+    assertEq(s_token.balanceOf(recipient) - feeAmount1, feeAmount2);
   }
 
-  function test_withdrawFeeTokens_RevertsWhen_FeeAggregatorNotSet() public {
+  function test_withdrawFeeTokens_CallableByOwnerAndFeeAdmin() public {
+    uint256 feeAmount = 20 ether;
+    address recipient = makeAddr("fee_recipient");
+
+    deal(address(s_token), address(s_tokenPool), feeAmount / 2);
+
     address[] memory feeTokens = new address[](1);
     feeTokens[0] = address(s_token);
 
-    vm.expectRevert(FeeTokenHandler.ZeroAddressNotAllowed.selector);
-    s_tokenPool.withdrawFeeTokens(feeTokens);
+    vm.expectEmit();
+    emit FeeTokenHandler.FeeTokenWithdrawn(recipient, address(s_token), feeAmount / 2);
+    vm.prank(s_feeAdmin);
+    s_tokenPool.withdrawFeeTokens(feeTokens, recipient);
+
+    deal(address(s_token), address(s_tokenPool), feeAmount / 2);
+
+    vm.expectEmit();
+    emit FeeTokenHandler.FeeTokenWithdrawn(recipient, address(s_token), feeAmount / 2);
+    vm.prank(OWNER);
+    s_tokenPool.withdrawFeeTokens(feeTokens, recipient);
+
+    assertEq(s_token.balanceOf(recipient), feeAmount);
+  }
+
+  function test_withdrawFeeTokens_RevertsWhen_CalledByNonOwnerOrFeeAdmin() public {
+    uint256 feeAmount = 20 ether;
+    address recipient = makeAddr("fee_recipient");
+
+    deal(address(s_token), address(s_tokenPool), feeAmount);
+
+    address[] memory feeTokens = new address[](1);
+    feeTokens[0] = address(s_token);
+
+    vm.expectRevert(abi.encodeWithSelector(TokenPool.CallerIsNotOwnerOrFeeAdmin.selector, STRANGER));
+    vm.prank(STRANGER);
+    s_tokenPool.withdrawFeeTokens(feeTokens, recipient);
   }
 }
