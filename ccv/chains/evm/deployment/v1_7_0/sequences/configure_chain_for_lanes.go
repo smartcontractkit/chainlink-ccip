@@ -6,15 +6,18 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 
-	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
-	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
+
+	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/erc20"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/executor"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/offramp"
@@ -208,8 +211,65 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 			batchOps = append(batchOps, committeeVerifierReport.Output.BatchOps...)
 		}
 
+		// Collect extra metadata.
+		contractMetadata := make([]datastore.ContractMetadata, 0)
+
+		// Read fee tokens from the FeeQuoter.
+		getFeeTokensReport, err := cldf_ops.ExecuteOperation(b, fee_quoter.GetFeeTokens, chain, contract.FunctionInput[any]{
+			ChainSelector: chain.Selector,
+			Address:       common.HexToAddress(input.FeeQuoter),
+			Args:          nil,
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to read fee tokens from FeeQuoter(%s) on chain %s: %w", input.FeeQuoter, chain, err)
+		}
+
+		// Read metadata for each fee token.
+		for _, tokenAddr := range getFeeTokensReport.Output {
+			// Read name
+			nameReport, err := cldf_ops.ExecuteOperation(b, erc20.Name, chain, contract.FunctionInput[any]{
+				ChainSelector: chain.Selector,
+				Address:       tokenAddr,
+				Args:          nil,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to read name of fee token(%s) on chain %s: %w", tokenAddr, chain, err)
+			}
+
+			// Read symbol
+			symbolReport, err := cldf_ops.ExecuteOperation(b, erc20.Symbol, chain, contract.FunctionInput[any]{
+				ChainSelector: chain.Selector,
+				Address:       tokenAddr,
+				Args:          nil,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to read symbol of fee token(%s) on chain %s: %w", tokenAddr, chain, err)
+			}
+			// Read decimals
+			decimalsReport, err := cldf_ops.ExecuteOperation(b, erc20.Decimals, chain, contract.FunctionInput[any]{
+				ChainSelector: chain.Selector,
+				Address:       tokenAddr,
+				Args:          nil,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to read decimals of fee token(%s) on chain %s: %w", tokenAddr, chain, err)
+			}
+
+			contractMetadata = append(contractMetadata, datastore.ContractMetadata{
+				Address:       tokenAddr.Hex(),
+				ChainSelector: chain.Selector,
+				Metadata: map[string]interface{}{
+					"name":     nameReport.Output,
+					"symbol":   symbolReport.Output,
+					"decimals": decimalsReport.Output,
+				},
+			})
+		}
+
 		return sequences.OnChainOutput{
+			Metadata: sequences.Metadata{
+				Contracts: contractMetadata,
+			},
 			BatchOps: batchOps,
 		}, nil
-	},
-)
+	})

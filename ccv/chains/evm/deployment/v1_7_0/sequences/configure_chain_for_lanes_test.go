@@ -1,13 +1,17 @@
 package sequences_test
 
 import (
+	"math/big"
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/v2"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/stretchr/testify/require"
+
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/erc20"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/executor"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/offramp"
@@ -18,13 +22,14 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/versioned_verifier_resolver"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/link_token"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	"github.com/stretchr/testify/require"
 )
 
 func TestConfigureChainForLanes(t *testing.T) {
@@ -96,7 +101,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 			ccipMessageDest := common.HexToAddress("0x11").Bytes()
 			remoteChainSelector := uint64(4356164186791070119)
 
-			_, err = operations.ExecuteSequence(
+			configureReport, err := operations.ExecuteSequence(
 				e.OperationsBundle,
 				sequences.ConfigureChainForLanes,
 				e.BlockChains,
@@ -142,6 +147,26 @@ func TestConfigureChainForLanes(t *testing.T) {
 				},
 			)
 			require.NoError(t, err, "ExecuteSequence should not error")
+
+			// Test FeeQuoter metadata
+			require.NotNil(t, configureReport.Output.Metadata, "Metadata should be set")
+			require.NotEmpty(t, configureReport.Output.Metadata.Contracts, "Should have contract metadata")
+			feeQuoterMetadataFound := false
+			for _, contractMeta := range configureReport.Output.Metadata.Contracts {
+				if contractMeta.Address == feeQuoter && contractMeta.ChainSelector == chainSelector {
+					feeQuoterMetadataFound = true
+					require.Equal(t, feeQuoter, contractMeta.Address, "FeeQuoter metadata should have correct address")
+					require.Equal(t, chainSelector, contractMeta.ChainSelector, "FeeQuoter metadata should have correct chain selector")
+					if metaMap, ok := contractMeta.Metadata.(map[string]interface{}); ok {
+						require.Equal(t, true, metaMap["configured"], "FeeQuoter metadata should have configured=true")
+						require.Equal(t, "fee_quoter_configured", metaMap["test_metadata"], "FeeQuoter metadata should have test_metadata")
+					} else {
+						t.Fatalf("FeeQuoter metadata should be a map[string]interface{}")
+					}
+					break
+				}
+			}
+			require.True(t, feeQuoterMetadataFound, "Should have found FeeQuoter metadata")
 
 			// Check onRamps on router
 			onRampOnRouter, err := operations.ExecuteOperation(e.OperationsBundle, router.GetOnRamp, evmChain, contract.FunctionInput[uint64]{
@@ -289,6 +314,287 @@ func TestConfigureChainForLanes(t *testing.T) {
 				Args:          ccipSendArgs,
 			})
 			require.NoError(t, err, "ExecuteOperation should not error")
+		})
+	}
+}
+
+func TestConfigureChainForLanes_Metadata(t *testing.T) {
+	tests := []struct {
+		desc string
+	}{
+		{
+			desc: "valid input",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			chainSelector := uint64(5009297550715157269)
+			e, err := environment.New(t.Context(),
+				environment.WithEVMSimulated(t, []uint64{chainSelector}),
+			)
+			require.NoError(t, err, "Failed to create environment")
+			require.NotNil(t, e, "Environment should be created")
+			evmChain := e.BlockChains.EVMChains()[chainSelector]
+
+			create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, evmChain, contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+				TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
+				ChainSelector:  chainSelector,
+				Args: create2_factory.ConstructorArgs{
+					AllowList: []common.Address{evmChain.DeployerKey.From},
+				},
+			}, nil)
+			require.NoError(t, err, "Failed to deploy CREATE2Factory")
+
+			mockERC20Ref0, err := contract_utils.MaybeDeployContract(e.OperationsBundle, erc20.Deploy, evmChain, contract_utils.DeployInput[erc20.ConstructorArgs]{
+				TypeAndVersion: deployment.NewTypeAndVersion(erc20.ContractType, *semver.MustParse("1.0.0")),
+				ChainSelector:  chainSelector,
+				Args: erc20.ConstructorArgs{
+					Name:      "Mock ERC20 0",
+					Symbol:    "MOCK 0",
+					Decimals:  18,
+					MaxSupply: big.NewInt(1000000000000000000),
+					PreMint:   big.NewInt(1000000000000000000),
+					NewOwner:  evmChain.DeployerKey.From,
+				},
+			}, nil)
+			require.NoError(t, err, "Failed to deploy Mock ERC20 0")
+
+			mockERC20Ref1, err := contract_utils.MaybeDeployContract(e.OperationsBundle, erc20.Deploy, evmChain, contract_utils.DeployInput[erc20.ConstructorArgs]{
+				TypeAndVersion: deployment.NewTypeAndVersion(erc20.ContractType, *semver.MustParse("1.0.0")),
+				ChainSelector:  chainSelector,
+				Args: erc20.ConstructorArgs{
+					Name:      "Mock ERC20 1",
+					Symbol:    "MOCK 1",
+					Decimals:  18,
+					MaxSupply: big.NewInt(1000000000000000000),
+					PreMint:   big.NewInt(1000000000000000000),
+					NewOwner:  evmChain.DeployerKey.From,
+				},
+			}, nil)
+			require.NoError(t, err, "Failed to deploy Mock ERC20 1")
+
+			mockERC20Ref2, err := contract_utils.MaybeDeployContract(e.OperationsBundle, erc20.Deploy, evmChain, contract_utils.DeployInput[erc20.ConstructorArgs]{
+				TypeAndVersion: deployment.NewTypeAndVersion(erc20.ContractType, *semver.MustParse("1.0.0")),
+				ChainSelector:  chainSelector,
+				Args: erc20.ConstructorArgs{
+					Name:      "Mock ERC20 2",
+					Symbol:    "MOCK 2",
+					Decimals:  6,
+					MaxSupply: big.NewInt(1000000000000000000),
+					PreMint:   big.NewInt(1000000000000000000),
+					NewOwner:  evmChain.DeployerKey.From,
+				},
+			}, nil)
+			require.NoError(t, err, "Failed to deploy Mock ERC20 2")
+
+			deploymentReport, err := operations.ExecuteSequence(
+				e.OperationsBundle,
+				sequences.DeployChainContracts,
+				evmChain,
+				sequences.DeployChainContractsInput{
+					ChainSelector:  chainSelector,
+					CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
+					ContractParams: testsetup.CreateBasicContractParams(),
+				},
+			)
+			require.NoError(t, err, "ExecuteSequence should not error")
+
+			var routerAddress string
+			var onRamp string
+			var feeQuoter string
+			var offRamp string
+			var committeeVerifier string
+			var committeeVerifierResolver string
+			var executorAddress string
+			for _, addr := range deploymentReport.Output.Addresses {
+				switch addr.Type {
+				case datastore.ContractType(router.ContractType):
+					routerAddress = addr.Address
+				case datastore.ContractType(onramp.ContractType):
+					onRamp = addr.Address
+				case datastore.ContractType(fee_quoter.ContractType):
+					feeQuoter = addr.Address
+				case datastore.ContractType(offramp.ContractType):
+					offRamp = addr.Address
+				case datastore.ContractType(committee_verifier.ContractType):
+					committeeVerifier = addr.Address
+				case datastore.ContractType(executor.ProxyType):
+					executorAddress = addr.Address
+				case datastore.ContractType(committee_verifier.ResolverType):
+					committeeVerifierResolver = addr.Address
+				}
+			}
+
+			// Extract LINK and WETH addresses from deployment report
+			var linkAddress string
+			var wethAddress string
+			for _, addr := range deploymentReport.Output.Addresses {
+				switch addr.Type {
+				case datastore.ContractType(link_token.ContractType):
+					linkAddress = addr.Address
+				case datastore.ContractType(weth.ContractType):
+					wethAddress = addr.Address
+				}
+			}
+			require.NotEmpty(t, linkAddress, "LINK address should be found")
+			require.NotEmpty(t, wethAddress, "WETH address should be found")
+
+			nameReport, err := operations.ExecuteOperation(e.OperationsBundle, erc20.Name, evmChain, contract.FunctionInput[any]{
+				ChainSelector: chainSelector,
+				Address:       common.HexToAddress(mockERC20Ref0.Address),
+				Args:          nil,
+			})
+			require.NoError(t, err, "Failed to read token name")
+			require.Equal(t, "Mock ERC20 0", nameReport.Output, "Token name should match")
+
+			nameReport, err = operations.ExecuteOperation(e.OperationsBundle, erc20.Name, evmChain, contract.FunctionInput[any]{
+				ChainSelector: chainSelector,
+				Address:       common.HexToAddress(mockERC20Ref1.Address),
+				Args:          nil,
+			})
+			require.NoError(t, err, "Failed to read token name")
+			require.Equal(t, "Mock ERC20 1", nameReport.Output, "Token name should match")
+
+			nameReport, err = operations.ExecuteOperation(e.OperationsBundle, erc20.Name, evmChain, contract.FunctionInput[any]{
+				ChainSelector: chainSelector,
+				Address:       common.HexToAddress(mockERC20Ref2.Address),
+				Args:          nil,
+			})
+			require.NoError(t, err, "Failed to read token name")
+			require.Equal(t, "Mock ERC20 2", nameReport.Output, "Token name should match")
+
+			// Price mock tokens in fee quoter, so they are added to it.
+			_, err = operations.ExecuteOperation(e.OperationsBundle, fee_quoter.UpdatePrices, evmChain, contract.FunctionInput[fee_quoter.PriceUpdates]{
+				ChainSelector: evmChain.Selector,
+				Address:       common.HexToAddress(feeQuoter),
+				Args: fee_quoter.PriceUpdates{
+					TokenPriceUpdates: []fee_quoter.TokenPriceUpdate{
+						{
+							SourceToken: common.HexToAddress(mockERC20Ref0.Address),
+							UsdPerToken: big.NewInt(1000000000000000000),
+						},
+						{
+							SourceToken: common.HexToAddress(mockERC20Ref1.Address),
+							UsdPerToken: big.NewInt(2000000000000000000),
+						},
+						{
+							SourceToken: common.HexToAddress(mockERC20Ref2.Address),
+							UsdPerToken: big.NewInt(3000000000000000000),
+						},
+					},
+				},
+			})
+			require.NoError(t, err, "ExecuteOperation should not error")
+
+			ccipMessageSource := common.HexToAddress("0x10").Bytes()
+			ccipMessageDest := common.HexToAddress("0x11").Bytes()
+			remoteChainSelector := uint64(4356164186791070119)
+
+			configureReport, err := operations.ExecuteSequence(
+				e.OperationsBundle,
+				sequences.ConfigureChainForLanes,
+				e.BlockChains,
+				adapters.ConfigureChainForLanesInput{
+					ChainSelector: chainSelector,
+					Router:        routerAddress,
+					OnRamp:        onRamp,
+					CommitteeVerifiers: []adapters.CommitteeVerifierConfig[datastore.AddressRef]{
+						{
+							CommitteeVerifier: []datastore.AddressRef{
+								{
+									Address: committeeVerifier,
+									Type:    datastore.ContractType(committee_verifier.ContractType),
+									Version: committee_verifier.Version,
+								},
+								{
+									Address: committeeVerifierResolver,
+									Type:    datastore.ContractType(committee_verifier.ResolverType),
+									Version: committee_verifier.Version,
+								},
+							},
+							RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
+								remoteChainSelector: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
+							},
+						},
+					},
+					FeeQuoter: feeQuoter,
+					OffRamp:   offRamp,
+					RemoteChains: map[uint64]adapters.RemoteChainConfig[[]byte, string]{
+						remoteChainSelector: {
+							AllowTrafficFrom:         true,
+							OnRamps:                  [][]byte{ccipMessageSource},
+							OffRamp:                  ccipMessageDest,
+							DefaultInboundCCVs:       []string{committeeVerifier},
+							DefaultOutboundCCVs:      []string{committeeVerifier},
+							DefaultExecutor:          executorAddress,
+							FeeQuoterDestChainConfig: testsetup.CreateBasicFeeQuoterDestChainConfig(),
+							ExecutorDestChainConfig:  testsetup.CreateBasicExecutorDestChainConfig(),
+							AddressBytesLength:       20,
+							BaseExecutionGasCost:     80_000,
+						},
+					},
+				},
+			)
+			require.NoError(t, err, "ExecuteSequence should not error")
+
+			// Test fee token metadata
+			require.NotNil(t, configureReport.Output.Metadata, "Metadata should be set")
+			require.NotEmpty(t, configureReport.Output.Metadata.Contracts, "Should have contract metadata")
+
+			// Expected fee token metadata
+			expectedFeeTokens := map[string]struct {
+				name     string
+				symbol   string
+				decimals uint8
+			}{
+				linkAddress: {
+					name:     "LINK",
+					symbol:   "LINK",
+					decimals: 18,
+				},
+				wethAddress: {
+					name:     "Wrapped Ether",
+					symbol:   "WETH",
+					decimals: 18,
+				},
+				mockERC20Ref0.Address: {
+					name:     "Mock ERC20 0",
+					symbol:   "MOCK 0",
+					decimals: 18,
+				},
+				mockERC20Ref1.Address: {
+					name:     "Mock ERC20 1",
+					symbol:   "MOCK 1",
+					decimals: 18,
+				},
+				mockERC20Ref2.Address: {
+					name:     "Mock ERC20 2",
+					symbol:   "MOCK 2",
+					decimals: 6,
+				},
+			}
+
+			// Build a map of contract metadata by address for easy lookup
+			metadataByAddress := make(map[string]datastore.ContractMetadata)
+			for _, contractMeta := range configureReport.Output.Metadata.Contracts {
+				metadataByAddress[contractMeta.Address] = contractMeta
+			}
+
+			// Verify each expected fee token has metadata
+			for tokenAddr, expected := range expectedFeeTokens {
+				contractMeta, found := metadataByAddress[tokenAddr]
+				require.True(t, found, "Should have metadata for fee token %s", tokenAddr)
+				require.Equal(t, tokenAddr, contractMeta.Address, "Fee token metadata should have correct address")
+				require.Equal(t, chainSelector, contractMeta.ChainSelector, "Fee token metadata should have correct chain selector")
+
+				metaMap, ok := contractMeta.Metadata.(map[string]interface{})
+				require.True(t, ok, "Fee token metadata should be a map[string]interface{}")
+
+				require.Equal(t, expected.name, metaMap["name"], "Fee token %s should have correct name", tokenAddr)
+				require.Equal(t, expected.symbol, metaMap["symbol"], "Fee token %s should have correct symbol", tokenAddr)
+				require.Equal(t, expected.decimals, metaMap["decimals"], "Fee token %s should have correct decimals", tokenAddr)
+			}
 		})
 	}
 }
