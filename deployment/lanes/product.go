@@ -30,8 +30,9 @@ type LaneAdapter interface {
 // This is primarily used by EVM chains; other chains can skip this.
 type TokenPriceProvider interface {
 	// GetDefaultTokenPrices returns default fee token prices for a chain.
-	// Returns a map of token address (hex string) to USD price (18 decimals).
-	GetDefaultTokenPrices(ds datastore.DataStore, chainSelector uint64) map[string]*big.Int
+	// Returns a map of contract type to USD price (18 decimals).
+	// The caller is responsible for resolving contract types to addresses.
+	GetDefaultTokenPrices() map[datastore.ContractType]*big.Int
 }
 
 type laneAdapterID string

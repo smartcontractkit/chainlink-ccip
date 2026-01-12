@@ -144,6 +144,7 @@ func DeployContractsForSelector(ctx context.Context, env *deployment.Environment
 
 // getTokenPricesForChain returns the token prices for fee tokens on a chain.
 // Uses the optional TokenPriceProvider interface - only chains that implement it (like EVM) provide prices.
+// Resolves contract types to addresses using the datastore.
 func getTokenPricesForChain(ds datastore.DataStore, selector uint64, version *semver.Version) map[string]*big.Int {
 	family, err := chain_selectors.GetSelectorFamily(selector)
 	if err != nil {
@@ -156,11 +157,27 @@ func getTokenPricesForChain(ds datastore.DataStore, selector uint64, version *se
 	}
 
 	// Check if adapter implements TokenPriceProvider (optional interface)
-	if priceProvider, ok := adapter.(lanesapi.TokenPriceProvider); ok {
-		return priceProvider.GetDefaultTokenPrices(ds, selector)
+	priceProvider, ok := adapter.(lanesapi.TokenPriceProvider)
+	if !ok {
+		return make(map[string]*big.Int)
 	}
 
-	return make(map[string]*big.Int)
+	// Get prices keyed by contract type
+	typePrices := priceProvider.GetDefaultTokenPrices()
+
+	// Resolve contract types to addresses
+	addressPrices := make(map[string]*big.Int)
+	for contractType, price := range typePrices {
+		refs := ds.Addresses().Filter(
+			datastore.AddressRefByType(contractType),
+			datastore.AddressRefByChainSelector(selector),
+		)
+		for _, ref := range refs {
+			addressPrices[ref.Address] = price
+		}
+	}
+
+	return addressPrices
 }
 
 func ConnectContractsWithSelectors(ctx context.Context, e *deployment.Environment, selector uint64, remoteSelectors []uint64) error {
