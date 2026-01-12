@@ -1,6 +1,9 @@
 use anchor_lang::prelude::*;
 
-use ccip_common::{CommonCcipError, CHAIN_FAMILY_SELECTOR_EVM, CHAIN_FAMILY_SELECTOR_SVM};
+use ccip_common::{
+    CommonCcipError, CHAIN_FAMILY_SELECTOR_APTOS, CHAIN_FAMILY_SELECTOR_EVM,
+    CHAIN_FAMILY_SELECTOR_SVM, CHAIN_FAMILY_SELECTOR_TVM,
+};
 
 use crate::context::{
     AcceptOwnership, AddBillingTokenConfig, AddDestChain, AddPriceUpdater, RemovePriceUpdater,
@@ -302,10 +305,46 @@ fn validate_dest_chain_config(dest_chain_selector: u64, config: &DestChainConfig
     require!(
         matches!(
             u32::from_be_bytes(config.chain_family_selector),
-            CHAIN_FAMILY_SELECTOR_EVM | CHAIN_FAMILY_SELECTOR_SVM
+            CHAIN_FAMILY_SELECTOR_EVM
+                | CHAIN_FAMILY_SELECTOR_SVM
+                | CHAIN_FAMILY_SELECTOR_TVM
+                | CHAIN_FAMILY_SELECTOR_APTOS
         ),
         CommonCcipError::InvalidChainFamilySelector
     );
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::instructions::v1::messages::tests::sample_dest_chain;
+
+    #[test]
+    fn validate_dest_chain_config_accepts_tvm() {
+        let mut dest_chain = sample_dest_chain();
+        dest_chain.config.chain_family_selector = CHAIN_FAMILY_SELECTOR_TVM.to_be_bytes();
+
+        validate_dest_chain_config(dest_chain.chain_selector, &dest_chain.config).unwrap();
+    }
+
+    #[test]
+    fn validate_dest_chain_config_accepts_aptos() {
+        let mut dest_chain = sample_dest_chain();
+        dest_chain.config.chain_family_selector = CHAIN_FAMILY_SELECTOR_APTOS.to_be_bytes();
+
+        validate_dest_chain_config(dest_chain.chain_selector, &dest_chain.config).unwrap();
+    }
+
+    #[test]
+    fn validate_dest_chain_config_rejects_unknown_selector() {
+        let mut dest_chain = sample_dest_chain();
+        dest_chain.config.chain_family_selector = [0u8; 4];
+
+        assert_eq!(
+            validate_dest_chain_config(dest_chain.chain_selector, &dest_chain.config).unwrap_err(),
+            CommonCcipError::InvalidChainFamilySelector.into()
+        );
+    }
 }
