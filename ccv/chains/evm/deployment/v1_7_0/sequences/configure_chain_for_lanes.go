@@ -18,6 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/erc20"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/executor"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/fee_quoter"
@@ -218,6 +219,26 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, err
 		}
 
+		// Collect CommitteeVerifier signature config metadata for each CommitteeVerifier
+		for _, committeeVerifier := range input.CommitteeVerifiers {
+			var committeeVerifierAddr string
+			for _, addr := range committeeVerifier.CommitteeVerifier {
+				if addr.Type == datastore.ContractType(committee_verifier.ContractType) {
+					committeeVerifierAddr = addr.Address
+					break
+				}
+			}
+			if committeeVerifierAddr == "" {
+				continue // Skip if we can't find the CommitteeVerifier address
+			}
+
+			committeeVerifierMetadata, err := collectCommitteeVerifierSignatureConfigs(b, chain, committeeVerifierAddr, chain.Selector, []datastore.ContractMetadata{})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to collect CommitteeVerifier signature configs: %w", err)
+			}
+			contractMetadata = append(contractMetadata, committeeVerifierMetadata...)
+		}
+
 		return sequences.OnChainOutput{
 			Metadata: sequences.Metadata{
 				Contracts: contractMetadata,
@@ -283,6 +304,49 @@ func collectFeeTokenMetadata(
 				"name":     nameReport.Output,
 				"symbol":   symbolReport.Output,
 				"decimals": decimalsReport.Output,
+			},
+		})
+	}
+
+	return contractMetadata, nil
+}
+
+func collectCommitteeVerifierSignatureConfigs(
+	b cldf_ops.Bundle,
+	chain evm.Chain,
+	committeeVerifierAddr string,
+	chainSelector uint64,
+	contractMetadata []datastore.ContractMetadata,
+) ([]datastore.ContractMetadata, error) {
+	// Read current signature configs from the contract.
+	getAllConfigsReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.GetAllSignatureConfigs, chain, contract.FunctionInput[any]{
+		ChainSelector: chainSelector,
+		Address:       common.HexToAddress(committeeVerifierAddr),
+		Args:          nil,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to read signature configs from CommitteeVerifier(%s) on chain %s: %w", committeeVerifierAddr, chain, err)
+	}
+
+	// Build a map of current signature configs.
+	currentConfigs := make(map[uint64]committee_verifier.SignatureConfig)
+	for _, cfg := range getAllConfigsReport.Output {
+		currentConfigs[cfg.SourceChainSelector] = cfg
+	}
+
+	// Convert to metadata
+	for selector, cfg := range currentConfigs {
+		signersHex := make([]string, len(cfg.Signers))
+		for i, signer := range cfg.Signers {
+			signersHex[i] = signer.Hex()
+		}
+		contractMetadata = append(contractMetadata, datastore.ContractMetadata{
+			Address:       committeeVerifierAddr,
+			ChainSelector: chainSelector,
+			Metadata: map[string]interface{}{
+				"sourceChainSelector": selector,
+				"threshold":           cfg.Threshold,
+				"signers":             signersHex,
 			},
 		})
 	}

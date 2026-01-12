@@ -487,9 +487,38 @@ func TestConfigureChainForLanes_Metadata(t *testing.T) {
 			})
 			require.NoError(t, err, "ExecuteOperation should not error")
 
+			remoteChainSelector := uint64(4356164186791070119)
+
+			// Pre-configure signature configs on CommitteeVerifier so they exist on-chain
+			// when metadata is collected
+			preConfiguredConfig := committee_verifier.SignatureConfig{
+				SourceChainSelector: remoteChainSelector,
+				Threshold:           1,
+				Signers:             []common.Address{common.HexToAddress("0x01"), common.HexToAddress("0x02")},
+			}
+			_, err = operations.ExecuteOperation(e.OperationsBundle, committee_verifier.ApplySignatureConfigs, evmChain, contract.FunctionInput[committee_verifier.SignatureConfigArgs]{
+				ChainSelector: chainSelector,
+				Address:       common.HexToAddress(committeeVerifier),
+				Args: committee_verifier.SignatureConfigArgs{
+					SignatureConfigUpdates: []committee_verifier.SignatureConfig{preConfiguredConfig},
+				},
+			})
+			require.NoError(t, err, "Failed to pre-configure signature configs on CommitteeVerifier")
+
+			// Verify they're actually on-chain
+			getAllConfigsReport, err := operations.ExecuteOperation(e.OperationsBundle, committee_verifier.GetAllSignatureConfigs, evmChain, contract.FunctionInput[any]{
+				ChainSelector: chainSelector,
+				Address:       common.HexToAddress(committeeVerifier),
+				Args:          nil,
+			})
+			require.NoError(t, err, "Failed to verify signature configs are on-chain")
+			require.Len(t, getAllConfigsReport.Output, 1, "Should have one signature config on-chain")
+			require.Equal(t, preConfiguredConfig.SourceChainSelector, getAllConfigsReport.Output[0].SourceChainSelector, "Signature config should have correct sourceChainSelector")
+			require.Equal(t, preConfiguredConfig.Threshold, getAllConfigsReport.Output[0].Threshold, "Signature config should have correct threshold")
+			require.Equal(t, preConfiguredConfig.Signers, getAllConfigsReport.Output[0].Signers, "Signature config should have correct signers")
+
 			ccipMessageSource := common.HexToAddress("0x10").Bytes()
 			ccipMessageDest := common.HexToAddress("0x11").Bytes()
-			remoteChainSelector := uint64(4356164186791070119)
 
 			configureReport, err := operations.ExecuteSequence(
 				e.OperationsBundle,
@@ -595,6 +624,41 @@ func TestConfigureChainForLanes_Metadata(t *testing.T) {
 				require.Equal(t, expected.symbol, metaMap["symbol"], "Fee token %s should have correct symbol", tokenAddr)
 				require.Equal(t, expected.decimals, metaMap["decimals"], "Fee token %s should have correct decimals", tokenAddr)
 			}
+
+			// Test CommitteeVerifier signature config metadata
+			// Convert expected signers to hex strings for comparison
+			expectedSignersHex := make([]string, len(preConfiguredConfig.Signers))
+			for i, signer := range preConfiguredConfig.Signers {
+				expectedSignersHex[i] = signer.Hex()
+			}
+
+			// Find CommitteeVerifier metadata entry for the pre-configured config
+			committeeVerifierMetadataFound := false
+			for _, contractMeta := range configureReport.Output.Metadata.Contracts {
+				if contractMeta.Address == committeeVerifier && contractMeta.ChainSelector == chainSelector {
+					metaMap, ok := contractMeta.Metadata.(map[string]interface{})
+					require.True(t, ok, "CommitteeVerifier metadata should be a map[string]interface{}")
+
+					// Check if this is the metadata for our pre-configured signature config
+					if sourceChainSelector, ok := metaMap["sourceChainSelector"].(uint64); ok {
+						if sourceChainSelector == preConfiguredConfig.SourceChainSelector {
+							require.Equal(t, committeeVerifier, contractMeta.Address, "CommitteeVerifier metadata should have correct address")
+							require.Equal(t, chainSelector, contractMeta.ChainSelector, "CommitteeVerifier metadata should have correct chain selector")
+							require.Equal(t, preConfiguredConfig.SourceChainSelector, metaMap["sourceChainSelector"], "Signature config should have correct sourceChainSelector")
+							require.Equal(t, preConfiguredConfig.Threshold, metaMap["threshold"], "Signature config should have correct threshold")
+
+							signers, ok := metaMap["signers"].([]string)
+							require.True(t, ok, "Signers should be []string")
+							require.Equal(t, expectedSignersHex, signers, "Signature config should have correct signers")
+
+							committeeVerifierMetadataFound = true
+							break
+						}
+					}
+				}
+			}
+
+			require.True(t, committeeVerifierMetadataFound, "Should have found CommitteeVerifier signature config metadata")
 		})
 	}
 }
