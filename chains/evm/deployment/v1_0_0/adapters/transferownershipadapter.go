@@ -15,7 +15,7 @@ import (
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
-	api "github.com/smartcontractkit/chainlink-ccip/deployment/v1_0"
+	api "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 )
 
 type EVMTransferOwnershipAdapter struct {

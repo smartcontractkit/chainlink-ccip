@@ -27,7 +27,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_0"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 )
 
 // TestTransferOwnership tests transferring ownership of deployed contracts via MCMS timelocks.
