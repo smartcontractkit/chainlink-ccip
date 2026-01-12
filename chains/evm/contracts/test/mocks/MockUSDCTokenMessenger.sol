@@ -105,4 +105,11 @@ contract MockUSDCTokenMessenger is ITokenMessenger {
   function localMessageTransmitter() external view returns (address) {
     return i_transmitter;
   }
+
+  /// @dev This function is only available for CCTP V2
+  function getMinFeeAmount(
+    uint256
+  ) external pure returns (uint256) {
+    return 0;
+  }
 }

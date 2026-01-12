@@ -1,8 +1,11 @@
 package contract
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -130,7 +133,7 @@ func NewWrite[ARGS any, C any](params WriteParams[ARGS, C]) *operations.Operatio
 					},
 					To:               input.Address.Hex(),
 					Data:             tx.Data(),
-					AdditionalFields: []byte{0x7B, 0x7D}, // "{}" in bytes
+					AdditionalFields: json.RawMessage(`{"value": 0}`),
 				},
 			}, nil
 		},
@@ -143,11 +146,35 @@ type ownableContract interface {
 }
 
 func OnlyOwner[C ownableContract, ARGS any](contract C, opts *bind.CallOpts, caller common.Address, args ARGS) (bool, error) {
-	owner, err := contract.Owner(opts)
-	if err != nil {
+	// Retry with timeout to handle testnet flakiness where a newly deployed contract
+	// may not be immediately visible to the RPC node
+	const (
+		timeout    = 5 * time.Second
+		retryDelay = 500 * time.Millisecond
+	)
+
+	deadline := time.Now().Add(timeout)
+	var lastErr error
+
+	for time.Now().Before(deadline) {
+		owner, err := contract.Owner(opts)
+		if err == nil {
+			return owner == caller, nil
+		}
+
+		// Check if this is a "contract not found" type error (empty response)
+		// These errors typically contain "attempting to unmarshal an empty string"
+		if strings.Contains(err.Error(), "empty string") || strings.Contains(err.Error(), "no contract code") {
+			lastErr = err
+			time.Sleep(retryDelay)
+			continue
+		}
+
+		// For other errors, fail immediately
 		return false, fmt.Errorf("failed to get owner of %s: %w", contract.Address(), err)
 	}
-	return owner == caller, nil
+
+	return false, fmt.Errorf("failed to get owner of %s after %v: %w", contract.Address(), timeout, lastErr)
 }
 
 func AllCallersAllowed[C any, ARGS any](contract C, opts *bind.CallOpts, caller common.Address, args ARGS) (bool, error) {

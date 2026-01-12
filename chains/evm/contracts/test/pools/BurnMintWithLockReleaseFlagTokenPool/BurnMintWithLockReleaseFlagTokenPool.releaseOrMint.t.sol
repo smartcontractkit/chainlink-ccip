@@ -25,7 +25,7 @@ contract BurnMintWithLockReleaseFlagTokenPool_releaseOrMint is BurnMintWithLockR
         localToken: address(s_token),
         remoteChainSelector: DEST_CHAIN_SELECTOR,
         sourcePoolAddress: abi.encode(s_initialRemotePool),
-        sourcePoolData: abi.encode(LOCK_RELEASE_FLAG),
+        sourcePoolData: abi.encodePacked(LOCK_RELEASE_FLAG),
         offchainTokenData: ""
       })
     );

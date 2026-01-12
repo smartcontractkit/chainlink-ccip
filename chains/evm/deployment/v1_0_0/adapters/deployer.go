@@ -9,16 +9,54 @@ import (
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
+	ccipapi "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	sequtil "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
-	ccipapi "github.com/smartcontractkit/chainlink-ccip/deployment/v1_0"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations"
 	seq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/sequences"
 )
 
+var Version = semver.MustParse("1.0.0")
+
 type EVMDeployer struct{}
+
+func (a *EVMDeployer) DeployChainContracts() *cldf_ops.Sequence[ccipapi.ContractDeploymentConfigPerChainWithAddress, sequtil.OnChainOutput, cldf_chain.BlockChains] {
+	// Not implemented for the 1.0.0 deployer
+	return nil
+}
+
+func (a *EVMDeployer) SetOCR3Config() *cldf_ops.Sequence[ccipapi.SetOCR3ConfigInput, sequtil.OnChainOutput, cldf_chain.BlockChains] {
+	// Not implemented for the 1.0.0 deployer
+	return nil
+}
+
+func (a *EVMDeployer) GrantAdminRoleToTimelock() *cldf_ops.Sequence[ccipapi.GrantAdminRoleToTimelockConfigPerChainWithSelector, sequtil.OnChainOutput, cldf_chain.BlockChains] {
+	return cldf_ops.NewSequence(
+		"grant-admin-role-of-timelock-to-timelock",
+		semver.MustParse("1.0.0"),
+		"Grants admin role of specified timelock contract to the other specified timelock and renounces admin role of the deployer key",
+		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, in ccipapi.GrantAdminRoleToTimelockConfigPerChainWithSelector) (output sequtil.OnChainOutput, err error) {
+			evmChain, ok := chains.EVMChains()[in.ChainSelector]
+			if !ok {
+				return sequtil.OnChainOutput{}, fmt.Errorf("chain with selector %d not found in environment", in.ChainSelector)
+			}
+
+			// create sequence input
+			seqInput := seq.SeqGrantAdminRoleOfTimelockToTimelockInput{
+				ChainSelector:           in.ChainSelector,
+				TimelockAddress:         common.HexToAddress(in.TimelockToTransferRef.Address),
+				NewAdminTimelockAddress: common.HexToAddress(in.NewAdminTimelockRef.Address),
+			}
+			report, err := cldf_ops.ExecuteSequence(b, seq.SeqGrantAdminRoleOfTimelockToTimelock, evmChain, seqInput)
+			if err != nil {
+				return sequtil.OnChainOutput{}, fmt.Errorf("failed to deploy and configure proposer MCM on chain %d: %w", in.ChainSelector, err)
+			}
+
+			return report.Output, nil
+		})
+}
 
 func (d *EVMDeployer) DeployMCMS() *cldf_ops.Sequence[ccipapi.MCMSDeploymentConfigPerChainWithAddress, sequtil.OnChainOutput, cldf_chain.BlockChains] {
 	return cldf_ops.NewSequence(
@@ -131,6 +169,16 @@ func (d *EVMDeployer) DeployMCMS() *cldf_ops.Sequence[ccipapi.MCMSDeploymentConf
 				return sequtil.OnChainOutput{}, fmt.Errorf("failed to grant executor role to call proxy on timelock on chain %d: %w", in.ChainSelector, err)
 			}
 			b.Logger.Infof("Granted Executor role on Timelock %s to Call Proxy %s on chain %s", timelockAddr, callProxyAddr, evmChain.Name)
+			return output, nil
+		})
+}
+
+func (d *EVMDeployer) FinalizeDeployMCMS() *cldf_ops.Sequence[ccipapi.MCMSDeploymentConfigPerChainWithAddress, sequtil.OnChainOutput, cldf_chain.BlockChains] {
+	return cldf_ops.NewSequence(
+		"finalize-deploy-mcms",
+		semver.MustParse("1.0.0"),
+		"On EVM, finalizing MCM deployment is a no-op",
+		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, in ccipapi.MCMSDeploymentConfigPerChainWithAddress) (output sequtil.OnChainOutput, err error) {
 			return output, nil
 		})
 }

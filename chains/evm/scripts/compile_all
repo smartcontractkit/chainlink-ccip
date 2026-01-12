@@ -40,9 +40,6 @@ compileContract() {
     -o $dir"
 
     $command
-
-    # Move the build info to an expected file name
-    mv $(find $dir/build -type f -name '*.json' ! -name 'build.json') $dir/build/build.json
   fi
 }
 

@@ -1,7 +1,9 @@
 package changesets_test
 
 import (
+	"math/big"
 	"testing"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
@@ -27,36 +29,48 @@ func TestDeployChainContracts_VerifyPreconditions(t *testing.T) {
 
 	tests := []struct {
 		desc        string
-		input       cs_core.WithMCMS[changesets.DeployChainContractsCfg]
+		input       deployops.ContractDeploymentConfig
 		expectedErr string
 	}{
 		{
 			desc: "valid input",
-			input: cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
+			input: deployops.ContractDeploymentConfig{
 				MCMS: mcms.Input{},
-				Cfg: changesets.DeployChainContractsCfg{
-					ChainSel: chain_selectors.ETHEREUM_MAINNET.Selector,
-					Params:   sequences.ContractParams{},
+				Chains: map[uint64]deployops.ContractDeploymentConfigPerChain{
+					chain_selectors.ETHEREUM_MAINNET.Selector: {
+						Version: semver.MustParse("1.6.0"),
+					},
 				},
 			},
 		},
 		{
-			desc: "invalid chain selector",
-			input: cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
+			desc: "invalid version nil",
+			input: deployops.ContractDeploymentConfig{
 				MCMS: mcms.Input{},
-				Cfg: changesets.DeployChainContractsCfg{
-					ChainSel: 12345,
-					Params:   sequences.ContractParams{},
+				Chains: map[uint64]deployops.ContractDeploymentConfigPerChain{
+					chain_selectors.ETHEREUM_MAINNET.Selector: {
+						Version: nil,
+					},
 				},
 			},
-			expectedErr: "no EVM chain with selector 12345 found in environment",
+			expectedErr: "no version specified for chain with selector 5009297550715157269",
+		},
+		{
+			desc: "invalid chain selector",
+			input: deployops.ContractDeploymentConfig{
+				MCMS: mcms.Input{},
+				Chains: map[uint64]deployops.ContractDeploymentConfigPerChain{
+					12345: {},
+				},
+			},
+			expectedErr: "no selector 12345 found in environment: unknown chain selector 12345",
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			mcmsRegistry := cs_core.NewMCMSReaderRegistry()
-			err := changesets.DeployChainContracts(mcmsRegistry).VerifyPreconditions(*e, test.input)
+			dReg := deployops.GetRegistry()
+			err := deployops.DeployContracts(dReg).VerifyPreconditions(*e, test.input)
 			if test.expectedErr != "" {
 				require.ErrorContains(t, err, test.expectedErr, "Expected error containing %q but got none", test.expectedErr)
 			} else {
@@ -111,14 +125,21 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 			require.NoError(t, err, "Failed to fetch addresses from datastore")
 			e.DataStore = ds.Seal() // Override datastore in environment to include existing addresses
 
-			mcmsRegistry := cs_core.NewMCMSReaderRegistry()
-			out, err := changesets.DeployChainContracts(mcmsRegistry).Apply(*e, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
+			dReg := deployops.GetRegistry()
+			version := semver.MustParse("1.6.0")
+			out, err := deployops.DeployContracts(dReg).Apply(*e, deployops.ContractDeploymentConfig{
 				MCMS: mcms.Input{},
-				Cfg: changesets.DeployChainContractsCfg{
-					ChainSel: chain_selectors.ETHEREUM_MAINNET.Selector,
-					Params: sequences.ContractParams{
-						FeeQuoter: fee_quoter.DefaultFeeQuoterParams(),
-						OffRamp:   offramp.DefaultOffRampParams(),
+				Chains: map[uint64]deployops.ContractDeploymentConfigPerChain{
+					chain_selectors.ETHEREUM_MAINNET.Selector: {
+						Version: version,
+						// FEE QUOTER CONFIG
+						MaxFeeJuelsPerMsg:            big.NewInt(0).Mul(big.NewInt(200), big.NewInt(1e18)),
+						TokenPriceStalenessThreshold: uint32(24 * 60 * 60),
+						LinkPremiumMultiplier:        9e17, // 0.9 ETH
+						NativeTokenPremiumMultiplier: 1e18, // 1.0 ETH
+						// OFFRAMP CONFIG
+						PermissionLessExecutionThresholdSeconds: uint32((20 * time.Minute).Seconds()),
+						GasForCallExactCheck:                    uint16(5000),
 					},
 				},
 			})

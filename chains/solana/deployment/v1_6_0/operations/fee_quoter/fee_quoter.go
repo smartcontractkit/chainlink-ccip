@@ -3,7 +3,6 @@ package fee_quoter
 import (
 	"context"
 	"fmt"
-	"math/big"
 
 	"github.com/Masterminds/semver/v3"
 	bin "github.com/gagliardetto/binary"
@@ -16,12 +15,15 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	"github.com/smartcontractkit/mcms/types"
 )
 
-var ContractType cldf_deployment.ContractType = "FeeQuoter"
-var ProgramName = "fee_quoter"
-var ProgramSize = 5 * 1024 * 1024
-var Version *semver.Version = semver.MustParse("1.6.0")
+var (
+	ContractType cldf_deployment.ContractType = "FeeQuoter"
+	ProgramName                               = "fee_quoter"
+	ProgramSize                               = 5 * 1024 * 1024
+	Version      *semver.Version              = semver.MustParse("1.6.0")
+)
 
 type ConnectChainsParams struct {
 	FeeQuoter           solana.PublicKey
@@ -42,8 +44,7 @@ var Deploy = operations.NewOperation(
 			ContractType,
 			Version,
 			"",
-			ProgramName,
-			ProgramSize)
+			ProgramName)
 	},
 )
 
@@ -52,17 +53,19 @@ var Initialize = operations.NewOperation(
 	Version,
 	"Initializes the FeeQuoter 1.6.0 contract",
 	func(b operations.Bundle, chain cldf_solana.Chain, input Params) (sequences.OnChainOutput, error) {
-		programData, err := utils.GetSolProgramData(chain, input.FeeQuoter)
+		fee_quoter.SetProgramID(input.FeeQuoter)
+		programData, err := utils.GetSolProgramData(chain.Client, input.FeeQuoter)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get program data: %w", err)
 		}
+		authority := GetAuthority(chain, input.FeeQuoter)
 		feeQuoterConfigPDA, _, _ := state.FindFqConfigPDA(input.FeeQuoter)
 		instruction, err := fee_quoter.NewInitializeInstruction(
 			input.MaxFeeJuelsPerMsg,
 			input.Router,
 			feeQuoterConfigPDA,
 			input.LinkToken,
-			chain.DeployerKey.PublicKey(),
+			authority,
 			solana.SystemProgramID,
 			input.FeeQuoter,
 			programData.Address,
@@ -83,6 +86,7 @@ var AddPriceUpdater = operations.NewOperation(
 	Version,
 	"Adds a price updater to the FeeQuoter 1.6.0 contract",
 	func(b operations.Bundle, chain cldf_solana.Chain, input Params) (sequences.OnChainOutput, error) {
+		fee_quoter.SetProgramID(input.FeeQuoter)
 		authority := GetAuthority(chain, input.FeeQuoter)
 		feeQuoterConfigPDA, _, _ := state.FindFqConfigPDA(input.FeeQuoter)
 		offRampBillingSignerPDA, _, _ := state.FindOfframpBillingSignerPDA(input.OffRamp)
@@ -97,6 +101,18 @@ var AddPriceUpdater = operations.NewOperation(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to build add price updater instruction: %w", err)
 		}
+		if authority != chain.DeployerKey.PublicKey() {
+			batches, err := utils.BuildMCMSBatchOperation(
+				chain.Selector,
+				[]solana.Instruction{instruction},
+				input.FeeQuoter.String(),
+				ContractType.String(),
+			)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute or create batch: %w", err)
+			}
+			return sequences.OnChainOutput{BatchOps: []types.BatchOperation{batches}}, nil
+		}
 		err = chain.Confirm([]solana.Instruction{instruction})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm add price updater: %w", err)
@@ -110,6 +126,7 @@ var ConnectChains = operations.NewOperation(
 	Version,
 	"Connects the FeeQuoter 1.6.0 contract to other chains",
 	func(b operations.Bundle, chain cldf_solana.Chain, input ConnectChainsParams) (sequences.OnChainOutput, error) {
+		fee_quoter.SetProgramID(input.FeeQuoter)
 		isUpdate := false
 		authority := GetAuthority(chain, input.FeeQuoter)
 		feeQuoterConfigPDA, _, _ := state.FindFqConfigPDA(input.FeeQuoter)
@@ -117,7 +134,7 @@ var ConnectChains = operations.NewOperation(
 		var destChainStateAccount fee_quoter.DestChain
 		err := chain.GetAccountDataBorshInto(context.Background(), fqRemoteChainPDA, &destChainStateAccount)
 		if err == nil {
-			fmt.Println("Remote chain state account found:", destChainStateAccount)
+			b.Logger.Infof("Remote chain state account found: %+v", destChainStateAccount)
 			isUpdate = true
 		}
 		var ixn solana.Instruction
@@ -127,7 +144,7 @@ var ConnectChains = operations.NewOperation(
 				input.DestChainConfig,
 				feeQuoterConfigPDA,
 				fqRemoteChainPDA,
-				chain.DeployerKey.PublicKey(),
+				authority,
 			).ValidateAndBuild()
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to build update dest chain instruction: %w", err)
@@ -149,16 +166,109 @@ var ConnectChains = operations.NewOperation(
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to extend OffRamp lookup table: %w", err)
 			}
 		}
+		if authority != chain.DeployerKey.PublicKey() {
+			batches, err := utils.BuildMCMSBatchOperation(
+				chain.Selector,
+				[]solana.Instruction{ixn},
+				input.FeeQuoter.String(),
+				ContractType.String(),
+			)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute or create batch: %w", err)
+			}
+			return sequences.OnChainOutput{BatchOps: []types.BatchOperation{batches}}, nil
+		}
 		err = chain.Confirm([]solana.Instruction{ixn})
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm add price updater: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm add dest chain instruction: %w", err)
+		}
+		return sequences.OnChainOutput{}, nil
+	},
+)
+
+var TransferOwnership = operations.NewOperation(
+	"fee-quoter:transfer-ownership",
+	Version,
+	"Transfers ownership of the FeeQuoter 1.6.0 contract to a new authority",
+	func(b operations.Bundle, chain cldf_solana.Chain, input utils.TransferOwnershipParams) (sequences.OnChainOutput, error) {
+		fee_quoter.SetProgramID(input.Program)
+		authority := GetAuthority(chain, input.Program)
+		if authority != input.CurrentOwner {
+			return sequences.OnChainOutput{}, fmt.Errorf("current owner %s does not match on-chain authority %s", input.CurrentOwner.String(), authority.String())
+		}
+		configPDA, _, _ := state.FindConfigPDA(input.Program)
+		ixn, err := fee_quoter.NewTransferOwnershipInstruction(
+			input.NewOwner,
+			configPDA,
+			authority,
+		).ValidateAndBuild()
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to build add dest chain instruction: %w", err)
+		}
+		if authority != chain.DeployerKey.PublicKey() {
+			batches, err := utils.BuildMCMSBatchOperation(
+				chain.Selector,
+				[]solana.Instruction{ixn},
+				input.Program.String(),
+				ContractType.String(),
+			)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute or create batch: %w", err)
+			}
+			return sequences.OnChainOutput{BatchOps: []types.BatchOperation{batches}}, nil
+		}
+
+		err = chain.Confirm([]solana.Instruction{ixn})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm transfer ownership instruction: %w", err)
+		}
+		return sequences.OnChainOutput{}, nil
+	},
+)
+
+var AcceptOwnership = operations.NewOperation(
+	"fee-quoter:accept-ownership",
+	Version,
+	"Accepts ownership of the FeeQuoter 1.6.0 contract",
+	func(b operations.Bundle, chain cldf_solana.Chain, input utils.TransferOwnershipParams) (sequences.OnChainOutput, error) {
+		fee_quoter.SetProgramID(input.Program)
+		configPDA, _, _ := state.FindConfigPDA(input.Program)
+		ixn, err := fee_quoter.NewAcceptOwnershipInstruction(
+			configPDA,
+			input.NewOwner,
+		).ValidateAndBuild()
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to build add dest chain instruction: %w", err)
+		}
+		if input.NewOwner != chain.DeployerKey.PublicKey() {
+			batches, err := utils.BuildMCMSBatchOperation(
+				chain.Selector,
+				[]solana.Instruction{ixn},
+				input.Program.String(),
+				ContractType.String(),
+			)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute or create batch: %w", err)
+			}
+			return sequences.OnChainOutput{BatchOps: []types.BatchOperation{batches}}, nil
+		}
+
+		err = chain.Confirm([]solana.Instruction{ixn})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm accept ownership instruction: %w", err)
 		}
 		return sequences.OnChainOutput{}, nil
 	},
 )
 
 func GetAuthority(chain cldf_solana.Chain, program solana.PublicKey) solana.PublicKey {
-	return chain.DeployerKey.PublicKey()
+	programData := fee_quoter.Config{}
+	feeQuoterConfigPDA, _, _ := state.FindFqConfigPDA(program)
+	err := chain.GetAccountDataBorshInto(context.Background(), feeQuoterConfigPDA, &programData)
+	if err != nil {
+		return chain.DeployerKey.PublicKey()
+	}
+	return programData.Owner
 }
 
 type Params struct {
@@ -169,25 +279,51 @@ type Params struct {
 	LinkToken         solana.PublicKey
 }
 
-func DefaultParams() Params {
-	defaultLow, defaultHigh := GetHighLowBits(big.NewInt(0).Mul(big.NewInt(200), big.NewInt(1e18)))
-	return Params{
-		MaxFeeJuelsPerMsg: bin.Uint128{
-			Lo:         defaultLow,
-			Hi:         defaultHigh,
-			Endianness: nil,
-		},
-	}
+type SetTokenTransferFeeConfigInput struct {
+	SrcSelector uint64
+	DstSelector uint64
+	FeeQuoter   solana.PublicKey
+	Config      fee_quoter.TokenTransferFeeConfig
+	Token       solana.PublicKey
 }
 
-func GetHighLowBits(n *big.Int) (low, high uint64) {
-	mask := big.NewInt(0).SetUint64(0xFFFFFFFFFFFFFFFF) // 64-bit mask
-
-	lowBig := big.NewInt(0).And(n, mask)
-	low = lowBig.Uint64()
-
-	highBig := big.NewInt(0).Rsh(n, 64) // Shift right by 64 bits
-	high = highBig.Uint64()
-
-	return low, high
-}
+var SetTokenTransferFeeConfig = operations.NewOperation(
+	"fee-quoter:set-token-transfer-fee-config",
+	Version,
+	"Sets token transfer fee config on the FeeQuoter 1.6.0 contract",
+	func(b operations.Bundle, chain cldf_solana.Chain, input SetTokenTransferFeeConfigInput) (sequences.OnChainOutput, error) {
+		fee_quoter.SetProgramID(input.FeeQuoter)
+		authority := GetAuthority(chain, input.FeeQuoter)
+		feeQuoterConfigPDA, _, _ := state.FindFqConfigPDA(input.FeeQuoter)
+		remoteBillingPDA, _, _ := state.FindFqPerChainPerTokenConfigPDA(input.DstSelector, input.Token, input.FeeQuoter)
+		instruction, err := fee_quoter.NewSetTokenTransferFeeConfigInstruction(
+			input.DstSelector,
+			input.Token,
+			input.Config,
+			feeQuoterConfigPDA,
+			remoteBillingPDA,
+			authority,
+			solana.SystemProgramID,
+		).ValidateAndBuild()
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to build set token transfer fee config instruction: %w", err)
+		}
+		if authority != chain.DeployerKey.PublicKey() {
+			batches, err := utils.BuildMCMSBatchOperation(
+				chain.Selector,
+				[]solana.Instruction{instruction},
+				input.FeeQuoter.String(),
+				ContractType.String(),
+			)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute or create batch: %w", err)
+			}
+			return sequences.OnChainOutput{BatchOps: []types.BatchOperation{batches}}, nil
+		}
+		err = chain.Confirm([]solana.Instruction{instruction})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm set token transfer fee config: %w", err)
+		}
+		return sequences.OnChainOutput{}, nil
+	},
+)

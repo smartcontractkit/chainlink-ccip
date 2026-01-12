@@ -2,6 +2,7 @@ package operations
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 
@@ -13,6 +14,7 @@ import (
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/mcms/sdk/evm/bindings"
+	zkbindings "github.com/smartcontractkit/mcms/sdk/zksync/bindings"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	evmutils "github.com/smartcontractkit/chainlink-evm/pkg/utils"
@@ -27,6 +29,11 @@ var (
 	EXECUTOR_ROLE     = Role{
 		ID:   evmutils.MustHash(EXECUTOR_ROLE_STR),
 		Name: EXECUTOR_ROLE_STR,
+	}
+	ADMIN_ROLE_STR = "ADMIN_ROLE"
+	ADMIN_ROLE     = Role{
+		ID:   evmutils.MustHash(ADMIN_ROLE_STR),
+		Name: ADMIN_ROLE_STR,
 	}
 )
 
@@ -62,6 +69,10 @@ type OpGrantRoleTimelockInput struct {
 	RoleID  [32]byte       `json:"roleID"`
 }
 
+type OpRenounceRoleTimelockInput struct {
+	RoleID [32]byte `json:"roleID"`
+}
+
 type OpTransferOwnershipInput struct {
 	ChainSelector   uint64
 	TimelockAddress common.Address
@@ -89,7 +100,8 @@ var OpDeployTimelock = contract.NewDeploy(contract.DeployParams[OpDeployTimelock
 	ContractMetadata: bindings.RBACTimelockMetaData,
 	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
 		cldf_deployment.NewTypeAndVersion(utils.RBACTimelock, *MCMSVersion).String(): {
-			EVM: common.FromHex(bindings.RBACTimelockBin),
+			EVM:      common.FromHex(bindings.RBACTimelockBin),
+			ZkSyncVM: zkbindings.RBACTimelockZkBytecode,
 		},
 	},
 	Validate: func(input OpDeployTimelockInput) error { return nil },
@@ -102,7 +114,8 @@ var OpDeployBypasserMCM = contract.NewDeploy(contract.DeployParams[struct{}]{
 	ContractMetadata: bindings.ManyChainMultiSigMetaData,
 	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
 		cldf_deployment.NewTypeAndVersion(utils.BypasserManyChainMultisig, *MCMSVersion).String(): {
-			EVM: common.FromHex(bindings.ManyChainMultiSigBin),
+			EVM:      common.FromHex(bindings.ManyChainMultiSigBin),
+			ZkSyncVM: zkbindings.ManyChainMultiSigZkBytecode,
 		},
 	},
 	Validate: func(input struct{}) error { return nil },
@@ -115,7 +128,8 @@ var OpDeployCancellerMCM = contract.NewDeploy(contract.DeployParams[struct{}]{
 	ContractMetadata: bindings.ManyChainMultiSigMetaData,
 	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
 		cldf_deployment.NewTypeAndVersion(utils.CancellerManyChainMultisig, *MCMSVersion).String(): {
-			EVM: common.FromHex(bindings.ManyChainMultiSigBin),
+			EVM:      common.FromHex(bindings.ManyChainMultiSigBin),
+			ZkSyncVM: zkbindings.ManyChainMultiSigZkBytecode,
 		},
 	},
 	Validate: func(input struct{}) error { return nil },
@@ -128,7 +142,8 @@ var OpDeployProposerMCM = contract.NewDeploy(contract.DeployParams[struct{}]{
 	ContractMetadata: bindings.ManyChainMultiSigMetaData,
 	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
 		cldf_deployment.NewTypeAndVersion(utils.ProposerManyChainMultisig, *MCMSVersion).String(): {
-			EVM: common.FromHex(bindings.ManyChainMultiSigBin),
+			EVM:      common.FromHex(bindings.ManyChainMultiSigBin),
+			ZkSyncVM: zkbindings.ManyChainMultiSigZkBytecode,
 		},
 	},
 	Validate: func(input struct{}) error { return nil },
@@ -141,7 +156,8 @@ var OpDeployCallProxy = contract.NewDeploy(contract.DeployParams[OpDeployCallPro
 	ContractMetadata: bindings.CallProxyMetaData,
 	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
 		cldf_deployment.NewTypeAndVersion(utils.CallProxy, *MCMSVersion).String(): {
-			EVM: common.FromHex(bindings.CallProxyBin),
+			EVM:      common.FromHex(bindings.CallProxyBin),
+			ZkSyncVM: zkbindings.CallProxyZkBytecode,
 		},
 	},
 	Validate: func(input OpDeployCallProxyInput) error { return nil },
@@ -184,6 +200,9 @@ var OpGrantRoleTimelock = contract.NewWrite(contract.WriteParams[OpGrantRoleTime
 		return contract.HasRole(opts, roleAdmin, caller)
 	},
 	Validate: func(input OpGrantRoleTimelockInput) error {
+		if len(input.RoleID) == 0 {
+			return errors.New("role id cannot be empty")
+		}
 		if input.Account == (common.Address{}) {
 			return utils.ErrZeroAddress
 		}
@@ -194,9 +213,35 @@ var OpGrantRoleTimelock = contract.NewWrite(contract.WriteParams[OpGrantRoleTime
 	},
 })
 
+var OpRenounceRoleTimelock = contract.NewWrite(contract.WriteParams[OpRenounceRoleTimelockInput, *bindings.RBACTimelock]{
+	Name:         "evm-timelock-renounce-role",
+	Version:      semver.MustParse("1.0.0"),
+	Description:  "Renounces role of the caller key on the deployed Timelock contract",
+	ContractABI:  bindings.RBACTimelockABI,
+	ContractType: "RBACTimelock",
+	NewContract:  bindings.NewRBACTimelock,
+	IsAllowedCaller: func(contract *bindings.RBACTimelock, opts *bind.CallOpts, caller common.Address, input OpRenounceRoleTimelockInput) (bool, error) {
+		roleAdmin, err := contract.GetRoleAdmin(opts, input.RoleID)
+		if err != nil {
+			return false, err
+		}
+		// Check if caller has admin role of the role being granted
+		return contract.HasRole(opts, roleAdmin, caller)
+	},
+	Validate: func(input OpRenounceRoleTimelockInput) error {
+		if len(input.RoleID) == 0 {
+			return errors.New("role id cannot be empty")
+		}
+		return nil
+	},
+	CallContract: func(timelock *bindings.RBACTimelock, opts *bind.TransactOpts, input OpRenounceRoleTimelockInput) (*types.Transaction, error) {
+		return timelock.RenounceRole(opts, input.RoleID, opts.From)
+	},
+})
+
 var OpTransferOwnership = operations.NewOperation(
 	"evm-transfer-ownership",
-	MCMSVersion,
+	semver.MustParse("1.0.0"),
 	"Transfer ownership of an ownable contract to the specified address",
 	func(b operations.Bundle, deps OpEVMOwnershipDeps, in OpTransferOwnershipInput) (contract.WriteOutput, error) {
 		currentOwner, err := deps.OwnableC.Owner(&bind.CallOpts{
@@ -274,7 +319,7 @@ var OpTransferOwnership = operations.NewOperation(
 
 var OpAcceptOwnership = operations.NewOperation(
 	"evm-accept-ownership",
-	MCMSVersion,
+	semver.MustParse("1.0.0"),
 	"Accepts ownership of an ownable contract Via the Timelock contract",
 	func(b operations.Bundle, deps OpEVMOwnershipDeps, in OpTransferOwnershipInput) (contract.WriteOutput, error) {
 		var opts *bind.TransactOpts

@@ -1,8 +1,6 @@
 package offramp
 
 import (
-	"time"
-
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -60,9 +58,16 @@ var OffRampApplySourceChainConfigUpdates = contract.NewWrite(contract.WriteParam
 	},
 })
 
-func DefaultOffRampParams() OffRampParams {
-	return OffRampParams{
-		GasForCallExactCheck:                    uint16(5000),
-		PermissionLessExecutionThresholdSeconds: uint32((1 * time.Hour).Seconds()),
-	}
-}
+var OffRampSetOcr3 = contract.NewWrite(contract.WriteParams[[]offramp.MultiOCR3BaseOCRConfigArgs, *offramp.OffRamp]{
+	Name:            "offramp:set-ocr3",
+	Version:         Version,
+	Description:     "Sets the OCR3 configuration on the OffRamp 1.6.0 contract",
+	ContractType:    ContractType,
+	ContractABI:     offramp.OffRampABI,
+	NewContract:     offramp.NewOffRamp,
+	IsAllowedCaller: contract.OnlyOwner[*offramp.OffRamp, []offramp.MultiOCR3BaseOCRConfigArgs],
+	Validate:        func([]offramp.MultiOCR3BaseOCRConfigArgs) error { return nil },
+	CallContract: func(offRamp *offramp.OffRamp, opts *bind.TransactOpts, args []offramp.MultiOCR3BaseOCRConfigArgs) (*types.Transaction, error) {
+		return offRamp.SetOCR3Configs(opts, args)
+	},
+})
