@@ -221,6 +221,11 @@ func NewCLDFOperationsEnvironment(bc []*blockchain.Input, dataStore datastore.Da
 		Logger:      lggr,
 		BlockChains: blockchains,
 		DataStore:   runningDS.Seal(),
+		OperationsBundle: operations.NewBundle(
+			func() context.Context { return context.Background() },
+			lggr,
+			operations.NewMemoryReporter(),
+		),
 	}
 	return selectors, &e, nil
 }

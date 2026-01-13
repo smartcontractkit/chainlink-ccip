@@ -61,10 +61,145 @@ type UpdateChainConfigConfig struct {
 	MCMS               mcms.Input             `json:"mcmsConfig"`
 }
 
+type AddNodesToCapabilitiesRegistryChangesetConfig struct {
+	HomeChainSelector        uint64                `json:"homeChainSelector"`
+	NodeP2PIDsPerNodeOpAdmin map[string][][32]byte `json:"nodeP2pIdsPerNodeOpAdmin"`
+	MCMS                     mcms.Input            `json:"mcmsConfig"`
+}
+
+type AddCapabilityToCapabilitiesRegistryChangesetConfig struct {
+	HomeChainSelector uint64     `json:"homeChainSelector"`
+	MCMS              mcms.Input `json:"mcmsConfig"`
+}
+
+type AddNodeOperatorsToCapabilitiesRegistryChangesetConfig struct {
+	HomeChainSelector uint64 `json:"homeChainSelector"`
+	Nop               []capabilities_registry.CapabilitiesRegistryNodeOperator
+	MCMS              mcms.Input `json:"mcmsConfig"`
+}
+
 var UpdateChainConfig = deployment.CreateChangeSet(applyUpdateChainConfig, validateUpdateChainConfig)
 var AddDONAndSetCandidate = deployment.CreateChangeSet(applyAddDonAndSetCandidateChangesetConfig, validateAddDonAndSetCandidateChangesetConfig)
 var SetCandidate = deployment.CreateChangeSet(applySetCandidateChangesetConfig, validateSetCandidateChangesetConfig)
 var PromoteCandidate = deployment.CreateChangeSet(applyPromoteCandidateChangesetConfig, validatePromoteCandidateChangesetConfig)
+var AddNodesToCapabilitiesRegistry = deployment.CreateChangeSet(applyAddNodesToCapabilitiesRegistryChangeset, validateAddNodesToCapabilitiesRegistryChangeset)
+var AddCapabilityToCapabilitiesRegistry = deployment.CreateChangeSet(applyAddCapabilityToCapabilitiesRegistryChangeset, validateAddCapabilityToCapabilitiesRegistryChangeset)
+var AddNodeOperatorsToCapabilitiesRegistry = deployment.CreateChangeSet(applyAddNodeOperatorsToCapabilitiesRegistryChangeset, validateAddNodeOperatorsToCapabilitiesRegistryChangeset)
+
+func validateAddNodeOperatorsToCapabilitiesRegistryChangeset(e deployment.Environment, cfg AddNodeOperatorsToCapabilitiesRegistryChangesetConfig) error {
+	return nil
+}
+
+func applyAddNodeOperatorsToCapabilitiesRegistryChangeset(e deployment.Environment, cfg AddNodeOperatorsToCapabilitiesRegistryChangesetConfig) (deployment.ChangesetOutput, error) {
+	capRegAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+		ChainSelector: cfg.HomeChainSelector,
+		Type:          datastore.ContractType(utils.CapabilitiesRegistry),
+		Version:       semver.MustParse("1.0.0"),
+	}, cfg.HomeChainSelector, datastore_utils.FullRef)
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("finding CapabilitiesRegistry address: %w", err)
+	}
+	result, err := operations.ExecuteSequence(
+		e.OperationsBundle,
+		SeqAddNodeOperatorsToCapReg,
+		e.BlockChains,
+		AddNodeOperatorsToCapRegConfig{
+			HomeChainSel:  cfg.HomeChainSelector,
+			CapReg:        common.HexToAddress(capRegAddr.Address),
+			NodeOperators: cfg.Nop,
+		},
+	)
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("applying chain config updates: %w", err)
+	}
+	mcmsReg := changesets.GetRegistry()
+	// since we are only using evm here
+	mcmsReg.RegisterMCMSReader(chain_selectors.FamilyEVM, &adapters.EVMMCMSReader{})
+	return changesets.NewOutputBuilder(e, mcmsReg).
+		WithReports(result.ExecutionReports).
+		WithBatchOps(result.Output.BatchOps).
+		Build(cfg.MCMS)
+}
+
+func validateAddCapabilityToCapabilitiesRegistryChangeset(e deployment.Environment, cfg AddCapabilityToCapabilitiesRegistryChangesetConfig) error {
+	return nil
+}
+
+func applyAddCapabilityToCapabilitiesRegistryChangeset(e deployment.Environment, cfg AddCapabilityToCapabilitiesRegistryChangesetConfig) (deployment.ChangesetOutput, error) {
+	capRegAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+		ChainSelector: cfg.HomeChainSelector,
+		Type:          datastore.ContractType(utils.CapabilitiesRegistry),
+		Version:       semver.MustParse("1.0.0"),
+	}, cfg.HomeChainSelector, datastore_utils.FullRef)
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("finding CapabilitiesRegistry address: %w", err)
+	}
+	ccipHomeAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+		ChainSelector: cfg.HomeChainSelector,
+		Type:          datastore.ContractType(utils.CCIPHome),
+		Version:       semver.MustParse("1.6.0"),
+	}, cfg.HomeChainSelector, datastore_utils.FullRef)
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("finding CCIPHome address: %w", err)
+	}
+	result, err := operations.ExecuteSequence(
+		e.OperationsBundle,
+		SeqAddCapabilityToCapReg,
+		DONSequenceDeps{
+			HomeChain: e.BlockChains.EVMChains()[cfg.HomeChainSelector],
+		},
+		AddCapabilityToCapRegConfig{
+			HomeChainSel: cfg.HomeChainSelector,
+			CapReg:       common.HexToAddress(capRegAddr.Address),
+			CCIPHome:     common.HexToAddress(ccipHomeAddr.Address),
+		})
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("applying chain config updates: %w", err)
+	}
+	mcmsReg := changesets.GetRegistry()
+	// since we are only using evm here
+	mcmsReg.RegisterMCMSReader(chain_selectors.FamilyEVM, &adapters.EVMMCMSReader{})
+	return changesets.NewOutputBuilder(e, mcmsReg).
+		WithReports(result.ExecutionReports).
+		WithBatchOps(result.Output.BatchOps).
+		Build(cfg.MCMS)
+}
+
+func validateAddNodesToCapabilitiesRegistryChangeset(e deployment.Environment, cfg AddNodesToCapabilitiesRegistryChangesetConfig) error {
+	return nil
+}
+
+func applyAddNodesToCapabilitiesRegistryChangeset(e deployment.Environment, cfg AddNodesToCapabilitiesRegistryChangesetConfig) (deployment.ChangesetOutput, error) {
+	capRegAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+		ChainSelector: cfg.HomeChainSelector,
+		Type:          datastore.ContractType(utils.CapabilitiesRegistry),
+		Version:       semver.MustParse("1.0.0"),
+	}, cfg.HomeChainSelector, datastore_utils.FullRef)
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("finding CapabilitiesRegistry address: %w", err)
+	}
+
+	result, err := operations.ExecuteSequence(
+		e.OperationsBundle,
+		SeqAddNodesToCapReg,
+		e.BlockChains,
+		AddNodesToCapRegConfig{
+			HomeChainSel:             cfg.HomeChainSelector,
+			CapReg:                   common.HexToAddress(capRegAddr.Address),
+			NodeP2PIDsPerNodeOpAdmin: cfg.NodeP2PIDsPerNodeOpAdmin,
+		},
+	)
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("applying chain config updates: %w", err)
+	}
+	mcmsReg := changesets.GetRegistry()
+	// since we are only using evm here
+	mcmsReg.RegisterMCMSReader(chain_selectors.FamilyEVM, &adapters.EVMMCMSReader{})
+	return changesets.NewOutputBuilder(e, mcmsReg).
+		WithReports(result.ExecutionReports).
+		WithBatchOps(result.Output.BatchOps).
+		Build(cfg.MCMS)
+}
 
 func validateUpdateChainConfig(e deployment.Environment, cfg UpdateChainConfigConfig) error {
 	return nil
@@ -242,9 +377,17 @@ func applyAddDonAndSetCandidateChangesetConfig(e deployment.Environment, cfg Add
 		readers = append(readers, id)
 	}
 
-	dons := make([]DONAddition, len(cfg.PluginInfo.OCRConfigPerRemoteChainSelector))
+	dons := make([]DONAddition, 0, len(cfg.PluginInfo.OCRConfigPerRemoteChainSelector))
 	i := 0
 	for chainSelector, params := range cfg.PluginInfo.OCRConfigPerRemoteChainSelector {
+		id, err := DonIDForChain(capReg, ccipHome, chainSelector)
+		if err != nil {
+			return deployment.ChangesetOutput{}, fmt.Errorf("getting don ID for chain selector %d: %w", chainSelector, err)
+		}
+		if id != 0 {
+			e.Logger.Infow("DON already exists for chain selector, skipping addition")
+			continue
+		}
 		family, err := chain_selectors.GetSelectorFamily(chainSelector)
 		if err != nil {
 			return deployment.ChangesetOutput{}, fmt.Errorf("getting chain family for selector %d: %w", chainSelector, err)
@@ -294,18 +437,21 @@ func applyAddDonAndSetCandidateChangesetConfig(e deployment.Environment, cfg Add
 				cfg.PluginInfo.PluginType.String())
 		}
 
-		dons[i] = DONAddition{
+		dons = append(dons, DONAddition{
 			ExpectedID:       expectedDonID,
 			PluginConfig:     pluginOCR3Config,
 			PeerIDs:          readers,
 			F:                uint8(len(cfg.NonBootstraps) / 3),
 			IsPublic:         false,
 			AcceptsWorkflows: false,
-		}
+		})
 		i++
 		expectedDonID++
 	}
-
+	if len(dons) == 0 {
+		e.Logger.Info("No new DONs to add, skipping AddDONAndSetCandidateChangeset, just setting candidate")
+		return deployment.ChangesetOutput{}, nil
+	}
 	result, err := operations.ExecuteSequence(
 		e.OperationsBundle,
 		AddDONAndSetCandidateSequence,

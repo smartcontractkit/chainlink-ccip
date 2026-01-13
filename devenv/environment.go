@@ -143,7 +143,10 @@ func NewEnvironment() (*Cfg, error) {
 	}
 	L.Info().Any("Selectors", selectors).Msg("Deploying for chain selectors")
 	ds := datastore.NewMemoryDataStore()
-	ds.Merge(e.DataStore)
+	err = ds.Merge(e.DataStore)
+	if err != nil {
+		return nil, err
+	}
 
 	// Deploy Capabilities Registry
 	crAddr, tx, _, err := capabilities_registry.DeployCapabilitiesRegistry(
@@ -296,8 +299,14 @@ func NewEnvironment() (*Cfg, error) {
 	if err != nil {
 		return nil, fmt.Errorf("creating CCIP jobs: %w", err)
 	}
-
-	err = devenvcommon.AddNodesToContracts(ctx, e, in.NodeSets, nodeKeyBundles, CCIPHomeChain, selectors)
+	var homeChainType string
+	for _, bc := range in.Blockchains {
+		if bc.ChainID == fmt.Sprintf("%d", CCIPHomeChainID) {
+			homeChainType = bc.Type
+			break
+		}
+	}
+	err = devenvcommon.AddNodesToContracts(ctx, e, in.NodeSets, nodeKeyBundles, CCIPHomeChain, selectors, homeChainType, in.Blockchains)
 	if err != nil {
 		return nil, err
 	}
