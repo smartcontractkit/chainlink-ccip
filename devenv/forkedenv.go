@@ -63,14 +63,14 @@ func checkForkedEnvIsSet(in *Cfg) error {
 		if in.ForkedEnvConfig.ForkBlockNumbers != nil && in.ForkedEnvConfig.ForkBlockNumbers[bc.ChainID] != 0 {
 			forkedArgs = append(forkedArgs, "--fork-block-number", fmt.Sprintf("%d", in.ForkedEnvConfig.ForkBlockNumbers[bc.ChainID]))
 		}
-		forkedArgs = append(forkedArgs, "--timeout", "180000", "--auto-impersonate")
+		forkedArgs = append(forkedArgs, "--timeout", "180000", "--auto-impersonate", "--no-rate-limit")
 		in.Blockchains[i].DockerCmdParamsOverrides = append(forkedArgs, in.Blockchains[i].DockerCmdParamsOverrides...)
 	}
 	return nil
 }
 
 func NewForkedEnvironment() (*Cfg, error) {
-	ctx, cancelFunc := context.WithTimeout(context.Background(), 2*time.Minute)
+	ctx, cancelFunc := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancelFunc()
 	tr := NewTimeTracker(Plog)
 	ctx = L.WithContext(ctx)
@@ -221,6 +221,11 @@ func NewForkedEnvironment() (*Cfg, error) {
 		return nil, err
 	}
 	in.CLDF.AddAddresses(string(a))
+
+	err = devenvcommon.AddNodesToCapReg(ctx, e, in.NodeSets, in.Blockchains, homeChainSelector, true)
+	if err != nil {
+		return nil, err
+	}
 
 	err = devenvcommon.AddNodesToContracts(ctx, e, in.NodeSets, nodeKeyBundles, homeChainSelector, selectors, blockchain.TypeAnvil, in.Blockchains)
 	if err != nil {
