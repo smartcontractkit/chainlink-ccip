@@ -1,5 +1,5 @@
 export type CcipCommon = {
-  "version": "0.1.1",
+  "version": "1.6.1-candidate",
   "name": "ccip_common",
   "instructions": [],
   "accounts": [
@@ -115,7 +115,7 @@ export type CcipCommon = {
 };
 
 export const IDL: CcipCommon = {
-  "version": "0.1.1",
+  "version": "1.6.1-candidate",
   "name": "ccip_common",
   "instructions": [],
   "accounts": [
