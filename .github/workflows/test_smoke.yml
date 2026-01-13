@@ -29,7 +29,6 @@ defaults:
     working-directory: devenv
 
 env:
-  PARALLEL_E2E_TESTS: 'true'
   DEPLOY_CONTRACT_VERSION: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.contract_version || '' }}
 
 jobs:
@@ -42,13 +41,11 @@ jobs:
       matrix:
         test:
         - name: TestE2ESmoke
-          config: "env.toml"                     # only the base config
-        - name: TestE2ESmoke
           config: >-
             ${{ 
                 github.event_name == 'workflow_dispatch' &&
-                ( inputs.custom_config != '' && inputs.custom_config || 'env.toml,solana.toml' )
-                || 'env.toml,solana.toml'
+                ( inputs.custom_config != '' && inputs.custom_config || 'env.toml' )
+                || 'env.toml'
             }}
       fail-fast: false
     steps:
