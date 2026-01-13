@@ -4,8 +4,6 @@ package ccip
 //go:generate go run ./wrap ccip CCIPHome ccip_home
 //go:generate go run ./wrap ccip OnRamp onramp
 //go:generate go run ./wrap ccip OffRamp offramp
-//go:generate go run ./wrap ccip OnRampWithMessageTransformer onramp_with_message_transformer
-//go:generate go run ./wrap ccip OffRampWithMessageTransformer offramp_with_message_transformer
 //go:generate go run ./wrap ccip FeeQuoter fee_quoter
 //go:generate go run ./wrap ccip NonceManager nonce_manager
 //go:generate go run ./wrap ccip TokenAdminRegistry token_admin_registry
@@ -47,10 +45,6 @@ package ccip
 
 // EncodingUtils
 //go:generate go run ./wrap ccip EncodingUtils ccip_encoding_utils
-
-// Superchain Interop
-//go:generate go run ./wrap ccip OnRampOverSuperchainInterop onramp_over_superchain_interop
-//go:generate go run ./wrap ccip OffRampOverSuperchainInterop offramp_over_superchain_interop
 
 // Extract bytecode and ABI from generated wrappers
 //go:generate go run github.com/smartcontractkit/chainlink-evm/gethwrappers/helpers/extract_bytecode -input=generated -bytecode=../bytecode -abi=../abi
