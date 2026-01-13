@@ -9,17 +9,18 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
-	v1_7_0_changesets "github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/changesets"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
+
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
+	v1_7_0_changesets "github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/changesets"
 )
 
 type cctpTest_MockReader struct{}
@@ -28,6 +29,24 @@ func (m *cctpTest_MockReader) GetChainMetadata(_ deployment.Environment, _ uint6
 	return mcms_types.ChainMetadata{
 		MCMAddress:      input.MCMSAddressRef.Address,
 		StartingOpCount: 10,
+	}, nil
+}
+
+func (m *cctpTest_MockReader) GetTimelockRef(_ deployment.Environment, selector uint64, input mcms.Input) (datastore.AddressRef, error) {
+	return datastore.AddressRef{
+		ChainSelector: selector,
+		Address:       input.TimelockAddressRef.Address,
+		Type:          "Timelock",
+		Version:       semver.MustParse("1.0.0"),
+	}, nil
+}
+
+func (m *cctpTest_MockReader) GetMCMSRef(_ deployment.Environment, selector uint64, input mcms.Input) (datastore.AddressRef, error) {
+	return datastore.AddressRef{
+		ChainSelector: selector,
+		Address:       input.MCMSAddressRef.Address,
+		Type:          "MCM",
+		Version:       semver.MustParse("1.0.0"),
 	}, nil
 }
 
@@ -261,7 +280,7 @@ func TestDeployCCTPChains_Apply(t *testing.T) {
 			}
 
 			cctpChainRegistry := adapters.NewCCTPChainRegistry()
-			mcmsRegistry := changesets.NewMCMSReaderRegistry()
+			mcmsRegistry := changesets.GetRegistry()
 			mcmsRegistry.RegisterMCMSReader("evm", &cctpTest_MockReader{})
 
 			// Register mock adapter for successful tests
@@ -555,7 +574,7 @@ func TestDeployCCTPChains_VerifyPreconditions(t *testing.T) {
 		t.Run(tt.desc, func(t *testing.T) {
 			// Create CCTP chain registry and MCMS registry (not used in verify, but required for changeset creation)
 			cctpChainRegistry := adapters.NewCCTPChainRegistry()
-			mcmsRegistry := changesets.NewMCMSReaderRegistry()
+			mcmsRegistry := changesets.GetRegistry()
 
 			// Create changeset
 			changeset := v1_7_0_changesets.DeployCCTPChains(cctpChainRegistry, mcmsRegistry)
