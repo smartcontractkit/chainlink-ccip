@@ -1,4 +1,4 @@
-package usdc_token_pool_cctp_v2_cctp_v2
+package usdc_token_pool_cctp_v2
 
 import (
 	"errors"
@@ -8,7 +8,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
@@ -20,7 +19,6 @@ var Version = semver.MustParse("1.6.4")
 
 type DomainUpdate = usdc_token_pool_cctp_v2.USDCTokenPoolDomainUpdate
 type AuthorizedCallerUpdate = usdc_token_pool_cctp_v2.AuthorizedCallersAuthorizedCallerArgs
-
 
 type ConstructorArgs struct {
 	TokenMessenger              common.Address
