@@ -63,7 +63,7 @@ type ApplyAllowListUpdatesArgs struct {
 type DynamicConfigArgs struct {
 	Router         common.Address
 	RateLimitAdmin common.Address
-	FeeAggregator  common.Address
+	FeeAdmin  common.Address
 }
 
 type CustomBlockConfirmationRateLimitConfigArg struct {
@@ -202,7 +202,7 @@ var SetDynamicConfig = contract.NewWrite(contract.WriteParams[DynamicConfigArgs,
 	IsAllowedCaller: contract.OnlyOwner[*token_pool.TokenPool, DynamicConfigArgs],
 	Validate:        func(DynamicConfigArgs) error { return nil },
 	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.TransactOpts, args DynamicConfigArgs) (*types.Transaction, error) {
-		return tokenPool.SetDynamicConfig(opts, args.Router, args.RateLimitAdmin, args.FeeAggregator)
+		return tokenPool.SetDynamicConfig(opts, args.Router, args.RateLimitAdmin, args.FeeAdmin)
 	},
 })
 

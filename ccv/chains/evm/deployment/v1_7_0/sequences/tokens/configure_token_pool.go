@@ -88,19 +88,19 @@ var ConfigureTokenPool = cldf_ops.NewSequence(
 				desiredRateLimitAdmin = input.RateLimitAdmin
 			}
 
-			desiredFeeAggregator := currentDynamicConfig.FeeAggregator
+			desiredFeeAdmin := currentDynamicConfig.FeeAdmin
 			if input.FeeAggregator != (common.Address{}) {
-				desiredFeeAggregator = input.FeeAggregator
+				desiredFeeAdmin = input.FeeAggregator
 			}
 
-			if desiredRouter != currentDynamicConfig.Router || desiredRateLimitAdmin != currentDynamicConfig.RateLimitAdmin || desiredFeeAggregator != currentDynamicConfig.FeeAggregator {
+			if desiredRouter != currentDynamicConfig.Router || desiredRateLimitAdmin != currentDynamicConfig.RateLimitAdmin || desiredFeeAdmin != currentDynamicConfig.FeeAdmin{
 				setDynamicConfigReport, err := cldf_ops.ExecuteOperation(b, token_pool.SetDynamicConfig, chain, evm_contract.FunctionInput[token_pool.DynamicConfigArgs]{
 					ChainSelector: input.ChainSelector,
 					Address:       input.TokenPoolAddress,
 					Args: token_pool.DynamicConfigArgs{
 						Router:         desiredRouter,
 						RateLimitAdmin: desiredRateLimitAdmin,
-						FeeAggregator:  desiredFeeAggregator,
+						FeeAdmin:  desiredFeeAdmin,
 					},
 				})
 				if err != nil {
