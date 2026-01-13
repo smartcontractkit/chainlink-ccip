@@ -63,7 +63,7 @@ type ApplyAllowListUpdatesArgs struct {
 type DynamicConfigArgs struct {
 	Router         common.Address
 	RateLimitAdmin common.Address
-	FeeAggregator  common.Address
+	FeeAdmin  common.Address
 }
 
 type CustomBlockConfirmationRateLimitConfigArg struct {
@@ -202,7 +202,7 @@ var SetDynamicConfig = contract.NewWrite(contract.WriteParams[DynamicConfigArgs,
 	IsAllowedCaller: contract.OnlyOwner[*token_pool.TokenPool, DynamicConfigArgs],
 	Validate:        func(DynamicConfigArgs) error { return nil },
 	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.TransactOpts, args DynamicConfigArgs) (*types.Transaction, error) {
-		return tokenPool.SetDynamicConfig(opts, args.Router, args.RateLimitAdmin, args.FeeAggregator)
+		return tokenPool.SetDynamicConfig(opts, args.Router, args.RateLimitAdmin, args.FeeAdmin)
 	},
 })
 
@@ -216,7 +216,7 @@ var WithdrawFeeTokens = contract.NewWrite(contract.WriteParams[WithdrawFeeTokens
 	IsAllowedCaller: contract.AllCallersAllowed[*token_pool.TokenPool, WithdrawFeeTokensArgs],
 	Validate:        func(WithdrawFeeTokensArgs) error { return nil },
 	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.TransactOpts, args WithdrawFeeTokensArgs) (*types.Transaction, error) {
-		return tokenPool.WithdrawFeeTokens(opts, args.FeeTokens)
+		return tokenPool.WithdrawFeeTokens(opts, args.FeeTokens, args.Recipient)
 	},
 })
 
