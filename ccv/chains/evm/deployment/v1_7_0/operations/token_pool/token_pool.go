@@ -216,7 +216,7 @@ var WithdrawFeeTokens = contract.NewWrite(contract.WriteParams[WithdrawFeeTokens
 	IsAllowedCaller: contract.AllCallersAllowed[*token_pool.TokenPool, WithdrawFeeTokensArgs],
 	Validate:        func(WithdrawFeeTokensArgs) error { return nil },
 	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.TransactOpts, args WithdrawFeeTokensArgs) (*types.Transaction, error) {
-		return tokenPool.WithdrawFeeTokens(opts, args.FeeTokens)
+		return tokenPool.WithdrawFeeTokens(opts, args.FeeTokens, args.Recipient)
 	},
 })
 
