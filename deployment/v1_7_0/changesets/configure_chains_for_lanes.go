@@ -7,6 +7,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -60,6 +61,7 @@ func makeApply(chainFamilyRegistry *adapters.ChainFamilyRegistry, mcmsRegistry *
 	return func(e cldf.Environment, cfg ConfigureChainsForLanesConfig) (cldf.ChangesetOutput, error) {
 		batchOps := make([]mcms_types.BatchOperation, 0)
 		reports := make([]cldf_ops.Report[any, any], 0)
+		ds := datastore.NewMemoryDataStore()
 
 		for _, chain := range cfg.Chains {
 			router, err := datastore_utils.FindAndFormatRef(e.DataStore, chain.Router, chain.ChainSelector, datastore_utils.FullRef)
@@ -134,10 +136,24 @@ func makeApply(chainFamilyRegistry *adapters.ChainFamilyRegistry, mcmsRegistry *
 
 			batchOps = append(batchOps, configureChainForLanesReport.Output.BatchOps...)
 			reports = append(reports, configureChainForLanesReport.ExecutionReports...)
+
+			// Add addresses from sequence output to datastore
+			for _, addr := range configureChainForLanesReport.Output.Addresses {
+				if err := ds.Addresses().Add(addr); err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %s on chain with selector %d to datastore: %w", addr.Type, addr.Version, addr.Address, addr.ChainSelector, err)
+				}
+			}
+
+			// Write metadata to datastore
+			err = sequences.WriteMetadataToDatastore(ds, configureChainForLanesReport.Output.Metadata)
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to write metadata to datastore: %w", err)
+			}
 		}
 
 		return changesets.NewOutputBuilder(e, mcmsRegistry).
 			WithReports(reports).
+			WithDataStore(ds).
 			WithBatchOps(batchOps).
 			Build(cfg.MCMS)
 	}
