@@ -39,10 +39,10 @@ require (
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20251014191100-bad58388f0c9
 	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260107192940-0be702ef3ff5
 	github.com/smartcontractkit/chainlink-common v0.9.6-0.20260107095648-223976d2b9f1
-	github.com/smartcontractkit/chainlink-deployments-framework v0.72.0
+	github.com/smartcontractkit/chainlink-deployments-framework v0.74.2
 	github.com/smartcontractkit/chainlink-evm v0.3.3
 	github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20250808121824-2c3544aab8f3
-	github.com/smartcontractkit/chainlink-testing-framework/framework v0.12.3
+	github.com/smartcontractkit/chainlink-testing-framework/framework v0.12.6
 	github.com/smartcontractkit/chainlink-testing-framework/wasp v1.51.1
 	github.com/smartcontractkit/libocr v0.0.0-20250912173940-f3ab0246e23d
 	github.com/smartcontractkit/mcms v0.31.1
@@ -249,7 +249,7 @@ require (
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/julienschmidt/httprouter v1.3.0 // indirect
 	github.com/karalabe/hid v1.0.1-0.20240306101548-573246063e52 // indirect
-	github.com/klauspost/compress v1.18.1 // indirect
+	github.com/klauspost/compress v1.18.2 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/kr/text v0.2.0 // indirect
@@ -428,7 +428,7 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20251022142026-3a174f9686a8 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20251022142026-3a174f9686a8 // indirect
 	google.golang.org/grpc v1.77.0 // indirect
-	google.golang.org/protobuf v1.36.10 // indirect
+	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
 	gopkg.in/guregu/null.v4 v4.0.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
