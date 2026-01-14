@@ -4,8 +4,6 @@ package ccip
 //go:generate go run ./wrap ccip CCIPHome ccip_home
 //go:generate go run ./wrap ccip OnRamp onramp
 //go:generate go run ./wrap ccip OffRamp offramp
-//go:generate go run ./wrap ccip OnRampWithMessageTransformer onramp_with_message_transformer
-//go:generate go run ./wrap ccip OffRampWithMessageTransformer offramp_with_message_transformer
 //go:generate go run ./wrap ccip FeeQuoter fee_quoter
 //go:generate go run ./wrap ccip NonceManager nonce_manager
 //go:generate go run ./wrap ccip TokenAdminRegistry token_admin_registry
@@ -22,12 +20,10 @@ package ccip
 //go:generate go run ./wrap ccip BurnWithFromMintTokenPool burn_with_from_mint_token_pool
 //go:generate go run ./wrap ccip LockReleaseTokenPool lock_release_token_pool
 //go:generate go run ./wrap ccip TokenPool token_pool
-//go:generate go run ./wrap ccip USDCTokenPool usdc_token_pool
 //go:generate go run ./wrap ccip SiloedLockReleaseTokenPool siloed_lock_release_token_pool
 //go:generate go run ./wrap ccip BurnToAddressMintTokenPool burn_to_address_mint_token_pool
 //go:generate go run ./wrap ccip BurnMintFastTransferTokenPool fast_transfer_token_pool
 //go:generate go run ./wrap ccip CCTPMessageTransmitterProxy cctp_message_transmitter_proxy
-//go:generate go run ./wrap ccip ERC20LockBox erc20_lock_box
 //go:generate go run ./wrap ccip SiloedUSDCTokenPool siloed_usdc_token_pool
 //go:generate go run ./wrap ccip USDCTokenPoolCCTPV2 usdc_token_pool_cctp_v2
 //go:generate go run ./wrap ccip USDCTokenPoolProxy usdc_token_pool_proxy
@@ -49,10 +45,6 @@ package ccip
 
 // EncodingUtils
 //go:generate go run ./wrap ccip EncodingUtils ccip_encoding_utils
-
-// Superchain Interop
-//go:generate go run ./wrap ccip OnRampOverSuperchainInterop onramp_over_superchain_interop
-//go:generate go run ./wrap ccip OffRampOverSuperchainInterop offramp_over_superchain_interop
 
 // Extract bytecode and ABI from generated wrappers
 //go:generate go run github.com/smartcontractkit/chainlink-evm/gethwrappers/helpers/extract_bytecode -input=generated -bytecode=../bytecode -abi=../abi

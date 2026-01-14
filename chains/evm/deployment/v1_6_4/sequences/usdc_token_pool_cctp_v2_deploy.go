@@ -4,16 +4,15 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/cctp_message_transmitter_proxy"
-	usdc_token_pool_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/usdc_token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/usdc_token_pool_cctp_v2"
-	usdc_token_pool_cctp_v2_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/usdc_token_pool_cctp_v2"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/cctp_message_transmitter_proxy"
+	usdc_token_pool_cctp_v2_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/usdc_token_pool_cctp_v2"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
 type USDCTokenPoolCCTPV2DeploySequenceInput struct {
@@ -55,13 +54,13 @@ var USDCTokenPoolCCTPV2DeploySequence = operations.NewSequence(
 		cctpProxyAddress := common.HexToAddress(cctpProxyReport.Output.Address)
 
 		// Deploy USDCTokenPoolCCTPV2 using the deployed CCTPMessageTransmitterProxy address
-		report, err := operations.ExecuteOperation(b, usdc_token_pool_cctp_v2.Deploy, chain, contract.DeployInput[usdc_token_pool_cctp_v2.ConstructorArgs]{
+		report, err := operations.ExecuteOperation(b, usdc_token_pool_cctp_v2_ops.Deploy, chain, contract.DeployInput[usdc_token_pool_cctp_v2_ops.ConstructorArgs]{
 			ChainSelector: input.ChainSelector,
 			TypeAndVersion: deployment.NewTypeAndVersion(
-				usdc_token_pool_cctp_v2.ContractType,
-				*usdc_token_pool_cctp_v2.Version,
+				usdc_token_pool_cctp_v2_ops.ContractType,
+				*usdc_token_pool_cctp_v2_ops.Version,
 			),
-			Args: usdc_token_pool_cctp_v2.ConstructorArgs{
+			Args: usdc_token_pool_cctp_v2_ops.ConstructorArgs{
 				TokenMessenger:              input.TokenMessenger,
 				CCTPMessageTransmitterProxy: cctpProxyAddress,
 				Token:                       input.Token,
@@ -94,7 +93,7 @@ var USDCTokenPoolCCTPV2DeploySequence = operations.NewSequence(
 		// Begin transferring ownership of the Message Transmitter Proxy to MCMS. A separate changeset will be used to
 		// accept ownership. It uses the same operation as the token pool but if you look, the address to be performed on
 		// is different.
-		_, err = operations.ExecuteOperation(b, usdc_token_pool_ops.USDCTokenPoolTransferOwnership, chain, contract.FunctionInput[common.Address]{
+		_, err = operations.ExecuteOperation(b, usdc_token_pool_cctp_v2_ops.USDCTokenPoolTransferOwnership, chain, contract.FunctionInput[common.Address]{
 			ChainSelector: input.ChainSelector,
 			Address:       cctpProxyAddress,
 			Args:          input.MCMSAddress,
@@ -104,7 +103,7 @@ var USDCTokenPoolCCTPV2DeploySequence = operations.NewSequence(
 		}
 
 		// Begin transferring ownership of the token pool to MCMS
-		_, err = operations.ExecuteOperation(b, usdc_token_pool_ops.USDCTokenPoolTransferOwnership, chain, contract.FunctionInput[common.Address]{
+		_, err = operations.ExecuteOperation(b, usdc_token_pool_cctp_v2_ops.USDCTokenPoolTransferOwnership, chain, contract.FunctionInput[common.Address]{
 			ChainSelector: input.ChainSelector,
 			Address:       common.HexToAddress(report.Output.Address),
 			Args:          input.MCMSAddress,

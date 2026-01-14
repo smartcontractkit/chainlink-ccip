@@ -110,6 +110,7 @@ jobs:
             go get github.com/smartcontractkit/chainlink-ton/devenv@${{ inputs.ton_ref }}
             go get github.com/smartcontractkit/chainlink-ton/deployment@${{ inputs.ton_ref }}
             go get github.com/smartcontractkit/chainlink-ton@${{ inputs.ton_ref }}
+            go mod tidy
           fi
           go mod download
       - name: Run CCIP environment with config
