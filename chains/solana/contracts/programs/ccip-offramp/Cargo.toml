@@ -24,7 +24,9 @@ ethnum = "1.5"
 fee_quoter = { version = "1.6.1-candidate", path = "../fee-quoter", features = [
     "cpi",
 ] }
-rmn_remote = { path = "../rmn-remote", features = ["cpi"] }
+rmn_remote = { version = "1.6.1-candidate", path = "../rmn-remote", features = [
+    "cpi",
+] }
 ccip_common = { version = "1.6.1-candidate", path = "../ccip-common" }
 
 [dev-dependencies]
