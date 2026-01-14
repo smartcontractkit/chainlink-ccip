@@ -195,7 +195,7 @@ func TestDeployCCTPChain(t *testing.T) {
 
 	indexAddressesByTypeAndVersion = func(_ cldf_ops.Bundle, _ evm.Chain, _ []string) (map[string]string, error) {
 		return map[string]string{
-			deployment.NewTypeAndVersion("USDCTokenPool", *semver.MustParse("1.6.4")).String():       cctpV1Pool.Hex(),
+			deployment.NewTypeAndVersion("USDCTokenPool", *semver.MustParse("1.6.2")).String():       cctpV1Pool.Hex(),
 			deployment.NewTypeAndVersion("USDCTokenPoolCCTPV2", *semver.MustParse("1.6.4")).String(): cctpV2Pool.Hex(),
 			deployment.NewTypeAndVersion("SiloedUSDCTokenPool", *semver.MustParse("1.7.0")).String(): siloedUSDCTokenPool.Hex(),
 		}, nil
