@@ -33,7 +33,7 @@ func basicFormatterFactory(options format.Options) format.Formatter {
 */
 func fancyFormatter(data *parse.Data) {
 	// simple color selection algorithm
-	withColor := func(in interface{}, i int) string {
+	withColor := func(in any, i int) string {
 		color := fmt.Sprintf("%d", i%7+1)
 		str := fmt.Sprintf("%v", in)
 

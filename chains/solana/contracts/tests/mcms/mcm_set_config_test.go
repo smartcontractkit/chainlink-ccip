@@ -187,7 +187,7 @@ func TestMcmSetConfig(t *testing.T) {
 		require.NoError(t, err)
 
 		signerGroups := make([]byte, numSigners)
-		for i := 0; i < len(signerGroups); i++ {
+		for i := range signerGroups {
 			signerGroups[i] = byte(i % 10)
 		}
 
@@ -314,7 +314,7 @@ func TestMcmSetConfig(t *testing.T) {
 		require.NoError(t, err)
 
 		signerGroups := make([]byte, numSigners)
-		for i := 0; i < len(signerGroups); i++ {
+		for i := range signerGroups {
 			signerGroups[i] = byte(i % 10)
 		}
 

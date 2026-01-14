@@ -94,10 +94,7 @@ func GetBatchAddAccessIxs(ctx context.Context, timelockID [32]byte, roleAcAccoun
 	}
 	ixs := []solana.Instruction{}
 	for i := 0; i < len(addresses); i += chunkSize {
-		end := i + chunkSize
-		if end > len(addresses) {
-			end = len(addresses)
-		}
+		end := min(i+chunkSize, len(addresses))
 		chunk := addresses[i:end]
 		ix := timelock.NewBatchAddAccessInstruction(
 			timelockID,
@@ -161,10 +158,7 @@ func GetPreloadOperationIxs(timelockID [32]byte, op Operation, authority solana.
 		offset := 0
 
 		for offset < len(rawData) {
-			end := offset + config.AppendIxDataChunkSize
-			if end > len(rawData) {
-				end = len(rawData)
-			}
+			end := min(offset+config.AppendIxDataChunkSize, len(rawData))
 			chunk := rawData[offset:end]
 
 			appendIx, err := timelock.NewAppendInstructionDataInstruction(
@@ -245,10 +239,7 @@ func GetPreloadBypasserOperationIxs(timelockID [32]byte, op Operation, authority
 		offset := 0
 
 		for offset < len(rawData) {
-			end := offset + config.AppendIxDataChunkSize
-			if end > len(rawData) {
-				end = len(rawData)
-			}
+			end := min(offset+config.AppendIxDataChunkSize, len(rawData))
 			chunk := rawData[offset:end]
 
 			appendIx, err := timelock.NewAppendBypasserInstructionDataInstruction(
@@ -308,7 +299,7 @@ func (r RoleMultisigs) GetAnyMultisig() mcms.Multisig {
 
 func CreateRoleMultisigs(role timelock.Role, numMsigs int) RoleMultisigs {
 	msigs := make([]mcms.Multisig, numMsigs)
-	for i := 0; i < numMsigs; i++ {
+	for i := range numMsigs {
 		name, _ := mcms.PadString32(fmt.Sprintf("%s_%d", role.String(), i))
 		msig := mcms.GetNewMcmMultisig(name)
 		// Create and set the config for each msig
@@ -375,7 +366,7 @@ func WaitForOperationToBeReady(ctx context.Context, client *rpc.Client, opPDA so
 	// add buffer to scheduled time to ensure blockchain has advanced enough
 	scheduledTimeWithBuffer := scheduledTime.Add(timeBuffer)
 
-	for attempts := 0; attempts < maxAttempts; attempts++ {
+	for range maxAttempts {
 		currentTime, err := common.GetBlockTime(ctx, client, commitment)
 		if err != nil {
 			return fmt.Errorf("failed to get current block time: %w", err)
@@ -411,7 +402,7 @@ func GetBlockedFunctionSelectors(
 
 	// convert to [][]byte for easier comparison
 	selectors := make([][]byte, blockedCount)
-	for i := uint64(0); i < blockedCount; i++ {
+	for i := range blockedCount {
 		selectors[i] = config.BlockedSelectors.Xs[i][:] // Convert [8]byte to []byte
 	}
 

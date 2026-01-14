@@ -330,7 +330,7 @@ func TestCCTPv2TokenDataObserver_Observe(t *testing.T) {
 				require.Len(t, tokenData, 4)
 
 				// All tokens get msg1 data (FIFO consumption, exact match)
-				for i := 0; i < 4; i++ {
+				for i := range 4 {
 					assert.Equal(t, successTokenData1, tokenData[i])
 				}
 			},

@@ -409,7 +409,7 @@ func ExtractTypedReturnValue[T any](ctx context.Context, logs []string, programI
 	return decoderFn(bytes), err
 }
 
-func GetAccountDataBorshInto(ctx context.Context, solanaGoClient *rpc.Client, account solana.PublicKey, commitment rpc.CommitmentType, data interface{}) error {
+func GetAccountDataBorshInto(ctx context.Context, solanaGoClient *rpc.Client, account solana.PublicKey, commitment rpc.CommitmentType, data any) error {
 	resp, err := solanaGoClient.GetAccountInfoWithOpts(
 		ctx,
 		account,

@@ -59,8 +59,8 @@ func TestE2ESmoke(t *testing.T) {
 		toSelector   uint64
 	}
 	tcs := []testcase{}
-	for i := 0; i < len(selectors); i++ {
-		for j := 0; j < len(selectors); j++ {
+	for i := range selectors {
+		for j := range selectors {
 			if i == j {
 				continue
 			}
@@ -76,7 +76,6 @@ func TestE2ESmoke(t *testing.T) {
 
 	for _, tc := range tcs {
 		// Capture the loop variable so each goroutine gets its own copy.
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			if os.Getenv("PARALLEL_E2E_TESTS") == "true" {
 				t.Parallel()

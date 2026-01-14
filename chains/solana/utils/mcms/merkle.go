@@ -86,7 +86,7 @@ func (t *McmOpNode) Proofs() ([][32]byte, error) {
 }
 
 func (t *McmOpNode) Print(padding int) {
-	for i := 0; i < padding; i++ {
+	for range padding {
 		fmt.Print("| ")
 	}
 	h := fmt.Sprintf("%x", t.Hash())
@@ -133,7 +133,7 @@ func (rm *RootMetadataNode) Proofs() ([][32]byte, error) {
 }
 
 func (rm *RootMetadataNode) Print(padding int) {
-	for i := 0; i < padding; i++ {
+	for range padding {
 		fmt.Print("| ")
 	}
 	h := fmt.Sprintf("%x", rm.Hash())
@@ -222,7 +222,7 @@ func (o *OpMerkleTree) FindSiblingOf(n MerkleNode) (MerkleNode, error) {
 }
 
 func (o *OpMerkleTree) Print(padding int) {
-	for i := 0; i < padding; i++ {
+	for range padding {
 		fmt.Print("| ")
 	}
 	h := fmt.Sprintf("%x", o.Hash())
