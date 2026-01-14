@@ -24,14 +24,14 @@ require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/docker/docker v28.5.1+incompatible
 	github.com/docker/go-connections v0.6.0 // indirect
-	github.com/ethereum/go-ethereum v1.16.7
+	github.com/ethereum/go-ethereum v1.16.8
 	github.com/gagliardetto/solana-go v1.13.0
 	github.com/go-resty/resty/v2 v2.16.5
 	github.com/google/uuid v1.6.0
 	github.com/pelletier/go-toml/v2 v2.2.4
 	github.com/prometheus/client_golang v1.23.0
 	github.com/rs/zerolog v1.34.0
-	github.com/smartcontractkit/chain-selectors v1.0.85
+	github.com/smartcontractkit/chain-selectors v1.0.89
 	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20251216154855-949167c7e9d1
 	github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment v0.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250908144012-8184001834b5
@@ -50,7 +50,7 @@ require (
 	github.com/stretchr/testify v1.11.1
 	github.com/xssnick/tonutils-go v1.14.1
 	go.uber.org/zap v1.27.1
-	golang.org/x/crypto v0.45.0
+	golang.org/x/crypto v0.47.0
 	golang.org/x/sync v0.19.0
 )
 
@@ -417,13 +417,13 @@ require (
 	golang.org/x/arch v0.21.0 // indirect
 	golang.org/x/exp v0.0.0-20250711185948-6ae5c78190dc // indirect
 	golang.org/x/mod v0.31.0 // indirect
-	golang.org/x/net v0.47.0 // indirect
+	golang.org/x/net v0.48.0 // indirect
 	golang.org/x/oauth2 v0.32.0 // indirect
-	golang.org/x/sys v0.39.0 // indirect
-	golang.org/x/term v0.37.0 // indirect
-	golang.org/x/text v0.31.0 // indirect
+	golang.org/x/sys v0.40.0 // indirect
+	golang.org/x/term v0.39.0 // indirect
+	golang.org/x/text v0.33.0 // indirect
 	golang.org/x/time v0.12.0 // indirect
-	golang.org/x/tools v0.39.0 // indirect
+	golang.org/x/tools v0.40.0 // indirect
 	google.golang.org/api v0.221.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20251022142026-3a174f9686a8 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20251022142026-3a174f9686a8 // indirect
