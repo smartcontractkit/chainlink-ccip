@@ -57,6 +57,8 @@ jobs:
     name: cache build artifacts
     runs-on: ubuntu-latest-8cores-32GB
     steps:
+    - name: Free Disk Space
+      uses: smartcontractkit/.github/actions/free-disk-space@free-disk-space/v1
     - uses: actions/checkout@v4
     - name: cache docker build image
       id: cache-image

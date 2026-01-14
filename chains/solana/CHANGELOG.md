@@ -3,7 +3,6 @@
 This document describes the changes introduced in the different versions of the **Chainlink CCIP Solana programs**, located in [`chains/solana/contracts/programs`](https://github.com/smartcontractkit/chainlink-ccip/tree/main/chains/solana/contracts/programs).
 
 <!-- --- -->
-
 <!-- ## [Unreleased] (1.6.1) -->
 <!-- ### Added
 - (Placeholder for upcoming features) -->
