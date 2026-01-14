@@ -8,7 +8,7 @@ import (
 
 	bin "github.com/gagliardetto/binary"
 
-	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccip/consts"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_offramp"
 )
