@@ -2,25 +2,31 @@ package common
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/big"
 	"os"
 	"time"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gagliardetto/solana-go"
 	"github.com/rs/zerolog"
-	chain_selectors "github.com/smartcontractkit/chain-selectors"
+
+	chainsel "github.com/smartcontractkit/chain-selectors"
 	ccipocr3common "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	capabilities_registry "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/clclient"
+	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
+	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/ccip_home"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/rmn_home"
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
@@ -28,7 +34,9 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	changesetscore "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
+	"github.com/smartcontractkit/chainlink-ccip/devenv/blockchainutils"
 )
 
 func DeployContractsForSelector(ctx context.Context, env *deployment.Environment, cls []*simple_node_set.Input, selector uint64, ccipHomeSelector uint64, crAddr string) (datastore.DataStore, error) {
@@ -146,7 +154,7 @@ func DeployContractsForSelector(ctx context.Context, env *deployment.Environment
 // Uses the optional TokenPriceProvider interface - only chains that implement it (like EVM) provide prices.
 // Resolves contract types to addresses using the datastore.
 func getTokenPricesForChain(ds datastore.DataStore, selector uint64, version *semver.Version) map[string]*big.Int {
-	family, err := chain_selectors.GetSelectorFamily(selector)
+	family, err := chainsel.GetSelectorFamily(selector)
 	if err != nil {
 		return make(map[string]*big.Int)
 	}
@@ -235,7 +243,15 @@ func ConnectContractsWithSelectors(ctx context.Context, e *deployment.Environmen
 	return nil
 }
 
-func AddNodesToContracts(ctx context.Context, e *deployment.Environment, cls []*simple_node_set.Input, nodeKeyBundles map[string]map[string]clclient.NodeKeysBundle, ccipHomeSelector uint64, remoteSelectors []uint64) error {
+func AddNodesToContracts(
+	ctx context.Context,
+	e *deployment.Environment,
+	cls []*simple_node_set.Input,
+	nodeKeyBundles map[string]map[string]clclient.NodeKeysBundle,
+	ccipHomeSelector uint64, remoteSelectors []uint64,
+	homeChainType string,
+	bcs []*blockchain.Input,
+) error {
 	l := zerolog.Ctx(ctx)
 	l.Info().Uint64("HomeChainSelector", ccipHomeSelector).Msg("Configuring contracts for home chain selector")
 	bundle := operations.NewBundle(
@@ -264,6 +280,7 @@ func AddNodesToContracts(ctx context.Context, e *deployment.Environment, cls []*
 		id := MustPeerIDFromString(nodeP2PIds.Data[0].Attributes.PeerID)
 		readers = append(readers, id)
 	}
+
 	for _, chain := range remoteSelectors {
 		ocrOverride := func(ocrParams CCIPOCRParams) CCIPOCRParams {
 			if ocrParams.CommitOffChainConfig != nil {
@@ -286,15 +303,58 @@ func AddNodesToContracts(ctx context.Context, e *deployment.Environment, cls []*
 		}
 	}
 
-	_, err = UpdateChainConfig.Apply(*e, UpdateChainConfigConfig{
+	// check if ccipHome is owned by a timelock
+	ccipHomeAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+		ChainSelector: ccipHomeSelector,
+		Type:          datastore.ContractType(utils.CCIPHome),
+		Version:       semver.MustParse("1.6.0"),
+	}, ccipHomeSelector, datastore_utils.FullRef)
+	if err != nil {
+		return fmt.Errorf("finding CCIPHome address for selector %d: %w", ccipHomeSelector, err)
+	}
+	ccipHome, err := ccip_home.NewCCIPHome(
+		common.HexToAddress(ccipHomeAddr.Address),
+		e.BlockChains.EVMChains()[ccipHomeSelector].Client)
+	if err != nil {
+		return fmt.Errorf("creating CCIPHome instance for selector %d: %w", ccipHomeSelector, err)
+	}
+	ccipHomeOwner, err := ccipHome.Owner(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		return fmt.Errorf("getting CCIPHome owner for selector %d: %w", ccipHomeSelector, err)
+	}
+
+	var mcmsInput mcms.Input
+	// we consider that if the owner is not the deployer key, then it's timelock owned and we need to use MCMS
+	// this is generally true in case of forked chains from mainnet/testnet and only possible with anvil chains in tests
+	if ccipHomeOwner != e.BlockChains.EVMChains()[ccipHomeSelector].DeployerKey.From {
+		mcmsInput = mcms.Input{
+			ValidUntil:     4126214326,
+			TimelockAction: mcms_types.TimelockActionBypass,
+			Qualifier:      "CLLCCIP",
+			Description:    "Home chain CCIP configuration",
+		}
+	}
+
+	csOut, err := UpdateChainConfig.Apply(*e, UpdateChainConfigConfig{
 		HomeChainSelector: ccipHomeSelector,
 		RemoteChainAdds:   chainConfigs,
+		MCMS:              mcmsInput,
 	})
 	if err != nil {
 		return fmt.Errorf("updating chain config for selector %d: %w", ccipHomeSelector, err)
 	}
+	if len(csOut.MCMSTimelockProposals) > 0 {
+		if homeChainType != blockchain.TypeAnvil {
+			return errors.New("timelock proposals are only supported on Anvil home chains in tests")
+		}
+		err = blockchainutils.ProcessMCMSProposalsWithTimelockForAnvil(ctx, bcs, csOut.MCMSTimelockProposals)
+		if err != nil {
+			return fmt.Errorf("processing MCMS timelock proposals for updating chain config %d: %w", ccipHomeSelector, err)
+		}
+		e.Logger.Info("Successfully updated chain config through proposal execution")
+	}
 
-	_, err = AddDONAndSetCandidate.Apply(*e, AddDonAndSetCandidateChangesetConfig{
+	csOut, err = AddDONAndSetCandidate.Apply(*e, AddDonAndSetCandidateChangesetConfig{
 		HomeChainSelector: ccipHomeSelector,
 		FeedChainSelector: ccipHomeSelector,
 		PluginInfo: SetCandidatePluginInfo{
@@ -303,11 +363,23 @@ func AddNodesToContracts(ctx context.Context, e *deployment.Environment, cls []*
 		},
 		NonBootstraps:  workerNodes,
 		NodeKeyBundles: nodeKeyBundles,
+		MCMS:           mcmsInput,
 	})
 	if err != nil {
 		return fmt.Errorf("adding DON and setting candidate for selector %d: %w", ccipHomeSelector, err)
 	}
-	_, err = SetCandidate.Apply(*e, SetCandidateChangesetConfig{
+	if len(csOut.MCMSTimelockProposals) > 0 {
+		if homeChainType != blockchain.TypeAnvil {
+			return errors.New("timelock proposals are only supported on Anvil home chains in tests")
+		}
+		err = blockchainutils.ProcessMCMSProposalsWithTimelockForAnvil(ctx, bcs, csOut.MCMSTimelockProposals)
+		if err != nil {
+			return fmt.Errorf("processing MCMS timelock proposals for adding DON and setting candidate for selector %d: %w", ccipHomeSelector, err)
+		}
+		e.Logger.Info("Successfully added DON and set candidate for commit OCR through proposal execution")
+	}
+
+	csOut, err = SetCandidate.Apply(*e, SetCandidateChangesetConfig{
 		HomeChainSelector: ccipHomeSelector,
 		FeedChainSelector: ccipHomeSelector,
 		PluginInfo: []SetCandidatePluginInfo{
@@ -315,39 +387,190 @@ func AddNodesToContracts(ctx context.Context, e *deployment.Environment, cls []*
 				OCRConfigPerRemoteChainSelector: execOCRConfigs,
 				PluginType:                      ccipocr3common.PluginTypeCCIPExec,
 			},
+			// In case of existing DON, the previous ADDDONAndSetCandidate would not have executed
+			// therefore we need to set the candidate for commit OCR here as well
+			// TODO : have a conditional check to avoid setting twice in case of new DON
+			{
+				OCRConfigPerRemoteChainSelector: commitOCRConfigs,
+				PluginType:                      ccipocr3common.PluginTypeCCIPCommit,
+			},
 		},
 		NonBootstraps:  workerNodes,
 		NodeKeyBundles: nodeKeyBundles,
+		MCMS:           mcmsInput,
 	})
 	if err != nil {
 		return fmt.Errorf("setting candidate for selector %d: %w", ccipHomeSelector, err)
 	}
-	_, err = PromoteCandidate.Apply(*e, PromoteCandidateChangesetConfig{
+	if len(csOut.MCMSTimelockProposals) > 0 {
+		if homeChainType != blockchain.TypeAnvil {
+			return errors.New("timelock proposals are only supported on Anvil home chains in tests")
+		}
+		err = blockchainutils.ProcessMCMSProposalsWithTimelockForAnvil(ctx, bcs, csOut.MCMSTimelockProposals)
+		if err != nil {
+			return fmt.Errorf("processing MCMS timelock proposals for setting candidate: %w", err)
+		}
+		e.Logger.Info("Successfully set candidate for exec OCR through proposal execution")
+	}
+	csOut, err = PromoteCandidate.Apply(*e, PromoteCandidateChangesetConfig{
 		HomeChainSelector: ccipHomeSelector,
 		PluginInfo: []PromoteCandidatePluginInfo{
-			{
-				PluginType:           ccipocr3common.PluginTypeCCIPCommit,
-				RemoteChainSelectors: remoteSelectors,
-			},
 			{
 				PluginType:           ccipocr3common.PluginTypeCCIPExec,
 				RemoteChainSelectors: remoteSelectors,
 			},
+			{
+				PluginType:           ccipocr3common.PluginTypeCCIPCommit,
+				RemoteChainSelectors: remoteSelectors,
+			},
 		},
 		NonBootstraps: workerNodes,
+		MCMS:          mcmsInput,
 	})
 	if err != nil {
 		return fmt.Errorf("promoting candidate for selector %d: %w", ccipHomeSelector, err)
 	}
+	if len(csOut.MCMSTimelockProposals) > 0 {
+		if homeChainType != blockchain.TypeAnvil {
+			return errors.New("timelock proposals are only supported on Anvil home chains in tests")
+		}
+		err = blockchainutils.ProcessMCMSProposalsWithTimelockForAnvil(ctx, bcs, csOut.MCMSTimelockProposals)
+		if err != nil {
+			return fmt.Errorf("processing MCMS timelock proposals for promoting candidate: %w", err)
+		}
+		e.Logger.Info("Successfully promoted candidate through proposal execution")
+	}
 	dReg := deployops.GetRegistry()
 	mcmsRegistry := changesetscore.GetRegistry()
-	_, err = deployops.SetOCR3Config(dReg, mcmsRegistry).Apply(*e, deployops.SetOCR3ConfigArgs{
+	csOut, err = deployops.SetOCR3Config(dReg, mcmsRegistry).Apply(*e, deployops.SetOCR3ConfigArgs{
 		HomeChainSel:    ccipHomeSelector,
 		RemoteChainSels: remoteSelectors,
 		ConfigType:      cciputils.ConfigTypeActive,
+		MCMS:            mcmsInput,
 	})
 	if err != nil {
 		return fmt.Errorf("setting OCR3 config for selector %d: %w", ccipHomeSelector, err)
+	}
+	if len(csOut.MCMSTimelockProposals) > 0 {
+		if homeChainType != blockchain.TypeAnvil {
+			return errors.New("timelock proposals are only supported on Anvil home chains in tests")
+		}
+		err = blockchainutils.ProcessMCMSProposalsWithTimelockForAnvil(ctx, bcs, csOut.MCMSTimelockProposals)
+		if err != nil {
+			return fmt.Errorf("processing MCMS timelock proposals for setting ocr3 config: %w", err)
+		}
+		e.Logger.Info("Successfully set OCR3 config through proposal execution")
+	}
+	return nil
+}
+
+func AddNodesToCapReg(
+	ctx context.Context,
+	env *deployment.Environment,
+	cls []*simple_node_set.Input,
+	bcs []*blockchain.Input,
+	ccipHomeSelector uint64,
+	needMcms bool,
+) error {
+	nodeClients, err := clclient.New(cls[0].Out.CLNodes)
+	if err != nil {
+		return fmt.Errorf("connecting to CL nodes: %w", err)
+	}
+	// bootstrap is 0
+	workerNodes := nodeClients[1:]
+	var readers [][32]byte
+	for _, node := range workerNodes {
+		nodeP2PIds, err := node.MustReadP2PKeys()
+		if err != nil {
+			return fmt.Errorf("reading worker node P2P keys: %w", err)
+		}
+		id := MustPeerIDFromString(nodeP2PIds.Data[0].Attributes.PeerID)
+		readers = append(readers, id)
+	}
+	homeChain, ok := env.BlockChains.EVMChains()[ccipHomeSelector]
+	if !ok {
+		return fmt.Errorf("evm chain not found for selector %d", ccipHomeSelector)
+	}
+	var mcmsInput mcms.Input
+	if needMcms {
+		mcmsInput = mcms.Input{
+			ValidUntil:     4126214326,
+			TimelockAction: mcms_types.TimelockActionBypass,
+			Qualifier:      "CLLCCIP",
+			Description:    "Add node operators to Capabilities Registry",
+		}
+	}
+	// get chain id
+	homeChainDetails, ok := chainsel.ChainBySelector(ccipHomeSelector)
+	if !ok {
+		return fmt.Errorf("could not get chain details for selector %d", ccipHomeSelector)
+	}
+	var homeChainType string
+	for _, bc := range bcs {
+		if bc.ChainID == fmt.Sprintf("%d", homeChainDetails.EvmChainID) {
+			homeChainType = bc.Type
+			break
+		}
+	}
+	// add capability
+	out, err := AddCapabilityToCapabilitiesRegistry.Apply(*env, AddCapabilityToCapabilitiesRegistryChangesetConfig{
+		HomeChainSelector: ccipHomeSelector,
+		MCMS:              mcmsInput,
+	})
+	if err != nil {
+		return fmt.Errorf("adding capability to capabilities registry for selector %d: %w", ccipHomeSelector, err)
+	}
+	if len(out.MCMSTimelockProposals) > 0 {
+		if homeChainType != blockchain.TypeAnvil {
+			return errors.New("timelock proposals are only supported on Anvil home chains in tests")
+		}
+		err = blockchainutils.ProcessMCMSProposalsWithTimelockForAnvil(ctx, bcs, out.MCMSTimelockProposals)
+		if err != nil {
+			return fmt.Errorf("processing MCMS timelock proposals for adding capability to capabilities registry for selector %d: %w", ccipHomeSelector, err)
+		}
+		env.Logger.Info("Successfully added capability to Capabilities Registry through proposal execution")
+	}
+	// Add Node Operator
+	out, err = AddNodeOperatorsToCapabilitiesRegistry.Apply(*env, AddNodeOperatorsToCapabilitiesRegistryChangesetConfig{
+		HomeChainSelector: ccipHomeSelector,
+		Nop: []capabilities_registry.CapabilitiesRegistryNodeOperator{
+			{
+				Admin: homeChain.DeployerKey.From,
+				Name:  "TestNodeOperator",
+			},
+		},
+		MCMS: mcmsInput,
+	})
+	if err != nil {
+		return fmt.Errorf("adding node operators to capabilities registry for selector %d: %w", ccipHomeSelector, err)
+	}
+	if len(out.MCMSTimelockProposals) > 0 {
+		if homeChainType != blockchain.TypeAnvil {
+			return errors.New("timelock proposals are only supported on Anvil home chains in tests")
+		}
+		err = blockchainutils.ProcessMCMSProposalsWithTimelockForAnvil(ctx, bcs, out.MCMSTimelockProposals)
+		if err != nil {
+			return fmt.Errorf("processing MCMS timelock proposals for adding node operators to capabilities registry for selector %d: %w", ccipHomeSelector, err)
+		}
+		env.Logger.Info("Successfully added node operators to Capabilities Registry through proposal execution")
+	}
+	out, err = AddNodesToCapabilitiesRegistry.Apply(*env, AddNodesToCapabilitiesRegistryChangesetConfig{
+		HomeChainSelector:        ccipHomeSelector,
+		NodeP2PIDsPerNodeOpAdmin: map[string][][32]byte{"TestNodeOperator": readers},
+		MCMS:                     mcmsInput,
+	})
+	if err != nil {
+		return fmt.Errorf("adding nodes to capabilities registry for selector %d: %w", ccipHomeSelector, err)
+	}
+	if len(out.MCMSTimelockProposals) > 0 {
+		if homeChainType != blockchain.TypeAnvil {
+			return errors.New("timelock proposals are only supported on Anvil home chains in tests")
+		}
+		err = blockchainutils.ProcessMCMSProposalsWithTimelockForAnvil(ctx, bcs, out.MCMSTimelockProposals)
+		if err != nil {
+			return fmt.Errorf("processing MCMS timelock proposals for adding nodes to capabilities registry for selector %d: %w", ccipHomeSelector, err)
+		}
+		env.Logger.Info("Successfully added node operators to Capabilities Registry through proposal execution")
 	}
 	return nil
 }

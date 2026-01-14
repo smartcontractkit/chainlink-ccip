@@ -18,9 +18,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/xssnick/tonutils-go/address"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/onramp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/fee_quoter"
 	ccipocr3common "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -28,15 +25,21 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/onramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/devenv/blockchainutils"
+
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	"github.com/smartcontractkit/chainlink-ton/pkg/ccip/codec"
+
 	evmseqs "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
 	msg_hasher163 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/message_hasher"
 	solccip "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/ccip"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	devenvcommon "github.com/smartcontractkit/chainlink-ccip/devenv/common"
-	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
-	"github.com/smartcontractkit/chainlink-ton/pkg/ccip/codec"
 )
 
 type SourceDestPair struct {
@@ -654,7 +657,7 @@ func (m *CCIP16EVM) FundNodes(ctx context.Context, ns []*simple_node_set.Input, 
 		rpcURL = bc.Out.Nodes[0].ExternalHTTPUrl
 		l.Info().Str("URL", rpcURL).Msg("Using HTTP URL for ETH client (HTTP-only mode)")
 	}
-	clientSrc, _, _, err := ETHClient(ctx, rpcURL, &GasSettings{
+	clientSrc, _, _, err := blockchainutils.ETHClient(ctx, rpcURL, &blockchainutils.GasSettings{
 		FeeCapMultiplier: 2,
 		TipCapMultiplier: 2,
 	})
@@ -662,9 +665,9 @@ func (m *CCIP16EVM) FundNodes(ctx context.Context, ns []*simple_node_set.Input, 
 		return fmt.Errorf("could not create basic eth client: %w", err)
 	}
 	// Use default Anvil key for local chain 1337, otherwise use PRIVATE_KEY env var
-	privateKey := getNetworkPrivateKey()
+	privateKey := blockchainutils.GetNetworkPrivateKey()
 	if bc.ChainID == "1337" {
-		privateKey = DefaultAnvilKey
+		privateKey = blockchainutils.DefaultAnvilKey
 	}
 
 	// nativeAmount is in ETH units (integer) - use directly for FundNodeEIP1559
@@ -672,7 +675,7 @@ func (m *CCIP16EVM) FundNodes(ctx context.Context, ns []*simple_node_set.Input, 
 	nativeAmountETH := float64(nativeAmount.Int64())
 
 	for _, addr := range ethKeyAddressesSrc {
-		if err := FundNodeEIP1559(ctx, clientSrc, privateKey, addr, nativeAmountETH); err != nil {
+		if err := blockchainutils.FundNodeEIP1559(ctx, clientSrc, privateKey, addr, nativeAmountETH); err != nil {
 			return fmt.Errorf("failed to fund CL nodes on src chain: %w", err)
 		}
 	}

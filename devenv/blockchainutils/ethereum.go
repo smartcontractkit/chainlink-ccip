@@ -1,4 +1,4 @@
-package ccip_evm
+package blockchainutils
 
 import (
 	"context"
@@ -22,7 +22,7 @@ const (
 	DefaultAnvilKey = "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 )
 
-func getNetworkPrivateKey() string {
+func GetNetworkPrivateKey() string {
 	pk := os.Getenv("PRIVATE_KEY")
 	if pk == "" {
 		return DefaultAnvilKey
@@ -47,7 +47,7 @@ func ETHClient(ctx context.Context, wsURL string, gasSettings *GasSettings) (*et
 	if err != nil {
 		return nil, nil, "", fmt.Errorf("could not connect to eth client: %w", err)
 	}
-	privateKey, err := crypto.HexToECDSA(getNetworkPrivateKey())
+	privateKey, err := crypto.HexToECDSA(GetNetworkPrivateKey())
 	if err != nil {
 		return nil, nil, "", fmt.Errorf("could not parse private key: %w", err)
 	}
