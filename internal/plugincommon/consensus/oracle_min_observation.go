@@ -38,7 +38,7 @@ type oracleMinObservation[T any] struct {
 func NewOracleMinObservation[T any](minThreshold Threshold, idFunc func(T) [32]byte) OracleMinObservation[T] {
 	if idFunc == nil {
 		idFunc = func(data T) [32]byte {
-			return sha3.Sum256([]byte(fmt.Sprintf("%v", data)))
+			return sha3.Sum256(fmt.Appendf(nil, "%v", data))
 		}
 	}
 	return &oracleMinObservation[T]{

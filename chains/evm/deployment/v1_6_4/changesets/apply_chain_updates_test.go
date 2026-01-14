@@ -5,26 +5,24 @@ import (
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
-	changesets "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/changesets"
-	token_pool_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/token_pool"
-	burn_mint_token_pool "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/burn_mint_token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
-	datastore "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-	environment "github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/changesets"
+	token_pool_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/factory_burn_mint_erc20"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/burn_mint_token_pool"
 	token_pool_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/token_pool"
-
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-
-	factory_burn_mint_erc20 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/factory_burn_mint_erc20"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 )
 
 func TestApplyChainUpdatesChangeset(t *testing.T) {
-	chainSelector := uint64(chain_selectors.TEST_90000001.Selector)
-	remoteChainSelector := uint64(chain_selectors.TEST_90000002.Selector)
+	chainSelector := chain_selectors.TEST_90000001.Selector
+	remoteChainSelector := chain_selectors.TEST_90000002.Selector
 	e, err := environment.New(t.Context(),
 		environment.WithEVMSimulated(t, []uint64{chainSelector, remoteChainSelector}),
 	)
@@ -48,6 +46,8 @@ func TestApplyChainUpdatesChangeset(t *testing.T) {
 		big.NewInt(0),       // pre mint
 		common.Address{1},   // new owner
 	)
+	require.NoError(t, err, "Failed to deploy")
+
 	_, err = evmChain.Confirm(tx)
 	require.NoError(t, err, "Failed to confirm BurnMintERC20 deployment transaction")
 
@@ -65,7 +65,7 @@ func TestApplyChainUpdatesChangeset(t *testing.T) {
 	_, err = evmChain.Confirm(tx)
 	require.NoError(t, err, "Failed to confirm BurnMintTokenPool deployment transaction")
 	ds.Addresses().Add(datastore.AddressRef{
-		Type:          datastore.ContractType("BurnMintTokenPool"),
+		Type:          "BurnMintTokenPool",
 		Version:       semver.MustParse("1.6.4"),
 		Address:       burnMintTokenPoolAddr.Hex(),
 		ChainSelector: chainSelector,
@@ -82,7 +82,7 @@ func TestApplyChainUpdatesChangeset(t *testing.T) {
 						{
 							RemoteChainSelector: remoteChainSelector,
 							// Remote Pool address is an array of byte-arrays
-							RemotePoolAddresses: [][]byte{[]byte{1}},
+							RemotePoolAddresses: [][]byte{{1}},
 							RemoteTokenAddress:  []byte{2},
 							OutboundRateLimiterConfig: token_pool_bindings.RateLimiterConfig{
 								IsEnabled: false,

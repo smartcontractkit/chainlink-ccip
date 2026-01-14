@@ -84,7 +84,6 @@ func getReusableAccounts(t *testing.T, linkMint solana.PublicKey) ReusableAccoun
 // Test basic happy path of the ping pong demo with "itself", meaning an SVM <-> SVM message
 // from the ping pong program to itself.
 func TestPingPong(t *testing.T) {
-	t.Parallel()
 
 	// acting as "dumb" offramp, proxying calls to the receiver that are signed by PDA
 	test_ccip_invalid_receiver.SetProgramID(config.CcipInvalidReceiverProgram)

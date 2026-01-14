@@ -14,13 +14,14 @@ import (
 	"github.com/pelletier/go-toml/v2"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	devenvcommon "github.com/smartcontractkit/chainlink-ccip/devenv/common"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	capabilities_registry "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/clclient"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/jd"
+
+	devenvcommon "github.com/smartcontractkit/chainlink-ccip/devenv/common"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
@@ -76,6 +77,20 @@ type Cfg struct {
 	NodeSets           []*ns.Input         `toml:"nodesets"              validate:"required"`
 	CLNodesFundingETH  float64             `toml:"cl_nodes_funding_eth"`
 	CLNodesFundingLink float64             `toml:"cl_nodes_funding_link"`
+	// NodeConfigOverrides allows users to provide custom TOML configuration that will be
+	// appended to the generated node configuration. This is useful for testnets/mainnets
+	// where you need to customize settings like FinalityDepth, LogPollInterval, etc.
+	// The overrides are applied AFTER the auto-generated config, so they take precedence.
+	NodeConfigOverrides string           `toml:"node_config_overrides"`
+	ForkedEnvConfig     *ForkedEnvConfig `toml:"forked_env_config"`
+}
+
+type ForkedEnvConfig struct {
+	ForkURLs          map[string]string `toml:"fork_urls_by_chain_id"`
+	ForkBlockNumbers  map[string]uint64 `toml:"fork_block_numbers_by_chain_id"`
+	HomeChainSelector uint64            `toml:"home_chain_selector"`
+	CLDRootPath       string            `toml:"cld_root_path"`
+	CLDEnvironment    string            `toml:"cld_environment"`
 }
 
 func checkKeys(in *Cfg) error {
@@ -128,7 +143,10 @@ func NewEnvironment() (*Cfg, error) {
 	}
 	L.Info().Any("Selectors", selectors).Msg("Deploying for chain selectors")
 	ds := datastore.NewMemoryDataStore()
-	ds.Merge(e.DataStore)
+	err = ds.Merge(e.DataStore)
+	if err != nil {
+		return nil, err
+	}
 
 	// Deploy Capabilities Registry
 	crAddr, tx, _, err := capabilities_registry.DeployCapabilitiesRegistry(
@@ -154,9 +172,27 @@ func NewEnvironment() (*Cfg, error) {
 		}
 		clChainConfigs = append(clChainConfigs, clChainConfig)
 	}
-	allConfigs := strings.Join(clChainConfigs, "\n")
+	generatedConfigs := strings.Join(clChainConfigs, "\n")
+
+	// Apply configs to nodes, preserving user overrides
+	// Order of precedence (later overrides earlier):
+	// 1. Generated configs (common + chain-specific)
+	// 2. Top-level NodeConfigOverrides from Cfg
+	// 3. Per-node TestConfigOverrides from node specs
 	for _, nodeSpec := range in.NodeSets[0].NodeSpecs {
-		nodeSpec.Node.TestConfigOverrides = allConfigs
+		configParts := []string{generatedConfigs}
+
+		// Add top-level user overrides if provided
+		if in.NodeConfigOverrides != "" {
+			configParts = append(configParts, in.NodeConfigOverrides)
+		}
+
+		// Preserve per-node overrides if they were provided in the config file
+		if nodeSpec.Node.TestConfigOverrides != "" {
+			configParts = append(configParts, nodeSpec.Node.TestConfigOverrides)
+		}
+
+		nodeSpec.Node.TestConfigOverrides = strings.Join(configParts, "\n")
 	}
 	Plog.Info().Msg("Nodes network configuration is generated")
 
@@ -187,9 +223,30 @@ func NewEnvironment() (*Cfg, error) {
 	}
 
 	nodeKeyBundles := make(map[string]map[string]clclient.NodeKeysBundle, 0)
+	allNodeClients, err := clclient.New(in.NodeSets[0].Out.CLNodes)
+	if err != nil {
+		return nil, fmt.Errorf("connecting to CL nodes: %w", err)
+	}
+
+	// Pass funding amounts as-is (in native units like ETH, SOL, TON)
+	// Each chain implementation handles its own unit conversion:
+	// - EVM: ETH -> wei (×10^18)
+	// - Solana: SOL -> lamports (×10^9)
+	// - TON: TON -> nanotons (×10^9)
+	// Using big.Int with the integer part; fractional units handled by each impl
+	nativeAmount := big.NewInt(int64(in.CLNodesFundingETH))
+	linkAmount := big.NewInt(int64(in.CLNodesFundingLink))
+
 	// deploy all the contracts
 	for i, impl := range impls {
-		nkb, err := impl.FundNodes(ctx, in.NodeSets, in.Blockchains[i], big.NewInt(1), big.NewInt(5))
+		// Create node key bundles for this chain type
+		nkb, err := devenvcommon.CreateNodeKeysBundle(allNodeClients, in.Blockchains[i].Type, in.Blockchains[i].ChainID)
+		if err != nil {
+			return nil, fmt.Errorf("creating node keys bundle: %w", err)
+		}
+
+		// Fund nodes with native token
+		err = impl.FundNodes(ctx, in.NodeSets, nkb, in.Blockchains[i], linkAmount, nativeAmount)
 		if err != nil {
 			return nil, fmt.Errorf("funding nodes: %w", err)
 		}
@@ -211,7 +268,15 @@ func NewEnvironment() (*Cfg, error) {
 			return nil, err
 		}
 		L.Info().Uint64("Selector", networkInfo.ChainSelector).Msg("Deployed chain selector")
-		dsi, err := impl.DeployContractsForSelector(ctx, e, in.NodeSets, networkInfo.ChainSelector, CCIPHomeChain, crAddr.String())
+		err = impl.PreDeployContractsForSelector(ctx, e, in.NodeSets, networkInfo.ChainSelector, CCIPHomeChain, crAddr.String())
+		if err != nil {
+			return nil, err
+		}
+		dsi, err := devenvcommon.DeployContractsForSelector(ctx, e, in.NodeSets, networkInfo.ChainSelector, CCIPHomeChain, crAddr.String())
+		if err != nil {
+			return nil, err
+		}
+		err = impl.PostDeployContractsForSelector(ctx, e, in.NodeSets, networkInfo.ChainSelector, CCIPHomeChain, crAddr.String())
 		if err != nil {
 			return nil, err
 		}
@@ -230,13 +295,24 @@ func NewEnvironment() (*Cfg, error) {
 	}
 	e.DataStore = ds.Seal()
 
-	err = impls[0].ConfigureContractsForSelectors(ctx, e, in.NodeSets, nodeKeyBundles, CCIPHomeChain, selectors)
+	err = CreateJobs(ctx, allNodeClients, nodeKeyBundles)
+	if err != nil {
+		return nil, fmt.Errorf("creating CCIP jobs: %w", err)
+	}
+	var homeChainType string
+	for _, bc := range in.Blockchains {
+		if bc.ChainID == fmt.Sprintf("%d", CCIPHomeChainID) {
+			homeChainType = bc.Type
+			break
+		}
+	}
+	err = devenvcommon.AddNodesToContracts(ctx, e, in.NodeSets, nodeKeyBundles, CCIPHomeChain, selectors, homeChainType, in.Blockchains)
 	if err != nil {
 		return nil, err
 	}
 
 	// connect all the contracts together (on-ramps, off-ramps)
-	for i, impl := range impls {
+	for i := range impls {
 		var family string
 		switch in.Blockchains[i].Type {
 		case "anvil", "geth":
@@ -258,90 +334,9 @@ func NewEnvironment() (*Cfg, error) {
 				selsToConnect = append(selsToConnect, sel)
 			}
 		}
-		err = impl.ConnectContractsWithSelectors(ctx, e, networkInfo.ChainSelector, selsToConnect)
+		err = devenvcommon.ConnectContractsWithSelectors(ctx, e, networkInfo.ChainSelector, selsToConnect)
 		if err != nil {
 			return nil, err
-		}
-	}
-
-	nodeClients, err := clclient.New(in.NodeSets[0].Out.CLNodes)
-	if err != nil {
-		return nil, fmt.Errorf("connecting to CL nodes: %w", err)
-	}
-	bootstrapNode := nodeClients[0]
-	bootstrapKeys, err := bootstrapNode.MustReadOCR2Keys()
-	if err != nil {
-		return nil, fmt.Errorf("reading bootstrap node OCR keys: %w", err)
-	}
-	// bootstrap is 0
-	workerNodes := nodeClients[1:]
-
-	// create jobs post-deployment for home chain
-	bootstrapP2PKeys, err := bootstrapNode.MustReadP2PKeys()
-	if err != nil {
-		return nil, fmt.Errorf("reading worker node P2P keys: %w", err)
-	}
-	bootstrapId := devenvcommon.MustPeerIDFromString(bootstrapP2PKeys.Data[0].Attributes.PeerID)
-	ocrKeyBundleIDs := map[string]string{
-		"evm": bootstrapKeys.Data[0].ID,
-	}
-	for family, nkb := range nodeKeyBundles {
-		ocrKeyBundleIDs[family] = nkb[bootstrapId.Raw()].OCR2Key.Data.ID
-	}
-	L.Info().Str("ocrKeyBundleIDs", fmt.Sprintf("%+v", ocrKeyBundleIDs)).Msg("Read OCR keys for bootstrap node")
-	raw, err := NewCCIPSpecToml(SpecArgs{
-		P2PV2Bootstrappers:     []string{},
-		CapabilityVersion:      "v1.0.0",
-		CapabilityLabelledName: "ccip",
-		OCRKeyBundleIDs:        ocrKeyBundleIDs,
-		P2PKeyID:               bootstrapId.String(),
-		RelayConfigs:           nil,
-		PluginConfig:           map[string]any{},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("creating CCIP job spec: %w", err)
-	}
-	_, _, err = bootstrapNode.CreateJobRaw(raw)
-	if err != nil {
-		return nil, fmt.Errorf("creating CCIP job: %w", err)
-	}
-	for _, node := range workerNodes {
-		nodeP2PIds, err := node.MustReadP2PKeys()
-		if err != nil {
-			return nil, fmt.Errorf("reading worker node P2P keys: %w", err)
-		}
-		L.Info().Str("Node", node.Config.URL).Any("PeerIDs", nodeP2PIds).Msg("Adding worker peer ID")
-		ocrKeys, err := node.MustReadOCR2Keys()
-		if err != nil {
-			return nil, fmt.Errorf("reading worker node OCR keys: %w", err)
-		}
-		L.Info().Str("Node", node.Config.URL).Any("OCRKeys", ocrKeys).Msg("Adding worker OCR keys")
-		ocrKeyBundleIDs := map[string]string{
-			"evm": ocrKeys.Data[0].ID,
-		}
-		id := devenvcommon.MustPeerIDFromString(nodeP2PIds.Data[0].Attributes.PeerID)
-		for family, nkb := range nodeKeyBundles {
-			ocrKeyBundleIDs[family] = nkb[id.Raw()].OCR2Key.Data.ID
-		}
-		L.Info().Str("ocrKeyBundleIDs", fmt.Sprintf("%+v", ocrKeyBundleIDs)).Msg("Read OCR keys for worker node")
-		raw, err := NewCCIPSpecToml(SpecArgs{
-			P2PV2Bootstrappers: []string{
-				fmt.Sprintf("%s@%s", strings.TrimPrefix(bootstrapId.String(), "p2p_"), "don-node0:6690"),
-			},
-			CapabilityVersion:      "v1.0.0",
-			CapabilityLabelledName: "ccip",
-			OCRKeyBundleIDs:        ocrKeyBundleIDs,
-			P2PKeyID:               id.String(),
-			RelayConfigs:           nil,
-			PluginConfig:           map[string]any{},
-		})
-		if err != nil {
-			return nil, fmt.Errorf("creating CCIP job spec: %w", err)
-		}
-		L.Info().Str("RawSpec", raw).Msg("Creating CCIP job on worker node")
-		_, _, err = node.CreateJobRaw(raw)
-		if err != nil {
-			return nil, fmt.Errorf("creating CCIP job: %w", err)
 		}
 	}
 
@@ -395,6 +390,86 @@ func NewCCIPSpecToml(spec SpecArgs) (string, error) {
 	}
 
 	return string(marshaled), nil
+}
+
+func CreateJobs(ctx context.Context, nodeClients []*clclient.ChainlinkClient, nodeKeyBundles map[string]map[string]clclient.NodeKeysBundle) error {
+	bootstrapNode := nodeClients[0]
+	bootstrapKeys, err := bootstrapNode.MustReadOCR2Keys()
+	if err != nil {
+		return fmt.Errorf("reading bootstrap node OCR keys: %w", err)
+	}
+	// bootstrap is 0
+	workerNodes := nodeClients[1:]
+
+	// create jobs post-deployment for home chain
+	bootstrapP2PKeys, err := bootstrapNode.MustReadP2PKeys()
+	if err != nil {
+		return fmt.Errorf("reading worker node P2P keys: %w", err)
+	}
+	bootstrapId := devenvcommon.MustPeerIDFromString(bootstrapP2PKeys.Data[0].Attributes.PeerID)
+	ocrKeyBundleIDs := map[string]string{
+		"evm": bootstrapKeys.Data[0].ID,
+	}
+	for family, nkb := range nodeKeyBundles {
+		ocrKeyBundleIDs[family] = nkb[bootstrapId.Raw()].OCR2Key.Data.ID
+	}
+	L.Info().Str("ocrKeyBundleIDs", fmt.Sprintf("%+v", ocrKeyBundleIDs)).Msg("Read OCR keys for bootstrap node")
+	raw, err := NewCCIPSpecToml(SpecArgs{
+		P2PV2Bootstrappers:     []string{},
+		CapabilityVersion:      "v1.0.0",
+		CapabilityLabelledName: "ccip",
+		OCRKeyBundleIDs:        ocrKeyBundleIDs,
+		P2PKeyID:               bootstrapId.String(),
+		RelayConfigs:           nil,
+		PluginConfig:           map[string]any{},
+	})
+	if err != nil {
+		return fmt.Errorf("creating CCIP job spec: %w", err)
+	}
+	_, _, err = bootstrapNode.CreateJobRaw(raw)
+	if err != nil {
+		return fmt.Errorf("creating CCIP job: %w", err)
+	}
+	for _, node := range workerNodes {
+		nodeP2PIds, err := node.MustReadP2PKeys()
+		if err != nil {
+			return fmt.Errorf("reading worker node P2P keys: %w", err)
+		}
+		L.Info().Str("Node", node.Config.URL).Any("PeerIDs", nodeP2PIds).Msg("Adding worker peer ID")
+		ocrKeys, err := node.MustReadOCR2Keys()
+		if err != nil {
+			return fmt.Errorf("reading worker node OCR keys: %w", err)
+		}
+		L.Info().Str("Node", node.Config.URL).Any("OCRKeys", ocrKeys).Msg("Adding worker OCR keys")
+		ocrKeyBundleIDs := map[string]string{
+			"evm": ocrKeys.Data[0].ID,
+		}
+		id := devenvcommon.MustPeerIDFromString(nodeP2PIds.Data[0].Attributes.PeerID)
+		for family, nkb := range nodeKeyBundles {
+			ocrKeyBundleIDs[family] = nkb[id.Raw()].OCR2Key.Data.ID
+		}
+		L.Info().Str("ocrKeyBundleIDs", fmt.Sprintf("%+v", ocrKeyBundleIDs)).Msg("Read OCR keys for worker node")
+		raw, err := NewCCIPSpecToml(SpecArgs{
+			P2PV2Bootstrappers: []string{
+				fmt.Sprintf("%s@%s", strings.TrimPrefix(bootstrapId.String(), "p2p_"), "don-node0:6690"),
+			},
+			CapabilityVersion:      "v1.0.0",
+			CapabilityLabelledName: "ccip",
+			OCRKeyBundleIDs:        ocrKeyBundleIDs,
+			P2PKeyID:               id.String(),
+			RelayConfigs:           nil,
+			PluginConfig:           map[string]any{},
+		})
+		if err != nil {
+			return fmt.Errorf("creating CCIP job spec: %w", err)
+		}
+		L.Info().Str("RawSpec", raw).Msg("Creating CCIP job on worker node")
+		_, _, err = node.CreateJobRaw(raw)
+		if err != nil {
+			return fmt.Errorf("creating CCIP job: %w", err)
+		}
+	}
+	return nil
 }
 
 func ExternalJobID(spec SpecArgs) (string, error) {

@@ -40,8 +40,6 @@ import (
 )
 
 func TestCCIPRouter(t *testing.T) {
-	t.Parallel()
-
 	ccip_router.SetProgramID(config.CcipRouterProgram)
 	test_ccip_receiver.SetProgramID(config.CcipLogicReceiver)
 	test_token_pool.SetProgramID(config.CcipTokenPoolProgram)
@@ -5882,9 +5880,7 @@ func TestCCIPRouter(t *testing.T) {
 							require.NoError(t, err)
 							base.AccountMetaSlice = append(base.AccountMetaSlice, tokenMetas1...)
 							addressTables[token1.PoolLookupTable] = addressTables1[token1.PoolLookupTable]
-							for k, v := range ccipSendLookupTable {
-								addressTables[k] = v
-							}
+							maps.Copy(addressTables, ccipSendLookupTable)
 
 							ix, err := base.ValidateAndBuild()
 							require.NoError(t, err)
@@ -5952,9 +5948,7 @@ func TestCCIPRouter(t *testing.T) {
 							require.NoError(t, err)
 							base.AccountMetaSlice = append(base.AccountMetaSlice, tokenMetasLink...)
 							addressTables[linkPool.PoolLookupTable] = addressTablesLink[linkPool.PoolLookupTable]
-							for k, v := range ccipSendLookupTable {
-								addressTables[k] = v
-							}
+							maps.Copy(addressTables, ccipSendLookupTable)
 
 							ix, err := base.ValidateAndBuild()
 							require.NoError(t, err)
@@ -6025,9 +6019,7 @@ func TestCCIPRouter(t *testing.T) {
 			require.NoError(t, err)
 			base.AccountMetaSlice = append(base.AccountMetaSlice, tokenMetas0...)
 			base.AccountMetaSlice = append(base.AccountMetaSlice, tokenMetas0...)
-			for k, v := range ccipSendLookupTable {
-				addressTables[k] = v
-			}
+			maps.Copy(addressTables, ccipSendLookupTable)
 
 			ix, err := base.ValidateAndBuild()
 			require.NoError(t, err)

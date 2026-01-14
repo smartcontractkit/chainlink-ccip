@@ -21,7 +21,6 @@ import (
 var (
 	ContractType cldf_deployment.ContractType = "FeeQuoter"
 	ProgramName                               = "fee_quoter"
-	ProgramSize                               = 5 * 1024 * 1024
 	Version      *semver.Version              = semver.MustParse("1.6.0")
 )
 
@@ -180,7 +179,7 @@ var ConnectChains = operations.NewOperation(
 		}
 		err = chain.Confirm([]solana.Instruction{ixn})
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm add price updater: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm add dest chain instruction: %w", err)
 		}
 		return sequences.OnChainOutput{}, nil
 	},
@@ -220,7 +219,7 @@ var TransferOwnership = operations.NewOperation(
 
 		err = chain.Confirm([]solana.Instruction{ixn})
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm add price updater: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm transfer ownership instruction: %w", err)
 		}
 		return sequences.OnChainOutput{}, nil
 	},
@@ -255,7 +254,7 @@ var AcceptOwnership = operations.NewOperation(
 
 		err = chain.Confirm([]solana.Instruction{ixn})
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm add price updater: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm accept ownership instruction: %w", err)
 		}
 		return sequences.OnChainOutput{}, nil
 	},

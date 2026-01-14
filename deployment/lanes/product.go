@@ -2,6 +2,7 @@ package lanes
 
 import (
 	"fmt"
+	"math/big"
 	"sync"
 
 	"github.com/Masterminds/semver/v3"
@@ -22,6 +23,16 @@ type LaneAdapter interface {
 	GetOffRampAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error)
 	GetRouterAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error)
 	GetFQAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error)
+}
+
+// TokenPriceProvider is an optional interface that LaneAdapters can implement
+// to provide default fee token prices for a chain.
+// This is primarily used by EVM chains; other chains can skip this.
+type TokenPriceProvider interface {
+	// GetDefaultTokenPrices returns default fee token prices for a chain.
+	// Returns a map of contract type to USD price (18 decimals).
+	// The caller is responsible for resolving contract types to addresses.
+	GetDefaultTokenPrices() map[datastore.ContractType]*big.Int
 }
 
 type laneAdapterID string

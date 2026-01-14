@@ -37,7 +37,6 @@ type TestMcmOperation struct {
 }
 
 func TestMcmSetRootAndExecute(t *testing.T) {
-	t.Parallel()
 	mcm.SetProgramID(config.McmProgram)
 	external_program_cpi_stub.SetProgramID(config.ExternalCpiStubProgram) // testing program
 
@@ -243,7 +242,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 			require.NoError(t, err)
 
 			signerGroups := make([]byte, numSigners)
-			for i := 0; i < len(signerGroups); i++ {
+			for i := range signerGroups {
 				signerGroups[i] = byte(i % 5)
 			}
 

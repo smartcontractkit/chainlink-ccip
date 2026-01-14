@@ -29,7 +29,6 @@ import (
 )
 
 func TestMcmsCapacity(t *testing.T) {
-	t.Parallel()
 	ctx := tests.Context(t)
 
 	mcm.SetProgramID(config.McmProgram)
@@ -631,7 +630,7 @@ func TestMcmsCapacity(t *testing.T) {
 				Salt:        salt,
 				Delay:       uint64(1),
 			}
-			for i := 0; i < count; i++ {
+			for range count {
 				heavyIx, hverr := external_program_cpi_stub.NewComputeHeavyInstruction(iterationsPerInstr).ValidateAndBuild()
 				require.NoError(t, hverr)
 				op.AddInstruction(heavyIx, []solana.PublicKey{config.ExternalCpiStubProgram})
@@ -1111,10 +1110,7 @@ func TestMcmsCapacity(t *testing.T) {
 
 					batchSize := 10
 					for i := 0; i < len(createAtaIxs); i += batchSize {
-						end := i + batchSize
-						if end > len(createAtaIxs) {
-							end = len(createAtaIxs)
-						}
+						end := min(i+batchSize, len(createAtaIxs))
 
 						batch := createAtaIxs[i:end]
 						testutils.SendAndConfirm(ctx, t, solanaGoClient, batch, admin, config.DefaultCommitment)

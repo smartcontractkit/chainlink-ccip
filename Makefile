@@ -91,7 +91,7 @@ install-custom-linters: install-safebigint
 install-linters: install-golangcilint install-custom-linters
 
 ensure_go_version:
-	@go version | grep -q 'go1.24' || (echo "Please use go1.24" && exit 1)
+	@go version | grep -q 'go1.25' || (echo "Please use go1.25" && exit 1)
 
 ensure_golangcilint:
 	@golangci-lint --version | grep -q '1.64.5' || (echo "Please use golangci-lint 1.64.5, make install-golangcilint" && exit 1)
