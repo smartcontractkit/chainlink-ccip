@@ -1,5 +1,5 @@
 export type LockreleaseTokenPool = {
-  "version": "1.6.0",
+  "version": "1.6.1-candidate",
   "name": "lockrelease_token_pool",
   "instructions": [
     {
@@ -983,7 +983,7 @@ export type LockreleaseTokenPool = {
 };
 
 export const IDL: LockreleaseTokenPool = {
-  "version": "1.6.0",
+  "version": "1.6.1-candidate",
   "name": "lockrelease_token_pool",
   "instructions": [
     {
