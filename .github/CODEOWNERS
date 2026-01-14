@@ -1,5 +1,5 @@
 # 2024-12-04 - The codeowners file is correct
-* @smartcontractkit/ccip-offchain
+* @smartcontractkit/ccip-offchain @smartcontractkit/ccip-onchain
 
 # EVM contracts
 /chains/evm @smartcontractkit/ccip-onchain

@@ -8,7 +8,7 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/usdc_token_pool"
+	usdc_token_pool_cctp_v2_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/usdc_token_pool_cctp_v2"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
@@ -22,7 +22,7 @@ type SetDomainsInput struct {
 type SetDomainsPerChainInput struct {
 	ChainSelector uint64
 	Address       common.Address
-	Domains       []usdc_token_pool.DomainUpdate
+	Domains       []usdc_token_pool_cctp_v2_ops.DomainUpdate
 }
 
 // This changeset is used to set the domains for a given token in the USDCTokenPool contract.
@@ -44,7 +44,7 @@ func setDomainsApply() func(cldf.Environment, SetDomainsInput) (cldf.ChangesetOu
 		// across all contracts. Otherwise, this changeset would only be capable of setting domains for a single contract
 		// at a time per chain, which would require multiple invocations of this changeset to achieve the same result.
 		addressesByChain := make(map[uint64][]common.Address)
-		domainsByChain := make(map[uint64]map[common.Address][]usdc_token_pool.DomainUpdate)
+		domainsByChain := make(map[uint64]map[common.Address][]usdc_token_pool_cctp_v2_ops.DomainUpdate)
 
 		for _, perChainInput := range input.ChainInputs {
 			// For each chain input, add the address to the addressesByChain map.
@@ -52,7 +52,7 @@ func setDomainsApply() func(cldf.Environment, SetDomainsInput) (cldf.ChangesetOu
 
 			// Initialize the map for the chain selector if it doesn't exist yet to prevent a nil pointer dereference.
 			if _, ok := domainsByChain[perChainInput.ChainSelector]; !ok {
-				domainsByChain[perChainInput.ChainSelector] = make(map[common.Address][]usdc_token_pool.DomainUpdate)
+				domainsByChain[perChainInput.ChainSelector] = make(map[common.Address][]usdc_token_pool_cctp_v2_ops.DomainUpdate)
 			}
 
 			// Map the provided DomainUpdate to the given address and chain selector.
