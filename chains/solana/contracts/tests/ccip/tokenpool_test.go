@@ -40,7 +40,6 @@ import (
 )
 
 func TestTokenPool(t *testing.T) {
-
 	rmn_remote.SetProgramID(config.RMNRemoteProgram)
 	test_token_pool.SetProgramID(config.CcipTokenPoolProgram)
 	cctp_message_transmitter.SetProgramID(config.CctpMessageTransmitter)
