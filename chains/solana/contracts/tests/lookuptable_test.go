@@ -31,7 +31,7 @@ func TestSVMLookupTables(t *testing.T) {
 	// transfer instructions
 	pubkeys := solana.PublicKeySlice{}
 	instructions := []solana.Instruction{}
-	for i := 0; i < 32; i++ {
+	for range 32 {
 		k, kerr := solana.NewRandomPrivateKey()
 		require.NoError(t, kerr)
 		pubkeys = append(pubkeys, k.PublicKey())

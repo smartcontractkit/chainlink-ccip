@@ -89,7 +89,7 @@ func (m *EVMTXGun) Call(_ *wasp.Generator) *wasp.Response {
 func gasControlFunc(t *testing.T, r *rpc.RPCClient, blockPace time.Duration) {
 	startGasPrice := big.NewInt(2e9)
 	// ramp
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		err := r.PrintBlockBaseFee()
 		require.NoError(t, err)
 		err = r.AnvilSetNextBlockBaseFeePerGas(startGasPrice)
@@ -98,7 +98,7 @@ func gasControlFunc(t *testing.T, r *rpc.RPCClient, blockPace time.Duration) {
 		time.Sleep(blockPace)
 	}
 	// hold
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		err := r.PrintBlockBaseFee()
 		require.NoError(t, err)
 		time.Sleep(blockPace)
@@ -106,7 +106,7 @@ func gasControlFunc(t *testing.T, r *rpc.RPCClient, blockPace time.Duration) {
 		require.NoError(t, err)
 	}
 	// release
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		err := r.PrintBlockBaseFee()
 		require.NoError(t, err)
 		time.Sleep(blockPace)

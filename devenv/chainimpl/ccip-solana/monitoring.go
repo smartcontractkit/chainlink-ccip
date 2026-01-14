@@ -199,7 +199,7 @@ func (lp *LokiPusher) Push(msgs []any, labels map[string]string) error {
 	}
 	values := make([][]string, 0, len(msgs))
 
-	for i := 0; i < len(msgs); i++ {
+	for i := range msgs {
 		combinedMessage := map[string]any{
 			"log": msgs[i],
 			"ts":  time.Now().Format(time.RFC3339Nano),

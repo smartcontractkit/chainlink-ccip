@@ -1141,7 +1141,7 @@ func Test_buildMerkleRootsOutcome(t *testing.T) {
 		}
 
 		lggr := logger.Test(t)
-		for i := 0; i < rounds; i++ {
+		for range rounds {
 			report1, err := buildMerkleRootsOutcome(rmn.ReportSignatures{}, false, lggr, obs, Outcome{}, mockAddrCodec)
 			require.NoError(t, err)
 			report2, err := buildMerkleRootsOutcome(rmn.ReportSignatures{}, false, lggr, obs, Outcome{}, mockAddrCodec)

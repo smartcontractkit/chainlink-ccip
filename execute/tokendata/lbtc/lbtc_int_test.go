@@ -35,18 +35,18 @@ type lbtcMessage struct {
 }
 
 func (u *lbtcMessage) tokenData(idx int) []byte {
-	var result map[string]interface{}
+	var result map[string]any
 
 	err := json.Unmarshal([]byte(u.attestationResponse), &result)
 	if err != nil {
 		panic(err)
 	}
 
-	attestations, ok := result["attestations"].([]interface{})
+	attestations, ok := result["attestations"].([]any)
 	if !ok {
 		panic("attestations not found")
 	}
-	attestation, ok := attestations[idx].(map[string]interface{})
+	attestation, ok := attestations[idx].(map[string]any)
 	if !ok {
 		panic("attestation not found")
 	}

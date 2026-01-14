@@ -150,7 +150,7 @@ func Test_MessageTokenData_Append(t *testing.T) {
 		assert.False(t, msg.IsReady())
 		assert.Nil(t, msg.Error())
 
-		for i := 0; i < 10; i++ {
+		for i := range 10 {
 			assert.Nil(t, msg.TokenData[i].Data)
 			msg = msg.Append(i, NewSuccessTokenData([]byte{byte(i)}))
 		}

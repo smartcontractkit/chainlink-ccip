@@ -132,7 +132,7 @@ func ParseLine(line string, logType LogType) (*Data, error) {
 	switch logType {
 
 	case LogTypeJSON:
-		var obj map[string]interface{}
+		var obj map[string]any
 		dec := json.NewDecoder(strings.NewReader(line))
 		err := dec.Decode(&obj)
 		if err != nil {
