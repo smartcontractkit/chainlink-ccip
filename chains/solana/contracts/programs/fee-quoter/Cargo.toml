@@ -1,6 +1,6 @@
 [package]
 name = "fee_quoter"
-version = "0.1.1"
+version = "1.6.1-candidate"
 description = "Created with Anchor"
 edition = "2021"
 
@@ -16,12 +16,12 @@ cpi = ["no-entrypoint"]
 default = []
 
 [dependencies]
-solana-program = "1.17.25" # pin solana to 1.17
+solana-program = "1.17.25"                                             # pin solana to 1.17
 anchor-lang = { version = "0.29.0", features = ["init-if-needed"] }
 anchor-spl = "0.29.0"
 bytemuck = "1.7"
 ethnum = "1.5"
-ccip_common = {path = "../ccip-common"}
+ccip_common = { version = "1.6.1-candidate", path = "../ccip-common" }
 
 [dev-dependencies]
 hex = "0.4.3"
@@ -31,4 +31,7 @@ build_commit = { path = "../../crates/build-commit" }
 
 [lints.rust.unexpected_cfgs]
 level = "warn"
-check-cfg = ['cfg(target_os, values("solana"))', 'cfg(feature, values("anchor-debug", "custom-panic", "custom-heap"))']
+check-cfg = [
+    'cfg(target_os, values("solana"))',
+    'cfg(feature, values("anchor-debug", "custom-panic", "custom-heap"))',
+]
