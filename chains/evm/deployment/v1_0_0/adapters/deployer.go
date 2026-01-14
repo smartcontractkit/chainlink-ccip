@@ -9,9 +9,9 @@ import (
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
+	ccipapi "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	sequtil "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
-	ccipapi "github.com/smartcontractkit/chainlink-ccip/deployment/v1_0"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations"
@@ -19,6 +19,16 @@ import (
 )
 
 type EVMDeployer struct{}
+
+func (a *EVMDeployer) DeployChainContracts() *cldf_ops.Sequence[ccipapi.ContractDeploymentConfigPerChainWithAddress, sequtil.OnChainOutput, cldf_chain.BlockChains] {
+	// Not implemented for the 1.0.0 deployer
+	return nil
+}
+
+func (a *EVMDeployer) SetOCR3Config() *cldf_ops.Sequence[ccipapi.SetOCR3ConfigInput, sequtil.OnChainOutput, cldf_chain.BlockChains] {
+	// Not implemented for the 1.0.0 deployer
+	return nil
+}
 
 func (d *EVMDeployer) DeployMCMS() *cldf_ops.Sequence[ccipapi.MCMSDeploymentConfigPerChainWithAddress, sequtil.OnChainOutput, cldf_chain.BlockChains] {
 	return cldf_ops.NewSequence(

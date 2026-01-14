@@ -3,6 +3,7 @@ package adapters
 import (
 	"fmt"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	mcms_types "github.com/smartcontractkit/mcms/types"
@@ -15,6 +16,8 @@ import (
 	mcms_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 )
 
+var Version = semver.MustParse("1.0.0")
+
 type EVMMCMSReader struct{}
 
 func (r *EVMMCMSReader) GetChainMetadata(e deployment.Environment, chainSelector uint64, input mcms_utils.Input) (mcms_types.ChainMetadata, error) {
@@ -24,21 +27,32 @@ func (r *EVMMCMSReader) GetChainMetadata(e deployment.Environment, chainSelector
 	}
 	inspector := mcmsevmsdk.NewInspector(chain.Client)
 	// find mcms address
-	// if contract type is specified not empty, populate contract type from TimelockAction
-	if input.MCMSAddressRef.Type == "" {
+	// populate contract type from TimelockAction
+	var addrType datastore.ContractType
+	if input.MCMSAddressRef.Type != "" {
+		addrType = input.MCMSAddressRef.Type
+	} else {
 		switch input.TimelockAction {
 		case mcms_types.TimelockActionSchedule:
-			input.MCMSAddressRef.Type = datastore.ContractType(utils.ProposerManyChainMultisig)
+			addrType = datastore.ContractType(utils.ProposerManyChainMultisig)
 		case mcms_types.TimelockActionBypass:
-			input.MCMSAddressRef.Type = datastore.ContractType(utils.BypasserManyChainMultisig)
+			addrType = datastore.ContractType(utils.BypasserManyChainMultisig)
 		case mcms_types.TimelockActionCancel:
-			input.MCMSAddressRef.Type = datastore.ContractType(utils.CancellerManyChainMultisig)
+			addrType = datastore.ContractType(utils.CancellerManyChainMultisig)
 		default:
 			return mcms_types.ChainMetadata{}, fmt.Errorf("unsupported timelock action: %s", input.TimelockAction)
 		}
 	}
 
-	addrRef, err := datastore_utils.FindAndFormatRef(e.DataStore, input.MCMSAddressRef, chainSelector, evm_datastore_utils.ToEVMAddress)
+	// Use GetAddressRef with qualifier to properly filter MCMS addresses
+	mcmAddressRef := datastore_utils.GetAddressRef(
+		e.DataStore.Addresses().Filter(),
+		chainSelector,
+		deployment.ContractType(addrType),
+		Version,
+		input.Qualifier,
+	)
+	addrRef, err := evm_datastore_utils.ToEVMAddress(mcmAddressRef)
 	if err != nil {
 		return mcms_types.ChainMetadata{}, fmt.Errorf("failed to find MCMS address for chain %d: %w", chainSelector, err)
 	}
@@ -55,4 +69,39 @@ func (r *EVMMCMSReader) GetChainMetadata(e deployment.Environment, chainSelector
 		StartingOpCount: opCount,
 		MCMAddress:      mcmAddr,
 	}, nil
+}
+
+func (r *EVMMCMSReader) GetTimelockRef(e deployment.Environment, chainSelector uint64, input mcms_utils.Input) (datastore.AddressRef, error) {
+	timelockRef := datastore_utils.GetAddressRef(
+		e.DataStore.Addresses().Filter(),
+		chainSelector,
+		utils.RBACTimelock,
+		Version,
+		input.Qualifier,
+	)
+	return timelockRef, nil
+}
+
+func (r *EVMMCMSReader) GetMCMSRef(e deployment.Environment, chainSelector uint64, input mcms_utils.Input) (datastore.AddressRef, error) {
+	// find mcms address
+	// populate contract type from TimelockAction
+	var addrType datastore.ContractType
+	switch input.TimelockAction {
+	case mcms_types.TimelockActionSchedule:
+		addrType = datastore.ContractType(utils.ProposerManyChainMultisig)
+	case mcms_types.TimelockActionBypass:
+		addrType = datastore.ContractType(utils.BypasserManyChainMultisig)
+	case mcms_types.TimelockActionCancel:
+		addrType = datastore.ContractType(utils.CancellerManyChainMultisig)
+	default:
+		return datastore.AddressRef{}, fmt.Errorf("unsupported timelock action type: %s", input.TimelockAction)
+	}
+	mcmAddress := datastore_utils.GetAddressRef(
+		e.DataStore.Addresses().Filter(),
+		chainSelector,
+		deployment.ContractType(addrType),
+		Version,
+		input.Qualifier,
+	)
+	return mcmAddress, nil
 }

@@ -8,9 +8,11 @@ require (
 	github.com/deckarep/golang-set/v2 v2.6.0
 	github.com/ethereum/go-ethereum v1.16.2
 	github.com/smartcontractkit/chain-selectors v1.0.72
+	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20251222192458-01e9f8631e3d
 	github.com/smartcontractkit/chainlink-common v0.9.6-0.20250929154511-1f5fbda7ae76
 	github.com/smartcontractkit/chainlink-deployments-framework v0.56.0
 	github.com/smartcontractkit/chainlink-evm v0.3.3
+	github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20250808121824-2c3544aab8f3
 	github.com/smartcontractkit/mcms v0.25.0
 	github.com/stretchr/testify v1.11.1
 )
@@ -121,7 +123,6 @@ require (
 	github.com/shopspring/decimal v1.4.0 // indirect
 	github.com/sigurn/crc16 v0.0.0-20211026045750-20ab5afb07e3 // indirect
 	github.com/smartcontractkit/chainlink-aptos v0.0.0-20250915164817-46a35eda083d // indirect
-	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20251222192458-01e9f8631e3d // indirect
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250908144012-8184001834b5 // indirect
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20250908144012-8184001834b5 // indirect
 	github.com/smartcontractkit/chainlink-common/pkg/chipingress v0.0.4 // indirect

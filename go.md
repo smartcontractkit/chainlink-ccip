@@ -12,6 +12,7 @@ flowchart LR
 	chainlink-common --> chainlink-common/pkg/chipingress
 	chainlink-common --> chainlink-protos/billing/go
 	chainlink-common --> chainlink-protos/cre/go
+	chainlink-common --> chainlink-protos/linking-service/go
 	chainlink-common --> chainlink-protos/storage-service
 	chainlink-common --> chainlink-protos/workflows/go
 	chainlink-common --> freeport
@@ -24,6 +25,8 @@ flowchart LR
 	click chainlink-protos/billing/go href "https://github.com/smartcontractkit/chainlink-protos"
 	chainlink-protos/cre/go
 	click chainlink-protos/cre/go href "https://github.com/smartcontractkit/chainlink-protos"
+	chainlink-protos/linking-service/go
+	click chainlink-protos/linking-service/go href "https://github.com/smartcontractkit/chainlink-protos"
 	chainlink-protos/rmn/v1.6/go
 	click chainlink-protos/rmn/v1.6/go href "https://github.com/smartcontractkit/chainlink-protos"
 	chainlink-protos/storage-service
@@ -46,6 +49,7 @@ flowchart LR
 	subgraph chainlink-protos-repo[chainlink-protos]
 		 chainlink-protos/billing/go
 		 chainlink-protos/cre/go
+		 chainlink-protos/linking-service/go
 		 chainlink-protos/rmn/v1.6/go
 		 chainlink-protos/storage-service
 		 chainlink-protos/workflows/go
@@ -94,6 +98,7 @@ flowchart LR
 	chainlink-common --> chainlink-common/pkg/chipingress
 	chainlink-common --> chainlink-protos/billing/go
 	chainlink-common --> chainlink-protos/cre/go
+	chainlink-common --> chainlink-protos/linking-service/go
 	chainlink-common --> chainlink-protos/storage-service
 	chainlink-common --> chainlink-protos/workflows/go
 	chainlink-common --> freeport
@@ -135,6 +140,8 @@ flowchart LR
 	click chainlink-protos/cre/go href "https://github.com/smartcontractkit/chainlink-protos"
 	chainlink-protos/job-distributor
 	click chainlink-protos/job-distributor href "https://github.com/smartcontractkit/chainlink-protos"
+	chainlink-protos/linking-service/go
+	click chainlink-protos/linking-service/go href "https://github.com/smartcontractkit/chainlink-protos"
 	chainlink-protos/op-catalog
 	click chainlink-protos/op-catalog href "https://github.com/smartcontractkit/chainlink-protos"
 	chainlink-protos/rmn/v1.6/go
@@ -206,6 +213,7 @@ flowchart LR
 		 chainlink-protos/billing/go
 		 chainlink-protos/cre/go
 		 chainlink-protos/job-distributor
+		 chainlink-protos/linking-service/go
 		 chainlink-protos/op-catalog
 		 chainlink-protos/rmn/v1.6/go
 		 chainlink-protos/storage-service
