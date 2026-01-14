@@ -37,7 +37,6 @@ type TestMcmOperation struct {
 }
 
 func TestMcmSetRootAndExecute(t *testing.T) {
-	t.Parallel()
 	mcm.SetProgramID(config.McmProgram)
 	external_program_cpi_stub.SetProgramID(config.ExternalCpiStubProgram) // testing program
 
