@@ -15,8 +15,13 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
+var (
+	singletonCurseRegistry *CurseRegistry
+	curseRegistryOnce      sync.Once
+)
+
 type CurseAdapter interface {
-	Initialize(e cldf.Environment) error
+	Initialize(e cldf.Environment, selector uint64) error
 	// IsSubjectCursedOnChain has the default RMN behavior.
 	// Returns true if subject is cursed or chain is globally cursed. False otherwise.
 	IsSubjectCursedOnChain(e cldf.Environment, selector uint64, subject Subject) (bool, error)
@@ -27,16 +32,24 @@ type CurseAdapter interface {
 	// For example, in case of EVM 1.6 chains, this could check if the RMNRemote contract is deployed on the chain
 	IsCurseEnabledForChain(e cldf.Environment, selector uint64) (bool, error)
 	// SubjectToSelector converts a Subject to a chain selector
-	SubjectToSelector(subject Subject) uint64
+	SubjectToSelector(subject Subject) (uint64, error)
 	// Curse returns the sequence to curse subjects on a chain
 	Curse() *cldf_ops.Sequence[CurseInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 	// Uncurse returns the sequence to lift the curse on subjects on a chain
 	Uncurse() *cldf_ops.Sequence[CurseInput, sequences.OnChainOutput, cldf_chain.BlockChains]
+	// ListConnectedChains returns a slice of connected chain selectors
+	// It is used to determine which chains needs to curse subjects derived from given selector
+	// This is needed to put global curse on a given chain with selector `selector`,
+	// so that all chains connected to it can curse the subject derived from `selector`
+	ListConnectedChains(e cldf.Environment, selector uint64) ([]uint64, error)
 }
 
 type CurseSubjectAdapter interface {
 	// SelectorToSubject converts a chain selector to a Subject
 	SelectorToSubject(selector uint64) Subject
+	// DeriveCurseAdapterVersion derives the curse adapter version to be used to curse the subject on a chain
+	// For example, for EVM chains, this could derive the RMN version deployed on the chain with selector `selector`
+	DeriveCurseAdapterVersion(e cldf.Environment, selector uint64) (*semver.Version, error)
 }
 
 type CurseRegistryInput struct {
@@ -53,12 +66,19 @@ type CurseRegistry struct {
 	CurseSubjects map[string]CurseSubjectAdapter
 }
 
-func NewCurseRegistry() *CurseRegistry {
+func newCurseRegistry() *CurseRegistry {
 	return &CurseRegistry{
 		mu:            sync.Mutex{},
 		CurseAdapters: make(map[string]CurseAdapter),
 		CurseSubjects: make(map[string]CurseSubjectAdapter),
 	}
+}
+
+func GetCurseRegistry() *CurseRegistry {
+	curseRegistryOnce.Do(func() {
+		singletonCurseRegistry = newCurseRegistry()
+	})
+	return singletonCurseRegistry
 }
 
 func (c *CurseRegistry) RegisterNewCurse(
@@ -109,6 +129,10 @@ func (cr *CurseRegistry) groupRMNSubjectBySelector(e cldf.Environment, rmnSubjec
 		// Skip self-curse
 		if s.SubjectChainSelector == s.ChainSelector {
 			continue
+		}
+		err = adapter.Initialize(e, s.ChainSelector)
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize curse adapter for chain selector %d: %w", s.ChainSelector, err)
 		}
 		// Check if curse is enabled on chain
 		cursable, err := adapter.IsCurseEnabledForChain(e, s.ChainSelector)

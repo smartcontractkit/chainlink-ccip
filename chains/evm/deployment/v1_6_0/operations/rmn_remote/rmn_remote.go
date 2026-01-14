@@ -67,7 +67,7 @@ var Uncurse = contract.NewWrite(contract.WriteParams[CurseArgs, *rmn_remote.RMNR
 
 var IsCursed = contract.NewRead(contract.ReadParams[fastcurse.Subject, bool, *rmn_remote.RMNRemote]{
 	Name:         "rmn-remote:is-cursed",
-	Version:      Version,
+	Version:      semver.MustParse("1.6.0"),
 	Description:  "Checks if a subject is cursed on an RMNRemote contract",
 	ContractType: ContractType,
 	NewContract:  rmn_remote.NewRMNRemote,
