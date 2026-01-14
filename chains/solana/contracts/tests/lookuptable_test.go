@@ -18,7 +18,6 @@ import (
 )
 
 func TestSVMLookupTables(t *testing.T) {
-	t.Parallel()
 
 	ctx := tests.Context(t)
 	url := testutils.SetupLocalSolNode(t)

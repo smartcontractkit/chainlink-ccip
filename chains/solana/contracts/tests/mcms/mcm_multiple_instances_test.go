@@ -20,7 +20,6 @@ import (
 )
 
 func TestMcmMultipleInstances(t *testing.T) {
-	t.Parallel()
 	mcm.SetProgramID(config.McmProgram)
 
 	ctx := tests.Context(t)

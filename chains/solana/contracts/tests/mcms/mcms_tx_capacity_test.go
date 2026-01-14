@@ -29,7 +29,6 @@ import (
 )
 
 func TestMcmsCapacity(t *testing.T) {
-	t.Parallel()
 	ctx := tests.Context(t)
 
 	mcm.SetProgramID(config.McmProgram)

@@ -22,7 +22,6 @@ import (
 )
 
 func TestMcmSetConfig(t *testing.T) {
-	t.Parallel()
 	mcm.SetProgramID(config.McmProgram)
 
 	ctx := tests.Context(t)
