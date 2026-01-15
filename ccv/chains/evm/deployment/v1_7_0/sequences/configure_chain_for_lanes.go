@@ -239,6 +239,13 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 			contractMetadata = append(contractMetadata, committeeVerifierMetadata...)
 		}
 
+		// Collect OnRamp destination chain config metadata
+		onRampDestChainMetadata, err := collectOnRampDestChainConfigs(b, chain, input.OnRamp, chain.Selector, []datastore.ContractMetadata{})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to collect OnRamp destination chain configs: %w", err)
+		}
+		contractMetadata = append(contractMetadata, onRampDestChainMetadata...)
+
 		return sequences.OnChainOutput{
 			Metadata: sequences.Metadata{
 				Contracts: contractMetadata,
@@ -350,6 +357,62 @@ func collectCommitteeVerifierSignatureConfigs(
 			},
 		})
 	}
+
+	return contractMetadata, nil
+}
+
+// collectOnRampDestChainConfigs collects metadata for all destination chain configurations from the OnRamp.
+// For each destination chain, it saves: router, defaultExecutor, laneMandatedCCVs, defaultCCVs, and offRamp bytes.
+// Note: To determine if a Router/OffRamp/OnRamp is test, check the AddressRef's Type field in the datastore
+// (e.g., Type == "TestRouter" vs Type == "Router").
+func collectOnRampDestChainConfigs(
+	b cldf_ops.Bundle,
+	chain evm.Chain,
+	onRampAddr string,
+	chainSelector uint64,
+	contractMetadata []datastore.ContractMetadata,
+) ([]datastore.ContractMetadata, error) {
+	// TODO: Uncomment once GetAllDestChainConfigs is available in gobindings
+	// Read all destination chain configs from the OnRamp
+	// getAllConfigsReport, err := cldf_ops.ExecuteOperation(b, onramp.GetAllDestChainConfigs, chain, contract.FunctionInput[any]{
+	// 	ChainSelector: chainSelector,
+	// 	Address:       common.HexToAddress(onRampAddr),
+	// 	Args:          nil,
+	// })
+	// if err != nil {
+	// 	return contractMetadata, fmt.Errorf("failed to read all dest chain configs from OnRamp(%s) on chain %s: %w", onRampAddr, chain, err)
+	// }
+
+	// TODO: Uncomment once GetAllDestChainConfigs is available in gobindings
+	// for i, destChainSelector := range getAllConfigsReport.Output.DestChainSelectors {
+	// 	destChainConfig := getAllConfigsReport.Output.DestChainConfigs[i]
+	//
+	// 	offRampBytes := destChainConfig.OffRamp
+	//
+	// 	// Convert CCV addresses to hex strings
+	// 	defaultCCVsHex := make([]string, len(destChainConfig.DefaultCCVs))
+	// 	for j, ccv := range destChainConfig.DefaultCCVs {
+	// 		defaultCCVsHex[j] = ccv.Hex()
+	// 	}
+	//
+	// 	laneMandatedCCVsHex := make([]string, len(destChainConfig.LaneMandatedCCVs))
+	// 	for j, ccv := range destChainConfig.LaneMandatedCCVs {
+	// 		laneMandatedCCVsHex[j] = ccv.Hex()
+	// 	}
+	//
+	// 	contractMetadata = append(contractMetadata, datastore.ContractMetadata{
+	// 		Address:       onRampAddr,
+	// 		ChainSelector: chainSelector,
+	// 		Metadata: map[string]interface{}{
+	// 			"destChainSelector": destChainSelector,
+	// 			"router":            destChainConfig.Router.Hex(),
+	// 			"defaultExecutor":   destChainConfig.DefaultExecutor.Hex(),
+	// 			"laneMandatedCCVs":  laneMandatedCCVsHex,
+	// 			"defaultCCVs":       defaultCCVsHex,
+	// 			"offRamp":           fmt.Sprintf("0x%x", offRampBytes),
+	// 		},
+	// 	})
+	// }
 
 	return contractMetadata, nil
 }
