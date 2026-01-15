@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -170,5 +171,28 @@ var GetSignatureConfig = contract.NewRead(contract.ReadParams[uint64, SignatureC
 			Threshold:           threshold,
 			SourceChainSelector: args,
 		}, nil
+	},
+})
+
+var GetAllSignatureConfigs = contract.NewRead(contract.ReadParams[any, []SignatureConfig, *committee_verifier.CommitteeVerifier]{
+	Name:         "committee-verifier:get-all-signature-configs",
+	Version:      Version,
+	Description:  "Gets all the signature configurations on the CommitteeVerifier",
+	ContractType: ContractType,
+	NewContract:  committee_verifier.NewCommitteeVerifier,
+	CallContract: func(committeeVerifier *committee_verifier.CommitteeVerifier, opts *bind.CallOpts, args any) ([]SignatureConfig, error) {
+		configs, err := committeeVerifier.GetAllSignatureConfigs(opts)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get all signature configurations: %w", err)
+		}
+		result := make([]SignatureConfig, len(configs))
+		for i, cfg := range configs {
+			result[i] = SignatureConfig{
+				SourceChainSelector: cfg.SourceChainSelector,
+				Threshold:           cfg.Threshold,
+				Signers:             cfg.Signers,
+			}
+		}
+		return result, nil
 	},
 })

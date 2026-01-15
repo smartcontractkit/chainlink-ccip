@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
@@ -129,6 +130,17 @@ var UpdatePrices = contract.NewWrite(contract.WriteParams[PriceUpdates, *fee_quo
 	Validate: func(PriceUpdates) error { return nil },
 	CallContract: func(feeQuoter *fee_quoter.FeeQuoter, opts *bind.TransactOpts, args PriceUpdates) (*types.Transaction, error) {
 		return feeQuoter.UpdatePrices(opts, args)
+	},
+})
+
+var GetFeeTokens = contract.NewRead(contract.ReadParams[any, []common.Address, *fee_quoter.FeeQuoter]{
+	Name:         "fee-quoter-v2:get-fee-tokens",
+	Version:      Version,
+	Description:  "Gets the fee tokens on the FeeQuoter",
+	ContractType: ContractType,
+	NewContract:  fee_quoter.NewFeeQuoter,
+	CallContract: func(feeQuoter *fee_quoter.FeeQuoter, opts *bind.CallOpts, args any) ([]common.Address, error) {
+		return feeQuoter.GetFeeTokens(opts)
 	},
 })
 

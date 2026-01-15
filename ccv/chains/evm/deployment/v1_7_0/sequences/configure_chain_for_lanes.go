@@ -6,15 +6,20 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 
-	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
-	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
+
+	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/committee_verifier"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/erc20"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/executor"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/offramp"
@@ -208,8 +213,206 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 			batchOps = append(batchOps, committeeVerifierReport.Output.BatchOps...)
 		}
 
+		// Collect fee token metadata
+		contractMetadata, err := collectFeeTokenMetadata(b, chain, input.FeeQuoter, chain.Selector, []datastore.ContractMetadata{})
+		if err != nil {
+			return sequences.OnChainOutput{}, err
+		}
+
+		// Collect CommitteeVerifier signature config metadata for each CommitteeVerifier
+		for _, committeeVerifier := range input.CommitteeVerifiers {
+			var committeeVerifierAddr string
+			for _, addr := range committeeVerifier.CommitteeVerifier {
+				if addr.Type == datastore.ContractType(committee_verifier.ContractType) {
+					committeeVerifierAddr = addr.Address
+					break
+				}
+			}
+			if committeeVerifierAddr == "" {
+				continue // Skip if we can't find the CommitteeVerifier address
+			}
+
+			committeeVerifierMetadata, err := collectCommitteeVerifierSignatureConfigs(b, chain, committeeVerifierAddr, chain.Selector, []datastore.ContractMetadata{})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to collect CommitteeVerifier signature configs: %w", err)
+			}
+			contractMetadata = append(contractMetadata, committeeVerifierMetadata...)
+		}
+
+		// Collect OnRamp destination chain config metadata
+		onRampDestChainMetadata, err := collectOnRampDestChainConfigs(b, chain, input.OnRamp, chain.Selector, []datastore.ContractMetadata{})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to collect OnRamp destination chain configs: %w", err)
+		}
+		contractMetadata = append(contractMetadata, onRampDestChainMetadata...)
+
 		return sequences.OnChainOutput{
+			Metadata: sequences.Metadata{
+				Contracts: contractMetadata,
+			},
 			BatchOps: batchOps,
 		}, nil
-	},
-)
+	})
+
+// collectFeeTokenMetadata collects metadata for all fee tokens from the FeeQuoter
+func collectFeeTokenMetadata(
+	b cldf_ops.Bundle,
+	chain evm.Chain,
+	feeQuoterAddr string,
+	chainSelector uint64,
+	contractMetadata []datastore.ContractMetadata,
+) ([]datastore.ContractMetadata, error) {
+	// Read fee tokens from the FeeQuoter
+	getFeeTokensReport, err := cldf_ops.ExecuteOperation(b, fee_quoter.GetFeeTokens, chain, contract.FunctionInput[any]{
+		ChainSelector: chainSelector,
+		Address:       common.HexToAddress(feeQuoterAddr),
+		Args:          nil,
+	})
+	if err != nil {
+		return contractMetadata, fmt.Errorf("failed to read fee tokens from FeeQuoter(%s) on chain %s: %w", feeQuoterAddr, chain, err)
+	}
+
+	// Read metadata for each fee token
+	for _, tokenAddr := range getFeeTokensReport.Output {
+		// Read name
+		nameReport, err := cldf_ops.ExecuteOperation(b, erc20.Name, chain, contract.FunctionInput[any]{
+			ChainSelector: chainSelector,
+			Address:       tokenAddr,
+			Args:          nil,
+		})
+		if err != nil {
+			return contractMetadata, fmt.Errorf("failed to read name of fee token(%s) on chain %s: %w", tokenAddr, chain, err)
+		}
+
+		// Read symbol
+		symbolReport, err := cldf_ops.ExecuteOperation(b, erc20.Symbol, chain, contract.FunctionInput[any]{
+			ChainSelector: chainSelector,
+			Address:       tokenAddr,
+			Args:          nil,
+		})
+		if err != nil {
+			return contractMetadata, fmt.Errorf("failed to read symbol of fee token(%s) on chain %s: %w", tokenAddr, chain, err)
+		}
+
+		// Read decimals
+		decimalsReport, err := cldf_ops.ExecuteOperation(b, erc20.Decimals, chain, contract.FunctionInput[any]{
+			ChainSelector: chainSelector,
+			Address:       tokenAddr,
+			Args:          nil,
+		})
+		if err != nil {
+			return contractMetadata, fmt.Errorf("failed to read decimals of fee token(%s) on chain %s: %w", tokenAddr, chain, err)
+		}
+
+		contractMetadata = append(contractMetadata, datastore.ContractMetadata{
+			Address:       tokenAddr.Hex(),
+			ChainSelector: chainSelector,
+			Metadata: map[string]interface{}{
+				"name":     nameReport.Output,
+				"symbol":   symbolReport.Output,
+				"decimals": decimalsReport.Output,
+			},
+		})
+	}
+
+	return contractMetadata, nil
+}
+
+func collectCommitteeVerifierSignatureConfigs(
+	b cldf_ops.Bundle,
+	chain evm.Chain,
+	committeeVerifierAddr string,
+	chainSelector uint64,
+	contractMetadata []datastore.ContractMetadata,
+) ([]datastore.ContractMetadata, error) {
+	// Read current signature configs from the contract.
+	getAllConfigsReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.GetAllSignatureConfigs, chain, contract.FunctionInput[any]{
+		ChainSelector: chainSelector,
+		Address:       common.HexToAddress(committeeVerifierAddr),
+		Args:          nil,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to read signature configs from CommitteeVerifier(%s) on chain %s: %w", committeeVerifierAddr, chain, err)
+	}
+
+	// Build a map of current signature configs.
+	currentConfigs := make(map[uint64]committee_verifier.SignatureConfig)
+	for _, cfg := range getAllConfigsReport.Output {
+		currentConfigs[cfg.SourceChainSelector] = cfg
+	}
+
+	// Convert to metadata
+	for selector, cfg := range currentConfigs {
+		signersHex := make([]string, len(cfg.Signers))
+		for i, signer := range cfg.Signers {
+			signersHex[i] = signer.Hex()
+		}
+		contractMetadata = append(contractMetadata, datastore.ContractMetadata{
+			Address:       committeeVerifierAddr,
+			ChainSelector: chainSelector,
+			Metadata: map[string]interface{}{
+				"sourceChainSelector": selector,
+				"threshold":           cfg.Threshold,
+				"signers":             signersHex,
+			},
+		})
+	}
+
+	return contractMetadata, nil
+}
+
+// collectOnRampDestChainConfigs collects metadata for all destination chain configurations from the OnRamp.
+// For each destination chain, it saves: router, defaultExecutor, laneMandatedCCVs, defaultCCVs, and offRamp bytes.
+// Note: To determine if a Router/OffRamp/OnRamp is test, check the AddressRef's Type field in the datastore
+// (e.g., Type == "TestRouter" vs Type == "Router").
+func collectOnRampDestChainConfigs(
+	b cldf_ops.Bundle,
+	chain evm.Chain,
+	onRampAddr string,
+	chainSelector uint64,
+	contractMetadata []datastore.ContractMetadata,
+) ([]datastore.ContractMetadata, error) {
+	// TODO: Uncomment once GetAllDestChainConfigs is available in gobindings
+	// Read all destination chain configs from the OnRamp
+	// getAllConfigsReport, err := cldf_ops.ExecuteOperation(b, onramp.GetAllDestChainConfigs, chain, contract.FunctionInput[any]{
+	// 	ChainSelector: chainSelector,
+	// 	Address:       common.HexToAddress(onRampAddr),
+	// 	Args:          nil,
+	// })
+	// if err != nil {
+	// 	return contractMetadata, fmt.Errorf("failed to read all dest chain configs from OnRamp(%s) on chain %s: %w", onRampAddr, chain, err)
+	// }
+
+	// TODO: Uncomment once GetAllDestChainConfigs is available in gobindings
+	// for i, destChainSelector := range getAllConfigsReport.Output.DestChainSelectors {
+	// 	destChainConfig := getAllConfigsReport.Output.DestChainConfigs[i]
+	//
+	// 	offRampBytes := destChainConfig.OffRamp
+	//
+	// 	// Convert CCV addresses to hex strings
+	// 	defaultCCVsHex := make([]string, len(destChainConfig.DefaultCCVs))
+	// 	for j, ccv := range destChainConfig.DefaultCCVs {
+	// 		defaultCCVsHex[j] = ccv.Hex()
+	// 	}
+	//
+	// 	laneMandatedCCVsHex := make([]string, len(destChainConfig.LaneMandatedCCVs))
+	// 	for j, ccv := range destChainConfig.LaneMandatedCCVs {
+	// 		laneMandatedCCVsHex[j] = ccv.Hex()
+	// 	}
+	//
+	// 	contractMetadata = append(contractMetadata, datastore.ContractMetadata{
+	// 		Address:       onRampAddr,
+	// 		ChainSelector: chainSelector,
+	// 		Metadata: map[string]interface{}{
+	// 			"destChainSelector": destChainSelector,
+	// 			"router":            destChainConfig.Router.Hex(),
+	// 			"defaultExecutor":   destChainConfig.DefaultExecutor.Hex(),
+	// 			"laneMandatedCCVs":  laneMandatedCCVsHex,
+	// 			"defaultCCVs":       defaultCCVsHex,
+	// 			"offRamp":           fmt.Sprintf("0x%x", offRampBytes),
+	// 		},
+	// 	})
+	// }
+
+	return contractMetadata, nil
+}
