@@ -378,7 +378,7 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 		}
 		configureTokenForTransfersReport, err := cldf_ops.ExecuteSequence(b, tokens_sequences.ConfigureTokenForTransfers, chains, tokens_core.ConfigureTokenForTransfersInput{
 			ChainSelector:    input.ChainSelector,
-			TokenPoolAddress: cctpTokenPoolAddress,
+			TokenPoolAddress: usdcTokenPoolProxyAddress,
 			RegistryAddress:  input.TokenAdminRegistry,
 			MinFinalityValue: input.MinFinalityValue,
 			RemoteChains:     remoteChains,
