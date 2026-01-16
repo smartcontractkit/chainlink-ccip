@@ -25,6 +25,7 @@ import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/Enumera
 /// and to have a variable update frequency based on the asset.
 contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndVersion {
   using EnumerableSet for EnumerableSet.AddressSet;
+  using EnumerableSet for EnumerableSet.UintSet;
   using USDPriceWith18Decimals for uint224;
 
   error TokenNotSupported(address token);
@@ -149,6 +150,9 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
   /// which is why this set is updated when prices are pushed, not manually. Removals are manual and also clear out
   /// the price.
   EnumerableSet.AddressSet private s_feeTokens;
+
+  /// @dev Set of destination chain selectors.
+  EnumerableSet.UintSet internal s_destChainSelectors;
 
   /// @dev The destination chain specific fee configs.
   mapping(uint64 destChainSelector => DestChainConfig destChainConfig) internal s_destChainConfigs;
@@ -392,6 +396,9 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
 
         s_tokenTransferFeeConfig[destChainSelector][token] = tokenTransferFeeConfig;
 
+        // We don't need to check the return value, as inserting the item twice has no effect.
+        s_destChainSelectors.add(destChainSelector);
+
         emit TokenTransferFeeConfigUpdated(destChainSelector, token, tokenTransferFeeConfig);
       }
     }
@@ -565,6 +572,51 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
     return s_destChainConfigs[destChainSelector];
   }
 
+  /// @notice Returns all destination chain selectors that have been configured.
+  /// @return destChainSelectors The supported destination chain selectors.
+  function getAllDestChainSelectors() external view returns (uint64[] memory destChainSelectors) {
+    destChainSelectors = new uint64[](s_destChainSelectors.length());
+    for (uint256 i = 0; i < s_destChainSelectors.length(); ++i) {
+      destChainSelectors[i] = uint64(s_destChainSelectors.at(i));
+    }
+    return destChainSelectors;
+  }
+
+  /// @notice Returns all token transfer fee configs for a specific destination chain selector.
+  /// @param destChainSelector Destination chain selector to fetch configs for.
+  /// @return tokens The token addresses (all fee tokens).
+  /// @return tokenTransferFeeConfigs The token transfer fee configs corresponding to the tokens.
+  /// @dev Iterates through all fee tokens and returns their configs for the given chain selector.
+  /// Returns empty structs for tokens that don't have a config set.
+  function getAllTokenTransferFeeConfigs(
+    uint64 destChainSelector
+  ) external view returns (address[] memory tokens, TokenTransferFeeConfig[] memory tokenTransferFeeConfigs) {
+    uint256 feeTokenCount = s_feeTokens.length();
+    tokens = new address[](feeTokenCount);
+    tokenTransferFeeConfigs = new TokenTransferFeeConfig[](feeTokenCount);
+
+    for (uint256 i = 0; i < feeTokenCount; ++i) {
+      address token = s_feeTokens.at(i);
+      tokens[i] = token;
+      tokenTransferFeeConfigs[i] = s_tokenTransferFeeConfig[destChainSelector][token];
+    }
+
+    return (tokens, tokenTransferFeeConfigs);
+  }
+
+  /// @notice Returns all destination chain configs.
+  /// @return destChainSelectors The supported destination chain selectors.
+  /// @return destChainConfigs The destination chain configs corresponding to all the supported chain selectors.
+  function getAllDestChainConfigs() external view returns (uint64[] memory, DestChainConfig[] memory) {
+    DestChainConfig[] memory destChainConfigs = new DestChainConfig[](s_destChainSelectors.length());
+    uint64[] memory destChainSelectors = new uint64[](s_destChainSelectors.length());
+    for (uint256 i = 0; i < s_destChainSelectors.length(); ++i) {
+      destChainSelectors[i] = uint64(s_destChainSelectors.at(i));
+      destChainConfigs[i] = s_destChainConfigs[destChainSelectors[i]];
+    }
+    return (destChainSelectors, destChainConfigs);
+  }
+
   /// @notice Updates the destination chain specific config.
   /// @param destChainConfigArgs Array of source chain specific configs.
   function applyDestChainConfigUpdates(
@@ -599,6 +651,9 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
       }
 
       s_destChainConfigs[destChainSelector] = destChainConfig;
+
+      // We don't need to check the return value, as inserting the item twice has no effect.
+      s_destChainSelectors.add(destChainSelector);
     }
   }
 

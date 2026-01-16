@@ -86,6 +86,85 @@ contract FeeQuoter_applyDestChainConfigUpdates is FeeQuoterSetup {
     assertEq(vm.getRecordedLogs().length, 0);
   }
 
+  function test_getAllDestChainConfigs() public {
+    // Set up multiple destination chain configs
+    FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = new FeeQuoter.DestChainConfigArgs[](3);
+
+    destChainConfigArgs[0] = _generateFeeQuoterDestChainConfigArgs()[0];
+    destChainConfigArgs[0].destChainSelector = DEST_CHAIN_SELECTOR;
+    destChainConfigArgs[0].destChainConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_EVM;
+
+    destChainConfigArgs[1] = _generateFeeQuoterDestChainConfigArgs()[0];
+    destChainConfigArgs[1].destChainSelector = DEST_CHAIN_SELECTOR + 1;
+    destChainConfigArgs[1].destChainConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_SVM;
+
+    destChainConfigArgs[2] = _generateFeeQuoterDestChainConfigArgs()[0];
+    destChainConfigArgs[2].destChainSelector = DEST_CHAIN_SELECTOR + 2;
+    destChainConfigArgs[2].destChainConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_APTOS;
+
+    // Apply the configs
+    s_feeQuoter.applyDestChainConfigUpdates(destChainConfigArgs);
+
+    // Get all dest chain configs
+    (uint64[] memory destChainSelectors, FeeQuoter.DestChainConfig[] memory destChainConfigs) =
+      s_feeQuoter.getAllDestChainConfigs();
+
+    // Verify arrays are the same length
+    assertEq(destChainSelectors.length, destChainConfigs.length, "Arrays should have same length");
+
+    // Verify we got all the configs (including any that were set up in the test setup)
+    // We need to find our configs in the returned arrays
+    uint256 foundCount = 0;
+    for (uint256 i = 0; i < destChainSelectors.length; ++i) {
+      for (uint256 j = 0; j < destChainConfigArgs.length; ++j) {
+        if (destChainSelectors[i] == destChainConfigArgs[j].destChainSelector) {
+          _assertFeeQuoterDestChainConfigsEqual(destChainConfigArgs[j].destChainConfig, destChainConfigs[i]);
+          foundCount++;
+          break;
+        }
+      }
+    }
+
+    // Verify we found all the configs we just added
+    assertGe(foundCount, destChainConfigArgs.length, "Should find all configured chains");
+  }
+
+  function test_getAllDestChainSelectors() public {
+    // Get initial count (from setup)
+    uint64[] memory initialSelectors = s_feeQuoter.getAllDestChainSelectors();
+    uint256 initialCount = initialSelectors.length;
+
+    // Add new chain configs
+    FeeQuoter.DestChainConfigArgs[] memory newConfigs = new FeeQuoter.DestChainConfigArgs[](2);
+    newConfigs[0] = _generateFeeQuoterDestChainConfigArgs()[0];
+    newConfigs[0].destChainSelector = DEST_CHAIN_SELECTOR + 10;
+    newConfigs[0].destChainConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_SUI;
+
+    newConfigs[1] = _generateFeeQuoterDestChainConfigArgs()[0];
+    newConfigs[1].destChainSelector = DEST_CHAIN_SELECTOR + 11;
+    newConfigs[1].destChainConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_APTOS;
+
+    s_feeQuoter.applyDestChainConfigUpdates(newConfigs);
+
+    // Verify the count increased
+    uint64[] memory updatedSelectors = s_feeQuoter.getAllDestChainSelectors();
+    assertGe(updatedSelectors.length, initialCount + 2, "Should have at least 2 more chain selectors");
+
+    // Verify the new chain selectors are in the results
+    bool found10 = false;
+    bool found11 = false;
+    for (uint256 i = 0; i < updatedSelectors.length; ++i) {
+      if (updatedSelectors[i] == DEST_CHAIN_SELECTOR + 10) {
+        found10 = true;
+      }
+      if (updatedSelectors[i] == DEST_CHAIN_SELECTOR + 11) {
+        found11 = true;
+      }
+    }
+    assertTrue(found10, "Should find chain selector + 10");
+    assertTrue(found11, "Should find chain selector + 11");
+  }
+
   // Reverts
 
   function test_applyDestChainConfigUpdates_RevertWhen_DefaultTxGasLimitEqZero() public {

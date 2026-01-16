@@ -96,6 +96,53 @@ contract OnRamp_applyDestChainConfigUpdates is OnRampSetup {
     assertEq(EVM_ADDRESS_LENGTH, cfg.addressBytesLength);
   }
 
+  function test_getAllDestChainConfigs_ReturnsMultipleChains() public {
+    // Add a second destination chain.
+    uint64 chain2 = NEW_DEST_SELECTOR + 100;
+    address[] memory defaultCCVs2 = new address[](1);
+    defaultCCVs2[0] = makeAddr("defaultCCV2");
+    address[] memory laneMandated2 = new address[](1);
+    laneMandated2[0] = makeAddr("laneCCV2");
+    address defaultExecutor2 = makeAddr("defaultExecutor2");
+
+    OnRamp.DestChainConfigArgs[] memory configs = new OnRamp.DestChainConfigArgs[](1);
+    configs[0] = OnRamp.DestChainConfigArgs({
+      destChainSelector: chain2,
+      router: s_sourceRouter,
+      addressBytesLength: EVM_ADDRESS_LENGTH,
+      messageNetworkFeeUSDCents: MESSAGE_NETWORK_FEE_USD_CENTS + 1,
+      tokenNetworkFeeUSDCents: TOKEN_NETWORK_FEE_USD_CENTS + 1,
+      tokenReceiverAllowed: true,
+      baseExecutionGasCost: BASE_EXEC_GAS_COST + 1000,
+      defaultCCVs: defaultCCVs2,
+      laneMandatedCCVs: laneMandated2,
+      defaultExecutor: defaultExecutor2,
+      offRamp: abi.encodePacked(address(s_offRampOnRemoteChain))
+    });
+
+    s_onRamp.applyDestChainConfigUpdates(configs);
+
+    (uint64[] memory selectors, OnRamp.DestChainConfig[] memory chainConfigs) = s_onRamp.getAllDestChainConfigs();
+
+    assertEq(selectors.length, 2);
+    assertEq(chainConfigs.length, 2);
+
+    // Check first chain (from setup).
+    assertEq(selectors[0], DEST_CHAIN_SELECTOR);
+    assertEq(chainConfigs[0].defaultCCVs[0], s_defaultCCV);
+    assertEq(chainConfigs[0].defaultExecutor, s_defaultExecutor);
+
+    // Check second chain.
+    assertEq(selectors[1], chain2);
+    assertEq(chainConfigs[1].defaultCCVs[0], defaultCCVs2[0]);
+    assertEq(chainConfigs[1].laneMandatedCCVs[0], laneMandated2[0]);
+    assertEq(chainConfigs[1].defaultExecutor, defaultExecutor2);
+    assertEq(chainConfigs[1].messageNetworkFeeUSDCents, MESSAGE_NETWORK_FEE_USD_CENTS + 1);
+    assertEq(chainConfigs[1].tokenNetworkFeeUSDCents, TOKEN_NETWORK_FEE_USD_CENTS + 1);
+    assertEq(chainConfigs[1].baseExecutionGasCost, BASE_EXEC_GAS_COST + 1000);
+    assertEq(chainConfigs[1].tokenReceiverAllowed, true);
+  }
+
   function test_applyDestChainConfigUpdates_RevertWhen_InvalidDestChainConfig_ZeroAddressBytesLength() public {
     OnRamp.DestChainConfigArgs[] memory args = new OnRamp.DestChainConfigArgs[](1);
     address[] memory defaultCCVs = new address[](1);
