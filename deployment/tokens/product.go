@@ -87,8 +87,13 @@ type RemoteChainConfig[R any, CCV any] struct {
 type ConfigureTokenForTransfersInput struct {
 	// ChainSelector is the chain selector for the chain being configured.
 	ChainSelector uint64
+	// TokenAddress is the address of the token being registered and configured.
+	TokenAddress string
 	// TokenPoolAddress is the address of the token pool to be configured.
 	TokenPoolAddress string
+	// RegistryTokenPoolAddress overrides the pool address to register in the token admin registry.
+	// If empty, TokenPoolAddress is used.
+	RegistryTokenPoolAddress string
 	// RemoteChains specifies the remote chains to configure on the token pool.
 	RemoteChains map[uint64]RemoteChainConfig[[]byte, string]
 	// ExternalAdmin is specified when we want to propose an admin that we don't control.
