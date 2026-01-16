@@ -16,8 +16,9 @@ import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165
 import {Vm} from "forge-std/Vm.sol";
 
 contract OnRamp_forwardFromRouter is OnRampSetup {
-  bytes32 internal constant CCIP_MESSAGE_SENT_TOPIC =
-    keccak256("CCIPMessageSent(uint64,address,bytes32,address,bytes,(address,uint32,uint32,uint256,bytes)[],bytes[])");
+  bytes32 internal constant CCIP_MESSAGE_SENT_TOPIC = keccak256(
+    "CCIPMessageSent(uint64,address,bytes32,address,uint256,bytes,(address,uint32,uint32,uint256,bytes)[],bytes[])"
+  );
 
   function setUp() public virtual override {
     super.setUp();
@@ -41,6 +42,7 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
       sender: STRANGER,
       messageId: messageId,
       feeToken: s_sourceFeeToken,
+      tokenAmountBeforeTokenPoolFees: 0,
       encodedMessage: encodedMessage,
       receipts: receipts,
       verifierBlobs: verifierBlobs
@@ -87,6 +89,7 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
       sender: STRANGER,
       messageId: messageIdExpected,
       feeToken: s_sourceFeeToken,
+      tokenAmountBeforeTokenPoolFees: 0,
       encodedMessage: encodedMessage,
       receipts: receipts,
       verifierBlobs: verifierBlobs
@@ -108,6 +111,7 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
       sender: STRANGER,
       messageId: messageIdExpected,
       feeToken: s_sourceFeeToken,
+      tokenAmountBeforeTokenPoolFees: 0,
       encodedMessage: encodedMessage,
       receipts: receipts,
       verifierBlobs: verifierBlobs
@@ -296,12 +300,68 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, fee, STRANGER);
   }
 
+  function test_forwardFromRouter_tokenAmountBeforeTokenPoolFees_EmitsOriginalAmountWhenPoolChargesFees() public {
+    address token = s_sourceTokens[0];
+    uint256 originalAmount = 1000;
+    uint256 poolFee = 10;
+    uint256 destAmount = originalAmount - poolFee;
+    address pool = s_sourcePoolByToken[token];
+
+    // Setup pool to support IPoolV2 interface
+    vm.mockCall(pool, abi.encodeCall(IERC165.supportsInterface, (type(IPoolV2).interfaceId)), abi.encode(true));
+
+    // Mock pool's getFee to return fee components with custom fee config enabled
+    vm.mockCall(
+      pool,
+      abi.encodeWithSelector(
+        IPoolV2.getFee.selector, token, DEST_CHAIN_SELECTOR, originalAmount, s_sourceFeeToken, 0, ""
+      ),
+      abi.encode(poolFee, uint32(0), uint32(0), uint16(0), true)
+    );
+
+    // Mock pool's lockOrBurn V2 call to return a reduced destination amount (after fees)
+    vm.mockCall(
+      pool,
+      abi.encodeWithSelector(IPoolV2.lockOrBurn.selector),
+      abi.encode(
+        Pool.LockOrBurnOutV1({
+          destTokenAddress: abi.encode(address(s_destTokenBySourceToken[token])), destPoolData: ""
+        }),
+        destAmount
+      )
+    );
+
+    Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(token, originalAmount);
+    uint256 fee = s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
+
+    // Transfer tokens to the pool (simulating Router behavior)
+    deal(token, address(pool), originalAmount);
+
+    // Record logs to capture the event
+    vm.recordLogs();
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, fee, STRANGER);
+
+    // Extract tokenAmountBeforeTokenPoolFees from the event
+    Vm.Log[] memory logs = vm.getRecordedLogs();
+    uint256 emittedTokenAmount = 0;
+    for (uint256 i = 0; i < logs.length; ++i) {
+      if (logs[i].topics.length != 0 && logs[i].topics[0] == CCIP_MESSAGE_SENT_TOPIC) {
+        (, emittedTokenAmount,,,) = abi.decode(logs[i].data, (address, uint256, bytes, OnRamp.Receipt[], bytes[]));
+        break;
+      }
+    }
+
+    // Assert that the emitted value is the original amount before pool fees
+    assertEq(originalAmount, emittedTokenAmount, "tokenAmountBeforeTokenPoolFees should be original amount");
+    assertTrue(emittedTokenAmount > destAmount, "tokenAmountBeforeTokenPoolFees should be greater than destAmount");
+  }
+
   function _getReceiptsFromLogs(
     Vm.Log[] memory logs
   ) private pure returns (OnRamp.Receipt[] memory receipts) {
     for (uint256 i = 0; i < logs.length; ++i) {
       if (logs[i].topics.length != 0 && logs[i].topics[0] == CCIP_MESSAGE_SENT_TOPIC) {
-        (,, receipts,) = abi.decode(logs[i].data, (address, bytes, OnRamp.Receipt[], bytes[]));
+        (,,, receipts,) = abi.decode(logs[i].data, (address, uint256, bytes, OnRamp.Receipt[], bytes[]));
         break;
       }
     }

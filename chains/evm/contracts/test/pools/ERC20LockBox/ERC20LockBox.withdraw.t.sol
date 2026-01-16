@@ -12,7 +12,6 @@ contract ERC20LockBox_withdraw is ERC20LockBoxSetup {
     vm.assume(amount != 0);
     amount = bound(amount, 1, type(uint256).max / 2);
 
-    // Deposit tokens first
     _depositTokens(amount);
 
     uint256 recipientBalanceBefore = s_token.balanceOf(s_recipient);
@@ -25,8 +24,6 @@ contract ERC20LockBox_withdraw is ERC20LockBoxSetup {
 
     s_erc20LockBox.withdraw(address(s_token), 0, amount, s_recipient);
 
-    vm.stopPrank();
-
     // Verify balances
     assertEq(s_token.balanceOf(s_recipient), recipientBalanceBefore + amount);
     assertEq(s_token.balanceOf(address(s_erc20LockBox)), lockBoxBalanceBefore - amount);
@@ -36,7 +33,6 @@ contract ERC20LockBox_withdraw is ERC20LockBoxSetup {
     uint256 amount1 = 1000e18;
     uint256 amount2 = 2000e18;
 
-    // Deposit tokens
     _depositTokens(amount1);
     _depositTokens(amount2);
 
@@ -54,8 +50,6 @@ contract ERC20LockBox_withdraw is ERC20LockBoxSetup {
     emit ERC20LockBox.Withdrawal(address(s_token), s_recipient, amount2);
     s_erc20LockBox.withdraw(address(s_token), 0, amount2, s_recipient);
 
-    vm.stopPrank();
-
     // Verify final balances
     assertEq(s_token.balanceOf(s_recipient), recipientBalanceBefore + amount1 + amount2);
     assertEq(s_token.balanceOf(address(s_erc20LockBox)), 0);
@@ -65,7 +59,6 @@ contract ERC20LockBox_withdraw is ERC20LockBoxSetup {
     uint256 depositAmount = 1000e18;
     uint256 withdrawAmount = 300e18;
 
-    // Deposit tokens
     _depositTokens(depositAmount);
 
     uint256 recipientBalanceBefore = s_token.balanceOf(s_recipient);
@@ -78,11 +71,27 @@ contract ERC20LockBox_withdraw is ERC20LockBoxSetup {
 
     s_erc20LockBox.withdraw(address(s_token), 0, withdrawAmount, s_recipient);
 
-    vm.stopPrank();
-
-    // Verify balances
     assertEq(s_token.balanceOf(s_recipient), recipientBalanceBefore + withdrawAmount);
     assertEq(s_token.balanceOf(address(s_erc20LockBox)), expectedRemainingBalance);
+  }
+
+  function test_withdraw_uint256_max() public {
+    uint256 depositAmount = 1000e18;
+
+    _depositTokens(depositAmount);
+
+    uint256 recipientBalanceBefore = s_token.balanceOf(s_recipient);
+
+    vm.startPrank(s_allowedCaller);
+
+    // Emits the balance, not max uint256.
+    vm.expectEmit();
+    emit ERC20LockBox.Withdrawal(address(s_token), s_recipient, depositAmount);
+
+    s_erc20LockBox.withdraw(address(s_token), 0, type(uint256).max, s_recipient);
+
+    assertEq(s_token.balanceOf(s_recipient), recipientBalanceBefore + depositAmount);
+    assertEq(s_token.balanceOf(address(s_erc20LockBox)), 0);
   }
 
   function test_withdraw_EventEmission() public {

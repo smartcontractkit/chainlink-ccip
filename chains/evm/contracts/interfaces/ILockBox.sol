@@ -15,7 +15,7 @@ interface ILockBox {
   /// @notice Withdraws tokens to a specific recipient.
   /// @param token The address of the token to withdraw.
   /// @param remoteChainSelector The chain selector of the remote chain.
-  /// @param amount The amount of tokens to withdraw.
+  /// @param amount The amount of tokens to withdraw. If set to max uint256, withdraws the entire balance.
   /// @param recipient The address of the recipient to receive the withdrawn tokens.
   function withdraw(
     address token,
