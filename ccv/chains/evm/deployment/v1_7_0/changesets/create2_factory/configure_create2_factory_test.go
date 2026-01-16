@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/stretchr/testify/require"
+
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/changesets/create2_factory"
 	create2_factory_ops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
@@ -12,7 +14,6 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	"github.com/stretchr/testify/require"
 )
 
 func TestConfigureCREATE2Factory_Apply(t *testing.T) {
@@ -85,7 +86,7 @@ func TestConfigureCREATE2Factory_Apply(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			mcmsRegistry := changesets.NewMCMSReaderRegistry()
+			mcmsRegistry := changesets.GetRegistry()
 			// Apply the configuration changeset
 			out, err := create2_factory.ConfigureCREATE2Factory(mcmsRegistry).Apply(*e, changesets.WithMCMS[create2_factory.ConfigureCREATE2FactoryInput[datastore.AddressRef]]{
 				Cfg: create2_factory.ConfigureCREATE2FactoryInput[datastore.AddressRef]{
@@ -115,7 +116,7 @@ func TestConfigureCREATE2Factory_ContractNotFound(t *testing.T) {
 	require.NotNil(t, e, "Environment should be created")
 
 	// Try to configure a contract that doesn't exist
-	mcmsRegistry := changesets.NewMCMSReaderRegistry()
+	mcmsRegistry := changesets.GetRegistry()
 	_, err = create2_factory.ConfigureCREATE2Factory(mcmsRegistry).Apply(*e, changesets.WithMCMS[create2_factory.ConfigureCREATE2FactoryInput[datastore.AddressRef]]{
 		Cfg: create2_factory.ConfigureCREATE2FactoryInput[datastore.AddressRef]{
 			ChainSel: chainSel,
@@ -141,7 +142,7 @@ func TestConfigureCREATE2Factory_InvalidChain(t *testing.T) {
 	require.NotNil(t, e, "Environment should be created")
 
 	// Try to configure on a chain that doesn't exist
-	mcmsRegistry := changesets.NewMCMSReaderRegistry()
+	mcmsRegistry := changesets.GetRegistry()
 	_, err = create2_factory.ConfigureCREATE2Factory(mcmsRegistry).Apply(*e, changesets.WithMCMS[create2_factory.ConfigureCREATE2FactoryInput[datastore.AddressRef]]{
 		Cfg: create2_factory.ConfigureCREATE2FactoryInput[datastore.AddressRef]{
 			ChainSel: 99999999,
@@ -190,7 +191,7 @@ func TestConfigureCREATE2Factory_EmptyUpdates(t *testing.T) {
 	e.DataStore = ds.Seal()
 
 	// Apply configuration with empty adds and removes (should still work)
-	mcmsRegistry := changesets.NewMCMSReaderRegistry()
+	mcmsRegistry := changesets.GetRegistry()
 	out, err := create2_factory.ConfigureCREATE2Factory(mcmsRegistry).Apply(*e, changesets.WithMCMS[create2_factory.ConfigureCREATE2FactoryInput[datastore.AddressRef]]{
 		Cfg: create2_factory.ConfigureCREATE2FactoryInput[datastore.AddressRef]{
 			ChainSel: chainSel,
