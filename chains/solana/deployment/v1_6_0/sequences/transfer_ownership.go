@@ -30,32 +30,25 @@ func (a *SolanaAdapter) GetChainMetadata(e deployment.Environment, chainSelector
 	if !ok {
 		return mcms_types.ChainMetadata{}, fmt.Errorf("chain with selector %d not found in environment", chainSelector)
 	}
-	proposerAddr := datastore.GetAddressRef(
-		e.DataStore.Addresses().Filter(),
-		chainSelector,
-		common_utils.ProposerManyChainMultisig,
-		common_utils.Version_1_6_0,
-		input.Qualifier,
-	)
-	id, seed, err := mcms_solana.ParseContractAddress(proposerAddr.Address)
-	if err != nil {
-		return mcms_types.ChainMetadata{}, fmt.Errorf("failed to parse proposer address %s for chain %d: %w", proposerAddr.Address, chainSelector, err)
-	}
-	proposer := mcms_solana.ContractAddress(
-		id,
-		seed,
-	)
-	inspector := mcms_solana.NewInspector(chain.Client)
-	opcount, err := inspector.GetOpCount(context.Background(), proposer)
-	if err != nil {
-		return mcms_types.ChainMetadata{}, fmt.Errorf("failed to get op count for chain %d: %w", chainSelector, err)
-	}
 
-	var instanceSeed mcms_solana.PDASeed
+	inspector := mcms_solana.NewInspector(chain.Client)
+
+	var id solana.PublicKey
+	var seed mcms_solana.PDASeed
+	var err error
 	switch input.TimelockAction {
 	case mcms_types.TimelockActionSchedule:
-		// use proposer ref as seed
-		instanceSeed = seed
+		addr := datastore.GetAddressRef(
+			e.DataStore.Addresses().Filter(),
+			chainSelector,
+			common_utils.ProposerManyChainMultisig,
+			common_utils.Version_1_6_0,
+			input.Qualifier,
+		)
+		id, seed, err = mcms_solana.ParseContractAddress(addr.Address)
+		if err != nil {
+			return mcms_types.ChainMetadata{}, fmt.Errorf("failed to parse proposer address %s for chain %d: %w", addr.Address, chainSelector, err)
+		}
 	case mcms_types.TimelockActionCancel:
 		addr := datastore.GetAddressRef(
 			e.DataStore.Addresses().Filter(),
@@ -64,11 +57,10 @@ func (a *SolanaAdapter) GetChainMetadata(e deployment.Environment, chainSelector
 			common_utils.Version_1_6_0,
 			input.Qualifier,
 		)
-		_, seed, err = mcms_solana.ParseContractAddress(addr.Address)
+		id, seed, err = mcms_solana.ParseContractAddress(addr.Address)
 		if err != nil {
-			return mcms_types.ChainMetadata{}, fmt.Errorf("failed to parse address %s for chain %d: %w", proposerAddr.Address, chainSelector, err)
+			return mcms_types.ChainMetadata{}, fmt.Errorf("failed to parse address %s for chain %d: %w", addr.Address, chainSelector, err)
 		}
-		instanceSeed = mcms_solana.PDASeed(seed)
 	case mcms_types.TimelockActionBypass:
 		addr := datastore.GetAddressRef(
 			e.DataStore.Addresses().Filter(),
@@ -77,13 +69,20 @@ func (a *SolanaAdapter) GetChainMetadata(e deployment.Environment, chainSelector
 			common_utils.Version_1_6_0,
 			input.Qualifier,
 		)
-		_, seed, err = mcms_solana.ParseContractAddress(addr.Address)
+		id, seed, err = mcms_solana.ParseContractAddress(addr.Address)
 		if err != nil {
-			return mcms_types.ChainMetadata{}, fmt.Errorf("failed to parse address %s for chain %d: %w", proposerAddr.Address, chainSelector, err)
+			return mcms_types.ChainMetadata{}, fmt.Errorf("failed to parse address %s for chain %d: %w", addr.Address, chainSelector, err)
 		}
-		instanceSeed = mcms_solana.PDASeed(seed)
 	default:
 		return mcms_types.ChainMetadata{}, fmt.Errorf("unsupported timelock action %s for chain %d", input.TimelockAction, chainSelector)
+	}
+	executor := mcms_solana.ContractAddress(
+		id,
+		seed,
+	)
+	opcount, err := inspector.GetOpCount(context.Background(), executor)
+	if err != nil {
+		return mcms_types.ChainMetadata{}, fmt.Errorf("failed to get op count for chain %d: %w", chainSelector, err)
 	}
 	proposerAccount := datastore.GetAddressRef(
 		e.DataStore.Addresses().Filter(),
@@ -109,7 +108,7 @@ func (a *SolanaAdapter) GetChainMetadata(e deployment.Environment, chainSelector
 	metadata, err := mcms_solana.NewChainMetadata(
 		opcount,
 		id,
-		instanceSeed,
+		seed,
 		solana.MustPublicKeyFromBase58(proposerAccount.Address),
 		solana.MustPublicKeyFromBase58(cancellerAccount.Address),
 		solana.MustPublicKeyFromBase58(bypasserAccount.Address))
@@ -200,7 +199,14 @@ func (a *SolanaAdapter) SequenceTransferOwnershipViaMCMS() *cldf_ops.Sequence[de
 					output.BatchOps = append(output.BatchOps, report.Output.BatchOps...)
 				// assume access controller will have all MCMS refs
 				case utils.AccessControllerProgramType.String():
-					report, err := transferAllMCMS(b, chain, in)
+					report, err := transferAllMCMS(b, chain, in, true)
+					if err != nil {
+						return sequences.OnChainOutput{}, fmt.Errorf("failed to transfer ownership via MCMS on chain %d: %w", in.ChainSelector, err)
+					}
+					output.BatchOps = append(output.BatchOps, report.BatchOps...)
+				// assume rbac timelock will not have all MCMS refs
+				case common_utils.RBACTimelock.String():
+					report, err := transferAllMCMS(b, chain, in, false)
 					if err != nil {
 						return sequences.OnChainOutput{}, fmt.Errorf("failed to transfer ownership via MCMS on chain %d: %w", in.ChainSelector, err)
 					}
@@ -218,11 +224,7 @@ func (a *SolanaAdapter) ShouldAcceptOwnershipWithTransferOwnership(e deployment.
 	if !ok {
 		return false, fmt.Errorf("chain with selector %d not found in environment", in.ChainSelector)
 	}
-	// Only accept ownership if the proposed owner is either the timelock or the deployer
-	if solana.MustPublicKeyFromBase58(in.ProposedOwner) != a.timelockAddr[in.ChainSelector] && solana.MustPublicKeyFromBase58(in.ProposedOwner) != chain.DeployerKey.PublicKey() {
-		return false, nil
-	}
-	return true, nil
+	return solana.MustPublicKeyFromBase58(in.CurrentOwner) == chain.DeployerKey.PublicKey(), nil
 }
 
 func (a *SolanaAdapter) SequenceAcceptOwnership() *cldf_ops.Sequence[deployops.TransferOwnershipPerChainInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
@@ -280,7 +282,14 @@ func (a *SolanaAdapter) SequenceAcceptOwnership() *cldf_ops.Sequence[deployops.T
 					output.BatchOps = append(output.BatchOps, report.Output.BatchOps...)
 				// assume access controller will have all MCMS refs
 				case utils.AccessControllerProgramType.String():
-					report, err := acceptAllMCMS(b, chain, in)
+					report, err := acceptAllMCMS(b, chain, in, true)
+					if err != nil {
+						return sequences.OnChainOutput{}, fmt.Errorf("failed to transfer ownership via MCMS on chain %d: %w", in.ChainSelector, err)
+					}
+					output.BatchOps = append(output.BatchOps, report.BatchOps...)
+				// assume rbac timelock will not have all MCMS refs
+				case common_utils.RBACTimelock.String():
+					report, err := acceptAllMCMS(b, chain, in, false)
 					if err != nil {
 						return sequences.OnChainOutput{}, fmt.Errorf("failed to transfer ownership via MCMS on chain %d: %w", in.ChainSelector, err)
 					}

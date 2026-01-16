@@ -8,10 +8,12 @@ import (
 	"time"
 
 	"github.com/gagliardetto/solana-go"
+	"github.com/gagliardetto/solana-go/programs/system"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
+	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
 	cldf_datastore "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	mcms_solana "github.com/smartcontractkit/mcms/sdk/solana"
@@ -32,6 +34,9 @@ const (
 	ExecutorAccessControllerAccount  cldf_deployment.ContractType = "ExecutorAccessControllerAccount"
 	CancellerAccessControllerAccount cldf_deployment.ContractType = "CancellerAccessControllerAccount"
 	BypasserAccessControllerAccount  cldf_deployment.ContractType = "BypasserAccessControllerAccount"
+	// tokens
+	SPLTokens     cldf_deployment.ContractType = "SPLTokens"
+	SPL2022Tokens cldf_deployment.ContractType = "SPL2022Tokens"
 )
 
 // Common parameters for transferring ownership of a program
@@ -170,6 +175,38 @@ func FundSolanaAccounts(
 			}
 			remaining = unfinalizedCount
 		}
+	}
+	return nil
+}
+
+// FundFromAddressIxs transfers SOL from the given address to each provided account and waits for confirmations.
+func FundFromAddressIxs(solChain cldf_solana.Chain, from solana.PublicKey, accounts []solana.PublicKey, amount uint64) ([]solana.Instruction, error) {
+	var ixs []solana.Instruction
+	for _, account := range accounts {
+		// Create a transfer instruction using the provided builder.
+		ix, err := system.NewTransferInstruction(
+			amount,
+			from,    // funding account (sender)
+			account, // recipient account
+		).ValidateAndBuild()
+		if err != nil {
+			return nil, fmt.Errorf("failed to create transfer instruction: %w", err)
+		}
+		ixs = append(ixs, ix)
+	}
+
+	return ixs, nil
+}
+
+// FundFromDeployerKey transfers SOL from the deployer to each provided account and waits for confirmations.
+func FundFromDeployerKey(solChain cldf_solana.Chain, accounts []solana.PublicKey, amount uint64) error {
+	ixs, err := FundFromAddressIxs(solChain, solChain.DeployerKey.PublicKey(), accounts, amount*solana.LAMPORTS_PER_SOL)
+	if err != nil {
+		return fmt.Errorf("failed to create transfer instructions: %w", err)
+	}
+	err = solChain.Confirm(ixs)
+	if err != nil {
+		return fmt.Errorf("failed to confirm transaction: %w", err)
 	}
 	return nil
 }

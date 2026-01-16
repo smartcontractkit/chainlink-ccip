@@ -9,8 +9,7 @@ import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/Aut
 contract FeeQuoter_updatePrices is FeeQuoterSetup {
   function test_OnlyTokenPrice() public {
     Internal.PriceUpdates memory update = Internal.PriceUpdates({
-      tokenPriceUpdates: new Internal.TokenPriceUpdate[](1),
-      gasPriceUpdates: new Internal.GasPriceUpdate[](0)
+      tokenPriceUpdates: new Internal.TokenPriceUpdate[](1), gasPriceUpdates: new Internal.GasPriceUpdate[](0)
     });
     update.tokenPriceUpdates[0] = Internal.TokenPriceUpdate({sourceToken: s_sourceTokens[0], usdPerToken: 4e18});
 
@@ -26,8 +25,7 @@ contract FeeQuoter_updatePrices is FeeQuoterSetup {
 
   function test_OnlyGasPrice() public {
     Internal.PriceUpdates memory update = Internal.PriceUpdates({
-      tokenPriceUpdates: new Internal.TokenPriceUpdate[](0),
-      gasPriceUpdates: new Internal.GasPriceUpdate[](1)
+      tokenPriceUpdates: new Internal.TokenPriceUpdate[](0), gasPriceUpdates: new Internal.GasPriceUpdate[](1)
     });
     update.gasPriceUpdates[0] =
       Internal.GasPriceUpdate({destChainSelector: DEST_CHAIN_SELECTOR, usdPerUnitGas: 2000e18});
@@ -88,8 +86,7 @@ contract FeeQuoter_updatePrices is FeeQuoterSetup {
 
   function test_UpdatableByAuthorizedCaller() public {
     Internal.PriceUpdates memory priceUpdates = Internal.PriceUpdates({
-      tokenPriceUpdates: new Internal.TokenPriceUpdate[](1),
-      gasPriceUpdates: new Internal.GasPriceUpdate[](0)
+      tokenPriceUpdates: new Internal.TokenPriceUpdate[](1), gasPriceUpdates: new Internal.GasPriceUpdate[](0)
     });
     priceUpdates.tokenPriceUpdates[0] = Internal.TokenPriceUpdate({sourceToken: s_sourceTokens[0], usdPerToken: 4e18});
 
@@ -129,8 +126,7 @@ contract FeeQuoter_updatePrices is FeeQuoterSetup {
 
   function test_RevertWhen_OnlyCallableByUpdater() public {
     Internal.PriceUpdates memory priceUpdates = Internal.PriceUpdates({
-      tokenPriceUpdates: new Internal.TokenPriceUpdate[](0),
-      gasPriceUpdates: new Internal.GasPriceUpdate[](0)
+      tokenPriceUpdates: new Internal.TokenPriceUpdate[](0), gasPriceUpdates: new Internal.GasPriceUpdate[](0)
     });
 
     vm.startPrank(STRANGER);

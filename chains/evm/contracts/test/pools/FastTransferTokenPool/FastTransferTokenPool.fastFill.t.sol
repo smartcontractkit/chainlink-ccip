@@ -68,18 +68,18 @@ contract FastTransferTokenPool_fastFill_Test is FastTransferTokenPoolSetup {
     vm.stopPrank();
     vm.prank(OWNER);
     // Disable allowlist
-    FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs memory laneConfigArgs = FastTransferTokenPoolAbstract
-      .DestChainConfigUpdateArgs({
-      remoteChainSelector: SOURCE_CHAIN_SELECTOR,
-      fastTransferFillerFeeBps: 100,
-      fastTransferPoolFeeBps: 0, // No pool fee for this test
-      fillerAllowlistEnabled: false,
-      destinationPool: destPoolAddress,
-      maxFillAmountPerRequest: 1000 ether,
-      settlementOverheadGas: SETTLEMENT_GAS_OVERHEAD,
-      chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
-      customExtraArgs: ""
-    });
+    FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs memory laneConfigArgs =
+      FastTransferTokenPoolAbstract.DestChainConfigUpdateArgs({
+        remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+        fastTransferFillerFeeBps: 100,
+        fastTransferPoolFeeBps: 0, // No pool fee for this test
+        fillerAllowlistEnabled: false,
+        destinationPool: destPoolAddress,
+        maxFillAmountPerRequest: 1000 ether,
+        settlementOverheadGas: SETTLEMENT_GAS_OVERHEAD,
+        chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM,
+        customExtraArgs: ""
+      });
 
     vm.expectEmit();
     emit FastTransferTokenPoolAbstract.DestChainConfigUpdated(

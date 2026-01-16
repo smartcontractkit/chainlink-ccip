@@ -44,6 +44,11 @@ type ContractDeploymentConfigPerChain struct {
 	MessageInterceptor string
 	// RMN REMOTE CONFIG
 	LegacyRMN string
+	// CONTRACT VERSION
+	ContractVersion string
+	// PING PONG DEMO CONFIG
+	// DeployPingPongDapp enables deployment of the PingPongDemo contract (default: false)
+	DeployPingPongDapp bool
 }
 
 type ContractDeploymentConfigPerChainWithAddress struct {

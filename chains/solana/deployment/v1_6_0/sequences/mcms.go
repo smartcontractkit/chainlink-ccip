@@ -15,6 +15,7 @@ import (
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
 	cldf_datastore "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -23,6 +24,9 @@ import (
 	mcms_solana "github.com/smartcontractkit/mcms/sdk/solana"
 	"github.com/smartcontractkit/mcms/types"
 )
+
+const AccessControllerRefs = 4
+const MCMSRefs = 4
 
 func (d *SolanaAdapter) DeployMCMS() *operations.Sequence[ccipapi.MCMSDeploymentConfigPerChainWithAddress, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return operations.NewSequence(
@@ -71,6 +75,7 @@ func (d *SolanaAdapter) DeployMCMS() *operations.Sequence[ccipapi.MCMSDeployment
 			output.Addresses = append(output.Addresses, initAccessRef...)
 			deps.ExistingAddresses = append(deps.ExistingAddresses, initAccessRef...)
 
+			// Initialize MCMs
 			initMcmRef, err := initMCM(b, deps, in.MCMSDeploymentConfigPerChain, mcmAddress)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to initialize MCMs: %w", err)
@@ -79,6 +84,7 @@ func (d *SolanaAdapter) DeployMCMS() *operations.Sequence[ccipapi.MCMSDeployment
 			output.BatchOps = append(output.BatchOps, initMcmRef.BatchOps...)
 			deps.ExistingAddresses = append(deps.ExistingAddresses, initMcmRef.NewAddresses...)
 
+			// Initialize Timelock
 			initTimelockRef, err := initTimelock(b, deps, in.TimelockMinDelay, timelockAddress)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to initialize Timelock: %w", err)
@@ -86,6 +92,47 @@ func (d *SolanaAdapter) DeployMCMS() *operations.Sequence[ccipapi.MCMSDeployment
 			output.Addresses = append(output.Addresses, initTimelockRef.NewAddresses...)
 			output.BatchOps = append(output.BatchOps, initTimelockRef.BatchOps...)
 			deps.ExistingAddresses = append(deps.ExistingAddresses, initTimelockRef.NewAddresses...)
+
+			return output, err
+		},
+	)
+}
+
+func (d *SolanaAdapter) FinalizeDeployMCMS() *operations.Sequence[ccipapi.MCMSDeploymentConfigPerChainWithAddress, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return operations.NewSequence(
+		"finalize-deploy-mcms",
+		semver.MustParse("1.0.0"),
+		"Finalizes MCM deployment by initializing Timelock",
+		func(b operations.Bundle, chains cldf_chain.BlockChains, in ccipapi.MCMSDeploymentConfigPerChainWithAddress) (output sequences.OnChainOutput, err error) {
+			chain, ok := chains.SolanaChains()[in.ChainSelector]
+			if !ok {
+				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found in environment", in.ChainSelector)
+			}
+
+			mcmProgram := datastore.GetAddressRef(
+				in.ExistingAddresses,
+				chain.ChainSelector(),
+				utils.McmProgramType,
+				common_utils.Version_1_6_0,
+				"",
+			)
+
+			mcmAddress := solana.MustPublicKeyFromBase58(mcmProgram.Address)
+
+			deps := mcmsops.Deps{
+				Chain:             chain,
+				ExistingAddresses: in.ExistingAddresses,
+				Qualifier:         *in.Qualifier,
+			}
+
+			// Configure MCMs
+			mcmRef, err := configureMCM(b, deps, in.MCMSDeploymentConfigPerChain, mcmAddress)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to configure MCMs: %w", err)
+			}
+			output.Addresses = append(output.Addresses, mcmRef.NewAddresses...)
+			output.BatchOps = append(output.BatchOps, mcmRef.BatchOps...)
+			deps.ExistingAddresses = append(deps.ExistingAddresses, mcmRef.NewAddresses...)
 
 			// roles
 			setupRolesOutput, err := setupRoles(b, deps, mcmAddress)
@@ -126,6 +173,19 @@ func initAccessController(b operations.Bundle, deps mcmsops.Deps, accessControll
 }
 
 func initMCM(b operations.Bundle, deps mcmsops.Deps, cfg ccipapi.MCMSDeploymentConfigPerChain, mcmAddress solana.PublicKey) (mcmsops.MCMOutput, error) {
+	return doMCMOp(b, deps, cfg, mcmAddress, false)
+}
+
+func configureMCM(b operations.Bundle, deps mcmsops.Deps, cfg ccipapi.MCMSDeploymentConfigPerChain, mcmAddress solana.PublicKey) (mcmsops.MCMOutput, error) {
+	return doMCMOp(b, deps, cfg, mcmAddress, true)
+}
+
+func doMCMOp(
+	b operations.Bundle,
+	deps mcmsops.Deps,
+	cfg ccipapi.MCMSDeploymentConfigPerChain,
+	mcmAddress solana.PublicKey,
+	configure bool) (mcmsops.MCMOutput, error) {
 	var output mcmsops.MCMOutput
 	configs := []struct {
 		ctype cldf_deployment.ContractType
@@ -145,8 +205,13 @@ func initMCM(b operations.Bundle, deps mcmsops.Deps, cfg ccipapi.MCMSDeploymentC
 		},
 	}
 
+	op := mcmsops.InitMCMOp
+	if configure {
+		op = mcmsops.ConfigureMCMOp
+	}
+
 	for _, cfg := range configs {
-		ref, err := operations.ExecuteOperation(b, mcmsops.InitMCMOp, deps,
+		ref, err := operations.ExecuteOperation(b, op, deps,
 			mcmsops.InitMCMInput{
 				ContractType: cfg.ctype,
 				MCMConfig:    cfg.cfg,
@@ -240,7 +305,11 @@ func setupRoles(b operations.Bundle, deps mcmsops.Deps, mcmProgram solana.Public
 }
 
 // assume refs are in the order returned by GetAllMCMS
-func transferAllMCMS(b operations.Bundle, chain cldf_solana.Chain, in deployops.TransferOwnershipPerChainInput) (sequences.OnChainOutput, error) {
+func transferAllMCMS(
+	b operations.Bundle,
+	chain cldf_solana.Chain,
+	in deployops.TransferOwnershipPerChainInput,
+	transferAccessController bool) (sequences.OnChainOutput, error) {
 	var output sequences.OnChainOutput
 	deps := mcmsops.Deps{
 		Chain:             chain,
@@ -250,7 +319,7 @@ func transferAllMCMS(b operations.Bundle, chain cldf_solana.Chain, in deployops.
 		CurrentOwner: solana.MustPublicKeyFromBase58(in.CurrentOwner),
 		NewOwner:     solana.MustPublicKeyFromBase58(in.ProposedOwner),
 	}
-	ownableRefs := getRefsAsOwnable(in.ContractRef)
+	ownableRefs := getRefsAsOwnable(in.ContractRef, transferAccessController)
 	for _, contractRef := range ownableRefs {
 		opIn.Contract = contractRef
 		report, err := operations.ExecuteOperation(b, mcmsops.TransferOwnershipOp, deps, opIn)
@@ -264,7 +333,7 @@ func transferAllMCMS(b operations.Bundle, chain cldf_solana.Chain, in deployops.
 }
 
 // assume refs are in the order returned by GetAllMCMS
-func acceptAllMCMS(b operations.Bundle, chain cldf_solana.Chain, in deployops.TransferOwnershipPerChainInput) (sequences.OnChainOutput, error) {
+func acceptAllMCMS(b operations.Bundle, chain cldf_solana.Chain, in deployops.TransferOwnershipPerChainInput, transferAccessController bool) (sequences.OnChainOutput, error) {
 	var output sequences.OnChainOutput
 	deps := mcmsops.Deps{
 		Chain:             chain,
@@ -274,7 +343,7 @@ func acceptAllMCMS(b operations.Bundle, chain cldf_solana.Chain, in deployops.Tr
 		CurrentOwner: solana.MustPublicKeyFromBase58(in.CurrentOwner),
 		NewOwner:     solana.MustPublicKeyFromBase58(in.ProposedOwner),
 	}
-	ownableRefs := getRefsAsOwnable(in.ContractRef)
+	ownableRefs := getRefsAsOwnable(in.ContractRef, transferAccessController)
 	for _, contractRef := range ownableRefs {
 		opIn.Contract = contractRef
 		report, err := operations.ExecuteOperation(b, mcmsops.AcceptOwnershipOp, deps, opIn)
@@ -286,18 +355,30 @@ func acceptAllMCMS(b operations.Bundle, chain cldf_solana.Chain, in deployops.Tr
 	return output, nil
 }
 
+func (a *SolanaAdapter) GrantAdminRoleToTimelock() *operations.Sequence[deployops.GrantAdminRoleToTimelockConfigPerChainWithSelector, sequences.OnChainOutput, chain.BlockChains] {
+	// Not implemented for Solana
+	return nil
+}
+
 func getRefsAsOwnable(
+	refs []cldf_datastore.AddressRef,
+	transferAccessController bool) []mcmsops.OwnableContract {
+	if transferAccessController {
+		return getRefsAsOwnableWithAccessController(refs)
+	}
+	if len(refs) != MCMSRefs {
+		refs = refs[len(refs)-MCMSRefs:] // skip access controller refs
+	}
+	return getRefsAsOwnableWithoutAccessController(refs)
+}
+
+func getRefsAsOwnableWithoutAccessController(
 	refs []cldf_datastore.AddressRef) []mcmsops.OwnableContract {
-	accessControllerProgram := refs[0]
-	proposerAccount := refs[1]
-	executorAccount := refs[2]
-	cancellerAccount := refs[3]
-	bypasserAccount := refs[4]
-	timelockProgram := refs[5]
+	timelockProgram := refs[0]
 	timelockID, timelockSeed, _ := mcms_solana.ParseContractAddress(timelockProgram.Address)
-	proposerMCMSAccount := refs[6]
-	cancellerMCMSAccount := refs[7]
-	bypasserMCMSAccount := refs[8]
+	proposerMCMSAccount := refs[1]
+	cancellerMCMSAccount := refs[2]
+	bypasserMCMSAccount := refs[3]
 	mcmID, proposerSeed, _ := mcms_solana.ParseContractAddress(proposerMCMSAccount.Address)
 	_, cancellerSeed, _ := mcms_solana.ParseContractAddress(cancellerMCMSAccount.Address)
 	_, bypasserSeed, _ := mcms_solana.ParseContractAddress(bypasserMCMSAccount.Address)
@@ -327,6 +408,18 @@ func getRefsAsOwnable(
 			OwnerPDA:  state.GetTimelockConfigPDA(timelockID, state.PDASeed([]byte(timelockSeed[:]))),
 			Type:      common_utils.RBACTimelock,
 		},
+	}
+}
+
+func getRefsAsOwnableWithAccessController(
+	refs []cldf_datastore.AddressRef) []mcmsops.OwnableContract {
+	accessControllerProgram := refs[0]
+	proposerAccount := refs[1]
+	executorAccount := refs[2]
+	cancellerAccount := refs[3]
+	bypasserAccount := refs[4]
+
+	return []mcmsops.OwnableContract{
 		{
 			ProgramID: solana.MustPublicKeyFromBase58(accessControllerProgram.Address),
 			OwnerPDA:  solana.MustPublicKeyFromBase58(proposerAccount.Address),

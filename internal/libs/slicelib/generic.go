@@ -1,7 +1,7 @@
 package slicelib
 
 import (
-	"sort"
+	"slices"
 
 	mapset "github.com/deckarep/golang-set/v2"
 )
@@ -44,8 +44,6 @@ func Map[T any, T2 any](slice []T, mapper func(T) T2) []T2 {
 
 func ToSortedSlice[T ~int | ~int64 | ~uint64](set mapset.Set[T]) []T {
 	elements := set.ToSlice()
-	sort.Slice(elements, func(i, j int) bool {
-		return elements[i] < elements[j]
-	})
+	slices.Sort(elements)
 	return elements
 }

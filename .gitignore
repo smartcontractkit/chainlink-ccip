@@ -60,3 +60,6 @@ dockercfg
 env
 credentials.env
 gcr_creds.env
+devenv/tests/e2e/blockscout
+devenv/env-out.toml
+.cursorrules

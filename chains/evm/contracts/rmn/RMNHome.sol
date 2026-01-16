@@ -262,7 +262,10 @@ contract RMNHome is Ownable2StepMsgSender, ITypeAndVersion {
   /// @dev No config is changed in storage, the only storage changes that happen are
   /// - The activeConfigIndex is flipped.
   /// - The digest of the old active config is deleted.
-  function promoteCandidateAndRevokeActive(bytes32 digestToPromote, bytes32 digestToRevoke) external onlyOwner {
+  function promoteCandidateAndRevokeActive(
+    bytes32 digestToPromote,
+    bytes32 digestToRevoke
+  ) external onlyOwner {
     if (digestToPromote == ZERO_DIGEST && digestToRevoke == ZERO_DIGEST) {
       revert NoOpStateTransitionNotAllowed();
     }
@@ -291,7 +294,10 @@ contract RMNHome is Ownable2StepMsgSender, ITypeAndVersion {
   /// @param newDynamicConfig The new dynamic config.
   /// @param currentDigest The digest of the config to update.
   /// @dev This does not update the config digest as only the static config is part of the digest.
-  function setDynamicConfig(DynamicConfig calldata newDynamicConfig, bytes32 currentDigest) external onlyOwner {
+  function setDynamicConfig(
+    DynamicConfig calldata newDynamicConfig,
+    bytes32 currentDigest
+  ) external onlyOwner {
     for (uint256 i = 0; i < MAX_CONCURRENT_CONFIGS; ++i) {
       if (s_configs[i].configDigest == currentDigest && currentDigest != ZERO_DIGEST) {
         _validateDynamicConfig(newDynamicConfig, s_configs[i].staticConfig.nodes.length);
@@ -310,14 +316,16 @@ contract RMNHome is Ownable2StepMsgSender, ITypeAndVersion {
   /// @param staticConfig The static part of the config.
   /// @param version The version of the config.
   /// @return The calculated config digest.
-  function _calculateConfigDigest(bytes memory staticConfig, uint32 version) internal view returns (bytes32) {
+  function _calculateConfigDigest(
+    bytes memory staticConfig,
+    uint32 version
+  ) internal view returns (bytes32) {
     return bytes32(
       PREFIX
-        | (
-          uint256(
+        | (uint256(
             keccak256(bytes.concat(abi.encode(bytes32("EVM"), block.chainid, address(this), version), staticConfig))
-          ) & ~PREFIX_MASK
-        )
+          )
+          & ~PREFIX_MASK)
     );
   }
 
@@ -363,7 +371,10 @@ contract RMNHome is Ownable2StepMsgSender, ITypeAndVersion {
   /// @notice Validates the dynamic config. Reverts when the config is invalid.
   /// @param dynamicConfig The dynamic part of the config.
   /// @param numberOfNodes The number of nodes in the static config.
-  function _validateDynamicConfig(DynamicConfig memory dynamicConfig, uint256 numberOfNodes) internal pure {
+  function _validateDynamicConfig(
+    DynamicConfig memory dynamicConfig,
+    uint256 numberOfNodes
+  ) internal pure {
     uint256 numberOfSourceChains = dynamicConfig.sourceChains.length;
     for (uint256 i = 0; i < numberOfSourceChains; ++i) {
       SourceChain memory currentSourceChain = dynamicConfig.sourceChains[i];

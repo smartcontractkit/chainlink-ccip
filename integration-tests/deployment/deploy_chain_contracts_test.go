@@ -1,7 +1,6 @@
 package deployment
 
 import (
-	"context"
 	"math/big"
 	"testing"
 	"time"
@@ -65,7 +64,7 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 	require.NoError(t, err, "Failed to apply DeployChainContracts changeset")
 
 	DeployMCMS(t, e, chain_selectors.SOLANA_MAINNET.Selector, []string{common_utils.CLLQualifier, common_utils.RMNTimelockQualifier})
-	SolanaTransferMCMSContracts(t, e, chain_selectors.SOLANA_MAINNET.Selector, common_utils.CLLQualifier)
+	SolanaTransferMCMSContracts(t, e, chain_selectors.SOLANA_MAINNET.Selector, common_utils.CLLQualifier, true)
 	SolanaTransferOwnership(t, e, chain_selectors.SOLANA_MAINNET.Selector)
 	// Transfer from one qualifier to another
 	fromQualifier := common_utils.CLLQualifier
@@ -86,10 +85,16 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 		toQualifier,
 	)
 	err = utils.FundSolanaAccounts(
-		context.Background(),
-		[]solana.PublicKey{toTimelockSigner, toMcmSigner},
+		t.Context(),
+		[]solana.PublicKey{chain.DeployerKey.PublicKey()},
 		100,
 		chain.Client,
+	)
+	require.NoError(t, err)
+	err = utils.FundFromDeployerKey(
+		chain,
+		[]solana.PublicKey{toTimelockSigner, toMcmSigner},
+		10,
 	)
 	require.NoError(t, err)
 	mcmsInput := mcmsapi.TransferOwnershipInput{
@@ -203,29 +208,32 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 }
 
 var solanaProgramIDs = map[string]string{
-	"ccip_router": "Ccip842gzYHhvdDkSyi2YVCoAWPbYJoApMFzSxQroE9C",
-	// "test_token_pool":           "JuCcZ4smxAYv9QHJ36jshA7pA3FuQ3vQeWLUeAtZduJ",
-	// "burnmint_token_pool":       "41FGToCmdaWa1dgZLKFAjvmx6e6AjVTX7SVRibvsMGVB",
-	// "lockrelease_token_pool":    "8eqh8wppT9c5rw4ERqNCffvU6cNFJWff9WmkcYtmGiqC",
-	"fee_quoter": "FeeQPGkKDeRV1MgoYfMH6L8o3KeuYjwUZrgn4LRKfjHi",
-	// "test_ccip_receiver":        "EvhgrPhTDt4LcSPS2kfJgH6T6XWZ6wT3X9ncDGLT1vui",
-	"ccip_offramp":      "offqSMQWgQud6WJz694LRzkeN5kMYpCHTpXQr3Rkcjm",
-	"mcm":               "5vNJx78mz7KVMjhuipyr9jKBKcMrKYGdjGkgE4LUmjKk",
-	"timelock":          "DoajfR5tK24xVw51fWcawUZWhAXD8yrBJVacc13neVQA",
-	"access_controller": "6KsN58MTnRQ8FfPaXHiFPPFGDRioikj9CdPvPxZJdCjb",
-	// "external_program_cpi_stub": "2zZwzyptLqwFJFEFxjPvrdhiGpH9pJ3MfrrmZX6NTKxm",
-	"rmn_remote": "RmnXLft1mSEwDgMKu2okYuHkiazxntFFcZFrrcXxYg7",
-	// "cctp_token_pool":           "CCiTPESGEevd7TBU8EGBKrcxuRq7jx3YtW6tPidnscaZ",
+	"ccip_router":               "Ccip842gzYHhvdDkSyi2YVCoAWPbYJoApMFzSxQroE9C",
+	"test_token_pool":           "JuCcZ4smxAYv9QHJ36jshA7pA3FuQ3vQeWLUeAtZduJ",
+	"burnmint_token_pool":       "41FGToCmdaWa1dgZLKFAjvmx6e6AjVTX7SVRibvsMGVB",
+	"lockrelease_token_pool":    "8eqh8wppT9c5rw4ERqNCffvU6cNFJWff9WmkcYtmGiqC",
+	"fee_quoter":                "FeeQPGkKDeRV1MgoYfMH6L8o3KeuYjwUZrgn4LRKfjHi",
+	"test_ccip_receiver":        "EvhgrPhTDt4LcSPS2kfJgH6T6XWZ6wT3X9ncDGLT1vui",
+	"ccip_offramp":              "offqSMQWgQud6WJz694LRzkeN5kMYpCHTpXQr3Rkcjm",
+	"mcm":                       "5vNJx78mz7KVMjhuipyr9jKBKcMrKYGdjGkgE4LUmjKk",
+	"timelock":                  "DoajfR5tK24xVw51fWcawUZWhAXD8yrBJVacc13neVQA",
+	"access_controller":         "6KsN58MTnRQ8FfPaXHiFPPFGDRioikj9CdPvPxZJdCjb",
+	"external_program_cpi_stub": "2zZwzyptLqwFJFEFxjPvrdhiGpH9pJ3MfrrmZX6NTKxm",
+	"rmn_remote":                "RmnXLft1mSEwDgMKu2okYuHkiazxntFFcZFrrcXxYg7",
+	"cctp_token_pool":           "CCiTPESGEevd7TBU8EGBKrcxuRq7jx3YtW6tPidnscaZ",
 }
 
 var solanaContracts = map[string]datastore.ContractType{
-	"ccip_router":       datastore.ContractType(routerops.ContractType),
-	"fee_quoter":        datastore.ContractType(fqops.ContractType),
-	"ccip_offramp":      datastore.ContractType(offrampops.ContractType),
-	"rmn_remote":        datastore.ContractType(rmnremoteops.ContractType),
-	"mcm":               datastore.ContractType(utils.McmProgramType),
-	"timelock":          datastore.ContractType(utils.TimelockProgramType),
-	"access_controller": datastore.ContractType(utils.AccessControllerProgramType),
+	"ccip_router":            datastore.ContractType(routerops.ContractType),
+	"fee_quoter":             datastore.ContractType(fqops.ContractType),
+	"ccip_offramp":           datastore.ContractType(offrampops.ContractType),
+	"rmn_remote":             datastore.ContractType(rmnremoteops.ContractType),
+	"mcm":                    datastore.ContractType(utils.McmProgramType),
+	"timelock":               datastore.ContractType(utils.TimelockProgramType),
+	"access_controller":      datastore.ContractType(utils.AccessControllerProgramType),
+	"burnmint_token_pool":    datastore.ContractType(common_utils.BurnMintTokenPool),
+	"lockrelease_token_pool": datastore.ContractType(common_utils.LockReleaseTokenPool),
+	"test_ccip_receiver":     datastore.ContractType("TestReceiver"),
 }
 
 func PreloadSolanaEnvironment(t *testing.T, chainSelector uint64) (string, *datastore.MemoryDataStore, error) {

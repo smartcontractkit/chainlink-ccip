@@ -47,11 +47,17 @@ library MerkleHelper {
     }
   }
 
-  function hashPair(bytes32 a, bytes32 b) public pure returns (bytes32) {
+  function hashPair(
+    bytes32 a,
+    bytes32 b
+  ) public pure returns (bytes32) {
     return a < b ? hashInternalNode(a, b) : hashInternalNode(b, a);
   }
 
-  function hashInternalNode(bytes32 left, bytes32 right) public pure returns (bytes32 hash) {
+  function hashInternalNode(
+    bytes32 left,
+    bytes32 right
+  ) public pure returns (bytes32 hash) {
     return keccak256(abi.encode(MerkleMultiProof.INTERNAL_DOMAIN_SEPARATOR, left, right));
   }
 }

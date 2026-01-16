@@ -30,9 +30,7 @@ contract USDCTokenPoolProxySetup is USDCSetup {
     s_usdcTokenPoolProxy = new USDCTokenPoolProxyHelper(
       s_USDCToken,
       USDCTokenPoolProxy.PoolAddresses({
-        legacyCctpV1Pool: s_legacyCctpV1Pool,
-        cctpV1Pool: s_cctpV1Pool,
-        cctpV2Pool: s_cctpV2Pool
+        legacyCctpV1Pool: s_legacyCctpV1Pool, cctpV1Pool: s_cctpV1Pool, cctpV2Pool: s_cctpV2Pool
       }),
       address(s_router)
     );

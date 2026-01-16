@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"maps"
 	"slices"
-	"sort"
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -326,7 +325,7 @@ func (p *Plugin) isStaleReport(
 	}
 
 	chainSlice := chainSet.ToSlice()
-	sort.Slice(chainSlice, func(i, j int) bool { return chainSlice[i] < chainSlice[j] })
+	slices.Sort(chainSlice)
 
 	offRampExpNextSeqNums, err := p.ccipReader.NextSeqNum(ctx, chainSlice)
 	if err != nil {

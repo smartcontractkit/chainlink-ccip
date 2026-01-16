@@ -2,7 +2,7 @@ package plugincommon
 
 import (
 	"fmt"
-	"sort"
+	"slices"
 	"time"
 
 	"github.com/smartcontractkit/libocr/commontypes"
@@ -35,7 +35,7 @@ func GetTransmissionSchedule(
 	}
 
 	// transmissionSchedule must be deterministic
-	sort.Slice(transmitters, func(i, j int) bool { return transmitters[i] < transmitters[j] })
+	slices.Sort(transmitters)
 
 	transmissionDelays := make([]time.Duration, len(transmitters))
 
