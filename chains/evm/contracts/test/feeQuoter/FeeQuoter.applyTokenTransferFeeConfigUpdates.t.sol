@@ -120,6 +120,75 @@ contract FeeQuoter_applyTokenTransferFeeConfigUpdates is FeeQuoterSetup {
     );
   }
 
+  function test_getAllTokenTransferFeeConfigs() public {
+    // Set up token transfer fee configs for a chain selector
+    uint64 testChainSelector = DEST_CHAIN_SELECTOR + 20;
+    FeeQuoter.TokenTransferFeeConfigArgs[] memory tokenConfigArgs = new FeeQuoter.TokenTransferFeeConfigArgs[](1);
+    tokenConfigArgs[0].destChainSelector = testChainSelector;
+    tokenConfigArgs[0].tokenTransferFeeConfigs = new FeeQuoter.TokenTransferFeeConfigSingleTokenArgs[](2);
+
+    // Use fee tokens from setup
+    tokenConfigArgs[0].tokenTransferFeeConfigs[0].token = s_sourceFeeTokens[0];
+    tokenConfigArgs[0].tokenTransferFeeConfigs[0].tokenTransferFeeConfig = FeeQuoter.TokenTransferFeeConfig({
+      feeUSDCents: 100, destGasOverhead: 50000, destBytesOverhead: 64, isEnabled: true
+    });
+
+    tokenConfigArgs[0].tokenTransferFeeConfigs[1].token = s_sourceFeeTokens[1];
+    tokenConfigArgs[0].tokenTransferFeeConfigs[1].tokenTransferFeeConfig = FeeQuoter.TokenTransferFeeConfig({
+      feeUSDCents: 200, destGasOverhead: 60000, destBytesOverhead: 96, isEnabled: true
+    });
+
+    s_feeQuoter.applyTokenTransferFeeConfigUpdates(tokenConfigArgs, new FeeQuoter.TokenTransferFeeConfigRemoveArgs[](0));
+
+    // Get all token transfer fee configs for this chain selector
+    (address[] memory tokens, FeeQuoter.TokenTransferFeeConfig[] memory configs) =
+      s_feeQuoter.getAllTokenTransferFeeConfigs(testChainSelector);
+
+    // Verify we got all fee tokens (should return all fee tokens, even if they don't have configs)
+    assertGe(tokens.length, s_sourceFeeTokens.length, "Should return at least all fee tokens");
+
+    // Find our configured tokens and verify their configs
+    bool foundToken0 = false;
+    bool foundToken1 = false;
+    for (uint256 i = 0; i < tokens.length; ++i) {
+      if (tokens[i] == s_sourceFeeTokens[0]) {
+        _assertTokenTransferFeeConfigEqual(
+          tokenConfigArgs[0].tokenTransferFeeConfigs[0].tokenTransferFeeConfig, configs[i]
+        );
+        foundToken0 = true;
+      }
+      if (tokens[i] == s_sourceFeeTokens[1]) {
+        _assertTokenTransferFeeConfigEqual(
+          tokenConfigArgs[0].tokenTransferFeeConfigs[1].tokenTransferFeeConfig, configs[i]
+        );
+        foundToken1 = true;
+      }
+    }
+    assertTrue(foundToken0, "Should find first configured token");
+    assertTrue(foundToken1, "Should find second configured token");
+    assertEq(tokens.length, configs.length, "Arrays should have same length");
+  }
+
+  function test_getAllTokenTransferFeeConfigs_ReturnsEmptyStructsForUnconfiguredTokens() public view {
+    uint64 testChainSelector = DEST_CHAIN_SELECTOR + 30;
+
+    // Don't set any token configs, just get all fee tokens
+    (address[] memory tokens, FeeQuoter.TokenTransferFeeConfig[] memory configs) =
+      s_feeQuoter.getAllTokenTransferFeeConfigs(testChainSelector);
+
+    // Should return all fee tokens with empty configs
+    assertGe(tokens.length, s_sourceFeeTokens.length, "Should return all fee tokens");
+    assertEq(tokens.length, configs.length, "Arrays should have same length");
+
+    // Verify all configs are empty (isEnabled should be false)
+    for (uint256 i = 0; i < configs.length; ++i) {
+      assertFalse(configs[i].isEnabled, "Unconfigured tokens should have isEnabled = false");
+      assertEq(configs[i].feeUSDCents, 0, "Unconfigured tokens should have zero feeUSDCents");
+      assertEq(configs[i].destGasOverhead, 0, "Unconfigured tokens should have zero destGasOverhead");
+      assertEq(configs[i].destBytesOverhead, 0, "Unconfigured tokens should have zero destBytesOverhead");
+    }
+  }
+
   // Reverts
 
   function test_applyTokenTransferFeeConfigUpdates_RevertWhen_OnlyCallableByOwner() public {

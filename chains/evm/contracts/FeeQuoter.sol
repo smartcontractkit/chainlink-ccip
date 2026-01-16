@@ -396,6 +396,9 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
 
         s_tokenTransferFeeConfig[destChainSelector][token] = tokenTransferFeeConfig;
 
+        // We don't need to check the return value, as inserting the item twice has no effect.
+        s_destChainSelectors.add(destChainSelector);
+
         emit TokenTransferFeeConfigUpdated(destChainSelector, token, tokenTransferFeeConfig);
       }
     }
@@ -567,6 +570,38 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
     uint64 destChainSelector
   ) external view returns (DestChainConfig memory) {
     return s_destChainConfigs[destChainSelector];
+  }
+
+  /// @notice Returns all destination chain selectors that have been configured.
+  /// @return destChainSelectors The supported destination chain selectors.
+  function getAllDestChainSelectors() external view returns (uint64[] memory destChainSelectors) {
+    destChainSelectors = new uint64[](s_destChainSelectors.length());
+    for (uint256 i = 0; i < s_destChainSelectors.length(); ++i) {
+      destChainSelectors[i] = uint64(s_destChainSelectors.at(i));
+    }
+    return destChainSelectors;
+  }
+
+  /// @notice Returns all token transfer fee configs for a specific destination chain selector.
+  /// @param destChainSelector Destination chain selector to fetch configs for.
+  /// @return tokens The token addresses (all fee tokens).
+  /// @return tokenTransferFeeConfigs The token transfer fee configs corresponding to the tokens.
+  /// @dev Iterates through all fee tokens and returns their configs for the given chain selector.
+  /// Returns empty structs for tokens that don't have a config set.
+  function getAllTokenTransferFeeConfigs(
+    uint64 destChainSelector
+  ) external view returns (address[] memory tokens, TokenTransferFeeConfig[] memory tokenTransferFeeConfigs) {
+    uint256 feeTokenCount = s_feeTokens.length();
+    tokens = new address[](feeTokenCount);
+    tokenTransferFeeConfigs = new TokenTransferFeeConfig[](feeTokenCount);
+
+    for (uint256 i = 0; i < feeTokenCount; ++i) {
+      address token = s_feeTokens.at(i);
+      tokens[i] = token;
+      tokenTransferFeeConfigs[i] = s_tokenTransferFeeConfig[destChainSelector][token];
+    }
+
+    return (tokens, tokenTransferFeeConfigs);
   }
 
   /// @notice Returns all destination chain configs.
