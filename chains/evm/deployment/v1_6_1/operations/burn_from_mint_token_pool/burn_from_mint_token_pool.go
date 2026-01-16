@@ -1,19 +1,19 @@
 package burn_from_mint_token_pool
 
 import (
-	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_1/burn_from_mint_token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 )
 
 var ContractType cldf_deployment.ContractType = "BurnFromMintTokenPool"
 var TypeAndVersion = cldf_deployment.NewTypeAndVersion(ContractType, *Version)
 
-var Version *semver.Version = utils.Version_1_6_1
+var Version = utils.Version_1_6_1
 
 type ConstructorArgs struct {
 	Token              common.Address   // The token managed by this pool

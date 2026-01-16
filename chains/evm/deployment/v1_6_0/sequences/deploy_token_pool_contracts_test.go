@@ -10,6 +10,15 @@ import (
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/stretchr/testify/require"
 
+	burn_mint_token_pool_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_1/burn_mint_token_pool"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
+	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	bnm_bindings "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc20"
+
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	rmnproxyops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
@@ -20,16 +29,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/burn_with_from_mint_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/siloed_lock_release_token_pool"
-	burn_mint_token_pool_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_1/burn_mint_token_pool"
 	tokenapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
-	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
-	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	bnm_bindings "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc20"
 )
 
 // TestDeployTokenPool tests the DeployTokenPool sequence for various token pool types.
@@ -53,7 +54,7 @@ func TestDeployTokenPool(t *testing.T) {
 		// v1.6.1 pools
 		{
 			name:                "BurnMintTokenPool_v1_6_1",
-			poolType:            burn_mint_token_pool.ContractType,
+			poolType:            burn_mint_token_pool.BurnMintContractType,
 			poolVersion:         utils.Version_1_6_1,
 			expectedTypeVersion: "BurnMintTokenPool 1.6.1",
 		},
@@ -96,7 +97,7 @@ func TestDeployTokenPool(t *testing.T) {
 		},
 		{
 			name:                "BurnMintTokenPool_v1_6_1_with_allowlist",
-			poolType:            burn_mint_token_pool.ContractType,
+			poolType:            burn_mint_token_pool.BurnMintContractType,
 			poolVersion:         utils.Version_1_6_1,
 			allowlist:           []string{"0x1111111111111111111111111111111111111111", "0x2222222222222222222222222222222222222222"},
 			expectedTypeVersion: "BurnMintTokenPool 1.6.1",
@@ -108,7 +109,7 @@ func TestDeployTokenPool(t *testing.T) {
 		// v1.5.1 pools (using same ContractType constants since they're identical strings)
 		{
 			name:                "BurnMintTokenPool_v1_5_1",
-			poolType:            burn_mint_token_pool.ContractType,
+			poolType:            burn_mint_token_pool.BurnMintContractType,
 			poolVersion:         utils.Version_1_5_1,
 			expectedTypeVersion: "BurnMintTokenPool 1.5.1",
 		},
@@ -293,7 +294,7 @@ func TestDeployTokenPool_AlreadyDeployed(t *testing.T) {
 	chainSelector := chain_selectors.ETHEREUM_MAINNET.Selector
 	tokenSymbol := "TEST"
 	tokenDecimals := uint8(18)
-	poolType := burn_mint_token_pool.ContractType
+	poolType := burn_mint_token_pool.BurnMintContractType
 
 	e, err := environment.New(t.Context(),
 		environment.WithEVMSimulated(t, []uint64{chainSelector}),
@@ -382,7 +383,7 @@ func TestDeployTokenPool_MissingTokenPoolVersion(t *testing.T) {
 
 	input := tokenapi.DeployTokenPoolInput{
 		TokenSymbol:       "TEST",
-		PoolType:          string(burn_mint_token_pool.ContractType),
+		PoolType:          string(burn_mint_token_pool.BurnMintContractType),
 		TokenPoolVersion:  nil, // Missing version
 		ChainSelector:     chainSelector,
 		ExistingDataStore: e.DataStore,
@@ -500,7 +501,7 @@ func TestDeployTokenPool_MissingRouter(t *testing.T) {
 
 	input := tokenapi.DeployTokenPoolInput{
 		TokenSymbol:       tokenSymbol,
-		PoolType:          string(burn_mint_token_pool.ContractType),
+		PoolType:          string(burn_mint_token_pool.BurnMintContractType),
 		TokenPoolVersion:  utils.Version_1_6_1,
 		ChainSelector:     chainSelector,
 		ExistingDataStore: e.DataStore,
@@ -555,7 +556,7 @@ func TestDeployTokenPool_MissingRMNProxy(t *testing.T) {
 
 	input := tokenapi.DeployTokenPoolInput{
 		TokenSymbol:       tokenSymbol,
-		PoolType:          string(burn_mint_token_pool.ContractType),
+		PoolType:          string(burn_mint_token_pool.BurnMintContractType),
 		TokenPoolVersion:  utils.Version_1_6_1,
 		ChainSelector:     chainSelector,
 		ExistingDataStore: e.DataStore,
@@ -605,7 +606,7 @@ func TestDeployTokenPool_MissingToken(t *testing.T) {
 
 	input := tokenapi.DeployTokenPoolInput{
 		TokenSymbol:       tokenSymbol, // Token not in datastore
-		PoolType:          string(burn_mint_token_pool.ContractType),
+		PoolType:          string(burn_mint_token_pool.BurnMintContractType),
 		TokenPoolVersion:  utils.Version_1_6_1,
 		ChainSelector:     chainSelector,
 		ExistingDataStore: e.DataStore,

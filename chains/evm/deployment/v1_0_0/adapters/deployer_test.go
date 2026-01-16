@@ -4,6 +4,7 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/aws/smithy-go/ptr"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -15,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
+	ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations"
 	v1_0 "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
@@ -37,7 +39,7 @@ func TestDeployMCMS(t *testing.T) {
 	evmDeployer := &adapters.EVMDeployer{}
 	dReg := v1_0.GetRegistry()
 	dReg.RegisterDeployer(chainsel.FamilyEVM, v1_0.MCMSVersion, evmDeployer)
-	cs := v1_0.DeployMCMS(dReg)
+	cs := v1_0.DeployMCMS(dReg, nil)
 	output, err := cs.Apply(*env, v1_0.MCMSDeploymentConfig{
 		AdapterVersion: v1_0.MCMSVersion,
 		Chains: map[uint64]v1_0.MCMSDeploymentConfigPerChain{
@@ -135,14 +137,14 @@ func TestGrantAdminRoleToTimelock(t *testing.T) {
 	evmChain2 := env.BlockChains.EVMChains()[selector2]
 
 	evmDeployer := &adapters.EVMDeployer{}
-	dReg := deployops.GetRegistry()
-	dReg.RegisterDeployer(chainsel.FamilyEVM, deployops.MCMSVersion, evmDeployer)
+	dReg := v1_0.GetRegistry()
+	dReg.RegisterDeployer(chainsel.FamilyEVM, v1_0.MCMSVersion, evmDeployer)
 
 	// deploy two timelocks on each chain so we can set one as the admin of the other
-	deployMCMS := deployops.DeployMCMS(dReg, nil)
-	output, err := deployMCMS.Apply(*env, deployops.MCMSDeploymentConfig{
-		AdapterVersion: semver.MustParse("1.0.0"),
-		Chains: map[uint64]deployops.MCMSDeploymentConfigPerChain{
+	deployMCMS := v1_0.DeployMCMS(dReg, nil)
+	output, err := deployMCMS.Apply(*env, v1_0.MCMSDeploymentConfig{
+		AdapterVersion: v1_0.MCMSVersion,
+		Chains: map[uint64]v1_0.MCMSDeploymentConfigPerChain{
 			selector1: {
 				Canceller:        testhelpers.SingleGroupMCMS(),
 				Bypasser:         testhelpers.SingleGroupMCMS(),
@@ -165,9 +167,9 @@ func TestGrantAdminRoleToTimelock(t *testing.T) {
 	require.Greater(t, len(output.Reports), 0)
 	ds := output.DataStore
 
-	output, err = deployMCMS.Apply(*env, deployops.MCMSDeploymentConfig{
-		AdapterVersion: semver.MustParse("1.0.0"),
-		Chains: map[uint64]deployops.MCMSDeploymentConfigPerChain{
+	output, err = deployMCMS.Apply(*env, v1_0.MCMSDeploymentConfig{
+		AdapterVersion: v1_0.MCMSVersion,
+		Chains: map[uint64]v1_0.MCMSDeploymentConfigPerChain{
 			selector1: {
 				Canceller:        testhelpers.SingleGroupMCMS(),
 				Bypasser:         testhelpers.SingleGroupMCMS(),
@@ -236,10 +238,10 @@ func TestGrantAdminRoleToTimelock(t *testing.T) {
 	}
 
 	// grant admin role to timelock
-	grantAdminRoleMCMS := deployops.GrantAdminRoleToTimelock(dReg, nil)
-	output, err = grantAdminRoleMCMS.Apply(*env, deployops.GrantAdminRoleToTimelockConfig{
+	grantAdminRoleMCMS := v1_0.GrantAdminRoleToTimelock(dReg, nil)
+	output, err = grantAdminRoleMCMS.Apply(*env, v1_0.GrantAdminRoleToTimelockConfig{
 		AdapterVersion: semver.MustParse("1.0.0"),
-		Chains: map[uint64]deployops.GrantAdminRoleToTimelockConfigPerChain{
+		Chains: map[uint64]v1_0.GrantAdminRoleToTimelockConfigPerChain{
 			selector1: {
 				TimelockToTransferRef: datastore.AddressRef{
 					Type:      datastore.ContractType(deploymentutils.RBACTimelock),
