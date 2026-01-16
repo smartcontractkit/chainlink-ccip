@@ -100,7 +100,7 @@ func TestCCIPChainReader_Sync_HappyPath_BindsContractsSuccessfully(t *testing.T)
 	)
 	require.NoError(t, err)
 
-	contracts := ContractAddresses{
+	contracts := cciptypes.ContractAddresses{
 		consts.ContractNameOnRamp: {
 			sourceChain1: s1Onramp,
 			sourceChain2: s2Onramp,
@@ -161,7 +161,7 @@ func TestCCIPChainReader_Sync_HappyPath_SkipsEmptyAddress(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	contracts := ContractAddresses{
+	contracts := cciptypes.ContractAddresses{
 		consts.ContractNameOnRamp: {
 			sourceChain1: s1Onramp,
 			sourceChain2: s2Onramp,
@@ -218,7 +218,7 @@ func TestCCIPChainReader_Sync_HappyPath_DontSupportAllChains(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	contracts := ContractAddresses{
+	contracts := cciptypes.ContractAddresses{
 		consts.ContractNameOnRamp: {
 			sourceChain1: s1Onramp,
 			sourceChain2: s2Onramp,
@@ -280,7 +280,7 @@ func TestCCIPChainReader_Sync_BindError(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	contracts := ContractAddresses{
+	contracts := cciptypes.ContractAddresses{
 		consts.ContractNameOnRamp: {
 			sourceChain1: s1Onramp,
 			sourceChain2: s2Onramp,
@@ -732,62 +732,6 @@ func TestCCIPFeeComponents_HappyPath(t *testing.T) {
 	assert.Equal(t, big.NewInt(2), feeComponents[chainA].DataAvailabilityFee)
 	assert.Equal(t, big.NewInt(2), feeComponents[chainB].DataAvailabilityFee)
 	assert.Equal(t, big.NewInt(2), feeComponents[chainC].DataAvailabilityFee)
-
-	destChainFeeComponent, err := ccipReader.GetDestChainFeeComponents(ctx)
-	require.NoError(t, err)
-	assert.Equal(t, big.NewInt(1), destChainFeeComponent.ExecutionFee)
-	assert.Equal(t, big.NewInt(2), destChainFeeComponent.DataAvailabilityFee)
-}
-
-func TestCCIPChainReader_LinkPriceUSD(t *testing.T) {
-	ctx := context.Background()
-	tokenAddr := []byte{0x3, 0x4}
-	offrampAddress := []byte{0x3}
-
-	// Setup mock cache with the fee quoter static config
-	mockCache := new(mockConfigCache)
-	chainConfig := cciptypes.ChainConfigSnapshot{
-		FeeQuoter: cciptypes.FeeQuoterConfig{
-			StaticConfig: cciptypes.FeeQuoterStaticConfig{
-				MaxFeeJuelsPerMsg:  cciptypes.NewBigIntFromInt64(10),
-				LinkToken:          tokenAddr,
-				StalenessThreshold: 12,
-			},
-		},
-	}
-	mockCache.On("GetChainConfig", mock.Anything, chainC).Return(chainConfig, nil)
-
-	// Setup contract reader for getting token price
-	destCR := readermocks.NewMockExtended(t)
-
-	// Mock accessors
-	chainAccessors := createMockedChainAccessors(t, chainC)
-	expectedPrice := cciptypes.TimestampedUnixBig{
-		Value:     big.NewInt(145),
-		Timestamp: uint32(time.Now().Unix()),
-	}
-	mockExpectChainAccessorGetTokenPriceUSD(chainAccessors[chainC], tokenAddr, expectedPrice)
-
-	// Setup ccipReader with both cache and contract readers
-	mockAddrCodec := internal.NewMockAddressCodecHex(t)
-	offrampAddressStr, err := mockAddrCodec.AddressBytesToString(offrampAddress, chainC)
-	require.NoError(t, err)
-	ccipReader := &ccipChainReader{
-		lggr:           logger.Test(t),
-		destChain:      chainC,
-		configPoller:   mockCache,
-		offrampAddress: offrampAddressStr,
-		accessors:      chainAccessors,
-		contractReaders: map[cciptypes.ChainSelector]contractreader.Extended{
-			chainC: destCR,
-		},
-	}
-
-	price, err := ccipReader.LinkPriceUSD(ctx)
-	require.NoError(t, err)
-	assert.Equal(t, cciptypes.NewBigIntFromInt64(145), price)
-
-	mockCache.AssertExpectations(t)
 }
 
 func Test_getCurseInfoFromCursedSubjects(t *testing.T) {
@@ -1372,85 +1316,6 @@ func TestCCIPChainReader_GetWrappedNativeTokenPriceUSD(t *testing.T) {
 		require.Empty(t, prices)
 
 		mockCache.AssertExpectations(t)
-	})
-}
-
-func TestCCIPChainReader_prepareBatchConfigRequests(t *testing.T) {
-	destChain := cciptypes.ChainSelector(1)
-	sourceChain := cciptypes.ChainSelector(2)
-
-	ccipReader := &ccipChainReader{
-		destChain: destChain,
-	}
-
-	t.Run("source chain requests", func(t *testing.T) {
-		requests := ccipReader.prepareBatchConfigRequests(sourceChain)
-
-		// Should contain OnRamp and Router requests
-		require.Len(t, requests, 2)
-		require.Contains(t, requests, consts.ContractNameOnRamp)
-		require.Contains(t, requests, consts.ContractNameRouter)
-
-		onRampRequests := requests[consts.ContractNameOnRamp]
-		require.Len(t, onRampRequests, 2)
-
-		// Verify OnRamp dynamic config request
-		require.Equal(t, consts.MethodNameOnRampGetDynamicConfig, onRampRequests[0].ReadName)
-		require.Empty(t, onRampRequests[0].Params)
-		require.IsType(t, &cciptypes.GetOnRampDynamicConfigResponse{}, onRampRequests[0].ReturnVal)
-
-		// Verify OnRamp dest chain config request
-		require.Equal(t, consts.MethodNameOnRampGetDestChainConfig, onRampRequests[1].ReadName)
-		require.Equal(t, map[string]any{"destChainSelector": destChain}, onRampRequests[1].Params)
-		require.IsType(t, &cciptypes.OnRampDestChainConfig{}, onRampRequests[1].ReturnVal)
-
-		// Verify Router requests
-		routerRequests := requests[consts.ContractNameRouter]
-		require.Len(t, routerRequests, 1)
-		require.Equal(t, consts.MethodNameRouterGetWrappedNative, routerRequests[0].ReadName)
-		require.Empty(t, routerRequests[0].Params)
-		require.IsType(t, &[]byte{}, routerRequests[0].ReturnVal)
-	})
-
-	t.Run("destination chain requests", func(t *testing.T) {
-		requests := ccipReader.prepareBatchConfigRequests(destChain)
-
-		// Should contain all contract requests except OnRamp and Router
-		require.Len(t, requests, 4)
-		require.Contains(t, requests, consts.ContractNameOffRamp)
-		require.Contains(t, requests, consts.ContractNameRMNProxy)
-		require.Contains(t, requests, consts.ContractNameRMNRemote)
-		require.Contains(t, requests, consts.ContractNameFeeQuoter)
-		require.NotContains(t, requests, consts.ContractNameOnRamp)
-		require.NotContains(t, requests, consts.ContractNameRouter)
-
-		// Verify OffRamp requests
-		offRampRequests := requests[consts.ContractNameOffRamp]
-		require.Len(t, offRampRequests, 4)
-
-		// Check OffRamp commit config request
-		require.Equal(t, consts.MethodNameOffRampLatestConfigDetails, offRampRequests[0].ReadName)
-		require.Equal(t, map[string]any{"ocrPluginType": consts.PluginTypeCommit}, offRampRequests[0].Params)
-		require.IsType(t, &cciptypes.OCRConfigResponse{}, offRampRequests[0].ReturnVal)
-
-		// Check OffRamp execute config request
-		require.Equal(t, consts.MethodNameOffRampLatestConfigDetails, offRampRequests[1].ReadName)
-		require.Equal(t, map[string]any{"ocrPluginType": consts.PluginTypeExecute}, offRampRequests[1].Params)
-		require.IsType(t, &cciptypes.OCRConfigResponse{}, offRampRequests[1].ReturnVal)
-
-		// Verify RMN requests
-		rmnProxyRequests := requests[consts.ContractNameRMNProxy]
-		require.Len(t, rmnProxyRequests, 1)
-		require.Equal(t, consts.MethodNameGetARM, rmnProxyRequests[0].ReadName)
-		require.Empty(t, rmnProxyRequests[0].Params)
-		require.IsType(t, &[]byte{}, rmnProxyRequests[0].ReturnVal)
-
-		// Verify FeeQuoter request
-		feeQuoterRequests := requests[consts.ContractNameFeeQuoter]
-		require.Len(t, feeQuoterRequests, 1)
-		require.Equal(t, consts.MethodNameFeeQuoterGetStaticConfig, feeQuoterRequests[0].ReadName)
-		require.Empty(t, feeQuoterRequests[0].Params)
-		require.IsType(t, &cciptypes.FeeQuoterStaticConfig{}, feeQuoterRequests[0].ReturnVal)
 	})
 }
 

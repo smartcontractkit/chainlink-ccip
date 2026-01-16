@@ -2,7 +2,6 @@ package inmem
 
 import (
 	"context"
-	"math/big"
 	"slices"
 	"time"
 
@@ -172,14 +171,6 @@ func (r InMemoryCCIPReader) GetChainsFeeComponents(
 	panic("implement me")
 }
 
-func (r InMemoryCCIPReader) GetDestChainFeeComponents(_ context.Context) (types.ChainFeeComponents, error) {
-	feeComponents := types.ChainFeeComponents{
-		ExecutionFee:        big.NewInt(0),
-		DataAvailabilityFee: big.NewInt(0),
-	}
-	return feeComponents, nil
-}
-
 func (r InMemoryCCIPReader) GetWrappedNativeTokenPriceUSD(
 	ctx context.Context,
 	selectors []cciptypes.ChainSelector,
@@ -212,13 +203,9 @@ func (r InMemoryCCIPReader) GetRmnCurseInfo(ctx context.Context) (cciptypes.Curs
 	}, nil
 }
 
-func (r InMemoryCCIPReader) LinkPriceUSD(ctx context.Context) (cciptypes.BigInt, error) {
-	return cciptypes.NewBigIntFromInt64(100), nil
-}
-
 // Sync can be used to perform frequent syncing operations inside the reader implementation.
 // Returns a bool indicating whether something was updated.
-func (r InMemoryCCIPReader) Sync(_ context.Context, _ reader.ContractAddresses) error {
+func (r InMemoryCCIPReader) Sync(_ context.Context, _ cciptypes.ContractAddresses) error {
 	return nil
 }
 
