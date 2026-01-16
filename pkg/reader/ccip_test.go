@@ -318,7 +318,7 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round1(t *testing.T) {
 	}
 
 	// Build expected addresses.
-	var expectedContractAddresses ContractAddresses
+	var expectedContractAddresses cciptypes.ContractAddresses
 	for i := range onramps {
 		expectedContractAddresses = expectedContractAddresses.Append(
 			consts.ContractNameOnRamp, sourceChain[i], onramps[i])
@@ -421,7 +421,7 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round2(t *testing.T) {
 	}
 
 	// Build expected addresses.
-	var expectedContractAddresses ContractAddresses
+	var expectedContractAddresses cciptypes.ContractAddresses
 	for i := range onramps {
 		expectedContractAddresses = expectedContractAddresses.Append(
 			consts.ContractNameOnRamp, sourceChain[i], onramps[i])
