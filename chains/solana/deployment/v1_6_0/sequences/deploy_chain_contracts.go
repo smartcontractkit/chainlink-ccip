@@ -8,10 +8,12 @@ import (
 	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
+	tokenpoolops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/token_pools"
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/fee_quoter"
 	offrampops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/offramp"
 	rmnremoteops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/rmn_remote"
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/router"
+	testreceiverops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/test_receiver"
 	tokensops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
@@ -71,11 +73,28 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy RMN Remote: %w", err)
 		}
 		addresses = append(addresses, rmnRemoteRef.Output)
+
+		// Deploy BurnMint Token Pool
+		burnMintTokenPoolRef, err := operations.ExecuteOperation(b, tokenpoolops.DeployBurnMint, chain, input.ExistingAddresses)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy BurnMint Token Pool: %w", err)
+		}
+		addresses = append(addresses, burnMintTokenPoolRef.Output)
+
+		// Deploy LockRelease Token Pool
+		lockReleaseTokenPoolRef, err := operations.ExecuteOperation(b, tokenpoolops.DeployLockRelease, chain, input.ExistingAddresses)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy LockRelease Token Pool: %w", err)
+		}
+		addresses = append(addresses, lockReleaseTokenPoolRef.Output)
+
 		linkTokenAddress := solana.MustPublicKeyFromBase58(linkRef.Output.Address)
 		feeQuoterAddress := solana.MustPublicKeyFromBase58(feeQuoterRef.Output.Address)
 		offRampAddress := solana.MustPublicKeyFromBase58(offRampRef.Output.Address)
 		rmnRemoteAddress := solana.MustPublicKeyFromBase58(rmnRemoteRef.Output.Address)
 		ccipRouterProgram := solana.MustPublicKeyFromBase58(routerRef.Output.Address)
+		burnMintTokenPoolAddress := solana.MustPublicKeyFromBase58(burnMintTokenPoolRef.Output.Address)
+		lockReleaseTokenPoolAddress := solana.MustPublicKeyFromBase58(lockReleaseTokenPoolRef.Output.Address)
 
 		// Initialize FeeQuoter
 		lowBits, highBits := GetHighLowBits(input.MaxFeeJuelsPerMsg)
@@ -175,11 +194,29 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			rmnRemoteAddress,
 			rmnRemoteConfigPDA,
 			rmnRemoteCursePDA,
+			// token pools
+			burnMintTokenPoolAddress,
+			lockReleaseTokenPoolAddress,
 		}
 
 		err = utils.ExtendLookupTable(chain, offRampAddress, lookupTableKeys)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to extend OffRamp lookup table: %w", err)
+		}
+
+		// deploy test receiver contract
+		receiverRef, err := operations.ExecuteOperation(b, testreceiverops.Deploy, chain, input.ExistingAddresses)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy TestReceiver: %w", err)
+		}
+		addresses = append(addresses, receiverRef.Output)
+		// initialize test receiver contract
+		_, err = operations.ExecuteOperation(b, testreceiverops.Initialize, chain, testreceiverops.Params{
+			Router:   ccipRouterProgram,
+			Receiver: solana.MustPublicKeyFromBase58(receiverRef.Output.Address),
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to initialize TestReceiver: %w", err)
 		}
 
 		return sequences.OnChainOutput{

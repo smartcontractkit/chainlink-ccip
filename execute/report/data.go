@@ -1,7 +1,7 @@
 package report
 
 import (
-	"sort"
+	"slices"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
@@ -18,9 +18,8 @@ func markNewMessagesExecuted(
 		report.ExecutedMessages =
 			append(report.ExecutedMessages, execReport.Messages[i].Header.SequenceNumber)
 	}
-	sort.Slice(
-		report.ExecutedMessages,
-		func(i, j int) bool { return report.ExecutedMessages[i] < report.ExecutedMessages[j] })
+	slices.Sort(
+		report.ExecutedMessages)
 
 	return report
 }

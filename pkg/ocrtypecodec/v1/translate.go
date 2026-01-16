@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"maps"
 	"math/big"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -854,9 +855,7 @@ func (t *protoTranslator) nonceObservationsToProto(
 
 	for chainSel, nonceMap := range observations {
 		addrToNonce := make(map[string]uint64, len(nonceMap))
-		for addr, nonce := range nonceMap {
-			addrToNonce[addr] = nonce
-		}
+		maps.Copy(addrToNonce, nonceMap)
 		nonceObservations[uint64(chainSel)] = &ocrtypecodecpb.StringAddrToNonce{Nonces: addrToNonce}
 	}
 
@@ -873,9 +872,7 @@ func (t *protoTranslator) nonceObservationsFromProto(
 
 	for chainSel, nonceMap := range pbObservations {
 		innerMap := make(map[string]uint64, len(nonceMap.Nonces))
-		for addr, nonce := range nonceMap.Nonces {
-			innerMap[addr] = nonce
-		}
+		maps.Copy(innerMap, nonceMap.Nonces)
 		nonces[cciptypes.ChainSelector(chainSel)] = innerMap
 	}
 

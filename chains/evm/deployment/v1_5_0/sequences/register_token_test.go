@@ -87,7 +87,7 @@ func TestRegisterToken(t *testing.T) {
 			require.NoError(t, err, "Confirm should not error")
 
 			// Deploy token pool
-			tokenPoolAddress, tx, _, err := burn_mint_token_pool.DeployBurnMintTokenPool(
+			tokenPoolAddress, _, _, err := burn_mint_token_pool.DeployBurnMintTokenPool(
 				e.BlockChains.EVMChains()[chainSel].DeployerKey,
 				e.BlockChains.EVMChains()[chainSel].Client,
 				tokenAddress,
@@ -96,6 +96,7 @@ func TestRegisterToken(t *testing.T) {
 				common.HexToAddress("0x01"),
 				common.HexToAddress("0x02"),
 			)
+			require.NoError(t, err, "DeployBurnMintTokenPool should not error")
 
 			input := test.makeInput(
 				chainSel,

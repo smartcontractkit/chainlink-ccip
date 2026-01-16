@@ -3,24 +3,33 @@ package rmn_remote
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/gagliardetto/solana-go"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/rmn_remote"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/mcms/types"
+
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/rmn_remote"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
+	api "github.com/smartcontractkit/chainlink-ccip/deployment/fastcurse"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
 var ContractType cldf_deployment.ContractType = "RMNRemote"
 var ProgramName = "rmn_remote"
-var ProgramSize = 3 * 1024 * 1024
 var Version *semver.Version = semver.MustParse("1.6.0")
+
+type CurseInput struct {
+	Subjects           []api.Subject
+	RMNRemoteCursePDA  solana.PublicKey
+	RMNRemoteConfigPDA solana.PublicKey
+	RMNRemote          solana.PublicKey
+}
 
 var Deploy = operations.NewOperation(
 	"rmn-remote:deploy",
@@ -34,8 +43,7 @@ var Deploy = operations.NewOperation(
 			ContractType,
 			Version,
 			"",
-			ProgramName,
-			ProgramSize)
+			ProgramName)
 	},
 )
 
@@ -45,7 +53,7 @@ var Initialize = operations.NewOperation(
 	"Initializes the RMNRemote 1.6.0 contract",
 	func(b operations.Bundle, chain cldf_solana.Chain, input Params) (sequences.OnChainOutput, error) {
 		rmn_remote.SetProgramID(input.RMNRemote)
-		programData, err := utils.GetSolProgramData(chain, input.RMNRemote)
+		programData, err := utils.GetSolProgramData(chain.Client, input.RMNRemote)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get program data: %w", err)
 		}
@@ -107,7 +115,7 @@ var TransferOwnership = operations.NewOperation(
 
 		err = chain.Confirm([]solana.Instruction{ixn})
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm add price updater: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm ownership transfer: %w", err)
 		}
 		return sequences.OnChainOutput{}, nil
 	},
@@ -142,9 +150,109 @@ var AcceptOwnership = operations.NewOperation(
 
 		err = chain.Confirm([]solana.Instruction{ixn})
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm add price updater: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm ownership acceptance: %w", err)
 		}
 		return sequences.OnChainOutput{}, nil
+	},
+)
+
+var Curse = operations.NewOperation(
+	"rmn-remote:curse",
+	Version,
+	"Curses subjects with RMNRemote",
+	func(b operations.Bundle, chain cldf_solana.Chain, input CurseInput) (sequences.OnChainOutput, error) {
+		rmnRemoteConfigPDA := input.RMNRemoteConfigPDA
+		rmnRemoteCursesPDA := input.RMNRemoteCursePDA
+		rmn_remote.SetProgramID(input.RMNRemote)
+		authority := GetAuthority(chain, input.RMNRemote)
+		ins := make([]solana.Instruction, 0)
+		for _, subject := range input.Subjects {
+			curseSubject := rmn_remote.CurseSubject{
+				Value: subject,
+			}
+			ix, err := rmn_remote.NewCurseInstruction(
+				curseSubject,
+				rmnRemoteConfigPDA,
+				authority,
+				rmnRemoteCursesPDA,
+				solana.SystemProgramID,
+			).ValidateAndBuild()
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to build curse instruction: %w", err)
+			}
+			ins = append(ins, ix)
+		}
+		batches := make([]types.BatchOperation, 0)
+		if authority != chain.DeployerKey.PublicKey() {
+			b, err := utils.BuildMCMSBatchOperation(
+				chain.Selector,
+				ins,
+				input.RMNRemote.String(),
+				ContractType.String(),
+			)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute or create batch: %w", err)
+			}
+			batches = append(batches, b)
+		} else {
+			for _, ixn := range ins {
+				err := chain.Confirm([]solana.Instruction{ixn})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm curse instruction: %w", err)
+				}
+			}
+		}
+		return sequences.OnChainOutput{BatchOps: batches}, nil
+	},
+)
+
+var Uncurse = operations.NewOperation(
+	"rmn-remote:uncurse",
+	Version,
+	"Lifts curses for subjects with RMNRemote",
+	func(b operations.Bundle, chain cldf_solana.Chain, input CurseInput) (sequences.OnChainOutput, error) {
+		rmnRemoteConfigPDA := input.RMNRemoteConfigPDA
+		rmnRemoteCursesPDA := input.RMNRemoteCursePDA
+		rmn_remote.SetProgramID(input.RMNRemote)
+		authority := GetAuthority(chain, input.RMNRemote)
+		ins := make([]solana.Instruction, 0)
+		for _, subject := range input.Subjects {
+			curseSubject := rmn_remote.CurseSubject{
+				Value: subject,
+			}
+			ix, err := rmn_remote.NewUncurseInstruction(
+				curseSubject,
+				rmnRemoteConfigPDA,
+				authority,
+				rmnRemoteCursesPDA,
+				solana.SystemProgramID,
+			).ValidateAndBuild()
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to build uncurse instruction: %w", err)
+			}
+			ins = append(ins, ix)
+		}
+		batches := make([]types.BatchOperation, 0)
+		if authority != chain.DeployerKey.PublicKey() {
+			b, err := utils.BuildMCMSBatchOperation(
+				chain.Selector,
+				ins,
+				input.RMNRemote.String(),
+				ContractType.String(),
+			)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute or create batch: %w", err)
+			}
+			batches = append(batches, b)
+		} else {
+			for _, ixn := range ins {
+				err := chain.Confirm([]solana.Instruction{ixn})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm uncurse instruction: %w", err)
+				}
+			}
+		}
+		return sequences.OnChainOutput{BatchOps: batches}, nil
 	},
 )
 
@@ -156,6 +264,25 @@ func GetAuthority(chain cldf_solana.Chain, program solana.PublicKey) solana.Publ
 		return chain.DeployerKey.PublicKey()
 	}
 	return programData.Owner
+}
+
+func IsSubjectCursed(chain cldf_solana.Chain, program solana.PublicKey, subject rmn_remote.CurseSubject) (bool, error) {
+	rmnRemoteCursesPDA, _, err := state.FindRMNRemoteCursesPDA(program)
+	if err != nil {
+		return false, fmt.Errorf("failed to find RMNRemoteCurses PDA: %w", err)
+	}
+
+	var cursesAccount rmn_remote.Curses
+	err = chain.GetAccountDataBorshInto(context.Background(), rmnRemoteCursesPDA, &cursesAccount)
+	if err != nil {
+		return false, fmt.Errorf("failed to read curses account: %w", err)
+	}
+
+	if slices.Contains(cursesAccount.CursedSubjects, subject) {
+		return true, nil
+	}
+
+	return false, nil
 }
 
 type Params struct {

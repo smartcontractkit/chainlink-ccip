@@ -257,6 +257,17 @@ var GetToken = contract.NewRead(contract.ReadParams[any, common.Address, *burn_m
 	},
 })
 
+var IsSupportedToken = contract.NewRead(contract.ReadParams[common.Address, bool, *burn_mint_token_pool.BurnMintTokenPool]{
+	Name:         "token-pool:is-supported-token",
+	Version:      Version,
+	Description:  "Checks whether a token is supported by a TokenPool",
+	ContractType: ContractType,
+	NewContract:  burn_mint_token_pool.NewBurnMintTokenPool,
+	CallContract: func(tokenPool *burn_mint_token_pool.BurnMintTokenPool, opts *bind.CallOpts, token common.Address) (bool, error) {
+		return tokenPool.IsSupportedToken(opts, token)
+	},
+})
+
 var GetAllowListEnabled = contract.NewRead(contract.ReadParams[any, bool, *burn_mint_token_pool.BurnMintTokenPool]{
 	Name:         "token-pool:get-allow-list-enabled",
 	Version:      Version,

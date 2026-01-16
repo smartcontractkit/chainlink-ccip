@@ -22,12 +22,12 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	routerops1_2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
 	deploymentutils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 )
 
 // TestTransferOwnership tests transferring ownership of deployed contracts via MCMS timelocks.
@@ -48,7 +48,7 @@ func TestTransferOwnership(t *testing.T) {
 	evmDeployer := &adapters.EVMDeployer{}
 	dReg := deploy.GetRegistry()
 	dReg.RegisterDeployer(chainsel.FamilyEVM, deploy.MCMSVersion, evmDeployer)
-	deployMCMS := deploy.DeployMCMS(dReg)
+	deployMCMS := deploy.DeployMCMS(dReg, nil)
 	output, err := deployMCMS.Apply(*env, deploy.MCMSDeploymentConfig{
 		AdapterVersion: deploy.MCMSVersion,
 		Chains: map[uint64]deploy.MCMSDeploymentConfigPerChain{

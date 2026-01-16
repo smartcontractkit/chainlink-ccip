@@ -15,6 +15,7 @@ import (
 
 type GlobalCurseOnNetworkInput struct {
 	ChainSelectors map[uint64]*semver.Version
+	Force          bool
 	MCMS           mcms.Input
 }
 
@@ -67,6 +68,7 @@ func formCurseConfigForGlobalCurse(e cldf.Environment, cr *CurseRegistry, cfg Gl
 	// form the curse input for each chain selector
 	curseCfg := RMNCurseConfig{
 		CurseActions: make([]CurseActionInput, 0),
+		Force:        cfg.Force,
 		MCMS:         cfg.MCMS,
 	}
 	for chainSelector, version := range cfg.ChainSelectors {
@@ -138,38 +140,61 @@ func verifyCurseInput(cr *CurseRegistry, mcmsRegistry *changesets.MCMSReaderRegi
 	}
 }
 
+func filterSubjectsToCurse(e cldf.Environment, force bool, selector uint64, curseDetail curseActionDetails) ([]Subject, error) {
+	if force {
+		return curseDetail.subjects, nil
+	}
+
+	adapter := curseDetail.curseAdapter
+	subjects := curseDetail.subjects
+
+	globallyCursed, err := adapter.IsSubjectCursedOnChain(e, selector, GlobalCurseSubject())
+	if err != nil {
+		return nil, fmt.Errorf("failed to check if global curse is active on chain with selector %d: %w", selector, err)
+	}
+	if globallyCursed {
+		e.Logger.Infof("Global curse is already active on chain with selector %d, skipping all subjects", selector)
+		return nil, nil
+	}
+
+	result := make([]Subject, 0, len(subjects))
+	for _, subject := range subjects {
+		cursed, err := adapter.IsSubjectCursedOnChain(e, selector, subject)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check if subject %x is cursed on chain with selector %d: %w", subject, selector, err)
+		}
+		if cursed {
+			e.Logger.Infof("Subject %x is already cursed on chain with selector %d, skipping", subject, selector)
+			continue
+		}
+		result = append(result, subject)
+	}
+	return result, nil
+}
+
 func applyCurse(cr *CurseRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, RMNCurseConfig) (cldf.ChangesetOutput, error) {
 	return func(e cldf.Environment, cfg RMNCurseConfig) (cldf.ChangesetOutput, error) {
 		batchOps := make([]mcms_types.BatchOperation, 0)
 		reports := make([]cldf_ops.Report[any, any], 0)
-		// Group curse actions by chain selector
 		grouped, err := cr.groupRMNSubjectBySelector(e, cfg.CurseActions)
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to group curse actions: %w", err)
 		}
+
 		for selector, curseDetail := range grouped {
-			adapter := curseDetail.curseAdapter
-			subjects := curseDetail.subjects
-			notAlreadyCursedSubjects := make([]Subject, 0)
-			for _, subject := range subjects {
-				// Only curse the subjects that are not actually cursed
-				cursed, err := adapter.IsSubjectCursedOnChain(e, selector, subject)
-				if err != nil {
-					return cldf.ChangesetOutput{}, fmt.Errorf("failed to check if subject %x is cursed on chain with selector %d: %w", subject, selector, err)
-				}
-				if cursed && !cfg.Force {
-					e.Logger.Infof("Subject %x is already cursed on chain with selector %d, skipping", subject, selector)
-					continue
-				}
-				notAlreadyCursedSubjects = append(notAlreadyCursedSubjects, subject)
+			subjectsToCurse, err := filterSubjectsToCurse(e, cfg.Force, selector, curseDetail)
+			if err != nil {
+				return cldf.ChangesetOutput{}, err
 			}
-			if len(notAlreadyCursedSubjects) == 0 {
+
+			if len(subjectsToCurse) == 0 {
 				e.Logger.Infof("No new subjects to curse on chain with selector %d, skipping", selector)
 				continue
 			}
-			e.Logger.Infof("Cursing %d subjects on chain with selector %d", len(notAlreadyCursedSubjects), selector)
-			curseReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adapter.Curse(), e.BlockChains, CurseInput{
-				Subjects:      notAlreadyCursedSubjects,
+
+			e.Logger.Infof("Cursing %d subjects on chain with selector %d", len(subjectsToCurse), selector)
+			curseReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, curseDetail.curseAdapter.Curse(), e.BlockChains, CurseInput{
+				Subjects:      subjectsToCurse,
 				ChainSelector: selector,
 			})
 			if err != nil {
@@ -200,11 +225,15 @@ func applyUncurse(cr *CurseRegistry, mcmsRegistry *changesets.MCMSReaderRegistry
 			subjects := curseDetail.subjects
 			alreadyCursedSubjects := make([]Subject, 0)
 			for _, subject := range subjects {
+				if cfg.Force {
+					alreadyCursedSubjects = append(alreadyCursedSubjects, subject)
+					continue
+				}
 				cursed, err := adapter.IsSubjectCursedOnChain(e, selector, subject)
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to check if subject %x is cursed on chain with selector %d: %w", subject, selector, err)
 				}
-				if !cursed && !cfg.Force {
+				if !cursed {
 					e.Logger.Infof("Subject %x is not cursed on chain with selector %d, skipping", subject, selector)
 					continue
 				}
