@@ -270,6 +270,20 @@ func TestDeployCCTPChain(t *testing.T) {
 	require.NotEqual(t, common.Address{}, usdcTokenPoolProxyAddr, "USDCTokenPoolProxy address should be set")
 	require.NotEqual(t, common.Address{}, cctpVerifierResolverAddr, "CCTPVerifierResolver address should be set")
 
+	// Token admin registry should point to the USDCTokenPoolProxy
+	tokenConfigReport, err := operations.ExecuteOperation(
+		testsetup.BundleWithFreshReporter(e.OperationsBundle),
+		token_admin_registry.GetTokenConfig,
+		chain,
+		contract_utils.FunctionInput[common.Address]{
+			ChainSelector: input.ChainSelector,
+			Address:       setup.TokenAdminRegistry,
+			Args:          common.HexToAddress(setup.USDCToken.Hex()),
+		},
+	)
+	require.NoError(t, err, "Failed to get token config from token admin registry")
+	require.Equal(t, usdcTokenPoolProxyAddr, tokenConfigReport.Output.TokenPool, "Token pool in registry should be the proxy")
+
 	// Check CCTPTokenPool dynamic config
 	cctpTokenPool, err := cctp_through_ccv_token_pool_bindings.NewCCTPThroughCCVTokenPool(cctpTokenPoolAddr, chain.Client)
 	require.NoError(t, err, "Failed to instantiate CCTPTokenPool contract")
