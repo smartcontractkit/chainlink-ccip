@@ -428,7 +428,10 @@ type readerSyncer struct {
 //
 // Returns true if a sync was already in progress.
 // Make sure to pass a context with a timeout to avoid blocking the plugin for too long.
-func (s *readerSyncer) Sync(ctx context.Context, contracts cciptypes.ContractAddresses) (alreadySyncing bool, err error) {
+func (s *readerSyncer) Sync(
+	ctx context.Context,
+	contracts cciptypes.ContractAddresses,
+) (alreadySyncing bool, err error) {
 	if !s.busy.CompareAndSwap(false, true) {
 		return true, nil
 	}

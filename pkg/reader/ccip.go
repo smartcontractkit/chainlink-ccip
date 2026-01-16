@@ -1032,10 +1032,5 @@ func (r *ccipChainReader) GetOnRampConfig(
 	return config.OnRamp, nil
 }
 
-// getDestChain returns the destination chain selector
-func (r *ccipChainReader) getDestChain() cciptypes.ChainSelector {
-	return r.destChain
-}
-
 // Interface compliance check
 var _ CCIPReader = (*ccipChainReader)(nil)

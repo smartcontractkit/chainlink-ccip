@@ -254,7 +254,7 @@ func TestContractDiscoveryProcessor_Outcome_HappyPath(t *testing.T) {
 	mockReader.
 		EXPECT().
 		Sync(mock.Anything, expectedContracts).
-		Run(func(_ context.Context, _ reader.ContractAddresses) { close(syncCalled) }).
+		Run(func(_ context.Context, _ cciptypes.ContractAddresses) { close(syncCalled) }).
 		Return(nil)
 
 	cdp := internalNewContractDiscoveryProcessor(
@@ -341,7 +341,7 @@ func TestContractDiscovery_Outcome_HappyPath_FRoleDONAndFDestChainAreDifferent(t
 	mockReader.
 		EXPECT().
 		Sync(mock.Anything, expectedContracts).
-		Run(func(_ context.Context, _ reader.ContractAddresses) { close(syncCalled) }).
+		Run(func(_ context.Context, _ cciptypes.ContractAddresses) { close(syncCalled) }).
 		Return(nil)
 
 	cdp := internalNewContractDiscoveryProcessor(
@@ -434,7 +434,7 @@ func TestContractDiscoveryProcessor_Outcome_NotEnoughObservations(t *testing.T) 
 	mockReader.
 		EXPECT().
 		Sync(mock.Anything, expectedContracts).
-		Run(func(_ context.Context, _ reader.ContractAddresses) { close(syncCalled) }).
+		Run(func(_ context.Context, _ cciptypes.ContractAddresses) { close(syncCalled) }).
 		Return(nil)
 
 	cdp := internalNewContractDiscoveryProcessor(
@@ -523,7 +523,7 @@ func TestContractDiscoveryProcessor_Outcome_ErrorSyncingContracts(t *testing.T) 
 	mockReader.
 		EXPECT().
 		Sync(mock.Anything, expectedContracts).
-		Run(func(_ context.Context, _ reader.ContractAddresses) { close(syncCalled) }).
+		Run(func(_ context.Context, _ cciptypes.ContractAddresses) { close(syncCalled) }).
 		Return(syncErr)
 
 	cdp := internalNewContractDiscoveryProcessor(
@@ -829,7 +829,7 @@ func TestReaderSyncer_Sync_FirstCall(t *testing.T) {
 	var readerInstance reader.CCIPReader = mockReader
 	syncer := &readerSyncer{reader: &readerInstance}
 
-	contracts := reader.ContractAddresses{}
+	contracts := cciptypes.ContractAddresses{}
 	mockReader.On("Sync", mock.Anything, contracts).Return(nil)
 
 	alreadySyncing, err := syncer.Sync(t.Context(), contracts)
@@ -842,7 +842,7 @@ func TestReaderSyncer_Sync_ConcurrentCall(t *testing.T) {
 	mockReader := mock_reader.NewMockCCIPReader(t)
 	var readerInstance reader.CCIPReader = mockReader
 	syncer := &readerSyncer{reader: &readerInstance}
-	contracts := reader.ContractAddresses{}
+	contracts := cciptypes.ContractAddresses{}
 
 	// Simulate a long-running sync operation
 	syncStarted := make(chan struct{})
@@ -893,7 +893,7 @@ func TestReaderSyncer_Sync_AfterCompletion(t *testing.T) {
 	mockReader := mock_reader.NewMockCCIPReader(t)
 	var readerInstance reader.CCIPReader = mockReader
 	syncer := &readerSyncer{reader: &readerInstance}
-	contracts := reader.ContractAddresses{}
+	contracts := cciptypes.ContractAddresses{}
 
 	// First call
 	mockReader.On("Sync", mock.Anything, contracts).Return(nil).Once()
@@ -912,7 +912,7 @@ func TestReaderSyncer_Sync_ErrorPropagation(t *testing.T) {
 	mockReader := mock_reader.NewMockCCIPReader(t)
 	var readerInstance reader.CCIPReader = mockReader
 	syncer := &readerSyncer{reader: &readerInstance}
-	contracts := reader.ContractAddresses{}
+	contracts := cciptypes.ContractAddresses{}
 
 	expectedErr := errors.New("sync error")
 	mockReader.On("Sync", mock.Anything, contracts).Return(expectedErr)

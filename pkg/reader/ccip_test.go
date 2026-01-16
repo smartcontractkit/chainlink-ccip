@@ -34,7 +34,6 @@ var (
 	chainA = cciptypes.ChainSelector(1)
 	chainB = cciptypes.ChainSelector(2)
 	chainC = cciptypes.ChainSelector(3)
-	chainD = cciptypes.ChainSelector(4)
 )
 
 func TestCCIPChainReader_GetContractAddress(t *testing.T) {
