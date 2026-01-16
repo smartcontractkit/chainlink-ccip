@@ -1,7 +1,6 @@
 package deployment
 
 import (
-	"encoding/hex"
 	"math/big"
 	"testing"
 	"time"
@@ -10,12 +9,16 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gagliardetto/solana-go"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
+	mcms_types "github.com/smartcontractkit/mcms/types"
+	"github.com/stretchr/testify/require"
+
 	evmsequences "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
 	evmfq "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/fee_quoter"
-	_ "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
+	solanasequences "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/fee_quoter"
@@ -24,13 +27,11 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
 	cs_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
-	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
-	mcms_types "github.com/smartcontractkit/mcms/types"
-	"github.com/stretchr/testify/require"
+
+	fdeployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	lanesapi "github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
-	fdeployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
 
 func checkBidirectionalLaneConnectivity(
@@ -57,21 +58,6 @@ func checkBidirectionalLaneConnectivity(
 	offRampOnSrcAddr, err := solanaAdapter.GetOffRampAddress(e.DataStore, solanaChain.Selector)
 	require.NoError(t, err, "must get offRamp from srcAdapter")
 
-	offRampEvmSourceChainPDA, _, _ = state.FindOfframpSourceChainPDA(evmChain.Selector, solana.PublicKeyFromBytes(offRampOnSrcAddr))
-	err = e.BlockChains.SolanaChains()[solanaChain.Selector].GetAccountDataBorshInto(e.GetContext(), offRampEvmSourceChainPDA, &offRampSourceChain)
-	require.NoError(t, err)
-	require.Equal(t, !disable, offRampSourceChain.Config.IsEnabled)
-
-	evmDestChainStatePDA, _ = state.FindDestChainStatePDA(evmChain.Selector, solana.PublicKeyFromBytes(routerOnSrcAddr))
-	err = e.BlockChains.SolanaChains()[solanaChain.Selector].GetAccountDataBorshInto(e.GetContext(), evmDestChainStatePDA, &destChainStateAccount)
-	require.NoError(t, err)
-	require.Equal(t, solanaChain.AllowListEnabled, destChainStateAccount.Config.AllowListEnabled)
-
-	fqEvmDestChainPDA, _, _ = state.FindFqDestChainPDA(evmChain.Selector, solana.PublicKeyFromBytes(feeQuoterOnSrcAddr))
-	err = e.BlockChains.SolanaChains()[solanaChain.Selector].GetAccountDataBorshInto(e.GetContext(), fqEvmDestChainPDA, &destChainFqAccount)
-	require.NoError(t, err, "failed to get account info")
-	require.Equal(t, !disable, destChainFqAccount.Config.IsEnabled)
-
 	// EVM Validation
 	feeQuoterOnDestAddr, err := evmAdapter.GetFQAddress(e.DataStore, evmChain.Selector)
 	require.NoError(t, err, "must get feeQuoter from srcAdapter")
@@ -93,6 +79,25 @@ func checkBidirectionalLaneConnectivity(
 	routerOnDest, err := router.NewRouter(common.BytesToAddress(routerOnDestAddr), e.BlockChains.EVMChains()[evmChain.Selector].Client)
 	require.NoError(t, err, "must instantiate router")
 
+	// Validate EVM PDAs are set
+	offRampEvmSourceChainPDA, _, _ = state.FindOfframpSourceChainPDA(evmChain.Selector, solana.PublicKeyFromBytes(offRampOnSrcAddr))
+	err = e.BlockChains.SolanaChains()[solanaChain.Selector].GetAccountDataBorshInto(e.GetContext(), offRampEvmSourceChainPDA, &offRampSourceChain)
+	require.NoError(t, err)
+	require.Equal(t, !disable, offRampSourceChain.Config.IsEnabled)
+	require.Equal(t, common.BytesToAddress(onRampDestAddr).Hex(), common.BytesToAddress(offRampSourceChain.Config.OnRamp.Bytes[:offRampSourceChain.Config.OnRamp.Len]).Hex())
+
+	evmDestChainStatePDA, _ = state.FindDestChainStatePDA(evmChain.Selector, solana.PublicKeyFromBytes(routerOnSrcAddr))
+	err = e.BlockChains.SolanaChains()[solanaChain.Selector].GetAccountDataBorshInto(e.GetContext(), evmDestChainStatePDA, &destChainStateAccount)
+	require.NoError(t, err)
+	require.Equal(t, solanaChain.AllowListEnabled, destChainStateAccount.Config.AllowListEnabled)
+
+	fqEvmDestChainPDA, _, _ = state.FindFqDestChainPDA(evmChain.Selector, solana.PublicKeyFromBytes(feeQuoterOnSrcAddr))
+	err = e.BlockChains.SolanaChains()[solanaChain.Selector].GetAccountDataBorshInto(e.GetContext(), fqEvmDestChainPDA, &destChainFqAccount)
+	require.NoError(t, err, "failed to get account info")
+	require.Equal(t, !disable, destChainFqAccount.Config.IsEnabled)
+	require.Equal(t, solanasequences.TranslateFQ(evmChain.FeeQuoterDestChainConfig), destChainFqAccount.Config)
+
+	// Validate EVM onRamp/OffRamp/Router/FeeQuoter state
 	destChainConfig, err := onRampDest.GetDestChainConfig(nil, solanaChain.Selector)
 	require.NoError(t, err, "must get dest chain config from onRamp")
 	routerAddr := routerOnDestAddr
@@ -131,7 +136,7 @@ func checkBidirectionalLaneConnectivity(
 
 func TestConnectChains_EVM2SVM_NoMCMS(t *testing.T) {
 	t.Parallel()
-	programsPath, ds, err := PreloadSolanaEnvironment(chain_selectors.SOLANA_MAINNET.Selector)
+	programsPath, ds, err := PreloadSolanaEnvironment(t, chain_selectors.SOLANA_MAINNET.Selector)
 	require.NoError(t, err, "Failed to set up Solana environment")
 	require.NotNil(t, ds, "Datastore should be created")
 
@@ -180,24 +185,20 @@ func TestConnectChains_EVM2SVM_NoMCMS(t *testing.T) {
 		out.DataStore.Merge(e.DataStore)
 		e.DataStore = out.DataStore.Seal()
 	}
-	DeployMCMS(t, e, chain_selectors.SOLANA_MAINNET.Selector)
+	DeployMCMS(t, e, chain_selectors.SOLANA_MAINNET.Selector, []string{cciputils.CLLQualifier})
 	SolanaTransferOwnership(t, e, chain_selectors.SOLANA_MAINNET.Selector)
 	// TODO: EVM doesn't work with a non-zero timelock delay
 	// DeployMCMS(t, e, chain_selectors.ETHEREUM_MAINNET.Selector)
 	// EVMTransferOwnership(t, e, chain_selectors.ETHEREUM_MAINNET.Selector)
-	evmEncoded, err := hex.DecodeString(cciputils.EVMFamilySelector)
-	require.NoError(t, err, "Failed to decode EVM family selector")
-	svmEncoded, err := hex.DecodeString(cciputils.SVMFamilySelector)
-	require.NoError(t, err, "Failed to decode SVM family selector")
 	chain1 := lanesapi.ChainDefinition{
 		Selector:                 chain_selectors.SOLANA_MAINNET.Selector,
 		GasPrice:                 big.NewInt(1e17),
-		FeeQuoterDestChainConfig: lanesapi.DefaultFeeQuoterDestChainConfig(true, svmEncoded),
+		FeeQuoterDestChainConfig: lanesapi.DefaultFeeQuoterDestChainConfig(true, chain_selectors.SOLANA_MAINNET.Selector),
 	}
 	chain2 := lanesapi.ChainDefinition{
 		Selector:                 chain_selectors.ETHEREUM_MAINNET.Selector,
 		GasPrice:                 big.NewInt(1e9),
-		FeeQuoterDestChainConfig: lanesapi.DefaultFeeQuoterDestChainConfig(true, evmEncoded),
+		FeeQuoterDestChainConfig: lanesapi.DefaultFeeQuoterDestChainConfig(true, chain_selectors.ETHEREUM_MAINNET.Selector),
 	}
 
 	connectOut, err := lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.ConnectChainsConfig{
@@ -213,6 +214,7 @@ func TestConnectChains_EVM2SVM_NoMCMS(t *testing.T) {
 			ValidUntil:           3759765795,
 			TimelockDelay:        mcms_types.MustParseDuration("1s"),
 			TimelockAction:       mcms_types.TimelockActionSchedule,
+			Qualifier:            cciputils.CLLQualifier,
 			Description:          "Connect Chains",
 		},
 	})
@@ -228,4 +230,6 @@ func TestConnectChains_EVM2SVM_NoMCMS(t *testing.T) {
 	destAdapter, exists := laneRegistry.GetLaneAdapter(destFamily, version)
 	require.True(t, exists, "must have ChainAdapter registered for dest chain family")
 	checkBidirectionalLaneConnectivity(t, e, chain1, chain2, srcAdapter, destAdapter, false, false)
+	// should add a new entry for remote source and remote dest in solana
+	require.Equal(t, 2, len(connectOut.DataStore.Addresses().Filter()))
 }

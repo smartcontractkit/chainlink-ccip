@@ -5,6 +5,8 @@ import (
 	"math/big"
 
 	"github.com/Masterminds/semver/v3"
+	chain_selectors "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 )
 
@@ -91,8 +93,9 @@ type UpdateLanesInput struct {
 	ExtraConfigs ExtraConfigs
 }
 
-func DefaultFeeQuoterDestChainConfig(configEnabled bool, destChain []byte) FeeQuoterDestChainConfig {
-	return FeeQuoterDestChainConfig{
+func DefaultFeeQuoterDestChainConfig(configEnabled bool, selector uint64) FeeQuoterDestChainConfig {
+	chainHex := utils.GetSelectorHex(selector)
+	params := FeeQuoterDestChainConfig{
 		IsEnabled:                         configEnabled,
 		MaxNumberOfTokensPerMsg:           10,
 		MaxDataBytes:                      30_000,
@@ -109,6 +112,24 @@ func DefaultFeeQuoterDestChainConfig(configEnabled bool, destChain []byte) FeeQu
 		DefaultTxGasLimit:                 200_000,
 		GasMultiplierWeiPerEth:            11e17,
 		NetworkFeeUSDCents:                10,
-		ChainFamilySelector:               binary.BigEndian.Uint32(destChain[:]),
+		ChainFamilySelector:               binary.BigEndian.Uint32(chainHex[:]),
 	}
+	family, _ := chain_selectors.GetSelectorFamily(selector)
+	switch family {
+	case chain_selectors.FamilyTon:
+		params.MaxPerMsgGasLimit = 4_200_000_000 // 4_200_000_000 nano TON = 4.2 TON
+	}
+	return params
+}
+
+func DefaultGasPrice(selector uint64) *big.Int {
+	family, _ := chain_selectors.GetSelectorFamily(selector)
+	switch family {
+	case chain_selectors.FamilyTon:
+		return big.NewInt(2.12e9) // 1 TON ~2.13 USD -> 1 nanoTON = 2.13e−9 USD -> 1 nanoTON expressed in 1e18 (1 USD) = 2.13e9
+	}
+	// Gas price in USD (18 decimals) per unit of gas
+	// 2e12 = $0.000002 per gas unit
+	// With ~500,000 gas, this results in ~$1 USD fee per message
+	return big.NewInt(2e12)
 }

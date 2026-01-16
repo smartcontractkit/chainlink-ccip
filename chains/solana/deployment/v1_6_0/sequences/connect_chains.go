@@ -24,7 +24,7 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 	"Configures lane leg as source on CCIP 1.6.0",
 	func(b operations.Bundle, chains cldf_chain.BlockChains, input lanes.UpdateLanesInput) (sequences.OnChainOutput, error) {
 		var result sequences.OnChainOutput
-		b.Logger.Info("SVM Configuring lane leg as source:", input)
+		b.Logger.Infof("SVM Configuring lane leg as source: %+v", input)
 		feeQuoterAddress := solana.PublicKeyFromBytes(input.Source.FeeQuoter)
 		offRampAddress := solana.PublicKeyFromBytes(input.Source.OffRamp)
 		ccipRouterProgram := solana.PublicKeyFromBytes(input.Source.Router)
@@ -66,7 +66,7 @@ var ConfigureLaneLegAsDest = operations.NewSequence(
 	"Configures lane leg as destination on CCIP 1.6.0",
 	func(b operations.Bundle, chains cldf_chain.BlockChains, input lanes.UpdateLanesInput) (sequences.OnChainOutput, error) {
 		var result sequences.OnChainOutput
-		b.Logger.Info("SVM Configuring lane leg as destination:", input)
+		b.Logger.Infof("SVM Configuring lane leg as destination: %+v", input)
 		offRampAddress := solana.PublicKeyFromBytes(input.Dest.OffRamp)
 		ccipRouterProgram := solana.PublicKeyFromBytes(input.Dest.Router)
 
@@ -88,8 +88,9 @@ var ConfigureLaneLegAsDest = operations.NewSequence(
 		offRampOut, err := operations.ExecuteOperation(b, offrampops.ConnectChains, chains.SolanaChains()[input.Dest.Selector], offrampops.ConnectChainsParams{
 			RemoteChainSelector: input.Source.Selector,
 			OffRamp:             offRampAddress,
-			SourceOnRamp:        input.Source.OffRamp,
+			SourceOnRamp:        input.Source.OnRamp,
 			EnabledAsSource:     !input.IsDisabled,
+			IsRMNVerificationDisabled: !input.Source.RMNVerificationEnabled,
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to initialize OffRamp: %w", err)

@@ -8,10 +8,12 @@ import (
 	"time"
 
 	"github.com/gagliardetto/solana-go"
+	"github.com/gagliardetto/solana-go/programs/system"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
+	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
 	cldf_datastore "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	mcms_solana "github.com/smartcontractkit/mcms/sdk/solana"
@@ -19,10 +21,22 @@ import (
 )
 
 const (
-	TimelockProgramType cldf_deployment.ContractType = "RBACTimelockProgram"
-	McmProgramType      cldf_deployment.ContractType = "ManyChainMultiSigProgram"
+	TimelockProgramType         cldf_deployment.ContractType = "RBACTimelockProgram"
+	McmProgramType              cldf_deployment.ContractType = "ManyChainMultiSigProgram"
+	AccessControllerProgramType cldf_deployment.ContractType = "AccessControllerProgram"
 	// special type for Solana that encodes PDA seed usage
-	TimelockCompositeAddress cldf_deployment.ContractType = "RBACTimelockProgramCompositeAddress"
+	ProposerSeed     cldf_deployment.ContractType = "ProposerSeed"
+	CancellerSeed    cldf_deployment.ContractType = "CancellerSeed"
+	BypasserSeed     cldf_deployment.ContractType = "BypasserSeed"
+	RBACTimelockSeed cldf_deployment.ContractType = "RBACTimelockSeed"
+	// access controller accounts
+	ProposerAccessControllerAccount  cldf_deployment.ContractType = "ProposerAccessControllerAccount"
+	ExecutorAccessControllerAccount  cldf_deployment.ContractType = "ExecutorAccessControllerAccount"
+	CancellerAccessControllerAccount cldf_deployment.ContractType = "CancellerAccessControllerAccount"
+	BypasserAccessControllerAccount  cldf_deployment.ContractType = "BypasserAccessControllerAccount"
+	// tokens
+	SPLTokens     cldf_deployment.ContractType = "SPLTokens"
+	SPL2022Tokens cldf_deployment.ContractType = "SPL2022Tokens"
 )
 
 // Common parameters for transferring ownership of a program
@@ -71,77 +85,40 @@ func GetTimelockSignerPDA(
 	existingAddresses []cldf_datastore.AddressRef,
 	chainSelector uint64,
 	qualifier string) solana.PublicKey {
-	timelockProgram := datastore.GetAddressRef(
-		existingAddresses,
-		chainSelector,
-		TimelockProgramType,
-		common_utils.Version_1_6_0,
-		"",
-	)
 	// timelock seeds stored as a separate program type
 	// qualifier will identify the correct timelock instance
-	timelockSeed := datastore.GetAddressRef(
+	timelock := datastore.GetAddressRef(
 		existingAddresses,
 		chainSelector,
 		common_utils.RBACTimelock,
 		common_utils.Version_1_6_0,
 		qualifier,
 	)
+	id, seed, _ := mcms_solana.ParseContractAddress(timelock.Address)
 	return state.GetTimelockSignerPDA(
-		solana.MustPublicKeyFromBase58(timelockProgram.Address),
-		state.PDASeed([]byte(timelockSeed.Address)),
+		id,
+		state.PDASeed([]byte(seed[:])),
 	)
 }
 
 func GetMCMSignerPDA(
 	existingAddresses []cldf_datastore.AddressRef,
 	chainSelector uint64,
+	signerType cldf_deployment.ContractType,
 	qualifier string) solana.PublicKey {
-	mcmProgram := datastore.GetAddressRef(
-		existingAddresses,
-		chainSelector,
-		McmProgramType,
-		common_utils.Version_1_6_0,
-		"",
-	)
 	// mcm seeds stored as a separate program type
 	// qualifier will identify the correct mcm instance
-	mcmSeed := datastore.GetAddressRef(
+	mcm := datastore.GetAddressRef(
 		existingAddresses,
 		chainSelector,
-		common_utils.ProposerManyChainMultisig,
+		signerType,
 		common_utils.Version_1_6_0,
 		qualifier,
 	)
+	id, seed, _ := mcms_solana.ParseContractAddress(mcm.Address)
 	return state.GetMCMSignerPDA(
-		solana.MustPublicKeyFromBase58(mcmProgram.Address),
-		state.PDASeed([]byte(mcmSeed.Address)),
-	)
-}
-
-func GetTimelockCompositeAddress(
-	existingAddresses []cldf_datastore.AddressRef,
-	chainSelector uint64,
-	qualifier string) string {
-	timelockProgram := datastore.GetAddressRef(
-		existingAddresses,
-		chainSelector,
-		TimelockProgramType,
-		common_utils.Version_1_6_0,
-		"",
-	)
-	// timelock seeds stored as a separate program type
-	// qualifier will identify the correct timelock instance
-	timelockSeed := datastore.GetAddressRef(
-		existingAddresses,
-		chainSelector,
-		common_utils.RBACTimelock,
-		common_utils.Version_1_6_0,
-		qualifier,
-	)
-	return mcms_solana.ContractAddress(
-		solana.MustPublicKeyFromBase58(timelockProgram.Address),
-		mcms_solana.PDASeed([]byte(timelockSeed.Address)),
+		id,
+		state.PDASeed([]byte(seed[:])),
 	)
 }
 
@@ -198,6 +175,38 @@ func FundSolanaAccounts(
 			}
 			remaining = unfinalizedCount
 		}
+	}
+	return nil
+}
+
+// FundFromAddressIxs transfers SOL from the given address to each provided account and waits for confirmations.
+func FundFromAddressIxs(solChain cldf_solana.Chain, from solana.PublicKey, accounts []solana.PublicKey, amount uint64) ([]solana.Instruction, error) {
+	var ixs []solana.Instruction
+	for _, account := range accounts {
+		// Create a transfer instruction using the provided builder.
+		ix, err := system.NewTransferInstruction(
+			amount,
+			from,    // funding account (sender)
+			account, // recipient account
+		).ValidateAndBuild()
+		if err != nil {
+			return nil, fmt.Errorf("failed to create transfer instruction: %w", err)
+		}
+		ixs = append(ixs, ix)
+	}
+
+	return ixs, nil
+}
+
+// FundFromDeployerKey transfers SOL from the deployer to each provided account and waits for confirmations.
+func FundFromDeployerKey(solChain cldf_solana.Chain, accounts []solana.PublicKey, amount uint64) error {
+	ixs, err := FundFromAddressIxs(solChain, solChain.DeployerKey.PublicKey(), accounts, amount*solana.LAMPORTS_PER_SOL)
+	if err != nil {
+		return fmt.Errorf("failed to create transfer instructions: %w", err)
+	}
+	err = solChain.Confirm(ixs)
+	if err != nil {
+		return fmt.Errorf("failed to confirm transaction: %w", err)
 	}
 	return nil
 }

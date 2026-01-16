@@ -5,7 +5,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"math/big"
-	"sort"
+	"slices"
 	"testing"
 	"time"
 
@@ -855,7 +855,7 @@ func setupNode(params SetupNodeParams) nodeSetup {
 	for chainSel := range params.offRampNextSeqNum {
 		sourceChains = append(sourceChains, chainSel)
 	}
-	sort.Slice(sourceChains, func(i, j int) bool { return sourceChains[i] < sourceChains[j] })
+	slices.Sort(sourceChains)
 
 	offRampNextSeqNums := make(map[ccipocr3.ChainSelector]ccipocr3.SeqNum, 0)
 	chainsWithNewMsgs := make([]ccipocr3.ChainSelector, 0)
@@ -867,7 +867,7 @@ func setupNode(params SetupNodeParams) nodeSetup {
 		newMsgs := make([]ccipocr3.Message, 0)
 		numNewMsgs := (params.onRampLastSeqNum[sourceChain] - offRampNextSeqNum) + 1
 		for i := uint64(0); i < uint64(numNewMsgs); i++ {
-			messageID := sha256.Sum256([]byte(fmt.Sprintf("%d", uint64(offRampNextSeqNum)+i)))
+			messageID := sha256.Sum256(fmt.Appendf(nil, "%d", uint64(offRampNextSeqNum)+i))
 			newMsgs = append(newMsgs, ccipocr3.Message{
 				Header: ccipocr3.RampMessageHeader{
 					MessageID:      messageID,

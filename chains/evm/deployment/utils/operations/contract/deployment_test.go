@@ -141,7 +141,7 @@ func TestDeploy(t *testing.T) {
 				_ *clients.Client,
 				_ *accounts.Wallet,
 				_ *abi.ABI,
-				_ ...interface{},
+				_ ...any,
 			) (common.Address, error) {
 				return address, nil
 			}
@@ -150,7 +150,7 @@ func TestDeploy(t *testing.T) {
 				_ abi.ABI,
 				_ []byte,
 				_ bind.ContractBackend,
-				params ...interface{},
+				params ...any,
 			) (common.Address, *types.Transaction, *bind.BoundContract, error) {
 				// Not caught by operation validation, revert reason should be surfaced
 				if params[0] == 10 {

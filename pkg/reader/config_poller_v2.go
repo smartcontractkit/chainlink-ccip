@@ -124,9 +124,7 @@ func (c *configPollerV2) Ready() error {
 //
 // The goroutine continues until the stopChan is closed during service shutdown.
 func (c *configPollerV2) startBackgroundPolling() {
-	c.wg.Add(1)
-	go func() {
-		defer c.wg.Done()
+	c.wg.Go(func() {
 		ticker := time.NewTicker(c.refreshPeriod)
 		defer ticker.Stop()
 		for {
@@ -137,7 +135,7 @@ func (c *configPollerV2) startBackgroundPolling() {
 				return
 			}
 		}
-	}()
+	})
 }
 
 // GetChainConfig retrieves the ChainConfigSnapshot for a specific chain selector.
@@ -428,7 +426,12 @@ func (c *configPollerV2) batchRefreshChainAndSourceConfigs(
 			"sourceChainSelectors", sourceChainSelectors,
 		)
 	}
-	c.lggr.Debugw("Batch refreshed configs via chainAccessor", "chain", chainSel, "latency", time.Since(start))
+	c.lggr.Debugw("Batch refreshed configs via chainAccessor",
+		"chain", chainSel,
+		"latency", time.Since(start),
+		"chainConfigSnapshot", chainConfigSnapshot,
+		"sourceChainConfigs", sourceChainConfigs,
+	)
 	return nil
 }
 
