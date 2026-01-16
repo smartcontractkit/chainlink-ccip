@@ -8,6 +8,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -41,17 +42,29 @@ var RegisterToken = cldf_ops.NewSequence(
 	"register-token",
 	semver.MustParse("1.5.0"),
 	"Registers a token with CCIP via the token admin registry",
-	func(b operations.Bundle, chain evm.Chain, input RegisterTokenInput) (output sequences.OnChainOutput, err error) {
+	func(b cldf_ops.Bundle, chain evm.Chain, input RegisterTokenInput) (output sequences.OnChainOutput, err error) {
 		if err := input.Validate(chain); err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("invalid input: %w", err)
 		}
-		writes := make([]contract.WriteOutput, 0)
+		writes := make([]evm_contract.WriteOutput, 0)
+
+		tokenAddress := input.TokenAddress
+		if tokenAddress == (common.Address{}) {
+			getTokenReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetToken, chain, evm_contract.FunctionInput[any]{
+				ChainSelector: input.ChainSelector,
+				Address:       input.TokenPoolAddress,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token address: %w", err)
+			}
+			tokenAddress = getTokenReport.Output
+		}
 
 		// Get the current token config from the token admin registry.
 		tokenConfigReport, err := cldf_ops.ExecuteOperation(b, token_admin_registry.GetTokenConfig, chain, evm_contract.FunctionInput[common.Address]{
 			ChainSelector: input.ChainSelector,
 			Address:       input.TokenAdminRegistryAddress,
-			Args:          input.TokenAddress,
+			Args:          tokenAddress,
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get token config: %w", err)
@@ -81,7 +94,7 @@ var RegisterToken = cldf_ops.NewSequence(
 				ChainSelector: input.ChainSelector,
 				Address:       input.TokenAdminRegistryAddress,
 				Args: token_admin_registry.ProposeAdministratorArgs{
-					TokenAddress:  input.TokenAddress,
+					TokenAddress:  tokenAddress,
 					Administrator: desiredAdmin,
 				},
 			})
@@ -98,7 +111,7 @@ var RegisterToken = cldf_ops.NewSequence(
 				ChainSelector: input.ChainSelector,
 				Address:       input.TokenAdminRegistryAddress,
 				Args: token_admin_registry.AcceptAdminRoleArgs{
-					TokenAddress: input.TokenAddress,
+					TokenAddress: tokenAddress,
 				},
 			})
 			if err != nil {
@@ -114,7 +127,7 @@ var RegisterToken = cldf_ops.NewSequence(
 				ChainSelector: input.ChainSelector,
 				Address:       input.TokenAdminRegistryAddress,
 				Args: token_admin_registry.SetPoolArgs{
-					TokenAddress:     input.TokenAddress,
+					TokenAddress:     tokenAddress,
 					TokenPoolAddress: input.TokenPoolAddress,
 				},
 			})
@@ -124,7 +137,7 @@ var RegisterToken = cldf_ops.NewSequence(
 			writes = append(writes, setPoolReport.Output)
 		}
 
-		batchOp, err := contract.NewBatchOperationFromWrites(writes)
+		batchOp, err := evm_contract.NewBatchOperationFromWrites(writes)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
 		}

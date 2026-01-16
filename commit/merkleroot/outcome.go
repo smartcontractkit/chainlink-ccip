@@ -496,7 +496,7 @@ func getOffRampNextSequenceNumbersConsensus(
 			continue
 		}
 
-		sort.Slice(observedNextSeqNums, func(i, j int) bool { return observedNextSeqNums[i] < observedNextSeqNums[j] })
+		slices.Sort(observedNextSeqNums)
 		offRampNextSeqNumsConsensus[sourceChain] = observedNextSeqNums[fDestChain]
 	}
 

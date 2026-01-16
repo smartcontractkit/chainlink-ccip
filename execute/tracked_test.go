@@ -49,7 +49,7 @@ func Test_LatencyIsTracked(t *testing.T) {
 	tracked := NewTrackedPlugin(origin, lggr, reporter, ocrtypecodec.DefaultExecCodec)
 
 	count := 100
-	for i := 0; i < count; i++ {
+	for range count {
 		q, err := tracked.Query(ctx, ocr3types.OutcomeContext{})
 		require.Equal(t, query, q)
 		require.NoError(t, err)
@@ -93,7 +93,7 @@ func Test_ErrorIsTrackedWhenOriginReturns(t *testing.T) {
 	tracked := NewTrackedPlugin(origin, lggr, reporter, ocrtypecodec.DefaultExecCodec)
 
 	count := 100
-	for i := 0; i < count; i++ {
+	for range count {
 		_, err = tracked.Outcome(
 			t.Context(), ocr3types.OutcomeContext{}, types.Query{}, []types.AttributedObservation{},
 		)

@@ -15,8 +15,10 @@ import (
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
 
-var ContractType cldf_deployment.ContractType = "FeeQuoter"
-var Version *semver.Version = semver.MustParse("1.6.3")
+var (
+	ContractType cldf_deployment.ContractType = "FeeQuoter"
+	Version      *semver.Version              = semver.MustParse("1.6.3")
+)
 
 type ConstructorArgs struct {
 	StaticConfig                   fee_quoter.FeeQuoterStaticConfig
@@ -69,6 +71,21 @@ var FeeQuoterUpdatePrices = contract.NewWrite(contract.WriteParams[fee_quoter.In
 	},
 })
 
+type AuthorizedCallerArgs = fee_quoter.AuthorizedCallersAuthorizedCallerArgs
+var ApplyAuthorizedCallerUpdates = contract.NewWrite(contract.WriteParams[AuthorizedCallerArgs, *fee_quoter.FeeQuoter]{
+	Name:            "fee-quoter:apply-authorized-caller-updates",
+	Version:         semver.MustParse("1.6.0"),
+	Description:     "Applies updates to the list of authorized callers on the FeeQuoter 1.6.0 contract",
+	ContractType:    ContractType,
+	ContractABI:     fee_quoter.FeeQuoterABI,
+	NewContract:     fee_quoter.NewFeeQuoter,
+	IsAllowedCaller: contract.OnlyOwner[*fee_quoter.FeeQuoter, AuthorizedCallerArgs],
+	Validate:        func(AuthorizedCallerArgs) error { return nil },
+	CallContract: func(feeQuoter *fee_quoter.FeeQuoter, opts *bind.TransactOpts, args AuthorizedCallerArgs) (*types.Transaction, error) {
+		return feeQuoter.ApplyAuthorizedCallerUpdates(opts, args)
+	},
+})
+
 type FeeQuoterParams struct {
 	MaxFeeJuelsPerMsg              *big.Int
 	TokenPriceStalenessThreshold   uint32
@@ -92,3 +109,24 @@ func (c FeeQuoterParams) Validate() error {
 	}
 	return nil
 }
+
+type ApplyTokenTransferFeeConfigUpdatesInput struct {
+	TokenTransferFeeConfigArgs   []fee_quoter.FeeQuoterTokenTransferFeeConfigArgs
+	TokensToUseDefaultFeeConfigs []fee_quoter.FeeQuoterTokenTransferFeeConfigRemoveArgs
+}
+
+// FeeQuoterApplyTokenTransferFeeConfigUpdates applies updates to token transfer fee configs on the FeeQuoter contract.
+// https://etherscan.io/address/0x40858070814a57FdF33a613ae84fE0a8b4a874f7#code#F1#L836
+var FeeQuoterApplyTokenTransferFeeConfigUpdates = contract.NewWrite(contract.WriteParams[ApplyTokenTransferFeeConfigUpdatesInput, *fee_quoter.FeeQuoter]{
+	Name:            "fee-quoter:apply-token-transfer-fee-config-updates",
+	Version:         Version,
+	Description:     "Applies updates to token transfer fee configs on the FeeQuoter 1.6.0 contract",
+	ContractType:    ContractType,
+	ContractABI:     fee_quoter.FeeQuoterABI,
+	NewContract:     fee_quoter.NewFeeQuoter,
+	IsAllowedCaller: contract.OnlyOwner[*fee_quoter.FeeQuoter, ApplyTokenTransferFeeConfigUpdatesInput],
+	Validate:        func(args ApplyTokenTransferFeeConfigUpdatesInput) error { return nil },
+	CallContract: func(feeQuoter *fee_quoter.FeeQuoter, opts *bind.TransactOpts, args ApplyTokenTransferFeeConfigUpdatesInput) (*types.Transaction, error) {
+		return feeQuoter.ApplyTokenTransferFeeConfigUpdates(opts, args.TokenTransferFeeConfigArgs, args.TokensToUseDefaultFeeConfigs)
+	},
+})

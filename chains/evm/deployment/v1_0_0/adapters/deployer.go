@@ -30,6 +30,32 @@ func (a *EVMDeployer) SetOCR3Config() *cldf_ops.Sequence[ccipapi.SetOCR3ConfigIn
 	return nil
 }
 
+func (a *EVMDeployer) GrantAdminRoleToTimelock() *cldf_ops.Sequence[ccipapi.GrantAdminRoleToTimelockConfigPerChainWithSelector, sequtil.OnChainOutput, cldf_chain.BlockChains] {
+	return cldf_ops.NewSequence(
+		"grant-admin-role-of-timelock-to-timelock",
+		semver.MustParse("1.0.0"),
+		"Grants admin role of specified timelock contract to the other specified timelock and renounces admin role of the deployer key",
+		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, in ccipapi.GrantAdminRoleToTimelockConfigPerChainWithSelector) (output sequtil.OnChainOutput, err error) {
+			evmChain, ok := chains.EVMChains()[in.ChainSelector]
+			if !ok {
+				return sequtil.OnChainOutput{}, fmt.Errorf("chain with selector %d not found in environment", in.ChainSelector)
+			}
+
+			// create sequence input
+			seqInput := seq.SeqGrantAdminRoleOfTimelockToTimelockInput{
+				ChainSelector:           in.ChainSelector,
+				TimelockAddress:         common.HexToAddress(in.TimelockToTransferRef.Address),
+				NewAdminTimelockAddress: common.HexToAddress(in.NewAdminTimelockRef.Address),
+			}
+			report, err := cldf_ops.ExecuteSequence(b, seq.SeqGrantAdminRoleOfTimelockToTimelock, evmChain, seqInput)
+			if err != nil {
+				return sequtil.OnChainOutput{}, fmt.Errorf("failed to deploy and configure proposer MCM on chain %d: %w", in.ChainSelector, err)
+			}
+
+			return report.Output, nil
+		})
+}
+
 func (d *EVMDeployer) DeployMCMS() *cldf_ops.Sequence[ccipapi.MCMSDeploymentConfigPerChainWithAddress, sequtil.OnChainOutput, cldf_chain.BlockChains] {
 	return cldf_ops.NewSequence(
 		"deploy-mcms",
@@ -141,6 +167,16 @@ func (d *EVMDeployer) DeployMCMS() *cldf_ops.Sequence[ccipapi.MCMSDeploymentConf
 				return sequtil.OnChainOutput{}, fmt.Errorf("failed to grant executor role to call proxy on timelock on chain %d: %w", in.ChainSelector, err)
 			}
 			b.Logger.Infof("Granted Executor role on Timelock %s to Call Proxy %s on chain %s", timelockAddr, callProxyAddr, evmChain.Name)
+			return output, nil
+		})
+}
+
+func (d *EVMDeployer) FinalizeDeployMCMS() *cldf_ops.Sequence[ccipapi.MCMSDeploymentConfigPerChainWithAddress, sequtil.OnChainOutput, cldf_chain.BlockChains] {
+	return cldf_ops.NewSequence(
+		"finalize-deploy-mcms",
+		semver.MustParse("1.0.0"),
+		"On EVM, finalizing MCM deployment is a no-op",
+		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, in ccipapi.MCMSDeploymentConfigPerChainWithAddress) (output sequtil.OnChainOutput, err error) {
 			return output, nil
 		})
 }

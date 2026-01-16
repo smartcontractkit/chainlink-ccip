@@ -222,11 +222,24 @@ func TestCalculateUsdPerUnitGas(t *testing.T) {
 			exp:            big.NewInt(0),
 		},
 		{
+			// TON uses nanoTON as gas units, so sourceGasPrice is always 1
+			// usdPerFeeCoin for 9-decimal token @ $2: 2 * 1e9 * 1e18 = 2e27
+			// Result: 1 * 2e27 / 1e18 = 2e9 (USD per nanoTON in 1e18 precision)
 			name:           "ton base case",
-			sourceGasPrice: big.NewInt(400),
-			usdPerFeeCoin:  new(big.Int).Mul(big.NewInt(2), big.NewInt(1e18)),
+			sourceGasPrice: big.NewInt(1),
+			usdPerFeeCoin:  new(big.Int).Mul(big.NewInt(2), new(big.Int).Mul(big.NewInt(1e9), big.NewInt(1e18))),
 			chainSelector:  TonChainSelector,
-			exp:            big.NewInt(400 * 2 * 1e9),
+			exp:            big.NewInt(2e9),
+		},
+		{
+			// TON @ $4, sourceGasPrice = 1
+			// usdPerFeeCoin = 4 * 1e9 * 1e18 = 4e27
+			// Result: 1 * 4e27 / 1e18 = 4e9
+			name:           "ton high price case",
+			sourceGasPrice: big.NewInt(1),
+			usdPerFeeCoin:  new(big.Int).Mul(big.NewInt(4), new(big.Int).Mul(big.NewInt(1e9), big.NewInt(1e18))),
+			chainSelector:  TonChainSelector,
+			exp:            big.NewInt(4e9),
 		},
 	}
 
@@ -242,7 +255,7 @@ func TestCalculateUsdPerUnitGas(t *testing.T) {
 
 func MustBigIntSetString(s string, zeroSuffixSize int) *big.Int {
 	// append zeroes to the string
-	for i := 0; i < zeroSuffixSize; i++ {
+	for range zeroSuffixSize {
 		s += "0"
 	}
 	bi, ok := new(big.Int).SetString(s, 10)

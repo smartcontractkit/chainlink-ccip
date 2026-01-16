@@ -1,10 +1,17 @@
 package fastcurse
 
 import (
+	"bytes"
 	"encoding/binary"
 )
 
 type Subject = [16]byte
+
+func IfSubjectEqual(s, other Subject) bool {
+	byteSub := s[:]
+	otherByteSub := other[:]
+	return bytes.Equal(byteSub, otherByteSub)
+}
 
 type CurseInput struct {
 	Subjects      []Subject

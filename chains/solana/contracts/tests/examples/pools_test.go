@@ -53,7 +53,6 @@ type ProgramData struct {
 // TestBaseTokenPoolHappyPath does basic happy path checks on the lock/release and burn/mint example pools
 // more detailed token pool tests are handled by the test-token-pool which is used in the tokenpool_test.go and ccip_router_test.go
 func TestBaseTokenPoolHappyPath(t *testing.T) {
-	t.Parallel()
 
 	// acting as "dumb" onramp & offramp, proxying calls to the pool that are signed by PDA
 	test_ccip_invalid_receiver.SetProgramID(config.CcipInvalidReceiverProgram)

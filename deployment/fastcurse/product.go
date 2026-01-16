@@ -22,8 +22,8 @@ var (
 
 type CurseAdapter interface {
 	Initialize(e cldf.Environment, selector uint64) error
-	// IsSubjectCursedOnChain has the default RMN behavior.
-	// Returns true if subject is cursed or chain is globally cursed. False otherwise.
+	// IsSubjectCursedOnChain do not follow EVM RMN behavior which return true if subject is cursed or chain is globally cursed. False otherwise.
+	// Instead, it returns true if subject is cursed. To check if chain is globally cursed call IsSubjectCursedOnChain with the GlobalCurseSubject() as the subject.
 	IsSubjectCursedOnChain(e cldf.Environment, selector uint64, subject Subject) (bool, error)
 	// IsChainConnectedToTargetChain returns true if the chain with selector `selector` is connected to the chain with selector `targetSel`
 	// For example, in case of EVM chains, router.isChainSupported(targetSel) should return true when called on the chain with selector `selector`
@@ -55,7 +55,6 @@ type CurseSubjectAdapter interface {
 type CurseRegistryInput struct {
 	CursingFamily       string
 	CursingVersion      *semver.Version
-	SubjectFamily       string
 	CurseAdapter        CurseAdapter
 	CurseSubjectAdapter CurseSubjectAdapter
 }
@@ -81,6 +80,13 @@ func GetCurseRegistry() *CurseRegistry {
 	return singletonCurseRegistry
 }
 
+func (c *CurseRegistry) IsFamilyRegistered(family string) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	_, exists := c.CurseSubjects[family]
+	return exists
+}
+
 func (c *CurseRegistry) RegisterNewCurse(
 	in CurseRegistryInput,
 ) {
@@ -91,8 +97,8 @@ func (c *CurseRegistry) RegisterNewCurse(
 		c.CurseAdapters[id] = in.CurseAdapter
 	}
 
-	if _, exists := c.CurseSubjects[in.SubjectFamily]; !exists {
-		c.CurseSubjects[in.SubjectFamily] = in.CurseSubjectAdapter
+	if _, exists := c.CurseSubjects[in.CursingFamily]; !exists {
+		c.CurseSubjects[in.CursingFamily] = in.CurseSubjectAdapter
 	}
 }
 
@@ -154,22 +160,24 @@ func (cr *CurseRegistry) groupRMNSubjectBySelector(e cldf.Environment, rmnSubjec
 			}
 			continue
 		}
+		// Skip specific subjects if global curse is already set for this chain
+		if slices.ContainsFunc(grouped[s.ChainSelector].subjects, func(subj Subject) bool {
+			return IfSubjectEqual(subj, GlobalCurseSubject())
+		}) {
+			continue
+		}
 		// find if target subject is connected if not global
 		connected, err := adapter.IsChainConnectedToTargetChain(e, s.ChainSelector, s.SubjectChainSelector)
 		if err != nil {
 			return nil, fmt.Errorf("failed to check if chain selector %d is connected to chain %d: %w", s.ChainSelector, s.SubjectChainSelector, err)
 		}
 		if !connected {
-			continue
+			return nil, fmt.Errorf("chain selector %d is not connected to subject chain %d", s.ChainSelector, s.SubjectChainSelector)
 		}
 		// get the subject from the subject chain selector
-		subjectFamily, err := chain_selectors.GetSelectorFamily(s.SubjectChainSelector)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get chain family for subject selector %d: %w", s.SubjectChainSelector, err)
-		}
-		subjectAdapter, ok := cr.GetCurseSubjectAdapter(subjectFamily)
+		subjectAdapter, ok := cr.GetCurseSubjectAdapter(family)
 		if !ok {
-			return nil, fmt.Errorf("no curse subject adapter registered for chain family '%s'", subjectFamily)
+			return nil, fmt.Errorf("no curse subject adapter registered for chain family '%s'", family)
 		}
 		subjectToCurse := subjectAdapter.SelectorToSubject(s.SubjectChainSelector)
 		// Ensure uniqueness

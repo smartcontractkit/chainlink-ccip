@@ -688,7 +688,7 @@ func (p *Plugin) validateReport(
 		return cciptypes.ExecutePluginReport{},
 			plugincommon.NewErrInvalidReport("dest chain not supported")
 	}
-	if err := p.checkConfigDigest(); err != nil {
+	if err := p.checkConfigDigest(ctx); err != nil {
 		if errors.Is(err, errOffRampConfigMismatch) {
 			return cciptypes.ExecutePluginReport{},
 				plugincommon.NewErrInvalidReport(err.Error())
