@@ -423,7 +423,7 @@ func TestContractDiscoveryProcessor_Outcome_NotEnoughObservations(t *testing.T) 
 		source2: cciptypes.UnknownAddress("onRamp"),
 	}
 	// we expect no contracts here due to not enough observations to come to consensus.
-	expectedContracts := reader.ContractAddresses{
+	expectedContracts := cciptypes.ContractAddresses{
 		consts.ContractNameNonceManager: {},
 		consts.ContractNameOnRamp:       {},
 		consts.ContractNameRMNRemote:    {},
