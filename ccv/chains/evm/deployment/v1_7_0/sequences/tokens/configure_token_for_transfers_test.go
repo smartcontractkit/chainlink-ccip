@@ -242,7 +242,7 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 
 		input := tokens_core.ConfigureTokenForTransfersInput{
 			ChainSelector:    chainSel,
-			TokenAddress:     tokenAddress,
+			TokenAddress:     tokenAndPoolReport.Output.Addresses[0].Address,
 			TokenPoolAddress: tokenPoolAddress,
 			RemoteChains: map[uint64]tokens_core.RemoteChainConfig[[]byte, string]{
 				remoteChainSel: {
