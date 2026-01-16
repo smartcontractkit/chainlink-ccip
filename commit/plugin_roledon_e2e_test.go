@@ -328,8 +328,8 @@ func TestPlugin_RoleDonE2E_Discovery(t *testing.T) {
 		{
 			deps.ccipReader.EXPECT().DiscoverContracts(mock.Anything, mock.Anything, mock.Anything).
 				RunAndReturn(func(ctx context.Context, supportedChains, selectors []cciptypes.ChainSelector,
-				) (ccipreader.ContractAddresses, error) {
-					addrs := ccipreader.ContractAddresses{}
+				) (cciptypes.ContractAddresses, error) {
+					addrs := cciptypes.ContractAddresses{}
 
 					// the following contracts can only be discovered by dest supporting oracles
 					if oracleChains.Contains(s.destChain) {

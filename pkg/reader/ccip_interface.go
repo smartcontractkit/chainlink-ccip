@@ -235,7 +235,7 @@ type CCIPReader interface {
 	// allChains is needed because there is no way to enumerate all chain selectors on Solana. We'll attempt to
 	// fetch the source config from the offramp for each of them.
 	DiscoverContracts(ctx context.Context,
-		supportedChains, allChains []cciptypes.ChainSelector) (ContractAddresses, error)
+		supportedChains, allChains []cciptypes.ChainSelector) (cciptypes.ContractAddresses, error)
 
 	// Sync can be used to perform frequent syncing operations inside the reader implementation.
 	// NOTE: this method may make network calls.

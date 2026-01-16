@@ -628,14 +628,14 @@ func (r *ccipChainReader) discoverOffRampContracts(
 	ctx context.Context,
 	lggr logger.Logger,
 	chains []cciptypes.ChainSelector,
-) (ContractAddresses, error) {
+) (cciptypes.ContractAddresses, error) {
 	// Get from cache
 	config, err := r.configPoller.GetChainConfig(ctx, r.destChain)
 	if err != nil {
 		return nil, fmt.Errorf("unable to lookup RMN remote address (RMN proxy): %w", err)
 	}
 
-	resp := make(ContractAddresses)
+	resp := make(cciptypes.ContractAddresses)
 
 	// OnRamps are in the offRamp SourceChainConfig.
 	{
@@ -683,8 +683,8 @@ func (r *ccipChainReader) discoverOffRampContracts(
 
 func (r *ccipChainReader) DiscoverContracts(ctx context.Context,
 	supportedChains, allChains []cciptypes.ChainSelector,
-) (ContractAddresses, error) {
-	var resp ContractAddresses
+) (cciptypes.ContractAddresses, error) {
+	var resp cciptypes.ContractAddresses
 	var err error
 	lggr := logutil.WithContextValues(ctx, r.lggr)
 

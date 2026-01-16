@@ -138,23 +138,23 @@ func (_c *MockCCIPReader_CommitReportsGTETimestamp_Call) RunAndReturn(run func(c
 }
 
 // DiscoverContracts provides a mock function with given fields: ctx, supportedChains, allChains
-func (_m *MockCCIPReader) DiscoverContracts(ctx context.Context, supportedChains []ccipocr3.ChainSelector, allChains []ccipocr3.ChainSelector) (reader.ContractAddresses, error) {
+func (_m *MockCCIPReader) DiscoverContracts(ctx context.Context, supportedChains []ccipocr3.ChainSelector, allChains []ccipocr3.ChainSelector) (ccipocr3.ContractAddresses, error) {
 	ret := _m.Called(ctx, supportedChains, allChains)
 
 	if len(ret) == 0 {
 		panic("no return value specified for DiscoverContracts")
 	}
 
-	var r0 reader.ContractAddresses
+	var r0 ccipocr3.ContractAddresses
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, []ccipocr3.ChainSelector, []ccipocr3.ChainSelector) (reader.ContractAddresses, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, []ccipocr3.ChainSelector, []ccipocr3.ChainSelector) (ccipocr3.ContractAddresses, error)); ok {
 		return rf(ctx, supportedChains, allChains)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, []ccipocr3.ChainSelector, []ccipocr3.ChainSelector) reader.ContractAddresses); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, []ccipocr3.ChainSelector, []ccipocr3.ChainSelector) ccipocr3.ContractAddresses); ok {
 		r0 = rf(ctx, supportedChains, allChains)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(reader.ContractAddresses)
+			r0 = ret.Get(0).(ccipocr3.ContractAddresses)
 		}
 	}
 
@@ -187,12 +187,12 @@ func (_c *MockCCIPReader_DiscoverContracts_Call) Run(run func(ctx context.Contex
 	return _c
 }
 
-func (_c *MockCCIPReader_DiscoverContracts_Call) Return(_a0 reader.ContractAddresses, _a1 error) *MockCCIPReader_DiscoverContracts_Call {
+func (_c *MockCCIPReader_DiscoverContracts_Call) Return(_a0 ccipocr3.ContractAddresses, _a1 error) *MockCCIPReader_DiscoverContracts_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockCCIPReader_DiscoverContracts_Call) RunAndReturn(run func(context.Context, []ccipocr3.ChainSelector, []ccipocr3.ChainSelector) (reader.ContractAddresses, error)) *MockCCIPReader_DiscoverContracts_Call {
+func (_c *MockCCIPReader_DiscoverContracts_Call) RunAndReturn(run func(context.Context, []ccipocr3.ChainSelector, []ccipocr3.ChainSelector) (ccipocr3.ContractAddresses, error)) *MockCCIPReader_DiscoverContracts_Call {
 	_c.Call.Return(run)
 	return _c
 }

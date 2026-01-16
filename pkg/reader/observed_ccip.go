@@ -261,15 +261,15 @@ func (o *observedCCIPReader) GetRmnCurseInfo(ctx context.Context) (cciptypes.Cur
 func (o *observedCCIPReader) DiscoverContracts(
 	ctx context.Context,
 	supportedChains, allChains []cciptypes.ChainSelector,
-) (ContractAddresses, error) {
-	contractAddressesLength := func(addresses ContractAddresses) float64 {
+) (cciptypes.ContractAddresses, error) {
+	contractAddressesLength := func(addresses cciptypes.ContractAddresses) float64 {
 		return mapOfMapLength(addresses)
 	}
 
 	return withObservedQueryAndResult(
 		o,
 		"DiscoverContracts",
-		func() (ContractAddresses, error) {
+		func() (cciptypes.ContractAddresses, error) {
 			return o.CCIPReader.DiscoverContracts(ctx, supportedChains, allChains)
 		},
 		contractAddressesLength,

@@ -51,7 +51,7 @@ func TestContractDiscoveryProcessor_Observation_SupportsDest_HappyPath(t *testin
 	}
 	expectedRMNRemote := cciptypes.UnknownAddress("rmnRemote")
 	expectedRouter := cciptypes.UnknownAddress("router")
-	expectedContracts := reader.ContractAddresses{
+	expectedContracts := cciptypes.ContractAddresses{
 		consts.ContractNameNonceManager: map[cciptypes.ChainSelector]cciptypes.UnknownAddress{
 			dest: expectedNonceManager,
 		},
@@ -236,7 +236,7 @@ func TestContractDiscoveryProcessor_Outcome_HappyPath(t *testing.T) {
 		dest: cciptypes.UnknownAddress("onRamp"),
 	}
 	expectedRMNRemote := cciptypes.UnknownAddress("rmnRemote")
-	expectedContracts := reader.ContractAddresses{
+	expectedContracts := cciptypes.ContractAddresses{
 		consts.ContractNameNonceManager: map[cciptypes.ChainSelector]cciptypes.UnknownAddress{
 			dest: expectedNonceManager,
 		},
@@ -324,7 +324,7 @@ func TestContractDiscovery_Outcome_HappyPath_FRoleDONAndFDestChainAreDifferent(t
 		dest: cciptypes.UnknownAddress("onRamp"),
 	}
 	expectedRMNRemote := cciptypes.UnknownAddress("rmnRemote")
-	expectedContracts := reader.ContractAddresses{
+	expectedContracts := cciptypes.ContractAddresses{
 		consts.ContractNameNonceManager: map[cciptypes.ChainSelector]cciptypes.UnknownAddress{
 			dest: expectedNonceManager,
 		},
@@ -507,7 +507,7 @@ func TestContractDiscoveryProcessor_Outcome_ErrorSyncingContracts(t *testing.T) 
 		dest: cciptypes.UnknownAddress("onRamp"),
 	}
 	expectedRMNRemote := cciptypes.UnknownAddress("rmnRemote")
-	expectedContracts := reader.ContractAddresses{
+	expectedContracts := cciptypes.ContractAddresses{
 		consts.ContractNameNonceManager: map[cciptypes.ChainSelector]cciptypes.UnknownAddress{
 			dest: expectedNonceManager,
 		},
@@ -668,7 +668,7 @@ func TestContractDiscoveryProcessor_ValidateObservation_OracleNotAllowedToObserv
 	cases := []struct {
 		name            string
 		supportedChains []cciptypes.ChainSelector
-		addresses       reader.ContractAddresses
+		addresses       cciptypes.ContractAddresses
 		fChain          map[cciptypes.ChainSelector]int
 		errStr          string
 	}{
