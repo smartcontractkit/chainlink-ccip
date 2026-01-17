@@ -14,15 +14,16 @@ import {SafeERC20} from
 contract BurnMintFastTransferTokenPool is FastTransferTokenPoolAbstract {
   using SafeERC20 for IERC20;
 
-  string public constant override typeAndVersion = "BurnMintFastTransferTokenPool 1.6.1-dev";
+  string public constant override typeAndVersion = "BurnMintFastTransferTokenPool 1.6.3-dev";
 
   constructor(
     IBurnMintERC20 token,
     uint8 localTokenDecimals,
     address[] memory allowlist,
     address rmnProxy,
-    address router
-  ) FastTransferTokenPoolAbstract(token, localTokenDecimals, allowlist, rmnProxy, router) {}
+    address router,
+    uint64 sourceChainSelector
+  ) FastTransferTokenPoolAbstract(token, localTokenDecimals, allowlist, rmnProxy, router, sourceChainSelector) {}
 
   /// @notice Handles the locking or burning of tokens for both fast and slow transfers. Regardless of the transfer
   /// type, all the tokens are always burned.
@@ -43,6 +44,8 @@ contract BurnMintFastTransferTokenPool is FastTransferTokenPoolAbstract {
     IBurnMintERC20(address(i_token)).mint(receiver, amount);
   }
 
+  /// @notice Returns the accumulated pool fees
+  /// @return The total accumulated pool fees, which is the balance of the token in the pool contract.
   function getAccumulatedPoolFees() public view override returns (uint256) {
     return getToken().balanceOf(address(this));
   }

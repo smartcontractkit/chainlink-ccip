@@ -14,12 +14,13 @@ import (
 
 	rmnpb "github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 const SendingOutcome = "Sending Outcome"
@@ -122,9 +123,14 @@ func reportRangesOutcome(
 		}
 
 		if onRampMaxSeqNum < offRampNextSeqNum-1 {
-			lggr.Errorw("sequence numbers between offRamp and onRamp reached an impossible state, "+
-				"offRamp latest executed sequence number is greater than onRamp latest executed sequence number",
-				"chain", chainSel, "onRampMaxSeqNum", onRampMaxSeqNum, "offRampNextSeqNum", offRampNextSeqNum)
+			if onRampMaxSeqNum == 0 {
+				lggr.Infow("OnRamp max sequence numbers consensus = 0. This might not indicate an issue" +
+					" but if it persists without progress on the commit plugin, investigate why oracles observe 0")
+			} else {
+				lggr.Errorw("sequence numbers between offRamp and onRamp reached an impossible state, "+
+					"offRamp latest executed sequence number is greater than onRamp latest executed sequence number",
+					"chain", chainSel, "onRampMaxSeqNum", onRampMaxSeqNum, "offRampNextSeqNum", offRampNextSeqNum)
+			}
 		}
 
 		newMsgsExist := offRampNextSeqNum <= onRampMaxSeqNum
@@ -138,9 +144,9 @@ func reportRangesOutcome(
 			rangesToReport = append(rangesToReport, chainRange)
 
 			if rng.End() != chainRange.SeqNumRange.End() { // Check if the range was truncated.
-				lggr.Infof("Range for chain %d: %s (before truncate: %v)", chainSel, chainRange.SeqNumRange, rng)
+				lggr.Debugf("Range for chain %d: %s (before truncate: %v)", chainSel, chainRange.SeqNumRange, rng)
 			} else {
-				lggr.Infof("Range for chain %d: %s", chainSel, chainRange.SeqNumRange)
+				lggr.Debugf("Range for chain %d: %s", chainSel, chainRange.SeqNumRange)
 			}
 		}
 	}
@@ -159,7 +165,7 @@ func reportRangesOutcome(
 	}
 
 	if len(rangesToReport) == 0 {
-		lggr.Info("No ranges to report, outcomeType is ReportEmpty")
+		lggr.Debug("No ranges to report, outcomeType is ReportEmpty")
 		return Outcome{OutcomeType: ReportEmpty}
 	}
 
@@ -333,10 +339,10 @@ func filterValidRoots(
 			"root", rk, "isSigned", signedRoots.Contains(rk), "rmnEnabled", rmnEnabledChains[root.ChainSel])
 
 		if rootIsValid {
-			lggr2.Infow("root valid, added to the results")
+			lggr2.Debugw("root valid, added to the results")
 			validRoots = append(validRoots, root)
 		} else {
-			lggr2.Infow("root invalid, skipping")
+			lggr2.Debugw("root invalid, skipping")
 		}
 	}
 

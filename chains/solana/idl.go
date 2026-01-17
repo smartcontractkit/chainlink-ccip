@@ -29,7 +29,7 @@ func FetchFeeQuoterIDL() string {
 //go:embed contracts/target/idl/rmn_remote.json
 var rmnRemoteIdl string
 
-// FetchRMNRemoteIDL returne
+// FetchRMNRemoteIDL returns
 func FetchRMNRemoteIDL() string {
 	return rmnRemoteIdl
 }
@@ -40,4 +40,12 @@ var ccipCommonIdl string
 // FetchCommonIDL returns
 func FetchCommonIDL() string {
 	return ccipCommonIdl
+}
+
+//go:embed contracts/target/idl/cctp_token_pool.json
+var cctpTokenPoolIdl string
+
+// FetchCommonIDL returns
+func FetchCctpTokenPoolIDL() string {
+	return cctpTokenPoolIdl
 }

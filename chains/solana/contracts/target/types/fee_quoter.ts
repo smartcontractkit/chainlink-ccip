@@ -1,5 +1,5 @@
 export type FeeQuoter = {
-  "version": "0.1.0-dev",
+  "version": "0.1.1",
   "name": "fee_quoter",
   "instructions": [
     {
@@ -1736,12 +1736,17 @@ export type FeeQuoter = {
       "code": 8036,
       "name": "InvalidCodeVersion",
       "msg": "Invalid code version"
+    },
+    {
+      "code": 8037,
+      "name": "DefaultOwnerProposal",
+      "msg": "Proposed owner is the default pubkey"
     }
   ]
 };
 
 export const IDL: FeeQuoter = {
-  "version": "0.1.0-dev",
+  "version": "0.1.1",
   "name": "fee_quoter",
   "instructions": [
     {
@@ -3478,6 +3483,11 @@ export const IDL: FeeQuoter = {
       "code": 8036,
       "name": "InvalidCodeVersion",
       "msg": "Invalid code version"
+    },
+    {
+      "code": 8037,
+      "name": "DefaultOwnerProposal",
+      "msg": "Proposed owner is the default pubkey"
     }
   ]
 };

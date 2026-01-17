@@ -5,7 +5,6 @@ package token_pool_factory
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 	"strings"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated"
 )
 
 var (
@@ -369,16 +367,6 @@ func (_TokenPoolFactory *TokenPoolFactoryFilterer) ParseRemoteChainConfigUpdated
 	return event, nil
 }
 
-func (_TokenPoolFactory *TokenPoolFactory) ParseLog(log types.Log) (generated.AbigenLog, error) {
-	switch log.Topics[0] {
-	case _TokenPoolFactory.abi.Events["RemoteChainConfigUpdated"].ID:
-		return _TokenPoolFactory.ParseRemoteChainConfigUpdated(log)
-
-	default:
-		return nil, fmt.Errorf("abigen wrapper received unknown log topic: %v", log.Topics[0])
-	}
-}
-
 func (TokenPoolFactoryRemoteChainConfigUpdated) Topic() common.Hash {
 	return common.HexToHash("0xe3606343290c8e3853a7f92686979dfe24a0f29594186b61177236cb145126f0")
 }
@@ -399,8 +387,6 @@ type TokenPoolFactoryInterface interface {
 	WatchRemoteChainConfigUpdated(opts *bind.WatchOpts, sink chan<- *TokenPoolFactoryRemoteChainConfigUpdated, remoteChainSelector []uint64) (event.Subscription, error)
 
 	ParseRemoteChainConfigUpdated(log types.Log) (*TokenPoolFactoryRemoteChainConfigUpdated, error)
-
-	ParseLog(log types.Log) (generated.AbigenLog, error)
 
 	Address() common.Address
 }

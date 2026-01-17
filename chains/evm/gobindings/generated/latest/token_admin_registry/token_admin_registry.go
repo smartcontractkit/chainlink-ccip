@@ -5,7 +5,6 @@ package token_admin_registry
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 	"strings"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated"
 )
 
 var (
@@ -1391,28 +1389,6 @@ func (_TokenAdminRegistry *TokenAdminRegistryFilterer) ParseRegistryModuleRemove
 	return event, nil
 }
 
-func (_TokenAdminRegistry *TokenAdminRegistry) ParseLog(log types.Log) (generated.AbigenLog, error) {
-	switch log.Topics[0] {
-	case _TokenAdminRegistry.abi.Events["AdministratorTransferRequested"].ID:
-		return _TokenAdminRegistry.ParseAdministratorTransferRequested(log)
-	case _TokenAdminRegistry.abi.Events["AdministratorTransferred"].ID:
-		return _TokenAdminRegistry.ParseAdministratorTransferred(log)
-	case _TokenAdminRegistry.abi.Events["OwnershipTransferRequested"].ID:
-		return _TokenAdminRegistry.ParseOwnershipTransferRequested(log)
-	case _TokenAdminRegistry.abi.Events["OwnershipTransferred"].ID:
-		return _TokenAdminRegistry.ParseOwnershipTransferred(log)
-	case _TokenAdminRegistry.abi.Events["PoolSet"].ID:
-		return _TokenAdminRegistry.ParsePoolSet(log)
-	case _TokenAdminRegistry.abi.Events["RegistryModuleAdded"].ID:
-		return _TokenAdminRegistry.ParseRegistryModuleAdded(log)
-	case _TokenAdminRegistry.abi.Events["RegistryModuleRemoved"].ID:
-		return _TokenAdminRegistry.ParseRegistryModuleRemoved(log)
-
-	default:
-		return nil, fmt.Errorf("abigen wrapper received unknown log topic: %v", log.Topics[0])
-	}
-}
-
 func (TokenAdminRegistryAdministratorTransferRequested) Topic() common.Hash {
 	return common.HexToHash("0xc54c3051ff16e63bb9203214432372aca006c589e3653619b577a3265675b716")
 }
@@ -1519,8 +1495,6 @@ type TokenAdminRegistryInterface interface {
 	WatchRegistryModuleRemoved(opts *bind.WatchOpts, sink chan<- *TokenAdminRegistryRegistryModuleRemoved, module []common.Address) (event.Subscription, error)
 
 	ParseRegistryModuleRemoved(log types.Log) (*TokenAdminRegistryRegistryModuleRemoved, error)
-
-	ParseLog(log types.Log) (generated.AbigenLog, error)
 
 	Address() common.Address
 }

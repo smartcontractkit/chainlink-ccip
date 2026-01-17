@@ -19,11 +19,12 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 var (
@@ -375,7 +376,7 @@ func isNodeObserver(sourceChain SourceChain, nodeIndex int, totalNodes int) (boo
 
 	// Validate the bitmap
 	maxValidBitmap := new(big.Int).Lsh(big.NewInt(1), uint(totalNodes))
-	maxValidBitmap.Sub(maxValidBitmap, big.NewInt(1))
+	maxValidBitmap = new(big.Int).Sub(maxValidBitmap, big.NewInt(1))
 	if sourceChain.ObserverNodesBitmap.Cmp(maxValidBitmap) > 0 {
 		return false, fmt.Errorf("invalid observer nodes bitmap")
 	}

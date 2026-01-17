@@ -1,5 +1,5 @@
 export type RmnRemote = {
-  "version": "0.1.0-dev",
+  "version": "0.1.1",
   "name": "rmn_remote",
   "instructions": [
     {
@@ -488,12 +488,17 @@ export type RmnRemote = {
       "code": 9007,
       "name": "InvalidCodeVersion",
       "msg": "Invalid code version"
+    },
+    {
+      "code": 9008,
+      "name": "DefaultOwnerProposal",
+      "msg": "Proposed owner is the default pubkey"
     }
   ]
 };
 
 export const IDL: RmnRemote = {
-  "version": "0.1.0-dev",
+  "version": "0.1.1",
   "name": "rmn_remote",
   "instructions": [
     {
@@ -982,6 +987,11 @@ export const IDL: RmnRemote = {
       "code": 9007,
       "name": "InvalidCodeVersion",
       "msg": "Invalid code version"
+    },
+    {
+      "code": 9008,
+      "name": "DefaultOwnerProposal",
+      "msg": "Proposed owner is the default pubkey"
     }
   ]
 };

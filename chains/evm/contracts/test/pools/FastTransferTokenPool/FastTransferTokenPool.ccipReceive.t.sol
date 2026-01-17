@@ -8,6 +8,8 @@ import {CCIPReceiver} from "../../../applications/CCIPReceiver.sol";
 import {Client} from "../../../libraries/Client.sol";
 import {Internal} from "../../../libraries/Internal.sol";
 import {FastTransferTokenPoolAbstract} from "../../../pools/FastTransferTokenPoolAbstract.sol";
+
+import {TokenPool} from "../../../pools/TokenPool.sol";
 import {FastTransferTokenPoolSetup} from "./FastTransferTokenPoolSetup.t.sol";
 
 import {IERC20Metadata} from
@@ -39,9 +41,16 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
     Client.Any2EVMMessage memory message =
       _generateMintMessage(RECEIVER, SOURCE_AMOUNT, SOURCE_DECIMALS, FAST_FEE_FILLER_BPS, 0);
     uint256 fastTransferFee = (SOURCE_AMOUNT * FAST_FEE_FILLER_BPS) / 10_000;
-    bytes32 fillId =
-      s_pool.computeFillId(message.messageId, SOURCE_AMOUNT - fastTransferFee, SOURCE_DECIMALS, abi.encode(RECEIVER));
+    bytes32 fillId = s_pool.computeFillId(
+      message.messageId,
+      message.sourceChainSelector,
+      SOURCE_AMOUNT - fastTransferFee,
+      SOURCE_DECIMALS,
+      abi.encode(RECEIVER)
+    );
 
+    vm.expectEmit();
+    emit TokenPool.InboundRateLimitConsumed(SOURCE_CHAIN_SELECTOR, address(s_token), SOURCE_AMOUNT);
     vm.expectEmit();
     emit IFastTransferPool.FastTransferSettled(fillId, MESSAGE_ID, 0, 0, IFastTransferPool.FillState.NOT_FILLED);
 
@@ -53,7 +62,8 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
 
   function test_ccipReceive_FastFill_Settlement() public {
     uint256 amountToFill = SOURCE_AMOUNT - (SOURCE_AMOUNT * FAST_FEE_FILLER_BPS / 10_000);
-    bytes32 fillId = s_pool.computeFillId(MESSAGE_ID, amountToFill, SOURCE_DECIMALS, abi.encode(RECEIVER));
+    bytes32 fillId =
+      s_pool.computeFillId(MESSAGE_ID, SOURCE_CHAIN_SELECTOR, amountToFill, SOURCE_DECIMALS, abi.encode(RECEIVER));
 
     vm.stopPrank();
     vm.prank(s_filler);
@@ -66,6 +76,8 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
     Client.Any2EVMMessage memory message =
       _generateMintMessage(RECEIVER, SOURCE_AMOUNT, SOURCE_DECIMALS, FAST_FEE_FILLER_BPS, 0);
 
+    vm.expectEmit();
+    emit TokenPool.InboundRateLimitConsumed(SOURCE_CHAIN_SELECTOR, address(s_token), SOURCE_AMOUNT);
     vm.expectEmit();
     emit IFastTransferPool.FastTransferSettled(fillId, MESSAGE_ID, SOURCE_AMOUNT, 0, IFastTransferPool.FillState.FILLED);
 
@@ -81,7 +93,7 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
   function test_ccipReceive_WithDifferentDecimals() public {
     uint8 sourceDecimals = 6; // USDC-like decimals
     uint8 destDecimals = IERC20Metadata(address(s_token)).decimals();
-    require(sourceDecimals != destDecimals, "Test requires different source and destination decimals");
+    assertTrue(sourceDecimals != destDecimals, "Test requires different source and destination decimals");
 
     uint256 sourceAmount = 100 * 10 ** sourceDecimals; // 100 tokens in source decimals
     uint256 expectedLocalAmount = sourceAmount * 10 ** 18 / 10 ** sourceDecimals; // Should be scaled to 18 decimals
@@ -91,6 +103,8 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
     Client.Any2EVMMessage memory message =
       _generateMintMessage(RECEIVER, sourceAmount, sourceDecimals, FAST_FEE_FILLER_BPS, 0);
 
+    vm.expectEmit();
+    emit TokenPool.InboundRateLimitConsumed(SOURCE_CHAIN_SELECTOR, address(s_token), expectedLocalAmount);
     s_pool.ccipReceive(message);
 
     // Verify receiver got the scaled amount
@@ -105,8 +119,12 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
     Client.Any2EVMMessage memory message =
       _generateMintMessage(RECEIVER, SOURCE_AMOUNT, SOURCE_DECIMALS, zeroFee, zeroFee);
 
-    bytes32 fillId = s_pool.computeFillId(message.messageId, SOURCE_AMOUNT - 0, SOURCE_DECIMALS, abi.encode(RECEIVER));
+    bytes32 fillId = s_pool.computeFillId(
+      message.messageId, message.sourceChainSelector, SOURCE_AMOUNT - 0, SOURCE_DECIMALS, abi.encode(RECEIVER)
+    );
 
+    vm.expectEmit();
+    emit TokenPool.InboundRateLimitConsumed(SOURCE_CHAIN_SELECTOR, address(s_token), SOURCE_AMOUNT);
     vm.expectEmit();
     emit IFastTransferPool.FastTransferSettled(fillId, MESSAGE_ID, 0, 0, IFastTransferPool.FillState.NOT_FILLED);
 
@@ -136,8 +154,12 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
     uint256 fillerFeeAmount = (SOURCE_AMOUNT * fillerFeeBps) / 10_000;
     uint256 poolFeeAmount = (SOURCE_AMOUNT * poolFeeBps) / 10_000;
     uint256 amountAfterFees = SOURCE_AMOUNT - fillerFeeAmount - poolFeeAmount;
-    bytes32 fillId = s_pool.computeFillId(message.messageId, amountAfterFees, SOURCE_DECIMALS, abi.encode(RECEIVER));
+    bytes32 fillId = s_pool.computeFillId(
+      message.messageId, message.sourceChainSelector, amountAfterFees, SOURCE_DECIMALS, abi.encode(RECEIVER)
+    );
 
+    vm.expectEmit();
+    emit TokenPool.InboundRateLimitConsumed(SOURCE_CHAIN_SELECTOR, address(s_token), SOURCE_AMOUNT);
     vm.expectEmit();
     emit IFastTransferPool.FastTransferSettled(fillId, MESSAGE_ID, 0, 0, IFastTransferPool.FillState.NOT_FILLED);
     s_pool.ccipReceive(message);
@@ -167,7 +189,8 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
     uint256 poolFeeAmount = (SOURCE_AMOUNT * poolFeeBps) / 10_000;
     uint256 amountToFill = SOURCE_AMOUNT - fillerFeeAmount - poolFeeAmount;
 
-    bytes32 fillId = s_pool.computeFillId(MESSAGE_ID, amountToFill, SOURCE_DECIMALS, abi.encode(RECEIVER));
+    bytes32 fillId =
+      s_pool.computeFillId(MESSAGE_ID, SOURCE_CHAIN_SELECTOR, amountToFill, SOURCE_DECIMALS, abi.encode(RECEIVER));
 
     // Fast fill first
     vm.stopPrank();
@@ -185,6 +208,8 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
 
     // Expected filler reimbursement = SOURCE_AMOUNT - poolFeeAmount
     uint256 expectedFillerReimbursement = SOURCE_AMOUNT - poolFeeAmount;
+    vm.expectEmit();
+    emit TokenPool.InboundRateLimitConsumed(SOURCE_CHAIN_SELECTOR, address(s_token), SOURCE_AMOUNT);
     vm.expectEmit();
     emit IFastTransferPool.FastTransferSettled(
       fillId, MESSAGE_ID, expectedFillerReimbursement, poolFeeAmount, IFastTransferPool.FillState.FILLED
@@ -206,7 +231,7 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
   function test_ccipReceive_FastFill_Settlement_WithDifferentDecimals() public {
     uint8 sourceDecimals = 6; // USDC-like decimals
     uint8 destDecimals = IERC20Metadata(address(s_token)).decimals();
-    require(sourceDecimals != destDecimals, "Test requires different source and destination decimals");
+    assertTrue(sourceDecimals != destDecimals, "Test requires different source and destination decimals");
 
     uint256 sourceAmount = 100 * 10 ** sourceDecimals; // 100 tokens in source decimals
     uint256 expectedLocalAmount = sourceAmount * 10 ** destDecimals / 10 ** sourceDecimals; // Scale to dest decimals
@@ -215,7 +240,9 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
     uint256 fillerFeeAmount = (sourceAmount * FAST_FEE_FILLER_BPS) / 10_000;
     uint256 sourceAmountAfterFee = sourceAmount - fillerFeeAmount;
 
-    bytes32 fillId = s_pool.computeFillId(MESSAGE_ID, sourceAmountAfterFee, sourceDecimals, abi.encode(RECEIVER));
+    bytes32 fillId = s_pool.computeFillId(
+      MESSAGE_ID, SOURCE_CHAIN_SELECTOR, sourceAmountAfterFee, sourceDecimals, abi.encode(RECEIVER)
+    );
 
     // Fast fill first
     vm.stopPrank();
@@ -232,6 +259,8 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
     // Expected scaled amounts for settlement
     uint256 expectedFillerReimbursement = expectedLocalAmount; // Full amount scaled to dest decimals
 
+    vm.expectEmit();
+    emit TokenPool.InboundRateLimitConsumed(SOURCE_CHAIN_SELECTOR, address(s_token), expectedLocalAmount);
     vm.expectEmit();
     emit IFastTransferPool.FastTransferSettled(
       fillId, MESSAGE_ID, expectedFillerReimbursement, 0, IFastTransferPool.FillState.FILLED
@@ -254,7 +283,8 @@ contract FastTransferTokenPool_ccipReceive_Test is FastTransferTokenPoolSetup {
     s_pool.ccipReceive(message);
 
     uint256 amountToFill = SOURCE_AMOUNT - (SOURCE_AMOUNT * FAST_FEE_FILLER_BPS / 10_000);
-    bytes32 fillId = s_pool.computeFillId(MESSAGE_ID, amountToFill, SOURCE_DECIMALS, abi.encode(RECEIVER));
+    bytes32 fillId =
+      s_pool.computeFillId(MESSAGE_ID, SOURCE_CHAIN_SELECTOR, amountToFill, SOURCE_DECIMALS, abi.encode(RECEIVER));
 
     // Try to settle again - should revert
     vm.expectRevert(abi.encodeWithSelector(IFastTransferPool.AlreadySettled.selector, fillId));

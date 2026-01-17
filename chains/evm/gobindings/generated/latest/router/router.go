@@ -5,7 +5,6 @@ package router
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 	"strings"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated"
 )
 
 var (
@@ -1304,26 +1302,6 @@ func (_Router *RouterFilterer) ParseOwnershipTransferred(log types.Log) (*Router
 	return event, nil
 }
 
-func (_Router *Router) ParseLog(log types.Log) (generated.AbigenLog, error) {
-	switch log.Topics[0] {
-	case _Router.abi.Events["MessageExecuted"].ID:
-		return _Router.ParseMessageExecuted(log)
-	case _Router.abi.Events["OffRampAdded"].ID:
-		return _Router.ParseOffRampAdded(log)
-	case _Router.abi.Events["OffRampRemoved"].ID:
-		return _Router.ParseOffRampRemoved(log)
-	case _Router.abi.Events["OnRampSet"].ID:
-		return _Router.ParseOnRampSet(log)
-	case _Router.abi.Events["OwnershipTransferRequested"].ID:
-		return _Router.ParseOwnershipTransferRequested(log)
-	case _Router.abi.Events["OwnershipTransferred"].ID:
-		return _Router.ParseOwnershipTransferred(log)
-
-	default:
-		return nil, fmt.Errorf("abigen wrapper received unknown log topic: %v", log.Topics[0])
-	}
-}
-
 func (RouterMessageExecuted) Topic() common.Hash {
 	return common.HexToHash("0x9b877de93ea9895756e337442c657f95a34fc68e7eb988bdfa693d5be83016b6")
 }
@@ -1424,8 +1402,6 @@ type RouterInterface interface {
 	WatchOwnershipTransferred(opts *bind.WatchOpts, sink chan<- *RouterOwnershipTransferred, from []common.Address, to []common.Address) (event.Subscription, error)
 
 	ParseOwnershipTransferred(log types.Log) (*RouterOwnershipTransferred, error)
-
-	ParseLog(log types.Log) (generated.AbigenLog, error)
 
 	Address() common.Address
 }

@@ -14,6 +14,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
@@ -21,23 +23,76 @@ import (
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	ocrtypecodec "github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
-// validateCommitReportsReadingEligibility validates that all commit reports' source chains are supported by observer
+// validateCommitReportsReadingEligibility validates that if commit reports exist, the oracle supports the destination
+// chain and if messages exist the oracles supports the corresponding source chain.
 func validateCommitReportsReadingEligibility(
+	state exectypes.PluginState,
+	supportedChains mapset.Set[cciptypes.ChainSelector],
+	destChain cciptypes.ChainSelector,
+	observedData exectypes.CommitObservations,
+) error {
+	switch state {
+	case exectypes.GetCommitReports:
+		if err := validateGetCommitReportsObservation(supportedChains, destChain, observedData); err != nil {
+			return fmt.Errorf("validate get commit reports observation: %w", err)
+		}
+	case exectypes.GetMessages:
+		if err := validateGetMessagesObservation(supportedChains, observedData); err != nil {
+			return fmt.Errorf("validate get messages observation: %w", err)
+		}
+	case exectypes.Filter, exectypes.Initialized, exectypes.Unknown:
+		// nothing to validate
+		break
+	}
+
+	// generic validation
+	for chainSel, observedDataOfChain := range observedData {
+		for _, data := range observedDataOfChain {
+			if data.SourceChain != chainSel {
+				return fmt.Errorf("invalid observed data, key=%d but data chain=%d", chainSel, data.SourceChain)
+			}
+		}
+	}
+
+	return nil
+}
+
+func validateGetCommitReportsObservation(
+	supportedChains mapset.Set[cciptypes.ChainSelector],
+	destChain cciptypes.ChainSelector,
+	observedData exectypes.CommitObservations,
+) error {
+	for _, observedDataOfChain := range observedData {
+		for _, data := range observedDataOfChain {
+			if data.MerkleRoot.IsEmpty() {
+				continue
+			}
+			if !supportedChains.Contains(destChain) {
+				return fmt.Errorf("invalid observation, destination chain not supported but observed commit report")
+			}
+		}
+	}
+	return nil
+}
+
+func validateGetMessagesObservation(
 	supportedChains mapset.Set[cciptypes.ChainSelector],
 	observedData exectypes.CommitObservations,
 ) error {
 	for chainSel, observedDataOfChain := range observedData {
-		if !supportedChains.Contains(chainSel) {
-			return fmt.Errorf("observer not allowed to read from chain %d", chainSel)
-		}
+		containsMsgs := false
+
 		for _, data := range observedDataOfChain {
-			if data.SourceChain != chainSel {
-				return fmt.Errorf("invalid observed data, key=%d but data chain=%d",
-					chainSel, data.SourceChain)
+			if len(data.Messages) > 0 {
+				containsMsgs = true
+				break
 			}
+		}
+
+		if containsMsgs && !supportedChains.Contains(chainSel) {
+			return fmt.Errorf("observed messages on chain %d while chain is not supported", chainSel)
 		}
 	}
 
@@ -169,17 +224,9 @@ func validateMessagesConformToCommitReports(
 
 // validateObservedSequenceNumbers checks if the sequence numbers of the provided messages are unique for each chain
 // and that they match the observed max sequence numbers.
-func validateObservedSequenceNumbers(
-	supportedChains mapset.Set[cciptypes.ChainSelector],
-	observedData map[cciptypes.ChainSelector][]exectypes.CommitData,
-) error {
-	for chainSel, commitData := range observedData {
-		if !supportedChains.Contains(chainSel) {
-			return fmt.Errorf("observed a non-supported chain %d", chainSel)
-		}
-
+func validateObservedSequenceNumbers(observedData map[cciptypes.ChainSelector][]exectypes.CommitData) error {
+	for _, commitData := range observedData {
 		// observed commitData must not contain duplicates
-
 		observedMerkleRoots := mapset.NewSet[string]()
 		observedRanges := make([]cciptypes.SeqNumRange, 0)
 
@@ -367,6 +414,7 @@ func decodeAttributedObservations(
 	return decoded, nil
 }
 
+//nolint:gocyclo // This function is complex, but it is not too long.
 func computeMessageObservationsConsensus(
 	lggr logger.Logger,
 	aos []plugincommon.AttributedObservation[exectypes.Observation],
@@ -404,8 +452,34 @@ func computeMessageObservationsConsensus(
 					results[chain] = make(map[cciptypes.SeqNum]cciptypes.Message)
 				}
 				results[chain][seqNum] = msgsWithConsensus[0]
+			case 2:
+				// In rare cases where more than f+1 nodes observed the message and f+1 nodes pseudo deleted the message
+				// because of observation size limit, we can end up with 2 consensus on the same message with one of
+				// them being pseudo deleted. We need to choose the one that wasn't deleted as the one with consensus.
+				var msg *cciptypes.Message
+
+				if msgsWithConsensus[0].IsPseudoDeleted() && !msgsWithConsensus[1].IsPseudoDeleted() {
+					msg = &msgsWithConsensus[1]
+					lggr.Infow("two messages reached consensus, first is empty, second is full, selecting full")
+				} else if msgsWithConsensus[1].IsPseudoDeleted() && !msgsWithConsensus[0].IsPseudoDeleted() {
+					msg = &msgsWithConsensus[0]
+					lggr.Infow("two messages reached consensus, first is full, second is empty, selecting full")
+				}
+
+				if msg == nil {
+					lggr.Errorw("more than one message reached consensus for a sequence number, skipping it",
+						"chain", chain, "seqNum", seqNum, "msgs", msgsWithConsensus)
+				}
+
+				if msg != nil {
+					if _, ok := results[chain]; !ok {
+						results[chain] = make(map[cciptypes.SeqNum]cciptypes.Message)
+					}
+					results[chain][seqNum] = *msg
+				}
+
 			default:
-				lggr.Warnw("more than one message reached consensus for a sequence number, skipping it",
+				lggr.Errorw("more than one message reached consensus for a sequence number, skipping it",
 					"chain", chain, "seqNum", seqNum, "msgs", msgsWithConsensus)
 			}
 		}
@@ -438,7 +512,13 @@ func prepareValidatorsForComputeMessageObservationsConsensus(
 			}
 			// Add reports
 			for _, msg := range messages {
-				validator.Add(msg, ao.OracleID)
+				// We add an empty message only with id and seq num in any case. If we cannot form consensus on the
+				// populated one we will form consensus on the unpopulated/empty one.
+				validator.Add(createEmptyMessageWithIDAndSeqNum(msg), ao.OracleID)
+
+				if !msg.IsPseudoDeleted() {
+					validator.Add(msg, ao.OracleID)
+				}
 			}
 		}
 	}
@@ -567,6 +647,11 @@ type merkleRootData struct {
 	SequenceNumberRange cciptypes.SeqNumRange
 }
 
+type chainSeqNumPair struct {
+	chain  cciptypes.ChainSelector
+	seqNum cciptypes.SeqNum
+}
+
 // computeMessageHashesConsensus will iterate over observations of message hashes and come to consensus on them.
 // We select a hash if it has at least f+1 votes. If more than one hashes exist with at
 // least f+1 votes (reaching consensus threshold) then we log an error and skip that specific message.
@@ -578,11 +663,6 @@ func computeMessageHashesConsensus(
 	lggr = logger.With(lggr, "function", "computeMessageHashesConsensus", "fChain", fChain)
 
 	// for each (chain, seqNum) pair keep a count of the votes for each hash
-	type chainSeqNumPair struct {
-		chain  cciptypes.ChainSelector
-		seqNum cciptypes.SeqNum
-	}
-
 	hashVotes := make(map[chainSeqNumPair]map[cciptypes.Bytes32]int)
 	for _, observation := range observations {
 		for chain, hashes := range observation.Observation.Hashes {
@@ -637,6 +717,7 @@ func computeMessageHashesConsensus(
 	return results
 }
 
+//nolint:gocyclo // todo later
 func computeTokenDataObservationsConsensus(
 	lggr logger.Logger,
 	aos []plugincommon.AttributedObservation[exectypes.Observation],
@@ -647,11 +728,29 @@ func computeTokenDataObservationsConsensus(
 		make(map[cciptypes.ChainSelector]map[reader.MessageTokenID]consensus.OracleMinObservation[exectypes.TokenData])
 	results := make(exectypes.TokenDataObservations)
 
+	// count how many token data observations per chain and per sequence number and use the count to determine
+	// if token data should be initialized as empty or not appear at all.
+	numChainObservations := make(map[cciptypes.ChainSelector]int)
+	chainSeqNumTokenDataObservations := make(map[chainSeqNumPair]int)
+	for _, ao := range aos {
+		for selector, seqNums := range ao.Observation.TokenData {
+			numChainObservations[selector]++
+			for seqNum := range seqNums {
+				chainSeqNumTokenDataObservations[chainSeqNumPair{chain: selector, seqNum: seqNum}]++
+			}
+		}
+	}
+
 	for _, ao := range aos {
 		for selector, seqMap := range ao.Observation.TokenData {
 			f, ok := fChain[selector]
 			if !ok {
 				lggr.Warnw("no F defined for chain", "chain", selector)
+				continue
+			}
+
+			if consensus.LtFPlusOne(f, numChainObservations[selector]) {
+				lggr.Infow("chain skipped from token data since not enough oracles observed it", "chain", selector)
 				continue
 			}
 
@@ -663,7 +762,8 @@ func computeTokenDataObservationsConsensus(
 				validators[selector] = make(map[reader.MessageTokenID]consensus.OracleMinObservation[exectypes.TokenData])
 			}
 
-			initResultsAndValidators(selector, f, seqMap, results, validators, ao.OracleID)
+			initResultsAndValidators(
+				selector, f, seqMap, results, validators, ao.OracleID, chainSeqNumTokenDataObservations)
 		}
 	}
 
@@ -694,8 +794,17 @@ func initResultsAndValidators(
 	results exectypes.TokenDataObservations,
 	validators map[cciptypes.ChainSelector]map[reader.MessageTokenID]consensus.OracleMinObservation[exectypes.TokenData],
 	oracleID commontypes.OracleID,
+	chainSeqNumTokenDataObservations map[chainSeqNumPair]int,
 ) {
 	for seqNr, msgTokenData := range seqMap {
+		cnt := chainSeqNumTokenDataObservations[chainSeqNumPair{
+			chain:  selector,
+			seqNum: seqNr,
+		}]
+		if consensus.LtFPlusOne(f, cnt) {
+			continue
+		}
+
 		if _, ok := results[selector][seqNr]; !ok {
 			results[selector][seqNr] = exectypes.NewMessageTokenData()
 		}

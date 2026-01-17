@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/stretchr/testify/assert"
 
@@ -16,6 +16,7 @@ import (
 var (
 	SolChainSelector = ccipocr3.ChainSelector(sel.SOLANA_DEVNET.Selector)
 	EvmChainSelector = ccipocr3.ChainSelector(sel.ETHEREUM_TESTNET_SEPOLIA.Selector)
+	AptChainSelector = ccipocr3.ChainSelector(sel.APTOS_TESTNET.Selector)
 )
 
 func TestDeviates(t *testing.T) {
@@ -167,6 +168,34 @@ func TestCalculateUsdPerUnitGas(t *testing.T) {
 			usdPerFeeCoin:  new(big.Int).Mul(big.NewInt(150e9), big.NewInt(1e18)),
 			chainSelector:  SolChainSelector,
 			exp:            big.NewInt(0),
+		},
+		{
+			name:           "apt base fee case",
+			sourceGasPrice: big.NewInt(100),
+			usdPerFeeCoin:  new(big.Int).Mul(big.NewInt(5), new(big.Int).Mul(big.NewInt(1e10), big.NewInt(1e18))),
+			chainSelector:  AptChainSelector,
+			exp:            big.NewInt(100 * 5 * 1e10), // gasprice * USD per APT * (USD / APT)
+		},
+		{
+			name:           "apt high fee case",
+			sourceGasPrice: big.NewInt(100000),
+			usdPerFeeCoin:  new(big.Int).Mul(big.NewInt(20), new(big.Int).Mul(big.NewInt(1e10), big.NewInt(1e18))),
+			chainSelector:  AptChainSelector,
+			exp:            big.NewInt(100000 * 20 * 1e10), // gasprice * USD per APT * (USD / APT)
+		},
+		{
+			name:           "apt low fee case",
+			sourceGasPrice: big.NewInt(100),
+			usdPerFeeCoin:  new(big.Int).Mul(big.NewInt(1), new(big.Int).Mul(big.NewInt(1e10), big.NewInt(1e18))),
+			chainSelector:  AptChainSelector,
+			exp:            big.NewInt(100 * 1 * 1e10), // gasprice * USD per APT * (USD / APT)
+		},
+		{
+			name:           "apt 0 fee case",
+			sourceGasPrice: big.NewInt(0),
+			usdPerFeeCoin:  new(big.Int).Mul(big.NewInt(1), new(big.Int).Mul(big.NewInt(1e10), big.NewInt(1e18))),
+			chainSelector:  AptChainSelector,
+			exp:            big.NewInt(0 * 1 * 1e10), // gasprice * USD per APT * (USD / APT)
 		},
 	}
 

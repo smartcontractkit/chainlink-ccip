@@ -5,7 +5,6 @@ package nonce_manager
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 	"strings"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated"
 )
 
 var (
@@ -1144,26 +1142,6 @@ func (_NonceManager *NonceManagerFilterer) ParseSkippedIncorrectNonce(log types.
 	return event, nil
 }
 
-func (_NonceManager *NonceManager) ParseLog(log types.Log) (generated.AbigenLog, error) {
-	switch log.Topics[0] {
-	case _NonceManager.abi.Events["AuthorizedCallerAdded"].ID:
-		return _NonceManager.ParseAuthorizedCallerAdded(log)
-	case _NonceManager.abi.Events["AuthorizedCallerRemoved"].ID:
-		return _NonceManager.ParseAuthorizedCallerRemoved(log)
-	case _NonceManager.abi.Events["OwnershipTransferRequested"].ID:
-		return _NonceManager.ParseOwnershipTransferRequested(log)
-	case _NonceManager.abi.Events["OwnershipTransferred"].ID:
-		return _NonceManager.ParseOwnershipTransferred(log)
-	case _NonceManager.abi.Events["PreviousRampsUpdated"].ID:
-		return _NonceManager.ParsePreviousRampsUpdated(log)
-	case _NonceManager.abi.Events["SkippedIncorrectNonce"].ID:
-		return _NonceManager.ParseSkippedIncorrectNonce(log)
-
-	default:
-		return nil, fmt.Errorf("abigen wrapper received unknown log topic: %v", log.Topics[0])
-	}
-}
-
 func (NonceManagerAuthorizedCallerAdded) Topic() common.Hash {
 	return common.HexToHash("0xeb1b9b92e50b7f88f9ff25d56765095ac6e91540eee214906f4036a908ffbdef")
 }
@@ -1252,8 +1230,6 @@ type NonceManagerInterface interface {
 	WatchSkippedIncorrectNonce(opts *bind.WatchOpts, sink chan<- *NonceManagerSkippedIncorrectNonce) (event.Subscription, error)
 
 	ParseSkippedIncorrectNonce(log types.Log) (*NonceManagerSkippedIncorrectNonce, error)
-
-	ParseLog(log types.Log) (generated.AbigenLog, error)
 
 	Address() common.Address
 }

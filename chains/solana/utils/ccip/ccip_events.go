@@ -4,9 +4,9 @@ import (
 	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_offramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/fee_quoter"
 )
 
 // Events - temporary event struct to decode
@@ -147,4 +147,15 @@ type EventReferenceAddressesSet struct {
 	Router             solana.PublicKey
 	FeeQuoter          solana.PublicKey
 	OfframpLookupTable solana.PublicKey
+}
+
+type EventCcipCctpMessageSent struct {
+	Discriminator       [8]byte
+	OriginalSender      solana.PublicKey
+	RemoteChainSelector uint64
+	MsgTotalNonce       uint64
+	EventAddress        solana.PublicKey
+	SourceDomain        uint32
+	CctpNonce           uint64
+	MessageSentBytes    []byte
 }

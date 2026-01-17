@@ -5,7 +5,7 @@ import (
 	"errors"
 	"math/big"
 
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
 // ChainConfig holds configuration that is stored in the onchain CCIPConfig.sol

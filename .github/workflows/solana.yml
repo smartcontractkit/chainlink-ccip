@@ -121,6 +121,7 @@ jobs:
           cd /solana/contracts &&\
           anchor build &&\
           cargo check &&\
+          cargo clippy -- --version &&\
           cargo clippy -- -D warnings &&\
           cargo test --workspace"
 

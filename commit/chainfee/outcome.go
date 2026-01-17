@@ -13,10 +13,11 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/mathslib"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 func (p *processor) Outcome(
@@ -106,6 +107,7 @@ func (p *processor) Outcome(
 		"gasPrices", gasPrices,
 		"consensusTimestamp", consensusObs.TimestampNow,
 	)
+
 	out := Outcome{GasPrices: gasPrices}
 	return out, nil
 }
@@ -317,11 +319,16 @@ func (p *processor) getGasPricesToUpdate(
 				ChainSel: chain,
 				GasPrice: packedFee,
 			})
-		} else {
-			lggr.Debugw("chain fee update not needed: within deviation thresholds",
-				"executionFeeDeviationPPB", feeConfig.GasPriceDeviationPPB,
-				"dataAvFeeDeviationPPB", feeConfig.DAGasPriceDeviationPPB)
+			continue
 		}
+
+		lggr.Infow("chain fee update not needed",
+			"chain", chain,
+			"currentChainFee", currentChainFee,
+			"lastUpdateTimestamp", lastUpdate.Timestamp,
+			"currentTimestamp", consensusTimestamp,
+			"executionFeeDeviationPPB", feeConfig.GasPriceDeviationPPB,
+			"dataAvFeeDeviationPPB", feeConfig.DAGasPriceDeviationPPB)
 	}
 
 	return gasPrices

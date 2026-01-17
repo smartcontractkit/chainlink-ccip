@@ -5,7 +5,6 @@ package rmn_proxy_contract
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 	"strings"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated"
 )
 
 var (
@@ -674,20 +672,6 @@ func (_RMNProxy *RMNProxyFilterer) ParseOwnershipTransferred(log types.Log) (*RM
 	return event, nil
 }
 
-func (_RMNProxy *RMNProxy) ParseLog(log types.Log) (generated.AbigenLog, error) {
-	switch log.Topics[0] {
-	case _RMNProxy.abi.Events["ARMSet"].ID:
-		return _RMNProxy.ParseARMSet(log)
-	case _RMNProxy.abi.Events["OwnershipTransferRequested"].ID:
-		return _RMNProxy.ParseOwnershipTransferRequested(log)
-	case _RMNProxy.abi.Events["OwnershipTransferred"].ID:
-		return _RMNProxy.ParseOwnershipTransferred(log)
-
-	default:
-		return nil, fmt.Errorf("abigen wrapper received unknown log topic: %v", log.Topics[0])
-	}
-}
-
 func (RMNProxyARMSet) Topic() common.Hash {
 	return common.HexToHash("0xef31f568d741a833c6a9dc85a6e1c65e06fa772740d5dc94d1da21827a4e0cab")
 }
@@ -736,8 +720,6 @@ type RMNProxyInterface interface {
 	WatchOwnershipTransferred(opts *bind.WatchOpts, sink chan<- *RMNProxyOwnershipTransferred, from []common.Address, to []common.Address) (event.Subscription, error)
 
 	ParseOwnershipTransferred(log types.Log) (*RMNProxyOwnershipTransferred, error)
-
-	ParseLog(log types.Log) (generated.AbigenLog, error)
 
 	Address() common.Address
 }

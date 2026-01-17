@@ -254,7 +254,6 @@ func (e *extendedContractReader) Bind(ctx context.Context, allBindings []types.B
 	if len(validBindings) == 0 {
 		return nil
 	}
-
 	err := e.reader.Bind(ctx, validBindings)
 	if err != nil {
 		return fmt.Errorf("failed to call ContractReader.Bind: %w", err)
@@ -304,7 +303,8 @@ func (e *extendedContractReader) bindingExists(b types.BoundContract) bool {
 
 	for _, boundContracts := range e.contractBindingsByName {
 		for _, boundContract := range boundContracts {
-			if boundContract.Binding.String() == b.String() {
+			// Ignore case when comparing addresses
+			if strings.EqualFold(boundContract.Binding.String(), b.String()) {
 				return true
 			}
 		}

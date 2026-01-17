@@ -10,8 +10,14 @@ pub struct Impl;
 impl Admin for Impl {
     fn transfer_ownership(&self, ctx: Context<UpdateConfig>, proposed_owner: Pubkey) -> Result<()> {
         let config = &mut ctx.accounts.config;
-        require!(
-            proposed_owner != config.owner,
+        require_keys_neq!(
+            proposed_owner,
+            Pubkey::default(),
+            RmnRemoteError::DefaultOwnerProposal
+        );
+        require_keys_neq!(
+            proposed_owner,
+            config.owner,
             RmnRemoteError::RedundantOwnerProposal
         );
         emit!(OwnershipTransferRequested {

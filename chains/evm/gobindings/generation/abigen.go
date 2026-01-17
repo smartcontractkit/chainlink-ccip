@@ -170,10 +170,6 @@ func ImproveAbigenOutput(path string, abiPath string) {
 
 	fset, fileNode := parseFile(bs)
 	logNames := getLogNames(fileNode)
-	if len(logNames) > 0 {
-		astutil.AddImport(fset, fileNode, "fmt")
-		astutil.AddImport(fset, fileNode, "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated")
-	}
 	contractName := getContractName(fileNode)
 	fileNode = addContractStructFields(contractName, fileNode)
 	fileNode = replaceAnonymousStructs(contractName, fileNode)
@@ -459,26 +455,6 @@ func replaceAnonymousStructs(contractName string, fileNode *ast.File) *ast.File 
 }
 
 func writeAdditionalMethods(contractName string, logNames []string, abi abi.ABI, bs []byte) []byte {
-	// Write the ParseLog method
-	if len(logNames) > 0 {
-		var logSwitchBody string
-		for _, logName := range logNames {
-			logSwitchBody += fmt.Sprintf(`case _%v.abi.Events["%v"].ID:
-        return _%v.Parse%v(log)
-`, contractName, logName, contractName, logName)
-		}
-
-		bs = append(bs, []byte(fmt.Sprintf(`
-func (_%v *%v) ParseLog(log types.Log) (generated.AbigenLog, error) {
-    switch log.Topics[0] {
-    %v
-    default:
-        return nil, fmt.Errorf("abigen wrapper received unknown log topic: %%v", log.Topics[0])
-    }
-}
-`, contractName, contractName, logSwitchBody))...)
-	}
-
 	// Write the Topic method
 	for _, logName := range logNames {
 		bs = append(bs, []byte(fmt.Sprintf(`

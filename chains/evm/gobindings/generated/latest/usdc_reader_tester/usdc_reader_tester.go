@@ -5,7 +5,6 @@ package usdc_reader_tester
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 	"strings"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated"
 )
 
 var (
@@ -300,16 +298,6 @@ func (_USDCReaderTester *USDCReaderTesterFilterer) ParseMessageSent(log types.Lo
 	return event, nil
 }
 
-func (_USDCReaderTester *USDCReaderTester) ParseLog(log types.Log) (generated.AbigenLog, error) {
-	switch log.Topics[0] {
-	case _USDCReaderTester.abi.Events["MessageSent"].ID:
-		return _USDCReaderTester.ParseMessageSent(log)
-
-	default:
-		return nil, fmt.Errorf("abigen wrapper received unknown log topic: %v", log.Topics[0])
-	}
-}
-
 func (USDCReaderTesterMessageSent) Topic() common.Hash {
 	return common.HexToHash("0x8c5261668696ce22758910d05bab8f186d6eb247ceac2af2e82c7dc17669b036")
 }
@@ -326,8 +314,6 @@ type USDCReaderTesterInterface interface {
 	WatchMessageSent(opts *bind.WatchOpts, sink chan<- *USDCReaderTesterMessageSent) (event.Subscription, error)
 
 	ParseMessageSent(log types.Log) (*USDCReaderTesterMessageSent, error)
-
-	ParseLog(log types.Log) (generated.AbigenLog, error)
 
 	Address() common.Address
 }

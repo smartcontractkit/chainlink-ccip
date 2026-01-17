@@ -1,5 +1,5 @@
 export type Mcm = {
-  "version": "0.1.0-dev",
+  "version": "0.1.1",
   "name": "mcm",
   "docs": [
     "A multi-signature contract system that supports signing many transactions targeting",
@@ -1370,7 +1370,7 @@ export type Mcm = {
 };
 
 export const IDL: Mcm = {
-  "version": "0.1.0-dev",
+  "version": "0.1.1",
   "name": "mcm",
   "docs": [
     "A multi-signature contract system that supports signing many transactions targeting",

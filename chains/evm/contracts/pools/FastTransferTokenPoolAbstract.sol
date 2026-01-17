@@ -41,6 +41,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   error TransferAmountExceedsMaxFillAmount(uint64 remoteChainSelector, uint256 amount);
   error InsufficientPoolFees(uint256 requested, uint256 available);
   error QuoteFeeExceedsUserMaxLimit(uint256 quoteFee, uint256 maxFastTransferFee);
+  error InvalidReceiver(bytes receiver);
 
   event DestChainConfigUpdated(
     uint64 indexed destinationChainSelector,
@@ -93,8 +94,20 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     address filler;
   }
 
+  /// @dev This struct helps avoid stack too deep errors by encapsulating fee components.
+  struct InternalQuote {
+    uint256 ccipSettlementFee; // Fee paid to for CCIP settlement in CCIP supported fee tokens.
+    uint256 totalFastTransferFee; // Fee paid to the fast transfer filler in the same asset as requested.
+    // The following two are the fee components that are used to calculate the total fast transfer fee.
+    uint256 fillerFeeComponent; // Fee amount going to the filler.
+    uint256 poolFeeComponent; // Fee amount going to the pool.
+  }
+
   /// @notice The division factor for basis points (BPS). This also represents the maximum BPS fee for fast transfer.
   uint256 internal constant BPS_DIVIDER = 10_000;
+
+  /// @notice The chain selector for the chain where this contract is deployed.
+  uint64 internal immutable i_localChainSelector;
 
   /// @dev Mapping of remote chain selector to destinationChain configuration.
   mapping(uint64 remoteChainSelector => DestChainConfig destinationChainConfig) internal s_fastTransferDestChainConfig;
@@ -111,13 +124,17 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   /// @param allowlist The allowlist of addresses.
   /// @param rmnProxy The RMN proxy address.
   /// @param router Address of the CCIP router.
+  /// @param localChainSelector The chain selector where this contract is deployed.
   constructor(
     IERC20 token,
     uint8 localTokenDecimals,
     address[] memory allowlist,
     address rmnProxy,
-    address router
-  ) TokenPool(token, localTokenDecimals, allowlist, rmnProxy, router) CCIPReceiver(router) {}
+    address router,
+    uint64 localChainSelector
+  ) TokenPool(token, localTokenDecimals, allowlist, rmnProxy, router) CCIPReceiver(router) {
+    i_localChainSelector = localChainSelector;
+  }
 
   /// @notice Gets the fill information for a given fill ID.
   /// @return fillInfo The fill information including state and filler address.
@@ -133,35 +150,38 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     uint256 amount,
     uint256 maxFastTransferFee,
     bytes calldata receiver,
-    address feeToken,
+    address settlementFeeToken,
     bytes calldata extraArgs
   ) external payable virtual override returns (bytes32 settlementId) {
-    (Quote memory quote, Client.EVM2AnyMessage memory message) =
-      _getFeeQuoteAndCCIPMessage(destinationChainSelector, amount, receiver, feeToken, extraArgs);
+    (InternalQuote memory internalQuote, Client.EVM2AnyMessage memory message) =
+      _getInternalQuoteAndCCIPMessage(destinationChainSelector, amount, receiver, settlementFeeToken, extraArgs);
+
     _consumeOutboundRateLimit(destinationChainSelector, amount);
-    if (quote.fastTransferFee > maxFastTransferFee) {
-      revert QuoteFeeExceedsUserMaxLimit(quote.fastTransferFee, maxFastTransferFee);
+    if (internalQuote.totalFastTransferFee > maxFastTransferFee) {
+      revert QuoteFeeExceedsUserMaxLimit(internalQuote.totalFastTransferFee, maxFastTransferFee);
     }
-    _handleFastTransferLockOrBurn(msg.sender, amount);
+
+    _handleFastTransferLockOrBurn(destinationChainSelector, msg.sender, amount);
 
     // If the user is not paying in native, we need to transfer the fee token to the contract.
-    if (feeToken != address(0)) {
-      IERC20(feeToken).safeTransferFrom(msg.sender, address(this), quote.ccipSettlementFee);
-      IERC20(feeToken).safeApprove(i_ccipRouter, quote.ccipSettlementFee);
+    if (settlementFeeToken != address(0)) {
+      IERC20(settlementFeeToken).safeTransferFrom(msg.sender, address(this), internalQuote.ccipSettlementFee);
+      IERC20(settlementFeeToken).safeApprove(i_ccipRouter, internalQuote.ccipSettlementFee);
     }
 
     settlementId = IRouterClient(getRouter()).ccipSend{value: msg.value}(destinationChainSelector, message);
-    uint256 amountNetFee = amount - quote.fastTransferFee;
 
-    emit FastTransferRequested({
-      destinationChainSelector: destinationChainSelector,
-      fillId: computeFillId(settlementId, amountNetFee, i_tokenDecimals, receiver),
-      settlementId: settlementId,
-      sourceAmountNetFee: amountNetFee,
-      sourceDecimals: i_tokenDecimals,
-      fastTransferFee: quote.fastTransferFee,
-      receiver: receiver
-    });
+    // Extracted FastTransferRequested into a helper to reduce the number of local variables in this function,
+    // avoiding “stack too deep” compiler errors and keeping the main flow clear.
+    _emitFastTransferRequested(
+      destinationChainSelector,
+      settlementId,
+      amount - internalQuote.totalFastTransferFee,
+      internalQuote.fillerFeeComponent,
+      internalQuote.poolFeeComponent,
+      message.receiver,
+      receiver
+    );
 
     return settlementId;
   }
@@ -169,11 +189,12 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   /// @inheritdoc IFastTransferPool
   function computeFillId(
     bytes32 settlementId,
+    uint64 sourceChainSelector,
     uint256 sourceAmountNetFee,
     uint8 sourceDecimals,
     bytes memory receiver
   ) public pure override returns (bytes32) {
-    return keccak256(abi.encode(settlementId, sourceAmountNetFee, sourceDecimals, receiver));
+    return keccak256(abi.encode(settlementId, sourceChainSelector, sourceAmountNetFee, sourceDecimals, receiver));
   }
 
   // ================================================================
@@ -181,18 +202,18 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   // ================================================================
 
   /// @notice Calculates the filler and pool fees for a fast transfer.
-  /// @dev Common function to ensure consistent fee calculation
-  /// @param amount The transfer amount
-  /// @param fillerFeeBps Filler fee in basis points
-  /// @param poolFeeBps Pool fee in basis points
-  /// @return fillerFee The calculated filler fee
-  /// @return poolFee The calculated pool fee
+  /// @dev Common function to ensure consistent fee calculation.
+  /// @param amount The transfer amount.
+  /// @param fillerFeeBps Filler fee in basis points.
+  /// @param poolFeeBps Pool fee in basis points.
+  /// @return fillerFee The calculated filler fee.
+  /// @return poolFee The calculated pool fee.
   function _calculateFastTransferFees(
     uint256 amount,
     uint16 fillerFeeBps,
     uint16 poolFeeBps
   ) internal pure returns (uint256 fillerFee, uint256 poolFee) {
-    // Calculate individual fees using separate divisions to ensure consistency
+    // Calculate individual fees using separate divisions to ensure consistency.
     fillerFee = (amount * fillerFeeBps) / BPS_DIVIDER;
     poolFee = (amount * poolFeeBps) / BPS_DIVIDER;
     return (fillerFee, poolFee);
@@ -205,20 +226,21 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     bytes calldata receiver,
     address settlementFeeToken,
     bytes calldata extraArgs
-  ) public view virtual override returns (Quote memory) {
-    (Quote memory quote,) =
-      _getFeeQuoteAndCCIPMessage(destinationChainSelector, amount, receiver, settlementFeeToken, extraArgs);
-    return quote;
+  ) public view virtual override returns (Quote memory quote) {
+    (InternalQuote memory internalQuote,) =
+      _getInternalQuoteAndCCIPMessage(destinationChainSelector, amount, receiver, settlementFeeToken, extraArgs);
+    return
+      Quote({ccipSettlementFee: internalQuote.ccipSettlementFee, fastTransferFee: internalQuote.totalFastTransferFee});
   }
 
-  function _getFeeQuoteAndCCIPMessage(
+  function _getInternalQuoteAndCCIPMessage(
     uint64 destinationChainSelector,
     uint256 amount,
     bytes calldata receiver,
     address settlementFeeToken,
     bytes calldata
-  ) internal view virtual returns (IFastTransferPool.Quote memory quote, Client.EVM2AnyMessage memory message) {
-    _validateSendRequest(destinationChainSelector);
+  ) internal view virtual returns (InternalQuote memory internalQuote, Client.EVM2AnyMessage memory message) {
+    _validateSendRequest(destinationChainSelector, receiver);
 
     // Using storage here appears to be cheaper.
     DestChainConfig storage destChainConfig = s_fastTransferDestChainConfig[destinationChainSelector];
@@ -226,10 +248,11 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
       revert TransferAmountExceedsMaxFillAmount(destinationChainSelector, amount);
     }
 
-    (uint256 fillerFee, uint256 poolFee) = _calculateFastTransferFees(
+    (internalQuote.fillerFeeComponent, internalQuote.poolFeeComponent) = _calculateFastTransferFees(
       amount, destChainConfig.fastTransferFillerFeeBps, destChainConfig.fastTransferPoolFeeBps
     );
-    quote.fastTransferFee = fillerFee + poolFee;
+    internalQuote.totalFastTransferFee = internalQuote.fillerFeeComponent + internalQuote.poolFeeComponent;
+
     bytes memory extraArgs;
 
     // We use 0 as a toggle for whether the destination chain requires custom ExtraArgs. Zero would not be a sensible
@@ -245,7 +268,6 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
 
     message = Client.EVM2AnyMessage({
       receiver: destChainConfig.destinationPool,
-      // pack the MintMessage
       data: abi.encode(
         MintMessage({
           sourceAmount: amount,
@@ -260,8 +282,8 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
       extraArgs: extraArgs
     });
 
-    quote.ccipSettlementFee = IRouterClient(getRouter()).getFee(destinationChainSelector, message);
-    return (quote, message);
+    internalQuote.ccipSettlementFee = IRouterClient(getRouter()).getFee(destinationChainSelector, message);
+    return (internalQuote, message);
   }
 
   // ================================================================
@@ -289,17 +311,18 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
       }
     }
 
-    if (fillId != computeFillId(settlementId, sourceAmountNetFee, sourceDecimals, abi.encode(receiver))) {
+    if (
+      fillId
+        != computeFillId(settlementId, sourceChainSelector, sourceAmountNetFee, sourceDecimals, abi.encode(receiver))
+    ) {
       revert InvalidFillId(fillId);
     }
 
     FillInfo memory fillInfo = s_fills[fillId];
-    if (fillInfo.state != IFastTransferPool.FillState.NOT_FILLED) revert AlreadyFilled(fillId);
+    if (fillInfo.state != IFastTransferPool.FillState.NOT_FILLED) revert AlreadyFilledOrSettled(fillId);
 
     // Calculate the local amount.
     uint256 localAmount = _calculateLocalAmount(sourceAmountNetFee, sourceDecimals);
-    // We rate limit when there are funds going to an end user, not when they are going to a filler.
-    _consumeInboundRateLimit(sourceChainSelector, localAmount);
 
     s_fills[fillId] = FillInfo({state: IFastTransferPool.FillState.FILLED, filler: msg.sender});
 
@@ -311,7 +334,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   // @inheritdoc CCIPReceiver
   function _ccipReceive(
     Client.Any2EVMMessage memory message
-  ) internal virtual override onlyRouter {
+  ) internal virtual override {
     _settle(message.sourceChainSelector, message.messageId, message.sender, abi.decode(message.data, (MintMessage)));
   }
 
@@ -332,45 +355,83 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     uint256 localPoolFee = _calculateLocalAmount(sourcePoolFee, mintMessage.sourceDecimals);
     bytes32 fillId = computeFillId(
       settlementId,
+      sourceChainSelector,
       // sourceAmountNetFee is the amount minus the fast fill fee, so we need to subtract both fees.
       mintMessage.sourceAmount - sourceFillerFee - sourcePoolFee,
       mintMessage.sourceDecimals,
       mintMessage.receiver
     );
 
+    // Cache current fill info to decide which hook to call.
     FillInfo memory fillInfo = s_fills[fillId];
+    /// Mark the fill as SETTLED before any value transfers or external calls.
+    /// This makes the new state visible immediately, preventing the same fill
+    /// from being settled twice even if execution re-enters this contract.
+    s_fills[fillId].state = IFastTransferPool.FillState.SETTLED;
+    // Rate limiting should apply to the full sourceAmount regardless of whether the request was fast-filled or not.
+    // This ensures that the rate limit controls the overall rate of release/mint operations.
+    _consumeInboundRateLimit(sourceChainSelector, localAmount);
+
     // The amount to reimburse to the filler in local denomination.
     uint256 fillerReimbursementAmount = 0;
-
     if (fillInfo.state == IFastTransferPool.FillState.NOT_FILLED) {
-      // Set the local pool fee to zero, as fees are only applied for fast-fill operations
+      // Set the local pool fee to zero, as fees are only applied for fast-fill operations.
       localPoolFee = 0;
-      // Rate limits should be consumed only when the request was not fast-filled. During fast fill, the rate limit is
-      // consumed by the filler.
-      _consumeInboundRateLimit(sourceChainSelector, localAmount);
       // When no filler is involved, we send the entire amount to the receiver.
-      _handleSlowFill(fillId, localAmount, abi.decode(mintMessage.receiver, (address)));
+      _handleSlowFill(fillId, sourceChainSelector, localAmount, abi.decode(mintMessage.receiver, (address)));
     } else if (fillInfo.state == IFastTransferPool.FillState.FILLED) {
-      // The request was fast-filled, so we reimburse the filler and accumulate the pool.
       fillerReimbursementAmount = localAmount - localPoolFee;
-      _handleFastFillReimbursement(fillId, fillInfo.filler, fillerReimbursementAmount, localPoolFee);
+      _handleFastFillReimbursement(
+        fillId, sourceChainSelector, fillInfo.filler, fillerReimbursementAmount, localPoolFee
+      );
     } else {
       // The catch all assertion for already settled fills ensures that any wrong value will revert.
       revert AlreadySettled(fillId);
     }
-    s_fills[fillId].state = IFastTransferPool.FillState.SETTLED;
     emit FastTransferSettled(fillId, settlementId, fillerReimbursementAmount, localPoolFee, fillInfo.state);
   }
 
   /// @notice Validates the send request parameters. Can be overridden by derived contracts to add additional checks.
   /// @param destinationChainSelector The destination chain selector.
   /// @dev Checks if the destination chain is allowed, if the sender is allowed, and if the RMN curse applies.
-  function _validateSendRequest(
-    uint64 destinationChainSelector
-  ) internal view virtual {
+  function _validateSendRequest(uint64 destinationChainSelector, bytes calldata receiver) internal view virtual {
+    _validateReceiver(receiver);
+
     if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(destinationChainSelector)))) revert CursedByRMN();
     _checkAllowList(msg.sender);
     if (!isSupportedChain(destinationChainSelector)) revert ChainNotAllowed(destinationChainSelector);
+  }
+
+  /// @notice Validates receiver address parameters.
+  /// @dev Checks length bounds (0 < length ≤ 64) and ensures receiver is not all zeros.
+  /// @param receiver The receiver address to validate.
+  function _validateReceiver(
+    bytes calldata receiver
+  ) internal pure {
+    uint256 receiverLength = receiver.length;
+    if (receiverLength == 0 || receiverLength > 64) {
+      revert InvalidReceiver(receiver);
+    }
+
+    // Check if receiver is all zeros by scanning at most 2 32-byte words
+    bool isNonZero = false;
+    assembly {
+      let dataPtr := receiver.offset
+      // Load and check first 32 bytes
+      if calldataload(dataPtr) { isNonZero := 1 }
+
+      if gt(receiverLength, 32) {
+        // Load and check second 32 bytes only if receiver length > 32
+        // Note: dataPtr + 32 may exceed the actual receiver data bounds (e.g., for 40-byte receiver,
+        // this reads bytes [32, 64) where [40, 64) is out-of-bounds). However, this is safe because
+        // calldata is ABI-encoded with zero-padding to 32-byte boundaries, so out-of-bounds bytes are zeros.
+        if calldataload(add(dataPtr, 32)) { isNonZero := 1 }
+      }
+    }
+
+    if (!isNonZero) {
+      revert InvalidReceiver(receiver);
+    }
   }
 
   /// @notice Validates settlement prerequisites. Can be overridden by derived contracts to add additional checks.
@@ -389,9 +450,11 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   // ================================================================
 
   /// @notice Handles the token to transfer on fast fill request at source chain.
+  /// @dev The first param is the chainSelector. It's unused in this implementation, but kept to allow overriding this
+  /// function to handle the transfer in a different way.
   /// @param sender The sender address.
   /// @param amount The amount to transfer.
-  function _handleFastTransferLockOrBurn(address sender, uint256 amount) internal virtual {
+  function _handleFastTransferLockOrBurn(uint64, address sender, uint256 amount) internal virtual {
     // Since this is a fast transfer, the Router doesn't forward the tokens to the pool.
     getToken().safeTransferFrom(sender, address(this), amount);
     // Use the normal burn logic once the tokens are in the pool.
@@ -409,11 +472,12 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   }
 
   /// @notice Handles settlement when the request was not fast-filled
-  /// @dev The first param is the fillId. It's unused in this implementation, but kept to allow overriding this function
-  /// to handle the slow fill in a different way.
-  /// @param localSettlementAmount The amount to settle in local token
-  /// @param receiver The receiver address
-  function _handleSlowFill(bytes32, uint256 localSettlementAmount, address receiver) internal virtual {
+  /// @dev The first two parameters, `fillId` and `chainSelector`, are unused in this implementation.
+  /// They are included to allow derived contracts to override this function and implement custom logic
+  /// for handling slow fills.
+  /// @param localSettlementAmount The amount to settle in local token.
+  /// @param receiver The receiver address.
+  function _handleSlowFill(bytes32, uint64, uint256 localSettlementAmount, address receiver) internal virtual {
     _releaseOrMint(receiver, localSettlementAmount);
   }
 
@@ -433,14 +497,15 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
   /// @param poolReimbursementAmount The amount to reimburse to the pool (the pool fee).
   function _handleFastFillReimbursement(
     bytes32,
+    uint64,
     address filler,
     uint256 fillerReimbursementAmount,
     uint256 poolReimbursementAmount
   ) internal virtual {
-    // Mint entire amount to pool first
+    // Mint entire amount to pool first.
     _releaseOrMint(address(this), fillerReimbursementAmount + poolReimbursementAmount);
 
-    // Then transfer filler's share to them
+    // Then transfer filler's share to them.
     if (fillerReimbursementAmount > 0) {
       getToken().safeTransfer(filler, fillerReimbursementAmount);
     }
@@ -510,7 +575,7 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
       }
     }
 
-    // Ensure total fees is below 100%
+    // Ensure total fees is below 100%.
     if (destChainConfigArgs.fastTransferFillerFeeBps + destChainConfigArgs.fastTransferPoolFeeBps >= BPS_DIVIDER) {
       revert InvalidDestChainConfig();
     }
@@ -578,5 +643,36 @@ abstract contract FastTransferTokenPoolAbstract is TokenPool, CCIPReceiver, ITyp
     }
 
     emit FillerAllowListUpdated(fillersToAdd, fillersToRemove);
+  }
+
+  /// @dev Pulled out event emission into its own function to handle stack too deep in ccipSendToken
+  function _emitFastTransferRequested(
+    uint64 destinationChainSelector,
+    bytes32 settlementId,
+    uint256 sourceAmountNetFee,
+    uint256 fillerFee,
+    uint256 poolFee,
+    bytes memory destinationPool,
+    bytes calldata receiver
+  ) internal {
+    // Note: For the fillId computation during request emission, we use the local chain selector (i_localChainSelector)
+    // as the sourceChainSelector since this is where the request originates. When the message is settled on the
+    // destination chain, the same sourceChainSelector (this chain's selector) will be used. This consistency is
+    // critical for security as it ensures that the fillId computed during fastFill() validation matches the fillId
+    // computed during settlement, preventing cross-chain selector manipulation where non-allowlisted fillers
+    // could bypass validation by providing incorrect chain selectors.
+    bytes32 fillId = computeFillId(settlementId, i_localChainSelector, sourceAmountNetFee, i_tokenDecimals, receiver);
+
+    emit FastTransferRequested({
+      destinationChainSelector: destinationChainSelector,
+      fillId: fillId,
+      settlementId: settlementId,
+      sourceAmountNetFee: sourceAmountNetFee,
+      sourceDecimals: i_tokenDecimals,
+      fillerFee: fillerFee,
+      poolFee: poolFee,
+      destinationPool: destinationPool,
+      receiver: receiver
+    });
   }
 }

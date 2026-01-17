@@ -25,4 +25,4 @@ pub const FEE_BILLING_SIGNER: &[u8] = b"fee_billing_signer";
 pub const TOKEN_ADMIN_REGISTRY: &[u8] = b"token_admin_registry";
 pub const CCIP_TOKENPOOL_CONFIG: &[u8] = b"ccip_tokenpool_config";
 pub const CCIP_TOKENPOOL_SIGNER: &[u8] = b"ccip_tokenpool_signer";
-pub const TOKEN_POOL_CONFIG: &[u8] = b"ccip_tokenpool_chainconfig";
+pub const TOKEN_POOL_CHAIN_CONFIG: &[u8] = b"ccip_tokenpool_chainconfig";

@@ -3,6 +3,7 @@ use crate::state::CodeVersion;
 use super::interfaces::*;
 use super::v1;
 
+#[allow(clippy::empty_line_after_doc_comments)]
 /**
  * This file routes traffic between multiple versions of our business logic, which can be upgraded in a
  * backwards-compatible way and so we can gradually shift traffic between versions (and rollback if there are issues).

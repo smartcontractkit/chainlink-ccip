@@ -2,6 +2,8 @@ package logutil
 
 import (
 	"context"
+	"sync/atomic"
+	"time"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/libocr/commontypes"
@@ -108,4 +110,22 @@ func GetSeqNr(ctx context.Context) uint64 {
 		return 0
 	}
 	return seqNr
+}
+
+// LogWhenExceedFrequency logs state information if enough time has passed since the last state log.
+// This function is thread-safe and uses atomic operations.
+func LogWhenExceedFrequency(lastLog *atomic.Pointer[time.Time], frequency time.Duration, logFunc func()) {
+	now := time.Now()
+
+	lastLogPtr := lastLog.Load()
+	var lastLogTime time.Time
+	if lastLogPtr != nil {
+		lastLogTime = *lastLogPtr
+	}
+
+	// Check if enough time has passed since the last log
+	if now.Sub(lastLogTime) >= frequency {
+		lastLog.Store(&now)
+		logFunc()
+	}
 }

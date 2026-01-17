@@ -15,8 +15,12 @@ contract FeeQuoter_validateDestFamilyAddress is FeeQuoterSetup {
     s_feeQuoter.validateDestFamilyAddress(Internal.CHAIN_FAMILY_SELECTOR_SVM, abi.encode(type(uint208).max), 0);
   }
 
+  function test_validateDestFamilyAddress_Sui() public view {
+    s_feeQuoter.validateDestFamilyAddress(Internal.CHAIN_FAMILY_SELECTOR_SVM, abi.encode(type(uint208).max), 0);
+  }
+
   function test_validateDestFamilyAddress_Aptos() public view {
-    s_feeQuoter.validateDestFamilyAddress(Internal.CHAIN_FAMILY_SELECTOR_APTOS, abi.encode(type(uint208).max), 0);
+    s_feeQuoter.validateDestFamilyAddress(Internal.CHAIN_FAMILY_SELECTOR_SUI, abi.encode(type(uint208).max), 0);
   }
 
   // Reverts
@@ -63,5 +67,12 @@ contract FeeQuoter_validateDestFamilyAddress is FeeQuoterSetup {
 
     vm.expectRevert(abi.encodeWithSelector(Internal.Invalid32ByteAddress.selector, invalidAddress));
     s_feeQuoter.validateDestFamilyAddress(Internal.CHAIN_FAMILY_SELECTOR_APTOS, invalidAddress, 0);
+  }
+
+  function test_validateDestFamilyAddress_Sui_RevertWhen_Invalid32ByteAddress() public {
+    bytes memory invalidAddress = abi.encode(address(234), address(234));
+
+    vm.expectRevert(abi.encodeWithSelector(Internal.Invalid32ByteAddress.selector, invalidAddress));
+    s_feeQuoter.validateDestFamilyAddress(Internal.CHAIN_FAMILY_SELECTOR_SUI, invalidAddress, 0);
   }
 }

@@ -5,7 +5,6 @@ package mock_usdc_token_transmitter
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 	"strings"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated"
 )
 
 var (
@@ -424,16 +422,6 @@ func (_MockE2EUSDCTransmitter *MockE2EUSDCTransmitterFilterer) ParseMessageSent(
 	return event, nil
 }
 
-func (_MockE2EUSDCTransmitter *MockE2EUSDCTransmitter) ParseLog(log types.Log) (generated.AbigenLog, error) {
-	switch log.Topics[0] {
-	case _MockE2EUSDCTransmitter.abi.Events["MessageSent"].ID:
-		return _MockE2EUSDCTransmitter.ParseMessageSent(log)
-
-	default:
-		return nil, fmt.Errorf("abigen wrapper received unknown log topic: %v", log.Topics[0])
-	}
-}
-
 func (MockE2EUSDCTransmitterMessageSent) Topic() common.Hash {
 	return common.HexToHash("0x8c5261668696ce22758910d05bab8f186d6eb247ceac2af2e82c7dc17669b036")
 }
@@ -464,8 +452,6 @@ type MockE2EUSDCTransmitterInterface interface {
 	WatchMessageSent(opts *bind.WatchOpts, sink chan<- *MockE2EUSDCTransmitterMessageSent) (event.Subscription, error)
 
 	ParseMessageSent(log types.Log) (*MockE2EUSDCTransmitterMessageSent, error)
-
-	ParseLog(log types.Log) (generated.AbigenLog, error)
 
 	Address() common.Address
 }

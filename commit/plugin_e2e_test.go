@@ -25,7 +25,7 @@ import (
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
 	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
@@ -45,7 +45,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	ocrtypecodec "github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1"
 	reader2 "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
@@ -76,12 +75,12 @@ var (
 
 	decimals18 = uint8(18)
 
-	arbInfo = pluginconfig.TokenInfo{
+	arbInfo = ccipocr3.TokenInfo{
 		AggregatorAddress: arbAggregatorAddr,
 		DeviationPPB:      ccipocr3.NewBigInt(big.NewInt(1e5)),
 		Decimals:          decimals18,
 	}
-	ethInfo = pluginconfig.TokenInfo{
+	ethInfo = ccipocr3.TokenInfo{
 		AggregatorAddress: ethAggregatorAddr,
 		DeviationPPB:      ccipocr3.NewBigInt(big.NewInt(1e5)),
 		Decimals:          decimals18,
@@ -748,7 +747,7 @@ func prepareCcipReaderMock(
 		GetContractAddress(mock.Anything, mock.Anything).
 		Return(ccipocr3.Bytes{1}, nil).Maybe()
 	ccipReader.EXPECT().GetRmnCurseInfo(mock.Anything).
-		Return(reader2.CurseInfo{}, nil).Maybe()
+		Return(ccipocr3.CurseInfo{}, nil).Maybe()
 	ccipReader.EXPECT().GetOffRampSourceChainsConfig(mock.Anything, mock.Anything).
 		Return(sourceChainConfigs, nil).Maybe()
 
@@ -952,7 +951,7 @@ func setupNode(params SetupNodeParams) nodeSetup {
 // Note:
 // oracleID will be set to 0
 func defaultNodeParams(t *testing.T) SetupNodeParams {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	lggr := logger.Test(t)
 
 	donID := uint32(1)
@@ -999,7 +998,7 @@ func defaultNodeParams(t *testing.T) SetupNodeParams {
 		NewMsgScanBatchSize:                100,
 		MaxReportTransmissionCheckAttempts: 2,
 		TokenPriceBatchWriteFrequency:      writeFrequency,
-		TokenInfo: map[ccipocr3.UnknownEncodedAddress]pluginconfig.TokenInfo{
+		TokenInfo: map[ccipocr3.UnknownEncodedAddress]ccipocr3.TokenInfo{
 			arbAddr: arbInfo,
 			ethAddr: ethInfo,
 		},

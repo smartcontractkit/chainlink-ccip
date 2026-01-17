@@ -16,9 +16,9 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/testutils"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/access_controller"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/external_program_cpi_stub"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/timelock"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/access_controller"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/external_program_cpi_stub"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/timelock"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/accesscontroller"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	timelockutil "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/timelock"

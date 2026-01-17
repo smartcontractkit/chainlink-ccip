@@ -11,16 +11,16 @@ import (
 	sel "github.com/smartcontractkit/chain-selectors"
 
 	logger2 "github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
+
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks/inmem"
 	ocrtypecodec "github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 func runRoundAndGetOutcome(ctx context.Context, ocrTypeCodec ocrtypecodec.ExecCodec,
@@ -34,7 +34,7 @@ func runRoundAndGetOutcome(ctx context.Context, ocrTypeCodec ocrtypecodec.ExecCo
 
 func Test_LBTC_USDC_Transfer(t *testing.T) {
 	ocrTypeCodec := ocrtypecodec.DefaultExecCodec
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	sourceChain := cciptypes.ChainSelector(sel.ETHEREUM_TESTNET_SEPOLIA.Selector)
 	destChain := cciptypes.ChainSelector(sel.ETHEREUM_MAINNET_BASE_1.Selector)

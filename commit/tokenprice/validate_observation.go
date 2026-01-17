@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"time"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
-	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
 func (p *processor) ValidateObservation(
@@ -56,7 +56,7 @@ func (p *processor) ValidateObservation(
 
 func validateObservedTokenPrices(
 	tokenPrices cciptypes.TokenPriceMap,
-	tokensToQuery map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo) error {
+	tokensToQuery map[cciptypes.UnknownEncodedAddress]cciptypes.TokenInfo) error {
 	for tokenID, price := range tokenPrices {
 		if _, ok := tokensToQuery[tokenID]; !ok {
 			return fmt.Errorf("observed token %v is not in the list of tokens to query", tokenID)
@@ -70,7 +70,7 @@ func validateObservedTokenPrices(
 
 func validateObservedTokenUpdates(
 	tokenUpdates map[cciptypes.UnknownEncodedAddress]cciptypes.TimestampedBig,
-	tokensToQuery map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo) error {
+	tokensToQuery map[cciptypes.UnknownEncodedAddress]cciptypes.TokenInfo) error {
 	for tokenID, update := range tokenUpdates {
 		if _, ok := tokensToQuery[tokenID]; !ok {
 			return fmt.Errorf("observed token %v is not in the list of tokens to query", tokenID)

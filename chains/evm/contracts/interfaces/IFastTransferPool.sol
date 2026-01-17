@@ -2,7 +2,7 @@
 pragma solidity ^0.8.4;
 
 /// @title IFastTransferPool
-/// @notice Interface for the CCIP Fast-Transfer Pool
+/// @notice Interface for the CCIP Fast-Transfer Pool.
 interface IFastTransferPool {
   /// @notice Enum representing the state of a fill request.
   enum FillState {
@@ -12,24 +12,34 @@ interface IFastTransferPool {
 
   }
 
-  /// @notice Quote struct containing fee information
+  /// @notice Quote struct containing fee information.
   struct Quote {
     uint256 ccipSettlementFee; // Fee paid to for CCIP settlement in CCIP supported fee tokens.
     uint256 fastTransferFee; // Fee paid to the fast transfer filler in the same asset as requested.
   }
 
-  error AlreadyFilled(bytes32 fillId);
+  error AlreadyFilledOrSettled(bytes32 fillId);
   error AlreadySettled(bytes32 fillId);
 
-  /// @notice Emitted when a fast transfer is requested
+  /// @notice Emitted when a fast transfer is requested.
   event FastTransferRequested(
     uint64 indexed destinationChainSelector,
     bytes32 indexed fillId,
     bytes32 indexed settlementId,
-    /// @param sourceAmountNetFee The amount being transferred, excluding the fast fill fee, expressed in source token decimals.
+    /// @param sourceAmountNetFee The amount being transferred, excluding the fast fill fee, expressed in source token
+    /// decimals.
     uint256 sourceAmountNetFee,
     uint8 sourceDecimals,
-    uint256 fastTransferFee,
+    uint256 fillerFee,
+    uint256 poolFee,
+    /// @param destinationPool The destination chain pool where both the fill and settlement processes occur.
+    /// @dev Fillers must invoke `fill` on the exact `destinationPool` address specified in the event tied to a fast transfer request.
+    /// This ensures proper handling, as the active destination pool address can be updated in the token admin registry during token pool upgrades.
+    /// In such cases, inflight messages are routed to the pool address specified in the event, where settlement takes place.
+    /// To ensure accurate compensation during settlement, the fast fill must also occur at the pool address specified in the event.
+    /// @notice Observability tools or indexing components should observe the `FastTransferFilled` and `FastTransferSettled` events from the `destinationPool`
+    /// emitted in this event to monitor both fill and settlement actions for accurate status and metrics.
+    bytes destinationPool,
     bytes receiver
   );
   /// @notice Emitted when a fast transfer is filled. This means the end user has received the tokens but the slow
@@ -83,13 +93,17 @@ interface IFastTransferPool {
     bytes calldata extraArgs
   ) external payable returns (bytes32 settlementId);
 
-  /// @notice Fast fills a transfer using liquidity provider funds
+  /// @notice Fast fills a transfer using liquidity provider funds.
+  /// @notice Fillers must ensure that the parameters provided here exactly match the
+  /// values emitted in the `FastTransferRequested` event on the source chain.
+  /// It is recommended that the fillId must be passed directly from the event to avoid any mismatch
+  /// as encoding differences can cause divergence between fast fill and slow path settlement IDs.
   /// @param settlementId The settlement ID, which under normal circumstances is the same as the CCIP message ID.
   /// @param fillId The fill ID, computed from the fill request parameters.
   /// @param sourceChainSelector The source chain selector.
   /// @param sourceAmountNetFee The amount being filled, excluding the fast fill fee, expressed in source token decimals.
   /// @param sourceDecimals The decimals of the token on the source token.
-  /// @param receiver The receiver on the destination chain. ABI encoded in the case of an EVM destination chain.
+  /// @param receiver The receiver on the destination chain.
   function fastFill(
     bytes32 settlementId,
     bytes32 fillId,
@@ -101,12 +115,14 @@ interface IFastTransferPool {
 
   /// @notice Helper function to generate fill ID from request parameters.
   /// @param settlementId The settlement ID, which under normal circumstances is the same as the CCIP message ID.
+  /// @param sourceChainSelector The chain selector where the fill request originated.
   /// @param sourceAmountNetFee The amount being filled, excluding the fast fill fee, expressed in source token decimals.
   /// @param sourceDecimals The decimals of the token on the source token.
   /// @param receiver The receiver on the destination chain. ABI encoded in the case of an EVM destination chain.
   /// @return fillId The computed fill ID.
   function computeFillId(
     bytes32 settlementId,
+    uint64 sourceChainSelector,
     uint256 sourceAmountNetFee,
     uint8 sourceDecimals,
     bytes memory receiver

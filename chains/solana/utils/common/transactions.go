@@ -225,6 +225,7 @@ func sendTransactionWithLookupTables(ctx context.Context, rpcClient *rpc.Client,
 					time.Sleep(50 * time.Millisecond)
 					continue
 				}
+				fmt.Printf("Failed Tx: %+v\n", tx)
 				fmt.Println("Unexpected error (most likely contract related), no point in retrying:", err)
 				return nil, err
 			}
@@ -396,7 +397,7 @@ func ExtractAnchorTypedReturnValue[T any, PT anchorType[T]](ctx context.Context,
 	if err != nil {
 		return nil, err
 	}
-	err = PT(&result).UnmarshalWithDecoder(bin.NewBinDecoder(bytes))
+	err = PT(&result).UnmarshalWithDecoder(bin.NewBorshDecoder(bytes))
 	if err != nil {
 		return nil, err
 	}

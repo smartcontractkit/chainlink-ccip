@@ -5,7 +5,6 @@ package rmn_home
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 	"strings"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated"
 )
 
 var (
@@ -1373,28 +1371,6 @@ type GetConfigDigests struct {
 	CandidateConfigDigest [32]byte
 }
 
-func (_RMNHome *RMNHome) ParseLog(log types.Log) (generated.AbigenLog, error) {
-	switch log.Topics[0] {
-	case _RMNHome.abi.Events["ActiveConfigRevoked"].ID:
-		return _RMNHome.ParseActiveConfigRevoked(log)
-	case _RMNHome.abi.Events["CandidateConfigRevoked"].ID:
-		return _RMNHome.ParseCandidateConfigRevoked(log)
-	case _RMNHome.abi.Events["ConfigPromoted"].ID:
-		return _RMNHome.ParseConfigPromoted(log)
-	case _RMNHome.abi.Events["ConfigSet"].ID:
-		return _RMNHome.ParseConfigSet(log)
-	case _RMNHome.abi.Events["DynamicConfigSet"].ID:
-		return _RMNHome.ParseDynamicConfigSet(log)
-	case _RMNHome.abi.Events["OwnershipTransferRequested"].ID:
-		return _RMNHome.ParseOwnershipTransferRequested(log)
-	case _RMNHome.abi.Events["OwnershipTransferred"].ID:
-		return _RMNHome.ParseOwnershipTransferred(log)
-
-	default:
-		return nil, fmt.Errorf("abigen wrapper received unknown log topic: %v", log.Topics[0])
-	}
-}
-
 func (RMNHomeActiveConfigRevoked) Topic() common.Hash {
 	return common.HexToHash("0x0b31c0055e2d464bef7781994b98c4ff9ef4ae0d05f59feb6a68c42de5e201b8")
 }
@@ -1501,8 +1477,6 @@ type RMNHomeInterface interface {
 	WatchOwnershipTransferred(opts *bind.WatchOpts, sink chan<- *RMNHomeOwnershipTransferred, from []common.Address, to []common.Address) (event.Subscription, error)
 
 	ParseOwnershipTransferred(log types.Log) (*RMNHomeOwnershipTransferred, error)
-
-	ParseLog(log types.Log) (generated.AbigenLog, error)
 
 	Address() common.Address
 }

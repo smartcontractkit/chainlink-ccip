@@ -1,16 +1,11 @@
 package ccipocr3
 
-// RMNReport is the payload that is signed by the RMN nodes, transmitted and verified onchain.
-type RMNReport struct {
-	ReportVersionDigest         Bytes32 // e.g. keccak256("RMN_V1_6_ANY2EVM_REPORT")
-	DestChainID                 BigInt  // If applies, a chain specific id, e.g. evm chain id otherwise empty.
-	DestChainSelector           ChainSelector
-	RmnRemoteContractAddress    UnknownAddress
-	OfframpAddress              UnknownAddress
-	RmnHomeContractConfigDigest Bytes32
-	LaneUpdates                 []RMNLaneUpdate
-}
+import ccipocr3common "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
+// Deprecated: Use ccipocr3common.RMNReport instead.
+type RMNReport = ccipocr3common.RMNReport
+
+// Deprecated: Use ccipocr3common.NewRMNReport instead.
 func NewRMNReport(
 	reportVersionDigest Bytes32,
 	destChainID BigInt,
@@ -20,31 +15,22 @@ func NewRMNReport(
 	rmnHomeContractConfigDigest Bytes32,
 	laneUpdates []RMNLaneUpdate,
 ) RMNReport {
-	return RMNReport{
-		ReportVersionDigest:         reportVersionDigest,
-		DestChainID:                 destChainID,
-		DestChainSelector:           destChainSelector,
-		RmnRemoteContractAddress:    rmnRemoteContractAddress,
-		OfframpAddress:              offRampAddress,
-		RmnHomeContractConfigDigest: rmnHomeContractConfigDigest,
-		LaneUpdates:                 laneUpdates,
-	}
+	commonRMNLaneUpdates := make([]ccipocr3common.RMNLaneUpdate, len(laneUpdates))
+	copy(commonRMNLaneUpdates, laneUpdates)
+	return ccipocr3common.NewRMNReport(
+		reportVersionDigest,
+		destChainID,
+		destChainSelector,
+		rmnRemoteContractAddress,
+		offRampAddress,
+		rmnHomeContractConfigDigest,
+		commonRMNLaneUpdates,
+	)
+
 }
 
-// RMNLaneUpdate represents an interval that has been observed by an RMN node.
-// It is part of the payload that is signed and transmitted onchain.
-type RMNLaneUpdate struct {
-	SourceChainSelector ChainSelector
-	OnRampAddress       UnknownAddress // (for EVM should be abi-encoded)
-	MinSeqNr            SeqNum
-	MaxSeqNr            SeqNum
-	MerkleRoot          Bytes32
-}
+// Deprecated: Use ccipocr3common.RMNLaneUpdate instead.
+type RMNLaneUpdate = ccipocr3common.RMNLaneUpdate
 
-// RMNECDSASignature represents the signature provided by RMN on the RMNReport structure.
-// The V value of the signature is included in the top-level commit report as part of a
-// bitmap.
-type RMNECDSASignature struct {
-	R Bytes32 `json:"r"`
-	S Bytes32 `json:"s"`
-}
+// Deprecated: Use ccipocr3common.RMNECDSASignature instead.
+type RMNECDSASignature = ccipocr3common.RMNECDSASignature

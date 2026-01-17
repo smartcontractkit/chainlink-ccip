@@ -42,7 +42,7 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
   using RateLimiter for RateLimiter.TokenBucket;
 
   error CallerIsNotARampOnRouter(address caller);
-  error ZeroAddressNotAllowed();
+  error ZeroAddressInvalid();
   error SenderNotAllowed(address sender);
   error AllowListNotEnabled();
   error NonExistentChain(uint64 remoteChainSelector);
@@ -127,7 +127,9 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
   address internal s_rateLimitAdmin;
 
   constructor(IERC20 token, uint8 localTokenDecimals, address[] memory allowlist, address rmnProxy, address router) {
-    if (address(token) == address(0) || router == address(0) || rmnProxy == address(0)) revert ZeroAddressNotAllowed();
+    if (address(token) == address(0) || router == address(0) || rmnProxy == address(0)) {
+      revert ZeroAddressInvalid();
+    }
     i_token = token;
     i_rmnProxy = rmnProxy;
 
@@ -180,7 +182,7 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
   function setRouter(
     address newRouter
   ) public onlyOwner {
-    if (newRouter == address(0)) revert ZeroAddressNotAllowed();
+    if (newRouter == address(0)) revert ZeroAddressInvalid();
     address oldRouter = address(s_router);
     s_router = IRouter(newRouter);
 
@@ -486,7 +488,7 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
       RateLimiter._validateTokenBucketConfig(newChain.inboundRateLimiterConfig);
 
       if (newChain.remoteTokenAddress.length == 0) {
-        revert ZeroAddressNotAllowed();
+        revert ZeroAddressInvalid();
       }
 
       // If the chain already exists, revert
@@ -530,7 +532,7 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
   /// @param remotePoolAddress The address of the new remote pool.
   function _setRemotePool(uint64 remoteChainSelector, bytes memory remotePoolAddress) internal {
     if (remotePoolAddress.length == 0) {
-      revert ZeroAddressNotAllowed();
+      revert ZeroAddressInvalid();
     }
 
     bytes32 poolHash = keccak256(remotePoolAddress);
@@ -665,18 +667,26 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
 
   /// @notice Checks whether remote chain selector is configured on this contract, and if the msg.sender
   /// is a permissioned onRamp for the given chain on the Router.
+  /// @dev This function is marked virtual as other token pools may inherit from this contract, but do
+  /// not receive calls from the ramps directly, instead receiving them from a proxy contract. In that
+  /// situation this function must be overridden and the ramp-check removed and replaced with a different
+  /// access-control scheme.
   function _onlyOnRamp(
     uint64 remoteChainSelector
-  ) internal view {
+  ) internal view virtual {
     if (!isSupportedChain(remoteChainSelector)) revert ChainNotAllowed(remoteChainSelector);
     if (!(msg.sender == s_router.getOnRamp(remoteChainSelector))) revert CallerIsNotARampOnRouter(msg.sender);
   }
 
   /// @notice Checks whether remote chain selector is configured on this contract, and if the msg.sender
   /// is a permissioned offRamp for the given chain on the Router.
+  /// @dev This function is marked virtual as other token pools may inherit from this contract, but do
+  /// not receive calls from the ramps directly, instead receiving them from a proxy contract. In that
+  /// situation this function must be overridden and the ramp-check removed and replaced with a different
+  /// access-control scheme.
   function _onlyOffRamp(
     uint64 remoteChainSelector
-  ) internal view {
+  ) internal view virtual {
     if (!isSupportedChain(remoteChainSelector)) revert ChainNotAllowed(remoteChainSelector);
     if (!s_router.isOffRamp(remoteChainSelector, msg.sender)) revert CallerIsNotARampOnRouter(msg.sender);
   }

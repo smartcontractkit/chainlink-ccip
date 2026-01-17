@@ -11,15 +11,12 @@ pub fn cargo_instructions(source_file: &str, version: &str) {
 
     // ensure it is re-run when the build script changes
     println!("cargo:rerun-if-changed=build.rs");
-    println!("cargo:rerun-if-changed={}", source_file);
+    println!("cargo:rerun-if-changed={source_file}");
     println!("cargo:rerun-if-changed={}", file!());
 
     // set environment variables for the build
-    println!("cargo:rustc-env=CCIP_BUILD_PROGRAM_NAME={}", program_name);
-    println!(
-        "cargo:rustc-env=CCIP_BUILD_TYPE_VERSION={} {}",
-        program_name, version,
-    );
+    println!("cargo:rustc-env=CCIP_BUILD_PROGRAM_NAME={program_name}");
+    println!("cargo:rustc-env=CCIP_BUILD_TYPE_VERSION={program_name} {version}");
 }
 
 #[cfg(test)]

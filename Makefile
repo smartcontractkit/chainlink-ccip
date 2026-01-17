@@ -53,7 +53,21 @@ lint: ensure_go_version ensure_golangcilint
 lint-fix: ensure_go_version ensure_golangcilint
 	golangci-lint run -c .golangci.yml --fix
 
-checks: test lint
+lint-safebigint: ensure_go_version
+	@echo "Running safebigint linter..."
+	@if command -v safebigint >/dev/null 2>&1; then \
+		safebigint ./... || echo "safebigint found issues. Review the output above."; \
+	else \
+		echo "safebigint not found. Run 'make install-safebigint' to install it."; \
+		exit 1; \
+	fi
+
+lint-custom: ensure_go_version
+	@echo "Running custom linters in strict mode..."
+	@if command -v safebigint >/dev/null 2>&1; then safebigint ./...; fi
+
+
+checks: test lint lint-custom
 
 install-protoc:
 	@echo "Downloading and installing protoc for $(ARCH)..."
@@ -68,6 +82,13 @@ install-protoc:
 
 install-golangcilint:
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.5
+
+install-safebigint:
+	go install github.com/winder/safebigint/cmd/safebigint@latest
+
+install-custom-linters: install-safebigint
+
+install-linters: install-golangcilint install-custom-linters
 
 ensure_go_version:
 	@go version | grep -q 'go1.24' || (echo "Please use go1.24" && exit 1)

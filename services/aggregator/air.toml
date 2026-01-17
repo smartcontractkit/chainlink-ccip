@@ -1,0 +1,7 @@
+root = "."
+
+[build]
+cmd = "go build -o ./tmp/aggregator cmd/main.go"
+bin = "tmp/aggregator"
+include_ext = ["go", "mod", "sum"]
+exclude_dir = ["tmp", "vendor", "testdata", ".git"]

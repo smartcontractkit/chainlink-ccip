@@ -31,9 +31,11 @@ jobs:
         run: make
       - name: Install linter
         run: |
-          make install-golangcilint
+          make install-linters
       - name: Run linter
         run: make lint
+      - name: Run lint-custom
+        run: make lint-custom
       - name: Run protobuf linter
         run: |
           make install_buf

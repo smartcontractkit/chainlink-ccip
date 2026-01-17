@@ -4,15 +4,16 @@ import (
 	"context"
 	"fmt"
 
-	sel "github.com/smartcontractkit/chain-selectors"
-
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/beholder"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
+
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/metrics"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata/observer"
@@ -21,7 +22,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
@@ -75,7 +75,8 @@ type PluginFactory struct {
 	homeChainReader  reader.HomeChain
 	estimateProvider cciptypes.EstimateProvider
 	tokenDataEncoder cciptypes.TokenDataEncoder
-	contractReaders  map[cciptypes.ChainSelector]types.ContractReader
+	chainAccessors   map[cciptypes.ChainSelector]cciptypes.ChainAccessor
+	extendedReaders  map[cciptypes.ChainSelector]contractreader.Extended
 	chainWriters     map[cciptypes.ChainSelector]types.ContractWriter
 }
 
@@ -88,8 +89,9 @@ type PluginFactoryParams struct {
 	AddrCodec        cciptypes.AddressCodec
 	HomeChainReader  reader.HomeChain
 	TokenDataEncoder cciptypes.TokenDataEncoder
+	ChainAccessors   map[cciptypes.ChainSelector]cciptypes.ChainAccessor
 	EstimateProvider cciptypes.EstimateProvider
-	ContractReaders  map[cciptypes.ChainSelector]types.ContractReader
+	ExtendedReaders  map[cciptypes.ChainSelector]contractreader.Extended
 	ContractWriters  map[cciptypes.ChainSelector]types.ContractWriter
 }
 
@@ -106,7 +108,8 @@ func NewExecutePluginFactory(params PluginFactoryParams) *PluginFactory {
 		homeChainReader:  params.HomeChainReader,
 		estimateProvider: params.EstimateProvider,
 		tokenDataEncoder: params.TokenDataEncoder,
-		contractReaders:  params.ContractReaders,
+		chainAccessors:   params.ChainAccessors,
+		extendedReaders:  params.ExtendedReaders,
 		chainWriters:     params.ContractWriters,
 	}
 }
@@ -130,26 +133,17 @@ func (p PluginFactory) NewReportingPlugin(
 		oracleIDToP2PID[commontypes.OracleID(oracleID)] = node.P2pID
 	}
 
-	// Map contract readers to ContractReaderFacade:
-	// - Extended reader adds finality violation and contract binding management.
-	// - Observed reader adds metric reporting.
-	readers := make(map[cciptypes.ChainSelector]contractreader.ContractReaderFacade)
-	extended := make(map[cciptypes.ChainSelector]contractreader.Extended)
-	for chain, cr := range p.contractReaders {
-		chainID, err1 := sel.GetChainIDFromSelector(uint64(chain))
-		if err1 != nil {
-			return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to get chain id from selector: %w", err1)
-		}
-		reader := contractreader.NewExtendedContractReader(
-			contractreader.NewObserverReader(cr, lggr, chainID))
-		readers[chain] = reader
-		extended[chain] = reader
+	// Validate that the readerFacades were already wrapped in the Extended interface from core.
+	readerFacades := make(map[cciptypes.ChainSelector]contractreader.ContractReaderFacade)
+	for chain, cr := range p.extendedReaders {
+		readerFacades[chain] = cr
 	}
 
 	ccipReader, err := readerpkg.NewCCIPChainReader(
 		ctx,
 		logutil.WithComponent(lggr, "CCIPReader"),
-		readers,
+		p.chainAccessors,
+		readerFacades,
 		p.chainWriters,
 		p.ocrConfig.Config.ChainSelector,
 		p.ocrConfig.Config.OfframpAddress,
@@ -165,14 +159,16 @@ func (p PluginFactory) NewReportingPlugin(
 		p.ocrConfig.Config.ChainSelector,
 		offchainConfig.TokenDataObservers,
 		p.tokenDataEncoder,
-		extended,
+		p.extendedReaders,
 		p.addrCodec,
 	)
 	if err != nil {
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to create token data observer: %w", err)
 	}
 
-	metricsReporter, err := metrics.NewPromReporter(lggr, p.ocrConfig.Config.ChainSelector)
+	bhClient := beholder.GetClient().ForPackage("ocr3-ccip-execute")
+
+	metricsReporter, err := metrics.NewPromReporter(lggr, p.ocrConfig.Config.ChainSelector, bhClient)
 	if err != nil {
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to create metrics reporter: %w", err)
 	}

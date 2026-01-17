@@ -28,13 +28,16 @@ contract BurnMintFastTransferTokenPool_ccipSendToken is BurnMintFastTransferToke
   function test_ccipSendToken_Success() public {
     uint256 maxFastTransferFee = (TRANSFER_AMOUNT * FAST_FEE_FILLER_BPS) / 10_000;
     uint256 expectedFastTransferFee = maxFastTransferFee;
+    uint256 expectedFillerFee = expectedFastTransferFee; // All fee goes to filler in basic tests
+    uint256 expectedPoolFee = 0; // No pool fee in basic tests
     uint256 expectedAmountNetFee = TRANSFER_AMOUNT - expectedFastTransferFee;
 
     uint256 balanceBefore = s_token.balanceOf(OWNER);
     uint256 poolBalanceBefore = s_token.balanceOf(address(s_pool));
 
-    bytes32 expectedFillId =
-      s_pool.computeFillId(MESSAGE_ID, expectedAmountNetFee, SOURCE_DECIMALS, abi.encode(RECEIVER));
+    bytes32 expectedFillId = s_pool.computeFillId(
+      MESSAGE_ID, SOURCE_CHAIN_SELECTOR, expectedAmountNetFee, SOURCE_DECIMALS, abi.encode(RECEIVER)
+    );
 
     vm.expectEmit();
     emit IERC20.Transfer(OWNER, address(s_pool), TRANSFER_AMOUNT);
@@ -49,7 +52,9 @@ contract BurnMintFastTransferTokenPool_ccipSendToken is BurnMintFastTransferToke
       settlementId: MESSAGE_ID,
       sourceAmountNetFee: expectedAmountNetFee,
       sourceDecimals: SOURCE_DECIMALS,
-      fastTransferFee: expectedFastTransferFee,
+      fillerFee: expectedFillerFee,
+      poolFee: expectedPoolFee,
+      destinationPool: abi.encode(s_remoteBurnMintPool),
       receiver: abi.encode(RECEIVER)
     });
 
@@ -79,8 +84,11 @@ contract BurnMintFastTransferTokenPool_ccipSendToken is BurnMintFastTransferToke
       s_pool.getCcipSendTokenFee(DEST_CHAIN_SELECTOR, TRANSFER_AMOUNT, abi.encode(RECEIVER), feeToken, "");
 
     uint256 expectedAmountNetFee = TRANSFER_AMOUNT - quote.fastTransferFee;
-    bytes32 expectedFillId =
-      s_pool.computeFillId(MESSAGE_ID, expectedAmountNetFee, SOURCE_DECIMALS, abi.encode(RECEIVER));
+    uint256 expectedFillerFee = quote.fastTransferFee; // All fee goes to filler in basic tests
+    uint256 expectedPoolFee = 0; // No pool fee in basic tests
+    bytes32 expectedFillId = s_pool.computeFillId(
+      MESSAGE_ID, SOURCE_CHAIN_SELECTOR, expectedAmountNetFee, SOURCE_DECIMALS, abi.encode(RECEIVER)
+    );
 
     vm.expectEmit();
     emit IFastTransferPool.FastTransferRequested({
@@ -89,7 +97,9 @@ contract BurnMintFastTransferTokenPool_ccipSendToken is BurnMintFastTransferToke
       settlementId: MESSAGE_ID,
       sourceAmountNetFee: expectedAmountNetFee,
       sourceDecimals: SOURCE_DECIMALS,
-      fastTransferFee: quote.fastTransferFee,
+      fillerFee: expectedFillerFee,
+      poolFee: expectedPoolFee,
+      destinationPool: abi.encode(s_remoteBurnMintPool),
       receiver: abi.encode(RECEIVER)
     });
 

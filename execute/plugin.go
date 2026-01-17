@@ -1,10 +1,8 @@
 package execute
 
 import (
-	"bytes"
 	"cmp"
 	"context"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -27,6 +25,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/cache"
 	"github.com/smartcontractkit/chainlink-ccip/execute/metrics"
@@ -38,11 +38,9 @@ import (
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	ocrtypecodec "github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
@@ -383,7 +381,9 @@ func (p *Plugin) ValidateObservation(
 		}
 	}
 
-	if err = validateCommonStateObservations(p, ao.Observer, decodedObservation, supportedChains); err != nil {
+	state := previousOutcome.State.Next()
+
+	if err = validateCommonStateObservations(p, ao.Observer, decodedObservation, supportedChains, state); err != nil {
 		return err
 	}
 
@@ -412,17 +412,19 @@ func validateCommonStateObservations(
 	oracleID commontypes.OracleID,
 	decodedObservation exectypes.Observation,
 	supportedChains mapset.Set[cciptypes.ChainSelector],
+	state exectypes.PluginState,
 ) error {
 	if err := plugincommon.ValidateFChain(decodedObservation.FChain); err != nil {
 		return fmt.Errorf("failed to validate FChain: %w", err)
 	}
 
 	// These checks are common to all states.
-	if err := validateCommitReportsReadingEligibility(supportedChains, decodedObservation.CommitReports); err != nil {
+	if err := validateCommitReportsReadingEligibility(
+		state, supportedChains, p.destChain, decodedObservation.CommitReports); err != nil {
 		return fmt.Errorf("validate commit reports reading eligibility: %w", err)
 	}
 
-	if err := validateObservedSequenceNumbers(supportedChains, decodedObservation.CommitReports); err != nil {
+	if err := validateObservedSequenceNumbers(decodedObservation.CommitReports); err != nil {
 		return fmt.Errorf("validate observed sequence numbers: %w", err)
 	}
 
@@ -587,7 +589,7 @@ func (p *Plugin) Reports(
 	}
 
 	if len(decodedOutcome.Reports) == 0 {
-		lggr.Warn("empty report", "outcome", decodedOutcome)
+		lggr.Warnw("empty report", "outcome", decodedOutcome)
 		return nil, nil
 	}
 
@@ -686,20 +688,13 @@ func (p *Plugin) validateReport(
 		return cciptypes.ExecutePluginReport{},
 			plugincommon.NewErrInvalidReport("dest chain not supported")
 	}
-
-	offRampConfigDigest, err := p.ccipReader.GetOffRampConfigDigest(ctx, consts.PluginTypeExecute)
-	if err != nil {
+	if err := p.checkConfigDigest(); err != nil {
+		if errors.Is(err, errOffRampConfigMismatch) {
+			return cciptypes.ExecutePluginReport{},
+				plugincommon.NewErrInvalidReport(err.Error())
+		}
 		return cciptypes.ExecutePluginReport{},
-			plugincommon.NewErrValidatingReport(fmt.Errorf("get offramp config digest: %w", err))
-	}
-
-	if !bytes.Equal(offRampConfigDigest[:], p.reportingCfg.ConfigDigest[:]) {
-		lggr.Warnw("my config digest doesn't match offramp's config digest, not accepting/transmitting report",
-			"myConfigDigest", p.reportingCfg.ConfigDigest,
-			"offRampConfigDigest", hex.EncodeToString(offRampConfigDigest[:]),
-		)
-		return cciptypes.ExecutePluginReport{},
-			plugincommon.NewErrInvalidReport("offramp config digest mismatch")
+			plugincommon.NewErrValidatingReport(err)
 	}
 
 	// check that the messages in the report are not already executed onchain.

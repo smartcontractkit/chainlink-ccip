@@ -154,4 +154,6 @@ pub enum RmnRemoteError {
     GloballyCursed,
     #[msg("Invalid code version")]
     InvalidCodeVersion,
+    #[msg("Proposed owner is the default pubkey")]
+    DefaultOwnerProposal,
 }

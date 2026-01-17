@@ -1,0 +1,11 @@
+build:
+    docker build -f Dockerfile -t indexer:latest .
+
+build-dev:
+    docker build -f Dockerfile.dev -t indexer:dev .
+
+clean:
+    docker rmi indexer:latest
+
+clean-dev:
+    docker rmi indexer:dev

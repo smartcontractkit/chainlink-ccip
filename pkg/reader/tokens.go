@@ -3,7 +3,7 @@ package reader
 import (
 	"fmt"
 
-	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
 // TODO: This is a temporary solution to avoid circular dependencies. There should be a better way to do this.

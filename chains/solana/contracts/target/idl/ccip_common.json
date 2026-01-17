@@ -1,5 +1,5 @@
 {
-  "version": "0.1.0-dev",
+  "version": "0.1.1",
   "name": "ccip_common",
   "instructions": [],
   "accounts": [
@@ -36,6 +36,10 @@
           {
             "name": "mint",
             "type": "publicKey"
+          },
+          {
+            "name": "supportsAutoDerivation",
+            "type": "bool"
           }
         ]
       }

@@ -8,32 +8,31 @@ import (
 	"testing"
 	"time"
 
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	rmnpb "github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
-
-	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
-	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
-
-	"github.com/smartcontractkit/chainlink-ccip/internal"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
 	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/commit/tokenprice"
+	"github.com/smartcontractkit/chainlink-ccip/internal"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	reader2 "github.com/smartcontractkit/chainlink-ccip/internal/reader"
-	writer_mocks "github.com/smartcontractkit/chainlink-ccip/mocks/chainlink_common"
+	writermocks "github.com/smartcontractkit/chainlink-ccip/mocks/chainlink_common/types"
+	readermocks "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	ocrtypecodec "github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	rmnpb "github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
 )
 
 func Test_maxQueryLength(t *testing.T) {
@@ -297,7 +296,7 @@ func Test_maxReportLength(t *testing.T) {
 
 func TestPluginFactory_NewReportingPlugin(t *testing.T) {
 	t.Run("basic checks for the happy flow", func(t *testing.T) {
-		ctx := tests.Context(t)
+		ctx := t.Context()
 		lggr := mocks.NullLogger
 
 		offChainConfig := pluginconfig.CommitOffchainConfig{
@@ -306,7 +305,7 @@ func TestPluginFactory_NewReportingPlugin(t *testing.T) {
 		b, err := json.Marshal(offChainConfig)
 		require.NoError(t, err)
 
-		cw := writer_mocks.NewMockContractWriter(t)
+		cw := writermocks.NewMockContractWriter(t)
 		chainSel := ccipocr3.ChainSelector(12922642891491394802)
 		mockAddrCodec := internal.NewMockAddressCodecHex(t)
 		p := &PluginFactory{
@@ -321,8 +320,8 @@ func TestPluginFactory_NewReportingPlugin(t *testing.T) {
 					ChainSelector: chainSel,
 				},
 			},
-			contractReaders: map[ccipocr3.ChainSelector]types.ContractReader{
-				chainSel: types.UnimplementedContractReader{},
+			extendedReaders: map[ccipocr3.ChainSelector]contractreader.Extended{
+				chainSel: readermocks.NewMockExtended(t),
 			},
 			chainWriters: map[ccipocr3.ChainSelector]types.ContractWriter{chainSel: cw},
 			addrCodec:    mockAddrCodec,

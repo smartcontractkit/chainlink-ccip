@@ -20,8 +20,9 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 const (
@@ -169,9 +170,9 @@ func Test_HTTPClient_Get_Post(t *testing.T) {
 				var statusCode HTTPStatus
 				switch method {
 				case http.MethodGet:
-					response, statusCode, err = client.Get(tests.Context(t), tc.messageHash.String())
+					response, statusCode, err = client.Get(t.Context(), tc.messageHash.String())
 				case http.MethodPost:
-					response, statusCode, err = client.Post(tests.Context(t), tc.messageHash.String(), []byte("{}"))
+					response, statusCode, err = client.Post(t.Context(), tc.messageHash.String(), []byte("{}"))
 				default:
 					t.Fatalf("unknown method %s", method)
 				}
@@ -206,12 +207,12 @@ func Test_HTTPClient_Cooldown(t *testing.T) {
 
 	client, err := newHTTPClient(logger.Nop(), attestationURI.String(), time.Millisecond, longTimeout, time.Minute)
 	require.NoError(t, err)
-	_, _, err = client.Get(tests.Context(t), cciptypes.Bytes32{1, 2, 3}.String())
+	_, _, err = client.Get(t.Context(), cciptypes.Bytes32{1, 2, 3}.String())
 	require.EqualError(t, err, tokendata.ErrUnknownResponse.Error())
 
 	// First rate-limit activates cooldown and other requests should return rate limit immediately
 	for i := 0; i < 10; i++ {
-		_, _, err = client.Get(tests.Context(t), cciptypes.Bytes32{1, 2, 3}.String())
+		_, _, err = client.Get(t.Context(), cciptypes.Bytes32{1, 2, 3}.String())
 		require.EqualError(t, err, tokendata.ErrRateLimit.Error())
 	}
 	require.Equal(t, requestCount, 2)
@@ -236,10 +237,10 @@ func Test_HTTPClient_GetInstance(t *testing.T) {
 	assert.True(t, client1 == client2)
 
 	// This not hang and return immediately
-	_, _, err = client1.Get(tests.Context(t), cciptypes.Bytes32{1, 2, 3}.String())
+	_, _, err = client1.Get(t.Context(), cciptypes.Bytes32{1, 2, 3}.String())
 	require.NoError(t, err)
 
-	timeoutCtx, cancel := context.WithTimeoutCause(tests.Context(t), 500*time.Millisecond, tokendata.ErrTimeout)
+	timeoutCtx, cancel := context.WithTimeoutCause(t.Context(), 500*time.Millisecond, tokendata.ErrTimeout)
 	defer cancel()
 	// This should return immediately with timeout error
 	_, _, err = client2.Get(timeoutCtx, cciptypes.Bytes32{1, 2, 3}.String())
@@ -247,7 +248,7 @@ func Test_HTTPClient_GetInstance(t *testing.T) {
 	require.ErrorIs(t, err, tokendata.ErrRateLimit)
 
 	// This is different instance, should return success immediately
-	_, _, err = client3.Get(tests.Context(t), cciptypes.Bytes32{1, 2, 3}.String())
+	_, _, err = client3.Get(t.Context(), cciptypes.Bytes32{1, 2, 3}.String())
 	require.NoError(t, err)
 }
 
@@ -269,15 +270,15 @@ func Test_HTTPClient_CoolDownWithRetryHeader(t *testing.T) {
 
 	client, err := newHTTPClient(logger.Nop(), attestationURI.String(), 1*time.Millisecond, time.Hour, 0)
 	require.NoError(t, err)
-	_, _, err = client.Get(tests.Context(t), cciptypes.Bytes32{1, 2, 3}.String())
+	_, _, err = client.Get(t.Context(), cciptypes.Bytes32{1, 2, 3}.String())
 	require.EqualError(t, err, tokendata.ErrUnknownResponse.Error())
 
 	// Getting rate limited, cooling down for 1 second
-	_, _, err = client.Get(tests.Context(t), cciptypes.Bytes32{1, 2, 3}.String())
+	_, _, err = client.Get(t.Context(), cciptypes.Bytes32{1, 2, 3}.String())
 	require.EqualError(t, err, tokendata.ErrRateLimit.Error())
 
 	require.Eventually(t, func() bool {
-		_, _, err = client.Get(tests.Context(t), cciptypes.Bytes32{1, 2, 3}.String())
+		_, _, err = client.Get(t.Context(), cciptypes.Bytes32{1, 2, 3}.String())
 		return errors.Is(err, tokendata.ErrUnknownResponse)
 	}, tests.WaitTimeout(t), 50*time.Millisecond)
 	require.Equal(t, requestCount, 3)

@@ -15,7 +15,7 @@ contract USDCTokenPoolHelper is USDCTokenPool {
     address[] memory allowlist,
     address rmnProxy,
     address router
-  ) USDCTokenPool(tokenMessenger, messageTransmitterProxy, token, allowlist, rmnProxy, router) {}
+  ) USDCTokenPool(tokenMessenger, messageTransmitterProxy, token, allowlist, rmnProxy, router, 0) {}
 
   function validateMessage(bytes memory usdcMessage, SourceTokenDataPayload memory sourceTokenData) external view {
     return _validateMessage(usdcMessage, sourceTokenData);

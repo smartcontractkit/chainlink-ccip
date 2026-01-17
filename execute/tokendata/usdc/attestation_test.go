@@ -11,14 +11,14 @@ import (
 	"github.com/stretchr/testify/require"
 
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 	"github.com/smartcontractkit/chainlink-ccip/internal"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
@@ -192,7 +192,7 @@ func Test_AttestationClient(t *testing.T) {
 					},
 				)
 				require.NoError(t, err)
-				attestations, err := client.Attestations(tests.Context(t), tc.input)
+				attestations, err := client.Attestations(t.Context(), tc.input)
 				require.NoError(t, err)
 				require.Equal(t, tc.expected, attestations)
 			},

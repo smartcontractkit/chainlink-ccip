@@ -4,7 +4,7 @@ import (
 	"math/big"
 	"testing"
 
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
 func TestChainConfig_Validate(t *testing.T) {

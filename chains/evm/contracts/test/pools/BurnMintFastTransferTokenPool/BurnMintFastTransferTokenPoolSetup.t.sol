@@ -34,7 +34,12 @@ contract BurnMintFastTransferTokenPoolSetup is BaseTest {
     s_token = new BurnMintERC20("Chainlink Token", "LINK", 18, 0, 0);
 
     s_pool = new BurnMintFastTransferTokenPool(
-      s_token, DEFAULT_TOKEN_DECIMALS, new address[](0), address(s_mockRMNRemote), address(s_sourceRouter)
+      s_token,
+      DEFAULT_TOKEN_DECIMALS,
+      new address[](0),
+      address(s_mockRMNRemote),
+      address(s_sourceRouter),
+      SOURCE_CHAIN_SELECTOR
     );
 
     s_token.grantMintAndBurnRoles(address(s_pool));

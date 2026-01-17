@@ -23,13 +23,18 @@ contract USDCTokenPool_setDomains is USDCTokenPoolSetup {
 
       domainUpdates[i] = USDCTokenPool.DomainUpdate({
         allowedCaller: allowedCallers[i],
+        mintRecipient: bytes32(0),
         domainIdentifier: domainIdentifiers[i],
         destChainSelector: destChainSelectors[i],
         enabled: true
       });
 
-      s_chainToDomain[destChainSelectors[i]] =
-        USDCTokenPool.Domain({domainIdentifier: domainIdentifiers[i], allowedCaller: allowedCallers[i], enabled: true});
+      s_chainToDomain[destChainSelectors[i]] = USDCTokenPool.Domain({
+        domainIdentifier: domainIdentifiers[i],
+        mintRecipient: bytes32(0),
+        allowedCaller: allowedCallers[i],
+        enabled: true
+      });
     }
 
     vm.expectEmit();
@@ -47,7 +52,7 @@ contract USDCTokenPool_setDomains is USDCTokenPoolSetup {
 
   // Reverts
 
-  function test_RevertWhen_OnlyOwner() public {
+  function test_setDomains_RevertWhen_OnlyOwner() public {
     USDCTokenPool.DomainUpdate[] memory domainUpdates = new USDCTokenPool.DomainUpdate[](0);
 
     vm.startPrank(STRANGER);
@@ -56,12 +61,13 @@ contract USDCTokenPool_setDomains is USDCTokenPoolSetup {
     s_usdcTokenPool.setDomains(domainUpdates);
   }
 
-  function test_RevertWhen_InvalidDomain() public {
+  function test_setDomains_RevertWhen_InvalidDomain() public {
     bytes32 validCaller = bytes32(uint256(25));
     // Ensure valid domain works
     USDCTokenPool.DomainUpdate[] memory domainUpdates = new USDCTokenPool.DomainUpdate[](1);
     domainUpdates[0] = USDCTokenPool.DomainUpdate({
       allowedCaller: validCaller,
+      mintRecipient: bytes32(0),
       domainIdentifier: 0, // ensures 0 is valid, as this is eth mainnet
       destChainSelector: 45690,
       enabled: true
