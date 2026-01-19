@@ -17,9 +17,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20_with_drip"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc677"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/erc20"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/erc677"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/factory_burn_mint_erc20"
 	bnm_bindings "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc20"
 
@@ -27,8 +25,7 @@ import (
 )
 
 // TestEVMTokenDeployments tests various EVM token deployments using the DeployToken sequence directly.
-// This covers all supported EVM token types: ERC20, ERC677, BurnMintERC20, BurnMintERC677,
-// FactoryBurnMintERC20, and BurnMintERC20WithDrip.
+// This covers all supported EVM token types: ERC20, BurnMintERC20, FactoryBurnMintERC20, and BurnMintERC20WithDrip.
 // Note: The full TokenExpansion changeset is not yet implemented for EVM (DeployTokenPoolForToken,
 // RegisterToken, SetPool return nil), so we test token deployment directly via the sequence.
 func TestEVMTokenDeployments(t *testing.T) {
@@ -59,13 +56,6 @@ func TestEVMTokenDeployments(t *testing.T) {
 			decimals:    18,
 		},
 		{
-			name:        "ERC677Token",
-			tokenType:   erc677.ContractType,
-			tokenName:   "Test ERC677",
-			tokenSymbol: "TERC677",
-			decimals:    6,
-		},
-		{
 			name:           "BurnMintERC20Token",
 			tokenType:      burn_mint_erc20.ContractType,
 			tokenName:      "Test BurnMint ERC20",
@@ -74,15 +64,6 @@ func TestEVMTokenDeployments(t *testing.T) {
 			ccipAdmin:      "0x1111111111111111111111111111111111111111",
 			supply:         big.NewInt(0).Mul(big.NewInt(1e9), big.NewInt(1e18)), // 1 billion tokens
 			preMint:        big.NewInt(0).Mul(big.NewInt(1e6), big.NewInt(1e18)), // 1 million tokens
-			requiresSupply: true,
-		},
-		{
-			name:           "BurnMintERC677Token",
-			tokenType:      burn_mint_erc677.ContractType,
-			tokenName:      "Test BurnMint ERC677",
-			tokenSymbol:    "TBMERC677",
-			decimals:       18,
-			supply:         big.NewInt(0).Mul(big.NewInt(1e9), big.NewInt(1e18)),
 			requiresSupply: true,
 		},
 		{

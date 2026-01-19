@@ -22,7 +22,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/factory_burn_mint_erc20"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/factory_burn_mint_erc20"
 )
 
 func TestModifyRemotePoolsChangeset(t *testing.T) {
