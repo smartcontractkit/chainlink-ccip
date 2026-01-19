@@ -51,8 +51,9 @@ contract e2e_feeWithdrawal is OnRampSetup {
   address internal s_feeAggregator;
   address internal s_feeAdmin;
 
-  bytes32 internal constant CCIP_MESSAGE_SENT_TOPIC =
-    keccak256("CCIPMessageSent(uint64,address,bytes32,address,bytes,(address,uint32,uint32,uint256,bytes)[],bytes[])");
+  bytes32 internal constant CCIP_MESSAGE_SENT_TOPIC = keccak256(
+    "CCIPMessageSent(uint64,address,bytes32,address,uint256,bytes,(address,uint32,uint32,uint256,bytes)[],bytes[])"
+  );
 
   function setUp() public virtual override {
     super.setUp();
@@ -397,7 +398,7 @@ contract e2e_feeWithdrawal is OnRampSetup {
   ) private pure returns (OnRamp.Receipt[] memory receipts) {
     for (uint256 i = 0; i < logs.length; ++i) {
       if (logs[i].topics.length != 0 && logs[i].topics[0] == CCIP_MESSAGE_SENT_TOPIC) {
-        (,, receipts,) = abi.decode(logs[i].data, (address, bytes, OnRamp.Receipt[], bytes[]));
+        (,,, receipts,) = abi.decode(logs[i].data, (address, uint256, bytes, OnRamp.Receipt[], bytes[]));
         break;
       }
     }

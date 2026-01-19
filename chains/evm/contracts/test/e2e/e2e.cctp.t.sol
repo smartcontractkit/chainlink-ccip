@@ -195,6 +195,7 @@ contract cctp_e2e is OnRampSetup {
       sender: OWNER,
       messageId: messageId,
       feeToken: s_sourceFeeToken,
+      tokenAmountBeforeTokenPoolFees: amount,
       encodedMessage: encodedMessage,
       receipts: receipts,
       verifierBlobs: verifierBlobs

@@ -70,6 +70,11 @@ contract ERC20LockBox is ITypeAndVersion, ILockBox, AuthorizedCallers {
     }
 
     uint256 balance = IERC20(token).balanceOf(address(this));
+
+    // If amount is max uint256, withdraw the entire balance.
+    if (amount == type(uint256).max) {
+      amount = balance;
+    }
     if (amount > balance) {
       revert InsufficientBalance(amount, balance);
     }
