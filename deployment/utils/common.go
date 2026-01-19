@@ -86,3 +86,10 @@ var (
 func NewRegistererID(chainFamily string, version *semver.Version) string {
 	return fmt.Sprintf("%s-%s", chainFamily, version.String())
 }
+
+const (
+	EXECUTION_STATE_UNTOUCHED  = 0
+	EXECUTION_STATE_INPROGRESS = 1
+	EXECUTION_STATE_SUCCESS    = 2
+	EXECUTION_STATE_FAILURE    = 3
+)

@@ -2,6 +2,7 @@ package common
 
 import (
 	"bytes"
+	"context"
 	"crypto/ed25519"
 	"encoding/binary"
 	"encoding/hex"
@@ -15,14 +16,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gagliardetto/solana-go"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
-	evmseqs "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/ccip_home"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/rmn_home"
-	solanaSeqs "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
-	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
-	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -30,11 +23,29 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	capabilities_registry "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/clclient"
+	tonSeqs "github.com/smartcontractkit/chainlink-ton/deployment/ccip/1_6_0/sequences"
+	ccip_ton "github.com/smartcontractkit/chainlink-ton/devenv"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/confighelper"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3confighelper"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"github.com/xssnick/tonutils-go/address"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
+
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
+
+	evmseqs "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/ccip_home"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/rmn_home"
+	solanaSeqs "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
+
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
+
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
 type ChainConfig struct {
@@ -47,12 +58,148 @@ type UpdateChainConfigConfig struct {
 	HomeChainSelector  uint64                 `json:"homeChainSelector"`
 	RemoteChainRemoves []uint64               `json:"remoteChainRemoves"`
 	RemoteChainAdds    map[uint64]ChainConfig `json:"remoteChainAdds"`
+	MCMS               mcms.Input             `json:"mcmsConfig"`
+}
+
+type AddNodesToCapabilitiesRegistryChangesetConfig struct {
+	HomeChainSelector        uint64                `json:"homeChainSelector"`
+	NodeP2PIDsPerNodeOpAdmin map[string][][32]byte `json:"nodeP2pIdsPerNodeOpAdmin"`
+	MCMS                     mcms.Input            `json:"mcmsConfig"`
+}
+
+type AddCapabilityToCapabilitiesRegistryChangesetConfig struct {
+	HomeChainSelector uint64     `json:"homeChainSelector"`
+	MCMS              mcms.Input `json:"mcmsConfig"`
+}
+
+type AddNodeOperatorsToCapabilitiesRegistryChangesetConfig struct {
+	HomeChainSelector uint64 `json:"homeChainSelector"`
+	Nop               []capabilities_registry.CapabilitiesRegistryNodeOperator
+	MCMS              mcms.Input `json:"mcmsConfig"`
 }
 
 var UpdateChainConfig = deployment.CreateChangeSet(applyUpdateChainConfig, validateUpdateChainConfig)
 var AddDONAndSetCandidate = deployment.CreateChangeSet(applyAddDonAndSetCandidateChangesetConfig, validateAddDonAndSetCandidateChangesetConfig)
 var SetCandidate = deployment.CreateChangeSet(applySetCandidateChangesetConfig, validateSetCandidateChangesetConfig)
 var PromoteCandidate = deployment.CreateChangeSet(applyPromoteCandidateChangesetConfig, validatePromoteCandidateChangesetConfig)
+var AddNodesToCapabilitiesRegistry = deployment.CreateChangeSet(applyAddNodesToCapabilitiesRegistryChangeset, validateAddNodesToCapabilitiesRegistryChangeset)
+var AddCapabilityToCapabilitiesRegistry = deployment.CreateChangeSet(applyAddCapabilityToCapabilitiesRegistryChangeset, validateAddCapabilityToCapabilitiesRegistryChangeset)
+var AddNodeOperatorsToCapabilitiesRegistry = deployment.CreateChangeSet(applyAddNodeOperatorsToCapabilitiesRegistryChangeset, validateAddNodeOperatorsToCapabilitiesRegistryChangeset)
+
+func validateAddNodeOperatorsToCapabilitiesRegistryChangeset(e deployment.Environment, cfg AddNodeOperatorsToCapabilitiesRegistryChangesetConfig) error {
+	return nil
+}
+
+func applyAddNodeOperatorsToCapabilitiesRegistryChangeset(e deployment.Environment, cfg AddNodeOperatorsToCapabilitiesRegistryChangesetConfig) (deployment.ChangesetOutput, error) {
+	capRegAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+		ChainSelector: cfg.HomeChainSelector,
+		Type:          datastore.ContractType(utils.CapabilitiesRegistry),
+		Version:       semver.MustParse("1.0.0"),
+	}, cfg.HomeChainSelector, datastore_utils.FullRef)
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("finding CapabilitiesRegistry address: %w", err)
+	}
+	result, err := operations.ExecuteSequence(
+		e.OperationsBundle,
+		SeqAddNodeOperatorsToCapReg,
+		e.BlockChains,
+		AddNodeOperatorsToCapRegConfig{
+			HomeChainSel:  cfg.HomeChainSelector,
+			CapReg:        common.HexToAddress(capRegAddr.Address),
+			NodeOperators: cfg.Nop,
+		},
+	)
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("applying chain config updates: %w", err)
+	}
+	mcmsReg := changesets.GetRegistry()
+	// since we are only using evm here
+	mcmsReg.RegisterMCMSReader(chain_selectors.FamilyEVM, &adapters.EVMMCMSReader{})
+	return changesets.NewOutputBuilder(e, mcmsReg).
+		WithReports(result.ExecutionReports).
+		WithBatchOps(result.Output.BatchOps).
+		Build(cfg.MCMS)
+}
+
+func validateAddCapabilityToCapabilitiesRegistryChangeset(e deployment.Environment, cfg AddCapabilityToCapabilitiesRegistryChangesetConfig) error {
+	return nil
+}
+
+func applyAddCapabilityToCapabilitiesRegistryChangeset(e deployment.Environment, cfg AddCapabilityToCapabilitiesRegistryChangesetConfig) (deployment.ChangesetOutput, error) {
+	capRegAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+		ChainSelector: cfg.HomeChainSelector,
+		Type:          datastore.ContractType(utils.CapabilitiesRegistry),
+		Version:       semver.MustParse("1.0.0"),
+	}, cfg.HomeChainSelector, datastore_utils.FullRef)
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("finding CapabilitiesRegistry address: %w", err)
+	}
+	ccipHomeAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+		ChainSelector: cfg.HomeChainSelector,
+		Type:          datastore.ContractType(utils.CCIPHome),
+		Version:       semver.MustParse("1.6.0"),
+	}, cfg.HomeChainSelector, datastore_utils.FullRef)
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("finding CCIPHome address: %w", err)
+	}
+	result, err := operations.ExecuteSequence(
+		e.OperationsBundle,
+		SeqAddCapabilityToCapReg,
+		DONSequenceDeps{
+			HomeChain: e.BlockChains.EVMChains()[cfg.HomeChainSelector],
+		},
+		AddCapabilityToCapRegConfig{
+			HomeChainSel: cfg.HomeChainSelector,
+			CapReg:       common.HexToAddress(capRegAddr.Address),
+			CCIPHome:     common.HexToAddress(ccipHomeAddr.Address),
+		})
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("applying chain config updates: %w", err)
+	}
+	mcmsReg := changesets.GetRegistry()
+	// since we are only using evm here
+	mcmsReg.RegisterMCMSReader(chain_selectors.FamilyEVM, &adapters.EVMMCMSReader{})
+	return changesets.NewOutputBuilder(e, mcmsReg).
+		WithReports(result.ExecutionReports).
+		WithBatchOps(result.Output.BatchOps).
+		Build(cfg.MCMS)
+}
+
+func validateAddNodesToCapabilitiesRegistryChangeset(e deployment.Environment, cfg AddNodesToCapabilitiesRegistryChangesetConfig) error {
+	return nil
+}
+
+func applyAddNodesToCapabilitiesRegistryChangeset(e deployment.Environment, cfg AddNodesToCapabilitiesRegistryChangesetConfig) (deployment.ChangesetOutput, error) {
+	capRegAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+		ChainSelector: cfg.HomeChainSelector,
+		Type:          datastore.ContractType(utils.CapabilitiesRegistry),
+		Version:       semver.MustParse("1.0.0"),
+	}, cfg.HomeChainSelector, datastore_utils.FullRef)
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("finding CapabilitiesRegistry address: %w", err)
+	}
+
+	result, err := operations.ExecuteSequence(
+		e.OperationsBundle,
+		SeqAddNodesToCapReg,
+		e.BlockChains,
+		AddNodesToCapRegConfig{
+			HomeChainSel:             cfg.HomeChainSelector,
+			CapReg:                   common.HexToAddress(capRegAddr.Address),
+			NodeP2PIDsPerNodeOpAdmin: cfg.NodeP2PIDsPerNodeOpAdmin,
+		},
+	)
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("applying chain config updates: %w", err)
+	}
+	mcmsReg := changesets.GetRegistry()
+	// since we are only using evm here
+	mcmsReg.RegisterMCMSReader(chain_selectors.FamilyEVM, &adapters.EVMMCMSReader{})
+	return changesets.NewOutputBuilder(e, mcmsReg).
+		WithReports(result.ExecutionReports).
+		WithBatchOps(result.Output.BatchOps).
+		Build(cfg.MCMS)
+}
 
 func validateUpdateChainConfig(e deployment.Environment, cfg UpdateChainConfigConfig) error {
 	return nil
@@ -71,7 +218,7 @@ func applyUpdateChainConfig(e deployment.Environment, cfg UpdateChainConfigConfi
 		common.HexToAddress(ccipHomeAddr.Address),
 		e.BlockChains.EVMChains()[cfg.HomeChainSelector].Client)
 	if err != nil {
-		return deployment.ChangesetOutput{}, fmt.Errorf("finding CCIPHome address: %w", err)
+		return deployment.ChangesetOutput{}, fmt.Errorf("creating CCIPHome instance: %w", err)
 	}
 
 	// Create mapping of all removals to check if we are removing and re-adding chains
@@ -108,7 +255,7 @@ func applyUpdateChainConfig(e deployment.Environment, cfg UpdateChainConfigConfi
 			ChainConfig:   chainConfig,
 		})
 	}
-	_, err = operations.ExecuteSequence(
+	result, err := operations.ExecuteSequence(
 		e.OperationsBundle,
 		ApplyChainConfigUpdatesSequence,
 		DONSequenceDeps{
@@ -121,7 +268,16 @@ func applyUpdateChainConfig(e deployment.Environment, cfg UpdateChainConfigConfi
 			BatchSize:          4, // Conservative batch size to avoid exceeding gas limits (TODO: Make this configurable)
 		},
 	)
-	return deployment.ChangesetOutput{}, err
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("applying chain config updates: %w", err)
+	}
+	mcmsReg := changesets.GetRegistry()
+	// since we are only using evm here
+	mcmsReg.RegisterMCMSReader(chain_selectors.FamilyEVM, &adapters.EVMMCMSReader{})
+	return changesets.NewOutputBuilder(e, mcmsReg).
+		WithReports(result.ExecutionReports).
+		WithBatchOps(result.Output.BatchOps).
+		Build(cfg.MCMS)
 }
 
 func isChainConfigEqual(a, b ccip_home.CCIPHomeChainConfig) bool {
@@ -153,6 +309,7 @@ type AddDonAndSetCandidateChangesetConfig struct {
 	PluginInfo     SetCandidatePluginInfo                        `json:"pluginInfo"`
 	NonBootstraps  []*clclient.ChainlinkClient                   `json:"nonBootstraps"`
 	NodeKeyBundles map[string]map[string]clclient.NodeKeysBundle `json:"nodeKeyBundles"`
+	MCMS           mcms.Input                                    `json:"mcmsConfig"`
 }
 
 func validateAddDonAndSetCandidateChangesetConfig(e deployment.Environment, cfg AddDonAndSetCandidateChangesetConfig) error {
@@ -220,9 +377,17 @@ func applyAddDonAndSetCandidateChangesetConfig(e deployment.Environment, cfg Add
 		readers = append(readers, id)
 	}
 
-	dons := make([]DONAddition, len(cfg.PluginInfo.OCRConfigPerRemoteChainSelector))
+	dons := make([]DONAddition, 0, len(cfg.PluginInfo.OCRConfigPerRemoteChainSelector))
 	i := 0
 	for chainSelector, params := range cfg.PluginInfo.OCRConfigPerRemoteChainSelector {
+		id, err := DonIDForChain(capReg, ccipHome, chainSelector)
+		if err != nil {
+			return deployment.ChangesetOutput{}, fmt.Errorf("getting don ID for chain selector %d: %w", chainSelector, err)
+		}
+		if id != 0 {
+			e.Logger.Infow("DON already exists for chain selector, skipping addition")
+			continue
+		}
 		family, err := chain_selectors.GetSelectorFamily(chainSelector)
 		if err != nil {
 			return deployment.ChangesetOutput{}, fmt.Errorf("getting chain family for selector %d: %w", chainSelector, err)
@@ -237,6 +402,12 @@ func applyAddDonAndSetCandidateChangesetConfig(e deployment.Environment, cfg Add
 			}
 		case chain_selectors.FamilySolana:
 			a := &solanaSeqs.SolanaAdapter{}
+			offRampAddress, err = a.GetOffRampAddress(e.DataStore, chainSelector)
+			if err != nil {
+				return deployment.ChangesetOutput{}, err
+			}
+		case chain_selectors.FamilyTon:
+			a := &tonSeqs.TonAdapter{}
 			offRampAddress, err = a.GetOffRampAddress(e.DataStore, chainSelector)
 			if err != nil {
 				return deployment.ChangesetOutput{}, err
@@ -266,19 +437,22 @@ func applyAddDonAndSetCandidateChangesetConfig(e deployment.Environment, cfg Add
 				cfg.PluginInfo.PluginType.String())
 		}
 
-		dons[i] = DONAddition{
+		dons = append(dons, DONAddition{
 			ExpectedID:       expectedDonID,
 			PluginConfig:     pluginOCR3Config,
 			PeerIDs:          readers,
 			F:                uint8(len(cfg.NonBootstraps) / 3),
 			IsPublic:         false,
 			AcceptsWorkflows: false,
-		}
+		})
 		i++
 		expectedDonID++
 	}
-
-	_, err = operations.ExecuteSequence(
+	if len(dons) == 0 {
+		e.Logger.Info("No new DONs to add, skipping AddDONAndSetCandidateChangeset, just setting candidate")
+		return deployment.ChangesetOutput{}, nil
+	}
+	result, err := operations.ExecuteSequence(
 		e.OperationsBundle,
 		AddDONAndSetCandidateSequence,
 		DONSequenceDeps{
@@ -289,7 +463,15 @@ func applyAddDonAndSetCandidateChangesetConfig(e deployment.Environment, cfg Add
 			DONs:                 dons,
 		},
 	)
-	return deployment.ChangesetOutput{}, err
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("adding DON and setting candidate: %w", err)
+	}
+	mcmsReg := changesets.GetRegistry()
+	mcmsReg.RegisterMCMSReader(chain_selectors.FamilyEVM, &adapters.EVMMCMSReader{})
+	return changesets.NewOutputBuilder(e, mcmsReg).
+		WithReports(result.ExecutionReports).
+		WithBatchOps(result.Output.BatchOps).
+		Build(cfg.MCMS)
 }
 
 func BuildOCR3ConfigForCCIPHome(
@@ -509,6 +691,17 @@ func getOracleIdentities(clClients []*clclient.ChainlinkClient, nodeKeyBundles m
 				offPrefix = "ocr2off_solana_"
 				onPrefix = "ocr2on_solana_"
 				cfgPrefix = "ocr2cfg_solana_"
+			case chain_selectors.FamilyTon:
+				bundle := nodeKeyBundles[family][id.Raw()]
+				addr, err = ccip_ton.GetNodeAddressFromBundle(&bundle)
+				if err != nil {
+					return err
+				}
+				ocrKey := bundle.OCR2Key
+				ocr2Config = ocrKey.Data.Attributes
+				offPrefix = "ocr2off_ton_"
+				onPrefix = "ocr2on_ton_"
+				cfgPrefix = "ocr2cfg_ton_"
 			default:
 				return fmt.Errorf("unsupported chain family %s for selector %d", family, destSelector)
 			}
@@ -563,6 +756,7 @@ type SetCandidateChangesetConfig struct {
 	PluginInfo     []SetCandidatePluginInfo                      `json:"pluginInfo"`
 	NonBootstraps  []*clclient.ChainlinkClient                   `json:"nonBootstraps"`
 	NodeKeyBundles map[string]map[string]clclient.NodeKeysBundle `json:"nodeKeyBundles"`
+	MCMS           mcms.Input                                    `json:"mcmsConfig"`
 }
 
 func validateSetCandidateChangesetConfig(e deployment.Environment, cfg SetCandidateChangesetConfig) error {
@@ -667,6 +861,12 @@ func applySetCandidateChangesetConfig(e deployment.Environment, cfg SetCandidate
 				if err != nil {
 					return deployment.ChangesetOutput{}, err
 				}
+			case chain_selectors.FamilyTon:
+				a := &tonSeqs.TonAdapter{}
+				offRampAddress, err = a.GetOffRampAddress(e.DataStore, chainSelector)
+				if err != nil {
+					return deployment.ChangesetOutput{}, err
+				}
 			default:
 				return deployment.ChangesetOutput{}, fmt.Errorf("unsupported chain family %s for selector %d", family, chainSelector)
 			}
@@ -713,7 +913,7 @@ func applySetCandidateChangesetConfig(e deployment.Environment, cfg SetCandidate
 			})
 		}
 	}
-	_, err = operations.ExecuteSequence(
+	result, err := operations.ExecuteSequence(
 		e.OperationsBundle,
 		SetCandidateSequence,
 		DONSequenceDeps{
@@ -724,46 +924,71 @@ func applySetCandidateChangesetConfig(e deployment.Environment, cfg SetCandidate
 			DONs:                 dons,
 		},
 	)
-	return deployment.ChangesetOutput{}, err
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("setting candidate config: %w", err)
+	}
+	mcmsReg := changesets.GetRegistry()
+	mcmsReg.RegisterMCMSReader(chain_selectors.FamilyEVM, &adapters.EVMMCMSReader{})
+	return changesets.NewOutputBuilder(e, mcmsReg).
+		WithReports(result.ExecutionReports).
+		WithBatchOps(result.Output.BatchOps).
+		Build(cfg.MCMS)
 }
 
 func DonIDForChain(registry *capabilities_registry.CapabilitiesRegistry, ccipHome *ccip_home.CCIPHome, chainSelector uint64) (uint32, error) {
-	dons, err := registry.GetDONs(nil)
+	nextDonID, err := registry.GetNextDONId(&bind.CallOpts{
+		Context: context.Background(),
+	})
 	if err != nil {
-		return 0, fmt.Errorf("get Dons from capability registry: %w", err)
+		return 0, fmt.Errorf("get next don id from capability registry: %w", err)
 	}
-	var donIDs []uint32
-	for _, don := range dons {
+
+	var donID uint32
+	for donId := uint32(1); donId < nextDonID; donId++ {
+		don, err := registry.GetDON(&bind.CallOpts{
+			Context: context.Background(),
+		}, donId)
+		if err != nil {
+			return 0, fmt.Errorf("get don %d from capability registry: %w", donId, err)
+		}
 		if len(don.CapabilityConfigurations) == 1 &&
 			don.CapabilityConfigurations[0].CapabilityId == CCIPCapabilityID {
-			configs, err := ccipHome.GetAllConfigs(nil, don.Id, uint8(ccipocr3.PluginTypeCCIPCommit))
+			// Another possible way is to query GetAllConfigs from CCIPHome, but the return data for that would be more expensive.
+			// So we first filter DONs by checking if they have only CCIP capability in the capability registry.
+			// Then we fetch the config digests from CCIPHome to check the chain selector.
+			// This requires multiple calls, but those are cheaper than fetching all configs in one call.
+			digests, err := ccipHome.GetConfigDigests(nil, don.Id, uint8(ccipocr3.PluginTypeCCIPCommit))
 			if err != nil {
-				return 0, fmt.Errorf("get all commit configs from cciphome: %w", err)
+				return 0, fmt.Errorf("get commit config digests from cciphome: %w", err)
 			}
-			if configs.ActiveConfig.ConfigDigest == [32]byte{} && configs.CandidateConfig.ConfigDigest == [32]byte{} {
-				configs, err = ccipHome.GetAllConfigs(nil, don.Id, uint8(ccipocr3.PluginTypeCCIPExec))
+			pluginType := uint8(ccipocr3.PluginTypeCCIPCommit)
+			if digests.ActiveConfigDigest == [32]byte{} && digests.CandidateConfigDigest == [32]byte{} {
+				digests, err = ccipHome.GetConfigDigests(nil, don.Id, uint8(ccipocr3.PluginTypeCCIPExec))
 				if err != nil {
-					return 0, fmt.Errorf("get all exec configs from cciphome: %w", err)
+					return 0, fmt.Errorf("get exec config digests from cciphome: %w", err)
 				}
+				pluginType = uint8(ccipocr3.PluginTypeCCIPExec)
 			}
-			if configs.ActiveConfig.Config.ChainSelector == chainSelector || configs.CandidateConfig.Config.ChainSelector == chainSelector {
-				donIDs = append(donIDs, don.Id)
+			activeConfig, err := ccipHome.GetConfig(&bind.CallOpts{
+				Context: context.Background(),
+			}, don.Id, pluginType, digests.ActiveConfigDigest)
+			if err != nil {
+				return 0, fmt.Errorf("get active config from cciphome: %w", err)
+			}
+			candidateConfig, err := ccipHome.GetConfig(&bind.CallOpts{
+				Context: context.Background(),
+			}, don.Id, pluginType, digests.CandidateConfigDigest)
+			if err != nil {
+				return 0, fmt.Errorf("get candidate config from cciphome: %w", err)
+			}
+			if activeConfig.VersionedConfig.Config.ChainSelector == chainSelector || candidateConfig.VersionedConfig.Config.ChainSelector == chainSelector {
+				donID = don.Id
+				break
 			}
 		}
 	}
 
-	// more than one DON is an error
-	if len(donIDs) > 1 {
-		return 0, fmt.Errorf("more than one DON found for (chain selector %d, ccip capability id %x) pair", chainSelector, CCIPCapabilityID[:])
-	}
-
-	// no DON found - don ID of 0 indicates that (this is the case in the CR as well).
-	if len(donIDs) == 0 {
-		return 0, nil
-	}
-
-	// DON found - return it.
-	return donIDs[0], nil
+	return donID, nil
 }
 
 type PromoteCandidatePluginInfo struct {
@@ -779,6 +1004,7 @@ type PromoteCandidateChangesetConfig struct {
 
 	PluginInfo    []PromoteCandidatePluginInfo `json:"pluginInfo"`
 	NonBootstraps []*clclient.ChainlinkClient  `json:"nonBootstraps"`
+	MCMS          mcms.Input                   `json:"mcmsConfig"`
 }
 
 func validatePromoteCandidateChangesetConfig(e deployment.Environment, cfg PromoteCandidateChangesetConfig) error {
@@ -894,7 +1120,7 @@ func applyPromoteCandidateChangesetConfig(e deployment.Environment, cfg PromoteC
 		}
 	}
 
-	_, err = operations.ExecuteSequence(
+	result, err := operations.ExecuteSequence(
 		e.OperationsBundle,
 		PromoteCandidateSequence,
 		DONSequenceDeps{
@@ -905,5 +1131,13 @@ func applyPromoteCandidateChangesetConfig(e deployment.Environment, cfg PromoteC
 			DONs:                 dons,
 		},
 	)
-	return deployment.ChangesetOutput{}, err
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("promoting candidate config: %w", err)
+	}
+	mcmsReg := changesets.GetRegistry()
+	mcmsReg.RegisterMCMSReader(chain_selectors.FamilyEVM, &adapters.EVMMCMSReader{})
+	return changesets.NewOutputBuilder(e, mcmsReg).
+		WithReports(result.ExecutionReports).
+		WithBatchOps(result.Output.BatchOps).
+		Build(cfg.MCMS)
 }

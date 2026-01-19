@@ -29,7 +29,6 @@ import (
 )
 
 func TestMcmWithTimelock(t *testing.T) {
-	t.Parallel()
 	ctx := tests.Context(t)
 
 	mcm.SetProgramID(config.McmProgram)
@@ -501,7 +500,7 @@ func TestMcmWithTimelock(t *testing.T) {
 
 					mcmOpNodes := []mcms.McmOpNode{}
 
-					for i := 0; i < numMintIxs; i++ {
+					for range numMintIxs {
 						// timelock signer can mint token (transferred authority)
 						ix, mIxErr := tokens.MintTo(1*solana.LAMPORTS_PER_SOL, v.tokenProgram, mint, rAta, timelockutil.GetSignerPDA(config.TestTimelockID))
 						require.NoError(t, mIxErr)

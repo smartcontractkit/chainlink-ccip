@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"sort"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -564,10 +564,8 @@ func (p *Plugin) getMainOutcomeAndCacheInvalidation(
 
 	// check if the inflight prices made it on-chain
 	// first validate and agree on fDestChain and current onChainOcrSeqNum
-	for _, v := range observedOnChainOcrSeqNums {
-		if v == 0 {
-			return committypes.MainOutcome{}, false, fmt.Errorf("observed ocr seq num cannot be zero at this point")
-		}
+	if slices.Contains(observedOnChainOcrSeqNums, 0) {
+		return committypes.MainOutcome{}, false, fmt.Errorf("observed ocr seq num cannot be zero at this point")
 	}
 
 	donThresh := consensus.MakeConstantThreshold[cciptypes.ChainSelector](consensus.TwoFPlus1(p.reportingCfg.F))
@@ -582,9 +580,7 @@ func (p *Plugin) getMainOutcomeAndCacheInvalidation(
 			fDestChain+1, len(observedOnChainOcrSeqNums), observedOnChainOcrSeqNums)
 	}
 
-	sort.Slice(observedOnChainOcrSeqNums, func(i, j int) bool {
-		return observedOnChainOcrSeqNums[i] < observedOnChainOcrSeqNums[j]
-	})
+	slices.Sort(observedOnChainOcrSeqNums)
 	consensusOnChainOcrSeqNum := observedOnChainOcrSeqNums[fDestChain]
 
 	// make the actual checks and send the corresponding outcome

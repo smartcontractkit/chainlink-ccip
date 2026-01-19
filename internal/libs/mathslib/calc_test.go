@@ -255,7 +255,7 @@ func TestCalculateUsdPerUnitGas(t *testing.T) {
 
 func MustBigIntSetString(s string, zeroSuffixSize int) *big.Int {
 	// append zeroes to the string
-	for i := 0; i < zeroSuffixSize; i++ {
+	for range zeroSuffixSize {
 		s += "0"
 	}
 	bi, ok := new(big.Int).SetString(s, 10)

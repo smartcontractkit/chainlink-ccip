@@ -18,7 +18,7 @@ type ManualRegistrationInput struct {
 	ChainSelector        uint64          `yaml:"chain-selector" json:"chainSelector"`
 	ChainAdapterVersion  *semver.Version `yaml:"chain-adapter-version" json:"chainAdapterVersion"`
 	ExistingAddresses    []datastore.AddressRef
-	MCMS                 mcms.Input          `yaml:"mcms,omitempty" json:"mcms,omitempty"`
+	MCMS                 mcms.Input          `yaml:"mcms,omitempty" json:"mcms"`
 	RegisterTokenConfigs RegisterTokenConfig `yaml:"register-token-configs" json:"registerTokenConfigs"`
 }
 

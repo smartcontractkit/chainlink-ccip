@@ -6,9 +6,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/core/types"
 
+	capabilities_registry "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
+
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/ccip_home"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
-	capabilities_registry "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 )
@@ -59,6 +60,60 @@ var UpdateDON = contract.NewWrite(contract.WriteParams[UpdateDONOpInput, *capabi
 	Validate:        func(UpdateDONOpInput) error { return nil },
 	CallContract: func(capReg *capabilities_registry.CapabilitiesRegistry, opts *bind.TransactOpts, input UpdateDONOpInput) (*types.Transaction, error) {
 		return capReg.UpdateDON(opts, input.ID, input.Nodes, input.CapabilityConfigurations, input.IsPublic, input.F)
+	},
+})
+
+type AddNodesOpInput struct {
+	Nodes []capabilities_registry.CapabilitiesRegistryNodeParams
+}
+
+var AddNodes = contract.NewWrite(contract.WriteParams[AddNodesOpInput, *capabilities_registry.CapabilitiesRegistry]{
+	Name:            "capabilities-registry:add-nodes",
+	Version:         CapabilitiesRegistryVersion,
+	Description:     "Adds nodes to an existing node operator in the CapabilitiesRegistry",
+	ContractType:    utils.CapabilitiesRegistry,
+	ContractABI:     capabilities_registry.CapabilitiesRegistryABI,
+	NewContract:     capabilities_registry.NewCapabilitiesRegistry,
+	IsAllowedCaller: contract.OnlyOwner[*capabilities_registry.CapabilitiesRegistry, AddNodesOpInput],
+	Validate:        func(AddNodesOpInput) error { return nil },
+	CallContract: func(capReg *capabilities_registry.CapabilitiesRegistry, opts *bind.TransactOpts, input AddNodesOpInput) (*types.Transaction, error) {
+		return capReg.AddNodes(opts, input.Nodes)
+	},
+})
+
+type AddNodesOperatorsOpInput struct {
+	Nodes []capabilities_registry.CapabilitiesRegistryNodeOperator
+}
+
+var AddNodeOperators = contract.NewWrite(contract.WriteParams[AddNodesOperatorsOpInput, *capabilities_registry.CapabilitiesRegistry]{
+	Name:            "capabilities-registry:add-node-operators",
+	Version:         CapabilitiesRegistryVersion,
+	Description:     "Adds new node operators to the CapabilitiesRegistry",
+	ContractType:    utils.CapabilitiesRegistry,
+	ContractABI:     capabilities_registry.CapabilitiesRegistryABI,
+	NewContract:     capabilities_registry.NewCapabilitiesRegistry,
+	IsAllowedCaller: contract.OnlyOwner[*capabilities_registry.CapabilitiesRegistry, AddNodesOperatorsOpInput],
+	Validate:        func(AddNodesOperatorsOpInput) error { return nil },
+	CallContract: func(capReg *capabilities_registry.CapabilitiesRegistry, opts *bind.TransactOpts, input AddNodesOperatorsOpInput) (*types.Transaction, error) {
+		return capReg.AddNodeOperators(opts, input.Nodes)
+	},
+})
+
+type AddCapabilitiesOpInput struct {
+	Capabilities []capabilities_registry.CapabilitiesRegistryCapability
+}
+
+var AddCapabilities = contract.NewWrite(contract.WriteParams[AddCapabilitiesOpInput, *capabilities_registry.CapabilitiesRegistry]{
+	Name:            "capabilities-registry:add-capability",
+	Version:         CapabilitiesRegistryVersion,
+	Description:     "Adds a new capability to the CapabilitiesRegistry",
+	ContractType:    utils.CapabilitiesRegistry,
+	ContractABI:     capabilities_registry.CapabilitiesRegistryABI,
+	NewContract:     capabilities_registry.NewCapabilitiesRegistry,
+	IsAllowedCaller: contract.OnlyOwner[*capabilities_registry.CapabilitiesRegistry, AddCapabilitiesOpInput],
+	Validate:        func(AddCapabilitiesOpInput) error { return nil },
+	CallContract: func(capReg *capabilities_registry.CapabilitiesRegistry, opts *bind.TransactOpts, input AddCapabilitiesOpInput) (*types.Transaction, error) {
+		return capReg.AddCapabilities(opts, input.Capabilities)
 	},
 })
 

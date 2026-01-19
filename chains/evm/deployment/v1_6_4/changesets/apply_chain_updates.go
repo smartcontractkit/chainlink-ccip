@@ -10,9 +10,8 @@ import (
 
 	token_pool_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/sequences"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
-
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 )
 
 type ApplyChainUpdatesPerChainInput struct {

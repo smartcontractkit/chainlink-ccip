@@ -22,7 +22,7 @@ type TokenExpansionInput struct {
 	// per-chain configuration for token expansion
 	TokenExpansionInputPerChain map[uint64]TokenExpansionInputPerChain `yaml:"token-expansion-input-per-chain" json:"tokenExpansionInputPerChain"`
 	ChainAdapterVersion         *semver.Version                        `yaml:"chain-adapter-version" json:"chainAdapterVersion"`
-	MCMS                        mcms.Input                             `yaml:"mcms,omitempty" json:"mcms,omitempty"`
+	MCMS                        mcms.Input                             `yaml:"mcms,omitempty" json:"mcms"`
 }
 
 type TokenExpansionInputPerChain struct {

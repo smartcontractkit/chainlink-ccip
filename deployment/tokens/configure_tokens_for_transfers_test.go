@@ -572,7 +572,6 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 	tokenAdapterRegistry.RegisterTokenAdapter("evm", semver.MustParse("1.0.0"), mockAdapter)
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.desc, func(t *testing.T) {
 			// Register token adapter with appropriate error condition
 
@@ -622,7 +621,7 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 					if tt.shouldDeriveToken {
 						require.Equal(t, []byte("mocked-remote-token-address"), op.Transactions[0].Data)
 					} else {
-						require.Equal(t, []byte(fmt.Sprintf("%d-token", op.ChainSelector)), op.Transactions[0].Data)
+						require.Equal(t, fmt.Appendf(nil, "%d-token", op.ChainSelector), op.Transactions[0].Data)
 					}
 					require.Equal(t, fmt.Sprintf("%d-token-pool", op.ChainSelector), op.Transactions[0].To)
 				}

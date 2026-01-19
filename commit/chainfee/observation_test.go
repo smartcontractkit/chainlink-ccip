@@ -5,7 +5,6 @@ import (
 	"math/big"
 	"math/rand"
 	"slices"
-	"sort"
 	"testing"
 	"time"
 
@@ -142,7 +141,7 @@ func Test_processor_Observation(t *testing.T) {
 
 			supportedSet.Remove(tc.dstChain)
 			slicesWithoutDst := supportedSet.ToSlice()
-			sort.Slice(slicesWithoutDst, func(i, j int) bool { return slicesWithoutDst[i] < slicesWithoutDst[j] })
+			slices.Sort(slicesWithoutDst)
 
 			if len(slicesWithoutDst) == 0 {
 				slicesWithoutDst = []ccipocr3.ChainSelector(nil)
@@ -355,7 +354,7 @@ func Test_unique_chain_filter_in_Observation(t *testing.T) {
 
 			supportedSet.Remove(tc.dstChain)
 			slicesWithoutDst := supportedSet.ToSlice()
-			sort.Slice(slicesWithoutDst, func(i, j int) bool { return slicesWithoutDst[i] < slicesWithoutDst[j] })
+			slices.Sort(slicesWithoutDst)
 
 			cs.EXPECT().KnownSourceChainsSlice().Return(slicesWithoutDst, nil).Maybe()
 			srcChainsCfg := make(map[ccipocr3.ChainSelector]reader3.StaticSourceChainConfig, len(slicesWithoutDst))

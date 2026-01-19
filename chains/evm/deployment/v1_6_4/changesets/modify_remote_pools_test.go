@@ -7,26 +7,27 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
-	changesets "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/changesets"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
+	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/token_pool"
 	token_pool_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/sequences"
-	burn_mint_token_pool "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/burn_mint_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
-	datastore "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-	environment "github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
-	"github.com/stretchr/testify/require"
 
 	token_pool_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/token_pool"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 
-	factory_burn_mint_erc20 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/factory_burn_mint_erc20"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/factory_burn_mint_erc20"
 )
 
 func TestModifyRemotePoolsChangeset(t *testing.T) {
-	chainSelector := uint64(chain_selectors.TEST_90000001.Selector)
-	remoteChainSelector := uint64(chain_selectors.TEST_90000002.Selector)
+	chainSelector := chain_selectors.TEST_90000001.Selector
+	remoteChainSelector := chain_selectors.TEST_90000002.Selector
 	e, err := environment.New(t.Context(),
 		environment.WithEVMSimulated(t, []uint64{chainSelector, remoteChainSelector}),
 	)
@@ -84,7 +85,7 @@ func TestModifyRemotePoolsChangeset(t *testing.T) {
 						{
 							RemoteChainSelector: remoteChainSelector,
 							// Remote Pool address is an array of byte-arrays
-							RemotePoolAddresses: [][]byte{[]byte{1}},
+							RemotePoolAddresses: [][]byte{{1}},
 							RemoteTokenAddress:  []byte{2},
 							OutboundRateLimiterConfig: token_pool_bindings.RateLimiterConfig{
 								IsEnabled: false,

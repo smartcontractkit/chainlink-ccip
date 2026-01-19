@@ -35,9 +35,11 @@ const (
 	DefaultAnvilKey   = "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 	DefaultLokiURL    = "http://localhost:3030/loki/api/v1/push"
 	DefaultTempoURL   = "http://localhost:4318/v1/traces"
+	CLDDomain         = "ccip"
 )
 
 var CCIPHomeChain = chain_selectors.GETH_TESTNET.Selector
+var CCIPHomeChainID = chain_selectors.GETH_TESTNET.EvmChainID
 var L = log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).Level(zerolog.InfoLevel)
 
 // Load loads TOML configurations from a list of paths, i.e. env.toml,overrides.toml

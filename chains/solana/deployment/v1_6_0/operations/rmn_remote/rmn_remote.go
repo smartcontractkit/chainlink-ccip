@@ -3,6 +3,7 @@ package rmn_remote
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/gagliardetto/solana-go"
@@ -277,10 +278,8 @@ func IsSubjectCursed(chain cldf_solana.Chain, program solana.PublicKey, subject 
 		return false, fmt.Errorf("failed to read curses account: %w", err)
 	}
 
-	for _, cursedSubject := range cursesAccount.CursedSubjects {
-		if cursedSubject == subject {
-			return true, nil
-		}
+	if slices.Contains(cursesAccount.CursedSubjects, subject) {
+		return true, nil
 	}
 
 	return false, nil

@@ -3,21 +3,13 @@ package token_pool
 import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/token_pool"
 )
 
-// This version is being used since the Token Pool gobinding was included in version 1.5.1, but the actual token
-// pool this operation is being performed on may be different.
-var Version *semver.Version = semver.MustParse("1.5.1")
-
-type ConstructorArgs struct {
-	Token             common.Address
-	Decimals          uint8
-	RateLimiterConfig token_pool.RateLimiterConfig
-}
+var Version = semver.MustParse("1.6.4")
 
 type ChainUpdate = token_pool.TokenPoolChainUpdate
 

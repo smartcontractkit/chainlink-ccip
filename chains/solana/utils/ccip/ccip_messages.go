@@ -278,7 +278,7 @@ func GenerateBitMapForIndexes(indexes []int) uint64 {
 	return bitmap
 }
 
-func SerializeExtraArgs(data interface{}, tag string) ([]byte, error) {
+func SerializeExtraArgs(data any, tag string) ([]byte, error) {
 	tagBytes, err := hex.DecodeString(tag)
 	if err != nil {
 		return nil, err
@@ -287,7 +287,7 @@ func SerializeExtraArgs(data interface{}, tag string) ([]byte, error) {
 	return append(tagBytes, v...), err
 }
 
-func DeserializeExtraArgs(obj interface{}, data []byte, tag string) error {
+func DeserializeExtraArgs(obj any, data []byte, tag string) error {
 	tagBytes, err := hex.DecodeString(tag)
 	if err != nil {
 		return err

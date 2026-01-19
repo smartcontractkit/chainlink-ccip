@@ -14,6 +14,7 @@ import (
 	"github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_router"
@@ -162,7 +163,7 @@ var ConnectChains = operations.NewOperation(
 		} else {
 			err = chain.Confirm([]solana.Instruction{ixn})
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm connect chains: %w", err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm add dest chain instruction: %w", err)
 			}
 		}
 		return sequences.OnChainOutput{
@@ -214,7 +215,7 @@ var AddOffRamp = operations.NewOperation(
 
 		err = chain.Confirm([]solana.Instruction{ixn})
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm add off-ramp: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm add off ramp instruction: %w", err)
 		}
 		return sequences.OnChainOutput{}, nil
 	},
@@ -254,7 +255,7 @@ var TransferOwnership = operations.NewOperation(
 
 		err = chain.Confirm([]solana.Instruction{ixn})
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm transfer ownership: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm transfer ownership instruction: %w", err)
 		}
 		return sequences.OnChainOutput{}, nil
 	},
@@ -289,6 +290,8 @@ var AcceptOwnership = operations.NewOperation(
 
 		err = chain.Confirm([]solana.Instruction{ixn})
 		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm accept ownership instruction: %w", err)
+
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm accept ownership: %w", err)
 		}
 		return sequences.OnChainOutput{}, nil
@@ -671,7 +674,9 @@ var TransferTokenAdminRegistry = operations.NewOperation(
 		err = chain.Confirm([]solana.Instruction{ixn})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm register token admin registry: %w", err)
+
 		}
+
 		return sequences.OnChainOutput{}, nil
 	},
 )
