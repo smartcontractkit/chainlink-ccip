@@ -1,7 +1,6 @@
 package token_governor
 
 import (
-	"errors"
 	"fmt"
 	"math/big"
 
@@ -64,7 +63,7 @@ var GrantRole = contract.NewWrite(contract.WriteParams[RoleAssignment, *token_go
 	},
 	CallContract: func(tg *token_governor.TokenGovernor, opts *bind.TransactOpts, input RoleAssignment) (*types.Transaction, error) {
 		if input.Role == [32]byte{} {
-			return nil, errors.New(fmt.Sprintf("invalid role input %v for grant access", input.Role))
+			return nil, fmt.Errorf("invalid role input %v for grant access", input.Role)
 		}
 		return tg.GrantRole(opts, input.Role, input.To)
 	},
@@ -89,7 +88,7 @@ var RenounceRole = contract.NewWrite(contract.WriteParams[RoleAssignment, *token
 	},
 	CallContract: func(tg *token_governor.TokenGovernor, opts *bind.TransactOpts, input RoleAssignment) (*types.Transaction, error) {
 		if input.Role == [32]byte{} {
-			return nil, errors.New(fmt.Sprintf("invalid role input %v for renounce role access", input.Role))
+			return nil, fmt.Errorf("invalid role input %v for renounce role access", input.Role)
 		}
 		return tg.RenounceRole(opts, input.Role, input.To)
 	},
@@ -114,7 +113,7 @@ var RevokeRole = contract.NewWrite(contract.WriteParams[RoleAssignment, *token_g
 	},
 	CallContract: func(tg *token_governor.TokenGovernor, opts *bind.TransactOpts, input RoleAssignment) (*types.Transaction, error) {
 		if input.Role == [32]byte{} {
-			return nil, errors.New(fmt.Sprintf("invalid role input %v for revoke access", input.Role))
+			return nil, fmt.Errorf("invalid role input %v for revoke access", input.Role)
 		}
 		return tg.RevokeRole(opts, input.Role, input.To)
 	},
