@@ -6,10 +6,10 @@ import (
 	"math/big"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccip/consts"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
-	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 )
 

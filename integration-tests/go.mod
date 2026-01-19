@@ -224,7 +224,7 @@ require (
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/smartcontractkit/ccip-contract-examples/chains/evm v0.0.0-20250826190403-aed7f5f33cde // indirect
 	github.com/smartcontractkit/chainlink-aptos v0.0.0-20251024142440-51f2ad2652a2 // indirect
-	github.com/smartcontractkit/chainlink-common v0.9.6-0.20260107095648-223976d2b9f1 // indirect
+	github.com/smartcontractkit/chainlink-common v0.9.6-0.20260114142648-bd9e1b483e96 // indirect
 	github.com/smartcontractkit/chainlink-common/pkg/chipingress v0.0.10 // indirect
 	github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20250808121824-2c3544aab8f3 // indirect
 	github.com/smartcontractkit/chainlink-protos/job-distributor v0.17.0 // indirect
@@ -291,8 +291,8 @@ require (
 	golang.org/x/text v0.33.0 // indirect
 	golang.org/x/time v0.12.0 // indirect
 	golang.org/x/tools v0.40.0 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20251022142026-3a174f9686a8 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20251022142026-3a174f9686a8 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20260114163908-3f89685c29c3 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20251222181119-0a764e51fe1b // indirect
 	google.golang.org/grpc v1.77.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect

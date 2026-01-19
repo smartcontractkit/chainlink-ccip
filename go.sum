@@ -289,8 +289,8 @@ github.com/shopspring/decimal v1.4.0 h1:bxl37RwXBklmTi0C79JfXCEBD1cqqHt0bbgBAGFp
 github.com/shopspring/decimal v1.4.0/go.mod h1:gawqmDU56v4yIKSwfBSFip1HdCCXN8/+DMd9qYNcwME=
 github.com/smartcontractkit/chain-selectors v1.0.89 h1:L9oWZGqQXWyTPnC6ODXgu3b0DFyLmJ9eHv+uJrE9IZY=
 github.com/smartcontractkit/chain-selectors v1.0.89/go.mod h1:qy7whtgG5g+7z0jt0nRyii9bLND9m15NZTzuQPkMZ5w=
-github.com/smartcontractkit/chainlink-common v0.9.6-0.20260107095648-223976d2b9f1 h1:6IJthmu1oGis38KdTLsm+m7SI2ckMt4lEiwgyEn4nOI=
-github.com/smartcontractkit/chainlink-common v0.9.6-0.20260107095648-223976d2b9f1/go.mod h1:DAwaVSiQMgAsCjHa8nOnIAM9GixuIQWsgEZFGpf3JxE=
+github.com/smartcontractkit/chainlink-common v0.9.6-0.20260114142648-bd9e1b483e96 h1:ZnBBOLyMLJjgQQm7WRJl8sA9Q2RhwagJ+WR62VnA3MY=
+github.com/smartcontractkit/chainlink-common v0.9.6-0.20260114142648-bd9e1b483e96/go.mod h1:DAwaVSiQMgAsCjHa8nOnIAM9GixuIQWsgEZFGpf3JxE=
 github.com/smartcontractkit/chainlink-common/pkg/chipingress v0.0.10 h1:FJAFgXS9oqASnkS03RE1HQwYQQxrO4l46O5JSzxqLgg=
 github.com/smartcontractkit/chainlink-common/pkg/chipingress v0.0.10/go.mod h1:oiDa54M0FwxevWwyAX773lwdWvFYYlYHHQV1LQ5HpWY=
 github.com/smartcontractkit/chainlink-evm/gethwrappers/helpers v0.0.0-20260113095857-e13e0dd04d9f h1:qzv+V6DYNBkE+hyNbHg9Rv2mtCHsfwlmOt2+Fa6hTgk=
