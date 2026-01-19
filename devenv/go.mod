@@ -45,7 +45,7 @@ require (
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.12.6
 	github.com/smartcontractkit/chainlink-testing-framework/wasp v1.51.1
 	github.com/smartcontractkit/libocr v0.0.0-20250912173940-f3ab0246e23d
-	github.com/smartcontractkit/mcms v0.31.1
+	github.com/smartcontractkit/mcms v0.32.0
 	github.com/spf13/cobra v1.10.1
 	github.com/stretchr/testify v1.11.1
 	github.com/xssnick/tonutils-go v1.14.1
@@ -56,8 +56,8 @@ require (
 
 require (
 	github.com/smartcontractkit/chainlink-ton v0.0.0-20260119175539-ae7d01b4e643
-	github.com/smartcontractkit/chainlink-ton/deployment v0.0.0-20260108224749-1189180d119d
-	github.com/smartcontractkit/chainlink-ton/devenv v0.0.0-20260108224749-1189180d119d
+	github.com/smartcontractkit/chainlink-ton/deployment v0.0.0-20260119162312-74edaa830fa4
+	github.com/smartcontractkit/chainlink-ton/devenv v0.0.0-20260119175539-ae7d01b4e643
 )
 
 require (
@@ -220,6 +220,7 @@ require (
 	github.com/hashicorp/go-rootcerts v1.0.2 // indirect
 	github.com/hashicorp/go-sockaddr v1.0.7 // indirect
 	github.com/hashicorp/golang-lru v1.0.2 // indirect
+	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
 	github.com/hashicorp/memberlist v0.5.2 // indirect
 	github.com/hashicorp/serf v0.10.1 // indirect
 	github.com/hashicorp/yamux v0.1.2 // indirect
