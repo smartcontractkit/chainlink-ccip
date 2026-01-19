@@ -49,7 +49,7 @@ var SetCounterpart = contract.NewWrite(contract.WriteParams[SetCounterpartArgs, 
 	IsAllowedCaller: contract.OnlyOwner[*ping_pong_demo.PingPongDemo, SetCounterpartArgs],
 	Validate:        func(SetCounterpartArgs) error { return nil },
 	CallContract: func(pingPong *ping_pong_demo.PingPongDemo, opts *bind.TransactOpts, args SetCounterpartArgs) (*types.Transaction, error) {
-		return pingPong.SetCounterpart(opts, args.CounterpartChainSelector, args.CounterpartAddress)
+		return pingPong.SetCounterpart(opts, args.CounterpartChainSelector, common.BytesToAddress(args.CounterpartAddress))
 	},
 })
 
@@ -87,7 +87,7 @@ var SetCounterpartAddress = contract.NewWrite(contract.WriteParams[SetCounterpar
 	IsAllowedCaller: contract.OnlyOwner[*ping_pong_demo.PingPongDemo, SetCounterpartAddressArgs],
 	Validate:        func(SetCounterpartAddressArgs) error { return nil },
 	CallContract: func(pingPong *ping_pong_demo.PingPongDemo, opts *bind.TransactOpts, args SetCounterpartAddressArgs) (*types.Transaction, error) {
-		return pingPong.SetCounterpartAddress(opts, args.Address)
+		return pingPong.SetCounterpartAddress(opts, common.BytesToAddress(args.Address))
 	},
 })
 
