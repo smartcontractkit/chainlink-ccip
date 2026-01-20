@@ -60,6 +60,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     address indexed sender,
     bytes32 indexed messageId,
     address feeToken,
+    uint256 tokenAmountBeforeTokenPoolFees,
     bytes encodedMessage,
     Receipt[] receipts,
     bytes[] verifierBlobs
@@ -351,6 +352,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       sender: originalSender,
       messageId: messageId,
       feeToken: message.feeToken,
+      tokenAmountBeforeTokenPoolFees: message.tokenAmounts.length != 0 ? message.tokenAmounts[0].amount : 0,
       encodedMessage: eventData.encodedMessage,
       receipts: eventData.receipts,
       verifierBlobs: eventData.verifierBlobs

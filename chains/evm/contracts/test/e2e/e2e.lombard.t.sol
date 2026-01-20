@@ -345,6 +345,7 @@ contract e2e_lombard is OnRampSetup {
       sender: OWNER,
       messageId: messageId,
       feeToken: s_sourceFeeToken,
+      tokenAmountBeforeTokenPoolFees: 1e18,
       encodedMessage: encodedMessage,
       receipts: receipts,
       verifierBlobs: verifierBlobs
