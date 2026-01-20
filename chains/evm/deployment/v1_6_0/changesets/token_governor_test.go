@@ -743,7 +743,7 @@ func TestDefaultAdminChangesetValidation(t *testing.T) {
 		require.Contains(t, err.Error(), "token symbol must be provided")
 	})
 
-	t.Run("zero new admin owner address", func(t *testing.T) {
+	t.Run("zero new admin address", func(t *testing.T) {
 		input := sequences.TokenGovernorOwnershipInput{
 			Tokens: map[uint64]map[string]common.Address{
 				chain_selectors.ETHEREUM_MAINNET.Selector: {

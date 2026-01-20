@@ -273,7 +273,7 @@ var GrantRole = cldf_ops.NewSequence(
 var RevokeRole = cldf_ops.NewSequence(
 	"RevokeRole",
 	token_governor.Version,
-	"revokes the given role to the given account on the given chains.",
+	"revokes the given role from the given account on the given chains.",
 	func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input TokenGovernorRoleInput) (sequences.OnChainOutput, error) {
 		writes := make([]contract.WriteOutput, 0)
 		for chainSelector, tokenMap := range input.Tokens {
@@ -333,7 +333,7 @@ var RevokeRole = cldf_ops.NewSequence(
 var RenounceRole = cldf_ops.NewSequence(
 	"RenounceRole",
 	token_governor.Version,
-	"renounce the given role to the given account on the given chains.",
+	"renounce the given role from the given account on the given chains.",
 	func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input TokenGovernorRoleInput) (sequences.OnChainOutput, error) {
 		writes := make([]contract.WriteOutput, 0)
 		for chainSelector, tokenMap := range input.Tokens {
