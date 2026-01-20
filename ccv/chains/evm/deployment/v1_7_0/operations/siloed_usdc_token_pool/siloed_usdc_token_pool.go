@@ -29,9 +29,9 @@ var ConfigureLockBoxes = contract.NewWrite(contract.WriteParams[[]LockBoxConfig,
 	NewContract:     siloed_usdc_token_pool.NewSiloedUSDCTokenPool,
 	IsAllowedCaller: contract.OnlyOwner[*siloed_usdc_token_pool.SiloedUSDCTokenPool, []LockBoxConfig],
 	Validate: func(configs []LockBoxConfig) error {
-		for i, cfg := range configs {
+		for _, cfg := range configs {
 			if cfg.LockBox == (common.Address{}) {
-				return fmt.Errorf("lock box config %d has zero address", i)
+				return fmt.Errorf("lock box config for chain %d has zero address", cfg.RemoteChainSelector)
 			}
 		}
 		return nil
