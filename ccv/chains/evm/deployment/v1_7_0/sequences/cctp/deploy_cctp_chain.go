@@ -6,6 +6,9 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
+	chain_selectors "github.com/smartcontractkit/chain-selectors"
+	mcms_types "github.com/smartcontractkit/mcms/types"
+
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	tokens_core "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -14,7 +17,6 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/cctp_message_transmitter_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/cctp_through_ccv_token_pool"
@@ -280,12 +282,14 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 				DestChainSelector: remoteChainSelector,
 				Verifier:          common.HexToAddress(cctpVerifierAddress),
 			})
-			remoteChainSelectors = append(remoteChainSelectors, remoteChainSelector)
-			mechanism, err := convertMechanismToUint8(remoteChain.LockOrBurnMechanism)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to convert lock or burn mechanism to uint8: %w", err)
+			if remoteChain.LockOrBurnMechanism != "LOCK_RELEASE" {
+				remoteChainSelectors = append(remoteChainSelectors, remoteChainSelector)
+				mechanism, err := convertMechanismToUint8(remoteChain.LockOrBurnMechanism)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to convert lock or burn mechanism to uint8: %w", err)
+				}
+				mechanisms = append(mechanisms, mechanism)
 			}
-			mechanisms = append(mechanisms, mechanism)
 			allowedCallerOnDest, err := toBytes32LeftPad(remoteChain.RemoteDomain.AllowedCallerOnDest)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to convert allowed caller on dest to bytes32: %w", err)
@@ -326,19 +330,21 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 		}
 		writes = append(writes, setOutboundImplementationReport.Output)
 
-		// Set lock or burn mechanism for each remote chain
-		updateLockOrBurnMechanismsReport, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_proxy.UpdateLockOrBurnMechanisms, chain, contract_utils.FunctionInput[usdc_token_pool_proxy.UpdateLockOrBurnMechanismsArgs]{
-			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(usdcTokenPoolProxyAddress),
-			Args: usdc_token_pool_proxy.UpdateLockOrBurnMechanismsArgs{
-				RemoteChainSelectors: remoteChainSelectors,
-				Mechanisms:           mechanisms,
-			},
-		})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to update lock or burn mechanisms on USDCTokenPoolProxy: %w", err)
+		// Set lock or burn mechanism for each remote chain (excluding lock-release chains)
+		if len(remoteChainSelectors) > 0 {
+			updateLockOrBurnMechanismsReport, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_proxy.UpdateLockOrBurnMechanisms, chain, contract_utils.FunctionInput[usdc_token_pool_proxy.UpdateLockOrBurnMechanismsArgs]{
+				ChainSelector: chain.Selector,
+				Address:       common.HexToAddress(usdcTokenPoolProxyAddress),
+				Args: usdc_token_pool_proxy.UpdateLockOrBurnMechanismsArgs{
+					RemoteChainSelectors: remoteChainSelectors,
+					Mechanisms:           mechanisms,
+				},
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to update lock or burn mechanisms on USDCTokenPoolProxy: %w", err)
+			}
+			writes = append(writes, updateLockOrBurnMechanismsReport.Output)
 		}
-		writes = append(writes, updateLockOrBurnMechanismsReport.Output)
 
 		// Apply remote chain config updates on the CCTPVerifier
 		applyRemoteChainConfigUpdatesReport, err := cldf_ops.ExecuteOperation(b, cctp_verifier.ApplyRemoteChainConfigUpdates, chain, contract_utils.FunctionInput[[]cctp_verifier.RemoteChainConfigArgs]{
@@ -371,6 +377,37 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 			batchOps = append(batchOps, batchOpFromWrites)
 		}
 
+		// Deploy siloed USDC lock-release stack if not present
+		siloedUSDCAddress := poolTypeAndVersionToAddr[deployment.NewTypeAndVersion(siloed_usdc_token_pool.ContractType, *siloed_usdc_token_pool.Version).String()]
+		if siloedUSDCAddress == "" && (chain.Selector == chain_selectors.ETHEREUM_MAINNET.Selector || chain.Selector == chain_selectors.ETHEREUM_TESTNET_SEPOLIA.Selector) {
+			lockReleaseSelectors := make([]uint64, 0)
+			for sel, cfg := range input.RemoteChains {
+				if cfg.LockOrBurnMechanism == "LOCK_RELEASE" {
+					lockReleaseSelectors = append(lockReleaseSelectors, sel)
+				}
+			}
+			// Deploy SiloedUSDCTokenPool, ERC20LockBoxes and configure USDCTokenPoolProxy as allowed caller to this pool
+			siloedLockReleaseReport, err := cldf_ops.ExecuteSequence(b, DeploySiloedUSDCLockRelease, chains, DeploySiloedUSDCLockReleaseInput{
+				ChainSelector:             input.ChainSelector,
+				USDCToken:                 input.USDCToken,
+				Router:                    input.Router,
+				RMN:                       input.RMN,
+				USDCTokenPoolProxy:        usdcTokenPoolProxyAddress,
+				SiloedUSDCTokenPool:       siloedUSDCAddress,
+				LockReleaseChainSelectors: lockReleaseSelectors,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy siloed USDC lock release stack: %w", err)
+			}
+			addresses = append(addresses, siloedLockReleaseReport.Output.Addresses...)
+			batchOps = append(batchOps, siloedLockReleaseReport.Output.BatchOps...)
+			if siloedUSDCAddress == "" {
+				// Update local copy for downstream usage if needed
+				if siloedLockReleaseReport.Output.SiloedPoolAddress != "" {
+					siloedUSDCAddress = siloedLockReleaseReport.Output.SiloedPoolAddress
+				}
+			}
+		}
 		// Call into configure token for transfers sequence
 		remoteChains := make(map[uint64]tokens_core.RemoteChainConfig[[]byte, string])
 		for remoteChainSelector, remoteChain := range input.RemoteChains {
