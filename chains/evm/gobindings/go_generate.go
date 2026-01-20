@@ -49,4 +49,5 @@ package ccip
 //go:generate go run ./wrap ccip MockE2EUSDCTokenMessenger mock_usdc_token_messenger
 //go:generate go run ./wrap ccip MockReceiverV2 mock_receiver_v2
 //go:generate go run ./wrap ccip MockE2EUSDCTransmitter mock_usdc_token_transmitter
+//go:generate go run ./wrap ccip MockE2EUSDCTransmitterCCTPV2 mock_usdc_token_transmitter_v2
 //go:generate go run ./wrap ccip MockE2ELBTCTokenPool mock_lbtc_token_pool
