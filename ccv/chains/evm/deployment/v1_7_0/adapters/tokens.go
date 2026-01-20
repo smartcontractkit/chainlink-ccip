@@ -8,8 +8,10 @@ import (
 	evm_tokens "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
+	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -46,4 +48,39 @@ func (t *TokenAdapter) DeriveTokenAddress(e deployment.Environment, chainSelecto
 	return t.AddressRefToBytes(datastore.AddressRef{
 		Address: getTokenReport.Output.Hex(),
 	})
+}
+
+func (t *TokenAdapter) ManualRegistration() *cldf_ops.Sequence[tokensapi.ManualRegistrationInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	// TODO implement me
+	return nil
+}
+
+func (t *TokenAdapter) DeployToken() *cldf_ops.Sequence[tokensapi.DeployTokenInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	// TODO implement me
+	return nil
+}
+
+func (t *TokenAdapter) DeployTokenVerify(e deployment.Environment, in any) error {
+	// TODO implement me
+	return nil
+}
+
+func (t *TokenAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.DeployTokenPoolInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	// TODO implement me
+	return nil
+}
+
+func (t *TokenAdapter) RegisterToken() *cldf_ops.Sequence[tokensapi.RegisterTokenInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	// TODO implement me
+	return nil
+}
+
+func (t *TokenAdapter) SetPool() *cldf_ops.Sequence[tokensapi.SetPoolInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	// TODO implement me
+	return nil
+}
+
+func (t *TokenAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokensapi.UpdateAuthoritiesInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	// TODO implement me
+	return nil
 }
