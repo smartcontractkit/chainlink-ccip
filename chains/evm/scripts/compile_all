@@ -119,6 +119,7 @@ compileContract test/helpers/MessageHasher
 
 compileContract test/mocks/MockE2EUSDCTokenMessenger
 compileContract test/mocks/MockE2EUSDCTransmitter
+compileContract test/mocks/MockE2EUSDCTransmitterCCTPV2
 compileContract test/mocks/MockE2ELBTCTokenPool
 compileContract test/mocks/MockReceiverV2
 
