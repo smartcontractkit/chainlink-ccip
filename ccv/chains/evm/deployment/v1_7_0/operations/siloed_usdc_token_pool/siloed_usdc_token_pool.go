@@ -1,8 +1,11 @@
 package siloed_usdc_token_pool
 
 import (
+	"fmt"
+
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/siloed_usdc_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
@@ -25,7 +28,14 @@ var ConfigureLockBoxes = contract.NewWrite(contract.WriteParams[[]LockBoxConfig,
 	ContractABI:     siloed_usdc_token_pool.SiloedUSDCTokenPoolABI,
 	NewContract:     siloed_usdc_token_pool.NewSiloedUSDCTokenPool,
 	IsAllowedCaller: contract.OnlyOwner[*siloed_usdc_token_pool.SiloedUSDCTokenPool, []LockBoxConfig],
-	Validate:        func([]LockBoxConfig) error { return nil },
+	Validate: func(configs []LockBoxConfig) error {
+		for i, cfg := range configs {
+			if cfg.LockBox == (common.Address{}) {
+				return fmt.Errorf("lock box config %d has zero address", i)
+			}
+		}
+		return nil
+	},
 	CallContract: func(pool *siloed_usdc_token_pool.SiloedUSDCTokenPool, opts *bind.TransactOpts, args []LockBoxConfig) (*types.Transaction, error) {
 		return pool.ConfigureLockBoxes(opts, args)
 	},
