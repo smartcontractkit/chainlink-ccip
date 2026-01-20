@@ -161,6 +161,9 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
   mapping(uint64 destChainSelector => mapping(address token => TokenTransferFeeConfig tranferFeeConfig)) internal
     s_tokenTransferFeeConfig;
 
+  /// @dev Set of transfer tokens with a configuration for a given destination chain.
+  mapping(uint64 destChainSelector => EnumerableSet.AddressSet transferTokens) internal s_transferTokens;
+
   constructor(
     StaticConfig memory staticConfig,
     address[] memory priceUpdaters,
@@ -396,8 +399,11 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
 
         s_tokenTransferFeeConfig[destChainSelector][token] = tokenTransferFeeConfig;
 
-        // We don't need to check the return value, as inserting the item twice has no effect.
+        // Add destination chain selector to the set, okay if already exists.
         s_destChainSelectors.add(destChainSelector);
+
+        // Add token to the set, okay if already exists.
+        s_transferTokens[destChainSelector].add(token);
 
         emit TokenTransferFeeConfigUpdated(destChainSelector, token, tokenTransferFeeConfig);
       }
@@ -408,6 +414,8 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
       uint64 destChainSelector = tokensToUseDefaultFeeConfigs[i].destChainSelector;
       address token = tokensToUseDefaultFeeConfigs[i].token;
       delete s_tokenTransferFeeConfig[destChainSelector][token];
+      // Remove token from the set, okay if it doesn't exist.
+      s_transferTokens[destChainSelector].remove(token);
       emit TokenTransferFeeConfigDeleted(destChainSelector, token);
     }
   }
@@ -572,36 +580,32 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
     return s_destChainConfigs[destChainSelector];
   }
 
-  /// @notice Returns all destination chain selectors that have been configured.
-  /// @return destChainSelectors The supported destination chain selectors.
-  function getAllDestChainSelectors() external view returns (uint64[] memory destChainSelectors) {
+  /// @notice Returns all token transfer fee configs for all destination chain selectors.
+  /// @return destChainSelectors The destination chain selectors.
+  /// @return transferTokens The transfer tokens for each destination chain selector.
+  /// @return tokenTransferFeeConfigs The token transfer fee configs corresponding to the transfer tokens.
+  function getAllTokenTransferFeeConfigs()
+    external
+    view
+    returns (
+      uint64[] memory destChainSelectors,
+      address[][] memory transferTokens,
+      TokenTransferFeeConfig[][] memory tokenTransferFeeConfigs
+    )
+  {
     destChainSelectors = new uint64[](s_destChainSelectors.length());
+    transferTokens = new address[][](s_destChainSelectors.length());
+    tokenTransferFeeConfigs = new TokenTransferFeeConfig[][](s_destChainSelectors.length());
     for (uint256 i = 0; i < s_destChainSelectors.length(); ++i) {
       destChainSelectors[i] = uint64(s_destChainSelectors.at(i));
+      transferTokens[i] = new address[](s_transferTokens[destChainSelectors[i]].length());
+      tokenTransferFeeConfigs[i] = new TokenTransferFeeConfig[](s_transferTokens[destChainSelectors[i]].length());
+      for (uint256 j = 0; j < s_transferTokens[destChainSelectors[i]].length(); ++j) {
+        transferTokens[i][j] = s_transferTokens[destChainSelectors[i]].at(j);
+        tokenTransferFeeConfigs[i][j] = s_tokenTransferFeeConfig[destChainSelectors[i]][transferTokens[i][j]];
+      }
     }
-    return destChainSelectors;
-  }
-
-  /// @notice Returns all token transfer fee configs for a specific destination chain selector.
-  /// @param destChainSelector Destination chain selector to fetch configs for.
-  /// @return tokens The token addresses (all fee tokens).
-  /// @return tokenTransferFeeConfigs The token transfer fee configs corresponding to the tokens.
-  /// @dev Iterates through all fee tokens and returns their configs for the given chain selector.
-  /// Returns empty structs for tokens that don't have a config set.
-  function getAllTokenTransferFeeConfigs(
-    uint64 destChainSelector
-  ) external view returns (address[] memory tokens, TokenTransferFeeConfig[] memory tokenTransferFeeConfigs) {
-    uint256 feeTokenCount = s_feeTokens.length();
-    tokens = new address[](feeTokenCount);
-    tokenTransferFeeConfigs = new TokenTransferFeeConfig[](feeTokenCount);
-
-    for (uint256 i = 0; i < feeTokenCount; ++i) {
-      address token = s_feeTokens.at(i);
-      tokens[i] = token;
-      tokenTransferFeeConfigs[i] = s_tokenTransferFeeConfig[destChainSelector][token];
-    }
-
-    return (tokens, tokenTransferFeeConfigs);
+    return (destChainSelectors, transferTokens, tokenTransferFeeConfigs);
   }
 
   /// @notice Returns all destination chain configs.

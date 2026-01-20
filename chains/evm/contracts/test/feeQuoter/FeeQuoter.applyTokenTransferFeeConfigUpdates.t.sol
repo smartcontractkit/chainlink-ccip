@@ -127,65 +127,101 @@ contract FeeQuoter_applyTokenTransferFeeConfigUpdates is FeeQuoterSetup {
     tokenConfigArgs[0].destChainSelector = testChainSelector;
     tokenConfigArgs[0].tokenTransferFeeConfigs = new FeeQuoter.TokenTransferFeeConfigSingleTokenArgs[](2);
 
-    // Use fee tokens from setup
-    tokenConfigArgs[0].tokenTransferFeeConfigs[0].token = s_sourceFeeTokens[0];
+    // Use source tokens as transfer tokens
+    address transferToken0 = makeAddr("transferToken0");
+    address transferToken1 = makeAddr("transferToken1");
+    tokenConfigArgs[0].tokenTransferFeeConfigs[0].token = transferToken0;
     tokenConfigArgs[0].tokenTransferFeeConfigs[0].tokenTransferFeeConfig = FeeQuoter.TokenTransferFeeConfig({
       feeUSDCents: 100, destGasOverhead: 50000, destBytesOverhead: 64, isEnabled: true
     });
 
-    tokenConfigArgs[0].tokenTransferFeeConfigs[1].token = s_sourceFeeTokens[1];
+    tokenConfigArgs[0].tokenTransferFeeConfigs[1].token = transferToken1;
     tokenConfigArgs[0].tokenTransferFeeConfigs[1].tokenTransferFeeConfig = FeeQuoter.TokenTransferFeeConfig({
       feeUSDCents: 200, destGasOverhead: 60000, destBytesOverhead: 96, isEnabled: true
     });
 
     s_feeQuoter.applyTokenTransferFeeConfigUpdates(tokenConfigArgs, new FeeQuoter.TokenTransferFeeConfigRemoveArgs[](0));
 
-    // Get all token transfer fee configs for this chain selector
-    (address[] memory tokens, FeeQuoter.TokenTransferFeeConfig[] memory configs) =
-      s_feeQuoter.getAllTokenTransferFeeConfigs(testChainSelector);
+    // Get all token transfer fee configs for all chain selectors
+    (
+      uint64[] memory destChainSelectors,
+      address[][] memory transferTokens,
+      FeeQuoter.TokenTransferFeeConfig[][] memory tokenTransferFeeConfigs
+    ) = s_feeQuoter.getAllTokenTransferFeeConfigs();
 
-    // Verify we got all fee tokens (should return all fee tokens, even if they don't have configs)
-    assertGe(tokens.length, s_sourceFeeTokens.length, "Should return at least all fee tokens");
+    // Find the index of our test chain selector
+    uint256 chainIndex = type(uint256).max;
+    for (uint256 i = 0; i < destChainSelectors.length; ++i) {
+      if (destChainSelectors[i] == testChainSelector) {
+        chainIndex = i;
+        break;
+      }
+    }
+    require(chainIndex != type(uint256).max, "Chain selector not found");
+
+    address[] memory tokens = transferTokens[chainIndex];
+    FeeQuoter.TokenTransferFeeConfig[] memory configs = tokenTransferFeeConfigs[chainIndex];
+
+    // Verify we got the transfer tokens we configured
+    assertGe(tokens.length, 2, "Should return at least the configured transfer tokens");
 
     // Find our configured tokens and verify their configs
     bool foundToken0 = false;
     bool foundToken1 = false;
     for (uint256 i = 0; i < tokens.length; ++i) {
-      if (tokens[i] == s_sourceFeeTokens[0]) {
+      if (tokens[i] == transferToken0) {
         _assertTokenTransferFeeConfigEqual(
           tokenConfigArgs[0].tokenTransferFeeConfigs[0].tokenTransferFeeConfig, configs[i]
         );
         foundToken0 = true;
       }
-      if (tokens[i] == s_sourceFeeTokens[1]) {
+      if (tokens[i] == transferToken1) {
         _assertTokenTransferFeeConfigEqual(
           tokenConfigArgs[0].tokenTransferFeeConfigs[1].tokenTransferFeeConfig, configs[i]
         );
         foundToken1 = true;
       }
     }
-    assertTrue(foundToken0, "Should find first configured token");
-    assertTrue(foundToken1, "Should find second configured token");
+    assertTrue(foundToken0, "Should find first configured transfer token");
+    assertTrue(foundToken1, "Should find second configured transfer token");
     assertEq(tokens.length, configs.length, "Arrays should have same length");
   }
 
   function test_getAllTokenTransferFeeConfigs_ReturnsEmptyStructsForUnconfiguredTokens() public view {
     uint64 testChainSelector = DEST_CHAIN_SELECTOR + 30;
 
-    // Don't set any token configs, just get all fee tokens
-    (address[] memory tokens, FeeQuoter.TokenTransferFeeConfig[] memory configs) =
-      s_feeQuoter.getAllTokenTransferFeeConfigs(testChainSelector);
+    // Don't set any transfer token configs, just get all transfer tokens
+    (
+      uint64[] memory destChainSelectors,
+      address[][] memory transferTokens,
+      FeeQuoter.TokenTransferFeeConfig[][] memory tokenTransferFeeConfigs
+    ) = s_feeQuoter.getAllTokenTransferFeeConfigs();
 
-    // Should return all fee tokens with empty configs
-    assertGe(tokens.length, s_sourceFeeTokens.length, "Should return all fee tokens");
+    // Find the index of our test chain selector
+    uint256 chainIndex = type(uint256).max;
+    for (uint256 i = 0; i < destChainSelectors.length; ++i) {
+      if (destChainSelectors[i] == testChainSelector) {
+        chainIndex = i;
+        break;
+      }
+    }
+    // If chain selector not found, it means no transfer token configs exist for it, which is expected
+    if (chainIndex == type(uint256).max) {
+      return;
+    }
+
+    address[] memory tokens = transferTokens[chainIndex];
+    FeeQuoter.TokenTransferFeeConfig[] memory configs = tokenTransferFeeConfigs[chainIndex];
+
+    // Should return transfer tokens - if any exist for this chain selector
     assertEq(tokens.length, configs.length, "Arrays should have same length");
 
     // Verify all configs are empty (isEnabled should be false)
     for (uint256 i = 0; i < configs.length; ++i) {
-      assertFalse(configs[i].isEnabled, "Unconfigured tokens should have isEnabled = false");
-      assertEq(configs[i].feeUSDCents, 0, "Unconfigured tokens should have zero feeUSDCents");
-      assertEq(configs[i].destGasOverhead, 0, "Unconfigured tokens should have zero destGasOverhead");
-      assertEq(configs[i].destBytesOverhead, 0, "Unconfigured tokens should have zero destBytesOverhead");
+      assertFalse(configs[i].isEnabled, "Unconfigured transfer tokens should have isEnabled = false");
+      assertEq(configs[i].feeUSDCents, 0, "Unconfigured transfer tokens should have zero feeUSDCents");
+      assertEq(configs[i].destGasOverhead, 0, "Unconfigured transfer tokens should have zero destGasOverhead");
+      assertEq(configs[i].destBytesOverhead, 0, "Unconfigured transfer tokens should have zero destBytesOverhead");
     }
   }
 
