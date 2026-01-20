@@ -16,7 +16,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/token_governor"
-	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -163,7 +162,7 @@ func GetRoleFromTokenGovernor(ctx context.Context, tokenGovernor *tg_bindings.To
 
 var DeployTokenGovernor = cldf_ops.NewSequence(
 	"deploy-token-governor",
-	common_utils.Version_1_0_0,
+	token_governor.Version,
 	"Deploy token governor contract",
 	func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input DeployTokenGovernorInput) (sequences.OnChainOutput, error) {
 		addresses := make([]datastore.AddressRef, 0)
@@ -180,14 +179,17 @@ var DeployTokenGovernor = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get symbol for ERC20 token at %s: %w", input.Token, err)
 		}
 		qualifier := symbol
-
+		admin := chain.DeployerKey.From
+		if input.InitialDefaultAdmin != "" {
+			admin = common.HexToAddress(input.InitialDefaultAdmin)
+		}
 		tokenGovernorRef, err = contract.MaybeDeployContract(b, token_governor.Deploy, chain, contract.DeployInput[token_governor.ConstructorArgs]{
 			TypeAndVersion: token_governor.TypeAndVersion,
 			ChainSelector:  chain.Selector,
 			Args: token_governor.ConstructorArgs{
 				Token:               common.HexToAddress(input.Token),
 				InitialDelay:        input.InitialDelay,
-				InitialDefaultAdmin: chain.DeployerKey.From,
+				InitialDefaultAdmin: admin,
 			},
 			Qualifier: &qualifier,
 		}, nil)
