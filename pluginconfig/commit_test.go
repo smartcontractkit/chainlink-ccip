@@ -516,7 +516,6 @@ func TestCommitOffchainConfig_ApplyDefaultsAndValidate(t *testing.T) {
 			name: "Config with all valid values doesn't change and validates successfully",
 			input: CommitOffchainConfig{
 				RemoteGasPriceBatchWriteFrequency:  *commonconfig.MustNewDuration(2 * time.Minute),
-				RMNSignaturesTimeout:               10 * time.Second,
 				NewMsgScanBatchSize:                100,
 				MaxReportTransmissionCheckAttempts: 10,
 				MaxMerkleTreeSize:                  1000,
