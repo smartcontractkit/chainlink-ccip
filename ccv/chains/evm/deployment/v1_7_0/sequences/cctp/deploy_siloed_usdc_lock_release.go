@@ -68,6 +68,7 @@ var DeploySiloedUSDCLockRelease = cldf_ops.NewSequence(
 			addresses = append(addresses, poolReport.Output)
 			siloedPoolAddr = poolReport.Output.Address
 		}
+		siloedPoolAddress := common.HexToAddress(siloedPoolAddr)
 
 		lockBoxes := make(map[uint64]string, len(input.LockReleaseChainSelectors))
 		// Deploy lockboxes and configure them on the pool
@@ -94,7 +95,7 @@ var DeploySiloedUSDCLockRelease = cldf_ops.NewSequence(
 
 			cfgReport, err := cldf_ops.ExecuteOperation(b, siloed_usdc_token_pool.ConfigureLockBoxes, chain, contract_utils.FunctionInput[[]siloed_usdc_token_pool.LockBoxConfig]{
 				ChainSelector: input.ChainSelector,
-				Address:       common.HexToAddress(siloedPoolAddr),
+				Address:       siloedPoolAddress,
 				Args:          configs,
 			})
 			if err != nil {
@@ -106,17 +107,29 @@ var DeploySiloedUSDCLockRelease = cldf_ops.NewSequence(
 		// Authorize siloed pool on each lockbox
 		for sel := range lockBoxes {
 			lbAddr := lockBoxes[sel]
-			authReport, err := cldf_ops.ExecuteOperation(b, erc20_lock_box.ApplyAuthorizedCallerUpdates, chain, contract_utils.FunctionInput[erc20_lock_box.AuthorizedCallerArgs]{
+			lockBoxAddress := common.HexToAddress(lbAddr)
+			// Check if already authorized
+			callersReport, err := cldf_ops.ExecuteOperation(b, erc20_lock_box.GetAllAuthorizedCallers, chain, contract_utils.FunctionInput[any]{
 				ChainSelector: input.ChainSelector,
-				Address:       common.HexToAddress(lbAddr),
-				Args: erc20_lock_box.AuthorizedCallerArgs{
-					AddedCallers: []common.Address{common.HexToAddress(siloedPoolAddr)},
-				},
+				Address:       lockBoxAddress,
 			})
 			if err != nil {
-				return DeploySiloedUSDCLockReleaseOutput{}, fmt.Errorf("failed to authorize siloed pool on lockbox %s (chain %d): %w", lbAddr, sel, err)
+				return DeploySiloedUSDCLockReleaseOutput{}, fmt.Errorf("failed to get authorized callers on lockbox %s (chain %d): %w", lbAddr, sel, err)
 			}
-			writes = append(writes, authReport.Output)
+			// If not authorized, authorize it
+			if !containsAddress(callersReport.Output, siloedPoolAddress) {
+				authReport, err := cldf_ops.ExecuteOperation(b, erc20_lock_box.ApplyAuthorizedCallerUpdates, chain, contract_utils.FunctionInput[erc20_lock_box.AuthorizedCallerArgs]{
+					ChainSelector: input.ChainSelector,
+					Address:       lockBoxAddress,
+					Args: erc20_lock_box.AuthorizedCallerArgs{
+						AddedCallers: []common.Address{siloedPoolAddress},
+					},
+				})
+				if err != nil {
+					return DeploySiloedUSDCLockReleaseOutput{}, fmt.Errorf("failed to authorize siloed pool on lockbox %s (chain %d): %w", lbAddr, sel, err)
+				}
+				writes = append(writes, authReport.Output)
+			}
 		}
 
 		batchOps := make([]mcms_types.BatchOperation, 0)
