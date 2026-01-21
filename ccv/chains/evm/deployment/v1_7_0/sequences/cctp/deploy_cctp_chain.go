@@ -77,7 +77,8 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 				lockReleaseSelectors = append(lockReleaseSelectors, sel)
 			}
 		}
-		isHomeChain := chain.Selector == chain_selectors.ETHEREUM_MAINNET.Selector || chain.Selector == chain_selectors.ETHEREUM_TESTNET_SEPOLIA.Selector
+
+		isHomeChainAndConfigureSiloedPool := (chain.Selector == chain_selectors.ETHEREUM_MAINNET.Selector || chain.Selector == chain_selectors.ETHEREUM_TESTNET_SEPOLIA.Selector) && len(lockReleaseSelectors) > 0
 		usdcTokenPoolProxyAddress := poolTypeAndVersionToAddr[deployment.NewTypeAndVersion(usdc_token_pool_proxy.ContractType, *usdc_token_pool_proxy.Version).String()]
 		siloedUSDCAddress := poolTypeAndVersionToAddr[deployment.NewTypeAndVersion(siloed_usdc_token_pool.ContractType, *siloed_usdc_token_pool.Version).String()]
 
@@ -191,7 +192,7 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 		batchOps = append(batchOps, configureTokenPoolReport.Output.BatchOps...)
 
 		// Deploy siloed USDC lock-release stack before the proxy when needed.
-		if isHomeChain && len(lockReleaseSelectors) > 0 && siloedUSDCAddress == "" {
+		if isHomeChainAndConfigureSiloedPool && siloedUSDCAddress == "" {
 			siloedLockReleaseReport, err := cldf_ops.ExecuteSequence(b, DeploySiloedUSDCLockRelease, chains, DeploySiloedUSDCLockReleaseInput{
 				ChainSelector:             input.ChainSelector,
 				USDCToken:                 input.USDCToken,
@@ -251,7 +252,7 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 			writes = append(writes, setFeeAggregatorReport.Output)
 		}
 
-		if isHomeChain && len(lockReleaseSelectors) > 0 {
+		if isHomeChainAndConfigureSiloedPool {
 			siloedPoolWrites, err := configureSiloedPoolProxyWiring(b, chain, input.ChainSelector, common.HexToAddress(usdcTokenPoolProxyAddress), common.HexToAddress(siloedUSDCAddress), lockReleaseSelectors)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to configure siloed pool proxy wiring: %w", err)
