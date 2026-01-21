@@ -11,7 +11,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/erc20_lock_box"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/siloed_usdc_token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/usdc_token_pool_proxy"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -24,8 +23,7 @@ type DeploySiloedUSDCLockReleaseInput struct {
 	USDCToken     string
 	Router        string
 	RMN           string
-	// Existing proxy and siloed pool addresses; both optional.
-	USDCTokenPoolProxy        string
+	// Existing siloed pool address; optional.
 	SiloedUSDCTokenPool       string
 	LockReleaseChainSelectors []uint64
 }
@@ -40,7 +38,7 @@ type DeploySiloedUSDCLockReleaseOutput struct {
 var DeploySiloedUSDCLockRelease = cldf_ops.NewSequence(
 	"deploy-siloed-usdc-lock-release",
 	semver.MustParse("1.7.0"),
-	"Deploys SiloedUSDCTokenPool and per-chain ERC20LockBox contracts, wiring them to the USDCTokenPoolProxy when provided",
+	"Deploys SiloedUSDCTokenPool and per-chain ERC20LockBox contracts",
 	func(b cldf_ops.Bundle, chains chain.BlockChains, input DeploySiloedUSDCLockReleaseInput) (output DeploySiloedUSDCLockReleaseOutput, err error) {
 		chain, ok := chains.EVMChains()[input.ChainSelector]
 		if !ok {
@@ -105,21 +103,6 @@ var DeploySiloedUSDCLockRelease = cldf_ops.NewSequence(
 			writes = append(writes, cfgReport.Output)
 		}
 
-		if input.USDCTokenPoolProxy != "" {
-			// Authorize proxy on pool
-			poolAuthReport, err := cldf_ops.ExecuteOperation(b, siloed_usdc_token_pool.ApplyAuthorizedCallerUpdates, chain, contract_utils.FunctionInput[siloed_usdc_token_pool.AuthorizedCallerArgs]{
-				ChainSelector: input.ChainSelector,
-				Address:       common.HexToAddress(siloedPoolAddr),
-				Args: siloed_usdc_token_pool.AuthorizedCallerArgs{
-					AddedCallers: []common.Address{common.HexToAddress(input.USDCTokenPoolProxy)},
-				},
-			})
-			if err != nil {
-				return DeploySiloedUSDCLockReleaseOutput{}, fmt.Errorf("failed to authorize proxy on siloed pool: %w", err)
-			}
-			writes = append(writes, poolAuthReport.Output)
-		}
-
 		// Authorize siloed pool on each lockbox
 		for sel := range lockBoxes {
 			lbAddr := lockBoxes[sel]
@@ -134,57 +117,6 @@ var DeploySiloedUSDCLockRelease = cldf_ops.NewSequence(
 				return DeploySiloedUSDCLockReleaseOutput{}, fmt.Errorf("failed to authorize siloed pool on lockbox %s (chain %d): %w", lbAddr, sel, err)
 			}
 			writes = append(writes, authReport.Output)
-		}
-
-		// Update proxy pool addresses and lock-release mechanisms
-		if input.USDCTokenPoolProxy != "" && len(input.LockReleaseChainSelectors) > 0 {
-			poolsReport, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_proxy.GetPools, chain, contract_utils.FunctionInput[any]{
-				ChainSelector: input.ChainSelector,
-				Address:       common.HexToAddress(input.USDCTokenPoolProxy),
-			})
-			if err != nil {
-				return DeploySiloedUSDCLockReleaseOutput{}, fmt.Errorf("failed to get existing proxy pools: %w", err)
-			}
-			currentPools := poolsReport.Output
-			if currentPools.SiloedLockReleasePool.Hex() != common.HexToAddress(siloedPoolAddr).Hex() {
-				updatePoolsReport, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_proxy.UpdatePoolAddresses, chain, contract_utils.FunctionInput[usdc_token_pool_proxy.PoolAddresses]{
-					ChainSelector: input.ChainSelector,
-					Address:       common.HexToAddress(input.USDCTokenPoolProxy),
-					Args: usdc_token_pool_proxy.PoolAddresses{
-						CctpV1Pool:            currentPools.CctpV1Pool,
-						CctpV2Pool:            currentPools.CctpV2Pool,
-						CctpV2PoolWithCCV:     currentPools.CctpV2PoolWithCCV,
-						SiloedLockReleasePool: common.HexToAddress(siloedPoolAddr),
-					},
-				})
-				if err != nil {
-					return DeploySiloedUSDCLockReleaseOutput{}, fmt.Errorf("failed to update proxy pool addresses: %w", err)
-				}
-				writes = append(writes, updatePoolsReport.Output)
-			}
-
-			selectors := make([]uint64, 0, len(input.LockReleaseChainSelectors))
-			mechanisms := make([]uint8, 0, len(input.LockReleaseChainSelectors))
-			lockReleaseMechanism, err := convertMechanismToUint8("LOCK_RELEASE")
-			if err != nil {
-				return DeploySiloedUSDCLockReleaseOutput{}, fmt.Errorf("failed to resolve LOCK_RELEASE mechanism: %w", err)
-			}
-			for _, sel := range input.LockReleaseChainSelectors {
-				selectors = append(selectors, sel)
-				mechanisms = append(mechanisms, lockReleaseMechanism)
-			}
-			updateMechanismsReport, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_proxy.UpdateLockOrBurnMechanisms, chain, contract_utils.FunctionInput[usdc_token_pool_proxy.UpdateLockOrBurnMechanismsArgs]{
-				ChainSelector: input.ChainSelector,
-				Address:       common.HexToAddress(input.USDCTokenPoolProxy),
-				Args: usdc_token_pool_proxy.UpdateLockOrBurnMechanismsArgs{
-					RemoteChainSelectors: selectors,
-					Mechanisms:           mechanisms,
-				},
-			})
-			if err != nil {
-				return DeploySiloedUSDCLockReleaseOutput{}, fmt.Errorf("failed to set lock-release mechanisms on proxy: %w", err)
-			}
-			writes = append(writes, updateMechanismsReport.Output)
 		}
 
 		batchOps := make([]mcms_types.BatchOperation, 0)

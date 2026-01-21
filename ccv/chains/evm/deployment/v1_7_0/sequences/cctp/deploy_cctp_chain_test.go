@@ -205,7 +205,7 @@ func TestDeployCCTPChain(t *testing.T) {
 		FeeUSDCents:         10,
 		GasForVerification:  100000,
 		PayloadSizeBytes:    1000,
-		LockOrBurnMechanism: "CCTP_V2_WITH_CCV",
+		LockOrBurnMechanism: mechanismCCTPV2WithCCV,
 		RemoteDomain: adapters.RemoteDomain[[]byte]{
 			AllowedCallerOnDest:   common.LeftPadBytes(common.HexToAddress("0x0D").Bytes(), 32),
 			AllowedCallerOnSource: common.LeftPadBytes(common.HexToAddress("0x0E").Bytes(), 32),
@@ -225,7 +225,7 @@ func TestDeployCCTPChain(t *testing.T) {
 		FeeUSDCents:         5,
 		GasForVerification:  120000,
 		PayloadSizeBytes:    800,
-		LockOrBurnMechanism: "LOCK_RELEASE",
+		LockOrBurnMechanism: mechanismLockRelease,
 		RemoteDomain: adapters.RemoteDomain[[]byte]{
 			AllowedCallerOnDest:   common.LeftPadBytes(common.HexToAddress("0x10").Bytes(), 32),
 			AllowedCallerOnSource: common.LeftPadBytes(common.HexToAddress("0x11").Bytes(), 32),
@@ -363,13 +363,13 @@ func TestDeployCCTPChain(t *testing.T) {
 	require.NoError(t, err, "Failed to instantiate USDCTokenPoolProxy contract")
 	mechanism, err := usdcTokenPoolProxy.GetLockOrBurnMechanism(nil, remoteChainSelector)
 	require.NoError(t, err, "Failed to get lock or burn mechanism from USDCTokenPoolProxy")
-	expectedMechanism, err := convertMechanismToUint8("CCTP_V2_WITH_CCV")
+	expectedMechanism, err := convertMechanismToUint8(mechanismCCTPV2WithCCV)
 	require.NoError(t, err, "Failed to convert mechanism to uint8")
 	require.Equal(t, expectedMechanism, uint8(mechanism), "Lock or burn mechanism should match")
 
 	lockReleaseMechanism, err := usdcTokenPoolProxy.GetLockOrBurnMechanism(nil, lockReleaseChainSelector)
 	require.NoError(t, err, "Failed to get lock or burn mechanism from USDCTokenPoolProxy for lock release chain")
-	expectedLockReleaseMechanism, err := convertMechanismToUint8("LOCK_RELEASE")
+	expectedLockReleaseMechanism, err := convertMechanismToUint8(mechanismLockRelease)
 	require.NoError(t, err, "Failed to convert lock release mechanism to uint8")
 	require.Equal(t, expectedLockReleaseMechanism, uint8(lockReleaseMechanism), "Lock or burn mechanism should match for lock release chain")
 

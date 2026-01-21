@@ -14,6 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -33,6 +34,11 @@ var indexAddressesByTypeAndVersion = type_and_version.IndexAddressesByTypeAndVer
 
 const (
 	localTokenDecimals = 6
+
+	mechanismCCTPV1        = "CCTP_V1"
+	mechanismCCTPV2        = "CCTP_V2"
+	mechanismLockRelease   = "LOCK_RELEASE"
+	mechanismCCTPV2WithCCV = "CCTP_V2_WITH_CCV"
 )
 
 var (
@@ -67,14 +73,13 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 
 		lockReleaseSelectors := make([]uint64, 0)
 		for sel, cfg := range input.RemoteChains {
-			if cfg.LockOrBurnMechanism == "LOCK_RELEASE" {
+			if cfg.LockOrBurnMechanism == mechanismLockRelease {
 				lockReleaseSelectors = append(lockReleaseSelectors, sel)
 			}
 		}
 		isHomeChain := chain.Selector == chain_selectors.ETHEREUM_MAINNET.Selector || chain.Selector == chain_selectors.ETHEREUM_TESTNET_SEPOLIA.Selector
 		usdcTokenPoolProxyAddress := poolTypeAndVersionToAddr[deployment.NewTypeAndVersion(usdc_token_pool_proxy.ContractType, *usdc_token_pool_proxy.Version).String()]
 		siloedUSDCAddress := poolTypeAndVersionToAddr[deployment.NewTypeAndVersion(siloed_usdc_token_pool.ContractType, *siloed_usdc_token_pool.Version).String()]
-		shouldConfigureSiloedPool := false
 
 		// Deploy CCTPMessageTransmitterProxy if needed
 		if input.MessageTransmitterProxy == "" {
@@ -192,7 +197,6 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 				USDCToken:                 input.USDCToken,
 				Router:                    input.Router,
 				RMN:                       input.RMN,
-				USDCTokenPoolProxy:        usdcTokenPoolProxyAddress,
 				SiloedUSDCTokenPool:       siloedUSDCAddress,
 				LockReleaseChainSelectors: lockReleaseSelectors,
 			})
@@ -204,9 +208,6 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 			if siloedLockReleaseReport.Output.SiloedPoolAddress != "" {
 				siloedUSDCAddress = siloedLockReleaseReport.Output.SiloedPoolAddress
 			}
-		}
-		if isHomeChain && len(lockReleaseSelectors) > 0 && usdcTokenPoolProxyAddress == "" && siloedUSDCAddress != "" {
-			shouldConfigureSiloedPool = true
 		}
 
 		// Deploy USDCTokenPoolProxy if needed
@@ -250,6 +251,14 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 			writes = append(writes, setFeeAggregatorReport.Output)
 		}
 
+		if isHomeChain && len(lockReleaseSelectors) > 0 {
+			siloedPoolWrites, err := configureSiloedPoolProxyWiring(b, chain, input.ChainSelector, common.HexToAddress(usdcTokenPoolProxyAddress), common.HexToAddress(siloedUSDCAddress), lockReleaseSelectors)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to configure siloed pool proxy wiring: %w", err)
+			}
+			writes = append(writes, siloedPoolWrites...)
+		}
+
 		// Add CCTPVerifier as an authorized caller on the CCTPMessageTransmitterProxy
 		verifierApplyAuthorizedCallerUpdatesReport, err := cldf_ops.ExecuteOperation(b, cctp_message_transmitter_proxy.ApplyAuthorizedCallerUpdates, chain, contract_utils.FunctionInput[cctp_message_transmitter_proxy.AuthorizedCallerArgs]{
 			ChainSelector: chain.Selector,
@@ -279,66 +288,6 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to apply authorized caller updates to CCTPTokenPool: %w", err)
 		}
 		writes = append(writes, poolApplyAuthorizedCallerUpdatesReport.Output)
-
-		if shouldConfigureSiloedPool {
-			poolAuthReport, err := cldf_ops.ExecuteOperation(b, siloed_usdc_token_pool.ApplyAuthorizedCallerUpdates, chain, contract_utils.FunctionInput[siloed_usdc_token_pool.AuthorizedCallerArgs]{
-				ChainSelector: input.ChainSelector,
-				Address:       common.HexToAddress(siloedUSDCAddress),
-				Args: siloed_usdc_token_pool.AuthorizedCallerArgs{
-					AddedCallers: []common.Address{common.HexToAddress(usdcTokenPoolProxyAddress)},
-				},
-			})
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to authorize proxy on siloed pool: %w", err)
-			}
-			writes = append(writes, poolAuthReport.Output)
-
-			poolsReport, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_proxy.GetPools, chain, contract_utils.FunctionInput[any]{
-				ChainSelector: input.ChainSelector,
-				Address:       common.HexToAddress(usdcTokenPoolProxyAddress),
-			})
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to get existing proxy pools: %w", err)
-			}
-			currentPools := poolsReport.Output
-			if currentPools.SiloedLockReleasePool.Hex() != common.HexToAddress(siloedUSDCAddress).Hex() {
-				updatePoolsReport, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_proxy.UpdatePoolAddresses, chain, contract_utils.FunctionInput[usdc_token_pool_proxy.PoolAddresses]{
-					ChainSelector: input.ChainSelector,
-					Address:       common.HexToAddress(usdcTokenPoolProxyAddress),
-					Args: usdc_token_pool_proxy.PoolAddresses{
-						CctpV1Pool:            currentPools.CctpV1Pool,
-						CctpV2Pool:            currentPools.CctpV2Pool,
-						CctpV2PoolWithCCV:     currentPools.CctpV2PoolWithCCV,
-						SiloedLockReleasePool: common.HexToAddress(siloedUSDCAddress),
-					},
-				})
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to update proxy pool addresses: %w", err)
-				}
-				writes = append(writes, updatePoolsReport.Output)
-			}
-
-			lockReleaseMechanism, err := convertMechanismToUint8("LOCK_RELEASE")
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to resolve LOCK_RELEASE mechanism: %w", err)
-			}
-			lockReleaseMechanisms := make([]uint8, 0, len(lockReleaseSelectors))
-			for range lockReleaseSelectors {
-				lockReleaseMechanisms = append(lockReleaseMechanisms, lockReleaseMechanism)
-			}
-			updateMechanismsReport, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_proxy.UpdateLockOrBurnMechanisms, chain, contract_utils.FunctionInput[usdc_token_pool_proxy.UpdateLockOrBurnMechanismsArgs]{
-				ChainSelector: input.ChainSelector,
-				Address:       common.HexToAddress(usdcTokenPoolProxyAddress),
-				Args: usdc_token_pool_proxy.UpdateLockOrBurnMechanismsArgs{
-					RemoteChainSelectors: lockReleaseSelectors,
-					Mechanisms:           lockReleaseMechanisms,
-				},
-			})
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to set lock-release mechanisms on proxy: %w", err)
-			}
-			writes = append(writes, updateMechanismsReport.Output)
-		}
 
 		// Set inbound implementation on the CCTPVerifierResolver
 		committeeVerifierVersionTagReport, err := cldf_ops.ExecuteOperation(b, cctp_verifier.GetVersionTag, chain, contract_utils.FunctionInput[any]{
@@ -375,7 +324,7 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 				DestChainSelector: remoteChainSelector,
 				Verifier:          common.HexToAddress(cctpVerifierAddress),
 			})
-			if remoteChain.LockOrBurnMechanism != "LOCK_RELEASE" {
+			if remoteChain.LockOrBurnMechanism != mechanismLockRelease {
 				remoteChainSelectors = append(remoteChainSelectors, remoteChainSelector)
 				mechanism, err := convertMechanismToUint8(remoteChain.LockOrBurnMechanism)
 				if err != nil {
@@ -496,6 +445,98 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 	},
 )
 
+func configureSiloedPoolProxyWiring(
+	b cldf_ops.Bundle,
+	chain evm.Chain,
+	chainSelector uint64,
+	proxyAddr common.Address,
+	siloedPoolAddr common.Address,
+	lockReleaseSelectors []uint64,
+) ([]contract_utils.WriteOutput, error) {
+	writes := make([]contract_utils.WriteOutput, 0)
+	// Get authorized callers on siloed pool.
+	callersReport, err := cldf_ops.ExecuteOperation(b, siloed_usdc_token_pool.GetAllAuthorizedCallers, chain, contract_utils.FunctionInput[any]{
+		ChainSelector: chainSelector,
+		Address:       siloedPoolAddr,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get authorized callers from siloed pool: %w", err)
+	}
+	// Authorize proxy if not already authorized.
+	if !containsAddress(callersReport.Output, proxyAddr) {
+		poolAuthReport, err := cldf_ops.ExecuteOperation(b, siloed_usdc_token_pool.ApplyAuthorizedCallerUpdates, chain, contract_utils.FunctionInput[siloed_usdc_token_pool.AuthorizedCallerArgs]{
+			ChainSelector: chainSelector,
+			Address:       siloedPoolAddr,
+			Args: siloed_usdc_token_pool.AuthorizedCallerArgs{
+				AddedCallers: []common.Address{proxyAddr},
+			},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to authorize proxy on siloed pool: %w", err)
+		}
+		writes = append(writes, poolAuthReport.Output)
+	}
+	// Get current pools from proxy.
+	poolsReport, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_proxy.GetPools, chain, contract_utils.FunctionInput[any]{
+		ChainSelector: chainSelector,
+		Address:       proxyAddr,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get existing proxy pools: %w", err)
+	}
+	currentPools := poolsReport.Output
+	// If siloed pool address is not set correctly, update it.
+	if currentPools.SiloedLockReleasePool != siloedPoolAddr {
+		updatePoolsReport, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_proxy.UpdatePoolAddresses, chain, contract_utils.FunctionInput[usdc_token_pool_proxy.PoolAddresses]{
+			ChainSelector: chainSelector,
+			Address:       proxyAddr,
+			Args: usdc_token_pool_proxy.PoolAddresses{
+				CctpV1Pool:            currentPools.CctpV1Pool,
+				CctpV2Pool:            currentPools.CctpV2Pool,
+				CctpV2PoolWithCCV:     currentPools.CctpV2PoolWithCCV,
+				SiloedLockReleasePool: siloedPoolAddr,
+			},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to update proxy pool addresses: %w", err)
+		}
+		writes = append(writes, updatePoolsReport.Output)
+	}
+
+	// Set lock-release mechanisms for relevant chains.
+	lockReleaseMechanism, err := convertMechanismToUint8(mechanismLockRelease)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve lock-release mechanism: %w", err)
+	}
+	lockReleaseMechanisms := make([]uint8, len(lockReleaseSelectors))
+	for i := range lockReleaseMechanisms {
+		lockReleaseMechanisms[i] = lockReleaseMechanism
+	}
+	updateMechanismsReport, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_proxy.UpdateLockOrBurnMechanisms, chain, contract_utils.FunctionInput[usdc_token_pool_proxy.UpdateLockOrBurnMechanismsArgs]{
+		ChainSelector: chainSelector,
+		Address:       proxyAddr,
+		Args: usdc_token_pool_proxy.UpdateLockOrBurnMechanismsArgs{
+			RemoteChainSelectors: lockReleaseSelectors,
+			Mechanisms:           lockReleaseMechanisms,
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to set lock-release mechanisms on proxy: %w", err)
+	}
+	writes = append(writes, updateMechanismsReport.Output)
+
+	return writes, nil
+}
+
+func containsAddress(addresses []common.Address, needle common.Address) bool {
+	for _, address := range addresses {
+		if address == needle {
+			return true
+		}
+	}
+	return false
+}
+
 func toBytes32LeftPad(b []byte) ([32]byte, error) {
 	if len(b) > 32 {
 		return [32]byte{}, errors.New("byte slice is too long")
@@ -507,15 +548,15 @@ func toBytes32LeftPad(b []byte) ([32]byte, error) {
 
 func convertMechanismToUint8(mechanism string) (uint8, error) {
 	switch mechanism {
-	case "CCTP_V1":
+	case mechanismCCTPV1:
 		return 1, nil
-	case "CCTP_V2":
+	case mechanismCCTPV2:
 		return 2, nil
-	case "LOCK_RELEASE":
+	case mechanismLockRelease:
 		return 3, nil
-	case "CCTP_V2_WITH_CCV":
+	case mechanismCCTPV2WithCCV:
 		return 4, nil
 	default:
-		return 0, fmt.Errorf("invalid mechanism, must be CCTP_V1, CCTP_V2, LOCK_RELEASE, or CCTP_V2_WITH_CCV: %s", mechanism)
+		return 0, fmt.Errorf("invalid mechanism, must be %s, %s, %s, or %s: %s", mechanismCCTPV1, mechanismCCTPV2, mechanismLockRelease, mechanismCCTPV2WithCCV, mechanism)
 	}
 }
