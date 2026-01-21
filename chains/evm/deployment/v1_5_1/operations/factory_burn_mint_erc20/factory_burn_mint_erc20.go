@@ -24,11 +24,11 @@ type ConstructorArgs struct {
 
 var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Name:             "factory_burn_mint_erc20:deploy",
-	Version:          utils.Version_1_0_0,
+	Version:          utils.Version_1_5_1,
 	Description:      "Deploys the FactoryBurnMintERC20 token contract",
 	ContractMetadata: factory_burn_mint_erc20.FactoryBurnMintERC20MetaData,
 	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
-		cldf_deployment.NewTypeAndVersion(ContractType, *utils.Version_1_0_0).String(): {
+		cldf_deployment.NewTypeAndVersion(ContractType, *utils.Version_1_5_1).String(): {
 			EVM: common.FromHex(factory_burn_mint_erc20.FactoryBurnMintERC20Bin),
 		},
 	},
