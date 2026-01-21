@@ -19,13 +19,13 @@ import (
 	usdc_token_pool_cctp_v2_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/usdc_token_pool_cctp_v2"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/mock_usdc_token_messenger"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/mock_usdc_token_transmitter"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/factory_burn_mint_erc20"
 	cctp_message_transmitter_proxy_binding "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_2/cctp_message_transmitter_proxy"
 	usdc_token_pool_cctp_v2_binding "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_4/usdc_token_pool_cctp_v2"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
 	deploymentutils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
+	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc20"
 )
 
 func TestUSDCTokenPoolCCTPV2DeployChangeset_ProvidedTokenAddress(t *testing.T) {
@@ -39,19 +39,19 @@ func TestUSDCTokenPoolCCTPV2DeployChangeset_ProvidedTokenAddress(t *testing.T) {
 	e.DataStore = ds.Seal()
 	evmChain := e.BlockChains.EVMChains()[chainSelector]
 
-	tokenAddress, tx, _, err := factory_burn_mint_erc20.DeployFactoryBurnMintERC20(
+	// Deploy a mock USDC token with 6 decimals (USDC pool validates decimals)
+	tokenAddress, tx, _, err := burn_mint_erc20.DeployBurnMintERC20(
 		evmChain.DeployerKey,
 		evmChain.Client,
-		"TestToken",
-		"TEST6",
-		6,
-		big.NewInt(0),             // maxSupply (0 = unlimited)
-		big.NewInt(0),             // preMint
-		evmChain.DeployerKey.From, // newOwner
+		"TestUSDC",
+		"USDC",
+		6,             // decimals - must be 6 for USDC pool compatibility
+		big.NewInt(0), // maxSupply (0 = unlimited)
+		big.NewInt(0), // preMint
 	)
-	require.NoError(t, err, "Failed to deploy FactoryBurnMintERC20 token")
+	require.NoError(t, err, "Failed to deploy mock USDC token")
 	_, err = evmChain.Confirm(tx)
-	require.NoError(t, err, "Failed to confirm FactoryBurnMintERC20 token deployment transaction")
+	require.NoError(t, err, "Failed to confirm token deployment transaction")
 
 	// Add the USDCToken address to the datastore so that it can be used in the changeset
 	err = ds.Addresses().Add(datastore.AddressRef{
@@ -230,19 +230,19 @@ func TestUSDCTokenPoolCCTPV2DeployChangeset_StoredTokenAddress(t *testing.T) {
 	e.DataStore = ds.Seal()
 	evmChain := e.BlockChains.EVMChains()[chainSelector]
 
-	tokenAddress, tx, _, err := factory_burn_mint_erc20.DeployFactoryBurnMintERC20(
+	// Deploy a mock USDC token with 6 decimals (USDC pool validates decimals)
+	tokenAddress, tx, _, err := burn_mint_erc20.DeployBurnMintERC20(
 		evmChain.DeployerKey,
 		evmChain.Client,
-		"TestToken",
-		"TEST6",
-		6,
-		big.NewInt(0),             // maxSupply (0 = unlimited)
-		big.NewInt(0),             // preMint
-		evmChain.DeployerKey.From, // newOwner
+		"TestUSDC",
+		"USDC",
+		6,             // decimals - must be 6 for USDC pool compatibility
+		big.NewInt(0), // maxSupply (0 = unlimited)
+		big.NewInt(0), // preMint
 	)
-	require.NoError(t, err, "Failed to deploy FactoryBurnMintERC20 token")
+	require.NoError(t, err, "Failed to deploy mock USDC token")
 	_, err = evmChain.Confirm(tx)
-	require.NoError(t, err, "Failed to confirm FactoryBurnMintERC20 token deployment transaction")
+	require.NoError(t, err, "Failed to confirm token deployment transaction")
 	err = ds.Addresses().Add(datastore.AddressRef{
 		Type:          datastore.ContractType("USDCToken"),
 		Version:       semver.MustParse("1.0.0"),
@@ -419,19 +419,19 @@ func TestUSDCTokenPoolCCTPV2DeployChangeset_InvalidTokenAddress(t *testing.T) {
 	e.DataStore = ds.Seal()
 	evmChain := e.BlockChains.EVMChains()[chainSelector]
 
-	tokenAddress, tx, _, err := factory_burn_mint_erc20.DeployFactoryBurnMintERC20(
+	// Deploy a mock USDC token with 6 decimals (USDC pool validates decimals)
+	tokenAddress, tx, _, err := burn_mint_erc20.DeployBurnMintERC20(
 		evmChain.DeployerKey,
 		evmChain.Client,
-		"TestToken",
-		"TEST6",
-		6,
-		big.NewInt(0),             // maxSupply (0 = unlimited)
-		big.NewInt(0),             // preMint
-		evmChain.DeployerKey.From, // newOwner
+		"TestUSDC",
+		"USDC",
+		6,             // decimals - must be 6 for USDC pool compatibility
+		big.NewInt(0), // maxSupply (0 = unlimited)
+		big.NewInt(0), // preMint
 	)
-	require.NoError(t, err, "Failed to deploy FactoryBurnMintERC20 token")
+	require.NoError(t, err, "Failed to deploy mock USDC token")
 	_, err = evmChain.Confirm(tx)
-	require.NoError(t, err, "Failed to confirm FactoryBurnMintERC20 token deployment transaction")
+	require.NoError(t, err, "Failed to confirm token deployment transaction")
 	err = ds.Addresses().Add(datastore.AddressRef{
 		Type:          "USDCToken",
 		Version:       semver.MustParse("1.0.0"),
