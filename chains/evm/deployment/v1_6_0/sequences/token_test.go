@@ -18,7 +18,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20_with_drip"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/erc20"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/factory_burn_mint_erc20"
 	bnm_bindings "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc20"
 
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
@@ -64,18 +63,6 @@ func TestEVMTokenDeployments(t *testing.T) {
 			ccipAdmin:      "0x1111111111111111111111111111111111111111",
 			supply:         big.NewInt(0).Mul(big.NewInt(1e9), big.NewInt(1e18)), // 1 billion tokens
 			preMint:        big.NewInt(0).Mul(big.NewInt(1e6), big.NewInt(1e18)), // 1 million tokens
-			requiresSupply: true,
-		},
-		{
-			name:           "FactoryBurnMintERC20Token",
-			tokenType:      factory_burn_mint_erc20.ContractType,
-			tokenName:      "Test Factory BurnMint ERC20",
-			tokenSymbol:    "TFBMERC20",
-			decimals:       6,
-			ccipAdmin:      "0x1111111111111111111111111111111111111111",
-			supply:         big.NewInt(0).Mul(big.NewInt(1e9), big.NewInt(1e18)),
-			preMint:        big.NewInt(0).Mul(big.NewInt(1e6), big.NewInt(1e18)),
-			requiresOwner:  true,
 			requiresSupply: true,
 		},
 		{
