@@ -9,9 +9,10 @@ echo " └───────────────────────�
 # The offRamp uses a specific lower optimization runs value. All other contracts use the default value
 # as specified in the foundry.toml.
 OPTIMIZE_RUNS_TOKEN_POOL=50000
-OPTIMIZE_RUNS_ONRAMP=5000
+OPTIMIZE_RUNS_ONRAMP=1500
 OPTIMIZE_RUNS_OFFRAMP=30000
 OPTIMIZE_RUNS_LOMBARD_POOL=20000
+OPTIMIZE_RUNS_FEE_QUOTER=40000
 
 PROJECT="ccip"
 FOUNDRY_PROJECT_SUFFIX="-compile"
@@ -65,7 +66,10 @@ function getOptimizations() {
         optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_OFFRAMP"
         ;;
       "LombardTokenPool")
-        optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_LOMBARD_POOL"
+          optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_LOMBARD_POOL"
+          ;;
+      "FeeQuoter")
+        optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_FEE_QUOTER"
         ;;
     esac
 
