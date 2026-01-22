@@ -158,7 +158,7 @@ contract e2e_lombard is OnRampSetup {
     // │                        Lombard pool                          │
     // ================================================================
 
-    AdvancedPoolHooks hooks = new AdvancedPoolHooks(new address[](0), 0);
+    AdvancedPoolHooks hooks = new AdvancedPoolHooks(new address[](0), 0, address(0));
     AdvancedPoolHooks.CCVConfigArg[] memory ccvConfigs = new AdvancedPoolHooks.CCVConfigArg[](2);
 
     address[] memory required = new address[](2);
