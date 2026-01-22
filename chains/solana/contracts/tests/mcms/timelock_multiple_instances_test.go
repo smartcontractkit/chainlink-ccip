@@ -31,7 +31,6 @@ type TimelockInstance struct {
 }
 
 func TestTimelockMultipleInstances(t *testing.T) {
-	t.Parallel()
 	ctx := tests.Context(t)
 
 	timelock.SetProgramID(config.TimelockProgram)

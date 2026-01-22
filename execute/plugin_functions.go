@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"slices"
 	"sort"
 	"time"
 
@@ -386,9 +387,7 @@ func combineReportsAndMessages(
 			continue
 		}
 
-		sort.Slice(executedMsgsInReportRange, func(i, j int) bool {
-			return executedMsgsInReportRange[i] < executedMsgsInReportRange[j]
-		})
+		slices.Sort(executedMsgsInReportRange)
 		report.ExecutedMessages = append(reports[i].ExecutedMessages, executedMsgsInReportRange...)
 		pending = append(pending, report)
 	}
@@ -467,7 +466,8 @@ func computeMessageObservationsConsensus(
 				}
 
 				if msg == nil {
-					lggr.Errorw("more than one message reached consensus for a sequence number, skipping it",
+					lggr.Errorw("more than one message reached consensus for a sequence number, skipping it. "+
+						"Compare the diff between the message fields to debug what is causing the issue",
 						"chain", chain, "seqNum", seqNum, "msgs", msgsWithConsensus)
 				}
 
@@ -479,7 +479,8 @@ func computeMessageObservationsConsensus(
 				}
 
 			default:
-				lggr.Errorw("more than one message reached consensus for a sequence number, skipping it",
+				lggr.Errorw("more than than 2 message reached consensus for a sequence number, "+
+					"skipping it. Compare the diff between the message fields to debug what is causing the issue",
 					"chain", chain, "seqNum", seqNum, "msgs", msgsWithConsensus)
 			}
 		}
@@ -568,7 +569,7 @@ func computeCommitObservationsConsensus(
 			}
 			executedMessages = append(executedMessages, seqNum)
 		}
-		sort.Slice(executedMessages, func(i, j int) bool { return executedMessages[i] < executedMessages[j] })
+		slices.Sort(executedMessages)
 
 		if _, ok := result[mr.SourceChain]; !ok {
 			result[mr.SourceChain] = make([]exectypes.CommitData, 0)
@@ -853,7 +854,7 @@ func computeNoncesConsensus(
 			continue
 		}
 
-		sort.Slice(nonces, func(i, j int) bool { return nonces[i] < nonces[j] })
+		slices.Sort(nonces)
 		consensusNonce := nonces[fChainDest]
 
 		if _, ok := consensusNonces[pair.chain]; !ok {

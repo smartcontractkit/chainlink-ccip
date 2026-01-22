@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -21,14 +22,13 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
-
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccip/consts"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
@@ -557,16 +557,14 @@ func (o observerImpl) ObserveLatestOnRampSeqNums(ctx context.Context) []pluginty
 	supportedSourceChains := mapset.NewSet(allSourceChains...).
 		Intersect(supportedChains).ToSlice()
 
-	sort.Slice(supportedSourceChains, func(i, j int) bool { return supportedSourceChains[i] < supportedSourceChains[j] })
+	slices.Sort(supportedSourceChains)
 
 	mu := &sync.Mutex{}
 	latestOnRampSeqNums := make([]plugintypes.SeqNumChain, 0, len(supportedSourceChains))
 
 	wg := &sync.WaitGroup{}
 	for _, sourceChain := range supportedSourceChains {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			latestOnRampSeqNum, err := o.ccipReader.LatestMsgSeqNum(ctx, sourceChain)
 			if err != nil {
 				if isNoBindingsError(err) {
@@ -585,7 +583,7 @@ func (o observerImpl) ObserveLatestOnRampSeqNums(ctx context.Context) []pluginty
 				plugintypes.NewSeqNumChain(sourceChain, latestOnRampSeqNum),
 			)
 			mu.Unlock()
-		}()
+		})
 	}
 	wg.Wait()
 
@@ -614,9 +612,7 @@ func (o observerImpl) ObserveMerkleRoots(
 	wg := sync.WaitGroup{}
 	for _, chainRange := range ranges {
 		if supportedChains.Contains(chainRange.ChainSel) {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 				msgs, err := o.ccipReader.MsgsBetweenSeqNums(ctx, chainRange.ChainSel, chainRange.SeqNumRange)
 				if err != nil {
 					lggr.Warnw("call to MsgsBetweenSeqNums failed", "err", err)
@@ -676,7 +672,7 @@ func (o observerImpl) ObserveMerkleRoots(
 				rootsMu.Lock()
 				roots = append(roots, merkleRoot)
 				rootsMu.Unlock()
-			}()
+			})
 		}
 	}
 	wg.Wait()

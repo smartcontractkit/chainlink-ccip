@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
@@ -514,12 +515,7 @@ func (m *mockCCTPv2HTTPClient) wasCalledWith(
 		sourceDomain:  domain,
 		txHash:        txHash,
 	}
-	for _, call := range m.calls {
-		if call == params {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(m.calls, params)
 }
 
 func TestCCTPv2MessageToTokenData(t *testing.T) {

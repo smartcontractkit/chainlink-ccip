@@ -26,7 +26,6 @@ import (
 )
 
 func TestTimelockScheduleAndExecute(t *testing.T) {
-	t.Parallel()
 	ctx := tests.Context(t)
 
 	timelock.SetProgramID(config.TimelockProgram)
@@ -689,10 +688,7 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 
 			for i := 0; i < len(ixs); i += chunkSize {
 				wg.Add(1)
-				end := i + chunkSize
-				if end > len(ixs) {
-					end = len(ixs)
-				}
+				end := min(i+chunkSize, len(ixs))
 				chunk := ixs[i:end]
 
 				go func(chunk []solana.Instruction) {

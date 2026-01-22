@@ -4,15 +4,15 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"maps"
 
 	sel "github.com/smartcontractkit/chain-selectors"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
-
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccip/consts"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
-	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
@@ -231,9 +231,7 @@ func AllAvailableDomains() map[uint64]uint32 {
 	}
 
 	destDomains := make(map[uint64]uint32)
-	for k, v := range CCTPDestDomains {
-		destDomains[k] = v
-	}
+	maps.Copy(destDomains, CCTPDestDomains)
 
 	for i, chainID := range chainIDs {
 		chainSelector, _ := sel.SelectorFromChainId(chainID)

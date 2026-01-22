@@ -6,7 +6,6 @@ import (
 	"math"
 	"math/rand"
 	"slices"
-	"sort"
 	"testing"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -18,9 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-
-	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
-
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccip/consts"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
@@ -47,7 +44,7 @@ func TestPlugin_RoleDonE2E_NoPrevOutcome(t *testing.T) {
 
 	s := newRoleDonTestSetup(t, 3, 7, 1)
 	const numUnderstaffedChains = 1
-	for i := 0; i < numUnderstaffedChains; i++ {
+	for i := range numUnderstaffedChains {
 		s.fChain[s.sourceChains[i]] = 2 // <--- we set fChain to 2, that requires at least 2f+1=5 oracles for this chain
 		// we set a maximum of 2*fChain+2=4 originally within newRoleDonTestSetup, we expect no results for the chain
 	}
@@ -72,7 +69,7 @@ func TestPlugin_RoleDonE2E_NoPrevOutcome(t *testing.T) {
 		var oracleSourceChains []cciptypes.ChainSelector
 		if oracleSourceChainsSet.Cardinality() > 0 {
 			oracleSourceChains = oracleSourceChainsSet.ToSlice()
-			sort.Slice(oracleSourceChains, func(i, j int) bool { return oracleSourceChains[i] < oracleSourceChains[j] })
+			slices.Sort(oracleSourceChains)
 		}
 
 		// Home Chain Expectations - Every oracle should be able to read
@@ -186,7 +183,7 @@ func TestPlugin_RoleDonE2E_RangesAndPricesSelectedPreviously(t *testing.T) {
 		var oracleSourceChains []cciptypes.ChainSelector
 		if oracleSourceChainsSet.Cardinality() > 0 {
 			oracleSourceChains = oracleSourceChainsSet.ToSlice()
-			sort.Slice(oracleSourceChains, func(i, j int) bool { return oracleSourceChains[i] < oracleSourceChains[j] })
+			slices.Sort(oracleSourceChains)
 		}
 
 		// Home Chain Expectations - Every oracle should be able to read
@@ -305,7 +302,7 @@ func TestPlugin_RoleDonE2E_Discovery(t *testing.T) {
 		var oracleSourceChains []cciptypes.ChainSelector
 		if oracleSourceChainsSet.Cardinality() > 0 {
 			oracleSourceChains = oracleSourceChainsSet.ToSlice()
-			sort.Slice(oracleSourceChains, func(i, j int) bool { return oracleSourceChains[i] < oracleSourceChains[j] })
+			slices.Sort(oracleSourceChains)
 		}
 
 		// Home Chain Expectations - Every oracle should be able to read
@@ -482,10 +479,10 @@ func newRoleDonTestSetup(t *testing.T, numSourceChains, numOracles, fChain int) 
 		t.Fatal("too many source chains")
 	}
 	s.sourceChains = make([]cciptypes.ChainSelector, numSourceChains)
-	for i := 0; i < numSourceChains; i++ {
+	for i := range numSourceChains {
 		s.sourceChains[i] = cciptypes.ChainSelector(chainsel.ALL[i].Selector)
 	}
-	sort.Slice(s.sourceChains, func(i, j int) bool { return s.sourceChains[i] < s.sourceChains[j] })
+	slices.Sort(s.sourceChains)
 
 	s.destChain = cciptypes.ChainSelector(chainsel.ALL[len(chainsel.ALL)-1].Selector)
 
@@ -534,7 +531,7 @@ func newRoleDonTestSetup(t *testing.T, numSourceChains, numOracles, fChain int) 
 // example: getRandomPermutation({1,2,3,4,5}, 2) = {4, 1}
 func getRandomPermutation[T any](sl []T, lim int) []T {
 	var cp []T
-	for i := 0; i < lim; i++ {
+	for i := range lim {
 		cp = append(cp, sl[i])
 	}
 	rand.Shuffle(len(sl), func(i, j int) { sl[i], sl[j] = sl[j], sl[i] })

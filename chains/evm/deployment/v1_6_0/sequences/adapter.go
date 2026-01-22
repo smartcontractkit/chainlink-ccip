@@ -1,17 +1,22 @@
 package sequences
 
 import (
+	"math/big"
+
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	link "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
+	weth "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
 	pingpongdapp "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/ping_pong_dapp"
+	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -30,6 +35,7 @@ func init() {
 	ccipapi.GetPingPongAdapterRegistry().RegisterPingPongAdapter(chain_selectors.FamilyEVM, v, &EVMAdapter{})
 	deployops.GetRegistry().RegisterDeployer(chain_selectors.FamilyEVM, v, &EVMAdapter{})
 	deployops.GetTransferOwnershipRegistry().RegisterAdapter(chain_selectors.FamilyEVM, v, &EVMAdapter{})
+	tokensapi.GetTokenAdapterRegistry().RegisterTokenAdapter(chain_selectors.FamilyEVM, v, &EVMAdapter{})
 }
 
 type EVMAdapter struct{}
@@ -94,6 +100,21 @@ func (a *EVMAdapter) GetRouterAddress(ds datastore.DataStore, chainSelector uint
 		return nil, err
 	}
 	return addr, nil
+}
+
+// GetDefaultTokenPrices returns default fee token prices for EVM chains.
+// Returns a map of contract type to USD price (18 decimals).
+// The caller resolves contract types to addresses using the datastore.
+func (a *EVMAdapter) GetDefaultTokenPrices() map[datastore.ContractType]*big.Int {
+	// Default price: $20 per token (20 * 1e18)
+	// Realistic price for LINK/WETH in test environments
+	// Combined with low gas price (~$1 USD fee), this gives ~0.05 LINK per send
+	defaultPrice := new(big.Int).Mul(big.NewInt(20), big.NewInt(1e18))
+
+	return map[datastore.ContractType]*big.Int{
+		datastore.ContractType(link.ContractType): defaultPrice,
+		datastore.ContractType(weth.ContractType): defaultPrice,
+	}
 }
 
 func (a *EVMAdapter) GetPingPongDemoAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error) {

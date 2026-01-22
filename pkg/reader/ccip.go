@@ -18,12 +18,11 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccip/consts"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-
 	"github.com/smartcontractkit/chainlink-ccip/pkg/addressbook"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 )
@@ -470,9 +469,7 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 		// Capture loop variable
 		chain := chainSelector
 
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 
 			chainAccessor, err := getChainAccessor(r.accessors, chain)
 			if err != nil {
@@ -511,7 +508,7 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 			mu.Lock()
 			prices[chain] = cciptypes.NewBigInt(price.Value)
 			mu.Unlock()
-		}()
+		})
 	}
 
 	wg.Wait()
@@ -1377,7 +1374,7 @@ func (r *ccipChainReader) processOfframpResults(
 	// Define processors for each expected result
 	processors := []resultProcessor{
 		// CommitLatestOCRConfig
-		func(val interface{}) error {
+		func(val any) error {
 			typed, ok := val.(*cciptypes.OCRConfigResponse)
 			if !ok {
 				return fmt.Errorf("invalid type for CommitLatestOCRConfig: %T", val)
@@ -1386,7 +1383,7 @@ func (r *ccipChainReader) processOfframpResults(
 			return nil
 		},
 		// ExecLatestOCRConfig
-		func(val interface{}) error {
+		func(val any) error {
 			typed, ok := val.(*cciptypes.OCRConfigResponse)
 			if !ok {
 				return fmt.Errorf("invalid type for ExecLatestOCRConfig: %T", val)
@@ -1395,7 +1392,7 @@ func (r *ccipChainReader) processOfframpResults(
 			return nil
 		},
 		// StaticConfig
-		func(val interface{}) error {
+		func(val any) error {
 			typed, ok := val.(*cciptypes.OffRampStaticChainConfig)
 			if !ok {
 				return fmt.Errorf("invalid type for StaticConfig: %T", val)
@@ -1404,7 +1401,7 @@ func (r *ccipChainReader) processOfframpResults(
 			return nil
 		},
 		// DynamicConfig
-		func(val interface{}) error {
+		func(val any) error {
 			typed, ok := val.(*cciptypes.OffRampDynamicChainConfig)
 			if !ok {
 				return fmt.Errorf("invalid type for DynamicConfig: %T", val)

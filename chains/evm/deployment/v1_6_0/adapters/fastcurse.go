@@ -2,6 +2,7 @@ package adapters
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -83,10 +84,8 @@ func (ca *CurseAdapter) IsSubjectCursedOnChain(e cldf.Environment, selector uint
 	if err != nil {
 		return false, fmt.Errorf("failed to get cursed subjects on chain %d: %w", chain.Selector, err)
 	}
-	for _, s := range cursedSubjects {
-		if s == subject {
-			return true, nil
-		}
+	if slices.Contains(cursedSubjects, subject) {
+		return true, nil
 	}
 	return false, nil
 }

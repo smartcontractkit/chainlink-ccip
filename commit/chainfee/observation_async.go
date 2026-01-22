@@ -2,7 +2,7 @@ package chainfee
 
 import (
 	"context"
-	"sort"
+	"slices"
 	"sync"
 	"time"
 
@@ -124,7 +124,7 @@ func (o *baseObserver) getEnabledSourceChains(ctx context.Context) ([]cciptypes.
 		}
 	}
 
-	sort.Slice(enabledSourceChains, func(i, j int) bool { return enabledSourceChains[i] < enabledSourceChains[j] })
+	slices.Sort(enabledSourceChains)
 	return enabledSourceChains, nil
 }
 
@@ -146,7 +146,7 @@ func (o *baseObserver) getSupportedSourceChains() ([]cciptypes.ChainSelector, er
 	}
 
 	supportedChainsSlice := supportedChains.ToSlice()
-	sort.Slice(supportedChainsSlice, func(i, j int) bool { return supportedChainsSlice[i] < supportedChainsSlice[j] })
+	slices.Sort(supportedChainsSlice)
 
 	return supportedChainsSlice, nil
 }

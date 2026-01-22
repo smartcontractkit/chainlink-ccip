@@ -7,30 +7,25 @@ import (
 	"testing"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-ccip/internal"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
-
-	"github.com/stretchr/testify/mock"
-
 	mapset "github.com/deckarep/golang-set/v2"
-	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
-
-	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
-	mock_home_chain "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/libocr/commontypes"
+	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
-
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccip/consts"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
+	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
+	"github.com/smartcontractkit/chainlink-ccip/internal"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
+	mock_home_chain "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
@@ -146,7 +141,7 @@ var defaultChainConfig = reader.ChainConfig{
 // sameObs returns n observations with the same observation but from different oracle ids
 func sameObs(n int, obs Observation) []plugincommon.AttributedObservation[Observation] {
 	aos := make([]plugincommon.AttributedObservation[Observation], n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		aos[i] = plugincommon.AttributedObservation[Observation]{OracleID: commontypes.OracleID(i), Observation: obs}
 	}
 	return aos
@@ -352,7 +347,7 @@ func TestProcessor_Outcome(t *testing.T) {
 			name: "Empty Observations with only FChain and TimestampNow",
 			aos: func() []plugincommon.AttributedObservation[Observation] {
 				aos := make([]plugincommon.AttributedObservation[Observation], numOracles)
-				for i := 0; i < numOracles; i++ {
+				for i := range numOracles {
 					aos[i] = plugincommon.AttributedObservation[Observation]{
 						OracleID: commontypes.OracleID(i),
 						Observation: Observation{

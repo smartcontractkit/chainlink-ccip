@@ -100,7 +100,7 @@ func GenerateEthPrivateKeys(n int) ([]string, error) {
 
 	privateKeys := make([]string, n)
 
-	for i := 0; i < n; i++ {
+	for i := range n {
 		// Generate a valid private key
 		pk, err := generateValidPrivateKey()
 		if err != nil {

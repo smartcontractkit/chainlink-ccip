@@ -421,7 +421,7 @@ func Test_LatencyAndErrors(t *testing.T) {
 		method := "observation"
 
 		passCounter := 10
-		for i := 0; i < passCounter; i++ {
+		for range passCounter {
 			reporter.TrackProcessorLatency(processor, method, time.Second, nil)
 		}
 		l2 := internal.CounterFromHistogramByLabels(t, reporter.processorLatencyHistogram, "evm", chainID, processor, method)
@@ -433,7 +433,7 @@ func Test_LatencyAndErrors(t *testing.T) {
 		method := "outcome"
 
 		errCounter := 5
-		for i := 0; i < errCounter; i++ {
+		for range errCounter {
 			reporter.TrackProcessorLatency(processor, method, time.Second, fmt.Errorf("error"))
 		}
 		errs := testutil.ToFloat64(
