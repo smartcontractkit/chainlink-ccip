@@ -6,6 +6,7 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
+	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/burn_mint_token_pool"
 	cctp_message_transmitter_proxy_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/cctp_message_transmitter_proxy"
 	cctp_through_ccv_token_pool_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/cctp_through_ccv_token_pool"
@@ -169,7 +170,7 @@ func basicDeployCCTPInput(t *testing.T, e *deployment.Environment, chainSelector
 }
 
 func TestDeployCCTPChain(t *testing.T) {
-	chainSelector := uint64(5009297550715157269)
+	chainSelector := chain_selectors.ETHEREUM_TESTNET_SEPOLIA.Selector
 	e, err := environment.New(t.Context(),
 		environment.WithEVMSimulated(t, []uint64{chainSelector}),
 	)
@@ -412,4 +413,51 @@ func TestDeployCCTPChain(t *testing.T) {
 	var expectedMintRecipientOnDest [32]byte
 	copy(expectedMintRecipientOnDest[:], common.LeftPadBytes(common.HexToAddress("0x0F").Bytes(), 32))
 	require.Equal(t, expectedMintRecipientOnDest, domain.MintRecipientOnDest, "MintRecipientOnDest should match")
+}
+
+func TestDeployCCTPChainRejectsLockReleaseOnNonHomeChain(t *testing.T) {
+	chainSelector := chain_selectors.ETHEREUM_MAINNET_ARBITRUM_1.Selector
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{chainSelector}),
+	)
+	require.NoError(t, err, "Failed to create environment")
+	require.NotNil(t, e, "Environment should be created")
+	e.DataStore = datastore.NewMemoryDataStore().Seal()
+
+	setup := setupCCTPTestEnvironment(t, e, chainSelector)
+
+	indexAddressesByTypeAndVersion = func(_ cldf_ops.Bundle, _ evm.Chain, _ []string) (map[string]string, error) {
+		return map[string]string{}, nil
+	}
+
+	input := basicDeployCCTPInput(t, e, chainSelector, setup)
+	lockReleaseChainSelector := uint64(6433500567565415381)
+	input.RemoteChains[lockReleaseChainSelector] = adapters.RemoteCCTPChainConfig[string, []byte]{
+		FeeUSDCents:         5,
+		GasForVerification:  120000,
+		PayloadSizeBytes:    800,
+		LockOrBurnMechanism: mechanismLockRelease,
+		RemoteDomain: adapters.RemoteDomain[[]byte]{
+			AllowedCallerOnDest:   common.LeftPadBytes(common.HexToAddress("0x10").Bytes(), 32),
+			AllowedCallerOnSource: common.LeftPadBytes(common.HexToAddress("0x11").Bytes(), 32),
+			MintRecipientOnDest:   common.LeftPadBytes(common.HexToAddress("0x12").Bytes(), 32),
+			DomainIdentifier:      2,
+		},
+		TokenPoolConfig: tokens.RemoteChainConfig[[]byte, string]{
+			RemotePool:                               common.LeftPadBytes(common.HexToAddress("0x2E").Bytes(), 32),
+			RemoteToken:                              common.LeftPadBytes(setup.USDCToken.Bytes(), 32),
+			DefaultFinalityInboundRateLimiterConfig:  testsetup.CreateRateLimiterConfig(0, 0),
+			DefaultFinalityOutboundRateLimiterConfig: testsetup.CreateRateLimiterConfig(0, 0),
+			CustomFinalityInboundRateLimiterConfig:   testsetup.CreateRateLimiterConfig(0, 0),
+			CustomFinalityOutboundRateLimiterConfig:  testsetup.CreateRateLimiterConfig(0, 0),
+		},
+	}
+
+	_, err = operations.ExecuteSequence(
+		e.OperationsBundle,
+		DeployCCTPChain,
+		e.BlockChains,
+		input,
+	)
+	require.ErrorContains(t, err, "lock-release configuration is only supported on home chains")
 }

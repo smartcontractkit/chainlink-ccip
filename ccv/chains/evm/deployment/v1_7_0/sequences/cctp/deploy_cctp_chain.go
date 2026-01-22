@@ -78,7 +78,11 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 			}
 		}
 
-		isHomeChainAndConfigureSiloedPool := (chain.Selector == chain_selectors.ETHEREUM_MAINNET.Selector || chain.Selector == chain_selectors.ETHEREUM_TESTNET_SEPOLIA.Selector) && len(lockReleaseSelectors) > 0
+		isHomeChain := chain.Selector == chain_selectors.ETHEREUM_MAINNET.Selector || chain.Selector == chain_selectors.ETHEREUM_TESTNET_SEPOLIA.Selector
+		if !isHomeChain && len(lockReleaseSelectors) > 0 {
+			return sequences.OnChainOutput{}, fmt.Errorf("lock-release configuration is only supported on home chains")
+		}
+		isHomeChainAndConfigureSiloedPool := isHomeChain && len(lockReleaseSelectors) > 0
 		usdcTokenPoolProxyAddress := poolTypeAndVersionToAddr[deployment.NewTypeAndVersion(usdc_token_pool_proxy.ContractType, *usdc_token_pool_proxy.Version).String()]
 		siloedUSDCAddress := poolTypeAndVersionToAddr[deployment.NewTypeAndVersion(siloed_usdc_token_pool.ContractType, *siloed_usdc_token_pool.Version).String()]
 
@@ -253,7 +257,7 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 		}
 
 		if isHomeChainAndConfigureSiloedPool {
-			siloedPoolWrites, err := configureSiloedPoolProxyWiring(b, chain, input.ChainSelector, common.HexToAddress(usdcTokenPoolProxyAddress), common.HexToAddress(siloedUSDCAddress), lockReleaseSelectors)
+			siloedPoolWrites, err := configureSiloedPoolProxyWiring(b, chain, input.ChainSelector, common.HexToAddress(usdcTokenPoolProxyAddress), common.HexToAddress(siloedUSDCAddress))
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to configure siloed pool proxy wiring: %w", err)
 			}
@@ -325,14 +329,12 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 				DestChainSelector: remoteChainSelector,
 				Verifier:          common.HexToAddress(cctpVerifierAddress),
 			})
-			if remoteChain.LockOrBurnMechanism != mechanismLockRelease {
-				remoteChainSelectors = append(remoteChainSelectors, remoteChainSelector)
-				mechanism, err := convertMechanismToUint8(remoteChain.LockOrBurnMechanism)
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to convert lock or burn mechanism to uint8: %w", err)
-				}
-				mechanisms = append(mechanisms, mechanism)
+			remoteChainSelectors = append(remoteChainSelectors, remoteChainSelector)
+			mechanism, err := convertMechanismToUint8(remoteChain.LockOrBurnMechanism)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to convert lock or burn mechanism to uint8: %w", err)
 			}
+			mechanisms = append(mechanisms, mechanism)
 			allowedCallerOnDest, err := toBytes32LeftPad(remoteChain.RemoteDomain.AllowedCallerOnDest)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to convert allowed caller on dest to bytes32: %w", err)
@@ -373,7 +375,7 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 		}
 		writes = append(writes, setOutboundImplementationReport.Output)
 
-		// Set lock or burn mechanism for each remote chain (excluding lock-release chains)
+		// Set lock or burn mechanism for each remote chain.
 		if len(remoteChainSelectors) > 0 {
 			updateLockOrBurnMechanismsReport, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_proxy.UpdateLockOrBurnMechanisms, chain, contract_utils.FunctionInput[usdc_token_pool_proxy.UpdateLockOrBurnMechanismsArgs]{
 				ChainSelector: chain.Selector,
@@ -452,7 +454,6 @@ func configureSiloedPoolProxyWiring(
 	chainSelector uint64,
 	proxyAddr common.Address,
 	siloedPoolAddr common.Address,
-	lockReleaseSelectors []uint64,
 ) ([]contract_utils.WriteOutput, error) {
 	writes := make([]contract_utils.WriteOutput, 0)
 	// Get authorized callers on siloed pool.
@@ -503,28 +504,6 @@ func configureSiloedPoolProxyWiring(
 		}
 		writes = append(writes, updatePoolsReport.Output)
 	}
-
-	// Set lock-release mechanisms for relevant chains.
-	lockReleaseMechanism, err := convertMechanismToUint8(mechanismLockRelease)
-	if err != nil {
-		return nil, fmt.Errorf("failed to resolve lock-release mechanism: %w", err)
-	}
-	lockReleaseMechanisms := make([]uint8, len(lockReleaseSelectors))
-	for i := range lockReleaseMechanisms {
-		lockReleaseMechanisms[i] = lockReleaseMechanism
-	}
-	updateMechanismsReport, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_proxy.UpdateLockOrBurnMechanisms, chain, contract_utils.FunctionInput[usdc_token_pool_proxy.UpdateLockOrBurnMechanismsArgs]{
-		ChainSelector: chainSelector,
-		Address:       proxyAddr,
-		Args: usdc_token_pool_proxy.UpdateLockOrBurnMechanismsArgs{
-			RemoteChainSelectors: lockReleaseSelectors,
-			Mechanisms:           lockReleaseMechanisms,
-		},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to set lock-release mechanisms on proxy: %w", err)
-	}
-	writes = append(writes, updateMechanismsReport.Output)
 
 	return writes, nil
 }
