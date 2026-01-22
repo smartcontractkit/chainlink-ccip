@@ -5,6 +5,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -34,6 +35,12 @@ type WithdrawFeeTokensArgs struct {
 }
 
 type DestChainConfig = onramp.OnRampDestChainConfig
+
+// GetAllDestChainConfigsResult is the return type for GetAllDestChainConfigs
+type GetAllDestChainConfigsResult struct {
+	DestChainSelectors []uint64
+	DestChainConfigs   []DestChainConfig
+}
 
 var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Name:             "on-ramp:deploy",
@@ -98,5 +105,37 @@ var GetDestChainConfig = contract.NewRead(contract.ReadParams[uint64, DestChainC
 	NewContract:  onramp.NewOnRamp,
 	CallContract: func(onRamp *onramp.OnRamp, opts *bind.CallOpts, args uint64) (DestChainConfig, error) {
 		return onRamp.GetDestChainConfig(opts, args)
+	},
+})
+
+// GetAllDestChainConfigs reads all destination chain configurations from the OnRamp.
+// NOTE: This operation is defined but not yet functional until the gobindings are regenerated
+// after the contract's getAllDestChainConfigs() function is merged.
+var GetAllDestChainConfigs = contract.NewRead(contract.ReadParams[any, GetAllDestChainConfigsResult, *onramp.OnRamp]{
+	Name:         "on-ramp:get-all-dest-chain-configs",
+	Version:      Version,
+	Description:  "Gets all destination chain configurations from the OnRamp",
+	ContractType: ContractType,
+	NewContract:  onramp.NewOnRamp,
+	CallContract: func(onRamp *onramp.OnRamp, opts *bind.CallOpts, _ any) (GetAllDestChainConfigsResult, error) {
+		selectors, configs, err := onRamp.GetAllDestChainConfigs(opts)
+		if err != nil {
+			return GetAllDestChainConfigsResult{}, err
+		}
+		return GetAllDestChainConfigsResult{
+			DestChainSelectors: selectors,
+			DestChainConfigs:   configs,
+		}, nil
+	},
+})
+
+var GetStaticConfig = contract.NewRead(contract.ReadParams[any, StaticConfig, *onramp.OnRamp]{
+	Name:         "on-ramp:get-static-config",
+	Version:      Version,
+	Description:  "Gets the static configuration from the OnRamp",
+	ContractType: ContractType,
+	NewContract:  onramp.NewOnRamp,
+	CallContract: func(onRamp *onramp.OnRamp, opts *bind.CallOpts, _ any) (StaticConfig, error) {
+		return onRamp.GetStaticConfig(opts)
 	},
 })
