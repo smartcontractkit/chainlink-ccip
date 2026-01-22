@@ -1,7 +1,10 @@
 package sequences_test
 
 import (
+	"encoding/json"
+	"fmt"
 	"math/big"
+	"os"
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
@@ -517,8 +520,49 @@ func TestConfigureChainForLanes_Metadata(t *testing.T) {
 			require.Equal(t, preConfiguredConfig.Threshold, getAllConfigsReport.Output[0].Threshold, "Signature config should have correct threshold")
 			require.Equal(t, preConfiguredConfig.Signers, getAllConfigsReport.Output[0].Signers, "Signature config should have correct signers")
 
+			// Pre-configure Router with onRamps and offRamps so they exist on-chain
+			// when metadata is collected (similar to how fee tokens are priced before the sequence)
 			ccipMessageSource := common.HexToAddress("0x10").Bytes()
 			ccipMessageDest := common.HexToAddress("0x11").Bytes()
+			_, err = operations.ExecuteOperation(e.OperationsBundle, router.ApplyRampUpdates, evmChain, contract.FunctionInput[router.ApplyRampsUpdatesArgs]{
+				ChainSelector: chainSelector,
+				Address:       common.HexToAddress(routerAddress),
+				Args: router.ApplyRampsUpdatesArgs{
+					OnRampUpdates: []router.OnRamp{
+						{
+							DestChainSelector: remoteChainSelector,
+							OnRamp:            common.HexToAddress(onRamp),
+						},
+					},
+					OffRampRemoves: []router.OffRamp{},
+					OffRampAdds: []router.OffRamp{
+						{
+							SourceChainSelector: remoteChainSelector,
+							OffRamp:             common.HexToAddress(offRamp),
+						},
+					},
+				},
+			})
+			require.NoError(t, err, "Failed to pre-configure Router with onRamps and offRamps")
+
+			// Verify they're actually on-chain
+			getOffRampsReport, err := operations.ExecuteOperation(e.OperationsBundle, router.GetOffRamps, evmChain, contract.FunctionInput[any]{
+				ChainSelector: chainSelector,
+				Address:       common.HexToAddress(routerAddress),
+				Args:          nil,
+			})
+			require.NoError(t, err, "Failed to verify offRamps are on-chain")
+			require.Len(t, getOffRampsReport.Output, 1, "Should have one offRamp on-chain")
+			require.Equal(t, remoteChainSelector, getOffRampsReport.Output[0].SourceChainSelector, "OffRamp should have correct sourceChainSelector")
+			require.Equal(t, offRamp, getOffRampsReport.Output[0].OffRamp.Hex(), "OffRamp should have correct address")
+
+			getOnRampReport, err := operations.ExecuteOperation(e.OperationsBundle, router.GetOnRamp, evmChain, contract.FunctionInput[uint64]{
+				ChainSelector: chainSelector,
+				Address:       common.HexToAddress(routerAddress),
+				Args:          remoteChainSelector,
+			})
+			require.NoError(t, err, "Failed to verify onRamp is on-chain")
+			require.Equal(t, onRamp, getOnRampReport.Output.Hex(), "OnRamp should have correct address")
 
 			configureReport, err := operations.ExecuteSequence(
 				e.OperationsBundle,
@@ -604,26 +648,81 @@ func TestConfigureChainForLanes_Metadata(t *testing.T) {
 				},
 			}
 
-			// Build a map of contract metadata by address for easy lookup
-			metadataByAddress := make(map[string]datastore.ContractMetadata)
+			// Find FeeQuoter metadata and verify fee tokens are nested within it
+			feeQuoterMetadataFound := false
 			for _, contractMeta := range configureReport.Output.Metadata.Contracts {
-				metadataByAddress[contractMeta.Address] = contractMeta
+				if contractMeta.Address == feeQuoter && contractMeta.ChainSelector == chainSelector {
+					feeQuoterMetadataFound = true
+					require.Equal(t, feeQuoter, contractMeta.Address, "FeeQuoter metadata should have correct address")
+					require.Equal(t, chainSelector, contractMeta.ChainSelector, "FeeQuoter metadata should have correct chain selector")
+
+					metaMap, ok := contractMeta.Metadata.(map[string]interface{})
+					require.True(t, ok, "FeeQuoter metadata should be a map[string]interface{}")
+
+					require.Equal(t, true, metaMap["configured"], "FeeQuoter metadata should have configured=true")
+					require.Equal(t, "fee_quoter_configured", metaMap["test_metadata"], "FeeQuoter metadata should have test_metadata")
+
+					// Verify feeTokens list exists
+					feeTokensValue, ok := metaMap["feeTokens"]
+					require.True(t, ok, "feeTokens should exist in FeeQuoter metadata")
+					feeTokensList, ok := feeTokensValue.([]interface{})
+					if !ok {
+						// Try []map[string]interface{} (might not have gone through JSON round-trip)
+						feeTokensListMap, okMap := feeTokensValue.([]map[string]interface{})
+						require.True(t, okMap, "feeTokens should be a []interface{} or []map[string]interface{}, got %T", feeTokensValue)
+						feeTokensList = make([]interface{}, len(feeTokensListMap))
+						for i, m := range feeTokensListMap {
+							feeTokensList[i] = m
+						}
+					}
+					require.Len(t, feeTokensList, len(expectedFeeTokens), "Should have correct number of fee tokens")
+
+					// Build a map of fee tokens by address for easy lookup
+					feeTokensByAddress := make(map[string]map[string]interface{})
+					for _, tokenInterface := range feeTokensList {
+						tokenMap, ok := tokenInterface.(map[string]interface{})
+						require.True(t, ok, "Each fee token should be a map[string]interface{}")
+						address, ok := tokenMap["address"].(string)
+						require.True(t, ok, "Fee token should have address field")
+						feeTokensByAddress[address] = tokenMap
+					}
+
+					// Verify each expected fee token is in the list
+					for tokenAddr, expected := range expectedFeeTokens {
+						tokenMeta, found := feeTokensByAddress[tokenAddr]
+						require.True(t, found, "Should have fee token %s in feeTokens list", tokenAddr)
+						require.Equal(t, tokenAddr, tokenMeta["address"], "Fee token should have correct address")
+
+						// Handle chainSelector - can be uint64 or float64 after JSON round-trip
+						chainSelectorValue := tokenMeta["chainSelector"]
+						switch v := chainSelectorValue.(type) {
+						case uint64:
+							require.Equal(t, chainSelector, v, "Fee token should have correct chain selector")
+						case float64:
+							require.Equal(t, float64(chainSelector), v, "Fee token should have correct chain selector")
+						default:
+							require.Fail(t, "chainSelector should be uint64 or float64, got %T", chainSelectorValue)
+						}
+
+						require.Equal(t, expected.name, tokenMeta["name"], "Fee token %s should have correct name", tokenAddr)
+						require.Equal(t, expected.symbol, tokenMeta["symbol"], "Fee token %s should have correct symbol", tokenAddr)
+
+						// Handle decimals - can be uint8 or float64 after JSON round-trip
+						decimalsValue := tokenMeta["decimals"]
+						switch v := decimalsValue.(type) {
+						case uint8:
+							require.Equal(t, expected.decimals, v, "Fee token %s should have correct decimals", tokenAddr)
+						case float64:
+							require.Equal(t, float64(expected.decimals), v, "Fee token %s should have correct decimals", tokenAddr)
+						default:
+							require.Fail(t, "decimals should be uint8 or float64, got %T", decimalsValue)
+						}
+					}
+
+					break
+				}
 			}
-
-			// Verify each expected fee token has metadata
-			for tokenAddr, expected := range expectedFeeTokens {
-				contractMeta, found := metadataByAddress[tokenAddr]
-				require.True(t, found, "Should have metadata for fee token %s", tokenAddr)
-				require.Equal(t, tokenAddr, contractMeta.Address, "Fee token metadata should have correct address")
-				require.Equal(t, chainSelector, contractMeta.ChainSelector, "Fee token metadata should have correct chain selector")
-
-				metaMap, ok := contractMeta.Metadata.(map[string]interface{})
-				require.True(t, ok, "Fee token metadata should be a map[string]interface{}")
-
-				require.Equal(t, expected.name, metaMap["name"], "Fee token %s should have correct name", tokenAddr)
-				require.Equal(t, expected.symbol, metaMap["symbol"], "Fee token %s should have correct symbol", tokenAddr)
-				require.Equal(t, expected.decimals, metaMap["decimals"], "Fee token %s should have correct decimals", tokenAddr)
-			}
+			require.True(t, feeQuoterMetadataFound, "Should have found FeeQuoter metadata")
 
 			// Test CommitteeVerifier signature config metadata
 			// Convert expected signers to hex strings for comparison
@@ -659,6 +758,85 @@ func TestConfigureChainForLanes_Metadata(t *testing.T) {
 			}
 
 			require.True(t, committeeVerifierMetadataFound, "Should have found CommitteeVerifier signature config metadata")
+
+			// Test Router metadata (onRamps and offRamps)
+			routerMetadataFound := false
+			for _, contractMeta := range configureReport.Output.Metadata.Contracts {
+				if contractMeta.Address == routerAddress && contractMeta.ChainSelector == chainSelector {
+					routerMetadataFound = true
+					require.Equal(t, routerAddress, contractMeta.Address, "Router metadata should have correct address")
+					require.Equal(t, chainSelector, contractMeta.ChainSelector, "Router metadata should have correct chain selector")
+
+					metaMap, ok := contractMeta.Metadata.(map[string]interface{})
+					require.True(t, ok, "Router metadata should be a map[string]interface{}")
+
+					// Verify onRamps
+					onRampsValue, ok := metaMap["onRamps"]
+					require.True(t, ok, "onRamps should exist in metadata")
+					onRampsMap, ok := onRampsValue.(map[string]interface{})
+					if !ok {
+						// Try map[string]string (might not have gone through JSON round-trip)
+						onRampsMapStr, okStr := onRampsValue.(map[string]string)
+						require.True(t, okStr, "onRamps should be a map[string]interface{} or map[string]string, got %T", onRampsValue)
+						onRampsMap = make(map[string]interface{})
+						for k, v := range onRampsMapStr {
+							onRampsMap[k] = v
+						}
+					}
+					require.Len(t, onRampsMap, 1, "Should have one onRamp")
+					onRampAddrValue, ok := onRampsMap[fmt.Sprintf("%d", remoteChainSelector)]
+					require.True(t, ok, "onRamp should exist for remote chain selector")
+					onRampAddr, ok := onRampAddrValue.(string)
+					require.True(t, ok, "onRamp address should be a string, got %T", onRampAddrValue)
+					require.Equal(t, onRamp, onRampAddr, "OnRamp address should match")
+
+					// Verify offRamps
+					offRampsValue, ok := metaMap["offRamps"]
+					require.True(t, ok, "offRamps should exist in metadata")
+					offRampsMap, ok := offRampsValue.(map[string]interface{})
+					if !ok {
+						// Try map[string][]string (might not have gone through JSON round-trip)
+						offRampsMapStr, okStr := offRampsValue.(map[string][]string)
+						require.True(t, okStr, "offRamps should be a map[string]interface{} or map[string][]string, got %T", offRampsValue)
+						offRampsMap = make(map[string]interface{})
+						for k, v := range offRampsMapStr {
+							// Convert []string to []interface{}
+							interfaceSlice := make([]interface{}, len(v))
+							for i, s := range v {
+								interfaceSlice[i] = s
+							}
+							offRampsMap[k] = interfaceSlice
+						}
+					}
+					require.Len(t, offRampsMap, 1, "Should have one offRamp entry")
+					offRampAddrsValue, ok := offRampsMap[fmt.Sprintf("%d", remoteChainSelector)]
+					require.True(t, ok, "offRamp should exist for remote chain selector")
+					offRampAddrs, ok := offRampAddrsValue.([]interface{})
+					if !ok {
+						// Try []string (might not have gone through JSON round-trip)
+						offRampAddrsStr, okStr := offRampAddrsValue.([]string)
+						require.True(t, okStr, "offRamp addresses should be []interface{} or []string, got %T", offRampAddrsValue)
+						offRampAddrs = make([]interface{}, len(offRampAddrsStr))
+						for i, s := range offRampAddrsStr {
+							offRampAddrs[i] = s
+						}
+					}
+					require.Len(t, offRampAddrs, 1, "Should have one offRamp address")
+					offRampAddrValue, ok := offRampAddrs[0].(string)
+					require.True(t, ok, "offRamp address should be a string, got %T", offRampAddrs[0])
+					require.Equal(t, offRamp, offRampAddrValue, "OffRamp address should match")
+
+					break
+				}
+			}
+			require.True(t, routerMetadataFound, "Should have found Router metadata")
+
+			// Output metadata to JSON file for inspection
+			metadataJSON, err := json.MarshalIndent(configureReport.Output.Metadata, "", "  ")
+			require.NoError(t, err, "Failed to marshal metadata to JSON")
+			err = os.WriteFile("test_metadata_output.json", metadataJSON, 0644)
+			require.NoError(t, err, "Failed to write metadata to file")
+			t.Logf("Metadata written to test_metadata_output.json")
 		})
 	}
 }

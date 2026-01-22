@@ -213,11 +213,25 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 			batchOps = append(batchOps, committeeVerifierReport.Output.BatchOps...)
 		}
 
-		// Collect fee token metadata
-		contractMetadata, err := collectFeeTokenMetadata(b, chain, input.FeeQuoter, chain.Selector, []datastore.ContractMetadata{})
+		// Initialize contract metadata slice
+		contractMetadata := make([]datastore.ContractMetadata, 0)
+
+		// Collect fee token metadata and add to FeeQuoter metadata
+		feeTokens, err := collectFeeTokens(b, chain, input.FeeQuoter, chain.Selector)
 		if err != nil {
 			return sequences.OnChainOutput{}, err
 		}
+
+		// Add FeeQuoter metadata with fee tokens
+		contractMetadata = append(contractMetadata, datastore.ContractMetadata{
+			Address:       input.FeeQuoter,
+			ChainSelector: chain.Selector,
+			Metadata: map[string]interface{}{
+				"configured":    true,
+				"test_metadata": "fee_quoter_configured",
+				"feeTokens":     feeTokens,
+			},
+		})
 
 		// Collect CommitteeVerifier signature config metadata for each CommitteeVerifier
 		for _, committeeVerifier := range input.CommitteeVerifiers {
@@ -246,6 +260,13 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 		}
 		contractMetadata = append(contractMetadata, onRampDestChainMetadata...)
 
+		// Collect Router metadata (onRamps and offRamps)
+		routerMetadata, err := collectRouterMetadata(b, chain, input.Router, chain.Selector, []datastore.ContractMetadata{})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to collect Router metadata: %w", err)
+		}
+		contractMetadata = append(contractMetadata, routerMetadata...)
+
 		return sequences.OnChainOutput{
 			Metadata: sequences.Metadata{
 				Contracts: contractMetadata,
@@ -254,14 +275,13 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 		}, nil
 	})
 
-// collectFeeTokenMetadata collects metadata for all fee tokens from the FeeQuoter
-func collectFeeTokenMetadata(
+// collectFeeTokens collects metadata for all fee tokens from the FeeQuoter and returns them as a list
+func collectFeeTokens(
 	b cldf_ops.Bundle,
 	chain evm.Chain,
 	feeQuoterAddr string,
 	chainSelector uint64,
-	contractMetadata []datastore.ContractMetadata,
-) ([]datastore.ContractMetadata, error) {
+) ([]interface{}, error) {
 	// Read fee tokens from the FeeQuoter
 	getFeeTokensReport, err := cldf_ops.ExecuteOperation(b, fee_quoter.GetFeeTokens, chain, contract.FunctionInput[any]{
 		ChainSelector: chainSelector,
@@ -269,9 +289,10 @@ func collectFeeTokenMetadata(
 		Args:          nil,
 	})
 	if err != nil {
-		return contractMetadata, fmt.Errorf("failed to read fee tokens from FeeQuoter(%s) on chain %s: %w", feeQuoterAddr, chain, err)
+		return nil, fmt.Errorf("failed to read fee tokens from FeeQuoter(%s) on chain %s: %w", feeQuoterAddr, chain, err)
 	}
 
+	feeTokens := make([]interface{}, 0, len(getFeeTokensReport.Output))
 	// Read metadata for each fee token
 	for _, tokenAddr := range getFeeTokensReport.Output {
 		// Read name
@@ -281,7 +302,7 @@ func collectFeeTokenMetadata(
 			Args:          nil,
 		})
 		if err != nil {
-			return contractMetadata, fmt.Errorf("failed to read name of fee token(%s) on chain %s: %w", tokenAddr, chain, err)
+			return nil, fmt.Errorf("failed to read name of fee token(%s) on chain %s: %w", tokenAddr, chain, err)
 		}
 
 		// Read symbol
@@ -291,7 +312,7 @@ func collectFeeTokenMetadata(
 			Args:          nil,
 		})
 		if err != nil {
-			return contractMetadata, fmt.Errorf("failed to read symbol of fee token(%s) on chain %s: %w", tokenAddr, chain, err)
+			return nil, fmt.Errorf("failed to read symbol of fee token(%s) on chain %s: %w", tokenAddr, chain, err)
 		}
 
 		// Read decimals
@@ -301,21 +322,19 @@ func collectFeeTokenMetadata(
 			Args:          nil,
 		})
 		if err != nil {
-			return contractMetadata, fmt.Errorf("failed to read decimals of fee token(%s) on chain %s: %w", tokenAddr, chain, err)
+			return nil, fmt.Errorf("failed to read decimals of fee token(%s) on chain %s: %w", tokenAddr, chain, err)
 		}
 
-		contractMetadata = append(contractMetadata, datastore.ContractMetadata{
-			Address:       tokenAddr.Hex(),
-			ChainSelector: chainSelector,
-			Metadata: map[string]interface{}{
-				"name":     nameReport.Output,
-				"symbol":   symbolReport.Output,
-				"decimals": decimalsReport.Output,
-			},
+		feeTokens = append(feeTokens, map[string]interface{}{
+			"address":       tokenAddr.Hex(),
+			"chainSelector": chainSelector,
+			"name":          nameReport.Output,
+			"symbol":        symbolReport.Output,
+			"decimals":      decimalsReport.Output,
 		})
 	}
 
-	return contractMetadata, nil
+	return feeTokens, nil
 }
 
 func collectCommitteeVerifierSignatureConfigs(
@@ -413,6 +432,70 @@ func collectOnRampDestChainConfigs(
 	// 		},
 	// 	})
 	// }
+
+	return contractMetadata, nil
+}
+
+// collectRouterMetadata collects metadata for all onRamps and offRamps from the Router
+func collectRouterMetadata(
+	b cldf_ops.Bundle,
+	chain evm.Chain,
+	routerAddr string,
+	chainSelector uint64,
+	contractMetadata []datastore.ContractMetadata,
+) ([]datastore.ContractMetadata, error) {
+	// Read all offRamps from the Router
+	getOffRampsReport, err := cldf_ops.ExecuteOperation(b, router.GetOffRamps, chain, contract.FunctionInput[any]{
+		ChainSelector: chainSelector,
+		Address:       common.HexToAddress(routerAddr),
+		Args:          nil,
+	})
+	if err != nil {
+		return contractMetadata, fmt.Errorf("failed to read offRamps from Router(%s) on chain %s: %w", routerAddr, chain, err)
+	}
+
+	// Group offRamps by sourceChainSelector
+	offRampsByChain := make(map[uint64][]string)
+	uniqueChainSelectors := make(map[uint64]struct{})
+	for _, offRamp := range getOffRampsReport.Output {
+		sourceChainSelector := offRamp.SourceChainSelector
+		offRampsByChain[sourceChainSelector] = append(offRampsByChain[sourceChainSelector], offRamp.OffRamp.Hex())
+		uniqueChainSelectors[sourceChainSelector] = struct{}{}
+	}
+
+	// Get onRamp for each unique sourceChainSelector
+	onRampsByChain := make(map[uint64]string)
+	for sourceChainSelector := range uniqueChainSelectors {
+		getOnRampReport, err := cldf_ops.ExecuteOperation(b, router.GetOnRamp, chain, contract.FunctionInput[uint64]{
+			ChainSelector: chainSelector,
+			Address:       common.HexToAddress(routerAddr),
+			Args:          sourceChainSelector,
+		})
+		if err != nil {
+			return contractMetadata, fmt.Errorf("failed to read onRamp for chain selector %d from Router(%s) on chain %s: %w", sourceChainSelector, routerAddr, chain, err)
+		}
+		onRampsByChain[sourceChainSelector] = getOnRampReport.Output.Hex()
+	}
+
+	// Convert to string keys for JSON serialization
+	onRampsMap := make(map[string]string)
+	for selector, onRampAddr := range onRampsByChain {
+		onRampsMap[fmt.Sprintf("%d", selector)] = onRampAddr
+	}
+
+	offRampsMap := make(map[string][]string)
+	for selector, offRampAddrs := range offRampsByChain {
+		offRampsMap[fmt.Sprintf("%d", selector)] = offRampAddrs
+	}
+
+	contractMetadata = append(contractMetadata, datastore.ContractMetadata{
+		Address:       routerAddr,
+		ChainSelector: chainSelector,
+		Metadata: map[string]interface{}{
+			"onRamps":  onRampsMap,
+			"offRamps": offRampsMap,
+		},
+	})
 
 	return contractMetadata, nil
 }
