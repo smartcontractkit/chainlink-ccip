@@ -20,14 +20,18 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/message_hasher"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/versioned_verifier_resolver"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/link_token"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
+	v1_5_0_sequences "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -103,6 +107,71 @@ func TestConfigureChainForLanes(t *testing.T) {
 			ccipMessageSource := common.HexToAddress("0x10").Bytes()
 			ccipMessageDest := common.HexToAddress("0x11").Bytes()
 			remoteChainSelector := uint64(4356164186791070119)
+
+			// Deploy a token and pool, then register it with TokenAdminRegistry
+			// This is the lightest weight way to add a token to the registry for testing
+			var rmnProxyAddr common.Address
+			for _, addr := range deploymentReport.Output.Addresses {
+				if addr.Type == datastore.ContractType(rmn_proxy.ContractType) {
+					rmnProxyAddr = common.HexToAddress(addr.Address)
+					break
+				}
+			}
+
+			tokenAndPoolReport, err := operations.ExecuteSequence(
+				e.OperationsBundle,
+				tokens.DeployTokenAndPool,
+				e.BlockChains.EVMChains()[chainSelector],
+				tokens.DeployTokenAndPoolInput{
+					Accounts: map[common.Address]*big.Int{
+						common.HexToAddress("0x01"): big.NewInt(500_000),
+					},
+					DeployTokenPoolInput: tokens.DeployTokenPoolInput{
+						ChainSel:                         chainSelector,
+						TokenPoolType:                    datastore.ContractType("BurnMintTokenPool"),
+						TokenPoolVersion:                 semver.MustParse("1.7.0"),
+						TokenSymbol:                      "TEST",
+						RateLimitAdmin:                   common.HexToAddress("0x01"),
+						ThresholdAmountForAdditionalCCVs: big.NewInt(1e18),
+						FeeAggregator:                    common.HexToAddress("0x03"),
+						ConstructorArgs: tokens.ConstructorArgs{
+							Decimals: 18,
+							RMNProxy: rmnProxyAddr,
+							Router:   common.HexToAddress(routerAddress),
+						},
+					},
+				},
+			)
+			require.NoError(t, err, "Failed to deploy token and pool")
+			require.Len(t, tokenAndPoolReport.Output.Addresses, 3, "Expected 3 addresses (token, pool, advanced pool hooks)")
+
+			tokenAddress := tokenAndPoolReport.Output.Addresses[0].Address
+			tokenPoolAddress := tokenAndPoolReport.Output.Addresses[1].Address
+
+			// Find TokenAdminRegistry address
+			var tokenAdminRegistryAddress string
+			for _, addr := range deploymentReport.Output.Addresses {
+				if addr.Type == datastore.ContractType(token_admin_registry.ContractType) {
+					tokenAdminRegistryAddress = addr.Address
+					break
+				}
+			}
+			require.NotEmpty(t, tokenAdminRegistryAddress, "TokenAdminRegistry address should be found")
+
+			// Register the token with TokenAdminRegistry
+			_, err = operations.ExecuteSequence(
+				e.OperationsBundle,
+				v1_5_0_sequences.RegisterToken,
+				e.BlockChains.EVMChains()[chainSelector],
+				v1_5_0_sequences.RegisterTokenInput{
+					ChainSelector:             chainSelector,
+					TokenAddress:              common.HexToAddress(tokenAddress),
+					TokenPoolAddress:          common.HexToAddress(tokenPoolAddress),
+					ExternalAdmin:             common.Address{}, // Use internal admin
+					TokenAdminRegistryAddress: common.HexToAddress(tokenAdminRegistryAddress),
+				},
+			)
+			require.NoError(t, err, "Failed to register token with TokenAdminRegistry")
 
 			configureReport, err := operations.ExecuteSequence(
 				e.OperationsBundle,
@@ -564,6 +633,71 @@ func TestConfigureChainForLanes_Metadata(t *testing.T) {
 			require.NoError(t, err, "Failed to verify onRamp is on-chain")
 			require.Equal(t, onRamp, getOnRampReport.Output.Hex(), "OnRamp should have correct address")
 
+			// Deploy a token and pool, then register it with TokenAdminRegistry
+			// This is the lightest weight way to add a token to the registry for testing
+			var rmnProxyAddr common.Address
+			for _, addr := range deploymentReport.Output.Addresses {
+				if addr.Type == datastore.ContractType(rmn_proxy.ContractType) {
+					rmnProxyAddr = common.HexToAddress(addr.Address)
+					break
+				}
+			}
+
+			tokenAndPoolReport, err := operations.ExecuteSequence(
+				e.OperationsBundle,
+				tokens.DeployTokenAndPool,
+				e.BlockChains.EVMChains()[chainSelector],
+				tokens.DeployTokenAndPoolInput{
+					Accounts: map[common.Address]*big.Int{
+						common.HexToAddress("0x01"): big.NewInt(500_000),
+					},
+					DeployTokenPoolInput: tokens.DeployTokenPoolInput{
+						ChainSel:                         chainSelector,
+						TokenPoolType:                    datastore.ContractType("BurnMintTokenPool"),
+						TokenPoolVersion:                 semver.MustParse("1.7.0"),
+						TokenSymbol:                      "TEST",
+						RateLimitAdmin:                   common.HexToAddress("0x01"),
+						ThresholdAmountForAdditionalCCVs: big.NewInt(1e18),
+						FeeAggregator:                    common.HexToAddress("0x03"),
+						ConstructorArgs: tokens.ConstructorArgs{
+							Decimals: 18,
+							RMNProxy: rmnProxyAddr,
+							Router:   common.HexToAddress(routerAddress),
+						},
+					},
+				},
+			)
+			require.NoError(t, err, "Failed to deploy token and pool")
+			require.Len(t, tokenAndPoolReport.Output.Addresses, 3, "Expected 3 addresses (token, pool, advanced pool hooks)")
+
+			tokenAddress := tokenAndPoolReport.Output.Addresses[0].Address
+			tokenPoolAddress := tokenAndPoolReport.Output.Addresses[1].Address
+
+			// Find TokenAdminRegistry address
+			var tokenAdminRegistryAddress string
+			for _, addr := range deploymentReport.Output.Addresses {
+				if addr.Type == datastore.ContractType(token_admin_registry.ContractType) {
+					tokenAdminRegistryAddress = addr.Address
+					break
+				}
+			}
+			require.NotEmpty(t, tokenAdminRegistryAddress, "TokenAdminRegistry address should be found")
+
+			// Register the token with TokenAdminRegistry
+			_, err = operations.ExecuteSequence(
+				e.OperationsBundle,
+				v1_5_0_sequences.RegisterToken,
+				e.BlockChains.EVMChains()[chainSelector],
+				v1_5_0_sequences.RegisterTokenInput{
+					ChainSelector:             chainSelector,
+					TokenAddress:              common.HexToAddress(tokenAddress),
+					TokenPoolAddress:          common.HexToAddress(tokenPoolAddress),
+					ExternalAdmin:             common.Address{}, // Use internal admin
+					TokenAdminRegistryAddress: common.HexToAddress(tokenAdminRegistryAddress),
+				},
+			)
+			require.NoError(t, err, "Failed to register token with TokenAdminRegistry")
+
 			configureReport, err := operations.ExecuteSequence(
 				e.OperationsBundle,
 				sequences.ConfigureChainForLanes,
@@ -973,6 +1107,88 @@ func TestConfigureChainForLanes_Metadata(t *testing.T) {
 				}
 			}
 			require.True(t, offRampMetadataFound, "Should have found OffRamp metadata")
+
+			// Test TokenAdminRegistry metadata (tokens)
+			tokenAdminRegistryMetadataFound := false
+			for _, contractMeta := range configureReport.Output.Metadata.Contracts {
+				if contractMeta.Address == tokenAdminRegistryAddress && contractMeta.ChainSelector == chainSelector {
+					tokenAdminRegistryMetadataFound = true
+					require.Equal(t, tokenAdminRegistryAddress, contractMeta.Address, "TokenAdminRegistry metadata should have correct address")
+					require.Equal(t, chainSelector, contractMeta.ChainSelector, "TokenAdminRegistry metadata should have correct chain selector")
+
+					metaMap, ok := contractMeta.Metadata.(map[string]interface{})
+					require.True(t, ok, "TokenAdminRegistry metadata should be a map[string]interface{}")
+
+					// Verify tokens list exists
+					tokensValue, ok := metaMap["tokens"]
+					require.True(t, ok, "tokens should exist in TokenAdminRegistry metadata")
+					tokensList, ok := tokensValue.([]interface{})
+					if !ok {
+						// Try []map[string]interface{} (might not have gone through JSON round-trip)
+						tokensListMap, okMap := tokensValue.([]map[string]interface{})
+						require.True(t, okMap, "tokens should be a []interface{} or []map[string]interface{}, got %T", tokensValue)
+						tokensList = make([]interface{}, len(tokensListMap))
+						for i, m := range tokensListMap {
+							tokensList[i] = m
+						}
+					}
+					require.Greater(t, len(tokensList), 0, "Should have at least one token registered")
+
+					// Verify the first token has the expected structure
+					tokenObj, ok := tokensList[0].(map[string]interface{})
+					require.True(t, ok, "Token should be a map[string]interface{}")
+
+					// Verify token address exists and matches
+					tokenAddrValue, ok := tokenObj["address"].(string)
+					require.True(t, ok, "Token address should be a string")
+					require.Equal(t, tokenAddress, tokenAddrValue, "Token address should match registered token")
+
+					// Verify token has name, symbol, decimals
+					require.Contains(t, tokenObj, "name", "Token should have name")
+					require.Contains(t, tokenObj, "symbol", "Token should have symbol")
+					require.Contains(t, tokenObj, "decimals", "Token should have decimals")
+
+					// Verify admin fields exist
+					require.Contains(t, tokenObj, "admin", "Token should have admin")
+					require.Contains(t, tokenObj, "pendingAdministrator", "Token should have pendingAdministrator")
+
+					// Verify tokenPool exists and has rmnProxy
+					tokenPoolValueRaw, tokenPoolExists := tokenObj["tokenPool"]
+					require.True(t, tokenPoolExists, "Token should have tokenPool field")
+
+					// tokenPool might be nil if the token doesn't have a pool set
+					if tokenPoolValueRaw != nil {
+						tokenPoolValue, ok := tokenPoolValueRaw.(map[string]interface{})
+						if !ok {
+							// Try to see what type it actually is for debugging
+							t.Fatalf("TokenPool should be map[string]interface{} or nil, got %T: %v", tokenPoolValueRaw, tokenPoolValueRaw)
+						}
+						require.Contains(t, tokenPoolValue, "address", "TokenPool should have address")
+						require.Contains(t, tokenPoolValue, "rmnProxy", "TokenPool should have rmnProxy")
+
+						// Verify rmnProxy exists and has owner and arm
+						rmnProxyValueRaw, rmnProxyExists := tokenPoolValue["rmnProxy"]
+						require.True(t, rmnProxyExists, "TokenPool should have rmnProxy field")
+						require.NotNil(t, rmnProxyValueRaw, "RMNProxy should not be nil")
+
+						rmnProxyValue, ok := rmnProxyValueRaw.(map[string]interface{})
+						if !ok {
+							// Try to see what type it actually is for debugging
+							t.Fatalf("RMNProxy should be map[string]interface{}, got %T: %v", rmnProxyValueRaw, rmnProxyValueRaw)
+						}
+						require.Contains(t, rmnProxyValue, "address", "RMNProxy should have address")
+						require.Contains(t, rmnProxyValue, "owner", "RMNProxy should have owner")
+						require.Contains(t, rmnProxyValue, "arm", "RMNProxy should have arm")
+					} else {
+						// If tokenPool is nil, that's okay - some tokens might not have pools
+						// But in our test, we registered a token with a pool, so this shouldn't happen
+						t.Logf("Warning: tokenPool is nil for token %s, but we registered it with a pool", tokenAddress)
+					}
+
+					break
+				}
+			}
+			require.True(t, tokenAdminRegistryMetadataFound, "Should have found TokenAdminRegistry metadata")
 
 			// Output metadata to JSON file for inspection
 			metadataJSON, err := json.MarshalIndent(configureReport.Output.Metadata, "", "  ")

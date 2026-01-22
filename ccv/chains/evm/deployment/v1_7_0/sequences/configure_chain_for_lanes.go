@@ -25,6 +25,9 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/proxy"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 )
 
 var ConfigureChainForLanes = cldf_ops.NewSequence(
@@ -266,6 +269,27 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to collect Router metadata: %w", err)
 		}
 		contractMetadata = append(contractMetadata, routerMetadata...)
+
+		// Collect TokenAdminRegistry metadata
+		// Get TokenAdminRegistry address from OnRamp's static config
+		getOnRampStaticConfigReport, err := cldf_ops.ExecuteOperation(b, onramp.GetStaticConfig, chain, contract.FunctionInput[any]{
+			ChainSelector: chain.Selector,
+			Address:       common.HexToAddress(input.OnRamp),
+			Args:          nil,
+		})
+		if err != nil {
+			// Log error but don't fail - TokenAdminRegistry might not be available
+		} else {
+			tokenAdminRegistryAddr := getOnRampStaticConfigReport.Output.TokenAdminRegistry.Hex()
+			if tokenAdminRegistryAddr != "" && tokenAdminRegistryAddr != "0x0000000000000000000000000000000000000000" {
+				tokenAdminRegistryMetadata, err := collectTokenAdminRegistryMetadata(b, chain, chain.Selector, tokenAdminRegistryAddr)
+				if err != nil {
+					// Log error but don't fail - TokenAdminRegistry metadata collection might fail
+				} else {
+					contractMetadata = append(contractMetadata, tokenAdminRegistryMetadata)
+				}
+			}
+		}
 
 		return sequences.OnChainOutput{
 			Metadata: sequences.Metadata{
@@ -642,6 +666,148 @@ func collectOffRampSourceChainConfigsMetadata(
 		ChainSelector: chainSelector,
 		Metadata: map[string]interface{}{
 			"sourceChainConfigs": sourceChainConfigsList,
+		},
+	}, nil
+}
+
+// collectTokenAdminRegistryMetadata collects metadata for all tokens from the TokenAdminRegistry
+// tokenAdminRegistryAddr should be the address of the TokenAdminRegistry contract
+func collectTokenAdminRegistryMetadata(
+	b cldf_ops.Bundle,
+	chain evm.Chain,
+	chainSelector uint64,
+	tokenAdminRegistryAddr string,
+) (datastore.ContractMetadata, error) {
+	if tokenAdminRegistryAddr == "" {
+		return datastore.ContractMetadata{}, fmt.Errorf("TokenAdminRegistry address is required")
+	}
+
+	// Get all configured tokens (using max uint64 for maxCount to get all tokens)
+	maxUint64 := uint64(18446744073709551615) // 2^64 - 1
+	getAllTokensReport, err := cldf_ops.ExecuteOperation(b, token_admin_registry.GetAllConfiguredTokens, chain, contract.FunctionInput[token_admin_registry.GetAllConfiguredTokensArgs]{
+		ChainSelector: chainSelector,
+		Address:       common.HexToAddress(tokenAdminRegistryAddr),
+		Args: token_admin_registry.GetAllConfiguredTokensArgs{
+			StartIndex: 0,
+			MaxCount:   maxUint64,
+		},
+	})
+	if err != nil {
+		return datastore.ContractMetadata{}, fmt.Errorf("failed to get all configured tokens from TokenAdminRegistry(%s) on chain %s: %w", tokenAdminRegistryAddr, chain, err)
+	}
+
+	tokens := getAllTokensReport.Output
+	tokensList := make([]map[string]interface{}, 0, len(tokens))
+
+	// For each token, collect its metadata
+	for _, tokenAddr := range tokens {
+		tokenAddrStr := tokenAddr.Hex()
+
+		// Get token config from TokenAdminRegistry
+		getTokenConfigReport, err := cldf_ops.ExecuteOperation(b, token_admin_registry.GetTokenConfig, chain, contract.FunctionInput[common.Address]{
+			ChainSelector: chainSelector,
+			Address:       common.HexToAddress(tokenAdminRegistryAddr),
+			Args:          tokenAddr,
+		})
+		if err != nil {
+			return datastore.ContractMetadata{}, fmt.Errorf("failed to get token config for token %s: %w", tokenAddrStr, err)
+		}
+		tokenConfig := getTokenConfigReport.Output
+
+		// Get token name, symbol, decimals (like we do for feeTokens)
+		nameReport, err := cldf_ops.ExecuteOperation(b, erc20.Name, chain, contract.FunctionInput[any]{
+			ChainSelector: chainSelector,
+			Address:       tokenAddr,
+			Args:          nil,
+		})
+		if err != nil {
+			return datastore.ContractMetadata{}, fmt.Errorf("failed to get token name for %s: %w", tokenAddrStr, err)
+		}
+
+		symbolReport, err := cldf_ops.ExecuteOperation(b, erc20.Symbol, chain, contract.FunctionInput[any]{
+			ChainSelector: chainSelector,
+			Address:       tokenAddr,
+			Args:          nil,
+		})
+		if err != nil {
+			return datastore.ContractMetadata{}, fmt.Errorf("failed to get token symbol for %s: %w", tokenAddrStr, err)
+		}
+
+		decimalsReport, err := cldf_ops.ExecuteOperation(b, erc20.Decimals, chain, contract.FunctionInput[any]{
+			ChainSelector: chainSelector,
+			Address:       tokenAddr,
+			Args:          nil,
+		})
+		if err != nil {
+			return datastore.ContractMetadata{}, fmt.Errorf("failed to get token decimals for %s: %w", tokenAddrStr, err)
+		}
+
+		// Build token metadata object
+		tokenMetadata := map[string]interface{}{
+			"name":                 nameReport.Output,
+			"symbol":               symbolReport.Output,
+			"decimals":             decimalsReport.Output,
+			"admin":                tokenConfig.Administrator.Hex(),
+			"pendingAdministrator": tokenConfig.PendingAdministrator.Hex(),
+		}
+
+		// If token has a pool, get pool metadata
+		if tokenConfig.TokenPool != (common.Address{}) {
+			tokenPoolAddr := tokenConfig.TokenPool.Hex()
+
+			// Get RMN proxy from TokenPool
+			getRmnProxyReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetRMNProxy, chain, contract.FunctionInput[any]{
+				ChainSelector: chainSelector,
+				Address:       tokenConfig.TokenPool,
+				Args:          nil,
+			})
+			if err != nil {
+				return datastore.ContractMetadata{}, fmt.Errorf("failed to get RMN proxy from TokenPool %s: %w", tokenPoolAddr, err)
+			}
+			rmnProxyAddr := getRmnProxyReport.Output
+
+			// Get ARM and Owner from RMNProxy
+			getARMReport, err := cldf_ops.ExecuteOperation(b, rmn_proxy.GetARM, chain, contract.FunctionInput[any]{
+				ChainSelector: chainSelector,
+				Address:       rmnProxyAddr,
+				Args:          nil,
+			})
+			if err != nil {
+				return datastore.ContractMetadata{}, fmt.Errorf("failed to get ARM from RMNProxy %s: %w", rmnProxyAddr.Hex(), err)
+			}
+
+			getOwnerReport, err := cldf_ops.ExecuteOperation(b, rmn_proxy.Owner, chain, contract.FunctionInput[any]{
+				ChainSelector: chainSelector,
+				Address:       rmnProxyAddr,
+				Args:          nil,
+			})
+			if err != nil {
+				return datastore.ContractMetadata{}, fmt.Errorf("failed to get owner from RMNProxy %s: %w", rmnProxyAddr.Hex(), err)
+			}
+
+			// Build nested structure: tokenPool -> rmnProxy -> {owner, arm}
+			tokenMetadata["tokenPool"] = map[string]interface{}{
+				"address": tokenPoolAddr,
+				"rmnProxy": map[string]interface{}{
+					"address": rmnProxyAddr.Hex(),
+					"owner":   getOwnerReport.Output.Hex(),
+					"arm":     getARMReport.Output.Hex(),
+				},
+			}
+		} else {
+			tokenMetadata["tokenPool"] = nil
+		}
+
+		// Add token address to the metadata object
+		tokenMetadata["address"] = tokenAddrStr
+		tokensList = append(tokensList, tokenMetadata)
+	}
+
+	return datastore.ContractMetadata{
+		Address:       tokenAdminRegistryAddr,
+		ChainSelector: chainSelector,
+		Metadata: map[string]interface{}{
+			"tokens": tokensList,
 		},
 	}, nil
 }

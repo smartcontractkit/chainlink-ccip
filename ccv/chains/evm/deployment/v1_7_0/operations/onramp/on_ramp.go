@@ -128,3 +128,14 @@ var GetAllDestChainConfigs = contract.NewRead(contract.ReadParams[any, GetAllDes
 		}, nil
 	},
 })
+
+var GetStaticConfig = contract.NewRead(contract.ReadParams[any, StaticConfig, *onramp.OnRamp]{
+	Name:         "on-ramp:get-static-config",
+	Version:      Version,
+	Description:  "Gets the static configuration from the OnRamp",
+	ContractType: ContractType,
+	NewContract:  onramp.NewOnRamp,
+	CallContract: func(onRamp *onramp.OnRamp, opts *bind.CallOpts, _ any) (StaticConfig, error) {
+		return onRamp.GetStaticConfig(opts)
+	},
+})

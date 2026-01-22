@@ -5,6 +5,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
@@ -47,5 +48,27 @@ var SetRMN = contract.NewWrite(contract.WriteParams[SetRMNArgs, *rmn_proxy_contr
 	Validate:        func(SetRMNArgs) error { return nil },
 	CallContract: func(rmnProxy *rmn_proxy_contract.RMNProxy, opts *bind.TransactOpts, args SetRMNArgs) (*types.Transaction, error) {
 		return rmnProxy.SetARM(opts, args.RMN)
+	},
+})
+
+var GetARM = contract.NewRead(contract.ReadParams[any, common.Address, *rmn_proxy_contract.RMNProxy]{
+	Name:         "rmn_proxy:get-arm",
+	Version:      Version,
+	Description:  "Gets the ARM address from the RMNProxy contract",
+	ContractType: ContractType,
+	NewContract:  rmn_proxy_contract.NewRMNProxy,
+	CallContract: func(rmnProxy *rmn_proxy_contract.RMNProxy, opts *bind.CallOpts, args any) (common.Address, error) {
+		return rmnProxy.GetARM(opts)
+	},
+})
+
+var Owner = contract.NewRead(contract.ReadParams[any, common.Address, *rmn_proxy_contract.RMNProxy]{
+	Name:         "rmn_proxy:owner",
+	Version:      Version,
+	Description:  "Gets the owner address from the RMNProxy contract",
+	ContractType: ContractType,
+	NewContract:  rmn_proxy_contract.NewRMNProxy,
+	CallContract: func(rmnProxy *rmn_proxy_contract.RMNProxy, opts *bind.CallOpts, args any) (common.Address, error) {
+		return rmnProxy.Owner(opts)
 	},
 })

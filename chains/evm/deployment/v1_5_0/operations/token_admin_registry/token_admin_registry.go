@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -154,5 +155,21 @@ var GetTokenConfig = contract.NewRead(contract.ReadParams[common.Address, TokenC
 	NewContract:  token_admin_registry.NewTokenAdminRegistry,
 	CallContract: func(tokenAdminRegistry *token_admin_registry.TokenAdminRegistry, opts *bind.CallOpts, args common.Address) (TokenConfig, error) {
 		return tokenAdminRegistry.GetTokenConfig(opts, args)
+	},
+})
+
+type GetAllConfiguredTokensArgs struct {
+	StartIndex uint64
+	MaxCount   uint64
+}
+
+var GetAllConfiguredTokens = contract.NewRead(contract.ReadParams[GetAllConfiguredTokensArgs, []common.Address, *token_admin_registry.TokenAdminRegistry]{
+	Name:         "token-admin-registry:get-all-configured-tokens",
+	Version:      Version,
+	Description:  "Gets all configured tokens from the TokenAdminRegistry contract",
+	ContractType: ContractType,
+	NewContract:  token_admin_registry.NewTokenAdminRegistry,
+	CallContract: func(tokenAdminRegistry *token_admin_registry.TokenAdminRegistry, opts *bind.CallOpts, args GetAllConfiguredTokensArgs) ([]common.Address, error) {
+		return tokenAdminRegistry.GetAllConfiguredTokens(opts, args.StartIndex, args.MaxCount)
 	},
 })
