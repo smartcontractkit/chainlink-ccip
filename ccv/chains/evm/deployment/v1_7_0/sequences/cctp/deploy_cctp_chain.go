@@ -127,7 +127,7 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 				CREATE2Factory: common.HexToAddress(input.DeployerContract),
 			})
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CommitteeVerifierResolver: %w", err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CCTPVerifierResolver: %w", err)
 			}
 			addresses = append(addresses, deployVerifierResolverViaCREATE2Report.Output.Addresses...)
 			writes = append(writes, deployVerifierResolverViaCREATE2Report.Output.Writes...)
