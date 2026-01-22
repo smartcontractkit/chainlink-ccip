@@ -10,6 +10,8 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/stretchr/testify/require"
 
+	mcms_types "github.com/smartcontractkit/mcms/types"
+
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
@@ -19,7 +21,6 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	mcms_types "github.com/smartcontractkit/mcms/types"
 )
 
 type MockReader struct{}
@@ -28,10 +29,29 @@ const OP_COUNT = 42
 
 func (m *MockReader) GetChainMetadata(_ deployment.Environment, _ uint64, input mcms.Input) (mcms_types.ChainMetadata, error) {
 	return mcms_types.ChainMetadata{
-		MCMAddress:      input.MCMSAddressRef.Address,
 		StartingOpCount: OP_COUNT,
 	}, nil
 }
+
+func (m *MockReader) GetTimelockRef(_ deployment.Environment, selector uint64, _ mcms.Input) (datastore.AddressRef, error) {
+	return datastore.AddressRef{
+		ChainSelector: selector,
+		Address:       "0x01",
+		Type:          datastore.ContractType("Timelock"),
+		Version:       semver.MustParse("1.0.0"),
+	}, nil
+}
+
+func (m *MockReader) GetMCMSRef(_ deployment.Environment, selector uint64, _ mcms.Input) (datastore.AddressRef, error) {
+	return datastore.AddressRef{
+		ChainSelector: selector,
+		Address:       "0x02",
+		Type:          datastore.ContractType("MCM"),
+		Version:       semver.MustParse("1.0.0"),
+	}, nil
+}
+
+var transfersTest_NewTokenAdapterRegistry = tokens.GetTokenAdapterRegistry()
 
 type transfersTest_MockTokenAdapter struct {
 	deriveTokenErrorMsg string
@@ -103,19 +123,39 @@ func (ma *transfersTest_MockTokenAdapter) DeriveTokenAddress(e deployment.Enviro
 	return []byte("mocked-remote-token-address"), nil
 }
 
+func (ma *transfersTest_MockTokenAdapter) ManualRegistration() *cldf_ops.Sequence[tokens.ManualRegistrationInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return &cldf_ops.Sequence[tokens.ManualRegistrationInput, sequences.OnChainOutput, cldf_chain.BlockChains]{}
+}
+
+func (ma *transfersTest_MockTokenAdapter) DeployToken() *cldf_ops.Sequence[tokens.DeployTokenInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return &cldf_ops.Sequence[tokens.DeployTokenInput, sequences.OnChainOutput, cldf_chain.BlockChains]{}
+}
+
+func (ma *transfersTest_MockTokenAdapter) DeployTokenVerify(e deployment.Environment, in any) error {
+	return nil
+}
+
+func (ma *transfersTest_MockTokenAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokens.DeployTokenPoolInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return &cldf_ops.Sequence[tokens.DeployTokenPoolInput, sequences.OnChainOutput, cldf_chain.BlockChains]{}
+}
+
+func (ma *transfersTest_MockTokenAdapter) RegisterToken() *cldf_ops.Sequence[tokens.RegisterTokenInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return &cldf_ops.Sequence[tokens.RegisterTokenInput, sequences.OnChainOutput, cldf_chain.BlockChains]{}
+}
+
+func (ma *transfersTest_MockTokenAdapter) SetPool() *cldf_ops.Sequence[tokens.SetPoolInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return &cldf_ops.Sequence[tokens.SetPoolInput, sequences.OnChainOutput, cldf_chain.BlockChains]{}
+}
+
+func (ma *transfersTest_MockTokenAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokens.UpdateAuthoritiesInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return &cldf_ops.Sequence[tokens.UpdateAuthoritiesInput, sequences.OnChainOutput, cldf_chain.BlockChains]{}
+}
+
 var basicMCMSInput = mcms.Input{
 	OverridePreviousRoot: true,
 	ValidUntil:           3759765795,
 	TimelockDelay:        mcms_types.MustParseDuration("1h"),
 	TimelockAction:       mcms_types.TimelockActionSchedule,
-	MCMSAddressRef: datastore.AddressRef{
-		Type:    "MCM",
-		Version: semver.MustParse("1.0.0"),
-	},
-	TimelockAddressRef: datastore.AddressRef{
-		Type:    "Timelock",
-		Version: semver.MustParse("1.0.0"),
-	},
 }
 
 func makeBaseDataStore(t *testing.T, chains []uint64) *datastore.MemoryDataStore {
@@ -551,23 +591,20 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 			expectedSequenceErrorMsg: "sequence execution failed",
 		},
 	}
+	// Register MCMS reader
+	mcmsRegistry := changesets.GetRegistry()
+	mcmsRegistry.RegisterMCMSReader("evm", &MockReader{})
+	tokenAdapterRegistry := tokens.GetTokenAdapterRegistry()
+	mockAdapter := &transfersTest_MockTokenAdapter{}
+	tokenAdapterRegistry.RegisterTokenAdapter("evm", semver.MustParse("1.0.0"), mockAdapter)
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.desc, func(t *testing.T) {
-			// Register MCMS reader
-			mcmsRegistry := changesets.NewMCMSReaderRegistry()
-			mcmsRegistry.RegisterMCMSReader("evm", &MockReader{})
-
 			// Register token adapter with appropriate error condition
-			tokenAdapterRegistry := tokens.NewTokenAdapterRegistry()
-			mockAdapter := &transfersTest_MockTokenAdapter{}
 
 			// Set error conditions for specific test cases
 			mockAdapter.deriveTokenErrorMsg = tt.expectedTokenDerivationErrorMsg
 			mockAdapter.sequenceErrorMsg = tt.expectedSequenceErrorMsg
-
-			tokenAdapterRegistry.RegisterTokenAdapter("evm", semver.MustParse("1.0.0"), mockAdapter)
 
 			// Create environment with datastore
 			ds := tt.makeDataStore(t)
@@ -611,7 +648,7 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 					if tt.shouldDeriveToken {
 						require.Equal(t, []byte("mocked-remote-token-address"), op.Transactions[0].Data)
 					} else {
-						require.Equal(t, []byte(fmt.Sprintf("%d-token", op.ChainSelector)), op.Transactions[0].Data)
+						require.Equal(t, fmt.Appendf(nil, "%d-token", op.ChainSelector), op.Transactions[0].Data)
 					}
 					require.Equal(t, fmt.Sprintf("%d-token-pool", op.ChainSelector), op.Transactions[0].To)
 				}

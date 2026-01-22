@@ -1,6 +1,6 @@
 {
   "name": "@chainlink/contracts-ccip",
-  "version": "1.6.3",
+  "version": "1.6.4",
   "description": "Chainlink smart contracts for CCIP",
   "author": "Chainlink devs",
   "repository": "github:smartcontractkit/chainlink-ccip",
@@ -48,14 +48,14 @@
   },
   "dependencies": {
     "@chainlink/contracts": "1.5.0",
-    "@changesets/cli": "^2.29.7",
-    "@changesets/get-github-info": "^0.6.0",
+    "@changesets/cli": "^2.29.8",
+    "@changesets/get-github-info": "^0.7.0",
     "@openzeppelin/contracts-4.8.3": "npm:@openzeppelin/contracts@4.8.3",
     "@openzeppelin/contracts-5.3.0": "npm:@openzeppelin/contracts@5.3.0",
-    "semver": "^7.7.2"
+    "semver": "^7.7.3"
   },
   "devDependencies": {
-    "solhint": "^6.0.1",
+    "solhint": "^6.0.2",
     "solhint-plugin-chainlink-solidity": "github:smartcontractkit/chainlink-solhint-rules#v1.2.1"
   },
   "pnpm": {

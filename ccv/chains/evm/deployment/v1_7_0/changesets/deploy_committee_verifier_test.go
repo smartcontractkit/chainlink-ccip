@@ -67,7 +67,7 @@ func TestDeployCommitteeVerifier_VerifyPreconditions(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			mcmsRegistry := cs_core.NewMCMSReaderRegistry()
+			mcmsRegistry := cs_core.GetRegistry()
 			err := changesets.DeployCommitteeVerifier(mcmsRegistry).VerifyPreconditions(*e, test.input)
 			if test.expectedErr != "" {
 				require.ErrorContains(t, err, test.expectedErr, "Expected error containing %q but got none", test.expectedErr)
@@ -111,7 +111,7 @@ func TestDeployCommitteeVerifier_Apply_MultipleQualifiersOnSameChain(t *testing.
 	require.NoError(t, ds.Addresses().Add(rmnAddressRef))
 	e.DataStore = ds.Seal()
 
-	mcmsRegistry := cs_core.NewMCMSReaderRegistry()
+	mcmsRegistry := cs_core.GetRegistry()
 
 	// 1) First run with qualifier "alpha"
 	paramsAlpha := basicDeployCommitteeVerifierParams()

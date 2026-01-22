@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -556,19 +558,17 @@ func (o observerImpl) ObserveLatestOnRampSeqNums(ctx context.Context) []pluginty
 	supportedSourceChains := mapset.NewSet(allSourceChains...).
 		Intersect(supportedChains).ToSlice()
 
-	sort.Slice(supportedSourceChains, func(i, j int) bool { return supportedSourceChains[i] < supportedSourceChains[j] })
+	slices.Sort(supportedSourceChains)
 
 	mu := &sync.Mutex{}
 	latestOnRampSeqNums := make([]plugintypes.SeqNumChain, 0, len(supportedSourceChains))
 
 	wg := &sync.WaitGroup{}
 	for _, sourceChain := range supportedSourceChains {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			latestOnRampSeqNum, err := o.ccipReader.LatestMsgSeqNum(ctx, sourceChain)
 			if err != nil {
-				if errors.Is(err, contractreader.ErrNoBindings) {
+				if isNoBindingsError(err) {
 					// when a source chain is disabled there will not be a binding for the onRamp contract
 					// we don't want to log this as an error.
 					lggr.Debugw("no bindings for source chain, ignore if chain is disabled", "sourceChain", sourceChain)
@@ -584,7 +584,7 @@ func (o observerImpl) ObserveLatestOnRampSeqNums(ctx context.Context) []pluginty
 				plugintypes.NewSeqNumChain(sourceChain, latestOnRampSeqNum),
 			)
 			mu.Unlock()
-		}()
+		})
 	}
 	wg.Wait()
 
@@ -613,9 +613,7 @@ func (o observerImpl) ObserveMerkleRoots(
 	wg := sync.WaitGroup{}
 	for _, chainRange := range ranges {
 		if supportedChains.Contains(chainRange.ChainSel) {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 				msgs, err := o.ccipReader.MsgsBetweenSeqNums(ctx, chainRange.ChainSel, chainRange.SeqNumRange)
 				if err != nil {
 					lggr.Warnw("call to MsgsBetweenSeqNums failed", "err", err)
@@ -675,7 +673,7 @@ func (o observerImpl) ObserveMerkleRoots(
 				rootsMu.Lock()
 				roots = append(roots, merkleRoot)
 				rootsMu.Unlock()
-			}()
+			})
 		}
 	}
 	wg.Wait()
@@ -777,4 +775,15 @@ func (o observerImpl) ObserveFChain(ctx context.Context) map[cciptypes.ChainSele
 
 func (o observerImpl) Close() error {
 	return nil
+}
+
+// isNoBindingsError checks if the error is a no bindings error. We check both for the sentinel error
+// and for the error message containing "no bindings" to cover different implementations since not all
+// chain accessors use contract reader anymore.
+// TODO: consider adding chain-agnostic ChainAccessor error types to cl-common.
+func isNoBindingsError(err error) bool {
+	if err == nil {
+		return false
+	}
+	return errors.Is(err, contractreader.ErrNoBindings) || strings.Contains(err.Error(), "no bindings")
 }

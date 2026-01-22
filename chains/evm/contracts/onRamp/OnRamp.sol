@@ -30,6 +30,7 @@ import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/Enumera
 contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender {
   using SafeERC20 for IERC20;
   using EnumerableSet for EnumerableSet.AddressSet;
+  using EnumerableSet for EnumerableSet.UintSet;
   using USDPriceWith18Decimals for uint224;
 
   error CannotSendZeroTokens();
@@ -59,6 +60,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     address indexed sender,
     bytes32 indexed messageId,
     address feeToken,
+    uint256 tokenAmountBeforeTokenPoolFees,
     bytes encodedMessage,
     Receipt[] receipts,
     bytes[] verifierBlobs
@@ -156,6 +158,9 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   // DYNAMIC CONFIG
   /// @dev The dynamic config for the onRamp.
   DynamicConfig private s_dynamicConfig;
+
+  /// @notice Set of destination chain selectors.
+  EnumerableSet.UintSet internal s_destChainSelectors;
 
   /// @dev The destination chain specific configs.
   mapping(uint64 destChainSelector => DestChainConfig destChainConfig) internal s_destChainConfigs;
@@ -347,6 +352,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       sender: originalSender,
       messageId: messageId,
       feeToken: message.feeToken,
+      tokenAmountBeforeTokenPoolFees: message.tokenAmounts.length != 0 ? message.tokenAmounts[0].amount : 0,
       encodedMessage: eventData.encodedMessage,
       receipts: eventData.receipts,
       verifierBlobs: eventData.verifierBlobs
@@ -651,6 +657,9 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       }
       destChainConfig.offRamp = destChainConfigArg.offRamp;
 
+      // We don't need to check the return value, as inserting the item twice has no effect.
+      s_destChainSelectors.add(destChainSelector);
+
       emit DestChainConfigSet(destChainSelector, destChainConfig.messageNumber, destChainConfigArg);
     }
   }
@@ -662,6 +671,19 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     uint64 destChainSelector
   ) external view returns (DestChainConfig memory destChainConfig) {
     return s_destChainConfigs[destChainSelector];
+  }
+
+  /// @notice Returns all destination chain configs.
+  /// @return destChainSelectors The supported destination chain selectors.
+  /// @return destChainConfigs The destination chain configs corresponding to all the supported chain selectors.
+  function getAllDestChainConfigs() external view returns (uint64[] memory, DestChainConfig[] memory) {
+    DestChainConfig[] memory destChainConfigs = new DestChainConfig[](s_destChainSelectors.length());
+    uint64[] memory destChainSelectors = new uint64[](s_destChainSelectors.length());
+    for (uint256 i = 0; i < s_destChainSelectors.length(); ++i) {
+      destChainSelectors[i] = uint64(s_destChainSelectors.at(i));
+      destChainConfigs[i] = s_destChainConfigs[destChainSelectors[i]];
+    }
+    return (destChainSelectors, destChainConfigs);
   }
 
   // ================================================================

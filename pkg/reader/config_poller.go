@@ -3,6 +3,7 @@ package reader
 import (
 	"context"
 	"fmt"
+	"maps"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -90,9 +91,7 @@ func newConfigPoller(
 
 // startBackgroundPolling starts a goroutine that periodically refreshes the cache
 func (c *configPoller) startBackgroundPolling() {
-	c.wg.Add(1)
-	go func() {
-		defer c.wg.Done()
+	c.wg.Go(func() {
 		ticker := time.NewTicker(c.refreshPeriod)
 		defer ticker.Stop()
 
@@ -104,7 +103,7 @@ func (c *configPoller) startBackgroundPolling() {
 				return
 			}
 		}
-	}()
+	})
 }
 
 func (c *configPoller) Start(ctx context.Context) error {
@@ -591,9 +590,7 @@ func (c *configPoller) GetOfframpSourceChainConfigs(
 	}
 
 	// Merge the new configs with existing cached results
-	for chain, config := range newCachedConfigs {
-		cachedSourceConfigs[chain] = config
-	}
+	maps.Copy(cachedSourceConfigs, newCachedConfigs)
 
 	return cachedSourceConfigs, nil
 }
@@ -772,7 +769,7 @@ func staticSourceChainConfigFromSourceChainConfig(sc cciptypes.SourceChainConfig
 }
 
 // resultProcessor defines a function type for processing individual results
-type resultProcessor func(interface{}) error
+type resultProcessor func(any) error
 
 // Ensure configCache implements ConfigPoller
 var _ ConfigPoller = (*configPoller)(nil)

@@ -12,10 +12,11 @@ import (
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations"
 	seq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
-	api "github.com/smartcontractkit/chainlink-ccip/deployment/v1_0"
+	api "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 )
 
 type EVMTransferOwnershipAdapter struct {
@@ -26,7 +27,15 @@ func (a *EVMTransferOwnershipAdapter) InitializeTimelockAddress(e deployment.Env
 	evmChains := e.BlockChains.EVMChains()
 	a.timelockAddr = make(map[uint64]common.Address)
 	for sel := range evmChains {
-		addr, err := datastore_utils.FindAndFormatRef(e.DataStore, input.TimelockAddressRef, sel, evm_datastore_utils.ToEVMAddress)
+		// Use GetAddressRef with qualifier and version to properly filter timelocks
+		timelockRef := datastore_utils.GetAddressRef(
+			e.DataStore.Addresses().Filter(),
+			sel,
+			utils.RBACTimelock,
+			ops.MCMSVersion,
+			input.Qualifier,
+		)
+		addr, err := evm_datastore_utils.ToEVMAddress(timelockRef)
 		if err != nil {
 			return fmt.Errorf("failed to find timelock address for chain %d: %w", sel, err)
 		}

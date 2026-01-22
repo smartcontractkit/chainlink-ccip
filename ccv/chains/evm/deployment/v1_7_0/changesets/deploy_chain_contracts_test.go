@@ -5,6 +5,8 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/stretchr/testify/require"
+
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
@@ -17,7 +19,6 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
-	"github.com/stretchr/testify/require"
 )
 
 func TestDeployChainContracts_VerifyPreconditions(t *testing.T) {
@@ -57,7 +58,7 @@ func TestDeployChainContracts_VerifyPreconditions(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			mcmsRegistry := cs_core.NewMCMSReaderRegistry()
+			mcmsRegistry := cs_core.GetRegistry()
 			err := changesets.DeployChainContracts(mcmsRegistry).VerifyPreconditions(*e, test.input)
 			if test.expectedErr != "" {
 				require.ErrorContains(t, err, test.expectedErr, "Expected error containing %q but got none", test.expectedErr)
@@ -113,7 +114,7 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 			require.NoError(t, err, "Failed to fetch addresses from datastore")
 			e.DataStore = ds.Seal() // Override datastore in environment to include existing addresses
 
-			mcmsRegistry := cs_core.NewMCMSReaderRegistry()
+			mcmsRegistry := cs_core.GetRegistry()
 			create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[5009297550715157269], contract_utils.DeployInput[create2_factory.ConstructorArgs]{
 				TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
 				ChainSelector:  5009297550715157269,

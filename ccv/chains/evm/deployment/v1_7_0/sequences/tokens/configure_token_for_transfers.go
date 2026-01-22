@@ -26,18 +26,42 @@ var ConfigureTokenForTransfers = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found", input.ChainSelector)
 		}
 
-		tokenAddress, err := cldf_ops.ExecuteOperation(b, token_pool.GetToken, chain, evm_contract.FunctionInput[any]{
+		var tokenAddress common.Address
+		if input.TokenAddress != "" {
+			tokenAddress = common.HexToAddress(input.TokenAddress)
+		} else {
+			tokenAddrReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetToken, chain, evm_contract.FunctionInput[any]{
+				ChainSelector: input.ChainSelector,
+				Address:       common.HexToAddress(input.TokenPoolAddress),
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token address from token pool with address %s on %s: %w", input.TokenPoolAddress, chain, err)
+			}
+			tokenAddress = tokenAddrReport.Output
+		}
+		tokenPoolAddress := common.HexToAddress(input.TokenPoolAddress)
+		registryTokenPoolAddress := tokenPoolAddress
+		if input.RegistryTokenPoolAddress != "" {
+			registryTokenPoolAddress = common.HexToAddress(input.RegistryTokenPoolAddress)
+		}
+
+		// Validate the pool supports the token
+		isSupported, err := cldf_ops.ExecuteOperation(b, token_pool.IsSupportedToken, chain, evm_contract.FunctionInput[common.Address]{
 			ChainSelector: input.ChainSelector,
-			Address:       common.HexToAddress(input.TokenPoolAddress),
+			Address:       tokenPoolAddress,
+			Args:          tokenAddress,
 		})
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to get token address from token pool with address %s on %s: %w", input.TokenPoolAddress, chain, err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to check if token %s is supported by token pool %s on %s: %w", tokenAddress, tokenPoolAddress, chain, err)
+		}
+		if !isSupported.Output {
+			return sequences.OnChainOutput{}, fmt.Errorf("token %s is not supported by token pool %s", tokenAddress, tokenPoolAddress)
 		}
 
 		// Configure minimum block confirmation
 		configureMinBlockConfirmationReport, err := cldf_ops.ExecuteOperation(b, token_pool.SetMinBlockConfirmation, chain, evm_contract.FunctionInput[uint16]{
 			ChainSelector: input.ChainSelector,
-			Address:       common.HexToAddress(input.TokenPoolAddress),
+			Address:       tokenPoolAddress,
 			Args:          input.MinFinalityValue,
 		})
 		if err != nil {
@@ -52,7 +76,7 @@ var ConfigureTokenForTransfers = cldf_ops.NewSequence(
 		// Get the advanced pool hooks address
 		advancedPoolHooksAddress, err := cldf_ops.ExecuteOperation(b, token_pool.GetAdvancedPoolHooks, chain, evm_contract.FunctionInput[any]{
 			ChainSelector: input.ChainSelector,
-			Address:       common.HexToAddress(input.TokenPoolAddress),
+			Address:       tokenPoolAddress,
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get advanced pool hooks address from token pool with address %s on %s: %w", input.TokenPoolAddress, chain, err)
@@ -62,7 +86,7 @@ var ConfigureTokenForTransfers = cldf_ops.NewSequence(
 		for remoteChainSelector, remoteChainConfig := range input.RemoteChains {
 			configureTokenPoolForRemoteChainReport, err := cldf_ops.ExecuteSequence(b, ConfigureTokenPoolForRemoteChain, chain, ConfigureTokenPoolForRemoteChainInput{
 				ChainSelector:       input.ChainSelector,
-				TokenPoolAddress:    common.HexToAddress(input.TokenPoolAddress),
+				TokenPoolAddress:    tokenPoolAddress,
 				AdvancedPoolHooks:   advancedPoolHooksAddress.Output,
 				RemoteChainSelector: remoteChainSelector,
 				RemoteChainConfig:   remoteChainConfig,
@@ -76,8 +100,8 @@ var ConfigureTokenForTransfers = cldf_ops.NewSequence(
 		// Register the token with the token admin registry
 		registerTokenReport, err := cldf_ops.ExecuteSequence(b, v1_5_0.RegisterToken, chain, v1_5_0.RegisterTokenInput{
 			ChainSelector:             input.ChainSelector,
-			TokenAddress:              tokenAddress.Output,
-			TokenPoolAddress:          common.HexToAddress(input.TokenPoolAddress),
+			TokenAddress:              tokenAddress,
+			TokenPoolAddress:          registryTokenPoolAddress,
 			ExternalAdmin:             common.HexToAddress(input.ExternalAdmin),
 			TokenAdminRegistryAddress: common.HexToAddress(input.RegistryAddress),
 		})

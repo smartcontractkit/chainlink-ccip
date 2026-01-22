@@ -195,7 +195,7 @@ func TestDeployCCTPChain(t *testing.T) {
 
 	indexAddressesByTypeAndVersion = func(_ cldf_ops.Bundle, _ evm.Chain, _ []string) (map[string]string, error) {
 		return map[string]string{
-			deployment.NewTypeAndVersion("USDCTokenPool", *semver.MustParse("1.6.4")).String():       cctpV1Pool.Hex(),
+			deployment.NewTypeAndVersion("USDCTokenPool", *semver.MustParse("1.6.2")).String():       cctpV1Pool.Hex(),
 			deployment.NewTypeAndVersion("USDCTokenPoolCCTPV2", *semver.MustParse("1.6.4")).String(): cctpV2Pool.Hex(),
 			deployment.NewTypeAndVersion("SiloedUSDCTokenPool", *semver.MustParse("1.7.0")).String(): siloedUSDCTokenPool.Hex(),
 		}, nil
@@ -269,6 +269,20 @@ func TestDeployCCTPChain(t *testing.T) {
 	require.NotEqual(t, common.Address{}, cctpVerifierAddr, "CCTPVerifier address should be set")
 	require.NotEqual(t, common.Address{}, usdcTokenPoolProxyAddr, "USDCTokenPoolProxy address should be set")
 	require.NotEqual(t, common.Address{}, cctpVerifierResolverAddr, "CCTPVerifierResolver address should be set")
+
+	// Token admin registry should point to the USDCTokenPoolProxy
+	tokenConfigReport, err := operations.ExecuteOperation(
+		testsetup.BundleWithFreshReporter(e.OperationsBundle),
+		token_admin_registry.GetTokenConfig,
+		chain,
+		contract_utils.FunctionInput[common.Address]{
+			ChainSelector: input.ChainSelector,
+			Address:       setup.TokenAdminRegistry,
+			Args:          common.HexToAddress(setup.USDCToken.Hex()),
+		},
+	)
+	require.NoError(t, err, "Failed to get token config from token admin registry")
+	require.Equal(t, usdcTokenPoolProxyAddr, tokenConfigReport.Output.TokenPool, "Token pool in registry should be the proxy")
 
 	// Check CCTPTokenPool dynamic config
 	cctpTokenPool, err := cctp_through_ccv_token_pool_bindings.NewCCTPThroughCCVTokenPool(cctpTokenPoolAddr, chain.Client)

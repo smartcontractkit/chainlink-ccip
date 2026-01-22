@@ -17,7 +17,7 @@ import (
 
 var ConfigureTokenForTransfers = cldf_ops.NewSequence(
 	"configure-token-for-transfers",
-	semver.MustParse("1.7.0"),
+	semver.MustParse("1.6.1"),
 	"Configures a token on an EVM chain for usage with CCIP",
 	func(b cldf_ops.Bundle, chains chain.BlockChains, input tokens.ConfigureTokenForTransfersInput) (output sequences.OnChainOutput, err error) {
 		ops := make([]mcms_types.BatchOperation, 0)
@@ -26,19 +26,43 @@ var ConfigureTokenForTransfers = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found", input.ChainSelector)
 		}
 
-		tokenAddress, err := cldf_ops.ExecuteOperation(b, token_pool.GetToken, chain, evm_contract.FunctionInput[any]{
+		var tokenAddress common.Address
+		if input.TokenAddress != "" {
+			tokenAddress = common.HexToAddress(input.TokenAddress)
+		} else {
+			tokenAddrReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetToken, chain, evm_contract.FunctionInput[any]{
+				ChainSelector: input.ChainSelector,
+				Address:       common.HexToAddress(input.TokenPoolAddress),
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token address from token pool with address %s on %s: %w", input.TokenPoolAddress, chain, err)
+			}
+			tokenAddress = tokenAddrReport.Output
+		}
+		tokenPoolAddress := common.HexToAddress(input.TokenPoolAddress)
+		registryTokenPoolAddress := tokenPoolAddress
+		if input.RegistryTokenPoolAddress != "" {
+			registryTokenPoolAddress = common.HexToAddress(input.RegistryTokenPoolAddress)
+		}
+
+		// Validate the pool supports the token
+		isSupported, err := cldf_ops.ExecuteOperation(b, token_pool.IsSupportedToken, chain, evm_contract.FunctionInput[common.Address]{
 			ChainSelector: input.ChainSelector,
-			Address:       common.HexToAddress(input.TokenPoolAddress),
+			Address:       tokenPoolAddress,
+			Args:          tokenAddress,
 		})
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to get token address from token pool with address %s on %s: %w", input.TokenPoolAddress, chain, err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to check if token %s is supported by token pool %s on %s: %w", tokenAddress, tokenPoolAddress, chain, err)
+		}
+		if !isSupported.Output {
+			return sequences.OnChainOutput{}, fmt.Errorf("token %s is not supported by token pool %s", tokenAddress, tokenPoolAddress)
 		}
 
 		// Configure token pool for each remote chain
 		for remoteChainSelector, remoteChainConfig := range input.RemoteChains {
 			configureTokenPoolForRemoteChainReport, err := cldf_ops.ExecuteSequence(b, ConfigureTokenPoolForRemoteChain, chain, ConfigureTokenPoolForRemoteChainInput{
 				ChainSelector:       input.ChainSelector,
-				TokenPoolAddress:    common.HexToAddress(input.TokenPoolAddress),
+				TokenPoolAddress:    tokenPoolAddress,
 				RemoteChainSelector: remoteChainSelector,
 				RemoteChainConfig:   remoteChainConfig,
 			})
@@ -51,8 +75,8 @@ var ConfigureTokenForTransfers = cldf_ops.NewSequence(
 		// Register the token with the token admin registry
 		registerTokenReport, err := cldf_ops.ExecuteSequence(b, v1_5_0.RegisterToken, chain, v1_5_0.RegisterTokenInput{
 			ChainSelector:             input.ChainSelector,
-			TokenAddress:              tokenAddress.Output,
-			TokenPoolAddress:          common.HexToAddress(input.TokenPoolAddress),
+			TokenAddress:              tokenAddress,
+			TokenPoolAddress:          registryTokenPoolAddress,
 			ExternalAdmin:             common.HexToAddress(input.ExternalAdmin),
 			TokenAdminRegistryAddress: common.HexToAddress(input.RegistryAddress),
 		})

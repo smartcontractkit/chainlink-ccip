@@ -39,11 +39,12 @@ type ccipChainReader struct {
 	contractReaders map[cciptypes.ChainSelector]contractreader.Extended
 	contractWriters map[cciptypes.ChainSelector]types.ContractWriter
 
-	destChain      cciptypes.ChainSelector
-	offrampAddress string
-	configPoller   ConfigPoller
-	addrCodec      cciptypes.AddressCodec
-	donAddressBook *addressbook.Book
+	destChain             cciptypes.ChainSelector
+	offrampAddress        string
+	configPoller          ConfigPoller
+	addrCodec             cciptypes.AddressCodec
+	donAddressBook        *addressbook.Book
+	populateTxHashEnabled bool
 }
 
 func newCCIPChainReaderInternal(
@@ -55,6 +56,7 @@ func newCCIPChainReaderInternal(
 	destChain cciptypes.ChainSelector,
 	offrampAddress []byte,
 	addrCodec cciptypes.AddressCodec,
+	populateTxHashEnabled bool,
 ) (*ccipChainReader, error) {
 	return newCCIPChainReaderWithConfigPollerInternal(
 		ctx,
@@ -66,6 +68,7 @@ func newCCIPChainReaderInternal(
 		offrampAddress,
 		addrCodec,
 		nil,
+		populateTxHashEnabled,
 	)
 }
 
@@ -79,6 +82,7 @@ func newCCIPChainReaderWithConfigPollerInternal(
 	offrampAddress []byte,
 	addrCodec cciptypes.AddressCodec,
 	configPoller ConfigPoller,
+	populateTxHashEnabled bool,
 ) (*ccipChainReader, error) {
 	var crs = make(map[cciptypes.ChainSelector]contractreader.Extended)
 	for chainSelector, cr := range contractReaders {
@@ -92,14 +96,15 @@ func newCCIPChainReaderWithConfigPollerInternal(
 	}
 
 	reader := &ccipChainReader{
-		lggr:            lggr,
-		contractReaders: crs,
-		contractWriters: contractWriters,
-		accessors:       chainAccessors,
-		destChain:       destChain,
-		offrampAddress:  offrampAddrStr,
-		addrCodec:       addrCodec,
-		donAddressBook:  addressbook.NewBook(),
+		lggr:                  lggr,
+		contractReaders:       crs,
+		contractWriters:       contractWriters,
+		accessors:             chainAccessors,
+		destChain:             destChain,
+		offrampAddress:        offrampAddrStr,
+		addrCodec:             addrCodec,
+		donAddressBook:        addressbook.NewBook(),
+		populateTxHashEnabled: populateTxHashEnabled,
 	}
 
 	// Initialize cache with readers
@@ -267,6 +272,13 @@ func (r *ccipChainReader) MsgsBetweenSeqNums(
 	// Ensure the onRamp address hasn't changed during the query.
 	if !bytes.Equal(onRampAddressBeforeQuery, onRampAddressAfterQuery) {
 		return nil, fmt.Errorf("onRamp address has changed from %s to %s", onRampAddressBeforeQuery, onRampAddressAfterQuery)
+	}
+
+	// Clear TxHash if population is disabled
+	if !r.populateTxHashEnabled {
+		for i := range messages {
+			messages[i].Header.TxHash = ""
+		}
 	}
 
 	return messages, nil
@@ -458,9 +470,7 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 		// Capture loop variable
 		chain := chainSelector
 
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 
 			chainAccessor, err := getChainAccessor(r.accessors, chain)
 			if err != nil {
@@ -476,7 +486,7 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 			nativeTokenAddress := config.Router.WrappedNativeAddress
 
 			if cciptypes.UnknownAddress(nativeTokenAddress).IsZeroOrEmpty() {
-				lggr.Warnw("Native token address is zero or empty. Ignore for disabled chains otherwise "+
+				lggr.Debug("Native token address is zero or empty. Ignore for disabled chains otherwise "+
 					"check for router misconfiguration", "chain", chain, "address", nativeTokenAddress.String())
 				return
 			}
@@ -499,7 +509,7 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 			mu.Lock()
 			prices[chain] = cciptypes.NewBigInt(price.Value)
 			mu.Unlock()
-		}()
+		})
 	}
 
 	wg.Wait()
@@ -1365,7 +1375,7 @@ func (r *ccipChainReader) processOfframpResults(
 	// Define processors for each expected result
 	processors := []resultProcessor{
 		// CommitLatestOCRConfig
-		func(val interface{}) error {
+		func(val any) error {
 			typed, ok := val.(*cciptypes.OCRConfigResponse)
 			if !ok {
 				return fmt.Errorf("invalid type for CommitLatestOCRConfig: %T", val)
@@ -1374,7 +1384,7 @@ func (r *ccipChainReader) processOfframpResults(
 			return nil
 		},
 		// ExecLatestOCRConfig
-		func(val interface{}) error {
+		func(val any) error {
 			typed, ok := val.(*cciptypes.OCRConfigResponse)
 			if !ok {
 				return fmt.Errorf("invalid type for ExecLatestOCRConfig: %T", val)
@@ -1383,7 +1393,7 @@ func (r *ccipChainReader) processOfframpResults(
 			return nil
 		},
 		// StaticConfig
-		func(val interface{}) error {
+		func(val any) error {
 			typed, ok := val.(*cciptypes.OffRampStaticChainConfig)
 			if !ok {
 				return fmt.Errorf("invalid type for StaticConfig: %T", val)
@@ -1392,7 +1402,7 @@ func (r *ccipChainReader) processOfframpResults(
 			return nil
 		},
 		// DynamicConfig
-		func(val interface{}) error {
+		func(val any) error {
 			typed, ok := val.(*cciptypes.OffRampDynamicChainConfig)
 			if !ok {
 				return fmt.Errorf("invalid type for DynamicConfig: %T", val)

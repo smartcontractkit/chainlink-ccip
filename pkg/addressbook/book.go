@@ -2,6 +2,7 @@ package addressbook
 
 import (
 	"errors"
+	"maps"
 	"sync"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
@@ -73,9 +74,7 @@ func (b *Book) InsertOrUpdate(addresses ContractAddresses) error {
 		}
 
 		// if contract exists, set or replace any existing address for each chain
-		for chain, addr := range chains {
-			b.mem[name][chain] = addr
-		}
+		maps.Copy(b.mem[name], chains)
 	}
 
 	return nil

@@ -6,7 +6,6 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	tokens_core "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -37,8 +36,9 @@ const (
 var (
 	cctpQualifier = "CCTP"
 
-	// This sequence assumes that CCTP V2 and CCTP V1 are all on pool version 1.6.4
-	prevVersion        = semver.MustParse("1.6.4")
+	// This sequence assumes that CCTP V2 pools are on version 1.6.4 and CCTP V1 pools on 1.6.2
+	cctpV2PrevVersion  = semver.MustParse("1.6.4")
+	cctpV1PrevVersion  = semver.MustParse("1.6.2")
 	cctpV2ContractType = deployment.ContractType("USDCTokenPoolCCTPV2")
 	cctpV1ContractType = deployment.ContractType("USDCTokenPool")
 )
@@ -57,7 +57,7 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found", input.ChainSelector)
 		}
 
-		// Deploy CCTPTokenPool & advanced pool hooks if needed
+		// Index already-deployed CCTPTokenPool & advanced pool hooks addresses if present
 		poolTypeAndVersionToAddr, err := indexAddressesByTypeAndVersion(b, chain, input.TokenPool)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to index addresses by type and version: %w", err)
@@ -137,7 +137,7 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 			cctpVerifierResolverAddress = deployVerifierResolverViaCREATE2Report.Output.Addresses[0].Address
 		}
 
-		// Deploy CCTPTokenPool if needed
+		// Deploy CCTPThroughCCVTokenPool if needed
 		cctpTokenPoolAddress := poolTypeAndVersionToAddr[deployment.NewTypeAndVersion(cctp_through_ccv_token_pool.ContractType, *cctp_through_ccv_token_pool.Version).String()]
 		if cctpTokenPoolAddress == "" {
 			cctpTokenPoolReport, err := cldf_ops.ExecuteOperation(b, cctp_through_ccv_token_pool.Deploy, chain, contract_utils.DeployInput[cctp_through_ccv_token_pool.ConstructorArgs]{
@@ -175,19 +175,9 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 		// Deploy USDCTokenPoolProxy if needed
 		usdcTokenPoolProxyAddress := poolTypeAndVersionToAddr[deployment.NewTypeAndVersion(usdc_token_pool_proxy.ContractType, *usdc_token_pool_proxy.Version).String()]
 		if usdcTokenPoolProxyAddress == "" {
-			cctpV1PoolAddress := poolTypeAndVersionToAddr[deployment.NewTypeAndVersion(cctpV1ContractType, *prevVersion).String()]
-			if cctpV1PoolAddress == "" {
-				return sequences.OnChainOutput{}, fmt.Errorf("cctp v1 pool with type and version %s not found", deployment.NewTypeAndVersion(cctpV1ContractType, *prevVersion).String())
-			}
-			cctpV2PoolAddress := poolTypeAndVersionToAddr[deployment.NewTypeAndVersion(cctpV2ContractType, *prevVersion).String()]
-			if cctpV2PoolAddress == "" {
-				return sequences.OnChainOutput{}, fmt.Errorf("cctp v2 pool with type and version %s not found", deployment.NewTypeAndVersion(cctpV2ContractType, *prevVersion).String())
-			}
-			// Siloed lock release pool is required on Ethereum mainnet and Ethereum testnet Sepolia
+			cctpV1PoolAddress := poolTypeAndVersionToAddr[deployment.NewTypeAndVersion(cctpV1ContractType, *cctpV1PrevVersion).String()]
+			cctpV2PoolAddress := poolTypeAndVersionToAddr[deployment.NewTypeAndVersion(cctpV2ContractType, *cctpV2PrevVersion).String()]
 			siloedLockReleasePoolAddress := poolTypeAndVersionToAddr[deployment.NewTypeAndVersion(siloed_usdc_token_pool.ContractType, *siloed_usdc_token_pool.Version).String()]
-			if siloedLockReleasePoolAddress == "" && (input.ChainSelector == chain_selectors.ETHEREUM_MAINNET.Selector || input.ChainSelector == chain_selectors.ETHEREUM_TESTNET_SEPOLIA.Selector) {
-				return sequences.OnChainOutput{}, fmt.Errorf("siloed lock release pool with type and version %s not found", deployment.NewTypeAndVersion(siloed_usdc_token_pool.ContractType, *siloed_usdc_token_pool.Version).String())
-			}
 
 			usdcTokenPoolProxyReport, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_proxy.Deploy, chain, contract_utils.DeployInput[usdc_token_pool_proxy.ConstructorArgs]{
 				TypeAndVersion: deployment.NewTypeAndVersion(usdc_token_pool_proxy.ContractType, *usdc_token_pool_proxy.Version),
@@ -387,11 +377,13 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 			remoteChains[remoteChainSelector] = remoteChain.TokenPoolConfig
 		}
 		configureTokenForTransfersReport, err := cldf_ops.ExecuteSequence(b, tokens_sequences.ConfigureTokenForTransfers, chains, tokens_core.ConfigureTokenForTransfersInput{
-			ChainSelector:    input.ChainSelector,
-			TokenPoolAddress: cctpTokenPoolAddress,
-			RegistryAddress:  input.TokenAdminRegistry,
-			MinFinalityValue: input.MinFinalityValue,
-			RemoteChains:     remoteChains,
+			ChainSelector:            input.ChainSelector,
+			TokenAddress:             input.USDCToken,
+			TokenPoolAddress:         cctpTokenPoolAddress,
+			RegistryTokenPoolAddress: usdcTokenPoolProxyAddress,
+			RegistryAddress:          input.TokenAdminRegistry,
+			MinFinalityValue:         input.MinFinalityValue,
+			RemoteChains:             remoteChains,
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to configure token for transfers: %w", err)

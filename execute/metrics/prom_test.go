@@ -441,7 +441,7 @@ func Test_ExecLatency(t *testing.T) {
 
 	t.Run("multiple latency outcomes", func(t *testing.T) {
 		passCounter := 10
-		for i := 0; i < passCounter; i++ {
+		for range passCounter {
 			reporter.TrackLatency(exectypes.Filter, plugincommon.OutcomeMethod, time.Second, nil)
 		}
 		l2 := internal.CounterFromHistogramByLabels(t, reporter.latencyHistogram, "solana", chainID, "outcome", "Filter")
@@ -450,7 +450,7 @@ func Test_ExecLatency(t *testing.T) {
 
 	t.Run("multiple latency observation with errors", func(t *testing.T) {
 		errCounter := 5
-		for i := 0; i < errCounter; i++ {
+		for range errCounter {
 			reporter.TrackLatency(exectypes.GetMessages, plugincommon.ObservationMethod, time.Second, fmt.Errorf("error"))
 		}
 		errs := testutil.ToFloat64(
@@ -489,7 +489,7 @@ func Test_LatencyAndErrors(t *testing.T) {
 		method := "observation"
 
 		passCounter := 10
-		for i := 0; i < passCounter; i++ {
+		for range passCounter {
 			reporter.TrackProcessorLatency(processor, method, time.Second, nil)
 		}
 		l2 := internal.CounterFromHistogramByLabels(
@@ -503,7 +503,7 @@ func Test_LatencyAndErrors(t *testing.T) {
 		method := "outcome"
 
 		errCounter := 5
-		for i := 0; i < errCounter; i++ {
+		for range errCounter {
 			reporter.TrackProcessorLatency(processor, method, time.Second, fmt.Errorf("error"))
 		}
 		errs := testutil.ToFloat64(
@@ -515,6 +515,74 @@ func Test_LatencyAndErrors(t *testing.T) {
 	require.Contains(t, b.String(), "ccip_exec_processor_latency")
 }
 
+func Test_TrackLooppProviderSupported(t *testing.T) {
+	var b strings.Builder
+	bhClient, _ := beholder.NewWriterClient(&b)
+	reporter, err := NewPromReporter(logger.Test(t), selector, *bhClient)
+	require.NoError(t, err)
+
+	t.Cleanup(cleanupMetrics(reporter))
+
+	tcs := []struct {
+		name           string
+		supportedMap   map[string]bool
+		expectedValues map[string]float64
+	}{
+		{
+			name:           "empty map should not report anything",
+			supportedMap:   map[string]bool{},
+			expectedValues: map[string]float64{},
+		},
+		{
+			name: "single chain family supported",
+			supportedMap: map[string]bool{
+				"evm": true,
+			},
+			expectedValues: map[string]float64{
+				"evm": 1,
+			},
+		},
+		{
+			name: "single chain family not supported",
+			supportedMap: map[string]bool{
+				"solana": false,
+			},
+			expectedValues: map[string]float64{
+				"solana": 0,
+			},
+		},
+		{
+			name: "multiple chain families with mixed support",
+			supportedMap: map[string]bool{
+				"evm":    false,
+				"solana": true,
+				"ton":    false,
+			},
+			expectedValues: map[string]float64{
+				"evm":    0,
+				"solana": 1,
+				"ton":    0,
+			},
+		},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			reporter.TrackLooppProviderSupported(tc.supportedMap)
+
+			for chainFamily, expectedValue := range tc.expectedValues {
+				value := testutil.ToFloat64(
+					reporter.looppProviderSupported.WithLabelValues(chainFamily),
+				)
+				require.Equal(t, expectedValue, value,
+					"chain family %s should have value %f, got %f", chainFamily, expectedValue, value)
+			}
+		})
+	}
+	bhClient.Close()
+	require.Contains(t, b.String(), "ccip_exec_loopp_ccip_provider_supported")
+}
+
 func cleanupMetrics(p *PromReporter) func() {
 	return func() {
 		p.sequenceNumbers.Reset()
@@ -523,5 +591,6 @@ func cleanupMetrics(p *PromReporter) func() {
 		p.execErrors.Reset()
 		p.processorLatencyHistogram.Reset()
 		p.processorErrors.Reset()
+		p.looppProviderSupported.Reset()
 	}
 }
