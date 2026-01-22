@@ -5,6 +5,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -59,5 +60,28 @@ var GetSourceChainConfig = contract.NewRead(contract.ReadParams[uint64, SourceCh
 	NewContract:  offramp.NewOffRamp,
 	CallContract: func(offRamp *offramp.OffRamp, opts *bind.CallOpts, args uint64) (SourceChainConfig, error) {
 		return offRamp.GetSourceChainConfig(opts, args)
+	},
+})
+
+type GetAllSourceChainConfigsResult struct {
+	SourceChainSelectors []uint64
+	SourceChainConfigs   []SourceChainConfig
+}
+
+var GetAllSourceChainConfigs = contract.NewRead(contract.ReadParams[any, GetAllSourceChainConfigsResult, *offramp.OffRamp]{
+	Name:         "off-ramp:get-all-source-chain-configs",
+	Version:      Version,
+	Description:  "Gets all source chain configurations from the OffRamp",
+	ContractType: ContractType,
+	NewContract:  offramp.NewOffRamp,
+	CallContract: func(offRamp *offramp.OffRamp, opts *bind.CallOpts, args any) (GetAllSourceChainConfigsResult, error) {
+		sourceChainSelectors, sourceChainConfigs, err := offRamp.GetAllSourceChainConfigs(opts)
+		if err != nil {
+			return GetAllSourceChainConfigsResult{}, err
+		}
+		return GetAllSourceChainConfigsResult{
+			SourceChainSelectors: sourceChainSelectors,
+			SourceChainConfigs:   sourceChainConfigs,
+		}, nil
 	},
 })

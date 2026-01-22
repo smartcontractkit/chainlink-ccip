@@ -511,6 +511,22 @@ func collectRouterMetadata(
 		contractMetadata = append(contractMetadata, onRampMetadata)
 	}
 
+	// Collect OffRamp metadata for each unique OffRamp
+	uniqueOffRamps := make(map[string]struct{})
+	for _, offRampAddrs := range offRampsByChain {
+		for _, offRampAddr := range offRampAddrs {
+			uniqueOffRamps[offRampAddr] = struct{}{}
+		}
+	}
+
+	for offRampAddr := range uniqueOffRamps {
+		offRampMetadata, err := collectOffRampSourceChainConfigsMetadata(b, chain, offRampAddr, chainSelector)
+		if err != nil {
+			return contractMetadata, fmt.Errorf("failed to collect OffRamp metadata for %s: %w", offRampAddr, err)
+		}
+		contractMetadata = append(contractMetadata, offRampMetadata)
+	}
+
 	return contractMetadata, nil
 }
 
@@ -568,6 +584,64 @@ func collectOnRampDestChainConfigsMetadata(
 		ChainSelector: chainSelector,
 		Metadata: map[string]interface{}{
 			"destChainConfigs": destChainConfigsList,
+		},
+	}, nil
+}
+
+// collectOffRampSourceChainConfigsMetadata collects all source chain configs from an OffRamp and returns metadata
+func collectOffRampSourceChainConfigsMetadata(
+	b cldf_ops.Bundle,
+	chain evm.Chain,
+	offRampAddr string,
+	chainSelector uint64,
+) (datastore.ContractMetadata, error) {
+	// Read all source chain configs from the OffRamp
+	getAllConfigsReport, err := cldf_ops.ExecuteOperation(b, offramp.GetAllSourceChainConfigs, chain, contract.FunctionInput[any]{
+		ChainSelector: chainSelector,
+		Address:       common.HexToAddress(offRampAddr),
+		Args:          nil,
+	})
+	if err != nil {
+		return datastore.ContractMetadata{}, fmt.Errorf("failed to read all source chain configs from OffRamp(%s) on chain %s: %w", offRampAddr, chain, err)
+	}
+
+	// Convert source chain configs to JSON-serializable format
+	sourceChainConfigsList := make([]map[string]interface{}, 0, len(getAllConfigsReport.Output.SourceChainSelectors))
+	for i, sourceChainSelector := range getAllConfigsReport.Output.SourceChainSelectors {
+		config := getAllConfigsReport.Output.SourceChainConfigs[i]
+
+		// Convert CCV addresses to hex strings
+		defaultCCVsHex := make([]string, len(config.DefaultCCVs))
+		for j, ccv := range config.DefaultCCVs {
+			defaultCCVsHex[j] = ccv.Hex()
+		}
+
+		laneMandatedCCVsHex := make([]string, len(config.LaneMandatedCCVs))
+		for j, ccv := range config.LaneMandatedCCVs {
+			laneMandatedCCVsHex[j] = ccv.Hex()
+		}
+
+		// Convert OnRamps bytes to hex strings
+		onRampsHex := make([]string, len(config.OnRamps))
+		for j, onRampBytes := range config.OnRamps {
+			onRampsHex[j] = fmt.Sprintf("0x%x", onRampBytes)
+		}
+
+		sourceChainConfigsList = append(sourceChainConfigsList, map[string]interface{}{
+			"sourceChainSelector": sourceChainSelector,
+			"router":              config.Router.Hex(),
+			"isEnabled":           config.IsEnabled,
+			"onRamps":             onRampsHex,
+			"defaultCCVs":         defaultCCVsHex,
+			"laneMandatedCCVs":    laneMandatedCCVsHex,
+		})
+	}
+
+	return datastore.ContractMetadata{
+		Address:       offRampAddr,
+		ChainSelector: chainSelector,
+		Metadata: map[string]interface{}{
+			"sourceChainConfigs": sourceChainConfigsList,
 		},
 	}, nil
 }

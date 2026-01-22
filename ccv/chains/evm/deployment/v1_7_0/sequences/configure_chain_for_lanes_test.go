@@ -901,6 +901,79 @@ func TestConfigureChainForLanes_Metadata(t *testing.T) {
 			}
 			require.True(t, onRampMetadataFound, "Should have found OnRamp metadata")
 
+			// Test OffRamp metadata (sourceChainConfigs)
+			offRampMetadataFound := false
+			for _, contractMeta := range configureReport.Output.Metadata.Contracts {
+				if contractMeta.Address == offRamp && contractMeta.ChainSelector == chainSelector {
+					offRampMetadataFound = true
+					require.Equal(t, offRamp, contractMeta.Address, "OffRamp metadata should have correct address")
+					require.Equal(t, chainSelector, contractMeta.ChainSelector, "OffRamp metadata should have correct chain selector")
+
+					metaMap, ok := contractMeta.Metadata.(map[string]interface{})
+					require.True(t, ok, "OffRamp metadata should be a map[string]interface{}")
+
+					// Verify sourceChainConfigs list exists
+					sourceChainConfigsValue, ok := metaMap["sourceChainConfigs"]
+					require.True(t, ok, "sourceChainConfigs should exist in OffRamp metadata")
+					sourceChainConfigsList, ok := sourceChainConfigsValue.([]interface{})
+					if !ok {
+						// Try []map[string]interface{} (might not have gone through JSON round-trip)
+						sourceChainConfigsListMap, okMap := sourceChainConfigsValue.([]map[string]interface{})
+						require.True(t, okMap, "sourceChainConfigs should be a []interface{} or []map[string]interface{}, got %T", sourceChainConfigsValue)
+						sourceChainConfigsList = make([]interface{}, len(sourceChainConfigsListMap))
+						for i, m := range sourceChainConfigsListMap {
+							sourceChainConfigsList[i] = m
+						}
+					}
+					require.Len(t, sourceChainConfigsList, 1, "Should have one source chain config")
+
+					// Verify the source chain config structure
+					configMap, ok := sourceChainConfigsList[0].(map[string]interface{})
+					require.True(t, ok, "Each source chain config should be a map[string]interface{}")
+
+					// Verify sourceChainSelector
+					sourceChainSelectorValue := configMap["sourceChainSelector"]
+					switch v := sourceChainSelectorValue.(type) {
+					case uint64:
+						require.Equal(t, remoteChainSelector, v, "Source chain config should have correct sourceChainSelector")
+					case float64:
+						require.Equal(t, float64(remoteChainSelector), v, "Source chain config should have correct sourceChainSelector")
+					default:
+						require.Fail(t, "sourceChainSelector should be uint64 or float64, got %T", sourceChainSelectorValue)
+					}
+
+					// Verify router
+					routerValue, ok := configMap["router"].(string)
+					require.True(t, ok, "router should be a string")
+					require.Equal(t, routerAddress, routerValue, "Source chain config should have correct router address")
+
+					// Verify isEnabled
+					isEnabledValue, ok := configMap["isEnabled"].(bool)
+					require.True(t, ok, "isEnabled should be a bool")
+					require.True(t, isEnabledValue, "Source chain config should be enabled")
+
+					// Verify onRamps
+					onRampsValue, ok := configMap["onRamps"].([]interface{})
+					if !ok {
+						// Try []string (might not have gone through JSON round-trip)
+						onRampsStr, okStr := configMap["onRamps"].([]string)
+						require.True(t, okStr, "onRamps should be []interface{} or []string, got %T", configMap["onRamps"])
+						onRampsValue = make([]interface{}, len(onRampsStr))
+						for i, s := range onRampsStr {
+							onRampsValue[i] = s
+						}
+					}
+					require.True(t, len(onRampsValue) > 0, "onRamps should not be empty")
+
+					// Verify other fields exist
+					require.Contains(t, configMap, "defaultCCVs", "Source chain config should have defaultCCVs")
+					require.Contains(t, configMap, "laneMandatedCCVs", "Source chain config should have laneMandatedCCVs")
+
+					break
+				}
+			}
+			require.True(t, offRampMetadataFound, "Should have found OffRamp metadata")
+
 			// Output metadata to JSON file for inspection
 			metadataJSON, err := json.MarshalIndent(configureReport.Output.Metadata, "", "  ")
 			require.NoError(t, err, "Failed to marshal metadata to JSON")
