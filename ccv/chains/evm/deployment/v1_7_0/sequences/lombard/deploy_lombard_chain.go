@@ -39,7 +39,7 @@ var DeployLombardChain = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found", input.ChainSelector)
 		}
 
-		verifierTypeAndVersionToAddr, err := indexAddressesByTypeAndVersion(b, chain, input.CCTPVerifier)
+		verifierTypeAndVersionToAddr, err := indexAddressesByTypeAndVersion(b, chain, input.LombardVerifier)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to index addresses by type and version: %w", err)
 		}
@@ -50,7 +50,7 @@ var DeployLombardChain = cldf_ops.NewSequence(
 		if lombardVerifierAddress == "" {
 			lombardVerifierReport, err := cldf_ops.ExecuteOperation(b, lombard_verifier.Deploy, chain, contract_utils.DeployInput[lombard_verifier.ConstructorArgs]{
 				TypeAndVersion: deployment.NewTypeAndVersion(lombard_verifier.ContractType, *lombard_verifier.Version),
-				ChainSelector:  input.Selector,
+				ChainSelector:  input.ChainSelector,
 				Qualifier:      &lombardQualifier,
 				Args: lombard_verifier.ConstructorArgs{
 					Bridge:           common.HexToAddress(input.Bridge),
@@ -58,7 +58,7 @@ var DeployLombardChain = cldf_ops.NewSequence(
 					DynamicConfig: lombard_verifier.DynamicConfig{
 						FeeAggregator: common.HexToAddress(input.FeeAggregator),
 					},
-					RMN: common.HexToAddress(input.RMN),
+					RMN: common.HexToAddress(input.RMN.Address),
 				},
 			})
 			if err != nil {
@@ -74,7 +74,7 @@ var DeployLombardChain = cldf_ops.NewSequence(
 			}
 
 			deployVerifierResolverViaCREATE2Report, err := cldf_ops.ExecuteSequence(b, v1_7_0_sequences.DeployVerifierResolverViaCREATE2, chain, v1_7_0_sequences.DeployVerifierResolverViaCREATE2Input{
-				ChainSelector:  input.Selector,
+				ChainSelector:  input.ChainSelector,
 				Qualifier:      lombardQualifier,
 				Type:           datastore.ContractType(lombard_verifier.ResolverType),
 				Version:        lombard_verifier.Version,
