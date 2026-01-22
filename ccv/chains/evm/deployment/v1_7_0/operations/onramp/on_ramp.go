@@ -1,8 +1,6 @@
 package onramp
 
 import (
-	"fmt"
-
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -120,15 +118,13 @@ var GetAllDestChainConfigs = contract.NewRead(contract.ReadParams[any, GetAllDes
 	ContractType: ContractType,
 	NewContract:  onramp.NewOnRamp,
 	CallContract: func(onRamp *onramp.OnRamp, opts *bind.CallOpts, _ any) (GetAllDestChainConfigsResult, error) {
-		// TODO: Uncomment once gobindings are regenerated with GetAllDestChainConfigs
-		// selectors, configs, err := onRamp.GetAllDestChainConfigs(opts)
-		// if err != nil {
-		// 	return GetAllDestChainConfigsResult{}, err
-		// }
-		// return GetAllDestChainConfigsResult{
-		// 	DestChainSelectors: selectors,
-		// 	DestChainConfigs:   configs,
-		// }, nil
-		return GetAllDestChainConfigsResult{}, fmt.Errorf("GetAllDestChainConfigs not yet available in gobindings")
+		selectors, configs, err := onRamp.GetAllDestChainConfigs(opts)
+		if err != nil {
+			return GetAllDestChainConfigsResult{}, err
+		}
+		return GetAllDestChainConfigsResult{
+			DestChainSelectors: selectors,
+			DestChainConfigs:   configs,
+		}, nil
 	},
 })

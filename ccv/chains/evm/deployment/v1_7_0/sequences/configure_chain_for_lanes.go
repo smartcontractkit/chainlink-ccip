@@ -497,5 +497,77 @@ func collectRouterMetadata(
 		},
 	})
 
+	// Collect OnRamp metadata for each unique OnRamp
+	uniqueOnRamps := make(map[string]struct{})
+	for _, onRampAddr := range onRampsByChain {
+		uniqueOnRamps[onRampAddr] = struct{}{}
+	}
+
+	for onRampAddr := range uniqueOnRamps {
+		onRampMetadata, err := collectOnRampDestChainConfigsMetadata(b, chain, onRampAddr, chainSelector)
+		if err != nil {
+			return contractMetadata, fmt.Errorf("failed to collect OnRamp metadata for %s: %w", onRampAddr, err)
+		}
+		contractMetadata = append(contractMetadata, onRampMetadata)
+	}
+
 	return contractMetadata, nil
+}
+
+// collectOnRampDestChainConfigsMetadata collects all destination chain configs from an OnRamp and returns metadata
+func collectOnRampDestChainConfigsMetadata(
+	b cldf_ops.Bundle,
+	chain evm.Chain,
+	onRampAddr string,
+	chainSelector uint64,
+) (datastore.ContractMetadata, error) {
+	// Read all destination chain configs from the OnRamp
+	getAllConfigsReport, err := cldf_ops.ExecuteOperation(b, onramp.GetAllDestChainConfigs, chain, contract.FunctionInput[any]{
+		ChainSelector: chainSelector,
+		Address:       common.HexToAddress(onRampAddr),
+		Args:          nil,
+	})
+	if err != nil {
+		return datastore.ContractMetadata{}, fmt.Errorf("failed to read all dest chain configs from OnRamp(%s) on chain %s: %w", onRampAddr, chain, err)
+	}
+
+	// Convert dest chain configs to JSON-serializable format
+	destChainConfigsList := make([]map[string]interface{}, 0, len(getAllConfigsReport.Output.DestChainSelectors))
+	for i, destChainSelector := range getAllConfigsReport.Output.DestChainSelectors {
+		config := getAllConfigsReport.Output.DestChainConfigs[i]
+
+		// Convert CCV addresses to hex strings
+		defaultCCVsHex := make([]string, len(config.DefaultCCVs))
+		for j, ccv := range config.DefaultCCVs {
+			defaultCCVsHex[j] = ccv.Hex()
+		}
+
+		laneMandatedCCVsHex := make([]string, len(config.LaneMandatedCCVs))
+		for j, ccv := range config.LaneMandatedCCVs {
+			laneMandatedCCVsHex[j] = ccv.Hex()
+		}
+
+		destChainConfigsList = append(destChainConfigsList, map[string]interface{}{
+			"destChainSelector":         destChainSelector,
+			"router":                    config.Router.Hex(),
+			"messageNumber":             config.MessageNumber,
+			"addressBytesLength":        config.AddressBytesLength,
+			"tokenReceiverAllowed":      config.TokenReceiverAllowed,
+			"messageNetworkFeeUSDCents": config.MessageNetworkFeeUSDCents,
+			"tokenNetworkFeeUSDCents":   config.TokenNetworkFeeUSDCents,
+			"baseExecutionGasCost":      config.BaseExecutionGasCost,
+			"defaultExecutor":           config.DefaultExecutor.Hex(),
+			"laneMandatedCCVs":          laneMandatedCCVsHex,
+			"defaultCCVs":               defaultCCVsHex,
+			"offRamp":                   fmt.Sprintf("0x%x", config.OffRamp),
+		})
+	}
+
+	return datastore.ContractMetadata{
+		Address:       onRampAddr,
+		ChainSelector: chainSelector,
+		Metadata: map[string]interface{}{
+			"destChainConfigs": destChainConfigsList,
+		},
+	}, nil
 }

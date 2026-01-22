@@ -831,6 +831,76 @@ func TestConfigureChainForLanes_Metadata(t *testing.T) {
 			}
 			require.True(t, routerMetadataFound, "Should have found Router metadata")
 
+			// Test OnRamp metadata (destChainConfigs)
+			onRampMetadataFound := false
+			for _, contractMeta := range configureReport.Output.Metadata.Contracts {
+				if contractMeta.Address == onRamp && contractMeta.ChainSelector == chainSelector {
+					onRampMetadataFound = true
+					require.Equal(t, onRamp, contractMeta.Address, "OnRamp metadata should have correct address")
+					require.Equal(t, chainSelector, contractMeta.ChainSelector, "OnRamp metadata should have correct chain selector")
+
+					metaMap, ok := contractMeta.Metadata.(map[string]interface{})
+					require.True(t, ok, "OnRamp metadata should be a map[string]interface{}")
+
+					// Verify destChainConfigs list exists
+					destChainConfigsValue, ok := metaMap["destChainConfigs"]
+					require.True(t, ok, "destChainConfigs should exist in OnRamp metadata")
+					destChainConfigsList, ok := destChainConfigsValue.([]interface{})
+					if !ok {
+						// Try []map[string]interface{} (might not have gone through JSON round-trip)
+						destChainConfigsListMap, okMap := destChainConfigsValue.([]map[string]interface{})
+						require.True(t, okMap, "destChainConfigs should be a []interface{} or []map[string]interface{}, got %T", destChainConfigsValue)
+						destChainConfigsList = make([]interface{}, len(destChainConfigsListMap))
+						for i, m := range destChainConfigsListMap {
+							destChainConfigsList[i] = m
+						}
+					}
+					require.Len(t, destChainConfigsList, 1, "Should have one dest chain config")
+
+					// Verify the dest chain config structure
+					configMap, ok := destChainConfigsList[0].(map[string]interface{})
+					require.True(t, ok, "Each dest chain config should be a map[string]interface{}")
+
+					// Verify destChainSelector
+					destChainSelectorValue := configMap["destChainSelector"]
+					switch v := destChainSelectorValue.(type) {
+					case uint64:
+						require.Equal(t, remoteChainSelector, v, "Dest chain config should have correct destChainSelector")
+					case float64:
+						require.Equal(t, float64(remoteChainSelector), v, "Dest chain config should have correct destChainSelector")
+					default:
+						require.Fail(t, "destChainSelector should be uint64 or float64, got %T", destChainSelectorValue)
+					}
+
+					// Verify router
+					routerValue, ok := configMap["router"].(string)
+					require.True(t, ok, "router should be a string")
+					require.Equal(t, routerAddress, routerValue, "Dest chain config should have correct router address")
+
+					// Verify defaultExecutor
+					defaultExecutorValue, ok := configMap["defaultExecutor"].(string)
+					require.True(t, ok, "defaultExecutor should be a string")
+					require.Equal(t, executorAddress, defaultExecutorValue, "Dest chain config should have correct defaultExecutor address")
+
+					// Verify offRamp
+					offRampValue, ok := configMap["offRamp"].(string)
+					require.True(t, ok, "offRamp should be a string")
+					require.True(t, len(offRampValue) > 0, "offRamp should not be empty")
+
+					// Verify other fields exist
+					require.Contains(t, configMap, "addressBytesLength", "Dest chain config should have addressBytesLength")
+					require.Contains(t, configMap, "baseExecutionGasCost", "Dest chain config should have baseExecutionGasCost")
+					require.Contains(t, configMap, "tokenReceiverAllowed", "Dest chain config should have tokenReceiverAllowed")
+					require.Contains(t, configMap, "messageNetworkFeeUSDCents", "Dest chain config should have messageNetworkFeeUSDCents")
+					require.Contains(t, configMap, "tokenNetworkFeeUSDCents", "Dest chain config should have tokenNetworkFeeUSDCents")
+					require.Contains(t, configMap, "defaultCCVs", "Dest chain config should have defaultCCVs")
+					require.Contains(t, configMap, "laneMandatedCCVs", "Dest chain config should have laneMandatedCCVs")
+
+					break
+				}
+			}
+			require.True(t, onRampMetadataFound, "Should have found OnRamp metadata")
+
 			// Output metadata to JSON file for inspection
 			metadataJSON, err := json.MarshalIndent(configureReport.Output.Metadata, "", "  ")
 			require.NoError(t, err, "Failed to marshal metadata to JSON")
