@@ -39,7 +39,11 @@ var DeployLombardChain = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found", input.ChainSelector)
 		}
 
-		verifierTypeAndVersionToAddr, err := indexAddressesByTypeAndVersion(b, chain, input.LombardVerifier)
+		verifierAddresses := make([]string, len(input.LombardVerifier))
+		for i, addrRef := range input.LombardVerifier {
+			verifierAddresses[i] = addrRef.Address
+		}
+		verifierTypeAndVersionToAddr, err := indexAddressesByTypeAndVersion(b, chain, verifierAddresses)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to index addresses by type and version: %w", err)
 		}
