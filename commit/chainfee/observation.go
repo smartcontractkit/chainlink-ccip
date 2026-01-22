@@ -132,8 +132,12 @@ func feeUpdatesFromTimestampedBig(
 ) map[cciptypes.ChainSelector]Update {
 	chainFeeUpdates := make(map[cciptypes.ChainSelector]Update, len(updates))
 	for chain, u := range updates {
+		value := big.NewInt(0)
+		if u.Value.Int != nil {
+			value = u.Value.Int
+		}
 		chainFeeUpdates[chain] = Update{
-			ChainFee:  fromPackedFee(u.Value.Int),
+			ChainFee:  fromPackedFee(value),
 			Timestamp: u.Timestamp,
 		}
 	}

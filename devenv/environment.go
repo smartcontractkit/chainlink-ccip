@@ -122,7 +122,7 @@ func NewEnvironment() (*Cfg, error) {
 
 	impls := make([]CCIP16ProductConfiguration, 0)
 	for _, bc := range in.Blockchains {
-		impl, err := NewCCIPImplFromNetwork(bc.Type)
+		impl, err := NewCCIPImplFromNetwork(bc.Type, bc.ChainID)
 		if err != nil {
 			return nil, err
 		}
@@ -250,33 +250,17 @@ func NewEnvironment() (*Cfg, error) {
 		if err != nil {
 			return nil, fmt.Errorf("funding nodes: %w", err)
 		}
-		var family string
-		switch in.Blockchains[i].Type {
-		case "anvil", "geth":
-			family = chainsel.FamilyEVM
-		case "solana":
-			family = chainsel.FamilySolana
-			nodeKeyBundles[family] = nkb
-		case "ton":
-			family = chainsel.FamilyTon
-			nodeKeyBundles[family] = nkb
-		default:
-			return nil, fmt.Errorf("unsupported blockchain type: %s", in.Blockchains[i].Type)
-		}
-		networkInfo, err := chainsel.GetChainDetailsByChainIDAndFamily(in.Blockchains[i].ChainID, family)
+		selector := impl.ChainSelector()
+		L.Info().Uint64("Selector", selector).Msg("Deployed chain selector")
+		err = impl.PreDeployContractsForSelector(ctx, e, in.NodeSets, selector, CCIPHomeChain, crAddr.String())
 		if err != nil {
 			return nil, err
 		}
-		L.Info().Uint64("Selector", networkInfo.ChainSelector).Msg("Deployed chain selector")
-		err = impl.PreDeployContractsForSelector(ctx, e, in.NodeSets, networkInfo.ChainSelector, CCIPHomeChain, crAddr.String())
+		dsi, err := devenvcommon.DeployContractsForSelector(ctx, e, in.NodeSets, selector, CCIPHomeChain, crAddr.String())
 		if err != nil {
 			return nil, err
 		}
-		dsi, err := devenvcommon.DeployContractsForSelector(ctx, e, in.NodeSets, networkInfo.ChainSelector, CCIPHomeChain, crAddr.String())
-		if err != nil {
-			return nil, err
-		}
-		err = impl.PostDeployContractsForSelector(ctx, e, in.NodeSets, networkInfo.ChainSelector, CCIPHomeChain, crAddr.String())
+		err = impl.PostDeployContractsForSelector(ctx, e, in.NodeSets, selector, CCIPHomeChain, crAddr.String())
 		if err != nil {
 			return nil, err
 		}

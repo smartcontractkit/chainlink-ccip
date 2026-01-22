@@ -87,7 +87,7 @@ func NewForkedEnvironment() (*Cfg, error) {
 
 	impls := make([]CCIP16ProductConfiguration, 0)
 	for _, bc := range in.Blockchains {
-		impl, err := NewCCIPImplFromNetwork(bc.Type)
+		impl, err := NewCCIPImplFromNetwork(bc.Type, bc.ChainID)
 		if err != nil {
 			return nil, err
 		}
