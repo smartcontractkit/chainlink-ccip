@@ -6,6 +6,7 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
+
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 )
@@ -65,7 +66,7 @@ type FeeQuoterDestChainConfig struct {
 	DefaultTxGasLimit                 uint32
 	GasMultiplierWeiPerEth            uint64
 	GasPriceStalenessThreshold        uint32
-	NetworkFeeUSDCents                uint32
+	NetworkFeeUSDCents                uint16
 }
 
 type ConnectChainsConfig struct {
