@@ -10,6 +10,7 @@ contract MockPolicyEngine is IPolicyEngine {
   using EnumerableSet for EnumerableSet.AddressSet;
 
   error MockPolicyEngineRejection(string reason);
+  error NoPayloadRecorded();
 
   EnumerableSet.AddressSet internal s_attachedTargets;
   bool internal s_shouldRevert;
@@ -75,7 +76,7 @@ contract MockPolicyEngine is IPolicyEngine {
 
   /// @notice Returns the last payload passed to run().
   function getLastPayload() external view returns (Payload memory) {
-    require(s_payloadRecorded, "No payload recorded");
+    if (!s_payloadRecorded) revert NoPayloadRecorded();
     return s_lastPayload;
   }
 
