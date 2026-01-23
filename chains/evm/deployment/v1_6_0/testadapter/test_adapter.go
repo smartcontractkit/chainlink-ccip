@@ -272,7 +272,7 @@ func (a *EVMAdapter[S]) GetExtraArgs(receiver []byte, sourceFamily string, opts 
 	switch sourceFamily {
 	case chain_selectors.FamilyEVM:
 		return ccipcommon.SerializeClientGenericExtraArgsV2(msg_hasher163.ClientGenericExtraArgsV2{
-			GasLimit:                 new(big.Int).SetUint64(100_000_000),
+			GasLimit:                 new(big.Int).SetUint64(100_000),
 			AllowOutOfOrderExecution: true,
 		})
 	case chain_selectors.FamilySolana:

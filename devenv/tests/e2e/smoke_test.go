@@ -78,12 +78,16 @@ func TestE2ESmoke(t *testing.T) {
 			fromImpl := selectorsToImpl[tc.fromSelector]
 			toImpl := selectorsToImpl[tc.toSelector]
 
+			receiver := toImpl.CCIPReceiver()
+			extraArgs, err := toImpl.GetExtraArgs(receiver, fromImpl.Family())
+			require.NoError(t, err)
+
 			msg, err := fromImpl.BuildMessage(testadapters.MessageComponents{
 				DestChainSelector: tc.toSelector,
-				Receiver:          toImpl.CCIPReceiver(),
+				Receiver:          receiver,
 				Data:              []byte("hello eoa"),
 				FeeToken:          "",
-				ExtraArgs:         nil,
+				ExtraArgs:         extraArgs,
 				TokenAmounts:      nil,
 			})
 			require.NoError(t, err)
