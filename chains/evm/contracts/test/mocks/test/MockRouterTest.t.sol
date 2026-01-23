@@ -1,6 +1,7 @@
 pragma solidity ^0.8.24;
 
 import {Client} from "../../../libraries/Client.sol";
+import {ExtraArgsCodec} from "../../../libraries/ExtraArgsCodec.sol";
 import {TokenSetup} from "../../TokenSetup.t.sol";
 import {IRouterClient, MockCCIPRouter} from "../MockRouter.sol";
 
@@ -72,6 +73,11 @@ contract MockRouterTest is TokenSetup {
     Client.GenericExtraArgsV2 memory extraArgs =
       Client.GenericExtraArgsV2({gasLimit: 500_000, allowOutOfOrderExecution: true});
     message.extraArgs = Client._argsToBytes(extraArgs);
+    mockRouter.ccipSend{value: 0.1 ether}(MOCK_CHAIN_SELECTOR, message);
+  }
+
+  function test_ccipSendWithGenericExtraArgsV3() public {
+    message.extraArgs = ExtraArgsCodec._getBasicEncodedExtraArgsV3(500_000, 0);
     mockRouter.ccipSend{value: 0.1 ether}(MOCK_CHAIN_SELECTOR, message);
   }
 
