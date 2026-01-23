@@ -30,7 +30,7 @@ func TestE2ESmoke(t *testing.T) {
 	selectorsToImpl := make(map[uint64]ccip.CCIP16ProductConfiguration)
 
 	for _, bc := range in.Blockchains {
-		i, err := ccip.NewCCIPImplFromNetwork(bc.Out.Type, bc.Out.ChainID)
+		i, err := ccip.NewCCIPImplFromNetwork(bc.Type, bc.ChainID)
 		require.NoError(t, err)
 		i.SetCLDF(e)
 		family, err := chainsel.GetSelectorFamily(i.ChainSelector())
@@ -80,7 +80,7 @@ func TestE2ESmoke(t *testing.T) {
 
 			msg, err := fromImpl.BuildMessage(testadapters.MessageComponents{
 				DestChainSelector: tc.toSelector,
-				Receiver:          []byte{}, // TODO:
+				Receiver:          toImpl.CCIPReceiver(),
 				Data:              []byte("hello eoa"),
 				FeeToken:          "",
 				ExtraArgs:         nil,

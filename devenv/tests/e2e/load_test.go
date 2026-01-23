@@ -161,7 +161,7 @@ func TestE2ELoad(t *testing.T) {
 
 	impls := make([]ccip.CCIP16ProductConfiguration, 0)
 	for _, bc := range in.Blockchains {
-		i, err := ccip.NewCCIPImplFromNetwork(bc.Out.Type, bc.Out.ChainID)
+		i, err := ccip.NewCCIPImplFromNetwork(bc.Type, bc.ChainID)
 		require.NoError(t, err)
 		i.SetCLDF(e)
 		impls = append(impls, i)

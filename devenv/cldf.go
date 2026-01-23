@@ -35,6 +35,10 @@ import (
 
 	ccipEVM "github.com/smartcontractkit/chainlink-ccip/devenv/chainimpl/ccip-evm"
 	ccipSolana "github.com/smartcontractkit/chainlink-ccip/devenv/chainimpl/ccip-solana"
+
+	// Register test adapters
+	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/testadapter"
+	_ "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/testadapter"
 )
 
 type initOptions struct {
@@ -110,7 +114,7 @@ func NewCLDFOperationsEnvironment(bc []*blockchain.Input, dataStore datastore.Da
 							Name:               "default",
 							WSURL:              rpcWSURL,
 							HTTPURL:            rpcHTTPURL,
-							PreferredURLScheme: rpcclient.URLSchemePreferenceHTTP,
+							PreferredURLScheme: rpcclient.URLSchemePreferenceWS,
 						},
 					},
 					ConfirmFunctor: cldf_evm_provider.ConfirmFuncGeth(1*time.Minute, cldf_evm_provider.WithTickInterval(5*time.Millisecond)),

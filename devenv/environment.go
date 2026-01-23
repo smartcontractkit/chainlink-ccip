@@ -251,6 +251,21 @@ func NewEnvironment() (*Cfg, error) {
 			return nil, fmt.Errorf("funding nodes: %w", err)
 		}
 		selector := impl.ChainSelector()
+
+		var family string
+		switch in.Blockchains[i].Type {
+		case "anvil", "geth":
+			// NOTE: this seems like a massive hack, why not for EVM?
+			family = chainsel.FamilyEVM
+		case "solana":
+			family = chainsel.FamilySolana
+			nodeKeyBundles[family] = nkb
+		case "ton":
+			family = chainsel.FamilyTon
+			nodeKeyBundles[family] = nkb
+		default:
+			return nil, fmt.Errorf("unsupported blockchain type: %s", in.Blockchains[i].Type)
+		}
 		L.Info().Uint64("Selector", selector).Msg("Deployed chain selector")
 		err = impl.PreDeployContractsForSelector(ctx, e, in.NodeSets, selector, CCIPHomeChain, crAddr.String())
 		if err != nil {

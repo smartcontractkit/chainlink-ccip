@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gagliardetto/solana-go"
 	solrpc "github.com/gagliardetto/solana-go/rpc"
@@ -69,6 +70,10 @@ func (c *CommitReportTracker) allCommited(sourceChainSelector uint64) bool {
 	return true
 }
 
+func init() {
+	testadapters.GetTestAdapterRegistry().RegisterTestAdapter(chain_selectors.FamilySolana, semver.MustParse("1.6.0"), NewSVMAdapter)
+}
+
 type SVMAdapter[S testadapters.StateProvider] struct {
 	state S
 	cldf_solana.Chain
@@ -82,7 +87,7 @@ type SVMAdapter[S testadapters.StateProvider] struct {
 // NOTE: since this returns a copy, adapters shouldn't be constructed until everything is deployed
 // s := state.SolChains[c.ChainSelector()]
 
-func NewSVMAdapter(env deployment.Environment, selector uint64) testadapters.TestAdapter {
+func NewSVMAdapter(env *deployment.Environment, selector uint64) testadapters.TestAdapter {
 	c, ok := env.BlockChains.SolanaChains()[selector]
 	if !ok {
 		panic(fmt.Sprintf("chain not found: %d", selector))
@@ -132,15 +137,6 @@ func (a *SVMAdapter[S]) SendMessage(ctx context.Context, destChainSelector uint6
 		return 0, errors.New("expected ccip_router.SVM2AnyMessage")
 	}
 
-	// a := &solanaseqs.SolanaAdapter{}
-	// receiver := common.LeftPadBytes(common.HexToAddress("0xdead").Bytes(), 32)
-	// msg := ccip_router.SVM2AnyMessage{
-	// 	Receiver:     receiver,
-	// 	Data:         []byte("hello eoa"),
-	// 	TokenAmounts: nil,
-	// 	FeeToken:     solana.PublicKey{},
-	// 	ExtraArgs:    nil,
-	// }
 	routerID, err := a.getAddress(datastore.ContractType("Router"))
 	if err != nil {
 		return 0, fmt.Errorf("failed to get router address: %w", err)
@@ -296,6 +292,8 @@ func (a *SVMAdapter[S]) GetExtraArgs(receiver []byte, sourceFamily string, opts 
 			ComputeUnits:             80_000,
 			AllowOutOfOrderExecution: true,
 		})
+	case chain_selectors.FamilySolana:
+		panic("unimplemented GetExtraArgs(solana->solana)")
 	default:
 		// TODO: add support for other families
 		return nil, fmt.Errorf("unsupported source family: %s", sourceFamily)
@@ -303,7 +301,6 @@ func (a *SVMAdapter[S]) GetExtraArgs(receiver []byte, sourceFamily string, opts 
 }
 
 func (a *SVMAdapter[S]) GetInboundNonce(ctx context.Context, sender []byte, srcSel uint64) (uint64, error) {
-	// TODO: solcommon.FindNoncePDA expected the sender to be a solana pubkey
 	chainSelectorLE := solcommon.Uint64ToLE(a.Selector)
 	routerAddress, err := a.getAddress(datastore.ContractType("Router"))
 	if err != nil {

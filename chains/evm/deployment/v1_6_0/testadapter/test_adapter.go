@@ -5,19 +5,24 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math/big"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
+	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/nonce_manager"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
+	msg_hasher163 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/message_hasher"
+	ccipcommon "github.com/smartcontractkit/chainlink-ccip/deployment/common"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testadapters"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
@@ -97,12 +102,16 @@ type StateProvider[T any] interface {
 	GetNonceManagerAddress() (T, error)
 }
 
+func init() {
+	testadapters.GetTestAdapterRegistry().RegisterTestAdapter(chain_selectors.FamilyEVM, semver.MustParse("1.6.0"), NewEVMAdapter)
+}
+
 type EVMAdapter[S testadapters.StateProvider] struct {
 	state S
 	cldf_evm.Chain
 }
 
-func NewEVMAdapter(env deployment.Environment, selector uint64) testadapters.TestAdapter {
+func NewEVMAdapter(env *deployment.Environment, selector uint64) testadapters.TestAdapter {
 	// TODO: tron needs to use TronChains
 	c, ok := env.BlockChains.EVMChains()[selector]
 	if !ok {
@@ -165,21 +174,6 @@ func (a *EVMAdapter[S]) SendMessage(ctx context.Context, destChainSelector uint6
 	// 	if err != nil {
 	// 		return fmt.Errorf("failed to convert TON address to bytes: %w", err)
 	// 	}
-	// 	extraArgs, err = devenvcommon.SerializeClientGenericExtraArgsV2(msg_hasher163.ClientGenericExtraArgsV2{
-	// 		GasLimit:                 new(big.Int).SetUint64(100_000_000),
-	// 		AllowOutOfOrderExecution: true,
-	// 	})
-	// 	if err != nil {
-	// 		return fmt.Errorf("failed to serialize TON extra args: %w", err)
-	// 	}
-	//
-	// msg := router.ClientEVM2AnyMessage{
-	// 	Receiver:     receiver,
-	// 	Data:         []byte("hello eoa"),
-	// 	TokenAmounts: nil,
-	// 	FeeToken:     common.HexToAddress("0x0"),
-	// 	ExtraArgs:    extraArgs,
-	// }
 
 	const errCodeInsufficientFee = "0x07da6ee6"
 	const cannotDecodeErrorReason = "could not decode error reason"
@@ -275,7 +269,18 @@ func (a *EVMAdapter[S]) NativeFeeToken() string {
 }
 
 func (a *EVMAdapter[S]) GetExtraArgs(receiver []byte, sourceFamily string, opts ...testadapters.ExtraArgOpt) ([]byte, error) {
-	return nil, nil
+	switch sourceFamily {
+	case chain_selectors.FamilyEVM:
+		return ccipcommon.SerializeClientGenericExtraArgsV2(msg_hasher163.ClientGenericExtraArgsV2{
+			GasLimit:                 new(big.Int).SetUint64(100_000_000),
+			AllowOutOfOrderExecution: true,
+		})
+	case chain_selectors.FamilySolana:
+		panic("unimplemented GetExtraArgs(solana->evm)")
+	default:
+		// TODO: add support for other families
+		return nil, fmt.Errorf("unsupported source family: %s", sourceFamily)
+	}
 }
 
 func (a *EVMAdapter[S]) GetInboundNonce(ctx context.Context, sender []byte, srcSel uint64) (uint64, error) {
