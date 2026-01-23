@@ -49,8 +49,7 @@ contract CCTPThroughCCVTokenPool is TokenPool, ITypeAndVersion, AuthorizedCaller
     uint16 blockConfirmationRequested,
     bytes calldata tokenArgs
   ) public virtual override returns (Pool.LockOrBurnOutV1 memory, uint256 destTokenAmount) {
-    uint256 feeAmount = _getFee(lockOrBurnIn, blockConfirmationRequested);
-    _validateLockOrBurn(lockOrBurnIn, blockConfirmationRequested, tokenArgs, feeAmount);
+    _validateLockOrBurn(lockOrBurnIn, blockConfirmationRequested, tokenArgs, 0);
 
     emit LockedOrBurned({
       remoteChainSelector: lockOrBurnIn.remoteChainSelector,
