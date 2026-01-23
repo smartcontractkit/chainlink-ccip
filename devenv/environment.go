@@ -146,7 +146,6 @@ func checkForkedEnvIsSet(in *Cfg) error {
 		if in.ForkedEnvConfig.ForkBlockNumbers != nil && in.ForkedEnvConfig.ForkBlockNumbers[bc.ChainID] != 0 {
 			forkedArgs = append(forkedArgs, "--fork-block-number", fmt.Sprintf("%d", in.ForkedEnvConfig.ForkBlockNumbers[bc.ChainID]))
 		}
-		forkedArgs = append(forkedArgs, "--timeout", "180000", "--auto-impersonate", "--no-rate-limit")
 		in.Blockchains[i].DockerCmdParamsOverrides = append(forkedArgs, in.Blockchains[i].DockerCmdParamsOverrides...)
 	}
 	return nil
@@ -364,7 +363,6 @@ func NewEnvironment() (*Cfg, error) {
 		switch in.Blockchains[i].Type {
 		case "anvil", "geth":
 			family = chainsel.FamilyEVM
-			nodeKeyBundles[family] = nkb
 		case "solana":
 			family = chainsel.FamilySolana
 			nodeKeyBundles[family] = nkb
@@ -409,7 +407,14 @@ func NewEnvironment() (*Cfg, error) {
 			return nil, err
 		}
 	}
+
+	var homeChainType string
 	if in.ForkedEnvConfig != nil {
+		homeChainType = blockchain.TypeAnvil
+		err = devenvcommon.AddNodesToCapReg(ctx, e, in.NodeSets, in.Blockchains, homeChainSelector, true)
+		if err != nil {
+			return nil, err
+		}
 		// Add addresses from initial CLDF data store
 		addresses, err := e.DataStore.Addresses().Fetch()
 		if err != nil {
@@ -423,22 +428,17 @@ func NewEnvironment() (*Cfg, error) {
 	} else {
 		// Merge newly deployed addresses into environment data store
 		e.DataStore = ds.Seal()
-	}
-
-	err = CreateJobs(ctx, allNodeClients, nodeKeyBundles)
-	if err != nil {
-		return nil, fmt.Errorf("creating CCIP jobs: %w", err)
-	}
-	var homeChainType string
-	if in.ForkedEnvConfig != nil {
-		homeChainType = blockchain.TypeAnvil
-	} else {
 		for _, bc := range in.Blockchains {
 			if bc.ChainID == fmt.Sprintf("%d", CCIPHomeChainID) {
 				homeChainType = bc.Type
 				break
 			}
 		}
+	}
+
+	err = CreateJobs(ctx, allNodeClients, nodeKeyBundles)
+	if err != nil {
+		return nil, fmt.Errorf("creating CCIP jobs: %w", err)
 	}
 
 	err = devenvcommon.AddNodesToContracts(ctx, e, in.NodeSets, nodeKeyBundles, homeChainSelector, selectors, homeChainType, in.Blockchains)
