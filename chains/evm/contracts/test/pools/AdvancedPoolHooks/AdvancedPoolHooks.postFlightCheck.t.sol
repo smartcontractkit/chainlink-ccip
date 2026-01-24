@@ -77,6 +77,8 @@ contract AdvancedPoolHooks_postFlightCheck is AdvancedPoolHooksSetup {
     s_advancedPoolHooks.postFlightCheck(releaseOrMintIn, 100e18, 5);
   }
 
+  // Reverts
+
   function test_postFlightCheck_RevertWhen_PolicyEngineRejects() public {
     s_advancedPoolHooks.setPolicyEngine(address(s_mockPolicyEngine));
     s_mockPolicyEngine.setShouldRevert(true, "Policy rejected");
@@ -90,7 +92,7 @@ contract AdvancedPoolHooks_postFlightCheck is AdvancedPoolHooksSetup {
   // Helper to slice bytes, exposed as external for use with this.
   function _sliceBytes(bytes memory data, uint256 start) external pure returns (bytes memory) {
     bytes memory result = new bytes(data.length - start);
-    for (uint256 i = 0; i < result.length; i++) {
+    for (uint256 i = 0; i < result.length; ++i) {
       result[i] = data[start + i];
     }
     return result;

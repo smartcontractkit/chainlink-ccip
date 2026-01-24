@@ -74,6 +74,23 @@ contract AdvancedPoolHooks_preflightCheck is AdvancedPoolHooksSetup {
     s_advancedPoolHooks.preflightCheck(lockOrBurnIn, 5, "");
   }
 
+  function test_preflightCheck_AllowListAndPolicyEngine() public {
+    address[] memory allowedSenders = new address[](1);
+    allowedSenders[0] = OWNER;
+    AdvancedPoolHooks hooksWithBoth = new AdvancedPoolHooks(allowedSenders, 0, address(s_mockPolicyEngine), new address[](0), true);
+
+    Pool.LockOrBurnInV1 memory lockOrBurnIn = _createLockOrBurnIn(OWNER);
+
+    hooksWithBoth.preflightCheck(lockOrBurnIn, 5, "");
+
+    // Verify policy engine was called with correct tag
+    IPolicyEngine.Payload memory lastPayload = s_mockPolicyEngine.getLastPayload();
+    assertEq(lastPayload.selector, IAdvancedPoolHooks.preflightCheck.selector);
+    assertEq(bytes4(lastPayload.data), OUTBOUND_POLICY_DATA_V1_TAG);
+  }
+
+  // Reverts
+
   function test_preflightCheck_RevertWhen_PolicyEngineRejects() public {
     s_advancedPoolHooks.setPolicyEngine(address(s_mockPolicyEngine));
     s_mockPolicyEngine.setShouldRevert(true, "Policy rejected");
@@ -87,7 +104,7 @@ contract AdvancedPoolHooks_preflightCheck is AdvancedPoolHooksSetup {
   function test_preflightCheck_RevertWhen_SenderNotAllowed() public {
     address[] memory allowedSenders = new address[](1);
     allowedSenders[0] = OWNER;
-    AdvancedPoolHooks hooksWithAllowList = new AdvancedPoolHooks(allowedSenders, 0, address(0));
+    AdvancedPoolHooks hooksWithAllowList = new AdvancedPoolHooks(allowedSenders, 0, address(0), new address[](0), true);
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _createLockOrBurnIn(STRANGER);
 
@@ -95,25 +112,10 @@ contract AdvancedPoolHooks_preflightCheck is AdvancedPoolHooksSetup {
     hooksWithAllowList.preflightCheck(lockOrBurnIn, 5, "");
   }
 
-  function test_preflightCheck_AllowListAndPolicyEngine() public {
-    address[] memory allowedSenders = new address[](1);
-    allowedSenders[0] = OWNER;
-    AdvancedPoolHooks hooksWithBoth = new AdvancedPoolHooks(allowedSenders, 0, address(s_mockPolicyEngine));
-
-    Pool.LockOrBurnInV1 memory lockOrBurnIn = _createLockOrBurnIn(OWNER);
-
-    hooksWithBoth.preflightCheck(lockOrBurnIn, 5, "");
-
-    // Verify policy engine was called with correct tag
-    IPolicyEngine.Payload memory lastPayload = s_mockPolicyEngine.getLastPayload();
-    assertEq(lastPayload.selector, IAdvancedPoolHooks.preflightCheck.selector);
-    assertEq(bytes4(lastPayload.data), OUTBOUND_POLICY_DATA_V1_TAG);
-  }
-
   // Helper to slice bytes, exposed as external for use with this.
   function _sliceBytes(bytes memory data, uint256 start) external pure returns (bytes memory) {
     bytes memory result = new bytes(data.length - start);
-    for (uint256 i = 0; i < result.length; i++) {
+    for (uint256 i = 0; i < result.length; ++i) {
       result[i] = data[start + i];
     }
     return result;

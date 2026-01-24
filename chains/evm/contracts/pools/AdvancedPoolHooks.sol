@@ -8,18 +8,19 @@ import {IPoolV2} from "../interfaces/IPoolV2.sol";
 import {CCIPPolicyEnginePayloads} from "../libraries/CCIPPolicyEnginePayloads.sol";
 import {CCVConfigValidation} from "../libraries/CCVConfigValidation.sol";
 import {Pool} from "../libraries/Pool.sol";
-import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
+import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
 import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/EnumerableSet.sol";
 
 /// @notice Advanced pool hooks for additional security features like allowlists, CCV management, and policy engine integration.
 /// @dev This is a standalone contract that can optionally be used by TokenPools.
-contract AdvancedPoolHooks is IAdvancedPoolHooks, Ownable2StepMsgSender {
+contract AdvancedPoolHooks is IAdvancedPoolHooks, AuthorizedCallers {
   using EnumerableSet for EnumerableSet.AddressSet;
 
   error AllowListNotEnabled();
   error SenderNotAllowed(address sender);
   error MustSpecifyUnderThresholdCCVsForThresholdCCVs();
+  error PolicyEngineDetachFailed(address oldPolicyEngine, bytes err);
 
   event AllowListAdd(address sender);
   event AllowListRemove(address sender);
@@ -32,6 +33,7 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, Ownable2StepMsgSender {
   );
   event ThresholdAmountSet(uint256 thresholdAmount);
   event PolicyEngineSet(address indexed oldPolicyEngine, address indexed newPolicyEngine);
+  event AllowAnyoneToInvokeThisHookSet(bool allowed);
 
   // bytes4(keccak256("OutboundPolicyDataV1"))
   bytes4 internal constant OUTBOUND_POLICY_DATA_V1_TAG = 0x73bb902c;
@@ -69,21 +71,27 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, Ownable2StepMsgSender {
   /// @dev The policy engine to use for additional validation. If set to address(0), no policy engine will be used.
   IPolicyEngine internal s_policyEngine;
 
+  /// @dev When true, anyone can call preflightCheck/postFlightCheck. When false, only authorized callers can call.
+  bool internal s_allowAnyoneToInvokeThisHook;
+
   /// @dev Stores verifier (CCV) requirements keyed by remote chain selector.
   mapping(uint64 remoteChainSelector => CCVConfig ccvConfig) internal s_verifierConfig;
 
   constructor(
     address[] memory allowlist,
     uint256 thresholdAmountForAdditionalCCVs,
-    address policyEngine
-  ) {
+    address policyEngine,
+    address[] memory authorizedCallers,
+    bool allowAnyoneToInvokeThisHook
+  ) AuthorizedCallers(authorizedCallers) {
     // Allowlist can be set as enabled or disabled at deployment time only to save hot-path gas.
     i_allowlistEnabled = allowlist.length > 0;
     if (i_allowlistEnabled) {
       _applyAllowListUpdates(new address[](0), allowlist);
     }
     s_thresholdAmountForAdditionalCCVs = thresholdAmountForAdditionalCCVs;
-    _setPolicyEngine(policyEngine);
+    _setPolicyEngine(policyEngine, false);
+    s_allowAnyoneToInvokeThisHook = allowAnyoneToInvokeThisHook;
   }
 
   /// @inheritdoc IAdvancedPoolHooks
@@ -93,6 +101,9 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, Ownable2StepMsgSender {
     uint16 blockConfirmationRequested,
     bytes calldata tokenArgs
   ) external {
+    if (!s_allowAnyoneToInvokeThisHook) {
+      _validateCaller();
+    }
     checkAllowList(lockOrBurnIn.originalSender);
 
     IPolicyEngine policyEngine = s_policyEngine;
@@ -124,6 +135,10 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, Ownable2StepMsgSender {
     uint256 localAmount,
     uint16 blockConfirmationRequested
   ) external {
+    if (!s_allowAnyoneToInvokeThisHook) {
+      _validateCaller();
+    }
+
     IPolicyEngine policyEngine = s_policyEngine;
     if (address(policyEngine) == address(0)) {
       return;
@@ -343,18 +358,28 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, Ownable2StepMsgSender {
   // │                       Policy Engine                          │
   // ================================================================
 
-  /// @notice Sets the policy engine.
-  /// @param newPolicyEngine The address of the new policy engine, or address(0) to disable.
+  /// @notice Sets a new policy engine.
+  /// @param newPolicyEngine The address of the new policy engine.
   function setPolicyEngine(
     address newPolicyEngine
   ) external onlyOwner {
-    _setPolicyEngine(newPolicyEngine);
+    _setPolicyEngine(newPolicyEngine, false);
+  }
+
+  /// @notice Sets a new policy engine while tolerating pre-existing policy enginer's detach reverting.
+  /// @param newPolicyEngine The address of the new policy engine.
+  function setPolicyEngineAllowFailedDetach(
+    address newPolicyEngine
+  ) external onlyOwner {
+    _setPolicyEngine(newPolicyEngine, true);
   }
 
   /// @notice Internal function to set and attach to a policy engine.
   /// @param newPolicyEngine The address of the new policy engine, or address(0) to disable.
+  /// @param allowFailedDetach Whether to revert if old policy engine's detach reverts.
   function _setPolicyEngine(
-    address newPolicyEngine
+    address newPolicyEngine,
+    bool allowFailedDetach
   ) internal {
     address oldPolicyEngine = address(s_policyEngine);
 
@@ -363,7 +388,12 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, Ownable2StepMsgSender {
     }
 
     if (oldPolicyEngine != address(0)) {
-      IPolicyEngine(oldPolicyEngine).detach();
+      try IPolicyEngine(oldPolicyEngine).detach() {}
+      catch (bytes memory err) {
+        if (!allowFailedDetach) {
+          revert PolicyEngineDetachFailed(oldPolicyEngine, err);
+        }
+      }
     }
 
     s_policyEngine = IPolicyEngine(newPolicyEngine);
@@ -378,5 +408,24 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, Ownable2StepMsgSender {
   /// @return The address of the policy engine, address(0) if none is set.
   function getPolicyEngine() external view returns (address) {
     return address(s_policyEngine);
+  }
+
+  // ================================================================
+  // │                     Authorized Callers                       │
+  // ================================================================
+
+  /// @notice Gets whether anyone can invoke this hook.
+  /// @return true if anyone can call, false if only authorized callers can call.
+  function getAllowAnyoneToInvokeThisHook() external view returns (bool) {
+    return s_allowAnyoneToInvokeThisHook;
+  }
+
+  /// @notice Sets whether anyone can invoke this hook.
+  /// @param allowed When true, anyone can call preflightCheck/postFlightCheck. When false, only authorized callers.
+  function setAllowAnyoneToInvokeThisHook(
+    bool allowed
+  ) external onlyOwner {
+    s_allowAnyoneToInvokeThisHook = allowed;
+    emit AllowAnyoneToInvokeThisHookSet(allowed);
   }
 }

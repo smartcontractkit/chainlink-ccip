@@ -2,8 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {CCIPPolicyEnginePayloads} from "../../../libraries/CCIPPolicyEnginePayloads.sol";
-import {Pool} from "../../../libraries/Pool.sol";
-import {AdvancedPoolHooks} from "../../../pools/AdvancedPoolHooks.sol";
 import {AdvancedPoolHooksSetup} from "./AdvancedPoolHooksSetup.t.sol";
 
 contract AdvancedPoolHooks_policyEngineEncoding is AdvancedPoolHooksSetup {
@@ -91,7 +89,7 @@ contract AdvancedPoolHooks_policyEngineEncoding is AdvancedPoolHooksSetup {
 
   function _sliceBytes(bytes memory data, uint256 start) internal pure returns (bytes memory) {
     bytes memory result = new bytes(data.length - start);
-    for (uint256 i = 0; i < result.length; i++) {
+    for (uint256 i = 0; i < result.length; ++i) {
       result[i] = data[start + i];
     }
     return result;
