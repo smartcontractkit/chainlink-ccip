@@ -123,7 +123,10 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, AuthorizedCallers {
     bytes memory policyData = abi.encodeWithSelector(OUTBOUND_POLICY_DATA_V1_TAG, outboundData);
     policyEngine.run(
       IPolicyEngine.Payload({
-        selector: IAdvancedPoolHooks.preflightCheck.selector, sender: msg.sender, data: policyData, context: ""
+        selector: IAdvancedPoolHooks.preflightCheck.selector,
+        sender: msg.sender,
+        data: policyData,
+        context: ""
       })
     );
   }
@@ -159,7 +162,10 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, AuthorizedCallers {
     bytes memory policyData = abi.encodeWithSelector(INBOUND_POLICY_DATA_V1_TAG, inboundData);
     policyEngine.run(
       IPolicyEngine.Payload({
-        selector: IAdvancedPoolHooks.postFlightCheck.selector, sender: msg.sender, data: policyData, context: ""
+        selector: IAdvancedPoolHooks.postFlightCheck.selector,
+        sender: msg.sender,
+        data: policyData,
+        context: ""
       })
     );
   }
@@ -195,20 +201,14 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, AuthorizedCallers {
   /// @notice Apply updates to the allow list.
   /// @param removes The addresses to be removed.
   /// @param adds The addresses to be added.
-  function applyAllowListUpdates(
-    address[] calldata removes,
-    address[] calldata adds
-  ) external onlyOwner {
+  function applyAllowListUpdates(address[] calldata removes, address[] calldata adds) external onlyOwner {
     _applyAllowListUpdates(removes, adds);
   }
 
   /// @notice Internal version of applyAllowListUpdates to allow for reuse in the constructor.
   /// @param removes The addresses to be removed.
   /// @param adds The addresses to be added.
-  function _applyAllowListUpdates(
-    address[] memory removes,
-    address[] memory adds
-  ) internal {
+  function _applyAllowListUpdates(address[] memory removes, address[] memory adds) internal {
     if (!i_allowlistEnabled) revert AllowListNotEnabled();
 
     for (uint256 i = 0; i < removes.length; ++i) {
@@ -366,7 +366,8 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, AuthorizedCallers {
     _setPolicyEngine(newPolicyEngine, false);
   }
 
-  /// @notice Sets a new policy engine while tolerating pre-existing policy enginer's detach reverting.
+  /// @notice Sets a new policy engine while tolerating a pre-existing policy engine's detach reverting.
+  /// @dev Use this when the old policy engine is unresponsive or has a bug in its detach() implementation.
   /// @param newPolicyEngine The address of the new policy engine.
   function setPolicyEngineAllowFailedDetach(
     address newPolicyEngine
@@ -377,10 +378,7 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, AuthorizedCallers {
   /// @notice Internal function to set and attach to a policy engine.
   /// @param newPolicyEngine The address of the new policy engine, or address(0) to disable.
   /// @param allowFailedDetach Whether to revert if old policy engine's detach reverts.
-  function _setPolicyEngine(
-    address newPolicyEngine,
-    bool allowFailedDetach
-  ) internal {
+  function _setPolicyEngine(address newPolicyEngine, bool allowFailedDetach) internal {
     address oldPolicyEngine = address(s_policyEngine);
 
     if (newPolicyEngine == oldPolicyEngine) {
@@ -414,13 +412,13 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, AuthorizedCallers {
   // │                     Authorized Callers                       │
   // ================================================================
 
-  /// @notice Gets whether anyone can invoke this hook.
+  /// @notice Gets whether anyone can invoke preflightCheck/postFlightCheck.
   /// @return true if anyone can call, false if only authorized callers can call.
   function getAllowAnyoneToInvokeThisHook() external view returns (bool) {
     return s_allowAnyoneToInvokeThisHook;
   }
 
-  /// @notice Sets whether anyone can invoke this hook.
+  /// @notice Sets whether anyone can invoke preflightCheck/postFlightCheck.
   /// @param allowed When true, anyone can call preflightCheck/postFlightCheck. When false, only authorized callers.
   function setAllowAnyoneToInvokeThisHook(
     bool allowed
