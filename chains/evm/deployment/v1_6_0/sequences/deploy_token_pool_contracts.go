@@ -52,7 +52,7 @@ var DeployTokenPool = cldf_ops.NewSequence(
 		tokenPoolAddr, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, datastore.AddressRef{
 			ChainSelector: input.ChainSelector,
 			Type:          datastore.ContractType(input.PoolType),
-			Qualifier:     input.TokenSymbol,
+			Qualifier:     input.TokenPoolQualifier,
 		}, input.ChainSelector, datastore_utils.FullRef)
 		if err == nil {
 			b.Logger.Info("Token pool already deployed at address:", tokenPoolAddr.Address)
@@ -108,7 +108,7 @@ var DeployTokenPool = cldf_ops.NewSequence(
 		var poolRef datastore.AddressRef
 
 		typeAndVersion := deployment.NewTypeAndVersion(deployment.ContractType(input.PoolType), *input.TokenPoolVersion).String()
-		qualifier := input.TokenSymbol
+		qualifier := input.TokenPoolQualifier
 
 		switch typeAndVersion {
 		// v1.6.1 pools
@@ -384,7 +384,7 @@ var DeployTokenPool = cldf_ops.NewSequence(
 )
 
 func fetchTokenGovernor(input tokenapi.DeployTokenPoolInput) (string, error) {
-	var tokenGovernor = input.TokenGovernor
+	tokenGovernor := input.TokenGovernor
 	if tokenGovernor == "" {
 		// fetch token governor from the data store
 		tokenGovernorAddr, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, datastore.AddressRef{

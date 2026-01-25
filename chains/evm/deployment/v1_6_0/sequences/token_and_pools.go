@@ -1,6 +1,7 @@
 package sequences
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 
@@ -17,7 +18,6 @@ import (
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -25,7 +25,7 @@ import (
 )
 
 func (a *EVMAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[tokensapi.ConfigureTokenForTransfersInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
-	// TODO implement me
+	// TODO: implement me
 	return nil
 }
 
@@ -43,18 +43,29 @@ func (a *EVMAdapter) DeriveTokenAddress(e deployment.Environment, chainSelector 
 		return nil, fmt.Errorf("chain with selector %d not defined", chainSelector)
 	}
 
-	if !common.IsHexAddress(poolRef.Address) {
-		return nil, fmt.Errorf("pool address %q is not a valid hex address", poolRef.Address)
+	addrRef, err := datastore_utils.FindAndFormatRef(e.DataStore, poolRef, chainSelector, datastore_utils.FullRef)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find token pool in datastore using ref (%+v): %w", poolRef, err)
 	}
 
-	tp, err := token_pool.NewTokenPool(common.HexToAddress(poolRef.Address), chain.Client)
+	addrRaw, err := a.AddressRefToBytes(addrRef)
 	if err != nil {
-		return nil, fmt.Errorf("failed to instantiate token pool contract at %q: %w", poolRef.Address, err)
+		return nil, fmt.Errorf("failed to convert address ref to bytes: %w", err)
+	}
+
+	tpAddr := common.BytesToAddress(addrRaw)
+	if tpAddr == (common.Address{}) {
+		return nil, errors.New("token pool address is zero address")
+	}
+
+	tp, err := token_pool.NewTokenPool(tpAddr, chain.Client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to instantiate token pool contract at %q: %w", tpAddr.Hex(), err)
 	}
 
 	tokenAddress, err := tp.GetToken(&bind.CallOpts{Context: e.GetContext()})
 	if err != nil {
-		return nil, fmt.Errorf("failed to get token address from token pool at %q: %w", poolRef.Address, err)
+		return nil, fmt.Errorf("failed to get token address from token pool at %q: %w", tpAddr.Hex(), err)
 	}
 
 	return tokenAddress.Bytes(), nil
@@ -84,9 +95,14 @@ func (a *EVMAdapter) ManualRegistration() *cldf_ops.Sequence[tokensapi.ManualReg
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token admin registry address for chain %d: %w", input.ChainSelector, err)
 			}
 
-			tokenPool, err := a.GetTokenPool(ds, chain, input.RegisterTokenConfigs.TokenPoolQualifier, input.RegisterTokenConfigs.PoolType)
+			tokenPoolAddress, err := a.FindLatestTokenPoolAddress(ds, chain.Selector, input.RegisterTokenConfigs.TokenPoolQualifier, input.RegisterTokenConfigs.PoolType)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token pool with qualifier %q on chain %d: %w", input.RegisterTokenConfigs.TokenPoolQualifier, input.ChainSelector, err)
+			}
+
+			tokenPool, err := token_pool.NewTokenPool(tokenPoolAddress, chain.Client)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to create new token pool instance using address %q: %w", tokenPoolAddress.Hex(), err)
 			}
 
 			tokenAddress, err := tokenPool.GetToken(&bind.CallOpts{Context: b.GetContext()})
@@ -161,8 +177,7 @@ func (a *EVMAdapter) DeployTokenVerify(e deployment.Environment, in any) error {
 }
 
 func (a *EVMAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.DeployTokenPoolInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
-	// TODO implement me
-	return nil
+	return DeployTokenPool
 }
 
 func (a *EVMAdapter) RegisterToken() *cldf_ops.Sequence[tokensapi.RegisterTokenInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
@@ -183,7 +198,7 @@ func (a *EVMAdapter) RegisterToken() *cldf_ops.Sequence[tokensapi.RegisterTokenI
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token admin registry address for chain %d: %w", input.ChainSelector, err)
 			}
 
-			tokAddress, err := a.GetTokenAddress(input.ExistingDataStore, input.ChainSelector, input.TokenSymbol)
+			tokAddress, err := a.FindOneTokenAddress(input.ExistingDataStore, input.ChainSelector, input.TokenSymbol)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token address for symbol %q on chain %d: %w", input.TokenSymbol, input.ChainSelector, err)
 			}
@@ -257,9 +272,14 @@ func (a *EVMAdapter) SetPool() *cldf_ops.Sequence[tokensapi.SetPoolInput, sequen
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token admin registry address for chain %d: %w", input.ChainSelector, err)
 			}
 
-			tokenPool, err := a.GetTokenPool(input.ExistingDataStore, chain, input.TokenPoolQualifier, input.PoolType)
+			tokenPoolAddress, err := a.FindLatestTokenPoolAddress(input.ExistingDataStore, chain.Selector, input.TokenPoolQualifier, input.PoolType)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token pool with qualifier %q on chain %d: %w", input.TokenPoolQualifier, input.ChainSelector, err)
+			}
+
+			tokenPool, err := token_pool.NewTokenPool(tokenPoolAddress, chain.Client)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to create new token pool instance using address %q: %w", tokenPoolAddress.Hex(), err)
 			}
 
 			tokenAddress, err := tokenPool.GetToken(&bind.CallOpts{Context: b.GetContext()})
@@ -296,7 +316,7 @@ func (a *EVMAdapter) SetPool() *cldf_ops.Sequence[tokensapi.SetPoolInput, sequen
 }
 
 func (a *EVMAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokensapi.UpdateAuthoritiesInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
-	// TODO implement me
+	// TODO: implement me
 	return nil
 }
 
@@ -324,7 +344,7 @@ func (a *EVMAdapter) GetTokenAdminRegistryAddress(ds datastore.DataStore, select
 	return common.BytesToAddress(addr), nil
 }
 
-func (a *EVMAdapter) GetTokenAddress(ds datastore.DataStore, chainSelector uint64, tokenSymbol string) (common.Address, error) {
+func (a *EVMAdapter) FindOneTokenAddress(ds datastore.DataStore, chainSelector uint64, tokenSymbol string) (common.Address, error) {
 	filters := datastore.AddressRef{
 		ChainSelector: chainSelector,
 		Qualifier:     tokenSymbol,
@@ -343,7 +363,7 @@ func (a *EVMAdapter) GetTokenAddress(ds datastore.DataStore, chainSelector uint6
 	return common.BytesToAddress(addr), nil
 }
 
-func (a *EVMAdapter) GetTokenPool(ds datastore.DataStore, chain evm.Chain, qualifier string, poolType string) (*token_pool.TokenPool, error) {
+func (a *EVMAdapter) FindLatestTokenPoolAddress(ds datastore.DataStore, chainSelector uint64, qualifier string, poolType string) (common.Address, error) {
 	// Define the version range
 	minVersion := semver.MustParse("1.5.0") // inclusive
 	maxVersion := semver.MustParse("1.7.0") // exclusive
@@ -351,7 +371,7 @@ func (a *EVMAdapter) GetTokenPool(ds datastore.DataStore, chain evm.Chain, quali
 	// Get all matching token pool addresses
 	refs := ds.Addresses().Filter(
 		datastore.AddressRefByType(datastore.ContractType(poolType)),
-		datastore.AddressRefByChainSelector(chain.Selector),
+		datastore.AddressRefByChainSelector(chainSelector),
 		datastore.AddressRefByQualifier(qualifier),
 	)
 
@@ -376,21 +396,15 @@ func (a *EVMAdapter) GetTokenPool(ds datastore.DataStore, chain evm.Chain, quali
 
 	// If no matching reference was found, then return an error
 	if !doesExist {
-		return nil, fmt.Errorf("no token pool found for type %q with qualifier %q on chain %d", poolType, qualifier, chain.Selector)
+		return common.Address{}, fmt.Errorf("no token pool found for type %q with qualifier %q on chain %d", poolType, qualifier, chainSelector)
 	}
 
 	// Convert the address reference to bytes
 	addrBytes, err := a.AddressRefToBytes(latestRef)
 	if err != nil {
-		return nil, fmt.Errorf("failed to convert address ref to bytes: %w", err)
+		return common.Address{}, fmt.Errorf("failed to convert address ref to bytes: %w", err)
 	}
 
 	// Construct the token pool instance
-	address := common.BytesToAddress(addrBytes)
-	tp, err := token_pool.NewTokenPool(address, chain.Client)
-	if err != nil {
-		return nil, fmt.Errorf("failed to instantiate token pool contract at %q: %w", address.Hex(), err)
-	}
-
-	return tp, nil
+	return common.BytesToAddress(addrBytes), nil
 }
