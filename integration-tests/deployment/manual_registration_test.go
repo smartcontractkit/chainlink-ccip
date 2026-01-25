@@ -102,9 +102,9 @@ func TestManualRegistration(t *testing.T) {
 	evmTokenDeci := uint8(18)
 	evmTokenSymb := "EVMTEST"
 
-	// NOTE: unlike Solana, each token pool is linked to exactly one token on
-	// EVM chains. To differentiate between token pools, qualifiers are used.
-	// Thus, we set a non-empty qualifier here.
+	// NOTE: unlike Solana, EVM token pools can be deployed several times
+	// and each token pool is linked to exactly one token. To distinguish
+	// between token pools for different tokens, a qualifier is needed.
 	evmTokenPoolType := cciputils.BurnMintTokenPool
 	evmTokenPoolQlfr := "EVM_TEST_POOL"
 
