@@ -6,6 +6,7 @@ import {IRouter} from "../../interfaces/IRouter.sol";
 import {IRouterClient} from "../../interfaces/IRouterClient.sol";
 
 import {Client} from "../../libraries/Client.sol";
+import {ExtraArgsCodec} from "../../libraries/ExtraArgsCodec.sol";
 import {Internal} from "../../libraries/Internal.sol";
 import {CallWithExactGas} from "@chainlink/contracts/src/v0.8/shared/call/CallWithExactGas.sol";
 
@@ -96,7 +97,7 @@ contract MockCCIPRouter is IRouter, IRouterClient {
     }
 
     address receiver = address(uint160(decodedReceiver));
-    uint256 gasLimit = _fromBytes(message.extraArgs).gasLimit;
+    uint256 gasLimit = _gasLimitFromExtraArgs(message.extraArgs);
     bytes32 mockMsgId = keccak256(abi.encode(message));
 
     Client.Any2EVMMessage memory executableMsg = Client.Any2EVMMessage({
@@ -118,19 +119,23 @@ contract MockCCIPRouter is IRouter, IRouterClient {
     return mockMsgId;
   }
 
-  function _fromBytes(
+  function _gasLimitFromExtraArgs(
     bytes calldata extraArgs
-  ) internal pure returns (Client.GenericExtraArgsV2 memory) {
+  ) internal pure returns (uint32) {
     if (extraArgs.length == 0) {
-      return Client.GenericExtraArgsV2({gasLimit: DEFAULT_GAS_LIMIT, allowOutOfOrderExecution: false});
+      return DEFAULT_GAS_LIMIT;
+    }
+    if (extraArgs.length < 4) {
+      revert InvalidExtraArgsTag();
     }
 
     bytes4 extraArgsTag = bytes4(extraArgs);
-    if (extraArgsTag == Client.GENERIC_EXTRA_ARGS_V2_TAG) {
-      return abi.decode(extraArgs[4:], (Client.GenericExtraArgsV2));
+    if (extraArgsTag == ExtraArgsCodec.GENERIC_EXTRA_ARGS_V3_TAG) {
+      return ExtraArgsCodec._decodeGenericExtraArgsV3(extraArgs).gasLimit;
+    } else if (extraArgsTag == Client.GENERIC_EXTRA_ARGS_V2_TAG) {
+      return uint32(abi.decode(extraArgs[4:], (Client.GenericExtraArgsV2)).gasLimit);
     } else if (extraArgsTag == Client.EVM_EXTRA_ARGS_V1_TAG) {
-      return
-        Client.GenericExtraArgsV2({gasLimit: abi.decode(extraArgs[4:], (uint256)), allowOutOfOrderExecution: false});
+      return uint32(abi.decode(extraArgs[4:], (uint256)));
     }
 
     revert InvalidExtraArgsTag();
