@@ -562,9 +562,10 @@ func TestConfigureChainForLanes_Metadata(t *testing.T) {
 			remoteChainSelector := uint64(4356164186791070119)
 
 			// Pre-configure signature configs on CommitteeVerifier so they exist on-chain
-			// when metadata is collected
+			// when metadata is collected. Use a different selector so it doesn't conflict with the input.
+			preConfiguredSelector := uint64(9999999999999999999) // Different from remoteChainSelector
 			preConfiguredConfig := committee_verifier.SignatureConfig{
-				SourceChainSelector: remoteChainSelector,
+				SourceChainSelector: preConfiguredSelector,
 				Threshold:           1,
 				Signers:             []common.Address{common.HexToAddress("0x01"), common.HexToAddress("0x02")},
 			}
@@ -1533,6 +1534,86 @@ func TestConfigureChainForLanes_PendingChangesProjection(t *testing.T) {
 		}
 	}
 	require.True(t, offRampMetadataFound, "Should have found OffRamp metadata")
+
+	// Verify CommitteeVerifier signature config metadata shows both chains
+	// Chain1 should be from current state, Chain2 should be from pending
+	committeeVerifierMetadataFound := false
+	for _, contractMeta := range configureReport2.Output.Metadata.Contracts {
+		if contractMeta.Address == committeeVerifier && contractMeta.ChainSelector == chainSelector {
+			metaMap, ok := contractMeta.Metadata.(map[string]interface{})
+			require.True(t, ok, "CommitteeVerifier metadata should be a map[string]interface{}")
+
+			// Check if this is the metadata for chain1 or chain2
+			sourceChainSelector, ok := metaMap["sourceChainSelector"].(uint64)
+			if !ok {
+				// Try float64 (from JSON)
+				if sourceChainSelectorFloat, okFloat := metaMap["sourceChainSelector"].(float64); okFloat {
+					sourceChainSelector = uint64(sourceChainSelectorFloat)
+				} else {
+					continue
+				}
+			}
+
+			if sourceChainSelector == remoteChainSelector1 {
+				committeeVerifierMetadataFound = true
+				// Chain1 config should be from current state (first configuration)
+				require.Equal(t, remoteChainSelector1, metaMap["sourceChainSelector"], "Chain1 should have correct sourceChainSelector")
+				threshold, ok := metaMap["threshold"].(uint8)
+				if !ok {
+					thresholdFloat, okFloat := metaMap["threshold"].(float64)
+					require.True(t, okFloat, "Threshold should be uint8 or float64")
+					threshold = uint8(thresholdFloat)
+				}
+				require.Equal(t, uint8(1), threshold, "Chain1 should have threshold=1 from first config")
+				signers, ok := metaMap["signers"].([]string)
+				require.True(t, ok, "Signers should be []string")
+				require.Len(t, signers, 1, "Chain1 should have 1 signer from first config")
+				require.Equal(t, common.HexToAddress("0x01").Hex(), signers[0], "Chain1 should have correct signer")
+			} else if sourceChainSelector == remoteChainSelector2 {
+				// Chain2 config should be from pending (second configuration)
+				require.Equal(t, remoteChainSelector2, metaMap["sourceChainSelector"], "Chain2 should have correct sourceChainSelector")
+				threshold, ok := metaMap["threshold"].(uint8)
+				if !ok {
+					thresholdFloat, okFloat := metaMap["threshold"].(float64)
+					require.True(t, okFloat, "Threshold should be uint8 or float64")
+					threshold = uint8(thresholdFloat)
+				}
+				require.Equal(t, uint8(1), threshold, "Chain2 should have threshold=1 from pending config")
+				signers, ok := metaMap["signers"].([]string)
+				require.True(t, ok, "Signers should be []string")
+				require.Len(t, signers, 1, "Chain2 should have 1 signer from pending config")
+				require.Equal(t, common.HexToAddress("0x01").Hex(), signers[0], "Chain2 should have correct signer from pending config")
+			}
+		}
+	}
+	require.True(t, committeeVerifierMetadataFound, "Should have found CommitteeVerifier metadata for chain1")
+
+	// Verify we have metadata for both chains
+	chain1SigConfigFound := false
+	chain2SigConfigFound := false
+	for _, contractMeta := range configureReport2.Output.Metadata.Contracts {
+		if contractMeta.Address == committeeVerifier && contractMeta.ChainSelector == chainSelector {
+			metaMap, ok := contractMeta.Metadata.(map[string]interface{})
+			require.True(t, ok, "CommitteeVerifier metadata should be a map[string]interface{}")
+
+			sourceChainSelector, ok := metaMap["sourceChainSelector"].(uint64)
+			if !ok {
+				if sourceChainSelectorFloat, okFloat := metaMap["sourceChainSelector"].(float64); okFloat {
+					sourceChainSelector = uint64(sourceChainSelectorFloat)
+				} else {
+					continue
+				}
+			}
+
+			if sourceChainSelector == remoteChainSelector1 {
+				chain1SigConfigFound = true
+			} else if sourceChainSelector == remoteChainSelector2 {
+				chain2SigConfigFound = true
+			}
+		}
+	}
+	require.True(t, chain1SigConfigFound, "Should have found signature config for chain1")
+	require.True(t, chain2SigConfigFound, "Should have found signature config for chain2")
 }
 
 // Helper function to extract uint64 from interface{} (handles both uint64 and float64 from JSON)

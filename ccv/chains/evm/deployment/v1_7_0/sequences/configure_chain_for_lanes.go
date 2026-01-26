@@ -258,7 +258,27 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 				continue // Skip if we can't find the CommitteeVerifier address
 			}
 
-			committeeVerifierMetadata, err := collectCommitteeVerifierSignatureConfigs(b, chain, committeeVerifierAddr, chain.Selector, []datastore.ContractMetadata{}, input.OffchainClient)
+			// Build pending signature configs from input
+			// Note: We don't have removals in the current input structure, so SourceChainSelectorsToRemove is empty
+			pendingSignatureConfigs := make([]committee_verifier.SignatureConfig, 0, len(committeeVerifier.RemoteChains))
+			for remoteSelector, remoteConfig := range committeeVerifier.RemoteChains {
+				signers := make([]common.Address, 0, len(remoteConfig.SignatureConfig.Signers))
+				for _, signer := range remoteConfig.SignatureConfig.Signers {
+					signers = append(signers, common.HexToAddress(signer))
+				}
+				pendingSignatureConfigs = append(pendingSignatureConfigs, committee_verifier.SignatureConfig{
+					SourceChainSelector: remoteSelector,
+					Threshold:           remoteConfig.SignatureConfig.Threshold,
+					Signers:             signers,
+				})
+			}
+
+			pendingSignatureConfigArgs := committee_verifier.SignatureConfigArgs{
+				SourceChainSelectorsToRemove: []uint64{}, // No removals in current input structure
+				SignatureConfigUpdates:       pendingSignatureConfigs,
+			}
+
+			committeeVerifierMetadata, err := collectCommitteeVerifierSignatureConfigs(b, chain, committeeVerifierAddr, chain.Selector, []datastore.ContractMetadata{}, input.OffchainClient, pendingSignatureConfigArgs)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to collect CommitteeVerifier signature configs: %w", err)
 			}
@@ -387,6 +407,7 @@ func collectCommitteeVerifierSignatureConfigs(
 	chainSelector uint64,
 	contractMetadata []datastore.ContractMetadata,
 	offchainClient interface{}, // Optional: cldf_offchain.Client for fetching CSA keys
+	pendingSignatureConfigArgs committee_verifier.SignatureConfigArgs, // Pending signature config changes
 ) ([]datastore.ContractMetadata, error) {
 	// Read current signature configs from the contract.
 	getAllConfigsReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.GetAllSignatureConfigs, chain, contract.FunctionInput[any]{
@@ -402,6 +423,20 @@ func collectCommitteeVerifierSignatureConfigs(
 	currentConfigs := make(map[uint64]committee_verifier.SignatureConfig)
 	for _, cfg := range getAllConfigsReport.Output {
 		currentConfigs[cfg.SourceChainSelector] = cfg
+	}
+
+	// Apply pending removals: remove selectors that are being removed
+	for _, selectorToRemove := range pendingSignatureConfigArgs.SourceChainSelectorsToRemove {
+		if _, exists := currentConfigs[selectorToRemove]; exists {
+			delete(currentConfigs, selectorToRemove)
+		}
+		// If selector doesn't exist in current state, it's a NOOP (as per contract behavior)
+	}
+
+	// Apply pending updates/adds: override existing or add new configs
+	for _, pendingConfig := range pendingSignatureConfigArgs.SignatureConfigUpdates {
+		// Override existing or add new
+		currentConfigs[pendingConfig.SourceChainSelector] = pendingConfig
 	}
 
 	// Convert to metadata
