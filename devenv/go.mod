@@ -9,10 +9,10 @@ replace (
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment => ../chains/solana/deployment
 	github.com/smartcontractkit/chainlink-ccip/deployment => ../deployment
 
-	// local development
-	github.com/smartcontractkit/chainlink-ton => ../../../.
-	github.com/smartcontractkit/chainlink-ton/deployment => ../../../deployment
-	github.com/smartcontractkit/chainlink-ton/devenv => ../../../devenv
+// local development
+// github.com/smartcontractkit/chainlink-ton => ../../../.
+// github.com/smartcontractkit/chainlink-ton/deployment => ../../../deployment
+// github.com/smartcontractkit/chainlink-ton/devenv => ../../../devenv
 // github.com/smartcontractkit/chainlink-testing-framework/framework => ../../chainlink-testing-framework/framework
 )
 
