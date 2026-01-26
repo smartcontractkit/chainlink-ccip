@@ -154,7 +154,7 @@ type CommitOffchainConfig struct {
 	// EvmGasLimit is the gas limit to use for EVM chain report transmissions.
 	// If set to zero, the default gas limit defined in the chain writer will be used.
 	// This field is ignored for non-EVM chains.
-	GasLimit uint64 `json:"gasLimit"`
+	EvmGasLimit uint64 `json:"evmGasLimit"`
 }
 
 const (
