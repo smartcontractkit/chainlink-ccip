@@ -22,18 +22,15 @@ type SimpleConfig struct {
 }
 
 type OutputConfig struct {
-	BasePath      string `yaml:"base_path"`
-	VersionPrefix string `yaml:"version_prefix"`
+	BasePath string `yaml:"base_path"`
 }
 
 type SimpleContractConfig struct {
-	SolidityPath string   `yaml:"solidity_path"`
-	ContractName string   `yaml:"contract_name,omitempty"`
-	Version      string   `yaml:"version,omitempty"`
+	ContractName string   `yaml:"contract_name"`
+	Version      string   `yaml:"version"`
 	Functions    []string `yaml:"functions"`
 }
 
-// ABI structures
 type ABIEntry struct {
 	Type            string     `json:"type"`
 	Name            string     `json:"name"`
@@ -43,13 +40,12 @@ type ABIEntry struct {
 }
 
 type ABIParam struct {
-	Name         string      `json:"name"`
-	Type         string      `json:"type"`
-	InternalType string      `json:"internalType"`
-	Components   []ABIParam  `json:"components"` // For tuple types (structs)
+	Name         string     `json:"name"`
+	Type         string     `json:"type"`
+	InternalType string     `json:"internalType"`
+	Components   []ABIParam `json:"components"` // For tuple types (structs)
 }
 
-// Contract info
 type ContractInfo struct {
 	Name            string
 	Version         string
@@ -61,16 +57,15 @@ type ContractInfo struct {
 	Bytecode        string // Hex bytecode string
 	Constructor     *FunctionInfo
 	Functions       map[string]*FunctionInfo
-	FunctionOrder   []string // Preserve order from config
+	FunctionOrder   []string              // Preserve order from config
 	StructDefs      map[string]*StructDef // Local struct definitions (key is struct name)
 }
 
-// StructDef represents a local struct definition
 type StructDef struct {
 	Name            string // Local name (e.g., "DestChainConfigArgs")
 	GethwrapperType string // Full gethwrapper type (e.g., "fee_quoter.FeeQuoterDestChainConfigArgs")
 	Fields          []ParameterInfo
-	NeedsConversion bool   // True if this struct needs a conversion function
+	NeedsConversion bool // True if this struct needs a conversion function
 }
 
 type FunctionInfo struct {
@@ -87,13 +82,13 @@ type FunctionInfo struct {
 }
 
 type ParameterInfo struct {
-	Name         string
-	SolidityType string
-	GoType       string
-	IsStruct     bool   // True if this is a custom struct type
-	StructName   string // Name of the struct (without package prefix)
-	GethwrapperType string // Full gethwrapper type if IsStruct (e.g., "fee_quoter.FeeQuoterDestChainConfigArgs")
-	Components   []ParameterInfo // For struct fields
+	Name            string
+	SolidityType    string
+	GoType          string
+	IsStruct        bool            // True if this is a custom struct type
+	StructName      string          // Name of the struct (without package prefix)
+	GethwrapperType string          // Full gethwrapper type if IsStruct (e.g., "fee_quoter.FeeQuoterDestChainConfigArgs")
+	Components      []ParameterInfo // For struct fields
 }
 
 func main() {
@@ -115,7 +110,7 @@ func main() {
 	for _, contractCfg := range config.Contracts {
 		contractInfo, err := extractContractInfo(contractCfg, config.Output)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error extracting info from %s: %v\n", contractCfg.SolidityPath, err)
+			fmt.Fprintf(os.Stderr, "Error extracting info for %s: %v\n", contractCfg.ContractName, err)
 			os.Exit(1)
 		}
 
@@ -128,36 +123,37 @@ func main() {
 	}
 }
 
-func findGobindingPath(packageName, preferredVersion, contractVersion string) (path string, actualPackageName string, version string, err error) {
+// versionToPath converts a semver version to a directory path format
+// e.g., "1.6.0" -> "v1_6_0"
+func versionToPath(version string) string {
+	return "v" + strings.ReplaceAll(version, ".", "_")
+}
+
+func findGobindingPath(packageName, contractVersion string) (path string, actualPackageName string, version string, err error) {
 	baseDir := filepath.Join("chains", "evm", "gobindings", "generated")
-	
+
 	// Try in order of preference:
-	// 1. Preferred version from config (e.g., v1_6_0)
-	// 2. Contract version converted to directory name (e.g., 1.5.0 -> v1_5_0)
-	// 3. "latest"
-	
-	candidateVersions := []string{preferredVersion}
-	
+	// 1. Contract version converted to directory name (e.g., 1.5.0 -> v1_5_0)
+	// 2. "latest"
+
+	var candidateVersions []string
+
 	if contractVersion != "" {
-		// Convert "1.5.0" to "v1_5_0"
-		versionDir := "v" + strings.ReplaceAll(contractVersion, ".", "_")
-		if versionDir != preferredVersion {
-			candidateVersions = append(candidateVersions, versionDir)
-		}
+		candidateVersions = append(candidateVersions, versionToPath(contractVersion))
 	}
-	
+
 	candidateVersions = append(candidateVersions, "latest")
-	
+
 	// Also try package name without underscores (e.g., "onramp" instead of "on_ramp")
 	packageNameNoUnderscore := strings.ReplaceAll(packageName, "_", "")
-	
+
 	for _, ver := range candidateVersions {
 		// Try with original package name
 		candidate := filepath.Join(baseDir, ver, packageName, packageName+".go")
 		if _, err := os.Stat(candidate); err == nil {
 			return candidate, packageName, ver, nil
 		}
-		
+
 		// Try without underscores
 		if packageNameNoUnderscore != packageName {
 			candidate = filepath.Join(baseDir, ver, packageNameNoUnderscore, packageNameNoUnderscore+".go")
@@ -166,28 +162,30 @@ func findGobindingPath(packageName, preferredVersion, contractVersion string) (p
 			}
 		}
 	}
-	
-	return "", "", "", fmt.Errorf("gobinding not found for package %s (tried versions: %s, with/without underscores)", 
+
+	return "", "", "", fmt.Errorf("gobinding not found for package %s (tried versions: %s, with/without underscores)",
 		packageName, strings.Join(candidateVersions, ", "))
 }
 
 func extractContractInfo(cfg SimpleContractConfig, output OutputConfig) (*ContractInfo, error) {
 	contractName := cfg.ContractName
+	version := cfg.Version
+
 	if contractName == "" {
-		contractName = strings.TrimSuffix(filepath.Base(cfg.SolidityPath), ".sol")
+		return nil, fmt.Errorf("contract_name is required")
+	}
+	if version == "" {
+		return nil, fmt.Errorf("version is required")
 	}
 
 	packageName := toSnakeCase(contractName)
-	
-	// Extract version from Solidity to help find gobinding
-	contractVersion := extractVersionFromSolidity(cfg.SolidityPath)
-	
-	// Find the correct gobinding path by trying multiple locations
-	gobindingPath, actualPackageName, gobindingVersion, err := findGobindingPath(packageName, output.VersionPrefix, contractVersion)
+
+	// Find the correct gobinding path using version from config
+	gobindingPath, actualPackageName, gobindingVersion, err := findGobindingPath(packageName, version)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find gobinding: %w", err)
 	}
-	
+
 	// Use the actual package name that was found (e.g., "onramp" not "on_ramp")
 	packageName = actualPackageName
 
@@ -203,15 +201,6 @@ func extractContractInfo(cfg SimpleContractConfig, output OutputConfig) (*Contra
 		return nil, fmt.Errorf("failed to parse ABI: %w", err)
 	}
 
-	// Extract version from typeAndVersion if not specified
-	version := cfg.Version
-	if version == "" {
-		version = extractVersionFromSolidity(cfg.SolidityPath)
-		if version == "" {
-			version = "1.6.0" // default
-		}
-	}
-
 	info := &ContractInfo{
 		Name:            contractName,
 		Version:         version,
@@ -223,12 +212,14 @@ func extractContractInfo(cfg SimpleContractConfig, output OutputConfig) (*Contra
 		StructDefs:      make(map[string]*StructDef),
 	}
 
-	info.OutputPath = filepath.Join(output.BasePath, output.VersionPrefix, "operations", info.PackageName, info.PackageName+".go")
+	// Convert version to path format (e.g., "1.6.0" -> "v1_6_0")
+	versionPath := versionToPath(version)
+	info.OutputPath = filepath.Join(output.BasePath, versionPath, "operations", info.PackageName, info.PackageName+".go")
 	info.GobindingImport = fmt.Sprintf("github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/%s/%s",
 		gobindingVersion, info.GobindingPrefix)
 
-	// Check for onlyOwner modifier in Solidity source
-	ownershipFuncs := detectOwnershipModifiers(cfg.SolidityPath)
+	// Detect ownership pattern from ABI (presence of owner(), transferOwnership(), etc.)
+	isOwnable := detectOwnableFromABI(abiEntries)
 
 	// Extract constructor
 	for _, entry := range abiEntries {
@@ -245,7 +236,13 @@ func extractContractInfo(cfg SimpleContractConfig, output OutputConfig) (*Contra
 		if funcInfo == nil {
 			return nil, fmt.Errorf("function %s not found in ABI", funcName)
 		}
-		funcInfo.HasOnlyOwner = ownershipFuncs[funcName]
+
+		// If contract is Ownable and this is a write function, mark it as owner-only
+		// For read functions or non-ownable contracts, allow all callers
+		if isOwnable && funcInfo.IsWrite {
+			funcInfo.HasOnlyOwner = true
+		}
+
 		info.Functions[funcName] = funcInfo
 	}
 
@@ -328,13 +325,43 @@ func extractVersionFromSolidity(path string) string {
 	return ""
 }
 
+// detectOwnableFromABI checks if the contract follows the Ownable pattern
+// by looking for standard ownership functions in the ABI
+func detectOwnableFromABI(entries []ABIEntry) bool {
+	hasOwner := false
+	hasTransferOwnership := false
+
+	for _, entry := range entries {
+		if entry.Type != "function" {
+			continue
+		}
+
+		// Check for owner() function
+		if entry.Name == "owner" && len(entry.Inputs) == 0 {
+			hasOwner = true
+		}
+
+		// Check for transferOwnership(address) function
+		if entry.Name == "transferOwnership" && len(entry.Inputs) == 1 {
+			hasTransferOwnership = true
+		}
+
+		// If we found both, it's an Ownable contract
+		if hasOwner && hasTransferOwnership {
+			return true
+		}
+	}
+
+	return false
+}
+
 func detectOwnershipModifiers(path string) map[string]bool {
 	result := make(map[string]bool)
 	visited := make(map[string]bool)
-	
+
 	// Recursively check this file and all inherited contracts
 	detectOwnershipModifiersRecursive(path, result, visited)
-	
+
 	return result
 }
 
@@ -348,7 +375,7 @@ func detectOwnershipModifiersRecursive(path string, result map[string]bool, visi
 		return
 	}
 	visited[absPath] = true
-	
+
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return
@@ -376,7 +403,7 @@ func detectOwnershipModifiersRecursive(path string, result map[string]bool, visi
 			if parent == "" {
 				continue
 			}
-			
+
 			// Find the import for this parent
 			parentPath := findImportPathForContract(source, parent, filepath.Dir(path))
 			if parentPath != "" {
@@ -389,21 +416,21 @@ func detectOwnershipModifiersRecursive(path string, result map[string]bool, visi
 func findImportPathForContract(source, contractName, baseDir string) string {
 	// Find import statements: import {ContractName} from "path";
 	// or: import "path";
-	
+
 	// Try: import {X, ContractName, Y} from "path";
 	re1 := regexp.MustCompile(`import\s*\{[^}]*\b` + regexp.QuoteMeta(contractName) + `\b[^}]*\}\s*from\s*"([^"]+)"`)
 	matches := re1.FindStringSubmatch(source)
 	if len(matches) > 1 {
 		return resolveImportPath(matches[1], baseDir)
 	}
-	
+
 	// Try: import "path/ContractName.sol";
 	re2 := regexp.MustCompile(`import\s*"([^"]*` + regexp.QuoteMeta(contractName) + `\.sol)"`)
 	matches = re2.FindStringSubmatch(source)
 	if len(matches) > 1 {
 		return resolveImportPath(matches[1], baseDir)
 	}
-	
+
 	return ""
 }
 
@@ -415,7 +442,7 @@ func resolveImportPath(importPath, baseDir string) string {
 			return resolved
 		}
 	}
-	
+
 	// Handle absolute imports from project root
 	// Try from chains/evm/contracts
 	contractsBase := "chains/evm/contracts"
@@ -423,18 +450,18 @@ func resolveImportPath(importPath, baseDir string) string {
 	if _, err := os.Stat(resolved); err == nil {
 		return resolved
 	}
-	
+
 	// Handle @chainlink imports (look in node_modules or contracts)
 	if strings.HasPrefix(importPath, "@chainlink/") {
 		// These are usually in node_modules or vendored, skip for now
 		return ""
 	}
-	
+
 	// Handle @openzeppelin imports (skip)
 	if strings.HasPrefix(importPath, "@openzeppelin/") {
 		return ""
 	}
-	
+
 	return ""
 }
 
@@ -462,13 +489,13 @@ func findFunctionInABI(entries []ABIEntry, funcName string, gobindingPrefix stri
 		// 1. Version with array parameters (more flexible)
 		// 2. Version with MORE parameters (more specific)
 		// 3. First candidate
-		
+
 		var arrayVersion ABIEntry
 		var arrayIndex int
 		var maxParams int
 		var maxParamVersion ABIEntry
 		var maxParamIndex int
-		
+
 		for i, c := range candidates {
 			// Check for array parameters
 			hasArray := false
@@ -482,7 +509,7 @@ func findFunctionInABI(entries []ABIEntry, funcName string, gobindingPrefix stri
 				arrayVersion = c
 				arrayIndex = i
 			}
-			
+
 			// Track version with most parameters
 			if len(c.Inputs) > maxParams {
 				maxParams = len(c.Inputs)
@@ -490,7 +517,7 @@ func findFunctionInABI(entries []ABIEntry, funcName string, gobindingPrefix stri
 				maxParamIndex = i
 			}
 		}
-		
+
 		// Select in priority order
 		if arrayVersion.Name != "" {
 			selected = arrayVersion
@@ -558,15 +585,6 @@ func solidityToGoType(solidityType, internalType, gobindingPrefix string) string
 		return "common.Address"
 	}
 
-	// Handle bytes16 special case (often used for chain selectors/subjects)
-	if solidityType == "bytes16" {
-		// Check if it's a custom type like fastcurse.Subject
-		if strings.Contains(internalType, "Subject") {
-			return "fastcurse.Subject"
-		}
-		return "[16]byte"
-	}
-
 	// Handle struct types (tuple in Solidity ABI)
 	if solidityType == "tuple" || solidityType == "tuple[]" {
 		// Extract the Go type name from internalType
@@ -575,13 +593,13 @@ func solidityToGoType(solidityType, internalType, gobindingPrefix string) string
 		if strings.HasPrefix(internalType, "struct") && !strings.HasPrefix(internalType, "struct ") {
 			structPrefix = "struct"
 		}
-		
+
 		if strings.HasPrefix(internalType, structPrefix) {
 			// Handle both "structFeeQuoter.Foo[]" and "struct FeeQuoter.Foo"
 			typeStr := strings.TrimPrefix(internalType, structPrefix)
 			// Remove trailing [] if present
 			typeStr = strings.TrimSuffix(typeStr, "[]")
-			
+
 			parts := strings.Split(typeStr, ".")
 			if len(parts) == 2 {
 				// Convert "FeeQuoter.DestChainConfigArgs" to "fee_quoter.FeeQuoterDestChainConfigArgs"
@@ -604,37 +622,37 @@ func solidityToGoType(solidityType, internalType, gobindingPrefix string) string
 
 	// Map basic types
 	typeMap := map[string]string{
-		"uint8":    "uint8",
-		"uint16":   "uint16",
-		"uint24":   "uint32", // Go doesn't have uint24, use uint32
-		"uint32":   "uint32",
-		"uint48":   "uint64", // Go doesn't have uint48, use uint64
-		"uint64":   "uint64",
-		"uint96":   "*big.Int", // Larger than uint64
-		"uint128":  "*big.Int",
-		"uint160":  "*big.Int", // address-sized
-		"uint192":  "*big.Int",
-		"uint224":  "*big.Int",
-		"uint256":  "*big.Int",
-		"int8":     "int8",
-		"int16":    "int16",
-		"int24":    "int32",
-		"int32":    "int32",
-		"int48":    "int64",
-		"int64":    "int64",
-		"int96":    "*big.Int",
-		"int128":   "*big.Int",
-		"int160":   "*big.Int",
-		"int192":   "*big.Int",
-		"int224":   "*big.Int",
-		"int256":   "*big.Int",
-		"address":  "common.Address",
-		"bool":     "bool",
-		"string":   "string",
-		"bytes":    "[]byte",
-		"bytes4":   "[4]byte",
-		"bytes16":  "[16]byte",
-		"bytes32":  "[32]byte",
+		"uint8":   "uint8",
+		"uint16":  "uint16",
+		"uint24":  "uint32", // Go doesn't have uint24, use uint32
+		"uint32":  "uint32",
+		"uint48":  "uint64", // Go doesn't have uint48, use uint64
+		"uint64":  "uint64",
+		"uint96":  "*big.Int", // Larger than uint64
+		"uint128": "*big.Int",
+		"uint160": "*big.Int",
+		"uint192": "*big.Int",
+		"uint224": "*big.Int",
+		"uint256": "*big.Int",
+		"int8":    "int8",
+		"int16":   "int16",
+		"int24":   "int32",
+		"int32":   "int32",
+		"int48":   "int64",
+		"int64":   "int64",
+		"int96":   "*big.Int",
+		"int128":  "*big.Int",
+		"int160":  "*big.Int",
+		"int192":  "*big.Int",
+		"int224":  "*big.Int",
+		"int256":  "*big.Int",
+		"address": "common.Address",
+		"bool":    "bool",
+		"string":  "string",
+		"bytes":   "[]byte",
+		"bytes4":  "[4]byte",
+		"bytes16": "[16]byte",
+		"bytes32": "[32]byte",
 	}
 
 	if goType, ok := typeMap[solidityType]; ok {
@@ -649,11 +667,11 @@ func parseABIParam(param ABIParam, gobindingPrefix string) ParameterInfo {
 		Name:         param.Name,
 		SolidityType: param.Type,
 	}
-	
+
 	// Check if this is a struct type (tuple in ABI)
 	baseType := strings.TrimSuffix(param.Type, "[]")
 	isArray := strings.HasSuffix(param.Type, "[]")
-	
+
 	if baseType == "tuple" && len(param.Components) > 0 {
 		// Extract struct name from internalType
 		// Format: "struct ContractName.StructName" or "struct ContractName.StructName[]"
@@ -661,27 +679,27 @@ func parseABIParam(param ABIParam, gobindingPrefix string) ParameterInfo {
 		if strings.HasPrefix(param.InternalType, "struct") && !strings.HasPrefix(param.InternalType, "struct ") {
 			structPrefix = "struct"
 		}
-		
+
 		internalType := strings.TrimPrefix(param.InternalType, structPrefix)
 		internalType = strings.TrimSuffix(internalType, "[]")
-		
+
 		parts := strings.Split(internalType, ".")
 		if len(parts) == 2 {
 			// Local name: just the struct name (e.g., "DestChainConfigArgs")
 			localStructName := parts[1]
-			
+
 			// Gethwrapper type: prefix.ContractNameStructName (e.g., "fee_quoter.FeeQuoterDestChainConfigArgs")
 			gethwrapperType := gobindingPrefix + "." + parts[0] + parts[1]
-			
+
 			paramInfo.IsStruct = true
 			paramInfo.StructName = localStructName
 			paramInfo.GethwrapperType = gethwrapperType
-			
+
 			// Recursively parse struct fields
 			for _, comp := range param.Components {
 				paramInfo.Components = append(paramInfo.Components, parseABIParam(comp, gobindingPrefix))
 			}
-			
+
 			// Set GoType
 			if isArray {
 				paramInfo.GoType = "[]" + localStructName
@@ -696,7 +714,7 @@ func parseABIParam(param ABIParam, gobindingPrefix string) ParameterInfo {
 		// Not a struct, use solidityToGoType
 		paramInfo.GoType = solidityToGoType(param.Type, param.InternalType, gobindingPrefix)
 	}
-	
+
 	return paramInfo
 }
 
@@ -762,9 +780,6 @@ import (
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-{{- if .NeedsFastcurse}}
-	"github.com/smartcontractkit/chainlink-ccip/deployment/fastcurse"
-{{- end}}
 )
 
 var ContractType cldf_deployment.ContractType = "{{.ContractType}}"
@@ -911,7 +926,10 @@ var {{.Name}} = contract.NewRead(contract.ReadParams[{{.ArgsType}}, {{.ReturnTyp
 
 	formatted, err := format.Source(buf.Bytes())
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Generated code (unformatted):\n%s\n", buf.String())
+		_, err := fmt.Fprintf(os.Stderr, "Generated code (unformatted):\n%s\n", buf.String())
+		if err != nil {
+			return err
+		}
 		return fmt.Errorf("formatting failed: %w", err)
 	}
 
@@ -942,31 +960,24 @@ func prepareTemplateData(info *ContractInfo) map[string]interface{} {
 	// Use the order from config (already preserved in FunctionOrder)
 	funcNames := info.FunctionOrder
 
-	// Check if we need fastcurse import
-	needsFastcurse := false
+	// Check if we need big.Int import
 	needsBigInt := false
-	
+
 	// Check functions
 	for _, name := range funcNames {
 		funcInfo := info.Functions[name]
 		for _, param := range funcInfo.Parameters {
-			if strings.Contains(param.GoType, "fastcurse") {
-				needsFastcurse = true
-			}
 			if strings.Contains(param.GoType, "*big.Int") {
 				needsBigInt = true
 			}
 		}
 		for _, param := range funcInfo.ReturnParams {
-			if strings.Contains(param.GoType, "fastcurse") {
-				needsFastcurse = true
-			}
 			if strings.Contains(param.GoType, "*big.Int") {
 				needsBigInt = true
 			}
 		}
 	}
-	
+
 	// Check structs
 	for _, structDef := range info.StructDefs {
 		for _, field := range structDef.Fields {
@@ -976,7 +987,7 @@ func prepareTemplateData(info *ContractInfo) map[string]interface{} {
 			}
 		}
 	}
-	
+
 	// Check constructor
 	if info.Constructor != nil {
 		for _, param := range info.Constructor.Parameters {
@@ -986,8 +997,7 @@ func prepareTemplateData(info *ContractInfo) map[string]interface{} {
 			}
 		}
 	}
-	
-	data["NeedsFastcurse"] = needsFastcurse
+
 	data["NeedsBigInt"] = needsBigInt
 
 	// Add constructor
@@ -1033,9 +1043,9 @@ func prepareTemplateData(info *ContractInfo) map[string]interface{} {
 	for _, name := range funcNames {
 		funcInfo := info.Functions[name]
 		if funcInfo.IsWrite {
-			contractMethods = append(contractMethods, prepareContractMethod(funcInfo, true, info.Name, info.GobindingPrefix))
+			contractMethods = append(contractMethods, prepareContractMethod(funcInfo, true))
 		} else if funcInfo.IsRead {
-			contractMethods = append(contractMethods, prepareContractMethod(funcInfo, false, info.Name, info.GobindingPrefix))
+			contractMethods = append(contractMethods, prepareContractMethod(funcInfo, false))
 		}
 	}
 	data["ContractMethods"] = contractMethods
@@ -1043,14 +1053,14 @@ func prepareTemplateData(info *ContractInfo) map[string]interface{} {
 	return data
 }
 
-func prepareContractMethod(funcInfo *FunctionInfo, isWrite bool, contractType string, gobindingPrefix string) map[string]interface{} {
+func prepareContractMethod(funcInfo *FunctionInfo, isWrite bool) map[string]interface{} {
 	// Params: opts *bind.TransactOpts, args <Type>
 	// or: opts *bind.CallOpts, args <Type>
 	optsType := "*bind.TransactOpts"
 	if !isWrite {
 		optsType = "*bind.CallOpts"
 	}
-	
+
 	argsParam := ""
 	if len(funcInfo.Parameters) == 1 {
 		argsType := funcInfo.Parameters[0].GoType
@@ -1059,12 +1069,12 @@ func prepareContractMethod(funcInfo *FunctionInfo, isWrite bool, contractType st
 		argsType := funcInfo.Name + "Args"
 		argsParam = fmt.Sprintf("args %s", argsType)
 	}
-	
+
 	params := fmt.Sprintf("opts %s", optsType)
 	if argsParam != "" {
 		params = fmt.Sprintf("%s, %s", params, argsParam)
 	}
-	
+
 	// Returns
 	returns := "(*types.Transaction, error)"
 	returnType := "interface{}"
@@ -1074,7 +1084,7 @@ func prepareContractMethod(funcInfo *FunctionInfo, isWrite bool, contractType st
 		}
 		returns = fmt.Sprintf("(%s, error)", returnType)
 	}
-	
+
 	// Build method body
 	var methodBody string
 	if isWrite {
@@ -1104,12 +1114,12 @@ func prepareContractMethod(funcInfo *FunctionInfo, isWrite bool, contractType st
 				callArgsList = append(callArgsList, "args")
 			}
 		}
-		
+
 		callArgsStr := ""
 		if len(callArgsList) > 0 {
 			callArgsStr = ", " + strings.Join(callArgsList, ", ")
 		}
-		
+
 		methodBody = fmt.Sprintf(`var out []interface{}
 	err := c.contract.Call(opts, &out, "%s"%s)
 	if err != nil {
@@ -1118,7 +1128,7 @@ func prepareContractMethod(funcInfo *FunctionInfo, isWrite bool, contractType st
 	}
 	return *abi.ConvertType(out[0], new(%s)).(*%s), nil`, funcInfo.CallMethod, callArgsStr, returnType, returnType, returnType)
 	}
-	
+
 	return map[string]interface{}{
 		"Name":       funcInfo.Name,
 		"MethodName": funcInfo.CallMethod,
@@ -1127,7 +1137,6 @@ func prepareContractMethod(funcInfo *FunctionInfo, isWrite bool, contractType st
 		"MethodBody": methodBody,
 	}
 }
-
 
 func prepareParameters(params []ParameterInfo) []map[string]string {
 	var result []map[string]string
@@ -1184,7 +1193,7 @@ func prepareWriteOp(funcInfo *FunctionInfo) map[string]interface{} {
 
 func prepareReadOp(funcInfo *FunctionInfo) map[string]interface{} {
 	argsType := "struct{}"
-	
+
 	if len(funcInfo.Parameters) == 1 {
 		param := funcInfo.Parameters[0]
 		argsType = param.GoType

@@ -65,6 +65,14 @@ func (c *OnRampContract) ApplyDestChainConfigUpdates(opts *bind.TransactOpts, ar
 	return c.contract.Transact(opts, "ApplyDestChainConfigUpdates", args)
 }
 
+// StaticConfig represents onramp.OnRampStaticConfig structure
+type StaticConfig struct {
+	ChainSelector      uint64
+	RmnRemote          common.Address
+	NonceManager       common.Address
+	TokenAdminRegistry common.Address
+}
+
 // DynamicConfig represents onramp.OnRampDynamicConfig structure
 type DynamicConfig struct {
 	FeeQuoter              common.Address
@@ -79,14 +87,6 @@ type DestChainConfigArgs struct {
 	DestChainSelector uint64
 	Router            common.Address
 	AllowlistEnabled  bool
-}
-
-// StaticConfig represents onramp.OnRampStaticConfig structure
-type StaticConfig struct {
-	ChainSelector      uint64
-	RmnRemote          common.Address
-	NonceManager       common.Address
-	TokenAdminRegistry common.Address
 }
 
 type ConstructorArgs struct {
