@@ -18,8 +18,9 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/wasp"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
-	ccip "github.com/smartcontractkit/chainlink-ccip/devenv"
 	f "github.com/smartcontractkit/chainlink-testing-framework/framework"
+
+	ccip "github.com/smartcontractkit/chainlink-ccip/devenv"
 )
 
 type ChaosTestCase struct {

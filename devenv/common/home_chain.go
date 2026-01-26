@@ -713,7 +713,7 @@ func getOracleIdentities(clClients []*clclient.ChainlinkClient, nodeKeyBundles m
 			offchainPkBytesFixed := [ed25519.PublicKeySize]byte{}
 			n := copy(offchainPkBytesFixed[:], offchainPkBytes)
 			if n != ed25519.PublicKeySize {
-				return fmt.Errorf("wrong number of elements copied")
+				return fmt.Errorf("wrong number of elements copied (offchainPk, family = %s, %v %v %v)", family, ocr2Config.OffChainPublicKey, len(offchainPkBytes), offchainPkBytes)
 			}
 			configPkBytes, err := hex.DecodeString(strings.TrimPrefix(ocr2Config.ConfigPublicKey, cfgPrefix))
 			if err != nil {
@@ -722,7 +722,7 @@ func getOracleIdentities(clClients []*clclient.ChainlinkClient, nodeKeyBundles m
 			configPkBytesFixed := [ed25519.PublicKeySize]byte{}
 			n = copy(configPkBytesFixed[:], configPkBytes)
 			if n != ed25519.PublicKeySize {
-				return fmt.Errorf("wrong number of elements copied")
+				return fmt.Errorf("wrong number of elements copied (configPk, family = %s)", family)
 			}
 			onchainPkBytes, err := hex.DecodeString(strings.TrimPrefix(ocr2Config.OnChainPublicKey, onPrefix))
 			if err != nil {

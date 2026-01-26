@@ -11,6 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
+
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testadapters"
 	ccip "github.com/smartcontractkit/chainlink-ccip/devenv"
 )
