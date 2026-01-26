@@ -1,6 +1,15 @@
 package adapters
 
-import "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
+import (
+	"fmt"
+	"sync"
+
+	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
+	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+)
 
 type DeployLombardInput[LocalContract any, RemoteContract any] struct {
 	// ChainSelector is the selector for the chain being deployed.
@@ -40,4 +49,45 @@ type RemoteLombardChainConfig[LocalContract any, RemoteContract any] struct {
 type LombardRemoteDomain[RemoteContract any] struct {
 	AllowedCaller RemoteContract
 	LChainId      uint32
+}
+
+// LombardChain is a configurable CCTP chain.
+type LombardChain interface {
+	// DeployLombardChain deploys the CCTP contracts on the chain.
+	DeployLombardChain() *cldf_ops.Sequence[DeployLombardInput[string, []byte], sequences.OnChainOutput, cldf_chain.BlockChains]
+	// AddressRefToBytes converts an AddressRef to a byte slice representing the address.
+	// Each chain family has their own way of serializing addresses from strings and needs to specify this logic.
+	AddressRefToBytes(ref datastore.AddressRef) ([]byte, error)
+}
+
+// LombardChainRegistry maintains a registry of Lombard chains.
+type LombardChainRegistry struct {
+	mu sync.Mutex
+	m  map[string]LombardChain
+}
+
+// NewLombardChainRegistry creates a new Lombard chain registry.
+func NewLombardChainRegistry() *LombardChainRegistry {
+	return &LombardChainRegistry{
+		m: make(map[string]LombardChain),
+	}
+}
+
+// RegisterLombardChain allows Lombard chains to register their changeset logic.
+func (r *LombardChainRegistry) RegisterLombardChain(chainFamily string, adapter LombardChain) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if _, exists := r.m[chainFamily]; exists {
+		panic(fmt.Errorf("CCTPChain '%s' already registered", chainFamily))
+	}
+	r.m[chainFamily] = adapter
+}
+
+// GetLombardChain retrieves a registered Lombard chain for the given chain family.
+// The boolean return value indicates whether a Lombard chain was found.
+func (r *LombardChainRegistry) GetLombardChain(chainFamily string) (LombardChain, bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	adapter, ok := r.m[chainFamily]
+	return adapter, ok
 }
