@@ -112,6 +112,49 @@ func main() {
 	}
 }
 
+func findGobindingPath(packageName, preferredVersion, contractVersion string) (path string, actualPackageName string, version string, err error) {
+	baseDir := filepath.Join("chains", "evm", "gobindings", "generated")
+	
+	// Try in order of preference:
+	// 1. Preferred version from config (e.g., v1_6_0)
+	// 2. Contract version converted to directory name (e.g., 1.5.0 -> v1_5_0)
+	// 3. "latest"
+	
+	candidateVersions := []string{preferredVersion}
+	
+	if contractVersion != "" {
+		// Convert "1.5.0" to "v1_5_0"
+		versionDir := "v" + strings.ReplaceAll(contractVersion, ".", "_")
+		if versionDir != preferredVersion {
+			candidateVersions = append(candidateVersions, versionDir)
+		}
+	}
+	
+	candidateVersions = append(candidateVersions, "latest")
+	
+	// Also try package name without underscores (e.g., "onramp" instead of "on_ramp")
+	packageNameNoUnderscore := strings.ReplaceAll(packageName, "_", "")
+	
+	for _, ver := range candidateVersions {
+		// Try with original package name
+		candidate := filepath.Join(baseDir, ver, packageName, packageName+".go")
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate, packageName, ver, nil
+		}
+		
+		// Try without underscores
+		if packageNameNoUnderscore != packageName {
+			candidate = filepath.Join(baseDir, ver, packageNameNoUnderscore, packageNameNoUnderscore+".go")
+			if _, err := os.Stat(candidate); err == nil {
+				return candidate, packageNameNoUnderscore, ver, nil
+			}
+		}
+	}
+	
+	return "", "", "", fmt.Errorf("gobinding not found for package %s (tried versions: %s, with/without underscores)", 
+		packageName, strings.Join(candidateVersions, ", "))
+}
+
 func extractContractInfo(cfg SimpleContractConfig, output OutputConfig) (*ContractInfo, error) {
 	contractName := cfg.ContractName
 	if contractName == "" {
@@ -119,7 +162,18 @@ func extractContractInfo(cfg SimpleContractConfig, output OutputConfig) (*Contra
 	}
 
 	packageName := toSnakeCase(contractName)
-	gobindingPath := filepath.Join("chains", "evm", "gobindings", "generated", output.VersionPrefix, packageName, packageName+".go")
+	
+	// Extract version from Solidity to help find gobinding
+	contractVersion := extractVersionFromSolidity(cfg.SolidityPath)
+	
+	// Find the correct gobinding path by trying multiple locations
+	gobindingPath, actualPackageName, gobindingVersion, err := findGobindingPath(packageName, output.VersionPrefix, contractVersion)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find gobinding: %w", err)
+	}
+	
+	// Use the actual package name that was found (e.g., "onramp" not "on_ramp")
+	packageName = actualPackageName
 
 	// Extract ABI from gobinding
 	abi, err := extractABIFromGobinding(gobindingPath)
@@ -152,7 +206,7 @@ func extractContractInfo(cfg SimpleContractConfig, output OutputConfig) (*Contra
 
 	info.OutputPath = filepath.Join(output.BasePath, output.VersionPrefix, "operations", info.PackageName, info.PackageName+".go")
 	info.GobindingImport = fmt.Sprintf("github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/%s/%s",
-		output.VersionPrefix, info.GobindingPrefix)
+		gobindingVersion, info.GobindingPrefix)
 
 	// Check for onlyOwner modifier in Solidity source
 	ownershipFuncs := detectOwnershipModifiers(cfg.SolidityPath)
@@ -206,7 +260,11 @@ func extractVersionFromSolidity(path string) string {
 		return ""
 	}
 
-	re := regexp.MustCompile(`typeAndVersion.*?=.*?"[^"]*\s+(\d+\.\d+\.\d+)"`)
+	// Match both constant declarations and function returns:
+	// string public constant override typeAndVersion = "ContractName 1.6.0";
+	// function typeAndVersion() ... { return "ContractName 1.5.0"; }
+	// Use (?s) to make . match newlines, [\s\S]*? to match anything including newlines
+	re := regexp.MustCompile(`(?s)typeAndVersion[\s\S]*?(?:=|return)\s*"[^"]+\s+(\d+\.\d+\.\d+)"`)
 	matches := re.FindStringSubmatch(string(data))
 	if len(matches) > 1 {
 		return matches[1]
@@ -215,15 +273,34 @@ func extractVersionFromSolidity(path string) string {
 }
 
 func detectOwnershipModifiers(path string) map[string]bool {
+	result := make(map[string]bool)
+	visited := make(map[string]bool)
+	
+	// Recursively check this file and all inherited contracts
+	detectOwnershipModifiersRecursive(path, result, visited)
+	
+	return result
+}
+
+func detectOwnershipModifiersRecursive(path string, result map[string]bool, visited map[string]bool) {
+	// Avoid infinite loops
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return
+	}
+	if visited[absPath] {
+		return
+	}
+	visited[absPath] = true
+	
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil
+		return
 	}
 
 	source := string(data)
-	result := make(map[string]bool)
 
-	// Find functions with onlyOwner modifier
+	// Find functions with onlyOwner modifier in this file
 	re := regexp.MustCompile(`function\s+(\w+)\s*\([^)]*\)[^{]*\bonlyOwner\b`)
 	matches := re.FindAllStringSubmatch(source, -1)
 	for _, match := range matches {
@@ -232,7 +309,77 @@ func detectOwnershipModifiers(path string) map[string]bool {
 		}
 	}
 
-	return result
+	// Find inherited contracts and process them
+	// Match: contract ContractName is Parent1, Parent2 {
+	inheritRe := regexp.MustCompile(`contract\s+\w+\s+is\s+([\w\s,]+)\s*\{`)
+	inheritMatches := inheritRe.FindStringSubmatch(source)
+	if len(inheritMatches) > 1 {
+		parents := strings.Split(inheritMatches[1], ",")
+		for _, parent := range parents {
+			parent = strings.TrimSpace(parent)
+			if parent == "" {
+				continue
+			}
+			
+			// Find the import for this parent
+			parentPath := findImportPathForContract(source, parent, filepath.Dir(path))
+			if parentPath != "" {
+				detectOwnershipModifiersRecursive(parentPath, result, visited)
+			}
+		}
+	}
+}
+
+func findImportPathForContract(source, contractName, baseDir string) string {
+	// Find import statements: import {ContractName} from "path";
+	// or: import "path";
+	
+	// Try: import {X, ContractName, Y} from "path";
+	re1 := regexp.MustCompile(`import\s*\{[^}]*\b` + regexp.QuoteMeta(contractName) + `\b[^}]*\}\s*from\s*"([^"]+)"`)
+	matches := re1.FindStringSubmatch(source)
+	if len(matches) > 1 {
+		return resolveImportPath(matches[1], baseDir)
+	}
+	
+	// Try: import "path/ContractName.sol";
+	re2 := regexp.MustCompile(`import\s*"([^"]*` + regexp.QuoteMeta(contractName) + `\.sol)"`)
+	matches = re2.FindStringSubmatch(source)
+	if len(matches) > 1 {
+		return resolveImportPath(matches[1], baseDir)
+	}
+	
+	return ""
+}
+
+func resolveImportPath(importPath, baseDir string) string {
+	// Handle relative imports
+	if strings.HasPrefix(importPath, ".") {
+		resolved := filepath.Join(baseDir, importPath)
+		if _, err := os.Stat(resolved); err == nil {
+			return resolved
+		}
+	}
+	
+	// Handle absolute imports from project root
+	// Try from chains/evm/contracts
+	contractsBase := "chains/evm/contracts"
+	resolved := filepath.Join(contractsBase, importPath)
+	if _, err := os.Stat(resolved); err == nil {
+		return resolved
+	}
+	
+	// Handle @chainlink imports (look in node_modules or contracts)
+	if strings.HasPrefix(importPath, "@chainlink/") {
+		// These are usually in node_modules or vendored, skip for now
+		return ""
+	}
+	
+	// Handle @openzeppelin imports (skip)
+	if strings.HasPrefix(importPath, "@openzeppelin/") {
+		return ""
+	}
+	
+	return ""
 }
 
 func findFunctionInABI(entries []ABIEntry, funcName string, gobindingPrefix string) *FunctionInfo {
@@ -521,7 +668,7 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 {{- end}}
 
 {{- range .WriteOps}}
-{{- if not .UseSingleArg}}
+{{- if and (not .UseSingleArg) (not .UseNoArgs)}}
 
 type {{.ArgsStructName}} struct {
 {{- range .Parameters}}
@@ -669,6 +816,7 @@ func prepareParameters(params []ParameterInfo) []map[string]string {
 func prepareWriteOp(funcInfo *FunctionInfo) map[string]interface{} {
 	argsStructName := funcInfo.Name + "Args"
 	useSingleArg := len(funcInfo.Parameters) == 1
+	useNoArgs := len(funcInfo.Parameters) == 0
 	argsType := argsStructName
 
 	accessControl := "AllCallersAllowed"
@@ -690,6 +838,9 @@ func prepareWriteOp(funcInfo *FunctionInfo) map[string]interface{} {
 			}
 			callArgs = ", " + strings.Join(args, ", ")
 		}
+	} else {
+		// For zero parameters, use struct{}
+		argsType = "struct{}"
 	}
 
 	return map[string]interface{}{
@@ -698,6 +849,7 @@ func prepareWriteOp(funcInfo *FunctionInfo) map[string]interface{} {
 		"ArgsStructName": argsStructName,
 		"ArgsType":       argsType,
 		"UseSingleArg":   useSingleArg,
+		"UseNoArgs":      useNoArgs,
 		"Parameters":     prepareParameters(funcInfo.Parameters),
 		"Description":    fmt.Sprintf("Calls %s on the contract", funcInfo.SolidityName),
 		"AccessControl":  accessControl,

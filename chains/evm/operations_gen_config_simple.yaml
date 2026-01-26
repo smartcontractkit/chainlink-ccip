@@ -20,3 +20,18 @@ contracts:
       - updatePrices
       - applyAuthorizedCallerUpdates
       - applyTokenTransferFeeConfigUpdates
+  - solidity_path: chains/evm/contracts/applications/PingPongDemo.sol
+    functions:
+      - setCounterpart
+      - setCounterpartChainSelector
+      - setCounterpartAddress
+      - setPaused
+      - setOutOfOrderExecution
+      - startPingPong
+  - solidity_path: chains/evm/contracts/onRamp/OnRamp.sol
+    functions:
+      - applyDestChainConfigUpdates
+  - solidity_path: chains/evm/contracts/offRamp/OffRamp.sol
+    functions:
+      - applySourceChainConfigUpdates
+      - setOCR3Configs

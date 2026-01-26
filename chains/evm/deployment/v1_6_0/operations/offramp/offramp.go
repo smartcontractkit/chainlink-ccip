@@ -5,34 +5,23 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
+	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
 )
 
 var ContractType cldf_deployment.ContractType = "OffRamp"
-var Version *semver.Version = semver.MustParse("1.6.0")
-
-type OffRampParams struct {
-	GasForCallExactCheck                    uint16
-	PermissionLessExecutionThresholdSeconds uint32
-	MessageInterceptor                      common.Address
-}
-
-type StaticConfig = offramp.OffRampStaticConfig
-type DynamicConfig = offramp.OffRampDynamicConfig
-type SourceChainConfigArgs = offramp.OffRampSourceChainConfigArgs
+var Version = semver.MustParse("1.6.0")
 
 type ConstructorArgs struct {
-	StaticConfig       StaticConfig
-	DynamicConfig      DynamicConfig
-	SourceChainConfigs []SourceChainConfigArgs
+	StaticConfig       offramp.OffRampStaticConfig
+	DynamicConfig      offramp.OffRampDynamicConfig
+	SourceChainConfigs []offramp.OffRampSourceChainConfigArgs
 }
 
 var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
-	Name:             "off-ramp:deploy",
+	Name:             "offramp:deploy",
 	Version:          Version,
 	Description:      "Deploys the OffRamp contract",
 	ContractMetadata: offramp.OffRampMetaData,
@@ -44,10 +33,10 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Validate: func(ConstructorArgs) error { return nil },
 })
 
-var OffRampApplySourceChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]offramp.OffRampSourceChainConfigArgs, *offramp.OffRamp]{
+var ApplySourceChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]offramp.OffRampSourceChainConfigArgs, *offramp.OffRamp]{
 	Name:            "offramp:apply-source-chain-config-updates",
 	Version:         Version,
-	Description:     "Applies updates to source chain configs on the OffRamp 1.6.0 contract",
+	Description:     "Calls applySourceChainConfigUpdates on the contract",
 	ContractType:    ContractType,
 	ContractABI:     offramp.OffRampABI,
 	NewContract:     offramp.NewOffRamp,
@@ -58,10 +47,10 @@ var OffRampApplySourceChainConfigUpdates = contract.NewWrite(contract.WriteParam
 	},
 })
 
-var OffRampSetOcr3 = contract.NewWrite(contract.WriteParams[[]offramp.MultiOCR3BaseOCRConfigArgs, *offramp.OffRamp]{
-	Name:            "offramp:set-ocr3",
+var SetOCR3Configs = contract.NewWrite(contract.WriteParams[[]offramp.MultiOCR3BaseOCRConfigArgs, *offramp.OffRamp]{
+	Name:            "offramp:set-o-c-r3-configs",
 	Version:         Version,
-	Description:     "Sets the OCR3 configuration on the OffRamp 1.6.0 contract",
+	Description:     "Calls setOCR3Configs on the contract",
 	ContractType:    ContractType,
 	ContractABI:     offramp.OffRampABI,
 	NewContract:     offramp.NewOffRamp,
