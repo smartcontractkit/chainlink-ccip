@@ -470,6 +470,12 @@ func confirmCommitWithExpectedSeqNumRangeSol(
 				t.Logf("Skipping CommitReportAccepted with only price updates")
 				continue
 			}
+			// Check source chain selector match. We might see roots from other chains on repeated test runs
+			if commitEvent.Report.SourceChainSelector != srcSelector {
+				t.Logf("[Root] Source chain mismatch: got %d, expected %d",
+					commitEvent.Report.SourceChainSelector, srcSelector)
+				continue
+			}
 			require.Equal(t, srcSelector, commitEvent.Report.SourceChainSelector)
 
 			// TODO: this logic is duplicated with verifyCommitReport, share

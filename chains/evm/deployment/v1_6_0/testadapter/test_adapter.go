@@ -276,7 +276,8 @@ func (a *EVMAdapter[S]) GetExtraArgs(receiver []byte, sourceFamily string, opts 
 			AllowOutOfOrderExecution: true,
 		})
 	case chain_selectors.FamilySolana:
-		panic("unimplemented GetExtraArgs(solana->evm)")
+		// EVM allows empty extraArgs
+		return nil, nil
 	default:
 		// TODO: add support for other families
 		return nil, fmt.Errorf("unsupported source family: %s", sourceFamily)
