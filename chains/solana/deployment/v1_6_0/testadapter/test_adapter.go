@@ -324,6 +324,7 @@ func (a *SVMAdapter[S]) ValidateCommit(t *testing.T, sourceSelector uint64, star
 		startSlot = *startBlock
 	}
 	offRampAddress, err := a.getAddress(datastore.ContractType("OffRamp"))
+	require.NoError(t, err)
 	_, err = confirmCommitWithExpectedSeqNumRangeSol(
 		t,
 		sourceSelector,
