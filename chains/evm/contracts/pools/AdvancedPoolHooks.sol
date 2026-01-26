@@ -35,11 +35,11 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, AuthorizedCallers {
   event PolicyEngineSet(address indexed oldPolicyEngine, address indexed newPolicyEngine);
   event AllowAnyoneToInvokeThisHookSet(bool allowed);
 
-  // bytes4(keccak256("OutboundPolicyDataV1"))
-  bytes4 internal constant OUTBOUND_POLICY_DATA_V1_TAG = 0x73bb902c;
+  // bytes4(keccak256("PoolHookOutboundPolicyDataV1"))
+  bytes4 internal constant POOL_HOOK_OUTBOUND_POLICY_DATA_V1_TAG = 0x12bebcb8;
 
-  // bytes4(keccak256("InboundPolicyDataV1"))
-  bytes4 internal constant INBOUND_POLICY_DATA_V1_TAG = 0xe8deab79;
+  // bytes4(keccak256("PoolHookInboundPolicyDataV1"))
+  bytes4 internal constant POOL_HOOK_INBOUND_POLICY_DATA_V1_TAG = 0x44d1de78;
 
   struct CCVConfig {
     address[] outboundCCVs; // CCVs required for outgoing messages to the remote chain.
@@ -111,16 +111,16 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, AuthorizedCallers {
       return;
     }
 
-    CCIPPolicyEnginePayloads.OutboundPolicyDataV1 memory outboundData = CCIPPolicyEnginePayloads.OutboundPolicyDataV1({
-      receiver: lockOrBurnIn.receiver,
-      remoteChainSelector: lockOrBurnIn.remoteChainSelector,
+    CCIPPolicyEnginePayloads.PoolHookOutboundPolicyDataV1 memory outboundData = CCIPPolicyEnginePayloads.PoolHookOutboundPolicyDataV1({
       originalSender: lockOrBurnIn.originalSender,
+      blockConfirmationRequested: blockConfirmationRequested,
+      remoteChainSelector: lockOrBurnIn.remoteChainSelector,
+      receiver: lockOrBurnIn.receiver,
       amount: lockOrBurnIn.amount,
       localToken: lockOrBurnIn.localToken,
-      blockConfirmationRequested: blockConfirmationRequested,
       tokenArgs: tokenArgs
     });
-    bytes memory policyData = abi.encodeWithSelector(OUTBOUND_POLICY_DATA_V1_TAG, outboundData);
+    bytes memory policyData = abi.encodeWithSelector(POOL_HOOK_OUTBOUND_POLICY_DATA_V1_TAG, outboundData);
     policyEngine.run(
       IPolicyEngine.Payload({
         selector: IAdvancedPoolHooks.preflightCheck.selector,
@@ -147,8 +147,9 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, AuthorizedCallers {
       return;
     }
 
-    CCIPPolicyEnginePayloads.InboundPolicyDataV1 memory inboundData = CCIPPolicyEnginePayloads.InboundPolicyDataV1({
+    CCIPPolicyEnginePayloads.PoolHookInboundPolicyDataV1 memory inboundData = CCIPPolicyEnginePayloads.PoolHookInboundPolicyDataV1({
       originalSender: releaseOrMintIn.originalSender,
+      blockConfirmationRequested: blockConfirmationRequested,
       remoteChainSelector: releaseOrMintIn.remoteChainSelector,
       receiver: releaseOrMintIn.receiver,
       amount: releaseOrMintIn.sourceDenominatedAmount,
@@ -156,10 +157,9 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, AuthorizedCallers {
       sourcePoolAddress: releaseOrMintIn.sourcePoolAddress,
       sourcePoolData: releaseOrMintIn.sourcePoolData,
       offchainTokenData: releaseOrMintIn.offchainTokenData,
-      localAmount: localAmount,
-      blockConfirmationRequested: blockConfirmationRequested
+      localAmount: localAmount
     });
-    bytes memory policyData = abi.encodeWithSelector(INBOUND_POLICY_DATA_V1_TAG, inboundData);
+    bytes memory policyData = abi.encodeWithSelector(POOL_HOOK_INBOUND_POLICY_DATA_V1_TAG, inboundData);
     policyEngine.run(
       IPolicyEngine.Payload({
         selector: IAdvancedPoolHooks.postFlightCheck.selector,

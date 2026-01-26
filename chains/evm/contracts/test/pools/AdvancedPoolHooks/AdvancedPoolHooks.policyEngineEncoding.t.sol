@@ -5,41 +5,41 @@ import {CCIPPolicyEnginePayloads} from "../../../libraries/CCIPPolicyEnginePaylo
 import {AdvancedPoolHooksSetup} from "./AdvancedPoolHooksSetup.t.sol";
 
 contract AdvancedPoolHooks_policyEngineEncoding is AdvancedPoolHooksSetup {
-  // bytes4(keccak256("OutboundPolicyDataV1"))
-  bytes4 internal constant OUTBOUND_POLICY_DATA_V1_TAG = 0x73bb902c;
+  // bytes4(keccak256("PoolHookOutboundPolicyDataV1"))
+  bytes4 internal constant POOL_HOOK_OUTBOUND_POLICY_DATA_V1_TAG = 0x12bebcb8;
 
-  // bytes4(keccak256("InboundPolicyDataV1"))
-  bytes4 internal constant INBOUND_POLICY_DATA_V1_TAG = 0xe8deab79;
+  // bytes4(keccak256("PoolHookInboundPolicyDataV1"))
+  bytes4 internal constant POOL_HOOK_INBOUND_POLICY_DATA_V1_TAG = 0x44d1de78;
 
-  function test_OutboundPolicyDataV1TagSelector() public pure {
-    assertEq(OUTBOUND_POLICY_DATA_V1_TAG, bytes4(keccak256("OutboundPolicyDataV1")));
+  function test_PoolHookOutboundPolicyDataV1TagSelector() public pure {
+    assertEq(POOL_HOOK_OUTBOUND_POLICY_DATA_V1_TAG, bytes4(keccak256("PoolHookOutboundPolicyDataV1")));
   }
 
-  function test_InboundPolicyDataV1TagSelector() public pure {
-    assertEq(INBOUND_POLICY_DATA_V1_TAG, bytes4(keccak256("InboundPolicyDataV1")));
+  function test_PoolHookInboundPolicyDataV1TagSelector() public pure {
+    assertEq(POOL_HOOK_INBOUND_POLICY_DATA_V1_TAG, bytes4(keccak256("PoolHookInboundPolicyDataV1")));
   }
 
-  function test_OutboundPolicyDataV1_RoundTrip() public pure {
-    CCIPPolicyEnginePayloads.OutboundPolicyDataV1 memory original = CCIPPolicyEnginePayloads.OutboundPolicyDataV1({
-      receiver: abi.encode(address(0x123)),
-      remoteChainSelector: 1,
+  function test_PoolHookOutboundPolicyDataV1_RoundTrip() public pure {
+    CCIPPolicyEnginePayloads.PoolHookOutboundPolicyDataV1 memory original = CCIPPolicyEnginePayloads.PoolHookOutboundPolicyDataV1({
       originalSender: address(0x456),
+      blockConfirmationRequested: 5,
+      remoteChainSelector: 1,
+      receiver: abi.encode(address(0x123)),
       amount: 100e18,
       localToken: address(0x789),
-      blockConfirmationRequested: 5,
       tokenArgs: abi.encode("test")
     });
 
     // Encode with tag
-    bytes memory encoded = abi.encodeWithSelector(OUTBOUND_POLICY_DATA_V1_TAG, original);
+    bytes memory encoded = abi.encodeWithSelector(POOL_HOOK_OUTBOUND_POLICY_DATA_V1_TAG, original);
 
     // Verify tag
-    assertEq(bytes4(encoded), OUTBOUND_POLICY_DATA_V1_TAG);
+    assertEq(bytes4(encoded), POOL_HOOK_OUTBOUND_POLICY_DATA_V1_TAG);
 
     // Decode and verify
     bytes memory dataWithoutTag = _sliceBytes(encoded, 4);
-    CCIPPolicyEnginePayloads.OutboundPolicyDataV1 memory decoded =
-      abi.decode(dataWithoutTag, (CCIPPolicyEnginePayloads.OutboundPolicyDataV1));
+    CCIPPolicyEnginePayloads.PoolHookOutboundPolicyDataV1 memory decoded =
+      abi.decode(dataWithoutTag, (CCIPPolicyEnginePayloads.PoolHookOutboundPolicyDataV1));
 
     assertEq(decoded.receiver, original.receiver);
     assertEq(decoded.remoteChainSelector, original.remoteChainSelector);
@@ -50,9 +50,10 @@ contract AdvancedPoolHooks_policyEngineEncoding is AdvancedPoolHooksSetup {
     assertEq(decoded.tokenArgs, original.tokenArgs);
   }
 
-  function test_InboundPolicyDataV1_RoundTrip() public pure {
-    CCIPPolicyEnginePayloads.InboundPolicyDataV1 memory original = CCIPPolicyEnginePayloads.InboundPolicyDataV1({
+  function test_PoolHookInboundPolicyDataV1_RoundTrip() public pure {
+    CCIPPolicyEnginePayloads.PoolHookInboundPolicyDataV1 memory original = CCIPPolicyEnginePayloads.PoolHookInboundPolicyDataV1({
       originalSender: abi.encode(address(0x123)),
+      blockConfirmationRequested: 10,
       remoteChainSelector: 1,
       receiver: address(0x456),
       amount: 100e18,
@@ -60,20 +61,19 @@ contract AdvancedPoolHooks_policyEngineEncoding is AdvancedPoolHooksSetup {
       sourcePoolAddress: abi.encode(address(0xabc)),
       sourcePoolData: abi.encode("poolData"),
       offchainTokenData: abi.encode("offchain"),
-      localAmount: 99e18,
-      blockConfirmationRequested: 10
+      localAmount: 99e18
     });
 
     // Encode with tag
-    bytes memory encoded = abi.encodeWithSelector(INBOUND_POLICY_DATA_V1_TAG, original);
+    bytes memory encoded = abi.encodeWithSelector(POOL_HOOK_INBOUND_POLICY_DATA_V1_TAG, original);
 
     // Verify tag
-    assertEq(bytes4(encoded), INBOUND_POLICY_DATA_V1_TAG);
+    assertEq(bytes4(encoded), POOL_HOOK_INBOUND_POLICY_DATA_V1_TAG);
 
     // Decode and verify
     bytes memory dataWithoutTag = _sliceBytes(encoded, 4);
-    CCIPPolicyEnginePayloads.InboundPolicyDataV1 memory decoded =
-      abi.decode(dataWithoutTag, (CCIPPolicyEnginePayloads.InboundPolicyDataV1));
+    CCIPPolicyEnginePayloads.PoolHookInboundPolicyDataV1 memory decoded =
+      abi.decode(dataWithoutTag, (CCIPPolicyEnginePayloads.PoolHookInboundPolicyDataV1));
 
     assertEq(decoded.originalSender, original.originalSender);
     assertEq(decoded.remoteChainSelector, original.remoteChainSelector);

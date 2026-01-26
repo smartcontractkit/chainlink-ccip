@@ -11,8 +11,8 @@ import {MockPolicyEngine} from "../../mocks/MockPolicyEngine.sol";
 import {AdvancedPoolHooksSetup} from "./AdvancedPoolHooksSetup.t.sol";
 
 contract AdvancedPoolHooks_preflightCheck is AdvancedPoolHooksSetup {
-  // bytes4(keccak256("OutboundPolicyDataV1"))
-  bytes4 internal constant OUTBOUND_POLICY_DATA_V1_TAG = 0x73bb902c;
+  // bytes4(keccak256("PoolHookOutboundPolicyDataV1"))
+  bytes4 internal constant POOL_HOOK_OUTBOUND_POLICY_DATA_V1_TAG = 0x12bebcb8;
 
   MockPolicyEngine internal s_mockPolicyEngine;
 
@@ -50,11 +50,11 @@ contract AdvancedPoolHooks_preflightCheck is AdvancedPoolHooksSetup {
 
     // Verify tag prefix
     bytes4 tag = bytes4(lastPayload.data);
-    assertEq(tag, OUTBOUND_POLICY_DATA_V1_TAG);
+    assertEq(tag, POOL_HOOK_OUTBOUND_POLICY_DATA_V1_TAG);
 
     // Decode and verify the payload data
-    CCIPPolicyEnginePayloads.OutboundPolicyDataV1 memory decoded =
-      abi.decode(this._sliceBytes(lastPayload.data, 4), (CCIPPolicyEnginePayloads.OutboundPolicyDataV1));
+    CCIPPolicyEnginePayloads.PoolHookOutboundPolicyDataV1 memory decoded =
+      abi.decode(this._sliceBytes(lastPayload.data, 4), (CCIPPolicyEnginePayloads.PoolHookOutboundPolicyDataV1));
 
     assertEq(decoded.receiver, lockOrBurnIn.receiver);
     assertEq(decoded.remoteChainSelector, lockOrBurnIn.remoteChainSelector);
@@ -86,7 +86,7 @@ contract AdvancedPoolHooks_preflightCheck is AdvancedPoolHooksSetup {
     // Verify policy engine was called with correct tag
     IPolicyEngine.Payload memory lastPayload = s_mockPolicyEngine.getLastPayload();
     assertEq(lastPayload.selector, IAdvancedPoolHooks.preflightCheck.selector);
-    assertEq(bytes4(lastPayload.data), OUTBOUND_POLICY_DATA_V1_TAG);
+    assertEq(bytes4(lastPayload.data), POOL_HOOK_OUTBOUND_POLICY_DATA_V1_TAG);
   }
 
   // Reverts

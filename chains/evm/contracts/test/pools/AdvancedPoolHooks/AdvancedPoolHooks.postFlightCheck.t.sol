@@ -10,8 +10,8 @@ import {MockPolicyEngine} from "../../mocks/MockPolicyEngine.sol";
 import {AdvancedPoolHooksSetup} from "./AdvancedPoolHooksSetup.t.sol";
 
 contract AdvancedPoolHooks_postFlightCheck is AdvancedPoolHooksSetup {
-  // bytes4(keccak256("InboundPolicyDataV1"))
-  bytes4 internal constant INBOUND_POLICY_DATA_V1_TAG = 0xe8deab79;
+  // bytes4(keccak256("PoolHookInboundPolicyDataV1"))
+  bytes4 internal constant POOL_HOOK_INBOUND_POLICY_DATA_V1_TAG = 0x44d1de78;
 
   MockPolicyEngine internal s_mockPolicyEngine;
 
@@ -50,11 +50,11 @@ contract AdvancedPoolHooks_postFlightCheck is AdvancedPoolHooksSetup {
 
     // Verify tag prefix
     bytes4 tag = bytes4(lastPayload.data);
-    assertEq(tag, INBOUND_POLICY_DATA_V1_TAG);
+    assertEq(tag, POOL_HOOK_INBOUND_POLICY_DATA_V1_TAG);
 
     // Decode and verify the payload data
-    CCIPPolicyEnginePayloads.InboundPolicyDataV1 memory decoded =
-      abi.decode(this._sliceBytes(lastPayload.data, 4), (CCIPPolicyEnginePayloads.InboundPolicyDataV1));
+    CCIPPolicyEnginePayloads.PoolHookInboundPolicyDataV1 memory decoded =
+      abi.decode(this._sliceBytes(lastPayload.data, 4), (CCIPPolicyEnginePayloads.PoolHookInboundPolicyDataV1));
 
     assertEq(decoded.originalSender, releaseOrMintIn.originalSender);
     assertEq(decoded.remoteChainSelector, releaseOrMintIn.remoteChainSelector);
