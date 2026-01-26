@@ -150,6 +150,11 @@ type CommitOffchainConfig struct {
 	// PopulateTxHashEnabled enables populating the TxHash field in message headers.
 	// When disabled, TxHash will be omitted from messages for backwards compatibility.
 	PopulateTxHashEnabled bool `json:"populateTxHashEnabled"`
+
+	// EvmGasLimit is the gas limit to use for EVM chain report transmissions.
+	// If set to zero, the default gas limit defined in the chain writer will be used.
+	// This field is ignored for non-EVM chains.
+	EvmGasLimit uint64 `json:"evmGasLimit"`
 }
 
 const (

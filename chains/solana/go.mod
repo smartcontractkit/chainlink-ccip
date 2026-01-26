@@ -9,7 +9,7 @@ require (
 	github.com/gagliardetto/binary v0.8.0
 	github.com/gagliardetto/solana-go v1.13.0
 	github.com/pelletier/go-toml/v2 v2.2.4
-	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250320090719-315440f5b0a7
+	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20260119161343-499241536dea
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/chainlink-common v0.9.6-0.20260114142648-bd9e1b483e96
 	github.com/stretchr/testify v1.11.1
@@ -32,6 +32,7 @@ require (
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.26.3 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect
+	github.com/smartcontractkit/chain-selectors v1.0.89 // indirect
 	github.com/smartcontractkit/chainlink-common/pkg/chipingress v0.0.10 // indirect
 	github.com/smartcontractkit/freeport v0.1.3-0.20250716200817-cb5dfd0e369e // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
@@ -88,7 +89,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.38.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/ratelimit v0.2.0 // indirect
-	go.uber.org/zap v1.27.0 // indirect
+	go.uber.org/zap v1.27.1 // indirect
 	golang.org/x/sys v0.40.0 // indirect
 	golang.org/x/term v0.39.0 // indirect
 	golang.org/x/time v0.12.0 // indirect
