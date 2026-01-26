@@ -341,10 +341,10 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		}
 
 		// Add Authorized Caller to FQ
-		_, err = cldf_ops.ExecuteOperation(b, fqops.ApplyAuthorizedCallerUpdates, chain, contract.FunctionInput[fqops.AuthorizedCallerArgs]{
+		_, err = cldf_ops.ExecuteOperation(b, fqops.ApplyAuthorizedCallerUpdates, chain, contract.FunctionInput[fee_quoter.AuthorizedCallersAuthorizedCallerArgs]{
 			ChainSelector: chain.Selector,
 			Address:       common.HexToAddress(feeQuoterRef.Address),
-			Args: fqops.AuthorizedCallerArgs{
+			Args: fee_quoter.AuthorizedCallersAuthorizedCallerArgs{
 				AddedCallers: []common.Address{
 					common.HexToAddress(offRampRef.Address),
 				},

@@ -521,23 +521,25 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 {{- end}}
 
 {{- range .WriteOps}}
+{{- if not .UseSingleArg}}
 
 type {{.ArgsStructName}} struct {
 {{- range .Parameters}}
 	{{.GoName}} {{.GoType}}
 {{- end}}
 }
+{{- end}}
 
-var {{.Name}} = contract.NewWrite(contract.WriteParams[{{.ArgsStructName}}, *{{$.GobindingPrefix}}.{{$.ContractType}}]{
+var {{.Name}} = contract.NewWrite(contract.WriteParams[{{.ArgsType}}, *{{$.GobindingPrefix}}.{{$.ContractType}}]{
 	Name:            "{{$.PackageNameHyphen}}:{{.OpName}}",
 	Version:         Version,
 	Description:     "{{.Description}}",
 	ContractType:    ContractType,
 	ContractABI:     {{$.GobindingPrefix}}.{{$.ContractType}}ABI,
 	NewContract:     {{$.GobindingPrefix}}.New{{$.ContractType}},
-	IsAllowedCaller: contract.{{.AccessControl}}[*{{$.GobindingPrefix}}.{{$.ContractType}}, {{.ArgsStructName}}],
-	Validate:        func({{.ArgsStructName}}) error { return nil },
-	CallContract: func({{$.ContractVarName}} *{{$.GobindingPrefix}}.{{$.ContractType}}, opts *bind.TransactOpts, args {{.ArgsStructName}}) (*types.Transaction, error) {
+	IsAllowedCaller: contract.{{.AccessControl}}[*{{$.GobindingPrefix}}.{{$.ContractType}}, {{.ArgsType}}],
+	Validate:        func({{.ArgsType}}) error { return nil },
+	CallContract: func({{$.ContractVarName}} *{{$.GobindingPrefix}}.{{$.ContractType}}, opts *bind.TransactOpts, args {{.ArgsType}}) (*types.Transaction, error) {
 		return {{$.ContractVarName}}.{{.CallMethod}}(opts{{.CallArgs}})
 	},
 })
@@ -666,6 +668,8 @@ func prepareParameters(params []ParameterInfo) []map[string]string {
 
 func prepareWriteOp(funcInfo *FunctionInfo) map[string]interface{} {
 	argsStructName := funcInfo.Name + "Args"
+	useSingleArg := len(funcInfo.Parameters) == 1
+	argsType := argsStructName
 
 	accessControl := "AllCallersAllowed"
 	if funcInfo.HasOnlyOwner {
@@ -674,17 +678,26 @@ func prepareWriteOp(funcInfo *FunctionInfo) map[string]interface{} {
 
 	var callArgs string
 	if len(funcInfo.Parameters) > 0 {
-		var args []string
-		for _, p := range funcInfo.Parameters {
-			args = append(args, "args."+capitalize(p.Name))
+		if useSingleArg {
+			// For single parameter, just pass args directly
+			callArgs = ", args"
+			argsType = funcInfo.Parameters[0].GoType
+		} else {
+			// For multiple parameters, access struct fields
+			var args []string
+			for _, p := range funcInfo.Parameters {
+				args = append(args, "args."+capitalize(p.Name))
+			}
+			callArgs = ", " + strings.Join(args, ", ")
 		}
-		callArgs = ", " + strings.Join(args, ", ")
 	}
 
 	return map[string]interface{}{
 		"Name":           funcInfo.Name,
 		"OpName":         toKebabCase(funcInfo.SolidityName),
 		"ArgsStructName": argsStructName,
+		"ArgsType":       argsType,
+		"UseSingleArg":   useSingleArg,
 		"Parameters":     prepareParameters(funcInfo.Parameters),
 		"Description":    fmt.Sprintf("Calls %s on the contract", funcInfo.SolidityName),
 		"AccessControl":  accessControl,

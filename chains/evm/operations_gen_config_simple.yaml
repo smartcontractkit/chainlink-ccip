@@ -14,3 +14,9 @@ contracts:
       - curse    # Will auto-detect: parameters, types, mutability, access control
       - uncurse
       - isCursed
+  - solidity_path: chains/evm/contracts/FeeQuoter.sol
+    functions:
+      - applyDestChainConfigUpdates
+      - updatePrices
+      - applyAuthorizedCallerUpdates
+      - applyTokenTransferFeeConfigUpdates
