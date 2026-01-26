@@ -5,28 +5,23 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
+	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
 )
 
 var ContractType cldf_deployment.ContractType = "OnRamp"
-var Version *semver.Version = semver.MustParse("1.6.0")
-
-type StaticConfig = onramp.OnRampStaticConfig
-type DynamicConfig = onramp.OnRampDynamicConfig
-type DestChainConfigArgs = onramp.OnRampDestChainConfigArgs
+var Version = semver.MustParse("1.6.0")
 
 type ConstructorArgs struct {
-	StaticConfig        StaticConfig
-	DynamicConfig       DynamicConfig
-	DestChainConfigArgs []DestChainConfigArgs
+	StaticConfig        onramp.OnRampStaticConfig
+	DynamicConfig       onramp.OnRampDynamicConfig
+	DestChainConfigArgs []onramp.OnRampDestChainConfigArgs
 }
 
 var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
-	Name:             "on-ramp:deploy",
+	Name:             "onramp:deploy",
 	Version:          Version,
 	Description:      "Deploys the OnRamp contract",
 	ContractMetadata: onramp.OnRampMetaData,
@@ -38,10 +33,10 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Validate: func(ConstructorArgs) error { return nil },
 })
 
-var OnRampApplyDestChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]onramp.OnRampDestChainConfigArgs, *onramp.OnRamp]{
+var ApplyDestChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]onramp.OnRampDestChainConfigArgs, *onramp.OnRamp]{
 	Name:            "onramp:apply-dest-chain-config-updates",
 	Version:         Version,
-	Description:     "Applies updates to destination chain configs on the OnRamp 1.6.0 contract",
+	Description:     "Calls applyDestChainConfigUpdates on the contract",
 	ContractType:    ContractType,
 	ContractABI:     onramp.OnRampABI,
 	NewContract:     onramp.NewOnRamp,
