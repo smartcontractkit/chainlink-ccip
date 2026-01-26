@@ -165,9 +165,11 @@ func TestNewFromOnChainSequence(t *testing.T) {
 			var expectErr bool
 			require.NoError(t, err)
 			input := sequences.OnChainOutput{
-				Addresses:        test.addresses,
-				ContractMetadata: test.contractMetadata,
-				BatchOps:         test.ops,
+				Addresses: test.addresses,
+				Metadata: sequences.Metadata{
+					Contracts: test.contractMetadata,
+				},
+				BatchOps: test.ops,
 			}
 			// Pre-check that the input can be resolved outside of the changeset flow.
 			// This ensures that any errors in resolveInput or resolveDep are from the changeset flow.
