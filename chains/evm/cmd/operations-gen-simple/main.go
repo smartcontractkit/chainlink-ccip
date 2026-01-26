@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"text/template"
 
@@ -522,9 +523,17 @@ func prepareTemplateData(info *ContractInfo) map[string]interface{} {
 		"ContractVarName":   makeVarName(info.Name),
 	}
 
+	// Get sorted function names for deterministic ordering
+	funcNames := make([]string, 0, len(info.Functions))
+	for name := range info.Functions {
+		funcNames = append(funcNames, name)
+	}
+	sort.Strings(funcNames)
+
 	// Check if we need fastcurse import
 	needsFastcurse := false
-	for _, funcInfo := range info.Functions {
+	for _, name := range funcNames {
+		funcInfo := info.Functions[name]
 		for _, param := range funcInfo.Parameters {
 			if strings.Contains(param.GoType, "fastcurse") {
 				needsFastcurse = true
@@ -537,6 +546,9 @@ func prepareTemplateData(info *ContractInfo) map[string]interface{} {
 				break
 			}
 		}
+		if needsFastcurse {
+			break
+		}
 	}
 	data["NeedsFastcurse"] = needsFastcurse
 
@@ -547,18 +559,20 @@ func prepareTemplateData(info *ContractInfo) map[string]interface{} {
 		}
 	}
 
-	// Prepare write operations
+	// Prepare write operations (in sorted order)
 	var writeOps []map[string]interface{}
-	for _, funcInfo := range info.Functions {
+	for _, name := range funcNames {
+		funcInfo := info.Functions[name]
 		if funcInfo.IsWrite {
 			writeOps = append(writeOps, prepareWriteOp(funcInfo))
 		}
 	}
 	data["WriteOps"] = writeOps
 
-	// Prepare read operations
+	// Prepare read operations (in sorted order)
 	var readOps []map[string]interface{}
-	for _, funcInfo := range info.Functions {
+	for _, name := range funcNames {
+		funcInfo := info.Functions[name]
 		if funcInfo.IsRead {
 			readOps = append(readOps, prepareReadOp(funcInfo))
 		}
