@@ -3,6 +3,7 @@ package reader
 import (
 	"context"
 	"errors"
+	"maps"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -314,9 +315,7 @@ func TestConfigPollerV2_BatchRefreshChainAndSourceConfigs_Error(t *testing.T) {
 	cache.sourceChainMu.RLock()
 	initialSourceRefreshTime := cache.sourceChainRefresh
 	initialSourceConfigData := make(map[cciptypes.ChainSelector]StaticSourceChainConfig)
-	for k, v := range cache.staticSourceChainConfigs {
-		initialSourceConfigData[k] = v
-	}
+	maps.Copy(initialSourceConfigData, cache.staticSourceChainConfigs)
 	cache.sourceChainMu.RUnlock()
 
 	// Verify cache was populated
@@ -379,17 +378,15 @@ func TestConfigPollerV2_ConcurrentAccess_GetChainConfig(t *testing.T) {
 	var successCount int32
 	var errorCount int32
 
-	for i := 0; i < numGoroutines; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range numGoroutines {
+		wg.Go(func() {
 			_, err := cPollerV2.GetChainConfig(ctx, destChain)
 			if err != nil {
 				atomic.AddInt32(&errorCount, 1)
 			} else {
 				atomic.AddInt32(&successCount, 1)
 			}
-		}()
+		})
 	}
 
 	wg.Wait()
@@ -422,16 +419,14 @@ func TestConfigPollerV2_ConcurrentCacheAccess_PrepopulatedCache(t *testing.T) {
 	var wg sync.WaitGroup
 	var successCount int32
 
-	for i := 0; i < numGoroutines; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range numGoroutines {
+		wg.Go(func() {
 			_, err := cPollerV2.GetChainConfig(ctx, destChain)
 			if err == nil {
 				// All reads should succeed from cache
 				atomic.AddInt32(&successCount, 1)
 			}
-		}()
+		})
 	}
 
 	wg.Wait()
@@ -726,7 +721,7 @@ func TestConfigPollerV2_ConsecutivePollsAtomicity(t *testing.T) {
 	assert.Equal(t, uint32(0), initialValue)
 
 	// Simulate failed polls
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		cPollerV2.consecutiveFailedPolls.Add(1)
 	}
 
@@ -826,7 +821,7 @@ func TestConfigPollerV2_NoDeadlocks(t *testing.T) {
 	var wg sync.WaitGroup
 
 	// Mix of read and write operations
-	for i := 0; i < numOperations; i++ {
+	for i := range numOperations {
 		wg.Add(1)
 		go func(iteration int) {
 			defer wg.Done()

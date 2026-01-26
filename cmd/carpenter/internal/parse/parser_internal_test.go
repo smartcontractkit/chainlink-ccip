@@ -126,7 +126,6 @@ func Test_ParseLine_Mixed(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			result, err := ParseLine(tc.line, LogTypeMixed)
 			require.NoError(t, err)

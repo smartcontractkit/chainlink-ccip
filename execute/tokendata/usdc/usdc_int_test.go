@@ -20,6 +20,7 @@ import (
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccip/consts"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
@@ -28,7 +29,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
 	readermock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
@@ -54,7 +54,7 @@ type usdcMessage struct {
 // TODO actual tokenData bytes would be abi encoded, but we can't use abi in the repo so only
 // passing attestation as it is
 func (u *usdcMessage) tokenData() []byte {
-	var result map[string]interface{}
+	var result map[string]any
 
 	err := json.Unmarshal([]byte(u.attestationResponse), &result)
 	if err != nil {

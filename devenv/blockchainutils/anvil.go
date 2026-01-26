@@ -95,7 +95,7 @@ func sendImpersonatedTx(ec *ethclient.Client, rpcURL string, from, to string, da
 		Msg("Impersonated tx details")
 
 	// 🔹 2. Build JSON-RPC params for eth_sendTransaction
-	txParams := map[string]interface{}{
+	txParams := map[string]any{
 		"from": from,
 		"to":   to,
 		"data": fmt.Sprintf("0x%x", data),
@@ -113,10 +113,10 @@ func sendImpersonatedTx(ec *ethclient.Client, rpcURL string, from, to string, da
 		}
 	}
 
-	rpcReq := map[string]interface{}{
+	rpcReq := map[string]any{
 		"jsonrpc": "2.0",
 		"method":  "eth_sendTransaction",
-		"params":  []interface{}{txParams},
+		"params":  []any{txParams},
 		"id":      1,
 	}
 
@@ -144,10 +144,10 @@ func sendImpersonatedTx(ec *ethclient.Client, rpcURL string, from, to string, da
 }
 
 func setImpersonatedBalance(rpcURL, addr string, weiBalance *big.Int) error {
-	body := map[string]interface{}{
+	body := map[string]any{
 		"jsonrpc": "2.0",
 		"method":  "anvil_setBalance",
-		"params":  []interface{}{addr, fmt.Sprintf("0x%x", weiBalance)},
+		"params":  []any{addr, fmt.Sprintf("0x%x", weiBalance)},
 		"id":      1,
 	}
 	b, _ := json.Marshal(body)

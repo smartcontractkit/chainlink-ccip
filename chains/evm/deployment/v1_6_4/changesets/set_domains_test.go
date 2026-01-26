@@ -6,31 +6,25 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	chain_selectors "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
+	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/usdc_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/changesets"
+	usdc_token_pool_cctp_v2_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/usdc_token_pool_cctp_v2"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/cctp_message_transmitter_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/factory_burn_mint_erc20"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/mock_usdc_token_messenger"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/mock_usdc_token_transmitter"
-
-	changesets "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/changesets"
-
-	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
-
-	chain_selectors "github.com/smartcontractkit/chain-selectors"
-
-	usdc_token_pool_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_4/usdc_token_pool"
-
-	"github.com/stretchr/testify/require"
+	usdc_token_pool_cctp_v2_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_4/usdc_token_pool_cctp_v2"
 )
 
 func TestSetDomainsSequence(t *testing.T) {
-	chainSelector := uint64(chain_selectors.TEST_90000001.Selector)
+	chainSelector := chain_selectors.TEST_90000001.Selector
 	e, err := environment.New(t.Context(),
 		environment.WithEVMSimulated(t, []uint64{chainSelector}),
 	)
@@ -59,7 +53,7 @@ func TestSetDomainsSequence(t *testing.T) {
 	mockTransmitterAddress, tx, _, err := mock_usdc_token_transmitter.DeployMockE2EUSDCTransmitter(
 		evmChain.DeployerKey,
 		evmChain.Client,
-		0,            // _version
+		1,            // _version
 		1,            // _localDomain
 		tokenAddress, // token
 	)
@@ -71,7 +65,7 @@ func TestSetDomainsSequence(t *testing.T) {
 	mockTokenMessengerAddress, tx, _, err := mock_usdc_token_messenger.DeployMockE2EUSDCTokenMessenger(
 		evmChain.DeployerKey,
 		evmChain.Client,
-		0,                      // version
+		1,                      // version
 		mockTransmitterAddress, // transmitter
 	)
 	require.NoError(t, err, "Failed to deploy MockUSDCTokenMessenger")
@@ -89,24 +83,23 @@ func TestSetDomainsSequence(t *testing.T) {
 	require.NoError(t, err, "Failed to confirm CCTPMessageTransmitterProxy deployment transaction")
 
 	// Deploy USDC Token Pool with placeholder addresses for dependencies
-	usdcTokenPoolRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, usdc_token_pool.Deploy, evmChain, contract.DeployInput[usdc_token_pool.ConstructorArgs]{
-		TypeAndVersion: deployment.NewTypeAndVersion(usdc_token_pool.ContractType, *usdc_token_pool.Version),
+	usdcTokenPoolRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, usdc_token_pool_cctp_v2_ops.Deploy, evmChain, contract.DeployInput[usdc_token_pool_cctp_v2_ops.ConstructorArgs]{
+		TypeAndVersion: deployment.NewTypeAndVersion(usdc_token_pool_cctp_v2_ops.ContractType, *usdc_token_pool_cctp_v2_ops.Version),
 		ChainSelector:  chainSelector,
-		Args: usdc_token_pool.ConstructorArgs{
+		Args: usdc_token_pool_cctp_v2_ops.ConstructorArgs{
 			TokenMessenger:              mockTokenMessengerAddress,
 			CCTPMessageTransmitterProxy: cctpMessageTransmitterProxyAddress,
 			Token:                       tokenAddress,
 			Allowlist:                   []common.Address{},
 			RMNProxy:                    common.HexToAddress("0x04"),
 			Router:                      common.HexToAddress("0x05"),
-			SupportedUSDCVersion:        uint32(0),
 		},
 	}, nil)
 
 	require.NoError(t, err, "Failed to deploy USDCTokenPool")
 	require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
-		Type:          datastore.ContractType(usdc_token_pool.ContractType),
-		Version:       usdc_token_pool.Version,
+		Type:          datastore.ContractType(usdc_token_pool_cctp_v2_ops.ContractType),
+		Version:       usdc_token_pool_cctp_v2_ops.Version,
 		ChainSelector: chainSelector,
 		Address:       usdcTokenPoolRef.Address,
 	}))
@@ -120,7 +113,7 @@ func TestSetDomainsSequence(t *testing.T) {
 			{
 				ChainSelector: chainSelector,
 				Address:       common.HexToAddress(usdcTokenPoolRef.Address),
-				Domains: []usdc_token_pool.DomainUpdate{
+				Domains: []usdc_token_pool_cctp_v2_ops.DomainUpdate{
 					{
 						AllowedCaller:                 [32]byte{1},
 						MintRecipient:                 [32]byte{2},
@@ -144,7 +137,7 @@ func TestSetDomainsSequence(t *testing.T) {
 	require.Greater(t, len(output.Reports), 0)
 
 	// Verify the domains
-	usdcTokenPool, err := usdc_token_pool_bindings.NewUSDCTokenPool(common.HexToAddress(usdcTokenPoolRef.Address), evmChain.Client)
+	usdcTokenPool, err := usdc_token_pool_cctp_v2_bindings.NewUSDCTokenPoolCCTPV2(common.HexToAddress(usdcTokenPoolRef.Address), evmChain.Client)
 	require.NoError(t, err, "Failed to create USDCTokenPool")
 	domain, err := usdcTokenPool.GetDomain(&bind.CallOpts{Context: t.Context()}, chainSelector)
 	require.NoError(t, err, "Failed to get domain")
@@ -156,7 +149,7 @@ func TestSetDomainsSequence(t *testing.T) {
 }
 
 func TestSetDomainsChangeset_MultipleAddressesOnSameChain(t *testing.T) {
-	chainSelector := uint64(chain_selectors.TEST_90000001.Selector)
+	chainSelector := chain_selectors.TEST_90000001.Selector
 	e, err := environment.New(t.Context(),
 		environment.WithEVMSimulated(t, []uint64{chainSelector}),
 	)
@@ -185,7 +178,7 @@ func TestSetDomainsChangeset_MultipleAddressesOnSameChain(t *testing.T) {
 	mockTransmitterAddress, tx, _, err := mock_usdc_token_transmitter.DeployMockE2EUSDCTransmitter(
 		evmChain.DeployerKey,
 		evmChain.Client,
-		0,            // _version
+		1,            // _version
 		1,            // _localDomain
 		tokenAddress, // token
 	)
@@ -197,7 +190,7 @@ func TestSetDomainsChangeset_MultipleAddressesOnSameChain(t *testing.T) {
 	mockTokenMessengerAddress, tx, _, err := mock_usdc_token_messenger.DeployMockE2EUSDCTokenMessenger(
 		evmChain.DeployerKey,
 		evmChain.Client,
-		0,                      // version
+		1,                      // version
 		mockTransmitterAddress, // transmitter
 	)
 	require.NoError(t, err, "Failed to deploy MockUSDCTokenMessenger")
@@ -215,28 +208,27 @@ func TestSetDomainsChangeset_MultipleAddressesOnSameChain(t *testing.T) {
 	require.NoError(t, err, "Failed to confirm CCTPMessageTransmitterProxy deployment transaction")
 
 	// Deploy USDC Token Pool with placeholder addresses for dependencies
-	usdcTokenPoolRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, usdc_token_pool.Deploy, evmChain, contract.DeployInput[usdc_token_pool.ConstructorArgs]{
-		TypeAndVersion: deployment.NewTypeAndVersion(usdc_token_pool.ContractType, *usdc_token_pool.Version),
+	usdcTokenPoolRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, usdc_token_pool_cctp_v2_ops.Deploy, evmChain, contract.DeployInput[usdc_token_pool_cctp_v2_ops.ConstructorArgs]{
+		TypeAndVersion: deployment.NewTypeAndVersion(usdc_token_pool_cctp_v2_ops.ContractType, *usdc_token_pool_cctp_v2_ops.Version),
 		ChainSelector:  chainSelector,
-		Args: usdc_token_pool.ConstructorArgs{
+		Args: usdc_token_pool_cctp_v2_ops.ConstructorArgs{
 			TokenMessenger:              mockTokenMessengerAddress,
 			CCTPMessageTransmitterProxy: cctpMessageTransmitterProxyAddress,
 			Token:                       tokenAddress,
 			Allowlist:                   []common.Address{},
 			RMNProxy:                    common.HexToAddress("0x04"),
 			Router:                      common.HexToAddress("0x05"),
-			SupportedUSDCVersion:        uint32(0),
 		},
 	}, nil)
 	require.NoError(t, err, "Failed to deploy USDCTokenPool")
 	require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
-		Type:          datastore.ContractType(usdc_token_pool.ContractType),
-		Version:       usdc_token_pool.Version,
+		Type:          datastore.ContractType(usdc_token_pool_cctp_v2_ops.ContractType),
+		Version:       usdc_token_pool_cctp_v2_ops.Version,
 		ChainSelector: chainSelector,
 		Address:       usdcTokenPoolRef.Address,
 	}))
 
-	additionalUSDCTokenPool, tx, _, err := usdc_token_pool_bindings.DeployUSDCTokenPool(
+	additionalUSDCTokenPool, tx, _, err := usdc_token_pool_cctp_v2_bindings.DeployUSDCTokenPoolCCTPV2(
 		evmChain.DeployerKey,
 		evmChain.Client,
 		mockTokenMessengerAddress,
@@ -245,7 +237,6 @@ func TestSetDomainsChangeset_MultipleAddressesOnSameChain(t *testing.T) {
 		[]common.Address{},
 		common.HexToAddress("0x04"),
 		common.HexToAddress("0x05"),
-		uint32(0),
 	)
 	require.NoError(t, err, "Failed to confirm additional USDCTokenPool deployment transaction")
 	_, err = evmChain.Confirm(tx)
@@ -260,7 +251,7 @@ func TestSetDomainsChangeset_MultipleAddressesOnSameChain(t *testing.T) {
 			{
 				ChainSelector: chainSelector,
 				Address:       common.HexToAddress(usdcTokenPoolRef.Address),
-				Domains: []usdc_token_pool.DomainUpdate{
+				Domains: []usdc_token_pool_cctp_v2_ops.DomainUpdate{
 					{
 						AllowedCaller:                 [32]byte{1},
 						MintRecipient:                 [32]byte{2},
@@ -274,7 +265,7 @@ func TestSetDomainsChangeset_MultipleAddressesOnSameChain(t *testing.T) {
 			{
 				ChainSelector: chainSelector,
 				Address:       additionalUSDCTokenPool,
-				Domains: []usdc_token_pool.DomainUpdate{
+				Domains: []usdc_token_pool_cctp_v2_ops.DomainUpdate{
 					{
 						AllowedCaller:                 [32]byte{4},
 						MintRecipient:                 [32]byte{5},
@@ -298,7 +289,7 @@ func TestSetDomainsChangeset_MultipleAddressesOnSameChain(t *testing.T) {
 	require.Greater(t, len(output.Reports), 0)
 
 	// Verify the domains
-	usdcTokenPool, err := usdc_token_pool_bindings.NewUSDCTokenPool(common.HexToAddress(usdcTokenPoolRef.Address), evmChain.Client)
+	usdcTokenPool, err := usdc_token_pool_cctp_v2_bindings.NewUSDCTokenPoolCCTPV2(common.HexToAddress(usdcTokenPoolRef.Address), evmChain.Client)
 	require.NoError(t, err, "Failed to create USDCTokenPool")
 	domain, err := usdcTokenPool.GetDomain(&bind.CallOpts{Context: t.Context()}, chainSelector)
 	require.NoError(t, err, "Failed to get domain")
@@ -308,7 +299,7 @@ func TestSetDomainsChangeset_MultipleAddressesOnSameChain(t *testing.T) {
 	require.Equal(t, domain.Enabled, true, "Domain should be enabled")
 	require.Equal(t, domain.UseLegacySourcePoolDataFormat, true, "Use legacy source pool data format should be true")
 
-	additionalUSDCTokenPoolInstance, err := usdc_token_pool_bindings.NewUSDCTokenPool(additionalUSDCTokenPool, evmChain.Client)
+	additionalUSDCTokenPoolInstance, err := usdc_token_pool_cctp_v2_bindings.NewUSDCTokenPoolCCTPV2(additionalUSDCTokenPool, evmChain.Client)
 	require.NoError(t, err, "Failed to create additional USDCTokenPool")
 	domain, err = additionalUSDCTokenPoolInstance.GetDomain(&bind.CallOpts{Context: t.Context()}, chainSelector)
 	require.NoError(t, err, "Failed to get domain")

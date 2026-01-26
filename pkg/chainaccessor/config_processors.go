@@ -8,9 +8,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccip/consts"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-
-	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 )
 
 func processConfigResults(
@@ -119,7 +118,7 @@ func processOfframpResults(
 	// Define processors for each expected result
 	processors := []resultProcessor{
 		// CommitLatestOCRConfig
-		func(val interface{}) error {
+		func(val any) error {
 			typed, ok := val.(*cciptypes.OCRConfigResponse)
 			if !ok {
 				return fmt.Errorf("invalid type for CommitLatestOCRConfig: %T", val)
@@ -128,7 +127,7 @@ func processOfframpResults(
 			return nil
 		},
 		// ExecLatestOCRConfig
-		func(val interface{}) error {
+		func(val any) error {
 			typed, ok := val.(*cciptypes.OCRConfigResponse)
 			if !ok {
 				return fmt.Errorf("invalid type for ExecLatestOCRConfig: %T", val)
@@ -137,7 +136,7 @@ func processOfframpResults(
 			return nil
 		},
 		// StaticConfig
-		func(val interface{}) error {
+		func(val any) error {
 			typed, ok := val.(*cciptypes.OffRampStaticChainConfig)
 			if !ok {
 				return fmt.Errorf("invalid type for StaticConfig: %T", val)
@@ -146,7 +145,7 @@ func processOfframpResults(
 			return nil
 		},
 		// DynamicConfig
-		func(val interface{}) error {
+		func(val any) error {
 			typed, ok := val.(*cciptypes.OffRampDynamicChainConfig)
 			if !ok {
 				return fmt.Errorf("invalid type for DynamicConfig: %T", val)
@@ -359,4 +358,4 @@ func chainSelectorToBytes16(chainSel cciptypes.ChainSelector) [16]byte {
 }
 
 // resultProcessor defines a function type for processing individual results
-type resultProcessor func(interface{}) error
+type resultProcessor func(any) error

@@ -261,16 +261,16 @@ func ParseTokenLookupTableWithChain(ctx context.Context, client *rpc.Client, tok
 	}
 
 	writableBytes := append(tokenAdminRegistry.WritableIndexes[0].Bytes(), tokenAdminRegistry.WritableIndexes[1].Bytes()...)
-	writableBits := ""
+	var writableBits strings.Builder
 	for _, b := range writableBytes {
-		writableBits += fmt.Sprintf("%08b", b)
+		writableBits.WriteString(fmt.Sprintf("%08b", b))
 	}
 
 	lookupTableMeta := []*solana.AccountMeta{}
 	for i := range lookupTableEntries {
 		meta := solana.Meta(lookupTableEntries[i])
 
-		if string(writableBits[i]) == "1" {
+		if string(writableBits.String()[i]) == "1" {
 			meta = meta.WRITE()
 		}
 		lookupTableMeta = append(lookupTableMeta, meta)

@@ -24,6 +24,7 @@ import (
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccip/consts"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
@@ -39,7 +40,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	cciptypesmocks "github.com/smartcontractkit/chainlink-ccip/mocks/chainlink_common/ccipocr3"
 	readermock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
@@ -119,7 +119,7 @@ func (it *IntTest) WithMessages(
 	totalMessages := len(mapped)
 	messagesPerReport := totalMessages / numReports
 
-	for i := 0; i < numReports; i++ {
+	for i := range numReports {
 		startIndex := i * messagesPerReport
 		endIndex := startIndex + messagesPerReport
 		if i == numReports-1 {
@@ -398,7 +398,7 @@ func newConfigurableAttestationServer(responses map[string]string) *Configurable
 			}
 		}
 		if r.Method == http.MethodPost {
-			var request map[string]interface{}
+			var request map[string]any
 			bodyRaw, err := io.ReadAll(r.Body)
 			if err != nil {
 				panic(err)
@@ -407,7 +407,7 @@ func newConfigurableAttestationServer(responses map[string]string) *Configurable
 			if err != nil {
 				panic(err)
 			}
-			payloadHashesUntyped := request["messageHash"].([]interface{})
+			payloadHashesUntyped := request["messageHash"].([]any)
 			if len(payloadHashesUntyped) == 0 {
 				w.WriteHeader(http.StatusBadRequest)
 			}
@@ -431,11 +431,11 @@ func newConfigurableAttestationServer(responses map[string]string) *Configurable
 	return c
 }
 
-func attestationBatchByMessageHashes(payloadHashes []string, responses map[string]string) map[string]interface{} {
-	attestations := make([]interface{}, 0, len(responses))
+func attestationBatchByMessageHashes(payloadHashes []string, responses map[string]string) map[string]any {
+	attestations := make([]any, 0, len(responses))
 	for payloadHash, attestationRaw := range responses {
 		if slices.Contains(payloadHashes, payloadHash) {
-			var attestation map[string]interface{}
+			var attestation map[string]any
 			err := json.Unmarshal([]byte(attestationRaw), &attestation)
 			if err != nil {
 				panic(err)
@@ -443,7 +443,7 @@ func attestationBatchByMessageHashes(payloadHashes []string, responses map[strin
 			attestations = append(attestations, attestation)
 		}
 	}
-	attestationResponse := make(map[string]interface{})
+	attestationResponse := make(map[string]any)
 	attestationResponse["attestations"] = attestations
 	return attestationResponse
 }
@@ -529,7 +529,7 @@ func setupHomeChainPoller(
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
-		mock.MatchedBy(func(input map[string]interface{}) bool {
+		mock.MatchedBy(func(input map[string]any) bool {
 			_, pageIndexExists := input["pageIndex"]
 			_, pageSizeExists := input["pageSize"]
 			return pageIndexExists && pageSizeExists

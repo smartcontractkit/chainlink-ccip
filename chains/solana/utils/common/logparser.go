@@ -21,20 +21,20 @@ type AnchorInstruction struct {
 
 type EventMapping struct {
 	Name string
-	New  func() interface{}
+	New  func() any
 }
 
 type EventData struct {
 	Base64Data  string
 	DecodedData []byte
 	EventName   string
-	Data        interface{} // Decoded data using the provided type
+	Data        any // Decoded data using the provided type
 }
 
 func EventMappingFor[T any](name string) EventMapping {
 	return EventMapping{
 		Name: name,
-		New: func() interface{} {
+		New: func() any {
 			return new(T)
 		},
 	}

@@ -13,10 +13,10 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccip/consts"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	reader_mocks "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 )
 
@@ -724,7 +724,7 @@ func TestConfigCache_ConcurrentAccess(t *testing.T) {
 	// Run concurrent fetches on the filled cache
 	const numGoroutines = 10
 	errCh := make(chan error, numGoroutines)
-	for i := 0; i < numGoroutines; i++ {
+	for range numGoroutines {
 		go func() {
 			_, err := cache.GetChainConfig(ctx, chainA)
 			errCh <- err
@@ -732,7 +732,7 @@ func TestConfigCache_ConcurrentAccess(t *testing.T) {
 	}
 
 	// Collect results
-	for i := 0; i < numGoroutines; i++ {
+	for range numGoroutines {
 		err := <-errCh
 		require.NoError(t, err)
 	}

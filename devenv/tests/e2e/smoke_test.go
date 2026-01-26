@@ -68,7 +68,6 @@ func TestE2ESmoke(t *testing.T) {
 
 	for _, tc := range tcs {
 		// Capture the loop variable so each goroutine gets its own copy.
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			if os.Getenv("PARALLEL_E2E_TESTS") == "true" {
 				t.Parallel()

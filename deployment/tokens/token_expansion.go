@@ -22,7 +22,7 @@ type TokenExpansionInput struct {
 	// per-chain configuration for token expansion
 	TokenExpansionInputPerChain map[uint64]TokenExpansionInputPerChain `yaml:"token-expansion-input-per-chain" json:"tokenExpansionInputPerChain"`
 	ChainAdapterVersion         *semver.Version                        `yaml:"chain-adapter-version" json:"chainAdapterVersion"`
-	MCMS                        mcms.Input                             `yaml:"mcms,omitempty" json:"mcms,omitempty"`
+	MCMS                        mcms.Input                             `yaml:"mcms,omitempty" json:"mcms"`
 }
 
 type TokenExpansionInputPerChain struct {
@@ -82,9 +82,9 @@ type DeployTokenPoolInput struct {
 	// BurnAddress is used by BurnToAddressMintTokenPool to specify the address
 	// where tokens will be burned to
 	BurnAddress string `yaml:"burn-address" json:"burnAddress"`
-	// ExternalMinter is used by BurnMintWithExternalMinterTokenPool kind of pools to specify the minter address
-	// ideally a token governor contract address
-	ExternalMinter string `yaml:"external-minter" json:"externalMinter"`
+	// TokenGovernor is used by BurnMintWithExternalMinterTokenPool kind of pools to specify the token governor contract address
+	// if it is not provided, the token governor will be fetched from the datastore based on the token symbol
+	TokenGovernor string `yaml:"token-governor,omitempty" json:"tokenGovernor,omitempty"`
 	// below are not specified by the user, filled in by the deployment system to pass to chain operations
 	ChainSelector     uint64
 	ExistingDataStore datastore.DataStore
