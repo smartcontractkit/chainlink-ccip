@@ -1,0 +1,38 @@
+version: "1.0"
+
+# Output configuration
+output:
+  base_path: chains/evm/deployment
+
+contracts:
+  - contract_name: RMNRemote
+    version: "1.6.0"
+    functions:
+      - curse
+      - uncurse
+      - isCursed
+  - contract_name: FeeQuoter
+    version: "1.6.3"
+    functions:
+      - applyDestChainConfigUpdates
+      - updatePrices
+      - applyAuthorizedCallerUpdates
+      - applyTokenTransferFeeConfigUpdates
+  - contract_name: PingPongDemo
+    version: "1.5.0"
+    functions:
+      - setCounterpart
+      - setCounterpartChainSelector
+      - setCounterpartAddress
+      - setPaused
+      - setOutOfOrderExecution
+      - startPingPong
+  - contract_name: OnRamp
+    version: "1.6.0"
+    functions:
+      - applyDestChainConfigUpdates
+  - contract_name: OffRamp
+    version: "1.6.0"
+    functions:
+      - applySourceChainConfigUpdates
+      - setOCR3Configs
