@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
 	"strings"
 	"text/template"
 
@@ -59,6 +58,7 @@ type ContractInfo struct {
 	GobindingPrefix string
 	Constructor     *FunctionInfo
 	Functions       map[string]*FunctionInfo
+	FunctionOrder   []string // Preserve order from config
 }
 
 type FunctionInfo struct {
@@ -160,14 +160,15 @@ func extractContractInfo(cfg SimpleContractConfig, output OutputConfig) (*Contra
 	// Extract constructor
 	for _, entry := range abiEntries {
 		if entry.Type == "constructor" {
-			info.Constructor = parseABIFunction(entry, true, false)
+			info.Constructor = parseABIFunction(entry, true, false, 0, info.GobindingPrefix)
 			break
 		}
 	}
 
-	// Extract requested functions
+	// Extract requested functions (preserve order from config)
+	info.FunctionOrder = cfg.Functions // Store the order
 	for _, funcName := range cfg.Functions {
-		funcInfo := findFunctionInABI(abiEntries, funcName)
+		funcInfo := findFunctionInABI(abiEntries, funcName, info.GobindingPrefix)
 		if funcInfo == nil {
 			return nil, fmt.Errorf("function %s not found in ABI", funcName)
 		}
@@ -234,7 +235,7 @@ func detectOwnershipModifiers(path string) map[string]bool {
 	return result
 }
 
-func findFunctionInABI(entries []ABIEntry, funcName string) *FunctionInfo {
+func findFunctionInABI(entries []ABIEntry, funcName string, gobindingPrefix string) *FunctionInfo {
 	// Find all functions with this name (may be overloaded)
 	var candidates []ABIEntry
 	for _, entry := range entries {
@@ -247,29 +248,70 @@ func findFunctionInABI(entries []ABIEntry, funcName string) *FunctionInfo {
 		return nil
 	}
 
-	// Prefer array version if multiple exist
+	// Check if truly overloaded (multiple versions exist)
+	isOverloaded := len(candidates) > 1
+
+	// Select the best version when overloaded
 	var selected ABIEntry
-	hasArrayVersion := false
-	for _, c := range candidates {
-		for _, param := range c.Inputs {
-			if strings.Contains(param.Type, "[]") {
-				selected = c
-				hasArrayVersion = true
-				break
+	var selectedIndex int
+	if isOverloaded {
+		// Preference order:
+		// 1. Version with array parameters (more flexible)
+		// 2. Version with MORE parameters (more specific)
+		// 3. First candidate
+		
+		var arrayVersion ABIEntry
+		var arrayIndex int
+		var maxParams int
+		var maxParamVersion ABIEntry
+		var maxParamIndex int
+		
+		for i, c := range candidates {
+			// Check for array parameters
+			hasArray := false
+			for _, param := range c.Inputs {
+				if strings.Contains(param.Type, "[]") {
+					hasArray = true
+					break
+				}
+			}
+			if hasArray && arrayVersion.Name == "" {
+				arrayVersion = c
+				arrayIndex = i
+			}
+			
+			// Track version with most parameters
+			if len(c.Inputs) > maxParams {
+				maxParams = len(c.Inputs)
+				maxParamVersion = c
+				maxParamIndex = i
 			}
 		}
-		if hasArrayVersion {
-			break
+		
+		// Select in priority order
+		if arrayVersion.Name != "" {
+			selected = arrayVersion
+			selectedIndex = arrayIndex
+		} else if maxParamVersion.Name != "" {
+			selected = maxParamVersion
+			selectedIndex = maxParamIndex
+		} else {
+			selected = candidates[0]
+			selectedIndex = 0
 		}
-	}
-	if !hasArrayVersion {
+	} else {
 		selected = candidates[0]
+		selectedIndex = 0
 	}
 
-	return parseABIFunction(selected, false, hasArrayVersion)
+	// Only add suffix if we selected a non-first overload
+	// (abigen adds suffixes to 2nd, 3rd, etc. versions: func0, func1, ...)
+	needsSuffix := isOverloaded && selectedIndex > 0
+
+	return parseABIFunction(selected, false, needsSuffix, selectedIndex, gobindingPrefix)
 }
 
-func parseABIFunction(entry ABIEntry, isConstructor bool, isOverloaded bool) *FunctionInfo {
+func parseABIFunction(entry ABIEntry, isConstructor bool, needsSuffix bool, suffixIndex int, gobindingPrefix string) *FunctionInfo {
 	info := &FunctionInfo{
 		SolidityName:    entry.Name,
 		IsConstructor:   isConstructor,
@@ -281,7 +323,7 @@ func parseABIFunction(entry ABIEntry, isConstructor bool, isOverloaded bool) *Fu
 		info.Parameters = append(info.Parameters, ParameterInfo{
 			Name:         param.Name,
 			SolidityType: param.Type,
-			GoType:       solidityToGoType(param.Type, param.InternalType),
+			GoType:       solidityToGoType(param.Type, param.InternalType, gobindingPrefix),
 		})
 	}
 
@@ -290,7 +332,7 @@ func parseABIFunction(entry ABIEntry, isConstructor bool, isOverloaded bool) *Fu
 		info.ReturnParams = append(info.ReturnParams, ParameterInfo{
 			Name:         param.Name,
 			SolidityType: param.Type,
-			GoType:       solidityToGoType(param.Type, param.InternalType),
+			GoType:       solidityToGoType(param.Type, param.InternalType, gobindingPrefix),
 		})
 	}
 
@@ -301,17 +343,21 @@ func parseABIFunction(entry ABIEntry, isConstructor bool, isOverloaded bool) *Fu
 	// Generate Go name
 	if !isConstructor {
 		info.Name = capitalize(info.SolidityName)
-		// Handle overloaded functions
+		// Determine call method (handle overloaded functions)
 		info.CallMethod = info.Name
-		if isOverloaded {
-			info.CallMethod = info.Name + "0"
+		if needsSuffix {
+			// abigen adds numeric suffixes: first overload gets no suffix, second gets "0", third gets "1", etc.
+			// But we're given the index in our selected candidates, so we use that
+			if suffixIndex > 0 {
+				info.CallMethod = fmt.Sprintf("%s%d", info.Name, suffixIndex-1)
+			}
 		}
 	}
 
 	return info
 }
 
-func solidityToGoType(solidityType, internalType string) string {
+func solidityToGoType(solidityType, internalType, gobindingPrefix string) string {
 	// Check for custom types first
 	if strings.HasPrefix(internalType, "contract ") {
 		return "common.Address"
@@ -326,10 +372,39 @@ func solidityToGoType(solidityType, internalType string) string {
 		return "[16]byte"
 	}
 
-	// Handle array types
+	// Handle struct types (tuple in Solidity ABI)
+	if solidityType == "tuple" || solidityType == "tuple[]" {
+		// Extract the Go type name from internalType
+		// Format can be either "struct ContractName.StructName" or "structContractName.StructName" (no space)
+		structPrefix := "struct "
+		if strings.HasPrefix(internalType, "struct") && !strings.HasPrefix(internalType, "struct ") {
+			structPrefix = "struct"
+		}
+		
+		if strings.HasPrefix(internalType, structPrefix) {
+			// Handle both "structFeeQuoter.Foo[]" and "struct FeeQuoter.Foo"
+			typeStr := strings.TrimPrefix(internalType, structPrefix)
+			// Remove trailing [] if present
+			typeStr = strings.TrimSuffix(typeStr, "[]")
+			
+			parts := strings.Split(typeStr, ".")
+			if len(parts) == 2 {
+				// Convert "FeeQuoter.DestChainConfigArgs" to "fee_quoter.FeeQuoterDestChainConfigArgs"
+				goTypeName := gobindingPrefix + "." + parts[0] + parts[1]
+				if solidityType == "tuple[]" {
+					return "[]" + goTypeName
+				}
+				return goTypeName
+			}
+		}
+		// Fallback
+		return "interface{}"
+	}
+
+	// Handle array types (must come after tuple check)
 	if strings.HasSuffix(solidityType, "[]") {
 		elemType := strings.TrimSuffix(solidityType, "[]")
-		return "[]" + solidityToGoType(elemType, strings.TrimSuffix(internalType, "[]"))
+		return "[]" + solidityToGoType(elemType, strings.TrimSuffix(internalType, "[]"), gobindingPrefix)
 	}
 
 	// Map basic types
@@ -433,11 +508,11 @@ type ConstructorArgs struct {
 
 var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Name:             "{{.PackageNameHyphen}}:deploy",
-	Version:          semver.MustParse("{{.Version}}"),
+	Version:          Version,
 	Description:      "Deploys the {{.ContractType}} contract",
 	ContractMetadata: {{.GobindingPrefix}}.{{.ContractType}}MetaData,
 	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
-		cldf_deployment.NewTypeAndVersion(ContractType, *semver.MustParse("{{.Version}}")).String(): {
+		cldf_deployment.NewTypeAndVersion(ContractType, *Version).String(): {
 			EVM: common.FromHex({{.GobindingPrefix}}.{{.ContractType}}Bin),
 		},
 	},
@@ -455,7 +530,7 @@ type {{.ArgsStructName}} struct {
 
 var {{.Name}} = contract.NewWrite(contract.WriteParams[{{.ArgsStructName}}, *{{$.GobindingPrefix}}.{{$.ContractType}}]{
 	Name:            "{{$.PackageNameHyphen}}:{{.OpName}}",
-	Version:         semver.MustParse("{{$.Version}}"),
+	Version:         Version,
 	Description:     "{{.Description}}",
 	ContractType:    ContractType,
 	ContractABI:     {{$.GobindingPrefix}}.{{$.ContractType}}ABI,
@@ -472,7 +547,7 @@ var {{.Name}} = contract.NewWrite(contract.WriteParams[{{.ArgsStructName}}, *{{$
 
 var {{.Name}} = contract.NewRead(contract.ReadParams[{{.ArgsType}}, {{.ReturnType}}, *{{$.GobindingPrefix}}.{{$.ContractType}}]{
 	Name:         "{{$.PackageNameHyphen}}:{{.OpName}}",
-	Version:      semver.MustParse("{{$.Version}}"),
+	Version:      Version,
 	Description:  "{{.Description}}",
 	ContractType: ContractType,
 	NewContract:  {{$.GobindingPrefix}}.New{{$.ContractType}},
@@ -523,12 +598,8 @@ func prepareTemplateData(info *ContractInfo) map[string]interface{} {
 		"ContractVarName":   makeVarName(info.Name),
 	}
 
-	// Get sorted function names for deterministic ordering
-	funcNames := make([]string, 0, len(info.Functions))
-	for name := range info.Functions {
-		funcNames = append(funcNames, name)
-	}
-	sort.Strings(funcNames)
+	// Use the order from config (already preserved in FunctionOrder)
+	funcNames := info.FunctionOrder
 
 	// Check if we need fastcurse import
 	needsFastcurse := false
