@@ -21,11 +21,11 @@ type ConstructorArgs struct {
 
 var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Name:             "rmn-remote:deploy",
-	Version:          semver.MustParse("1.6.0"),
+	Version:          Version,
 	Description:      "Deploys the RMNRemote contract",
 	ContractMetadata: rmn_remote.RMNRemoteMetaData,
 	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
-		cldf_deployment.NewTypeAndVersion(ContractType, *semver.MustParse("1.6.0")).String(): {
+		cldf_deployment.NewTypeAndVersion(ContractType, *Version).String(): {
 			EVM: common.FromHex(rmn_remote.RMNRemoteBin),
 		},
 	},
@@ -38,7 +38,7 @@ type CurseArgs struct {
 
 var Curse = contract.NewWrite(contract.WriteParams[CurseArgs, *rmn_remote.RMNRemote]{
 	Name:            "rmn-remote:curse",
-	Version:         semver.MustParse("1.6.0"),
+	Version:         Version,
 	Description:     "Calls curse on the contract",
 	ContractType:    ContractType,
 	ContractABI:     rmn_remote.RMNRemoteABI,
@@ -56,7 +56,7 @@ type UncurseArgs struct {
 
 var Uncurse = contract.NewWrite(contract.WriteParams[UncurseArgs, *rmn_remote.RMNRemote]{
 	Name:            "rmn-remote:uncurse",
-	Version:         semver.MustParse("1.6.0"),
+	Version:         Version,
 	Description:     "Calls uncurse on the contract",
 	ContractType:    ContractType,
 	ContractABI:     rmn_remote.RMNRemoteABI,
@@ -70,7 +70,7 @@ var Uncurse = contract.NewWrite(contract.WriteParams[UncurseArgs, *rmn_remote.RM
 
 var IsCursed = contract.NewRead(contract.ReadParams[[16]byte, bool, *rmn_remote.RMNRemote]{
 	Name:         "rmn-remote:is-cursed",
-	Version:      semver.MustParse("1.6.0"),
+	Version:      Version,
 	Description:  "Calls isCursed on the contract",
 	ContractType: ContractType,
 	NewContract:  rmn_remote.NewRMNRemote,
