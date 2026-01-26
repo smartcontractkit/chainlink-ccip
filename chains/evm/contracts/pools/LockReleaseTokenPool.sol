@@ -7,10 +7,13 @@ import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/I
 import {TokenPool} from "./TokenPool.sol";
 
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/utils/SafeERC20.sol";
 
 /// @notice Token pool used for tokens on their native chain. This uses a lock and release mechanism.
 /// @dev One token per LockReleaseTokenPool.
 contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
+  using SafeERC20 for IERC20;
+
   string public constant override typeAndVersion = "LockReleaseTokenPool 1.7.0-dev";
 
   /// @notice The lock box for the token pool.
@@ -30,7 +33,7 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
     if (!lockBoxContract.isTokenSupported(address(token))) {
       revert InvalidToken(address(token));
     }
-    token.approve(lockBox, type(uint256).max);
+    token.forceApprove(lockBox, type(uint256).max);
     i_lockBox = lockBoxContract;
   }
 

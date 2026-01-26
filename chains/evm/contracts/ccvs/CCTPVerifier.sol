@@ -193,7 +193,7 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
 
     // Approve the token messenger to burn the USDC token on behalf of this contract.
     // The USDC token pool will be responsible for forwarding USDC it receives from the router to this contract.
-    i_usdcToken.approve(address(i_tokenMessenger), type(uint256).max);
+    i_usdcToken.forceApprove(address(i_tokenMessenger), type(uint256).max);
 
     emit StaticConfigSet(
       address(i_tokenMessenger), address(i_messageTransmitterProxy), address(i_usdcToken), i_localDomainIdentifier

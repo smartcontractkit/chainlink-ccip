@@ -105,9 +105,9 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
     i_tokenAdapter = adapter;
 
     if (adapter != address(0)) {
-      token.approve(adapter, type(uint256).max);
+      token.forceApprove(adapter, type(uint256).max);
     } else {
-      token.approve(address(bridge), type(uint256).max);
+      token.forceApprove(address(bridge), type(uint256).max);
     }
 
     emit LombardConfigurationSet(verifier, address(bridge), adapter);
