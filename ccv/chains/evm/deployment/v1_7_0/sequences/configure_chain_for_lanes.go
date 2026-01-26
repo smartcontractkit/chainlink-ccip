@@ -1,17 +1,26 @@
 package sequences
 
 import (
+	"context"
+	"encoding/hex"
+	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
+	nodev1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/node"
+
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	cldf_offchain "github.com/smartcontractkit/chainlink-deployments-framework/offchain"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+
+	"github.com/smartcontractkit/chainlink/deployment"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
@@ -249,7 +258,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 				continue // Skip if we can't find the CommitteeVerifier address
 			}
 
-			committeeVerifierMetadata, err := collectCommitteeVerifierSignatureConfigs(b, chain, committeeVerifierAddr, chain.Selector, []datastore.ContractMetadata{})
+			committeeVerifierMetadata, err := collectCommitteeVerifierSignatureConfigs(b, chain, committeeVerifierAddr, chain.Selector, []datastore.ContractMetadata{}, input.OffchainClient)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to collect CommitteeVerifier signature configs: %w", err)
 			}
@@ -367,6 +376,7 @@ func collectCommitteeVerifierSignatureConfigs(
 	committeeVerifierAddr string,
 	chainSelector uint64,
 	contractMetadata []datastore.ContractMetadata,
+	offchainClient interface{}, // Optional: cldf_offchain.Client for fetching CSA keys
 ) ([]datastore.ContractMetadata, error) {
 	// Read current signature configs from the contract.
 	getAllConfigsReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.GetAllSignatureConfigs, chain, contract.FunctionInput[any]{
@@ -387,17 +397,63 @@ func collectCommitteeVerifierSignatureConfigs(
 	// Convert to metadata
 	for selector, cfg := range currentConfigs {
 		signersHex := make([]string, len(cfg.Signers))
+		csaKeys := make([]string, 0, len(cfg.Signers))
+
 		for i, signer := range cfg.Signers {
 			signersHex[i] = signer.Hex()
+
+			// Optionally fetch CSA key from job distributor if offchain client is provided
+			if offchainClient != nil {
+				if client, ok := offchainClient.(cldf_offchain.Client); ok {
+					csaKey, err := getCSAKeyFromOnchainPublicKey(
+						b.GetContext(),
+						client,
+						signer.Hex(),
+						chainSelector,
+					)
+					if err == nil {
+						csaKeys = append(csaKeys, csaKey)
+						b.Logger.Debugw("Successfully fetched CSA key for signer", "signer", signer.Hex(), "csaKey", csaKey)
+					} else {
+						// Log warning but continue - CSA key fetch is optional
+						b.Logger.Warnw("Failed to fetch CSA key for signer", "signer", signer.Hex(), "error", err)
+						csaKeys = append(csaKeys, "")
+					}
+				} else {
+					// Type assertion failed - offchainClient doesn't implement cldf_offchain.Client
+					b.Logger.Debugw("Offchain client type assertion failed - CSA keys won't be fetched", "signer", signer.Hex())
+				}
+			}
 		}
+
+		metadata := map[string]interface{}{
+			"sourceChainSelector": selector,
+			"threshold":           cfg.Threshold,
+			"signers":             signersHex,
+		}
+
+		// Add CSA keys to metadata if they were fetched
+		// Only add if we successfully fetched CSA keys for all signers (no empty strings)
+		// Note: CSA keys will only be present when a job distributor (OffchainClient) is configured
+		// in the deployment environment. Unit tests typically don't include a job distributor.
+		allCSAKeysFetched := len(csaKeys) == len(signersHex) && len(csaKeys) > 0
+		if allCSAKeysFetched {
+			// Check that all CSA keys are non-empty
+			for _, key := range csaKeys {
+				if key == "" {
+					allCSAKeysFetched = false
+					break
+				}
+			}
+		}
+		if allCSAKeysFetched {
+			metadata["csaKeys"] = csaKeys
+		}
+
 		contractMetadata = append(contractMetadata, datastore.ContractMetadata{
 			Address:       committeeVerifierAddr,
 			ChainSelector: chainSelector,
-			Metadata: map[string]interface{}{
-				"sourceChainSelector": selector,
-				"threshold":           cfg.Threshold,
-				"signers":             signersHex,
-			},
+			Metadata:      metadata,
 		})
 	}
 
@@ -810,4 +866,86 @@ func collectTokenAdminRegistryMetadata(
 			"tokens": tokensList,
 		},
 	}, nil
+}
+
+// getCSAKeyFromOnchainPublicKey queries the job distributor to find the CSA key
+// associated with the given onchain public key for a specific chain selector.
+func getCSAKeyFromOnchainPublicKey(
+	ctx context.Context,
+	offchainClient cldf_offchain.Client,
+	onchainPublicKey string,
+	chainSelector uint64,
+) (string, error) {
+	if offchainClient == nil {
+		return "", errors.New("offchain client is nil, ensure it is configured")
+	}
+
+	if chainSelector == 0 {
+		return "", errors.New("chain selector is required and cannot be 0")
+	}
+
+	// Normalize the onchain public key (remove 0x prefix if present, convert to lowercase)
+	onchainKey := strings.TrimPrefix(strings.ToLower(onchainPublicKey), "0x")
+
+	// Decode to bytes for comparison
+	onchainKeyBytes, err := hex.DecodeString(onchainKey)
+	if err != nil {
+		return "", fmt.Errorf("invalid onchain public key format: %w", err)
+	}
+
+	// List all nodes from the job distributor
+	resp, err := offchainClient.ListNodes(ctx, &nodev1.ListNodesRequest{
+		Filter: &nodev1.ListNodesRequest_Filter{},
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to list nodes: %w", err)
+	}
+
+	if len(resp.GetNodes()) == 0 {
+		return "", errors.New("no nodes found in job distributor")
+	}
+
+	// Collect all node IDs to fetch detailed information
+	var nodeIds []string
+	for _, node := range resp.GetNodes() {
+		nodeIds = append(nodeIds, node.GetId())
+	}
+
+	// Get detailed node information (includes OCR configs with onchain public keys)
+	allNodes, err := deployment.NodeInfo(nodeIds, offchainClient)
+	if err != nil {
+		return "", fmt.Errorf("failed to get nodes info (requested %d nodes): %w", len(nodeIds), err)
+	}
+
+	if len(allNodes) == 0 {
+		return "", fmt.Errorf("deployment.NodeInfo returned no nodes (requested %d node IDs: %v)", len(nodeIds), nodeIds)
+	}
+
+	// Search through all nodes for the matching onchain public key
+	for _, node := range allNodes {
+		ocrConfig, exists := node.OCRConfigForChainSelector(chainSelector)
+		if !exists {
+			continue
+		}
+
+		// Compare onchain public keys (they're stored as bytes)
+		if bytesEqual(ocrConfig.OnchainPublicKey, onchainKeyBytes) {
+			return node.CSAKey, nil
+		}
+	}
+
+	return "", fmt.Errorf("node with onchain public key %s not found for chain selector %d (searched %d nodes, onchain key bytes: %x)", onchainPublicKey, chainSelector, len(allNodes), onchainKeyBytes)
+}
+
+// bytesEqual compares two byte slices for equality
+func bytesEqual(a, b []byte) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }

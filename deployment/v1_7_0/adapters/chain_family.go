@@ -128,6 +128,9 @@ type ConfigureChainForLanesInput struct {
 	OffRamp string
 	// The configuration for each remote chain that we want to connect to.
 	RemoteChains map[uint64]RemoteChainConfig[[]byte, string]
+	// Optional: Offchain client (JobDistributor) for fetching CSA keys from job service API.
+	// If provided, CSA keys will be fetched for each signer in CommitteeVerifier signature configs.
+	OffchainClient interface{} // cldf_offchain.Client
 }
 
 // ChainFamily is a configurable chain family.

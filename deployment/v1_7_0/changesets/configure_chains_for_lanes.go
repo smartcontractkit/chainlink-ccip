@@ -129,6 +129,7 @@ func makeApply(chainFamilyRegistry *adapters.ChainFamilyRegistry, mcmsRegistry *
 				FeeQuoter:          feeQuoter.Address,
 				OffRamp:            offRamp.Address,
 				RemoteChains:       remoteChains,
+				OffchainClient:     e.Offchain, // Pass job distributor client for CSA key fetching
 			})
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to configure chain with selector %d: %w", chain.ChainSelector, err)
