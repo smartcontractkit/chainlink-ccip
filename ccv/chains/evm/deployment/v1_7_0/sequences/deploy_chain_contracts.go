@@ -4,9 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"slices"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
+	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -104,6 +106,9 @@ var DeployChainContracts = cldf_ops.NewSequence(
 	semver.MustParse("1.7.0"),
 	"Deploys all required contracts for CCIP 1.7.0 to an EVM chain",
 	func(b cldf_ops.Bundle, chain evm.Chain, input DeployChainContractsInput) (output sequences.OnChainOutput, err error) {
+		// Check if the current chain is a testnet or not
+		isTestNet := slices.Contains(chain_selectors.TestChainIds(), chain.Selector)
+
 		addresses := make([]datastore.AddressRef, 0)
 		writes := make([]contract_utils.WriteOutput, 0)
 
@@ -120,14 +125,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, wethRef)
 
 		// Deploy LINK
-		linkRef, err := contract_utils.MaybeDeployContract(b, burn_mint_erc20_with_drip.Deploy, chain, contract_utils.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs]{
-			TypeAndVersion: deployment.NewTypeAndVersion(link_token.ContractType, *link_token.Version),
-			ChainSelector:  chain.Selector,
-			Args: burn_mint_erc20_with_drip.ConstructorArgs{
-				Name:   "LINK",
-				Symbol: "LINK",
-			},
-		}, input.ExistingAddresses)
+		linkRef, err := MaybeDeployLinkToken(b, chain, input.ExistingAddresses, isTestNet)
 		if err != nil {
 			return sequences.OnChainOutput{}, err
 		}
@@ -253,27 +251,29 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		}
 		addresses = append(addresses, feeQuoterRef)
 
-		// Set initial prices on FeeQuoter
-		updatePricesReport, err := cldf_ops.ExecuteOperation(b, fee_quoter.UpdatePrices, chain, contract_utils.FunctionInput[fee_quoter.PriceUpdates]{
-			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(feeQuoterRef.Address),
-			Args: fee_quoter.PriceUpdates{
-				TokenPriceUpdates: []fee_quoter.TokenPriceUpdate{
-					{
-						SourceToken: common.HexToAddress(linkRef.Address),
-						UsdPerToken: input.ContractParams.FeeQuoter.USDPerLINK,
-					},
-					{
-						SourceToken: common.HexToAddress(wethRef.Address),
-						UsdPerToken: input.ContractParams.FeeQuoter.USDPerWETH,
+		// Set initial prices on FeeQuoter, only on testnet.
+		if !isTestNet {
+			updatePricesReport, err := cldf_ops.ExecuteOperation(b, fee_quoter.UpdatePrices, chain, contract_utils.FunctionInput[fee_quoter.PriceUpdates]{
+				ChainSelector: chain.Selector,
+				Address:       common.HexToAddress(feeQuoterRef.Address),
+				Args: fee_quoter.PriceUpdates{
+					TokenPriceUpdates: []fee_quoter.TokenPriceUpdate{
+						{
+							SourceToken: common.HexToAddress(linkRef.Address),
+							UsdPerToken: input.ContractParams.FeeQuoter.USDPerLINK,
+						},
+						{
+							SourceToken: common.HexToAddress(wethRef.Address),
+							UsdPerToken: input.ContractParams.FeeQuoter.USDPerWETH,
+						},
 					},
 				},
-			},
-		})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to set initial prices on FeeQuoter: %w", err)
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to set initial prices on FeeQuoter: %w", err)
+			}
+			writes = append(writes, updatePricesReport.Output)
 		}
-		writes = append(writes, updatePricesReport.Output)
 
 		// Deploy OffRamp
 		offRampRef, err := contract_utils.MaybeDeployContract(b, offramp.Deploy, chain, contract_utils.DeployInput[offramp.ConstructorArgs]{
@@ -498,4 +498,42 @@ func MaybeRegisterModuleOnTokenAdminRegistry(
 	}
 
 	return addRegistryModuleReport.Output, true, nil
+}
+
+func MaybeDeployLinkToken(b cldf_ops.Bundle, chain evm.Chain, existingAddresses []datastore.AddressRef, isTestNet bool) (datastore.AddressRef, error) {
+	linkTokenInput := contract_utils.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs]{
+		TypeAndVersion: deployment.NewTypeAndVersion(link_token.ContractType, *link_token.Version),
+		ChainSelector:  chain.Selector,
+		Args: burn_mint_erc20_with_drip.ConstructorArgs{
+			Name:   "LINK",
+			Symbol: "LINK",
+		},
+	}
+	if !IsDeployedOnChain(linkTokenInput, existingAddresses) && !isTestNet {
+		return datastore.AddressRef{}, fmt.Errorf("LINK token is not deployed on non-testnet chain %d; please deploy it first", chain.Selector)
+	}
+	linkRef, err := contract_utils.MaybeDeployContract(b, burn_mint_erc20_with_drip.Deploy, chain, linkTokenInput, existingAddresses)
+	if err != nil {
+		return datastore.AddressRef{}, err
+	}
+	return linkRef, nil
+}
+
+func IsDeployedOnChain[ARGS any](
+	input contract_utils.DeployInput[ARGS],
+	existingAddresses []datastore.AddressRef,
+) bool {
+	for _, ref := range existingAddresses {
+		if ref.Type == datastore.ContractType(input.TypeAndVersion.Type) &&
+			ref.Version.String() == input.TypeAndVersion.Version.String() {
+			if input.Qualifier != nil {
+				if ref.Qualifier == *input.Qualifier {
+					return true
+				}
+			} else {
+				return true
+			}
+		}
+	}
+	return false
 }
