@@ -32,39 +32,31 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Validate: func(ConstructorArgs) error { return nil },
 })
 
-type CurseArgs struct {
-	Subjects [][16]byte
-}
-
-var Curse = contract.NewWrite(contract.WriteParams[CurseArgs, *rmn_remote.RMNRemote]{
+var Curse = contract.NewWrite(contract.WriteParams[[][16]byte, *rmn_remote.RMNRemote]{
 	Name:            "rmn-remote:curse",
 	Version:         Version,
 	Description:     "Calls curse on the contract",
 	ContractType:    ContractType,
 	ContractABI:     rmn_remote.RMNRemoteABI,
 	NewContract:     rmn_remote.NewRMNRemote,
-	IsAllowedCaller: contract.OnlyOwner[*rmn_remote.RMNRemote, CurseArgs],
-	Validate:        func(CurseArgs) error { return nil },
-	CallContract: func(rMNRemote *rmn_remote.RMNRemote, opts *bind.TransactOpts, args CurseArgs) (*types.Transaction, error) {
-		return rMNRemote.Curse0(opts, args.Subjects)
+	IsAllowedCaller: contract.OnlyOwner[*rmn_remote.RMNRemote, [][16]byte],
+	Validate:        func([][16]byte) error { return nil },
+	CallContract: func(rMNRemote *rmn_remote.RMNRemote, opts *bind.TransactOpts, args [][16]byte) (*types.Transaction, error) {
+		return rMNRemote.Curse0(opts, args)
 	},
 })
 
-type UncurseArgs struct {
-	Subjects [][16]byte
-}
-
-var Uncurse = contract.NewWrite(contract.WriteParams[UncurseArgs, *rmn_remote.RMNRemote]{
+var Uncurse = contract.NewWrite(contract.WriteParams[[][16]byte, *rmn_remote.RMNRemote]{
 	Name:            "rmn-remote:uncurse",
 	Version:         Version,
 	Description:     "Calls uncurse on the contract",
 	ContractType:    ContractType,
 	ContractABI:     rmn_remote.RMNRemoteABI,
 	NewContract:     rmn_remote.NewRMNRemote,
-	IsAllowedCaller: contract.OnlyOwner[*rmn_remote.RMNRemote, UncurseArgs],
-	Validate:        func(UncurseArgs) error { return nil },
-	CallContract: func(rMNRemote *rmn_remote.RMNRemote, opts *bind.TransactOpts, args UncurseArgs) (*types.Transaction, error) {
-		return rMNRemote.Uncurse0(opts, args.Subjects)
+	IsAllowedCaller: contract.OnlyOwner[*rmn_remote.RMNRemote, [][16]byte],
+	Validate:        func([][16]byte) error { return nil },
+	CallContract: func(rMNRemote *rmn_remote.RMNRemote, opts *bind.TransactOpts, args [][16]byte) (*types.Transaction, error) {
+		return rMNRemote.Uncurse0(opts, args)
 	},
 })
 
