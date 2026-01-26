@@ -1,0 +1,16 @@
+version: "1.0"
+
+# Output configuration
+output:
+  base_path: chains/evm/deployment
+  version_prefix: v1_6_0
+
+contracts:
+  - solidity_path: chains/evm/contracts/rmn/RMNRemote.sol
+    # Optional: override auto-detected values
+    # contract_name: RMNRemote  # auto-detected from file
+    # version: "1.6.0"          # auto-detected from typeAndVersion()
+    functions:
+      - curse    # Will auto-detect: parameters, types, mutability, access control
+      - uncurse
+      - isCursed
