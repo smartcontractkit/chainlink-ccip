@@ -267,7 +267,23 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 
 		// Collect Router metadata (onRamps and offRamps)
 		// Note: OnRamp destination chain config metadata is collected within collectRouterMetadata
-		routerMetadata, err := collectRouterMetadata(b, chain, input.Router, chain.Selector, []datastore.ContractMetadata{})
+		// Project pending changes: merge ramp updates with current state
+		routerMetadata, err := collectRouterMetadata(
+			b,
+			chain,
+			input.Router,
+			chain.Selector,
+			[]datastore.ContractMetadata{},
+			router.ApplyRampsUpdatesArgs{
+				OnRampUpdates:  onRampAdds,
+				OffRampRemoves: []router.OffRamp{}, // removals should be processed by a separate sequence responsible for disconnecting lanes
+				OffRampAdds:    offRampAdds,
+			},
+			input.OnRamp,  // OnRamp address that pending configs apply to
+			input.OffRamp, // OffRamp address that pending configs apply to
+			onRampArgs,
+			offRampArgs,
+		)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to collect Router metadata: %w", err)
 		}
@@ -454,13 +470,19 @@ func collectCommitteeVerifierSignatureConfigs(
 	return contractMetadata, nil
 }
 
-// collectRouterMetadata collects metadata for all onRamps and offRamps from the Router
+// collectRouterMetadata collects metadata for all onRamps and offRamps from the Router.
+// It projects the state after pending ramp updates by merging pending changes with current state.
 func collectRouterMetadata(
 	b cldf_ops.Bundle,
 	chain evm.Chain,
 	routerAddr string,
 	chainSelector uint64,
 	contractMetadata []datastore.ContractMetadata,
+	pendingRampUpdates router.ApplyRampsUpdatesArgs, // Pending ramp updates to apply
+	onRampAddr string, // OnRamp address that pending configs apply to
+	offRampAddr string, // OffRamp address that pending configs apply to
+	pendingOnRampConfigs []onramp.DestChainConfigArgs, // Pending OnRamp dest chain configs
+	pendingOffRampConfigs []offramp.SourceChainConfigArgs, // Pending OffRamp source chain configs
 ) ([]datastore.ContractMetadata, error) {
 	// Read all offRamps from the Router
 	getOffRampsReport, err := cldf_ops.ExecuteOperation(b, router.GetOffRamps, chain, contract.FunctionInput[any]{
@@ -472,7 +494,7 @@ func collectRouterMetadata(
 		return contractMetadata, fmt.Errorf("failed to read offRamps from Router(%s) on chain %s: %w", routerAddr, chain, err)
 	}
 
-	// Group offRamps by sourceChainSelector
+	// Group offRamps by sourceChainSelector (current state)
 	offRampsByChain := make(map[uint64][]string)
 	uniqueChainSelectors := make(map[uint64]struct{})
 	for _, offRamp := range getOffRampsReport.Output {
@@ -481,7 +503,7 @@ func collectRouterMetadata(
 		uniqueChainSelectors[sourceChainSelector] = struct{}{}
 	}
 
-	// Get onRamp for each unique sourceChainSelector
+	// Get onRamp for each unique sourceChainSelector (current state)
 	onRampsByChain := make(map[uint64]string)
 	for sourceChainSelector := range uniqueChainSelectors {
 		getOnRampReport, err := cldf_ops.ExecuteOperation(b, router.GetOnRamp, chain, contract.FunctionInput[uint64]{
@@ -493,6 +515,73 @@ func collectRouterMetadata(
 			return contractMetadata, fmt.Errorf("failed to read onRamp for chain selector %d from Router(%s) on chain %s: %w", sourceChainSelector, routerAddr, chain, err)
 		}
 		onRampsByChain[sourceChainSelector] = getOnRampReport.Output.Hex()
+	}
+
+	// Apply pending OnRamp updates: update existing or add new
+	for _, onRampUpdate := range pendingRampUpdates.OnRampUpdates {
+		destChainSelector := onRampUpdate.DestChainSelector
+		onRampAddr := onRampUpdate.OnRamp.Hex()
+		onRampsByChain[destChainSelector] = onRampAddr
+		uniqueChainSelectors[destChainSelector] = struct{}{}
+	}
+
+	// Apply pending OffRamp removes
+	for _, offRampRemove := range pendingRampUpdates.OffRampRemoves {
+		sourceChainSelector := offRampRemove.SourceChainSelector
+		offRampAddr := offRampRemove.OffRamp.Hex()
+		// Remove this offRamp from the list for this source chain selector
+		if offRamps, exists := offRampsByChain[sourceChainSelector]; exists {
+			newOffRamps := make([]string, 0, len(offRamps))
+			for _, existing := range offRamps {
+				if existing != offRampAddr {
+					newOffRamps = append(newOffRamps, existing)
+				}
+			}
+			offRampsByChain[sourceChainSelector] = newOffRamps
+		}
+	}
+
+	// Apply pending OffRamp adds
+	for _, offRampAdd := range pendingRampUpdates.OffRampAdds {
+		sourceChainSelector := offRampAdd.SourceChainSelector
+		offRampAddr := offRampAdd.OffRamp.Hex()
+		// Check if this offRamp is already in the list
+		found := false
+		if existingOffRamps, exists := offRampsByChain[sourceChainSelector]; exists {
+			for _, existing := range existingOffRamps {
+				if existing == offRampAddr {
+					found = true
+					break
+				}
+			}
+		}
+		if !found {
+			offRampsByChain[sourceChainSelector] = append(offRampsByChain[sourceChainSelector], offRampAddr)
+		}
+		uniqueChainSelectors[sourceChainSelector] = struct{}{}
+	}
+
+	// Build sets of pending ramp addresses (ramps being updated/added)
+	pendingOnRampAddrs := make(map[string]struct{})
+	for _, onRampUpdate := range pendingRampUpdates.OnRampUpdates {
+		pendingOnRampAddrs[onRampUpdate.OnRamp.Hex()] = struct{}{}
+	}
+
+	pendingOffRampAddrs := make(map[string]struct{})
+	for _, offRampAdd := range pendingRampUpdates.OffRampAdds {
+		pendingOffRampAddrs[offRampAdd.OffRamp.Hex()] = struct{}{}
+	}
+
+	// Build maps of pending configs by chain selector for the input OnRamp/OffRamp
+	// These configs apply to onRampAddr and offRampAddr respectively
+	pendingOnRampConfigsBySelector := make(map[uint64]onramp.DestChainConfigArgs)
+	for _, config := range pendingOnRampConfigs {
+		pendingOnRampConfigsBySelector[config.DestChainSelector] = config
+	}
+
+	pendingOffRampConfigsBySelector := make(map[uint64]offramp.SourceChainConfigArgs)
+	for _, config := range pendingOffRampConfigs {
+		pendingOffRampConfigsBySelector[config.SourceChainSelector] = config
 	}
 
 	// Convert to string keys for JSON serialization
@@ -517,14 +606,22 @@ func collectRouterMetadata(
 
 	// Collect OnRamp metadata for each unique OnRamp
 	uniqueOnRamps := make(map[string]struct{})
-	for _, onRampAddr := range onRampsByChain {
-		uniqueOnRamps[onRampAddr] = struct{}{}
+	for _, onRampAddrLoop := range onRampsByChain {
+		uniqueOnRamps[onRampAddrLoop] = struct{}{}
 	}
 
-	for onRampAddr := range uniqueOnRamps {
-		onRampMetadata, err := collectOnRampDestChainConfigsMetadata(b, chain, onRampAddr, chainSelector)
+	for onRampAddrLoop := range uniqueOnRamps {
+		// Check if this OnRamp is pending (being updated)
+		_, isPending := pendingOnRampAddrs[onRampAddrLoop]
+		var pendingConfigsForOnRamp map[uint64]onramp.DestChainConfigArgs
+		if isPending && onRampAddrLoop == onRampAddr {
+			// This is the OnRamp being updated, use its pending configs
+			pendingConfigsForOnRamp = pendingOnRampConfigsBySelector
+		}
+
+		onRampMetadata, err := collectOnRampDestChainConfigsMetadata(b, chain, onRampAddrLoop, chainSelector, isPending, pendingConfigsForOnRamp)
 		if err != nil {
-			return contractMetadata, fmt.Errorf("failed to collect OnRamp metadata for %s: %w", onRampAddr, err)
+			return contractMetadata, fmt.Errorf("failed to collect OnRamp metadata for %s: %w", onRampAddrLoop, err)
 		}
 		contractMetadata = append(contractMetadata, onRampMetadata)
 	}
@@ -532,15 +629,23 @@ func collectRouterMetadata(
 	// Collect OffRamp metadata for each unique OffRamp
 	uniqueOffRamps := make(map[string]struct{})
 	for _, offRampAddrs := range offRampsByChain {
-		for _, offRampAddr := range offRampAddrs {
-			uniqueOffRamps[offRampAddr] = struct{}{}
+		for _, offRampAddrLoop := range offRampAddrs {
+			uniqueOffRamps[offRampAddrLoop] = struct{}{}
 		}
 	}
 
-	for offRampAddr := range uniqueOffRamps {
-		offRampMetadata, err := collectOffRampSourceChainConfigsMetadata(b, chain, offRampAddr, chainSelector)
+	for offRampAddrLoop := range uniqueOffRamps {
+		// Check if this OffRamp is pending (being added)
+		_, isPending := pendingOffRampAddrs[offRampAddrLoop]
+		var pendingConfigsForOffRamp map[uint64]offramp.SourceChainConfigArgs
+		if isPending && offRampAddrLoop == offRampAddr {
+			// This is the OffRamp being updated, use its pending configs
+			pendingConfigsForOffRamp = pendingOffRampConfigsBySelector
+		}
+
+		offRampMetadata, err := collectOffRampSourceChainConfigsMetadata(b, chain, offRampAddrLoop, chainSelector, isPending, pendingConfigsForOffRamp)
 		if err != nil {
-			return contractMetadata, fmt.Errorf("failed to collect OffRamp metadata for %s: %w", offRampAddr, err)
+			return contractMetadata, fmt.Errorf("failed to collect OffRamp metadata for %s: %w", offRampAddrLoop, err)
 		}
 		contractMetadata = append(contractMetadata, offRampMetadata)
 	}
@@ -548,14 +653,19 @@ func collectRouterMetadata(
 	return contractMetadata, nil
 }
 
-// collectOnRampDestChainConfigsMetadata collects all destination chain configs from an OnRamp and returns metadata
+// collectOnRampDestChainConfigsMetadata collects all destination chain configs from an OnRamp and returns metadata.
+// If isPending is true and pendingConfigs is provided, it uses those instead of querying chain state.
 func collectOnRampDestChainConfigsMetadata(
 	b cldf_ops.Bundle,
 	chain evm.Chain,
 	onRampAddr string,
 	chainSelector uint64,
+	isPending bool,
+	pendingConfigs map[uint64]onramp.DestChainConfigArgs, // Pending configs by destChainSelector (only used if isPending is true)
 ) (datastore.ContractMetadata, error) {
-	// Read all destination chain configs from the OnRamp
+	var destChainConfigsList []map[string]interface{}
+
+	// Always query chain state first to get existing configs
 	getAllConfigsReport, err := cldf_ops.ExecuteOperation(b, onramp.GetAllDestChainConfigs, chain, contract.FunctionInput[any]{
 		ChainSelector: chainSelector,
 		Address:       common.HexToAddress(onRampAddr),
@@ -565,8 +675,8 @@ func collectOnRampDestChainConfigsMetadata(
 		return datastore.ContractMetadata{}, fmt.Errorf("failed to read all dest chain configs from OnRamp(%s) on chain %s: %w", onRampAddr, chain, err)
 	}
 
-	// Convert dest chain configs to JSON-serializable format
-	destChainConfigsList := make([]map[string]interface{}, 0, len(getAllConfigsReport.Output.DestChainSelectors))
+	// Build a map of existing configs by destChainSelector
+	existingConfigsBySelector := make(map[uint64]map[string]interface{})
 	for i, destChainSelector := range getAllConfigsReport.Output.DestChainSelectors {
 		config := getAllConfigsReport.Output.DestChainConfigs[i]
 
@@ -581,7 +691,7 @@ func collectOnRampDestChainConfigsMetadata(
 			laneMandatedCCVsHex[j] = ccv.Hex()
 		}
 
-		destChainConfigsList = append(destChainConfigsList, map[string]interface{}{
+		existingConfigsBySelector[destChainSelector] = map[string]interface{}{
 			"destChainSelector":         destChainSelector,
 			"router":                    config.Router.Hex(),
 			"messageNumber":             config.MessageNumber,
@@ -594,7 +704,52 @@ func collectOnRampDestChainConfigsMetadata(
 			"laneMandatedCCVs":          laneMandatedCCVsHex,
 			"defaultCCVs":               defaultCCVsHex,
 			"offRamp":                   fmt.Sprintf("0x%x", config.OffRamp),
-		})
+		}
+	}
+
+	if isPending {
+		if pendingConfigs != nil && len(pendingConfigs) > 0 {
+			// Merge pending configs with existing configs (pending overrides existing)
+			for destChainSelector, pendingConfig := range pendingConfigs {
+				// Convert pending config to metadata format
+				defaultCCVsHex := make([]string, len(pendingConfig.DefaultCCVs))
+				for j, ccv := range pendingConfig.DefaultCCVs {
+					defaultCCVsHex[j] = ccv.Hex()
+				}
+
+				laneMandatedCCVsHex := make([]string, len(pendingConfig.LaneMandatedCCVs))
+				for j, ccv := range pendingConfig.LaneMandatedCCVs {
+					laneMandatedCCVsHex[j] = ccv.Hex()
+				}
+
+				// Override or add pending config
+				existingConfigsBySelector[destChainSelector] = map[string]interface{}{
+					"destChainSelector":         destChainSelector,
+					"router":                    pendingConfig.Router.Hex(),
+					"messageNumber":             0, // Not in pending config, default to 0
+					"addressBytesLength":        pendingConfig.AddressBytesLength,
+					"tokenReceiverAllowed":      false, // Not in pending config, default to false
+					"messageNetworkFeeUSDCents": 0,     // Not in pending config, default to 0
+					"tokenNetworkFeeUSDCents":   0,     // Not in pending config, default to 0
+					"baseExecutionGasCost":      pendingConfig.BaseExecutionGasCost,
+					"defaultExecutor":           pendingConfig.DefaultExecutor.Hex(),
+					"laneMandatedCCVs":          laneMandatedCCVsHex,
+					"defaultCCVs":               defaultCCVsHex,
+					"offRamp":                   fmt.Sprintf("0x%x", pendingConfig.OffRamp),
+				}
+			}
+		}
+		// Convert map to list
+		destChainConfigsList = make([]map[string]interface{}, 0, len(existingConfigsBySelector))
+		for _, config := range existingConfigsBySelector {
+			destChainConfigsList = append(destChainConfigsList, config)
+		}
+	} else {
+		// Not pending - use existing configs as-is
+		destChainConfigsList = make([]map[string]interface{}, 0, len(existingConfigsBySelector))
+		for _, config := range existingConfigsBySelector {
+			destChainConfigsList = append(destChainConfigsList, config)
+		}
 	}
 
 	return datastore.ContractMetadata{
@@ -606,14 +761,19 @@ func collectOnRampDestChainConfigsMetadata(
 	}, nil
 }
 
-// collectOffRampSourceChainConfigsMetadata collects all source chain configs from an OffRamp and returns metadata
+// collectOffRampSourceChainConfigsMetadata collects all source chain configs from an OffRamp and returns metadata.
+// If isPending is true and pendingConfigs is provided, it uses those instead of querying chain state.
 func collectOffRampSourceChainConfigsMetadata(
 	b cldf_ops.Bundle,
 	chain evm.Chain,
 	offRampAddr string,
 	chainSelector uint64,
+	isPending bool,
+	pendingConfigs map[uint64]offramp.SourceChainConfigArgs, // Pending configs by sourceChainSelector (only used if isPending is true)
 ) (datastore.ContractMetadata, error) {
-	// Read all source chain configs from the OffRamp
+	var sourceChainConfigsList []map[string]interface{}
+
+	// Always query chain state first to get existing configs
 	getAllConfigsReport, err := cldf_ops.ExecuteOperation(b, offramp.GetAllSourceChainConfigs, chain, contract.FunctionInput[any]{
 		ChainSelector: chainSelector,
 		Address:       common.HexToAddress(offRampAddr),
@@ -623,8 +783,8 @@ func collectOffRampSourceChainConfigsMetadata(
 		return datastore.ContractMetadata{}, fmt.Errorf("failed to read all source chain configs from OffRamp(%s) on chain %s: %w", offRampAddr, chain, err)
 	}
 
-	// Convert source chain configs to JSON-serializable format
-	sourceChainConfigsList := make([]map[string]interface{}, 0, len(getAllConfigsReport.Output.SourceChainSelectors))
+	// Build a map of existing configs by sourceChainSelector
+	existingConfigsBySelector := make(map[uint64]map[string]interface{})
 	for i, sourceChainSelector := range getAllConfigsReport.Output.SourceChainSelectors {
 		config := getAllConfigsReport.Output.SourceChainConfigs[i]
 
@@ -645,14 +805,59 @@ func collectOffRampSourceChainConfigsMetadata(
 			onRampsHex[j] = fmt.Sprintf("0x%x", onRampBytes)
 		}
 
-		sourceChainConfigsList = append(sourceChainConfigsList, map[string]interface{}{
+		existingConfigsBySelector[sourceChainSelector] = map[string]interface{}{
 			"sourceChainSelector": sourceChainSelector,
 			"router":              config.Router.Hex(),
 			"isEnabled":           config.IsEnabled,
 			"onRamps":             onRampsHex,
 			"defaultCCVs":         defaultCCVsHex,
 			"laneMandatedCCVs":    laneMandatedCCVsHex,
-		})
+		}
+	}
+
+	if isPending {
+		if pendingConfigs != nil && len(pendingConfigs) > 0 {
+			// Merge pending configs with existing configs (pending overrides existing)
+			for sourceChainSelector, pendingConfig := range pendingConfigs {
+				// Convert pending config to metadata format
+				defaultCCVsHex := make([]string, len(pendingConfig.DefaultCCVs))
+				for j, ccv := range pendingConfig.DefaultCCVs {
+					defaultCCVsHex[j] = ccv.Hex()
+				}
+
+				laneMandatedCCVsHex := make([]string, len(pendingConfig.LaneMandatedCCVs))
+				for j, ccv := range pendingConfig.LaneMandatedCCVs {
+					laneMandatedCCVsHex[j] = ccv.Hex()
+				}
+
+				// Convert OnRamps bytes to hex strings
+				onRampsHex := make([]string, len(pendingConfig.OnRamps))
+				for j, onRampBytes := range pendingConfig.OnRamps {
+					onRampsHex[j] = fmt.Sprintf("0x%x", onRampBytes)
+				}
+
+				// Override or add pending config
+				existingConfigsBySelector[sourceChainSelector] = map[string]interface{}{
+					"sourceChainSelector": sourceChainSelector,
+					"router":              pendingConfig.Router.Hex(),
+					"isEnabled":           pendingConfig.IsEnabled,
+					"onRamps":             onRampsHex,
+					"defaultCCVs":         defaultCCVsHex,
+					"laneMandatedCCVs":    laneMandatedCCVsHex,
+				}
+			}
+		}
+		// Convert map to list
+		sourceChainConfigsList = make([]map[string]interface{}, 0, len(existingConfigsBySelector))
+		for _, config := range existingConfigsBySelector {
+			sourceChainConfigsList = append(sourceChainConfigsList, config)
+		}
+	} else {
+		// Not pending - use existing configs as-is
+		sourceChainConfigsList = make([]map[string]interface{}, 0, len(existingConfigsBySelector))
+		for _, config := range existingConfigsBySelector {
+			sourceChainConfigsList = append(sourceChainConfigsList, config)
+		}
 	}
 
 	return datastore.ContractMetadata{

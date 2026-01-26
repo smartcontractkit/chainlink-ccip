@@ -1199,3 +1199,356 @@ func TestConfigureChainForLanes_Metadata(t *testing.T) {
 		})
 	}
 }
+
+func TestConfigureChainForLanes_PendingChangesProjection(t *testing.T) {
+	chainSelector := uint64(5009297550715157269)
+	remoteChainSelector1 := uint64(4356164186791070119)
+	remoteChainSelector2 := uint64(1234567890123456789) // Different remote chain
+
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{chainSelector}),
+	)
+	require.NoError(t, err, "Failed to create environment")
+	evmChain := e.BlockChains.EVMChains()[chainSelector]
+
+	// Deploy contracts
+	create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, evmChain, contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
+		ChainSelector:  chainSelector,
+		Args: create2_factory.ConstructorArgs{
+			AllowList: []common.Address{evmChain.DeployerKey.From},
+		},
+	}, nil)
+	require.NoError(t, err, "Failed to deploy CREATE2Factory")
+
+	deploymentReport, err := operations.ExecuteSequence(
+		e.OperationsBundle,
+		sequences.DeployChainContracts,
+		evmChain,
+		sequences.DeployChainContractsInput{
+			ChainSelector:  chainSelector,
+			CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
+			ContractParams: testsetup.CreateBasicContractParams(),
+		},
+	)
+	require.NoError(t, err, "ExecuteSequence should not error")
+
+	var routerAddress, onRamp, feeQuoter, offRamp, committeeVerifier, committeeVerifierResolver, executorAddress string
+	for _, addr := range deploymentReport.Output.Addresses {
+		switch addr.Type {
+		case datastore.ContractType(router.ContractType):
+			routerAddress = addr.Address
+		case datastore.ContractType(onramp.ContractType):
+			onRamp = addr.Address
+		case datastore.ContractType(fee_quoter.ContractType):
+			feeQuoter = addr.Address
+		case datastore.ContractType(offramp.ContractType):
+			offRamp = addr.Address
+		case datastore.ContractType(committee_verifier.ContractType):
+			committeeVerifier = addr.Address
+		case datastore.ContractType(executor.ProxyType):
+			executorAddress = addr.Address
+		case datastore.ContractType(committee_verifier.ResolverType):
+			committeeVerifierResolver = addr.Address
+		}
+	}
+
+	// Configure first remote chain (this establishes current state)
+	ccipMessageSource1 := common.HexToAddress("0x10").Bytes()
+	ccipMessageDest1 := common.HexToAddress("0x11").Bytes()
+	_, err = operations.ExecuteSequence(
+		e.OperationsBundle,
+		sequences.ConfigureChainForLanes,
+		e.BlockChains,
+		adapters.ConfigureChainForLanesInput{
+			ChainSelector: chainSelector,
+			Router:        routerAddress,
+			OnRamp:        onRamp,
+			CommitteeVerifiers: []adapters.CommitteeVerifierConfig[datastore.AddressRef]{
+				{
+					CommitteeVerifier: []datastore.AddressRef{
+						{
+							Address: committeeVerifier,
+							Type:    datastore.ContractType(committee_verifier.ContractType),
+							Version: committee_verifier.Version,
+						},
+						{
+							Address: committeeVerifierResolver,
+							Type:    datastore.ContractType(committee_verifier.ResolverType),
+							Version: committee_verifier.Version,
+						},
+					},
+					RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
+						remoteChainSelector1: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
+					},
+				},
+			},
+			FeeQuoter: feeQuoter,
+			OffRamp:   offRamp,
+			RemoteChains: map[uint64]adapters.RemoteChainConfig[[]byte, string]{
+				remoteChainSelector1: {
+					AllowTrafficFrom:         true,
+					OnRamps:                  [][]byte{ccipMessageSource1},
+					OffRamp:                  ccipMessageDest1,
+					DefaultInboundCCVs:       []string{committeeVerifier},
+					DefaultOutboundCCVs:      []string{committeeVerifier},
+					DefaultExecutor:          executorAddress,
+					FeeQuoterDestChainConfig: testsetup.CreateBasicFeeQuoterDestChainConfig(),
+					ExecutorDestChainConfig:  testsetup.CreateBasicExecutorDestChainConfig(),
+					AddressBytesLength:       20,
+					BaseExecutionGasCost:     80_000,
+				},
+			},
+		},
+	)
+	require.NoError(t, err, "First ConfigureChainForLanes should not error")
+
+	// Now configure a second remote chain (this is the "pending" change we're testing)
+	// The metadata should project both chains: chain1 from current state, chain2 from pending
+	ccipMessageSource2 := common.HexToAddress("0x20").Bytes()
+	ccipMessageDest2 := common.HexToAddress("0x21").Bytes()
+	configureReport2, err := operations.ExecuteSequence(
+		e.OperationsBundle,
+		sequences.ConfigureChainForLanes,
+		e.BlockChains,
+		adapters.ConfigureChainForLanesInput{
+			ChainSelector: chainSelector,
+			Router:        routerAddress,
+			OnRamp:        onRamp,
+			CommitteeVerifiers: []adapters.CommitteeVerifierConfig[datastore.AddressRef]{
+				{
+					CommitteeVerifier: []datastore.AddressRef{
+						{
+							Address: committeeVerifier,
+							Type:    datastore.ContractType(committee_verifier.ContractType),
+							Version: committee_verifier.Version,
+						},
+						{
+							Address: committeeVerifierResolver,
+							Type:    datastore.ContractType(committee_verifier.ResolverType),
+							Version: committee_verifier.Version,
+						},
+					},
+					RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
+						remoteChainSelector2: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
+					},
+				},
+			},
+			FeeQuoter: feeQuoter,
+			OffRamp:   offRamp,
+			RemoteChains: map[uint64]adapters.RemoteChainConfig[[]byte, string]{
+				remoteChainSelector2: {
+					AllowTrafficFrom:         true,
+					OnRamps:                  [][]byte{ccipMessageSource2},
+					OffRamp:                  ccipMessageDest2,
+					DefaultInboundCCVs:       []string{committeeVerifier},
+					DefaultOutboundCCVs:      []string{committeeVerifier},
+					DefaultExecutor:          executorAddress,
+					FeeQuoterDestChainConfig: testsetup.CreateBasicFeeQuoterDestChainConfig(),
+					ExecutorDestChainConfig:  testsetup.CreateBasicExecutorDestChainConfig(),
+					AddressBytesLength:       20,
+					BaseExecutionGasCost:     90_000, // Different value to verify pending changes
+				},
+			},
+		},
+	)
+	require.NoError(t, err, "Second ConfigureChainForLanes should not error")
+
+	// Verify Router metadata shows both remote chains (chain1 from current state, chain2 from pending)
+	routerMetadataFound := false
+	for _, contractMeta := range configureReport2.Output.Metadata.Contracts {
+		if contractMeta.Address == routerAddress && contractMeta.ChainSelector == chainSelector {
+			routerMetadataFound = true
+			metaMap, ok := contractMeta.Metadata.(map[string]interface{})
+			require.True(t, ok, "Router metadata should be a map[string]interface{}")
+
+			// Verify onRamps shows both chains
+			onRampsValue, ok := metaMap["onRamps"]
+			require.True(t, ok, "onRamps should exist in metadata")
+			onRampsMap, ok := onRampsValue.(map[string]interface{})
+			if !ok {
+				onRampsMapStr, okStr := onRampsValue.(map[string]string)
+				require.True(t, okStr, "onRamps should be a map")
+				onRampsMap = make(map[string]interface{})
+				for k, v := range onRampsMapStr {
+					onRampsMap[k] = v
+				}
+			}
+			// Should have both remote chains: chain1 (current) and chain2 (pending)
+			require.Len(t, onRampsMap, 2, "Should have onRamps for both remote chains")
+			require.Equal(t, onRamp, onRampsMap[fmt.Sprintf("%d", remoteChainSelector1)], "Chain1 onRamp should match current state")
+			require.Equal(t, onRamp, onRampsMap[fmt.Sprintf("%d", remoteChainSelector2)], "Chain2 onRamp should match pending update")
+
+			// Verify offRamps shows both chains
+			offRampsValue, ok := metaMap["offRamps"]
+			require.True(t, ok, "offRamps should exist in metadata")
+			offRampsMap, ok := offRampsValue.(map[string]interface{})
+			if !ok {
+				offRampsMapStr, okStr := offRampsValue.(map[string][]string)
+				require.True(t, okStr, "offRamps should be a map")
+				offRampsMap = make(map[string]interface{})
+				for k, v := range offRampsMapStr {
+					interfaceSlice := make([]interface{}, len(v))
+					for i, s := range v {
+						interfaceSlice[i] = s
+					}
+					offRampsMap[k] = interfaceSlice
+				}
+			}
+			// Should have both remote chains
+			require.Len(t, offRampsMap, 2, "Should have offRamps for both remote chains")
+			chain1OffRamps, ok := offRampsMap[fmt.Sprintf("%d", remoteChainSelector1)].([]interface{})
+			require.True(t, ok, "Chain1 offRamps should be a slice")
+			require.Contains(t, chain1OffRamps, offRamp, "Chain1 should include current offRamp")
+			chain2OffRamps, ok := offRampsMap[fmt.Sprintf("%d", remoteChainSelector2)].([]interface{})
+			require.True(t, ok, "Chain2 offRamps should be a slice")
+			require.Contains(t, chain2OffRamps, offRamp, "Chain2 should include pending offRamp")
+
+			break
+		}
+	}
+	require.True(t, routerMetadataFound, "Should have found Router metadata")
+
+	// Verify OnRamp metadata shows both dest chain configs
+	// Chain1 should be from current state (queried from chain)
+	// Chain2 should be from pending configs (projected state)
+	onRampMetadataFound := false
+	for _, contractMeta := range configureReport2.Output.Metadata.Contracts {
+		if contractMeta.Address == onRamp && contractMeta.ChainSelector == chainSelector {
+			onRampMetadataFound = true
+			metaMap, ok := contractMeta.Metadata.(map[string]interface{})
+			require.True(t, ok, "OnRamp metadata should be a map[string]interface{}")
+
+			destChainConfigsValue, ok := metaMap["destChainConfigs"]
+			require.True(t, ok, "destChainConfigs should exist")
+			destChainConfigsList, ok := destChainConfigsValue.([]interface{})
+			if !ok {
+				destChainConfigsListMap, okMap := destChainConfigsValue.([]map[string]interface{})
+				require.True(t, okMap, "destChainConfigs should be a slice")
+				destChainConfigsList = make([]interface{}, len(destChainConfigsListMap))
+				for i, m := range destChainConfigsListMap {
+					destChainConfigsList[i] = m
+				}
+			}
+
+			// Should have configs for both chains
+			require.Len(t, destChainConfigsList, 2, "Should have dest chain configs for both remote chains")
+
+			// Find configs for each chain
+			chain1ConfigFound := false
+			chain2ConfigFound := false
+			for _, configInterface := range destChainConfigsList {
+				configMap, ok := configInterface.(map[string]interface{})
+				require.True(t, ok, "Config should be a map")
+
+				var destChainSelector uint64
+				switch v := configMap["destChainSelector"].(type) {
+				case uint64:
+					destChainSelector = v
+				case float64:
+					destChainSelector = uint64(v)
+				default:
+					continue
+				}
+
+				if destChainSelector == remoteChainSelector1 {
+					chain1ConfigFound = true
+					// Chain1 config should be from current state (has messageNumber, etc.)
+					require.Contains(t, configMap, "messageNumber", "Chain1 config should have messageNumber from current state")
+					require.Equal(t, uint64(80_000), getUint64FromInterface(configMap["baseExecutionGasCost"]), "Chain1 should have baseExecutionGasCost from first config")
+				} else if destChainSelector == remoteChainSelector2 {
+					chain2ConfigFound = true
+					// Chain2 config should be from pending (projected state)
+					// messageNumber should be 0 (default for pending configs)
+					messageNumber := getUint64FromInterface(configMap["messageNumber"])
+					require.Equal(t, uint64(0), messageNumber, "Chain2 config should have messageNumber=0 from pending config")
+					require.Equal(t, uint64(90_000), getUint64FromInterface(configMap["baseExecutionGasCost"]), "Chain2 should have baseExecutionGasCost=90000 from pending config")
+					require.Equal(t, routerAddress, configMap["router"], "Chain2 config should have router from pending config")
+					require.Equal(t, executorAddress, configMap["defaultExecutor"], "Chain2 config should have defaultExecutor from pending config")
+				}
+			}
+			require.True(t, chain1ConfigFound, "Should have found config for chain1")
+			require.True(t, chain2ConfigFound, "Should have found config for chain2")
+
+			break
+		}
+	}
+	require.True(t, onRampMetadataFound, "Should have found OnRamp metadata")
+
+	// Verify OffRamp metadata shows both source chain configs
+	offRampMetadataFound := false
+	for _, contractMeta := range configureReport2.Output.Metadata.Contracts {
+		if contractMeta.Address == offRamp && contractMeta.ChainSelector == chainSelector {
+			offRampMetadataFound = true
+			metaMap, ok := contractMeta.Metadata.(map[string]interface{})
+			require.True(t, ok, "OffRamp metadata should be a map[string]interface{}")
+
+			sourceChainConfigsValue, ok := metaMap["sourceChainConfigs"]
+			require.True(t, ok, "sourceChainConfigs should exist")
+			sourceChainConfigsList, ok := sourceChainConfigsValue.([]interface{})
+			if !ok {
+				sourceChainConfigsListMap, okMap := sourceChainConfigsValue.([]map[string]interface{})
+				require.True(t, okMap, "sourceChainConfigs should be a slice")
+				sourceChainConfigsList = make([]interface{}, len(sourceChainConfigsListMap))
+				for i, m := range sourceChainConfigsListMap {
+					sourceChainConfigsList[i] = m
+				}
+			}
+
+			// Should have configs for both chains
+			require.Len(t, sourceChainConfigsList, 2, "Should have source chain configs for both remote chains")
+
+			// Find configs for each chain
+			chain1ConfigFound := false
+			chain2ConfigFound := false
+			for _, configInterface := range sourceChainConfigsList {
+				configMap, ok := configInterface.(map[string]interface{})
+				require.True(t, ok, "Config should be a map")
+
+				var sourceChainSelector uint64
+				switch v := configMap["sourceChainSelector"].(type) {
+				case uint64:
+					sourceChainSelector = v
+				case float64:
+					sourceChainSelector = uint64(v)
+				default:
+					continue
+				}
+
+				if sourceChainSelector == remoteChainSelector1 {
+					chain1ConfigFound = true
+					// Chain1 config should be from current state
+					require.Contains(t, configMap, "isEnabled", "Chain1 config should have isEnabled from current state")
+				} else if sourceChainSelector == remoteChainSelector2 {
+					chain2ConfigFound = true
+					// Chain2 config should be from pending (projected state)
+					require.Equal(t, true, configMap["isEnabled"], "Chain2 config should have isEnabled=true from pending config")
+					require.Equal(t, routerAddress, configMap["router"], "Chain2 config should have router from pending config")
+				}
+			}
+			require.True(t, chain1ConfigFound, "Should have found config for chain1")
+			require.True(t, chain2ConfigFound, "Should have found config for chain2")
+
+			break
+		}
+	}
+	require.True(t, offRampMetadataFound, "Should have found OffRamp metadata")
+}
+
+// Helper function to extract uint64 from interface{} (handles both uint64 and float64 from JSON)
+func getUint64FromInterface(v interface{}) uint64 {
+	switch val := v.(type) {
+	case uint64:
+		return val
+	case uint32:
+		return uint64(val)
+	case float64:
+		return uint64(val)
+	case int:
+		return uint64(val)
+	case int64:
+		return uint64(val)
+	default:
+		return 0
+	}
+}
