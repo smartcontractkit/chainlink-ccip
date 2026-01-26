@@ -293,7 +293,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
 
     emit LockedOrBurned({
       remoteChainSelector: lockOrBurnIn.remoteChainSelector,
-      token: address(i_token),
+      token: lockOrBurnIn.localToken,
       sender: msg.sender,
       amount: destTokenAmount
     });
@@ -318,7 +318,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
 
     emit LockedOrBurned({
       remoteChainSelector: lockOrBurnIn.remoteChainSelector,
-      token: address(i_token),
+      token: lockOrBurnIn.localToken,
       sender: msg.sender,
       amount: lockOrBurnIn.amount
     });
@@ -360,7 +360,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
 
     emit ReleasedOrMinted({
       remoteChainSelector: releaseOrMintIn.remoteChainSelector,
-      token: address(i_token),
+      token: releaseOrMintIn.localToken,
       sender: msg.sender,
       recipient: releaseOrMintIn.receiver,
       amount: localAmount
