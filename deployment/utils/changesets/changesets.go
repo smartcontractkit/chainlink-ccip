@@ -63,6 +63,11 @@ func NewFromOnChainSequence[IN any, DEP any, CFG any](params NewFromOnChainSeque
 					return deployment.ChangesetOutput{Reports: report.ExecutionReports}, fmt.Errorf("failed to add %s %s with address %s on chain with selector %d to datastore: %w", r.Type, r.Version, r.Address, r.ChainSelector, err)
 				}
 			}
+			for _, r := range report.Output.ContractMetadata {
+				if err := ds.ContractMetadata().Add(r); err != nil {
+					return deployment.ChangesetOutput{Reports: report.ExecutionReports}, fmt.Errorf("failed to add contract metadata for address %s on chain with selector %d to datastore: %w", r.Address, r.ChainSelector, err)
+				}
+			}
 
 			return NewOutputBuilder(e, mcmsRegistry).
 				WithReports(report.ExecutionReports).

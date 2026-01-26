@@ -19,6 +19,8 @@ type WithChainSelector interface {
 type OnChainOutput struct {
 	// Addresses are the contract addresses that the sequence deployed.
 	Addresses []datastore.AddressRef
+	// ContractMetadata are the contract metadata records that the sequence generated.
+	ContractMetadata []datastore.ContractMetadata
 	// BatchOps are operations that must be executed via MCMS.
 	// Order is important and should be preserved during construction of the proposal.
 	// Each batch operation is executed atomically.
@@ -38,5 +40,6 @@ func RunAndMergeSequence[IN any](
 	}
 	agg.BatchOps = append(agg.BatchOps, report.Output.BatchOps...)
 	agg.Addresses = append(agg.Addresses, report.Output.Addresses...)
+	agg.ContractMetadata = append(agg.ContractMetadata, report.Output.ContractMetadata...)
 	return agg, nil
 }
