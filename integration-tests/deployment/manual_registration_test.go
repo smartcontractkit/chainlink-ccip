@@ -13,9 +13,10 @@ import (
 	"github.com/gagliardetto/solana-go"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	evmadapters "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc677"
+	bnmERC677ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc677"
 	evmseqV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	tarbindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
+	bnmpool "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/burn_mint_token_pool"
 	solutils "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
 	solseqV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
@@ -25,6 +26,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
+	bnmERC677gen "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc677"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 	"github.com/stretchr/testify/require"
 )
@@ -84,6 +86,7 @@ func TestManualRegistration(t *testing.T) {
 	// tokenRegistry.RegisterTokenAdapter(chainsel.FamilySolana, v1_6_0, &solAdapter)
 
 	// Define SOL token info
+	solTokenSupp := big.NewInt(math.MaxInt64)
 	solTokenType := solutils.SPLTokens
 	solTokenName := "SOLANA Test Token"
 	solTokenDeci := uint8(9)
@@ -97,7 +100,8 @@ func TestManualRegistration(t *testing.T) {
 	solTokenPoolQlfr := ""
 
 	// Define EVM token info
-	evmTokenType := burn_mint_erc677.ContractType
+	evmTokenSupp := big.NewInt(math.MaxInt64)
+	evmTokenType := bnmERC677ops.ContractType
 	evmTokenName := "EVM Test Token"
 	evmTokenDeci := uint8(18)
 	evmTokenSymb := "EVMTEST"
@@ -159,14 +163,14 @@ func TestManualRegistration(t *testing.T) {
 	//   - DeployTokenPoolForToken
 	//   - RegisterToken
 	//   - SetPool
-	t.Run("Token Expansion", func(t *testing.T) {
+	t.Run("Token Expansion EVM and Solana", func(t *testing.T) {
 		// Verify that token and token pool do NOT exist in the datastore yet
 		_, err = evmAdapter.FindOneTokenAddress(env.DataStore, evmChainSel, evmTokenSymb)
 		require.Error(t, err)
 		_, err = evmAdapter.FindLatestTokenPoolAddress(env.DataStore, evmChainSel, evmTokenPoolQlfr, evmTokenPoolType.String())
 		require.Error(t, err)
 
-		// Deploy a token pool
+		// Run token expansion
 		output, err = tokensapi.TokenExpansion().Apply(*env, tokensapi.TokenExpansionInput{
 			ChainAdapterVersion: v1_6_0,
 			TokenExpansionInputPerChain: map[uint64]tokensapi.TokenExpansionInputPerChain{
@@ -181,9 +185,9 @@ func TestManualRegistration(t *testing.T) {
 						Symbol:                 solTokenSymb,
 						Name:                   solTokenName,
 						Type:                   solTokenType,
-						ExternalAdmin:          []string{},
-						Supply:                 big.NewInt(math.MaxInt64),
+						Supply:                 solTokenSupp,
 						PreMint:                big.NewInt(math.MaxInt64 / 2),
+						ExternalAdmin:          []string{},
 						DisableFreezeAuthority: true,
 						Senders:                []string{solDeployer.PublicKey().String()},
 						TokenPrivKey:           "", // if empty, a new key will be generated
@@ -208,9 +212,9 @@ func TestManualRegistration(t *testing.T) {
 						Symbol:                 evmTokenSymb,
 						Name:                   evmTokenName,
 						Type:                   evmTokenType,
-						ExternalAdmin:          []string{},
-						Supply:                 big.NewInt(math.MaxInt64),
+						Supply:                 evmTokenSupp,
 						PreMint:                big.NewInt(0),
+						ExternalAdmin:          []string{},
 						DisableFreezeAuthority: false,      // not needed for EVM
 						TokenPrivKey:           "",         // not needed for EVM
 						Senders:                []string{}, // not needed for test
@@ -236,6 +240,53 @@ func TestManualRegistration(t *testing.T) {
 		})
 		require.NoError(t, err)
 		MergeAddresses(env, output.DataStore)
+
+		t.Run("Check EVM Token Expansion", func(t *testing.T) {
+			// Query EVM token info from chain
+			tokAddress, err := evmAdapter.FindOneTokenAddress(env.DataStore, evmChainSel, evmTokenSymb)
+			require.NoError(t, err)
+			tokn, err := bnmERC677gen.NewBurnMintERC677(tokAddress, evmChainInfo.Client)
+			require.NoError(t, err)
+			supp, err := tokn.MaxSupply(&bind.CallOpts{Context: t.Context()})
+			require.NoError(t, err)
+			deci, err := tokn.Decimals(&bind.CallOpts{Context: t.Context()})
+			require.NoError(t, err)
+			symb, err := tokn.Symbol(&bind.CallOpts{Context: t.Context()})
+			require.NoError(t, err)
+			ownr, err := tokn.Owner(&bind.CallOpts{Context: t.Context()})
+			require.NoError(t, err)
+			name, err := tokn.Name(&bind.CallOpts{Context: t.Context()})
+			require.NoError(t, err)
+
+			// Ensure on-chain token info matches what we provided to the changeset
+			require.True(t, evmDeployer.Cmp(ownr) == 0, fmt.Sprintf("expected EVM deployer to be the owner of the deployed token (deployer = %q, token owner = %q", evmDeployer.Hex(), ownr.Hex()))
+			require.Equal(t, evmTokenSupp, supp)
+			require.Equal(t, evmTokenDeci, deci)
+			require.Equal(t, evmTokenSymb, symb)
+			require.Equal(t, evmTokenName, name)
+
+			// Query EVM token pool info from chain
+			tpAddress, err := evmAdapter.FindLatestTokenPoolAddress(env.DataStore, evmChainSel, evmTokenPoolQlfr, string(evmTokenPoolType))
+			require.NoError(t, err)
+			tp, err := bnmpool.NewBurnMintTokenPool(tpAddress, evmChainInfo.Client)
+			require.NoError(t, err)
+			dec, err := tp.GetTokenDecimals(&bind.CallOpts{Context: t.Context()})
+			require.NoError(t, err)
+			tok, err := tp.GetToken(&bind.CallOpts{Context: t.Context()})
+			require.NoError(t, err)
+			own, err := tp.Owner(&bind.CallOpts{Context: t.Context()})
+			require.NoError(t, err)
+
+			// Ensure on-chain token pool info is consistent
+			require.True(t, evmDeployer.Cmp(own) == 0, fmt.Sprintf("expected EVM deployer to be the owner of the deployed token pool (deployer = %q, token pool owner = %q", evmDeployer.Hex(), own.Hex()))
+			require.Equal(t, evmTokenDeci, dec)
+			require.Equal(t, tokAddress, tok)
+		})
+
+		t.Run("Check Solana Token Expansion", func(t *testing.T) {
+			// TODO: implement this
+			t.Skip("Skipping Solana token expansion verification")
+		})
 	})
 
 	// This test will call the following methods on the EVM TokenAdapter interface:
@@ -310,6 +361,7 @@ func TestManualRegistration(t *testing.T) {
 	//   - DeriveTokenAddress (which also calls AddressRefToBytes)
 	//   - ManualRegistration
 	t.Run("Manual Registration Solana", func(t *testing.T) {
+		// TODO: implement this once manual registration is supported for Solana
 		t.Skip("Skipping Solana manual registration test - changeset is not implemented yet")
 	})
 }
