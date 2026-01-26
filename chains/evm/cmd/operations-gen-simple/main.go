@@ -43,9 +43,10 @@ type ABIEntry struct {
 }
 
 type ABIParam struct {
-	Name         string `json:"name"`
-	Type         string `json:"type"`
-	InternalType string `json:"internalType"`
+	Name         string      `json:"name"`
+	Type         string      `json:"type"`
+	InternalType string      `json:"internalType"`
+	Components   []ABIParam  `json:"components"` // For tuple types (structs)
 }
 
 // Contract info
@@ -56,9 +57,20 @@ type ContractInfo struct {
 	OutputPath      string
 	GobindingImport string
 	GobindingPrefix string
+	ABI             string // JSON ABI string
+	Bytecode        string // Hex bytecode string
 	Constructor     *FunctionInfo
 	Functions       map[string]*FunctionInfo
 	FunctionOrder   []string // Preserve order from config
+	StructDefs      map[string]*StructDef // Local struct definitions (key is struct name)
+}
+
+// StructDef represents a local struct definition
+type StructDef struct {
+	Name            string // Local name (e.g., "DestChainConfigArgs")
+	GethwrapperType string // Full gethwrapper type (e.g., "fee_quoter.FeeQuoterDestChainConfigArgs")
+	Fields          []ParameterInfo
+	NeedsConversion bool   // True if this struct needs a conversion function
 }
 
 type FunctionInfo struct {
@@ -78,6 +90,10 @@ type ParameterInfo struct {
 	Name         string
 	SolidityType string
 	GoType       string
+	IsStruct     bool   // True if this is a custom struct type
+	StructName   string // Name of the struct (without package prefix)
+	GethwrapperType string // Full gethwrapper type if IsStruct (e.g., "fee_quoter.FeeQuoterDestChainConfigArgs")
+	Components   []ParameterInfo // For struct fields
 }
 
 func main() {
@@ -175,15 +191,15 @@ func extractContractInfo(cfg SimpleContractConfig, output OutputConfig) (*Contra
 	// Use the actual package name that was found (e.g., "onramp" not "on_ramp")
 	packageName = actualPackageName
 
-	// Extract ABI from gobinding
-	abi, err := extractABIFromGobinding(gobindingPath)
+	// Extract ABI and Bytecode from gobinding
+	abiString, bytecode, err := extractABIAndBytecodeFromGobinding(gobindingPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to extract ABI: %w", err)
+		return nil, fmt.Errorf("failed to extract ABI and bytecode: %w", err)
 	}
 
 	// Parse ABI
 	var abiEntries []ABIEntry
-	if err := json.Unmarshal([]byte(abi), &abiEntries); err != nil {
+	if err := json.Unmarshal([]byte(abiString), &abiEntries); err != nil {
 		return nil, fmt.Errorf("failed to parse ABI: %w", err)
 	}
 
@@ -201,7 +217,10 @@ func extractContractInfo(cfg SimpleContractConfig, output OutputConfig) (*Contra
 		Version:         version,
 		PackageName:     packageName,
 		GobindingPrefix: packageName,
+		ABI:             abiString,
+		Bytecode:        bytecode,
 		Functions:       make(map[string]*FunctionInfo),
+		StructDefs:      make(map[string]*StructDef),
 	}
 
 	info.OutputPath = filepath.Join(output.BasePath, output.VersionPrefix, "operations", info.PackageName, info.PackageName+".go")
@@ -230,28 +249,65 @@ func extractContractInfo(cfg SimpleContractConfig, output OutputConfig) (*Contra
 		info.Functions[funcName] = funcInfo
 	}
 
+	// Collect all struct definitions from constructor and functions
+	if info.Constructor != nil {
+		collectStructDefs(info.Constructor.Parameters, info.StructDefs)
+	}
+	for _, funcInfo := range info.Functions {
+		collectStructDefs(funcInfo.Parameters, info.StructDefs)
+		collectStructDefs(funcInfo.ReturnParams, info.StructDefs)
+	}
+
 	return info, nil
 }
 
-func extractABIFromGobinding(path string) (string, error) {
+func collectStructDefs(params []ParameterInfo, structDefs map[string]*StructDef) {
+	for _, param := range params {
+		if param.IsStruct && param.StructName != "" {
+			// Add struct definition if not already present
+			if _, exists := structDefs[param.StructName]; !exists {
+				structDefs[param.StructName] = &StructDef{
+					Name:            param.StructName,
+					GethwrapperType: param.GethwrapperType,
+					Fields:          param.Components,
+				}
+			}
+			// Recursively collect nested struct definitions
+			collectStructDefs(param.Components, structDefs)
+		}
+	}
+}
+
+func extractABIAndBytecodeFromGobinding(path string) (string, string, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
+	content := string(data)
+
 	// Find the ABI string in the MetaData
-	re := regexp.MustCompile(`ABI: "((?:[^"\\]|\\.)*)"`)
-	matches := re.FindStringSubmatch(string(data))
-	if len(matches) < 2 {
-		return "", fmt.Errorf("ABI not found in gobinding")
+	abiRe := regexp.MustCompile(`ABI: "((?:[^"\\]|\\.)*)"`)
+	abiMatches := abiRe.FindStringSubmatch(content)
+	if len(abiMatches) < 2 {
+		return "", "", fmt.Errorf("ABI not found in gobinding")
 	}
 
 	// Unescape the JSON string
-	abi := matches[1]
+	abi := abiMatches[1]
 	abi = strings.ReplaceAll(abi, `\"`, `"`)
 	abi = strings.ReplaceAll(abi, `\\`, `\`)
 
-	return abi, nil
+	// Find the Bin string (bytecode)
+	binRe := regexp.MustCompile(`Bin: "(0x[0-9a-fA-F]*)"`)
+	binMatches := binRe.FindStringSubmatch(content)
+	if len(binMatches) < 2 {
+		return "", "", fmt.Errorf("Bin not found in gobinding")
+	}
+
+	bytecode := binMatches[1]
+
+	return abi, bytecode, nil
 }
 
 func extractVersionFromSolidity(path string) string {
@@ -467,20 +523,12 @@ func parseABIFunction(entry ABIEntry, isConstructor bool, needsSuffix bool, suff
 
 	// Parse parameters
 	for _, param := range entry.Inputs {
-		info.Parameters = append(info.Parameters, ParameterInfo{
-			Name:         param.Name,
-			SolidityType: param.Type,
-			GoType:       solidityToGoType(param.Type, param.InternalType, gobindingPrefix),
-		})
+		info.Parameters = append(info.Parameters, parseABIParam(param, gobindingPrefix))
 	}
 
 	// Parse return parameters
 	for _, param := range entry.Outputs {
-		info.ReturnParams = append(info.ReturnParams, ParameterInfo{
-			Name:         param.Name,
-			SolidityType: param.Type,
-			GoType:       solidityToGoType(param.Type, param.InternalType, gobindingPrefix),
-		})
+		info.ReturnParams = append(info.ReturnParams, parseABIParam(param, gobindingPrefix))
 	}
 
 	// Determine operation type
@@ -556,21 +604,37 @@ func solidityToGoType(solidityType, internalType, gobindingPrefix string) string
 
 	// Map basic types
 	typeMap := map[string]string{
-		"uint8":   "uint8",
-		"uint16":  "uint16",
-		"uint32":  "uint32",
-		"uint64":  "uint64",
-		"uint256": "*big.Int",
-		"int8":    "int8",
-		"int16":   "int16",
-		"int32":   "int32",
-		"int64":   "int64",
-		"int256":  "*big.Int",
-		"address": "common.Address",
-		"bool":    "bool",
-		"string":  "string",
-		"bytes":   "[]byte",
-		"bytes32": "[32]byte",
+		"uint8":    "uint8",
+		"uint16":   "uint16",
+		"uint24":   "uint32", // Go doesn't have uint24, use uint32
+		"uint32":   "uint32",
+		"uint48":   "uint64", // Go doesn't have uint48, use uint64
+		"uint64":   "uint64",
+		"uint96":   "*big.Int", // Larger than uint64
+		"uint128":  "*big.Int",
+		"uint160":  "*big.Int", // address-sized
+		"uint192":  "*big.Int",
+		"uint224":  "*big.Int",
+		"uint256":  "*big.Int",
+		"int8":     "int8",
+		"int16":    "int16",
+		"int24":    "int32",
+		"int32":    "int32",
+		"int48":    "int64",
+		"int64":    "int64",
+		"int96":    "*big.Int",
+		"int128":   "*big.Int",
+		"int160":   "*big.Int",
+		"int192":   "*big.Int",
+		"int224":   "*big.Int",
+		"int256":   "*big.Int",
+		"address":  "common.Address",
+		"bool":     "bool",
+		"string":   "string",
+		"bytes":    "[]byte",
+		"bytes4":   "[4]byte",
+		"bytes16":  "[16]byte",
+		"bytes32":  "[32]byte",
 	}
 
 	if goType, ok := typeMap[solidityType]; ok {
@@ -578,6 +642,62 @@ func solidityToGoType(solidityType, internalType, gobindingPrefix string) string
 	}
 
 	return "interface{}"
+}
+
+func parseABIParam(param ABIParam, gobindingPrefix string) ParameterInfo {
+	paramInfo := ParameterInfo{
+		Name:         param.Name,
+		SolidityType: param.Type,
+	}
+	
+	// Check if this is a struct type (tuple in ABI)
+	baseType := strings.TrimSuffix(param.Type, "[]")
+	isArray := strings.HasSuffix(param.Type, "[]")
+	
+	if baseType == "tuple" && len(param.Components) > 0 {
+		// Extract struct name from internalType
+		// Format: "struct ContractName.StructName" or "struct ContractName.StructName[]"
+		structPrefix := "struct "
+		if strings.HasPrefix(param.InternalType, "struct") && !strings.HasPrefix(param.InternalType, "struct ") {
+			structPrefix = "struct"
+		}
+		
+		internalType := strings.TrimPrefix(param.InternalType, structPrefix)
+		internalType = strings.TrimSuffix(internalType, "[]")
+		
+		parts := strings.Split(internalType, ".")
+		if len(parts) == 2 {
+			// Local name: just the struct name (e.g., "DestChainConfigArgs")
+			localStructName := parts[1]
+			
+			// Gethwrapper type: prefix.ContractNameStructName (e.g., "fee_quoter.FeeQuoterDestChainConfigArgs")
+			gethwrapperType := gobindingPrefix + "." + parts[0] + parts[1]
+			
+			paramInfo.IsStruct = true
+			paramInfo.StructName = localStructName
+			paramInfo.GethwrapperType = gethwrapperType
+			
+			// Recursively parse struct fields
+			for _, comp := range param.Components {
+				paramInfo.Components = append(paramInfo.Components, parseABIParam(comp, gobindingPrefix))
+			}
+			
+			// Set GoType
+			if isArray {
+				paramInfo.GoType = "[]" + localStructName
+			} else {
+				paramInfo.GoType = localStructName
+			}
+		} else {
+			// Fallback to solidityToGoType
+			paramInfo.GoType = solidityToGoType(param.Type, param.InternalType, gobindingPrefix)
+		}
+	} else {
+		// Not a struct, use solidityToGoType
+		paramInfo.GoType = solidityToGoType(param.Type, param.InternalType, gobindingPrefix)
+	}
+	
+	return paramInfo
 }
 
 func toSnakeCase(s string) string {
@@ -629,14 +749,19 @@ func generateOperationsFile(info *ContractInfo) error {
 	tmpl := `package {{.PackageName}}
 
 import (
+{{- if .NeedsBigInt}}
+	"math/big"
+{{end}}
+	"strings"
+
 	"github.com/Masterminds/semver/v3"
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	"{{.GobindingImport}}"
 {{- if .NeedsFastcurse}}
 	"github.com/smartcontractkit/chainlink-ccip/deployment/fastcurse"
 {{- end}}
@@ -644,6 +769,68 @@ import (
 
 var ContractType cldf_deployment.ContractType = "{{.ContractType}}"
 var Version = semver.MustParse("{{.Version}}")
+
+// {{.ContractType}}ABI is the ABI for the {{.ContractType}} contract
+const {{.ContractType}}ABI = ` + "`" + `{{.ABI}}` + "`" + `
+
+// {{.ContractType}}Bin is the bytecode for the {{.ContractType}} contract
+const {{.ContractType}}Bin = "{{.Bytecode}}"
+
+// {{.ContractType}}Contract is a local wrapper for {{.ContractType}} contract interactions
+type {{.ContractType}}Contract struct {
+	address  common.Address
+	abi      abi.ABI
+	backend  bind.ContractBackend
+	contract *bind.BoundContract
+}
+
+// New{{.ContractType}}Contract creates a new {{.ContractType}}Contract wrapper
+func New{{.ContractType}}Contract(address common.Address, backend bind.ContractBackend) (*{{.ContractType}}Contract, error) {
+	parsed, err := abi.JSON(strings.NewReader({{.ContractType}}ABI))
+	if err != nil {
+		return nil, err
+	}
+	contract := bind.NewBoundContract(address, parsed, backend, backend, backend)
+	return &{{.ContractType}}Contract{
+		address:  address,
+		abi:      parsed,
+		backend:  backend,
+		contract: contract,
+	}, nil
+}
+
+// Address returns the contract address
+func (c *{{.ContractType}}Contract) Address() common.Address {
+	return c.address
+}
+
+// Owner returns the contract owner (if applicable)
+func (c *{{.ContractType}}Contract) Owner(opts *bind.CallOpts) (common.Address, error) {
+	var out []interface{}
+	err := c.contract.Call(opts, &out, "owner")
+	if err != nil {
+		return common.Address{}, err
+	}
+	return *abi.ConvertType(out[0], new(common.Address)).(*common.Address), nil
+}
+
+{{- range .ContractMethods}}
+
+// {{.Name}} calls {{.MethodName}} on the contract
+func (c *{{$.ContractType}}Contract) {{.Name}}({{.Params}}) {{.Returns}} {
+	{{.MethodBody}}
+}
+{{- end}}
+
+{{- range .StructDefs}}
+
+// {{.Name}} represents {{.GethwrapperType}} structure
+type {{.Name}} struct {
+{{- range .Fields}}
+	{{.GoName}} {{.GoType}}
+{{- end}}
+}
+{{- end}}
 
 {{- if .Constructor}}
 
@@ -657,10 +844,13 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Name:             "{{.PackageNameHyphen}}:deploy",
 	Version:          Version,
 	Description:      "Deploys the {{.ContractType}} contract",
-	ContractMetadata: {{.GobindingPrefix}}.{{.ContractType}}MetaData,
+	ContractMetadata: &bind.MetaData{
+		ABI: {{.ContractType}}ABI,
+		Bin: {{.ContractType}}Bin,
+	},
 	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
 		cldf_deployment.NewTypeAndVersion(ContractType, *Version).String(): {
-			EVM: common.FromHex({{.GobindingPrefix}}.{{.ContractType}}Bin),
+			EVM: common.FromHex({{.ContractType}}Bin),
 		},
 	},
 	Validate: func(ConstructorArgs) error { return nil },
@@ -677,31 +867,31 @@ type {{.ArgsStructName}} struct {
 }
 {{- end}}
 
-var {{.Name}} = contract.NewWrite(contract.WriteParams[{{.ArgsType}}, *{{$.GobindingPrefix}}.{{$.ContractType}}]{
+var {{.Name}} = contract.NewWrite(contract.WriteParams[{{.ArgsType}}, *{{$.ContractType}}Contract]{
 	Name:            "{{$.PackageNameHyphen}}:{{.OpName}}",
 	Version:         Version,
 	Description:     "{{.Description}}",
 	ContractType:    ContractType,
-	ContractABI:     {{$.GobindingPrefix}}.{{$.ContractType}}ABI,
-	NewContract:     {{$.GobindingPrefix}}.New{{$.ContractType}},
-	IsAllowedCaller: contract.{{.AccessControl}}[*{{$.GobindingPrefix}}.{{$.ContractType}}, {{.ArgsType}}],
+	ContractABI:     {{$.ContractType}}ABI,
+	NewContract:     New{{$.ContractType}}Contract,
+	IsAllowedCaller: contract.{{.AccessControl}}[*{{$.ContractType}}Contract, {{.ArgsType}}],
 	Validate:        func({{.ArgsType}}) error { return nil },
-	CallContract: func({{$.ContractVarName}} *{{$.GobindingPrefix}}.{{$.ContractType}}, opts *bind.TransactOpts, args {{.ArgsType}}) (*types.Transaction, error) {
-		return {{$.ContractVarName}}.{{.CallMethod}}(opts{{.CallArgs}})
+	CallContract: func(c *{{$.ContractType}}Contract, opts *bind.TransactOpts, args {{.ArgsType}}) (*types.Transaction, error) {
+		return c.{{.Name}}(opts{{.CallArgs}})
 	},
 })
 {{- end}}
 
 {{- range .ReadOps}}
 
-var {{.Name}} = contract.NewRead(contract.ReadParams[{{.ArgsType}}, {{.ReturnType}}, *{{$.GobindingPrefix}}.{{$.ContractType}}]{
+var {{.Name}} = contract.NewRead(contract.ReadParams[{{.ArgsType}}, {{.ReturnType}}, *{{$.ContractType}}Contract]{
 	Name:         "{{$.PackageNameHyphen}}:{{.OpName}}",
 	Version:      Version,
 	Description:  "{{.Description}}",
 	ContractType: ContractType,
-	NewContract:  {{$.GobindingPrefix}}.New{{$.ContractType}},
-	CallContract: func({{$.ContractVarName}} *{{$.GobindingPrefix}}.{{$.ContractType}}, opts *bind.CallOpts, args {{.ArgsType}}) ({{.ReturnType}}, error) {
-		return {{$.ContractVarName}}.{{.CallMethod}}(opts, args)
+	NewContract:  New{{$.ContractType}}Contract,
+	CallContract: func(c *{{$.ContractType}}Contract, opts *bind.CallOpts, args {{.ArgsType}}) ({{.ReturnType}}, error) {
+		return c.{{.Name}}(opts, {{.CallArg}})
 	},
 })
 {{- end}}
@@ -745,6 +935,8 @@ func prepareTemplateData(info *ContractInfo) map[string]interface{} {
 		"GobindingImport":   info.GobindingImport,
 		"GobindingPrefix":   info.GobindingPrefix,
 		"ContractVarName":   makeVarName(info.Name),
+		"ABI":               info.ABI,
+		"Bytecode":          info.Bytecode,
 	}
 
 	// Use the order from config (already preserved in FunctionOrder)
@@ -752,25 +944,51 @@ func prepareTemplateData(info *ContractInfo) map[string]interface{} {
 
 	// Check if we need fastcurse import
 	needsFastcurse := false
+	needsBigInt := false
+	
+	// Check functions
 	for _, name := range funcNames {
 		funcInfo := info.Functions[name]
 		for _, param := range funcInfo.Parameters {
 			if strings.Contains(param.GoType, "fastcurse") {
 				needsFastcurse = true
-				break
+			}
+			if strings.Contains(param.GoType, "*big.Int") {
+				needsBigInt = true
 			}
 		}
 		for _, param := range funcInfo.ReturnParams {
 			if strings.Contains(param.GoType, "fastcurse") {
 				needsFastcurse = true
+			}
+			if strings.Contains(param.GoType, "*big.Int") {
+				needsBigInt = true
+			}
+		}
+	}
+	
+	// Check structs
+	for _, structDef := range info.StructDefs {
+		for _, field := range structDef.Fields {
+			if strings.Contains(field.GoType, "*big.Int") {
+				needsBigInt = true
 				break
 			}
 		}
-		if needsFastcurse {
-			break
+	}
+	
+	// Check constructor
+	if info.Constructor != nil {
+		for _, param := range info.Constructor.Parameters {
+			if strings.Contains(param.GoType, "*big.Int") {
+				needsBigInt = true
+				break
+			}
 		}
 	}
+	
 	data["NeedsFastcurse"] = needsFastcurse
+	data["NeedsBigInt"] = needsBigInt
 
 	// Add constructor
 	if info.Constructor != nil {
@@ -799,8 +1017,117 @@ func prepareTemplateData(info *ContractInfo) map[string]interface{} {
 	}
 	data["ReadOps"] = readOps
 
+	// Prepare struct definitions
+	var structDefs []map[string]interface{}
+	for _, structDef := range info.StructDefs {
+		structDefs = append(structDefs, map[string]interface{}{
+			"Name":            structDef.Name,
+			"GethwrapperType": structDef.GethwrapperType,
+			"Fields":          prepareParameters(structDef.Fields),
+		})
+	}
+	data["StructDefs"] = structDefs
+
+	// Prepare contract wrapper methods
+	var contractMethods []map[string]interface{}
+	for _, name := range funcNames {
+		funcInfo := info.Functions[name]
+		if funcInfo.IsWrite {
+			contractMethods = append(contractMethods, prepareContractMethod(funcInfo, true, info.Name, info.GobindingPrefix))
+		} else if funcInfo.IsRead {
+			contractMethods = append(contractMethods, prepareContractMethod(funcInfo, false, info.Name, info.GobindingPrefix))
+		}
+	}
+	data["ContractMethods"] = contractMethods
+
 	return data
 }
+
+func prepareContractMethod(funcInfo *FunctionInfo, isWrite bool, contractType string, gobindingPrefix string) map[string]interface{} {
+	// Params: opts *bind.TransactOpts, args <Type>
+	// or: opts *bind.CallOpts, args <Type>
+	optsType := "*bind.TransactOpts"
+	if !isWrite {
+		optsType = "*bind.CallOpts"
+	}
+	
+	argsParam := ""
+	if len(funcInfo.Parameters) == 1 {
+		argsType := funcInfo.Parameters[0].GoType
+		argsParam = fmt.Sprintf("args %s", argsType)
+	} else if len(funcInfo.Parameters) > 1 {
+		argsType := funcInfo.Name + "Args"
+		argsParam = fmt.Sprintf("args %s", argsType)
+	}
+	
+	params := fmt.Sprintf("opts %s", optsType)
+	if argsParam != "" {
+		params = fmt.Sprintf("%s, %s", params, argsParam)
+	}
+	
+	// Returns
+	returns := "(*types.Transaction, error)"
+	returnType := "interface{}"
+	if !isWrite {
+		if len(funcInfo.ReturnParams) == 1 {
+			returnType = funcInfo.ReturnParams[0].GoType
+		}
+		returns = fmt.Sprintf("(%s, error)", returnType)
+	}
+	
+	// Build method body
+	var methodBody string
+	if isWrite {
+		// Build call args for Transact - pass local types directly
+		var callArgsList []string
+		if len(funcInfo.Parameters) > 0 {
+			if len(funcInfo.Parameters) == 1 {
+				callArgsList = append(callArgsList, "args")
+			} else {
+				// Multiple parameters - extract fields
+				for _, p := range funcInfo.Parameters {
+					callArgsList = append(callArgsList, "args."+capitalize(p.Name))
+				}
+			}
+		}
+		callArgsStr := strings.Join(callArgsList, ", ")
+		if callArgsStr != "" {
+			methodBody = fmt.Sprintf("return c.contract.Transact(opts, \"%s\", %s)", funcInfo.CallMethod, callArgsStr)
+		} else {
+			methodBody = fmt.Sprintf("return c.contract.Transact(opts, \"%s\")", funcInfo.CallMethod)
+		}
+	} else {
+		// Read operation - use Call
+		var callArgsList []string
+		if len(funcInfo.Parameters) > 0 {
+			if len(funcInfo.Parameters) == 1 {
+				callArgsList = append(callArgsList, "args")
+			}
+		}
+		
+		callArgsStr := ""
+		if len(callArgsList) > 0 {
+			callArgsStr = ", " + strings.Join(callArgsList, ", ")
+		}
+		
+		methodBody = fmt.Sprintf(`var out []interface{}
+	err := c.contract.Call(opts, &out, "%s"%s)
+	if err != nil {
+		var zero %s
+		return zero, err
+	}
+	return *abi.ConvertType(out[0], new(%s)).(*%s), nil`, funcInfo.CallMethod, callArgsStr, returnType, returnType, returnType)
+	}
+	
+	return map[string]interface{}{
+		"Name":       funcInfo.Name,
+		"MethodName": funcInfo.CallMethod,
+		"Params":     params,
+		"Returns":    returns,
+		"MethodBody": methodBody,
+	}
+}
+
 
 func prepareParameters(params []ParameterInfo) []map[string]string {
 	var result []map[string]string
@@ -827,16 +1154,13 @@ func prepareWriteOp(funcInfo *FunctionInfo) map[string]interface{} {
 	var callArgs string
 	if len(funcInfo.Parameters) > 0 {
 		if useSingleArg {
-			// For single parameter, just pass args directly
+			// For single parameter
+			param := funcInfo.Parameters[0]
+			argsType = param.GoType
 			callArgs = ", args"
-			argsType = funcInfo.Parameters[0].GoType
 		} else {
-			// For multiple parameters, access struct fields
-			var args []string
-			for _, p := range funcInfo.Parameters {
-				args = append(args, "args."+capitalize(p.Name))
-			}
-			callArgs = ", " + strings.Join(args, ", ")
+			// For multiple parameters, just pass args (conversion in wrapper)
+			callArgs = ", args"
 		}
 	} else {
 		// For zero parameters, use struct{}
@@ -860,8 +1184,10 @@ func prepareWriteOp(funcInfo *FunctionInfo) map[string]interface{} {
 
 func prepareReadOp(funcInfo *FunctionInfo) map[string]interface{} {
 	argsType := "struct{}"
+	
 	if len(funcInfo.Parameters) == 1 {
-		argsType = funcInfo.Parameters[0].GoType
+		param := funcInfo.Parameters[0]
+		argsType = param.GoType
 	}
 
 	returnType := "interface{}"
@@ -874,6 +1200,7 @@ func prepareReadOp(funcInfo *FunctionInfo) map[string]interface{} {
 		"OpName":      toKebabCase(funcInfo.SolidityName),
 		"ArgsType":    argsType,
 		"ReturnType":  returnType,
+		"CallArg":     "args",
 		"Description": fmt.Sprintf("Calls %s on the contract", funcInfo.SolidityName),
 		"CallMethod":  funcInfo.CallMethod,
 	}
