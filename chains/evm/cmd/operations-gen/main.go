@@ -15,36 +15,41 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const (
+	// anyType is the fallback Go type for unknown Solidity types
+	anyType = "any"
+)
+
 var (
 	// typeMap maps Solidity types to their Go equivalents
 	typeMap = map[string]string{
-		"address":   "common.Address",
-		"string":    "string",
-		"bool":      "bool",
-		"bytes":     "[]byte",
-		"bytes32":   "[32]byte",
-		"bytes16":   "[16]byte",
-		"bytes4":    "[4]byte",
-		"uint8":     "uint8",
-		"uint16":    "uint16",
-		"uint32":    "uint32",
-		"uint64":    "uint64",
-		"uint96":    "*big.Int",
-		"uint128":   "*big.Int",
-		"uint160":   "*big.Int",
-		"uint192":   "*big.Int",
-		"uint224":   "*big.Int",
-		"uint256":   "*big.Int",
-		"int8":      "int8",
-		"int16":     "int16",
-		"int32":     "int32",
-		"int64":     "int64",
-		"int96":     "*big.Int",
-		"int128":    "*big.Int",
-		"int160":    "*big.Int",
-		"int192":    "*big.Int",
-		"int224":    "*big.Int",
-		"int256":    "*big.Int",
+		"address": "common.Address",
+		"string":  "string",
+		"bool":    "bool",
+		"bytes":   "[]byte",
+		"bytes32": "[32]byte",
+		"bytes16": "[16]byte",
+		"bytes4":  "[4]byte",
+		"uint8":   "uint8",
+		"uint16":  "uint16",
+		"uint32":  "uint32",
+		"uint64":  "uint64",
+		"uint96":  "*big.Int",
+		"uint128": "*big.Int",
+		"uint160": "*big.Int",
+		"uint192": "*big.Int",
+		"uint224": "*big.Int",
+		"uint256": "*big.Int",
+		"int8":    "int8",
+		"int16":   "int16",
+		"int32":   "int32",
+		"int64":   "int64",
+		"int96":   "*big.Int",
+		"int128":  "*big.Int",
+		"int160":  "*big.Int",
+		"int192":  "*big.Int",
+		"int224":  "*big.Int",
+		"int256":  "*big.Int",
 	}
 
 	// nameOverrides provides special case naming for specific contracts
@@ -192,7 +197,7 @@ func extractContractInfo(cfg ContractConfig, output OutputConfig) (*ContractInfo
 	}
 
 	extractConstructor(info, abiEntries)
-	
+
 	if err := extractFunctions(info, cfg.Functions, abiEntries); err != nil {
 		return nil, err
 	}
@@ -201,17 +206,17 @@ func extractContractInfo(cfg ContractConfig, output OutputConfig) (*ContractInfo
 	return info, nil
 }
 
-func readABIAndBytecode(packageName, versionPath string) (string, string, error) {
+func readABIAndBytecode(packageName, versionPath string) (abiString string, bytecode string, err error) {
 	fileName := packageName
 	abiPath := filepath.Join("chains", "evm", "abi", versionPath, fileName+".json")
-	
+
 	abiBytes, err := os.ReadFile(abiPath)
 	if err != nil {
 		fileNameNoUnderscore := strings.ReplaceAll(packageName, "_", "")
 		abiPath = filepath.Join("chains", "evm", "abi", versionPath, fileNameNoUnderscore+".json")
 		abiBytes, err = os.ReadFile(abiPath)
 		if err != nil {
-			return "", "", fmt.Errorf("ABI not found (tried %s.json and %s.json in %s)", 
+			return "", "", fmt.Errorf("ABI not found (tried %s.json and %s.json in %s)",
 				fileName, fileNameNoUnderscore, versionPath)
 		}
 		fileName = fileNameNoUnderscore
@@ -254,13 +259,13 @@ func extractFunctions(info *ContractInfo, funcConfigs []FunctionConfig, abiEntri
 		case "public", "":
 			funcInfo.HasOnlyOwner = false
 		default:
-			return fmt.Errorf("unknown access control '%s' for function %s (use 'owner' or 'public')", 
+			return fmt.Errorf("unknown access control '%s' for function %s (use 'owner' or 'public')",
 				funcCfg.Access, funcCfg.Name)
 		}
 
 		info.Functions[funcCfg.Name] = funcInfo
 	}
-	
+
 	return nil
 }
 
@@ -340,8 +345,8 @@ func parseABIFunction(entry ABIEntry, _ bool, packageName string, needsSuffix bo
 }
 
 func parseABIParam(param ABIParam, packageName string) ParameterInfo {
-	goType := solidityToGoType(param.Type, param.InternalType, packageName)
-	
+	goType := solidityToGoType(param.Type, param.InternalType)
+
 	paramInfo := ParameterInfo{
 		Name:         param.Name,
 		SolidityType: param.Type,
@@ -353,7 +358,7 @@ func parseABIParam(param ABIParam, packageName string) ParameterInfo {
 		if structName != "" {
 			paramInfo.IsStruct = true
 			paramInfo.StructName = structName
-			
+
 			if strings.HasSuffix(param.Type, "[]") {
 				paramInfo.GoType = "[]" + structName
 			} else {
@@ -369,7 +374,7 @@ func parseABIParam(param ABIParam, packageName string) ParameterInfo {
 	return paramInfo
 }
 
-func solidityToGoType(solidityType, internalType, _ string) string {
+func solidityToGoType(solidityType, _ string) string {
 	baseType := strings.TrimSuffix(solidityType, "[]")
 	if goType, ok := typeMap[baseType]; ok {
 		if strings.HasSuffix(solidityType, "[]") {
@@ -379,21 +384,21 @@ func solidityToGoType(solidityType, internalType, _ string) string {
 	}
 
 	if strings.HasPrefix(baseType, "tuple") {
-		return "any"
+		return anyType
 	}
 
-	return "any"
+	return anyType
 }
 
 func extractStructName(internalType string) string {
 	if internalType == "" {
 		return ""
 	}
-	
+
 	parts := strings.Split(internalType, ".")
 	structName := parts[len(parts)-1]
 	structName = strings.TrimSuffix(structName, "[]")
-	
+
 	return structName
 }
 
@@ -405,7 +410,7 @@ func toSnakeCase(s string) string {
 	if override, ok := nameOverrides[s]; ok {
 		return override
 	}
-	
+
 	var result []rune
 	runes := []rune(s)
 	for i := 0; i < len(runes); i++ {
@@ -465,7 +470,10 @@ type {{.ContractType}}Contract struct {
 	contract *bind.BoundContract
 }
 
-func New{{.ContractType}}Contract(address common.Address, backend bind.ContractBackend) (*{{.ContractType}}Contract, error) {
+func New{{.ContractType}}Contract(
+	address common.Address,
+	backend bind.ContractBackend,
+) (*{{.ContractType}}Contract, error) {
 	parsed, err := abi.JSON(strings.NewReader({{.ContractType}}ABI))
 	if err != nil {
 		return nil, err
@@ -547,7 +555,11 @@ var {{.Name}} = contract.NewWrite(contract.WriteParams[{{.ArgsType}}, *{{$.Contr
 	NewContract:     New{{$.ContractType}}Contract,
 	IsAllowedCaller: contract.{{.AccessControl}}[*{{$.ContractType}}Contract, {{.ArgsType}}],
 	Validate:        func({{.ArgsType}}) error { return nil },
-	CallContract: func(c *{{$.ContractType}}Contract, opts *bind.TransactOpts, args {{.ArgsType}}) (*types.Transaction, error) {
+	CallContract: func(
+		c *{{$.ContractType}}Contract,
+		opts *bind.TransactOpts,
+		args {{.ArgsType}},
+	) (*types.Transaction, error) {
 		return c.{{.Name}}(opts{{.CallArgs}})
 	},
 })
@@ -588,7 +600,7 @@ var {{.Name}} = contract.NewRead(contract.ReadParams[{{.ArgsType}}, {{.ReturnTyp
 		return fmt.Errorf("failed to create output directory: %w", err)
 	}
 
-	if err := os.WriteFile(info.OutputPath, formatted, 0644); err != nil {
+	if err := os.WriteFile(info.OutputPath, formatted, 0600); err != nil {
 		return fmt.Errorf("failed to write file: %w", err)
 	}
 
@@ -621,7 +633,7 @@ func prepareTemplateData(info *ContractInfo) map[string]any {
 	for _, name := range info.FunctionOrder {
 		funcInfo := info.Functions[name]
 		contractMethods = append(contractMethods, prepareContractMethod(funcInfo, funcInfo.IsWrite))
-		
+
 		if funcInfo.IsWrite {
 			writeOps = append(writeOps, prepareWriteOp(funcInfo))
 			if len(funcInfo.Parameters) > 1 {
@@ -695,7 +707,7 @@ func prepareContractMethod(funcInfo *FunctionInfo, isWrite bool) map[string]any 
 
 	params := fmt.Sprintf("opts %s", optsType)
 	var methodArgs []string
-	
+
 	if len(funcInfo.Parameters) == 1 {
 		params += fmt.Sprintf(", args %s", funcInfo.Parameters[0].GoType)
 		methodArgs = []string{"args"}
@@ -714,7 +726,7 @@ func prepareContractMethod(funcInfo *FunctionInfo, isWrite bool) map[string]any 
 	}
 
 	returns := "(*types.Transaction, error)"
-	returnType := "any"
+	returnType := anyType
 	if !isWrite {
 		if len(funcInfo.ReturnParams) == 1 {
 			returnType = funcInfo.ReturnParams[0].GoType
@@ -725,7 +737,7 @@ func prepareContractMethod(funcInfo *FunctionInfo, isWrite bool) map[string]any 
 	var methodBody string
 	if isWrite {
 		if len(methodArgs) > 0 {
-			methodBody = fmt.Sprintf("return c.contract.Transact(opts, \"%s\", %s)", 
+			methodBody = fmt.Sprintf("return c.contract.Transact(opts, \"%s\", %s)",
 				funcInfo.CallMethod, strings.Join(methodArgs, ", "))
 		} else {
 			methodBody = fmt.Sprintf("return c.contract.Transact(opts, \"%s\")", funcInfo.CallMethod)
@@ -735,13 +747,16 @@ func prepareContractMethod(funcInfo *FunctionInfo, isWrite bool) map[string]any 
 		if len(methodArgs) > 0 {
 			callArgsStr = ", " + strings.Join(methodArgs, ", ")
 		}
-		methodBody = fmt.Sprintf(`var out []any
+		methodBody = fmt.Sprintf(
+			`var out []any
 	err := c.contract.Call(opts, &out, "%s"%s)
 	if err != nil {
 		var zero %s
 		return zero, err
 	}
-	return *abi.ConvertType(out[0], new(%s)).(*%s), nil`, funcInfo.CallMethod, callArgsStr, returnType, returnType, returnType)
+	return *abi.ConvertType(out[0], new(%s)).(*%s), nil`,
+			funcInfo.CallMethod, callArgsStr, returnType, returnType, returnType,
+		)
 	}
 
 	return map[string]any{
@@ -814,7 +829,7 @@ func prepareReadOp(funcInfo *FunctionInfo) map[string]any {
 		callArgs = strings.Join(parts, "")
 	}
 
-	returnType := "any"
+	returnType := anyType
 	if len(funcInfo.ReturnParams) == 1 {
 		returnType = funcInfo.ReturnParams[0].GoType
 	}
