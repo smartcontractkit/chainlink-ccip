@@ -289,7 +289,7 @@ func (a *SVMAdapter[S]) ValidateCommit(t *testing.T, sourceSelector uint64, star
 	if startBlock != nil {
 		startSlot = *startBlock
 	}
-	offRampAddress, err := a.getAddress(datastore.ContractType("OffRamp"))
+	offRampAddress, err := a.getAddress("OffRamp")
 	require.NoError(t, err)
 	_, err = confirmCommitWithExpectedSeqNumRangeSol(
 		t,
@@ -457,7 +457,7 @@ func confirmCommitWithExpectedSeqNumRangeSol(
 				return true, nil
 			}
 
-			if !enforceSingleCommit && seenMessages.AllCommited(srcSelector) {
+			if !enforceSingleCommit && seenMessages.AllCommitted(srcSelector) {
 				t.Logf("All sequence numbers already committed from range [%d, %d]", expectedSeqNumRange.Start(), expectedSeqNumRange.End())
 				return true, nil
 			}

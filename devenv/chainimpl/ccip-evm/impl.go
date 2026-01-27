@@ -13,7 +13,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 
-	ccipocr3common "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/clclient"
@@ -44,22 +43,16 @@ type AnyMsgSentEvent struct {
 }
 
 type CCIP16EVM struct {
-	e                   *deployment.Environment
-	chainDetails        chainsel.ChainDetails
-	ethClients          map[uint64]*ethclient.Client
-	ExpectedSeqNumRange map[SourceDestPair]ccipocr3common.SeqNumRange
-	ExpectedSeqNumExec  map[SourceDestPair][]uint64
-	MsgSentEvents       []*AnyMsgSentEvent
+	e            *deployment.Environment
+	chainDetails chainsel.ChainDetails
+	ethClients   map[uint64]*ethclient.Client
 	testadapters.TestAdapter
 }
 
 func NewEmptyCCIP16EVM(chainDetails chainsel.ChainDetails) *CCIP16EVM {
 	return &CCIP16EVM{
-		chainDetails:        chainDetails,
-		ethClients:          make(map[uint64]*ethclient.Client),
-		ExpectedSeqNumRange: make(map[SourceDestPair]ccipocr3common.SeqNumRange),
-		ExpectedSeqNumExec:  make(map[SourceDestPair][]uint64),
-		MsgSentEvents:       make([]*AnyMsgSentEvent, 0),
+		chainDetails: chainDetails,
+		ethClients:   make(map[uint64]*ethclient.Client),
 	}
 }
 
@@ -127,16 +120,6 @@ func updatePrices(datastore datastore.DataStore, src, dest uint64, srcChain cldf
 		return fmt.Errorf("failed to confirm update prices transaction: %w", err)
 	}
 	return nil
-}
-
-func (m *CCIP16EVM) GetExpectedNextSequenceNumber(ctx context.Context, from, to uint64) (uint64, error) {
-	_ = zerolog.Ctx(ctx)
-	sourceDest := SourceDestPair{SourceChainSelector: from, DestChainSelector: to}
-	seqRange, ok := m.ExpectedSeqNumRange[sourceDest]
-	if !ok {
-		return 0, fmt.Errorf("no expected sequence number range for source-dest pair %v", sourceDest)
-	}
-	return uint64(seqRange.End()), nil
 }
 
 func (m *CCIP16EVM) GetEOAReceiverAddress(ctx context.Context, chainSelector uint64) ([]byte, error) {

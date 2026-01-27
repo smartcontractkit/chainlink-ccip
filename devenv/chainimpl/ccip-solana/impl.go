@@ -13,7 +13,6 @@ import (
 
 	ata "github.com/gagliardetto/solana-go/programs/associated-token-account"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
-	ccipocr3common "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/clclient"
@@ -55,20 +54,14 @@ type AnyMsgSentEvent struct {
 }
 
 type CCIP16Solana struct {
-	e                   *deployment.Environment
-	chainDetails        chainsel.ChainDetails
-	ExpectedSeqNumRange map[SourceDestPair]ccipocr3common.SeqNumRange
-	ExpectedSeqNumExec  map[SourceDestPair][]uint64
-	MsgSentEvents       []*AnyMsgSentEvent
+	e            *deployment.Environment
+	chainDetails chainsel.ChainDetails
 	testadapters.TestAdapter
 }
 
 func NewEmptyCCIP16Solana(chainDetails chainsel.ChainDetails) *CCIP16Solana {
 	return &CCIP16Solana{
-		chainDetails:        chainDetails,
-		ExpectedSeqNumRange: make(map[SourceDestPair]ccipocr3common.SeqNumRange),
-		ExpectedSeqNumExec:  make(map[SourceDestPair][]uint64),
-		MsgSentEvents:       make([]*AnyMsgSentEvent, 0),
+		chainDetails: chainDetails,
 	}
 }
 

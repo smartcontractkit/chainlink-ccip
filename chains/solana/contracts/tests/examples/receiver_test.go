@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	bin "github.com/gagliardetto/binary"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/testutils"
