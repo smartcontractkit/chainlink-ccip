@@ -11,7 +11,6 @@ import (
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
 	offrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
 	onrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
@@ -32,7 +31,7 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 		UpdatesByChain: []fqops.DestChainConfigArgs{
 			{
 				DestChainSelector: input.Dest.Selector,
-				DestChainConfig:   toOperationsDestChainConfig(TranslateFQ(input.Dest.FeeQuoterDestChainConfig)),
+				DestChainConfig:   TranslateFQ(input.Dest.FeeQuoterDestChainConfig),
 			},
 		},
 	}, result)
@@ -45,7 +44,7 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 		Address:       common.BytesToAddress(input.Source.FeeQuoter),
 		ChainSelector: input.Source.Selector,
 		UpdatesByChain: fqops.PriceUpdates{
-			TokenPriceUpdates: toOperationsTokenPriceUpdates(TranslateTokenPrices(input.Source.TokenPrices)),
+			TokenPriceUpdates: TranslateTokenPrices(input.Source.TokenPrices),
 			GasPriceUpdates: []fqops.GasPriceUpdate{
 				{
 					DestChainSelector: input.Dest.Selector,
@@ -161,8 +160,8 @@ func (a *EVMAdapter) ConfigureLaneLegAsDest() *operations.Sequence[lanes.UpdateL
 	return ConfigureLaneLegAsDest
 }
 
-func TranslateFQ(fqc lanes.FeeQuoterDestChainConfig) fee_quoter.FeeQuoterDestChainConfig {
-	return fee_quoter.FeeQuoterDestChainConfig{
+func TranslateFQ(fqc lanes.FeeQuoterDestChainConfig) fqops.DestChainConfig {
+	return fqops.DestChainConfig{
 		IsEnabled:                         fqc.IsEnabled,
 		MaxNumberOfTokensPerMsg:           fqc.MaxNumberOfTokensPerMsg,
 		MaxDataBytes:                      fqc.MaxDataBytes,
@@ -185,47 +184,12 @@ func TranslateFQ(fqc lanes.FeeQuoterDestChainConfig) fee_quoter.FeeQuoterDestCha
 	}
 }
 
-func toOperationsDestChainConfig(cfg fee_quoter.FeeQuoterDestChainConfig) fqops.DestChainConfig {
-	return fqops.DestChainConfig{
-		IsEnabled:                         cfg.IsEnabled,
-		MaxNumberOfTokensPerMsg:           cfg.MaxNumberOfTokensPerMsg,
-		MaxDataBytes:                      cfg.MaxDataBytes,
-		MaxPerMsgGasLimit:                 cfg.MaxPerMsgGasLimit,
-		DestGasOverhead:                   cfg.DestGasOverhead,
-		DestGasPerPayloadByteBase:         cfg.DestGasPerPayloadByteBase,
-		DestGasPerPayloadByteHigh:         cfg.DestGasPerPayloadByteHigh,
-		DestGasPerPayloadByteThreshold:    cfg.DestGasPerPayloadByteThreshold,
-		DestDataAvailabilityOverheadGas:   cfg.DestDataAvailabilityOverheadGas,
-		DestGasPerDataAvailabilityByte:    cfg.DestGasPerDataAvailabilityByte,
-		DestDataAvailabilityMultiplierBps: cfg.DestDataAvailabilityMultiplierBps,
-		ChainFamilySelector:               cfg.ChainFamilySelector,
-		EnforceOutOfOrder:                 cfg.EnforceOutOfOrder,
-		DefaultTokenFeeUSDCents:           cfg.DefaultTokenFeeUSDCents,
-		DefaultTokenDestGasOverhead:       cfg.DefaultTokenDestGasOverhead,
-		DefaultTxGasLimit:                 cfg.DefaultTxGasLimit,
-		GasMultiplierWeiPerEth:            cfg.GasMultiplierWeiPerEth,
-		GasPriceStalenessThreshold:        cfg.GasPriceStalenessThreshold,
-		NetworkFeeUSDCents:                cfg.NetworkFeeUSDCents,
-	}
-}
-
-func TranslateTokenPrices(prices map[string]*big.Int) []fee_quoter.InternalTokenPriceUpdate {
-	var result []fee_quoter.InternalTokenPriceUpdate
+func TranslateTokenPrices(prices map[string]*big.Int) []fqops.TokenPriceUpdate {
+	var result []fqops.TokenPriceUpdate
 	for k, v := range prices {
-		result = append(result, fee_quoter.InternalTokenPriceUpdate{
+		result = append(result, fqops.TokenPriceUpdate{
 			SourceToken: common.HexToAddress(k),
 			UsdPerToken: v,
-		})
-	}
-	return result
-}
-
-func toOperationsTokenPriceUpdates(updates []fee_quoter.InternalTokenPriceUpdate) []fqops.TokenPriceUpdate {
-	var result []fqops.TokenPriceUpdate
-	for _, u := range updates {
-		result = append(result, fqops.TokenPriceUpdate{
-			SourceToken: u.SourceToken,
-			UsdPerToken: u.UsdPerToken,
 		})
 	}
 	return result
