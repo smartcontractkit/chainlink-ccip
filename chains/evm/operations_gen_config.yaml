@@ -6,7 +6,7 @@ output:
 
 # Access control aliases
 # - owner: Only contract owner can call (OnlyOwner)
-# - public: Anyone can call (AllCallersAllowed)
+# - public: Anyone can call
 # - (none): Read functions don't need access control
 
 contracts:
@@ -17,7 +17,7 @@ contracts:
         access: owner
       - name: uncurse
         access: owner
-      - name: isCursed  # Read function, no access control needed
+      - name: isCursed
   
   - contract_name: FeeQuoter
     version: "1.6.3"
