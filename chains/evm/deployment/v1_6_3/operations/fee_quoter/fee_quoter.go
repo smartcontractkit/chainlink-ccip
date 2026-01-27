@@ -46,7 +46,7 @@ func (c *FeeQuoterContract) Address() common.Address {
 }
 
 func (c *FeeQuoterContract) Owner(opts *bind.CallOpts) (common.Address, error) {
-	var out []interface{}
+	var out []any
 	err := c.contract.Call(opts, &out, "owner")
 	if err != nil {
 		return common.Address{}, err

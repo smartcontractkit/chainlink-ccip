@@ -44,7 +44,7 @@ func (c *PingPongDemoContract) Address() common.Address {
 }
 
 func (c *PingPongDemoContract) Owner(opts *bind.CallOpts) (common.Address, error) {
-	var out []interface{}
+	var out []any
 	err := c.contract.Call(opts, &out, "owner")
 	if err != nil {
 		return common.Address{}, err
