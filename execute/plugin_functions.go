@@ -466,7 +466,8 @@ func computeMessageObservationsConsensus(
 				}
 
 				if msg == nil {
-					lggr.Errorw("more than one message reached consensus for a sequence number, skipping it",
+					lggr.Errorw("more than one message reached consensus for a sequence number, skipping it. "+
+						"Compare the diff between the message fields to debug what is causing the issue",
 						"chain", chain, "seqNum", seqNum, "msgs", msgsWithConsensus)
 				}
 
@@ -478,7 +479,8 @@ func computeMessageObservationsConsensus(
 				}
 
 			default:
-				lggr.Errorw("more than one message reached consensus for a sequence number, skipping it",
+				lggr.Errorw("more than than 2 message reached consensus for a sequence number, "+
+					"skipping it. Compare the diff between the message fields to debug what is causing the issue",
 					"chain", chain, "seqNum", seqNum, "msgs", msgsWithConsensus)
 			}
 		}
