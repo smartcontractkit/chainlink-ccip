@@ -29,7 +29,6 @@ import (
 	onrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
 	pingpongdappops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/ping_pong_dapp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/fee_quoter"
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
@@ -183,7 +182,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			TypeAndVersion: deployment.NewTypeAndVersion(fqops.ContractType, *fqops.Version),
 			ChainSelector:  chain.Selector,
 			Args: fqops.ConstructorArgs{
-				StaticConfig: fee_quoter.FeeQuoterStaticConfig{
+				StaticConfig: fqops.StaticConfig{
 					MaxFeeJuelsPerMsg:            input.MaxFeeJuelsPerMsg,
 					LinkToken:                    common.HexToAddress(linkRef.Address),
 					TokenPriceStalenessThreshold: input.TokenPriceStalenessThreshold,
@@ -196,9 +195,9 @@ var DeployChainContracts = cldf_ops.NewSequence(
 					common.HexToAddress(linkRef.Address),
 					common.HexToAddress(wethRef.Address),
 				},
-				TokenPriceFeedUpdates:      []fee_quoter.FeeQuoterTokenPriceFeedUpdate{},
-				TokenTransferFeeConfigArgs: []fee_quoter.FeeQuoterTokenTransferFeeConfigArgs{},
-				MorePremiumMultiplierWeiPerEth: []fee_quoter.FeeQuoterPremiumMultiplierWeiPerEthArgs{
+				TokenPriceFeeds:                []fqops.TokenPriceFeedUpdate{},
+				TokenTransferFeeConfigArgs:     []fqops.TokenTransferFeeConfigArgs{},
+				PremiumMultiplierWeiPerEthArgs: []fqops.PremiumMultiplierWeiPerEthArgs{
 					{
 						PremiumMultiplierWeiPerEth: input.LinkPremiumMultiplier,
 						Token:                      common.HexToAddress(linkRef.Address),
@@ -208,7 +207,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 						Token:                      common.HexToAddress(wethRef.Address),
 					},
 				},
-				DestChainConfigArgs: []fee_quoter.FeeQuoterDestChainConfigArgs{},
+				DestChainConfigArgs: []fqops.DestChainConfigArgs{},
 			},
 		}, input.ExistingAddresses)
 		if err != nil {
@@ -339,14 +338,14 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, err
 		}
 
-		// Add Authorized Caller to FQ
-		_, err = cldf_ops.ExecuteOperation(b, fqops.ApplyAuthorizedCallerUpdates, chain, contract.FunctionInput[fee_quoter.AuthorizedCallersAuthorizedCallerArgs]{
-			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(feeQuoterRef.Address),
-			Args: fee_quoter.AuthorizedCallersAuthorizedCallerArgs{
-				AddedCallers: []common.Address{
-					common.HexToAddress(offRampRef.Address),
-				},
+	// Add Authorized Caller to FQ
+	_, err = cldf_ops.ExecuteOperation(b, fqops.ApplyAuthorizedCallerUpdates, chain, contract.FunctionInput[fqops.AuthorizedCallerArgs]{
+		ChainSelector: chain.Selector,
+		Address:       common.HexToAddress(feeQuoterRef.Address),
+		Args: fqops.AuthorizedCallerArgs{
+			AddedCallers: []common.Address{
+				common.HexToAddress(offRampRef.Address),
+			},
 			},
 		})
 		if err != nil {

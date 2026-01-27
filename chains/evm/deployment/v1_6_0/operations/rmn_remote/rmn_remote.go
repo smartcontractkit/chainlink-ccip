@@ -26,7 +26,10 @@ type RMNRemoteContract struct {
 	contract *bind.BoundContract
 }
 
-func NewRMNRemoteContract(address common.Address, backend bind.ContractBackend) (*RMNRemoteContract, error) {
+func NewRMNRemoteContract(
+	address common.Address,
+	backend bind.ContractBackend,
+) (*RMNRemoteContract, error) {
 	parsed, err := abi.JSON(strings.NewReader(RMNRemoteABI))
 	if err != nil {
 		return nil, err
@@ -100,7 +103,11 @@ var Curse = contract.NewWrite(contract.WriteParams[[16]byte, *RMNRemoteContract]
 	NewContract:     NewRMNRemoteContract,
 	IsAllowedCaller: contract.OnlyOwner[*RMNRemoteContract, [16]byte],
 	Validate:        func([16]byte) error { return nil },
-	CallContract: func(c *RMNRemoteContract, opts *bind.TransactOpts, args [16]byte) (*types.Transaction, error) {
+	CallContract: func(
+		c *RMNRemoteContract,
+		opts *bind.TransactOpts,
+		args [16]byte,
+	) (*types.Transaction, error) {
 		return c.Curse(opts, args)
 	},
 })
@@ -114,7 +121,11 @@ var Uncurse = contract.NewWrite(contract.WriteParams[[16]byte, *RMNRemoteContrac
 	NewContract:     NewRMNRemoteContract,
 	IsAllowedCaller: contract.OnlyOwner[*RMNRemoteContract, [16]byte],
 	Validate:        func([16]byte) error { return nil },
-	CallContract: func(c *RMNRemoteContract, opts *bind.TransactOpts, args [16]byte) (*types.Transaction, error) {
+	CallContract: func(
+		c *RMNRemoteContract,
+		opts *bind.TransactOpts,
+		args [16]byte,
+	) (*types.Transaction, error) {
 		return c.Uncurse(opts, args)
 	},
 })

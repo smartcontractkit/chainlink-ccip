@@ -26,7 +26,10 @@ type OnRampContract struct {
 	contract *bind.BoundContract
 }
 
-func NewOnRampContract(address common.Address, backend bind.ContractBackend) (*OnRampContract, error) {
+func NewOnRampContract(
+	address common.Address,
+	backend bind.ContractBackend,
+) (*OnRampContract, error) {
 	parsed, err := abi.JSON(strings.NewReader(OnRampABI))
 	if err != nil {
 		return nil, err
@@ -108,7 +111,11 @@ var ApplyDestChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]DestC
 	NewContract:     NewOnRampContract,
 	IsAllowedCaller: contract.OnlyOwner[*OnRampContract, []DestChainConfigArgs],
 	Validate:        func([]DestChainConfigArgs) error { return nil },
-	CallContract: func(c *OnRampContract, opts *bind.TransactOpts, args []DestChainConfigArgs) (*types.Transaction, error) {
+	CallContract: func(
+		c *OnRampContract,
+		opts *bind.TransactOpts,
+		args []DestChainConfigArgs,
+	) (*types.Transaction, error) {
 		return c.ApplyDestChainConfigUpdates(opts, args)
 	},
 })
