@@ -6,6 +6,7 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
+	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/burn_mint_token_pool"
 	cctp_message_transmitter_proxy_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/cctp_message_transmitter_proxy"
 	cctp_through_ccv_token_pool_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/cctp_through_ccv_token_pool"
@@ -34,6 +35,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/cctp_through_ccv_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/cctp_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/erc20_lock_box"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/siloed_usdc_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/usdc_token_pool_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
@@ -167,7 +170,7 @@ func basicDeployCCTPInput(t *testing.T, e *deployment.Environment, chainSelector
 }
 
 func TestDeployCCTPChain(t *testing.T) {
-	chainSelector := uint64(5009297550715157269)
+	chainSelector := chain_selectors.ETHEREUM_TESTNET_SEPOLIA.Selector
 	e, err := environment.New(t.Context(),
 		environment.WithEVMSimulated(t, []uint64{chainSelector}),
 	)
@@ -188,27 +191,22 @@ func TestDeployCCTPChain(t *testing.T) {
 	_, err = e.BlockChains.EVMChains()[chainSelector].Confirm(tx)
 	require.NoError(t, err, "Failed to confirm CCTP V1 pool deployment")
 
-	siloedUSDCTokenPool, tx, _, err := v1_6_1_burn_mint_token_pool.DeployBurnMintTokenPool(chain.DeployerKey, chain.Client, setup.USDCToken, 6, []common.Address{}, setup.RMN, setup.Router)
-	require.NoError(t, err, "Failed to deploy Siloed USDCTokenPool pool")
-	_, err = e.BlockChains.EVMChains()[chainSelector].Confirm(tx)
-	require.NoError(t, err, "Failed to confirm Siloed USDCTokenPool pool deployment")
-
 	indexAddressesByTypeAndVersion = func(_ cldf_ops.Bundle, _ evm.Chain, _ []string) (map[string]string, error) {
 		return map[string]string{
 			deployment.NewTypeAndVersion("USDCTokenPool", *semver.MustParse("1.6.2")).String():       cctpV1Pool.Hex(),
 			deployment.NewTypeAndVersion("USDCTokenPoolCCTPV2", *semver.MustParse("1.6.4")).String(): cctpV2Pool.Hex(),
-			deployment.NewTypeAndVersion("SiloedUSDCTokenPool", *semver.MustParse("1.7.0")).String(): siloedUSDCTokenPool.Hex(),
 		}, nil
 	}
 
 	input := basicDeployCCTPInput(t, e, chainSelector, setup)
 	// Add a remote chain config for testing (CCTP V2 with CCV)
 	remoteChainSelector := uint64(4949039107694359620)
+	lockReleaseChainSelector := uint64(6433500567565415381)
 	input.RemoteChains[remoteChainSelector] = adapters.RemoteCCTPChainConfig[string, []byte]{
 		FeeUSDCents:         10,
 		GasForVerification:  100000,
 		PayloadSizeBytes:    1000,
-		LockOrBurnMechanism: "CCTP_V2_WITH_CCV",
+		LockOrBurnMechanism: mechanismCCTPV2WithCCV,
 		RemoteDomain: adapters.RemoteDomain[[]byte]{
 			AllowedCallerOnDest:   common.LeftPadBytes(common.HexToAddress("0x0D").Bytes(), 32),
 			AllowedCallerOnSource: common.LeftPadBytes(common.HexToAddress("0x0E").Bytes(), 32),
@@ -217,6 +215,26 @@ func TestDeployCCTPChain(t *testing.T) {
 		},
 		TokenPoolConfig: tokens.RemoteChainConfig[[]byte, string]{
 			RemotePool:                               common.LeftPadBytes(common.HexToAddress("0x1E").Bytes(), 32),
+			RemoteToken:                              common.LeftPadBytes(setup.USDCToken.Bytes(), 32),
+			DefaultFinalityInboundRateLimiterConfig:  testsetup.CreateRateLimiterConfig(0, 0),
+			DefaultFinalityOutboundRateLimiterConfig: testsetup.CreateRateLimiterConfig(0, 0),
+			CustomFinalityInboundRateLimiterConfig:   testsetup.CreateRateLimiterConfig(0, 0),
+			CustomFinalityOutboundRateLimiterConfig:  testsetup.CreateRateLimiterConfig(0, 0),
+		},
+	}
+	input.RemoteChains[lockReleaseChainSelector] = adapters.RemoteCCTPChainConfig[string, []byte]{
+		FeeUSDCents:         5,
+		GasForVerification:  120000,
+		PayloadSizeBytes:    800,
+		LockOrBurnMechanism: mechanismLockRelease,
+		RemoteDomain: adapters.RemoteDomain[[]byte]{
+			AllowedCallerOnDest:   common.LeftPadBytes(common.HexToAddress("0x10").Bytes(), 32),
+			AllowedCallerOnSource: common.LeftPadBytes(common.HexToAddress("0x11").Bytes(), 32),
+			MintRecipientOnDest:   common.LeftPadBytes(common.HexToAddress("0x12").Bytes(), 32),
+			DomainIdentifier:      2,
+		},
+		TokenPoolConfig: tokens.RemoteChainConfig[[]byte, string]{
+			RemotePool:                               common.LeftPadBytes(common.HexToAddress("0x2E").Bytes(), 32),
 			RemoteToken:                              common.LeftPadBytes(setup.USDCToken.Bytes(), 32),
 			DefaultFinalityInboundRateLimiterConfig:  testsetup.CreateRateLimiterConfig(0, 0),
 			DefaultFinalityOutboundRateLimiterConfig: testsetup.CreateRateLimiterConfig(0, 0),
@@ -239,6 +257,8 @@ func TestDeployCCTPChain(t *testing.T) {
 		cctp_verifier.ContractType:                  false,
 		usdc_token_pool_proxy.ContractType:          false,
 		cctp_verifier.ResolverType:                  false,
+		siloed_usdc_token_pool.ContractType:         false,
+		erc20_lock_box.ContractType:                 false,
 	}
 	for _, addr := range report.Output.Addresses {
 		exists[deployment.ContractType(addr.Type)] = true
@@ -248,7 +268,7 @@ func TestDeployCCTPChain(t *testing.T) {
 	}
 
 	// Extract contract addresses from report
-	var cctpTokenPoolAddr, cctpMessageTransmitterProxyAddr, cctpVerifierAddr, usdcTokenPoolProxyAddr, cctpVerifierResolverAddr common.Address
+	var cctpTokenPoolAddr, cctpMessageTransmitterProxyAddr, cctpVerifierAddr, usdcTokenPoolProxyAddr, cctpVerifierResolverAddr, siloedUSDCTokenPoolAddr common.Address
 	for _, addr := range report.Output.Addresses {
 		switch deployment.ContractType(addr.Type) {
 		case cctp_through_ccv_token_pool.ContractType:
@@ -261,6 +281,8 @@ func TestDeployCCTPChain(t *testing.T) {
 			usdcTokenPoolProxyAddr = common.HexToAddress(addr.Address)
 		case cctp_verifier.ResolverType:
 			cctpVerifierResolverAddr = common.HexToAddress(addr.Address)
+		case siloed_usdc_token_pool.ContractType:
+			siloedUSDCTokenPoolAddr = common.HexToAddress(addr.Address)
 		}
 	}
 
@@ -269,6 +291,7 @@ func TestDeployCCTPChain(t *testing.T) {
 	require.NotEqual(t, common.Address{}, cctpVerifierAddr, "CCTPVerifier address should be set")
 	require.NotEqual(t, common.Address{}, usdcTokenPoolProxyAddr, "USDCTokenPoolProxy address should be set")
 	require.NotEqual(t, common.Address{}, cctpVerifierResolverAddr, "CCTPVerifierResolver address should be set")
+	require.NotEqual(t, common.Address{}, siloedUSDCTokenPoolAddr, "SiloedUSDCTokenPool address should be set")
 
 	// Token admin registry should point to the USDCTokenPoolProxy
 	tokenConfigReport, err := operations.ExecuteOperation(
@@ -329,28 +352,34 @@ func TestDeployCCTPChain(t *testing.T) {
 	require.NoError(t, err, "Failed to get outbound implementations from CCTPVerifierResolver")
 	foundOutbound := false
 	for _, impl := range allOutboundImpls {
-		if impl.DestChainSelector == remoteChainSelector && impl.Verifier == cctpVerifierAddr {
+		if (impl.DestChainSelector == remoteChainSelector || impl.DestChainSelector == lockReleaseChainSelector) && impl.Verifier == cctpVerifierAddr {
 			foundOutbound = true
 			break
 		}
 	}
-	require.True(t, foundOutbound, "CCTPVerifier should be registered as outbound implementation for remote chain")
+	require.True(t, foundOutbound, "CCTPVerifier should be registered as outbound implementation for remote chains")
 
 	// Check USDCTokenPoolProxy lock or burn mechanism
 	usdcTokenPoolProxy, err := usdc_token_pool_proxy_bindings.NewUSDCTokenPoolProxy(usdcTokenPoolProxyAddr, chain.Client)
 	require.NoError(t, err, "Failed to instantiate USDCTokenPoolProxy contract")
 	mechanism, err := usdcTokenPoolProxy.GetLockOrBurnMechanism(nil, remoteChainSelector)
 	require.NoError(t, err, "Failed to get lock or burn mechanism from USDCTokenPoolProxy")
-	expectedMechanism, err := convertMechanismToUint8("CCTP_V2_WITH_CCV")
+	expectedMechanism, err := convertMechanismToUint8(mechanismCCTPV2WithCCV)
 	require.NoError(t, err, "Failed to convert mechanism to uint8")
 	require.Equal(t, expectedMechanism, uint8(mechanism), "Lock or burn mechanism should match")
+
+	lockReleaseMechanism, err := usdcTokenPoolProxy.GetLockOrBurnMechanism(nil, lockReleaseChainSelector)
+	require.NoError(t, err, "Failed to get lock or burn mechanism from USDCTokenPoolProxy for lock release chain")
+	expectedLockReleaseMechanism, err := convertMechanismToUint8(mechanismLockRelease)
+	require.NoError(t, err, "Failed to convert lock release mechanism to uint8")
+	require.Equal(t, expectedLockReleaseMechanism, uint8(lockReleaseMechanism), "Lock or burn mechanism should match for lock release chain")
 
 	// Check USDCTokenPoolProxy pools
 	pools, err := usdcTokenPoolProxy.GetPools(nil)
 	require.NoError(t, err, "Failed to get pools from USDCTokenPoolProxy")
 	require.Equal(t, cctpV1Pool, pools.CctpV1Pool, "CCTP V1 pool should match")
 	require.Equal(t, cctpV2Pool, pools.CctpV2Pool, "CCTP V2 pool should match")
-	require.Equal(t, siloedUSDCTokenPool, pools.SiloedLockReleasePool, "Siloed LockRelease pool should match")
+	require.Equal(t, siloedUSDCTokenPoolAddr, pools.SiloedLockReleasePool, "Siloed LockRelease pool should match")
 
 	// Check USDCTokenPoolProxy required CCVs
 	requiredCCVs, err := usdcTokenPoolProxy.GetRequiredCCVs(nil, setup.USDCToken, remoteChainSelector, big.NewInt(1e18), 1, []byte{}, 0)
@@ -384,4 +413,51 @@ func TestDeployCCTPChain(t *testing.T) {
 	var expectedMintRecipientOnDest [32]byte
 	copy(expectedMintRecipientOnDest[:], common.LeftPadBytes(common.HexToAddress("0x0F").Bytes(), 32))
 	require.Equal(t, expectedMintRecipientOnDest, domain.MintRecipientOnDest, "MintRecipientOnDest should match")
+}
+
+func TestDeployCCTPChainRejectsLockReleaseOnNonHomeChain(t *testing.T) {
+	chainSelector := chain_selectors.ETHEREUM_MAINNET_ARBITRUM_1.Selector
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{chainSelector}),
+	)
+	require.NoError(t, err, "Failed to create environment")
+	require.NotNil(t, e, "Environment should be created")
+	e.DataStore = datastore.NewMemoryDataStore().Seal()
+
+	setup := setupCCTPTestEnvironment(t, e, chainSelector)
+
+	indexAddressesByTypeAndVersion = func(_ cldf_ops.Bundle, _ evm.Chain, _ []string) (map[string]string, error) {
+		return map[string]string{}, nil
+	}
+
+	input := basicDeployCCTPInput(t, e, chainSelector, setup)
+	lockReleaseChainSelector := uint64(6433500567565415381)
+	input.RemoteChains[lockReleaseChainSelector] = adapters.RemoteCCTPChainConfig[string, []byte]{
+		FeeUSDCents:         5,
+		GasForVerification:  120000,
+		PayloadSizeBytes:    800,
+		LockOrBurnMechanism: mechanismLockRelease,
+		RemoteDomain: adapters.RemoteDomain[[]byte]{
+			AllowedCallerOnDest:   common.LeftPadBytes(common.HexToAddress("0x10").Bytes(), 32),
+			AllowedCallerOnSource: common.LeftPadBytes(common.HexToAddress("0x11").Bytes(), 32),
+			MintRecipientOnDest:   common.LeftPadBytes(common.HexToAddress("0x12").Bytes(), 32),
+			DomainIdentifier:      2,
+		},
+		TokenPoolConfig: tokens.RemoteChainConfig[[]byte, string]{
+			RemotePool:                               common.LeftPadBytes(common.HexToAddress("0x2E").Bytes(), 32),
+			RemoteToken:                              common.LeftPadBytes(setup.USDCToken.Bytes(), 32),
+			DefaultFinalityInboundRateLimiterConfig:  testsetup.CreateRateLimiterConfig(0, 0),
+			DefaultFinalityOutboundRateLimiterConfig: testsetup.CreateRateLimiterConfig(0, 0),
+			CustomFinalityInboundRateLimiterConfig:   testsetup.CreateRateLimiterConfig(0, 0),
+			CustomFinalityOutboundRateLimiterConfig:  testsetup.CreateRateLimiterConfig(0, 0),
+		},
+	}
+
+	_, err = operations.ExecuteSequence(
+		e.OperationsBundle,
+		DeployCCTPChain,
+		e.BlockChains,
+		input,
+	)
+	require.ErrorContains(t, err, "lock-release configuration is only supported on home chains")
 }
