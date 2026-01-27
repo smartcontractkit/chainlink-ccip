@@ -378,16 +378,14 @@ func applyAddDonAndSetCandidateChangesetConfig(e deployment.Environment, cfg Add
 	}
 
 	dons := make([]DONAddition, 0, len(cfg.PluginInfo.OCRConfigPerRemoteChainSelector))
+	donUpdates := make([]DONUpdate, 0, len(cfg.PluginInfo.OCRConfigPerRemoteChainSelector))
 	i := 0
 	for chainSelector, params := range cfg.PluginInfo.OCRConfigPerRemoteChainSelector {
 		id, err := DonIDForChain(capReg, ccipHome, chainSelector)
 		if err != nil {
 			return deployment.ChangesetOutput{}, fmt.Errorf("getting don ID for chain selector %d: %w", chainSelector, err)
 		}
-		if id != 0 {
-			e.Logger.Infow("DON already exists for chain selector, skipping addition")
-			continue
-		}
+
 		family, err := chain_selectors.GetSelectorFamily(chainSelector)
 		if err != nil {
 			return deployment.ChangesetOutput{}, fmt.Errorf("getting chain family for selector %d: %w", chainSelector, err)
@@ -436,7 +434,27 @@ func applyAddDonAndSetCandidateChangesetConfig(e deployment.Environment, cfg Add
 			return deployment.ChangesetOutput{}, fmt.Errorf("missing plugin %s in ocr3Configs",
 				cfg.PluginInfo.PluginType.String())
 		}
-
+		if id != 0 {
+			e.Logger.Infow("DON already exists for chain selector, skipping addition, will just set candidate")
+			existingDigest, err := ccipHome.GetCandidateDigest(&bind.CallOpts{
+				Context: e.GetContext(),
+			}, id, pluginOCR3Config.PluginType)
+			if err != nil {
+				return deployment.ChangesetOutput{}, fmt.Errorf("get candidate digest from ccipHome: %w", err)
+			}
+			if existingDigest != [32]byte{} {
+				e.Logger.Warnw("Overwriting existing candidate config", "digest", existingDigest, "donID", id, "pluginType", pluginOCR3Config.PluginType)
+			}
+			donUpdates = append(donUpdates, DONUpdate{
+				ID:             id,
+				PluginConfig:   pluginOCR3Config,
+				PeerIDs:        readers,
+				F:              uint8(len(cfg.NonBootstraps) / 3),
+				IsPublic:       false,
+				ExistingDigest: existingDigest,
+			})
+			continue
+		}
 		dons = append(dons, DONAddition{
 			ExpectedID:       expectedDonID,
 			PluginConfig:     pluginOCR3Config,
@@ -445,12 +463,32 @@ func applyAddDonAndSetCandidateChangesetConfig(e deployment.Environment, cfg Add
 			IsPublic:         false,
 			AcceptsWorkflows: false,
 		})
+
 		i++
 		expectedDonID++
 	}
 	if len(dons) == 0 {
 		e.Logger.Info("No new DONs to add, skipping AddDONAndSetCandidateChangeset, just setting candidate")
-		return deployment.ChangesetOutput{}, nil
+		result, err := operations.ExecuteSequence(
+			e.OperationsBundle,
+			SetCandidateSequence,
+			DONSequenceDeps{
+				HomeChain: e.BlockChains.EVMChains()[cfg.HomeChainSelector],
+			},
+			SetCandidateSequenceInput{
+				CapabilitiesRegistry: capReg.Address(),
+				DONs:                 donUpdates,
+			},
+		)
+		if err != nil {
+			return deployment.ChangesetOutput{}, fmt.Errorf("setting candidate: %w", err)
+		}
+		mcmsReg := changesets.GetRegistry()
+		mcmsReg.RegisterMCMSReader(chain_selectors.FamilyEVM, &adapters.EVMMCMSReader{})
+		return changesets.NewOutputBuilder(e, mcmsReg).
+			WithReports(result.ExecutionReports).
+			WithBatchOps(result.Output.BatchOps).
+			Build(cfg.MCMS)
 	}
 	result, err := operations.ExecuteSequence(
 		e.OperationsBundle,
@@ -713,7 +751,7 @@ func getOracleIdentities(clClients []*clclient.ChainlinkClient, nodeKeyBundles m
 			offchainPkBytesFixed := [ed25519.PublicKeySize]byte{}
 			n := copy(offchainPkBytesFixed[:], offchainPkBytes)
 			if n != ed25519.PublicKeySize {
-				return fmt.Errorf("wrong number of elements copied")
+				return fmt.Errorf("wrong number of elements copied (offchainPk, family = %s, %v %v %v)", family, ocr2Config.OffChainPublicKey, len(offchainPkBytes), offchainPkBytes)
 			}
 			configPkBytes, err := hex.DecodeString(strings.TrimPrefix(ocr2Config.ConfigPublicKey, cfgPrefix))
 			if err != nil {
@@ -722,7 +760,7 @@ func getOracleIdentities(clClients []*clclient.ChainlinkClient, nodeKeyBundles m
 			configPkBytesFixed := [ed25519.PublicKeySize]byte{}
 			n = copy(configPkBytesFixed[:], configPkBytes)
 			if n != ed25519.PublicKeySize {
-				return fmt.Errorf("wrong number of elements copied")
+				return fmt.Errorf("wrong number of elements copied (configPk, family = %s)", family)
 			}
 			onchainPkBytes, err := hex.DecodeString(strings.TrimPrefix(ocr2Config.OnChainPublicKey, onPrefix))
 			if err != nil {
@@ -1061,21 +1099,27 @@ func applyPromoteCandidateChangesetConfig(e deployment.Environment, cfg PromoteC
 				return deployment.ChangesetOutput{}, fmt.Errorf("don doesn't exist in CR for chain %d", chainSelector)
 			}
 			// Check that candidate digest and active digest are not both zero - this is enforced onchain.
-			pluginConfigs, err := ccipHome.GetAllConfigs(&bind.CallOpts{
+			candidateDigest, err := ccipHome.GetCandidateDigest(&bind.CallOpts{
 				Context: e.GetContext(),
 			}, donID, uint8(plugin.PluginType))
 			if err != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("fetching %s configs from cciphome: %w", plugin.PluginType.String(), err)
+				return deployment.ChangesetOutput{}, fmt.Errorf("fetching %s candidate digest from cciphome: %w", plugin.PluginType.String(), err)
+			}
+			activeDigest, err := ccipHome.GetActiveDigest(&bind.CallOpts{
+				Context: e.GetContext(),
+			}, donID, uint8(plugin.PluginType))
+			if err != nil {
+				return deployment.ChangesetOutput{}, fmt.Errorf("fetching %s active digest from cciphome: %w", plugin.PluginType.String(), err)
 			}
 			// If promoteCandidate is called with AllowEmptyConfigPromote set to false and
 			// the CandidateConfig config digest is zero, do not promote the candidate config to active.
-			if !plugin.AllowEmptyConfigPromote && pluginConfigs.CandidateConfig.ConfigDigest == [32]byte{} {
+			if !plugin.AllowEmptyConfigPromote && candidateDigest == [32]byte{} {
 				return deployment.ChangesetOutput{}, fmt.Errorf("%s candidate config digest is empty", plugin.PluginType.String())
 			}
 
 			// If the active and candidate config digests are both zero, we should not promote the candidate config to active.
-			if pluginConfigs.ActiveConfig.ConfigDigest == [32]byte{} &&
-				pluginConfigs.CandidateConfig.ConfigDigest == [32]byte{} {
+			if activeDigest == [32]byte{} &&
+				candidateDigest == [32]byte{} {
 				return deployment.ChangesetOutput{}, fmt.Errorf("%s active and candidate config digests are both zero", plugin.PluginType.String())
 			}
 			donIDs[chainSelector] = donID
@@ -1093,29 +1137,33 @@ func applyPromoteCandidateChangesetConfig(e deployment.Environment, cfg PromoteC
 		readers = append(readers, id)
 	}
 	for _, plugin := range cfg.PluginInfo {
-		for _, donID := range donIDs {
-			digest, err := ccipHome.GetCandidateDigest(nil, donID, uint8(plugin.PluginType))
+		for sel, donID := range donIDs {
+			candidateDigest, err := ccipHome.GetCandidateDigest(nil, donID, uint8(plugin.PluginType))
 			if err != nil {
 				return deployment.ChangesetOutput{}, err
 			}
-			if digest == [32]byte{} && !plugin.AllowEmptyConfigPromote {
+			if candidateDigest == [32]byte{} && !plugin.AllowEmptyConfigPromote {
 				return deployment.ChangesetOutput{}, errors.New("candidate config digest is zero, promoting empty config is not allowed")
 			}
-			allConfigs, err := ccipHome.GetAllConfigs(nil, donID, uint8(plugin.PluginType))
+			activeDigest, err := ccipHome.GetActiveDigest(nil, donID, uint8(plugin.PluginType))
 			if err != nil {
 				return deployment.ChangesetOutput{}, err
 			}
-			e.Logger.Infow("Promoting candidate for plugin "+plugin.PluginType.String(), "digest", digest)
+			if activeDigest == candidateDigest {
+				e.Logger.Infow("Active and candidate config digests are the same, skipping promotion for plugin "+plugin.PluginType.String(), "digest", candidateDigest)
+				continue
+			}
+			e.Logger.Infow("Promoting candidate for plugin "+plugin.PluginType.String(), "digest", candidateDigest)
 
 			dons = append(dons, DONUpdatePromotion{
 				ID:              donID,
 				PluginType:      uint8(plugin.PluginType),
-				ChainSelector:   allConfigs.CandidateConfig.Config.ChainSelector,
+				ChainSelector:   sel,
 				PeerIDs:         readers,
 				F:               uint8(len(cfg.NonBootstraps) / 3),
 				IsPublic:        false,
-				CandidateDigest: allConfigs.CandidateConfig.ConfigDigest,
-				ActiveDigest:    allConfigs.ActiveConfig.ConfigDigest,
+				CandidateDigest: candidateDigest,
+				ActiveDigest:    activeDigest,
 			})
 		}
 	}
