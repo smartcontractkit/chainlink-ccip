@@ -1080,8 +1080,8 @@ github.com/smartcontractkit/chainlink-testing-framework/seth v1.51.2 h1:ZJ/8Jx6B
 github.com/smartcontractkit/chainlink-testing-framework/seth v1.51.2/go.mod h1:kHYJnZUqiPF7/xN5273prV+srrLJkS77GbBXHLKQpx0=
 github.com/smartcontractkit/chainlink-testing-framework/wasp v1.51.1 h1:azdJaWIyZJlHFEQQExHklfGfb30zzAx3WsxaCaMm4IM=
 github.com/smartcontractkit/chainlink-testing-framework/wasp v1.51.1/go.mod h1:vB5W8mngbHvDFlpujHY8jIotHr0a8J/8TIsexP/yANo=
-github.com/smartcontractkit/chainlink-ton v0.0.0-20260119175539-ae7d01b4e643 h1:xv9i3Mm5w6szL1sf6cIgthnf7/8sdrMD4LN7GY/dIdg=
-github.com/smartcontractkit/chainlink-ton v0.0.0-20260119175539-ae7d01b4e643/go.mod h1:jeuUzo8fWXrqnMniJrtfmbbtE8FJr6why+Maj/Xz1ZU=
+github.com/smartcontractkit/chainlink-ton v0.0.0-20260127214148-d1bc1a4821a9 h1:kTyV7r7efaxgK8UPhZsTA5aN7+MDZ5wRRWjepOF1GjE=
+github.com/smartcontractkit/chainlink-ton v0.0.0-20260127214148-d1bc1a4821a9/go.mod h1:jeuUzo8fWXrqnMniJrtfmbbtE8FJr6why+Maj/Xz1ZU=
 github.com/smartcontractkit/chainlink-ton/deployment v0.0.0-20260127214148-d1bc1a4821a9 h1:hm94btVcQN5SdkvzWGNyjxuhNRMWeSRQpI+TeJSxIlU=
 github.com/smartcontractkit/chainlink-ton/deployment v0.0.0-20260127214148-d1bc1a4821a9/go.mod h1:hLqFToTj0HH/mtshMHAI2uT0M1/t3DnjrjyCNoReS2Y=
 github.com/smartcontractkit/chainlink-ton/devenv v0.0.0-20260127214148-d1bc1a4821a9 h1:D6+XFv18qqFLDhqSmKXE7/IFxLXEAnMSAfxj6tlUP2A=
