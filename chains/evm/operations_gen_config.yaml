@@ -31,22 +31,6 @@ contracts:
       - name: applyTokenTransferFeeConfigUpdates
         access: owner
   
-  - contract_name: PingPongDemo
-    version: "1.5.0"
-    functions:
-      - name: setCounterpart
-        access: owner
-      - name: setCounterpartChainSelector
-        access: owner
-      - name: setCounterpartAddress
-        access: owner
-      - name: setPaused
-        access: owner
-      - name: setOutOfOrderExecution
-        access: owner
-      - name: startPingPong
-        access: public
-  
   - contract_name: OnRamp
     version: "1.6.0"
     functions:
