@@ -376,7 +376,7 @@ func AddNodesToContracts(
 		if err != nil {
 			return fmt.Errorf("processing MCMS timelock proposals for adding DON and setting candidate for selector %d: %w", ccipHomeSelector, err)
 		}
-		e.Logger.Info("Successfully added DON and set candidate for commit OCR through proposal execution")
+		e.Logger.Info("Successfully added DON/set candidate for commit OCR through proposal execution")
 	}
 
 	csOut, err = SetCandidate.Apply(*e, SetCandidateChangesetConfig{
@@ -386,13 +386,6 @@ func AddNodesToContracts(
 			{
 				OCRConfigPerRemoteChainSelector: execOCRConfigs,
 				PluginType:                      ccipocr3common.PluginTypeCCIPExec,
-			},
-			// In case of existing DON, the previous ADDDONAndSetCandidate would not have executed
-			// therefore we need to set the candidate for commit OCR here as well
-			// TODO : have a conditional check to avoid setting twice in case of new DON
-			{
-				OCRConfigPerRemoteChainSelector: commitOCRConfigs,
-				PluginType:                      ccipocr3common.PluginTypeCCIPCommit,
 			},
 		},
 		NonBootstraps:  workerNodes,

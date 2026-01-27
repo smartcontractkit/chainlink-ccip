@@ -12,16 +12,15 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/beholder"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
-
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccip/consts"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/internal/builder"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/commit/metrics"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
