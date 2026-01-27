@@ -137,6 +137,9 @@ func createLoadProfile(in *ccip.Cfg, rps int64, testDuration time.Duration, e *d
 func TestE2ELoad(t *testing.T) {
 	in, err := ccip.LoadOutput[ccip.Cfg]("../../env-out.toml")
 	require.NoError(t, err)
+	if in.ForkedEnvConfig != nil {
+		t.Skip("Skipping E2E tests on forked environments, not supported yet")
+	}
 	if os.Getenv("LOKI_URL") == "" {
 		_ = os.Setenv("LOKI_URL", ccip.DefaultLokiURL)
 	}

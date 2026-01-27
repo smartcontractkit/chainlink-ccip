@@ -19,7 +19,9 @@ import (
 func TestE2ESmoke(t *testing.T) {
 	in, err := ccip.LoadOutput[ccip.Cfg]("../../env-out.toml")
 	require.NoError(t, err)
-
+	if in.ForkedEnvConfig != nil {
+		t.Skip("Skipping E2E tests on forked environments, not supported yet")
+	}
 	chainIDs, wsURLs := make([]string, 0), make([]string, 0)
 	for _, bc := range in.Blockchains {
 		chainIDs = append(chainIDs, bc.ChainID)

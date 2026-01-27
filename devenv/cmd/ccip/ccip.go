@@ -68,8 +68,6 @@ func restartCmd() *cobra.Command {
 			}
 			if forked {
 				framework.L.Info().Msg("Starting forked development environment")
-				_, err = ccipde.NewForkedEnvironment()
-				return err
 			}
 			_, err = ccipde.NewEnvironment()
 			return err
@@ -102,8 +100,6 @@ func upCmd() *cobra.Command {
 			_ = os.Setenv("TESTCONTAINERS_RYUK_DISABLED", "true")
 			if forked {
 				framework.L.Info().Msg("Starting forked development environment")
-				_, err := ccipde.NewForkedEnvironment()
-				return err
 			}
 			_, err := ccipde.NewEnvironment()
 			if err != nil {
