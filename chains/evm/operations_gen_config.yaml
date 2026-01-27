@@ -4,35 +4,59 @@ version: "1.0"
 output:
   base_path: chains/evm/deployment
 
+# Access control aliases
+# - owner: Only contract owner can call (OnlyOwner)
+# - public: Anyone can call (AllCallersAllowed)
+# - (none): Read functions don't need access control
+
 contracts:
   - contract_name: RMNRemote
     version: "1.6.0"
     functions:
-      - curse
-      - uncurse
-      - isCursed
+      - name: curse
+        access: owner
+      - name: uncurse
+        access: owner
+      - name: isCursed  # Read function, no access control needed
+  
   - contract_name: FeeQuoter
     version: "1.6.3"
     functions:
-      - applyDestChainConfigUpdates
-      - updatePrices
-      - applyAuthorizedCallerUpdates
-      - applyTokenTransferFeeConfigUpdates
+      - name: applyDestChainConfigUpdates
+        access: owner
+      - name: updatePrices
+        access: owner
+      - name: applyAuthorizedCallerUpdates
+        access: owner
+      - name: applyTokenTransferFeeConfigUpdates
+        access: owner
+  
   - contract_name: PingPongDemo
     version: "1.5.0"
     functions:
-      - setCounterpart
-      - setCounterpartChainSelector
-      - setCounterpartAddress
-      - setPaused
-      - setOutOfOrderExecution
-      - startPingPong
+      - name: setCounterpart
+        access: owner
+      - name: setCounterpartChainSelector
+        access: owner
+      - name: setCounterpartAddress
+        access: owner
+      - name: setPaused
+        access: owner
+      - name: setOutOfOrderExecution
+        access: owner
+      - name: startPingPong
+        access: public
+  
   - contract_name: OnRamp
     version: "1.6.0"
     functions:
-      - applyDestChainConfigUpdates
+      - name: applyDestChainConfigUpdates
+        access: owner
+  
   - contract_name: OffRamp
     version: "1.6.0"
     functions:
-      - applySourceChainConfigUpdates
-      - setOCR3Configs
+      - name: applySourceChainConfigUpdates
+        access: owner
+      - name: setOCR3Configs
+        access: owner
