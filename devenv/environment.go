@@ -177,7 +177,7 @@ func NewEnvironment() (*Cfg, error) {
 
 	impls := make([]CCIP16ProductConfiguration, 0)
 	for _, bc := range in.Blockchains {
-		impl, err := NewCCIPImplFromNetwork(bc.Type)
+		impl, err := NewCCIPImplFromNetwork(bc.Type, bc.ChainID)
 		if err != nil {
 			return nil, err
 		}
@@ -359,9 +359,12 @@ func NewEnvironment() (*Cfg, error) {
 		if err != nil {
 			return nil, fmt.Errorf("funding nodes: %w", err)
 		}
+		selector := impl.ChainSelector()
+
 		var family string
 		switch in.Blockchains[i].Type {
 		case "anvil", "geth":
+			// NOTE: this seems like a massive hack, why not for EVM?
 			family = chainsel.FamilyEVM
 		case "solana":
 			family = chainsel.FamilySolana
@@ -377,20 +380,16 @@ func NewEnvironment() (*Cfg, error) {
 			L.Info().Str("ChainID", in.Blockchains[i].ChainID).Msg("Skipping contract deployment on forked environment")
 			continue
 		}
-		networkInfo, err := chainsel.GetChainDetailsByChainIDAndFamily(in.Blockchains[i].ChainID, family)
+		L.Info().Uint64("Selector", selector).Msg("Deployed chain selector")
+		err = impl.PreDeployContractsForSelector(ctx, e, in.NodeSets, selector, CCIPHomeChain, crAddr.String())
 		if err != nil {
 			return nil, err
 		}
-		L.Info().Uint64("Selector", networkInfo.ChainSelector).Msg("Deployed chain selector")
-		err = impl.PreDeployContractsForSelector(ctx, e, in.NodeSets, networkInfo.ChainSelector, CCIPHomeChain, crAddr.String())
+		dsi, err := devenvcommon.DeployContractsForSelector(ctx, e, in.NodeSets, selector, CCIPHomeChain, crAddr.String())
 		if err != nil {
 			return nil, err
 		}
-		dsi, err := devenvcommon.DeployContractsForSelector(ctx, e, in.NodeSets, networkInfo.ChainSelector, CCIPHomeChain, crAddr.String())
-		if err != nil {
-			return nil, err
-		}
-		err = impl.PostDeployContractsForSelector(ctx, e, in.NodeSets, networkInfo.ChainSelector, CCIPHomeChain, crAddr.String())
+		err = impl.PostDeployContractsForSelector(ctx, e, in.NodeSets, selector, CCIPHomeChain, crAddr.String())
 		if err != nil {
 			return nil, err
 		}

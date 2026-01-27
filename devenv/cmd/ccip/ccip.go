@@ -12,6 +12,7 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/spf13/cobra"
 
+	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 
 	ccipde "github.com/smartcontractkit/chainlink-ccip/devenv"
@@ -322,7 +323,24 @@ var monitorContractsCmd = &cobra.Command{
 			return fmt.Errorf("failed to create CLDF operations environment: %w", err)
 		}
 		ctx = ccipde.Plog.WithContext(ctx)
-		impl, err := ccipEVM.NewCCIP16EVM(ctx, e)
+		chain := in.Blockchains[0]
+		var family string
+		switch chain.Type {
+		case "anvil", "geth":
+			family = chainsel.FamilyEVM
+		case "solana":
+			family = chainsel.FamilySolana
+		case "ton":
+			family = chainsel.FamilyTon
+		default:
+			return fmt.Errorf("unsupported blockchain type: %s", chain.Type)
+		}
+		// NOTE: this is unused on ExposeMetrics so doesn't matter if source or dest
+		networkInfo, err := chainsel.GetChainDetailsByChainIDAndFamily(chain.ChainID, family)
+		if err != nil {
+			return err
+		}
+		impl, err := ccipEVM.NewCCIP16EVM(ctx, e, networkInfo)
 		if err != nil {
 			return fmt.Errorf("failed to create CCIP16EVM: %w", err)
 		}

@@ -4,14 +4,15 @@ import (
 	"fmt"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 
+	"github.com/smartcontractkit/chainlink-ccip/deployment/testadapters"
 	ccip "github.com/smartcontractkit/chainlink-ccip/devenv"
 )
 
@@ -32,20 +33,11 @@ func TestE2ESmoke(t *testing.T) {
 	selectorsToImpl := make(map[uint64]ccip.CCIP16ProductConfiguration)
 
 	for _, bc := range in.Blockchains {
-		i, err := ccip.NewCCIPImplFromNetwork(bc.Out.Type)
+		i, err := ccip.NewCCIPImplFromNetwork(bc.Type, bc.ChainID)
 		require.NoError(t, err)
 		i.SetCLDF(e)
-		var family string
-		switch bc.Type {
-		case "anvil", "geth":
-			family = chainsel.FamilyEVM
-		case "solana":
-			family = chainsel.FamilySolana
-		case "ton":
-			family = chainsel.FamilyTon
-		default:
-			panic("unsupported blockchain type")
-		}
+		family, err := chainsel.GetSelectorFamily(i.ChainSelector())
+		require.NoError(t, err)
 		networkInfo, err := chainsel.GetChainDetailsByChainIDAndFamily(bc.ChainID, family)
 		require.NoError(t, err)
 		selectorsToImpl[networkInfo.ChainSelector] = i
@@ -87,14 +79,27 @@ func TestE2ESmoke(t *testing.T) {
 			t.Logf("Testing CCIP message from chain %d to chain %d", tc.fromSelector, tc.toSelector)
 			fromImpl := selectorsToImpl[tc.fromSelector]
 			toImpl := selectorsToImpl[tc.toSelector]
-			err := fromImpl.SendMessage(t.Context(), tc.fromSelector, tc.toSelector, nil, nil)
+
+			receiver := toImpl.CCIPReceiver()
+			extraArgs, err := toImpl.GetExtraArgs(receiver, fromImpl.Family())
 			require.NoError(t, err)
-			seq, err := fromImpl.GetExpectedNextSequenceNumber(t.Context(), tc.fromSelector, tc.toSelector)
+
+			msg, err := fromImpl.BuildMessage(testadapters.MessageComponents{
+				DestChainSelector: tc.toSelector,
+				Receiver:          receiver,
+				Data:              []byte("hello eoa"),
+				FeeToken:          "",
+				ExtraArgs:         extraArgs,
+				TokenAmounts:      nil,
+			})
 			require.NoError(t, err)
-			_, err = toImpl.WaitOneSentEventBySeqNo(t.Context(), tc.fromSelector, tc.toSelector, seq, 1*time.Minute)
+
+			seq, err := fromImpl.SendMessage(t.Context(), tc.toSelector, msg)
 			require.NoError(t, err)
-			_, err = toImpl.WaitOneExecEventBySeqNo(t.Context(), tc.fromSelector, tc.toSelector, seq, 1*time.Minute)
-			require.NoError(t, err)
+			seqNr := ccipocr3.SeqNum(seq)
+			seqNumRange := ccipocr3.NewSeqNumRange(seqNr, seqNr)
+			toImpl.ValidateCommit(t, tc.fromSelector, nil, seqNumRange)
+			toImpl.ValidateExec(t, tc.fromSelector, nil, []uint64{seq})
 		})
 	}
 }
