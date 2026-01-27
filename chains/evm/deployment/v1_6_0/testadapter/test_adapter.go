@@ -45,8 +45,8 @@ func init() {
 	testadapters.GetTestAdapterRegistry().RegisterTestAdapter(chain_selectors.FamilyEVM, semver.MustParse("1.6.0"), NewEVMAdapter)
 }
 
-type EVMAdapter[S testadapters.StateProvider] struct {
-	state S
+type EVMAdapter struct {
+	state testadapters.StateProvider
 	cldf_evm.Chain
 }
 
@@ -58,13 +58,13 @@ func NewEVMAdapter(env *deployment.Environment, selector uint64) testadapters.Te
 	}
 
 	s := &testadapters.DataStoreStateProvider{Selector: selector, DS: env.DataStore}
-	return &EVMAdapter[*testadapters.DataStoreStateProvider]{
+	return &EVMAdapter{
 		state: s,
 		Chain: c,
 	}
 }
 
-func (a *EVMAdapter[S]) getAddress(ty datastore.ContractType) (common.Address, error) {
+func (a *EVMAdapter) getAddress(ty datastore.ContractType) (common.Address, error) {
 	addr, err := a.state.GetAddress(ty)
 	if err != nil {
 		return common.Address{}, fmt.Errorf("failed to get %v address: %w", ty, err)
@@ -72,7 +72,7 @@ func (a *EVMAdapter[S]) getAddress(ty datastore.ContractType) (common.Address, e
 	return common.HexToAddress(addr), nil
 }
 
-func (a *EVMAdapter[S]) BuildMessage(components testadapters.MessageComponents) (any, error) {
+func (a *EVMAdapter) BuildMessage(components testadapters.MessageComponents) (any, error) {
 	receiver := common.LeftPadBytes(components.Receiver, 32)
 	feeToken := common.HexToAddress(a.NativeFeeToken())
 	if len(components.FeeToken) > 0 {
@@ -88,7 +88,7 @@ func (a *EVMAdapter[S]) BuildMessage(components testadapters.MessageComponents) 
 	}, nil
 }
 
-func (a *EVMAdapter[S]) SendMessage(ctx context.Context, destChainSelector uint64, m any) (uint64, error) {
+func (a *EVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, m any) (uint64, error) {
 	l := zerolog.Ctx(ctx)
 	l.Info().Msg("Sending CCIP message")
 
@@ -199,15 +199,15 @@ func (a *EVMAdapter[S]) SendMessage(ctx context.Context, destChainSelector uint6
 	}
 }
 
-func (a *EVMAdapter[S]) CCIPReceiver() []byte {
+func (a *EVMAdapter) CCIPReceiver() []byte {
 	return common.LeftPadBytes(common.HexToAddress("0xdead").Bytes(), 32)
 }
 
-func (a *EVMAdapter[S]) NativeFeeToken() string {
+func (a *EVMAdapter) NativeFeeToken() string {
 	return "0x0"
 }
 
-func (a *EVMAdapter[S]) GetExtraArgs(receiver []byte, sourceFamily string, opts ...testadapters.ExtraArgOpt) ([]byte, error) {
+func (a *EVMAdapter) GetExtraArgs(receiver []byte, sourceFamily string, opts ...testadapters.ExtraArgOpt) ([]byte, error) {
 	switch sourceFamily {
 	case chain_selectors.FamilyEVM:
 		return ccipcommon.SerializeClientGenericExtraArgsV2(msg_hasher163.ClientGenericExtraArgsV2{
@@ -223,7 +223,7 @@ func (a *EVMAdapter[S]) GetExtraArgs(receiver []byte, sourceFamily string, opts 
 	}
 }
 
-func (a *EVMAdapter[S]) GetInboundNonce(ctx context.Context, sender []byte, srcSel uint64) (uint64, error) {
+func (a *EVMAdapter) GetInboundNonce(ctx context.Context, sender []byte, srcSel uint64) (uint64, error) {
 	nonceManagerAddress, err := a.getAddress("NonceManager")
 	if err != nil {
 		return 0, err
@@ -235,7 +235,7 @@ func (a *EVMAdapter[S]) GetInboundNonce(ctx context.Context, sender []byte, srcS
 	return nonceManager.GetInboundNonce(&bind.CallOpts{Context: ctx}, srcSel, sender)
 }
 
-func (a *EVMAdapter[S]) ValidateCommit(t *testing.T, sourceSelector uint64, startBlock *uint64, seqNumRange ccipocr3.SeqNumRange) {
+func (a *EVMAdapter) ValidateCommit(t *testing.T, sourceSelector uint64, startBlock *uint64, seqNumRange ccipocr3.SeqNumRange) {
 	offRampAddress, err := a.getAddress(datastore.ContractType("OffRamp"))
 	require.NoError(t, err)
 	offRamp, err := offramp.NewOffRamp(
@@ -254,7 +254,7 @@ func (a *EVMAdapter[S]) ValidateCommit(t *testing.T, sourceSelector uint64, star
 	require.NoError(t, err)
 }
 
-func (a *EVMAdapter[S]) ValidateExec(t *testing.T, sourceSelector uint64, startBlock *uint64, seqNrs []uint64) (executionStates map[uint64]int) {
+func (a *EVMAdapter) ValidateExec(t *testing.T, sourceSelector uint64, startBlock *uint64, seqNrs []uint64) (executionStates map[uint64]int) {
 	offRampAddress, err := a.getAddress("OffRamp")
 	require.NoError(t, err)
 	offRamp, err := offramp.NewOffRamp(

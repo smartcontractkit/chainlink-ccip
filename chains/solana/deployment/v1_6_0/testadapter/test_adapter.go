@@ -42,8 +42,8 @@ func init() {
 	testadapters.GetTestAdapterRegistry().RegisterTestAdapter(chain_selectors.FamilySolana, semver.MustParse("1.6.0"), NewSVMAdapter)
 }
 
-type SVMAdapter[S testadapters.StateProvider] struct {
-	state S
+type SVMAdapter struct {
+	state testadapters.StateProvider
 	cldf_solana.Chain
 }
 
@@ -61,13 +61,13 @@ func NewSVMAdapter(env *deployment.Environment, selector uint64) testadapters.Te
 		panic(fmt.Sprintf("chain not found: %d", selector))
 	}
 	s := &testadapters.DataStoreStateProvider{Selector: selector, DS: env.DataStore}
-	return &SVMAdapter[*testadapters.DataStoreStateProvider]{
+	return &SVMAdapter{
 		state: s,
 		Chain: c,
 	}
 }
 
-func (a *SVMAdapter[S]) BuildMessage(components testadapters.MessageComponents) (any, error) {
+func (a *SVMAdapter) BuildMessage(components testadapters.MessageComponents) (any, error) {
 	feeToken := solana.PublicKey{}
 	if len(components.FeeToken) > 0 {
 		var err error
@@ -86,7 +86,7 @@ func (a *SVMAdapter[S]) BuildMessage(components testadapters.MessageComponents) 
 	}, nil
 }
 
-func (a *SVMAdapter[S]) getAddress(ty datastore.ContractType) (solana.PublicKey, error) {
+func (a *SVMAdapter) getAddress(ty datastore.ContractType) (solana.PublicKey, error) {
 	addr, err := a.state.GetAddress(ty)
 	if err != nil {
 		return solana.PublicKey{}, fmt.Errorf("failed to get %v address: %w", ty, err)
@@ -96,7 +96,7 @@ func (a *SVMAdapter[S]) getAddress(ty datastore.ContractType) (solana.PublicKey,
 
 // TODO: contractType constants should be extracted from core
 
-func (a *SVMAdapter[S]) SendMessage(ctx context.Context, destChainSelector uint64, m any) (uint64, error) {
+func (a *SVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, m any) (uint64, error) {
 	l := zerolog.Ctx(ctx)
 	l.Info().Msg("Sending CCIP message")
 
@@ -229,7 +229,7 @@ func (a *SVMAdapter[S]) SendMessage(ctx context.Context, destChainSelector uint6
 	return ccipMessageSentEvent.SequenceNumber, nil
 }
 
-func (a *SVMAdapter[S]) CCIPReceiver() []byte {
+func (a *SVMAdapter) CCIPReceiver() []byte {
 	receiver, err := a.getAddress("TestReceiver")
 	if err != nil {
 		panic(fmt.Sprintf("failed to get TestReceiver address: %v", err))
@@ -238,11 +238,11 @@ func (a *SVMAdapter[S]) CCIPReceiver() []byte {
 
 }
 
-func (a *SVMAdapter[S]) NativeFeeToken() string {
+func (a *SVMAdapter) NativeFeeToken() string {
 	return solana.SolMint.String()
 }
 
-func (a *SVMAdapter[S]) GetExtraArgs(receiver []byte, sourceFamily string, opts ...testadapters.ExtraArgOpt) ([]byte, error) {
+func (a *SVMAdapter) GetExtraArgs(receiver []byte, sourceFamily string, opts ...testadapters.ExtraArgOpt) ([]byte, error) {
 	receiverProgram := solana.PublicKeyFromBytes(receiver)
 	receiverTargetAccountPDA, _, _ := solana.FindProgramAddress([][]byte{[]byte("counter")}, receiverProgram)
 	receiverExternalExecutionConfigPDA, _, _ := solana.FindProgramAddress([][]byte{[]byte("external_execution_config")}, receiverProgram)
@@ -268,7 +268,7 @@ func (a *SVMAdapter[S]) GetExtraArgs(receiver []byte, sourceFamily string, opts 
 	}
 }
 
-func (a *SVMAdapter[S]) GetInboundNonce(ctx context.Context, sender []byte, srcSel uint64) (uint64, error) {
+func (a *SVMAdapter) GetInboundNonce(ctx context.Context, sender []byte, srcSel uint64) (uint64, error) {
 	chainSelectorLE := solcommon.Uint64ToLE(a.Selector)
 	routerAddress, err := a.getAddress(datastore.ContractType("Router"))
 	if err != nil {
@@ -284,7 +284,7 @@ func (a *SVMAdapter[S]) GetInboundNonce(ctx context.Context, sender []byte, srcS
 	return nonceCounterAccount.Counter, nil
 }
 
-func (a *SVMAdapter[S]) ValidateCommit(t *testing.T, sourceSelector uint64, startBlock *uint64, seqNumRange ccipocr3.SeqNumRange) {
+func (a *SVMAdapter) ValidateCommit(t *testing.T, sourceSelector uint64, startBlock *uint64, seqNumRange ccipocr3.SeqNumRange) {
 	var startSlot uint64
 	if startBlock != nil {
 		startSlot = *startBlock
@@ -303,7 +303,7 @@ func (a *SVMAdapter[S]) ValidateCommit(t *testing.T, sourceSelector uint64, star
 	require.NoError(t, err)
 }
 
-func (a *SVMAdapter[S]) ValidateExec(t *testing.T, sourceSelector uint64, startBlock *uint64, seqNrs []uint64) (executionStates map[uint64]int) {
+func (a *SVMAdapter) ValidateExec(t *testing.T, sourceSelector uint64, startBlock *uint64, seqNrs []uint64) (executionStates map[uint64]int) {
 	var startSlot uint64
 	if startBlock != nil {
 		startSlot = *startBlock
