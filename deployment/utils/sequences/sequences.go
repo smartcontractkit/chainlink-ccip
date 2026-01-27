@@ -58,9 +58,16 @@ func RunAndMergeSequence[IN any](
 	agg.Addresses = append(agg.Addresses, report.Output.Addresses...)
 	agg.Metadata.Contracts = append(agg.Metadata.Contracts, report.Output.Metadata.Contracts...)
 	if report.Output.Metadata.Chain != nil {
-		agg.Metadata.Chain = report.Output.Metadata.Chain
+		if agg.Metadata.Chain == nil {
+			agg.Metadata.Chain = report.Output.Metadata.Chain
+		} else {
+			return agg, fmt.Errorf("conflicting chain metadata from sequence %s", seq.ID())
+		}
 	}
 	if report.Output.Metadata.Env != nil {
+		if agg.Metadata.Env != nil {
+			return agg, fmt.Errorf("conflicting env metadata from sequence %s", seq.ID())
+		}
 		agg.Metadata.Env = report.Output.Metadata.Env
 	}
 	return agg, nil
