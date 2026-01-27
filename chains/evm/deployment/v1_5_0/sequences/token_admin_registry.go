@@ -32,11 +32,12 @@ var ManualRegistrationSequence = operations.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 		}
 
+		// INFO: we intentionally avoid the use of `operations.ExecuteOperation(b, tarops.GetTokenConfig, ...` due to
+		// the caching issues described in the comment in: chains/evm/deployment/v1_6_0/sequences/token_and_pools.go
 		tar, err := token_admin_registry.NewTokenAdminRegistry(input.Address, chain.Client)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to bind to token admin registry at address %q on chain %d: %w", input.Address, input.ChainSelector, err)
 		}
-
 		cfg, err := tar.GetTokenConfig(&bind.CallOpts{Context: b.GetContext()}, input.TokenAddress)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get token config for token %q from token admin registry at address %q: %w", input.TokenAddress, input.Address, err)

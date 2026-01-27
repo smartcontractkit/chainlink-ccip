@@ -13,7 +13,8 @@ import (
 	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	tarops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	tarseq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/token_pool"
+	tpops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/operations/token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -58,17 +59,20 @@ func (a *EVMAdapter) DeriveTokenAddress(e deployment.Environment, chainSelector 
 		return nil, errors.New("token pool address is zero address")
 	}
 
-	tp, err := token_pool.NewTokenPool(tpAddr, chain.Client)
+	token, err := cldf_ops.ExecuteOperation(e.OperationsBundle,
+		tpops.GetToken,
+		chain,
+		evm_contract.FunctionInput[struct{}]{
+			ChainSelector: chainSelector,
+			Address:       tpAddr,
+			Args:          struct{}{},
+		},
+	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to instantiate token pool contract at %q: %w", tpAddr.Hex(), err)
+		return nil, fmt.Errorf("failed to get token address via GetToken operation: %w", err)
 	}
 
-	tokenAddress, err := tp.GetToken(&bind.CallOpts{Context: e.GetContext()})
-	if err != nil {
-		return nil, fmt.Errorf("failed to get token address from token pool at %q: %w", tpAddr.Hex(), err)
-	}
-
-	return tokenAddress.Bytes(), nil
+	return token.Output.Bytes(), nil
 }
 
 func (a *EVMAdapter) ManualRegistration() *cldf_ops.Sequence[tokensapi.ManualRegistrationInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
@@ -100,14 +104,17 @@ func (a *EVMAdapter) ManualRegistration() *cldf_ops.Sequence[tokensapi.ManualReg
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token pool with qualifier %q on chain %d: %w", input.RegisterTokenConfigs.TokenPoolQualifier, input.ChainSelector, err)
 			}
 
-			tokenPool, err := token_pool.NewTokenPool(tokenPoolAddress, chain.Client)
+			token, err := cldf_ops.ExecuteOperation(b,
+				tpops.GetToken,
+				chain,
+				evm_contract.FunctionInput[struct{}]{
+					ChainSelector: input.ChainSelector,
+					Address:       tokenPoolAddress,
+					Args:          struct{}{},
+				},
+			)
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to create new token pool instance using address %q: %w", tokenPoolAddress.Hex(), err)
-			}
-
-			tokenAddress, err := tokenPool.GetToken(&bind.CallOpts{Context: b.GetContext()})
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token address from token pool at %q: %w", tokenPool.Address().Hex(), err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token address via GetToken operation: %w", err)
 			}
 
 			proposedOwner := input.RegisterTokenConfigs.ProposedOwner
@@ -121,7 +128,7 @@ func (a *EVMAdapter) ManualRegistration() *cldf_ops.Sequence[tokensapi.ManualReg
 				tarseq.ManualRegistrationSequenceInput{
 					AdminAddress:  common.HexToAddress(proposedOwner),
 					ChainSelector: input.ChainSelector,
-					TokenAddress:  tokenAddress,
+					TokenAddress:  token.Output,
 					Address:       tokenAdminRegistryAddress,
 				},
 				result,
@@ -212,16 +219,44 @@ func (a *EVMAdapter) RegisterToken() *cldf_ops.Sequence[tokensapi.RegisterTokenI
 				extnAdmin = common.HexToAddress(input.TokenAdmin)
 			}
 
-			tokCfg, err := cldf_ops.ExecuteOperation(b,
-				tarops.GetTokenConfig,
-				chain,
-				evm_contract.FunctionInput[common.Address]{
-					ChainSelector: input.ChainSelector,
-					Address:       tarAddress,
-					Args:          tokAddress,
-				})
+			// INFO: by default, operations are cached if they are called with the same ID, version,
+			// description, and input params. For this sequence (and token expansion in general), we
+			// need to be extra cautious with this behavior. Many token API sequence implementations
+			// call the ExecuteOperation function assuming that they are getting the latest on-chain
+			// data back. However, if many of these seqeuences are combined to create one changeset,
+			// (e.g. TokenExpansion) then downstream sequences will receive stale data from upstream
+			// ones due to caching causing issues. Here is an example scenario:
+			// --
+			//   1. sequence A calls GET token config with some payload (config is empty)
+			//   2. sequence B calls SET token config (config is no longer empty now)
+			//   3. sequence C calls GET token config with the same exact payload (the empty cached config is returned, which is stale)
+			// --
+			// Unfortunately, this sequence is subject to the issue described above, and there is no
+			// clean way to disable the default caching mechanism at present. To circumvent this for
+			// now, we intentionally avoid the use of ExecuteOperation in favor of fetching directly
+			// from the contract. This type of workaround only needs to be added if there's a chance
+			// that there's a changeset that does read -> write -> read, so a function like GetToken
+			// is not affected since the value is immutable after deployment. For completeness, here
+			// is an example of what should *NOT* be done:
+			// --
+			//   ```go
+			//     cached, err := operations.ExecuteOperation(b, tarops.GetTokenConfig, chain,
+			//     	contract.FunctionInput[common.Address]{
+			//     		ChainSelector: input.ChainSelector,
+			//     		Address:       tarAddress,
+			//     		Args:          tokAddress,
+			//     	})
+			//   ```
+			// --
+			// Reference: https://docs.cld.cldev.sh/guides/changesets/operations-api
+			// --
+			tar, err := token_admin_registry.NewTokenAdminRegistry(tarAddress, chain.Client)
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token config: %w", err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to bind to token admin registry at address %q on chain %d: %w", tarAddress, input.ChainSelector, err)
+			}
+			cfg, err := tar.GetTokenConfig(&bind.CallOpts{Context: b.GetContext()}, tokAddress)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token config for token %q from token admin registry at address %q: %w", tokAddress, tarAddress, err)
 			}
 
 			// INFO: there are two cases to consider here:
@@ -233,7 +268,7 @@ func (a *EVMAdapter) RegisterToken() *cldf_ops.Sequence[tokensapi.RegisterTokenI
 			//      will be set to the zero address below. This causes the RegisterToken seq
 			//      to skip calling `SetPool`, which is OK since the token pool expansion cs
 			//      will call `SetPool` again later on.
-			tpAddress := tokCfg.Output.TokenPool
+			tpAddress := cfg.TokenPool
 
 			report, err := cldf_ops.ExecuteSequence(b,
 				tarseq.RegisterToken,
@@ -277,14 +312,17 @@ func (a *EVMAdapter) SetPool() *cldf_ops.Sequence[tokensapi.SetPoolInput, sequen
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token pool with qualifier %q on chain %d: %w", input.TokenPoolQualifier, input.ChainSelector, err)
 			}
 
-			tokenPool, err := token_pool.NewTokenPool(tokenPoolAddress, chain.Client)
+			token, err := cldf_ops.ExecuteOperation(b,
+				tpops.GetToken,
+				chain,
+				evm_contract.FunctionInput[struct{}]{
+					ChainSelector: input.ChainSelector,
+					Address:       tokenPoolAddress,
+					Args:          struct{}{},
+				},
+			)
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to create new token pool instance using address %q: %w", tokenPoolAddress.Hex(), err)
-			}
-
-			tokenAddress, err := tokenPool.GetToken(&bind.CallOpts{Context: b.GetContext()})
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token address from token pool at %q: %w", tokenPool.Address().Hex(), err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token address via GetToken operation: %w", err)
 			}
 
 			report, err := cldf_ops.ExecuteOperation(b,
@@ -294,8 +332,8 @@ func (a *EVMAdapter) SetPool() *cldf_ops.Sequence[tokensapi.SetPoolInput, sequen
 					Address:       tokenAdminRegistryAddress,
 					ChainSelector: input.ChainSelector,
 					Args: tarops.SetPoolArgs{
-						TokenPoolAddress: tokenPool.Address(),
-						TokenAddress:     tokenAddress,
+						TokenPoolAddress: tokenPoolAddress,
+						TokenAddress:     token.Output,
 					},
 				},
 			)
