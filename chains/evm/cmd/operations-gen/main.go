@@ -394,10 +394,6 @@ func extractStructName(internalType string) string {
 	structName := parts[len(parts)-1]
 	structName = strings.TrimSuffix(structName, "[]")
 	
-	if structName == "" || strings.HasPrefix(structName, "I") {
-		return ""
-	}
-	
 	return structName
 }
 
