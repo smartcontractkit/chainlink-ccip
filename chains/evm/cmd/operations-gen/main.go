@@ -25,10 +25,15 @@ type OutputConfig struct {
 	BasePath string `yaml:"base_path"`
 }
 
+type FunctionConfig struct {
+	Name   string `yaml:"name"`
+	Access string `yaml:"access,omitempty"` // "owner", "public", or empty for reads
+}
+
 type SimpleContractConfig struct {
-	ContractName string   `yaml:"contract_name"`
-	Version      string   `yaml:"version"`
-	Functions    []string `yaml:"functions"`
+	ContractName string           `yaml:"contract_name"`
+	Version      string           `yaml:"version"`
+	Functions    []FunctionConfig `yaml:"functions"`
 }
 
 type ABIEntry struct {
@@ -170,7 +175,7 @@ func findGobindingPath(packageName, contractVersion string) (path string, actual
 func extractContractInfo(cfg SimpleContractConfig, output OutputConfig) (*ContractInfo, error) {
 	contractName := cfg.ContractName
 	version := cfg.Version
-
+	
 	if contractName == "" {
 		return nil, fmt.Errorf("contract_name is required")
 	}
@@ -179,25 +184,42 @@ func extractContractInfo(cfg SimpleContractConfig, output OutputConfig) (*Contra
 	}
 
 	packageName := toSnakeCase(contractName)
-
-	// Find the correct gobinding path using version from config
-	gobindingPath, actualPackageName, gobindingVersion, err := findGobindingPath(packageName, version)
+	versionPath := versionToPath(version)
+	
+	// Try to find ABI file - some files use snake_case with underscores, others without
+	// Try snake_case first, then without underscores
+	var abiPath string
+	var abiBytes []byte
+	var err error
+	
+	// Try with underscores (e.g., rmn_remote.json, fee_quoter.json)
+	fileName := packageName
+	abiPath = filepath.Join("chains", "evm", "abi", versionPath, fileName+".json")
+	abiBytes, err = os.ReadFile(abiPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find gobinding: %w", err)
+		// Try without underscores (e.g., onramp.json, offramp.json)
+		fileNameNoUnderscore := strings.ReplaceAll(packageName, "_", "")
+		abiPath = filepath.Join("chains", "evm", "abi", versionPath, fileNameNoUnderscore+".json")
+		abiBytes, err = os.ReadFile(abiPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read ABI (tried %s.json and %s.json in %s)", 
+				fileName, fileNameNoUnderscore, versionPath)
+		}
+		fileName = fileNameNoUnderscore
 	}
-
-	// Use the actual package name that was found (e.g., "onramp" not "on_ramp")
-	packageName = actualPackageName
-
-	// Extract ABI and Bytecode from gobinding
-	abiString, bytecode, err := extractABIAndBytecodeFromGobinding(gobindingPath)
+	abiString := string(abiBytes)
+	
+	// Read Bytecode from chains/evm/bytecode/{version}/{contract}.bin
+	bytecodePath := filepath.Join("chains", "evm", "bytecode", versionPath, fileName+".bin")
+	bytecodeBytes, err := os.ReadFile(bytecodePath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to extract ABI and bytecode: %w", err)
+		return nil, fmt.Errorf("failed to read bytecode from %s: %w", bytecodePath, err)
 	}
+	bytecode := strings.TrimSpace(string(bytecodeBytes))
 
 	// Parse ABI
 	var abiEntries []ABIEntry
-	if err := json.Unmarshal([]byte(abiString), &abiEntries); err != nil {
+	if err := json.Unmarshal(abiBytes, &abiEntries); err != nil {
 		return nil, fmt.Errorf("failed to parse ABI: %w", err)
 	}
 
@@ -212,14 +234,9 @@ func extractContractInfo(cfg SimpleContractConfig, output OutputConfig) (*Contra
 		StructDefs:      make(map[string]*StructDef),
 	}
 
-	// Convert version to path format (e.g., "1.6.0" -> "v1_6_0")
-	versionPath := versionToPath(version)
+	// Output path based on version
 	info.OutputPath = filepath.Join(output.BasePath, versionPath, "operations", info.PackageName, info.PackageName+".go")
-	info.GobindingImport = fmt.Sprintf("github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/%s/%s",
-		gobindingVersion, info.GobindingPrefix)
-
-	// Detect ownership pattern from ABI (presence of owner(), transferOwnership(), etc.)
-	isOwnable := detectOwnableFromABI(abiEntries)
+	info.GobindingImport = "" // No longer needed
 
 	// Extract constructor
 	for _, entry := range abiEntries {
@@ -230,20 +247,30 @@ func extractContractInfo(cfg SimpleContractConfig, output OutputConfig) (*Contra
 	}
 
 	// Extract requested functions (preserve order from config)
-	info.FunctionOrder = cfg.Functions // Store the order
-	for _, funcName := range cfg.Functions {
-		funcInfo := findFunctionInABI(abiEntries, funcName, info.GobindingPrefix)
+	functionNames := make([]string, len(cfg.Functions))
+	for i, funcCfg := range cfg.Functions {
+		functionNames[i] = funcCfg.Name
+	}
+	info.FunctionOrder = functionNames
+	
+	for _, funcCfg := range cfg.Functions {
+		funcInfo := findFunctionInABI(abiEntries, funcCfg.Name, info.GobindingPrefix)
 		if funcInfo == nil {
-			return nil, fmt.Errorf("function %s not found in ABI", funcName)
+			return nil, fmt.Errorf("function %s not found in ABI", funcCfg.Name)
 		}
-
-		// If contract is Ownable and this is a write function, mark it as owner-only
-		// For read functions or non-ownable contracts, allow all callers
-		if isOwnable && funcInfo.IsWrite {
+		
+		// Apply explicit access control from config
+		switch funcCfg.Access {
+		case "owner":
 			funcInfo.HasOnlyOwner = true
+		case "public", "":
+			funcInfo.HasOnlyOwner = false
+		default:
+			return nil, fmt.Errorf("unknown access control '%s' for function %s (use 'owner' or 'public')", 
+				funcCfg.Access, funcCfg.Name)
 		}
-
-		info.Functions[funcName] = funcInfo
+		
+		info.Functions[funcCfg.Name] = funcInfo
 	}
 
 	// Collect all struct definitions from constructor and functions
