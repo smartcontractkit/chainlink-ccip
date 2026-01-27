@@ -38,40 +38,6 @@ import (
 	ccipcommon "github.com/smartcontractkit/chainlink-ccip/deployment/common"
 )
 
-// TODO: deduplicate
-type CommitReportTracker struct {
-	seenMessages map[uint64]map[uint64]bool
-}
-
-func NewCommitReportTracker(sourceChainSelector uint64, seqNrs ccipocr3.SeqNumRange) CommitReportTracker {
-	seenMessages := make(map[uint64]map[uint64]bool)
-	seenMessages[sourceChainSelector] = make(map[uint64]bool)
-
-	for i := seqNrs.Start(); i <= seqNrs.End(); i++ {
-		seenMessages[sourceChainSelector][uint64(i)] = false
-	}
-	return CommitReportTracker{seenMessages: seenMessages}
-}
-
-func (c *CommitReportTracker) visitCommitReport(sourceChainSelector uint64, minSeqNr uint64, maxSeqNr uint64) {
-	if _, ok := c.seenMessages[sourceChainSelector]; !ok {
-		return
-	}
-
-	for i := minSeqNr; i <= maxSeqNr; i++ {
-		c.seenMessages[sourceChainSelector][i] = true
-	}
-}
-
-func (c *CommitReportTracker) allCommited(sourceChainSelector uint64) bool {
-	for _, v := range c.seenMessages[sourceChainSelector] {
-		if !v {
-			return false
-		}
-	}
-	return true
-}
-
 func init() {
 	testadapters.GetTestAdapterRegistry().RegisterTestAdapter(chain_selectors.FamilySolana, semver.MustParse("1.6.0"), NewSVMAdapter)
 }
@@ -455,7 +421,7 @@ func confirmCommitWithExpectedSeqNumRangeSol(
 	expectedSeqNumRange ccipocr3.SeqNumRange,
 	enforceSingleCommit bool,
 ) (bool, error) {
-	seenMessages := NewCommitReportTracker(srcSelector, expectedSeqNumRange)
+	seenMessages := testadapters.NewCommitReportTracker(srcSelector, expectedSeqNumRange)
 
 	done := make(chan any)
 	defer close(done)
@@ -483,7 +449,7 @@ func confirmCommitWithExpectedSeqNumRangeSol(
 
 			// TODO: this logic is duplicated with verifyCommitReport, share
 			mr := commitEvent.Report
-			seenMessages.visitCommitReport(mr.SourceChainSelector, mr.MinSeqNr, mr.MaxSeqNr)
+			seenMessages.VisitCommitReport(mr.SourceChainSelector, mr.MinSeqNr, mr.MaxSeqNr)
 			if mr.SourceChainSelector == srcSelector &&
 				uint64(expectedSeqNumRange.Start()) >= mr.MinSeqNr &&
 				uint64(expectedSeqNumRange.End()) <= mr.MaxSeqNr {
@@ -491,7 +457,7 @@ func confirmCommitWithExpectedSeqNumRangeSol(
 				return true, nil
 			}
 
-			if !enforceSingleCommit && seenMessages.allCommited(srcSelector) {
+			if !enforceSingleCommit && seenMessages.AllCommited(srcSelector) {
 				t.Logf("All sequence numbers already committed from range [%d, %d]", expectedSeqNumRange.Start(), expectedSeqNumRange.End())
 				return true, nil
 			}

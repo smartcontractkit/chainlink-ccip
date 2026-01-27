@@ -195,3 +195,36 @@ func (p *DataStoreStateProvider) GetAddress(ty datastore.ContractType) (string, 
 	}
 	return addr.Address, nil
 }
+
+type CommitReportTracker struct {
+	seenMessages map[uint64]map[uint64]bool
+}
+
+func NewCommitReportTracker(sourceChainSelector uint64, seqNrs ccipocr3.SeqNumRange) CommitReportTracker {
+	seenMessages := make(map[uint64]map[uint64]bool)
+	seenMessages[sourceChainSelector] = make(map[uint64]bool)
+
+	for i := seqNrs.Start(); i <= seqNrs.End(); i++ {
+		seenMessages[sourceChainSelector][uint64(i)] = false
+	}
+	return CommitReportTracker{seenMessages: seenMessages}
+}
+
+func (c *CommitReportTracker) VisitCommitReport(sourceChainSelector uint64, minSeqNr uint64, maxSeqNr uint64) {
+	if _, ok := c.seenMessages[sourceChainSelector]; !ok {
+		return
+	}
+
+	for i := minSeqNr; i <= maxSeqNr; i++ {
+		c.seenMessages[sourceChainSelector][i] = true
+	}
+}
+
+func (c *CommitReportTracker) AllCommited(sourceChainSelector uint64) bool {
+	for _, v := range c.seenMessages[sourceChainSelector] {
+		if !v {
+			return false
+		}
+	}
+	return true
+}

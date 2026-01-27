@@ -30,29 +30,8 @@ import (
 	msg_hasher163 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/message_hasher"
 	ccipcommon "github.com/smartcontractkit/chainlink-ccip/deployment/common"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testadapters"
+	commonutils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 )
-
-const (
-	EXECUTION_STATE_UNTOUCHED  = 0
-	EXECUTION_STATE_INPROGRESS = 1
-	EXECUTION_STATE_SUCCESS    = 2
-	EXECUTION_STATE_FAILURE    = 3
-)
-
-func executionStateToString(state uint8) string {
-	switch state {
-	case EXECUTION_STATE_UNTOUCHED:
-		return "UNTOUCHED"
-	case EXECUTION_STATE_INPROGRESS:
-		return "IN_PROGRESS"
-	case EXECUTION_STATE_SUCCESS:
-		return "SUCCESS"
-	case EXECUTION_STATE_FAILURE:
-		return "FAILURE"
-	default:
-		return "UNKNOWN"
-	}
-}
 
 func getExecutionState(t *testing.T, sourceSelector uint64, offRamp offramp.OffRampInterface, expectedSeqNr uint64) (offramp.OffRampSourceChainConfig, uint8) {
 	scc, err := offRamp.GetSourceChainConfig(nil, sourceSelector)
@@ -60,47 +39,6 @@ func getExecutionState(t *testing.T, sourceSelector uint64, offRamp offramp.OffR
 	executionState, err := offRamp.GetExecutionState(nil, sourceSelector, expectedSeqNr)
 	require.NoError(t, err)
 	return scc, executionState
-}
-
-// TODO: deduplicate
-type CommitReportTracker struct {
-	seenMessages map[uint64]map[uint64]bool
-}
-
-func NewCommitReportTracker(sourceChainSelector uint64, seqNrs ccipocr3.SeqNumRange) CommitReportTracker {
-	seenMessages := make(map[uint64]map[uint64]bool)
-	seenMessages[sourceChainSelector] = make(map[uint64]bool)
-
-	for i := seqNrs.Start(); i <= seqNrs.End(); i++ {
-		seenMessages[sourceChainSelector][uint64(i)] = false
-	}
-	return CommitReportTracker{seenMessages: seenMessages}
-}
-
-func (c *CommitReportTracker) visitCommitReport(sourceChainSelector uint64, minSeqNr uint64, maxSeqNr uint64) {
-	if _, ok := c.seenMessages[sourceChainSelector]; !ok {
-		return
-	}
-
-	for i := minSeqNr; i <= maxSeqNr; i++ {
-		c.seenMessages[sourceChainSelector][i] = true
-	}
-}
-
-func (c *CommitReportTracker) allCommited(sourceChainSelector uint64) bool {
-	for _, v := range c.seenMessages[sourceChainSelector] {
-		if !v {
-			return false
-		}
-	}
-	return true
-}
-
-// TODO: remove once migration to DataStore is completed and stateview is obsolete
-type StateProvider[T any] interface {
-	GetRouterAddress() (T, error)
-	GetOffRampAddress() (T, error)
-	GetNonceManagerAddress() (T, error)
 }
 
 func init() {
@@ -356,7 +294,7 @@ func ConfirmCommitWithExpectedSeqNumRange(
 		return nil, fmt.Errorf("error to subscribe CommitReportAccepted : %w", err)
 	}
 
-	seenMessages := NewCommitReportTracker(srcSelector, expectedSeqNumRange)
+	seenMessages := testadapters.NewCommitReportTracker(srcSelector, expectedSeqNumRange)
 
 	verifyCommitReport := func(report *offramp.OffRampCommitReportAccepted) bool {
 		t.Logf("Verifying commit report: blessed roots=%d, unblessed roots=%d",
@@ -369,7 +307,7 @@ func ConfirmCommitWithExpectedSeqNumRange(
 					"[%s Root #%d] Received commit report for [%d, %d] on selector %d from source selector %d expected seq nr range %s, token prices: %v",
 					rootType, i+1, mr.MinSeqNr, mr.MaxSeqNr, dest.Selector, srcSelector, expectedSeqNumRange.String(), report.PriceUpdates.TokenPriceUpdates,
 				)
-				seenMessages.visitCommitReport(srcSelector, mr.MinSeqNr, mr.MaxSeqNr)
+				seenMessages.VisitCommitReport(srcSelector, mr.MinSeqNr, mr.MaxSeqNr)
 
 				// Check source chain selector match
 				if mr.SourceChainSelector != srcSelector {
@@ -395,7 +333,7 @@ func ConfirmCommitWithExpectedSeqNumRange(
 			}
 
 			// Check if all messages committed across multiple reports (if enforceSingleCommit is false)
-			if !enforceSingleCommit && seenMessages.allCommited(srcSelector) {
+			if !enforceSingleCommit && seenMessages.AllCommited(srcSelector) {
 				t.Logf(
 					"✅ All sequence numbers already committed from range [%d, %d] across multiple reports",
 					expectedSeqNumRange.Start(), expectedSeqNumRange.End(),
@@ -537,10 +475,10 @@ func ConfirmExecWithSeqNrs(
 			for expectedSeqNr := range seqNrsToWatch {
 				scc, executionState := getExecutionState(t, sourceSelector, offRamp, expectedSeqNr)
 				t.Logf("Waiting for ExecutionStateChanged on chain %d (offramp %s) from chain %d with expected sequence number %d, current onchain minSeqNr: %d, execution state: %s",
-					dest.Selector, offRamp.Address().String(), sourceSelector, expectedSeqNr, scc.MinSeqNr, executionStateToString(executionState))
-				if executionState == EXECUTION_STATE_SUCCESS || executionState == EXECUTION_STATE_FAILURE {
+					dest.Selector, offRamp.Address().String(), sourceSelector, expectedSeqNr, scc.MinSeqNr, commonutils.ExecutionStateToString(executionState))
+				if executionState == commonutils.EXECUTION_STATE_SUCCESS || executionState == commonutils.EXECUTION_STATE_FAILURE {
 					t.Logf("Observed %s execution state on chain %d (offramp %s) from chain %d with expected sequence number %d",
-						executionStateToString(executionState), dest.Selector, offRamp.Address().String(), sourceSelector, expectedSeqNr)
+						commonutils.ExecutionStateToString(executionState), dest.Selector, offRamp.Address().String(), sourceSelector, expectedSeqNr)
 					executionStates[expectedSeqNr] = int(executionState)
 					delete(seqNrsToWatch, expectedSeqNr)
 					if len(seqNrsToWatch) == 0 {
@@ -550,14 +488,14 @@ func ConfirmExecWithSeqNrs(
 			}
 		case execEvent := <-sink:
 			t.Logf("Received ExecutionStateChanged (state %s) for seqNum %d on chain %d (offramp %s) from chain %d",
-				executionStateToString(execEvent.State), execEvent.SequenceNumber, dest.Selector, offRamp.Address().String(),
+				commonutils.ExecutionStateToString(execEvent.State), execEvent.SequenceNumber, dest.Selector, offRamp.Address().String(),
 				sourceSelector,
 			)
 
 			_, found := seqNrsToWatch[execEvent.SequenceNumber]
 			if found && execEvent.SourceChainSelector == sourceSelector {
 				t.Logf("Received ExecutionStateChanged (state %s) on chain %d (offramp %s) from chain %d with expected sequence number %d",
-					executionStateToString(execEvent.State), dest.Selector, offRamp.Address().String(), sourceSelector, execEvent.SequenceNumber)
+					commonutils.ExecutionStateToString(execEvent.State), dest.Selector, offRamp.Address().String(), sourceSelector, execEvent.SequenceNumber)
 				executionStates[execEvent.SequenceNumber] = int(execEvent.State)
 				delete(seqNrsToWatch, execEvent.SequenceNumber)
 				if len(seqNrsToWatch) == 0 {
