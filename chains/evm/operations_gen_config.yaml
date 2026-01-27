@@ -20,7 +20,7 @@ contracts:
       - name: isCursed
   
   - contract_name: FeeQuoter
-    version: "1.6.3"
+    version: "1.6.0"
     functions:
       - name: applyDestChainConfigUpdates
         access: owner
