@@ -7,7 +7,6 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/programs/system"
 	"github.com/gagliardetto/solana-go/rpc"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	bin "github.com/gagliardetto/binary"
 	"github.com/stretchr/testify/require"
@@ -94,7 +93,7 @@ func TestPingPong(t *testing.T) {
 
 	admin, err := solana.NewRandomPrivateKey()
 	require.NoError(t, err)
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	linkMintPrivK := solana.MustPrivateKeyFromBase58("32YVeJArcWWWV96fztfkRQhohyFz5Hwno93AeGVrN4g2LuFyvwznrNd9A6tbvaTU6BuyBsynwJEMLre8vSy3CrVU")
 	linkMint := linkMintPrivK.PublicKey()

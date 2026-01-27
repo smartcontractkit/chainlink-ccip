@@ -204,26 +204,6 @@ func (o *observedCCIPReader) GetChainsFeeComponents(
 	return res
 }
 
-func (o *observedCCIPReader) GetDestChainFeeComponents(
-	ctx context.Context,
-) (types.ChainFeeComponents, error) {
-	res, err := withObservedQueryAndResult(
-		o,
-		"GetDestChainFeeComponents",
-		func() (types.ChainFeeComponents, error) {
-			return o.CCIPReader.GetDestChainFeeComponents(ctx)
-		},
-		nil,
-	)
-
-	if err == nil {
-		o.trackChainFeeComponents(
-			map[cciptypes.ChainSelector]types.ChainFeeComponents{o.destChainSelector: res},
-		)
-	}
-	return res, err
-}
-
 func (o *observedCCIPReader) GetWrappedNativeTokenPriceUSD(
 	ctx context.Context,
 	selectors []cciptypes.ChainSelector,
@@ -281,15 +261,15 @@ func (o *observedCCIPReader) GetRmnCurseInfo(ctx context.Context) (cciptypes.Cur
 func (o *observedCCIPReader) DiscoverContracts(
 	ctx context.Context,
 	supportedChains, allChains []cciptypes.ChainSelector,
-) (ContractAddresses, error) {
-	contractAddressesLength := func(addresses ContractAddresses) float64 {
+) (cciptypes.ContractAddresses, error) {
+	contractAddressesLength := func(addresses cciptypes.ContractAddresses) float64 {
 		return mapOfMapLength(addresses)
 	}
 
 	return withObservedQueryAndResult(
 		o,
 		"DiscoverContracts",
-		func() (ContractAddresses, error) {
+		func() (cciptypes.ContractAddresses, error) {
 			return o.CCIPReader.DiscoverContracts(ctx, supportedChains, allChains)
 		},
 		contractAddressesLength,

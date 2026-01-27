@@ -31,10 +31,14 @@ import (
 	cldf_ton_provider "github.com/smartcontractkit/chainlink-deployments-framework/chain/ton/provider"
 	testutils "github.com/smartcontractkit/chainlink-ton/deployment/utils"
 
-	ccipTon "github.com/smartcontractkit/chainlink-ton/devenv"
+	// ccipTon "github.com/smartcontractkit/chainlink-ton/devenv"
 
 	ccipEVM "github.com/smartcontractkit/chainlink-ccip/devenv/chainimpl/ccip-evm"
 	ccipSolana "github.com/smartcontractkit/chainlink-ccip/devenv/chainimpl/ccip-solana"
+
+	// Register test adapters
+	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/testadapter"
+	_ "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/testadapter"
 )
 
 type initOptions struct {
@@ -110,7 +114,7 @@ func NewCLDFOperationsEnvironment(bc []*blockchain.Input, dataStore datastore.Da
 							Name:               "default",
 							WSURL:              rpcWSURL,
 							HTTPURL:            rpcHTTPURL,
-							PreferredURLScheme: rpcclient.URLSchemePreferenceHTTP,
+							PreferredURLScheme: rpcclient.URLSchemePreferenceWS,
 						},
 					},
 					ConfirmFunctor: cldf_evm_provider.ConfirmFuncGeth(1*time.Minute, cldf_evm_provider.WithTickInterval(5*time.Millisecond)),
@@ -239,18 +243,36 @@ func NewDefaultCLDFBundle(e *deployment.Environment) operations.Bundle {
 	)
 }
 
-func NewCCIPImplFromNetwork(typ string) (CCIP16ProductConfiguration, error) {
+func NewCCIPImplFromNetwork(typ string, chainID string) (CCIP16ProductConfiguration, error) {
+	// TODO: extract to method
+	var family string
 	switch typ {
 	case "anvil", "geth":
-		return ccipEVM.NewEmptyCCIP16EVM(), nil
+		family = chainsel.FamilyEVM
 	case "solana":
-		return ccipSolana.NewEmptyCCIP16Solana(), nil
+		family = chainsel.FamilySolana
+	case "ton":
+		family = chainsel.FamilyTon
+	default:
+		return nil, fmt.Errorf("unsupported blockchain type: %s", typ)
+	}
+	networkInfo, err := chainsel.GetChainDetailsByChainIDAndFamily(chainID, family)
+	if err != nil {
+		return nil, err
+	}
+
+	switch typ {
+	case "anvil", "geth":
+		return ccipEVM.NewEmptyCCIP16EVM(networkInfo), nil
+	case "solana":
+		return ccipSolana.NewEmptyCCIP16Solana(networkInfo), nil
 	case "sui":
 		panic("implement Sui")
 	case "aptos":
 		panic("implement Aptos")
 	case "ton":
-		return ccipTon.NewEmptyCCIP16TON(), nil
+		panic("TON temporarily disabled")
+		// return ccipTon.NewEmptyCCIP16TON(networkInfo), nil
 	default:
 		return nil, errors.New("unknown devenv network type " + typ)
 	}
