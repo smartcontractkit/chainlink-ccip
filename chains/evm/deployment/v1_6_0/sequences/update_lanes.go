@@ -8,8 +8,9 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
+	fqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
+	offrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
+	onrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -25,50 +26,50 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 		var result sequences.OnChainOutput
 		b.Logger.Infof("EVM Configuring lane leg as source. src: %+v, dest: %+v", input.Source, input.Dest)
 
-		result, err := sequences.RunAndMergeSequence(b, chains, FeeQuoterApplyDestChainConfigUpdatesSequence, FeeQuoterApplyDestChainConfigUpdatesSequenceInput{
-			Address:       common.BytesToAddress(input.Source.FeeQuoter),
-			ChainSelector: input.Source.Selector,
-			UpdatesByChain: []fee_quoter.FeeQuoterDestChainConfigArgs{
-				{
-					DestChainSelector: input.Dest.Selector,
-					DestChainConfig:   TranslateFQ(input.Dest.FeeQuoterDestChainConfig),
-				},
+	result, err := sequences.RunAndMergeSequence(b, chains, FeeQuoterApplyDestChainConfigUpdatesSequence, FeeQuoterApplyDestChainConfigUpdatesSequenceInput{
+		Address:       common.BytesToAddress(input.Source.FeeQuoter),
+		ChainSelector: input.Source.Selector,
+		UpdatesByChain: []fqops.DestChainConfigArgs{
+			{
+				DestChainSelector: input.Dest.Selector,
+				DestChainConfig:   toOperationsDestChainConfig(TranslateFQ(input.Dest.FeeQuoterDestChainConfig)),
 			},
-		}, result)
+		},
+	}, result)
 		if err != nil {
 			return result, err
 		}
 		b.Logger.Info("Destination configs updated on FeeQuoters")
 
-		result, err = sequences.RunAndMergeSequence(b, chains, FeeQuoterUpdatePricesSequence, FeeQuoterUpdatePricesSequenceInput{
-			Address:       common.BytesToAddress(input.Source.FeeQuoter),
-			ChainSelector: input.Source.Selector,
-			UpdatesByChain: fee_quoter.InternalPriceUpdates{
-				TokenPriceUpdates: TranslateTokenPrices(input.Source.TokenPrices),
-				GasPriceUpdates: []fee_quoter.InternalGasPriceUpdate{
-					{
-						DestChainSelector: input.Dest.Selector,
-						UsdPerUnitGas:     input.Dest.GasPrice,
-					},
+	result, err = sequences.RunAndMergeSequence(b, chains, FeeQuoterUpdatePricesSequence, FeeQuoterUpdatePricesSequenceInput{
+		Address:       common.BytesToAddress(input.Source.FeeQuoter),
+		ChainSelector: input.Source.Selector,
+		UpdatesByChain: fqops.PriceUpdates{
+			TokenPriceUpdates: toOperationsTokenPriceUpdates(TranslateTokenPrices(input.Source.TokenPrices)),
+			GasPriceUpdates: []fqops.GasPriceUpdate{
+				{
+					DestChainSelector: input.Dest.Selector,
+					UsdPerUnitGas:     input.Dest.GasPrice,
 				},
 			},
-		}, result)
+		},
+	}, result)
 		if err != nil {
 			return result, err
 		}
 		b.Logger.Info("Gas prices updated on FeeQuoters")
 
-		result, err = sequences.RunAndMergeSequence(b, chains, OnRampApplyDestChainConfigUpdatesSequence, OnRampApplyDestChainConfigUpdatesSequenceInput{
-			Address:       common.BytesToAddress(input.Source.OnRamp),
-			ChainSelector: input.Source.Selector,
-			UpdatesByChain: []onramp.OnRampDestChainConfigArgs{
-				{
-					Router:            common.BytesToAddress(input.Source.Router),
-					DestChainSelector: input.Dest.Selector,
-					AllowlistEnabled:  input.Dest.AllowListEnabled,
-				},
+	result, err = sequences.RunAndMergeSequence(b, chains, OnRampApplyDestChainConfigUpdatesSequence, OnRampApplyDestChainConfigUpdatesSequenceInput{
+		Address:       common.BytesToAddress(input.Source.OnRamp),
+		ChainSelector: input.Source.Selector,
+		UpdatesByChain: []onrampops.DestChainConfigArgs{
+			{
+				Router:            common.BytesToAddress(input.Source.Router),
+				DestChainSelector: input.Dest.Selector,
+				AllowlistEnabled:  input.Dest.AllowListEnabled,
 			},
-		}, result)
+		},
+	}, result)
 		if err != nil {
 			return result, err
 		}
@@ -105,16 +106,16 @@ var ConfigureLaneLegAsDest = operations.NewSequence(
 		var result sequences.OnChainOutput
 		b.Logger.Infof("EVM Configuring lane leg as destination. src: %+v, dest: %+v", input.Source, input.Dest)
 
-		result, err := sequences.RunAndMergeSequence(b, chains, OffRampApplySourceChainConfigUpdatesSequence, OffRampApplySourceChainConfigUpdatesSequenceInput{
-			Address:       common.BytesToAddress(input.Dest.OffRamp),
-			ChainSelector: input.Dest.Selector,
-			UpdatesByChain: []offramp.OffRampSourceChainConfigArgs{
-				{
-					Router:              common.BytesToAddress(input.Dest.Router),
-					SourceChainSelector: input.Source.Selector,
-					// https://github.com/smartcontractkit/chainlink/blob/f7ca3d51db51258bb3b8ae22a8e1593d03bc040b/deployment/ccip/changeset/v1_6/cs_chain_contracts.go#L1148
-					OnRamp:                    common.LeftPadBytes(input.Source.OnRamp, 32),
-					IsEnabled:                 !input.IsDisabled,
+	result, err := sequences.RunAndMergeSequence(b, chains, OffRampApplySourceChainConfigUpdatesSequence, OffRampApplySourceChainConfigUpdatesSequenceInput{
+		Address:       common.BytesToAddress(input.Dest.OffRamp),
+		ChainSelector: input.Dest.Selector,
+		UpdatesByChain: []offrampops.SourceChainConfigArgs{
+			{
+				Router:              common.BytesToAddress(input.Dest.Router),
+				SourceChainSelector: input.Source.Selector,
+				// https://github.com/smartcontractkit/chainlink/blob/f7ca3d51db51258bb3b8ae22a8e1593d03bc040b/deployment/ccip/changeset/v1_6/cs_chain_contracts.go#L1148
+				OnRamp:                    common.LeftPadBytes(input.Source.OnRamp, 32),
+				IsEnabled:                 !input.IsDisabled,
 					IsRMNVerificationDisabled: !input.Source.RMNVerificationEnabled,
 				},
 			},
@@ -184,12 +185,47 @@ func TranslateFQ(fqc lanes.FeeQuoterDestChainConfig) fee_quoter.FeeQuoterDestCha
 	}
 }
 
+func toOperationsDestChainConfig(cfg fee_quoter.FeeQuoterDestChainConfig) fqops.DestChainConfig {
+	return fqops.DestChainConfig{
+		IsEnabled:                         cfg.IsEnabled,
+		MaxNumberOfTokensPerMsg:           cfg.MaxNumberOfTokensPerMsg,
+		MaxDataBytes:                      cfg.MaxDataBytes,
+		MaxPerMsgGasLimit:                 cfg.MaxPerMsgGasLimit,
+		DestGasOverhead:                   cfg.DestGasOverhead,
+		DestGasPerPayloadByteBase:         cfg.DestGasPerPayloadByteBase,
+		DestGasPerPayloadByteHigh:         cfg.DestGasPerPayloadByteHigh,
+		DestGasPerPayloadByteThreshold:    cfg.DestGasPerPayloadByteThreshold,
+		DestDataAvailabilityOverheadGas:   cfg.DestDataAvailabilityOverheadGas,
+		DestGasPerDataAvailabilityByte:    cfg.DestGasPerDataAvailabilityByte,
+		DestDataAvailabilityMultiplierBps: cfg.DestDataAvailabilityMultiplierBps,
+		ChainFamilySelector:               cfg.ChainFamilySelector,
+		EnforceOutOfOrder:                 cfg.EnforceOutOfOrder,
+		DefaultTokenFeeUSDCents:           cfg.DefaultTokenFeeUSDCents,
+		DefaultTokenDestGasOverhead:       cfg.DefaultTokenDestGasOverhead,
+		DefaultTxGasLimit:                 cfg.DefaultTxGasLimit,
+		GasMultiplierWeiPerEth:            cfg.GasMultiplierWeiPerEth,
+		GasPriceStalenessThreshold:        cfg.GasPriceStalenessThreshold,
+		NetworkFeeUSDCents:                cfg.NetworkFeeUSDCents,
+	}
+}
+
 func TranslateTokenPrices(prices map[string]*big.Int) []fee_quoter.InternalTokenPriceUpdate {
 	var result []fee_quoter.InternalTokenPriceUpdate
 	for k, v := range prices {
 		result = append(result, fee_quoter.InternalTokenPriceUpdate{
 			SourceToken: common.HexToAddress(k),
 			UsdPerToken: v,
+		})
+	}
+	return result
+}
+
+func toOperationsTokenPriceUpdates(updates []fee_quoter.InternalTokenPriceUpdate) []fqops.TokenPriceUpdate {
+	var result []fqops.TokenPriceUpdate
+	for _, u := range updates {
+		result = append(result, fqops.TokenPriceUpdate{
+			SourceToken: u.SourceToken,
+			UsdPerToken: u.UsdPerToken,
 		})
 	}
 	return result

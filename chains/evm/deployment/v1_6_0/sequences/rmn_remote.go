@@ -26,17 +26,19 @@ var SeqCurse = cldf_ops.NewSequence(
 	semver.MustParse("1.0.0"),
 	"Cursing subjects with RMNRemote",
 	func(b cldf_ops.Bundle, chain cldf_evm.Chain, in SeqCurseInput) (output sequences.OnChainOutput, err error) {
-		opOutput, err := cldf_ops.ExecuteOperation(b, ops.Curse, chain, contract.FunctionInput[ops.CurseArgs]{
-			Address:       in.Addr,
-			ChainSelector: chain.Selector,
-			Args: ops.CurseArgs{
-				Subject: in.Subjects,
-			},
-		})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to curse with RMNRemote at %s on chain %d: %w", in.Addr.String(), chain.Selector, err)
+		var writes []contract.WriteOutput
+		for _, subject := range in.Subjects {
+			opOutput, err := cldf_ops.ExecuteOperation(b, ops.Curse, chain, contract.FunctionInput[[16]byte]{
+				Address:       in.Addr,
+				ChainSelector: chain.Selector,
+				Args:          subject,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to curse subject with RMNRemote at %s on chain %d: %w", in.Addr.String(), chain.Selector, err)
+			}
+			writes = append(writes, opOutput.Output)
 		}
-		batchOp, err := contract.NewBatchOperationFromWrites([]contract.WriteOutput{opOutput.Output})
+		batchOp, err := contract.NewBatchOperationFromWrites(writes)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
 		}
@@ -50,17 +52,19 @@ var SeqUncurse = cldf_ops.NewSequence(
 	semver.MustParse("1.0.0"),
 	"Uncursing subjects with RMNRemote",
 	func(b cldf_ops.Bundle, chain cldf_evm.Chain, in SeqCurseInput) (output sequences.OnChainOutput, err error) {
-		opOutput, err := cldf_ops.ExecuteOperation(b, ops.Uncurse, chain, contract.FunctionInput[ops.CurseArgs]{
-			Address:       in.Addr,
-			ChainSelector: chain.Selector,
-			Args: ops.CurseArgs{
-				Subject: in.Subjects,
-			},
-		})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to curse with RMNRemote at %s on chain %d: %w", in.Addr.String(), chain.Selector, err)
+		var writes []contract.WriteOutput
+		for _, subject := range in.Subjects {
+			opOutput, err := cldf_ops.ExecuteOperation(b, ops.Uncurse, chain, contract.FunctionInput[[16]byte]{
+				Address:       in.Addr,
+				ChainSelector: chain.Selector,
+				Args:          subject,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to uncurse subject with RMNRemote at %s on chain %d: %w", in.Addr.String(), chain.Selector, err)
+			}
+			writes = append(writes, opOutput.Output)
 		}
-		batchOp, err := contract.NewBatchOperationFromWrites([]contract.WriteOutput{opOutput.Output})
+		batchOp, err := contract.NewBatchOperationFromWrites(writes)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
 		}

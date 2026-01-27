@@ -26,7 +26,10 @@ type OffRampContract struct {
 	contract *bind.BoundContract
 }
 
-func NewOffRampContract(address common.Address, backend bind.ContractBackend) (*OffRampContract, error) {
+func NewOffRampContract(
+	address common.Address,
+	backend bind.ContractBackend,
+) (*OffRampContract, error) {
 	parsed, err := abi.JSON(strings.NewReader(OffRampABI))
 	if err != nil {
 		return nil, err
@@ -122,7 +125,11 @@ var ApplySourceChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]Sou
 	NewContract:     NewOffRampContract,
 	IsAllowedCaller: contract.OnlyOwner[*OffRampContract, []SourceChainConfigArgs],
 	Validate:        func([]SourceChainConfigArgs) error { return nil },
-	CallContract: func(c *OffRampContract, opts *bind.TransactOpts, args []SourceChainConfigArgs) (*types.Transaction, error) {
+	CallContract: func(
+		c *OffRampContract,
+		opts *bind.TransactOpts,
+		args []SourceChainConfigArgs,
+	) (*types.Transaction, error) {
 		return c.ApplySourceChainConfigUpdates(opts, args)
 	},
 })
@@ -136,7 +143,11 @@ var SetOCR3Configs = contract.NewWrite(contract.WriteParams[[]OCRConfigArgs, *Of
 	NewContract:     NewOffRampContract,
 	IsAllowedCaller: contract.OnlyOwner[*OffRampContract, []OCRConfigArgs],
 	Validate:        func([]OCRConfigArgs) error { return nil },
-	CallContract: func(c *OffRampContract, opts *bind.TransactOpts, args []OCRConfigArgs) (*types.Transaction, error) {
+	CallContract: func(
+		c *OffRampContract,
+		opts *bind.TransactOpts,
+		args []OCRConfigArgs,
+	) (*types.Transaction, error) {
 		return c.SetOCR3Configs(opts, args)
 	},
 })

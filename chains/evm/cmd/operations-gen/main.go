@@ -344,6 +344,7 @@ func parseABIFunction(entry ABIEntry, _ bool, packageName string, needsSuffix bo
 	return funcInfo
 }
 
+//nolint:unparam
 func parseABIParam(param ABIParam, packageName string) ParameterInfo {
 	goType := solidityToGoType(param.Type, param.InternalType)
 

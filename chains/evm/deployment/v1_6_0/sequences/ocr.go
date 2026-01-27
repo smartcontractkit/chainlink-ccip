@@ -7,7 +7,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	offrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
@@ -32,33 +31,33 @@ var SetOCR3Config = cldf_ops.NewSequence(
 		}
 		e := &EVMAdapter{}
 		offRampAddr, err := e.GetOffRampAddress(input.Datastore, input.ChainSelector)
-		if err != nil {
-			return sequences.OnChainOutput{}, err
+	if err != nil {
+		return sequences.OnChainOutput{}, err
+	}
+	update := make([]offrampops.OCRConfigArgs, 0)
+	for _, cfg := range input.Configs {
+		var signerAddresses []common.Address
+		var transmitterAddresses []common.Address
+		for _, s := range cfg.Signers {
+			signerAddresses = append(signerAddresses, common.BytesToAddress(s))
 		}
-		update := make([]offramp.MultiOCR3BaseOCRConfigArgs, 0)
-		for _, cfg := range input.Configs {
-			var signerAddresses []common.Address
-			var transmitterAddresses []common.Address
-			for _, s := range cfg.Signers {
-				signerAddresses = append(signerAddresses, common.BytesToAddress(s))
-			}
-			for _, t := range cfg.Transmitters {
-				transmitterAddresses = append(transmitterAddresses, common.BytesToAddress(t))
-			}
-			update = append(update, offramp.MultiOCR3BaseOCRConfigArgs{
-				ConfigDigest:                   cfg.ConfigDigest,
-				OcrPluginType:                  uint8(cfg.PluginType),
-				F:                              cfg.F,
-				IsSignatureVerificationEnabled: cfg.IsSignatureVerificationEnabled,
-				Signers:                        signerAddresses,
-				Transmitters:                   transmitterAddresses,
-			})
+		for _, t := range cfg.Transmitters {
+			transmitterAddresses = append(transmitterAddresses, common.BytesToAddress(t))
 		}
-		report, err := operations.ExecuteOperation(b, offrampops.OffRampSetOcr3, chain, contract.FunctionInput[[]offramp.MultiOCR3BaseOCRConfigArgs]{
-			ChainSelector: chain.Selector,
-			Address:       common.BytesToAddress(offRampAddr),
-			Args:          update,
+		update = append(update, offrampops.OCRConfigArgs{
+			ConfigDigest:                   cfg.ConfigDigest,
+			OcrPluginType:                  uint8(cfg.PluginType),
+			F:                              cfg.F,
+			IsSignatureVerificationEnabled: cfg.IsSignatureVerificationEnabled,
+			Signers:                        signerAddresses,
+			Transmitters:                   transmitterAddresses,
 		})
+	}
+	report, err := operations.ExecuteOperation(b, offrampops.SetOCR3Configs, chain, contract.FunctionInput[[]offrampops.OCRConfigArgs]{
+		ChainSelector: chain.Selector,
+		Address:       common.BytesToAddress(offRampAddr),
+		Args:          update,
+	})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to execute OffRampSetOcr3 on %s: %w", chain, err)
 		}

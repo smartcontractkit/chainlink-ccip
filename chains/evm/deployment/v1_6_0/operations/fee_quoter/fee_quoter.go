@@ -28,7 +28,10 @@ type FeeQuoterContract struct {
 	contract *bind.BoundContract
 }
 
-func NewFeeQuoterContract(address common.Address, backend bind.ContractBackend) (*FeeQuoterContract, error) {
+func NewFeeQuoterContract(
+	address common.Address,
+	backend bind.ContractBackend,
+) (*FeeQuoterContract, error) {
 	parsed, err := abi.JSON(strings.NewReader(FeeQuoterABI))
 	if err != nil {
 		return nil, err
@@ -203,7 +206,11 @@ var ApplyDestChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]DestC
 	NewContract:     NewFeeQuoterContract,
 	IsAllowedCaller: contract.OnlyOwner[*FeeQuoterContract, []DestChainConfigArgs],
 	Validate:        func([]DestChainConfigArgs) error { return nil },
-	CallContract: func(c *FeeQuoterContract, opts *bind.TransactOpts, args []DestChainConfigArgs) (*types.Transaction, error) {
+	CallContract: func(
+		c *FeeQuoterContract,
+		opts *bind.TransactOpts,
+		args []DestChainConfigArgs,
+	) (*types.Transaction, error) {
 		return c.ApplyDestChainConfigUpdates(opts, args)
 	},
 })
@@ -217,7 +224,11 @@ var UpdatePrices = contract.NewWrite(contract.WriteParams[PriceUpdates, *FeeQuot
 	NewContract:     NewFeeQuoterContract,
 	IsAllowedCaller: contract.OnlyOwner[*FeeQuoterContract, PriceUpdates],
 	Validate:        func(PriceUpdates) error { return nil },
-	CallContract: func(c *FeeQuoterContract, opts *bind.TransactOpts, args PriceUpdates) (*types.Transaction, error) {
+	CallContract: func(
+		c *FeeQuoterContract,
+		opts *bind.TransactOpts,
+		args PriceUpdates,
+	) (*types.Transaction, error) {
 		return c.UpdatePrices(opts, args)
 	},
 })
@@ -231,7 +242,11 @@ var ApplyAuthorizedCallerUpdates = contract.NewWrite(contract.WriteParams[Author
 	NewContract:     NewFeeQuoterContract,
 	IsAllowedCaller: contract.OnlyOwner[*FeeQuoterContract, AuthorizedCallerArgs],
 	Validate:        func(AuthorizedCallerArgs) error { return nil },
-	CallContract: func(c *FeeQuoterContract, opts *bind.TransactOpts, args AuthorizedCallerArgs) (*types.Transaction, error) {
+	CallContract: func(
+		c *FeeQuoterContract,
+		opts *bind.TransactOpts,
+		args AuthorizedCallerArgs,
+	) (*types.Transaction, error) {
 		return c.ApplyAuthorizedCallerUpdates(opts, args)
 	},
 })
@@ -245,7 +260,11 @@ var ApplyTokenTransferFeeConfigUpdates = contract.NewWrite(contract.WriteParams[
 	NewContract:     NewFeeQuoterContract,
 	IsAllowedCaller: contract.OnlyOwner[*FeeQuoterContract, ApplyTokenTransferFeeConfigUpdatesArgs],
 	Validate:        func(ApplyTokenTransferFeeConfigUpdatesArgs) error { return nil },
-	CallContract: func(c *FeeQuoterContract, opts *bind.TransactOpts, args ApplyTokenTransferFeeConfigUpdatesArgs) (*types.Transaction, error) {
+	CallContract: func(
+		c *FeeQuoterContract,
+		opts *bind.TransactOpts,
+		args ApplyTokenTransferFeeConfigUpdatesArgs,
+	) (*types.Transaction, error) {
 		return c.ApplyTokenTransferFeeConfigUpdates(opts, args.TokenTransferFeeConfigArgs, args.TokensToUseDefaultFeeConfigs)
 	},
 })
