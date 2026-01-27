@@ -11,9 +11,6 @@ import {MockPolicyEngine} from "../../mocks/MockPolicyEngine.sol";
 import {AdvancedPoolHooksSetup} from "./AdvancedPoolHooksSetup.t.sol";
 
 contract AdvancedPoolHooks_preflightCheck is AdvancedPoolHooksSetup {
-  // bytes4(keccak256("PoolHookOutboundPolicyDataV1"))
-  bytes4 internal constant POOL_HOOK_OUTBOUND_POLICY_DATA_V1_TAG = 0x12bebcb8;
-
   MockPolicyEngine internal s_mockPolicyEngine;
 
   function setUp() public virtual override {
@@ -42,31 +39,26 @@ contract AdvancedPoolHooks_preflightCheck is AdvancedPoolHooksSetup {
 
     s_advancedPoolHooks.preflightCheck(lockOrBurnIn, blockConfirmationRequested, tokenArgs);
 
-    // Verify policy engine was called with correct payload
     IPolicyEngine.Payload memory lastPayload = s_mockPolicyEngine.getLastPayload();
-    assertEq(lastPayload.selector, IAdvancedPoolHooks.preflightCheck.selector);
-    assertEq(lastPayload.sender, OWNER);
-    assertEq(lastPayload.context, "");
+    assertEq(IAdvancedPoolHooks.preflightCheck.selector, lastPayload.selector);
+    assertEq(OWNER, lastPayload.sender);
+    assertEq("", lastPayload.context);
+    assertEq(CCIPPolicyEnginePayloads.POOL_HOOK_OUTBOUND_POLICY_DATA_V1_TAG, bytes4(lastPayload.data));
 
-    // Verify tag prefix
-    bytes4 tag = bytes4(lastPayload.data);
-    assertEq(tag, POOL_HOOK_OUTBOUND_POLICY_DATA_V1_TAG);
-
-    // Decode and verify the payload data
     CCIPPolicyEnginePayloads.PoolHookOutboundPolicyDataV1 memory decoded =
-      abi.decode(this._sliceBytes(lastPayload.data, 4), (CCIPPolicyEnginePayloads.PoolHookOutboundPolicyDataV1));
+      abi.decode(_sliceBytes(lastPayload.data, 4), (CCIPPolicyEnginePayloads.PoolHookOutboundPolicyDataV1));
 
-    assertEq(decoded.receiver, lockOrBurnIn.receiver);
-    assertEq(decoded.remoteChainSelector, lockOrBurnIn.remoteChainSelector);
-    assertEq(decoded.originalSender, lockOrBurnIn.originalSender);
-    assertEq(decoded.amount, lockOrBurnIn.amount);
-    assertEq(decoded.localToken, lockOrBurnIn.localToken);
-    assertEq(decoded.blockConfirmationRequested, blockConfirmationRequested);
-    assertEq(decoded.tokenArgs, tokenArgs);
+    assertEq(lockOrBurnIn.originalSender, decoded.originalSender);
+    assertEq(blockConfirmationRequested, decoded.blockConfirmationRequested);
+    assertEq(lockOrBurnIn.remoteChainSelector, decoded.remoteChainSelector);
+    assertEq(lockOrBurnIn.receiver, decoded.receiver);
+    assertEq(lockOrBurnIn.amount, decoded.amount);
+    assertEq(lockOrBurnIn.localToken, decoded.localToken);
+    assertEq(tokenArgs, decoded.tokenArgs);
   }
 
   function test_preflightCheck_WithoutPolicyEngine() public {
-    assertEq(s_advancedPoolHooks.getPolicyEngine(), address(0));
+    assertEq(address(0), s_advancedPoolHooks.getPolicyEngine());
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _createLockOrBurnIn(OWNER);
 
@@ -77,16 +69,16 @@ contract AdvancedPoolHooks_preflightCheck is AdvancedPoolHooksSetup {
   function test_preflightCheck_AllowListAndPolicyEngine() public {
     address[] memory allowedSenders = new address[](1);
     allowedSenders[0] = OWNER;
-    AdvancedPoolHooks hooksWithBoth = new AdvancedPoolHooks(allowedSenders, 0, address(s_mockPolicyEngine), new address[](0), true);
+    AdvancedPoolHooks hooksWithBoth =
+      new AdvancedPoolHooks(allowedSenders, 0, address(s_mockPolicyEngine), new address[](0), true);
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _createLockOrBurnIn(OWNER);
 
     hooksWithBoth.preflightCheck(lockOrBurnIn, 5, "");
 
-    // Verify policy engine was called with correct tag
     IPolicyEngine.Payload memory lastPayload = s_mockPolicyEngine.getLastPayload();
-    assertEq(lastPayload.selector, IAdvancedPoolHooks.preflightCheck.selector);
-    assertEq(bytes4(lastPayload.data), POOL_HOOK_OUTBOUND_POLICY_DATA_V1_TAG);
+    assertEq(IAdvancedPoolHooks.preflightCheck.selector, lastPayload.selector);
+    assertEq(CCIPPolicyEnginePayloads.POOL_HOOK_OUTBOUND_POLICY_DATA_V1_TAG, bytes4(lastPayload.data));
   }
 
   // Reverts
@@ -110,14 +102,5 @@ contract AdvancedPoolHooks_preflightCheck is AdvancedPoolHooksSetup {
 
     vm.expectRevert(abi.encodeWithSelector(AdvancedPoolHooks.SenderNotAllowed.selector, STRANGER));
     hooksWithAllowList.preflightCheck(lockOrBurnIn, 5, "");
-  }
-
-  // Helper to slice bytes, exposed as external for use with this.
-  function _sliceBytes(bytes memory data, uint256 start) external pure returns (bytes memory) {
-    bytes memory result = new bytes(data.length - start);
-    for (uint256 i = 0; i < result.length; ++i) {
-      result[i] = data[start + i];
-    }
-    return result;
   }
 }

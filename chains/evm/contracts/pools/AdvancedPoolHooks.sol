@@ -35,12 +35,6 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, AuthorizedCallers {
   event PolicyEngineSet(address indexed oldPolicyEngine, address indexed newPolicyEngine);
   event AllowAnyoneToInvokeThisHookSet(bool allowed);
 
-  // bytes4(keccak256("PoolHookOutboundPolicyDataV1"))
-  bytes4 internal constant POOL_HOOK_OUTBOUND_POLICY_DATA_V1_TAG = 0x12bebcb8;
-
-  // bytes4(keccak256("PoolHookInboundPolicyDataV1"))
-  bytes4 internal constant POOL_HOOK_INBOUND_POLICY_DATA_V1_TAG = 0x44d1de78;
-
   struct CCVConfig {
     address[] outboundCCVs; // CCVs required for outgoing messages to the remote chain.
     address[] thresholdOutboundCCVs; // Additional CCVs that are required for outgoing messages after reaching the threshold amount.
@@ -120,7 +114,7 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, AuthorizedCallers {
       localToken: lockOrBurnIn.localToken,
       tokenArgs: tokenArgs
     });
-    bytes memory policyData = abi.encodeWithSelector(POOL_HOOK_OUTBOUND_POLICY_DATA_V1_TAG, outboundData);
+    bytes memory policyData = abi.encodeWithSelector(CCIPPolicyEnginePayloads.POOL_HOOK_OUTBOUND_POLICY_DATA_V1_TAG, outboundData);
     policyEngine.run(
       IPolicyEngine.Payload({
         selector: IAdvancedPoolHooks.preflightCheck.selector,
@@ -159,7 +153,7 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, AuthorizedCallers {
       offchainTokenData: releaseOrMintIn.offchainTokenData,
       localAmount: localAmount
     });
-    bytes memory policyData = abi.encodeWithSelector(POOL_HOOK_INBOUND_POLICY_DATA_V1_TAG, inboundData);
+    bytes memory policyData = abi.encodeWithSelector(CCIPPolicyEnginePayloads.POOL_HOOK_INBOUND_POLICY_DATA_V1_TAG, inboundData);
     policyEngine.run(
       IPolicyEngine.Payload({
         selector: IAdvancedPoolHooks.postFlightCheck.selector,

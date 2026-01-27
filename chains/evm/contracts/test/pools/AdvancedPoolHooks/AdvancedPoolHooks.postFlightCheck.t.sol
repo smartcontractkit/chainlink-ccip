@@ -10,9 +10,6 @@ import {MockPolicyEngine} from "../../mocks/MockPolicyEngine.sol";
 import {AdvancedPoolHooksSetup} from "./AdvancedPoolHooksSetup.t.sol";
 
 contract AdvancedPoolHooks_postFlightCheck is AdvancedPoolHooksSetup {
-  // bytes4(keccak256("PoolHookInboundPolicyDataV1"))
-  bytes4 internal constant POOL_HOOK_INBOUND_POLICY_DATA_V1_TAG = 0x44d1de78;
-
   MockPolicyEngine internal s_mockPolicyEngine;
 
   function setUp() public virtual override {
@@ -44,32 +41,31 @@ contract AdvancedPoolHooks_postFlightCheck is AdvancedPoolHooksSetup {
 
     // Verify policy engine was called with correct payload
     IPolicyEngine.Payload memory lastPayload = s_mockPolicyEngine.getLastPayload();
-    assertEq(lastPayload.selector, IAdvancedPoolHooks.postFlightCheck.selector);
-    assertEq(lastPayload.sender, OWNER);
-    assertEq(lastPayload.context, "");
+    assertEq(IAdvancedPoolHooks.postFlightCheck.selector, lastPayload.selector);
+    assertEq(OWNER, lastPayload.sender);
+    assertEq("", lastPayload.context);
 
     // Verify tag prefix
-    bytes4 tag = bytes4(lastPayload.data);
-    assertEq(tag, POOL_HOOK_INBOUND_POLICY_DATA_V1_TAG);
+    assertEq(CCIPPolicyEnginePayloads.POOL_HOOK_INBOUND_POLICY_DATA_V1_TAG, bytes4(lastPayload.data));
 
     // Decode and verify the payload data
     CCIPPolicyEnginePayloads.PoolHookInboundPolicyDataV1 memory decoded =
-      abi.decode(this._sliceBytes(lastPayload.data, 4), (CCIPPolicyEnginePayloads.PoolHookInboundPolicyDataV1));
+      abi.decode(_sliceBytes(lastPayload.data, 4), (CCIPPolicyEnginePayloads.PoolHookInboundPolicyDataV1));
 
-    assertEq(decoded.originalSender, releaseOrMintIn.originalSender);
-    assertEq(decoded.remoteChainSelector, releaseOrMintIn.remoteChainSelector);
-    assertEq(decoded.receiver, releaseOrMintIn.receiver);
-    assertEq(decoded.amount, releaseOrMintIn.sourceDenominatedAmount);
-    assertEq(decoded.localToken, releaseOrMintIn.localToken);
-    assertEq(decoded.sourcePoolAddress, releaseOrMintIn.sourcePoolAddress);
-    assertEq(decoded.sourcePoolData, releaseOrMintIn.sourcePoolData);
-    assertEq(decoded.offchainTokenData, releaseOrMintIn.offchainTokenData);
-    assertEq(decoded.localAmount, localAmount);
-    assertEq(decoded.blockConfirmationRequested, blockConfirmationRequested);
+    assertEq(releaseOrMintIn.originalSender, decoded.originalSender);
+    assertEq(blockConfirmationRequested, decoded.blockConfirmationRequested);
+    assertEq(releaseOrMintIn.remoteChainSelector, decoded.remoteChainSelector);
+    assertEq(releaseOrMintIn.receiver, decoded.receiver);
+    assertEq(releaseOrMintIn.sourceDenominatedAmount, decoded.amount);
+    assertEq(releaseOrMintIn.localToken, decoded.localToken);
+    assertEq(releaseOrMintIn.sourcePoolAddress, decoded.sourcePoolAddress);
+    assertEq(releaseOrMintIn.sourcePoolData, decoded.sourcePoolData);
+    assertEq(releaseOrMintIn.offchainTokenData, decoded.offchainTokenData);
+    assertEq(localAmount, decoded.localAmount);
   }
 
   function test_postFlightCheck_WithoutPolicyEngine() public {
-    assertEq(s_advancedPoolHooks.getPolicyEngine(), address(0));
+    assertEq(address(0), s_advancedPoolHooks.getPolicyEngine());
 
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = _createReleaseOrMintIn();
 
@@ -87,14 +83,5 @@ contract AdvancedPoolHooks_postFlightCheck is AdvancedPoolHooksSetup {
 
     vm.expectRevert(abi.encodeWithSelector(MockPolicyEngine.MockPolicyEngineRejection.selector, "Policy rejected"));
     s_advancedPoolHooks.postFlightCheck(releaseOrMintIn, 100e18, 5);
-  }
-
-  // Helper to slice bytes, exposed as external for use with this.
-  function _sliceBytes(bytes memory data, uint256 start) external pure returns (bytes memory) {
-    bytes memory result = new bytes(data.length - start);
-    for (uint256 i = 0; i < result.length; ++i) {
-      result[i] = data[start + i];
-    }
-    return result;
   }
 }

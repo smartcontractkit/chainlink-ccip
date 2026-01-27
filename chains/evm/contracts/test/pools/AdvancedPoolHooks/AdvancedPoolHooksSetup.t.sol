@@ -57,4 +57,13 @@ contract AdvancedPoolHooksSetup is BaseTest {
     offRampUpdates[0] = Router.OffRamp({sourceChainSelector: DEST_CHAIN_SELECTOR, offRamp: s_allowedOffRamp});
     s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), offRampUpdates);
   }
+
+  /// @notice Helper to slice bytes, removing a prefix.
+  function _sliceBytes(bytes memory data, uint256 start) internal pure returns (bytes memory) {
+    bytes memory result = new bytes(data.length - start);
+    for (uint256 i = 0; i < result.length; ++i) {
+      result[i] = data[start + i];
+    }
+    return result;
+  }
 }
