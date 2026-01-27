@@ -150,6 +150,11 @@ type CommitOffchainConfig struct {
 	// PopulateTxHashEnabled enables populating the TxHash field in message headers.
 	// When disabled, TxHash will be omitted from messages for backwards compatibility.
 	PopulateTxHashEnabled bool `json:"populateTxHashEnabled"`
+
+	// EvmGasLimit is the gas limit to use for EVM chain report transmissions.
+	// If set to zero, the default gas limit defined in the chain writer will be used.
+	// This field is ignored for non-EVM chains.
+	EvmGasLimit uint64 `json:"evmGasLimit"`
 }
 
 const (
@@ -274,19 +279,15 @@ func (c *CommitOffchainConfig) Validate() error {
 		return fmt.Errorf("chain fee async observer sync freq (%s) or sync timeout (%s) not set",
 			c.ChainFeeAsyncObserverSyncFreq, c.ChainFeeAsyncObserverSyncTimeout)
 	}
+	if c.RMNEnabled {
+		return fmt.Errorf("rmn has been deprecated, the RMNEnabled field must be set to false")
+	}
 
 	// Options for multiple reports. These settings were added so that Solana can be configured
 	// to split merkle roots across multiple reports. The functions do not support RMN, so it is
 	// an error to use them unless RMNEnabled == false.
 	var errs []error
-	if c.RMNEnabled {
-		if c.MultipleReportsEnabled {
-			errs = append(errs, fmt.Errorf("multipleReports do not support RMN, RMNEnabled cannot be true"))
-		}
-		if c.MaxMerkleRootsPerReport != 0 {
-			errs = append(errs, fmt.Errorf("maxMerkleRootsPerReport does not support RMN, RMNEnabled cannot be true"))
-		}
-	}
+
 	if c.MaxMerkleRootsPerReport != 0 && !c.MultipleReportsEnabled {
 		errs = append(errs, fmt.Errorf("maxMerkleRootsPerReport cannot be used without MultipleReportsEnabled"))
 	}
