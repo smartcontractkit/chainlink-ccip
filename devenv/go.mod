@@ -4,6 +4,7 @@ go 1.25.5
 
 replace (
 	github.com/smartcontractkit/chainlink-ccip => ..
+	github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm => ../ccv/chains/evm
 	github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment => ../chains/evm/deployment
 	github.com/smartcontractkit/chainlink-ccip/chains/solana => ../chains/solana
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment => ../chains/solana/deployment
@@ -32,12 +33,12 @@ require (
 	github.com/prometheus/client_golang v1.23.0
 	github.com/rs/zerolog v1.34.0
 	github.com/smartcontractkit/chain-selectors v1.0.89
-	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20260119161343-499241536dea
+	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20260127033250-34af90dfc63b
 	github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment v0.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20260119161343-499241536dea
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment v0.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20251014191100-bad58388f0c9
-	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260107192940-0be702ef3ff5
+	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260127033250-34af90dfc63b
 	github.com/smartcontractkit/chainlink-common v0.9.6-0.20260114142648-bd9e1b483e96
 	github.com/smartcontractkit/chainlink-deployments-framework v0.75.2-0.20260120092221-c83e6ba1e827
 	github.com/smartcontractkit/chainlink-evm v0.3.3
@@ -55,6 +56,7 @@ require (
 )
 
 require (
+	github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm v0.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/chainlink-ton v0.0.0-20260119175539-ae7d01b4e643
 	github.com/smartcontractkit/chainlink-ton/deployment v0.0.0-20260119162312-74edaa830fa4
 	github.com/smartcontractkit/chainlink-ton/devenv v0.0.0-20260119175539-ae7d01b4e643
