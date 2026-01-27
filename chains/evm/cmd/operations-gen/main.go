@@ -15,6 +15,45 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+var (
+	// typeMap maps Solidity types to their Go equivalents
+	typeMap = map[string]string{
+		"address":   "common.Address",
+		"string":    "string",
+		"bool":      "bool",
+		"bytes":     "[]byte",
+		"bytes32":   "[32]byte",
+		"bytes16":   "[16]byte",
+		"bytes4":    "[4]byte",
+		"uint8":     "uint8",
+		"uint16":    "uint16",
+		"uint32":    "uint32",
+		"uint64":    "uint64",
+		"uint96":    "*big.Int",
+		"uint128":   "*big.Int",
+		"uint160":   "*big.Int",
+		"uint192":   "*big.Int",
+		"uint224":   "*big.Int",
+		"uint256":   "*big.Int",
+		"int8":      "int8",
+		"int16":     "int16",
+		"int32":     "int32",
+		"int64":     "int64",
+		"int96":     "*big.Int",
+		"int128":    "*big.Int",
+		"int160":    "*big.Int",
+		"int192":    "*big.Int",
+		"int224":    "*big.Int",
+		"int256":    "*big.Int",
+	}
+
+	// nameOverrides provides special case naming for specific contracts
+	nameOverrides = map[string]string{
+		"OnRamp":  "onramp",
+		"OffRamp": "offramp",
+	}
+)
+
 // Config structures
 type Config struct {
 	Version   string           `yaml:"version"`
@@ -275,7 +314,7 @@ func findFunctionInABI(entries []ABIEntry, funcName string, packageName string) 
 	return parseABIFunction(candidates[0], false, packageName, false, 0)
 }
 
-func parseABIFunction(entry ABIEntry, isConstructor bool, packageName string, needsSuffix bool, suffixIndex int) *FunctionInfo {
+func parseABIFunction(entry ABIEntry, _ bool, packageName string, needsSuffix bool, suffixIndex int) *FunctionInfo {
 
 	callMethod := entry.Name
 	if needsSuffix {
@@ -330,37 +369,7 @@ func parseABIParam(param ABIParam, packageName string) ParameterInfo {
 	return paramInfo
 }
 
-func solidityToGoType(solidityType, internalType, packageName string) string {
-	typeMap := map[string]string{
-		"address":   "common.Address",
-		"string":    "string",
-		"bool":      "bool",
-		"bytes":     "[]byte",
-		"bytes32":   "[32]byte",
-		"bytes16":   "[16]byte",
-		"bytes4":    "[4]byte",
-		"uint8":     "uint8",
-		"uint16":    "uint16",
-		"uint32":    "uint32",
-		"uint64":    "uint64",
-		"uint96":    "*big.Int",
-		"uint128":   "*big.Int",
-		"uint160":   "*big.Int",
-		"uint192":   "*big.Int",
-		"uint224":   "*big.Int",
-		"uint256":   "*big.Int",
-		"int8":      "int8",
-		"int16":     "int16",
-		"int32":     "int32",
-		"int64":     "int64",
-		"int96":     "*big.Int",
-		"int128":    "*big.Int",
-		"int160":    "*big.Int",
-		"int192":    "*big.Int",
-		"int224":    "*big.Int",
-		"int256":    "*big.Int",
-	}
-
+func solidityToGoType(solidityType, internalType, _ string) string {
 	baseType := strings.TrimSuffix(solidityType, "[]")
 	if goType, ok := typeMap[baseType]; ok {
 		if strings.HasSuffix(solidityType, "[]") {
@@ -370,10 +379,10 @@ func solidityToGoType(solidityType, internalType, packageName string) string {
 	}
 
 	if strings.HasPrefix(baseType, "tuple") {
-		return "interface{}"
+		return "any"
 	}
 
-	return "interface{}"
+	return "any"
 }
 
 func extractStructName(internalType string) string {
@@ -397,11 +406,6 @@ func versionToPath(version string) string {
 }
 
 func toSnakeCase(s string) string {
-	nameOverrides := map[string]string{
-		"OnRamp":  "onramp",
-		"OffRamp": "offramp",
-	}
-	
 	if override, ok := nameOverrides[s]; ok {
 		return override
 	}
@@ -483,7 +487,7 @@ func (c *{{.ContractType}}Contract) Address() common.Address {
 }
 
 func (c *{{.ContractType}}Contract) Owner(opts *bind.CallOpts) (common.Address, error) {
-	var out []interface{}
+	var out []any
 	err := c.contract.Call(opts, &out, "owner")
 	if err != nil {
 		return common.Address{}, err
@@ -595,8 +599,8 @@ var {{.Name}} = contract.NewRead(contract.ReadParams[{{.ArgsType}}, {{.ReturnTyp
 	return nil
 }
 
-func prepareTemplateData(info *ContractInfo) map[string]interface{} {
-	data := map[string]interface{}{
+func prepareTemplateData(info *ContractInfo) map[string]any {
+	data := map[string]any{
 		"PackageName":       info.PackageName,
 		"PackageNameHyphen": toKebabCase(info.Name),
 		"ContractType":      info.Name,
@@ -609,14 +613,14 @@ func prepareTemplateData(info *ContractInfo) map[string]interface{} {
 	data["NeedsBigInt"] = needsBigInt
 
 	if info.Constructor != nil {
-		data["Constructor"] = map[string]interface{}{
+		data["Constructor"] = map[string]any{
 			"Parameters": prepareParameters(info.Constructor.Parameters),
 		}
 	}
 
-	var writeOps, readOps []map[string]interface{}
-	var contractMethods []map[string]interface{}
-	var writeArgStructs []map[string]interface{}
+	var writeOps, readOps []map[string]any
+	var contractMethods []map[string]any
+	var writeArgStructs []map[string]any
 
 	for _, name := range info.FunctionOrder {
 		funcInfo := info.Functions[name]
@@ -625,7 +629,7 @@ func prepareTemplateData(info *ContractInfo) map[string]interface{} {
 		if funcInfo.IsWrite {
 			writeOps = append(writeOps, prepareWriteOp(funcInfo))
 			if len(funcInfo.Parameters) > 1 {
-				writeArgStructs = append(writeArgStructs, map[string]interface{}{
+				writeArgStructs = append(writeArgStructs, map[string]any{
 					"Name":   funcInfo.Name + "Args",
 					"Fields": prepareParameters(funcInfo.Parameters),
 				})
@@ -635,7 +639,7 @@ func prepareTemplateData(info *ContractInfo) map[string]interface{} {
 		}
 	}
 
-	var structDefs []map[string]interface{}
+	var structDefs []map[string]any
 	var structNames []string
 	for name := range info.StructDefs {
 		structNames = append(structNames, name)
@@ -643,7 +647,7 @@ func prepareTemplateData(info *ContractInfo) map[string]interface{} {
 	sort.Strings(structNames)
 	for _, name := range structNames {
 		structDef := info.StructDefs[name]
-		structDefs = append(structDefs, map[string]interface{}{
+		structDefs = append(structDefs, map[string]any{
 			"Name":   structDef.Name,
 			"Fields": prepareParameters(structDef.Fields),
 		})
@@ -687,7 +691,7 @@ func checkNeedsBigInt(info *ContractInfo) bool {
 	return false
 }
 
-func prepareContractMethod(funcInfo *FunctionInfo, isWrite bool) map[string]interface{} {
+func prepareContractMethod(funcInfo *FunctionInfo, isWrite bool) map[string]any {
 	optsType := "*bind.CallOpts"
 	if isWrite {
 		optsType = "*bind.TransactOpts"
@@ -701,9 +705,12 @@ func prepareContractMethod(funcInfo *FunctionInfo, isWrite bool) map[string]inte
 		methodArgs = []string{"args"}
 	} else if len(funcInfo.Parameters) > 1 {
 		for _, p := range funcInfo.Parameters {
-			paramName := strings.ToLower(p.Name[:1]) + p.Name[1:]
+			paramName := p.Name
+			if len(paramName) > 0 {
+				paramName = strings.ToLower(paramName[:1]) + paramName[1:]
+			}
 			if paramName == "" {
-				paramName = "arg" + fmt.Sprint(len(methodArgs))
+				paramName = fmt.Sprintf("arg%d", len(methodArgs))
 			}
 			params += fmt.Sprintf(", %s %s", paramName, p.GoType)
 			methodArgs = append(methodArgs, paramName)
@@ -711,7 +718,7 @@ func prepareContractMethod(funcInfo *FunctionInfo, isWrite bool) map[string]inte
 	}
 
 	returns := "(*types.Transaction, error)"
-	returnType := "interface{}"
+	returnType := "any"
 	if !isWrite {
 		if len(funcInfo.ReturnParams) == 1 {
 			returnType = funcInfo.ReturnParams[0].GoType
@@ -732,7 +739,7 @@ func prepareContractMethod(funcInfo *FunctionInfo, isWrite bool) map[string]inte
 		if len(methodArgs) > 0 {
 			callArgsStr = ", " + strings.Join(methodArgs, ", ")
 		}
-		methodBody = fmt.Sprintf(`var out []interface{}
+		methodBody = fmt.Sprintf(`var out []any
 	err := c.contract.Call(opts, &out, "%s"%s)
 	if err != nil {
 		var zero %s
@@ -741,7 +748,7 @@ func prepareContractMethod(funcInfo *FunctionInfo, isWrite bool) map[string]inte
 	return *abi.ConvertType(out[0], new(%s)).(*%s), nil`, funcInfo.CallMethod, callArgsStr, returnType, returnType, returnType)
 	}
 
-	return map[string]interface{}{
+	return map[string]any{
 		"Name":       funcInfo.Name,
 		"MethodName": funcInfo.CallMethod,
 		"Params":     params,
@@ -761,7 +768,7 @@ func prepareParameters(params []ParameterInfo) []map[string]string {
 	return result
 }
 
-func prepareWriteOp(funcInfo *FunctionInfo) map[string]interface{} {
+func prepareWriteOp(funcInfo *FunctionInfo) map[string]any {
 	argsType := "struct{}"
 	var callArgsList []string
 
@@ -785,7 +792,7 @@ func prepareWriteOp(funcInfo *FunctionInfo) map[string]interface{} {
 		accessControl = "OnlyOwner"
 	}
 
-	return map[string]interface{}{
+	return map[string]any{
 		"Name":          funcInfo.Name,
 		"MethodName":    funcInfo.CallMethod,
 		"OpName":        toKebabCase(funcInfo.Name),
@@ -795,7 +802,7 @@ func prepareWriteOp(funcInfo *FunctionInfo) map[string]interface{} {
 	}
 }
 
-func prepareReadOp(funcInfo *FunctionInfo) map[string]interface{} {
+func prepareReadOp(funcInfo *FunctionInfo) map[string]any {
 	argsType := "struct{}"
 	callArgs := ""
 
@@ -811,12 +818,12 @@ func prepareReadOp(funcInfo *FunctionInfo) map[string]interface{} {
 		callArgs = strings.Join(parts, "")
 	}
 
-	returnType := "interface{}"
+	returnType := "any"
 	if len(funcInfo.ReturnParams) == 1 {
 		returnType = funcInfo.ReturnParams[0].GoType
 	}
 
-	return map[string]interface{}{
+	return map[string]any{
 		"Name":       funcInfo.Name,
 		"MethodName": funcInfo.CallMethod,
 		"OpName":     toKebabCase(funcInfo.Name),

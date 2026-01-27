@@ -44,7 +44,7 @@ func (c *RMNRemoteContract) Address() common.Address {
 }
 
 func (c *RMNRemoteContract) Owner(opts *bind.CallOpts) (common.Address, error) {
-	var out []interface{}
+	var out []any
 	err := c.contract.Call(opts, &out, "owner")
 	if err != nil {
 		return common.Address{}, err
@@ -61,7 +61,7 @@ func (c *RMNRemoteContract) Uncurse(opts *bind.TransactOpts, args [16]byte) (*ty
 }
 
 func (c *RMNRemoteContract) IsCursed(opts *bind.CallOpts, args [16]byte) (bool, error) {
-	var out []interface{}
+	var out []any
 	err := c.contract.Call(opts, &out, "isCursed", args)
 	if err != nil {
 		var zero bool
