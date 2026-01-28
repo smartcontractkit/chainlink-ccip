@@ -2,22 +2,25 @@
 pragma solidity ^0.8.24;
 
 import {IAdvancedPoolHooks} from "../interfaces/IAdvancedPoolHooks.sol";
+import {IPolicyEngine} from "../interfaces/IPolicyEngine.sol";
 import {IPoolV2} from "../interfaces/IPoolV2.sol";
 
+import {CCIPPolicyEnginePayloads} from "../libraries/CCIPPolicyEnginePayloads.sol";
 import {CCVConfigValidation} from "../libraries/CCVConfigValidation.sol";
 import {Pool} from "../libraries/Pool.sol";
-import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
+import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
 import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/EnumerableSet.sol";
 
-/// @notice Advanced pool hooks for additional security features like allowlists and CCV management.
+/// @notice Advanced pool hooks for additional security features like allowlists, CCV management, and policy engine runs.
 /// @dev This is a standalone contract that can optionally be used by TokenPools.
-contract AdvancedPoolHooks is IAdvancedPoolHooks, Ownable2StepMsgSender {
+contract AdvancedPoolHooks is IAdvancedPoolHooks, AuthorizedCallers {
   using EnumerableSet for EnumerableSet.AddressSet;
 
   error AllowListNotEnabled();
   error SenderNotAllowed(address sender);
   error MustSpecifyUnderThresholdCCVsForThresholdCCVs();
+  error PolicyEngineDetachFailed(address oldPolicyEngine, bytes err);
 
   event AllowListAdd(address sender);
   event AllowListRemove(address sender);
@@ -29,6 +32,7 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, Ownable2StepMsgSender {
     address[] thresholdInboundCCVs
   );
   event ThresholdAmountSet(uint256 thresholdAmount);
+  event PolicyEngineSet(address indexed oldPolicyEngine, address indexed newPolicyEngine);
 
   struct CCVConfig {
     address[] outboundCCVs; // CCVs required for outgoing messages to the remote chain.
@@ -48,6 +52,9 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, Ownable2StepMsgSender {
   /// @dev The immutable flag that indicates if the allowlist is access-controlled.
   bool internal immutable i_allowlistEnabled;
 
+  /// @dev The immutable flag that indicates if preflightCheck/postFlightCheck are access-controlled.
+  bool internal immutable i_authorizedCallersEnabled;
+
   /// @dev A set of addresses allowed to trigger lockOrBurn as original senders.
   /// Only takes effect if i_allowlistEnabled is true.
   /// This can be used to ensure only token-issuer specified addresses can move tokens.
@@ -57,38 +64,102 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, Ownable2StepMsgSender {
   /// Value of 0 means that there is no threshold and additional CCVs are not required for any transfer amount.
   uint256 internal s_thresholdAmountForAdditionalCCVs;
 
+  /// @dev The policy engine to use. Value of 0 disables policy engine checks.
+  IPolicyEngine internal s_policyEngine;
+
   /// @dev Stores verifier (CCV) requirements keyed by remote chain selector.
   mapping(uint64 remoteChainSelector => CCVConfig ccvConfig) internal s_verifierConfig;
 
   constructor(
     address[] memory allowlist,
-    uint256 thresholdAmountForAdditionalCCVs
-  ) {
+    uint256 thresholdAmountForAdditionalCCVs,
+    address policyEngine,
+    address[] memory authorizedCallers
+  ) AuthorizedCallers(authorizedCallers) {
     // Allowlist can be set as enabled or disabled at deployment time only to save hot-path gas.
     i_allowlistEnabled = allowlist.length > 0;
     if (i_allowlistEnabled) {
       _applyAllowListUpdates(new address[](0), allowlist);
     }
     s_thresholdAmountForAdditionalCCVs = thresholdAmountForAdditionalCCVs;
+
+    i_authorizedCallersEnabled = authorizedCallers.length > 0;
+    _setPolicyEngine(policyEngine, false);
   }
 
   /// @inheritdoc IAdvancedPoolHooks
-  /// @param lockOrBurnIn The lock or burn input parameters.
+  /// @dev Performs allowlist check and policy engine validation for outbound transfers.
   function preflightCheck(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
-    uint16,
-    bytes calldata
-  ) external view {
+    uint16 blockConfirmationRequested,
+    bytes calldata tokenArgs
+  ) external {
+    if (i_authorizedCallersEnabled) {
+      _validateCaller();
+    }
     checkAllowList(lockOrBurnIn.originalSender);
+
+    IPolicyEngine policyEngine = s_policyEngine;
+    if (address(policyEngine) == address(0)) {
+      return;
+    }
+
+    CCIPPolicyEnginePayloads.PoolHookOutboundPolicyDataV1 memory outboundData =
+      CCIPPolicyEnginePayloads.PoolHookOutboundPolicyDataV1({
+        originalSender: lockOrBurnIn.originalSender,
+        blockConfirmationRequested: blockConfirmationRequested,
+        remoteChainSelector: lockOrBurnIn.remoteChainSelector,
+        receiver: lockOrBurnIn.receiver,
+        amount: lockOrBurnIn.amount,
+        localToken: lockOrBurnIn.localToken,
+        tokenArgs: tokenArgs
+      });
+    bytes memory policyData =
+      abi.encodeWithSelector(CCIPPolicyEnginePayloads.POOL_HOOK_OUTBOUND_POLICY_DATA_V1_TAG, outboundData);
+    policyEngine.run(
+      IPolicyEngine.Payload({
+        selector: IAdvancedPoolHooks.preflightCheck.selector, sender: msg.sender, data: policyData, context: ""
+      })
+    );
   }
 
   /// @inheritdoc IAdvancedPoolHooks
-  /// @dev No-op implementation.
+  /// @dev Performs policy engine validation for inbound transfers.
   function postFlightCheck(
-    Pool.ReleaseOrMintInV1 calldata,
-    uint256,
-    uint16
-  ) external pure {}
+    Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
+    uint256 localAmount,
+    uint16 blockConfirmationRequested
+  ) external {
+    if (i_authorizedCallersEnabled) {
+      _validateCaller();
+    }
+
+    IPolicyEngine policyEngine = s_policyEngine;
+    if (address(policyEngine) == address(0)) {
+      return;
+    }
+
+    CCIPPolicyEnginePayloads.PoolHookInboundPolicyDataV1 memory inboundData =
+      CCIPPolicyEnginePayloads.PoolHookInboundPolicyDataV1({
+        originalSender: releaseOrMintIn.originalSender,
+        blockConfirmationRequested: blockConfirmationRequested,
+        remoteChainSelector: releaseOrMintIn.remoteChainSelector,
+        receiver: releaseOrMintIn.receiver,
+        amount: releaseOrMintIn.sourceDenominatedAmount,
+        localToken: releaseOrMintIn.localToken,
+        sourcePoolAddress: releaseOrMintIn.sourcePoolAddress,
+        sourcePoolData: releaseOrMintIn.sourcePoolData,
+        offchainTokenData: releaseOrMintIn.offchainTokenData,
+        localAmount: localAmount
+      });
+    bytes memory policyData =
+      abi.encodeWithSelector(CCIPPolicyEnginePayloads.POOL_HOOK_INBOUND_POLICY_DATA_V1_TAG, inboundData);
+    policyEngine.run(
+      IPolicyEngine.Payload({
+        selector: IAdvancedPoolHooks.postFlightCheck.selector, sender: msg.sender, data: policyData, context: ""
+      })
+    );
+  }
 
   // ================================================================
   // │                          Allowlist                           │
@@ -173,10 +244,10 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, Ownable2StepMsgSender {
       address[] calldata inboundCCVs = ccvConfigArgs[i].inboundCCVs;
       address[] calldata thresholdInboundCCVs = ccvConfigArgs[i].thresholdInboundCCVs;
 
-      // check for duplicates in outbound CCVs.
+      // Check for duplicates in outbound CCVs.
       CCVConfigValidation._assertNoDuplicates(outboundCCVs);
 
-      // check for duplicates in inbound CCVs.
+      // Check for duplicates in inbound CCVs.
       CCVConfigValidation._assertNoDuplicates(inboundCCVs);
 
       if (thresholdOutboundCCVs.length > 0) {
@@ -221,7 +292,7 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, Ownable2StepMsgSender {
   /// @param remoteChainSelector The remote chain selector for this transfer.
   /// @param amount The amount being transferred.
   /// @param direction The direction of the transfer (Inbound or Outbound).
-  /// This implementation returns base CCVs for all transfers, and includes additional CCVs when the transfer amount.
+  /// This implementation returns base CCVs for all transfers, and includes additional CCVs when the transfer amount
   /// is above the configured threshold.
   /// @return requiredCCVs Set of required CCV addresses.
   function getRequiredCCVs(
@@ -278,5 +349,73 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, Ownable2StepMsgSender {
       }
     }
     return baseCCVs;
+  }
+
+  // ================================================================
+  // │                       Policy Engine                          │
+  // ================================================================
+
+  /// @notice Sets a new policy engine.
+  /// @param newPolicyEngine The address of the new policy engine.
+  function setPolicyEngine(
+    address newPolicyEngine
+  ) external onlyOwner {
+    _setPolicyEngine(newPolicyEngine, false);
+  }
+
+  /// @notice Sets a new policy engine while tolerating a pre-existing policy engine's detach reverting.
+  /// @dev Use this to force update an old policy engine whose detach() reverts.
+  /// @param newPolicyEngine The address of the new policy engine.
+  function setPolicyEngineAllowFailedDetach(
+    address newPolicyEngine
+  ) external onlyOwner {
+    _setPolicyEngine(newPolicyEngine, true);
+  }
+
+  /// @notice Internal function to set and attach to a policy engine.
+  /// @param newPolicyEngine The address of the new policy engine, or address(0) to disable.
+  /// @param allowFailedDetach Whether to revert if old policy engine's detach reverts.
+  function _setPolicyEngine(
+    address newPolicyEngine,
+    bool allowFailedDetach
+  ) internal {
+    address oldPolicyEngine = address(s_policyEngine);
+
+    if (newPolicyEngine == oldPolicyEngine) {
+      return;
+    }
+
+    if (oldPolicyEngine != address(0)) {
+      // Guarding detach reverts to offer escape hatch from adversarial policy engine instances.
+      try IPolicyEngine(oldPolicyEngine).detach() {}
+      catch (bytes memory err) {
+        if (!allowFailedDetach) {
+          revert PolicyEngineDetachFailed(oldPolicyEngine, err);
+        }
+      }
+    }
+
+    s_policyEngine = IPolicyEngine(newPolicyEngine);
+    if (newPolicyEngine != address(0)) {
+      IPolicyEngine(newPolicyEngine).attach();
+    }
+
+    emit PolicyEngineSet(oldPolicyEngine, newPolicyEngine);
+  }
+
+  /// @notice Gets the current policy engine address.
+  /// @return The address of the policy engine.
+  function getPolicyEngine() external view returns (address) {
+    return address(s_policyEngine);
+  }
+
+  // ================================================================
+  // │                     Authorized Callers                       │
+  // ================================================================
+
+  /// @notice Gets whether only authorized callers can invoke preflightCheck/postFlightCheck.
+  /// @return true if only authorized callers can call, false if anyone can call.
+  function getAuthorizedCallersEnabled() external view returns (bool) {
+    return i_authorizedCallersEnabled;
   }
 }
