@@ -6,9 +6,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 
+	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/ping_pong_demo"
-	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
 
 var ContractType cldf_deployment.ContractType = "PingPongDemo"
