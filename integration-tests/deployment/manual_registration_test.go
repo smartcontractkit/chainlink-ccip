@@ -13,7 +13,8 @@ import (
 	"github.com/gagliardetto/solana-go"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	evmadapters "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
-	bnmERC677ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc677"
+
+	bnmERC20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	evmseqV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	tarbindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
 	bnmpool "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/burn_mint_token_pool"
@@ -26,7 +27,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
-	bnmERC677gen "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc677"
+
+	bnmERC20gen "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc20"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 	"github.com/stretchr/testify/require"
 )
@@ -101,7 +103,7 @@ func TestManualRegistration(t *testing.T) {
 
 	// Define EVM token info
 	evmTokenSupp := big.NewInt(math.MaxInt64)
-	evmTokenType := bnmERC677ops.ContractType
+	evmTokenType := bnmERC20ops.ContractType
 	evmTokenName := "EVM Test Token"
 	evmTokenDeci := uint8(18)
 	evmTokenSymb := "EVMTEST"
@@ -245,7 +247,7 @@ func TestManualRegistration(t *testing.T) {
 			// Query EVM token info from chain
 			tokAddress, err := evmAdapter.FindOneTokenAddress(env.DataStore, evmChainSel, evmTokenSymb)
 			require.NoError(t, err)
-			tokn, err := bnmERC677gen.NewBurnMintERC677(tokAddress, evmChainInfo.Client)
+			tokn, err := bnmERC20gen.NewBurnMintERC20(tokAddress, evmChainInfo.Client)
 			require.NoError(t, err)
 			supp, err := tokn.MaxSupply(&bind.CallOpts{Context: t.Context()})
 			require.NoError(t, err)
