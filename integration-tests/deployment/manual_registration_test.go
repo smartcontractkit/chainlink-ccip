@@ -255,13 +255,13 @@ func TestManualRegistration(t *testing.T) {
 			require.NoError(t, err)
 			symb, err := tokn.Symbol(&bind.CallOpts{Context: t.Context()})
 			require.NoError(t, err)
-			ownr, err := tokn.Owner(&bind.CallOpts{Context: t.Context()})
+			ccipAdmin, err := tokn.GetCCIPAdmin(&bind.CallOpts{Context: t.Context()})
 			require.NoError(t, err)
 			name, err := tokn.Name(&bind.CallOpts{Context: t.Context()})
 			require.NoError(t, err)
 
 			// Ensure on-chain token info matches what we provided to the changeset
-			require.True(t, evmDeployer.Cmp(ownr) == 0, fmt.Sprintf("expected EVM deployer to be the owner of the deployed token (deployer = %q, token owner = %q", evmDeployer.Hex(), ownr.Hex()))
+			require.True(t, evmDeployer.Cmp(ccipAdmin) == 0, fmt.Sprintf("expected EVM deployer to be the owner of the deployed token (deployer = %q, token owner = %q", evmDeployer.Hex(), ccipAdmin.Hex()))
 			require.Equal(t, evmTokenSupp, supp)
 			require.Equal(t, evmTokenDeci, deci)
 			require.Equal(t, evmTokenSymb, symb)
