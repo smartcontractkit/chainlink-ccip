@@ -23,6 +23,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
+	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -260,8 +261,17 @@ func TestManualRegistration(t *testing.T) {
 			name, err := tokn.Name(&bind.CallOpts{Context: t.Context()})
 			require.NoError(t, err)
 
+			timelockAddrs := make(map[uint64]string)
+			for _, addrRef := range env.DataStore.Addresses().Filter() {
+				if addrRef.Type == datastore.ContractType(common_utils.RBACTimelock) {
+					timelockAddrs[addrRef.ChainSelector] = addrRef.Address
+				}
+			}
+
+			timelockEvmAddr, ok := timelockAddrs[evmChainSel]
+			require.True(t, ok, "expected to find timelock address for EVM chain")
 			// Ensure on-chain token info matches what we provided to the changeset
-			require.True(t, evmDeployer.Cmp(ccipAdmin) == 0, fmt.Sprintf("expected EVM deployer to be the owner of the deployed token (deployer = %q, token owner = %q", evmDeployer.Hex(), ccipAdmin.Hex()))
+			require.Equal(t, timelockEvmAddr, ccipAdmin.String(), fmt.Sprintf("expected EVM deployer to be the owner of the deployed token (deployer = %q, token owner = %q", evmDeployer.Hex(), ccipAdmin.Hex()))
 			require.Equal(t, evmTokenSupp, supp)
 			require.Equal(t, evmTokenDeci, deci)
 			require.Equal(t, evmTokenSymb, symb)
