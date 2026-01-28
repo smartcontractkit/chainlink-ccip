@@ -96,28 +96,28 @@ func (m *cctpTest_MockCCTPChain) ConfigureCCTPChainForLanes() *cldf_ops.Sequence
 }
 
 // PoolAddress returns the address of the token pool on the remote chain in bytes
-func (m *cctpTest_MockCCTPChain) PoolAddress(d datastore.DataStore, b cldf_chain.BlockChains, chainSelector uint64) []byte {
-	return []byte("pool-address")
+func (m *cctpTest_MockCCTPChain) PoolAddress(d datastore.DataStore, b cldf_chain.BlockChains, chainSelector uint64) ([]byte, error) {
+	return []byte("pool-address"), nil
 }
 
 // TokenAddress returns the address of the token on the remote chain in bytes
-func (m *cctpTest_MockCCTPChain) TokenAddress(d datastore.DataStore, b cldf_chain.BlockChains, chainSelector uint64) []byte {
-	return []byte("token-address")
+func (m *cctpTest_MockCCTPChain) TokenAddress(d datastore.DataStore, b cldf_chain.BlockChains, chainSelector uint64) ([]byte, error) {
+	return []byte("token-address"), nil
 }
 
 // AllowedCallerOnDest returns the address allowed to trigger message reception on the remote domain
-func (m *cctpTest_MockCCTPChain) AllowedCallerOnDest(d datastore.DataStore, b cldf_chain.BlockChains, chainSelector uint64) []byte {
-	return []byte("allowed-caller-dest")
+func (m *cctpTest_MockCCTPChain) AllowedCallerOnDest(d datastore.DataStore, b cldf_chain.BlockChains, chainSelector uint64) ([]byte, error) {
+	return []byte("allowed-caller-dest"), nil
 }
 
 // AllowedCallerOnSource returns the address allowed to deposit tokens for burn on the remote chain
-func (m *cctpTest_MockCCTPChain) AllowedCallerOnSource(d datastore.DataStore, b cldf_chain.BlockChains, chainSelector uint64) []byte {
-	return []byte("allowed-caller-source")
+func (m *cctpTest_MockCCTPChain) AllowedCallerOnSource(d datastore.DataStore, b cldf_chain.BlockChains, chainSelector uint64) ([]byte, error) {
+	return []byte("allowed-caller-source"), nil
 }
 
 // MintRecipientOnDest returns the address that will receive tokens on the remote domain
-func (m *cctpTest_MockCCTPChain) MintRecipientOnDest(d datastore.DataStore, b cldf_chain.BlockChains, chainSelector uint64) []byte {
-	return []byte("mint-recipient")
+func (m *cctpTest_MockCCTPChain) MintRecipientOnDest(d datastore.DataStore, b cldf_chain.BlockChains, chainSelector uint64) ([]byte, error) {
+	return []byte("mint-recipient"), nil
 }
 
 var cctpTest_BasicMCMSInput = mcms.Input{

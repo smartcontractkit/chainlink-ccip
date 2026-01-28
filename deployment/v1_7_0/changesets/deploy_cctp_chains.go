@@ -142,6 +142,7 @@ func makeApplyDeployCCTPChains(cctpChainRegistry *adapters.CCTPChainRegistry, mc
 			}
 			in := adapters.ConfigureCCTPChainForLanesInput{
 				ChainSelector: chainSel,
+				USDCToken:     chainCfg.USDCToken,
 				RemoteChains:  chainCfg.RemoteChains,
 			}
 			configureCCTPChainForLanesReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adaptersByChain[chainSel].ConfigureCCTPChainForLanes(), dep, in)

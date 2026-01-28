@@ -32,6 +32,8 @@ type RemoteCCTPChainConfig struct {
 type ConfigureCCTPChainForLanesInput struct {
 	// ChainSelector is the selector for the chain being configured.
 	ChainSelector uint64
+	// USDCToken is the address of the USDCToken contract.
+	USDCToken string
 	// RemoteChains is the set of remote chains to configure.
 	RemoteChains map[uint64]RemoteCCTPChainConfig
 }
@@ -69,16 +71,16 @@ type CCTPSequenceDeps struct {
 type RemoteCCTPChain interface {
 	// PoolAddress returns the address of the token pool on the remote chain in bytes.
 	// This should return whatever address is registered on the remote chain.
-	PoolAddress(d datastore.DataStore, b cldf_chain.BlockChains, chainSelector uint64) []byte
+	PoolAddress(d datastore.DataStore, b cldf_chain.BlockChains, chainSelector uint64) ([]byte, error)
 	// TokenAddress returns the address of the token on the remote chain in bytes.
-	TokenAddress(d datastore.DataStore, b cldf_chain.BlockChains, chainSelector uint64) []byte
+	TokenAddress(d datastore.DataStore, b cldf_chain.BlockChains, chainSelector uint64) ([]byte, error)
 	// AllowedCallerOnDest returns the address allowed to trigger message reception on the remote domain.
-	AllowedCallerOnDest(d datastore.DataStore, b cldf_chain.BlockChains, chainSelector uint64) []byte
+	AllowedCallerOnDest(d datastore.DataStore, b cldf_chain.BlockChains, chainSelector uint64) ([]byte, error)
 	// AllowedCallerOnSource returns the address allowed to deposit tokens for burn on the remote chain.
-	AllowedCallerOnSource(d datastore.DataStore, b cldf_chain.BlockChains, chainSelector uint64) []byte
+	AllowedCallerOnSource(d datastore.DataStore, b cldf_chain.BlockChains, chainSelector uint64) ([]byte, error)
 	// MintRecipientOnDest returns the address that will receive tokens on the remote domain.
 	// If not empty, the tokens will be minted to the message receiver.
-	MintRecipientOnDest(d datastore.DataStore, b cldf_chain.BlockChains, chainSelector uint64) []byte
+	MintRecipientOnDest(d datastore.DataStore, b cldf_chain.BlockChains, chainSelector uint64) ([]byte, error)
 }
 
 // CCTPChain is a configurable CCTP chain.
