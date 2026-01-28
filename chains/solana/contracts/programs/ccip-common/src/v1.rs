@@ -419,6 +419,38 @@ pub fn validate_svm_address(address: &[u8], address_must_be_nonzero: bool) -> Re
         .map_err(|_| CommonCcipError::InvalidSVMAddress.into())
 }
 
+/// 36-byte TON address raw format:
+/// - [0]   flags
+/// - [1]   workchain_id
+/// - [2..34) account_id (32 bytes)
+/// - [34..36) crc16 (ignored here)
+pub fn validate_tvm_address(address: &[u8]) -> Result<()> {
+    require_eq!(address.len(), 36, CommonCcipError::InvalidTVMAddress);
+
+    // account_id starts at offset 2 and is 32 bytes long
+    let account_id: &[u8; 32] = address[2..34]
+        .try_into()
+        .expect("slice length is guaranteed to be 32");
+
+    require!(
+        account_id.iter().any(|b| *b != 0),
+        CommonCcipError::InvalidTVMAddress
+    );
+
+    Ok(())
+}
+
+pub fn validate_aptos_address(address: &[u8]) -> Result<()> {
+    require_eq!(address.len(), 32, CommonCcipError::InvalidAptosAddress);
+
+    require!(
+        address.iter().any(|b| *b != 0),
+        CommonCcipError::InvalidAptosAddress
+    );
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -518,5 +550,61 @@ mod tests {
 
         let result = load_v1_token_admin_registry(&account_info);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn validate_tvm_address_accepts_len_36_nonzero_account_id() {
+        // 36-byte TON address raw format:
+        // [0] flags, [1] workchain_id, [2..34) account_id (32 bytes), [34..36) crc16
+        let mut addr = [0u8; 36];
+        addr[0] = 1;
+        addr[1] = 2;
+        addr[2] = 1; // make account_id non-zero
+        validate_tvm_address(&addr).unwrap();
+    }
+
+    #[test]
+    fn validate_tvm_address_rejects_wrong_len() {
+        let addr = [1u8; 35];
+        assert_eq!(
+            validate_tvm_address(&addr).unwrap_err(),
+            CommonCcipError::InvalidTVMAddress.into()
+        );
+    }
+
+    #[test]
+    fn validate_tvm_address_rejects_zero_account_id() {
+        let mut addr = [0u8; 36];
+        addr[0] = 1;
+        addr[1] = 2;
+        // account_id is all-zero
+        assert_eq!(
+            validate_tvm_address(&addr).unwrap_err(),
+            CommonCcipError::InvalidTVMAddress.into()
+        );
+    }
+
+    #[test]
+    fn validate_aptos_address_accepts_len_32_nonzero() {
+        let addr = [1u8; 32];
+        validate_aptos_address(&addr).unwrap();
+    }
+
+    #[test]
+    fn validate_aptos_address_rejects_wrong_len() {
+        let addr = [1u8; 31];
+        assert_eq!(
+            validate_aptos_address(&addr).unwrap_err(),
+            CommonCcipError::InvalidAptosAddress.into()
+        );
+    }
+
+    #[test]
+    fn validate_aptos_address_rejects_all_zero() {
+        let addr = [0u8; 32];
+        assert_eq!(
+            validate_aptos_address(&addr).unwrap_err(),
+            CommonCcipError::InvalidAptosAddress.into()
+        );
     }
 }
