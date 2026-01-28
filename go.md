@@ -131,7 +131,7 @@ flowchart LR
 	chainlink-evm --> chainlink-protos/svr
 	chainlink-evm --> chainlink-tron/relayer
 	click chainlink-evm href "https://github.com/smartcontractkit/chainlink-evm"
-	chainlink-evm/gethwrappers
+	chainlink-evm/gethwrappers --> chainlink-evm/gethwrappers/helpers
 	click chainlink-evm/gethwrappers href "https://github.com/smartcontractkit/chainlink-evm"
 	chainlink-evm/gethwrappers/helpers
 	click chainlink-evm/gethwrappers/helpers href "https://github.com/smartcontractkit/chainlink-evm"
