@@ -30,9 +30,9 @@ contract AdvancedPoolHooksSetup is BaseTest {
     s_token = IERC20(address(new BurnMintERC20("LINK", "LNK", 18, 0, 0)));
     deal(address(s_token), OWNER, type(uint256).max);
 
-    // Create AdvancedPoolHooks with CCV threshold
+    // Create AdvancedPoolHooks with CCV threshold (no authorized callers means anyone can call)
     s_advancedPoolHooks =
-      new AdvancedPoolHooks(new address[](0), CCV_THRESHOLD_AMOUNT, address(0), new address[](0), true);
+      new AdvancedPoolHooks(new address[](0), CCV_THRESHOLD_AMOUNT, address(0), new address[](0));
 
     s_tokenPool = new TokenPoolHelper(
       s_token, DEFAULT_TOKEN_DECIMALS, address(s_advancedPoolHooks), address(s_mockRMNRemote), address(s_sourceRouter)

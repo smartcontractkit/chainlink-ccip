@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 /// @notice Struct definitions for CCIP policy engine payloads.
-/// @dev Zero-dependency library for external policy engines to decode policy data.
 library CCIPPolicyEnginePayloads {
   // bytes4(keccak256("PoolHookOutboundPolicyDataV1"))
   bytes4 public constant POOL_HOOK_OUTBOUND_POLICY_DATA_V1_TAG = 0x12bebcb8;
@@ -11,10 +10,10 @@ library CCIPPolicyEnginePayloads {
   bytes4 public constant POOL_HOOK_INBOUND_POLICY_DATA_V1_TAG = 0x44d1de78;
 
   struct PoolHookOutboundPolicyDataV1 {
-    address originalSender; // ─────────────╮ The original sender of the tx on the source chain.
-    uint16 blockConfirmationRequested; //   │ The requested block confirmations.
+    address originalSender; // ─────────────╮ The The message sender on the source chain.
+    uint16 blockConfirmationRequested; //   │ The block confirmation requested.
     uint64 remoteChainSelector; // ─────────╯ The destination chain selector.
-    bytes receiver; //                        The recipient of the tokens on the destination chain, abi-encoded.
+    bytes receiver; //                        The recipient of the tokens on the destination chain, abi-encoded if destination chain is EVM.
     /// @dev NOTE: This is the user-entered transfer amount, excluding any source pool fees.
     /// It may not reflect the actual tokens sent to the destination.
     uint256 amount; //                        The amount of tokens, denominated in the source token's decimals.
@@ -23,15 +22,15 @@ library CCIPPolicyEnginePayloads {
   }
 
   struct PoolHookInboundPolicyDataV1 {
-    bytes originalSender; //                  The original sender of the tx on the source chain, abi-encoded.
-    uint16 blockConfirmationRequested; // ──╮ The requested block confirmations.
+    bytes originalSender; //                  The The message sender on the source chain.
+    uint16 blockConfirmationRequested; // ──╮ The block confirmation requested.
     uint64 remoteChainSelector; //          │ The source chain selector.
     address receiver; // ───────────────────╯ The recipient of the tokens on this chain.
-    uint256 amount; //                        The amount of tokens, denominated in the source token's decimals.
+    uint256 amount; //                        The amount of tokens to release or mint, denominated in the source token's decimals.
     address localToken; //                    The token address on dest chain.
-    bytes sourcePoolAddress; //               The source pool address, abi-encoded.
-    bytes sourcePoolData; //                  The data received from the source pool.
-    bytes offchainTokenData; //               The offchain attestation data.
-    uint256 localAmount; //                   The amount of tokens, denominated in the local token's decimals.
+    bytes sourcePoolAddress; //               The address of the source pool, abi encoded in the case of EVM chains.
+    bytes sourcePoolData; //                  The data received from the source pool to process the release or mint.
+    bytes offchainTokenData; //               The offchain data to process the release or mint.
+    uint256 localAmount; //                   The address on this chain of the token to release or mint.
   }
 }

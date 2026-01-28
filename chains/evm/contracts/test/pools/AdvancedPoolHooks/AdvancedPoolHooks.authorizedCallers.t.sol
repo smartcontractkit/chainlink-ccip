@@ -5,7 +5,6 @@ import {Pool} from "../../../libraries/Pool.sol";
 import {AdvancedPoolHooks} from "../../../pools/AdvancedPoolHooks.sol";
 import {AdvancedPoolHooksSetup} from "./AdvancedPoolHooksSetup.t.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
-import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
 
 contract AdvancedPoolHooks_authorizedCallers is AdvancedPoolHooksSetup {
   address internal s_authorizedCaller = makeAddr("authorizedCaller");
@@ -16,15 +15,14 @@ contract AdvancedPoolHooks_authorizedCallers is AdvancedPoolHooksSetup {
   function setUp() public virtual override {
     super.setUp();
 
-    // Create AdvancedPoolHooks with restricted callers (allowAnyoneToInvokeThisHook = false)
+    // Create AdvancedPoolHooks with restricted callers (authorizedCallers.length > 0 enables restriction)
     address[] memory authorizedCallers = new address[](1);
     authorizedCallers[0] = s_authorizedCaller;
     s_hooksWithRestrictedCallers = new AdvancedPoolHooks(
       new address[](0), // no allowlist
       0, // no threshold
       address(0), // no policy engine
-      authorizedCallers,
-      false // only authorized callers can invoke
+      authorizedCallers // only authorized callers can invoke
     );
   }
 
@@ -55,36 +53,17 @@ contract AdvancedPoolHooks_authorizedCallers is AdvancedPoolHooksSetup {
   // │                       Success Tests                          │
   // ================================================================
 
-  function test_setAllowAnyoneToInvokeThisHook() public {
-    assertTrue(s_advancedPoolHooks.getAllowAnyoneToInvokeThisHook());
+  function test_getAuthorizedCallerEnabled() public view {
+    // Default setup allows anyone to invoke (authorizedCallerEnabled = false)
+    assertFalse(s_advancedPoolHooks.getAuthorizedCallerEnabled());
 
-    vm.expectEmit();
-    emit AdvancedPoolHooks.AllowAnyoneToInvokeThisHookSet(false);
-
-    s_advancedPoolHooks.setAllowAnyoneToInvokeThisHook(false);
-
-    assertFalse(s_advancedPoolHooks.getAllowAnyoneToInvokeThisHook());
-
-    // Toggle back to true
-    vm.expectEmit();
-    emit AdvancedPoolHooks.AllowAnyoneToInvokeThisHookSet(true);
-
-    s_advancedPoolHooks.setAllowAnyoneToInvokeThisHook(true);
-
-    assertTrue(s_advancedPoolHooks.getAllowAnyoneToInvokeThisHook());
-  }
-
-  function test_getAllowAnyoneToInvokeThisHook() public view {
-    // Default setup allows anyone to invoke
-    assertTrue(s_advancedPoolHooks.getAllowAnyoneToInvokeThisHook());
-
-    // Hooks with restricted callers (only authorized callers)
-    assertFalse(s_hooksWithRestrictedCallers.getAllowAnyoneToInvokeThisHook());
+    // Hooks with restricted callers (authorizedCallerEnabled = true)
+    assertTrue(s_hooksWithRestrictedCallers.getAuthorizedCallerEnabled());
   }
 
   function test_preflightCheck_WhenAnyoneCanInvoke() public {
-    // Default setup allows anyone to invoke
-    assertTrue(s_advancedPoolHooks.getAllowAnyoneToInvokeThisHook());
+    // Default setup allows anyone to invoke (authorizedCallerEnabled = false)
+    assertFalse(s_advancedPoolHooks.getAuthorizedCallerEnabled());
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _createLockOrBurnIn();
 
@@ -95,8 +74,8 @@ contract AdvancedPoolHooks_authorizedCallers is AdvancedPoolHooksSetup {
   }
 
   function test_postFlightCheck_WhenAnyoneCanInvoke() public {
-    // Default setup allows anyone to invoke
-    assertTrue(s_advancedPoolHooks.getAllowAnyoneToInvokeThisHook());
+    // Default setup allows anyone to invoke (authorizedCallerEnabled = false)
+    assertFalse(s_advancedPoolHooks.getAuthorizedCallerEnabled());
 
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = _createReleaseOrMintIn();
 
@@ -107,7 +86,7 @@ contract AdvancedPoolHooks_authorizedCallers is AdvancedPoolHooksSetup {
   }
 
   function test_preflightCheck_WhenOnlyAuthorizedCallersCanInvoke() public {
-    assertFalse(s_hooksWithRestrictedCallers.getAllowAnyoneToInvokeThisHook());
+    assertTrue(s_hooksWithRestrictedCallers.getAuthorizedCallerEnabled());
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _createLockOrBurnIn();
 
@@ -118,7 +97,7 @@ contract AdvancedPoolHooks_authorizedCallers is AdvancedPoolHooksSetup {
   }
 
   function test_postFlightCheck_WhenOnlyAuthorizedCallersCanInvoke() public {
-    assertFalse(s_hooksWithRestrictedCallers.getAllowAnyoneToInvokeThisHook());
+    assertTrue(s_hooksWithRestrictedCallers.getAuthorizedCallerEnabled());
 
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = _createReleaseOrMintIn();
 
@@ -132,16 +111,8 @@ contract AdvancedPoolHooks_authorizedCallers is AdvancedPoolHooksSetup {
   // │                       Revert Tests                           │
   // ================================================================
 
-  function test_setAllowAnyoneToInvokeThisHook_RevertWhen_OnlyCallableByOwner() public {
-    vm.stopPrank();
-    vm.prank(STRANGER);
-
-    vm.expectRevert(Ownable2Step.OnlyCallableByOwner.selector);
-    s_advancedPoolHooks.setAllowAnyoneToInvokeThisHook(false);
-  }
-
   function test_preflightCheck_RevertWhen_UnauthorizedCaller() public {
-    assertFalse(s_hooksWithRestrictedCallers.getAllowAnyoneToInvokeThisHook());
+    assertTrue(s_hooksWithRestrictedCallers.getAuthorizedCallerEnabled());
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _createLockOrBurnIn();
 
@@ -152,7 +123,7 @@ contract AdvancedPoolHooks_authorizedCallers is AdvancedPoolHooksSetup {
   }
 
   function test_postFlightCheck_RevertWhen_UnauthorizedCaller() public {
-    assertFalse(s_hooksWithRestrictedCallers.getAllowAnyoneToInvokeThisHook());
+    assertTrue(s_hooksWithRestrictedCallers.getAuthorizedCallerEnabled());
 
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = _createReleaseOrMintIn();
 

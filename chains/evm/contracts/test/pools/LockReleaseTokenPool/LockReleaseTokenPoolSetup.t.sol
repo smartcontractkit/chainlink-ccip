@@ -39,7 +39,7 @@ contract LockReleaseTokenPoolSetup is BaseTest {
 
     s_allowedList.push(vm.randomAddress());
     s_allowedList.push(OWNER);
-    AdvancedPoolHooks advancedHooks = new AdvancedPoolHooks(s_allowedList, 0, address(0), new address[](0), true);
+    AdvancedPoolHooks advancedHooks = new AdvancedPoolHooks(s_allowedList, 0, address(0), new address[](0));
     s_lockReleaseTokenPoolWithAllowList = new LockReleaseTokenPool(
       s_token,
       DEFAULT_TOKEN_DECIMALS,

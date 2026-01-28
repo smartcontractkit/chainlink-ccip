@@ -19,6 +19,8 @@ var Version = semver.MustParse("1.7.0")
 type ConstructorArgs struct {
 	Allowlist                        []common.Address
 	ThresholdAmountForAdditionalCCVs *big.Int
+	PolicyEngine                     common.Address
+	AuthorizedCallers                []common.Address
 }
 
 type CCVConfigArg = advanced_pool_hooks.AdvancedPoolHooksCCVConfigArg
@@ -115,3 +117,15 @@ var GetThresholdAmount = contract.NewRead(contract.ReadParams[any, *big.Int, *ad
 		return advancedPoolHooks.GetThresholdAmount(opts)
 	},
 })
+
+// TODO: Uncomment after regenerating Go bindings with the new GetAuthorizedCallerEnabled method
+// var GetAuthorizedCallerEnabled = contract.NewRead(contract.ReadParams[any, bool, *advanced_pool_hooks.AdvancedPoolHooks]{
+// 	Name:         "advanced-pool-hooks:get-authorized-caller-enabled",
+// 	Version:      Version,
+// 	Description:  "Gets whether only authorized callers can invoke preflightCheck/postFlightCheck",
+// 	ContractType: ContractType,
+// 	NewContract:  advanced_pool_hooks.NewAdvancedPoolHooks,
+// 	CallContract: func(advancedPoolHooks *advanced_pool_hooks.AdvancedPoolHooks, opts *bind.CallOpts, args any) (bool, error) {
+// 		return advancedPoolHooks.GetAuthorizedCallerEnabled(opts)
+// 	},
+// })

@@ -70,7 +70,7 @@ contract AdvancedPoolHooks_preflightCheck is AdvancedPoolHooksSetup {
     address[] memory allowedSenders = new address[](1);
     allowedSenders[0] = OWNER;
     AdvancedPoolHooks hooksWithBoth =
-      new AdvancedPoolHooks(allowedSenders, 0, address(s_mockPolicyEngine), new address[](0), true);
+      new AdvancedPoolHooks(allowedSenders, 0, address(s_mockPolicyEngine), new address[](0));
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _createLockOrBurnIn(OWNER);
 
@@ -96,7 +96,7 @@ contract AdvancedPoolHooks_preflightCheck is AdvancedPoolHooksSetup {
   function test_preflightCheck_RevertWhen_SenderNotAllowed() public {
     address[] memory allowedSenders = new address[](1);
     allowedSenders[0] = OWNER;
-    AdvancedPoolHooks hooksWithAllowList = new AdvancedPoolHooks(allowedSenders, 0, address(0), new address[](0), true);
+    AdvancedPoolHooks hooksWithAllowList = new AdvancedPoolHooks(allowedSenders, 0, address(0), new address[](0));
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _createLockOrBurnIn(STRANGER);
 
