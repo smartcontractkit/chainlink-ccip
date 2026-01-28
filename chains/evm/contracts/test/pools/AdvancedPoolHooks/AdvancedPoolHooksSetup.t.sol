@@ -31,7 +31,8 @@ contract AdvancedPoolHooksSetup is BaseTest {
     deal(address(s_token), OWNER, type(uint256).max);
 
     // Create AdvancedPoolHooks with CCV threshold
-    s_advancedPoolHooks = new AdvancedPoolHooks(new address[](0), CCV_THRESHOLD_AMOUNT, address(0), new address[](0), true);
+    s_advancedPoolHooks =
+      new AdvancedPoolHooks(new address[](0), CCV_THRESHOLD_AMOUNT, address(0), new address[](0), true);
 
     s_tokenPool = new TokenPoolHelper(
       s_token, DEFAULT_TOKEN_DECIMALS, address(s_advancedPoolHooks), address(s_mockRMNRemote), address(s_sourceRouter)
@@ -59,7 +60,10 @@ contract AdvancedPoolHooksSetup is BaseTest {
   }
 
   /// @notice Helper to slice bytes, removing a prefix.
-  function _sliceBytes(bytes memory data, uint256 start) internal pure returns (bytes memory) {
+  function _sliceBytes(
+    bytes memory data,
+    uint256 start
+  ) internal pure returns (bytes memory) {
     bytes memory result = new bytes(data.length - start);
     for (uint256 i = 0; i < result.length; ++i) {
       result[i] = data[start + i];

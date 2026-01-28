@@ -62,7 +62,10 @@ contract MockPolicyEngine is IPolicyEngine {
   // ================================================================
 
   /// @notice Sets whether run() should revert.
-  function setShouldRevert(bool shouldRevert, string memory revertReason) external {
+  function setShouldRevert(
+    bool shouldRevert,
+    string memory revertReason
+  ) external {
     s_shouldRevert = shouldRevert;
     s_revertReason = revertReason;
   }
@@ -93,9 +96,15 @@ contract MockPolicyEngine is IPolicyEngine {
     return "MockPolicyEngine 1.0.0";
   }
 
-  function setExtractor(bytes4, address) external override {}
+  function setExtractor(
+    bytes4,
+    address
+  ) external override {}
 
-  function setExtractors(bytes4[] calldata, address) external override {}
+  function setExtractors(
+    bytes4[] calldata,
+    address
+  ) external override {}
 
   function getExtractor(
     bytes4
@@ -103,7 +112,10 @@ contract MockPolicyEngine is IPolicyEngine {
     return address(0);
   }
 
-  function setPolicyMapper(address, address) external override {}
+  function setPolicyMapper(
+    address,
+    address
+  ) external override {}
 
   function getPolicyMapper(
     address
@@ -111,17 +123,40 @@ contract MockPolicyEngine is IPolicyEngine {
     return address(0);
   }
 
-  function addPolicy(address, bytes4, address, bytes32[] calldata) external override {}
+  function addPolicy(
+    address,
+    bytes4,
+    address,
+    bytes32[] calldata
+  ) external override {}
 
-  function addPolicyAt(address, bytes4, address, bytes32[] calldata, uint256) external override {}
+  function addPolicyAt(
+    address,
+    bytes4,
+    address,
+    bytes32[] calldata,
+    uint256
+  ) external override {}
 
-  function removePolicy(address, bytes4, address) external override {}
+  function removePolicy(
+    address,
+    bytes4,
+    address
+  ) external override {}
 
-  function getPolicies(address, bytes4) external pure override returns (address[] memory) {
+  function getPolicies(
+    address,
+    bytes4
+  ) external pure override returns (address[] memory) {
     return new address[](0);
   }
 
-  function setPolicyConfiguration(address, uint256, bytes4, bytes calldata) external override {}
+  function setPolicyConfiguration(
+    address,
+    uint256,
+    bytes4,
+    bytes calldata
+  ) external override {}
 
   function getPolicyConfigVersion(
     address
@@ -133,5 +168,8 @@ contract MockPolicyEngine is IPolicyEngine {
     bool
   ) external override {}
 
-  function setTargetDefaultPolicyAllow(address, bool) external override {}
+  function setTargetDefaultPolicyAllow(
+    address,
+    bool
+  ) external override {}
 }

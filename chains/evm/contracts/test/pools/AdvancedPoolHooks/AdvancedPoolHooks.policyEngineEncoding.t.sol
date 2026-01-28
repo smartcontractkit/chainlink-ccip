@@ -18,8 +18,8 @@ contract AdvancedPoolHooks_policyEngineEncoding is AdvancedPoolHooksSetup {
   }
 
   function test_PoolHookOutboundPolicyDataV1_RoundTrip() public pure {
-    CCIPPolicyEnginePayloads.PoolHookOutboundPolicyDataV1 memory original = CCIPPolicyEnginePayloads
-      .PoolHookOutboundPolicyDataV1({
+    CCIPPolicyEnginePayloads.PoolHookOutboundPolicyDataV1 memory original =
+      CCIPPolicyEnginePayloads.PoolHookOutboundPolicyDataV1({
         originalSender: address(0x456),
         blockConfirmationRequested: 5,
         remoteChainSelector: 1,
@@ -47,8 +47,8 @@ contract AdvancedPoolHooks_policyEngineEncoding is AdvancedPoolHooksSetup {
   }
 
   function test_PoolHookInboundPolicyDataV1_RoundTrip() public pure {
-    CCIPPolicyEnginePayloads.PoolHookInboundPolicyDataV1 memory original = CCIPPolicyEnginePayloads
-      .PoolHookInboundPolicyDataV1({
+    CCIPPolicyEnginePayloads.PoolHookInboundPolicyDataV1 memory original =
+      CCIPPolicyEnginePayloads.PoolHookInboundPolicyDataV1({
         originalSender: abi.encode(address(0x123)),
         blockConfirmationRequested: 10,
         remoteChainSelector: 1,

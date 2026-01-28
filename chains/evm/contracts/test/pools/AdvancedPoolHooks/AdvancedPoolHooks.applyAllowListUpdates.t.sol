@@ -102,7 +102,8 @@ contract AdvancedPoolHooks_applyAllowListUpdates is TokenPoolSetup {
   }
 
   function test_applyAllowListUpdates_RevertWhen_AllowListNotEnabled() public {
-    AdvancedPoolHooks hooksWithoutAllowList = new AdvancedPoolHooks(new address[](0), 0, address(0), new address[](0), true);
+    AdvancedPoolHooks hooksWithoutAllowList =
+      new AdvancedPoolHooks(new address[](0), 0, address(0), new address[](0), true);
 
     vm.expectRevert(AdvancedPoolHooks.AllowListNotEnabled.selector);
 
