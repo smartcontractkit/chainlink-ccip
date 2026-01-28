@@ -30,9 +30,8 @@ contract AdvancedPoolHooksSetup is BaseTest {
     s_token = IERC20(address(new BurnMintERC20("LINK", "LNK", 18, 0, 0)));
     deal(address(s_token), OWNER, type(uint256).max);
 
-    // Create AdvancedPoolHooks with CCV threshold (no authorized callers means anyone can call)
-    s_advancedPoolHooks =
-      new AdvancedPoolHooks(new address[](0), CCV_THRESHOLD_AMOUNT, address(0), new address[](0));
+    // Create AdvancedPoolHooks with CCV threshold
+    s_advancedPoolHooks = new AdvancedPoolHooks(new address[](0), CCV_THRESHOLD_AMOUNT, address(0), new address[](0));
 
     s_tokenPool = new TokenPoolHelper(
       s_token, DEFAULT_TOKEN_DECIMALS, address(s_advancedPoolHooks), address(s_mockRMNRemote), address(s_sourceRouter)
@@ -57,17 +56,5 @@ contract AdvancedPoolHooksSetup is BaseTest {
     Router.OffRamp[] memory offRampUpdates = new Router.OffRamp[](1);
     offRampUpdates[0] = Router.OffRamp({sourceChainSelector: DEST_CHAIN_SELECTOR, offRamp: s_allowedOffRamp});
     s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), offRampUpdates);
-  }
-
-  /// @notice Helper to slice bytes, removing a prefix.
-  function _sliceBytes(
-    bytes memory data,
-    uint256 start
-  ) internal pure returns (bytes memory) {
-    bytes memory result = new bytes(data.length - start);
-    for (uint256 i = 0; i < result.length; ++i) {
-      result[i] = data[start + i];
-    }
-    return result;
   }
 }

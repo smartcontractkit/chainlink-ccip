@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {CCIPPolicyEnginePayloads} from "../../../libraries/CCIPPolicyEnginePayloads.sol";
+import {BytesTestHelper} from "../../helpers/BytesTestHelper.sol";
 import {AdvancedPoolHooksSetup} from "./AdvancedPoolHooksSetup.t.sol";
 
 contract AdvancedPoolHooks_policyEngineEncoding is AdvancedPoolHooksSetup {
@@ -35,7 +36,7 @@ contract AdvancedPoolHooks_policyEngineEncoding is AdvancedPoolHooksSetup {
     assertEq(CCIPPolicyEnginePayloads.POOL_HOOK_OUTBOUND_POLICY_DATA_V1_TAG, bytes4(encoded));
 
     CCIPPolicyEnginePayloads.PoolHookOutboundPolicyDataV1 memory decoded =
-      abi.decode(_sliceBytes(encoded, 4), (CCIPPolicyEnginePayloads.PoolHookOutboundPolicyDataV1));
+      abi.decode(BytesTestHelper._slice(encoded, 4), (CCIPPolicyEnginePayloads.PoolHookOutboundPolicyDataV1));
 
     assertEq(original.originalSender, decoded.originalSender);
     assertEq(original.blockConfirmationRequested, decoded.blockConfirmationRequested);
@@ -67,7 +68,7 @@ contract AdvancedPoolHooks_policyEngineEncoding is AdvancedPoolHooksSetup {
     assertEq(CCIPPolicyEnginePayloads.POOL_HOOK_INBOUND_POLICY_DATA_V1_TAG, bytes4(encoded));
 
     CCIPPolicyEnginePayloads.PoolHookInboundPolicyDataV1 memory decoded =
-      abi.decode(_sliceBytes(encoded, 4), (CCIPPolicyEnginePayloads.PoolHookInboundPolicyDataV1));
+      abi.decode(BytesTestHelper._slice(encoded, 4), (CCIPPolicyEnginePayloads.PoolHookInboundPolicyDataV1));
 
     assertEq(original.originalSender, decoded.originalSender);
     assertEq(original.blockConfirmationRequested, decoded.blockConfirmationRequested);
