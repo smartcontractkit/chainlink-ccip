@@ -405,7 +405,7 @@ func applyAddDonAndSetCandidateChangesetConfig(e deployment.Environment, cfg Add
 				return deployment.ChangesetOutput{}, err
 			}
 		case chain_selectors.FamilyTon:
-			a := &tonSeqs.TonAdapter{}
+			a := &tonSeqs.TonLaneAdapter{}
 			offRampAddress, err = a.GetOffRampAddress(e.DataStore, chainSelector)
 			if err != nil {
 				return deployment.ChangesetOutput{}, err
@@ -900,7 +900,7 @@ func applySetCandidateChangesetConfig(e deployment.Environment, cfg SetCandidate
 					return deployment.ChangesetOutput{}, err
 				}
 			case chain_selectors.FamilyTon:
-				a := &tonSeqs.TonAdapter{}
+				a := &tonSeqs.TonLaneAdapter{}
 				offRampAddress, err = a.GetOffRampAddress(e.DataStore, chainSelector)
 				if err != nil {
 					return deployment.ChangesetOutput{}, err
