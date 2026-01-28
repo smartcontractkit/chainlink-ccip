@@ -202,6 +202,7 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 			deployTokenPoolInput := DeployTokenPoolInput{
 				TokenSymbol:        deployTokenInput.Symbol,
 				TokenPoolQualifier: input.TokenPoolQualifier,
+				TokenPoolVersion:   input.TokenPoolVersion,
 				PoolType:           input.PoolType,
 			}
 			deployTokenPoolInput.ExistingDataStore = e.DataStore
