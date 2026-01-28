@@ -164,7 +164,6 @@ func (a *SolanaAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokenapi.De
 			b.Logger.Info("SVM Deploying token:", input)
 			chain := chains.SolanaChains()[input.ChainSelector]
 
-			// TODO: Add support for LnR type here
 			op := tokenpoolops.InitializeBurnMint
 			switch input.PoolType {
 			case common_utils.BurnMintTokenPool.String():
@@ -214,7 +213,7 @@ func (a *SolanaAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokenapi.De
 
 			poolSigner, _ := tokens.TokenPoolSignerAddress(tokenMint, tokenPool)
 
-			// ata for token pool
+			// ATA for token pool
 			tokenPoolATA, _, err := tokens.FindAssociatedTokenAddress(tokenProgramId, tokenMint, poolSigner)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to find associated token address for token pool: %w", err)
