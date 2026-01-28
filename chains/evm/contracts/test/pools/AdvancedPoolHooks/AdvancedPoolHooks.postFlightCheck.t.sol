@@ -40,16 +40,12 @@ contract AdvancedPoolHooks_postFlightCheck is AdvancedPoolHooksSetup {
 
     s_advancedPoolHooks.postFlightCheck(releaseOrMintIn, localAmount, blockConfirmationRequested);
 
-    // Verify policy engine was called with correct payload
     IPolicyEngine.Payload memory lastPayload = s_mockPolicyEngine.getLastPayload();
     assertEq(IAdvancedPoolHooks.postFlightCheck.selector, lastPayload.selector);
     assertEq(OWNER, lastPayload.sender);
     assertEq("", lastPayload.context);
-
-    // Verify tag prefix
     assertEq(CCIPPolicyEnginePayloads.POOL_HOOK_INBOUND_POLICY_DATA_V1_TAG, bytes4(lastPayload.data));
 
-    // Decode and verify the payload data
     CCIPPolicyEnginePayloads.PoolHookInboundPolicyDataV1 memory decoded =
       abi.decode(BytesTestHelper._slice(lastPayload.data, 4), (CCIPPolicyEnginePayloads.PoolHookInboundPolicyDataV1));
 
@@ -70,11 +66,8 @@ contract AdvancedPoolHooks_postFlightCheck is AdvancedPoolHooksSetup {
 
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = _createReleaseOrMintIn();
 
-    // Should not revert when policy engine is not set
     s_advancedPoolHooks.postFlightCheck(releaseOrMintIn, 100e18, 5);
   }
-
-  // Reverts
 
   function test_postFlightCheck_RevertWhen_PolicyEngineRejects() public {
     s_advancedPoolHooks.setPolicyEngine(address(s_mockPolicyEngine));

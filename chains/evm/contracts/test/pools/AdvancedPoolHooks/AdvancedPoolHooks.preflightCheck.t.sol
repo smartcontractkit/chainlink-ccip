@@ -63,7 +63,6 @@ contract AdvancedPoolHooks_preflightCheck is AdvancedPoolHooksSetup {
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _createLockOrBurnIn(OWNER);
 
-    // Should not revert when policy engine is not set
     s_advancedPoolHooks.preflightCheck(lockOrBurnIn, 5, "");
   }
 
@@ -81,8 +80,6 @@ contract AdvancedPoolHooks_preflightCheck is AdvancedPoolHooksSetup {
     assertEq(IAdvancedPoolHooks.preflightCheck.selector, lastPayload.selector);
     assertEq(CCIPPolicyEnginePayloads.POOL_HOOK_OUTBOUND_POLICY_DATA_V1_TAG, bytes4(lastPayload.data));
   }
-
-  // Reverts
 
   function test_preflightCheck_RevertWhen_PolicyEngineRejects() public {
     s_advancedPoolHooks.setPolicyEngine(address(s_mockPolicyEngine));

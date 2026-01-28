@@ -18,12 +18,7 @@ contract AdvancedPoolHooks_authorizedCallers is AdvancedPoolHooksSetup {
     // Create AdvancedPoolHooks with restricted callers (authorizedCallers.length > 0 enables restriction)
     address[] memory authorizedCallers = new address[](1);
     authorizedCallers[0] = s_authorizedCaller;
-    s_hooksWithRestrictedCallers = new AdvancedPoolHooks(
-      new address[](0), // no allowlist
-      0, // no threshold
-      address(0), // no policy engine
-      authorizedCallers // only authorized callers can invoke
-    );
+    s_hooksWithRestrictedCallers = new AdvancedPoolHooks(new address[](0), 0, address(0), authorizedCallers);
   }
 
   function _createLockOrBurnIn() internal view returns (Pool.LockOrBurnInV1 memory) {
@@ -49,37 +44,26 @@ contract AdvancedPoolHooks_authorizedCallers is AdvancedPoolHooksSetup {
     });
   }
 
-  // ================================================================
-  // │                       Success Tests                          │
-  // ================================================================
-
   function test_getAuthorizedCallersEnabled() public view {
-    // Default setup allows anyone to invoke (authorizedCallersEnabled = false)
     assertFalse(s_advancedPoolHooks.getAuthorizedCallersEnabled());
-
-    // Hooks with restricted callers (authorizedCallersEnabled = true)
     assertTrue(s_hooksWithRestrictedCallers.getAuthorizedCallersEnabled());
   }
 
   function test_preflightCheck_WhenAnyoneCanInvoke() public {
-    // Default setup allows anyone to invoke (authorizedCallersEnabled = false)
     assertFalse(s_advancedPoolHooks.getAuthorizedCallersEnabled());
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _createLockOrBurnIn();
 
-    // Any caller should be able to call when anyone can invoke
     vm.stopPrank();
     vm.prank(s_unauthorizedCaller);
     s_advancedPoolHooks.preflightCheck(lockOrBurnIn, 5, "");
   }
 
   function test_postFlightCheck_WhenAnyoneCanInvoke() public {
-    // Default setup allows anyone to invoke (authorizedCallersEnabled = false)
     assertFalse(s_advancedPoolHooks.getAuthorizedCallersEnabled());
 
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = _createReleaseOrMintIn();
 
-    // Any caller should be able to call when anyone can invoke
     vm.stopPrank();
     vm.prank(s_unauthorizedCaller);
     s_advancedPoolHooks.postFlightCheck(releaseOrMintIn, 100e18, 5);
@@ -90,7 +74,6 @@ contract AdvancedPoolHooks_authorizedCallers is AdvancedPoolHooksSetup {
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _createLockOrBurnIn();
 
-    // Authorized caller should succeed
     vm.stopPrank();
     vm.prank(s_authorizedCaller);
     s_hooksWithRestrictedCallers.preflightCheck(lockOrBurnIn, 5, "");
@@ -101,15 +84,10 @@ contract AdvancedPoolHooks_authorizedCallers is AdvancedPoolHooksSetup {
 
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = _createReleaseOrMintIn();
 
-    // Authorized caller should succeed
     vm.stopPrank();
     vm.prank(s_authorizedCaller);
     s_hooksWithRestrictedCallers.postFlightCheck(releaseOrMintIn, 100e18, 5);
   }
-
-  // ================================================================
-  // │                       Revert Tests                           │
-  // ================================================================
 
   function test_preflightCheck_RevertWhen_UnauthorizedCaller() public {
     assertTrue(s_hooksWithRestrictedCallers.getAuthorizedCallersEnabled());
@@ -117,8 +95,8 @@ contract AdvancedPoolHooks_authorizedCallers is AdvancedPoolHooksSetup {
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _createLockOrBurnIn();
 
     vm.stopPrank();
-    vm.expectRevert(abi.encodeWithSelector(AuthorizedCallers.UnauthorizedCaller.selector, s_unauthorizedCaller));
     vm.prank(s_unauthorizedCaller);
+    vm.expectRevert(abi.encodeWithSelector(AuthorizedCallers.UnauthorizedCaller.selector, s_unauthorizedCaller));
     s_hooksWithRestrictedCallers.preflightCheck(lockOrBurnIn, 5, "");
   }
 
@@ -128,8 +106,8 @@ contract AdvancedPoolHooks_authorizedCallers is AdvancedPoolHooksSetup {
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = _createReleaseOrMintIn();
 
     vm.stopPrank();
-    vm.expectRevert(abi.encodeWithSelector(AuthorizedCallers.UnauthorizedCaller.selector, s_unauthorizedCaller));
     vm.prank(s_unauthorizedCaller);
+    vm.expectRevert(abi.encodeWithSelector(AuthorizedCallers.UnauthorizedCaller.selector, s_unauthorizedCaller));
     s_hooksWithRestrictedCallers.postFlightCheck(releaseOrMintIn, 100e18, 5);
   }
 }
