@@ -164,119 +164,117 @@ var InitializeLockRelease = operations.NewOperation(
 		return sequences.OnChainOutput{}, nil
 	})
 
+type initGlobalCfgParams struct {
+	PoolTypeLabel string // e.g. common_utils.BurnMintTokenPool.String()
+	LogName       string // e.g. "BurnMintTokenPool"
+	SetProgramID  func(solana.PublicKey)
+	BuildInitIx   func(configPDA solana.PublicKey, upgradeAuthority solana.PublicKey, programData solana.PublicKey) (solana.Instruction, error)
+}
+
+// initGlobalConfigTokenPool initializes the token pool global config if not initialized.
+// If upgradeAuthority != deployer => produces MCMS batch op, otherwise sends tx directly.
+func initGlobalConfigTokenPool(
+	b operations.Bundle,
+	chain cldf_solana.Chain,
+	input Params,
+	p initGlobalCfgParams,
+) (sequences.OnChainOutput, error) {
+	p.SetProgramID(input.TokenPool)
+
+	programData, err := utils.GetSolProgramData(chain.Client, input.TokenPool)
+	if err != nil {
+		return sequences.OnChainOutput{}, err
+	}
+
+	upgradeAuthority, err := utils.GetUpgradeAuthority(chain.Client, input.TokenPool)
+	if err != nil {
+		return sequences.OnChainOutput{}, err
+	}
+
+	configPDA, _, _ := state.FindConfigPDA(input.TokenPool)
+
+	// Check if already initialized.
+	var chainConfig base_token_pool.BaseConfig
+	_ = chain.GetAccountDataBorshInto(context.Background(), configPDA, &chainConfig)
+	if !chainConfig.TokenProgram.IsZero() {
+		b.Logger.Info(p.LogName+" global config already initialized for token pool:", input.TokenPool.String())
+		return sequences.OnChainOutput{}, nil
+	}
+
+	ixn, err := p.BuildInitIx(configPDA, upgradeAuthority, programData.Address)
+	if err != nil {
+		return sequences.OnChainOutput{}, err
+	}
+
+	// If deployer isn't upgrade authority, create MCMS batch op.
+	if upgradeAuthority != chain.DeployerKey.PublicKey() {
+		batch, err := utils.BuildMCMSBatchOperation(
+			chain.Selector,
+			[]solana.Instruction{ixn},
+			input.TokenPool.String(),
+			p.PoolTypeLabel,
+		)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to execute or create batch: %w", err)
+		}
+		return sequences.OnChainOutput{BatchOps: []types.BatchOperation{batch}}, nil
+	}
+
+	// Otherwise execute directly.
+	if err := chain.Confirm([]solana.Instruction{ixn}); err != nil {
+		return sequences.OnChainOutput{}, err
+	}
+
+	return sequences.OnChainOutput{}, nil
+}
+
 var InitGlobalConfigBurnMint = operations.NewOperation(
 	"burnmint:global_config",
 	common_utils.Version_1_6_0,
 	"Initializes the BurnMintTokenPool global config",
 	func(b operations.Bundle, chain cldf_solana.Chain, input Params) (sequences.OnChainOutput, error) {
-		burnmint_token_pool.SetProgramID(input.TokenPool)
-		programData, err := utils.GetSolProgramData(chain.Client, input.TokenPool)
-		if err != nil {
-			return sequences.OnChainOutput{}, err
-		}
-		upgradeAuthority, err := utils.GetUpgradeAuthority(chain.Client, input.TokenPool)
-		if err != nil {
-			return sequences.OnChainOutput{}, err
-		}
-		configPDA, _, _ := state.FindConfigPDA(input.TokenPool)
-		var chainConfig base_token_pool.BaseConfig
-		_ = chain.GetAccountDataBorshInto(context.Background(), configPDA, &chainConfig)
-		// already initialized
-		if !chainConfig.TokenProgram.IsZero() {
-			b.Logger.Info("BurnMintTokenPool global config already initialized for token pool:", input.TokenPool.String())
-			return sequences.OnChainOutput{}, nil
-		}
-		batches := make([]types.BatchOperation, 0)
-		ixn, err := burnmint_token_pool.NewInitGlobalConfigInstruction(
-			input.Router,
-			input.RMNRemote,
-			configPDA,
-			upgradeAuthority,
-			solana.SystemProgramID,
-			input.TokenPool,
-			programData.Address,
-		).ValidateAndBuild()
-		if err != nil {
-			return sequences.OnChainOutput{}, err
-		}
-		if upgradeAuthority != chain.DeployerKey.PublicKey() {
-			b, err := utils.BuildMCMSBatchOperation(
-				chain.Selector,
-				[]solana.Instruction{ixn},
-				input.TokenPool.String(),
-				common_utils.BurnMintTokenPool.String(),
-			)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute or create batch: %w", err)
-			}
-			batches = append(batches, b)
-			return sequences.OnChainOutput{BatchOps: batches}, nil
-		} else {
-			err = chain.Confirm([]solana.Instruction{ixn})
-			if err != nil {
-				return sequences.OnChainOutput{}, err
-			}
-		}
-
-		return sequences.OnChainOutput{}, nil
-	})
+		return initGlobalConfigTokenPool(b, chain, input, initGlobalCfgParams{
+			PoolTypeLabel: common_utils.BurnMintTokenPool.String(),
+			LogName:       "BurnMintTokenPool",
+			SetProgramID:  burnmint_token_pool.SetProgramID,
+			BuildInitIx: func(configPDA solana.PublicKey, upgradeAuthority solana.PublicKey, programData solana.PublicKey) (solana.Instruction, error) {
+				return burnmint_token_pool.NewInitGlobalConfigInstruction(
+					input.Router,
+					input.RMNRemote,
+					configPDA,
+					upgradeAuthority,
+					solana.SystemProgramID,
+					input.TokenPool,
+					programData,
+				).ValidateAndBuild()
+			},
+		})
+	},
+)
 
 var InitGlobalConfigLockRelease = operations.NewOperation(
 	"lockrelease:global_config",
 	common_utils.Version_1_6_0,
 	"Initializes the LockReleaseTokenPool global config",
 	func(b operations.Bundle, chain cldf_solana.Chain, input Params) (sequences.OnChainOutput, error) {
-		lockrelease_token_pool.SetProgramID(input.TokenPool)
-		programData, err := utils.GetSolProgramData(chain.Client, input.TokenPool)
-		if err != nil {
-			return sequences.OnChainOutput{}, err
-		}
-		upgradeAuthority, err := utils.GetUpgradeAuthority(chain.Client, input.TokenPool)
-		if err != nil {
-			return sequences.OnChainOutput{}, err
-		}
-		configPDA, _, _ := state.FindConfigPDA(input.TokenPool)
-		var chainConfig base_token_pool.BaseConfig
-		_ = chain.GetAccountDataBorshInto(context.Background(), configPDA, &chainConfig)
-		// already initialized
-		if !chainConfig.TokenProgram.IsZero() {
-			b.Logger.Info("LockReleaseTokenPool global config already initialized for token pool:", input.TokenPool.String())
-			return sequences.OnChainOutput{}, nil
-		}
-		batches := make([]types.BatchOperation, 0)
-		ixn, err := lockrelease_token_pool.NewInitGlobalConfigInstruction(
-			input.Router,
-			input.RMNRemote,
-			configPDA,
-			upgradeAuthority,
-			solana.SystemProgramID,
-			input.TokenPool,
-			programData.Address,
-		).ValidateAndBuild()
-		if err != nil {
-			return sequences.OnChainOutput{}, err
-		}
-		if upgradeAuthority != chain.DeployerKey.PublicKey() {
-			b, err := utils.BuildMCMSBatchOperation(
-				chain.Selector,
-				[]solana.Instruction{ixn},
-				input.TokenPool.String(),
-				common_utils.LockReleaseTokenPool.String(),
-			)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute or create batch: %w", err)
-			}
-			batches = append(batches, b)
-			return sequences.OnChainOutput{BatchOps: batches}, nil
-		} else {
-			err = chain.Confirm([]solana.Instruction{ixn})
-			if err != nil {
-				return sequences.OnChainOutput{}, err
-			}
-		}
-
-		return sequences.OnChainOutput{}, nil
-	})
+		return initGlobalConfigTokenPool(b, chain, input, initGlobalCfgParams{
+			PoolTypeLabel: common_utils.LockReleaseTokenPool.String(),
+			LogName:       "LockReleaseTokenPool",
+			SetProgramID:  lockrelease_token_pool.SetProgramID,
+			BuildInitIx: func(configPDA solana.PublicKey, upgradeAuthority solana.PublicKey, programData solana.PublicKey) (solana.Instruction, error) {
+				return lockrelease_token_pool.NewInitGlobalConfigInstruction(
+					input.Router,
+					input.RMNRemote,
+					configPDA,
+					upgradeAuthority,
+					solana.SystemProgramID,
+					input.TokenPool,
+					programData,
+				).ValidateAndBuild()
+			},
+		})
+	},
+)
 
 var TransferMintAuthorityBurnMint = operations.NewOperation(
 	"burnmint:transfer_mint_authority",
