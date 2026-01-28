@@ -42,7 +42,7 @@ func (a *SolanaAdapter) DeriveTokenAddress(e deployment.Environment, chainSelect
 // So, this changeset includes the minimum configuration that CCIP Admin needs to do in the Token Admin Registry and in the Token Pool Program
 func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualRegistrationInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return cldf_ops.NewSequence(
-		"evm-adapter:manual-registration",
+		"svm-adapter:manual-registration",
 		common_utils.Version_1_6_0,
 		"Manually register a token and token pool on multiple EVM chains",
 		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokenapi.ManualRegistrationInput) (sequences.OnChainOutput, error) {
@@ -53,21 +53,22 @@ func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualR
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to upsert address %v: %w", addr, err)
 				}
 			}
-
 			chain, ok := chains.SolanaChains()[input.ChainSelector]
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
-
 			tokenAddr, _, err := getTokenMintAndTokenProgram(input.ExistingDataStore, input.RegisterTokenConfigs.TokenSymbol, chain)
 			if err != nil {
 				return sequences.OnChainOutput{}, err
 			}
-
 			routerAddr, err := a.GetRouterAddress(input.ExistingDataStore, input.ChainSelector)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get router address: %w", err)
 			}
+
+			////////////////////////////
+			/// Token Admin Registry ///
+			////////////////////////////
 
 			// if no token admin provided, ccip admin becomes the admin
 			var tokenAdmin solana.PublicKey
@@ -86,6 +87,18 @@ func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualR
 			}
 			result.Addresses = append(result.Addresses, rtarOut.Output.Addresses...)
 			result.BatchOps = append(result.BatchOps, rtarOut.Output.BatchOps...)
+
+			/////////////////////////////
+			/// Initialize Token Pool ///
+			/////////////////////////////
+
+			// TODO
+
+			/////////////////////////////
+			/// Create Token Multisig ///
+			/////////////////////////////
+
+			// TODO
 
 			return result, nil
 		})
@@ -156,6 +169,8 @@ func (a *SolanaAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokenapi.De
 			switch input.PoolType {
 			case common_utils.BurnMintTokenPool.String():
 				op = tokenpoolops.InitializeBurnMint
+			case common_utils.LockReleaseTokenPool.String():
+				op = tokenpoolops.InitializeLockRelease
 			default:
 				return sequences.OnChainOutput{}, fmt.Errorf("unsupported token pool type '%s' for Solana", input.PoolType)
 			}
