@@ -31,6 +31,6 @@ library CCIPPolicyEnginePayloads {
     bytes sourcePoolAddress; //               The address of the source pool, abi encoded in the case of EVM chains.
     bytes sourcePoolData; //                  The data received from the source pool to process the release or mint.
     bytes offchainTokenData; //               The offchain data to process the release or mint.
-    uint256 localAmount; //                   The address on this chain of the token to release or mint.
+    uint256 localAmount; //                   The local amount of tokens on dest chain to be released or minted.
   }
 }

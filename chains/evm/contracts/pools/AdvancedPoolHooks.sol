@@ -53,7 +53,7 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, AuthorizedCallers {
   bool internal immutable i_allowlistEnabled;
 
   /// @dev The immutable flag that indicates if preflightCheck/postFlightCheck are access-controlled.
-  bool internal immutable i_authorizedCallerEnabled;
+  bool internal immutable i_authorizedCallersEnabled;
 
   /// @dev A set of addresses allowed to trigger lockOrBurn as original senders.
   /// Only takes effect if i_allowlistEnabled is true.
@@ -83,7 +83,7 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, AuthorizedCallers {
     }
     s_thresholdAmountForAdditionalCCVs = thresholdAmountForAdditionalCCVs;
 
-    i_authorizedCallerEnabled = authorizedCallers.length > 0;
+    i_authorizedCallersEnabled = authorizedCallers.length > 0;
     _setPolicyEngine(policyEngine, false);
   }
 
@@ -94,7 +94,7 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, AuthorizedCallers {
     uint16 blockConfirmationRequested,
     bytes calldata tokenArgs
   ) external {
-    if (i_authorizedCallerEnabled) {
+    if (i_authorizedCallersEnabled) {
       _validateCaller();
     }
     checkAllowList(lockOrBurnIn.originalSender);
@@ -130,7 +130,7 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, AuthorizedCallers {
     uint256 localAmount,
     uint16 blockConfirmationRequested
   ) external {
-    if (i_authorizedCallerEnabled) {
+    if (i_authorizedCallersEnabled) {
       _validateCaller();
     }
 
@@ -415,7 +415,7 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, AuthorizedCallers {
 
   /// @notice Gets whether only authorized callers can invoke preflightCheck/postFlightCheck.
   /// @return true if only authorized callers can call, false if anyone can call.
-  function getAuthorizedCallerEnabled() external view returns (bool) {
-    return i_authorizedCallerEnabled;
+  function getAuthorizedCallersEnabled() external view returns (bool) {
+    return i_authorizedCallersEnabled;
   }
 }
