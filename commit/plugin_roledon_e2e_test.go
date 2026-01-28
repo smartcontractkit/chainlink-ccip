@@ -128,7 +128,7 @@ func TestPlugin_RoleDonE2E_NoPrevOutcome(t *testing.T) {
 						OnRamp:                    clrand.RandomBytes(32),
 					}
 				}
-				deps.ccipReader.EXPECT().GetOffRampSourceChainsConfig(mock.Anything, s.sourceChains).Return(sourceChainsCfg, nil)
+				deps.ccipReader.EXPECT().GetOffRampSourceChainsConfig(mock.Anything, mock.Anything).Return(sourceChainsCfg, nil)
 
 				deps.priceReader.EXPECT().GetFeeQuoterTokenUpdates(mock.Anything, mock.Anything, s.destChain).Return(nil, nil)
 
