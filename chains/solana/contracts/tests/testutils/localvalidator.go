@@ -121,9 +121,13 @@ func SetupLocalSolNodeWithFlags(t *testing.T, flags ...string) (string, string) 
 func FundTestAccounts(t *testing.T, keys []solana.PublicKey, url string) {
 	t.Helper()
 
+	ctx := t.Context()
+
 	for i := range keys {
 		account := keys[i].String()
-		_, err := exec.Command("solana", "airdrop", "100",
+		_, err := exec.CommandContext(
+			ctx,
+			"solana", "airdrop", "100",
 			account,
 			"--url", url,
 		).Output()
