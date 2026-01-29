@@ -91,7 +91,6 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 		})
 
 		t.Run("RMN Remote", func(t *testing.T) {
-
 			// get program data account
 			data, err := solanaGoClient.GetAccountInfoWithOpts(ctx, config.RMNRemoteProgram, &rpc.GetAccountInfoOpts{
 				Commitment: config.DefaultCommitment,
@@ -142,7 +141,6 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{
 				&tokens.TokenInstruction{Instruction: ix, Program: p.poolProgram},
 			}, admin, config.DefaultCommitment)
-
 		})
 
 		// test functionality with token & token-2022 standards
@@ -415,7 +413,6 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 
 				// If it wasn't a multisig, then we test the upgrade path to change the mint authority to a multisig
 				if p.poolName == "burnmint" && !v.multisig {
-
 					poolSigner, err := tokens.TokenPoolSignerAddress(mint, poolProgram)
 					require.NoError(t, err)
 					poolConfig, err := tokens.TokenPoolConfigAddress(mint, poolProgram)
@@ -689,7 +686,6 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{
 						&tokens.TokenInstruction{Instruction: poolInitI, Program: p.PoolProgram},
 					}, newOwner, config.DefaultCommitment)
-
 				})
 			}
 		})
