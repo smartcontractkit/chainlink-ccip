@@ -33,7 +33,7 @@ type ConfigureTokenPoolForRemoteChainInput struct {
 // chain token transfers with other remote chains. It's capable of configuring multiple
 // remote chains with a single invocation.
 var ConfigureTokenPoolForRemoteChains = cldf_ops.NewSequence(
-	"token-pool:configure-token-pool",
+	"token-pool:configure-token-pool-for-remote-chains",
 	tpops.Version,
 	"Configure a token on an EVM chain for cross-chain transfers",
 	func(b cldf_ops.Bundle, chain evm.Chain, input ConfigureTokenPoolForRemoteChainsInput) (sequences.OnChainOutput, error) {
@@ -84,7 +84,7 @@ var ConfigureTokenPoolForRemoteChains = cldf_ops.NewSequence(
 // configuring a token pool for a SINGLE remote chain. The sequence allows the upper
 // level ConfigureTokenPoolForRemoteChains sequence to handle multiple remote chains
 var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
-	"token-pool:configure-token-pool-for-one-remote-chain",
+	"token-pool:configure-token-pool-for-remote-chain",
 	tpops.Version,
 	"Configures a token pool on an EVM chain for transfers with other chains",
 	func(b cldf_ops.Bundle, chain evm.Chain, input ConfigureTokenPoolForRemoteChainInput) (sequences.OnChainOutput, error) {
