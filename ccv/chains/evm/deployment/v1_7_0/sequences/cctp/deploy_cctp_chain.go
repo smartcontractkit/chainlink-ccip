@@ -46,7 +46,7 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 	"deploy-cctp-chain",
 	semver.MustParse("1.7.0"),
 	"Deploys & configures the CCTP contracts on a chain",
-	func(b cldf_ops.Bundle, dep adapters.CCTPSequenceDeps, input adapters.DeployCCTPInput) (output sequences.OnChainOutput, err error) {
+	func(b cldf_ops.Bundle, dep adapters.DeployCCTPChainDeps, input adapters.DeployCCTPInput) (output sequences.OnChainOutput, err error) {
 		addresses := make([]datastore.AddressRef, 0)
 		writes := make([]contract_utils.WriteOutput, 0)
 		batchOps := make([]mcms_types.BatchOperation, 0)

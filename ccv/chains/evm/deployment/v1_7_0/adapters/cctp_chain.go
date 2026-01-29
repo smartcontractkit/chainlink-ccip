@@ -29,12 +29,12 @@ func (c *CCTPChainAdapter) AddressRefToBytes(ref datastore.AddressRef) ([]byte, 
 }
 
 // DeployCCTPChain returns the sequence for deploying a CCTP chain.
-func (c *CCTPChainAdapter) DeployCCTPChain() *operations.Sequence[adapters.DeployCCTPInput, seq_core.OnChainOutput, adapters.CCTPSequenceDeps] {
+func (c *CCTPChainAdapter) DeployCCTPChain() *operations.Sequence[adapters.DeployCCTPInput, seq_core.OnChainOutput, adapters.DeployCCTPChainDeps] {
 	return cctp.DeployCCTPChain
 }
 
 // ConfigureCCTPChainForLanes returns the sequence for configuring a CCTP chain for lanes.
-func (c *CCTPChainAdapter) ConfigureCCTPChainForLanes() *operations.Sequence[adapters.ConfigureCCTPChainForLanesInput, seq_core.OnChainOutput, adapters.CCTPSequenceDeps] {
+func (c *CCTPChainAdapter) ConfigureCCTPChainForLanes() *operations.Sequence[adapters.ConfigureCCTPChainForLanesInput, seq_core.OnChainOutput, adapters.ConfigureCCTPChainForLanesDeps] {
 	return cctp.ConfigureCCTPChainForLanes
 }
 
