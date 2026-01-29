@@ -330,8 +330,8 @@ func TestTokensAndTokenPools(t *testing.T) {
 		})
 
 		t.Run("Validate ManualRegistration", func(t *testing.T) {
-			// Verify that the token and token pool exist in datastore
 			for _, data := range evmTestData {
+				// Verify that the token and token pool exist in datastore
 				tokAddress, err := evmAdapter.FindOneTokenAddress(env.DataStore, data.Chain.Selector, data.Token.Symbol)
 				require.NoError(t, err)
 				tpAddress, err := evmAdapter.FindLatestTokenPoolAddress(env.DataStore, data.Chain.Selector, data.TokenPoolQualifier, evmTokenPoolType.String())
@@ -454,7 +454,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 			// configured on chain A. Thus, running this twice in a row tests the idempotency of
 			// the changeset.
 			for range 2 {
-				// Run the ConfigureTokensForTransfers changeset
+				// Run the changeset
 				output, err = tokensapi.ConfigureTokensForTransfers(tokenRegistry, mcmsRegistry).Apply(*env, input)
 				require.NoError(t, err)
 				MergeAddresses(t, env, output.DataStore)
