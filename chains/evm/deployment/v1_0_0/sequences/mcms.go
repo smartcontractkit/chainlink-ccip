@@ -11,7 +11,7 @@ import (
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc677"
-	"github.com/smartcontractkit/mcms/sdk/evm"
+	"github.com/smartcontractkit/mcms/sdk"
 	"github.com/smartcontractkit/mcms/sdk/evm/bindings"
 	"github.com/smartcontractkit/mcms/types"
 
@@ -82,7 +82,7 @@ var SeqDeployMCMWithConfig = cldf_ops.NewSequence(
 		}
 
 		// Set config
-		groupQuorums, groupParents, signerAddresses, signerGroups, err := evm.ExtractSetConfigInputs(in.MCMConfig)
+		groupQuorums, groupParents, signerAddresses, signerGroups, err := sdk.ExtractSetConfigInputs(in.MCMConfig)
 		if err != nil {
 			return sequences.OnChainOutput{}, err
 		}
