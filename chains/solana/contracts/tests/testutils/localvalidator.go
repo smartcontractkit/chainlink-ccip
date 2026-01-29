@@ -32,9 +32,9 @@ func getPorts(t *testing.T) (rpcPort, wsPort, faucetPort, gossipPort string) {
 	attempts := 5
 
 	for range attempts {
-		rpcPort = utils.MustRandomPort(t)
+		portInt := freeport.GetOne(t)
 
-		portInt, _ := strconv.Atoi(rpcPort)
+		rpcPort = strconv.Itoa(portInt)
 		wsPort = strconv.Itoa(portInt + 1) // WS port must be RPC+1
 
 		if !utils.IsPortOpen(t, wsPort) {
@@ -80,7 +80,8 @@ func SetupLocalSolNodeWithFlags(t *testing.T, flags ...string) (string, string) 
 		"--deactivate-feature", "EenyoWx9UMXYKpR8mW5Jmfmy2fRjzUtM7NduYMY8bx33",
 	}, flags...)
 
-	cmd := exec.Command("solana-test-validator", args...)
+	ctx := t.Context()
+	cmd := exec.CommandContext(ctx, "solana-test-validator", args...)
 
 	var stdErr bytes.Buffer
 	cmd.Stderr = &stdErr

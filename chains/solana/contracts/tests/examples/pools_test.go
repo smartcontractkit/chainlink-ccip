@@ -195,15 +195,15 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 					require.NoError(t, err)
 
 					t.Run("setup", func(t *testing.T) {
-						poolInitI, err := tokenpool.NewInitializeInstruction(poolConfig, mint, admin.PublicKey(), solana.SystemProgramID, poolProgram, programData.Address, configPDA).ValidateAndBuild()
-						require.NoError(t, err)
+						poolInitI, initErr := tokenpool.NewInitializeInstruction(poolConfig, mint, admin.PublicKey(), solana.SystemProgramID, poolProgram, programData.Address, configPDA).ValidateAndBuild()
+						require.NoError(t, initErr)
 
 						newMintAuthority := poolSigner
 
 						if v.multisig {
 							// create multisig
-							multisig, err := solana.NewRandomPrivateKey()
-							require.NoError(t, err)
+							multisig, newKeyErr := solana.NewRandomPrivateKey()
+							require.NoError(t, newKeyErr)
 							ixMsig, ixErrMsig := tokens.CreateMultisig(ctx, admin.PublicKey(), v.tokenProgram, multisig.PublicKey(), 1, []solana.PublicKey{admin.PublicKey(), poolSigner}, solanaGoClient, config.DefaultCommitment)
 							require.NoError(t, ixErrMsig)
 							testutils.SendAndConfirm(ctx, t, solanaGoClient, ixMsig, admin, config.DefaultCommitment, common.AddSigners(multisig, admin))
@@ -213,11 +213,11 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 						}
 
 						// make pool mint_authority for token (required for burn/mint) poolsigner or multisig
-						authI, err := tokens.SetTokenMintAuthority(v.tokenProgram, newMintAuthority, mint, admin.PublicKey())
-						require.NoError(t, err)
+						authI, setAuthorityErr := tokens.SetTokenMintAuthority(v.tokenProgram, newMintAuthority, mint, admin.PublicKey())
+						require.NoError(t, setAuthorityErr)
 
 						// set pool config
-						ixConfigure, err := tokenpool.NewInitChainRemoteConfigInstruction(
+						ixConfigure, initChainRemoteErr := tokenpool.NewInitChainRemoteConfigInstruction(
 							config.EvmChainSelector,
 							tokenPool.Mint,
 							tokenpool.RemoteConfig{
@@ -229,12 +229,12 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 							admin.PublicKey(),
 							solana.SystemProgramID,
 						).ValidateAndBuild()
-						require.NoError(t, err)
+						require.NoError(t, initChainRemoteErr)
 
-						ixAppend, err := tokenpool.NewAppendRemotePoolAddressesInstruction(
+						ixAppend, appendErr := tokenpool.NewAppendRemotePoolAddressesInstruction(
 							config.EvmChainSelector, tokenPool.Mint, []tokenpool.RemoteAddress{remotePool}, poolConfig, tokenPool.Chain[config.EvmChainSelector], admin.PublicKey(), solana.SystemProgramID,
 						).ValidateAndBuild()
-						require.NoError(t, err)
+						require.NoError(t, appendErr)
 
 						testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{
 							&tokens.TokenInstruction{Instruction: poolInitI, Program: poolProgram},
@@ -248,16 +248,16 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 						a, _ := solana.NewRandomPrivateKey()
 						b, _ := solana.NewRandomPrivateKey()
 
-						ixGrowWithDuplicates, err := tokenpool.NewConfigureAllowListInstruction([]solana.PublicKey{a.PublicKey(), b.PublicKey(), b.PublicKey()}, false, poolConfig, mint, admin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
-						require.NoError(t, err)
+						ixGrowWithDuplicates, allowlistConfigDupErr := tokenpool.NewConfigureAllowListInstruction([]solana.PublicKey{a.PublicKey(), b.PublicKey(), b.PublicKey()}, false, poolConfig, mint, admin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+						require.NoError(t, allowlistConfigDupErr)
 						testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{&tokens.TokenInstruction{Instruction: ixGrowWithDuplicates, Program: poolProgram}}, admin, rpc.CommitmentConfirmed, []string{"Key already existed in the allowlist"})
 
-						ixGrow, err := tokenpool.NewConfigureAllowListInstruction([]solana.PublicKey{a.PublicKey(), b.PublicKey()}, false, poolConfig, mint, admin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
-						require.NoError(t, err)
+						ixGrow, allowlistConfigErr := tokenpool.NewConfigureAllowListInstruction([]solana.PublicKey{a.PublicKey(), b.PublicKey()}, false, poolConfig, mint, admin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+						require.NoError(t, allowlistConfigErr)
 						testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{&tokens.TokenInstruction{Instruction: ixGrow, Program: poolProgram}}, admin, rpc.CommitmentConfirmed)
 
-						ixShrink, err := tokenpool.NewRemoveFromAllowListInstruction([]solana.PublicKey{a.PublicKey(), b.PublicKey()}, poolConfig, mint, admin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
-						require.NoError(t, err)
+						ixShrink, removeAllowlistErr := tokenpool.NewRemoveFromAllowListInstruction([]solana.PublicKey{a.PublicKey(), b.PublicKey()}, poolConfig, mint, admin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+						require.NoError(t, removeAllowlistErr)
 						testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{&tokens.TokenInstruction{Instruction: ixShrink, Program: poolProgram}}, admin, rpc.CommitmentConfirmed)
 
 						// Shrinking fails now as the entries do not exist anymore
@@ -432,8 +432,6 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 						// create invalidMultisig
 						invalidMultisig, err := solana.NewRandomPrivateKey()
 						require.NoError(t, err)
-						poolSigner, err := tokens.TokenPoolSignerAddress(mint, poolProgram)
-						require.NoError(t, err)
 
 						var invalidTokenProgram solana.PublicKey
 						if v.tokenProgram == solana.TokenProgramID {
@@ -476,8 +474,6 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 					t.Run("try to upgrade to invalid m configured multisig", func(t *testing.T) {
 						// create invalidMultisig
 						invalidMultisig, err := solana.NewRandomPrivateKey()
-						require.NoError(t, err)
-						poolSigner, err := tokens.TokenPoolSignerAddress(mint, poolProgram)
 						require.NoError(t, err)
 
 						ixMsig, ixErrMsig := tokens.CreateMultisig(ctx, admin.PublicKey(), v.tokenProgram, invalidMultisig.PublicKey(), 2, []solana.PublicKey{admin.PublicKey(), poolSigner}, solanaGoClient, config.DefaultCommitment)
