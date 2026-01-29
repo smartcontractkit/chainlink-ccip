@@ -351,14 +351,12 @@ func TestTokensAndTokenPools(t *testing.T) {
 				// for the token, so the EVM manual registration changeset should detect this and call
 				// `TransferAdminRole` instead of `ProposeAdministrator`.  Once this changeset is run,
 				// the pending admin should be updated to a non-zero address on-chain.
-				existingAddresses, err := env.DataStore.Addresses().Fetch()
-				require.NoError(t, err)
 				output, err = tokensapi.
 					ManualRegistration().
 					Apply(*env, tokensapi.ManualRegistrationInput{
 						ChainAdapterVersion: v1_6_0,
 						MCMS:                NewDefaultInputForMCMS("Manual Registration"),
-						ExistingAddresses:   existingAddresses,
+						ExistingAddresses:   env.DataStore.Addresses().Filter(),
 						ChainSelector:       data.Chain.Selector,
 						RegisterTokenConfigs: tokensapi.RegisterTokenConfig{
 							ProposedOwner:      data.Deployer.Hex(),
@@ -381,9 +379,8 @@ func TestTokensAndTokenPools(t *testing.T) {
 		})
 
 		t.Run("Validate ConfigureTokenForTransfers", func(t *testing.T) {
-			evmA := evmTestData[0]
-			evmB := evmTestData[1]
-
+			require.Len(t, evmTestData, 2, "expected exactly two EVM test data entries for this test")
+			evmA, evmB := evmTestData[0], evmTestData[1]
 			defaultRL := tokensapi.RateLimiterConfig{
 				Capacity:  big.NewInt(1_000_000_000),
 				Rate:      big.NewInt(100_000_000),
@@ -452,52 +449,51 @@ func TestTokensAndTokenPools(t *testing.T) {
 			require.Empty(t, remotePoolsAB)
 			require.Empty(t, remoteTokenAB)
 
-			// At this point, there are no remote chains configured on the token pool, so
-			// this should directly call ApplyChainUpdates.
-			output, err = tokensapi.ConfigureTokensForTransfers(tokenRegistry, mcmsRegistry).Apply(*env, input)
-			require.NoError(t, err)
-			MergeAddresses(t, env, output.DataStore)
+			// For the first iteration, there are no remote chains configured on token pool A so
+			// ApplyChainUpdates should be called directly. On the second iteration the "update"
+			// path will be taken instead of the "add" path, since chain B will already be fully
+			// configured on chain A. Thus, running this twice in a row tests the idempotency of
+			// the changeset.
+			for range 2 {
+				// Run the ConfigureTokensForTransfers changeset
+				output, err = tokensapi.ConfigureTokensForTransfers(tokenRegistry, mcmsRegistry).Apply(*env, input)
+				require.NoError(t, err)
+				MergeAddresses(t, env, output.DataStore)
 
-			// If we run the changeset again, then it should take the "update" path instead
-			// of the "add" path, since chain B is now already configured on chain A. Thus,
-			// we are testing idempotency by running the changeset twice in a row.
-			output, err = tokensapi.ConfigureTokensForTransfers(tokenRegistry, mcmsRegistry).Apply(*env, input)
-			require.NoError(t, err)
-			MergeAddresses(t, env, output.DataStore)
+				// Query the latest on-chain state for chain A
+				outboundRateLimitAB, err = poolA.GetCurrentOutboundRateLimiterState(&bind.CallOpts{Context: t.Context()}, evmB.Chain.Selector)
+				require.NoError(t, err)
+				inboundRateLimitAB, err = poolA.GetCurrentInboundRateLimiterState(&bind.CallOpts{Context: t.Context()}, evmB.Chain.Selector)
+				require.NoError(t, err)
+				supportedChainsOnA, err = poolA.GetSupportedChains(&bind.CallOpts{Context: t.Context()})
+				require.NoError(t, err)
+				remotePoolsAB, err = poolA.GetRemotePools(&bind.CallOpts{Context: t.Context()}, evmB.Chain.Selector)
+				require.NoError(t, err)
+				remoteTokenAB, err = poolA.GetRemoteToken(&bind.CallOpts{Context: t.Context()}, evmB.Chain.Selector)
+				require.NoError(t, err)
 
-			// Query the latest on-chain state for chain A
-			outboundRateLimitAB, err = poolA.GetCurrentOutboundRateLimiterState(&bind.CallOpts{Context: t.Context()}, evmB.Chain.Selector)
-			require.NoError(t, err)
-			inboundRateLimitAB, err = poolA.GetCurrentInboundRateLimiterState(&bind.CallOpts{Context: t.Context()}, evmB.Chain.Selector)
-			require.NoError(t, err)
-			supportedChainsOnA, err = poolA.GetSupportedChains(&bind.CallOpts{Context: t.Context()})
-			require.NoError(t, err)
-			remotePoolsAB, err = poolA.GetRemotePools(&bind.CallOpts{Context: t.Context()}, evmB.Chain.Selector)
-			require.NoError(t, err)
-			remoteTokenAB, err = poolA.GetRemoteToken(&bind.CallOpts{Context: t.Context()}, evmB.Chain.Selector)
-			require.NoError(t, err)
+				// Verify that chain B is now supported on chain A
+				require.Equal(t, []uint64{evmB.Chain.Selector}, supportedChainsOnA)
 
-			// Verify that chain B is now supported on chain A
-			require.Equal(t, []uint64{evmB.Chain.Selector}, supportedChainsOnA)
+				// Verify that the rate limits were set correctly
+				require.Equal(t, 0, defaultRL.Capacity.Cmp(outboundRateLimitAB.Capacity))
+				require.Equal(t, 0, defaultRL.Rate.Cmp(outboundRateLimitAB.Rate))
+				require.True(t, outboundRateLimitAB.IsEnabled)
+				require.Equal(t, 0, defaultRL.Capacity.Cmp(inboundRateLimitAB.Capacity))
+				require.Equal(t, 0, defaultRL.Rate.Cmp(inboundRateLimitAB.Rate))
+				require.True(t, inboundRateLimitAB.IsEnabled)
 
-			// Verify that the rate limits were set correctly
-			require.Equal(t, 0, defaultRL.Capacity.Cmp(outboundRateLimitAB.Capacity))
-			require.Equal(t, 0, defaultRL.Rate.Cmp(outboundRateLimitAB.Rate))
-			require.True(t, outboundRateLimitAB.IsEnabled)
-			require.Equal(t, 0, defaultRL.Capacity.Cmp(inboundRateLimitAB.Capacity))
-			require.Equal(t, 0, defaultRL.Rate.Cmp(inboundRateLimitAB.Rate))
-			require.True(t, inboundRateLimitAB.IsEnabled)
+				// Verify that the remote token pool was set correctly
+				poolB, err := evmAdapter.FindLatestTokenPoolAddress(env.DataStore, evmB.Chain.Selector, evmB.TokenPoolQualifier, evmTokenPoolType.String())
+				require.NoError(t, err)
+				require.Len(t, remotePoolsAB, 1)
+				require.True(t, bytes.Equal(remotePoolsAB[0], common.LeftPadBytes(poolB.Bytes(), 32)))
 
-			// Verify that the remote token pool was set correctly
-			poolB, err := evmAdapter.FindLatestTokenPoolAddress(env.DataStore, evmB.Chain.Selector, evmB.TokenPoolQualifier, evmTokenPoolType.String())
-			require.NoError(t, err)
-			require.Len(t, remotePoolsAB, 1)
-			require.True(t, bytes.Equal(remotePoolsAB[0], common.LeftPadBytes(poolB.Bytes(), 32)))
-
-			// Verify that the remote token was set correctly
-			tokB, err := evmAdapter.FindOneTokenAddress(env.DataStore, evmB.Chain.Selector, evmB.Token.Symbol)
-			require.NoError(t, err)
-			require.True(t, bytes.Equal(remoteTokenAB, common.LeftPadBytes(tokB.Bytes(), 32)))
+				// Verify that the remote token was set correctly
+				tokB, err := evmAdapter.FindOneTokenAddress(env.DataStore, evmB.Chain.Selector, evmB.Token.Symbol)
+				require.NoError(t, err)
+				require.True(t, bytes.Equal(remoteTokenAB, common.LeftPadBytes(tokB.Bytes(), 32)))
+			}
 		})
 	})
 
