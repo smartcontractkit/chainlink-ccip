@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {IAdvancedPoolHooks} from "../interfaces/IAdvancedPoolHooks.sol";
 import {IPoolV2} from "../interfaces/IPoolV2.sol";
+import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 import {CCVConfigValidation} from "../libraries/CCVConfigValidation.sol";
 import {Pool} from "../libraries/Pool.sol";
@@ -12,8 +13,10 @@ import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/Enumera
 
 /// @notice Advanced pool hooks for additional security features like allowlists and CCV management.
 /// @dev This is a standalone contract that can optionally be used by TokenPools.
-contract AdvancedPoolHooks is IAdvancedPoolHooks, Ownable2StepMsgSender {
+contract AdvancedPoolHooks is IAdvancedPoolHooks, ITypeAndVersion, Ownable2StepMsgSender {
   using EnumerableSet for EnumerableSet.AddressSet;
+
+  string public constant override typeAndVersion = "AdvancedPoolHooks 1.7.0-dev";
 
   error AllowListNotEnabled();
   error SenderNotAllowed(address sender);
