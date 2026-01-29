@@ -148,7 +148,7 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 					inputORL.Capacity.Cmp(onchainORL.Capacity) == 0 &&
 					inputORL.Rate.Cmp(onchainORL.Rate) == 0
 
-				// Check if the provided inbound RL matches the onchain inboud RL
+				// Check if the provided inbound RL matches the onchain inbound RL
 				isInboundEqual := inputIRL.IsEnabled == onchainIRL.IsEnabled &&
 					inputIRL.Capacity.Cmp(onchainIRL.Capacity) == 0 &&
 					inputIRL.Rate.Cmp(onchainIRL.Rate) == 0
