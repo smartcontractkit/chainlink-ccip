@@ -106,6 +106,7 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 
 		// Deploy CCTPVerifierResolver if needed
 		cctpVerifierResolverRefs := dep.DataStore.Addresses().Filter(
+			datastore.AddressRefByChainSelector(chain.Selector),
 			datastore.AddressRefByType(datastore.ContractType(cctp_verifier.ResolverType)),
 			datastore.AddressRefByVersion(cctp_verifier.Version),
 			datastore.AddressRefByQualifier(cctpQualifier),
@@ -198,6 +199,7 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 		}
 
 		cctpV1PoolAddresses := dep.DataStore.Addresses().Filter(
+			datastore.AddressRefByChainSelector(chain.Selector),
 			datastore.AddressRefByType(datastore.ContractType(cctpV1ContractType)),
 			datastore.AddressRefByVersion(cctpV1PrevVersion),
 		)
@@ -208,6 +210,7 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 		}
 
 		cctpV2PoolAddresses := dep.DataStore.Addresses().Filter(
+			datastore.AddressRefByChainSelector(chain.Selector),
 			datastore.AddressRefByType(datastore.ContractType(cctpV2ContractType)),
 			datastore.AddressRefByVersion(cctpV2PrevVersion),
 		)
@@ -231,7 +234,7 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 					SiloedLockReleasePool: common.HexToAddress(siloedLockReleaseTokenPoolRef.Address),
 				},
 				Router:       common.HexToAddress(routerRef.Address),
-				CCTPVerifier: common.HexToAddress(cctpVerifierRef.Address),
+				CCTPVerifier: common.HexToAddress(cctpVerifierResolverRef.Address),
 			},
 		}, existingAddresses)
 		if err != nil {

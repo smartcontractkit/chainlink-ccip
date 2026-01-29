@@ -63,14 +63,6 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 		}
 		isHomeChainAndConfigureSiloedPool := isHomeChain && len(lockReleaseSelectors) > 0
 
-		siloedUSDCAddressRef, err := datastore_utils.FindAndFormatRef(dep.DataStore, datastore.AddressRef{
-			Type:    datastore.ContractType(siloed_usdc_token_pool.ContractType),
-			Version: siloed_usdc_token_pool.Version,
-		}, chain.Selector, datastore_utils.FullRef)
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to find siloed USDC token pool ref on chain %d: %w", chain.Selector, err)
-		}
-
 		usdcTokenPoolProxyAddressRef, err := datastore_utils.FindAndFormatRef(dep.DataStore, datastore.AddressRef{
 			Type:    datastore.ContractType(usdc_token_pool_proxy.ContractType),
 			Version: usdc_token_pool_proxy.Version,
@@ -121,6 +113,14 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 
 		// Deploy siloed USDC lock-release stack before the proxy when needed.
 		if isHomeChainAndConfigureSiloedPool {
+			siloedUSDCAddressRef, err := datastore_utils.FindAndFormatRef(dep.DataStore, datastore.AddressRef{
+				Type:    datastore.ContractType(siloed_usdc_token_pool.ContractType),
+				Version: siloed_usdc_token_pool.Version,
+			}, chain.Selector, datastore_utils.FullRef)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to find siloed USDC token pool ref on chain %d: %w", chain.Selector, err)
+			}
+
 			siloedLockReleaseReport, err := cldf_ops.ExecuteSequence(b, DeploySiloedUSDCLockRelease, dep.BlockChains, DeploySiloedUSDCLockReleaseInput{
 				ChainSelector:             input.ChainSelector,
 				USDCToken:                 input.USDCToken,
@@ -132,9 +132,7 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 			}
 			addresses = append(addresses, siloedLockReleaseReport.Output.Addresses...)
 			batchOps = append(batchOps, siloedLockReleaseReport.Output.BatchOps...)
-		}
 
-		if isHomeChainAndConfigureSiloedPool {
 			siloedPoolWrites, err := configureSiloedPoolProxyWiring(b, chain, input.ChainSelector, common.HexToAddress(usdcTokenPoolProxyAddressRef.Address), common.HexToAddress(siloedUSDCAddressRef.Address))
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to configure siloed pool proxy wiring: %w", err)
@@ -177,8 +175,6 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 					Capacity: big.NewInt(0),
 					Rate:     big.NewInt(0),
 				},
-				OutboundCCVs: []string{cctpVerifierResolverAddressRef.Address},
-				InboundCCVs:  []string{cctpVerifierResolverAddressRef.Address},
 			}
 			outboundImplementations = append(outboundImplementations, versioned_verifier_resolver.OutboundImplementationArgs{
 				DestChainSelector: remoteChainSelector,
