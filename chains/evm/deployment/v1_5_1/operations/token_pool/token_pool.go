@@ -1,6 +1,8 @@
 package token_pool
 
 import (
+	"fmt"
+
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -59,14 +61,27 @@ var ApplyChainUpdates = contract.NewWrite(contract.WriteParams[ApplyChainUpdates
 })
 
 var SetChainRateLimiterConfig = contract.NewWrite(contract.WriteParams[SetChainRateLimiterConfigArgs, *token_pool.TokenPool]{
-	Name:            "token-pool:set-chain-rate-limiter-config",
-	Version:         Version,
-	Description:     "Sets the rate limiter configuration for a remote chain on the TokenPool 1.5.1 contract",
-	ContractType:    ContractType,
-	ContractABI:     token_pool.TokenPoolABI,
-	NewContract:     token_pool.NewTokenPool,
-	IsAllowedCaller: contract.OnlyOwner[*token_pool.TokenPool, SetChainRateLimiterConfigArgs],
-	Validate:        func(args SetChainRateLimiterConfigArgs) error { return nil },
+	Name:         "token-pool:set-chain-rate-limiter-config",
+	Version:      Version,
+	Description:  "Sets the rate limiter configuration for a remote chain on the TokenPool 1.5.1 contract",
+	ContractType: ContractType,
+	ContractABI:  token_pool.TokenPoolABI,
+	NewContract:  token_pool.NewTokenPool,
+	IsAllowedCaller: func(tp *token_pool.TokenPool, opts *bind.CallOpts, caller common.Address, input SetChainRateLimiterConfigArgs) (bool, error) {
+		admin, err := tp.GetRateLimitAdmin(opts)
+		if err != nil {
+			return false, fmt.Errorf("failed to get rate limit admin for pool at address %q: %w", tp.Address().Hex(), err)
+		}
+
+		owner, err := tp.Owner(opts)
+		if err != nil {
+			return false, fmt.Errorf("failed to get owner for pool at address %q: %w", tp.Address().Hex(), err)
+		}
+
+		// Rate limit config can be set by either the rate limit admin or the owner
+		return caller.Cmp(admin) == 0 || caller.Cmp(owner) == 0, nil
+	},
+	Validate: func(args SetChainRateLimiterConfigArgs) error { return nil },
 	CallContract: func(tp *token_pool.TokenPool, opts *bind.TransactOpts, args SetChainRateLimiterConfigArgs) (*types.Transaction, error) {
 		return tp.SetChainRateLimiterConfig(opts, args.RemoteChainSelector, args.OutboundRateLimitConfig, args.InboundRateLimitConfig)
 	},
