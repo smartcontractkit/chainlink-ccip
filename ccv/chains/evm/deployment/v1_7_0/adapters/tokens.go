@@ -47,3 +47,38 @@ func (t *TokenAdapter) DeriveTokenAddress(e deployment.Environment, chainSelecto
 		Address: getTokenReport.Output.Hex(),
 	})
 }
+
+func (t *TokenAdapter) ManualRegistration() *cldf_ops.Sequence[tokens.ManualRegistrationInput, sequences.OnChainOutput, chain.BlockChains] {
+	// TODO implement me
+	return nil
+}
+
+func (t *TokenAdapter) DeployToken() *cldf_ops.Sequence[tokens.DeployTokenInput, sequences.OnChainOutput, chain.BlockChains] {
+	// TODO implement me
+	return nil
+}
+
+func (t *TokenAdapter) DeployTokenVerify(e deployment.Environment, in any) error {
+	// TODO implement me
+	return nil
+}
+
+func (t *TokenAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokens.DeployTokenPoolInput, sequences.OnChainOutput, chain.BlockChains] {
+	// TODO implement me
+	return nil
+}
+
+func (t *TokenAdapter) RegisterToken() *cldf_ops.Sequence[tokens.RegisterTokenInput, sequences.OnChainOutput, chain.BlockChains] {
+	// TODO implement me
+	return nil
+}
+
+func (t *TokenAdapter) SetPool() *cldf_ops.Sequence[tokens.SetPoolInput, sequences.OnChainOutput, chain.BlockChains] {
+	// TODO implement me
+	return nil
+}
+
+func (t *TokenAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokens.UpdateAuthoritiesInput, sequences.OnChainOutput, chain.BlockChains] {
+	// TODO implement me
+	return nil
+}

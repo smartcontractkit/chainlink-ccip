@@ -64,7 +64,7 @@ func TestTokenAdapter(t *testing.T) {
 			require.NotNil(t, e, "Environment should be created")
 
 			mcmsRegistry := changesets.GetRegistry()
-			tokenAdapterRegistry := tokens.NewTokenAdapterRegistry()
+			tokenAdapterRegistry := tokens.GetTokenAdapterRegistry()
 			tokenAdapterRegistry.RegisterTokenAdapter("evm", semver.MustParse("1.7.0"), &adapters.TokenAdapter{})
 			tokenAdapterRegistry.RegisterTokenAdapter("evm", semver.MustParse("1.6.1"), &v1_6_1_adapters.TokenAdapter{})
 
