@@ -25,6 +25,7 @@ import (
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	evmchain "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	solchain "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
@@ -245,7 +246,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 			},
 		}
 
-		// Add EVM chains to the input and make sure datastores are up to date
+		// Add EVM chains to the input
 		for _, data := range evmTestData {
 			input[data.Chain.Selector] = tokensapi.TokenExpansionInputPerChain{
 				TokenPoolQualifier: data.TokenPoolQualifier,
@@ -268,6 +269,14 @@ func TestTokensAndTokenPools(t *testing.T) {
 	t.Run("EVM Token Adapter", func(t *testing.T) {
 		t.Run("Validate TokenExpansion", func(t *testing.T) {
 			for _, data := range evmTestData {
+				// Verify that we can find the timelock address in the datastore
+				timelockRef, err := datastore_utils.FindAndFormatRef(env.DataStore,
+					datastore.AddressRef{Type: datastore.ContractType(common_utils.RBACTimelock)},
+					data.Chain.Selector,
+					datastore_utils.FullRef,
+				)
+				require.NoError(t, err)
+
 				// Query EVM token info from the chain
 				tokAddress, err := evmAdapter.FindOneTokenAddress(env.DataStore, data.Chain.Selector, data.Token.Symbol)
 				require.NoError(t, err)
@@ -284,19 +293,9 @@ func TestTokensAndTokenPools(t *testing.T) {
 				name, err := tokn.Name(&bind.CallOpts{Context: t.Context()})
 				require.NoError(t, err)
 
-				// Verify that we can find the timelock address in the datastore
-				timelockAddrs := make(map[uint64]string)
-				for _, addrRef := range env.DataStore.Addresses().Filter() {
-					if addrRef.Type == datastore.ContractType(common_utils.RBACTimelock) {
-						timelockAddrs[addrRef.ChainSelector] = addrRef.Address
-					}
-				}
-				timelockEvmAddr, ok := timelockAddrs[data.Chain.Selector]
-				require.True(t, ok, "expected to find timelock address for EVM chain")
-
 				// Verify on-chain token info matches what we provided to the changeset
-				require.Equal(t, timelockEvmAddr, ccipAdmin.String(), fmt.Sprintf("expected EVM deployer to be the owner of the deployed token (deployer = %q, token owner = %q", data.Deployer.Hex(), ccipAdmin.Hex()))
-				require.Equal(t, data.Token.Supply.Cmp(supp), 0)
+				require.Equal(t, timelockRef.Address, ccipAdmin.String(), fmt.Sprintf("expected CCIP admin %q to be timelock %q", ccipAdmin.Hex(), timelockRef.Address))
+				require.Equal(t, 0, data.Token.Supply.Cmp(supp))
 				require.Equal(t, data.Token.Decimals, deci)
 				require.Equal(t, data.Token.Symbol, symb)
 				require.Equal(t, data.Token.Name, name)
@@ -310,11 +309,11 @@ func TestTokensAndTokenPools(t *testing.T) {
 				require.NoError(t, err)
 				tok, err := tp.GetToken(&bind.CallOpts{Context: t.Context()})
 				require.NoError(t, err)
-				own, err := tp.Owner(&bind.CallOpts{Context: t.Context()})
+				tpo, err := tp.Owner(&bind.CallOpts{Context: t.Context()})
 				require.NoError(t, err)
 
 				// Verify on-chain token pool info is consistent
-				require.Equal(t, data.Deployer.Cmp(own), 0, fmt.Sprintf("expected EVM deployer to be the owner of the deployed token pool (deployer = %q, token pool owner = %q", data.Deployer.Hex(), own.Hex()))
+				require.Equal(t, 0, data.Deployer.Cmp(tpo), fmt.Sprintf("expected EVM deployer to be the owner of the deployed token pool (deployer = %q, token pool owner = %q", data.Deployer.Hex(), tpo.Hex()))
 				require.Equal(t, data.Token.Decimals, dec)
 				require.Equal(t, tokAddress, tok)
 
