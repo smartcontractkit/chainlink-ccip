@@ -102,9 +102,9 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get supported chains: %w", err)
 		}
 
-		// Token pool remote chain configuration varies depending on whether the remote
-		// pool  matches or not. The different cases to consider are documented further
-		// below in the code.
+		// Token pool remote chain configuration can vary depending on whether the remote
+		// pool is or isn't supported. The different cases to consider are recorded below
+		// in the code.
 		reportWrites := []contract.WriteOutput{}
 		remotesToDel := []uint64{}
 		if slices.Contains(sc, input.RemoteChainSelector) {
