@@ -45,7 +45,7 @@ require (
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.12.6
 	github.com/smartcontractkit/chainlink-testing-framework/wasp v1.51.1
 	github.com/smartcontractkit/libocr v0.0.0-20250912173940-f3ab0246e23d
-	github.com/smartcontractkit/mcms v0.32.1-0.20260115182955-e63152532517
+	github.com/smartcontractkit/mcms v0.34.0
 	github.com/spf13/cobra v1.10.1
 	github.com/stretchr/testify v1.11.1
 	github.com/xssnick/tonutils-go v1.14.1
