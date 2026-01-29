@@ -59,7 +59,7 @@ var ApplyChainUpdates = contract.NewWrite(contract.WriteParams[ApplyChainUpdates
 })
 
 var SetRateLimiterConfig = contract.NewWrite(contract.WriteParams[SetRateLimiterConfigArgs, *token_pool.TokenPool]{
-	Name:            "token-pool:set-rate-limit-config",
+	Name:            "token-pool:set-rate-limiter-config",
 	Version:         Version,
 	Description:     "Sets the rate limiter configuration for a remote chain on the TokenPool 1.5.1 contract",
 	ContractType:    ContractType,
