@@ -29,14 +29,19 @@ func SetupLocalSolNode(t *testing.T) string {
 // helper function to get a set of different random open ports
 func getPorts(t *testing.T) (rpcPort, wsPort, faucetPort, gossipPort string) {
 	t.Helper()
-	attempts := 5
+
+	const attempts = 50
 
 	for range attempts {
-		portInt := freeport.GetOne(t)
+		rpc := freeport.GetOne(t)
+		ws := rpc + 1
 
-		rpcPort = strconv.Itoa(portInt)
-		wsPort = strconv.Itoa(portInt + 1) // WS port must be RPC+1
+		rpcPort = strconv.Itoa(rpc)
+		wsPort = strconv.Itoa(ws)
 
+		if !utils.IsPortOpen(t, rpcPort) {
+			continue
+		}
 		if !utils.IsPortOpen(t, wsPort) {
 			continue
 		}
@@ -52,9 +57,9 @@ func getPorts(t *testing.T) (rpcPort, wsPort, faucetPort, gossipPort string) {
 			continue
 		}
 
-		// All distinct and open
 		return
 	}
+
 	panic(fmt.Sprintf("unable to find unique open ports after %d attempts", attempts))
 }
 
