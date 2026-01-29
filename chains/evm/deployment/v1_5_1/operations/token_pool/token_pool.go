@@ -22,7 +22,7 @@ type ApplyChainUpdatesArgs struct {
 	ChainsToAdd                  []token_pool.TokenPoolChainUpdate
 }
 
-type SetRateLimiterConfigArgs struct {
+type SetChainRateLimiterConfigArgs struct {
 	RemoteChainSelector     uint64
 	OutboundRateLimitConfig token_pool.RateLimiterConfig
 	InboundRateLimitConfig  token_pool.RateLimiterConfig
@@ -58,16 +58,16 @@ var ApplyChainUpdates = contract.NewWrite(contract.WriteParams[ApplyChainUpdates
 	},
 })
 
-var SetRateLimiterConfig = contract.NewWrite(contract.WriteParams[SetRateLimiterConfigArgs, *token_pool.TokenPool]{
-	Name:            "token-pool:set-rate-limiter-config",
+var SetChainRateLimiterConfig = contract.NewWrite(contract.WriteParams[SetChainRateLimiterConfigArgs, *token_pool.TokenPool]{
+	Name:            "token-pool:set-chain-rate-limiter-config",
 	Version:         Version,
 	Description:     "Sets the rate limiter configuration for a remote chain on the TokenPool 1.5.1 contract",
 	ContractType:    ContractType,
 	ContractABI:     token_pool.TokenPoolABI,
 	NewContract:     token_pool.NewTokenPool,
-	IsAllowedCaller: contract.OnlyOwner[*token_pool.TokenPool, SetRateLimiterConfigArgs],
-	Validate:        func(args SetRateLimiterConfigArgs) error { return nil },
-	CallContract: func(tp *token_pool.TokenPool, opts *bind.TransactOpts, args SetRateLimiterConfigArgs) (*types.Transaction, error) {
+	IsAllowedCaller: contract.OnlyOwner[*token_pool.TokenPool, SetChainRateLimiterConfigArgs],
+	Validate:        func(args SetChainRateLimiterConfigArgs) error { return nil },
+	CallContract: func(tp *token_pool.TokenPool, opts *bind.TransactOpts, args SetChainRateLimiterConfigArgs) (*types.Transaction, error) {
 		return tp.SetChainRateLimiterConfig(opts, args.RemoteChainSelector, args.OutboundRateLimitConfig, args.InboundRateLimitConfig)
 	},
 })
