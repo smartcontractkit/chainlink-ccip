@@ -57,8 +57,16 @@ type DeployCCTPInput struct {
 	FeeAggregator string
 }
 
-// CCTPSequenceDeps are the dependencies for the CCTP sequences.
-type CCTPSequenceDeps struct {
+// DeployCCTPChainDeps are the dependencies for the DeployCCTPChain sequence.
+type DeployCCTPChainDeps struct {
+	// BlockChains are the chains in the environment.
+	BlockChains cldf_chain.BlockChains
+	// DataStore defines all addresses in the environment.
+	DataStore datastore.DataStore
+}
+
+// ConfigureCCTPChainForLanesDeps are the dependencies for the ConfigureCCTPChainForLanes sequence.
+type ConfigureCCTPChainForLanesDeps struct {
 	// BlockChains are the chains in the environment.
 	BlockChains cldf_chain.BlockChains
 	// DataStore defines all addresses in the environment.
@@ -87,9 +95,9 @@ type RemoteCCTPChain interface {
 type CCTPChain interface {
 	RemoteCCTPChain
 	// DeployCCTPChain deploys the CCTP contracts on the chain.
-	DeployCCTPChain() *cldf_ops.Sequence[DeployCCTPInput, sequences.OnChainOutput, CCTPSequenceDeps]
+	DeployCCTPChain() *cldf_ops.Sequence[DeployCCTPInput, sequences.OnChainOutput, DeployCCTPChainDeps]
 	// ConfigureCCTPChainForLanes configures the CCTP contracts on the chain for lanes.
-	ConfigureCCTPChainForLanes() *cldf_ops.Sequence[ConfigureCCTPChainForLanesInput, sequences.OnChainOutput, CCTPSequenceDeps]
+	ConfigureCCTPChainForLanes() *cldf_ops.Sequence[ConfigureCCTPChainForLanesInput, sequences.OnChainOutput, ConfigureCCTPChainForLanesDeps]
 }
 
 // CCTPChainRegistry maintains a registry of CCTP chains.

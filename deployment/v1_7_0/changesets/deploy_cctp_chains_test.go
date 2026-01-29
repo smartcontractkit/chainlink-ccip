@@ -54,12 +54,12 @@ type cctpTest_MockCCTPChain struct {
 }
 
 // DeployCCTPChain returns a sequence that accepts resolved adapter input (with string addresses)
-func (m *cctpTest_MockCCTPChain) DeployCCTPChain() *cldf_ops.Sequence[adapters.DeployCCTPInput, sequences.OnChainOutput, adapters.CCTPSequenceDeps] {
+func (m *cctpTest_MockCCTPChain) DeployCCTPChain() *cldf_ops.Sequence[adapters.DeployCCTPInput, sequences.OnChainOutput, adapters.DeployCCTPChainDeps] {
 	return cldf_ops.NewSequence(
 		"mock-deploy-cctp-chain-sequence",
 		semver.MustParse("1.0.0"),
 		"Mock sequence for testing CCTP deployment",
-		func(bundle cldf_ops.Bundle, deps adapters.CCTPSequenceDeps, input adapters.DeployCCTPInput) (sequences.OnChainOutput, error) {
+		func(bundle cldf_ops.Bundle, deps adapters.DeployCCTPChainDeps, input adapters.DeployCCTPInput) (sequences.OnChainOutput, error) {
 			if m.sequenceErrorMsg != "" {
 				return sequences.OnChainOutput{}, errors.New(m.sequenceErrorMsg)
 			}
@@ -81,12 +81,12 @@ func (m *cctpTest_MockCCTPChain) DeployCCTPChain() *cldf_ops.Sequence[adapters.D
 }
 
 // ConfigureCCTPChainForLanes returns a sequence that configures CCTP for lanes
-func (m *cctpTest_MockCCTPChain) ConfigureCCTPChainForLanes() *cldf_ops.Sequence[adapters.ConfigureCCTPChainForLanesInput, sequences.OnChainOutput, adapters.CCTPSequenceDeps] {
+func (m *cctpTest_MockCCTPChain) ConfigureCCTPChainForLanes() *cldf_ops.Sequence[adapters.ConfigureCCTPChainForLanesInput, sequences.OnChainOutput, adapters.ConfigureCCTPChainForLanesDeps] {
 	return cldf_ops.NewSequence(
 		"mock-configure-cctp-chain-for-lanes-sequence",
 		semver.MustParse("1.0.0"),
 		"Mock sequence for testing CCTP configuration",
-		func(bundle cldf_ops.Bundle, deps adapters.CCTPSequenceDeps, input adapters.ConfigureCCTPChainForLanesInput) (sequences.OnChainOutput, error) {
+		func(bundle cldf_ops.Bundle, deps adapters.ConfigureCCTPChainForLanesDeps, input adapters.ConfigureCCTPChainForLanesInput) (sequences.OnChainOutput, error) {
 			return sequences.OnChainOutput{
 				Addresses: []datastore.AddressRef{},
 				BatchOps:  []mcms_types.BatchOperation{},

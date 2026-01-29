@@ -76,7 +76,6 @@ func makeApplyDeployCCTPChains(cctpChainRegistry *adapters.CCTPChainRegistry, mc
 		batchOps := make([]mcms_types.BatchOperation, 0)
 		reports := make([]cldf_ops.Report[any, any], 0)
 
-		remoteChains := make(map[uint64]adapters.RemoteCCTPChain)
 		adaptersByChain := make(map[uint64]adapters.CCTPChain)
 		for chainSel := range cfg.Chains {
 			family, err := chain_selectors.GetSelectorFamily(chainSel)
@@ -87,17 +86,15 @@ func makeApplyDeployCCTPChains(cctpChainRegistry *adapters.CCTPChainRegistry, mc
 			if !ok {
 				return cldf.ChangesetOutput{}, fmt.Errorf("no CCTP adapter registered for chain family '%s'", family)
 			}
-			remoteChains[chainSel] = adapter
 			adaptersByChain[chainSel] = adapter
 		}
 
 		// Deploy across all chains.
 		newDS := datastore.NewMemoryDataStore()
 		for chainSel, chainCfg := range cfg.Chains {
-			dep := adapters.CCTPSequenceDeps{
-				BlockChains:  e.BlockChains,
-				DataStore:    e.DataStore,
-				RemoteChains: remoteChains,
+			dep := adapters.DeployCCTPChainDeps{
+				BlockChains: e.BlockChains,
+				DataStore:   e.DataStore,
 			}
 			in := adapters.DeployCCTPInput{
 				ChainSelector:    chainSel,
@@ -135,7 +132,19 @@ func makeApplyDeployCCTPChains(cctpChainRegistry *adapters.CCTPChainRegistry, mc
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to merge datastore: %w", err)
 		}
 		for chainSel, chainCfg := range cfg.Chains {
-			dep := adapters.CCTPSequenceDeps{
+			remoteChains := make(map[uint64]adapters.RemoteCCTPChain)
+			for remoteChainSelector := range chainCfg.RemoteChains {
+				family, err := chain_selectors.GetSelectorFamily(remoteChainSelector)
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to get chain family for remote chain selector %d: %w", remoteChainSelector, err)
+				}
+				adapter, ok := cctpChainRegistry.GetCCTPChain(family)
+				if !ok {
+					return cldf.ChangesetOutput{}, fmt.Errorf("no CCTP adapter registered for chain family '%s'", family)
+				}
+				remoteChains[remoteChainSelector] = adapter
+			}
+			dep := adapters.ConfigureCCTPChainForLanesDeps{
 				BlockChains:  e.BlockChains,
 				DataStore:    combinedDS.Seal(),
 				RemoteChains: remoteChains,
