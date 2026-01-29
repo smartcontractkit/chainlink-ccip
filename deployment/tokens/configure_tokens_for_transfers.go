@@ -3,6 +3,7 @@ package tokens
 import (
 	"fmt"
 
+	"github.com/Masterminds/semver/v3"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
@@ -33,6 +34,8 @@ type TokenTransferConfig struct {
 
 // ConfigureTokensForTransfersConfig is the configuration for the ConfigureTokensForTransfers changeset.
 type ConfigureTokensForTransfersConfig struct {
+	// ChainAdapterVersion specifies the version of the chain adapter to use for this chain.
+	ChainAdapterVersion *semver.Version `yaml:"chain-adapter-version" json:"chainAdapterVersion"`
 	// Tokens specifies the tokens to configure for cross-chain transfers.
 	Tokens []TokenTransferConfig
 	// MCMS configures the resulting proposal.
@@ -70,7 +73,7 @@ func makeApply(tokenRegistry *TokenAdapterRegistry, mcmsRegistry *changesets.MCM
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to get chain family for chain selector %d: %w", token.ChainSelector, err)
 			}
-			adapter, ok := tokenRegistry.GetTokenAdapter(family, tokenPool.Version)
+			adapter, ok := tokenRegistry.GetTokenAdapter(family, cfg.ChainAdapterVersion)
 			if !ok {
 				return cldf.ChangesetOutput{}, fmt.Errorf("no token adapter registered for chain family '%s' and token pool version '%s'", family, tokenPool.Version)
 			}
