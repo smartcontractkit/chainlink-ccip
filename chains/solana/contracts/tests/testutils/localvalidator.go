@@ -30,11 +30,11 @@ func SetupLocalSolNode(t *testing.T) string {
 func getPorts(t *testing.T) (rpcPort, wsPort, faucetPort, gossipPort string) {
 	t.Helper()
 
-	const attempts = 50
+	const attempts = 5
 
 	for range attempts {
 		rpc := freeport.GetOne(t)
-		ws := rpc + 1
+		ws := freeport.GetOne(t)
 
 		rpcPort = strconv.Itoa(rpc)
 		wsPort = strconv.Itoa(ws)
