@@ -93,3 +93,9 @@ type TransferOwnershipAdapter interface {
 	SequenceAcceptOwnership() *cldf_ops.Sequence[TransferOwnershipPerChainInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 	ShouldAcceptOwnershipWithTransferOwnership(e cldf.Environment, in TransferOwnershipPerChainInput) (bool, error)
 }
+
+type ConfigImporter interface {
+	InitializeAdapter(e cldf.Environment, selectors []uint64) error
+	ConnectedChains(e cldf.Environment, chainsel uint64) ([]uint64, error)
+	SequenceImportConfig() *cldf_ops.Sequence[ImportConfigPerChainInput, sequences.OnChainOutput, cldf_chain.BlockChains]
+}
