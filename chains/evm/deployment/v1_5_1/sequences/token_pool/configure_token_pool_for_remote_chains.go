@@ -92,7 +92,7 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 		// avoid the use of ExecuteOperation because it could return stale onchain data from
 		// the operations reports cache if this sequence is called as part of a broader, and
 		// more complex changeset that repeatedly reads and writes to the same config during
-		// execution (e.g. TokenExpansion)
+		// execution (e.g. ConfigureTokensForTransfers)
 		tp, err := token_pool.NewTokenPool(input.TokenPoolAddress, chain.Client)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to instantiate token pool contract: %w", err)
