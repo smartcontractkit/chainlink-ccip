@@ -777,7 +777,7 @@ func (o observerImpl) ObserveRMNRemoteCfg(ctx context.Context) cciptypes.RemoteC
 
 	rmnRemoteCfg, err := o.ccipReader.GetRMNRemoteConfig(ctx)
 	if err != nil {
-		if errors.Is(err, readerpkg.ErrContractReaderNotFound) {
+		if errors.Is(err, readerpkg.ErrContractReaderNotFound) || isNoBindingsError(err) {
 			// destination chain not supported
 			return cciptypes.RemoteConfig{}
 		}
