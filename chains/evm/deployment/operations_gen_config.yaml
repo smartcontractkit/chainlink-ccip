@@ -19,6 +19,7 @@ contracts:
       - name: uncurse
         access: owner
       - name: isCursed
+        access: public
   
   - contract_name: FeeQuoter
     version: "1.6.0"

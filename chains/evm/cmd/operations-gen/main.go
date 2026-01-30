@@ -336,7 +336,7 @@ func extractFunctions(info *ContractInfo, funcConfigs []FunctionConfig, abiEntri
 			switch funcCfg.Access {
 			case "owner":
 				funcInfo.HasOnlyOwner = true
-			case "public", "":
+			case "public":
 				funcInfo.HasOnlyOwner = false
 			default:
 				return fmt.Errorf("unknown access control '%s' for function %s (use 'owner' or 'public')",
