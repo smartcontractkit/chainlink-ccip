@@ -62,8 +62,13 @@ var (
 // Config structures
 type Config struct {
 	Version   string           `yaml:"version"`
+	Input     InputConfig      `yaml:"input"`
 	Output    OutputConfig     `yaml:"output"`
 	Contracts []ContractConfig `yaml:"contracts"`
+}
+
+type InputConfig struct {
+	BasePath string `yaml:"base_path"`
 }
 
 type OutputConfig struct {
@@ -136,7 +141,7 @@ type ParameterInfo struct {
 }
 
 func main() {
-	configPath := flag.String("config", "chains/evm/operations_gen_config.yaml", "Path to config file")
+	configPath := flag.String("config", "operations_gen_config.yaml", "Path to config file")
 	flag.Parse()
 
 	configData, err := os.ReadFile(*configPath)
@@ -151,8 +156,20 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Get the directory containing the config file
+	configDir := filepath.Dir(*configPath)
+	absConfigDir, err := filepath.Abs(configDir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error resolving config directory: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Make input and output paths relative to config file location
+	config.Input.BasePath = filepath.Join(absConfigDir, config.Input.BasePath)
+	config.Output.BasePath = filepath.Join(absConfigDir, config.Output.BasePath)
+
 	for _, contractCfg := range config.Contracts {
-		info, err := extractContractInfo(contractCfg, config.Output)
+		info, err := extractContractInfo(contractCfg, config.Input, config.Output)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error extracting info for %s: %v\n", contractCfg.Name, err)
 			os.Exit(1)
@@ -167,7 +184,7 @@ func main() {
 	}
 }
 
-func extractContractInfo(cfg ContractConfig, output OutputConfig) (*ContractInfo, error) {
+func extractContractInfo(cfg ContractConfig, input InputConfig, output OutputConfig) (*ContractInfo, error) {
 	if cfg.Name == "" || cfg.Version == "" {
 		return nil, fmt.Errorf("contract_name and version are required")
 	}
@@ -175,7 +192,7 @@ func extractContractInfo(cfg ContractConfig, output OutputConfig) (*ContractInfo
 	packageName := toSnakeCase(cfg.Name)
 	versionPath := versionToPath(cfg.Version)
 
-	abiString, bytecode, err := readABIAndBytecode(packageName, versionPath)
+	abiString, bytecode, err := readABIAndBytecode(packageName, versionPath, input.BasePath)
 	if err != nil {
 		return nil, err
 	}
@@ -206,14 +223,14 @@ func extractContractInfo(cfg ContractConfig, output OutputConfig) (*ContractInfo
 	return info, nil
 }
 
-func readABIAndBytecode(packageName, versionPath string) (abiString string, bytecode string, err error) {
+func readABIAndBytecode(packageName, versionPath, basePath string) (abiString string, bytecode string, err error) {
 	fileName := packageName
-	abiPath := filepath.Join("chains", "evm", "abi", versionPath, fileName+".json")
+	abiPath := filepath.Join(basePath, "abi", versionPath, fileName+".json")
 
 	abiBytes, err := os.ReadFile(abiPath)
 	if err != nil {
 		fileNameNoUnderscore := strings.ReplaceAll(packageName, "_", "")
-		abiPath = filepath.Join("chains", "evm", "abi", versionPath, fileNameNoUnderscore+".json")
+		abiPath = filepath.Join(basePath, "abi", versionPath, fileNameNoUnderscore+".json")
 		abiBytes, err = os.ReadFile(abiPath)
 		if err != nil {
 			return "", "", fmt.Errorf("ABI not found (tried %s.json and %s.json in %s)",
@@ -222,7 +239,7 @@ func readABIAndBytecode(packageName, versionPath string) (abiString string, byte
 		fileName = fileNameNoUnderscore
 	}
 
-	bytecodePath := filepath.Join("chains", "evm", "bytecode", versionPath, fileName+".bin")
+	bytecodePath := filepath.Join(basePath, "bytecode", versionPath, fileName+".bin")
 	bytecodeBytes, err := os.ReadFile(bytecodePath)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to read bytecode from %s: %w", bytecodePath, err)

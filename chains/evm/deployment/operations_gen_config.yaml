@@ -1,13 +1,14 @@
 version: "1.0"
 
-# Output configuration
+input:
+  base_path: ".."
+
 output:
-  base_path: chains/evm/deployment
+  base_path: "."
 
 # Access control aliases
 # - owner: Only contract owner can call (OnlyOwner)
-# - public: Anyone can call
-# - (none): Read functions don't need access control
+# - (none): Public/Read functions don't need access control
 
 contracts:
   - contract_name: RMNRemote
