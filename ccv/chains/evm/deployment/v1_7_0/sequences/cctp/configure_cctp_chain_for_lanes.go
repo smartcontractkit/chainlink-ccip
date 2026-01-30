@@ -283,7 +283,7 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 			batchOps = append(batchOps, batchOpFromWrites)
 		}
 
-		// Call into configure token for transfers sequence
+		// Call into configure token for transfers sequence (TODO: ON EACH TOKEN POOL)
 		configureTokenForTransfersReport, err := cldf_ops.ExecuteSequence(b, tokens_sequences.ConfigureTokenForTransfers, dep.BlockChains, tokens_core.ConfigureTokenForTransfersInput{
 			ChainSelector:            input.ChainSelector,
 			TokenAddress:             input.USDCToken,
