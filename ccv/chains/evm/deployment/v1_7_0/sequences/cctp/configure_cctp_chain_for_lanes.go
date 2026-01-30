@@ -17,7 +17,6 @@ import (
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
@@ -132,13 +131,12 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 			}
 			addresses = append(addresses, siloedLockReleaseReport.Output.Addresses...)
 			batchOps = append(batchOps, siloedLockReleaseReport.Output.BatchOps...)
-
-			siloedPoolWrites, err := configureSiloedPoolProxyWiring(b, chain, input.ChainSelector, common.HexToAddress(usdcTokenPoolProxyAddressRef.Address), common.HexToAddress(siloedUSDCAddressRef.Address))
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to configure siloed pool proxy wiring: %w", err)
-			}
-			writes = append(writes, siloedPoolWrites...)
 		}
+
+		cctpVerifierAddress := common.HexToAddress(cctpVerifierAddressRef.Address)
+		cctpVerifierResolverAddress := common.HexToAddress(cctpVerifierResolverAddressRef.Address)
+		usdcTokenPoolProxyAddress := common.HexToAddress(usdcTokenPoolProxyAddressRef.Address)
+		routerAddress := common.HexToAddress(routerAddressRef.Address)
 
 		remoteChainConfigs := make(map[uint64]tokens_core.RemoteChainConfig[[]byte, string])
 		outboundImplementations := make([]versioned_verifier_resolver.OutboundImplementationArgs, 0)
@@ -178,7 +176,7 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 			}
 			outboundImplementations = append(outboundImplementations, versioned_verifier_resolver.OutboundImplementationArgs{
 				DestChainSelector: remoteChainSelector,
-				Verifier:          common.HexToAddress(cctpVerifierAddressRef.Address),
+				Verifier:          cctpVerifierAddress,
 			})
 			remoteChainSelectors = append(remoteChainSelectors, remoteChainSelector)
 			mechanism, err := convertMechanismToUint8(remoteChain.LockOrBurnMechanism)
@@ -219,7 +217,7 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 				ChainSelector:         remoteChainSelector,
 			})
 			remoteChainConfigArgs = append(remoteChainConfigArgs, cctp_verifier.RemoteChainConfigArgs{
-				Router:              common.HexToAddress(routerAddressRef.Address),
+				Router:              routerAddress,
 				RemoteChainSelector: remoteChainSelector,
 				FeeUSDCents:         remoteChain.FeeUSDCents,
 				GasForVerification:  remoteChain.GasForVerification,
@@ -230,7 +228,7 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 		// Set outbound implementation on the CCTPVerifierResolver for each remote chain
 		setOutboundImplementationReport, err := cldf_ops.ExecuteOperation(b, versioned_verifier_resolver.ApplyOutboundImplementationUpdates, chain, contract_utils.FunctionInput[[]versioned_verifier_resolver.OutboundImplementationArgs]{
 			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(cctpVerifierResolverAddressRef.Address),
+			Address:       cctpVerifierResolverAddress,
 			Args:          outboundImplementations,
 		})
 		if err != nil {
@@ -242,7 +240,7 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 		if len(remoteChainSelectors) > 0 {
 			updateLockOrBurnMechanismsReport, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_proxy.UpdateLockOrBurnMechanisms, chain, contract_utils.FunctionInput[usdc_token_pool_proxy.UpdateLockOrBurnMechanismsArgs]{
 				ChainSelector: chain.Selector,
-				Address:       common.HexToAddress(usdcTokenPoolProxyAddressRef.Address),
+				Address:       usdcTokenPoolProxyAddress,
 				Args: usdc_token_pool_proxy.UpdateLockOrBurnMechanismsArgs{
 					RemoteChainSelectors: remoteChainSelectors,
 					Mechanisms:           mechanisms,
@@ -257,7 +255,7 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 		// Apply remote chain config updates on the CCTPVerifier
 		applyRemoteChainConfigUpdatesReport, err := cldf_ops.ExecuteOperation(b, cctp_verifier.ApplyRemoteChainConfigUpdates, chain, contract_utils.FunctionInput[[]cctp_verifier.RemoteChainConfigArgs]{
 			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(cctpVerifierAddressRef.Address),
+			Address:       cctpVerifierAddress,
 			Args:          remoteChainConfigArgs,
 		})
 		if err != nil {
@@ -268,7 +266,7 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 		// Set each remote domain on the CCTPVerifier
 		setDomainsReport, err := cldf_ops.ExecuteOperation(b, cctp_verifier.SetDomains, chain, contract_utils.FunctionInput[[]cctp_verifier.SetDomainArgs]{
 			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(cctpVerifierAddressRef.Address),
+			Address:       cctpVerifierAddress,
 			Args:          setDomainArgs,
 		})
 		if err != nil {
@@ -306,66 +304,6 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 		}, nil
 	},
 )
-
-func configureSiloedPoolProxyWiring(
-	b cldf_ops.Bundle,
-	chain evm.Chain,
-	chainSelector uint64,
-	proxyAddr common.Address,
-	siloedPoolAddr common.Address,
-) ([]contract_utils.WriteOutput, error) {
-	writes := make([]contract_utils.WriteOutput, 0)
-	// Get authorized callers on siloed pool.
-	callersReport, err := cldf_ops.ExecuteOperation(b, siloed_usdc_token_pool.GetAllAuthorizedCallers, chain, contract_utils.FunctionInput[any]{
-		ChainSelector: chainSelector,
-		Address:       siloedPoolAddr,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to get authorized callers from siloed pool: %w", err)
-	}
-	// Authorize proxy if not already authorized.
-	if !containsAddress(callersReport.Output, proxyAddr) {
-		poolAuthReport, err := cldf_ops.ExecuteOperation(b, siloed_usdc_token_pool.ApplyAuthorizedCallerUpdates, chain, contract_utils.FunctionInput[siloed_usdc_token_pool.AuthorizedCallerArgs]{
-			ChainSelector: chainSelector,
-			Address:       siloedPoolAddr,
-			Args: siloed_usdc_token_pool.AuthorizedCallerArgs{
-				AddedCallers: []common.Address{proxyAddr},
-			},
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to authorize proxy on siloed pool: %w", err)
-		}
-		writes = append(writes, poolAuthReport.Output)
-	}
-	// Get current pools from proxy.
-	poolsReport, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_proxy.GetPools, chain, contract_utils.FunctionInput[any]{
-		ChainSelector: chainSelector,
-		Address:       proxyAddr,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to get existing proxy pools: %w", err)
-	}
-	currentPools := poolsReport.Output
-	// If siloed pool address is not set correctly, update it.
-	if currentPools.SiloedLockReleasePool != siloedPoolAddr {
-		updatePoolsReport, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_proxy.UpdatePoolAddresses, chain, contract_utils.FunctionInput[usdc_token_pool_proxy.PoolAddresses]{
-			ChainSelector: chainSelector,
-			Address:       proxyAddr,
-			Args: usdc_token_pool_proxy.PoolAddresses{
-				CctpV1Pool:            currentPools.CctpV1Pool,
-				CctpV2Pool:            currentPools.CctpV2Pool,
-				CctpV2PoolWithCCV:     currentPools.CctpV2PoolWithCCV,
-				SiloedLockReleasePool: siloedPoolAddr,
-			},
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to update proxy pool addresses: %w", err)
-		}
-		writes = append(writes, updatePoolsReport.Output)
-	}
-
-	return writes, nil
-}
 
 func containsAddress(addresses []common.Address, needle common.Address) bool {
 	for _, address := range addresses {

@@ -13,6 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -21,6 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/cctp_through_ccv_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/cctp_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/lock_release_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/siloed_usdc_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/usdc_token_pool_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/versioned_verifier_resolver"
 	v1_7_0_sequences "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
@@ -61,21 +63,11 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found", input.ChainSelector)
 		}
 
-		// Deploy CCTPMessageTransmitterProxy if needed
-		cctpMessageTransmitterProxyRef, err := contract_utils.MaybeDeployContract(b, cctp_message_transmitter_proxy.Deploy, chain, contract_utils.DeployInput[cctp_message_transmitter_proxy.ConstructorArgs]{
-			TypeAndVersion: deployment.NewTypeAndVersion(cctp_message_transmitter_proxy.ContractType, *cctp_message_transmitter_proxy.Version),
-			ChainSelector:  chain.Selector,
-			Qualifier:      &cctpQualifier,
-			Args: cctp_message_transmitter_proxy.ConstructorArgs{
-				TokenMessenger: common.HexToAddress(input.TokenMessenger),
-			},
-		}, existingAddresses)
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CCTPMessageTransmitterProxy: %w", err)
-		}
-		addresses = append(addresses, cctpMessageTransmitterProxyRef)
+		tokenMessengerAddress := common.HexToAddress(input.TokenMessenger)
+		usdcTokenAddress := common.HexToAddress(input.USDCToken)
+		feeAggregatorAddress := common.HexToAddress(input.FeeAggregator)
+		create2FactoryAddress := common.HexToAddress(input.DeployerContract)
 
-		// Deploy CCTPVerifier if needed
 		rmnRef, err := datastore_utils.FindAndFormatRef(dep.DataStore, datastore.AddressRef{
 			Type:    datastore.ContractType(rmn_proxy.ContractType),
 			Version: rmn_proxy.Version,
@@ -83,26 +75,54 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to find RMN proxy ref on chain %d: %w", chain.Selector, err)
 		}
+		rmnAddress := common.HexToAddress(rmnRef.Address)
+
+		routerRef, err := datastore_utils.FindAndFormatRef(dep.DataStore, datastore.AddressRef{
+			Type:    datastore.ContractType(router.ContractType),
+			Version: router.Version,
+		}, chain.Selector, datastore_utils.FullRef)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to find router ref on chain %d: %w", chain.Selector, err)
+		}
+		routerAddress := common.HexToAddress(routerRef.Address)
+
+		// Deploy CCTPMessageTransmitterProxy if needed
+		cctpMessageTransmitterProxyRef, err := contract_utils.MaybeDeployContract(b, cctp_message_transmitter_proxy.Deploy, chain, contract_utils.DeployInput[cctp_message_transmitter_proxy.ConstructorArgs]{
+			TypeAndVersion: deployment.NewTypeAndVersion(cctp_message_transmitter_proxy.ContractType, *cctp_message_transmitter_proxy.Version),
+			ChainSelector:  chain.Selector,
+			Qualifier:      &cctpQualifier,
+			Args: cctp_message_transmitter_proxy.ConstructorArgs{
+				TokenMessenger: tokenMessengerAddress,
+			},
+		}, existingAddresses)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CCTPMessageTransmitterProxy: %w", err)
+		}
+		addresses = append(addresses, cctpMessageTransmitterProxyRef)
+		cctpMessageTransmitterProxyAddress := common.HexToAddress(cctpMessageTransmitterProxyRef.Address)
+
+		// Deploy CCTPVerifier if needed
 		cctpVerifierRef, err := contract_utils.MaybeDeployContract(b, cctp_verifier.Deploy, chain, contract_utils.DeployInput[cctp_verifier.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(cctp_verifier.ContractType, *cctp_verifier.Version),
 			ChainSelector:  chain.Selector,
 			Qualifier:      &cctpQualifier,
 			Args: cctp_verifier.ConstructorArgs{
-				TokenMessenger:          common.HexToAddress(input.TokenMessenger),
-				MessageTransmitterProxy: common.HexToAddress(cctpMessageTransmitterProxyRef.Address),
-				USDCToken:               common.HexToAddress(input.USDCToken),
+				TokenMessenger:          tokenMessengerAddress,
+				MessageTransmitterProxy: cctpMessageTransmitterProxyAddress,
+				USDCToken:               usdcTokenAddress,
 				StorageLocations:        input.StorageLocations,
 				DynamicConfig: cctp_verifier.DynamicConfig{
-					FeeAggregator:   common.HexToAddress(input.FeeAggregator),
+					FeeAggregator:   feeAggregatorAddress,
 					FastFinalityBps: input.FastFinalityBps,
 				},
-				RMN: common.HexToAddress(rmnRef.Address),
+				RMN: rmnAddress,
 			},
 		}, existingAddresses)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CCTPVerifier: %w", err)
 		}
 		addresses = append(addresses, cctpVerifierRef)
+		cctpVerifierAddress := common.HexToAddress(cctpVerifierRef.Address)
 
 		// Deploy CCTPVerifierResolver if needed
 		cctpVerifierResolverRefs := dep.DataStore.Addresses().Filter(
@@ -122,7 +142,7 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 				Qualifier:      cctpQualifier,
 				Type:           datastore.ContractType(cctp_verifier.ResolverType),
 				Version:        cctp_verifier.Version,
-				CREATE2Factory: common.HexToAddress(input.DeployerContract),
+				CREATE2Factory: create2FactoryAddress,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CommitteeVerifierResolver: %w", err)
@@ -139,38 +159,33 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 			cctpVerifierResolverRef = cctpVerifierResolverRefs[0]
 			addresses = append(addresses, cctpVerifierResolverRef)
 		}
+		cctpVerifierResolverAddress := common.HexToAddress(cctpVerifierResolverRef.Address)
 
 		// Deploy CCTPThroughCCVTokenPool if needed
-		routerRef, err := datastore_utils.FindAndFormatRef(dep.DataStore, datastore.AddressRef{
-			Type:    datastore.ContractType(router.ContractType),
-			Version: router.Version,
-		}, chain.Selector, datastore_utils.FullRef)
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to find router ref on chain %d: %w", chain.Selector, err)
-		}
 		cctpTokenPoolRef, err := contract_utils.MaybeDeployContract(b, cctp_through_ccv_token_pool.Deploy, chain, contract_utils.DeployInput[cctp_through_ccv_token_pool.ConstructorArgs]{
 			ChainSelector:  chain.Selector,
 			TypeAndVersion: deployment.NewTypeAndVersion(cctp_through_ccv_token_pool.ContractType, *cctp_through_ccv_token_pool.Version),
 			Qualifier:      &cctpQualifier,
 			Args: cctp_through_ccv_token_pool.ConstructorArgs{
-				Token:              common.HexToAddress(input.USDCToken),
+				Token:              usdcTokenAddress,
 				LocalTokenDecimals: localTokenDecimals,
-				RMNProxy:           common.HexToAddress(rmnRef.Address),
-				Router:             common.HexToAddress(routerRef.Address),
-				CCTPVerifier:       common.HexToAddress(cctpVerifierRef.Address),
+				RMNProxy:           rmnAddress,
+				Router:             routerAddress,
+				CCTPVerifier:       cctpVerifierAddress,
 			},
 		}, existingAddresses)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CCTPTokenPool: %w", err)
 		}
 		addresses = append(addresses, cctpTokenPoolRef)
+		cctpTokenPoolAddress := common.HexToAddress(cctpTokenPoolRef.Address)
 
 		// Configure token pool
 		configureTokenPoolReport, err := cldf_ops.ExecuteSequence(b, tokens_sequences.ConfigureTokenPool, chain, tokens_sequences.ConfigureTokenPoolInput{
 			ChainSelector:    input.ChainSelector,
-			TokenPoolAddress: common.HexToAddress(cctpTokenPoolRef.Address),
-			RouterAddress:    common.HexToAddress(routerRef.Address),
-			FeeAggregator:    common.HexToAddress(input.FeeAggregator),
+			TokenPoolAddress: cctpTokenPoolAddress,
+			RouterAddress:    routerAddress,
+			FeeAggregator:    feeAggregatorAddress,
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to configure token pool: %w", err)
@@ -184,11 +199,11 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 				TypeAndVersion: deployment.NewTypeAndVersion(lock_release_token_pool.SiloedUSDCTokenPoolContractType, *lock_release_token_pool.Version),
 				ChainSelector:  chain.Selector,
 				Args: lock_release_token_pool.ConstructorArgs{
-					Token:              common.HexToAddress(input.USDCToken),
+					Token:              usdcTokenAddress,
 					LocalTokenDecimals: localTokenDecimals,
 					AdvancedPoolHooks:  common.Address{},
-					RMNProxy:           common.HexToAddress(rmnRef.Address),
-					Router:             common.HexToAddress(routerRef.Address),
+					RMNProxy:           rmnAddress,
+					Router:             routerAddress,
 				},
 			}, existingAddresses)
 			if err != nil {
@@ -197,6 +212,7 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 			siloedLockReleaseTokenPoolRef = ref
 			addresses = append(addresses, ref)
 		}
+		siloedLockReleaseTokenPoolAddress := common.HexToAddress(siloedLockReleaseTokenPoolRef.Address)
 
 		cctpV1PoolAddresses := dep.DataStore.Addresses().Filter(
 			datastore.AddressRefByChainSelector(chain.Selector),
@@ -220,34 +236,46 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 			cctpV2PoolAddresses = append(cctpV2PoolAddresses, datastore.AddressRef{})
 		}
 
+		cctpV1PoolAddress := common.HexToAddress(cctpV1PoolAddresses[0].Address)
+		cctpV2PoolAddress := common.HexToAddress(cctpV2PoolAddresses[0].Address)
+
 		// Deploy USDCTokenPoolProxy
 		usdcTokenPoolProxyRef, err := contract_utils.MaybeDeployContract(b, usdc_token_pool_proxy.Deploy, chain, contract_utils.DeployInput[usdc_token_pool_proxy.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(usdc_token_pool_proxy.ContractType, *usdc_token_pool_proxy.Version),
 			ChainSelector:  chain.Selector,
 			Qualifier:      &cctpQualifier,
 			Args: usdc_token_pool_proxy.ConstructorArgs{
-				Token: common.HexToAddress(input.USDCToken),
+				Token: usdcTokenAddress,
 				Pools: usdc_token_pool_proxy.USDCTokenPoolProxyPoolAddresses{
-					CctpV1Pool:            common.HexToAddress(cctpV1PoolAddresses[0].Address),
-					CctpV2Pool:            common.HexToAddress(cctpV2PoolAddresses[0].Address),
-					CctpV2PoolWithCCV:     common.HexToAddress(cctpTokenPoolRef.Address),
-					SiloedLockReleasePool: common.HexToAddress(siloedLockReleaseTokenPoolRef.Address),
+					CctpV1Pool:            cctpV1PoolAddress,
+					CctpV2Pool:            cctpV2PoolAddress,
+					CctpV2PoolWithCCV:     cctpTokenPoolAddress,
+					SiloedLockReleasePool: siloedLockReleaseTokenPoolAddress,
 				},
-				Router:       common.HexToAddress(routerRef.Address),
-				CCTPVerifier: common.HexToAddress(cctpVerifierResolverRef.Address),
+				Router:       routerAddress,
+				CCTPVerifier: cctpVerifierResolverAddress,
 			},
 		}, existingAddresses)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy USDCTokenPoolProxy: %w", err)
 		}
 		addresses = append(addresses, usdcTokenPoolProxyRef)
+		usdcTokenPoolProxyAddress := common.HexToAddress(usdcTokenPoolProxyRef.Address)
+
+		if isHomeChain {
+			siloedPoolWrites, err := configureSiloedPoolProxyWiring(b, chain, input.ChainSelector, usdcTokenPoolProxyAddress, siloedLockReleaseTokenPoolAddress)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to configure siloed pool proxy wiring: %w", err)
+			}
+			writes = append(writes, siloedPoolWrites...)
+		}
 
 		// Set the fee aggregator on the USDCTokenPoolProxy
 		setFeeAggregatorReport, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_proxy.SetFeeAggregator, chain, contract_utils.FunctionInput[usdc_token_pool_proxy.SetFeeAggregatorArgs]{
 			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(usdcTokenPoolProxyRef.Address),
+			Address:       usdcTokenPoolProxyAddress,
 			Args: usdc_token_pool_proxy.SetFeeAggregatorArgs{
-				FeeAggregator: common.HexToAddress(input.FeeAggregator),
+				FeeAggregator: feeAggregatorAddress,
 			},
 		})
 		if err != nil {
@@ -258,10 +286,10 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 		// Add CCTPVerifier as an authorized caller on the CCTPMessageTransmitterProxy
 		verifierApplyAuthorizedCallerUpdatesReport, err := cldf_ops.ExecuteOperation(b, cctp_message_transmitter_proxy.ApplyAuthorizedCallerUpdates, chain, contract_utils.FunctionInput[cctp_message_transmitter_proxy.AuthorizedCallerArgs]{
 			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(cctpMessageTransmitterProxyRef.Address),
+			Address:       cctpMessageTransmitterProxyAddress,
 			Args: cctp_message_transmitter_proxy.AuthorizedCallerArgs{
 				AddedCallers: []common.Address{
-					common.HexToAddress(cctpVerifierRef.Address),
+					cctpVerifierAddress,
 				},
 			},
 		})
@@ -273,10 +301,10 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 		// Add USDCTokenPoolProxy as an authorized caller on the CCTPTokenPool
 		poolApplyAuthorizedCallerUpdatesReport, err := cldf_ops.ExecuteOperation(b, cctp_through_ccv_token_pool.ApplyAuthorizedCallerUpdates, chain, contract_utils.FunctionInput[cctp_through_ccv_token_pool.AuthorizedCallerArgs]{
 			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(cctpTokenPoolRef.Address),
+			Address:       cctpTokenPoolAddress,
 			Args: cctp_through_ccv_token_pool.AuthorizedCallerArgs{
 				AddedCallers: []common.Address{
-					common.HexToAddress(usdcTokenPoolProxyRef.Address),
+					usdcTokenPoolProxyAddress,
 				},
 			},
 		})
@@ -288,18 +316,18 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 		// Set inbound implementation on the CCTPVerifierResolver
 		committeeVerifierVersionTagReport, err := cldf_ops.ExecuteOperation(b, cctp_verifier.GetVersionTag, chain, contract_utils.FunctionInput[any]{
 			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(cctpVerifierRef.Address),
+			Address:       cctpVerifierAddress,
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get version tag from CCTPVerifier: %w", err)
 		}
 		setInboundImplementationReport, err := cldf_ops.ExecuteOperation(b, versioned_verifier_resolver.ApplyInboundImplementationUpdates, chain, contract_utils.FunctionInput[[]versioned_verifier_resolver.InboundImplementationArgs]{
 			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(cctpVerifierResolverRef.Address),
+			Address:       cctpVerifierResolverAddress,
 			Args: []versioned_verifier_resolver.InboundImplementationArgs{
 				{
 					Version:  committeeVerifierVersionTagReport.Output,
-					Verifier: common.HexToAddress(cctpVerifierRef.Address),
+					Verifier: cctpVerifierAddress,
 				},
 			},
 		})
@@ -314,3 +342,63 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 		}, nil
 	},
 )
+
+func configureSiloedPoolProxyWiring(
+	b cldf_ops.Bundle,
+	chain evm.Chain,
+	chainSelector uint64,
+	proxyAddr common.Address,
+	siloedPoolAddr common.Address,
+) ([]contract_utils.WriteOutput, error) {
+	writes := make([]contract_utils.WriteOutput, 0)
+	// Get authorized callers on siloed pool.
+	callersReport, err := cldf_ops.ExecuteOperation(b, siloed_usdc_token_pool.GetAllAuthorizedCallers, chain, contract_utils.FunctionInput[any]{
+		ChainSelector: chainSelector,
+		Address:       siloedPoolAddr,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get authorized callers from siloed pool: %w", err)
+	}
+	// Authorize proxy if not already authorized.
+	if !containsAddress(callersReport.Output, proxyAddr) {
+		poolAuthReport, err := cldf_ops.ExecuteOperation(b, siloed_usdc_token_pool.ApplyAuthorizedCallerUpdates, chain, contract_utils.FunctionInput[siloed_usdc_token_pool.AuthorizedCallerArgs]{
+			ChainSelector: chainSelector,
+			Address:       siloedPoolAddr,
+			Args: siloed_usdc_token_pool.AuthorizedCallerArgs{
+				AddedCallers: []common.Address{proxyAddr},
+			},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to authorize proxy on siloed pool: %w", err)
+		}
+		writes = append(writes, poolAuthReport.Output)
+	}
+	// Get current pools from proxy.
+	poolsReport, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_proxy.GetPools, chain, contract_utils.FunctionInput[any]{
+		ChainSelector: chainSelector,
+		Address:       proxyAddr,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get existing proxy pools: %w", err)
+	}
+	currentPools := poolsReport.Output
+	// If siloed pool address is not set correctly, update it.
+	if currentPools.SiloedLockReleasePool != siloedPoolAddr {
+		updatePoolsReport, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_proxy.UpdatePoolAddresses, chain, contract_utils.FunctionInput[usdc_token_pool_proxy.PoolAddresses]{
+			ChainSelector: chainSelector,
+			Address:       proxyAddr,
+			Args: usdc_token_pool_proxy.PoolAddresses{
+				CctpV1Pool:            currentPools.CctpV1Pool,
+				CctpV2Pool:            currentPools.CctpV2Pool,
+				CctpV2PoolWithCCV:     currentPools.CctpV2PoolWithCCV,
+				SiloedLockReleasePool: siloedPoolAddr,
+			},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to update proxy pool addresses: %w", err)
+		}
+		writes = append(writes, updatePoolsReport.Output)
+	}
+
+	return writes, nil
+}
