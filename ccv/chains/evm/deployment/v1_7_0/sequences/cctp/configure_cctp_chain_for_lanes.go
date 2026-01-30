@@ -109,7 +109,8 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to find TokenAdminRegistry ref on chain %d: %w", chain.Selector, err)
 		}
 
-		// Deploy siloed USDC lock-release stack before the proxy when needed.
+		// Configure each remote chain of the siloed USDC pool, if required.
+		// This involves deploying a lockbox for each remote chain and configuring it on the pool.
 		if isHomeChainAndConfigureSiloedPool {
 			siloedUSDCAddressRef, err := datastore_utils.FindAndFormatRef(dep.DataStore, datastore.AddressRef{
 				Type:    datastore.ContractType(siloed_usdc_token_pool.ContractType),

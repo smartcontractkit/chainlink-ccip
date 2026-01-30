@@ -182,22 +182,18 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 		isHomeChain := chain.Selector == chain_selectors.ETHEREUM_MAINNET.Selector || chain.Selector == chain_selectors.ETHEREUM_TESTNET_SEPOLIA.Selector
 		var siloedLockReleaseTokenPoolRef datastore.AddressRef
 		if isHomeChain {
-			ref, err := contract_utils.MaybeDeployContract(b, siloed_usdc_token_pool.Deploy, chain, contract_utils.DeployInput[siloed_usdc_token_pool.ConstructorArgs]{
-				TypeAndVersion: deployment.NewTypeAndVersion(siloed_usdc_token_pool.ContractType, *siloed_usdc_token_pool.Version),
-				ChainSelector:  chain.Selector,
-				Args: siloed_usdc_token_pool.ConstructorArgs{
-					Token:              usdcTokenAddress,
-					LocalTokenDecimals: localTokenDecimals,
-					AdvancedPoolHooks:  common.Address{},
-					RMNProxy:           rmnAddress,
-					Router:             routerAddress,
-				},
-			}, existingAddresses)
+			siloedLockReleaseReport, err := cldf_ops.ExecuteSequence(b, DeploySiloedUSDCLockRelease, dep.BlockChains, DeploySiloedUSDCLockReleaseInput{
+				ChainSelector: input.ChainSelector,
+				USDCToken:     input.USDCToken,
+				RMN:           rmnAddress.Hex(),
+				Router:        routerAddress.Hex(),
+			})
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy SiloedUSDCTokenPool: %w", err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy siloed USDC lock release stack: %w", err)
 			}
-			siloedLockReleaseTokenPoolRef = ref
-			addresses = append(addresses, ref)
+			siloedLockReleaseTokenPoolRef.Address = siloedLockReleaseReport.Output.SiloedPoolAddress
+			addresses = append(addresses, siloedLockReleaseReport.Output.Addresses...)
+			batchOps = append(batchOps, siloedLockReleaseReport.Output.BatchOps...)
 		}
 		siloedLockReleaseTokenPoolAddress := common.HexToAddress(siloedLockReleaseTokenPoolRef.Address)
 
