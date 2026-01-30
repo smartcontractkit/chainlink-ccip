@@ -6,7 +6,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/ping_pong_demo"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/ping_pong_demo"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
@@ -50,7 +51,7 @@ var SetCounterpart = contract.NewWrite(contract.WriteParams[SetCounterpartArgs, 
 	IsAllowedCaller: contract.OnlyOwner[*ping_pong_demo.PingPongDemo, SetCounterpartArgs],
 	Validate:        func(SetCounterpartArgs) error { return nil },
 	CallContract: func(pingPong *ping_pong_demo.PingPongDemo, opts *bind.TransactOpts, args SetCounterpartArgs) (*types.Transaction, error) {
-		return pingPong.SetCounterpart(opts, args.CounterpartChainSelector, args.CounterpartAddress)
+		return pingPong.SetCounterpart(opts, args.CounterpartChainSelector, common.BytesToAddress(args.CounterpartAddress))
 	},
 })
 
@@ -88,7 +89,7 @@ var SetCounterpartAddress = contract.NewWrite(contract.WriteParams[SetCounterpar
 	IsAllowedCaller: contract.OnlyOwner[*ping_pong_demo.PingPongDemo, SetCounterpartAddressArgs],
 	Validate:        func(SetCounterpartAddressArgs) error { return nil },
 	CallContract: func(pingPong *ping_pong_demo.PingPongDemo, opts *bind.TransactOpts, args SetCounterpartAddressArgs) (*types.Transaction, error) {
-		return pingPong.SetCounterpartAddress(opts, args.Address)
+		return pingPong.SetCounterpartAddress(opts, common.BytesToAddress(args.Address))
 	},
 })
 

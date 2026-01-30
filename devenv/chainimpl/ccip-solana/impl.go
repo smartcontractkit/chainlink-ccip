@@ -2,48 +2,42 @@ package ccip_solana
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math/big"
-	"slices"
-	"strings"
 	"time"
 
 	"github.com/Masterminds/semver/v3"
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 
 	ata "github.com/gagliardetto/solana-go/programs/associated-token-account"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_offramp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_router"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/fee_quoter"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
-	ccipocr3common "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/clclient"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
+
 	"github.com/gagliardetto/solana-go"
 	solRpc "github.com/gagliardetto/solana-go/rpc"
 	chainsel "github.com/smartcontractkit/chain-selectors"
-	solconfig "github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
+	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
+
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/fee_quoter"
 	offrampops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/offramp"
 	rmnremoteops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/rmn_remote"
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/router"
 	solanaseqs "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
-	solccip "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/ccip"
 	solCommonUtil "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/testadapters"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
-	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
 )
 
 type SourceDestPair struct {
@@ -60,32 +54,36 @@ type AnyMsgSentEvent struct {
 }
 
 type CCIP16Solana struct {
-	e                      *deployment.Environment
-	chainDetailsBySelector map[uint64]chainsel.ChainDetails
-	ExpectedSeqNumRange    map[SourceDestPair]ccipocr3common.SeqNumRange
-	ExpectedSeqNumExec     map[SourceDestPair][]uint64
-	MsgSentEvents          []*AnyMsgSentEvent
+	e            *deployment.Environment
+	chainDetails chainsel.ChainDetails
+	testadapters.TestAdapter
 }
 
-func NewEmptyCCIP16Solana() *CCIP16Solana {
+func NewEmptyCCIP16Solana(chainDetails chainsel.ChainDetails) *CCIP16Solana {
 	return &CCIP16Solana{
-		chainDetailsBySelector: make(map[uint64]chainsel.ChainDetails),
-		ExpectedSeqNumRange:    make(map[SourceDestPair]ccipocr3common.SeqNumRange),
-		ExpectedSeqNumExec:     make(map[SourceDestPair][]uint64),
-		MsgSentEvents:          make([]*AnyMsgSentEvent, 0),
+		chainDetails: chainDetails,
 	}
 }
 
 // NewCCIP16Solana creates new smart-contracts wrappers with utility functions for CCIP16Solana implementation.
-func NewCCIP16Solana(ctx context.Context, e *deployment.Environment) (*CCIP16Solana, error) {
+func NewCCIP16Solana(ctx context.Context, e *deployment.Environment, chainDetails chainsel.ChainDetails) (*CCIP16Solana, error) {
 	_ = zerolog.Ctx(ctx)
-	out := NewEmptyCCIP16Solana()
-	out.e = e
+	out := NewEmptyCCIP16Solana(chainDetails)
+	out.SetCLDF(e)
 	return out, nil
 }
 
 func (m *CCIP16Solana) SetCLDF(e *deployment.Environment) {
 	m.e = e
+	factory, found := testadapters.GetTestAdapterRegistry().GetTestAdapter(chain_selectors.FamilySolana, semver.MustParse("1.6.0"))
+	if !found {
+		panic(fmt.Sprintf("failed to find testadapter factory for %s", chain_selectors.FamilySolana))
+	}
+	m.TestAdapter = factory(e, m.chainDetails.ChainSelector)
+}
+
+func (m *CCIP16Solana) ChainSelector() uint64 {
+	return m.chainDetails.ChainSelector
 }
 
 func updatePrices(ds datastore.DataStore, src, dest uint64, srcChain cldf_solana.Chain) error {
@@ -141,425 +139,6 @@ func updatePrices(ds datastore.DataStore, src, dest uint64, srcChain cldf_solana
 		return fmt.Errorf("failed to confirm get fee tokens transaction: %w", err)
 	}
 	return nil
-}
-
-func (m *CCIP16Solana) SendMessage(ctx context.Context, src, dest uint64, fields any, opts any) error {
-	l := zerolog.Ctx(ctx)
-	l.Info().Msg("Sending CCIP message")
-	a := &solanaseqs.SolanaAdapter{}
-	receiver := common.LeftPadBytes(common.HexToAddress("0xdead").Bytes(), 32)
-	msg := ccip_router.SVM2AnyMessage{
-		Receiver:     receiver,
-		Data:         []byte("hello eoa"),
-		TokenAmounts: nil,
-		FeeToken:     solana.PublicKey{},
-		ExtraArgs:    nil,
-	}
-	rAddr, err := a.GetRouterAddress(m.e.DataStore, src)
-	if err != nil {
-		return fmt.Errorf("failed to get router address: %w", err)
-	}
-	fqAddr, err := a.GetFQAddress(m.e.DataStore, src)
-	if err != nil {
-		return fmt.Errorf("failed to get fee quoter address: %w", err)
-	}
-	rmnAddr, err := datastore_utils.FindAndFormatRef(m.e.DataStore, datastore.AddressRef{
-		ChainSelector: src,
-		Type:          datastore.ContractType("RMNRemote"),
-	}, src, datastore_utils.FullRef)
-	if err != nil {
-		return fmt.Errorf("failed to get RMNRemote address: %w", err)
-	}
-	linkAddr, err := datastore_utils.FindAndFormatRef(m.e.DataStore, datastore.AddressRef{
-		ChainSelector: src,
-		Type:          datastore.ContractType("LINK"),
-	}, src, datastore_utils.FullRef)
-	if err != nil {
-		return fmt.Errorf("failed to get LINK address: %w", err)
-	}
-	fqID := solana.PublicKeyFromBytes(fqAddr)
-	routerID := solana.PublicKeyFromBytes(rAddr)
-	ccip_router.SetProgramID(routerID)
-	l.Info().Msg("Got contract instances, preparing to send CCIP message")
-	err = updatePrices(m.e.DataStore, src, dest, m.e.BlockChains.SolanaChains()[src])
-	if err != nil {
-		return fmt.Errorf("failed to update prices: %w", err)
-	}
-	feeToken := solana.SolMint
-	sender := m.e.BlockChains.SolanaChains()[src].DeployerKey
-	destinationChainStatePDA, _ := state.FindDestChainStatePDA(dest, routerID)
-	noncePDA, _ := state.FindNoncePDA(dest, sender.PublicKey(), routerID)
-	linkFqBillingConfigPDA, _, _ := state.FindFqBillingTokenConfigPDA(solana.MustPublicKeyFromBase58(linkAddr.Address), fqID)
-	feeTokenFqBillingConfigPDA, _, _ := state.FindFqBillingTokenConfigPDA(feeToken, fqID)
-	billingSignerPDA, _, _ := state.FindFeeBillingSignerPDA(routerID)
-	feeTokenReceiverATA, _, _ := tokens.FindAssociatedTokenAddress(solana.TokenProgramID, feeToken, billingSignerPDA)
-	fqDestChainPDA, _, _ := state.FindFqDestChainPDA(dest, fqID)
-	rmnRemoteCursesPDA, _, _ := state.FindRMNRemoteCursesPDA(solana.MustPublicKeyFromBase58(rmnAddr.Address))
-	routerConfig, _, _ := state.FindConfigPDA(routerID)
-	fqConfig, _, _ := state.FindConfigPDA(fqID)
-	rmnConfig, _, _ := state.FindConfigPDA(solana.MustPublicKeyFromBase58(rmnAddr.Address))
-
-	base := ccip_router.NewCcipSendInstruction(
-		dest,
-		msg,
-		[]byte{}, // starting indices for accounts, calculated later
-		routerConfig,
-		destinationChainStatePDA,
-		noncePDA,
-		sender.PublicKey(),
-		solana.SystemProgramID,
-		solana.TokenProgramID,
-		feeToken,
-		solana.PublicKey{},
-		feeTokenReceiverATA,
-		billingSignerPDA,
-		fqID,
-		fqConfig,
-		fqDestChainPDA,
-		feeTokenFqBillingConfigPDA,
-		linkFqBillingConfigPDA,
-		solana.MustPublicKeyFromBase58(rmnAddr.Address),
-		rmnRemoteCursesPDA,
-		rmnConfig,
-	)
-
-	addressTables := map[solana.PublicKey]solana.PublicKeySlice{}
-
-	tokenIndexes := []byte{}
-
-	// set config.FeeQuoterProgram and CcipRouterProgram since they point to wrong addresses
-	solconfig.FeeQuoterProgram = fqID
-	solconfig.CcipRouterProgram = routerID
-
-	base.SetTokenIndexes(tokenIndexes)
-
-	tempIx, err := base.ValidateAndBuild()
-	if err != nil {
-		return err
-	}
-	ixData, err := tempIx.Data()
-	if err != nil {
-		return fmt.Errorf("failed to extract data payload from router ccip send instruction: %w", err)
-	}
-	ix := solana.NewInstruction(routerID, tempIx.Accounts(), ixData)
-
-	// for some reason onchain doesn't see extraAccounts
-
-	ixs := []solana.Instruction{ix}
-	result, err := solCommonUtil.SendAndConfirmWithLookupTables(ctx, m.e.BlockChains.SolanaChains()[src].Client, ixs, *sender, solconfig.DefaultCommitment, addressTables, solCommonUtil.AddComputeUnitLimit(400_000))
-	if err != nil {
-		return fmt.Errorf("failed to send and confirm transaction: %w", err)
-	}
-
-	// check CCIP event
-	ccipMessageSentEvent := solccip.EventCCIPMessageSent{}
-	printEvents := true
-	err = solCommonUtil.ParseEvent(result.Meta.LogMessages, "CCIPMessageSent", &ccipMessageSentEvent, printEvents)
-	if err != nil {
-		return err
-	}
-
-	if len(msg.TokenAmounts) != len(ccipMessageSentEvent.Message.TokenAmounts) {
-		return errors.New("token amounts mismatch")
-	}
-
-	// TODO: fee bumping?
-
-	transactionID := "N/A"
-	if tx, err := result.Transaction.GetTransaction(); err != nil {
-		m.e.Logger.Warnf("could not obtain transaction details (err = %s)", err.Error())
-	} else if len(tx.Signatures) == 0 {
-		m.e.Logger.Warnf("transaction has no signatures: %v", tx)
-	} else {
-		transactionID = tx.Signatures[0].String()
-	}
-
-	m.e.Logger.Infof("CCIP message (id %s) sent from chain selector %d to chain selector %d tx %s seqNum %d nonce %d sender %s",
-		common.Bytes2Hex(ccipMessageSentEvent.Message.Header.MessageId[:]),
-		src,
-		dest,
-		transactionID,
-		ccipMessageSentEvent.SequenceNumber,
-		ccipMessageSentEvent.Message.Header.Nonce,
-		ccipMessageSentEvent.Message.Sender.String(),
-	)
-
-	sourceDest := SourceDestPair{SourceChainSelector: src, DestChainSelector: dest}
-	m.MsgSentEvents = append(m.MsgSentEvents, &AnyMsgSentEvent{
-		SequenceNumber: ccipMessageSentEvent.SequenceNumber,
-		RawEvent:       ccipMessageSentEvent,
-	})
-	m.ExpectedSeqNumRange[sourceDest] = ccipocr3common.SeqNumRange{
-		ccipocr3common.SeqNum(m.MsgSentEvents[0].SequenceNumber),
-		ccipocr3common.SeqNum(m.MsgSentEvents[0].SequenceNumber)}
-	m.ExpectedSeqNumExec[sourceDest] = append(
-		m.ExpectedSeqNumExec[sourceDest],
-		ccipMessageSentEvent.SequenceNumber)
-
-	return nil
-}
-
-func (m *CCIP16Solana) GetExpectedNextSequenceNumber(ctx context.Context, from, to uint64) (uint64, error) {
-	_ = zerolog.Ctx(ctx)
-	sourceDest := SourceDestPair{SourceChainSelector: from, DestChainSelector: to}
-	seqRange, ok := m.ExpectedSeqNumRange[sourceDest]
-	if !ok {
-		return 0, fmt.Errorf("no expected sequence number range for source-dest pair %v", sourceDest)
-	}
-	return uint64(seqRange.End()), nil
-}
-
-type CommitReportTracker struct {
-	seenMessages map[uint64]map[uint64]bool
-}
-
-func NewCommitReportTracker(sourceChainSelector uint64, seqNrs ccipocr3common.SeqNumRange) CommitReportTracker {
-	seenMessages := make(map[uint64]map[uint64]bool)
-	seenMessages[sourceChainSelector] = make(map[uint64]bool)
-
-	for i := seqNrs.Start(); i <= seqNrs.End(); i++ {
-		seenMessages[sourceChainSelector][uint64(i)] = false
-	}
-	return CommitReportTracker{seenMessages: seenMessages}
-}
-
-func (c *CommitReportTracker) visitCommitReport(sourceChainSelector uint64, minSeqNr uint64, maxSeqNr uint64) {
-	if _, ok := c.seenMessages[sourceChainSelector]; !ok {
-		return
-	}
-
-	for i := minSeqNr; i <= maxSeqNr; i++ {
-		c.seenMessages[sourceChainSelector][i] = true
-	}
-}
-
-func (c *CommitReportTracker) allCommited(sourceChainSelector uint64) bool {
-	for _, v := range c.seenMessages[sourceChainSelector] {
-		if !v {
-			return false
-		}
-	}
-	return true
-}
-
-// WaitOneSentEventBySeqNo wait and fetch strictly one CCIPMessageSent event by selector and sequence number and selector.
-func (m *CCIP16Solana) WaitOneSentEventBySeqNo(ctx context.Context, from, to, seq uint64, timeout time.Duration) (any, error) {
-	l := zerolog.Ctx(ctx)
-	a := &solanaseqs.SolanaAdapter{}
-	offAddr, err := a.GetOffRampAddress(m.e.DataStore, to)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get off ramp address: %w", err)
-	}
-	seqRange := ccipocr3common.SeqNumRange{ccipocr3common.SeqNum(seq), ccipocr3common.SeqNum(seq)}
-	seenMessages := NewCommitReportTracker(from, seqRange)
-	done := make(chan any)
-	defer close(done)
-	sink, errCh := solEventEmitter[solCommonUtil.EventCommitReportAccepted](ctx, m.e.BlockChains.SolanaChains()[to].Client, solana.PublicKeyFromBytes(offAddr), consts.EventNameCommitReportAccepted, 0, done, time.NewTicker(2*time.Second))
-
-	timer := time.NewTimer(timeout)
-	defer timer.Stop()
-
-	for {
-		select {
-		case eventWithTxn := <-sink:
-			commitEvent := eventWithTxn.Event
-			// if merkle root is zero, it only contains price updates
-			if commitEvent.Report == nil {
-				l.Info().Msg("Skipping commit report with nil report")
-				continue
-			}
-			if commitEvent.Report.SourceChainSelector != from {
-				l.Info().Uint64("SourceChainSelector", commitEvent.Report.SourceChainSelector).Msg("Skipping commit report from different source chain selector")
-				continue
-			}
-
-			// TODO: this logic is duplicated with verifyCommitReport, share
-			mr := commitEvent.Report
-			seenMessages.visitCommitReport(mr.SourceChainSelector, mr.MinSeqNr, mr.MaxSeqNr)
-			if mr.SourceChainSelector == from &&
-				uint64(seqRange.Start()) >= mr.MinSeqNr &&
-				uint64(seqRange.End()) <= mr.MaxSeqNr {
-				l.Info().Msgf("All sequence numbers committed in a single report [%d, %d]", seqRange.Start(), seqRange.End())
-				return true, nil
-			}
-
-			if seenMessages.allCommited(from) {
-				l.Info().Msgf("All sequence numbers already committed from range [%d, %d]", seqRange.Start(), seqRange.End())
-				return true, nil
-			}
-		case err := <-errCh:
-			if err != nil {
-				return false, fmt.Errorf("error while fetching commit report events: %w", err)
-			}
-		case <-timer.C:
-			return false, fmt.Errorf("timed out after waiting for commit report on chain selector %d from source selector %d expected seq nr range %s",
-				to, from, seqRange.String())
-		}
-	}
-}
-
-type EventWithTxn[T any] struct {
-	Event T
-	Txn   *solRpc.GetTransactionResult
-}
-
-// Scan for events referencing address
-func solEventEmitter[T any](ctx context.Context, client *solRpc.Client, address solana.PublicKey, eventType string, startSlot uint64, done chan any, ticker *time.Ticker) (<-chan EventWithTxn[T], <-chan error) {
-	ch := make(chan EventWithTxn[T])
-	errorCh := make(chan error)
-	go func() {
-		defer ticker.Stop()
-		var until solana.Signature
-		for {
-			select {
-			case <-done:
-				return
-			case <-ticker.C:
-				// Scan for transactions referencing the address
-				txSigs, err := client.GetSignaturesForAddressWithOpts(
-					ctx,
-					address,
-					&solRpc.GetSignaturesForAddressOpts{
-						Commitment: solRpc.CommitmentConfirmed,
-						Until:      until,
-					},
-				)
-				if err != nil {
-					errorCh <- err
-					return
-				}
-
-				if len(txSigs) == 0 {
-					continue
-				}
-
-				// values are returned ordered newest to oldest, so we replay them backwards
-				for _, txSig := range slices.Backward(txSigs) {
-					if txSig.Err != nil {
-						// We're not interested in failed transactions.
-						continue
-					}
-					if txSig.Slot < startSlot {
-						// Skip any signatures that are before the starting slot
-						continue
-					}
-					v := uint64(0) // v0 = latest, supports address table lookups
-					tx, err := client.GetTransaction(
-						ctx,
-						txSig.Signature,
-						&solRpc.GetTransactionOpts{
-							Commitment:                     solRpc.CommitmentConfirmed,
-							Encoding:                       solana.EncodingBase64,
-							MaxSupportedTransactionVersion: &v,
-						},
-					)
-					if err != nil {
-						errorCh <- err
-						return
-					}
-
-					events, err := solCommonUtil.ParseMultipleEvents[T](tx.Meta.LogMessages, eventType, solconfig.PrintEvents)
-					if err != nil && strings.Contains(err.Error(), "event not found") {
-						continue
-					}
-					if err != nil {
-						errorCh <- err
-						return
-					}
-
-					for _, event := range events {
-						select {
-						case ch <- EventWithTxn[T]{
-							Event: event,
-							Txn:   tx,
-						}:
-						case <-done:
-							return
-						}
-					}
-				}
-				// next scan should stop at the newest signature we've received
-				until = txSigs[0].Signature
-			}
-		}
-	}()
-
-	return ch, errorCh
-}
-
-const (
-	EXECUTION_STATE_UNTOUCHED  = 0
-	EXECUTION_STATE_INPROGRESS = 1
-	EXECUTION_STATE_SUCCESS    = 2
-	EXECUTION_STATE_FAILURE    = 3
-)
-
-func executionStateToString(state uint8) string {
-	switch state {
-	case EXECUTION_STATE_UNTOUCHED:
-		return "UNTOUCHED"
-	case EXECUTION_STATE_INPROGRESS:
-		return "IN_PROGRESS"
-	case EXECUTION_STATE_SUCCESS:
-		return "SUCCESS"
-	case EXECUTION_STATE_FAILURE:
-		return "FAILURE"
-	default:
-		return "UNKNOWN"
-	}
-}
-
-// WaitOneExecEventBySeqNo wait and fetch strictly one ExecutionStateChanged event by sequence number and selector.
-func (m *CCIP16Solana) WaitOneExecEventBySeqNo(ctx context.Context, from, to, seq uint64, timeout time.Duration) (any, error) {
-	l := zerolog.Ctx(ctx)
-	a := &solanaseqs.SolanaAdapter{}
-	offAddr, err := a.GetOffRampAddress(m.e.DataStore, to)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get off ramp address: %w", err)
-	}
-	offRampAddress := solana.PublicKeyFromBytes(offAddr)
-	seqRange := ccipocr3common.SeqNumRange{ccipocr3common.SeqNum(seq), ccipocr3common.SeqNum(seq)}
-
-	executionStates := make(map[uint64]int)
-	seqNrsToWatch := make(map[uint64]struct{})
-	for seqNr := seqRange.Start(); seqNr <= seqRange.End(); seqNr++ {
-		seqNrsToWatch[uint64(seqNr)] = struct{}{}
-	}
-
-	done := make(chan any)
-	sink, errCh := solEventEmitter[solccip.EventExecutionStateChanged](ctx, m.e.BlockChains.SolanaChains()[to].Client, offRampAddress, consts.EventNameExecutionStateChanged, 0, done, time.NewTicker(2*time.Second))
-
-	timer := time.NewTimer(timeout)
-	defer timer.Stop()
-
-	for {
-		select {
-		case eventWithTxn := <-sink:
-			execEvent := eventWithTxn.Event
-			// TODO: share with EVM
-			_, found := seqNrsToWatch[execEvent.SequenceNumber]
-			if found && execEvent.SourceChainSelector == from {
-				l.Log().Msgf("Received ExecutionStateChanged (state %s) on chain %d (offramp %s) from chain %d with expected sequence number %d",
-					execEvent.State.String(), to, offRampAddress.String(), from, execEvent.SequenceNumber)
-				if execEvent.State == ccip_offramp.InProgress_MessageExecutionState {
-					// skip the in progress state, executed event should follow
-					continue
-				}
-				executionStates[execEvent.SequenceNumber] = int(execEvent.State)
-				delete(seqNrsToWatch, execEvent.SequenceNumber)
-				if len(seqNrsToWatch) == 0 {
-					return executionStates, nil
-				}
-			}
-		case err := <-errCh:
-			if err != nil {
-				return nil, fmt.Errorf("error while fetching execution state changed events: %w", err)
-			}
-		case <-timer.C:
-			return nil, fmt.Errorf("timed out waiting for ExecutionStateChanged on chain %d (offramp %s) from chain %d with expected sequence numbers %+v",
-				to, offRampAddress.String(), from, seqRange)
-		}
-	}
 }
 
 func (m *CCIP16Solana) GetEOAReceiverAddress(ctx context.Context, chainSelector uint64) ([]byte, error) {
