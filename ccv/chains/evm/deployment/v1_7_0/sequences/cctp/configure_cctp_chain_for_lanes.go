@@ -12,6 +12,8 @@ import (
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
+	v1_6_1_tokens "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/usdc_token_pool_cctp_v2"
 	tokens_core "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -93,7 +95,7 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to find CCTPVerifierResolver ref on chain %d: %w", chain.Selector, err)
 		}
 
-		cctpTokenPoolAddressRef, err := datastore_utils.FindAndFormatRef(dep.DataStore, datastore.AddressRef{
+		cctpV2WithCCVsTokenPoolAddressRef, err := datastore_utils.FindAndFormatRef(dep.DataStore, datastore.AddressRef{
 			Type:    datastore.ContractType(cctp_through_ccv_token_pool.ContractType),
 			Version: cctp_through_ccv_token_pool.Version,
 		}, chain.Selector, datastore_utils.FullRef)
@@ -107,6 +109,22 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 		}, chain.Selector, datastore_utils.FullRef)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to find TokenAdminRegistry ref on chain %d: %w", chain.Selector, err)
+		}
+
+		cctpV2TokenPoolAddressRef, err := datastore_utils.FindAndFormatRef(dep.DataStore, datastore.AddressRef{
+			Type:    datastore.ContractType(usdc_token_pool_cctp_v2.ContractType),
+			Version: usdc_token_pool_cctp_v2.Version,
+		}, chain.Selector, datastore_utils.FullRef)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to find CCTP V2 token pool ref on chain %d: %w", chain.Selector, err)
+		}
+
+		cctpV1TokenPoolAddressRef, err := datastore_utils.FindAndFormatRef(dep.DataStore, datastore.AddressRef{
+			Type:    datastore.ContractType(cctpV1ContractType),
+			Version: cctpV1PrevVersion,
+		}, chain.Selector, datastore_utils.FullRef)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to find CCTP V1 token pool ref on chain %d: %w", chain.Selector, err)
 		}
 
 		// Configure each remote chain of the siloed USDC pool, if required.
@@ -143,6 +161,7 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 		remoteChainSelectors := make([]uint64, 0)
 		mechanisms := make([]uint8, 0)
 		setDomainArgs := make([]cctp_verifier.SetDomainArgs, 0)
+		cctpV2DomainUpdates := make([]usdc_token_pool_cctp_v2.DomainUpdate, 0)
 		remoteChainConfigArgs := make([]cctp_verifier.RemoteChainConfigArgs, 0)
 		for remoteChainSelector, remoteChain := range input.RemoteChains {
 			remotePoolAddress, err := dep.RemoteChains[remoteChainSelector].PoolAddress(dep.DataStore, dep.BlockChains, remoteChainSelector)
@@ -218,6 +237,14 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 				Enabled:               true,
 				ChainSelector:         remoteChainSelector,
 			})
+			cctpV2DomainUpdates = append(cctpV2DomainUpdates, usdc_token_pool_cctp_v2.DomainUpdate{
+				AllowedCaller:                 allowedCallerOnDestBytes32,
+				MintRecipient:                 mintRecipientOnDestBytes32,
+				DomainIdentifier:              remoteChain.DomainIdentifier,
+				DestChainSelector:             remoteChainSelector,
+				Enabled:                       true,
+				UseLegacySourcePoolDataFormat: false,
+			})
 			remoteChainConfigArgs = append(remoteChainConfigArgs, cctp_verifier.RemoteChainConfigArgs{
 				Router:              routerAddress,
 				RemoteChainSelector: remoteChainSelector,
@@ -285,11 +312,53 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 			batchOps = append(batchOps, batchOpFromWrites)
 		}
 
-		// Call into configure token for transfers sequence (TODO: ON EACH TOKEN POOL)
+		// Set domains on the CCTP V2 token pool
+		setCCTPV2DomainsReport, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_cctp_v2.USDCTokenPoolSetDomains, chain, contract_utils.FunctionInput[[]usdc_token_pool_cctp_v2.DomainUpdate]{
+			ChainSelector: chain.Selector,
+			Address:       common.HexToAddress(cctpV2TokenPoolAddressRef.Address),
+			Args:          cctpV2DomainUpdates,
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to set domains on CCTP V2 token pool: %w", err)
+		}
+		writes = append(writes, setCCTPV2DomainsReport.Output)
+
+		// Configure remote chains on the CCTP V2 token pool (1.6.x sequence)
+		cctpV2TokenPoolAddress := common.HexToAddress(cctpV2TokenPoolAddressRef.Address)
+		for remoteChainSelector, remoteChainConfig := range remoteChainConfigs {
+			configureCCTPV2PoolReport, err := cldf_ops.ExecuteSequence(b, v1_6_1_tokens.ConfigureTokenPoolForRemoteChain, chain, v1_6_1_tokens.ConfigureTokenPoolForRemoteChainInput{
+				ChainSelector:       input.ChainSelector,
+				TokenPoolAddress:    cctpV2TokenPoolAddress,
+				RemoteChainSelector: remoteChainSelector,
+				RemoteChainConfig:   remoteChainConfig,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to configure CCTP V2 token pool for remote chain %d: %w", remoteChainSelector, err)
+			}
+			batchOps = append(batchOps, configureCCTPV2PoolReport.Output.BatchOps...)
+		}
+
+		// Configure remote chains on the CCTP V1 token pool (1.6.x sequence)
+		cctpV1TokenPoolAddress := common.HexToAddress(cctpV1TokenPoolAddressRef.Address)
+		for remoteChainSelector, remoteChainConfig := range remoteChainConfigs {
+			configureCCTPV1PoolReport, err := cldf_ops.ExecuteSequence(b, v1_6_1_tokens.ConfigureTokenPoolForRemoteChain, chain, v1_6_1_tokens.ConfigureTokenPoolForRemoteChainInput{
+				ChainSelector:       input.ChainSelector,
+				TokenPoolAddress:    cctpV1TokenPoolAddress,
+				RemoteChainSelector: remoteChainSelector,
+				RemoteChainConfig:   remoteChainConfig,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to configure CCTP V1 token pool for remote chain %d: %w", remoteChainSelector, err)
+			}
+			batchOps = append(batchOps, configureCCTPV1PoolReport.Output.BatchOps...)
+		}
+
+		// Call into configure token for transfers sequence for the CCTP token pool with CCVs
+		// Configure token for transfers performs full registration, which we only need to do once.
 		configureTokenForTransfersReport, err := cldf_ops.ExecuteSequence(b, tokens_sequences.ConfigureTokenForTransfers, dep.BlockChains, tokens_core.ConfigureTokenForTransfersInput{
 			ChainSelector:            input.ChainSelector,
 			TokenAddress:             input.USDCToken,
-			TokenPoolAddress:         cctpTokenPoolAddressRef.Address,
+			TokenPoolAddress:         cctpV2WithCCVsTokenPoolAddressRef.Address,
 			RegistryTokenPoolAddress: usdcTokenPoolProxyAddressRef.Address,
 			RegistryAddress:          tokenAdminRegistryAddressRef.Address,
 			MinFinalityValue:         1,
