@@ -11,8 +11,6 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
-
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/testutils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/mcm"
@@ -24,7 +22,7 @@ import (
 func TestMcmSetConfig(t *testing.T) {
 	mcm.SetProgramID(config.McmProgram)
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	admin, err := solana.NewRandomPrivateKey()
 	require.NoError(t, err)

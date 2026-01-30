@@ -326,8 +326,8 @@ func TestPlugin_RoleDonE2E_Discovery(t *testing.T) {
 		{
 			deps.ccipReader.EXPECT().DiscoverContracts(mock.Anything, mock.Anything, mock.Anything).
 				RunAndReturn(func(ctx context.Context, supportedChains, selectors []cciptypes.ChainSelector,
-				) (ccipreader.ContractAddresses, error) {
-					addrs := ccipreader.ContractAddresses{}
+				) (cciptypes.ContractAddresses, error) {
+					addrs := cciptypes.ContractAddresses{}
 
 					// the following contracts can only be discovered by dest supporting oracles
 					if oracleChains.Contains(s.destChain) {
@@ -356,8 +356,8 @@ func TestPlugin_RoleDonE2E_Discovery(t *testing.T) {
 				})
 
 			deps.ccipReader.EXPECT().Sync(mock.Anything, mock.Anything).
-				RunAndReturn(func(ctx context.Context, addresses ccipreader.ContractAddresses) error {
-					require.Equal(t, ccipreader.ContractAddresses{
+				RunAndReturn(func(ctx context.Context, addresses cciptypes.ContractAddresses) error {
+					require.Equal(t, cciptypes.ContractAddresses{
 						// offramp is synced once and cannot change afterwards
 						//consts.ContractNameOffRamp:      {s.destChain: []byte("offramp")},
 						consts.ContractNameOnRamp:       {s.sourceChains[0]: []byte("onramp")},

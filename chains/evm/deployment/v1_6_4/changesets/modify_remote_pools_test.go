@@ -21,8 +21,7 @@ import (
 	token_pool_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/token_pool"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/factory_burn_mint_erc20"
+	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc20"
 )
 
 func TestModifyRemotePoolsChangeset(t *testing.T) {
@@ -41,7 +40,7 @@ func TestModifyRemotePoolsChangeset(t *testing.T) {
 	evmChain := e.BlockChains.EVMChains()[chainSelector]
 
 	// Deploy a mock BurnMintERC20 token contract for use as the pooled token in the BurnMintTokenPool
-	burnMintERC20Addr, tx, _, err := factory_burn_mint_erc20.DeployFactoryBurnMintERC20(
+	burnMintERC20Addr, tx, _, err := burn_mint_erc20.DeployBurnMintERC20(
 		evmChain.DeployerKey,
 		evmChain.Client,
 		"TestBurnMintToken", // name
@@ -49,8 +48,8 @@ func TestModifyRemotePoolsChangeset(t *testing.T) {
 		18,                  // decimals
 		big.NewInt(0),       // max supply
 		big.NewInt(0),       // pre mint
-		common.Address{1},   // new owner
 	)
+	require.NoError(t, err, "Failed to deploy BurnMintERC20 token")
 	_, err = evmChain.Confirm(tx)
 	require.NoError(t, err, "Failed to confirm BurnMintERC20 deployment transaction")
 
