@@ -166,7 +166,13 @@ func Template() Check {
 func CheckIfPseudoDeleted() Check {
 	return func(lggr logger.Logger, msg ccipocr3.Message, idx int, report exectypes.CommitData) (messageStatus, error) {
 		if msg.IsPseudoDeleted() {
-			lggr.Infow("message pseudo deleted", "index", idx, "messageID", msg.Header.MessageID)
+			// Only log if the message is part of the report and not already executed,
+			// since pseudo-deletion for executed messages is expected behavior.
+			isAlreadyExecuted := slices.Contains(report.ExecutedMessages, msg.Header.SequenceNumber)
+			isPartOfReport := report.SequenceNumberRange.Contains(msg.Header.SequenceNumber)
+			if isPartOfReport && !isAlreadyExecuted {
+				lggr.Infow("message pseudo deleted", "index", idx, "messageID", msg.Header.MessageID)
+			}
 			return PseudoDeleted, nil
 		}
 		return None, nil

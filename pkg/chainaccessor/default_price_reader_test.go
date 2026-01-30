@@ -11,10 +11,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	readermock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccip/consts"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
