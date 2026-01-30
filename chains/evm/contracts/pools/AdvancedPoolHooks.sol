@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {IAdvancedPoolHooks} from "../interfaces/IAdvancedPoolHooks.sol";
 import {IPolicyEngine} from "../interfaces/IPolicyEngine.sol";
 import {IPoolV2} from "../interfaces/IPoolV2.sol";
+import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 import {CCIPPolicyEnginePayloads} from "../libraries/CCIPPolicyEnginePayloads.sol";
 import {CCVConfigValidation} from "../libraries/CCVConfigValidation.sol";
@@ -16,6 +17,8 @@ import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/Enumera
 /// @dev This is a standalone contract that can optionally be used by TokenPools.
 contract AdvancedPoolHooks is IAdvancedPoolHooks, AuthorizedCallers {
   using EnumerableSet for EnumerableSet.AddressSet;
+
+  string public constant override typeAndVersion = "AdvancedPoolHooks 1.7.0-dev";
 
   error AllowListNotEnabled();
   error SenderNotAllowed(address sender);
@@ -104,21 +107,24 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, AuthorizedCallers {
       return;
     }
 
-    CCIPPolicyEnginePayloads.PoolHookOutboundPolicyDataV1 memory outboundData =
-      CCIPPolicyEnginePayloads.PoolHookOutboundPolicyDataV1({
-        originalSender: lockOrBurnIn.originalSender,
-        blockConfirmationRequested: blockConfirmationRequested,
-        remoteChainSelector: lockOrBurnIn.remoteChainSelector,
-        receiver: lockOrBurnIn.receiver,
-        amount: lockOrBurnIn.amount,
-        localToken: lockOrBurnIn.localToken,
-        tokenArgs: tokenArgs
-      });
+    CCIPPolicyEnginePayloads.PoolHookOutboundPolicyDataV1 memory outboundData = CCIPPolicyEnginePayloads
+      .PoolHookOutboundPolicyDataV1({
+      originalSender: lockOrBurnIn.originalSender,
+      blockConfirmationRequested: blockConfirmationRequested,
+      remoteChainSelector: lockOrBurnIn.remoteChainSelector,
+      receiver: lockOrBurnIn.receiver,
+      amount: lockOrBurnIn.amount,
+      localToken: lockOrBurnIn.localToken,
+      tokenArgs: tokenArgs
+    });
     bytes memory policyData =
       abi.encodeWithSelector(CCIPPolicyEnginePayloads.POOL_HOOK_OUTBOUND_POLICY_DATA_V1_TAG, outboundData);
     policyEngine.run(
       IPolicyEngine.Payload({
-        selector: IAdvancedPoolHooks.preflightCheck.selector, sender: msg.sender, data: policyData, context: ""
+        selector: IAdvancedPoolHooks.preflightCheck.selector,
+        sender: msg.sender,
+        data: policyData,
+        context: ""
       })
     );
   }
@@ -139,24 +145,27 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, AuthorizedCallers {
       return;
     }
 
-    CCIPPolicyEnginePayloads.PoolHookInboundPolicyDataV1 memory inboundData =
-      CCIPPolicyEnginePayloads.PoolHookInboundPolicyDataV1({
-        originalSender: releaseOrMintIn.originalSender,
-        blockConfirmationRequested: blockConfirmationRequested,
-        remoteChainSelector: releaseOrMintIn.remoteChainSelector,
-        receiver: releaseOrMintIn.receiver,
-        amount: releaseOrMintIn.sourceDenominatedAmount,
-        localToken: releaseOrMintIn.localToken,
-        sourcePoolAddress: releaseOrMintIn.sourcePoolAddress,
-        sourcePoolData: releaseOrMintIn.sourcePoolData,
-        offchainTokenData: releaseOrMintIn.offchainTokenData,
-        localAmount: localAmount
-      });
+    CCIPPolicyEnginePayloads.PoolHookInboundPolicyDataV1 memory inboundData = CCIPPolicyEnginePayloads
+      .PoolHookInboundPolicyDataV1({
+      originalSender: releaseOrMintIn.originalSender,
+      blockConfirmationRequested: blockConfirmationRequested,
+      remoteChainSelector: releaseOrMintIn.remoteChainSelector,
+      receiver: releaseOrMintIn.receiver,
+      amount: releaseOrMintIn.sourceDenominatedAmount,
+      localToken: releaseOrMintIn.localToken,
+      sourcePoolAddress: releaseOrMintIn.sourcePoolAddress,
+      sourcePoolData: releaseOrMintIn.sourcePoolData,
+      offchainTokenData: releaseOrMintIn.offchainTokenData,
+      localAmount: localAmount
+    });
     bytes memory policyData =
       abi.encodeWithSelector(CCIPPolicyEnginePayloads.POOL_HOOK_INBOUND_POLICY_DATA_V1_TAG, inboundData);
     policyEngine.run(
       IPolicyEngine.Payload({
-        selector: IAdvancedPoolHooks.postFlightCheck.selector, sender: msg.sender, data: policyData, context: ""
+        selector: IAdvancedPoolHooks.postFlightCheck.selector,
+        sender: msg.sender,
+        data: policyData,
+        context: ""
       })
     );
   }
@@ -192,20 +201,14 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, AuthorizedCallers {
   /// @notice Apply updates to the allow list.
   /// @param removes The addresses to be removed.
   /// @param adds The addresses to be added.
-  function applyAllowListUpdates(
-    address[] calldata removes,
-    address[] calldata adds
-  ) external onlyOwner {
+  function applyAllowListUpdates(address[] calldata removes, address[] calldata adds) external onlyOwner {
     _applyAllowListUpdates(removes, adds);
   }
 
   /// @notice Internal version of applyAllowListUpdates to allow for reuse in the constructor.
   /// @param removes The addresses to be removed.
   /// @param adds The addresses to be added.
-  function _applyAllowListUpdates(
-    address[] memory removes,
-    address[] memory adds
-  ) internal {
+  function _applyAllowListUpdates(address[] memory removes, address[] memory adds) internal {
     if (!i_allowlistEnabled) revert AllowListNotEnabled();
 
     for (uint256 i = 0; i < removes.length; ++i) {
@@ -375,10 +378,7 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, AuthorizedCallers {
   /// @notice Internal function to set and attach to a policy engine.
   /// @param newPolicyEngine The address of the new policy engine, or address(0) to disable.
   /// @param allowFailedDetach Whether to revert if old policy engine's detach reverts.
-  function _setPolicyEngine(
-    address newPolicyEngine,
-    bool allowFailedDetach
-  ) internal {
+  function _setPolicyEngine(address newPolicyEngine, bool allowFailedDetach) internal {
     address oldPolicyEngine = address(s_policyEngine);
 
     if (newPolicyEngine == oldPolicyEngine) {

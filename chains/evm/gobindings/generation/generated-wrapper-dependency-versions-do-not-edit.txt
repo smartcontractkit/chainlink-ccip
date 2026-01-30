@@ -1,5 +1,5 @@
 GETH_VERSION: 1.16.8
-advanced_pool_hooks: ../solc/ccip/AdvancedPoolHooks/AdvancedPoolHooks.sol/AdvancedPoolHooks.abi.json ../solc/ccip/AdvancedPoolHooks/AdvancedPoolHooks.sol/AdvancedPoolHooks.bin ca19253faaf108b9a529d8618bba475604db1b451b7db781072651a535b81a19
+advanced_pool_hooks: ../solc/ccip/AdvancedPoolHooks/AdvancedPoolHooks.sol/AdvancedPoolHooks.abi.json ../solc/ccip/AdvancedPoolHooks/AdvancedPoolHooks.sol/AdvancedPoolHooks.bin 0ce6324cd782da8d4ef3b90f8b697ca9e7d0d998159176ada03262eaaf026463
 burn_from_mint_token_pool: ../solc/ccip/BurnFromMintTokenPool/BurnFromMintTokenPool.sol/BurnFromMintTokenPool.abi.json ../solc/ccip/BurnFromMintTokenPool/BurnFromMintTokenPool.sol/BurnFromMintTokenPool.bin d44f2cca6eba1286087b6a9472103cbf7ec7b530c8528c73f7cbb7d248f42470
 burn_mint_token_pool: ../solc/ccip/BurnMintTokenPool/BurnMintTokenPool.sol/BurnMintTokenPool.abi.json ../solc/ccip/BurnMintTokenPool/BurnMintTokenPool.sol/BurnMintTokenPool.bin 3413980eb09f835057fd91d4ec8422d775978a675e16931863793c9a710edb6c
 burn_mint_with_lock_release_flag_token_pool: ../solc/ccip/BurnMintWithLockReleaseFlagTokenPool/BurnMintWithLockReleaseFlagTokenPool.sol/BurnMintWithLockReleaseFlagTokenPool.abi.json ../solc/ccip/BurnMintWithLockReleaseFlagTokenPool/BurnMintWithLockReleaseFlagTokenPool.sol/BurnMintWithLockReleaseFlagTokenPool.bin 6177191a4f81510fd067d7f3dcb4a4dd859fcac6279390e75bab8a92056018ac
@@ -36,7 +36,7 @@ multi_ocr3_helper: ../solc/ccip/MultiOCR3Helper/MultiOCR3Helper.sol/MultiOCR3Hel
 offramp: ../solc/ccip/OffRamp/OffRamp.sol/OffRamp.abi.json ../solc/ccip/OffRamp/OffRamp.sol/OffRamp.bin 28580b5c850083b3867727031cdcbc6ca542dec012ea0faccfaf99dde66a84ee
 onramp: ../solc/ccip/OnRamp/OnRamp.sol/OnRamp.abi.json ../solc/ccip/OnRamp/OnRamp.sol/OnRamp.bin 2c4e92436af479ac98f225a765a449349989c405c33c7e939d365135f249e008
 ping_pong_demo: ../solc/ccip/PingPongDemo/PingPongDemo.sol/PingPongDemo.abi.json ../solc/ccip/PingPongDemo/PingPongDemo.sol/PingPongDemo.bin db90196d1d48e825d2d9cf9fffcb4d662a9b9ceaf3b61dbac3f60a61e99a4572
-proxy: ../solc/ccip/Proxy/Proxy.sol/Proxy.abi.json ../solc/ccip/Proxy/Proxy.sol/Proxy.bin 3916035cbec7281d520fc0ea1808bdc757442e82a2f14c66fa3c0294a082e91f
+proxy: ../solc/ccip/Proxy/Proxy.sol/Proxy.abi.json ../solc/ccip/Proxy/Proxy.sol/Proxy.bin e18f73f9bfe45826b1e3beabe84326528659b6318f84075c7d63927b5741ebc1
 registry_module_owner_custom: ../solc/ccip/RegistryModuleOwnerCustom/RegistryModuleOwnerCustom.sol/RegistryModuleOwnerCustom.abi.json ../solc/ccip/RegistryModuleOwnerCustom/RegistryModuleOwnerCustom.sol/RegistryModuleOwnerCustom.bin ce04722cdea2e96d791e48c6a99f64559125d34cd24e19cfd5281892d2ed8ef0
 report_codec: ../solc/ccip/ReportCodec/ReportCodec.sol/ReportCodec.abi.json ../solc/ccip/ReportCodec/ReportCodec.sol/ReportCodec.bin 5dbf5d817141fb025a8c5e889b7c4481f1e4339587ed72f046199b3199dfedb6
 rmn_home: ../solc/ccip/RMNHome/RMNHome.sol/RMNHome.abi.json ../solc/ccip/RMNHome/RMNHome.sol/RMNHome.bin 96944df89e952dae93205f5975fbec5935d1bfec5187967fc3e242562131f338
@@ -44,7 +44,7 @@ rmn_proxy_contract: ../solc/ccip/RMNProxy/RMNProxy.sol/RMNProxy.abi.json ../solc
 rmn_remote: ../solc/ccip/RMNRemote/RMNRemote.sol/RMNRemote.abi.json ../solc/ccip/RMNRemote/RMNRemote.sol/RMNRemote.bin e345511af2c05588a6875c9c5cc728732e8728e76217caa3de3966b0051b0ad2
 router: ../solc/ccip/Router/Router.sol/Router.abi.json ../solc/ccip/Router/Router.sol/Router.bin 4048d8be7531670b5e054b7dc18aa8394f2b6dd44fd7fff83aa0cb4aeb38e926
 siloed_lock_release_token_pool: ../solc/ccip/SiloedLockReleaseTokenPool/SiloedLockReleaseTokenPool.sol/SiloedLockReleaseTokenPool.abi.json ../solc/ccip/SiloedLockReleaseTokenPool/SiloedLockReleaseTokenPool.sol/SiloedLockReleaseTokenPool.bin 473e2d3557f463c2039e97998e62f5f75088f5e2f6817ca02a2d189b56774044
-siloed_usdc_token_pool: ../solc/ccip/SiloedUSDCTokenPool/SiloedUSDCTokenPool.sol/SiloedUSDCTokenPool.abi.json ../solc/ccip/SiloedUSDCTokenPool/SiloedUSDCTokenPool.sol/SiloedUSDCTokenPool.bin f6b4e2b61346560922dabedb2e975545a1be882c7d16f3c21fd8fa902a89880f
+siloed_usdc_token_pool: ../solc/ccip/SiloedUSDCTokenPool/SiloedUSDCTokenPool.sol/SiloedUSDCTokenPool.abi.json ../solc/ccip/SiloedUSDCTokenPool/SiloedUSDCTokenPool.sol/SiloedUSDCTokenPool.bin b675286aeffb942d673b681db0d59acb92c237911bf110e48fe7ade807d67613
 token_admin_registry: ../solc/ccip/TokenAdminRegistry/TokenAdminRegistry.sol/TokenAdminRegistry.abi.json ../solc/ccip/TokenAdminRegistry/TokenAdminRegistry.sol/TokenAdminRegistry.bin 086268b9df56e089a69a96ce3e4fd03a07a00a1c8812ba9504e31930a5c3ff1d
 token_pool: ../solc/ccip/TokenPool/TokenPool.sol/TokenPool.abi.json ../solc/ccip/TokenPool/TokenPool.sol/TokenPool.bin d6ceab531e9ebede708dba6bacf02402bd93dcefbf4518a16b6c01bbe9cd6938
 token_pool_factory: ../solc/ccip/TokenPoolFactory/TokenPoolFactory.sol/TokenPoolFactory.abi.json ../solc/ccip/TokenPoolFactory/TokenPoolFactory.sol/TokenPoolFactory.bin 759144c67caff5af9ccdf6fc6d2ed7d70766ae9edac1c80e97e86626bd8628ce
