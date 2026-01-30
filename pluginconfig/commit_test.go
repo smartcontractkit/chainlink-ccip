@@ -510,25 +510,20 @@ func TestCommitOffchainConfig_ApplyDefaultsAndValidate(t *testing.T) {
 			name: "Config with some values set applies remaining defaults and validates successfully",
 			input: CommitOffchainConfig{
 				NewMsgScanBatchSize: 100,
+				RMNEnabled:          true,
 			},
 		},
 		{
 			name: "Config with all valid values doesn't change and validates successfully",
 			input: CommitOffchainConfig{
 				RemoteGasPriceBatchWriteFrequency:  *commonconfig.MustNewDuration(2 * time.Minute),
+				RMNSignaturesTimeout:               10 * time.Second,
 				NewMsgScanBatchSize:                100,
 				MaxReportTransmissionCheckAttempts: 10,
 				MaxMerkleTreeSize:                  1000,
+				RMNEnabled:                         true,
 				SignObservationPrefix:              defaultSignObservationPrefix,
 			},
-		},
-		{
-			name: "RMNEnabled throws an error if set to true",
-			input: CommitOffchainConfig{
-				NewMsgScanBatchSize: 100,
-				RMNEnabled:          true,
-			},
-			expectedError: "rmn has been deprecated, the RMNEnabled field must be set to false",
 		},
 	}
 
