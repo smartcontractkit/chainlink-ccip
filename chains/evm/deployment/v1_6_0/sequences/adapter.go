@@ -5,6 +5,7 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
+
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -19,12 +20,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
-	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
-	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
-	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
-	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
-
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	ccipapi "github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
