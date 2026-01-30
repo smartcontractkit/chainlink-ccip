@@ -15,7 +15,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/usdc_token_pool_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/burn_mint_token_pool"
 	cctp_message_transmitter_proxy_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/cctp_message_transmitter_proxy"
 	cctp_through_ccv_token_pool_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/cctp_through_ccv_token_pool"
 	cctp_verifier_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/cctp_verifier"
@@ -190,21 +189,11 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 	homeChain := e.BlockChains.EVMChains()[homeChainSelector]
 	nonHomeChain := e.BlockChains.EVMChains()[nonHomeChainSelector]
 
-	// Deploy CCTP V2 and V1 pools on both chains for testing
-	homeCCTPV2Pool, tx, _, err := burn_mint_token_pool.DeployBurnMintTokenPool(homeChain.DeployerKey, homeChain.Client, homeSetup.USDCToken, 6, common.Address{}, homeSetup.RMN, homeSetup.Router)
-	require.NoError(t, err, "Failed to deploy CCTP V2 pool on home chain")
-	_, err = homeChain.Confirm(tx)
-	require.NoError(t, err, "Failed to confirm CCTP V2 pool deployment on home chain")
-
+	// Deploy CCTP V1 pools on both chains for testing
 	homeCCTPV1Pool, tx, _, err := v1_6_1_burn_mint_token_pool.DeployBurnMintTokenPool(homeChain.DeployerKey, homeChain.Client, homeSetup.USDCToken, 6, []common.Address{}, homeSetup.RMN, homeSetup.Router)
 	require.NoError(t, err, "Failed to deploy CCTP V1 pool on home chain")
 	_, err = homeChain.Confirm(tx)
 	require.NoError(t, err, "Failed to confirm CCTP V1 pool deployment on home chain")
-
-	nonHomeCCTPV2Pool, tx, _, err := burn_mint_token_pool.DeployBurnMintTokenPool(nonHomeChain.DeployerKey, nonHomeChain.Client, nonHomeSetup.USDCToken, 6, common.Address{}, nonHomeSetup.RMN, nonHomeSetup.Router)
-	require.NoError(t, err, "Failed to deploy CCTP V2 pool on non-home chain")
-	_, err = nonHomeChain.Confirm(tx)
-	require.NoError(t, err, "Failed to confirm CCTP V2 pool deployment on non-home chain")
 
 	nonHomeCCTPV1Pool, tx, _, err := v1_6_1_burn_mint_token_pool.DeployBurnMintTokenPool(nonHomeChain.DeployerKey, nonHomeChain.Client, nonHomeSetup.USDCToken, 6, []common.Address{}, nonHomeSetup.RMN, nonHomeSetup.Router)
 	require.NoError(t, err, "Failed to deploy CCTP V1 pool on non-home chain")
@@ -213,13 +202,6 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 
 	// Add pools to datastore
 	newDS := datastore.NewMemoryDataStore()
-	err = newDS.Addresses().Add(datastore.AddressRef{
-		ChainSelector: homeChainSelector,
-		Address:       homeCCTPV2Pool.Hex(),
-		Type:          datastore.ContractType("USDCTokenPoolCCTPV2"),
-		Version:       semver.MustParse("1.6.4"),
-	})
-	require.NoError(t, err, "Failed to add home CCTP V2 pool to datastore")
 
 	err = newDS.Addresses().Add(datastore.AddressRef{
 		ChainSelector: homeChainSelector,
@@ -228,14 +210,6 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 		Version:       semver.MustParse("1.6.2"),
 	})
 	require.NoError(t, err, "Failed to add home CCTP V1 pool to datastore")
-
-	err = newDS.Addresses().Add(datastore.AddressRef{
-		ChainSelector: nonHomeChainSelector,
-		Address:       nonHomeCCTPV2Pool.Hex(),
-		Type:          datastore.ContractType("USDCTokenPoolCCTPV2"),
-		Version:       semver.MustParse("1.6.4"),
-	})
-	require.NoError(t, err, "Failed to add non-home CCTP V2 pool to datastore")
 
 	err = newDS.Addresses().Add(datastore.AddressRef{
 		ChainSelector: nonHomeChainSelector,
@@ -462,7 +436,6 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 	homePools, err := homeUSDCTokenPoolProxy.GetPools(nil)
 	require.NoError(t, err, "Failed to get pools from USDCTokenPoolProxy on home chain")
 	require.Equal(t, homeCCTPV1Pool, homePools.CctpV1Pool, "CCTP V1 pool should match on home chain")
-	require.Equal(t, homeCCTPV2Pool, homePools.CctpV2Pool, "CCTP V2 pool should match on home chain")
 
 	// Check USDCTokenPoolProxy required CCVs on home chain
 	homeRequiredCCVs, err := homeUSDCTokenPoolProxy.GetRequiredCCVs(nil, homeSetup.USDCToken, nonHomeChainSelector, big.NewInt(1e18), 1, []byte{}, 0)
