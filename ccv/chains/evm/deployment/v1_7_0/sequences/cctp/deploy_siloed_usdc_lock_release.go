@@ -2,6 +2,7 @@ package cctp
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
@@ -117,7 +118,7 @@ var DeploySiloedUSDCLockRelease = cldf_ops.NewSequence(
 				return DeploySiloedUSDCLockReleaseOutput{}, fmt.Errorf("failed to get authorized callers on lockbox %s (chain %d): %w", lbAddr, sel, err)
 			}
 			// If not authorized, authorize it
-			if !containsAddress(callersReport.Output, siloedPoolAddress) {
+			if !slices.Contains(callersReport.Output, siloedPoolAddress) {
 				authReport, err := cldf_ops.ExecuteOperation(b, erc20_lock_box.ApplyAuthorizedCallerUpdates, chain, contract_utils.FunctionInput[erc20_lock_box.AuthorizedCallerArgs]{
 					ChainSelector: input.ChainSelector,
 					Address:       lockBoxAddress,

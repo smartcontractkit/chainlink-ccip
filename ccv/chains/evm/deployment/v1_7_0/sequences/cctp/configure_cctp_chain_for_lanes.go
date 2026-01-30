@@ -1,7 +1,6 @@
 package cctp
 
 import (
-	"errors"
 	"fmt"
 	"math/big"
 
@@ -157,6 +156,7 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 				RemotePool:             common.LeftPadBytes(remotePoolAddress, 32),
 				RemoteToken:            common.LeftPadBytes(remoteTokenAddress, 32),
 				TokenTransferFeeConfig: remoteChain.TokenTransferFeeConfig,
+				// CCTP does not use rate limiters, so we set them to 0 here.
 				DefaultFinalityOutboundRateLimiterConfig: tokens_core.RateLimiterConfig{
 					Capacity: big.NewInt(0),
 					Rate:     big.NewInt(0),
@@ -184,34 +184,35 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to convert lock or burn mechanism to uint8: %w", err)
 			}
 			mechanisms = append(mechanisms, mechanism)
+
 			unpaddedAllowedCallerOnDest, err := dep.RemoteChains[remoteChainSelector].AllowedCallerOnDest(dep.DataStore, dep.BlockChains, remoteChainSelector)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get allowed caller on dest: %w", err)
 			}
-			allowedCallerOnDest, err := toBytes32LeftPad(unpaddedAllowedCallerOnDest)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to convert allowed caller on dest to bytes32: %w", err)
-			}
+			allowedCallerOnDest := common.LeftPadBytes(unpaddedAllowedCallerOnDest, 32)
+
 			unpaddedAllowedCallerOnSource, err := dep.RemoteChains[remoteChainSelector].AllowedCallerOnSource(dep.DataStore, dep.BlockChains, remoteChainSelector)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get allowed caller on source: %w", err)
 			}
-			allowedCallerOnSource, err := toBytes32LeftPad(unpaddedAllowedCallerOnSource)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to convert allowed caller on source to bytes32: %w", err)
-			}
+			allowedCallerOnSource := common.LeftPadBytes(unpaddedAllowedCallerOnSource, 32)
+
 			unpaddedMintRecipientOnDest, err := dep.RemoteChains[remoteChainSelector].MintRecipientOnDest(dep.DataStore, dep.BlockChains, remoteChainSelector)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get mint recipient on dest: %w", err)
 			}
-			mintRecipientOnDest, err := toBytes32LeftPad(unpaddedMintRecipientOnDest)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to convert mint recipient on dest to bytes32: %w", err)
-			}
+			mintRecipientOnDest := common.LeftPadBytes(unpaddedMintRecipientOnDest, 32)
+
+			var allowedCallerOnDestBytes32 [32]byte
+			copy(allowedCallerOnDestBytes32[32-len(allowedCallerOnDest):], allowedCallerOnDest)
+			var allowedCallerOnSourceBytes32 [32]byte
+			copy(allowedCallerOnSourceBytes32[32-len(allowedCallerOnSource):], allowedCallerOnSource)
+			var mintRecipientOnDestBytes32 [32]byte
+			copy(mintRecipientOnDestBytes32[32-len(mintRecipientOnDest):], mintRecipientOnDest)
 			setDomainArgs = append(setDomainArgs, cctp_verifier.SetDomainArgs{
-				AllowedCallerOnDest:   allowedCallerOnDest,
-				AllowedCallerOnSource: allowedCallerOnSource,
-				MintRecipientOnDest:   mintRecipientOnDest,
+				AllowedCallerOnDest:   allowedCallerOnDestBytes32,
+				AllowedCallerOnSource: allowedCallerOnSourceBytes32,
+				MintRecipientOnDest:   mintRecipientOnDestBytes32,
 				DomainIdentifier:      remoteChain.DomainIdentifier,
 				Enabled:               true,
 				ChainSelector:         remoteChainSelector,
@@ -304,24 +305,6 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 		}, nil
 	},
 )
-
-func containsAddress(addresses []common.Address, needle common.Address) bool {
-	for _, address := range addresses {
-		if address == needle {
-			return true
-		}
-	}
-	return false
-}
-
-func toBytes32LeftPad(b []byte) ([32]byte, error) {
-	if len(b) > 32 {
-		return [32]byte{}, errors.New("byte slice is too long")
-	}
-	var result [32]byte
-	copy(result[32-len(b):], b)
-	return result, nil
-}
 
 func convertMechanismToUint8(mechanism string) (uint8, error) {
 	switch mechanism {
