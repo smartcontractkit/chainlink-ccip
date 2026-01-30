@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	_ "embed"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -14,6 +15,9 @@ import (
 
 	"gopkg.in/yaml.v3"
 )
+
+//go:embed operations.tmpl
+var operationsTemplate string
 
 const (
 	// anyType is the fallback Go type for unknown Solidity types
@@ -78,6 +82,7 @@ type OutputConfig struct {
 type ContractConfig struct {
 	Name      string           `yaml:"contract_name"`
 	Version   string           `yaml:"version"`
+	ABIFile   string           `yaml:"abi_file,omitempty"` // Optional: override ABI file name
 	Functions []FunctionConfig `yaml:"functions"`
 }
 
@@ -86,7 +91,6 @@ type FunctionConfig struct {
 	Access string `yaml:"access,omitempty"` // "owner", "public", or empty
 }
 
-// ABI structures
 type ABIEntry struct {
 	Type            string     `json:"type"`
 	Name            string     `json:"name"`
@@ -102,7 +106,6 @@ type ABIParam struct {
 	Components   []ABIParam `json:"components"`
 }
 
-// Contract info structures
 type ContractInfo struct {
 	Name          string
 	Version       string
@@ -127,7 +130,7 @@ type FunctionInfo struct {
 	Parameters      []ParameterInfo
 	ReturnParams    []ParameterInfo
 	IsWrite         bool
-	CallMethod      string
+	CallMethod      string // The method name or full signature for overloaded functions
 	HasOnlyOwner    bool
 }
 
@@ -138,6 +141,67 @@ type ParameterInfo struct {
 	IsStruct     bool
 	StructName   string
 	Components   []ParameterInfo
+}
+
+type TemplateData struct {
+	PackageName       string
+	PackageNameHyphen string
+	ContractType      string
+	Version           string
+	ABI               string
+	Bytecode          string
+	NeedsBigInt       bool
+	Constructor       *ConstructorData
+	StructDefs        []StructDefData
+	WriteArgStructs   []ArgStructData
+	WriteOps          []WriteOpData
+	ReadOps           []ReadOpData
+	ContractMethods   []ContractMethodData
+}
+
+type ConstructorData struct {
+	Parameters []ParameterData
+}
+
+type StructDefData struct {
+	Name   string
+	Fields []ParameterData
+}
+
+type ArgStructData struct {
+	Name   string
+	Fields []ParameterData
+}
+
+type ParameterData struct {
+	GoName string
+	GoType string
+}
+
+type WriteOpData struct {
+	Name          string
+	MethodName    string
+	OpName        string
+	ArgsType      string
+	CallArgs      string
+	AccessControl string
+}
+
+type ReadOpData struct {
+	Name       string
+	MethodName string
+	OpName     string
+	ArgsType   string
+	ReturnType string
+	CallArgs   string
+}
+
+type ContractMethodData struct {
+	Name       string
+	MethodName string
+	Params     string
+	Returns    string
+	MethodBody string
 }
 
 func main() {
@@ -192,7 +256,7 @@ func extractContractInfo(cfg ContractConfig, input InputConfig, output OutputCon
 	packageName := toSnakeCase(cfg.Name)
 	versionPath := versionToPath(cfg.Version)
 
-	abiString, bytecode, err := readABIAndBytecode(packageName, versionPath, input.BasePath)
+	abiString, bytecode, err := readABIAndBytecode(cfg, versionPath, input.BasePath)
 	if err != nil {
 		return nil, err
 	}
@@ -223,23 +287,27 @@ func extractContractInfo(cfg ContractConfig, input InputConfig, output OutputCon
 	return info, nil
 }
 
-func readABIAndBytecode(packageName, versionPath, basePath string) (abiString string, bytecode string, err error) {
-	fileName := packageName
-	abiPath := filepath.Join(basePath, "abi", versionPath, fileName+".json")
-
-	abiBytes, err := os.ReadFile(abiPath)
-	if err != nil {
-		fileNameNoUnderscore := strings.ReplaceAll(packageName, "_", "")
-		abiPath = filepath.Join(basePath, "abi", versionPath, fileNameNoUnderscore+".json")
-		abiBytes, err = os.ReadFile(abiPath)
-		if err != nil {
-			return "", "", fmt.Errorf("ABI not found (tried %s.json and %s.json in %s)",
-				fileName, fileNameNoUnderscore, versionPath)
-		}
-		fileName = fileNameNoUnderscore
+func readABIAndBytecode(
+	cfg ContractConfig,
+	versionPath,
+	basePath string) (abiString string, bytecode string, err error) {
+	// Use explicit ABI file if provided, otherwise derive from package name
+	var abiFileName string
+	if cfg.ABIFile != "" {
+		abiFileName = cfg.ABIFile
+	} else {
+		abiFileName = toSnakeCase(cfg.Name) + ".json"
 	}
 
-	bytecodePath := filepath.Join(basePath, "bytecode", versionPath, fileName+".bin")
+	abiPath := filepath.Join(basePath, "abi", versionPath, abiFileName)
+	abiBytes, err := os.ReadFile(abiPath)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to read ABI from %s: %w", abiPath, err)
+	}
+
+	// Bytecode file matches ABI file name (without .json, with .bin)
+	bytecodeFileName := strings.TrimSuffix(abiFileName, ".json") + ".bin"
+	bytecodePath := filepath.Join(basePath, "bytecode", versionPath, bytecodeFileName)
 	bytecodeBytes, err := os.ReadFile(bytecodePath)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to read bytecode from %s: %w", bytecodePath, err)
@@ -251,36 +319,34 @@ func readABIAndBytecode(packageName, versionPath, basePath string) (abiString st
 func extractConstructor(info *ContractInfo, abiEntries []ABIEntry) {
 	for _, entry := range abiEntries {
 		if entry.Type == "constructor" {
-			info.Constructor = parseABIFunction(entry, true, info.PackageName, false, 0)
+			info.Constructor = parseABIFunction(entry, true, info.PackageName)
 			break
 		}
 	}
 }
 
 func extractFunctions(info *ContractInfo, funcConfigs []FunctionConfig, abiEntries []ABIEntry) error {
-	functionNames := make([]string, len(funcConfigs))
-	for i, cfg := range funcConfigs {
-		functionNames[i] = cfg.Name
-	}
-	info.FunctionOrder = functionNames
-
 	for _, funcCfg := range funcConfigs {
-		funcInfo := findFunctionInABI(abiEntries, funcCfg.Name, info.PackageName)
-		if funcInfo == nil {
+		funcInfos := findFunctionInABI(abiEntries, funcCfg.Name, info.PackageName)
+		if funcInfos == nil {
 			return fmt.Errorf("function %s not found in ABI", funcCfg.Name)
 		}
 
-		switch funcCfg.Access {
-		case "owner":
-			funcInfo.HasOnlyOwner = true
-		case "public", "":
-			funcInfo.HasOnlyOwner = false
-		default:
-			return fmt.Errorf("unknown access control '%s' for function %s (use 'owner' or 'public')",
-				funcCfg.Access, funcCfg.Name)
-		}
+		for _, funcInfo := range funcInfos {
+			switch funcCfg.Access {
+			case "owner":
+				funcInfo.HasOnlyOwner = true
+			case "public", "":
+				funcInfo.HasOnlyOwner = false
+			default:
+				return fmt.Errorf("unknown access control '%s' for function %s (use 'owner' or 'public')",
+					funcCfg.Access, funcCfg.Name)
+			}
 
-		info.Functions[funcCfg.Name] = funcInfo
+			// Use the potentially suffixed name as the key
+			info.Functions[funcInfo.Name] = funcInfo
+			info.FunctionOrder = append(info.FunctionOrder, funcInfo.Name)
+		}
 	}
 
 	return nil
@@ -310,7 +376,7 @@ func collectStructDefs(params []ParameterInfo, structDefs map[string]*StructDef)
 	}
 }
 
-func findFunctionInABI(entries []ABIEntry, funcName string, packageName string) *FunctionInfo {
+func findFunctionInABI(entries []ABIEntry, funcName string, packageName string) []*FunctionInfo {
 	var candidates []ABIEntry
 	for _, entry := range entries {
 		if entry.Type == "function" && strings.EqualFold(entry.Name, funcName) {
@@ -322,31 +388,32 @@ func findFunctionInABI(entries []ABIEntry, funcName string, packageName string) 
 		return nil
 	}
 
-	if len(candidates) == 1 {
-		return parseABIFunction(candidates[0], false, packageName, false, 0)
-	}
-
+	// Parse all overloads
+	var funcInfos []*FunctionInfo
 	for i, candidate := range candidates {
-		if len(candidate.Inputs) > 0 {
-			needsSuffix := i > 0
-			return parseABIFunction(candidate, false, packageName, needsSuffix, i)
+		funcInfo := parseABIFunction(candidate, false, packageName)
+
+		// For overloaded functions, follow Geth's naming convention:
+		// - First overload (i=0): no suffix (e.g., "Curse", "curse")
+		// - Second overload (i=1): suffix "0" (e.g., "Curse0", "curse0")
+		// - Third overload (i=2): suffix "1" (e.g., "Curse1", "curse1")
+		if len(candidates) > 1 && i > 0 {
+			suffix := fmt.Sprintf("%d", i-1)
+			funcInfo.Name = funcInfo.Name + suffix
+			funcInfo.CallMethod = funcInfo.CallMethod + suffix
 		}
+
+		funcInfos = append(funcInfos, funcInfo)
 	}
 
-	return parseABIFunction(candidates[0], false, packageName, false, 0)
+	return funcInfos
 }
 
-func parseABIFunction(entry ABIEntry, _ bool, packageName string, needsSuffix bool, suffixIndex int) *FunctionInfo {
-
-	callMethod := entry.Name
-	if needsSuffix {
-		callMethod = fmt.Sprintf("%s%d", entry.Name, suffixIndex)
-	}
-
+func parseABIFunction(entry ABIEntry, _ bool, packageName string) *FunctionInfo {
 	funcInfo := &FunctionInfo{
 		Name:            capitalize(entry.Name),
 		StateMutability: entry.StateMutability,
-		CallMethod:      callMethod,
+		CallMethod:      entry.Name,
 		IsWrite:         entry.StateMutability != "view" && entry.StateMutability != "pure",
 	}
 
@@ -457,149 +524,9 @@ func toKebabCase(s string) string {
 }
 
 func generateOperationsFile(info *ContractInfo) error {
-	tmpl := `package {{.PackageName}}
-
-import (
-{{- if .NeedsBigInt}}
-	"math/big"
-{{end}}
-	"strings"
-
-	"github.com/Masterminds/semver/v3"
-	"github.com/ethereum/go-ethereum/accounts/abi"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
-	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-)
-
-var ContractType cldf_deployment.ContractType = "{{.ContractType}}"
-var Version = semver.MustParse("{{.Version}}")
-
-const {{.ContractType}}ABI = ` + "`" + `{{.ABI}}` + "`" + `
-const {{.ContractType}}Bin = "{{.Bytecode}}"
-
-type {{.ContractType}}Contract struct {
-	address  common.Address
-	abi      abi.ABI
-	backend  bind.ContractBackend
-	contract *bind.BoundContract
-}
-
-func New{{.ContractType}}Contract(
-	address common.Address,
-	backend bind.ContractBackend,
-) (*{{.ContractType}}Contract, error) {
-	parsed, err := abi.JSON(strings.NewReader({{.ContractType}}ABI))
-	if err != nil {
-		return nil, err
-	}
-	return &{{.ContractType}}Contract{
-		address:  address,
-		abi:      parsed,
-		backend:  backend,
-		contract: bind.NewBoundContract(address, parsed, backend, backend, backend),
-	}, nil
-}
-
-func (c *{{.ContractType}}Contract) Address() common.Address {
-	return c.address
-}
-
-func (c *{{.ContractType}}Contract) Owner(opts *bind.CallOpts) (common.Address, error) {
-	var out []any
-	err := c.contract.Call(opts, &out, "owner")
-	if err != nil {
-		return common.Address{}, err
-	}
-	return *abi.ConvertType(out[0], new(common.Address)).(*common.Address), nil
-}
-{{range .ContractMethods}}
-
-func (c *{{$.ContractType}}Contract) {{.Name}}({{.Params}}) {{.Returns}} {
-	{{.MethodBody}}
-}
-{{- end}}
-{{range .StructDefs}}
-
-type {{.Name}} struct {
-{{- range .Fields}}
-	{{.GoName}} {{.GoType}}
-{{- end}}
-}
-{{- end}}
-{{range .WriteArgStructs}}
-
-type {{.Name}} struct {
-{{- range .Fields}}
-	{{.GoName}} {{.GoType}}
-{{- end}}
-}
-{{- end}}
-{{if .Constructor}}
-
-type ConstructorArgs struct {
-{{- range .Constructor.Parameters}}
-	{{.GoName}} {{.GoType}}
-{{- end}}
-}
-{{end}}
-
-var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
-	Name:        "{{.PackageNameHyphen}}:deploy",
-	Version:     Version,
-	Description: "Deploys the {{.ContractType}} contract",
-	ContractMetadata: &bind.MetaData{
-		ABI: {{.ContractType}}ABI,
-		Bin: {{.ContractType}}Bin,
-	},
-	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
-		cldf_deployment.NewTypeAndVersion(ContractType, *Version).String(): {
-			EVM: common.FromHex({{.ContractType}}Bin),
-		},
-	},
-	Validate: func(ConstructorArgs) error { return nil },
-})
-{{range .WriteOps}}
-
-var {{.Name}} = contract.NewWrite(contract.WriteParams[{{.ArgsType}}, *{{$.ContractType}}Contract]{
-	Name:            "{{$.PackageNameHyphen}}:{{.OpName}}",
-	Version:         Version,
-	Description:     "Calls {{.MethodName}} on the contract",
-	ContractType:    ContractType,
-	ContractABI:     {{$.ContractType}}ABI,
-	NewContract:     New{{$.ContractType}}Contract,
-	IsAllowedCaller: contract.{{.AccessControl}}[*{{$.ContractType}}Contract, {{.ArgsType}}],
-	Validate:        func({{.ArgsType}}) error { return nil },
-	CallContract: func(
-		c *{{$.ContractType}}Contract,
-		opts *bind.TransactOpts,
-		args {{.ArgsType}},
-	) (*types.Transaction, error) {
-		return c.{{.Name}}(opts{{.CallArgs}})
-	},
-})
-{{- end}}
-{{range .ReadOps}}
-
-var {{.Name}} = contract.NewRead(contract.ReadParams[{{.ArgsType}}, {{.ReturnType}}, *{{$.ContractType}}Contract]{
-	Name:         "{{$.PackageNameHyphen}}:{{.OpName}}",
-	Version:      Version,
-	Description:  "Calls {{.MethodName}} on the contract",
-	ContractType: ContractType,
-	NewContract:  New{{$.ContractType}}Contract,
-	CallContract: func(c *{{$.ContractType}}Contract, opts *bind.CallOpts, args {{.ArgsType}}) ({{.ReturnType}}, error) {
-		return c.{{.Name}}(opts{{.CallArgs}})
-	},
-})
-{{- end}}
-`
-
 	data := prepareTemplateData(info)
 
-	t, err := template.New("operations").Parse(tmpl)
+	t, err := template.New("operations").Parse(operationsTemplate)
 	if err != nil {
 		return fmt.Errorf("template parse error: %w", err)
 	}
@@ -625,47 +552,40 @@ var {{.Name}} = contract.NewRead(contract.ReadParams[{{.ArgsType}}, {{.ReturnTyp
 	return nil
 }
 
-func prepareTemplateData(info *ContractInfo) map[string]any {
-	data := map[string]any{
-		"PackageName":       info.PackageName,
-		"PackageNameHyphen": toKebabCase(info.Name),
-		"ContractType":      info.Name,
-		"Version":           info.Version,
-		"ABI":               info.ABI,
-		"Bytecode":          info.Bytecode,
+func prepareTemplateData(info *ContractInfo) TemplateData {
+	data := TemplateData{
+		PackageName:       info.PackageName,
+		PackageNameHyphen: toKebabCase(info.Name),
+		ContractType:      info.Name,
+		Version:           info.Version,
+		ABI:               info.ABI,
+		Bytecode:          info.Bytecode,
+		NeedsBigInt:       checkNeedsBigInt(info),
 	}
-
-	needsBigInt := checkNeedsBigInt(info)
-	data["NeedsBigInt"] = needsBigInt
 
 	if info.Constructor != nil {
-		data["Constructor"] = map[string]any{
-			"Parameters": prepareParameters(info.Constructor.Parameters),
+		data.Constructor = &ConstructorData{
+			Parameters: prepareParameters(info.Constructor.Parameters),
 		}
 	}
-
-	var writeOps, readOps []map[string]any
-	var contractMethods []map[string]any
-	var writeArgStructs []map[string]any
 
 	for _, name := range info.FunctionOrder {
 		funcInfo := info.Functions[name]
-		contractMethods = append(contractMethods, prepareContractMethod(funcInfo, funcInfo.IsWrite))
+		data.ContractMethods = append(data.ContractMethods, prepareContractMethod(funcInfo, funcInfo.IsWrite))
 
 		if funcInfo.IsWrite {
-			writeOps = append(writeOps, prepareWriteOp(funcInfo))
+			data.WriteOps = append(data.WriteOps, prepareWriteOp(funcInfo))
 			if len(funcInfo.Parameters) > 1 {
-				writeArgStructs = append(writeArgStructs, map[string]any{
-					"Name":   funcInfo.Name + "Args",
-					"Fields": prepareParameters(funcInfo.Parameters),
+				data.WriteArgStructs = append(data.WriteArgStructs, ArgStructData{
+					Name:   funcInfo.Name + "Args",
+					Fields: prepareParameters(funcInfo.Parameters),
 				})
 			}
 		} else {
-			readOps = append(readOps, prepareReadOp(funcInfo))
+			data.ReadOps = append(data.ReadOps, prepareReadOp(funcInfo))
 		}
 	}
 
-	var structDefs []map[string]any
 	var structNames []string
 	for name := range info.StructDefs {
 		structNames = append(structNames, name)
@@ -673,17 +593,11 @@ func prepareTemplateData(info *ContractInfo) map[string]any {
 	sort.Strings(structNames)
 	for _, name := range structNames {
 		structDef := info.StructDefs[name]
-		structDefs = append(structDefs, map[string]any{
-			"Name":   structDef.Name,
-			"Fields": prepareParameters(structDef.Fields),
+		data.StructDefs = append(data.StructDefs, StructDefData{
+			Name:   structDef.Name,
+			Fields: prepareParameters(structDef.Fields),
 		})
 	}
-
-	data["StructDefs"] = structDefs
-	data["WriteArgStructs"] = writeArgStructs
-	data["WriteOps"] = writeOps
-	data["ReadOps"] = readOps
-	data["ContractMethods"] = contractMethods
 
 	return data
 }
@@ -717,7 +631,7 @@ func checkNeedsBigInt(info *ContractInfo) bool {
 	return false
 }
 
-func prepareContractMethod(funcInfo *FunctionInfo, isWrite bool) map[string]any {
+func prepareContractMethod(funcInfo *FunctionInfo, isWrite bool) ContractMethodData {
 	optsType := "*bind.CallOpts"
 	if isWrite {
 		optsType = "*bind.TransactOpts"
@@ -777,87 +691,78 @@ func prepareContractMethod(funcInfo *FunctionInfo, isWrite bool) map[string]any 
 		)
 	}
 
-	return map[string]any{
-		"Name":       funcInfo.Name,
-		"MethodName": funcInfo.CallMethod,
-		"Params":     params,
-		"Returns":    returns,
-		"MethodBody": methodBody,
+	return ContractMethodData{
+		Name:       funcInfo.Name,
+		MethodName: funcInfo.CallMethod,
+		Params:     params,
+		Returns:    returns,
+		MethodBody: methodBody,
 	}
 }
 
-func prepareParameters(params []ParameterInfo) []map[string]string {
-	var result []map[string]string
+func prepareParameters(params []ParameterInfo) []ParameterData {
+	var result []ParameterData
 	for _, param := range params {
-		result = append(result, map[string]string{
-			"GoName": capitalize(param.Name),
-			"GoType": param.GoType,
+		result = append(result, ParameterData{
+			GoName: capitalize(param.Name),
+			GoType: param.GoType,
 		})
 	}
 	return result
 }
 
-func prepareWriteOp(funcInfo *FunctionInfo) map[string]any {
-	argsType := "struct{}"
-	var callArgsList []string
+// buildCallArgs extracts common logic for building argument types and call arguments
+func buildCallArgs(funcInfo *FunctionInfo, argsPrefix string) (argsType string, callArgs string) {
+	if len(funcInfo.Parameters) == 0 {
+		return "struct{}", ""
+	}
 
 	if len(funcInfo.Parameters) == 1 {
-		argsType = funcInfo.Parameters[0].GoType
-		callArgsList = []string{"args"}
-	} else if len(funcInfo.Parameters) > 1 {
-		argsType = funcInfo.Name + "Args"
-		for _, p := range funcInfo.Parameters {
-			callArgsList = append(callArgsList, "args."+capitalize(p.Name))
-		}
+		return funcInfo.Parameters[0].GoType, ", " + argsPrefix
 	}
 
-	callArgs := ""
-	if len(callArgsList) > 0 {
-		callArgs = ", " + strings.Join(callArgsList, ", ")
+	// Multiple parameters - use Args struct
+	argsType = funcInfo.Name + "Args"
+	var callArgsList []string
+	for _, p := range funcInfo.Parameters {
+		callArgsList = append(callArgsList, argsPrefix+"."+capitalize(p.Name))
 	}
+	callArgs = ", " + strings.Join(callArgsList, ", ")
+	return argsType, callArgs
+}
+
+func prepareWriteOp(funcInfo *FunctionInfo) WriteOpData {
+	argsType, callArgs := buildCallArgs(funcInfo, "args")
 
 	accessControl := "AllCallersAllowed"
 	if funcInfo.HasOnlyOwner {
 		accessControl = "OnlyOwner"
 	}
 
-	return map[string]any{
-		"Name":          funcInfo.Name,
-		"MethodName":    funcInfo.CallMethod,
-		"OpName":        toKebabCase(funcInfo.Name),
-		"ArgsType":      argsType,
-		"CallArgs":      callArgs,
-		"AccessControl": accessControl,
+	return WriteOpData{
+		Name:          funcInfo.Name,
+		MethodName:    funcInfo.CallMethod,
+		OpName:        toKebabCase(funcInfo.Name),
+		ArgsType:      argsType,
+		CallArgs:      callArgs,
+		AccessControl: accessControl,
 	}
 }
 
-func prepareReadOp(funcInfo *FunctionInfo) map[string]any {
-	argsType := "struct{}"
-	callArgs := ""
-
-	if len(funcInfo.Parameters) == 1 {
-		argsType = funcInfo.Parameters[0].GoType
-		callArgs = ", args"
-	} else if len(funcInfo.Parameters) > 1 {
-		argsType = funcInfo.Name + "Args"
-		var parts []string
-		for _, p := range funcInfo.Parameters {
-			parts = append(parts, ", args."+capitalize(p.Name))
-		}
-		callArgs = strings.Join(parts, "")
-	}
+func prepareReadOp(funcInfo *FunctionInfo) ReadOpData {
+	argsType, callArgs := buildCallArgs(funcInfo, "args")
 
 	returnType := anyType
 	if len(funcInfo.ReturnParams) == 1 {
 		returnType = funcInfo.ReturnParams[0].GoType
 	}
 
-	return map[string]any{
-		"Name":       funcInfo.Name,
-		"MethodName": funcInfo.CallMethod,
-		"OpName":     toKebabCase(funcInfo.Name),
-		"ArgsType":   argsType,
-		"ReturnType": returnType,
-		"CallArgs":   callArgs,
+	return ReadOpData{
+		Name:       funcInfo.Name,
+		MethodName: funcInfo.CallMethod,
+		OpName:     toKebabCase(funcInfo.Name),
+		ArgsType:   argsType,
+		ReturnType: returnType,
+		CallArgs:   callArgs,
 	}
 }
