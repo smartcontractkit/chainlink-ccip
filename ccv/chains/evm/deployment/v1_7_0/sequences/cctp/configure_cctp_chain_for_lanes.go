@@ -153,9 +153,18 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get remote token address: %w", err)
 			}
+			remotePoolPadded, err := toBytes32LeftPad(remotePoolAddress)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to convert remote pool address to bytes32: %w", err)
+			}
+			remoteTokenPadded, err := toBytes32LeftPad(remoteTokenAddress)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to convert remote token address to bytes32: %w", err)
+			}
+
 			remoteChainConfigs[remoteChainSelector] = tokens_core.RemoteChainConfig[[]byte, string]{
-				RemotePool:             common.LeftPadBytes(remotePoolAddress, 32),
-				RemoteToken:            common.LeftPadBytes(remoteTokenAddress, 32),
+				RemotePool:             remotePoolPadded[:],
+				RemoteToken:            remoteTokenPadded[:],
 				TokenTransferFeeConfig: remoteChain.TokenTransferFeeConfig,
 				DefaultFinalityOutboundRateLimiterConfig: tokens_core.RateLimiterConfig{
 					Capacity: big.NewInt(0),
