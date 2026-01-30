@@ -15,7 +15,7 @@ import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/Enumera
 
 /// @notice Advanced pool hooks for additional security features like allowlists, CCV management, and policy engine runs.
 /// @dev This is a standalone contract that can optionally be used by TokenPools.
-contract AdvancedPoolHooks is IAdvancedPoolHooks, AuthorizedCallers {
+contract AdvancedPoolHooks is IAdvancedPoolHooks, ITypeAndVersion, AuthorizedCallers {
   using EnumerableSet for EnumerableSet.AddressSet;
 
   string public constant override typeAndVersion = "AdvancedPoolHooks 1.7.0-dev";
