@@ -559,7 +559,7 @@ func (o observerImpl) ObserveLatestOnRampSeqNums(ctx context.Context) []pluginty
 
 	slices.Sort(oracleSupportedSourceChains)
 
-	// If this oracle supports the destination chain, filter to only enabled source chains.
+	// If this oracle supports the destination chain, filter to only enabled source chains. I.e., valid lanes to dest.
 	// Otherwise, we try all supported source chains and rely on error handling for disabled lanes.
 	destChain := o.chainSupport.DestChain()
 	chainsToQuery := oracleSupportedSourceChains

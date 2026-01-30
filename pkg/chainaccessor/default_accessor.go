@@ -84,7 +84,7 @@ func (l *DefaultAccessor) GetAllConfigsLegacy(
 	lggr := logger.With(
 		l.lggr,
 		"destChainSelector", destChainSelector,
-		"sourceChainSelector", l.chainSelector,
+		"sourceChainSelectors", sourceChainSelectors,
 	)
 
 	var configRequests contractreader.ExtendedBatchGetLatestValuesRequest
@@ -360,7 +360,6 @@ func (l *DefaultAccessor) MsgsBetweenSeqNums(
 
 	lggr.Infow("queried messages between sequence numbers",
 		"numMsgs", len(seq),
-		"sourceChainSelector", l.chainSelector,
 		"seqNumRange", seqNumRange.String(),
 	)
 
@@ -400,7 +399,6 @@ func (l *DefaultAccessor) MsgsBetweenSeqNums(
 		"seqNum.MsgID", slicelib.Map(msgsWithoutDataField, func(m cciptypes.Message) string {
 			return fmt.Sprintf("%d.%d", m.Header.SequenceNumber, m.Header.MessageID)
 		}),
-		"sourceChainSelector", l.chainSelector,
 		"seqNumRange", seqNumRange.String(),
 	)
 
@@ -440,7 +438,6 @@ func (l *DefaultAccessor) LatestMessageTo(
 
 	lggr.Debugw("queried latest message from source",
 		"numMsgs", len(seq),
-		"sourceChainSelector", l.chainSelector,
 		"destChainSelector", destChainSelector,
 	)
 	if len(seq) > 1 {

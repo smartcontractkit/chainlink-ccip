@@ -37,6 +37,7 @@ import (
 	common_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/plugincommon"
 	reader_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
 	readerpkg_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
@@ -991,4 +992,297 @@ func (a signatureVerifierAlwaysTrue) Verify(_ ed25519.PublicKey, _, _ []byte) bo
 func (a signatureVerifierAlwaysTrue) VerifyReportSignatures(
 	_ context.Context, _ []cciptypes.RMNECDSASignature, _ cciptypes.RMNReport, _ []cciptypes.UnknownAddress) error {
 	return nil
+}
+
+func Test_ObserveLatestOnRampSeqNums(t *testing.T) {
+	const nodeID commontypes.OracleID = 1
+	destChain := cciptypes.ChainSelector(100)
+	sourceChain1 := cciptypes.ChainSelector(4)
+	sourceChain2 := cciptypes.ChainSelector(7)
+	sourceChain3 := cciptypes.ChainSelector(19)
+	allSourceChains := []cciptypes.ChainSelector{sourceChain1, sourceChain2, sourceChain3}
+
+	testCases := []struct {
+		name      string
+		expResult []plugintypes.SeqNumChain
+		getDeps   func(t *testing.T) (*common_mock.MockChainSupport, *reader_mock.MockCCIPReader)
+	}{
+		{
+			name: "Happy path - all chains enabled, oracle supports dest chain",
+			getDeps: func(t *testing.T) (*common_mock.MockChainSupport, *reader_mock.MockCCIPReader) {
+				chainSupport := common_mock.NewMockChainSupport(t)
+				chainSupport.EXPECT().KnownSourceChainsSlice().Return(allSourceChains, nil)
+				chainSupport.EXPECT().SupportedChains(nodeID).Return(
+					mapset.NewSet(sourceChain1, sourceChain2, sourceChain3), nil)
+				chainSupport.EXPECT().DestChain().Return(destChain)
+				chainSupport.EXPECT().SupportsDestChain(nodeID).Return(true, nil)
+
+				ccipReader := reader_mock.NewMockCCIPReader(t)
+				ccipReader.EXPECT().GetOffRampSourceChainsConfig(mock.Anything, mock.Anything).Return(
+					map[cciptypes.ChainSelector]reader.StaticSourceChainConfig{
+						sourceChain1: {IsEnabled: true},
+						sourceChain2: {IsEnabled: true},
+						sourceChain3: {IsEnabled: true},
+					}, nil)
+				ccipReader.EXPECT().LatestMsgSeqNum(mock.Anything, sourceChain1).Return(cciptypes.SeqNum(100), nil)
+				ccipReader.EXPECT().LatestMsgSeqNum(mock.Anything, sourceChain2).Return(cciptypes.SeqNum(200), nil)
+				ccipReader.EXPECT().LatestMsgSeqNum(mock.Anything, sourceChain3).Return(cciptypes.SeqNum(300), nil)
+				return chainSupport, ccipReader
+			},
+			expResult: []plugintypes.SeqNumChain{
+				plugintypes.NewSeqNumChain(sourceChain1, 100),
+				plugintypes.NewSeqNumChain(sourceChain2, 200),
+				plugintypes.NewSeqNumChain(sourceChain3, 300),
+			},
+		},
+		{
+			name: "Some chains disabled - only enabled chains are queried",
+			getDeps: func(t *testing.T) (*common_mock.MockChainSupport, *reader_mock.MockCCIPReader) {
+				chainSupport := common_mock.NewMockChainSupport(t)
+				chainSupport.EXPECT().KnownSourceChainsSlice().Return(allSourceChains, nil)
+				chainSupport.EXPECT().SupportedChains(nodeID).Return(
+					mapset.NewSet(sourceChain1, sourceChain2, sourceChain3), nil)
+				chainSupport.EXPECT().DestChain().Return(destChain)
+				chainSupport.EXPECT().SupportsDestChain(nodeID).Return(true, nil)
+
+				ccipReader := reader_mock.NewMockCCIPReader(t)
+				// sourceChain2 is disabled
+				ccipReader.EXPECT().GetOffRampSourceChainsConfig(mock.Anything, mock.Anything).Return(
+					map[cciptypes.ChainSelector]reader.StaticSourceChainConfig{
+						sourceChain1: {IsEnabled: true},
+						sourceChain2: {IsEnabled: false},
+						sourceChain3: {IsEnabled: true},
+					}, nil)
+				// Only enabled chains should be queried
+				ccipReader.EXPECT().LatestMsgSeqNum(mock.Anything, sourceChain1).Return(cciptypes.SeqNum(100), nil)
+				ccipReader.EXPECT().LatestMsgSeqNum(mock.Anything, sourceChain3).Return(cciptypes.SeqNum(300), nil)
+				return chainSupport, ccipReader
+			},
+			expResult: []plugintypes.SeqNumChain{
+				plugintypes.NewSeqNumChain(sourceChain1, 100),
+				plugintypes.NewSeqNumChain(sourceChain3, 300),
+			},
+		},
+		{
+			name: "All chains disabled - no chains queried",
+			getDeps: func(t *testing.T) (*common_mock.MockChainSupport, *reader_mock.MockCCIPReader) {
+				chainSupport := common_mock.NewMockChainSupport(t)
+				chainSupport.EXPECT().KnownSourceChainsSlice().Return(allSourceChains, nil)
+				chainSupport.EXPECT().SupportedChains(nodeID).Return(
+					mapset.NewSet(sourceChain1, sourceChain2, sourceChain3), nil)
+				chainSupport.EXPECT().DestChain().Return(destChain)
+				chainSupport.EXPECT().SupportsDestChain(nodeID).Return(true, nil)
+
+				ccipReader := reader_mock.NewMockCCIPReader(t)
+				ccipReader.EXPECT().GetOffRampSourceChainsConfig(mock.Anything, mock.Anything).Return(
+					map[cciptypes.ChainSelector]reader.StaticSourceChainConfig{
+						sourceChain1: {IsEnabled: false},
+						sourceChain2: {IsEnabled: false},
+						sourceChain3: {IsEnabled: false},
+					}, nil)
+				// No LatestMsgSeqNum calls expected
+				return chainSupport, ccipReader
+			},
+			expResult: []plugintypes.SeqNumChain{},
+		},
+		{
+			name: "Oracle does not support dest chain - falls back to all supported chains",
+			getDeps: func(t *testing.T) (*common_mock.MockChainSupport, *reader_mock.MockCCIPReader) {
+				chainSupport := common_mock.NewMockChainSupport(t)
+				chainSupport.EXPECT().KnownSourceChainsSlice().Return(allSourceChains, nil)
+				chainSupport.EXPECT().SupportedChains(nodeID).Return(
+					mapset.NewSet(sourceChain1, sourceChain2, sourceChain3), nil)
+				chainSupport.EXPECT().DestChain().Return(destChain)
+				chainSupport.EXPECT().SupportsDestChain(nodeID).Return(false, nil)
+
+				ccipReader := reader_mock.NewMockCCIPReader(t)
+				// GetOffRampSourceChainsConfig should NOT be called
+				// All supported chains should be queried
+				ccipReader.EXPECT().LatestMsgSeqNum(mock.Anything, sourceChain1).Return(cciptypes.SeqNum(100), nil)
+				ccipReader.EXPECT().LatestMsgSeqNum(mock.Anything, sourceChain2).Return(cciptypes.SeqNum(200), nil)
+				ccipReader.EXPECT().LatestMsgSeqNum(mock.Anything, sourceChain3).Return(cciptypes.SeqNum(300), nil)
+				return chainSupport, ccipReader
+			},
+			expResult: []plugintypes.SeqNumChain{
+				plugintypes.NewSeqNumChain(sourceChain1, 100),
+				plugintypes.NewSeqNumChain(sourceChain2, 200),
+				plugintypes.NewSeqNumChain(sourceChain3, 300),
+			},
+		},
+		{
+			name: "SupportsDestChain errors - falls back to all supported chains",
+			getDeps: func(t *testing.T) (*common_mock.MockChainSupport, *reader_mock.MockCCIPReader) {
+				chainSupport := common_mock.NewMockChainSupport(t)
+				chainSupport.EXPECT().KnownSourceChainsSlice().Return(allSourceChains, nil)
+				chainSupport.EXPECT().SupportedChains(nodeID).Return(
+					mapset.NewSet(sourceChain1, sourceChain2, sourceChain3), nil)
+				chainSupport.EXPECT().DestChain().Return(destChain)
+				chainSupport.EXPECT().SupportsDestChain(nodeID).Return(false, errors.New("some error"))
+
+				ccipReader := reader_mock.NewMockCCIPReader(t)
+				// GetOffRampSourceChainsConfig should NOT be called
+				// All supported chains should be queried
+				ccipReader.EXPECT().LatestMsgSeqNum(mock.Anything, sourceChain1).Return(cciptypes.SeqNum(100), nil)
+				ccipReader.EXPECT().LatestMsgSeqNum(mock.Anything, sourceChain2).Return(cciptypes.SeqNum(200), nil)
+				ccipReader.EXPECT().LatestMsgSeqNum(mock.Anything, sourceChain3).Return(cciptypes.SeqNum(300), nil)
+				return chainSupport, ccipReader
+			},
+			expResult: []plugintypes.SeqNumChain{
+				plugintypes.NewSeqNumChain(sourceChain1, 100),
+				plugintypes.NewSeqNumChain(sourceChain2, 200),
+				plugintypes.NewSeqNumChain(sourceChain3, 300),
+			},
+		},
+		{
+			name: "GetOffRampSourceChainsConfig errors - falls back to all supported chains",
+			getDeps: func(t *testing.T) (*common_mock.MockChainSupport, *reader_mock.MockCCIPReader) {
+				chainSupport := common_mock.NewMockChainSupport(t)
+				chainSupport.EXPECT().KnownSourceChainsSlice().Return(allSourceChains, nil)
+				chainSupport.EXPECT().SupportedChains(nodeID).Return(
+					mapset.NewSet(sourceChain1, sourceChain2, sourceChain3), nil)
+				chainSupport.EXPECT().DestChain().Return(destChain)
+				chainSupport.EXPECT().SupportsDestChain(nodeID).Return(true, nil)
+
+				ccipReader := reader_mock.NewMockCCIPReader(t)
+				ccipReader.EXPECT().GetOffRampSourceChainsConfig(mock.Anything, mock.Anything).Return(
+					nil, errors.New("failed to get source chains config"))
+				// Fallback: all supported chains should be queried
+				ccipReader.EXPECT().LatestMsgSeqNum(mock.Anything, sourceChain1).Return(cciptypes.SeqNum(100), nil)
+				ccipReader.EXPECT().LatestMsgSeqNum(mock.Anything, sourceChain2).Return(cciptypes.SeqNum(200), nil)
+				ccipReader.EXPECT().LatestMsgSeqNum(mock.Anything, sourceChain3).Return(cciptypes.SeqNum(300), nil)
+				return chainSupport, ccipReader
+			},
+			expResult: []plugintypes.SeqNumChain{
+				plugintypes.NewSeqNumChain(sourceChain1, 100),
+				plugintypes.NewSeqNumChain(sourceChain2, 200),
+				plugintypes.NewSeqNumChain(sourceChain3, 300),
+			},
+		},
+		{
+			name: "Dest chain excluded from enabled chains even if in config",
+			getDeps: func(t *testing.T) (*common_mock.MockChainSupport, *reader_mock.MockCCIPReader) {
+				chainSupport := common_mock.NewMockChainSupport(t)
+				chainSupport.EXPECT().KnownSourceChainsSlice().Return(
+					[]cciptypes.ChainSelector{sourceChain1, destChain}, nil)
+				chainSupport.EXPECT().SupportedChains(nodeID).Return(
+					mapset.NewSet(sourceChain1, destChain), nil)
+				chainSupport.EXPECT().DestChain().Return(destChain)
+				chainSupport.EXPECT().SupportsDestChain(nodeID).Return(true, nil)
+
+				ccipReader := reader_mock.NewMockCCIPReader(t)
+				// Even though destChain is marked as enabled, it should be excluded
+				ccipReader.EXPECT().GetOffRampSourceChainsConfig(mock.Anything, mock.Anything).Return(
+					map[cciptypes.ChainSelector]reader.StaticSourceChainConfig{
+						sourceChain1: {IsEnabled: true},
+						destChain:    {IsEnabled: true}, // Should be excluded
+					}, nil)
+				// Only sourceChain1 should be queried
+				ccipReader.EXPECT().LatestMsgSeqNum(mock.Anything, sourceChain1).Return(cciptypes.SeqNum(100), nil)
+				return chainSupport, ccipReader
+			},
+			expResult: []plugintypes.SeqNumChain{
+				plugintypes.NewSeqNumChain(sourceChain1, 100),
+			},
+		},
+		{
+			name: "nil is returned when KnownSourceChainsSlice errors",
+			getDeps: func(t *testing.T) (*common_mock.MockChainSupport, *reader_mock.MockCCIPReader) {
+				chainSupport := common_mock.NewMockChainSupport(t)
+				chainSupport.EXPECT().KnownSourceChainsSlice().Return(nil, errors.New("some error"))
+				ccipReader := reader_mock.NewMockCCIPReader(t)
+				return chainSupport, ccipReader
+			},
+			expResult: nil,
+		},
+		{
+			name: "nil is returned when SupportedChains errors",
+			getDeps: func(t *testing.T) (*common_mock.MockChainSupport, *reader_mock.MockCCIPReader) {
+				chainSupport := common_mock.NewMockChainSupport(t)
+				chainSupport.EXPECT().KnownSourceChainsSlice().Return(allSourceChains, nil)
+				chainSupport.EXPECT().SupportedChains(nodeID).Return(nil, errors.New("some error"))
+				ccipReader := reader_mock.NewMockCCIPReader(t)
+				return chainSupport, ccipReader
+			},
+			expResult: nil,
+		},
+		{
+			name: "Enabled chains intersected with oracle supported chains",
+			getDeps: func(t *testing.T) (*common_mock.MockChainSupport, *reader_mock.MockCCIPReader) {
+				chainSupport := common_mock.NewMockChainSupport(t)
+				// Oracle only supports sourceChain1 and sourceChain2
+				chainSupport.EXPECT().KnownSourceChainsSlice().Return(allSourceChains, nil)
+				chainSupport.EXPECT().SupportedChains(nodeID).Return(
+					mapset.NewSet(sourceChain1, sourceChain2), nil) // Missing sourceChain3
+				chainSupport.EXPECT().DestChain().Return(destChain)
+				chainSupport.EXPECT().SupportsDestChain(nodeID).Return(true, nil)
+
+				ccipReader := reader_mock.NewMockCCIPReader(t)
+				// All chains are enabled in the config
+				ccipReader.EXPECT().GetOffRampSourceChainsConfig(mock.Anything, mock.Anything).Return(
+					map[cciptypes.ChainSelector]reader.StaticSourceChainConfig{
+						sourceChain1: {IsEnabled: true},
+						sourceChain2: {IsEnabled: true},
+						sourceChain3: {IsEnabled: true}, // But oracle doesn't support this
+					}, nil)
+				// Only sourceChain1 and sourceChain2 should be queried (intersection)
+				ccipReader.EXPECT().LatestMsgSeqNum(mock.Anything, sourceChain1).Return(cciptypes.SeqNum(100), nil)
+				ccipReader.EXPECT().LatestMsgSeqNum(mock.Anything, sourceChain2).Return(cciptypes.SeqNum(200), nil)
+				return chainSupport, ccipReader
+			},
+			expResult: []plugintypes.SeqNumChain{
+				plugintypes.NewSeqNumChain(sourceChain1, 100),
+				plugintypes.NewSeqNumChain(sourceChain2, 200),
+			},
+		},
+		{
+			name: "LatestMsgSeqNum error for one chain - other chains still returned",
+			getDeps: func(t *testing.T) (*common_mock.MockChainSupport, *reader_mock.MockCCIPReader) {
+				chainSupport := common_mock.NewMockChainSupport(t)
+				chainSupport.EXPECT().KnownSourceChainsSlice().Return(allSourceChains, nil)
+				chainSupport.EXPECT().SupportedChains(nodeID).Return(
+					mapset.NewSet(sourceChain1, sourceChain2, sourceChain3), nil)
+				chainSupport.EXPECT().DestChain().Return(destChain)
+				chainSupport.EXPECT().SupportsDestChain(nodeID).Return(true, nil)
+
+				ccipReader := reader_mock.NewMockCCIPReader(t)
+				ccipReader.EXPECT().GetOffRampSourceChainsConfig(mock.Anything, mock.Anything).Return(
+					map[cciptypes.ChainSelector]reader.StaticSourceChainConfig{
+						sourceChain1: {IsEnabled: true},
+						sourceChain2: {IsEnabled: true},
+						sourceChain3: {IsEnabled: true},
+					}, nil)
+				ccipReader.EXPECT().LatestMsgSeqNum(mock.Anything, sourceChain1).Return(cciptypes.SeqNum(100), nil)
+				ccipReader.EXPECT().LatestMsgSeqNum(mock.Anything, sourceChain2).Return(
+					cciptypes.SeqNum(0), errors.New("rpc error"))
+				ccipReader.EXPECT().LatestMsgSeqNum(mock.Anything, sourceChain3).Return(cciptypes.SeqNum(300), nil)
+				return chainSupport, ccipReader
+			},
+			expResult: []plugintypes.SeqNumChain{
+				plugintypes.NewSeqNumChain(sourceChain1, 100),
+				plugintypes.NewSeqNumChain(sourceChain3, 300),
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := t.Context()
+
+			chainSupport, ccipReader := tc.getDeps(t)
+			defer chainSupport.AssertExpectations(t)
+			defer ccipReader.AssertExpectations(t)
+
+			o := newObserverImpl(
+				logger.Test(t),
+				nil,
+				nodeID,
+				chainSupport,
+				ccipReader,
+				mocks.NewMessageHasher(),
+			)
+
+			result := o.ObserveLatestOnRampSeqNums(ctx)
+			assert.Equal(t, tc.expResult, result)
+		})
+	}
 }
