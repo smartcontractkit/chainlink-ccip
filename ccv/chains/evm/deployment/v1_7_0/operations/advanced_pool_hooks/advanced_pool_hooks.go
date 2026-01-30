@@ -118,14 +118,13 @@ var GetThresholdAmount = contract.NewRead(contract.ReadParams[any, *big.Int, *ad
 	},
 })
 
-// TODO: Uncomment after regenerating Go bindings with the new GetAuthorizedCallerEnabled method
-// var GetAuthorizedCallerEnabled = contract.NewRead(contract.ReadParams[any, bool, *advanced_pool_hooks.AdvancedPoolHooks]{
-// 	Name:         "advanced-pool-hooks:get-authorized-caller-enabled",
-// 	Version:      Version,
-// 	Description:  "Gets whether only authorized callers can invoke preflightCheck/postFlightCheck",
-// 	ContractType: ContractType,
-// 	NewContract:  advanced_pool_hooks.NewAdvancedPoolHooks,
-// 	CallContract: func(advancedPoolHooks *advanced_pool_hooks.AdvancedPoolHooks, opts *bind.CallOpts, args any) (bool, error) {
-// 		return advancedPoolHooks.GetAuthorizedCallerEnabled(opts)
-// 	},
-// })
+var GetAuthorizedCallersEnabled = contract.NewRead(contract.ReadParams[any, bool, *advanced_pool_hooks.AdvancedPoolHooks]{
+	Name:         "advanced-pool-hooks:get-authorized-callers-enabled",
+	Version:      Version,
+	Description:  "Gets whether only authorized callers can invoke preflightCheck/postFlightCheck",
+	ContractType: ContractType,
+	NewContract:  advanced_pool_hooks.NewAdvancedPoolHooks,
+	CallContract: func(advancedPoolHooks *advanced_pool_hooks.AdvancedPoolHooks, opts *bind.CallOpts, args any) (bool, error) {
+		return advancedPoolHooks.GetAuthorizedCallersEnabled(opts)
+	},
+})

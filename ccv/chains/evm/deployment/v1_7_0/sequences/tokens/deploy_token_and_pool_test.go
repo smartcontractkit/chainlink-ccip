@@ -69,6 +69,11 @@ func basicDeployTokenAndPoolInput(chainReport operations.SequenceReport[sequence
 				RMNProxy: rmnProxyAddress,
 				Router:   routerAddress,
 			},
+			AdvancedPoolHooksConfig: tokens.AdvancedPoolHooksConfig{
+				Allowlist:         nil,            // disabled
+				PolicyEngine:      common.Address{}, // disabled
+				AuthorizedCallers: nil,            // anyone can call
+			},
 		},
 	}
 }
