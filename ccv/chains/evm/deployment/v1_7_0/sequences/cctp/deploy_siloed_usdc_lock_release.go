@@ -10,7 +10,6 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/erc20_lock_box"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/siloed_usdc_token_pool"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
@@ -52,10 +51,10 @@ var DeploySiloedUSDCLockRelease = cldf_ops.NewSequence(
 		siloedPoolAddr := input.SiloedUSDCTokenPool
 		// Deploy siloed USDC token pool if not provided
 		if siloedPoolAddr == "" {
-			poolReport, err := cldf_ops.ExecuteOperation(b, lock_release_token_pool.Deploy, chain, contract_utils.DeployInput[lock_release_token_pool.ConstructorArgs]{
-				TypeAndVersion: deployment.NewTypeAndVersion(lock_release_token_pool.SiloedUSDCTokenPoolContractType, *lock_release_token_pool.Version),
+			poolReport, err := cldf_ops.ExecuteOperation(b, siloed_usdc_token_pool.Deploy, chain, contract_utils.DeployInput[siloed_usdc_token_pool.ConstructorArgs]{
+				TypeAndVersion: deployment.NewTypeAndVersion(siloed_usdc_token_pool.ContractType, *siloed_usdc_token_pool.Version),
 				ChainSelector:  chain.Selector,
-				Args: lock_release_token_pool.ConstructorArgs{
+				Args: siloed_usdc_token_pool.ConstructorArgs{
 					Token:              common.HexToAddress(input.USDCToken),
 					LocalTokenDecimals: localTokenDecimals,
 					AdvancedPoolHooks:  common.Address{},
