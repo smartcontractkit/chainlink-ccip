@@ -1,10 +1,10 @@
 version: "1.0"
 
 input:
-  base_path: ".."
+  base_path: ".."  # Directory containing abi/ and bytecode/ folders
 
 output:
-  base_path: "."
+  base_path: "." # Directory for generated operations/
 
 # Access control aliases
 # - owner: Only contract owner can call (OnlyOwner)
