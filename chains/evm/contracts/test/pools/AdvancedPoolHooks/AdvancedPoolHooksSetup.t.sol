@@ -57,4 +57,10 @@ contract AdvancedPoolHooksSetup is BaseTest {
     offRampUpdates[0] = Router.OffRamp({sourceChainSelector: DEST_CHAIN_SELECTOR, offRamp: s_allowedOffRamp});
     s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), offRampUpdates);
   }
+
+  function slicePolicyEnginePayload(
+    bytes calldata data
+  ) external pure returns (bytes memory) {
+    return data[4:];
+  }
 }

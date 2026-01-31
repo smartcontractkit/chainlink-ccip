@@ -19,6 +19,8 @@ contract AdvancedPoolHooks_authorizedCallers is AdvancedPoolHooksSetup {
     address[] memory authorizedCallers = new address[](1);
     authorizedCallers[0] = s_authorizedCaller;
     s_hooksWithRestrictedCallers = new AdvancedPoolHooks(new address[](0), 0, address(0), authorizedCallers);
+
+    vm.stopPrank();
   }
 
   function _createLockOrBurnIn() internal view returns (Pool.LockOrBurnInV1 memory) {
@@ -54,7 +56,6 @@ contract AdvancedPoolHooks_authorizedCallers is AdvancedPoolHooksSetup {
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _createLockOrBurnIn();
 
-    vm.stopPrank();
     vm.prank(s_unauthorizedCaller);
     s_advancedPoolHooks.preflightCheck(lockOrBurnIn, 5, "");
   }
@@ -64,7 +65,6 @@ contract AdvancedPoolHooks_authorizedCallers is AdvancedPoolHooksSetup {
 
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = _createReleaseOrMintIn();
 
-    vm.stopPrank();
     vm.prank(s_unauthorizedCaller);
     s_advancedPoolHooks.postFlightCheck(releaseOrMintIn, 100e18, 5);
   }
@@ -74,7 +74,6 @@ contract AdvancedPoolHooks_authorizedCallers is AdvancedPoolHooksSetup {
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _createLockOrBurnIn();
 
-    vm.stopPrank();
     vm.prank(s_authorizedCaller);
     s_hooksWithRestrictedCallers.preflightCheck(lockOrBurnIn, 5, "");
   }
@@ -84,7 +83,6 @@ contract AdvancedPoolHooks_authorizedCallers is AdvancedPoolHooksSetup {
 
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = _createReleaseOrMintIn();
 
-    vm.stopPrank();
     vm.prank(s_authorizedCaller);
     s_hooksWithRestrictedCallers.postFlightCheck(releaseOrMintIn, 100e18, 5);
   }
@@ -94,7 +92,6 @@ contract AdvancedPoolHooks_authorizedCallers is AdvancedPoolHooksSetup {
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _createLockOrBurnIn();
 
-    vm.stopPrank();
     vm.prank(s_unauthorizedCaller);
     vm.expectRevert(abi.encodeWithSelector(AuthorizedCallers.UnauthorizedCaller.selector, s_unauthorizedCaller));
     s_hooksWithRestrictedCallers.preflightCheck(lockOrBurnIn, 5, "");
@@ -105,7 +102,6 @@ contract AdvancedPoolHooks_authorizedCallers is AdvancedPoolHooksSetup {
 
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = _createReleaseOrMintIn();
 
-    vm.stopPrank();
     vm.prank(s_unauthorizedCaller);
     vm.expectRevert(abi.encodeWithSelector(AuthorizedCallers.UnauthorizedCaller.selector, s_unauthorizedCaller));
     s_hooksWithRestrictedCallers.postFlightCheck(releaseOrMintIn, 100e18, 5);

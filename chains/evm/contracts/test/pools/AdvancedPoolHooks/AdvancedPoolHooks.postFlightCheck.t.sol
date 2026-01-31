@@ -6,7 +6,6 @@ import {IPolicyEngine} from "../../../interfaces/IPolicyEngine.sol";
 
 import {CCIPPolicyEnginePayloads} from "../../../libraries/CCIPPolicyEnginePayloads.sol";
 import {Pool} from "../../../libraries/Pool.sol";
-import {BytesTestHelper} from "../../helpers/BytesTestHelper.sol";
 import {MockPolicyEngine} from "../../mocks/MockPolicyEngine.sol";
 import {AdvancedPoolHooksSetup} from "./AdvancedPoolHooksSetup.t.sol";
 
@@ -46,8 +45,9 @@ contract AdvancedPoolHooks_postFlightCheck is AdvancedPoolHooksSetup {
     assertEq("", lastPayload.context);
     assertEq(CCIPPolicyEnginePayloads.POOL_HOOK_INBOUND_POLICY_DATA_V1_TAG, bytes4(lastPayload.data));
 
-    CCIPPolicyEnginePayloads.PoolHookInboundPolicyDataV1 memory decoded =
-      abi.decode(BytesTestHelper._slice(lastPayload.data, 4), (CCIPPolicyEnginePayloads.PoolHookInboundPolicyDataV1));
+    CCIPPolicyEnginePayloads.PoolHookInboundPolicyDataV1 memory decoded = abi.decode(
+      this.slicePolicyEnginePayload(lastPayload.data), (CCIPPolicyEnginePayloads.PoolHookInboundPolicyDataV1)
+    );
 
     assertEq(releaseOrMintIn.originalSender, decoded.originalSender);
     assertEq(blockConfirmationRequested, decoded.blockConfirmationRequested);
