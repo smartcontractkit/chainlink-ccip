@@ -4,7 +4,6 @@ pragma solidity ^0.8.24;
 import {IAdvancedPoolHooks} from "../../../interfaces/IAdvancedPoolHooks.sol";
 import {IPolicyEngine} from "../../../interfaces/IPolicyEngine.sol";
 
-import {CCIPPolicyEnginePayloads} from "../../../libraries/CCIPPolicyEnginePayloads.sol";
 import {Pool} from "../../../libraries/Pool.sol";
 import {MockPolicyEngine} from "../../mocks/MockPolicyEngine.sol";
 import {AdvancedPoolHooksSetup} from "./AdvancedPoolHooksSetup.t.sol";
@@ -30,35 +29,22 @@ contract AdvancedPoolHooks_postFlightCheck is AdvancedPoolHooksSetup {
     });
   }
 
-  function test_postFlightCheck_WithPolicyEngine() public {
+  function testFuzz_postFlightCheck_WithPolicyEngine(bytes memory sourcePoolData, bytes memory offchainTokenData) public {
     s_advancedPoolHooks.setPolicyEngine(address(s_mockPolicyEngine));
 
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = _createReleaseOrMintIn();
     uint256 localAmount = 100e18;
     uint16 blockConfirmationRequested = 5;
+    releaseOrMintIn.sourcePoolData = sourcePoolData;
+    releaseOrMintIn.offchainTokenData = offchainTokenData;
 
     s_advancedPoolHooks.postFlightCheck(releaseOrMintIn, localAmount, blockConfirmationRequested);
 
     IPolicyEngine.Payload memory lastPayload = s_mockPolicyEngine.getLastPayload();
     assertEq(IAdvancedPoolHooks.postFlightCheck.selector, lastPayload.selector);
     assertEq(OWNER, lastPayload.sender);
-    assertEq("", lastPayload.context);
-    assertEq(CCIPPolicyEnginePayloads.POOL_HOOK_INBOUND_POLICY_DATA_V1_TAG, bytes4(lastPayload.data));
-
-    CCIPPolicyEnginePayloads.PoolHookInboundPolicyDataV1 memory decoded = abi.decode(
-      this.slicePolicyEnginePayload(lastPayload.data), (CCIPPolicyEnginePayloads.PoolHookInboundPolicyDataV1)
-    );
-
-    assertEq(releaseOrMintIn.originalSender, decoded.originalSender);
-    assertEq(blockConfirmationRequested, decoded.blockConfirmationRequested);
-    assertEq(releaseOrMintIn.remoteChainSelector, decoded.remoteChainSelector);
-    assertEq(releaseOrMintIn.receiver, decoded.receiver);
-    assertEq(releaseOrMintIn.sourceDenominatedAmount, decoded.amount);
-    assertEq(releaseOrMintIn.localToken, decoded.localToken);
-    assertEq(releaseOrMintIn.sourcePoolAddress, decoded.sourcePoolAddress);
-    assertEq(releaseOrMintIn.sourcePoolData, decoded.sourcePoolData);
-    assertEq(releaseOrMintIn.offchainTokenData, decoded.offchainTokenData);
-    assertEq(localAmount, decoded.localAmount);
+    assertEq(releaseOrMintIn.offchainTokenData, lastPayload.context);
+    assertEq(abi.encode(releaseOrMintIn, localAmount, blockConfirmationRequested), lastPayload.data);
   }
 
   function test_postFlightCheck_WithoutPolicyEngine() public {

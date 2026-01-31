@@ -6,7 +6,6 @@ import {IPolicyEngine} from "../interfaces/IPolicyEngine.sol";
 import {IPoolV2} from "../interfaces/IPoolV2.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
-import {CCIPPolicyEnginePayloads} from "../libraries/CCIPPolicyEnginePayloads.sol";
 import {CCVConfigValidation} from "../libraries/CCVConfigValidation.sol";
 import {Pool} from "../libraries/Pool.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
@@ -94,7 +93,7 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, ITypeAndVersion, AuthorizedCal
   /// @dev Performs allowlist check and policy engine validation for outbound transfers.
   function preflightCheck(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
-    uint16 blockConfirmationRequested,
+    uint16,
     bytes calldata tokenArgs
   ) external {
     if (i_authorizedCallersEnabled) {
@@ -107,22 +106,8 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, ITypeAndVersion, AuthorizedCal
       return;
     }
 
-    CCIPPolicyEnginePayloads.PoolHookOutboundPolicyDataV1 memory outboundData =
-      CCIPPolicyEnginePayloads.PoolHookOutboundPolicyDataV1({
-        originalSender: lockOrBurnIn.originalSender,
-        blockConfirmationRequested: blockConfirmationRequested,
-        remoteChainSelector: lockOrBurnIn.remoteChainSelector,
-        receiver: lockOrBurnIn.receiver,
-        amount: lockOrBurnIn.amount,
-        localToken: lockOrBurnIn.localToken,
-        tokenArgs: tokenArgs
-      });
-    bytes memory policyData =
-      abi.encodeWithSelector(CCIPPolicyEnginePayloads.POOL_HOOK_OUTBOUND_POLICY_DATA_V1_TAG, outboundData);
     policyEngine.run(
-      IPolicyEngine.Payload({
-        selector: IAdvancedPoolHooks.preflightCheck.selector, sender: msg.sender, data: policyData, context: ""
-      })
+      IPolicyEngine.Payload({selector: msg.sig, sender: msg.sender, data: msg.data[4:], context: tokenArgs})
     );
   }
 
@@ -130,8 +115,8 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, ITypeAndVersion, AuthorizedCal
   /// @dev Performs policy engine validation for inbound transfers.
   function postFlightCheck(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
-    uint256 localAmount,
-    uint16 blockConfirmationRequested
+    uint256,
+    uint16
   ) external {
     if (i_authorizedCallersEnabled) {
       _validateCaller();
@@ -142,24 +127,9 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, ITypeAndVersion, AuthorizedCal
       return;
     }
 
-    CCIPPolicyEnginePayloads.PoolHookInboundPolicyDataV1 memory inboundData =
-      CCIPPolicyEnginePayloads.PoolHookInboundPolicyDataV1({
-        originalSender: releaseOrMintIn.originalSender,
-        blockConfirmationRequested: blockConfirmationRequested,
-        remoteChainSelector: releaseOrMintIn.remoteChainSelector,
-        receiver: releaseOrMintIn.receiver,
-        amount: releaseOrMintIn.sourceDenominatedAmount,
-        localToken: releaseOrMintIn.localToken,
-        sourcePoolAddress: releaseOrMintIn.sourcePoolAddress,
-        sourcePoolData: releaseOrMintIn.sourcePoolData,
-        offchainTokenData: releaseOrMintIn.offchainTokenData,
-        localAmount: localAmount
-      });
-    bytes memory policyData =
-      abi.encodeWithSelector(CCIPPolicyEnginePayloads.POOL_HOOK_INBOUND_POLICY_DATA_V1_TAG, inboundData);
     policyEngine.run(
       IPolicyEngine.Payload({
-        selector: IAdvancedPoolHooks.postFlightCheck.selector, sender: msg.sender, data: policyData, context: ""
+        selector: msg.sig, sender: msg.sender, data: msg.data[4:], context: releaseOrMintIn.offchainTokenData
       })
     );
   }

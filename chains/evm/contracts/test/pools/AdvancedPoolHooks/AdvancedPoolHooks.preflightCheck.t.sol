@@ -4,7 +4,6 @@ pragma solidity ^0.8.24;
 import {IAdvancedPoolHooks} from "../../../interfaces/IAdvancedPoolHooks.sol";
 import {IPolicyEngine} from "../../../interfaces/IPolicyEngine.sol";
 
-import {CCIPPolicyEnginePayloads} from "../../../libraries/CCIPPolicyEnginePayloads.sol";
 import {Pool} from "../../../libraries/Pool.sol";
 import {AdvancedPoolHooks} from "../../../pools/AdvancedPoolHooks.sol";
 import {MockPolicyEngine} from "../../mocks/MockPolicyEngine.sol";
@@ -30,32 +29,19 @@ contract AdvancedPoolHooks_preflightCheck is AdvancedPoolHooksSetup {
     });
   }
 
-  function test_preflightCheck_WithPolicyEngine() public {
+  function testFuzz_preflightCheck_WithPolicyEngine(bytes memory tokenArgs) public {
     s_advancedPoolHooks.setPolicyEngine(address(s_mockPolicyEngine));
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _createLockOrBurnIn(OWNER);
     uint16 blockConfirmationRequested = 5;
-    bytes memory tokenArgs = abi.encode("test");
 
     s_advancedPoolHooks.preflightCheck(lockOrBurnIn, blockConfirmationRequested, tokenArgs);
 
     IPolicyEngine.Payload memory lastPayload = s_mockPolicyEngine.getLastPayload();
     assertEq(IAdvancedPoolHooks.preflightCheck.selector, lastPayload.selector);
     assertEq(OWNER, lastPayload.sender);
-    assertEq("", lastPayload.context);
-    assertEq(CCIPPolicyEnginePayloads.POOL_HOOK_OUTBOUND_POLICY_DATA_V1_TAG, bytes4(lastPayload.data));
-
-    CCIPPolicyEnginePayloads.PoolHookOutboundPolicyDataV1 memory decoded = abi.decode(
-      this.slicePolicyEnginePayload(lastPayload.data), (CCIPPolicyEnginePayloads.PoolHookOutboundPolicyDataV1)
-    );
-
-    assertEq(lockOrBurnIn.originalSender, decoded.originalSender);
-    assertEq(blockConfirmationRequested, decoded.blockConfirmationRequested);
-    assertEq(lockOrBurnIn.remoteChainSelector, decoded.remoteChainSelector);
-    assertEq(lockOrBurnIn.receiver, decoded.receiver);
-    assertEq(lockOrBurnIn.amount, decoded.amount);
-    assertEq(lockOrBurnIn.localToken, decoded.localToken);
-    assertEq(tokenArgs, decoded.tokenArgs);
+    assertEq(tokenArgs, lastPayload.context);
+    assertEq(abi.encode(lockOrBurnIn, blockConfirmationRequested, tokenArgs), lastPayload.data);
   }
 
   function test_preflightCheck_WithoutPolicyEngine() public {
@@ -78,7 +64,8 @@ contract AdvancedPoolHooks_preflightCheck is AdvancedPoolHooksSetup {
 
     IPolicyEngine.Payload memory lastPayload = s_mockPolicyEngine.getLastPayload();
     assertEq(IAdvancedPoolHooks.preflightCheck.selector, lastPayload.selector);
-    assertEq(CCIPPolicyEnginePayloads.POOL_HOOK_OUTBOUND_POLICY_DATA_V1_TAG, bytes4(lastPayload.data));
+    assertEq(abi.encode(lockOrBurnIn, uint16(5), bytes("")), lastPayload.data);
+    assertEq(bytes(""), lastPayload.context);
   }
 
   function test_preflightCheck_RevertWhen_PolicyEngineRejects() public {

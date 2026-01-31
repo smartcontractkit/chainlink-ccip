@@ -2,7 +2,11 @@
 pragma solidity ^0.8.24;
 
 import {AdvancedPoolHooks} from "../../../pools/AdvancedPoolHooks.sol";
-import {MockPolicyEngine, MockPolicyEngineNoDetach, MockPolicyEngineRevertingDetach} from "../../mocks/MockPolicyEngine.sol";
+import {
+  MockPolicyEngine,
+  MockPolicyEngineNoDetach,
+  MockPolicyEngineRevertingDetach
+} from "../../mocks/MockPolicyEngine.sol";
 import {AdvancedPoolHooksSetup} from "./AdvancedPoolHooksSetup.t.sol";
 import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
 
