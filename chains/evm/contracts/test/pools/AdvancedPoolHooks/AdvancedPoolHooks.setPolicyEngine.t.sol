@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {IPolicyEngine} from "../../../interfaces/IPolicyEngine.sol";
-
 import {AdvancedPoolHooks} from "../../../pools/AdvancedPoolHooks.sol";
 import {MockPolicyEngine} from "../../mocks/MockPolicyEngine.sol";
 import {AdvancedPoolHooksSetup} from "./AdvancedPoolHooksSetup.t.sol";
@@ -18,10 +17,6 @@ contract MockPolicyEngineRevertingDetach {
   function run(
     IPolicyEngine.Payload calldata
   ) external {}
-
-  function typeAndVersion() external pure returns (string memory) {
-    return "MockPolicyEngineRevertingDetach 1.0.0";
-  }
 }
 
 contract MockPolicyEngineNoDetach {
@@ -30,10 +25,6 @@ contract MockPolicyEngineNoDetach {
   function run(
     IPolicyEngine.Payload calldata
   ) external {}
-
-  function typeAndVersion() external pure returns (string memory) {
-    return "MockPolicyEngineNoDetach 1.0.0";
-  }
 }
 
 contract AdvancedPoolHooks_setPolicyEngine is AdvancedPoolHooksSetup {
@@ -46,7 +37,7 @@ contract AdvancedPoolHooks_setPolicyEngine is AdvancedPoolHooksSetup {
     s_mockPolicyEngine2 = new MockPolicyEngine();
   }
 
-  function test_setPolicyEngine() public {
+  function test_setPolicyEngine_FromZeroAddress() public {
     assertEq(address(0), s_advancedPoolHooks.getPolicyEngine());
 
     vm.expectEmit();
@@ -72,7 +63,7 @@ contract AdvancedPoolHooks_setPolicyEngine is AdvancedPoolHooksSetup {
     assertFalse(s_mockPolicyEngine.isAttached(address(s_advancedPoolHooks)));
   }
 
-  function test_setPolicyEngine_Change() public {
+  function test_setPolicyEngine_Swap() public {
     s_advancedPoolHooks.setPolicyEngine(address(s_mockPolicyEngine));
     assertTrue(s_mockPolicyEngine.isAttached(address(s_advancedPoolHooks)));
     assertFalse(s_mockPolicyEngine2.isAttached(address(s_advancedPoolHooks)));
@@ -106,8 +97,54 @@ contract AdvancedPoolHooks_setPolicyEngine is AdvancedPoolHooksSetup {
     assertEq(address(s_mockPolicyEngine), s_advancedPoolHooks.getPolicyEngine());
   }
 
+  function test_setPolicyEngineAllowFailedDetach_Swap_AllowFailedDetach() public {
+    s_advancedPoolHooks.setPolicyEngineAllowFailedDetach(address(s_mockPolicyEngine));
+    assertTrue(s_mockPolicyEngine.isAttached(address(s_advancedPoolHooks)));
+    assertFalse(s_mockPolicyEngine2.isAttached(address(s_advancedPoolHooks)));
+
+    vm.expectEmit();
+    emit AdvancedPoolHooks.PolicyEngineSet(address(s_mockPolicyEngine), address(s_mockPolicyEngine2));
+
+    s_advancedPoolHooks.setPolicyEngineAllowFailedDetach(address(s_mockPolicyEngine2));
+
+    assertEq(address(s_mockPolicyEngine2), s_advancedPoolHooks.getPolicyEngine());
+    assertFalse(s_mockPolicyEngine.isAttached(address(s_advancedPoolHooks)));
+    assertTrue(s_mockPolicyEngine2.isAttached(address(s_advancedPoolHooks)));
+  }
+
+  function test_setPolicyEngineAllowFailedDetach_OldEngineDetachReverts_AllowFailedDetach() public {
+    MockPolicyEngineRevertingDetach revertingEngine = new MockPolicyEngineRevertingDetach();
+    s_advancedPoolHooks.setPolicyEngineAllowFailedDetach(address(revertingEngine));
+    assertEq(address(revertingEngine), s_advancedPoolHooks.getPolicyEngine());
+
+    vm.expectEmit();
+    emit AdvancedPoolHooks.PolicyEngineSet(address(revertingEngine), address(s_mockPolicyEngine));
+
+    s_advancedPoolHooks.setPolicyEngineAllowFailedDetach(address(s_mockPolicyEngine));
+
+    assertEq(address(s_mockPolicyEngine), s_advancedPoolHooks.getPolicyEngine());
+    assertTrue(s_mockPolicyEngine.isAttached(address(s_advancedPoolHooks)));
+  }
+
+  function test_setPolicyEngineAllowFailedDetach_OldEngineDoesNotImplementDetach_AllowFailedDetach() public {
+    MockPolicyEngineNoDetach noDetachEngine = new MockPolicyEngineNoDetach();
+    s_advancedPoolHooks.setPolicyEngineAllowFailedDetach(address(noDetachEngine));
+    assertEq(address(noDetachEngine), s_advancedPoolHooks.getPolicyEngine());
+
+    vm.expectEmit();
+    emit AdvancedPoolHooks.PolicyEngineSet(address(noDetachEngine), address(s_mockPolicyEngine));
+
+    s_advancedPoolHooks.setPolicyEngineAllowFailedDetach(address(s_mockPolicyEngine));
+
+    assertEq(address(s_mockPolicyEngine), s_advancedPoolHooks.getPolicyEngine());
+    assertTrue(s_mockPolicyEngine.isAttached(address(s_advancedPoolHooks)));
+  }
+
+  // Reverts
+
   function test_setPolicyEngine_RevertWhen_OnlyCallableByOwner() public {
     vm.stopPrank();
+    vm.prank(STRANGER);
     vm.expectRevert(Ownable2Step.OnlyCallableByOwner.selector);
     s_advancedPoolHooks.setPolicyEngine(address(s_mockPolicyEngine));
   }
@@ -140,103 +177,5 @@ contract AdvancedPoolHooks_setPolicyEngine is AdvancedPoolHooksSetup {
     s_advancedPoolHooks.setPolicyEngine(address(s_mockPolicyEngine));
 
     assertEq(address(noDetachEngine), s_advancedPoolHooks.getPolicyEngine());
-  }
-}
-
-contract AdvancedPoolHooks_setPolicyEngineAllowFailedDetach is AdvancedPoolHooksSetup {
-  MockPolicyEngine internal s_mockPolicyEngine;
-  MockPolicyEngine internal s_mockPolicyEngine2;
-
-  function setUp() public virtual override {
-    super.setUp();
-    s_mockPolicyEngine = new MockPolicyEngine();
-    s_mockPolicyEngine2 = new MockPolicyEngine();
-  }
-
-  function test_setPolicyEngineAllowFailedDetach() public {
-    assertEq(address(0), s_advancedPoolHooks.getPolicyEngine());
-
-    vm.expectEmit();
-    emit AdvancedPoolHooks.PolicyEngineSet(address(0), address(s_mockPolicyEngine));
-
-    s_advancedPoolHooks.setPolicyEngineAllowFailedDetach(address(s_mockPolicyEngine));
-
-    assertEq(address(s_mockPolicyEngine), s_advancedPoolHooks.getPolicyEngine());
-    assertTrue(s_mockPolicyEngine.isAttached(address(s_advancedPoolHooks)));
-  }
-
-  function test_setPolicyEngineAllowFailedDetach_ToZeroAddress() public {
-    s_advancedPoolHooks.setPolicyEngineAllowFailedDetach(address(s_mockPolicyEngine));
-    assertEq(address(s_mockPolicyEngine), s_advancedPoolHooks.getPolicyEngine());
-    assertTrue(s_mockPolicyEngine.isAttached(address(s_advancedPoolHooks)));
-
-    vm.expectEmit();
-    emit AdvancedPoolHooks.PolicyEngineSet(address(s_mockPolicyEngine), address(0));
-
-    s_advancedPoolHooks.setPolicyEngineAllowFailedDetach(address(0));
-
-    assertEq(address(0), s_advancedPoolHooks.getPolicyEngine());
-    assertFalse(s_mockPolicyEngine.isAttached(address(s_advancedPoolHooks)));
-  }
-
-  function test_setPolicyEngineAllowFailedDetach_Change() public {
-    s_advancedPoolHooks.setPolicyEngineAllowFailedDetach(address(s_mockPolicyEngine));
-    assertTrue(s_mockPolicyEngine.isAttached(address(s_advancedPoolHooks)));
-    assertFalse(s_mockPolicyEngine2.isAttached(address(s_advancedPoolHooks)));
-
-    vm.expectEmit();
-    emit AdvancedPoolHooks.PolicyEngineSet(address(s_mockPolicyEngine), address(s_mockPolicyEngine2));
-
-    s_advancedPoolHooks.setPolicyEngineAllowFailedDetach(address(s_mockPolicyEngine2));
-
-    assertEq(address(s_mockPolicyEngine2), s_advancedPoolHooks.getPolicyEngine());
-    assertFalse(s_mockPolicyEngine.isAttached(address(s_advancedPoolHooks)));
-    assertTrue(s_mockPolicyEngine2.isAttached(address(s_advancedPoolHooks)));
-  }
-
-  function test_setPolicyEngineAllowFailedDetach_SameValue() public {
-    s_advancedPoolHooks.setPolicyEngineAllowFailedDetach(address(s_mockPolicyEngine));
-    assertTrue(s_mockPolicyEngine.isAttached(address(s_advancedPoolHooks)));
-
-    vm.recordLogs();
-    s_advancedPoolHooks.setPolicyEngineAllowFailedDetach(address(s_mockPolicyEngine));
-
-    assertEq(0, vm.getRecordedLogs().length);
-    assertEq(address(s_mockPolicyEngine), s_advancedPoolHooks.getPolicyEngine());
-    assertTrue(s_mockPolicyEngine.isAttached(address(s_advancedPoolHooks)));
-  }
-
-  function test_setPolicyEngineAllowFailedDetach_WhenOldEngineDetachReverts() public {
-    MockPolicyEngineRevertingDetach revertingEngine = new MockPolicyEngineRevertingDetach();
-    s_advancedPoolHooks.setPolicyEngineAllowFailedDetach(address(revertingEngine));
-    assertEq(address(revertingEngine), s_advancedPoolHooks.getPolicyEngine());
-
-    vm.expectEmit();
-    emit AdvancedPoolHooks.PolicyEngineSet(address(revertingEngine), address(s_mockPolicyEngine));
-
-    s_advancedPoolHooks.setPolicyEngineAllowFailedDetach(address(s_mockPolicyEngine));
-
-    assertEq(address(s_mockPolicyEngine), s_advancedPoolHooks.getPolicyEngine());
-    assertTrue(s_mockPolicyEngine.isAttached(address(s_advancedPoolHooks)));
-  }
-
-  function test_setPolicyEngineAllowFailedDetach_WhenOldEngineDoesNotImplementDetach() public {
-    MockPolicyEngineNoDetach noDetachEngine = new MockPolicyEngineNoDetach();
-    s_advancedPoolHooks.setPolicyEngineAllowFailedDetach(address(noDetachEngine));
-    assertEq(address(noDetachEngine), s_advancedPoolHooks.getPolicyEngine());
-
-    vm.expectEmit();
-    emit AdvancedPoolHooks.PolicyEngineSet(address(noDetachEngine), address(s_mockPolicyEngine));
-
-    s_advancedPoolHooks.setPolicyEngineAllowFailedDetach(address(s_mockPolicyEngine));
-
-    assertEq(address(s_mockPolicyEngine), s_advancedPoolHooks.getPolicyEngine());
-    assertTrue(s_mockPolicyEngine.isAttached(address(s_advancedPoolHooks)));
-  }
-
-  function test_setPolicyEngineAllowFailedDetach_RevertWhen_OnlyCallableByOwner() public {
-    vm.stopPrank();
-    vm.expectRevert(Ownable2Step.OnlyCallableByOwner.selector);
-    s_advancedPoolHooks.setPolicyEngineAllowFailedDetach(address(s_mockPolicyEngine));
   }
 }

@@ -15,7 +15,7 @@ contract AdvancedPoolHooks_authorizedCallers is AdvancedPoolHooksSetup {
   function setUp() public virtual override {
     super.setUp();
 
-    // Create AdvancedPoolHooks with restricted callers (authorizedCallers.length > 0 enables restriction)
+    // Create another AdvancedPoolHooks with authorizedCallers enabled
     address[] memory authorizedCallers = new address[](1);
     authorizedCallers[0] = s_authorizedCaller;
     s_hooksWithRestrictedCallers = new AdvancedPoolHooks(new address[](0), 0, address(0), authorizedCallers);
@@ -51,7 +51,7 @@ contract AdvancedPoolHooks_authorizedCallers is AdvancedPoolHooksSetup {
     assertTrue(s_hooksWithRestrictedCallers.getAuthorizedCallersEnabled());
   }
 
-  function test_preflightCheck_WhenAnyoneCanInvoke() public {
+  function test_preflightCheck_AnyoneCanInvoke() public {
     assertFalse(s_advancedPoolHooks.getAuthorizedCallersEnabled());
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _createLockOrBurnIn();
@@ -60,7 +60,7 @@ contract AdvancedPoolHooks_authorizedCallers is AdvancedPoolHooksSetup {
     s_advancedPoolHooks.preflightCheck(lockOrBurnIn, 5, "");
   }
 
-  function test_postFlightCheck_WhenAnyoneCanInvoke() public {
+  function test_postFlightCheck_AnyoneCanInvoke() public {
     assertFalse(s_advancedPoolHooks.getAuthorizedCallersEnabled());
 
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = _createReleaseOrMintIn();
@@ -69,7 +69,7 @@ contract AdvancedPoolHooks_authorizedCallers is AdvancedPoolHooksSetup {
     s_advancedPoolHooks.postFlightCheck(releaseOrMintIn, 100e18, 5);
   }
 
-  function test_preflightCheck_WhenOnlyAuthorizedCallersCanInvoke() public {
+  function test_preflightCheck_OnlyAuthorizedCallersCanInvoke() public {
     assertTrue(s_hooksWithRestrictedCallers.getAuthorizedCallersEnabled());
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _createLockOrBurnIn();
@@ -78,7 +78,7 @@ contract AdvancedPoolHooks_authorizedCallers is AdvancedPoolHooksSetup {
     s_hooksWithRestrictedCallers.preflightCheck(lockOrBurnIn, 5, "");
   }
 
-  function test_postFlightCheck_WhenOnlyAuthorizedCallersCanInvoke() public {
+  function test_postFlightCheck_OnlyAuthorizedCallersCanInvoke() public {
     assertTrue(s_hooksWithRestrictedCallers.getAuthorizedCallersEnabled());
 
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = _createReleaseOrMintIn();
