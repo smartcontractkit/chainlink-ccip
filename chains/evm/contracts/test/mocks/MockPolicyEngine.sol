@@ -18,7 +18,6 @@ contract MockPolicyEngine is IPolicyEngine {
   IPolicyEngine.Payload internal s_lastPayload;
   bool internal s_payloadRecorded;
 
-  /// @notice Attaches the calling contract to the policy engine.
   function attach() external override {
     if (s_attachedTargets.contains(msg.sender)) {
       revert TargetAlreadyAttached(msg.sender);
@@ -27,7 +26,6 @@ contract MockPolicyEngine is IPolicyEngine {
     emit TargetAttached(msg.sender);
   }
 
-  /// @notice Detaches the calling contract from the policy engine.
   function detach() external override {
     if (!s_attachedTargets.contains(msg.sender)) {
       revert TargetNotAttached(msg.sender);
@@ -36,7 +34,6 @@ contract MockPolicyEngine is IPolicyEngine {
     emit TargetDetached(msg.sender);
   }
 
-  /// @notice Runs the policies for a given operation payload.
   function run(
     Payload calldata payload
   ) external override {
@@ -48,7 +45,6 @@ contract MockPolicyEngine is IPolicyEngine {
     }
   }
 
-  /// @notice Runs the policies for a given payload for offchain pre-validation.
   function check(
     Payload calldata
   ) external view override {
@@ -56,10 +52,6 @@ contract MockPolicyEngine is IPolicyEngine {
       revert MockPolicyEngineRejection(s_revertReason);
     }
   }
-
-  // ================================================================
-  // │                     Test Helper Functions                     │
-  // ================================================================
 
   /// @notice Sets whether run() should revert.
   function setShouldRevert(
@@ -87,10 +79,6 @@ contract MockPolicyEngine is IPolicyEngine {
   function clearLastPayload() external {
     s_payloadRecorded = false;
   }
-
-  // ================================================================
-  // │                   Stub Implementations                        │
-  // ================================================================
 
   function typeAndVersion() external pure override returns (string memory) {
     return "MockPolicyEngine 1.0.0";
@@ -172,4 +160,32 @@ contract MockPolicyEngine is IPolicyEngine {
     address,
     bool
   ) external override {}
+}
+
+contract MockPolicyEngineRevertingDetach {
+  function attach() external {}
+
+  function detach() external pure {
+    revert("detach not supported");
+  }
+
+  function run(
+    IPolicyEngine.Payload calldata
+  ) external {}
+
+  function check(
+    IPolicyEngine.Payload calldata
+  ) external view {}
+}
+
+contract MockPolicyEngineNoDetach {
+  function attach() external {}
+
+  function run(
+    IPolicyEngine.Payload calldata
+  ) external {}
+
+  function check(
+    IPolicyEngine.Payload calldata
+  ) external view {}
 }
