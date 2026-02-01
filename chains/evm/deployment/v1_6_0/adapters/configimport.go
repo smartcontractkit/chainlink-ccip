@@ -12,11 +12,10 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
+	seq1_6 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/fee_quoter"
 	api "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -137,39 +136,25 @@ func (ci *ConfigImportAdapter) SequenceImportConfig() *cldf_ops.Sequence[api.Imp
 			}
 			chainSelector := in.ChainSelector
 			b.Logger.Infof("Importing configuration for chain %d (%s)", chainSelector, evmChain.Name())
-			var contractMetadata []datastore.ContractMetadata
 			// read FQ config from onchain
 			fqAddress, ok := ci.FeeQuoter[chainSelector]
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("fee quoter address not found for chain %d", chainSelector)
 			}
-			destChainConfigs := make(map[uint64]fee_quoter.FeeQuoterDestChainConfig)
-			for _, remoteChain := range in.RemoteChains {
-				opsOutput, err := cldf_ops.ExecuteOperation(b, fqops.GetDestChainConfig, evmChain, contract.FunctionInput[uint64]{
+			var result sequences.OnChainOutput
+			// fetch fee quoter config
+			result, err = sequences.RunAndMergeSequence(b, chains,
+				seq1_6.FeeQuoterImportConfigSequence,
+				seq1_6.FeeQuoterImportConfigSequenceInput{
 					Address:       fqAddress,
 					ChainSelector: chainSelector,
-					Args:          remoteChain,
-				})
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to get dest chain config for "+
-						"remote chain %d from feequoter %s on chain %d: %w",
-						remoteChain, fqAddress.Hex(), chainSelector, err)
-				}
-				destChainConfigs[remoteChain] = opsOutput.Output
+					RemoteChains:  in.RemoteChains,
+					Tokens:        in.Tokens,
+				}, result)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to import fee quoter config on chain %d: %w", chainSelector, err)
 			}
-			for _, token := range in.Tokens {
-
-			}
-			contractMetadata = append(contractMetadata, datastore.ContractMetadata{
-				Address:       fqAddress.Hex(),
-				ChainSelector: chainSelector,
-				Metadata: struct {
-					DestChainConfigs map[uint64]fee_quoter.FeeQuoterDestChainConfig
-				}{
-					DestChainConfigs: destChainConfigs,
-				},
-			})
-			return sequences.OnChainOutput{}, nil
+			return result, nil
 		},
 	)
 }
