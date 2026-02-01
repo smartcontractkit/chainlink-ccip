@@ -165,24 +165,35 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 			deployTokenInput := input.DeployTokenInput
 			deployTokenInput.ExistingDataStore = e.DataStore
 			deployTokenInput.ChainSelector = selector
-			timelockAddr, err := datastore_utils.FindAndFormatRef(deployTokenInput.ExistingDataStore, datastore.AddressRef{
-				ChainSelector: deployTokenInput.ChainSelector,
-				Type:          datastore.ContractType(common_utils.RBACTimelock),
-				Qualifier:     cfg.MCMS.Qualifier,
-			}, deployTokenInput.ChainSelector, datastore_utils.FullRef)
-			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("couldn't find the RBACTimelock "+
-					"address in datastore for selector %v and qualifier %v %v", deployTokenInput.ChainSelector, cfg.MCMS.Qualifier, err)
-			}
+
 			// if token is deployed by CLL, set CCIP admin as RBACTimelock by default.
 			// If input has CCIPAdmin and which is external address, set that address as CCIPAdmin
 			// and we may not be able to register the token by CLL in that case.
 			if deployTokenInput.CCIPAdmin == "" {
+				timelockAddr, err := datastore_utils.FindAndFormatRef(
+					deployTokenInput.ExistingDataStore,
+					datastore.AddressRef{
+						ChainSelector: deployTokenInput.ChainSelector,
+						Type:          datastore.ContractType(common_utils.RBACTimelock),
+						Qualifier:     cfg.MCMS.Qualifier,
+					},
+					deployTokenInput.ChainSelector,
+					datastore_utils.FullRef,
+				)
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf(
+						"couldn't find the RBACTimelock address in datastore for selector %v and qualifier %v %v",
+						deployTokenInput.ChainSelector,
+						cfg.MCMS.Qualifier,
+						err,
+					)
+				}
+
 				deployTokenInput.CCIPAdmin = timelockAddr.Address
 			}
 			deployTokenReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, tokenPoolAdapter.DeployToken(), e.BlockChains, deployTokenInput)
 			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to manual register token and token pool %d: %w", selector, err)
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy token on chain %d: %w", selector, err)
 			}
 			batchOps = append(batchOps, deployTokenReport.Output.BatchOps...)
 			reports = append(reports, deployTokenReport.ExecutionReports...)
@@ -209,7 +220,7 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 			deployTokenPoolInput.ChainSelector = selector
 			deployTokenPoolReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, tokenPoolAdapter.DeployTokenPoolForToken(), e.BlockChains, deployTokenPoolInput)
 			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to manual register token and token pool %d: %w", selector, err)
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy token pool for token on chain %d: %w", selector, err)
 			}
 			batchOps = append(batchOps, deployTokenPoolReport.Output.BatchOps...)
 			reports = append(reports, deployTokenPoolReport.ExecutionReports...)
