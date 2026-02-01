@@ -29,7 +29,10 @@ contract AdvancedPoolHooks_postFlightCheck is AdvancedPoolHooksSetup {
     });
   }
 
-  function testFuzz_postFlightCheck_WithPolicyEngine(bytes memory sourcePoolData, bytes memory offchainTokenData) public {
+  function testFuzz_postFlightCheck_WithPolicyEngine(
+    bytes memory sourcePoolData,
+    bytes memory offchainTokenData
+  ) public {
     s_advancedPoolHooks.setPolicyEngine(address(s_mockPolicyEngine));
 
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = _createReleaseOrMintIn();

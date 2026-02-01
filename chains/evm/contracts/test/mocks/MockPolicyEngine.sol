@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
+// solhint-disable one-contract-per-file
 pragma solidity ^0.8.24;
 
 import {IPolicyEngine} from "../../interfaces/IPolicyEngine.sol";
@@ -163,10 +164,12 @@ contract MockPolicyEngine is IPolicyEngine {
 }
 
 contract MockPolicyEngineRevertingDetach {
+  error DetachNotSupported();
+
   function attach() external {}
 
   function detach() external pure {
-    revert("detach not supported");
+    revert DetachNotSupported();
   }
 
   function run(

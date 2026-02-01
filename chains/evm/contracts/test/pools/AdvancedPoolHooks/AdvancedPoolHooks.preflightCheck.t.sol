@@ -29,7 +29,9 @@ contract AdvancedPoolHooks_preflightCheck is AdvancedPoolHooksSetup {
     });
   }
 
-  function testFuzz_preflightCheck_WithPolicyEngine(bytes memory tokenArgs) public {
+  function testFuzz_preflightCheck_WithPolicyEngine(
+    bytes memory tokenArgs
+  ) public {
     s_advancedPoolHooks.setPolicyEngine(address(s_mockPolicyEngine));
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _createLockOrBurnIn(OWNER);

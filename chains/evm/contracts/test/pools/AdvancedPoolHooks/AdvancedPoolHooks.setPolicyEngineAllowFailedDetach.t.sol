@@ -72,4 +72,3 @@ contract AdvancedPoolHooks_setPolicyEngineAllowFailedDetach is AdvancedPoolHooks
     s_advancedPoolHooks.setPolicyEngineAllowFailedDetach(address(s_mockPolicyEngine));
   }
 }
-

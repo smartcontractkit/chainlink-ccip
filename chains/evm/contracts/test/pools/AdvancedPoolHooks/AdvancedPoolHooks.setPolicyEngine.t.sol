@@ -98,7 +98,7 @@ contract AdvancedPoolHooks_setPolicyEngine is AdvancedPoolHooksSetup {
       abi.encodeWithSelector(
         AdvancedPoolHooks.PolicyEngineDetachFailed.selector,
         address(revertingEngine),
-        abi.encodeWithSignature("Error(string)", "detach not supported")
+        abi.encodeWithSelector(MockPolicyEngineRevertingDetach.DetachNotSupported.selector)
       )
     );
     s_advancedPoolHooks.setPolicyEngine(address(s_mockPolicyEngine));
