@@ -426,13 +426,11 @@ func (a *SVMAdapter) GetTokenBalance(ctx context.Context, tokenAddress string, o
 	if err != nil {
 		return nil, fmt.Errorf("failed to get the balance of token %q for account %q: %w", mint.String(), ownr.String(), err)
 	}
-
-	val, ok := new(big.Int).SetString(strconv.Itoa(balance), 10)
-	if !ok {
-		return nil, fmt.Errorf("failed to convert balance to big.Int: %d", balance)
+	if balance < 0 {
+		return nil, fmt.Errorf("unexpected negative balance: %d", balance)
 	}
 
-	return val, nil
+	return new(big.Int).SetUint64(uint64(balance)), nil
 }
 
 func (a *SVMAdapter) GetTokenExpansionConfig() tokensapi.TokenExpansionInputPerChain {
@@ -443,7 +441,7 @@ func (a *SVMAdapter) GetTokenExpansionConfig() tokensapi.TokenExpansionInputPerC
 	mintAmnt := new(big.Int).Mul(oneToken, big.NewInt(1_000_000)) // pre-mint 1 million tokens
 
 	return tokensapi.TokenExpansionInputPerChain{
-		TokenPoolQualifier:      "", // should be empty since there'll only be one BnM / LnM pool deployed
+		TokenPoolQualifier:      "", // should be empty since there'll only be one BnM / LnR pool deployed
 		TokenPoolVersion:        cciputils.Version_1_6_0,
 		PoolType:                cciputils.BurnMintTokenPool.String(),
 		TokenPoolRateLimitAdmin: admin,
@@ -457,7 +455,7 @@ func (a *SVMAdapter) GetTokenExpansionConfig() tokensapi.TokenExpansionInputPerC
 			Supply:                 big.NewInt(0),   // unlimited supply
 			PreMint:                mintAmnt,        // pre-mint some tokens for transfers
 			Senders:                []string{admin}, // use deployer as sender
-			ExternalAdmin:          []string{},      // use default admin
+			ExternalAdmin:          []string{},      // not needed for tests
 			DisableFreezeAuthority: false,           // don't revoke freeze authority after token creation
 			TokenPrivKey:           "",              // if empty, a new keypair will be generated
 			CCIPAdmin:              admin,           // deployer is the admin (if empty defaults to timelock)

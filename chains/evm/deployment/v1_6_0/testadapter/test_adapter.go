@@ -351,6 +351,8 @@ func (a *EVMAdapter) GetTokenBalance(ctx context.Context, tokenAddress string, o
 		return nil, errors.New("cannot get balance of zero address token")
 	}
 
+	// NOTE: GetTokenExpansionConfig uses BurnMintERC20 as the token
+	// type so we need to be consistent about using it here as well.
 	token, err := burn_mint_erc20.NewBurnMintERC20(tokenAddr, a.Chain.Client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create burn mint erc20 instance for address %q: %w", tokenAddr.Hex(), err)
@@ -380,14 +382,14 @@ func (a *EVMAdapter) GetTokenExpansionConfig() tokensapi.TokenExpansionInputPerC
 		TokenPoolAdmin:          admin,
 		TARAdmin:                admin,
 		DeployTokenInput: tokensapi.DeployTokenInput{
-			Decimals:               uint8(18),
+			Decimals:               deci,
 			Symbol:                 "TEST_TOKEN_" + suffix,
 			Name:                   "TEST TOKEN " + suffix,
 			Type:                   bnmERC20ops.ContractType, // BnM ERC20 is the most common
 			Supply:                 big.NewInt(0),            // unlimited supply
 			PreMint:                mintAmnt,                 // pre-mint some tokens for transfers
 			Senders:                []string{admin},          // use deployer as sender
-			ExternalAdmin:          []string{},               // use default admin
+			ExternalAdmin:          []string{},               // not needed for tests
 			DisableFreezeAuthority: false,                    // not applicable for EVM
 			TokenPrivKey:           "",                       // not applicable for EVM
 			CCIPAdmin:              admin,                    // deployer is the admin (if empty defaults to timelock)

@@ -170,22 +170,22 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 			// If input has CCIPAdmin and which is external address, set that address as CCIPAdmin
 			// and we may not be able to register the token by CLL in that case.
 			if deployTokenInput.CCIPAdmin == "" {
+				filter := datastore.AddressRef{
+					Type:          datastore.ContractType(common_utils.RBACTimelock),
+					ChainSelector: deployTokenInput.ChainSelector,
+					Qualifier:     cfg.MCMS.Qualifier,
+				}
+
 				timelockAddr, err := datastore_utils.FindAndFormatRef(
 					deployTokenInput.ExistingDataStore,
-					datastore.AddressRef{
-						ChainSelector: deployTokenInput.ChainSelector,
-						Type:          datastore.ContractType(common_utils.RBACTimelock),
-						Qualifier:     cfg.MCMS.Qualifier,
-					},
+					filter,
 					deployTokenInput.ChainSelector,
 					datastore_utils.FullRef,
 				)
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf(
-						"couldn't find the RBACTimelock address in datastore for selector %v and qualifier %v %v",
-						deployTokenInput.ChainSelector,
-						cfg.MCMS.Qualifier,
-						err,
+						"couldn't find the RBACTimelock address in datastore for selector %d and qualifier %s: %w",
+						deployTokenInput.ChainSelector, cfg.MCMS.Qualifier, err,
 					)
 				}
 
