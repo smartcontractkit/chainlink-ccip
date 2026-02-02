@@ -87,7 +87,7 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, ITypeAndVersion, Ownable2StepM
 
   /// @inheritdoc IAdvancedPoolHooks
   /// @dev No-op implementation.
-  function postFlightCheck(
+  function postflightCheck(
     Pool.ReleaseOrMintInV1 calldata,
     uint256,
     uint16
