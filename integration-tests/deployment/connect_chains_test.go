@@ -32,7 +32,35 @@ import (
 
 	lanesapi "github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
+
+	evmfqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
 )
+
+// convertOpsConfigToGobinding converts operations type to gobinding type for test assertions.
+// This helper keeps gobinding imports in tests, not production code.
+func convertOpsConfigToGobinding(cfg evmfqops.DestChainConfig) evmfq.FeeQuoterDestChainConfig {
+	return evmfq.FeeQuoterDestChainConfig{
+		IsEnabled:                         cfg.IsEnabled,
+		MaxNumberOfTokensPerMsg:           cfg.MaxNumberOfTokensPerMsg,
+		MaxDataBytes:                      cfg.MaxDataBytes,
+		MaxPerMsgGasLimit:                 cfg.MaxPerMsgGasLimit,
+		DestGasOverhead:                   cfg.DestGasOverhead,
+		DestGasPerPayloadByteBase:         cfg.DestGasPerPayloadByteBase,
+		DestGasPerPayloadByteHigh:         cfg.DestGasPerPayloadByteHigh,
+		DestGasPerPayloadByteThreshold:    cfg.DestGasPerPayloadByteThreshold,
+		DestDataAvailabilityOverheadGas:   cfg.DestDataAvailabilityOverheadGas,
+		DestGasPerDataAvailabilityByte:    cfg.DestGasPerDataAvailabilityByte,
+		DestDataAvailabilityMultiplierBps: cfg.DestDataAvailabilityMultiplierBps,
+		ChainFamilySelector:               cfg.ChainFamilySelector,
+		EnforceOutOfOrder:                 cfg.EnforceOutOfOrder,
+		DefaultTokenFeeUSDCents:           cfg.DefaultTokenFeeUSDCents,
+		DefaultTokenDestGasOverhead:       cfg.DefaultTokenDestGasOverhead,
+		DefaultTxGasLimit:                 cfg.DefaultTxGasLimit,
+		GasMultiplierWeiPerEth:            cfg.GasMultiplierWeiPerEth,
+		GasPriceStalenessThreshold:        cfg.GasPriceStalenessThreshold,
+		NetworkFeeUSDCents:                cfg.NetworkFeeUSDCents,
+	}
+}
 
 func checkBidirectionalLaneConnectivity(
 	t *testing.T,
@@ -127,7 +155,8 @@ func checkBidirectionalLaneConnectivity(
 
 	feeQuoterDestConfig, err := feeQuoterOnDest.GetDestChainConfig(nil, solanaChain.Selector)
 	require.NoError(t, err, "must get dest chain config from feeQuoter")
-	require.Equal(t, evmsequences.TranslateFQ(solanaChain.FeeQuoterDestChainConfig), feeQuoterDestConfig, "feeQuoter dest chain config must equal expected")
+	expectedConfig := convertOpsConfigToGobinding(evmsequences.TranslateFQ(solanaChain.FeeQuoterDestChainConfig))
+	require.Equal(t, expectedConfig, feeQuoterDestConfig, "feeQuoter dest chain config must equal expected")
 
 	price, err := feeQuoterOnDest.GetDestinationChainGasPrice(nil, solanaChain.Selector)
 	require.NoError(t, err, "must get price from feeQuoter")
