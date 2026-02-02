@@ -144,7 +144,7 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 				CREATE2Factory: create2FactoryAddress,
 			})
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CommitteeVerifierResolver: %w", err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CCTPVerifierResolver: %w", err)
 			}
 			if len(deployVerifierResolverViaCREATE2Report.Output.Addresses) != 1 {
 				return sequences.OnChainOutput{}, fmt.Errorf("expected 1 CCTPVerifierResolver address, got %d", len(deployVerifierResolverViaCREATE2Report.Output.Addresses))
