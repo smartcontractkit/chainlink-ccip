@@ -8,6 +8,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
+	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
@@ -35,6 +36,29 @@ type DeployLombardChainDeps struct {
 	BlockChains cldf_chain.BlockChains
 	// DataStore defines all addresses in the environment.
 	DataStore datastore.DataStore
+}
+
+// ConfigureLombardChainForLanesInput specifies the input for the ConfigureLOmbardChainForLanes sequence.
+type ConfigureLombardChainForLanesInput struct {
+	// ChainSelector is the selector for the chain being configured.
+	ChainSelector uint64
+	// Token is the address of the Token contract.
+	Token string
+	// RemoteChains is the set of remote chains to configure.
+	RemoteChains map[uint64]RemoteLombardChainConfig
+}
+
+// RemoteLombardChainConfig configures a Lombard-enabled chain for a remote counterpart.
+type RemoteLombardChainConfig struct {
+	TokenPoolConfig        tokens.RemoteChainConfig[datastore.AddressRef, datastore.AddressRef]
+	TokenTransferFeeConfig tokens.TokenTransferFeeConfig
+	RemoteDomain           LombardRemoteDomain
+}
+
+// LombardRemoteDomain identifies Lombard-specific parameters for a remote chain.
+type LombardRemoteDomain struct {
+	AllowedCaller datastore.AddressRef
+	LChainId      uint32
 }
 
 // LombardChain is a configurable Lombard chain.
