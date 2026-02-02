@@ -11,9 +11,9 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/erc20"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/erc20_lock_box"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/hybrid_lock_release_usdc_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/siloed_usdc_token_pool"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_2/operations/hybrid_lock_release_usdc_token_pool"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"

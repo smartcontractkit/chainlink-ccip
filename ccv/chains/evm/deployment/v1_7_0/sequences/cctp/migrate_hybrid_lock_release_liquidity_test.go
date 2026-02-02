@@ -7,7 +7,7 @@ import (
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/stretchr/testify/require"
 
-	hybrid_lock_release_usdc_token_pool_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/v1_6_2/hybrid_lock_release_usdc_token_pool"
+	hybrid_lock_release_usdc_token_pool_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_2/hybrid_lock_release_usdc_token_pool"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -51,9 +51,8 @@ func TestMigrateHybridLockReleaseLiquidityErrorsWhenLockBoxMissing(t *testing.T)
 		setup.Router,
 		common.Address{},
 	)
-	require.NoError(t, err, "Failed to deploy HybridLockReleaseUSDCTokenPool")
-	_, err = chain.Confirm(tx)
-	require.NoError(t, err, "Failed to confirm HybridLockReleaseUSDCTokenPool deployment")
+	require.NoErrorf(t, err, "Failed to confirm HybridLockReleaseUSDCTokenPool deployment: %v", err)
+	require.NoError(t, err, "Failed to confirm HybridLockReleaseUSDCTokenPool deployment: %v", err)
 
 	lockReleaseChainSelector := chain_selectors.ETHEREUM_MAINNET_ARBITRUM_1.Selector
 	tx, err = hybridPool.UpdateChainSelectorMechanisms(chain.DeployerKey, nil, []uint64{lockReleaseChainSelector})
