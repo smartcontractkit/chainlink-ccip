@@ -222,9 +222,7 @@ func (c *CommitOffchainConfig) applyDefaults() {
 	}
 	// RMN has been deprecated. Hardcode the configuration to avoid bringing down CCIP 1.6.
 	// https://smartcontract-it.atlassian.net/browse/INCIDENT-2243
-	if c.RMNEnabled {
-		c.RMNEnabled = false
-	}
+	c.RMNEnabled = false
 }
 
 //nolint:gocyclo // it is considered ok since we don't have complicated logic here

@@ -510,7 +510,8 @@ func TestCommitOffchainConfig_ApplyDefaultsAndValidate(t *testing.T) {
 			name: "Config with some values set applies remaining defaults and validates successfully",
 			input: CommitOffchainConfig{
 				NewMsgScanBatchSize: 100,
-				RMNEnabled:          true,
+				// ensure that an incorrect RMN value is changed to false
+				RMNEnabled: true,
 			},
 		},
 		{
