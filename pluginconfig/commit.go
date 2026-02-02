@@ -15,7 +15,7 @@ import (
 
 // We use this default value when the config is not set for a specific chain.
 const (
-	defaultRMNSignaturesTimeout               = 5 * time.Second
+	defaultRMNSignaturesTimeout               = 0
 	defaultNewMsgScanBatchSize                = merklemulti.MaxNumberTreeLeaves
 	defaultEvmDefaultMaxMerkleTreeSize        = merklemulti.MaxNumberTreeLeaves
 	defaultMaxReportTransmissionCheckAttempts = 5
