@@ -7,6 +7,7 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
+	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -120,14 +121,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, wethRef)
 
 		// Deploy LINK
-		linkRef, err := contract_utils.MaybeDeployContract(b, burn_mint_erc20_with_drip.Deploy, chain, contract_utils.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs]{
-			TypeAndVersion: deployment.NewTypeAndVersion(link_token.ContractType, *link_token.Version),
-			ChainSelector:  chain.Selector,
-			Args: burn_mint_erc20_with_drip.ConstructorArgs{
-				Name:   "LINK",
-				Symbol: "LINK",
-			},
-		}, input.ExistingAddresses)
+		linkRef, err := MaybeDeployFakeTestnetLinkToken(b, chain, input.ExistingAddresses)
 		if err != nil {
 			return sequences.OnChainOutput{}, err
 		}
@@ -498,4 +492,44 @@ func MaybeRegisterModuleOnTokenAdminRegistry(
 	}
 
 	return addRegistryModuleReport.Output, true, nil
+}
+
+func MaybeDeployFakeTestnetLinkToken(b cldf_ops.Bundle, chain evm.Chain, existingAddresses []datastore.AddressRef) (datastore.AddressRef, error) {
+	linkTokenInput := contract_utils.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs]{
+		TypeAndVersion: deployment.NewTypeAndVersion(link_token.ContractType, *link_token.Version),
+		ChainSelector:  chain.Selector,
+		Args: burn_mint_erc20_with_drip.ConstructorArgs{
+			Name:   "LINK",
+			Symbol: "LINK",
+		},
+	}
+
+	// If LINK is not deployed on-chain and this is a mainnet chain, error.
+	if !IsDeployedOnChain(linkTokenInput, existingAddresses) && chain.IsNetworkType(chain_selectors.NetworkTypeMainnet) {
+		return datastore.AddressRef{}, fmt.Errorf(
+			"LINK token is not deployed on non-testnet chain %d; please deploy it first", chain.Selector)
+	}
+	linkRef, err := contract_utils.MaybeDeployContract(b, burn_mint_erc20_with_drip.Deploy, chain, linkTokenInput, existingAddresses)
+	if err != nil {
+		return datastore.AddressRef{}, err
+	}
+	return linkRef, nil
+}
+
+func IsDeployedOnChain[ARGS any](
+	input contract_utils.DeployInput[ARGS],
+	existingAddresses []datastore.AddressRef,
+) bool {
+	for _, ref := range existingAddresses {
+		if ref.Type == datastore.ContractType(input.TypeAndVersion.Type) &&
+			ref.Version.String() == input.TypeAndVersion.Version.String() {
+			if input.Qualifier == nil {
+				return true
+			}
+			if ref.Qualifier == *input.Qualifier {
+				return true
+			}
+		}
+	}
+	return false
 }

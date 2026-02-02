@@ -6,6 +6,7 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
+	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
@@ -181,35 +182,35 @@ func TestDeployLockReleaseTokenPool(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			chainSel := uint64(5009297550715157269)
-		e, err := environment.New(t.Context(),
-			environment.WithEVMSimulated(t, []uint64{chainSel}),
-		)
-		require.NoError(t, err, "Failed to create environment")
-		require.NotNil(t, e, "Environment should be created")
+			chainSel := chain_selectors.ETHEREUM_TESTNET_SEPOLIA.Selector
+			e, err := environment.New(t.Context(),
+				environment.WithEVMSimulated(t, []uint64{chainSel}),
+			)
+			require.NoError(t, err, "Failed to create environment")
+			require.NotNil(t, e, "Environment should be created")
 
-		// Deploy CREATE2Factory first
-		create2FactoryRef, err := contract.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], contract.DeployInput[create2_factory.ConstructorArgs]{
-			TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
-			ChainSelector:  chainSel,
-			Args: create2_factory.ConstructorArgs{
-				AllowList: []common.Address{e.BlockChains.EVMChains()[chainSel].DeployerKey.From},
-			},
-		}, nil)
-		require.NoError(t, err, "Failed to deploy CREATE2Factory")
-
-		// Deploy chain
-		chainReport, err := operations.ExecuteSequence(
-			e.OperationsBundle,
-			sequences.DeployChainContracts,
-			e.BlockChains.EVMChains()[chainSel],
-			sequences.DeployChainContractsInput{
+			// Deploy CREATE2Factory first
+			create2FactoryRef, err := contract.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], contract.DeployInput[create2_factory.ConstructorArgs]{
+				TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
 				ChainSelector:  chainSel,
-				CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
-				ContractParams: testsetup.CreateBasicContractParams(),
-			},
-		)
-		require.NoError(t, err, "ExecuteSequence should not error")
+				Args: create2_factory.ConstructorArgs{
+					AllowList: []common.Address{e.BlockChains.EVMChains()[chainSel].DeployerKey.From},
+				},
+			}, nil)
+			require.NoError(t, err, "Failed to deploy CREATE2Factory")
+
+			// Deploy chain
+			chainReport, err := operations.ExecuteSequence(
+				e.OperationsBundle,
+				sequences.DeployChainContracts,
+				e.BlockChains.EVMChains()[chainSel],
+				sequences.DeployChainContractsInput{
+					ChainSelector:  chainSel,
+					CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
+					ContractParams: testsetup.CreateBasicContractParams(),
+				},
+			)
+			require.NoError(t, err, "ExecuteSequence should not error")
 
 			// Deploy token
 			tokenReport, err := operations.ExecuteOperation(

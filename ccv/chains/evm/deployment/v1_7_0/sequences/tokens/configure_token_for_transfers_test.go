@@ -6,13 +6,9 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
+	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/tokens"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
 	tp_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/token_pool"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
@@ -22,6 +18,12 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/tokens"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
 )
 
 const (
@@ -31,9 +33,9 @@ const (
 
 func TestConfigureTokenForTransfers(t *testing.T) {
 	t.Run("happy path - configure token for transfers with 2 remote chains", func(t *testing.T) {
-		chainSel := uint64(5009297550715157269)        // Main chain
-		remoteChainSel1 := uint64(4949039107694359620) // First remote chain
-		remoteChainSel2 := uint64(6433500567565415381) // Second remote chain
+		chainSel := chain_selectors.ETHEREUM_TESTNET_SEPOLIA.Selector // Main chain
+		remoteChainSel1 := uint64(4949039107694359620)                // First remote chain
+		remoteChainSel2 := uint64(6433500567565415381)                // Second remote chain
 
 		e, err := environment.New(t.Context(),
 			environment.WithEVMSimulated(t, []uint64{chainSel}),
@@ -191,7 +193,7 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 	})
 
 	t.Run("applies custom finality rate limit config when global finality unchanged", func(t *testing.T) {
-		chainSel := uint64(5009297550715157269)
+		chainSel := chain_selectors.ETHEREUM_TESTNET_SEPOLIA.Selector
 		remoteChainSel := uint64(4949039107694359620)
 
 		e, err := environment.New(t.Context(),
