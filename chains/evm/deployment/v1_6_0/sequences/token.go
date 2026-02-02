@@ -11,10 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20_with_drip"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc677"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/erc20"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/erc677"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/factory_burn_mint_erc20"
 	tokenapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -26,7 +23,7 @@ import (
 )
 
 // tokenSupportsAdminRole returns true if the token type supports AccessControl admin roles.
-// ERC20 and ERC677 are basic tokens without role management.
+// ERC20 is the basic token without role management.
 // BurnMint tokens inherit from AccessControl and support role management.
 func tokenSupportsAdminRole(tokenType deployment.ContractType) bool {
 	switch tokenType {
@@ -39,11 +36,10 @@ func tokenSupportsAdminRole(tokenType deployment.ContractType) bool {
 }
 
 // tokenSupportsCCIPAdmin returns true if the token type supports AccessControl CCIP admin roles.
-// ERC20 and ERC677 are basic tokens without role management.
+// ERC20 is the basic token without role management.
 func tokenSupportsCCIPAdmin(tokenType deployment.ContractType) bool {
 	switch tokenType {
 	case burn_mint_erc20.ContractType,
-		factory_burn_mint_erc20.ContractType,
 		burn_mint_erc20_with_drip.ContractType:
 		return true
 	default:
@@ -77,20 +73,6 @@ var DeployToken = cldf_ops.NewSequence(
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy ERC20 token: %w", err)
 			}
 
-		case erc677.ContractType:
-			tokenRef, err = contract.MaybeDeployContract(b, erc677.Deploy, chain, contract.DeployInput[erc677.ConstructorArgs]{
-				TypeAndVersion: deployment.NewTypeAndVersion(erc677.ContractType, *common_utils.Version_1_0_0),
-				ChainSelector:  chain.Selector,
-				Args: erc677.ConstructorArgs{
-					Name:   input.Name,
-					Symbol: input.Symbol,
-				},
-				Qualifier: &qualifier,
-			}, nil)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy ERC677 token: %w", err)
-			}
-
 		case burn_mint_erc20.ContractType:
 			tokenRef, err = contract.MaybeDeployContract(b, burn_mint_erc20.Deploy, chain, contract.DeployInput[burn_mint_erc20.ConstructorArgs]{
 				TypeAndVersion: deployment.NewTypeAndVersion(burn_mint_erc20.ContractType, *common_utils.Version_1_0_0),
@@ -106,40 +88,6 @@ var DeployToken = cldf_ops.NewSequence(
 			}, nil)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy BurnMintERC20 token: %w", err)
-			}
-
-		case burn_mint_erc677.ContractType:
-			tokenRef, err = contract.MaybeDeployContract(b, burn_mint_erc677.Deploy, chain, contract.DeployInput[burn_mint_erc677.ConstructorArgs]{
-				TypeAndVersion: deployment.NewTypeAndVersion(burn_mint_erc677.ContractType, *common_utils.Version_1_0_0),
-				ChainSelector:  chain.Selector,
-				Args: burn_mint_erc677.ConstructorArgs{
-					Name:      input.Name,
-					Symbol:    input.Symbol,
-					Decimals:  input.Decimals,
-					MaxSupply: input.Supply,
-				},
-				Qualifier: &qualifier,
-			}, nil)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy BurnMintERC677 token: %w", err)
-			}
-
-		case factory_burn_mint_erc20.ContractType:
-			tokenRef, err = contract.MaybeDeployContract(b, factory_burn_mint_erc20.Deploy, chain, contract.DeployInput[factory_burn_mint_erc20.ConstructorArgs]{
-				TypeAndVersion: deployment.NewTypeAndVersion(factory_burn_mint_erc20.ContractType, *common_utils.Version_1_0_0),
-				ChainSelector:  chain.Selector,
-				Args: factory_burn_mint_erc20.ConstructorArgs{
-					Name:      input.Name,
-					Symbol:    input.Symbol,
-					Decimals:  input.Decimals,
-					MaxSupply: input.Supply,
-					PreMint:   input.PreMint,                               // pre-mint given amount to deployer address. Not advised to use against mainnet.
-					NewOwner:  common.HexToAddress(input.ExternalAdmin[0]), // Owner of the token contract (converted from chain-agnostic string) and we expect to have only one address given
-				},
-				Qualifier: &qualifier,
-			}, nil)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy FactoryBurnMintERC20 token: %w", err)
 			}
 
 		case burn_mint_erc20_with_drip.ContractType:

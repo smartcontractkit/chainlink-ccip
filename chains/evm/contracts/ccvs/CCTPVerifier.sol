@@ -75,7 +75,7 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   /// @notice Dynamic configuration for this chain.
   struct DynamicConfig {
     address feeAggregator; //     Address to which fees are withdrawn.
-    address allowlistAdmin; // ─╮ Address permitted to update the allowlist (in addition to the owner).
+    address allowlistAdmin; // ─╮ Address permitted to update the allowlist, in addition to the owner.
     uint16 fastFinalityBps; // ─╯ Basis points charged for fast finality on destination.
   }
 

@@ -13,13 +13,13 @@ import (
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccip/consts"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	ocrtypecodec "github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 )
 
 /*
@@ -173,7 +173,7 @@ func TestObservationSize(t *testing.T) {
 	}
 	discoveryObs := dt.Observation{
 		FChain:    make(map[ccipocr3.ChainSelector]int, estimatedMaxNumberOfSourceChains),
-		Addresses: make(reader.ContractAddresses, len(contracts)),
+		Addresses: make(cciptypes.ContractAddresses, len(contracts)),
 	}
 	set := func(contract string) {
 		//type ContractAddresses map[string]map[cciptypes.ChainSelector]cciptypes.UnknownAddress
