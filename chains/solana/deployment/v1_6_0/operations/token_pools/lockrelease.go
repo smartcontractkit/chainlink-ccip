@@ -6,6 +6,7 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/base_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/lockrelease_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/test_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
@@ -121,6 +122,61 @@ var InitGlobalConfigLockRelease = operations.NewOperation(
 		})
 	},
 )
+
+var UpsertRateLimitsLockRelease = operations.NewOperation(
+	"lockrelease:rate_limits",
+	common_utils.Version_1_6_0,
+	"Initializes the LockReleaseTokenPool rate limits for a remote chain",
+	func(b operations.Bundle, chain cldf_solana.Chain, input RemoteChainConfig) (sequences.OnChainOutput, error) {
+		lockrelease_token_pool.SetProgramID(input.TokenPool)
+		inbound := base_token_pool.RateLimitConfig{
+			Enabled:  input.InboundRateLimiterConfig.IsEnabled,
+			Capacity: input.InboundRateLimiterConfig.Capacity.Uint64(),
+			Rate:     input.InboundRateLimiterConfig.Rate.Uint64(),
+		}
+		outbound := base_token_pool.RateLimitConfig{
+			Enabled:  input.OutboundRateLimiterConfig.IsEnabled,
+			Capacity: input.OutboundRateLimiterConfig.Capacity.Uint64(),
+			Rate:     input.OutboundRateLimiterConfig.Rate.Uint64(),
+		}
+		authority := GetAuthorityBurnMint(chain, input.TokenPool, input.TokenMint)
+		poolConfigPDA, _ := tokens.TokenPoolConfigAddress(input.TokenMint, input.TokenPool)
+		// check if remote chain config already exists
+		remoteChainConfigPDA, _, _ := tokens.TokenPoolChainConfigPDA(input.RemoteSelector, input.TokenMint, input.TokenPool)
+		batches := make([]types.BatchOperation, 0)
+		ixn, err := lockrelease_token_pool.NewSetChainRateLimitInstruction(
+			input.RemoteSelector,
+			input.TokenMint,
+			inbound,
+			outbound,
+			poolConfigPDA,
+			remoteChainConfigPDA,
+			authority,
+		).ValidateAndBuild()
+		if err != nil {
+			return sequences.OnChainOutput{}, err
+		}
+		if authority != chain.DeployerKey.PublicKey() {
+			b, err := utils.BuildMCMSBatchOperation(
+				chain.Selector,
+				[]solana.Instruction{ixn},
+				input.TokenPool.String(),
+				common_utils.BurnMintTokenPool.String(),
+			)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute or create batch: %w", err)
+			}
+			batches = append(batches, b)
+			return sequences.OnChainOutput{BatchOps: batches}, nil
+		} else {
+			err = chain.Confirm([]solana.Instruction{ixn})
+			if err != nil {
+				return sequences.OnChainOutput{}, err
+			}
+		}
+
+		return sequences.OnChainOutput{}, nil
+	})
 
 var TransferOwnershipLockRelease = operations.NewOperation(
 	"lockrelease:transfer-ownership",

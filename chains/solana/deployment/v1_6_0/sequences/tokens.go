@@ -157,6 +157,18 @@ func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualR
 		})
 }
 
+func (a *SolanaAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokenapi.RateLimiterConfigInputs, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return operations.NewSequence(
+		"SetTokenPoolRateLimits",
+		common_utils.Version_1_6_0,
+		"Sets rate limits for a token pool on Solana",
+		func(b operations.Bundle, chains cldf_chain.BlockChains, input tokenapi.RateLimiterConfigInputs) (sequences.OnChainOutput, error) {
+			// TODO: Implement rate limit setting logic for Solana token pools
+			return sequences.OnChainOutput{}, nil
+		},
+	)
+}
+
 func (a *SolanaAdapter) DeployToken() *cldf_ops.Sequence[tokenapi.DeployTokenInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return operations.NewSequence(
 		"DeployToken",

@@ -128,6 +128,10 @@ func (ma *transfersTest_MockTokenAdapter) ManualRegistration() *cldf_ops.Sequenc
 	return &cldf_ops.Sequence[tokens.ManualRegistrationInput, sequences.OnChainOutput, cldf_chain.BlockChains]{}
 }
 
+func (ma *transfersTest_MockTokenAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokens.RateLimiterConfigInputs, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return &cldf_ops.Sequence[tokens.RateLimiterConfigInputs, sequences.OnChainOutput, cldf_chain.BlockChains]{}
+}
+
 func (ma *transfersTest_MockTokenAdapter) DeployToken() *cldf_ops.Sequence[tokens.DeployTokenInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return &cldf_ops.Sequence[tokens.DeployTokenInput, sequences.OnChainOutput, cldf_chain.BlockChains]{}
 }
