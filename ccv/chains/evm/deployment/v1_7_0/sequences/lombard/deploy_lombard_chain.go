@@ -1,7 +1,6 @@
 package lombard
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
@@ -36,7 +35,7 @@ var DeployLombardChain = cldf_ops.NewSequence(
 	"deploy-lombard-chain",
 	semver.MustParse("1.7.0"),
 	"Deploys the Lombard chain with all required contracts and configurations",
-	func(b cldf_ops.Bundle, dep adapters.DeployCCTPChainDeps, input adapters.DeployLombardInput[string, []byte]) (output sequences.OnChainOutput, err error) {
+	func(b cldf_ops.Bundle, dep adapters.DeployLombardChainDeps, input adapters.DeployLombardInput) (output sequences.OnChainOutput, err error) {
 		addresses := make([]datastore.AddressRef, 0)
 		writes := make([]contract_utils.WriteOutput, 0)
 		batchOps := make([]mcms_types.BatchOperation, 0)
@@ -93,7 +92,7 @@ var DeployLombardChain = cldf_ops.NewSequence(
 		addresses = append(addresses, lombardVerifierRef)
 		lombardVerifierAddress := common.HexToAddress(lombardVerifierRef.Address)
 
-		// Deploy CCTPVerifierResolver if needed
+		// Deploy LombardVerifierResolver if needed
 		lombardVerifierResolverRefs := dep.DataStore.Addresses().Filter(
 			datastore.AddressRefByChainSelector(chain.Selector),
 			datastore.AddressRefByType(datastore.ContractType(lombard_verifier.ResolverType)),
@@ -166,12 +165,3 @@ var DeployLombardChain = cldf_ops.NewSequence(
 			BatchOps:  batchOps,
 		}, nil
 	})
-
-func toBytes32LeftPad(b []byte) ([32]byte, error) {
-	if len(b) > 32 {
-		return [32]byte{}, errors.New("byte slice is too long")
-	}
-	var result [32]byte
-	copy(result[32-len(b):], b)
-	return result, nil
-}

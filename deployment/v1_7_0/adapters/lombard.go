@@ -8,7 +8,6 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
@@ -30,24 +29,12 @@ type DeployLombardInput struct {
 	RateLimitAdmin string
 }
 
-// DeployLombardChainDeps are the dependencies for the DeployCCTPChain sequence.
+// DeployLombardChainDeps are the dependencies for the DeployLombardChain sequence.
 type DeployLombardChainDeps struct {
 	// BlockChains are the chains in the environment.
 	BlockChains cldf_chain.BlockChains
 	// DataStore defines all addresses in the environment.
 	DataStore datastore.DataStore
-}
-
-type RemoteLombardChainConfig[LocalContract any, RemoteContract any] struct {
-	// TokenPoolConfig configures the token pool for the remote chain.
-	TokenPoolConfig tokens.RemoteChainConfig[RemoteContract, LocalContract]
-	RemoteDomain    LombardRemoteDomain[RemoteContract]
-}
-
-// LombardRemoteDomain identifies Lombard-specific parameters for a remote chain.
-type LombardRemoteDomain[RemoteContract any] struct {
-	AllowedCaller RemoteContract
-	LChainId      uint32
 }
 
 // LombardChain is a configurable Lombard chain.
@@ -77,7 +64,7 @@ func (r *LombardChainRegistry) RegisterLombardChain(chainFamily string, adapter 
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if _, exists := r.m[chainFamily]; exists {
-		panic(fmt.Errorf("CCTPChain '%s' already registered", chainFamily))
+		panic(fmt.Errorf("LombardChain '%s' already registered", chainFamily))
 	}
 	r.m[chainFamily] = adapter
 }
