@@ -359,7 +359,7 @@ func deployOrResolveCCTPVerifierResolver(
 			CREATE2Factory: create2FactoryAddress,
 		})
 		if err != nil {
-			return datastore.AddressRef{}, fmt.Errorf("failed to deploy CommitteeVerifierResolver: %w", err)
+			return datastore.AddressRef{}, fmt.Errorf("failed to deploy CCTPVerifierResolver: %w", err)
 		}
 		if len(report.Output.Addresses) != 1 {
 			return datastore.AddressRef{}, fmt.Errorf("expected 1 CCTPVerifierResolver address, got %d", len(report.Output.Addresses))
