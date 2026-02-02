@@ -95,6 +95,8 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 			for _, sel := range lockReleaseSelectors {
 				siloedRemoteChainConfigs[sel] = remoteChainConfigs[sel]
 			}
+			// Siloed USDC lock release will not be deployed here as it already exists.
+			// One lockbox will be deployed per lock-release selector.
 			siloedLockReleaseReport, err := cldf_ops.ExecuteSequence(b, DeploySiloedUSDCLockRelease, dep.BlockChains, DeploySiloedUSDCLockReleaseInput{
 				ChainSelector:             input.ChainSelector,
 				USDCToken:                 input.USDCToken,

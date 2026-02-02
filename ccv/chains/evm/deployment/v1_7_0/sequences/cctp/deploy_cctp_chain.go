@@ -138,6 +138,8 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 		isHomeChain := chain.Selector == chain_selectors.ETHEREUM_MAINNET.Selector || chain.Selector == chain_selectors.ETHEREUM_TESTNET_SEPOLIA.Selector
 		var siloedLockReleaseTokenPoolRef datastore.AddressRef
 		if isHomeChain {
+			// Only the siloed USDC lock release pool will be deployed here.
+			// Lockboxes are deployed per lane and are therefore deployed during ConfigureCCTPChainForLanes.
 			siloedLockReleaseReport, err := cldf_ops.ExecuteSequence(b, DeploySiloedUSDCLockRelease, dep.BlockChains, DeploySiloedUSDCLockReleaseInput{
 				ChainSelector: input.ChainSelector,
 				USDCToken:     input.USDCToken,
