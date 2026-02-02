@@ -101,6 +101,10 @@ func NewPlugin(
 		offchainCfg.MaxMerkleTreeSize = merklemulti.MaxNumberTreeLeaves
 	}
 
+	// RMN has been deprecated. Hardcode the configuration to false to avoid bringing down CCIP 1.6.
+	// https://smartcontract-it.atlassian.net/browse/INCIDENT-2243
+	offchainCfg.RMNEnabled = false
+
 	chainSupport := plugincommon.NewChainSupport(
 		logutil.WithComponent(lggr, "ChainSupport"),
 		homeChain,
