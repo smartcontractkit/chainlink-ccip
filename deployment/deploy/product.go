@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/ethereum/go-ethereum/common"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -97,5 +98,7 @@ type TransferOwnershipAdapter interface {
 type ConfigImporter interface {
 	InitializeAdapter(e cldf.Environment, selectors []uint64) error
 	ConnectedChains(e cldf.Environment, chainsel uint64) ([]uint64, error)
+	SupportedTokensPerRemoteChain(e cldf.Environment, chainSelector uint64) (map[uint64][]common.Address, error)
+	SequenceImportConfigForFeeQuoter() *cldf_ops.Sequence[ImportConfigPerChainInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 	SequenceImportConfig() *cldf_ops.Sequence[ImportConfigPerChainInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 }

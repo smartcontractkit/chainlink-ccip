@@ -11,7 +11,10 @@ type ImportConfigInput struct {
 }
 
 type ImportConfigPerChainInput struct {
-	ChainSelector uint64
-	RemoteChains  []uint64
-	Tokens        []common.Address
+	ChainSelector        uint64
+	RemoteChains         []uint64
+	TokensPerRemoteChain map[uint64][]common.Address
+}
+
+type FeeQuoterImportConfigOutput struct {
 }

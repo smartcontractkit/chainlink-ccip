@@ -13,9 +13,12 @@ import (
 
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
+	offrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
+	onrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
 	seq1_6 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/token_pool"
 	api "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -25,6 +28,8 @@ var GetTokensPaginationSize = uint64(20)
 
 type ConfigImportAdapter struct {
 	FeeQuoter     map[uint64]common.Address
+	OnRamp        map[uint64]common.Address
+	OffRamp       map[uint64]common.Address
 	Router        map[uint64]common.Address
 	TokenAdminReg map[uint64]common.Address
 }
@@ -60,11 +65,27 @@ func (ci *ConfigImportAdapter) InitializeAdapter(e cldf.Environment, selectors [
 			return fmt.Errorf("failed to find token admin registry contract ref for chain %d: %w", chainSelector, err)
 		}
 		ci.TokenAdminReg[chainSelector] = tokenAdminRegRef
+		onRampRef, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+			Type:    datastore.ContractType(onrampops.ContractType),
+			Version: semver.MustParse("1.6.0"),
+		}, chainSelector, evm_datastore_utils.ToEVMAddress)
+		if err != nil {
+			return fmt.Errorf("failed to find onramp contract ref for chain %d: %w", chainSelector, err)
+		}
+		ci.OnRamp[chainSelector] = onRampRef
+		offRampRef, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+			Type:    datastore.ContractType(offrampops.ContractType),
+			Version: semver.MustParse("1.6.0"),
+		}, chainSelector, evm_datastore_utils.ToEVMAddress)
+		if err != nil {
+			return fmt.Errorf("failed to find offramp contract ref for chain %d: %w", chainSelector, err)
+		}
+		ci.OffRamp[chainSelector] = offRampRef
 	}
 	return nil
 }
 
-func (ci *ConfigImportAdapter) SupportedTokens(e cldf.Environment, chainsel uint64) ([]common.Address, error) {
+func (ci *ConfigImportAdapter) SupportedTokensPerRemoteChain(e cldf.Environment, chainsel uint64) (map[uint64][]common.Address, error) {
 	chain, ok := e.BlockChains.EVMChains()[chainsel]
 	if !ok {
 		return nil, fmt.Errorf("chain with selector %d not found in environment", chainsel)
@@ -91,7 +112,33 @@ func (ci *ConfigImportAdapter) SupportedTokens(e cldf.Environment, chainsel uint
 			break
 		}
 	}
-	return allTokens, nil
+	pools, err := tokenAdminRegC.GetPools(nil, allTokens)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get pools for tokens from token admin registry at %s on chain %d: %w", tokenAdminRegAddr.String(), chain.Selector, err)
+	}
+	tokensPerRemoteChain := make(map[uint64][]common.Address)
+	for _, poolAddr := range pools {
+		// there is no supported pool for this token
+		if poolAddr == (common.Address{}) {
+			continue
+		}
+		tokenPoolC, err := token_pool.NewTokenPool(poolAddr, chain.Client)
+		if err != nil {
+			return nil, fmt.Errorf("failed to instantiate token pool contract at %s on chain %d: %w", poolAddr.String(), chain.Selector, err)
+		}
+		chains, err := tokenPoolC.GetSupportedChains(nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get supported chains from token pool at %s on chain %d: %w", poolAddr.String(), chain.Selector, err)
+		}
+		tokenAddr, err := tokenPoolC.GetToken(nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get token address from token pool at %s on chain %d: %w", poolAddr.String(), chain.Selector, err)
+		}
+		for _, remoteChain := range chains {
+			tokensPerRemoteChain[remoteChain] = append(tokensPerRemoteChain[remoteChain], tokenAddr)
+		}
+	}
+	return tokensPerRemoteChain, nil
 }
 
 func (ci *ConfigImportAdapter) ConnectedChains(e cldf.Environment, chainsel uint64) ([]uint64, error) {
@@ -124,7 +171,7 @@ func (ci *ConfigImportAdapter) ConnectedChains(e cldf.Environment, chainsel uint
 	return connectedChains, nil
 }
 
-func (ci *ConfigImportAdapter) SequenceImportConfig() *cldf_ops.Sequence[api.ImportConfigPerChainInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+func (ci *ConfigImportAdapter) SequenceImportConfigFromFeeQuoter() *cldf_ops.Sequence[api.ImportConfigPerChainInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return cldf_ops.NewSequence(
 		"seq-config-import",
 		semver.MustParse("1.0.0"),
@@ -146,13 +193,43 @@ func (ci *ConfigImportAdapter) SequenceImportConfig() *cldf_ops.Sequence[api.Imp
 			result, err = sequences.RunAndMergeSequence(b, chains,
 				seq1_6.FeeQuoterImportConfigSequence,
 				seq1_6.FeeQuoterImportConfigSequenceInput{
-					Address:       fqAddress,
-					ChainSelector: chainSelector,
-					RemoteChains:  in.RemoteChains,
-					Tokens:        in.Tokens,
+					Address:              fqAddress,
+					ChainSelector:        chainSelector,
+					RemoteChains:         in.RemoteChains,
+					TokensPerRemoteChain: in.TokensPerRemoteChain,
 				}, result)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to import fee quoter config on chain %d: %w", chainSelector, err)
+			}
+			// fetch onramp config
+			onRampAddress, ok := ci.OnRamp[chainSelector]
+			if !ok {
+				return sequences.OnChainOutput{}, fmt.Errorf("onramp address not found for chain %d", chainSelector)
+			}
+			result, err = sequences.RunAndMergeSequence(b, chains,
+				seq1_6.OnRampImportConfigSequence,
+				seq1_6.OnRampImportConfigSequenceInput{
+					Address:       onRampAddress,
+					ChainSelector: chainSelector,
+					RemoteChains:  in.RemoteChains,
+				}, result)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to import onramp config on chain %d: %w", chainSelector, err)
+			}
+			// fetch offramp config
+			offRampAddress, ok := ci.OffRamp[chainSelector]
+			if !ok {
+				return sequences.OnChainOutput{}, fmt.Errorf("offramp address not found for chain %d", chainSelector)
+			}
+			result, err = sequences.RunAndMergeSequence(b, chains,
+				seq1_6.OffRampImportConfigSequence,
+				seq1_6.OffRampImportConfigSequenceInput{
+					Address:       offRampAddress,
+					ChainSelector: chainSelector,
+					RemoteChains:  in.RemoteChains,
+				}, result)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to import offramp config on chain %d: %w", chainSelector, err)
 			}
 			return result, nil
 		},

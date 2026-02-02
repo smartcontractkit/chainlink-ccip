@@ -5,6 +5,7 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -27,6 +28,12 @@ type OnRampImportConfigSequenceInput struct {
 	Address       common.Address
 	ChainSelector uint64
 	RemoteChains  []uint64
+}
+
+type OnRampImportConfigSequenceOutput struct {
+	DestChainCfgs map[uint64]onramp.GetDestChainConfig
+	StaticConfig  onramp.OnRampStaticConfig
+	DynamicConfig onramp.OnRampDynamicConfig
 }
 
 var (
@@ -79,5 +86,37 @@ var (
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to get dest chain config for chain %d from OnRamp at %s on %s: %w", remoteChain, input.Address.String(), chain, err)
 				}
 			}
+			report, err := operations.ExecuteOperation(b, onrampops.GetStaticConfig, chain, contract.FunctionInput[any]{
+				ChainSelector: chain.Selector,
+				Address:       input.Address,
+				Args:          nil,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get static config from OnRamp at %s on %s: %w", input.Address.String(), chain, err)
+			}
+			staticConfig := report.Output
+			out, err := operations.ExecuteOperation(b, onrampops.GetDynamicConfig, chain, contract.FunctionInput[any]{
+				ChainSelector: chain.Selector,
+				Address:       input.Address,
+				Args:          nil,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get dynamic config from OnRamp at %s on %s: %w", input.Address.String(), chain, err)
+			}
+			dynamicConfig := out.Output
+			contractMetadata := datastore.ContractMetadata{
+				Address:       input.Address.Hex(),
+				ChainSelector: chain.Selector,
+				Metadata: OnRampImportConfigSequenceOutput{
+					StaticConfig:  staticConfig,
+					DynamicConfig: dynamicConfig,
+					DestChainCfgs: onRampDestConfigs,
+				},
+			}
+			return sequences.OnChainOutput{
+				Metadata: sequences.Metadata{
+					Contracts: []datastore.ContractMetadata{contractMetadata},
+				},
+			}, nil
 		})
 )

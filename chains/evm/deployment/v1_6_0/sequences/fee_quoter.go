@@ -36,10 +36,10 @@ type FeeQuoterApplyTokenTransferFeeConfigUpdatesSequenceInput struct {
 }
 
 type FeeQuoterImportConfigSequenceInput struct {
-	Address       common.Address
-	ChainSelector uint64
-	Tokens        []common.Address
-	RemoteChains  []uint64
+	Address              common.Address
+	ChainSelector        uint64
+	TokensPerRemoteChain map[uint64][]common.Address
+	RemoteChains         []uint64
 }
 
 type FqOutput struct {
@@ -163,8 +163,8 @@ var (
 			tokenTransferFeeCfgs := make(map[common.Address]fee_quoter.FeeQuoterTokenTransferFeeConfig)
 			tokenTransferFeeCfgsPerChain := make(map[uint64]map[common.Address]fee_quoter.FeeQuoterTokenTransferFeeConfig)
 
-			for remoteChain := range destChainConfigs {
-				for _, token := range in.Tokens {
+			for remoteChain, tokens := range in.TokensPerRemoteChain {
+				for _, token := range tokens {
 					opsOutput, err := operations.ExecuteOperation(b, fqops.GetTokenTransferFeeConfig, evmChain,
 						contract.FunctionInput[fqops.GetTokenTransferFeeConfigInput]{
 							Address:       fqAddress,

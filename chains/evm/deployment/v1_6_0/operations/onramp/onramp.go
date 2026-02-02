@@ -63,3 +63,25 @@ var GetDestChainConfig = contract.NewRead(contract.ReadParams[uint64, onramp.Get
 		return onRamp.GetDestChainConfig(opts, arg)
 	},
 })
+
+var GetStaticConfig = contract.NewRead(contract.ReadParams[any, onramp.OnRampStaticConfig, *onramp.OnRamp]{
+	Name:         "onramp:get-static-config",
+	Version:      Version,
+	Description:  "Gets the static config from the OnRamp 1.6.0 contract",
+	ContractType: ContractType,
+	NewContract:  onramp.NewOnRamp,
+	CallContract: func(onRamp *onramp.OnRamp, opts *bind.CallOpts, args any) (onramp.OnRampStaticConfig, error) {
+		return onRamp.GetStaticConfig(opts)
+	},
+})
+
+var GetDynamicConfig = contract.NewRead(contract.ReadParams[any, onramp.OnRampDynamicConfig, *onramp.OnRamp]{
+	Name:         "onramp:get-dynamic-config",
+	Version:      Version,
+	Description:  "Gets the dynamic config from the OnRamp 1.6.0 contract",
+	ContractType: ContractType,
+	NewContract:  onramp.NewOnRamp,
+	CallContract: func(onRamp *onramp.OnRamp, opts *bind.CallOpts, args any) (onramp.OnRampDynamicConfig, error) {
+		return onRamp.GetDynamicConfig(opts)
+	},
+})
