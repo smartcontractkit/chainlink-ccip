@@ -14,8 +14,9 @@ var Version = semver.MustParse("1.7.0")
 
 type ConstructorArgs struct {
 	Token             common.Address
-	LombardVerifier   common.Address
-	BridgeV2          common.Address
+	Verifier          common.Address
+	Bridge            common.Address
+	Adapter           common.Address
 	AdvancedPoolHooks common.Address
 	RMNProxy          common.Address
 	Router            common.Address

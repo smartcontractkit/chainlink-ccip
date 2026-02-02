@@ -134,8 +134,8 @@ var DeployLombardChain = cldf_ops.NewSequence(
 			Qualifier:      &lombardQualifier,
 			Args: lombard_token_pool.ConstructorArgs{
 				Token:            tokenAddress,
-				LombardVerifier:  lombardVerifierAddress,
-				BridgeV2:         lombardBridgeAddress,
+				Verifier:         lombardVerifierAddress,
+				Bridge:           lombardBridgeAddress,
 				RMNProxy:         rmnAddress,
 				Router:           routerAddress,
 				FallbackDecimals: fallbackDecimals,
