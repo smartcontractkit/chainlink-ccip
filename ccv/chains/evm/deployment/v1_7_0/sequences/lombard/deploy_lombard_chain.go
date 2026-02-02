@@ -100,7 +100,7 @@ var DeployLombardChain = cldf_ops.NewSequence(
 			datastore.AddressRefByQualifier(lombardQualifier),
 		)
 		var lombardVerifierResolverRef datastore.AddressRef
-		if len(lombardVerifierResolverRefs) > 0 {
+		if len(lombardVerifierResolverRefs) == 0 {
 			if input.DeployerContract == "" {
 				return sequences.OnChainOutput{}, fmt.Errorf("deployer contract is required")
 			}
