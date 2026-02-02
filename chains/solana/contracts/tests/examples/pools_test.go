@@ -8,7 +8,6 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/programs/token"
 	"github.com/gagliardetto/solana-go/rpc"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
@@ -53,7 +52,6 @@ type ProgramData struct {
 // TestBaseTokenPoolHappyPath does basic happy path checks on the lock/release and burn/mint example pools
 // more detailed token pool tests are handled by the test-token-pool which is used in the tokenpool_test.go and ccip_router_test.go
 func TestBaseTokenPoolHappyPath(t *testing.T) {
-
 	// acting as "dumb" onramp & offramp, proxying calls to the pool that are signed by PDA
 	test_ccip_invalid_receiver.SetProgramID(config.CcipInvalidReceiverProgram)
 	rmn_remote.SetProgramID(config.RMNRemoteProgram)
@@ -63,7 +61,7 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 
 	admin, err := solana.NewRandomPrivateKey()
 	require.NoError(t, err)
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	solanaGoClient := testutils.DeployAllPrograms(t, testutils.PathToAnchorConfig, admin)
 	getBalance := func(account solana.PublicKey) string {
@@ -121,13 +119,11 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 
 	// test functionality with each pool type (burnmint & lockrelease)
 	for _, p := range pools {
-
 		var programData ProgramData
 		var configPDA solana.PublicKey
 		poolProgram := p.poolProgram
 
 		t.Run("setup:tokenPool "+p.poolName, func(t *testing.T) {
-
 			// get program data account
 			data, err := solanaGoClient.GetAccountInfoWithOpts(ctx, p.poolProgram, &rpc.GetAccountInfoOpts{
 				Commitment: config.DefaultCommitment,
@@ -151,7 +147,6 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 
 		// test functionality with token & token-2022 standards
 		for _, v := range tokenPrograms {
-
 			t.Run(p.poolName+" "+v.tokenName, func(t *testing.T) {
 				t.Parallel()
 
@@ -200,7 +195,6 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 					require.NoError(t, err)
 
 					t.Run("setup", func(t *testing.T) {
-
 						poolInitI, err := tokenpool.NewInitializeInstruction(poolConfig, mint, admin.PublicKey(), solana.SystemProgramID, poolProgram, programData.Address, configPDA).ValidateAndBuild()
 						require.NoError(t, err)
 
@@ -350,7 +344,7 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 						)
 
 						if v.multisig {
-							raw.AccountMetaSlice.Append(solana.Meta(tokenPool.MintAuthorityMultisig))
+							raw.Append(solana.Meta(tokenPool.MintAuthorityMultisig))
 						}
 
 						rmI, err := raw.ValidateAndBuild()
@@ -435,7 +429,6 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, ixMsig, admin, config.DefaultCommitment, common.AddSigners(multisig, admin))
 
 					t.Run("try to upgrade to invalid token program multisig", func(t *testing.T) {
-
 						// create invalidMultisig
 						invalidMultisig, err := solana.NewRandomPrivateKey()
 						require.NoError(t, err)
@@ -481,7 +474,6 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 					})
 
 					t.Run("try to upgrade to invalid m configured multisig", func(t *testing.T) {
-
 						// create invalidMultisig
 						invalidMultisig, err := solana.NewRandomPrivateKey()
 						require.NoError(t, err)
@@ -521,7 +513,6 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 					})
 
 					t.Run("try to upgrade to multisig without poolsigner", func(t *testing.T) {
-
 						// create invalidMultisig
 						invalidMultisig, err := solana.NewRandomPrivateKey()
 						require.NoError(t, err)
@@ -560,7 +551,6 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 						require.Equal(t, solana.PublicKey(poolSigner), *mintAccount.MintAuthority)
 					})
 					t.Run("upgrade to valid multisig", func(t *testing.T) {
-
 						newMintAuthority := multisig.PublicKey()
 						tokenPool.MintAuthorityMultisig = newMintAuthority
 
@@ -589,7 +579,6 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 						require.Equal(t, solana.PublicKey(newMintAuthority), *mintAccount.MintAuthority)
 					})
 					t.Run("try to transfer back", func(t *testing.T) {
-
 						poolSigner, err := tokens.TokenPoolSignerAddress(mint, poolProgram)
 						require.NoError(t, err)
 						poolConfig, err := tokens.TokenPoolConfigAddress(mint, poolProgram)
@@ -620,7 +609,6 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 						require.Equal(t, solana.PublicKey(multisig.PublicKey()), *mintAccount.MintAuthority)
 					})
 					t.Run("transfer to another multisig", func(t *testing.T) {
-
 						poolSigner, err := tokens.TokenPoolSignerAddress(mint, poolProgram)
 						require.NoError(t, err)
 						poolConfig, err := tokens.TokenPoolConfigAddress(mint, poolProgram)
@@ -644,7 +632,7 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 							programData.Address,
 						)
 
-						raw.AccountMetaSlice.Append(solana.Meta(multisig.PublicKey()))
+						raw.Append(solana.Meta(multisig.PublicKey()))
 
 						ixTransferMint, err := raw.ValidateAndBuild()
 						require.NoError(t, err)
@@ -666,7 +654,6 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 
 		// Test self onboarding to the pool
 		t.Run("self-onboard", func(t *testing.T) {
-
 			// Enable self-served token pool onboarding
 			ix, err := tokenpool.NewUpdateSelfServedAllowedInstruction(true, configPDA, admin.PublicKey(), poolProgram, programData.Address).ValidateAndBuild()
 			require.NoError(t, err)

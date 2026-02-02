@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	bin "github.com/gagliardetto/binary"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/testutils"
@@ -21,7 +20,7 @@ import (
 )
 
 func TestCcipReceiver(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	ccip_router.SetProgramID(config.CcipRouterProgram)
 	ccip_receiver.SetProgramID(config.CcipBaseReceiver)
@@ -152,8 +151,8 @@ func TestCcipReceiver(t *testing.T) {
 				allowedOfframpPDA,
 			)
 
-			raw.AccountMetaSlice.Append(solana.Meta(approvedSenderPDA))
-			raw.AccountMetaSlice.Append(solana.Meta(receiverState))
+			raw.Append(solana.Meta(approvedSenderPDA))
+			raw.Append(solana.Meta(receiverState))
 
 			ix, err := raw.ValidateAndBuild()
 			require.NoError(t, err)
@@ -209,8 +208,8 @@ func TestCcipReceiver(t *testing.T) {
 				allowedOfframpPDA,
 			)
 
-			raw.AccountMetaSlice.Append(solana.Meta(approvedSenderPDA))
-			raw.AccountMetaSlice.Append(solana.Meta(receiverState))
+			raw.Append(solana.Meta(approvedSenderPDA))
+			raw.Append(solana.Meta(receiverState))
 
 			ix, err := raw.ValidateAndBuild()
 
@@ -231,8 +230,8 @@ func TestCcipReceiver(t *testing.T) {
 				allowedOfframpPDA,
 			)
 
-			raw.AccountMetaSlice.Append(solana.Meta(approvedSenderPDA))
-			raw.AccountMetaSlice.Append(solana.Meta(receiverState))
+			raw.Append(solana.Meta(approvedSenderPDA))
+			raw.Append(solana.Meta(receiverState))
 
 			ix, err := raw.ValidateAndBuild()
 
