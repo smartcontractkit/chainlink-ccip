@@ -2,6 +2,7 @@ package lombard
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
@@ -15,7 +16,6 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/cctp_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/lombard_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/versioned_verifier_resolver"
 )
@@ -53,10 +53,10 @@ var ConfigureLombardChainForLanes = cldf_ops.NewSequence(
 		lombardVerifierAddress := common.HexToAddress(lombardVerifierAddressRef.Address)
 		lombardVerifierResolverAddress := common.HexToAddress(lombardVerifierResolverAddressRef.Address)
 
-		remoteChainConfigs := make(map[uint64]tokens_core.RemoteChainConfig[[]byte, string])
+		remoteChainConfigs := make(map[uint64]tokens_core.RemoteChainConfig[string, string])
 		outboundImplementations := make([]versioned_verifier_resolver.OutboundImplementationArgs, 0)
 		remoteChainSelectors := make([]uint64, 0)
-		remoteChainConfigArgs := make([]cctp_verifier.RemoteChainConfigArgs, 0)
+		remoteChainConfigArgs := make([]lombard_verifier.RemoteChainConfigArgs, 0)
 
 		for remoteChainSelector, remoteChain := range input.RemoteChains {
 			remoteChainConfigs[remoteChainSelector] = remoteChain.TokenPoolConfig
@@ -64,8 +64,10 @@ var ConfigureLombardChainForLanes = cldf_ops.NewSequence(
 				DestChainSelector: remoteChainSelector,
 				Verifier:          lombardVerifierAddress,
 			})
+
 			remoteChainSelectors = append(remoteChainSelectors, remoteChainSelector)
-			allowedCaller, err := toBytes32LeftPad(remoteChain.RemoteDomain.AllowedCaller)
+			allowedCallerBytes := common.FromHex(remoteChain.RemoteDomain.AllowedCaller.Address)
+			allowedCaller, err := toBytes32LeftPad(allowedCallerBytes)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to convert allowed caller to bytes32: %w", err)
 			}
@@ -114,6 +116,18 @@ var ConfigureLombardChainForLanes = cldf_ops.NewSequence(
 		}
 		writes = append(writes, applyRemoteChainConfigUpdatesReport.Output)
 
-		return 1, nil
+		return sequences.OnChainOutput{
+			Addresses: addresses,
+			BatchOps:  batchOps,
+		}, nil
 	},
 )
+
+func toBytes32LeftPad(b []byte) ([32]byte, error) {
+	if len(b) > 32 {
+		return [32]byte{}, errors.New("byte slice is too long")
+	}
+	var result [32]byte
+	copy(result[32-len(b):], b)
+	return result, nil
+}
