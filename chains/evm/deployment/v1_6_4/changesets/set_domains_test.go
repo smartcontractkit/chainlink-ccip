@@ -87,10 +87,10 @@ func TestSetDomainsSequence(t *testing.T) {
 		ChainSelector:  chainSelector,
 		Args: usdc_token_pool_cctp_v2_ops.ConstructorArgs{
 			TokenMessenger:              mockTokenMessengerAddress,
-			CCTPMessageTransmitterProxy: cctpMessageTransmitterProxyAddress,
+			CctpMessageTransmitterProxy: cctpMessageTransmitterProxyAddress,
 			Token:                       tokenAddress,
 			Allowlist:                   []common.Address{},
-			RMNProxy:                    common.HexToAddress("0x04"),
+			RmnProxy:                    common.HexToAddress("0x04"),
 			Router:                      common.HexToAddress("0x05"),
 		},
 	}, nil)
@@ -211,10 +211,10 @@ func TestSetDomainsChangeset_MultipleAddressesOnSameChain(t *testing.T) {
 		ChainSelector:  chainSelector,
 		Args: usdc_token_pool_cctp_v2_ops.ConstructorArgs{
 			TokenMessenger:              mockTokenMessengerAddress,
-			CCTPMessageTransmitterProxy: cctpMessageTransmitterProxyAddress,
+			CctpMessageTransmitterProxy: cctpMessageTransmitterProxyAddress,
 			Token:                       tokenAddress,
 			Allowlist:                   []common.Address{},
-			RMNProxy:                    common.HexToAddress("0x04"),
+			RmnProxy:                    common.HexToAddress("0x04"),
 			Router:                      common.HexToAddress("0x05"),
 		},
 	}, nil)

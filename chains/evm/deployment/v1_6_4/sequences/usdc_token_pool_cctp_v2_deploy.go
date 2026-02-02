@@ -62,10 +62,10 @@ var USDCTokenPoolCCTPV2DeploySequence = operations.NewSequence(
 			),
 			Args: usdc_token_pool_cctp_v2_ops.ConstructorArgs{
 				TokenMessenger:              input.TokenMessenger,
-				CCTPMessageTransmitterProxy: cctpProxyAddress,
+				CctpMessageTransmitterProxy: cctpProxyAddress,
 				Token:                       input.Token,
 				Allowlist:                   input.Allowlist,
-				RMNProxy:                    input.RMNProxy,
+				RmnProxy:                    input.RMNProxy,
 				Router:                      input.Router,
 			},
 		})
@@ -93,7 +93,7 @@ var USDCTokenPoolCCTPV2DeploySequence = operations.NewSequence(
 		// Begin transferring ownership of the Message Transmitter Proxy to MCMS. A separate changeset will be used to
 		// accept ownership. It uses the same operation as the token pool but if you look, the address to be performed on
 		// is different.
-		_, err = operations.ExecuteOperation(b, usdc_token_pool_cctp_v2_ops.USDCTokenPoolTransferOwnership, chain, contract.FunctionInput[common.Address]{
+		_, err = operations.ExecuteOperation(b, usdc_token_pool_cctp_v2_ops.TransferOwnership, chain, contract.FunctionInput[common.Address]{
 			ChainSelector: input.ChainSelector,
 			Address:       cctpProxyAddress,
 			Args:          input.MCMSAddress,
@@ -103,7 +103,7 @@ var USDCTokenPoolCCTPV2DeploySequence = operations.NewSequence(
 		}
 
 		// Begin transferring ownership of the token pool to MCMS
-		_, err = operations.ExecuteOperation(b, usdc_token_pool_cctp_v2_ops.USDCTokenPoolTransferOwnership, chain, contract.FunctionInput[common.Address]{
+		_, err = operations.ExecuteOperation(b, usdc_token_pool_cctp_v2_ops.TransferOwnership, chain, contract.FunctionInput[common.Address]{
 			ChainSelector: input.ChainSelector,
 			Address:       common.HexToAddress(report.Output.Address),
 			Args:          input.MCMSAddress,

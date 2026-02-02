@@ -11,28 +11,43 @@ output:
 # - (none): Public/Read functions don't need access control
 
 contracts:
-  # 1.6.1 
+  # 1.6.4
+  - contract_name: USDCTokenPoolCCTPV2
+    package_name: usdc_token_pool_cctp_v2
+    version: "1.6.4"
+    abi_file: "usdc_token_pool_cctp_v2.json"
+    functions:
+      - name: setDomains
+        access: owner
+      - name: getDomain
+        access: public
+      - name: applyAuthorizedCallerUpdates
+        access: owner
+      - name: transferOwnership
+        access: owner
+
+  # 1.6.1
   - contract_name: BurnMintTokenPool
     version: "1.6.1"
-  
+
   - contract_name: BurnFromMintTokenPool
     version: "1.6.1"
-  
+
   - contract_name: BurnToAddressMintTokenPool
     version: "1.6.1"
-  
+
   - contract_name: BurnWithFromMintTokenPool
     version: "1.6.1"
-  
+
   - contract_name: BurnMintWithLockReleaseFlagTokenPool
     version: "1.6.1"
-  
+
   - contract_name: LockReleaseTokenPool
     version: "1.6.1"
-  
+
   - contract_name: SiloedLockReleaseTokenPool
     version: "1.6.1"
-   
+
   # 1.6.0
   - contract_name: RMNRemote
     version: "1.6.0"
@@ -43,7 +58,7 @@ contracts:
         access: owner
       - name: isCursed
         access: public
-  
+
   - contract_name: FeeQuoter
     version: "1.6.0"
     functions:
@@ -55,13 +70,13 @@ contracts:
         access: owner
       - name: applyTokenTransferFeeConfigUpdates
         access: owner
-  
+
   - contract_name: OnRamp
     version: "1.6.0"
     functions:
       - name: applyDestChainConfigUpdates
         access: owner
-  
+
   - contract_name: OffRamp
     package_name: offramp
     version: "1.6.0"
