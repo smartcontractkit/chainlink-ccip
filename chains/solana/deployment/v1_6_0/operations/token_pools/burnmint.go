@@ -336,7 +336,7 @@ var UpsertRateLimitsBurnMint = operations.NewOperation(
 		return sequences.OnChainOutput{}, nil
 	})
 
-var TransferOwnership = operations.NewOperation(
+var TransferOwnershipBurnMint = operations.NewOperation(
 	"burnmint:transfer-ownership",
 	common_utils.Version_1_6_0,
 	"Transfers ownership of the BurnMintTokenPool token mint PDA to a new authority",
@@ -412,3 +412,13 @@ var AcceptOwnership = operations.NewOperation(
 		return sequences.OnChainOutput{}, nil
 	},
 )
+
+func GetAuthorityBurnMint(chain cldf_solana.Chain, program solana.PublicKey, tokenMint solana.PublicKey) solana.PublicKey {
+	programData := burnmint_token_pool.State{}
+	poolConfigPDA, _ := tokens.TokenPoolConfigAddress(tokenMint, program)
+	err := chain.GetAccountDataBorshInto(context.Background(), poolConfigPDA, &programData)
+	if err != nil {
+		return chain.DeployerKey.PublicKey()
+	}
+	return programData.Config.Owner
+}

@@ -44,7 +44,7 @@ func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualR
 	return cldf_ops.NewSequence(
 		"svm-adapter:manual-registration",
 		common_utils.Version_1_6_0,
-		"Manually register a token and token pool on multiple EVM chains",
+		"Manually register a token and token pool on Solana Chain",
 		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokenapi.ManualRegistrationInput) (sequences.OnChainOutput, error) {
 			var result sequences.OnChainOutput
 			store := datastore.NewMemoryDataStore()
@@ -57,7 +57,7 @@ func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualR
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
-			tokenAddr, _, err := getTokenMintAndTokenProgram(input.ExistingDataStore, input.RegisterTokenConfigs.TokenSymbol, chain)
+			tokenAddr, tokenProgramId, err := getTokenMintAndTokenProgram(input.ExistingDataStore, input.RegisterTokenConfigs.TokenSymbol, chain)
 			if err != nil {
 				return sequences.OnChainOutput{}, err
 			}
@@ -92,7 +92,60 @@ func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualR
 			/// Initialize Token Pool ///
 			/////////////////////////////
 
-			// TODO
+			tokenPoolAddr, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, datastore.AddressRef{
+				ChainSelector: chain.Selector,
+				Qualifier:     input.RegisterTokenConfigs.TokenPoolQualifier,
+				Type:          datastore.ContractType(input.RegisterTokenConfigs.PoolType),
+			}, chain.Selector, datastore_utils.FullRef)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to find token pool address for symbol '%s' and qualifier '%s': %w", input.TokenSymbol, input.TokenPoolQualifier, err)
+			}
+			tokenMint := solana.MustPublicKeyFromBase58(tokenAddr.Address)
+			tokenPool := solana.MustPublicKeyFromBase58(tokenPoolAddr.Address)
+
+			initTPOp := tokenpoolops.InitializeBurnMint
+			transferOwnershipTPOp := tokenpoolops.TransferOwnershipBurnMint
+			authority := tokenpoolops.GetAuthorityBurnMint(chain, tokenPool, tokenMint)
+			switch input.RegisterTokenConfigs.PoolType {
+			case common_utils.BurnMintTokenPool.String():
+				// Already set to burn mint
+			case common_utils.LockReleaseTokenPool.String():
+				initTPOp = tokenpoolops.InitializeLockRelease
+				transferOwnershipTPOp = tokenpoolops.TransferOwnershipLockRelease
+				authority = tokenpoolops.GetAuthorityLockRelease(chain, tokenPool, tokenMint)
+			default:
+				return sequences.OnChainOutput{}, fmt.Errorf("unsupported token pool type '%s' for Solana", input.RegisterTokenConfigs.PoolType)
+			}
+
+			rmnRemoteAddr, err := a.GetRMNRemoteAddress(input.ExistingDataStore, input.ChainSelector)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get RMN remote address: %w", err)
+			}
+
+			initTPOut, err := operations.ExecuteOperation(b, initTPOp, chains.SolanaChains()[chain.Selector], tokenpoolops.Params{
+				TokenPool:      tokenPool,
+				TokenMint:      tokenMint,
+				TokenProgramID: tokenProgramId,
+				Router:         solana.PublicKeyFromBytes(routerAddr),
+				RMNRemote:      solana.PublicKeyFromBytes(rmnRemoteAddr),
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy token: %w", err)
+			}
+			result.Addresses = append(result.Addresses, initTPOut.Output.Addresses...)
+			result.BatchOps = append(result.BatchOps, initTPOut.Output.BatchOps...)
+
+			transferOwnershipOut, err := operations.ExecuteOperation(b, transferOwnershipTPOp, chains.SolanaChains()[chain.Selector], tokenpoolops.TokenPoolTransferOwnershipInput{
+				Program:      tokenPool,
+				CurrentOwner: authority,
+				NewOwner:     solana.MustPublicKeyFromBase58(input.RegisterTokenConfigs.ProposedOwner),
+				TokenMint:    tokenMint,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy token: %w", err)
+			}
+			result.Addresses = append(result.Addresses, transferOwnershipOut.Output.Addresses...)
+			result.BatchOps = append(result.BatchOps, transferOwnershipOut.Output.BatchOps...)
 
 			/////////////////////////////
 			/// Create Token Multisig ///
