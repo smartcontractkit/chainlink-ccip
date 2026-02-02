@@ -7,16 +7,16 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/mock_usdc_token_messenger"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/mock_usdc_token_transmitter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_2/cctp_message_transmitter_proxy"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_2/factory_burn_mint_erc20"
 	usdc_token_pool_cctp_v2_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_4/usdc_token_pool_cctp_v2"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
+	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc20"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
@@ -35,18 +35,17 @@ func TestSetDomainsSequence(t *testing.T) {
 
 	evmChain := e.BlockChains.EVMChains()[chainSelector]
 
-	// Deploy a real ERC20 token using factory_burn_mint_erc20
-	tokenAddress, tx, _, err := factory_burn_mint_erc20.DeployFactoryBurnMintERC20(
+	// Deploy a mock USDC token with 6 decimals (USDC pool validates decimals)
+	tokenAddress, tx, _, err := burn_mint_erc20.DeployBurnMintERC20(
 		evmChain.DeployerKey,
 		evmChain.Client,
-		"TestToken",
-		"TEST",
-		6,
-		big.NewInt(0),             // maxSupply (0 = unlimited)
-		big.NewInt(0),             // preMint
-		evmChain.DeployerKey.From, // newOwner
+		"TestUSDC",
+		"USDC",
+		6,             // decimals - must be 6 for USDC pool compatibility
+		big.NewInt(0), // maxSupply (0 = unlimited)
+		big.NewInt(0), // preMint
 	)
-	require.NoError(t, err, "Failed to deploy FactoryBurnMintERC20 token")
+	require.NoError(t, err, "Failed to deploy mock USDC token")
 	_, err = evmChain.Confirm(tx)
 	require.NoError(t, err, "Failed to confirm token deployment transaction")
 
@@ -160,18 +159,17 @@ func TestSetDomainsChangeset_MultipleAddressesOnSameChain(t *testing.T) {
 
 	evmChain := e.BlockChains.EVMChains()[chainSelector]
 
-	// Deploy a real ERC20 token using factory_burn_mint_erc20
-	tokenAddress, tx, _, err := factory_burn_mint_erc20.DeployFactoryBurnMintERC20(
+	// Deploy a mock USDC token with 6 decimals (USDC pool validates decimals)
+	tokenAddress, tx, _, err := burn_mint_erc20.DeployBurnMintERC20(
 		evmChain.DeployerKey,
 		evmChain.Client,
-		"TestToken",
-		"TEST6",
-		6,
-		big.NewInt(0),
-		big.NewInt(0),
-		evmChain.DeployerKey.From,
+		"TestUSDC",
+		"USDC",
+		6,             // decimals - must be 6 for USDC pool compatibility
+		big.NewInt(0), // maxSupply (0 = unlimited)
+		big.NewInt(0), // preMint
 	)
-	require.NoError(t, err, "Failed to deploy FactoryBurnMintERC20 token")
+	require.NoError(t, err, "Failed to deploy mock USDC token")
 	_, err = evmChain.Confirm(tx)
 	require.NoError(t, err, "Failed to confirm token deployment transaction")
 
