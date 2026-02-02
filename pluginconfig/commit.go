@@ -165,10 +165,6 @@ const (
 
 //nolint:gocyclo // it is considered ok since we don't have complicated logic here
 func (c *CommitOffchainConfig) applyDefaults() {
-	if c.RMNEnabled && c.RMNSignaturesTimeout == 0 {
-		c.RMNSignaturesTimeout = defaultRMNSignaturesTimeout
-	}
-
 	if c.NewMsgScanBatchSize == 0 {
 		c.NewMsgScanBatchSize = defaultNewMsgScanBatchSize
 	}
@@ -223,6 +219,11 @@ func (c *CommitOffchainConfig) applyDefaults() {
 	}
 	if c.TokenPriceAsyncObserverSyncTimeout.Duration() == 0 {
 		c.TokenPriceAsyncObserverSyncTimeout = *commonconfig.MustNewDuration(defaultAsyncObserverSyncTimeout)
+	}
+	// RMN has been deprecated. Hardcode the configuration to avoid bringing down CCIP 1.6.
+	// https://smartcontract-it.atlassian.net/browse/INCIDENT-2243
+	if c.RMNEnabled {
+		c.RMNEnabled = false
 	}
 }
 
