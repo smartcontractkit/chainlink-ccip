@@ -11,6 +11,29 @@ output:
 # - (none): Public/Read functions don't need access control
 
 contracts:
+  # 1.6.1 
+  - contract_name: BurnMintTokenPool
+    version: "1.6.1"
+  
+  - contract_name: BurnFromMintTokenPool
+    version: "1.6.1"
+  
+  - contract_name: BurnToAddressMintTokenPool
+    version: "1.6.1"
+  
+  - contract_name: BurnWithFromMintTokenPool
+    version: "1.6.1"
+  
+  - contract_name: BurnMintWithLockReleaseFlagTokenPool
+    version: "1.6.1"
+  
+  - contract_name: LockReleaseTokenPool
+    version: "1.6.1"
+  
+  - contract_name: SiloedLockReleaseTokenPool
+    version: "1.6.1"
+   
+  # 1.6.0
   - contract_name: RMNRemote
     version: "1.6.0"
     functions:
@@ -40,6 +63,7 @@ contracts:
         access: owner
   
   - contract_name: OffRamp
+    package_name: offramp
     version: "1.6.0"
     functions:
       - name: applySourceChainConfigUpdates
