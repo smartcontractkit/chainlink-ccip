@@ -42,6 +42,10 @@ const (
 )
 
 func TestTokenAdapter(t *testing.T) {
+	tokenAdapterRegistry := tokens.GetTokenAdapterRegistry()
+	tokenAdapterRegistry.RegisterTokenAdapter("evm", semver.MustParse("1.7.0"), &adapters.TokenAdapter{})
+	tokenAdapterRegistry.RegisterTokenAdapter("evm", semver.MustParse("1.6.1"), &v1_6_1_adapters.TokenAdapter{})
+
 	tests := []struct {
 		desc               string
 		deriveTokenAddress bool
@@ -66,9 +70,6 @@ func TestTokenAdapter(t *testing.T) {
 			require.NotNil(t, e, "Environment should be created")
 
 			mcmsRegistry := changesets.GetRegistry()
-			tokenAdapterRegistry := tokens.NewTokenAdapterRegistry()
-			tokenAdapterRegistry.RegisterTokenAdapter("evm", semver.MustParse("1.7.0"), &adapters.TokenAdapter{})
-			tokenAdapterRegistry.RegisterTokenAdapter("evm", semver.MustParse("1.6.1"), &v1_6_1_adapters.TokenAdapter{})
 
 			// On each chain, deploy chain contracts & a token + token pool
 			create2FactoryRefs := make(map[uint64]datastore.AddressRef)
