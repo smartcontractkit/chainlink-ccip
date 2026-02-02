@@ -9,7 +9,7 @@ require (
 	github.com/Masterminds/semver/v3 v3.4.0
 	github.com/ethereum/go-ethereum v1.16.8
 	github.com/smartcontractkit/chain-selectors v1.0.89
-	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20260202120047-159d5f42b664
+	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20260202121053-dca0df46b296
 	github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm v0.0.0-20260202120047-159d5f42b664
 	github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment v0.0.0-20260202120047-159d5f42b664
 	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260202120047-159d5f42b664

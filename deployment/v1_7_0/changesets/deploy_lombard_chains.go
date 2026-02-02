@@ -2,18 +2,38 @@ package changesets
 
 import (
 	"fmt"
+
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
+
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 )
 
+type LombardChainConfig struct {
+	// Bridge is the address of the Bridge contract provided by Lombard
+	Bridge string
+	// Token is the address of the token to be used in the LombardTokenPool.
+	Token string
+	// DeployerContract is a contract that can be used to deploy other contracts.
+	// i.e. A CREATE2Factory contract on Ethereum can enable consistent deployments.
+	DeployerContract string
+	// StorageLocations is the set of storage locations for the LombardVerifier contract.
+	StorageLocations []string
+	// FeeAggregator is the address to which fees are withdrawn.
+	FeeAggregator string
+	// RateLimitAdmin is the address allowed to update token pool rate limits.
+	RateLimitAdmin string
+	// RemoteChains is the set of remote chains to configure.
+	RemoteChains map[uint64]struct{}
+}
+
 type DeployLombardChainsConfig struct {
-	Chains []adapters.DeployLombardInput[datastore.AddressRef, datastore.AddressRef]
+	Chains map[uint64]LombardChainConfig
 	// MCMS configures the resulting proposal.
 	MCMS *mcms.Input
 }
@@ -34,12 +54,9 @@ func makeVerifyDeployLombardChains(_ *adapters.LombardChainRegistry, _ *changese
 			}
 		}
 
-		for _, chainCfg := range cfg.Chains {
-			if _, err := chain_selectors.GetSelectorFamily(chainCfg.ChainSelector); err != nil {
+		for chainSel, chainCfg := range cfg.Chains {
+			if _, err := chain_selectors.GetSelectorFamily(chainSel); err != nil {
 				return err
-			}
-			if chainCfg.TokenPool.Address == "" {
-				return fmt.Errorf("token pool is empty for chain with selector %d", chainCfg.ChainSelector)
 			}
 			for remoteChainSelector := range chainCfg.RemoteChains {
 				if _, err := chain_selectors.GetSelectorFamily(remoteChainSelector); err != nil {
@@ -47,6 +64,7 @@ func makeVerifyDeployLombardChains(_ *adapters.LombardChainRegistry, _ *changese
 				}
 			}
 		}
+
 		return nil
 	}
 }
@@ -55,35 +73,47 @@ func makeApplyDeployLombardChains(lombardChainRegistry *adapters.LombardChainReg
 	return func(e cldf.Environment, cfg DeployLombardChainsConfig) (cldf.ChangesetOutput, error) {
 		batchOps := make([]mcms_types.BatchOperation, 0)
 		reports := make([]cldf_ops.Report[any, any], 0)
-		ds := datastore.NewMemoryDataStore()
 
-		for _, chainCfg := range cfg.Chains {
-			family, err := chain_selectors.GetSelectorFamily(chainCfg.ChainSelector)
+		adaptersByChain := make(map[uint64]adapters.LombardChain)
+		for chainSel := range cfg.Chains {
+			family, err := chain_selectors.GetSelectorFamily(chainSel)
 			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to get chain family for chain selector %d: %w", chainCfg.ChainSelector, err)
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to get chain family for chain selector %d: %w", chainSel, err)
 			}
 			adapter, ok := lombardChainRegistry.GetLombardChain(family)
 			if !ok {
 				return cldf.ChangesetOutput{}, fmt.Errorf("no CCTP adapter registered for chain family '%s'", family)
 			}
+			adaptersByChain[chainSel] = adapter
+		}
 
-			// Resolve AddressRefs in the adapter input
-			resolvedInput, err := resolveDeployLombardChainInput(e, chainCfg.ChainSelector, chainCfg, adapter)
-			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve DeployCCTPInput for chain selector %d: %w", chainCfg.ChainSelector, err)
+		// Deploy across all chains.
+		newDS := datastore.NewMemoryDataStore()
+		for chainSel, chainCfg := range cfg.Chains {
+			dep := adapters.DeployLombardChainDeps{
+				BlockChains: e.BlockChains,
+				DataStore:   e.DataStore,
 			}
 
-			// Call into DeployCCTPChain sequence
+			in := adapters.DeployLombardInput{
+				ChainSelector:    chainSel,
+				Bridge:           chainCfg.Bridge,
+				Token:            chainCfg.Token,
+				DeployerContract: chainCfg.DeployerContract,
+				StorageLocations: chainCfg.StorageLocations,
+				FeeAggregator:    chainCfg.FeeAggregator,
+				RateLimitAdmin:   chainCfg.RateLimitAdmin,
+			}
 			deployLombardChainReport, err := cldf_ops.ExecuteSequence(
-				e.OperationsBundle, adapter.DeployLombardChain(), e.BlockChains, resolvedInput)
+				e.OperationsBundle, adaptersByChain[chainSel].DeployLombardChain(), dep, in)
 			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy CCTP on chain with selector %d: %w", chainCfg.ChainSelector, err)
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy Lombard on chain with selector %d: %w", chainSel, err)
 			}
 
 			batchOps = append(batchOps, deployLombardChainReport.Output.BatchOps...)
 			reports = append(reports, deployLombardChainReport.ExecutionReports...)
 			for _, r := range deployLombardChainReport.Output.Addresses {
-				if err := ds.Addresses().Add(r); err != nil {
+				if err := newDS.Addresses().Add(r); err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %s on chain with selector %d to datastore: %w", r.Type, r.Version, r.Address, r.ChainSelector, err)
 				}
 			}
@@ -97,19 +127,7 @@ func makeApplyDeployLombardChains(lombardChainRegistry *adapters.LombardChainReg
 		return changesets.NewOutputBuilder(e, mcmsRegistry).
 			WithReports(reports).
 			WithBatchOps(batchOps).
-			WithDataStore(ds).
+			WithDataStore(newDS).
 			Build(mcmsInput)
 	}
-}
-
-func resolveDeployLombardChainInput(
-	e cldf.Environment,
-	selector uint64,
-	cfg adapters.DeployLombardInput[datastore.AddressRef, datastore.AddressRef],
-	adapter adapters.LombardChain,
-) (adapters.DeployLombardInput[string, []byte], error) {
-	out := adapters.DeployLombardInput[string, []byte]{
-		ChainSelector: selector,
-	}
-	return out, nil
 }

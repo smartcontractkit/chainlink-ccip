@@ -40,7 +40,7 @@ type DeployLombardChainDeps struct {
 // LombardChain is a configurable Lombard chain.
 type LombardChain interface {
 	// DeployLombardChain deploys the Lombard contracts on the chain.
-	DeployLombardChain() *cldf_ops.Sequence[DeployLombardInput, sequences.OnChainOutput, cldf_chain.BlockChains]
+	DeployLombardChain() *cldf_ops.Sequence[DeployLombardInput, sequences.OnChainOutput, DeployLombardChainDeps]
 	// AddressRefToBytes converts an AddressRef to a byte slice representing the address.
 	// Each chain family has their own way of serializing addresses from strings and needs to specify this logic.
 	AddressRefToBytes(ref datastore.AddressRef) ([]byte, error)
