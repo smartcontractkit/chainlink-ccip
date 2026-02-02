@@ -8,11 +8,13 @@ import {Pool} from "../libraries/Pool.sol";
 import {TokenPool} from "./TokenPool.sol";
 
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/utils/SafeERC20.sol";
 import {EnumerableMap} from "@openzeppelin/contracts@5.3.0/utils/structs/EnumerableMap.sol";
 
 /// @notice A variation on Lock Release token pools where liquidity is shared among some chains, and stored independently
 /// for others. Chains which do not share liquidity are known as siloed chains.
 contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
+  using SafeERC20 for IERC20;
   using EnumerableMap for EnumerableMap.UintToAddressMap;
 
   error LockBoxNotConfigured(uint64 remoteChainSelector);
@@ -48,11 +50,11 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     ILockBox lockBox = getLockBox(remoteChainSelector);
 
     // Lockboxes trust pools but pools don't necessarily trust lockboxes, so we need to approve each time.
-    i_token.approve(address(lockBox), amount);
+    i_token.forceApprove(address(lockBox), amount);
     lockBox.deposit(address(i_token), remoteChainSelector, amount);
     // We reset to 0 to reduce the risk of dangling approvals being exploited. It should already be 0 but just in case.
     if (i_token.allowance(address(this), address(lockBox)) != 0) {
-      i_token.approve(address(lockBox), 0);
+      i_token.forceApprove(address(lockBox), 0);
     }
   }
 
@@ -109,12 +111,12 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     Pool.ReleaseOrMintInV1 calldata,
     uint256,
     uint16
-  ) internal pure virtual override {}
+  ) internal virtual override {}
 
   /// @notice No-op override to purge the unused code path from the contract.
   function _preFlightCheck(
     Pool.LockOrBurnInV1 calldata,
     uint16,
     bytes memory
-  ) internal pure virtual override {}
+  ) internal virtual override {}
 }

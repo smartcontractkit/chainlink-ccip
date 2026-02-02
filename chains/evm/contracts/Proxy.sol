@@ -1,11 +1,15 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
+
 import {FeeTokenHandler} from "./libraries/FeeTokenHandler.sol";
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 
 /// @notice Proxy forwards calls to a target contract.
-contract Proxy is Ownable2StepMsgSender {
+contract Proxy is ITypeAndVersion, Ownable2StepMsgSender {
+  string public constant override typeAndVersion = "Proxy 1.7.0-dev";
+
   error ZeroAddressNotAllowed();
 
   event TargetUpdated(address indexed oldTarget, address indexed newTarget);
