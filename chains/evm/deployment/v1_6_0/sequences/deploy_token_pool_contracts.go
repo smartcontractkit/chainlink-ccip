@@ -23,6 +23,7 @@ import (
 	v1_5_1_lock_release_token_pool "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/operations/lock_release_token_pool"
 	v1_6_0_burn_mint_with_external_minter_token_pool "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/burn_mint_with_external_minter_token_pool"
 	v1_6_0_hybrid_with_external_minter_token_pool "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/hybrid_with_external_minter_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/token_governor"
 	v1_6_1_burn_from_mint_token_pool "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/burn_from_mint_token_pool"
 	v1_6_1_burn_mint_token_pool "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/burn_mint_token_pool"
 	v1_6_1_burn_mint_with_lock_release_flag_token_pool "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/burn_mint_with_lock_release_flag_token_pool"
@@ -52,7 +53,7 @@ var DeployTokenPool = cldf_ops.NewSequence(
 		tokenPoolAddr, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, datastore.AddressRef{
 			ChainSelector: input.ChainSelector,
 			Type:          datastore.ContractType(input.PoolType),
-			Qualifier:     input.TokenSymbol,
+			Qualifier:     input.TokenPoolQualifier,
 		}, input.ChainSelector, datastore_utils.FullRef)
 		if err == nil {
 			b.Logger.Info("Token pool already deployed at address:", tokenPoolAddr.Address)
@@ -108,7 +109,7 @@ var DeployTokenPool = cldf_ops.NewSequence(
 		var poolRef datastore.AddressRef
 
 		typeAndVersion := deployment.NewTypeAndVersion(deployment.ContractType(input.PoolType), *input.TokenPoolVersion).String()
-		qualifier := input.TokenSymbol
+		qualifier := input.TokenPoolQualifier
 
 		switch typeAndVersion {
 		// v1.6.1 pools
@@ -234,11 +235,15 @@ var DeployTokenPool = cldf_ops.NewSequence(
 
 		// 1.6.0 pools
 		case v1_6_0_burn_mint_with_external_minter_token_pool.TypeAndVersion.String():
+			tokenGovernor, err := fetchTokenGovernor(input)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to fetch token governor address: %w", err)
+			}
 			poolRef, err = contract.MaybeDeployContract(b, v1_6_0_burn_mint_with_external_minter_token_pool.Deploy, chain, contract.DeployInput[v1_6_0_burn_mint_with_external_minter_token_pool.ConstructorArgs]{
 				TypeAndVersion: v1_6_0_burn_mint_with_external_minter_token_pool.TypeAndVersion,
 				ChainSelector:  chain.Selector,
 				Args: v1_6_0_burn_mint_with_external_minter_token_pool.ConstructorArgs{
-					Minter:             common.HexToAddress(input.ExternalMinter),
+					Minter:             common.HexToAddress(tokenGovernor),
 					Token:              common.HexToAddress(tokenAddr.Address),
 					LocalTokenDecimals: tokenDecimal,
 					Allowlist:          allowlist,
@@ -252,11 +257,15 @@ var DeployTokenPool = cldf_ops.NewSequence(
 			}
 
 		case v1_6_0_hybrid_with_external_minter_token_pool.TypeAndVersion.String():
+			tokenGovernor, err := fetchTokenGovernor(input)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to fetch token governor address: %w", err)
+			}
 			poolRef, err = contract.MaybeDeployContract(b, v1_6_0_hybrid_with_external_minter_token_pool.Deploy, chain, contract.DeployInput[v1_6_0_hybrid_with_external_minter_token_pool.ConstructorArgs]{
 				TypeAndVersion: v1_6_0_hybrid_with_external_minter_token_pool.TypeAndVersion,
 				ChainSelector:  chain.Selector,
 				Args: v1_6_0_hybrid_with_external_minter_token_pool.ConstructorArgs{
-					Minter:             common.HexToAddress(input.ExternalMinter),
+					Minter:             common.HexToAddress(tokenGovernor),
 					Token:              common.HexToAddress(tokenAddr.Address),
 					LocalTokenDecimals: tokenDecimal,
 					Allowlist:          allowlist,
@@ -374,3 +383,20 @@ var DeployTokenPool = cldf_ops.NewSequence(
 		}, nil
 	},
 )
+
+func fetchTokenGovernor(input tokenapi.DeployTokenPoolInput) (string, error) {
+	tokenGovernor := input.TokenGovernor
+	if tokenGovernor == "" {
+		// fetch token governor from the data store
+		tokenGovernorAddr, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, datastore.AddressRef{
+			ChainSelector: input.ChainSelector,
+			Type:          datastore.ContractType(token_governor.ContractType),
+			Qualifier:     input.TokenSymbol,
+		}, input.ChainSelector, datastore_utils.FullRef)
+		if err != nil {
+			return "", fmt.Errorf("token governor for token with symbol '%s' is not found in datastore, %v", input.TokenSymbol, err)
+		}
+		tokenGovernor = tokenGovernorAddr.Address
+	}
+	return tokenGovernor, nil
+}

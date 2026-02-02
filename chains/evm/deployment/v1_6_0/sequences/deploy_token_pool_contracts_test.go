@@ -196,15 +196,17 @@ func TestDeployTokenPool(t *testing.T) {
 			e.DataStore = ds.Seal()
 
 			// Build input for DeployTokenPool sequence
+			poolQualifier := tc.poolType.String() + "-" + tc.poolVersion.String()
 			input := tokenapi.DeployTokenPoolInput{
-				TokenSymbol:       tokenSymbol,
-				PoolType:          string(tc.poolType),
-				TokenPoolVersion:  tc.poolVersion,
-				Allowlist:         tc.allowlist,
-				AcceptLiquidity:   tc.acceptLiquidity,
-				BurnAddress:       tc.burnAddress,
-				ChainSelector:     chainSelector,
-				ExistingDataStore: e.DataStore,
+				TokenPoolQualifier: poolQualifier,
+				TokenSymbol:        tokenSymbol,
+				PoolType:           string(tc.poolType),
+				TokenPoolVersion:   tc.poolVersion,
+				Allowlist:          tc.allowlist,
+				AcceptLiquidity:    tc.acceptLiquidity,
+				BurnAddress:        tc.burnAddress,
+				ChainSelector:      chainSelector,
+				ExistingDataStore:  e.DataStore,
 			}
 
 			// Execute the DeployTokenPool sequence
@@ -221,7 +223,7 @@ func TestDeployTokenPool(t *testing.T) {
 			for _, addr := range report.Output.Addresses {
 				if addr.Type == datastore.ContractType(tc.poolType) &&
 					addr.ChainSelector == chainSelector &&
-					addr.Qualifier == tokenSymbol {
+					addr.Qualifier == poolQualifier {
 					poolRef = addr
 					poolFound = true
 					break

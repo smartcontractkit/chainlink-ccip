@@ -63,6 +63,9 @@ func NewFromOnChainSequence[IN any, DEP any, CFG any](params NewFromOnChainSeque
 					return deployment.ChangesetOutput{Reports: report.ExecutionReports}, fmt.Errorf("failed to add %s %s with address %s on chain with selector %d to datastore: %w", r.Type, r.Version, r.Address, r.ChainSelector, err)
 				}
 			}
+			if err := sequences.WriteMetadataToDatastore(ds, report.Output.Metadata); err != nil {
+				return deployment.ChangesetOutput{Reports: report.ExecutionReports}, fmt.Errorf("failed to write metadata to datastore: %w", err)
+			}
 
 			return NewOutputBuilder(e, mcmsRegistry).
 				WithReports(report.ExecutionReports).

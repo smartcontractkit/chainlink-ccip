@@ -368,3 +368,10 @@ func EVMTransferOwnership(t *testing.T, e *cldf_deployment.Environment, selector
 	require.Equal(t, 1, len(transferOutput.MCMSTimelockProposals))
 	testhelpers.ProcessTimelockProposals(t, *e, transferOutput.MCMSTimelockProposals, false)
 }
+
+func MergeAddresses(env *cldf_deployment.Environment, ds datastore.MutableDataStore) {
+	if ds != nil {
+		ds.Merge(env.DataStore)
+		env.DataStore = ds.Seal()
+	}
+}
