@@ -29,9 +29,9 @@ type RemotePathArgs struct {
 }
 
 type ConstructorArgs struct {
+	DynamicConfig    DynamicConfig
 	Bridge           common.Address
 	StorageLocations []string
-	DynamicConfig    DynamicConfig
 	RMN              common.Address
 }
 
