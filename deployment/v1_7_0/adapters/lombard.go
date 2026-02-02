@@ -50,7 +50,7 @@ type ConfigureLombardChainForLanesInput struct {
 
 // RemoteLombardChainConfig configures a Lombard-enabled chain for a remote counterpart.
 type RemoteLombardChainConfig struct {
-	TokenPoolConfig        tokens.RemoteChainConfig[datastore.AddressRef, datastore.AddressRef]
+	TokenPoolConfig        tokens.RemoteChainConfig[string, string]
 	TokenTransferFeeConfig tokens.TokenTransferFeeConfig
 	RemoteDomain           LombardRemoteDomain
 }
@@ -59,6 +59,14 @@ type RemoteLombardChainConfig struct {
 type LombardRemoteDomain struct {
 	AllowedCaller datastore.AddressRef
 	LChainId      uint32
+}
+
+// ConfigureLombardChainForLanesDeps are the dependencies for the ConfigureLombardChainForLanes sequence.
+type ConfigureLombardChainForLanesDeps struct {
+	// BlockChains are the chains in the environment.
+	BlockChains cldf_chain.BlockChains
+	// DataStore defines all addresses in the environment.
+	DataStore datastore.DataStore
 }
 
 // LombardChain is a configurable Lombard chain.

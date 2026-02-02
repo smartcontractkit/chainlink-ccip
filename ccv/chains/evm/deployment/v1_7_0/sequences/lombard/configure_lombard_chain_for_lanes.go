@@ -24,7 +24,7 @@ var ConfigureLombardChainForLanes = cldf_ops.NewSequence(
 	"configure-lombard-chain-for-lanes",
 	semver.MustParse("1.7.0"),
 	"Configures the Lombard chain to support CCIP lanes",
-	func(b cldf_ops.Bundle, dep adapters.DeployLombardChainDeps, input adapters.DeployLombardInput) (output sequences.OnChainOutput, err error) {
+	func(b cldf_ops.Bundle, dep adapters.DeployLombardChainDeps, input adapters.ConfigureLombardChainForLanesInput) (output sequences.OnChainOutput, err error) {
 		addresses := make([]datastore.AddressRef, 0)
 		writes := make([]contract_utils.WriteOutput, 0)
 		batchOps := make([]mcms_types.BatchOperation, 0)
