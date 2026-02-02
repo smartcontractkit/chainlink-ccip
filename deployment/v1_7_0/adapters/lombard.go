@@ -4,28 +4,21 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+
+	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
-type DeployLombardInput[LocalContract any, RemoteContract any] struct {
+type DeployLombardInput struct {
 	// ChainSelector is the selector for the chain being deployed.
 	ChainSelector uint64
-	// LombardVerifier is set of addresses comprising the LombardVerifier system.
-	LombardVerifier []LocalContract
-	Token           string
-	TokenPool       LocalContract
-	// TokenAdminRegistry is the address of the TokenAdminRegistry contract.
-	TokenAdminRegistry LocalContract
-	// RMN is the address of the RMN contract.
-	RMN LocalContract
-	// Router is the address of the Router contract.
-	Router LocalContract
-	// RemoteChains is the set of remote chains to configure on the CCTPVerifier contract.
-	RemoteChains map[uint64]RemoteLombardChainConfig[LocalContract, RemoteContract]
+	// Bridge is the address of the Bridge contract provided by Lombard
+	Bridge string
+	// Token is the address of the token to be used in the LombardTokenPool.
+	Token string
 	// DeployerContract is a contract that can be used to deploy other contracts.
 	// i.e. A CREATE2Factory contract on Ethereum can enable consistent deployments.
 	DeployerContract string
@@ -33,10 +26,16 @@ type DeployLombardInput[LocalContract any, RemoteContract any] struct {
 	StorageLocations []string
 	// FeeAggregator is the address to which fees are withdrawn.
 	FeeAggregator string
-	// Bridge is the address of the Bridge contract.
-	Bridge string
 	// RateLimitAdmin is the address allowed to update token pool rate limits.
 	RateLimitAdmin string
+}
+
+// DeployLombardChainDeps are the dependencies for the DeployCCTPChain sequence.
+type DeployLombardChainDeps struct {
+	// BlockChains are the chains in the environment.
+	BlockChains cldf_chain.BlockChains
+	// DataStore defines all addresses in the environment.
+	DataStore datastore.DataStore
 }
 
 type RemoteLombardChainConfig[LocalContract any, RemoteContract any] struct {
@@ -51,10 +50,10 @@ type LombardRemoteDomain[RemoteContract any] struct {
 	LChainId      uint32
 }
 
-// LombardChain is a configurable CCTP chain.
+// LombardChain is a configurable Lombard chain.
 type LombardChain interface {
-	// DeployLombardChain deploys the CCTP contracts on the chain.
-	DeployLombardChain() *cldf_ops.Sequence[DeployLombardInput[string, []byte], sequences.OnChainOutput, cldf_chain.BlockChains]
+	// DeployLombardChain deploys the Lombard contracts on the chain.
+	DeployLombardChain() *cldf_ops.Sequence[DeployLombardInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 	// AddressRefToBytes converts an AddressRef to a byte slice representing the address.
 	// Each chain family has their own way of serializing addresses from strings and needs to specify this logic.
 	AddressRefToBytes(ref datastore.AddressRef) ([]byte, error)
