@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -21,6 +23,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	solconfig "github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
+	solutils "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_0/ccip_router"
 	solccip "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/ccip"
@@ -29,6 +32,9 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testadapters"
 
+	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
+
+	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -36,6 +42,12 @@ import (
 
 	msg_hasher163 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/message_hasher"
 	ccipcommon "github.com/smartcontractkit/chainlink-ccip/deployment/common"
+)
+
+var (
+	DefaultTokenDecimals = uint8(9)
+	DefaultTokenProgram  = solana.TokenProgramID
+	DefaultTokenType     = solutils.SPLTokens
 )
 
 func init() {
@@ -77,9 +89,28 @@ func (a *SVMAdapter) BuildMessage(components testadapters.MessageComponents) (an
 		}
 	}
 
+	tokenAmounts := []ccip_router.SVMTokenAmount{}
+	for i, ta := range components.TokenAmounts {
+		token, err := solana.PublicKeyFromBase58(ta.Token)
+		if err != nil {
+			return nil, fmt.Errorf("invalid token address at index %d: %w", i, err)
+		}
+
+		if !ta.Amount.IsUint64() {
+			return nil, fmt.Errorf("amount at index %d is too large for uint64: %s", i, ta.Amount.String())
+		}
+
+		tokenAmounts = append(tokenAmounts,
+			ccip_router.SVMTokenAmount{
+				Token:  token,
+				Amount: ta.Amount.Uint64(),
+			},
+		)
+	}
+
 	return ccip_router.SVM2AnyMessage{
 		Receiver:     common.LeftPadBytes(components.Receiver, 32),
-		TokenAmounts: nil,
+		TokenAmounts: tokenAmounts,
 		Data:         components.Data,
 		FeeToken:     feeToken,
 		ExtraArgs:    components.ExtraArgs,
@@ -235,7 +266,6 @@ func (a *SVMAdapter) CCIPReceiver() []byte {
 		panic(fmt.Sprintf("failed to get TestReceiver address: %v", err))
 	}
 	return receiver.Bytes()
-
 }
 
 func (a *SVMAdapter) NativeFeeToken() string {
@@ -320,6 +350,131 @@ func (a *SVMAdapter) ValidateExec(t *testing.T, sourceSelector uint64, startBloc
 	)
 	require.NoError(t, err)
 	return executionStates
+}
+
+func (a *SVMAdapter) AllowRouterToWithdrawTokens(ctx context.Context, tokenAddress string, amount *big.Int) error {
+	if amount.Cmp(big.NewInt(0)) <= 0 {
+		return fmt.Errorf("amount must be greater than zero")
+	}
+	if !amount.IsUint64() {
+		return fmt.Errorf("amount is too large for uint64: %s", amount.String())
+	}
+
+	routerAddress, err := a.getAddress(datastore.ContractType("Router"))
+	if err != nil {
+		return fmt.Errorf("failed to get router address: %w", err)
+	}
+
+	tokenPubKey, err := solana.PublicKeyFromBase58(tokenAddress)
+	if err != nil {
+		return fmt.Errorf("invalid token address: %w", err)
+	}
+
+	deployerATA, _, err := tokens.FindAssociatedTokenAddress(DefaultTokenProgram, tokenPubKey, a.DeployerKey.PublicKey())
+	if err != nil {
+		return fmt.Errorf(
+			"failed to find associated token address (token = %q, deployer = %q): %w",
+			tokenPubKey.String(), a.DeployerKey.PublicKey().String(), err,
+		)
+	}
+
+	ix, err := tokens.TokenApproveChecked(
+		amount.Uint64(),
+		DefaultTokenDecimals,
+		DefaultTokenProgram,
+		deployerATA,
+		tokenPubKey,
+		routerAddress,
+		a.DeployerKey.PublicKey(),
+		solana.PublicKeySlice{},
+	)
+	if err != nil {
+		return fmt.Errorf(
+			"failed to create TokenApproveChecked instruction (ata = %q, token = %q, router = %q): %w",
+			deployerATA.String(), tokenPubKey.String(), routerAddress.String(), err,
+		)
+	}
+
+	err = a.Confirm([]solana.Instruction{ix})
+	if err != nil {
+		return fmt.Errorf(
+			"failed to confirm TokenApproveChecked instruction (ata = %q, token = %q, router = %q): %w",
+			deployerATA.String(), tokenPubKey.String(), routerAddress.String(), err,
+		)
+	}
+
+	return nil
+}
+
+func (a *SVMAdapter) GetTokenBalance(ctx context.Context, tokenAddress string, ownerAddress []byte) (*big.Int, error) {
+	ownr := solana.PublicKeyFromBytes(ownerAddress)
+	if ownr.IsZero() {
+		return nil, fmt.Errorf("owner address cannot be zero")
+	}
+
+	mint, err := solana.PublicKeyFromBase58(tokenAddress)
+	if err != nil {
+		return nil, fmt.Errorf("invalid token address: %w", err)
+	}
+
+	ata, _, err := tokens.FindAssociatedTokenAddress(DefaultTokenProgram, mint, ownr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find associated token address for owner %q and mint %q: %w", ownr.String(), mint.String(), err)
+	}
+
+	_, balance, err := tokens.TokenBalance(ctx, a.Chain.Client, ata, solconfig.DefaultCommitment)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get the balance of token %q for account %q: %w", mint.String(), ownr.String(), err)
+	}
+	if balance < 0 {
+		return nil, fmt.Errorf("unexpected negative balance: %d", balance)
+	}
+
+	return new(big.Int).SetUint64(uint64(balance)), nil
+}
+
+func (a *SVMAdapter) GetTokenExpansionConfig() tokensapi.TokenExpansionInputPerChain {
+	suffix := strconv.FormatUint(a.Selector, 10) + "-" + a.Family()
+	admin := a.Chain.DeployerKey.PublicKey().String()
+
+	oneToken := new(big.Int).Exp(big.NewInt(10), new(big.Int).SetUint64(uint64(DefaultTokenDecimals)), nil)
+	mintAmnt := new(big.Int).Mul(oneToken, big.NewInt(1_000_000)) // pre-mint 1 million tokens
+
+	return tokensapi.TokenExpansionInputPerChain{
+		TokenPoolQualifier:      "", // should be empty since there'll only be one BnM / LnR pool deployed
+		TokenPoolVersion:        cciputils.Version_1_6_0,
+		PoolType:                cciputils.BurnMintTokenPool.String(),
+		TokenPoolRateLimitAdmin: admin,
+		TokenPoolAdmin:          admin,
+		TARAdmin:                admin,
+		DeployTokenInput: tokensapi.DeployTokenInput{
+			Decimals:               DefaultTokenDecimals,
+			Symbol:                 "TEST_TOKEN_" + suffix,
+			Name:                   "TEST TOKEN " + suffix,
+			Type:                   DefaultTokenType,
+			Supply:                 big.NewInt(0),   // unlimited supply
+			PreMint:                mintAmnt,        // pre-mint some tokens for transfers
+			Senders:                []string{admin}, // use deployer as sender
+			ExternalAdmin:          []string{},      // not needed for tests
+			DisableFreezeAuthority: false,           // don't revoke freeze authority after token creation
+			TokenPrivKey:           "",              // if empty, a new keypair will be generated
+			CCIPAdmin:              admin,           // deployer is the admin (if empty defaults to timelock)
+		},
+
+		// optional fields left empty, but included here for completeness
+		RemoteCounterpartUpdates: map[uint64]tokensapi.RateLimiterConfig{},
+		RemoteCounterpartDeletes: []uint64{},
+	}
+}
+
+func (a *SVMAdapter) GetRegistryAddress() (string, error) {
+	// NOTE: unlike EVM, Solana doesn't have a TokenAdminRegistry contract - instead, the router manages token registration
+	addr, err := a.getAddress(datastore.ContractType("Router"))
+	if err != nil {
+		return "", fmt.Errorf("failed to get Router address: %w", err)
+	}
+
+	return addr.String(), nil
 }
 
 type EventWithTxn[T any] struct {
