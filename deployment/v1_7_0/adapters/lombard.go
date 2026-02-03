@@ -78,6 +78,7 @@ type LombardChain interface {
 	// AddressRefToBytes converts an AddressRef to a byte slice representing the address.
 	// Each chain family has their own way of serializing addresses from strings and needs to specify this logic.
 	AddressRefToBytes(ref datastore.AddressRef) ([]byte, error)
+	TokenPool(ds datastore.DataStore, chains cldf_chain.BlockChains, selector uint64) (datastore.AddressRef, error)
 }
 
 // RemoteLombardChain is a connectable remote Lombard chain.

@@ -8,11 +8,13 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/lombard_verifier"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/lombard"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	seq_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
+
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/lombard_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/lombard_verifier"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/lombard"
 )
 
 var _ adapters.LombardChain = &LombardChainAdapter{}
@@ -45,4 +47,11 @@ func (c *LombardChainAdapter) AllowedCallerOnDest(ds datastore.DataStore, chains
 		return nil, fmt.Errorf("failed to find allowed caller on source address: %w", err)
 	}
 	return common.FromHex(allowedCallerOnSourceAddressRef.Address), nil
+}
+
+func (c *LombardChainAdapter) TokenPool(ds datastore.DataStore, chains chain.BlockChains, selector uint64) (datastore.AddressRef, error) {
+	return datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
+		Type:    datastore.ContractType(lombard_token_pool.ContractType),
+		Version: lombard_token_pool.Version,
+	}, selector, datastore_utils.FullRef)
 }

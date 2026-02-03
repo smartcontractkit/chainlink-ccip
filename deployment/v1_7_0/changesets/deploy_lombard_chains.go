@@ -9,8 +9,6 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/lombard_token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/lombard"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
@@ -148,14 +146,9 @@ func makeApplyDeployLombardChains(lombardChainRegistry *adapters.LombardChainReg
 				remoteChains[remoteChainSelector] = adapter
 			}
 
-			tokenPoolRef, err := newDS.Addresses().Get(datastore.NewAddressRefKey(
-				chainSel,
-				datastore.ContractType(lombard_token_pool.ContractType),
-				lombard_token_pool.Version,
-				lombard.ContractQualifier,
-			))
+			tokenPoolRef, err := adaptersByChain[chainSel].TokenPool(newDS.Seal(), e.BlockChains, chainSel)
 			if err != nil {
-				return cldf.ChangesetOutput{}, err
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to get token pool ref on chain with selector %d: %w", chainSel, err)
 			}
 
 			dep := adapters.ConfigureLombardChainForLanesDeps{
