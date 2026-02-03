@@ -93,3 +93,18 @@ const (
 	EXECUTION_STATE_SUCCESS    = 2
 	EXECUTION_STATE_FAILURE    = 3
 )
+
+func ExecutionStateToString(state uint8) string {
+	switch state {
+	case EXECUTION_STATE_UNTOUCHED:
+		return "UNTOUCHED"
+	case EXECUTION_STATE_INPROGRESS:
+		return "IN_PROGRESS"
+	case EXECUTION_STATE_SUCCESS:
+		return "SUCCESS"
+	case EXECUTION_STATE_FAILURE:
+		return "FAILURE"
+	default:
+		return "UNKNOWN"
+	}
+}

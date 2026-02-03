@@ -17,7 +17,6 @@ import (
 	computebudget "github.com/gagliardetto/solana-go/programs/compute-budget"
 	"github.com/gagliardetto/solana-go/programs/system"
 	"github.com/gagliardetto/solana-go/rpc"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/cctp"
@@ -49,7 +48,7 @@ func TestCCIPRouter(t *testing.T) {
 	rmn_remote.SetProgramID(config.RMNRemoteProgram)
 	cctp_token_pool.SetProgramID(config.CctpTokenPoolProgram)
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	user := solana.MustPrivateKeyFromBase58("ZZdVf32Npuhci4u4ir2NW9491Y3FTv2Gwk41HMpvgJoh81UM42LcNqAN8SXapHfPcr61QP7sJj7K2mKHt7qFCoV")
 	anotherUser := solana.MustPrivateKeyFromBase58("i9btAVgpmReUv9jH52xpPoYvtsv6XQSJrRGnLpTU4ArSP6E3Xa9aunyeT7n83QhMeLZMmRPnwY41xr7jFrTXAPR")
 	tokenlessUser := solana.MustPrivateKeyFromBase58("4g8xCc96ox2ksCcv5VggqaenkSsnkUEe8WZBazLyTCMFnB2r2bJtdNK2QW9E6mojMmMGpGcSGuKFeDQbGLiCqM3n")
@@ -3961,8 +3960,8 @@ func TestCCIPRouter(t *testing.T) {
 			require.Equal(t, billing.MaxFeeUsdcents, tokenTransferFeeConfigUpdatedEvent.TokenTransferFeeConfig.MaxFeeUsdcents)
 
 			raw := fee_quoter.NewGetFeeInstruction(config.EvmChainSelector, message, config.FqConfigPDA, config.FqEvmDestChainPDA, wsol.fqBillingConfigPDA, link22.fqBillingConfigPDA)
-			raw.AccountMetaSlice.Append(solana.Meta(token0BillingConfigPda))
-			raw.AccountMetaSlice.Append(solana.Meta(token0PerChainPerConfigPda))
+			raw.Append(solana.Meta(token0BillingConfigPda))
+			raw.Append(solana.Meta(token0PerChainPerConfigPda))
 			instruction, err := raw.ValidateAndBuild()
 			require.NoError(t, err)
 
@@ -3985,8 +3984,8 @@ func TestCCIPRouter(t *testing.T) {
 			token2PerChainPerConfigPda := getFqPerChainPerTokenConfigBillingPDA(token2.Mint)
 
 			raw := fee_quoter.NewGetFeeInstruction(config.EvmChainSelector, message, config.FqConfigPDA, config.FqEvmDestChainPDA, wsol.fqBillingConfigPDA, link22.fqBillingConfigPDA)
-			raw.AccountMetaSlice.Append(solana.Meta(token2BillingConfigPda))
-			raw.AccountMetaSlice.Append(solana.Meta(token2PerChainPerConfigPda))
+			raw.Append(solana.Meta(token2BillingConfigPda))
+			raw.Append(solana.Meta(token2PerChainPerConfigPda))
 			instruction, err := raw.ValidateAndBuild()
 			require.NoError(t, err)
 
@@ -6296,8 +6295,8 @@ func TestCCIPRouter(t *testing.T) {
 				testAllowedPriceUpdaterPDA,
 				config.FqConfigPDA,
 			)
-			raw.AccountMetaSlice.Append(solana.Meta(wsol.fqBillingConfigPDA).WRITE())
-			raw.AccountMetaSlice.Append(solana.Meta(config.FqEvmDestChainPDA).WRITE())
+			raw.Append(solana.Meta(wsol.fqBillingConfigPDA).WRITE())
+			raw.Append(solana.Meta(config.FqEvmDestChainPDA).WRITE())
 
 			ix, err := raw.ValidateAndBuild()
 			require.NoError(t, err)
@@ -6341,8 +6340,8 @@ func TestCCIPRouter(t *testing.T) {
 				testAllowedPriceUpdaterPDA,
 				config.FqConfigPDA,
 			)
-			raw.AccountMetaSlice.Append(solana.Meta(wsol.fqBillingConfigPDA).WRITE())
-			raw.AccountMetaSlice.Append(solana.Meta(token2.Billing[config.EvmChainSelector]).WRITE())
+			raw.Append(solana.Meta(wsol.fqBillingConfigPDA).WRITE())
+			raw.Append(solana.Meta(token2.Billing[config.EvmChainSelector]).WRITE())
 
 			ix, err := raw.ValidateAndBuild()
 			require.NoError(t, err)
@@ -6690,7 +6689,7 @@ func TestCCIPRouter(t *testing.T) {
 						)
 
 						for _, pubkey := range testcase.RemainingAccounts {
-							raw.AccountMetaSlice.Append(solana.Meta(pubkey).WRITE())
+							raw.Append(solana.Meta(pubkey).WRITE())
 						}
 
 						instruction, err := raw.ValidateAndBuild()
@@ -6782,7 +6781,7 @@ func TestCCIPRouter(t *testing.T) {
 						)
 
 						for _, pubkey := range testcase.RemainingAccounts {
-							raw.AccountMetaSlice.Append(solana.Meta(pubkey).WRITE())
+							raw.Append(solana.Meta(pubkey).WRITE())
 						}
 
 						instruction, err := raw.ValidateAndBuild()
@@ -7210,9 +7209,9 @@ func TestCCIPRouter(t *testing.T) {
 								config.RMNRemoteConfigPDA,
 							)
 
-							raw.AccountMetaSlice.Append(solana.Meta(config.OfframpStatePDA).WRITE())
+							raw.Append(solana.Meta(config.OfframpStatePDA).WRITE())
 							for _, meta := range testcase.AccountMetaSlice {
-								raw.AccountMetaSlice.Append(meta)
+								raw.Append(meta)
 							}
 
 							instruction, err := raw.ValidateAndBuild()

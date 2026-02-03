@@ -16,7 +16,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1/ocrtypecodecpb"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 )
 
 type protoTranslator struct{}
@@ -421,7 +420,7 @@ func (t *protoTranslator) chainFeeUpdatesFromProto(
 }
 
 func (t *protoTranslator) discoveryAddressesToProto(
-	addresses reader.ContractAddresses,
+	addresses cciptypes.ContractAddresses,
 ) map[string]*ocrtypecodecpb.ChainAddressMap {
 	var pbAddresses map[string]*ocrtypecodecpb.ChainAddressMap
 	if len(addresses) > 0 {
@@ -447,10 +446,10 @@ func (t *protoTranslator) discoveryAddressesToProto(
 
 func (t *protoTranslator) discoveryAddressesFromProto(
 	pbAddresses map[string]*ocrtypecodecpb.ChainAddressMap,
-) reader.ContractAddresses {
-	var discoveryAddresses reader.ContractAddresses
+) cciptypes.ContractAddresses {
+	var discoveryAddresses cciptypes.ContractAddresses
 	if len(pbAddresses) > 0 {
-		discoveryAddresses = make(reader.ContractAddresses, len(pbAddresses))
+		discoveryAddresses = make(cciptypes.ContractAddresses, len(pbAddresses))
 	}
 
 	for contractName, chainMap := range pbAddresses {

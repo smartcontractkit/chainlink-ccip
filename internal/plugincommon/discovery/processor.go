@@ -275,7 +275,7 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 ) (dt.Outcome, error) {
 	lggr := logutil.WithContextValues(ctx, cdp.lggr)
 	lggr.Debugw("Processing contract discovery outcome")
-	contracts := make(reader.ContractAddresses)
+	contracts := make(cciptypes.ContractAddresses)
 
 	agg := aggregateObservations(lggr, cdp.dest, aos)
 
@@ -395,7 +395,7 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 	return dt.Outcome{}, nil
 }
 
-func (cdp *ContractDiscoveryProcessor) syncContracts(lggr logger.Logger, contracts reader.ContractAddresses) {
+func (cdp *ContractDiscoveryProcessor) syncContracts(lggr logger.Logger, contracts cciptypes.ContractAddresses) {
 	ctx, cancel := context.WithTimeout(context.Background(), syncTimeout)
 	defer cancel()
 	alreadySyncing, err := cdp.syncer.Sync(ctx, contracts)
@@ -427,7 +427,10 @@ type readerSyncer struct {
 //
 // Returns true if a sync was already in progress.
 // Make sure to pass a context with a timeout to avoid blocking the plugin for too long.
-func (s *readerSyncer) Sync(ctx context.Context, contracts reader.ContractAddresses) (alreadySyncing bool, err error) {
+func (s *readerSyncer) Sync(
+	ctx context.Context,
+	contracts cciptypes.ContractAddresses,
+) (alreadySyncing bool, err error) {
 	if !s.busy.CompareAndSwap(false, true) {
 		return true, nil
 	}

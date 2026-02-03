@@ -7,7 +7,6 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/programs/system"
 	"github.com/gagliardetto/solana-go/rpc"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	bin "github.com/gagliardetto/binary"
 	"github.com/stretchr/testify/require"
@@ -84,7 +83,6 @@ func getReusableAccounts(t *testing.T, linkMint solana.PublicKey) ReusableAccoun
 // Test basic happy path of the ping pong demo with "itself", meaning an SVM <-> SVM message
 // from the ping pong program to itself.
 func TestPingPong(t *testing.T) {
-
 	// acting as "dumb" offramp, proxying calls to the receiver that are signed by PDA
 	test_ccip_invalid_receiver.SetProgramID(config.CcipInvalidReceiverProgram)
 	fee_quoter.SetProgramID(config.FeeQuoterProgram)
@@ -94,7 +92,7 @@ func TestPingPong(t *testing.T) {
 
 	admin, err := solana.NewRandomPrivateKey()
 	require.NoError(t, err)
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	linkMintPrivK := solana.MustPrivateKeyFromBase58("32YVeJArcWWWV96fztfkRQhohyFz5Hwno93AeGVrN4g2LuFyvwznrNd9A6tbvaTU6BuyBsynwJEMLre8vSy3CrVU")
 	linkMint := linkMintPrivK.PublicKey()
@@ -428,7 +426,6 @@ func TestPingPong(t *testing.T) {
 	})
 
 	t.Run("PingPong", func(t *testing.T) {
-
 		var latestSentMsg ccip_router.SVM2AnyRampMessage
 
 		// Check that the CCIP Send event was emitted
@@ -496,7 +493,7 @@ func TestPingPong(t *testing.T) {
 				if (extraArgs.AccountIsWritableBitmap & (uint64(1) << i)) != 0 {
 					meta.WRITE()
 				}
-				raw.AccountMetaSlice.Append(meta)
+				raw.Append(meta)
 			}
 
 			ix, err := raw.ValidateAndBuild()
