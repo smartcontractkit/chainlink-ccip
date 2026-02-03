@@ -42,7 +42,7 @@ type FeeQuoterImportConfigSequenceInput struct {
 	RemoteChains         []uint64
 }
 
-type FqOutput struct {
+type FeeQuoterImportConfigSequenceOutput struct {
 	DestChainCfg         fee_quoter.FeeQuoterDestChainConfig
 	TokenTransferFeeCfgs map[common.Address]fee_quoter.FeeQuoterTokenTransferFeeConfig
 }
@@ -145,7 +145,7 @@ var (
 			fqAddress := in.Address
 			chainSelector := in.ChainSelector
 			b.Logger.Infof("Importing configuration for FeeQuoter %s on chain %d (%s)", fqAddress.Hex(), chainSelector, evmChain.Name())
-			fqOutput := make(map[uint64]FqOutput)
+			fqOutput := make(map[uint64]FeeQuoterImportConfigSequenceOutput)
 			destChainConfigs := make(map[uint64]fee_quoter.FeeQuoterDestChainConfig)
 			for _, remoteChain := range in.RemoteChains {
 				opsOutput, err := operations.ExecuteOperation(b, fqops.GetDestChainConfig, evmChain, contract.FunctionInput[uint64]{
@@ -160,10 +160,11 @@ var (
 				}
 				destChainConfigs[remoteChain] = opsOutput.Output
 			}
-			tokenTransferFeeCfgs := make(map[common.Address]fee_quoter.FeeQuoterTokenTransferFeeConfig)
+
 			tokenTransferFeeCfgsPerChain := make(map[uint64]map[common.Address]fee_quoter.FeeQuoterTokenTransferFeeConfig)
 
 			for remoteChain, tokens := range in.TokensPerRemoteChain {
+				tokenTransferFeeCfgs := make(map[common.Address]fee_quoter.FeeQuoterTokenTransferFeeConfig)
 				for _, token := range tokens {
 					opsOutput, err := operations.ExecuteOperation(b, fqops.GetTokenTransferFeeConfig, evmChain,
 						contract.FunctionInput[fqops.GetTokenTransferFeeConfigInput]{
@@ -186,7 +187,7 @@ var (
 				tokenTransferFeeCfgsPerChain[remoteChain] = tokenTransferFeeCfgs
 			}
 			for remoteChain, destCfg := range destChainConfigs {
-				fqOutput[remoteChain] = FqOutput{
+				fqOutput[remoteChain] = FeeQuoterImportConfigSequenceOutput{
 					DestChainCfg:         destCfg,
 					TokenTransferFeeCfgs: tokenTransferFeeCfgsPerChain[remoteChain],
 				}

@@ -102,7 +102,7 @@ var (
 					Args:          remoteChain,
 				})
 				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to execute GetDestChainConfig for chain %d on %s: %w", remoteChain, chain, err)
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to execute GetSourceChainConfig for chain %d on %s: %w", remoteChain, chain, err)
 				}
 				output.SourceChainCfgs[remoteChain] = report.Output
 			}
