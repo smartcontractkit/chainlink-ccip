@@ -554,16 +554,46 @@ func (o observerImpl) ObserveLatestOnRampSeqNums(ctx context.Context) []pluginty
 		return nil
 	}
 
-	supportedSourceChains := mapset.NewSet(allSourceChains...).
+	oracleSupportedSourceChains := mapset.NewSet(allSourceChains...).
 		Intersect(supportedChains).ToSlice()
 
-	slices.Sort(supportedSourceChains)
+	slices.Sort(oracleSupportedSourceChains)
+
+	// If this oracle supports the destination chain, filter to only enabled source chains. I.e., valid lanes to dest.
+	// Otherwise, we try all supported source chains and rely on error handling for disabled lanes.
+	destChain := o.chainSupport.DestChain()
+	chainsToQuery := oracleSupportedSourceChains
+
+	supportsDestChain, err := o.chainSupport.SupportsDestChain(o.oracleID)
+	if err != nil {
+		lggr.Warnw("call to SupportsDestChain failed", "err", err)
+		// Continue with oracleSupportedSourceChains, error handling will filter disabled lanes
+	} else if supportsDestChain {
+		// Filter to only include enabled source chains (valid lanes to the destination)
+		sourceChainsCfg, cfgErr := o.ccipReader.GetOffRampSourceChainsConfig(ctx, oracleSupportedSourceChains)
+		if cfgErr != nil {
+			lggr.Warnw("call to GetOffRampSourceChainsConfig failed, falling back to all supported chains", "err", cfgErr)
+			// Continue with oracleSupportedSourceChains, error handling will filter disabled lanes
+		} else {
+			// Build set of enabled chains from the config
+			enabledChainsSet := mapset.NewSet[cciptypes.ChainSelector]()
+			for chain, cfg := range sourceChainsCfg {
+				if cfg.IsEnabled && chain != destChain {
+					enabledChainsSet.Add(chain)
+				}
+			}
+			// Intersect with supported chains to get the final list
+			chainsToQuery = mapset.NewSet(oracleSupportedSourceChains...).
+				Intersect(enabledChainsSet).ToSlice()
+			slices.Sort(chainsToQuery)
+		}
+	}
 
 	mu := &sync.Mutex{}
-	latestOnRampSeqNums := make([]plugintypes.SeqNumChain, 0, len(supportedSourceChains))
+	latestOnRampSeqNums := make([]plugintypes.SeqNumChain, 0, len(chainsToQuery))
 
 	wg := &sync.WaitGroup{}
-	for _, sourceChain := range supportedSourceChains {
+	for _, sourceChain := range chainsToQuery {
 		wg.Go(func() {
 			latestOnRampSeqNum, err := o.ccipReader.LatestMsgSeqNum(ctx, sourceChain)
 			if err != nil {
@@ -747,7 +777,7 @@ func (o observerImpl) ObserveRMNRemoteCfg(ctx context.Context) cciptypes.RemoteC
 
 	rmnRemoteCfg, err := o.ccipReader.GetRMNRemoteConfig(ctx)
 	if err != nil {
-		if errors.Is(err, readerpkg.ErrContractReaderNotFound) {
+		if errors.Is(err, readerpkg.ErrContractReaderNotFound) || isNoBindingsError(err) {
 			// destination chain not supported
 			return cciptypes.RemoteConfig{}
 		}
