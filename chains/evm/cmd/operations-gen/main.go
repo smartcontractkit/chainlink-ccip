@@ -80,11 +80,12 @@ type OutputConfig struct {
 }
 
 type ContractConfig struct {
-	Name        string           `yaml:"contract_name"`
-	Version     string           `yaml:"version"`
-	PackageName string           `yaml:"package_name,omitempty"` // Optional: override package name
-	ABIFile     string           `yaml:"abi_file,omitempty"`     // Optional: override ABI file name
-	Functions   []FunctionConfig `yaml:"functions"`
+	Name         string           `yaml:"contract_name"`
+	Version      string           `yaml:"version"`
+	PackageName  string           `yaml:"package_name,omitempty"`  // Optional: override package name
+	ABIFile      string           `yaml:"abi_file,omitempty"`      // Optional: override ABI file name
+	NoDeployment bool             `yaml:"no_deployment,omitempty"` // Optional: skip bytecode and deploy operation
+	Functions    []FunctionConfig `yaml:"functions"`
 }
 
 type FunctionConfig struct {
@@ -114,6 +115,7 @@ type ContractInfo struct {
 	OutputPath    string
 	ABI           string
 	Bytecode      string
+	NoDeployment  bool
 	Constructor   *FunctionInfo
 	Functions     map[string]*FunctionInfo
 	FunctionOrder []string
@@ -153,6 +155,7 @@ type TemplateData struct {
 	Bytecode          string
 	NeedsBigInt       bool
 	HasWriteOps       bool
+	NoDeployment      bool
 	Constructor       *ConstructorData
 	StructDefs        []StructDefData
 	WriteArgStructs   []ArgStructData
@@ -283,14 +286,15 @@ func extractContractInfo(cfg ContractConfig, input InputConfig, output OutputCon
 	}
 
 	info := &ContractInfo{
-		Name:        cfg.Name,
-		Version:     cfg.Version,
-		PackageName: packageName,
-		OutputPath:  filepath.Join(output.BasePath, versionPath, "operations", packageName, packageName+".go"),
-		ABI:         abiString,
-		Bytecode:    bytecode,
-		Functions:   make(map[string]*FunctionInfo),
-		StructDefs:  make(map[string]*StructDef),
+		Name:         cfg.Name,
+		Version:      cfg.Version,
+		PackageName:  packageName,
+		OutputPath:   filepath.Join(output.BasePath, versionPath, "operations", packageName, packageName+".go"),
+		ABI:          abiString,
+		Bytecode:     bytecode,
+		NoDeployment: cfg.NoDeployment,
+		Functions:    make(map[string]*FunctionInfo),
+		StructDefs:   make(map[string]*StructDef),
 	}
 
 	extractConstructor(info, abiEntries)
@@ -324,6 +328,11 @@ func readABIAndBytecode(
 	abiBytes, err := os.ReadFile(abiPath)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to read ABI from %s: %w", abiPath, err)
+	}
+
+	// Skip bytecode reading if no_deployment is true
+	if cfg.NoDeployment {
+		return string(abiBytes), "", nil
 	}
 
 	// Bytecode file matches ABI file name (without .json, with .bin)
@@ -583,6 +592,7 @@ func prepareTemplateData(info *ContractInfo) TemplateData {
 		Bytecode:          info.Bytecode,
 		NeedsBigInt:       checkNeedsBigInt(info),
 		HasWriteOps:       false,
+		NoDeployment:      info.NoDeployment,
 	}
 
 	if info.Constructor != nil {

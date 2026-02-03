@@ -23,7 +23,9 @@ var Version = semver.MustParse("{{.Version}}")
 var TypeAndVersion = cldf_deployment.NewTypeAndVersion(ContractType, *Version)
 
 const {{.ContractType}}ABI = `{{.ABI}}`
+{{- if not .NoDeployment}}
 const {{.ContractType}}Bin = "{{.Bytecode}}"
+{{- end}}
 
 type {{.ContractType}}Contract struct {
 	address  common.Address
@@ -82,6 +84,7 @@ type {{.Name}} struct {
 {{- end}}
 }
 {{- end}}
+{{- if not .NoDeployment}}
 {{if .Constructor}}
 
 type ConstructorArgs struct {
@@ -106,6 +109,7 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	},
 	Validate: func(ConstructorArgs) error { return nil },
 })
+{{- end}}
 {{range .Operations}}
 {{if .IsWrite}}
 

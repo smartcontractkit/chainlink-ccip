@@ -13,8 +13,8 @@ output:
 contracts:
   # 1.6.4
   - contract_name: USDCTokenPoolCCTPV2
-    package_name: usdc_token_pool_cctp_v2
     version: "1.6.4"
+    package_name: usdc_token_pool_cctp_v2
     functions:
       - name: setDomains
         access: owner
@@ -27,8 +27,9 @@ contracts:
 
   # 1.6.1
   - contract_name: TokenPool
-    abi_file: burn_mint_token_pool.json
     version: "1.6.1"
+    abi_file: burn_mint_token_pool.json
+    no_deployment: true
     functions:
       - name: applyChainUpdates
         access: owner
