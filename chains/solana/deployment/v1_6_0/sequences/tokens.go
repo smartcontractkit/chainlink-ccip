@@ -163,8 +163,47 @@ func (a *SolanaAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokenapi.Rat
 		common_utils.Version_1_6_0,
 		"Sets rate limits for a token pool on Solana",
 		func(b operations.Bundle, chains cldf_chain.BlockChains, input tokenapi.RateLimiterConfigInputs) (sequences.OnChainOutput, error) {
-			// TODO: Implement rate limit setting logic for Solana token pools
-			return sequences.OnChainOutput{}, nil
+			chain := chains.SolanaChains()[input.ChainSelector]
+
+			op := tokenpoolops.UpsertRateLimitsBurnMint
+			switch input.PoolType {
+			case common_utils.BurnMintTokenPool.String():
+				op = tokenpoolops.UpsertRateLimitsBurnMint
+			case common_utils.LockReleaseTokenPool.String():
+				op = tokenpoolops.UpsertRateLimitsLockRelease
+			default:
+				return sequences.OnChainOutput{}, fmt.Errorf("unsupported token pool type '%s' for Solana", input.PoolType)
+			}
+			tokenAddr, tokenProgramId, err := getTokenMintAndTokenProgram(input.ExistingDataStore, input.TokenSymbol, chain)
+			if err != nil {
+				return sequences.OnChainOutput{}, err
+			}
+
+			tokenPoolAddr, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, datastore.AddressRef{
+				ChainSelector: chain.Selector,
+				Qualifier:     input.TokenPoolQualifier,
+				Type:          datastore.ContractType(input.PoolType),
+			}, chain.Selector, datastore_utils.FullRef)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to find token pool address for symbol '%s' and qualifier '%s': %w", input.TokenSymbol, input.TokenPoolQualifier, err)
+			}
+			tokenMint := solana.MustPublicKeyFromBase58(tokenAddr.Address)
+			tokenPool := solana.MustPublicKeyFromBase58(tokenPoolAddr.Address)
+			rateLimitOut, err := operations.ExecuteOperation(b, op, chains.SolanaChains()[chain.Selector],
+				tokenpoolops.RemoteChainConfig{
+					TokenPool:                 tokenPool,
+					TokenMint:                 tokenMint,
+					TokenProgramID:            tokenProgramId,
+					RemoteSelector:            input.RemoteChainSelector,
+					InboundRateLimiterConfig:  input.InboundRateLimiterConfig,
+					OutboundRateLimiterConfig: input.OutboundRateLimiterConfig,
+				})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to set rate limits for token pool: %w", err)
+			}
+			return sequences.OnChainOutput{
+				BatchOps: rateLimitOut.Output.BatchOps,
+			}, nil
 		},
 	)
 }

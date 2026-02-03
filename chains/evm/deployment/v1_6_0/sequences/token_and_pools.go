@@ -10,12 +10,14 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	tarops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	tarseq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
 	tpops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/operations/token_pool"
 	tpseq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/sequences/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/token_pool"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -172,20 +174,29 @@ func (a *EVMAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokensapi.RateL
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token pool with qualifier %q on chain %d: %w", input.TokenPoolQualifier, input.ChainSelector, err)
 			}
-			report, err := cldf_ops.ExecuteSequence(b,
-				tarseq.SetTokenPoolRateLimits,
-				chain,
-				tarseq.SetTokenPoolRateLimitsInput{
-					ChainSelector:             input.ChainSelector,
-					TokenPoolAddress:          tpAddress,
-					InboundRateLimiterConfig:  input.InboundRateLimiterConfig,
-					OutboundRateLimiterConfig: input.OutboundRateLimiterConfig,
+			report, err := cldf_ops.ExecuteOperation(b, tpops.SetChainRateLimiterConfig, chain, contract.FunctionInput[tpops.SetChainRateLimiterConfigArgs]{
+				ChainSelector: chain.Selector,
+				Address:       tpAddress,
+				Args: tpops.SetChainRateLimiterConfigArgs{
+					OutboundRateLimitConfig: token_pool.RateLimiterConfig{
+						IsEnabled: input.OutboundRateLimiterConfig.IsEnabled,
+						Capacity:  input.OutboundRateLimiterConfig.Capacity,
+						Rate:      input.OutboundRateLimiterConfig.Rate},
+					InboundRateLimitConfig: token_pool.RateLimiterConfig{
+						IsEnabled: input.InboundRateLimiterConfig.IsEnabled,
+						Capacity:  input.InboundRateLimiterConfig.Capacity,
+						Rate:      input.InboundRateLimiterConfig.Rate},
+					RemoteChainSelector: input.RemoteChainSelector,
 				},
-			)
+			})
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to set rate limits for token pool on chain %d: %w", input.ChainSelector, err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to set rate limiter config: %w", err)
 			}
-			result = sequences.MergeOnChainOutputs(result, report)
+			batchOp, err := contract.NewBatchOperationFromWrites([]contract.WriteOutput{report.Output})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation: %w", err)
+			}
+			result.BatchOps = append(result.BatchOps, batchOp)
 			return result, nil
 		})
 }
