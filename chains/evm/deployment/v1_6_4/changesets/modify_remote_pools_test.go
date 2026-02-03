@@ -134,7 +134,7 @@ func TestModifyRemotePoolsChangeset(t *testing.T) {
 			{
 				ChainSelector: chainSelector,
 				Address:       burnMintTokenPoolAddr,
-				Modification: usdc_pool_ops.RemotePoolModification{
+				Modification: sequences.RemotePoolModification{
 					Operation:           sequences.RemoveRemotePoolOperation,
 					RemoteChainSelector: remoteChainSelector,
 					RemotePoolAddress:   []byte{1},
@@ -171,7 +171,7 @@ func TestModifyRemotePoolsChangeset(t *testing.T) {
 			{
 				ChainSelector: chainSelector,
 				Address:       burnMintTokenPoolAddr,
-				Modification: usdc_pool_ops.RemotePoolModification{
+				Modification: sequences.RemotePoolModification{
 					Operation:           sequences.AddRemotePoolOperation,
 					RemoteChainSelector: remoteChainSelector,
 					RemotePoolAddress:   []byte{1},

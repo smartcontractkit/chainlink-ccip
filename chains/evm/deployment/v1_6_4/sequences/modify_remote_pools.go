@@ -18,11 +18,18 @@ const (
 	RemoveRemotePoolOperation = "REMOVE_REMOTE_POOL"
 )
 
+// RemotePoolModification combines the operation type with the pool parameters
+type RemotePoolModification struct {
+	Operation           string
+	RemoteChainSelector uint64
+	RemotePoolAddress   []byte
+}
+
 // The input is structured to use the same format for both adding and removing remote pools. It also allows for
 // performing operations on multiple addresses for a given chain selector.
 type ModifyRemotePoolsSequenceInput struct {
 	AddressesByChain     map[uint64][]common.Address
-	ModificationsByChain map[uint64]map[common.Address]usdc_pool_ops.RemotePoolModification
+	ModificationsByChain map[uint64]map[common.Address]RemotePoolModification
 }
 
 var ModifyRemotePoolsSequence = operations.NewSequence(

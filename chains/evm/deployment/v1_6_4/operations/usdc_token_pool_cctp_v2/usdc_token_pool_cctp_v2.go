@@ -146,12 +146,6 @@ type RemoveRemotePoolArgs struct {
 	RemotePoolAddress   []byte
 }
 
-type RemotePoolModification struct {
-	Operation           string
-	RemoteChainSelector uint64
-	RemotePoolAddress   []byte
-}
-
 type ConstructorArgs struct {
 	TokenMessenger              common.Address
 	CctpMessageTransmitterProxy common.Address
