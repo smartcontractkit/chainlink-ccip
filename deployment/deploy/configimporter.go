@@ -15,6 +15,3 @@ type ImportConfigPerChainInput struct {
 	RemoteChains         []uint64
 	TokensPerRemoteChain map[uint64][]common.Address
 }
-
-type FeeQuoterImportConfigOutput struct {
-}

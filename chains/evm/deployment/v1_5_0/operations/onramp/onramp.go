@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	ContractType cldf_deployment.ContractType = "OnRamp"
+	ContractType cldf_deployment.ContractType = "EVM2EVMOnRamp"
 	Version      *semver.Version              = semver.MustParse("1.5.0")
 )
 
@@ -56,5 +56,16 @@ var OnRampStaticConfig = contract.NewRead(contract.ReadParams[any, evm_2_evm_onr
 	NewContract:  evm_2_evm_onramp.NewEVM2EVMOnRamp,
 	CallContract: func(onRamp *evm_2_evm_onramp.EVM2EVMOnRamp, opts *bind.CallOpts, args any) (evm_2_evm_onramp.EVM2EVMOnRampStaticConfig, error) {
 		return onRamp.GetStaticConfig(opts)
+	},
+})
+
+var OnRampDynamicConfig = contract.NewRead(contract.ReadParams[any, evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig, *evm_2_evm_onramp.EVM2EVMOnRamp]{
+	Name:         "onramp:dynamic-config",
+	Version:      Version,
+	Description:  "Reads the dynamic config from the OnRamp 1.5.0 contract",
+	ContractType: ContractType,
+	NewContract:  evm_2_evm_onramp.NewEVM2EVMOnRamp,
+	CallContract: func(onRamp *evm_2_evm_onramp.EVM2EVMOnRamp, opts *bind.CallOpts, args any) (evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig, error) {
+		return onRamp.GetDynamicConfig(opts)
 	},
 })

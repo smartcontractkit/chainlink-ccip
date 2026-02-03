@@ -12,19 +12,17 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
+	adapters1_5 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/adapters"
+	tokenadminops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
 	offrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
 	onrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
 	seq1_6 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/token_pool"
 	api "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
-
-var GetTokensPaginationSize = uint64(20)
 
 type ConfigImportAdapter struct {
 	FeeQuoter     map[uint64]common.Address
@@ -37,6 +35,9 @@ type ConfigImportAdapter struct {
 func (ci *ConfigImportAdapter) InitializeAdapter(e cldf.Environment, selectors []uint64) error {
 	ci.FeeQuoter = make(map[uint64]common.Address)
 	ci.Router = make(map[uint64]common.Address)
+	ci.TokenAdminReg = make(map[uint64]common.Address)
+	ci.OnRamp = make(map[uint64]common.Address)
+	ci.OffRamp = make(map[uint64]common.Address)
 	for _, chainSelector := range selectors {
 		fqRef, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 			Type:          datastore.ContractType(fqops.ContractType),
@@ -57,8 +58,8 @@ func (ci *ConfigImportAdapter) InitializeAdapter(e cldf.Environment, selectors [
 		}
 		ci.Router[chainSelector] = routerRef
 		tokenAdminRegRef, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-			Type:          datastore.ContractType("TokenAdminRegistry"),
-			Version:       semver.MustParse("1.5.0"),
+			Type:          datastore.ContractType(tokenadminops.ContractType),
+			Version:       tokenadminops.Version,
 			ChainSelector: chainSelector,
 		}, chainSelector, evm_datastore_utils.ToEVMAddress)
 		if err != nil {
@@ -95,50 +96,7 @@ func (ci *ConfigImportAdapter) SupportedTokensPerRemoteChain(e cldf.Environment,
 		return nil, fmt.Errorf("token admin registry address not found for chain %d", chainsel)
 	}
 	// get all supported tokens from token admin registry
-	tokenAdminRegC, err := token_admin_registry.NewTokenAdminRegistry(tokenAdminRegAddr, chain.Client)
-	if err != nil {
-		return nil, fmt.Errorf("failed to instantiate token admin registry contract at %s on chain %d: %w", tokenAdminRegAddr.String(), chain.Selector, err)
-	}
-	startIndex := uint64(0)
-	allTokens := make([]common.Address, 0)
-	for {
-		fetchedTokens, err := tokenAdminRegC.GetAllConfiguredTokens(nil, startIndex, GetTokensPaginationSize)
-		if err != nil {
-			return nil, err
-		}
-		allTokens = append(allTokens, fetchedTokens...)
-		startIndex += GetTokensPaginationSize
-		if uint64(len(fetchedTokens)) < GetTokensPaginationSize {
-			break
-		}
-	}
-	pools, err := tokenAdminRegC.GetPools(nil, allTokens)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get pools for tokens from token admin registry at %s on chain %d: %w", tokenAdminRegAddr.String(), chain.Selector, err)
-	}
-	tokensPerRemoteChain := make(map[uint64][]common.Address)
-	for _, poolAddr := range pools {
-		// there is no supported pool for this token
-		if poolAddr == (common.Address{}) {
-			continue
-		}
-		tokenPoolC, err := token_pool.NewTokenPool(poolAddr, chain.Client)
-		if err != nil {
-			return nil, fmt.Errorf("failed to instantiate token pool contract at %s on chain %d: %w", poolAddr.String(), chain.Selector, err)
-		}
-		chains, err := tokenPoolC.GetSupportedChains(nil)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get supported chains from token pool at %s on chain %d: %w", poolAddr.String(), chain.Selector, err)
-		}
-		tokenAddr, err := tokenPoolC.GetToken(nil)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get token address from token pool at %s on chain %d: %w", poolAddr.String(), chain.Selector, err)
-		}
-		for _, remoteChain := range chains {
-			tokensPerRemoteChain[remoteChain] = append(tokensPerRemoteChain[remoteChain], tokenAddr)
-		}
-	}
-	return tokensPerRemoteChain, nil
+	return adapters1_5.GetSupportedTokensPerRemoteChain(tokenAdminRegAddr, chain)
 }
 
 func (ci *ConfigImportAdapter) ConnectedChains(e cldf.Environment, chainsel uint64) ([]uint64, error) {
@@ -171,7 +129,7 @@ func (ci *ConfigImportAdapter) ConnectedChains(e cldf.Environment, chainsel uint
 	return connectedChains, nil
 }
 
-func (ci *ConfigImportAdapter) SequenceImportConfigFromFeeQuoter() *cldf_ops.Sequence[api.ImportConfigPerChainInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+func (ci *ConfigImportAdapter) SequenceImportConfig() *cldf_ops.Sequence[api.ImportConfigPerChainInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return cldf_ops.NewSequence(
 		"seq-config-import",
 		semver.MustParse("1.0.0"),
