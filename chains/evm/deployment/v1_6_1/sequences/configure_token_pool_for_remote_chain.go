@@ -8,10 +8,11 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 
+	mcms_types "github.com/smartcontractkit/mcms/types"
+
 	tp_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_1/burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/token_pool"
@@ -83,7 +84,10 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to maybe update rate limiters: %w", err)
 				}
-				writes = append(writes, rateLimitersReport)
+				// Only append if there's an actual write (maybeUpdateRateLimiters returns empty WriteOutput when no update needed)
+				if rateLimitersReport.ChainSelector != 0 {
+					writes = append(writes, rateLimitersReport)
+				}
 
 				// Check existing remote pools
 				getRemotePoolsReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetRemotePools, chain, evm_contract.FunctionInput[uint64]{
