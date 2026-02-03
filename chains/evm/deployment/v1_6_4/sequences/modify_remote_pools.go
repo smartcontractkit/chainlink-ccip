@@ -5,13 +5,11 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/token_pool"
-	token_pool_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/token_pool"
+	usdc_pool_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/usdc_token_pool_cctp_v2"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
@@ -24,12 +22,12 @@ const (
 // performing operations on multiple addresses for a given chain selector.
 type ModifyRemotePoolsSequenceInput struct {
 	AddressesByChain     map[uint64][]common.Address
-	ModificationsByChain map[uint64]map[common.Address]token_pool.RemotePoolModification
+	ModificationsByChain map[uint64]map[common.Address]usdc_pool_ops.RemotePoolModification
 }
 
 var ModifyRemotePoolsSequence = operations.NewSequence(
 	"ModifyRemotePoolsSequence",
-	token_pool.Version,
+	usdc_pool_ops.Version,
 	"Modifies remote pools in the remote chain config for a sequence of TokenPool contracts on multiple chains",
 	func(b operations.Bundle, chains cldf_chain.BlockChains, input ModifyRemotePoolsSequenceInput) (sequences.OnChainOutput, error) {
 		writes := make([]contract.WriteOutput, 0)
@@ -41,25 +39,33 @@ var ModifyRemotePoolsSequence = operations.NewSequence(
 			for _, address := range addresses {
 				modification := input.ModificationsByChain[chainSel][address]
 
-				// Get the operation based on the operation type
-				var operation *operations.Operation[contract.FunctionInput[token_pool_ops.RemotePoolModification], contract.WriteOutput, evm.Chain] = nil
+				// Execute the operation based on the operation type
+				var report operations.Report[contract.FunctionInput[usdc_pool_ops.AddRemotePoolArgs], contract.WriteOutput]
+				var err error
 				switch modification.Operation {
 				case AddRemotePoolOperation:
-					operation = token_pool_ops.AddRemotePool
+					report, err = operations.ExecuteOperation(b, usdc_pool_ops.AddRemotePool, chain, contract.FunctionInput[usdc_pool_ops.AddRemotePoolArgs]{
+						ChainSelector: chain.Selector,
+						Address:       address,
+						Args: usdc_pool_ops.AddRemotePoolArgs{
+							RemoteChainSelector: modification.RemoteChainSelector,
+							RemotePoolAddress:   modification.RemotePoolAddress,
+						},
+					})
 				case RemoveRemotePoolOperation:
-					operation = token_pool_ops.RemoveRemotePool
+					removeReport, removeErr := operations.ExecuteOperation(b, usdc_pool_ops.RemoveRemotePool, chain, contract.FunctionInput[usdc_pool_ops.RemoveRemotePoolArgs]{
+						ChainSelector: chain.Selector,
+						Address:       address,
+						Args: usdc_pool_ops.RemoveRemotePoolArgs{
+							RemoteChainSelector: modification.RemoteChainSelector,
+							RemotePoolAddress:   modification.RemotePoolAddress,
+						},
+					})
+					report.Output = removeReport.Output
+					err = removeErr
 				default:
 					return sequences.OnChainOutput{}, fmt.Errorf("invalid operation: %s", modification.Operation)
 				}
-
-				// Execute the operation on the chain with the input being the remote pool modification
-				// The function signatures have the same input parameters, so the only difference is the operation type.
-				// Therefore it is safe to perform this operation as "Args" does not need to be changed.
-				report, err := operations.ExecuteOperation(b, operation, chain, contract.FunctionInput[token_pool_ops.RemotePoolModification]{
-					ChainSelector: chain.Selector,
-					Address:       address,
-					Args:          modification,
-				})
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to execute AddRemotePoolOp on %s: %w", chain, err)
 				}

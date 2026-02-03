@@ -9,7 +9,7 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/token_pool"
+	usdc_pool_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/usdc_token_pool_cctp_v2"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
@@ -23,7 +23,7 @@ type ModifyRemotePoolsInput struct {
 type ModifyRemotePoolsPerChainInput struct {
 	ChainSelector uint64
 	Address       common.Address
-	Modification  token_pool.RemotePoolModification
+	Modification  usdc_pool_ops.RemotePoolModification
 }
 
 func ModifyRemotePoolsChangeset() cldf.ChangeSetV2[ModifyRemotePoolsInput] {
@@ -36,7 +36,7 @@ func modifyRemotePoolsApply() func(cldf.Environment, ModifyRemotePoolsInput) (cl
 		reports := make([]cldf_ops.Report[any, any], 0)
 
 		addressesByChain := make(map[uint64][]common.Address)
-		modificationsByChain := make(map[uint64]map[common.Address]token_pool.RemotePoolModification)
+		modificationsByChain := make(map[uint64]map[common.Address]usdc_pool_ops.RemotePoolModification)
 
 		for _, perChainInput := range input.ChainInputs {
 			// For each chain input, add the addresses to the addressesByChain map.
@@ -44,7 +44,7 @@ func modifyRemotePoolsApply() func(cldf.Environment, ModifyRemotePoolsInput) (cl
 
 			// Initialize the map for the chain selector if it doesn't exist yet to prevent a nil pointer dereference.
 			if _, ok := modificationsByChain[perChainInput.ChainSelector]; !ok {
-				modificationsByChain[perChainInput.ChainSelector] = make(map[common.Address]token_pool.RemotePoolModification)
+				modificationsByChain[perChainInput.ChainSelector] = make(map[common.Address]usdc_pool_ops.RemotePoolModification)
 			}
 
 			// Map the provided RemotePoolModification to the given address and chain selector.

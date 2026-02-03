@@ -22,6 +22,12 @@ contracts:
         access: public
       - name: applyAuthorizedCallerUpdates
         access: owner
+      - name: applyChainUpdates
+        access: owner
+      - name: addRemotePool
+        access: owner
+      - name: removeRemotePool
+        access: owner
       - name: transferOwnership
         access: owner
 

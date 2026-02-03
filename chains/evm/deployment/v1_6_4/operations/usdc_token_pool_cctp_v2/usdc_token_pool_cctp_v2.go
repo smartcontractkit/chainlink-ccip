@@ -1,6 +1,7 @@
 package usdc_token_pool_cctp_v2
 
 import (
+	"math/big"
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
@@ -75,6 +76,18 @@ func (c *USDCTokenPoolCCTPV2Contract) ApplyAuthorizedCallerUpdates(opts *bind.Tr
 	return c.contract.Transact(opts, "applyAuthorizedCallerUpdates", args)
 }
 
+func (c *USDCTokenPoolCCTPV2Contract) ApplyChainUpdates(opts *bind.TransactOpts, remoteChainSelectorsToRemove []uint64, chainsToAdd []ChainUpdate) (*types.Transaction, error) {
+	return c.contract.Transact(opts, "applyChainUpdates", remoteChainSelectorsToRemove, chainsToAdd)
+}
+
+func (c *USDCTokenPoolCCTPV2Contract) AddRemotePool(opts *bind.TransactOpts, remoteChainSelector uint64, remotePoolAddress []byte) (*types.Transaction, error) {
+	return c.contract.Transact(opts, "addRemotePool", remoteChainSelector, remotePoolAddress)
+}
+
+func (c *USDCTokenPoolCCTPV2Contract) RemoveRemotePool(opts *bind.TransactOpts, remoteChainSelector uint64, remotePoolAddress []byte) (*types.Transaction, error) {
+	return c.contract.Transact(opts, "removeRemotePool", remoteChainSelector, remotePoolAddress)
+}
+
 func (c *USDCTokenPoolCCTPV2Contract) TransferOwnership(opts *bind.TransactOpts, args common.Address) (*types.Transaction, error) {
 	return c.contract.Transact(opts, "transferOwnership", args)
 }
@@ -82,6 +95,20 @@ func (c *USDCTokenPoolCCTPV2Contract) TransferOwnership(opts *bind.TransactOpts,
 type AuthorizedCallerArgs struct {
 	AddedCallers   []common.Address
 	RemovedCallers []common.Address
+}
+
+type ChainUpdate struct {
+	RemoteChainSelector       uint64
+	RemotePoolAddresses       [][]byte
+	RemoteTokenAddress        []byte
+	OutboundRateLimiterConfig Config
+	InboundRateLimiterConfig  Config
+}
+
+type Config struct {
+	IsEnabled bool
+	Capacity  *big.Int
+	Rate      *big.Int
 }
 
 type Domain struct {
@@ -99,6 +126,27 @@ type DomainUpdate struct {
 	DestChainSelector             uint64
 	Enabled                       bool
 	UseLegacySourcePoolDataFormat bool
+}
+
+type ApplyChainUpdatesArgs struct {
+	RemoteChainSelectorsToRemove []uint64
+	ChainsToAdd                  []ChainUpdate
+}
+
+type AddRemotePoolArgs struct {
+	RemoteChainSelector uint64
+	RemotePoolAddress   []byte
+}
+
+type RemoveRemotePoolArgs struct {
+	RemoteChainSelector uint64
+	RemotePoolAddress   []byte
+}
+
+type RemotePoolModification struct {
+	Operation           string
+	RemoteChainSelector uint64
+	RemotePoolAddress   []byte
 }
 
 type ConstructorArgs struct {
@@ -170,6 +218,60 @@ var ApplyAuthorizedCallerUpdates = contract.NewWrite(contract.WriteParams[Author
 		args AuthorizedCallerArgs,
 	) (*types.Transaction, error) {
 		return c.ApplyAuthorizedCallerUpdates(opts, args)
+	},
+})
+
+var ApplyChainUpdates = contract.NewWrite(contract.WriteParams[ApplyChainUpdatesArgs, *USDCTokenPoolCCTPV2Contract]{
+	Name:            "usdc-token-pool-cctpv2:apply-chain-updates",
+	Version:         Version,
+	Description:     "Calls applyChainUpdates on the contract",
+	ContractType:    ContractType,
+	ContractABI:     USDCTokenPoolCCTPV2ABI,
+	NewContract:     NewUSDCTokenPoolCCTPV2Contract,
+	IsAllowedCaller: contract.OnlyOwner[*USDCTokenPoolCCTPV2Contract, ApplyChainUpdatesArgs],
+	Validate:        func(ApplyChainUpdatesArgs) error { return nil },
+	CallContract: func(
+		c *USDCTokenPoolCCTPV2Contract,
+		opts *bind.TransactOpts,
+		args ApplyChainUpdatesArgs,
+	) (*types.Transaction, error) {
+		return c.ApplyChainUpdates(opts, args.RemoteChainSelectorsToRemove, args.ChainsToAdd)
+	},
+})
+
+var AddRemotePool = contract.NewWrite(contract.WriteParams[AddRemotePoolArgs, *USDCTokenPoolCCTPV2Contract]{
+	Name:            "usdc-token-pool-cctpv2:add-remote-pool",
+	Version:         Version,
+	Description:     "Calls addRemotePool on the contract",
+	ContractType:    ContractType,
+	ContractABI:     USDCTokenPoolCCTPV2ABI,
+	NewContract:     NewUSDCTokenPoolCCTPV2Contract,
+	IsAllowedCaller: contract.OnlyOwner[*USDCTokenPoolCCTPV2Contract, AddRemotePoolArgs],
+	Validate:        func(AddRemotePoolArgs) error { return nil },
+	CallContract: func(
+		c *USDCTokenPoolCCTPV2Contract,
+		opts *bind.TransactOpts,
+		args AddRemotePoolArgs,
+	) (*types.Transaction, error) {
+		return c.AddRemotePool(opts, args.RemoteChainSelector, args.RemotePoolAddress)
+	},
+})
+
+var RemoveRemotePool = contract.NewWrite(contract.WriteParams[RemoveRemotePoolArgs, *USDCTokenPoolCCTPV2Contract]{
+	Name:            "usdc-token-pool-cctpv2:remove-remote-pool",
+	Version:         Version,
+	Description:     "Calls removeRemotePool on the contract",
+	ContractType:    ContractType,
+	ContractABI:     USDCTokenPoolCCTPV2ABI,
+	NewContract:     NewUSDCTokenPoolCCTPV2Contract,
+	IsAllowedCaller: contract.OnlyOwner[*USDCTokenPoolCCTPV2Contract, RemoveRemotePoolArgs],
+	Validate:        func(RemoveRemotePoolArgs) error { return nil },
+	CallContract: func(
+		c *USDCTokenPoolCCTPV2Contract,
+		opts *bind.TransactOpts,
+		args RemoveRemotePoolArgs,
+	) (*types.Transaction, error) {
+		return c.RemoveRemotePool(opts, args.RemoteChainSelector, args.RemotePoolAddress)
 	},
 })
 
