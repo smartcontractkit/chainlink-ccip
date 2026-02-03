@@ -142,8 +142,8 @@ var DeployLombardChain = cldf_ops.NewSequence(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy AdvancedPoolHooks: %w", err)
 		}
-		addresses = append(addresses, advancedPoolHooksRef.Output)
-		advancedPoolHooksAddress := common.HexToAddress(advancedPoolHooksRef.Output.Address)
+		addresses = append(addresses, advancedPoolHooksRef)
+		advancedPoolHooksAddress := common.HexToAddress(advancedPoolHooksRef.Address)
 
 		lombardTokenPoolRef, err := contract_utils.MaybeDeployContract(b, lombard_token_pool.Deploy, chain, contract_utils.DeployInput[lombard_token_pool.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(lombard_token_pool.ContractType, *lombard_token_pool.Version),
@@ -162,8 +162,8 @@ var DeployLombardChain = cldf_ops.NewSequence(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy LombardTokenPool: %w", err)
 		}
-		addresses = append(addresses, lombardTokenPoolRef.Output)
-		lombardTokenPoolAddress := common.HexToAddress(lombardTokenPoolRef.Output.Address)
+		addresses = append(addresses, lombardTokenPoolRef)
+		lombardTokenPoolAddress := common.HexToAddress(lombardTokenPoolRef.Address)
 
 		// Configure token pool
 		configureTokenPoolReport, err := cldf_ops.ExecuteSequence(b, tokens_sequences.ConfigureTokenPool, chain, tokens_sequences.ConfigureTokenPoolInput{
