@@ -2,7 +2,6 @@ package lombard
 
 import (
 	"fmt"
-	"math/big"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
@@ -92,6 +91,19 @@ var DeployLombardChain = cldf_ops.NewSequence(
 		}
 		addresses = append(addresses, lombardVerifierRef)
 		lombardVerifierAddress := common.HexToAddress(lombardVerifierRef.Address)
+
+		_, err = cldf_ops.ExecuteOperation(b, lombard_verifier.UpdateSupportedTokens, chain, contract_utils.FunctionInput[lombard_verifier.SupportedTokenArgs]{
+			ChainSelector: input.ChainSelector,
+			Address:       lombardVerifierAddress,
+			Args: lombard_verifier.SupportedTokenArgs{
+				TokensToSet: []lombard_verifier.SupportedTokensArgs{
+					{LocalToken: tokenAddress},
+				},
+			},
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to update supported tokens on LombardVerifier: %w", err)
+		}
 
 		// Deploy LombardVerifierResolver if needed
 		lombardVerifierResolverRefs := dep.DataStore.Addresses().Filter(
