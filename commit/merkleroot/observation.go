@@ -572,7 +572,7 @@ func (o observerImpl) ObserveLatestOnRampSeqNums(ctx context.Context) []pluginty
 	for _, sourceChain := range supportedSourceChains {
 		wg.Go(func() {
 			if !sourceChainsCfg[sourceChain].IsRMNVerificationDisabled {
-				lggr.Warnw("rmn enablement is misconfigured on this lane, skipping observations for this source", "chain", sourceChain)
+				lggr.Warnw("rmn enablement is misconfigured on this lane, skipping observations", "source", sourceChain)
 				return
 			}
 			latestOnRampSeqNum, err := o.ccipReader.LatestMsgSeqNum(ctx, sourceChain)
