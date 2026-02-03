@@ -154,13 +154,14 @@ func makeApplyDeployLombardChains(lombardChainRegistry *adapters.LombardChainReg
 				RemoteChains: remoteChains,
 			}
 			in := adapters.ConfigureLombardChainForLanesInput{
-				ChainSelector: chainSel,
-				Token:         chainCfg.Token,
-				RemoteChains:  chainCfg.RemoteChains,
+				ChainSelector:  chainSel,
+				Token:          chainCfg.Token,
+				TokenQualifier: chainCfg.TokenQualifier,
+				RemoteChains:   chainCfg.RemoteChains,
 			}
 			configureChainForLanesReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adaptersByChain[chainSel].ConfigureLombardChainForLanes(), dep, in)
 			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to configure CCTP on chain with selector %d: %w", chainSel, err)
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to configure Lombard on chain with selector %d: %w", chainSel, err)
 			}
 			batchOps = append(batchOps, configureChainForLanesReport.Output.BatchOps...)
 			reports = append(reports, configureChainForLanesReport.ExecutionReports...)
