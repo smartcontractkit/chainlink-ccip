@@ -8,8 +8,9 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 )
 
 var ContractType cldf_deployment.ContractType = "OffRamp"
@@ -69,5 +70,38 @@ var OffRampSetOcr3 = contract.NewWrite(contract.WriteParams[[]offramp.MultiOCR3B
 	Validate:        func([]offramp.MultiOCR3BaseOCRConfigArgs) error { return nil },
 	CallContract: func(offRamp *offramp.OffRamp, opts *bind.TransactOpts, args []offramp.MultiOCR3BaseOCRConfigArgs) (*types.Transaction, error) {
 		return offRamp.SetOCR3Configs(opts, args)
+	},
+})
+
+var GetStaticConfig = contract.NewRead(contract.ReadParams[any, offramp.OffRampStaticConfig, *offramp.OffRamp]{
+	Name:         "offramp:get-static-config",
+	Version:      Version,
+	Description:  "Gets the static config from the OffRamp 1.6.0 contract",
+	ContractType: ContractType,
+	NewContract:  offramp.NewOffRamp,
+	CallContract: func(offRamp *offramp.OffRamp, opts *bind.CallOpts, args any) (offramp.OffRampStaticConfig, error) {
+		return offRamp.GetStaticConfig(opts)
+	},
+})
+
+var GetDynamicConfig = contract.NewRead(contract.ReadParams[any, offramp.OffRampDynamicConfig, *offramp.OffRamp]{
+	Name:         "offramp:get-dynamic-config",
+	Version:      Version,
+	Description:  "Gets the dynamic config from the OffRamp 1.6.0 contract",
+	ContractType: ContractType,
+	NewContract:  offramp.NewOffRamp,
+	CallContract: func(offRamp *offramp.OffRamp, opts *bind.CallOpts, args any) (offramp.OffRampDynamicConfig, error) {
+		return offRamp.GetDynamicConfig(opts)
+	},
+})
+
+var GetSourceChainConfig = contract.NewRead(contract.ReadParams[uint64, offramp.OffRampSourceChainConfig, *offramp.OffRamp]{
+	Name:         "offramp:get-source-chain-config",
+	Version:      Version,
+	Description:  "Gets the source chain config for a given chain selector from the OffRamp 1.6.0 contract",
+	ContractType: ContractType,
+	NewContract:  offramp.NewOffRamp,
+	CallContract: func(offRamp *offramp.OffRamp, opts *bind.CallOpts, arg uint64) (offramp.OffRampSourceChainConfig, error) {
+		return offRamp.GetSourceChainConfig(opts, arg)
 	},
 })
