@@ -15,7 +15,6 @@ contracts:
   - contract_name: USDCTokenPoolCCTPV2
     package_name: usdc_token_pool_cctp_v2
     version: "1.6.4"
-    abi_file: "usdc_token_pool_cctp_v2.json"
     functions:
       - name: setDomains
         access: owner
@@ -27,6 +26,23 @@ contracts:
         access: owner
 
   # 1.6.1
+  - contract_name: TokenPool
+    abi_file: burn_mint_token_pool.json
+    version: "1.6.1"
+    functions:
+      - name: applyChainUpdates
+        access: owner
+      - name: setRateLimitAdmin
+        access: owner
+      - name: getRateLimitAdmin
+        access: public
+      - name: transferOwnership
+        access: owner
+      - name: setChainRateLimiterConfigs
+        access: owner
+      - name: setChainRateLimiterConfig
+        access: owner
+
   - contract_name: BurnMintTokenPool
     version: "1.6.1"
 
