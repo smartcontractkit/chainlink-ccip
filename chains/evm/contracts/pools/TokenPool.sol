@@ -502,7 +502,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
     uint16 blockConfirmationRequested
   ) internal virtual {
     if (address(s_advancedPoolHooks) != address(0)) {
-      s_advancedPoolHooks.postFlightCheck(releaseOrMintIn, localAmount, blockConfirmationRequested);
+      s_advancedPoolHooks.postflightCheck(releaseOrMintIn, localAmount, blockConfirmationRequested);
     }
   }
 
