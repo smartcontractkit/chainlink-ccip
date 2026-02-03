@@ -95,7 +95,21 @@ func TestPlugin_RoleDonE2E_NoPrevOutcome(t *testing.T) {
 		}
 
 		// Source Chain Expectations - Makes sure only oracles that support specific source chains are reading them.
+		// GetOffRampSourceChainsConfig is called for every oracle (with this oracle's supported source chains, possibly empty).
 		{
+			deps.ccipReader.EXPECT().GetOffRampSourceChainsConfig(mock.Anything, mock.Anything).
+				RunAndReturn(func(ctx context.Context, chains []cciptypes.ChainSelector) (map[cciptypes.ChainSelector]ccipreader.StaticSourceChainConfig, error) {
+					cfg := make(map[cciptypes.ChainSelector]ccipreader.StaticSourceChainConfig)
+					for _, ch := range chains {
+						cfg[ch] = ccipreader.StaticSourceChainConfig{
+							Router:                    clrand.RandomBytes(32),
+							IsEnabled:                 true,
+							IsRMNVerificationDisabled: true,
+							OnRamp:                    clrand.RandomBytes(32),
+						}
+					}
+					return cfg, nil
+				})
 			if len(oracleSourceChains) > 0 {
 				deps.ccipReader.EXPECT().LatestMsgSeqNum(mock.Anything, mock.Anything).
 					RunAndReturn(func(ctx context.Context, ch cciptypes.ChainSelector) (cciptypes.SeqNum, error) {
@@ -118,17 +132,6 @@ func TestPlugin_RoleDonE2E_NoPrevOutcome(t *testing.T) {
 				deps.ccipReader.EXPECT().NextSeqNum(mock.Anything, s.sourceChains).Return(nextSeqNums, nil)
 
 				deps.ccipReader.EXPECT().GetRMNRemoteConfig(mock.Anything).Return(cciptypes.RemoteConfig{FSign: 1234}, nil)
-
-				sourceChainsCfg := make(map[cciptypes.ChainSelector]ccipreader.StaticSourceChainConfig)
-				for _, ch := range s.sourceChains {
-					sourceChainsCfg[ch] = ccipreader.StaticSourceChainConfig{
-						Router:                    clrand.RandomBytes(32),
-						IsEnabled:                 true,
-						IsRMNVerificationDisabled: true,
-						OnRamp:                    clrand.RandomBytes(32),
-					}
-				}
-				deps.ccipReader.EXPECT().GetOffRampSourceChainsConfig(mock.Anything, s.sourceChains).Return(sourceChainsCfg, nil)
 
 				deps.priceReader.EXPECT().GetFeeQuoterTokenUpdates(mock.Anything, mock.Anything, s.destChain).Return(nil, nil)
 
