@@ -95,10 +95,11 @@ func TestPlugin_RoleDonE2E_NoPrevOutcome(t *testing.T) {
 		}
 
 		// Source Chain Expectations - Makes sure only oracles that support specific source chains are reading them.
-		// GetOffRampSourceChainsConfig is called for every oracle (with this oracle's supported source chains, possibly empty).
+		// GetOffRampSourceChainsConfig is called for every oracle (with the supported source chains, possibly empty).
 		{
 			deps.ccipReader.EXPECT().GetOffRampSourceChainsConfig(mock.Anything, mock.Anything).
-				RunAndReturn(func(ctx context.Context, chains []cciptypes.ChainSelector) (map[cciptypes.ChainSelector]ccipreader.StaticSourceChainConfig, error) {
+				RunAndReturn(func(ctx context.Context, chains []cciptypes.ChainSelector) (
+					map[cciptypes.ChainSelector]ccipreader.StaticSourceChainConfig, error) {
 					cfg := make(map[cciptypes.ChainSelector]ccipreader.StaticSourceChainConfig)
 					for _, ch := range chains {
 						cfg[ch] = ccipreader.StaticSourceChainConfig{
