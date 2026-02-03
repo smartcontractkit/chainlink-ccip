@@ -38,9 +38,11 @@ const (
 	CLDDomain         = "ccip"
 )
 
-var CCIPHomeChain = chain_selectors.GETH_TESTNET.Selector
-var CCIPHomeChainID = chain_selectors.GETH_TESTNET.EvmChainID
-var L = log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).Level(zerolog.InfoLevel)
+var (
+	CCIPHomeChain   = chain_selectors.GETH_TESTNET.Selector
+	CCIPHomeChainID = chain_selectors.GETH_TESTNET.EvmChainID
+	L               = log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).Level(zerolog.InfoLevel)
+)
 
 // Load loads TOML configurations from a list of paths, i.e. env.toml,overrides.toml
 // and unmarshalls the files from left to right overriding keys.
@@ -114,7 +116,7 @@ func LoadOutput[T any](outputPath string) (*T, error) {
 					return nil, fmt.Errorf("failed to unmarshal addresses from config: %w", err)
 				}
 				for _, addr := range addrs {
-					if err := ds.Addresses().Add(addr); err != nil {
+					if err := ds.Addresses().Upsert(addr); err != nil {
 						return nil, fmt.Errorf("failed to set address in datastore: %w", err)
 					}
 				}

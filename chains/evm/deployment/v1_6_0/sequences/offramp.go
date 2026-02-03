@@ -11,6 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
 
 	mcms_types "github.com/smartcontractkit/mcms/types"
@@ -22,7 +23,7 @@ import (
 type OffRampApplySourceChainConfigUpdatesSequenceInput struct {
 	Address        common.Address
 	ChainSelector  uint64
-	UpdatesByChain []offramp.OffRampSourceChainConfigArgs
+	UpdatesByChain []offrampops.SourceChainConfigArgs
 }
 
 type OffRampImportConfigSequenceInput struct {
@@ -48,7 +49,7 @@ var (
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
-			report, err := operations.ExecuteOperation(b, offrampops.OffRampApplySourceChainConfigUpdates, chain, contract.FunctionInput[[]offramp.OffRampSourceChainConfigArgs]{
+			report, err := operations.ExecuteOperation(b, offrampops.ApplySourceChainConfigUpdates, chain, contract.FunctionInput[[]offrampops.SourceChainConfigArgs]{
 				ChainSelector: chain.Selector,
 				Address:       input.Address,
 				Args:          input.UpdatesByChain,

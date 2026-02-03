@@ -9,6 +9,7 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 
+	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -112,6 +113,18 @@ type TestAdapter interface {
 
 	// ValidateExec validates that the message specified by the given send event was executed.
 	ValidateExec(t *testing.T, sourceSelector uint64, startBlock *uint64, seqNrs []uint64) (execStates map[uint64]int)
+
+	// AllowRouterToWithdrawTokens allows the router to withdraw tokens of the given address and amount from the deployer account.
+	AllowRouterToWithdrawTokens(ctx context.Context, tokenAddress string, amount *big.Int) error
+
+	// GetTokenBalance gets the token balance of the given owner address for the given token address.
+	GetTokenBalance(ctx context.Context, tokenAddress string, ownerAddress []byte) (*big.Int, error)
+
+	// GetTokenExpansionConfig returns a token expansion deployment config with sensible defaults for testing cross-chain token transfers.
+	GetTokenExpansionConfig() tokensapi.TokenExpansionInputPerChain
+
+	// GetRegistryAddress returns the address of the contract on which the token pool must be registered.
+	GetRegistryAddress() (string, error)
 }
 
 type TestAdapterFactory = func(env *deployment.Environment, selector uint64) TestAdapter

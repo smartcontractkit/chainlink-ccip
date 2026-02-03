@@ -28,6 +28,7 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/jd"
 
+	"github.com/smartcontractkit/chainlink-ccip/deployment/testadapters"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	devenvcommon "github.com/smartcontractkit/chainlink-ccip/devenv/common"
 
@@ -406,6 +407,32 @@ func NewEnvironment() (*Cfg, error) {
 			return nil, err
 		}
 	}
+
+	// Make sure datastore has the latest deployed addresses
+	if err = ds.Merge(e.DataStore); err != nil {
+		return nil, err
+	} else {
+		e.DataStore = ds.Seal()
+	}
+
+	// Populate test adapters
+	adapters := make([]testadapters.TestAdapter, 0, len(impls))
+	for _, impl := range impls {
+		impl.SetCLDF(e)
+		adapters = append(adapters, impl)
+	}
+
+	// Deploy a token and its corresponding token pool on each chain
+	L.Info().Msg("Deploying tokens and token pools for chains")
+	newDS, err := devenvcommon.SetupTokensAndTokenPools(ctx, e, adapters)
+	if err != nil {
+		return nil, fmt.Errorf("failed to setup tokens and token pools: %w", err)
+	}
+	a, err := json.Marshal(newDS.Addresses().Filter())
+	if err != nil {
+		return nil, err
+	}
+	in.CLDF.AddAddresses(string(a))
 
 	var homeChainType string
 	if in.ForkedEnvConfig != nil {

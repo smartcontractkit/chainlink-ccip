@@ -1,0 +1,138 @@
+package {{.PackageName}}
+
+import (
+{{- if .NeedsBigInt}}
+	"math/big"
+{{end}}
+	"strings"
+
+	"github.com/Masterminds/semver/v3"
+	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+)
+
+var ContractType cldf_deployment.ContractType = "{{.ContractType}}"
+var Version = semver.MustParse("{{.Version}}")
+
+const {{.ContractType}}ABI = `{{.ABI}}`
+const {{.ContractType}}Bin = "{{.Bytecode}}"
+
+type {{.ContractType}}Contract struct {
+	address  common.Address
+	abi      abi.ABI
+	backend  bind.ContractBackend
+	contract *bind.BoundContract
+}
+
+func New{{.ContractType}}Contract(
+	address common.Address,
+	backend bind.ContractBackend,
+) (*{{.ContractType}}Contract, error) {
+	parsed, err := abi.JSON(strings.NewReader({{.ContractType}}ABI))
+	if err != nil {
+		return nil, err
+	}
+	return &{{.ContractType}}Contract{
+		address:  address,
+		abi:      parsed,
+		backend:  backend,
+		contract: bind.NewBoundContract(address, parsed, backend, backend, backend),
+	}, nil
+}
+
+func (c *{{.ContractType}}Contract) Address() common.Address {
+	return c.address
+}
+
+func (c *{{.ContractType}}Contract) Owner(opts *bind.CallOpts) (common.Address, error) {
+	var out []any
+	err := c.contract.Call(opts, &out, "owner")
+	if err != nil {
+		return common.Address{}, err
+	}
+	return *abi.ConvertType(out[0], new(common.Address)).(*common.Address), nil
+}
+{{range .ContractMethods}}
+
+func (c *{{$.ContractType}}Contract) {{.Name}}({{.Params}}) {{.Returns}} {
+	{{.MethodBody}}
+}
+{{- end}}
+{{range .StructDefs}}
+
+type {{.Name}} struct {
+{{- range .Fields}}
+	{{.GoName}} {{.GoType}}
+{{- end}}
+}
+{{- end}}
+{{range .WriteArgStructs}}
+
+type {{.Name}} struct {
+{{- range .Fields}}
+	{{.GoName}} {{.GoType}}
+{{- end}}
+}
+{{- end}}
+{{if .Constructor}}
+
+type ConstructorArgs struct {
+{{- range .Constructor.Parameters}}
+	{{.GoName}} {{.GoType}}
+{{- end}}
+}
+{{end}}
+
+var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
+	Name:        "{{.PackageNameHyphen}}:deploy",
+	Version:     Version,
+	Description: "Deploys the {{.ContractType}} contract",
+	ContractMetadata: &bind.MetaData{
+		ABI: {{.ContractType}}ABI,
+		Bin: {{.ContractType}}Bin,
+	},
+	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
+		cldf_deployment.NewTypeAndVersion(ContractType, *Version).String(): {
+			EVM: common.FromHex({{.ContractType}}Bin),
+		},
+	},
+	Validate: func(ConstructorArgs) error { return nil },
+})
+{{range .WriteOps}}
+
+var {{.Name}} = contract.NewWrite(contract.WriteParams[{{.ArgsType}}, *{{$.ContractType}}Contract]{
+	Name:            "{{$.PackageNameHyphen}}:{{.OpName}}",
+	Version:         Version,
+	Description:     "Calls {{.MethodName}} on the contract",
+	ContractType:    ContractType,
+	ContractABI:     {{$.ContractType}}ABI,
+	NewContract:     New{{$.ContractType}}Contract,
+	IsAllowedCaller: contract.{{.AccessControl}}[*{{$.ContractType}}Contract, {{.ArgsType}}],
+	Validate:        func({{.ArgsType}}) error { return nil },
+	CallContract: func(
+		c *{{$.ContractType}}Contract,
+		opts *bind.TransactOpts,
+		args {{.ArgsType}},
+	) (*types.Transaction, error) {
+		return c.{{.Name}}(opts{{.CallArgs}})
+	},
+})
+{{- end}}
+{{range .ReadOps}}
+
+var {{.Name}} = contract.NewRead(contract.ReadParams[{{.ArgsType}}, {{.ReturnType}}, *{{$.ContractType}}Contract]{
+	Name:         "{{$.PackageNameHyphen}}:{{.OpName}}",
+	Version:      Version,
+	Description:  "Calls {{.MethodName}} on the contract",
+	ContractType: ContractType,
+	NewContract:  New{{$.ContractType}}Contract,
+	CallContract: func(c *{{$.ContractType}}Contract, opts *bind.CallOpts, args {{.ArgsType}}) ({{.ReturnType}}, error) {
+		return c.{{.Name}}(opts{{.CallArgs}})
+	},
+})
+{{- end}}
