@@ -13,6 +13,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
@@ -57,11 +58,11 @@ var (
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
-		report, err := operations.ExecuteOperation(b, fqops.ApplyDestChainConfigUpdates, chain, contract.FunctionInput[[]fqops.DestChainConfigArgs]{
-			ChainSelector: chain.Selector,
-			Address:       input.Address,
-			Args:          input.UpdatesByChain,
-		})
+			report, err := operations.ExecuteOperation(b, fqops.ApplyDestChainConfigUpdates, chain, contract.FunctionInput[[]fqops.DestChainConfigArgs]{
+				ChainSelector: chain.Selector,
+				Address:       input.Address,
+				Args:          input.UpdatesByChain,
+			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute FeeQuoterApplyDestChainConfigUpdatesOp on %s: %w", chain, err)
 			}
@@ -85,11 +86,11 @@ var (
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
-		report, err := operations.ExecuteOperation(b, fqops.UpdatePrices, chain, contract.FunctionInput[fqops.PriceUpdates]{
-			ChainSelector: chain.Selector,
-			Address:       input.Address,
-			Args:          input.UpdatesByChain,
-		})
+			report, err := operations.ExecuteOperation(b, fqops.UpdatePrices, chain, contract.FunctionInput[fqops.PriceUpdates]{
+				ChainSelector: chain.Selector,
+				Address:       input.Address,
+				Args:          input.UpdatesByChain,
+			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute FeeQuoterUpdatePricesOp on %s: %w", chain, err)
 			}
@@ -113,11 +114,11 @@ var (
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
-		report, err := operations.ExecuteOperation(b, fqops.ApplyTokenTransferFeeConfigUpdates, chain, contract.FunctionInput[fqops.ApplyTokenTransferFeeConfigUpdatesArgs]{
-			ChainSelector: chain.Selector,
-			Address:       input.Address,
-			Args:          input.UpdatesByChain,
-		})
+			report, err := operations.ExecuteOperation(b, fqops.ApplyTokenTransferFeeConfigUpdates, chain, contract.FunctionInput[fqops.ApplyTokenTransferFeeConfigUpdatesArgs]{
+				ChainSelector: chain.Selector,
+				Address:       input.Address,
+				Args:          input.UpdatesByChain,
+			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute FeeQuoterApplyTokenTransferFeeConfigUpdatesOp on %s: %w", chain, err)
 			}
