@@ -12,9 +12,11 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gagliardetto/solana-go"
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	evmadapters "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 
 	bnmERC20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
+	tpops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/operations/token_pool"
 	evmseqV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	tarbindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
 	bnmpool "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/burn_mint_token_pool"
@@ -31,6 +33,7 @@ import (
 	solchain "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
+	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	bnmERC20gen "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc20"
 	"github.com/stretchr/testify/require"
@@ -493,6 +496,106 @@ func TestTokensAndTokenPools(t *testing.T) {
 				require.NoError(t, err)
 				require.True(t, bytes.Equal(remoteTokenAB, common.LeftPadBytes(tokB.Bytes(), 32)))
 			}
+		})
+
+		t.Run("Validate SetTokenPoolRateLimit", func(t *testing.T) {
+			require.Len(t, evmTestData, 2, "expected exactly two EVM test data entries for this test")
+			evmA, evmB := evmTestData[0], evmTestData[1]
+
+			defaultRL := tokensapi.RateLimiterConfig{
+				Capacity:  big.NewInt(2_000_000_000),
+				Rate:      big.NewInt(200_000_000),
+				IsEnabled: true,
+			}
+
+			input := tokensapi.RateLimiterConfigInput{
+				ChainSelector:       evmA.Chain.Selector,
+				TokenSymbol:         evmA.Token.Symbol,
+				TokenPoolQualifier:  evmA.TokenPoolQualifier,
+				PoolType:            evmTokenPoolType.String(),
+				ChainAdapterVersion: v1_6_0,
+				MCMS:                NewDefaultInputForMCMS("Set Token Pool Rate Limits"),
+				Inputs: map[uint64]tokensapi.RateLimiterConfigInputs{
+					evmB.Chain.Selector: {
+						OutboundRateLimiterConfig: defaultRL,
+						InboundRateLimiterConfig:  defaultRL,
+					},
+				},
+			}
+
+			// Query the latest on-chain state for chain A
+			poolAddressA, err := evmAdapter.FindLatestTokenPoolAddress(env.DataStore, evmA.Chain.Selector, evmA.TokenPoolQualifier, string(evmTokenPoolType))
+			require.NoError(t, err)
+			poolA, err := bnmpool.NewBurnMintTokenPool(poolAddressA, evmA.Chain.Client)
+			require.NoError(t, err)
+			outboundRateLimitAB, err := poolA.GetCurrentOutboundRateLimiterState(&bind.CallOpts{Context: t.Context()}, evmB.Chain.Selector)
+			require.NoError(t, err)
+			inboundRateLimitAB, err := poolA.GetCurrentInboundRateLimiterState(&bind.CallOpts{Context: t.Context()}, evmB.Chain.Selector)
+			require.NoError(t, err)
+
+			_, err = cldf_ops.ExecuteOperation(env.OperationsBundle, tpops.SetRateLimitAdmin, evmChainA, contract.FunctionInput[tpops.SetRateLimitAdminArgs]{
+				ChainSelector: evmChainA.Selector,
+				Address:       poolAddressA,
+				Args: tpops.SetRateLimitAdminArgs{
+					NewAdmin: evmChainA.DeployerKey.From,
+				},
+			})
+			require.NoError(t, err)
+
+			// Run the changeset
+			output, err = tokensapi.SetTokenPoolRateLimits().Apply(*env, input)
+			require.NoError(t, err)
+			MergeAddresses(t, env, output.DataStore)
+
+			// Query the latest on-chain state for chain A
+			outboundRateLimitAB, err = poolA.GetCurrentOutboundRateLimiterState(&bind.CallOpts{Context: t.Context()}, evmB.Chain.Selector)
+			require.NoError(t, err)
+			inboundRateLimitAB, err = poolA.GetCurrentInboundRateLimiterState(&bind.CallOpts{Context: t.Context()}, evmB.Chain.Selector)
+			require.NoError(t, err)
+
+			// Verify that the rate limits were set correctly
+			require.Equal(t, 0, defaultRL.Capacity.Cmp(outboundRateLimitAB.Capacity))
+			require.Equal(t, 0, defaultRL.Rate.Cmp(outboundRateLimitAB.Rate))
+			require.True(t, outboundRateLimitAB.IsEnabled)
+			require.Equal(t, 0, defaultRL.Capacity.Cmp(inboundRateLimitAB.Capacity))
+			require.Equal(t, 0, defaultRL.Rate.Cmp(inboundRateLimitAB.Rate))
+			require.True(t, inboundRateLimitAB.IsEnabled)
+
+			// Update RL to disable
+			defaultRL = tokensapi.RateLimiterConfig{
+				Capacity:  big.NewInt(0),
+				Rate:      big.NewInt(0),
+				IsEnabled: false,
+			}
+			input = tokensapi.RateLimiterConfigInput{
+				ChainSelector:       evmA.Chain.Selector,
+				TokenSymbol:         evmA.Token.Symbol,
+				TokenPoolQualifier:  evmA.TokenPoolQualifier,
+				PoolType:            evmTokenPoolType.String(),
+				ChainAdapterVersion: v1_6_0,
+				MCMS:                NewDefaultInputForMCMS("Set Token Pool Rate Limits"),
+				Inputs: map[uint64]tokensapi.RateLimiterConfigInputs{
+					evmB.Chain.Selector: {
+						OutboundRateLimiterConfig: defaultRL,
+						InboundRateLimiterConfig:  defaultRL,
+					},
+				},
+			}
+
+			// Run the changeset again to disable rate limiters
+			output, err = tokensapi.SetTokenPoolRateLimits().Apply(*env, input)
+			require.NoError(t, err)
+			MergeAddresses(t, env, output.DataStore)
+
+			// Query the latest on-chain state for chain A
+			outboundRateLimitAB, err = poolA.GetCurrentOutboundRateLimiterState(&bind.CallOpts{Context: t.Context()}, evmB.Chain.Selector)
+			require.NoError(t, err)
+			inboundRateLimitAB, err = poolA.GetCurrentInboundRateLimiterState(&bind.CallOpts{Context: t.Context()}, evmB.Chain.Selector)
+			require.NoError(t, err)
+
+			// Verify that the rate limits were disabled correctly
+			require.False(t, outboundRateLimitAB.IsEnabled)
+			require.False(t, inboundRateLimitAB.IsEnabled)
 		})
 	})
 

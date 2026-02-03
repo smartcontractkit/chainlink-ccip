@@ -35,6 +35,10 @@ type AddRemotePoolArgs struct {
 	RemotePoolAddress   []byte
 }
 
+type SetRateLimitAdminArgs struct {
+	NewAdmin common.Address
+}
+
 var GetToken = contract.NewRead(contract.ReadParams[struct{}, common.Address, *token_pool.TokenPool]{
 	Name:         "token-pool:get-token",
 	Version:      Version,
@@ -77,12 +81,17 @@ var SetChainRateLimiterConfig = contract.NewWrite(contract.WriteParams[SetChainR
 		if err != nil {
 			return false, fmt.Errorf("failed to get owner for pool at address %q: %w", tp.Address().Hex(), err)
 		}
+		fmt.Println("Caller address:", caller.Hex())
+		fmt.Println("Admin address:", admin.Hex())
+		fmt.Println("Owner address:", owner.Hex())
 
 		// Rate limit config can be set by either the rate limit admin or the owner
 		return caller.Cmp(admin) == 0 || caller.Cmp(owner) == 0, nil
 	},
 	Validate: func(args SetChainRateLimiterConfigArgs) error { return nil },
 	CallContract: func(tp *token_pool.TokenPool, opts *bind.TransactOpts, args SetChainRateLimiterConfigArgs) (*types.Transaction, error) {
+		fmt.Println("Setting rate limits on token pool at address:", tp.Address().Hex())
+		fmt.Println("Data for setting rate limits:", args)
 		return tp.SetChainRateLimiterConfig(opts, args.RemoteChainSelector, args.OutboundRateLimitConfig, args.InboundRateLimitConfig)
 	},
 })
@@ -98,5 +107,19 @@ var AddRemotePool = contract.NewWrite(contract.WriteParams[AddRemotePoolArgs, *t
 	Validate:        func(args AddRemotePoolArgs) error { return nil },
 	CallContract: func(tp *token_pool.TokenPool, opts *bind.TransactOpts, args AddRemotePoolArgs) (*types.Transaction, error) {
 		return tp.AddRemotePool(opts, args.RemoteChainSelector, args.RemotePoolAddress)
+	},
+})
+
+var SetRateLimitAdmin = contract.NewWrite(contract.WriteParams[SetRateLimitAdminArgs, *token_pool.TokenPool]{
+	Name:            "token-pool:set-rate-limit-admin",
+	Version:         Version,
+	Description:     "Sets the rate limit admin for the TokenPool 1.5.1 contract",
+	ContractType:    ContractType,
+	ContractABI:     token_pool.TokenPoolABI,
+	NewContract:     token_pool.NewTokenPool,
+	IsAllowedCaller: contract.OnlyOwner[*token_pool.TokenPool, SetRateLimitAdminArgs],
+	Validate:        func(args SetRateLimitAdminArgs) error { return nil },
+	CallContract: func(tp *token_pool.TokenPool, opts *bind.TransactOpts, args SetRateLimitAdminArgs) (*types.Transaction, error) {
+		return tp.SetRateLimitAdmin(opts, args.NewAdmin)
 	},
 })

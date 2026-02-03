@@ -16,19 +16,22 @@ import (
 type RateLimiterConfigInput struct {
 	ChainSelector       uint64                             `yaml:"chain-selector" json:"chainSelector"`
 	ChainAdapterVersion *semver.Version                    `yaml:"chain-adapter-version" json:"chainAdapterVersion"`
+	TokenSymbol         string                             `yaml:"token-symbol" json:"tokenSymbol"`
+	TokenPoolQualifier  string                             `yaml:"token-pool-qualifier" json:"tokenPoolQualifier"`
+	PoolType            string                             `yaml:"pool-type" json:"poolType"`
 	Inputs              map[uint64]RateLimiterConfigInputs `yaml:"inputs" json:"inputs"`
 	MCMS                mcms.Input                         `yaml:"mcms,omitempty" json:"mcms"`
 }
 
 type RateLimiterConfigInputs struct {
-	TokenSymbol               string            `yaml:"token-symbol" json:"tokenSymbol"`
-	TokenPoolQualifier        string            `yaml:"token-pool-qualifier" json:"tokenPoolQualifier"`
-	PoolType                  string            `yaml:"pool-type" json:"poolType"`
 	InboundRateLimiterConfig  RateLimiterConfig `yaml:"inbound-rate-limiter-config" json:"inboundRateLimiterConfig"`
 	OutboundRateLimiterConfig RateLimiterConfig `yaml:"outbound-rate-limiter-config" json:"outboundRateLimiterConfig"`
 	// below are not specified by the user, filled in by the deployment system to pass to chain operations
 	ChainSelector       uint64
 	RemoteChainSelector uint64
+	TokenSymbol         string
+	TokenPoolQualifier  string
+	PoolType            string
 	ExistingDataStore   datastore.DataStore
 }
 
@@ -61,6 +64,9 @@ func setTokenPoolRateLimitsApply() func(cldf.Environment, RateLimiterConfigInput
 		}
 		for remoteSelector, inputs := range cfg.Inputs {
 			inputs.ChainSelector = cfg.ChainSelector
+			inputs.TokenSymbol = cfg.TokenSymbol
+			inputs.TokenPoolQualifier = cfg.TokenPoolQualifier
+			inputs.PoolType = cfg.PoolType
 			inputs.RemoteChainSelector = remoteSelector
 			inputs.ExistingDataStore = e.DataStore
 			rateLimitReport, err := cldf_ops.ExecuteSequence(

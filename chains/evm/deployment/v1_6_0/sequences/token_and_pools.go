@@ -174,6 +174,7 @@ func (a *EVMAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokensapi.RateL
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token pool with qualifier %q on chain %d: %w", input.TokenPoolQualifier, input.ChainSelector, err)
 			}
+
 			report, err := cldf_ops.ExecuteOperation(b, tpops.SetChainRateLimiterConfig, chain, contract.FunctionInput[tpops.SetChainRateLimiterConfigArgs]{
 				ChainSelector: chain.Selector,
 				Address:       tpAddress,

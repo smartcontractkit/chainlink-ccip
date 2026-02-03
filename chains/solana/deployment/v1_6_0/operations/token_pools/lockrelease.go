@@ -139,7 +139,7 @@ var UpsertRateLimitsLockRelease = operations.NewOperation(
 			Capacity: input.OutboundRateLimiterConfig.Capacity.Uint64(),
 			Rate:     input.OutboundRateLimiterConfig.Rate.Uint64(),
 		}
-		authority := GetAuthorityBurnMint(chain, input.TokenPool, input.TokenMint)
+		authority := GetAuthorityLockRelease(chain, input.TokenPool, input.TokenMint)
 		poolConfigPDA, _ := tokens.TokenPoolConfigAddress(input.TokenMint, input.TokenPool)
 		// check if remote chain config already exists
 		remoteChainConfigPDA, _, _ := tokens.TokenPoolChainConfigPDA(input.RemoteSelector, input.TokenMint, input.TokenPool)
@@ -161,7 +161,7 @@ var UpsertRateLimitsLockRelease = operations.NewOperation(
 				chain.Selector,
 				[]solana.Instruction{ixn},
 				input.TokenPool.String(),
-				common_utils.BurnMintTokenPool.String(),
+				common_utils.LockReleaseTokenPool.String(),
 			)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute or create batch: %w", err)
