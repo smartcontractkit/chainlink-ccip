@@ -31,6 +31,14 @@ contracts:
       - name: transferOwnership
         access: owner
 
+  # 1.6.2
+  - contract_name: CCTPMessageTransmitterProxy
+    version: "1.6.2"
+    package_name: cctp_message_transmitter_proxy
+    functions:
+      - name: configureAllowedCallers
+        access: owner
+
   # 1.6.1
   - contract_name: TokenPool
     version: "1.6.1"

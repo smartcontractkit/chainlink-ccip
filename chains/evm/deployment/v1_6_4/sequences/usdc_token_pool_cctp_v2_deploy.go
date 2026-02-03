@@ -10,7 +10,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/cctp_message_transmitter_proxy"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_2/operations/cctp_message_transmitter_proxy"
 	usdc_token_pool_cctp_v2_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/usdc_token_pool_cctp_v2"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
@@ -75,7 +75,7 @@ var USDCTokenPoolCCTPV2DeploySequence = operations.NewSequence(
 
 		// Configure the allowed callers for the CCTPMessageTransmitterProxy to allow the USDCTokenPoolCCTPV2 contract to
 		// proxy messages through it.
-		_, err = operations.ExecuteOperation(b, cctp_message_transmitter_proxy.CCTPMessageTransmitterProxyConfigureAllowedCallers, chain, contract.FunctionInput[[]cctp_message_transmitter_proxy.AllowedCallerConfigArgs]{
+		_, err = operations.ExecuteOperation(b, cctp_message_transmitter_proxy.ConfigureAllowedCallers, chain, contract.FunctionInput[[]cctp_message_transmitter_proxy.AllowedCallerConfigArgs]{
 			ChainSelector: input.ChainSelector,
 			Address:       cctpProxyAddress,
 			Args: []cctp_message_transmitter_proxy.AllowedCallerConfigArgs{

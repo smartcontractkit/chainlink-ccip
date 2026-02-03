@@ -2,6 +2,7 @@ package usdc_token_pool_cctp_v2
 
 import (
 	"math/big"
+
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
@@ -139,12 +140,6 @@ type AddRemotePoolArgs struct {
 }
 
 type RemoveRemotePoolArgs struct {
-	RemoteChainSelector uint64
-	RemotePoolAddress   []byte
-}
-
-type RemotePoolModification struct {
-	Operation           string
 	RemoteChainSelector uint64
 	RemotePoolAddress   []byte
 }
