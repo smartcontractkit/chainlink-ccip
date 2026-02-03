@@ -43,22 +43,21 @@ type ConfigureLombardChainForLanesInput struct {
 	// ChainSelector is the selector for the chain being configured.
 	ChainSelector uint64
 	// Token is the address of the Token contract.
-	Token string
+	Token              string
+	TokenPoolReference datastore.AddressRef
 	// RemoteChains is the set of remote chains to configure.
 	RemoteChains map[uint64]RemoteLombardChainConfig
 }
 
 // RemoteLombardChainConfig configures a Lombard-enabled chain for a remote counterpart.
 type RemoteLombardChainConfig struct {
-	TokenPoolConfig        tokens.RemoteChainConfig[string, string]
+	RemotePoolAddress      []byte
+	RemoteTokenAddress     []byte
 	TokenTransferFeeConfig tokens.TokenTransferFeeConfig
-	RemoteDomain           LombardRemoteDomain
-}
-
-// LombardRemoteDomain identifies Lombard-specific parameters for a remote chain.
-type LombardRemoteDomain struct {
-	AllowedCaller datastore.AddressRef
-	LChainId      uint32
+	LombardChainId         uint32
+	FeeUSDCents            uint16
+	GasForVerification     uint32
+	PayloadSizeBytes       uint32
 }
 
 // ConfigureLombardChainForLanesDeps are the dependencies for the ConfigureLombardChainForLanes sequence.
@@ -66,16 +65,25 @@ type ConfigureLombardChainForLanesDeps struct {
 	// BlockChains are the chains in the environment.
 	BlockChains cldf_chain.BlockChains
 	// DataStore defines all addresses in the environment.
-	DataStore datastore.DataStore
+	DataStore    datastore.DataStore
+	RemoteChains map[uint64]RemoteLombardChain
 }
 
 // LombardChain is a configurable Lombard chain.
 type LombardChain interface {
+	RemoteLombardChain
 	// DeployLombardChain deploys the Lombard contracts on the chain.
 	DeployLombardChain() *cldf_ops.Sequence[DeployLombardInput, sequences.OnChainOutput, DeployLombardChainDeps]
+	ConfigureLombardChainForLanes() *cldf_ops.Sequence[ConfigureLombardChainForLanesInput, sequences.OnChainOutput, ConfigureLombardChainForLanesDeps]
 	// AddressRefToBytes converts an AddressRef to a byte slice representing the address.
 	// Each chain family has their own way of serializing addresses from strings and needs to specify this logic.
 	AddressRefToBytes(ref datastore.AddressRef) ([]byte, error)
+}
+
+// RemoteLombardChain is a connectable remote Lombard chain.
+type RemoteLombardChain interface {
+	// AllowedCallerOnDest returns the address allowed to deposit tokens for burn on the remote chain.
+	AllowedCallerOnDest(ds datastore.DataStore, chains cldf_chain.BlockChains, selector uint64) ([]byte, error)
 }
 
 // LombardChainRegistry maintains a registry of Lombard chains.

@@ -9,6 +9,8 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/lombard_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/lombard"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
@@ -29,7 +31,7 @@ type LombardChainConfig struct {
 	// RateLimitAdmin is the address allowed to update token pool rate limits.
 	RateLimitAdmin string
 	// RemoteChains is the set of remote chains to configure.
-	RemoteChains map[uint64]struct{}
+	RemoteChains map[uint64]adapters.RemoteLombardChainConfig
 }
 
 type DeployLombardChainsConfig struct {
@@ -117,6 +119,62 @@ func makeApplyDeployLombardChains(lombardChainRegistry *adapters.LombardChainReg
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %s on chain with selector %d to datastore: %w", r.Type, r.Version, r.Address, r.ChainSelector, err)
 				}
 			}
+		}
+
+		// Configure across all chains.
+		// Create a new datastore that merges the existing datastore with the new datastore.
+		// Enables the configuration sequence to have all existing and new addresses.
+		combinedDS := datastore.NewMemoryDataStore()
+		err := combinedDS.Merge(e.DataStore)
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to merge datastore: %w", err)
+		}
+		err = combinedDS.Merge(newDS.Seal())
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to merge datastore: %w", err)
+		}
+
+		for chainSel, chainCfg := range cfg.Chains {
+			remoteChains := make(map[uint64]adapters.RemoteLombardChain)
+			for remoteChainSelector := range chainCfg.RemoteChains {
+				family, err := chain_selectors.GetSelectorFamily(remoteChainSelector)
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to get chain family for remote chain selector %d: %w", remoteChainSelector, err)
+				}
+				adapter, ok := lombardChainRegistry.GetLombardChain(family)
+				if !ok {
+					return cldf.ChangesetOutput{}, fmt.Errorf("no CCTP adapter registered for chain family '%s'", family)
+				}
+				remoteChains[remoteChainSelector] = adapter
+			}
+
+			tokenPoolRef, err := newDS.Addresses().Get(datastore.NewAddressRefKey(
+				chainSel,
+				datastore.ContractType(lombard_token_pool.ContractType),
+				lombard_token_pool.Version,
+				lombard.ContractQualifier,
+			))
+			if err != nil {
+				return cldf.ChangesetOutput{}, err
+			}
+
+			dep := adapters.ConfigureLombardChainForLanesDeps{
+				BlockChains:  e.BlockChains,
+				DataStore:    combinedDS.Seal(),
+				RemoteChains: remoteChains,
+			}
+			in := adapters.ConfigureLombardChainForLanesInput{
+				ChainSelector:      chainSel,
+				Token:              chainCfg.Token,
+				TokenPoolReference: tokenPoolRef,
+				RemoteChains:       chainCfg.RemoteChains,
+			}
+			configureChainForLanesReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adaptersByChain[chainSel].ConfigureLombardChainForLanes(), dep, in)
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to configure CCTP on chain with selector %d: %w", chainSel, err)
+			}
+			batchOps = append(batchOps, configureChainForLanesReport.Output.BatchOps...)
+			reports = append(reports, configureChainForLanesReport.ExecutionReports...)
 		}
 
 		var mcmsInput mcms.Input
