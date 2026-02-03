@@ -60,3 +60,12 @@ gcr_creds.env
 devenv/tests/e2e/blockscout
 devenv/env-out.toml
 .cursorrules
+
+
+testnet.yaml
+mainnet.yaml
+address_refs.json
+mainnet_address_refs.json
+_old_view/
+goal_state.json
+state.json
