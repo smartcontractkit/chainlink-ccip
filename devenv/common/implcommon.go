@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"math/big"
 	"os"
 	"time"
@@ -26,11 +27,14 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
+	evmadapters "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/ccip_home"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/rmn_home"
-	_ "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
+	solseq "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	lanesapi "github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/testadapters"
+	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	changesetscore "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
@@ -566,4 +570,178 @@ func AddNodesToCapReg(
 		env.Logger.Info("Successfully added node operators to Capabilities Registry through proposal execution")
 	}
 	return nil
+}
+
+func SetupTokensAndTokenPools(
+	ctx context.Context,
+	env *deployment.Environment,
+	adp []testadapters.TestAdapter,
+) (datastore.DataStore, error) {
+	// Get registries and define v1.6.0 alias
+	toknRegistry := tokensapi.GetTokenAdapterRegistry()
+	mcmsRegistry := changesetscore.GetRegistry()
+	v1_6_0 := semver.MustParse("1.6.0")
+
+	// Ensure all MCMS readers are registered.
+	mcmsRegistry.RegisterMCMSReader(chainsel.FamilyEVM, &evmadapters.EVMMCMSReader{})
+	mcmsRegistry.RegisterMCMSReader(chainsel.FamilySolana, &solseq.SolanaAdapter{})
+
+	// To simplify testing, we disable rate limiting on all token transfers.
+	disabledRL := tokensapi.RateLimiterConfig{Capacity: big.NewInt(0), Rate: big.NewInt(0), IsEnabled: false}
+
+	// This will only store the addresses deployed during this setup.
+	outputDS := datastore.NewMemoryDataStore()
+
+	// A helper to create MCMS inputs with long expirations and short timelock delays.
+	newInputForMCMS := func(desc string) mcms.Input {
+		return mcms.Input{
+			OverridePreviousRoot: false,
+			ValidUntil:           math.MaxUint32,
+			TimelockDelay:        mcms_types.MustParseDuration("1s"),
+			TimelockAction:       mcms_types.TimelockActionSchedule,
+			Qualifier:            cciputils.CLLQualifier,
+			Description:          desc,
+		}
+	}
+
+	// A helper to update both the environment datastore and output datastore after each operation.
+	mergeDS := func(deltaDS datastore.MutableDataStore) error {
+		if deltaDS != nil {
+			fullDS := datastore.NewMemoryDataStore()
+			if err := outputDS.Merge(deltaDS.Seal()); err != nil {
+				return fmt.Errorf("failed to update output datastore: %w", err)
+			}
+			if err := fullDS.Merge(deltaDS.Seal()); err != nil {
+				return fmt.Errorf("failed to merge delta datastore: %w", err)
+			}
+			if err := fullDS.Merge(env.DataStore); err != nil {
+				return fmt.Errorf("failed to merge environment datastore: %w", err)
+			}
+			env.DataStore = fullDS.Seal()
+		}
+		return nil
+	}
+
+	// Here we construct two maps. The deployment map defines the tokens and token pools to deploy.
+	// The mesh defines the token transfer configuration between all chains. Here, we define a full
+	// mesh that allows tokens to be transferred between all chains.
+	dply := map[uint64]tokensapi.TokenExpansionInputPerChain{}
+	mesh := map[uint64][]tokensapi.TokenTransferConfig{}
+	for _, srcAdapter := range adp {
+		srcCfg := srcAdapter.GetTokenExpansionConfig()
+		srcSel := srcAdapter.ChainSelector()
+
+		externalAdmin := ""
+		if len(srcCfg.DeployTokenInput.ExternalAdmin) > 0 {
+			externalAdmin = srcCfg.DeployTokenInput.ExternalAdmin[0]
+		}
+
+		registryAddr, err := srcAdapter.GetRegistryAddress()
+		if err != nil {
+			return nil, fmt.Errorf("getting registry address for selector %d: %w", srcSel, err)
+		}
+
+		ttCfg := tokensapi.TokenTransferConfig{
+			RemoteChains:  map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{},
+			ChainSelector: srcSel,
+			ExternalAdmin: externalAdmin,
+			RegistryRef: datastore.AddressRef{
+				Address:       registryAddr,
+				ChainSelector: srcSel,
+			},
+			TokenPoolRef: datastore.AddressRef{
+				Type:          datastore.ContractType(srcCfg.PoolType),
+				Qualifier:     srcCfg.TokenPoolQualifier,
+				Version:       srcCfg.TokenPoolVersion,
+				ChainSelector: srcSel,
+			},
+		}
+
+		for _, dstAdapter := range adp {
+			dstCfg := dstAdapter.GetTokenExpansionConfig()
+			dstSel := dstAdapter.ChainSelector()
+
+			if srcSel != dstSel {
+				ttCfg.RemoteChains[dstSel] = tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+					OutboundCCVs:              []datastore.AddressRef{}, // not needed for for 1.6
+					InboundCCVs:               []datastore.AddressRef{}, // not needed for for 1.6
+					OutboundRateLimiterConfig: disabledRL,
+					InboundRateLimiterConfig:  disabledRL,
+					RemoteToken: &datastore.AddressRef{
+						Type:          datastore.ContractType(dstCfg.DeployTokenInput.Type),
+						Qualifier:     dstCfg.DeployTokenInput.Symbol,
+						ChainSelector: dstSel,
+					},
+					RemotePool: &datastore.AddressRef{
+						Type:          datastore.ContractType(dstCfg.PoolType),
+						Qualifier:     dstCfg.TokenPoolQualifier,
+						Version:       dstCfg.TokenPoolVersion,
+						ChainSelector: dstSel,
+					},
+				}
+			}
+		}
+
+		mesh[srcSel] = append(mesh[srcSel], ttCfg)
+		dply[srcSel] = srcCfg
+	}
+
+	// Deploy one token and its corresponding token pool for all the input chains.
+	out, err := tokensapi.TokenExpansion().Apply(*env,
+		tokensapi.TokenExpansionInput{
+			ChainAdapterVersion:         v1_6_0,
+			TokenExpansionInputPerChain: dply,
+			MCMS:                        newInputForMCMS("Token Expansion"),
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to deploy tokens and token pools: %w", err)
+	}
+	if err = mergeDS(out.DataStore); err != nil {
+		return nil, fmt.Errorf("failed to merge datastore after token expansion: %w", err)
+	}
+
+	// Enable token transfers between all chains in the mesh.
+	for _, tokens := range mesh {
+		out, err = tokensapi.ConfigureTokensForTransfers(toknRegistry, mcmsRegistry).Apply(*env,
+			tokensapi.ConfigureTokensForTransfersConfig{
+				ChainAdapterVersion: v1_6_0,
+				Tokens:              tokens,
+				MCMS:                newInputForMCMS("Configure Tokens For Transfers"),
+			},
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to configure tokens for transfers: %w", err)
+		}
+		if err = mergeDS(out.DataStore); err != nil {
+			return nil, fmt.Errorf("failed to merge datastore after configuring tokens for transfers: %w", err)
+		}
+	}
+
+	// Allow the router to withdraw a sensible amount of tokens from the account that will be transferring tokens.
+	for _, adapter := range adp {
+		teConfig := adapter.GetTokenExpansionConfig()
+		selector := adapter.ChainSelector()
+
+		oneToken := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(teConfig.DeployTokenInput.Decimals)), nil)
+		maxAllow := new(big.Int).Mul(oneToken, big.NewInt(10_000)) // allow 10,000 tokens to be withdrawn
+		tokenRef := datastore.AddressRef{
+			Type:          datastore.ContractType(teConfig.DeployTokenInput.Type),
+			Qualifier:     teConfig.DeployTokenInput.Symbol,
+			ChainSelector: selector,
+		}
+
+		token, err := datastore_utils.FindAndFormatRef(env.DataStore, tokenRef, selector, datastore_utils.FullRef)
+		if err != nil {
+			return nil, fmt.Errorf("finding token address for selector %d: %w", selector, err)
+		}
+
+		err = adapter.AllowRouterToWithdrawTokens(env.GetContext(), token.Address, maxAllow)
+		if err != nil {
+			return nil, fmt.Errorf("failed to allow router to withdraw tokens for selector %d: %w", selector, err)
+		}
+	}
+
+	// Return only the newly deployed addresses from this setup.
+	return outputDS.Seal(), nil
 }

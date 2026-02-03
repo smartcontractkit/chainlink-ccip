@@ -37,6 +37,8 @@ import (
 	common_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/plugincommon"
 	reader_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
 	readerpkg_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
+	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
+
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
@@ -376,6 +378,190 @@ func Test_ObserveOffRampNextSeqNums(t *testing.T) {
 			)
 
 			assert.Equal(t, tc.expResult, o.ObserveOffRampNextSeqNums(ctx))
+		})
+	}
+}
+
+func Test_ObserveOnRampNextSeqNums(t *testing.T) {
+	const nodeID commontypes.OracleID = 1
+	knownSourceChains := []cciptypes.ChainSelector{4, 7, 19}
+	nextSeqNums := map[cciptypes.ChainSelector]cciptypes.SeqNum{4: 345, 7: 608, 19: 7713}
+	supportedChains := mapset.NewSet(knownSourceChains...)
+
+	testCases := []struct {
+		name      string
+		expResult []plugintypes.SeqNumChain
+		getDeps   func(t *testing.T) *reader_mock.MockCCIPReader
+	}{
+		{
+			name: "Happy path",
+			getDeps: func(t *testing.T) *reader_mock.MockCCIPReader {
+				ccipReader := reader_mock.NewMockCCIPReader(t)
+				ccipReader.EXPECT().GetOffRampSourceChainsConfig(mock.Anything, knownSourceChains).
+					Return(map[cciptypes.ChainSelector]readerpkg.StaticSourceChainConfig{
+						cciptypes.ChainSelector(4): {
+							IsRMNVerificationDisabled: true,
+						},
+						cciptypes.ChainSelector(7): {
+							IsRMNVerificationDisabled: true,
+						},
+						cciptypes.ChainSelector(19): {
+							IsRMNVerificationDisabled: true,
+						},
+					}, nil)
+				ccipReader.EXPECT().LatestMsgSeqNum(mock.Anything, mock.Anything).
+					RunAndReturn(
+						func(ctx context.Context, chain cciptypes.ChainSelector) (cciptypes.SeqNum, error) {
+							require.True(t, supportedChains.Contains(chain))
+							return nextSeqNums[chain], nil
+						},
+					)
+				return ccipReader
+			},
+			expResult: []plugintypes.SeqNumChain{
+				plugintypes.NewSeqNumChain(4, 345),
+				plugintypes.NewSeqNumChain(7, 608),
+				plugintypes.NewSeqNumChain(19, 7713),
+			},
+		},
+		{
+			name: "rmn verification misconfigured, should ignore observations",
+			getDeps: func(t *testing.T) *reader_mock.MockCCIPReader {
+				ccipReader := reader_mock.NewMockCCIPReader(t)
+				ccipReader.EXPECT().GetOffRampSourceChainsConfig(mock.Anything, knownSourceChains).
+					Return(map[cciptypes.ChainSelector]readerpkg.StaticSourceChainConfig{
+						cciptypes.ChainSelector(4): {
+							IsRMNVerificationDisabled: true,
+						},
+						cciptypes.ChainSelector(7): {
+							IsRMNVerificationDisabled: true,
+						},
+						cciptypes.ChainSelector(19): {
+							IsRMNVerificationDisabled: false,
+						},
+					}, nil)
+				ccipReader.EXPECT().LatestMsgSeqNum(mock.Anything, mock.Anything).
+					RunAndReturn(
+						func(ctx context.Context, chain cciptypes.ChainSelector) (cciptypes.SeqNum, error) {
+							require.True(t, supportedChains.Contains(chain))
+							return nextSeqNums[chain], nil
+						},
+					)
+				return ccipReader
+			},
+			expResult: []plugintypes.SeqNumChain{
+				plugintypes.NewSeqNumChain(4, 345),
+				plugintypes.NewSeqNumChain(7, 608),
+			},
+		},
+		{
+			name: "source configuration missing, should not break",
+			getDeps: func(t *testing.T) *reader_mock.MockCCIPReader {
+				ccipReader := reader_mock.NewMockCCIPReader(t)
+				ccipReader.EXPECT().GetOffRampSourceChainsConfig(mock.Anything, knownSourceChains).
+					Return(map[cciptypes.ChainSelector]readerpkg.StaticSourceChainConfig{
+						cciptypes.ChainSelector(4): {
+							IsRMNVerificationDisabled: true,
+						},
+						cciptypes.ChainSelector(19): {
+							IsRMNVerificationDisabled: true,
+						},
+					}, nil)
+				ccipReader.EXPECT().LatestMsgSeqNum(mock.Anything, mock.Anything).
+					RunAndReturn(
+						func(ctx context.Context, chain cciptypes.ChainSelector) (cciptypes.SeqNum, error) {
+							require.True(t, supportedChains.Contains(chain))
+							return nextSeqNums[chain], nil
+						},
+					)
+				return ccipReader
+			},
+			expResult: []plugintypes.SeqNumChain{
+				plugintypes.NewSeqNumChain(4, 345),
+				plugintypes.NewSeqNumChain(19, 7713),
+			},
+		},
+		{
+			name: "multiple rmn misconfigurations, should not break",
+			getDeps: func(t *testing.T) *reader_mock.MockCCIPReader {
+				ccipReader := reader_mock.NewMockCCIPReader(t)
+				ccipReader.EXPECT().GetOffRampSourceChainsConfig(mock.Anything, knownSourceChains).
+					Return(map[cciptypes.ChainSelector]readerpkg.StaticSourceChainConfig{
+						cciptypes.ChainSelector(4): {
+							IsRMNVerificationDisabled: false,
+						},
+						cciptypes.ChainSelector(7): {
+							IsRMNVerificationDisabled: false,
+						},
+						cciptypes.ChainSelector(19): {
+							IsRMNVerificationDisabled: true,
+						},
+					}, nil)
+				ccipReader.EXPECT().LatestMsgSeqNum(mock.Anything, mock.Anything).
+					RunAndReturn(
+						func(ctx context.Context, chain cciptypes.ChainSelector) (cciptypes.SeqNum, error) {
+							require.True(t, supportedChains.Contains(chain))
+							return nextSeqNums[chain], nil
+						},
+					)
+				return ccipReader
+			},
+			expResult: []plugintypes.SeqNumChain{
+				plugintypes.NewSeqNumChain(19, 7713),
+			},
+		},
+		{
+			name: "should only ask for seq nums for rmn disabled chains",
+			getDeps: func(t *testing.T) *reader_mock.MockCCIPReader {
+
+				ccipReader := reader_mock.NewMockCCIPReader(t)
+				ccipReader.EXPECT().GetOffRampSourceChainsConfig(mock.Anything, knownSourceChains).
+					Return(map[cciptypes.ChainSelector]readerpkg.StaticSourceChainConfig{
+						cciptypes.ChainSelector(4): {
+							IsRMNVerificationDisabled: false,
+						},
+						cciptypes.ChainSelector(7): {
+							IsRMNVerificationDisabled: false,
+						},
+						cciptypes.ChainSelector(19): {
+							IsRMNVerificationDisabled: true,
+						},
+					}, nil)
+				ccipReader.EXPECT().LatestMsgSeqNum(mock.Anything, cciptypes.ChainSelector(19)).
+					RunAndReturn(
+						func(ctx context.Context, chain cciptypes.ChainSelector) (cciptypes.SeqNum, error) {
+							require.True(t, supportedChains.Contains(chain))
+							return nextSeqNums[chain], nil
+						},
+					).Once()
+				return ccipReader
+			},
+			expResult: []plugintypes.SeqNumChain{
+				plugintypes.NewSeqNumChain(19, 7713),
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := t.Context()
+			chainSupport := common_mock.NewMockChainSupport(t)
+			chainSupport.EXPECT().KnownSourceChainsSlice().Return(knownSourceChains, nil)
+			chainSupport.EXPECT().SupportedChains(nodeID).Return(supportedChains, nil)
+			ccipReader := tc.getDeps(t)
+			defer chainSupport.AssertExpectations(t)
+			defer ccipReader.AssertExpectations(t)
+
+			o := newObserverImpl(
+				logger.Test(t),
+				nil,
+				nodeID,
+				chainSupport,
+				ccipReader,
+				mocks.NewMessageHasher(),
+			)
+
+			assert.Equal(t, tc.expResult, o.ObserveLatestOnRampSeqNums(ctx))
 		})
 	}
 }
