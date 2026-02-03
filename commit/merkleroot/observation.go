@@ -571,6 +571,12 @@ func (o observerImpl) ObserveLatestOnRampSeqNums(ctx context.Context) []pluginty
 	wg := &sync.WaitGroup{}
 	for _, sourceChain := range supportedSourceChains {
 		wg.Go(func() {
+			// RMN should never be enabled on any source chain lane
+			// if it is misconfigured, we skip observations to avoid impact to the report
+			if _, ok := sourceChainsCfg[sourceChain]; !ok {
+				lggr.Warnw("source chain config not found, skipping observations", "source", sourceChain)
+				return
+			}
 			if !sourceChainsCfg[sourceChain].IsRMNVerificationDisabled {
 				lggr.Warnw("rmn enablement is misconfigured on this lane, skipping observations", "source", sourceChain)
 				return
