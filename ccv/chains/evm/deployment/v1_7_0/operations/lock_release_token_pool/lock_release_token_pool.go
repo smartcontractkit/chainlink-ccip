@@ -5,7 +5,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/siloed_lock_release_token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/siloed_usdc_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -15,8 +14,6 @@ var ContractType cldf_deployment.ContractType = "LockReleaseTokenPool"
 
 var SiloedContractType cldf_deployment.ContractType = "SiloedLockReleaseTokenPool"
 
-var SiloedUSDCTokenPoolContractType cldf_deployment.ContractType = "SiloedUSDCTokenPool"
-
 var Version = semver.MustParse("1.7.0")
 
 var bytecodeByTypeAndVersion = map[string]contract.Bytecode{
@@ -25,9 +22,6 @@ var bytecodeByTypeAndVersion = map[string]contract.Bytecode{
 	},
 	cldf_deployment.NewTypeAndVersion(SiloedContractType, *Version).String(): {
 		EVM: common.FromHex(siloed_lock_release_token_pool.SiloedLockReleaseTokenPoolBin),
-	},
-	cldf_deployment.NewTypeAndVersion(SiloedUSDCTokenPoolContractType, *Version).String(): {
-		EVM: common.FromHex(siloed_usdc_token_pool.SiloedUSDCTokenPoolBin),
 	},
 }
 
