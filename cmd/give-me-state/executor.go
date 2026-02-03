@@ -379,3 +379,74 @@ func base58Encode(input []byte) string {
 
 	return string(result)
 }
+
+// =====================================================
+// Aptos Executor
+// =====================================================
+
+// AptosExecutor implements ChainExecutor for Aptos chains.
+// It uses the Aptos REST API to fetch account resources.
+type AptosExecutor struct {
+	rpcURL string
+	client *http.Client
+}
+
+// NewAptosExecutor creates a new Aptos executor for the given RPC URL.
+func NewAptosExecutor(rpcURL string) *AptosExecutor {
+	return &AptosExecutor{
+		rpcURL: strings.TrimSuffix(rpcURL, "/"),
+		client: &http.Client{
+			Timeout: 30 * time.Second,
+		},
+	}
+}
+
+// aptosResourceResponse represents an Aptos resource response
+type aptosResourceResponse struct {
+	Type string          `json:"type"`
+	Data json.RawMessage `json:"data"`
+}
+
+// Execute performs an Aptos REST API call.
+// For Aptos, "target" is the account address (hex string as bytes).
+// The "data" parameter can contain the resource type to fetch (optional).
+// If data is empty, fetches all resources for the account.
+func (a *AptosExecutor) Execute(target, data []byte) ([]byte, error) {
+	// Convert target to address string
+	accountAddr := string(target)
+	if !strings.HasPrefix(accountAddr, "0x") {
+		accountAddr = "0x" + accountAddr
+	}
+
+	var url string
+	if len(data) > 0 {
+		// Fetch specific resource
+		resourceType := string(data)
+		url = fmt.Sprintf("%s/v1/accounts/%s/resource/%s", a.rpcURL, accountAddr, resourceType)
+	} else {
+		// Fetch all resources
+		url = fmt.Sprintf("%s/v1/accounts/%s/resources", a.rpcURL, accountAddr)
+	}
+
+	resp, err := a.client.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("http request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		// Check for 404 (resource not found)
+		if resp.StatusCode == http.StatusNotFound {
+			return nil, fmt.Errorf("account or resource not found: %s", accountAddr)
+		}
+		return nil, fmt.Errorf("http error %d: %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	// Return the raw JSON response - views will parse it
+	return bodyBytes, nil
+}

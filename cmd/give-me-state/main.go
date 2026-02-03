@@ -10,8 +10,10 @@ import (
 	"time"
 
 	"call-orchestrator-demo/views"
-	// Import EVM views to trigger init() registration
+	// Import views to trigger init() registration
+	_ "call-orchestrator-demo/views/aptos"
 	_ "call-orchestrator-demo/views/evm"
+	_ "call-orchestrator-demo/views/solana"
 )
 
 func main() {

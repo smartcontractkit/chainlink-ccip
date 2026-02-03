@@ -98,6 +98,8 @@ func NewCallManagerWithConfig(registry *ChainRegistry) *CallManager {
 				executor = NewEVMExecutor(rpc.HTTPURL)
 			case ChainFamilySVM:
 				executor = NewSolanaExecutor(rpc.HTTPURL)
+			case ChainFamilyAptos:
+				executor = NewAptosExecutor(rpc.HTTPURL)
 			default:
 				// Skip unsupported chain families for now
 				continue
