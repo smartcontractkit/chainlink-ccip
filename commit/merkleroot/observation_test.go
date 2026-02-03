@@ -391,14 +391,11 @@ func Test_ObserveOnRampNextSeqNums(t *testing.T) {
 	testCases := []struct {
 		name      string
 		expResult []plugintypes.SeqNumChain
-		getDeps   func(t *testing.T) (*common_mock.MockChainSupport, *reader_mock.MockCCIPReader)
+		getDeps   func(t *testing.T) *reader_mock.MockCCIPReader
 	}{
 		{
 			name: "Happy path",
-			getDeps: func(t *testing.T) (*common_mock.MockChainSupport, *reader_mock.MockCCIPReader) {
-				chainSupport := common_mock.NewMockChainSupport(t)
-				chainSupport.EXPECT().KnownSourceChainsSlice().Return(knownSourceChains, nil)
-				chainSupport.EXPECT().SupportedChains(nodeID).Return(supportedChains, nil)
+			getDeps: func(t *testing.T) *reader_mock.MockCCIPReader {
 				ccipReader := reader_mock.NewMockCCIPReader(t)
 				ccipReader.EXPECT().GetOffRampSourceChainsConfig(mock.Anything, knownSourceChains).
 					Return(map[cciptypes.ChainSelector]readerpkg.StaticSourceChainConfig{
@@ -419,7 +416,7 @@ func Test_ObserveOnRampNextSeqNums(t *testing.T) {
 							return nextSeqNums[chain], nil
 						},
 					)
-				return chainSupport, ccipReader
+				return ccipReader
 			},
 			expResult: []plugintypes.SeqNumChain{
 				plugintypes.NewSeqNumChain(4, 345),
@@ -429,10 +426,7 @@ func Test_ObserveOnRampNextSeqNums(t *testing.T) {
 		},
 		{
 			name: "rmn verification misconfigured, should ignore observations",
-			getDeps: func(t *testing.T) (*common_mock.MockChainSupport, *reader_mock.MockCCIPReader) {
-				chainSupport := common_mock.NewMockChainSupport(t)
-				chainSupport.EXPECT().KnownSourceChainsSlice().Return(knownSourceChains, nil)
-				chainSupport.EXPECT().SupportedChains(nodeID).Return(supportedChains, nil)
+			getDeps: func(t *testing.T) *reader_mock.MockCCIPReader {
 				ccipReader := reader_mock.NewMockCCIPReader(t)
 				ccipReader.EXPECT().GetOffRampSourceChainsConfig(mock.Anything, knownSourceChains).
 					Return(map[cciptypes.ChainSelector]readerpkg.StaticSourceChainConfig{
@@ -453,7 +447,7 @@ func Test_ObserveOnRampNextSeqNums(t *testing.T) {
 							return nextSeqNums[chain], nil
 						},
 					)
-				return chainSupport, ccipReader
+				return ccipReader
 			},
 			expResult: []plugintypes.SeqNumChain{
 				plugintypes.NewSeqNumChain(4, 345),
@@ -462,10 +456,7 @@ func Test_ObserveOnRampNextSeqNums(t *testing.T) {
 		},
 		{
 			name: "source configuration missing, should not break",
-			getDeps: func(t *testing.T) (*common_mock.MockChainSupport, *reader_mock.MockCCIPReader) {
-				chainSupport := common_mock.NewMockChainSupport(t)
-				chainSupport.EXPECT().KnownSourceChainsSlice().Return(knownSourceChains, nil)
-				chainSupport.EXPECT().SupportedChains(nodeID).Return(supportedChains, nil)
+			getDeps: func(t *testing.T) *reader_mock.MockCCIPReader {
 				ccipReader := reader_mock.NewMockCCIPReader(t)
 				ccipReader.EXPECT().GetOffRampSourceChainsConfig(mock.Anything, knownSourceChains).
 					Return(map[cciptypes.ChainSelector]readerpkg.StaticSourceChainConfig{
@@ -483,7 +474,7 @@ func Test_ObserveOnRampNextSeqNums(t *testing.T) {
 							return nextSeqNums[chain], nil
 						},
 					)
-				return chainSupport, ccipReader
+				return ccipReader
 			},
 			expResult: []plugintypes.SeqNumChain{
 				plugintypes.NewSeqNumChain(4, 345),
@@ -492,10 +483,7 @@ func Test_ObserveOnRampNextSeqNums(t *testing.T) {
 		},
 		{
 			name: "multiple rmn misconfigurations, should not break",
-			getDeps: func(t *testing.T) (*common_mock.MockChainSupport, *reader_mock.MockCCIPReader) {
-				chainSupport := common_mock.NewMockChainSupport(t)
-				chainSupport.EXPECT().KnownSourceChainsSlice().Return(knownSourceChains, nil)
-				chainSupport.EXPECT().SupportedChains(nodeID).Return(supportedChains, nil)
+			getDeps: func(t *testing.T) *reader_mock.MockCCIPReader {
 				ccipReader := reader_mock.NewMockCCIPReader(t)
 				ccipReader.EXPECT().GetOffRampSourceChainsConfig(mock.Anything, knownSourceChains).
 					Return(map[cciptypes.ChainSelector]readerpkg.StaticSourceChainConfig{
@@ -516,7 +504,7 @@ func Test_ObserveOnRampNextSeqNums(t *testing.T) {
 							return nextSeqNums[chain], nil
 						},
 					)
-				return chainSupport, ccipReader
+				return ccipReader
 			},
 			expResult: []plugintypes.SeqNumChain{
 				plugintypes.NewSeqNumChain(19, 7713),
@@ -524,10 +512,8 @@ func Test_ObserveOnRampNextSeqNums(t *testing.T) {
 		},
 		{
 			name: "should only ask for seq nums for rmn disabled chains",
-			getDeps: func(t *testing.T) (*common_mock.MockChainSupport, *reader_mock.MockCCIPReader) {
-				chainSupport := common_mock.NewMockChainSupport(t)
-				chainSupport.EXPECT().KnownSourceChainsSlice().Return(knownSourceChains, nil)
-				chainSupport.EXPECT().SupportedChains(nodeID).Return(supportedChains, nil)
+			getDeps: func(t *testing.T) *reader_mock.MockCCIPReader {
+
 				ccipReader := reader_mock.NewMockCCIPReader(t)
 				ccipReader.EXPECT().GetOffRampSourceChainsConfig(mock.Anything, knownSourceChains).
 					Return(map[cciptypes.ChainSelector]readerpkg.StaticSourceChainConfig{
@@ -548,7 +534,7 @@ func Test_ObserveOnRampNextSeqNums(t *testing.T) {
 							return nextSeqNums[chain], nil
 						},
 					).Once()
-				return chainSupport, ccipReader
+				return ccipReader
 			},
 			expResult: []plugintypes.SeqNumChain{
 				plugintypes.NewSeqNumChain(19, 7713),
@@ -559,8 +545,10 @@ func Test_ObserveOnRampNextSeqNums(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := t.Context()
-
-			chainSupport, ccipReader := tc.getDeps(t)
+			chainSupport := common_mock.NewMockChainSupport(t)
+			chainSupport.EXPECT().KnownSourceChainsSlice().Return(knownSourceChains, nil)
+			chainSupport.EXPECT().SupportedChains(nodeID).Return(supportedChains, nil)
+			ccipReader := tc.getDeps(t)
 			defer chainSupport.AssertExpectations(t)
 			defer ccipReader.AssertExpectations(t)
 
