@@ -1,6 +1,9 @@
 package erc20_lock_box
 
 import (
+	"fmt"
+	"math/big"
+
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -19,6 +22,12 @@ type ConstructorArgs struct {
 }
 
 type AuthorizedCallerArgs = erc20_lock_box.AuthorizedCallersAuthorizedCallerArgs
+
+type DepositArgs struct {
+	Token               common.Address
+	RemoteChainSelector uint64
+	Amount              *big.Int
+}
 
 var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Name:             "erc20-lock-box:deploy",
@@ -54,5 +63,38 @@ var GetAllAuthorizedCallers = contract.NewRead(contract.ReadParams[any, []common
 	NewContract:  erc20_lock_box.NewERC20LockBox,
 	CallContract: func(erc20LockBox *erc20_lock_box.ERC20LockBox, opts *bind.CallOpts, args any) ([]common.Address, error) {
 		return erc20LockBox.GetAllAuthorizedCallers(opts)
+	},
+})
+
+var Deposit = contract.NewWrite(contract.WriteParams[DepositArgs, *erc20_lock_box.ERC20LockBox]{
+	Name:         "erc20-lock-box:deposit",
+	Version:      Version,
+	Description:  "Deposits tokens into the ERC20LockBox",
+	ContractType: ContractType,
+	ContractABI:  erc20_lock_box.ERC20LockBoxABI,
+	NewContract:  erc20_lock_box.NewERC20LockBox,
+	IsAllowedCaller: func(erc20LockBox *erc20_lock_box.ERC20LockBox, opts *bind.CallOpts, caller common.Address, args DepositArgs) (bool, error) {
+		callers, err := erc20LockBox.GetAllAuthorizedCallers(opts)
+		if err != nil {
+			return false, err
+		}
+		for _, authorized := range callers {
+			if authorized == caller {
+				return true, nil
+			}
+		}
+		return false, nil
+	},
+	Validate: func(args DepositArgs) error {
+		if args.Amount == nil || args.Amount.Sign() <= 0 {
+			return fmt.Errorf("amount must be greater than zero")
+		}
+		if args.Token == (common.Address{}) {
+			return fmt.Errorf("token address must be set")
+		}
+		return nil
+	},
+	CallContract: func(erc20LockBox *erc20_lock_box.ERC20LockBox, opts *bind.TransactOpts, args DepositArgs) (*types.Transaction, error) {
+		return erc20LockBox.Deposit(opts, args.Token, args.RemoteChainSelector, args.Amount)
 	},
 })
