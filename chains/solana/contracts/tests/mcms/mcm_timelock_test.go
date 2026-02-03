@@ -12,7 +12,6 @@ import (
 	computebudget "github.com/gagliardetto/solana-go/programs/compute-budget"
 	"github.com/gagliardetto/solana-go/programs/system"
 	"github.com/gagliardetto/solana-go/rpc"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
@@ -29,8 +28,7 @@ import (
 )
 
 func TestMcmWithTimelock(t *testing.T) {
-	t.Parallel()
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	mcm.SetProgramID(config.McmProgram)
 	timelock.SetProgramID(config.TimelockProgram)
@@ -501,7 +499,7 @@ func TestMcmWithTimelock(t *testing.T) {
 
 					mcmOpNodes := []mcms.McmOpNode{}
 
-					for i := 0; i < numMintIxs; i++ {
+					for range numMintIxs {
 						// timelock signer can mint token (transferred authority)
 						ix, mIxErr := tokens.MintTo(1*solana.LAMPORTS_PER_SOL, v.tokenProgram, mint, rAta, timelockutil.GetSignerPDA(config.TestTimelockID))
 						require.NoError(t, mIxErr)

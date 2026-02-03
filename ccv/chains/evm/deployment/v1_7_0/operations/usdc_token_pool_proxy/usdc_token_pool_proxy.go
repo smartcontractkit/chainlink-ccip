@@ -37,6 +37,8 @@ type SetFeeAggregatorArgs struct {
 	FeeAggregator common.Address
 }
 
+type PoolAddresses = usdc_token_pool_proxy.USDCTokenPoolProxyPoolAddresses
+
 var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Name:             "usdc-token-pool-proxy:deploy",
 	Version:          Version,
@@ -50,6 +52,17 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Validate: func(ConstructorArgs) error { return nil },
 })
 
+var GetPools = contract.NewRead(contract.ReadParams[any, USDCTokenPoolProxyPoolAddresses, *usdc_token_pool_proxy.USDCTokenPoolProxy]{
+	Name:         "usdc-token-pool-proxy:get-pools",
+	Version:      Version,
+	Description:  "Gets the pool addresses configured on the USDCTokenPoolProxy",
+	ContractType: ContractType,
+	NewContract:  usdc_token_pool_proxy.NewUSDCTokenPoolProxy,
+	CallContract: func(proxy *usdc_token_pool_proxy.USDCTokenPoolProxy, opts *bind.CallOpts, args any) (USDCTokenPoolProxyPoolAddresses, error) {
+		return proxy.GetPools(opts)
+	},
+})
+
 var UpdateLockOrBurnMechanisms = contract.NewWrite(contract.WriteParams[UpdateLockOrBurnMechanismsArgs, *usdc_token_pool_proxy.USDCTokenPoolProxy]{
 	Name:            "usdc-token-pool-proxy:update-lock-or-burn-mechanisms",
 	Version:         Version,
@@ -61,6 +74,20 @@ var UpdateLockOrBurnMechanisms = contract.NewWrite(contract.WriteParams[UpdateLo
 	Validate:        func(UpdateLockOrBurnMechanismsArgs) error { return nil },
 	CallContract: func(proxy *usdc_token_pool_proxy.USDCTokenPoolProxy, opts *bind.TransactOpts, args UpdateLockOrBurnMechanismsArgs) (*types.Transaction, error) {
 		return proxy.UpdateLockOrBurnMechanisms(opts, args.RemoteChainSelectors, args.Mechanisms)
+	},
+})
+
+var UpdatePoolAddresses = contract.NewWrite(contract.WriteParams[PoolAddresses, *usdc_token_pool_proxy.USDCTokenPoolProxy]{
+	Name:            "usdc-token-pool-proxy:update-pool-addresses",
+	Version:         Version,
+	Description:     "Updates the pool addresses on the USDCTokenPoolProxy",
+	ContractType:    ContractType,
+	ContractABI:     usdc_token_pool_proxy.USDCTokenPoolProxyABI,
+	NewContract:     usdc_token_pool_proxy.NewUSDCTokenPoolProxy,
+	IsAllowedCaller: contract.OnlyOwner[*usdc_token_pool_proxy.USDCTokenPoolProxy, PoolAddresses],
+	Validate:        func(PoolAddresses) error { return nil },
+	CallContract: func(proxy *usdc_token_pool_proxy.USDCTokenPoolProxy, opts *bind.TransactOpts, args PoolAddresses) (*types.Transaction, error) {
+		return proxy.UpdatePoolAddresses(opts, usdc_token_pool_proxy.USDCTokenPoolProxyPoolAddresses(args))
 	},
 })
 

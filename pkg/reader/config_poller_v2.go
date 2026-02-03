@@ -12,6 +12,25 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
+// refreshAllKnownChains refreshes all known chains in background using batched requests where possible
+// bgRefreshTimeout defines the timeout for background refresh operations
+const (
+	bgRefreshTimeout = 30 * time.Second
+	MaxFailedPolls   = 10
+)
+
+// ConfigPoller defines the interface for caching chain configuration data
+type ConfigPoller interface {
+	// GetChainConfig retrieves the cached configuration for a chain
+	GetChainConfig(ctx context.Context, chainSel cciptypes.ChainSelector) (cciptypes.ChainConfigSnapshot, error)
+	// GetOfframpSourceChainConfigs retrieves cached source chain configurations
+	GetOfframpSourceChainConfigs(
+		ctx context.Context,
+		destChain cciptypes.ChainSelector,
+		sourceChains []cciptypes.ChainSelector) (map[cciptypes.ChainSelector]StaticSourceChainConfig, error)
+	services.Service
+}
+
 var _ ConfigPoller = (*configPollerV2)(nil)
 var _ services.Service = (*configPollerV2)(nil)
 
@@ -37,6 +56,21 @@ type configPollerV2 struct {
 	stopChan               chan struct{}
 	wg                     sync.WaitGroup
 	consecutiveFailedPolls atomic.Uint32
+}
+
+// chainCache represents the cache for a single chain.
+// It stores the configuration data for a specific chain and manages
+// the last refresh time to determine when the data needs to be updated.
+type chainCache struct {
+	// Chain config specific lock and data
+	chainConfigMu      sync.RWMutex
+	chainConfigData    cciptypes.ChainConfigSnapshot
+	chainConfigRefresh time.Time
+
+	// Source chain config specific lock and data
+	sourceChainMu            sync.RWMutex
+	staticSourceChainConfigs map[cciptypes.ChainSelector]StaticSourceChainConfig
+	sourceChainRefresh       time.Time // Single timestamp for all source chain configs
 }
 
 // newConfigPollerV2 creates a new instance of configPollerV2 with improved batch fetching capabilities.
@@ -124,9 +158,7 @@ func (c *configPollerV2) Ready() error {
 //
 // The goroutine continues until the stopChan is closed during service shutdown.
 func (c *configPollerV2) startBackgroundPolling() {
-	c.wg.Add(1)
-	go func() {
-		defer c.wg.Done()
+	c.wg.Go(func() {
 		ticker := time.NewTicker(c.refreshPeriod)
 		defer ticker.Stop()
 		for {
@@ -137,7 +169,7 @@ func (c *configPollerV2) startBackgroundPolling() {
 				return
 			}
 		}
-	}()
+	})
 }
 
 // GetChainConfig retrieves the ChainConfigSnapshot for a specific chain selector.
@@ -428,7 +460,12 @@ func (c *configPollerV2) batchRefreshChainAndSourceConfigs(
 			"sourceChainSelectors", sourceChainSelectors,
 		)
 	}
-	c.lggr.Debugw("Batch refreshed configs via chainAccessor", "chain", chainSel, "latency", time.Since(start))
+	c.lggr.Debugw("Batch refreshed configs via chainAccessor",
+		"chain", chainSel,
+		"latency", time.Since(start),
+		"chainConfigSnapshot", chainConfigSnapshot,
+		"sourceChainConfigs", sourceChainConfigs,
+	)
 	return nil
 }
 
@@ -505,4 +542,32 @@ func (c *configPollerV2) getKnownSourceChainsForDestChain() []cciptypes.ChainSel
 		sourceChains = append(sourceChains, sourceChain)
 	}
 	return sourceChains
+}
+
+// filterOutChainSelector removes a specified chain selector from a slice of chain selectors
+func filterOutChainSelector(
+	chains []cciptypes.ChainSelector,
+	chainToFilter cciptypes.ChainSelector) []cciptypes.ChainSelector {
+	if len(chains) == 0 {
+		return nil
+	}
+
+	filtered := make([]cciptypes.ChainSelector, 0, len(chains))
+	for _, chain := range chains {
+		if chain != chainToFilter {
+			filtered = append(filtered, chain)
+		}
+	}
+	return filtered
+}
+
+// StaticSourceChainConfigFromSourceChainConfig creates a StaticSourceChainConfig from a SourceChainConfig,
+// omitting the MinSeqNr field.
+func staticSourceChainConfigFromSourceChainConfig(sc cciptypes.SourceChainConfig) StaticSourceChainConfig {
+	return StaticSourceChainConfig{
+		Router:                    sc.Router,
+		IsEnabled:                 sc.IsEnabled,
+		IsRMNVerificationDisabled: sc.IsRMNVerificationDisabled,
+		OnRamp:                    sc.OnRamp,
+	}
 }

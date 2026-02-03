@@ -15,12 +15,11 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccip/consts"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 )
 
@@ -136,7 +135,7 @@ func (r *homeChainPoller) fetchAndSetConfigs(ctx context.Context) error {
 			ctx,
 			r.ccipConfigBoundContract.ReadIdentifier(consts.MethodNameGetAllChainConfigs),
 			primitives.Unconfirmed,
-			map[string]interface{}{
+			map[string]any{
 				"pageIndex": pageIndex,
 				"pageSize":  defaultConfigPageSize,
 			},

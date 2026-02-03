@@ -50,7 +50,7 @@ type commitSummary struct {
 func commitObservationSummary(logs []*parse.Data) string {
 	for _, log := range logs {
 		if log.GetMessage() == merkleroot.SendingObservation {
-			if raw, ok := log.RawLoggerFields["observation"].(map[string]interface{}); ok {
+			if raw, ok := log.RawLoggerFields["observation"].(map[string]any); ok {
 				var obs merkleroot.Observation
 				err := mapstructure.Decode(raw, &obs)
 				if err != nil {
@@ -92,7 +92,7 @@ func commitOutcomeSummary(logs []*parse.Data) string {
 			var outcomeTypeName string
 			var parts []string
 
-			if raw, ok := log.RawLoggerFields["outcome"].(map[string]interface{}); ok {
+			if raw, ok := log.RawLoggerFields["outcome"].(map[string]any); ok {
 				var otc merkleroot.Outcome
 				err := mapstructure.Decode(raw, &otc)
 				if err != nil {
@@ -159,16 +159,16 @@ func commitReportSummary(logs []*parse.Data) string {
 	for _, log := range logs {
 		message := log.GetMessage()
 		if message == "generating report" {
-			if roots, ok := log.RawLoggerFields["roots"].([]interface{}); ok {
+			if roots, ok := log.RawLoggerFields["roots"].([]any); ok {
 				reportParts = append(reportParts, fmt.Sprintf("Roots: %d", len(roots)))
 			}
-			if prices, ok := log.RawLoggerFields["tokenPriceUpdates"].(map[string]interface{}); ok {
+			if prices, ok := log.RawLoggerFields["tokenPriceUpdates"].(map[string]any); ok {
 				reportParts = append(reportParts, fmt.Sprintf("TokenPriceUpdates: %d", len(prices)))
 			}
-			if gasUpdates, ok := log.RawLoggerFields["gasPriceUpdates"].([]interface{}); ok {
+			if gasUpdates, ok := log.RawLoggerFields["gasPriceUpdates"].([]any); ok {
 				reportParts = append(reportParts, fmt.Sprintf("GasPriceUpdates: %d", len(gasUpdates)))
 			}
-			if sigs, ok := log.RawLoggerFields["rmnSignatures"].(map[string]interface{}); ok {
+			if sigs, ok := log.RawLoggerFields["rmnSignatures"].(map[string]any); ok {
 				reportParts = append(reportParts, fmt.Sprintf("RMNSignatures: %d", len(sigs)))
 			}
 		} else {

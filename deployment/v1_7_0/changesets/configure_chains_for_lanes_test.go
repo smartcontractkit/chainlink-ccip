@@ -10,17 +10,18 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
-	v1_7_0_changesets "github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/changesets"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
+
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
+	v1_7_0_changesets "github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/changesets"
 )
 
 type lanesTest_MockReader struct{}
@@ -31,6 +32,24 @@ func (m *lanesTest_MockReader) GetChainMetadata(_ deployment.Environment, _ uint
 	return mcms_types.ChainMetadata{
 		MCMAddress:      input.MCMSAddressRef.Address,
 		StartingOpCount: LANES_OP_COUNT,
+	}, nil
+}
+
+func (m *lanesTest_MockReader) GetTimelockRef(_ deployment.Environment, selector uint64, input mcms.Input) (datastore.AddressRef, error) {
+	return datastore.AddressRef{
+		ChainSelector: selector,
+		Address:       input.TimelockAddressRef.Address,
+		Type:          "Timelock",
+		Version:       semver.MustParse("1.0.0"),
+	}, nil
+}
+
+func (m *lanesTest_MockReader) GetMCMSRef(_ deployment.Environment, selector uint64, input mcms.Input) (datastore.AddressRef, error) {
+	return datastore.AddressRef{
+		ChainSelector: selector,
+		Address:       input.MCMSAddressRef.Address,
+		Type:          "MCM",
+		Version:       semver.MustParse("1.0.0"),
 	}, nil
 }
 
@@ -98,6 +117,24 @@ func (ma *lanesTest_MockChainFamily) ConfigureChainForLanes() *cldf_ops.Sequence
 						Address:       input.OffRamp,
 						Type:          datastore.ContractType("OffRamp"),
 						Version:       semver.MustParse("1.0.0"),
+					},
+				},
+				Metadata: sequences.Metadata{
+					Contracts: []datastore.ContractMetadata{
+						{
+							Address:       input.Router,
+							ChainSelector: input.ChainSelector,
+							Metadata:      map[string]interface{}{"configured": true, "test_metadata": "router_configured"},
+						},
+						{
+							Address:       input.OnRamp,
+							ChainSelector: input.ChainSelector,
+							Metadata:      map[string]interface{}{"configured": true, "test_metadata": "onramp_configured"},
+						},
+					},
+					Chain: &datastore.ChainMetadata{
+						ChainSelector: input.ChainSelector,
+						Metadata:      map[string]interface{}{"lanes_configured": len(input.RemoteChains), "test_metadata": "chain_configured"},
 					},
 				},
 				BatchOps: batchOps,
@@ -913,7 +950,7 @@ func TestConfigureChainsForLanes_Apply(t *testing.T) {
 		tt := tt
 		t.Run(tt.desc, func(t *testing.T) {
 			// Register MCMS reader
-			mcmsRegistry := changesets.NewMCMSReaderRegistry()
+			mcmsRegistry := changesets.GetRegistry()
 			mcmsRegistry.RegisterMCMSReader("evm", &lanesTest_MockReader{})
 
 			// Register chain family adapter with appropriate error condition
@@ -963,6 +1000,76 @@ func TestConfigureChainsForLanes_Apply(t *testing.T) {
 					// Validate transactions were created for remote chains
 					require.Greater(t, len(op.Transactions), 0)
 				}
+			}
+
+			// Verify that metadata was written to the datastore
+			require.NotNil(t, out.DataStore, "DataStore should be set in output")
+			sealedDS := out.DataStore
+
+			// Verify contract metadata was written by checking the sealed datastore
+			// We know the addresses from the mock sequence output, so we can verify metadata exists
+			for _, chain := range tt.cfg.Chains {
+				// Get router address from the sealed datastore
+				routerRefs := sealedDS.Addresses().Filter(
+					datastore.AddressRefByChainSelector(chain.ChainSelector),
+					datastore.AddressRefByType(chain.Router.Type),
+				)
+				require.Greater(t, len(routerRefs), 0, "Router address should be in datastore")
+				routerAddr := routerRefs[0].Address
+
+				// Check Router contract metadata exists
+				// The mock sequence writes metadata for router, so we verify it was written
+				// We'll iterate through all contract metadata to find the one we're looking for
+				allContractMetadata := sealedDS.ContractMetadata().Filter()
+				var routerMetadata *datastore.ContractMetadata
+				for _, cm := range allContractMetadata {
+					if cm.Address == routerAddr && cm.ChainSelector == chain.ChainSelector {
+						routerMetadata = &cm
+						break
+					}
+				}
+				require.NotNil(t, routerMetadata, "Router contract metadata should exist")
+				routerMetaMap, ok := routerMetadata.Metadata.(map[string]interface{})
+				require.True(t, ok, "Router metadata should be a map")
+				require.Equal(t, true, routerMetaMap["configured"], "Router metadata should have configured=true")
+				require.Equal(t, "router_configured", routerMetaMap["test_metadata"], "Router metadata should have test_metadata=router_configured")
+
+				// Get onRamp address from the sealed datastore
+				onRampRefs := sealedDS.Addresses().Filter(
+					datastore.AddressRefByChainSelector(chain.ChainSelector),
+					datastore.AddressRefByType(chain.OnRamp.Type),
+				)
+				require.Greater(t, len(onRampRefs), 0, "OnRamp address should be in datastore")
+				onRampAddr := onRampRefs[0].Address
+
+				// Check OnRamp contract metadata exists
+				var onRampMetadata *datastore.ContractMetadata
+				for _, cm := range allContractMetadata {
+					if cm.Address == onRampAddr && cm.ChainSelector == chain.ChainSelector {
+						onRampMetadata = &cm
+						break
+					}
+				}
+				require.NotNil(t, onRampMetadata, "OnRamp contract metadata should exist")
+				onRampMetaMap, ok := onRampMetadata.Metadata.(map[string]interface{})
+				require.True(t, ok, "OnRamp metadata should be a map")
+				require.Equal(t, true, onRampMetaMap["configured"], "OnRamp metadata should have configured=true")
+				require.Equal(t, "onramp_configured", onRampMetaMap["test_metadata"], "OnRamp metadata should have test_metadata=onramp_configured")
+
+				// Verify chain metadata was written
+				allChainMetadata := sealedDS.ChainMetadata().Filter()
+				var chainMetadata *datastore.ChainMetadata
+				for _, cm := range allChainMetadata {
+					if cm.ChainSelector == chain.ChainSelector {
+						chainMetadata = &cm
+						break
+					}
+				}
+				require.NotNil(t, chainMetadata, "Chain metadata should exist")
+				chainMetaMap, ok := chainMetadata.Metadata.(map[string]interface{})
+				require.True(t, ok, "Chain metadata should be a map")
+				require.Equal(t, len(chain.RemoteChains), chainMetaMap["lanes_configured"], "Chain metadata should have correct lanes_configured count")
+				require.Equal(t, "chain_configured", chainMetaMap["test_metadata"], "Chain metadata should have test_metadata=chain_configured")
 			}
 		})
 	}

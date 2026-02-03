@@ -17,11 +17,11 @@ import (
 	sel "github.com/smartcontractkit/chain-selectors"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccip/consts"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	mockChainAccessor "github.com/smartcontractkit/chainlink-ccip/mocks/chainlink_common/ccipocr3"
 	reader "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
@@ -280,7 +280,7 @@ func Test_USDCMessageReader_MessagesByTokenID(t *testing.T) {
 
 func Test_MessageSentEvent_unpackID(t *testing.T) {
 	nonEmptyEvent := eventID{}
-	for i := 0; i < 32; i++ {
+	for i := range 32 {
 		nonEmptyEvent[i] = byte(i)
 	}
 

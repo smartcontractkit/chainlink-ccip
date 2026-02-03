@@ -1,5 +1,7 @@
 # CCIP Deployments
 
+[Design Doc](https://docs.google.com/document/d/1axlWfAzINa_g01DrmbRMncgncKqgeKRMOzgch2S16Cs/edit?tab=t.0#heading=h.4e7ng0tekbkc).
+
 CCIP deployments often target multiple chain families (and product versions, in the case of token pools). Each of these deployment stories have a singular changeset capable of interfacing with different logic per chain family. This document describes how these changesets are designed, how to run them, and how to extend support to new chain families.
 
 ## Design

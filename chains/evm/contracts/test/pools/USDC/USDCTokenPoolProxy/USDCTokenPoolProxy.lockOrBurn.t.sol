@@ -381,4 +381,33 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
     vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.CallerIsNotARampOnRouter.selector, unauthorized));
     s_usdcTokenPoolProxy.lockOrBurn(lockOrBurnIn);
   }
+
+  function test_lockOrBurn_RevertWhen_NoLockOrBurnMechanismSet_PoolRemovedAfterMechanismConfigured() public {
+    // This tests the path where a non-CCV mechanism (CCTP_V1, CCTP_V2, LOCK_RELEASE) is configured
+    // but the corresponding pool is later removed (set to address(0)).
+
+    // First, configure CCTP_V2 mechanism for a chain (already done in setUp).
+    // Then remove the CCTP_V2 pool.
+    s_usdcTokenPoolProxy.updatePoolAddresses(
+      USDCTokenPoolProxy.PoolAddresses({
+        cctpV1Pool: s_cctpV1Pool,
+        cctpV2Pool: address(0), // Remove CCTP_V2 pool
+        cctpV2PoolWithCCV: s_cctpThroughCCVTokenPool,
+        siloedLockReleasePool: s_lockReleasePool
+      })
+    );
+
+    Pool.LockOrBurnInV1 memory lockOrBurnIn = Pool.LockOrBurnInV1({
+      receiver: abi.encode(s_receiver),
+      remoteChainSelector: s_chainSelForV2, // Uses CCTP_V2 mechanism
+      originalSender: s_sender,
+      amount: 100,
+      localToken: address(s_USDCToken)
+    });
+
+    vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.NoLockOrBurnMechanismSet.selector, s_chainSelForV2));
+
+    vm.startPrank(s_routerAllowedOnRamp);
+    s_usdcTokenPoolProxy.lockOrBurn(lockOrBurnIn);
+  }
 }

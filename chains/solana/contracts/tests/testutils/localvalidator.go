@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+	"github.com/smartcontractkit/freeport"
 )
 
 // SetupLocalSolNode sets up a local solana node via solana cli, and returns the url
@@ -31,7 +31,7 @@ func getPorts(t *testing.T) (rpcPort, wsPort, faucetPort, gossipPort string) {
 	t.Helper()
 	attempts := 5
 
-	for i := 0; i < attempts; i++ {
+	for range attempts {
 		rpcPort = utils.MustRandomPort(t)
 
 		portInt, _ := strconv.Atoi(rpcPort)
@@ -41,13 +41,14 @@ func getPorts(t *testing.T) (rpcPort, wsPort, faucetPort, gossipPort string) {
 			continue
 		}
 
-		faucetPort = utils.MustRandomPort(t)
+		ports := freeport.GetN(t, 2)
+		faucetPort = strconv.Itoa(ports[0])
+		gossipPort = strconv.Itoa(ports[1])
+
 		if faucetPort == rpcPort || faucetPort == wsPort {
 			continue
 		}
-
-		gossipPort = utils.MustRandomPort(t)
-		if gossipPort == rpcPort || gossipPort == wsPort || gossipPort == faucetPort {
+		if gossipPort == rpcPort || gossipPort == wsPort {
 			continue
 		}
 
@@ -97,10 +98,10 @@ func SetupLocalSolNodeWithFlags(t *testing.T, flags ...string) (string, string) 
 
 	// Wait for api server to boot
 	var ready bool
-	for i := 0; i < 30; i++ {
+	for i := range 30 {
 		time.Sleep(time.Second)
 		client := rpc.New(url)
-		out, err := client.GetHealth(tests.Context(t))
+		out, err := client.GetHealth(t.Context())
 		if err != nil || out != rpc.HealthOk {
 			t.Logf("API server not ready yet (attempt %d)\n", i+1)
 			continue

@@ -10,8 +10,9 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/latest/burn_mint_erc677"
-	"github.com/smartcontractkit/mcms/sdk/evm"
+	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc677"
+	"github.com/smartcontractkit/mcms/sdk"
+	"github.com/smartcontractkit/mcms/sdk/evm/bindings"
 	"github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
@@ -33,6 +34,12 @@ type SeqMCMSDeploymentCfg struct {
 type SeqTransferMCMOwnershipToTimelockInput struct {
 	ChainSelector uint64
 	Contracts     []ops.OpTransferOwnershipInput
+}
+
+type SeqGrantAdminRoleOfTimelockToTimelockInput struct {
+	ChainSelector           uint64
+	TimelockAddress         common.Address
+	NewAdminTimelockAddress common.Address
 }
 
 var SeqDeployMCMWithConfig = cldf_ops.NewSequence(
@@ -75,7 +82,7 @@ var SeqDeployMCMWithConfig = cldf_ops.NewSequence(
 		}
 
 		// Set config
-		groupQuorums, groupParents, signerAddresses, signerGroups, err := evm.ExtractSetConfigInputs(in.MCMConfig)
+		groupQuorums, groupParents, signerAddresses, signerGroups, err := sdk.ExtractSetConfigInputs(in.MCMConfig)
 		if err != nil {
 			return sequences.OnChainOutput{}, err
 		}
@@ -101,6 +108,69 @@ var SeqDeployMCMWithConfig = cldf_ops.NewSequence(
 		}, nil
 	},
 )
+
+var SeqGrantAdminRoleOfTimelockToTimelock = cldf_ops.NewSequence(
+	"seq-grant-admin-role-of-timelock-to-timelock",
+	semver.MustParse("1.0.0"),
+	"Grants admin role of specified timelock contract to the other specified timelock and renounces admin role of the deployer key",
+	func(b cldf_ops.Bundle, chain cldf_evm.Chain, in SeqGrantAdminRoleOfTimelockToTimelockInput) (output sequences.OnChainOutput, err error) {
+		// Load the Timelock contract
+		timelock, err := LoadTimelockContract(in.TimelockAddress, chain.Client)
+		if err != nil {
+			b.Logger.Errorf("failed to load timelock contract %s: %v", in.TimelockAddress, err)
+			return output, fmt.Errorf("error loading timclock contract %s: %w", in.TimelockAddress, err)
+		}
+
+		// Verify that admin of Timelock contract is the Deployer EOA
+		callerHasRole, err := timelock.HasRole(nil, ops.ADMIN_ROLE.ID, chain.DeployerKey.From)
+		if err != nil {
+			b.Logger.Errorf("failed to check whether caller %s is admin on timelock contract %s: %v", chain.DeployerKey.From, in.TimelockAddress, err)
+			return output, fmt.Errorf("failed to check whether caller %s is admin on timelock contract %s: %w", chain.DeployerKey.From, in.TimelockAddress, err)
+		}
+		if !callerHasRole {
+			b.Logger.Errorf("caller %s is not admin on timelock contract %s: %v", chain.DeployerKey.From, in.TimelockAddress, err)
+			return output, fmt.Errorf("caller %s is not admin on timelock contract %s: %w", chain.DeployerKey.From, in.TimelockAddress, err)
+		}
+
+		newAdminTimelockHasRole, err := timelock.HasRole(nil, ops.ADMIN_ROLE.ID, in.NewAdminTimelockAddress)
+		if err != nil {
+			b.Logger.Errorf("failed to check whether new timelock owner %s is admin on timelock contract %s: %v", in.NewAdminTimelockAddress, in.TimelockAddress, err)
+			return output, fmt.Errorf("failed to check whether new timelock owner %s is admin on timelock contract %s: %w", in.NewAdminTimelockAddress, in.TimelockAddress, err)
+		}
+
+		// Grant admin role to new admin Timelock
+		if !newAdminTimelockHasRole {
+			_, err = cldf_ops.ExecuteOperation(b, ops.OpGrantRoleTimelock, chain, contract.FunctionInput[ops.OpGrantRoleTimelockInput]{
+				ChainSelector: in.ChainSelector,
+				Address:       in.TimelockAddress,
+				Args: ops.OpGrantRoleTimelockInput{
+					RoleID:  ops.ADMIN_ROLE.ID,
+					Account: in.NewAdminTimelockAddress,
+				},
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to grant admin role to new admin timelock on chain %d: %w", in.ChainSelector, err)
+			}
+			b.Logger.Infof("Granted Admin role on Timelock %s to Timelock %s on chain %s", in.TimelockAddress, in.NewAdminTimelockAddress, chain)
+		} else {
+			b.Logger.Infof("Timelock %s is already admin on Timelock %s on chain %s", in.NewAdminTimelockAddress, in.TimelockAddress, chain)
+		}
+
+		// Renounce admin role from Deployer EOA
+		_, err = cldf_ops.ExecuteOperation(b, ops.OpRenounceRoleTimelock, chain, contract.FunctionInput[ops.OpRenounceRoleTimelockInput]{
+			ChainSelector: in.ChainSelector,
+			Address:       in.TimelockAddress,
+			Args: ops.OpRenounceRoleTimelockInput{
+				RoleID: ops.ADMIN_ROLE.ID,
+			},
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to renounce admin role on timelock contract on chain %d: %w", in.ChainSelector, err)
+		}
+		b.Logger.Infof("Renounced Admin role on Timelock %s on chain %s", in.TimelockAddress, chain)
+
+		return sequences.OnChainOutput{}, nil
+	})
 
 var SeqTransferMCMOwnershipToTimelock = cldf_ops.NewSequence(
 	"seq-transfer-mcm-ownership-to-timelock",
@@ -198,4 +268,13 @@ func LoadOwnableContract(addr common.Address, client bind.ContractBackend) (comm
 	}
 
 	return owner, c, nil
+}
+
+func LoadTimelockContract(addr common.Address, client bind.ContractBackend) (*bindings.RBACTimelock, error) {
+	c, err := bindings.NewRBACTimelock(addr, client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load timelock contract: %w", err)
+	}
+
+	return c, nil
 }

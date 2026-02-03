@@ -2,54 +2,73 @@ package sequences
 
 import (
 	"fmt"
+	"math/big"
+	"strings"
+	"time"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
+	mcms_types "github.com/smartcontractkit/mcms/types"
+
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
+
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/fee_quoter"
+
+	evm1_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/link_token"
+	pingpongdappops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/ping_pong_dapp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/nonce_manager"
 	offrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
 	onrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/fee_quoter"
+	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
-	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	mcms_types "github.com/smartcontractkit/mcms/types"
 )
 
-type RMNRemoteParams struct {
-	LegacyRMN common.Address
+func (a *EVMAdapter) DeployChainContracts() *cldf_ops.Sequence[deployops.ContractDeploymentConfigPerChainWithAddress, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return DeployChainContracts
 }
 
-type ContractParams struct {
-	RMNRemote RMNRemoteParams
-	FeeQuoter fqops.FeeQuoterParams
-	OffRamp   offrampops.OffRampParams
+// just a wrapper around the v1.0.0 deployer for now
+func (a *EVMAdapter) DeployMCMS() *cldf_ops.Sequence[deployops.MCMSDeploymentConfigPerChainWithAddress, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	evmDeployer := &evm1_0_0.EVMDeployer{}
+	return evmDeployer.DeployMCMS()
 }
 
-type DeployChainContractsInput struct {
-	ChainSelector     uint64 // Only exists to differentiate sequence runs on different chains
-	ExistingAddresses []datastore.AddressRef
-	ContractParams    ContractParams
+// FinalizeDeployMCMS finalizes the deployment of MCM contracts, e.g., by initializing timelock ownership
+func (a *EVMAdapter) FinalizeDeployMCMS() *cldf_ops.Sequence[deployops.MCMSDeploymentConfigPerChainWithAddress, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	evmDeployer := &evm1_0_0.EVMDeployer{}
+	return evmDeployer.FinalizeDeployMCMS()
+}
+
+// Sets a timelock as admin of a newly deployed timelock
+func (a *EVMAdapter) GrantAdminRoleToTimelock() *operations.Sequence[deployops.GrantAdminRoleToTimelockConfigPerChainWithSelector, sequences.OnChainOutput, chain.BlockChains] {
+	evmDeployer := &evm1_0_0.EVMDeployer{}
+	return evmDeployer.GrantAdminRoleToTimelock()
 }
 
 var DeployChainContracts = cldf_ops.NewSequence(
 	"deploy-chain-contracts",
 	semver.MustParse("1.6.0"),
 	"Deploys all required contracts for CCIP 1.6.0 to an EVM chain",
-	func(b operations.Bundle, chain evm.Chain, input DeployChainContractsInput) (output sequences.OnChainOutput, err error) {
+	func(b operations.Bundle, chains cldf_chain.BlockChains, input deployops.ContractDeploymentConfigPerChainWithAddress) (output sequences.OnChainOutput, err error) {
 		addresses := make([]datastore.AddressRef, 0)
 		writes := make([]contract.WriteOutput, 0)
+		chain := chains.EVMChains()[input.ChainSelector]
 
 		// TODO: Deploy MCMS (Timelock, MCM contracts) when MCMS support is needed.
 
@@ -83,7 +102,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			ChainSelector:  chain.Selector,
 			Args: rmn_remote.ConstructorArgs{
 				LocalChainSelector: chain.Selector,
-				LegacyRMN:          input.ContractParams.RMNRemote.LegacyRMN,
+				LegacyRMN:          common.HexToAddress(input.LegacyRMN),
 			},
 		}, input.ExistingAddresses)
 		if err != nil {
@@ -174,9 +193,9 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			ChainSelector:  chain.Selector,
 			Args: fqops.ConstructorArgs{
 				StaticConfig: fee_quoter.FeeQuoterStaticConfig{
-					MaxFeeJuelsPerMsg:            input.ContractParams.FeeQuoter.MaxFeeJuelsPerMsg,
+					MaxFeeJuelsPerMsg:            input.MaxFeeJuelsPerMsg,
 					LinkToken:                    common.HexToAddress(linkRef.Address),
-					TokenPriceStalenessThreshold: input.ContractParams.FeeQuoter.TokenPriceStalenessThreshold,
+					TokenPriceStalenessThreshold: input.TokenPriceStalenessThreshold,
 				},
 				PriceUpdaters: []common.Address{
 					// TODO: Add Timelock here when MCMS support is needed.
@@ -186,19 +205,19 @@ var DeployChainContracts = cldf_ops.NewSequence(
 					common.HexToAddress(linkRef.Address),
 					common.HexToAddress(wethRef.Address),
 				},
-				TokenPriceFeedUpdates:      input.ContractParams.FeeQuoter.TokenPriceFeedUpdates,
-				TokenTransferFeeConfigArgs: input.ContractParams.FeeQuoter.TokenTransferFeeConfigArgs,
-				MorePremiumMultiplierWeiPerEth: append([]fee_quoter.FeeQuoterPremiumMultiplierWeiPerEthArgs{
+				TokenPriceFeedUpdates:      []fee_quoter.FeeQuoterTokenPriceFeedUpdate{},
+				TokenTransferFeeConfigArgs: []fee_quoter.FeeQuoterTokenTransferFeeConfigArgs{},
+				MorePremiumMultiplierWeiPerEth: []fee_quoter.FeeQuoterPremiumMultiplierWeiPerEthArgs{
 					{
-						PremiumMultiplierWeiPerEth: input.ContractParams.FeeQuoter.LinkPremiumMultiplierWeiPerEth,
+						PremiumMultiplierWeiPerEth: input.LinkPremiumMultiplier,
 						Token:                      common.HexToAddress(linkRef.Address),
 					},
 					{
-						PremiumMultiplierWeiPerEth: input.ContractParams.FeeQuoter.WethPremiumMultiplierWeiPerEth,
+						PremiumMultiplierWeiPerEth: input.NativeTokenPremiumMultiplier,
 						Token:                      common.HexToAddress(wethRef.Address),
 					},
-				}, input.ContractParams.FeeQuoter.MorePremiumMultiplierWeiPerEth...),
-				DestChainConfigArgs: input.ContractParams.FeeQuoter.DestChainConfigArgs,
+				},
+				DestChainConfigArgs: []fee_quoter.FeeQuoterDestChainConfigArgs{},
 			},
 		}, input.ExistingAddresses)
 		if err != nil {
@@ -213,15 +232,15 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			Args: offrampops.ConstructorArgs{
 				StaticConfig: offrampops.StaticConfig{
 					ChainSelector:        chain.Selector,
-					GasForCallExactCheck: input.ContractParams.OffRamp.GasForCallExactCheck,
+					GasForCallExactCheck: input.GasForCallExactCheck,
 					RmnRemote:            common.HexToAddress(rmnProxyRef.Address),
 					NonceManager:         common.HexToAddress(nonceManagerRef.Address),
 					TokenAdminRegistry:   common.HexToAddress(tokenAdminRegistryRef.Address),
 				},
 				DynamicConfig: offrampops.DynamicConfig{
 					FeeQuoter:                               common.HexToAddress(feeQuoterRef.Address),
-					PermissionLessExecutionThresholdSeconds: input.ContractParams.OffRamp.PermissionLessExecutionThresholdSeconds,
-					MessageInterceptor:                      input.ContractParams.OffRamp.MessageInterceptor,
+					PermissionLessExecutionThresholdSeconds: input.PermissionLessExecutionThresholdSeconds,
+					MessageInterceptor:                      common.HexToAddress(input.MessageInterceptor),
 				},
 			},
 		}, input.ExistingAddresses)
@@ -251,6 +270,97 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy OnRamp: %w", err)
 		}
 		addresses = append(addresses, onRampRef)
+
+		// Deploy Ping Pong Dapp (optional - only when DeployPingPongDapp is true)
+		if input.DeployPingPongDapp {
+			pingPongDappRef, err := contract.MaybeDeployContract(b, pingpongdappops.Deploy, chain, contract.DeployInput[pingpongdappops.ConstructorArgs]{
+				TypeAndVersion: deployment.NewTypeAndVersion(pingpongdappops.ContractType, *pingpongdappops.Version),
+				ChainSelector:  chain.Selector,
+				Args: pingpongdappops.ConstructorArgs{
+					Router:   common.HexToAddress(routerRef.Address),
+					FeeToken: common.HexToAddress(linkRef.Address),
+				},
+			}, input.ExistingAddresses)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy Ping Pong Dapp: %w", err)
+			}
+			addresses = append(addresses, pingPongDappRef)
+
+			// Fund Ping Pong Dapp with LINK tokens for cross-chain message fees
+			// First, grant mint role to the deployer
+			_, err = cldf_ops.ExecuteOperation(b, link.GrantMintRole, chain, contract.FunctionInput[link.GrantMintRoleArgs]{
+				ChainSelector: chain.Selector,
+				Address:       common.HexToAddress(linkRef.Address),
+				Args: link.GrantMintRoleArgs{
+					Minter: chain.DeployerKey.From,
+				},
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to grant mint role for LINK: %w", err)
+			}
+
+			// Mint 20 LINK (20 * 10^18 wei) directly to the PingPongDemo contract
+			// Retry with backoff for external networks where grant confirmation may take time
+			pingPongFundingAmount := new(big.Int).Mul(big.NewInt(20), new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil))
+			mintInput := contract.FunctionInput[link.MintArgs]{
+				ChainSelector: chain.Selector,
+				Address:       common.HexToAddress(linkRef.Address),
+				Args: link.MintArgs{
+					To:     common.HexToAddress(pingPongDappRef.Address),
+					Amount: pingPongFundingAmount,
+				},
+			}
+
+			maxRetries := 5
+			retryDelay := 3 * time.Second
+			var mintErr error
+			for attempt := 1; attempt <= maxRetries; attempt++ {
+				_, mintErr = cldf_ops.ExecuteOperation(b, link.Mint, chain, mintInput)
+				if mintErr == nil {
+					break
+				}
+				// Only retry on SenderNotMinter error (minter role not yet confirmed)
+				if !strings.Contains(mintErr.Error(), "SenderNotMinter") {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to mint LINK to Ping Pong Dapp: %w", mintErr)
+				}
+				if attempt < maxRetries {
+					b.Logger.Warnf("Mint failed with SenderNotMinter (attempt %d/%d), retrying in %v...", attempt, maxRetries, retryDelay)
+					time.Sleep(retryDelay)
+				}
+			}
+			if mintErr != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to mint LINK to Ping Pong Dapp after %d retries: %w", maxRetries, mintErr)
+			}
+		}
+
+		// Add Authorized Caller to NonceManager
+		_, err = cldf_ops.ExecuteOperation(b, nonce_manager.ApplyAuthorizedCallerUpdates, chain, contract.FunctionInput[nonce_manager.AuthorizedCallerArgs]{
+			ChainSelector: chain.Selector,
+			Address:       common.HexToAddress(nonceManagerRef.Address),
+			Args: nonce_manager.AuthorizedCallerArgs{
+				AddedCallers: []common.Address{
+					common.HexToAddress(offRampRef.Address),
+					common.HexToAddress(onRampRef.Address),
+				},
+			},
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, err
+		}
+
+		// Add Authorized Caller to FQ
+		_, err = cldf_ops.ExecuteOperation(b, fqops.ApplyAuthorizedCallerUpdates, chain, contract.FunctionInput[fqops.AuthorizedCallerArgs]{
+			ChainSelector: chain.Selector,
+			Address:       common.HexToAddress(feeQuoterRef.Address),
+			Args: fqops.AuthorizedCallerArgs{
+				AddedCallers: []common.Address{
+					common.HexToAddress(offRampRef.Address),
+				},
+			},
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, err
+		}
 
 		batchOp, err := contract.NewBatchOperationFromWrites(writes)
 		if err != nil {

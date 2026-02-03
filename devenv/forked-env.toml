@@ -1,0 +1,73 @@
+cl_nodes_funding_eth = 50
+cl_nodes_funding_link = 50
+
+[cldf]
+
+[[blockchains]]
+container_name = "ethereum-mainnet"
+chain_id = "1"
+docker_cmd_params = ["--timeout", "180000", "--auto-impersonate", "--no-rate-limit"]
+image = "ghcr.io/foundry-rs/foundry:latest"
+port = "8545"
+type = "anvil"
+
+[[blockchains]]
+container_name = "binance-smart-chain"
+chain_id = "56"
+docker_cmd_params = ["--timeout", "180000", "--auto-impersonate", "--no-rate-limit"]
+image = "ghcr.io/foundry-rs/foundry:latest"
+port = "8555"
+type = "anvil"
+
+[jd]
+csa_encryption_key = "1a3f7e9d2c5b8a0f4e6d9c2b7a1e5f3d8c0b9a8d7f6e5c4b3a2d1e0f9a8b7c1a"
+image = "job-distributor:local"
+
+[forked_env_config]
+# Chain selector used as the home chain
+home_chain_selector = 5009297550715157269
+# Root path for chainlink-deployments repository
+cld_root_path = "../../chainlink-deployments/domains"
+# CLD environment name (e.g. staging, testnet, mainnet)
+cld_environment = "mainnet"
+[forked_env_config.fork_urls_by_chain_id]
+"1"   = "https://rpcs.cldev.sh/5009297550715157269"
+"56"   = "https://rpcs.cldev.sh/11344663589394136015"
+
+[[nodesets]]
+name = "don"
+nodes = 6
+override_mode = "each"
+
+[nodesets.db]
+image = "postgres:15.0"
+
+[[nodesets.node_specs]]
+
+[nodesets.node_specs.node]
+image = "public.ecr.aws/chainlink/chainlink:2.31.0"
+
+[[nodesets.node_specs]]
+
+[nodesets.node_specs.node]
+image = "public.ecr.aws/chainlink/chainlink:2.31.0"
+
+[[nodesets.node_specs]]
+
+[nodesets.node_specs.node]
+image = "public.ecr.aws/chainlink/chainlink:2.31.0"
+
+[[nodesets.node_specs]]
+
+[nodesets.node_specs.node]
+image = "public.ecr.aws/chainlink/chainlink:2.31.0"
+
+[[nodesets.node_specs]]
+
+[nodesets.node_specs.node]
+image = "public.ecr.aws/chainlink/chainlink:2.31.0"
+
+[[nodesets.node_specs]]
+
+[nodesets.node_specs.node]
+image = "public.ecr.aws/chainlink/chainlink:2.31.0"

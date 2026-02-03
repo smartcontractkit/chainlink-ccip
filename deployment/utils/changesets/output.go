@@ -12,7 +12,7 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
-	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
+
 	mcms_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 )
 
@@ -21,6 +21,10 @@ type MCMSReader interface {
 	// GetChainMetadata returns the chain metadata for a given MCMS input.
 	// Each chain family defines its own implementation of this method.
 	GetChainMetadata(e deployment.Environment, chainSelector uint64, input mcms_utils.Input) (mcms_types.ChainMetadata, error)
+	// GetTimelockRef returns the timelock contract address reference for a given MCMS input.
+	GetTimelockRef(e deployment.Environment, chainSelector uint64, input mcms_utils.Input) (datastore.AddressRef, error)
+	// GetMCMSRef returns the MCMS contract address reference for a given MCMS input.
+	GetMCMSRef(e deployment.Environment, chainSelector uint64, input mcms_utils.Input) (datastore.AddressRef, error)
 }
 
 // MCMSReaderRegistry maintains a registry of MCMS readers.
@@ -29,10 +33,24 @@ type MCMSReaderRegistry struct {
 	m  map[string]MCMSReader
 }
 
-func NewMCMSReaderRegistry() *MCMSReaderRegistry {
+func newMCMSReaderRegistry() *MCMSReaderRegistry {
 	return &MCMSReaderRegistry{
 		m: make(map[string]MCMSReader),
 	}
+}
+
+var (
+	singletonRegistry *MCMSReaderRegistry
+	once              sync.Once
+)
+
+// GetRegistry returns the global singleton instance.
+// The first call creates the registry; subsequent calls return the same pointer.
+func GetRegistry() *MCMSReaderRegistry {
+	once.Do(func() {
+		singletonRegistry = newMCMSReaderRegistry()
+	})
+	return singletonRegistry
 }
 
 // RegisterMCMSReader registers an MCMSReader for a specific chain family.
@@ -43,10 +61,9 @@ func (r *MCMSReaderRegistry) RegisterMCMSReader(chainFamily string, reader MCMSR
 	if r.m == nil {
 		r.m = make(map[string]MCMSReader)
 	}
-	if _, exists := r.m[chainFamily]; exists {
-		panic(fmt.Sprintf("MCMS reader already registered for chain family: %s", chainFamily))
+	if _, exists := r.m[chainFamily]; !exists {
+		r.m[chainFamily] = reader
 	}
-	r.m[chainFamily] = reader
 }
 
 // GetMCMSReader retrieves an MCMSReader for a specific chain family.
@@ -107,7 +124,7 @@ func (b *OutputBuilder) Build(input mcms_utils.Input) (deployment.ChangesetOutpu
 		return b.changesetOutput, nil
 	}
 
-	timelockAddresses, err := b.getTimelockAddresses(input.TimelockAddressRef, b.batchOps)
+	timelockAddresses, err := b.getTimelockAddresses(input, b.batchOps)
 	if err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to get timelock addresses: %w", err)
 	}
@@ -140,7 +157,7 @@ func (b *OutputBuilder) Build(input mcms_utils.Input) (deployment.ChangesetOutpu
 
 // getTimelockAddresses resolves the timelock contract addresses for each chain selector in the list of batch operations.
 func (b *OutputBuilder) getTimelockAddresses(
-	timelockRef datastore.AddressRef,
+	input mcms_utils.Input,
 	ops []mcms_types.BatchOperation,
 ) (map[mcms_types.ChainSelector]string, error) {
 	timelocks := make(map[mcms_types.ChainSelector]string)
@@ -148,16 +165,22 @@ func (b *OutputBuilder) getTimelockAddresses(
 		if _, exists := timelocks[op.ChainSelector]; exists {
 			continue // Already resolved timelock for this chain selector
 		}
-		fullTimelockRef, err := datastore_utils.FindAndFormatRef(
-			b.environment.DataStore,
-			timelockRef,
-			uint64(op.ChainSelector),
-			datastore_utils.FullRef,
-		)
+		family, err := chain_selectors.GetSelectorFamily(uint64(op.ChainSelector))
+		if err != nil {
+			return nil, fmt.Errorf("failed to get chain family for chain selector %d: %w", op.ChainSelector, err)
+		}
+		reader, ok := b.registry.GetMCMSReader(family)
+		if !ok {
+			return nil, fmt.Errorf("no MCMS reader registered for chain family '%s'", family)
+		}
+		timelockRef, err := reader.GetTimelockRef(b.environment, uint64(op.ChainSelector), input)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get timelock ref for chain with selector %d: %w", op.ChainSelector, err)
+		}
 		if err != nil {
 			return nil, fmt.Errorf("failed to resolve timelock ref on chain with selector %d: %w", op.ChainSelector, err)
 		}
-		timelocks[op.ChainSelector] = fullTimelockRef.Address
+		timelocks[op.ChainSelector] = timelockRef.Address
 	}
 
 	return timelocks, nil

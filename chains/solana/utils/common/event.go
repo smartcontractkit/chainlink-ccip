@@ -8,7 +8,7 @@ import (
 
 	bin "github.com/gagliardetto/binary"
 
-	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccip/consts"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_offramp"
 )
@@ -28,7 +28,7 @@ func NewEventNotFoundError(event string) error {
 // Note: This will not work for any events containing `Option`. This will be fixed when the version
 // of anchor-go is updated to support events. In the meantime, events containing `Option` require
 // bespoke parsing (see ParseEventCommitReportAccepted)
-func ParseEvent(logs []string, event string, obj interface{}, shouldPrint ...bool) error {
+func ParseEvent(logs []string, event string, obj any, shouldPrint ...bool) error {
 	for _, v := range logs {
 		if strings.Contains(v, "Program data:") {
 			encodedData := strings.TrimSpace(strings.TrimPrefix(v, "Program data:"))

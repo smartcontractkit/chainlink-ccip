@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"maps"
 	"slices"
-	"sort"
 	"sync/atomic"
 	"time"
 
@@ -13,13 +12,12 @@ import (
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccip/consts"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 )
@@ -121,7 +119,7 @@ func (cdp *ContractDiscoveryProcessor) getSupportedChains() ([]cciptypes.ChainSe
 	}
 
 	supportedChainsSlice := supportedChains.ToSlice()
-	sort.Slice(supportedChainsSlice, func(i, j int) bool { return supportedChainsSlice[i] < supportedChainsSlice[j] })
+	slices.Sort(supportedChainsSlice)
 	return supportedChainsSlice, nil
 }
 
@@ -277,7 +275,7 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 ) (dt.Outcome, error) {
 	lggr := logutil.WithContextValues(ctx, cdp.lggr)
 	lggr.Debugw("Processing contract discovery outcome")
-	contracts := make(reader.ContractAddresses)
+	contracts := make(cciptypes.ContractAddresses)
 
 	agg := aggregateObservations(lggr, cdp.dest, aos)
 
@@ -397,7 +395,7 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 	return dt.Outcome{}, nil
 }
 
-func (cdp *ContractDiscoveryProcessor) syncContracts(lggr logger.Logger, contracts reader.ContractAddresses) {
+func (cdp *ContractDiscoveryProcessor) syncContracts(lggr logger.Logger, contracts cciptypes.ContractAddresses) {
 	ctx, cancel := context.WithTimeout(context.Background(), syncTimeout)
 	defer cancel()
 	alreadySyncing, err := cdp.syncer.Sync(ctx, contracts)
@@ -429,7 +427,10 @@ type readerSyncer struct {
 //
 // Returns true if a sync was already in progress.
 // Make sure to pass a context with a timeout to avoid blocking the plugin for too long.
-func (s *readerSyncer) Sync(ctx context.Context, contracts reader.ContractAddresses) (alreadySyncing bool, err error) {
+func (s *readerSyncer) Sync(
+	ctx context.Context,
+	contracts cciptypes.ContractAddresses,
+) (alreadySyncing bool, err error) {
 	if !s.busy.CompareAndSwap(false, true) {
 		return true, nil
 	}

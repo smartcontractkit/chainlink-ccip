@@ -15,8 +15,9 @@ import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165
 import {VmSafe} from "forge-std/Vm.sol";
 
 contract OnRamp_addressEncodingCompatibility is OnRampSetup {
-  bytes32 internal constant CCIP_MESSAGE_SENT_TOPIC =
-    keccak256("CCIPMessageSent(uint64,address,bytes32,address,bytes,(address,uint32,uint32,uint256,bytes)[],bytes[])");
+  bytes32 internal constant CCIP_MESSAGE_SENT_TOPIC = keccak256(
+    "CCIPMessageSent(uint64,address,bytes32,address,uint256,bytes,(address,uint32,uint32,uint256,bytes)[],bytes[])"
+  );
 
   function decode(
     bytes calldata encodedMessage
@@ -40,7 +41,7 @@ contract OnRamp_addressEncodingCompatibility is OnRampSetup {
     bytes memory encodedMessage;
     for (uint256 i = 0; i < logs.length; ++i) {
       if (logs[i].topics.length != 0 && logs[i].topics[0] == CCIP_MESSAGE_SENT_TOPIC) {
-        (, encodedMessage,,) = abi.decode(logs[i].data, (address, bytes, OnRamp.Receipt[], bytes[]));
+        (,, encodedMessage,,) = abi.decode(logs[i].data, (address, uint256, bytes, OnRamp.Receipt[], bytes[]));
         break;
       }
     }

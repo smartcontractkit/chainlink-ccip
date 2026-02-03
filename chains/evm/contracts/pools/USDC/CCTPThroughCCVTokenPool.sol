@@ -49,8 +49,7 @@ contract CCTPThroughCCVTokenPool is TokenPool, ITypeAndVersion, AuthorizedCaller
     uint16 blockConfirmationRequested,
     bytes calldata tokenArgs
   ) public virtual override returns (Pool.LockOrBurnOutV1 memory, uint256 destTokenAmount) {
-    uint256 feeAmount = _getFee(lockOrBurnIn, blockConfirmationRequested);
-    _validateLockOrBurn(lockOrBurnIn, blockConfirmationRequested, tokenArgs, feeAmount);
+    _validateLockOrBurn(lockOrBurnIn, blockConfirmationRequested, tokenArgs, 0);
 
     emit LockedOrBurned({
       remoteChainSelector: lockOrBurnIn.remoteChainSelector,
@@ -161,12 +160,12 @@ contract CCTPThroughCCVTokenPool is TokenPool, ITypeAndVersion, AuthorizedCaller
     Pool.ReleaseOrMintInV1 calldata,
     uint256,
     uint16
-  ) internal pure virtual override {}
+  ) internal virtual override {}
 
   /// @notice No-op override to purge the unused code path from the contract.
   function _preFlightCheck(
     Pool.LockOrBurnInV1 calldata,
     uint16,
     bytes memory
-  ) internal pure virtual override {}
+  ) internal virtual override {}
 }

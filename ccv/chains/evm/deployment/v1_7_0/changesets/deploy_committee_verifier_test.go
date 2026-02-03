@@ -11,7 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/rmn"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
 	cs_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -38,8 +38,8 @@ func TestDeployCommitteeVerifier_VerifyPreconditions(t *testing.T) {
 	ds := datastore.NewMemoryDataStore()
 	rmnAddressRef := datastore.AddressRef{
 		ChainSelector: 5009297550715157269,
-		Type:          datastore.ContractType(rmn.ContractType),
-		Version:       rmn.Version,
+		Type:          datastore.ContractType(rmn_remote.ContractType),
+		Version:       rmn_remote.Version,
 		Address:       common.HexToAddress("0x01").Hex(),
 	}
 	err = ds.Addresses().Add(rmnAddressRef)
@@ -67,7 +67,7 @@ func TestDeployCommitteeVerifier_VerifyPreconditions(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			mcmsRegistry := cs_core.NewMCMSReaderRegistry()
+			mcmsRegistry := cs_core.GetRegistry()
 			err := changesets.DeployCommitteeVerifier(mcmsRegistry).VerifyPreconditions(*e, test.input)
 			if test.expectedErr != "" {
 				require.ErrorContains(t, err, test.expectedErr, "Expected error containing %q but got none", test.expectedErr)
@@ -92,8 +92,8 @@ func TestDeployCommitteeVerifier_Apply_MultipleQualifiersOnSameChain(t *testing.
 	}
 	rmnAddressRef := datastore.AddressRef{
 		ChainSelector: 5009297550715157269,
-		Type:          datastore.ContractType(rmn.ContractType),
-		Version:       rmn.Version,
+		Type:          datastore.ContractType(rmn_remote.ContractType),
+		Version:       rmn_remote.Version,
 		Address:       common.HexToAddress("0x02").Hex(),
 	}
 	create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[5009297550715157269], contract_utils.DeployInput[create2_factory.ConstructorArgs]{
@@ -111,7 +111,7 @@ func TestDeployCommitteeVerifier_Apply_MultipleQualifiersOnSameChain(t *testing.
 	require.NoError(t, ds.Addresses().Add(rmnAddressRef))
 	e.DataStore = ds.Seal()
 
-	mcmsRegistry := cs_core.NewMCMSReaderRegistry()
+	mcmsRegistry := cs_core.GetRegistry()
 
 	// 1) First run with qualifier "alpha"
 	paramsAlpha := basicDeployCommitteeVerifierParams()

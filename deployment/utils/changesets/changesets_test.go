@@ -7,15 +7,16 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
 type MockReader struct{}
@@ -24,9 +25,32 @@ const OP_COUNT = 42
 
 func (m *MockReader) GetChainMetadata(_ deployment.Environment, _ uint64, input mcms.Input) (mcms_types.ChainMetadata, error) {
 	return mcms_types.ChainMetadata{
-		MCMAddress:      input.MCMSAddressRef.Address,
 		StartingOpCount: OP_COUNT,
 	}, nil
+}
+
+func (m *MockReader) GetTimelockRef(_ deployment.Environment, selector uint64, _ mcms.Input) (datastore.AddressRef, error) {
+	return datastore.AddressRef{
+		ChainSelector: selector,
+		Address:       "0x01",
+		Type:          datastore.ContractType("Timelock"),
+		Version:       semver.MustParse("1.0.0"),
+	}, nil
+}
+
+func (m *MockReader) GetMCMSRef(_ deployment.Environment, selector uint64, _ mcms.Input) (datastore.AddressRef, error) {
+	return datastore.AddressRef{
+		ChainSelector: selector,
+		Address:       "0x02",
+		Type:          datastore.ContractType("MCM"),
+		Version:       semver.MustParse("1.0.0"),
+	}, nil
+}
+
+// only register once for tests
+func init() {
+	registry := changesets.GetRegistry()
+	registry.RegisterMCMSReader("evm", &MockReader{})
 }
 
 var mockSequence = operations.NewSequence(
@@ -40,11 +64,12 @@ var mockSequence = operations.NewSequence(
 
 func TestNewFromOnChainSequence(t *testing.T) {
 	tests := []struct {
-		desc         string
-		addresses    []datastore.AddressRef
-		ops          []mcms_types.BatchOperation
-		resolveInput func(e deployment.Environment, cfg sequences.OnChainOutput) (sequences.OnChainOutput, error)
-		resolveDep   func(e deployment.Environment, cfg sequences.OnChainOutput) (int, error)
+		desc             string
+		addresses        []datastore.AddressRef
+		contractMetadata []datastore.ContractMetadata
+		ops              []mcms_types.BatchOperation
+		resolveInput     func(e deployment.Environment, cfg sequences.OnChainOutput) (sequences.OnChainOutput, error)
+		resolveDep       func(e deployment.Environment, cfg sequences.OnChainOutput) (int, error)
 	}{
 		{
 			desc: "happy path",
@@ -54,6 +79,13 @@ func TestNewFromOnChainSequence(t *testing.T) {
 					Address:       "0x01",
 					Type:          datastore.ContractType("TestContract"),
 					Version:       semver.MustParse("1.0.0"),
+				},
+			},
+			contractMetadata: []datastore.ContractMetadata{
+				{
+					ChainSelector: 4340886533089894000,
+					Address:       "0x01",
+					Metadata:      []byte(`{"abi":[]}`),
 				},
 			},
 			ops: []mcms_types.BatchOperation{
@@ -94,6 +126,7 @@ func TestNewFromOnChainSequence(t *testing.T) {
 			},
 		},
 	}
+	registry := changesets.GetRegistry()
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
@@ -123,8 +156,6 @@ func TestNewFromOnChainSequence(t *testing.T) {
 				DataStore:        ds.Seal(),
 			}
 
-			registry := changesets.NewMCMSReaderRegistry()
-			registry.RegisterMCMSReader("evm", &MockReader{})
 			changeset := changesets.NewFromOnChainSequence(changesets.NewFromOnChainSequenceParams[sequences.OnChainOutput, int, sequences.OnChainOutput]{
 				Sequence:     mockSequence,
 				ResolveInput: test.resolveInput,
@@ -135,7 +166,10 @@ func TestNewFromOnChainSequence(t *testing.T) {
 			require.NoError(t, err)
 			input := sequences.OnChainOutput{
 				Addresses: test.addresses,
-				BatchOps:  test.ops,
+				Metadata: sequences.Metadata{
+					Contracts: test.contractMetadata,
+				},
+				BatchOps: test.ops,
 			}
 			// Pre-check that the input can be resolved outside of the changeset flow.
 			// This ensures that any errors in resolveInput or resolveDep are from the changeset flow.
@@ -162,21 +196,16 @@ func TestNewFromOnChainSequence(t *testing.T) {
 					ValidUntil:           4126214326,
 					TimelockDelay:        mcms_types.MustParseDuration("1h"),
 					TimelockAction:       mcms_types.TimelockActionSchedule,
-					MCMSAddressRef: datastore.AddressRef{
-						Type:    "MCM",
-						Version: semver.MustParse("1.0.0"),
-					},
-					TimelockAddressRef: datastore.AddressRef{
-						Type:    "Timelock",
-						Version: semver.MustParse("1.0.0"),
-					},
-					Description: "Test Proposal",
+					Description:          "Test Proposal",
 				},
 			})
 			require.NoError(t, err)
 
 			dsAddrs, err := out.DataStore.Addresses().Fetch()
 			require.Len(t, dsAddrs, len(input.Addresses))
+
+			metadata, err := out.DataStore.ContractMetadata().Fetch()
+			require.Len(t, metadata, len(test.contractMetadata))
 
 			if len(test.ops) > 0 {
 				require.Len(t, out.MCMSTimelockProposals, 1)

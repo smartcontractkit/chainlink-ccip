@@ -25,6 +25,7 @@ import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/Enumera
 /// and to have a variable update frequency based on the asset.
 contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndVersion {
   using EnumerableSet for EnumerableSet.AddressSet;
+  using EnumerableSet for EnumerableSet.UintSet;
   using USDPriceWith18Decimals for uint224;
 
   error TokenNotSupported(address token);
@@ -150,12 +151,18 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
   /// the price.
   EnumerableSet.AddressSet private s_feeTokens;
 
+  /// @dev Set of destination chain selectors.
+  EnumerableSet.UintSet internal s_destChainSelectors;
+
   /// @dev The destination chain specific fee configs.
   mapping(uint64 destChainSelector => DestChainConfig destChainConfig) internal s_destChainConfigs;
 
   /// @dev The token transfer fee config that can be set by the owner or fee admin.
   mapping(uint64 destChainSelector => mapping(address token => TokenTransferFeeConfig tranferFeeConfig)) internal
     s_tokenTransferFeeConfig;
+
+  /// @dev Set of transfer tokens with a configuration for a given destination chain.
+  mapping(uint64 destChainSelector => EnumerableSet.AddressSet transferTokens) internal s_transferTokens;
 
   constructor(
     StaticConfig memory staticConfig,
@@ -392,6 +399,12 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
 
         s_tokenTransferFeeConfig[destChainSelector][token] = tokenTransferFeeConfig;
 
+        // Add destination chain selector to the set, okay if already exists.
+        s_destChainSelectors.add(destChainSelector);
+
+        // Add token to the set, okay if already exists.
+        s_transferTokens[destChainSelector].add(token);
+
         emit TokenTransferFeeConfigUpdated(destChainSelector, token, tokenTransferFeeConfig);
       }
     }
@@ -401,6 +414,8 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
       uint64 destChainSelector = tokensToUseDefaultFeeConfigs[i].destChainSelector;
       address token = tokensToUseDefaultFeeConfigs[i].token;
       delete s_tokenTransferFeeConfig[destChainSelector][token];
+      // Remove token from the set, okay if it doesn't exist.
+      s_transferTokens[destChainSelector].remove(token);
       emit TokenTransferFeeConfigDeleted(destChainSelector, token);
     }
   }
@@ -565,6 +580,47 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
     return s_destChainConfigs[destChainSelector];
   }
 
+  /// @notice Returns all token transfer fee configs for all destination chain selectors.
+  /// @return destChainSelectors The destination chain selectors.
+  /// @return transferTokens The transfer tokens for each destination chain selector.
+  /// @return tokenTransferFeeConfigs The token transfer fee configs corresponding to the transfer tokens.
+  function getAllTokenTransferFeeConfigs()
+    external
+    view
+    returns (
+      uint64[] memory destChainSelectors,
+      address[][] memory transferTokens,
+      TokenTransferFeeConfig[][] memory tokenTransferFeeConfigs
+    )
+  {
+    destChainSelectors = new uint64[](s_destChainSelectors.length());
+    transferTokens = new address[][](s_destChainSelectors.length());
+    tokenTransferFeeConfigs = new TokenTransferFeeConfig[][](s_destChainSelectors.length());
+    for (uint256 i = 0; i < s_destChainSelectors.length(); ++i) {
+      destChainSelectors[i] = uint64(s_destChainSelectors.at(i));
+      transferTokens[i] = new address[](s_transferTokens[destChainSelectors[i]].length());
+      tokenTransferFeeConfigs[i] = new TokenTransferFeeConfig[](s_transferTokens[destChainSelectors[i]].length());
+      for (uint256 j = 0; j < s_transferTokens[destChainSelectors[i]].length(); ++j) {
+        transferTokens[i][j] = s_transferTokens[destChainSelectors[i]].at(j);
+        tokenTransferFeeConfigs[i][j] = s_tokenTransferFeeConfig[destChainSelectors[i]][transferTokens[i][j]];
+      }
+    }
+    return (destChainSelectors, transferTokens, tokenTransferFeeConfigs);
+  }
+
+  /// @notice Returns all destination chain configs.
+  /// @return destChainSelectors The supported destination chain selectors.
+  /// @return destChainConfigs The destination chain configs corresponding to all the supported chain selectors.
+  function getAllDestChainConfigs() external view returns (uint64[] memory, DestChainConfig[] memory) {
+    DestChainConfig[] memory destChainConfigs = new DestChainConfig[](s_destChainSelectors.length());
+    uint64[] memory destChainSelectors = new uint64[](s_destChainSelectors.length());
+    for (uint256 i = 0; i < s_destChainSelectors.length(); ++i) {
+      destChainSelectors[i] = uint64(s_destChainSelectors.at(i));
+      destChainConfigs[i] = s_destChainConfigs[destChainSelectors[i]];
+    }
+    return (destChainSelectors, destChainConfigs);
+  }
+
   /// @notice Updates the destination chain specific config.
   /// @param destChainConfigArgs Array of source chain specific configs.
   function applyDestChainConfigUpdates(
@@ -599,6 +655,9 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
       }
 
       s_destChainConfigs[destChainSelector] = destChainConfig;
+
+      // We don't need to check the return value, as inserting the item twice has no effect.
+      s_destChainSelectors.add(destChainSelector);
     }
   }
 

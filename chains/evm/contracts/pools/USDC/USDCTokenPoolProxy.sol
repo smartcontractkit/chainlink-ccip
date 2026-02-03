@@ -38,11 +38,6 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
   event LockOrBurnMechanismUpdated(uint64 indexed remoteChainSelector, LockOrBurnMechanism mechanism);
   event PoolAddressesUpdated(PoolAddresses pools);
 
-  struct MessageAndAttestation {
-    bytes message;
-    bytes attestation;
-  }
-
   struct PoolAddresses {
     address cctpV1Pool;
     address cctpV2Pool;
@@ -240,18 +235,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
     if (releaseOrMintIn.sourcePoolData.length == 64) {
       // Since the CCTP v1 pool will have this contract set as an allowed caller, no additional configurations are
       // needed to route the message to the v1 pool.
-
-      Pool.ReleaseOrMintInV1 memory newReleaseOrMintIn = releaseOrMintIn;
-      // While the legacy source pool data struct uses the same fields as the current source pool data struct, it is
-      // was initially encoded using abi.encode(sourceTokenDataPayload) instead of the encoding scheme used in the
-      // USDCSourcePoolDataCodec library, and without a version tag. Therefore, we need to decode the source pool data
-      // into a SourceTokenDataPayloadV1 struct and then re-encode it into a format that using the proper versioning
-      // scheme whereby the CCTP V1 pool can process the message.
-      newReleaseOrMintIn.sourcePoolData = USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV1(
-        abi.decode(releaseOrMintIn.sourcePoolData, (USDCSourcePoolDataCodec.SourceTokenDataPayloadV1))
-      );
-
-      return IPoolV1(s_cctpV1Pool).releaseOrMint(newReleaseOrMintIn);
+      return IPoolV1(s_cctpV1Pool).releaseOrMint(releaseOrMintIn);
     }
 
     revert InvalidMessageVersion(version);

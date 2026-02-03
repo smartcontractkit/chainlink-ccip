@@ -17,8 +17,6 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
-
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/testutils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/external_program_cpi_stub"
@@ -37,11 +35,10 @@ type TestMcmOperation struct {
 }
 
 func TestMcmSetRootAndExecute(t *testing.T) {
-	t.Parallel()
 	mcm.SetProgramID(config.McmProgram)
 	external_program_cpi_stub.SetProgramID(config.ExternalCpiStubProgram) // testing program
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	admin, err := solana.NewRandomPrivateKey()
 	require.NoError(t, err)
@@ -243,7 +240,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 			require.NoError(t, err)
 
 			signerGroups := make([]byte, numSigners)
-			for i := 0; i < len(signerGroups); i++ {
+			for i := range signerGroups {
 				signerGroups[i] = byte(i % 5)
 			}
 

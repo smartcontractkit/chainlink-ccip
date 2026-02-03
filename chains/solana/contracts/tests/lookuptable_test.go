@@ -11,16 +11,12 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
-
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/testutils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 )
 
 func TestSVMLookupTables(t *testing.T) {
-	t.Parallel()
-
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	url := testutils.SetupLocalSolNode(t)
 	c := rpc.New(url)
 
@@ -31,7 +27,7 @@ func TestSVMLookupTables(t *testing.T) {
 	// transfer instructions
 	pubkeys := solana.PublicKeySlice{}
 	instructions := []solana.Instruction{}
-	for i := 0; i < 32; i++ {
+	for range 32 {
 		k, kerr := solana.NewRandomPrivateKey()
 		require.NoError(t, kerr)
 		pubkeys = append(pubkeys, k.PublicKey())

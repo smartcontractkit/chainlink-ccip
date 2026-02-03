@@ -278,7 +278,7 @@ func GenerateBitMapForIndexes(indexes []int) uint64 {
 	return bitmap
 }
 
-func SerializeExtraArgs(data interface{}, tag string) ([]byte, error) {
+func SerializeExtraArgs(data any, tag string) ([]byte, error) {
 	tagBytes, err := hex.DecodeString(tag)
 	if err != nil {
 		return nil, err
@@ -287,14 +287,14 @@ func SerializeExtraArgs(data interface{}, tag string) ([]byte, error) {
 	return append(tagBytes, v...), err
 }
 
-func DeserializeExtraArgs(obj interface{}, data []byte, tag string) error {
+func DeserializeExtraArgs(obj any, data []byte, tag string) error {
 	tagBytes, err := hex.DecodeString(tag)
 	if err != nil {
 		return err
 	}
 
 	if !bytes.Equal(data[:4], tagBytes) {
-		return fmt.Errorf("Mismatched tag: %s != %s", hex.EncodeToString(data[:4]), tag)
+		return fmt.Errorf("mismatched tag: %s != %s", hex.EncodeToString(data[:4]), tag)
 	}
 
 	err = bin.UnmarshalBorsh(obj, data[4:])

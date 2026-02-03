@@ -13,16 +13,16 @@ import (
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
+	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
-	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
-
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccip/consts"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 )
@@ -239,7 +239,7 @@ func (r *rmnHomePoller) fetchAndSetRmnHomeConfigs(ctx context.Context) error {
 		ctx,
 		r.rmnHomeBoundContract.ReadIdentifier(consts.MethodNameGetAllConfigs),
 		primitives.Unconfirmed,
-		map[string]interface{}{},
+		map[string]any{},
 		&activeAndCandidateConfigs,
 	)
 	if err != nil {
@@ -342,7 +342,7 @@ func convertOnChainConfigToRMNHomeChainConfig(
 
 		for _, chain := range cfg.DynamicConfig.SourceChains {
 			homeFMap[chain.ChainSelector] = int(chain.FObserve)
-			for j := 0; j < len(nodes); j++ {
+			for j := range nodes {
 				isObserver, err := isNodeObserver(chain, j, len(nodes))
 				if err != nil {
 					lggr.Warnw("failed to check if node is observer", "err", err)

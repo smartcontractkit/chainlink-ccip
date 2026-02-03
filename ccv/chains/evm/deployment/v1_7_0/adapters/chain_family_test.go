@@ -5,6 +5,8 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/stretchr/testify/require"
+
 	evm_adapters "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/adapters"
 	v1_7_0 "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/committee_verifier"
@@ -22,7 +24,6 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
-	"github.com/stretchr/testify/require"
 )
 
 func makeChainConfig(chainSelector uint64, remoteChainSelector uint64) v1_7_0_changesets.ChainConfig {
@@ -120,7 +121,7 @@ func TestChainFamilyAdapter(t *testing.T) {
 
 			chainFamilyRegistry := adapters.NewChainFamilyRegistry()
 			chainFamilyRegistry.RegisterChainFamily("evm", &evm_adapters.ChainFamilyAdapter{})
-			mcmsRegistry := changesets.NewMCMSReaderRegistry()
+			mcmsRegistry := changesets.GetRegistry()
 
 			// On each chain, deploy chain contracts
 			ds := datastore.NewMemoryDataStore()

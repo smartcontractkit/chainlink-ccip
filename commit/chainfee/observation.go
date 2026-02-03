@@ -11,12 +11,10 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
-
-	"github.com/smartcontractkit/chainlink-ccip/internal/libs/asynclib"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
-
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccip/consts"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/asynclib"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 )
 
@@ -145,7 +143,7 @@ func feeUpdatesFromTimestampedBig(
 // packedFee = (dataAvFeeUSD << 112) | executionFeeUSD
 func fromPackedFee(packedFee *big.Int) ComponentsUSDPrices {
 	ones112 := big.NewInt(0)
-	for i := 0; i < 112; i++ {
+	for i := range 112 {
 		ones112 = ones112.SetBit(ones112, i, 1)
 	}
 

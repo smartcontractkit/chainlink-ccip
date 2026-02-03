@@ -67,7 +67,7 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 			e.OperationsBundle,
 			tokens.DeployTokenAndPool,
 			e.BlockChains.EVMChains()[chainSel],
-			basicDeployTokenAndPoolInput(chainReport),
+			basicDeployTokenAndPoolInput(chainReport, false),
 		)
 		require.NoError(t, err, "ExecuteSequence should not error")
 		require.Len(t, tokenAndPoolReport.Output.Addresses, 3, "Expected 3 addresses (token, pool, advanced pool hooks)")
@@ -88,6 +88,7 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 		// Prepare input for configuring token for transfers
 		input := tokens_core.ConfigureTokenForTransfersInput{
 			ChainSelector:    chainSel,
+			TokenAddress:     tokenAddress,
 			TokenPoolAddress: tokenPoolAddress,
 			RemoteChains: map[uint64]tokens_core.RemoteChainConfig[[]byte, string]{
 				remoteChainSel1: {
@@ -223,7 +224,7 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 			e.OperationsBundle,
 			tokens.DeployTokenAndPool,
 			e.BlockChains.EVMChains()[chainSel],
-			basicDeployTokenAndPoolInput(chainReport),
+			basicDeployTokenAndPoolInput(chainReport, false),
 		)
 		require.NoError(t, err, "ExecuteSequence should not error")
 		require.Len(t, tokenAndPoolReport.Output.Addresses, 3, "Expected 3 addresses (token, pool, advanced pool hooks)")
@@ -241,6 +242,7 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 
 		input := tokens_core.ConfigureTokenForTransfersInput{
 			ChainSelector:    chainSel,
+			TokenAddress:     tokenAndPoolReport.Output.Addresses[0].Address,
 			TokenPoolAddress: tokenPoolAddress,
 			RemoteChains: map[uint64]tokens_core.RemoteChainConfig[[]byte, string]{
 				remoteChainSel: {

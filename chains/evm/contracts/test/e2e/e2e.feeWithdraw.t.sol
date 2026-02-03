@@ -49,14 +49,17 @@ contract e2e_feeWithdrawal is OnRampSetup {
   address internal s_automationAddress; // Simulates Chainlink Automation/CRE
   uint16 internal constant NETWORK_FEE_USD_CENTS = 200;
   address internal s_feeAggregator;
+  address internal s_feeAdmin;
 
-  bytes32 internal constant CCIP_MESSAGE_SENT_TOPIC =
-    keccak256("CCIPMessageSent(uint64,address,bytes32,address,bytes,(address,uint32,uint32,uint256,bytes)[],bytes[])");
+  bytes32 internal constant CCIP_MESSAGE_SENT_TOPIC = keccak256(
+    "CCIPMessageSent(uint64,address,bytes32,address,uint256,bytes,(address,uint32,uint32,uint256,bytes)[],bytes[])"
+  );
 
   function setUp() public virtual override {
     super.setUp();
 
     s_feeAggregator = makeAddr("feeAggregator");
+    s_feeAdmin = makeAddr("feeAdmin");
 
     // Deploy a test token and pool
     s_testToken = new BurnMintERC20("TestToken", "TEST", 18, 0, 0);
@@ -90,7 +93,7 @@ contract e2e_feeWithdrawal is OnRampSetup {
     s_tokenPool.applyChainUpdates(new uint64[](0), chainUpdate);
 
     // Set fee aggregator for TokenPool via setDynamicConfig
-    s_tokenPool.setDynamicConfig(address(s_sourceRouter), address(0), s_feeAggregator);
+    s_tokenPool.setDynamicConfig(address(s_sourceRouter), address(0), s_feeAdmin);
 
     // Set up router with onRamp
     Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](1);
@@ -339,7 +342,9 @@ contract e2e_feeWithdrawal is OnRampSetup {
     {
       // 3. Test TokenPool withdrawal (permissionless - PAL compatible)
       // For V2 pools, fees go directly to pool during _distributeFees (check against receipt)
-      s_tokenPool.withdrawFeeTokens(feeTokens);
+      vm.stopPrank();
+      vm.prank(s_feeAdmin);
+      s_tokenPool.withdrawFeeTokens(feeTokens, s_feeAggregator);
       uint256 newAggregatorBalance = IERC20(s_sourceFeeToken).balanceOf(s_feeAggregator);
       uint256 actualPoolWithdrawn = newAggregatorBalance - aggregatorBalance;
       assertEq(
@@ -393,7 +398,7 @@ contract e2e_feeWithdrawal is OnRampSetup {
   ) private pure returns (OnRamp.Receipt[] memory receipts) {
     for (uint256 i = 0; i < logs.length; ++i) {
       if (logs[i].topics.length != 0 && logs[i].topics[0] == CCIP_MESSAGE_SENT_TOPIC) {
-        (,, receipts,) = abi.decode(logs[i].data, (address, bytes, OnRamp.Receipt[], bytes[]));
+        (,,, receipts,) = abi.decode(logs[i].data, (address, uint256, bytes, OnRamp.Receipt[], bytes[]));
         break;
       }
     }

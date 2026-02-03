@@ -11,8 +11,6 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
-
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/testutils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/mcm"
@@ -22,10 +20,9 @@ import (
 )
 
 func TestMcmSetConfig(t *testing.T) {
-	t.Parallel()
 	mcm.SetProgramID(config.McmProgram)
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	admin, err := solana.NewRandomPrivateKey()
 	require.NoError(t, err)
@@ -187,7 +184,7 @@ func TestMcmSetConfig(t *testing.T) {
 		require.NoError(t, err)
 
 		signerGroups := make([]byte, numSigners)
-		for i := 0; i < len(signerGroups); i++ {
+		for i := range signerGroups {
 			signerGroups[i] = byte(i % 10)
 		}
 
@@ -314,7 +311,7 @@ func TestMcmSetConfig(t *testing.T) {
 		require.NoError(t, err)
 
 		signerGroups := make([]byte, numSigners)
-		for i := 0; i < len(signerGroups); i++ {
+		for i := range signerGroups {
 			signerGroups[i] = byte(i % 10)
 		}
 

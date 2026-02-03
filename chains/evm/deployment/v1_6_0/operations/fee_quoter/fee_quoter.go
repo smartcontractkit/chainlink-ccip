@@ -11,12 +11,14 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/fee_quoter"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
 
-var ContractType cldf_deployment.ContractType = "FeeQuoter"
-var Version *semver.Version = semver.MustParse("1.6.0")
+var (
+	ContractType cldf_deployment.ContractType = "FeeQuoter"
+	Version      *semver.Version              = semver.MustParse("1.6.3")
+)
 
 type ConstructorArgs struct {
 	StaticConfig                   fee_quoter.FeeQuoterStaticConfig
@@ -69,6 +71,21 @@ var FeeQuoterUpdatePrices = contract.NewWrite(contract.WriteParams[fee_quoter.In
 	},
 })
 
+type AuthorizedCallerArgs = fee_quoter.AuthorizedCallersAuthorizedCallerArgs
+var ApplyAuthorizedCallerUpdates = contract.NewWrite(contract.WriteParams[AuthorizedCallerArgs, *fee_quoter.FeeQuoter]{
+	Name:            "fee-quoter:apply-authorized-caller-updates",
+	Version:         semver.MustParse("1.6.0"),
+	Description:     "Applies updates to the list of authorized callers on the FeeQuoter 1.6.0 contract",
+	ContractType:    ContractType,
+	ContractABI:     fee_quoter.FeeQuoterABI,
+	NewContract:     fee_quoter.NewFeeQuoter,
+	IsAllowedCaller: contract.OnlyOwner[*fee_quoter.FeeQuoter, AuthorizedCallerArgs],
+	Validate:        func(AuthorizedCallerArgs) error { return nil },
+	CallContract: func(feeQuoter *fee_quoter.FeeQuoter, opts *bind.TransactOpts, args AuthorizedCallerArgs) (*types.Transaction, error) {
+		return feeQuoter.ApplyAuthorizedCallerUpdates(opts, args)
+	},
+})
+
 type FeeQuoterParams struct {
 	MaxFeeJuelsPerMsg              *big.Int
 	TokenPriceStalenessThreshold   uint32
@@ -93,15 +110,23 @@ func (c FeeQuoterParams) Validate() error {
 	return nil
 }
 
-func DefaultFeeQuoterParams() FeeQuoterParams {
-	return FeeQuoterParams{
-		MaxFeeJuelsPerMsg:              big.NewInt(0).Mul(big.NewInt(2e2), big.NewInt(1e18)),
-		TokenPriceStalenessThreshold:   uint32(24 * 60 * 60),
-		LinkPremiumMultiplierWeiPerEth: 9e17, // 0.9 ETH
-		WethPremiumMultiplierWeiPerEth: 1e18, // 1.0 ETH
-		TokenPriceFeedUpdates:          []fee_quoter.FeeQuoterTokenPriceFeedUpdate{},
-		TokenTransferFeeConfigArgs:     []fee_quoter.FeeQuoterTokenTransferFeeConfigArgs{},
-		MorePremiumMultiplierWeiPerEth: []fee_quoter.FeeQuoterPremiumMultiplierWeiPerEthArgs{},
-		DestChainConfigArgs:            []fee_quoter.FeeQuoterDestChainConfigArgs{},
-	}
+type ApplyTokenTransferFeeConfigUpdatesInput struct {
+	TokenTransferFeeConfigArgs   []fee_quoter.FeeQuoterTokenTransferFeeConfigArgs
+	TokensToUseDefaultFeeConfigs []fee_quoter.FeeQuoterTokenTransferFeeConfigRemoveArgs
 }
+
+// FeeQuoterApplyTokenTransferFeeConfigUpdates applies updates to token transfer fee configs on the FeeQuoter contract.
+// https://etherscan.io/address/0x40858070814a57FdF33a613ae84fE0a8b4a874f7#code#F1#L836
+var FeeQuoterApplyTokenTransferFeeConfigUpdates = contract.NewWrite(contract.WriteParams[ApplyTokenTransferFeeConfigUpdatesInput, *fee_quoter.FeeQuoter]{
+	Name:            "fee-quoter:apply-token-transfer-fee-config-updates",
+	Version:         Version,
+	Description:     "Applies updates to token transfer fee configs on the FeeQuoter 1.6.0 contract",
+	ContractType:    ContractType,
+	ContractABI:     fee_quoter.FeeQuoterABI,
+	NewContract:     fee_quoter.NewFeeQuoter,
+	IsAllowedCaller: contract.OnlyOwner[*fee_quoter.FeeQuoter, ApplyTokenTransferFeeConfigUpdatesInput],
+	Validate:        func(args ApplyTokenTransferFeeConfigUpdatesInput) error { return nil },
+	CallContract: func(feeQuoter *fee_quoter.FeeQuoter, opts *bind.TransactOpts, args ApplyTokenTransferFeeConfigUpdatesInput) (*types.Transaction, error) {
+		return feeQuoter.ApplyTokenTransferFeeConfigUpdates(opts, args.TokenTransferFeeConfigArgs, args.TokensToUseDefaultFeeConfigs)
+	},
+})

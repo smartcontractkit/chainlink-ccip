@@ -89,6 +89,7 @@ func NewCCIPChainReader(
 	destChain cciptypes.ChainSelector,
 	offrampAddress []byte,
 	addrCodec cciptypes.AddressCodec,
+	populateTxHashEnabled bool,
 ) (CCIPReader, error) {
 	reader, err := newCCIPChainReaderInternal(
 		ctx,
@@ -99,6 +100,7 @@ func NewCCIPChainReader(
 		destChain,
 		offrampAddress,
 		addrCodec,
+		populateTxHashEnabled,
 	)
 	if err != nil {
 		return nil, err
@@ -131,6 +133,7 @@ func NewCCIPReaderWithExtendedContractReaders(
 		destChain,
 		offrampAddress,
 		addrCodec,
+		false, // populateTxHashEnabled - default to false for deprecated test function
 	)
 	if err != nil {
 		// Panic here since right now this is only called from tests in core
@@ -201,10 +204,6 @@ type CCIPReader interface {
 		chains []cciptypes.ChainSelector,
 	) map[cciptypes.ChainSelector]types.ChainFeeComponents
 
-	// GetDestChainFeeComponents Reads the fee components for the destination chain.
-	// DEPRECATED: Not used and should be removed.
-	GetDestChainFeeComponents(ctx context.Context) (types.ChainFeeComponents, error)
-
 	// GetWrappedNativeTokenPriceUSD Gets the wrapped native token price in USD for the provided chains.
 	// It reads the prices from the FeeQuoter contract on each chain.
 	// If it encounters an issue (e.g. chain not supported) it logs the error and skips the chain.
@@ -236,20 +235,13 @@ type CCIPReader interface {
 	// allChains is needed because there is no way to enumerate all chain selectors on Solana. We'll attempt to
 	// fetch the source config from the offramp for each of them.
 	DiscoverContracts(ctx context.Context,
-		supportedChains, allChains []cciptypes.ChainSelector) (ContractAddresses, error)
-
-	// LinkPriceUSD gets the LINK price in 1e-18 USDs from the FeeQuoter contract on the destination chain.
-	// For example, if the price is 1 LINK = 10 USD, this function will return 10e18 (10 * 1e18). You can think of this
-	// function returning the price of LINK not in USD, but in a small denomination of USD, similar to returning
-	// the price of ETH not in ETH but in wei (1e-18 ETH).
-	// DEPRECATED: Not used and should be removed.
-	LinkPriceUSD(ctx context.Context) (cciptypes.BigInt, error)
+		supportedChains, allChains []cciptypes.ChainSelector) (cciptypes.ContractAddresses, error)
 
 	// Sync can be used to perform frequent syncing operations inside the reader implementation.
 	// NOTE: this method may make network calls.
 	//
 	// NOTE: You should ensure that Sync is called deterministically for every oracle in the DON (e.g. in the Outcome).
-	Sync(ctx context.Context, contracts ContractAddresses) error
+	Sync(ctx context.Context, contracts cciptypes.ContractAddresses) error
 
 	// GetLatestPriceSeqNr returns the latest price sequence number for the destination chain.
 	// Not to confuse with the sequence number of the messages. This is the OCR sequence number.

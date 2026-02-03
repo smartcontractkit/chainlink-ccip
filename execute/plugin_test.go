@@ -8,7 +8,6 @@ import (
 	"iter"
 	"maps"
 	"slices"
-	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -29,6 +28,7 @@ import (
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccip/consts"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
@@ -42,7 +42,6 @@ import (
 	plugincommon_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/plugincommon"
 	reader_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
 	readerpkg_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
@@ -51,14 +50,14 @@ func genRandomChainReports(numReports, numMsgsPerReport int) []cciptypes.Execute
 	// chain selectors and unique (random) sequence number ranges.
 	// don't need to set anything else.
 	chainReports := make([]cciptypes.ExecutePluginReportSingleChain, numReports)
-	for i := 0; i < numReports; i++ {
+	for i := range numReports {
 		scc := cciptypes.ChainSelector(rand.RandomUint64())
 		chainReports[i] = cciptypes.ExecutePluginReportSingleChain{
 			SourceChainSelector: scc,
 			Messages:            make([]cciptypes.Message, 0, numMsgsPerReport),
 		}
 		start := rand.RandomUint32()
-		for j := 0; j < numMsgsPerReport; j++ {
+		for j := range numMsgsPerReport {
 			chainReports[i].Messages = append(chainReports[i].Messages, cciptypes.Message{
 				Header: cciptypes.RampMessageHeader{
 					SequenceNumber:      cciptypes.SeqNum(start + uint32(j)),
@@ -100,12 +99,8 @@ func Test_getSeqNrRangesBySource(t *testing.T) {
 		}
 		expectedSetSlice := slices.Collect(maps.Keys(expectedSet))
 		actualSetSlice := seqNrRange.ToSlice()
-		sort.Slice(expectedSetSlice, func(i, j int) bool {
-			return expectedSetSlice[i] < expectedSetSlice[j]
-		})
-		sort.Slice(actualSetSlice, func(i, j int) bool {
-			return actualSetSlice[i] < actualSetSlice[j]
-		})
+		slices.Sort(expectedSetSlice)
+		slices.Sort(actualSetSlice)
 		require.Equal(t, expectedSetSlice, actualSetSlice)
 	}
 }

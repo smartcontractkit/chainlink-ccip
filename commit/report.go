@@ -8,14 +8,14 @@ import (
 	"fmt"
 	"maps"
 	"slices"
-	"sort"
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccip/consts"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/internal/builder"
@@ -23,7 +23,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 )
 
@@ -326,7 +325,7 @@ func (p *Plugin) isStaleReport(
 	}
 
 	chainSlice := chainSet.ToSlice()
-	sort.Slice(chainSlice, func(i, j int) bool { return chainSlice[i] < chainSlice[j] })
+	slices.Sort(chainSlice)
 
 	offRampExpNextSeqNums, err := p.ccipReader.NextSeqNum(ctx, chainSlice)
 	if err != nil {

@@ -14,8 +14,6 @@ import (
 
 var ContractType cldf_deployment.ContractType = "RMN"
 
-var Version *semver.Version = semver.MustParse("1.5.0")
-
 type ConstructorArgs struct {
 	RMNConfig rmn_contract.RMNConfig
 }
@@ -31,11 +29,11 @@ type UncurseArgs struct {
 
 var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Name:             "rmn:deploy",
-	Version:          Version,
+	Version:          semver.MustParse("1.5.0"),
 	Description:      "Deploys the RMN contract",
 	ContractMetadata: rmn_contract.RMNContractMetaData,
 	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
-		cldf_deployment.NewTypeAndVersion(ContractType, *Version).String(): {
+		cldf_deployment.NewTypeAndVersion(ContractType, *semver.MustParse("1.5.0")).String(): {
 			EVM: common.FromHex(rmn_contract.RMNContractBin),
 		},
 	},
@@ -44,7 +42,7 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 
 var Curse = contract.NewWrite(contract.WriteParams[CurseArgs, *rmn_contract.RMNContract]{
 	Name:            "rmn:curse",
-	Version:         Version,
+	Version:         semver.MustParse("1.5.0"),
 	Description:     "Applies a curse to an RMN contract",
 	ContractType:    ContractType,
 	ContractABI:     rmn_contract.RMNContractABI,
@@ -58,7 +56,7 @@ var Curse = contract.NewWrite(contract.WriteParams[CurseArgs, *rmn_contract.RMNC
 
 var Uncurse = contract.NewWrite(contract.WriteParams[UncurseArgs, *rmn_contract.RMNContract]{
 	Name:            "rmn:uncurse",
-	Version:         Version,
+	Version:         semver.MustParse("1.5.0"),
 	Description:     "Uncurses an existing curse on an RMN contract",
 	ContractType:    ContractType,
 	ContractABI:     rmn_contract.RMNContractABI,
@@ -72,7 +70,7 @@ var Uncurse = contract.NewWrite(contract.WriteParams[UncurseArgs, *rmn_contract.
 
 var IsCursed = contract.NewRead(contract.ReadParams[fastcurse.Subject, bool, *rmn_contract.RMNContract]{
 	Name:         "rmn:is-cursed",
-	Version:      Version,
+	Version:      semver.MustParse("1.5.0"),
 	Description:  "Checks if a subject is cursed on an RMN contract",
 	ContractType: ContractType,
 	NewContract:  rmn_contract.NewRMNContract,
@@ -83,7 +81,7 @@ var IsCursed = contract.NewRead(contract.ReadParams[fastcurse.Subject, bool, *rm
 
 var GetCurseProgress = contract.NewRead(contract.ReadParams[fastcurse.Subject, rmn_contract.GetCurseProgress, *rmn_contract.RMNContract]{
 	Name:         "rmn:get-curse-progress",
-	Version:      Version,
+	Version:      semver.MustParse("1.5.0"),
 	Description:  "Gets the curse progress for a given subject on an RMN contract",
 	ContractType: ContractType,
 	NewContract:  rmn_contract.NewRMNContract,
@@ -94,7 +92,7 @@ var GetCurseProgress = contract.NewRead(contract.ReadParams[fastcurse.Subject, r
 
 var GetConfigDetails = contract.NewRead(contract.ReadParams[any, rmn_contract.GetConfigDetails, *rmn_contract.RMNContract]{
 	Name:         "rmn:get-config-details",
-	Version:      Version,
+	Version:      semver.MustParse("1.5.0"),
 	Description:  "Gets the configuration details of the RMN contract",
 	ContractType: ContractType,
 	NewContract:  rmn_contract.NewRMNContract,

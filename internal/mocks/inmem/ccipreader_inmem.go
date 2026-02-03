@@ -2,8 +2,7 @@ package inmem
 
 import (
 	"context"
-	"math/big"
-	"sort"
+	"slices"
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -124,7 +123,7 @@ func (r InMemoryCCIPReader) ExecutedMessages(
 		}
 
 		unqSeqNums := mapset.NewSet(seqNums...).ToSlice()
-		sort.Slice(unqSeqNums, func(i, j int) bool { return unqSeqNums[i] < unqSeqNums[j] })
+		slices.Sort(unqSeqNums)
 		ret[source] = unqSeqNums
 	}
 	return ret, nil
@@ -172,14 +171,6 @@ func (r InMemoryCCIPReader) GetChainsFeeComponents(
 	panic("implement me")
 }
 
-func (r InMemoryCCIPReader) GetDestChainFeeComponents(_ context.Context) (types.ChainFeeComponents, error) {
-	feeComponents := types.ChainFeeComponents{
-		ExecutionFee:        big.NewInt(0),
-		DataAvailabilityFee: big.NewInt(0),
-	}
-	return feeComponents, nil
-}
-
 func (r InMemoryCCIPReader) GetWrappedNativeTokenPriceUSD(
 	ctx context.Context,
 	selectors []cciptypes.ChainSelector,
@@ -196,7 +187,7 @@ func (r InMemoryCCIPReader) GetChainFeePriceUpdate(
 
 func (r InMemoryCCIPReader) DiscoverContracts(
 	ctx context.Context,
-	supportedChains, allChains []cciptypes.ChainSelector) (reader.ContractAddresses, error) {
+	supportedChains, allChains []cciptypes.ChainSelector) (cciptypes.ContractAddresses, error) {
 	return nil, nil
 }
 
@@ -212,13 +203,9 @@ func (r InMemoryCCIPReader) GetRmnCurseInfo(ctx context.Context) (cciptypes.Curs
 	}, nil
 }
 
-func (r InMemoryCCIPReader) LinkPriceUSD(ctx context.Context) (cciptypes.BigInt, error) {
-	return cciptypes.NewBigIntFromInt64(100), nil
-}
-
 // Sync can be used to perform frequent syncing operations inside the reader implementation.
 // Returns a bool indicating whether something was updated.
-func (r InMemoryCCIPReader) Sync(_ context.Context, _ reader.ContractAddresses) error {
+func (r InMemoryCCIPReader) Sync(_ context.Context, _ cciptypes.ContractAddresses) error {
 	return nil
 }
 

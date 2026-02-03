@@ -10,8 +10,6 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/programs/system"
 	"github.com/gagliardetto/solana-go/rpc"
-
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
@@ -26,8 +24,7 @@ import (
 )
 
 func TestTimelockScheduleAndExecute(t *testing.T) {
-	t.Parallel()
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	timelock.SetProgramID(config.TimelockProgram)
 	access_controller.SetProgramID(config.AccessControllerProgram)
@@ -689,10 +686,7 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 
 			for i := 0; i < len(ixs); i += chunkSize {
 				wg.Add(1)
-				end := i + chunkSize
-				if end > len(ixs) {
-					end = len(ixs)
-				}
+				end := min(i+chunkSize, len(ixs))
 				chunk := ixs[i:end]
 
 				go func(chunk []solana.Instruction) {
