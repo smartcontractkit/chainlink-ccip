@@ -14,6 +14,7 @@ import (
 	tarops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	tarseq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
 	tpops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/operations/token_pool"
+	tpseq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/sequences/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
@@ -26,8 +27,89 @@ import (
 )
 
 func (a *EVMAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[tokensapi.ConfigureTokenForTransfersInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
-	// TODO: implement me
-	return nil
+	return cldf_ops.NewSequence(
+		"token-adapter:configure-token-for-transfers",
+		tpops.Version,
+		"Configure a token for cross-chain transfers for an EVM chain",
+		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokensapi.ConfigureTokenForTransfersInput) (sequences.OnChainOutput, error) {
+			chain, ok := chains.EVMChains()[input.ChainSelector]
+			if !ok {
+				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
+			}
+			if !common.IsHexAddress(input.TokenPoolAddress) {
+				return sequences.OnChainOutput{}, fmt.Errorf("token pool address %q is not a valid hex address", input.TokenPoolAddress)
+			}
+			if !common.IsHexAddress(input.RegistryAddress) {
+				return sequences.OnChainOutput{}, fmt.Errorf("registry address %q is not a valid hex address", input.RegistryAddress)
+			}
+
+			tpAddr := common.HexToAddress(input.TokenPoolAddress)
+			if tpAddr == (common.Address{}) {
+				return sequences.OnChainOutput{}, errors.New("token pool address is zero address")
+			}
+
+			trAddr := common.HexToAddress(input.RegistryAddress)
+			if trAddr == (common.Address{}) {
+				return sequences.OnChainOutput{}, errors.New("token admin registry address is zero address")
+			}
+
+			externalAdmin := common.Address{}
+			if input.ExternalAdmin != "" {
+				if !common.IsHexAddress(input.ExternalAdmin) {
+					return sequences.OnChainOutput{}, fmt.Errorf("external admin address %q is not a valid hex address", input.ExternalAdmin)
+				}
+
+				externalAdmin = common.HexToAddress(input.ExternalAdmin)
+			}
+
+			token, err := cldf_ops.ExecuteOperation(b,
+				tpops.GetToken,
+				chain,
+				evm_contract.FunctionInput[struct{}]{
+					ChainSelector: input.ChainSelector,
+					Address:       tpAddr,
+					Args:          struct{}{},
+				},
+			)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token address via GetToken operation: %w", err)
+			}
+
+			configureReport, err := cldf_ops.ExecuteSequence(b,
+				tpseq.ConfigureTokenPoolForRemoteChains,
+				chain,
+				tpseq.ConfigureTokenPoolForRemoteChainsInput{
+					TokenPoolAddress: tpAddr,
+					RemoteChains:     input.RemoteChains,
+				},
+			)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to configure token pool for transfers on chain %d: %w", input.ChainSelector, err)
+			}
+
+			registerReport, err := cldf_ops.ExecuteSequence(b,
+				tarseq.RegisterToken,
+				chain,
+				tarseq.RegisterTokenInput{
+					ChainSelector:             input.ChainSelector,
+					TokenAdminRegistryAddress: trAddr,
+					TokenPoolAddress:          tpAddr,
+					ExternalAdmin:             externalAdmin,
+					TokenAddress:              token.Output,
+				},
+			)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to register token on chain %d: %w", input.ChainSelector, err)
+			}
+
+			var result sequences.OnChainOutput
+			result.Addresses = append(result.Addresses, configureReport.Output.Addresses...)
+			result.Addresses = append(result.Addresses, registerReport.Output.Addresses...)
+			result.BatchOps = append(result.BatchOps, configureReport.Output.BatchOps...)
+			result.BatchOps = append(result.BatchOps, registerReport.Output.BatchOps...)
+
+			return result, nil
+		})
 }
 
 func (a *EVMAdapter) AddressRefToBytes(ref datastore.AddressRef) ([]byte, error) {
