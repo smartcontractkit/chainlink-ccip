@@ -4,10 +4,12 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
+	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/token_pool"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	seq_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
@@ -49,9 +51,35 @@ func (c *LombardChainAdapter) AllowedCallerOnDest(ds datastore.DataStore, chains
 	return common.FromHex(allowedCallerOnSourceAddressRef.Address), nil
 }
 
-func (c *LombardChainAdapter) TokenPool(ds datastore.DataStore, chains chain.BlockChains, selector uint64) (datastore.AddressRef, error) {
+func (c *LombardChainAdapter) TokenPool(ds datastore.DataStore, selector uint64, tokenQualifier string) (datastore.AddressRef, error) {
 	return datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
-		Type:    datastore.ContractType(lombard_token_pool.ContractType),
-		Version: lombard_token_pool.Version,
+		Type:      datastore.ContractType(lombard_token_pool.ContractType),
+		Version:   lombard_token_pool.Version,
+		Qualifier: tokenQualifier,
 	}, selector, datastore_utils.FullRef)
+}
+
+func (c *LombardChainAdapter) RemoteTokenAddress(bundle operations.Bundle, ds datastore.DataStore, chains chain.BlockChains, selector uint64, tokenQualifier string) ([]byte, error) {
+	tokenPool, err := c.TokenPool(ds, selector, tokenQualifier)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get token pool: %w", err)
+	}
+
+	getTokenReport, err := operations.ExecuteOperation(bundle, token_pool.GetToken, chains.EVMChains()[selector], evm_contract.FunctionInput[any]{
+		ChainSelector: selector,
+		Address:       common.HexToAddress(tokenPool.Address),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute get token operation: %w", err)
+	}
+
+	return getTokenReport.Output.Bytes(), nil
+}
+
+func (c *LombardChainAdapter) RemoteTokenPoolAddress(ds datastore.DataStore, chains chain.BlockChains, selector uint64, tokenQualifier string) ([]byte, error) {
+	tokenPool, err := c.TokenPool(ds, selector, tokenQualifier)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get token pool: %w", err)
+	}
+	return c.AddressRefToBytes(tokenPool)
 }

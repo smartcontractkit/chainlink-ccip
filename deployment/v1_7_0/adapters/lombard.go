@@ -19,6 +19,8 @@ type DeployLombardInput struct {
 	Bridge string
 	// Token is the address of the token to be used in the LombardTokenPool.
 	Token string
+	// TokenQualifier is the qualifier for matching token with the tokenPool during deployment
+	TokenQualifier string
 	// DeployerContract is a contract that can be used to deploy other contracts.
 	// i.e. A CREATE2Factory contract on Ethereum can enable consistent deployments.
 	DeployerContract string
@@ -43,16 +45,15 @@ type ConfigureLombardChainForLanesInput struct {
 	// ChainSelector is the selector for the chain being configured.
 	ChainSelector uint64
 	// Token is the address of the Token contract.
-	Token              string
-	TokenPoolReference datastore.AddressRef
+	Token string
+	// TokenQualifier is the qualifier for matching token with the tokenPool during deployment
+	TokenQualifier string
 	// RemoteChains is the set of remote chains to configure.
 	RemoteChains map[uint64]RemoteLombardChainConfig
 }
 
 // RemoteLombardChainConfig configures a Lombard-enabled chain for a remote counterpart.
 type RemoteLombardChainConfig struct {
-	RemotePoolAddress      []byte
-	RemoteTokenAddress     []byte
 	TokenTransferFeeConfig tokens.TokenTransferFeeConfig
 	LombardChainId         uint32
 	FeeUSDCents            uint16
@@ -78,13 +79,16 @@ type LombardChain interface {
 	// AddressRefToBytes converts an AddressRef to a byte slice representing the address.
 	// Each chain family has their own way of serializing addresses from strings and needs to specify this logic.
 	AddressRefToBytes(ref datastore.AddressRef) ([]byte, error)
-	TokenPool(ds datastore.DataStore, chains cldf_chain.BlockChains, selector uint64) (datastore.AddressRef, error)
 }
 
 // RemoteLombardChain is a connectable remote Lombard chain.
 type RemoteLombardChain interface {
 	// AllowedCallerOnDest returns the address allowed to deposit tokens for burn on the remote chain.
 	AllowedCallerOnDest(ds datastore.DataStore, chains cldf_chain.BlockChains, selector uint64) ([]byte, error)
+
+	RemoteTokenAddress(bundle cldf_ops.Bundle, ds datastore.DataStore, chains cldf_chain.BlockChains, selector uint64, tokenQualifier string) ([]byte, error)
+
+	RemoteTokenPoolAddress(ds datastore.DataStore, chains cldf_chain.BlockChains, selector uint64, tokenQualifier string) ([]byte, error)
 }
 
 // LombardChainRegistry maintains a registry of Lombard chains.

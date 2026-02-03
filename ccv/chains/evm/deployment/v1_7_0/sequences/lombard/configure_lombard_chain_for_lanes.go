@@ -11,13 +11,15 @@ import (
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	mcms_types "github.com/smartcontractkit/mcms/types"
+
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/lombard_token_pool"
 	tokens_core "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
-	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/advanced_pool_hooks"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/lombard_verifier"
@@ -66,7 +68,16 @@ var ConfigureLombardChainForLanes = cldf_ops.NewSequence(
 		advancedPoolHooksRef, err := datastore_utils.FindAndFormatRef(dep.DataStore, datastore.AddressRef{
 			Type:      datastore.ContractType(advanced_pool_hooks.ContractType),
 			Version:   advanced_pool_hooks.Version,
-			Qualifier: ContractQualifier,
+			Qualifier: *tokenPoolQualifier(input.TokenQualifier),
+		}, chain.Selector, datastore_utils.FullRef)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to find AdvancedPoolHooks ref on chain %d: %w", chain.Selector, err)
+		}
+
+		tokenPoolRef, err := datastore_utils.FindAndFormatRef(dep.DataStore, datastore.AddressRef{
+			Type:      datastore.ContractType(lombard_token_pool.ContractType),
+			Version:   lombard_token_pool.Version,
+			Qualifier: *tokenPoolQualifier(input.TokenQualifier),
 		}, chain.Selector, datastore_utils.FullRef)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to find AdvancedPoolHooks ref on chain %d: %w", chain.Selector, err)
@@ -99,18 +110,18 @@ var ConfigureLombardChainForLanes = cldf_ops.NewSequence(
 		})
 
 		for remoteChainSelector, remoteChain := range input.RemoteChains {
-			remotePoolPadded, err := toBytes32LeftPad(remoteChain.RemotePoolAddress)
+			remotePoolAddress, err := dep.RemoteChains[remoteChainSelector].RemoteTokenPoolAddress(dep.DataStore, dep.BlockChains, remoteChainSelector, *tokenPoolQualifier(input.TokenQualifier))
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to convert remote pool address to bytes32: %w", err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get remote pool address: %w", err)
 			}
-			remoteTokenPadded, err := toBytes32LeftPad(remoteChain.RemoteTokenAddress)
+			remoteTokenAddress, err := dep.RemoteChains[remoteChainSelector].RemoteTokenAddress(b, dep.DataStore, dep.BlockChains, remoteChainSelector, *tokenPoolQualifier(input.TokenQualifier))
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to convert remote token address to bytes32: %w", err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get remote token address: %w", err)
 			}
 
 			remoteChainConfigs[remoteChainSelector] = tokens_core.RemoteChainConfig[[]byte, string]{
-				RemotePool:             remotePoolPadded[:],
-				RemoteToken:            remoteTokenPadded[:],
+				RemotePool:             common.LeftPadBytes(remotePoolAddress, 32),
+				RemoteToken:            common.LeftPadBytes(remoteTokenAddress, 32),
 				TokenTransferFeeConfig: remoteChain.TokenTransferFeeConfig,
 				DefaultFinalityOutboundRateLimiterConfig: tokens_core.RateLimiterConfig{
 					Capacity: big.NewInt(0),
@@ -220,7 +231,7 @@ var ConfigureLombardChainForLanes = cldf_ops.NewSequence(
 		configureTokenForTransfersReport, err := cldf_ops.ExecuteSequence(b, tokens_sequences.ConfigureTokenForTransfers, dep.BlockChains, tokens_core.ConfigureTokenForTransfersInput{
 			ChainSelector:    input.ChainSelector,
 			TokenAddress:     input.Token,
-			TokenPoolAddress: input.TokenPoolReference.Address,
+			TokenPoolAddress: tokenPoolRef.Address,
 			RegistryAddress:  tokenAdminRegistryAddressRef.Address,
 			MinFinalityValue: 0,
 			RemoteChains:     remoteChainConfigs,

@@ -18,7 +18,8 @@ type LombardChainConfig struct {
 	// Bridge is the address of the Bridge contract provided by Lombard
 	Bridge string
 	// Token is the address of the token to be used in the LombardTokenPool.
-	Token string
+	Token          string
+	TokenQualifier string
 	// DeployerContract is a contract that can be used to deploy other contracts.
 	// i.e. A CREATE2Factory contract on Ethereum can enable consistent deployments.
 	DeployerContract string
@@ -99,6 +100,7 @@ func makeApplyDeployLombardChains(lombardChainRegistry *adapters.LombardChainReg
 				ChainSelector:    chainSel,
 				Bridge:           chainCfg.Bridge,
 				Token:            chainCfg.Token,
+				TokenQualifier:   chainCfg.TokenQualifier,
 				DeployerContract: chainCfg.DeployerContract,
 				StorageLocations: chainCfg.StorageLocations,
 				FeeAggregator:    chainCfg.FeeAggregator,
@@ -146,21 +148,15 @@ func makeApplyDeployLombardChains(lombardChainRegistry *adapters.LombardChainReg
 				remoteChains[remoteChainSelector] = adapter
 			}
 
-			tokenPoolRef, err := adaptersByChain[chainSel].TokenPool(newDS.Seal(), e.BlockChains, chainSel)
-			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to get token pool ref on chain with selector %d: %w", chainSel, err)
-			}
-
 			dep := adapters.ConfigureLombardChainForLanesDeps{
 				BlockChains:  e.BlockChains,
 				DataStore:    combinedDS.Seal(),
 				RemoteChains: remoteChains,
 			}
 			in := adapters.ConfigureLombardChainForLanesInput{
-				ChainSelector:      chainSel,
-				Token:              chainCfg.Token,
-				TokenPoolReference: tokenPoolRef,
-				RemoteChains:       chainCfg.RemoteChains,
+				ChainSelector: chainSel,
+				Token:         chainCfg.Token,
+				RemoteChains:  chainCfg.RemoteChains,
 			}
 			configureChainForLanesReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adaptersByChain[chainSel].ConfigureLombardChainForLanes(), dep, in)
 			if err != nil {
