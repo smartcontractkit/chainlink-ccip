@@ -393,7 +393,7 @@ func applyCCTPAuthorizedCallerWrites(
 	}
 	writes = append(writes, msgTxReport.Output)
 
-	ccvPoolReport, err := cldf_ops.ExecuteOperation(b, cctp_through_ccv_token_pool.ApplyAuthorizedCallerUpdates, chain, contract_utils.FunctionInput[cctp_through_ccv_token_pool.AuthorizedCallerArgs]{
+	cctpV2ThroughCCVTokenPoolReport, err := cldf_ops.ExecuteOperation(b, cctp_through_ccv_token_pool.ApplyAuthorizedCallerUpdates, chain, contract_utils.FunctionInput[cctp_through_ccv_token_pool.AuthorizedCallerArgs]{
 		ChainSelector: chain.Selector,
 		Address:       cctpV2WithCCVsPoolAddr,
 		Args: cctp_through_ccv_token_pool.AuthorizedCallerArgs{
@@ -403,9 +403,9 @@ func applyCCTPAuthorizedCallerWrites(
 	if err != nil {
 		return nil, fmt.Errorf("failed to apply authorized caller updates to CCTPThroughCCVTokenPool: %w", err)
 	}
-	writes = append(writes, ccvPoolReport.Output)
+	writes = append(writes, cctpV2ThroughCCVTokenPoolReport.Output)
 
-	v2PoolReport, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_cctp_v2.USDCTokenPoolUpdateAuthorizedCallers, chain, contract_utils.FunctionInput[usdc_token_pool_cctp_v2.AuthorizedCallerUpdate]{
+	cctpV2TokenPoolReport, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_cctp_v2.USDCTokenPoolUpdateAuthorizedCallers, chain, contract_utils.FunctionInput[usdc_token_pool_cctp_v2.AuthorizedCallerUpdate]{
 		ChainSelector: chain.Selector,
 		Address:       cctpV2PoolAddr,
 		Args: usdc_token_pool_cctp_v2.AuthorizedCallerUpdate{
@@ -415,7 +415,7 @@ func applyCCTPAuthorizedCallerWrites(
 	if err != nil {
 		return nil, fmt.Errorf("failed to apply authorized caller updates to USDCTokenPoolCCTPV2: %w", err)
 	}
-	writes = append(writes, v2PoolReport.Output)
+	writes = append(writes, cctpV2TokenPoolReport.Output)
 	return writes, nil
 }
 
