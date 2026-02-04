@@ -4,22 +4,13 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
-overrides:
-  '@babel/runtime': '^7.26.10 '
-
 importers:
 
   .:
     dependencies:
       '@chainlink/contracts':
-        specifier: 1.5.1-beta.0
-        version: 1.5.1-beta.0(ethers@5.8.0)
-      '@changesets/cli':
-        specifier: ^2.29.8
-        version: 2.29.8
-      '@changesets/get-github-info':
-        specifier: ^0.7.0
-        version: 0.7.0
+        specifier: 1.5.0
+        version: 1.5.0(ethers@5.8.0)
       '@openzeppelin/contracts-4.8.3':
         specifier: npm:@openzeppelin/contracts@4.8.3
         version: '@openzeppelin/contracts@4.8.3'
@@ -30,6 +21,12 @@ importers:
         specifier: ^7.7.3
         version: 7.7.3
     devDependencies:
+      '@changesets/cli':
+        specifier: ^2.29.8
+        version: 2.29.8
+      '@changesets/get-github-info':
+        specifier: ^0.7.0
+        version: 0.7.0
       solhint:
         specifier: ^6.0.2
         version: 6.0.2
@@ -54,8 +51,8 @@ packages:
     resolution: {integrity: sha512-VtPOkrdPHZsKc/clNqyi9WUA8TINkZ4cGk63UUE3u4pmB2k+ZMQRDuIOagv8UVd6j7k0T3+RRIb7beKTebNbcw==}
     engines: {node: '>=6.9.0'}
 
-  '@chainlink/contracts@1.5.1-beta.0':
-    resolution: {integrity: sha512-XSApjtbc+KWdgo+ek+417x12J9LOI1ztTtpvGIoosfsnqAGp7ewW7GUQiudqAUeRv9W10lC4uByqVyxnWg13hw==}
+  '@chainlink/contracts@1.5.0':
+    resolution: {integrity: sha512-1fGJwjvivqAxvVOTqZUEXGR54CATtg0vjcXgSIk4Cfoad2nUhSG/qaWHXjLg1CkNTeOoteoxGQcpP/HiA5HsUA==}
     engines: {node: '>=22', pnpm: '>=10'}
 
   '@chainlink/solhint-plugin-chainlink-solidity@https://codeload.github.com/smartcontractkit/chainlink-solhint-rules/tar.gz/1b4c0c2663fcd983589d4f33a2e73908624ed43c':
@@ -622,7 +619,7 @@ packages:
 
   glob@7.2.3:
     resolution: {integrity: sha512-nFR0zLpU2YCaRxwoCJvL6UvCH2JFyFVIvwTLsIf21AuHlMskA1hhTdk+LlYJtOlYt9v6dvszD2BGRqBL+iQK9Q==}
-    deprecated: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+    deprecated: Glob versions prior to v9 are no longer supported
 
   glob@8.1.0:
     resolution: {integrity: sha512-r8hpEjiQEYlF2QU0df3dS+nxxSIreXQS1qRhMJM0Q5NDdR386C7jb7Hwwod8Fgiuex+k0GFjgft18yvxm5XoCQ==}
@@ -1203,7 +1200,7 @@ snapshots:
     dependencies:
       regenerator-runtime: 0.14.1
 
-  '@chainlink/contracts@1.5.1-beta.0(ethers@5.8.0)':
+  '@chainlink/contracts@1.5.0(ethers@5.8.0)':
     dependencies:
       '@arbitrum/nitro-contracts': 3.0.0
       '@changesets/cli': 2.29.8

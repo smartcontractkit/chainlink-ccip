@@ -294,7 +294,7 @@ func DeserializeExtraArgs(obj any, data []byte, tag string) error {
 	}
 
 	if !bytes.Equal(data[:4], tagBytes) {
-		return fmt.Errorf("Mismatched tag: %s != %s", hex.EncodeToString(data[:4]), tag)
+		return fmt.Errorf("mismatched tag: %s != %s", hex.EncodeToString(data[:4]), tag)
 	}
 
 	err = bin.UnmarshalBorsh(obj, data[4:])

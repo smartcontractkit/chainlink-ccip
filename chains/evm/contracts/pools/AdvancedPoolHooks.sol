@@ -113,7 +113,7 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, ITypeAndVersion, AuthorizedCal
 
   /// @inheritdoc IAdvancedPoolHooks
   /// @dev Performs policy engine validation for inbound transfers.
-  function postFlightCheck(
+  function postflightCheck(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
     uint256,
     uint16

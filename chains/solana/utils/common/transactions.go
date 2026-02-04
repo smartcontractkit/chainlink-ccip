@@ -75,7 +75,7 @@ func SendAndFailWithLookupTables(ctx context.Context, rpcClient *rpc.Client, ins
 	logs := strings.Join(txres.Meta.LogMessages, " ")
 	for _, expectedError := range expectedErrors {
 		if !strings.Contains(logs, expectedError) {
-			return nil, fmt.Errorf("The logs did not contain '%s'. The logs were: %s", expectedError, logs)
+			return nil, fmt.Errorf("the logs did not contain '%s'. The logs were: %s", expectedError, logs)
 		}
 	}
 	return txres, nil
@@ -122,7 +122,7 @@ func SendAndFailWithRPCError(ctx context.Context, rpcClient *rpc.Client, instruc
 	errStr := err.Error()
 	for _, expectedError := range expectedErrors {
 		if !strings.Contains(errStr, expectedError) {
-			return fmt.Errorf("The error did not contain '%s'. The error was: %s", expectedError, errStr)
+			return fmt.Errorf("the error did not contain '%s'. The error was: %s", expectedError, errStr)
 		}
 	}
 	return nil

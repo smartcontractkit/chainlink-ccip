@@ -23,7 +23,7 @@ interface IAdvancedPoolHooks {
   /// @param blockConfirmationRequested The block confirmation requested.
   /// @dev This function may revert if the postflight check fails. This means the transaction is unexecutable until
   /// the issue is resolved.
-  function postFlightCheck(
+  function postflightCheck(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
     uint256 localAmount,
     uint16 blockConfirmationRequested
