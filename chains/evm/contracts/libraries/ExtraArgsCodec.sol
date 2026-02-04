@@ -8,7 +8,7 @@ library ExtraArgsCodec {
   error InvalidAddressLength(uint256 length);
   error CCVArrayLengthMismatch(uint256 ccvsLength, uint256 ccvArgsLength);
 
-  bytes4 public constant GENERIC_EXTRA_ARGS_V3_TAG = 0x302326cb;
+  bytes4 public constant GENERIC_EXTRA_ARGS_V3_TAG = 0xa69dd4aa;
   bytes4 public constant SVM_EXECUTOR_ARGS_V1_TAG = 0x1a2b3c4d;
   bytes4 public constant SUI_EXECUTOR_ARGS_V1_TAG = 0x5e6f7a8b;
 
