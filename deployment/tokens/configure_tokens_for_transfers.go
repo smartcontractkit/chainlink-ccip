@@ -30,6 +30,8 @@ type TokenTransferConfig struct {
 	RegistryRef datastore.AddressRef
 	// RemoteChains specifies the remote chains to configure on the token pool.
 	RemoteChains map[uint64]RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]
+	// TokenSymbol is the symbol of the token being configured. Not required if the token can be derived from the pool reference.
+	TokenSymbol string
 }
 
 // ConfigureTokensForTransfersConfig is the configuration for the ConfigureTokensForTransfers changeset.
@@ -99,6 +101,8 @@ func makeApply(tokenRegistry *TokenAdapterRegistry, mcmsRegistry *changesets.MCM
 				RemoteChains:     remoteChains,
 				ExternalAdmin:    token.ExternalAdmin,
 				RegistryAddress:  registry.Address,
+				TokenSymbol:      token.TokenSymbol,
+				ExistingDataStore: e.DataStore,
 			})
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to configure token pool on chain with selector %d: %w", token.ChainSelector, err)

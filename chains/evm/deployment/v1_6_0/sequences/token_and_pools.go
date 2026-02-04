@@ -161,6 +161,34 @@ func (a *EVMAdapter) DeriveTokenAddress(e deployment.Environment, chainSelector 
 	return token.Output.Bytes(), nil
 }
 
+func (a *EVMAdapter) DeriveTokenDecimals(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) (uint8, error) {
+	chain, ok := e.BlockChains.EVMChains()[chainSelector]
+	if !ok {
+		return 0, fmt.Errorf("chain with selector %d not defined", chainSelector)
+	}
+
+	addrRef, err := datastore_utils.FindAndFormatRef(e.DataStore, poolRef, chainSelector, datastore_utils.FullRef)
+	if err != nil {
+		return 0, fmt.Errorf("failed to find token pool in datastore using ref (%+v): %w", poolRef, err)
+	}
+
+	addrRaw, err := a.AddressRefToBytes(addrRef)
+	if err != nil {
+		return 0, fmt.Errorf("failed to convert address ref to bytes: %w", err)
+	}
+
+	tpAddr := common.BytesToAddress(addrRaw)
+	if tpAddr == (common.Address{}) {
+		return 0, errors.New("token pool address is zero address")
+	}
+
+	tp, err := token_pool.NewTokenPool(tpAddr, chain.Client)
+	if err != nil {
+		return 0, fmt.Errorf("failed to instantiate token pool contract: %w", err)
+	}
+	return tp.GetTokenDecimals(nil)
+}
+
 func (a *EVMAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokensapi.RateLimiterConfigInputs, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return cldf_ops.NewSequence(
 		"evm-adapter:set-token-pool-rate-limits",
