@@ -29,8 +29,9 @@ type AdvancedPoolHooksConfig struct {
 	Allowlist []common.Address
 	// PolicyEngine is the policy engine address. Zero address disables policy checks.
 	PolicyEngine common.Address
-	// AuthorizedCallers restricts who can call preflightCheck/postFlightCheck.
-	// Empty list means anyone can call.
+	// AuthorizedCallers restricts who can call preflightCheck/postflightCheck.
+	// Empty list means anyone can call (gating disabled). A non-empty list enables gating at deploy time (cannot be enabled later).
+	// When gating is enabled, deploy sequences will ensure the deployed token pool is added as an authorized caller.
 	AuthorizedCallers []common.Address
 }
 

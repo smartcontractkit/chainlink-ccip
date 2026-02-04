@@ -73,6 +73,30 @@ var DeployBurnMintTokenPool = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to configure token pool with address %s on %s: %w", tpDeployReport.Output.Address, chain, err)
 		}
 
+		// If hooks authorized callers gating is enabled at deployment time, ensure the newly deployed token pool is authorized.
+		// Otherwise, calls to preflightCheck/postflightCheck will revert when executed by the token pool.
+		if len(input.AdvancedPoolHooksConfig.AuthorizedCallers) > 0 {
+			poolAddr := common.HexToAddress(tpDeployReport.Output.Address)
+			hooksAddr := common.HexToAddress(hooksDeployReport.Output.Address)
+
+			applyAuthorizedCallerUpdatesReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.ApplyAuthorizedCallerUpdates, chain, evm_contract.FunctionInput[advanced_pool_hooks.AuthorizedCallerArgs]{
+				ChainSelector: input.ChainSel,
+				Address:       hooksAddr,
+				Args: advanced_pool_hooks.AuthorizedCallerArgs{
+					AddedCallers: []common.Address{poolAddr},
+				},
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to authorize token pool %s on advanced pool hooks with address %s on %s: %w", poolAddr, hooksAddr, chain, err)
+			}
+
+			batchOp, err := evm_contract.NewBatchOperationFromWrites([]evm_contract.WriteOutput{applyAuthorizedCallerUpdatesReport.Output})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
+			}
+			configureReport.Output.BatchOps = append(configureReport.Output.BatchOps, batchOp)
+		}
+
 		return sequences.OnChainOutput{
 			Addresses: []datastore.AddressRef{tpDeployReport.Output, hooksDeployReport.Output},
 			BatchOps:  configureReport.Output.BatchOps,
