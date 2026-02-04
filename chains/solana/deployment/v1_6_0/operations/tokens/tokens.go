@@ -2,14 +2,18 @@ package tokens
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/gagliardetto/solana-go"
+
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 	soltokens "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -135,3 +139,67 @@ var DeploySolanaToken = operations.NewOperation(
 		}, nil
 	},
 )
+
+type TokenMultisigParams struct {
+	Signers      []solana.PublicKey
+	TokenProgram solana.PublicKey
+}
+
+var CreateTokenMultisig = operations.NewOperation(
+	"solana-token:create-multisig",
+	Version,
+	"Creates a Token Multisig account for the given token program",
+	func(b operations.Bundle, chain cldf_solana.Chain, input TokenMultisigParams) (sequences.OnChainOutput, error) {
+		ctx := context.Background()
+
+		// m is always 1
+		const m uint8 = 1
+
+		// --- Validate inputs ---
+		if input.TokenProgram.IsZero() {
+			return sequences.OnChainOutput{}, fmt.Errorf("token program is zero")
+		}
+		if !input.TokenProgram.Equals(solana.Token2022ProgramID) && !input.TokenProgram.Equals(solana.TokenProgramID) {
+			return sequences.OnChainOutput{}, fmt.Errorf("unsupported token program: %s", input.TokenProgram.String())
+		}
+		if len(input.Signers) < 2 {
+			return sequences.OnChainOutput{}, fmt.Errorf("signers length must be at least 2, got %d", len(input.Signers))
+		}
+		if len(input.Signers) > 11 {
+			return sequences.OnChainOutput{}, fmt.Errorf("too many signers: %d > %d", len(input.Signers), 11)
+		}
+
+		// --- Create multisig keypair (must sign CreateAccount) ---
+		multisig, err := solana.NewRandomPrivateKey()
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to generate multisig keypair: %w", err)
+		}
+
+		// --- Instructions ---
+		// get stake amount for init
+		lamports, err := chain.Client.GetMinimumBalanceForRentExemption(ctx, soltokens.MultisigSize, config.DefaultCommitment)
+		if err != nil {
+			return sequences.OnChainOutput{}, err
+		}
+
+		ixs, err := soltokens.IxsInitTokenMultisig(input.TokenProgram, lamports, chain.DeployerKey.PublicKey(), multisig.PublicKey(), m, input.Signers)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to create multisig instructions: %w", err)
+		}
+
+		err = chain.SendAndConfirm(context.Background(), ixs)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm transfer ownership: %w", err)
+		}
+		return sequences.OnChainOutput{
+			Addresses: []datastore.AddressRef{
+				{
+					ChainSelector: chain.Selector,
+					Address:       multisig.PublicKey().String(),
+					Type:          datastore.ContractType("TOKEN_MULTISIG"),
+					Version:       Version,
+				},
+			},
+		}, nil
+
+	})
