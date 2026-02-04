@@ -20,6 +20,7 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, ITypeAndVersion, AuthorizedCal
   string public constant override typeAndVersion = "AdvancedPoolHooks 1.7.0-dev";
 
   error AllowListNotEnabled();
+  error AuthorizedCallersNotEnabled();
   error SenderNotAllowed(address sender);
   error MustSpecifyUnderThresholdCCVsForThresholdCCVs();
   error PolicyEngineDetachFailed(address oldPolicyEngine, bytes err);
@@ -96,9 +97,7 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, ITypeAndVersion, AuthorizedCal
     uint16,
     bytes calldata tokenArgs
   ) external {
-    if (i_authorizedCallersEnabled) {
-      _validateCaller();
-    }
+    validateCaller();
     checkAllowList(lockOrBurnIn.originalSender);
 
     IPolicyEngine policyEngine = s_policyEngine;
@@ -118,9 +117,7 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, ITypeAndVersion, AuthorizedCal
     uint256,
     uint16
   ) external {
-    if (i_authorizedCallersEnabled) {
-      _validateCaller();
-    }
+    validateCaller();
 
     IPolicyEngine policyEngine = s_policyEngine;
     if (address(policyEngine) == address(0)) {
@@ -386,9 +383,26 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, ITypeAndVersion, AuthorizedCal
   // │                     Authorized Callers                       │
   // ================================================================
 
+  /// @notice Checks the sender and reverts if it is anyone other than a listed authorized caller.
+  function validateCaller() public view virtual {
+    if (i_authorizedCallersEnabled) {
+      _validateCaller();
+    }
+  }
+
   /// @notice Gets whether only authorized callers can invoke preflightCheck/postFlightCheck.
   /// @return true if only authorized callers can call, false if anyone can call.
   function getAuthorizedCallersEnabled() external view returns (bool) {
     return i_authorizedCallersEnabled;
+  }
+
+  /// @notice Updates the list of authorized callers.
+  /// @param authorizedCallerArgs Callers to add and remove. Removals are performed first.
+  function applyAuthorizedCallerUpdates(
+    AuthorizedCallerArgs memory authorizedCallerArgs
+  ) external virtual override onlyOwner {
+    if (!i_authorizedCallersEnabled) revert AuthorizedCallersNotEnabled();
+
+    _applyAuthorizedCallerUpdates(authorizedCallerArgs);
   }
 }

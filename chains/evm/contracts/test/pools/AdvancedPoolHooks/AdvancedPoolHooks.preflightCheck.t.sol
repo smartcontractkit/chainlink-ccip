@@ -8,13 +8,22 @@ import {Pool} from "../../../libraries/Pool.sol";
 import {AdvancedPoolHooks} from "../../../pools/AdvancedPoolHooks.sol";
 import {MockPolicyEngine} from "../../mocks/MockPolicyEngine.sol";
 import {AdvancedPoolHooksSetup} from "./AdvancedPoolHooksSetup.t.sol";
+import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
 contract AdvancedPoolHooks_preflightCheck is AdvancedPoolHooksSetup {
   MockPolicyEngine internal s_mockPolicyEngine;
 
+  address internal s_authorizedCaller = makeAddr("authorizedCaller");
+  address internal s_unauthorizedCaller = makeAddr("unauthorizedCaller");
+  AdvancedPoolHooks internal s_hooksWithAuthorizedCallers;
+
   function setUp() public virtual override {
     super.setUp();
     s_mockPolicyEngine = new MockPolicyEngine();
+
+    address[] memory authorizedCallers = new address[](1);
+    authorizedCallers[0] = s_authorizedCaller;
+    s_hooksWithAuthorizedCallers = new AdvancedPoolHooks(new address[](0), 0, address(0), authorizedCallers);
   }
 
   function _createLockOrBurnIn(
@@ -89,5 +98,36 @@ contract AdvancedPoolHooks_preflightCheck is AdvancedPoolHooksSetup {
 
     vm.expectRevert(abi.encodeWithSelector(AdvancedPoolHooks.SenderNotAllowed.selector, STRANGER));
     hooksWithAllowList.preflightCheck(lockOrBurnIn, 5, "");
+  }
+
+  function test_preflightCheck_AnyoneCanInvoke_WhenAuthorizedCallersDisabled() public {
+    vm.stopPrank();
+    assertFalse(s_advancedPoolHooks.getAuthorizedCallersEnabled());
+
+    Pool.LockOrBurnInV1 memory lockOrBurnIn = _createLockOrBurnIn(OWNER);
+
+    vm.prank(s_unauthorizedCaller);
+    s_advancedPoolHooks.preflightCheck(lockOrBurnIn, 5, "");
+  }
+
+  function test_preflightCheck_OnlyAuthorizedCallersCanInvoke() public {
+    vm.stopPrank();
+    assertTrue(s_hooksWithAuthorizedCallers.getAuthorizedCallersEnabled());
+
+    Pool.LockOrBurnInV1 memory lockOrBurnIn = _createLockOrBurnIn(OWNER);
+
+    vm.prank(s_authorizedCaller);
+    s_hooksWithAuthorizedCallers.preflightCheck(lockOrBurnIn, 5, "");
+  }
+
+  function test_preflightCheck_RevertWhen_UnauthorizedCaller() public {
+    vm.stopPrank();
+    assertTrue(s_hooksWithAuthorizedCallers.getAuthorizedCallersEnabled());
+
+    Pool.LockOrBurnInV1 memory lockOrBurnIn = _createLockOrBurnIn(OWNER);
+
+    vm.prank(s_unauthorizedCaller);
+    vm.expectRevert(abi.encodeWithSelector(AuthorizedCallers.UnauthorizedCaller.selector, s_unauthorizedCaller));
+    s_hooksWithAuthorizedCallers.preflightCheck(lockOrBurnIn, 5, "");
   }
 }
