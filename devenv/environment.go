@@ -153,7 +153,7 @@ func checkForkedEnvIsSet(in *Cfg) error {
 
 // NewEnvironment creates a new CCIP environment either locally in Docker or remotely in K8s.
 func NewEnvironment() (*Cfg, error) {
-	ctx, cancelFunc := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancelFunc := context.WithTimeout(context.Background(), 15*time.Minute)
 	defer cancelFunc()
 	tr := NewTimeTracker(Plog)
 	ctx = L.WithContext(ctx)
