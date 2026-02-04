@@ -143,33 +143,32 @@ var DeployLombardChain = cldf_ops.NewSequence(
 		}
 
 		// There can be multiple pools / tokens and advancedPoolHooks for Lombard
-		advancedPoolHooksRef, err := contract_utils.MaybeDeployContract(b, advanced_pool_hooks.Deploy, chain, contract_utils.DeployInput[advanced_pool_hooks.ConstructorArgs]{
-			TypeAndVersion: deployment.NewTypeAndVersion(advanced_pool_hooks.ContractType, *advanced_pool_hooks.Version),
-			ChainSelector:  input.ChainSelector,
-			Qualifier:      tokenPoolQualifier(input.TokenQualifier),
-			Args: advanced_pool_hooks.ConstructorArgs{
-				Allowlist:                        []common.Address{chain.DeployerKey.From},
-				ThresholdAmountForAdditionalCCVs: big.NewInt(0),
-			},
-		}, existingAddresses)
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy AdvancedPoolHooks: %w", err)
-		}
-		addresses = append(addresses, advancedPoolHooksRef)
-		advancedPoolHooksAddress := common.HexToAddress(advancedPoolHooksRef.Address)
+		//advancedPoolHooksRef, err := contract_utils.MaybeDeployContract(b, advanced_pool_hooks.Deploy, chain, contract_utils.DeployInput[advanced_pool_hooks.ConstructorArgs]{
+		//	TypeAndVersion: deployment.NewTypeAndVersion(advanced_pool_hooks.ContractType, *advanced_pool_hooks.Version),
+		//	ChainSelector:  input.ChainSelector,
+		//	Qualifier:      tokenPoolQualifier(input.TokenQualifier),
+		//	Args: advanced_pool_hooks.ConstructorArgs{
+		//		Allowlist:                        []common.Address{chain.DeployerKey.From},
+		//		ThresholdAmountForAdditionalCCVs: big.NewInt(0),
+		//	},
+		//}, existingAddresses)
+		//if err != nil {
+		//	return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy AdvancedPoolHooks: %w", err)
+		//}
+		//addresses = append(addresses, advancedPoolHooksRef)
+		//advancedPoolHooksAddress := common.HexToAddress(advancedPoolHooksRef.Address)
 
 		lombardTokenPoolRef, err := contract_utils.MaybeDeployContract(b, lombard_token_pool.Deploy, chain, contract_utils.DeployInput[lombard_token_pool.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(lombard_token_pool.ContractType, *lombard_token_pool.Version),
 			ChainSelector:  input.ChainSelector,
 			Qualifier:      tokenPoolQualifier(input.TokenQualifier),
 			Args: lombard_token_pool.ConstructorArgs{
-				Token:             tokenAddress,
-				Verifier:          lombardVerifierAddress,
-				Bridge:            lombardBridgeAddress,
-				RMNProxy:          rmnAddress,
-				Router:            routerAddress,
-				AdvancedPoolHooks: advancedPoolHooksAddress,
-				FallbackDecimals:  fallbackDecimals,
+				Token:            tokenAddress,
+				Verifier:         lombardVerifierAddress,
+				Bridge:           lombardBridgeAddress,
+				RMNProxy:         rmnAddress,
+				Router:           routerAddress,
+				FallbackDecimals: fallbackDecimals,
 			},
 		}, existingAddresses)
 		if err != nil {

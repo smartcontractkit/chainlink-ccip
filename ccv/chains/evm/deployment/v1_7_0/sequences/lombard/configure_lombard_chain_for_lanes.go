@@ -66,14 +66,14 @@ var ConfigureLombardChainForLanes = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to find router ref on chain %d: %w", chain.Selector, err)
 		}
 
-		advancedPoolHooksRef, err := datastore_utils.FindAndFormatRef(dep.DataStore, datastore.AddressRef{
-			Type:      datastore.ContractType(advanced_pool_hooks.ContractType),
-			Version:   advanced_pool_hooks.Version,
-			Qualifier: *tokenPoolQualifier(input.TokenQualifier),
-		}, chain.Selector, datastore_utils.FullRef)
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to find AdvancedPoolHooks ref on chain %d: %w", chain.Selector, err)
-		}
+		//advancedPoolHooksRef, err := datastore_utils.FindAndFormatRef(dep.DataStore, datastore.AddressRef{
+		//	Type:      datastore.ContractType(advanced_pool_hooks.ContractType),
+		//	Version:   advanced_pool_hooks.Version,
+		//	Qualifier: *tokenPoolQualifier(input.TokenQualifier),
+		//}, chain.Selector, datastore_utils.FullRef)
+		//if err != nil {
+		//	return sequences.OnChainOutput{}, fmt.Errorf("failed to find AdvancedPoolHooks ref on chain %d: %w", chain.Selector, err)
+		//}
 
 		tokenPoolRef, err := datastore_utils.FindAndFormatRef(dep.DataStore, datastore.AddressRef{
 			Type:      datastore.ContractType(lombard_token_pool.ContractType),
@@ -92,7 +92,7 @@ var ConfigureLombardChainForLanes = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to find TokenAdminRegistry ref on chain %d: %w", chain.Selector, err)
 		}
 
-		advancedPoolHooksAddress := common.HexToAddress(advancedPoolHooksRef.Address)
+		//advancedPoolHooksAddress := common.HexToAddress(advancedPoolHooksRef.Address)
 		routerAddress := common.HexToAddress(routerRef.Address)
 		lombardVerifierAddress := common.HexToAddress(lombardVerifierAddressRef.Address)
 		lombardVerifierResolverAddress := common.HexToAddress(lombardVerifierResolverAddressRef.Address)
@@ -101,14 +101,14 @@ var ConfigureLombardChainForLanes = cldf_ops.NewSequence(
 		outboundImplementations := make([]versioned_verifier_resolver.OutboundImplementationArgs, 0)
 		remoteChainSelectors := make([]uint64, 0)
 		remoteChainConfigArgs := make([]lombard_verifier.RemoteChainConfigArgs, 0)
-		advancedPoolHooks := make([]advanced_pool_hooks.CCVConfigArg, 0)
-		advancedPoolHooks = append(advancedPoolHooks, advanced_pool_hooks.CCVConfigArg{
-			RemoteChainSelector: chain.Selector,
-			InboundCCVs: []common.Address{
-				lombardVerifierAddress,
-				{}, // This means "require the default CCV(s) for this lane".
-			},
-		})
+		//advancedPoolHooks := make([]advanced_pool_hooks.CCVConfigArg, 0)
+		//advancedPoolHooks = append(advancedPoolHooks, advanced_pool_hooks.CCVConfigArg{
+		//	RemoteChainSelector: chain.Selector,
+		//	InboundCCVs: []common.Address{
+		//		lombardVerifierAddress,
+		//		{}, // This means "require the default CCV(s) for this lane".
+		//	},
+		//})
 
 		for remoteChainSelector, remoteChain := range input.RemoteChains {
 			remotePoolAddress, err := dep.RemoteChains[remoteChainSelector].RemoteTokenPoolAddress(dep.DataStore, dep.BlockChains, remoteChainSelector, *tokenPoolQualifier(input.TokenQualifier))
@@ -156,13 +156,13 @@ var ConfigureLombardChainForLanes = cldf_ops.NewSequence(
 				PayloadSizeBytes:    remoteChain.PayloadSizeBytes,
 			})
 
-			advancedPoolHooks = append(advancedPoolHooks, advanced_pool_hooks.CCVConfigArg{
-				RemoteChainSelector: remoteChainSelector,
-				OutboundCCVs: []common.Address{
-					lombardVerifierAddress,
-					{}, // This means "require the default CCV(s) for this lane".
-				},
-			})
+			//advancedPoolHooks = append(advancedPoolHooks, advanced_pool_hooks.CCVConfigArg{
+			//	RemoteChainSelector: remoteChainSelector,
+			//	OutboundCCVs: []common.Address{
+			//		lombardVerifierAddress,
+			//		{}, // This means "require the default CCV(s) for this lane".
+			//	},
+			//})
 
 			remoteChainSelectors = append(remoteChainSelectors, remoteChainSelector)
 
@@ -219,15 +219,15 @@ var ConfigureLombardChainForLanes = cldf_ops.NewSequence(
 		writes = append(writes, applyRemoteChainConfigUpdatesReport.Output)
 
 		// Apply advanced pool hooks CCV config updates
-		advancedPoolHooksApplyReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.ApplyCCVConfigUpdates, chain, contract_utils.FunctionInput[[]advanced_pool_hooks.CCVConfigArg]{
-			Address:       advancedPoolHooksAddress,
-			ChainSelector: chain.Selector,
-			Args:          advancedPoolHooks,
-		})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to apply advanced pool hooks CCV config updates: %w", err)
-		}
-		writes = append(writes, advancedPoolHooksApplyReport.Output)
+		//advancedPoolHooksApplyReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.ApplyCCVConfigUpdates, chain, contract_utils.FunctionInput[[]advanced_pool_hooks.CCVConfigArg]{
+		//	Address:       advancedPoolHooksAddress,
+		//	ChainSelector: chain.Selector,
+		//	Args:          advancedPoolHooks,
+		//})
+		//if err != nil {
+		//	return sequences.OnChainOutput{}, fmt.Errorf("failed to apply advanced pool hooks CCV config updates: %w", err)
+		//}
+		//writes = append(writes, advancedPoolHooksApplyReport.Output)
 
 		// Call into configure token for transfers sequence
 		configureTokenForTransfersReport, err := cldf_ops.ExecuteSequence(b, tokens_sequences.ConfigureTokenForTransfers, dep.BlockChains, tokens_core.ConfigureTokenForTransfersInput{
