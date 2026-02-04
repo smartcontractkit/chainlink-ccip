@@ -14,4 +14,7 @@ func init() {
 
 	// StaticLinkToken (simpler wrapped/static LINK token)
 	views.Register("evm", "StaticLinkToken", "1.0.0", ViewStaticLinkToken)
+
+	// CapabilitiesRegistry v1.0
+	views.Register("evm", "CapabilitiesRegistry", "1.0.0", ViewCapabilitiesRegistry)
 }
