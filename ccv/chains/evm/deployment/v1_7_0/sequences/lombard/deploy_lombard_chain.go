@@ -1,6 +1,7 @@
 package lombard
 
 import (
+	"encoding/hex"
 	"fmt"
 	"math/big"
 
@@ -20,6 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/advanced_pool_hooks"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/lombard_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/lombard_verifier"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/versioned_verifier_resolver"
 	v1_7_0_sequences "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	tokens_sequences "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/tokens"
 )
@@ -30,6 +32,7 @@ const (
 
 var (
 	ContractQualifier = "Lombard"
+	VerifierVersion   = mustDecodeHex("f0f3a135")
 )
 
 var DeployLombardChain = cldf_ops.NewSequence(
@@ -142,6 +145,18 @@ var DeployLombardChain = cldf_ops.NewSequence(
 			addresses = append(addresses, lombardVerifierResolverRef)
 		}
 
+		report, err := cldf_ops.ExecuteOperation(b, versioned_verifier_resolver.ApplyInboundImplementationUpdates, chain, contract_utils.FunctionInput[[]versioned_verifier_resolver.InboundImplementationArgs]{
+			ChainSelector: chain.Selector,
+			Address:       common.HexToAddress(lombardVerifierResolverRef.Address),
+			Args: []versioned_verifier_resolver.InboundImplementationArgs{
+				{Version: VerifierVersion, Verifier: lombardVerifierAddress},
+			},
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to set inbound implementation on LombardVerifierResolver: %w", err)
+		}
+		writes = append(writes, report.Output.Writes...)
+
 		// There can be multiple pools / tokens and advancedPoolHooks for Lombard
 		advancedPoolHooksRef, err := contract_utils.MaybeDeployContract(b, advanced_pool_hooks.Deploy, chain, contract_utils.DeployInput[advanced_pool_hooks.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(advanced_pool_hooks.ContractType, *advanced_pool_hooks.Version),
@@ -200,4 +215,17 @@ var DeployLombardChain = cldf_ops.NewSequence(
 func tokenPoolQualifier(tokenQualifier string) *string {
 	qualifier := ContractQualifier + "_" + tokenQualifier
 	return &qualifier
+}
+
+func mustDecodeHex(s string) [4]byte {
+	b, err := hex.DecodeString(s)
+	if err != nil {
+		panic(fmt.Sprintf("failed to decode hex: %v", err))
+	}
+	if len(b) < 4 {
+		panic(fmt.Sprintf("decoded hex is too short: got %d bytes, need at least 4", len(b)))
+	}
+	var result [4]byte
+	copy(result[:], b[:4])
+	return result
 }

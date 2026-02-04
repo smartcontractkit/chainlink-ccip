@@ -105,7 +105,7 @@ var ConfigureLombardChainForLanes = cldf_ops.NewSequence(
 		advancedPoolHooks = append(advancedPoolHooks, advanced_pool_hooks.CCVConfigArg{
 			RemoteChainSelector: chain.Selector,
 			InboundCCVs: []common.Address{
-				lombardVerifierAddress,
+				lombardVerifierResolverAddress,
 				{}, // This means "require the default CCV(s) for this lane".
 			},
 		})
