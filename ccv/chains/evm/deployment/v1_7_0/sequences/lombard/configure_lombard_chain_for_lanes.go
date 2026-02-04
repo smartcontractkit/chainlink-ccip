@@ -106,7 +106,6 @@ var ConfigureLombardChainForLanes = cldf_ops.NewSequence(
 			RemoteChainSelector: chain.Selector,
 			InboundCCVs: []common.Address{
 				lombardVerifierAddress,
-				{}, // This means "require the default CCV(s) for this lane".
 			},
 		})
 
@@ -160,7 +159,6 @@ var ConfigureLombardChainForLanes = cldf_ops.NewSequence(
 				RemoteChainSelector: remoteChainSelector,
 				OutboundCCVs: []common.Address{
 					lombardVerifierAddress,
-					{}, // This means "require the default CCV(s) for this lane".
 				},
 			})
 
