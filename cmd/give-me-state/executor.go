@@ -407,10 +407,32 @@ type aptosResourceResponse struct {
 	Data json.RawMessage `json:"data"`
 }
 
+// AptosCallType indicates the type of Aptos API call
+type AptosCallType byte
+
+const (
+	// AptosCallResources fetches all resources for an account (GET /v1/accounts/{addr}/resources)
+	AptosCallResources AptosCallType = 0
+	// AptosCallResource fetches a specific resource (GET /v1/accounts/{addr}/resource/{type})
+	AptosCallResource AptosCallType = 1
+	// AptosCallView executes a view function (POST /v1/view)
+	AptosCallView AptosCallType = 2
+)
+
+// AptosViewCall represents a view function call payload
+type AptosViewCall struct {
+	Function      string   `json:"function"`       // e.g., "0x1::module::function"
+	TypeArguments []string `json:"type_arguments"` // Generic type args
+	Arguments     []any    `json:"arguments"`      // Function arguments
+}
+
 // Execute performs an Aptos REST API call.
 // For Aptos, "target" is the account address (hex string as bytes).
-// The "data" parameter can contain the resource type to fetch (optional).
-// If data is empty, fetches all resources for the account.
+// The "data" parameter format depends on the call type:
+//   - First byte is AptosCallType
+//   - For AptosCallResources (0): no additional data needed
+//   - For AptosCallResource (1): rest of data is the resource type string
+//   - For AptosCallView (2): rest of data is JSON-encoded AptosViewCall
 func (a *AptosExecutor) Execute(target, data []byte) ([]byte, error) {
 	// Convert target to address string
 	accountAddr := string(target)
@@ -418,16 +440,68 @@ func (a *AptosExecutor) Execute(target, data []byte) ([]byte, error) {
 		accountAddr = "0x" + accountAddr
 	}
 
-	var url string
+	// Determine call type from first byte of data
+	callType := AptosCallResources
+	callData := data
 	if len(data) > 0 {
-		// Fetch specific resource
-		resourceType := string(data)
-		url = fmt.Sprintf("%s/v1/accounts/%s/resource/%s", a.rpcURL, accountAddr, resourceType)
-	} else {
-		// Fetch all resources
-		url = fmt.Sprintf("%s/v1/accounts/%s/resources", a.rpcURL, accountAddr)
+		callType = AptosCallType(data[0])
+		callData = data[1:]
 	}
 
+	switch callType {
+	case AptosCallResources:
+		return a.fetchResources(accountAddr)
+	case AptosCallResource:
+		return a.fetchResource(accountAddr, string(callData))
+	case AptosCallView:
+		return a.executeView(callData)
+	default:
+		return nil, fmt.Errorf("unknown Aptos call type: %d", callType)
+	}
+}
+
+// fetchResources gets all resources for an account
+func (a *AptosExecutor) fetchResources(accountAddr string) ([]byte, error) {
+	url := fmt.Sprintf("%s/v1/accounts/%s/resources", a.rpcURL, accountAddr)
+	return a.doGet(url)
+}
+
+// fetchResource gets a specific resource for an account
+func (a *AptosExecutor) fetchResource(accountAddr, resourceType string) ([]byte, error) {
+	url := fmt.Sprintf("%s/v1/accounts/%s/resource/%s", a.rpcURL, accountAddr, resourceType)
+	return a.doGet(url)
+}
+
+// executeView executes a view function via POST /v1/view
+func (a *AptosExecutor) executeView(callData []byte) ([]byte, error) {
+	url := fmt.Sprintf("%s/v1/view", a.rpcURL)
+
+	req, err := http.NewRequest("POST", url, bytes.NewReader(callData))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := a.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("http request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("view call failed (status %d): %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	return bodyBytes, nil
+}
+
+// doGet performs a GET request and returns the response body
+func (a *AptosExecutor) doGet(url string) ([]byte, error) {
 	resp, err := a.client.Get(url)
 	if err != nil {
 		return nil, fmt.Errorf("http request failed: %w", err)
@@ -440,13 +514,11 @@ func (a *AptosExecutor) Execute(target, data []byte) ([]byte, error) {
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		// Check for 404 (resource not found)
 		if resp.StatusCode == http.StatusNotFound {
-			return nil, fmt.Errorf("account or resource not found: %s", accountAddr)
+			return nil, fmt.Errorf("account or resource not found")
 		}
 		return nil, fmt.Errorf("http error %d: %s", resp.StatusCode, string(bodyBytes))
 	}
 
-	// Return the raw JSON response - views will parse it
 	return bodyBytes, nil
 }

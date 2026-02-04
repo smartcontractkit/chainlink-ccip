@@ -59,6 +59,10 @@ func main() {
 	// Create chain registry
 	chainRegistry := NewChainRegistry(networkConfig)
 
+	// Note: Aptos clients are not created here to avoid connection exhaustion.
+	// The Aptos bindings bypass our rate-limited CallManager and can overwhelm
+	// the system with unthrottled HTTP connections.
+
 	// =====================================================
 	// 2. Create Call Manager
 	// =====================================================

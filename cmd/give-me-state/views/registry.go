@@ -2,6 +2,7 @@ package views
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
@@ -27,6 +28,10 @@ type ViewContext struct {
 
 	// All chain selectors in the deployment (for discovering remote chain configs)
 	AllChainSelectors []uint64
+
+	// Optional chain-specific clients (to avoid import cycles, use any and type assert)
+	// For Aptos: *aptos.Client from github.com/aptos-labs/aptos-go-sdk
+	AptosClient any
 }
 
 // CallManagerInterface is the interface the views package needs from the orchestrator.
@@ -221,4 +226,103 @@ func BytesToHex(b []byte) string {
 // Uint64ToString converts a uint64 to a string.
 func Uint64ToString(v uint64) string {
 	return fmt.Sprintf("%d", v)
+}
+
+// =====================================================
+// Aptos Call Helpers
+// =====================================================
+
+// AptosCallType indicates the type of Aptos API call
+type AptosCallType byte
+
+const (
+	// AptosCallResources fetches all resources for an account
+	AptosCallResources AptosCallType = 0
+	// AptosCallResource fetches a specific resource
+	AptosCallResource AptosCallType = 1
+	// AptosCallView executes a view function
+	AptosCallView AptosCallType = 2
+)
+
+// AptosViewCall represents a view function call
+type AptosViewCall struct {
+	Function      string   `json:"function"`       // e.g., "0x1::module::function"
+	TypeArguments []string `json:"type_arguments"` // Generic type args
+	Arguments     []any    `json:"arguments"`      // Function arguments
+}
+
+// EncodeAptosResourcesCall creates calldata to fetch all resources for an account
+func EncodeAptosResourcesCall() []byte {
+	return []byte{byte(AptosCallResources)}
+}
+
+// EncodeAptosResourceCall creates calldata to fetch a specific resource
+func EncodeAptosResourceCall(resourceType string) []byte {
+	data := make([]byte, 1+len(resourceType))
+	data[0] = byte(AptosCallResource)
+	copy(data[1:], resourceType)
+	return data
+}
+
+// EncodeAptosViewCall creates calldata to execute a view function
+func EncodeAptosViewCall(moduleAddr, moduleName, funcName string, typeArgs []string, args []any) ([]byte, error) {
+	call := AptosViewCall{
+		Function:      fmt.Sprintf("%s::%s::%s", moduleAddr, moduleName, funcName),
+		TypeArguments: typeArgs,
+		Arguments:     args,
+	}
+	if call.TypeArguments == nil {
+		call.TypeArguments = []string{}
+	}
+	if call.Arguments == nil {
+		call.Arguments = []any{}
+	}
+
+	jsonData, err := json.Marshal(call)
+	if err != nil {
+		return nil, err
+	}
+
+	data := make([]byte, 1+len(jsonData))
+	data[0] = byte(AptosCallView)
+	copy(data[1:], jsonData)
+	return data, nil
+}
+
+// ExecuteAptosView is a helper that constructs and executes an Aptos view call
+func ExecuteAptosView(ctx *ViewContext, moduleAddr, moduleName, funcName string, typeArgs []string, args []any) ([]byte, error) {
+	callData, err := EncodeAptosViewCall(moduleAddr, moduleName, funcName, typeArgs, args)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode view call: %w", err)
+	}
+
+	result := ctx.CallManager.Execute(Call{
+		ChainID: ctx.ChainSelector,
+		Target:  ctx.Address,
+		Data:    callData,
+	})
+
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	return result.Data, nil
+}
+
+// ExecuteAptosViewOnAddress executes a view call on a specific address (not ctx.Address)
+func ExecuteAptosViewOnAddress(ctx *ViewContext, targetAddr, moduleAddr, moduleName, funcName string, typeArgs []string, args []any) ([]byte, error) {
+	callData, err := EncodeAptosViewCall(moduleAddr, moduleName, funcName, typeArgs, args)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode view call: %w", err)
+	}
+
+	result := ctx.CallManager.Execute(Call{
+		ChainID: ctx.ChainSelector,
+		Target:  []byte(targetAddr),
+		Data:    callData,
+	})
+
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	return result.Data, nil
 }
