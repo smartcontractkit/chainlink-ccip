@@ -116,7 +116,6 @@ func buildIxData(closeAuthority *solana.PublicKey) []byte {
 const MultisigSize = 355
 
 func CreateMultisig(ctx context.Context, payer, tokenProgram, multisig solana.PublicKey, m uint8, signers []solana.PublicKey, client *rpc.Client, commitment rpc.CommitmentType) ([]solana.Instruction, error) {
-
 	// get stake amount for init
 	lamports, err := client.GetMinimumBalanceForRentExemption(ctx, MultisigSize, commitment)
 	if err != nil {
