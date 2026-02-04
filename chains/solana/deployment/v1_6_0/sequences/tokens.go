@@ -173,7 +173,7 @@ func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualR
 				RMNRemote:      solana.PublicKeyFromBytes(rmnRemoteAddr),
 			})
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy token: %w", err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to initialize token pool: %w", err)
 			}
 			result.Addresses = append(result.Addresses, initTPOut.Output.Addresses...)
 			result.BatchOps = append(result.BatchOps, initTPOut.Output.BatchOps...)
@@ -185,7 +185,7 @@ func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualR
 				TokenMint:    tokenMint,
 			})
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy token: %w", err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to transfer token pool ownership: %w", err)
 			}
 			result.Addresses = append(result.Addresses, transferOwnershipOut.Output.Addresses...)
 			result.BatchOps = append(result.BatchOps, transferOwnershipOut.Output.BatchOps...)
