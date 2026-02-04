@@ -56,7 +56,7 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, ITypeAndVersion, AuthorizedCal
   /// @dev The immutable flag that indicates if the allowlist is access-controlled.
   bool internal immutable i_allowlistEnabled;
 
-  /// @dev The immutable flag that indicates if preflightCheck/postFlightCheck are access-controlled.
+  /// @dev The immutable flag that indicates if preflightCheck/postflightCheck are access-controlled.
   bool internal immutable i_authorizedCallersEnabled;
 
   /// @dev A set of addresses allowed to trigger lockOrBurn as original senders.
@@ -392,7 +392,7 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, ITypeAndVersion, AuthorizedCal
     }
   }
 
-  /// @notice Gets whether only authorized callers can invoke preflightCheck/postFlightCheck.
+  /// @notice Gets whether only authorized callers can invoke preflightCheck/postflightCheck.
   /// @return true if only authorized callers can call, false if anyone can call.
   function getAuthorizedCallersEnabled() external view returns (bool) {
     return i_authorizedCallersEnabled;

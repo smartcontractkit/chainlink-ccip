@@ -10,7 +10,7 @@ import {MockPolicyEngine} from "../../mocks/MockPolicyEngine.sol";
 import {AdvancedPoolHooksSetup} from "./AdvancedPoolHooksSetup.t.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
-contract AdvancedPoolHooks_postFlightCheck is AdvancedPoolHooksSetup {
+contract AdvancedPoolHooks_postflightCheck is AdvancedPoolHooksSetup {
   MockPolicyEngine internal s_mockPolicyEngine;
 
   address internal s_authorizedCaller = makeAddr("authorizedCaller");
@@ -39,7 +39,7 @@ contract AdvancedPoolHooks_postFlightCheck is AdvancedPoolHooksSetup {
     });
   }
 
-  function testFuzz_postFlightCheck_WithPolicyEngine(
+  function testFuzz_postflightCheck_WithPolicyEngine(
     bytes memory sourcePoolData,
     bytes memory offchainTokenData
   ) public {
@@ -51,54 +51,54 @@ contract AdvancedPoolHooks_postFlightCheck is AdvancedPoolHooksSetup {
     releaseOrMintIn.sourcePoolData = sourcePoolData;
     releaseOrMintIn.offchainTokenData = offchainTokenData;
 
-    s_advancedPoolHooks.postFlightCheck(releaseOrMintIn, localAmount, blockConfirmationRequested);
+    s_advancedPoolHooks.postflightCheck(releaseOrMintIn, localAmount, blockConfirmationRequested);
 
     IPolicyEngine.Payload memory lastPayload = s_mockPolicyEngine.getLastPayload();
-    assertEq(IAdvancedPoolHooks.postFlightCheck.selector, lastPayload.selector);
+    assertEq(IAdvancedPoolHooks.postflightCheck.selector, lastPayload.selector);
     assertEq(OWNER, lastPayload.sender);
     assertEq(releaseOrMintIn.offchainTokenData, lastPayload.context);
     assertEq(abi.encode(releaseOrMintIn, localAmount, blockConfirmationRequested), lastPayload.data);
   }
 
-  function test_postFlightCheck_WithoutPolicyEngine() public {
+  function test_postflightCheck_WithoutPolicyEngine() public {
     assertEq(address(0), s_advancedPoolHooks.getPolicyEngine());
 
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = _createReleaseOrMintIn();
 
-    s_advancedPoolHooks.postFlightCheck(releaseOrMintIn, 100e18, 5);
+    s_advancedPoolHooks.postflightCheck(releaseOrMintIn, 100e18, 5);
   }
 
-  function test_postFlightCheck_RevertWhen_PolicyEngineRejects() public {
+  function test_postflightCheck_RevertWhen_PolicyEngineRejects() public {
     s_advancedPoolHooks.setPolicyEngine(address(s_mockPolicyEngine));
     s_mockPolicyEngine.setShouldRevert(true, "Policy rejected");
 
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = _createReleaseOrMintIn();
 
     vm.expectRevert(abi.encodeWithSelector(MockPolicyEngine.MockPolicyEngineRejection.selector, "Policy rejected"));
-    s_advancedPoolHooks.postFlightCheck(releaseOrMintIn, 100e18, 5);
+    s_advancedPoolHooks.postflightCheck(releaseOrMintIn, 100e18, 5);
   }
 
-  function test_postFlightCheck_AnyoneCanInvoke_WhenAuthorizedCallersDisabled() public {
+  function test_postflightCheck_AnyoneCanInvoke_WhenAuthorizedCallersDisabled() public {
     vm.stopPrank();
     assertFalse(s_advancedPoolHooks.getAuthorizedCallersEnabled());
 
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = _createReleaseOrMintIn();
 
     vm.prank(s_unauthorizedCaller);
-    s_advancedPoolHooks.postFlightCheck(releaseOrMintIn, 100e18, 5);
+    s_advancedPoolHooks.postflightCheck(releaseOrMintIn, 100e18, 5);
   }
 
-  function test_postFlightCheck_OnlyAuthorizedCallersCanInvoke() public {
+  function test_postflightCheck_OnlyAuthorizedCallersCanInvoke() public {
     vm.stopPrank();
     assertTrue(s_hooksWithAuthorizedCallers.getAuthorizedCallersEnabled());
 
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = _createReleaseOrMintIn();
 
     vm.prank(s_authorizedCaller);
-    s_hooksWithAuthorizedCallers.postFlightCheck(releaseOrMintIn, 100e18, 5);
+    s_hooksWithAuthorizedCallers.postflightCheck(releaseOrMintIn, 100e18, 5);
   }
 
-  function test_postFlightCheck_RevertWhen_UnauthorizedCaller() public {
+  function test_postflightCheck_RevertWhen_UnauthorizedCaller() public {
     vm.stopPrank();
     assertTrue(s_hooksWithAuthorizedCallers.getAuthorizedCallersEnabled());
 
@@ -106,6 +106,6 @@ contract AdvancedPoolHooks_postFlightCheck is AdvancedPoolHooksSetup {
 
     vm.prank(s_unauthorizedCaller);
     vm.expectRevert(abi.encodeWithSelector(AuthorizedCallers.UnauthorizedCaller.selector, s_unauthorizedCaller));
-    s_hooksWithAuthorizedCallers.postFlightCheck(releaseOrMintIn, 100e18, 5);
+    s_hooksWithAuthorizedCallers.postflightCheck(releaseOrMintIn, 100e18, 5);
   }
 }
