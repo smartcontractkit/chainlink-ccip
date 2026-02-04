@@ -24,7 +24,19 @@ import (
 
 func (a *SolanaAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[tokenapi.ConfigureTokenForTransfersInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	// TODO: implement me
-	return nil
+	// NOTE: this should be replaced with a real implementation. Right now,
+	// smoke tests don't perform any sort of token transfers when Solana is
+	// involved (it has not implemented the full token adapter interface at
+	// the moment). However, the smoke tests still invoke this function and
+	// expect a non-nil sequence to be returned. If nil is returned, then a
+	// nil pointer dereference error will occur when running the tests.
+	return cldf_ops.NewSequence(
+		"solana-adapter:configure-token-for-transfers",
+		common_utils.Version_1_6_0,
+		"Configure a token for cross-chain transfers across multiple chains",
+		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokenapi.ConfigureTokenForTransfersInput) (sequences.OnChainOutput, error) {
+			return sequences.OnChainOutput{}, nil
+		})
 }
 
 func (a *SolanaAdapter) AddressRefToBytes(ref datastore.AddressRef) ([]byte, error) {
