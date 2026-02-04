@@ -10,9 +10,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/fee_quoter"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 )
 
 var (
@@ -72,6 +73,7 @@ var FeeQuoterUpdatePrices = contract.NewWrite(contract.WriteParams[fee_quoter.In
 })
 
 type AuthorizedCallerArgs = fee_quoter.AuthorizedCallersAuthorizedCallerArgs
+
 var ApplyAuthorizedCallerUpdates = contract.NewWrite(contract.WriteParams[AuthorizedCallerArgs, *fee_quoter.FeeQuoter]{
 	Name:            "fee-quoter:apply-authorized-caller-updates",
 	Version:         semver.MustParse("1.6.0"),
@@ -128,5 +130,32 @@ var FeeQuoterApplyTokenTransferFeeConfigUpdates = contract.NewWrite(contract.Wri
 	Validate:        func(args ApplyTokenTransferFeeConfigUpdatesInput) error { return nil },
 	CallContract: func(feeQuoter *fee_quoter.FeeQuoter, opts *bind.TransactOpts, args ApplyTokenTransferFeeConfigUpdatesInput) (*types.Transaction, error) {
 		return feeQuoter.ApplyTokenTransferFeeConfigUpdates(opts, args.TokenTransferFeeConfigArgs, args.TokensToUseDefaultFeeConfigs)
+	},
+})
+
+var GetDestChainConfig = contract.NewRead(contract.ReadParams[uint64, fee_quoter.FeeQuoterDestChainConfig, *fee_quoter.FeeQuoter]{
+	Name:         "fee-quoter:dest-chain-config",
+	Version:      Version,
+	Description:  "Reads the destination chain config from the FeeQuoter 1.6.0 contract",
+	ContractType: ContractType,
+	NewContract:  fee_quoter.NewFeeQuoter,
+	CallContract: func(feeQuoter *fee_quoter.FeeQuoter, opts *bind.CallOpts, chainSelector uint64) (fee_quoter.FeeQuoterDestChainConfig, error) {
+		return feeQuoter.GetDestChainConfig(opts, chainSelector)
+	},
+})
+
+type GetTokenTransferFeeConfigInput struct {
+	Token             common.Address
+	DestChainSelector uint64
+}
+
+var GetTokenTransferFeeConfig = contract.NewRead(contract.ReadParams[GetTokenTransferFeeConfigInput, fee_quoter.FeeQuoterTokenTransferFeeConfig, *fee_quoter.FeeQuoter]{
+	Name:         "fee-quoter:token-transfer-fee-config",
+	Version:      Version,
+	Description:  "Reads the token transfer fee config from the FeeQuoter 1.6.0 contract",
+	ContractType: ContractType,
+	NewContract:  fee_quoter.NewFeeQuoter,
+	CallContract: func(feeQuoter *fee_quoter.FeeQuoter, opts *bind.CallOpts, in GetTokenTransferFeeConfigInput) (fee_quoter.FeeQuoterTokenTransferFeeConfig, error) {
+		return feeQuoter.GetTokenTransferFeeConfig(opts, in.DestChainSelector, in.Token)
 	},
 })

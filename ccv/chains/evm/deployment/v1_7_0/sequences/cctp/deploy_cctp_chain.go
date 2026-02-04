@@ -52,10 +52,9 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 		batchOps := make([]mcms_types.BatchOperation, 0)
 
 		// Resolve chain and existing addresses
-		existingAddresses, err := dep.DataStore.Addresses().Fetch()
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to fetch all addresses: %w", err)
-		}
+		existingAddresses := dep.DataStore.Addresses().Filter(
+			datastore.AddressRefByChainSelector(input.ChainSelector),
+		)
 		chain, ok := dep.BlockChains.EVMChains()[input.ChainSelector]
 		if !ok {
 			return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found", input.ChainSelector)
