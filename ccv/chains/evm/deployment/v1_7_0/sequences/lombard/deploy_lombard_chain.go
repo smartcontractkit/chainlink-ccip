@@ -155,7 +155,7 @@ var DeployLombardChain = cldf_ops.NewSequence(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to set inbound implementation on LombardVerifierResolver: %w", err)
 		}
-		writes = append(writes, report.Output.Writes...)
+		writes = append(writes, report.Output)
 
 		// There can be multiple pools / tokens and advancedPoolHooks for Lombard
 		advancedPoolHooksRef, err := contract_utils.MaybeDeployContract(b, advanced_pool_hooks.Deploy, chain, contract_utils.DeployInput[advanced_pool_hooks.ConstructorArgs]{
