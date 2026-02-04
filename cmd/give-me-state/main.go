@@ -23,6 +23,7 @@ func main() {
 	outputPath := flag.String("output", "", "Output file path (default: stdout)")
 	timeout := flag.Duration("timeout", 30*time.Minute, "Overall timeout for all operations")
 	maxRPCWorkers := flag.Int("rpc-workers", 8, "Max concurrent requests per RPC endpoint")
+	format := flag.Bool("format", false, "Formats json to expected format (matches state.json structure)")
 	flag.Parse()
 
 	fmt.Println("╔═══════════════════════════════════════════════════════════════╗")
@@ -302,6 +303,16 @@ func main() {
 	if err != nil {
 		fmt.Printf("Error marshaling output: %v\n", err)
 		os.Exit(1)
+	}
+
+	// Optionally transform to legacy format
+	if *format {
+		legacyOutput, err := formatOutput(jsonOutput, chainRegistry.GetAllChains())
+		if err != nil {
+			fmt.Printf("Error transforming to legacy format: %v\n", err)
+			os.Exit(1)
+		}
+		jsonOutput = legacyOutput
 	}
 
 	if *outputPath != "" {

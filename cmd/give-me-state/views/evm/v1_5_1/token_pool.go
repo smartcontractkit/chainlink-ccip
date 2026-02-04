@@ -340,6 +340,12 @@ func ViewBurnMintTokenPool(ctx *views.ViewContext) (map[string]any, error) {
 		result["token_error"] = err.Error()
 	} else {
 		result["token"] = token
+		// Fetch token symbol
+		if symbol, err := common.GetERC20Symbol(ctx, token); err == nil {
+			result["symbol"] = symbol
+		} else {
+			result["symbol_error"] = err.Error()
+		}
 	}
 
 	supportedChains, err := getTokenPoolSupportedChains(ctx)
@@ -396,6 +402,12 @@ func ViewLockReleaseTokenPool(ctx *views.ViewContext) (map[string]any, error) {
 		result["token_error"] = err.Error()
 	} else {
 		result["token"] = token
+		// Fetch token symbol
+		if symbol, err := common.GetERC20Symbol(ctx, token); err == nil {
+			result["symbol"] = symbol
+		} else {
+			result["symbol_error"] = err.Error()
+		}
 	}
 
 	supportedChains, err := getTokenPoolSupportedChains(ctx)
@@ -458,6 +470,12 @@ func ViewBurnFromMintTokenPool(ctx *views.ViewContext) (map[string]any, error) {
 		result["token_error"] = err.Error()
 	} else {
 		result["token"] = token
+		// Fetch token symbol
+		if symbol, err := common.GetERC20Symbol(ctx, token); err == nil {
+			result["symbol"] = symbol
+		} else {
+			result["symbol_error"] = err.Error()
+		}
 	}
 
 	supportedChains, err := getTokenPoolSupportedChains(ctx)
@@ -515,6 +533,12 @@ func ViewBurnWithFromMintTokenPool(ctx *views.ViewContext) (map[string]any, erro
 		result["token_error"] = err.Error()
 	} else {
 		result["token"] = token
+		// Fetch token symbol
+		if symbol, err := common.GetERC20Symbol(ctx, token); err == nil {
+			result["symbol"] = symbol
+		} else {
+			result["symbol_error"] = err.Error()
+		}
 	}
 
 	supportedChains, err := getTokenPoolSupportedChains(ctx)

@@ -266,6 +266,12 @@ func ViewBurnMintTokenPool(ctx *views.ViewContext) (map[string]any, error) {
 	}
 	if token, err := getTokenPoolToken(ctx); err == nil {
 		result["token"] = token
+		// Fetch token symbol
+		if symbol, err := common.GetERC20Symbol(ctx, token); err == nil {
+			result["symbol"] = symbol
+		} else {
+			result["symbol_error"] = err.Error()
+		}
 	}
 
 	if supportedChains, err := getTokenPoolSupportedChains(ctx); err == nil {
@@ -301,6 +307,12 @@ func ViewLockReleaseTokenPool(ctx *views.ViewContext) (map[string]any, error) {
 	}
 	if token, err := getTokenPoolToken(ctx); err == nil {
 		result["token"] = token
+		// Fetch token symbol
+		if symbol, err := common.GetERC20Symbol(ctx, token); err == nil {
+			result["symbol"] = symbol
+		} else {
+			result["symbol_error"] = err.Error()
+		}
 	}
 
 	if supportedChains, err := getTokenPoolSupportedChains(ctx); err == nil {

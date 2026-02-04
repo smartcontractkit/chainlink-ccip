@@ -154,6 +154,11 @@ func (r *ChainRegistry) GetChain(selector uint64) *ChainInfo {
 	return r.chains[selector]
 }
 
+// GetAllChains returns a map of all chain infos
+func (r *ChainRegistry) GetAllChains() map[uint64]*ChainInfo {
+	return r.chains
+}
+
 // GetRPCURLs returns HTTP RPC URLs for a chain
 func (r *ChainRegistry) GetRPCURLs(selector uint64) []string {
 	chain := r.chains[selector]

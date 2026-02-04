@@ -95,6 +95,12 @@ func viewTokenPoolCommon(ctx *views.ViewContext, version string, hasRebalancer b
 		result["token_error"] = err.Error()
 	} else {
 		result["token"] = token
+		// Fetch token symbol
+		if symbol, err := common.GetERC20Symbol(ctx, token); err == nil {
+			result["symbol"] = symbol
+		} else {
+			result["symbol_error"] = err.Error()
+		}
 	}
 
 	// Get RMN Proxy

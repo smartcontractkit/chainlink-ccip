@@ -170,3 +170,71 @@ func GetTypeAndVersion(ctx *views.ViewContext) (string, error) {
 	}
 	return DecodeString(data)
 }
+
+// ERC20 function selectors
+var (
+	SelectorERC20Symbol = HexToSelector("95d89b41") // symbol()
+	SelectorERC20Name   = HexToSelector("06fdde03") // name()
+)
+
+// GetERC20Symbol fetches the symbol of an ERC20 token at the given address.
+// tokenAddrHex should be a hex string like "0x1234..." or just "1234..."
+func GetERC20Symbol(ctx *views.ViewContext, tokenAddrHex string) (string, error) {
+	// Parse the token address
+	tokenAddrHex = strings.TrimPrefix(tokenAddrHex, "0x")
+	tokenAddr, err := hex.DecodeString(tokenAddrHex)
+	if err != nil {
+		return "", fmt.Errorf("invalid token address: %w", err)
+	}
+
+	// Pad to 20 bytes if needed
+	if len(tokenAddr) < 20 {
+		padded := make([]byte, 20)
+		copy(padded[20-len(tokenAddr):], tokenAddr)
+		tokenAddr = padded
+	}
+
+	// Create call to the token contract's symbol() function
+	calldata := views.ABIEncodeCall(SelectorERC20Symbol)
+	call := views.Call{
+		ChainID: ctx.ChainSelector,
+		Target:  tokenAddr,
+		Data:    calldata,
+	}
+
+	result := ctx.CallManager.Execute(call)
+	if result.Error != nil {
+		return "", fmt.Errorf("symbol() call failed: %w", result.Error)
+	}
+
+	return DecodeString(result.Data)
+}
+
+// GetERC20Name fetches the name of an ERC20 token at the given address.
+func GetERC20Name(ctx *views.ViewContext, tokenAddrHex string) (string, error) {
+	tokenAddrHex = strings.TrimPrefix(tokenAddrHex, "0x")
+	tokenAddr, err := hex.DecodeString(tokenAddrHex)
+	if err != nil {
+		return "", fmt.Errorf("invalid token address: %w", err)
+	}
+
+	if len(tokenAddr) < 20 {
+		padded := make([]byte, 20)
+		copy(padded[20-len(tokenAddr):], tokenAddr)
+		tokenAddr = padded
+	}
+
+	calldata := views.ABIEncodeCall(SelectorERC20Name)
+	call := views.Call{
+		ChainID: ctx.ChainSelector,
+		Target:  tokenAddr,
+		Data:    calldata,
+	}
+
+	result := ctx.CallManager.Execute(call)
+	if result.Error != nil {
+		return "", fmt.Errorf("name() call failed: %w", result.Error)
+	}
+
+	return DecodeString(result.Data)
+}
