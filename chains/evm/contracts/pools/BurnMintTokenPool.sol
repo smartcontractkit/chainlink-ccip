@@ -15,7 +15,7 @@ import {TokenPool} from "./TokenPool.sol";
 /// @dev This contract is a variant of BurnMintTokenPool that uses `burn(amount)`.
 contract BurnMintTokenPool is BurnMintTokenPoolAbstract, ITypeAndVersion {
   function typeAndVersion() external pure virtual override returns (string memory) {
-    return "BurnMintTokenPool 1.7.0-dev";
+    return "BurnMintTokenPool 2.0.0-dev";
   }
 
   constructor(

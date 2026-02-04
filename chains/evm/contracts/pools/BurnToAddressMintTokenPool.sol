@@ -18,7 +18,7 @@ contract BurnToAddressMintTokenPool is BurnMintTokenPoolAbstract, ITypeAndVersio
   using SafeERC20 for IERC20;
 
   function typeAndVersion() external pure virtual override returns (string memory) {
-    return "BurnToAddressTokenPool 1.7.0-dev";
+    return "BurnToAddressTokenPool 2.0.0-dev";
   }
 
   /// @notice The address where tokens are sent during a call to lockOrBurn, functionally burning but without decreasing

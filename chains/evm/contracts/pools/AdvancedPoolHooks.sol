@@ -17,7 +17,7 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, ITypeAndVersion, Ownable2StepM
   using EnumerableSet for EnumerableSet.AddressSet;
 
   function typeAndVersion() external pure virtual override returns (string memory) {
-    return "AdvancedPoolHooks 1.7.0-dev";
+    return "AdvancedPoolHooks 2.0.0-dev";
   }
 
   error AllowListNotEnabled();

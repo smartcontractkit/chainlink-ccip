@@ -15,7 +15,7 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
   using SafeERC20 for IERC20;
 
   function typeAndVersion() external pure virtual override returns (string memory) {
-    return "LockReleaseTokenPool 1.7.0-dev";
+    return "LockReleaseTokenPool 2.0.0-dev";
   }
 
   /// @notice The lock box for the token pool.

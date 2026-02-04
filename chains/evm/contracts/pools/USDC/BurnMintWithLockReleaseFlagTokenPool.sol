@@ -18,7 +18,7 @@ bytes4 constant LOCK_RELEASE_FLAG = 0xfa7c07de;
 contract BurnMintWithLockReleaseFlagTokenPool is BurnMintTokenPool {
   /// @dev Using a function because constant state variables cannot be overridden by child contracts.
   function typeAndVersion() external pure override returns (string memory) {
-    return "BurnMintWithLockReleaseFlagTokenPool 1.7.0-dev";
+    return "BurnMintWithLockReleaseFlagTokenPool 2.0.0-dev";
   }
 
   constructor(

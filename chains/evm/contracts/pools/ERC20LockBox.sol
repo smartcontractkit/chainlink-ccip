@@ -17,7 +17,7 @@ contract ERC20LockBox is ITypeAndVersion, ILockBox, AuthorizedCallers {
   using SafeERC20 for IERC20;
 
   function typeAndVersion() external pure virtual override returns (string memory) {
-    return "ERC20LockBox 1.7.0-dev";
+    return "ERC20LockBox 2.0.0-dev";
   }
 
   error InsufficientBalance(uint256 requested, uint256 available);

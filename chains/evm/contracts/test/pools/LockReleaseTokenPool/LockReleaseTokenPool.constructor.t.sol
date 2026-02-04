@@ -24,7 +24,7 @@ contract LockReleaseTokenPool_constructor is BaseTest {
     );
 
     assertEq(address(pool.getToken()), address(token));
-    assertEq(pool.typeAndVersion(), "LockReleaseTokenPool 1.7.0-dev");
+    assertEq(pool.typeAndVersion(), "LockReleaseTokenPool 2.0.0-dev");
   }
 
   function test_constructor_RevertWhen_InvalidToken() public {

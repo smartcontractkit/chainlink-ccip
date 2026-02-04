@@ -19,7 +19,7 @@ contract BurnFromMintTokenPool is BurnMintTokenPoolAbstract, ITypeAndVersion {
   using SafeERC20 for IBurnMintERC20;
 
   function typeAndVersion() external pure virtual override returns (string memory) {
-    return "BurnFromMintTokenPool 1.7.0-dev";
+    return "BurnFromMintTokenPool 2.0.0-dev";
   }
 
   constructor(

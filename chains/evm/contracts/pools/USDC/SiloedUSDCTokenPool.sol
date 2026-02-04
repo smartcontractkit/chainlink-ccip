@@ -66,7 +66,7 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
 
   /// @dev Using a function because constant state variables cannot be overridden by child contracts.
   function typeAndVersion() external pure virtual override returns (string memory) {
-    return "SiloedUSDCTokenPool 1.7.0-dev";
+    return "SiloedUSDCTokenPool 2.0.0-dev";
   }
 
   /// @notice Mint tokens from the pool to the recipient.
