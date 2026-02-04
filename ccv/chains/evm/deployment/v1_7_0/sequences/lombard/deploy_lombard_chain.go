@@ -2,14 +2,14 @@ package lombard
 
 import (
 	"fmt"
+	"math/big"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
+	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
-
-	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -17,6 +17,7 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/advanced_pool_hooks"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/lombard_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/lombard_verifier"
 	v1_7_0_sequences "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
@@ -28,7 +29,7 @@ const (
 )
 
 var (
-	lombardQualifier = "Lombard"
+	ContractQualifier = "Lombard"
 )
 
 var DeployLombardChain = cldf_ops.NewSequence(
@@ -76,7 +77,7 @@ var DeployLombardChain = cldf_ops.NewSequence(
 		lombardVerifierRef, err := contract_utils.MaybeDeployContract(b, lombard_verifier.Deploy, chain, contract_utils.DeployInput[lombard_verifier.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(lombard_verifier.ContractType, *lombard_verifier.Version),
 			ChainSelector:  input.ChainSelector,
-			Qualifier:      &lombardQualifier,
+			Qualifier:      &ContractQualifier,
 			Args: lombard_verifier.ConstructorArgs{
 				Bridge:           lombardBridgeAddress,
 				StorageLocations: input.StorageLocations,
@@ -92,12 +93,25 @@ var DeployLombardChain = cldf_ops.NewSequence(
 		addresses = append(addresses, lombardVerifierRef)
 		lombardVerifierAddress := common.HexToAddress(lombardVerifierRef.Address)
 
+		_, err = cldf_ops.ExecuteOperation(b, lombard_verifier.UpdateSupportedTokens, chain, contract_utils.FunctionInput[lombard_verifier.SupportedTokenArgs]{
+			ChainSelector: input.ChainSelector,
+			Address:       lombardVerifierAddress,
+			Args: lombard_verifier.SupportedTokenArgs{
+				TokensToSet: []lombard_verifier.SupportedTokensArgs{
+					{LocalToken: tokenAddress},
+				},
+			},
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to update supported tokens on LombardVerifier: %w", err)
+		}
+
 		// Deploy LombardVerifierResolver if needed
 		lombardVerifierResolverRefs := dep.DataStore.Addresses().Filter(
 			datastore.AddressRefByChainSelector(chain.Selector),
 			datastore.AddressRefByType(datastore.ContractType(lombard_verifier.ResolverType)),
 			datastore.AddressRefByVersion(lombard_verifier.Version),
-			datastore.AddressRefByQualifier(lombardQualifier),
+			datastore.AddressRefByQualifier(ContractQualifier),
 		)
 		var lombardVerifierResolverRef datastore.AddressRef
 		if len(lombardVerifierResolverRefs) == 0 {
@@ -107,7 +121,7 @@ var DeployLombardChain = cldf_ops.NewSequence(
 
 			deployVerifierResolverViaCREATE2Report, err := cldf_ops.ExecuteSequence(b, v1_7_0_sequences.DeployVerifierResolverViaCREATE2, chain, v1_7_0_sequences.DeployVerifierResolverViaCREATE2Input{
 				ChainSelector:  input.ChainSelector,
-				Qualifier:      lombardQualifier,
+				Qualifier:      ContractQualifier,
 				Type:           datastore.ContractType(lombard_verifier.ResolverType),
 				Version:        lombard_verifier.Version,
 				CREATE2Factory: common.HexToAddress(input.DeployerContract),
@@ -128,17 +142,34 @@ var DeployLombardChain = cldf_ops.NewSequence(
 			addresses = append(addresses, lombardVerifierResolverRef)
 		}
 
+		// There can be multiple pools / tokens and advancedPoolHooks for Lombard
+		advancedPoolHooksRef, err := contract_utils.MaybeDeployContract(b, advanced_pool_hooks.Deploy, chain, contract_utils.DeployInput[advanced_pool_hooks.ConstructorArgs]{
+			TypeAndVersion: deployment.NewTypeAndVersion(advanced_pool_hooks.ContractType, *advanced_pool_hooks.Version),
+			ChainSelector:  input.ChainSelector,
+			Qualifier:      tokenPoolQualifier(input.TokenQualifier),
+			Args: advanced_pool_hooks.ConstructorArgs{
+				Allowlist:                        []common.Address{chain.DeployerKey.From},
+				ThresholdAmountForAdditionalCCVs: big.NewInt(0),
+			},
+		}, existingAddresses)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy AdvancedPoolHooks: %w", err)
+		}
+		addresses = append(addresses, advancedPoolHooksRef)
+		advancedPoolHooksAddress := common.HexToAddress(advancedPoolHooksRef.Address)
+
 		lombardTokenPoolRef, err := contract_utils.MaybeDeployContract(b, lombard_token_pool.Deploy, chain, contract_utils.DeployInput[lombard_token_pool.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(lombard_token_pool.ContractType, *lombard_token_pool.Version),
 			ChainSelector:  input.ChainSelector,
-			Qualifier:      &lombardQualifier,
+			Qualifier:      tokenPoolQualifier(input.TokenQualifier),
 			Args: lombard_token_pool.ConstructorArgs{
-				Token:            tokenAddress,
-				Verifier:         lombardVerifierAddress,
-				Bridge:           lombardBridgeAddress,
-				RMNProxy:         rmnAddress,
-				Router:           routerAddress,
-				FallbackDecimals: fallbackDecimals,
+				Token:             tokenAddress,
+				Verifier:          lombardVerifierAddress,
+				Bridge:            lombardBridgeAddress,
+				RMNProxy:          rmnAddress,
+				Router:            routerAddress,
+				AdvancedPoolHooks: advancedPoolHooksAddress,
+				FallbackDecimals:  fallbackDecimals,
 			},
 		}, existingAddresses)
 		if err != nil {
@@ -165,3 +196,8 @@ var DeployLombardChain = cldf_ops.NewSequence(
 			BatchOps:  batchOps,
 		}, nil
 	})
+
+func tokenPoolQualifier(tokenQualifier string) *string {
+	qualifier := ContractQualifier + "_" + tokenQualifier
+	return &qualifier
+}
