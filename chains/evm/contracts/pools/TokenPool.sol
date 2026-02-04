@@ -434,7 +434,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
       _consumeOutboundRateLimit(lockOrBurnIn.remoteChainSelector, amount);
     }
 
-    _preflightCheck(lockOrBurnIn, blockConfirmationRequested, tokenArgs);
+    _preflightCheck(lockOrBurnIn, blockConfirmationRequested, tokenArgs, amount);
   }
 
   /// @notice Hook for pre-flight checks on lock or burn.
@@ -444,13 +444,15 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   /// @param lockOrBurnIn The input to validate.
   /// @param blockConfirmationRequested The minimum block confirmation requested by the message.
   /// @param tokenArgs Additional token arguments passed in by the sender of the message.
+  /// @param amountPostFee The amount after token pool bps-based fees have been deducted.
   function _preflightCheck(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
     uint16 blockConfirmationRequested,
-    bytes memory tokenArgs
+    bytes memory tokenArgs,
+    uint256 amountPostFee
   ) internal virtual {
     if (address(s_advancedPoolHooks) != address(0)) {
-      s_advancedPoolHooks.preflightCheck(lockOrBurnIn, blockConfirmationRequested, tokenArgs);
+      s_advancedPoolHooks.preflightCheck(lockOrBurnIn, blockConfirmationRequested, tokenArgs, amountPostFee);
     }
   }
 

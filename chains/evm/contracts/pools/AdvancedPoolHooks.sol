@@ -82,7 +82,8 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, ITypeAndVersion, Ownable2StepM
   function preflightCheck(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
     uint16,
-    bytes calldata
+    bytes calldata,
+    uint256
   ) external view {
     checkAllowList(lockOrBurnIn.originalSender);
   }

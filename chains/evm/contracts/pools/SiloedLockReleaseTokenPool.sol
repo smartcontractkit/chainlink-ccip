@@ -116,6 +116,7 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
   function _preflightCheck(
     Pool.LockOrBurnInV1 calldata,
     uint16,
-    bytes memory
+    bytes memory,
+    uint256
   ) internal virtual override {}
 }
