@@ -156,7 +156,7 @@ type ConstructorArgs struct {
 }
 
 var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
-	Name:        "usdc-token-pool-cctpv2:deploy",
+	Name:        "usdc-token-pool-cctp-v2:deploy",
 	Version:     Version,
 	Description: "Deploys the USDCTokenPoolCCTPV2 contract",
 	ContractMetadata: &bind.MetaData{
@@ -172,7 +172,7 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 })
 
 var SetDomains = contract.NewWrite(contract.WriteParams[[]DomainUpdate, *USDCTokenPoolCCTPV2Contract]{
-	Name:            "usdc-token-pool-cctpv2:set-domains",
+	Name:            "usdc-token-pool-cctp-v2:set-domains",
 	Version:         Version,
 	Description:     "Calls setDomains on the contract",
 	ContractType:    ContractType,
@@ -190,7 +190,7 @@ var SetDomains = contract.NewWrite(contract.WriteParams[[]DomainUpdate, *USDCTok
 })
 
 var GetDomain = contract.NewRead(contract.ReadParams[uint64, Domain, *USDCTokenPoolCCTPV2Contract]{
-	Name:         "usdc-token-pool-cctpv2:get-domain",
+	Name:         "usdc-token-pool-cctp-v2:get-domain",
 	Version:      Version,
 	Description:  "Calls getDomain on the contract",
 	ContractType: ContractType,
@@ -201,7 +201,7 @@ var GetDomain = contract.NewRead(contract.ReadParams[uint64, Domain, *USDCTokenP
 })
 
 var ApplyAuthorizedCallerUpdates = contract.NewWrite(contract.WriteParams[AuthorizedCallerArgs, *USDCTokenPoolCCTPV2Contract]{
-	Name:            "usdc-token-pool-cctpv2:apply-authorized-caller-updates",
+	Name:            "usdc-token-pool-cctp-v2:apply-authorized-caller-updates",
 	Version:         Version,
 	Description:     "Calls applyAuthorizedCallerUpdates on the contract",
 	ContractType:    ContractType,
@@ -219,7 +219,7 @@ var ApplyAuthorizedCallerUpdates = contract.NewWrite(contract.WriteParams[Author
 })
 
 var ApplyChainUpdates = contract.NewWrite(contract.WriteParams[ApplyChainUpdatesArgs, *USDCTokenPoolCCTPV2Contract]{
-	Name:            "usdc-token-pool-cctpv2:apply-chain-updates",
+	Name:            "usdc-token-pool-cctp-v2:apply-chain-updates",
 	Version:         Version,
 	Description:     "Calls applyChainUpdates on the contract",
 	ContractType:    ContractType,
@@ -237,7 +237,7 @@ var ApplyChainUpdates = contract.NewWrite(contract.WriteParams[ApplyChainUpdates
 })
 
 var AddRemotePool = contract.NewWrite(contract.WriteParams[AddRemotePoolArgs, *USDCTokenPoolCCTPV2Contract]{
-	Name:            "usdc-token-pool-cctpv2:add-remote-pool",
+	Name:            "usdc-token-pool-cctp-v2:add-remote-pool",
 	Version:         Version,
 	Description:     "Calls addRemotePool on the contract",
 	ContractType:    ContractType,
@@ -255,7 +255,7 @@ var AddRemotePool = contract.NewWrite(contract.WriteParams[AddRemotePoolArgs, *U
 })
 
 var RemoveRemotePool = contract.NewWrite(contract.WriteParams[RemoveRemotePoolArgs, *USDCTokenPoolCCTPV2Contract]{
-	Name:            "usdc-token-pool-cctpv2:remove-remote-pool",
+	Name:            "usdc-token-pool-cctp-v2:remove-remote-pool",
 	Version:         Version,
 	Description:     "Calls removeRemotePool on the contract",
 	ContractType:    ContractType,
@@ -273,7 +273,7 @@ var RemoveRemotePool = contract.NewWrite(contract.WriteParams[RemoveRemotePoolAr
 })
 
 var TransferOwnership = contract.NewWrite(contract.WriteParams[common.Address, *USDCTokenPoolCCTPV2Contract]{
-	Name:            "usdc-token-pool-cctpv2:transfer-ownership",
+	Name:            "usdc-token-pool-cctp-v2:transfer-ownership",
 	Version:         Version,
 	Description:     "Calls transferOwnership on the contract",
 	ContractType:    ContractType,

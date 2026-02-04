@@ -585,13 +585,12 @@ func generateOperationsFile(info *ContractInfo) error {
 func prepareTemplateData(info *ContractInfo) TemplateData {
 	data := TemplateData{
 		PackageName:       info.PackageName,
-		PackageNameHyphen: toKebabCase(info.Name),
+		PackageNameHyphen: toKebabCase(info.PackageName),
 		ContractType:      info.Name,
 		Version:           info.Version,
 		ABI:               info.ABI,
 		Bytecode:          info.Bytecode,
 		NeedsBigInt:       checkNeedsBigInt(info),
-		HasWriteOps:       false,
 		NoDeployment:      info.NoDeployment,
 	}
 
