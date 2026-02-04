@@ -7,7 +7,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/cctp_message_transmitter_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/cctp_through_ccv_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/cctp_verifier"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/usdc_token_pool_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/cctp"
 	cctp_through_ccv_token_pool_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/cctp_through_ccv_token_pool"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
@@ -71,16 +70,12 @@ func (c *CCTPChainAdapter) MintRecipientOnDest(d datastore.DataStore, b chain.Bl
 }
 
 // PoolAddress returns the address of the token pool on the remote chain in bytes.
-// On EVM, the pool address is the USDCTokenPoolProxy.
-func (c *CCTPChainAdapter) PoolAddress(d datastore.DataStore, b chain.BlockChains, chainSelector uint64) ([]byte, error) {
-	poolAddressRef, err := datastore_utils.FindAndFormatRef(d, datastore.AddressRef{
-		Type:    datastore.ContractType(usdc_token_pool_proxy.ContractType),
-		Version: usdc_token_pool_proxy.Version,
-	}, chainSelector, datastore_utils.FullRef)
+func (c *CCTPChainAdapter) PoolAddress(d datastore.DataStore, b chain.BlockChains, chainSelector uint64, registeredPoolRef datastore.AddressRef) ([]byte, error) {
+	registeredPoolAddress, err := datastore_utils.FindAndFormatRef(d, registeredPoolRef, chainSelector, datastore_utils.FullRef)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find pool address: %w", err)
+		return nil, fmt.Errorf("failed to find registered pool address: %w", err)
 	}
-	return common.FromHex(poolAddressRef.Address), nil
+	return common.FromHex(registeredPoolAddress.Address), nil
 }
 
 // TokenAddress returns the address of the token on the remote chain in bytes.

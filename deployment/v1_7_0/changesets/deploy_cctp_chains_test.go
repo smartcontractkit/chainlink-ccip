@@ -309,6 +309,11 @@ func TestDeployCCTPChains_VerifyPreconditions(t *testing.T) {
 							15971525489660198786: {},
 						},
 					},
+					15971525489660198786: {
+						RemoteChains: map[uint64]adapters.RemoteCCTPChainConfig{
+							5009297550715157269: {},
+						},
+					},
 				},
 				MCMS: &cctpTest_BasicMCMSInput,
 			},
@@ -437,6 +442,11 @@ func TestDeployCCTPChains_VerifyPreconditions(t *testing.T) {
 						RemoteChains: map[uint64]adapters.RemoteCCTPChainConfig{
 							15971525489660198786: {},
 							0:                    {}, // Invalid remote chain selector
+						},
+					},
+					15971525489660198786: {
+						RemoteChains: map[uint64]adapters.RemoteCCTPChainConfig{
+							5009297550715157269: {},
 						},
 					},
 				},

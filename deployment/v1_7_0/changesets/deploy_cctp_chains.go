@@ -157,10 +157,11 @@ func makeApplyDeployCCTPChains(cctpChainRegistry *adapters.CCTPChainRegistry, mc
 				RemoteChains: remoteChains,
 			}
 			in := adapters.ConfigureCCTPChainForLanesInput{
-				ChainSelector:     chainSel,
-				USDCToken:         chainCfg.USDCToken,
-				RegisteredPoolRef: chainCfg.RegisteredPoolRef,
-				RemoteChains:      chainCfg.RemoteChains,
+				ChainSelector:            chainSel,
+				USDCToken:                chainCfg.USDCToken,
+				RegisteredPoolRef:        chainCfg.RegisteredPoolRef,
+				RemoteRegisteredPoolRefs: remoteRegisteredPoolRefs,
+				RemoteChains:             chainCfg.RemoteChains,
 			}
 			configureCCTPChainForLanesReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adaptersByChain[chainSel].ConfigureCCTPChainForLanes(), dep, in)
 			if err != nil {

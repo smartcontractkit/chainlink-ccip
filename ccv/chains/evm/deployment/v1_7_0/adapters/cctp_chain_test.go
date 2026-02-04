@@ -67,6 +67,7 @@ type cctpTestSetup struct {
 	USDCToken          common.Address
 	TokenMessenger     common.Address
 	MessageTransmitter common.Address
+	RegisteredPool     datastore.AddressRef
 }
 
 func setupCCTPTestEnvironment(t *testing.T, e *deployment.Environment, chainSelector uint64) cctpTestSetup {
@@ -166,6 +167,10 @@ func setupCCTPTestEnvironment(t *testing.T, e *deployment.Environment, chainSele
 		USDCToken:          usdcTokenAddr,
 		TokenMessenger:     tokenMessengerAddr,
 		MessageTransmitter: messageTransmitterAddr,
+		RegisteredPool: datastore.AddressRef{
+			Type:    datastore.ContractType(usdc_token_pool_proxy.ContractType),
+			Version: usdc_token_pool_proxy.Version,
+		},
 	}
 }
 
@@ -256,12 +261,13 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 	cfg := v1_7_0_changesets.DeployCCTPChainsConfig{
 		Chains: map[uint64]v1_7_0_changesets.CCTPChainConfig{
 			homeChainSelector: {
-				TokenMessenger:   homeSetup.TokenMessenger.Hex(),
-				USDCToken:        homeSetup.USDCToken.Hex(),
-				DeployerContract: homeCreate2FactoryRef.Address,
-				StorageLocations: []string{"https://test.chain.link.fake"},
-				FeeAggregator:    common.HexToAddress("0x04").Hex(),
-				FastFinalityBps:  100,
+				TokenMessenger:    homeSetup.TokenMessenger.Hex(),
+				USDCToken:         homeSetup.USDCToken.Hex(),
+				RegisteredPoolRef: homeSetup.RegisteredPool,
+				DeployerContract:  homeCreate2FactoryRef.Address,
+				StorageLocations:  []string{"https://test.chain.link.fake"},
+				FeeAggregator:     common.HexToAddress("0x04").Hex(),
+				FastFinalityBps:   100,
 				RemoteChains: map[uint64]adapters.RemoteCCTPChainConfig{
 					nonHomeChainSelector: {
 						FeeUSDCents:         50,
@@ -282,12 +288,13 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 				},
 			},
 			nonHomeChainSelector: {
-				TokenMessenger:   nonHomeSetup.TokenMessenger.Hex(),
-				USDCToken:        nonHomeSetup.USDCToken.Hex(),
-				DeployerContract: nonHomeCreate2FactoryRef.Address,
-				StorageLocations: []string{"https://test.chain.link.fake"},
-				FeeAggregator:    common.HexToAddress("0x04").Hex(),
-				FastFinalityBps:  100,
+				TokenMessenger:    nonHomeSetup.TokenMessenger.Hex(),
+				USDCToken:         nonHomeSetup.USDCToken.Hex(),
+				RegisteredPoolRef: nonHomeSetup.RegisteredPool,
+				DeployerContract:  nonHomeCreate2FactoryRef.Address,
+				StorageLocations:  []string{"https://test.chain.link.fake"},
+				FeeAggregator:     common.HexToAddress("0x04").Hex(),
+				FastFinalityBps:   100,
 				RemoteChains: map[uint64]adapters.RemoteCCTPChainConfig{
 					homeChainSelector: {
 						FeeUSDCents:         50,
@@ -521,7 +528,7 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 	require.Equal(t, common.HexToAddress("0x04"), homeFeeAggregator, "Fee aggregator should match on home chain")
 
 	// Check adapter methods work correctly
-	homePoolAddress, err := adapter.PoolAddress(e.DataStore, e.BlockChains, homeChainSelector)
+	homePoolAddress, err := adapter.PoolAddress(e.DataStore, e.BlockChains, homeChainSelector, homeSetup.RegisteredPool)
 	require.NoError(t, err, "Failed to get pool address from adapter")
 	require.Equal(t, homeUSDCTokenPoolProxyAddr.Bytes(), homePoolAddress, "Pool address should match")
 
@@ -633,7 +640,7 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 	require.Equal(t, common.HexToAddress("0x04"), nonHomeFeeAggregator, "Fee aggregator should match on non-home chain")
 
 	// Check adapter methods work correctly for non-home chain
-	nonHomePoolAddress, err := adapter.PoolAddress(e.DataStore, e.BlockChains, nonHomeChainSelector)
+	nonHomePoolAddress, err := adapter.PoolAddress(e.DataStore, e.BlockChains, nonHomeChainSelector, nonHomeSetup.RegisteredPool)
 	require.NoError(t, err, "Failed to get pool address from adapter for non-home chain")
 	require.Equal(t, nonHomeUSDCTokenPoolProxyAddr.Bytes(), nonHomePoolAddress, "Pool address should match for non-home chain")
 
