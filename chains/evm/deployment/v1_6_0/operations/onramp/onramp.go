@@ -12,9 +12,8 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-	
+
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
 )
 
 var ContractType cldf_deployment.ContractType = "OnRamp"
@@ -62,6 +61,36 @@ func (c *OnRampContract) Owner(opts *bind.CallOpts) (common.Address, error) {
 
 func (c *OnRampContract) ApplyDestChainConfigUpdates(opts *bind.TransactOpts, args []DestChainConfigArgs) (*types.Transaction, error) {
 	return c.contract.Transact(opts, "applyDestChainConfigUpdates", args)
+}
+
+func (c *OnRampContract) GetDestChainConfig(opts *bind.CallOpts, args uint64) (any, error) {
+	var out []any
+	err := c.contract.Call(opts, &out, "getDestChainConfig", args)
+	if err != nil {
+		var zero any
+		return zero, err
+	}
+	return *abi.ConvertType(out[0], new(any)).(*any), nil
+}
+
+func (c *OnRampContract) GetStaticConfig(opts *bind.CallOpts) (StaticConfig, error) {
+	var out []any
+	err := c.contract.Call(opts, &out, "getStaticConfig")
+	if err != nil {
+		var zero StaticConfig
+		return zero, err
+	}
+	return *abi.ConvertType(out[0], new(StaticConfig)).(*StaticConfig), nil
+}
+
+func (c *OnRampContract) GetDynamicConfig(opts *bind.CallOpts) (DynamicConfig, error) {
+	var out []any
+	err := c.contract.Call(opts, &out, "getDynamicConfig")
+	if err != nil {
+		var zero DynamicConfig
+		return zero, err
+	}
+	return *abi.ConvertType(out[0], new(DynamicConfig)).(*DynamicConfig), nil
 }
 
 type DestChainConfigArgs struct {
@@ -125,35 +154,35 @@ var ApplyDestChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]DestC
 	},
 })
 
-var GetDestChainConfig = contract.NewRead(contract.ReadParams[uint64, onramp.GetDestChainConfig, *onramp.OnRamp]{
+var GetDestChainConfig = contract.NewRead(contract.ReadParams[uint64, any, *OnRampContract]{
 	Name:         "onramp:get-dest-chain-config",
 	Version:      Version,
-	Description:  "Gets the destination chain config for a given chain selector from the OnRamp 1.6.0 contract",
+	Description:  "Calls getDestChainConfig on the contract",
 	ContractType: ContractType,
-	NewContract:  onramp.NewOnRamp,
-	CallContract: func(onRamp *onramp.OnRamp, opts *bind.CallOpts, arg uint64) (onramp.GetDestChainConfig, error) {
-		return onRamp.GetDestChainConfig(opts, arg)
+	NewContract:  NewOnRampContract,
+	CallContract: func(c *OnRampContract, opts *bind.CallOpts, args uint64) (any, error) {
+		return c.GetDestChainConfig(opts, args)
 	},
 })
 
-var GetStaticConfig = contract.NewRead(contract.ReadParams[any, onramp.OnRampStaticConfig, *onramp.OnRamp]{
+var GetStaticConfig = contract.NewRead(contract.ReadParams[struct{}, StaticConfig, *OnRampContract]{
 	Name:         "onramp:get-static-config",
 	Version:      Version,
-	Description:  "Gets the static config from the OnRamp 1.6.0 contract",
+	Description:  "Calls getStaticConfig on the contract",
 	ContractType: ContractType,
-	NewContract:  onramp.NewOnRamp,
-	CallContract: func(onRamp *onramp.OnRamp, opts *bind.CallOpts, args any) (onramp.OnRampStaticConfig, error) {
-		return onRamp.GetStaticConfig(opts)
+	NewContract:  NewOnRampContract,
+	CallContract: func(c *OnRampContract, opts *bind.CallOpts, args struct{}) (StaticConfig, error) {
+		return c.GetStaticConfig(opts)
 	},
 })
 
-var GetDynamicConfig = contract.NewRead(contract.ReadParams[any, onramp.OnRampDynamicConfig, *onramp.OnRamp]{
+var GetDynamicConfig = contract.NewRead(contract.ReadParams[struct{}, DynamicConfig, *OnRampContract]{
 	Name:         "onramp:get-dynamic-config",
 	Version:      Version,
-	Description:  "Gets the dynamic config from the OnRamp 1.6.0 contract",
+	Description:  "Calls getDynamicConfig on the contract",
 	ContractType: ContractType,
-	NewContract:  onramp.NewOnRamp,
-	CallContract: func(onRamp *onramp.OnRamp, opts *bind.CallOpts, args any) (onramp.OnRampDynamicConfig, error) {
-		return onRamp.GetDynamicConfig(opts)
+	NewContract:  NewOnRampContract,
+	CallContract: func(c *OnRampContract, opts *bind.CallOpts, args struct{}) (DynamicConfig, error) {
+		return c.GetDynamicConfig(opts)
 	},
 })

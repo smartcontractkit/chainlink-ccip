@@ -4,6 +4,7 @@ package fee_quoter
 
 import (
 	"math/big"
+
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
@@ -15,7 +16,6 @@ import (
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/fee_quoter"
 )
 
 var ContractType cldf_deployment.ContractType = "FeeQuoter"
@@ -75,6 +75,26 @@ func (c *FeeQuoterContract) ApplyAuthorizedCallerUpdates(opts *bind.TransactOpts
 
 func (c *FeeQuoterContract) ApplyTokenTransferFeeConfigUpdates(opts *bind.TransactOpts, tokenTransferFeeConfigArgs []TokenTransferFeeConfigArgs, tokensToUseDefaultFeeConfigs []TokenTransferFeeConfigRemoveArgs) (*types.Transaction, error) {
 	return c.contract.Transact(opts, "applyTokenTransferFeeConfigUpdates", tokenTransferFeeConfigArgs, tokensToUseDefaultFeeConfigs)
+}
+
+func (c *FeeQuoterContract) GetDestChainConfig(opts *bind.CallOpts, args uint64) (DestChainConfig, error) {
+	var out []any
+	err := c.contract.Call(opts, &out, "getDestChainConfig", args)
+	if err != nil {
+		var zero DestChainConfig
+		return zero, err
+	}
+	return *abi.ConvertType(out[0], new(DestChainConfig)).(*DestChainConfig), nil
+}
+
+func (c *FeeQuoterContract) GetTokenTransferFeeConfig(opts *bind.CallOpts, destChainSelector uint64, token common.Address) (TokenTransferFeeConfig, error) {
+	var out []any
+	err := c.contract.Call(opts, &out, "getTokenTransferFeeConfig", destChainSelector, token)
+	if err != nil {
+		var zero TokenTransferFeeConfig
+		return zero, err
+	}
+	return *abi.ConvertType(out[0], new(TokenTransferFeeConfig)).(*TokenTransferFeeConfig), nil
 }
 
 type AuthorizedCallerArgs struct {
@@ -175,6 +195,11 @@ type ApplyTokenTransferFeeConfigUpdatesArgs struct {
 	TokensToUseDefaultFeeConfigs []TokenTransferFeeConfigRemoveArgs
 }
 
+type GetTokenTransferFeeConfigArgs struct {
+	DestChainSelector uint64
+	Token             common.Address
+}
+
 type ConstructorArgs struct {
 	StaticConfig                   StaticConfig
 	PriceUpdaters                  []common.Address
@@ -273,29 +298,24 @@ var ApplyTokenTransferFeeConfigUpdates = contract.NewWrite(contract.WriteParams[
 	},
 })
 
-var GetDestChainConfig = contract.NewRead(contract.ReadParams[uint64, fee_quoter.FeeQuoterDestChainConfig, *fee_quoter.FeeQuoter]{
-	Name:         "fee-quoter:dest-chain-config",
+var GetDestChainConfig = contract.NewRead(contract.ReadParams[uint64, DestChainConfig, *FeeQuoterContract]{
+	Name:         "fee-quoter:get-dest-chain-config",
 	Version:      Version,
-	Description:  "Reads the destination chain config from the FeeQuoter 1.6.0 contract",
+	Description:  "Calls getDestChainConfig on the contract",
 	ContractType: ContractType,
-	NewContract:  fee_quoter.NewFeeQuoter,
-	CallContract: func(feeQuoter *fee_quoter.FeeQuoter, opts *bind.CallOpts, chainSelector uint64) (fee_quoter.FeeQuoterDestChainConfig, error) {
-		return feeQuoter.GetDestChainConfig(opts, chainSelector)
+	NewContract:  NewFeeQuoterContract,
+	CallContract: func(c *FeeQuoterContract, opts *bind.CallOpts, args uint64) (DestChainConfig, error) {
+		return c.GetDestChainConfig(opts, args)
 	},
 })
 
-type GetTokenTransferFeeConfigInput struct {
-	Token             common.Address
-	DestChainSelector uint64
-}
-
-var GetTokenTransferFeeConfig = contract.NewRead(contract.ReadParams[GetTokenTransferFeeConfigInput, fee_quoter.FeeQuoterTokenTransferFeeConfig, *fee_quoter.FeeQuoter]{
-	Name:         "fee-quoter:token-transfer-fee-config",
+var GetTokenTransferFeeConfig = contract.NewRead(contract.ReadParams[GetTokenTransferFeeConfigArgs, TokenTransferFeeConfig, *FeeQuoterContract]{
+	Name:         "fee-quoter:get-token-transfer-fee-config",
 	Version:      Version,
-	Description:  "Reads the token transfer fee config from the FeeQuoter 1.6.0 contract",
+	Description:  "Calls getTokenTransferFeeConfig on the contract",
 	ContractType: ContractType,
-	NewContract:  fee_quoter.NewFeeQuoter,
-	CallContract: func(feeQuoter *fee_quoter.FeeQuoter, opts *bind.CallOpts, in GetTokenTransferFeeConfigInput) (fee_quoter.FeeQuoterTokenTransferFeeConfig, error) {
-		return feeQuoter.GetTokenTransferFeeConfig(opts, in.DestChainSelector, in.Token)
+	NewContract:  NewFeeQuoterContract,
+	CallContract: func(c *FeeQuoterContract, opts *bind.CallOpts, args GetTokenTransferFeeConfigArgs) (TokenTransferFeeConfig, error) {
+		return c.GetTokenTransferFeeConfig(opts, args.DestChainSelector, args.Token)
 	},
 })
