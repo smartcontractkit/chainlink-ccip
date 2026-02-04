@@ -559,12 +559,28 @@ func (o observerImpl) ObserveLatestOnRampSeqNums(ctx context.Context) []pluginty
 
 	slices.Sort(supportedSourceChains)
 
+	sourceChainsCfg, err := o.ccipReader.GetOffRampSourceChainsConfig(ctx, supportedSourceChains)
+	if err != nil {
+		lggr.Warnw("call to GetOffRampSourceChainsConfig failed", "err", err)
+		return nil
+	}
+
 	mu := &sync.Mutex{}
 	latestOnRampSeqNums := make([]plugintypes.SeqNumChain, 0, len(supportedSourceChains))
 
 	wg := &sync.WaitGroup{}
 	for _, sourceChain := range supportedSourceChains {
 		wg.Go(func() {
+			// RMN should never be enabled on any source chain lane
+			// if it is misconfigured, we skip observations to avoid impact to the report
+			if _, ok := sourceChainsCfg[sourceChain]; !ok {
+				lggr.Warnw("source chain config not found, skipping observations", "source", sourceChain)
+				return
+			}
+			if !sourceChainsCfg[sourceChain].IsRMNVerificationDisabled {
+				lggr.Warnw("rmn enablement is misconfigured on this lane, skipping observations", "source", sourceChain)
+				return
+			}
 			latestOnRampSeqNum, err := o.ccipReader.LatestMsgSeqNum(ctx, sourceChain)
 			if err != nil {
 				if isNoBindingsError(err) {

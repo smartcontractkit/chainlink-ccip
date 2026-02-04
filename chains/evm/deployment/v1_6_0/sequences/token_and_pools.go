@@ -11,12 +11,14 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils"
 	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	bnmERC20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	tarops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	tarseq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
 	tpops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/operations/token_pool"
 	tpseq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/sequences/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
+	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
@@ -28,7 +30,7 @@ import (
 
 func (a *EVMAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[tokensapi.ConfigureTokenForTransfersInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return cldf_ops.NewSequence(
-		"token-adapter:configure-token-for-transfers",
+		"evm-adapter:configure-token-for-transfers",
 		tpops.Version,
 		"Configure a token for cross-chain transfers for an EVM chain",
 		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokensapi.ConfigureTokenForTransfersInput) (sequences.OnChainOutput, error) {
@@ -266,7 +268,99 @@ func (a *EVMAdapter) DeployTokenVerify(e deployment.Environment, in any) error {
 }
 
 func (a *EVMAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.DeployTokenPoolInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
-	return DeployTokenPool
+	return cldf_ops.NewSequence(
+		"evm-adapter:deploy-token-pool-for-token",
+		tpops.Version,
+		"Deploy a token pool for a token on an EVM chains",
+		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokensapi.DeployTokenPoolInput) (output sequences.OnChainOutput, err error) {
+			out, err := cldf_ops.ExecuteSequence(b, DeployTokenPool, chains, input)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy token pool on chain %d: %w", input.ChainSelector, err)
+			}
+
+			var result sequences.OnChainOutput
+			result.Addresses = append(result.Addresses, out.Output.Addresses...)
+			result.BatchOps = append(result.BatchOps, out.Output.BatchOps...)
+
+			toknFilterDS := datastore.AddressRef{ChainSelector: input.ChainSelector, Qualifier: input.TokenSymbol}
+			toknRef, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, toknFilterDS, input.ChainSelector, datastore_utils.FullRef)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to find token address for symbol %q on chain %d: %w", input.TokenSymbol, input.ChainSelector, err)
+			}
+
+			// For a BnM token + BnM token pool, we need to grant the pool mint and burn roles on the token
+			isToknTypeBnM := toknRef.Type.String() == bnmERC20ops.ContractType.String()
+			isPoolTypeBnM := input.PoolType == cciputils.BurnMintTokenPool.String()
+			if isPoolTypeBnM && isToknTypeBnM {
+				// NOTE: the pool ref isn't in the datastore yet so
+				// we locate it from the sequence output addresses.
+				poolRef, foundIt := datastore.AddressRef{}, false
+				for _, addrRef := range out.Output.Addresses {
+					isPoolRef := addrRef.ChainSelector == input.ChainSelector &&
+						addrRef.Qualifier == input.TokenPoolQualifier &&
+						addrRef.Type.String() == input.PoolType &&
+						addrRef.Address != ""
+
+					if isPoolRef {
+						poolRef = addrRef
+						foundIt = true
+						break
+					}
+				}
+
+				if !foundIt {
+					return sequences.OnChainOutput{}, fmt.Errorf("deployed token pool address for qualifier %q on chain %d not found in output addresses", input.TokenPoolQualifier, input.ChainSelector)
+				}
+
+				poolAddrBytes, err := a.AddressRefToBytes(poolRef)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to convert deployed token pool address ref to bytes: %w", err)
+				}
+
+				toknAddrBytes, err := a.AddressRefToBytes(toknRef)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to convert token address ref to bytes: %w", err)
+				}
+
+				poolAddr := common.BytesToAddress(poolAddrBytes)
+				if poolAddr == (common.Address{}) {
+					return sequences.OnChainOutput{}, errors.New("deployed token pool address is zero address")
+				}
+
+				toknAddr := common.BytesToAddress(toknAddrBytes)
+				if toknAddr == (common.Address{}) {
+					return sequences.OnChainOutput{}, fmt.Errorf("token address for symbol %q is zero address", input.TokenSymbol)
+				}
+
+				chain, ok := chains.EVMChains()[input.ChainSelector]
+				if !ok {
+					return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
+				}
+
+				report, err := cldf_ops.ExecuteOperation(b,
+					bnmERC20ops.GrantMintAndBurnRoles,
+					chain,
+					evm_contract.FunctionInput[common.Address]{
+						ChainSelector: input.ChainSelector,
+						Address:       toknAddr,
+						Args:          poolAddr,
+					},
+				)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to grant mint and burn roles to token pool %q for token %q on chain %d: %w", poolAddr.Hex(), input.TokenSymbol, input.ChainSelector, err)
+				}
+
+				batchOp, err := evm_contract.NewBatchOperationFromWrites([]evm_contract.WriteOutput{report.Output})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation for granting mint and burn roles to token pool %q for token %q on chain %d: %w", poolAddr.Hex(), input.TokenSymbol, input.ChainSelector, err)
+				}
+
+				result.BatchOps = append(result.BatchOps, batchOp)
+			}
+
+			return result, nil
+		},
+	)
 }
 
 func (a *EVMAdapter) RegisterToken() *cldf_ops.Sequence[tokensapi.RegisterTokenInput, sequences.OnChainOutput, cldf_chain.BlockChains] {

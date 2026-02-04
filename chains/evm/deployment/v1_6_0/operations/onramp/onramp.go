@@ -9,8 +9,9 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-
+	
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
 )
 
 var ContractType cldf_deployment.ContractType = "OnRamp"
@@ -117,5 +118,38 @@ var ApplyDestChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]DestC
 		args []DestChainConfigArgs,
 	) (*types.Transaction, error) {
 		return c.ApplyDestChainConfigUpdates(opts, args)
+	},
+})
+
+var GetDestChainConfig = contract.NewRead(contract.ReadParams[uint64, onramp.GetDestChainConfig, *onramp.OnRamp]{
+	Name:         "onramp:get-dest-chain-config",
+	Version:      Version,
+	Description:  "Gets the destination chain config for a given chain selector from the OnRamp 1.6.0 contract",
+	ContractType: ContractType,
+	NewContract:  onramp.NewOnRamp,
+	CallContract: func(onRamp *onramp.OnRamp, opts *bind.CallOpts, arg uint64) (onramp.GetDestChainConfig, error) {
+		return onRamp.GetDestChainConfig(opts, arg)
+	},
+})
+
+var GetStaticConfig = contract.NewRead(contract.ReadParams[any, onramp.OnRampStaticConfig, *onramp.OnRamp]{
+	Name:         "onramp:get-static-config",
+	Version:      Version,
+	Description:  "Gets the static config from the OnRamp 1.6.0 contract",
+	ContractType: ContractType,
+	NewContract:  onramp.NewOnRamp,
+	CallContract: func(onRamp *onramp.OnRamp, opts *bind.CallOpts, args any) (onramp.OnRampStaticConfig, error) {
+		return onRamp.GetStaticConfig(opts)
+	},
+})
+
+var GetDynamicConfig = contract.NewRead(contract.ReadParams[any, onramp.OnRampDynamicConfig, *onramp.OnRamp]{
+	Name:         "onramp:get-dynamic-config",
+	Version:      Version,
+	Description:  "Gets the dynamic config from the OnRamp 1.6.0 contract",
+	ContractType: ContractType,
+	NewContract:  onramp.NewOnRamp,
+	CallContract: func(onRamp *onramp.OnRamp, opts *bind.CallOpts, args any) (onramp.OnRampDynamicConfig, error) {
+		return onRamp.GetDynamicConfig(opts)
 	},
 })
