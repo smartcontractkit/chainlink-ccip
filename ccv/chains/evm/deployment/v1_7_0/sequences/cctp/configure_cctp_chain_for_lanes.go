@@ -316,7 +316,6 @@ func resolveConfigureCCTPChainRefs(
 func buildRemoteChainConfigs(dep adapters.ConfigureCCTPChainForLanesDeps, input adapters.ConfigureCCTPChainForLanesInput) (map[uint64]tokens_core.RemoteChainConfig[[]byte, string], error) {
 	configs := make(map[uint64]tokens_core.RemoteChainConfig[[]byte, string], len(input.RemoteChains))
 	for remoteChainSelector, remoteChain := range input.RemoteChains {
-		fmt.Println(input.RemoteRegisteredPoolRefs)
 		remotePoolAddress, err := dep.RemoteChains[remoteChainSelector].PoolAddress(dep.DataStore, dep.BlockChains, remoteChainSelector, input.RemoteRegisteredPoolRefs[remoteChainSelector])
 		if err != nil {
 			return nil, fmt.Errorf("failed to get remote pool address: %w", err)

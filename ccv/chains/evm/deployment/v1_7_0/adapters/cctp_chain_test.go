@@ -67,7 +67,6 @@ type cctpTestSetup struct {
 	USDCToken          common.Address
 	TokenMessenger     common.Address
 	MessageTransmitter common.Address
-	RegisteredPool     datastore.AddressRef
 }
 
 func setupCCTPTestEnvironment(t *testing.T, e *deployment.Environment, chainSelector uint64) cctpTestSetup {
@@ -167,10 +166,6 @@ func setupCCTPTestEnvironment(t *testing.T, e *deployment.Environment, chainSele
 		USDCToken:          usdcTokenAddr,
 		TokenMessenger:     tokenMessengerAddr,
 		MessageTransmitter: messageTransmitterAddr,
-		RegisteredPool: datastore.AddressRef{
-			Type:    datastore.ContractType(usdc_token_pool_proxy.ContractType),
-			Version: usdc_token_pool_proxy.Version,
-		},
 	}
 }
 
@@ -261,13 +256,16 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 	cfg := v1_7_0_changesets.DeployCCTPChainsConfig{
 		Chains: map[uint64]v1_7_0_changesets.CCTPChainConfig{
 			homeChainSelector: {
-				TokenMessenger:    homeSetup.TokenMessenger.Hex(),
-				USDCToken:         homeSetup.USDCToken.Hex(),
-				RegisteredPoolRef: homeSetup.RegisteredPool,
-				DeployerContract:  homeCreate2FactoryRef.Address,
-				StorageLocations:  []string{"https://test.chain.link.fake"},
-				FeeAggregator:     common.HexToAddress("0x04").Hex(),
-				FastFinalityBps:   100,
+				TokenMessenger: homeSetup.TokenMessenger.Hex(),
+				USDCToken:      homeSetup.USDCToken.Hex(),
+				RegisteredPoolRef: datastore.AddressRef{
+					Type:    datastore.ContractType(usdc_token_pool_proxy.ContractType),
+					Version: usdc_token_pool_proxy.Version,
+				},
+				DeployerContract: homeCreate2FactoryRef.Address,
+				StorageLocations: []string{"https://test.chain.link.fake"},
+				FeeAggregator:    common.HexToAddress("0x04").Hex(),
+				FastFinalityBps:  100,
 				RemoteChains: map[uint64]adapters.RemoteCCTPChainConfig{
 					nonHomeChainSelector: {
 						FeeUSDCents:         50,
@@ -288,13 +286,16 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 				},
 			},
 			nonHomeChainSelector: {
-				TokenMessenger:    nonHomeSetup.TokenMessenger.Hex(),
-				USDCToken:         nonHomeSetup.USDCToken.Hex(),
-				RegisteredPoolRef: nonHomeSetup.RegisteredPool,
-				DeployerContract:  nonHomeCreate2FactoryRef.Address,
-				StorageLocations:  []string{"https://test.chain.link.fake"},
-				FeeAggregator:     common.HexToAddress("0x04").Hex(),
-				FastFinalityBps:   100,
+				TokenMessenger: nonHomeSetup.TokenMessenger.Hex(),
+				USDCToken:      nonHomeSetup.USDCToken.Hex(),
+				RegisteredPoolRef: datastore.AddressRef{
+					Type:    datastore.ContractType("USDCTokenPool"),
+					Version: semver.MustParse("1.6.2"),
+				},
+				DeployerContract: nonHomeCreate2FactoryRef.Address,
+				StorageLocations: []string{"https://test.chain.link.fake"},
+				FeeAggregator:    common.HexToAddress("0x04").Hex(),
+				FastFinalityBps:  100,
 				RemoteChains: map[uint64]adapters.RemoteCCTPChainConfig{
 					homeChainSelector: {
 						FeeUSDCents:         50,
@@ -507,7 +508,7 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 	require.Equal(t, common.LeftPadBytes(nonHomeSetup.USDCToken.Bytes(), 32), homeCCTPV2RemoteToken, "CCTP V2 pool remote token should be non-home USDC on home chain")
 	homeCCTPV2RemotePools, err := homeCCTPV2TokenPool.GetRemotePools(nil, nonHomeChainSelector)
 	require.NoError(t, err, "Failed to get remote pools from CCTP V2 token pool on home chain")
-	require.Contains(t, homeCCTPV2RemotePools, common.LeftPadBytes(nonHomeUSDCTokenPoolProxyAddr.Bytes(), 32), "CCTP V2 pool should have non-home proxy as remote pool on home chain")
+	require.Contains(t, homeCCTPV2RemotePools, common.LeftPadBytes(nonHomeCCTPV1Pool.Bytes(), 32), "CCTP V2 pool should have non-home CCTP V1 pool as remote pool on home chain")
 
 	// Check CCTP V1 token pool remote chain config on home chain (ConfigureTokenPoolForRemoteChain)
 	homeCCTPV1PoolBinding, err := v1_6_1_burn_mint_token_pool.NewBurnMintTokenPool(homeCCTPV1Pool, homeChain.Client)
@@ -520,7 +521,7 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 	require.Equal(t, common.LeftPadBytes(nonHomeSetup.USDCToken.Bytes(), 32), homeCCTPV1RemoteToken, "CCTP V1 pool remote token should be non-home USDC on home chain")
 	homeCCTPV1RemotePools, err := homeCCTPV1PoolBinding.GetRemotePools(nil, nonHomeChainSelector)
 	require.NoError(t, err, "Failed to get remote pools from CCTP V1 token pool on home chain")
-	require.Contains(t, homeCCTPV1RemotePools, common.LeftPadBytes(nonHomeUSDCTokenPoolProxyAddr.Bytes(), 32), "CCTP V1 pool should have non-home proxy as remote pool on home chain")
+	require.Contains(t, homeCCTPV1RemotePools, common.LeftPadBytes(nonHomeCCTPV1Pool.Bytes(), 32), "CCTP V1 pool should have non-home CCTP V1 pool as remote pool on home chain")
 
 	// Check USDCTokenPoolProxy fee aggregator on home chain
 	homeFeeAggregator, err := homeUSDCTokenPoolProxy.GetFeeAggregator(nil)
@@ -528,7 +529,10 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 	require.Equal(t, common.HexToAddress("0x04"), homeFeeAggregator, "Fee aggregator should match on home chain")
 
 	// Check adapter methods work correctly
-	homePoolAddress, err := adapter.PoolAddress(e.DataStore, e.BlockChains, homeChainSelector, homeSetup.RegisteredPool)
+	homePoolAddress, err := adapter.PoolAddress(e.DataStore, e.BlockChains, homeChainSelector, datastore.AddressRef{
+		Type:    datastore.ContractType(usdc_token_pool_proxy.ContractType),
+		Version: usdc_token_pool_proxy.Version,
+	})
 	require.NoError(t, err, "Failed to get pool address from adapter")
 	require.Equal(t, homeUSDCTokenPoolProxyAddr.Bytes(), homePoolAddress, "Pool address should match")
 
@@ -550,7 +554,7 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 
 	// ===== State Checks for Non-Home Chain =====
 
-	// Check TokenAdminRegistry points to USDCTokenPoolProxy on non-home chain
+	// Check TokenAdminRegistry points to USDCTokenPool on non-home chain
 	nonHomeTokenConfigReport, err := operations.ExecuteOperation(
 		testsetup.BundleWithFreshReporter(e.OperationsBundle),
 		token_admin_registry.GetTokenConfig,
@@ -562,7 +566,7 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 		},
 	)
 	require.NoError(t, err, "Failed to get token config from token admin registry on non-home chain")
-	require.Equal(t, nonHomeUSDCTokenPoolProxyAddr, nonHomeTokenConfigReport.Output.TokenPool, "Token pool in registry should be the proxy on non-home chain")
+	require.Equal(t, nonHomeCCTPV1Pool, nonHomeTokenConfigReport.Output.TokenPool, "Token pool in registry should be the CCTP V1 pool on non-home chain")
 
 	// Check CCTPTokenPool dynamic config on non-home chain
 	nonHomeCCTPTokenPool, err := cctp_through_ccv_token_pool_bindings.NewCCTPThroughCCVTokenPool(nonHomeCCTPTokenPoolAddr, nonHomeChain.Client)
@@ -640,9 +644,12 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 	require.Equal(t, common.HexToAddress("0x04"), nonHomeFeeAggregator, "Fee aggregator should match on non-home chain")
 
 	// Check adapter methods work correctly for non-home chain
-	nonHomePoolAddress, err := adapter.PoolAddress(e.DataStore, e.BlockChains, nonHomeChainSelector, nonHomeSetup.RegisteredPool)
+	nonHomePoolAddress, err := adapter.PoolAddress(e.DataStore, e.BlockChains, nonHomeChainSelector, datastore.AddressRef{
+		Type:    datastore.ContractType("USDCTokenPool"),
+		Version: semver.MustParse("1.6.2"),
+	})
 	require.NoError(t, err, "Failed to get pool address from adapter for non-home chain")
-	require.Equal(t, nonHomeUSDCTokenPoolProxyAddr.Bytes(), nonHomePoolAddress, "Pool address should match for non-home chain")
+	require.Equal(t, nonHomeCCTPV1Pool.Bytes(), nonHomePoolAddress, "Pool address should match for non-home chain")
 
 	nonHomeTokenAddress, err := adapter.TokenAddress(e.DataStore, e.BlockChains, nonHomeChainSelector)
 	require.NoError(t, err, "Failed to get token address from adapter for non-home chain")
