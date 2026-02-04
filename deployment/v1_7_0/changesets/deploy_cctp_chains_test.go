@@ -96,7 +96,7 @@ func (m *cctpTest_MockCCTPChain) ConfigureCCTPChainForLanes() *cldf_ops.Sequence
 }
 
 // PoolAddress returns the address of the token pool on the remote chain in bytes
-func (m *cctpTest_MockCCTPChain) PoolAddress(d datastore.DataStore, b cldf_chain.BlockChains, chainSelector uint64) ([]byte, error) {
+func (m *cctpTest_MockCCTPChain) PoolAddress(d datastore.DataStore, b cldf_chain.BlockChains, chainSelector uint64, registeredPoolRef datastore.AddressRef) ([]byte, error) {
 	return []byte("pool-address"), nil
 }
 

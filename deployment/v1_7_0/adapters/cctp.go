@@ -34,6 +34,10 @@ type ConfigureCCTPChainForLanesInput struct {
 	ChainSelector uint64
 	// USDCToken is the address of the USDCToken contract.
 	USDCToken string
+	// RegisteredPoolRef is a reference to the pool that should be set on the registry on this chain.
+	RegisteredPoolRef datastore.AddressRef
+	// RemoteRegisteredPoolRefs is a map of remote chain selectors to references to the pool that should be set on the registry on the remote chain.
+	RemoteRegisteredPoolRefs map[uint64]datastore.AddressRef
 	// RemoteChains is the set of remote chains to configure.
 	RemoteChains map[uint64]RemoteCCTPChainConfig
 }
@@ -78,8 +82,8 @@ type ConfigureCCTPChainForLanesDeps struct {
 // RemoteCCTPChain is a connectable remote CCTP chain.
 type RemoteCCTPChain interface {
 	// PoolAddress returns the address of the token pool on the remote chain in bytes.
-	// This should return whatever address is registered on the remote chain.
-	PoolAddress(d datastore.DataStore, b cldf_chain.BlockChains, chainSelector uint64) ([]byte, error)
+	// The ref is used in combination with the chain selector to query the datastore for the registered pool address.
+	PoolAddress(d datastore.DataStore, b cldf_chain.BlockChains, chainSelector uint64, registeredPoolRef datastore.AddressRef) ([]byte, error)
 	// TokenAddress returns the address of the token on the remote chain in bytes.
 	TokenAddress(d datastore.DataStore, b cldf_chain.BlockChains, chainSelector uint64) ([]byte, error)
 	// AllowedCallerOnDest returns the address allowed to trigger message reception on the remote domain.
