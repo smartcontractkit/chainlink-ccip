@@ -15,11 +15,12 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/lombard_token_pool"
 	tokens_core "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
+
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/lombard_token_pool"
 
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/advanced_pool_hooks"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/lombard_verifier"
@@ -123,6 +124,7 @@ var ConfigureLombardChainForLanes = cldf_ops.NewSequence(
 				RemotePool:             common.LeftPadBytes(remotePoolAddress, 32),
 				RemoteToken:            common.LeftPadBytes(remoteTokenAddress, 32),
 				TokenTransferFeeConfig: remoteChain.TokenTransferFeeConfig,
+				// Lombard does not use rate limiters
 				DefaultFinalityOutboundRateLimiterConfig: tokens_core.RateLimiterConfig{
 					Capacity: big.NewInt(0),
 					Rate:     big.NewInt(0),
