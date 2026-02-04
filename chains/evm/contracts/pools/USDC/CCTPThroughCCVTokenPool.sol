@@ -156,14 +156,14 @@ contract CCTPThroughCCVTokenPool is TokenPool, ITypeAndVersion, AuthorizedCaller
   }
 
   /// @notice No-op override to purge the unused code path from the contract.
-  function _postFlightCheck(
+  function _postflightCheck(
     Pool.ReleaseOrMintInV1 calldata,
     uint256,
     uint16
   ) internal virtual override {}
 
   /// @notice No-op override to purge the unused code path from the contract.
-  function _preFlightCheck(
+  function _preflightCheck(
     Pool.LockOrBurnInV1 calldata,
     uint16,
     bytes memory

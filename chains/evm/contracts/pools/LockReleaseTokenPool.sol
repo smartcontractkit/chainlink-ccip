@@ -14,7 +14,9 @@ import {SafeERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/utils/SafeERC
 contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
   using SafeERC20 for IERC20;
 
-  string public constant override typeAndVersion = "LockReleaseTokenPool 1.7.0-dev";
+  function typeAndVersion() external pure virtual override returns (string memory) {
+    return "LockReleaseTokenPool 1.7.0-dev";
+  }
 
   /// @notice The lock box for the token pool.
   ILockBox internal immutable i_lockBox;

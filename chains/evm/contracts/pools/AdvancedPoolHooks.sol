@@ -16,7 +16,9 @@ import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/Enumera
 contract AdvancedPoolHooks is IAdvancedPoolHooks, ITypeAndVersion, Ownable2StepMsgSender {
   using EnumerableSet for EnumerableSet.AddressSet;
 
-  string public constant override typeAndVersion = "AdvancedPoolHooks 1.7.0-dev";
+  function typeAndVersion() external pure virtual override returns (string memory) {
+    return "AdvancedPoolHooks 1.7.0-dev";
+  }
 
   error AllowListNotEnabled();
   error SenderNotAllowed(address sender);

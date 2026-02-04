@@ -18,7 +18,9 @@ import {SafeERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/utils/SafeERC
 contract BurnFromMintTokenPool is BurnMintTokenPoolAbstract, ITypeAndVersion {
   using SafeERC20 for IBurnMintERC20;
 
-  string public constant override typeAndVersion = "BurnFromMintTokenPool 1.7.0-dev";
+  function typeAndVersion() external pure virtual override returns (string memory) {
+    return "BurnFromMintTokenPool 1.7.0-dev";
+  }
 
   constructor(
     IBurnMintERC20 token,

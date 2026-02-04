@@ -434,7 +434,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
       _consumeOutboundRateLimit(lockOrBurnIn.remoteChainSelector, amount);
     }
 
-    _preFlightCheck(lockOrBurnIn, blockConfirmationRequested, tokenArgs);
+    _preflightCheck(lockOrBurnIn, blockConfirmationRequested, tokenArgs);
   }
 
   /// @notice Hook for pre-flight checks on lock or burn.
@@ -444,7 +444,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   /// @param lockOrBurnIn The input to validate.
   /// @param blockConfirmationRequested The minimum block confirmation requested by the message.
   /// @param tokenArgs Additional token arguments passed in by the sender of the message.
-  function _preFlightCheck(
+  function _preflightCheck(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
     uint16 blockConfirmationRequested,
     bytes memory tokenArgs
@@ -486,7 +486,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
       _consumeInboundRateLimit(releaseOrMintIn.remoteChainSelector, localAmount);
     }
 
-    _postFlightCheck(releaseOrMintIn, localAmount, blockConfirmationRequested);
+    _postflightCheck(releaseOrMintIn, localAmount, blockConfirmationRequested);
   }
 
   /// @notice Hook for post-flight checks on release or mint.
@@ -496,7 +496,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   /// @param releaseOrMintIn The input to validate.
   /// @param localAmount The local amount to be released or minted.
   /// @param blockConfirmationRequested The minimum block confirmation requested by the message.
-  function _postFlightCheck(
+  function _postflightCheck(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
     uint256 localAmount,
     uint16 blockConfirmationRequested
