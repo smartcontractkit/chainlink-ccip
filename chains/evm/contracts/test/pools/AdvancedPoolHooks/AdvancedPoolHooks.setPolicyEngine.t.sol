@@ -24,7 +24,7 @@ contract AdvancedPoolHooks_setPolicyEngine is AdvancedPoolHooksSetup {
     assertEq(address(0), s_advancedPoolHooks.getPolicyEngine());
 
     vm.expectEmit();
-    emit AdvancedPoolHooks.PolicyEngineSet(address(0), address(s_mockPolicyEngine));
+    emit AdvancedPoolHooks.PolicyEngineAttached(address(s_mockPolicyEngine));
 
     s_advancedPoolHooks.setPolicyEngine(address(s_mockPolicyEngine));
 
@@ -38,7 +38,7 @@ contract AdvancedPoolHooks_setPolicyEngine is AdvancedPoolHooksSetup {
     assertTrue(s_mockPolicyEngine.isAttached(address(s_advancedPoolHooks)));
 
     vm.expectEmit();
-    emit AdvancedPoolHooks.PolicyEngineSet(address(s_mockPolicyEngine), address(0));
+    emit AdvancedPoolHooks.PolicyEngineAttached(address(0));
 
     s_advancedPoolHooks.setPolicyEngine(address(0));
 
@@ -52,7 +52,7 @@ contract AdvancedPoolHooks_setPolicyEngine is AdvancedPoolHooksSetup {
     assertFalse(s_mockPolicyEngine2.isAttached(address(s_advancedPoolHooks)));
 
     vm.expectEmit();
-    emit AdvancedPoolHooks.PolicyEngineSet(address(s_mockPolicyEngine), address(s_mockPolicyEngine2));
+    emit AdvancedPoolHooks.PolicyEngineAttached(address(s_mockPolicyEngine2));
 
     s_advancedPoolHooks.setPolicyEngine(address(s_mockPolicyEngine2));
 
@@ -96,7 +96,7 @@ contract AdvancedPoolHooks_setPolicyEngine is AdvancedPoolHooksSetup {
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        AdvancedPoolHooks.PolicyEngineDetachFailed.selector,
+        AdvancedPoolHooks.PolicyEngineDetachReverted.selector,
         address(revertingEngine),
         abi.encodeWithSelector(MockPolicyEngineRevertingDetach.DetachNotSupported.selector)
       )
@@ -112,7 +112,7 @@ contract AdvancedPoolHooks_setPolicyEngine is AdvancedPoolHooksSetup {
     assertEq(address(noDetachEngine), s_advancedPoolHooks.getPolicyEngine());
 
     vm.expectRevert(
-      abi.encodeWithSelector(AdvancedPoolHooks.PolicyEngineDetachFailed.selector, address(noDetachEngine), "")
+      abi.encodeWithSelector(AdvancedPoolHooks.PolicyEngineDetachReverted.selector, address(noDetachEngine), "")
     );
     s_advancedPoolHooks.setPolicyEngine(address(s_mockPolicyEngine));
 

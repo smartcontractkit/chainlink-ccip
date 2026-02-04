@@ -26,7 +26,7 @@ contract AdvancedPoolHooks_setPolicyEngineAllowFailedDetach is AdvancedPoolHooks
     assertFalse(s_mockPolicyEngine2.isAttached(address(s_advancedPoolHooks)));
 
     vm.expectEmit();
-    emit AdvancedPoolHooks.PolicyEngineSet(address(s_mockPolicyEngine), address(s_mockPolicyEngine2));
+    emit AdvancedPoolHooks.PolicyEngineAttached(address(s_mockPolicyEngine2));
 
     s_advancedPoolHooks.setPolicyEngineAllowFailedDetach(address(s_mockPolicyEngine2));
 
@@ -41,7 +41,11 @@ contract AdvancedPoolHooks_setPolicyEngineAllowFailedDetach is AdvancedPoolHooks
     assertEq(address(revertingEngine), s_advancedPoolHooks.getPolicyEngine());
 
     vm.expectEmit();
-    emit AdvancedPoolHooks.PolicyEngineSet(address(revertingEngine), address(s_mockPolicyEngine));
+    emit AdvancedPoolHooks.PolicyEngineDetachFailed(
+      address(revertingEngine), abi.encodeWithSelector(MockPolicyEngineRevertingDetach.DetachNotSupported.selector)
+    );
+    vm.expectEmit();
+    emit AdvancedPoolHooks.PolicyEngineAttached(address(s_mockPolicyEngine));
 
     s_advancedPoolHooks.setPolicyEngineAllowFailedDetach(address(s_mockPolicyEngine));
 
@@ -55,7 +59,9 @@ contract AdvancedPoolHooks_setPolicyEngineAllowFailedDetach is AdvancedPoolHooks
     assertEq(address(noDetachEngine), s_advancedPoolHooks.getPolicyEngine());
 
     vm.expectEmit();
-    emit AdvancedPoolHooks.PolicyEngineSet(address(noDetachEngine), address(s_mockPolicyEngine));
+    emit AdvancedPoolHooks.PolicyEngineDetachFailed(address(noDetachEngine), "");
+    vm.expectEmit();
+    emit AdvancedPoolHooks.PolicyEngineAttached(address(s_mockPolicyEngine));
 
     s_advancedPoolHooks.setPolicyEngineAllowFailedDetach(address(s_mockPolicyEngine));
 

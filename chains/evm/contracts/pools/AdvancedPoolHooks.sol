@@ -23,7 +23,7 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, ITypeAndVersion, AuthorizedCal
   error AuthorizedCallersNotEnabled();
   error SenderNotAllowed(address sender);
   error MustSpecifyUnderThresholdCCVsForThresholdCCVs();
-  error PolicyEngineDetachFailed(address oldPolicyEngine, bytes err);
+  error PolicyEngineDetachReverted(address oldPolicyEngine, bytes err);
 
   event AllowListAdd(address sender);
   event AllowListRemove(address sender);
@@ -35,7 +35,8 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, ITypeAndVersion, AuthorizedCal
     address[] thresholdInboundCCVs
   );
   event ThresholdAmountSet(uint256 thresholdAmount);
-  event PolicyEngineSet(address indexed oldPolicyEngine, address indexed newPolicyEngine);
+  event PolicyEngineAttached(address indexed policyEngine);
+  event PolicyEngineDetachFailed(address indexed policyEngine, bytes reason);
 
   struct CCVConfig {
     address[] outboundCCVs; // CCVs required for outgoing messages to the remote chain.
@@ -360,8 +361,9 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, ITypeAndVersion, AuthorizedCal
       try IPolicyEngine(oldPolicyEngine).detach() {}
       catch (bytes memory err) {
         if (!allowFailedDetach) {
-          revert PolicyEngineDetachFailed(oldPolicyEngine, err);
+          revert PolicyEngineDetachReverted(oldPolicyEngine, err);
         }
+        emit PolicyEngineDetachFailed(oldPolicyEngine, err);
       }
     }
 
@@ -370,7 +372,7 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, ITypeAndVersion, AuthorizedCal
       IPolicyEngine(newPolicyEngine).attach();
     }
 
-    emit PolicyEngineSet(oldPolicyEngine, newPolicyEngine);
+    emit PolicyEngineAttached(newPolicyEngine);
   }
 
   /// @notice Gets the current policy engine address.
