@@ -1,7 +1,6 @@
 package deployment
 
 import (
-	"fmt"
 	"math"
 	"math/big"
 	"testing"
@@ -27,7 +26,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	mcmsapi "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
-	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 
@@ -417,23 +415,4 @@ func NewDefaultInputForMCMS(desc string) mcms.Input {
 		Qualifier:            common_utils.CLLQualifier,
 		Description:          desc,
 	}
-}
-
-func FindOneTokenAddress(a tokensapi.TokenAdapter, ds datastore.DataStore, chainSelector uint64, tokenSymbol string) (common.Address, error) {
-	filters := datastore.AddressRef{
-		ChainSelector: chainSelector,
-		Qualifier:     tokenSymbol,
-	}
-
-	ref, err := datastore_utils.FindAndFormatRef(ds, filters, chainSelector, datastore_utils.FullRef)
-	if err != nil {
-		return common.Address{}, fmt.Errorf("failed to find token address for symbol %q on chain %d: %w", tokenSymbol, chainSelector, err)
-	}
-
-	addr, err := a.AddressRefToBytes(ref)
-	if err != nil {
-		return common.Address{}, fmt.Errorf("failed to convert address ref to bytes: %w", err)
-	}
-
-	return common.BytesToAddress(addr), nil
 }

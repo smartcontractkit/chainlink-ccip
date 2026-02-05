@@ -223,7 +223,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 	t.Run("Token Expansion EVM and Solana", func(t *testing.T) {
 		// Verify that token and token pool do NOT exist in the datastore yet
 		for _, data := range evmTestData {
-			_, err = FindOneTokenAddress(&evmAdapter, env.DataStore, data.Chain.Selector, data.Token.Symbol)
+			_, err = tokensapi.FindOneTokenAddress(&evmAdapter, env.DataStore, data.Chain.Selector, data.Token.Symbol)
 			require.Error(t, err)
 			_, err = evmAdapter.FindLatestTokenPoolAddress(env.DataStore, data.Chain.Selector, data.TokenPoolQualifier, evmTokenPoolType.String())
 			require.Error(t, err)
@@ -278,7 +278,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 				require.NoError(t, err)
 
 				// Query EVM token info from the chain
-				tokAddress, err := FindOneTokenAddress(&evmAdapter, env.DataStore, data.Chain.Selector, data.Token.Symbol)
+				tokAddress, err := tokensapi.FindOneTokenAddress(&evmAdapter, env.DataStore, data.Chain.Selector, data.Token.Symbol)
 				require.NoError(t, err)
 				tokn, err := bnmERC20gen.NewBurnMintERC20(tokAddress, data.Chain.Client)
 				require.NoError(t, err)
@@ -332,7 +332,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 		t.Run("Validate ManualRegistration", func(t *testing.T) {
 			for _, data := range evmTestData {
 				// Verify that the token and token pool exist in datastore
-				tokAddress, err := FindOneTokenAddress(&evmAdapter, env.DataStore, data.Chain.Selector, data.Token.Symbol)
+				tokAddress, err := tokensapi.FindOneTokenAddress(&evmAdapter, env.DataStore, data.Chain.Selector, data.Token.Symbol)
 				require.NoError(t, err)
 				tpAddress, err := evmAdapter.FindLatestTokenPoolAddress(env.DataStore, data.Chain.Selector, data.TokenPoolQualifier, evmTokenPoolType.String())
 				require.NoError(t, err)
@@ -489,7 +489,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 				require.True(t, bytes.Equal(remotePoolsAB[0], common.LeftPadBytes(poolB.Bytes(), 32)))
 
 				// Verify that the remote token was set correctly
-				tokB, err := FindOneTokenAddress(&evmAdapter, env.DataStore, evmB.Chain.Selector, evmB.Token.Symbol)
+				tokB, err := tokensapi.FindOneTokenAddress(&evmAdapter, env.DataStore, evmB.Chain.Selector, evmB.Token.Symbol)
 				require.NoError(t, err)
 				require.True(t, bytes.Equal(remoteTokenAB, common.LeftPadBytes(tokB.Bytes(), 32)))
 			}

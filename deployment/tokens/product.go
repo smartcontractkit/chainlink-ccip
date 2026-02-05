@@ -6,6 +6,8 @@ import (
 	"sync"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/ethereum/go-ethereum/common"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
@@ -133,4 +135,23 @@ func GetTokenAdapterRegistry() *TokenAdapterRegistry {
 
 func newTokenAdapterID(chainFamily string, version *semver.Version) tokenAdapterID {
 	return tokenAdapterID(fmt.Sprintf("%s-%s", chainFamily, version.String()))
+}
+
+func FindOneTokenAddress(a TokenAdapter, ds datastore.DataStore, chainSelector uint64, tokenSymbol string) (common.Address, error) {
+	filters := datastore.AddressRef{
+		ChainSelector: chainSelector,
+		Qualifier:     tokenSymbol,
+	}
+
+	ref, err := datastore_utils.FindAndFormatRef(ds, filters, chainSelector, datastore_utils.FullRef)
+	if err != nil {
+		return common.Address{}, fmt.Errorf("failed to find token address for symbol %q on chain %d: %w", tokenSymbol, chainSelector, err)
+	}
+
+	addr, err := a.AddressRefToBytes(ref)
+	if err != nil {
+		return common.Address{}, fmt.Errorf("failed to convert address ref to bytes: %w", err)
+	}
+
+	return common.BytesToAddress(addr), nil
 }
