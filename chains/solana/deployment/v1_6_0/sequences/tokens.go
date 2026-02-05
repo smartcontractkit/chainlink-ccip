@@ -1,7 +1,6 @@
 package sequences
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/gagliardetto/solana-go"
@@ -10,9 +9,6 @@ import (
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/router"
 	tokenpoolops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/token_pools"
 	tokensops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/tokens"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/base_token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/cctp_token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/test_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 	tokenapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
@@ -22,10 +18,8 @@ import (
 	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	"github.com/smartcontractkit/chainlink/deployment/ccip/shared"
 )
 
 func (a *SolanaAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[tokenapi.ConfigureTokenForTransfersInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
@@ -40,30 +34,64 @@ func (a *SolanaAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[
 		common_utils.Version_1_6_0,
 		"Configure a token for cross-chain transfers across multiple chains",
 		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokenapi.ConfigureTokenForTransfersInput) (sequences.OnChainOutput, error) {
+			var result sequences.OnChainOutput
 			chain, ok := chains.SolanaChains()[input.ChainSelector]
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
 
 			tpAddr := solana.MustPublicKeyFromBase58(input.TokenPoolAddress)
-			trAddr := solana.MustPublicKeyFromBase58(input.RegistryAddress)
-
-			externalAdmin := solana.PublicKey{}
-			if input.ExternalAdmin != "" {
-				externalAdmin = solana.MustPublicKeyFromBase58(input.ExternalAdmin)
-			}
 			tokenAddr, tokenProgramId, err := getTokenMintAndTokenProgram(input.ExistingDataStore, input.TokenSymbol, chain)
 			if err != nil {
 				return sequences.OnChainOutput{}, err
 			}
 			tokenMint := solana.MustPublicKeyFromBase58(tokenAddr.Address)
 			for remoteChainSelector, remoteChainConfig := range input.RemoteChains {
-				// TODO
+				op := tokenpoolops.UpsertRemoteChainConfigBurnMint
+				tprl := tokenpoolops.UpsertRateLimitsBurnMint
+				switch input.PoolType {
+				case common_utils.BurnMintTokenPool.String():
+					op = tokenpoolops.UpsertRemoteChainConfigBurnMint
+					tprl = tokenpoolops.UpsertRateLimitsBurnMint
+				case common_utils.LockReleaseTokenPool.String():
+					op = tokenpoolops.UpsertRemoteChainConfigLockRelease
+					tprl = tokenpoolops.UpsertRateLimitsLockRelease
+				default:
+					return sequences.OnChainOutput{}, fmt.Errorf("unsupported token pool type '%s' for Solana", input.PoolType)
+				}
+				upsertOut, err := operations.ExecuteOperation(b, op, chains.SolanaChains()[chain.Selector],
+					tokenpoolops.RemoteChainConfig{
+						TokenPool:          tpAddr,
+						TokenMint:          tokenMint,
+						TokenProgramID:     tokenProgramId,
+						RemoteSelector:     remoteChainSelector,
+						RemoteTokenAddress: remoteChainConfig.RemoteToken,
+						RemoteDecimals:     remoteChainConfig.RemoteDecimals,
+						RemotePoolAddress:  remoteChainConfig.RemotePool,
+					})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to upsert remote chain config for token pool: %w", err)
+				}
+				result.Addresses = append(result.Addresses, upsertOut.Output.Addresses...)
+				result.BatchOps = append(result.BatchOps, upsertOut.Output.BatchOps...)
+				rateLimitOut, err := operations.ExecuteOperation(b, tprl, chains.SolanaChains()[chain.Selector],
+					tokenpoolops.RemoteChainConfig{
+						TokenPool:                 tpAddr,
+						TokenMint:                 tokenMint,
+						TokenProgramID:            tokenProgramId,
+						RemoteSelector:            remoteChainSelector,
+						InboundRateLimiterConfig:  remoteChainConfig.InboundRateLimiterConfig,
+						OutboundRateLimiterConfig: remoteChainConfig.OutboundRateLimiterConfig,
+					})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to set rate limits for token pool: %w", err)
+				}
+				result.Addresses = append(result.Addresses, rateLimitOut.Output.Addresses...)
+				result.BatchOps = append(result.BatchOps, rateLimitOut.Output.BatchOps...)
 			}
-			return sequences.OnChainOutput{}, nil
+			return result, nil
 		})
 }
-
 
 func (a *SolanaAdapter) AddressRefToBytes(ref datastore.AddressRef) ([]byte, error) {
 	// TODO: implement me
@@ -285,6 +313,7 @@ func (a *SolanaAdapter) DeployToken() *cldf_ops.Sequence[tokenapi.DeployTokenInp
 				TokenPrivKey:           privateKey,
 				TokenSymbol:            input.Symbol,
 				ATAList:                ataList,
+				PreMint:                input.PreMint.Uint64(),
 				DisableFreezeAuthority: input.DisableFreezeAuthority,
 				TokenDecimals:          input.Decimals,
 			})

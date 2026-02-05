@@ -180,11 +180,7 @@ var UpsertRemoteChainConfigBurnMint = operations.NewOperation(
 	func(b operations.Bundle, chain cldf_solana.Chain, input RemoteChainConfig) (sequences.OnChainOutput, error) {
 		burnmint_token_pool.SetProgramID(input.TokenPool)
 		remoteConfig := base_token_pool.RemoteConfig{
-			PoolAddresses: []base_token_pool.RemoteAddress{
-				{
-					Address: input.RemotePoolAddress,
-				},
-			},
+			PoolAddresses: []base_token_pool.RemoteAddress{},
 			TokenAddress: base_token_pool.RemoteAddress{
 				Address: input.RemoteTokenAddress,
 			},
@@ -203,11 +199,15 @@ var UpsertRemoteChainConfigBurnMint = operations.NewOperation(
 			existingConfig = remoteChainConfigAccount
 		}
 		batches := make([]types.BatchOperation, 0)
-		var ixn solana.Instruction
+		var ixns []solana.Instruction
 		if isSuportedChain {
+			remoteConfig.PoolAddresses = append(remoteConfig.PoolAddresses,
+				base_token_pool.RemoteAddress{
+					Address: input.RemotePoolAddress,
+				})
 			// if the token address has changed or if the override config flag is set, edit the remote config (just overwrite the existing remote config)
 			if !bytes.Equal(existingConfig.Remote.TokenAddress.Address, input.RemoteTokenAddress) || input.ForceOverrideRemoteConfig {
-				ixn, err = burnmint_token_pool.NewEditChainRemoteConfigInstruction(
+				ixn, err := burnmint_token_pool.NewEditChainRemoteConfigInstruction(
 					input.RemoteSelector,
 					input.TokenMint,
 					remoteConfig,
@@ -219,6 +219,7 @@ var UpsertRemoteChainConfigBurnMint = operations.NewOperation(
 				if err != nil {
 					return sequences.OnChainOutput{}, err
 				}
+				ixns = append(ixns, ixn)
 			} else {
 				// diff between [existing remote pool addresses on solana chain] vs [what was just derived from evm chain]
 				poolAddresses := existingConfig.Remote.PoolAddresses
@@ -231,7 +232,7 @@ var UpsertRemoteChainConfigBurnMint = operations.NewOperation(
 				}
 				diff := poolDiff(baseAddresses, remoteConfig.PoolAddresses)
 				if len(diff) > 0 {
-					ixn, err = burnmint_token_pool.NewAppendRemotePoolAddressesInstruction(
+					ixn, err := burnmint_token_pool.NewAppendRemotePoolAddressesInstruction(
 						input.RemoteSelector,
 						input.TokenMint,
 						diff, // evm supports multiple remote pools per token
@@ -243,10 +244,11 @@ var UpsertRemoteChainConfigBurnMint = operations.NewOperation(
 					if err != nil {
 						return sequences.OnChainOutput{}, err
 					}
+					ixns = append(ixns, ixn)
 				}
 			}
 		} else {
-			ixn, err = burnmint_token_pool.NewInitChainRemoteConfigInstruction(
+			ixn, err := burnmint_token_pool.NewInitChainRemoteConfigInstruction(
 				input.RemoteSelector,
 				input.TokenMint,
 				remoteConfig,
@@ -258,11 +260,29 @@ var UpsertRemoteChainConfigBurnMint = operations.NewOperation(
 			if err != nil {
 				return sequences.OnChainOutput{}, err
 			}
+			ixns = append(ixns, ixn)
+			appendIxn, err := burnmint_token_pool.NewAppendRemotePoolAddressesInstruction(
+				input.RemoteSelector,
+				input.TokenMint,
+				[]base_token_pool.RemoteAddress{
+					{
+						Address: input.RemotePoolAddress,
+					},
+				},
+				poolConfigPDA,
+				remoteChainConfigPDA,
+				authority,
+				solana.SystemProgramID,
+			).ValidateAndBuild()
+			if err != nil {
+				return sequences.OnChainOutput{}, err
+			}
+			ixns = append(ixns, appendIxn)
 		}
 		if authority != chain.DeployerKey.PublicKey() {
 			b, err := utils.BuildMCMSBatchOperation(
 				chain.Selector,
-				[]solana.Instruction{ixn},
+				ixns,
 				input.TokenPool.String(),
 				common_utils.BurnMintTokenPool.String(),
 			)
@@ -272,7 +292,7 @@ var UpsertRemoteChainConfigBurnMint = operations.NewOperation(
 			batches = append(batches, b)
 			return sequences.OnChainOutput{BatchOps: batches}, nil
 		} else {
-			err = chain.Confirm([]solana.Instruction{ixn})
+			err = chain.Confirm(ixns)
 			if err != nil {
 				return sequences.OnChainOutput{}, err
 			}

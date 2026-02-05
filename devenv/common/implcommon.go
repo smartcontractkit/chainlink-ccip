@@ -662,6 +662,7 @@ func SetupTokensAndTokenPools(
 				Version:       srcCfg.TokenPoolVersion,
 				ChainSelector: srcSel,
 			},
+			TokenSymbol: srcCfg.DeployTokenInput.Symbol,
 		}
 
 		for _, dstAdapter := range adp {
@@ -749,14 +750,6 @@ func SetupTokensAndTokenPools(
 		}
 		for _, dst := range adp {
 			if dst.ChainSelector() == selector {
-				continue
-			}
-			family, err := chainsel.GetSelectorFamily(selector)
-			if err != nil {
-				return nil, fmt.Errorf("getting chain family for selector %d: %w", selector, err)
-			}
-			if family != chainsel.FamilyEVM {
-				// rate limiting only supported on EVM for now
 				continue
 			}
 			// Set some rate limiters for testing - one enabled and one disabled.

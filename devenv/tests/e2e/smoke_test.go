@@ -92,7 +92,16 @@ func TestE2ESmoke(t *testing.T) {
 			// to remove the EVM <-> EVM filter and directly set these variables.
 			var tokenAmounts []testadapters.TokenAmount = nil
 			var balanceCheck func() bool = nil
-			if fromImpl.Family() == chainsel.FamilyEVM && toImpl.Family() == chainsel.FamilyEVM {
+			supportedFamilies := map[string]bool{
+				chainsel.FamilyEVM:    true,
+				chainsel.FamilySolana: true,
+			}
+			_, fromSupported := supportedFamilies[fromImpl.Family()]
+			_, toSupported := supportedFamilies[toImpl.Family()]
+			// technically something like solana <> solana isn't valid, but this
+			// check is just to ensure we only run token transfer tests on supported
+			// chain families for now.
+			if fromSupported && toSupported {
 				srcChainSel, srcTokenCfg := fromImpl.ChainSelector(), fromImpl.GetTokenExpansionConfig().DeployTokenInput
 				dstChainSel, dstTokenCfg := toImpl.ChainSelector(), toImpl.GetTokenExpansionConfig().DeployTokenInput
 

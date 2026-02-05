@@ -96,12 +96,13 @@ func makeApply(tokenRegistry *TokenAdapterRegistry, mcmsRegistry *changesets.MCM
 				return cldf.ChangesetOutput{}, fmt.Errorf("no token adapter registered for chain family '%s' and chain adapter version '%s'", family, cfg.ChainAdapterVersion)
 			}
 			configureTokenReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adapter.ConfigureTokenForTransfersSequence(), e.BlockChains, ConfigureTokenForTransfersInput{
-				ChainSelector:    token.ChainSelector,
-				TokenPoolAddress: tokenPool.Address,
-				RemoteChains:     remoteChains,
-				ExternalAdmin:    token.ExternalAdmin,
-				RegistryAddress:  registry.Address,
-				TokenSymbol:      token.TokenSymbol,
+				ChainSelector:     token.ChainSelector,
+				TokenPoolAddress:  tokenPool.Address,
+				RemoteChains:      remoteChains,
+				ExternalAdmin:     token.ExternalAdmin,
+				RegistryAddress:   registry.Address,
+				TokenSymbol:       token.TokenSymbol,
+				PoolType:          tokenPool.Type.String(),
 				ExistingDataStore: e.DataStore,
 			})
 			if err != nil {
@@ -150,6 +151,10 @@ func convertRemoteChainConfig(
 			if err != nil {
 				return outCfg, fmt.Errorf("failed to get remote token address via pool ref (%s) for remote chain selector %d: %w", datastore_utils.SprintRef(*inCfg.RemotePool), remoteChainSelector, err)
 			}
+		}
+		outCfg.RemoteDecimals, err = adapter.DeriveTokenDecimals(e, remoteChainSelector, fullRemotePoolRef)
+		if err != nil {
+			return outCfg, fmt.Errorf("failed to get remote token decimals for remote chain selector %d: %w", remoteChainSelector, err)
 		}
 	}
 	for _, ccvRef := range inCfg.OutboundCCVs {

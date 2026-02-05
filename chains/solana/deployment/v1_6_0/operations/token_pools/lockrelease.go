@@ -1,6 +1,7 @@
 package token_pools
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 
@@ -122,6 +123,134 @@ var InitGlobalConfigLockRelease = operations.NewOperation(
 		})
 	},
 )
+
+var UpsertRemoteChainConfigLockRelease = operations.NewOperation(
+	"lockrelease:init_chain_remote_config",
+	common_utils.Version_1_6_0,
+	"Initializes the LockReleaseTokenPool chain remote config",
+	func(b operations.Bundle, chain cldf_solana.Chain, input RemoteChainConfig) (sequences.OnChainOutput, error) {
+		lockrelease_token_pool.SetProgramID(input.TokenPool)
+		remoteConfig := base_token_pool.RemoteConfig{
+			PoolAddresses: []base_token_pool.RemoteAddress{},
+			TokenAddress: base_token_pool.RemoteAddress{
+				Address: input.RemoteTokenAddress,
+			},
+			Decimals: input.RemoteDecimals,
+		}
+		authority := GetAuthorityLockRelease(chain, input.TokenPool, input.TokenMint)
+		poolConfigPDA, _ := tokens.TokenPoolConfigAddress(input.TokenMint, input.TokenPool)
+		// check if remote chain config already exists
+		remoteChainConfigPDA, _, _ := tokens.TokenPoolChainConfigPDA(input.RemoteSelector, input.TokenMint, input.TokenPool)
+		isSuportedChain := false
+		existingConfig := base_token_pool.BaseChain{}
+		var remoteChainConfigAccount base_token_pool.BaseChain
+		err := chain.GetAccountDataBorshInto(context.Background(), remoteChainConfigPDA, &remoteChainConfigAccount)
+		if err == nil {
+			isSuportedChain = true
+			existingConfig = remoteChainConfigAccount
+		}
+		batches := make([]types.BatchOperation, 0)
+		var ixns []solana.Instruction
+		if isSuportedChain {
+			remoteConfig.PoolAddresses = append(remoteConfig.PoolAddresses,
+				base_token_pool.RemoteAddress{
+					Address: input.RemotePoolAddress,
+				})
+			// if the token address has changed or if the override config flag is set, edit the remote config (just overwrite the existing remote config)
+			if !bytes.Equal(existingConfig.Remote.TokenAddress.Address, input.RemoteTokenAddress) || input.ForceOverrideRemoteConfig {
+				ixn, err := lockrelease_token_pool.NewEditChainRemoteConfigInstruction(
+					input.RemoteSelector,
+					input.TokenMint,
+					remoteConfig,
+					poolConfigPDA,
+					remoteChainConfigPDA,
+					authority,
+					solana.SystemProgramID,
+				).ValidateAndBuild()
+				if err != nil {
+					return sequences.OnChainOutput{}, err
+				}
+				ixns = append(ixns, ixn)
+			} else {
+				// diff between [existing remote pool addresses on solana chain] vs [what was just derived from evm chain]
+				poolAddresses := existingConfig.Remote.PoolAddresses
+				// translate to base
+				baseAddresses := make([]base_token_pool.RemoteAddress, len(poolAddresses))
+				for i, cfg := range poolAddresses {
+					baseAddresses[i] = base_token_pool.RemoteAddress{
+						Address: cfg.Address,
+					}
+				}
+				diff := poolDiff(baseAddresses, remoteConfig.PoolAddresses)
+				if len(diff) > 0 {
+					ixn, err := lockrelease_token_pool.NewAppendRemotePoolAddressesInstruction(
+						input.RemoteSelector,
+						input.TokenMint,
+						diff, // evm supports multiple remote pools per token
+						poolConfigPDA,
+						remoteChainConfigPDA,
+						authority,
+						solana.SystemProgramID,
+					).ValidateAndBuild()
+					if err != nil {
+						return sequences.OnChainOutput{}, err
+					}
+					ixns = append(ixns, ixn)
+				}
+			}
+		} else {
+			ixn, err := lockrelease_token_pool.NewInitChainRemoteConfigInstruction(
+				input.RemoteSelector,
+				input.TokenMint,
+				remoteConfig,
+				poolConfigPDA,
+				remoteChainConfigPDA,
+				authority,
+				solana.SystemProgramID,
+			).ValidateAndBuild()
+			if err != nil {
+				return sequences.OnChainOutput{}, err
+			}
+			ixns = append(ixns, ixn)
+			appendIxn, err := lockrelease_token_pool.NewAppendRemotePoolAddressesInstruction(
+				input.RemoteSelector,
+				input.TokenMint,
+				[]base_token_pool.RemoteAddress{
+					{
+						Address: input.RemotePoolAddress,
+					},
+				},
+				poolConfigPDA,
+				remoteChainConfigPDA,
+				authority,
+				solana.SystemProgramID,
+			).ValidateAndBuild()
+			if err != nil {
+				return sequences.OnChainOutput{}, err
+			}
+			ixns = append(ixns, appendIxn)
+		}
+		if authority != chain.DeployerKey.PublicKey() {
+			b, err := utils.BuildMCMSBatchOperation(
+				chain.Selector,
+				ixns,
+				input.TokenPool.String(),
+				common_utils.LockReleaseTokenPool.String(),
+			)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute or create batch: %w", err)
+			}
+			batches = append(batches, b)
+			return sequences.OnChainOutput{BatchOps: batches}, nil
+		} else {
+			err = chain.Confirm(ixns)
+			if err != nil {
+				return sequences.OnChainOutput{}, err
+			}
+		}
+
+		return sequences.OnChainOutput{}, nil
+	})
 
 var UpsertRateLimitsLockRelease = operations.NewOperation(
 	"lockrelease:rate_limits",
