@@ -2,6 +2,7 @@ package tokens
 
 import (
 	"fmt"
+	"math/big"
 
 	"github.com/Masterminds/semver/v3"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
@@ -48,23 +49,11 @@ func setTokenPoolRateLimitsVerify() func(cldf.Environment, RateLimiterConfigInpu
 					input.InboundRateLimiterConfig.Capacity.Sign() <= 0 || input.InboundRateLimiterConfig.Rate.Sign() <= 0 {
 					return fmt.Errorf("inbound rate limiter config for remote chain %d is enabled but capacity or rate is nil", input.RemoteChainSelector)
 				}
-			} else {
-				// if the rate limiter is not enabled, the capacity and rate should be nil or zero
-				if (input.InboundRateLimiterConfig.Capacity != nil && input.InboundRateLimiterConfig.Capacity.Sign() > 0) ||
-					(input.InboundRateLimiterConfig.Rate != nil && input.InboundRateLimiterConfig.Rate.Sign() > 0) {
-					return fmt.Errorf("inbound rate limiter config for remote chain %d is not enabled but capacity or rate is set", input.RemoteChainSelector)
-				}
 			}
 			if input.OutboundRateLimiterConfig.IsEnabled {
 				if input.OutboundRateLimiterConfig.Capacity == nil || input.OutboundRateLimiterConfig.Rate == nil ||
 					input.OutboundRateLimiterConfig.Capacity.Sign() <= 0 || input.OutboundRateLimiterConfig.Rate.Sign() <= 0 {
 					return fmt.Errorf("outbound rate limiter config for remote chain %d is enabled but capacity or rate is nil", input.RemoteChainSelector)
-				}
-			} else {
-				// if the rate limiter is not enabled, the capacity and rate should be nil or zero
-				if (input.OutboundRateLimiterConfig.Capacity != nil && input.OutboundRateLimiterConfig.Capacity.Sign() > 0) ||
-					(input.OutboundRateLimiterConfig.Rate != nil && input.OutboundRateLimiterConfig.Rate.Sign() > 0) {
-					return fmt.Errorf("outbound rate limiter config for remote chain %d is not enabled but capacity or rate is set", input.RemoteChainSelector)
 				}
 			}
 		}
@@ -94,6 +83,16 @@ func setTokenPoolRateLimitsApply() func(cldf.Environment, RateLimiterConfigInput
 			inputs.PoolType = cfg.PoolType
 			inputs.RemoteChainSelector = remoteSelector
 			inputs.ExistingDataStore = e.DataStore
+			if !inputs.InboundRateLimiterConfig.IsEnabled {
+				// If the rate limiter is not enabled, set capacity and rate to 0 to disable it on chain.
+				inputs.InboundRateLimiterConfig.Capacity = big.NewInt(0)
+				inputs.InboundRateLimiterConfig.Rate = big.NewInt(0)
+			}
+			if !inputs.OutboundRateLimiterConfig.IsEnabled {
+				// If the rate limiter is not enabled, set capacity and rate to 0 to disable it on chain.
+				inputs.OutboundRateLimiterConfig.Capacity = big.NewInt(0)
+				inputs.OutboundRateLimiterConfig.Rate = big.NewInt(0)
+			}
 			rateLimitReport, err := cldf_ops.ExecuteSequence(
 				e.OperationsBundle, tokenPoolAdapter.SetTokenPoolRateLimits(), e.BlockChains, inputs)
 			if err != nil {
