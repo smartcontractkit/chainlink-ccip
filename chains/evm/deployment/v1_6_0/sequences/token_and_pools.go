@@ -558,25 +558,6 @@ func (a *EVMAdapter) GetTokenAdminRegistryAddress(ds datastore.DataStore, select
 	return common.BytesToAddress(addr), nil
 }
 
-func (a *EVMAdapter) FindOneTokenAddress(ds datastore.DataStore, chainSelector uint64, tokenSymbol string) (common.Address, error) {
-	filters := datastore.AddressRef{
-		ChainSelector: chainSelector,
-		Qualifier:     tokenSymbol,
-	}
-
-	ref, err := datastore_utils.FindAndFormatRef(ds, filters, chainSelector, datastore_utils.FullRef)
-	if err != nil {
-		return common.Address{}, fmt.Errorf("failed to find token address for symbol %q on chain %d: %w", tokenSymbol, chainSelector, err)
-	}
-
-	addr, err := a.AddressRefToBytes(ref)
-	if err != nil {
-		return common.Address{}, fmt.Errorf("failed to convert address ref to bytes: %w", err)
-	}
-
-	return common.BytesToAddress(addr), nil
-}
-
 func (a *EVMAdapter) FindLatestTokenPoolAddress(ds datastore.DataStore, chainSelector uint64, qualifier string, poolType string) (common.Address, error) {
 	// Define the version range
 	minVersion := semver.MustParse("1.5.0") // inclusive

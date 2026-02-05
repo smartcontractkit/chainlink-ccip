@@ -223,7 +223,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 	t.Run("Token Expansion EVM and Solana", func(t *testing.T) {
 		// Verify that token and token pool do NOT exist in the datastore yet
 		for _, data := range evmTestData {
-			_, err = evmAdapter.FindOneTokenAddress(env.DataStore, data.Chain.Selector, data.Token.Symbol)
+			_, err = FindOneTokenAddress(&evmAdapter, env.DataStore, data.Chain.Selector, data.Token.Symbol)
 			require.Error(t, err)
 			_, err = evmAdapter.FindLatestTokenPoolAddress(env.DataStore, data.Chain.Selector, data.TokenPoolQualifier, evmTokenPoolType.String())
 			require.Error(t, err)
@@ -278,7 +278,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 				require.NoError(t, err)
 
 				// Query EVM token info from the chain
-				tokAddress, err := evmAdapter.FindOneTokenAddress(env.DataStore, data.Chain.Selector, data.Token.Symbol)
+				tokAddress, err := FindOneTokenAddress(&evmAdapter, env.DataStore, data.Chain.Selector, data.Token.Symbol)
 				require.NoError(t, err)
 				tokn, err := bnmERC20gen.NewBurnMintERC20(tokAddress, data.Chain.Client)
 				require.NoError(t, err)
@@ -332,7 +332,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 		t.Run("Validate ManualRegistration", func(t *testing.T) {
 			for _, data := range evmTestData {
 				// Verify that the token and token pool exist in datastore
-				tokAddress, err := evmAdapter.FindOneTokenAddress(env.DataStore, data.Chain.Selector, data.Token.Symbol)
+				tokAddress, err := FindOneTokenAddress(&evmAdapter, env.DataStore, data.Chain.Selector, data.Token.Symbol)
 				require.NoError(t, err)
 				tpAddress, err := evmAdapter.FindLatestTokenPoolAddress(env.DataStore, data.Chain.Selector, data.TokenPoolQualifier, evmTokenPoolType.String())
 				require.NoError(t, err)
@@ -489,7 +489,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 				require.True(t, bytes.Equal(remotePoolsAB[0], common.LeftPadBytes(poolB.Bytes(), 32)))
 
 				// Verify that the remote token was set correctly
-				tokB, err := evmAdapter.FindOneTokenAddress(env.DataStore, evmB.Chain.Selector, evmB.Token.Symbol)
+				tokB, err := FindOneTokenAddress(&evmAdapter, env.DataStore, evmB.Chain.Selector, evmB.Token.Symbol)
 				require.NoError(t, err)
 				require.True(t, bytes.Equal(remoteTokenAB, common.LeftPadBytes(tokB.Bytes(), 32)))
 			}
@@ -503,8 +503,45 @@ func TestTokensAndTokenPools(t *testing.T) {
 		})
 
 		t.Run("Validate ManualRegistration", func(t *testing.T) {
-			// TODO: implement this once ManualRegistration is supported for Solana
-			t.Skip("Skipping Solana manual registration test - changeset is not implemented yet")
+			// Verify that the token exists in datastore
+			// tokAddress, err := FindOneTokenAddress(&solAdapter, env.DataStore, solTestData.Chain.Selector, solTestData.Token.Symbol)
+			// require.NoError(t, err)
+
+			// Verify that no **pending** admin exists for the token at the moment. Also,
+			// The PDA for TokenAdminRegistry is not initialized
+			// TODO:
+
+			// Verify that the PDA token pool has not been initialzied
+			// TODO:
+
+			// proposedOwner := solana.NewWallet().PublicKey()
+
+			// // Run the changeset
+			// output, err = tokensapi.
+			// 	ManualRegistration().
+			// 	Apply(*env, tokensapi.ManualRegistrationInput{
+			// 		ChainAdapterVersion: v1_6_0,
+			// 		MCMS:                NewDefaultInputForMCMS("Manual Registration"),
+			// 		ExistingAddresses:   env.DataStore.Addresses().Filter(),
+			// 		ChainSelector:       solTestData.Chain.Selector,
+			// 		RegisterTokenConfigs: tokensapi.RegisterTokenConfig{
+			// 			ProposedOwner:      solTestData.Deployer.Hex(),
+			// 			TokenPoolQualifier: solTestData.TokenPoolQualifier,
+			// 			TokenSymbol:        solTestData.Token.Symbol,
+			// 			PoolType:           solanaTokenPoolType.String(),
+			// 			SVMExtraArgs:       nil,
+			// 		},
+			// 	})
+			// require.NoError(t, err)
+			// MergeAddresses(t, env, output.DataStore)
+
+			// // Verify that a new admin was proposed for the specified token
+			// tokConfig, err = data.TAR.GetTokenConfig(&bind.CallOpts{Context: t.Context()}, tokAddress)
+			// require.NoError(t, err)
+			// require.Equal(t, 0, tokConfig.PendingAdministrator.Cmp(data.Deployer), fmt.Sprintf("expected pending admin %q to be deployer %q", tokConfig.PendingAdministrator.Hex(), data.Deployer.Hex()))
+			// require.Equal(t, 0, tokConfig.Administrator.Cmp(data.Deployer), fmt.Sprintf("expected current admin %q to be deployer %q", tokConfig.Administrator.Hex(), data.Deployer.Hex()))
+			// require.Equal(t, 0, tokConfig.TokenPool.Cmp(tpAddress), fmt.Sprintf("expected token pool %q to match registered pool %q", tokConfig.TokenPool.Hex(), tpAddress.Hex()))
+
 		})
 
 		t.Run("Validate ConfigureTokenForTransfers", func(t *testing.T) {
