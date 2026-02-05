@@ -130,7 +130,7 @@ func (ma *transfersTest_MockTokenAdapter) DeriveTokenDecimals(e deployment.Envir
 }
 
 func (ma *transfersTest_MockTokenAdapter) DeriveTokenPoolCounterpart(e deployment.Environment, chainSelector uint64, tokenPool []byte, token []byte) ([]byte, error) {
-	return []byte("mocked-derived-pool-counterpart"), nil
+	return tokenPool, nil
 }
 
 func (ma *transfersTest_MockTokenAdapter) ManualRegistration() *cldf_ops.Sequence[tokens.ManualRegistrationInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
