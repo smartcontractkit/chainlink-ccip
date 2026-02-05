@@ -300,6 +300,7 @@ func (a *SolanaAdapter) DeployToken() *cldf_ops.Sequence[tokenapi.DeployTokenInp
 
 			tokenAddr, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, datastore.AddressRef{
 				ChainSelector: chain.Selector,
+				Type:          datastore.ContractType(input.Type),
 				Qualifier:     input.Symbol,
 			}, chain.Selector, datastore_utils.FullRef)
 			if err == nil {
