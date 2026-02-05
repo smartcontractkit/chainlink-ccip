@@ -94,7 +94,7 @@ func TestEVMTokenDeployments(t *testing.T) {
 
 			// Generate test addresses for CCIP admin and external admins
 			ccipAdminAddr := common.HexToAddress("0x1111111111111111111111111111111111111111")
-			externalAdmin1 := "0x2222222222222222222222222222222222222222"
+			externalAdmin := "0x2222222222222222222222222222222222222222"
 
 			// Build token input based on test case configuration
 			tokenInput := tokensapi.DeployTokenInput{
@@ -102,7 +102,7 @@ func TestEVMTokenDeployments(t *testing.T) {
 				Symbol:        tc.tokenSymbol,
 				Decimals:      tc.decimals,
 				Type:          tc.tokenType,
-				ExternalAdmin: externalAdmin1,
+				ExternalAdmin: externalAdmin,
 				CCIPAdmin:     tc.ccipAdmin,
 				ChainSelector: chain_selectors.ETHEREUM_MAINNET.Selector,
 			}
@@ -197,12 +197,12 @@ func TestEVMTokenDeployments(t *testing.T) {
 						require.NoError(t, err, "Failed to get DEFAULT_ADMIN_ROLE")
 						t.Logf("  DEFAULT_ADMIN_ROLE: 0x%x", defaultAdminRole)
 
-						// Verify externalAdmin1 has the admin role
-						hasRole1, err := tokenContract.HasRole(&bind.CallOpts{}, defaultAdminRole, common.HexToAddress(externalAdmin1))
-						require.NoError(t, err, "Failed to check HasRole for externalAdmin1")
-						require.True(t, hasRole1, "External admin 1 should have DEFAULT_ADMIN_ROLE")
-						t.Logf("  External admin 1 (%s) has DEFAULT_ADMIN_ROLE: %v", externalAdmin1, hasRole1)
-						
+						// Verify externalAdmin has the admin role
+						hasRole, err := tokenContract.HasRole(&bind.CallOpts{}, defaultAdminRole, common.HexToAddress(externalAdmin))
+						require.NoError(t, err, "Failed to check HasRole for externalAdmin")
+						require.True(t, hasRole, "External admin should have DEFAULT_ADMIN_ROLE")
+						t.Logf("  External admin (%s) has DEFAULT_ADMIN_ROLE: %v", externalAdmin, hasRole)
+
 						// Verify deployer still has the admin role (original deployer should retain role)
 						deployerHasRole, err := tokenContract.HasRole(&bind.CallOpts{}, defaultAdminRole, deployerAddr)
 						require.NoError(t, err, "Failed to check HasRole for deployer")
