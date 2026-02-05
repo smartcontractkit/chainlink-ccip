@@ -32,16 +32,25 @@ output:
 contracts:
   - contract_name: FeeQuoter
     version: "1.6.0"
+    package_name: fee_quoter    # Optional: override default package name
+    abi_file: "fee_quoter.json" # Optional: override default ABI filename
+    no_deployment: false         # Optional: skip bytecode and Deploy operation (default: false)
     functions:
       - name: updatePrices
         access: owner  # Generates MCMS-compatible transaction
       - name: getPrice 
 ```
 
+### Optional Fields
+
+- `package_name`: Override the generated package name (default: snake_case of contract_name)
+- `abi_file`: Override the ABI filename to use (default: {package_name}.json)
+- `no_deployment`: Skip bytecode constant and Deploy operation (default: false, useful for contracts deployed elsewhere)
+
 ### Access Control
 
 - `owner`: Generates write operation with MCMS support
-- Omit `access`: For view functions or functions without special access control
+- `public`: Generates read-only or public write operation
 
 ## Output
 

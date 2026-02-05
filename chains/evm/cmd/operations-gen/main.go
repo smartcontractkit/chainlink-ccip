@@ -80,10 +80,12 @@ type OutputConfig struct {
 }
 
 type ContractConfig struct {
-	Name      string           `yaml:"contract_name"`
-	Version   string           `yaml:"version"`
-	ABIFile   string           `yaml:"abi_file,omitempty"` // Optional: override ABI file name
-	Functions []FunctionConfig `yaml:"functions"`
+	Name         string           `yaml:"contract_name"`
+	Version      string           `yaml:"version"`
+	PackageName  string           `yaml:"package_name,omitempty"`  // Optional: override package name
+	ABIFile      string           `yaml:"abi_file,omitempty"`      // Optional: override ABI file name
+	NoDeployment bool             `yaml:"no_deployment,omitempty"` // Optional: skip bytecode and deploy operation
+	Functions    []FunctionConfig `yaml:"functions"`
 }
 
 type FunctionConfig struct {
@@ -113,6 +115,7 @@ type ContractInfo struct {
 	OutputPath    string
 	ABI           string
 	Bytecode      string
+	NoDeployment  bool
 	Constructor   *FunctionInfo
 	Functions     map[string]*FunctionInfo
 	FunctionOrder []string
@@ -151,11 +154,12 @@ type TemplateData struct {
 	ABI               string
 	Bytecode          string
 	NeedsBigInt       bool
+	HasWriteOps       bool
+	NoDeployment      bool
 	Constructor       *ConstructorData
 	StructDefs        []StructDefData
 	WriteArgStructs   []ArgStructData
-	WriteOps          []WriteOpData
-	ReadOps           []ReadOpData
+	Operations        []OperationData
 	ContractMethods   []ContractMethodData
 }
 
@@ -176,6 +180,17 @@ type ArgStructData struct {
 type ParameterData struct {
 	GoName string
 	GoType string
+}
+
+type OperationData struct {
+	Name          string
+	MethodName    string
+	OpName        string
+	ArgsType      string
+	CallArgs      string
+	IsWrite       bool
+	AccessControl string // Only for writes
+	ReturnType    string // Only for reads
 }
 
 type WriteOpData struct {
@@ -253,10 +268,14 @@ func extractContractInfo(cfg ContractConfig, input InputConfig, output OutputCon
 		return nil, fmt.Errorf("contract_name and version are required")
 	}
 
-	packageName := toSnakeCase(cfg.Name)
+	// Use explicit package name if provided, otherwise derive from contract name
+	packageName := cfg.PackageName
+	if packageName == "" {
+		packageName = toSnakeCase(cfg.Name)
+	}
 	versionPath := versionToPath(cfg.Version)
 
-	abiString, bytecode, err := readABIAndBytecode(cfg, versionPath, input.BasePath)
+	abiString, bytecode, err := readABIAndBytecode(cfg, packageName, versionPath, input.BasePath)
 	if err != nil {
 		return nil, err
 	}
@@ -267,14 +286,15 @@ func extractContractInfo(cfg ContractConfig, input InputConfig, output OutputCon
 	}
 
 	info := &ContractInfo{
-		Name:        cfg.Name,
-		Version:     cfg.Version,
-		PackageName: packageName,
-		OutputPath:  filepath.Join(output.BasePath, versionPath, "operations", packageName, packageName+".go"),
-		ABI:         abiString,
-		Bytecode:    bytecode,
-		Functions:   make(map[string]*FunctionInfo),
-		StructDefs:  make(map[string]*StructDef),
+		Name:         cfg.Name,
+		Version:      cfg.Version,
+		PackageName:  packageName,
+		OutputPath:   filepath.Join(output.BasePath, versionPath, "operations", packageName, packageName+".go"),
+		ABI:          abiString,
+		Bytecode:     bytecode,
+		NoDeployment: cfg.NoDeployment,
+		Functions:    make(map[string]*FunctionInfo),
+		StructDefs:   make(map[string]*StructDef),
 	}
 
 	extractConstructor(info, abiEntries)
@@ -289,20 +309,30 @@ func extractContractInfo(cfg ContractConfig, input InputConfig, output OutputCon
 
 func readABIAndBytecode(
 	cfg ContractConfig,
+	packageName,
 	versionPath,
 	basePath string) (abiString string, bytecode string, err error) {
-	// Use explicit ABI file if provided, otherwise derive from package name
+	// Determine ABI filename:
+	// 1. Use explicit abi_file if provided
+	// 2. Use package_name if provided (useful for usdc_token_pool_cctp_v2)
+	// 3. Otherwise derive from contract_name
 	var abiFileName string
 	if cfg.ABIFile != "" {
 		abiFileName = cfg.ABIFile
 	} else {
-		abiFileName = toSnakeCase(cfg.Name) + ".json"
+		// Use the package name for ABI lookup - it matches the actual file names better
+		abiFileName = packageName + ".json"
 	}
 
 	abiPath := filepath.Join(basePath, "abi", versionPath, abiFileName)
 	abiBytes, err := os.ReadFile(abiPath)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to read ABI from %s: %w", abiPath, err)
+	}
+
+	// Skip bytecode reading if no_deployment is true
+	if cfg.NoDeployment {
+		return string(abiBytes), "", nil
 	}
 
 	// Bytecode file matches ABI file name (without .json, with .bin)
@@ -555,12 +585,13 @@ func generateOperationsFile(info *ContractInfo) error {
 func prepareTemplateData(info *ContractInfo) TemplateData {
 	data := TemplateData{
 		PackageName:       info.PackageName,
-		PackageNameHyphen: toKebabCase(info.Name),
+		PackageNameHyphen: toKebabCase(info.PackageName),
 		ContractType:      info.Name,
 		Version:           info.Version,
 		ABI:               info.ABI,
 		Bytecode:          info.Bytecode,
 		NeedsBigInt:       checkNeedsBigInt(info),
+		NoDeployment:      info.NoDeployment,
 	}
 
 	if info.Constructor != nil {
@@ -573,8 +604,19 @@ func prepareTemplateData(info *ContractInfo) TemplateData {
 		funcInfo := info.Functions[name]
 		data.ContractMethods = append(data.ContractMethods, prepareContractMethod(funcInfo, funcInfo.IsWrite))
 
+		// Add to unified operations list
 		if funcInfo.IsWrite {
-			data.WriteOps = append(data.WriteOps, prepareWriteOp(funcInfo))
+			data.HasWriteOps = true
+			writeOp := prepareWriteOp(funcInfo)
+			data.Operations = append(data.Operations, OperationData{
+				Name:          writeOp.Name,
+				MethodName:    writeOp.MethodName,
+				OpName:        writeOp.OpName,
+				ArgsType:      writeOp.ArgsType,
+				CallArgs:      writeOp.CallArgs,
+				IsWrite:       true,
+				AccessControl: writeOp.AccessControl,
+			})
 			if len(funcInfo.Parameters) > 1 {
 				data.WriteArgStructs = append(data.WriteArgStructs, ArgStructData{
 					Name:   funcInfo.Name + "Args",
@@ -582,7 +624,16 @@ func prepareTemplateData(info *ContractInfo) TemplateData {
 				})
 			}
 		} else {
-			data.ReadOps = append(data.ReadOps, prepareReadOp(funcInfo))
+			readOp := prepareReadOp(funcInfo)
+			data.Operations = append(data.Operations, OperationData{
+				Name:       readOp.Name,
+				MethodName: readOp.MethodName,
+				OpName:     readOp.OpName,
+				ArgsType:   readOp.ArgsType,
+				CallArgs:   readOp.CallArgs,
+				IsWrite:    false,
+				ReturnType: readOp.ReturnType,
+			})
 		}
 	}
 
