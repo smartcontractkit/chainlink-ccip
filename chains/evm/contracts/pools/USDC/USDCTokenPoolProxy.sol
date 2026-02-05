@@ -123,8 +123,34 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
   ) public virtual override returns (Pool.LockOrBurnOutV1 memory) {
-    (Pool.LockOrBurnOutV1 memory lockOrBurnOut,) = lockOrBurn(lockOrBurnIn, WAIT_FOR_FINALITY, "");
-    return lockOrBurnOut;
+    // Since this contract does not inherit from the TokenPool contract, it must manually validate the caller as an onRamp.
+    if (i_router.getOnRamp(lockOrBurnIn.remoteChainSelector) != msg.sender) {
+      revert CallerIsNotARampOnRouter(msg.sender);
+    }
+    LockOrBurnMechanism mechanism = s_lockOrBurnMechanism[lockOrBurnIn.remoteChainSelector];
+
+    // The child pool which will perform the lock/burn operation.
+    address pool;
+
+    // For a IPoolV2 call, only CCTP v1/v2 and Lock/Release are supported.
+    if (mechanism == LockOrBurnMechanism.CCTP_V2) {
+      pool = s_cctpV2Pool;
+    } else if (mechanism == LockOrBurnMechanism.CCTP_V1) {
+      pool = s_cctpV1Pool;
+    } else if (mechanism == LockOrBurnMechanism.LOCK_RELEASE) {
+      pool = s_siloedLockReleasePool;
+    } else {
+      revert InvalidLockOrBurnMechanism(mechanism);
+    }
+
+    if (pool == address(0)) {
+      revert NoLockOrBurnMechanismSet(lockOrBurnIn.remoteChainSelector);
+    }
+
+    // Transfer the tokens to the correct address, as this contract is only a proxy and will not perform the lock/burn itself.
+    i_token.safeTransfer(pool, lockOrBurnIn.amount);
+
+    return IPoolV1(pool).lockOrBurn(lockOrBurnIn);
   }
 
   /// @inheritdoc IPoolV2
@@ -149,10 +175,12 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
       revert InvalidLockOrBurnMechanism(mechanism);
     }
 
+    address pool;
+
+    // For a IPoolV2 call, only CCTP with CCV and Lock/Release are supported.
     if (mechanism == LockOrBurnMechanism.CCV) {
-      // CCV-compatible lockOrBurn path is completed within this if statement to avoid redundant checks.
-      address ccvPool = s_cctpV2PoolWithCCV;
-      if (ccvPool == address(0)) {
+      pool = s_cctpV2PoolWithCCV;
+      if (pool == address(0)) {
         revert NoLockOrBurnMechanismSet(lockOrBurnIn.remoteChainSelector);
       }
       // If using the CCTP verifier, transfer funds to the verifier instead of the pool.
@@ -162,31 +190,17 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
         revert ChainNotSupportedByVerifier(lockOrBurnIn.remoteChainSelector);
       }
       i_token.safeTransfer(verifierImpl, lockOrBurnIn.amount);
-
-      return IPoolV2(ccvPool).lockOrBurn(lockOrBurnIn, blockConfirmationRequested, tokenArgs);
-    }
-
-    // The child pool which will perform the lock/burn operation.
-    address childPool;
-
-    if (mechanism == LockOrBurnMechanism.CCTP_V2) {
-      childPool = s_cctpV2Pool;
-    } else if (mechanism == LockOrBurnMechanism.CCTP_V1) {
-      childPool = s_cctpV1Pool;
     } else if (mechanism == LockOrBurnMechanism.LOCK_RELEASE) {
-      childPool = s_siloedLockReleasePool;
+      pool = s_siloedLockReleasePool;
+      if (pool == address(0)) {
+        revert NoLockOrBurnMechanismSet(lockOrBurnIn.remoteChainSelector);
+      }
+      i_token.safeTransfer(pool, lockOrBurnIn.amount);
+    } else {
+      revert InvalidLockOrBurnMechanism(mechanism);
     }
 
-    // If the destination pool is the zero address, then no mechanism has been configured for the outgoing tokens
-    // and thus the destination chain is not supported and should revert.
-    if (childPool == address(0)) {
-      revert NoLockOrBurnMechanismSet(lockOrBurnIn.remoteChainSelector);
-    }
-
-    // Transfer the tokens to the correct address, as this contract is only a proxy and will not perform the lock/burn itself.
-    i_token.safeTransfer(childPool, lockOrBurnIn.amount);
-
-    return (IPoolV1(childPool).lockOrBurn(lockOrBurnIn), lockOrBurnIn.amount);
+    return IPoolV2(pool).lockOrBurn(lockOrBurnIn, blockConfirmationRequested, tokenArgs);
   }
 
   /// @inheritdoc IPoolV1
@@ -194,7 +208,37 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
-    return releaseOrMint(releaseOrMintIn, WAIT_FOR_FINALITY);
+    // Since this proxy does not inherit from the TokenPool contract, it must manually validate the caller as an offRamp.
+    if (!i_router.isOffRamp(releaseOrMintIn.remoteChainSelector, msg.sender)) {
+      revert CallerIsNotARampOnRouter(msg.sender);
+    }
+
+    // The first 4 bytes of source pool data are the version which can be extracted directly and cast into a uint32.
+    bytes4 version = bytes4(releaseOrMintIn.sourcePoolData[:4]);
+
+    if (version == USDCSourcePoolDataCodec.LOCK_RELEASE_FLAG) {
+      return IPoolV1(s_siloedLockReleasePool).releaseOrMint(releaseOrMintIn);
+    }
+    if (version == USDCSourcePoolDataCodec.CCTP_VERSION_1_TAG) {
+      return IPoolV1(s_cctpV1Pool).releaseOrMint(releaseOrMintIn);
+    }
+    if (version == USDCSourcePoolDataCodec.CCTP_VERSION_2_TAG) {
+      return IPoolV1(s_cctpV2Pool).releaseOrMint(releaseOrMintIn);
+    }
+
+    // In previous versions of the USDC Token Pool, the sourcePoolData only contained abi encoded (uint64, uint32).
+    // This means that a message originating from a previous version of the pool will have a sourcePoolData that is 64
+    // bytes long, indicating an inflight message originating from a previous version of the USDC Token pool.
+    // Note: It is possible for a future version of the source pool data to also be 64 bytes long. However, any future
+    // version will have a version number in the first 4 bytes and will be routed to the proper pool before this check
+    // is reached. Therefore this branch will only be triggered for messages using the legacy source pool data format.
+    if (releaseOrMintIn.sourcePoolData.length == 64) {
+      // Since the CCTP v1 pool will have this contract set as an allowed caller, no additional configurations are
+      // needed to route the message to the v1 pool.
+      return IPoolV1(s_cctpV1Pool).releaseOrMint(releaseOrMintIn);
+    }
+
+    revert InvalidMessageVersion(version);
   }
 
   /// @inheritdoc IPoolV2
@@ -216,26 +260,8 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
     if (version == USDCSourcePoolDataCodec.LOCK_RELEASE_FLAG) {
       return IPoolV1(s_siloedLockReleasePool).releaseOrMint(releaseOrMintIn);
     }
-    if (version == USDCSourcePoolDataCodec.CCTP_VERSION_1_TAG) {
-      return IPoolV1(s_cctpV1Pool).releaseOrMint(releaseOrMintIn);
-    }
-    if (version == USDCSourcePoolDataCodec.CCTP_VERSION_2_TAG) {
-      return IPoolV1(s_cctpV2Pool).releaseOrMint(releaseOrMintIn);
-    }
     if (version == USDCSourcePoolDataCodec.CCTP_VERSION_2_CCV_TAG) {
       return IPoolV2(s_cctpV2PoolWithCCV).releaseOrMint(releaseOrMintIn, blockConfirmationRequested);
-    }
-
-    // In previous versions of the USDC Token Pool, the sourcePoolData only contained abi encoded (uint64, uint32).
-    // This means that a message originating from a previous version of the pool will have a sourcePoolData that is 64
-    // bytes long, indicating an inflight message originating from a previous version of the USDC Token pool.
-    // Note: It is possible for a future version of the source pool data to also be 64 bytes long. However, any future
-    // version will have a version number in the first 4 bytes and will be routed to the proper pool before this check
-    // is reached. Therefore this branch will only be triggered for messages using the legacy source pool data format.
-    if (releaseOrMintIn.sourcePoolData.length == 64) {
-      // Since the CCTP v1 pool will have this contract set as an allowed caller, no additional configurations are
-      // needed to route the message to the v1 pool.
-      return IPoolV1(s_cctpV1Pool).releaseOrMint(releaseOrMintIn);
     }
 
     revert InvalidMessageVersion(version);

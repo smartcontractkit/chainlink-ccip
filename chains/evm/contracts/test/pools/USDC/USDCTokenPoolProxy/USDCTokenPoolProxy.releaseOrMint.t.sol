@@ -149,7 +149,7 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
       abi.encode(expectedOut)
     );
 
-    Pool.ReleaseOrMintOutV1 memory actualOut = s_usdcTokenPoolProxy.releaseOrMint(releaseOrMintIn);
+    Pool.ReleaseOrMintOutV1 memory actualOut = s_usdcTokenPoolProxy.releaseOrMint(releaseOrMintIn, 0);
 
     assertEq(actualOut.destinationAmount, expectedOut.destinationAmount);
   }
