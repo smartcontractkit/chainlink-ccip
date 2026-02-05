@@ -151,24 +151,29 @@ func makeApplyDeployCCTPChains(cctpChainRegistry *adapters.CCTPChainRegistry, mc
 				remoteChains[remoteChainSelector] = adapter
 				remoteRegisteredPoolRefs[remoteChainSelector] = cfg.Chains[remoteChainSelector].RegisteredPoolRef
 			}
-			dep := adapters.ConfigureCCTPChainForLanesDeps{
-				BlockChains:  e.BlockChains,
-				DataStore:    combinedDS.Seal(),
-				RemoteChains: remoteChains,
+
+			// If there are no remote chains to configure, skip the configuration for this chain since it's not needed.
+			// It's up to the user of a changeset to configure them in a separate step
+			if len(remoteChains) > 0 {
+				dep := adapters.ConfigureCCTPChainForLanesDeps{
+					BlockChains:  e.BlockChains,
+					DataStore:    combinedDS.Seal(),
+					RemoteChains: remoteChains,
+				}
+				in := adapters.ConfigureCCTPChainForLanesInput{
+					ChainSelector:            chainSel,
+					USDCToken:                chainCfg.USDCToken,
+					RegisteredPoolRef:        chainCfg.RegisteredPoolRef,
+					RemoteRegisteredPoolRefs: remoteRegisteredPoolRefs,
+					RemoteChains:             chainCfg.RemoteChains,
+				}
+				configureCCTPChainForLanesReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adaptersByChain[chainSel].ConfigureCCTPChainForLanes(), dep, in)
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to configure CCTP on chain with selector %d: %w", chainSel, err)
+				}
+				batchOps = append(batchOps, configureCCTPChainForLanesReport.Output.BatchOps...)
+				reports = append(reports, configureCCTPChainForLanesReport.ExecutionReports...)
 			}
-			in := adapters.ConfigureCCTPChainForLanesInput{
-				ChainSelector:            chainSel,
-				USDCToken:                chainCfg.USDCToken,
-				RegisteredPoolRef:        chainCfg.RegisteredPoolRef,
-				RemoteRegisteredPoolRefs: remoteRegisteredPoolRefs,
-				RemoteChains:             chainCfg.RemoteChains,
-			}
-			configureCCTPChainForLanesReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adaptersByChain[chainSel].ConfigureCCTPChainForLanes(), dep, in)
-			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to configure CCTP on chain with selector %d: %w", chainSel, err)
-			}
-			batchOps = append(batchOps, configureCCTPChainForLanesReport.Output.BatchOps...)
-			reports = append(reports, configureCCTPChainForLanesReport.ExecutionReports...)
 		}
 
 		// Return the output.
