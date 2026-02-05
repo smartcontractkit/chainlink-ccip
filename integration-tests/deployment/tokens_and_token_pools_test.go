@@ -115,7 +115,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 			Type:                   solutils.SPLTokens,
 			Supply:                 big.NewInt(math.MaxInt64),
 			PreMint:                big.NewInt(math.MaxInt64 / 2),
-			ExternalAdmin:          []string{},
+			ExternalAdmin:          "",
 			DisableFreezeAuthority: true,
 			Senders:                []string{solChain.DeployerKey.PublicKey().String()},
 			TokenPrivKey:           "", // if empty, a new key will be generated
@@ -149,7 +149,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 				Type:                   bnmERC20ops.ContractType,
 				Supply:                 big.NewInt(0), // unlimited supply
 				PreMint:                big.NewInt(0),
-				ExternalAdmin:          []string{},
+				ExternalAdmin:          "",
 				DisableFreezeAuthority: false,      // not needed for EVM
 				TokenPrivKey:           "",         // not needed for EVM
 				Senders:                []string{}, // not needed for test
@@ -169,7 +169,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 				Type:                   bnmERC20ops.ContractType,
 				Supply:                 big.NewInt(0), // unlimited supply
 				PreMint:                big.NewInt(0),
-				ExternalAdmin:          []string{},
+				ExternalAdmin:          "",
 				DisableFreezeAuthority: false,      // not needed for EVM
 				TokenPrivKey:           "",         // not needed for EVM
 				Senders:                []string{}, // not needed for test

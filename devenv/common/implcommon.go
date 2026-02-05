@@ -572,11 +572,7 @@ func AddNodesToCapReg(
 	return nil
 }
 
-func SetupTokensAndTokenPools(
-	ctx context.Context,
-	env *deployment.Environment,
-	adp []testadapters.TestAdapter,
-) (datastore.DataStore, error) {
+func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.TestAdapter, ) (datastore.DataStore, error) {
 	// Get registries and define v1.6.0 alias
 	toknRegistry := tokensapi.GetTokenAdapterRegistry()
 	mcmsRegistry := changesetscore.GetRegistry()
@@ -633,7 +629,7 @@ func SetupTokensAndTokenPools(
 
 		externalAdmin := ""
 		if len(srcCfg.DeployTokenInput.ExternalAdmin) > 0 {
-			externalAdmin = srcCfg.DeployTokenInput.ExternalAdmin[0]
+			externalAdmin = srcCfg.DeployTokenInput.ExternalAdmin
 		}
 
 		registryAddr, err := srcAdapter.GetRegistryAddress()

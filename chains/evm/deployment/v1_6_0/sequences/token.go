@@ -137,21 +137,20 @@ var DeployToken = cldf_ops.NewSequence(
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get default admin role constant: %w", err)
 			}
 
-			// Grant admin role to each external admin
-			for _, admin := range input.ExternalAdmin {
-				grantReport, err := cldf_ops.ExecuteOperation(b, burn_mint_erc20.GrantAdminRole, chain, contract.FunctionInput[burn_mint_erc20.RoleAssignment]{
-					ChainSelector: chain.Selector,
-					Address:       common.HexToAddress(tokenRef.Address),
-					Args: burn_mint_erc20.RoleAssignment{
-						Role: role,
-						To:   common.HexToAddress(admin),
-					},
-				})
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to grant admin role to %s: %w", admin, err)
-				}
-				writes = append(writes, grantReport.Output)
+			// Grant admin role to the external admin
+			grantReport, err := cldf_ops.ExecuteOperation(b, burn_mint_erc20.GrantAdminRole, chain, contract.FunctionInput[burn_mint_erc20.RoleAssignment]{
+				ChainSelector: chain.Selector,
+				Address:       common.HexToAddress(tokenRef.Address),
+				Args: burn_mint_erc20.RoleAssignment{
+					Role: role,
+					To:   common.HexToAddress(input.ExternalAdmin),
+				},
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to grant admin role to %s: %w", input.ExternalAdmin, err)
 			}
+			writes = append(writes, grantReport.Output)
+
 		}
 
 		batchOp, err := contract.NewBatchOperationFromWrites(writes)
