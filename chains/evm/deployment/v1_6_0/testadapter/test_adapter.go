@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -26,6 +27,7 @@ import (
 
 	ton_onramp "github.com/smartcontractkit/chainlink-ton/pkg/ccip/bindings/onramp"
 
+	bnmERC20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/nonce_manager"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
@@ -33,7 +35,10 @@ import (
 	msg_hasher163 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/message_hasher"
 	ccipcommon "github.com/smartcontractkit/chainlink-ccip/deployment/common"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testadapters"
+	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
+	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	commonutils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
+	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc20"
 )
 
 func getExecutionState(t *testing.T, sourceSelector uint64, offRamp offramp.OffRampInterface, expectedSeqNr uint64) (offramp.OffRampSourceChainConfig, uint8) {
@@ -82,10 +87,24 @@ func (a *EVMAdapter) BuildMessage(components testadapters.MessageComponents) (an
 		feeToken = common.HexToAddress(components.FeeToken)
 	}
 
+	tokenAmounts := []router.ClientEVMTokenAmount{}
+	for i, ta := range components.TokenAmounts {
+		if !common.IsHexAddress(ta.Token) {
+			return nil, fmt.Errorf("invalid token address at index %d: %s", i, ta.Token)
+		}
+
+		tokenAmounts = append(tokenAmounts,
+			router.ClientEVMTokenAmount{
+				Token:  common.HexToAddress(ta.Token),
+				Amount: ta.Amount,
+			},
+		)
+	}
+
 	return router.ClientEVM2AnyMessage{
 		Receiver:     receiver,
 		Data:         components.Data,
-		TokenAmounts: nil, // TODO:
+		TokenAmounts: tokenAmounts,
 		FeeToken:     feeToken,
 		ExtraArgs:    components.ExtraArgs,
 	}, nil
@@ -286,6 +305,124 @@ func (a *EVMAdapter) ValidateExec(t *testing.T, sourceSelector uint64, startBloc
 	return executionStates
 }
 
+func (a *EVMAdapter) AllowRouterToWithdrawTokens(ctx context.Context, tokenAddress string, amount *big.Int) error {
+	if !common.IsHexAddress(tokenAddress) {
+		return fmt.Errorf("invalid token address: %s", tokenAddress)
+	}
+	if amount.Cmp(big.NewInt(0)) <= 0 {
+		return fmt.Errorf("amount must be greater than zero: %s", amount.String())
+	}
+
+	routerAddr, err := a.getAddress(datastore.ContractType("Router"))
+	if err != nil {
+		return fmt.Errorf("failed to get router address: %w", err)
+	}
+
+	tokenAddr := common.HexToAddress(tokenAddress)
+	if tokenAddr == (common.Address{}) {
+		return errors.New("cannot approve zero address token")
+	}
+
+	// NOTE: GetTokenExpansionConfig uses BurnMintERC20 as the token
+	// type so we need to be consistent about using it here as well.
+	token, err := burn_mint_erc20.NewBurnMintERC20(tokenAddr, a.Chain.Client)
+	if err != nil {
+		return fmt.Errorf("failed to create burn mint erc20 instance: %w", err)
+	}
+
+	tx, err := token.Approve(a.DeployerKey, routerAddr, amount)
+	if err != nil {
+		return fmt.Errorf(
+			"failed to send approve tokens tx (token = %q, deployer = %q, router = %q): %w",
+			tokenAddr.Hex(), a.DeployerKey.From.Hex(), routerAddr.Hex(), err,
+		)
+	}
+
+	_, err = a.Chain.Confirm(tx)
+	if err != nil {
+		return fmt.Errorf(
+			"failed to confirm approve tokens tx (token = %q, deployer = %q, router = %q): %w",
+			tokenAddr.Hex(), a.DeployerKey.From.Hex(), routerAddr.Hex(), err,
+		)
+	}
+
+	return nil
+}
+
+func (a *EVMAdapter) GetTokenBalance(ctx context.Context, tokenAddress string, ownerAddress []byte) (*big.Int, error) {
+	if !common.IsHexAddress(tokenAddress) {
+		return nil, fmt.Errorf("invalid token address: %s", tokenAddress)
+	}
+
+	ownerAddr := common.BytesToAddress(ownerAddress)
+	if ownerAddr == (common.Address{}) {
+		return nil, errors.New("cannot get balance of zero address owner")
+	}
+
+	tokenAddr := common.HexToAddress(tokenAddress)
+	if tokenAddr == (common.Address{}) {
+		return nil, errors.New("cannot get balance of zero address token")
+	}
+
+	// NOTE: GetTokenExpansionConfig uses BurnMintERC20 as the token
+	// type so we need to be consistent about using it here as well.
+	token, err := burn_mint_erc20.NewBurnMintERC20(tokenAddr, a.Chain.Client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create burn mint erc20 instance for address %q: %w", tokenAddr.Hex(), err)
+	}
+
+	balance, err := token.BalanceOf(&bind.CallOpts{Context: ctx}, ownerAddr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get balance of token %q for owner %q: %w", tokenAddr.Hex(), ownerAddr.Hex(), err)
+	}
+
+	return balance, nil
+}
+
+func (a *EVMAdapter) GetTokenExpansionConfig() tokensapi.TokenExpansionInputPerChain {
+	suffix := strconv.FormatUint(a.Selector, 10) + "-" + a.Family()
+	admin := a.Chain.DeployerKey.From.Hex()
+	deci := uint8(18)
+
+	oneToken := new(big.Int).Exp(big.NewInt(10), new(big.Int).SetUint64(uint64(deci)), nil)
+	mintAmnt := new(big.Int).Mul(oneToken, big.NewInt(1_000_000)) // pre-mint 1 million tokens
+
+	return tokensapi.TokenExpansionInputPerChain{
+		TokenPoolQualifier:      "TEST TOKEN POOL " + suffix,
+		TokenPoolVersion:        cciputils.Version_1_5_1,
+		PoolType:                cciputils.BurnMintTokenPool.String(),
+		TokenPoolRateLimitAdmin: admin,
+		TokenPoolAdmin:          admin,
+		TARAdmin:                admin,
+		DeployTokenInput: tokensapi.DeployTokenInput{
+			Decimals:               deci,
+			Symbol:                 "TEST_TOKEN_" + suffix,
+			Name:                   "TEST TOKEN " + suffix,
+			Type:                   bnmERC20ops.ContractType, // BnM ERC20 is the most common
+			Supply:                 big.NewInt(0),            // unlimited supply
+			PreMint:                mintAmnt,                 // pre-mint some tokens for transfers
+			Senders:                []string{admin},          // use deployer as sender
+			ExternalAdmin:          []string{},               // not needed for tests
+			DisableFreezeAuthority: false,                    // not applicable for EVM
+			TokenPrivKey:           "",                       // not applicable for EVM
+			CCIPAdmin:              admin,                    // deployer is the admin (if empty defaults to timelock)
+		},
+
+		// optional fields left empty, but included here for completeness
+		RemoteCounterpartUpdates: map[uint64]tokensapi.RateLimiterConfig{},
+		RemoteCounterpartDeletes: []uint64{},
+	}
+}
+
+func (a *EVMAdapter) GetRegistryAddress() (string, error) {
+	addr, err := a.getAddress("TokenAdminRegistry")
+	if err != nil {
+		return "", fmt.Errorf("failed to get TokenAdminRegistry address: %w", err)
+	}
+
+	return addr.Hex(), nil
+}
+
 // Co// ConfirmCommitWithExpectedSeqNumRange waits for a commit report on the destination chain with the expected sequence number range.
 // startBlock is the block number to start watching from.
 // If startBlock is nil, it will start watching from the latest block.
@@ -390,7 +527,6 @@ func ConfirmCommitWithExpectedSeqNumRange(
 			iter, err := offRamp.FilterCommitReportAccepted(&bind.FilterOpts{
 				Context: t.Context(),
 			})
-
 			// In some test case the test ends while the filter is still running resulting in a context.Canceled error.
 			if err != nil {
 				if errors.Is(err, context.Canceled) {

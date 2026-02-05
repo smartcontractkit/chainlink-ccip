@@ -1,8 +1,10 @@
 package deployment
 
 import (
+	"math"
 	"math/big"
 	"testing"
+	"time"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/aws/smithy-go/ptr"
@@ -21,6 +23,7 @@ import (
 	offrampops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/offramp"
 	rmnremoteops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/rmn_remote"
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/router"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	mcmsapi "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
@@ -369,9 +372,47 @@ func EVMTransferOwnership(t *testing.T, e *cldf_deployment.Environment, selector
 	testhelpers.ProcessTimelockProposals(t, *e, transferOutput.MCMSTimelockProposals, false)
 }
 
-func MergeAddresses(env *cldf_deployment.Environment, ds datastore.MutableDataStore) {
+func MergeAddresses(t *testing.T, env *cldf_deployment.Environment, ds datastore.MutableDataStore) {
+	t.Helper()
+
 	if ds != nil {
-		ds.Merge(env.DataStore)
+		require.NoError(t, ds.Merge(env.DataStore))
 		env.DataStore = ds.Seal()
+	}
+}
+
+func NewDefaultDeploymentConfigForSolana(version *semver.Version) deploy.ContractDeploymentConfigPerChain {
+	return deploy.ContractDeploymentConfigPerChain{
+		Version:                      version,
+		MaxFeeJuelsPerMsg:            big.NewInt(0).Mul(big.NewInt(200), big.NewInt(1e18)),
+		TokenPriceStalenessThreshold: uint32(24 * 60 * 60),
+		NativeTokenPremiumMultiplier: 1e18, // 1.0 ETH
+		LinkPremiumMultiplier:        9e17, // 0.9 ETH
+		TokenPrivKey:                 solana.NewWallet().PrivateKey.String(),
+		TokenDecimals:                9,
+	}
+}
+
+func NewDefaultDeploymentConfigForEVM(version *semver.Version) deploy.ContractDeploymentConfigPerChain {
+	return deploy.ContractDeploymentConfigPerChain{
+		Version:                                 version,
+		MaxFeeJuelsPerMsg:                       big.NewInt(0).Mul(big.NewInt(200), big.NewInt(1e18)),
+		TokenPriceStalenessThreshold:            uint32(24 * 60 * 60),
+		NativeTokenPremiumMultiplier:            1e18, // 1.0 ETH
+		LinkPremiumMultiplier:                   9e17, // 0.9 ETH
+		PermissionLessExecutionThresholdSeconds: uint32((20 * time.Minute).Seconds()),
+		GasForCallExactCheck:                    uint16(5000),
+		TokenDecimals:                           18,
+	}
+}
+
+func NewDefaultInputForMCMS(desc string) mcms.Input {
+	return mcms.Input{
+		OverridePreviousRoot: false,
+		ValidUntil:           math.MaxUint32,
+		TimelockDelay:        mcms_types.MustParseDuration("1s"),
+		TimelockAction:       mcms_types.TimelockActionSchedule,
+		Qualifier:            common_utils.CLLQualifier,
+		Description:          desc,
 	}
 }

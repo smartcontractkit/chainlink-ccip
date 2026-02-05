@@ -94,57 +94,57 @@ func (a *FeesAdapter) SetTokenTransferFee(e cldf.Environment) *operations.Sequen
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get FeeQuoter address for chain selector %d: %w", src, err)
 			}
 
-			updatesByChain := fqops.ApplyTokenTransferFeeConfigUpdatesInput{}
-			for dst, dstCfg := range input.Settings {
-				tokensToUseDefaultFeeConfigs := []fee_quoter.FeeQuoterTokenTransferFeeConfigRemoveArgs{}
-				tokenTransferFeeConfigs := []fee_quoter.FeeQuoterTokenTransferFeeConfigSingleTokenArgs{}
-				for rawTokenAddress, feeCfg := range dstCfg {
-					if !common.IsHexAddress(rawTokenAddress) {
-						return sequences.OnChainOutput{}, fmt.Errorf("invalid token address for src %d and dst %d: %s", src, dst, rawTokenAddress)
-					}
-
-					token := common.HexToAddress(rawTokenAddress)
-					if feeCfg == nil {
-						tokensToUseDefaultFeeConfigs = append(
-							tokensToUseDefaultFeeConfigs,
-							fee_quoter.FeeQuoterTokenTransferFeeConfigRemoveArgs{
-								DestChainSelector: dst,
-								Token:             token,
-							},
-						)
-					} else {
-						tokenTransferFeeConfigs = append(
-							tokenTransferFeeConfigs,
-							fee_quoter.FeeQuoterTokenTransferFeeConfigSingleTokenArgs{
-								Token: token,
-								TokenTransferFeeConfig: fee_quoter.FeeQuoterTokenTransferFeeConfig{
-									DestBytesOverhead: feeCfg.DestBytesOverhead,
-									DestGasOverhead:   feeCfg.DestGasOverhead,
-									MinFeeUSDCents:    feeCfg.MinFeeUSDCents,
-									MaxFeeUSDCents:    feeCfg.MaxFeeUSDCents,
-									IsEnabled:         feeCfg.IsEnabled,
-									DeciBps:           feeCfg.DeciBps,
-								},
-							},
-						)
-					}
+		updatesByChain := fqops.ApplyTokenTransferFeeConfigUpdatesArgs{}
+		for dst, dstCfg := range input.Settings {
+			var tokensToUseDefaultFeeConfigs []fqops.TokenTransferFeeConfigRemoveArgs
+			var tokenTransferFeeConfigs []fqops.TokenTransferFeeConfigSingleTokenArgs
+			for rawTokenAddress, feeCfg := range dstCfg {
+				if !common.IsHexAddress(rawTokenAddress) {
+					return sequences.OnChainOutput{}, fmt.Errorf("invalid token address for src %d and dst %d: %s", src, dst, rawTokenAddress)
 				}
 
-				if len(tokensToUseDefaultFeeConfigs) > 0 {
-					updatesByChain.TokensToUseDefaultFeeConfigs = append(updatesByChain.TokensToUseDefaultFeeConfigs, tokensToUseDefaultFeeConfigs...)
-				}
-
-				if len(tokenTransferFeeConfigs) > 0 {
-					updatesByChain.TokenTransferFeeConfigArgs = append(updatesByChain.TokenTransferFeeConfigArgs, fee_quoter.FeeQuoterTokenTransferFeeConfigArgs{
-						TokenTransferFeeConfigs: tokenTransferFeeConfigs,
-						DestChainSelector:       dst,
-					})
+				token := common.HexToAddress(rawTokenAddress)
+				if feeCfg == nil {
+					tokensToUseDefaultFeeConfigs = append(
+						tokensToUseDefaultFeeConfigs,
+						fqops.TokenTransferFeeConfigRemoveArgs{
+							DestChainSelector: dst,
+							Token:             token,
+						},
+					)
+				} else {
+					tokenTransferFeeConfigs = append(
+						tokenTransferFeeConfigs,
+						fqops.TokenTransferFeeConfigSingleTokenArgs{
+							Token: token,
+							TokenTransferFeeConfig: fqops.TokenTransferFeeConfig{
+								DestBytesOverhead: feeCfg.DestBytesOverhead,
+								DestGasOverhead:   feeCfg.DestGasOverhead,
+								MinFeeUSDCents:    feeCfg.MinFeeUSDCents,
+								MaxFeeUSDCents:    feeCfg.MaxFeeUSDCents,
+								IsEnabled:         feeCfg.IsEnabled,
+								DeciBps:           feeCfg.DeciBps,
+							},
+						},
+					)
 				}
 			}
 
-			if len(updatesByChain.TokensToUseDefaultFeeConfigs) == 0 && len(updatesByChain.TokenTransferFeeConfigArgs) == 0 {
-				return result, nil
+			if len(tokensToUseDefaultFeeConfigs) > 0 {
+				updatesByChain.TokensToUseDefaultFeeConfigs = append(updatesByChain.TokensToUseDefaultFeeConfigs, tokensToUseDefaultFeeConfigs...)
 			}
+
+			if len(tokenTransferFeeConfigs) > 0 {
+				updatesByChain.TokenTransferFeeConfigArgs = append(updatesByChain.TokenTransferFeeConfigArgs, fqops.TokenTransferFeeConfigArgs{
+					TokenTransferFeeConfigs: tokenTransferFeeConfigs,
+					DestChainSelector:       dst,
+				})
+			}
+		}
+
+		if len(updatesByChain.TokensToUseDefaultFeeConfigs) == 0 && len(updatesByChain.TokenTransferFeeConfigArgs) == 0 {
+			return result, nil
+		}
 
 			result, err = sequences.RunAndMergeSequence(b, chains,
 				evmseq.FeeQuoterApplyTokenTransferFeeConfigUpdatesSequence,
