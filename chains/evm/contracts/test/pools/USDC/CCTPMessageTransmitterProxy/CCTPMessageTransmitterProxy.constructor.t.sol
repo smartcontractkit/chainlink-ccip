@@ -19,7 +19,7 @@ contract CCTPMessageTransmitterProxy_constructor is BaseTest {
     CCTPMessageTransmitterProxy proxy = new CCTPMessageTransmitterProxy(ITokenMessenger(s_tokenMessenger));
 
     assertEq(address(proxy.i_cctpTransmitter()), s_cctpMessageTransmitter);
-    assertEq(proxy.typeAndVersion(), "CCTPMessageTransmitterProxy 1.7.0-dev");
+    assertEq(proxy.typeAndVersion(), "CCTPMessageTransmitterProxy 2.0.0-dev");
   }
 
   // Reverts

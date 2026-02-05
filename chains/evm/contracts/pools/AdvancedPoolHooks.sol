@@ -17,7 +17,9 @@ import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/Enumera
 contract AdvancedPoolHooks is IAdvancedPoolHooks, ITypeAndVersion, AuthorizedCallers {
   using EnumerableSet for EnumerableSet.AddressSet;
 
-  string public constant override typeAndVersion = "AdvancedPoolHooks 1.7.0-dev";
+  function typeAndVersion() external pure virtual override returns (string memory) {
+    return "AdvancedPoolHooks 2.0.0-dev";
+  }
 
   error AllowListNotEnabled();
   error AuthorizedCallersNotEnabled();
@@ -96,7 +98,8 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, ITypeAndVersion, AuthorizedCal
   function preflightCheck(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
     uint16,
-    bytes calldata tokenArgs
+    bytes calldata tokenArgs,
+    uint256
   ) external {
     validateCaller();
     checkAllowList(lockOrBurnIn.originalSender);
