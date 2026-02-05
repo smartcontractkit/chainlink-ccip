@@ -81,17 +81,12 @@ var SetChainRateLimiterConfig = contract.NewWrite(contract.WriteParams[SetChainR
 		if err != nil {
 			return false, fmt.Errorf("failed to get owner for pool at address %q: %w", tp.Address().Hex(), err)
 		}
-		fmt.Println("Caller address:", caller.Hex())
-		fmt.Println("Admin address:", admin.Hex())
-		fmt.Println("Owner address:", owner.Hex())
 
 		// Rate limit config can be set by either the rate limit admin or the owner
 		return caller.Cmp(admin) == 0 || caller.Cmp(owner) == 0, nil
 	},
 	Validate: func(args SetChainRateLimiterConfigArgs) error { return nil },
 	CallContract: func(tp *token_pool.TokenPool, opts *bind.TransactOpts, args SetChainRateLimiterConfigArgs) (*types.Transaction, error) {
-		fmt.Println("Setting rate limits on token pool at address:", tp.Address().Hex())
-		fmt.Println("Data for setting rate limits:", args)
 		return tp.SetChainRateLimiterConfig(opts, args.RemoteChainSelector, args.OutboundRateLimitConfig, args.InboundRateLimitConfig)
 	},
 })

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 
 	mcms_types "github.com/smartcontractkit/mcms/types"
@@ -640,9 +641,9 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 				for _, op := range proposal.Operations {
 					// For derived remote token test, expect mocked address
 					if tt.shouldDeriveToken {
-						require.Equal(t, []byte("mocked-remote-token-address"), op.Transactions[0].Data)
+						require.Equal(t, common.LeftPadBytes([]byte("mocked-remote-token-address"), 32), op.Transactions[0].Data)
 					} else {
-						require.Equal(t, fmt.Appendf(nil, "%d-token", op.ChainSelector), op.Transactions[0].Data)
+						require.Equal(t, common.LeftPadBytes([]byte(fmt.Sprintf("%d-token", op.ChainSelector)), 32), op.Transactions[0].Data)
 					}
 					require.Equal(t, fmt.Sprintf("%d-token-pool", op.ChainSelector), op.Transactions[0].To)
 				}
