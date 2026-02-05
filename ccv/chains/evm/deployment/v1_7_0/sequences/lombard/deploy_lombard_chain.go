@@ -101,7 +101,7 @@ var DeployLombardChain = cldf_ops.NewSequence(
 			Address:       lombardVerifierAddress,
 			Args: lombard_verifier.SupportedTokenArgs{
 				TokensToSet: []lombard_verifier.SupportedTokensArgs{
-					{LocalToken: tokenAddress},
+					{LocalToken: tokenAddress}, // LocalAdapter defaults to zero address
 				},
 			},
 		})
@@ -163,7 +163,7 @@ var DeployLombardChain = cldf_ops.NewSequence(
 			ChainSelector:  input.ChainSelector,
 			Qualifier:      tokenPoolQualifier(input.TokenQualifier),
 			Args: advanced_pool_hooks.ConstructorArgs{
-				Allowlist:                        []common.Address{chain.DeployerKey.From},
+				Allowlist:                        []common.Address{}, // Empty allowlist
 				ThresholdAmountForAdditionalCCVs: big.NewInt(0),
 			},
 		}, existingAddresses)
@@ -172,6 +172,7 @@ var DeployLombardChain = cldf_ops.NewSequence(
 		}
 		addresses = append(addresses, advancedPoolHooksRef)
 		advancedPoolHooksAddress := common.HexToAddress(advancedPoolHooksRef.Address)
+		lombardVerifierResolverAddress := common.HexToAddress(lombardVerifierResolverRef.Address)
 
 		lombardTokenPoolRef, err := contract_utils.MaybeDeployContract(b, lombard_token_pool.Deploy, chain, contract_utils.DeployInput[lombard_token_pool.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(lombard_token_pool.ContractType, *lombard_token_pool.Version),
@@ -179,11 +180,12 @@ var DeployLombardChain = cldf_ops.NewSequence(
 			Qualifier:      tokenPoolQualifier(input.TokenQualifier),
 			Args: lombard_token_pool.ConstructorArgs{
 				Token:             tokenAddress,
-				Verifier:          lombardVerifierAddress,
+				Verifier:          lombardVerifierResolverAddress,
 				Bridge:            lombardBridgeAddress,
+				Adapter:           common.Address{}, // Zero address
+				AdvancedPoolHooks: advancedPoolHooksAddress,
 				RMNProxy:          rmnAddress,
 				Router:            routerAddress,
-				AdvancedPoolHooks: advancedPoolHooksAddress,
 				FallbackDecimals:  fallbackDecimals,
 			},
 		}, existingAddresses)
