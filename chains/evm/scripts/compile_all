@@ -11,9 +11,9 @@ echo " └───────────────────────�
 OPTIMIZE_RUNS_TOKEN_POOL=50000
 OPTIMIZE_RUNS_ONRAMP=1500
 OPTIMIZE_RUNS_OFFRAMP=30000
-OPTIMIZE_RUNS_LOMBARD_POOL=20000
 OPTIMIZE_RUNS_FEE_QUOTER=40000
-OPTIMIZE_RUNS_SILOED_USDC_TOKEN_POOL=1500
+OPTIMIZE_RUNS_CCV_POOL=20000
+
 
 PROJECT="ccip"
 FOUNDRY_PROJECT_SUFFIX="-compile"
@@ -67,13 +67,13 @@ function getOptimizations() {
         optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_OFFRAMP"
         ;;
       "LombardTokenPool")
-          optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_LOMBARD_POOL"
+          optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_CCV_POOL"
           ;;
       "FeeQuoter")
         optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_FEE_QUOTER"
         ;;
       "SiloedUSDCTokenPool")
-        optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_SILOED_USDC_TOKEN_POOL"
+        optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_CCV_POOL"
         ;;
     esac
 

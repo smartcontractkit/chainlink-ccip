@@ -16,6 +16,6 @@ contract SiloedLockReleaseTokenPool_constructor is BaseTest {
     );
 
     assertEq(address(pool.getToken()), address(token));
-    assertEq(pool.typeAndVersion(), "SiloedLockReleaseTokenPool 1.7.0-dev");
+    assertEq(pool.typeAndVersion(), "SiloedLockReleaseTokenPool 2.0.0-dev");
   }
 }

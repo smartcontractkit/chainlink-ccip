@@ -145,7 +145,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   }
 
   // STATIC CONFIG
-  string public constant override typeAndVersion = "OnRamp 1.7.0-dev";
+  string public constant override typeAndVersion = "OnRamp 2.0.0-dev";
   /// @dev The chain ID of the source chain that this contract is deployed to.
   uint64 private immutable i_localChainSelector;
   /// @dev The rmn contract.

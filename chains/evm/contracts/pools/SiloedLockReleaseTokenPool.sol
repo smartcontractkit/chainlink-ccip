@@ -17,6 +17,10 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
   using SafeERC20 for IERC20;
   using EnumerableMap for EnumerableMap.UintToAddressMap;
 
+  function typeAndVersion() external pure virtual override returns (string memory) {
+    return "SiloedLockReleaseTokenPool 2.0.0-dev";
+  }
+
   error LockBoxNotConfigured(uint64 remoteChainSelector);
 
   struct LockBoxConfig {
@@ -35,11 +39,6 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     address rmnProxy,
     address router
   ) TokenPool(token, localTokenDecimals, advancedPoolHooks, rmnProxy, router) {}
-
-  /// @dev Using a function because constant state variables cannot be overridden by child contracts.
-  function typeAndVersion() external pure virtual override returns (string memory) {
-    return "SiloedLockReleaseTokenPool 1.7.0-dev";
-  }
 
   /// @inheritdoc TokenPool
   /// @dev Deposits the amount into the lockbox configured for the remote chain selector.
@@ -107,16 +106,17 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
   }
 
   /// @notice No-op override to purge the unused code path from the contract.
-  function _postFlightCheck(
+  function _postflightCheck(
     Pool.ReleaseOrMintInV1 calldata,
     uint256,
     uint16
   ) internal virtual override {}
 
   /// @notice No-op override to purge the unused code path from the contract.
-  function _preFlightCheck(
+  function _preflightCheck(
     Pool.LockOrBurnInV1 calldata,
     uint16,
-    bytes memory
+    bytes memory,
+    uint256
   ) internal virtual override {}
 }
