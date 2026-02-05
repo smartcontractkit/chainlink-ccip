@@ -444,13 +444,18 @@ func (a *SVMAdapter) AllowRouterToWithdrawTokens(ctx context.Context, tokenAddre
 		)
 	}
 
+	billingSignerPDA, _, err := state.FindFeeBillingSignerPDA(routerAddress)
+	if err != nil {
+		return fmt.Errorf("failed to find billing signer PDA for router %q: %w", routerAddress.String(), err)
+	}
+
 	ix, err := tokens.TokenApproveChecked(
 		amount.Uint64(),
 		DefaultTokenDecimals,
 		DefaultTokenProgram,
 		deployerATA,
 		tokenPubKey,
-		routerAddress,
+		billingSignerPDA,
 		a.DeployerKey.PublicKey(),
 		solana.PublicKeySlice{},
 	)
