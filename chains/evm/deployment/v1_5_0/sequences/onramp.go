@@ -11,9 +11,11 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/evm_2_evm_onramp"
+
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	priceregistryops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/price_registry"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
@@ -25,6 +27,7 @@ type OnRampSetTokenTransferFeeConfigSequenceInput struct {
 
 type OnRampImportConfigSequenceInput struct {
 	ChainSelector           uint64
+	PriceRegistry           common.Address
 	OnRampsPerRemoteChain   map[uint64]common.Address
 	SupportedTokensPerChain map[uint64][]common.Address
 }
@@ -34,6 +37,7 @@ type OnRampImportConfigSequenceOutput struct {
 	TokenTransferFeeConfig map[common.Address]evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfig
 	StaticConfig           evm_2_evm_onramp.EVM2EVMOnRampStaticConfig
 	DynamicConfig          evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig
+	FeeTokenConfig         map[common.Address]evm_2_evm_onramp.EVM2EVMOnRampFeeTokenConfig
 }
 
 var (
@@ -92,6 +96,28 @@ var (
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to execute OnRampDynamicConfigOp "+
 						"on %s for remote chain %d: %w", chain.String(), remoteChainSelector, err)
 				}
+				feetokenOut, err := operations.ExecuteOperation(b, priceregistryops.PriceRegistryGetFeeToken, chain, contract.FunctionInput[any]{
+					ChainSelector: chain.Selector,
+					Address:       input.PriceRegistry,
+				})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to execute PriceRegistryGetFeeTokenOp "+
+						"on %s for price registry %s: %w", chain.String(), input.PriceRegistry.String(), err)
+				}
+				feeTokens := feetokenOut.Output
+				feeTokenConfig := make(map[common.Address]evm_2_evm_onramp.EVM2EVMOnRampFeeTokenConfig)
+				for _, token := range feeTokens {
+					feeTokenConfigOut, err := operations.ExecuteOperation(b, onramp.OnRampFeeTokenConfig, chain, contract.FunctionInput[common.Address]{
+						ChainSelector: chain.Selector,
+						Address:       onRampAddress,
+						Args:          token,
+					})
+					if err != nil {
+						return sequences.OnChainOutput{}, fmt.Errorf("failed to execute OnRampFeeTokenConfigOp "+
+							"on %s for remote chain %d and token %s: %w", chain.String(), remoteChainSelector, token.String(), err)
+					}
+					feeTokenConfig[token] = feeTokenConfigOut.Output
+				}
 				tokenTransferFeeConfig := make(map[common.Address]evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfig)
 				for _, token := range input.SupportedTokensPerChain[remoteChainSelector] {
 					ttfcOut, err := operations.ExecuteOperation(b, onramp.OnRampGetTokenTransferFeeConfig, chain, contract.FunctionInput[common.Address]{
@@ -113,6 +139,7 @@ var (
 						StaticConfig:           sCfgOut.Output,
 						DynamicConfig:          dCfgOut.Output,
 						TokenTransferFeeConfig: tokenTransferFeeConfig,
+						FeeTokenConfig:         feeTokenConfig,
 					},
 				})
 			}

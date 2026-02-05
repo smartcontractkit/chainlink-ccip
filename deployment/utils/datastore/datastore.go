@@ -103,3 +103,42 @@ func GetAddressRef(
 	}
 	return datastore.AddressRef{}
 }
+
+func FilterContractMetaByContractTypeAndVersion(
+	addressRefs []datastore.AddressRef,
+	contractMetadata []datastore.ContractMetadata,
+	contractType cldf.ContractType,
+	contractVersion *semver.Version,
+	qualifier string,
+	chainSelector uint64,
+) ([]datastore.ContractMetadata, error) {
+	ds := datastore.NewMemoryDataStore()
+	for _, ref := range addressRefs {
+		if err := ds.Addresses().Add(ref); err != nil {
+			return nil, fmt.Errorf("failed to add address ref to datastore: %w", err)
+		}
+	}
+	filterFns := []datastore.FilterFunc[datastore.AddressRefKey, datastore.AddressRef]{
+		datastore.AddressRefByChainSelector(chainSelector),
+		datastore.AddressRefByType(datastore.ContractType(contractType)),
+		datastore.AddressRefByVersion(contractVersion),
+	}
+	if qualifier != "" {
+		filterFns = append(filterFns, datastore.AddressRefByQualifier(qualifier))
+	}
+	filteredAddressRefs := ds.Addresses().Filter(filterFns...)
+
+	if len(filteredAddressRefs) == 0 {
+		return nil, fmt.Errorf("no address ref found for contract type %s and version %s on chain %d",
+			contractType, contractVersion.String(), chainSelector)
+	}
+	var filteredContractMetadata []datastore.ContractMetadata
+	for _, meta := range contractMetadata {
+		for _, ref := range filteredAddressRefs {
+			if meta.Address == ref.Address && meta.ChainSelector == ref.ChainSelector {
+				filteredContractMetadata = append(filteredContractMetadata, meta)
+			}
+		}
+	}
+	return filteredContractMetadata, nil
+}

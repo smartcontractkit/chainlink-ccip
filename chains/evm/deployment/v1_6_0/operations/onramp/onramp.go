@@ -52,6 +52,20 @@ var OnRampApplyDestChainConfigUpdates = contract.NewWrite(contract.WriteParams[[
 	},
 })
 
+var OnRampSetDynamicConfig = contract.NewWrite(contract.WriteParams[DynamicConfig, *onramp.OnRamp]{
+	Name:            "onramp:set-dynamic-config",
+	Version:         Version,
+	Description:     "Sets the dynamic config on the OnRamp 1.6.0 contract",
+	ContractType:    ContractType,
+	ContractABI:     onramp.OnRampABI,
+	NewContract:     onramp.NewOnRamp,
+	IsAllowedCaller: contract.OnlyOwner[*onramp.OnRamp, DynamicConfig],
+	Validate:        func(DynamicConfig) error { return nil },
+	CallContract: func(onRamp *onramp.OnRamp, opts *bind.TransactOpts, args DynamicConfig) (*types.Transaction, error) {
+		return onRamp.SetDynamicConfig(opts, args)
+	},
+})
+
 var GetDestChainConfig = contract.NewRead(contract.ReadParams[uint64, onramp.GetDestChainConfig, *onramp.OnRamp]{
 	Name:         "onramp:get-dest-chain-config",
 	Version:      Version,
