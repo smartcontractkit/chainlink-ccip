@@ -190,17 +190,17 @@ var UpsertRemoteChainConfigBurnMint = operations.NewOperation(
 		poolConfigPDA, _ := tokens.TokenPoolConfigAddress(input.TokenMint, input.TokenPool)
 		// check if remote chain config already exists
 		remoteChainConfigPDA, _, _ := tokens.TokenPoolChainConfigPDA(input.RemoteSelector, input.TokenMint, input.TokenPool)
-		isSuportedChain := false
+		isSupportedChain := false
 		existingConfig := base_token_pool.BaseChain{}
 		var remoteChainConfigAccount base_token_pool.BaseChain
 		err := chain.GetAccountDataBorshInto(context.Background(), remoteChainConfigPDA, &remoteChainConfigAccount)
 		if err == nil {
-			isSuportedChain = true
+			isSupportedChain = true
 			existingConfig = remoteChainConfigAccount
 		}
 		batches := make([]types.BatchOperation, 0)
 		var ixns []solana.Instruction
-		if isSuportedChain {
+		if isSupportedChain {
 			remoteConfig.PoolAddresses = append(remoteConfig.PoolAddresses,
 				base_token_pool.RemoteAddress{
 					Address: input.RemotePoolAddress,
@@ -307,15 +307,31 @@ var UpsertRateLimitsBurnMint = operations.NewOperation(
 	"Initializes the BurnMintTokenPool rate limits for a remote chain",
 	func(b operations.Bundle, chain cldf_solana.Chain, input RemoteChainConfig) (sequences.OnChainOutput, error) {
 		burnmint_token_pool.SetProgramID(input.TokenPool)
+		var inboundCapacity uint64 = 0
+		if input.InboundRateLimiterConfig.Capacity != nil {
+			inboundCapacity = input.InboundRateLimiterConfig.Capacity.Uint64()
+		}
+		var inboundRate uint64 = 0
+		if input.InboundRateLimiterConfig.Rate != nil {
+			inboundRate = input.InboundRateLimiterConfig.Rate.Uint64()
+		}
 		inbound := base_token_pool.RateLimitConfig{
 			Enabled:  input.InboundRateLimiterConfig.IsEnabled,
-			Capacity: input.InboundRateLimiterConfig.Capacity.Uint64(),
-			Rate:     input.InboundRateLimiterConfig.Rate.Uint64(),
+			Capacity: inboundCapacity,
+			Rate:     inboundRate,
+		}
+		var outboundCapacity uint64 = 0
+		if input.OutboundRateLimiterConfig.Capacity != nil {
+			outboundCapacity = input.OutboundRateLimiterConfig.Capacity.Uint64()
+		}
+		var outboundRate uint64 = 0
+		if input.OutboundRateLimiterConfig.Rate != nil {
+			outboundRate = input.OutboundRateLimiterConfig.Rate.Uint64()
 		}
 		outbound := base_token_pool.RateLimitConfig{
 			Enabled:  input.OutboundRateLimiterConfig.IsEnabled,
-			Capacity: input.OutboundRateLimiterConfig.Capacity.Uint64(),
-			Rate:     input.OutboundRateLimiterConfig.Rate.Uint64(),
+			Capacity: outboundCapacity,
+			Rate:     outboundRate,
 		}
 		authority := GetAuthorityBurnMint(chain, input.TokenPool, input.TokenMint)
 		poolConfigPDA, _ := tokens.TokenPoolConfigAddress(input.TokenMint, input.TokenPool)

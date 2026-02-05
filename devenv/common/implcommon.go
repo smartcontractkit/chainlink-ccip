@@ -755,6 +755,9 @@ func SetupTokensAndTokenPools(
 			// Set some rate limiters for testing - one enabled and one disabled.
 			rls := []tokensapi.RateLimiterConfig{
 				{
+					IsEnabled: false,
+				},
+				{
 					Capacity:  big.NewInt(2_000_000_000),
 					Rate:      big.NewInt(200_000_000),
 					IsEnabled: true,

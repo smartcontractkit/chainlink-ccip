@@ -42,7 +42,32 @@ func SetTokenPoolRateLimits() cldf.ChangeSetV2[RateLimiterConfigInput] {
 
 func setTokenPoolRateLimitsVerify() func(cldf.Environment, RateLimiterConfigInput) error {
 	return func(e cldf.Environment, cfg RateLimiterConfigInput) error {
-		// TODO: implement
+		for _, input := range cfg.Inputs {
+			if input.InboundRateLimiterConfig.IsEnabled {
+				if input.InboundRateLimiterConfig.Capacity == nil || input.InboundRateLimiterConfig.Rate == nil ||
+					input.InboundRateLimiterConfig.Capacity.Sign() <= 0 || input.InboundRateLimiterConfig.Rate.Sign() <= 0 {
+					return fmt.Errorf("inbound rate limiter config for remote chain %d is enabled but capacity or rate is nil", input.RemoteChainSelector)
+				}
+			} else {
+				// if the rate limiter is not enabled, the capacity and rate should be nil or zero
+				if (input.InboundRateLimiterConfig.Capacity != nil && input.InboundRateLimiterConfig.Capacity.Sign() > 0) ||
+					(input.InboundRateLimiterConfig.Rate != nil && input.InboundRateLimiterConfig.Rate.Sign() > 0) {
+					return fmt.Errorf("inbound rate limiter config for remote chain %d is not enabled but capacity or rate is set", input.RemoteChainSelector)
+				}
+			}
+			if input.OutboundRateLimiterConfig.IsEnabled {
+				if input.OutboundRateLimiterConfig.Capacity == nil || input.OutboundRateLimiterConfig.Rate == nil ||
+					input.OutboundRateLimiterConfig.Capacity.Sign() <= 0 || input.OutboundRateLimiterConfig.Rate.Sign() <= 0 {
+					return fmt.Errorf("outbound rate limiter config for remote chain %d is enabled but capacity or rate is nil", input.RemoteChainSelector)
+				}
+			} else {
+				// if the rate limiter is not enabled, the capacity and rate should be nil or zero
+				if (input.OutboundRateLimiterConfig.Capacity != nil && input.OutboundRateLimiterConfig.Capacity.Sign() > 0) ||
+					(input.OutboundRateLimiterConfig.Rate != nil && input.OutboundRateLimiterConfig.Rate.Sign() > 0) {
+					return fmt.Errorf("outbound rate limiter config for remote chain %d is not enabled but capacity or rate is set", input.RemoteChainSelector)
+				}
+			}
+		}
 		return nil
 	}
 }
