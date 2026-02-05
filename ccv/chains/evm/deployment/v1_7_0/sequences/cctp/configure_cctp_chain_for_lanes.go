@@ -47,6 +47,7 @@ type configureCCTPChainRefs struct {
 	CCTPV2WithCCVsPool   datastore.AddressRef
 	TokenAdminRegistry   datastore.AddressRef
 	CCTPV2TokenPool      datastore.AddressRef
+	RegisteredPool       datastore.AddressRef
 	CCTPV1TokenPool      *datastore.AddressRef
 }
 
@@ -78,7 +79,7 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 		isHomeChainAndConfigureSiloedPool := isHomeChain && len(lockReleaseSelectors) > 0
 
 		// Resolve address refs
-		refs, siloedUSDCRef, err := resolveConfigureCCTPChainRefs(dep.DataStore, chain.Selector, isHomeChainAndConfigureSiloedPool)
+		refs, siloedUSDCRef, err := resolveConfigureCCTPChainRefs(dep.DataStore, chain.Selector, isHomeChainAndConfigureSiloedPool, input.RegisteredPoolRef)
 		if err != nil {
 			return sequences.OnChainOutput{}, err
 		}
@@ -205,7 +206,7 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 			ChainSelector:            input.ChainSelector,
 			TokenAddress:             input.USDCToken,
 			TokenPoolAddress:         refs.CCTPV2WithCCVsPool.Address,
-			RegistryTokenPoolAddress: refs.USDCTokenPoolProxy.Address,
+			RegistryTokenPoolAddress: refs.RegisteredPool.Address,
 			RegistryAddress:          refs.TokenAdminRegistry.Address,
 			MinFinalityValue:         1,
 			RemoteChains:             remoteChainConfigs,
@@ -227,6 +228,7 @@ func resolveConfigureCCTPChainRefs(
 	ds datastore.DataStore,
 	chainSelector uint64,
 	needSiloedUSDC bool,
+	registeredPoolRef datastore.AddressRef,
 ) (configureCCTPChainRefs, *datastore.AddressRef, error) {
 	refs := configureCCTPChainRefs{}
 	var err error
@@ -279,6 +281,10 @@ func resolveConfigureCCTPChainRefs(
 	if err != nil {
 		return refs, nil, fmt.Errorf("failed to find CCTP V2 token pool ref on chain %d: %w", chainSelector, err)
 	}
+	refs.RegisteredPool, err = datastore_utils.FindAndFormatRef(ds, registeredPoolRef, chainSelector, datastore_utils.FullRef)
+	if err != nil {
+		return refs, nil, fmt.Errorf("failed to find RegisteredPool ref on chain %d: %w", chainSelector, err)
+	}
 	cctpV1PoolRefs := ds.Addresses().Filter(
 		datastore.AddressRefByChainSelector(chainSelector),
 		datastore.AddressRefByType(datastore.ContractType(cctpV1ContractType)),
@@ -310,7 +316,7 @@ func resolveConfigureCCTPChainRefs(
 func buildRemoteChainConfigs(dep adapters.ConfigureCCTPChainForLanesDeps, input adapters.ConfigureCCTPChainForLanesInput) (map[uint64]tokens_core.RemoteChainConfig[[]byte, string], error) {
 	configs := make(map[uint64]tokens_core.RemoteChainConfig[[]byte, string], len(input.RemoteChains))
 	for remoteChainSelector, remoteChain := range input.RemoteChains {
-		remotePoolAddress, err := dep.RemoteChains[remoteChainSelector].PoolAddress(dep.DataStore, dep.BlockChains, remoteChainSelector)
+		remotePoolAddress, err := dep.RemoteChains[remoteChainSelector].PoolAddress(dep.DataStore, dep.BlockChains, remoteChainSelector, input.RemoteRegisteredPoolRefs[remoteChainSelector])
 		if err != nil {
 			return nil, fmt.Errorf("failed to get remote pool address: %w", err)
 		}

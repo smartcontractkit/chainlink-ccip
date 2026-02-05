@@ -37,7 +37,7 @@ contract VersionedVerifierResolver is ICrossChainVerifierResolver, ITypeAndVersi
     address verifier; // ──────────╯ Address of the verifier contract.
   }
 
-  string public constant override typeAndVersion = "VersionedVerifierResolver 1.7.0-dev";
+  string public constant override typeAndVersion = "VersionedVerifierResolver 2.0.0-dev";
 
   /// @notice maps verifier versions to their implementation addresses, applied to inbound traffic.
   mapping(bytes4 version => address verifier) private s_versionToInboundImplementation;

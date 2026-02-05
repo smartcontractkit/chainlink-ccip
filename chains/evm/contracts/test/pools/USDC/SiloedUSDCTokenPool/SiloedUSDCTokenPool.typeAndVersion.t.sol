@@ -5,6 +5,6 @@ import {SiloedUSDCTokenPoolSetup} from "./SiloedUSDCTokenPoolSetup.sol";
 
 contract SiloedUSDCTokenPool_typeAndVersion is SiloedUSDCTokenPoolSetup {
   function test_typeAndVersion() public view {
-    assertEq(s_usdcTokenPool.typeAndVersion(), "SiloedUSDCTokenPool 1.7.0-dev");
+    assertEq(s_usdcTokenPool.typeAndVersion(), "SiloedUSDCTokenPool 2.0.0-dev");
   }
 }

@@ -8,7 +8,7 @@ import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access
 
 /// @notice Proxy forwards calls to a target contract.
 contract Proxy is ITypeAndVersion, Ownable2StepMsgSender {
-  string public constant override typeAndVersion = "Proxy 1.7.0-dev";
+  string public constant override typeAndVersion = "Proxy 2.0.0-dev";
 
   error ZeroAddressNotAllowed();
 
