@@ -30,6 +30,9 @@ type TokenAdapter interface {
 	DeriveTokenAddress(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) ([]byte, error)
 	// DeriveTokenDecimals derives the token decimals from the given token pool reference.
 	DeriveTokenDecimals(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) (uint8, error)
+	// For some chains, the token pool address is not the deployed address and must be derived from the token reference.
+	// This method performs that derivation.
+	DeriveTokenPoolCounterpart(e deployment.Environment, chainSelector uint64, tokenPool []byte, token []byte) ([]byte, error)
 	// ManualRegistration manually registers a customer token with the token admin registry.
 	// This is usally done as they no longer have mint authority over the token.
 	ManualRegistration() *cldf_ops.Sequence[ManualRegistrationInput, sequences.OnChainOutput, cldf_chain.BlockChains]
@@ -90,7 +93,7 @@ type ConfigureTokenForTransfersInput struct {
 	// ExistingDataStore is the datastore containing existing deployment data.
 	ExistingDataStore datastore.DataStore
 	// PoolType specifies the type of the token pool. Needed for Solana token pools.
-	PoolType          string
+	PoolType string
 }
 
 // TokenAdapterRegistry maintains a registry of TokenAdapters.

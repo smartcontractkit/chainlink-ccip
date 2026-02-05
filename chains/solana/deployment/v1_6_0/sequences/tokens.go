@@ -94,18 +94,27 @@ func (a *SolanaAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[
 }
 
 func (a *SolanaAdapter) AddressRefToBytes(ref datastore.AddressRef) ([]byte, error) {
-	// TODO: implement me
-	return nil, nil
+	return solana.MustPublicKeyFromBase58(ref.Address).Bytes(), nil
 }
 
 func (a *SolanaAdapter) DeriveTokenAddress(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) ([]byte, error) {
-	// TODO: implement me
-	return nil, nil
+	return nil, fmt.Errorf("DeriveTokenAddress not implemented for Solana")
 }
 
 func (a *SolanaAdapter) DeriveTokenDecimals(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) (uint8, error) {
 	// TODO: implement me
 	return 0, nil
+}
+
+func (a *SolanaAdapter) DeriveTokenPoolCounterpart(e deployment.Environment, chainSelector uint64, tokenPool []byte, token []byte) ([]byte, error) {
+	decodedTokenPool := solana.PublicKeyFromBytes(tokenPool)
+	decodedToken := solana.PublicKeyFromBytes(token)
+	// For Solana, the token pool counterpart is derived using the token mint address and the token pool address as seeds.
+	pool, err := tokens.TokenPoolConfigAddress(decodedToken, decodedTokenPool)
+	if err != nil {
+		return nil, fmt.Errorf("failed to derive token pool counterpart: %w", err)
+	}
+	return pool.Bytes(), nil
 }
 
 // ManualRegistration in Solana registers a token admin registry for a given token and initializes the token pool in CLL Token Pool Program.
@@ -306,14 +315,17 @@ func (a *SolanaAdapter) DeployToken() *cldf_ops.Sequence[tokenapi.DeployTokenInp
 			for _, sender := range input.Senders {
 				ataList = append(ataList, solana.MustPublicKeyFromBase58(sender))
 			}
-
+			var premint uint64 = 0
+			if input.PreMint != nil {
+				premint = input.PreMint.Uint64()
+			}
 			deployOut, err := operations.ExecuteOperation(b, tokensops.DeploySolanaToken, chains.SolanaChains()[chain.Selector], tokensops.Params{
 				ExistingAddresses:      input.ExistingDataStore.Addresses().Filter(),
 				TokenProgramName:       input.Type,
 				TokenPrivKey:           privateKey,
 				TokenSymbol:            input.Symbol,
 				ATAList:                ataList,
-				PreMint:                input.PreMint.Uint64(),
+				PreMint:                premint,
 				DisableFreezeAuthority: input.DisableFreezeAuthority,
 				TokenDecimals:          input.Decimals,
 			})

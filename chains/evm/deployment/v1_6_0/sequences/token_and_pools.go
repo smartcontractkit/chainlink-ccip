@@ -189,6 +189,11 @@ func (a *EVMAdapter) DeriveTokenDecimals(e deployment.Environment, chainSelector
 	return tp.GetTokenDecimals(nil)
 }
 
+func (a *EVMAdapter) DeriveTokenPoolCounterpart(e deployment.Environment, chainSelector uint64, tokenPool []byte, token []byte) ([]byte, error) {
+	// For EVM chains, the token pool address is not derived from the token address, so we can return the token pool address as is.
+	return tokenPool, nil
+}
+
 func (a *EVMAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokensapi.RateLimiterConfigInputs, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return cldf_ops.NewSequence(
 		"evm-adapter:set-token-pool-rate-limits",

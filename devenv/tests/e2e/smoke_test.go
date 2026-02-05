@@ -74,6 +74,19 @@ func TestE2ESmoke(t *testing.T) {
 	}
 
 	for _, tc := range tcs {
+		fromImpl := selectorsToImpl[tc.fromSelector]
+		toImpl := selectorsToImpl[tc.toSelector]
+		supportedTokenFamilies := map[string]bool{
+			chainsel.FamilyEVM:    true,
+			chainsel.FamilySolana: true,
+		}
+		_, fromSupported := supportedTokenFamilies[fromImpl.Family()]
+		_, toSupported := supportedTokenFamilies[toImpl.Family()]
+		if fromSupported && toSupported {
+			tc.name += " with token transfer"
+		} else {
+			tc.name += " without token transfer"
+		}
 		// Capture the loop variable so each goroutine gets its own copy.
 		t.Run(tc.name, func(t *testing.T) {
 			if os.Getenv("PARALLEL_E2E_TESTS") == "true" {
@@ -81,8 +94,6 @@ func TestE2ESmoke(t *testing.T) {
 			}
 
 			t.Logf("Testing CCIP message from chain %d to chain %d", tc.fromSelector, tc.toSelector)
-			fromImpl := selectorsToImpl[tc.fromSelector]
-			toImpl := selectorsToImpl[tc.toSelector]
 
 			receiver := toImpl.CCIPReceiver()
 			extraArgs, err := toImpl.GetExtraArgs(receiver, fromImpl.Family())
@@ -92,12 +103,6 @@ func TestE2ESmoke(t *testing.T) {
 			// to remove the EVM <-> EVM filter and directly set these variables.
 			var tokenAmounts []testadapters.TokenAmount = nil
 			var balanceCheck func() bool = nil
-			supportedFamilies := map[string]bool{
-				chainsel.FamilyEVM:    true,
-				chainsel.FamilySolana: true,
-			}
-			_, fromSupported := supportedFamilies[fromImpl.Family()]
-			_, toSupported := supportedFamilies[toImpl.Family()]
 			// technically something like solana <> solana isn't valid, but this
 			// check is just to ensure we only run token transfer tests on supported
 			// chain families for now.
