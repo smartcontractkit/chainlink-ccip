@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"math/big"
 	"slices"
 	"strconv"
@@ -24,6 +25,7 @@ import (
 
 	solconfig "github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	solutils "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_0/ccip_router"
 	solccip "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/ccip"
@@ -152,6 +154,14 @@ func (a *SVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, 
 	if err != nil {
 		return 0, fmt.Errorf("failed to get LINK address: %w", err)
 	}
+	bnmPool, err := a.getAddress(datastore.ContractType("BurnMintTokenPool"))
+	if err != nil {
+		return 0, fmt.Errorf("failed to get BurnMintTokenPool address: %w", err)
+	}
+	// lnrPool, err := a.getAddress(datastore.ContractType("LockReleaseTokenPool"))
+	// if err != nil {
+	// 	return 0, fmt.Errorf("failed to get LockReleaseTokenPool address: %w", err)
+	// }
 	ccip_router.SetProgramID(routerID)
 	l.Info().Msg("Got contract instances, preparing to send CCIP message")
 	// err = updatePrices(m.e.DataStore, src, dest, m.e.BlockChains.SolanaChains()[src])
@@ -199,11 +209,66 @@ func (a *SVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, 
 
 	addressTables := map[solana.PublicKey]solana.PublicKeySlice{}
 
+	requiredAccounts := len(base.AccountMetaSlice)
 	tokenIndexes := []byte{}
 
 	// set config.FeeQuoterProgram and CcipRouterProgram since they point to wrong addresses
 	solconfig.FeeQuoterProgram = fqID
 	solconfig.CcipRouterProgram = routerID
+
+	// Append token accounts to the account metas
+	for _, tokenAmount := range msg.TokenAmounts {
+		tokenPubKey := tokenAmount.Token
+
+		// allTokenPools := solana.PublicKeySlice{}
+		// allTokenPools = slices.AppendSeq(allTokenPools, bnmPool)
+		// allTokenPools = slices.AppendSeq(allTokenPools, maps.Values(s.BurnMintTokenPools))
+		// allTokenPools = append(allTokenPools, s.CCTPTokenPool)
+
+		tokenPool, err := tokens.NewTokenPool(DefaultTokenProgram, bnmPool, tokenPubKey)
+		if err != nil {
+			return 0, err
+		}
+
+		// Set the token pool's lookup table address
+		var tokenAdminRegistry ccip_common.TokenAdminRegistry
+		err = solcommon.GetAccountDataBorshInto(ctx, a.Client, tokenPool.AdminRegistryPDA, solconfig.DefaultCommitment, &tokenAdminRegistry)
+		if err != nil {
+			return 0, err
+		}
+
+		tokenPool.PoolLookupTable = tokenAdminRegistry.LookupTable
+
+		// invalid config account, maybe this billing stuff isn't right
+
+		chainPDA, _, err := tokens.TokenPoolChainConfigPDA(destChainSelector, tokenPubKey, bnmPool)
+		if err != nil {
+			return 0, err
+		}
+
+		tokenPool.Chain[destChainSelector] = chainPDA
+
+		billingPDA, _, err := state.FindFqPerChainPerTokenConfigPDA(destChainSelector, tokenPubKey, fqID)
+		if err != nil {
+			return 0, err
+		}
+
+		tokenPool.Billing[destChainSelector] = billingPDA
+
+		userTokenAccount, _, err := tokens.FindAssociatedTokenAddress(DefaultTokenProgram, tokenPubKey, sender.PublicKey())
+		if err != nil {
+			return 0, err
+		}
+
+		tokenMetas, tokenAddressTables, err := tokens.ParseTokenLookupTableWithChain(ctx, a.Client, tokenPool, userTokenAccount, destChainSelector)
+		if err != nil {
+			return 0, err
+		}
+
+		tokenIndexes = append(tokenIndexes, byte(len(base.AccountMetaSlice)-requiredAccounts))
+		base.AccountMetaSlice = append(base.AccountMetaSlice, tokenMetas...)
+		maps.Copy(addressTables, tokenAddressTables)
+	}
 
 	base.SetTokenIndexes(tokenIndexes)
 
@@ -287,7 +352,8 @@ func (a *SVMAdapter) GetExtraArgs(receiver []byte, sourceFamily string, opts ...
 		return ccipcommon.SerializeClientSVMExtraArgsV1(msg_hasher163.ClientSVMExtraArgsV1{
 			AccountIsWritableBitmap:  solccip.GenerateBitMapForIndexes([]int{0, 1}),
 			Accounts:                 accounts,
-			ComputeUnits:             80_000,
+			TokenReceiver:            receiverProgram,
+			ComputeUnits:             100_000,
 			AllowOutOfOrderExecution: true,
 		})
 	case chain_selectors.FamilySolana:
@@ -378,13 +444,18 @@ func (a *SVMAdapter) AllowRouterToWithdrawTokens(ctx context.Context, tokenAddre
 		)
 	}
 
+	billingSignerPDA, _, err := state.FindFeeBillingSignerPDA(routerAddress)
+	if err != nil {
+		return fmt.Errorf("failed to find billing signer PDA for router %q: %w", routerAddress.String(), err)
+	}
+
 	ix, err := tokens.TokenApproveChecked(
 		amount.Uint64(),
 		DefaultTokenDecimals,
 		DefaultTokenProgram,
 		deployerATA,
 		tokenPubKey,
-		routerAddress,
+		billingSignerPDA,
 		a.DeployerKey.PublicKey(),
 		solana.PublicKeySlice{},
 	)
@@ -436,6 +507,8 @@ func (a *SVMAdapter) GetTokenBalance(ctx context.Context, tokenAddress string, o
 func (a *SVMAdapter) GetTokenExpansionConfig() tokensapi.TokenExpansionInputPerChain {
 	suffix := strconv.FormatUint(a.Selector, 10) + "-" + a.Family()
 	admin := a.Chain.DeployerKey.PublicKey().String()
+	receiverBytes := a.CCIPReceiver()
+	receiver := solana.PublicKeyFromBytes(receiverBytes).String()
 
 	oneToken := new(big.Int).Exp(big.NewInt(10), new(big.Int).SetUint64(uint64(DefaultTokenDecimals)), nil)
 	mintAmnt := new(big.Int).Mul(oneToken, big.NewInt(1_000_000)) // pre-mint 1 million tokens
@@ -452,13 +525,13 @@ func (a *SVMAdapter) GetTokenExpansionConfig() tokensapi.TokenExpansionInputPerC
 			Symbol:                 "TEST_TOKEN_" + suffix,
 			Name:                   "TEST TOKEN " + suffix,
 			Type:                   DefaultTokenType,
-			Supply:                 big.NewInt(0),   // unlimited supply
-			PreMint:                mintAmnt,        // pre-mint some tokens for transfers
-			Senders:                []string{admin}, // use deployer as sender
-			ExternalAdmin:          []string{},      // not needed for tests
-			DisableFreezeAuthority: false,           // don't revoke freeze authority after token creation
-			TokenPrivKey:           "",              // if empty, a new keypair will be generated
-			CCIPAdmin:              admin,           // deployer is the admin (if empty defaults to timelock)
+			Supply:                 big.NewInt(0),             // unlimited supply
+			PreMint:                mintAmnt,                  // pre-mint some tokens for transfers
+			Senders:                []string{admin, receiver}, // use deployer as sender
+			ExternalAdmin:          []string{},                // not needed for tests
+			DisableFreezeAuthority: false,                     // don't revoke freeze authority after token creation
+			TokenPrivKey:           "",                        // if empty, a new keypair will be generated
+			CCIPAdmin:              admin,                     // deployer is the admin (if empty defaults to timelock)
 		},
 
 		// optional fields left empty, but included here for completeness

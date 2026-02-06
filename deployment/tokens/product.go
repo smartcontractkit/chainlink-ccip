@@ -28,9 +28,16 @@ type TokenAdapter interface {
 	// DeriveTokenAddress derives the token address (in bytes) from the given token pool reference.
 	// For example, if this address is stored on the pool, this method should fetch it.
 	DeriveTokenAddress(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) ([]byte, error)
+	// DeriveTokenDecimals derives the token decimals from the given token pool reference.
+	DeriveTokenDecimals(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) (uint8, error)
+	// For some chains, the token pool address is not the deployed address and must be derived from the token reference.
+	// This method performs that derivation.
+	DeriveTokenPoolCounterpart(e deployment.Environment, chainSelector uint64, tokenPool []byte, token []byte) ([]byte, error)
 	// ManualRegistration manually registers a customer token with the token admin registry.
 	// This is usally done as they no longer have mint authority over the token.
 	ManualRegistration() *cldf_ops.Sequence[ManualRegistrationInput, sequences.OnChainOutput, cldf_chain.BlockChains]
+	// SetTokenPoolRateLimits returns a sequence that sets rate limits on a token pool.
+	SetTokenPoolRateLimits() *cldf_ops.Sequence[RateLimiterConfigInputs, sequences.OnChainOutput, cldf_chain.BlockChains]
 	DeployToken() *cldf_ops.Sequence[DeployTokenInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 	DeployTokenVerify(e deployment.Environment, in any) error
 	DeployTokenPoolForToken() *cldf_ops.Sequence[DeployTokenPoolInput, sequences.OnChainOutput, cldf_chain.BlockChains]
@@ -56,6 +63,8 @@ type RemoteChainConfig[R any, CCV any] struct {
 	RemoteToken R
 	// The token pool on the remote chain.
 	RemotePool R
+	// Decimals of the token on the remote chain.
+	RemoteDecimals uint8
 	// InboundRateLimiterConfig specifies the desired rate limiter configuration for inbound traffic.
 	InboundRateLimiterConfig RateLimiterConfig
 	// OutboundRateLimiterConfig specifies the desired rate limiter configuration for outbound traffic.
@@ -78,6 +87,13 @@ type ConfigureTokenForTransfersInput struct {
 	ExternalAdmin string
 	// RegistryAddress is the address of the contract on which the token pool must be registered.
 	RegistryAddress string
+	// TokenSymbol is the symbol of the token being configured.
+	TokenSymbol string
+	// Below are not provided by the user and populated programmatically.
+	// ExistingDataStore is the datastore containing existing deployment data.
+	ExistingDataStore datastore.DataStore
+	// PoolType specifies the type of the token pool. Needed for Solana token pools.
+	PoolType string
 }
 
 // TokenAdapterRegistry maintains a registry of TokenAdapters.

@@ -630,6 +630,13 @@ func SetupTokensAndTokenPools(
 	for _, srcAdapter := range adp {
 		srcCfg := srcAdapter.GetTokenExpansionConfig()
 		srcSel := srcAdapter.ChainSelector()
+		srcFamily, err := chainsel.GetSelectorFamily(srcSel)
+		if err != nil {
+			return nil, fmt.Errorf("getting chain family for selector %d: %w", srcSel, err)
+		}
+		if srcFamily != chainsel.FamilyEVM && srcFamily != chainsel.FamilySolana {
+			continue // only EVM and Solana are supported for token transfers in 1.6
+		}
 
 		externalAdmin := ""
 		if len(srcCfg.DeployTokenInput.ExternalAdmin) > 0 {
@@ -655,6 +662,7 @@ func SetupTokensAndTokenPools(
 				Version:       srcCfg.TokenPoolVersion,
 				ChainSelector: srcSel,
 			},
+			TokenSymbol: srcCfg.DeployTokenInput.Symbol,
 		}
 
 		for _, dstAdapter := range adp {
@@ -740,6 +748,44 @@ func SetupTokensAndTokenPools(
 		if err != nil {
 			return nil, fmt.Errorf("failed to allow router to withdraw tokens for selector %d: %w", selector, err)
 		}
+		for _, dst := range adp {
+			if dst.ChainSelector() == selector {
+				continue
+			}
+			// Set some rate limiters for testing - one enabled and one disabled.
+			rls := []tokensapi.RateLimiterConfig{
+				{
+					Capacity:  big.NewInt(2_000_000_000),
+					Rate:      big.NewInt(200_000_000),
+					IsEnabled: true,
+				},
+				{
+					IsEnabled: false,
+				},
+			}
+			for _, rl := range rls {
+				input := tokensapi.RateLimiterConfigInput{
+					ChainSelector:       selector,
+					TokenSymbol:         teConfig.DeployTokenInput.Symbol,
+					TokenPoolQualifier:  teConfig.TokenPoolQualifier,
+					PoolType:            teConfig.PoolType,
+					ChainAdapterVersion: v1_6_0,
+					Inputs: map[uint64]tokensapi.RateLimiterConfigInputs{
+						dst.ChainSelector(): {
+							OutboundRateLimiterConfig: rl,
+							InboundRateLimiterConfig:  rl,
+						},
+					},
+				}
+				_, err = tokensapi.SetTokenPoolRateLimits().Apply(*env, input)
+				if err != nil {
+					return nil, fmt.Errorf("setting rate limiter for token %s on selector %d to selector %d: %w",
+						teConfig.DeployTokenInput.Symbol, selector, dst.ChainSelector(), err)
+				}
+			}
+
+		}
+
 	}
 
 	// Return only the newly deployed addresses from this setup.

@@ -34,18 +34,87 @@ func (a *SolanaAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[
 		common_utils.Version_1_6_0,
 		"Configure a token for cross-chain transfers across multiple chains",
 		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokenapi.ConfigureTokenForTransfersInput) (sequences.OnChainOutput, error) {
-			return sequences.OnChainOutput{}, nil
+			var result sequences.OnChainOutput
+			chain, ok := chains.SolanaChains()[input.ChainSelector]
+			if !ok {
+				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
+			}
+
+			tpAddr := solana.MustPublicKeyFromBase58(input.TokenPoolAddress)
+			tokenAddr, tokenProgramId, err := getTokenMintAndTokenProgram(input.ExistingDataStore, input.TokenSymbol, chain)
+			if err != nil {
+				return sequences.OnChainOutput{}, err
+			}
+			tokenMint := solana.MustPublicKeyFromBase58(tokenAddr.Address)
+			for remoteChainSelector, remoteChainConfig := range input.RemoteChains {
+				op := tokenpoolops.UpsertRemoteChainConfigBurnMint
+				tprl := tokenpoolops.UpsertRateLimitsBurnMint
+				switch input.PoolType {
+				case common_utils.BurnMintTokenPool.String():
+					op = tokenpoolops.UpsertRemoteChainConfigBurnMint
+					tprl = tokenpoolops.UpsertRateLimitsBurnMint
+				case common_utils.LockReleaseTokenPool.String():
+					op = tokenpoolops.UpsertRemoteChainConfigLockRelease
+					tprl = tokenpoolops.UpsertRateLimitsLockRelease
+				default:
+					return sequences.OnChainOutput{}, fmt.Errorf("unsupported token pool type '%s' for Solana", input.PoolType)
+				}
+				upsertOut, err := operations.ExecuteOperation(b, op, chains.SolanaChains()[chain.Selector],
+					tokenpoolops.RemoteChainConfig{
+						TokenPool:          tpAddr,
+						TokenMint:          tokenMint,
+						TokenProgramID:     tokenProgramId,
+						RemoteSelector:     remoteChainSelector,
+						RemoteTokenAddress: remoteChainConfig.RemoteToken,
+						RemoteDecimals:     remoteChainConfig.RemoteDecimals,
+						RemotePoolAddress:  remoteChainConfig.RemotePool,
+					})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to upsert remote chain config for token pool: %w", err)
+				}
+				result.Addresses = append(result.Addresses, upsertOut.Output.Addresses...)
+				result.BatchOps = append(result.BatchOps, upsertOut.Output.BatchOps...)
+				rateLimitOut, err := operations.ExecuteOperation(b, tprl, chains.SolanaChains()[chain.Selector],
+					tokenpoolops.RemoteChainConfig{
+						TokenPool:                 tpAddr,
+						TokenMint:                 tokenMint,
+						TokenProgramID:            tokenProgramId,
+						RemoteSelector:            remoteChainSelector,
+						InboundRateLimiterConfig:  remoteChainConfig.InboundRateLimiterConfig,
+						OutboundRateLimiterConfig: remoteChainConfig.OutboundRateLimiterConfig,
+					})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to set rate limits for token pool: %w", err)
+				}
+				result.Addresses = append(result.Addresses, rateLimitOut.Output.Addresses...)
+				result.BatchOps = append(result.BatchOps, rateLimitOut.Output.BatchOps...)
+			}
+			return result, nil
 		})
 }
 
 func (a *SolanaAdapter) AddressRefToBytes(ref datastore.AddressRef) ([]byte, error) {
-	// TODO: implement me
-	return nil, nil
+	return solana.MustPublicKeyFromBase58(ref.Address).Bytes(), nil
 }
 
 func (a *SolanaAdapter) DeriveTokenAddress(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) ([]byte, error) {
+	return nil, fmt.Errorf("DeriveTokenAddress not implemented for Solana")
+}
+
+func (a *SolanaAdapter) DeriveTokenDecimals(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) (uint8, error) {
 	// TODO: implement me
-	return nil, nil
+	return 0, nil
+}
+
+func (a *SolanaAdapter) DeriveTokenPoolCounterpart(e deployment.Environment, chainSelector uint64, tokenPool []byte, token []byte) ([]byte, error) {
+	decodedTokenPool := solana.PublicKeyFromBytes(tokenPool)
+	decodedToken := solana.PublicKeyFromBytes(token)
+	// For Solana, the token pool counterpart is derived using the token mint address and the token pool address as seeds.
+	pool, err := tokens.TokenPoolConfigAddress(decodedToken, decodedTokenPool)
+	if err != nil {
+		return nil, fmt.Errorf("failed to derive token pool counterpart: %w", err)
+	}
+	return pool.Bytes(), nil
 }
 
 // ManualRegistration in Solana registers a token admin registry for a given token and initializes the token pool in CLL Token Pool Program.
@@ -168,6 +237,57 @@ func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualR
 		})
 }
 
+func (a *SolanaAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokenapi.RateLimiterConfigInputs, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return operations.NewSequence(
+		"SetTokenPoolRateLimits",
+		common_utils.Version_1_6_0,
+		"Sets rate limits for a token pool on Solana",
+		func(b operations.Bundle, chains cldf_chain.BlockChains, input tokenapi.RateLimiterConfigInputs) (sequences.OnChainOutput, error) {
+			chain := chains.SolanaChains()[input.ChainSelector]
+
+			op := tokenpoolops.UpsertRateLimitsBurnMint
+			switch input.PoolType {
+			case common_utils.BurnMintTokenPool.String():
+				op = tokenpoolops.UpsertRateLimitsBurnMint
+			case common_utils.LockReleaseTokenPool.String():
+				op = tokenpoolops.UpsertRateLimitsLockRelease
+			default:
+				return sequences.OnChainOutput{}, fmt.Errorf("unsupported token pool type '%s' for Solana", input.PoolType)
+			}
+			tokenAddr, tokenProgramId, err := getTokenMintAndTokenProgram(input.ExistingDataStore, input.TokenSymbol, chain)
+			if err != nil {
+				return sequences.OnChainOutput{}, err
+			}
+
+			tokenPoolAddr, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, datastore.AddressRef{
+				ChainSelector: chain.Selector,
+				Qualifier:     input.TokenPoolQualifier,
+				Type:          datastore.ContractType(input.PoolType),
+			}, chain.Selector, datastore_utils.FullRef)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to find token pool address for symbol '%s' and qualifier '%s': %w", input.TokenSymbol, input.TokenPoolQualifier, err)
+			}
+			tokenMint := solana.MustPublicKeyFromBase58(tokenAddr.Address)
+			tokenPool := solana.MustPublicKeyFromBase58(tokenPoolAddr.Address)
+			rateLimitOut, err := operations.ExecuteOperation(b, op, chains.SolanaChains()[chain.Selector],
+				tokenpoolops.RemoteChainConfig{
+					TokenPool:                 tokenPool,
+					TokenMint:                 tokenMint,
+					TokenProgramID:            tokenProgramId,
+					RemoteSelector:            input.RemoteChainSelector,
+					InboundRateLimiterConfig:  input.InboundRateLimiterConfig,
+					OutboundRateLimiterConfig: input.OutboundRateLimiterConfig,
+				})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to set rate limits for token pool: %w", err)
+			}
+			return sequences.OnChainOutput{
+				BatchOps: rateLimitOut.Output.BatchOps,
+			}, nil
+		},
+	)
+}
+
 func (a *SolanaAdapter) DeployToken() *cldf_ops.Sequence[tokenapi.DeployTokenInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return operations.NewSequence(
 		"DeployToken",
@@ -180,6 +300,7 @@ func (a *SolanaAdapter) DeployToken() *cldf_ops.Sequence[tokenapi.DeployTokenInp
 
 			tokenAddr, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, datastore.AddressRef{
 				ChainSelector: chain.Selector,
+				Type:          datastore.ContractType(input.Type),
 				Qualifier:     input.Symbol,
 			}, chain.Selector, datastore_utils.FullRef)
 			if err == nil {
@@ -195,13 +316,17 @@ func (a *SolanaAdapter) DeployToken() *cldf_ops.Sequence[tokenapi.DeployTokenInp
 			for _, sender := range input.Senders {
 				ataList = append(ataList, solana.MustPublicKeyFromBase58(sender))
 			}
-
+			var premint uint64 = 0
+			if input.PreMint != nil {
+				premint = input.PreMint.Uint64()
+			}
 			deployOut, err := operations.ExecuteOperation(b, tokensops.DeploySolanaToken, chains.SolanaChains()[chain.Selector], tokensops.Params{
 				ExistingAddresses:      input.ExistingDataStore.Addresses().Filter(),
 				TokenProgramName:       input.Type,
 				TokenPrivKey:           privateKey,
 				TokenSymbol:            input.Symbol,
 				ATAList:                ataList,
+				PreMint:                premint,
 				DisableFreezeAuthority: input.DisableFreezeAuthority,
 				TokenDecimals:          input.Decimals,
 			})

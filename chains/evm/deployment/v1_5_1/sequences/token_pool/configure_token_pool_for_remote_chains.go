@@ -208,7 +208,6 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 		//
 		if len(reportWrites) == 0 {
 			paddedRemoteTokenPoolAddress := common.LeftPadBytes(input.RemoteChainConfig.RemotePool, 32)
-			paddedRemoteTokenAddress := common.LeftPadBytes(input.RemoteChainConfig.RemoteToken, 32)
 			applyChainUpdatesInput := contract.FunctionInput[tpops.ApplyChainUpdatesArgs]{
 				ChainSelector: chain.Selector,
 				Address:       input.TokenPoolAddress,
@@ -218,7 +217,7 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 						{
 							RemotePoolAddresses: [][]byte{paddedRemoteTokenPoolAddress},
 							RemoteChainSelector: input.RemoteChainSelector,
-							RemoteTokenAddress:  paddedRemoteTokenAddress,
+							RemoteTokenAddress:  input.RemoteChainConfig.RemoteToken,
 							OutboundRateLimiterConfig: token_pool.RateLimiterConfig{
 								IsEnabled: input.RemoteChainConfig.OutboundRateLimiterConfig.IsEnabled,
 								Capacity:  input.RemoteChainConfig.OutboundRateLimiterConfig.Capacity,
