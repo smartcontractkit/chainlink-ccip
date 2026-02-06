@@ -71,7 +71,7 @@ func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualR
 			}
 			tokenAddr, tokenProgramId, err := getTokenMintAndTokenProgram(input.ExistingDataStore, input.RegisterTokenConfigs.TokenSymbol, chain)
 			if err != nil {
-				return sequences.OnChainOutput{}, err
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token and token program address: %w", err)
 			}
 			routerAddr, err := a.GetRouterAddress(input.ExistingDataStore, input.ChainSelector)
 			if err != nil {

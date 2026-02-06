@@ -13,11 +13,13 @@ import (
 	"github.com/gagliardetto/solana-go"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	evmadapters "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
+	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	bnmERC20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	evmseqV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	tarbindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
 	bnmpool "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/burn_mint_token_pool"
+	solanautils "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
 	solutils "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
 	solseqV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
 	deployapi "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
@@ -115,7 +117,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 			Type:                   solutils.SPLTokens,
 			Supply:                 big.NewInt(math.MaxInt64),
 			PreMint:                big.NewInt(math.MaxInt64 / 2),
-			ExternalAdmin:          "",
+			ExternalAdmin:          solana.NewWallet().PublicKey().String(),
 			DisableFreezeAuthority: true,
 			Senders:                []string{solChain.DeployerKey.PublicKey().String()},
 			TokenPrivKey:           "", // if empty, a new key will be generated
@@ -504,43 +506,42 @@ func TestTokensAndTokenPools(t *testing.T) {
 
 		t.Run("Validate ManualRegistration", func(t *testing.T) {
 			// Verify that the token exists in datastore
-			// tokAddress, err := FindOneTokenAddress(&solAdapter, env.DataStore, solTestData.Chain.Selector, solTestData.Token.Symbol)
-			// require.NoError(t, err)
+			tokenAddr, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
+				ChainSelector: solTestData.Chain.Selector,
+				Qualifier:     solTestData.Token.Symbol,
+			}, solTestData.Chain.Selector, datastore_utils.FullRef)
+			require.NoError(t, err)
+			_, err = solanautils.GetTokenProgramID(deployment.ContractType(tokenAddr.Type))
+			require.NoError(t, err)
 
 			// Verify that no **pending** admin exists for the token at the moment. Also,
 			// The PDA for TokenAdminRegistry is not initialized
 			// TODO:
 
-			// Verify that the PDA token pool has not been initialzied
+			// Verify that the PDA token pool has not been initialized
 			// TODO:
 
-			// proposedOwner := solana.NewWallet().PublicKey()
+			// Run the changeset
+			output, err = tokensapi.
+				ManualRegistration().
+				Apply(*env, tokensapi.ManualRegistrationInput{
+					ChainAdapterVersion: v1_6_0,
+					MCMS:                NewDefaultInputForMCMS("Manual Registration"),
+					ExistingDataStore:   env.DataStore,
+					ChainSelector:       solTestData.Chain.Selector,
+					RegisterTokenConfigs: tokensapi.RegisterTokenConfig{
+						ProposedOwner:      solTestData.Token.ExternalAdmin,
+						TokenPoolQualifier: solTestData.TokenPoolQualifier,
+						TokenSymbol:        solTestData.Token.Symbol,
+						PoolType:           solTokenPoolType.String(),
+						SVMExtraArgs:       nil,
+					},
+				})
+			require.NoError(t, err)
+			MergeAddresses(t, env, output.DataStore)
 
-			// // Run the changeset
-			// output, err = tokensapi.
-			// 	ManualRegistration().
-			// 	Apply(*env, tokensapi.ManualRegistrationInput{
-			// 		ChainAdapterVersion: v1_6_0,
-			// 		MCMS:                NewDefaultInputForMCMS("Manual Registration"),
-			// 		ExistingAddresses:   env.DataStore.Addresses().Filter(),
-			// 		ChainSelector:       solTestData.Chain.Selector,
-			// 		RegisterTokenConfigs: tokensapi.RegisterTokenConfig{
-			// 			ProposedOwner:      solTestData.Deployer.Hex(),
-			// 			TokenPoolQualifier: solTestData.TokenPoolQualifier,
-			// 			TokenSymbol:        solTestData.Token.Symbol,
-			// 			PoolType:           solanaTokenPoolType.String(),
-			// 			SVMExtraArgs:       nil,
-			// 		},
-			// 	})
-			// require.NoError(t, err)
-			// MergeAddresses(t, env, output.DataStore)
-
-			// // Verify that a new admin was proposed for the specified token
-			// tokConfig, err = data.TAR.GetTokenConfig(&bind.CallOpts{Context: t.Context()}, tokAddress)
-			// require.NoError(t, err)
-			// require.Equal(t, 0, tokConfig.PendingAdministrator.Cmp(data.Deployer), fmt.Sprintf("expected pending admin %q to be deployer %q", tokConfig.PendingAdministrator.Hex(), data.Deployer.Hex()))
-			// require.Equal(t, 0, tokConfig.Administrator.Cmp(data.Deployer), fmt.Sprintf("expected current admin %q to be deployer %q", tokConfig.Administrator.Hex(), data.Deployer.Hex()))
-			// require.Equal(t, 0, tokConfig.TokenPool.Cmp(tpAddress), fmt.Sprintf("expected token pool %q to match registered pool %q", tokConfig.TokenPool.Hex(), tpAddress.Hex()))
+			// Verify that a new admin was proposed for the specified token
+			// TODO:
 
 		})
 
