@@ -33,7 +33,7 @@ func (fqu FeeQuoterUpdater) SequenceFeeQuoterInputCreation() *cldf_ops.Sequence[
 				output = report.Output
 				output.ChainSelector = input.ChainSelector
 				output.ExistingAddresses = input.ExistingAddresses
-				return
+				return output, nil
 			case semver.MustParse("1.5.0"):
 				report, err := cldf_ops.ExecuteSequence(b, sequence1_7.CreateFeeQuoterUpdateInputFromV150, chain, input)
 				if err != nil {
@@ -42,7 +42,7 @@ func (fqu FeeQuoterUpdater) SequenceFeeQuoterInputCreation() *cldf_ops.Sequence[
 				output = report.Output
 				output.ChainSelector = input.ChainSelector
 				output.ExistingAddresses = input.ExistingAddresses
-				return
+				return output, nil
 			default:
 				return sequence1_7.FeeQuoterUpdate{}, fmt.Errorf("unsupported ImportFeeQuoterConfigFromVersion: %s", input.ImportConfigFromVersion.String())
 			}
