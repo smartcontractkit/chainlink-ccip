@@ -2,6 +2,7 @@ package tokens
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
@@ -101,15 +102,7 @@ var DeployLockReleaseTokenPool = cldf_ops.NewSequence(
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get authorized callers from advanced pool hooks %s on %s: %w", hooksAddr, chain, err)
 			}
 
-			alreadyAuthorized := false
-			for _, caller := range getAuthorizedCallersReport.Output {
-				if caller == poolAddr {
-					alreadyAuthorized = true
-					break
-				}
-			}
-
-			if !alreadyAuthorized {
+			if !slices.Contains(getAuthorizedCallersReport.Output, poolAddr) {
 				applyAuthorizedCallerUpdatesReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.ApplyAuthorizedCallerUpdates, chain, evm_contract.FunctionInput[advanced_pool_hooks.AuthorizedCallerArgs]{
 					ChainSelector: input.ChainSel,
 					Address:       hooksAddr,
