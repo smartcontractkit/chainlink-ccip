@@ -258,7 +258,8 @@ jobs:
         with:
           trunk-org-slug: smartcontractkit
           trunk-token: ${{ secrets.TRUNK_API_KEY }}
-          go-test-args: ${{ github.workspace }}/chainlink/integration-tests/smoke/ccip/${{ matrix.type.file }} ${{ matrix.type.run != '' && format('-run {0}', matrix.type.run) || '' }} -timeout ${{ matrix.type.timeout }}
+          # Need to use -C to run the tests from the proper directory
+          go-test-args: -C ./chainlink/integration-tests/smoke/ccip ${{ matrix.type.file }} ${{ matrix.type.run != '' && format('-run {0}', matrix.type.run) || '' }} -timeout ${{ matrix.type.timeout }}
         env:
           CL_DATABASE_URL: ${{ env.DB_URL }}
 
