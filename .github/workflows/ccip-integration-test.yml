@@ -5,7 +5,7 @@ on:
   merge_group:
   push:
     branches:
-      - 'main'
+      - "main"
 
 jobs:
   changes:
@@ -36,47 +36,81 @@ jobs:
       # We explicitly have this env var not be "CL_DATABASE_URL" to avoid having it be used by core related tests
       # when they should not be using it, while still allowing us to DRY up the setup
       DB_URL: postgresql://postgres:postgres@localhost:5432/chainlink_test?sslmode=disable
-    
+
     strategy:
       fail-fast: false
       matrix:
         type:
-          - cmd: cd integration-tests/smoke/ccip && go test ccip_fees_test.go -timeout 12m -test.parallel=2 -count=1 -json
-            name: "Fees Test"
-          - cmd: cd integration-tests/smoke/ccip && go test -run "TestTokenTransfer_EVM2EVM" ccip_token_transfer_test.go -timeout 12m -test.parallel=1 -count=1 -json
-            name: "Token Transfer Test"
-          - cmd: cd integration-tests/smoke/ccip && go test ccip_usdc_test.go -timeout 12m -test.parallel=1 -count=1 -json
-            name: "USDC Test"
-          - cmd: cd integration-tests/smoke/ccip && go test ccip_ooo_execution_test.go -timeout 12m -test.parallel=1 -count=1 -json
-            name: "OOO Execution Test"
-          - cmd: cd integration-tests/smoke/ccip && go test -run "^Test_CCIPMessaging_EVM2EVM$" ccip_messaging_test.go -timeout 20m -test.parallel=2 -count=1 -json
-            name: "Messaging Test Test_CCIPMessaging_EVM2EVM"
-          - cmd: cd integration-tests/smoke/ccip && go test -run "^Test_CCIPMessaging_EVM2Solana$" ccip_messaging_test.go -timeout 30m -test.parallel=2 -count=1 -json
-            name: "Messaging Test Test_CCIPMessaging_EVM2Solana"
-          - cmd: cd integration-tests/smoke/ccip && go test -run "^Test_CCIPMessaging_Solana2EVM$" ccip_messaging_test.go -timeout 30m -test.parallel=2 -count=1 -json
-            name: "Messaging Test Test_CCIPMessaging_Solana2EVM"
-          - cmd: cd integration-tests/smoke/ccip && go test -run "^Test_CCIPMessaging_EVM2SolanaMultiExecReports$" ccip_messaging_test.go -timeout 35m -test.parallel=1 -count=1 -json
-            name: "Messaging Test Test_CCIPMessaging_EVM2SolanaMultiExecReports"
-          - cmd: cd integration-tests/smoke/ccip && go test -run "Test_CCIPBatching_MaxBatchSizeEVM" ccip_batching_test.go -timeout 12m -test.parallel=1 -count=1 -json
-            name: "Batching Test Test_CCIPBatching_MaxBatchSizeEVM"
-          - cmd: cd integration-tests/smoke/ccip && go test -run "^Test_CCIPBatching_MultiSource$" ccip_batching_test.go -timeout 12m -test.parallel=1 -count=1 -json
-            name: "Batching Test Test_CCIPBatching_MultiSource"
-          - cmd: cd integration-tests/smoke/ccip && go test -run "Test_CCIPBatching_MultiSource_MultiRoot" ccip_batching_test.go -timeout 12m -test.parallel=1 -count=1 -json
-            name: "Batching Test Test_CCIPBatching_MultiSource_MultiRoot"
-          - cmd: cd integration-tests/smoke/ccip && go test -run "^Test_CCIPBatching_SingleSource$" ccip_batching_test.go -timeout 12m -test.parallel=1 -count=1 -json
-            name: "Batching Test Test_CCIPBatching_SingleSource"
-          - cmd: cd integration-tests/smoke/ccip && go test -run "Test_CCIPBatching_SingleSource_MultiRoot" ccip_batching_test.go -timeout 12m -test.parallel=1 -count=1 -json
-            name: "Batching Test Test_CCIPBatching_SingleSource_MultiRoot"
-          - cmd: cd integration-tests/smoke/ccip && go test ccip_gas_price_updates_test.go -timeout 12m -test.parallel=2 -count=1 -json
-            name: "Gas Price Updates Test"
+          - name: "Fees Test"
+            file: ccip_fees_test.go
+            run: ""
+            timeout: 12m
+          - name: "Token Transfer Test"
+            file: ccip_token_transfer_test.go
+            run: "TestTokenTransfer_EVM2EVM"
+            timeout: 12m
+          - name: "USDC Test"
+            file: ccip_usdc_test.go
+            run: ""
+            timeout: 12m
+          - name: "OOO Execution Test"
+            file: ccip_ooo_execution_test.go
+            run: ""
+            timeout: 12m
+          - name: "Messaging Test Test_CCIPMessaging_EVM2EVM"
+            file: ccip_messaging_test.go
+            run: "^Test_CCIPMessaging_EVM2EVM$"
+            timeout: 20m
+          - name: "Messaging Test Test_CCIPMessaging_EVM2Solana"
+            file: ccip_messaging_test.go
+            run: "^Test_CCIPMessaging_EVM2Solana$"
+            timeout: 30m
+          - name: "Messaging Test Test_CCIPMessaging_Solana2EVM"
+            file: ccip_messaging_test.go
+            run: "^Test_CCIPMessaging_Solana2EVM$"
+            timeout: 30m
+          - name: "Messaging Test Test_CCIPMessaging_EVM2SolanaMultiExecReports"
+            file: ccip_messaging_test.go
+            run: "^Test_CCIPMessaging_EVM2SolanaMultiExecReports$"
+            timeout: 35m
+          - name: "Batching Test Test_CCIPBatching_MaxBatchSizeEVM"
+            file: ccip_batching_test.go
+            run: "Test_CCIPBatching_MaxBatchSizeEVM"
+            timeout: 12m
+          - name: "Batching Test Test_CCIPBatching_MultiSource"
+            file: ccip_batching_test.go
+            run: "^Test_CCIPBatching_MultiSource$"
+            timeout: 12m
+          - name: "Batching Test Test_CCIPBatching_MultiSource_MultiRoot"
+            file: ccip_batching_test.go
+            run: "Test_CCIPBatching_MultiSource_MultiRoot"
+            timeout: 12m
+          - name: "Batching Test Test_CCIPBatching_SingleSource"
+            file: ccip_batching_test.go
+            run: "^Test_CCIPBatching_SingleSource$"
+            timeout: 12m
+          - name: "Batching Test Test_CCIPBatching_SingleSource_MultiRoot"
+            file: ccip_batching_test.go
+            run: "Test_CCIPBatching_SingleSource_MultiRoot"
+            timeout: 12m
+          - name: "Gas Price Updates Test"
+            file: ccip_gas_price_updates_test.go
+            run: ""
+            timeout: 12m
           # TODO: this can only run in docker for now, switch to in-memory and uncomment
-          # - cmd: cd integration-tests/smoke/ccip && go test ccip_token_price_updates_test.go -timeout 12m -test.parallel=2 -count=1 -json
-          #   name: "Token Price Updates Test"
-          - cmd: cd integration-tests/smoke/ccip && go test ccip_reader_test.go -timeout 5m -test.parallel=1 -count=1 -json
-            name: "CCIPReader Test"
-          - cmd: cd integration-tests/smoke/ccip && go test -run "^Test_CCIPTopologies_EVM2EVM_RoleDON_AllSupportSource_SomeSupportDest$" ccip_topologies_test.go -timeout 20m -test.parallel=2 -count=1 -json
-            name: "Test_CCIPTopologies_EVM2EVM_RoleDON_AllSupportSource_SomeSupportDest"
-    
+          # - name: "Token Price Updates Test"
+          #   file: ccip_token_price_updates_test.go
+          #   run: ""
+          #   timeout: 12m
+          - name: "CCIPReader Test"
+            file: ccip_reader_test.go
+            run: ""
+            timeout: 5m
+          - name: "Test_CCIPTopologies_EVM2EVM_RoleDON_AllSupportSource_SomeSupportDest"
+            file: ccip_topologies_test.go
+            run: "^Test_CCIPTopologies_EVM2EVM_RoleDON_AllSupportSource_SomeSupportDest$"
+            timeout: 20m
+
     name: Integration Tests (${{ matrix.type.name }})
     runs-on: ubuntu-latest
     steps:
@@ -217,8 +251,12 @@ jobs:
           go run github.com/smartcontractkit/chainlink/v2/core/store/cmd/preparetest
         env:
           CL_DATABASE_URL: ${{ env.DB_URL }}
-      - name: Run ${{ matrix.type.name }}
-        run: cd $GITHUB_WORKSPACE/chainlink/ && ${{ matrix.type.cmd }}
+      - name: ${{ matrix.type.name }}
+        uses: smartcontractkit/.github/actions/branch-out-upload@branch-out-upload/v1
+        with:
+          trunk-org-slug: smartcontractkit
+          trunk-token: ${{ secrets.TRUNK_API_KEY }}
+          go-test-args: ./integration-tests/smoke/ccip/${{ matrix.type.file }} ${{ matrix.type.run && format('-run {0}', matrix.type.run) }} -timeout ${{ matrix.type.timeout }}
         env:
           CL_DATABASE_URL: ${{ env.DB_URL }}
 

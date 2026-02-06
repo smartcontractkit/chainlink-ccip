@@ -8,7 +8,7 @@ on:
   merge_group:
   push:
     branches:
-      - 'main'
+      - "main"
 
 jobs:
   detect_deployments_changes:
@@ -60,8 +60,12 @@ jobs:
         working-directory: chains/evm/deployment
     steps:
       - uses: actions/checkout@v4
-      - name: Run tests
-        run: go test ./...
+      - name: Test EVM Deployments
+        uses: smartcontractkit/.github/actions/branch-out-upload@branch-out-upload/v1
+        with:
+          trunk-org-slug: smartcontractkit
+          trunk-token: ${{ secrets.TRUNK_API_KEY }}
+          go-test-args: ./chains/evm/deployment/...
 
   test-solana-deployments:
     needs: [detect_deployments_changes, setup-go]
@@ -72,8 +76,12 @@ jobs:
         working-directory: chains/solana/deployment
     steps:
       - uses: actions/checkout@v4
-      - name: Run tests
-        run: go test ./...
+      - name: Test Solana Deployments
+        uses: smartcontractkit/.github/actions/branch-out-upload@branch-out-upload/v1
+        with:
+          trunk-org-slug: smartcontractkit
+          trunk-token: ${{ secrets.TRUNK_API_KEY }}
+          go-test-args: ./chains/solana/deployment/...
 
   test-deployments:
     needs: [detect_deployments_changes, setup-go]
@@ -84,8 +92,12 @@ jobs:
         working-directory: deployment
     steps:
       - uses: actions/checkout@v4
-      - name: Run tests
-        run: go test ./...
+      - name: Test Crosschain Deployments
+        uses: smartcontractkit/.github/actions/branch-out-upload@branch-out-upload/v1
+        with:
+          trunk-org-slug: smartcontractkit
+          trunk-token: ${{ secrets.TRUNK_API_KEY }}
+          go-test-args: ./deployment/...
 
   test-deployments-crosschain:
     needs: [detect_deployments_changes, setup-go]
@@ -105,5 +117,9 @@ jobs:
         run: |
           sh -c "$(curl -sSfL https://release.anza.xyz/stable/install)" # always use latest stable release from solana
           echo "PATH=$HOME/.local/share/solana/install/active_release/bin:$PATH" >> $GITHUB_ENV
-      - name: Run tests
-        run: go test ./...
+      - name: Test Crosschain Deployments
+        uses: smartcontractkit/.github/actions/branch-out-upload@branch-out-upload/v1
+        with:
+          trunk-org-slug: smartcontractkit
+          trunk-token: ${{ secrets.TRUNK_API_KEY }}
+          go-test-args: ./integration-tests/deployment/...
