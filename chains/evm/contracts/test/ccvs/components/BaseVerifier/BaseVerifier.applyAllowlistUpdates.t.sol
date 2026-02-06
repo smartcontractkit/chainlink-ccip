@@ -53,9 +53,9 @@ contract BaseVerifier_applyAllowlistUpdates is BaseVerifierSetup {
     updateConfigs[0] = _getAllowlistConfig(DEST_CHAIN_SELECTOR, true, newSendersToAdd, sendersToRemove);
 
     vm.expectEmit();
-    emit BaseVerifier.AllowListSendersAdded(DEST_CHAIN_SELECTOR, newSendersToAdd);
-    vm.expectEmit();
     emit BaseVerifier.AllowListSendersRemoved(DEST_CHAIN_SELECTOR, sendersToRemove);
+    vm.expectEmit();
+    emit BaseVerifier.AllowListSendersAdded(DEST_CHAIN_SELECTOR, newSendersToAdd);
 
     s_baseVerifier.applyAllowlistUpdates(updateConfigs);
 
@@ -70,16 +70,26 @@ contract BaseVerifier_applyAllowlistUpdates is BaseVerifierSetup {
     // First add a sender.
     BaseVerifier.AllowlistConfigArgs[] memory addConfigs = new BaseVerifier.AllowlistConfigArgs[](1);
     addConfigs[0] = _getAllowlistConfig(DEST_CHAIN_SELECTOR, true, senders, new address[](0));
+
     s_baseVerifier.applyAllowlistUpdates(addConfigs);
 
     // Now disable allowlist.
     BaseVerifier.AllowlistConfigArgs[] memory disableConfigs = new BaseVerifier.AllowlistConfigArgs[](1);
     disableConfigs[0] = _getAllowlistConfig(DEST_CHAIN_SELECTOR, false, new address[](0), new address[](0));
 
+    vm.expectEmit();
+    emit BaseVerifier.AllowListStateChanged(DEST_CHAIN_SELECTOR, false);
+
     s_baseVerifier.applyAllowlistUpdates(disableConfigs);
 
     (bool allowlistEnabled,,) = s_baseVerifier.getRemoteChainConfig(DEST_CHAIN_SELECTOR);
     assertFalse(allowlistEnabled);
+
+    // Enabling it again will emit AllowListStateChanged.
+    vm.expectEmit();
+    emit BaseVerifier.AllowListStateChanged(DEST_CHAIN_SELECTOR, true);
+
+    s_baseVerifier.applyAllowlistUpdates(addConfigs);
   }
 
   // Reverts

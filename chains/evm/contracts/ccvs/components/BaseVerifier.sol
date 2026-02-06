@@ -26,6 +26,7 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
   event RemoteChainConfigSet(uint64 indexed remoteChainSelector, address router, bool allowlistEnabled);
   event AllowListSendersAdded(uint64 indexed destChainSelector, address[] senders);
   event AllowListSendersRemoved(uint64 indexed destChainSelector, address[] senders);
+  event AllowListStateChanged(uint64 indexed destChainSelector, bool allowlistEnabled);
   event StorageLocationsUpdated(string[] oldLocations, string[] newLocations);
 
   struct RemoteChainConfig {
@@ -201,10 +202,21 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
       AllowlistConfigArgs memory allowlistConfigArgs = allowlistConfigArgsItems[i];
 
       RemoteChainConfig storage remoteChainConfig = s_remoteChainConfigs[allowlistConfigArgs.destChainSelector];
-      remoteChainConfig.allowlistEnabled = allowlistConfigArgs.allowlistEnabled;
+
+      if (remoteChainConfig.allowlistEnabled != allowlistConfigArgs.allowlistEnabled) {
+        remoteChainConfig.allowlistEnabled = allowlistConfigArgs.allowlistEnabled;
+
+        emit AllowListStateChanged(allowlistConfigArgs.destChainSelector, allowlistConfigArgs.allowlistEnabled);
+      }
 
       for (uint256 j = 0; j < allowlistConfigArgs.removedAllowlistedSenders.length; ++j) {
         remoteChainConfig.allowedSendersList.remove(allowlistConfigArgs.removedAllowlistedSenders[j]);
+      }
+
+      if (allowlistConfigArgs.removedAllowlistedSenders.length > 0) {
+        emit AllowListSendersRemoved(
+          allowlistConfigArgs.destChainSelector, allowlistConfigArgs.removedAllowlistedSenders
+        );
       }
 
       if (allowlistConfigArgs.addedAllowlistedSenders.length > 0) {
@@ -221,12 +233,6 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
         } else {
           revert InvalidAllowListRequest(allowlistConfigArgs.destChainSelector);
         }
-      }
-
-      if (allowlistConfigArgs.removedAllowlistedSenders.length > 0) {
-        emit AllowListSendersRemoved(
-          allowlistConfigArgs.destChainSelector, allowlistConfigArgs.removedAllowlistedSenders
-        );
       }
     }
   }
