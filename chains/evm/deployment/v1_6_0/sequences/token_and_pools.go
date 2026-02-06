@@ -10,7 +10,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	bnmERC20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	tarops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
@@ -186,7 +185,7 @@ func (a *EVMAdapter) DeriveTokenDecimals(e deployment.Environment, chainSelector
 	if err != nil {
 		return 0, fmt.Errorf("failed to instantiate token pool contract: %w", err)
 	}
-	return tp.GetTokenDecimals(nil)
+	return tp.GetTokenDecimals(&bind.CallOpts{Context: e.GetContext()})
 }
 
 func (a *EVMAdapter) DeriveTokenPoolCounterpart(e deployment.Environment, chainSelector uint64, tokenPool []byte, token []byte) ([]byte, error) {
@@ -197,7 +196,7 @@ func (a *EVMAdapter) DeriveTokenPoolCounterpart(e deployment.Environment, chainS
 func (a *EVMAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokensapi.RateLimiterConfigInputs, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return cldf_ops.NewSequence(
 		"evm-adapter:set-token-pool-rate-limits",
-		tarops.Version,
+		tpops.Version,
 		"Set rate limits for a token pool across multiple EVM chains",
 		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokensapi.RateLimiterConfigInputs) (sequences.OnChainOutput, error) {
 			var result sequences.OnChainOutput
@@ -210,7 +209,7 @@ func (a *EVMAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokensapi.RateL
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token pool with qualifier %q on chain %d: %w", input.TokenPoolQualifier, input.ChainSelector, err)
 			}
 
-			report, err := cldf_ops.ExecuteOperation(b, tpops.SetChainRateLimiterConfig, chain, contract.FunctionInput[tpops.SetChainRateLimiterConfigArgs]{
+			report, err := cldf_ops.ExecuteOperation(b, tpops.SetChainRateLimiterConfig, chain, evm_contract.FunctionInput[tpops.SetChainRateLimiterConfigArgs]{
 				ChainSelector: chain.Selector,
 				Address:       tpAddress,
 				Args: tpops.SetChainRateLimiterConfigArgs{
@@ -228,7 +227,7 @@ func (a *EVMAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokensapi.RateL
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to set rate limiter config: %w", err)
 			}
-			batchOp, err := contract.NewBatchOperationFromWrites([]contract.WriteOutput{report.Output})
+			batchOp, err := evm_contract.NewBatchOperationFromWrites([]evm_contract.WriteOutput{report.Output})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation: %w", err)
 			}
