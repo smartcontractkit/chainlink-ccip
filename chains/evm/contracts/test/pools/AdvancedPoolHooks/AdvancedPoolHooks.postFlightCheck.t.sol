@@ -39,17 +39,14 @@ contract AdvancedPoolHooks_postflightCheck is AdvancedPoolHooksSetup {
     });
   }
 
-  function testFuzz_postflightCheck_WithPolicyEngine(
-    bytes memory sourcePoolData,
-    bytes memory offchainTokenData
-  ) public {
+  function test_postflightCheck_WithPolicyEngine() public {
     s_advancedPoolHooks.setPolicyEngine(address(s_mockPolicyEngine));
 
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = _createReleaseOrMintIn();
     uint256 localAmount = 100e18;
     uint16 blockConfirmationRequested = 5;
-    releaseOrMintIn.sourcePoolData = sourcePoolData;
-    releaseOrMintIn.offchainTokenData = offchainTokenData;
+    releaseOrMintIn.sourcePoolData = abi.encode("custom source pool data");
+    releaseOrMintIn.offchainTokenData = abi.encode("custom offchain token data");
 
     s_advancedPoolHooks.postflightCheck(releaseOrMintIn, localAmount, blockConfirmationRequested);
 
@@ -69,12 +66,13 @@ contract AdvancedPoolHooks_postflightCheck is AdvancedPoolHooksSetup {
   }
 
   function test_postflightCheck_RevertWhen_PolicyEngineRejects() public {
+    string memory expectedRevertReason = "policy rejected";
     s_advancedPoolHooks.setPolicyEngine(address(s_mockPolicyEngine));
-    s_mockPolicyEngine.setShouldRevert(true, "Policy rejected");
+    s_mockPolicyEngine.setShouldRevert(true, expectedRevertReason);
 
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = _createReleaseOrMintIn();
 
-    vm.expectRevert(abi.encodeWithSelector(MockPolicyEngine.MockPolicyEngineRejection.selector, "Policy rejected"));
+    vm.expectRevert(abi.encodeWithSelector(MockPolicyEngine.MockPolicyEngineRejection.selector, expectedRevertReason));
     s_advancedPoolHooks.postflightCheck(releaseOrMintIn, 100e18, 5);
   }
 

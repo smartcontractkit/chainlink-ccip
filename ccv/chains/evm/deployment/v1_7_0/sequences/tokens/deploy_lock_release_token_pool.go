@@ -92,22 +92,41 @@ var DeployLockReleaseTokenPool = cldf_ops.NewSequence(
 			poolAddr := common.HexToAddress(tpDeployReport.Output.Address)
 			hooksAddr := common.HexToAddress(hooksDeployReport.Output.Address)
 
-			applyAuthorizedCallerUpdatesReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.ApplyAuthorizedCallerUpdates, chain, evm_contract.FunctionInput[advanced_pool_hooks.AuthorizedCallerArgs]{
+			// Check if the pool is already an authorized caller.
+			getAuthorizedCallersReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.GetAllAuthorizedCallers, chain, evm_contract.FunctionInput[any]{
 				ChainSelector: input.ChainSel,
 				Address:       hooksAddr,
-				Args: advanced_pool_hooks.AuthorizedCallerArgs{
-					AddedCallers: []common.Address{poolAddr},
-				},
 			})
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to authorize token pool %s on advanced pool hooks with address %s on %s: %w", poolAddr, hooksAddr, chain, err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get authorized callers from advanced pool hooks %s on %s: %w", hooksAddr, chain, err)
 			}
 
-			batchOp, err := evm_contract.NewBatchOperationFromWrites([]evm_contract.WriteOutput{applyAuthorizedCallerUpdatesReport.Output})
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
+			alreadyAuthorized := false
+			for _, caller := range getAuthorizedCallersReport.Output {
+				if caller == poolAddr {
+					alreadyAuthorized = true
+					break
+				}
 			}
-			configureReport.Output.BatchOps = append(configureReport.Output.BatchOps, []mcms_types.BatchOperation{batchOp}...)
+
+			if !alreadyAuthorized {
+				applyAuthorizedCallerUpdatesReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.ApplyAuthorizedCallerUpdates, chain, evm_contract.FunctionInput[advanced_pool_hooks.AuthorizedCallerArgs]{
+					ChainSelector: input.ChainSel,
+					Address:       hooksAddr,
+					Args: advanced_pool_hooks.AuthorizedCallerArgs{
+						AddedCallers: []common.Address{poolAddr},
+					},
+				})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to authorize token pool %s on advanced pool hooks with address %s on %s: %w", poolAddr, hooksAddr, chain, err)
+				}
+
+				batchOp, err := evm_contract.NewBatchOperationFromWrites([]evm_contract.WriteOutput{applyAuthorizedCallerUpdatesReport.Output})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
+				}
+				configureReport.Output.BatchOps = append(configureReport.Output.BatchOps, []mcms_types.BatchOperation{batchOp}...)
+			}
 		}
 
 		// Add lock release token pool to the authorized callers of the lock box.

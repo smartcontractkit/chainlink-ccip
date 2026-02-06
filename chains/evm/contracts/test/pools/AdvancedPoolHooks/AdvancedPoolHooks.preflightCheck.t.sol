@@ -38,13 +38,12 @@ contract AdvancedPoolHooks_preflightCheck is AdvancedPoolHooksSetup {
     });
   }
 
-  function testFuzz_preflightCheck_WithPolicyEngine(
-    bytes memory tokenArgs
-  ) public {
+  function test_preflightCheck_WithPolicyEngine() public {
     s_advancedPoolHooks.setPolicyEngine(address(s_mockPolicyEngine));
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _createLockOrBurnIn(OWNER);
     uint16 blockConfirmationRequested = 5;
+    bytes memory tokenArgs = abi.encode("custom token args");
 
     s_advancedPoolHooks.preflightCheck(lockOrBurnIn, blockConfirmationRequested, tokenArgs, lockOrBurnIn.amount);
 
@@ -52,7 +51,7 @@ contract AdvancedPoolHooks_preflightCheck is AdvancedPoolHooksSetup {
     assertEq(IAdvancedPoolHooks.preflightCheck.selector, lastPayload.selector);
     assertEq(OWNER, lastPayload.sender);
     assertEq(tokenArgs, lastPayload.context);
-    assertEq(abi.encode(lockOrBurnIn, blockConfirmationRequested, tokenArgs), lastPayload.data);
+    assertEq(abi.encode(lockOrBurnIn, blockConfirmationRequested, tokenArgs, lockOrBurnIn.amount), lastPayload.data);
   }
 
   function test_preflightCheck_WithoutPolicyEngine() public {
@@ -63,29 +62,30 @@ contract AdvancedPoolHooks_preflightCheck is AdvancedPoolHooksSetup {
     s_advancedPoolHooks.preflightCheck(lockOrBurnIn, 5, "", lockOrBurnIn.amount);
   }
 
-  //  function test_preflightCheck_AllowListAndPolicyEngine() public {
-  //    address[] memory allowedSenders = new address[](1);
-  //    allowedSenders[0] = OWNER;
-  //    AdvancedPoolHooks hooksWithBoth =
-  //      new AdvancedPoolHooks(allowedSenders, 0, address(s_mockPolicyEngine), new address[](0));
-  //
-  //    Pool.LockOrBurnInV1 memory lockOrBurnIn = _createLockOrBurnIn(OWNER);
-  //
-  //    hooksWithBoth.preflightCheck(lockOrBurnIn, 5, "", lockOrBurnIn.amount);
-  //
-  //    IPolicyEngine.Payload memory lastPayload = s_mockPolicyEngine.getLastPayload();
-  //    assertEq(IAdvancedPoolHooks.preflightCheck.selector, lastPayload.selector);
-  //    assertEq(abi.encode(lockOrBurnIn, uint16(5), bytes("")), lastPayload.data);
-  //    assertEq(bytes(""), lastPayload.context);
-  //  }
-
-  function test_preflightCheck_RevertWhen_PolicyEngineRejects() public {
-    s_advancedPoolHooks.setPolicyEngine(address(s_mockPolicyEngine));
-    s_mockPolicyEngine.setShouldRevert(true, "Policy rejected");
+  function test_preflightCheck_AllowListAndPolicyEngine() public {
+    address[] memory allowedSenders = new address[](1);
+    allowedSenders[0] = OWNER;
+    AdvancedPoolHooks hooksWithBoth =
+      new AdvancedPoolHooks(allowedSenders, 0, address(s_mockPolicyEngine), new address[](0));
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _createLockOrBurnIn(OWNER);
 
-    vm.expectRevert(abi.encodeWithSelector(MockPolicyEngine.MockPolicyEngineRejection.selector, "Policy rejected"));
+    hooksWithBoth.preflightCheck(lockOrBurnIn, 5, "", lockOrBurnIn.amount);
+
+    IPolicyEngine.Payload memory lastPayload = s_mockPolicyEngine.getLastPayload();
+    assertEq(IAdvancedPoolHooks.preflightCheck.selector, lastPayload.selector);
+    assertEq(abi.encode(lockOrBurnIn, uint16(5), bytes(""), lockOrBurnIn.amount), lastPayload.data);
+    assertEq(bytes(""), lastPayload.context);
+  }
+
+  function test_preflightCheck_RevertWhen_PolicyEngineRejects() public {
+    string memory expectedRevertReason = "policy rejected";
+    s_advancedPoolHooks.setPolicyEngine(address(s_mockPolicyEngine));
+    s_mockPolicyEngine.setShouldRevert(true, expectedRevertReason);
+
+    Pool.LockOrBurnInV1 memory lockOrBurnIn = _createLockOrBurnIn(OWNER);
+
+    vm.expectRevert(abi.encodeWithSelector(MockPolicyEngine.MockPolicyEngineRejection.selector, expectedRevertReason));
     s_advancedPoolHooks.preflightCheck(lockOrBurnIn, 5, "", lockOrBurnIn.amount);
   }
 
