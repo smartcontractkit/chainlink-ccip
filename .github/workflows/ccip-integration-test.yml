@@ -252,7 +252,8 @@ jobs:
         env:
           CL_DATABASE_URL: ${{ env.DB_URL }}
       - name: ${{ matrix.type.name }}
-        uses: smartcontractkit/.github/actions/branch-out-upload@branch-out-upload/v1
+        # DEBUG: Using specific commit to figure out odd error
+        uses: smartcontractkit/.github/actions/branch-out-upload@12849b949554672a493e663cbb9f55205344aff6
         with:
           trunk-org-slug: smartcontractkit
           trunk-token: ${{ secrets.TRUNK_API_KEY }}
