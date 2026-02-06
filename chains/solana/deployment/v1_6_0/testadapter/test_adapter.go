@@ -91,7 +91,7 @@ func (a *SVMAdapter) BuildMessage(components testadapters.MessageComponents) (an
 		}
 	}
 
-	tokenAmounts := []ccip_router.SVMTokenAmount{}
+	var tokenAmounts []ccip_router.SVMTokenAmount
 	for i, ta := range components.TokenAmounts {
 		token, err := solana.PublicKeyFromBase58(ta.Token)
 		if err != nil {

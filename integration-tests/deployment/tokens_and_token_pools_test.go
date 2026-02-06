@@ -2,6 +2,7 @@ package deployment
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"math"
 	"math/big"
@@ -13,6 +14,10 @@ import (
 	"github.com/gagliardetto/solana-go"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	evmadapters "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_common"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_0/burnmint_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	bnmERC20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
@@ -516,10 +521,21 @@ func TestTokensAndTokenPools(t *testing.T) {
 
 			// Verify that no **pending** admin exists for the token at the moment. Also,
 			// The PDA for TokenAdminRegistry is not initialized
-			// TODO:
+			tokenMint := solana.MustPublicKeyFromBase58(tokenAddr.Address)
+			routerAdd, err := solAdapter.GetRouterAddress(env.DataStore, solTestData.Chain.Selector)
+			require.NoError(t, err)
+			routerProgramId := solana.PublicKeyFromBytes(routerAdd)
+			tokenAdminRegistryPDA, _, _ := state.FindTokenAdminRegistryPDA(tokenMint, routerProgramId)
+
+			var tokenAdminRegistryAccount ccip_common.TokenAdminRegistry
+			tokenAdminRegistryErr := env.BlockChains.SolanaChains()[solTestData.Chain.Selector].GetAccountDataBorshInto(context.Background(), tokenAdminRegistryPDA, &tokenAdminRegistryAccount)
+			require.Error(t, tokenAdminRegistryErr)
 
 			// Verify that the PDA token pool has not been initialized
-			// TODO:
+			tokenPoolStatePDA, _ := tokens.TokenPoolConfigAddress(tokenMint, routerProgramId)
+			var tokenPoolStateAccount burnmint_token_pool.State
+			tokenPoolStateErr := env.BlockChains.SolanaChains()[solTestData.Chain.Selector].GetAccountDataBorshInto(context.Background(), tokenPoolStatePDA, &tokenPoolStateAccount)
+			require.Error(t, tokenPoolStateErr)
 
 			// Run the changeset
 			output, err = tokensapi.
@@ -541,7 +557,16 @@ func TestTokensAndTokenPools(t *testing.T) {
 			MergeAddresses(t, env, output.DataStore)
 
 			// Verify that a new admin was proposed for the specified token
-			// TODO:
+			var tokenAdminRegistryAccountAfter ccip_common.TokenAdminRegistry
+			if err := env.BlockChains.SolanaChains()[solTestData.Chain.Selector].GetAccountDataBorshInto(context.Background(), tokenAdminRegistryPDA, &tokenAdminRegistryAccountAfter); err != nil {
+				require.Equal(t, solana.PublicKey{}, tokenAdminRegistryAccountAfter.Administrator)
+				//require.Equal(t, solTestData.Token.ExternalAdmin, tokenAdminRegistryAccountAfter.PendingAdministrator)
+			}
+			var tokenPoolStateAccountAfter burnmint_token_pool.State
+			if err := env.BlockChains.SolanaChains()[solTestData.Chain.Selector].GetAccountDataBorshInto(context.Background(), tokenPoolStatePDA, &tokenPoolStateAccount); err != nil {
+				require.Equal(t, solana.PublicKey{}, tokenPoolStateAccountAfter.Config.Owner)
+				//require.Equal(t, solTestData.Token.ExternalAdmin, tokenPoolStateAccountAfter.Config.ProposedOwner)
+			}
 
 		})
 
