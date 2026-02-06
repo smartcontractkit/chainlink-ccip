@@ -17,6 +17,7 @@ import (
 	tpops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/operations/token_pool"
 	tpseq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/sequences/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/token_pool"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
@@ -157,6 +158,82 @@ func (a *EVMAdapter) DeriveTokenAddress(e deployment.Environment, chainSelector 
 	}
 
 	return token.Output.Bytes(), nil
+}
+
+func (a *EVMAdapter) DeriveTokenDecimals(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) (uint8, error) {
+	chain, ok := e.BlockChains.EVMChains()[chainSelector]
+	if !ok {
+		return 0, fmt.Errorf("chain with selector %d not defined", chainSelector)
+	}
+
+	addrRef, err := datastore_utils.FindAndFormatRef(e.DataStore, poolRef, chainSelector, datastore_utils.FullRef)
+	if err != nil {
+		return 0, fmt.Errorf("failed to find token pool in datastore using ref (%+v): %w", poolRef, err)
+	}
+
+	addrRaw, err := a.AddressRefToBytes(addrRef)
+	if err != nil {
+		return 0, fmt.Errorf("failed to convert address ref to bytes: %w", err)
+	}
+
+	tpAddr := common.BytesToAddress(addrRaw)
+	if tpAddr == (common.Address{}) {
+		return 0, errors.New("token pool address is zero address")
+	}
+
+	tp, err := token_pool.NewTokenPool(tpAddr, chain.Client)
+	if err != nil {
+		return 0, fmt.Errorf("failed to instantiate token pool contract: %w", err)
+	}
+	return tp.GetTokenDecimals(&bind.CallOpts{Context: e.GetContext()})
+}
+
+func (a *EVMAdapter) DeriveTokenPoolCounterpart(e deployment.Environment, chainSelector uint64, tokenPool []byte, token []byte) ([]byte, error) {
+	// For EVM chains, the token pool address is not derived from the token address, so we can return the token pool address as is.
+	return tokenPool, nil
+}
+
+func (a *EVMAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokensapi.RateLimiterConfigInputs, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return cldf_ops.NewSequence(
+		"evm-adapter:set-token-pool-rate-limits",
+		tpops.Version,
+		"Set rate limits for a token pool across multiple EVM chains",
+		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokensapi.RateLimiterConfigInputs) (sequences.OnChainOutput, error) {
+			var result sequences.OnChainOutput
+			chain, ok := chains.EVMChains()[input.ChainSelector]
+			if !ok {
+				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
+			}
+			tpAddress, err := a.FindLatestTokenPoolAddress(input.ExistingDataStore, input.ChainSelector, input.TokenPoolQualifier, input.PoolType)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token pool with qualifier %q on chain %d: %w", input.TokenPoolQualifier, input.ChainSelector, err)
+			}
+
+			report, err := cldf_ops.ExecuteOperation(b, tpops.SetChainRateLimiterConfig, chain, evm_contract.FunctionInput[tpops.SetChainRateLimiterConfigArgs]{
+				ChainSelector: chain.Selector,
+				Address:       tpAddress,
+				Args: tpops.SetChainRateLimiterConfigArgs{
+					OutboundRateLimitConfig: token_pool.RateLimiterConfig{
+						IsEnabled: input.OutboundRateLimiterConfig.IsEnabled,
+						Capacity:  input.OutboundRateLimiterConfig.Capacity,
+						Rate:      input.OutboundRateLimiterConfig.Rate},
+					InboundRateLimitConfig: token_pool.RateLimiterConfig{
+						IsEnabled: input.InboundRateLimiterConfig.IsEnabled,
+						Capacity:  input.InboundRateLimiterConfig.Capacity,
+						Rate:      input.InboundRateLimiterConfig.Rate},
+					RemoteChainSelector: input.RemoteChainSelector,
+				},
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to set rate limiter config: %w", err)
+			}
+			batchOp, err := evm_contract.NewBatchOperationFromWrites([]evm_contract.WriteOutput{report.Output})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation: %w", err)
+			}
+			result.BatchOps = append(result.BatchOps, batchOp)
+			return result, nil
+		})
 }
 
 func (a *EVMAdapter) ManualRegistration() *cldf_ops.Sequence[tokensapi.ManualRegistrationInput, sequences.OnChainOutput, cldf_chain.BlockChains] {

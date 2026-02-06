@@ -57,6 +57,34 @@ contracts:
         access: owner
       - name: setChainRateLimiterConfig
         access: owner
+      - name: getToken
+        access: public
+      - name: isSupportedToken
+        access: public
+      - name: getAllowListEnabled
+        access: public
+      - name: getAllowList
+        access: public
+      - name: applyAllowListUpdates
+        access: owner
+      - name: getRouter
+        access: public
+      - name: setRouter
+        access: owner
+      - name: getSupportedChains
+        access: public
+      - name: getRemoteToken
+        access: public
+      - name: getRemotePools
+        access: public
+      - name: addRemotePool
+        access: owner
+      - name: removeRemotePool
+        access: owner
+      - name: getCurrentInboundRateLimiterState
+        access: public
+      - name: getCurrentOutboundRateLimiterState
+        access: public
 
   - contract_name: BurnMintTokenPool
     version: "1.6.1"
@@ -101,12 +129,22 @@ contracts:
         access: owner
       - name: applyTokenTransferFeeConfigUpdates
         access: owner
+      - name: getDestChainConfig
+        access: public
+      - name: getTokenTransferFeeConfig
+        access: public
 
   - contract_name: OnRamp
     version: "1.6.0"
     functions:
       - name: applyDestChainConfigUpdates
         access: owner
+      - name: getDestChainConfig
+        access: public
+      - name: getStaticConfig
+        access: public
+      - name: getDynamicConfig
+        access: public
 
   - contract_name: OffRamp
     package_name: offramp
@@ -116,3 +154,9 @@ contracts:
         access: owner
       - name: setOCR3Configs
         access: owner
+      - name: getStaticConfig
+        access: public
+      - name: getDynamicConfig
+        access: public
+      - name: getSourceChainConfig
+        access: public

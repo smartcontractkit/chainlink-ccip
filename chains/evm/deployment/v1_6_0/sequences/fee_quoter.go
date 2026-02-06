@@ -13,7 +13,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
@@ -43,8 +42,8 @@ type FeeQuoterImportConfigSequenceInput struct {
 }
 
 type FeeQuoterImportConfigSequenceOutput struct {
-	DestChainCfg         fee_quoter.FeeQuoterDestChainConfig
-	TokenTransferFeeCfgs map[common.Address]fee_quoter.FeeQuoterTokenTransferFeeConfig
+	DestChainCfg         fqops.DestChainConfig
+	TokenTransferFeeCfgs map[common.Address]fqops.TokenTransferFeeConfig
 }
 
 var (
@@ -146,7 +145,7 @@ var (
 			chainSelector := in.ChainSelector
 			b.Logger.Infof("Importing configuration for FeeQuoter %s on chain %d (%s)", fqAddress.Hex(), chainSelector, evmChain.Name())
 			fqOutput := make(map[uint64]FeeQuoterImportConfigSequenceOutput)
-			destChainConfigs := make(map[uint64]fee_quoter.FeeQuoterDestChainConfig)
+			destChainConfigs := make(map[uint64]fqops.DestChainConfig)
 			for _, remoteChain := range in.RemoteChains {
 				opsOutput, err := operations.ExecuteOperation(b, fqops.GetDestChainConfig, evmChain, contract.FunctionInput[uint64]{
 					Address:       fqAddress,
@@ -161,16 +160,16 @@ var (
 				destChainConfigs[remoteChain] = opsOutput.Output
 			}
 
-			tokenTransferFeeCfgsPerChain := make(map[uint64]map[common.Address]fee_quoter.FeeQuoterTokenTransferFeeConfig)
+			tokenTransferFeeCfgsPerChain := make(map[uint64]map[common.Address]fqops.TokenTransferFeeConfig)
 
 			for remoteChain, tokens := range in.TokensPerRemoteChain {
-				tokenTransferFeeCfgs := make(map[common.Address]fee_quoter.FeeQuoterTokenTransferFeeConfig)
+				tokenTransferFeeCfgs := make(map[common.Address]fqops.TokenTransferFeeConfig)
 				for _, token := range tokens {
 					opsOutput, err := operations.ExecuteOperation(b, fqops.GetTokenTransferFeeConfig, evmChain,
-						contract.FunctionInput[fqops.GetTokenTransferFeeConfigInput]{
+						contract.FunctionInput[fqops.GetTokenTransferFeeConfigArgs]{
 							Address:       fqAddress,
 							ChainSelector: chainSelector,
-							Args: fqops.GetTokenTransferFeeConfigInput{
+							Args: fqops.GetTokenTransferFeeConfigArgs{
 								Token:             token,
 								DestChainSelector: remoteChain,
 							},

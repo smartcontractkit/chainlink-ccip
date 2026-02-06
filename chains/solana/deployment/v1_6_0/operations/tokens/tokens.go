@@ -30,6 +30,7 @@ type Params struct {
 	TokenDecimals          uint8
 	TokenSymbol            string
 	ATAList                []solana.PublicKey
+	PreMint                uint64
 	DisableFreezeAuthority bool
 }
 
@@ -110,11 +111,11 @@ var DeploySolanaToken = operations.NewOperation(
 			return datastore.AddressRef{}, err
 		}
 		// CREATE ATAs
-		for _, ata := range input.ATAList {
+		for _, sender := range input.ATAList {
 			createATAIx, _, err := soltokens.CreateAssociatedTokenAccount(
 				tokenProgramID,
 				mint,
-				ata,
+				sender,
 				chain.DeployerKey.PublicKey(),
 			)
 			if err != nil {
@@ -122,6 +123,16 @@ var DeploySolanaToken = operations.NewOperation(
 			}
 			if err := chain.Confirm([]solana.Instruction{createATAIx}); err != nil {
 				return datastore.AddressRef{}, err
+			}
+			if input.PreMint > 0 {
+				ata, _, _ := soltokens.FindAssociatedTokenAddress(tokenProgramID, mint, sender)
+				mintToI, err := soltokens.MintTo(input.PreMint, tokenProgramID, mint, ata, chain.DeployerKey.PublicKey())
+				if err != nil {
+					return datastore.AddressRef{}, err
+				}
+				if err := chain.Confirm([]solana.Instruction{mintToI}); err != nil {
+					return datastore.AddressRef{}, err
+				}
 			}
 		}
 		// DISABLE FREEZE AUTHORITY
@@ -135,6 +146,7 @@ var DeploySolanaToken = operations.NewOperation(
 			ChainSelector: chain.Selector,
 			Address:       mint.String(),
 			Type:          datastore.ContractType(input.TokenProgramName),
+			Version:       Version,
 			Qualifier:     input.TokenSymbol,
 		}, nil
 	},

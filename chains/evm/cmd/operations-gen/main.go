@@ -158,7 +158,7 @@ type TemplateData struct {
 	NoDeployment      bool
 	Constructor       *ConstructorData
 	StructDefs        []StructDefData
-	WriteArgStructs   []ArgStructData
+	ArgStructs        []ArgStructData
 	Operations        []OperationData
 	ContractMethods   []ContractMethodData
 }
@@ -618,7 +618,7 @@ func prepareTemplateData(info *ContractInfo) TemplateData {
 				AccessControl: writeOp.AccessControl,
 			})
 			if len(funcInfo.Parameters) > 1 {
-				data.WriteArgStructs = append(data.WriteArgStructs, ArgStructData{
+				data.ArgStructs = append(data.ArgStructs, ArgStructData{
 					Name:   funcInfo.Name + "Args",
 					Fields: prepareParameters(funcInfo.Parameters),
 				})
@@ -634,6 +634,13 @@ func prepareTemplateData(info *ContractInfo) TemplateData {
 				IsWrite:    false,
 				ReturnType: readOp.ReturnType,
 			})
+			// Generate Args struct for read operations with multiple parameters
+			if len(funcInfo.Parameters) > 1 {
+				data.ArgStructs = append(data.ArgStructs, ArgStructData{
+					Name:   funcInfo.Name + "Args",
+					Fields: prepareParameters(funcInfo.Parameters),
+				})
+			}
 		}
 	}
 
