@@ -121,8 +121,9 @@ jobs:
           ccip u ${{ matrix.test.config }}
           sleep 120 # wait for nodes to be ready, need a better way here
       - name: Smoke Tests
-        uses: smartcontractkit/.github/actions/branch-out-upload@branch-out-upload/v1
+        # DEBUG: Using specific commit to figure out odd error
+        uses: smartcontractkit/.github/actions/branch-out-upload@12849b949554672a493e663cbb9f55205344aff6
         with:
           trunk-org-slug: smartcontractkit
           trunk-token: ${{ secrets.TRUNK_API_KEY }}
-          go-test-args: -v -run ${{ matrix.test.name }} -timeout 20m
+          go-test-args: -run ${{ matrix.test.name }} -timeout 20m
