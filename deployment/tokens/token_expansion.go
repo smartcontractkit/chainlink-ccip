@@ -65,9 +65,28 @@ type DeployTokenInput struct {
 	// if true, the freeze authority will be revoked on token creation
 	// and it will be disabled FOREVER
 	DisableFreezeAuthority bool `yaml:"disable-freeze-authority" json:"disableFreezeAuthority"`
+	// Token metadata to be uploaded
+	TokenMetadata *TokenMetadata `yaml:"token-metadata,omitempty" json:"tokenMetadata,omitempty"`
 	// below are not specified by the user, filled in by the deployment system to pass to chain operations
 	ChainSelector     uint64
 	ExistingDataStore datastore.DataStore
+}
+
+// Right now this is only used for Solana tokens but we can extend this to other VMs if needed in the future
+type TokenMetadata struct {
+	TokenPubkey string
+	// https://metaboss.dev/create.html#metadata
+	// only to be provided on initial upload, it takes in name, symbol, uri
+	// after initial upload, those fields can be updated using the update inputs
+	// put the json in ccip/env/input dir in CLD
+	MetadataJSONPath string
+	UpdateAuthority  string // used to set update authority of the token metadata PDA after initial upload
+	// https://metaboss.dev/update.html#update-name
+	UpdateName string // used to update the name of the token metadata PDA after initial upload
+	// https://metaboss.dev/update.html#update-symbol
+	UpdateSymbol string // used to update the symbol of the token metadata PDA after initial upload
+	// https://metaboss.dev/update.html#update-uri
+	UpdateURI string // used to update the uri of the token metadata PDA after initial upload
 }
 
 type DeployTokenPoolInput struct {

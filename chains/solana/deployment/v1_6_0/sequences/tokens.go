@@ -334,6 +334,15 @@ func (a *SolanaAdapter) DeployToken() *cldf_ops.Sequence[tokenapi.DeployTokenInp
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy token: %w", err)
 			}
 			result.Addresses = append(result.Addresses, deployOut.Output)
+			if input.TokenMetadata != nil {
+				_, err = operations.ExecuteOperation(b, tokensops.UpsertTokenMetadata, chains.SolanaChains()[chain.Selector], tokensops.TokenMetadataInput{
+					ExistingAddresses: input.ExistingDataStore.Addresses().Filter(),
+					Metadata:          *input.TokenMetadata,
+				})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to upload token metadata: %w", err)
+				}
+			}
 			return result, nil
 		},
 	)
