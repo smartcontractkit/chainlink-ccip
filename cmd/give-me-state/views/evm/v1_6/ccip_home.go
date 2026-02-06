@@ -4,6 +4,7 @@ import (
 	"call-orchestrator-demo/views"
 	"call-orchestrator-demo/views/evm/common"
 	"encoding/hex"
+	"encoding/json"
 	"math/big"
 )
 
@@ -131,9 +132,9 @@ func decodeChainConfigsArray(data []byte) ([]map[string]any, error) {
 			break
 		}
 
-		// Get the offset to this element (relative to the start of the array data)
+		// Get the offset to this element (relative to the start of the offsets section, i.e., after the length)
 		elementOffset := common.DecodeUint64FromBytes(data[offsetsStart+i*32 : offsetsStart+i*32+32])
-		actualOffset := offset + elementOffset
+		actualOffset := offsetsStart + elementOffset
 
 		if actualOffset+64 > uint64(len(data)) {
 			break
@@ -273,19 +274,25 @@ func formatPeerID(peerIdBytes []byte) string {
 }
 
 // decodeChainConfigBytes attempts to decode the chain config bytes.
-// The config is typically: (uint32 gasPriceDeviationPPB, uint32 daGasPriceDeviationPPB, uint32 optimisticConfirmations, bool chainFeeDeviationDisabled)
+// The config bytes are typically JSON-encoded.
 func decodeChainConfigBytes(configBytes []byte) map[string]any {
-	if len(configBytes) < 16 {
+	if len(configBytes) == 0 {
 		return nil
 	}
 
-	// The encoding varies, but typically it's packed values
-	// Let's try to decode as much as we can
-	result := make(map[string]any)
+	// Try to decode as JSON first (most common case)
+	// Check if it starts with '{' (0x7b)
+	if configBytes[0] == 0x7b {
+		result := make(map[string]any)
+		if err := json.Unmarshal(configBytes, &result); err == nil {
+			return result
+		}
+	}
 
-	// If it's at least 16 bytes, try to decode as packed config
+	// Fallback: try to decode as packed binary values
+	// (uint32 gasPriceDeviationPPB, uint32 daGasPriceDeviationPPB, uint32 optimisticConfirmations, bool chainFeeDeviationDisabled)
 	if len(configBytes) >= 16 {
-		// Read 4 uint32 values (16 bytes total)
+		result := make(map[string]any)
 		gasPriceDeviationPPB := new(big.Int).SetBytes(configBytes[0:4]).Uint64()
 		daGasPriceDeviationPPB := new(big.Int).SetBytes(configBytes[4:8]).Uint64()
 		optimisticConfirmations := new(big.Int).SetBytes(configBytes[8:12]).Uint64()
@@ -297,7 +304,8 @@ func decodeChainConfigBytes(configBytes []byte) map[string]any {
 		if len(configBytes) >= 13 {
 			result["chainFeeDeviationDisabled"] = configBytes[12] != 0
 		}
+		return result
 	}
 
-	return result
+	return nil
 }

@@ -193,9 +193,9 @@ func decodeNodesArray(data []byte) ([]map[string]any, error) {
 			break
 		}
 
-		// Get the offset to this element (relative to the start of the array data)
+		// Get the offset to this element (relative to the offsets section start, i.e., after the length)
 		elementOffset := common.DecodeUint64FromBytes(data[offsetsStart+i*32 : offsetsStart+i*32+32])
-		actualOffset := offset + elementOffset
+		actualOffset := offsetsStart + elementOffset
 
 		if actualOffset+256 > uint64(len(data)) {
 			break

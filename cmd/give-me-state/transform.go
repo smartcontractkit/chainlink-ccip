@@ -103,6 +103,7 @@ func buildChainObject(chainSelector uint64, chainID string, contracts []any) map
 		"priceRegistry":      make(map[string]any),
 		"commitStore":        make(map[string]any),
 		"rmn":                make(map[string]any),
+		"committeeVerifier":  make(map[string]any),
 	}
 
 	// MCMS contracts need special handling
@@ -224,6 +225,7 @@ func categorizeContract(contractType string) string {
 		"priceregistry":             "priceRegistry",
 		"commitstore":               "commitStore",
 		"rmn":                       "rmn",
+		"committeeverifier":         "committeeVerifier",
 		// Aptos types
 		"aptosccip":    "ccip",
 		"aptosrouter":  "router",
