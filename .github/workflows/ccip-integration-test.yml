@@ -252,19 +252,13 @@ jobs:
           go run github.com/smartcontractkit/chainlink/v2/core/store/cmd/preparetest
         env:
           CL_DATABASE_URL: ${{ env.DB_URL }}
-      - name: "DEBUG: Directory"
-        shell: bash
-        run: |
-          echo "DEBUG: Directory: $(pwd)"
-          ls -la
-          cd integration-tests/smoke/ccip
       - name: ${{ matrix.type.name }}
         # DEBUG: Using specific commit to figure out odd error
-        uses: smartcontractkit/.github/actions/branch-out-upload@12849b949554672a493e663cbb9f55205344aff6
+        uses: smartcontractkit/.github/actions/branch-out-upload@fe886e79324fc84f7a721fcea6994b03f57660f8
         with:
           trunk-org-slug: smartcontractkit
           trunk-token: ${{ secrets.TRUNK_API_KEY }}
-          go-test-args: /integration-tests/smoke/ccip/${{ matrix.type.file }} ${{ matrix.type.run != '' && format('-run {0}', matrix.type.run) || '' }} -timeout ${{ matrix.type.timeout }}
+          go-test-args: $GITHUB_WORKSPACE/chainlink/integration-tests/smoke/ccip/${{ matrix.type.file }} ${{ matrix.type.run != '' && format('-run {0}', matrix.type.run) || '' }} -timeout ${{ matrix.type.timeout }}
         env:
           CL_DATABASE_URL: ${{ env.DB_URL }}
 
