@@ -258,7 +258,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
 
     // If the source pool data is the lock release flag, use the lock release pool set for the remote chain selector.
     if (version == USDCSourcePoolDataCodec.LOCK_RELEASE_FLAG) {
-      return IPoolV1(s_siloedLockReleasePool).releaseOrMint(releaseOrMintIn);
+      return IPoolV2(s_siloedLockReleasePool).releaseOrMint(releaseOrMintIn, blockConfirmationRequested);
     }
     if (version == USDCSourcePoolDataCodec.CCTP_VERSION_2_CCV_TAG) {
       return IPoolV2(s_cctpV2PoolWithCCV).releaseOrMint(releaseOrMintIn, blockConfirmationRequested);
@@ -297,6 +297,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
     if (
       pools.siloedLockReleasePool != address(0)
         && !pools.siloedLockReleasePool.supportsInterface(type(IPoolV1).interfaceId)
+        && !pools.siloedLockReleasePool.supportsInterface(type(IPoolV2).interfaceId)
     ) {
       revert TokenPoolUnsupported(pools.siloedLockReleasePool);
     }

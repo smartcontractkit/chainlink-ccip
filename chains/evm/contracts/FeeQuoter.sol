@@ -73,14 +73,14 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
     bool isEnabled; // ────────────────────╮ Whether this destination chain is enabled.
     uint32 maxDataBytes; //                │ Maximum data payload size in bytes.
     uint32 maxPerMsgGasLimit; //           │ Maximum gas limit.
-    uint32 destGasOverhead; //             │ Gas charged on top of the gasLimit to cover destination chain costs.
-    uint8 destGasPerPayloadByteBase; //    │ Default dest-chain gas charged each byte of `data` payload.
+    uint32 destGasOverhead; //             │ LEGACY: Gas charged on top of the gasLimit to cover destination chain costs.
+    uint8 destGasPerPayloadByteBase; //    │ Default dest-chain gas charged each byte of `data` payload, accounting for DA costs.
     bytes4 chainFamilySelector; //         │ Selector that identifies the destination chain's family. Used to determine the correct validations to perform for the dest chain.
     // The following two properties are defaults, they can be overridden by setting the TokenTransferFeeConfig for a token.
     uint16 defaultTokenFeeUSDCents; //     │ Default token fee charged per token transfer.
     uint32 defaultTokenDestGasOverhead; // │ Default gas charged to execute a token transfer on the destination chain.
     uint32 defaultTxGasLimit; //           │ Default gas limit for a tx.
-    uint16 networkFeeUSDCents; //          │ Flat network fee to charge for messages, multiples of 0.01 USD.
+    uint16 networkFeeUSDCents; //          │ LEGACY: Flat network fee to charge for messages, multiples of 0.01 USD.
     uint8 linkFeeMultiplierPercent; // ────╯ Percentage multiplier to apply when fee is paid in LINK. 90 = 10% discount.
   }
 

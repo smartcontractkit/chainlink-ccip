@@ -60,12 +60,24 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
 
     // Expect the lockReleasePool's releaseOrMint to be called and return expectedOut.
     vm.mockCall(
-      address(s_lockReleasePool),
-      abi.encodeWithSelector(IPoolV1.releaseOrMint.selector, releaseOrMintIn),
-      abi.encode(expectedOut)
+      address(s_lockReleasePool), abi.encodeCall(IPoolV1.releaseOrMint, (releaseOrMintIn)), abi.encode(expectedOut)
     );
 
+    vm.expectCall(address(s_lockReleasePool), abi.encodeCall(IPoolV1.releaseOrMint, (releaseOrMintIn)));
+
     Pool.ReleaseOrMintOutV1 memory actualOut = s_usdcTokenPoolProxy.releaseOrMint(releaseOrMintIn);
+
+    assertEq(actualOut.destinationAmount, expectedOut.destinationAmount);
+
+    // Mock IPoolV2 version as well
+    vm.mockCall(
+      address(s_lockReleasePool), abi.encodeCall(IPoolV2.releaseOrMint, (releaseOrMintIn, 0)), abi.encode(expectedOut)
+    );
+
+    // Expect call to be IPoolV2 when using the IPoolV2 releaseOrMint.
+    vm.expectCall(address(s_lockReleasePool), abi.encodeCall(IPoolV2.releaseOrMint, (releaseOrMintIn, 0)));
+
+    actualOut = s_usdcTokenPoolProxy.releaseOrMint(releaseOrMintIn, 0);
 
     assertEq(actualOut.destinationAmount, expectedOut.destinationAmount);
   }
@@ -107,6 +119,8 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
       abi.encode(expectedOut)
     );
 
+    vm.expectCall(address(s_cctpV1Pool), abi.encodeWithSelector(IPoolV1.releaseOrMint.selector, releaseOrMintIn));
+
     Pool.ReleaseOrMintOutV1 memory actualOut = s_usdcTokenPoolProxy.releaseOrMint(releaseOrMintIn);
 
     assertEq(actualOut.destinationAmount, expectedOut.destinationAmount);
@@ -147,6 +161,10 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
       address(s_cctpThroughCCVTokenPool),
       abi.encodeWithSelector(IPoolV2.releaseOrMint.selector, releaseOrMintIn, 0),
       abi.encode(expectedOut)
+    );
+
+    vm.expectCall(
+      address(s_cctpThroughCCVTokenPool), abi.encodeWithSelector(IPoolV2.releaseOrMint.selector, releaseOrMintIn, 0)
     );
 
     Pool.ReleaseOrMintOutV1 memory actualOut = s_usdcTokenPoolProxy.releaseOrMint(releaseOrMintIn, 0);
@@ -192,6 +210,8 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
       abi.encodeWithSelector(IPoolV1.releaseOrMint.selector, releaseOrMintIn),
       abi.encode(expectedOut)
     );
+
+    vm.expectCall(address(s_cctpV2Pool), abi.encodeWithSelector(IPoolV1.releaseOrMint.selector, releaseOrMintIn));
 
     Pool.ReleaseOrMintOutV1 memory actualOut = s_usdcTokenPoolProxy.releaseOrMint(releaseOrMintIn);
 
