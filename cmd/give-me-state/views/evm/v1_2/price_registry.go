@@ -2,21 +2,41 @@ package v1_2
 
 import (
 	"encoding/hex"
+	"fmt"
 	"math/big"
 
 	"call-orchestrator-demo/views"
 	"call-orchestrator-demo/views/evm/common"
+
+	"github.com/ethereum/go-ethereum/accounts/abi"
+
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/price_registry"
 )
 
 // Function selectors for PriceRegistry
 var (
+	PriceRegistryABI abi.ABI
+
 	// getFeeTokens() returns (address[])
-	selectorGetFeeTokens = common.HexToSelector("cdc73d51")
+	selectorGetFeeTokens []byte
 	// getStalenessThreshold() returns (uint128)
-	selectorGetStalenessThreshold = common.HexToSelector("a6c94a73")
+	selectorGetStalenessThreshold []byte
 	// getPriceUpdaters() returns (address[])
-	selectorGetPriceUpdaters = common.HexToSelector("bfcd4566")
+	selectorGetPriceUpdaters []byte
 )
+
+func init() {
+	// Parse the PriceRegistry ABI once at startup
+	parsedPriceRegistry, err := price_registry.PriceRegistryMetaData.GetAbi()
+	if err != nil {
+		panic(fmt.Sprintf("failed to parse PriceRegistry ABI: %v", err))
+	}
+	PriceRegistryABI = *parsedPriceRegistry
+
+	selectorGetFeeTokens = PriceRegistryABI.Methods["getFeeTokens"].ID
+	selectorGetStalenessThreshold = PriceRegistryABI.Methods["getStalenessThreshold"].ID
+	selectorGetPriceUpdaters = PriceRegistryABI.Methods["getPriceUpdaters"].ID
+}
 
 // getPriceRegistryFeeTokens fetches the list of fee tokens using manual decoding.
 func getPriceRegistryFeeTokens(ctx *views.ViewContext) ([]string, error) {

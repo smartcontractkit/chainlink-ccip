@@ -81,7 +81,14 @@ func getOffRampStaticConfig(ctx *views.ViewContext) (map[string]any, error) {
 	config := make(map[string]any)
 	config["rawData"] = views.BytesToHex(data)
 
-	// Parse known fields
+	// Parse known fields per v1.6.0 ABI:
+	// struct StaticConfig {
+	//   uint64 chainSelector;
+	//   uint16 gasForCallExactCheck;
+	//   address rmnRemote;
+	//   address tokenAdminRegistry;
+	//   address nonceManager;
+	// }
 	offset := 0
 	if len(data) >= offset+32 {
 		cs, _ := common.DecodeUint64(data[offset : offset+32])
@@ -89,8 +96,13 @@ func getOffRampStaticConfig(ctx *views.ViewContext) (map[string]any, error) {
 		offset += 32
 	}
 	if len(data) >= offset+32 {
-		rmn, _ := common.DecodeAddress(data[offset : offset+32])
-		config["rmn"] = rmn
+		gasForCallExactCheck := common.DecodeUint64FromBytes(data[offset : offset+32])
+		config["gasForCallExactCheck"] = uint16(gasForCallExactCheck)
+		offset += 32
+	}
+	if len(data) >= offset+32 {
+		rmnRemote, _ := common.DecodeAddress(data[offset : offset+32])
+		config["rmnRemote"] = rmnRemote
 		offset += 32
 	}
 	if len(data) >= offset+32 {

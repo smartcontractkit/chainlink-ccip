@@ -5,10 +5,24 @@ import (
 
 	"call-orchestrator-demo/views"
 
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 
 	router "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/router"
 )
+
+var (
+	RouterABI abi.ABI
+)
+
+func init() {
+	// Parse the Router ABI once at startup (uses ccv local bindings)
+	parsedRouter, err := router.RouterMetaData.GetAbi()
+	if err != nil {
+		panic(fmt.Sprintf("failed to parse Router ABI: %v", err))
+	}
+	RouterABI = *parsedRouter
+}
 
 // packRouterCall packs a method call using the Router ABI and returns the calldata bytes.
 func packRouterCall(method string, args ...interface{}) ([]byte, error) {

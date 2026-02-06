@@ -3,29 +3,45 @@ package mcms
 import (
 	"call-orchestrator-demo/views"
 	"call-orchestrator-demo/views/evm/common"
-	"encoding/hex"
+	"strings"
+
+	"github.com/ethereum/go-ethereum/accounts/abi"
+	gethCommon "github.com/ethereum/go-ethereum/common"
 )
+
+const mcmsABIJson = `[{"inputs":[],"name":"getConfig","outputs":[{"components":[{"components":[{"internalType":"address","name":"addr","type":"address"},{"internalType":"uint8","name":"index","type":"uint8"},{"internalType":"uint8","name":"group","type":"uint8"}],"internalType":"struct ManyChainMultiSig.Signer[]","name":"signers","type":"tuple[]"},{"internalType":"uint8[32]","name":"groupQuorums","type":"uint8[32]"},{"internalType":"uint8[32]","name":"groupParents","type":"uint8[32]"}],"internalType":"struct ManyChainMultiSig.Config","name":"","type":"tuple"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"owner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"}]`
 
 // Function selectors for MCMS contracts (ManyChainMultiSig)
 var (
-	// owner() returns (address)
-	selectorOwner = common.HexToSelector("8da5cb5b")
-	// getConfig() returns (Signer[], uint8[32] groupQuorums, uint8[32] groupParents)
-	selectorGetConfig = common.HexToSelector("c3f909d4")
+	mcmsABI           abi.ABI
+	selectorOwner     []byte
+	selectorGetConfig []byte
 )
+
+func init() {
+	var err error
+	mcmsABI, err = abi.JSON(strings.NewReader(mcmsABIJson))
+	if err != nil {
+		panic("Failed to parse mcmsABI: " + err.Error())
+	}
+
+	// Extract selectors dynamically
+	selectorOwner = mcmsABI.Methods["owner"].ID
+	selectorGetConfig = mcmsABI.Methods["getConfig"].ID
+}
 
 // Signer represents a signer in the MCMS config
 type Signer struct {
-	Address string `json:"addr"`
-	Index   uint8  `json:"index"`
-	Group   uint8  `json:"group"`
+	Address gethCommon.Address `json:"addr"`
+	Index   uint8              `json:"index"`
+	Group   uint8              `json:"group"`
 }
 
 // MCMSConfig represents the MCMS contract configuration
 type MCMSConfig struct {
-	Signers      []Signer `json:"signers"`
-	GroupQuorums []uint8  `json:"groupQuorums"`
-	GroupParents []uint8  `json:"groupParents"`
+	Signers      []Signer  `json:"signers"`
+	GroupQuorums [32]uint8 `json:"groupQuorums"`
+	GroupParents [32]uint8 `json:"groupParents"`
 }
 
 // ViewMCMS generates a view of an MCMS contract (bypasser, canceller, proposer).
@@ -88,69 +104,18 @@ func ViewCallProxy(ctx *views.ViewContext) (map[string]any, error) {
 // Returns: (Signer[] signers, uint8[32] groupQuorums, uint8[32] groupParents)
 // Signer struct: (address addr, uint8 index, uint8 group)
 func decodeMCMSConfig(data []byte) (*MCMSConfig, error) {
-	config := &MCMSConfig{
+	result := &MCMSConfig{
 		Signers:      []Signer{},
-		GroupQuorums: make([]uint8, 32),
-		GroupParents: make([]uint8, 32),
+		GroupQuorums: [32]uint8{},
+		GroupParents: [32]uint8{},
 	}
 
-	if len(data) < 96 {
-		return config, nil
+	// Unpack raw data into MCMSConfig
+	err := mcmsABI.UnpackIntoInterface(&result, "getConfig", data)
+
+	if err != nil {
+		panic(err)
 	}
 
-	// Layout:
-	// [0:32]   - offset to signers array
-	// [32:64]  - offset to groupQuorums array (fixed size 32)
-	// [64:96]  - offset to groupParents array (fixed size 32)
-	// Then the actual data at those offsets
-
-	signersOffset := common.DecodeUint64FromBytes(data[0:32])
-	groupQuorumsOffset := common.DecodeUint64FromBytes(data[32:64])
-	groupParentsOffset := common.DecodeUint64FromBytes(data[64:96])
-
-	// Decode signers array
-	if signersOffset+32 <= uint64(len(data)) {
-		signersLen := common.DecodeUint64FromBytes(data[signersOffset : signersOffset+32])
-		signersDataStart := signersOffset + 32
-
-		for i := uint64(0); i < signersLen; i++ {
-			// Each signer is a tuple (address, uint8, uint8) = 3 * 32 bytes
-			signerOffset := signersDataStart + i*96
-			if signerOffset+96 > uint64(len(data)) {
-				break
-			}
-
-			// address (20 bytes, right-padded in 32 bytes)
-			addr := "0x" + hex.EncodeToString(data[signerOffset+12:signerOffset+32])
-			// uint8 index
-			index := uint8(data[signerOffset+63])
-			// uint8 group
-			group := uint8(data[signerOffset+95])
-
-			config.Signers = append(config.Signers, Signer{
-				Address: addr,
-				Index:   index,
-				Group:   group,
-			})
-		}
-	}
-
-	// Decode groupQuorums (fixed array of 32 uint8s)
-	// uint8[32] is packed into 32 bytes (1 byte each), but in ABI encoding each uint8 takes 32 bytes
-	if groupQuorumsOffset+32*32 <= uint64(len(data)) {
-		for i := 0; i < 32; i++ {
-			offset := groupQuorumsOffset + uint64(i)*32
-			config.GroupQuorums[i] = uint8(data[offset+31])
-		}
-	}
-
-	// Decode groupParents (fixed array of 32 uint8s)
-	if groupParentsOffset+32*32 <= uint64(len(data)) {
-		for i := 0; i < 32; i++ {
-			offset := groupParentsOffset + uint64(i)*32
-			config.GroupParents[i] = uint8(data[offset+31])
-		}
-	}
-
-	return config, nil
+	return result, nil
 }
