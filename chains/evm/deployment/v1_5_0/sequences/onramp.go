@@ -116,6 +116,9 @@ var (
 						return sequences.OnChainOutput{}, fmt.Errorf("failed to execute OnRampFeeTokenConfigOp "+
 							"on %s for remote chain %d and token %s: %w", chain.String(), remoteChainSelector, token.String(), err)
 					}
+					if !feeTokenConfigOut.Output.Enabled {
+						continue
+					}
 					feeTokenConfig[token] = feeTokenConfigOut.Output
 				}
 				tokenTransferFeeConfig := make(map[common.Address]evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfig)
@@ -128,6 +131,9 @@ var (
 					if err != nil {
 						return sequences.OnChainOutput{}, fmt.Errorf("failed to execute OnRampGetTokenTransferFeeConfigOp "+
 							"on %s for remote chain %d and token %s: %w", chain.String(), remoteChainSelector, token.String(), err)
+					}
+					if !ttfcOut.Output.IsEnabled {
+						continue
 					}
 					tokenTransferFeeConfig[token] = ttfcOut.Output
 				}

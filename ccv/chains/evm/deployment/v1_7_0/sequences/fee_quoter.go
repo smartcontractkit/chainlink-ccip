@@ -202,6 +202,9 @@ var (
 				}
 			}
 			for remoteChain, cfg := range fqOutput.RemoteChainCfgs {
+				if !cfg.DestChainCfg.IsEnabled {
+					continue
+				}
 				destChainConfig := cfg.DestChainCfg
 				outDestchainCfg := fqops.DestChainConfigArgs{
 					DestChainSelector: remoteChain,
@@ -221,6 +224,9 @@ var (
 				}
 				tokenTransferFeeCfgs := make([]fee_quoter.FeeQuoterTokenTransferFeeConfigSingleTokenArgs, 0)
 				for token, transferCfg := range cfg.TokenTransferFeeCfgs {
+					if !transferCfg.IsEnabled {
+						continue
+					}
 					tokenTransferFeeCfgs = append(tokenTransferFeeCfgs, fee_quoter.FeeQuoterTokenTransferFeeConfigSingleTokenArgs{
 						Token: token,
 						TokenTransferFeeConfig: fee_quoter.FeeQuoterTokenTransferFeeConfig{

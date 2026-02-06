@@ -168,12 +168,18 @@ var (
 						"remote chain %d from feequoter %s on chain %d: %w",
 						remoteChain, fqAddress.Hex(), chainSelector, err)
 				}
+				if !opsOutput.Output.IsEnabled {
+					continue // skip disabled dest chain configs
+				}
 				destChainConfigs[remoteChain] = opsOutput.Output
 			}
 
 			tokenTransferFeeCfgsPerChain := make(map[uint64]map[common.Address]fee_quoter.FeeQuoterTokenTransferFeeConfig)
 
 			for remoteChain, tokens := range in.TokensPerRemoteChain {
+				if _, ok := destChainConfigs[remoteChain]; !ok {
+					continue // skip token transfer fee config fetching if dest chain config is not enabled
+				}
 				tokenTransferFeeCfgs := make(map[common.Address]fee_quoter.FeeQuoterTokenTransferFeeConfig)
 				for _, token := range tokens {
 					opsOutput, err := operations.ExecuteOperation(b, fqops.GetTokenTransferFeeConfig, evmChain,
