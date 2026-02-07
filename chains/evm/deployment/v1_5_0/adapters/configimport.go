@@ -5,6 +5,7 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -34,6 +35,7 @@ type ConfigImportAdapter struct {
 	OffRamp       map[uint64]common.Address
 	TokenAdminReg common.Address
 	PriceRegistry common.Address
+	Router        common.Address
 }
 
 func (ci *ConfigImportAdapter) InitializeAdapter(e cldf.Environment, sel uint64) error {
@@ -94,13 +96,39 @@ func (ci *ConfigImportAdapter) InitializeAdapter(e cldf.Environment, sel uint64)
 		return fmt.Errorf("failed to find price registry contract ref for chain %d: %w", sel, err)
 	}
 	ci.PriceRegistry = priceRegistryRef
+	routerRef, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+		Type:    datastore.ContractType("Router"),
+		Version: semver.MustParse("1.2.0"),
+	}, sel, evm_datastore_utils.ToEVMAddress)
+	if err != nil {
+		return fmt.Errorf("failed to find router contract ref for chain %d: %w", sel, err)
+	}
+	ci.Router = routerRef
 	return nil
 }
 
-func (ci *ConfigImportAdapter) ConnectedChains(_ cldf.Environment, chainsel uint64) ([]uint64, error) {
+func (ci *ConfigImportAdapter) ConnectedChains(e cldf.Environment, chainsel uint64) ([]uint64, error) {
 	var connected []uint64
-	for destSel := range ci.OnRamp {
-		connected = append(connected, destSel)
+	// to ensure deduplication in case there are multiple onramps addresses in datastore for the same remote chain selector
+	var mapConnectedChains = make(map[uint64]bool)
+	chain, ok := e.BlockChains.EVMChains()[chainsel]
+	if !ok {
+		return nil, fmt.Errorf("chain with selector %d not found in environment", chainsel)
+	}
+	routerC, err := router.NewRouter(ci.Router, chain.Client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to instantiate router contract at %s on chain %d: %w", ci.Router.String(), chain.Selector, err)
+	}
+	for destSel, onrampForDest := range ci.OnRamp {
+		onRamp, err := routerC.GetOnRamp(nil, destSel)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get onramp for dest chain %d from router at %s on chain %d: %w", destSel, ci.Router.String(), chain.Selector, err)
+		}
+		// if the onramp address from the router doesn't match the onramp address we have, then this chain is not actually connected with 1.5
+		if onRamp == onrampForDest && !mapConnectedChains[destSel] {
+			connected = append(connected, destSel)
+			mapConnectedChains[destSel] = true
+		}
 	}
 	return connected, nil
 }

@@ -111,10 +111,10 @@ func (ci *ConfigImportAdapter) ConnectedChains(e cldf.Environment, chainsel uint
 	}
 	connectedChains := make([]uint64, 0)
 	for _, offRamp := range offRamps {
-		if offRamp.OffRamp == (common.Address{}) {
-			continue // skip uninitialized off-ramps
+		// if the offramp's address matches our offramp, then we are connected to the source chain via 1.6
+		if offRamp.OffRamp == ci.OffRamp {
+			connectedChains = append(connectedChains, offRamp.SourceChainSelector)
 		}
-		connectedChains = append(connectedChains, offRamp.SourceChainSelector)
 	}
 	return connectedChains, nil
 }

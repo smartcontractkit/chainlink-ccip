@@ -1,7 +1,7 @@
 package sequences
 
 import (
-	"encoding/hex"
+	"encoding/json"
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
@@ -13,6 +13,7 @@ import (
 	onrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/onramp"
 	seq1_5 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -30,8 +31,8 @@ import (
 	fqops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/fee_quoter"
 )
 
-var (
-	EVMFamilySelector, _ = hex.DecodeString("2812d52c")
+const (
+	LinkFeeMultiplierPercent uint8 = 90
 )
 
 type FeeQuoterUpdate struct {
@@ -42,6 +43,20 @@ type FeeQuoterUpdate struct {
 	DestChainConfigs              []fqops.DestChainConfigArgs
 	TokenTransferFeeConfigUpdates fqops.ApplyTokenTransferFeeConfigUpdatesArgs
 	AuthorizedCallerUpdates       fqops.AuthorizedCallerArgs
+}
+
+func (fqu FeeQuoterUpdate) IsEmpty() (bool, error) {
+	empty := FeeQuoterUpdate{}
+	// marshal into json
+	emptyBytes, err := json.Marshal(empty)
+	if err != nil {
+		return false, fmt.Errorf("failed to marshal empty FeeQuoterUpdate: %w", err)
+	}
+	inputBytes, err := json.Marshal(fqu)
+	if err != nil {
+		return false, fmt.Errorf("failed to marshal FeeQuoterUpdate: %w", err)
+	}
+	return string(emptyBytes) == string(inputBytes), nil
 }
 
 var (
@@ -60,6 +75,7 @@ var (
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found in environment", input.ChainSelector)
 			}
+
 			// deploy fee quoter or fetch existing fee quoter address
 			feeQuoterRef, err := contract.MaybeDeployContract(
 				b, fqops.Deploy, chain, contract.DeployInput[fqops.ConstructorArgs]{
@@ -153,13 +169,25 @@ var (
 		},
 	)
 
-	// CreateFeeQuoterUpdateInputFromV160 creates FeeQuoterUpdate input by importing configuration from FeeQuoter v1.6.0
-	CreateFeeQuoterUpdateInputFromV160 = cldf_ops.NewSequence(
-		"fetches-feequoter-config-values-from-v1.6.0",
+	// CreateFeeQuoterUpdateInputFromV163 creates FeeQuoterUpdate input by importing configuration from FeeQuoter v1.6.0
+	CreateFeeQuoterUpdateInputFromV163 = cldf_ops.NewSequence(
+		"fetches-feequoter-config-values-from-v1.6.3",
 		semver.MustParse("1.7.0"),
-		"Creates FeeQuoterUpdate input by importing configuration from FeeQuoter v1.6.0",
+		"Creates FeeQuoterUpdate input by importing configuration from FeeQuoter v1.6.3",
 		func(b cldf_ops.Bundle, chain evm.Chain, input deploy.FeeQuoterUpdateInput) (output FeeQuoterUpdate, err error) {
-			// get feeQuoter 1.6 address
+			// check if FeeQuoter v1.6.3 is present in existing addresses, if not, we return empty output
+			// it means there is no existing fee quoter deployed from v1.6.3 deployment, and we can skip the config import from v1.6.3
+			fq16Ref := datastore_utils.GetAddressRef(
+				input.ExistingAddresses,
+				input.ChainSelector,
+				fq1_6.ContractType,
+				fq1_6.Version,
+				"",
+			)
+			if datastore_utils.IsAddressRefEmpty(fq16Ref) {
+				return FeeQuoterUpdate{}, nil
+			}
+			// get feeQuoter 1.6 address meta
 			metadataForFq16, err := datastore_utils.FilterContractMetaByContractTypeAndVersion(
 				input.ExistingAddresses,
 				input.ContractMeta,
@@ -186,21 +214,9 @@ var (
 				fqops.Version,
 				"",
 			)
-			isNewDeployment := datastore_utils.IsAddressRefEmpty(feeQuoterRef)
-
-			if isNewDeployment {
-				output.ConstructorArgs = fqops.ConstructorArgs{
-					StaticConfig: fqops.StaticConfig{
-						LinkToken:         fqOutput.StaticCfg.LinkToken,
-						MaxFeeJuelsPerMsg: fqOutput.StaticCfg.MaxFeeJuelsPerMsg,
-					},
-					PriceUpdaters: fqOutput.PriceUpdaters,
-				}
-			} else {
-				output.AuthorizedCallerUpdates = fqops.AuthorizedCallerArgs{
-					AddedCallers: fqOutput.PriceUpdaters,
-				}
-			}
+			isNewFQ17Deployment := datastore_utils.IsAddressRefEmpty(feeQuoterRef)
+			tokenTransferFeeConfigArgs := make([]fee_quoter.FeeQuoterTokenTransferFeeConfigArgs, 0)
+			allDestChainConfigs := make([]fqops.DestChainConfigArgs, 0)
 			for remoteChain, cfg := range fqOutput.RemoteChainCfgs {
 				if !cfg.DestChainCfg.IsEnabled {
 					continue
@@ -219,7 +235,7 @@ var (
 						DefaultTokenDestGasOverhead: destChainConfig.DefaultTokenDestGasOverhead,
 						DefaultTxGasLimit:           destChainConfig.DefaultTxGasLimit,
 						NetworkFeeUSDCents:          uint16(destChainConfig.NetworkFeeUSDCents),
-						LinkFeeMultiplierPercent:    90,
+						LinkFeeMultiplierPercent:    LinkFeeMultiplierPercent,
 					},
 				}
 				tokenTransferFeeCfgs := make([]fee_quoter.FeeQuoterTokenTransferFeeConfigSingleTokenArgs, 0)
@@ -237,21 +253,30 @@ var (
 						},
 					})
 				}
-				if isNewDeployment {
-					output.ConstructorArgs.DestChainConfigArgs = append(output.ConstructorArgs.DestChainConfigArgs, outDestchainCfg)
-					output.ConstructorArgs.TokenTransferFeeConfigArgs = append(output.ConstructorArgs.TokenTransferFeeConfigArgs,
-						fqops.TokenTransferFeeConfigArgs{
-							DestChainSelector:       remoteChain,
-							TokenTransferFeeConfigs: tokenTransferFeeCfgs,
-						})
-				} else {
-					output.DestChainConfigs = append(output.DestChainConfigs, outDestchainCfg)
-					output.TokenTransferFeeConfigUpdates.TokenTransferFeeConfigArgs = append(output.TokenTransferFeeConfigUpdates.TokenTransferFeeConfigArgs,
-						fqops.TokenTransferFeeConfigArgs{
-							DestChainSelector:       remoteChain,
-							TokenTransferFeeConfigs: tokenTransferFeeCfgs,
-						})
+				tokenTransferFeeConfigArgs = append(tokenTransferFeeConfigArgs, fee_quoter.FeeQuoterTokenTransferFeeConfigArgs{
+					DestChainSelector:       remoteChain,
+					TokenTransferFeeConfigs: tokenTransferFeeCfgs,
+				})
+				allDestChainConfigs = append(allDestChainConfigs, outDestchainCfg)
+			}
+			if isNewFQ17Deployment {
+				output.ConstructorArgs = fqops.ConstructorArgs{
+					StaticConfig: fqops.StaticConfig{
+						LinkToken:         fqOutput.StaticCfg.LinkToken,
+						MaxFeeJuelsPerMsg: fqOutput.StaticCfg.MaxFeeJuelsPerMsg,
+					},
+					PriceUpdaters:              fqOutput.PriceUpdaters,
+					TokenTransferFeeConfigArgs: tokenTransferFeeConfigArgs,
+					DestChainConfigArgs:        allDestChainConfigs,
 				}
+			} else {
+				output.AuthorizedCallerUpdates = fqops.AuthorizedCallerArgs{
+					AddedCallers: fqOutput.PriceUpdaters,
+				}
+				output.TokenTransferFeeConfigUpdates = fqops.ApplyTokenTransferFeeConfigUpdatesArgs{
+					TokenTransferFeeConfigArgs: tokenTransferFeeConfigArgs,
+				}
+				output.DestChainConfigs = allDestChainConfigs
 			}
 			return output, nil
 		})
@@ -262,7 +287,19 @@ var (
 		semver.MustParse("1.7.0"),
 		"Creates FeeQuoterUpdate input by importing configuration from PriceRegistry v1.5.0 and EVM2EVMOnRamp v1.5.0",
 		func(b cldf_ops.Bundle, chain evm.Chain, input deploy.FeeQuoterUpdateInput) (output FeeQuoterUpdate, err error) {
-			// get ro
+			// get addressref for onramp 1.5.0
+			onRampRef := datastore_utils.GetAddressRef(
+				input.ExistingAddresses,
+				input.ChainSelector,
+				onrampops.ContractType,
+				onrampops.Version,
+				"",
+			)
+			// if there is no address ref for onRamp 1.5.0, it means onRamp 1.5.0 is not deployed and we can skip the config import from onRamp 1.5.0
+			if datastore_utils.IsAddressRefEmpty(onRampRef) {
+				return FeeQuoterUpdate{}, nil
+			}
+			// get address meta for onRamp 1.5.0 to read the config values from onRamp 1.5.0
 			onRampMetadata, err := datastore_utils.FilterContractMetaByContractTypeAndVersion(
 				input.ExistingAddresses,
 				input.ContractMeta,
@@ -279,14 +316,14 @@ var (
 			}
 
 			// is feeQuoter going to be deployed or fetched from existing addresses?
-			feeQuoterRef := datastore_utils.GetAddressRef(
+			feeQuoter17Ref := datastore_utils.GetAddressRef(
 				input.ExistingAddresses,
 				input.ChainSelector,
 				fqops.ContractType,
 				fqops.Version,
 				"",
 			)
-			isNewDeployment := datastore_utils.IsAddressRefEmpty(feeQuoterRef)
+			isNewFQ17Deployment := datastore_utils.IsAddressRefEmpty(feeQuoter17Ref)
 			var staticCfg fqops.StaticConfig
 			var destChainCfgs []fqops.DestChainConfigArgs
 			var tokenTransferFeeConfigArgs []fee_quoter.FeeQuoterTokenTransferFeeConfigSingleTokenArgs
@@ -307,6 +344,7 @@ var (
 						break
 					}
 				}
+				chainFamilySelector := utils.GetSelectorHex(onRampCfg.RemoteChainSelector)
 				destChainCfgs = append(destChainCfgs, fqops.DestChainConfigArgs{
 					DestChainSelector: onRampCfg.RemoteChainSelector,
 					DestChainConfig: adapters.FeeQuoterDestChainConfig{
@@ -315,7 +353,7 @@ var (
 						MaxPerMsgGasLimit:           onRampCfg.DynamicConfig.MaxPerMsgGasLimit,
 						DestGasOverhead:             onRampCfg.DynamicConfig.DestGasOverhead,
 						DestGasPerPayloadByteBase:   uint8(onRampCfg.DynamicConfig.DestGasPerPayloadByte),
-						ChainFamilySelector:         [4]byte(EVMFamilySelector), // as this is evm, safe to assume chain family selector is same as chain selector
+						ChainFamilySelector:         [4]byte(chainFamilySelector),
 						DefaultTokenFeeUSDCents:     onRampCfg.DynamicConfig.DefaultTokenFeeUSDCents,
 						DefaultTokenDestGasOverhead: onRampCfg.DynamicConfig.DefaultTokenDestGasOverhead,
 						DefaultTxGasLimit:           uint32(onRampCfg.StaticConfig.DefaultTxGasLimit),
@@ -339,7 +377,7 @@ var (
 					TokenTransferFeeConfigs: tokenTransferFeeConfigArgs,
 				})
 			}
-			if isNewDeployment {
+			if isNewFQ17Deployment {
 				output.ConstructorArgs = fqops.ConstructorArgs{
 					StaticConfig: fqops.StaticConfig{
 						LinkToken:         staticCfg.LinkToken,

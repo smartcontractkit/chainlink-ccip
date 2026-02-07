@@ -37,6 +37,13 @@ type ConstructorArgs struct {
 	DestChainConfigArgs        []DestChainConfigArgs
 }
 
+func (a ConstructorArgs) IsEmpty() bool {
+	return (a.StaticConfig == StaticConfig{}) &&
+		len(a.PriceUpdaters) == 0 &&
+		len(a.TokenTransferFeeConfigArgs) == 0 &&
+		len(a.DestChainConfigArgs) == 0
+}
+
 type ApplyFeeTokensUpdatesArgs struct {
 	FeeTokensToAdd    []common.Address
 	FeeTokensToRemove []common.Address
