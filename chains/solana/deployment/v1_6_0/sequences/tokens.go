@@ -297,6 +297,8 @@ func (a *SolanaAdapter) DeployToken() *cldf_ops.Sequence[tokenapi.DeployTokenInp
 			var result sequences.OnChainOutput
 			b.Logger.Info("SVM Deploying token:", input)
 			chain := chains.SolanaChains()[input.ChainSelector]
+			needsTokenDeploy := true
+			var rawTokenAddr string
 
 			tokenAddr, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, datastore.AddressRef{
 				ChainSelector: chain.Selector,
@@ -305,36 +307,41 @@ func (a *SolanaAdapter) DeployToken() *cldf_ops.Sequence[tokenapi.DeployTokenInp
 			}, chain.Selector, datastore_utils.FullRef)
 			if err == nil {
 				b.Logger.Info("Token already deployed at address:", tokenAddr.Address)
-				return result, nil
+				needsTokenDeploy = false
+				rawTokenAddr = tokenAddr.Address
 			}
-
-			var privateKey solana.PrivateKey
-			if input.TokenPrivKey != "" {
-				privateKey = solana.MustPrivateKeyFromBase58(input.TokenPrivKey)
+			if needsTokenDeploy {
+				var privateKey solana.PrivateKey
+				if input.TokenPrivKey != "" {
+					privateKey = solana.MustPrivateKeyFromBase58(input.TokenPrivKey)
+				}
+				ataList := []solana.PublicKey{}
+				for _, sender := range input.Senders {
+					ataList = append(ataList, solana.MustPublicKeyFromBase58(sender))
+				}
+				var premint uint64 = 0
+				if input.PreMint != nil {
+					premint = input.PreMint.Uint64()
+				}
+				deployOut, err := operations.ExecuteOperation(b, tokensops.DeploySolanaToken, chains.SolanaChains()[chain.Selector], tokensops.Params{
+					ExistingAddresses:      input.ExistingDataStore.Addresses().Filter(),
+					TokenProgramName:       input.Type,
+					TokenPrivKey:           privateKey,
+					TokenSymbol:            input.Symbol,
+					ATAList:                ataList,
+					PreMint:                premint,
+					DisableFreezeAuthority: input.DisableFreezeAuthority,
+					TokenDecimals:          input.Decimals,
+				})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy token: %w", err)
+				}
+				result.Addresses = append(result.Addresses, deployOut.Output)
+				rawTokenAddr = deployOut.Output.Address
 			}
-			ataList := []solana.PublicKey{}
-			for _, sender := range input.Senders {
-				ataList = append(ataList, solana.MustPublicKeyFromBase58(sender))
-			}
-			var premint uint64 = 0
-			if input.PreMint != nil {
-				premint = input.PreMint.Uint64()
-			}
-			deployOut, err := operations.ExecuteOperation(b, tokensops.DeploySolanaToken, chains.SolanaChains()[chain.Selector], tokensops.Params{
-				ExistingAddresses:      input.ExistingDataStore.Addresses().Filter(),
-				TokenProgramName:       input.Type,
-				TokenPrivKey:           privateKey,
-				TokenSymbol:            input.Symbol,
-				ATAList:                ataList,
-				PreMint:                premint,
-				DisableFreezeAuthority: input.DisableFreezeAuthority,
-				TokenDecimals:          input.Decimals,
-			})
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy token: %w", err)
-			}
-			result.Addresses = append(result.Addresses, deployOut.Output)
+			// irrrespective of whether the token was just deployed or already existed, we attempt to upload metadata if it was provided, since the metadata might not have been uploaded in a previous deployment
 			if input.TokenMetadata != nil {
+				input.TokenMetadata.TokenPubkey = rawTokenAddr
 				_, err = operations.ExecuteOperation(b, tokensops.UpsertTokenMetadata, chains.SolanaChains()[chain.Selector], tokensops.TokenMetadataInput{
 					ExistingAddresses: input.ExistingDataStore.Addresses().Filter(),
 					Metadata:          *input.TokenMetadata,
