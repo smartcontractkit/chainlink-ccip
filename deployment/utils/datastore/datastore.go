@@ -1,6 +1,7 @@
 package datastore
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -183,4 +184,33 @@ func FilterContractMetaByContractTypeAndVersion(
 		}
 	}
 	return filteredContractMetadata, nil
+}
+
+// ConvertMetadataToType converts metadata to a typed struct
+// Handles both typed structs and map[string]interface{} from JSON unmarshaling
+// T is the target type that the metadata should be converted to
+func ConvertMetadataToType[T any](metadata interface{}) (T, error) {
+	var zero T
+
+	// If already the correct type, return it
+	if typed, ok := metadata.(T); ok {
+		return typed, nil
+	}
+
+	// If it's a map (from JSON), convert it
+	if metaMap, ok := metadata.(map[string]interface{}); ok {
+		metadataBytes, err := json.Marshal(metaMap)
+		if err != nil {
+			return zero, fmt.Errorf("failed to marshal metadata: %w", err)
+		}
+
+		var typed T
+		if err := json.Unmarshal(metadataBytes, &typed); err != nil {
+			return zero, fmt.Errorf("failed to unmarshal metadata: %w", err)
+		}
+
+		return typed, nil
+	}
+
+	return zero, fmt.Errorf("metadata is neither the expected type nor map[string]interface{}")
 }

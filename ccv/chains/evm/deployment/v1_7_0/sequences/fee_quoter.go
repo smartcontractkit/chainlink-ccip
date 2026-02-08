@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/fee_quoter"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	onrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/onramp"
@@ -33,6 +34,7 @@ import (
 
 const (
 	LinkFeeMultiplierPercent uint8 = 90
+	NetworkFeeUSDCents             = 10
 )
 
 type FeeQuoterUpdate struct {
@@ -187,6 +189,8 @@ var (
 			if datastore_utils.IsAddressRefEmpty(fq16Ref) {
 				return FeeQuoterUpdate{}, nil
 			}
+			output.ChainSelector = input.ChainSelector
+			output.ExistingAddresses = input.ExistingAddresses
 			// get feeQuoter 1.6 address meta
 			metadataForFq16, err := datastore_utils.FilterContractMetaByContractTypeAndVersion(
 				input.ExistingAddresses,
@@ -205,7 +209,12 @@ var (
 			if len(metadataForFq16) > 1 {
 				return FeeQuoterUpdate{}, fmt.Errorf("multiple metadata entries found for FeeQuoter v1.6.3 on chain selector %d", input.ChainSelector)
 			}
-			fqOutput := metadataForFq16[0].Metadata.(seq1_6.FeeQuoterImportConfigSequenceOutput)
+			// Convert metadata to typed struct if needed
+			fqOutput, err := datastore_utils.ConvertMetadataToType[seq1_6.FeeQuoterImportConfigSequenceOutput](metadataForFq16[0].Metadata)
+			if err != nil {
+				return FeeQuoterUpdate{}, fmt.Errorf("failed to convert metadata to "+
+					"FeeQuoterImportConfigSequenceOutput for chain selector %d: %w", input.ChainSelector, err)
+			}
 			// is feeQuoter going to be deployed or fetched from existing addresses?
 			feeQuoterRef := datastore_utils.GetAddressRef(
 				input.ExistingAddresses,
@@ -314,7 +323,8 @@ var (
 			if len(onRampMetadata) == 0 {
 				return FeeQuoterUpdate{}, fmt.Errorf("no metadata found for EVM2EVMOnRamp v1.5.0 on chain selector %d", input.ChainSelector)
 			}
-
+			output.ChainSelector = input.ChainSelector
+			output.ExistingAddresses = input.ExistingAddresses
 			// is feeQuoter going to be deployed or fetched from existing addresses?
 			feeQuoter17Ref := datastore_utils.GetAddressRef(
 				input.ExistingAddresses,
@@ -329,22 +339,26 @@ var (
 			var tokenTransferFeeConfigArgs []fee_quoter.FeeQuoterTokenTransferFeeConfigSingleTokenArgs
 			var tokenTransferFeeConfigArgsForAll []fqops.TokenTransferFeeConfigArgs
 			for _, meta := range onRampMetadata {
-				onRampCfg := meta.Metadata.(seq1_5.OnRampImportConfigSequenceOutput)
+				// Convert metadata to typed struct if needed
+				onRampCfg, err := datastore_utils.ConvertMetadataToType[seq1_5.OnRampImportConfigSequenceOutput](meta.Metadata)
+				if err != nil {
+					return FeeQuoterUpdate{}, fmt.Errorf("failed to convert metadata to "+
+						"OnRampImportConfigSequenceOutput for chain selector %d: %w", input.ChainSelector, err)
+				}
 				if staticCfg.LinkToken == (common.Address{}) {
 					staticCfg = fqops.StaticConfig{
 						LinkToken:         onRampCfg.StaticConfig.LinkToken,
 						MaxFeeJuelsPerMsg: onRampCfg.StaticConfig.MaxNopFeesJuels,
 					}
 				}
-				var networkFeeUSDCents uint16
-				// NetworkFeeUSDCents is same across all feetokens in the same chain, so we can just take it from the first onRamp config
-				for _, feeTokenCfg := range onRampCfg.FeeTokenConfig {
-					if feeTokenCfg.NetworkFeeUSDCents != 0 {
-						networkFeeUSDCents = uint16(feeTokenCfg.NetworkFeeUSDCents)
-						break
-					}
+
+				chainFamilySelectorBytes := utils.GetSelectorHex(onRampCfg.RemoteChainSelector)
+				// Safely convert ChainFamilySelector from []byte to [4]byte
+				var chainFamilySelector [4]byte
+				if len(chainFamilySelectorBytes) < 4 {
+					return FeeQuoterUpdate{}, fmt.Errorf("ChainFamilySelector has invalid length %d (expected 4) for remote chain selector %d", len(chainFamilySelectorBytes), onRampCfg.RemoteChainSelector)
 				}
-				chainFamilySelector := utils.GetSelectorHex(onRampCfg.RemoteChainSelector)
+				copy(chainFamilySelector[:], chainFamilySelectorBytes[:4])
 				destChainCfgs = append(destChainCfgs, fqops.DestChainConfigArgs{
 					DestChainSelector: onRampCfg.RemoteChainSelector,
 					DestChainConfig: adapters.FeeQuoterDestChainConfig{
@@ -353,12 +367,12 @@ var (
 						MaxPerMsgGasLimit:           onRampCfg.DynamicConfig.MaxPerMsgGasLimit,
 						DestGasOverhead:             onRampCfg.DynamicConfig.DestGasOverhead,
 						DestGasPerPayloadByteBase:   uint8(onRampCfg.DynamicConfig.DestGasPerPayloadByte),
-						ChainFamilySelector:         [4]byte(chainFamilySelector),
+						ChainFamilySelector:         chainFamilySelector,
 						DefaultTokenFeeUSDCents:     onRampCfg.DynamicConfig.DefaultTokenFeeUSDCents,
 						DefaultTokenDestGasOverhead: onRampCfg.DynamicConfig.DefaultTokenDestGasOverhead,
 						DefaultTxGasLimit:           uint32(onRampCfg.StaticConfig.DefaultTxGasLimit),
-						NetworkFeeUSDCents:          networkFeeUSDCents,
-						LinkFeeMultiplierPercent:    90,
+						NetworkFeeUSDCents:          NetworkFeeUSDCents,
+						LinkFeeMultiplierPercent:    LinkFeeMultiplierPercent,
 					},
 				})
 				for token, tokenCfg := range onRampCfg.TokenTransferFeeConfig {
@@ -386,7 +400,7 @@ var (
 					DestChainConfigArgs:        destChainCfgs,
 					TokenTransferFeeConfigArgs: tokenTransferFeeConfigArgsForAll,
 					// TODO: what to do with price updaters for 1.5 if there is no 1.6 lanes here
-					PriceUpdaters: []common.Address{},
+					//	PriceUpdaters: []common.Address{},
 				}
 			} else {
 				output.DestChainConfigs = destChainCfgs
@@ -395,3 +409,132 @@ var (
 			return output, nil
 		})
 )
+
+func MergeFeeQuoterUpdateOutputs(output16, output15 FeeQuoterUpdate) (FeeQuoterUpdate, error) {
+	result := output16
+
+	// ConstructorArgs: use output15 if output16 is empty
+	if result.ConstructorArgs.IsEmpty() {
+		result.ConstructorArgs = output15.ConstructorArgs
+	} else {
+		// merge the dest chainConfig args
+		result.ConstructorArgs.DestChainConfigArgs = mergeDestChainConfigs(
+			result.ConstructorArgs.DestChainConfigArgs,
+			output15.ConstructorArgs.DestChainConfigArgs)
+		resultPriceUpdatersMap := make(map[common.Address]bool)
+		for _, updater := range result.ConstructorArgs.PriceUpdaters {
+			resultPriceUpdatersMap[updater] = true
+		}
+		for _, updater := range output15.ConstructorArgs.PriceUpdaters {
+			if !resultPriceUpdatersMap[updater] {
+				result.ConstructorArgs.PriceUpdaters = append(result.ConstructorArgs.PriceUpdaters, updater)
+				resultPriceUpdatersMap[updater] = true
+			}
+		}
+		result.ConstructorArgs.TokenTransferFeeConfigArgs = mergeTokenTransferFeeConfigArgs(
+			result.ConstructorArgs.TokenTransferFeeConfigArgs,
+			output15.ConstructorArgs.TokenTransferFeeConfigArgs)
+		result.ConstructorArgs.PriceUpdaters = maps.Keys(resultPriceUpdatersMap)
+	}
+
+	result.DestChainConfigs = mergeDestChainConfigs(result.DestChainConfigs, output15.DestChainConfigs)
+
+	// TokenTransferFeeConfigUpdates: merge by DestChainSelector, output16 takes precedence for duplicates
+	result.TokenTransferFeeConfigUpdates.TokenTransferFeeConfigArgs = mergeTokenTransferFeeConfigArgs(
+		result.TokenTransferFeeConfigUpdates.TokenTransferFeeConfigArgs,
+		output15.TokenTransferFeeConfigUpdates.TokenTransferFeeConfigArgs)
+
+	// TokensToUseDefaultFeeConfigs: merge by DestChainSelector and Token
+	if len(result.TokenTransferFeeConfigUpdates.TokensToUseDefaultFeeConfigs) == 0 {
+		result.TokenTransferFeeConfigUpdates.TokensToUseDefaultFeeConfigs = output15.TokenTransferFeeConfigUpdates.TokensToUseDefaultFeeConfigs
+	} else {
+		// Create a map of (DestChainSelector, Token) pairs from output16
+		tokenRemoveMap := make(map[string]bool)
+		for _, cfg := range result.TokenTransferFeeConfigUpdates.TokensToUseDefaultFeeConfigs {
+			key := fmt.Sprintf("%d:%s", cfg.DestChainSelector, cfg.Token.Hex())
+			tokenRemoveMap[key] = true
+		}
+		// Add configs from output15 that don't exist in output16
+		for _, cfg := range output15.TokenTransferFeeConfigUpdates.TokensToUseDefaultFeeConfigs {
+			key := fmt.Sprintf("%d:%s", cfg.DestChainSelector, cfg.Token.Hex())
+			if !tokenRemoveMap[key] {
+				result.TokenTransferFeeConfigUpdates.TokensToUseDefaultFeeConfigs = append(result.TokenTransferFeeConfigUpdates.TokensToUseDefaultFeeConfigs, cfg)
+			}
+			// If it exists in both, output16's value is already used (takes precedence)
+		}
+	}
+
+	// AuthorizedCallerUpdates: merge unique entries from both outputs
+	result.AuthorizedCallerUpdates = mergePriceUpdaters(result.AuthorizedCallerUpdates, output15.AuthorizedCallerUpdates)
+
+	return result, nil
+}
+
+func mergeTokenTransferFeeConfigArgs(args1, args2 []fee_quoter.FeeQuoterTokenTransferFeeConfigArgs) []fee_quoter.FeeQuoterTokenTransferFeeConfigArgs {
+	result := args1
+	// TokenTransferFeeConfigArgs: merge by DestChainSelector
+	if len(result) == 0 {
+		result = args2
+	} else {
+		// Create a map of dest chain selectors from output16
+		tokenConfigMap := make(map[uint64]int)
+		for i, cfg := range result {
+			tokenConfigMap[cfg.DestChainSelector] = i
+		}
+		// Add configs from output15 that don't exist in output16
+		for _, cfg := range args2 {
+			if _, exists := tokenConfigMap[cfg.DestChainSelector]; !exists && len(cfg.TokenTransferFeeConfigs) > 0 {
+				result = append(result, cfg)
+			}
+			// If it exists in both, output16's value is already used (takes precedence)
+		}
+	}
+	return result
+}
+
+func mergePriceUpdaters(updaters1, updaters2 fqops.AuthorizedCallerArgs) fqops.AuthorizedCallerArgs {
+	result := updaters1
+	// AddedCallers: merge unique addresses from both outputs
+	addedCallersMap := make(map[common.Address]bool)
+	for _, addr := range result.AddedCallers {
+		addedCallersMap[addr] = true
+	}
+	for _, addr := range updaters2.AddedCallers {
+		if !addedCallersMap[addr] {
+			result.AddedCallers = append(result.AddedCallers, addr)
+			addedCallersMap[addr] = true
+		}
+	}
+	// RemovedCallers: merge unique addresses from both outputs
+	removedCallersMap := make(map[common.Address]bool)
+	for _, addr := range result.RemovedCallers {
+		removedCallersMap[addr] = true
+	}
+	for _, addr := range updaters2.RemovedCallers {
+		if !removedCallersMap[addr] {
+			result.RemovedCallers = append(result.RemovedCallers, addr)
+			removedCallersMap[addr] = true
+		}
+	}
+	return result
+}
+
+func mergeDestChainConfigs(cfgs1, cfgs2 []fqops.DestChainConfigArgs) []fqops.DestChainConfigArgs {
+	// Create a map of dest chain selectors from cfgs1
+	destChainMap := make(map[uint64]fqops.DestChainConfigArgs)
+	for _, cfg := range cfgs1 {
+		destChainMap[cfg.DestChainSelector] = cfg
+	}
+	result := cfgs1
+	// Add configs from cfgs2 that don't exist in cfgs1
+	for _, cfg := range cfgs2 {
+		if _, exists := destChainMap[cfg.DestChainSelector]; !exists {
+			result = append(result, cfg)
+		}
+		// If it exists in both, cfgs1's value is already used (takes precedence)
+	}
+	if len(destChainMap) == 0 {
+		return nil
+	}
+	return result
+}
