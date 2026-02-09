@@ -197,7 +197,20 @@ func TestMergeFeeQuoterUpdateOutputs(t *testing.T) {
 		}
 		result, err := sequence1_7.MergeFeeQuoterUpdateOutputs(output16, output15)
 		require.NoError(t, err)
-		require.Equal(t, expected.ConstructorArgs, result.ConstructorArgs)
+		require.Equal(t, expected.ConstructorArgs.StaticConfig, result.ConstructorArgs.StaticConfig)
+		require.ElementsMatch(t, expected.ConstructorArgs.PriceUpdaters, result.ConstructorArgs.PriceUpdaters)
+		require.Len(t, result.ConstructorArgs.TokenTransferFeeConfigArgs, 2)
+		require.Equal(t, uint64(100), result.ConstructorArgs.TokenTransferFeeConfigArgs[0].DestChainSelector)
+		require.Equal(t, addr1, result.ConstructorArgs.TokenTransferFeeConfigArgs[0].TokenTransferFeeConfigs[0].Token) // from output16
+		require.Equal(t, uint64(200), result.ConstructorArgs.TokenTransferFeeConfigArgs[1].DestChainSelector)
+		require.Equal(t, addr3, result.ConstructorArgs.TokenTransferFeeConfigArgs[1].TokenTransferFeeConfigs[0].Token) // from output15
+		require.Len(t, result.ConstructorArgs.DestChainConfigArgs, 2)
+		require.Equal(t, uint64(100), result.ConstructorArgs.DestChainConfigArgs[0].DestChainSelector)
+		require.True(t, result.ConstructorArgs.DestChainConfigArgs[0].DestChainConfig.IsEnabled)                   // from output16
+		require.Equal(t, uint32(1000), result.ConstructorArgs.DestChainConfigArgs[0].DestChainConfig.MaxDataBytes) // from output16
+		require.Equal(t, uint64(200), result.ConstructorArgs.DestChainConfigArgs[1].DestChainSelector)
+		require.True(t, result.ConstructorArgs.DestChainConfigArgs[1].DestChainConfig.IsEnabled)                   // from output15
+		require.Equal(t, uint32(3000), result.ConstructorArgs.DestChainConfigArgs[1].DestChainConfig.MaxDataBytes) // from output15
 	})
 
 	t.Run("DestChainConfigs - output16 takes precedence for duplicates", func(t *testing.T) {

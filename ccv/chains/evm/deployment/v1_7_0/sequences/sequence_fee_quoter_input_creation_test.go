@@ -34,11 +34,16 @@ import (
 var dummyAddressRefs = []datastore.AddressRef{
 	{Address: "0x1111111111111111111111111111111111111111", ChainSelector: 5009297550715157269, Type: datastore.ContractType("FeeQuoter"), Version: semver.MustParse("1.6.3")},
 	{Address: "0x6666666666666666666666666666666666666666", ChainSelector: 5009297550715157269, Type: datastore.ContractType("EVM2EVMOnRamp"), Version: semver.MustParse("1.5.0")},
+	{Address: "0x2222222222222222222222222222222222222221", ChainSelector: 5009297550715157269, Type: datastore.ContractType("CommitStore"), Version: semver.MustParse("1.5.0")},
+	{Address: "0x9999999999999999999999999999999999999999", ChainSelector: 4949039107694359620, Type: datastore.ContractType("CommitStore"), Version: semver.MustParse("1.5.0"), Qualifier: "commitstore1"},
 	{Address: "0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", ChainSelector: 4949039107694359620, Type: datastore.ContractType("FeeQuoter"), Version: semver.MustParse("1.6.3")},
 	{Address: "0x1010101010101010101010101010101010101010", ChainSelector: 4949039107694359620, Type: datastore.ContractType("EVM2EVMOnRamp"), Version: semver.MustParse("1.5.0")},
+	{Address: "0x3333333333333333333333333333333333333333", ChainSelector: 4949039107694359620, Type: datastore.ContractType("CommitStore"), Version: semver.MustParse("1.5.0"), Qualifier: "commitstore2"},
 	{Address: "0x5050505050505050505050505050505050505050", ChainSelector: 15971525489660198786, Type: datastore.ContractType("EVM2EVMOnRamp"), Version: semver.MustParse("1.5.0")},
+	{Address: "0x4444444444444444444444444444444444444444", ChainSelector: 15971525489660198786, Type: datastore.ContractType("CommitStore"), Version: semver.MustParse("1.5.0")},
 	{Address: "0x6060606060606060606060606060606060606060", ChainSelector: 5936861837188149645, Type: datastore.ContractType("FeeQuoter"), Version: semver.MustParse("1.6.3")},
 	{Address: "0x7070707070707070707070707070707070707070", ChainSelector: 5936861837188149645, Type: datastore.ContractType("EVM2EVMOnRamp"), Version: semver.MustParse("1.5.0")},
+	{Address: "0x5555555555555555555555555555555555555551", ChainSelector: 5936861837188149645, Type: datastore.ContractType("CommitStore"), Version: semver.MustParse("1.5.0")},
 }
 
 var dummyContractMetadata = []datastore.ContractMetadata{
@@ -437,8 +442,6 @@ var dummyContractMetadata = []datastore.ContractMetadata{
 func getExpectedOutput() map[uint64]sequence1_7.FeeQuoterUpdate {
 	linkToken := common.HexToAddress("0x514910771AF9Ca656af840dff83E8264EcF986CA")
 	maxFeeJuels, _ := new(big.Int).SetString("1000000000000000000", 10)
-	priceUpdater1 := common.HexToAddress("0x4444444444444444444444444444444444444444")
-	priceUpdater2 := common.HexToAddress("0x5555555555555555555555555555555555555555")
 
 	expected := make(map[uint64]sequence1_7.FeeQuoterUpdate)
 
@@ -451,7 +454,11 @@ func getExpectedOutput() map[uint64]sequence1_7.FeeQuoterUpdate {
 				LinkToken:         linkToken,
 				MaxFeeJuelsPerMsg: maxFeeJuels,
 			},
-			PriceUpdaters: []common.Address{priceUpdater1, priceUpdater2},
+			PriceUpdaters: []common.Address{
+				common.HexToAddress("0x4444444444444444444444444444444444444444"),
+				common.HexToAddress("0x5555555555555555555555555555555555555555"),
+				common.HexToAddress("0x2222222222222222222222222222222222222221"),
+			},
 			DestChainConfigArgs: []fqops.DestChainConfigArgs{
 				{
 					DestChainSelector: 15971525489660198786,
@@ -536,7 +543,12 @@ func getExpectedOutput() map[uint64]sequence1_7.FeeQuoterUpdate {
 				LinkToken:         linkToken,
 				MaxFeeJuelsPerMsg: maxFeeJuels,
 			},
-			PriceUpdaters: []common.Address{priceUpdater1, priceUpdater2},
+			PriceUpdaters: []common.Address{
+				common.HexToAddress("0x4444444444444444444444444444444444444444"),
+				common.HexToAddress("0x5555555555555555555555555555555555555555"),
+				common.HexToAddress("0x3333333333333333333333333333333333333333"),
+				common.HexToAddress("0x9999999999999999999999999999999999999999"),
+			},
 			DestChainConfigArgs: []fqops.DestChainConfigArgs{
 				{
 					DestChainSelector: 15971525489660198786,
@@ -656,6 +668,9 @@ func getExpectedOutput() map[uint64]sequence1_7.FeeQuoterUpdate {
 					},
 				},
 			},
+			PriceUpdaters: []common.Address{
+				common.HexToAddress("0x4444444444444444444444444444444444444444"),
+			},
 		},
 	}
 
@@ -667,7 +682,11 @@ func getExpectedOutput() map[uint64]sequence1_7.FeeQuoterUpdate {
 				LinkToken:         linkToken,
 				MaxFeeJuelsPerMsg: maxFeeJuels,
 			},
-			PriceUpdaters: []common.Address{priceUpdater1, priceUpdater2},
+			PriceUpdaters: []common.Address{
+				common.HexToAddress("0x4444444444444444444444444444444444444444"),
+				common.HexToAddress("0x5555555555555555555555555555555555555555"),
+				common.HexToAddress("0x5555555555555555555555555555555555555551"),
+			},
 			DestChainConfigArgs: []fqops.DestChainConfigArgs{
 				{
 					DestChainSelector: 5009297550715157269,
@@ -763,7 +782,7 @@ func TestSequenceFeeQuoterInputCreation(t *testing.T) {
 	ds := datastore.NewMemoryDataStore()
 	for _, ref := range addressRefs {
 		err := ds.Addresses().Add(ref)
-		require.NoError(t, err, "Failed to add address ref to datastore")
+		require.NoError(t, err, "Failed to add address ref %+v to datastore", ref)
 	}
 
 	// Load contract metadata into the datastore

@@ -326,7 +326,7 @@ var (
 			var commitStoreRefs []datastore.AddressRef
 			for _, addressRef := range input.ExistingAddresses {
 				if addressRef.Type == "CommitStore" &&
-					addressRef.Version == semver.MustParse("1.5.0") &&
+					addressRef.Version.Equal(semver.MustParse("1.5.0")) &&
 					addressRef.ChainSelector == input.ChainSelector {
 					commitStoreRefs = append(commitStoreRefs, addressRef)
 				}
