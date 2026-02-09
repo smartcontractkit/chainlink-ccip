@@ -5,24 +5,33 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
-
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
-
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	onrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
 type OnRampApplyDestChainConfigUpdatesSequenceInput struct {
 	Address        common.Address
 	ChainSelector  uint64
-	UpdatesByChain []onramp.OnRampDestChainConfigArgs
+	UpdatesByChain []onrampops.DestChainConfigArgs
+}
+
+type OnRampImportConfigSequenceInput struct {
+	Address       common.Address
+	ChainSelector uint64
+	RemoteChains  []uint64
+}
+
+type OnRampImportConfigSequenceOutput struct {
+	DestChainCfgs map[uint64]any // GetDestChainConfig returns any (manually added operation)
+	StaticConfig  onrampops.StaticConfig
+	DynamicConfig onrampops.DynamicConfig
 }
 
 type OnRampImportConfigSequenceInput struct {
@@ -48,7 +57,7 @@ var (
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
-			report, err := operations.ExecuteOperation(b, onrampops.OnRampApplyDestChainConfigUpdates, chain, contract.FunctionInput[[]onramp.OnRampDestChainConfigArgs]{
+			report, err := operations.ExecuteOperation(b, onrampops.ApplyDestChainConfigUpdates, chain, contract.FunctionInput[[]onrampops.DestChainConfigArgs]{
 				ChainSelector: chain.Selector,
 				Address:       input.Address,
 				Args:          input.UpdatesByChain,
@@ -75,7 +84,7 @@ var (
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
-			onRampDestConfigs := make(map[uint64]onramp.GetDestChainConfig)
+			onRampDestConfigs := make(map[uint64]any)
 			for _, remoteChain := range input.RemoteChains {
 				report, err := operations.ExecuteOperation(b, onrampops.GetDestChainConfig, chain, contract.FunctionInput[uint64]{
 					ChainSelector: chain.Selector,
@@ -87,19 +96,17 @@ var (
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to get dest chain config for chain %d from OnRamp at %s on %s: %w", remoteChain, input.Address.String(), chain, err)
 				}
 			}
-			report, err := operations.ExecuteOperation(b, onrampops.GetStaticConfig, chain, contract.FunctionInput[any]{
+			report, err := operations.ExecuteOperation(b, onrampops.GetStaticConfig, chain, contract.FunctionInput[struct{}]{
 				ChainSelector: chain.Selector,
 				Address:       input.Address,
-				Args:          nil,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get static config from OnRamp at %s on %s: %w", input.Address.String(), chain, err)
 			}
 			staticConfig := report.Output
-			out, err := operations.ExecuteOperation(b, onrampops.GetDynamicConfig, chain, contract.FunctionInput[any]{
+			out, err := operations.ExecuteOperation(b, onrampops.GetDynamicConfig, chain, contract.FunctionInput[struct{}]{
 				ChainSelector: chain.Selector,
 				Address:       input.Address,
-				Args:          nil,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get dynamic config from OnRamp at %s on %s: %w", input.Address.String(), chain, err)

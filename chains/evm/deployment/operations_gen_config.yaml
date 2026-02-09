@@ -1,0 +1,162 @@
+version: "1.0"
+
+input:
+  base_path: ".."  # Directory containing abi/ and bytecode/ folders
+
+output:
+  base_path: "." # Directory for generated operations/
+
+# Access control aliases
+# - owner: Only contract owner can call (OnlyOwner)
+# - (none): Public/Read functions don't need access control
+
+contracts:
+  # 1.6.4
+  - contract_name: USDCTokenPoolCCTPV2
+    version: "1.6.4"
+    package_name: usdc_token_pool_cctp_v2
+    functions:
+      - name: setDomains
+        access: owner
+      - name: getDomain
+        access: public
+      - name: applyAuthorizedCallerUpdates
+        access: owner
+      - name: applyChainUpdates
+        access: owner
+      - name: addRemotePool
+        access: owner
+      - name: removeRemotePool
+        access: owner
+      - name: transferOwnership
+        access: owner
+
+  # 1.6.2
+  - contract_name: CCTPMessageTransmitterProxy
+    version: "1.6.2"
+    package_name: cctp_message_transmitter_proxy
+    functions:
+      - name: configureAllowedCallers
+        access: owner
+
+  # 1.6.1
+  - contract_name: TokenPool
+    version: "1.6.1"
+    abi_file: burn_mint_token_pool.json
+    no_deployment: true
+    functions:
+      - name: applyChainUpdates
+        access: owner
+      - name: setRateLimitAdmin
+        access: owner
+      - name: getRateLimitAdmin
+        access: public
+      - name: transferOwnership
+        access: owner
+      - name: setChainRateLimiterConfigs
+        access: owner
+      - name: setChainRateLimiterConfig
+        access: owner
+      - name: getToken
+        access: public
+      - name: isSupportedToken
+        access: public
+      - name: getAllowListEnabled
+        access: public
+      - name: getAllowList
+        access: public
+      - name: applyAllowListUpdates
+        access: owner
+      - name: getRouter
+        access: public
+      - name: setRouter
+        access: owner
+      - name: getSupportedChains
+        access: public
+      - name: getRemoteToken
+        access: public
+      - name: getRemotePools
+        access: public
+      - name: addRemotePool
+        access: owner
+      - name: removeRemotePool
+        access: owner
+      - name: getCurrentInboundRateLimiterState
+        access: public
+      - name: getCurrentOutboundRateLimiterState
+        access: public
+
+  - contract_name: BurnMintTokenPool
+    version: "1.6.1"
+
+  - contract_name: BurnFromMintTokenPool
+    version: "1.6.1"
+
+  - contract_name: BurnToAddressMintTokenPool
+    version: "1.6.1"
+
+  - contract_name: BurnWithFromMintTokenPool
+    version: "1.6.1"
+
+  - contract_name: BurnMintWithLockReleaseFlagTokenPool
+    version: "1.6.1"
+
+  - contract_name: LockReleaseTokenPool
+    version: "1.6.1"
+
+  - contract_name: SiloedLockReleaseTokenPool
+    version: "1.6.1"
+
+  # 1.6.0
+  - contract_name: RMNRemote
+    version: "1.6.0"
+    functions:
+      - name: curse
+        access: owner
+      - name: uncurse
+        access: owner
+      - name: isCursed
+        access: public
+
+  - contract_name: FeeQuoter
+    version: "1.6.0"
+    functions:
+      - name: applyDestChainConfigUpdates
+        access: owner
+      - name: updatePrices
+        access: owner
+      - name: applyAuthorizedCallerUpdates
+        access: owner
+      - name: applyTokenTransferFeeConfigUpdates
+        access: owner
+      - name: getDestChainConfig
+        access: public
+      - name: getTokenTransferFeeConfig
+        access: public
+
+  - contract_name: OnRamp
+    version: "1.6.0"
+    functions:
+      - name: applyDestChainConfigUpdates
+        access: owner
+      - name: getDestChainConfig
+        access: public
+      - name: getStaticConfig
+        access: public
+      - name: getDynamicConfig
+        access: public
+
+  - contract_name: OffRamp
+    package_name: offramp
+    version: "1.6.0"
+    functions:
+      - name: applySourceChainConfigUpdates
+        access: owner
+      - name: setOCR3Configs
+        access: owner
+      - name: getStaticConfig
+        access: public
+      - name: getDynamicConfig
+        access: public
+      - name: getSourceChainConfig
+        access: public

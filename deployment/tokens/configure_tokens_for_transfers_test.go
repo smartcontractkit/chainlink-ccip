@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 
 	mcms_types "github.com/smartcontractkit/mcms/types"
@@ -123,8 +124,20 @@ func (ma *transfersTest_MockTokenAdapter) DeriveTokenAddress(e deployment.Enviro
 	return []byte("mocked-remote-token-address"), nil
 }
 
+func (ma *transfersTest_MockTokenAdapter) DeriveTokenDecimals(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) (uint8, error) {
+	return 18, nil
+}
+
+func (ma *transfersTest_MockTokenAdapter) DeriveTokenPoolCounterpart(e deployment.Environment, chainSelector uint64, tokenPool []byte, token []byte) ([]byte, error) {
+	return tokenPool, nil
+}
+
 func (ma *transfersTest_MockTokenAdapter) ManualRegistration() *cldf_ops.Sequence[tokens.ManualRegistrationInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return &cldf_ops.Sequence[tokens.ManualRegistrationInput, sequences.OnChainOutput, cldf_chain.BlockChains]{}
+}
+
+func (ma *transfersTest_MockTokenAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokens.RateLimiterConfigInputs, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return &cldf_ops.Sequence[tokens.RateLimiterConfigInputs, sequences.OnChainOutput, cldf_chain.BlockChains]{}
 }
 
 func (ma *transfersTest_MockTokenAdapter) DeployToken() *cldf_ops.Sequence[tokens.DeployTokenInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
@@ -216,6 +229,7 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 				return makeBaseDataStore(t, []uint64{5009297550715157269, 15971525489660198786})
 			},
 			cfg: tokens.ConfigureTokensForTransfersConfig{
+				ChainAdapterVersion: semver.MustParse("1.0.0"),
 				Tokens: []tokens.TokenTransferConfig{
 					{
 						ChainSelector: 5009297550715157269,
@@ -274,6 +288,7 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 				return makeBaseDataStore(t, []uint64{5009297550715157269, 15971525489660198786})
 			},
 			cfg: tokens.ConfigureTokensForTransfersConfig{
+				ChainAdapterVersion: semver.MustParse("1.0.0"),
 				Tokens: []tokens.TokenTransferConfig{
 					{
 						ChainSelector: 5009297550715157269,
@@ -338,6 +353,7 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 				return ds
 			},
 			cfg: tokens.ConfigureTokensForTransfersConfig{
+				ChainAdapterVersion: semver.MustParse("1.0.0"),
 				Tokens: []tokens.TokenTransferConfig{
 					{
 						ChainSelector: 5009297550715157269,
@@ -372,6 +388,7 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 				return ds
 			},
 			cfg: tokens.ConfigureTokensForTransfersConfig{
+				ChainAdapterVersion: semver.MustParse("1.0.0"),
 				Tokens: []tokens.TokenTransferConfig{
 					{
 						ChainSelector: 5009297550715157269,
@@ -397,6 +414,7 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 				return makeBaseDataStore(t, []uint64{5009297550715157269})
 			},
 			cfg: tokens.ConfigureTokensForTransfersConfig{
+				ChainAdapterVersion: semver.MustParse("1.0.0"),
 				Tokens: []tokens.TokenTransferConfig{
 					{
 						ChainSelector: 0, // Invalid chain selector
@@ -424,6 +442,7 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 				return ds
 			},
 			cfg: tokens.ConfigureTokensForTransfersConfig{
+				ChainAdapterVersion: semver.MustParse("1.0.0"),
 				Tokens: []tokens.TokenTransferConfig{
 					{
 						ChainSelector: 5009297550715157269,
@@ -471,6 +490,7 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 				return ds
 			},
 			cfg: tokens.ConfigureTokensForTransfersConfig{
+				ChainAdapterVersion: semver.MustParse("1.0.0"),
 				Tokens: []tokens.TokenTransferConfig{
 					{
 						ChainSelector: 5009297550715157269,
@@ -514,6 +534,7 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 				return makeBaseDataStore(t, []uint64{5009297550715157269, 15971525489660198786})
 			},
 			cfg: tokens.ConfigureTokensForTransfersConfig{
+				ChainAdapterVersion: semver.MustParse("1.0.0"),
 				Tokens: []tokens.TokenTransferConfig{
 					{
 						ChainSelector: 5009297550715157269,
@@ -553,6 +574,7 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 				return makeBaseDataStore(t, []uint64{5009297550715157269, 15971525489660198786})
 			},
 			cfg: tokens.ConfigureTokensForTransfersConfig{
+				ChainAdapterVersion: semver.MustParse("1.0.0"),
 				Tokens: []tokens.TokenTransferConfig{
 					{
 						ChainSelector: 5009297550715157269,
@@ -646,9 +668,9 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 				for _, op := range proposal.Operations {
 					// For derived remote token test, expect mocked address
 					if tt.shouldDeriveToken {
-						require.Equal(t, []byte("mocked-remote-token-address"), op.Transactions[0].Data)
+						require.Equal(t, common.LeftPadBytes([]byte("mocked-remote-token-address"), 32), op.Transactions[0].Data)
 					} else {
-						require.Equal(t, fmt.Appendf(nil, "%d-token", op.ChainSelector), op.Transactions[0].Data)
+						require.Equal(t, common.LeftPadBytes([]byte(fmt.Sprintf("%d-token", op.ChainSelector)), 32), op.Transactions[0].Data)
 					}
 					require.Equal(t, fmt.Sprintf("%d-token-pool", op.ChainSelector), op.Transactions[0].To)
 				}
