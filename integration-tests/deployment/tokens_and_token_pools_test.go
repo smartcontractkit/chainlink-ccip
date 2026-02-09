@@ -18,6 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_0/burnmint_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	bnmERC20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
@@ -373,6 +374,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 						},
 					})
 				require.NoError(t, err)
+				testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
 				MergeAddresses(t, env, output.DataStore)
 
 				// Verify that a new admin was proposed for the specified token
