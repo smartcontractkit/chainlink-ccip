@@ -13,15 +13,16 @@ require (
 	github.com/Masterminds/semver/v3 v3.4.0
 	github.com/ethereum/go-ethereum v1.16.8
 	github.com/smartcontractkit/chain-selectors v1.0.89
-	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20260205102529-e2d2cca4a4f6
-	github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm v0.0.0-20260205102529-e2d2cca4a4f6
-	github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment v0.0.0-20260205102529-e2d2cca4a4f6
-	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260205102529-e2d2cca4a4f6
+	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20260206181544-f1613c67d071
+	github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm v0.0.0-20260206181544-f1613c67d071
+	github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment v0.0.0-20260206181544-f1613c67d071
+	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260206181544-f1613c67d071
 	github.com/smartcontractkit/chainlink-common v0.9.6-0.20260114142648-bd9e1b483e96
 	github.com/smartcontractkit/chainlink-deployments-framework v0.74.2
 	github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20260119171452-39c98c3b33cd
 	github.com/smartcontractkit/mcms v0.34.0
 	github.com/stretchr/testify v1.11.1
+	golang.org/x/exp v0.0.0-20250711185948-6ae5c78190dc
 )
 
 require (
@@ -271,7 +272,6 @@ require (
 	go.uber.org/ratelimit v0.3.1 // indirect
 	go.uber.org/zap v1.27.1 // indirect
 	golang.org/x/crypto v0.47.0 // indirect
-	golang.org/x/exp v0.0.0-20250711185948-6ae5c78190dc // indirect
 	golang.org/x/net v0.48.0 // indirect
 	golang.org/x/sync v0.19.0 // indirect
 	golang.org/x/sys v0.40.0 // indirect

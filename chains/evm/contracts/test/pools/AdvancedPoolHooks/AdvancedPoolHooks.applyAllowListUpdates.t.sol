@@ -16,7 +16,7 @@ contract AdvancedPoolHooks_applyAllowListUpdates is TokenPoolSetup {
     s_allowedSenders.push(STRANGER);
     s_allowedSenders.push(OWNER);
 
-    s_advancedPoolHooks = new AdvancedPoolHooks(s_allowedSenders, 0);
+    s_advancedPoolHooks = new AdvancedPoolHooks(s_allowedSenders, 0, address(0), new address[](0));
     s_tokenPool = new TokenPoolHelper(
       s_token, DEFAULT_TOKEN_DECIMALS, address(s_advancedPoolHooks), address(s_mockRMNRemote), address(s_sourceRouter)
     );
@@ -102,7 +102,7 @@ contract AdvancedPoolHooks_applyAllowListUpdates is TokenPoolSetup {
   }
 
   function test_applyAllowListUpdates_RevertWhen_AllowListNotEnabled() public {
-    AdvancedPoolHooks hooksWithoutAllowList = new AdvancedPoolHooks(new address[](0), 0);
+    AdvancedPoolHooks hooksWithoutAllowList = new AdvancedPoolHooks(new address[](0), 0, address(0), new address[](0));
 
     vm.expectRevert(AdvancedPoolHooks.AllowListNotEnabled.selector);
 

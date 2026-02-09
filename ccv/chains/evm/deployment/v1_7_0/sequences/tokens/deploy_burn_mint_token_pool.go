@@ -2,6 +2,7 @@ package tokens
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
@@ -29,7 +30,10 @@ var DeployBurnMintTokenPool = cldf_ops.NewSequence(
 			ChainSelector:  input.ChainSel,
 			TypeAndVersion: deployment.NewTypeAndVersion(advanced_pool_hooks.ContractType, *advanced_pool_hooks.Version),
 			Args: advanced_pool_hooks.ConstructorArgs{
+				Allowlist:                        input.AdvancedPoolHooksConfig.Allowlist,
 				ThresholdAmountForAdditionalCCVs: input.ThresholdAmountForAdditionalCCVs,
+				PolicyEngine:                     input.AdvancedPoolHooksConfig.PolicyEngine,
+				AuthorizedCallers:                input.AdvancedPoolHooksConfig.AuthorizedCallers,
 			},
 			Qualifier: &input.TokenSymbol,
 		})
@@ -68,6 +72,41 @@ var DeployBurnMintTokenPool = cldf_ops.NewSequence(
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to configure token pool with address %s on %s: %w", tpDeployReport.Output.Address, chain, err)
+		}
+
+		// If hooks authorized callers gating is enabled at deployment time, ensure the newly deployed token pool is authorized.
+		// Otherwise, calls to preflightCheck/postflightCheck will revert when executed by the token pool.
+		if len(input.AdvancedPoolHooksConfig.AuthorizedCallers) > 0 {
+			poolAddr := common.HexToAddress(tpDeployReport.Output.Address)
+			hooksAddr := common.HexToAddress(hooksDeployReport.Output.Address)
+
+			// Check if the pool is already an authorized caller.
+			getAuthorizedCallersReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.GetAllAuthorizedCallers, chain, evm_contract.FunctionInput[any]{
+				ChainSelector: input.ChainSel,
+				Address:       hooksAddr,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get authorized callers from advanced pool hooks %s on %s: %w", hooksAddr, chain, err)
+			}
+
+			if !slices.Contains(getAuthorizedCallersReport.Output, poolAddr) {
+				applyAuthorizedCallerUpdatesReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.ApplyAuthorizedCallerUpdates, chain, evm_contract.FunctionInput[advanced_pool_hooks.AuthorizedCallerArgs]{
+					ChainSelector: input.ChainSel,
+					Address:       hooksAddr,
+					Args: advanced_pool_hooks.AuthorizedCallerArgs{
+						AddedCallers: []common.Address{poolAddr},
+					},
+				})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to authorize token pool %s on advanced pool hooks with address %s on %s: %w", poolAddr, hooksAddr, chain, err)
+				}
+
+				batchOp, err := evm_contract.NewBatchOperationFromWrites([]evm_contract.WriteOutput{applyAuthorizedCallerUpdatesReport.Output})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
+				}
+				configureReport.Output.BatchOps = append(configureReport.Output.BatchOps, batchOp)
+			}
 		}
 
 		return sequences.OnChainOutput{
