@@ -410,6 +410,10 @@ var (
 		})
 )
 
+// MergeFeeQuoterUpdateOutputs merges FeeQuoterUpdate outputs from the v1.6.3 and v1.5.0 import
+// sequences into a single update. output16 is the base; output15 supplements it. Where both
+// provide values (e.g. ConstructorArgs, dest chain configs, token transfer fee configs),
+// output16 takes precedence and output15 fills in only missing entries.
 func MergeFeeQuoterUpdateOutputs(output16, output15 FeeQuoterUpdate) (FeeQuoterUpdate, error) {
 	result := output16
 
