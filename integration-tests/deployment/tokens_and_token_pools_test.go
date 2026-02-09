@@ -564,13 +564,13 @@ func TestTokensAndTokenPools(t *testing.T) {
 			var tokenAdminRegistryAccountAfter ccip_common.TokenAdminRegistry
 			if err := env.BlockChains.SolanaChains()[solTestData.Chain.Selector].GetAccountDataBorshInto(context.Background(), tokenAdminRegistryPDA, &tokenAdminRegistryAccountAfter); err != nil {
 				require.Equal(t, solana.PublicKey{}, tokenAdminRegistryAccountAfter.Administrator)
-				// require.Equal(t, solana.MustPublicKeyFromBase58(solTestData.Token.ExternalAdmin), tokenAdminRegistryAccountAfter.PendingAdministrator)
+				require.Equal(t, solana.MustPublicKeyFromBase58(solTestData.Token.ExternalAdmin), tokenAdminRegistryAccountAfter.PendingAdministrator)
 			}
 			var tokenPoolStateAccountAfter burnmint_token_pool.State
 			if err := env.BlockChains.SolanaChains()[solTestData.Chain.Selector].GetAccountDataBorshInto(context.Background(), tokenPoolStatePDA, &tokenPoolStateAccount); err != nil {
 				require.Equal(t, solana.PublicKey{}, tokenPoolStateAccountAfter.Config.Owner)
-				// require.Equal(t, solana.MustPublicKeyFromBase58(solTestData.Token.ExternalAdmin), tokenPoolStateAccountAfter.Config.ProposedOwner)
-				// require.Equal(t, tokenMint, tokenPoolStateAccountAfter.Config.Mint)
+				require.Equal(t, solana.MustPublicKeyFromBase58(solTestData.Token.ExternalAdmin), tokenPoolStateAccountAfter.Config.ProposedOwner)
+				require.Equal(t, tokenMint, tokenPoolStateAccountAfter.Config.Mint)
 				require.Equal(t, solana.PublicKey{}, tokenPoolStateAccountAfter.Config.RateLimitAdmin)
 			}
 
