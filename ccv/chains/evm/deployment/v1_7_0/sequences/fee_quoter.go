@@ -322,6 +322,23 @@ var (
 			if len(onRampMetadata) == 0 {
 				return FeeQuoterUpdate{}, fmt.Errorf("no metadata found for EVM2EVMOnRamp v1.5.0 on chain selector %d", input.ChainSelector)
 			}
+			// get the commit stores and that will act like price updaters for fee quoter
+			var commitStoreRefs []datastore.AddressRef
+			for _, addressRef := range input.ExistingAddresses {
+				if addressRef.Type == "CommitStore" &&
+					addressRef.Version == semver.MustParse("1.5.0") &&
+					addressRef.ChainSelector == input.ChainSelector {
+					commitStoreRefs = append(commitStoreRefs, addressRef)
+				}
+			}
+
+			if len(commitStoreRefs) == 0 {
+				return FeeQuoterUpdate{}, fmt.Errorf("failed to get commit store ref for chain %d", input.ChainSelector)
+			}
+			var priceUpdaters []common.Address
+			for _, ref := range commitStoreRefs {
+				priceUpdaters = append(priceUpdaters, common.HexToAddress(ref.Address))
+			}
 			output.ChainSelector = input.ChainSelector
 			output.ExistingAddresses = input.ExistingAddresses
 			// is feeQuoter going to be deployed or fetched from existing addresses?
@@ -405,12 +422,14 @@ var (
 					},
 					DestChainConfigArgs:        destChainCfgs,
 					TokenTransferFeeConfigArgs: tokenTransferFeeConfigArgsForAll,
-					// TODO: what to do with price updaters for 1.5 if there is no 1.6 lanes here
-					//	PriceUpdaters: []common.Address{},
+					PriceUpdaters:              priceUpdaters,
 				}
 			} else {
 				output.DestChainConfigs = destChainCfgs
 				output.TokenTransferFeeConfigUpdates.TokenTransferFeeConfigArgs = tokenTransferFeeConfigArgsForAll
+				output.AuthorizedCallerUpdates = fqops.AuthorizedCallerArgs{
+					AddedCallers: priceUpdaters,
+				}
 			}
 			return output, nil
 		})
