@@ -67,7 +67,7 @@ var dummyContractMetadata = []datastore.ContractMetadata{
 						DefaultTxGasLimit:                 180000,
 						GasMultiplierWeiPerEth:            0,
 						GasPriceStalenessThreshold:        0,
-						NetworkFeeUSDCents:                4,
+						NetworkFeeUSDCents:                10,
 					},
 					TokenTransferFeeCfgs: map[common.Address]fee_quoter_v1_6_3.FeeQuoterTokenTransferFeeConfig{
 						common.HexToAddress("0x2222222222222222222222222222222222222222"): {
@@ -144,13 +144,13 @@ var dummyContractMetadata = []datastore.ContractMetadata{
 			},
 			FeeTokenConfig: map[common.Address]evm_2_evm_onramp_v1_5_0.EVM2EVMOnRampFeeTokenConfig{
 				common.HexToAddress("0xBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"): {
-					NetworkFeeUSDCents:         5,
+					NetworkFeeUSDCents:         10,
 					GasMultiplierWeiPerEth:     1000000000000000000,
 					PremiumMultiplierWeiPerEth: 1100000000000000000,
 					Enabled:                    true,
 				},
 				common.HexToAddress("0xCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC"): {
-					NetworkFeeUSDCents:         3,
+					NetworkFeeUSDCents:         10,
 					GasMultiplierWeiPerEth:     900000000000000000,
 					PremiumMultiplierWeiPerEth: 1000000000000000000,
 					Enabled:                    true,
@@ -183,7 +183,7 @@ var dummyContractMetadata = []datastore.ContractMetadata{
 						DefaultTxGasLimit:                 180000,
 						GasMultiplierWeiPerEth:            0,
 						GasPriceStalenessThreshold:        0,
-						NetworkFeeUSDCents:                4,
+						NetworkFeeUSDCents:                10,
 					},
 					TokenTransferFeeCfgs: map[common.Address]fee_quoter_v1_6_3.FeeQuoterTokenTransferFeeConfig{
 						common.HexToAddress("0x2222222222222222222222222222222222222222"): {
@@ -251,7 +251,7 @@ var dummyContractMetadata = []datastore.ContractMetadata{
 			},
 			FeeTokenConfig: map[common.Address]evm_2_evm_onramp_v1_5_0.EVM2EVMOnRampFeeTokenConfig{
 				common.HexToAddress("0xBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"): {
-					NetworkFeeUSDCents:         5,
+					NetworkFeeUSDCents:         10,
 					GasMultiplierWeiPerEth:     1000000000000000000,
 					PremiumMultiplierWeiPerEth: 1100000000000000000,
 					Enabled:                    true,
@@ -311,13 +311,13 @@ var dummyContractMetadata = []datastore.ContractMetadata{
 			},
 			FeeTokenConfig: map[common.Address]evm_2_evm_onramp_v1_5_0.EVM2EVMOnRampFeeTokenConfig{
 				common.HexToAddress("0xBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"): {
-					NetworkFeeUSDCents:         5,
+					NetworkFeeUSDCents:         10,
 					GasMultiplierWeiPerEth:     1000000000000000000,
 					PremiumMultiplierWeiPerEth: 1100000000000000000,
 					Enabled:                    true,
 				},
 				common.HexToAddress("0xCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC"): {
-					NetworkFeeUSDCents:         3,
+					NetworkFeeUSDCents:         10,
 					GasMultiplierWeiPerEth:     900000000000000000,
 					PremiumMultiplierWeiPerEth: 1000000000000000000,
 					Enabled:                    true,
@@ -350,7 +350,7 @@ var dummyContractMetadata = []datastore.ContractMetadata{
 						DefaultTxGasLimit:                 200000,
 						GasMultiplierWeiPerEth:            0,
 						GasPriceStalenessThreshold:        0,
-						NetworkFeeUSDCents:                5,
+						NetworkFeeUSDCents:                10,
 					},
 					TokenTransferFeeCfgs: map[common.Address]fee_quoter_v1_6_3.FeeQuoterTokenTransferFeeConfig{},
 				},
@@ -374,7 +374,7 @@ var dummyContractMetadata = []datastore.ContractMetadata{
 						DefaultTxGasLimit:                 190000,
 						GasMultiplierWeiPerEth:            0,
 						GasPriceStalenessThreshold:        0,
-						NetworkFeeUSDCents:                4,
+						NetworkFeeUSDCents:                10,
 					},
 					TokenTransferFeeCfgs: map[common.Address]fee_quoter_v1_6_3.FeeQuoterTokenTransferFeeConfig{},
 				},
@@ -423,7 +423,7 @@ var dummyContractMetadata = []datastore.ContractMetadata{
 			TokenTransferFeeConfig: map[common.Address]evm_2_evm_onramp_v1_5_0.EVM2EVMOnRampTokenTransferFeeConfig{},
 			FeeTokenConfig: map[common.Address]evm_2_evm_onramp_v1_5_0.EVM2EVMOnRampFeeTokenConfig{
 				common.HexToAddress("0xBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"): {
-					NetworkFeeUSDCents:         4,
+					NetworkFeeUSDCents:         10,
 					GasMultiplierWeiPerEth:     950000000000000000,
 					PremiumMultiplierWeiPerEth: 1050000000000000000,
 					Enabled:                    true,
@@ -465,7 +465,7 @@ func getExpectedOutput() map[uint64]sequence1_7.FeeQuoterUpdate {
 						DefaultTokenFeeUSDCents:     8,
 						DefaultTokenDestGasOverhead: 40000,
 						DefaultTxGasLimit:           180000,
-						NetworkFeeUSDCents:          4,
+						NetworkFeeUSDCents:          10,
 						LinkFeeMultiplierPercent:    90,
 					},
 				},
@@ -550,7 +550,7 @@ func getExpectedOutput() map[uint64]sequence1_7.FeeQuoterUpdate {
 						DefaultTokenFeeUSDCents:     8,
 						DefaultTokenDestGasOverhead: 40000,
 						DefaultTxGasLimit:           180000,
-						NetworkFeeUSDCents:          4,
+						NetworkFeeUSDCents:          10,
 						LinkFeeMultiplierPercent:    90,
 					},
 				},
@@ -681,7 +681,7 @@ func getExpectedOutput() map[uint64]sequence1_7.FeeQuoterUpdate {
 						DefaultTokenFeeUSDCents:     10,
 						DefaultTokenDestGasOverhead: 50000,
 						DefaultTxGasLimit:           200000,
-						NetworkFeeUSDCents:          5,
+						NetworkFeeUSDCents:          10,
 						LinkFeeMultiplierPercent:    90,
 					},
 				},
@@ -697,7 +697,7 @@ func getExpectedOutput() map[uint64]sequence1_7.FeeQuoterUpdate {
 						DefaultTokenFeeUSDCents:     9,
 						DefaultTokenDestGasOverhead: 45000,
 						DefaultTxGasLimit:           190000,
-						NetworkFeeUSDCents:          4,
+						NetworkFeeUSDCents:          10,
 						LinkFeeMultiplierPercent:    90,
 					},
 				},
