@@ -24,12 +24,11 @@ import (
 )
 
 func main() {
-	addressRefsPath := flag.String("addresses", "address_refs.json", "Path to address_refs.json")
-	networkConfigPath := flag.String("network", "testnet.yaml", "Path to network config YAML")
+	addressRefsPath := flag.String("addresses", "example_address_refs.json", "Path to address_refs.json")
+	networkConfigPath := flag.String("network", "example.yaml", "Path to network config YAML")
 	outputPath := flag.String("output", "", "Output file path (default: stdout)")
 	timeout := flag.Duration("timeout", 30*time.Minute, "Overall timeout for all operations")
-	maxConcurrent := flag.Int("max-concurrent", 12, "Max concurrent workers per RPC endpoint (scales from min to this when healthy)")
-	minConcurrent := flag.Int("min-concurrent", 1, "Min workers per endpoint when unhealthy (scale down to this, not below)")
+	workersPerEndpoint := flag.Int("workers", 12, "Worker goroutines per RPC endpoint")
 	format := flag.Bool("format", false, "Format output to match state.json structure")
 	live := flag.Bool("live", true, "Show live RPC stats and progress during run")
 	flag.Parse()
@@ -64,7 +63,7 @@ func main() {
 	generic := orchestrator.NewGeneric()
 	retryable := retryableKeywords()
 
-	evmChains := buildEVMChainEndpoints(chainRegistry, *minConcurrent, *maxConcurrent)
+	evmChains := buildEVMChainEndpoints(chainRegistry, *workersPerEndpoint)
 	evmOrc, err := evm.NewEVMOrchestrator(generic, evmChains, retryable)
 	if err != nil {
 		fmt.Printf("Error creating EVM orchestrator: %v\n", err)
@@ -72,7 +71,7 @@ func main() {
 	}
 	fmt.Printf("  Registered %d EVM chains with generic engine\n", len(evmChains))
 
-	svmChains := buildSVMChainEndpoints(chainRegistry, *minConcurrent, *maxConcurrent)
+	svmChains := buildSVMChainEndpoints(chainRegistry, *workersPerEndpoint)
 	var svmOrc *svm.SVMOrchestrator
 	if len(svmChains) > 0 {
 		svmOrc, err = svm.NewSVMOrchestrator(generic, svmChains, retryable)
@@ -83,7 +82,7 @@ func main() {
 		fmt.Printf("  Registered %d SVM (Solana) chains with generic engine\n", len(svmChains))
 	}
 
-	aptosChains := buildAptosChainEndpoints(chainRegistry, *minConcurrent, *maxConcurrent)
+	aptosChains := buildAptosChainEndpoints(chainRegistry, *workersPerEndpoint)
 	var aptosOrc *aptos.AptosOrchestrator
 	if len(aptosChains) > 0 {
 		aptosOrc, err = aptos.NewAptosOrchestrator(generic, aptosChains, retryable)
@@ -301,15 +300,7 @@ func main() {
 		fmt.Println("\n" + string(jsonOutput))
 	}
 
-	fmt.Println("\n╔═══════════════════════════════════════════════════════════════╗")
-	fmt.Println("║                      STATISTICS                               ║")
-	fmt.Println("╠═══════════════════════════════════════════════════════════════╣")
-	fmt.Printf("║  Total Duration:        %-37v ║\n", totalDuration.Round(time.Millisecond))
-	fmt.Printf("║  Contracts Processed:   %-37d ║\n", len(supported))
-	fmt.Printf("║  Successful Views:      %-37d ║\n", successCount)
-	fmt.Printf("║  Skipped (no impl):     %-37d ║\n", skippedCount)
-	fmt.Printf("║  Failed Views:          %-37d ║\n", errorCount)
-	fmt.Println("╚═══════════════════════════════════════════════════════════════╝")
+	printFinalStats(totalDuration, len(supported), successCount, skippedCount, errorCount, evmOrc, chainRegistry)
 
 	select {
 	case <-ctx.Done():
@@ -319,7 +310,7 @@ func main() {
 	}
 }
 
-func buildEVMChainEndpoints(registry *ChainRegistry, minConcurrent, maxConcurrent int) []evm.ChainEndpoints {
+func buildEVMChainEndpoints(registry *ChainRegistry, workersPerEndpoint int) []evm.ChainEndpoints {
 	allChains := registry.GetAllChains()
 	var out []evm.ChainEndpoints
 	for selector, info := range allChains {
@@ -332,11 +323,9 @@ func buildEVMChainEndpoints(registry *ChainRegistry, minConcurrent, maxConcurren
 				continue
 			}
 			endpoints = append(endpoints, orchestrator.EndpointConfig{
-				URL:               rpc.HTTPURL,
-				MinConcurrent:     minConcurrent,
-				MaxConcurrent:     maxConcurrent,
-				TargetSuccessRate: 0.95,
-				Timeout:           30,
+				URL:     rpc.HTTPURL,
+				Workers: workersPerEndpoint,
+				Timeout: 30,
 			})
 		}
 		if len(endpoints) > 0 {
@@ -346,7 +335,7 @@ func buildEVMChainEndpoints(registry *ChainRegistry, minConcurrent, maxConcurren
 	return out
 }
 
-func buildSVMChainEndpoints(registry *ChainRegistry, minConcurrent, maxConcurrent int) []svm.ChainEndpoints {
+func buildSVMChainEndpoints(registry *ChainRegistry, workersPerEndpoint int) []svm.ChainEndpoints {
 	allChains := registry.GetAllChains()
 	var out []svm.ChainEndpoints
 	for selector, info := range allChains {
@@ -359,11 +348,9 @@ func buildSVMChainEndpoints(registry *ChainRegistry, minConcurrent, maxConcurren
 				continue
 			}
 			endpoints = append(endpoints, orchestrator.EndpointConfig{
-				URL:               rpc.HTTPURL,
-				MinConcurrent:     minConcurrent,
-				MaxConcurrent:     maxConcurrent,
-				TargetSuccessRate: 0.95,
-				Timeout:           30,
+				URL:     rpc.HTTPURL,
+				Workers: workersPerEndpoint,
+				Timeout: 30,
 			})
 		}
 		if len(endpoints) > 0 {
@@ -373,7 +360,7 @@ func buildSVMChainEndpoints(registry *ChainRegistry, minConcurrent, maxConcurren
 	return out
 }
 
-func buildAptosChainEndpoints(registry *ChainRegistry, minConcurrent, maxConcurrent int) []aptos.ChainEndpoints {
+func buildAptosChainEndpoints(registry *ChainRegistry, workersPerEndpoint int) []aptos.ChainEndpoints {
 	allChains := registry.GetAllChains()
 	var out []aptos.ChainEndpoints
 	for selector, info := range allChains {
@@ -386,11 +373,9 @@ func buildAptosChainEndpoints(registry *ChainRegistry, minConcurrent, maxConcurr
 				continue
 			}
 			endpoints = append(endpoints, orchestrator.EndpointConfig{
-				URL:               rpc.HTTPURL,
-				MinConcurrent:     minConcurrent,
-				MaxConcurrent:     maxConcurrent,
-				TargetSuccessRate: 0.95,
-				Timeout:           30,
+				URL:     rpc.HTTPURL,
+				Workers: workersPerEndpoint,
+				Timeout: 30,
 			})
 		}
 		if len(endpoints) > 0 {
@@ -400,12 +385,15 @@ func buildAptosChainEndpoints(registry *ChainRegistry, minConcurrent, maxConcurr
 	return out
 }
 
-// printLiveStats prints live RPC failure rates, queue depth, and progress every 2s.
+// printLiveStats prints live progress bar, queue depth, and aggregate failure rates every 2s.
 func printLiveStats(g *orchestrator.Generic, registry *ChainRegistry, viewsDone *atomic.Int64, totalViews int64, done chan struct{}) {
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 	startTime := time.Now()
 	lastLines := 0
+
+	const barWidth = 50 // characters for the progress bar fill area
+
 	for {
 		select {
 		case <-done:
@@ -423,68 +411,79 @@ func printLiveStats(g *orchestrator.Generic, registry *ChainRegistry, viewsDone 
 			}
 			lines := 0
 
-			// Progress + summary
-			fmt.Printf("╔══════════════════════════════════════════════════════════════════════════════════╗\n")
+			pct := float64(doneN) / float64(totalViews)
+			filled := int(pct * barWidth)
+			if filled > barWidth {
+				filled = barWidth
+			}
+			bar := strings.Repeat("█", filled) + strings.Repeat("░", barWidth-filled)
+
+			fmt.Println("╔═══════════════════════════════════════════════════════════════╗")
 			lines++
-			fmt.Printf("║ [%v] Views: %d / %d (%.0f%%)                                                    ║\n",
-				elapsed, doneN, totalViews, 100*float64(doneN)/float64(totalViews))
+			viewsStr := fmt.Sprintf(" [%v] Views: %d / %d", elapsed, doneN, totalViews)
+			fmt.Printf("║%s%-*s║\n", viewsStr, 61-len(viewsStr), "")
 			lines++
-			fmt.Printf("╠══════════════════════════════════════════════════════════════════════════════════╣\n")
+			fmt.Printf("║ [%s] %3.0f%%  %-*s║\n", bar, pct*100,
+				61-len(fmt.Sprintf(" [%s] %3.0f%%  ", bar, pct*100)), "")
 			lines++
-			fmt.Printf("║ %-22s │ %8s │ %10s │ %8s │ %-36s ║\n", "Chain", "Queue", "Workers", "Fail%", "Endpoint")
+			fmt.Println("╠═══════════════════════════════════════════════════════════════╣")
 			lines++
-			fmt.Printf("╠══════════════════════════╪══════════╪════════════╪══════════╪══════════════════════╣\n")
+			fmt.Printf("║ %-30s │ %7s │ %9s │ %7s ║\n",
+				"Chain", "Queue", "Workers", "Fail%")
+			lines++
+			fmt.Println("╠════════════════════════════════╪═════════╪═══════════╪═════════╣")
 			lines++
 
-			// Sort orc IDs by queue depth (busiest first), then by chain name
+			// Aggregate per-chain: one row per orchestrator
 			type orcRow struct {
-				id    string
-				label string
-				orc   orchestrator.OrcLiveStats
+				label      string
+				queueDepth int
+				workers    int
+				failPct    float64
 			}
 			var rows []orcRow
 			for id, orc := range stats {
 				label := orcIDToChainLabel(id, registry)
-				rows = append(rows, orcRow{id, label, orc})
+				var totalWorkers int
+				var failSum float64
+				for _, ep := range orc.Endpoints {
+					totalWorkers = ep.Workers // same for all endpoints in an orc
+					failSum += (1 - ep.SuccessRate)
+				}
+				avgFail := 0.0
+				if len(orc.Endpoints) > 0 {
+					avgFail = failSum / float64(len(orc.Endpoints)) * 100
+				}
+				rows = append(rows, orcRow{
+					label:      label,
+					queueDepth: orc.QueueDepth,
+					workers:    totalWorkers,
+					failPct:    avgFail,
+				})
 			}
 			sort.Slice(rows, func(i, j int) bool {
-				if rows[i].orc.QueueDepth != rows[j].orc.QueueDepth {
-					return rows[i].orc.QueueDepth > rows[j].orc.QueueDepth
+				// Highest fail% first so struggling chains are visible at the top.
+				if rows[i].queueDepth != rows[j].queueDepth {
+					return rows[i].queueDepth > rows[j].queueDepth
+				}
+				if rows[i].failPct != rows[j].failPct {
+					return rows[i].failPct > rows[j].failPct
 				}
 				return rows[i].label < rows[j].label
 			})
 
 			shown := 0
 			for _, row := range rows {
-				if shown >= 12 {
+				if shown >= 15 {
 					break
 				}
-				queueStr := fmt.Sprintf("%d", row.orc.QueueDepth)
-				for ei, ep := range row.orc.Endpoints {
-					failPct := (1 - ep.SuccessRate) * 100
-					workersStr := fmt.Sprintf("%d/%d", ep.Workers, ep.MaxConcurrent)
-					endpointShort := shortenURL(ep.URL, 36)
-					if ei == 0 {
-						fmt.Printf("║ %-22s │ %8s │ %10s │ %7.1f%% │ %-36s ║\n",
-							truncate(row.label, 22), queueStr, workersStr, failPct, endpointShort)
-					} else {
-						fmt.Printf("║ %-22s │ %8s │ %10s │ %7.1f%% │ %-36s ║\n",
-							"", "", "", failPct, endpointShort)
-					}
-					lines++
-					shown++
-					if shown >= 12 {
-						break
-					}
-				}
-				if len(row.orc.Endpoints) == 0 {
-					fmt.Printf("║ %-22s │ %8s │ %10s │ %8s │ %-36s ║\n",
-						truncate(row.label, 22), queueStr, "-", "-", "-")
-					lines++
-					shown++
-				}
+				fmt.Printf("║ %-30s │ %7d │ %9d │ %6.1f%% ║\n",
+					truncate(row.label, 30),
+					row.queueDepth, row.workers, row.failPct)
+				lines++
+				shown++
 			}
-			fmt.Printf("╚══════════════════════════════════════════════════════════════════════════════════╝\n")
+			fmt.Println("╚═══════════════════════════════════════════════════════════════╝")
 			lines++
 			lastLines = lines
 		}
@@ -502,11 +501,9 @@ func orcIDToChainLabel(id string, registry *ChainRegistry) string {
 		if name, ok := ChainSelectorToName[sel]; ok {
 			return name
 		}
-		chain := registry.GetChain(sel)
-		if chain != nil && chain.Name != "" {
-			return chain.Name
-		}
-		return s
+		// Don't fall back to chain.Name -- it's often the RPC provider
+		// name (e.g. "Alchemy"), not the chain name. Use selector instead.
+		return "chain-" + s
 	}
 	return id
 }
@@ -525,6 +522,133 @@ func truncate(s string, max int) string {
 		return s
 	}
 	return s[:max-3] + "..."
+}
+
+func printFinalStats(totalDuration time.Duration, totalContracts, successCount, skippedCount, errorCount int,
+	evmOrc *evm.EVMOrchestrator, registry *ChainRegistry) {
+
+	evmStats := evmOrc.Stats()
+
+	// Compute derived metrics
+	logicalCalls := evmStats.CacheHits + evmStats.CacheDeduped + evmStats.CacheMisses
+	uniqueCalls := evmStats.CacheMisses // calls that actually needed execution
+
+	// Throughput
+	durationSecs := totalDuration.Seconds()
+	var logicalPerSec, httpPerSec float64
+	if durationSecs > 0 {
+		logicalPerSec = float64(logicalCalls) / durationSecs
+		httpPerSec = float64(evmStats.TotalSuccesses) / durationSecs
+	}
+
+	// RPC reduction: compare logical calls vs successful HTTP calls
+	// (retries inflate TotalHTTPCalls, so use Successes for a fair comparison)
+	var rpcReductionPct float64
+	if logicalCalls > 0 {
+		rpcReductionPct = (1 - float64(evmStats.TotalSuccesses)/float64(logicalCalls)) * 100
+	}
+
+	// Avg batch size
+	var avgBatchSize float64
+	if evmStats.Multicall.BatchesSent > 0 {
+		avgBatchSize = float64(evmStats.Multicall.CallsBatched) / float64(evmStats.Multicall.BatchesSent)
+	}
+
+	// Cache hit rate
+	var cacheHitPct float64
+	if logicalCalls > 0 {
+		cacheHitPct = float64(evmStats.CacheHits+evmStats.CacheDeduped) / float64(logicalCalls) * 100
+	}
+
+	w := 61 // inner width between ║ and ║
+	line := func(label string, value string) {
+		fmt.Printf("║  %-28s %-*s ║\n", label, w-30, value)
+	}
+	sep := "╠═══════════════════════════════════════════════════════════════╣"
+
+	fmt.Println("\n╔═══════════════════════════════════════════════════════════════╗")
+	fmt.Println("║                         STATISTICS                           ║")
+	fmt.Println(sep)
+	line("Total Duration:", totalDuration.Round(time.Millisecond).String())
+	line("Contracts Processed:", fmt.Sprintf("%d", totalContracts))
+	line("Successful / Skipped / Failed:", fmt.Sprintf("%d / %d / %d", successCount, skippedCount, errorCount))
+
+	fmt.Println(sep)
+	fmt.Println("║                      RPC EFFICIENCY                          ║")
+	fmt.Println(sep)
+	line("Logical Calls (from views):", fmt.Sprintf("%d", logicalCalls))
+	line("  Cache Hits:", fmt.Sprintf("%d (%.1f%%)", evmStats.CacheHits, cacheHitPct))
+	line("  Deduped (in-flight):", fmt.Sprintf("%d", evmStats.CacheDeduped))
+	line("  Unique (executed):", fmt.Sprintf("%d", uniqueCalls))
+	line("Multicall Chains:", fmt.Sprintf("%d", evmStats.Multicall.MulticallChains))
+	line("Multicall Batches Sent:", fmt.Sprintf("%d (avg %.1f calls/batch)", evmStats.Multicall.BatchesSent, avgBatchSize))
+	line("Single Calls (unbatched):", fmt.Sprintf("%d", evmStats.Multicall.SingleCalls))
+	if evmStats.Multicall.FallbackCalls > 0 {
+		line("Multicall Fallbacks:", fmt.Sprintf("%d", evmStats.Multicall.FallbackCalls))
+	}
+	line("Successful HTTP Calls:", fmt.Sprintf("%d", evmStats.TotalSuccesses))
+	if evmStats.TotalRetries > 0 {
+		line("Retries (rate limits etc):", fmt.Sprintf("%d", evmStats.TotalRetries))
+		line("Total HTTP Calls:", fmt.Sprintf("%d (incl. retries)", evmStats.TotalHTTPCalls))
+	}
+	line("RPC Reduction:", fmt.Sprintf("%.1f%% fewer calls than naive", rpcReductionPct))
+
+	fmt.Println(sep)
+	fmt.Println("║                       THROUGHPUT                             ║")
+	fmt.Println(sep)
+	line("Logical Calls/sec:", fmt.Sprintf("%.0f", logicalPerSec))
+	line("Successful HTTP/sec:", fmt.Sprintf("%.0f", httpPerSec))
+
+	// Top chains by RPC pressure (successful HTTP calls)
+	type chainRow struct {
+		label        string
+		logicalCalls int64
+		successes    int64
+		retries      int64
+		hasMulticall bool
+	}
+	var chainRows []chainRow
+	for orcID, cs := range evmStats.PerChain {
+		label := orcIDToChainLabel(orcID, registry)
+		chainRows = append(chainRows, chainRow{
+			label:        label,
+			logicalCalls: cs.LogicalCalls,
+			successes:    cs.Successes,
+			retries:      cs.Retries,
+			hasMulticall: cs.HasMulticall,
+		})
+	}
+	sort.Slice(chainRows, func(i, j int) bool {
+		return chainRows[i].successes > chainRows[j].successes
+	})
+
+	if len(chainRows) > 0 {
+		fmt.Println(sep)
+		fmt.Println("║              TOP CHAINS (RPC PRESSURE)                       ║")
+		fmt.Printf("║  %-18s %7s %6s %7s %6s %3s  ║\n",
+			"Chain", "Logical", "OK", "Saved", "Retry", "MC")
+		fmt.Println(sep)
+		shown := 0
+		for _, cr := range chainRows {
+			if shown >= 10 || (cr.successes == 0 && cr.retries == 0) {
+				break
+			}
+			savedPct := 0.0
+			if cr.logicalCalls > 0 {
+				savedPct = (1 - float64(cr.successes)/float64(cr.logicalCalls)) * 100
+			}
+			mc := " -"
+			if cr.hasMulticall {
+				mc = " Y"
+			}
+			fmt.Printf("║  %-18s %7d %6d %6.0f%% %6d %3s  ║\n",
+				truncate(cr.label, 18),
+				cr.logicalCalls, cr.successes, savedPct, cr.retries, mc)
+			shown++
+		}
+	}
+
+	fmt.Println("╚═══════════════════════════════════════════════════════════════╝")
 }
 
 func retryableKeywords() []string {

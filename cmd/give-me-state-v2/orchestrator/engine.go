@@ -158,14 +158,14 @@ func (g *Generic) RegisterOrchestrator(id string, endpoints []EndpointConfig, re
 		retriesPerEndpoint: DefaultRetriesPerEndpoint,
 	}
 
-	// Sum up MaxConcurrent across all endpoints to get total worker count.
+	// Sum up Workers across all endpoints to get total worker count.
 	totalWorkers := 0
 	for i := range endpoints {
 		cfg := &endpoints[i]
-		if cfg.MaxConcurrent < 1 {
-			cfg.MaxConcurrent = 1
+		if cfg.Workers < 1 {
+			cfg.Workers = 1
 		}
-		totalWorkers += cfg.MaxConcurrent
+		totalWorkers += cfg.Workers
 
 		to := defaultHTTPTimeout
 		if cfg.Timeout > 0 {
@@ -361,16 +361,30 @@ func (g *Generic) isRetryable(orc *orcState, err error) bool {
 
 // EndpointLiveStats is the live view of one RPC endpoint (for display).
 type EndpointLiveStats struct {
-	URL           string  // RPC URL (may be truncated by caller)
-	SuccessRate   float64 // Laplace-smoothed score (0-1)
-	Workers       int     // total workers for this orchestrator (shared, not per-endpoint)
-	MaxConcurrent int     // kept for display compatibility
+	URL         string  // RPC URL (may be truncated by caller)
+	SuccessRate float64 // Laplace-smoothed score (0-1)
+	Workers     int     // total workers for this orchestrator (shared, not per-endpoint)
 }
 
 // OrcLiveStats is the live view of one registered orchestrator (e.g. one chain).
 type OrcLiveStats struct {
 	QueueDepth int                 // current items in queue
 	Endpoints  []EndpointLiveStats // per-endpoint stats
+}
+
+// EndpointFinalStats is the final tally for one RPC endpoint.
+type EndpointFinalStats struct {
+	URL       string
+	Successes int64
+	Failures  int64
+}
+
+// OrcFinalStats is the final tally for one registered orchestrator.
+type OrcFinalStats struct {
+	TotalHTTPCalls int64 // successes + failures (includes retries)
+	Successes      int64 // calls that returned data
+	Failures       int64 // calls that failed (retries, rate limits, etc.)
+	Endpoints      []EndpointFinalStats
 }
 
 // LiveStats returns a snapshot of all orchestrators for live dashboards.
@@ -383,15 +397,44 @@ func (g *Generic) LiveStats() map[string]OrcLiveStats {
 		for _, es := range orc.endpoints {
 			score := laplaceScore(es)
 			eps = append(eps, EndpointLiveStats{
-				URL:           es.url,
-				SuccessRate:   score,
-				Workers:       orc.workers,
-				MaxConcurrent: orc.workers,
+				URL:         es.url,
+				SuccessRate: score,
+				Workers:     orc.workers,
 			})
 		}
 		out[id] = OrcLiveStats{
 			QueueDepth: len(orc.queue),
 			Endpoints:  eps,
+		}
+	}
+	return out
+}
+
+// FinalStats returns the total HTTP call counts per orchestrator (for end-of-run reporting).
+func (g *Generic) FinalStats() map[string]OrcFinalStats {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	out := make(map[string]OrcFinalStats, len(g.orchestrators))
+	for id, orc := range g.orchestrators {
+		var totalS, totalF int64
+		eps := make([]EndpointFinalStats, 0, len(orc.endpoints))
+		for _, es := range orc.endpoints {
+			es.mu.Lock()
+			s, f := es.successes, es.failures
+			es.mu.Unlock()
+			totalS += s
+			totalF += f
+			eps = append(eps, EndpointFinalStats{
+				URL:       es.url,
+				Successes: s,
+				Failures:  f,
+			})
+		}
+		out[id] = OrcFinalStats{
+			TotalHTTPCalls: totalS + totalF,
+			Successes:      totalS,
+			Failures:       totalF,
+			Endpoints:      eps,
 		}
 	}
 	return out

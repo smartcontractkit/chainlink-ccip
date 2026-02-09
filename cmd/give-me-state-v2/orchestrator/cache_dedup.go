@@ -3,6 +3,7 @@ package orchestrator
 import (
 	"crypto/sha256"
 	"sync"
+	"sync/atomic"
 )
 
 // CacheDedup provides cache and in-flight request deduplication for typed orchestrators.
@@ -12,6 +13,18 @@ type CacheDedup struct {
 	cache     map[[32]byte]CallResult
 	pendingMu sync.Mutex
 	pending   map[[32]byte][]chan CallResult
+
+	// Counters for statistics
+	hits    atomic.Int64 // served from cache
+	deduped atomic.Int64 // coalesced with an in-flight request
+	misses  atomic.Int64 // actually executed
+}
+
+// CacheStats holds cache/dedup counters for reporting.
+type CacheStats struct {
+	Hits    int64
+	Deduped int64
+	Misses  int64
 }
 
 // NewCacheDedup creates a new cache+dedup for a single chain (or scope).
@@ -29,6 +42,7 @@ func (c *CacheDedup) GetOrRun(key [32]byte, fn func() CallResult) CallResult {
 	c.cacheMu.RLock()
 	if res, ok := c.cache[key]; ok {
 		c.cacheMu.RUnlock()
+		c.hits.Add(1)
 		res.Cached = true
 		return res
 	}
@@ -40,6 +54,7 @@ func (c *CacheDedup) GetOrRun(key [32]byte, fn func() CallResult) CallResult {
 		ch := make(chan CallResult, 1)
 		c.pending[key] = append(waiters, ch)
 		c.pendingMu.Unlock()
+		c.deduped.Add(1)
 		return <-ch
 	}
 	ch := make(chan CallResult, 1)
@@ -47,6 +62,7 @@ func (c *CacheDedup) GetOrRun(key [32]byte, fn func() CallResult) CallResult {
 	c.pendingMu.Unlock()
 
 	// 3. Run and store result
+	c.misses.Add(1)
 	result := fn()
 	c.cacheMu.Lock()
 	c.cache[key] = result
@@ -64,6 +80,15 @@ func (c *CacheDedup) GetOrRun(key [32]byte, fn func() CallResult) CallResult {
 		}
 	}
 	return result
+}
+
+// Stats returns a snapshot of cache/dedup counters.
+func (c *CacheDedup) Stats() CacheStats {
+	return CacheStats{
+		Hits:    c.hits.Load(),
+		Deduped: c.deduped.Load(),
+		Misses:  c.misses.Load(),
+	}
 }
 
 // KeyFromTargetAndData builds a 32-byte cache key from target and data (e.g. for EVM per-chain cache).

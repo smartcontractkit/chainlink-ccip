@@ -1,0 +1,98 @@
+[
+    {
+        "address": "0x80226fc0Ee2b096224EeAc085Bb9a8cba1146f7D",
+        "chainSelector": 5009297550715157269,
+        "labels": [],
+        "qualifier": "0x80226fc0Ee2b096224EeAc085Bb9a8cba1146f7D-Router",
+        "type": "Router",
+        "version": "1.2.0"
+    },
+    {
+        "address": "0x913814782144864e523C3FdB78E3ca25D2c2aeCa",
+        "chainSelector": 5009297550715157269,
+        "labels": [],
+        "qualifier": "0x913814782144864e523C3FdB78E3ca25D2c2aeCa-OnRamp",
+        "type": "OnRamp",
+        "version": "1.6.0"
+    },
+    {
+        "address": "0xb8a882f3B88bd52D1Ff56A873bfDB84b70431937",
+        "chainSelector": 5009297550715157269,
+        "labels": [],
+        "qualifier": "0xb8a882f3B88bd52D1Ff56A873bfDB84b70431937-OnRamp",
+        "type": "OnRamp",
+        "version": "1.5.0"
+    },
+    {
+        "address": "0x8B3eEed4948684c3ec1bb60967820f40285018B8",
+        "chainSelector": 5009297550715157269,
+        "labels": [],
+        "qualifier": "0x8B3eEed4948684c3ec1bb60967820f40285018B8-OffRamp",
+        "type": "OffRamp",
+        "version": "1.5.0"
+    },
+    {
+        "address": "0x881e3A65B4d4a04dD529061dd0071cf975F58bCD",
+        "chainSelector": 15971525489660198786,
+        "labels": [],
+        "qualifier": "0x881e3A65B4d4a04dD529061dd0071cf975F58bCD-Router",
+        "type": "Router",
+        "version": "1.2.0"
+    },
+    {
+        "address": "0xee85aEfb15b9489563A6a29891ebe0750AA1A7Ae",
+        "chainSelector": 15971525489660198786,
+        "labels": [],
+        "qualifier": "0xee85aEfb15b9489563A6a29891ebe0750AA1A7Ae-OnRamp",
+        "type": "OnRamp",
+        "version": "1.6.0"
+    },
+    {
+        "address": "0xEA20366b66C1FD262Eb600Cb4C721C39AC5D2C68",
+        "chainSelector": 15971525489660198786,
+        "labels": [],
+        "qualifier": "0xEA20366b66C1FD262Eb600Cb4C721C39AC5D2C68-OnRamp",
+        "type": "OnRamp",
+        "version": "1.5.0"
+    },
+    {
+        "address": "0x03EE839151E48CEE69f5e4e8D28B35CE2Eae0446",
+        "chainSelector": 15971525489660198786,
+        "labels": [],
+        "qualifier": "0x03EE839151E48CEE69f5e4e8D28B35CE2Eae0446-OffRamp",
+        "type": "OffRamp",
+        "version": "1.5.0"
+    },
+    {
+        "address": "0x3206695CaE29952f4b0c22a169725a865bc8Ce0f",
+        "chainSelector": 3734403246176062136,
+        "labels": [],
+        "qualifier": "0x3206695CaE29952f4b0c22a169725a865bc8Ce0f-Router",
+        "type": "Router",
+        "version": "1.2.0"
+    },
+    {
+        "address": "0x76a443768A5e3B8d1AED0105FC250877841Deb40",
+        "chainSelector": 3734403246176062136,
+        "labels": [],
+        "qualifier": "0x76a443768A5e3B8d1AED0105FC250877841Deb40-OnRamp",
+        "type": "OnRamp",
+        "version": "1.6.0"
+    },
+    {
+        "address": "0xfE11cfC957cCa331192EAC60040b442303CcA0a9",
+        "chainSelector": 3734403246176062136,
+        "labels": [],
+        "qualifier": "0xfE11cfC957cCa331192EAC60040b442303CcA0a9-OnRamp",
+        "type": "OnRamp",
+        "version": "1.5.0"
+    },
+    {
+        "address": "0xd2e7b4e9dA1a969C160524Ca27E4AdB5d26e36d0",
+        "chainSelector": 3734403246176062136,
+        "labels": [],
+        "qualifier": "0xd2e7b4e9dA1a969C160524Ca27E4AdB5d26e36d0-OffRamp",
+        "type": "OffRamp",
+        "version": "1.5.0"
+    }
+]

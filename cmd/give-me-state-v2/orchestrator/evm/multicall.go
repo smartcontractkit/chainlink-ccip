@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"give-me-state-v2/orchestrator"
@@ -53,6 +54,21 @@ type chainBatcher struct {
 	orcID     string
 	chainID   uint64
 	evm       *EVMOrchestrator
+
+	// Counters for statistics
+	batchesSent    atomic.Int64 // multicall batches sent (2+ calls)
+	callsBatched   atomic.Int64 // total sub-calls inside multicall batches
+	singleCalls    atomic.Int64 // batches of size 1 (sent directly, no multicall)
+	fallbackCalls  atomic.Int64 // batches that fell back to individual calls
+}
+
+// MulticallStats holds per-batcher counters for reporting.
+type MulticallStats struct {
+	MulticallChains int   // chains with multicall enabled
+	BatchesSent     int64 // multicall RPCs sent
+	CallsBatched    int64 // total sub-calls in multicall batches
+	SingleCalls     int64 // calls sent individually (batch of 1)
+	FallbackCalls   int64 // batches that fell back to individual calls
 }
 
 // run is the main batcher loop. It collects calls and dispatches batches
@@ -103,9 +119,13 @@ func (b *chainBatcher) submit(call orchestrator.Call) orchestrator.CallResult {
 func (b *chainBatcher) sendBatch(batch []*pendingCall) {
 	// Single call -- skip multicall overhead entirely.
 	if len(batch) == 1 {
+		b.singleCalls.Add(1)
 		batch[0].resultCh <- b.evm.doRequest(b.orcID, batch[0].call)
 		return
 	}
+
+	b.batchesSent.Add(1)
+	b.callsBatched.Add(int64(len(batch)))
 
 	// Build the Call[] argument for tryAggregate.
 	type MC3Call struct {
@@ -136,6 +156,7 @@ func (b *chainBatcher) sendBatch(batch []*pendingCall) {
 	if result.Error != nil {
 		// Multicall itself failed -- fall back to individual calls so each
 		// caller gets its own result rather than a blanket error.
+		b.fallbackCalls.Add(1)
 		b.fallbackIndividual(batch)
 		return
 	}

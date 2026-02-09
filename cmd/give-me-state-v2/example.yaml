@@ -1,0 +1,55 @@
+# Example network configuration for give-me-state-v2
+# Uses free public RPC endpoints for Ethereum, Base, and Optimism mainnet.
+# For production use, replace with your own RPC endpoints for better reliability.
+preferred_url_scheme: &preferred_url_scheme "http"
+networks:
+  # ethereum-mainnet (evm:1)
+  - type: mainnet
+    chain_selector: 5009297550715157269
+    rpcs:
+      - rpc_name: PublicNode0
+        preferred_url_scheme: *preferred_url_scheme
+        http_url: https://eth.llamarpc.com
+      - rpc_name: PublicNode1
+        preferred_url_scheme: *preferred_url_scheme
+        http_url: https://eth.drpc.org
+      - rpc_name: PublicNode2
+        preferred_url_scheme: *preferred_url_scheme
+        http_url: https://0xrpc.io/eth
+      - rpc_name: PublicNode3
+        preferred_url_scheme: *preferred_url_scheme
+        http_url: https://rpc.flashbots.net
+
+  # base-mainnet (evm:8453)
+  - type: mainnet
+    chain_selector: 15971525489660198786
+    rpcs:
+      - rpc_name: PublicNode0
+        preferred_url_scheme: *preferred_url_scheme
+        http_url: https://base.llamarpc.com
+      - rpc_name: PublicNode1
+        preferred_url_scheme: *preferred_url_scheme
+        http_url: https://mainnet.base.org
+      - rpc_name: PublicNode2
+        preferred_url_scheme: *preferred_url_scheme
+        http_url: https://base.drpc.org
+      - rpc_name: PublicNode3
+        preferred_url_scheme: *preferred_url_scheme
+        http_url: https://1rpc.io/base
+
+  # optimism-mainnet (evm:10)
+  - type: mainnet
+    chain_selector: 3734403246176062136
+    rpcs:
+      - rpc_name: PublicNode0
+        preferred_url_scheme: *preferred_url_scheme
+        http_url: https://optimism.drpc.org
+      - rpc_name: PublicNode1
+        preferred_url_scheme: *preferred_url_scheme
+        http_url: https://optimism.gateway.tenderly.co
+      - rpc_name: PublicNode2
+        preferred_url_scheme: *preferred_url_scheme
+        http_url: https://optimism-public.nodies.app
+      - rpc_name: PublicNode3
+        preferred_url_scheme: *preferred_url_scheme
+        http_url: https://1rpc.io/op

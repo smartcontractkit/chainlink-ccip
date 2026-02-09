@@ -148,3 +148,77 @@ type jsonRPCResponse struct {
 		Message string `json:"message"`
 	} `json:"error,omitempty"`
 }
+
+// EVMOrchestratorStats aggregates all stats from the EVM orchestrator layer.
+type EVMOrchestratorStats struct {
+	// Cache/dedup
+	CacheHits    int64 // served from cache
+	CacheDeduped int64 // coalesced with in-flight request
+	CacheMisses  int64 // unique calls actually executed
+
+	// Multicall
+	Multicall MulticallStats
+
+	// Engine (actual HTTP calls across all EVM chains)
+	TotalHTTPCalls int64 // successes + failures (includes retries)
+	TotalSuccesses int64 // HTTP calls that returned data
+	TotalRetries   int64 // HTTP calls that failed (rate limits, timeouts, etc.)
+	PerChain       map[string]ChainStats // orcID -> combined stats
+}
+
+// ChainStats combines engine HTTP stats and cache stats for one chain.
+type ChainStats struct {
+	HTTPCalls    int64 // total (successes + failures)
+	Successes    int64 // calls that returned data
+	Retries      int64 // failed attempts (retries, rate limits)
+	LogicalCalls int64 // cache hits + deduped + misses
+	HasMulticall bool
+}
+
+// Stats returns a snapshot of all EVM orchestrator statistics.
+func (e *EVMOrchestrator) Stats() EVMOrchestratorStats {
+	var s EVMOrchestratorStats
+
+	// Per-chain cache stats
+	perChainCache := make(map[uint64]orchestrator.CacheStats)
+	e.cachesMu.RLock()
+	for chainID, cache := range e.caches {
+		cs := cache.Stats()
+		perChainCache[chainID] = cs
+		s.CacheHits += cs.Hits
+		s.CacheDeduped += cs.Deduped
+		s.CacheMisses += cs.Misses
+	}
+	e.cachesMu.RUnlock()
+
+	// Aggregate multicall batcher stats.
+	s.Multicall.MulticallChains = len(e.batchers)
+	for _, b := range e.batchers {
+		s.Multicall.BatchesSent += b.batchesSent.Load()
+		s.Multicall.CallsBatched += b.callsBatched.Load()
+		s.Multicall.SingleCalls += b.singleCalls.Load()
+		s.Multicall.FallbackCalls += b.fallbackCalls.Load()
+	}
+
+	// Build per-chain combined stats (cache + engine HTTP).
+	engineStats := e.generic.FinalStats()
+	s.PerChain = make(map[string]ChainStats)
+	for chainID, orcID := range e.orcIDs {
+		cs := ChainStats{}
+		if cc, ok := perChainCache[chainID]; ok {
+			cs.LogicalCalls = cc.Hits + cc.Deduped + cc.Misses
+		}
+		if fs, ok := engineStats[orcID]; ok {
+			cs.HTTPCalls = fs.TotalHTTPCalls
+			cs.Successes = fs.Successes
+			cs.Retries = fs.Failures
+			s.TotalHTTPCalls += fs.TotalHTTPCalls
+			s.TotalSuccesses += fs.Successes
+			s.TotalRetries += fs.Failures
+		}
+		_, cs.HasMulticall = e.batchers[chainID]
+		s.PerChain[orcID] = cs
+	}
+
+	return s
+}

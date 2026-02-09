@@ -34,11 +34,9 @@ type Request struct {
 
 // EndpointConfig is per-endpoint configuration for the generic orchestrator.
 type EndpointConfig struct {
-	URL               string  // RPC or API base URL
-	MinConcurrent     int     // Unused (kept for compat); workers are a fixed shared pool
-	MaxConcurrent     int     // Workers contributed by this endpoint to the shared pool; 0 = use 1
-	TargetSuccessRate float64 // Unused (kept for compat); endpoint selection uses Laplace scoring
-	Timeout           int     // Seconds; 0 = use default
+	URL     string // RPC or API base URL
+	Workers int    // Worker goroutines contributed by this endpoint to the shared pool; 0 = use 1
+	Timeout int    // Seconds; 0 = use default
 }
 
 // DefaultRetriesPerEndpoint is how many times we retry on one endpoint before failover.
