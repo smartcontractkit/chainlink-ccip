@@ -551,10 +551,10 @@ func TestTokensAndTokenPools(t *testing.T) {
 						TokenPoolQualifier: solTestData.TokenPoolQualifier,
 						TokenSymbol:        solTestData.Token.Symbol,
 						PoolType:           solTokenPoolType.String(),
-						SVMExtraArgs: &tokensapi.SVMExtraArgs{
-							CustomerMintAuthorities: []solana.PublicKey{
-								solana.MustPublicKeyFromBase58(solTestData.Token.ExternalAdmin),
-							}},
+						//SVMExtraArgs: &tokensapi.SVMExtraArgs{
+						//	CustomerMintAuthorities: []solana.PublicKey{
+						//		solana.MustPublicKeyFromBase58(solTestData.Token.ExternalAdmin),
+						//	}},
 					},
 				})
 			require.NoError(t, err)

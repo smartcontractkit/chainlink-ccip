@@ -249,15 +249,15 @@ func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualR
 					}
 				}
 
-				//createTokenMultisigOutput, err := operations.ExecuteOperation(b, tokensops.CreateTokenMultisig, chains.SolanaChains()[chain.Selector], tokensops.TokenMultisigParams{
-				//	TokenProgram: tokenProgramId,
-				//	Signers:      signers,
-				//})
-				//if err != nil {
-				//	return sequences.OnChainOutput{}, fmt.Errorf("failed to create token multisig on-chain: %w", err)
-				//}
-				//result.Addresses = append(result.Addresses, createTokenMultisigOutput.Output.Addresses...)
-				//result.BatchOps = append(result.BatchOps, createTokenMultisigOutput.Output.BatchOps...)
+				createTokenMultisigOutput, err := operations.ExecuteOperation(b, tokensops.CreateTokenMultisig, chains.SolanaChains()[chain.Selector], tokensops.TokenMultisigParams{
+					TokenProgram: tokenProgramId,
+					Signers:      signers,
+				})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to create token multisig on-chain: %w", err)
+				}
+				result.Addresses = append(result.Addresses, createTokenMultisigOutput.Output.Addresses...)
+				result.BatchOps = append(result.BatchOps, createTokenMultisigOutput.Output.BatchOps...)
 			}
 
 			return result, nil
