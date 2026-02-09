@@ -1,104 +1,231 @@
 package v1_6_1
 
 import (
+	"encoding/hex"
+	"fmt"
+	"math/big"
+	"sync"
+
 	"give-me-state-v2/views"
 	"give-me-state-v2/views/evm/common"
-	"sync"
+
+	gethCommon "github.com/ethereum/go-ethereum/common"
 )
 
-// Function selectors for token pool methods
-var (
-	// getToken() returns (address)
-	selectorGetToken = common.HexToSelector("21df0da7")
-	// getSupportedChains() returns (uint64[])
-	selectorGetSupportedChains = common.HexToSelector("c4bffe2b")
-	// getRebalancer() returns (address)
-	selectorGetRebalancer = common.HexToSelector("432a6ba3")
-	// getAllowList() returns (address[])
-	selectorGetAllowList = common.HexToSelector("a7cd63b7")
-	// getAllowListEnabled() returns (bool)
-	selectorGetAllowListEnabled = common.HexToSelector("e0351e13")
-	// getRemotePools(uint64) returns (bytes[])
-	selectorGetRemotePools = common.HexToSelector("a42a7b8b")
-	// getRemoteToken(uint64) returns (bytes)
-	selectorGetRemoteToken = common.HexToSelector("b7946580")
-	// getCurrentInboundRateLimiterState(uint64) returns (RateLimiter.TokenBucket)
-	selectorGetInboundRateLimiter = common.HexToSelector("af58d59f")
-	// getCurrentOutboundRateLimiterState(uint64) returns (RateLimiter.TokenBucket)
-	selectorGetOutboundRateLimiter = common.HexToSelector("c75eea9c")
-)
+// executeTokenPoolCall packs a call using TokenPoolABI, executes it, and returns raw response bytes.
+func executeTokenPoolCall(ctx *views.ViewContext, method string, args ...interface{}) ([]byte, error) {
+	calldata, err := TokenPoolABI.Pack(method, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to pack %s call: %w", method, err)
+	}
 
+	call := views.Call{
+		ChainID: ctx.ChainSelector,
+		Target:  ctx.Address,
+		Data:    calldata,
+	}
+
+	result := ctx.TypedOrchestrator.Execute(call)
+	if result.Error != nil {
+		return nil, fmt.Errorf("%s call failed: %w", method, result.Error)
+	}
+
+	return result.Data, nil
+}
+
+// getTokenPoolToken fetches the token address.
 func getTokenPoolToken(ctx *views.ViewContext) (string, error) {
-	data, err := common.ExecuteCall(ctx, selectorGetToken)
+	data, err := executeTokenPoolCall(ctx, "getToken")
 	if err != nil {
 		return "", err
 	}
-	return common.DecodeAddress(data)
+	results, err := TokenPoolABI.Unpack("getToken", data)
+	if err != nil {
+		return "", fmt.Errorf("failed to unpack getToken: %w", err)
+	}
+	if len(results) == 0 {
+		return "", fmt.Errorf("no results from getToken call")
+	}
+	addr, ok := results[0].(gethCommon.Address)
+	if !ok {
+		return "", fmt.Errorf("unexpected type for token: %T", results[0])
+	}
+	return addr.Hex(), nil
 }
 
+// getTokenPoolSupportedChains fetches the supported chains.
 func getTokenPoolSupportedChains(ctx *views.ViewContext) ([]uint64, error) {
-	data, err := common.ExecuteCall(ctx, selectorGetSupportedChains)
+	data, err := executeTokenPoolCall(ctx, "getSupportedChains")
 	if err != nil {
 		return nil, err
 	}
-	if len(data) < 64 {
+	results, err := TokenPoolABI.Unpack("getSupportedChains", data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unpack getSupportedChains: %w", err)
+	}
+	if len(results) == 0 {
 		return []uint64{}, nil
 	}
-	length := common.DecodeUint64FromBytes(data[32:64])
-	if length == 0 {
-		return []uint64{}, nil
-	}
-	chains := make([]uint64, length)
-	for i := uint64(0); i < length; i++ {
-		offset := 64 + i*32
-		if offset+32 > uint64(len(data)) {
-			break
-		}
-		chains[i] = common.DecodeUint64FromBytes(data[offset : offset+32])
+	chains, ok := results[0].([]uint64)
+	if !ok {
+		return nil, fmt.Errorf("unexpected type for supported chains: %T", results[0])
 	}
 	return chains, nil
 }
 
+// getTokenPoolRebalancer fetches the rebalancer address.
 func getTokenPoolRebalancer(ctx *views.ViewContext) (string, error) {
-	data, err := common.ExecuteCall(ctx, selectorGetRebalancer)
+	data, err := executeTokenPoolCall(ctx, "getRebalancer")
 	if err != nil {
 		return "", err
 	}
-	return common.DecodeAddress(data)
+	results, err := TokenPoolABI.Unpack("getRebalancer", data)
+	if err != nil {
+		return "", fmt.Errorf("failed to unpack getRebalancer: %w", err)
+	}
+	if len(results) == 0 {
+		return "", fmt.Errorf("no results from getRebalancer call")
+	}
+	addr, ok := results[0].(gethCommon.Address)
+	if !ok {
+		return "", fmt.Errorf("unexpected type for rebalancer: %T", results[0])
+	}
+	return addr.Hex(), nil
 }
 
+// getAllowList fetches the allow list addresses.
 func getAllowList(ctx *views.ViewContext) ([]string, error) {
-	data, err := common.ExecuteCall(ctx, selectorGetAllowList)
+	data, err := executeTokenPoolCall(ctx, "getAllowList")
 	if err != nil {
 		return nil, err
 	}
-	if len(data) < 64 {
+	results, err := TokenPoolABI.Unpack("getAllowList", data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unpack getAllowList: %w", err)
+	}
+	if len(results) == 0 {
 		return []string{}, nil
 	}
-	length := common.DecodeUint64FromBytes(data[32:64])
-	if length == 0 {
-		return []string{}, nil
+	addrs, ok := results[0].([]gethCommon.Address)
+	if !ok {
+		return nil, fmt.Errorf("unexpected type for allow list: %T", results[0])
 	}
-	addresses := make([]string, 0, length)
-	for i := uint64(0); i < length; i++ {
-		offset := 64 + i*32
-		if offset+32 > uint64(len(data)) {
-			break
-		}
-		addr, _ := common.DecodeAddress(data[offset : offset+32])
-		addresses = append(addresses, addr)
+	addresses := make([]string, len(addrs))
+	for i, a := range addrs {
+		addresses[i] = a.Hex()
 	}
 	return addresses, nil
 }
 
+// getAllowListEnabled fetches whether allow list is enabled.
 func getAllowListEnabled(ctx *views.ViewContext) (bool, error) {
-	data, err := common.ExecuteCall(ctx, selectorGetAllowListEnabled)
+	data, err := executeTokenPoolCall(ctx, "getAllowListEnabled")
 	if err != nil {
 		return false, err
 	}
-	return common.DecodeBool(data)
+	results, err := TokenPoolABI.Unpack("getAllowListEnabled", data)
+	if err != nil {
+		return false, fmt.Errorf("failed to unpack getAllowListEnabled: %w", err)
+	}
+	if len(results) == 0 {
+		return false, fmt.Errorf("no results from getAllowListEnabled call")
+	}
+	enabled, ok := results[0].(bool)
+	if !ok {
+		return false, fmt.Errorf("unexpected type for allowListEnabled: %T", results[0])
+	}
+	return enabled, nil
 }
 
+// getRemoteToken fetches the remote token address for a chain.
+func getRemoteToken(ctx *views.ViewContext, chainSel uint64) (string, error) {
+	data, err := executeTokenPoolCall(ctx, "getRemoteToken", chainSel)
+	if err != nil {
+		return "", err
+	}
+	results, err := TokenPoolABI.Unpack("getRemoteToken", data)
+	if err != nil {
+		return "", fmt.Errorf("failed to unpack getRemoteToken: %w", err)
+	}
+	if len(results) == 0 {
+		return "", nil
+	}
+	bytesVal, ok := results[0].([]byte)
+	if !ok {
+		return "", fmt.Errorf("unexpected type for remote token: %T", results[0])
+	}
+	if len(bytesVal) == 0 {
+		return "", nil
+	}
+	if len(bytesVal) == 20 {
+		return gethCommon.BytesToAddress(bytesVal).Hex(), nil
+	}
+	return "0x" + hex.EncodeToString(bytesVal), nil
+}
+
+// getRemotePools fetches the remote pool addresses for a chain.
+func getRemotePools(ctx *views.ViewContext, chainSel uint64) ([]string, error) {
+	data, err := executeTokenPoolCall(ctx, "getRemotePools", chainSel)
+	if err != nil {
+		return nil, err
+	}
+	results, err := TokenPoolABI.Unpack("getRemotePools", data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unpack getRemotePools: %w", err)
+	}
+	if len(results) == 0 {
+		return []string{}, nil
+	}
+	bytesArr, ok := results[0].([][]byte)
+	if !ok {
+		return nil, fmt.Errorf("unexpected type for remote pools: %T", results[0])
+	}
+	pools := make([]string, 0, len(bytesArr))
+	for _, b := range bytesArr {
+		if len(b) == 20 {
+			pools = append(pools, gethCommon.BytesToAddress(b).Hex())
+		} else if len(b) > 0 {
+			pools = append(pools, "0x"+hex.EncodeToString(b))
+		}
+	}
+	return pools, nil
+}
+
+// getRateLimiter fetches a rate limiter state for a chain.
+func getRateLimiter(ctx *views.ViewContext, method string, chainSel uint64) (map[string]any, error) {
+	data, err := executeTokenPoolCall(ctx, method, chainSel)
+	if err != nil {
+		return nil, err
+	}
+	results, err := TokenPoolABI.Unpack(method, data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unpack %s: %w", method, err)
+	}
+	if len(results) == 0 {
+		return nil, fmt.Errorf("no results from %s call", method)
+	}
+
+	bucket, ok := results[0].(struct {
+		Tokens      *big.Int `json:"tokens"`
+		LastUpdated uint32   `json:"lastUpdated"`
+		IsEnabled   bool     `json:"isEnabled"`
+		Capacity    *big.Int `json:"capacity"`
+		Rate        *big.Int `json:"rate"`
+	})
+	if !ok {
+		return nil, fmt.Errorf("unexpected type for rate limiter: %T", results[0])
+	}
+
+	return map[string]any{
+		"tokens":      bucket.Tokens.String(),
+		"lastUpdated": bucket.LastUpdated,
+		"isEnabled":   bucket.IsEnabled,
+		"capacity":    bucket.Capacity.String(),
+		"rate":        bucket.Rate.String(),
+	}, nil
+}
+
+// getRemoteChainConfigs fetches remote chain configurations concurrently.
 func getRemoteChainConfigs(ctx *views.ViewContext, supportedChains []uint64) map[string]any {
 	if len(supportedChains) == 0 {
 		return map[string]any{}
@@ -119,10 +246,10 @@ func getRemoteChainConfigs(ctx *views.ViewContext, supportedChains []uint64) map
 			if remotePools, err := getRemotePools(ctx, cs); err == nil && len(remotePools) > 0 {
 				config["remotePoolAddresses"] = remotePools
 			}
-			if inbound, err := getInboundRateLimiter(ctx, cs); err == nil {
+			if inbound, err := getRateLimiter(ctx, "getCurrentInboundRateLimiterState", cs); err == nil {
 				config["inboundRateLimiterConfig"] = inbound
 			}
-			if outbound, err := getOutboundRateLimiter(ctx, cs); err == nil {
+			if outbound, err := getRateLimiter(ctx, "getCurrentOutboundRateLimiterState", cs); err == nil {
 				config["outboundRateLimiterConfig"] = outbound
 			}
 
@@ -137,120 +264,8 @@ func getRemoteChainConfigs(ctx *views.ViewContext, supportedChains []uint64) map
 	return result
 }
 
-func getRemoteToken(ctx *views.ViewContext, chainSel uint64) (string, error) {
-	data, err := common.ExecuteCall(ctx, selectorGetRemoteToken, common.EncodeUint64(chainSel))
-	if err != nil {
-		return "", err
-	}
-	if len(data) < 64 {
-		return "", nil
-	}
-	bytesLen := common.DecodeUint64FromBytes(data[32:64])
-	if bytesLen == 0 {
-		return "", nil
-	}
-	if bytesLen == 20 {
-		addr, _ := common.DecodeAddress(data[64:96])
-		return addr, nil
-	}
-	return views.BytesToHex(data[64 : 64+bytesLen]), nil
-}
-
-func getRemotePools(ctx *views.ViewContext, chainSel uint64) ([]string, error) {
-	data, err := common.ExecuteCall(ctx, selectorGetRemotePools, common.EncodeUint64(chainSel))
-	if err != nil {
-		return nil, err
-	}
-
-	// Returns bytes[] - dynamic array of dynamic bytes
-	if len(data) < 64 {
-		return []string{}, nil
-	}
-
-	arrayLen := common.DecodeUint64FromBytes(data[32:64])
-	if arrayLen == 0 {
-		return []string{}, nil
-	}
-
-	pools := make([]string, 0, arrayLen)
-	baseOffset := uint64(64)
-
-	for i := uint64(0); i < arrayLen; i++ {
-		if baseOffset+i*32+32 > uint64(len(data)) {
-			break
-		}
-		elementOffset := common.DecodeUint64FromBytes(data[baseOffset+i*32 : baseOffset+i*32+32])
-		absOffset := 32 + elementOffset
-
-		if absOffset+32 > uint64(len(data)) {
-			continue
-		}
-		bytesLen := common.DecodeUint64FromBytes(data[absOffset : absOffset+32])
-		if bytesLen == 0 {
-			continue
-		}
-		if absOffset+32+bytesLen > uint64(len(data)) {
-			continue
-		}
-
-		bytesData := data[absOffset+32 : absOffset+32+bytesLen]
-		if bytesLen == 20 {
-			addr, _ := common.DecodeAddress(append(make([]byte, 12), bytesData...))
-			pools = append(pools, addr)
-		} else {
-			pools = append(pools, views.BytesToHex(bytesData))
-		}
-	}
-
-	return pools, nil
-}
-
-func getInboundRateLimiter(ctx *views.ViewContext, chainSel uint64) (map[string]any, error) {
-	data, err := common.ExecuteCall(ctx, selectorGetInboundRateLimiter, common.EncodeUint64(chainSel))
-	if err != nil {
-		return nil, err
-	}
-	return decodeRateLimiter(data), nil
-}
-
-func getOutboundRateLimiter(ctx *views.ViewContext, chainSel uint64) (map[string]any, error) {
-	data, err := common.ExecuteCall(ctx, selectorGetOutboundRateLimiter, common.EncodeUint64(chainSel))
-	if err != nil {
-		return nil, err
-	}
-	return decodeRateLimiter(data), nil
-}
-
-func decodeRateLimiter(data []byte) map[string]any {
-	result := make(map[string]any)
-	if len(data) < 32 {
-		return result
-	}
-	offset := 0
-	if len(data) >= offset+32 {
-		result["tokens"] = common.DecodeUint64FromBytes(data[offset : offset+32])
-		offset += 32
-	}
-	if len(data) >= offset+32 {
-		result["lastUpdated"] = common.DecodeUint64FromBytes(data[offset : offset+32])
-		offset += 32
-	}
-	if len(data) >= offset+32 {
-		isEnabled, _ := common.DecodeBool(data[offset : offset+32])
-		result["isEnabled"] = isEnabled
-		offset += 32
-	}
-	if len(data) >= offset+32 {
-		result["capacity"] = common.DecodeUint64FromBytes(data[offset : offset+32])
-		offset += 32
-	}
-	if len(data) >= offset+32 {
-		result["rate"] = common.DecodeUint64FromBytes(data[offset : offset+32])
-	}
-	return result
-}
-
 // ViewBurnMintTokenPool generates a view of the BurnMintTokenPool contract (v1.6.1).
+// Uses ABI bindings for proper decoding.
 func ViewBurnMintTokenPool(ctx *views.ViewContext) (map[string]any, error) {
 	result := make(map[string]any)
 
@@ -266,7 +281,6 @@ func ViewBurnMintTokenPool(ctx *views.ViewContext) (map[string]any, error) {
 	}
 	if token, err := getTokenPoolToken(ctx); err == nil {
 		result["token"] = token
-		// Fetch token symbol
 		if symbol, err := common.GetERC20Symbol(ctx, token); err == nil {
 			result["symbol"] = symbol
 		} else {
@@ -292,6 +306,7 @@ func ViewBurnMintTokenPool(ctx *views.ViewContext) (map[string]any, error) {
 }
 
 // ViewLockReleaseTokenPool generates a view of the LockReleaseTokenPool contract (v1.6.1).
+// Uses ABI bindings for proper decoding.
 func ViewLockReleaseTokenPool(ctx *views.ViewContext) (map[string]any, error) {
 	result := make(map[string]any)
 
@@ -307,7 +322,6 @@ func ViewLockReleaseTokenPool(ctx *views.ViewContext) (map[string]any, error) {
 	}
 	if token, err := getTokenPoolToken(ctx); err == nil {
 		result["token"] = token
-		// Fetch token symbol
 		if symbol, err := common.GetERC20Symbol(ctx, token); err == nil {
 			result["symbol"] = symbol
 		} else {

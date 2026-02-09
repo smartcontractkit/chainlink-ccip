@@ -1,23 +1,188 @@
 package v1_6
 
 import (
-	"give-me-state-v2/views"
-	"give-me-state-v2/views/evm/common"
 	"encoding/hex"
+	"fmt"
 	"math/big"
+
+	"give-me-state-v2/views"
+
+	"github.com/ethereum/go-ethereum/common"
 )
 
-// Function selectors for RMNHome v1.6
-var (
-	// getActiveDigest() returns (bytes32)
-	selectorGetActiveDigest = common.HexToSelector("123e65db")
-	// getCandidateDigest() returns (bytes32)
-	selectorGetCandidateDigest = common.HexToSelector("38354c5c")
-	// getConfig(bytes32 configDigest) returns (VersionedConfig, bool ok)
-	selectorGetConfig = common.HexToSelector("6dd5b69d")
-)
+// packRMNHomeCall packs a method call using the RMNHome v1.6 ABI.
+func packRMNHomeCall(method string, args ...interface{}) ([]byte, error) {
+	return RMNHomeABI.Pack(method, args...)
+}
+
+// executeRMNHomeCall packs a call, executes it, and returns raw response bytes.
+func executeRMNHomeCall(ctx *views.ViewContext, method string, args ...interface{}) ([]byte, error) {
+	calldata, err := packRMNHomeCall(method, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to pack %s call: %w", method, err)
+	}
+
+	call := views.Call{
+		ChainID: ctx.ChainSelector,
+		Target:  ctx.Address,
+		Data:    calldata,
+	}
+
+	result := ctx.TypedOrchestrator.Execute(call)
+	if result.Error != nil {
+		return nil, fmt.Errorf("%s call failed: %w", method, result.Error)
+	}
+
+	return result.Data, nil
+}
+
+// getRMNHomeOwner fetches the owner address.
+func getRMNHomeOwner(ctx *views.ViewContext) (string, error) {
+	data, err := executeRMNHomeCall(ctx, "owner")
+	if err != nil {
+		return "", err
+	}
+	results, err := RMNHomeABI.Unpack("owner", data)
+	if err != nil {
+		return "", fmt.Errorf("failed to unpack owner: %w", err)
+	}
+	if len(results) == 0 {
+		return "", fmt.Errorf("no results from owner call")
+	}
+	owner, ok := results[0].(common.Address)
+	if !ok {
+		return "", fmt.Errorf("unexpected type for owner: %T", results[0])
+	}
+	return owner.Hex(), nil
+}
+
+// getRMNHomeTypeAndVersion fetches the typeAndVersion string.
+func getRMNHomeTypeAndVersion(ctx *views.ViewContext) (string, error) {
+	data, err := executeRMNHomeCall(ctx, "typeAndVersion")
+	if err != nil {
+		return "", err
+	}
+	results, err := RMNHomeABI.Unpack("typeAndVersion", data)
+	if err != nil {
+		return "", fmt.Errorf("failed to unpack typeAndVersion: %w", err)
+	}
+	if len(results) == 0 {
+		return "", fmt.Errorf("no results from typeAndVersion call")
+	}
+	tv, ok := results[0].(string)
+	if !ok {
+		return "", fmt.Errorf("unexpected type for typeAndVersion: %T", results[0])
+	}
+	return tv, nil
+}
+
+// getDigest fetches a bytes32 digest using ABI bindings.
+func getDigest(ctx *views.ViewContext, method string) (string, error) {
+	data, err := executeRMNHomeCall(ctx, method)
+	if err != nil {
+		return "", err
+	}
+	results, err := RMNHomeABI.Unpack(method, data)
+	if err != nil {
+		return "", fmt.Errorf("failed to unpack %s: %w", method, err)
+	}
+	if len(results) == 0 {
+		return "", fmt.Errorf("no results from %s call", method)
+	}
+	digest, ok := results[0].([32]byte)
+	if !ok {
+		return "", fmt.Errorf("unexpected type for digest: %T", results[0])
+	}
+	return "0x" + hex.EncodeToString(digest[:]), nil
+}
+
+// getRMNHomeConfig fetches the config for a given digest using ABI bindings.
+func getRMNHomeConfig(ctx *views.ViewContext, digestHex string) (map[string]any, error) {
+	digestBytes, err := hex.DecodeString(digestHex[2:])
+	if err != nil {
+		return nil, err
+	}
+	var digest [32]byte
+	copy(digest[32-len(digestBytes):], digestBytes)
+
+	data, err := executeRMNHomeCall(ctx, "getConfig", digest)
+	if err != nil {
+		return nil, err
+	}
+
+	results, err := RMNHomeABI.Unpack("getConfig", data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unpack getConfig: %w", err)
+	}
+	if len(results) < 2 {
+		return nil, fmt.Errorf("expected 2 results from getConfig, got %d", len(results))
+	}
+
+	// Check ok flag
+	ok, isBool := results[1].(bool)
+	if isBool && !ok {
+		return nil, fmt.Errorf("config not found for digest %s", digestHex)
+	}
+
+	// The result is a VersionedConfig struct
+	vCfg, isOk := results[0].(struct {
+		Version       uint32   `json:"version"`
+		ConfigDigest  [32]byte `json:"configDigest"`
+		StaticConfig  struct {
+			Nodes []struct {
+				PeerId            [32]byte `json:"peerId"`
+				OffchainPublicKey [32]byte `json:"offchainPublicKey"`
+			} `json:"nodes"`
+			OffchainConfig []byte `json:"offchainConfig"`
+		} `json:"staticConfig"`
+		DynamicConfig struct {
+			SourceChains []struct {
+				ChainSelector       uint64   `json:"chainSelector"`
+				FObserve            uint64   `json:"fObserve"`
+				ObserverNodesBitmap *big.Int `json:"observerNodesBitmap"`
+			} `json:"sourceChains"`
+			OffchainConfig []byte `json:"offchainConfig"`
+		} `json:"dynamicConfig"`
+	})
+	if !isOk {
+		return nil, fmt.Errorf("unexpected type for VersionedConfig: %T", results[0])
+	}
+
+	// Build nodes
+	nodes := make([]map[string]any, len(vCfg.StaticConfig.Nodes))
+	for i, n := range vCfg.StaticConfig.Nodes {
+		nodes[i] = map[string]any{
+			"peerId":            "0x" + hex.EncodeToString(n.PeerId[:]),
+			"offchainPublicKey": "0x" + hex.EncodeToString(n.OffchainPublicKey[:]),
+		}
+	}
+
+	// Build source chains
+	sourceChains := make([]map[string]any, len(vCfg.DynamicConfig.SourceChains))
+	for i, sc := range vCfg.DynamicConfig.SourceChains {
+		sourceChains[i] = map[string]any{
+			"chainSelector":       sc.ChainSelector,
+			"fObserve":            sc.FObserve,
+			"observerNodesBitmap": sc.ObserverNodesBitmap.String(),
+		}
+	}
+
+	config := map[string]any{
+		"version":      vCfg.Version,
+		"configDigest": "0x" + hex.EncodeToString(vCfg.ConfigDigest[:]),
+		"staticConfig": map[string]any{
+			"nodes": nodes,
+		},
+		"dynamicConfig": map[string]any{
+			"sourceChains": sourceChains,
+		},
+	}
+
+	return config, nil
+}
 
 // ViewRMNHome generates a view of the RMNHome contract (v1.6.0).
+// Uses ABI bindings for proper struct decoding.
 func ViewRMNHome(ctx *views.ViewContext) (map[string]any, error) {
 	result := make(map[string]any)
 
@@ -25,22 +190,21 @@ func ViewRMNHome(ctx *views.ViewContext) (map[string]any, error) {
 	result["chainSelector"] = ctx.ChainSelector
 	result["version"] = "1.6.0"
 
-	owner, err := common.GetOwner(ctx)
+	owner, err := getRMNHomeOwner(ctx)
 	if err != nil {
 		result["owner_error"] = err.Error()
 	} else {
 		result["owner"] = owner
 	}
 
-	typeAndVersion, err := common.GetTypeAndVersion(ctx)
+	typeAndVersion, err := getRMNHomeTypeAndVersion(ctx)
 	if err != nil {
 		result["typeAndVersion_error"] = err.Error()
 	} else {
 		result["typeAndVersion"] = typeAndVersion
 	}
 
-	// Get active config
-	activeDigest, err := getDigest(ctx, selectorGetActiveDigest)
+	activeDigest, err := getDigest(ctx, "getActiveDigest")
 	if err != nil {
 		result["activeDigest_error"] = err.Error()
 	} else {
@@ -55,8 +219,7 @@ func ViewRMNHome(ctx *views.ViewContext) (map[string]any, error) {
 		}
 	}
 
-	// Get candidate config
-	candidateDigest, err := getDigest(ctx, selectorGetCandidateDigest)
+	candidateDigest, err := getDigest(ctx, "getCandidateDigest")
 	if err != nil {
 		result["candidateDigest_error"] = err.Error()
 	} else {
@@ -72,185 +235,4 @@ func ViewRMNHome(ctx *views.ViewContext) (map[string]any, error) {
 	}
 
 	return result, nil
-}
-
-// getDigest fetches a bytes32 digest.
-func getDigest(ctx *views.ViewContext, selector []byte) (string, error) {
-	data, err := common.ExecuteCall(ctx, selector)
-	if err != nil {
-		return "", err
-	}
-	if len(data) < 32 {
-		return "", nil
-	}
-	return "0x" + hex.EncodeToString(data[:32]), nil
-}
-
-// getRMNHomeConfig fetches the config for a given digest.
-func getRMNHomeConfig(ctx *views.ViewContext, digestHex string) (map[string]any, error) {
-	// Decode the digest hex string to bytes
-	digestBytes, err := hex.DecodeString(digestHex[2:]) // Remove "0x" prefix
-	if err != nil {
-		return nil, err
-	}
-
-	// Pad to 32 bytes if needed
-	digest := make([]byte, 32)
-	copy(digest[32-len(digestBytes):], digestBytes)
-
-	data, err := common.ExecuteCall(ctx, selectorGetConfig, digest)
-	if err != nil {
-		return nil, err
-	}
-
-	// The return is (VersionedConfig versionedConfig, bool ok)
-	// VersionedConfig is a complex struct, decode what we can
-	return decodeRMNHomeVersionedConfig(data)
-}
-
-// decodeRMNHomeVersionedConfig decodes the VersionedConfig struct from getConfig return data.
-// VersionedConfig: (uint32 version, bytes32 configDigest, StaticConfig staticConfig, DynamicConfig dynamicConfig)
-// StaticConfig: (Node[] nodes)
-// DynamicConfig: (SourceChain[] sourceChains)
-// Node: (bytes32 peerId, bytes32 offchainPublicKey)
-// SourceChain: (uint64 chainSelector, uint64 fObserve, uint256 observerNodesBitmap)
-func decodeRMNHomeVersionedConfig(data []byte) (map[string]any, error) {
-	if len(data) < 128 {
-		return map[string]any{"raw": "0x" + hex.EncodeToString(data)}, nil
-	}
-
-	// The struct is ABI encoded with dynamic components
-	// First decode the static parts
-
-	config := make(map[string]any)
-
-	// First 32 bytes: offset to versionedConfig tuple (usually 0x40 = 64)
-	// We need to navigate the ABI encoding carefully
-
-	// For a tuple return, the data is:
-	// - offset to VersionedConfig (32 bytes)
-	// - ok bool (32 bytes)
-	// - Then the VersionedConfig data at the offset
-
-	// Check if ok is true (last part of the return)
-	// Actually the layout is more complex. Let's try to decode version and digest directly
-
-	// Simplified: just extract version from the data
-	// The VersionedConfig starts with version (uint32) which is padded to 32 bytes
-	version := common.DecodeUint64FromBytes(data[0:32])
-	config["version"] = version
-
-	// Next 32 bytes should be configDigest
-	if len(data) >= 64 {
-		config["configDigest"] = "0x" + hex.EncodeToString(data[32:64])
-	}
-
-	// The staticConfig and dynamicConfig are dynamic types with offsets
-	// For simplicity, we'll just indicate we have them without full decoding
-	if len(data) >= 128 {
-		staticConfigOffset := common.DecodeUint64FromBytes(data[64:96])
-		dynamicConfigOffset := common.DecodeUint64FromBytes(data[96:128])
-
-		// Try to decode static config (nodes array)
-		if staticConfigOffset > 0 && staticConfigOffset < uint64(len(data)) {
-			nodes, err := decodeRMNNodes(data, staticConfigOffset)
-			if err == nil {
-				config["staticConfig"] = map[string]any{"nodes": nodes}
-			}
-		}
-
-		// Try to decode dynamic config (source chains array)
-		if dynamicConfigOffset > 0 && dynamicConfigOffset < uint64(len(data)) {
-			sourceChains, err := decodeRMNSourceChains(data, dynamicConfigOffset)
-			if err == nil {
-				config["dynamicConfig"] = map[string]any{"sourceChains": sourceChains}
-			}
-		}
-	}
-
-	return config, nil
-}
-
-// decodeRMNNodes decodes the nodes array from the data.
-func decodeRMNNodes(data []byte, offset uint64) ([]map[string]any, error) {
-	if offset+32 > uint64(len(data)) {
-		return []map[string]any{}, nil
-	}
-
-	// At offset, there's another offset to the array
-	arrayOffset := common.DecodeUint64FromBytes(data[offset : offset+32])
-	actualOffset := offset + arrayOffset
-
-	if actualOffset+32 > uint64(len(data)) {
-		return []map[string]any{}, nil
-	}
-
-	// Length of the array
-	length := common.DecodeUint64FromBytes(data[actualOffset : actualOffset+32])
-	if length == 0 {
-		return []map[string]any{}, nil
-	}
-
-	nodes := make([]map[string]any, 0, length)
-
-	// Each node is (bytes32 peerId, bytes32 offchainPublicKey) = 64 bytes
-	for i := uint64(0); i < length; i++ {
-		nodeOffset := actualOffset + 32 + i*64
-		if nodeOffset+64 > uint64(len(data)) {
-			break
-		}
-
-		peerId := "0x" + hex.EncodeToString(data[nodeOffset:nodeOffset+32])
-		offchainPubKey := "0x" + hex.EncodeToString(data[nodeOffset+32:nodeOffset+64])
-
-		nodes = append(nodes, map[string]any{
-			"peerId":            peerId,
-			"offchainPublicKey": offchainPubKey,
-		})
-	}
-
-	return nodes, nil
-}
-
-// decodeRMNSourceChains decodes the source chains array from the data.
-func decodeRMNSourceChains(data []byte, offset uint64) ([]map[string]any, error) {
-	if offset+32 > uint64(len(data)) {
-		return []map[string]any{}, nil
-	}
-
-	// At offset, there's another offset to the array
-	arrayOffset := common.DecodeUint64FromBytes(data[offset : offset+32])
-	actualOffset := offset + arrayOffset
-
-	if actualOffset+32 > uint64(len(data)) {
-		return []map[string]any{}, nil
-	}
-
-	// Length of the array
-	length := common.DecodeUint64FromBytes(data[actualOffset : actualOffset+32])
-	if length == 0 {
-		return []map[string]any{}, nil
-	}
-
-	chains := make([]map[string]any, 0, length)
-
-	// Each source chain is (uint64 chainSelector, uint64 fObserve, uint256 observerNodesBitmap) = 96 bytes
-	for i := uint64(0); i < length; i++ {
-		chainOffset := actualOffset + 32 + i*96
-		if chainOffset+96 > uint64(len(data)) {
-			break
-		}
-
-		chainSelector := common.DecodeUint64FromBytes(data[chainOffset : chainOffset+32])
-		fObserve := common.DecodeUint64FromBytes(data[chainOffset+32 : chainOffset+64])
-		observerBitmap := new(big.Int).SetBytes(data[chainOffset+64 : chainOffset+96])
-
-		chains = append(chains, map[string]any{
-			"chainSelector":       chainSelector,
-			"fObserve":            fObserve,
-			"observerNodesBitmap": observerBitmap.String(),
-		})
-	}
-
-	return chains, nil
 }

@@ -1,287 +1,186 @@
 package v1_6
 
 import (
-	"give-me-state-v2/views"
-	"give-me-state-v2/views/evm/common"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"math/big"
+
+	"give-me-state-v2/views"
+
+	"github.com/ethereum/go-ethereum/common"
 )
 
-// Function selectors for CCIPHome v1.6
-var (
-	// getNumChainConfigurations() returns (uint256)
-	selectorGetNumChainConfigurations = common.HexToSelector("7ac0d41e")
-	// getAllChainConfigs(uint256 pageIndex, uint256 pageSize) returns (ChainConfigArgs[])
-	selectorGetAllChainConfigs = common.HexToSelector("b74b2356")
-	// getCapabilityRegistry() returns (address)
-	selectorGetCapabilityRegistry = common.HexToSelector("020330e6")
-)
+// packCCIPHomeCall packs a method call using the CCIPHome v1.6 ABI.
+func packCCIPHomeCall(method string, args ...interface{}) ([]byte, error) {
+	return CCIPHomeABI.Pack(method, args...)
+}
 
-// ViewCCIPHome generates a view of the CCIPHome contract (v1.6.0).
-func ViewCCIPHome(ctx *views.ViewContext) (map[string]any, error) {
-	result := make(map[string]any)
-
-	result["address"] = ctx.AddressHex
-	result["chainSelector"] = ctx.ChainSelector
-	result["version"] = "1.6.0"
-
-	owner, err := common.GetOwner(ctx)
+// executeCCIPHomeCall packs a call, executes it, and returns raw response bytes.
+func executeCCIPHomeCall(ctx *views.ViewContext, method string, args ...interface{}) ([]byte, error) {
+	calldata, err := packCCIPHomeCall(method, args...)
 	if err != nil {
-		result["owner_error"] = err.Error()
-	} else {
-		result["owner"] = owner
+		return nil, fmt.Errorf("failed to pack %s call: %w", method, err)
 	}
 
-	typeAndVersion, err := common.GetTypeAndVersion(ctx)
-	if err != nil {
-		result["typeAndVersion_error"] = err.Error()
-	} else {
-		result["typeAndVersion"] = typeAndVersion
+	call := views.Call{
+		ChainID: ctx.ChainSelector,
+		Target:  ctx.Address,
+		Data:    calldata,
 	}
 
-	// Get capability registry
-	capRegistry, err := getCapabilityRegistry(ctx)
-	if err != nil {
-		result["capabilityRegistry_error"] = err.Error()
-	} else {
-		result["capabilityRegistry"] = capRegistry
+	result := ctx.TypedOrchestrator.Execute(call)
+	if result.Error != nil {
+		return nil, fmt.Errorf("%s call failed: %w", method, result.Error)
 	}
 
-	// Get number of chain configurations
-	numChains, err := getNumChainConfigurations(ctx)
+	return result.Data, nil
+}
+
+// getCCIPHomeOwner fetches the owner address.
+func getCCIPHomeOwner(ctx *views.ViewContext) (string, error) {
+	data, err := executeCCIPHomeCall(ctx, "owner")
 	if err != nil {
-		result["numChainConfigurations_error"] = err.Error()
-	} else {
-		result["numChainConfigurations"] = numChains
-
-		// Get all chain configs if there are any
-		if numChains > 0 {
-			chainConfigs, err := getAllChainConfigs(ctx, numChains)
-			if err != nil {
-				result["chainConfigs_error"] = err.Error()
-			} else {
-				result["chainConfigs"] = chainConfigs
-			}
-		} else {
-			result["chainConfigs"] = []map[string]any{}
-		}
+		return "", err
 	}
+	results, err := CCIPHomeABI.Unpack("owner", data)
+	if err != nil {
+		return "", fmt.Errorf("failed to unpack owner: %w", err)
+	}
+	if len(results) == 0 {
+		return "", fmt.Errorf("no results from owner call")
+	}
+	owner, ok := results[0].(common.Address)
+	if !ok {
+		return "", fmt.Errorf("unexpected type for owner: %T", results[0])
+	}
+	return owner.Hex(), nil
+}
 
-	return result, nil
+// getCCIPHomeTypeAndVersion fetches the typeAndVersion string.
+func getCCIPHomeTypeAndVersion(ctx *views.ViewContext) (string, error) {
+	data, err := executeCCIPHomeCall(ctx, "typeAndVersion")
+	if err != nil {
+		return "", err
+	}
+	results, err := CCIPHomeABI.Unpack("typeAndVersion", data)
+	if err != nil {
+		return "", fmt.Errorf("failed to unpack typeAndVersion: %w", err)
+	}
+	if len(results) == 0 {
+		return "", fmt.Errorf("no results from typeAndVersion call")
+	}
+	tv, ok := results[0].(string)
+	if !ok {
+		return "", fmt.Errorf("unexpected type for typeAndVersion: %T", results[0])
+	}
+	return tv, nil
 }
 
 // getCapabilityRegistry fetches the capability registry address.
 func getCapabilityRegistry(ctx *views.ViewContext) (string, error) {
-	data, err := common.ExecuteCall(ctx, selectorGetCapabilityRegistry)
+	data, err := executeCCIPHomeCall(ctx, "getCapabilityRegistry")
 	if err != nil {
 		return "", err
 	}
-	return common.DecodeAddress(data)
+	results, err := CCIPHomeABI.Unpack("getCapabilityRegistry", data)
+	if err != nil {
+		return "", fmt.Errorf("failed to unpack getCapabilityRegistry: %w", err)
+	}
+	if len(results) == 0 {
+		return "", fmt.Errorf("no results from getCapabilityRegistry call")
+	}
+	addr, ok := results[0].(common.Address)
+	if !ok {
+		return "", fmt.Errorf("unexpected type for capabilityRegistry: %T", results[0])
+	}
+	return addr.Hex(), nil
 }
 
 // getNumChainConfigurations fetches the number of chain configurations.
 func getNumChainConfigurations(ctx *views.ViewContext) (uint64, error) {
-	data, err := common.ExecuteCall(ctx, selectorGetNumChainConfigurations)
+	data, err := executeCCIPHomeCall(ctx, "getNumChainConfigurations")
 	if err != nil {
 		return 0, err
 	}
-	return common.DecodeUint64(data)
+	results, err := CCIPHomeABI.Unpack("getNumChainConfigurations", data)
+	if err != nil {
+		return 0, fmt.Errorf("failed to unpack getNumChainConfigurations: %w", err)
+	}
+	if len(results) == 0 {
+		return 0, fmt.Errorf("no results from getNumChainConfigurations call")
+	}
+	val, ok := results[0].(*big.Int)
+	if !ok {
+		return 0, fmt.Errorf("unexpected type for numChainConfigurations: %T", results[0])
+	}
+	return val.Uint64(), nil
 }
 
-// getAllChainConfigs fetches all chain configurations.
+// getAllChainConfigs fetches all chain configurations using ABI bindings.
 func getAllChainConfigs(ctx *views.ViewContext, numChains uint64) ([]map[string]any, error) {
-	// Call getAllChainConfigs(0, numChains)
-	pageIndex := common.EncodeUint64(0)
-	pageSize := common.EncodeUint64(numChains)
-
-	data, err := common.ExecuteCall(ctx, selectorGetAllChainConfigs, pageIndex, pageSize)
+	data, err := executeCCIPHomeCall(ctx, "getAllChainConfigs", new(big.Int).SetUint64(0), new(big.Int).SetUint64(numChains))
 	if err != nil {
 		return nil, err
 	}
 
-	return decodeChainConfigsArray(data)
-}
-
-// decodeChainConfigsArray decodes the ChainConfigArgs[] return value.
-// ChainConfigArgs: (uint64 chainSelector, ChainConfig chainConfig)
-// ChainConfig: (bytes32[] readers, uint8 fChain, bytes config)
-func decodeChainConfigsArray(data []byte) ([]map[string]any, error) {
-	if len(data) < 64 {
+	results, err := CCIPHomeABI.Unpack("getAllChainConfigs", data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unpack getAllChainConfigs: %w", err)
+	}
+	if len(results) == 0 {
 		return []map[string]any{}, nil
 	}
 
-	// Dynamic array: first 32 bytes is offset to array data
-	offset := common.DecodeUint64FromBytes(data[0:32])
-	if offset+32 > uint64(len(data)) {
-		return []map[string]any{}, nil
+	// The result is []CCIPHomeChainConfigArgs
+	configs, ok := results[0].([]struct {
+		ChainSelector uint64 `json:"chainSelector"`
+		ChainConfig   struct {
+			Readers [][32]byte `json:"readers"`
+			FChain  uint8      `json:"fChain"`
+			Config  []byte     `json:"config"`
+		} `json:"chainConfig"`
+	})
+	if !ok {
+		return nil, fmt.Errorf("unexpected type for chain configs: %T", results[0])
 	}
 
-	// Length of the array
-	length := common.DecodeUint64FromBytes(data[offset : offset+32])
-	if length == 0 {
-		return []map[string]any{}, nil
-	}
-
-	configs := make([]map[string]any, 0, length)
-
-	// After length, we have offsets to each ChainConfigArgs element
-	offsetsStart := offset + 32
-	for i := uint64(0); i < length; i++ {
-		if offsetsStart+i*32+32 > uint64(len(data)) {
-			break
+	out := make([]map[string]any, 0, len(configs))
+	for _, cfg := range configs {
+		readers := make([]string, len(cfg.ChainConfig.Readers))
+		for i, r := range cfg.ChainConfig.Readers {
+			readers[i] = "0x" + hex.EncodeToString(r[:])
 		}
 
-		// Get the offset to this element (relative to the start of the offsets section, i.e., after the length)
-		elementOffset := common.DecodeUint64FromBytes(data[offsetsStart+i*32 : offsetsStart+i*32+32])
-		actualOffset := offsetsStart + elementOffset
-
-		if actualOffset+64 > uint64(len(data)) {
-			break
+		chainConfig := map[string]any{
+			"readers": readers,
+			"fChain":  cfg.ChainConfig.FChain,
 		}
 
-		config, err := decodeChainConfigArgs(data, actualOffset)
-		if err != nil {
-			continue
-		}
-		configs = append(configs, config)
-	}
-
-	return configs, nil
-}
-
-// decodeChainConfigArgs decodes a single ChainConfigArgs from the data at the given offset.
-func decodeChainConfigArgs(data []byte, offset uint64) (map[string]any, error) {
-	if offset+64 > uint64(len(data)) {
-		return nil, nil
-	}
-
-	result := make(map[string]any)
-
-	// ChainConfigArgs: (uint64 chainSelector, ChainConfig chainConfig)
-	// chainSelector is a uint64 (padded to 32 bytes)
-	chainSelector := common.DecodeUint64FromBytes(data[offset : offset+32])
-	result["chainSelector"] = chainSelector
-
-	// chainConfig offset (relative to this struct)
-	chainConfigOffset := common.DecodeUint64FromBytes(data[offset+32 : offset+64])
-	actualConfigOffset := offset + chainConfigOffset
-
-	// Decode ChainConfig
-	chainConfig, err := decodeChainConfig(data, actualConfigOffset)
-	if err == nil && chainConfig != nil {
-		result["chainConfig"] = chainConfig
-	}
-
-	return result, nil
-}
-
-// decodeChainConfig decodes a ChainConfig from the data at the given offset.
-// ChainConfig: (bytes32[] readers, uint8 fChain, bytes config)
-func decodeChainConfig(data []byte, offset uint64) (map[string]any, error) {
-	if offset+96 > uint64(len(data)) {
-		return nil, nil
-	}
-
-	result := make(map[string]any)
-
-	// readers array offset (relative to this struct)
-	readersOffset := common.DecodeUint64FromBytes(data[offset : offset+32])
-	actualReadersOffset := offset + readersOffset
-
-	// fChain (uint8 padded to 32 bytes)
-	fChain := data[offset+63] // Last byte of the 32-byte slot
-	result["fChain"] = fChain
-
-	// config bytes offset
-	configOffset := common.DecodeUint64FromBytes(data[offset+64 : offset+96])
-	actualConfigOffset := offset + configOffset
-
-	// Decode readers array (bytes32[])
-	readers, err := decodeBytes32Array(data, actualReadersOffset)
-	if err == nil {
-		result["readers"] = readers
-	}
-
-	// Decode config bytes
-	configBytes, err := decodeBytesField(data, actualConfigOffset)
-	if err == nil {
-		// Try to decode the config bytes as chain config parameters
-		decodedConfig := decodeChainConfigBytes(configBytes)
+		// Try to decode config bytes
+		decodedConfig := decodeChainConfigBytes(cfg.ChainConfig.Config)
 		if decodedConfig != nil {
-			result["config"] = decodedConfig
-		} else {
-			result["configRaw"] = "0x" + hex.EncodeToString(configBytes)
+			chainConfig["config"] = decodedConfig
+		} else if len(cfg.ChainConfig.Config) > 0 {
+			chainConfig["configRaw"] = "0x" + hex.EncodeToString(cfg.ChainConfig.Config)
 		}
+
+		out = append(out, map[string]any{
+			"chainSelector": cfg.ChainSelector,
+			"chainConfig":   chainConfig,
+		})
 	}
 
-	return result, nil
-}
-
-// decodeBytes32Array decodes a bytes32[] array.
-func decodeBytes32Array(data []byte, offset uint64) ([]string, error) {
-	if offset+32 > uint64(len(data)) {
-		return []string{}, nil
-	}
-
-	length := common.DecodeUint64FromBytes(data[offset : offset+32])
-	if length == 0 {
-		return []string{}, nil
-	}
-
-	result := make([]string, 0, length)
-	for i := uint64(0); i < length; i++ {
-		elemOffset := offset + 32 + i*32
-		if elemOffset+32 > uint64(len(data)) {
-			break
-		}
-		// These are P2P peer IDs encoded as bytes32
-		// Convert to the 12D3KooW... format if possible, otherwise hex
-		peerIdBytes := data[elemOffset : elemOffset+32]
-		result = append(result, formatPeerID(peerIdBytes))
-	}
-
-	return result, nil
-}
-
-// decodeBytesField decodes a dynamic bytes field.
-func decodeBytesField(data []byte, offset uint64) ([]byte, error) {
-	if offset+32 > uint64(len(data)) {
-		return nil, nil
-	}
-
-	length := common.DecodeUint64FromBytes(data[offset : offset+32])
-	if length == 0 {
-		return []byte{}, nil
-	}
-
-	if offset+32+length > uint64(len(data)) {
-		return nil, nil
-	}
-
-	return data[offset+32 : offset+32+length], nil
-}
-
-// formatPeerID formats a bytes32 peer ID.
-// In libp2p, peer IDs are typically base58-encoded multihash values.
-// For now, we'll just return the hex representation.
-func formatPeerID(peerIdBytes []byte) string {
-	// The peer ID is stored as a 32-byte value
-	// In the goal_state, these appear as "12D3KooW..." format (base58)
-	// For simplicity, we'll return hex for now
-	// A full implementation would use multibase/multihash decoding
-	return "0x" + hex.EncodeToString(peerIdBytes)
+	return out, nil
 }
 
 // decodeChainConfigBytes attempts to decode the chain config bytes.
-// The config bytes are typically JSON-encoded.
 func decodeChainConfigBytes(configBytes []byte) map[string]any {
 	if len(configBytes) == 0 {
 		return nil
 	}
 
-	// Try to decode as JSON first (most common case)
-	// Check if it starts with '{' (0x7b)
+	// Try JSON first
 	if configBytes[0] == 0x7b {
 		result := make(map[string]any)
 		if err := json.Unmarshal(configBytes, &result); err == nil {
@@ -289,8 +188,7 @@ func decodeChainConfigBytes(configBytes []byte) map[string]any {
 		}
 	}
 
-	// Fallback: try to decode as packed binary values
-	// (uint32 gasPriceDeviationPPB, uint32 daGasPriceDeviationPPB, uint32 optimisticConfirmations, bool chainFeeDeviationDisabled)
+	// Fallback: packed binary values
 	if len(configBytes) >= 16 {
 		result := make(map[string]any)
 		gasPriceDeviationPPB := new(big.Int).SetBytes(configBytes[0:4]).Uint64()
@@ -308,4 +206,55 @@ func decodeChainConfigBytes(configBytes []byte) map[string]any {
 	}
 
 	return nil
+}
+
+// ViewCCIPHome generates a view of the CCIPHome contract (v1.6.0).
+// Uses ABI bindings for proper struct decoding.
+func ViewCCIPHome(ctx *views.ViewContext) (map[string]any, error) {
+	result := make(map[string]any)
+
+	result["address"] = ctx.AddressHex
+	result["chainSelector"] = ctx.ChainSelector
+	result["version"] = "1.6.0"
+
+	owner, err := getCCIPHomeOwner(ctx)
+	if err != nil {
+		result["owner_error"] = err.Error()
+	} else {
+		result["owner"] = owner
+	}
+
+	typeAndVersion, err := getCCIPHomeTypeAndVersion(ctx)
+	if err != nil {
+		result["typeAndVersion_error"] = err.Error()
+	} else {
+		result["typeAndVersion"] = typeAndVersion
+	}
+
+	capRegistry, err := getCapabilityRegistry(ctx)
+	if err != nil {
+		result["capabilityRegistry_error"] = err.Error()
+	} else {
+		result["capabilityRegistry"] = capRegistry
+	}
+
+	numChains, err := getNumChainConfigurations(ctx)
+	if err != nil {
+		result["numChainConfigurations_error"] = err.Error()
+	} else {
+		result["numChainConfigurations"] = numChains
+
+		if numChains > 0 {
+			chainConfigs, err := getAllChainConfigs(ctx, numChains)
+			if err != nil {
+				result["chainConfigs_error"] = err.Error()
+			} else {
+				result["chainConfigs"] = chainConfigs
+			}
+		} else {
+			result["chainConfigs"] = []map[string]any{}
+		}
+	}
+
+	return result, nil
 }

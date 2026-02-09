@@ -9,45 +9,67 @@ import (
 	"give-me-state-v2/views"
 	"give-me-state-v2/views/evm/common"
 
-	"github.com/ethereum/go-ethereum/accounts/abi"
+	gethCommon "github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/price_registry"
+
+	"github.com/ethereum/go-ethereum/accounts/abi"
 )
 
-// Function selectors for PriceRegistry
-var (
-	PriceRegistryABI abi.ABI
-
-	// getFeeTokens() returns (address[])
-	selectorGetFeeTokens []byte
-	// getStalenessThreshold() returns (uint128)
-	selectorGetStalenessThreshold []byte
-	// getPriceUpdaters() returns (address[])
-	selectorGetPriceUpdaters []byte
-	// ERC20 decimals() for token calls
-	selectorERC20Decimals = common.HexToSelector("313ce567")
-)
+// PriceRegistryABI is parsed once at startup.
+var PriceRegistryABI abi.ABI
 
 func init() {
-	// Parse the PriceRegistry ABI once at startup
-	parsedPriceRegistry, err := price_registry.PriceRegistryMetaData.GetAbi()
+	parsed, err := price_registry.PriceRegistryMetaData.GetAbi()
 	if err != nil {
 		panic(fmt.Sprintf("failed to parse PriceRegistry ABI: %v", err))
 	}
-	PriceRegistryABI = *parsedPriceRegistry
-
-	selectorGetFeeTokens = PriceRegistryABI.Methods["getFeeTokens"].ID
-	selectorGetStalenessThreshold = PriceRegistryABI.Methods["getStalenessThreshold"].ID
-	selectorGetPriceUpdaters = PriceRegistryABI.Methods["getPriceUpdaters"].ID
+	PriceRegistryABI = *parsed
 }
 
-// getPriceRegistryFeeTokens fetches the list of fee token addresses.
+// executePriceRegistryCall packs a call, executes it, and returns raw response bytes.
+func executePriceRegistryCall(ctx *views.ViewContext, method string, args ...interface{}) ([]byte, error) {
+	calldata, err := PriceRegistryABI.Pack(method, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to pack %s call: %w", method, err)
+	}
+
+	call := views.Call{
+		ChainID: ctx.ChainSelector,
+		Target:  ctx.Address,
+		Data:    calldata,
+	}
+
+	result := ctx.TypedOrchestrator.Execute(call)
+	if result.Error != nil {
+		return nil, fmt.Errorf("%s call failed: %w", method, result.Error)
+	}
+
+	return result.Data, nil
+}
+
+// getPriceRegistryFeeTokens fetches the list of fee token addresses using ABI bindings.
 func getPriceRegistryFeeTokens(ctx *views.ViewContext) ([]string, error) {
-	data, err := common.ExecuteCall(ctx, selectorGetFeeTokens)
+	data, err := executePriceRegistryCall(ctx, "getFeeTokens")
 	if err != nil {
 		return nil, err
 	}
-	return decodeAddressArray(data)
+	results, err := PriceRegistryABI.Unpack("getFeeTokens", data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unpack getFeeTokens: %w", err)
+	}
+	if len(results) == 0 {
+		return []string{}, nil
+	}
+	addrs, ok := results[0].([]gethCommon.Address)
+	if !ok {
+		return nil, fmt.Errorf("unexpected type for fee tokens: %T", results[0])
+	}
+	tokens := make([]string, len(addrs))
+	for i, a := range addrs {
+		tokens[i] = a.Hex()
+	}
+	return tokens, nil
 }
 
 // getPriceRegistryERC20Decimals fetches decimals from an ERC20 token at tokenAddr.
@@ -62,6 +84,7 @@ func getPriceRegistryERC20Decimals(ctx *views.ViewContext, tokenAddrHex string) 
 		copy(padded[20-len(tokenAddr):], tokenAddr)
 		tokenAddr = padded
 	}
+	selectorERC20Decimals := common.HexToSelector("313ce567")
 	calldata := views.ABIEncodeCall(selectorERC20Decimals)
 	call := views.Call{ChainID: ctx.ChainSelector, Target: tokenAddr, Data: calldata}
 	result := ctx.TypedOrchestrator.Execute(call)
@@ -105,52 +128,52 @@ func getPriceRegistryFeeTokensEnriched(ctx *views.ViewContext) ([]map[string]any
 	return out, nil
 }
 
-// getPriceRegistryStalenessThreshold fetches the staleness threshold.
+// getPriceRegistryStalenessThreshold fetches the staleness threshold using ABI bindings.
 func getPriceRegistryStalenessThreshold(ctx *views.ViewContext) (string, error) {
-	data, err := common.ExecuteCall(ctx, selectorGetStalenessThreshold)
+	data, err := executePriceRegistryCall(ctx, "getStalenessThreshold")
 	if err != nil {
 		return "", err
 	}
-	if len(data) < 32 {
+	results, err := PriceRegistryABI.Unpack("getStalenessThreshold", data)
+	if err != nil {
+		return "", fmt.Errorf("failed to unpack getStalenessThreshold: %w", err)
+	}
+	if len(results) == 0 {
 		return "0", nil
 	}
-	n := new(big.Int).SetBytes(data[:32])
-	return n.String(), nil
+	val, ok := results[0].(*big.Int)
+	if !ok {
+		return "", fmt.Errorf("unexpected type for staleness threshold: %T", results[0])
+	}
+	return val.String(), nil
 }
 
-// getPriceRegistryUpdaters fetches the list of price updaters.
+// getPriceRegistryUpdaters fetches the list of price updaters using ABI bindings.
 func getPriceRegistryUpdaters(ctx *views.ViewContext) ([]string, error) {
-	data, err := common.ExecuteCall(ctx, selectorGetPriceUpdaters)
+	data, err := executePriceRegistryCall(ctx, "getPriceUpdaters")
 	if err != nil {
 		return nil, err
 	}
-	return decodeAddressArray(data)
-}
-
-// decodeAddressArray decodes an ABI-encoded dynamic array of addresses.
-func decodeAddressArray(data []byte) ([]string, error) {
-	if len(data) < 64 {
+	results, err := PriceRegistryABI.Unpack("getPriceUpdaters", data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unpack getPriceUpdaters: %w", err)
+	}
+	if len(results) == 0 {
 		return []string{}, nil
 	}
-	// Read length from offset 32
-	length := common.DecodeUint64FromBytes(data[32:64])
-	if length == 0 {
-		return []string{}, nil
+	addrs, ok := results[0].([]gethCommon.Address)
+	if !ok {
+		return nil, fmt.Errorf("unexpected type for price updaters: %T", results[0])
 	}
-	addresses := make([]string, length)
-	for i := uint64(0); i < length; i++ {
-		offset := 64 + i*32
-		if offset+32 > uint64(len(data)) {
-			break
-		}
-		// Address is in the last 20 bytes of the 32-byte slot
-		addr := data[offset+12 : offset+32]
-		addresses[i] = "0x" + hex.EncodeToString(addr)
+	updaters := make([]string, len(addrs))
+	for i, a := range addrs {
+		updaters[i] = a.Hex()
 	}
-	return addresses, nil
+	return updaters, nil
 }
 
 // ViewPriceRegistry generates a view of the PriceRegistry contract (v1.2.0).
+// Uses ABI bindings for proper decoding.
 func ViewPriceRegistry(ctx *views.ViewContext) (map[string]any, error) {
 	result := make(map[string]any)
 
@@ -158,7 +181,6 @@ func ViewPriceRegistry(ctx *views.ViewContext) (map[string]any, error) {
 	result["chainSelector"] = ctx.ChainSelector
 	result["version"] = "1.2.0"
 
-	// Get owner
 	owner, err := common.GetOwner(ctx)
 	if err != nil {
 		result["owner_error"] = err.Error()
@@ -166,7 +188,6 @@ func ViewPriceRegistry(ctx *views.ViewContext) (map[string]any, error) {
 		result["owner"] = owner
 	}
 
-	// Get typeAndVersion
 	typeAndVersion, err := common.GetTypeAndVersion(ctx)
 	if err != nil {
 		result["typeAndVersion_error"] = err.Error()
@@ -174,7 +195,6 @@ func ViewPriceRegistry(ctx *views.ViewContext) (map[string]any, error) {
 		result["typeAndVersion"] = typeAndVersion
 	}
 
-	// Get fee tokens with name, symbol, and decimals
 	feeTokens, err := getPriceRegistryFeeTokensEnriched(ctx)
 	if err != nil {
 		result["feeTokens_error"] = err.Error()
@@ -182,7 +202,6 @@ func ViewPriceRegistry(ctx *views.ViewContext) (map[string]any, error) {
 		result["feeTokens"] = feeTokens
 	}
 
-	// Get staleness threshold
 	stalenessThreshold, err := getPriceRegistryStalenessThreshold(ctx)
 	if err != nil {
 		result["stalenessThreshold_error"] = err.Error()
@@ -190,7 +209,6 @@ func ViewPriceRegistry(ctx *views.ViewContext) (map[string]any, error) {
 		result["stalenessThreshold"] = stalenessThreshold
 	}
 
-	// Get price updaters
 	updaters, err := getPriceRegistryUpdaters(ctx)
 	if err != nil {
 		result["updaters_error"] = err.Error()

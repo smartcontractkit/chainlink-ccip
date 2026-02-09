@@ -1,158 +1,211 @@
 package v1_6
 
 import (
-	"give-me-state-v2/views"
-	"give-me-state-v2/views/evm/common"
+	"encoding/hex"
+	"fmt"
 	"sync"
+
+	"give-me-state-v2/views"
+
+	"github.com/ethereum/go-ethereum/common"
 )
 
-// OffRamp selectors
-var (
-	// getSourceChainConfig(uint64) returns (SourceChainConfig)
-	selectorGetSourceChainConfig = common.HexToSelector("e9d68a8e")
-	// getLatestPriceSequenceNumber() returns (uint64)
-	selectorGetLatestPriceSeqNum = common.HexToSelector("3f4b04aa")
-)
-
-// ViewOffRamp generates a view of the OffRamp contract (v1.6.0).
-func ViewOffRamp(ctx *views.ViewContext) (map[string]any, error) {
-	result := make(map[string]any)
-
-	result["address"] = ctx.AddressHex
-	result["chainSelector"] = ctx.ChainSelector
-	result["version"] = "1.6.0"
-
-	// Get owner
-	owner, err := common.GetOwner(ctx)
-	if err != nil {
-		result["owner_error"] = err.Error()
-	} else {
-		result["owner"] = owner
-	}
-
-	// Get typeAndVersion
-	typeAndVersion, err := common.GetTypeAndVersion(ctx)
-	if err != nil {
-		result["typeAndVersion_error"] = err.Error()
-	} else {
-		result["typeAndVersion"] = typeAndVersion
-	}
-
-	// Get static config
-	staticConfig, err := getOffRampStaticConfig(ctx)
-	if err != nil {
-		result["staticConfig_error"] = err.Error()
-	} else {
-		result["staticConfig"] = staticConfig
-	}
-
-	// Get dynamic config
-	dynamicConfig, err := getOffRampDynamicConfig(ctx)
-	if err != nil {
-		result["dynamicConfig_error"] = err.Error()
-	} else {
-		result["dynamicConfig"] = dynamicConfig
-	}
-
-	// Get latest price sequence number
-	latestPriceSeqNum, err := getOffRampLatestPriceSeqNum(ctx)
-	if err == nil {
-		result["latestPriceSequenceNumber"] = latestPriceSeqNum
-	}
-
-	// Get source chain configs (concurrent)
-	sourceChainConfigs, err := getOffRampSourceChainConfigs(ctx)
-	if err != nil {
-		result["sourceChainConfigs_error"] = err.Error()
-	} else if len(sourceChainConfigs) > 0 {
-		result["sourceChainConfigs"] = sourceChainConfigs
-	}
-
-	return result, nil
+// packOffRampCall packs a method call using the OffRamp v1.6 ABI.
+func packOffRampCall(method string, args ...interface{}) ([]byte, error) {
+	return OffRampABI.Pack(method, args...)
 }
 
-// getOffRampStaticConfig fetches the static configuration (v1.6.0 style).
+// executeOffRampCall packs a call, executes it, and returns raw response bytes.
+func executeOffRampCall(ctx *views.ViewContext, method string, args ...interface{}) ([]byte, error) {
+	calldata, err := packOffRampCall(method, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to pack %s call: %w", method, err)
+	}
+
+	call := views.Call{
+		ChainID: ctx.ChainSelector,
+		Target:  ctx.Address,
+		Data:    calldata,
+	}
+
+	result := ctx.TypedOrchestrator.Execute(call)
+	if result.Error != nil {
+		return nil, fmt.Errorf("%s call failed: %w", method, result.Error)
+	}
+
+	return result.Data, nil
+}
+
+// getOffRampOwner fetches the owner address.
+func getOffRampOwner(ctx *views.ViewContext) (string, error) {
+	data, err := executeOffRampCall(ctx, "owner")
+	if err != nil {
+		return "", err
+	}
+	results, err := OffRampABI.Unpack("owner", data)
+	if err != nil {
+		return "", fmt.Errorf("failed to unpack owner: %w", err)
+	}
+	if len(results) == 0 {
+		return "", fmt.Errorf("no results from owner call")
+	}
+	owner, ok := results[0].(common.Address)
+	if !ok {
+		return "", fmt.Errorf("unexpected type for owner: %T", results[0])
+	}
+	return owner.Hex(), nil
+}
+
+// getOffRampTypeAndVersion fetches the typeAndVersion string.
+func getOffRampTypeAndVersion(ctx *views.ViewContext) (string, error) {
+	data, err := executeOffRampCall(ctx, "typeAndVersion")
+	if err != nil {
+		return "", err
+	}
+	results, err := OffRampABI.Unpack("typeAndVersion", data)
+	if err != nil {
+		return "", fmt.Errorf("failed to unpack typeAndVersion: %w", err)
+	}
+	if len(results) == 0 {
+		return "", fmt.Errorf("no results from typeAndVersion call")
+	}
+	tv, ok := results[0].(string)
+	if !ok {
+		return "", fmt.Errorf("unexpected type for typeAndVersion: %T", results[0])
+	}
+	return tv, nil
+}
+
+// getOffRampStaticConfig fetches the static configuration using ABI bindings.
 func getOffRampStaticConfig(ctx *views.ViewContext) (map[string]any, error) {
-	data, err := common.ExecuteCall(ctx, common.SelectorGetStaticConfig)
+	data, err := executeOffRampCall(ctx, "getStaticConfig")
 	if err != nil {
 		return nil, err
 	}
 
-	config := make(map[string]any)
-	config["rawData"] = views.BytesToHex(data)
-
-	// Parse known fields per v1.6.0 ABI:
-	// struct StaticConfig {
-	//   uint64 chainSelector;
-	//   uint16 gasForCallExactCheck;
-	//   address rmnRemote;
-	//   address tokenAdminRegistry;
-	//   address nonceManager;
-	// }
-	offset := 0
-	if len(data) >= offset+32 {
-		cs, _ := common.DecodeUint64(data[offset : offset+32])
-		config["chainSelector"] = cs
-		offset += 32
+	results, err := OffRampABI.Unpack("getStaticConfig", data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unpack getStaticConfig: %w", err)
 	}
-	if len(data) >= offset+32 {
-		gasForCallExactCheck := common.DecodeUint64FromBytes(data[offset : offset+32])
-		config["gasForCallExactCheck"] = uint16(gasForCallExactCheck)
-		offset += 32
-	}
-	if len(data) >= offset+32 {
-		rmnRemote, _ := common.DecodeAddress(data[offset : offset+32])
-		config["rmnRemote"] = rmnRemote
-		offset += 32
-	}
-	if len(data) >= offset+32 {
-		tokenAdminRegistry, _ := common.DecodeAddress(data[offset : offset+32])
-		config["tokenAdminRegistry"] = tokenAdminRegistry
-		offset += 32
-	}
-	if len(data) >= offset+32 {
-		nonceManager, _ := common.DecodeAddress(data[offset : offset+32])
-		config["nonceManager"] = nonceManager
+	if len(results) == 0 {
+		return nil, fmt.Errorf("no results from getStaticConfig call")
 	}
 
-	return config, nil
+	cfg, ok := results[0].(struct {
+		ChainSelector        uint64         `json:"chainSelector"`
+		GasForCallExactCheck uint16         `json:"gasForCallExactCheck"`
+		RmnRemote            common.Address `json:"rmnRemote"`
+		TokenAdminRegistry   common.Address `json:"tokenAdminRegistry"`
+		NonceManager         common.Address `json:"nonceManager"`
+	})
+	if !ok {
+		return nil, fmt.Errorf("unexpected type for StaticConfig: %T", results[0])
+	}
+
+	return map[string]any{
+		"chainSelector":        cfg.ChainSelector,
+		"gasForCallExactCheck": cfg.GasForCallExactCheck,
+		"rmnRemote":            cfg.RmnRemote.Hex(),
+		"tokenAdminRegistry":   cfg.TokenAdminRegistry.Hex(),
+		"nonceManager":         cfg.NonceManager.Hex(),
+	}, nil
 }
 
-// getOffRampDynamicConfig fetches the dynamic configuration (v1.6.0 style).
+// getOffRampDynamicConfig fetches the dynamic configuration using ABI bindings.
 func getOffRampDynamicConfig(ctx *views.ViewContext) (map[string]any, error) {
-	data, err := common.ExecuteCall(ctx, common.SelectorGetDynamicConfig)
+	data, err := executeOffRampCall(ctx, "getDynamicConfig")
 	if err != nil {
 		return nil, err
 	}
 
-	config := make(map[string]any)
-
-	// Parse known fields
-	offset := 0
-	if len(data) >= offset+32 {
-		feeQuoter, _ := common.DecodeAddress(data[offset : offset+32])
-		config["feeQuoter"] = feeQuoter
-		offset += 32
+	results, err := OffRampABI.Unpack("getDynamicConfig", data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unpack getDynamicConfig: %w", err)
 	}
-	if len(data) >= offset+32 {
-		permissionlessExec := common.DecodeUint64FromBytes(data[offset : offset+32])
-		config["permissionLessExecutionThresholdSeconds"] = permissionlessExec
+	if len(results) == 0 {
+		return nil, fmt.Errorf("no results from getDynamicConfig call")
 	}
 
-	return config, nil
+	cfg, ok := results[0].(struct {
+		FeeQuoter                               common.Address `json:"feeQuoter"`
+		PermissionLessExecutionThresholdSeconds uint32         `json:"permissionLessExecutionThresholdSeconds"`
+		MessageInterceptor                      common.Address `json:"messageInterceptor"`
+	})
+	if !ok {
+		return nil, fmt.Errorf("unexpected type for DynamicConfig: %T", results[0])
+	}
+
+	return map[string]any{
+		"feeQuoter":                               cfg.FeeQuoter.Hex(),
+		"permissionLessExecutionThresholdSeconds": cfg.PermissionLessExecutionThresholdSeconds,
+		"messageInterceptor":                      cfg.MessageInterceptor.Hex(),
+	}, nil
 }
 
 // getOffRampLatestPriceSeqNum fetches the latest price sequence number.
 func getOffRampLatestPriceSeqNum(ctx *views.ViewContext) (uint64, error) {
-	data, err := common.ExecuteCall(ctx, selectorGetLatestPriceSeqNum)
+	data, err := executeOffRampCall(ctx, "getLatestPriceSequenceNumber")
 	if err != nil {
 		return 0, err
 	}
-	return common.DecodeUint64(data)
+	results, err := OffRampABI.Unpack("getLatestPriceSequenceNumber", data)
+	if err != nil {
+		return 0, fmt.Errorf("failed to unpack getLatestPriceSequenceNumber: %w", err)
+	}
+	if len(results) == 0 {
+		return 0, fmt.Errorf("no results from getLatestPriceSequenceNumber call")
+	}
+	seqNum, ok := results[0].(uint64)
+	if !ok {
+		return 0, fmt.Errorf("unexpected type for sequence number: %T", results[0])
+	}
+	return seqNum, nil
+}
+
+// getSourceChainConfigForChain fetches the SourceChainConfig for a specific chain.
+func getSourceChainConfigForChain(ctx *views.ViewContext, chainSel uint64) (map[string]any, error) {
+	data, err := executeOffRampCall(ctx, "getSourceChainConfig", chainSel)
+	if err != nil {
+		return nil, err
+	}
+
+	results, err := OffRampABI.Unpack("getSourceChainConfig", data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unpack getSourceChainConfig: %w", err)
+	}
+	if len(results) == 0 {
+		return nil, fmt.Errorf("no results from getSourceChainConfig call")
+	}
+
+	cfg, ok := results[0].(struct {
+		Router                    common.Address `json:"router"`
+		IsEnabled                 bool           `json:"isEnabled"`
+		MinSeqNr                  uint64         `json:"minSeqNr"`
+		IsRMNVerificationDisabled bool           `json:"isRMNVerificationDisabled"`
+		OnRamp                    []byte         `json:"onRamp"`
+	})
+	if !ok {
+		return nil, fmt.Errorf("unexpected type for SourceChainConfig: %T", results[0])
+	}
+
+	config := map[string]any{
+		"router":                    cfg.Router.Hex(),
+		"isEnabled":                 cfg.IsEnabled,
+		"minSeqNr":                  cfg.MinSeqNr,
+		"isRMNVerificationDisabled": cfg.IsRMNVerificationDisabled,
+	}
+
+	// Format onRamp bytes based on length
+	if len(cfg.OnRamp) == 20 {
+		config["onRamp"] = common.BytesToAddress(cfg.OnRamp).Hex()
+	} else if len(cfg.OnRamp) > 0 {
+		config["onRamp"] = "0x" + hex.EncodeToString(cfg.OnRamp)
+	}
+
+	return config, nil
 }
 
 // getOffRampSourceChainConfigs fetches source chain configs concurrently.
-// In v1.6, we use AllChainSelectors from ctx since getAllSourceChainConfigs() may not exist.
 func getOffRampSourceChainConfigs(ctx *views.ViewContext) (map[string]any, error) {
 	if len(ctx.AllChainSelectors) == 0 {
 		return map[string]any{}, nil
@@ -169,13 +222,12 @@ func getOffRampSourceChainConfigs(ctx *views.ViewContext) (map[string]any, error
 
 			config, err := getSourceChainConfigForChain(ctx, cs)
 			if err != nil {
-				return // Chain not configured or error
+				return
 			}
 
-			// Check if router is set and isEnabled (indicates chain is configured)
 			isEnabled, ok := config["isEnabled"].(bool)
 			if !ok || !isEnabled {
-				return // Not enabled
+				return
 			}
 
 			mu.Lock()
@@ -188,54 +240,54 @@ func getOffRampSourceChainConfigs(ctx *views.ViewContext) (map[string]any, error
 	return result, nil
 }
 
-// getSourceChainConfigForChain fetches the SourceChainConfig for a specific chain.
-func getSourceChainConfigForChain(ctx *views.ViewContext, chainSel uint64) (map[string]any, error) {
-	data, err := common.ExecuteCall(ctx, selectorGetSourceChainConfig, common.EncodeUint64(chainSel))
+// ViewOffRamp generates a view of the OffRamp contract (v1.6.0).
+// Uses ABI bindings for proper struct decoding.
+func ViewOffRamp(ctx *views.ViewContext) (map[string]any, error) {
+	result := make(map[string]any)
+
+	result["address"] = ctx.AddressHex
+	result["chainSelector"] = ctx.ChainSelector
+	result["version"] = "1.6.0"
+
+	owner, err := getOffRampOwner(ctx)
 	if err != nil {
-		return nil, err
+		result["owner_error"] = err.Error()
+	} else {
+		result["owner"] = owner
 	}
 
-	config := make(map[string]any)
-
-	// SourceChainConfig: address router, bool isEnabled, uint64 minSeqNr, bool isRMNVerificationDisabled, bytes onRamp
-	offset := 0
-	if len(data) >= offset+32 {
-		router, _ := common.DecodeAddress(data[offset : offset+32])
-		config["router"] = router
-		offset += 32
-	}
-	if len(data) >= offset+32 {
-		isEnabled, _ := common.DecodeBool(data[offset : offset+32])
-		config["isEnabled"] = isEnabled
-		offset += 32
-	}
-	if len(data) >= offset+32 {
-		minSeqNr := common.DecodeUint64FromBytes(data[offset : offset+32])
-		config["minSeqNr"] = minSeqNr
-		offset += 32
-	}
-	if len(data) >= offset+32 {
-		isRMNDisabled, _ := common.DecodeBool(data[offset : offset+32])
-		config["isRMNVerificationDisabled"] = isRMNDisabled
-		offset += 32
-	}
-	// onRamp is a dynamic bytes field - decode it
-	if len(data) >= offset+32 {
-		// This is an offset to the bytes data
-		bytesOffset := common.DecodeUint64FromBytes(data[offset : offset+32])
-		if bytesOffset > 0 && int(bytesOffset+32) <= len(data) {
-			bytesLen := common.DecodeUint64FromBytes(data[bytesOffset : bytesOffset+32])
-			if bytesLen > 0 && int(bytesOffset+32+bytesLen) <= len(data) {
-				onRampBytes := data[bytesOffset+32 : bytesOffset+32+bytesLen]
-				// Format based on length - if 20 bytes, it's an EVM address, if 32 it might be Solana
-				if len(onRampBytes) == 20 {
-					config["onRamp"] = "0x" + views.BytesToHex(onRampBytes)[2:]
-				} else {
-					config["onRamp"] = views.BytesToHex(onRampBytes)
-				}
-			}
-		}
+	typeAndVersion, err := getOffRampTypeAndVersion(ctx)
+	if err != nil {
+		result["typeAndVersion_error"] = err.Error()
+	} else {
+		result["typeAndVersion"] = typeAndVersion
 	}
 
-	return config, nil
+	staticConfig, err := getOffRampStaticConfig(ctx)
+	if err != nil {
+		result["staticConfig_error"] = err.Error()
+	} else {
+		result["staticConfig"] = staticConfig
+	}
+
+	dynamicConfig, err := getOffRampDynamicConfig(ctx)
+	if err != nil {
+		result["dynamicConfig_error"] = err.Error()
+	} else {
+		result["dynamicConfig"] = dynamicConfig
+	}
+
+	latestPriceSeqNum, err := getOffRampLatestPriceSeqNum(ctx)
+	if err == nil {
+		result["latestPriceSequenceNumber"] = latestPriceSeqNum
+	}
+
+	sourceChainConfigs, err := getOffRampSourceChainConfigs(ctx)
+	if err != nil {
+		result["sourceChainConfigs_error"] = err.Error()
+	} else if len(sourceChainConfigs) > 0 {
+		result["sourceChainConfigs"] = sourceChainConfigs
+	}
+
+	return result, nil
 }
