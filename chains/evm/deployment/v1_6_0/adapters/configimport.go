@@ -113,6 +113,17 @@ func (ci *ConfigImportAdapter) ConnectedChains(e cldf.Environment, chainsel uint
 	for _, offRamp := range offRamps {
 		// if the offramp's address matches our offramp, then we are connected to the source chain via 1.6
 		if offRamp.OffRamp == ci.OffRamp {
+			// get the onRamp on router for the source chain and check if it matches our onRamp, if it does then we are connected to that chain
+			// lanes are always bi-directional so source and destination chain selectors are interchangeable for the purpose of finding connected chains
+			onRamp, err := routerC.GetOnRamp(&bind.CallOpts{
+				Context: e.GetContext(),
+			}, offRamp.SourceChainSelector)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get on ramp for source chain selector %d from router at %s on chain %d: %w", offRamp.SourceChainSelector, routerAddr.String(), chain.Selector, err)
+			}
+			if onRamp != ci.OnRamp {
+				continue
+			}
 			connectedChains = append(connectedChains, offRamp.SourceChainSelector)
 		}
 	}

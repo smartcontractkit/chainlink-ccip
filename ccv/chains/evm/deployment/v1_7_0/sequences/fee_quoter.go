@@ -34,7 +34,6 @@ import (
 
 const (
 	LinkFeeMultiplierPercent uint8 = 90
-	NetworkFeeUSDCents             = 10
 )
 
 type FeeQuoterUpdate struct {
@@ -351,7 +350,14 @@ var (
 						MaxFeeJuelsPerMsg: onRampCfg.StaticConfig.MaxNopFeesJuels,
 					}
 				}
-
+				var networkFeeUSDCents uint16
+				// NetworkFeeUSDCents is same across all feetokens in the same chain, so we can just take it from the first onRamp config
+				for _, feeTokenCfg := range onRampCfg.FeeTokenConfig {
+					if feeTokenCfg.NetworkFeeUSDCents != 0 {
+						networkFeeUSDCents = uint16(feeTokenCfg.NetworkFeeUSDCents)
+						break
+					}
+				}
 				chainFamilySelectorBytes := utils.GetSelectorHex(onRampCfg.RemoteChainSelector)
 				// Safely convert ChainFamilySelector from []byte to [4]byte
 				var chainFamilySelector [4]byte
@@ -371,7 +377,7 @@ var (
 						DefaultTokenFeeUSDCents:     onRampCfg.DynamicConfig.DefaultTokenFeeUSDCents,
 						DefaultTokenDestGasOverhead: onRampCfg.DynamicConfig.DefaultTokenDestGasOverhead,
 						DefaultTxGasLimit:           uint32(onRampCfg.StaticConfig.DefaultTxGasLimit),
-						NetworkFeeUSDCents:          NetworkFeeUSDCents,
+						NetworkFeeUSDCents:          networkFeeUSDCents,
 						LinkFeeMultiplierPercent:    LinkFeeMultiplierPercent,
 					},
 				})
