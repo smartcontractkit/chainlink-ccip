@@ -359,10 +359,19 @@ func (a *EVMAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.Depl
 			result.Addresses = append(result.Addresses, out.Output.Addresses...)
 			result.BatchOps = append(result.BatchOps, out.Output.BatchOps...)
 
-			toknFilterDS := datastore.AddressRef{ChainSelector: input.ChainSelector, Qualifier: input.TokenSymbol}
+			toknFilterDS := datastore.AddressRef{ChainSelector: input.ChainSelector}
+			if input.TokenRef.Address != "" {
+				toknFilterDS.Address = input.TokenRef.Address
+			}
+			if input.TokenRef.Qualifier != "" {
+				toknFilterDS.Qualifier = input.TokenRef.Qualifier
+			}
+			if input.TokenRef.Type != "" {
+				toknFilterDS.Type = input.TokenRef.Type
+			}
 			toknRef, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, toknFilterDS, input.ChainSelector, datastore_utils.FullRef)
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to find token address for symbol %q on chain %d: %w", input.TokenSymbol, input.ChainSelector, err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to find token address for symbol %q on chain %d: %w", input.TokenRef.Qualifier, input.ChainSelector, err)
 			}
 
 			// For a BnM token + BnM token pool, we need to grant the pool mint and burn roles on the token
@@ -406,7 +415,7 @@ func (a *EVMAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.Depl
 
 				toknAddr := common.BytesToAddress(toknAddrBytes)
 				if toknAddr == (common.Address{}) {
-					return sequences.OnChainOutput{}, fmt.Errorf("token address for symbol %q is zero address", input.TokenSymbol)
+					return sequences.OnChainOutput{}, fmt.Errorf("token address for symbol %q is zero address", input.TokenRef.Qualifier)
 				}
 
 				chain, ok := chains.EVMChains()[input.ChainSelector]
@@ -424,12 +433,12 @@ func (a *EVMAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.Depl
 					},
 				)
 				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to grant mint and burn roles to token pool %q for token %q on chain %d: %w", poolAddr.Hex(), input.TokenSymbol, input.ChainSelector, err)
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to grant mint and burn roles to token pool %q for token %q on chain %d: %w", poolAddr.Hex(), input.TokenRef.Qualifier, input.ChainSelector, err)
 				}
 
 				batchOp, err := evm_contract.NewBatchOperationFromWrites([]evm_contract.WriteOutput{report.Output})
 				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation for granting mint and burn roles to token pool %q for token %q on chain %d: %w", poolAddr.Hex(), input.TokenSymbol, input.ChainSelector, err)
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation for granting mint and burn roles to token pool %q for token %q on chain %d: %w", poolAddr.Hex(), input.TokenRef.Qualifier, input.ChainSelector, err)
 				}
 
 				result.BatchOps = append(result.BatchOps, batchOp)
@@ -458,9 +467,9 @@ func (a *EVMAdapter) RegisterToken() *cldf_ops.Sequence[tokensapi.RegisterTokenI
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token admin registry address for chain %d: %w", input.ChainSelector, err)
 			}
 
-			tokAddress, err := a.FindOneTokenAddress(input.ExistingDataStore, input.ChainSelector, input.TokenSymbol)
+			tokAddress, err := a.FindOneTokenAddress(input.ExistingDataStore, input.ChainSelector, input.TokenRef.Qualifier)
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token address for symbol %q on chain %d: %w", input.TokenSymbol, input.ChainSelector, err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token address for symbol %q on chain %d: %w", input.TokenRef.Qualifier, input.ChainSelector, err)
 			}
 
 			extnAdmin := common.Address{}
@@ -591,7 +600,7 @@ func (a *EVMAdapter) SetPool() *cldf_ops.Sequence[tokensapi.SetPoolInput, sequen
 				},
 			)
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to set pool for token %q on chain selector %d: %w", input.TokenSymbol, input.ChainSelector, err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to set pool for token %q on chain selector %d: %w", input.TokenRef.Qualifier, input.ChainSelector, err)
 			}
 
 			batchOp, err := evm_contract.NewBatchOperationFromWrites([]evm_contract.WriteOutput{report.Output})
@@ -604,11 +613,6 @@ func (a *EVMAdapter) SetPool() *cldf_ops.Sequence[tokensapi.SetPoolInput, sequen
 			}, nil
 		},
 	)
-}
-
-func (a *EVMAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokensapi.UpdateAuthoritiesInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
-	// TODO: implement me
-	return nil
 }
 
 ////////////////////

@@ -58,24 +58,32 @@ var DeployTokenPool = cldf_ops.NewSequence(
 			b.Logger.Info("Token pool already deployed at address:", tokenPoolAddr.Address)
 			return sequences.OnChainOutput{}, nil
 		}
+		tokenAddr := input.TokenRef.Address
 
-		// find token address from the data store
-		tokenAddr, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, datastore.AddressRef{
-			ChainSelector: input.ChainSelector,
-			Qualifier:     input.TokenSymbol,
-		}, input.ChainSelector, datastore_utils.FullRef)
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("token with symbol '%s' is not found in datastore, %v", input.TokenSymbol, err)
+		// this should resolve to the same address as the above lookup if the provided address is correct, 
+		// but will error if the provided address is incorrect or not provided at all
+		if input.TokenRef.Qualifier != "" {
+			// find token address from the data store
+			storedAddr, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, datastore.AddressRef{
+				ChainSelector: input.ChainSelector,
+				Qualifier:     input.TokenRef.Qualifier,
+			}, input.ChainSelector, datastore_utils.FullRef)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("token with symbol '%s' is not found in datastore, %v", input.TokenRef.Qualifier, err)
+			}
+			if tokenAddr != "" && storedAddr.Address != tokenAddr {
+				return sequences.OnChainOutput{}, fmt.Errorf("provided token address '%s' does not match address '%s' found in datastore for symbol '%s'", tokenAddr, storedAddr.Address, input.TokenRef.Qualifier)
+			}
 		}
 
 		// get token decimals
-		token, err := burn_mint_erc20.NewBurnMintERC20(common.HexToAddress(tokenAddr.Address), chain.Client)
+		token, err := burn_mint_erc20.NewBurnMintERC20(common.HexToAddress(tokenAddr), chain.Client)
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to instantiate token contract at address '%s': %w", tokenAddr.Address, err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to instantiate token contract at address '%s': %w", tokenAddr, err)
 		}
 		tokenDecimal, err := token.Decimals(&bind.CallOpts{Context: b.GetContext()})
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to get token decimals for token at address '%s': %w", tokenAddr.Address, err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to get token decimals for token at address '%s': %w", tokenAddr, err)
 		}
 
 		// find the router address from the data store
@@ -84,7 +92,7 @@ var DeployTokenPool = cldf_ops.NewSequence(
 			Type:          datastore.ContractType(router.ContractType),
 		}, input.ChainSelector, datastore_utils.FullRef)
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("token with symbol '%s' is not found in datastore, %v", input.TokenSymbol, err)
+			return sequences.OnChainOutput{}, fmt.Errorf("token with symbol '%s' is not found in datastore, %v", input.TokenRef.Qualifier, err)
 		}
 
 		// find the rmnproxy address from the data store
@@ -93,7 +101,7 @@ var DeployTokenPool = cldf_ops.NewSequence(
 			Type:          datastore.ContractType(rmnproxyops.ContractType),
 		}, input.ChainSelector, datastore_utils.FullRef)
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("token with symbol '%s' is not found in datastore, %v", input.TokenSymbol, err)
+			return sequences.OnChainOutput{}, fmt.Errorf("token with symbol '%s' is not found in datastore, %v", input.TokenRef.Qualifier, err)
 		}
 
 		// prepare allowlist
@@ -117,7 +125,7 @@ var DeployTokenPool = cldf_ops.NewSequence(
 				TypeAndVersion: v1_6_1_burn_mint_token_pool.TypeAndVersion,
 				ChainSelector:  chain.Selector,
 				Args: v1_6_1_burn_mint_token_pool.ConstructorArgs{
-					Token:              common.HexToAddress(tokenAddr.Address),
+					Token:              common.HexToAddress(tokenAddr),
 					LocalTokenDecimals: tokenDecimal,
 					Allowlist:          allowlist,
 					RmnProxy:           common.HexToAddress(rmpProxyAddr.Address),
@@ -134,7 +142,7 @@ var DeployTokenPool = cldf_ops.NewSequence(
 				TypeAndVersion: v1_6_1_burn_from_mint_token_pool.TypeAndVersion,
 				ChainSelector:  chain.Selector,
 				Args: v1_6_1_burn_from_mint_token_pool.ConstructorArgs{
-					Token:              common.HexToAddress(tokenAddr.Address),
+					Token:              common.HexToAddress(tokenAddr),
 					LocalTokenDecimals: tokenDecimal,
 					Allowlist:          allowlist,
 					RmnProxy:           common.HexToAddress(rmpProxyAddr.Address),
@@ -151,7 +159,7 @@ var DeployTokenPool = cldf_ops.NewSequence(
 				TypeAndVersion: v1_6_1_burn_mint_with_lock_release_flag_token_pool.TypeAndVersion,
 				ChainSelector:  chain.Selector,
 				Args: v1_6_1_burn_mint_with_lock_release_flag_token_pool.ConstructorArgs{
-					Token:              common.HexToAddress(tokenAddr.Address),
+					Token:              common.HexToAddress(tokenAddr),
 					LocalTokenDecimals: tokenDecimal,
 					Allowlist:          allowlist,
 					RmnProxy:           common.HexToAddress(rmpProxyAddr.Address),
@@ -168,7 +176,7 @@ var DeployTokenPool = cldf_ops.NewSequence(
 				TypeAndVersion: v1_6_1_burn_to_address_mint_token_pool.TypeAndVersion,
 				ChainSelector:  chain.Selector,
 				Args: v1_6_1_burn_to_address_mint_token_pool.ConstructorArgs{
-					Token:              common.HexToAddress(tokenAddr.Address),
+					Token:              common.HexToAddress(tokenAddr),
 					LocalTokenDecimals: tokenDecimal,
 					Allowlist:          allowlist,
 					RmnProxy:           common.HexToAddress(rmpProxyAddr.Address),
@@ -186,7 +194,7 @@ var DeployTokenPool = cldf_ops.NewSequence(
 				TypeAndVersion: v1_6_1_burn_with_from_mint_token_pool.TypeAndVersion,
 				ChainSelector:  chain.Selector,
 				Args: v1_6_1_burn_with_from_mint_token_pool.ConstructorArgs{
-					Token:              common.HexToAddress(tokenAddr.Address),
+					Token:              common.HexToAddress(tokenAddr),
 					LocalTokenDecimals: tokenDecimal,
 					Allowlist:          allowlist,
 					RmnProxy:           common.HexToAddress(rmpProxyAddr.Address),
@@ -203,7 +211,7 @@ var DeployTokenPool = cldf_ops.NewSequence(
 				TypeAndVersion: v1_6_1_lock_release_token_pool.TypeAndVersion,
 				ChainSelector:  chain.Selector,
 				Args: v1_6_1_lock_release_token_pool.ConstructorArgs{
-					Token:              common.HexToAddress(tokenAddr.Address),
+					Token:              common.HexToAddress(tokenAddr),
 					LocalTokenDecimals: tokenDecimal,
 					Allowlist:          allowlist,
 					RmnProxy:           common.HexToAddress(rmpProxyAddr.Address),
@@ -220,7 +228,7 @@ var DeployTokenPool = cldf_ops.NewSequence(
 				TypeAndVersion: v1_6_1_siloed_lock_release_token_pool.TypeAndVersion,
 				ChainSelector:  chain.Selector,
 				Args: v1_6_1_siloed_lock_release_token_pool.ConstructorArgs{
-					Token:              common.HexToAddress(tokenAddr.Address),
+					Token:              common.HexToAddress(tokenAddr),
 					LocalTokenDecimals: tokenDecimal,
 					Allowlist:          allowlist,
 					RmnProxy:           common.HexToAddress(rmpProxyAddr.Address),
@@ -243,7 +251,7 @@ var DeployTokenPool = cldf_ops.NewSequence(
 				ChainSelector:  chain.Selector,
 				Args: v1_6_0_burn_mint_with_external_minter_token_pool.ConstructorArgs{
 					Minter:             common.HexToAddress(tokenGovernor),
-					Token:              common.HexToAddress(tokenAddr.Address),
+					Token:              common.HexToAddress(tokenAddr),
 					LocalTokenDecimals: tokenDecimal,
 					Allowlist:          allowlist,
 					RmnProxy:           common.HexToAddress(rmpProxyAddr.Address),
@@ -265,7 +273,7 @@ var DeployTokenPool = cldf_ops.NewSequence(
 				ChainSelector:  chain.Selector,
 				Args: v1_6_0_hybrid_with_external_minter_token_pool.ConstructorArgs{
 					Minter:             common.HexToAddress(tokenGovernor),
-					Token:              common.HexToAddress(tokenAddr.Address),
+					Token:              common.HexToAddress(tokenAddr),
 					LocalTokenDecimals: tokenDecimal,
 					Allowlist:          allowlist,
 					RmnProxy:           common.HexToAddress(rmpProxyAddr.Address),
@@ -283,7 +291,7 @@ var DeployTokenPool = cldf_ops.NewSequence(
 				TypeAndVersion: v1_5_1_burn_mint_token_pool.TypeAndVersion,
 				ChainSelector:  chain.Selector,
 				Args: v1_5_1_burn_mint_token_pool.ConstructorArgs{
-					Token:              common.HexToAddress(tokenAddr.Address),
+					Token:              common.HexToAddress(tokenAddr),
 					LocalTokenDecimals: tokenDecimal,
 					Allowlist:          allowlist,
 					RmnProxy:           common.HexToAddress(rmpProxyAddr.Address),
@@ -300,7 +308,7 @@ var DeployTokenPool = cldf_ops.NewSequence(
 				TypeAndVersion: v1_5_1_burn_from_mint_token_pool.TypeAndVersion,
 				ChainSelector:  chain.Selector,
 				Args: v1_5_1_burn_from_mint_token_pool.ConstructorArgs{
-					Token:              common.HexToAddress(tokenAddr.Address),
+					Token:              common.HexToAddress(tokenAddr),
 					LocalTokenDecimals: tokenDecimal,
 					Allowlist:          allowlist,
 					RmnProxy:           common.HexToAddress(rmpProxyAddr.Address),
@@ -317,7 +325,7 @@ var DeployTokenPool = cldf_ops.NewSequence(
 				TypeAndVersion: v1_5_1_burn_to_address_mint_token_pool.TypeAndVersion,
 				ChainSelector:  chain.Selector,
 				Args: v1_5_1_burn_to_address_mint_token_pool.ConstructorArgs{
-					Token:              common.HexToAddress(tokenAddr.Address),
+					Token:              common.HexToAddress(tokenAddr),
 					LocalTokenDecimals: tokenDecimal,
 					Allowlist:          allowlist,
 					RmnProxy:           common.HexToAddress(rmpProxyAddr.Address),
@@ -335,7 +343,7 @@ var DeployTokenPool = cldf_ops.NewSequence(
 				TypeAndVersion: v1_5_1_burn_with_from_mint_token_pool.TypeAndVersion,
 				ChainSelector:  chain.Selector,
 				Args: v1_5_1_burn_with_from_mint_token_pool.ConstructorArgs{
-					Token:              common.HexToAddress(tokenAddr.Address),
+					Token:              common.HexToAddress(tokenAddr),
 					LocalTokenDecimals: tokenDecimal,
 					Allowlist:          allowlist,
 					RmnProxy:           common.HexToAddress(rmpProxyAddr.Address),
@@ -352,7 +360,7 @@ var DeployTokenPool = cldf_ops.NewSequence(
 				TypeAndVersion: v1_5_1_lock_release_token_pool.TypeAndVersion,
 				ChainSelector:  chain.Selector,
 				Args: v1_5_1_lock_release_token_pool.ConstructorArgs{
-					Token:              common.HexToAddress(tokenAddr.Address),
+					Token:              common.HexToAddress(tokenAddr),
 					LocalTokenDecimals: tokenDecimal,
 					Allowlist:          allowlist,
 					RmnProxy:           common.HexToAddress(rmpProxyAddr.Address),
@@ -390,10 +398,10 @@ func fetchTokenGovernor(input tokenapi.DeployTokenPoolInput) (string, error) {
 		tokenGovernorAddr, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, datastore.AddressRef{
 			ChainSelector: input.ChainSelector,
 			Type:          datastore.ContractType(token_governor.ContractType),
-			Qualifier:     input.TokenSymbol,
+			Qualifier:     input.TokenRef.Qualifier,
 		}, input.ChainSelector, datastore_utils.FullRef)
 		if err != nil {
-			return "", fmt.Errorf("token governor for token with symbol '%s' is not found in datastore, %v", input.TokenSymbol, err)
+			return "", fmt.Errorf("token governor for token with symbol '%s' is not found in datastore, %v", input.TokenRef.Qualifier, err)
 		}
 		tokenGovernor = tokenGovernorAddr.Address
 	}

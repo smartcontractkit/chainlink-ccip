@@ -23,6 +23,8 @@ type TokenTransferConfig struct {
 	// TokenPoolRef is a reference to the token pool in the datastore.
 	// Populate the reference as needed to match the desired token pool.
 	TokenPoolRef datastore.AddressRef
+	// TokenRef is a reference to the token in the datastore. This is only needed if the token address cannot be derived from the pool reference.
+	TokenRef datastore.AddressRef
 	// ExternalAdmin is specified when we want to propose an admin that we don't control.
 	// Leave empty to use internal administration.
 	ExternalAdmin string
@@ -31,8 +33,6 @@ type TokenTransferConfig struct {
 	RegistryRef datastore.AddressRef
 	// RemoteChains specifies the remote chains to configure on the token pool.
 	RemoteChains map[uint64]RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]
-	// TokenSymbol is the symbol of the token being configured. Not required if the token can be derived from the pool reference.
-	TokenSymbol string
 }
 
 // ConfigureTokensForTransfersConfig is the configuration for the ConfigureTokensForTransfers changeset.
@@ -102,7 +102,7 @@ func makeApply(tokenRegistry *TokenAdapterRegistry, mcmsRegistry *changesets.MCM
 				RemoteChains:      remoteChains,
 				ExternalAdmin:     token.ExternalAdmin,
 				RegistryAddress:   registry.Address,
-				TokenSymbol:       token.TokenSymbol,
+				TokenRef:       token.TokenRef,
 				PoolType:          tokenPool.Type.String(),
 				ExistingDataStore: e.DataStore,
 			})

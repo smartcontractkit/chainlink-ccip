@@ -43,7 +43,6 @@ type TokenAdapter interface {
 	DeployTokenPoolForToken() *cldf_ops.Sequence[DeployTokenPoolInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 	RegisterToken() *cldf_ops.Sequence[RegisterTokenInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 	SetPool() *cldf_ops.Sequence[SetPoolInput, sequences.OnChainOutput, cldf_chain.BlockChains]
-	UpdateAuthorities() *cldf_ops.Sequence[UpdateAuthoritiesInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 }
 
 // RateLimiterConfig specifies configuration for a rate limiter on a token pool.
@@ -87,13 +86,13 @@ type ConfigureTokenForTransfersInput struct {
 	ExternalAdmin string
 	// RegistryAddress is the address of the contract on which the token pool must be registered.
 	RegistryAddress string
-	// TokenSymbol is the symbol of the token being configured.
-	TokenSymbol string
 	// Below are not provided by the user and populated programmatically.
 	// ExistingDataStore is the datastore containing existing deployment data.
 	ExistingDataStore datastore.DataStore
 	// PoolType specifies the type of the token pool. Needed for Solana token pools.
 	PoolType string
+	// TokenAddress is the address of the token being configured.
+	TokenRef datastore.AddressRef
 }
 
 // TokenAdapterRegistry maintains a registry of TokenAdapters.

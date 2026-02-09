@@ -514,13 +514,11 @@ func (a *SVMAdapter) GetTokenExpansionConfig() tokensapi.TokenExpansionInputPerC
 	mintAmnt := new(big.Int).Mul(oneToken, big.NewInt(1_000_000)) // pre-mint 1 million tokens
 
 	return tokensapi.TokenExpansionInputPerChain{
-		TokenPoolQualifier:      "", // should be empty since there'll only be one BnM / LnR pool deployed
 		TokenPoolVersion:        cciputils.Version_1_6_0,
-		PoolType:                cciputils.BurnMintTokenPool.String(),
 		TokenPoolRateLimitAdmin: admin,
 		TokenPoolAdmin:          admin,
 		TARAdmin:                admin,
-		DeployTokenInput: tokensapi.DeployTokenInput{
+		DeployTokenInput: &tokensapi.DeployTokenInput{
 			Decimals:               DefaultTokenDecimals,
 			Symbol:                 "TEST_TOKEN_" + suffix,
 			Name:                   "TEST TOKEN " + suffix,
@@ -532,6 +530,10 @@ func (a *SVMAdapter) GetTokenExpansionConfig() tokensapi.TokenExpansionInputPerC
 			DisableFreezeAuthority: false,                     // don't revoke freeze authority after token creation
 			TokenPrivKey:           "",                        // if empty, a new keypair will be generated
 			CCIPAdmin:              admin,                     // deployer is the admin (if empty defaults to timelock)
+		},
+		DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
+			PoolType:                cciputils.BurnMintTokenPool.String(),
+			TokenPoolQualifier:      "", // should be empty since there'll only be one BnM / LnR pool deployed
 		},
 
 		// optional fields left empty, but included here for completeness

@@ -198,7 +198,6 @@ func TestDeployTokenPool(t *testing.T) {
 			poolQualifier := tc.poolType.String() + "-" + tc.poolVersion.String()
 			input := tokenapi.DeployTokenPoolInput{
 				TokenPoolQualifier: poolQualifier,
-				TokenSymbol:        tokenSymbol,
 				PoolType:           string(tc.poolType),
 				TokenPoolVersion:   tc.poolVersion,
 				Allowlist:          tc.allowlist,
@@ -351,7 +350,6 @@ func TestDeployTokenPool_AlreadyDeployed(t *testing.T) {
 	e.DataStore = ds.Seal()
 
 	input := tokenapi.DeployTokenPoolInput{
-		TokenSymbol:       tokenSymbol,
 		PoolType:          string(poolType),
 		TokenPoolVersion:  utils.Version_1_6_1,
 		ChainSelector:     chainSelector,
@@ -383,7 +381,6 @@ func TestDeployTokenPool_MissingTokenPoolVersion(t *testing.T) {
 	e.DataStore = ds.Seal()
 
 	input := tokenapi.DeployTokenPoolInput{
-		TokenSymbol:       "TEST",
 		PoolType:          string(burn_mint_token_pool.ContractType),
 		TokenPoolVersion:  nil, // Missing version
 		ChainSelector:     chainSelector,
@@ -446,7 +443,6 @@ func TestDeployTokenPool_UnsupportedPoolType(t *testing.T) {
 	e.DataStore = ds.Seal()
 
 	input := tokenapi.DeployTokenPoolInput{
-		TokenSymbol:       tokenSymbol,
 		PoolType:          "UnsupportedPoolType",
 		TokenPoolVersion:  utils.Version_1_6_1,
 		ChainSelector:     chainSelector,
@@ -501,7 +497,6 @@ func TestDeployTokenPool_MissingRouter(t *testing.T) {
 	e.DataStore = ds.Seal()
 
 	input := tokenapi.DeployTokenPoolInput{
-		TokenSymbol:       tokenSymbol,
 		PoolType:          string(burn_mint_token_pool.ContractType),
 		TokenPoolVersion:  utils.Version_1_6_1,
 		ChainSelector:     chainSelector,
@@ -556,7 +551,6 @@ func TestDeployTokenPool_MissingRMNProxy(t *testing.T) {
 	e.DataStore = ds.Seal()
 
 	input := tokenapi.DeployTokenPoolInput{
-		TokenSymbol:       tokenSymbol,
 		PoolType:          string(burn_mint_token_pool.ContractType),
 		TokenPoolVersion:  utils.Version_1_6_1,
 		ChainSelector:     chainSelector,
@@ -574,7 +568,6 @@ func TestDeployTokenPool_MissingToken(t *testing.T) {
 	t.Parallel()
 
 	chainSelector := chain_selectors.ETHEREUM_MAINNET.Selector
-	tokenSymbol := "NONEXISTENT"
 
 	e, err := environment.New(t.Context(),
 		environment.WithEVMSimulated(t, []uint64{chainSelector}),
@@ -606,7 +599,6 @@ func TestDeployTokenPool_MissingToken(t *testing.T) {
 	e.DataStore = ds.Seal()
 
 	input := tokenapi.DeployTokenPoolInput{
-		TokenSymbol:       tokenSymbol, // Token not in datastore
 		PoolType:          string(burn_mint_token_pool.ContractType),
 		TokenPoolVersion:  utils.Version_1_6_1,
 		ChainSelector:     chainSelector,

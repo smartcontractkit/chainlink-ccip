@@ -26,11 +26,12 @@ type TokenExpansionInput struct {
 }
 
 type TokenExpansionInputPerChain struct {
-	TokenPoolVersion *semver.Version  `yaml:"token-pool-version" json:"tokenPoolVersion"`
-	DeployTokenInput DeployTokenInput `yaml:"deploy-token-input" json:"deployTokenInput"`
-	// only necessary if we want to specifically query for a token pool with a given type + qualifier
-	TokenPoolQualifier string `yaml:"token-pool-qualifier" json:"tokenPoolQualifier"`
-	PoolType           string `yaml:"pool-type" json:"poolType"`
+	TokenPoolVersion *semver.Version `yaml:"token-pool-version" json:"tokenPoolVersion"`
+	// will deploy a token if DeployTokenInput is not nil,
+	// otherwise assumes token is already deployed and will look up the token address from the datastore based on the input parameters
+	DeployTokenInput *DeployTokenInput `yaml:"deploy-token-input" json:"deployTokenInput"`
+	// will deploy a token pool for the token if DeployTokenPoolInput is not nil
+	DeployTokenPoolInput *DeployTokenPoolInput `yaml:"deploy-token-pool-input" json:"deployTokenPoolInput"`
 	// only necessary if we want to set specific admin authorities. Will default to timelock admin otherwise
 	TARAdmin                string `yaml:"tar-admin" json:"tarAdmin"`
 	TokenPoolAdmin          string `yaml:"token-pool-admin" json:"tokenPoolAdmin"`
@@ -90,11 +91,13 @@ type TokenMetadata struct {
 }
 
 type DeployTokenPoolInput struct {
-	TokenSymbol        string          `yaml:"token-symbol" json:"tokenSymbol"`
-	TokenPoolQualifier string          `yaml:"token-pool-qualifier" json:"tokenPoolQualifier"`
-	PoolType           string          `yaml:"pool-type" json:"poolType"`
-	TokenPoolVersion   *semver.Version `yaml:"token-pool-version" json:"tokenPoolVersion"`
-	Allowlist          []string        `yaml:"allowlist" json:"allowlist"`
+	// TokenRef is a reference to the token in the datastore.
+	// If this is provided, it will be cross checked against the deployed token
+	TokenRef           *datastore.AddressRef `yaml:"token-ref" json:"tokenRef"`
+	TokenPoolQualifier string                `yaml:"token-pool-qualifier" json:"tokenPoolQualifier"`
+	PoolType           string                `yaml:"pool-type" json:"poolType"`
+	TokenPoolVersion   *semver.Version       `yaml:"token-pool-version" json:"tokenPoolVersion"`
+	Allowlist          []string              `yaml:"allowlist" json:"allowlist"`
 	// AcceptLiquidity is used by LockReleaseTokenPool (v1.5.1 only) to indicate
 	// whether the pool should accept liquidity from liquidity providers
 	AcceptLiquidity *bool `yaml:"accept-liquidity" json:"acceptLiquidity"`
@@ -108,24 +111,18 @@ type DeployTokenPoolInput struct {
 	ChainSelector     uint64
 	ExistingDataStore datastore.DataStore
 }
+
 type RegisterTokenInput struct {
-	TokenSymbol string `yaml:"token-symbol" json:"tokenSymbol"`
-	TokenAdmin  string `yaml:"token-admin" json:"tokenAdmin"`
+	TokenRef   datastore.AddressRef `yaml:"token-ref" json:"tokenRef"`
+	TokenAdmin string               `yaml:"token-admin" json:"tokenAdmin"`
 	// below are not specified by the user, filled in by the deployment system to pass to chain operations
 	ChainSelector     uint64
 	ExistingDataStore datastore.DataStore
 }
 type SetPoolInput struct {
-	TokenSymbol        string `yaml:"token-symbol" json:"tokenSymbol"`
-	TokenPoolQualifier string `yaml:"token-pool-qualifier" json:"tokenPoolQualifier"`
-	PoolType           string `yaml:"pool-type" json:"poolType"`
-	// below are not specified by the user, filled in by the deployment system to pass to chain operations
-	ChainSelector     uint64
-	ExistingDataStore datastore.DataStore
-}
-type UpdateAuthoritiesInput struct {
-	TokenPoolAdmin          string `yaml:"token-pool-admin" json:"tokenPoolAdmin"`
-	TokenPoolRateLimitAdmin string `yaml:"token-pool-rate-limit-admin" json:"tokenPoolRateLimitAdmin"`
+	TokenRef           datastore.AddressRef `yaml:"token-ref" json:"tokenRef"`
+	TokenPoolQualifier string               `yaml:"token-pool-qualifier" json:"tokenPoolQualifier"`
+	PoolType           string               `yaml:"pool-type" json:"poolType"`
 	// below are not specified by the user, filled in by the deployment system to pass to chain operations
 	ChainSelector     uint64
 	ExistingDataStore datastore.DataStore
@@ -182,128 +179,146 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 
 			// deploy token
 			deployTokenInput := input.DeployTokenInput
-			deployTokenInput.ExistingDataStore = e.DataStore
-			deployTokenInput.ChainSelector = selector
+			var tokenRef *datastore.AddressRef
+			if deployTokenInput != nil {
+				deployTokenInput.ExistingDataStore = e.DataStore
+				deployTokenInput.ChainSelector = selector
 
-			// if token is deployed by CLL, set CCIP admin as RBACTimelock by default.
-			// If input has CCIPAdmin and which is external address, set that address as CCIPAdmin
-			// and we may not be able to register the token by CLL in that case.
-			if deployTokenInput.CCIPAdmin == "" {
-				filter := datastore.AddressRef{
-					Type:          datastore.ContractType(common_utils.RBACTimelock),
-					ChainSelector: deployTokenInput.ChainSelector,
-					Qualifier:     cfg.MCMS.Qualifier,
-				}
+				// if token is deployed by CLL, set CCIP admin as RBACTimelock by default.
+				// If input has CCIPAdmin and which is external address, set that address as CCIPAdmin
+				// and we may not be able to register the token by CLL in that case.
+				if deployTokenInput.CCIPAdmin == "" {
+					filter := datastore.AddressRef{
+						Type:          datastore.ContractType(common_utils.RBACTimelock),
+						ChainSelector: deployTokenInput.ChainSelector,
+						Qualifier:     cfg.MCMS.Qualifier,
+					}
 
-				timelockAddr, err := datastore_utils.FindAndFormatRef(
-					deployTokenInput.ExistingDataStore,
-					filter,
-					deployTokenInput.ChainSelector,
-					datastore_utils.FullRef,
-				)
-				if err != nil {
-					return cldf.ChangesetOutput{}, fmt.Errorf(
-						"couldn't find the RBACTimelock address in datastore for selector %d and qualifier %s: %w",
-						deployTokenInput.ChainSelector, cfg.MCMS.Qualifier, err,
+					timelockAddr, err := datastore_utils.FindAndFormatRef(
+						deployTokenInput.ExistingDataStore,
+						filter,
+						deployTokenInput.ChainSelector,
+						datastore_utils.FullRef,
 					)
-				}
+					if err != nil {
+						return cldf.ChangesetOutput{}, fmt.Errorf(
+							"couldn't find the RBACTimelock address in datastore for selector %d and qualifier %s: %w",
+							deployTokenInput.ChainSelector, cfg.MCMS.Qualifier, err,
+						)
+					}
 
-				deployTokenInput.CCIPAdmin = timelockAddr.Address
-			}
-			deployTokenReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, tokenPoolAdapter.DeployToken(), e.BlockChains, deployTokenInput)
-			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy token on chain %d: %w", selector, err)
-			}
-			batchOps = append(batchOps, deployTokenReport.Output.BatchOps...)
-			reports = append(reports, deployTokenReport.ExecutionReports...)
-			for _, r := range deployTokenReport.Output.Addresses {
-				if err := tmpDatastore.Addresses().Add(r); err != nil {
-					return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %v on chain with selector %d to datastore: %w", r.Type, r.Version, r, r.ChainSelector, err)
+					deployTokenInput.CCIPAdmin = timelockAddr.Address
 				}
-				if err := ds.Addresses().Add(r); err != nil {
-					return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %v on chain with selector %d to datastore: %w", r.Type, r.Version, r, r.ChainSelector, err)
+				deployTokenReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, tokenPoolAdapter.DeployToken(), e.BlockChains, *deployTokenInput)
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy token on chain %d: %w", selector, err)
 				}
+				batchOps = append(batchOps, deployTokenReport.Output.BatchOps...)
+				reports = append(reports, deployTokenReport.ExecutionReports...)
+				tokenRef = &deployTokenReport.Output.Addresses[0]
+				for _, r := range deployTokenReport.Output.Addresses {
+					if err := tmpDatastore.Addresses().Add(r); err != nil {
+						return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %v on chain with selector %d to datastore: %w", r.Type, r.Version, r, r.ChainSelector, err)
+					}
+					if err := ds.Addresses().Add(r); err != nil {
+						return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %v on chain with selector %d to datastore: %w", r.Type, r.Version, r, r.ChainSelector, err)
+					}
+				}
+				tmpDatastore.Merge(e.DataStore)
+				e.DataStore = tmpDatastore.Seal()
 			}
-			tmpDatastore.Merge(e.DataStore)
-			e.DataStore = tmpDatastore.Seal()
 
-			// deploy token pool
-			tmpDatastore = datastore.NewMemoryDataStore()
-			deployTokenPoolInput := DeployTokenPoolInput{
-				TokenSymbol:        deployTokenInput.Symbol,
-				TokenPoolQualifier: input.TokenPoolQualifier,
-				TokenPoolVersion:   input.TokenPoolVersion,
-				PoolType:           input.PoolType,
-			}
-			deployTokenPoolInput.ExistingDataStore = e.DataStore
-			deployTokenPoolInput.ChainSelector = selector
-			deployTokenPoolReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, tokenPoolAdapter.DeployTokenPoolForToken(), e.BlockChains, deployTokenPoolInput)
-			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy token pool for token on chain %d: %w", selector, err)
-			}
-			batchOps = append(batchOps, deployTokenPoolReport.Output.BatchOps...)
-			reports = append(reports, deployTokenPoolReport.ExecutionReports...)
-			for _, r := range deployTokenPoolReport.Output.Addresses {
-				if err := tmpDatastore.Addresses().Add(r); err != nil {
-					return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %v on chain with selector %d to datastore: %w", r.Type, r.Version, r, r.ChainSelector, err)
+			if input.DeployTokenPoolInput != nil {
+				refToConnect := tokenRef
+				if refToConnect == nil && input.DeployTokenPoolInput.TokenRef == nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("no token deployed or provided for chain selector %d, cannot deploy token pool without token address", selector)
+				} else if refToConnect != nil && input.DeployTokenPoolInput.TokenRef != nil {
+					// cross check the deployed token address with the provided token ref address
+					if refToConnect.Address != input.DeployTokenPoolInput.TokenRef.Address {
+						return cldf.ChangesetOutput{}, fmt.Errorf("token address deployed does not match the provided token ref address for chain selector %d: deployed token address %s, provided token ref address %s", selector, refToConnect.Address, input.DeployTokenPoolInput.TokenRef.Address)
+					}
+					if refToConnect.Qualifier != input.DeployTokenPoolInput.TokenRef.Qualifier {
+						return cldf.ChangesetOutput{}, fmt.Errorf("token qualifier deployed does not match the provided token ref qualifier for chain selector %d: deployed token qualifier %s, provided token ref qualifier %s", selector, refToConnect.Qualifier, input.DeployTokenPoolInput.TokenRef.Qualifier)
+					}
+				} else if refToConnect == nil {
+					// if token is not deployed by this changeset but token ref is provided, use the provided token ref
+					refToConnect = input.DeployTokenPoolInput.TokenRef
 				}
-				if err := ds.Addresses().Add(r); err != nil {
-					return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %v on chain with selector %d to datastore: %w", r.Type, r.Version, r, r.ChainSelector, err)
+				// deploy token pool
+				tmpDatastore = datastore.NewMemoryDataStore()
+				deployTokenPoolInput := DeployTokenPoolInput{
+					TokenRef:         refToConnect,
+					TokenPoolVersion: input.TokenPoolVersion,
 				}
-			}
-			tmpDatastore.Merge(e.DataStore)
-			e.DataStore = tmpDatastore.Seal()
+				deployTokenPoolInput.ExistingDataStore = e.DataStore
+				deployTokenPoolInput.ChainSelector = selector
+				deployTokenPoolReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, tokenPoolAdapter.DeployTokenPoolForToken(), e.BlockChains, deployTokenPoolInput)
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy token pool for token on chain %d: %w", selector, err)
+				}
+				batchOps = append(batchOps, deployTokenPoolReport.Output.BatchOps...)
+				reports = append(reports, deployTokenPoolReport.ExecutionReports...)
+				for _, r := range deployTokenPoolReport.Output.Addresses {
+					if err := tmpDatastore.Addresses().Add(r); err != nil {
+						return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %v on chain with selector %d to datastore: %w", r.Type, r.Version, r, r.ChainSelector, err)
+					}
+					if err := ds.Addresses().Add(r); err != nil {
+						return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %v on chain with selector %d to datastore: %w", r.Type, r.Version, r, r.ChainSelector, err)
+					}
+				}
+				tmpDatastore.Merge(e.DataStore)
+				e.DataStore = tmpDatastore.Seal()
+				// register token
+				tmpDatastore = datastore.NewMemoryDataStore()
+				registerTokenInput := RegisterTokenInput{
+					TokenRef:   *refToConnect,
+					TokenAdmin: input.TARAdmin,
+				}
+				registerTokenInput.ExistingDataStore = e.DataStore
+				registerTokenInput.ChainSelector = selector
+				registerTokenReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, tokenPoolAdapter.RegisterToken(), e.BlockChains, registerTokenInput)
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to manual register token and token pool %d: %w", selector, err)
+				}
+				batchOps = append(batchOps, registerTokenReport.Output.BatchOps...)
+				reports = append(reports, registerTokenReport.ExecutionReports...)
+				for _, r := range registerTokenReport.Output.Addresses {
+					if err := tmpDatastore.Addresses().Add(r); err != nil {
+						return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %v on chain with selector %d to datastore: %w", r.Type, r.Version, r, r.ChainSelector, err)
+					}
+					if err := ds.Addresses().Add(r); err != nil {
+						return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %v on chain with selector %d to datastore: %w", r.Type, r.Version, r, r.ChainSelector, err)
+					}
+				}
+				tmpDatastore.Merge(e.DataStore)
+				e.DataStore = tmpDatastore.Seal()
 
-			// register token
-			tmpDatastore = datastore.NewMemoryDataStore()
-			registerTokenInput := RegisterTokenInput{
-				TokenSymbol: deployTokenInput.Symbol,
-				TokenAdmin:  input.TARAdmin,
-			}
-			registerTokenInput.ExistingDataStore = e.DataStore
-			registerTokenInput.ChainSelector = selector
-			registerTokenReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, tokenPoolAdapter.RegisterToken(), e.BlockChains, registerTokenInput)
-			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to manual register token and token pool %d: %w", selector, err)
-			}
-			batchOps = append(batchOps, registerTokenReport.Output.BatchOps...)
-			reports = append(reports, registerTokenReport.ExecutionReports...)
-			for _, r := range registerTokenReport.Output.Addresses {
-				if err := tmpDatastore.Addresses().Add(r); err != nil {
-					return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %v on chain with selector %d to datastore: %w", r.Type, r.Version, r, r.ChainSelector, err)
+				// set pool
+				tmpDatastore = datastore.NewMemoryDataStore()
+				setPoolInput := SetPoolInput{
+					TokenRef:           *refToConnect,
+					TokenPoolQualifier: input.DeployTokenPoolInput.TokenPoolQualifier,
+					PoolType:           input.DeployTokenPoolInput.PoolType,
 				}
-				if err := ds.Addresses().Add(r); err != nil {
-					return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %v on chain with selector %d to datastore: %w", r.Type, r.Version, r, r.ChainSelector, err)
+				setPoolInput.ExistingDataStore = e.DataStore
+				setPoolInput.ChainSelector = selector
+				setPoolReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, tokenPoolAdapter.SetPool(), e.BlockChains, setPoolInput)
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to manual register token and token pool %d: %w", selector, err)
 				}
-			}
-			tmpDatastore.Merge(e.DataStore)
-			e.DataStore = tmpDatastore.Seal()
-
-			// set pool
-			tmpDatastore = datastore.NewMemoryDataStore()
-			setPoolInput := SetPoolInput{
-				TokenSymbol:        deployTokenInput.Symbol,
-				TokenPoolQualifier: input.TokenPoolQualifier,
-				PoolType:           input.PoolType,
-			}
-			setPoolInput.ExistingDataStore = e.DataStore
-			setPoolInput.ChainSelector = selector
-			setPoolReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, tokenPoolAdapter.SetPool(), e.BlockChains, setPoolInput)
-			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to manual register token and token pool %d: %w", selector, err)
-			}
-			batchOps = append(batchOps, setPoolReport.Output.BatchOps...)
-			reports = append(reports, setPoolReport.ExecutionReports...)
-			for _, r := range setPoolReport.Output.Addresses {
-				if err := tmpDatastore.Addresses().Add(r); err != nil {
-					return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %v on chain with selector %d to datastore: %w", r.Type, r.Version, r, r.ChainSelector, err)
+				batchOps = append(batchOps, setPoolReport.Output.BatchOps...)
+				reports = append(reports, setPoolReport.ExecutionReports...)
+				for _, r := range setPoolReport.Output.Addresses {
+					if err := tmpDatastore.Addresses().Add(r); err != nil {
+						return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %v on chain with selector %d to datastore: %w", r.Type, r.Version, r, r.ChainSelector, err)
+					}
+					if err := ds.Addresses().Add(r); err != nil {
+						return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %v on chain with selector %d to datastore: %w", r.Type, r.Version, r, r.ChainSelector, err)
+					}
 				}
-				if err := ds.Addresses().Add(r); err != nil {
-					return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %v on chain with selector %d to datastore: %w", r.Type, r.Version, r, r.ChainSelector, err)
-				}
+				tmpDatastore.Merge(e.DataStore)
+				e.DataStore = tmpDatastore.Seal()
 			}
-			tmpDatastore.Merge(e.DataStore)
-			e.DataStore = tmpDatastore.Seal()
 		}
 
 		return changesets.NewOutputBuilder(e, mcmsRegistry).
