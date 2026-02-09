@@ -118,8 +118,9 @@ func (ru RampUpdateWithFQ) SequenceUpdateRampsWithFeeQuoter() *cldf_ops.Sequence
 				// Update OnRamp's FeeQuoter address
 				existingDynamicConfig.FeeQuoter = common.HexToAddress(input.FeeQuoterAddress.Address)
 				onRampReport, err := cldf_ops.ExecuteOperation(b, onrampops.OnRampSetDynamicConfig, chain, contract.FunctionInput[onrampops.DynamicConfig]{
-					Address: common.HexToAddress(input.OnRampAddressRef.Address),
-					Args:    existingDynamicConfig,
+					ChainSelector: input.ChainSelector,
+					Address:       common.HexToAddress(input.OnRampAddressRef.Address),
+					Args:          existingDynamicConfig,
 				})
 				if err != nil {
 					return sequences.OnChainOutput{}, err
@@ -139,8 +140,9 @@ func (ru RampUpdateWithFQ) SequenceUpdateRampsWithFeeQuoter() *cldf_ops.Sequence
 			if existingOffDynamicConfig.FeeQuoter != common.HexToAddress(input.FeeQuoterAddress.Address) {
 				existingOffDynamicConfig.FeeQuoter = common.HexToAddress(input.FeeQuoterAddress.Address)
 				offRampReport, err := cldf_ops.ExecuteOperation(b, offrampops.OffRampSetDynamicConfig, chain, contract.FunctionInput[offrampops.DynamicConfig]{
-					Address: common.HexToAddress(input.OffRampAddressRef.Address),
-					Args:    existingOffDynamicConfig,
+					ChainSelector: input.ChainSelector,
+					Address:       common.HexToAddress(input.OffRampAddressRef.Address),
+					Args:          existingOffDynamicConfig,
 				})
 				if err != nil {
 					return sequences.OnChainOutput{}, err

@@ -775,8 +775,8 @@ func TestSequenceFeeQuoterInputCreation(t *testing.T) {
 	// Seal the datastore for use in the test
 	e.DataStore = ds.Seal()
 
-	// Get the FeeQuoterUpdater adapter
-	fquUpdater := evmadapter.FeeQuoterUpdater{}
+	// Get the FeeQuoterUpdater adapter (use concrete type so report.Output is sequence1_7.FeeQuoterUpdate)
+	fquUpdater := evmadapter.FeeQuoterUpdater[sequence1_7.FeeQuoterUpdate]{}
 
 	// Test the sequence for each chain selector that has a FeeQuoter
 	for _, chainSelector := range chainSelectorList {
