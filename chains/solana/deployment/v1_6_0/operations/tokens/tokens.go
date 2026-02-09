@@ -6,7 +6,6 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/gagliardetto/solana-go"
-
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
@@ -194,7 +193,7 @@ var CreateTokenMultisig = operations.NewOperation(
 			return sequences.OnChainOutput{}, err
 		}
 
-		ixs, err := soltokens.IxsInitTokenMultisig(input.TokenProgram, lamports, chain.DeployerKey.PublicKey(), multisig.PublicKey(), m, input.Signers)
+		ixs, err := soltokens.IxsInitTokenMultisig(input.TokenProgram, lamports, chain.DeployerKey.PublicKey(), multisig.PublicKey(), m, []solana.PublicKey{chain.DeployerKey.PublicKey()})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to create multisig instructions: %w", err)
 		}
@@ -208,7 +207,7 @@ var CreateTokenMultisig = operations.NewOperation(
 				{
 					ChainSelector: chain.Selector,
 					Address:       multisig.PublicKey().String(),
-					Type:          datastore.ContractType("TOKEN_MULTISIG"),
+					Type:          "TOKEN_MULTISIG",
 					Version:       Version,
 				},
 			},

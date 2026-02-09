@@ -36,7 +36,6 @@ type SVMExtraArgs struct {
 	SkipTokenPoolInit       bool               `yaml:"skip-token-pool-init" json:"skipTokenPoolInit"`
 }
 
-// ConfigureTokensForTransfers returns a changeset that configures tokens on multiple chains for transfers with other chains.
 func ManualRegistration() cldf.ChangeSetV2[ManualRegistrationInput] {
 	return cldf.CreateChangeSet(manualRegistrationApply(), manualRegistrationVerify())
 }

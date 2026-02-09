@@ -510,6 +510,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 		})
 
 		t.Run("Validate ManualRegistration", func(t *testing.T) {
+			// TODO: Use here a different token
 			// Verify that the token exists in datastore
 			tokenAddr, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
 				ChainSelector: solTestData.Chain.Selector,
@@ -550,7 +551,10 @@ func TestTokensAndTokenPools(t *testing.T) {
 						TokenPoolQualifier: solTestData.TokenPoolQualifier,
 						TokenSymbol:        solTestData.Token.Symbol,
 						PoolType:           solTokenPoolType.String(),
-						SVMExtraArgs:       nil,
+						SVMExtraArgs: &tokensapi.SVMExtraArgs{
+							CustomerMintAuthorities: []solana.PublicKey{
+								solana.MustPublicKeyFromBase58(solTestData.Token.ExternalAdmin),
+							}},
 					},
 				})
 			require.NoError(t, err)
@@ -560,12 +564,14 @@ func TestTokensAndTokenPools(t *testing.T) {
 			var tokenAdminRegistryAccountAfter ccip_common.TokenAdminRegistry
 			if err := env.BlockChains.SolanaChains()[solTestData.Chain.Selector].GetAccountDataBorshInto(context.Background(), tokenAdminRegistryPDA, &tokenAdminRegistryAccountAfter); err != nil {
 				require.Equal(t, solana.PublicKey{}, tokenAdminRegistryAccountAfter.Administrator)
-				//require.Equal(t, solTestData.Token.ExternalAdmin, tokenAdminRegistryAccountAfter.PendingAdministrator)
+				// require.Equal(t, solana.MustPublicKeyFromBase58(solTestData.Token.ExternalAdmin), tokenAdminRegistryAccountAfter.PendingAdministrator)
 			}
 			var tokenPoolStateAccountAfter burnmint_token_pool.State
 			if err := env.BlockChains.SolanaChains()[solTestData.Chain.Selector].GetAccountDataBorshInto(context.Background(), tokenPoolStatePDA, &tokenPoolStateAccount); err != nil {
 				require.Equal(t, solana.PublicKey{}, tokenPoolStateAccountAfter.Config.Owner)
-				//require.Equal(t, solTestData.Token.ExternalAdmin, tokenPoolStateAccountAfter.Config.ProposedOwner)
+				// require.Equal(t, solana.MustPublicKeyFromBase58(solTestData.Token.ExternalAdmin), tokenPoolStateAccountAfter.Config.ProposedOwner)
+				// require.Equal(t, tokenMint, tokenPoolStateAccountAfter.Config.Mint)
+				require.Equal(t, solana.PublicKey{}, tokenPoolStateAccountAfter.Config.RateLimitAdmin)
 			}
 
 		})
