@@ -13,11 +13,13 @@ import (
 
 // EVMOrchestrator implements orchestrator.TypedOrchestratorInterface for EVM chains:
 // cache and dedup per chain selector, then delegate to the generic engine for eth_call.
+// When Multicall3 is available on a chain, calls are automatically batched.
 type EVMOrchestrator struct {
 	generic   *orchestrator.Generic
 	orcIDs    map[uint64]string // chainID -> registered orchestrator ID
 	caches    map[uint64]*orchestrator.CacheDedup
 	cachesMu  sync.RWMutex
+	batchers  map[uint64]*chainBatcher // chainID -> batcher (nil if multicall not available)
 	retryable []string
 }
 
@@ -37,6 +39,7 @@ func NewEVMOrchestrator(generic *orchestrator.Generic, chainEndpoints []ChainEnd
 		generic:   generic,
 		orcIDs:    make(map[uint64]string),
 		caches:    make(map[uint64]*orchestrator.CacheDedup),
+		batchers:  make(map[uint64]*chainBatcher),
 		retryable: retryableKeywords,
 	}
 	for _, ce := range chainEndpoints {
@@ -47,6 +50,10 @@ func NewEVMOrchestrator(generic *orchestrator.Generic, chainEndpoints []ChainEnd
 		e.orcIDs[ce.ChainID] = id
 		e.caches[ce.ChainID] = orchestrator.NewCacheDedup()
 	}
+
+	// Probe Multicall3 on every chain and start batchers where available.
+	e.initMulticallBatchers()
+
 	return e, nil
 }
 
@@ -69,6 +76,10 @@ func (e *EVMOrchestrator) Execute(call orchestrator.Call) orchestrator.CallResul
 
 	key := orchestrator.KeyFromTargetAndData(call.Target, call.Data)
 	return cache.GetOrRun(key, func() orchestrator.CallResult {
+		// Use multicall batching if available for this chain.
+		if batcher, ok := e.batchers[call.ChainID]; ok {
+			return batcher.submit(call)
+		}
 		return e.doRequest(orcID, call)
 	})
 }
