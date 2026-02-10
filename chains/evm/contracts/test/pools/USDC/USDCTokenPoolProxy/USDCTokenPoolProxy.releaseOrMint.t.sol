@@ -325,4 +325,50 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
     vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.CallerIsNotARampOnRouter.selector, unauthorized));
     s_usdcTokenPoolProxy.releaseOrMint(releaseOrMintIn);
   }
+
+  function test_releaseOrMint_V2_RevertWhen_CallerIsNotARampOnRouter() public {
+    address unauthorized = makeAddr("unauthorized");
+
+    vm.startPrank(unauthorized);
+
+    Pool.ReleaseOrMintInV1 memory releaseOrMintIn = Pool.ReleaseOrMintInV1({
+      remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+      originalSender: abi.encode(s_sender),
+      receiver: s_receiver,
+      sourceDenominatedAmount: 1000,
+      localToken: address(s_USDCToken),
+      sourcePoolData: abi.encodePacked(USDCSourcePoolDataCodec.LOCK_RELEASE_FLAG, bytes32(0)),
+      sourcePoolAddress: s_sourcePoolAddress,
+      offchainTokenData: ""
+    });
+
+    vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.CallerIsNotARampOnRouter.selector, unauthorized));
+    s_usdcTokenPoolProxy.releaseOrMint(releaseOrMintIn, 0);
+  }
+
+  function test_releaseOrMint_V2_RevertWhen_InvalidMessageVersion() public {
+    bytes memory invalidSourcePoolData = abi.encodePacked(bytes4(uint32(9999)), uint32(0), bytes32(hex"deafbeef"));
+
+    vm.mockCall(
+      address(s_router),
+      abi.encodeWithSelector(Router.isOffRamp.selector, SOURCE_CHAIN_SELECTOR, s_routerAllowedOffRamp),
+      abi.encode(true)
+    );
+
+    vm.startPrank(s_routerAllowedOffRamp);
+
+    Pool.ReleaseOrMintInV1 memory releaseOrMintIn = Pool.ReleaseOrMintInV1({
+      remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+      originalSender: abi.encode(s_sender),
+      receiver: s_receiver,
+      sourceDenominatedAmount: 1234,
+      localToken: address(s_USDCToken),
+      sourcePoolData: invalidSourcePoolData,
+      sourcePoolAddress: s_sourcePoolAddress,
+      offchainTokenData: ""
+    });
+
+    vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.InvalidMessageVersion.selector, bytes4(uint32(9999))));
+    s_usdcTokenPoolProxy.releaseOrMint(releaseOrMintIn, 0);
+  }
 }
