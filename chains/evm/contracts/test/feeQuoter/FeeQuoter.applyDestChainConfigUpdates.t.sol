@@ -14,6 +14,7 @@ contract FeeQuoter_applyDestChainConfigUpdates is FeeQuoterSetup {
   ) public {
     vm.assume(destChainConfigArgs.destChainSelector != 0);
     vm.assume(destChainConfigArgs.destChainConfig.maxPerMsgGasLimit != 0);
+    vm.assume(destChainConfigArgs.destChainConfig.linkFeeMultiplierPercent != 0);
     destChainConfigArgs.destChainConfig.defaultTxGasLimit = uint32(
       bound(
         destChainConfigArgs.destChainConfig.defaultTxGasLimit, 1, destChainConfigArgs.destChainConfig.maxPerMsgGasLimit
@@ -163,6 +164,17 @@ contract FeeQuoter_applyDestChainConfigUpdates is FeeQuoterSetup {
     FeeQuoter.DestChainConfigArgs memory destChainConfigArg = destChainConfigArgs[0];
 
     destChainConfigArg.destChainSelector = 0;
+    vm.expectRevert(
+      abi.encodeWithSelector(FeeQuoter.InvalidDestChainConfig.selector, destChainConfigArg.destChainSelector)
+    );
+    s_feeQuoter.applyDestChainConfigUpdates(destChainConfigArgs);
+  }
+
+  function test_applyDestChainConfigUpdates_RevertWhen_InvalidDestChainConfig_LinkFeeMultiplierPercentEqZero() public {
+    FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
+    FeeQuoter.DestChainConfigArgs memory destChainConfigArg = destChainConfigArgs[0];
+
+    destChainConfigArg.destChainConfig.linkFeeMultiplierPercent = 0;
     vm.expectRevert(
       abi.encodeWithSelector(FeeQuoter.InvalidDestChainConfig.selector, destChainConfigArg.destChainSelector)
     );

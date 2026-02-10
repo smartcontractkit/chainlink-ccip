@@ -642,6 +642,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
       if (
         destChainSelector == 0 || destChainConfig.defaultTxGasLimit == 0
           || destChainConfig.defaultTxGasLimit > destChainConfig.maxPerMsgGasLimit
+          || destChainConfig.linkFeeMultiplierPercent == 0
       ) {
         revert InvalidDestChainConfig(destChainSelector);
       }
