@@ -247,8 +247,10 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 				// deploy token pool
 				tmpDatastore = datastore.NewMemoryDataStore()
 				deployTokenPoolInput := DeployTokenPoolInput{
-					TokenRef:         refToConnect,
-					TokenPoolVersion: input.TokenPoolVersion,
+					TokenRef:           refToConnect,
+					TokenPoolVersion:   input.TokenPoolVersion,
+					TokenPoolQualifier: input.DeployTokenPoolInput.TokenPoolQualifier,
+					PoolType:           input.DeployTokenPoolInput.PoolType,
 				}
 				deployTokenPoolInput.ExistingDataStore = e.DataStore
 				deployTokenPoolInput.ChainSelector = selector

@@ -99,7 +99,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 	// Define testing data for Solana
 	solTestData := struct {
 		TokenPoolQualifier string
-		Token              tokensapi.DeployTokenInput
+		Token              *tokensapi.DeployTokenInput
 		Deployer           *solana.PrivateKey
 		Chain              solchain.Chain
 		Deploy             deployapi.ContractDeploymentConfigPerChain
@@ -108,7 +108,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 		Deployer:           solChain.DeployerKey,
 		Chain:              solChain,
 		Deploy:             NewDefaultDeploymentConfigForSolana(v1_6_0),
-		Token: tokensapi.DeployTokenInput{
+		Token: &tokensapi.DeployTokenInput{
 			Decimals:               uint8(9),
 			Symbol:                 "SOL_TEST",
 			Name:                   "SOLANA Test Token",
@@ -130,7 +130,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 	// Define testing data for EVM
 	evmTestData := []struct {
 		TokenPoolQualifier string
-		Token              tokensapi.DeployTokenInput
+		Token              *tokensapi.DeployTokenInput
 		Deployer           common.Address
 		TAR                *tarbindings.TokenAdminRegistry
 		Chain              evmchain.Chain
@@ -142,7 +142,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 			Chain:              evmChainA,
 			TAR:                nil, // populated later
 			Deploy:             NewDefaultDeploymentConfigForEVM(v1_6_0),
-			Token: tokensapi.DeployTokenInput{
+			Token: &tokensapi.DeployTokenInput{
 				Decimals:               uint8(18),
 				Symbol:                 "EVM_TEST_A",
 				Name:                   "EVM Test Token A",
@@ -162,7 +162,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 			Chain:              evmChainB,
 			TAR:                nil, // populated later
 			Deploy:             NewDefaultDeploymentConfigForEVM(v1_6_0),
-			Token: tokensapi.DeployTokenInput{
+			Token: &tokensapi.DeployTokenInput{
 				Decimals:               uint8(18),
 				Symbol:                 "EVM_TEST_B",
 				Name:                   "EVM Test Token B",
@@ -232,10 +232,12 @@ func TestTokensAndTokenPools(t *testing.T) {
 		// Define token expansion input
 		input := map[uint64]tokensapi.TokenExpansionInputPerChain{
 			solChainSel: {
-				TokenPoolQualifier: solTestData.TokenPoolQualifier,
-				TokenPoolVersion:   v1_6_0,
-				PoolType:           solTokenPoolType.String(),
-				DeployTokenInput:   solTestData.Token,
+				TokenPoolVersion: v1_6_0,
+				DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
+					TokenPoolQualifier: solTestData.TokenPoolQualifier,
+					PoolType:           solTokenPoolType.String(),
+				},
+				DeployTokenInput: solTestData.Token,
 
 				// optional fields left empty, but included here for completeness
 				RemoteCounterpartUpdates: map[uint64]tokensapi.RateLimiterConfig{},
@@ -249,10 +251,12 @@ func TestTokensAndTokenPools(t *testing.T) {
 		// Add EVM chains to the input
 		for _, data := range evmTestData {
 			input[data.Chain.Selector] = tokensapi.TokenExpansionInputPerChain{
-				TokenPoolQualifier: data.TokenPoolQualifier,
-				TokenPoolVersion:   v1_5_1,
-				PoolType:           evmTokenPoolType.String(),
-				DeployTokenInput:   data.Token,
+				TokenPoolVersion: v1_5_1,
+				DeployTokenInput: data.Token,
+				DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
+					TokenPoolQualifier: data.TokenPoolQualifier,
+					PoolType:           evmTokenPoolType.String(),
+				},
 			}
 		}
 
@@ -360,9 +364,12 @@ func TestTokensAndTokenPools(t *testing.T) {
 						RegisterTokenConfigs: tokensapi.RegisterTokenConfig{
 							ProposedOwner:      data.Deployer.Hex(),
 							TokenPoolQualifier: data.TokenPoolQualifier,
-							TokenSymbol:        data.Token.Symbol,
-							PoolType:           evmTokenPoolType.String(),
-							SVMExtraArgs:       nil,
+							TokenRef: datastore.AddressRef{
+								ChainSelector: data.Chain.Selector,
+								Qualifier:     data.Token.Symbol,
+							},
+							PoolType:     evmTokenPoolType.String(),
+							SVMExtraArgs: nil,
 						},
 					})
 				require.NoError(t, err)
