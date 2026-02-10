@@ -22,7 +22,7 @@ contract BaseVerifier_applyAllowlistUpdates is BaseVerifierSetup {
     allowlistConfigs[0] = _getAllowlistConfig(DEST_CHAIN_SELECTOR, true, senders, new address[](0));
 
     vm.expectEmit();
-    emit BaseVerifier.AllowListSendersAdded(DEST_CHAIN_SELECTOR, senders);
+    emit BaseVerifier.AllowListSendersAdded(DEST_CHAIN_SELECTOR, senders[0]);
 
     s_baseVerifier.applyAllowlistUpdates(allowlistConfigs);
 
@@ -53,9 +53,9 @@ contract BaseVerifier_applyAllowlistUpdates is BaseVerifierSetup {
     updateConfigs[0] = _getAllowlistConfig(DEST_CHAIN_SELECTOR, true, newSendersToAdd, sendersToRemove);
 
     vm.expectEmit();
-    emit BaseVerifier.AllowListSendersRemoved(DEST_CHAIN_SELECTOR, sendersToRemove);
+    emit BaseVerifier.AllowListSendersRemoved(DEST_CHAIN_SELECTOR, sendersToRemove[0]);
     vm.expectEmit();
-    emit BaseVerifier.AllowListSendersAdded(DEST_CHAIN_SELECTOR, newSendersToAdd);
+    emit BaseVerifier.AllowListSendersAdded(DEST_CHAIN_SELECTOR, newSendersToAdd[0]);
 
     s_baseVerifier.applyAllowlistUpdates(updateConfigs);
 

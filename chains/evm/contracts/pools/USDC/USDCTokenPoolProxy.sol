@@ -132,7 +132,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
     // The child pool which will perform the lock/burn operation.
     address pool;
 
-    // For a IPoolV2 call, only CCTP v1/v2 and Lock/Release are supported.
+    // For a IPoolV1 call, only CCTP v1/v2 and Lock/Release are supported.
     if (mechanism == LockOrBurnMechanism.CCTP_V2) {
       pool = s_cctpV2Pool;
     } else if (mechanism == LockOrBurnMechanism.CCTP_V1) {

@@ -24,8 +24,8 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
   error ZeroAddressNotAllowed();
 
   event RemoteChainConfigSet(uint64 indexed remoteChainSelector, address router, bool allowlistEnabled);
-  event AllowListSendersAdded(uint64 indexed destChainSelector, address[] senders);
-  event AllowListSendersRemoved(uint64 indexed destChainSelector, address[] senders);
+  event AllowListSendersAdded(uint64 indexed destChainSelector, address senders);
+  event AllowListSendersRemoved(uint64 indexed destChainSelector, address senders);
   event AllowListStateChanged(uint64 indexed destChainSelector, bool allowlistEnabled);
   event StorageLocationsUpdated(string[] oldLocations, string[] newLocations);
 
@@ -210,13 +210,11 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
       }
 
       for (uint256 j = 0; j < allowlistConfigArgs.removedAllowlistedSenders.length; ++j) {
-        remoteChainConfig.allowedSendersList.remove(allowlistConfigArgs.removedAllowlistedSenders[j]);
-      }
-
-      if (allowlistConfigArgs.removedAllowlistedSenders.length > 0) {
-        emit AllowListSendersRemoved(
-          allowlistConfigArgs.destChainSelector, allowlistConfigArgs.removedAllowlistedSenders
-        );
+        address toRemove = allowlistConfigArgs.removedAllowlistedSenders[j];
+        if (remoteChainConfig.allowedSendersList.remove(toRemove)) {
+          // Emit event only if the sender was actually removed from the allowlist.
+          emit AllowListSendersRemoved(allowlistConfigArgs.destChainSelector, toRemove);
+        }
       }
 
       if (allowlistConfigArgs.addedAllowlistedSenders.length > 0) {
@@ -226,10 +224,11 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
             if (toAdd == address(0)) {
               revert InvalidAllowListRequest(allowlistConfigArgs.destChainSelector);
             }
-            remoteChainConfig.allowedSendersList.add(toAdd);
+            if (remoteChainConfig.allowedSendersList.add(toAdd)) {
+              // Emit event only if the sender was actually added to the allowlist.
+              emit AllowListSendersAdded(allowlistConfigArgs.destChainSelector, toAdd);
+            }
           }
-
-          emit AllowListSendersAdded(allowlistConfigArgs.destChainSelector, allowlistConfigArgs.addedAllowlistedSenders);
         } else {
           revert InvalidAllowListRequest(allowlistConfigArgs.destChainSelector);
         }
