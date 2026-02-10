@@ -61,7 +61,7 @@ mockery: $(mockery) ## Install mockery.
 
 .PHONY: extract-bytecode-abi
 extract-bytecode-abi: ## Extract bytecode and abi from versioned gobindings to bytecode and abi directories
-	cd gobindings && go run ./cmd/extract_bytecode/main.go
+	go run github.com/smartcontractkit/chainlink-evm/gethwrappers/helpers/extract_bytecode -input=gobindings/generated -bytecode=bytecode -abi=abi
 
 .PHONY: operations
 operations: pnpmdep
