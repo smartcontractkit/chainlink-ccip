@@ -80,8 +80,8 @@ func (a *SolanaAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[
 						TokenMint:                 tokenMint,
 						TokenProgramID:            tokenProgramId,
 						RemoteSelector:            remoteChainSelector,
-						InboundRateLimiterConfig:  remoteChainConfig.InboundRateLimiterConfig,
-						OutboundRateLimiterConfig: remoteChainConfig.OutboundRateLimiterConfig,
+						InboundRateLimiterConfig:  remoteChainConfig.DefaultFinalityInboundRateLimiterConfig,
+						OutboundRateLimiterConfig: remoteChainConfig.DefaultFinalityOutboundRateLimiterConfig,
 					})
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to set rate limits for token pool: %w", err)
