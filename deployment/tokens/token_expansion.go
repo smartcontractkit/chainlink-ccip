@@ -204,7 +204,10 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %v on chain with selector %d to datastore: %w", r.Type, r.Version, r, r.ChainSelector, err)
 				}
 			}
-			tmpDatastore.Merge(e.DataStore)
+			dataStoreErr := tmpDatastore.Merge(e.DataStore)
+			if dataStoreErr != nil {
+				return cldf.ChangesetOutput{}, dataStoreErr
+			}
 			e.DataStore = tmpDatastore.Seal()
 
 			// deploy token pool
@@ -231,7 +234,10 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %v on chain with selector %d to datastore: %w", r.Type, r.Version, r, r.ChainSelector, err)
 				}
 			}
-			tmpDatastore.Merge(e.DataStore)
+			dataStoreErr = tmpDatastore.Merge(e.DataStore)
+			if dataStoreErr != nil {
+				return cldf.ChangesetOutput{}, dataStoreErr
+			}
 			e.DataStore = tmpDatastore.Seal()
 
 			// register token
@@ -282,7 +288,10 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %v on chain with selector %d to datastore: %w", r.Type, r.Version, r, r.ChainSelector, err)
 				}
 			}
-			tmpDatastore.Merge(e.DataStore)
+			dataStoreErr = tmpDatastore.Merge(e.DataStore)
+			if dataStoreErr != nil {
+				return cldf.ChangesetOutput{}, dataStoreErr
+			}
 			e.DataStore = tmpDatastore.Seal()
 		}
 

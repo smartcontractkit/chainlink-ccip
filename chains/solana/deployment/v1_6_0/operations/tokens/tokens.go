@@ -193,12 +193,11 @@ var CreateTokenMultisig = operations.NewOperation(
 			return sequences.OnChainOutput{}, err
 		}
 
-		ixs, err := soltokens.IxsInitTokenMultisig(input.TokenProgram, lamports, chain.DeployerKey.PublicKey(), multisig.PublicKey(), m, []solana.PublicKey{chain.DeployerKey.PublicKey()})
+		ixs, err := soltokens.IxsInitTokenMultisig(input.TokenProgram, lamports, chain.DeployerKey.PublicKey(), multisig.PublicKey(), m, input.Signers)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to create multisig instructions: %w", err)
 		}
-
-		err = chain.SendAndConfirm(context.Background(), ixs)
+		err = chain.Confirm(ixs, common.AddSigners(multisig))
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm transfer ownership: %w", err)
 		}

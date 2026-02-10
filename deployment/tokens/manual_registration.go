@@ -49,6 +49,9 @@ func manualRegistrationVerify() func(cldf.Environment, ManualRegistrationInput) 
 
 func manualRegistrationApply() func(cldf.Environment, ManualRegistrationInput) (cldf.ChangesetOutput, error) {
 	return func(e cldf.Environment, cfg ManualRegistrationInput) (cldf.ChangesetOutput, error) {
+		// ds to collect all addresses created during this changeset
+		// this gets passed as output
+		ds := datastore.NewMemoryDataStore()
 		batchOps := make([]mcms_types.BatchOperation, 0)
 		reports := make([]cldf_ops.Report[any, any], 0)
 		tokenPoolRegistry := GetTokenAdapterRegistry()
@@ -69,9 +72,14 @@ func manualRegistrationApply() func(cldf.Environment, ManualRegistrationInput) (
 		}
 		batchOps = append(batchOps, manualRegistrationReport.Output.BatchOps...)
 		reports = append(reports, manualRegistrationReport.ExecutionReports...)
-
+		for _, r := range manualRegistrationReport.Output.Addresses {
+			if err := ds.Addresses().Add(r); err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %v on chain with selector %d to datastore: %w", r.Type, r.Version, r, r.ChainSelector, err)
+			}
+		}
 		return changesets.NewOutputBuilder(e, mcmsRegistry).
 			WithReports(reports).
+			WithDataStore(ds).
 			WithBatchOps(batchOps).
 			Build(cfg.MCMS)
 	}

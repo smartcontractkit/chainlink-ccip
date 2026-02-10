@@ -561,10 +561,10 @@ func TestTokensAndTokenPools(t *testing.T) {
 						TokenPoolQualifier: solTestData.TokenPoolQualifier,
 						TokenSymbol:        solTestData.Token.Symbol,
 						PoolType:           solTokenPoolType.String(),
-						//SVMExtraArgs: &tokensapi.SVMExtraArgs{
-						//	CustomerMintAuthorities: []solana.PublicKey{
-						//		solana.MustPublicKeyFromBase58(solTestData.Token.ExternalAdmin),
-						//	}},
+						SVMExtraArgs: &tokensapi.SVMExtraArgs{
+							CustomerMintAuthorities: []solana.PublicKey{
+								solana.MustPublicKeyFromBase58(solTestData.Token.ExternalAdmin),
+							}},
 					},
 				})
 			require.NoError(t, err)
@@ -586,6 +586,16 @@ func TestTokensAndTokenPools(t *testing.T) {
 			//require.Equal(t, solana.MustPublicKeyFromBase58(solTestData.Token.ExternalAdmin), tokenPoolStateAccountAfter.Config.ProposedOwner)
 			require.Equal(t, tokenMint, tokenPoolStateAccountAfter.Config.Mint)
 			//require.Equal(t, solana.PublicKey{}, tokenPoolStateAccountAfter.Config.RateLimitAdmin)
+
+			// Validate the Multisig is stored
+			multisigAdd, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
+				ChainSelector: solTestData.Chain.Selector,
+				Version:       common_utils.Version_1_6_0,
+				Type:          "TOKEN_MULTISIG",
+			}, solTestData.Chain.Selector, datastore_utils.FullRef)
+			require.NoError(t, err)
+			multisigPublicKey := solana.MustPublicKeyFromBase58(multisigAdd.Address)
+			require.False(t, multisigPublicKey.IsZero())
 		})
 
 		t.Run("Validate ConfigureTokenForTransfers", func(t *testing.T) {
