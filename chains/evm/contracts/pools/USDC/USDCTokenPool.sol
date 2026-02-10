@@ -151,6 +151,11 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
     emit ConfigSet(address(tokenMessenger));
   }
 
+  /// @notice Using a function because constant state variables cannot be overridden by child contracts.
+  function typeAndVersion() external pure virtual override returns (string memory) {
+    return "USDCTokenPool 1.6.5-dev";
+  }
+
   /// @notice Burn tokens from the pool to initiate cross-chain transfer.
   /// @notice Outgoing messages (burn operations) are routed via `i_tokenMessenger.depositForBurnWithCaller`.
   /// The allowedCaller is preconfigured per destination domain and token pool version refer Domain struct.
@@ -269,7 +274,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
   function _validateMessage(
     bytes memory usdcMessage,
     USDCSourcePoolDataCodec.SourceTokenDataPayloadV1 memory sourceTokenData
-  ) internal view {
+  ) internal view virtual {
     // 116 is the minimum length of a valid USDC message. Since destinationCaller must be checked for the
     // previous pool, this ensures it can be parsed correctly and that the message is not too short.
     // Since messageBody is dynamic and not always used, it is not checked.
@@ -336,16 +341,12 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
       if (domain.allowedCaller == bytes32(0) || domain.destChainSelector == 0) revert InvalidDomain(domain);
 
       s_chainToDomain[domain.destChainSelector] = Domain({
-        domainIdentifier: domain.domainIdentifier,
-        mintRecipient: domain.mintRecipient,
         allowedCaller: domain.allowedCaller,
+        mintRecipient: domain.mintRecipient,
+        domainIdentifier: domain.domainIdentifier,
         enabled: domain.enabled
       });
     }
     emit DomainsSet(domains);
-  }
-
-  function typeAndVersion() external pure virtual override returns (string memory) {
-    return "USDCTokenPool 1.6.5-dev";
   }
 }
