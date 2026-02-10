@@ -118,7 +118,7 @@ interface ITokenMessenger {
     bytes32 mintRecipient,
     address burnToken,
     bytes32 destinationCaller,
-    uint32 maxFee,
+    uint256 maxFee,
     uint32 minFinalityThreshold,
     bytes calldata hookData
   ) external;
