@@ -58,11 +58,14 @@ var DeployTokenPool = cldf_ops.NewSequence(
 			b.Logger.Info("Token pool already deployed at address:", tokenPoolAddr.Address)
 			return sequences.OnChainOutput{}, nil
 		}
-		tokenAddr := input.TokenRef.Address
+		var tokenAddr string
+		if input.TokenRef != nil && input.TokenRef.Address != "" {
+			tokenAddr = input.TokenRef.Address
+		}
 
-		// this should resolve to the same address as the above lookup if the provided address is correct, 
+		// this should resolve to the same address as the above lookup if the provided address is correct,
 		// but will error if the provided address is incorrect or not provided at all
-		if input.TokenRef.Qualifier != "" {
+		if input.TokenRef != nil && input.TokenRef.Qualifier != "" {
 			// find token address from the data store
 			storedAddr, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, datastore.AddressRef{
 				ChainSelector: input.ChainSelector,
@@ -74,6 +77,13 @@ var DeployTokenPool = cldf_ops.NewSequence(
 			if tokenAddr != "" && storedAddr.Address != tokenAddr {
 				return sequences.OnChainOutput{}, fmt.Errorf("provided token address '%s' does not match address '%s' found in datastore for symbol '%s'", tokenAddr, storedAddr.Address, input.TokenRef.Qualifier)
 			}
+			if tokenAddr == "" {
+				tokenAddr = storedAddr.Address
+			}
+		}
+
+		if tokenAddr == "" {
+			return sequences.OnChainOutput{}, fmt.Errorf("token address must be provided either directly or via a datastore reference")
 		}
 
 		// get token decimals

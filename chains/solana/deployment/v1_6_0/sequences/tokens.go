@@ -576,7 +576,7 @@ func (a *SolanaAdapter) SetPool() *cldf_ops.Sequence[tokenapi.SetPoolInput, sequ
 				Type:          datastore.ContractType(input.PoolType),
 			}, chain.Selector, datastore_utils.FullRef)
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to find token pool address for symbol '%s' and qualifier '%s': %w", input.TokenRef, input.TokenPoolQualifier, err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to find token pool address for symbol '%s' and qualifier '%s': %w", input.TokenRef.Qualifier, input.TokenPoolQualifier, err)
 			}
 			routerAddr, err := a.GetRouterAddress(input.ExistingDataStore, input.ChainSelector)
 			if err != nil {
