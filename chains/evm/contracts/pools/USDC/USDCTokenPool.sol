@@ -57,6 +57,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
   error InvalidDestinationDomain(uint32 expected, uint32 got);
   error InvalidReceiver(bytes receiver);
   error InvalidTransmitterInProxy();
+  error InvalidSourcePoolDataLength(uint256 length);
   error InvalidMessageLength(uint256 length);
 
   // This data is supplied from offchain and contains everything needed to mint the USDC tokens on the destination chain
@@ -76,9 +77,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
     bool enabled; // ─────────────╯ Whether the domain is enabled
   }
 
-  function typeAndVersion() external pure virtual override returns (string memory) {
-    return "USDCTokenPool 1.6.5-dev";
-  }
+  uint256 internal constant SOURCE_POOL_DATA_LENGTH = 64;
 
   /// @notice The version of the USDC message format that this pool supports. Version 0 is the legacy version of CCTP.
   uint32 public immutable i_supportedUSDCVersion;
@@ -192,7 +191,9 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
 
     return Pool.LockOrBurnOutV1({
       destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
-      destPoolData: abi.encode(USDCSourcePoolDataCodec.SourceTokenDataPayloadV1({nonce: nonce, sourceDomain: i_localDomainIdentifier}))
+      destPoolData: abi.encode(
+        USDCSourcePoolDataCodec.SourceTokenDataPayloadV1({nonce: nonce, sourceDomain: i_localDomainIdentifier})
+      )
     });
   }
 
@@ -202,11 +203,14 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
     _validateReleaseOrMint(releaseOrMintIn, releaseOrMintIn.sourceDenominatedAmount);
+    uint256 sourcePoolDataLength = releaseOrMintIn.sourcePoolData.length;
+    if (sourcePoolDataLength != SOURCE_POOL_DATA_LENGTH) revert InvalidSourcePoolDataLength(sourcePoolDataLength);
+
     USDCSourcePoolDataCodec.SourceTokenDataPayloadV1 memory sourceTokenDataPayload =
-              abi.decode(releaseOrMintIn.sourcePoolData, (USDCSourcePoolDataCodec.SourceTokenDataPayloadV1));
+      abi.decode(releaseOrMintIn.sourcePoolData, (USDCSourcePoolDataCodec.SourceTokenDataPayloadV1));
 
     MessageAndAttestation memory msgAndAttestation =
-              abi.decode(releaseOrMintIn.offchainTokenData, (MessageAndAttestation));
+      abi.decode(releaseOrMintIn.offchainTokenData, (MessageAndAttestation));
 
     _validateMessage(msgAndAttestation.message, sourceTokenDataPayload);
 
@@ -260,7 +264,10 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
   ///     * recipient             32         bytes32    52
   ///     * destinationCaller     32         bytes32    84
   ///     * messageBody           dynamic    bytes      116
-  function _validateMessage(bytes memory usdcMessage, USDCSourcePoolDataCodec.SourceTokenDataPayloadV1 memory sourceTokenData) internal view {
+  function _validateMessage(
+    bytes memory usdcMessage,
+    USDCSourcePoolDataCodec.SourceTokenDataPayloadV1 memory sourceTokenData
+  ) internal view {
     // 116 is the minimum length of a valid USDC message. Since destinationCaller must be checked for the
     // previous pool, this ensures it can be parsed correctly and that the message is not too short.
     // Since messageBody is dynamic and not always used, it is not checked.
@@ -334,5 +341,9 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
       });
     }
     emit DomainsSet(domains);
+  }
+
+  function typeAndVersion() external pure virtual override returns (string memory) {
+    return "USDCTokenPool 1.6.5-dev";
   }
 }
