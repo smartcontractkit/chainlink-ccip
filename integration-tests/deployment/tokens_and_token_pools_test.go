@@ -20,6 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	bnmERC20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	evmseqV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
@@ -512,13 +513,42 @@ func TestTokensAndTokenPools(t *testing.T) {
 		})
 
 		t.Run("Validate ManualRegistration", func(t *testing.T) {
-			// TODO: Use here a different token
+			// Create Token Mint for testing manual registration
+			chain := env.BlockChains.SolanaChains()[solTestData.Chain.Selector]
+			externalAdmin := solana.MustPublicKeyFromBase58(solTestData.Token.ExternalAdmin)
+			tokenPrivKey := solana.MustPrivateKeyFromBase58("42uJJqZk4gFz6Q6ghMiaYrFdDapXhbufQdTCGJDMeyv2wN6wNBbXkBBPibF7xQQZemzRaDH66ouJmjfvWhPJKtQC")
+			tokenSymbol := "MANUAL_TEST_TOKEN"
+			deployTokenInput := tokensapi.DeployTokenInput{
+				Decimals:          solTestData.Token.Decimals,
+				Symbol:            tokenSymbol,
+				Name:              solTestData.Token.Name,
+				Type:              solutils.SPLTokens,
+				Supply:            big.NewInt(0),
+				TokenPrivKey:      tokenPrivKey.String(),
+				ChainSelector:     solTestData.Chain.Selector,
+				ExistingDataStore: env.DataStore,
+			}
+
+			deployTokenOutput, err := cldf_ops.ExecuteSequence(env.OperationsBundle, solAdapter.DeployToken(), env.BlockChains, deployTokenInput)
+			require.NoError(t, err)
+
+			// Store new token in Data store, this is needed as the sequence is ran independently and the token needs to be present in the datastore for the manual registration changeset to find it
+			ds := datastore.NewMemoryDataStore()
+			dataStoreErr := ds.Merge(env.DataStore)
+			require.NoError(t, dataStoreErr)
+			for _, r := range deployTokenOutput.Output.Addresses {
+				err = ds.Addresses().Add(r)
+				require.NoError(t, err)
+			}
+			MergeAddresses(t, env, ds)
+
 			// Verify that the token exists in datastore
 			tokenAddr, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
 				ChainSelector: solTestData.Chain.Selector,
-				Qualifier:     solTestData.Token.Symbol,
+				Qualifier:     tokenSymbol,
 			}, solTestData.Chain.Selector, datastore_utils.FullRef)
 			require.NoError(t, err)
+			require.Equal(t, tokenPrivKey.PublicKey(), solana.MustPublicKeyFromBase58(tokenAddr.Address))
 			_, err = solanautils.GetTokenProgramID(deployment.ContractType(tokenAddr.Type))
 			require.NoError(t, err)
 			tokenPool, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
@@ -538,15 +568,14 @@ func TestTokensAndTokenPools(t *testing.T) {
 			tokenAdminRegistryPDA, _, _ := state.FindTokenAdminRegistryPDA(tokenMint, routerProgramId)
 
 			var tokenAdminRegistryAccount ccip_common.TokenAdminRegistry
-			tokenAdminRegistryErr := env.BlockChains.SolanaChains()[solTestData.Chain.Selector].GetAccountDataBorshInto(context.Background(), tokenAdminRegistryPDA, &tokenAdminRegistryAccount)
+			tokenAdminRegistryErr := chain.GetAccountDataBorshInto(context.Background(), tokenAdminRegistryPDA, &tokenAdminRegistryAccount)
 			require.Error(t, tokenAdminRegistryErr)
 
 			// Verify that the PDA token pool has not been initialized
 			tokenPoolStatePDA, _ := tokens.TokenPoolConfigAddress(tokenMint, tokenPoolProgramId)
-			// TODO: This will be true when using a new token
-			//var tokenPoolStateAccount burnmint_token_pool.State
-			//tokenPoolStateErr := env.BlockChains.SolanaChains()[solTestData.Chain.Selector].GetAccountDataBorshInto(context.Background(), tokenPoolStatePDA, &tokenPoolStateAccount)
-			//require.Error(t, tokenPoolStateErr)
+			var tokenPoolStateAccount burnmint_token_pool.State
+			tokenPoolStateErr := chain.GetAccountDataBorshInto(context.Background(), tokenPoolStatePDA, &tokenPoolStateAccount)
+			require.Error(t, tokenPoolStateErr)
 
 			// Run the changeset
 			output, err = tokensapi.
@@ -559,11 +588,11 @@ func TestTokensAndTokenPools(t *testing.T) {
 					RegisterTokenConfigs: tokensapi.RegisterTokenConfig{
 						ProposedOwner:      solTestData.Token.ExternalAdmin,
 						TokenPoolQualifier: solTestData.TokenPoolQualifier,
-						TokenSymbol:        solTestData.Token.Symbol,
+						TokenSymbol:        tokenSymbol,
 						PoolType:           solTokenPoolType.String(),
 						SVMExtraArgs: &tokensapi.SVMExtraArgs{
 							CustomerMintAuthorities: []solana.PublicKey{
-								solana.MustPublicKeyFromBase58(solTestData.Token.ExternalAdmin),
+								externalAdmin,
 							}},
 					},
 				})
@@ -573,19 +602,18 @@ func TestTokensAndTokenPools(t *testing.T) {
 
 			// Verify that a new admin was proposed for the specified token
 			var tokenAdminRegistryAccountAfter ccip_common.TokenAdminRegistry
-			tarErr := env.BlockChains.SolanaChains()[solTestData.Chain.Selector].GetAccountDataBorshInto(context.Background(), tokenAdminRegistryPDA, &tokenAdminRegistryAccountAfter)
+			tarErr := chain.GetAccountDataBorshInto(context.Background(), tokenAdminRegistryPDA, &tokenAdminRegistryAccountAfter)
 			require.NoError(t, tarErr)
 			require.Equal(t, solana.PublicKey{}, tokenAdminRegistryAccountAfter.Administrator)
-			require.Equal(t, solana.MustPublicKeyFromBase58(solTestData.Token.ExternalAdmin), tokenAdminRegistryAccountAfter.PendingAdministrator)
+			require.Equal(t, externalAdmin, tokenAdminRegistryAccountAfter.PendingAdministrator)
 
 			var tokenPoolStateAccountAfter burnmint_token_pool.State
-			stateErr := env.BlockChains.SolanaChains()[solTestData.Chain.Selector].GetAccountDataBorshInto(context.Background(), tokenPoolStatePDA, &tokenPoolStateAccountAfter)
+			stateErr := chain.GetAccountDataBorshInto(context.Background(), tokenPoolStatePDA, &tokenPoolStateAccountAfter)
 			require.NoError(t, stateErr)
-			// TODO: This will be true when using a new token
-			//require.Equal(t, solana.PublicKey{}, tokenPoolStateAccountAfter.Config.Owner)
-			//require.Equal(t, solana.MustPublicKeyFromBase58(solTestData.Token.ExternalAdmin), tokenPoolStateAccountAfter.Config.ProposedOwner)
+			require.Equal(t, chain.DeployerKey.PublicKey(), tokenPoolStateAccountAfter.Config.Owner)
+			require.Equal(t, externalAdmin, tokenPoolStateAccountAfter.Config.ProposedOwner)
 			require.Equal(t, tokenMint, tokenPoolStateAccountAfter.Config.Mint)
-			//require.Equal(t, solana.PublicKey{}, tokenPoolStateAccountAfter.Config.RateLimitAdmin)
+			require.Equal(t, chain.DeployerKey.PublicKey(), tokenPoolStateAccountAfter.Config.RateLimitAdmin)
 
 			// Validate the Multisig is stored
 			multisigAdd, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
