@@ -388,6 +388,10 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
       TokenTransferFeeConfigArgs memory tokenTransferFeeConfigArg = tokenTransferFeeConfigArgs[i];
       uint64 destChainSelector = tokenTransferFeeConfigArg.destChainSelector;
 
+      if (destChainSelector == 0) {
+        revert InvalidDestChainConfig(destChainSelector);
+      }
+
       for (uint256 j = 0; j < tokenTransferFeeConfigArg.tokenTransferFeeConfigs.length; ++j) {
         TokenTransferFeeConfig memory tokenTransferFeeConfig =
         tokenTransferFeeConfigArg.tokenTransferFeeConfigs[j].tokenTransferFeeConfig;
@@ -429,7 +433,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
     bytes calldata extraArgs,
     uint256 maxPerMsgGasLimit
   ) internal pure returns (Client.SVMExtraArgsV1 memory svmExtraArgs) {
-    if (extraArgs.length == 0) {
+    if (extraArgs.length < 4) {
       revert InvalidExtraArgsData();
     }
 
@@ -452,7 +456,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
     bytes calldata extraArgs,
     uint256 maxPerMsgGasLimit
   ) internal pure returns (Client.SuiExtraArgsV1 memory suiExtraArgs) {
-    if (extraArgs.length == 0) {
+    if (extraArgs.length < 4) {
       revert InvalidExtraArgsData();
     }
 
@@ -497,7 +501,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
     bytes calldata extraArgs,
     uint64 defaultTxGasLimit
   ) private pure returns (Client.GenericExtraArgsV2 memory) {
-    if (extraArgs.length == 0) {
+    if (extraArgs.length < 4) {
       // If extra args are empty, generate default values.
       return Client.GenericExtraArgsV2({gasLimit: defaultTxGasLimit, allowOutOfOrderExecution: false});
     }
@@ -642,7 +646,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
       if (
         destChainSelector == 0 || destChainConfig.defaultTxGasLimit == 0
           || destChainConfig.defaultTxGasLimit > destChainConfig.maxPerMsgGasLimit
-          || destChainConfig.linkFeeMultiplierPercent == 0
+          || destChainConfig.linkFeeMultiplierPercent == 0 || destChainConfig.chainFamilySelector == 0
       ) {
         revert InvalidDestChainConfig(destChainSelector);
       }

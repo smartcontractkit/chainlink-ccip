@@ -180,4 +180,15 @@ contract FeeQuoter_applyDestChainConfigUpdates is FeeQuoterSetup {
     );
     s_feeQuoter.applyDestChainConfigUpdates(destChainConfigArgs);
   }
+
+  function test_applyDestChainConfigUpdates_RevertWhen_InvalidDestChainConfig_ChainFamilySelectorEqZero() public {
+    FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
+    FeeQuoter.DestChainConfigArgs memory destChainConfigArg = destChainConfigArgs[0];
+
+    destChainConfigArg.destChainConfig.chainFamilySelector = bytes4(0);
+    vm.expectRevert(
+      abi.encodeWithSelector(FeeQuoter.InvalidDestChainConfig.selector, destChainConfigArg.destChainSelector)
+    );
+    s_feeQuoter.applyDestChainConfigUpdates(destChainConfigArgs);
+  }
 }
