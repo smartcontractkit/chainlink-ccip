@@ -63,6 +63,10 @@ func (c *OffRampContract) ApplySourceChainConfigUpdates(opts *bind.TransactOpts,
 	return c.contract.Transact(opts, "applySourceChainConfigUpdates", args)
 }
 
+func (c *OffRampContract) SetDynamicConfig(opts *bind.TransactOpts, args DynamicConfig) (*types.Transaction, error) {
+	return c.contract.Transact(opts, "setDynamicConfig", args)
+}
+
 func (c *OffRampContract) SetOCR3Configs(opts *bind.TransactOpts, args []OCRConfigArgs) (*types.Transaction, error) {
 	return c.contract.Transact(opts, "setOCR3Configs", args)
 }
@@ -173,6 +177,24 @@ var ApplySourceChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]Sou
 		args []SourceChainConfigArgs,
 	) (*types.Transaction, error) {
 		return c.ApplySourceChainConfigUpdates(opts, args)
+	},
+})
+
+var SetDynamicConfig = contract.NewWrite(contract.WriteParams[DynamicConfig, *OffRampContract]{
+	Name:            "offramp:set-dynamic-config",
+	Version:         Version,
+	Description:     "Calls setDynamicConfig on the contract",
+	ContractType:    ContractType,
+	ContractABI:     OffRampABI,
+	NewContract:     NewOffRampContract,
+	IsAllowedCaller: contract.OnlyOwner[*OffRampContract, DynamicConfig],
+	Validate:        func(DynamicConfig) error { return nil },
+	CallContract: func(
+		c *OffRampContract,
+		opts *bind.TransactOpts,
+		args DynamicConfig,
+	) (*types.Transaction, error) {
+		return c.SetDynamicConfig(opts, args)
 	},
 })
 

@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
@@ -60,6 +61,10 @@ func (c *OnRampContract) Owner(opts *bind.CallOpts) (common.Address, error) {
 
 func (c *OnRampContract) ApplyDestChainConfigUpdates(opts *bind.TransactOpts, args []DestChainConfigArgs) (*types.Transaction, error) {
 	return c.contract.Transact(opts, "applyDestChainConfigUpdates", args)
+}
+
+func (c *OnRampContract) SetDynamicConfig(opts *bind.TransactOpts, args DynamicConfig) (*types.Transaction, error) {
+	return c.contract.Transact(opts, "setDynamicConfig", args)
 }
 
 func (c *OnRampContract) GetDestChainConfig(opts *bind.CallOpts, args uint64) (any, error) {
@@ -150,6 +155,24 @@ var ApplyDestChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]DestC
 		args []DestChainConfigArgs,
 	) (*types.Transaction, error) {
 		return c.ApplyDestChainConfigUpdates(opts, args)
+	},
+})
+
+var SetDynamicConfig = contract.NewWrite(contract.WriteParams[DynamicConfig, *OnRampContract]{
+	Name:            "onramp:set-dynamic-config",
+	Version:         Version,
+	Description:     "Calls setDynamicConfig on the contract",
+	ContractType:    ContractType,
+	ContractABI:     OnRampABI,
+	NewContract:     NewOnRampContract,
+	IsAllowedCaller: contract.OnlyOwner[*OnRampContract, DynamicConfig],
+	Validate:        func(DynamicConfig) error { return nil },
+	CallContract: func(
+		c *OnRampContract,
+		opts *bind.TransactOpts,
+		args DynamicConfig,
+	) (*types.Transaction, error) {
+		return c.SetDynamicConfig(opts, args)
 	},
 })
 

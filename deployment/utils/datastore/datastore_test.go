@@ -4,9 +4,10 @@ import (
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
-	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/stretchr/testify/require"
+
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 )
 
 func TestFindAndFormatRef(t *testing.T) {

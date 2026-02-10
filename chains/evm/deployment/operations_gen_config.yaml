@@ -11,34 +11,6 @@ output:
 # - (none): Public/Read functions don't need access control
 
 contracts:
-  # 1.6.4
-  - contract_name: USDCTokenPoolCCTPV2
-    version: "1.6.4"
-    package_name: usdc_token_pool_cctp_v2
-    functions:
-      - name: setDomains
-        access: owner
-      - name: getDomain
-        access: public
-      - name: applyAuthorizedCallerUpdates
-        access: owner
-      - name: applyChainUpdates
-        access: owner
-      - name: addRemotePool
-        access: owner
-      - name: removeRemotePool
-        access: owner
-      - name: transferOwnership
-        access: owner
-
-  # 1.6.2
-  - contract_name: CCTPMessageTransmitterProxy
-    version: "1.6.2"
-    package_name: cctp_message_transmitter_proxy
-    functions:
-      - name: configureAllowedCallers
-        access: owner
-
   # 1.6.1
   - contract_name: TokenPool
     version: "1.6.1"
@@ -58,6 +30,8 @@ contracts:
       - name: setChainRateLimiterConfig
         access: owner
       - name: getToken
+        access: public
+      - name: getTokenDecimals
         access: public
       - name: isSupportedToken
         access: public
@@ -133,11 +107,17 @@ contracts:
         access: public
       - name: getTokenTransferFeeConfig
         access: public
+      - name: getStaticConfig
+        access: public
+      - name: getAllAuthorizedCallers
+        access: public
 
   - contract_name: OnRamp
     version: "1.6.0"
     functions:
       - name: applyDestChainConfigUpdates
+        access: owner
+      - name: setDynamicConfig
         access: owner
       - name: getDestChainConfig
         access: public
@@ -151,6 +131,8 @@ contracts:
     version: "1.6.0"
     functions:
       - name: applySourceChainConfigUpdates
+        access: owner
+      - name: setDynamicConfig
         access: owner
       - name: setOCR3Configs
         access: owner

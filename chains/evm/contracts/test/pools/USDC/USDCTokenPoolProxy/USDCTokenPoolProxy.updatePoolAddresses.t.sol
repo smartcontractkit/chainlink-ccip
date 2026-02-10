@@ -109,4 +109,33 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
       })
     );
   }
+
+  function test_updatePoolAddresses_RevertWhen_TokenPoolUnsupported_SiloedLockReleasePoolDoesNotSupportIPoolV1OrV2()
+    public
+  {
+    // Test when siloedLockReleasePool doesn't support either IPoolV1 or IPoolV2.
+    vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.TokenPoolUnsupported.selector, s_newLockReleasePool));
+    s_usdcTokenPoolProxy.updatePoolAddresses(
+      USDCTokenPoolProxy.PoolAddresses({
+        cctpV1Pool: address(0),
+        cctpV2Pool: address(0),
+        cctpV2PoolWithCCV: address(0),
+        siloedLockReleasePool: s_newLockReleasePool
+      })
+    );
+
+    // Now enable IPoolV1 support and verify it works.
+    _enableERC165InterfaceChecks(s_newLockReleasePool, type(IPoolV1).interfaceId);
+
+    s_usdcTokenPoolProxy.updatePoolAddresses(
+      USDCTokenPoolProxy.PoolAddresses({
+        cctpV1Pool: address(0),
+        cctpV2Pool: address(0),
+        cctpV2PoolWithCCV: address(0),
+        siloedLockReleasePool: s_newLockReleasePool
+      })
+    );
+
+    assertEq(s_usdcTokenPoolProxy.getPools().siloedLockReleasePool, s_newLockReleasePool);
+  }
 }

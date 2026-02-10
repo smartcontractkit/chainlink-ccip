@@ -205,7 +205,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 				},
 				TokenPriceFeeds:            []fqops.TokenPriceFeedUpdate{},
 				TokenTransferFeeConfigArgs: []fqops.TokenTransferFeeConfigArgs{},
-				PremiumMultiplierWeiPerEthArgs: []fqops.PremiumMultiplierWeiPerEthArgs{
+				PremiumMultiplierWeiPerEthArgs: []fqops.FeeTokenArgs{
 					{
 						PremiumMultiplierWeiPerEth: input.LinkPremiumMultiplier,
 						Token:                      common.HexToAddress(linkRef.Address),

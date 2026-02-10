@@ -52,3 +52,6 @@ package ccip
 //go:generate go run ./wrap ccip MockE2EUSDCTransmitterCCTPV2 mock_usdc_token_transmitter_v2
 //go:generate go run ./wrap ccip MockE2ELBTCTokenPool mock_lbtc_token_pool
 //go:generate go run ./wrap ccip MockLombardBridge mock_lombard_bridge
+
+// Extract bytecode and ABI from generated wrappers
+//go:generate go run github.com/smartcontractkit/chainlink-evm/gethwrappers/helpers/extract_bytecode -input=generated -bytecode=../bytecode -abi=../abi

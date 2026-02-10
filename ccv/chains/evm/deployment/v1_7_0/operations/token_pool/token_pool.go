@@ -362,6 +362,17 @@ var GetToken = contract.NewRead(contract.ReadParams[any, common.Address, *token_
 	},
 })
 
+var GetTokenDecimals = contract.NewRead(contract.ReadParams[any, uint8, *token_pool.TokenPool]{
+	Name:         "token-pool:get-token-decimals",
+	Version:      Version,
+	Description:  "Gets the local token decimals for a TokenPool",
+	ContractType: ContractType,
+	NewContract:  token_pool.NewTokenPool,
+	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.CallOpts, args any) (uint8, error) {
+		return tokenPool.GetTokenDecimals(opts)
+	},
+})
+
 var IsSupportedToken = contract.NewRead(contract.ReadParams[common.Address, bool, *token_pool.TokenPool]{
 	Name:         "token-pool:is-supported-token",
 	Version:      Version,

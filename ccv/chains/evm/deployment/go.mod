@@ -5,19 +5,24 @@ go 1.25.5
 // Taken from CLDF go.mod: https://github.com/smartcontractkit/chainlink-deployments-framework/blob/main/go.mod
 replace github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk v0.0.4
 
+replace github.com/smartcontractkit/chainlink-ccip/deployment => ../../../../deployment
+
+replace github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment => ../../../../chains/evm/deployment
+
 require (
 	github.com/Masterminds/semver/v3 v3.4.0
 	github.com/ethereum/go-ethereum v1.16.8
 	github.com/smartcontractkit/chain-selectors v1.0.89
-	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20260206181544-f1613c67d071
-	github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm v0.0.0-20260206181544-f1613c67d071
-	github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment v0.0.0-20260206181544-f1613c67d071
-	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260206181544-f1613c67d071
+	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20260210192010-e67704a57118
+	github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm v0.0.0-20260210192010-e67704a57118
+	github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment v0.0.0-20260210192010-e67704a57118
+	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260210192010-e67704a57118
 	github.com/smartcontractkit/chainlink-common v0.9.6-0.20260114142648-bd9e1b483e96
 	github.com/smartcontractkit/chainlink-deployments-framework v0.74.2
 	github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20260119171452-39c98c3b33cd
 	github.com/smartcontractkit/mcms v0.34.0
 	github.com/stretchr/testify v1.11.1
+	golang.org/x/exp v0.0.0-20250711185948-6ae5c78190dc
 )
 
 require (
@@ -203,10 +208,12 @@ require (
 	github.com/shopspring/decimal v1.4.0 // indirect
 	github.com/sigurn/crc16 v0.0.0-20211026045750-20ab5afb07e3 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
+	github.com/smartcontractkit/ccip-contract-examples/chains/evm v0.0.0-20250826190403-aed7f5f33cde // indirect
 	github.com/smartcontractkit/chainlink-aptos v0.0.0-20251024142440-51f2ad2652a2 // indirect
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20260121163256-85accaf3d28d // indirect
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20250908144012-8184001834b5 // indirect
 	github.com/smartcontractkit/chainlink-common/pkg/chipingress v0.0.10 // indirect
+	github.com/smartcontractkit/chainlink-evm v0.3.3 // indirect
 	github.com/smartcontractkit/chainlink-protos/cre/go v0.0.0-20251124151448-0448aefdaab9 // indirect
 	github.com/smartcontractkit/chainlink-protos/job-distributor v0.17.0 // indirect
 	github.com/smartcontractkit/chainlink-protos/linking-service/go v0.0.0-20251002192024-d2ad9222409b // indirect
@@ -265,7 +272,6 @@ require (
 	go.uber.org/ratelimit v0.3.1 // indirect
 	go.uber.org/zap v1.27.1 // indirect
 	golang.org/x/crypto v0.47.0 // indirect
-	golang.org/x/exp v0.0.0-20250711185948-6ae5c78190dc // indirect
 	golang.org/x/net v0.48.0 // indirect
 	golang.org/x/sync v0.19.0 // indirect
 	golang.org/x/sys v0.40.0 // indirect

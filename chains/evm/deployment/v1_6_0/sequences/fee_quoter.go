@@ -43,6 +43,14 @@ type FeeQuoterImportConfigSequenceInput struct {
 type FeeQuoterImportConfigSequenceOutput struct {
 	DestChainCfg         fqops.DestChainConfig
 	TokenTransferFeeCfgs map[common.Address]fqops.TokenTransferFeeConfig
+	RemoteChainCfgs      map[uint64]FeeQuoterImportConfigSequenceOutputPerRemoteChain
+	PriceUpdaters        []common.Address
+	StaticCfg            fqops.StaticConfig
+}
+
+type FeeQuoterImportConfigSequenceOutputPerRemoteChain struct {
+	DestChainCfg         fqops.DestChainConfig
+	TokenTransferFeeCfgs map[common.Address]fqops.TokenTransferFeeConfig
 }
 
 var (
@@ -143,7 +151,7 @@ var (
 			fqAddress := in.Address
 			chainSelector := in.ChainSelector
 			b.Logger.Infof("Importing configuration for FeeQuoter %s on chain %d (%s)", fqAddress.Hex(), chainSelector, evmChain.Name())
-			fqOutput := make(map[uint64]FeeQuoterImportConfigSequenceOutput)
+			fqOutput := make(map[uint64]FeeQuoterImportConfigSequenceOutputPerRemoteChain)
 			destChainConfigs := make(map[uint64]fqops.DestChainConfig)
 			for _, remoteChain := range in.RemoteChains {
 				opsOutput, err := operations.ExecuteOperation(b, fqops.GetDestChainConfig, evmChain, contract.FunctionInput[uint64]{
@@ -156,12 +164,19 @@ var (
 						"remote chain %d from feequoter %s on chain %d: %w",
 						remoteChain, fqAddress.Hex(), chainSelector, err)
 				}
+				if !opsOutput.Output.IsEnabled {
+					continue // skip disabled dest chain configs
+				}
+
 				destChainConfigs[remoteChain] = opsOutput.Output
 			}
 
 			tokenTransferFeeCfgsPerChain := make(map[uint64]map[common.Address]fqops.TokenTransferFeeConfig)
 
 			for remoteChain, tokens := range in.TokensPerRemoteChain {
+				if _, ok := destChainConfigs[remoteChain]; !ok {
+					continue // skip token transfer fee config fetching if dest chain config is not enabled
+				}
 				tokenTransferFeeCfgs := make(map[common.Address]fqops.TokenTransferFeeConfig)
 				for _, token := range tokens {
 					opsOutput, err := operations.ExecuteOperation(b, fqops.GetTokenTransferFeeConfig, evmChain,
@@ -185,16 +200,36 @@ var (
 				tokenTransferFeeCfgsPerChain[remoteChain] = tokenTransferFeeCfgs
 			}
 			for remoteChain, destCfg := range destChainConfigs {
-				fqOutput[remoteChain] = FeeQuoterImportConfigSequenceOutput{
+				fqOutput[remoteChain] = FeeQuoterImportConfigSequenceOutputPerRemoteChain{
 					DestChainCfg:         destCfg,
 					TokenTransferFeeCfgs: tokenTransferFeeCfgsPerChain[remoteChain],
 				}
+			}
+			staticCfgOutput, err := operations.ExecuteOperation(b, fqops.GetStaticConfig, evmChain, contract.FunctionInput[struct{}]{
+				Address:       fqAddress,
+				ChainSelector: chainSelector,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get static config from feequoter %s on chain %d: %w",
+					fqAddress.Hex(), chainSelector, err)
+			}
+			priceUpdaters, err := operations.ExecuteOperation(b, fqops.GetAllAuthorizedCallers, evmChain, contract.FunctionInput[struct{}]{
+				Address:       fqAddress,
+				ChainSelector: chainSelector,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get all authorized callers from feequoter %s on chain %d: %w",
+					fqAddress.Hex(), chainSelector, err)
 			}
 			contractMetadata = []datastore.ContractMetadata{
 				{
 					Address:       fqAddress.Hex(),
 					ChainSelector: chainSelector,
-					Metadata:      fqOutput,
+					Metadata: FeeQuoterImportConfigSequenceOutput{
+						RemoteChainCfgs: fqOutput,
+						StaticCfg:       staticCfgOutput.Output,
+						PriceUpdaters:   priceUpdaters.Output,
+					},
 				},
 			}
 			return sequences.OnChainOutput{
