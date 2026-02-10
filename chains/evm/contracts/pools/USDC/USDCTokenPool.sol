@@ -77,6 +77,8 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
     bool enabled; // ─────────────╯ Whether the domain is enabled
   }
 
+  // releaseOrMint decodes `SourceTokenDataPayloadV1` using abi.decode, where both fields are static types
+  // (`uint64 nonce`, `uint32 sourceDomain`) and each occupies one 32-byte ABI word, so the payload is 64 bytes.
   uint256 internal constant SOURCE_POOL_DATA_LENGTH = 64;
 
   /// @notice The version of the USDC message format that this pool supports. Version 0 is the legacy version of CCTP.
