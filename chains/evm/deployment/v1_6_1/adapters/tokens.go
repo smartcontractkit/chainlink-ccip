@@ -35,7 +35,7 @@ func (t *TokenAdapter) DeriveTokenAddress(e deployment.Environment, chainSelecto
 	if !ok {
 		return nil, fmt.Errorf("chain with selector %d not found", chainSelector)
 	}
-	getTokenReport, err := cldf_ops.ExecuteOperation(e.OperationsBundle, token_pool.GetToken, chain, contract.FunctionInput[any]{
+	getTokenReport, err := cldf_ops.ExecuteOperation(e.OperationsBundle, token_pool.GetToken, chain, contract.FunctionInput[struct{}]{
 		ChainSelector: chainSelector,
 		Address:       common.HexToAddress(poolRef.Address),
 	})

@@ -50,7 +50,7 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 		writes := make([]evm_contract.WriteOutput, 0)
 
 		// Get remote chains that are currently supported by the token pools
-		supportedChainsReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetSupportedChains, chain, evm_contract.FunctionInput[any]{
+		supportedChainsReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetSupportedChains, chain, evm_contract.FunctionInput[struct{}]{
 			ChainSelector: input.ChainSelector,
 			Address:       input.TokenPoolAddress,
 		})
@@ -102,10 +102,10 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 					return bytes.Equal(addr, input.RemoteChainConfig.RemotePool)
 				}) {
 					// Add the requested remote pool
-					addRemotePoolsReport, err := cldf_ops.ExecuteOperation(b, token_pool.AddRemotePool, chain, evm_contract.FunctionInput[token_pool.RemotePoolArgs]{
+					addRemotePoolsReport, err := cldf_ops.ExecuteOperation(b, token_pool.AddRemotePool, chain, evm_contract.FunctionInput[token_pool.AddRemotePoolArgs]{
 						ChainSelector: input.ChainSelector,
 						Address:       input.TokenPoolAddress,
-						Args: token_pool.RemotePoolArgs{
+						Args: token_pool.AddRemotePoolArgs{
 							RemoteChainSelector: input.RemoteChainSelector,
 							RemotePoolAddress:   common.LeftPadBytes(input.RemoteChainConfig.RemotePool, 32),
 						},
@@ -138,9 +138,17 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 						RemotePoolAddresses: [][]byte{
 							common.LeftPadBytes(input.RemoteChainConfig.RemotePool, 32),
 						},
-						RemoteTokenAddress:        common.LeftPadBytes(input.RemoteChainConfig.RemoteToken, 32),
-						OutboundRateLimiterConfig: input.RemoteChainConfig.DefaultFinalityOutboundRateLimiterConfig,
-						InboundRateLimiterConfig:  input.RemoteChainConfig.DefaultFinalityInboundRateLimiterConfig,
+						RemoteTokenAddress: common.LeftPadBytes(input.RemoteChainConfig.RemoteToken, 32),
+						OutboundRateLimiterConfig: token_pool.Config{
+							IsEnabled: input.RemoteChainConfig.DefaultFinalityOutboundRateLimiterConfig.IsEnabled,
+							Capacity:  input.RemoteChainConfig.DefaultFinalityOutboundRateLimiterConfig.Capacity,
+							Rate:      input.RemoteChainConfig.DefaultFinalityOutboundRateLimiterConfig.Rate,
+						},
+						InboundRateLimiterConfig: token_pool.Config{
+							IsEnabled: input.RemoteChainConfig.DefaultFinalityInboundRateLimiterConfig.IsEnabled,
+							Capacity:  input.RemoteChainConfig.DefaultFinalityInboundRateLimiterConfig.Capacity,
+							Rate:      input.RemoteChainConfig.DefaultFinalityInboundRateLimiterConfig.Rate,
+						},
 					},
 				},
 			},
@@ -182,16 +190,26 @@ func maybeUpdateRateLimiters(b cldf_ops.Bundle, chain evm.Chain, input Configure
 	currentOutboundRateLimiterState := outboundRateLimiterStateReport.Output
 
 	// Update the rate limiters if they do not match the desired config
-	if !rateLimiterConfigsEqual(currentInboundRateLimiterState, input.RemoteChainConfig.DefaultFinalityInboundRateLimiterConfig) ||
-		!rateLimiterConfigsEqual(currentOutboundRateLimiterState, input.RemoteChainConfig.DefaultFinalityOutboundRateLimiterConfig) {
-		setInboundRateLimiterReport, err := cldf_ops.ExecuteOperation(b, token_pool.SetRateLimitConfig, chain, evm_contract.FunctionInput[[]token_pool.SetChainRateLimiterConfigArg]{
+	if !rateLimiterConfigsEqual(tp_bindings.RateLimiterTokenBucket(currentInboundRateLimiterState), input.RemoteChainConfig.DefaultFinalityInboundRateLimiterConfig) ||
+		!rateLimiterConfigsEqual(tp_bindings.RateLimiterTokenBucket(currentOutboundRateLimiterState), input.RemoteChainConfig.DefaultFinalityOutboundRateLimiterConfig) {
+		setInboundRateLimiterReport, err := cldf_ops.ExecuteOperation(b, token_pool.SetChainRateLimiterConfigs, chain, evm_contract.FunctionInput[token_pool.SetChainRateLimiterConfigsArgs]{
 			ChainSelector: input.ChainSelector,
 			Address:       input.TokenPoolAddress,
-			Args: []token_pool.SetChainRateLimiterConfigArg{
-				{
-					RemoteChainSelector:       input.RemoteChainSelector,
-					InboundRateLimiterConfig:  input.RemoteChainConfig.DefaultFinalityInboundRateLimiterConfig,
-					OutboundRateLimiterConfig: input.RemoteChainConfig.DefaultFinalityOutboundRateLimiterConfig,
+			Args: token_pool.SetChainRateLimiterConfigsArgs{
+				RemoteChainSelectors: []uint64{input.RemoteChainSelector},
+				InboundConfigs: []token_pool.Config{
+					{
+						IsEnabled: input.RemoteChainConfig.DefaultFinalityInboundRateLimiterConfig.IsEnabled,
+						Capacity:  input.RemoteChainConfig.DefaultFinalityInboundRateLimiterConfig.Capacity,
+						Rate:      input.RemoteChainConfig.DefaultFinalityInboundRateLimiterConfig.Rate,
+					},
+				},
+				OutboundConfigs: []token_pool.Config{
+					{
+						IsEnabled: input.RemoteChainConfig.DefaultFinalityOutboundRateLimiterConfig.IsEnabled,
+						Capacity:  input.RemoteChainConfig.DefaultFinalityOutboundRateLimiterConfig.Capacity,
+						Rate:      input.RemoteChainConfig.DefaultFinalityOutboundRateLimiterConfig.Rate,
+					},
 				},
 			},
 		})

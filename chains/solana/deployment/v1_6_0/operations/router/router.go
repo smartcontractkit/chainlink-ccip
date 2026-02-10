@@ -25,11 +25,13 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
-var ContractType cldf_deployment.ContractType = "Router"
-var DestChainType cldf_deployment.ContractType = "RemoteDest"
-var TokenPoolLookupTableType cldf_deployment.ContractType = "TokenPoolLookupTable"
-var ProgramName = "ccip_router"
-var Version *semver.Version = semver.MustParse("1.6.0")
+var (
+	ContractType             cldf_deployment.ContractType = "Router"
+	DestChainType            cldf_deployment.ContractType = "RemoteDest"
+	TokenPoolLookupTableType cldf_deployment.ContractType = "TokenPoolLookupTable"
+	ProgramName                                           = "ccip_router"
+	Version                  *semver.Version              = semver.MustParse("1.6.0")
+)
 
 type ConnectChainsParams struct {
 	Router              solana.PublicKey
@@ -560,7 +562,8 @@ var AcceptTokenAdminRegistry = operations.NewOperation(
 		tokenAdminRegistryPDA, _, _ := state.FindTokenAdminRegistryPDA(input.TokenMint, input.Router)
 		var pendingAdmin solana.PublicKey
 		var tokenAdminRegistryAccount ccip_common.TokenAdminRegistry
-		if err := chain.GetAccountDataBorshInto(context.Background(), tokenAdminRegistryPDA, &tokenAdminRegistryAccount); err != nil {
+		if err := chain.GetAccountDataBorshInto(context.Background(), tokenAdminRegistryPDA, &tokenAdminRegistryAccount); err == nil {
+			// NOTE: only set pendingAdmin if the account exists / fetch succeeds
 			pendingAdmin = tokenAdminRegistryAccount.PendingAdministrator
 		}
 		timelockSigner := utils.GetTimelockSignerPDA(
@@ -674,7 +677,6 @@ var TransferTokenAdminRegistry = operations.NewOperation(
 		err = chain.Confirm([]solana.Instruction{ixn})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm register token admin registry: %w", err)
-
 		}
 
 		return sequences.OnChainOutput{}, nil
