@@ -73,6 +73,20 @@ var OffRampSetOcr3 = contract.NewWrite(contract.WriteParams[[]offramp.MultiOCR3B
 	},
 })
 
+var OffRampSetDynamicConfig = contract.NewWrite(contract.WriteParams[DynamicConfig, *offramp.OffRamp]{
+	Name:            "offramp:set-dynamic-config",
+	Version:         Version,
+	Description:     "Sets the dynamic config on the OffRamp 1.6.0 contract",
+	ContractType:    ContractType,
+	ContractABI:     offramp.OffRampABI,
+	NewContract:     offramp.NewOffRamp,
+	IsAllowedCaller: contract.OnlyOwner[*offramp.OffRamp, DynamicConfig],
+	Validate:        func(DynamicConfig) error { return nil },
+	CallContract: func(offRamp *offramp.OffRamp, opts *bind.TransactOpts, args DynamicConfig) (*types.Transaction, error) {
+		return offRamp.SetDynamicConfig(opts, args)
+	},
+})
+
 var GetStaticConfig = contract.NewRead(contract.ReadParams[any, offramp.OffRampStaticConfig, *offramp.OffRamp]{
 	Name:         "offramp:get-static-config",
 	Version:      Version,

@@ -5,6 +5,7 @@ go 1.25.5
 replace (
 	// Make sure we're working with the latest chainlink-ccip
 	github.com/smartcontractkit/chainlink-ccip => ..
+	github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment => ../ccv/chains/evm/deployment
 
 	// Make sure we're working with the latest chainlink-ccip/chains/evm/deployment
 	github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment => ../chains/evm/deployment
@@ -36,6 +37,11 @@ require (
 	github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20260119171452-39c98c3b33cd
 	github.com/smartcontractkit/mcms v0.34.0
 	github.com/stretchr/testify v1.11.1
+)
+
+require (
+	github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm v0.0.0-20260206181544-f1613c67d071
+	github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment v0.0.0-20260116092715-df6a64d4bf00
 )
 
 require (

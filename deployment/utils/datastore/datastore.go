@@ -1,6 +1,7 @@
 package datastore
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -144,4 +145,72 @@ func GetAddressRef(
 		}
 	}
 	return datastore.AddressRef{}
+}
+
+func FilterContractMetaByContractTypeAndVersion(
+	addressRefs []datastore.AddressRef,
+	contractMetadata []datastore.ContractMetadata,
+	contractType cldf.ContractType,
+	contractVersion *semver.Version,
+	qualifier string,
+	chainSelector uint64,
+) ([]datastore.ContractMetadata, error) {
+	ds := datastore.NewMemoryDataStore()
+	for _, ref := range addressRefs {
+		if err := ds.Addresses().Add(ref); err != nil {
+			return nil, fmt.Errorf("failed to add address ref to datastore: %w", err)
+		}
+	}
+	filterFns := []datastore.FilterFunc[datastore.AddressRefKey, datastore.AddressRef]{
+		datastore.AddressRefByChainSelector(chainSelector),
+		datastore.AddressRefByType(datastore.ContractType(contractType)),
+		datastore.AddressRefByVersion(contractVersion),
+	}
+	if qualifier != "" {
+		filterFns = append(filterFns, datastore.AddressRefByQualifier(qualifier))
+	}
+	filteredAddressRefs := ds.Addresses().Filter(filterFns...)
+
+	if len(filteredAddressRefs) == 0 {
+		return nil, fmt.Errorf("no address ref found for contract type %s and version %s on chain %d",
+			contractType, contractVersion.String(), chainSelector)
+	}
+	var filteredContractMetadata []datastore.ContractMetadata
+	for _, meta := range contractMetadata {
+		for _, ref := range filteredAddressRefs {
+			if meta.Address == ref.Address && meta.ChainSelector == ref.ChainSelector {
+				filteredContractMetadata = append(filteredContractMetadata, meta)
+			}
+		}
+	}
+	return filteredContractMetadata, nil
+}
+
+// ConvertMetadataToType converts metadata to a typed struct
+// Handles both typed structs and map[string]interface{} from JSON unmarshaling
+// T is the target type that the metadata should be converted to
+func ConvertMetadataToType[T any](metadata interface{}) (T, error) {
+	var zero T
+
+	// If already the correct type, return it
+	if typed, ok := metadata.(T); ok {
+		return typed, nil
+	}
+
+	// If it's a map (from JSON), convert it
+	if metaMap, ok := metadata.(map[string]interface{}); ok {
+		metadataBytes, err := json.Marshal(metaMap)
+		if err != nil {
+			return zero, fmt.Errorf("failed to marshal metadata: %w", err)
+		}
+
+		var typed T
+		if err := json.Unmarshal(metadataBytes, &typed); err != nil {
+			return zero, fmt.Errorf("failed to unmarshal metadata: %w", err)
+		}
+
+		return typed, nil
+	}
+
+	return zero, fmt.Errorf("metadata is neither the expected type nor map[string]interface{}")
 }
