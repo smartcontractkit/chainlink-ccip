@@ -76,8 +76,7 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
       mintRecipient: expectedDomain.mintRecipient,
       domainIdentifier: expectedDomain.domainIdentifier,
       destChainSelector: DEST_CHAIN_SELECTOR,
-      enabled: expectedDomain.enabled,
-      useLegacySourcePoolDataFormat: true
+      enabled: expectedDomain.enabled
     });
     vm.startPrank(OWNER);
     s_usdcTokenPool.setDomains(updates);
@@ -143,8 +142,7 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
       mintRecipient: extraMintRecipient,
       domainIdentifier: expectedDomain.domainIdentifier,
       destChainSelector: DEST_CHAIN_SELECTOR,
-      enabled: expectedDomain.enabled,
-      useLegacySourcePoolDataFormat: false
+      enabled: expectedDomain.enabled
     });
     vm.startPrank(OWNER);
     s_usdcTokenPool.setDomains(updates);
