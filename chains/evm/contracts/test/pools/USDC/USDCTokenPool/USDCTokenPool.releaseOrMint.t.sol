@@ -52,7 +52,7 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
-      extraData: USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV1(
+      extraData: abi.encode(
         USDCSourcePoolDataCodec.SourceTokenDataPayloadV1({
           nonce: usdcMessage.nonce, sourceDomain: SOURCE_DOMAIN_IDENTIFIER
         })
@@ -65,6 +65,11 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
 
     // The mocked receiver does not release the token to the pool, so we manually do it here
     deal(address(s_USDCToken), address(s_usdcTokenPool), amount);
+
+    vm.expectEmit();
+    emit TokenPool.InboundRateLimitConsumed({
+      remoteChainSelector: SOURCE_CHAIN_SELECTOR, token: address(s_USDCToken), amount: amount
+    });
 
     vm.expectEmit();
     emit TokenPool.ReleasedOrMinted({
@@ -108,7 +113,7 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
-      extraData: USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV1(
+      extraData: abi.encode(
         USDCSourcePoolDataCodec.SourceTokenDataPayloadV1({nonce: nonce, sourceDomain: sourceDomain})
       ),
       destGasAmount: USDC_DEST_TOKEN_GAS
@@ -167,7 +172,7 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
-      extraData: USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV1(
+      extraData: abi.encode(
         USDCSourcePoolDataCodec.SourceTokenDataPayloadV1({
           nonce: usdcMessage.nonce, sourceDomain: SOURCE_DOMAIN_IDENTIFIER
         })
@@ -195,7 +200,7 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
     );
   }
 
-  function test_releaseOrMint_RevertWhen_InvalidVersion() public {
+  function test_releaseOrMint_RevertWhen_InvalidSourcePoolDataEncoding() public {
     uint256 amount = 1e6;
 
     USDCMessage memory usdcMessage = USDCMessage({
@@ -225,7 +230,7 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
 
     vm.startPrank(s_routerAllowedOffRamp);
 
-    vm.expectRevert(abi.encodeWithSelector(USDCSourcePoolDataCodec.InvalidVersion.selector, bytes4(uint32(1))));
+    vm.expectRevert();
 
     s_usdcTokenPool.releaseOrMint(
       Pool.ReleaseOrMintInV1({

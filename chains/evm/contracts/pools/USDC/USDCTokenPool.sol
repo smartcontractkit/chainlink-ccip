@@ -192,7 +192,9 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
 
     return Pool.LockOrBurnOutV1({
       destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
-      destPoolData: abi.encode(USDCSourcePoolDataCodec.SourceTokenDataPayloadV1({nonce: nonce, sourceDomain: i_localDomainIdentifier}))
+      destPoolData: abi.encode(
+        USDCSourcePoolDataCodec.SourceTokenDataPayloadV1({nonce: nonce, sourceDomain: i_localDomainIdentifier})
+      )
     });
   }
 
@@ -203,10 +205,10 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
     _validateReleaseOrMint(releaseOrMintIn, releaseOrMintIn.sourceDenominatedAmount);
     USDCSourcePoolDataCodec.SourceTokenDataPayloadV1 memory sourceTokenDataPayload =
-              abi.decode(releaseOrMintIn.sourcePoolData, (USDCSourcePoolDataCodec.SourceTokenDataPayloadV1));
+      abi.decode(releaseOrMintIn.sourcePoolData, (USDCSourcePoolDataCodec.SourceTokenDataPayloadV1));
 
     MessageAndAttestation memory msgAndAttestation =
-              abi.decode(releaseOrMintIn.offchainTokenData, (MessageAndAttestation));
+      abi.decode(releaseOrMintIn.offchainTokenData, (MessageAndAttestation));
 
     _validateMessage(msgAndAttestation.message, sourceTokenDataPayload);
 
@@ -260,7 +262,10 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
   ///     * recipient             32         bytes32    52
   ///     * destinationCaller     32         bytes32    84
   ///     * messageBody           dynamic    bytes      116
-  function _validateMessage(bytes memory usdcMessage, USDCSourcePoolDataCodec.SourceTokenDataPayloadV1 memory sourceTokenData) internal view {
+  function _validateMessage(
+    bytes memory usdcMessage,
+    USDCSourcePoolDataCodec.SourceTokenDataPayloadV1 memory sourceTokenData
+  ) internal view {
     // 116 is the minimum length of a valid USDC message. Since destinationCaller must be checked for the
     // previous pool, this ensures it can be parsed correctly and that the message is not too short.
     // Since messageBody is dynamic and not always used, it is not checked.
