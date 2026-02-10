@@ -73,14 +73,14 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
     bool isEnabled; // ────────────────────╮ Whether this destination chain is enabled.
     uint32 maxDataBytes; //                │ Maximum data payload size in bytes.
     uint32 maxPerMsgGasLimit; //           │ Maximum gas limit.
-    uint32 destGasOverhead; //             │ Gas charged on top of the gasLimit to cover destination chain costs.
-    uint8 destGasPerPayloadByteBase; //    │ Default dest-chain gas charged each byte of `data` payload.
+    uint32 destGasOverhead; //             │ LEGACY: Gas charged on top of the gasLimit to cover destination chain costs.
+    uint8 destGasPerPayloadByteBase; //    │ Default dest-chain gas charged each byte of `data` payload, accounting for DA costs.
     bytes4 chainFamilySelector; //         │ Selector that identifies the destination chain's family. Used to determine the correct validations to perform for the dest chain.
     // The following two properties are defaults, they can be overridden by setting the TokenTransferFeeConfig for a token.
     uint16 defaultTokenFeeUSDCents; //     │ Default token fee charged per token transfer.
     uint32 defaultTokenDestGasOverhead; // │ Default gas charged to execute a token transfer on the destination chain.
     uint32 defaultTxGasLimit; //           │ Default gas limit for a tx.
-    uint16 networkFeeUSDCents; //          │ Flat network fee to charge for messages, multiples of 0.01 USD.
+    uint16 networkFeeUSDCents; //          │ LEGACY: Flat network fee to charge for messages, multiples of 0.01 USD.
     uint8 linkFeeMultiplierPercent; // ────╯ Percentage multiplier to apply when fee is paid in LINK. 90 = 10% discount.
   }
 
@@ -388,6 +388,10 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
       TokenTransferFeeConfigArgs memory tokenTransferFeeConfigArg = tokenTransferFeeConfigArgs[i];
       uint64 destChainSelector = tokenTransferFeeConfigArg.destChainSelector;
 
+      if (destChainSelector == 0) {
+        revert InvalidDestChainConfig(destChainSelector);
+      }
+
       for (uint256 j = 0; j < tokenTransferFeeConfigArg.tokenTransferFeeConfigs.length; ++j) {
         TokenTransferFeeConfig memory tokenTransferFeeConfig =
         tokenTransferFeeConfigArg.tokenTransferFeeConfigs[j].tokenTransferFeeConfig;
@@ -429,7 +433,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
     bytes calldata extraArgs,
     uint256 maxPerMsgGasLimit
   ) internal pure returns (Client.SVMExtraArgsV1 memory svmExtraArgs) {
-    if (extraArgs.length == 0) {
+    if (extraArgs.length < 4) {
       revert InvalidExtraArgsData();
     }
 
@@ -452,7 +456,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
     bytes calldata extraArgs,
     uint256 maxPerMsgGasLimit
   ) internal pure returns (Client.SuiExtraArgsV1 memory suiExtraArgs) {
-    if (extraArgs.length == 0) {
+    if (extraArgs.length < 4) {
       revert InvalidExtraArgsData();
     }
 
@@ -497,7 +501,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
     bytes calldata extraArgs,
     uint64 defaultTxGasLimit
   ) private pure returns (Client.GenericExtraArgsV2 memory) {
-    if (extraArgs.length == 0) {
+    if (extraArgs.length < 4) {
       // If extra args are empty, generate default values.
       return Client.GenericExtraArgsV2({gasLimit: defaultTxGasLimit, allowOutOfOrderExecution: false});
     }
@@ -642,6 +646,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
       if (
         destChainSelector == 0 || destChainConfig.defaultTxGasLimit == 0
           || destChainConfig.defaultTxGasLimit > destChainConfig.maxPerMsgGasLimit
+          || destChainConfig.linkFeeMultiplierPercent == 0 || destChainConfig.chainFamilySelector == 0
       ) {
         revert InvalidDestChainConfig(destChainSelector);
       }

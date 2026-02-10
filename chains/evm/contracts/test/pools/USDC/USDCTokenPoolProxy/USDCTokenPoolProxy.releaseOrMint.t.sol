@@ -60,12 +60,24 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
 
     // Expect the lockReleasePool's releaseOrMint to be called and return expectedOut.
     vm.mockCall(
-      address(s_lockReleasePool),
-      abi.encodeWithSelector(IPoolV1.releaseOrMint.selector, releaseOrMintIn),
-      abi.encode(expectedOut)
+      address(s_lockReleasePool), abi.encodeCall(IPoolV1.releaseOrMint, (releaseOrMintIn)), abi.encode(expectedOut)
     );
 
+    vm.expectCall(address(s_lockReleasePool), abi.encodeCall(IPoolV1.releaseOrMint, (releaseOrMintIn)));
+
     Pool.ReleaseOrMintOutV1 memory actualOut = s_usdcTokenPoolProxy.releaseOrMint(releaseOrMintIn);
+
+    assertEq(actualOut.destinationAmount, expectedOut.destinationAmount);
+
+    // Mock IPoolV2 version as well
+    vm.mockCall(
+      address(s_lockReleasePool), abi.encodeCall(IPoolV2.releaseOrMint, (releaseOrMintIn, 0)), abi.encode(expectedOut)
+    );
+
+    // Expect call to be IPoolV2 when using the IPoolV2 releaseOrMint.
+    vm.expectCall(address(s_lockReleasePool), abi.encodeCall(IPoolV2.releaseOrMint, (releaseOrMintIn, 0)));
+
+    actualOut = s_usdcTokenPoolProxy.releaseOrMint(releaseOrMintIn, 0);
 
     assertEq(actualOut.destinationAmount, expectedOut.destinationAmount);
   }
@@ -106,6 +118,8 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
       abi.encodeWithSelector(IPoolV1.releaseOrMint.selector, releaseOrMintIn),
       abi.encode(expectedOut)
     );
+
+    vm.expectCall(address(s_cctpV1Pool), abi.encodeWithSelector(IPoolV1.releaseOrMint.selector, releaseOrMintIn));
 
     Pool.ReleaseOrMintOutV1 memory actualOut = s_usdcTokenPoolProxy.releaseOrMint(releaseOrMintIn);
 
@@ -149,7 +163,11 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
       abi.encode(expectedOut)
     );
 
-    Pool.ReleaseOrMintOutV1 memory actualOut = s_usdcTokenPoolProxy.releaseOrMint(releaseOrMintIn);
+    vm.expectCall(
+      address(s_cctpThroughCCVTokenPool), abi.encodeWithSelector(IPoolV2.releaseOrMint.selector, releaseOrMintIn, 0)
+    );
+
+    Pool.ReleaseOrMintOutV1 memory actualOut = s_usdcTokenPoolProxy.releaseOrMint(releaseOrMintIn, 0);
 
     assertEq(actualOut.destinationAmount, expectedOut.destinationAmount);
   }
@@ -192,6 +210,8 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
       abi.encodeWithSelector(IPoolV1.releaseOrMint.selector, releaseOrMintIn),
       abi.encode(expectedOut)
     );
+
+    vm.expectCall(address(s_cctpV2Pool), abi.encodeWithSelector(IPoolV1.releaseOrMint.selector, releaseOrMintIn));
 
     Pool.ReleaseOrMintOutV1 memory actualOut = s_usdcTokenPoolProxy.releaseOrMint(releaseOrMintIn);
 
@@ -304,5 +324,51 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
 
     vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.CallerIsNotARampOnRouter.selector, unauthorized));
     s_usdcTokenPoolProxy.releaseOrMint(releaseOrMintIn);
+  }
+
+  function test_releaseOrMint_V2_RevertWhen_CallerIsNotARampOnRouter() public {
+    address unauthorized = makeAddr("unauthorized");
+
+    vm.startPrank(unauthorized);
+
+    Pool.ReleaseOrMintInV1 memory releaseOrMintIn = Pool.ReleaseOrMintInV1({
+      remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+      originalSender: abi.encode(s_sender),
+      receiver: s_receiver,
+      sourceDenominatedAmount: 1000,
+      localToken: address(s_USDCToken),
+      sourcePoolData: abi.encodePacked(USDCSourcePoolDataCodec.LOCK_RELEASE_FLAG, bytes32(0)),
+      sourcePoolAddress: s_sourcePoolAddress,
+      offchainTokenData: ""
+    });
+
+    vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.CallerIsNotARampOnRouter.selector, unauthorized));
+    s_usdcTokenPoolProxy.releaseOrMint(releaseOrMintIn, 0);
+  }
+
+  function test_releaseOrMint_V2_RevertWhen_InvalidMessageVersion() public {
+    bytes memory invalidSourcePoolData = abi.encodePacked(bytes4(uint32(9999)), uint32(0), bytes32(hex"deafbeef"));
+
+    vm.mockCall(
+      address(s_router),
+      abi.encodeWithSelector(Router.isOffRamp.selector, SOURCE_CHAIN_SELECTOR, s_routerAllowedOffRamp),
+      abi.encode(true)
+    );
+
+    vm.startPrank(s_routerAllowedOffRamp);
+
+    Pool.ReleaseOrMintInV1 memory releaseOrMintIn = Pool.ReleaseOrMintInV1({
+      remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+      originalSender: abi.encode(s_sender),
+      receiver: s_receiver,
+      sourceDenominatedAmount: 1234,
+      localToken: address(s_USDCToken),
+      sourcePoolData: invalidSourcePoolData,
+      sourcePoolAddress: s_sourcePoolAddress,
+      offchainTokenData: ""
+    });
+
+    vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.InvalidMessageVersion.selector, bytes4(uint32(9999))));
+    s_usdcTokenPoolProxy.releaseOrMint(releaseOrMintIn, 0);
   }
 }
