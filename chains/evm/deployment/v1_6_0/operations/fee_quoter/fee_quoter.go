@@ -16,7 +16,6 @@ import (
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	fq163 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/fee_quoter"
 )
 
 var ContractType cldf_deployment.ContractType = "FeeQuoter"
@@ -211,23 +210,17 @@ type ConstructorArgs struct {
 	DestChainConfigArgs            []DestChainConfigArgs
 }
 
-// TODO: remove before merge, this file is auto generated.
-// TODO: devenv needs to support deploying Fee Quoter with v1.6.3 bytecode to support non-evms,
-// TODO: could be achieved by overriding the deployment sequence with 1.6.3 deployment operation
-// Deploy uses v1.6.3 bytecode which includes TVM (TON) family selector support.
-// The v1.6.0 bytecode only validates EVM and SVM selectors, so deploying with
-// v1.6.3 bytecode is required for cross-chain support with TON chains.
 var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Name:        "fee-quoter:deploy",
 	Version:     Version,
 	Description: "Deploys the FeeQuoter contract",
 	ContractMetadata: &bind.MetaData{
 		ABI: FeeQuoterABI,
-		Bin: fq163.FeeQuoterBin,
+		Bin: FeeQuoterBin,
 	},
 	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
 		cldf_deployment.NewTypeAndVersion(ContractType, *Version).String(): {
-			EVM: common.FromHex(fq163.FeeQuoterBin),
+			EVM: common.FromHex(FeeQuoterBin),
 		},
 	},
 	Validate: func(ConstructorArgs) error { return nil },
