@@ -18,6 +18,9 @@ import (
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+{{- range .SupportedBinVersions}}
+	{{.ImportAlias}} "{{.ImportPath}}"
+{{- end}}
 )
 
 var ContractType cldf_deployment.ContractType = "{{.ContractType}}"
@@ -108,6 +111,11 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 		cldf_deployment.NewTypeAndVersion(ContractType, *Version).String(): {
 			EVM: common.FromHex({{.ContractType}}Bin),
 		},
+{{- range .SupportedBinVersions}}
+		cldf_deployment.NewTypeAndVersion(ContractType, *{{.ImportAlias}}.Version).String(): {
+			EVM: common.FromHex({{.ImportAlias}}.{{$.ContractType}}Bin),
+		},
+{{- end}}
 	},
 	Validate: func(ConstructorArgs) error { return nil },
 })

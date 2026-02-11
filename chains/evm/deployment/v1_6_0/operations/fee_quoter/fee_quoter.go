@@ -16,6 +16,7 @@ import (
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	fee_quoter_v1_6_3 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_3/operations/fee_quoter"
 )
 
 var ContractType cldf_deployment.ContractType = "FeeQuoter"
@@ -221,6 +222,9 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
 		cldf_deployment.NewTypeAndVersion(ContractType, *Version).String(): {
 			EVM: common.FromHex(FeeQuoterBin),
+		},
+		cldf_deployment.NewTypeAndVersion(ContractType, *fee_quoter_v1_6_3.Version).String(): {
+			EVM: common.FromHex(fee_quoter_v1_6_3.FeeQuoterBin),
 		},
 	},
 	Validate: func(ConstructorArgs) error { return nil },

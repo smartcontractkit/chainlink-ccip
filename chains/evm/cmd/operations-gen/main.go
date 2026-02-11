@@ -76,16 +76,18 @@ type InputConfig struct {
 }
 
 type OutputConfig struct {
-	BasePath string `yaml:"base_path"`
+	BasePath   string `yaml:"base_path"`
+	ModulePath string `yaml:"module_path"` // Go module path, used for cross-version imports
 }
 
 type ContractConfig struct {
-	Name         string           `yaml:"contract_name"`
-	Version      string           `yaml:"version"`
-	PackageName  string           `yaml:"package_name,omitempty"`  // Optional: override package name
-	ABIFile      string           `yaml:"abi_file,omitempty"`      // Optional: override ABI file name
-	NoDeployment bool             `yaml:"no_deployment,omitempty"` // Optional: skip bytecode and deploy operation
-	Functions    []FunctionConfig `yaml:"functions"`
+	Name                 string           `yaml:"contract_name"`
+	Version              string           `yaml:"version"`
+	PackageName          string           `yaml:"package_name,omitempty"`              // Optional: override package name
+	ABIFile              string           `yaml:"abi_file,omitempty"`                  // Optional: override ABI file name
+	NoDeployment         bool             `yaml:"no_deployment,omitempty"`             // Optional: skip bytecode and deploy operation
+	Functions            []FunctionConfig `yaml:"functions"`
+	SupportedBinVersions []string         `yaml:"supported_bin_versions,omitempty"` // Optional: additional bytecode versions available via this deploy operation
 }
 
 type FunctionConfig struct {
@@ -109,17 +111,18 @@ type ABIParam struct {
 }
 
 type ContractInfo struct {
-	Name          string
-	Version       string
-	PackageName   string
-	OutputPath    string
-	ABI           string
-	Bytecode      string
-	NoDeployment  bool
-	Constructor   *FunctionInfo
-	Functions     map[string]*FunctionInfo
-	FunctionOrder []string
-	StructDefs    map[string]*StructDef
+	Name                 string
+	Version              string
+	PackageName          string
+	OutputPath           string
+	ABI                  string
+	Bytecode             string
+	NoDeployment         bool
+	SupportedBinVersions []SupportedBinVersion
+	Constructor          *FunctionInfo
+	Functions            map[string]*FunctionInfo
+	FunctionOrder        []string
+	StructDefs           map[string]*StructDef
 }
 
 type StructDef struct {
@@ -146,21 +149,27 @@ type ParameterInfo struct {
 	Components   []ParameterInfo
 }
 
+type SupportedBinVersion struct {
+	ImportAlias string // e.g. "fee_quoter_v1_6_3"
+	ImportPath  string // e.g. "github.com/smartcontractkit/.../v1_6_3/operations/fee_quoter"
+}
+
 type TemplateData struct {
-	PackageName       string
-	PackageNameHyphen string
-	ContractType      string
-	Version           string
-	ABI               string
-	Bytecode          string
-	NeedsBigInt       bool
-	HasWriteOps       bool
-	NoDeployment      bool
-	Constructor       *ConstructorData
-	StructDefs        []StructDefData
-	ArgStructs        []ArgStructData
-	Operations        []OperationData
-	ContractMethods   []ContractMethodData
+	PackageName          string
+	PackageNameHyphen    string
+	ContractType         string
+	Version              string
+	ABI                  string
+	Bytecode             string
+	NeedsBigInt          bool
+	HasWriteOps          bool
+	NoDeployment         bool
+	SupportedBinVersions []SupportedBinVersion
+	Constructor          *ConstructorData
+	StructDefs           []StructDefData
+	ArgStructs           []ArgStructData
+	Operations           []OperationData
+	ContractMethods      []ContractMethodData
 }
 
 type ConstructorData struct {
@@ -285,16 +294,29 @@ func extractContractInfo(cfg ContractConfig, input InputConfig, output OutputCon
 		return nil, fmt.Errorf("failed to parse ABI: %w", err)
 	}
 
+	// Build supported bin versions for cross-version bytecode imports
+	var supportedBinVersions []SupportedBinVersion
+	for _, v := range cfg.SupportedBinVersions {
+		vPath := versionToPath(v)
+		importPath := output.ModulePath + "/" + vPath + "/operations/" + packageName
+		alias := packageName + "_" + vPath
+		supportedBinVersions = append(supportedBinVersions, SupportedBinVersion{
+			ImportAlias: alias,
+			ImportPath:  importPath,
+		})
+	}
+
 	info := &ContractInfo{
-		Name:         cfg.Name,
-		Version:      cfg.Version,
-		PackageName:  packageName,
-		OutputPath:   filepath.Join(output.BasePath, versionPath, "operations", packageName, packageName+".go"),
-		ABI:          abiString,
-		Bytecode:     bytecode,
-		NoDeployment: cfg.NoDeployment,
-		Functions:    make(map[string]*FunctionInfo),
-		StructDefs:   make(map[string]*StructDef),
+		Name:                 cfg.Name,
+		Version:              cfg.Version,
+		PackageName:          packageName,
+		OutputPath:           filepath.Join(output.BasePath, versionPath, "operations", packageName, packageName+".go"),
+		ABI:                  abiString,
+		Bytecode:             bytecode,
+		NoDeployment:         cfg.NoDeployment,
+		SupportedBinVersions: supportedBinVersions,
+		Functions:            make(map[string]*FunctionInfo),
+		StructDefs:           make(map[string]*StructDef),
 	}
 
 	extractConstructor(info, abiEntries)
@@ -584,13 +606,14 @@ func generateOperationsFile(info *ContractInfo) error {
 
 func prepareTemplateData(info *ContractInfo) TemplateData {
 	data := TemplateData{
-		PackageName:       info.PackageName,
-		PackageNameHyphen: toKebabCase(info.PackageName),
-		ContractType:      info.Name,
-		Version:           info.Version,
-		ABI:               info.ABI,
-		Bytecode:          info.Bytecode,
-		NeedsBigInt:       checkNeedsBigInt(info),
+		PackageName:          info.PackageName,
+		PackageNameHyphen:    toKebabCase(info.PackageName),
+		ContractType:         info.Name,
+		Version:              info.Version,
+		ABI:                  info.ABI,
+		Bytecode:             info.Bytecode,
+		NeedsBigInt:          checkNeedsBigInt(info),
+		SupportedBinVersions: info.SupportedBinVersions,
 		NoDeployment:      info.NoDeployment,
 	}
 
@@ -824,3 +847,4 @@ func prepareReadOp(funcInfo *FunctionInfo) ReadOpData {
 		CallArgs:   callArgs,
 	}
 }
+

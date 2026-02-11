@@ -5,6 +5,7 @@ input:
 
 output:
   base_path: "." # Directory for generated operations/
+  module_path: "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment"
 
 # Access control aliases
 # - owner: Only contract owner can call (OnlyOwner)
@@ -120,6 +121,8 @@ contracts:
 
   - contract_name: FeeQuoter
     version: "1.6.0"
+    supported_bin_versions:
+      - "1.6.3"
     functions:
       - name: applyDestChainConfigUpdates
         access: owner
