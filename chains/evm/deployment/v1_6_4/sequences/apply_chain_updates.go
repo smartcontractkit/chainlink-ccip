@@ -2,25 +2,25 @@ package sequences
 
 import (
 	"fmt"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/token_pool"
+	usdc_pool_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/usdc_token_pool_cctp_v2"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
-	token_pool_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/token_pool"
 )
 
 type ApplyChainUpdatesSequenceInput struct {
 	AddressesByChain map[uint64][]common.Address
-	UpdatesByChain   map[uint64]map[common.Address]token_pool_ops.ApplyChainUpdatesArgs
+	UpdatesByChain   map[uint64]map[common.Address]usdc_pool_ops.ApplyChainUpdatesArgs
 }
 
 var (
 	TokenPoolApplyChainUpdatesSequence = operations.NewSequence(
 		"TokenPoolApplyChainUpdatesSequence",
-		token_pool.Version,
+		usdc_pool_ops.Version,
 		"Applies chain updates to a sequence of TokenPool contracts on multiple chains",
 		func(b operations.Bundle, chains cldf_chain.BlockChains, input ApplyChainUpdatesSequenceInput) (sequences.OnChainOutput, error) {
 			writes := make([]contract.WriteOutput, 0)
@@ -37,7 +37,7 @@ var (
 					chainUpdate := input.UpdatesByChain[chainSel][address]
 
 					// Execute the operation ApplyChainUpdates
-					report, err := operations.ExecuteOperation(b, token_pool_ops.ApplyChainUpdates, chain, contract.FunctionInput[token_pool_ops.ApplyChainUpdatesArgs]{
+					report, err := operations.ExecuteOperation(b, usdc_pool_ops.ApplyChainUpdates, chain, contract.FunctionInput[usdc_pool_ops.ApplyChainUpdatesArgs]{
 						ChainSelector: chain.Selector,
 						Address:       address,
 						Args:          chainUpdate,

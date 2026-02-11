@@ -28,8 +28,20 @@ func (ma *productTest_MockTokenAdapter) DeriveTokenAddress(e deployment.Environm
 	return []byte{}, nil
 }
 
+func (ma *productTest_MockTokenAdapter) DeriveTokenDecimals(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) (uint8, error) {
+	return 18, nil
+}
+
+func (ma *productTest_MockTokenAdapter) DeriveTokenPoolCounterpart(e deployment.Environment, chainSelector uint64, tokenPool []byte, token []byte) ([]byte, error) {
+	return []byte{}, nil
+}
+
 func (ma *productTest_MockTokenAdapter) ManualRegistration() *cldf_ops.Sequence[tokens.ManualRegistrationInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return &cldf_ops.Sequence[tokens.ManualRegistrationInput, sequences.OnChainOutput, cldf_chain.BlockChains]{}
+}
+
+func (ma *productTest_MockTokenAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokens.RateLimiterConfigInputs, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return &cldf_ops.Sequence[tokens.RateLimiterConfigInputs, sequences.OnChainOutput, cldf_chain.BlockChains]{}
 }
 
 func (ma *productTest_MockTokenAdapter) DeployToken() *cldf_ops.Sequence[tokens.DeployTokenInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
@@ -50,10 +62,6 @@ func (ma *productTest_MockTokenAdapter) RegisterToken() *cldf_ops.Sequence[token
 
 func (ma *productTest_MockTokenAdapter) SetPool() *cldf_ops.Sequence[tokens.SetPoolInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return &cldf_ops.Sequence[tokens.SetPoolInput, sequences.OnChainOutput, cldf_chain.BlockChains]{}
-}
-
-func (ma *productTest_MockTokenAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokens.UpdateAuthoritiesInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
-	return &cldf_ops.Sequence[tokens.UpdateAuthoritiesInput, sequences.OnChainOutput, cldf_chain.BlockChains]{}
 }
 
 func TestRegisterTokenAdapter(t *testing.T) {
