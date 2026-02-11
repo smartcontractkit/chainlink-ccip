@@ -323,10 +323,7 @@ func (a *EVMAdapter) DeployTokenVerify(e deployment.Environment, in any) error {
 	if err := utils.ValidateEVMAddress(input.CCIPAdmin, "CCIPAdmin"); err != nil {
 		return err
 	}
-	if len(input.ExternalAdmin) > 1 {
-		return fmt.Errorf("only one ExternalAdmin address is supported for EVM chains")
-	}
-	if err := utils.ValidateEVMAddress(input.ExternalAdmin[0], "ExternalAdmin"); err != nil {
+	if err := utils.ValidateEVMAddress(input.ExternalAdmin, "ExternalAdmin"); err != nil {
 		return err
 	}
 	// ensuring that decimals is not more than 18

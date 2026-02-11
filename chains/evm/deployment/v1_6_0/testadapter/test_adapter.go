@@ -389,7 +389,7 @@ func (a *EVMAdapter) GetTokenExpansionConfig() tokensapi.TokenExpansionInputPerC
 			Supply:                 big.NewInt(0),            // unlimited supply
 			PreMint:                mintAmnt,                 // pre-mint some tokens for transfers
 			Senders:                []string{admin},          // use deployer as sender
-			ExternalAdmin:          []string{},               // not needed for tests
+			ExternalAdmin:          "",                       // not needed for tests
 			DisableFreezeAuthority: false,                    // not applicable for EVM
 			TokenPrivKey:           "",                       // not applicable for EVM
 			CCIPAdmin:              admin,                    // deployer is the admin (if empty defaults to timelock)
