@@ -38,6 +38,8 @@ package ccip
 //go:generate go run ./wrap ccip CCTPThroughCCVTokenPool cctp_through_ccv_token_pool
 //go:generate go run ./wrap ccip CCTPMessageTransmitterProxy cctp_message_transmitter_proxy
 //go:generate go run ./wrap ccip SiloedUSDCTokenPool siloed_usdc_token_pool
+//go:generate go run ./wrap ccip USDCTokenPoolCCTPV2 usdc_token_pool_cctp_v2
+//go:generate go run ./wrap ccip USDCTokenPool usdc_token_pool
 //go:generate go run ./wrap ccip BurnMintWithLockReleaseFlagTokenPool burn_mint_with_lock_release_flag_token_pool
 //go:generate go run ./wrap ccip LombardTokenPool lombard_token_pool
 

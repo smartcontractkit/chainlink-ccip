@@ -113,15 +113,27 @@ func buildIxData(closeAuthority *solana.PublicKey) []byte {
 	return buf.Bytes()
 }
 
-func CreateMultisig(ctx context.Context, payer, program, multisig solana.PublicKey, m uint8, signers []solana.PublicKey, client *rpc.Client, commitment rpc.CommitmentType) ([]solana.Instruction, error) {
+const MultisigSize = 355
+
+func CreateMultisig(ctx context.Context, payer, tokenProgram, multisig solana.PublicKey, m uint8, signers []solana.PublicKey, client *rpc.Client, commitment rpc.CommitmentType) ([]solana.Instruction, error) {
 	// get stake amount for init
-	lamports, err := client.GetMinimumBalanceForRentExemption(ctx, 355, commitment)
+	lamports, err := client.GetMinimumBalanceForRentExemption(ctx, MultisigSize, commitment)
 	if err != nil {
 		return nil, err
 	}
 
-	// initialize mint account
-	initI, err := system.NewCreateAccountInstruction(lamports, 355, program, payer, multisig).ValidateAndBuild()
+	return IxsInitTokenMultisig(tokenProgram, lamports, payer, multisig, m, signers)
+}
+
+func IxsInitTokenMultisig(tokenProgram solana.PublicKey, lamports uint64, payer solana.PublicKey, multisig solana.PublicKey, m uint8, signers []solana.PublicKey) ([]solana.Instruction, error) {
+	if tokenProgram.IsZero() {
+		return nil, fmt.Errorf("token program is zero")
+	}
+	if !tokenProgram.Equals(solana.Token2022ProgramID) && !tokenProgram.Equals(solana.TokenProgramID) {
+		return nil, fmt.Errorf("unsupported token program: %s", tokenProgram.String())
+	}
+	// initialize Multisig account
+	initI, err := system.NewCreateAccountInstruction(lamports, MultisigSize, tokenProgram, payer, multisig).ValidateAndBuild()
 	if err != nil {
 		return nil, err
 	}
@@ -137,7 +149,7 @@ func CreateMultisig(ctx context.Context, payer, program, multisig solana.PublicK
 		return nil, err
 	}
 
-	msigWrap := &TokenInstruction{msigInitIx, program}
+	msigWrap := &TokenInstruction{msigInitIx, tokenProgram}
 	return []solana.Instruction{initI, msigWrap}, nil
 }
 

@@ -20,4 +20,102 @@ library USDCSourcePoolDataCodec {
 
   /// @dev The preimage is bytes4(keccak256("CCTP_V2_CCV"))
   bytes4 public constant CCTP_VERSION_2_CCV_TAG = 0x3047587c;
+
+  /// Note: Since this struct never exists in storage, only in memory after an ABI-decoding, proper struct-packing
+  /// is not necessary and field ordering has been defined so as to best support off-chain code.
+  /// @dev This struct has been titled for version 1 to indicate that it should be used for CCTP V1 messages.
+  struct SourceTokenDataPayloadV1 {
+    uint64 nonce; // Nonce of the message returned from the depositForBurnWithCaller() call to the CCTP contracts.
+    uint32 sourceDomain; // Source domain of the message.
+  }
+
+  /// @dev This struct has been titled for version 2 to indicate that it should be used for CCTP V2 messages. Whether
+  /// it is a slow or fast transfer is irrelevant as it will be routed to the same destination CCTP V2 pool regardless.
+  struct SourceTokenDataPayloadV2 {
+    uint32 sourceDomain;
+    bytes32 depositHash;
+  }
+
+  /// @notice Encodes the source token data payload into a bytes array using the CCTP V2 tag.
+  /// @param sourceTokenDataPayload The source token data payload to encode.
+  /// @return The encoded source token data payload.
+  function _encodeSourceTokenDataPayloadV2(
+    SourceTokenDataPayloadV2 memory sourceTokenDataPayload
+  ) internal pure returns (bytes memory) {
+    return abi.encodePacked(CCTP_VERSION_2_TAG, sourceTokenDataPayload.sourceDomain, sourceTokenDataPayload.depositHash);
+  }
+
+  /// @notice Encodes the source token data payload into a bytes array using the CCTP V2 CCV tag.
+  /// @param sourceTokenDataPayload The source token data payload to encode.
+  /// @return The encoded source token data payload.
+  function _encodeSourceTokenDataPayloadV2CCV(
+    SourceTokenDataPayloadV2 memory sourceTokenDataPayload
+  ) internal pure returns (bytes memory) {
+    return
+      abi.encodePacked(CCTP_VERSION_2_CCV_TAG, sourceTokenDataPayload.sourceDomain, sourceTokenDataPayload.depositHash);
+  }
+
+  /// @notice Decodes the abi.encodePacked() source pool data into its corresponding SourceTokenDataPayload struct.
+  /// @param sourcePoolData The source pool data to decode in raw bytes.
+  /// @return sourceTokenDataPayload The decoded source token data payload.
+  function _decodeSourceTokenDataPayloadV2(
+    bytes memory sourcePoolData
+  ) internal pure returns (SourceTokenDataPayloadV2 memory sourceTokenDataPayload) {
+    bytes4 version;
+    uint32 sourceDomain;
+    bytes32 depositHash;
+
+    assembly {
+      // Load version (first 4 bytes of data, offset 32 to skip the length slot)
+      version := mload(add(sourcePoolData, 32))
+      // Load sourceDomain (next 4 bytes, offset 36 (32 + 4)) - shift right by 224 bits to get left-most 4 bytes
+      // offset 36 = 32 (length slot) + 4 (uint32)
+      // shift right by 224 = 256 - 32 (uint32)
+      sourceDomain := shr(224, mload(add(sourcePoolData, 36)))
+      // Load depositHash (next 32 bytes) - Since depositHash is a bytes32, no shifting is needed.
+      // offset 40 = 32 (length slot) + 4 (bytes4) + 4 (uint32)
+      depositHash := mload(add(sourcePoolData, 40))
+    }
+
+    if (version != CCTP_VERSION_2_TAG && version != CCTP_VERSION_2_CCV_TAG) revert InvalidVersion(version);
+
+    sourceTokenDataPayload.sourceDomain = sourceDomain;
+    sourceTokenDataPayload.depositHash = depositHash;
+
+    return sourceTokenDataPayload;
+  }
+
+  /// @notice Calculates the deposit hash for the source pool data.
+  /// @param sourceDomain The source domain of the message.
+  /// @param amount The amount of the message.
+  /// @param destinationDomain The destination domain of the message.
+  /// @param mintRecipient The mint recipient of the message.
+  /// @param burnToken The burn token of the message.
+  /// @param destinationCaller The destination caller of the message.
+  /// @param maxFee The max fee of the message.
+  /// @param minFinalityThreshold The min finality threshold of the message.
+  /// @return depositHash The deposit hash of the source pool data which will be matched off-chain to its CCTP attestation.
+  function _calculateDepositHash(
+    uint32 sourceDomain,
+    uint256 amount,
+    uint32 destinationDomain,
+    bytes32 mintRecipient,
+    bytes32 burnToken,
+    bytes32 destinationCaller,
+    uint256 maxFee,
+    uint32 minFinalityThreshold
+  ) internal pure returns (bytes32) {
+    return keccak256(
+      abi.encode(
+        sourceDomain,
+        amount,
+        destinationDomain,
+        mintRecipient,
+        burnToken,
+        destinationCaller,
+        maxFee,
+        minFinalityThreshold
+      )
+    );
+  }
 }

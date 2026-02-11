@@ -49,9 +49,8 @@ type DeployTokenInput struct {
 	Supply   *big.Int `yaml:"supply" json:"supply"`
 	PreMint  *big.Int `yaml:"pre-mint" json:"preMint"`
 	// Customer admin who will be granted admin rights on the token
-	// For EVM, expect to have only one Admin address to be passed on whereas Solana may have multiple multisig signers.
 	// Use string to keep this struct chain-agnostic (EVM uses hex, Solana uses base58, etc.)
-	ExternalAdmin []string `yaml:"external-admin" json:"externalAdmin"`
+	ExternalAdmin string `yaml:"external-admin" json:"externalAdmin"`
 	// Address to be set as the CCIP admin on the token contract, defaults to the timelock address
 	CCIPAdmin string
 	// list of addresses who may need special processing in order to send tokens
@@ -165,24 +164,35 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 			deployTokenInput := input.DeployTokenInput
 			deployTokenInput.ExistingDataStore = e.DataStore
 			deployTokenInput.ChainSelector = selector
-			timelockAddr, err := datastore_utils.FindAndFormatRef(deployTokenInput.ExistingDataStore, datastore.AddressRef{
-				ChainSelector: deployTokenInput.ChainSelector,
-				Type:          datastore.ContractType(common_utils.RBACTimelock),
-				Qualifier:     cfg.MCMS.Qualifier,
-			}, deployTokenInput.ChainSelector, datastore_utils.FullRef)
-			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("couldn't find the RBACTimelock "+
-					"address in datastore for selector %v and qualifier %v %v", deployTokenInput.ChainSelector, cfg.MCMS.Qualifier, err)
-			}
+
 			// if token is deployed by CLL, set CCIP admin as RBACTimelock by default.
 			// If input has CCIPAdmin and which is external address, set that address as CCIPAdmin
 			// and we may not be able to register the token by CLL in that case.
 			if deployTokenInput.CCIPAdmin == "" {
+				filter := datastore.AddressRef{
+					Type:          datastore.ContractType(common_utils.RBACTimelock),
+					ChainSelector: deployTokenInput.ChainSelector,
+					Qualifier:     cfg.MCMS.Qualifier,
+				}
+
+				timelockAddr, err := datastore_utils.FindAndFormatRef(
+					deployTokenInput.ExistingDataStore,
+					filter,
+					deployTokenInput.ChainSelector,
+					datastore_utils.FullRef,
+				)
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf(
+						"couldn't find the RBACTimelock address in datastore for selector %d and qualifier %s: %w",
+						deployTokenInput.ChainSelector, cfg.MCMS.Qualifier, err,
+					)
+				}
+
 				deployTokenInput.CCIPAdmin = timelockAddr.Address
 			}
 			deployTokenReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, tokenPoolAdapter.DeployToken(), e.BlockChains, deployTokenInput)
 			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to manual register token and token pool %d: %w", selector, err)
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy token on chain %d: %w", selector, err)
 			}
 			batchOps = append(batchOps, deployTokenReport.Output.BatchOps...)
 			reports = append(reports, deployTokenReport.ExecutionReports...)
@@ -194,7 +204,10 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %v on chain with selector %d to datastore: %w", r.Type, r.Version, r, r.ChainSelector, err)
 				}
 			}
-			tmpDatastore.Merge(e.DataStore)
+			dataStoreErr := tmpDatastore.Merge(e.DataStore)
+			if dataStoreErr != nil {
+				return cldf.ChangesetOutput{}, dataStoreErr
+			}
 			e.DataStore = tmpDatastore.Seal()
 
 			// deploy token pool
@@ -209,7 +222,7 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 			deployTokenPoolInput.ChainSelector = selector
 			deployTokenPoolReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, tokenPoolAdapter.DeployTokenPoolForToken(), e.BlockChains, deployTokenPoolInput)
 			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to manual register token and token pool %d: %w", selector, err)
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy token pool for token on chain %d: %w", selector, err)
 			}
 			batchOps = append(batchOps, deployTokenPoolReport.Output.BatchOps...)
 			reports = append(reports, deployTokenPoolReport.ExecutionReports...)
@@ -221,7 +234,10 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %v on chain with selector %d to datastore: %w", r.Type, r.Version, r, r.ChainSelector, err)
 				}
 			}
-			tmpDatastore.Merge(e.DataStore)
+			dataStoreErr = tmpDatastore.Merge(e.DataStore)
+			if dataStoreErr != nil {
+				return cldf.ChangesetOutput{}, dataStoreErr
+			}
 			e.DataStore = tmpDatastore.Seal()
 
 			// register token
@@ -272,7 +288,10 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %v on chain with selector %d to datastore: %w", r.Type, r.Version, r, r.ChainSelector, err)
 				}
 			}
-			tmpDatastore.Merge(e.DataStore)
+			dataStoreErr = tmpDatastore.Merge(e.DataStore)
+			if dataStoreErr != nil {
+				return cldf.ChangesetOutput{}, dataStoreErr
+			}
 			e.DataStore = tmpDatastore.Seal()
 		}
 
