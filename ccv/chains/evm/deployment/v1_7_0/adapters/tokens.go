@@ -82,3 +82,27 @@ func (t *TokenAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokens.UpdateAutho
 	// TODO implement me
 	return nil
 }
+
+func (t *TokenAdapter) DeriveTokenDecimals(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) (uint8, error) {
+	chain, ok := e.BlockChains.EVMChains()[chainSelector]
+	if !ok {
+		return 0, fmt.Errorf("chain with selector %d not found", chainSelector)
+	}
+	getTokenDecimalsReport, err := cldf_ops.ExecuteOperation(e.OperationsBundle, token_pool.GetTokenDecimals, chain, contract.FunctionInput[any]{
+		ChainSelector: chainSelector,
+		Address:       common.HexToAddress(poolRef.Address),
+	})
+	if err != nil {
+		return 0, fmt.Errorf("failed to get token decimals from token pool with address %s on %s: %w", poolRef.Address, chain, err)
+	}
+	return getTokenDecimalsReport.Output, nil
+}
+
+func (t *TokenAdapter) DeriveTokenPoolCounterpart(e deployment.Environment, chainSelector uint64, tokenPool []byte, token []byte) ([]byte, error) {
+	return tokenPool, nil
+}
+
+func (t *TokenAdapter) SetTokenPoolRateLimits() *operations.Sequence[tokens.RateLimiterConfigInputs, sequences.OnChainOutput, chain.BlockChains] {
+	// TODO implement me
+	return nil
+}

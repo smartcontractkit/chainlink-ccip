@@ -91,10 +91,6 @@ type RemoteChainConfig[R any, CCV any] struct {
 	CustomFinalityOutboundRateLimiterConfig RateLimiterConfig
 	// Decimals of the token on the remote chain.
 	RemoteDecimals uint8
-	// InboundRateLimiterConfig specifies the desired rate limiter configuration for inbound traffic.
-	InboundRateLimiterConfig RateLimiterConfig
-	// OutboundRateLimiterConfig specifies the desired rate limiter configuration for outbound traffic.
-	OutboundRateLimiterConfig RateLimiterConfig
 	// OutboundCCVs specifies the verifiers to apply to outbound traffic.
 	OutboundCCVs []CCV
 	// InboundCCVs specifies the verifiers to apply to inbound traffic.

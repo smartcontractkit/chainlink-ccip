@@ -199,7 +199,7 @@ func updateFeeQuoterApply(fquRegistry *FQAndRampUpdaterRegistry, mcmsRegistry *c
 				if !ok {
 					return cldf.ChangesetOutput{}, utils.ErrNoAdapterRegistered("ConfigImporter", perChainInput.FeeQuoterVersion)
 				}
-				err := configImporter.InitializeAdapter(e, chainSel)
+				err := configImporter.InitializeAdapter(e, []uint64{chainSel})
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to initialize config importer for chain %d: %w", chainSel, err)
 				}

@@ -12,7 +12,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	onrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
@@ -32,18 +31,6 @@ type OnRampImportConfigSequenceOutput struct {
 	DestChainCfgs map[uint64]any // GetDestChainConfig returns any (manually added operation)
 	StaticConfig  onrampops.StaticConfig
 	DynamicConfig onrampops.DynamicConfig
-}
-
-type OnRampImportConfigSequenceInput struct {
-	Address       common.Address
-	ChainSelector uint64
-	RemoteChains  []uint64
-}
-
-type OnRampImportConfigSequenceOutput struct {
-	DestChainCfgs map[uint64]onramp.GetDestChainConfig
-	StaticConfig  onramp.OnRampStaticConfig
-	DynamicConfig onramp.OnRampDynamicConfig
 }
 
 var (

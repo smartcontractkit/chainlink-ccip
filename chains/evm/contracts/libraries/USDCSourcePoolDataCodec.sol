@@ -2,6 +2,8 @@
 pragma solidity ^0.8.24;
 
 library USDCSourcePoolDataCodec {
+  error InvalidVersion(bytes4 version);
+
   /// @dev The flag used to indicate that the source pool data is coming from a chain that does not have CCTP Support,
   /// and so the lock release pool should be used. The BurnMintWithLockReleaseTokenPool uses this flag as its source pool
   /// data to indicate that the tokens should be released from the lock release pool rather than attempting to be minted

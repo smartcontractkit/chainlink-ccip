@@ -5,7 +5,6 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -105,10 +104,9 @@ func (ru RampUpdateWithFQ) SequenceUpdateRampsWithFeeQuoter() *cldf_ops.Sequence
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found in environment", input.ChainSelector)
 			}
-			onDCfgReport, err := cldf_ops.ExecuteOperation(b, onrampops.GetDynamicConfig, chain, contract.FunctionInput[any]{
+			onDCfgReport, err := cldf_ops.ExecuteOperation(b, onrampops.GetDynamicConfig, chain, contract.FunctionInput[struct{}]{
 				ChainSelector: input.ChainSelector,
 				Address:       common.HexToAddress(input.OnRampAddressRef.Address),
-				Args:          nil,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, err
@@ -117,7 +115,7 @@ func (ru RampUpdateWithFQ) SequenceUpdateRampsWithFeeQuoter() *cldf_ops.Sequence
 			if existingDynamicConfig.FeeQuoter != common.HexToAddress(input.FeeQuoterAddress.Address) {
 				// Update OnRamp's FeeQuoter address
 				existingDynamicConfig.FeeQuoter = common.HexToAddress(input.FeeQuoterAddress.Address)
-				onRampReport, err := cldf_ops.ExecuteOperation(b, onrampops.OnRampSetDynamicConfig, chain, contract.FunctionInput[onrampops.DynamicConfig]{
+				onRampReport, err := cldf_ops.ExecuteOperation(b, onrampops.SetDynamicConfig, chain, contract.FunctionInput[onrampops.DynamicConfig]{
 					ChainSelector: input.ChainSelector,
 					Address:       common.HexToAddress(input.OnRampAddressRef.Address),
 					Args:          existingDynamicConfig,
@@ -128,10 +126,9 @@ func (ru RampUpdateWithFQ) SequenceUpdateRampsWithFeeQuoter() *cldf_ops.Sequence
 				writes = append(writes, onRampReport.Output)
 			}
 			// Similarly, update OffRamp's FeeQuoter address
-			offDCfgReport, err := cldf_ops.ExecuteOperation(b, offrampops.GetDynamicConfig, chain, contract.FunctionInput[any]{
+			offDCfgReport, err := cldf_ops.ExecuteOperation(b, offrampops.GetDynamicConfig, chain, contract.FunctionInput[struct{}]{
 				ChainSelector: input.ChainSelector,
 				Address:       common.HexToAddress(input.OffRampAddressRef.Address),
-				Args:          nil,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, err
@@ -139,7 +136,7 @@ func (ru RampUpdateWithFQ) SequenceUpdateRampsWithFeeQuoter() *cldf_ops.Sequence
 			existingOffDynamicConfig := offDCfgReport.Output
 			if existingOffDynamicConfig.FeeQuoter != common.HexToAddress(input.FeeQuoterAddress.Address) {
 				existingOffDynamicConfig.FeeQuoter = common.HexToAddress(input.FeeQuoterAddress.Address)
-				offRampReport, err := cldf_ops.ExecuteOperation(b, offrampops.OffRampSetDynamicConfig, chain, contract.FunctionInput[offrampops.DynamicConfig]{
+				offRampReport, err := cldf_ops.ExecuteOperation(b, offrampops.SetDynamicConfig, chain, contract.FunctionInput[offrampops.DynamicConfig]{
 					ChainSelector: input.ChainSelector,
 					Address:       common.HexToAddress(input.OffRampAddressRef.Address),
 					Args:          existingOffDynamicConfig,
@@ -150,7 +147,7 @@ func (ru RampUpdateWithFQ) SequenceUpdateRampsWithFeeQuoter() *cldf_ops.Sequence
 				writes = append(writes, offRampReport.Output)
 			}
 			if len(input.SourceChains) > 0 {
-				var sourceChainConfigs []offramp.OffRampSourceChainConfigArgs
+				var sourceChainConfigs []offrampops.SourceChainConfigArgs
 				for srcChainSelector, srcChainConfig := range input.SourceChains {
 					// Check if the source chain config already exists and is up to date
 					existingSrcChainsReport, err := cldf_ops.ExecuteOperation(b, offrampops.GetSourceChainConfig, chain, contract.FunctionInput[uint64]{
@@ -166,7 +163,7 @@ func (ru RampUpdateWithFQ) SequenceUpdateRampsWithFeeQuoter() *cldf_ops.Sequence
 						existingSrcChainConfig.Router == common.HexToAddress(srcChainConfig.Router.Address) {
 						continue
 					}
-					sourceChainConfigs = append(sourceChainConfigs, offramp.OffRampSourceChainConfigArgs{
+					sourceChainConfigs = append(sourceChainConfigs, offrampops.SourceChainConfigArgs{
 						SourceChainSelector:       srcChainSelector,
 						Router:                    common.HexToAddress(srcChainConfig.Router.Address),
 						OnRamp:                    common.Hex2Bytes(srcChainConfig.OnRamp.Address),
@@ -176,13 +173,12 @@ func (ru RampUpdateWithFQ) SequenceUpdateRampsWithFeeQuoter() *cldf_ops.Sequence
 				}
 				if len(sourceChainConfigs) > 0 {
 					offRampSrcReport, err := cldf_ops.ExecuteOperation(
-						b, offrampops.OffRampApplySourceChainConfigUpdates,
-						chain, contract.FunctionInput[[]offramp.OffRampSourceChainConfigArgs]{
-							Address:       common.HexToAddress(input.OffRampAddressRef.Address),
+						b, offrampops.ApplySourceChainConfigUpdates,
+						chain, contract.FunctionInput[[]offrampops.SourceChainConfigArgs]{
 							ChainSelector: input.ChainSelector,
+							Address:       common.HexToAddress(input.OffRampAddressRef.Address),
 							Args:          sourceChainConfigs,
-						},
-					)
+						})
 					if err != nil {
 						return sequences.OnChainOutput{}, err
 					}

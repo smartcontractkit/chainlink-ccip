@@ -229,7 +229,6 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 				return makeBaseDataStore(t, []uint64{5009297550715157269, 15971525489660198786})
 			},
 			cfg: tokens.ConfigureTokensForTransfersConfig{
-				ChainAdapterVersion: semver.MustParse("1.0.0"),
 				Tokens: []tokens.TokenTransferConfig{
 					{
 						ChainSelector: 5009297550715157269,
@@ -288,7 +287,6 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 				return makeBaseDataStore(t, []uint64{5009297550715157269, 15971525489660198786})
 			},
 			cfg: tokens.ConfigureTokensForTransfersConfig{
-				ChainAdapterVersion: semver.MustParse("1.0.0"),
 				Tokens: []tokens.TokenTransferConfig{
 					{
 						ChainSelector: 5009297550715157269,
@@ -353,7 +351,6 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 				return ds
 			},
 			cfg: tokens.ConfigureTokensForTransfersConfig{
-				ChainAdapterVersion: semver.MustParse("1.0.0"),
 				Tokens: []tokens.TokenTransferConfig{
 					{
 						ChainSelector: 5009297550715157269,
@@ -388,7 +385,6 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 				return ds
 			},
 			cfg: tokens.ConfigureTokensForTransfersConfig{
-				ChainAdapterVersion: semver.MustParse("1.0.0"),
 				Tokens: []tokens.TokenTransferConfig{
 					{
 						ChainSelector: 5009297550715157269,
@@ -414,7 +410,6 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 				return makeBaseDataStore(t, []uint64{5009297550715157269})
 			},
 			cfg: tokens.ConfigureTokensForTransfersConfig{
-				ChainAdapterVersion: semver.MustParse("1.0.0"),
 				Tokens: []tokens.TokenTransferConfig{
 					{
 						ChainSelector: 0, // Invalid chain selector
@@ -442,7 +437,6 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 				return ds
 			},
 			cfg: tokens.ConfigureTokensForTransfersConfig{
-				ChainAdapterVersion: semver.MustParse("1.0.0"),
 				Tokens: []tokens.TokenTransferConfig{
 					{
 						ChainSelector: 5009297550715157269,
@@ -490,7 +484,6 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 				return ds
 			},
 			cfg: tokens.ConfigureTokensForTransfersConfig{
-				ChainAdapterVersion: semver.MustParse("1.0.0"),
 				Tokens: []tokens.TokenTransferConfig{
 					{
 						ChainSelector: 5009297550715157269,
@@ -534,7 +527,6 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 				return makeBaseDataStore(t, []uint64{5009297550715157269, 15971525489660198786})
 			},
 			cfg: tokens.ConfigureTokensForTransfersConfig{
-				ChainAdapterVersion: semver.MustParse("1.0.0"),
 				Tokens: []tokens.TokenTransferConfig{
 					{
 						ChainSelector: 5009297550715157269,
@@ -574,7 +566,6 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 				return makeBaseDataStore(t, []uint64{5009297550715157269, 15971525489660198786})
 			},
 			cfg: tokens.ConfigureTokensForTransfersConfig{
-				ChainAdapterVersion: semver.MustParse("1.0.0"),
 				Tokens: []tokens.TokenTransferConfig{
 					{
 						ChainSelector: 5009297550715157269,

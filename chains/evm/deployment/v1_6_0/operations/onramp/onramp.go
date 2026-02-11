@@ -10,7 +10,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
@@ -92,6 +91,10 @@ func (c *OnRampContract) GetDynamicConfig(opts *bind.CallOpts) (DynamicConfig, e
 		return zero, err
 	}
 	return *abi.ConvertType(out[0], new(DynamicConfig)).(*DynamicConfig), nil
+}
+
+func (c *OnRampContract) SetDynamicConfig(opts *bind.TransactOpts, args DynamicConfig) (*types.Transaction, error) {
+	return c.contract.Transact(opts, "setDynamicConfig", args)
 }
 
 type DestChainConfigArgs struct {
@@ -188,49 +191,20 @@ var GetDynamicConfig = contract.NewRead(contract.ReadParams[struct{}, DynamicCon
 	},
 })
 
-var OnRampSetDynamicConfig = contract.NewWrite(contract.WriteParams[DynamicConfig, *onramp.OnRamp]{
+var SetDynamicConfig = contract.NewWrite(contract.WriteParams[DynamicConfig, *OnRampContract]{
 	Name:            "onramp:set-dynamic-config",
 	Version:         Version,
-	Description:     "Sets the dynamic config on the OnRamp 1.6.0 contract",
+	Description:     "Calls setDynamicConfig on the contract",
 	ContractType:    ContractType,
-	ContractABI:     onramp.OnRampABI,
-	NewContract:     onramp.NewOnRamp,
-	IsAllowedCaller: contract.OnlyOwner[*onramp.OnRamp, DynamicConfig],
+	ContractABI:     OnRampABI,
+	NewContract:     NewOnRampContract,
+	IsAllowedCaller: contract.OnlyOwner[*OnRampContract, DynamicConfig],
 	Validate:        func(DynamicConfig) error { return nil },
-	CallContract: func(onRamp *onramp.OnRamp, opts *bind.TransactOpts, args DynamicConfig) (*types.Transaction, error) {
-		return onRamp.SetDynamicConfig(opts, args)
-	},
-})
-
-var GetDestChainConfig = contract.NewRead(contract.ReadParams[uint64, onramp.GetDestChainConfig, *onramp.OnRamp]{
-	Name:         "onramp:get-dest-chain-config",
-	Version:      Version,
-	Description:  "Gets the destination chain config for a given chain selector from the OnRamp 1.6.0 contract",
-	ContractType: ContractType,
-	NewContract:  onramp.NewOnRamp,
-	CallContract: func(onRamp *onramp.OnRamp, opts *bind.CallOpts, arg uint64) (onramp.GetDestChainConfig, error) {
-		return onRamp.GetDestChainConfig(opts, arg)
-	},
-})
-
-var GetStaticConfig = contract.NewRead(contract.ReadParams[any, onramp.OnRampStaticConfig, *onramp.OnRamp]{
-	Name:         "onramp:get-static-config",
-	Version:      Version,
-	Description:  "Gets the static config from the OnRamp 1.6.0 contract",
-	ContractType: ContractType,
-	NewContract:  onramp.NewOnRamp,
-	CallContract: func(onRamp *onramp.OnRamp, opts *bind.CallOpts, args any) (onramp.OnRampStaticConfig, error) {
-		return onRamp.GetStaticConfig(opts)
-	},
-})
-
-var GetDynamicConfig = contract.NewRead(contract.ReadParams[any, onramp.OnRampDynamicConfig, *onramp.OnRamp]{
-	Name:         "onramp:get-dynamic-config",
-	Version:      Version,
-	Description:  "Gets the dynamic config from the OnRamp 1.6.0 contract",
-	ContractType: ContractType,
-	NewContract:  onramp.NewOnRamp,
-	CallContract: func(onRamp *onramp.OnRamp, opts *bind.CallOpts, args any) (onramp.OnRampDynamicConfig, error) {
-		return onRamp.GetDynamicConfig(opts)
+	CallContract: func(
+		c *OnRampContract,
+		opts *bind.TransactOpts,
+		args DynamicConfig,
+	) (*types.Transaction, error) {
+		return c.SetDynamicConfig(opts, args)
 	},
 })

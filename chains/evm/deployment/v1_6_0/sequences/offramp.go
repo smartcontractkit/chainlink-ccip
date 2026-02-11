@@ -13,7 +13,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	offrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
@@ -33,18 +32,6 @@ type OffRampImportConfigSequenceOutput struct {
 	SourceChainCfgs map[uint64]offrampops.SourceChainConfig
 	StaticConfig    offrampops.StaticConfig
 	DynamicConfig   offrampops.DynamicConfig
-}
-
-type OffRampImportConfigSequenceInput struct {
-	Address       common.Address
-	ChainSelector uint64
-	RemoteChains  []uint64
-}
-
-type OffRampImportConfigSequenceOutput struct {
-	SourceChainCfgs map[uint64]offramp.OffRampSourceChainConfig
-	StaticConfig    offramp.OffRampStaticConfig
-	DynamicConfig   offramp.OffRampDynamicConfig
 }
 
 var (

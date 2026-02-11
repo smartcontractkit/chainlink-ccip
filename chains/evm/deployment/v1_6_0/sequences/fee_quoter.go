@@ -47,19 +47,6 @@ type FeeQuoterImportConfigSequenceOutput struct {
 	TokenTransferFeeCfgs map[common.Address]fqops.TokenTransferFeeConfig
 }
 
-type FeeQuoterImportConfigSequenceInput struct {
-	Address              common.Address
-	ChainSelector        uint64
-	TokensPerRemoteChain map[uint64][]common.Address
-	RemoteChains         []uint64
-}
-
-type FeeQuoterImportConfigSequenceOutput struct {
-	RemoteChainCfgs map[uint64]FeeQuoterImportConfigSequenceOutputPerRemoteChain
-	PriceUpdaters   []common.Address
-	StaticCfg       fee_quoter.FeeQuoterStaticConfig
-}
-
 type FeeQuoterImportConfigSequenceOutputPerRemoteChain struct {
 	DestChainCfg         fee_quoter.FeeQuoterDestChainConfig
 	TokenTransferFeeCfgs map[common.Address]fee_quoter.FeeQuoterTokenTransferFeeConfig
