@@ -115,6 +115,10 @@ contracts:
         access: public
       - name: getTokenTransferFeeConfig
         access: public
+      - name: getStaticConfig
+        access: public
+      - name: getAllAuthorizedCallers
+        access: public
 
   - contract_name: OnRamp
     version: "1.6.0"

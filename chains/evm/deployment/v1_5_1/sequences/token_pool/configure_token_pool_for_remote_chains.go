@@ -124,8 +124,8 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 				// If the remote token onchain matches the one provided as input, then we won't call
 				// ApplyChainUpdates and instead handle the onchain updates via SetRateLimiterConfig
 				// and AddRemotePool.
-				inputORL := input.RemoteChainConfig.OutboundRateLimiterConfig
-				inputIRL := input.RemoteChainConfig.InboundRateLimiterConfig
+				inputORL := input.RemoteChainConfig.DefaultFinalityOutboundRateLimiterConfig
+				inputIRL := input.RemoteChainConfig.DefaultFinalityInboundRateLimiterConfig
 				remoteTP := input.RemoteChainConfig.RemotePool
 				remoteCS := input.RemoteChainSelector
 
@@ -219,14 +219,14 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 							RemoteChainSelector: input.RemoteChainSelector,
 							RemoteTokenAddress:  input.RemoteChainConfig.RemoteToken,
 							OutboundRateLimiterConfig: token_pool.RateLimiterConfig{
-								IsEnabled: input.RemoteChainConfig.OutboundRateLimiterConfig.IsEnabled,
-								Capacity:  input.RemoteChainConfig.OutboundRateLimiterConfig.Capacity,
-								Rate:      input.RemoteChainConfig.OutboundRateLimiterConfig.Rate,
+								IsEnabled: input.RemoteChainConfig.DefaultFinalityOutboundRateLimiterConfig.IsEnabled,
+								Capacity:  input.RemoteChainConfig.DefaultFinalityOutboundRateLimiterConfig.Capacity,
+								Rate:      input.RemoteChainConfig.DefaultFinalityOutboundRateLimiterConfig.Rate,
 							},
 							InboundRateLimiterConfig: token_pool.RateLimiterConfig{
-								IsEnabled: input.RemoteChainConfig.InboundRateLimiterConfig.IsEnabled,
-								Capacity:  input.RemoteChainConfig.InboundRateLimiterConfig.Capacity,
-								Rate:      input.RemoteChainConfig.InboundRateLimiterConfig.Rate,
+								IsEnabled: input.RemoteChainConfig.DefaultFinalityInboundRateLimiterConfig.IsEnabled,
+								Capacity:  input.RemoteChainConfig.DefaultFinalityInboundRateLimiterConfig.Capacity,
+								Rate:      input.RemoteChainConfig.DefaultFinalityInboundRateLimiterConfig.Rate,
 							},
 						},
 					},

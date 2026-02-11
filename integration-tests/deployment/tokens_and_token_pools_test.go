@@ -396,8 +396,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 			}
 
 			input := tokensapi.ConfigureTokensForTransfersConfig{
-				ChainAdapterVersion: v1_6_0,
-				MCMS:                NewDefaultInputForMCMS("Configure Tokens For Transfers"),
+				MCMS: NewDefaultInputForMCMS("Configure Tokens For Transfers"),
 				Tokens: []tokensapi.TokenTransferConfig{
 					{
 						ChainSelector: evmA.Chain.Selector,
@@ -414,10 +413,10 @@ func TestTokensAndTokenPools(t *testing.T) {
 						},
 						RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
 							evmB.Chain.Selector: {
-								OutboundRateLimiterConfig: defaultRL,
-								InboundRateLimiterConfig:  defaultRL,
-								OutboundCCVs:              []datastore.AddressRef{},
-								InboundCCVs:               []datastore.AddressRef{},
+								DefaultFinalityOutboundRateLimiterConfig: defaultRL,
+								DefaultFinalityInboundRateLimiterConfig:  defaultRL,
+								OutboundCCVs:                             []datastore.AddressRef{},
+								InboundCCVs:                              []datastore.AddressRef{},
 								RemoteToken: &datastore.AddressRef{
 									ChainSelector: evmB.Chain.Selector,
 									Qualifier:     evmB.Token.Symbol,
