@@ -261,4 +261,15 @@ contract FeeQuoter_applyTokenTransferFeeConfigUpdates is FeeQuoterSetup {
       tokenTransferFeeConfigArgs, new FeeQuoter.TokenTransferFeeConfigRemoveArgs[](0)
     );
   }
+
+  function test_applyTokenTransferFeeConfigUpdates_RevertWhen_InvalidDestChainConfig_DestChainSelectorEqZero() public {
+    FeeQuoter.TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs = _generateTokenTransferFeeConfigArgs(1, 1);
+    tokenTransferFeeConfigArgs[0].destChainSelector = 0;
+
+    vm.expectRevert(abi.encodeWithSelector(FeeQuoter.InvalidDestChainConfig.selector, 0));
+
+    s_feeQuoter.applyTokenTransferFeeConfigUpdates(
+      tokenTransferFeeConfigArgs, new FeeQuoter.TokenTransferFeeConfigRemoveArgs[](0)
+    );
+  }
 }

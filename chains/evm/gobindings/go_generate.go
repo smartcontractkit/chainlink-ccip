@@ -24,6 +24,7 @@ package ccip
 // Pools
 //go:generate go run ./wrap ccip TokenPool token_pool
 //go:generate go run ./wrap ccip AdvancedPoolHooks advanced_pool_hooks
+//go:generate go run ./wrap ccip AdvancedPoolHooksExtractor advanced_pool_hooks_extractor
 
 //go:generate go run ./wrap ccip BurnMintTokenPool burn_mint_token_pool
 //go:generate go run ./wrap ccip BurnFromMintTokenPool burn_from_mint_token_pool

@@ -293,7 +293,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
 
     emit LockedOrBurned({
       remoteChainSelector: lockOrBurnIn.remoteChainSelector,
-      token: address(i_token),
+      token: lockOrBurnIn.localToken,
       sender: msg.sender,
       amount: destTokenAmount
     });
@@ -318,7 +318,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
 
     emit LockedOrBurned({
       remoteChainSelector: lockOrBurnIn.remoteChainSelector,
-      token: address(i_token),
+      token: lockOrBurnIn.localToken,
       sender: msg.sender,
       amount: lockOrBurnIn.amount
     });
@@ -360,7 +360,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
 
     emit ReleasedOrMinted({
       remoteChainSelector: releaseOrMintIn.remoteChainSelector,
-      token: address(i_token),
+      token: releaseOrMintIn.localToken,
       sender: msg.sender,
       recipient: releaseOrMintIn.receiver,
       amount: localAmount
@@ -429,12 +429,14 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
       if (blockConfirmationRequested < minBlockConfirmationConfigured) {
         revert InvalidMinBlockConfirmation(blockConfirmationRequested, minBlockConfirmationConfigured);
       }
-      _consumeCustomBlockConfirmationOutboundRateLimit(lockOrBurnIn.remoteChainSelector, amount);
+      _consumeCustomBlockConfirmationOutboundRateLimit(
+        lockOrBurnIn.localToken, lockOrBurnIn.remoteChainSelector, amount
+      );
     } else {
-      _consumeOutboundRateLimit(lockOrBurnIn.remoteChainSelector, amount);
+      _consumeOutboundRateLimit(lockOrBurnIn.localToken, lockOrBurnIn.remoteChainSelector, amount);
     }
 
-    _preFlightCheck(lockOrBurnIn, blockConfirmationRequested, tokenArgs);
+    _preflightCheck(lockOrBurnIn, blockConfirmationRequested, tokenArgs, amount);
   }
 
   /// @notice Hook for pre-flight checks on lock or burn.
@@ -444,13 +446,15 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   /// @param lockOrBurnIn The input to validate.
   /// @param blockConfirmationRequested The minimum block confirmation requested by the message.
   /// @param tokenArgs Additional token arguments passed in by the sender of the message.
-  function _preFlightCheck(
+  /// @param amountPostFee The amount after token pool bps-based fees have been deducted.
+  function _preflightCheck(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
     uint16 blockConfirmationRequested,
-    bytes memory tokenArgs
+    bytes memory tokenArgs,
+    uint256 amountPostFee
   ) internal virtual {
     if (address(s_advancedPoolHooks) != address(0)) {
-      s_advancedPoolHooks.preflightCheck(lockOrBurnIn, blockConfirmationRequested, tokenArgs);
+      s_advancedPoolHooks.preflightCheck(lockOrBurnIn, blockConfirmationRequested, tokenArgs, amountPostFee);
     }
   }
 
@@ -481,12 +485,14 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
       revert InvalidSourcePoolAddress(releaseOrMintIn.sourcePoolAddress);
     }
     if (blockConfirmationRequested != WAIT_FOR_FINALITY) {
-      _consumeCustomBlockConfirmationInboundRateLimit(releaseOrMintIn.remoteChainSelector, localAmount);
+      _consumeCustomBlockConfirmationInboundRateLimit(
+        releaseOrMintIn.localToken, releaseOrMintIn.remoteChainSelector, localAmount
+      );
     } else {
-      _consumeInboundRateLimit(releaseOrMintIn.remoteChainSelector, localAmount);
+      _consumeInboundRateLimit(releaseOrMintIn.localToken, releaseOrMintIn.remoteChainSelector, localAmount);
     }
 
-    _postFlightCheck(releaseOrMintIn, localAmount, blockConfirmationRequested);
+    _postflightCheck(releaseOrMintIn, localAmount, blockConfirmationRequested);
   }
 
   /// @notice Hook for post-flight checks on release or mint.
@@ -496,7 +502,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   /// @param releaseOrMintIn The input to validate.
   /// @param localAmount The local amount to be released or minted.
   /// @param blockConfirmationRequested The minimum block confirmation requested by the message.
-  function _postFlightCheck(
+  function _postflightCheck(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
     uint256 localAmount,
     uint16 blockConfirmationRequested
@@ -770,37 +776,40 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   /// @param remoteChainSelector The remote chain selector.
   /// @param amount The amount of tokens consumed.
   function _consumeOutboundRateLimit(
+    address token,
     uint64 remoteChainSelector,
     uint256 amount
   ) internal virtual {
-    s_remoteChainConfigs[remoteChainSelector].outboundRateLimiterConfig._consume(amount, address(i_token));
+    s_remoteChainConfigs[remoteChainSelector].outboundRateLimiterConfig._consume(amount, token);
 
-    emit OutboundRateLimitConsumed({token: address(i_token), remoteChainSelector: remoteChainSelector, amount: amount});
+    emit OutboundRateLimitConsumed({token: token, remoteChainSelector: remoteChainSelector, amount: amount});
   }
 
   /// @notice Consumes inbound rate limiting capacity in this pool.
   /// @param remoteChainSelector The remote chain selector.
   /// @param amount The amount of tokens consumed.
   function _consumeInboundRateLimit(
+    address token,
     uint64 remoteChainSelector,
     uint256 amount
   ) internal virtual {
-    s_remoteChainConfigs[remoteChainSelector].inboundRateLimiterConfig._consume(amount, address(i_token));
+    s_remoteChainConfigs[remoteChainSelector].inboundRateLimiterConfig._consume(amount, token);
 
-    emit InboundRateLimitConsumed({token: address(i_token), remoteChainSelector: remoteChainSelector, amount: amount});
+    emit InboundRateLimitConsumed({token: token, remoteChainSelector: remoteChainSelector, amount: amount});
   }
 
   /// @notice Consumes custom block confirmation outbound rate limiting capacity in this pool.
   /// @param remoteChainSelector The remote chain selector.
   /// @param amount The amount of tokens consumed.
   function _consumeCustomBlockConfirmationOutboundRateLimit(
+    address token,
     uint64 remoteChainSelector,
     uint256 amount
   ) internal virtual {
-    s_outboundRateLimiterConfig[remoteChainSelector]._consume(amount, address(i_token));
+    s_outboundRateLimiterConfig[remoteChainSelector]._consume(amount, token);
 
     emit CustomBlockConfirmationOutboundRateLimitConsumed({
-      token: address(i_token), remoteChainSelector: remoteChainSelector, amount: amount
+      token: token, remoteChainSelector: remoteChainSelector, amount: amount
     });
   }
 
@@ -808,13 +817,14 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   /// @param remoteChainSelector The remote chain selector.
   /// @param amount The amount of tokens consumed.
   function _consumeCustomBlockConfirmationInboundRateLimit(
+    address token,
     uint64 remoteChainSelector,
     uint256 amount
   ) internal virtual {
-    s_inboundRateLimiterConfig[remoteChainSelector]._consume(amount, address(i_token));
+    s_inboundRateLimiterConfig[remoteChainSelector]._consume(amount, token);
 
     emit CustomBlockConfirmationInboundRateLimitConsumed({
-      token: address(i_token), remoteChainSelector: remoteChainSelector, amount: amount
+      token: token, remoteChainSelector: remoteChainSelector, amount: amount
     });
   }
 

@@ -22,6 +22,8 @@ type DynamicConfig = lombard_verifier.LombardVerifierDynamicConfig
 
 type RemoteChainConfigArgs = lombard_verifier.BaseVerifierRemoteChainConfigArgs
 
+type SupportedTokensArgs = lombard_verifier.LombardVerifierSupportedTokenArgs
+
 type RemotePathArgs struct {
 	RemoteChainSelector uint64
 	AllowedCaller       [32]byte
@@ -33,6 +35,11 @@ type ConstructorArgs struct {
 	Bridge           common.Address
 	StorageLocations []string
 	RMN              common.Address
+}
+
+type SupportedTokenArgs struct {
+	TokensToRemove []common.Address
+	TokensToSet    []SupportedTokensArgs
 }
 
 var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
@@ -73,5 +80,19 @@ var SetRemotePath = contract.NewWrite(contract.WriteParams[RemotePathArgs, *lomb
 	Validate:        func(RemotePathArgs) error { return nil },
 	CallContract: func(lombardVerifier *lombard_verifier.LombardVerifier, opts *bind.TransactOpts, args RemotePathArgs) (*types.Transaction, error) {
 		return lombardVerifier.SetPath(opts, args.RemoteChainSelector, args.LChainId, args.AllowedCaller)
+	},
+})
+
+var UpdateSupportedTokens = contract.NewWrite(contract.WriteParams[SupportedTokenArgs, *lombard_verifier.LombardVerifier]{
+	Name:            "lombard-verifier:update-supported-tokens",
+	Version:         Version,
+	Description:     "Updates supported tokens on the LombardVerifier",
+	ContractType:    ContractType,
+	ContractABI:     lombard_verifier.LombardVerifierABI,
+	NewContract:     lombard_verifier.NewLombardVerifier,
+	IsAllowedCaller: contract.OnlyOwner[*lombard_verifier.LombardVerifier, SupportedTokenArgs],
+	Validate:        func(SupportedTokenArgs) error { return nil },
+	CallContract: func(lombardVerifier *lombard_verifier.LombardVerifier, opts *bind.TransactOpts, args SupportedTokenArgs) (*types.Transaction, error) {
+		return lombardVerifier.UpdateSupportedTokens(opts, args.TokensToRemove, args.TokensToSet)
 	},
 })

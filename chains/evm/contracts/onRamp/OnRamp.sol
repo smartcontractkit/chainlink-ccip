@@ -97,7 +97,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     // 0 is not a valid message number for any real transaction as this value will be incremented before use.
     uint64 messageNumber; //              │
     uint8 addressBytesLength; //          │ The length of an address on this chain in bytes, e.g. 20 for EVM, 32 for SVM.
-    bool tokenReceiverAllowed; //         │ Whether specifying `tokenReceiver` in extraArgs is allowed at all.
+    bool tokenReceiverAllowed; //         │ Whether specifying `tokenReceiver` in extraArgs is allowed. Must be set to false for all EVM chains.
     uint16 messageNetworkFeeUSDCents; // ─╯ Network fee in USD cents for messages without token transfers.
     uint16 tokenNetworkFeeUSDCents; // ─╮ Network fee in USD cents for messages with token transfers.
     uint32 baseExecutionGasCost; //     │ Base gas cost for executing a message on the destination chain.
@@ -145,7 +145,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   }
 
   // STATIC CONFIG
-  string public constant override typeAndVersion = "OnRamp 1.7.0-dev";
+  string public constant override typeAndVersion = "OnRamp 2.0.0-dev";
   /// @dev The chain ID of the source chain that this contract is deployed to.
   uint64 private immutable i_localChainSelector;
   /// @dev The rmn contract.
@@ -1128,7 +1128,8 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       destBytesOverhead: uint32(
         MessageV1Codec.MESSAGE_V1_EVM_SOURCE_BASE_SIZE + dataLength + extraArgs.executorArgs.length
           + (MessageV1Codec.MESSAGE_V1_REMOTE_CHAIN_ADDRESSES * remoteChainAddressLengthBytes)
-          + (numberOfTokens * (MessageV1Codec.TOKEN_TRANSFER_V1_EVM_SOURCE_BASE_SIZE + remoteChainAddressLengthBytes))
+          + (numberOfTokens
+            * (MessageV1Codec.TOKEN_TRANSFER_V1_EVM_SOURCE_BASE_SIZE + remoteChainAddressLengthBytes * 2))
       ),
       // Only bill a flat fee when automated execution is enabled.
       feeTokenAmount: extraArgs.executor == Client.NO_EXECUTION_ADDRESS

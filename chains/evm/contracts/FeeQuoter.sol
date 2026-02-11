@@ -73,14 +73,14 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
     bool isEnabled; // ────────────────────╮ Whether this destination chain is enabled.
     uint32 maxDataBytes; //                │ Maximum data payload size in bytes.
     uint32 maxPerMsgGasLimit; //           │ Maximum gas limit.
-    uint32 destGasOverhead; //             │ Gas charged on top of the gasLimit to cover destination chain costs.
-    uint8 destGasPerPayloadByteBase; //    │ Default dest-chain gas charged each byte of `data` payload.
+    uint32 destGasOverhead; //             │ LEGACY: Gas charged on top of the gasLimit to cover destination chain costs.
+    uint8 destGasPerPayloadByteBase; //    │ Default dest-chain gas charged each byte of `data` payload, accounting for DA costs.
     bytes4 chainFamilySelector; //         │ Selector that identifies the destination chain's family. Used to determine the correct validations to perform for the dest chain.
     // The following two properties are defaults, they can be overridden by setting the TokenTransferFeeConfig for a token.
     uint16 defaultTokenFeeUSDCents; //     │ Default token fee charged per token transfer.
     uint32 defaultTokenDestGasOverhead; // │ Default gas charged to execute a token transfer on the destination chain.
     uint32 defaultTxGasLimit; //           │ Default gas limit for a tx.
-    uint16 networkFeeUSDCents; //          │ Flat network fee to charge for messages, multiples of 0.01 USD.
+    uint16 networkFeeUSDCents; //          │ LEGACY: Flat network fee to charge for messages, multiples of 0.01 USD.
     uint8 linkFeeMultiplierPercent; // ────╯ Percentage multiplier to apply when fee is paid in LINK. 90 = 10% discount.
   }
 
@@ -120,7 +120,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
     address token; // ────────────╯ Token address.
   }
 
-  string public constant override typeAndVersion = "FeeQuoter 1.7.0-dev";
+  string public constant override typeAndVersion = "FeeQuoter 2.0.0-dev";
 
   /// @dev Maximum fee that can be charged for a message. This is a guard to prevent massively overcharging due to
   /// misconfiguration.
@@ -388,6 +388,10 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
       TokenTransferFeeConfigArgs memory tokenTransferFeeConfigArg = tokenTransferFeeConfigArgs[i];
       uint64 destChainSelector = tokenTransferFeeConfigArg.destChainSelector;
 
+      if (destChainSelector == 0) {
+        revert InvalidDestChainConfig(destChainSelector);
+      }
+
       for (uint256 j = 0; j < tokenTransferFeeConfigArg.tokenTransferFeeConfigs.length; ++j) {
         TokenTransferFeeConfig memory tokenTransferFeeConfig =
         tokenTransferFeeConfigArg.tokenTransferFeeConfigs[j].tokenTransferFeeConfig;
@@ -429,7 +433,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
     bytes calldata extraArgs,
     uint256 maxPerMsgGasLimit
   ) internal pure returns (Client.SVMExtraArgsV1 memory svmExtraArgs) {
-    if (extraArgs.length == 0) {
+    if (extraArgs.length < 4) {
       revert InvalidExtraArgsData();
     }
 
@@ -452,7 +456,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
     bytes calldata extraArgs,
     uint256 maxPerMsgGasLimit
   ) internal pure returns (Client.SuiExtraArgsV1 memory suiExtraArgs) {
-    if (extraArgs.length == 0) {
+    if (extraArgs.length < 4) {
       revert InvalidExtraArgsData();
     }
 
@@ -478,9 +482,6 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
     uint32 defaultTxGasLimit,
     uint256 maxPerMsgGasLimit
   ) internal pure returns (Client.GenericExtraArgsV2 memory) {
-    // Since GenericExtraArgs are simply a superset of EVMExtraArgsV1, we can parse them as such. For Aptos, this
-    // technically means EVMExtraArgsV1 are processed like they would be valid, but they will always fail on the
-    // allowedOutOfOrderExecution check below.
     Client.GenericExtraArgsV2 memory parsedExtraArgs =
       _parseUnvalidatedEVMExtraArgsFromBytes(extraArgs, defaultTxGasLimit);
 
@@ -497,20 +498,22 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
     bytes calldata extraArgs,
     uint64 defaultTxGasLimit
   ) private pure returns (Client.GenericExtraArgsV2 memory) {
-    if (extraArgs.length == 0) {
+    if (extraArgs.length < 4) {
       // If extra args are empty, generate default values.
-      return Client.GenericExtraArgsV2({gasLimit: defaultTxGasLimit, allowOutOfOrderExecution: false});
+      return Client.GenericExtraArgsV2({gasLimit: defaultTxGasLimit, allowOutOfOrderExecution: true});
     }
 
     bytes4 extraArgsTag = bytes4(extraArgs);
     bytes memory argsData = extraArgs[4:];
 
     if (extraArgsTag == Client.GENERIC_EXTRA_ARGS_V2_TAG) {
-      return abi.decode(argsData, (Client.GenericExtraArgsV2));
+      Client.GenericExtraArgsV2 memory genericExtraArgs = abi.decode(argsData, (Client.GenericExtraArgsV2));
+      genericExtraArgs.allowOutOfOrderExecution = true;
+      return genericExtraArgs;
     } else if (extraArgsTag == Client.EVM_EXTRA_ARGS_V1_TAG) {
       // EVMExtraArgsV1 originally included a second boolean (strict) field which has been deprecated.
       // Clients may still include it but it will be ignored.
-      return Client.GenericExtraArgsV2({gasLimit: abi.decode(argsData, (uint256)), allowOutOfOrderExecution: false});
+      return Client.GenericExtraArgsV2({gasLimit: abi.decode(argsData, (uint256)), allowOutOfOrderExecution: true});
     }
     revert InvalidExtraArgsTag();
   }
@@ -642,6 +645,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
       if (
         destChainSelector == 0 || destChainConfig.defaultTxGasLimit == 0
           || destChainConfig.defaultTxGasLimit > destChainConfig.maxPerMsgGasLimit
+          || destChainConfig.linkFeeMultiplierPercent == 0 || destChainConfig.chainFamilySelector == 0
       ) {
         revert InvalidDestChainConfig(destChainSelector);
       }
@@ -973,6 +977,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
 
   /// @inheritdoc ILegacyFeeQuoter
   /// @dev precondition - onRampTokenTransfers and sourceTokenAmounts lengths must be equal.
+  /// @dev isOutOfOrderExecution is no longer supported, it will always return true.
   function processMessageArgs(
     uint64 destChainSelector,
     address feeToken,
@@ -1001,11 +1006,12 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
     (convertedExtraArgs, isOutOfOrderExecution, tokenReceiver) =
       _processChainFamilySelector(destChainSelector, messageReceiver, extraArgs);
 
-    return (msgFeeJuels, isOutOfOrderExecution, convertedExtraArgs, tokenReceiver);
+    return (msgFeeJuels, true, convertedExtraArgs, tokenReceiver);
   }
 
   /// @notice Parses the extra Args based on the chain family selector. Isolated into a separate function
   /// as it was the only way to prevent a stack too deep error, and makes future chain family additions easier.
+  /// @dev isOutOfOrderExecution is no longer supported, it will always return true.
   // solhint-disable-next-line chainlink-solidity/explicit-returns
   function _processChainFamilySelector(
     uint64 destChainSelector,
@@ -1024,7 +1030,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
       Client.GenericExtraArgsV2 memory parsedExtraArgs =
         _parseUnvalidatedEVMExtraArgsFromBytes(extraArgs, destChainConfig.defaultTxGasLimit);
 
-      return (Client._argsToBytes(parsedExtraArgs), parsedExtraArgs.allowOutOfOrderExecution, messageReceiver);
+      return (Client._argsToBytes(parsedExtraArgs), true, messageReceiver);
     }
     if (destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SUI) {
       // perform parsing check on the extraArgs
