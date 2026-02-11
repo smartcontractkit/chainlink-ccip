@@ -58,6 +58,10 @@ func formatOutput(stateJSON []byte, chainInfos map[uint64]*ChainInfo) ([]byte, e
 	if len(aptosChains) > 0 {
 		legacy["aptosChains"] = aptosChains
 	}
+	// Pass through nodeOperators section from JD orchestrator.
+	if nodeOps, ok := state["nodeOperators"]; ok {
+		legacy["nodeOperators"] = nodeOps
+	}
 	return json.MarshalIndent(legacy, "", "    ")
 }
 

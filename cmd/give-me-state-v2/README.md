@@ -68,6 +68,37 @@ go run . -network mainnet.yaml -addresses mainnet_address_refs.json -output stat
 | `-format` | `false` | Format output to match legacy state.json structure |
 | `-live` | `true` | Show live progress bar and RPC stats during run |
 
+## Job Distributor (Optional)
+
+To include node operator data in the output, add a `jd:` section to your network YAML:
+
+```yaml
+jd:
+  grpc_url: "jd.example.com:443"
+  tls: true
+  cognito_client_id: "your-client-id"
+  cognito_client_secret: "your-client-secret"
+  username: "your-username"
+  password: "your-password"
+  aws_region: "us-east-1"
+```
+
+When configured, the tool connects to the JD gRPC service after chain views complete and fetches:
+- **Nodes** -- ID, name, CSA public key, connection status, labels, version
+- **Chain Configs** -- per-node chain assignments with account/admin addresses, OCR2 key bundles, P2P keys
+
+The data appears under a top-level `"nodeOperators"` key in the output JSON. If the JD connection fails, the tool logs a warning and continues without JD data.
+
+| JD Config Field | Description |
+|-----------------|-------------|
+| `grpc_url` | gRPC endpoint address (e.g. `jd.example.com:443`) |
+| `tls` | Whether to use TLS for the gRPC connection |
+| `cognito_client_id` | AWS Cognito app client ID (omit for insecure/no-auth) |
+| `cognito_client_secret` | AWS Cognito app client secret |
+| `username` | Cognito username |
+| `password` | Cognito password |
+| `aws_region` | AWS region for Cognito (e.g. `us-east-1`) |
+
 ## How It Works
 
 1. **Typed Orchestrators** -- EVM, Solana, and Aptos each have their own orchestrator that knows how to talk to that chain type. Each orchestrator handles caching, deduplication, and request routing.

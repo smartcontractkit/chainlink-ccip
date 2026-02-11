@@ -16,12 +16,16 @@ import (
 	"give-me-state-v2/orchestrator"
 	"give-me-state-v2/orchestrator/aptos"
 	"give-me-state-v2/orchestrator/evm"
+	"give-me-state-v2/orchestrator/jd"
 	"give-me-state-v2/orchestrator/svm"
 	"give-me-state-v2/views"
 	_ "give-me-state-v2/views/aptos"
 	_ "give-me-state-v2/views/evm"
 	_ "give-me-state-v2/views/solana"
 )
+
+// TODO smarter json creation and merging? Like if some value wasn't updated, then dont override it.
+// This logic should happen for the raw JSON outputted by the tool, not the formatted one.
 
 func main() {
 	addressRefsPath := flag.String("addresses", "example_address_refs.json", "Path to address_refs.json")
@@ -93,8 +97,34 @@ func main() {
 		fmt.Printf("  Registered %d Aptos chains with generic engine\n", len(aptosChains))
 	}
 
-	if len(evmChains)+len(svmChains)+len(aptosChains) == 0 {
-		fmt.Println("No EVM/SVM/Aptos chains in network config; nothing to do.")
+	// Job Distributor orchestrator (optional -- only created if jd: section is present in YAML).
+	var jdOrc *jd.JDOrchestrator
+	if networkConfig.JD != nil {
+		jdCfg := jd.JDConfig{
+			GRPCURL: networkConfig.JD.GRPCURL,
+			TLS:     networkConfig.JD.TLS,
+		}
+		if networkConfig.JD.CognitoClientID != "" {
+			jdCfg.Auth = &jd.JDAuthConfig{
+				CognitoClientID:     networkConfig.JD.CognitoClientID,
+				CognitoClientSecret: networkConfig.JD.CognitoClientSecret,
+				Username:            networkConfig.JD.Username,
+				Password:            networkConfig.JD.Password,
+				AWSRegion:           networkConfig.JD.AWSRegion,
+			}
+		}
+		jdOrc, err = jd.NewJDOrchestrator(ctx, jdCfg)
+		if err != nil {
+			fmt.Printf("Warning: JD orchestrator setup failed (continuing without JD data): %v\n", err)
+			jdOrc = nil
+		} else {
+			defer jdOrc.Close()
+			fmt.Printf("  Connected to Job Distributor at %s\n", networkConfig.JD.GRPCURL)
+		}
+	}
+
+	if len(evmChains)+len(svmChains)+len(aptosChains) == 0 && jdOrc == nil {
+		fmt.Println("No EVM/SVM/Aptos chains in network config and no JD configured; nothing to do.")
 		os.Exit(0)
 	}
 
@@ -274,6 +304,16 @@ func main() {
 	}
 	if len(skipped) > 0 {
 		output["_skipped"] = skipped
+	}
+
+	// Query JD for node operator data (non-blocking on chain views).
+	if jdOrc != nil {
+		nodeOps, jdErr := queryJD(ctx, jdOrc)
+		if jdErr != nil {
+			fmt.Printf("Warning: JD query failed (continuing without JD data): %v\n", jdErr)
+		} else {
+			output["nodeOperators"] = nodeOps
+		}
 	}
 
 	jsonOutput, err := json.MarshalIndent(output, "", "  ")
@@ -649,6 +689,46 @@ func printFinalStats(totalDuration time.Duration, totalContracts, successCount, 
 	}
 
 	fmt.Println("╚═══════════════════════════════════════════════════════════════╝")
+}
+
+// queryJD fetches node + chain config data from the Job Distributor and
+// returns a JSON-serializable structure for the "nodeOperators" output section.
+func queryJD(ctx context.Context, jdOrc *jd.JDOrchestrator) (map[string]any, error) {
+	// Step 1: List all nodes.
+	nodes, err := jdOrc.ListNodes(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("listing nodes: %w", err)
+	}
+
+	// Step 2: Collect node IDs and fetch chain configs for all nodes.
+	nodeIDs := make([]string, 0, len(nodes))
+	for _, n := range nodes {
+		if id, ok := n["id"].(string); ok && id != "" {
+			nodeIDs = append(nodeIDs, id)
+		}
+	}
+
+	var chainConfigsByNode map[string][]map[string]any
+	if len(nodeIDs) > 0 {
+		chainConfigsByNode, err = jdOrc.ListNodeChainConfigs(ctx, nodeIDs)
+		if err != nil {
+			return nil, fmt.Errorf("listing chain configs: %w", err)
+		}
+	}
+
+	// Step 3: Merge chain configs into each node.
+	for _, node := range nodes {
+		id, _ := node["id"].(string)
+		if configs, ok := chainConfigsByNode[id]; ok {
+			node["chainConfigs"] = configs
+		} else {
+			node["chainConfigs"] = []map[string]any{}
+		}
+	}
+
+	return map[string]any{
+		"nodes": nodes,
+	}, nil
 }
 
 func retryableKeywords() []string {

@@ -53,3 +53,14 @@ networks:
       - rpc_name: PublicNode3
         preferred_url_scheme: *preferred_url_scheme
         http_url: https://1rpc.io/op
+
+# Optional: Job Distributor (JD) configuration.
+# Uncomment and fill in to include node operator data in the output.
+# jd:
+#   grpc_url: "jd.example.com:443"
+#   tls: true
+#   cognito_client_id: "your-client-id"
+#   cognito_client_secret: "your-client-secret"
+#   username: "your-username"
+#   password: "your-password"
+#   aws_region: "us-east-1"

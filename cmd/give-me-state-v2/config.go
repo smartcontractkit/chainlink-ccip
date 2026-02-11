@@ -34,8 +34,22 @@ func LoadAddressRefs(path string) ([]AddressRef, error) {
 
 // NetworkConfig represents the root of the YAML configuration
 type NetworkConfig struct {
-	PreferredURLScheme string    `yaml:"preferred_url_scheme"`
-	Networks           []Network `yaml:"networks"`
+	PreferredURLScheme string        `yaml:"preferred_url_scheme"`
+	Networks           []Network     `yaml:"networks"`
+	JD                 *JDYAMLConfig `yaml:"jd,omitempty"`
+}
+
+// JDYAMLConfig holds optional Job Distributor configuration from the network YAML.
+// When present, the tool will connect to the JD gRPC service and include
+// node operator data in the output.
+type JDYAMLConfig struct {
+	GRPCURL             string `yaml:"grpc_url"`
+	TLS                 bool   `yaml:"tls"`
+	CognitoClientID     string `yaml:"cognito_client_id,omitempty"`
+	CognitoClientSecret string `yaml:"cognito_client_secret,omitempty"`
+	Username            string `yaml:"username,omitempty"`
+	Password            string `yaml:"password,omitempty"`
+	AWSRegion           string `yaml:"aws_region,omitempty"`
 }
 
 // Network represents a single network/chain configuration
