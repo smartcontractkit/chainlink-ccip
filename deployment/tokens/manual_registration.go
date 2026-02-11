@@ -88,6 +88,11 @@ func manualRegistrationApply() func(cldf.Environment, ManualRegistrationInput) (
 		tokenPoolRegistry := GetTokenAdapterRegistry()
 		mcmsRegistry := changesets.GetRegistry()
 
+		err := ds.Merge(e.DataStore) // start with existing datastore state from environment
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to merge existing datastore from environment: %w", err)
+		}
+
 		for i, registration := range cfg.Registrations {
 			chainfam, err := chain_selectors.GetSelectorFamily(registration.ChainSelector)
 			if err != nil {
@@ -113,7 +118,7 @@ func manualRegistrationApply() func(cldf.Environment, ManualRegistrationInput) (
 				e.BlockChains,
 				ManualRegistrationSequenceInput{
 					RegisterTokenConfig: registration,
-					ExistingDataStore:   e.DataStore,
+					ExistingDataStore:   ds.Seal(),
 				},
 			)
 			if err != nil {
