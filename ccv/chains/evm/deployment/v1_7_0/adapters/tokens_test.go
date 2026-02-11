@@ -126,7 +126,7 @@ func TestTokenAdapter(t *testing.T) {
 								e.BlockChains.EVMChains()[chainSel].DeployerKey.From: big.NewInt(1_000_000),
 							},
 							ChainSel:         chainSel,
-							TokenPoolType:    datastore.ContractType(burn_mint_token_pool_v1_6_1.BurnMintContractType),
+							TokenPoolType:    datastore.ContractType(burn_mint_token_pool_v1_6_1.ContractType),
 							TokenPoolVersion: burn_mint_token_pool_v1_6_1.Version,
 							TokenSymbol:      "TEST",
 							Decimals:         18,
