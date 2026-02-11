@@ -572,11 +572,7 @@ func AddNodesToCapReg(
 	return nil
 }
 
-func SetupTokensAndTokenPools(
-	ctx context.Context,
-	env *deployment.Environment,
-	adp []testadapters.TestAdapter,
-) (datastore.DataStore, error) {
+func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.TestAdapter) (datastore.DataStore, error) {
 	// Get registries and define v1.6.0 alias
 	toknRegistry := tokensapi.GetTokenAdapterRegistry()
 	mcmsRegistry := changesetscore.GetRegistry()
@@ -638,11 +634,6 @@ func SetupTokensAndTokenPools(
 			continue // only EVM and Solana are supported for token transfers in 1.6
 		}
 
-		externalAdmin := ""
-		if len(srcCfg.DeployTokenInput.ExternalAdmin) > 0 {
-			externalAdmin = srcCfg.DeployTokenInput.ExternalAdmin[0]
-		}
-
 		registryAddr, err := srcAdapter.GetRegistryAddress()
 		if err != nil {
 			return nil, fmt.Errorf("getting registry address for selector %d: %w", srcSel, err)
@@ -651,7 +642,7 @@ func SetupTokensAndTokenPools(
 		ttCfg := tokensapi.TokenTransferConfig{
 			RemoteChains:  map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{},
 			ChainSelector: srcSel,
-			ExternalAdmin: externalAdmin,
+			ExternalAdmin: srcCfg.DeployTokenInput.ExternalAdmin,
 			RegistryRef: datastore.AddressRef{
 				Address:       registryAddr,
 				ChainSelector: srcSel,

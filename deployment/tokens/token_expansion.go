@@ -50,9 +50,8 @@ type DeployTokenInput struct {
 	Supply   *big.Int `yaml:"supply" json:"supply"`
 	PreMint  *big.Int `yaml:"pre-mint" json:"preMint"`
 	// Customer admin who will be granted admin rights on the token
-	// For EVM, expect to have only one Admin address to be passed on whereas Solana may have multiple multisig signers.
 	// Use string to keep this struct chain-agnostic (EVM uses hex, Solana uses base58, etc.)
-	ExternalAdmin []string `yaml:"external-admin" json:"externalAdmin"`
+	ExternalAdmin string `yaml:"external-admin" json:"externalAdmin"`
 	// Address to be set as the CCIP admin on the token contract, defaults to the timelock address
 	CCIPAdmin string
 	// list of addresses who may need special processing in order to send tokens

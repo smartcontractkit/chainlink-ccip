@@ -91,7 +91,7 @@ func (a *SVMAdapter) BuildMessage(components testadapters.MessageComponents) (an
 		}
 	}
 
-	tokenAmounts := []ccip_router.SVMTokenAmount{}
+	var tokenAmounts []ccip_router.SVMTokenAmount
 	for i, ta := range components.TokenAmounts {
 		token, err := solana.PublicKeyFromBase58(ta.Token)
 		if err != nil {
@@ -526,7 +526,7 @@ func (a *SVMAdapter) GetTokenExpansionConfig() tokensapi.TokenExpansionInputPerC
 			Supply:                 big.NewInt(0),             // unlimited supply
 			PreMint:                mintAmnt,                  // pre-mint some tokens for transfers
 			Senders:                []string{admin, receiver}, // use deployer as sender
-			ExternalAdmin:          []string{},                // not needed for tests
+			ExternalAdmin:          "",                        // not needed for tests
 			DisableFreezeAuthority: false,                     // don't revoke freeze authority after token creation
 			TokenPrivKey:           "",                        // if empty, a new keypair will be generated
 			CCIPAdmin:              admin,                     // deployer is the admin (if empty defaults to timelock)
