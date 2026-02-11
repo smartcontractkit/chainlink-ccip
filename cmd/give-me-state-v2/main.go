@@ -35,6 +35,7 @@ func main() {
 	workersPerEndpoint := flag.Int("workers", 12, "Worker goroutines per RPC endpoint")
 	format := flag.Bool("format", false, "Format output to match state.json structure")
 	live := flag.Bool("live", true, "Show live RPC stats and progress during run")
+	nops := flag.Bool("nops", false, "Include node operator data from Job Distributor (requires JD_* env vars)")
 	flag.Parse()
 
 	fmt.Println("╔═══════════════════════════════════════════════════════════════╗")
@@ -97,20 +98,38 @@ func main() {
 		fmt.Printf("  Registered %d Aptos chains with generic engine\n", len(aptosChains))
 	}
 
-	// Job Distributor orchestrator (optional -- only created if jd: section is present in YAML).
+	// Job Distributor orchestrator (optional -- only created when -nops flag is provided).
+	// Reads connection details from environment variables:
+	//   JD_GRPC_URL              - gRPC endpoint (e.g. "jd.example.com:443")
+	//   JD_TLS                   - "true" to enable TLS (default: false)
+	//   JD_COGNITO_CLIENT_ID     - Cognito OAuth2 client ID (optional, for auth)
+	//   JD_COGNITO_CLIENT_SECRET - Cognito OAuth2 client secret
+	//   JD_USERNAME              - Cognito username
+	//   JD_PASSWORD              - Cognito password
+	//   JD_AWS_REGION            - AWS region for Cognito (e.g. "us-west-2")
 	var jdOrc *jd.JDOrchestrator
-	if networkConfig.JD != nil {
-		jdCfg := jd.JDConfig{
-			GRPCURL: networkConfig.JD.GRPCURL,
-			TLS:     networkConfig.JD.TLS,
+	if *nops {
+		// Load .env file if present (won't override already-exported vars).
+		if err := loadDotEnv(".env"); err != nil && !os.IsNotExist(err) {
+			fmt.Printf("Warning: failed to load .env file: %v\n", err)
 		}
-		if networkConfig.JD.CognitoClientID != "" {
+		jdGRPCURL := os.Getenv("JD_GRPC_URL")
+		if jdGRPCURL == "" {
+			fmt.Println("Error: -nops flag requires JD_GRPC_URL environment variable to be set")
+			os.Exit(1)
+		}
+		jdTLS := strings.EqualFold(os.Getenv("JD_TLS"), "true")
+		jdCfg := jd.JDConfig{
+			GRPCURL: jdGRPCURL,
+			TLS:     jdTLS,
+		}
+		if cognitoClientID := os.Getenv("JD_COGNITO_CLIENT_ID"); cognitoClientID != "" {
 			jdCfg.Auth = &jd.JDAuthConfig{
-				CognitoClientID:     networkConfig.JD.CognitoClientID,
-				CognitoClientSecret: networkConfig.JD.CognitoClientSecret,
-				Username:            networkConfig.JD.Username,
-				Password:            networkConfig.JD.Password,
-				AWSRegion:           networkConfig.JD.AWSRegion,
+				CognitoClientID:     cognitoClientID,
+				CognitoClientSecret: os.Getenv("JD_COGNITO_CLIENT_SECRET"),
+				Username:            os.Getenv("JD_USERNAME"),
+				Password:            os.Getenv("JD_PASSWORD"),
+				AWSRegion:           os.Getenv("JD_AWS_REGION"),
 			}
 		}
 		jdOrc, err = jd.NewJDOrchestrator(ctx, jdCfg)
@@ -119,7 +138,7 @@ func main() {
 			jdOrc = nil
 		} else {
 			defer jdOrc.Close()
-			fmt.Printf("  Connected to Job Distributor at %s\n", networkConfig.JD.GRPCURL)
+			fmt.Printf("  Connected to Job Distributor at %s\n", jdGRPCURL)
 		}
 	}
 
@@ -729,6 +748,38 @@ func queryJD(ctx context.Context, jdOrc *jd.JDOrchestrator) (map[string]any, err
 	return map[string]any{
 		"nodes": nodes,
 	}, nil
+}
+
+// loadDotEnv reads a .env file and sets any variables that are not already
+// present in the process environment. It handles KEY=VALUE, KEY = VALUE,
+// quoted values, and comments / blank lines.
+func loadDotEnv(path string) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		key := strings.TrimSpace(parts[0])
+		value := strings.TrimSpace(parts[1])
+		// Strip surrounding quotes if present.
+		if len(value) >= 2 && ((value[0] == '"' && value[len(value)-1] == '"') ||
+			(value[0] == '\'' && value[len(value)-1] == '\'')) {
+			value = value[1 : len(value)-1]
+		}
+		// Only set if not already in environment (explicit exports take precedence).
+		if os.Getenv(key) == "" {
+			os.Setenv(key, value)
+		}
+	}
+	return nil
 }
 
 func retryableKeywords() []string {

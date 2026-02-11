@@ -67,37 +67,43 @@ go run . -network mainnet.yaml -addresses mainnet_address_refs.json -output stat
 | `-workers` | `12` | Worker goroutines per RPC endpoint |
 | `-format` | `false` | Format output to match legacy state.json structure |
 | `-live` | `true` | Show live progress bar and RPC stats during run |
+| `-nops` | `false` | Include node operator data from the Job Distributor (requires `.env`) |
 
-## Job Distributor (Optional)
+## Node Operators / Job Distributor (Optional)
 
-To include node operator data in the output, add a `jd:` section to your network YAML:
-
-```yaml
-jd:
-  grpc_url: "jd.example.com:443"
-  tls: true
-  cognito_client_id: "your-client-id"
-  cognito_client_secret: "your-client-secret"
-  username: "your-username"
-  password: "your-password"
-  aws_region: "us-east-1"
-```
-
-When configured, the tool connects to the JD gRPC service after chain views complete and fetches:
+To include node operator data in the output, pass the `-nops` flag. This connects to the Job Distributor (JD) gRPC service and fetches:
 - **Nodes** -- ID, name, CSA public key, connection status, labels, version
 - **Chain Configs** -- per-node chain assignments with account/admin addresses, OCR2 key bundles, P2P keys
 
 The data appears under a top-level `"nodeOperators"` key in the output JSON. If the JD connection fails, the tool logs a warning and continues without JD data.
 
-| JD Config Field | Description |
-|-----------------|-------------|
-| `grpc_url` | gRPC endpoint address (e.g. `jd.example.com:443`) |
-| `tls` | Whether to use TLS for the gRPC connection |
-| `cognito_client_id` | AWS Cognito app client ID (omit for insecure/no-auth) |
-| `cognito_client_secret` | AWS Cognito app client secret |
-| `username` | Cognito username |
-| `password` | Cognito password |
-| `aws_region` | AWS region for Cognito (e.g. `us-east-1`) |
+### Setup
+
+JD connection details are read from environment variables. The easiest way is to create a `.env` file in this directory (see `env.sample` for the template):
+
+```bash
+cp env.sample .env
+# Edit .env with your actual credentials
+```
+
+When `-nops` is provided, the tool automatically loads `.env` from the current working directory. Variables that are already exported in your shell take precedence over values in the file.
+
+| Environment Variable | Required | Description |
+|----------------------|----------|-------------|
+| `JD_GRPC_URL` | Yes | gRPC endpoint address (e.g. `jd.example.com:443`) |
+| `JD_TLS` | No | Set to `true` to enable TLS (default: `false`) |
+| `JD_COGNITO_CLIENT_ID` | No | AWS Cognito app client ID (omit for insecure/no-auth) |
+| `JD_COGNITO_CLIENT_SECRET` | No | AWS Cognito app client secret |
+| `JD_USERNAME` | No | Cognito username |
+| `JD_PASSWORD` | No | Cognito password |
+| `JD_AWS_REGION` | No | AWS region for Cognito (e.g. `us-west-2`) |
+
+### Example
+
+```bash
+# Run with node operator data
+go run . -network testnet.yaml -addresses address_refs.json -nops -output state.json
+```
 
 ## How It Works
 
