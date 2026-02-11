@@ -139,7 +139,7 @@ var DeployTokenPool = cldf_ops.NewSequence(
 					Token:              common.HexToAddress(tokenAddr),
 					LocalTokenDecimals: tokenDecimal,
 					Allowlist:          allowlist,
-					RMNProxy:           common.HexToAddress(rmpProxyAddr.Address),
+					RmnProxy:           common.HexToAddress(rmpProxyAddr.Address),
 					Router:             common.HexToAddress(routerAddr.Address),
 				},
 				Qualifier: &qualifier,

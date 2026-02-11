@@ -204,19 +204,17 @@ var (
 					TokenTransferFeeCfgs: tokenTransferFeeCfgsPerChain[remoteChain],
 				}
 			}
-			staticCfgOutput, err := operations.ExecuteOperation(b, fqops.GetStaticConfig, evmChain, contract.FunctionInput[any]{
+			staticCfgOutput, err := operations.ExecuteOperation(b, fqops.GetStaticConfig, evmChain, contract.FunctionInput[struct{}]{
 				Address:       fqAddress,
 				ChainSelector: chainSelector,
-				Args:          nil,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get static config from feequoter %s on chain %d: %w",
 					fqAddress.Hex(), chainSelector, err)
 			}
-			priceUpdaters, err := operations.ExecuteOperation(b, fqops.GetAllAuthorizedCallers, evmChain, contract.FunctionInput[any]{
+			priceUpdaters, err := operations.ExecuteOperation(b, fqops.GetAllAuthorizedCallers, evmChain, contract.FunctionInput[struct{}]{
 				Address:       fqAddress,
 				ChainSelector: chainSelector,
-				Args:          nil,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get all authorized callers from feequoter %s on chain %d: %w",

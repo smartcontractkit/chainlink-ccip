@@ -54,7 +54,7 @@ func TestDeployTokenPool(t *testing.T) {
 		// v1.6.1 pools
 		{
 			name:                "BurnMintTokenPool_v1_6_1",
-			poolType:            burn_mint_token_pool.BurnMintContractType,
+			poolType:            burn_mint_token_pool.ContractType,
 			poolVersion:         utils.Version_1_6_1,
 			expectedTypeVersion: "BurnMintTokenPool 1.6.1",
 		},
@@ -97,7 +97,7 @@ func TestDeployTokenPool(t *testing.T) {
 		},
 		{
 			name:                "BurnMintTokenPool_v1_6_1_with_allowlist",
-			poolType:            burn_mint_token_pool.BurnMintContractType,
+			poolType:            burn_mint_token_pool.ContractType,
 			poolVersion:         utils.Version_1_6_1,
 			allowlist:           []string{"0x1111111111111111111111111111111111111111", "0x2222222222222222222222222222222222222222"},
 			expectedTypeVersion: "BurnMintTokenPool 1.6.1",
@@ -109,7 +109,7 @@ func TestDeployTokenPool(t *testing.T) {
 		// v1.5.1 pools (using same ContractType constants since they're identical strings)
 		{
 			name:                "BurnMintTokenPool_v1_5_1",
-			poolType:            burn_mint_token_pool.BurnMintContractType,
+			poolType:            burn_mint_token_pool.ContractType,
 			poolVersion:         utils.Version_1_5_1,
 			expectedTypeVersion: "BurnMintTokenPool 1.5.1",
 		},
@@ -297,7 +297,7 @@ func TestDeployTokenPool_AlreadyDeployed(t *testing.T) {
 	chainSelector := chain_selectors.ETHEREUM_MAINNET.Selector
 	tokenSymbol := "TEST"
 	tokenDecimals := uint8(18)
-	poolType := burn_mint_token_pool.BurnMintContractType
+	poolType := burn_mint_token_pool.ContractType
 
 	e, err := environment.New(t.Context(),
 		environment.WithEVMSimulated(t, []uint64{chainSelector}),
@@ -385,11 +385,11 @@ func TestDeployTokenPool_MissingTokenPoolVersion(t *testing.T) {
 	e.DataStore = ds.Seal()
 
 	input := tokenapi.DeployTokenPoolInput{
-		TokenSymbol:       "TEST",
-		PoolType:          string(burn_mint_token_pool.ContractType),
-		TokenPoolVersion:  nil, // Missing version
-		ChainSelector:     chainSelector,
-		ExistingDataStore: e.DataStore,
+		TokenPoolQualifier: "TEST",
+		PoolType:           string(burn_mint_token_pool.ContractType),
+		TokenPoolVersion:   nil, // Missing version
+		ChainSelector:      chainSelector,
+		ExistingDataStore:  e.DataStore,
 	}
 
 	_, err = cldf_ops.ExecuteSequence(e.OperationsBundle, DeployTokenPool, e.BlockChains, input)
@@ -505,11 +505,11 @@ func TestDeployTokenPool_MissingRouter(t *testing.T) {
 	e.DataStore = ds.Seal()
 
 	input := tokenapi.DeployTokenPoolInput{
-		TokenSymbol:       tokenSymbol,
-		PoolType:          string(burn_mint_token_pool.ContractType),
-		TokenPoolVersion:  utils.Version_1_6_1,
-		ChainSelector:     chainSelector,
-		ExistingDataStore: e.DataStore,
+		TokenPoolQualifier: tokenSymbol,
+		PoolType:           string(burn_mint_token_pool.ContractType),
+		TokenPoolVersion:   utils.Version_1_6_1,
+		ChainSelector:      chainSelector,
+		ExistingDataStore:  e.DataStore,
 	}
 
 	_, err = cldf_ops.ExecuteSequence(e.OperationsBundle, DeployTokenPool, e.BlockChains, input)
@@ -561,11 +561,11 @@ func TestDeployTokenPool_MissingRMNProxy(t *testing.T) {
 	e.DataStore = ds.Seal()
 
 	input := tokenapi.DeployTokenPoolInput{
-		TokenSymbol:       tokenSymbol,
-		PoolType:          string(burn_mint_token_pool.ContractType),
-		TokenPoolVersion:  utils.Version_1_6_1,
-		ChainSelector:     chainSelector,
-		ExistingDataStore: e.DataStore,
+		TokenPoolQualifier: tokenSymbol,
+		PoolType:           string(burn_mint_token_pool.ContractType),
+		TokenPoolVersion:   utils.Version_1_6_1,
+		ChainSelector:      chainSelector,
+		ExistingDataStore:  e.DataStore,
 	}
 
 	_, err = cldf_ops.ExecuteSequence(e.OperationsBundle, DeployTokenPool, e.BlockChains, input)
@@ -611,11 +611,11 @@ func TestDeployTokenPool_MissingToken(t *testing.T) {
 	e.DataStore = ds.Seal()
 
 	input := tokenapi.DeployTokenPoolInput{
-		TokenSymbol:       tokenSymbol, // Token not in datastore
-		PoolType:          string(burn_mint_token_pool.ContractType),
-		TokenPoolVersion:  utils.Version_1_6_1,
-		ChainSelector:     chainSelector,
-		ExistingDataStore: e.DataStore,
+		TokenPoolQualifier: tokenSymbol, // Token not in datastore
+		PoolType:           string(burn_mint_token_pool.ContractType),
+		TokenPoolVersion:   utils.Version_1_6_1,
+		ChainSelector:      chainSelector,
+		ExistingDataStore:  e.DataStore,
 	}
 
 	_, err = cldf_ops.ExecuteSequence(e.OperationsBundle, DeployTokenPool, e.BlockChains, input)

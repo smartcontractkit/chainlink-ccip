@@ -20,8 +20,6 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/fee_quoter"
-
 	evm1_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
@@ -205,9 +203,9 @@ var DeployChainContracts = cldf_ops.NewSequence(
 					common.HexToAddress(linkRef.Address),
 					common.HexToAddress(wethRef.Address),
 				},
-				TokenPriceFeeds:                []fqops.TokenPriceFeedUpdate{},
-				TokenTransferFeeConfigArgs:     []fqops.TokenTransferFeeConfigArgs{},
-				PremiumMultiplierWeiPerEthArgs: []fqops.PremiumMultiplierWeiPerEthArgs{
+				TokenPriceFeeds:            []fqops.TokenPriceFeedUpdate{},
+				TokenTransferFeeConfigArgs: []fqops.TokenTransferFeeConfigArgs{},
+				PremiumMultiplierWeiPerEthArgs: []fqops.FeeTokenArgs{
 					{
 						PremiumMultiplierWeiPerEth: input.LinkPremiumMultiplier,
 						Token:                      common.HexToAddress(linkRef.Address),
@@ -348,14 +346,14 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, err
 		}
 
-	// Add Authorized Caller to FQ
-	_, err = cldf_ops.ExecuteOperation(b, fqops.ApplyAuthorizedCallerUpdates, chain, contract.FunctionInput[fqops.AuthorizedCallerArgs]{
-		ChainSelector: chain.Selector,
-		Address:       common.HexToAddress(feeQuoterRef.Address),
-		Args: fqops.AuthorizedCallerArgs{
-			AddedCallers: []common.Address{
-				common.HexToAddress(offRampRef.Address),
-			},
+		// Add Authorized Caller to FQ
+		_, err = cldf_ops.ExecuteOperation(b, fqops.ApplyAuthorizedCallerUpdates, chain, contract.FunctionInput[fqops.AuthorizedCallerArgs]{
+			ChainSelector: chain.Selector,
+			Address:       common.HexToAddress(feeQuoterRef.Address),
+			Args: fqops.AuthorizedCallerArgs{
+				AddedCallers: []common.Address{
+					common.HexToAddress(offRampRef.Address),
+				},
 			},
 		})
 		if err != nil {
