@@ -138,7 +138,7 @@ func (r *FQAndRampUpdaterRegistry) GetRampUpdater(chainsel uint64, version *semv
 	return updater, ok
 }
 
-func NewFQUpdaterRegistry() *FQAndRampUpdaterRegistry {
+func newFQUpdaterRegistry() *FQAndRampUpdaterRegistry {
 	return &FQAndRampUpdaterRegistry{
 		FeeQuoterUpdater: make(map[string]FeeQuoterUpdater[any]),
 		RampUpdater:      make(map[string]RampUpdater),
@@ -148,7 +148,7 @@ func NewFQUpdaterRegistry() *FQAndRampUpdaterRegistry {
 
 func GetFQAndRampUpdaterRegistry() *FQAndRampUpdaterRegistry {
 	fqupdaterOnce.Do(func() {
-		singletonFQAndRampUpdaterRegistry = NewFQUpdaterRegistry()
+		singletonFQAndRampUpdaterRegistry = newFQUpdaterRegistry()
 	})
 	return singletonFQAndRampUpdaterRegistry
 }
