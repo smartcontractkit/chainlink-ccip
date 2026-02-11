@@ -212,7 +212,7 @@ func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualR
 					RMNRemote:      solana.PublicKeyFromBytes(rmnRemoteAddr),
 				})
 				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy token: %w", err)
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to initialize token pool: %w", err)
 				}
 				result.Addresses = append(result.Addresses, initTPOut.Output.Addresses...)
 				result.BatchOps = append(result.BatchOps, initTPOut.Output.BatchOps...)
@@ -224,7 +224,7 @@ func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualR
 					TokenMint:    tokenMint,
 				})
 				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy token: %w", err)
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to transfer ownership: %w", err)
 				}
 				result.Addresses = append(result.Addresses, transferOwnershipOut.Output.Addresses...)
 				result.BatchOps = append(result.BatchOps, transferOwnershipOut.Output.BatchOps...)
@@ -252,6 +252,8 @@ func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualR
 				createTokenMultisigOutput, err := operations.ExecuteOperation(b, tokensops.CreateTokenMultisig, chains.SolanaChains()[chain.Selector], tokensops.TokenMultisigParams{
 					TokenProgram: tokenProgramId,
 					Signers:      signers,
+					TokenMint:    tokenMint,
+					TokenSymbol:  input.RegisterTokenConfigs.TokenSymbol,
 				})
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to create token multisig on-chain: %w", err)

@@ -73,7 +73,7 @@ func manualRegistrationApply() func(cldf.Environment, ManualRegistrationInput) (
 		batchOps = append(batchOps, manualRegistrationReport.Output.BatchOps...)
 		reports = append(reports, manualRegistrationReport.ExecutionReports...)
 		for _, r := range manualRegistrationReport.Output.Addresses {
-			if err := ds.Addresses().Add(r); err != nil {
+			if err := ds.Addresses().Upsert(r); err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %v on chain with selector %d to datastore: %w", r.Type, r.Version, r, r.ChainSelector, err)
 			}
 		}

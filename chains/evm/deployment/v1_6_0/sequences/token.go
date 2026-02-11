@@ -126,7 +126,7 @@ var DeployToken = cldf_ops.NewSequence(
 			writes = append(writes, setCCIPAdminReport.Output)
 		}
 		// Grant admin role to external admin if provided and token supports it
-		if len(input.ExternalAdmin) > 0 && tokenSupportsAdminRole(input.Type) {
+		if input.ExternalAdmin != "" && tokenSupportsAdminRole(input.Type) {
 			// Read the default admin role
 			token, err := bnm_erc20_bindings.NewBurnMintERC20(common.HexToAddress(tokenRef.Address), chain.Client)
 			if err != nil {
@@ -150,7 +150,6 @@ var DeployToken = cldf_ops.NewSequence(
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to grant admin role to %s: %w", input.ExternalAdmin, err)
 			}
 			writes = append(writes, grantReport.Output)
-
 		}
 
 		batchOp, err := contract.NewBatchOperationFromWrites(writes)

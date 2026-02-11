@@ -2,7 +2,6 @@ package deployment
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"math"
 	"math/big"
@@ -232,7 +231,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 	t.Run("Token Expansion EVM and Solana", func(t *testing.T) {
 		// Verify that token and token pool do NOT exist in the datastore yet
 		for _, data := range evmTestData {
-			_, err = tokensapi.FindOneTokenAddress(&evmAdapter, env.DataStore, data.Chain.Selector, data.Token.Symbol)
+			_, err = evmAdapter.FindOneTokenAddress(env.DataStore, data.Chain.Selector, data.Token.Symbol)
 			require.Error(t, err)
 			_, err = evmAdapter.FindLatestTokenPoolAddress(env.DataStore, data.Chain.Selector, data.TokenPoolQualifier, evmTokenPoolType.String())
 			require.Error(t, err)
@@ -287,7 +286,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 				require.NoError(t, err)
 
 				// Query EVM token info from the chain
-				tokAddress, err := tokensapi.FindOneTokenAddress(&evmAdapter, env.DataStore, data.Chain.Selector, data.Token.Symbol)
+				tokAddress, err := evmAdapter.FindOneTokenAddress(env.DataStore, data.Chain.Selector, data.Token.Symbol)
 				require.NoError(t, err)
 				tokn, err := bnmERC20gen.NewBurnMintERC20(tokAddress, data.Chain.Client)
 				require.NoError(t, err)
@@ -341,7 +340,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 		t.Run("Validate ManualRegistration", func(t *testing.T) {
 			for _, data := range evmTestData {
 				// Verify that the token and token pool exist in datastore
-				tokAddress, err := tokensapi.FindOneTokenAddress(&evmAdapter, env.DataStore, data.Chain.Selector, data.Token.Symbol)
+				tokAddress, err := evmAdapter.FindOneTokenAddress(env.DataStore, data.Chain.Selector, data.Token.Symbol)
 				require.NoError(t, err)
 				tpAddress, err := evmAdapter.FindLatestTokenPoolAddress(env.DataStore, data.Chain.Selector, data.TokenPoolQualifier, evmTokenPoolType.String())
 				require.NoError(t, err)
@@ -499,7 +498,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 				require.True(t, bytes.Equal(remotePoolsAB[0], common.LeftPadBytes(poolB.Bytes(), 32)))
 
 				// Verify that the remote token was set correctly
-				tokB, err := tokensapi.FindOneTokenAddress(&evmAdapter, env.DataStore, evmB.Chain.Selector, evmB.Token.Symbol)
+				tokB, err := evmAdapter.FindOneTokenAddress(env.DataStore, evmB.Chain.Selector, evmB.Token.Symbol)
 				require.NoError(t, err)
 				require.True(t, bytes.Equal(remoteTokenAB, common.LeftPadBytes(tokB.Bytes(), 32)))
 			}
@@ -568,13 +567,13 @@ func TestTokensAndTokenPools(t *testing.T) {
 			tokenAdminRegistryPDA, _, _ := state.FindTokenAdminRegistryPDA(tokenMint, routerProgramId)
 
 			var tokenAdminRegistryAccount ccip_common.TokenAdminRegistry
-			tokenAdminRegistryErr := chain.GetAccountDataBorshInto(context.Background(), tokenAdminRegistryPDA, &tokenAdminRegistryAccount)
+			tokenAdminRegistryErr := chain.GetAccountDataBorshInto(t.Context(), tokenAdminRegistryPDA, &tokenAdminRegistryAccount)
 			require.Error(t, tokenAdminRegistryErr)
 
 			// Verify that the PDA token pool has not been initialized
 			tokenPoolStatePDA, _ := tokens.TokenPoolConfigAddress(tokenMint, tokenPoolProgramId)
 			var tokenPoolStateAccount burnmint_token_pool.State
-			tokenPoolStateErr := chain.GetAccountDataBorshInto(context.Background(), tokenPoolStatePDA, &tokenPoolStateAccount)
+			tokenPoolStateErr := chain.GetAccountDataBorshInto(t.Context(), tokenPoolStatePDA, &tokenPoolStateAccount)
 			require.Error(t, tokenPoolStateErr)
 
 			// Run the changeset
@@ -602,13 +601,13 @@ func TestTokensAndTokenPools(t *testing.T) {
 
 			// Verify that a new admin was proposed for the specified token
 			var tokenAdminRegistryAccountAfter ccip_common.TokenAdminRegistry
-			tarErr := chain.GetAccountDataBorshInto(context.Background(), tokenAdminRegistryPDA, &tokenAdminRegistryAccountAfter)
+			tarErr := chain.GetAccountDataBorshInto(t.Context(), tokenAdminRegistryPDA, &tokenAdminRegistryAccountAfter)
 			require.NoError(t, tarErr)
 			require.Equal(t, solana.PublicKey{}, tokenAdminRegistryAccountAfter.Administrator)
 			require.Equal(t, externalAdmin, tokenAdminRegistryAccountAfter.PendingAdministrator)
 
 			var tokenPoolStateAccountAfter burnmint_token_pool.State
-			stateErr := chain.GetAccountDataBorshInto(context.Background(), tokenPoolStatePDA, &tokenPoolStateAccountAfter)
+			stateErr := chain.GetAccountDataBorshInto(t.Context(), tokenPoolStatePDA, &tokenPoolStateAccountAfter)
 			require.NoError(t, stateErr)
 			require.Equal(t, chain.DeployerKey.PublicKey(), tokenPoolStateAccountAfter.Config.Owner)
 			require.Equal(t, externalAdmin, tokenPoolStateAccountAfter.Config.ProposedOwner)

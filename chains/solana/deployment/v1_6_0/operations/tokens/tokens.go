@@ -6,7 +6,7 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/gagliardetto/solana-go"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
+	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
@@ -154,6 +154,8 @@ var DeploySolanaToken = operations.NewOperation(
 type TokenMultisigParams struct {
 	Signers      []solana.PublicKey
 	TokenProgram solana.PublicKey
+	TokenMint    solana.PublicKey
+	TokenSymbol  string
 }
 
 var CreateTokenMultisig = operations.NewOperation(
@@ -161,7 +163,7 @@ var CreateTokenMultisig = operations.NewOperation(
 	Version,
 	"Creates a Token Multisig account for the given token program",
 	func(b operations.Bundle, chain cldf_solana.Chain, input TokenMultisigParams) (sequences.OnChainOutput, error) {
-		ctx := context.Background()
+		ctx := b.GetContext()
 
 		// m is always 1
 		const m uint8 = 1
@@ -188,7 +190,7 @@ var CreateTokenMultisig = operations.NewOperation(
 
 		// --- Instructions ---
 		// get stake amount for init
-		lamports, err := chain.Client.GetMinimumBalanceForRentExemption(ctx, soltokens.MultisigSize, config.DefaultCommitment)
+		lamports, err := chain.Client.GetMinimumBalanceForRentExemption(ctx, soltokens.MultisigSize, rpc.CommitmentConfirmed)
 		if err != nil {
 			return sequences.OnChainOutput{}, err
 		}
@@ -199,7 +201,7 @@ var CreateTokenMultisig = operations.NewOperation(
 		}
 		err = chain.Confirm(ixs, common.AddSigners(multisig))
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm transfer ownership: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm create multisig transaction: %w", err)
 		}
 		return sequences.OnChainOutput{
 			Addresses: []datastore.AddressRef{
@@ -208,6 +210,8 @@ var CreateTokenMultisig = operations.NewOperation(
 					Address:       multisig.PublicKey().String(),
 					Type:          "TOKEN_MULTISIG",
 					Version:       Version,
+					Qualifier:     input.TokenSymbol,
+					Labels:        datastore.NewLabelSet("tokenMint", input.TokenMint.String()),
 				},
 			},
 		}, nil

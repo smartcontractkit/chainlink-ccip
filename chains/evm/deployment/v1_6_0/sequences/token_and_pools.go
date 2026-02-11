@@ -323,9 +323,6 @@ func (a *EVMAdapter) DeployTokenVerify(e deployment.Environment, in any) error {
 	if err := utils.ValidateEVMAddress(input.CCIPAdmin, "CCIPAdmin"); err != nil {
 		return err
 	}
-	if len(input.ExternalAdmin) > 1 {
-		return fmt.Errorf("only one ExternalAdmin address is supported for EVM chains")
-	}
 	if err := utils.ValidateEVMAddress(input.ExternalAdmin, "ExternalAdmin"); err != nil {
 		return err
 	}
@@ -458,7 +455,7 @@ func (a *EVMAdapter) RegisterToken() *cldf_ops.Sequence[tokensapi.RegisterTokenI
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token admin registry address for chain %d: %w", input.ChainSelector, err)
 			}
 
-			tokAddress, err := tokensapi.FindOneTokenAddress(a, input.ExistingDataStore, input.ChainSelector, input.TokenSymbol)
+			tokAddress, err := a.FindOneTokenAddress(input.ExistingDataStore, input.ChainSelector, input.TokenSymbol)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token address for symbol %q on chain %d: %w", input.TokenSymbol, input.ChainSelector, err)
 			}
@@ -625,6 +622,25 @@ func (a *EVMAdapter) GetTokenAdminRegistryAddress(ds datastore.DataStore, select
 	ref, err := datastore_utils.FindAndFormatRef(ds, filters, selector, datastore_utils.FullRef)
 	if err != nil {
 		return common.Address{}, fmt.Errorf("failed to find token admin registry address on chain %d: %w", selector, err)
+	}
+
+	addr, err := a.AddressRefToBytes(ref)
+	if err != nil {
+		return common.Address{}, fmt.Errorf("failed to convert address ref to bytes: %w", err)
+	}
+
+	return common.BytesToAddress(addr), nil
+}
+
+func (a *EVMAdapter) FindOneTokenAddress(ds datastore.DataStore, chainSelector uint64, tokenSymbol string) (common.Address, error) {
+	filters := datastore.AddressRef{
+		ChainSelector: chainSelector,
+		Qualifier:     tokenSymbol,
+	}
+
+	ref, err := datastore_utils.FindAndFormatRef(ds, filters, chainSelector, datastore_utils.FullRef)
+	if err != nil {
+		return common.Address{}, fmt.Errorf("failed to find token address for symbol %q on chain %d: %w", tokenSymbol, chainSelector, err)
 	}
 
 	addr, err := a.AddressRefToBytes(ref)
