@@ -482,9 +482,6 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
     uint32 defaultTxGasLimit,
     uint256 maxPerMsgGasLimit
   ) internal pure returns (Client.GenericExtraArgsV2 memory) {
-    // Since GenericExtraArgs are simply a superset of EVMExtraArgsV1, we can parse them as such. For Aptos, this
-    // technically means EVMExtraArgsV1 are processed like they would be valid, but they will always fail on the
-    // allowedOutOfOrderExecution check below.
     Client.GenericExtraArgsV2 memory parsedExtraArgs =
       _parseUnvalidatedEVMExtraArgsFromBytes(extraArgs, defaultTxGasLimit);
 
@@ -503,18 +500,20 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
   ) private pure returns (Client.GenericExtraArgsV2 memory) {
     if (extraArgs.length < 4) {
       // If extra args are empty, generate default values.
-      return Client.GenericExtraArgsV2({gasLimit: defaultTxGasLimit, allowOutOfOrderExecution: false});
+      return Client.GenericExtraArgsV2({gasLimit: defaultTxGasLimit, allowOutOfOrderExecution: true});
     }
 
     bytes4 extraArgsTag = bytes4(extraArgs);
     bytes memory argsData = extraArgs[4:];
 
     if (extraArgsTag == Client.GENERIC_EXTRA_ARGS_V2_TAG) {
-      return abi.decode(argsData, (Client.GenericExtraArgsV2));
+      Client.GenericExtraArgsV2 memory genericExtraArgs = abi.decode(argsData, (Client.GenericExtraArgsV2));
+      genericExtraArgs.allowOutOfOrderExecution = true;
+      return genericExtraArgs;
     } else if (extraArgsTag == Client.EVM_EXTRA_ARGS_V1_TAG) {
       // EVMExtraArgsV1 originally included a second boolean (strict) field which has been deprecated.
       // Clients may still include it but it will be ignored.
-      return Client.GenericExtraArgsV2({gasLimit: abi.decode(argsData, (uint256)), allowOutOfOrderExecution: false});
+      return Client.GenericExtraArgsV2({gasLimit: abi.decode(argsData, (uint256)), allowOutOfOrderExecution: true});
     }
     revert InvalidExtraArgsTag();
   }
@@ -978,6 +977,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
 
   /// @inheritdoc ILegacyFeeQuoter
   /// @dev precondition - onRampTokenTransfers and sourceTokenAmounts lengths must be equal.
+  /// @dev isOutOfOrderExecution is no longer supported, it will always return true.
   function processMessageArgs(
     uint64 destChainSelector,
     address feeToken,
@@ -1006,11 +1006,12 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
     (convertedExtraArgs, isOutOfOrderExecution, tokenReceiver) =
       _processChainFamilySelector(destChainSelector, messageReceiver, extraArgs);
 
-    return (msgFeeJuels, isOutOfOrderExecution, convertedExtraArgs, tokenReceiver);
+    return (msgFeeJuels, true, convertedExtraArgs, tokenReceiver);
   }
 
   /// @notice Parses the extra Args based on the chain family selector. Isolated into a separate function
   /// as it was the only way to prevent a stack too deep error, and makes future chain family additions easier.
+  /// @dev isOutOfOrderExecution is no longer supported, it will always return true.
   // solhint-disable-next-line chainlink-solidity/explicit-returns
   function _processChainFamilySelector(
     uint64 destChainSelector,
@@ -1029,7 +1030,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
       Client.GenericExtraArgsV2 memory parsedExtraArgs =
         _parseUnvalidatedEVMExtraArgsFromBytes(extraArgs, destChainConfig.defaultTxGasLimit);
 
-      return (Client._argsToBytes(parsedExtraArgs), parsedExtraArgs.allowOutOfOrderExecution, messageReceiver);
+      return (Client._argsToBytes(parsedExtraArgs), true, messageReceiver);
     }
     if (destChainConfig.chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SUI) {
       // perform parsing check on the extraArgs
