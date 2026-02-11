@@ -594,7 +594,10 @@ func TestTokensAndTokenPools(t *testing.T) {
 					RegisterTokenConfigs: tokensapi.RegisterTokenConfig{
 						ProposedOwner:      solTestData.Token.ExternalAdmin,
 						TokenPoolQualifier: solTestData.TokenPoolQualifier,
-						TokenSymbol:        tokenSymbol,
+						TokenRef: datastore.AddressRef{
+							ChainSelector: solTestData.Chain.Selector,
+							Qualifier:     tokenSymbol,
+						},
 						PoolType:           solTokenPoolType.String(),
 						SVMExtraArgs: &tokensapi.SVMExtraArgs{
 							CustomerMintAuthorities: []solana.PublicKey{

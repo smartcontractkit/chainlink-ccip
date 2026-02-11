@@ -253,7 +253,7 @@ func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualR
 					TokenProgram: tokenProgramId,
 					Signers:      signers,
 					TokenMint:    tokenMint,
-					TokenSymbol:  input.RegisterTokenConfigs.TokenSymbol,
+					TokenSymbol:  input.RegisterTokenConfigs.TokenRef.Qualifier,
 				})
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to create token multisig on-chain: %w", err)
