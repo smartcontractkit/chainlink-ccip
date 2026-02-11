@@ -204,6 +204,26 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
     });
   }
 
+  /// @notice Validates the caller of lockOrBurn against a set of allowed callers.
+  /// @dev Overrides the default behavior of _onlyOnRamp because this contract may be invoked by a proxy contract.
+  /// @param remoteChainSelector The remote chain selector to validate the caller against.
+  function _onlyOnRamp(
+    uint64 remoteChainSelector
+  ) internal view virtual override {
+    if (!isSupportedChain(remoteChainSelector)) revert ChainNotAllowed(remoteChainSelector);
+    _validateCaller();
+  }
+
+  /// @notice Validates the caller of releaseOrMint against a set of allowed callers.
+  /// @dev Overrides the default behavior of _onlyOffRamp because this contract may be invoked by a proxy contract.
+  /// @param remoteChainSelector The remote chain selector to validate the caller against.
+  function _onlyOffRamp(
+    uint64 remoteChainSelector
+  ) internal view virtual override {
+    if (!isSupportedChain(remoteChainSelector)) revert ChainNotAllowed(remoteChainSelector);
+    _validateCaller();
+  }
+
   /// @inheritdoc TokenPool
   /// @dev This function proxies the message to the message transmitter, which will mint the tokens through CCTP's contracts.
   function releaseOrMint(
@@ -235,26 +255,6 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
     });
 
     return Pool.ReleaseOrMintOutV1({destinationAmount: releaseOrMintIn.sourceDenominatedAmount});
-  }
-
-  /// @notice Validates the caller of lockOrBurn against a set of allowed callers.
-  /// @dev Overrides the default behavior of _onlyOnRamp because this contract may be invoked by a proxy contract.
-  /// @param remoteChainSelector The remote chain selector to validate the caller against.
-  function _onlyOnRamp(
-    uint64 remoteChainSelector
-  ) internal view virtual override {
-    if (!isSupportedChain(remoteChainSelector)) revert ChainNotAllowed(remoteChainSelector);
-    _validateCaller();
-  }
-
-  /// @notice Validates the caller of releaseOrMint against a set of allowed callers.
-  /// @dev Overrides the default behavior of _onlyOffRamp because this contract may be invoked by a proxy contract.
-  /// @param remoteChainSelector The remote chain selector to validate the caller against.
-  function _onlyOffRamp(
-    uint64 remoteChainSelector
-  ) internal view virtual override {
-    if (!isSupportedChain(remoteChainSelector)) revert ChainNotAllowed(remoteChainSelector);
-    _validateCaller();
   }
 
   /// @notice Validates the USDC encoded message against the given parameters.
