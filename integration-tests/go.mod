@@ -40,7 +40,7 @@ require (
 )
 
 require (
-	github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm v0.0.0-20260206181544-f1613c67d071
+	github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm v0.0.0-20260207103925-a92e7750e174
 	github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment v0.0.0-20260116092715-df6a64d4bf00
 )
 
