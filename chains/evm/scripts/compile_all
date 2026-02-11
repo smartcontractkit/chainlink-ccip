@@ -91,6 +91,7 @@ compileContract pools/USDC/CCTPMessageTransmitterProxy
 compileContract pools/SiloedLockReleaseTokenPool
 compileContract pools/BurnMintFastTransferTokenPool
 compileContract pools/USDC/SiloedUSDCTokenPool
+compileContract pools/USDC/USDCTokenPool
 compileContract pools/USDC/USDCTokenPoolCCTPV2
 compileContract pools/USDC/BurnMintWithLockReleaseFlagTokenPool
 
