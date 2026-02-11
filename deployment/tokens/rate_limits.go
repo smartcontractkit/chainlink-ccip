@@ -17,7 +17,7 @@ import (
 type RateLimiterConfigInput struct {
 	ChainSelector       uint64                             `yaml:"chain-selector" json:"chainSelector"`
 	ChainAdapterVersion *semver.Version                    `yaml:"chain-adapter-version" json:"chainAdapterVersion"`
-	TokenSymbol         string                             `yaml:"token-symbol" json:"tokenSymbol"`
+	TokenRef            datastore.AddressRef               `yaml:"token-ref" json:"tokenRef"`
 	TokenPoolQualifier  string                             `yaml:"token-pool-qualifier" json:"tokenPoolQualifier"`
 	PoolType            string                             `yaml:"pool-type" json:"poolType"`
 	Inputs              map[uint64]RateLimiterConfigInputs `yaml:"inputs" json:"inputs"`
@@ -30,7 +30,7 @@ type RateLimiterConfigInputs struct {
 	// below are not specified by the user, filled in by the deployment system to pass to chain operations
 	ChainSelector       uint64
 	RemoteChainSelector uint64
-	TokenSymbol         string
+	TokenRef            datastore.AddressRef
 	TokenPoolQualifier  string
 	PoolType            string
 	ExistingDataStore   datastore.DataStore
@@ -78,7 +78,7 @@ func setTokenPoolRateLimitsApply() func(cldf.Environment, RateLimiterConfigInput
 		}
 		for remoteSelector, inputs := range cfg.Inputs {
 			inputs.ChainSelector = cfg.ChainSelector
-			inputs.TokenSymbol = cfg.TokenSymbol
+			inputs.TokenRef = cfg.TokenRef
 			inputs.TokenPoolQualifier = cfg.TokenPoolQualifier
 			inputs.PoolType = cfg.PoolType
 			inputs.RemoteChainSelector = remoteSelector

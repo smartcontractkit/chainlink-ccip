@@ -42,7 +42,7 @@ func (a *SolanaAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[
 			}
 
 			tpAddr := solana.MustPublicKeyFromBase58(input.TokenPoolAddress)
-			tokenAddr, tokenProgramId, err := getTokenMintAndTokenProgram(input.ExistingDataStore, input.TokenSymbol, chain)
+			tokenAddr, tokenProgramId, err := getTokenMintAndTokenProgram(input.ExistingDataStore, input.TokenRef, chain)
 			if err != nil {
 				return sequences.OnChainOutput{}, err
 			}
@@ -138,7 +138,7 @@ func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualR
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
-			tokenAddr, tokenProgramId, err := getTokenMintAndTokenProgram(input.ExistingDataStore, input.RegisterTokenConfigs.TokenSymbol, chain)
+			tokenAddr, tokenProgramId, err := getTokenMintAndTokenProgram(input.ExistingDataStore, input.RegisterTokenConfigs.TokenRef, chain)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token and token program address: %w", err)
 			}
@@ -179,7 +179,7 @@ func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualR
 				Type:          datastore.ContractType(input.RegisterTokenConfigs.PoolType),
 			}, chain.Selector, datastore_utils.FullRef)
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to find token pool address for symbol '%s' and qualifier '%s': %w", input.RegisterTokenConfigs.TokenSymbol, input.RegisterTokenConfigs.TokenPoolQualifier, err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to find token pool address for symbol '%s' and qualifier '%s': %w", input.RegisterTokenConfigs.TokenRef.Qualifier, input.RegisterTokenConfigs.TokenPoolQualifier, err)
 			}
 			tokenMint := solana.MustPublicKeyFromBase58(tokenAddr.Address)
 			tokenPool := solana.MustPublicKeyFromBase58(tokenPoolAddr.Address)
@@ -253,7 +253,7 @@ func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualR
 					TokenProgram: tokenProgramId,
 					Signers:      signers,
 					TokenMint:    tokenMint,
-					TokenSymbol:  input.RegisterTokenConfigs.TokenSymbol,
+					TokenSymbol:  input.RegisterTokenConfigs.TokenRef.Qualifier,
 				})
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to create token multisig on-chain: %w", err)
@@ -283,7 +283,7 @@ func (a *SolanaAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokenapi.Rat
 			default:
 				return sequences.OnChainOutput{}, fmt.Errorf("unsupported token pool type '%s' for Solana", input.PoolType)
 			}
-			tokenAddr, tokenProgramId, err := getTokenMintAndTokenProgram(input.ExistingDataStore, input.TokenSymbol, chain)
+			tokenAddr, tokenProgramId, err := getTokenMintAndTokenProgram(input.ExistingDataStore, input.TokenRef, chain)
 			if err != nil {
 				return sequences.OnChainOutput{}, err
 			}
@@ -294,7 +294,7 @@ func (a *SolanaAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokenapi.Rat
 				Type:          datastore.ContractType(input.PoolType),
 			}, chain.Selector, datastore_utils.FullRef)
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to find token pool address for symbol '%s' and qualifier '%s': %w", input.TokenSymbol, input.TokenPoolQualifier, err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to find token pool address for symbol '%s' and qualifier '%s': %w", input.TokenRef.Qualifier, input.TokenPoolQualifier, err)
 			}
 			tokenMint := solana.MustPublicKeyFromBase58(tokenAddr.Address)
 			tokenPool := solana.MustPublicKeyFromBase58(tokenPoolAddr.Address)
@@ -326,6 +326,8 @@ func (a *SolanaAdapter) DeployToken() *cldf_ops.Sequence[tokenapi.DeployTokenInp
 			var result sequences.OnChainOutput
 			b.Logger.Info("SVM Deploying token:", input)
 			chain := chains.SolanaChains()[input.ChainSelector]
+			needsTokenDeploy := true
+			var rawTokenAddr string
 
 			tokenAddr, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, datastore.AddressRef{
 				ChainSelector: chain.Selector,
@@ -334,35 +336,49 @@ func (a *SolanaAdapter) DeployToken() *cldf_ops.Sequence[tokenapi.DeployTokenInp
 			}, chain.Selector, datastore_utils.FullRef)
 			if err == nil {
 				b.Logger.Info("Token already deployed at address:", tokenAddr.Address)
-				return result, nil
+				needsTokenDeploy = false
+				rawTokenAddr = tokenAddr.Address
 			}
-
-			var privateKey solana.PrivateKey
-			if input.TokenPrivKey != "" {
-				privateKey = solana.MustPrivateKeyFromBase58(input.TokenPrivKey)
+			if needsTokenDeploy {
+				var privateKey solana.PrivateKey
+				if input.TokenPrivKey != "" {
+					privateKey = solana.MustPrivateKeyFromBase58(input.TokenPrivKey)
+				}
+				ataList := []solana.PublicKey{}
+				for _, sender := range input.Senders {
+					ataList = append(ataList, solana.MustPublicKeyFromBase58(sender))
+				}
+				var premint uint64 = 0
+				if input.PreMint != nil {
+					premint = input.PreMint.Uint64()
+				}
+				deployOut, err := operations.ExecuteOperation(b, tokensops.DeploySolanaToken, chains.SolanaChains()[chain.Selector], tokensops.Params{
+					ExistingAddresses:      input.ExistingDataStore.Addresses().Filter(),
+					TokenProgramName:       input.Type,
+					TokenPrivKey:           privateKey,
+					TokenSymbol:            input.Symbol,
+					ATAList:                ataList,
+					PreMint:                premint,
+					DisableFreezeAuthority: input.DisableFreezeAuthority,
+					TokenDecimals:          input.Decimals,
+				})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy token: %w", err)
+				}
+				result.Addresses = append(result.Addresses, deployOut.Output)
+				rawTokenAddr = deployOut.Output.Address
 			}
-			ataList := []solana.PublicKey{}
-			for _, sender := range input.Senders {
-				ataList = append(ataList, solana.MustPublicKeyFromBase58(sender))
+			// irrespective of whether the token was just deployed or already existed, we attempt to upload metadata if it was provided, since the metadata might not have been uploaded in a previous deployment
+			if input.TokenMetadata != nil {
+				input.TokenMetadata.TokenPubkey = rawTokenAddr
+				_, err = operations.ExecuteOperation(b, tokensops.UpsertTokenMetadata, chains.SolanaChains()[chain.Selector], tokensops.TokenMetadataInput{
+					ExistingAddresses: input.ExistingDataStore.Addresses().Filter(),
+					Metadata:          *input.TokenMetadata,
+				})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to upload token metadata: %w", err)
+				}
 			}
-			var premint uint64 = 0
-			if input.PreMint != nil {
-				premint = input.PreMint.Uint64()
-			}
-			deployOut, err := operations.ExecuteOperation(b, tokensops.DeploySolanaToken, chains.SolanaChains()[chain.Selector], tokensops.Params{
-				ExistingAddresses:      input.ExistingDataStore.Addresses().Filter(),
-				TokenProgramName:       input.Type,
-				TokenPrivKey:           privateKey,
-				TokenSymbol:            input.Symbol,
-				ATAList:                ataList,
-				PreMint:                premint,
-				DisableFreezeAuthority: input.DisableFreezeAuthority,
-				TokenDecimals:          input.Decimals,
-			})
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy token: %w", err)
-			}
-			result.Addresses = append(result.Addresses, deployOut.Output)
 			return result, nil
 		},
 	)
@@ -391,7 +407,7 @@ func (a *SolanaAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokenapi.De
 			default:
 				return sequences.OnChainOutput{}, fmt.Errorf("unsupported token pool type '%s' for Solana", input.PoolType)
 			}
-			tokenAddr, tokenProgramId, err := getTokenMintAndTokenProgram(input.ExistingDataStore, input.TokenSymbol, chain)
+			tokenAddr, tokenProgramId, err := getTokenMintAndTokenProgram(input.ExistingDataStore, *input.TokenRef, chain)
 			if err != nil {
 				return sequences.OnChainOutput{}, err
 			}
@@ -402,7 +418,7 @@ func (a *SolanaAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokenapi.De
 				Type:          datastore.ContractType(input.PoolType),
 			}, chain.Selector, datastore_utils.FullRef)
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to find token pool address for symbol '%s' and qualifier '%s': %w", input.TokenSymbol, input.TokenPoolQualifier, err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to find token pool address for symbol '%s' and qualifier '%s': %w", input.TokenRef.Qualifier, input.TokenPoolQualifier, err)
 			}
 			routerAddr, err := a.GetRouterAddress(input.ExistingDataStore, input.ChainSelector)
 			if err != nil {
@@ -487,13 +503,19 @@ func (a *SolanaAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokenapi.De
 	)
 }
 
-func getTokenMintAndTokenProgram(store datastore.DataStore, tokenSymbol string, chain cldf_solana.Chain) (datastore.AddressRef, solana.PublicKey, error) {
-	tokenAddr, err := datastore_utils.FindAndFormatRef(store, datastore.AddressRef{
+func getTokenMintAndTokenProgram(store datastore.DataStore, tokenRef datastore.AddressRef, chain cldf_solana.Chain) (datastore.AddressRef, solana.PublicKey, error) {
+	ref := datastore.AddressRef{
 		ChainSelector: chain.Selector,
-		Qualifier:     tokenSymbol,
-	}, chain.Selector, datastore_utils.FullRef)
+	}
+	if tokenRef.Address != "" {
+		ref.Address = tokenRef.Address
+	}
+	if tokenRef.Qualifier != "" {
+		ref.Qualifier = tokenRef.Qualifier
+	}
+	tokenAddr, err := datastore_utils.FindAndFormatRef(store, ref, chain.Selector, datastore_utils.FullRef)
 	if err != nil {
-		return datastore.AddressRef{}, solana.PublicKey{}, fmt.Errorf("failed to find token address for symbol '%s': %w", tokenSymbol, err)
+		return datastore.AddressRef{}, solana.PublicKey{}, fmt.Errorf("failed to find token address for ref '%+v': %w", ref, err)
 	}
 	tokenProgramId, err := utils.GetTokenProgramID(deployment.ContractType(tokenAddr.Type))
 	if err != nil {
@@ -517,7 +539,7 @@ func (a *SolanaAdapter) RegisterToken() *cldf_ops.Sequence[tokenapi.RegisterToke
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get router address: %w", err)
 			}
 
-			tokenAddr, _, err := getTokenMintAndTokenProgram(input.ExistingDataStore, input.TokenSymbol, chain)
+			tokenAddr, _, err := getTokenMintAndTokenProgram(input.ExistingDataStore, input.TokenRef, chain)
 			if err != nil {
 				return sequences.OnChainOutput{}, err
 			}
@@ -568,12 +590,9 @@ func (a *SolanaAdapter) SetPool() *cldf_ops.Sequence[tokenapi.SetPoolInput, sequ
 			b.Logger.Info("SVM Setting token pool:", input)
 			chain := chains.SolanaChains()[input.ChainSelector]
 
-			tokenAddr, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, datastore.AddressRef{
-				ChainSelector: chain.Selector,
-				Qualifier:     input.TokenSymbol,
-			}, chain.Selector, datastore_utils.FullRef)
+			tokenAddr, _, err := getTokenMintAndTokenProgram(input.ExistingDataStore, input.TokenRef, chain)
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to find token address for symbol '%s': %w", input.TokenSymbol, err)
+				return sequences.OnChainOutput{}, err
 			}
 			tokenProgramId, err := utils.GetTokenProgramID(deployment.ContractType(tokenAddr.Type))
 			if err != nil {
@@ -586,7 +605,7 @@ func (a *SolanaAdapter) SetPool() *cldf_ops.Sequence[tokenapi.SetPoolInput, sequ
 				Type:          datastore.ContractType(input.PoolType),
 			}, chain.Selector, datastore_utils.FullRef)
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to find token pool address for symbol '%s' and qualifier '%s': %w", input.TokenSymbol, input.TokenPoolQualifier, err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to find token pool address for symbol '%s' and qualifier '%s': %w", input.TokenRef.Qualifier, input.TokenPoolQualifier, err)
 			}
 			routerAddr, err := a.GetRouterAddress(input.ExistingDataStore, input.ChainSelector)
 			if err != nil {
@@ -614,8 +633,4 @@ func (a *SolanaAdapter) SetPool() *cldf_ops.Sequence[tokenapi.SetPoolInput, sequ
 			return result, nil
 		},
 	)
-}
-
-func (a *SolanaAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokenapi.UpdateAuthoritiesInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
-	return nil
 }

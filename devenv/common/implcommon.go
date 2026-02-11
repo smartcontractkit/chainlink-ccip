@@ -648,12 +648,15 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 				ChainSelector: srcSel,
 			},
 			TokenPoolRef: datastore.AddressRef{
-				Type:          datastore.ContractType(srcCfg.PoolType),
-				Qualifier:     srcCfg.TokenPoolQualifier,
+				Type:          datastore.ContractType(srcCfg.DeployTokenPoolInput.PoolType),
+				Qualifier:     srcCfg.DeployTokenPoolInput.TokenPoolQualifier,
 				Version:       srcCfg.TokenPoolVersion,
 				ChainSelector: srcSel,
 			},
-			TokenSymbol: srcCfg.DeployTokenInput.Symbol,
+			TokenRef: datastore.AddressRef{
+				Qualifier:     srcCfg.DeployTokenInput.Symbol,
+				ChainSelector: srcSel,
+			},
 		}
 
 		for _, dstAdapter := range adp {
@@ -672,8 +675,8 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 						ChainSelector: dstSel,
 					},
 					RemotePool: &datastore.AddressRef{
-						Type:          datastore.ContractType(dstCfg.PoolType),
-						Qualifier:     dstCfg.TokenPoolQualifier,
+						Type:          datastore.ContractType(dstCfg.DeployTokenPoolInput.PoolType),
+						Qualifier:     dstCfg.DeployTokenPoolInput.TokenPoolQualifier,
 						Version:       dstCfg.TokenPoolVersion,
 						ChainSelector: dstSel,
 					},
@@ -757,9 +760,9 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 			for _, rl := range rls {
 				input := tokensapi.RateLimiterConfigInput{
 					ChainSelector:       selector,
-					TokenSymbol:         teConfig.DeployTokenInput.Symbol,
-					TokenPoolQualifier:  teConfig.TokenPoolQualifier,
-					PoolType:            teConfig.PoolType,
+					TokenRef:            tokenRef,
+					TokenPoolQualifier:  teConfig.DeployTokenPoolInput.TokenPoolQualifier,
+					PoolType:            teConfig.DeployTokenPoolInput.PoolType,
 					ChainAdapterVersion: v1_6_0,
 					Inputs: map[uint64]tokensapi.RateLimiterConfigInputs{
 						dst.ChainSelector(): {

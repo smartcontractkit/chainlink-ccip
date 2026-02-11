@@ -82,7 +82,7 @@ func TestTokenExpansion(t *testing.T) {
 		ChainAdapterVersion: version,
 		TokenExpansionInputPerChain: map[uint64]tokensapi.TokenExpansionInputPerChain{
 			chain_selectors.SOLANA_MAINNET.Selector: tokensapi.TokenExpansionInputPerChain{
-				DeployTokenInput: tokensapi.DeployTokenInput{
+				DeployTokenInput: &tokensapi.DeployTokenInput{
 					Name:     "Test Token",
 					Symbol:   "TEST",
 					Decimals: 9,
@@ -92,7 +92,9 @@ func TestTokenExpansion(t *testing.T) {
 					},
 					DisableFreezeAuthority: true,
 				},
-				PoolType: common_utils.BurnMintTokenPool.String(),
+				DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
+					PoolType: common_utils.BurnMintTokenPool.String(),
+				},
 			},
 		},
 		MCMS: mcms.Input{
