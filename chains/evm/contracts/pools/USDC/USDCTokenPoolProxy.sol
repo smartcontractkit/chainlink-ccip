@@ -219,16 +219,13 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
     if (version == USDCSourcePoolDataCodec.LOCK_RELEASE_FLAG) {
       return IPoolV1(s_siloedLockReleasePool).releaseOrMint(releaseOrMintIn);
     }
-    if (version == USDCSourcePoolDataCodec.CCTP_VERSION_1_TAG) {
-      return IPoolV1(s_cctpV1Pool).releaseOrMint(releaseOrMintIn);
-    }
     if (version == USDCSourcePoolDataCodec.CCTP_VERSION_2_TAG) {
       return IPoolV1(s_cctpV2Pool).releaseOrMint(releaseOrMintIn);
     }
 
-    // In previous versions of the USDC Token Pool, the sourcePoolData only contained abi encoded (uint64, uint32).
-    // This means that a message originating from a previous version of the pool will have a sourcePoolData that is 64
-    // bytes long, indicating an inflight message originating from a previous version of the USDC Token pool.
+    // In the CCTP v1 USDCTokenPool, `sourcePoolData` is produced as: abi.encode(USDCSourcePoolDataCodec.SourceTokenDataPayloadV1({nonce, sourceDomain}))
+    // ABI encoding places each static value into a full 32-byte word, so the payload is: 2 words * 32 bytes = 64 bytes
+    // Therefore, a 64-byte `sourcePoolData` with no 4-byte version/tag prefix indicates the legacy CCTP v1 payload format and must be routed to the CCTP v1 pool.
     // Note: It is possible for a future version of the source pool data to also be 64 bytes long. However, any future
     // version will have a version number in the first 4 bytes and will be routed to the proper pool before this check
     // is reached. Therefore this branch will only be triggered for messages using the legacy source pool data format.

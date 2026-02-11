@@ -82,50 +82,6 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
     assertEq(actualOut.destinationAmount, expectedOut.destinationAmount);
   }
 
-  function test_releaseOrMint_CCTPV1Flag() public {
-    uint256 testAmount = 4321;
-    bytes memory originalSender = abi.encode(s_sender);
-
-    bytes memory sourcePoolData = abi.encodePacked(USDCSourcePoolDataCodec.CCTP_VERSION_1_TAG, uint64(0), uint32(0));
-    bytes memory offChainTokenData = "";
-
-    // Mock the router's isOffRamp function to return true.
-    vm.mockCall(
-      address(s_router),
-      abi.encodeWithSelector(Router.isOffRamp.selector, SOURCE_CHAIN_SELECTOR, s_routerAllowedOffRamp),
-      abi.encode(true)
-    );
-
-    vm.startPrank(s_routerAllowedOffRamp);
-
-    // Prepare input with CCTP_V1_FLAG in sourcePoolData (version 0 in offchainTokenData).
-    Pool.ReleaseOrMintInV1 memory releaseOrMintIn = Pool.ReleaseOrMintInV1({
-      remoteChainSelector: SOURCE_CHAIN_SELECTOR,
-      originalSender: originalSender,
-      receiver: s_receiver,
-      sourceDenominatedAmount: testAmount,
-      localToken: address(s_USDCToken),
-      sourcePoolData: sourcePoolData,
-      sourcePoolAddress: s_sourcePoolAddress,
-      offchainTokenData: offChainTokenData
-    });
-
-    Pool.ReleaseOrMintOutV1 memory expectedOut = Pool.ReleaseOrMintOutV1({destinationAmount: testAmount});
-
-    // Expect the cctpV1Pool's releaseOrMint to be called and return expectedOut.
-    vm.mockCall(
-      address(s_cctpV1Pool),
-      abi.encodeWithSelector(IPoolV1.releaseOrMint.selector, releaseOrMintIn),
-      abi.encode(expectedOut)
-    );
-
-    vm.expectCall(address(s_cctpV1Pool), abi.encodeWithSelector(IPoolV1.releaseOrMint.selector, releaseOrMintIn));
-
-    Pool.ReleaseOrMintOutV1 memory actualOut = s_usdcTokenPoolProxy.releaseOrMint(releaseOrMintIn);
-
-    assertEq(actualOut.destinationAmount, expectedOut.destinationAmount);
-  }
-
   function test_releaseOrMint_CCTPV2_CCVFlag() public {
     uint256 testAmount = 5678;
     bytes memory originalSender = abi.encode(s_sender);
