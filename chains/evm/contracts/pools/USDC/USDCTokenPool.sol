@@ -5,7 +5,6 @@ import {IMessageTransmitter} from "./interfaces/IMessageTransmitter.sol";
 import {ITokenMessenger} from "./interfaces/ITokenMessenger.sol";
 
 import {Pool} from "../../libraries/Pool.sol";
-
 import {USDCSourcePoolDataCodec} from "../../libraries/USDCSourcePoolDataCodec.sol";
 import {TokenPool} from "../TokenPool.sol";
 import {CCTPMessageTransmitterProxy} from "./CCTPMessageTransmitterProxy.sol";
@@ -58,7 +57,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
   error InvalidDestinationDomain(uint32 expected, uint32 got);
   error InvalidReceiver(bytes receiver);
   error InvalidTransmitterInProxy();
-  error InvalidPreviousPool();
+  error InvalidSourcePoolDataLength(uint256 length);
   error InvalidMessageLength(uint256 length);
 
   // This data is supplied from offchain and contains everything needed to mint the USDC tokens on the destination chain
@@ -68,20 +67,24 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
     bytes attestation;
   }
 
+  // A domain is a USDC representation of a chain.
   // solhint-disable-next-line gas-struct-packing
   struct DomainUpdate {
     bytes32 allowedCaller; // Address allowed to mint on the domain (destination MessageTransmitterProxy)
-    bytes32 mintRecipient; // Address to mint to on the destination chain
-    uint32 domainIdentifier; // Unique domain ID
-    uint64 destChainSelector; // The destination chain for this domain
-    bool enabled; // Whether the domain is enabled
-    bool useLegacySourcePoolDataFormat; // Whether to use the legacy source pool data format
+    bytes32 mintRecipient; //       Address to mint to on the destination chain
+    uint32 domainIdentifier; // ──╮ Unique domain ID
+    uint64 destChainSelector; //  │ The destination chain for this domain
+    bool enabled; // ─────────────╯ Whether the domain is enabled
   }
+
+  // releaseOrMint decodes `SourceTokenDataPayloadV1` using abi.decode, where both fields are static types
+  // (`uint64 nonce`, `uint32 sourceDomain`) and each occupies one 32-byte ABI word, so the payload is 64 bytes.
+  uint256 internal constant SOURCE_POOL_DATA_LENGTH = 64;
 
   /// @notice The version of the USDC message format that this pool supports. Version 0 is the legacy version of CCTP.
   uint32 public immutable i_supportedUSDCVersion;
 
-  // The local USDC config.
+  // The local USDC config
   ITokenMessenger public immutable i_tokenMessenger;
   CCTPMessageTransmitterProxy public immutable i_messageTransmitterProxy;
   uint32 public immutable i_localDomainIdentifier;
@@ -89,17 +92,12 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
   /// A domain is a USDC representation of a destination chain.
   /// @dev Zero is a valid domain identifier.
   /// @dev The address to mint on the destination chain is the corresponding USDC pool.
-  /// @dev The allowedCaller represents the contract authorized to call receiveMessage on the destination CCTP message
-  /// transmitter. For dest pool version 1.6.1, this is the MessageTransmitterProxy of the destination chain. For dest
-  /// pool version 1.5.1, this is the destination chain's token pool.
-  // solhint-disable-next-line gas-struct-packing
+  /// @dev The allowedCaller represents the contract authorized to call receiveMessage on the destination CCTP message transmitter.
   struct Domain {
-    bytes32 allowedCaller; //                 Address allowed to mint on the domain
-    bytes32 mintRecipient; //                 Address to mint to on the destination chain
-    uint32 domainIdentifier; // ────────────╮ Unique domain ID
-    bool enabled; //                        | Whether the domain is enabled
-    bool useLegacySourcePoolDataFormat; // ─╯ Whether to use the legacy source pool data format for chains that
-    // have not yet been updated to the new source pool data format.
+    bytes32 allowedCaller; //      Address allowed to mint on the domain.
+    bytes32 mintRecipient; //      Address to mint to on the destination chain.
+    uint32 domainIdentifier; // ─╮ Unique domain ID.
+    bool enabled; // ────────────╯ Whether the domain is enabled.
   }
 
   // A mapping of CCIP chain identifiers to destination domains
@@ -155,7 +153,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
 
   /// @notice Using a function because constant state variables cannot be overridden by child contracts.
   function typeAndVersion() external pure virtual override returns (string memory) {
-    return "USDCTokenPool 1.6.4";
+    return "USDCTokenPool 1.6.5-dev";
   }
 
   /// @notice Burn tokens from the pool to initiate cross-chain transfer.
@@ -198,32 +196,17 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
       amount: lockOrBurnIn.amount
     });
 
-    bytes memory sourcePoolData;
-    USDCSourcePoolDataCodec.SourceTokenDataPayloadV1 memory sourceTokenDataPayload =
-      USDCSourcePoolDataCodec.SourceTokenDataPayloadV1({nonce: nonce, sourceDomain: i_localDomainIdentifier});
-
-    // The useLegacySourcePoolDataFormat flag is set to false for chains that have been updated to the new source pool
-    // data format. When the lane is updated, the flag should be set to false.
-    if (domain.useLegacySourcePoolDataFormat) {
-      // Since not all lanes will be updated to the new source pool data format simultaneously, it is important to support
-      // the legacy format until such a time as the lane can support it. Otherwise, the destination pool would not be able
-      // to parse the source pool data and all messages originating from this updated token pool would be rejected.
-
-      // It is safe to have the legacy format still be supported temporarily, as the USDCTokenPoolProxy will convert
-      // the legacy format to the new format before releaseOrMint() is called. Once all lanes in CCIP are updated to
-      // the new format and CCTP V2, this branch can be safely removed.
-      sourcePoolData = abi.encode(sourceTokenDataPayload);
-    } else {
-      sourcePoolData = USDCSourcePoolDataCodec._encodeSourceTokenDataPayloadV1(sourceTokenDataPayload);
-    }
-
     return Pool.LockOrBurnOutV1({
-      destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector), destPoolData: sourcePoolData
+      destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
+      destPoolData: abi.encode(
+        USDCSourcePoolDataCodec.SourceTokenDataPayloadV1({nonce: nonce, sourceDomain: i_localDomainIdentifier})
+      )
     });
   }
 
-  /// @notice Checks whether remote chain selector is configured on this contract, and if the msg.sender
-  /// is a permissioned onRamp for the given chain on the Router.
+  /// @notice Validates the caller of lockOrBurn against a set of allowed callers.
+  /// @dev Overrides the default behavior of _onlyOnRamp because this contract may be invoked by a proxy contract.
+  /// @param remoteChainSelector The remote chain selector to validate the caller against.
   function _onlyOnRamp(
     uint64 remoteChainSelector
   ) internal view virtual override {
@@ -231,8 +214,9 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
     _validateCaller();
   }
 
-  /// @notice Checks whether remote chain selector is configured on this contract, and if the msg.sender
-  /// is a permissioned offRamp for the given chain on the Router.
+  /// @notice Validates the caller of releaseOrMint against a set of allowed callers.
+  /// @dev Overrides the default behavior of _onlyOffRamp because this contract may be invoked by a proxy contract.
+  /// @param remoteChainSelector The remote chain selector to validate the caller against.
   function _onlyOffRamp(
     uint64 remoteChainSelector
   ) internal view virtual override {
@@ -246,16 +230,14 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
     _validateReleaseOrMint(releaseOrMintIn, releaseOrMintIn.sourceDenominatedAmount);
+    uint256 sourcePoolDataLength = releaseOrMintIn.sourcePoolData.length;
+    if (sourcePoolDataLength != SOURCE_POOL_DATA_LENGTH) revert InvalidSourcePoolDataLength(sourcePoolDataLength);
+
+    USDCSourcePoolDataCodec.SourceTokenDataPayloadV1 memory sourceTokenDataPayload =
+      abi.decode(releaseOrMintIn.sourcePoolData, (USDCSourcePoolDataCodec.SourceTokenDataPayloadV1));
 
     MessageAndAttestation memory msgAndAttestation =
       abi.decode(releaseOrMintIn.offchainTokenData, (MessageAndAttestation));
-
-    // Decode the source pool data from its raw bytes into a SourceTokenDataPayloadV0 struct that can be
-    // more easily validated. Since the USDCTokenPoolProxy that sits between this pool and the offRamp will convert
-    // the legacy format to the new format, this operation is safe to perform, as a message originating from a legacy
-    // pool will be converted to the new format before this decoding function is called.
-    USDCSourcePoolDataCodec.SourceTokenDataPayloadV1 memory sourceTokenDataPayload =
-      USDCSourcePoolDataCodec._decodeSourceTokenDataPayloadV1(releaseOrMintIn.sourcePoolData);
 
     _validateMessage(msgAndAttestation.message, sourceTokenDataPayload);
 
@@ -362,8 +344,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
         allowedCaller: domain.allowedCaller,
         mintRecipient: domain.mintRecipient,
         domainIdentifier: domain.domainIdentifier,
-        enabled: domain.enabled,
-        useLegacySourcePoolDataFormat: domain.useLegacySourcePoolDataFormat
+        enabled: domain.enabled
       });
     }
     emit DomainsSet(domains);
