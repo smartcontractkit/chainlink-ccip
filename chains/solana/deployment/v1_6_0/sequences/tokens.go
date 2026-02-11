@@ -368,7 +368,7 @@ func (a *SolanaAdapter) DeployToken() *cldf_ops.Sequence[tokenapi.DeployTokenInp
 				result.Addresses = append(result.Addresses, deployOut.Output)
 				rawTokenAddr = deployOut.Output.Address
 			}
-			// irrrespective of whether the token was just deployed or already existed, we attempt to upload metadata if it was provided, since the metadata might not have been uploaded in a previous deployment
+			// irrespective of whether the token was just deployed or already existed, we attempt to upload metadata if it was provided, since the metadata might not have been uploaded in a previous deployment
 			if input.TokenMetadata != nil {
 				input.TokenMetadata.TokenPubkey = rawTokenAddr
 				_, err = operations.ExecuteOperation(b, tokensops.UpsertTokenMetadata, chains.SolanaChains()[chain.Selector], tokensops.TokenMetadataInput{

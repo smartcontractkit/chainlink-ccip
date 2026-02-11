@@ -74,19 +74,19 @@ type DeployTokenInput struct {
 
 // Right now this is only used for Solana tokens but we can extend this to other VMs if needed in the future
 type TokenMetadata struct {
-	TokenPubkey string
+	TokenPubkey string `yaml:"token-pubkey" json:"tokenPubkey"`
 	// https://metaboss.dev/create.html#metadata
 	// only to be provided on initial upload, it takes in name, symbol, uri
 	// after initial upload, those fields can be updated using the update inputs
 	// put the json in ccip/env/input dir in CLD
-	MetadataJSONPath string
-	UpdateAuthority  string // used to set update authority of the token metadata PDA after initial upload
+	MetadataJSONPath string `yaml:"metadata-json-path" json:"metadataJsonPath"`
+	UpdateAuthority  string `yaml:"update-authority" json:"updateAuthority"` // used to set update authority of the token metadata PDA after initial upload
 	// https://metaboss.dev/update.html#update-name
-	UpdateName string // used to update the name of the token metadata PDA after initial upload
+	UpdateName string `yaml:"update-name" json:"updateName"` // used to update the name of the token metadata PDA after initial upload
 	// https://metaboss.dev/update.html#update-symbol
-	UpdateSymbol string // used to update the symbol of the token metadata PDA after initial upload
+	UpdateSymbol string `yaml:"update-symbol" json:"updateSymbol"` // used to update the symbol of the token metadata PDA after initial upload
 	// https://metaboss.dev/update.html#update-uri
-	UpdateURI string // used to update the uri of the token metadata PDA after initial upload
+	UpdateURI string `yaml:"update-uri" json:"updateUri"` // used to update the uri of the token metadata PDA after initial upload
 }
 
 type DeployTokenPoolInput struct {
@@ -214,7 +214,9 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 				}
 				batchOps = append(batchOps, deployTokenReport.Output.BatchOps...)
 				reports = append(reports, deployTokenReport.ExecutionReports...)
-				tokenRef = &deployTokenReport.Output.Addresses[0]
+				if len(deployTokenReport.Output.Addresses) != 0 {
+					tokenRef = &deployTokenReport.Output.Addresses[0]
+				}
 				for _, r := range deployTokenReport.Output.Addresses {
 					if err := tmpDatastore.Addresses().Add(r); err != nil {
 						return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %v on chain with selector %d to datastore: %w", r.Type, r.Version, r, r.ChainSelector, err)
@@ -229,15 +231,16 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 
 			if input.DeployTokenPoolInput != nil {
 				refToConnect := tokenRef
-				if refToConnect == nil && input.DeployTokenPoolInput.TokenRef == nil {
+				providedRef := input.DeployTokenPoolInput.TokenRef
+				if refToConnect == nil && providedRef == nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("no token deployed or provided for chain selector %d, cannot deploy token pool without token address", selector)
-				} else if refToConnect != nil && input.DeployTokenPoolInput.TokenRef != nil {
+				} else if refToConnect != nil && providedRef != nil {
 					// cross check the deployed token address with the provided token ref address
-					if refToConnect.Address != input.DeployTokenPoolInput.TokenRef.Address {
-						return cldf.ChangesetOutput{}, fmt.Errorf("token address deployed does not match the provided token ref address for chain selector %d: deployed token address %s, provided token ref address %s", selector, refToConnect.Address, input.DeployTokenPoolInput.TokenRef.Address)
+					if refToConnect.Address != providedRef.Address {
+						return cldf.ChangesetOutput{}, fmt.Errorf("token address deployed does not match the provided token ref address for chain selector %d: deployed token address %s, provided token ref address %s", selector, refToConnect.Address, providedRef.Address)
 					}
-					if refToConnect.Qualifier != input.DeployTokenPoolInput.TokenRef.Qualifier {
-						return cldf.ChangesetOutput{}, fmt.Errorf("token qualifier deployed does not match the provided token ref qualifier for chain selector %d: deployed token qualifier %s, provided token ref qualifier %s", selector, refToConnect.Qualifier, input.DeployTokenPoolInput.TokenRef.Qualifier)
+					if refToConnect.Qualifier != providedRef.Qualifier {
+						return cldf.ChangesetOutput{}, fmt.Errorf("token qualifier deployed does not match the provided token ref qualifier for chain selector %d: deployed token qualifier %s, provided token ref qualifier %s", selector, refToConnect.Qualifier, providedRef.Qualifier)
 					}
 				} else if refToConnect == nil {
 					// if token is not deployed by this changeset but token ref is provided, use the provided token ref

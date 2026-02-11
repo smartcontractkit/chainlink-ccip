@@ -102,7 +102,7 @@ var DeployTokenPool = cldf_ops.NewSequence(
 			Type:          datastore.ContractType(router.ContractType),
 		}, input.ChainSelector, datastore_utils.FullRef)
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("token with symbol '%s' is not found in datastore, %v", input.TokenRef.Qualifier, err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to find router address in datastore for chain with selector %d: %w", input.ChainSelector, err)
 		}
 
 		// find the rmnproxy address from the data store
@@ -111,7 +111,7 @@ var DeployTokenPool = cldf_ops.NewSequence(
 			Type:          datastore.ContractType(rmnproxyops.ContractType),
 		}, input.ChainSelector, datastore_utils.FullRef)
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("token with symbol '%s' is not found in datastore, %v", input.TokenRef.Qualifier, err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to find rmnproxy address in datastore for chain with selector %d: %w", input.ChainSelector, err)
 		}
 
 		// prepare allowlist
