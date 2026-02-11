@@ -102,7 +102,7 @@ func makeApply(tokenRegistry *TokenAdapterRegistry, mcmsRegistry *changesets.MCM
 				RemoteChains:      remoteChains,
 				ExternalAdmin:     token.ExternalAdmin,
 				RegistryAddress:   registry.Address,
-				TokenRef:       token.TokenRef,
+				TokenRef:          token.TokenRef,
 				PoolType:          tokenPool.Type.String(),
 				ExistingDataStore: e.DataStore,
 			})

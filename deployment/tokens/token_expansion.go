@@ -32,15 +32,8 @@ type TokenExpansionInputPerChain struct {
 	DeployTokenInput *DeployTokenInput `yaml:"deploy-token-input" json:"deployTokenInput"`
 	// will deploy a token pool for the token if DeployTokenPoolInput is not nil
 	DeployTokenPoolInput *DeployTokenPoolInput `yaml:"deploy-token-pool-input" json:"deployTokenPoolInput"`
-	// only necessary if we want to set specific admin authorities. Will default to timelock admin otherwise
-	TARAdmin                string `yaml:"tar-admin" json:"tarAdmin"`
-	TokenPoolAdmin          string `yaml:"token-pool-admin" json:"tokenPoolAdmin"`
-	TokenPoolRateLimitAdmin string `yaml:"token-pool-rate-limit-admin" json:"tokenPoolRateLimitAdmin"`
-	// rate lmiter config per remote chain
-	// we will look up the remote token from the top level token expansion config
-	RemoteCounterpartUpdates map[uint64]RateLimiterConfig `yaml:"remote-counterpart-updates" json:"remoteCounterpartUpdates"`
-	// if true, will delete the remote counterpart token pool on the specified chains
-	RemoteCounterpartDeletes []uint64 `yaml:"remote-counterpart-deletes" json:"remoteCounterpartDeletes"`
+	// if not nil, will try to fully configure the token for transfers, including registering the token and token pool on-chain and setting the pool on the token 
+	TokenTransferConfig *TokenTransferConfig `yaml:"token-transfer-config" json:"tokenTransferConfig"`
 }
 
 type DeployTokenInput struct {
@@ -272,6 +265,8 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 				}
 				tmpDatastore.Merge(e.DataStore)
 				e.DataStore = tmpDatastore.Seal()
+			}
+			if input.TokenTransferConfig != nil {
 				// register token
 				tmpDatastore = datastore.NewMemoryDataStore()
 				registerTokenInput := RegisterTokenInput{
