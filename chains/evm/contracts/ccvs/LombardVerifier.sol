@@ -23,6 +23,7 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
 
   error ZeroBridge();
   error ZeroLombardChainId();
+  error ZeroAllowedCaller();
   error PathNotExist(uint64 remoteChainSelector);
   error ExecutionError();
   error InvalidMessageLength(uint256 expected, uint256 actual);
@@ -338,6 +339,9 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
   ) external onlyOwner {
     if (lChainId == bytes32(0)) {
       revert ZeroLombardChainId();
+    }
+    if (allowedCaller == bytes32(0)) {
+      revert ZeroAllowedCaller();
     }
 
     s_chainSelectorToPath[remoteChainSelector] = Path({lChainId: lChainId, allowedCaller: allowedCaller});
