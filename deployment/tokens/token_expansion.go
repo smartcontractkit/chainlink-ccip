@@ -326,8 +326,8 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 				}
 			}
 		}
-		
-		fmt.Printf("all remote configs: %+v", )
+
+		fmt.Printf("all remote configs: %+v", allRemotes)
 		// finally, we process the token configs for transfers, which will register the tokens and token pools on-chain and set the pool on the token if necessary
 		transferOps, transferReports, err := processTokenConfigForChain(e, allTokenConfigs, cfg.ChainAdapterVersion)
 		if err != nil {
