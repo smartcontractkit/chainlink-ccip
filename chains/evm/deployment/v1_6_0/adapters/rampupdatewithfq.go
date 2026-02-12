@@ -12,7 +12,6 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	routerops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	offrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
 	onrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
@@ -55,44 +54,10 @@ func (ru RampUpdateWithFQ) ResolveRampsInput(e cldf.Environment, input deploy.Up
 		return input, fmt.Errorf("offramp address not found for chain selector %d", input.ChainSelector)
 	}
 	input.OffRampAddressRef = offRampAddr
-	routerAddr := datastore_utils.GetAddressRef(
-		e.DataStore.Addresses().Filter(
-			datastore.AddressRefByChainSelector(input.ChainSelector),
-			datastore.AddressRefByType(datastore.ContractType(routerops.ContractType)),
-			datastore.AddressRefByVersion(routerops.Version),
-		),
-		input.ChainSelector,
-		routerops.ContractType,
-		routerops.Version,
-		"",
-	)
-	if datastore_utils.IsAddressRefEmpty(routerAddr) {
-		return input, fmt.Errorf("router address not found for chain selector %d", input.ChainSelector)
-	}
-	for srcChain, srcChainConfig := range input.SourceChains {
-		srcOnRampAddr := datastore_utils.GetAddressRef(
-			e.DataStore.Addresses().Filter(
-				datastore.AddressRefByChainSelector(srcChain),
-				datastore.AddressRefByType(datastore.ContractType(onrampops.ContractType)),
-				datastore.AddressRefByVersion(onrampops.Version),
-			),
-			srcChain,
-			onrampops.ContractType,
-			onrampops.Version,
-			"",
-		)
-		if datastore_utils.IsAddressRefEmpty(srcOnRampAddr) {
-			return input, fmt.Errorf("onramp address not found for source chain selector %d", srcChain)
-		}
-		srcChainConfig.OnRamp = srcOnRampAddr
-		srcChainConfig.Router = routerAddr
-		input.SourceChains[srcChain] = srcChainConfig
-	}
 	return input, nil
 }
 
 // SequenceUpdateRampsWithFeeQuoter updates OnRamp and OffRamp contracts to use the new FeeQuoter contract
-// It also updates OffRamp source chain configs if provided in the input
 func (ru RampUpdateWithFQ) SequenceUpdateRampsWithFeeQuoter() *cldf_ops.Sequence[deploy.UpdateRampsInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return cldf_ops.NewSequence(
 		"ramp-update-with-fq:sequence-update-ramps-with-fee-quoter",
@@ -145,46 +110,6 @@ func (ru RampUpdateWithFQ) SequenceUpdateRampsWithFeeQuoter() *cldf_ops.Sequence
 					return sequences.OnChainOutput{}, err
 				}
 				writes = append(writes, offRampReport.Output)
-			}
-			if len(input.SourceChains) > 0 {
-				var sourceChainConfigs []offrampops.SourceChainConfigArgs
-				for srcChainSelector, srcChainConfig := range input.SourceChains {
-					// Check if the source chain config already exists and is up to date
-					existingSrcChainsReport, err := cldf_ops.ExecuteOperation(b, offrampops.GetSourceChainConfig, chain, contract.FunctionInput[uint64]{
-						Address:       common.HexToAddress(input.OffRampAddressRef.Address),
-						ChainSelector: input.ChainSelector,
-						Args:          srcChainSelector,
-					})
-					if err != nil {
-						return sequences.OnChainOutput{}, err
-					}
-					existingSrcChainConfig := existingSrcChainsReport.Output
-					if existingSrcChainConfig.IsEnabled &&
-						existingSrcChainConfig.Router == common.HexToAddress(srcChainConfig.Router.Address) {
-						continue
-					}
-					sourceChainConfigs = append(sourceChainConfigs, offrampops.SourceChainConfigArgs{
-						SourceChainSelector:       srcChainSelector,
-						Router:                    common.HexToAddress(srcChainConfig.Router.Address),
-						OnRamp:                    common.HexToAddress(srcChainConfig.OnRamp.Address).Bytes(),
-						IsEnabled:                 true,
-						IsRMNVerificationDisabled: true,
-					})
-				}
-				if len(sourceChainConfigs) > 0 {
-					offRampSrcReport, err := cldf_ops.ExecuteOperation(
-						b, offrampops.ApplySourceChainConfigUpdates,
-						chain, contract.FunctionInput[[]offrampops.SourceChainConfigArgs]{
-							Address:       common.HexToAddress(input.OffRampAddressRef.Address),
-							ChainSelector: input.ChainSelector,
-							Args:          sourceChainConfigs,
-						},
-					)
-					if err != nil {
-						return sequences.OnChainOutput{}, err
-					}
-					writes = append(writes, offRampSrcReport.Output)
-				}
 			}
 			batch, err := contract.NewBatchOperationFromWrites(writes)
 			if err != nil {

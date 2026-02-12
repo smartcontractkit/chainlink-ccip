@@ -32,7 +32,6 @@ type UpdateFeeQuoterInputPerChain struct {
 	ImportFeeQuoterConfigFromVersions []*semver.Version
 	FeeQuoterVersion                  *semver.Version
 	RampsVersion                      *semver.Version
-	SourceChainAddsToOffRamp          []uint64
 }
 
 type FeeQuoterUpdateInput struct {
@@ -51,7 +50,6 @@ type UpdateRampsInput struct {
 	FeeQuoterAddress  datastore.AddressRef
 	OnRampAddressRef  datastore.AddressRef
 	OffRampAddressRef datastore.AddressRef
-	SourceChains      map[uint64]SourceChainConfig
 }
 
 // FeeQuoterUpdater provides methods to update FeeQuoter contract on a chain.
@@ -156,12 +154,11 @@ func GetFQAndRampUpdaterRegistry() *FQAndRampUpdaterRegistry {
 // UpdateFeeQuoterChangeset creates a changeset that updates FeeQuoter contracts on specified chains.
 // It first optionally populates configuration values, then creates FeeQuoterUpdateInput,
 // deploys or updates the FeeQuoter contract, and finally updates the Ramps contracts to use the new FeeQuoter address.
-// If needed, it also updates OffRamp source chain configs ( specifically used when during updating feequoter only specific source chain needs to be added to offramp).
 func UpdateFeeQuoterChangeset(fquRegistry *FQAndRampUpdaterRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) cldf.ChangeSetV2[UpdateFeeQuoterInput] {
-	return cldf.CreateChangeSet(updateFeeQuoterApply(fquRegistry, mcmsRegistry), updateFeeQuoterVerify(fquRegistry, mcmsRegistry))
+	return cldf.CreateChangeSet(updateFeeQuoterApply(fquRegistry, mcmsRegistry), updateFeeQuoterVerify())
 }
 
-func updateFeeQuoterVerify(fquRegistry *FQAndRampUpdaterRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, UpdateFeeQuoterInput) error {
+func updateFeeQuoterVerify() func(cldf.Environment, UpdateFeeQuoterInput) error {
 	return func(e cldf.Environment, input UpdateFeeQuoterInput) error {
 		for chainSel, perChainInput := range input.Chains {
 			if !e.BlockChains.Exists(chainSel) {
@@ -253,10 +250,6 @@ func updateFeeQuoterApply(fquRegistry *FQAndRampUpdaterRegistry, mcmsRegistry *c
 				rampsInput := UpdateRampsInput{
 					ChainSelector:    chainSel,
 					FeeQuoterAddress: feeQuoterAddrRef,
-					SourceChains:     make(map[uint64]SourceChainConfig),
-				}
-				for _, srcChainSel := range perChainInput.SourceChainAddsToOffRamp {
-					rampsInput.SourceChains[srcChainSel] = SourceChainConfig{}
 				}
 				// Resolve Ramps input
 				resolvedRampsInput, err := rampUpdater.ResolveRampsInput(e, rampsInput)
