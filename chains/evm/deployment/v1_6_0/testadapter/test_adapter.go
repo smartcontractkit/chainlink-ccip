@@ -375,10 +375,7 @@ func (a *EVMAdapter) GetTokenExpansionConfig() tokensapi.TokenExpansionInputPerC
 	mintAmnt := new(big.Int).Mul(oneToken, big.NewInt(1_000_000)) // pre-mint 1 million tokens
 
 	return tokensapi.TokenExpansionInputPerChain{
-		TokenPoolVersion:        cciputils.Version_1_5_1,
-		TokenPoolRateLimitAdmin: admin,
-		TokenPoolAdmin:          admin,
-		TARAdmin:                admin,
+		TokenPoolVersion: cciputils.Version_1_5_1,
 		DeployTokenInput: &tokensapi.DeployTokenInput{
 			Decimals:               deci,
 			Symbol:                 "TEST_TOKEN_" + suffix,
@@ -396,9 +393,9 @@ func (a *EVMAdapter) GetTokenExpansionConfig() tokensapi.TokenExpansionInputPerC
 			PoolType:           cciputils.BurnMintTokenPool.String(),
 			TokenPoolQualifier: "TEST TOKEN POOL " + suffix,
 		},
-		// optional fields left empty, but included here for completeness
-		RemoteCounterpartUpdates: map[uint64]tokensapi.RateLimiterConfig{},
-		RemoteCounterpartDeletes: []uint64{},
+		TokenTransferConfig: &tokensapi.TokenTransferConfig{
+			ExternalAdmin: admin,
+		},
 	}
 }
 

@@ -32,7 +32,7 @@ type TokenExpansionInputPerChain struct {
 	DeployTokenInput *DeployTokenInput `yaml:"deploy-token-input" json:"deployTokenInput"`
 	// will deploy a token pool for the token if DeployTokenPoolInput is not nil
 	DeployTokenPoolInput *DeployTokenPoolInput `yaml:"deploy-token-pool-input" json:"deployTokenPoolInput"`
-	// if not nil, will try to fully configure the token for transfers, including registering the token and token pool on-chain and setting the pool on the token 
+	// if not nil, will try to fully configure the token for transfers, including registering the token and token pool on-chain and setting the pool on the token
 	TokenTransferConfig *TokenTransferConfig `yaml:"token-transfer-config" json:"tokenTransferConfig"`
 }
 
@@ -67,6 +67,8 @@ type DeployTokenInput struct {
 
 // Right now this is only used for Solana tokens but we can extend this to other VMs if needed in the future
 type TokenMetadata struct {
+	// not specified by the user. Overwritten by the deployment system to pass
+	// the token address to chain operations for metadata upload and updates
 	TokenPubkey string `yaml:"token-pubkey" json:"tokenPubkey"`
 	// https://metaboss.dev/create.html#metadata
 	// only to be provided on initial upload, it takes in name, symbol, uri
@@ -158,6 +160,8 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 		ds := datastore.NewMemoryDataStore()
 		tokenPoolRegistry := GetTokenAdapterRegistry()
 		mcmsRegistry := changesets.GetRegistry()
+		allRemotes := make(map[uint64]RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef])
+		allTokenConfigs := make([]TokenTransferConfig, 0)
 		for selector, input := range cfg.TokenExpansionInputPerChain {
 			tmpDatastore := datastore.NewMemoryDataStore()
 			family, err := chain_selectors.GetSelectorFamily(selector)
@@ -172,6 +176,7 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 			// deploy token
 			deployTokenInput := input.DeployTokenInput
 			var tokenRef *datastore.AddressRef
+			var tokenPool *datastore.AddressRef
 			if deployTokenInput != nil {
 				deployTokenInput.ExistingDataStore = e.DataStore
 				deployTokenInput.ChainSelector = selector
@@ -255,6 +260,9 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 				}
 				batchOps = append(batchOps, deployTokenPoolReport.Output.BatchOps...)
 				reports = append(reports, deployTokenPoolReport.ExecutionReports...)
+				if len(deployTokenPoolReport.Output.Addresses) != 0 {
+					tokenPool = &deployTokenPoolReport.Output.Addresses[0]
+				}
 				for _, r := range deployTokenPoolReport.Output.Addresses {
 					if err := tmpDatastore.Addresses().Add(r); err != nil {
 						return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %v on chain with selector %d to datastore: %w", r.Type, r.Version, r, r.ChainSelector, err)
@@ -266,59 +274,51 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 				tmpDatastore.Merge(e.DataStore)
 				e.DataStore = tmpDatastore.Seal()
 			}
+			allRemotes[selector] = RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+				RemoteToken: tokenRef,
+				RemotePool:  tokenPool,
+			}
+			// if token transfer config is provided, we will update the remote chain config with the token and token pool addresses and 
+			// save the token transfer config for processing after all tokens and token pools have been deployed
 			if input.TokenTransferConfig != nil {
-				// register token
-				tmpDatastore = datastore.NewMemoryDataStore()
-				registerTokenInput := RegisterTokenInput{
-					TokenRef:   *refToConnect,
-					TokenAdmin: input.TARAdmin,
+				actualPool := tokenPool
+				if actualPool == nil {
+					// if token pool is not deployed by this changeset, we expect the user to provide the token pool address in the TokenTransferConfig
+					actualPool = &input.TokenTransferConfig.TokenPoolRef
 				}
-				registerTokenInput.ExistingDataStore = e.DataStore
-				registerTokenInput.ChainSelector = selector
-				registerTokenReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, tokenPoolAdapter.RegisterToken(), e.BlockChains, registerTokenInput)
-				if err != nil {
-					return cldf.ChangesetOutput{}, fmt.Errorf("failed to manual register token and token pool %d: %w", selector, err)
+				actualToken := tokenRef
+				if actualToken == nil {
+					// if token is not deployed by this changeset, we expect the user to provide the token address in the TokenTransferConfig
+					actualToken = &input.TokenTransferConfig.TokenRef
 				}
-				batchOps = append(batchOps, registerTokenReport.Output.BatchOps...)
-				reports = append(reports, registerTokenReport.ExecutionReports...)
-				for _, r := range registerTokenReport.Output.Addresses {
-					if err := tmpDatastore.Addresses().Add(r); err != nil {
-						return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %v on chain with selector %d to datastore: %w", r.Type, r.Version, r, r.ChainSelector, err)
-					}
-					if err := ds.Addresses().Add(r); err != nil {
-						return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %v on chain with selector %d to datastore: %w", r.Type, r.Version, r, r.ChainSelector, err)
-					}
+				allRemotes[selector] = RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+					RemoteToken: actualToken,
+					RemotePool:  actualPool,
 				}
-				tmpDatastore.Merge(e.DataStore)
-				e.DataStore = tmpDatastore.Seal()
-
-				// set pool
-				tmpDatastore = datastore.NewMemoryDataStore()
-				setPoolInput := SetPoolInput{
-					TokenRef:           *refToConnect,
-					TokenPoolQualifier: input.DeployTokenPoolInput.TokenPoolQualifier,
-					PoolType:           input.DeployTokenPoolInput.PoolType,
-				}
-				setPoolInput.ExistingDataStore = e.DataStore
-				setPoolInput.ChainSelector = selector
-				setPoolReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, tokenPoolAdapter.SetPool(), e.BlockChains, setPoolInput)
-				if err != nil {
-					return cldf.ChangesetOutput{}, fmt.Errorf("failed to manual register token and token pool %d: %w", selector, err)
-				}
-				batchOps = append(batchOps, setPoolReport.Output.BatchOps...)
-				reports = append(reports, setPoolReport.ExecutionReports...)
-				for _, r := range setPoolReport.Output.Addresses {
-					if err := tmpDatastore.Addresses().Add(r); err != nil {
-						return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %v on chain with selector %d to datastore: %w", r.Type, r.Version, r, r.ChainSelector, err)
-					}
-					if err := ds.Addresses().Add(r); err != nil {
-						return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %v on chain with selector %d to datastore: %w", r.Type, r.Version, r, r.ChainSelector, err)
-					}
-				}
-				tmpDatastore.Merge(e.DataStore)
-				e.DataStore = tmpDatastore.Seal()
 			}
 		}
+
+		// now that we have all the token and token pools, we can loop through the token configs again 
+		// and update the remote chain configs with the correct token and token pool addresses before configuring the tokens for transfers
+		for _, input := range cfg.TokenExpansionInputPerChain {
+			if input.TokenTransferConfig != nil {
+				for remoteSelector, remoteConfig := range input.TokenTransferConfig.RemoteChains {
+					if _, exists := allRemotes[remoteSelector]; exists {
+						remoteConfig.RemoteToken = allRemotes[remoteSelector].RemoteToken
+						remoteConfig.RemotePool = allRemotes[remoteSelector].RemotePool
+					}
+				}
+				allTokenConfigs = append(allTokenConfigs, *input.TokenTransferConfig)
+			}
+		}
+
+		// finally, we process the token configs for transfers, which will register the tokens and token pools on-chain and set the pool on the token if necessary
+		transferOps, transferReports, err := processTokenConfigForChain(e, allTokenConfigs, cfg.ChainAdapterVersion)
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to process token configs for transfers: %w", err)
+		}
+		batchOps = append(batchOps, transferOps...)
+		reports = append(reports, transferReports...)
 
 		return changesets.NewOutputBuilder(e, mcmsRegistry).
 			WithReports(reports).

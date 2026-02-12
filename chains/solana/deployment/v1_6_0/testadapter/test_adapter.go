@@ -515,9 +515,6 @@ func (a *SVMAdapter) GetTokenExpansionConfig() tokensapi.TokenExpansionInputPerC
 
 	return tokensapi.TokenExpansionInputPerChain{
 		TokenPoolVersion:        cciputils.Version_1_6_0,
-		TokenPoolRateLimitAdmin: admin,
-		TokenPoolAdmin:          admin,
-		TARAdmin:                admin,
 		DeployTokenInput: &tokensapi.DeployTokenInput{
 			Decimals:               DefaultTokenDecimals,
 			Symbol:                 "TEST_TOKEN_" + suffix,
@@ -535,10 +532,9 @@ func (a *SVMAdapter) GetTokenExpansionConfig() tokensapi.TokenExpansionInputPerC
 			PoolType:                cciputils.BurnMintTokenPool.String(),
 			TokenPoolQualifier:      "", // should be empty since there'll only be one BnM / LnR pool deployed
 		},
-
-		// optional fields left empty, but included here for completeness
-		RemoteCounterpartUpdates: map[uint64]tokensapi.RateLimiterConfig{},
-		RemoteCounterpartDeletes: []uint64{},
+		TokenTransferConfig: &tokensapi.TokenTransferConfig{
+			ExternalAdmin: admin,
+		},
 	}
 }
 

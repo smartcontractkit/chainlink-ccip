@@ -246,13 +246,6 @@ func TestTokensAndTokenPools(t *testing.T) {
 					PoolType:           solTokenPoolType.String(),
 				},
 				DeployTokenInput: solTestData.Token,
-
-				// optional fields left empty, but included here for completeness
-				RemoteCounterpartUpdates: map[uint64]tokensapi.RateLimiterConfig{},
-				RemoteCounterpartDeletes: []uint64{},
-				TokenPoolRateLimitAdmin:  "",
-				TokenPoolAdmin:           "",
-				TARAdmin:                 "",
 			},
 		}
 

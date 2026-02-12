@@ -59,66 +59,74 @@ func makeVerify(_ *TokenAdapterRegistry, _ *changesets.MCMSReaderRegistry) func(
 
 func makeApply(tokenRegistry *TokenAdapterRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, ConfigureTokensForTransfersConfig) (cldf.ChangesetOutput, error) {
 	return func(e cldf.Environment, cfg ConfigureTokensForTransfersConfig) (cldf.ChangesetOutput, error) {
-		batchOps := make([]mcms_types.BatchOperation, 0)
-		reports := make([]cldf_ops.Report[any, any], 0)
-
-		for _, token := range cfg.Tokens {
-			tokenPool, err := datastore_utils.FindAndFormatRef(e.DataStore, token.TokenPoolRef, token.ChainSelector, datastore_utils.FullRef)
-			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve token pool ref on chain with selector %d: %w", token.ChainSelector, err)
-			}
-			registry, err := datastore_utils.FindAndFormatRef(e.DataStore, token.RegistryRef, token.ChainSelector, datastore_utils.FullRef)
-			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve registry ref on chain with selector %d: %w", token.ChainSelector, err)
-			}
-
-			remoteChains := make(map[uint64]RemoteChainConfig[[]byte, string], len(token.RemoteChains))
-			for remoteChainSelector, inCfg := range token.RemoteChains {
-				family, err := chain_selectors.GetSelectorFamily(remoteChainSelector)
-				if err != nil {
-					return cldf.ChangesetOutput{}, fmt.Errorf("failed to get chain family for remote chain selector %d: %w", remoteChainSelector, err)
-				}
-				adapter, ok := tokenRegistry.GetTokenAdapter(family, cfg.ChainAdapterVersion)
-				if !ok {
-					return cldf.ChangesetOutput{}, fmt.Errorf("no token adapter registered for chain family '%s' and chain adapter version '%s'", family, cfg.ChainAdapterVersion)
-				}
-				remoteChains[remoteChainSelector], err = convertRemoteChainConfig(e, adapter, token.ChainSelector, remoteChainSelector, inCfg)
-				if err != nil {
-					return cldf.ChangesetOutput{}, fmt.Errorf("failed to process remote chain config for remote chain selector %d: %w", remoteChainSelector, err)
-				}
-			}
-
-			family, err := chain_selectors.GetSelectorFamily(token.ChainSelector)
-			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to get chain family for chain selector %d: %w", token.ChainSelector, err)
-			}
-			adapter, ok := tokenRegistry.GetTokenAdapter(family, cfg.ChainAdapterVersion)
-			if !ok {
-				return cldf.ChangesetOutput{}, fmt.Errorf("no token adapter registered for chain family '%s' and chain adapter version '%s'", family, cfg.ChainAdapterVersion)
-			}
-			configureTokenReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adapter.ConfigureTokenForTransfersSequence(), e.BlockChains, ConfigureTokenForTransfersInput{
-				ChainSelector:     token.ChainSelector,
-				TokenPoolAddress:  tokenPool.Address,
-				RemoteChains:      remoteChains,
-				ExternalAdmin:     token.ExternalAdmin,
-				RegistryAddress:   registry.Address,
-				TokenRef:          token.TokenRef,
-				PoolType:          tokenPool.Type.String(),
-				ExistingDataStore: e.DataStore,
-			})
-			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to configure token pool on chain with selector %d: %w", token.ChainSelector, err)
-			}
-
-			batchOps = append(batchOps, configureTokenReport.Output.BatchOps...)
-			reports = append(reports, configureTokenReport.ExecutionReports...)
+		batchOps, reports, err := processTokenConfigForChain(e, cfg.Tokens, cfg.ChainAdapterVersion)
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to process token configs for chains: %w", err)
 		}
-
 		return changesets.NewOutputBuilder(e, mcmsRegistry).
 			WithReports(reports).
 			WithBatchOps(batchOps).
 			Build(cfg.MCMS)
 	}
+}
+
+func processTokenConfigForChain(e deployment.Environment, cfg []TokenTransferConfig, chainAdapterVersion *semver.Version) ([]mcms_types.BatchOperation, []cldf_ops.Report[any, any], error) {
+	tokenRegistry := GetTokenAdapterRegistry()
+	batchOps := make([]mcms_types.BatchOperation, 0)
+	reports := make([]cldf_ops.Report[any, any], 0)
+
+	for _, token := range cfg {
+		tokenPool, err := datastore_utils.FindAndFormatRef(e.DataStore, token.TokenPoolRef, token.ChainSelector, datastore_utils.FullRef)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to resolve token pool ref on chain with selector %d: %w", token.ChainSelector, err)
+		}
+		registry, err := datastore_utils.FindAndFormatRef(e.DataStore, token.RegistryRef, token.ChainSelector, datastore_utils.FullRef)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to resolve registry ref on chain with selector %d: %w", token.ChainSelector, err)
+		}
+
+		remoteChains := make(map[uint64]RemoteChainConfig[[]byte, string], len(token.RemoteChains))
+		for remoteChainSelector, inCfg := range token.RemoteChains {
+			family, err := chain_selectors.GetSelectorFamily(remoteChainSelector)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to get chain family for remote chain selector %d: %w", remoteChainSelector, err)
+			}
+			adapter, ok := tokenRegistry.GetTokenAdapter(family, chainAdapterVersion)
+			if !ok {
+				return nil, nil, fmt.Errorf("no token adapter registered for chain family '%s' and chain adapter version '%s'", family, chainAdapterVersion)
+			}
+			remoteChains[remoteChainSelector], err = convertRemoteChainConfig(e, adapter, token.ChainSelector, remoteChainSelector, inCfg)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to process remote chain config for remote chain selector %d: %w", remoteChainSelector, err)
+			}
+		}
+
+		family, err := chain_selectors.GetSelectorFamily(token.ChainSelector)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to get chain family for chain selector %d: %w", token.ChainSelector, err)
+		}
+		adapter, ok := tokenRegistry.GetTokenAdapter(family, chainAdapterVersion)
+		if !ok {
+			return nil, nil, fmt.Errorf("no token adapter registered for chain family '%s' and chain adapter version '%s'", family, chainAdapterVersion)
+		}
+		configureTokenReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adapter.ConfigureTokenForTransfersSequence(), e.BlockChains, ConfigureTokenForTransfersInput{
+			ChainSelector:     token.ChainSelector,
+			TokenPoolAddress:  tokenPool.Address,
+			RemoteChains:      remoteChains,
+			ExternalAdmin:     token.ExternalAdmin,
+			RegistryAddress:   registry.Address,
+			TokenRef:          token.TokenRef,
+			PoolType:          tokenPool.Type.String(),
+			ExistingDataStore: e.DataStore,
+		})
+		if err != nil {
+			return batchOps, reports, fmt.Errorf("failed to configure token pool on chain with selector %d: %w", token.ChainSelector, err)
+		}
+
+		batchOps = append(batchOps, configureTokenReport.Output.BatchOps...)
+		reports = append(reports, configureTokenReport.ExecutionReports...)
+	}
+	return batchOps, reports, nil
 }
 
 func convertRemoteChainConfig(

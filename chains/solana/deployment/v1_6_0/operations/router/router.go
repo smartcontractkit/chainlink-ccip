@@ -354,6 +354,10 @@ var SetPool = operations.NewOperation(
 		currentAdmin := GetAuthority(chain, input.Router)
 		var tokenAdminRegistryAccount ccip_common.TokenAdminRegistry
 		if err := chain.GetAccountDataBorshInto(context.Background(), tokenAdminRegistryPDA, &tokenAdminRegistryAccount); err != nil {
+			if !tokenAdminRegistryAccount.LookupTable.IsZero() {
+				b.Logger.Info("Token pool lookup table already set for this mint with the given admin:", tokenAdminRegistryAccount)
+				return sequences.OnChainOutput{}, nil
+			}
 			currentAdmin = tokenAdminRegistryAccount.Administrator
 		}
 
