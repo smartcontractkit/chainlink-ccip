@@ -32,8 +32,9 @@ func TestUpdateToFeeQuoter_1_7(t *testing.T) {
 		chain_selectors.ETHEREUM_MAINNET.Selector,
 		chain_selectors.AVALANCHE_MAINNET.Selector,
 	}
+	chainWithOnly15 := chain_selectors.ETHEREUM_MAINNET_UNICHAIN_1.Selector
 	e, err := environment.New(t.Context(),
-		environment.WithEVMSimulated(t, chains),
+		environment.WithEVMSimulated(t, append(chains, chainWithOnly15)),
 	)
 	require.NoError(t, err, "Failed to create test environment")
 	require.NotNil(t, e, "Environment should be created")
@@ -42,7 +43,8 @@ func TestUpdateToFeeQuoter_1_7(t *testing.T) {
 	version := semver.MustParse("1.6.0")
 	chainInput := make(map[uint64]deployops.ContractDeploymentConfigPerChain)
 	fqInput := make(map[uint64]deployops.UpdateFeeQuoterInputPerChain)
-	for _, chainSel := range chains {
+
+	for _, chainSel := range append(chains, chainWithOnly15) {
 		chainInput[chainSel] = deployops.ContractDeploymentConfigPerChain{
 			Version: version,
 			// FEE QUOTER CONFIG
@@ -54,12 +56,18 @@ func TestUpdateToFeeQuoter_1_7(t *testing.T) {
 			PermissionLessExecutionThresholdSeconds: uint32((20 * time.Minute).Seconds()),
 			GasForCallExactCheck:                    uint16(5000),
 		}
+		if chainSel == chainWithOnly15 {
+			continue
+		}
 		fqInput[chainSel] = deployops.UpdateFeeQuoterInputPerChain{
 			ImportFeeQuoterConfigFromVersions: []*semver.Version{
 				semver.MustParse("1.6.0"),
 			},
 			FeeQuoterVersion: semver.MustParse("1.7.0"),
 			RampsVersion:     semver.MustParse("1.6.0"),
+			SourceChainAddsToOffRamp: []uint64{
+				chainWithOnly15,
+			},
 		}
 	}
 	out, err := deployops.DeployContracts(dReg).Apply(*e, deployops.ContractDeploymentConfig{

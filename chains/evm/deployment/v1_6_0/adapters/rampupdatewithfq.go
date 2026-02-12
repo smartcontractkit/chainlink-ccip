@@ -166,7 +166,7 @@ func (ru RampUpdateWithFQ) SequenceUpdateRampsWithFeeQuoter() *cldf_ops.Sequence
 					sourceChainConfigs = append(sourceChainConfigs, offrampops.SourceChainConfigArgs{
 						SourceChainSelector:       srcChainSelector,
 						Router:                    common.HexToAddress(srcChainConfig.Router.Address),
-						OnRamp:                    common.Hex2Bytes(srcChainConfig.OnRamp.Address),
+						OnRamp:                    common.HexToAddress(srcChainConfig.OnRamp.Address).Bytes(),
 						IsEnabled:                 true,
 						IsRMNVerificationDisabled: true,
 					})
