@@ -32,7 +32,6 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   error InvalidToken(bytes token);
   error InvalidTokenTransferLength(uint256 length);
   error InvalidVerifierArgsLength(uint256 length);
-  error MaxFeeExceedsUint32(uint256 maxFee);
   error OnlyCallableByOwnerOrAllowlistAdmin();
   error ReceiveMessageCallFailed();
   error InvalidFastFinalityBps(uint16 fastFinalityBps);
@@ -264,8 +263,6 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
         // Neither scenario results in a user paying more than they were expecting to.
         maxFee = tokenTransfer.amount * s_dynamicConfig.fastFinalityBps / BPS_DIVIDER;
       }
-
-      if (maxFee > type(uint32).max) revert MaxFeeExceedsUint32(maxFee);
     }
 
     i_tokenMessenger.depositForBurnWithHook(
@@ -274,7 +271,7 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
       decodedReceiver,
       address(i_usdcToken),
       domain.allowedCallerOnDest,
-      uint32(maxFee),
+      maxFee,
       params.finalityThreshold,
       // The hook data includes the version tag and the message ID.
       // The version tag allows the destination verifier entity to route the message to the correct implementation.
