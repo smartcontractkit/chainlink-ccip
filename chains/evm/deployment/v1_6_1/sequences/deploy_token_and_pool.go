@@ -56,7 +56,7 @@ var DeployTokenAndPool = cldf_ops.NewSequence(
 		// Deploy token pool.
 		input.DeployTokenPoolInput.ConstructorArgs.Token = common.HexToAddress(deployTokenReport.Output.Address) // Set the token address to the deployed token.
 		switch {
-		case burn_mint_token_pool.IsSupported(deployment.ContractType(input.DeployTokenPoolInput.TokenPoolType), input.DeployTokenPoolInput.TokenPoolVersion):
+		case input.DeployTokenPoolInput.TokenPoolType == datastore.ContractType(burn_mint_token_pool.ContractType) && input.DeployTokenPoolInput.TokenPoolVersion.Equal(burn_mint_token_pool.Version):
 			deployTokenPoolReport, err := cldf_ops.ExecuteSequence(b, DeployBurnMintTokenPool, chain, input.DeployTokenPoolInput)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy burn mint token pool to %s: %w", chain, err)

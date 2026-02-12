@@ -12,13 +12,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/changesets"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/token_pool"
-	token_pool_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/token_pool"
+	usdc_pool_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/usdc_token_pool_cctp_v2"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
-
-	token_pool_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/token_pool"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc20"
@@ -78,20 +75,20 @@ func TestModifyRemotePoolsChangeset(t *testing.T) {
 			{
 				ChainSelector: chainSelector,
 				Address:       burnMintTokenPoolAddr,
-				Updates: token_pool_ops.ApplyChainUpdatesArgs{
+				Updates: usdc_pool_ops.ApplyChainUpdatesArgs{
 					RemoteChainSelectorsToRemove: []uint64{},
-					ChainsToAdd: []token_pool_ops.ChainUpdate{
+					ChainsToAdd: []usdc_pool_ops.ChainUpdate{
 						{
 							RemoteChainSelector: remoteChainSelector,
 							// Remote Pool address is an array of byte-arrays
 							RemotePoolAddresses: [][]byte{{1}},
 							RemoteTokenAddress:  []byte{2},
-							OutboundRateLimiterConfig: token_pool_bindings.RateLimiterConfig{
+							OutboundRateLimiterConfig: usdc_pool_ops.Config{
 								IsEnabled: false,
 								Capacity:  big.NewInt(0),
 								Rate:      big.NewInt(0),
 							},
-							InboundRateLimiterConfig: token_pool_bindings.RateLimiterConfig{
+							InboundRateLimiterConfig: usdc_pool_ops.Config{
 								IsEnabled: false,
 								Capacity:  big.NewInt(0),
 								Rate:      big.NewInt(0),
@@ -137,7 +134,7 @@ func TestModifyRemotePoolsChangeset(t *testing.T) {
 			{
 				ChainSelector: chainSelector,
 				Address:       burnMintTokenPoolAddr,
-				Modification: token_pool.RemotePoolModification{
+				Modification: sequences.RemotePoolModification{
 					Operation:           sequences.RemoveRemotePoolOperation,
 					RemoteChainSelector: remoteChainSelector,
 					RemotePoolAddress:   []byte{1},
@@ -174,7 +171,7 @@ func TestModifyRemotePoolsChangeset(t *testing.T) {
 			{
 				ChainSelector: chainSelector,
 				Address:       burnMintTokenPoolAddr,
-				Modification: token_pool.RemotePoolModification{
+				Modification: sequences.RemotePoolModification{
 					Operation:           sequences.AddRemotePoolOperation,
 					RemoteChainSelector: remoteChainSelector,
 					RemotePoolAddress:   []byte{1},

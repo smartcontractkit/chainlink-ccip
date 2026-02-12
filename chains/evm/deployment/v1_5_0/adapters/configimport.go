@@ -69,6 +69,7 @@ func (ci *ConfigImportAdapter) InitializeAdapter(e cldf.Environment, sel uint64)
 	if len(offRampRefs) == 0 {
 		return fmt.Errorf("failed to get offramp ref for chain %d", sel)
 	}
+	ci.OffRamp = make(map[uint64]common.Address)
 	for _, ref := range offRampRefs {
 		offRampC, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(common.HexToAddress(ref.Address), chain.Client)
 		if err != nil {

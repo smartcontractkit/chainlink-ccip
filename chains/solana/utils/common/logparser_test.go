@@ -1,3 +1,4 @@
+//revive:disable:var-naming // legacy package name
 package common
 
 import (

@@ -12,7 +12,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/test_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
-	token_deployments "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
@@ -106,57 +105,24 @@ var InitGlobalConfigBurnMint = operations.NewOperation(
 	common_utils.Version_1_6_0,
 	"Initializes the BurnMintTokenPool global config",
 	func(b operations.Bundle, chain cldf_solana.Chain, input Params) (sequences.OnChainOutput, error) {
-		burnmint_token_pool.SetProgramID(input.TokenPool)
-		programData, err := utils.GetSolProgramData(chain.Client, input.TokenPool)
-		if err != nil {
-			return sequences.OnChainOutput{}, err
-		}
-		upgradeAuthority, err := utils.GetUpgradeAuthority(chain.Client, input.TokenPool)
-		if err != nil {
-			return sequences.OnChainOutput{}, err
-		}
-		configPDA, _, _ := state.FindConfigPDA(input.TokenPool)
-		var chainConfig base_token_pool.BaseConfig
-		_ = chain.GetAccountDataBorshInto(context.Background(), configPDA, &chainConfig)
-		// already initialized
-		if !chainConfig.TokenProgram.IsZero() {
-			b.Logger.Info("BurnMintTokenPool global config already initialized for token pool:", input.TokenPool.String())
-			return sequences.OnChainOutput{}, nil
-		}
-		batches := make([]types.BatchOperation, 0)
-		ixn, err := burnmint_token_pool.NewInitGlobalConfigInstruction(
-			input.Router,
-			input.RMNRemote,
-			configPDA,
-			upgradeAuthority,
-			solana.SystemProgramID,
-			input.TokenPool,
-			programData.Address,
-		).ValidateAndBuild()
-		if err != nil {
-			return sequences.OnChainOutput{}, err
-		}
-		if upgradeAuthority != chain.DeployerKey.PublicKey() {
-			b, err := utils.BuildMCMSBatchOperation(
-				chain.Selector,
-				[]solana.Instruction{ixn},
-				input.TokenPool.String(),
-				common_utils.BurnMintTokenPool.String(),
-			)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute or create batch: %w", err)
-			}
-			batches = append(batches, b)
-			return sequences.OnChainOutput{BatchOps: batches}, nil
-		} else {
-			err = chain.Confirm([]solana.Instruction{ixn})
-			if err != nil {
-				return sequences.OnChainOutput{}, err
-			}
-		}
-
-		return sequences.OnChainOutput{}, nil
-	})
+		return initGlobalConfigTokenPool(b, chain, input, initGlobalCfgParams{
+			PoolTypeLabel: common_utils.BurnMintTokenPool.String(),
+			LogName:       "BurnMintTokenPool",
+			SetProgramID:  burnmint_token_pool.SetProgramID,
+			BuildInitIx: func(configPDA solana.PublicKey, upgradeAuthority solana.PublicKey, programData solana.PublicKey) (solana.Instruction, error) {
+				return burnmint_token_pool.NewInitGlobalConfigInstruction(
+					input.Router,
+					input.RMNRemote,
+					configPDA,
+					upgradeAuthority,
+					solana.SystemProgramID,
+					input.TokenPool,
+					programData,
+				).ValidateAndBuild()
+			},
+		})
+	},
+)
 
 var TransferMintAuthorityBurnMint = operations.NewOperation(
 	"burnmint:transfer_mint_authority",
@@ -214,11 +180,7 @@ var UpsertRemoteChainConfigBurnMint = operations.NewOperation(
 	func(b operations.Bundle, chain cldf_solana.Chain, input RemoteChainConfig) (sequences.OnChainOutput, error) {
 		burnmint_token_pool.SetProgramID(input.TokenPool)
 		remoteConfig := base_token_pool.RemoteConfig{
-			PoolAddresses: []base_token_pool.RemoteAddress{
-				{
-					Address: input.RemotePoolAddress,
-				},
-			},
+			PoolAddresses: []base_token_pool.RemoteAddress{},
 			TokenAddress: base_token_pool.RemoteAddress{
 				Address: input.RemoteTokenAddress,
 			},
@@ -228,20 +190,24 @@ var UpsertRemoteChainConfigBurnMint = operations.NewOperation(
 		poolConfigPDA, _ := tokens.TokenPoolConfigAddress(input.TokenMint, input.TokenPool)
 		// check if remote chain config already exists
 		remoteChainConfigPDA, _, _ := tokens.TokenPoolChainConfigPDA(input.RemoteSelector, input.TokenMint, input.TokenPool)
-		isSuportedChain := false
+		isSupportedChain := false
 		existingConfig := base_token_pool.BaseChain{}
 		var remoteChainConfigAccount base_token_pool.BaseChain
 		err := chain.GetAccountDataBorshInto(context.Background(), remoteChainConfigPDA, &remoteChainConfigAccount)
 		if err == nil {
-			isSuportedChain = true
+			isSupportedChain = true
 			existingConfig = remoteChainConfigAccount
 		}
 		batches := make([]types.BatchOperation, 0)
-		var ixn solana.Instruction
-		if isSuportedChain {
+		var ixns []solana.Instruction
+		if isSupportedChain {
+			remoteConfig.PoolAddresses = append(remoteConfig.PoolAddresses,
+				base_token_pool.RemoteAddress{
+					Address: input.RemotePoolAddress,
+				})
 			// if the token address has changed or if the override config flag is set, edit the remote config (just overwrite the existing remote config)
 			if !bytes.Equal(existingConfig.Remote.TokenAddress.Address, input.RemoteTokenAddress) || input.ForceOverrideRemoteConfig {
-				ixn, err = burnmint_token_pool.NewEditChainRemoteConfigInstruction(
+				ixn, err := burnmint_token_pool.NewEditChainRemoteConfigInstruction(
 					input.RemoteSelector,
 					input.TokenMint,
 					remoteConfig,
@@ -253,6 +219,7 @@ var UpsertRemoteChainConfigBurnMint = operations.NewOperation(
 				if err != nil {
 					return sequences.OnChainOutput{}, err
 				}
+				ixns = append(ixns, ixn)
 			} else {
 				// diff between [existing remote pool addresses on solana chain] vs [what was just derived from evm chain]
 				poolAddresses := existingConfig.Remote.PoolAddresses
@@ -265,7 +232,7 @@ var UpsertRemoteChainConfigBurnMint = operations.NewOperation(
 				}
 				diff := poolDiff(baseAddresses, remoteConfig.PoolAddresses)
 				if len(diff) > 0 {
-					ixn, err = burnmint_token_pool.NewAppendRemotePoolAddressesInstruction(
+					ixn, err := burnmint_token_pool.NewAppendRemotePoolAddressesInstruction(
 						input.RemoteSelector,
 						input.TokenMint,
 						diff, // evm supports multiple remote pools per token
@@ -277,10 +244,11 @@ var UpsertRemoteChainConfigBurnMint = operations.NewOperation(
 					if err != nil {
 						return sequences.OnChainOutput{}, err
 					}
+					ixns = append(ixns, ixn)
 				}
 			}
 		} else {
-			ixn, err = burnmint_token_pool.NewInitChainRemoteConfigInstruction(
+			ixn, err := burnmint_token_pool.NewInitChainRemoteConfigInstruction(
 				input.RemoteSelector,
 				input.TokenMint,
 				remoteConfig,
@@ -292,11 +260,29 @@ var UpsertRemoteChainConfigBurnMint = operations.NewOperation(
 			if err != nil {
 				return sequences.OnChainOutput{}, err
 			}
+			ixns = append(ixns, ixn)
+			appendIxn, err := burnmint_token_pool.NewAppendRemotePoolAddressesInstruction(
+				input.RemoteSelector,
+				input.TokenMint,
+				[]base_token_pool.RemoteAddress{
+					{
+						Address: input.RemotePoolAddress,
+					},
+				},
+				poolConfigPDA,
+				remoteChainConfigPDA,
+				authority,
+				solana.SystemProgramID,
+			).ValidateAndBuild()
+			if err != nil {
+				return sequences.OnChainOutput{}, err
+			}
+			ixns = append(ixns, appendIxn)
 		}
 		if authority != chain.DeployerKey.PublicKey() {
 			b, err := utils.BuildMCMSBatchOperation(
 				chain.Selector,
-				[]solana.Instruction{ixn},
+				ixns,
 				input.TokenPool.String(),
 				common_utils.BurnMintTokenPool.String(),
 			)
@@ -306,7 +292,7 @@ var UpsertRemoteChainConfigBurnMint = operations.NewOperation(
 			batches = append(batches, b)
 			return sequences.OnChainOutput{BatchOps: batches}, nil
 		} else {
-			err = chain.Confirm([]solana.Instruction{ixn})
+			err = chain.Confirm(ixns)
 			if err != nil {
 				return sequences.OnChainOutput{}, err
 			}
@@ -321,15 +307,31 @@ var UpsertRateLimitsBurnMint = operations.NewOperation(
 	"Initializes the BurnMintTokenPool rate limits for a remote chain",
 	func(b operations.Bundle, chain cldf_solana.Chain, input RemoteChainConfig) (sequences.OnChainOutput, error) {
 		burnmint_token_pool.SetProgramID(input.TokenPool)
+		var inboundCapacity uint64 = 0
+		if input.InboundRateLimiterConfig.Capacity != nil {
+			inboundCapacity = input.InboundRateLimiterConfig.Capacity.Uint64()
+		}
+		var inboundRate uint64 = 0
+		if input.InboundRateLimiterConfig.Rate != nil {
+			inboundRate = input.InboundRateLimiterConfig.Rate.Uint64()
+		}
 		inbound := base_token_pool.RateLimitConfig{
 			Enabled:  input.InboundRateLimiterConfig.IsEnabled,
-			Capacity: input.InboundRateLimiterConfig.Capacity.Uint64(),
-			Rate:     input.InboundRateLimiterConfig.Rate.Uint64(),
+			Capacity: inboundCapacity,
+			Rate:     inboundRate,
+		}
+		var outboundCapacity uint64 = 0
+		if input.OutboundRateLimiterConfig.Capacity != nil {
+			outboundCapacity = input.OutboundRateLimiterConfig.Capacity.Uint64()
+		}
+		var outboundRate uint64 = 0
+		if input.OutboundRateLimiterConfig.Rate != nil {
+			outboundRate = input.OutboundRateLimiterConfig.Rate.Uint64()
 		}
 		outbound := base_token_pool.RateLimitConfig{
 			Enabled:  input.OutboundRateLimiterConfig.IsEnabled,
-			Capacity: input.OutboundRateLimiterConfig.Capacity.Uint64(),
-			Rate:     input.OutboundRateLimiterConfig.Rate.Uint64(),
+			Capacity: outboundCapacity,
+			Rate:     outboundRate,
 		}
 		authority := GetAuthorityBurnMint(chain, input.TokenPool, input.TokenMint)
 		poolConfigPDA, _ := tokens.TokenPoolConfigAddress(input.TokenMint, input.TokenPool)
@@ -370,7 +372,7 @@ var UpsertRateLimitsBurnMint = operations.NewOperation(
 		return sequences.OnChainOutput{}, nil
 	})
 
-var TransferOwnership = operations.NewOperation(
+var TransferOwnershipBurnMint = operations.NewOperation(
 	"burnmint:transfer-ownership",
 	common_utils.Version_1_6_0,
 	"Transfers ownership of the BurnMintTokenPool token mint PDA to a new authority",
@@ -447,28 +449,12 @@ var AcceptOwnership = operations.NewOperation(
 	},
 )
 
-type Params struct {
-	TokenPool solana.PublicKey
-	TokenMint solana.PublicKey
-	// SPLToken or SPLToken2022
-	TokenProgramID solana.PublicKey
-	// Only used for certain ops
-	RMNRemote        solana.PublicKey
-	Router           solana.PublicKey
-	NewMintAuthority solana.PublicKey
-	OldMintAuthority solana.PublicKey
-}
-
-type RemoteChainConfig struct {
-	TokenPool solana.PublicKey
-	TokenMint solana.PublicKey
-	// SPLToken or SPLToken2022
-	TokenProgramID            solana.PublicKey
-	RemoteSelector            uint64
-	RemoteTokenAddress        []byte
-	RemotePoolAddress         []byte
-	RemoteDecimals            uint8
-	ForceOverrideRemoteConfig bool
-	InboundRateLimiterConfig  token_deployments.RateLimiterConfig
-	OutboundRateLimiterConfig token_deployments.RateLimiterConfig
+func GetAuthorityBurnMint(chain cldf_solana.Chain, program solana.PublicKey, tokenMint solana.PublicKey) solana.PublicKey {
+	programData := burnmint_token_pool.State{}
+	poolConfigPDA, _ := tokens.TokenPoolConfigAddress(tokenMint, program)
+	err := chain.GetAccountDataBorshInto(context.Background(), poolConfigPDA, &programData)
+	if err != nil {
+		return chain.DeployerKey.PublicKey()
+	}
+	return programData.Config.Owner
 }

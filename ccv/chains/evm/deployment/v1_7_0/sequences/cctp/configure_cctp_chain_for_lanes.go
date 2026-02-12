@@ -488,7 +488,7 @@ func applyCCTPVerifierWrites(b cldf_ops.Bundle, chain evm.Chain, verifierAddress
 
 // applyCCTPV2PoolSetDomainsWrites sets domains on the CCTP V2 token pool.
 func applyCCTPV2PoolSetDomainsWrites(b cldf_ops.Bundle, chain evm.Chain, poolAddress common.Address, domainUpdates []usdc_token_pool_cctp_v2.DomainUpdate) ([]contract_utils.WriteOutput, error) {
-	report, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_cctp_v2.USDCTokenPoolSetDomains, chain, contract_utils.FunctionInput[[]usdc_token_pool_cctp_v2.DomainUpdate]{
+	report, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_cctp_v2.SetDomains, chain, contract_utils.FunctionInput[[]usdc_token_pool_cctp_v2.DomainUpdate]{
 		ChainSelector: chain.Selector,
 		Address:       poolAddress,
 		Args:          domainUpdates,
