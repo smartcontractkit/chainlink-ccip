@@ -34,7 +34,7 @@ var DeployBurnMintTokenPool = cldf_ops.NewSequence(
 				Token:              input.ConstructorArgs.Token,
 				LocalTokenDecimals: input.ConstructorArgs.Decimals,
 				Allowlist:          input.ConstructorArgs.Allowlist,
-				RMNProxy:           input.ConstructorArgs.RMNProxy,
+				RmnProxy:           input.ConstructorArgs.RMNProxy, // TODO: Remove this once the constructor args are updated.
 				Router:             input.ConstructorArgs.Router,
 			},
 			Qualifier: &input.TokenSymbol,

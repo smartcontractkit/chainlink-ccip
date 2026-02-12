@@ -16,15 +16,12 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
-
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/testutils"
 
 	// use the real program bindings, although interacting with the mock contract
 
 	cctp_message_transmitter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/cctp_message_transmitter"
-	message_transmitter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/cctp_message_transmitter"
 	cctp_token_messenger_minter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/cctp_token_messenger_minter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/cctp_token_pool"
 
@@ -58,7 +55,7 @@ func TestTokenPool(t *testing.T) {
 	anotherAdmin := solana.MustPrivateKeyFromBase58("3T3TwgX851KixNcZ2nJDftvXb5gMckHg8zzonKXpSthdDQEtttP4iY5VwetMRmoJkMDUPqSbrypFHVV2aC9FWHKE")
 	user := solana.MustPrivateKeyFromBase58("iVu6VhFc44zTZx6LceYup18rQfxqFvKWFWzJtrNpFcWHCNnbmDfSMYFbDrj9R7RZon4t6YHHmFU8Fh6461PBvfC")
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	allowedOfframpEvmPDA, err := state.FindAllowedOfframpPDA(config.EvmChainSelector, dumbRamp, dumbRamp)
 	require.NoError(t, err)
@@ -1279,7 +1276,7 @@ func TestTokenPool(t *testing.T) {
 		t.Run("CCTP sanity checks", func(t *testing.T) {
 			messageAmount := uint64(1123456) // 1.123456 USDC, as it uses 6 decimals
 
-			var messageSent message_transmitter.MessageSent
+			var messageSent cctp_message_transmitter.MessageSent
 			messageSentEventKeypair, err := solana.NewRandomPrivateKey()
 			require.NoError(t, err)
 
@@ -1346,8 +1343,8 @@ func TestTokenPool(t *testing.T) {
 					fmt.Println("Attestation:", hex.EncodeToString(attestation))
 					require.NoError(t, err)
 
-					raw := message_transmitter.NewReceiveMessageInstruction(
-						message_transmitter.ReceiveMessageParams{
+					raw := cctp_message_transmitter.NewReceiveMessageInstruction(
+						cctp_message_transmitter.ReceiveMessageParams{
 							Message:     messageSent.Message,
 							Attestation: attestation,
 						},
@@ -1451,7 +1448,7 @@ func TestTokenPool(t *testing.T) {
 			require.NoError(t, err)
 
 			messageAmount := uint64(1e5) // 0.1 USDC, as it uses 6 decimals
-			var messageSentEventData message_transmitter.MessageSent
+			var messageSentEventData cctp_message_transmitter.MessageSent
 			var attestation []byte
 
 			t.Run("Basic onramp", func(t *testing.T) {

@@ -10,7 +10,6 @@ import (
 
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	tp_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_1/burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
@@ -50,7 +49,7 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 		writes := make([]evm_contract.WriteOutput, 0)
 
 		// Get remote chains that are currently supported by the token pools
-		supportedChainsReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetSupportedChains, chain, evm_contract.FunctionInput[any]{
+		supportedChainsReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetSupportedChains, chain, evm_contract.FunctionInput[struct{}]{
 			ChainSelector: input.ChainSelector,
 			Address:       input.TokenPoolAddress,
 		})
@@ -102,10 +101,10 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 					return bytes.Equal(addr, input.RemoteChainConfig.RemotePool)
 				}) {
 					// Add the requested remote pool
-					addRemotePoolsReport, err := cldf_ops.ExecuteOperation(b, token_pool.AddRemotePool, chain, evm_contract.FunctionInput[token_pool.RemotePoolArgs]{
+					addRemotePoolsReport, err := cldf_ops.ExecuteOperation(b, token_pool.AddRemotePool, chain, evm_contract.FunctionInput[token_pool.AddRemotePoolArgs]{
 						ChainSelector: input.ChainSelector,
 						Address:       input.TokenPoolAddress,
-						Args: token_pool.RemotePoolArgs{
+						Args: token_pool.AddRemotePoolArgs{
 							RemoteChainSelector: input.RemoteChainSelector,
 							RemotePoolAddress:   common.LeftPadBytes(input.RemoteChainConfig.RemotePool, 32),
 						},
@@ -138,9 +137,17 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 						RemotePoolAddresses: [][]byte{
 							common.LeftPadBytes(input.RemoteChainConfig.RemotePool, 32),
 						},
-						RemoteTokenAddress:        common.LeftPadBytes(input.RemoteChainConfig.RemoteToken, 32),
-						OutboundRateLimiterConfig: input.RemoteChainConfig.DefaultFinalityOutboundRateLimiterConfig,
-						InboundRateLimiterConfig:  input.RemoteChainConfig.DefaultFinalityInboundRateLimiterConfig,
+						RemoteTokenAddress: common.LeftPadBytes(input.RemoteChainConfig.RemoteToken, 32),
+						OutboundRateLimiterConfig: token_pool.Config{
+							IsEnabled: input.RemoteChainConfig.DefaultFinalityOutboundRateLimiterConfig.IsEnabled,
+							Capacity:  input.RemoteChainConfig.DefaultFinalityOutboundRateLimiterConfig.Capacity,
+							Rate:      input.RemoteChainConfig.DefaultFinalityOutboundRateLimiterConfig.Rate,
+						},
+						InboundRateLimiterConfig: token_pool.Config{
+							IsEnabled: input.RemoteChainConfig.DefaultFinalityInboundRateLimiterConfig.IsEnabled,
+							Capacity:  input.RemoteChainConfig.DefaultFinalityInboundRateLimiterConfig.Capacity,
+							Rate:      input.RemoteChainConfig.DefaultFinalityInboundRateLimiterConfig.Rate,
+						},
 					},
 				},
 			},
@@ -184,14 +191,20 @@ func maybeUpdateRateLimiters(b cldf_ops.Bundle, chain evm.Chain, input Configure
 	// Update the rate limiters if they do not match the desired config
 	if !rateLimiterConfigsEqual(currentInboundRateLimiterState, input.RemoteChainConfig.DefaultFinalityInboundRateLimiterConfig) ||
 		!rateLimiterConfigsEqual(currentOutboundRateLimiterState, input.RemoteChainConfig.DefaultFinalityOutboundRateLimiterConfig) {
-		setInboundRateLimiterReport, err := cldf_ops.ExecuteOperation(b, token_pool.SetRateLimitConfig, chain, evm_contract.FunctionInput[[]token_pool.SetChainRateLimiterConfigArg]{
+		setInboundRateLimiterReport, err := cldf_ops.ExecuteOperation(b, token_pool.SetChainRateLimiterConfig, chain, evm_contract.FunctionInput[token_pool.SetChainRateLimiterConfigArgs]{
 			ChainSelector: input.ChainSelector,
 			Address:       input.TokenPoolAddress,
-			Args: []token_pool.SetChainRateLimiterConfigArg{
-				{
-					RemoteChainSelector:       input.RemoteChainSelector,
-					InboundRateLimiterConfig:  input.RemoteChainConfig.DefaultFinalityInboundRateLimiterConfig,
-					OutboundRateLimiterConfig: input.RemoteChainConfig.DefaultFinalityOutboundRateLimiterConfig,
+			Args: token_pool.SetChainRateLimiterConfigArgs{
+				RemoteChainSelector: input.RemoteChainSelector,
+				InboundConfig: token_pool.Config{
+					IsEnabled: input.RemoteChainConfig.DefaultFinalityInboundRateLimiterConfig.IsEnabled,
+					Capacity:  input.RemoteChainConfig.DefaultFinalityInboundRateLimiterConfig.Capacity,
+					Rate:      input.RemoteChainConfig.DefaultFinalityInboundRateLimiterConfig.Rate,
+				},
+				OutboundConfig: token_pool.Config{
+					IsEnabled: input.RemoteChainConfig.DefaultFinalityOutboundRateLimiterConfig.IsEnabled,
+					Capacity:  input.RemoteChainConfig.DefaultFinalityOutboundRateLimiterConfig.Capacity,
+					Rate:      input.RemoteChainConfig.DefaultFinalityOutboundRateLimiterConfig.Rate,
 				},
 			},
 		})
@@ -205,7 +218,7 @@ func maybeUpdateRateLimiters(b cldf_ops.Bundle, chain evm.Chain, input Configure
 }
 
 // rateLimiterConfigsEqual returns true if the current rate limiter config on-chain matches the desired config.
-func rateLimiterConfigsEqual(current tp_bindings.RateLimiterTokenBucket, desired tokens.RateLimiterConfig) bool {
+func rateLimiterConfigsEqual(current token_pool.TokenBucket, desired tokens.RateLimiterConfig) bool {
 	return current.IsEnabled == desired.IsEnabled &&
 		current.Capacity.Cmp(desired.Capacity) == 0 &&
 		current.Rate.Cmp(desired.Rate) == 0

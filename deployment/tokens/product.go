@@ -28,15 +28,21 @@ type TokenAdapter interface {
 	// DeriveTokenAddress derives the token address (in bytes) from the given token pool reference.
 	// For example, if this address is stored on the pool, this method should fetch it.
 	DeriveTokenAddress(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) ([]byte, error)
+	// DeriveTokenDecimals derives the token decimals from the given token pool reference.
+	DeriveTokenDecimals(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) (uint8, error)
+	// For some chains, the token pool address is not the deployed address and must be derived from the token reference.
+	// This method performs that derivation.
+	DeriveTokenPoolCounterpart(e deployment.Environment, chainSelector uint64, tokenPool []byte, token []byte) ([]byte, error)
 	// ManualRegistration manually registers a customer token with the token admin registry.
 	// This is usally done as they no longer have mint authority over the token.
 	ManualRegistration() *cldf_ops.Sequence[ManualRegistrationInput, sequences.OnChainOutput, cldf_chain.BlockChains]
+	// SetTokenPoolRateLimits returns a sequence that sets rate limits on a token pool.
+	SetTokenPoolRateLimits() *cldf_ops.Sequence[RateLimiterConfigInputs, sequences.OnChainOutput, cldf_chain.BlockChains]
 	DeployToken() *cldf_ops.Sequence[DeployTokenInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 	DeployTokenVerify(e deployment.Environment, in any) error
 	DeployTokenPoolForToken() *cldf_ops.Sequence[DeployTokenPoolInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 	RegisterToken() *cldf_ops.Sequence[RegisterTokenInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 	SetPool() *cldf_ops.Sequence[SetPoolInput, sequences.OnChainOutput, cldf_chain.BlockChains]
-	UpdateAuthorities() *cldf_ops.Sequence[UpdateAuthoritiesInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 }
 
 // RateLimiterConfig specifies configuration for a rate limiter on a token pool.
@@ -82,6 +88,8 @@ type RemoteChainConfig[R any, CCV any] struct {
 	CustomFinalityInboundRateLimiterConfig RateLimiterConfig
 	// CustomFinalityOutboundRateLimiterConfig specifies the desired rate limiter configuration for custom-finality outbound traffic.
 	CustomFinalityOutboundRateLimiterConfig RateLimiterConfig
+	// Decimals of the token on the remote chain.
+	RemoteDecimals uint8
 	// OutboundCCVs specifies the verifiers to apply to outbound traffic.
 	OutboundCCVs []CCV
 	// InboundCCVs specifies the verifiers to apply to inbound traffic.
@@ -115,6 +123,13 @@ type ConfigureTokenForTransfersInput struct {
 	// This can be interpreted as # of block confirmations, an ID, or otherwise.
 	// Interpretation is left to each chain family.
 	MinFinalityValue uint16
+	// Below are not provided by the user and populated programmatically.
+	// ExistingDataStore is the datastore containing existing deployment data.
+	ExistingDataStore datastore.DataStore
+	// PoolType specifies the type of the token pool. Needed for Solana token pools.
+	PoolType string
+	// TokenAddress is the address of the token being configured.
+	TokenRef datastore.AddressRef
 }
 
 // TokenAdapterRegistry maintains a registry of TokenAdapters.

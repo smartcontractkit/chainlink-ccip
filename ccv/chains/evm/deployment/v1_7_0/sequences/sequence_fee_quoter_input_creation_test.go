@@ -22,8 +22,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 
+	fee_quoter_v1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
 	evm_2_evm_onramp_v1_5_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/evm_2_evm_onramp"
-	fee_quoter_v1_6_3 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/fee_quoter"
 
 	seq1_5 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
 	seq1_6 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
@@ -32,16 +32,16 @@ import (
 // dummyAddressRefs is hardcoded address refs (previously from address_refs.json).
 // Chain selectors must match dummyContractMetadata so metadata lookup succeeds.
 var dummyAddressRefs = []datastore.AddressRef{
-	{Address: "0x1111111111111111111111111111111111111111", ChainSelector: 5009297550715157269, Type: datastore.ContractType("FeeQuoter"), Version: semver.MustParse("1.6.3")},
+	{Address: "0x1111111111111111111111111111111111111111", ChainSelector: 5009297550715157269, Type: datastore.ContractType("FeeQuoter"), Version: semver.MustParse("1.6.0")},
 	{Address: "0x6666666666666666666666666666666666666666", ChainSelector: 5009297550715157269, Type: datastore.ContractType("EVM2EVMOnRamp"), Version: semver.MustParse("1.5.0")},
 	{Address: "0x2222222222222222222222222222222222222221", ChainSelector: 5009297550715157269, Type: datastore.ContractType("CommitStore"), Version: semver.MustParse("1.5.0")},
 	{Address: "0x9999999999999999999999999999999999999999", ChainSelector: 4949039107694359620, Type: datastore.ContractType("CommitStore"), Version: semver.MustParse("1.5.0"), Qualifier: "commitstore1"},
-	{Address: "0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", ChainSelector: 4949039107694359620, Type: datastore.ContractType("FeeQuoter"), Version: semver.MustParse("1.6.3")},
+	{Address: "0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", ChainSelector: 4949039107694359620, Type: datastore.ContractType("FeeQuoter"), Version: semver.MustParse("1.6.0")},
 	{Address: "0x1010101010101010101010101010101010101010", ChainSelector: 4949039107694359620, Type: datastore.ContractType("EVM2EVMOnRamp"), Version: semver.MustParse("1.5.0")},
 	{Address: "0x3333333333333333333333333333333333333333", ChainSelector: 4949039107694359620, Type: datastore.ContractType("CommitStore"), Version: semver.MustParse("1.5.0"), Qualifier: "commitstore2"},
 	{Address: "0x5050505050505050505050505050505050505050", ChainSelector: 15971525489660198786, Type: datastore.ContractType("EVM2EVMOnRamp"), Version: semver.MustParse("1.5.0")},
 	{Address: "0x4444444444444444444444444444444444444444", ChainSelector: 15971525489660198786, Type: datastore.ContractType("CommitStore"), Version: semver.MustParse("1.5.0")},
-	{Address: "0x6060606060606060606060606060606060606060", ChainSelector: 5936861837188149645, Type: datastore.ContractType("FeeQuoter"), Version: semver.MustParse("1.6.3")},
+	{Address: "0x6060606060606060606060606060606060606060", ChainSelector: 5936861837188149645, Type: datastore.ContractType("FeeQuoter"), Version: semver.MustParse("1.6.0")},
 	{Address: "0x7070707070707070707070707070707070707070", ChainSelector: 5936861837188149645, Type: datastore.ContractType("EVM2EVMOnRamp"), Version: semver.MustParse("1.5.0")},
 	{Address: "0x5555555555555555555555555555555555555551", ChainSelector: 5936861837188149645, Type: datastore.ContractType("CommitStore"), Version: semver.MustParse("1.5.0")},
 }
@@ -53,7 +53,7 @@ var dummyContractMetadata = []datastore.ContractMetadata{
 		Metadata: seq1_6.FeeQuoterImportConfigSequenceOutput{
 			RemoteChainCfgs: map[uint64]seq1_6.FeeQuoterImportConfigSequenceOutputPerRemoteChain{
 				15971525489660198786: {
-					DestChainCfg: fee_quoter_v1_6_3.FeeQuoterDestChainConfig{
+					DestChainCfg: fee_quoter_v1_6_0.DestChainConfig{
 						IsEnabled:                         true,
 						MaxNumberOfTokensPerMsg:           3,
 						MaxDataBytes:                      8000,
@@ -74,7 +74,7 @@ var dummyContractMetadata = []datastore.ContractMetadata{
 						GasPriceStalenessThreshold:        0,
 						NetworkFeeUSDCents:                10,
 					},
-					TokenTransferFeeCfgs: map[common.Address]fee_quoter_v1_6_3.FeeQuoterTokenTransferFeeConfig{
+					TokenTransferFeeCfgs: map[common.Address]fee_quoter_v1_6_0.TokenTransferFeeConfig{
 						common.HexToAddress("0x2222222222222222222222222222222222222222"): {
 							MinFeeUSDCents:    4,
 							MaxFeeUSDCents:    40,
@@ -86,7 +86,7 @@ var dummyContractMetadata = []datastore.ContractMetadata{
 					},
 				},
 			},
-			StaticCfg: fee_quoter_v1_6_3.FeeQuoterStaticConfig{
+			StaticCfg: fee_quoter_v1_6_0.StaticConfig{
 				MaxFeeJuelsPerMsg:            big.NewInt(1000000000000000000),
 				LinkToken:                    common.HexToAddress("0x514910771AF9Ca656af840dff83E8264EcF986CA"),
 				TokenPriceStalenessThreshold: 3600,
@@ -169,7 +169,7 @@ var dummyContractMetadata = []datastore.ContractMetadata{
 		Metadata: seq1_6.FeeQuoterImportConfigSequenceOutput{
 			RemoteChainCfgs: map[uint64]seq1_6.FeeQuoterImportConfigSequenceOutputPerRemoteChain{
 				15971525489660198786: {
-					DestChainCfg: fee_quoter_v1_6_3.FeeQuoterDestChainConfig{
+					DestChainCfg: fee_quoter_v1_6_0.DestChainConfig{
 						IsEnabled:                         true,
 						MaxNumberOfTokensPerMsg:           3,
 						MaxDataBytes:                      8000,
@@ -190,7 +190,7 @@ var dummyContractMetadata = []datastore.ContractMetadata{
 						GasPriceStalenessThreshold:        0,
 						NetworkFeeUSDCents:                10,
 					},
-					TokenTransferFeeCfgs: map[common.Address]fee_quoter_v1_6_3.FeeQuoterTokenTransferFeeConfig{
+					TokenTransferFeeCfgs: map[common.Address]fee_quoter_v1_6_0.TokenTransferFeeConfig{
 						common.HexToAddress("0x2222222222222222222222222222222222222222"): {
 							MinFeeUSDCents:    4,
 							MaxFeeUSDCents:    40,
@@ -202,7 +202,7 @@ var dummyContractMetadata = []datastore.ContractMetadata{
 					},
 				},
 			},
-			StaticCfg: fee_quoter_v1_6_3.FeeQuoterStaticConfig{
+			StaticCfg: fee_quoter_v1_6_0.StaticConfig{
 				MaxFeeJuelsPerMsg:            big.NewInt(1000000000000000000),
 				LinkToken:                    common.HexToAddress("0x514910771AF9Ca656af840dff83E8264EcF986CA"),
 				TokenPriceStalenessThreshold: 3600,
@@ -336,7 +336,7 @@ var dummyContractMetadata = []datastore.ContractMetadata{
 		Metadata: seq1_6.FeeQuoterImportConfigSequenceOutput{
 			RemoteChainCfgs: map[uint64]seq1_6.FeeQuoterImportConfigSequenceOutputPerRemoteChain{
 				5009297550715157269: {
-					DestChainCfg: fee_quoter_v1_6_3.FeeQuoterDestChainConfig{
+					DestChainCfg: fee_quoter_v1_6_0.DestChainConfig{
 						IsEnabled:                         true,
 						MaxNumberOfTokensPerMsg:           5,
 						MaxDataBytes:                      10000,
@@ -357,10 +357,10 @@ var dummyContractMetadata = []datastore.ContractMetadata{
 						GasPriceStalenessThreshold:        0,
 						NetworkFeeUSDCents:                10,
 					},
-					TokenTransferFeeCfgs: map[common.Address]fee_quoter_v1_6_3.FeeQuoterTokenTransferFeeConfig{},
+					TokenTransferFeeCfgs: map[common.Address]fee_quoter_v1_6_0.TokenTransferFeeConfig{},
 				},
 				4949039107694359620: {
-					DestChainCfg: fee_quoter_v1_6_3.FeeQuoterDestChainConfig{
+					DestChainCfg: fee_quoter_v1_6_0.DestChainConfig{
 						IsEnabled:                         true,
 						MaxNumberOfTokensPerMsg:           4,
 						MaxDataBytes:                      9000,
@@ -381,10 +381,10 @@ var dummyContractMetadata = []datastore.ContractMetadata{
 						GasPriceStalenessThreshold:        0,
 						NetworkFeeUSDCents:                10,
 					},
-					TokenTransferFeeCfgs: map[common.Address]fee_quoter_v1_6_3.FeeQuoterTokenTransferFeeConfig{},
+					TokenTransferFeeCfgs: map[common.Address]fee_quoter_v1_6_0.TokenTransferFeeConfig{},
 				},
 			},
-			StaticCfg: fee_quoter_v1_6_3.FeeQuoterStaticConfig{
+			StaticCfg: fee_quoter_v1_6_0.StaticConfig{
 				MaxFeeJuelsPerMsg:            big.NewInt(1000000000000000000),
 				LinkToken:                    common.HexToAddress("0x514910771AF9Ca656af840dff83E8264EcF986CA"),
 				TokenPriceStalenessThreshold: 3600,

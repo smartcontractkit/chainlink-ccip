@@ -175,9 +175,9 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 			),
 			Args: usdc_token_pool_cctp_v2.ConstructorArgs{
 				TokenMessenger:              tokenMessengerAddress,
-				CCTPMessageTransmitterProxy: cctpMessageTransmitterProxyAddress,
+				CctpMessageTransmitterProxy: cctpMessageTransmitterProxyAddress,
 				Token:                       usdcTokenAddress,
-				RMNProxy:                    rmnAddress,
+				RmnProxy:                    rmnAddress,
 				Router:                      routerAddress,
 			},
 		}, existingAddresses)
@@ -405,10 +405,10 @@ func applyCCTPAuthorizedCallerWrites(
 	}
 	writes = append(writes, cctpV2ThroughCCVTokenPoolReport.Output)
 
-	cctpV2TokenPoolReport, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_cctp_v2.USDCTokenPoolUpdateAuthorizedCallers, chain, contract_utils.FunctionInput[usdc_token_pool_cctp_v2.AuthorizedCallerUpdate]{
+	cctpV2TokenPoolReport, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_cctp_v2.ApplyAuthorizedCallerUpdates, chain, contract_utils.FunctionInput[usdc_token_pool_cctp_v2.AuthorizedCallerArgs]{
 		ChainSelector: chain.Selector,
 		Address:       cctpV2PoolAddr,
-		Args: usdc_token_pool_cctp_v2.AuthorizedCallerUpdate{
+		Args: usdc_token_pool_cctp_v2.AuthorizedCallerArgs{
 			AddedCallers: []common.Address{proxyAddr},
 		},
 	})
