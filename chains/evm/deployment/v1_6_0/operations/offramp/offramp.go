@@ -97,6 +97,10 @@ func (c *OffRampContract) GetSourceChainConfig(opts *bind.CallOpts, args uint64)
 	return *abi.ConvertType(out[0], new(SourceChainConfig)).(*SourceChainConfig), nil
 }
 
+func (c *OffRampContract) SetDynamicConfig(opts *bind.TransactOpts, args DynamicConfig) (*types.Transaction, error) {
+	return c.contract.Transact(opts, "setDynamicConfig", args)
+}
+
 type DynamicConfig struct {
 	FeeQuoter                               common.Address
 	PermissionLessExecutionThresholdSeconds uint32
@@ -224,5 +228,23 @@ var GetSourceChainConfig = contract.NewRead(contract.ReadParams[uint64, SourceCh
 	NewContract:  NewOffRampContract,
 	CallContract: func(c *OffRampContract, opts *bind.CallOpts, args uint64) (SourceChainConfig, error) {
 		return c.GetSourceChainConfig(opts, args)
+	},
+})
+
+var SetDynamicConfig = contract.NewWrite(contract.WriteParams[DynamicConfig, *OffRampContract]{
+	Name:            "offramp:set-dynamic-config",
+	Version:         Version,
+	Description:     "Calls setDynamicConfig on the contract",
+	ContractType:    ContractType,
+	ContractABI:     OffRampABI,
+	NewContract:     NewOffRampContract,
+	IsAllowedCaller: contract.OnlyOwner[*OffRampContract, DynamicConfig],
+	Validate:        func(DynamicConfig) error { return nil },
+	CallContract: func(
+		c *OffRampContract,
+		opts *bind.TransactOpts,
+		args DynamicConfig,
+	) (*types.Transaction, error) {
+		return c.SetDynamicConfig(opts, args)
 	},
 })
