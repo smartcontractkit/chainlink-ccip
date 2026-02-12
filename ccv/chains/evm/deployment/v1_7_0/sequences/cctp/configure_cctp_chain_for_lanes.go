@@ -24,7 +24,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 
-	cctp_message_transmitter_proxy_v1_7_0 "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/cctp_message_transmitter_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/cctp_through_ccv_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/cctp_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/siloed_usdc_token_pool"
@@ -468,24 +467,10 @@ func buildCCTPV1PoolDomainUpdates(dep adapters.ConfigureCCTPChainForLanesDeps, i
 			datastore.AddressRefByType(datastore.ContractType(cctp_message_transmitter_proxy_v1_6_2.ContractType)),
 			datastore.AddressRefByVersion(cctp_message_transmitter_proxy_v1_6_2.Version),
 		)
-		if len(legacyRefs) > 1 {
-			return nil, fmt.Errorf("expected 0 or 1 CCTPMessageTransmitterProxy v1.6.2 refs on remote chain %d, found %d", remoteChainSelector, len(legacyRefs))
+		if len(legacyRefs) != 1 {
+			return nil, fmt.Errorf("expected exactly 1 CCTPMessageTransmitterProxy v1.6.2 ref on remote chain %d, found %d", remoteChainSelector, len(legacyRefs))
 		}
-		var allowedCallerOnDest []byte
-		if len(legacyRefs) == 1 {
-			allowedCallerOnDest = common.FromHex(legacyRefs[0].Address)
-		} else {
-			fallbackRefs := dep.DataStore.Addresses().Filter(
-				datastore.AddressRefByChainSelector(remoteChainSelector),
-				datastore.AddressRefByType(datastore.ContractType(cctp_message_transmitter_proxy_v1_7_0.ContractType)),
-				datastore.AddressRefByVersion(cctp_message_transmitter_proxy_v1_7_0.Version),
-				datastore.AddressRefByQualifier(cctpV1Qualifier),
-			)
-			if len(fallbackRefs) != 1 {
-				return nil, fmt.Errorf("expected exactly 1 fallback CCTPMessageTransmitterProxy v1.7.0 with qualifier %q on remote chain %d, found %d", cctpV1Qualifier, remoteChainSelector, len(fallbackRefs))
-			}
-			allowedCallerOnDest = common.FromHex(fallbackRefs[0].Address)
-		}
+		allowedCallerOnDest := common.FromHex(legacyRefs[0].Address)
 		mintRecipientOnDest, err := dep.RemoteChains[remoteChainSelector].MintRecipientOnDest(dep.DataStore, dep.BlockChains, remoteChainSelector)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get mint recipient on dest: %w", err)
