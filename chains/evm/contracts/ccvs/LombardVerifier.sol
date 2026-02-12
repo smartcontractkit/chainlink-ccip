@@ -375,6 +375,14 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
     _applyRemoteChainConfigUpdates(remoteChainConfigArgs);
   }
 
+  /// @notice Updates senders that are allowed to use this verifier.
+  /// @param allowlistConfigArgsItems Array of AllowListConfigArgs, where each item is for a destChainSelector.
+  function applyAllowlistUpdates(
+    AllowlistConfigArgs[] calldata allowlistConfigArgsItems
+  ) external onlyOwner {
+    _applyAllowlistUpdates(allowlistConfigArgsItems);
+  }
+
   /// @notice Exposes the version tag.
   function versionTag() public pure override returns (bytes4) {
     return VERSION_TAG_V1_7_0;
