@@ -78,6 +78,8 @@ contracts:
         access: owner
       - name: getToken
         access: public
+      - name: getTokenDecimals
+        access: public
       - name: isSupportedToken
         access: public
       - name: getAllowListEnabled
@@ -152,6 +154,10 @@ contracts:
         access: public
       - name: getTokenTransferFeeConfig
         access: public
+      - name: getStaticConfig
+        access: public
+      - name: getAllAuthorizedCallers
+        access: public
 
   - contract_name: OnRamp
     version: "1.6.0"
@@ -164,6 +170,8 @@ contracts:
         access: public
       - name: getDynamicConfig
         access: public
+      - name: setDynamicConfig
+        access: owner
 
   - contract_name: OffRamp
     package_name: offramp
@@ -179,3 +187,5 @@ contracts:
         access: public
       - name: getSourceChainConfig
         access: public
+      - name: setDynamicConfig
+        access: owner
