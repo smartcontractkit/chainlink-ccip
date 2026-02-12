@@ -70,9 +70,17 @@ func (a *EVMAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[tok
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token admin registry address for chain %d: %w", input.ChainSelector, err)
 			}
 
-			tokAddress, err := a.FindOneTokenAddress(input.ExistingDataStore, input.ChainSelector, input.TokenRef.Qualifier)
+			token, err := cldf_ops.ExecuteOperation(b,
+				tpops.GetToken,
+				chain,
+				evm_contract.FunctionInput[struct{}]{
+					ChainSelector: input.ChainSelector,
+					Address:       tpAddr,
+					Args:          struct{}{},
+				},
+			)
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token address for symbol %q on chain %d: %w", input.TokenRef.Qualifier, input.ChainSelector, err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token address via GetToken operation: %w", err)
 			}
 
 			// INFO: by default, operations are cached if they are called with the same ID, version,
@@ -110,9 +118,9 @@ func (a *EVMAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[tok
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to bind to token admin registry at address %q on chain %d: %w", tarAddress, input.ChainSelector, err)
 			}
-			cfg, err := tar.GetTokenConfig(&bind.CallOpts{Context: b.GetContext()}, tokAddress)
+			cfg, err := tar.GetTokenConfig(&bind.CallOpts{Context: b.GetContext()}, token.Output)
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token config for token %q from token admin registry at address %q: %w", tokAddress, tarAddress, err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token config for token %q from token admin registry at address %q: %w", token.Output, tarAddress, err)
 			}
 
 			// INFO: there are two cases to consider here:
@@ -134,7 +142,7 @@ func (a *EVMAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[tok
 					TokenAdminRegistryAddress: tarAddress,
 					TokenPoolAddress:          tpAddress,
 					ExternalAdmin:             externalAdmin,
-					TokenAddress:              tokAddress,
+					TokenAddress:              token.Output,
 				},
 			)
 			if err != nil {
@@ -143,19 +151,6 @@ func (a *EVMAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[tok
 
 			result.Addresses = append(result.Addresses, report.Output.Addresses...)
 			result.BatchOps = append(result.BatchOps, report.Output.BatchOps...)
-
-			token, err := cldf_ops.ExecuteOperation(b,
-				tpops.GetToken,
-				chain,
-				evm_contract.FunctionInput[struct{}]{
-					ChainSelector: input.ChainSelector,
-					Address:       tpAddr,
-					Args:          struct{}{},
-				},
-			)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token address via GetToken operation: %w", err)
-			}
 
 			setPoolReport, err := cldf_ops.ExecuteOperation(b,
 				tarops.SetPool,
@@ -570,15 +565,19 @@ func (a *EVMAdapter) GetTokenAdminRegistryAddress(ds datastore.DataStore, select
 	return common.BytesToAddress(addr), nil
 }
 
-func (a *EVMAdapter) FindOneTokenAddress(ds datastore.DataStore, chainSelector uint64, tokenSymbol string) (common.Address, error) {
+func (a *EVMAdapter) FindOneTokenAddress(ds datastore.DataStore, chainSelector uint64, partialRef *datastore.AddressRef) (common.Address, error) {
 	filters := datastore.AddressRef{
 		ChainSelector: chainSelector,
-		Qualifier:     tokenSymbol,
+	}
+	if partialRef != nil {
+		filters.Address = partialRef.Address
+		filters.Qualifier = partialRef.Qualifier
+		filters.Type = partialRef.Type
 	}
 
 	ref, err := datastore_utils.FindAndFormatRef(ds, filters, chainSelector, datastore_utils.FullRef)
 	if err != nil {
-		return common.Address{}, fmt.Errorf("failed to find token address for symbol %q on chain %d: %w", tokenSymbol, chainSelector, err)
+		return common.Address{}, fmt.Errorf("failed to find token address for ref %v on chain %d: %w", filters, chainSelector, err)
 	}
 
 	addr, err := a.AddressRefToBytes(ref)
