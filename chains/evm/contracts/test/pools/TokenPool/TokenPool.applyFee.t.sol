@@ -7,7 +7,7 @@ import {Pool} from "../../../libraries/Pool.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {AdvancedPoolHooksSetup} from "../AdvancedPoolHooks/AdvancedPoolHooksSetup.t.sol";
 
-contract TokenPoolV2_applyFee is AdvancedPoolHooksSetup {
+contract TokenPool_applyFee is AdvancedPoolHooksSetup {
   function test_applyFee_CustomFinality() public {
     uint16 minBlockConfirmation = 5;
     uint16 defaultBlockConfirmationTransferFeeBps = 100;
