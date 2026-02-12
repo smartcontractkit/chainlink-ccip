@@ -193,7 +193,7 @@ func updateFeeQuoterApply(fquRegistry *FQAndRampUpdaterRegistry, mcmsRegistry *c
 			if !ok {
 				return cldf.ChangesetOutput{}, utils.ErrNoAdapterRegistered("RampUpdater", perChainInput.RampsVersion)
 			}
-			contractMeta := e.DataStore.ContractMetadata().Filter(datastore.ContractMetadataByChainSelector(chainSel))
+			contractMeta := make([]datastore.ContractMetadata, 0)
 			for _, version := range perChainInput.ImportFeeQuoterConfigFromVersions {
 				configImporter, ok := fquRegistry.GetConfigImporter(chainSel, version)
 				if !ok {
@@ -222,6 +222,7 @@ func updateFeeQuoterApply(fquRegistry *FQAndRampUpdaterRegistry, mcmsRegistry *c
 				if len(populateConfigReport.Output.Metadata.Contracts) == 0 {
 					return cldf.ChangesetOutput{}, fmt.Errorf("no contract metadata returned from populate config for FeeQuoter on chain %d", chainSel)
 				}
+
 				contractMeta = append(contractMeta, populateConfigReport.Output.Metadata.Contracts...)
 				contractMetadata = append(contractMetadata, populateConfigReport.Output.Metadata.Contracts...)
 			}
