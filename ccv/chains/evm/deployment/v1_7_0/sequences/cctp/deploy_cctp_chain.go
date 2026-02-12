@@ -421,7 +421,8 @@ func resolveExistingCCTPV1MessageTransmitterProxy(
 		ref := existingAddresses[i]
 		if ref.ChainSelector == chain.Selector &&
 			ref.Type == datastore.ContractType(cctp_message_transmitter_proxy_v1_6_2.ContractType) &&
-			ref.Version == cctp_message_transmitter_proxy_v1_6_2.Version {
+			ref.Version != nil &&
+			ref.Version.Equal(cctp_message_transmitter_proxy_v1_6_2.Version) {
 			if legacyRef != nil {
 				return common.Address{}, datastore.AddressRef{}, fmt.Errorf("expected exactly 1 CCTPMessageTransmitterProxy v1.6.2 ref on chain %d, found multiple", chain.Selector)
 			}
