@@ -262,6 +262,13 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 				reports = append(reports, deployTokenPoolReport.ExecutionReports...)
 				if len(deployTokenPoolReport.Output.Addresses) != 0 {
 					tokenPool = &deployTokenPoolReport.Output.Addresses[0]
+				} else {
+					tokenPool = &datastore.AddressRef{
+						ChainSelector: selector,
+						Qualifier:     input.DeployTokenPoolInput.TokenPoolQualifier,
+						Type:          datastore.ContractType(input.DeployTokenPoolInput.PoolType),
+						Version:       input.TokenPoolVersion,
+					}
 				}
 				for _, r := range deployTokenPoolReport.Output.Addresses {
 					if err := tmpDatastore.Addresses().Add(r); err != nil {
@@ -308,6 +315,30 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 		// and update the remote chain configs with the correct token and token pool addresses before configuring the tokens for transfers
 		for selector, input := range cfg.TokenExpansionInputPerChain {
 			if input.TokenTransferConfig != nil {
+				if input.TokenTransferConfig.TokenPoolRef.ChainSelector == 0 {
+					cfg.TokenExpansionInputPerChain[selector].TokenTransferConfig.TokenPoolRef.ChainSelector = selector
+				}
+				if input.TokenTransferConfig.TokenPoolRef.Address == "" {
+					cfg.TokenExpansionInputPerChain[selector].TokenTransferConfig.TokenPoolRef.Address = allRemotes[selector].RemotePool.Address
+				}
+				if input.TokenTransferConfig.TokenPoolRef.Qualifier == "" {
+					cfg.TokenExpansionInputPerChain[selector].TokenTransferConfig.TokenPoolRef.Qualifier = allRemotes[selector].RemotePool.Qualifier
+				}
+				if input.TokenTransferConfig.TokenPoolRef.Type == "" {
+					cfg.TokenExpansionInputPerChain[selector].TokenTransferConfig.TokenPoolRef.Type = allRemotes[selector].RemotePool.Type
+				}
+				if input.TokenTransferConfig.TokenRef.ChainSelector == 0 {
+					cfg.TokenExpansionInputPerChain[selector].TokenTransferConfig.TokenRef.ChainSelector = selector
+				}
+				if input.TokenTransferConfig.TokenRef.Address == "" {
+					cfg.TokenExpansionInputPerChain[selector].TokenTransferConfig.TokenRef.Address = allRemotes[selector].RemoteToken.Address
+				}
+				if input.TokenTransferConfig.TokenRef.Qualifier == "" {
+					cfg.TokenExpansionInputPerChain[selector].TokenTransferConfig.TokenRef.Qualifier = allRemotes[selector].RemoteToken.Qualifier
+				}
+				if input.TokenTransferConfig.TokenRef.Type == "" {
+					cfg.TokenExpansionInputPerChain[selector].TokenTransferConfig.TokenRef.Type = allRemotes[selector].RemoteToken.Type
+				}
 				for remoteSelector, remoteConfig := range input.TokenTransferConfig.RemoteChains {
 					if _, exists := allRemotes[remoteSelector]; exists {
 						if remoteConfig.RemoteToken == nil {
@@ -327,7 +358,6 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 			}
 		}
 
-		fmt.Printf("all remote configs: %+v", allRemotes)
 		// finally, we process the token configs for transfers, which will register the tokens and token pools on-chain and set the pool on the token if necessary
 		transferOps, transferReports, err := processTokenConfigForChain(e, allTokenConfigs, cfg.ChainAdapterVersion)
 		if err != nil {

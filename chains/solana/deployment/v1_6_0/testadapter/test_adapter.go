@@ -509,12 +509,16 @@ func (a *SVMAdapter) GetTokenExpansionConfig() tokensapi.TokenExpansionInputPerC
 	admin := a.Chain.DeployerKey.PublicKey().String()
 	receiverBytes := a.CCIPReceiver()
 	receiver := solana.PublicKeyFromBytes(receiverBytes).String()
+	registryAddr, err := a.GetRegistryAddress()
+	if err != nil {
+		return tokensapi.TokenExpansionInputPerChain{}
+	}
 
 	oneToken := new(big.Int).Exp(big.NewInt(10), new(big.Int).SetUint64(uint64(DefaultTokenDecimals)), nil)
 	mintAmnt := new(big.Int).Mul(oneToken, big.NewInt(1_000_000)) // pre-mint 1 million tokens
 
 	return tokensapi.TokenExpansionInputPerChain{
-		TokenPoolVersion:        cciputils.Version_1_6_0,
+		TokenPoolVersion: cciputils.Version_1_6_0,
 		DeployTokenInput: &tokensapi.DeployTokenInput{
 			Decimals:               DefaultTokenDecimals,
 			Symbol:                 "TEST_TOKEN_" + suffix,
@@ -529,11 +533,17 @@ func (a *SVMAdapter) GetTokenExpansionConfig() tokensapi.TokenExpansionInputPerC
 			CCIPAdmin:              admin,                     // deployer is the admin (if empty defaults to timelock)
 		},
 		DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
-			PoolType:                cciputils.BurnMintTokenPool.String(),
-			TokenPoolQualifier:      "", // should be empty since there'll only be one BnM / LnR pool deployed
+			PoolType:           cciputils.BurnMintTokenPool.String(),
+			TokenPoolQualifier: "", // should be empty since there'll only be one BnM / LnR pool deployed
 		},
 		TokenTransferConfig: &tokensapi.TokenTransferConfig{
+			ChainSelector: a.Selector,
 			ExternalAdmin: admin,
+			RegistryRef: datastore.AddressRef{
+				ChainSelector: a.Selector,
+				Address:       registryAddr,
+			},
+			RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{},
 		},
 	}
 }

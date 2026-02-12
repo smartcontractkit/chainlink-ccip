@@ -370,6 +370,10 @@ func (a *EVMAdapter) GetTokenExpansionConfig() tokensapi.TokenExpansionInputPerC
 	suffix := strconv.FormatUint(a.Selector, 10) + "-" + a.Family()
 	admin := a.Chain.DeployerKey.From.Hex()
 	deci := uint8(18)
+	registryAddr, err := a.GetRegistryAddress()
+	if err != nil {
+		return tokensapi.TokenExpansionInputPerChain{}
+	}
 
 	oneToken := new(big.Int).Exp(big.NewInt(10), new(big.Int).SetUint64(uint64(deci)), nil)
 	mintAmnt := new(big.Int).Mul(oneToken, big.NewInt(1_000_000)) // pre-mint 1 million tokens
@@ -394,7 +398,13 @@ func (a *EVMAdapter) GetTokenExpansionConfig() tokensapi.TokenExpansionInputPerC
 			TokenPoolQualifier: "TEST TOKEN POOL " + suffix,
 		},
 		TokenTransferConfig: &tokensapi.TokenTransferConfig{
+			ChainSelector: a.Selector,
 			ExternalAdmin: admin,
+			RegistryRef: datastore.AddressRef{
+				ChainSelector: a.Selector,
+				Address:       registryAddr,
+			},
+			RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{},
 		},
 	}
 }
