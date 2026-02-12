@@ -46,8 +46,10 @@ type ConfigureCCTPChainForLanesInput struct {
 type DeployCCTPInput struct {
 	// ChainSelector is the selector for the chain being deployed.
 	ChainSelector uint64
-	// TokenMessenger is the address of the TokenMessenger contract.
-	TokenMessenger string
+	// TokenMessengerV1 is the address of the CCTP v1 TokenMessenger contract.
+	TokenMessengerV1 string
+	// TokenMessengerV2 is the address of the CCTP v2 TokenMessenger contract.
+	TokenMessengerV2 string
 	// USDCToken is the address of the USDCToken contract.
 	USDCToken string
 	// DeployerContract is a contract that can be used to deploy other contracts.
