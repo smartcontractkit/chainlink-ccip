@@ -42,7 +42,7 @@ require (
 	github.com/smartcontractkit/chainlink-deployments-framework v0.80.1-0.20260209182815-b296b7df28a6
 	github.com/smartcontractkit/chainlink-evm v0.3.3 // indirect
 	github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20260119171452-39c98c3b33cd
-	github.com/smartcontractkit/chainlink-testing-framework/framework v0.13.16-0.20260210232024-d9ef70a1c3ac
+	github.com/smartcontractkit/chainlink-testing-framework/framework v0.14.1-0.20260212100725-fbd6b3bca4d1
 	github.com/smartcontractkit/chainlink-testing-framework/wasp v1.51.2
 	github.com/smartcontractkit/libocr v0.0.0-20250912173940-f3ab0246e23d
 	github.com/smartcontractkit/mcms v0.35.1-0.20260209175626-b68b54b6e8d0
@@ -186,7 +186,7 @@ require (
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/golang/snappy v1.0.0 // indirect
 	github.com/google/btree v1.1.3 // indirect
-	github.com/google/gnostic-models v0.6.8 // indirect
+	github.com/google/gnostic-models v0.6.9 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
@@ -277,6 +277,7 @@ require (
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/moby/go-archive v0.1.0 // indirect
 	github.com/moby/patternmatcher v0.6.0 // indirect
+	github.com/moby/spdystream v0.5.0 // indirect
 	github.com/moby/sys/sequential v0.6.0 // indirect
 	github.com/moby/sys/user v0.4.0 // indirect
 	github.com/moby/sys/userns v0.1.0 // indirect
@@ -289,6 +290,7 @@ require (
 	github.com/mr-tron/base58 v1.2.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/mwitkow/go-conntrack v0.0.0-20190716064945-2f068394615f // indirect
+	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
 	github.com/oklog/run v1.2.0 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
@@ -436,11 +438,11 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/api v0.32.2 // indirect
-	k8s.io/apimachinery v0.32.2 // indirect
-	k8s.io/client-go v0.32.2 // indirect
+	k8s.io/api v0.32.3 // indirect
+	k8s.io/apimachinery v0.32.3 // indirect
+	k8s.io/client-go v0.32.3 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
-	k8s.io/kube-openapi v0.0.0-20241105132330-32ad38e42d3f // indirect
+	k8s.io/kube-openapi v0.0.0-20241212222426-2c72e554b1e7 // indirect
 	k8s.io/utils v0.0.0-20241104163129-6fe5fd82f078 // indirect
 	sigs.k8s.io/json v0.0.0-20241010143419-9aa6b5e7a4b3 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.2 // indirect
