@@ -15,20 +15,51 @@ import (
 )
 
 type ManualRegistrationInput struct {
-	ChainSelector        uint64          `yaml:"chain-selector" json:"chainSelector"`
-	ChainAdapterVersion  *semver.Version `yaml:"chain-adapter-version" json:"chainAdapterVersion"`
-	ExistingAddresses    []datastore.AddressRef
-	ExistingDataStore    datastore.DataStore
-	MCMS                 mcms.Input          `yaml:"mcms,omitempty" json:"mcms"`
-	RegisterTokenConfigs RegisterTokenConfig `yaml:"register-token-configs" json:"registerTokenConfigs"`
+	ChainAdapterVersion *semver.Version       `yaml:"chain-adapter-version" json:"chainAdapterVersion"`
+	Registrations       []RegisterTokenConfig `yaml:"registrations" json:"registrations"`
+	MCMS                mcms.Input            `yaml:"mcms,omitempty" json:"mcms"`
+}
+
+type ManualRegistrationSequenceInput struct {
+	RegisterTokenConfig
+	ExistingDataStore datastore.DataStore
 }
 
 type RegisterTokenConfig struct {
-	TokenRef           datastore.AddressRef `yaml:"token-ref" json:"tokenRef"`
-	ProposedOwner      string               `yaml:"proposed-owner" json:"proposedOwner"`
-	TokenPoolQualifier string               `yaml:"token-pool-qualifier" json:"tokenPoolQualifier"`
-	PoolType           string               `yaml:"pool-type" json:"poolType"`
-	SVMExtraArgs       *SVMExtraArgs        `yaml:"svm-extra-args,omitempty" json:"svmExtraArgs,omitempty"`
+	// A reference to the token pool. The ChainSelector property should be omitted
+	// from the AddressRef, as it is already a property of the RegisterTokenConfig
+	// struct. It is NOT necessary to define all fields in the AddressRef. Instead
+	// only pass in the minimal set of fields needed to uniquely identify the pool
+	// in the datastore. TokenPoolRef is conditionally required based on chain:
+	// --
+	//  EVM: if no token was found using TokenRef (or it wasn't provided), then we
+	//  use the TokenPoolRef to find the token pool, and derive the token address.
+	// --
+	//  SVM: this field is always required.
+	// --
+	TokenPoolRef datastore.AddressRef `yaml:"token-pool-ref" json:"tokenPoolRef"`
+
+	// A reference to the token. The ChainSelector property should be omitted from
+	// the AddressRef, as it is already present in the RegisterTokenConfig struct.
+	// It is NOT necessary to define every field of AddressRef. Instead, only pass
+	// in the *minimal set of fields* needed to uniquely identify the token in the
+	// datastore. TokenRef is conditionally required based on chain:
+	// --
+	//  EVM: if this is not provided or if no token is found using this reference,
+	//  then TokenPoolRef will be used as a fallback to derive the token address.
+	// --
+	//  SVM: this field is always required.
+	// --
+	TokenRef datastore.AddressRef `yaml:"token-ref" json:"tokenRef"`
+
+	// The chain selector for the token being registered (required).
+	ChainSelector uint64 `yaml:"chain-selector" json:"chainSelector"`
+
+	// The proposed owner of the token (required).
+	ProposedOwner string `yaml:"proposed-owner" json:"proposedOwner"`
+
+	// Extra args specific to SVM manual registration. Only required for SVM chains.
+	SVMExtraArgs *SVMExtraArgs `yaml:"svm-extra-args,omitempty" json:"svmExtraArgs,omitempty"`
 }
 
 type SVMExtraArgs struct {
@@ -57,26 +88,52 @@ func manualRegistrationApply() func(cldf.Environment, ManualRegistrationInput) (
 		tokenPoolRegistry := GetTokenAdapterRegistry()
 		mcmsRegistry := changesets.GetRegistry()
 
-		family, err := chain_selectors.GetSelectorFamily(cfg.ChainSelector)
+		err := ds.Merge(e.DataStore) // start with existing datastore state from environment
 		if err != nil {
-			return cldf.ChangesetOutput{}, err
-		}
-		tokenPoolAdapter, exists := tokenPoolRegistry.GetTokenAdapter(family, cfg.ChainAdapterVersion)
-		if !exists {
-			return cldf.ChangesetOutput{}, fmt.Errorf("no TokenPoolAdapter registered for chain family '%s'", family)
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to merge existing datastore from environment: %w", err)
 		}
 
-		manualRegistrationReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, tokenPoolAdapter.ManualRegistration(), e.BlockChains, cfg)
-		if err != nil {
-			return cldf.ChangesetOutput{}, fmt.Errorf("failed to manual register token and token pool %d: %w", cfg.ChainSelector, err)
-		}
-		batchOps = append(batchOps, manualRegistrationReport.Output.BatchOps...)
-		reports = append(reports, manualRegistrationReport.ExecutionReports...)
-		for _, r := range manualRegistrationReport.Output.Addresses {
-			if err := ds.Addresses().Upsert(r); err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %v on chain with selector %d to datastore: %w", r.Type, r.Version, r, r.ChainSelector, err)
+		for i, registration := range cfg.Registrations {
+			chainfam, err := chain_selectors.GetSelectorFamily(registration.ChainSelector)
+			if err != nil {
+				return cldf.ChangesetOutput{}, err
+			}
+
+			adapter, exists := tokenPoolRegistry.GetTokenAdapter(chainfam, cfg.ChainAdapterVersion)
+			if !exists {
+				return cldf.ChangesetOutput{}, fmt.Errorf("no TokenPoolAdapter registered for chain family '%s'", chainfam)
+			}
+
+			// Safeguard: always prevent chain selector mismatches
+			if registration.TokenPoolRef.ChainSelector != 0 && registration.TokenPoolRef.ChainSelector != registration.ChainSelector {
+				return cldf.ChangesetOutput{}, fmt.Errorf("chain selector mismatch in TokenPoolRef for registration index %d: expected %d, got %d", i, registration.ChainSelector, registration.TokenPoolRef.ChainSelector)
+			}
+			if registration.TokenRef.ChainSelector != 0 && registration.TokenRef.ChainSelector != registration.ChainSelector {
+				return cldf.ChangesetOutput{}, fmt.Errorf("chain selector mismatch in TokenRef for registration index %d: expected %d, got %d", i, registration.ChainSelector, registration.TokenRef.ChainSelector)
+			}
+
+			report, err := cldf_ops.ExecuteSequence(
+				e.OperationsBundle,
+				adapter.ManualRegistration(),
+				e.BlockChains,
+				ManualRegistrationSequenceInput{
+					RegisterTokenConfig: registration,
+					ExistingDataStore:   ds.Seal(),
+				},
+			)
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to execute ManualRegistration sequence for registration index %d: %w", i, err)
+			}
+
+			batchOps = append(batchOps, report.Output.BatchOps...)
+			reports = append(reports, report.ExecutionReports...)
+			for j, addrRef := range report.Output.Addresses {
+				if err = ds.Addresses().Upsert(addrRef); err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to add address ref (%+v) from report output to datastore for registration index %d, address index %d: %w", addrRef, i, j, err)
+				}
 			}
 		}
+
 		return changesets.NewOutputBuilder(e, mcmsRegistry).
 			WithReports(reports).
 			WithDataStore(ds).
