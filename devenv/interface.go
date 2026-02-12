@@ -43,8 +43,6 @@ type Chains interface {
 	SetCLDF(e *deployment.Environment)
 	// GetEOAReceiverAddress gets an EOA receiver address for the provided chain selector.
 	GetEOAReceiverAddress(ctx context.Context, chainSelector uint64) ([]byte, error)
-	// GetTokenBalance gets the balance of an account for a token on a chain
-	GetTokenBalance(ctx context.Context, chainSelector uint64, address, tokenAddress []byte) (*big.Int, error)
 }
 
 // OnChainConfigurable defines methods that allows devenv to

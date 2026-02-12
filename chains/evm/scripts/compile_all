@@ -98,7 +98,6 @@ compileContract tokenAdminRegistry/TokenAdminRegistry
 compileContract tokenAdminRegistry/RegistryModuleOwnerCustom
 compileContract tokenAdminRegistry/TokenPoolFactory/TokenPoolFactory
 compileContract tokenAdminRegistry/TokenPoolFactory/FactoryBurnMintERC20
-compileContract tokenAdminRegistry/TokenPoolFactory/HyperLiquidCompatibleERC20
 compileContract rmn/RMNRemote
 compileContract rmn/RMNProxy
 

@@ -18,16 +18,17 @@ type ManualRegistrationInput struct {
 	ChainSelector        uint64          `yaml:"chain-selector" json:"chainSelector"`
 	ChainAdapterVersion  *semver.Version `yaml:"chain-adapter-version" json:"chainAdapterVersion"`
 	ExistingAddresses    []datastore.AddressRef
+	ExistingDataStore    datastore.DataStore
 	MCMS                 mcms.Input          `yaml:"mcms,omitempty" json:"mcms"`
 	RegisterTokenConfigs RegisterTokenConfig `yaml:"register-token-configs" json:"registerTokenConfigs"`
 }
 
 type RegisterTokenConfig struct {
-	TokenSymbol        string        `yaml:"token-symbol" json:"tokenSymbol"`
-	ProposedOwner      string        `yaml:"proposed-owner" json:"proposedOwner"`
-	TokenPoolQualifier string        `yaml:"token-pool-qualifier" json:"tokenPoolQualifier"`
-	PoolType           string        `yaml:"pool-type" json:"poolType"`
-	SVMExtraArgs       *SVMExtraArgs `yaml:"svm-extra-args,omitempty" json:"svmExtraArgs,omitempty"`
+	TokenRef           datastore.AddressRef `yaml:"token-ref" json:"tokenRef"`
+	ProposedOwner      string               `yaml:"proposed-owner" json:"proposedOwner"`
+	TokenPoolQualifier string               `yaml:"token-pool-qualifier" json:"tokenPoolQualifier"`
+	PoolType           string               `yaml:"pool-type" json:"poolType"`
+	SVMExtraArgs       *SVMExtraArgs        `yaml:"svm-extra-args,omitempty" json:"svmExtraArgs,omitempty"`
 }
 
 type SVMExtraArgs struct {
@@ -35,7 +36,6 @@ type SVMExtraArgs struct {
 	SkipTokenPoolInit       bool               `yaml:"skip-token-pool-init" json:"skipTokenPoolInit"`
 }
 
-// ConfigureTokensForTransfers returns a changeset that configures tokens on multiple chains for transfers with other chains.
 func ManualRegistration() cldf.ChangeSetV2[ManualRegistrationInput] {
 	return cldf.CreateChangeSet(manualRegistrationApply(), manualRegistrationVerify())
 }
@@ -49,6 +49,9 @@ func manualRegistrationVerify() func(cldf.Environment, ManualRegistrationInput) 
 
 func manualRegistrationApply() func(cldf.Environment, ManualRegistrationInput) (cldf.ChangesetOutput, error) {
 	return func(e cldf.Environment, cfg ManualRegistrationInput) (cldf.ChangesetOutput, error) {
+		// ds to collect all addresses created during this changeset
+		// this gets passed as output
+		ds := datastore.NewMemoryDataStore()
 		batchOps := make([]mcms_types.BatchOperation, 0)
 		reports := make([]cldf_ops.Report[any, any], 0)
 		tokenPoolRegistry := GetTokenAdapterRegistry()
@@ -69,9 +72,14 @@ func manualRegistrationApply() func(cldf.Environment, ManualRegistrationInput) (
 		}
 		batchOps = append(batchOps, manualRegistrationReport.Output.BatchOps...)
 		reports = append(reports, manualRegistrationReport.ExecutionReports...)
-
+		for _, r := range manualRegistrationReport.Output.Addresses {
+			if err := ds.Addresses().Upsert(r); err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %v on chain with selector %d to datastore: %w", r.Type, r.Version, r, r.ChainSelector, err)
+			}
+		}
 		return changesets.NewOutputBuilder(e, mcmsRegistry).
 			WithReports(reports).
+			WithDataStore(ds).
 			WithBatchOps(batchOps).
 			Build(cfg.MCMS)
 	}

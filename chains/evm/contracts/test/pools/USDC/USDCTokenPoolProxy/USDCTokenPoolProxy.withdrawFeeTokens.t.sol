@@ -4,18 +4,18 @@ pragma solidity ^0.8.24;
 import {FeeTokenHandler} from "../../../../libraries/FeeTokenHandler.sol";
 import {USDCTokenPoolProxySetup} from "./USDCTokenPoolProxySetup.t.sol";
 
-import {FactoryBurnMintERC20} from "../../../../tokenAdminRegistry/TokenPoolFactory/FactoryBurnMintERC20.sol";
+import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
 contract USDCTokenPoolProxy_withdrawFeeTokens is USDCTokenPoolProxySetup {
   address internal s_feeAggregator = makeAddr("feeAggregator");
-  FactoryBurnMintERC20 internal s_feeToken1;
-  FactoryBurnMintERC20 internal s_feeToken2;
+  BurnMintERC20 internal s_feeToken1;
+  BurnMintERC20 internal s_feeToken2;
 
   function setUp() public override {
     super.setUp();
 
-    s_feeToken1 = new FactoryBurnMintERC20("FeeToken1", "FT1", 18, 0, 0, OWNER);
-    s_feeToken2 = new FactoryBurnMintERC20("FeeToken2", "FT2", 18, 0, 0, OWNER);
+    s_feeToken1 = new BurnMintERC20("FeeToken1", "FT1", 18, 0, 0);
+    s_feeToken2 = new BurnMintERC20("FeeToken2", "FT2", 18, 0, 0);
   }
 
   function test_withdrawFeeTokens() public {

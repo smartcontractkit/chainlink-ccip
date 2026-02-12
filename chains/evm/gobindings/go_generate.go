@@ -18,7 +18,6 @@ package ccip
 //go:generate go run ./wrap ccip RegistryModuleOwnerCustom registry_module_owner_custom
 //go:generate go run ./wrap ccip RMNProxy rmn_proxy_contract
 //go:generate go run ./wrap ccip RMNRemote rmn_remote
-//go:generate go run ./wrap ccip HyperLiquidCompatibleERC20 hyper_liquid_compatible_erc20
 //go:generate go run ./wrap ccip EtherSenderReceiver ether_sender_receiver
 
 // Pools
@@ -53,3 +52,6 @@ package ccip
 //go:generate go run ./wrap ccip MockE2EUSDCTransmitterCCTPV2 mock_usdc_token_transmitter_v2
 //go:generate go run ./wrap ccip MockE2ELBTCTokenPool mock_lbtc_token_pool
 //go:generate go run ./wrap ccip MockLombardBridge mock_lombard_bridge
+
+// Extract bytecode and ABI from generated wrappers
+//go:generate go run github.com/smartcontractkit/chainlink-evm/gethwrappers/helpers/extract_bytecode -input=generated -bytecode=../bytecode -abi=../abi
