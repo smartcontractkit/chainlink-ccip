@@ -281,6 +281,14 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 		}
 		writes = append(writes, inboundImplWrites...)
 
+		chainBatchOp, err := contract_utils.NewBatchOperationFromWrites(writes)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to build batch operation from writes: %w", err)
+		}
+		if len(chainBatchOp.Transactions) > 0 {
+			batchOps = append(batchOps, chainBatchOp)
+		}
+
 		return sequences.OnChainOutput{
 			Addresses: addresses,
 			BatchOps:  batchOps,
