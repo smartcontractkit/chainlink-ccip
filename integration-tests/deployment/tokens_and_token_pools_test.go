@@ -41,6 +41,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 
 	bnmERC20gen "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc20"
+	evmutils "github.com/smartcontractkit/chainlink-evm/pkg/utils"
 	"github.com/stretchr/testify/require"
 )
 
@@ -231,9 +232,9 @@ func TestTokensAndTokenPools(t *testing.T) {
 	t.Run("Token Expansion EVM and Solana", func(t *testing.T) {
 		// Verify that token and token pool do NOT exist in the datastore yet
 		for _, data := range evmTestData {
-			_, err = evmAdapter.FindOneTokenAddress(env.DataStore, data.Chain.Selector, data.Token.Symbol)
+			_, err := evmAdapter.FindLatestAddressRef(env.DataStore, datastore.AddressRef{ChainSelector: data.Chain.Selector, Qualifier: data.TokenPoolQualifier, Type: datastore.ContractType(evmTokenPoolType)})
 			require.Error(t, err)
-			_, err = evmAdapter.FindLatestTokenPoolAddress(env.DataStore, data.Chain.Selector, data.TokenPoolQualifier, evmTokenPoolType.String())
+			_, err = evmAdapter.FindOneTokenAddress(env.DataStore, data.Chain.Selector, data.Token.Symbol)
 			require.Error(t, err)
 		}
 
@@ -313,7 +314,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 				require.Equal(t, data.Token.Name, name)
 
 				// Query EVM token pool info from chain
-				tpAddress, err := evmAdapter.FindLatestTokenPoolAddress(env.DataStore, data.Chain.Selector, data.TokenPoolQualifier, string(evmTokenPoolType))
+				tpAddress, err := evmAdapter.FindLatestAddressRef(env.DataStore, datastore.AddressRef{ChainSelector: data.Chain.Selector, Qualifier: data.TokenPoolQualifier, Type: datastore.ContractType(evmTokenPoolType)})
 				require.NoError(t, err)
 				tp, err := bnmpool.NewBurnMintTokenPool(tpAddress, data.Chain.Client)
 				require.NoError(t, err)
@@ -346,7 +347,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 				// Verify that the token and token pool exist in datastore
 				tokAddress, err := evmAdapter.FindOneTokenAddress(env.DataStore, data.Chain.Selector, data.Token.Symbol)
 				require.NoError(t, err)
-				tpAddress, err := evmAdapter.FindLatestTokenPoolAddress(env.DataStore, data.Chain.Selector, data.TokenPoolQualifier, evmTokenPoolType.String())
+				tpAddress, err := evmAdapter.FindLatestAddressRef(env.DataStore, datastore.AddressRef{ChainSelector: data.Chain.Selector, Qualifier: data.TokenPoolQualifier, Type: datastore.ContractType(evmTokenPoolType)})
 				require.NoError(t, err)
 
 				// Verify that no **pending** admin exists for the token at the moment. Also,
@@ -367,22 +368,34 @@ func TestTokensAndTokenPools(t *testing.T) {
 					Apply(*env, tokensapi.ManualRegistrationInput{
 						ChainAdapterVersion: v1_6_0,
 						MCMS:                NewDefaultInputForMCMS("Manual Registration EVM"),
-						ExistingAddresses:   env.DataStore.Addresses().Filter(),
-						ChainSelector:       data.Chain.Selector,
-						RegisterTokenConfigs: tokensapi.RegisterTokenConfig{
-							ProposedOwner:      data.Deployer.Hex(),
-							TokenPoolQualifier: data.TokenPoolQualifier,
-							TokenRef: datastore.AddressRef{
+						Registrations: []tokensapi.RegisterTokenConfig{
+							// NOTE: if the input contains registrations for the same chain selector + token
+							// then the last entry will win, so in this case, the deployer will end up being
+							// the proposed owner.
+							{
+								// We should be able to directly use a token ref
 								ChainSelector: data.Chain.Selector,
-								Qualifier:     data.Token.Symbol,
+								ProposedOwner: evmutils.RandomAddress().Hex(),
+								SVMExtraArgs:  nil,
+								TokenRef: datastore.AddressRef{
+									Qualifier: data.Token.Symbol,
+								},
 							},
-							PoolType:     evmTokenPoolType.String(),
-							SVMExtraArgs: nil,
+							{
+								// We should also be able to derive the token from a token pool ref
+								ChainSelector: data.Chain.Selector,
+								ProposedOwner: data.Deployer.Hex(),
+								SVMExtraArgs:  nil,
+								TokenPoolRef: datastore.AddressRef{
+									Qualifier: data.TokenPoolQualifier,
+									Type:      datastore.ContractType(evmTokenPoolType),
+								},
+							},
 						},
 					})
 				require.NoError(t, err)
-				testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
 				MergeAddresses(t, env, output.DataStore)
+				testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
 
 				// Verify that a new admin was proposed for the specified token
 				tokConfig, err = data.TAR.GetTokenConfig(&bind.CallOpts{Context: t.Context()}, tokAddress)
@@ -442,7 +455,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 			}
 
 			// Query the latest on-chain state for chain A
-			poolAddressA, err := evmAdapter.FindLatestTokenPoolAddress(env.DataStore, evmA.Chain.Selector, evmA.TokenPoolQualifier, string(evmTokenPoolType))
+			poolAddressA, err := evmAdapter.FindLatestAddressRef(env.DataStore, datastore.AddressRef{ChainSelector: evmA.Chain.Selector, Qualifier: evmA.TokenPoolQualifier, Type: datastore.ContractType(evmTokenPoolType)})
 			require.NoError(t, err)
 			poolA, err := bnmpool.NewBurnMintTokenPool(poolAddressA, evmA.Chain.Client)
 			require.NoError(t, err)
@@ -499,7 +512,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 				require.True(t, inboundRateLimitAB.IsEnabled)
 
 				// Verify that the remote token pool was set correctly
-				poolB, err := evmAdapter.FindLatestTokenPoolAddress(env.DataStore, evmB.Chain.Selector, evmB.TokenPoolQualifier, evmTokenPoolType.String())
+				poolB, err := evmAdapter.FindLatestAddressRef(env.DataStore, datastore.AddressRef{ChainSelector: evmB.Chain.Selector, Qualifier: evmB.TokenPoolQualifier, Type: datastore.ContractType(evmTokenPoolType)})
 				require.NoError(t, err)
 				require.Len(t, remotePoolsAB, 1)
 				require.True(t, bytes.Equal(remotePoolsAB[0], common.LeftPadBytes(poolB.Bytes(), 32)))
@@ -589,25 +602,28 @@ func TestTokensAndTokenPools(t *testing.T) {
 				Apply(*env, tokensapi.ManualRegistrationInput{
 					ChainAdapterVersion: v1_6_0,
 					MCMS:                NewDefaultInputForMCMS("Manual Registration Solana"),
-					ExistingDataStore:   env.DataStore,
-					ChainSelector:       solTestData.Chain.Selector,
-					RegisterTokenConfigs: tokensapi.RegisterTokenConfig{
-						ProposedOwner:      solTestData.Token.ExternalAdmin,
-						TokenPoolQualifier: solTestData.TokenPoolQualifier,
-						TokenRef: datastore.AddressRef{
+					Registrations: []tokensapi.RegisterTokenConfig{
+						{
 							ChainSelector: solTestData.Chain.Selector,
-							Qualifier:     tokenSymbol,
+							ProposedOwner: solTestData.Token.ExternalAdmin,
+							TokenPoolRef: datastore.AddressRef{
+								Qualifier: solTestData.TokenPoolQualifier,
+								Type:      datastore.ContractType(solTokenPoolType),
+							},
+							TokenRef: datastore.AddressRef{
+								Qualifier: tokenSymbol,
+							},
+							SVMExtraArgs: &tokensapi.SVMExtraArgs{
+								CustomerMintAuthorities: []solana.PublicKey{
+									externalAdmin,
+								},
+							},
 						},
-						PoolType:           solTokenPoolType.String(),
-						SVMExtraArgs: &tokensapi.SVMExtraArgs{
-							CustomerMintAuthorities: []solana.PublicKey{
-								externalAdmin,
-							}},
 					},
 				})
 			require.NoError(t, err)
-			testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
 			MergeAddresses(t, env, output.DataStore)
+			testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
 
 			// Verify that a new admin was proposed for the specified token
 			var tokenAdminRegistryAccountAfter ccip_common.TokenAdminRegistry
@@ -628,6 +644,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 			multisigAdd, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
 				ChainSelector: solTestData.Chain.Selector,
 				Version:       common_utils.Version_1_6_0,
+				Qualifier:     tokenSymbol,
 				Type:          "TOKEN_MULTISIG",
 			}, solTestData.Chain.Selector, datastore_utils.FullRef)
 			require.NoError(t, err)
