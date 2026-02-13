@@ -353,7 +353,7 @@ var SetPool = operations.NewOperation(
 		// if there is no admin set, we assume the router authority is timelock
 		currentAdmin := GetAuthority(chain, input.Router)
 		var tokenAdminRegistryAccount ccip_common.TokenAdminRegistry
-		if err := chain.GetAccountDataBorshInto(context.Background(), tokenAdminRegistryPDA, &tokenAdminRegistryAccount); err != nil {
+		if err := chain.GetAccountDataBorshInto(context.Background(), tokenAdminRegistryPDA, &tokenAdminRegistryAccount); err == nil {
 			if !tokenAdminRegistryAccount.LookupTable.IsZero() {
 				b.Logger.Info("Token pool lookup table already set for this mint with the given admin:", tokenAdminRegistryAccount)
 				return sequences.OnChainOutput{}, nil
@@ -424,7 +424,7 @@ var RegisterTokenAdminRegistry = operations.NewOperation(
 		}
 		var pendingAdmin solana.PublicKey
 		var tokenAdminRegistryAccount ccip_common.TokenAdminRegistry
-		if err := chain.GetAccountDataBorshInto(context.Background(), tokenAdminRegistryPDA, &tokenAdminRegistryAccount); err != nil {
+		if err := chain.GetAccountDataBorshInto(context.Background(), tokenAdminRegistryPDA, &tokenAdminRegistryAccount); err == nil {
 			if input.Admin == tokenAdminRegistryAccount.Administrator {
 				b.Logger.Info("Token admin registry already registered with the given admin:", tokenAdminRegistryAccount)
 				return TokenAdminRegistryOut{}, nil
@@ -634,7 +634,7 @@ var TransferTokenAdminRegistry = operations.NewOperation(
 		tokenAdminRegistryPDA, _, _ := state.FindTokenAdminRegistryPDA(input.TokenMint, input.Router)
 		var currentAdmin solana.PublicKey
 		var tokenAdminRegistryAccount ccip_common.TokenAdminRegistry
-		if err := chain.GetAccountDataBorshInto(context.Background(), tokenAdminRegistryPDA, &tokenAdminRegistryAccount); err != nil {
+		if err := chain.GetAccountDataBorshInto(context.Background(), tokenAdminRegistryPDA, &tokenAdminRegistryAccount); err == nil {
 			currentAdmin = tokenAdminRegistryAccount.Administrator
 		}
 		// we can only sign as either the deployer or timelock

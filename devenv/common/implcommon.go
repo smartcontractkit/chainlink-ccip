@@ -623,10 +623,7 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 	for _, srcAdapter := range adp {
 		srcCfg := srcAdapter.GetTokenExpansionConfig()
 		srcSel := srcAdapter.ChainSelector()
-		srcFamily, err := chainsel.GetSelectorFamily(srcSel)
-		if err != nil {
-			return nil, fmt.Errorf("getting chain family for selector %d: %w", srcSel, err)
-		}
+		srcFamily := srcAdapter.Family()
 		if srcFamily != chainsel.FamilyEVM && srcFamily != chainsel.FamilySolana {
 			continue // only EVM and Solana are supported for token transfers in 1.6
 		}

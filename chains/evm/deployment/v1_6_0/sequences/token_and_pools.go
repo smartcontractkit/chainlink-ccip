@@ -16,7 +16,6 @@ import (
 	tarseq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
 	tpops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/operations/token_pool"
 	tpseq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/sequences/token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/token_pool"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
@@ -51,11 +50,6 @@ func (a *EVMAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[tok
 				return sequences.OnChainOutput{}, errors.New("token pool address is zero address")
 			}
 
-			trAddr := common.HexToAddress(input.RegistryAddress)
-			if trAddr == (common.Address{}) {
-				return sequences.OnChainOutput{}, errors.New("token admin registry address is zero address")
-			}
-
 			externalAdmin := common.Address{}
 			if input.ExternalAdmin != "" {
 				if !common.IsHexAddress(input.ExternalAdmin) {
@@ -83,64 +77,13 @@ func (a *EVMAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[tok
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token address via GetToken operation: %w", err)
 			}
 
-			// INFO: by default, operations are cached if they are called with the same ID, version,
-			// description, and input params. For this sequence (and token expansion in general), we
-			// need to be extra cautious with this behavior. Many token API sequence implementations
-			// call the ExecuteOperation function assuming that they are getting the latest on-chain
-			// data back. However, if many of these seqeuences are combined to create one changeset,
-			// (e.g. TokenExpansion) then downstream sequences will receive stale data from upstream
-			// ones due to caching causing issues. Here is an example scenario:
-			// --
-			//   1. sequence A calls GET token config with some payload (config is empty)
-			//   2. sequence B calls SET token config (config is no longer empty now)
-			//   3. sequence C calls GET token config with the same exact payload (the empty cached config is returned, which is stale)
-			// --
-			// Unfortunately, this sequence is subject to the issue described above, and there is no
-			// clean way to disable the default caching mechanism at present. To circumvent this for
-			// now, we intentionally avoid the use of ExecuteOperation in favor of fetching directly
-			// from the contract. This type of workaround only needs to be added if there's a chance
-			// that there's a changeset that does read -> write -> read, so a function like GetToken
-			// is not affected since the value is immutable after deployment. For completeness, here
-			// is an example of what should *NOT* be done:
-			// --
-			//   ```go
-			//     cached, err := operations.ExecuteOperation(b, tarops.GetTokenConfig, chain,
-			//     	contract.FunctionInput[common.Address]{
-			//     		ChainSelector: input.ChainSelector,
-			//     		Address:       tarAddress,
-			//     		Args:          tokAddress,
-			//     	})
-			//   ```
-			// --
-			// Reference: https://docs.cld.cldev.sh/guides/changesets/operations-api
-			// --
-			tar, err := token_admin_registry.NewTokenAdminRegistry(tarAddress, chain.Client)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to bind to token admin registry at address %q on chain %d: %w", tarAddress, input.ChainSelector, err)
-			}
-			cfg, err := tar.GetTokenConfig(&bind.CallOpts{Context: b.GetContext()}, token.Output)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token config for token %q from token admin registry at address %q: %w", token.Output, tarAddress, err)
-			}
-
-			// INFO: there are two cases to consider here:
-			// --
-			//   1. The token pool is ALREADY set on-chain. In this case, we simply reuse the
-			//      current on-chain value. This makes the RegisterToken sequence idempotent.
-			// --
-			//   2. The token pool is NOT set on-chain. In this case, the token pool address
-			//      will be set to the zero address below. This causes the RegisterToken seq
-			//      to skip calling `SetPool`, which is OK since the token pool expansion cs
-			//      will call `SetPool` again later on.
-			tpAddress := cfg.TokenPool
-
 			report, err := cldf_ops.ExecuteSequence(b,
 				tarseq.RegisterToken,
 				chain,
 				tarseq.RegisterTokenInput{
 					ChainSelector:             input.ChainSelector,
 					TokenAdminRegistryAddress: tarAddress,
-					TokenPoolAddress:          tpAddress,
+					TokenPoolAddress:          tpAddr,
 					ExternalAdmin:             externalAdmin,
 					TokenAddress:              token.Output,
 				},
@@ -191,7 +134,7 @@ func (a *EVMAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[tok
 				chain,
 				tarseq.RegisterTokenInput{
 					ChainSelector:             input.ChainSelector,
-					TokenAdminRegistryAddress: trAddr,
+					TokenAdminRegistryAddress: tarAddress,
 					TokenPoolAddress:          tpAddr,
 					ExternalAdmin:             externalAdmin,
 					TokenAddress:              token.Output,
