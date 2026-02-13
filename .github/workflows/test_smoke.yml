@@ -120,10 +120,16 @@ jobs:
           cd cmd/ccip && go install . && cd -
           ccip u ${{ matrix.test.config }}
           sleep 120 # wait for nodes to be ready, need a better way here
+      - name: Install gotestsum
+        run: go install gotest.tools/gotestsum@latest
       - name: Smoke Tests
-        # DEBUG: Using specific commit to figure out odd error
-        uses: smartcontractkit/.github/actions/branch-out-upload@fe886e79324fc84f7a721fcea6994b03f57660f8
+        id: run-tests
+        run: gotestsum --junitfile=test-results.xml --format=short-verbose -- ${{ matrix.test.name }} -timeout 20m
+      - name: Analyze and upload test results
+        uses: smartcontractkit/.github/actions/branch-out-upload@branch-out-upload/v1
         with:
+          junit-file-path: test-results.xml
           trunk-org-slug: smartcontractkit
+          trunk-previous-step-outcome: ${{ steps.run-tests.outcome }}
           trunk-token: ${{ secrets.TRUNK_API_KEY }}
-          go-test-args: -run ${{ matrix.test.name }} -timeout 20m
+          trunk-job-url: ${{ format('https://github.com/{0}/actions/runs/{1}/job/{2}/attempts/{3}', github.repository, github.run_id, job.check_run_id, github.run_attempt) }}

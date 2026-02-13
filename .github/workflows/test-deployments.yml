@@ -60,12 +60,19 @@ jobs:
         working-directory: chains/evm/deployment
     steps:
       - uses: actions/checkout@v4
+      - name: Install gotestsum
+        run: go install gotest.tools/gotestsum@latest
       - name: Test EVM Deployments
+        id: run-tests
+        run: gotestsum --junitfile=test-results.xml --format=short-verbose -- ./...
+      - name: Analyze and upload test results
         uses: smartcontractkit/.github/actions/branch-out-upload@branch-out-upload/v1
         with:
+          junit-file-path: test-results.xml
           trunk-org-slug: smartcontractkit
+          trunk-previous-step-outcome: ${{ steps.run-tests.outcome }}
           trunk-token: ${{ secrets.TRUNK_API_KEY }}
-          go-test-args: ./chains/evm/deployment/...
+          trunk-job-url: ${{ format('https://github.com/{0}/actions/runs/{1}/job/{2}/attempts/{3}', github.repository, github.run_id, job.check_run_id, github.run_attempt) }}
 
   test-solana-deployments:
     needs: [detect_deployments_changes, setup-go]
@@ -76,12 +83,19 @@ jobs:
         working-directory: chains/solana/deployment
     steps:
       - uses: actions/checkout@v4
+      - name: Install gotestsum
+        run: go install gotest.tools/gotestsum@latest
       - name: Test Solana Deployments
+        id: run-tests
+        run: gotestsum --junitfile=test-results.xml --format=short-verbose -- ./...
+      - name: Analyze and upload test results
         uses: smartcontractkit/.github/actions/branch-out-upload@branch-out-upload/v1
         with:
+          junit-file-path: test-results.xml
           trunk-org-slug: smartcontractkit
+          trunk-previous-step-outcome: ${{ steps.run-tests.outcome }}
           trunk-token: ${{ secrets.TRUNK_API_KEY }}
-          go-test-args: ./chains/solana/deployment/...
+          trunk-job-url: ${{ format('https://github.com/{0}/actions/runs/{1}/job/{2}/attempts/{3}', github.repository, github.run_id, job.check_run_id, github.run_attempt) }}
 
   test-deployments:
     needs: [detect_deployments_changes, setup-go]
@@ -92,12 +106,19 @@ jobs:
         working-directory: deployment
     steps:
       - uses: actions/checkout@v4
+      - name: Install gotestsum
+        run: go install gotest.tools/gotestsum@latest
       - name: Test Crosschain Deployments
+        id: run-tests
+        run: gotestsum --junitfile=test-results.xml --format=short-verbose -- ./...
+      - name: Analyze and upload test results
         uses: smartcontractkit/.github/actions/branch-out-upload@branch-out-upload/v1
         with:
+          junit-file-path: test-results.xml
           trunk-org-slug: smartcontractkit
+          trunk-previous-step-outcome: ${{ steps.run-tests.outcome }}
           trunk-token: ${{ secrets.TRUNK_API_KEY }}
-          go-test-args: ./deployment/...
+          trunk-job-url: ${{ format('https://github.com/{0}/actions/runs/{1}/job/{2}/attempts/{3}', github.repository, github.run_id, job.check_run_id, github.run_attempt) }}
 
   test-deployments-crosschain:
     needs: [detect_deployments_changes, setup-go]
@@ -117,9 +138,16 @@ jobs:
         run: |
           sh -c "$(curl -sSfL https://release.anza.xyz/stable/install)" # always use latest stable release from solana
           echo "PATH=$HOME/.local/share/solana/install/active_release/bin:$PATH" >> $GITHUB_ENV
+      - name: Install gotestsum
+        run: go install gotest.tools/gotestsum@latest
       - name: Test Crosschain Deployments
+        id: run-tests
+        run: gotestsum --junitfile=test-results.xml --format=short-verbose -- ./...
+      - name: Analyze and upload test results
         uses: smartcontractkit/.github/actions/branch-out-upload@branch-out-upload/v1
         with:
+          junit-file-path: test-results.xml
           trunk-org-slug: smartcontractkit
+          trunk-previous-step-outcome: ${{ steps.run-tests.outcome }}
           trunk-token: ${{ secrets.TRUNK_API_KEY }}
-          go-test-args: ./integration-tests/deployment/...
+          trunk-job-url: ${{ format('https://github.com/{0}/actions/runs/{1}/job/{2}/attempts/{3}', github.repository, github.run_id, job.check_run_id, github.run_attempt) }}

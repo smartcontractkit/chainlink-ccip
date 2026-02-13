@@ -252,17 +252,23 @@ jobs:
           go run github.com/smartcontractkit/chainlink/v2/core/store/cmd/preparetest
         env:
           CL_DATABASE_URL: ${{ env.DB_URL }}
+
+      - name: Install gotestsum
+        run: go install gotest.tools/gotestsum@latest
       - name: ${{ matrix.type.name }}
-        # DEBUG: Using specific commit to figure out odd error
-        uses: smartcontractkit/.github/actions/branch-out-upload@fe886e79324fc84f7a721fcea6994b03f57660f8
+        id: run-tests
+        run: |
+          cd $GITHUB_WORKSPACE/chainlink/integration-tests/smoke/ccip
+          gotestsum --junitfile=test-results.xml --format=short-verbose -- ${{ matrix.type.file }} -timeout ${{ matrix.type.timeout }}
+
+      - name: Analyze and upload test results
+        uses: smartcontractkit/.github/actions/branch-out-upload@branch-out-upload/v1
         with:
+          junit-file-path: $GITHUB_WORKSPACE/chainlink/integration-tests/smoke/ccip/test-results.xml
           trunk-org-slug: smartcontractkit
+          trunk-previous-step-outcome: ${{ steps.run-tests.outcome }}
           trunk-token: ${{ secrets.TRUNK_API_KEY }}
-          # Need to use -C to run the tests from the proper directory
-          go-test-args: ${{ matrix.type.run != '' && format('-run {0} ', matrix.type.run) || '' }}-timeout ${{ matrix.type.timeout }} ${{ matrix.type.file }}
-        env:
-          GOFLAGS: -C=./chainlink/integration-tests/smoke/ccip
-          CL_DATABASE_URL: ${{ env.DB_URL }}
+          trunk-job-url: ${{ format('https://github.com/{0}/actions/runs/{1}/job/{2}/attempts/{3}', github.repository, github.run_id, job.check_run_id, github.run_attempt) }}
 
   integration-test-ccip-ocr3:
     if: always()
