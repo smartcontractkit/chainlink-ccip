@@ -265,7 +265,7 @@ jobs:
             run_args="-run $run"
           fi
           cd $GITHUB_WORKSPACE/chainlink/integration-tests/smoke/ccip && \
-          gotestsum --junitfile=test-results.xml --format=short-verbose -- ${{ matrix.type.file }} $run_args -timeout ${{ matrix.type.timeout }}
+          gotestsum --junitfile=test-results.xml --format=standard-verbose -- ${{ matrix.type.file }} $run_args -timeout ${{ matrix.type.timeout }}
         env:
           CL_DATABASE_URL: ${{ env.DB_URL }}
 

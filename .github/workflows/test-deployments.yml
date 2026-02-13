@@ -65,7 +65,7 @@ jobs:
       - name: Test EVM Deployments
         id: run-tests
         continue-on-error: true
-        run: gotestsum --junitfile=test-results.xml --format=short-verbose -- ./...
+        run: gotestsum --junitfile=test-results.xml --format=standard-verbose -- ./...
       - name: Analyze and upload test results
         uses: smartcontractkit/.github/actions/branch-out-upload@branch-out-upload/v1
         with:
@@ -89,7 +89,7 @@ jobs:
       - name: Test Solana Deployments
         id: run-tests
         continue-on-error: true
-        run: gotestsum --junitfile=test-results.xml --format=short-verbose -- ./...
+        run: gotestsum --junitfile=test-results.xml --format=standard-verbose -- ./...
       - name: Analyze and upload test results
         uses: smartcontractkit/.github/actions/branch-out-upload@branch-out-upload/v1
         with:
@@ -113,7 +113,7 @@ jobs:
       - name: Test Crosschain Deployments
         id: run-tests
         continue-on-error: true
-        run: gotestsum --junitfile=test-results.xml --format=short-verbose -- ./...
+        run: gotestsum --junitfile=test-results.xml --format=standard-verbose -- ./...
       - name: Analyze and upload test results
         uses: smartcontractkit/.github/actions/branch-out-upload@branch-out-upload/v1
         with:
@@ -146,7 +146,7 @@ jobs:
       - name: Test Crosschain Deployments
         id: run-tests
         continue-on-error: true
-        run: gotestsum --junitfile=test-results.xml --format=short-verbose -- ./...
+        run: gotestsum --junitfile=test-results.xml --format=standard-verbose -- ./...
       - name: Analyze and upload test results
         uses: smartcontractkit/.github/actions/branch-out-upload@branch-out-upload/v1
         with:
