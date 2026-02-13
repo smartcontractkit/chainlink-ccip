@@ -3,7 +3,6 @@ package tokens
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/Masterminds/semver/v3"
 	token_metadata "github.com/gagliardetto/metaplex-go/clients/token-metadata"
@@ -13,6 +12,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 	soltokens "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
+	tokenapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
@@ -20,11 +20,12 @@ import (
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/mcms/types"
-	tokenapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 )
 
-var LinkContractType cldf_deployment.ContractType = "LINK"
-var Version *semver.Version = semver.MustParse("1.6.0")
+var (
+	LinkContractType cldf_deployment.ContractType = "LINK"
+	Version          *semver.Version              = semver.MustParse("1.6.0")
+)
 
 type Params struct {
 	ExistingAddresses      []datastore.AddressRef
@@ -219,10 +220,9 @@ var CreateTokenMultisig = operations.NewOperation(
 				},
 			},
 		}, nil
-
 	})
 
-	var UpsertTokenMetadata = operations.NewOperation(
+var UpsertTokenMetadata = operations.NewOperation(
 	"solana-token:upsert-metadata",
 	Version,
 	"Upserts metadata for an SPL token",
@@ -247,22 +247,14 @@ var CreateTokenMultisig = operations.NewOperation(
 			}
 			return sequences.OnChainOutput{}, nil
 		}
-		var mintMetadata token_metadata.Metadata
-		metadataPDA, metadataErr := FindMplTokenMetadataPDA(tokenMint)
-		if metadataErr != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("error finding metadata account: %w", metadataErr)
-		}
-		fmt.Println("Metadata", metadataPDA)
-		if err := chain.GetAccountDataBorshInto(context.Background(), metadataPDA, &mintMetadata); err != nil {
+		mintMetadata, metadataPDA, err := soltokens.GetTokenMetadata(b.GetContext(), chain.Client, tokenMint)
+		if err != nil {
 			fmt.Println("error getting metadata account data, skipping update for", tokenMint.String(), ":", err)
 			return sequences.OnChainOutput{}, nil
 		}
+		fmt.Println("Metadata", metadataPDA)
+		newData := soltokens.GetTokenDataV2(mintMetadata)
 		newUpdateAuthority := mintMetadata.UpdateAuthority
-		newData := token_metadata.DataV2{
-			Name:   strings.ReplaceAll(mintMetadata.Data.Name, "\x00", ""),
-			Symbol: strings.ReplaceAll(mintMetadata.Data.Symbol, "\x00", ""),
-			Uri:    strings.ReplaceAll(mintMetadata.Data.Uri, "\x00", ""),
-		}
 		if metadata.UpdateAuthority != "" {
 			newUpdateAuthority = solana.MustPublicKeyFromBase58(metadata.UpdateAuthority)
 		}
@@ -284,8 +276,8 @@ var CreateTokenMultisig = operations.NewOperation(
 			b, err := utils.BuildMCMSBatchOperation(
 				chain.Selector,
 				[]solana.Instruction{&instruction},
-				MplTokenMetadataID.String(),
-				MplTokenMetadataProgramName,
+				soltokens.MplTokenMetadataID.String(),
+				soltokens.MplTokenMetadataProgramName,
 			)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute or create batch: %w", err)
@@ -308,26 +300,11 @@ type TokenMetadataInput struct {
 	Metadata          tokenapi.TokenMetadata
 }
 
-// PROGRAM ID for Metaplex Metadata Program
-var MplTokenMetadataID solana.PublicKey = solana.MustPublicKeyFromBase58("metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s")
-
-const MplTokenMetadataProgramName = "MplTokenMetadataProgramName"
-
 // discriminator for update_metadata_account_v2 ix
 const UpdateMetadataAccountV2Ix = 15
 
 // discriminator for create_metadata_account
 const CreateMetadataAccountV2Ix = 16
-
-func FindMplTokenMetadataPDA(mint solana.PublicKey) (solana.PublicKey, error) {
-	seeds := [][]byte{
-		[]byte("metadata"),
-		MplTokenMetadataID.Bytes(),
-		mint.Bytes(),
-	}
-	pda, _, err := solana.FindProgramAddress(seeds, MplTokenMetadataID)
-	return pda, err
-}
 
 func modifyTokenMetadataIx(
 	metadataPDA, authority solana.PublicKey,
@@ -348,7 +325,7 @@ func modifyTokenMetadataIx(
 	}
 
 	instruction := solana.NewInstruction(
-		MplTokenMetadataID,
+		soltokens.MplTokenMetadataID,
 		ix.Accounts(),
 		data,
 	)
