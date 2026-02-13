@@ -266,15 +266,13 @@ jobs:
           fi
           echo "$run_cmd"
           cd $GITHUB_WORKSPACE/chainlink/integration-tests/smoke/ccip && $run_cmd
-          # DEBUG: Find the junit file
-          ls -la $GITHUB_WORKSPACE/chainlink/integration-tests/smoke/ccip
         env:
           CL_DATABASE_URL: ${{ env.DB_URL }}
 
       - name: Analyze and upload test results
         uses: smartcontractkit/.github/actions/branch-out-upload@branch-out-upload/v1
         with:
-          junit-file-path: $GITHUB_WORKSPACE/chainlink/integration-tests/smoke/ccip/test-results.xml
+          junit-file-path: ${{ github.workspace }}/chainlink/integration-tests/smoke/ccip/test-results.xml
           trunk-org-slug: chainlink
           trunk-previous-step-outcome: ${{ steps.run-tests.outcome }}
           trunk-token: ${{ secrets.TRUNK_API_KEY }}
