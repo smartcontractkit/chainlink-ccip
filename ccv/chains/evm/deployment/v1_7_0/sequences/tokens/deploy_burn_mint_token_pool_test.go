@@ -346,32 +346,18 @@ func TestDeployTokenPool(t *testing.T) {
 				require.Equal(t, input.AdvancedPoolHooksConfig.PolicyEngine, getPolicyEngineReport.Output, "Expected policy engine address to be the same as the inputted policy engine address")
 			}
 
-			// If authorized callers gating was enabled at deploy time, ensure the newly deployed token pool is authorized.
-			if len(input.AdvancedPoolHooksConfig.AuthorizedCallers) > 0 {
-				getAuthorizedCallersEnabledReport, err := operations.ExecuteOperation(
-					testsetup.BundleWithFreshReporter(e.OperationsBundle),
-					advanced_pool_hooks.GetAuthorizedCallersEnabled,
-					e.BlockChains.EVMChains()[chainSel],
-					contract.FunctionInput[any]{
-						ChainSelector: chainSel,
-						Address:       common.HexToAddress(hooksAddress),
-					},
-				)
-				require.NoError(t, err, "ExecuteOperation should not error")
-				require.True(t, getAuthorizedCallersEnabledReport.Output, "Expected authorized callers gating to be enabled")
-
-				getAuthorizedCallersReport, err := operations.ExecuteOperation(
-					testsetup.BundleWithFreshReporter(e.OperationsBundle),
-					advanced_pool_hooks.GetAllAuthorizedCallers,
-					e.BlockChains.EVMChains()[chainSel],
-					contract.FunctionInput[any]{
-						ChainSelector: chainSel,
-						Address:       common.HexToAddress(hooksAddress),
-					},
-				)
-				require.NoError(t, err, "ExecuteOperation should not error")
-				require.Contains(t, getAuthorizedCallersReport.Output, common.HexToAddress(poolAddress), "Expected token pool address to be in the on-chain authorized callers")
-			}
+			// Verify the newly deployed token pool is always authorized on the hooks.
+			getAuthorizedCallersReport, err := operations.ExecuteOperation(
+				testsetup.BundleWithFreshReporter(e.OperationsBundle),
+				advanced_pool_hooks.GetAllAuthorizedCallers,
+				e.BlockChains.EVMChains()[chainSel],
+				contract.FunctionInput[any]{
+					ChainSelector: chainSel,
+					Address:       common.HexToAddress(hooksAddress),
+				},
+			)
+			require.NoError(t, err, "ExecuteOperation should not error")
+			require.Contains(t, getAuthorizedCallersReport.Output, common.HexToAddress(poolAddress), "Expected token pool address to be in the on-chain authorized callers")
 		})
 	}
 }
