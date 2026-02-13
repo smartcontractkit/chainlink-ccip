@@ -72,7 +72,6 @@ compileContract tokenAdminRegistry/TokenAdminRegistry
 compileContract tokenAdminRegistry/RegistryModuleOwnerCustom
 compileContract tokenAdminRegistry/TokenPoolFactory/TokenPoolFactory
 compileContract tokenAdminRegistry/TokenPoolFactory/FactoryBurnMintERC20
-compileContract tokenAdminRegistry/TokenPoolFactory/HyperLiquidCompatibleERC20
 compileContract capability/CCIPHome
 compileContract NonceManager
 compileContract rmn/RMNRemote
@@ -91,8 +90,8 @@ compileContract pools/USDC/CCTPMessageTransmitterProxy
 compileContract pools/SiloedLockReleaseTokenPool
 compileContract pools/BurnMintFastTransferTokenPool
 compileContract pools/USDC/SiloedUSDCTokenPool
+compileContract pools/USDC/USDCTokenPool
 compileContract pools/USDC/USDCTokenPoolCCTPV2
-compileContract pools/USDC/USDCTokenPoolProxy
 compileContract pools/USDC/BurnMintWithLockReleaseFlagTokenPool
 
 # Test helpers
