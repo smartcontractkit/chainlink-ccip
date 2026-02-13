@@ -37,7 +37,7 @@ type TokenAdapter interface {
 	// This is usally done as they no longer have mint authority over the token.
 	ManualRegistration() *cldf_ops.Sequence[ManualRegistrationSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 	// SetTokenPoolRateLimits returns a sequence that sets rate limits on a token pool.
-	SetTokenPoolRateLimits() *cldf_ops.Sequence[RateLimiterConfigInputs, sequences.OnChainOutput, cldf_chain.BlockChains]
+	SetTokenPoolRateLimits() *cldf_ops.Sequence[TPRLInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 	DeployToken() *cldf_ops.Sequence[DeployTokenInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 	DeployTokenVerify(e deployment.Environment, in any) error
 	DeployTokenPoolForToken() *cldf_ops.Sequence[DeployTokenPoolInput, sequences.OnChainOutput, cldf_chain.BlockChains]

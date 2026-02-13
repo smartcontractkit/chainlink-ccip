@@ -14,46 +14,46 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 )
 
-type RateLimiterConfigInput struct {
-	ChainSelector       uint64                             `yaml:"chain-selector" json:"chainSelector"`
-	ChainAdapterVersion *semver.Version                    `yaml:"chain-adapter-version" json:"chainAdapterVersion"`
-	TokenRef            datastore.AddressRef               `yaml:"token-ref" json:"tokenRef"`
-	TokenPoolQualifier  string                             `yaml:"token-pool-qualifier" json:"tokenPoolQualifier"`
-	PoolType            string                             `yaml:"pool-type" json:"poolType"`
-	Inputs              map[uint64]RateLimiterConfigInputs `yaml:"inputs" json:"inputs"`
-	MCMS                mcms.Input                         `yaml:"mcms,omitempty" json:"mcms"`
+type TPRLInput struct {
+	Configs map[uint64]TPRLConfig `yaml:"configs" json:"configs"`
+	MCMS    mcms.Input            `yaml:"mcms,omitempty" json:"mcms"`
 }
 
-type RateLimiterConfigInputs struct {
-	InboundRateLimiterConfig  RateLimiterConfig `yaml:"inbound-rate-limiter-config" json:"inboundRateLimiterConfig"`
+type TPRLConfig struct {
+	ChainSelector       uint64                 `yaml:"chain-selector" json:"chainSelector"`
+	ChainAdapterVersion *semver.Version        `yaml:"chain-adapter-version" json:"chainAdapterVersion"`
+	TokenRef            datastore.AddressRef   `yaml:"token-ref" json:"tokenRef"`
+	TokenPoolQualifier  string                 `yaml:"token-pool-qualifier" json:"tokenPoolQualifier"`
+	PoolType            string                 `yaml:"pool-type" json:"poolType"`
+	Inputs              map[uint64]TPRLRemotes `yaml:"inputs" json:"inputs"`
+}
+
+type TPRLRemotes struct {
 	OutboundRateLimiterConfig RateLimiterConfig `yaml:"outbound-rate-limiter-config" json:"outboundRateLimiterConfig"`
 	// below are not specified by the user, filled in by the deployment system to pass to chain operations
-	ChainSelector       uint64
-	RemoteChainSelector uint64
-	TokenRef            datastore.AddressRef
-	TokenPoolQualifier  string
-	PoolType            string
-	ExistingDataStore   datastore.DataStore
+	InboundRateLimiterConfig RateLimiterConfig
+	ChainSelector            uint64
+	RemoteChainSelector      uint64
+	TokenRef                 datastore.AddressRef
+	TokenPoolQualifier       string
+	PoolType                 string
+	ExistingDataStore        datastore.DataStore
 }
 
 // SetTokenPoolRateLimits returns a changeset that sets rate limits for token pools on multiple chains.
-func SetTokenPoolRateLimits() cldf.ChangeSetV2[RateLimiterConfigInput] {
+func SetTokenPoolRateLimits() cldf.ChangeSetV2[TPRLInput] {
 	return cldf.CreateChangeSet(setTokenPoolRateLimitsApply(), setTokenPoolRateLimitsVerify())
 }
 
-func setTokenPoolRateLimitsVerify() func(cldf.Environment, RateLimiterConfigInput) error {
-	return func(e cldf.Environment, cfg RateLimiterConfigInput) error {
-		for remoteSelector, input := range cfg.Inputs {
-			if input.InboundRateLimiterConfig.IsEnabled {
-				if input.InboundRateLimiterConfig.Capacity == nil || input.InboundRateLimiterConfig.Rate == nil ||
-					input.InboundRateLimiterConfig.Capacity.Sign() <= 0 || input.InboundRateLimiterConfig.Rate.Sign() <= 0 {
-					return fmt.Errorf("inbound rate limiter config for remote chain %d is enabled but capacity or rate is nil", remoteSelector)
-				}
-			}
-			if input.OutboundRateLimiterConfig.IsEnabled {
-				if input.OutboundRateLimiterConfig.Capacity == nil || input.OutboundRateLimiterConfig.Rate == nil ||
-					input.OutboundRateLimiterConfig.Capacity.Sign() <= 0 || input.OutboundRateLimiterConfig.Rate.Sign() <= 0 {
-					return fmt.Errorf("outbound rate limiter config for remote chain %d is enabled but capacity or rate is nil", remoteSelector)
+func setTokenPoolRateLimitsVerify() func(cldf.Environment, TPRLInput) error {
+	return func(e cldf.Environment, cfg TPRLInput) error {
+		for _, config := range cfg.Configs {
+			for remoteSelector, input := range config.Inputs {
+				if input.OutboundRateLimiterConfig.IsEnabled {
+					if input.OutboundRateLimiterConfig.Capacity == nil || input.OutboundRateLimiterConfig.Rate == nil ||
+						input.OutboundRateLimiterConfig.Capacity.Sign() <= 0 || input.OutboundRateLimiterConfig.Rate.Sign() <= 0 {
+						return fmt.Errorf("outbound rate limiter config for remote chain %d is enabled but capacity or rate is nil", remoteSelector)
+					}
 				}
 			}
 		}
@@ -61,8 +61,8 @@ func setTokenPoolRateLimitsVerify() func(cldf.Environment, RateLimiterConfigInpu
 	}
 }
 
-func setTokenPoolRateLimitsApply() func(cldf.Environment, RateLimiterConfigInput) (cldf.ChangesetOutput, error) {
-	return func(e cldf.Environment, cfg RateLimiterConfigInput) (cldf.ChangesetOutput, error) {
+func setTokenPoolRateLimitsApply() func(cldf.Environment, TPRLInput) (cldf.ChangesetOutput, error) {
+	return func(e cldf.Environment, cfg TPRLInput) (cldf.ChangesetOutput, error) {
 		batchOps := make([]mcms_types.BatchOperation, 0)
 		reports := make([]cldf_ops.Report[any, any], 0)
 		tokenPoolRegistry := GetTokenAdapterRegistry()
