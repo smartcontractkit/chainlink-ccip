@@ -260,12 +260,14 @@ jobs:
         continue-on-error: true
         run: |
           run="${{ matrix.type.run }}"
-          run_args=""
+          run_cmd="gotestsum --junitfile=test-results.xml --format=standard-verbose -- ${{ matrix.type.file }} -timeout ${{ matrix.type.timeout }}"
           if [ -n "$run" ]; then
-            run_args="-run $run"
+            run_cmd="$run_cmd -run $run"
           fi
-          cd $GITHUB_WORKSPACE/chainlink/integration-tests/smoke/ccip && \
-          gotestsum --junitfile=test-results.xml --format=standard-verbose -- ${{ matrix.type.file }} $run_args -timeout ${{ matrix.type.timeout }}
+          echo "$run_cmd"
+          cd $GITHUB_WORKSPACE/chainlink/integration-tests/smoke/ccip && $run_cmd
+          # DEBUG: Find the junit file
+          ls -la $GITHUB_WORKSPACE/chainlink/integration-tests/smoke/ccip
         env:
           CL_DATABASE_URL: ${{ env.DB_URL }}
 
