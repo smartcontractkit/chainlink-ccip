@@ -29,8 +29,8 @@ type AdvancedPoolHooksConfig struct {
 	Allowlist []common.Address
 	// PolicyEngine is the policy engine address. Zero address disables policy checks.
 	PolicyEngine common.Address
-	// AuthorizedCallers provides the initial set of callers authorized to invoke preflightCheck/postflightCheck.
-	// Auth is always enforced. Deploy sequences will add the deployed token pool as an authorized caller.
+	// AuthorizedCallers specifies the set of callers authorized to invoke preflightCheck/postflightCheck.
+	// AuthorizedCallers check is always enforced, regardless of whether the list is empty.
 	AuthorizedCallers []common.Address
 }
 

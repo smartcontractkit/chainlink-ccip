@@ -346,7 +346,7 @@ func TestDeployTokenPool(t *testing.T) {
 				require.Equal(t, input.AdvancedPoolHooksConfig.PolicyEngine, getPolicyEngineReport.Output, "Expected policy engine address to be the same as the inputted policy engine address")
 			}
 
-			// Verify the newly deployed token pool is always authorized on the hooks.
+			// Verify the newly deployed token pool is authorized on the hooks.
 			getAuthorizedCallersReport, err := operations.ExecuteOperation(
 				testsetup.BundleWithFreshReporter(e.OperationsBundle),
 				advanced_pool_hooks.GetAllAuthorizedCallers,
