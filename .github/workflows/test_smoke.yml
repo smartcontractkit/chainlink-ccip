@@ -123,12 +123,13 @@ jobs:
       - name: Install gotestsum
         run: go install gotest.tools/gotestsum@latest
       - name: Smoke Tests
+        working-directory: devenv/tests/e2e
         id: run-tests
         run: gotestsum --junitfile=test-results.xml --format=short-verbose -- ${{ matrix.test.name }} -timeout 20m
       - name: Analyze and upload test results
         uses: smartcontractkit/.github/actions/branch-out-upload@branch-out-upload/v1
         with:
-          junit-file-path: test-results.xml
+          junit-file-path: devenv/tests/e2e/test-results.xml
           trunk-org-slug: smartcontractkit
           trunk-previous-step-outcome: ${{ steps.run-tests.outcome }}
           trunk-token: ${{ secrets.TRUNK_API_KEY }}
