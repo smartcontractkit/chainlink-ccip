@@ -11,45 +11,6 @@ output:
 # - (none): Public/Read functions don't need access control
 
 contracts:
-  # 1.6.5
-  - contract_name: USDCTokenPoolCCTPV2
-    version: "1.6.5"
-    package_name: usdc_token_pool_cctp_v2
-    functions:
-      - name: setDomains
-        access: owner
-      - name: getDomain
-        access: public
-      - name: applyAuthorizedCallerUpdates
-        access: owner
-      - name: applyChainUpdates
-        access: owner
-      - name: addRemotePool
-        access: owner
-      - name: removeRemotePool
-        access: owner
-      - name: transferOwnership
-        access: owner
-
-  - contract_name: USDCTokenPool
-    version: "1.6.5"
-    package_name: usdc_token_pool
-    functions:
-      - name: setDomains
-        access: owner
-      - name: getDomain
-        access: public
-      - name: applyAuthorizedCallerUpdates
-        access: owner
-      - name: applyChainUpdates
-        access: owner
-      - name: addRemotePool
-        access: owner
-      - name: removeRemotePool
-        access: owner
-      - name: transferOwnership
-        access: owner
-
   # 1.6.2
   - contract_name: CCTPMessageTransmitterProxy
     version: "1.6.2"
@@ -77,6 +38,8 @@ contracts:
       - name: setChainRateLimiterConfig
         access: owner
       - name: getToken
+        access: public
+      - name: getTokenDecimals
         access: public
       - name: isSupportedToken
         access: public
@@ -152,6 +115,10 @@ contracts:
         access: public
       - name: getTokenTransferFeeConfig
         access: public
+      - name: getStaticConfig
+        access: public
+      - name: getAllAuthorizedCallers
+        access: public
 
   - contract_name: OnRamp
     version: "1.6.0"
@@ -164,6 +131,8 @@ contracts:
         access: public
       - name: getDynamicConfig
         access: public
+      - name: setDynamicConfig
+        access: owner
 
   - contract_name: OffRamp
     package_name: offramp
@@ -179,3 +148,5 @@ contracts:
         access: public
       - name: getSourceChainConfig
         access: public
+      - name: setDynamicConfig
+        access: owner

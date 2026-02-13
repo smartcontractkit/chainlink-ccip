@@ -64,6 +64,5 @@ extract-bytecode-abi: ## Extract bytecode and abi from versioned gobindings to b
 	cd gobindings && go run ./cmd/extract_bytecode/main.go
 
 .PHONY: operations
-operations: pnpmdep
-	./scripts/compile_all
+operations: pnpmdep wrappers
 	go run cmd/operations-gen/main.go -config deployment/operations_gen_config.yaml
