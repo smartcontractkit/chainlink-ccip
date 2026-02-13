@@ -341,7 +341,7 @@ func main() {
 		os.Exit(1)
 	}
 	if *format {
-		legacyOutput, err := formatOutput(jsonOutput, chainRegistry.GetAllChains())
+		legacyOutput, err := formatOutput(jsonOutput, chainRegistry.GetAllChains(), allChainSelectors)
 		if err != nil {
 			fmt.Printf("Error transforming to legacy format: %v\n", err)
 			os.Exit(1)
@@ -710,8 +710,8 @@ func printFinalStats(totalDuration time.Duration, totalContracts, successCount, 
 	fmt.Println("╚═══════════════════════════════════════════════════════════════╝")
 }
 
-// queryJD fetches node + chain config data from the Job Distributor and
-// returns a JSON-serializable structure for the "nodeOperators" output section.
+// queryJD fetches node + chain config + job/proposal data from the Job Distributor
+// and returns a JSON-serializable structure for the "nodeOperators" output section.
 func queryJD(ctx context.Context, jdOrc *jd.JDOrchestrator) (map[string]any, error) {
 	// Step 1: List all nodes.
 	nodes, err := jdOrc.ListNodes(ctx)
@@ -735,13 +735,54 @@ func queryJD(ctx context.Context, jdOrc *jd.JDOrchestrator) (map[string]any, err
 		}
 	}
 
-	// Step 3: Merge chain configs into each node.
+	// Step 3: Fetch jobs and proposals for all nodes.
+	var jobsByNode map[string][]map[string]any
+	var proposalsByJob map[string]map[string]any
+	if len(nodeIDs) > 0 {
+		jobsByNode, err = jdOrc.ListJobs(ctx, nodeIDs)
+		if err != nil {
+			fmt.Printf("Warning: failed to fetch jobs from JD (continuing without job data): %v\n", err)
+		} else {
+			// Collect all job IDs across all nodes to fetch proposals.
+			var allJobIDs []string
+			for _, jobs := range jobsByNode {
+				for _, job := range jobs {
+					if jobID, ok := job["id"].(string); ok && jobID != "" {
+						allJobIDs = append(allJobIDs, jobID)
+					}
+				}
+			}
+			if len(allJobIDs) > 0 {
+				proposalsByJob, err = jdOrc.ListProposals(ctx, allJobIDs)
+				if err != nil {
+					fmt.Printf("Warning: failed to fetch proposals from JD (continuing without proposal data): %v\n", err)
+					proposalsByJob = nil
+				}
+			}
+		}
+	}
+
+	// Step 4: Merge chain configs and jobs into each node.
 	for _, node := range nodes {
 		id, _ := node["id"].(string)
 		if configs, ok := chainConfigsByNode[id]; ok {
 			node["chainConfigs"] = configs
 		} else {
 			node["chainConfigs"] = []map[string]any{}
+		}
+
+		// Attach jobs + resolved proposals.
+		if jobs, ok := jobsByNode[id]; ok && len(jobs) > 0 {
+			for _, job := range jobs {
+				if proposalsByJob != nil {
+					if jobID, ok := job["id"].(string); ok {
+						if proposal, ok := proposalsByJob[jobID]; ok {
+							job["approvedProposal"] = proposal
+						}
+					}
+				}
+			}
+			node["jobs"] = jobs
 		}
 	}
 

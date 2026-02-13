@@ -9,10 +9,12 @@ import (
 	"fmt"
 	"strings"
 
-	nodev1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/node"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
+
+	jobv1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/job"
+	nodev1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/node"
 )
 
 // JDConfig holds the configuration for connecting to a Job Distributor instance.
@@ -35,6 +37,7 @@ type JDAuthConfig struct {
 // read-only query methods for node operator data.
 type JDOrchestrator struct {
 	nodeClient nodev1.NodeServiceClient
+	jobClient  jobv1.JobServiceClient
 	conn       *grpc.ClientConn
 }
 
@@ -73,6 +76,12 @@ func NewJDOrchestrator(ctx context.Context, cfg JDConfig) (*JDOrchestrator, erro
 		opts = append(opts, grpc.WithChainUnaryInterceptor(interceptors...))
 	}
 
+	// Raise the default max receive message size (4 MB) to 50 MB to handle
+	// large responses from ListProposals, ListJobs, etc.
+	opts = append(opts, grpc.WithDefaultCallOptions(
+		grpc.MaxCallRecvMsgSize(50*1024*1024),
+	))
+
 	conn, err := grpc.NewClient(cfg.GRPCURL, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("jd: failed to connect to %s: %w", cfg.GRPCURL, err)
@@ -80,6 +89,7 @@ func NewJDOrchestrator(ctx context.Context, cfg JDConfig) (*JDOrchestrator, erro
 
 	return &JDOrchestrator{
 		nodeClient: nodev1.NewNodeServiceClient(conn),
+		jobClient:  jobv1.NewJobServiceClient(conn),
 		conn:       conn,
 	}, nil
 }
@@ -119,6 +129,16 @@ func (j *JDOrchestrator) ListNodes(ctx context.Context) ([]map[string]any, error
 			"isConnected": n.GetIsConnected(),
 			"labels":      labels,
 			"version":     n.GetVersion(),
+		}
+
+		// Include workflow key if present.
+		if wk := n.GetWorkflowKey(); wk != "" {
+			node["workflowKey"] = wk
+		}
+
+		// Include NOP friendly name if present.
+		if nfn := n.GetNopFriendlyName(); nfn != "" {
+			node["nopFriendlyName"] = nfn
 		}
 
 		// Include P2P key bundles if present.
@@ -200,10 +220,10 @@ func (j *JDOrchestrator) ListNodeChainConfigs(ctx context.Context, nodeIDs []str
 			// Plugins.
 			if plugins := ocr2.GetPlugins(); plugins != nil {
 				ocr2Map["plugins"] = map[string]any{
-					"commit":    plugins.GetCommit(),
-					"execute":   plugins.GetExecute(),
-					"median":    plugins.GetMedian(),
-					"mercury":   plugins.GetMercury(),
+					"commit":     plugins.GetCommit(),
+					"execute":    plugins.GetExecute(),
+					"median":     plugins.GetMedian(),
+					"mercury":    plugins.GetMercury(),
 					"rebalancer": plugins.GetRebalancer(),
 				}
 			}
@@ -212,6 +232,101 @@ func (j *JDOrchestrator) ListNodeChainConfigs(ctx context.Context, nodeIDs []str
 		}
 
 		result[nodeID] = append(result[nodeID], cfg)
+	}
+
+	return result, nil
+}
+
+// ListJobs fetches jobs from the JD for the given node IDs.
+// Returns a map from nodeID to a slice of job maps.
+// Each job map contains: id, uuid, proposalIds, labels.
+func (j *JDOrchestrator) ListJobs(ctx context.Context, nodeIDs []string) (map[string][]map[string]any, error) {
+	resp, err := j.jobClient.ListJobs(ctx, &jobv1.ListJobsRequest{
+		Filter: &jobv1.ListJobsRequest_Filter{
+			NodeIds: nodeIDs,
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("jd: ListJobs failed: %w", err)
+	}
+
+	result := make(map[string][]map[string]any)
+	for _, job := range resp.GetJobs() {
+		nodeID := job.GetNodeId()
+		jobMap := map[string]any{
+			"id":          job.GetId(),
+			"uuid":        job.GetUuid(),
+			"proposalIds": job.GetProposalIds(),
+		}
+
+		if labels := job.GetLabels(); len(labels) > 0 {
+			labelsSlice := make([]map[string]any, 0, len(labels))
+			for _, l := range labels {
+				label := map[string]any{"key": l.GetKey()}
+				if l.Value != nil {
+					label["value"] = l.GetValue()
+				}
+				labelsSlice = append(labelsSlice, label)
+			}
+			jobMap["labels"] = labelsSlice
+		}
+
+		result[nodeID] = append(result[nodeID], jobMap)
+	}
+
+	return result, nil
+}
+
+// ListProposals fetches proposals for the given job IDs in batches to avoid
+// exceeding the gRPC max message size.
+// Returns a map from jobID to the latest approved proposal map.
+// Each proposal map contains: id, revision, status, spec, jobId.
+func (j *JDOrchestrator) ListProposals(ctx context.Context, jobIDs []string) (map[string]map[string]any, error) {
+	const batchSize = 100
+
+	result := make(map[string]map[string]any)
+
+	for i := 0; i < len(jobIDs); i += batchSize {
+		end := i + batchSize
+		if end > len(jobIDs) {
+			end = len(jobIDs)
+		}
+		batch := jobIDs[i:end]
+
+		resp, err := j.jobClient.ListProposals(ctx, &jobv1.ListProposalsRequest{
+			Filter: &jobv1.ListProposalsRequest_Filter{
+				JobIds: batch,
+			},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("jd: ListProposals failed (batch %d-%d): %w", i, end, err)
+		}
+
+		// For each job, keep only the approved proposal with the highest revision.
+		for _, p := range resp.GetProposals() {
+			if p.GetStatus() != jobv1.ProposalStatus_PROPOSAL_STATUS_APPROVED {
+				continue
+			}
+
+			jobID := p.GetJobId()
+			proposalMap := map[string]any{
+				"id":       p.GetId(),
+				"revision": p.GetRevision(),
+				"status":   friendlyProposalStatus(p.GetStatus()),
+				"spec":     p.GetSpec(),
+				"jobId":    jobID,
+			}
+
+			existing, ok := result[jobID]
+			if !ok {
+				result[jobID] = proposalMap
+			} else {
+				// Keep the one with the higher revision.
+				if existingRev, _ := existing["revision"].(int64); p.GetRevision() > existingRev {
+					result[jobID] = proposalMap
+				}
+			}
+		}
 	}
 
 	return result, nil
@@ -226,4 +341,11 @@ func friendlyChainType(ct nodev1.ChainType) string {
 		return "unknown"
 	}
 	return s
+}
+
+// friendlyProposalStatus converts the proto ProposalStatus enum to a short string.
+func friendlyProposalStatus(ps jobv1.ProposalStatus) string {
+	s := ps.String()
+	s = strings.TrimPrefix(s, "PROPOSAL_STATUS_")
+	return strings.ToLower(s)
 }
