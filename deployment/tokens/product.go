@@ -29,7 +29,7 @@ type TokenAdapter interface {
 	// For example, if this address is stored on the pool, this method should fetch it.
 	DeriveTokenAddress(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) ([]byte, error)
 	// DeriveTokenDecimals derives the token decimals from the given token pool reference.
-	DeriveTokenDecimals(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) (uint8, error)
+	DeriveTokenDecimals(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef, token []byte) (uint8, error)
 	// For some chains, the token pool address is not the deployed address and must be derived from the token reference.
 	// This method performs that derivation.
 	DeriveTokenPoolCounterpart(e deployment.Environment, chainSelector uint64, tokenPool []byte, token []byte) ([]byte, error)
@@ -41,8 +41,6 @@ type TokenAdapter interface {
 	DeployToken() *cldf_ops.Sequence[DeployTokenInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 	DeployTokenVerify(e deployment.Environment, in any) error
 	DeployTokenPoolForToken() *cldf_ops.Sequence[DeployTokenPoolInput, sequences.OnChainOutput, cldf_chain.BlockChains]
-	RegisterToken() *cldf_ops.Sequence[RegisterTokenInput, sequences.OnChainOutput, cldf_chain.BlockChains]
-	SetPool() *cldf_ops.Sequence[SetPoolInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 }
 
 // RateLimiterConfig specifies configuration for a rate limiter on a token pool.
