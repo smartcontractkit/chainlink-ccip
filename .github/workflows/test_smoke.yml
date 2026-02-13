@@ -125,6 +125,7 @@ jobs:
       - name: Smoke Tests
         working-directory: devenv/tests/e2e
         id: run-tests
+        continue-on-error: true
         run: gotestsum --junitfile=test-results.xml --format=short-verbose -- -run ${{ matrix.test.name }} -timeout 20m
       - name: Analyze and upload test results
         uses: smartcontractkit/.github/actions/branch-out-upload@branch-out-upload/v1
