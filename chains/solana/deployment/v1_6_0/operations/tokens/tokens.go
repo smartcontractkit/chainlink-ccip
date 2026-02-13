@@ -11,7 +11,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
-	soltokens "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 	tokenapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -96,7 +95,7 @@ var DeploySolanaToken = operations.NewOperation(
 			}
 			mint = privKey.PublicKey()
 		}
-		instructions, err := soltokens.CreateTokenWith(
+		instructions, err := tokens.CreateTokenWith(
 			context.Background(),
 			tokenProgramID,
 			mint,
@@ -116,7 +115,7 @@ var DeploySolanaToken = operations.NewOperation(
 		}
 		// CREATE ATAs
 		for _, sender := range input.ATAList {
-			createATAIx, _, err := soltokens.CreateAssociatedTokenAccount(
+			createATAIx, _, err := tokens.CreateAssociatedTokenAccount(
 				tokenProgramID,
 				mint,
 				sender,
@@ -129,8 +128,8 @@ var DeploySolanaToken = operations.NewOperation(
 				return datastore.AddressRef{}, err
 			}
 			if input.PreMint > 0 {
-				ata, _, _ := soltokens.FindAssociatedTokenAddress(tokenProgramID, mint, sender)
-				mintToI, err := soltokens.MintTo(input.PreMint, tokenProgramID, mint, ata, chain.DeployerKey.PublicKey())
+				ata, _, _ := tokens.FindAssociatedTokenAddress(tokenProgramID, mint, sender)
+				mintToI, err := tokens.MintTo(input.PreMint, tokenProgramID, mint, ata, chain.DeployerKey.PublicKey())
 				if err != nil {
 					return datastore.AddressRef{}, err
 				}
@@ -195,12 +194,12 @@ var CreateTokenMultisig = operations.NewOperation(
 
 		// --- Instructions ---
 		// get stake amount for init
-		lamports, err := chain.Client.GetMinimumBalanceForRentExemption(ctx, soltokens.MultisigSize, rpc.CommitmentConfirmed)
+		lamports, err := chain.Client.GetMinimumBalanceForRentExemption(ctx, tokens.MultisigSize, rpc.CommitmentConfirmed)
 		if err != nil {
 			return sequences.OnChainOutput{}, err
 		}
 
-		ixs, err := soltokens.IxsInitTokenMultisig(input.TokenProgram, lamports, chain.DeployerKey.PublicKey(), multisig.PublicKey(), m, input.Signers)
+		ixs, err := tokens.IxsInitTokenMultisig(input.TokenProgram, lamports, chain.DeployerKey.PublicKey(), multisig.PublicKey(), m, input.Signers)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to create multisig instructions: %w", err)
 		}
@@ -247,13 +246,13 @@ var UpsertTokenMetadata = operations.NewOperation(
 			}
 			return sequences.OnChainOutput{}, nil
 		}
-		mintMetadata, metadataPDA, err := soltokens.GetTokenMetadata(b.GetContext(), chain.Client, tokenMint)
+		mintMetadata, metadataPDA, err := tokens.GetTokenMetadata(b.GetContext(), chain.Client, tokenMint)
 		if err != nil {
 			fmt.Println("error getting metadata account data, skipping update for", tokenMint.String(), ":", err)
 			return sequences.OnChainOutput{}, nil
 		}
 		fmt.Println("Metadata", metadataPDA)
-		newData := soltokens.GetTokenDataV2(mintMetadata)
+		newData := tokens.GetTokenDataV2(mintMetadata)
 		newUpdateAuthority := mintMetadata.UpdateAuthority
 		if metadata.UpdateAuthority != "" {
 			newUpdateAuthority = solana.MustPublicKeyFromBase58(metadata.UpdateAuthority)
@@ -276,8 +275,8 @@ var UpsertTokenMetadata = operations.NewOperation(
 			b, err := utils.BuildMCMSBatchOperation(
 				chain.Selector,
 				[]solana.Instruction{&instruction},
-				soltokens.MplTokenMetadataID.String(),
-				soltokens.MplTokenMetadataProgramName,
+				tokens.MplTokenMetadataID.String(),
+				tokens.MplTokenMetadataProgramName,
 			)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute or create batch: %w", err)
@@ -325,7 +324,7 @@ func modifyTokenMetadataIx(
 	}
 
 	instruction := solana.NewInstruction(
-		soltokens.MplTokenMetadataID,
+		tokens.MplTokenMetadataID,
 		ix.Accounts(),
 		data,
 	)
