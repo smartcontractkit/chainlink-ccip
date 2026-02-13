@@ -165,6 +165,9 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, err
 		}
 		if len(cctpV1DomainUpdates) > 0 {
+			if refs.CCTPV1TokenPool.Address == "" {
+				return sequences.OnChainOutput{}, fmt.Errorf("CCTP V1 token pool ref is required when configuring CCTP V1 lanes on chain %d", input.ChainSelector)
+			}
 			w, err = applyCCTPV1PoolSetDomainsWrites(b, chain, common.HexToAddress(refs.CCTPV1TokenPool.Address), cctpV1DomainUpdates)
 			if err != nil {
 				return sequences.OnChainOutput{}, err
@@ -201,6 +204,9 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 		for remoteChainSelector, remoteChain := range input.RemoteChains {
 			if remoteChain.LockOrBurnMechanism != mechanismCCTPV1 {
 				continue
+			}
+			if refs.CCTPV1TokenPool.Address == "" {
+				return sequences.OnChainOutput{}, fmt.Errorf("CCTP V1 token pool ref is required when configuring CCTP V1 lanes on chain %d", input.ChainSelector)
 			}
 			remoteChainConfig, ok := remoteChainConfigs[remoteChainSelector]
 			if !ok {
@@ -302,12 +308,16 @@ func resolveConfigureCCTPChainRefs(
 	if err != nil {
 		return refs, nil, fmt.Errorf("failed to find RegisteredPool ref on chain %d: %w", chainSelector, err)
 	}
-	refs.CCTPV1TokenPool, err = datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
-		Type:    datastore.ContractType(cctpV1ContractType),
-		Version: cctpV1Version,
-	}, chainSelector, datastore_utils.FullRef)
-	if err != nil {
-		return refs, nil, fmt.Errorf("failed to find CCTP V1 token pool ref on chain %d: %w", chainSelector, err)
+	cctpV1PoolRefs := ds.Addresses().Filter(
+		datastore.AddressRefByChainSelector(chainSelector),
+		datastore.AddressRefByType(datastore.ContractType(cctpV1ContractType)),
+		datastore.AddressRefByVersion(cctpV1Version),
+	)
+	if len(cctpV1PoolRefs) > 1 {
+		return refs, nil, fmt.Errorf("expected at most 1 CCTP V1 token pool ref on chain %d, found %d", chainSelector, len(cctpV1PoolRefs))
+	}
+	if len(cctpV1PoolRefs) == 1 {
+		refs.CCTPV1TokenPool = cctpV1PoolRefs[0]
 	}
 	var siloedRef *datastore.AddressRef
 	if needSiloedUSDC {

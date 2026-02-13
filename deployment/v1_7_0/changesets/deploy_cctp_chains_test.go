@@ -335,6 +335,17 @@ func TestDeployCCTPChains_VerifyPreconditions(t *testing.T) {
 			},
 		},
 		{
+			desc: "success - empty CCTP v1 token messenger for V2-only chain",
+			cfg: v1_7_0_changesets.DeployCCTPChainsConfig{
+				Chains: map[uint64]v1_7_0_changesets.CCTPChainConfig{
+					5009297550715157269: {
+						TokenMessengerV1: "",
+						TokenMessengerV2: "0x8888888888888888888888888888888888888888",
+					},
+				},
+			},
+		},
+		{
 			desc: "failure - invalid CCTP v1 token messenger",
 			cfg: v1_7_0_changesets.DeployCCTPChainsConfig{
 				Chains: map[uint64]v1_7_0_changesets.CCTPChainConfig{
@@ -345,6 +356,25 @@ func TestDeployCCTPChains_VerifyPreconditions(t *testing.T) {
 				},
 			},
 			expectedError: "invalid TokenMessengerV1",
+		},
+		{
+			desc: "success - empty CCTP v1 token messenger with CCTP_V1 lane in config",
+			cfg: v1_7_0_changesets.DeployCCTPChainsConfig{
+				Chains: map[uint64]v1_7_0_changesets.CCTPChainConfig{
+					5009297550715157269: {
+						TokenMessengerV1: "",
+						TokenMessengerV2: "0x8888888888888888888888888888888888888888",
+						RemoteChains: map[uint64]adapters.RemoteCCTPChainConfig{
+							15971525489660198786: {
+								LockOrBurnMechanism: "CCTP_V1",
+							},
+						},
+					},
+					15971525489660198786: {
+						TokenMessengerV2: "0x6666666666666666666666666666666666666666",
+					},
+				},
+			},
 		},
 		{
 			desc: "failure - invalid CCTP v2 token messenger",

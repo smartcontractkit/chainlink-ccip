@@ -67,11 +67,11 @@ func makeVerifyDeployCCTPChains(_ *adapters.CCTPChainRegistry, _ *changesets.MCM
 			if _, err := chain_selectors.GetSelectorFamily(chainSel); err != nil {
 				return err
 			}
-			if !common.IsHexAddress(chainCfg.TokenMessengerV1) {
-				return fmt.Errorf("invalid TokenMessengerV1 for chain %d", chainSel)
-			}
 			if !common.IsHexAddress(chainCfg.TokenMessengerV2) {
 				return fmt.Errorf("invalid TokenMessengerV2 for chain %d", chainSel)
+			}
+			if chainCfg.TokenMessengerV1 != "" && !common.IsHexAddress(chainCfg.TokenMessengerV1) {
+				return fmt.Errorf("invalid TokenMessengerV1 for chain %d", chainSel)
 			}
 			for remoteChainSelector := range chainCfg.RemoteChains {
 				if _, err := chain_selectors.GetSelectorFamily(remoteChainSelector); err != nil {
