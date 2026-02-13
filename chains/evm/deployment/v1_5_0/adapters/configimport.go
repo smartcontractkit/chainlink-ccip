@@ -19,6 +19,7 @@ import (
 
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	priceregistryops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/price_registry"
+	routerops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	offrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/offramp"
 	onrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/onramp"
 	tokenadminops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
@@ -98,8 +99,8 @@ func (ci *ConfigImportAdapter) InitializeAdapter(e cldf.Environment, sel uint64)
 	}
 	ci.PriceRegistry = priceRegistryRef
 	routerRef, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-		Type:    datastore.ContractType("Router"),
-		Version: semver.MustParse("1.2.0"),
+		Type:    datastore.ContractType(routerops.ContractType),
+		Version: routerops.Version,
 	}, sel, evm_datastore_utils.ToEVMAddress)
 	if err != nil {
 		return fmt.Errorf("failed to find router contract ref for chain %d: %w", sel, err)
