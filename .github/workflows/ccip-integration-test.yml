@@ -259,7 +259,7 @@ jobs:
         id: run-tests
         continue-on-error: true
         run: |
-          cd $GITHUB_WORKSPACE/chainlink/integration-tests/smoke/ccip
+          cd $GITHUB_WORKSPACE/chainlink/integration-tests/smoke/ccip && \
           gotestsum --junitfile=test-results.xml --format=short-verbose -- ${{ matrix.type.file }} -timeout ${{ matrix.type.timeout }}
         env:
           CL_DATABASE_URL: ${{ env.DB_URL }}
