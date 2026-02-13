@@ -292,17 +292,11 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 				if actualPool == nil {
 					// if token pool is not deployed by this changeset, we expect the user to provide the token pool address in the TokenTransferConfig
 					actualPool = &input.TokenTransferConfig.TokenPoolRef
-					if actualPool == nil {
-						return cldf.ChangesetOutput{}, fmt.Errorf("no token pool deployed or provided for chain selector %d, cannot configure token for transfers without token pool address", selector)
-					}
 				}
 				actualToken := tokenRef
 				if actualToken == nil {
 					// if token is not deployed by this changeset, we expect the user to provide the token address in the TokenTransferConfig
 					actualToken = &input.TokenTransferConfig.TokenRef
-					if actualToken == nil {
-						return cldf.ChangesetOutput{}, fmt.Errorf("no token deployed or provided for chain selector %d, cannot configure token for transfers without token address", selector)
-					}
 				}
 				allRemotes[selector] = RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
 					RemoteToken: actualToken,
@@ -315,30 +309,22 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 		// and update the remote chain configs with the correct token and token pool addresses before configuring the tokens for transfers
 		for selector, input := range cfg.TokenExpansionInputPerChain {
 			if input.TokenTransferConfig != nil {
-				if input.TokenTransferConfig.TokenPoolRef.ChainSelector == 0 {
-					cfg.TokenExpansionInputPerChain[selector].TokenTransferConfig.TokenPoolRef.ChainSelector = selector
+				mergedPool, err := datastore_utils.MergeRefs(
+					&cfg.TokenExpansionInputPerChain[selector].TokenTransferConfig.TokenPoolRef,
+					allRemotes[selector].RemotePool,
+				)
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to merge token pool refs for chain selector %d: %w", selector, err)
 				}
-				if input.TokenTransferConfig.TokenPoolRef.Address == "" {
-					cfg.TokenExpansionInputPerChain[selector].TokenTransferConfig.TokenPoolRef.Address = allRemotes[selector].RemotePool.Address
+				cfg.TokenExpansionInputPerChain[selector].TokenTransferConfig.TokenPoolRef = mergedPool
+				mergedToken, err := datastore_utils.MergeRefs(
+					&cfg.TokenExpansionInputPerChain[selector].TokenTransferConfig.TokenRef,
+					allRemotes[selector].RemoteToken,
+				)
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to merge token refs for chain selector %d: %w", selector, err)
 				}
-				if input.TokenTransferConfig.TokenPoolRef.Qualifier == "" {
-					cfg.TokenExpansionInputPerChain[selector].TokenTransferConfig.TokenPoolRef.Qualifier = allRemotes[selector].RemotePool.Qualifier
-				}
-				if input.TokenTransferConfig.TokenPoolRef.Type == "" {
-					cfg.TokenExpansionInputPerChain[selector].TokenTransferConfig.TokenPoolRef.Type = allRemotes[selector].RemotePool.Type
-				}
-				if input.TokenTransferConfig.TokenRef.ChainSelector == 0 {
-					cfg.TokenExpansionInputPerChain[selector].TokenTransferConfig.TokenRef.ChainSelector = selector
-				}
-				if input.TokenTransferConfig.TokenRef.Address == "" {
-					cfg.TokenExpansionInputPerChain[selector].TokenTransferConfig.TokenRef.Address = allRemotes[selector].RemoteToken.Address
-				}
-				if input.TokenTransferConfig.TokenRef.Qualifier == "" {
-					cfg.TokenExpansionInputPerChain[selector].TokenTransferConfig.TokenRef.Qualifier = allRemotes[selector].RemoteToken.Qualifier
-				}
-				if input.TokenTransferConfig.TokenRef.Type == "" {
-					cfg.TokenExpansionInputPerChain[selector].TokenTransferConfig.TokenRef.Type = allRemotes[selector].RemoteToken.Type
-				}
+				cfg.TokenExpansionInputPerChain[selector].TokenTransferConfig.TokenRef = mergedToken
 				for remoteSelector, remoteConfig := range input.TokenTransferConfig.RemoteChains {
 					if _, exists := allRemotes[remoteSelector]; exists {
 						if remoteConfig.RemoteToken == nil {
