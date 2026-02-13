@@ -1,11 +1,10 @@
 use std::fmt::Display;
 
-use anchor_lang::prelude::borsh::{BorshDeserialize, BorshSerialize};
 use anchor_lang::prelude::*;
 
 use crate::messages::SVM2AnyMessage;
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, InitSpace, BorshSerialize, BorshDeserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, InitSpace, AnchorSerialize, AnchorDeserialize)]
 #[repr(u8)]
 pub enum CodeVersion {
     Default = 0,

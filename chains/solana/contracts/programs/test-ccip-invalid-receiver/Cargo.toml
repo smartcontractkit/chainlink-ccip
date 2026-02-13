@@ -14,11 +14,12 @@ no-idl = []
 no-log-ix-name = []
 cpi = ["no-entrypoint"]
 default = []
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
 
 [dependencies]
-anchor-lang = "0.29.0"
-anchor-spl = "0.29.0"
-solana-program = "1.17.25" # pin solana to 1.17
+anchor-lang = { git = "https://github.com/coral-xyz/anchor", branch = "master" }
+anchor-spl = { git = "https://github.com/coral-xyz/anchor", branch = "master" }
+solana-program = "2"
 example_ccip_receiver = { version = "0.1.1", path = "../example-ccip-receiver", features = ["no-entrypoint"] }
 
 [lints.rust.unexpected_cfgs]

@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::instruction::Instruction;
-use anchor_lang::solana_program::keccak::{hashv, HASH_BYTES};
 use anchor_lang::solana_program::program::invoke_signed;
+use solana_keccak_hasher::{hashv, HASH_BYTES};
 
 use crate::constant::*;
 use crate::error::*;

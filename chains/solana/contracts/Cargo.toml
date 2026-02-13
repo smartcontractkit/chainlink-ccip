@@ -5,6 +5,11 @@ members = [
   "crates/*",
 ]
 
+[workspace.dependencies]
+anchor-lang = { git = "https://github.com/coral-xyz/anchor", branch = "master", features = ["init-if-needed"] }
+anchor-spl = { git = "https://github.com/coral-xyz/anchor", branch = "master" }
+solana-program = "2"
+
 [profile.dev]
 overflow-checks = true
 

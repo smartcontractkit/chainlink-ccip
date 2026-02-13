@@ -1,7 +1,7 @@
 BIN_DIR = bin
 export GOPATH ?= $(shell go env GOPATH)
 export GO111MODULE ?= on
-export ANCHOR_VERSION ?=v0.29.0
+export ANCHOR_VERSION ?=v0.32.1
 export ANCHOR_IMAGE ?= backpackapp/build:$(ANCHOR_VERSION)
 export ANCHOR_BUILD_ARGS ?=
 # Allow overriding the output directory for docker builds
@@ -41,7 +41,7 @@ lint-go-fix:
 
 .PHONY: anchor-go-gen
 anchor-go-gen:
-	cd ./contracts && find ./target -mindepth 1 ! -path './target/vendor*' -exec rm -rf {} + && anchor build && cd .. && ./scripts/anchor-go-gen.sh
+	cd ./contracts && find ./target -mindepth 1 ! -path './target/vendor*' -exec rm -rf {} + && anchor build -- --tools-version v1.53 && cd .. && ./scripts/anchor-go-gen.sh
 
 .PHONY: format
 format:
@@ -61,7 +61,7 @@ test-token-pool-contracts-go-tests:
 
 .PHONY: build-contracts
 build-contracts:
-	cd ./contracts && anchor build
+	cd ./contracts && anchor build -- --tools-version v1.53
 
 # Note on CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse
 # Sparse index significantly speeds up dependency fetching, supposedly default in 1.70 but anchor build was still using a slow git download
@@ -72,7 +72,7 @@ docker-build-contracts:
 		-v ${TARGET_DIR}:/workdir/target \
 		-e CARGO_TARGET_DIR=/workdir/target \
 		-e CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse \
-		${ANCHOR_IMAGE} anchor build ${ANCHOR_BUILD_ARGS}
+		${ANCHOR_IMAGE} anchor build -- --tools-version v1.53 ${ANCHOR_BUILD_ARGS}
 
 .PHONY: docker-update-contracts
 docker-update-contracts:

@@ -14,9 +14,10 @@ no-idl = []
 no-log-ix-name = []
 cpi = ["no-entrypoint"]
 default = []
+idl-build = ["anchor-lang/idl-build"]
 
 [dependencies]
-anchor-lang = "0.29.0"
+anchor-lang = { git = "https://github.com/coral-xyz/anchor", branch = "master" }
 bytemuck = "1.7"
 ccip_common = { version = "1.6.1-candidate", path = "../ccip-common" }
 

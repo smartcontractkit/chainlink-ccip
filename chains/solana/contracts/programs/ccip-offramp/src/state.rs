@@ -1,6 +1,5 @@
 use std::fmt::Display;
 
-use anchor_lang::prelude::borsh::{BorshDeserialize, BorshSerialize};
 use anchor_lang::prelude::*;
 
 use crate::messages::Any2SVMTokenTransfer;
@@ -326,7 +325,7 @@ impl TryFrom<u128> for MessageExecutionState {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, InitSpace, BorshSerialize, BorshDeserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, InitSpace, AnchorSerialize, AnchorDeserialize)]
 #[repr(u8)]
 pub enum CodeVersion {
     Default = 0,

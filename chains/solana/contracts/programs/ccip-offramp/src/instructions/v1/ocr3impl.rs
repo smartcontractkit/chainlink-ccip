@@ -9,7 +9,7 @@ pub(super) struct Ocr3ReportForCommit<'a>(pub &'a CommitInput);
 
 impl Ocr3Report for Ocr3ReportForCommit<'_> {
     fn hash(&self, ctx: &ReportContext) -> [u8; 32] {
-        use anchor_lang::solana_program::keccak;
+        use solana_keccak_hasher as keccak;
         let mut buffer: Vec<u8> = Vec::new();
         self.0.serialize(&mut buffer).unwrap();
         let report_len = self.len() as u16; // u16 > max tx size, u8 may have overflow

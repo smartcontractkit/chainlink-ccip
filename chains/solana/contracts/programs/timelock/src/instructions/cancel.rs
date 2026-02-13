@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_lang::solana_program::keccak::HASH_BYTES;
+use solana_keccak_hasher::HASH_BYTES;
 
 use access_controller::AccessController;
 

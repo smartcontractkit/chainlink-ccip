@@ -14,10 +14,8 @@
 //!
 //! These separators ensure that hashes for different purposes cannot be reused or confused.
 use anchor_lang::prelude::*;
-use anchor_lang::solana_program::keccak::{hash, hashv, Hash, HASH_BYTES}; // use keccak256 for EVM compatibility
-use anchor_lang::solana_program::secp256k1_recover::{
-    secp256k1_recover, Secp256k1Pubkey, Secp256k1RecoverError,
-};
+use solana_keccak_hasher::{hash, hashv, Hash, HASH_BYTES}; // use keccak256 for EVM compatibility
+use solana_secp256k1_recover::{secp256k1_recover, Secp256k1Pubkey, Secp256k1RecoverError};
 
 use crate::error::*;
 use crate::state::root::RootMetadataInput;

@@ -1,5 +1,5 @@
 use anchor_lang::solana_program::instruction::Instruction;
-use anchor_lang::solana_program::keccak::HASH_BYTES;
+use solana_keccak_hasher::HASH_BYTES;
 use anchor_lang::{prelude::*, solana_program};
 use solana_program::program::invoke_signed;
 

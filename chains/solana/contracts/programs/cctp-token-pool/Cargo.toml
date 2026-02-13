@@ -14,15 +14,16 @@ no-idl = []
 no-log-ix-name = []
 cpi = ["no-entrypoint"]
 default = []
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
 
 [dependencies]
-anchor-lang = { version = "0.29.0", features = ["init-if-needed"] }
-anchor-spl = "0.29.0"
+anchor-lang = { git = "https://github.com/coral-xyz/anchor", branch = "master", features = ["init-if-needed"] }
+anchor-spl = { git = "https://github.com/coral-xyz/anchor", branch = "master" }
 base-token-pool = { version = "1.6.1-candidate", path = "../base-token-pool/", features = [
     "no-entrypoint",
 ] }
 ccip_common = { version = "1.6.1-candidate", path = "../ccip-common" }
-solana-program = "1.17.25"
+solana-program = "2"
 
 [build-dependencies]
 build_commit = { path = "../../crates/build-commit" }

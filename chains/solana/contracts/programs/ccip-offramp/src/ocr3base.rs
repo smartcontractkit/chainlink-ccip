@@ -2,7 +2,6 @@ use anchor_lang::prelude::*;
 
 use crate::OcrPluginType;
 
-#[constant]
 pub const MAX_ORACLES: usize = 16; // can set a maximum of 16 transmitters + 16 signers simultaneously in a single set config tx
 
 #[event]

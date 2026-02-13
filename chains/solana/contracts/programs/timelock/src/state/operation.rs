@@ -9,7 +9,7 @@
 
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::instruction::Instruction;
-use anchor_lang::solana_program::keccak::{hashv, HASH_BYTES};
+use solana_keccak_hasher::{hashv, HASH_BYTES};
 
 use crate::constants::ANCHOR_DISCRIMINATOR;
 
