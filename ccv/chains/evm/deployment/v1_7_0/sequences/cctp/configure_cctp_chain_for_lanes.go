@@ -16,7 +16,9 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	v1_6_1_tokens "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/sequences"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/usdc_token_pool_cctp_v2"
+	cctp_message_transmitter_proxy_v1_6_2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_2/operations/cctp_message_transmitter_proxy"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_5/operations/usdc_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_5/operations/usdc_token_pool_cctp_v2"
 	tokens_core "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -38,7 +40,6 @@ const (
 )
 
 // configureCCTPChainRefs holds resolved address refs for ConfigureCCTPChainForLanes.
-// CCTPV1TokenPool is optional; nil when the chain has no CCTP V1 pool deployed.
 type configureCCTPChainRefs struct {
 	USDCTokenPoolProxy   datastore.AddressRef
 	Router               datastore.AddressRef
@@ -48,7 +49,7 @@ type configureCCTPChainRefs struct {
 	TokenAdminRegistry   datastore.AddressRef
 	CCTPV2TokenPool      datastore.AddressRef
 	RegisteredPool       datastore.AddressRef
-	CCTPV1TokenPool      *datastore.AddressRef
+	CCTPV1TokenPool      datastore.AddressRef
 }
 
 var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
@@ -159,6 +160,20 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 			}
 			writes = append(writes, w...)
 		}
+		cctpV1DomainUpdates, err := buildCCTPV1PoolDomainUpdates(dep, input)
+		if err != nil {
+			return sequences.OnChainOutput{}, err
+		}
+		if len(cctpV1DomainUpdates) > 0 {
+			if refs.CCTPV1TokenPool.Address == "" {
+				return sequences.OnChainOutput{}, fmt.Errorf("CCTP V1 token pool ref is required when configuring CCTP V1 lanes on chain %d", input.ChainSelector)
+			}
+			w, err = applyCCTPV1PoolSetDomainsWrites(b, chain, common.HexToAddress(refs.CCTPV1TokenPool.Address), cctpV1DomainUpdates)
+			if err != nil {
+				return sequences.OnChainOutput{}, err
+			}
+			writes = append(writes, w...)
+		}
 
 		// Create batch operation from writes
 		if len(writes) > 0 {
@@ -184,21 +199,29 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 			batchOps = append(batchOps, report.Output.BatchOps...)
 		}
 
-		// Configure remote chains on CCTP V1 token pool (1.6.1 sequence), if present
-		if refs.CCTPV1TokenPool != nil {
-			cctpV1TokenPoolAddress := common.HexToAddress(refs.CCTPV1TokenPool.Address)
-			for remoteChainSelector, remoteChainConfig := range remoteChainConfigs {
-				report, err := cldf_ops.ExecuteSequence(b, v1_6_1_tokens.ConfigureTokenPoolForRemoteChain, chain, v1_6_1_tokens.ConfigureTokenPoolForRemoteChainInput{
-					ChainSelector:       input.ChainSelector,
-					TokenPoolAddress:    cctpV1TokenPoolAddress,
-					RemoteChainSelector: remoteChainSelector,
-					RemoteChainConfig:   remoteChainConfig,
-				})
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to configure CCTP V1 token pool for remote chain %d: %w", remoteChainSelector, err)
-				}
-				batchOps = append(batchOps, report.Output.BatchOps...)
+		// Configure remote chains on CCTP V1 token pool (1.6.1 sequence).
+		cctpV1TokenPoolAddress := common.HexToAddress(refs.CCTPV1TokenPool.Address)
+		for remoteChainSelector, remoteChain := range input.RemoteChains {
+			if remoteChain.LockOrBurnMechanism != mechanismCCTPV1 {
+				continue
 			}
+			if refs.CCTPV1TokenPool.Address == "" {
+				return sequences.OnChainOutput{}, fmt.Errorf("CCTP V1 token pool ref is required when configuring CCTP V1 lanes on chain %d", input.ChainSelector)
+			}
+			remoteChainConfig, ok := remoteChainConfigs[remoteChainSelector]
+			if !ok {
+				return sequences.OnChainOutput{}, fmt.Errorf("missing remote chain config for CCTP V1 remote chain %d", remoteChainSelector)
+			}
+			report, err := cldf_ops.ExecuteSequence(b, v1_6_1_tokens.ConfigureTokenPoolForRemoteChain, chain, v1_6_1_tokens.ConfigureTokenPoolForRemoteChainInput{
+				ChainSelector:       input.ChainSelector,
+				TokenPoolAddress:    cctpV1TokenPoolAddress,
+				RemoteChainSelector: remoteChainSelector,
+				RemoteChainConfig:   remoteChainConfig,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to configure CCTP V1 token pool for remote chain %d: %w", remoteChainSelector, err)
+			}
+			batchOps = append(batchOps, report.Output.BatchOps...)
 		}
 
 		// Configure token for transfers (CCTP-through-CCV pool; registration is done once)
@@ -288,15 +311,13 @@ func resolveConfigureCCTPChainRefs(
 	cctpV1PoolRefs := ds.Addresses().Filter(
 		datastore.AddressRefByChainSelector(chainSelector),
 		datastore.AddressRefByType(datastore.ContractType(cctpV1ContractType)),
-		datastore.AddressRefByVersion(cctpV1PrevVersion),
+		datastore.AddressRefByVersion(cctpV1Version),
 	)
 	if len(cctpV1PoolRefs) > 1 {
-		return refs, nil, fmt.Errorf("expected 0 or 1 CCTP V1 token pool refs on chain %d, found %d", chainSelector, len(cctpV1PoolRefs))
+		return refs, nil, fmt.Errorf("expected at most 1 CCTP V1 token pool ref on chain %d, found %d", chainSelector, len(cctpV1PoolRefs))
 	}
 	if len(cctpV1PoolRefs) == 1 {
-		refs.CCTPV1TokenPool = &cctpV1PoolRefs[0]
-	} else {
-		refs.CCTPV1TokenPool = nil
+		refs.CCTPV1TokenPool = cctpV1PoolRefs[0]
 	}
 	var siloedRef *datastore.AddressRef
 	if needSiloedUSDC {
@@ -422,12 +443,48 @@ func buildCCTPV2PoolDomainUpdates(dep adapters.ConfigureCCTPChainForLanesDeps, i
 		copy(allowedCallerBytes32[32-len(allowedCallerOnDest):], allowedCallerOnDest)
 		copy(mintRecipientBytes32[32-len(mintRecipientOnDest):], mintRecipientOnDest)
 		out = append(out, usdc_token_pool_cctp_v2.DomainUpdate{
-			AllowedCaller:                 allowedCallerBytes32,
-			MintRecipient:                 mintRecipientBytes32,
-			DomainIdentifier:              remoteChain.DomainIdentifier,
-			DestChainSelector:             remoteChainSelector,
-			Enabled:                       true,
-			UseLegacySourcePoolDataFormat: false,
+			AllowedCaller:     allowedCallerBytes32,
+			MintRecipient:     mintRecipientBytes32,
+			DomainIdentifier:  remoteChain.DomainIdentifier,
+			DestChainSelector: remoteChainSelector,
+			Enabled:           true,
+		})
+	}
+	return out, nil
+}
+
+// buildCCTPV1PoolDomainUpdates builds domain updates for the CCTP V1 token pool.
+// Only chains configured with CCTP_V1 mechanism are included.
+func buildCCTPV1PoolDomainUpdates(dep adapters.ConfigureCCTPChainForLanesDeps, input adapters.ConfigureCCTPChainForLanesInput) ([]usdc_token_pool.DomainUpdate, error) {
+	out := make([]usdc_token_pool.DomainUpdate, 0, len(input.RemoteChains))
+	for remoteChainSelector, remoteChain := range input.RemoteChains {
+		if remoteChain.LockOrBurnMechanism != mechanismCCTPV1 {
+			continue
+		}
+		legacyRefs := dep.DataStore.Addresses().Filter(
+			datastore.AddressRefByChainSelector(remoteChainSelector),
+			datastore.AddressRefByType(datastore.ContractType(cctp_message_transmitter_proxy_v1_6_2.ContractType)),
+			datastore.AddressRefByVersion(cctp_message_transmitter_proxy_v1_6_2.Version),
+		)
+		if len(legacyRefs) != 1 {
+			return nil, fmt.Errorf("expected exactly 1 CCTPMessageTransmitterProxy v1.6.2 ref on remote chain %d, found %d", remoteChainSelector, len(legacyRefs))
+		}
+		allowedCallerOnDest := common.FromHex(legacyRefs[0].Address)
+		mintRecipientOnDest, err := dep.RemoteChains[remoteChainSelector].MintRecipientOnDest(dep.DataStore, dep.BlockChains, remoteChainSelector)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get mint recipient on dest: %w", err)
+		}
+		allowedCallerOnDest = common.LeftPadBytes(allowedCallerOnDest, 32)
+		mintRecipientOnDest = common.LeftPadBytes(mintRecipientOnDest, 32)
+		var allowedCallerBytes32, mintRecipientBytes32 [32]byte
+		copy(allowedCallerBytes32[32-len(allowedCallerOnDest):], allowedCallerOnDest)
+		copy(mintRecipientBytes32[32-len(mintRecipientOnDest):], mintRecipientOnDest)
+		out = append(out, usdc_token_pool.DomainUpdate{
+			AllowedCaller:     allowedCallerBytes32,
+			MintRecipient:     mintRecipientBytes32,
+			DomainIdentifier:  remoteChain.DomainIdentifier,
+			DestChainSelector: remoteChainSelector,
+			Enabled:           true,
 		})
 	}
 	return out, nil
@@ -495,6 +552,19 @@ func applyCCTPV2PoolSetDomainsWrites(b cldf_ops.Bundle, chain evm.Chain, poolAdd
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to set domains on CCTP V2 token pool: %w", err)
+	}
+	return []contract_utils.WriteOutput{report.Output}, nil
+}
+
+// applyCCTPV1PoolSetDomainsWrites sets domains on the CCTP V1 token pool.
+func applyCCTPV1PoolSetDomainsWrites(b cldf_ops.Bundle, chain evm.Chain, poolAddress common.Address, domainUpdates []usdc_token_pool.DomainUpdate) ([]contract_utils.WriteOutput, error) {
+	report, err := cldf_ops.ExecuteOperation(b, usdc_token_pool.SetDomains, chain, contract_utils.FunctionInput[[]usdc_token_pool.DomainUpdate]{
+		ChainSelector: chain.Selector,
+		Address:       poolAddress,
+		Args:          domainUpdates,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to set domains on CCTP V1 token pool: %w", err)
 	}
 	return []contract_utils.WriteOutput{report.Output}, nil
 }

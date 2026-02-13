@@ -3,12 +3,15 @@ package changesets
 import (
 	"fmt"
 
+	"github.com/ethereum/go-ethereum/common"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
+
+	mcms_types "github.com/smartcontractkit/mcms/types"
+
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
@@ -17,8 +20,10 @@ import (
 
 // CCTPChainConfig specifies configuration required for a chain to deploy CCTP.
 type CCTPChainConfig struct {
-	// TokenMessenger is the address of the TokenMessenger contract.
-	TokenMessenger string
+	// TokenMessengerV1 is the address of the CCTP v1 TokenMessenger contract.
+	TokenMessengerV1 string
+	// TokenMessengerV2 is the address of the CCTP v2 TokenMessenger contract.
+	TokenMessengerV2 string
 	// USDCToken is the address of the USDCToken contract.
 	USDCToken string
 	// DeployerContract is a contract that can be used to deploy other contracts.
@@ -62,6 +67,12 @@ func makeVerifyDeployCCTPChains(_ *adapters.CCTPChainRegistry, _ *changesets.MCM
 			if _, err := chain_selectors.GetSelectorFamily(chainSel); err != nil {
 				return err
 			}
+			if !common.IsHexAddress(chainCfg.TokenMessengerV2) {
+				return fmt.Errorf("invalid TokenMessengerV2 for chain %d", chainSel)
+			}
+			if chainCfg.TokenMessengerV1 != "" && !common.IsHexAddress(chainCfg.TokenMessengerV1) {
+				return fmt.Errorf("invalid TokenMessengerV1 for chain %d", chainSel)
+			}
 			for remoteChainSelector := range chainCfg.RemoteChains {
 				if _, err := chain_selectors.GetSelectorFamily(remoteChainSelector); err != nil {
 					return err
@@ -103,7 +114,8 @@ func makeApplyDeployCCTPChains(cctpChainRegistry *adapters.CCTPChainRegistry, mc
 			}
 			in := adapters.DeployCCTPInput{
 				ChainSelector:    chainSel,
-				TokenMessenger:   chainCfg.TokenMessenger,
+				TokenMessengerV1: chainCfg.TokenMessengerV1,
+				TokenMessengerV2: chainCfg.TokenMessengerV2,
 				USDCToken:        chainCfg.USDCToken,
 				DeployerContract: chainCfg.DeployerContract,
 				FastFinalityBps:  chainCfg.FastFinalityBps,
