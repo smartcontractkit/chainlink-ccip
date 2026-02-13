@@ -260,6 +260,8 @@ jobs:
         run: |
           cd $GITHUB_WORKSPACE/chainlink/integration-tests/smoke/ccip
           gotestsum --junitfile=test-results.xml --format=short-verbose -- ${{ matrix.type.file }} -timeout ${{ matrix.type.timeout }}
+        env:
+          CL_DATABASE_URL: ${{ env.DB_URL }}
 
       - name: Analyze and upload test results
         uses: smartcontractkit/.github/actions/branch-out-upload@branch-out-upload/v1
