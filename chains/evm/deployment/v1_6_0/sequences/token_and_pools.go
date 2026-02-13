@@ -255,7 +255,7 @@ func (a *EVMAdapter) DeriveTokenAddress(e deployment.Environment, chainSelector 
 	return token.Output.Bytes(), nil
 }
 
-func (a *EVMAdapter) DeriveTokenDecimals(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) (uint8, error) {
+func (a *EVMAdapter) DeriveTokenDecimals(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef, token []byte) (uint8, error) {
 	chain, ok := e.BlockChains.EVMChains()[chainSelector]
 	if !ok {
 		return 0, fmt.Errorf("chain with selector %d not defined", chainSelector)

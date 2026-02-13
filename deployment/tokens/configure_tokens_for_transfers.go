@@ -162,7 +162,7 @@ func convertRemoteChainConfig(
 			}
 		}
 		outCfg.RemoteToken = common.LeftPadBytes(outCfg.RemoteToken, 32)
-		outCfg.RemoteDecimals, err = adapter.DeriveTokenDecimals(e, remoteChainSelector, fullRemotePoolRef)
+		outCfg.RemoteDecimals, err = adapter.DeriveTokenDecimals(e, remoteChainSelector, fullRemotePoolRef, outCfg.RemoteToken)
 		if err != nil {
 			return outCfg, fmt.Errorf("failed to get remote token decimals for remote chain selector %d: %w", remoteChainSelector, err)
 		}

@@ -617,9 +617,8 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 		return nil
 	}
 
-	// Here we construct two maps. The deployment map defines the tokens and token pools to deploy.
-	// The mesh defines the token transfer configuration between all chains. Here, we define a full
-	// mesh that allows tokens to be transferred between all chains.
+	// The deployment map defines the tokens and token pools to deploy
+	// and the configurations for their cross-chain interactions. We deploy one token and token pool per chain, and configure them to be transferable to each other.
 	dply := map[uint64]tokensapi.TokenExpansionInputPerChain{}
 	for _, srcAdapter := range adp {
 		srcCfg := srcAdapter.GetTokenExpansionConfig()
@@ -633,7 +632,7 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 		}
 
 		for _, dstAdapter := range adp {
-			dstCfg := dstAdapter.GetTokenExpansionConfig()
+			// dstCfg := dstAdapter.GetTokenExpansionConfig()
 			dstSel := dstAdapter.ChainSelector()
 
 			if srcSel != dstSel {
@@ -642,17 +641,19 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 					InboundCCVs:               []datastore.AddressRef{}, // not needed for for 1.6
 					OutboundRateLimiterConfig: disabledRL,
 					InboundRateLimiterConfig:  disabledRL,
-					RemoteToken: &datastore.AddressRef{
-						Type:          datastore.ContractType(dstCfg.DeployTokenInput.Type),
-						Qualifier:     dstCfg.DeployTokenInput.Symbol,
-						ChainSelector: dstSel,
-					},
-					RemotePool: &datastore.AddressRef{
-						Type:          datastore.ContractType(dstCfg.DeployTokenPoolInput.PoolType),
-						Qualifier:     dstCfg.DeployTokenPoolInput.TokenPoolQualifier,
-						Version:       dstCfg.TokenPoolVersion,
-						ChainSelector: dstSel,
-					},
+					// This is actually optional for 1.6 as the token and token pool addresses are 
+					// inferred after deployment
+					// RemoteToken: &datastore.AddressRef{
+					// 	Type:          datastore.ContractType(dstCfg.DeployTokenInput.Type),
+					// 	Qualifier:     dstCfg.DeployTokenInput.Symbol,
+					// 	ChainSelector: dstSel,
+					// },
+					// RemotePool: &datastore.AddressRef{
+					// 	Type:          datastore.ContractType(dstCfg.DeployTokenPoolInput.PoolType),
+					// 	Qualifier:     dstCfg.DeployTokenPoolInput.TokenPoolQualifier,
+					// 	Version:       dstCfg.TokenPoolVersion,
+					// 	ChainSelector: dstSel,
+					// },
 				}
 			}
 		}

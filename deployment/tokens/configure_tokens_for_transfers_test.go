@@ -125,7 +125,7 @@ func (ma *transfersTest_MockTokenAdapter) DeriveTokenAddress(e deployment.Enviro
 	return []byte("mocked-remote-token-address"), nil
 }
 
-func (ma *transfersTest_MockTokenAdapter) DeriveTokenDecimals(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) (uint8, error) {
+func (ma *transfersTest_MockTokenAdapter) DeriveTokenDecimals(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef, token []byte) (uint8, error) {
 	return 18, nil
 }
 

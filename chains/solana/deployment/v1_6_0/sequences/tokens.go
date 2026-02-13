@@ -103,7 +103,6 @@ func (a *SolanaAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[
 			result.Addresses = append(result.Addresses, spOut.Output.Addresses...)
 			result.BatchOps = append(result.BatchOps, spOut.Output.BatchOps...)
 
-			
 			tokenMint := solana.MustPublicKeyFromBase58(tokenAddr.Address)
 			for remoteChainSelector, remoteChainConfig := range input.RemoteChains {
 				op := tokenpoolops.UpsertRemoteChainConfigBurnMint
@@ -160,9 +159,12 @@ func (a *SolanaAdapter) DeriveTokenAddress(e deployment.Environment, chainSelect
 	return nil, fmt.Errorf("DeriveTokenAddress not implemented for Solana")
 }
 
-func (a *SolanaAdapter) DeriveTokenDecimals(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) (uint8, error) {
-	// TODO: implement me
-	return 0, nil
+func (a *SolanaAdapter) DeriveTokenDecimals(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef, token []byte) (uint8, error) {
+	chain, ok := e.BlockChains.SolanaChains()[chainSelector]
+	if !ok {
+		return 0, fmt.Errorf("chain with selector %d not defined", chainSelector)
+	}
+	return utils.GetTokenDecimals(chain, solana.PublicKeyFromBytes(token))
 }
 
 func (a *SolanaAdapter) DeriveTokenPoolCounterpart(e deployment.Environment, chainSelector uint64, tokenPool []byte, token []byte) ([]byte, error) {

@@ -19,7 +19,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	bnmERC20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	evmseqV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
@@ -341,8 +340,8 @@ func TestTokensAndTokenPools(t *testing.T) {
 				tokAddress, err := evmAdapter.FindOneTokenAddress(env.DataStore, data.Chain.Selector, &datastore.AddressRef{Qualifier: data.Token.Symbol})
 				require.NoError(t, err)
 
-				// Verify that nothing is set for the token in TAR yet since the token expansion changeset 
-				// should not have configured the token for transfers 
+				// Verify that nothing is set for the token in TAR yet since the token expansion changeset
+				// should not have configured the token for transfers
 				// (i.e. it should have deployed the token and token pool, but not set the pool on the token or proposed an admin)
 				tokConfig, err := data.TAR.GetTokenConfig(&bind.CallOpts{Context: t.Context()}, tokAddress)
 				require.NoError(t, err)
@@ -540,18 +539,19 @@ func TestTokensAndTokenPools(t *testing.T) {
 				ExistingDataStore: env.DataStore,
 			}
 
-			deployTokenOutput, err := cldf_ops.ExecuteSequence(env.OperationsBundle, solAdapter.DeployToken(), env.BlockChains, deployTokenInput)
+			// Run token expansion
+			output, err = tokensapi.TokenExpansion().Apply(*env, tokensapi.TokenExpansionInput{
+				TokenExpansionInputPerChain: map[uint64]tokensapi.TokenExpansionInputPerChain{
+					solTestData.Chain.Selector: {
+						TokenPoolVersion: v1_6_0,
+						DeployTokenInput: &deployTokenInput,
+					},
+				},
+				ChainAdapterVersion: v1_6_0,
+				MCMS:                NewDefaultInputForMCMS("Deploy token to test"),
+			})
 			require.NoError(t, err)
-
-			// Store new token in Data store, this is needed as the sequence is ran independently and the token needs to be present in the datastore for the manual registration changeset to find it
-			ds := datastore.NewMemoryDataStore()
-			dataStoreErr := ds.Merge(env.DataStore)
-			require.NoError(t, dataStoreErr)
-			for _, r := range deployTokenOutput.Output.Addresses {
-				err = ds.Addresses().Add(r)
-				require.NoError(t, err)
-			}
-			MergeAddresses(t, env, ds)
+			MergeAddresses(t, env, output.DataStore)
 
 			// Verify that the token exists in datastore
 			tokenAddr, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
