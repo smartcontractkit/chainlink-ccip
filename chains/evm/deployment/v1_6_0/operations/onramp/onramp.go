@@ -93,6 +93,10 @@ func (c *OnRampContract) GetDynamicConfig(opts *bind.CallOpts) (DynamicConfig, e
 	return *abi.ConvertType(out[0], new(DynamicConfig)).(*DynamicConfig), nil
 }
 
+func (c *OnRampContract) SetDynamicConfig(opts *bind.TransactOpts, args DynamicConfig) (*types.Transaction, error) {
+	return c.contract.Transact(opts, "setDynamicConfig", args)
+}
+
 type DestChainConfigArgs struct {
 	DestChainSelector uint64
 	Router            common.Address
@@ -184,5 +188,23 @@ var GetDynamicConfig = contract.NewRead(contract.ReadParams[struct{}, DynamicCon
 	NewContract:  NewOnRampContract,
 	CallContract: func(c *OnRampContract, opts *bind.CallOpts, args struct{}) (DynamicConfig, error) {
 		return c.GetDynamicConfig(opts)
+	},
+})
+
+var SetDynamicConfig = contract.NewWrite(contract.WriteParams[DynamicConfig, *OnRampContract]{
+	Name:            "onramp:set-dynamic-config",
+	Version:         Version,
+	Description:     "Calls setDynamicConfig on the contract",
+	ContractType:    ContractType,
+	ContractABI:     OnRampABI,
+	NewContract:     NewOnRampContract,
+	IsAllowedCaller: contract.OnlyOwner[*OnRampContract, DynamicConfig],
+	Validate:        func(DynamicConfig) error { return nil },
+	CallContract: func(
+		c *OnRampContract,
+		opts *bind.TransactOpts,
+		args DynamicConfig,
+	) (*types.Transaction, error) {
+		return c.SetDynamicConfig(opts, args)
 	},
 })

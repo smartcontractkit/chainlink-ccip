@@ -49,8 +49,7 @@ contract USDCTokenPoolCCTPV2Setup is USDCSetup {
       mintRecipient: bytes32(0),
       domainIdentifier: 9999,
       allowedCaller: keccak256("allowedCallerDestChain"),
-      enabled: true,
-      useLegacySourcePoolDataFormat: false
+      enabled: true
     });
     s_usdcTokenPool.setDomains(domains);
   }

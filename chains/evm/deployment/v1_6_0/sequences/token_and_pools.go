@@ -17,6 +17,7 @@ import (
 	tpops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/operations/token_pool"
 	tpseq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/sequences/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/token_pool"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
@@ -159,66 +160,177 @@ func (a *EVMAdapter) DeriveTokenAddress(e deployment.Environment, chainSelector 
 	return token.Output.Bytes(), nil
 }
 
-func (a *EVMAdapter) ManualRegistration() *cldf_ops.Sequence[tokensapi.ManualRegistrationInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
-	return cldf_ops.NewSequence(
-		"evm-adapter:manual-registration",
-		tarops.Version,
-		"Manually register a token and token pool on multiple EVM chains",
-		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokensapi.ManualRegistrationInput) (sequences.OnChainOutput, error) {
-			store := datastore.NewMemoryDataStore()
-			for _, addr := range input.ExistingAddresses {
-				if err := store.AddressRefStore.Upsert(addr); err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to upsert address %v: %w", addr, err)
-				}
-			}
-			ds := store.Seal()
+func (a *EVMAdapter) DeriveTokenDecimals(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) (uint8, error) {
+	chain, ok := e.BlockChains.EVMChains()[chainSelector]
+	if !ok {
+		return 0, fmt.Errorf("chain with selector %d not defined", chainSelector)
+	}
 
+	addrRef, err := datastore_utils.FindAndFormatRef(e.DataStore, poolRef, chainSelector, datastore_utils.FullRef)
+	if err != nil {
+		return 0, fmt.Errorf("failed to find token pool in datastore using ref (%+v): %w", poolRef, err)
+	}
+
+	addrRaw, err := a.AddressRefToBytes(addrRef)
+	if err != nil {
+		return 0, fmt.Errorf("failed to convert address ref to bytes: %w", err)
+	}
+
+	tpAddr := common.BytesToAddress(addrRaw)
+	if tpAddr == (common.Address{}) {
+		return 0, errors.New("token pool address is zero address")
+	}
+
+	tp, err := token_pool.NewTokenPool(tpAddr, chain.Client)
+	if err != nil {
+		return 0, fmt.Errorf("failed to instantiate token pool contract: %w", err)
+	}
+	return tp.GetTokenDecimals(&bind.CallOpts{Context: e.GetContext()})
+}
+
+func (a *EVMAdapter) DeriveTokenPoolCounterpart(e deployment.Environment, chainSelector uint64, tokenPool []byte, token []byte) ([]byte, error) {
+	// For EVM chains, the token pool address is not derived from the token address, so we can return the token pool address as is.
+	return tokenPool, nil
+}
+
+func (a *EVMAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokensapi.RateLimiterConfigInputs, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return cldf_ops.NewSequence(
+		"evm-adapter:set-token-pool-rate-limits",
+		tpops.Version,
+		"Set rate limits for a token pool across multiple EVM chains",
+		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokensapi.RateLimiterConfigInputs) (sequences.OnChainOutput, error) {
+			var result sequences.OnChainOutput
 			chain, ok := chains.EVMChains()[input.ChainSelector]
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
 
-			tokenAdminRegistryAddress, err := a.GetTokenAdminRegistryAddress(ds, input.ChainSelector)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token admin registry address for chain %d: %w", input.ChainSelector, err)
-			}
-
-			tokenPoolAddress, err := a.FindLatestTokenPoolAddress(ds, chain.Selector, input.RegisterTokenConfigs.TokenPoolQualifier, input.RegisterTokenConfigs.PoolType)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token pool with qualifier %q on chain %d: %w", input.RegisterTokenConfigs.TokenPoolQualifier, input.ChainSelector, err)
-			}
-
-			token, err := cldf_ops.ExecuteOperation(b,
-				tpops.GetToken,
-				chain,
-				evm_contract.FunctionInput[struct{}]{
+			tpAddress, err := a.FindLatestAddressRef(
+				input.ExistingDataStore,
+				datastore.AddressRef{
 					ChainSelector: input.ChainSelector,
-					Address:       tokenPoolAddress,
-					Args:          struct{}{},
+					Qualifier:     input.TokenPoolQualifier,
+					Type:          datastore.ContractType(input.PoolType),
 				},
 			)
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token address via GetToken operation: %w", err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token pool with qualifier %q on chain %d: %w", input.TokenPoolQualifier, input.ChainSelector, err)
 			}
 
-			proposedOwner := input.RegisterTokenConfigs.ProposedOwner
-			if !common.IsHexAddress(proposedOwner) {
-				return sequences.OnChainOutput{}, fmt.Errorf("proposed owner address %q is not a valid hex address", proposedOwner)
+			report, err := cldf_ops.ExecuteOperation(b, tpops.SetChainRateLimiterConfig, chain, evm_contract.FunctionInput[tpops.SetChainRateLimiterConfigArgs]{
+				ChainSelector: chain.Selector,
+				Address:       tpAddress,
+				Args: tpops.SetChainRateLimiterConfigArgs{
+					OutboundRateLimitConfig: token_pool.RateLimiterConfig{
+						IsEnabled: input.OutboundRateLimiterConfig.IsEnabled,
+						Capacity:  input.OutboundRateLimiterConfig.Capacity,
+						Rate:      input.OutboundRateLimiterConfig.Rate,
+					},
+					InboundRateLimitConfig: token_pool.RateLimiterConfig{
+						IsEnabled: input.InboundRateLimiterConfig.IsEnabled,
+						Capacity:  input.InboundRateLimiterConfig.Capacity,
+						Rate:      input.InboundRateLimiterConfig.Rate,
+					},
+					RemoteChainSelector: input.RemoteChainSelector,
+				},
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to set rate limiter config: %w", err)
+			}
+			batchOp, err := evm_contract.NewBatchOperationFromWrites([]evm_contract.WriteOutput{report.Output})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation: %w", err)
+			}
+			result.BatchOps = append(result.BatchOps, batchOp)
+			return result, nil
+		})
+}
+
+func (a *EVMAdapter) ManualRegistration() *cldf_ops.Sequence[tokensapi.ManualRegistrationSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return cldf_ops.NewSequence(
+		"evm-adapter:manual-registration",
+		tarops.Version,
+		"Manually register a token and token pool on multiple EVM chains",
+		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokensapi.ManualRegistrationSequenceInput) (sequences.OnChainOutput, error) {
+			chain, ok := chains.EVMChains()[input.ChainSelector]
+			if !ok {
+				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
+			}
+
+			tokenAdminRegistryAddress, err := a.GetTokenAdminRegistryAddress(input.ExistingDataStore, chain.Selector)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token admin registry address for chain %d: %w", chain.Selector, err)
+			}
+
+			// NOTE: when resolving the token address, we first attempt to resolve it from the TokenRef, and if that fails, then we'll fall back to the TokenPoolRef
+			tokenRef, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, input.TokenRef, chain.Selector, datastore_utils.FullRef)
+			if err != nil {
+				b.Logger.Warnf("token address could not be resolved using TokenRef (%+v): %v", input.TokenRef, err)
+				b.Logger.Warnf("attempting to resolve token address using TokenPoolRef instead: (%+v)", input.TokenPoolRef)
+
+				tokenPoolRef, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, input.TokenPoolRef, chain.Selector, datastore_utils.FullRef)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("token pool could not be resolved using TokenPoolRef (%+v): %w", input.TokenPoolRef, err)
+				}
+				tokenPoolAddrBytes, err := a.AddressRefToBytes(tokenPoolRef)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to convert token pool address ref to bytes: %w", err)
+				}
+				tokenPoolAddr := common.BytesToAddress(tokenPoolAddrBytes)
+				if tokenPoolAddr == (common.Address{}) {
+					return sequences.OnChainOutput{}, fmt.Errorf("token pool address for ref (%+v) is zero address", tokenPoolRef)
+				}
+
+				token, err := cldf_ops.ExecuteOperation(b,
+					tpops.GetToken,
+					chain,
+					evm_contract.FunctionInput[struct{}]{
+						ChainSelector: chain.Selector,
+						Address:       tokenPoolAddr,
+						Args:          struct{}{},
+					},
+				)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to get token address via GetToken operation: %w", err)
+				}
+
+				tokenRef = datastore.AddressRef{
+					ChainSelector: chain.Selector,
+					Address:       token.Output.Hex(),
+				}
+			}
+
+			tokenAddrBytes, err := a.AddressRefToBytes(tokenRef)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to convert token address ref to bytes: %w", err)
+			}
+			tokenAddr := common.BytesToAddress(tokenAddrBytes)
+			if tokenAddr == (common.Address{}) {
+				return sequences.OnChainOutput{}, fmt.Errorf("token address for ref (%+v) is zero address", tokenRef)
+			}
+
+			proposedOwnerAddrString := input.ProposedOwner
+			if !common.IsHexAddress(proposedOwnerAddrString) {
+				return sequences.OnChainOutput{}, fmt.Errorf("proposed owner address %q is not a valid hex address", proposedOwnerAddrString)
+			}
+			proposedOwnerAddr := common.HexToAddress(proposedOwnerAddrString)
+			if proposedOwnerAddr == (common.Address{}) {
+				return sequences.OnChainOutput{}, errors.New("proposed owner address cannot be the zero address")
 			}
 
 			var result sequences.OnChainOutput
 			result, err = sequences.RunAndMergeSequence(b, chains,
 				tarseq.ManualRegistrationSequence,
 				tarseq.ManualRegistrationSequenceInput{
-					AdminAddress:  common.HexToAddress(proposedOwner),
-					ChainSelector: input.ChainSelector,
-					TokenAddress:  token.Output,
+					AdminAddress:  proposedOwnerAddr,
+					ChainSelector: chain.Selector,
+					TokenAddress:  tokenAddr,
 					Address:       tokenAdminRegistryAddress,
 				},
 				result,
 			)
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to manually register token on chain %d: %w", input.ChainSelector, err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to manually register token on chain %d: %w", chain.Selector, err)
 			}
 
 			return result, nil
@@ -246,10 +358,7 @@ func (a *EVMAdapter) DeployTokenVerify(e deployment.Environment, in any) error {
 	if err := utils.ValidateEVMAddress(input.CCIPAdmin, "CCIPAdmin"); err != nil {
 		return err
 	}
-	if len(input.ExternalAdmin) > 1 {
-		return fmt.Errorf("only one ExternalAdmin address is supported for EVM chains")
-	}
-	if err := utils.ValidateEVMAddress(input.ExternalAdmin[0], "ExternalAdmin"); err != nil {
+	if err := utils.ValidateEVMAddress(input.ExternalAdmin, "ExternalAdmin"); err != nil {
 		return err
 	}
 	// ensuring that decimals is not more than 18
@@ -282,10 +391,19 @@ func (a *EVMAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.Depl
 			result.Addresses = append(result.Addresses, out.Output.Addresses...)
 			result.BatchOps = append(result.BatchOps, out.Output.BatchOps...)
 
-			toknFilterDS := datastore.AddressRef{ChainSelector: input.ChainSelector, Qualifier: input.TokenSymbol}
+			toknFilterDS := datastore.AddressRef{ChainSelector: input.ChainSelector}
+			if input.TokenRef.Address != "" {
+				toknFilterDS.Address = input.TokenRef.Address
+			}
+			if input.TokenRef.Qualifier != "" {
+				toknFilterDS.Qualifier = input.TokenRef.Qualifier
+			}
+			if input.TokenRef.Type != "" {
+				toknFilterDS.Type = input.TokenRef.Type
+			}
 			toknRef, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, toknFilterDS, input.ChainSelector, datastore_utils.FullRef)
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to find token address for symbol %q on chain %d: %w", input.TokenSymbol, input.ChainSelector, err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to find token address for symbol %q on chain %d: %w", input.TokenRef.Qualifier, input.ChainSelector, err)
 			}
 
 			// For a BnM token + BnM token pool, we need to grant the pool mint and burn roles on the token
@@ -329,7 +447,7 @@ func (a *EVMAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.Depl
 
 				toknAddr := common.BytesToAddress(toknAddrBytes)
 				if toknAddr == (common.Address{}) {
-					return sequences.OnChainOutput{}, fmt.Errorf("token address for symbol %q is zero address", input.TokenSymbol)
+					return sequences.OnChainOutput{}, fmt.Errorf("token address for symbol %q is zero address", input.TokenRef.Qualifier)
 				}
 
 				chain, ok := chains.EVMChains()[input.ChainSelector]
@@ -347,12 +465,12 @@ func (a *EVMAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.Depl
 					},
 				)
 				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to grant mint and burn roles to token pool %q for token %q on chain %d: %w", poolAddr.Hex(), input.TokenSymbol, input.ChainSelector, err)
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to grant mint and burn roles to token pool %q for token %q on chain %d: %w", poolAddr.Hex(), input.TokenRef.Qualifier, input.ChainSelector, err)
 				}
 
 				batchOp, err := evm_contract.NewBatchOperationFromWrites([]evm_contract.WriteOutput{report.Output})
 				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation for granting mint and burn roles to token pool %q for token %q on chain %d: %w", poolAddr.Hex(), input.TokenSymbol, input.ChainSelector, err)
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation for granting mint and burn roles to token pool %q for token %q on chain %d: %w", poolAddr.Hex(), input.TokenRef.Qualifier, input.ChainSelector, err)
 				}
 
 				result.BatchOps = append(result.BatchOps, batchOp)
@@ -381,9 +499,9 @@ func (a *EVMAdapter) RegisterToken() *cldf_ops.Sequence[tokensapi.RegisterTokenI
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token admin registry address for chain %d: %w", input.ChainSelector, err)
 			}
 
-			tokAddress, err := a.FindOneTokenAddress(input.ExistingDataStore, input.ChainSelector, input.TokenSymbol)
+			tokAddress, err := a.FindOneTokenAddress(input.ExistingDataStore, input.ChainSelector, input.TokenRef.Qualifier)
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token address for symbol %q on chain %d: %w", input.TokenSymbol, input.ChainSelector, err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token address for symbol %q on chain %d: %w", input.TokenRef.Qualifier, input.ChainSelector, err)
 			}
 
 			extnAdmin := common.Address{}
@@ -483,7 +601,14 @@ func (a *EVMAdapter) SetPool() *cldf_ops.Sequence[tokensapi.SetPoolInput, sequen
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token admin registry address for chain %d: %w", input.ChainSelector, err)
 			}
 
-			tokenPoolAddress, err := a.FindLatestTokenPoolAddress(input.ExistingDataStore, chain.Selector, input.TokenPoolQualifier, input.PoolType)
+			tokenPoolAddress, err := a.FindLatestAddressRef(
+				input.ExistingDataStore,
+				datastore.AddressRef{
+					ChainSelector: chain.Selector,
+					Qualifier:     input.TokenPoolQualifier,
+					Type:          datastore.ContractType(input.PoolType),
+				},
+			)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token pool with qualifier %q on chain %d: %w", input.TokenPoolQualifier, input.ChainSelector, err)
 			}
@@ -514,7 +639,7 @@ func (a *EVMAdapter) SetPool() *cldf_ops.Sequence[tokensapi.SetPoolInput, sequen
 				},
 			)
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to set pool for token %q on chain selector %d: %w", input.TokenSymbol, input.ChainSelector, err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to set pool for token %q on chain selector %d: %w", input.TokenRef.Qualifier, input.ChainSelector, err)
 			}
 
 			batchOp, err := evm_contract.NewBatchOperationFromWrites([]evm_contract.WriteOutput{report.Output})
@@ -527,11 +652,6 @@ func (a *EVMAdapter) SetPool() *cldf_ops.Sequence[tokensapi.SetPoolInput, sequen
 			}, nil
 		},
 	)
-}
-
-func (a *EVMAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokensapi.UpdateAuthoritiesInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
-	// TODO: implement me
-	return nil
 }
 
 ////////////////////
@@ -577,17 +697,33 @@ func (a *EVMAdapter) FindOneTokenAddress(ds datastore.DataStore, chainSelector u
 	return common.BytesToAddress(addr), nil
 }
 
-func (a *EVMAdapter) FindLatestTokenPoolAddress(ds datastore.DataStore, chainSelector uint64, qualifier string, poolType string) (common.Address, error) {
+func (a *EVMAdapter) FindLatestAddressRef(ds datastore.DataStore, ref datastore.AddressRef) (common.Address, error) {
 	// Define the version range
 	minVersion := semver.MustParse("1.5.0") // inclusive
 	maxVersion := semver.MustParse("1.7.0") // exclusive
 
+	// Build the filter
+	filter := []datastore.FilterFunc[datastore.AddressRefKey, datastore.AddressRef]{}
+	if ref.ChainSelector != 0 {
+		filter = append(filter, datastore.AddressRefByChainSelector(ref.ChainSelector))
+	}
+	if ref.Qualifier != "" {
+		filter = append(filter, datastore.AddressRefByQualifier(ref.Qualifier))
+	}
+	if ref.Version != nil {
+		// NOTE: this shouldn't be set otherwise we won't be able to find the latest version within the specified range
+		return common.Address{}, fmt.Errorf("ref version should not be set when finding the latest address ref, got version %s", ref.Version.String())
+	}
+	if ref.Address != "" {
+		// NOTE: this shouldn't be set otherwise we'd always get zero or one result back, which defeats this function's purpose
+		return common.Address{}, fmt.Errorf("ref address should not be set when finding the latest address ref, got address %q", ref.Address)
+	}
+	if ref.Type.String() != "" {
+		filter = append(filter, datastore.AddressRefByType(ref.Type))
+	}
+
 	// Get all matching token pool addresses
-	refs := ds.Addresses().Filter(
-		datastore.AddressRefByType(datastore.ContractType(poolType)),
-		datastore.AddressRefByChainSelector(chainSelector),
-		datastore.AddressRefByQualifier(qualifier),
-	)
+	refs := ds.Addresses().Filter(filter...)
 
 	// Use the latest version found within the specified range
 	var latestRef datastore.AddressRef
@@ -610,7 +746,7 @@ func (a *EVMAdapter) FindLatestTokenPoolAddress(ds datastore.DataStore, chainSel
 
 	// If no matching reference was found, then return an error
 	if !doesExist {
-		return common.Address{}, fmt.Errorf("no token pool found for type %q with qualifier %q on chain %d", poolType, qualifier, chainSelector)
+		return common.Address{}, fmt.Errorf("no address found for ref (%+v) in version range [%s, %s)", ref, minVersion.String(), maxVersion.String())
 	}
 
 	// Convert the address reference to bytes

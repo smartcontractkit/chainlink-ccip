@@ -100,6 +100,16 @@ func (c *TokenPoolContract) GetToken(opts *bind.CallOpts) (common.Address, error
 	return *abi.ConvertType(out[0], new(common.Address)).(*common.Address), nil
 }
 
+func (c *TokenPoolContract) GetTokenDecimals(opts *bind.CallOpts) (uint8, error) {
+	var out []any
+	err := c.contract.Call(opts, &out, "getTokenDecimals")
+	if err != nil {
+		var zero uint8
+		return zero, err
+	}
+	return *abi.ConvertType(out[0], new(uint8)).(*uint8), nil
+}
+
 func (c *TokenPoolContract) IsSupportedToken(opts *bind.CallOpts, args common.Address) (bool, error) {
 	var out []any
 	err := c.contract.Call(opts, &out, "isSupportedToken", args)
@@ -369,6 +379,17 @@ var GetToken = contract.NewRead(contract.ReadParams[struct{}, common.Address, *T
 	NewContract:  NewTokenPoolContract,
 	CallContract: func(c *TokenPoolContract, opts *bind.CallOpts, args struct{}) (common.Address, error) {
 		return c.GetToken(opts)
+	},
+})
+
+var GetTokenDecimals = contract.NewRead(contract.ReadParams[struct{}, uint8, *TokenPoolContract]{
+	Name:         "token-pool:get-token-decimals",
+	Version:      Version,
+	Description:  "Calls getTokenDecimals on the contract",
+	ContractType: ContractType,
+	NewContract:  NewTokenPoolContract,
+	CallContract: func(c *TokenPoolContract, opts *bind.CallOpts, args struct{}) (uint8, error) {
+		return c.GetTokenDecimals(opts)
 	},
 })
 

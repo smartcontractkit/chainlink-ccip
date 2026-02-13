@@ -424,7 +424,7 @@ func NewEnvironment() (*Cfg, error) {
 
 	// Deploy a token and its corresponding token pool on each chain
 	L.Info().Msg("Deploying tokens and token pools for chains")
-	newDS, err := devenvcommon.SetupTokensAndTokenPools(ctx, e, adapters)
+	newDS, err := devenvcommon.SetupTokensAndTokenPools(e, adapters)
 	if err != nil {
 		return nil, fmt.Errorf("failed to setup tokens and token pools: %w", err)
 	}

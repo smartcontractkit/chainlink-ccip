@@ -64,6 +64,5 @@ extract-bytecode-abi: ## Extract bytecode and abi from versioned gobindings to b
 	go run github.com/smartcontractkit/chainlink-evm/gethwrappers/helpers/extract_bytecode -input=gobindings/generated -bytecode=bytecode -abi=abi
 
 .PHONY: operations
-operations: pnpmdep
-	./scripts/compile_all
+operations: pnpmdep wrappers
 	go run cmd/operations-gen/main.go -config deployment/operations_gen_config.yaml
