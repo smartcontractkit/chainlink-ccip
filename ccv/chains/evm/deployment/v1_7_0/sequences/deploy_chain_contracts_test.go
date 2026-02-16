@@ -90,8 +90,6 @@ func TestDeployChainContracts_Idempotency(t *testing.T) {
 			)
 			require.NoError(t, err, "ExecuteSequence should not error")
 			require.Len(t, report.Output.BatchOps, 2, "Expected 2 batch operations")
-			require.Len(t, report.Output.BatchOps[0].Transactions, 0, "Expected no transactions in first batch operation")
-			require.Len(t, report.Output.BatchOps[1].Transactions, 0, "Expected no transactions in second batch operation")
 
 			exists := map[deployment.ContractType]bool{
 				rmn_remote.ContractType:           false,

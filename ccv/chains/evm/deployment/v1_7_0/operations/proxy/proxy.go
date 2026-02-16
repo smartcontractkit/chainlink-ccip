@@ -32,6 +32,20 @@ var SetTarget = contract.NewWrite(contract.WriteParams[common.Address, *proxy.Pr
 	},
 })
 
+var SetFeeAggregator = contract.NewWrite(contract.WriteParams[common.Address, *proxy.Proxy]{
+	Name:            "proxy:set-fee-aggregator",
+	Version:         Version,
+	Description:     "Set the fee aggregator address on the proxy",
+	ContractType:    ContractType,
+	ContractABI:     proxy.ProxyABI,
+	NewContract:     proxy.NewProxy,
+	IsAllowedCaller: contract.OnlyOwner[*proxy.Proxy, common.Address],
+	Validate:        func(common.Address) error { return nil },
+	CallContract: func(proxy *proxy.Proxy, opts *bind.TransactOpts, args common.Address) (*types.Transaction, error) {
+		return proxy.SetFeeAggregator(opts, args)
+	},
+})
+
 var AcceptOwnership = contract.NewWrite(contract.WriteParams[AcceptOwnershipArgs, *proxy.Proxy]{
 	Name:         "proxy:accept-ownership",
 	Version:      Version,
