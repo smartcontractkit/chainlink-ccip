@@ -138,7 +138,7 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 		}
 
 		// CCTPVerifier: remote chain config (fee, gas, payload) and domain args
-		verifierSetDomainArgs, verifierRemoteChainConfigArgs, err := buildCCTPVerifierArgs(dep, input, routerAddress, cctpVerifierAddress)
+		verifierSetDomainArgs, verifierRemoteChainConfigArgs, err := buildCCTPVerifierArgs(dep, input, routerAddress)
 		if err != nil {
 			return sequences.OnChainOutput{}, err
 		}
@@ -387,7 +387,7 @@ func buildUSDCTokenPoolProxyMechanismArgs(input adapters.ConfigureCCTPChainForLa
 
 // buildCCTPVerifierArgs builds set-domain args and remote-chain-config args for the CCTPVerifier.
 // allowedCallerOnSource is the current chain's verifier (source chain when sending to remote).
-func buildCCTPVerifierArgs(dep adapters.ConfigureCCTPChainForLanesDeps, input adapters.ConfigureCCTPChainForLanesInput, routerAddress common.Address, allowedCallerOnSource common.Address) ([]cctp_verifier.SetDomainArgs, []cctp_verifier.RemoteChainConfigArgs, error) {
+func buildCCTPVerifierArgs(dep adapters.ConfigureCCTPChainForLanesDeps, input adapters.ConfigureCCTPChainForLanesInput, routerAddress common.Address) ([]cctp_verifier.SetDomainArgs, []cctp_verifier.RemoteChainConfigArgs, error) {
 	setDomainArgs := make([]cctp_verifier.SetDomainArgs, 0, len(input.RemoteChains))
 	remoteChainConfigArgs := make([]cctp_verifier.RemoteChainConfigArgs, 0, len(input.RemoteChains))
 	for remoteChainSelector, remoteChain := range input.RemoteChains {
@@ -399,12 +399,16 @@ func buildCCTPVerifierArgs(dep adapters.ConfigureCCTPChainForLanesDeps, input ad
 		if err != nil {
 			return nil, nil, err
 		}
+		allowedCallerOnSource, err := dep.RemoteChains[remoteChainSelector].AllowedCallerOnSource(dep.DataStore, dep.BlockChains, remoteChainSelector)
+		if err != nil {
+			return nil, nil, err
+		}
 		allowedCallerOnDest = common.LeftPadBytes(allowedCallerOnDest, 32)
-		allowedCallerOnSourceBytes := common.LeftPadBytes(allowedCallerOnSource.Bytes(), 32)
+		allowedCallerOnSource = common.LeftPadBytes(allowedCallerOnSource, 32)
 		mintRecipientOnDest = common.LeftPadBytes(mintRecipientOnDest, 32)
 		var allowedCallerOnDestBytes32, allowedCallerOnSourceBytes32, mintRecipientOnDestBytes32 [32]byte
 		copy(allowedCallerOnDestBytes32[32-len(allowedCallerOnDest):], allowedCallerOnDest)
-		copy(allowedCallerOnSourceBytes32[32-len(allowedCallerOnSourceBytes):], allowedCallerOnSourceBytes)
+		copy(allowedCallerOnSourceBytes32[32-len(allowedCallerOnSource):], allowedCallerOnSource)
 		copy(mintRecipientOnDestBytes32[32-len(mintRecipientOnDest):], mintRecipientOnDest)
 		setDomainArgs = append(setDomainArgs, cctp_verifier.SetDomainArgs{
 			AllowedCallerOnDest:   allowedCallerOnDestBytes32,
