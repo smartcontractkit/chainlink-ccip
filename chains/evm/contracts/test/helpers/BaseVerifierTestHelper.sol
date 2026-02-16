@@ -51,6 +51,10 @@ contract BaseVerifierTestHelper is BaseVerifier {
     return "BaseVerifierTestHelper 1.0.0";
   }
 
+  function versionTag() public pure override returns (bytes4) {
+    return bytes4(keccak256("BaseVerifierTestHelper"));
+  }
+
   /// @notice Exposes the internal storage location setter for testing.
   function setStorageLocations(
     string[] memory storageLocations

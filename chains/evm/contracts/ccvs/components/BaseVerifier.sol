@@ -261,6 +261,10 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
     }
   }
 
+  /// @notice Exposes the version tag for outbound requests.
+  /// @dev Used by operational tooling. Verifiers implemented by CLL override this function.
+  function versionTag() public pure virtual returns (bytes4);
+
   /// @inheritdoc IERC165
   function supportsInterface(
     bytes4 interfaceId

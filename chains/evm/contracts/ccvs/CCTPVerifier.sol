@@ -448,7 +448,7 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   }
 
   /// @notice Exposes the version tag.
-  function versionTag() public pure returns (bytes4) {
+  function versionTag() public pure override returns (bytes4) {
     return VERSION_TAG_V1_7_0;
   }
 
