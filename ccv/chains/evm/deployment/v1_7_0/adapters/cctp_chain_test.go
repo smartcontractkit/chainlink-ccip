@@ -555,7 +555,7 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 	require.Equal(t, uint32(1), homeDomain.DomainIdentifier, "Domain identifier should match on home chain")
 	require.True(t, homeDomain.Enabled, "Domain should be enabled on home chain")
 	require.Equal(t, common.LeftPadBytes(nonHomeCCTPMessageTransmitterProxyAddr.Bytes(), 32), homeDomain.AllowedCallerOnDest[:], "AllowedCallerOnDest should be non-home message transmitter proxy on home chain")
-	require.Equal(t, common.LeftPadBytes(homeCCTPVerifierAddr.Bytes(), 32), homeDomain.AllowedCallerOnSource[:], "AllowedCallerOnSource should be home CCTPVerifier on home chain")
+	require.Equal(t, common.LeftPadBytes(nonHomeCCTPVerifierAddr.Bytes(), 32), homeDomain.AllowedCallerOnSource[:], "AllowedCallerOnSource should be home CCTPVerifier on home chain")
 	require.Equal(t, [32]byte{}, homeDomain.MintRecipientOnDest, "MintRecipientOnDest should be zero for EVM on home chain")
 
 	// Check CCTPVerifier remote chain config on home chain
@@ -663,7 +663,7 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 	require.Equal(t, uint32(1), nonHomeDomain.DomainIdentifier, "Domain identifier should match on non-home chain")
 	require.True(t, nonHomeDomain.Enabled, "Domain should be enabled on non-home chain")
 	require.Equal(t, common.LeftPadBytes(homeCCTPMessageTransmitterProxyAddr.Bytes(), 32), nonHomeDomain.AllowedCallerOnDest[:], "AllowedCallerOnDest should be home message transmitter proxy on non-home chain")
-	require.Equal(t, common.LeftPadBytes(nonHomeCCTPVerifierAddr.Bytes(), 32), nonHomeDomain.AllowedCallerOnSource[:], "AllowedCallerOnSource should be non-home CCTPVerifier on non-home chain")
+	require.Equal(t, common.LeftPadBytes(homeCCTPVerifierAddr.Bytes(), 32), nonHomeDomain.AllowedCallerOnSource[:], "AllowedCallerOnSource should be home CCTPVerifier on non-home chain")
 	require.Equal(t, [32]byte{}, nonHomeDomain.MintRecipientOnDest, "MintRecipientOnDest should be zero for EVM on non-home chain")
 
 	// Check CCTPVerifier remote chain config on non-home chain
