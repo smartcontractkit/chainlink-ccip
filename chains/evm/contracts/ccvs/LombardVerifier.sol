@@ -371,6 +371,11 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
     _applyRemoteChainConfigUpdates(remoteChainConfigArgs);
   }
 
+  /// @notice Exposes the version tag.
+  function versionTag() public pure override returns (bytes4) {
+    return VERSION_TAG_V1_7_0;
+  }
+
   // ================================================================
   // │                             Fees                             │
   // ================================================================
