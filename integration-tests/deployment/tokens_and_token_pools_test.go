@@ -19,7 +19,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	bnmERC20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	evmseqV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
@@ -232,9 +231,9 @@ func TestTokensAndTokenPools(t *testing.T) {
 	t.Run("Token Expansion EVM and Solana", func(t *testing.T) {
 		// Verify that token and token pool do NOT exist in the datastore yet
 		for _, data := range evmTestData {
-			_, err := evmAdapter.FindLatestAddressRef(env.DataStore, datastore.AddressRef{ChainSelector: data.Chain.Selector, Qualifier: data.TokenPoolQualifier, Type: datastore.ContractType(evmTokenPoolType)})
+			_, err = evmAdapter.FindOneTokenAddress(env.DataStore, data.Chain.Selector, &datastore.AddressRef{Qualifier: data.Token.Symbol})
 			require.Error(t, err)
-			_, err = evmAdapter.FindOneTokenAddress(env.DataStore, data.Chain.Selector, data.Token.Symbol)
+			_, err := evmAdapter.FindLatestAddressRef(env.DataStore, datastore.AddressRef{ChainSelector: data.Chain.Selector, Qualifier: data.TokenPoolQualifier, Type: datastore.ContractType(evmTokenPoolType)})
 			require.Error(t, err)
 		}
 
@@ -247,13 +246,6 @@ func TestTokensAndTokenPools(t *testing.T) {
 					PoolType:           solTokenPoolType.String(),
 				},
 				DeployTokenInput: solTestData.Token,
-
-				// optional fields left empty, but included here for completeness
-				RemoteCounterpartUpdates: map[uint64]tokensapi.RateLimiterConfig{},
-				RemoteCounterpartDeletes: []uint64{},
-				TokenPoolRateLimitAdmin:  "",
-				TokenPoolAdmin:           "",
-				TARAdmin:                 "",
 			},
 		}
 
@@ -291,7 +283,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 				require.NoError(t, err)
 
 				// Query EVM token info from the chain
-				tokAddress, err := evmAdapter.FindOneTokenAddress(env.DataStore, data.Chain.Selector, data.Token.Symbol)
+				tokAddress, err := evmAdapter.FindOneTokenAddress(env.DataStore, data.Chain.Selector, &datastore.AddressRef{Qualifier: data.Token.Symbol})
 				require.NoError(t, err)
 				tokn, err := bnmERC20gen.NewBurnMintERC20(tokAddress, data.Chain.Client)
 				require.NoError(t, err)
@@ -345,19 +337,17 @@ func TestTokensAndTokenPools(t *testing.T) {
 		t.Run("Validate ManualRegistration", func(t *testing.T) {
 			for _, data := range evmTestData {
 				// Verify that the token and token pool exist in datastore
-				tokAddress, err := evmAdapter.FindOneTokenAddress(env.DataStore, data.Chain.Selector, data.Token.Symbol)
-				require.NoError(t, err)
-				tpAddress, err := evmAdapter.FindLatestAddressRef(env.DataStore, datastore.AddressRef{ChainSelector: data.Chain.Selector, Qualifier: data.TokenPoolQualifier, Type: datastore.ContractType(evmTokenPoolType)})
+				tokAddress, err := evmAdapter.FindOneTokenAddress(env.DataStore, data.Chain.Selector, &datastore.AddressRef{Qualifier: data.Token.Symbol})
 				require.NoError(t, err)
 
-				// Verify that no **pending** admin exists for the token at the moment. Also,
-				// the TokenExpansion changeset should have set the EVM deployer as the admin
-				// for the token.
+				// Verify that nothing is set for the token in TAR yet since the token expansion changeset
+				// should not have configured the token for transfers
+				// (i.e. it should have deployed the token and token pool, but not set the pool on the token or proposed an admin)
 				tokConfig, err := data.TAR.GetTokenConfig(&bind.CallOpts{Context: t.Context()}, tokAddress)
 				require.NoError(t, err)
 				require.Equal(t, 0, tokConfig.PendingAdministrator.Cmp(common.Address{}), fmt.Sprintf("expected pending admin %q to be zero address", tokConfig.PendingAdministrator.Hex()))
-				require.Equal(t, 0, tokConfig.Administrator.Cmp(data.Deployer), fmt.Sprintf("expected current admin %q to be deployer %q", tokConfig.Administrator.Hex(), data.Deployer.Hex()))
-				require.Equal(t, 0, tokConfig.TokenPool.Cmp(tpAddress), fmt.Sprintf("expected token pool %q to match registered pool %q", tokConfig.TokenPool.Hex(), tpAddress.Hex()))
+				require.Equal(t, 0, tokConfig.Administrator.Cmp(common.Address{}), fmt.Sprintf("expected current admin %q to be zero address", tokConfig.Administrator.Hex()))
+				require.Equal(t, 0, tokConfig.TokenPool.Cmp(common.Address{}), fmt.Sprintf("expected token pool %q to be zero address", tokConfig.TokenPool.Hex()))
 
 				// At this point, the `TokenExpansion` changeset will have already configured an admin
 				// for the token, so the EVM manual registration changeset should detect this and call
@@ -397,12 +387,13 @@ func TestTokensAndTokenPools(t *testing.T) {
 				MergeAddresses(t, env, output.DataStore)
 				testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
 
-				// Verify that a new admin was proposed for the specified token
+				// Verify that a new admin was proposed for the specified token,
+				// and that the token pool is still not set since the token has not been configured for transfers yet
 				tokConfig, err = data.TAR.GetTokenConfig(&bind.CallOpts{Context: t.Context()}, tokAddress)
 				require.NoError(t, err)
 				require.Equal(t, 0, tokConfig.PendingAdministrator.Cmp(data.Deployer), fmt.Sprintf("expected pending admin %q to be deployer %q", tokConfig.PendingAdministrator.Hex(), data.Deployer.Hex()))
-				require.Equal(t, 0, tokConfig.Administrator.Cmp(data.Deployer), fmt.Sprintf("expected current admin %q to be deployer %q", tokConfig.Administrator.Hex(), data.Deployer.Hex()))
-				require.Equal(t, 0, tokConfig.TokenPool.Cmp(tpAddress), fmt.Sprintf("expected token pool %q to match registered pool %q", tokConfig.TokenPool.Hex(), tpAddress.Hex()))
+				require.Equal(t, 0, tokConfig.Administrator.Cmp(common.Address{}), fmt.Sprintf("expected current admin %q to be zero address", tokConfig.Administrator.Hex()))
+				require.Equal(t, 0, tokConfig.TokenPool.Cmp(common.Address{}), fmt.Sprintf("expected token pool %q to be zero address", tokConfig.TokenPool.Hex()))
 			}
 		})
 
@@ -518,7 +509,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 				require.True(t, bytes.Equal(remotePoolsAB[0], common.LeftPadBytes(poolB.Bytes(), 32)))
 
 				// Verify that the remote token was set correctly
-				tokB, err := evmAdapter.FindOneTokenAddress(env.DataStore, evmB.Chain.Selector, evmB.Token.Symbol)
+				tokB, err := evmAdapter.FindOneTokenAddress(env.DataStore, evmB.Chain.Selector, &datastore.AddressRef{Qualifier: evmB.Token.Symbol})
 				require.NoError(t, err)
 				require.True(t, bytes.Equal(remoteTokenAB, common.LeftPadBytes(tokB.Bytes(), 32)))
 			}
@@ -548,18 +539,19 @@ func TestTokensAndTokenPools(t *testing.T) {
 				ExistingDataStore: env.DataStore,
 			}
 
-			deployTokenOutput, err := cldf_ops.ExecuteSequence(env.OperationsBundle, solAdapter.DeployToken(), env.BlockChains, deployTokenInput)
+			// Run token expansion
+			output, err = tokensapi.TokenExpansion().Apply(*env, tokensapi.TokenExpansionInput{
+				TokenExpansionInputPerChain: map[uint64]tokensapi.TokenExpansionInputPerChain{
+					solTestData.Chain.Selector: {
+						TokenPoolVersion: v1_6_0,
+						DeployTokenInput: &deployTokenInput,
+					},
+				},
+				ChainAdapterVersion: v1_6_0,
+				MCMS:                NewDefaultInputForMCMS("Deploy token to test"),
+			})
 			require.NoError(t, err)
-
-			// Store new token in Data store, this is needed as the sequence is ran independently and the token needs to be present in the datastore for the manual registration changeset to find it
-			ds := datastore.NewMemoryDataStore()
-			dataStoreErr := ds.Merge(env.DataStore)
-			require.NoError(t, dataStoreErr)
-			for _, r := range deployTokenOutput.Output.Addresses {
-				err = ds.Addresses().Add(r)
-				require.NoError(t, err)
-			}
-			MergeAddresses(t, env, ds)
+			MergeAddresses(t, env, output.DataStore)
 
 			// Verify that the token exists in datastore
 			tokenAddr, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
