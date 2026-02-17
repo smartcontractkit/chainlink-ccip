@@ -1,6 +1,7 @@
 package deploy
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 
@@ -129,7 +130,7 @@ func laneMigrateApply(migratorReg *LaneMigratorRegistry, mcmsRegistry *changeset
 			// get the ramp address refs
 			onRampRef, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 				ChainSelector: chainSel,
-				Type:          "OnRamp", // does not work with 1.5 ramps
+				Type:          "OnRamp",
 				Version:       perChainConfig.RampVersion,
 			}, chainSel, datastore_utils.FullRef)
 			if err != nil {
@@ -137,7 +138,7 @@ func laneMigrateApply(migratorReg *LaneMigratorRegistry, mcmsRegistry *changeset
 			}
 			offRampRef, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 				ChainSelector: chainSel,
-				Type:          "OffRamp", // does not work with 1.5 ramps
+				Type:          "OffRamp",
 				Version:       perChainConfig.RampVersion,
 			}, chainSel, datastore_utils.FullRef)
 			if err != nil {
@@ -190,6 +191,10 @@ func laneMigrateVerify(migratorReg *LaneMigratorRegistry) func(cldf.Environment,
 			_, err := migratorReg.GetRouterUpdater(chainSel, perChainConfig.RouterVersion)
 			if err != nil {
 				return fmt.Errorf("error verifying existence of router updater for chain selector %d: %w", chainSel, err)
+			}
+			// check that ramp version to upgrade to is always more than 1.5
+			if perChainConfig.RampVersion.LessThan(semver.MustParse("1.6.0")) {
+				return errors.New("cannot upgrade to a version less than 1.6.0 with this changeset")
 			}
 			_, err = migratorReg.GetRampUpdater(chainSel, perChainConfig.RampVersion)
 			if err != nil {
