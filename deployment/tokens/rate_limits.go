@@ -133,6 +133,9 @@ func setTokenPoolRateLimitsApply() func(cldf.Environment, TPRLInput) (cldf.Chang
 					tprlRemote.OutboundRateLimiterConfig.IsEnabled = true
 					tprlRemote.OutboundRateLimiterConfig.Capacity = big.NewInt(int64(inputs.Capacity * math.Pow10(int(decimals))))
 					tprlRemote.OutboundRateLimiterConfig.Rate = big.NewInt(int64(inputs.Rate * math.Pow10(int(decimals))))
+					if tprlRemote.OutboundRateLimiterConfig.Capacity.Cmp(big.NewInt(0)) <= 0 || tprlRemote.OutboundRateLimiterConfig.Rate.Cmp(big.NewInt(0)) <= 0 {
+						return cldf.ChangesetOutput{}, fmt.Errorf("outbound rate limiter config for remote chain %d is enabled but capacity or rate is zero or negative after scaling by token decimals", remoteSelector)
+					}
 				}
 
 				if !remoteInputs.IsEnabled {
@@ -144,6 +147,9 @@ func setTokenPoolRateLimitsApply() func(cldf.Environment, TPRLInput) (cldf.Chang
 					// We set the inbound capacity to be 1.1x the outbound capacity of the counterpart to avoid accidentally hitting the rate limit due to minor timing differences in refilling
 					tprlRemote.InboundRateLimiterConfig.Capacity = big.NewInt(int64(remoteInputs.Capacity * 1.1 * math.Pow10(int(decimals))))
 					tprlRemote.InboundRateLimiterConfig.Rate = big.NewInt(int64(remoteInputs.Rate * 1.1 * math.Pow10(int(decimals))))
+					if tprlRemote.InboundRateLimiterConfig.Capacity.Cmp(big.NewInt(0)) <= 0 || tprlRemote.InboundRateLimiterConfig.Rate.Cmp(big.NewInt(0)) <= 0 {
+						return cldf.ChangesetOutput{}, fmt.Errorf("inbound rate limiter config for remote chain %d is enabled but capacity or rate is zero or negative after scaling by token decimals", remoteSelector)
+					}
 				}
 				rateLimitReport, err := cldf_ops.ExecuteSequence(
 					e.OperationsBundle, tokenPoolAdapter.SetTokenPoolRateLimits(), e.BlockChains, tprlRemote)
