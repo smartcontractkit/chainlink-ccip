@@ -31,6 +31,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/mock_receiver"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/onramp"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/proxy"
+	proxy_latest "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/proxy"
 )
 
 type MockReceiverParams struct {
@@ -97,6 +99,7 @@ type DeployChainContractsInput struct {
 	CREATE2Factory    common.Address
 	ExistingAddresses []datastore.AddressRef
 	ContractParams    ContractParams
+	DeployTestRouter  bool
 }
 
 var DeployChainContracts = cldf_ops.NewSequence(
@@ -189,6 +192,22 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, err
 		}
 		addresses = append(addresses, routerRef)
+
+		// Deploy Test Router
+		if input.DeployTestRouter {
+			testRouterRef, err := contract_utils.MaybeDeployContract(b, router.DeployTestRouter, chain, contract_utils.DeployInput[router.ConstructorArgs]{
+				TypeAndVersion: deployment.NewTypeAndVersion(router.TestRouterContractType, *router.Version),
+				ChainSelector:  chain.Selector,
+				Args: router.ConstructorArgs{
+					WrappedNative: common.HexToAddress(wethRef.Address),
+					RMNProxy:      common.HexToAddress(rmnProxyRef.Address),
+				},
+			}, input.ExistingAddresses)
+			if err != nil {
+				return sequences.OnChainOutput{}, err
+			}
+			addresses = append(addresses, testRouterRef)
+		}
 
 		// Deploy TokenAdminRegistry
 		tokenAdminRegistryRef, err := contract_utils.MaybeDeployContract(b, token_admin_registry.Deploy, chain, contract_utils.DeployInput[token_admin_registry.ConstructorArgs]{
@@ -353,20 +372,82 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			}
 			addresses = append(addresses, executorRef)
 
-			// Deploy ExecutorProxy
-			executorProxyRef, err := contract_utils.MaybeDeployContract(b, executor.DeployProxy, chain, contract_utils.DeployInput[executor.ProxyConstructorArgs]{
-				TypeAndVersion: deployment.NewTypeAndVersion(executor.ProxyType, *executor.Version),
-				ChainSelector:  chain.Selector,
-				Args: executor.ProxyConstructorArgs{
-					ExecutorAddress: common.HexToAddress(executorRef.Address),
-					FeeAggregator:   executorParam.DynamicConfig.FeeAggregator,
-				},
-				Qualifier: qualifierPtr,
-			}, input.ExistingAddresses)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy ExecutorProxy: %w", err)
+			// Deploy ExecutorProxy via CREATE2
+			var executorProxyRef *datastore.AddressRef
+			for _, ref := range input.ExistingAddresses {
+				if ref.Type == datastore.ContractType(executor.ProxyType) &&
+					ref.Version.String() == executor.Version.String() &&
+					(qualifierPtr == nil || ref.Qualifier == *qualifierPtr) {
+					executorProxyRef = &ref
+				}
 			}
-			addresses = append(addresses, executorProxyRef)
+			if executorProxyRef != nil {
+				addresses = append(addresses, *executorProxyRef)
+			} else {
+				if input.CREATE2Factory == (common.Address{}) {
+					return sequences.OnChainOutput{}, fmt.Errorf("CREATE2Factory is required to deploy ExecutorProxy")
+				}
+				deployExecutorProxyViaCREATE2Report, err := cldf_ops.ExecuteSequence(b, DeployContractViaCREATE2, chain, DeployContractViaCREATE2Input{
+					ChainSelector:  chain.Selector,
+					Qualifier:      *qualifierPtr,
+					Type:           datastore.ContractType(executor.ProxyType),
+					Version:        executor.Version,
+					CREATE2Factory: input.CREATE2Factory,
+					ABI:            proxy_latest.ProxyABI,
+					BIN:            proxy_latest.ProxyBin,
+					ConstructorArgs: []any{
+						// To ensure consistent addresses, we have to deploy with the same constructor args on every chain.
+						// Instead of setting in the constructor, we set the target and fee aggregator after deployment.
+						common.HexToAddress("0x01"), // Target (will revert if target is 0, so we use a dummy address)
+						common.Address{},            // Fee Aggregator
+					},
+				})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy ExecutorProxy: %w", err)
+				}
+				addresses = append(addresses, deployExecutorProxyViaCREATE2Report.Output.Addresses...)
+				writes = append(writes, deployExecutorProxyViaCREATE2Report.Output.Writes...)
+
+				if len(deployExecutorProxyViaCREATE2Report.Output.Addresses) != 1 {
+					return sequences.OnChainOutput{}, fmt.Errorf("expected 1 ExecutorProxy address, got %d", len(deployExecutorProxyViaCREATE2Report.Output.Addresses))
+				}
+				executorProxyRef = &deployExecutorProxyViaCREATE2Report.Output.Addresses[0]
+
+				// Accept ownership of the ExecutorProxy
+				acceptOwnershipReport, err := cldf_ops.ExecuteOperation(b, proxy.AcceptOwnership, chain, contract_utils.FunctionInput[proxy.AcceptOwnershipArgs]{
+					ChainSelector: chain.Selector,
+					Address:       common.HexToAddress(executorProxyRef.Address),
+					Args: proxy.AcceptOwnershipArgs{
+						IsProposedOwner: true,
+					},
+				})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to accept ownership of ExecutorProxy: %w", err)
+				}
+				writes = append(writes, acceptOwnershipReport.Output)
+			}
+
+			// Set target on the ExecutorProxy
+			setTargetReport, err := cldf_ops.ExecuteOperation(b, proxy.SetTarget, chain, contract_utils.FunctionInput[common.Address]{
+				ChainSelector: chain.Selector,
+				Address:       common.HexToAddress(executorProxyRef.Address),
+				Args:          common.HexToAddress(executorRef.Address),
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to set target on ExecutorProxy: %w", err)
+			}
+			writes = append(writes, setTargetReport.Output)
+
+			// Set fee aggregator on the ExecutorProxy
+			setFeeAggregatorReport, err := cldf_ops.ExecuteOperation(b, proxy.SetFeeAggregator, chain, contract_utils.FunctionInput[common.Address]{
+				ChainSelector: chain.Selector,
+				Address:       common.HexToAddress(executorProxyRef.Address),
+				Args:          executorParam.DynamicConfig.FeeAggregator,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to set fee aggregator on ExecutorProxy: %w", err)
+			}
+			writes = append(writes, setFeeAggregatorReport.Output)
 		}
 
 		for _, mockReceiverParams := range input.ContractParams.MockReceivers {
