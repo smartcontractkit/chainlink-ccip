@@ -184,7 +184,7 @@ func laneMigrateApply(migratorReg *LaneMigratorRegistry, mcmsRegistry *changeset
 	}
 }
 
-func lanemigrateVerify(migratorReg *LaneMigratorRegistry) func(cldf.Environment, LaneMigratorConfig) error {
+func laneMigrateVerify(migratorReg *LaneMigratorRegistry) func(cldf.Environment, LaneMigratorConfig) error {
 	return func(e cldf.Environment, input LaneMigratorConfig) error {
 		for chainSel, perChainConfig := range input.Input {
 			_, err := migratorReg.GetRouterUpdater(chainSel, perChainConfig.RouterVersion)
