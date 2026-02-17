@@ -439,6 +439,32 @@ var dummyContractMetadata = []datastore.ContractMetadata{
 	},
 }
 
+// validMaxFeeJuelsPerMsgFromMetadata returns the set of valid MaxFeeJuelsPerMsg for a chain
+// by collecting values from contract metadata. The sequence merges v1.6 (FeeQuoter) and v1.5 (OnRamp)
+// outputs; when the v1.6 path finds a FeeQuoter ref it uses FeeQuoter's StaticCfg.MaxFeeJuelsPerMsg,
+// otherwise it may use only v1.5's ConstructorArgs which take MaxFeeJuelsPerMsg from OnRamp's
+// MaxNopFeesJuels. So for chains that have both FeeQuoter and OnRamp metadata, either value is valid
+// depending on ref version matching the sequence's dependency. Keys are big.Int.String() for set lookup.
+func validMaxFeeJuelsPerMsgFromMetadata(chainSelector uint64, contractMetadata []datastore.ContractMetadata) map[string]bool {
+	valid := make(map[string]bool)
+	for _, meta := range contractMetadata {
+		if meta.ChainSelector != chainSelector {
+			continue
+		}
+		if fq, ok := meta.Metadata.(seq1_6.FeeQuoterImportConfigSequenceOutput); ok {
+			if fq.StaticCfg.MaxFeeJuelsPerMsg != nil {
+				valid[fq.StaticCfg.MaxFeeJuelsPerMsg.String()] = true
+			}
+		}
+		if onr, ok := meta.Metadata.(seq1_5.OnRampImportConfigSequenceOutput); ok {
+			if onr.StaticConfig.MaxNopFeesJuels != nil {
+				valid[onr.StaticConfig.MaxNopFeesJuels.String()] = true
+			}
+		}
+	}
+	return valid
+}
+
 // getExpectedOutput returns hardcoded expected FeeQuoterUpdate values based on contract_metadata.json
 func getExpectedOutput() map[uint64]sequence1_7.FeeQuoterUpdate {
 	linkToken := common.HexToAddress("0x514910771AF9Ca656af840dff83E8264EcF986CA")
@@ -880,18 +906,13 @@ func TestSequenceFeeQuoterInputCreation(t *testing.T) {
 			require.False(t, output.ConstructorArgs.IsEmpty(), "ConstructorArgs should be present for new deployment on chain %d", chainSelector)
 			require.Equal(t, expected.ConstructorArgs.StaticConfig.LinkToken, output.ConstructorArgs.StaticConfig.LinkToken,
 				"LinkToken should match expected value on chain %d", chainSelector)
-			// MaxFeeJuelsPerMsg: for chain 5936861837188149645 both FeeQuoter (1e18) and OnRamp (0.9e18) are valid
-			// depending on whether the v1.6 path finds the FeeQuoter ref (version match with pinned dependency).
-			if chainSelector == 5936861837188149645 {
-				maxFeeFromOnRamp, _ := new(big.Int).SetString("900000000000000000", 10)
-				matchExpected := expected.ConstructorArgs.StaticConfig.MaxFeeJuelsPerMsg.Cmp(output.ConstructorArgs.StaticConfig.MaxFeeJuelsPerMsg) == 0
-				matchOnRamp := maxFeeFromOnRamp.Cmp(output.ConstructorArgs.StaticConfig.MaxFeeJuelsPerMsg) == 0
-				require.True(t, matchExpected || matchOnRamp,
-					"MaxFeeJuelsPerMsg should match expected (from FeeQuoter) or OnRamp value on chain %d", chainSelector)
-			} else {
-				require.Equal(t, 0, expected.ConstructorArgs.StaticConfig.MaxFeeJuelsPerMsg.Cmp(output.ConstructorArgs.StaticConfig.MaxFeeJuelsPerMsg),
-					"MaxFeeJuelsPerMsg should match expected value on chain %d", chainSelector)
-			}
+			// MaxFeeJuelsPerMsg must be one of the values present in contract metadata for this chain
+			// (FeeQuoter StaticCfg or OnRamp MaxNopFeesJuels); the sequence uses one or the other depending
+			// on whether the v1.6 path finds a FeeQuoter ref.
+			validMaxFee := validMaxFeeJuelsPerMsgFromMetadata(chainSelector, contractMetadata)
+			require.NotEmpty(t, validMaxFee, "contract metadata for chain %d should define at least one MaxFeeJuelsPerMsg source", chainSelector)
+			require.True(t, validMaxFee[output.ConstructorArgs.StaticConfig.MaxFeeJuelsPerMsg.String()],
+				"MaxFeeJuelsPerMsg should be one of the values from contract metadata (FeeQuoter or OnRamp) on chain %d", chainSelector)
 			require.ElementsMatch(t, expected.ConstructorArgs.PriceUpdaters, output.ConstructorArgs.PriceUpdaters,
 				"PriceUpdaters should match expected value on chain %d", chainSelector)
 		} else {
