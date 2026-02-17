@@ -105,6 +105,14 @@ func setTokenPoolRateLimitsApply() func(cldf.Environment, TPRLInput) (cldf.Chang
 				if !ok {
 					return cldf.ChangesetOutput{}, fmt.Errorf("no config provided for remote chain with selector %d", remoteSelector)
 				}
+				counterpartFamily, err := chain_selectors.GetSelectorFamily(remoteSelector)
+				if err != nil {
+					return cldf.ChangesetOutput{}, err
+				}
+				counterPartAdapter, exists := tokenPoolRegistry.GetTokenAdapter(counterpartFamily, counterpart.ChainAdapterVersion)
+				if !exists {
+					return cldf.ChangesetOutput{}, fmt.Errorf("no TokenPoolAdapter registered for chain family '%s'", counterpartFamily)
+				}
 				remoteInputs, ok := counterpart.RemoteOutbounds[selector]
 				if !ok {
 					return cldf.ChangesetOutput{}, fmt.Errorf("no inputs provided for remote chain with selector %d to chain with selector %d", selector, remoteSelector)
@@ -114,11 +122,11 @@ func setTokenPoolRateLimitsApply() func(cldf.Environment, TPRLInput) (cldf.Chang
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve token pool ref on chain with selector %d: %w", remoteSelector, err)
 				}
-				remoteToken, err := datastore_utils.FindAndFormatRef(e.DataStore, counterpart.TokenRef, remoteSelector, datastore_utils.FullRef)
+				remoteTokenBytes, err := datastore_utils.FindAndFormatRef(e.DataStore, counterpart.TokenRef, remoteSelector, counterPartAdapter.AddressRefToBytes)
 				if err != nil {
-					return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve token ref on chain with selector %d: %w", remoteSelector, err)
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve token ref on chain with selector %d: %w", selector, err)
 				}
-				remoteDecimals, err := tokenPoolAdapter.DeriveTokenDecimals(e, remoteSelector, remoteTokenPool, []byte(remoteToken.Address))
+				remoteDecimals, err := counterPartAdapter.DeriveTokenDecimals(e, remoteSelector, remoteTokenPool, remoteTokenBytes)
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to get token decimals for token on chain with selector %d: %w", selector, err)
 				}
@@ -145,7 +153,7 @@ func setTokenPoolRateLimitsApply() func(cldf.Environment, TPRLInput) (cldf.Chang
 					// Only old EVM pools need to scale by remote deciamls on inbound. Newer pools and non-EVM pools handle all conversions in local decimals.
 					// This is a hack. Avoiding it would require refactoring the token pool adapters to handle rate limit configs in a more structured way instead of
 					// just passing them as bytes through the registry, so for now we can live with this special case for old EVM pools since we're moving towards newer versions and non-EVM chains where this isn't an issue.
-					if family == chain_selectors.FamilyEVM && tokenPool.Version.LessThan(semver.MustParse("1.6.1")){
+					if family == chain_selectors.FamilyEVM && tokenPool.Version.LessThan(semver.MustParse("1.6.1")) {
 						scaleByDecimals = remoteDecimals
 					}
 					tprlRemote.InboundRateLimiterConfig.IsEnabled = true
