@@ -196,11 +196,11 @@ func lanemigrateVerify() func(cldf.Environment, LaneMigraterConfig) error {
 				return fmt.Errorf("error verifying existence of ramp updater for chain selector %d: %w", chainSel, err)
 			}
 			if !e.BlockChains.Exists(chainSel) {
-				return fmt.Errorf("error verifying existence of blockchain with selector %d in environment: %w", chainSel, err)
+				return fmt.Errorf("error verifying existence of blockchain with selector %d in environment: blockchain not found", chainSel)
 			}
 			for _, remoteChainSel := range perChainConfig.RemoteChains {
 				if !e.BlockChains.Exists(remoteChainSel) {
-					return fmt.Errorf("error verifying existence of remote blockchain with selector %d in environment: %w", remoteChainSel, err)
+					return fmt.Errorf("error verifying existence of remote blockchain with selector %d in environment: blockchain not found", remoteChainSel)
 				}
 			}
 			// verify that the existing addresses for the chain selector are present in the environment datastore
