@@ -63,14 +63,18 @@ func (c *OnRampContract) ApplyDestChainConfigUpdates(opts *bind.TransactOpts, ar
 	return c.contract.Transact(opts, "applyDestChainConfigUpdates", args)
 }
 
-func (c *OnRampContract) GetDestChainConfig(opts *bind.CallOpts, args uint64) (any, error) {
+func (c *OnRampContract) GetDestChainConfig(opts *bind.CallOpts, args uint64) (GetDestChainConfigData, error) {
 	var out []any
 	err := c.contract.Call(opts, &out, "getDestChainConfig", args)
 	if err != nil {
-		var zero any
+		var zero GetDestChainConfigData
 		return zero, err
 	}
-	return *abi.ConvertType(out[0], new(any)).(*any), nil
+	var result GetDestChainConfigData
+	result.SequenceNumber = *abi.ConvertType(out[0], new(uint64)).(*uint64)
+	result.AllowlistEnabled = *abi.ConvertType(out[1], new(bool)).(*bool)
+	result.Router = *abi.ConvertType(out[2], new(common.Address)).(*common.Address)
+	return result, nil
 }
 
 func (c *OnRampContract) GetStaticConfig(opts *bind.CallOpts) (StaticConfig, error) {
@@ -118,6 +122,12 @@ type StaticConfig struct {
 	TokenAdminRegistry common.Address
 }
 
+type GetDestChainConfigData struct {
+	SequenceNumber   uint64
+	AllowlistEnabled bool
+	Router           common.Address
+}
+
 type ConstructorArgs struct {
 	StaticConfig        StaticConfig
 	DynamicConfig       DynamicConfig
@@ -158,13 +168,13 @@ var ApplyDestChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]DestC
 	},
 })
 
-var GetDestChainConfig = contract.NewRead(contract.ReadParams[uint64, any, *OnRampContract]{
+var GetDestChainConfig = contract.NewRead(contract.ReadParams[uint64, GetDestChainConfigData, *OnRampContract]{
 	Name:         "onramp:get-dest-chain-config",
 	Version:      Version,
 	Description:  "Calls getDestChainConfig on the contract",
 	ContractType: ContractType,
 	NewContract:  NewOnRampContract,
-	CallContract: func(c *OnRampContract, opts *bind.CallOpts, args uint64) (any, error) {
+	CallContract: func(c *OnRampContract, opts *bind.CallOpts, args uint64) (GetDestChainConfigData, error) {
 		return c.GetDestChainConfig(opts, args)
 	},
 })

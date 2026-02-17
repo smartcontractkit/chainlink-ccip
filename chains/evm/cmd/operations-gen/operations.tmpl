@@ -86,6 +86,14 @@ type {{.Name}} struct {
 {{- end}}
 }
 {{- end}}
+{{range .ResultStructs}}
+
+type {{.Name}} struct {
+{{- range .Fields}}
+	{{.GoName}} {{.GoType}}
+{{- end}}
+}
+{{- end}}
 {{- if not .NoDeployment}}
 {{if .Constructor}}
 
