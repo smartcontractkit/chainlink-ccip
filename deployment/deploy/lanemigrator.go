@@ -19,16 +19,16 @@ import (
 )
 
 var (
-	singletonLaneMigraterRegistry *LaneMigraterRegistry
-	lanemigraterOnce              sync.Once
+	singletonLaneMigratorRegistry *LaneMigratorRegistry
+	laneMigratorOnce              sync.Once
 )
 
-type LaneMigraterConfig struct {
-	Input map[uint64]LaneMigraterConfigPerChain
+type LaneMigratorConfig struct {
+	Input map[uint64]LaneMigratorConfigPerChain
 	MCMS  mcms.Input
 }
 
-type LaneMigraterConfigPerChain struct {
+type LaneMigratorConfigPerChain struct {
 	RemoteChains  []uint64
 	RouterVersion *semver.Version
 	RampVersion   *semver.Version
@@ -57,41 +57,41 @@ type RouterUpdateInRamp interface {
 	UpdateVersionWithRouter() *cldf_ops.Sequence[RampUpdaterConfig, sequences.OnChainOutput, chain.BlockChains]
 }
 
-type LaneMigraterRegistry struct {
+type LaneMigratorRegistry struct {
 	RouterUpdater map[string]RampUpdateInRouter
 	RampUpdater   map[string]RouterUpdateInRamp
 }
 
-func newLaneMigraterRegistry() *LaneMigraterRegistry {
-	return &LaneMigraterRegistry{
+func newLaneMigratorRegistry() *LaneMigratorRegistry {
+	return &LaneMigratorRegistry{
 		RouterUpdater: make(map[string]RampUpdateInRouter),
 		RampUpdater:   make(map[string]RouterUpdateInRamp),
 	}
 }
 
-func GetLaneMigraterRegistry() *LaneMigraterRegistry {
-	lanemigraterOnce.Do(func() {
-		singletonLaneMigraterRegistry = newLaneMigraterRegistry()
+func GetLaneMigratorRegistry() *LaneMigratorRegistry {
+	laneMigratorOnce.Do(func() {
+		singletonLaneMigratorRegistry = newLaneMigratorRegistry()
 	})
-	return singletonLaneMigraterRegistry
+	return singletonLaneMigratorRegistry
 }
 
-func (r *LaneMigraterRegistry) RegisterRouterUpdater(chainfamily string, version *semver.Version, updater RampUpdateInRouter) {
+func (r *LaneMigratorRegistry) RegisterRouterUpdater(chainfamily string, version *semver.Version, updater RampUpdateInRouter) {
 	id := utils.NewRegistererID(chainfamily, version)
 	if _, exists := r.RouterUpdater[id]; !exists {
 		r.RouterUpdater[id] = updater
 	}
 }
 
-func (r *LaneMigraterRegistry) RegisterRampUpdater(chainfamily string, version *semver.Version, updater RouterUpdateInRamp) {
+func (r *LaneMigratorRegistry) RegisterRampUpdater(chainfamily string, version *semver.Version, updater RouterUpdateInRamp) {
 	id := utils.NewRegistererID(chainfamily, version)
 	if _, exists := r.RampUpdater[id]; !exists {
 		r.RampUpdater[id] = updater
 	}
 }
 
-func (r *LaneMigraterRegistry) GetRouterUpdater(chainsel uint64, version *semver.Version) (RampUpdateInRouter, error) {
-	id := utils.NewIdFromSelector(chainsel, version)
+func (r *LaneMigratorRegistry) GetRouterUpdater(chainsel uint64, version *semver.Version) (RampUpdateInRouter, error) {
+	id := utils.NewIDFromSelector(chainsel, version)
 	updater, exists := r.RouterUpdater[id]
 	if !exists {
 		return nil, utils.ErrNoAdapterRegistered(id, version)
@@ -99,8 +99,8 @@ func (r *LaneMigraterRegistry) GetRouterUpdater(chainsel uint64, version *semver
 	return updater, nil
 }
 
-func (r *LaneMigraterRegistry) GetRampUpdater(chainsel uint64, version *semver.Version) (RouterUpdateInRamp, error) {
-	id := utils.NewIdFromSelector(chainsel, version)
+func (r *LaneMigratorRegistry) GetRampUpdater(chainsel uint64, version *semver.Version) (RouterUpdateInRamp, error) {
+	id := utils.NewIDFromSelector(chainsel, version)
 	updater, exists := r.RampUpdater[id]
 	if !exists {
 		return nil, utils.ErrNoAdapterRegistered(id, version)
@@ -108,21 +108,21 @@ func (r *LaneMigraterRegistry) GetRampUpdater(chainsel uint64, version *semver.V
 	return updater, nil
 }
 
-func LaneMigrateToNewVersionChangeset(migraterReg *LaneMigraterRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) cldf.ChangeSetV2[LaneMigraterConfig] {
-	return cldf.CreateChangeSet(lanemigrateApply(migraterReg, mcmsRegistry), lanemigrateVerify())
+func LaneMigrateToNewVersionChangeset(migratorReg *LaneMigratorRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) cldf.ChangeSetV2[LaneMigratorConfig] {
+	return cldf.CreateChangeSet(lanemigrateApply(migratorReg, mcmsRegistry), lanemigrateVerify(migratorReg))
 }
 
-func lanemigrateApply(migraterReg *LaneMigraterRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, LaneMigraterConfig) (cldf.ChangesetOutput, error) {
-	return func(e cldf.Environment, input LaneMigraterConfig) (cldf.ChangesetOutput, error) {
+func lanemigrateApply(migratorReg *LaneMigratorRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, LaneMigratorConfig) (cldf.ChangesetOutput, error) {
+	return func(e cldf.Environment, input LaneMigratorConfig) (cldf.ChangesetOutput, error) {
 		batchOps := make([]mcms_types.BatchOperation, 0)
 		reports := make([]cldf_ops.Report[any, any], 0)
 		for chainSel, perChainConfig := range input.Input {
 			existingAddresses := e.DataStore.Addresses().Filter(datastore.AddressRefByChainSelector(chainSel))
-			routerUpdater, err := migraterReg.GetRouterUpdater(chainSel, perChainConfig.RouterVersion)
+			routerUpdater, err := migratorReg.GetRouterUpdater(chainSel, perChainConfig.RouterVersion)
 			if err != nil {
 				return cldf.ChangesetOutput{}, err
 			}
-			rampUpdater, err := migraterReg.GetRampUpdater(chainSel, perChainConfig.RampVersion)
+			rampUpdater, err := migratorReg.GetRampUpdater(chainSel, perChainConfig.RampVersion)
 			if err != nil {
 				return cldf.ChangesetOutput{}, err
 			}
@@ -184,14 +184,14 @@ func lanemigrateApply(migraterReg *LaneMigraterRegistry, mcmsRegistry *changeset
 	}
 }
 
-func lanemigrateVerify(migraterReg *LaneMigraterRegistry) func(cldf.Environment, LaneMigraterConfig) error {
-	return func(e cldf.Environment, input LaneMigraterConfig) error {
+func lanemigrateVerify(migratorReg *LaneMigratorRegistry) func(cldf.Environment, LaneMigratorConfig) error {
+	return func(e cldf.Environment, input LaneMigratorConfig) error {
 		for chainSel, perChainConfig := range input.Input {
-			_, err := migraterReg.GetRouterUpdater(chainSel, perChainConfig.RouterVersion)
+			_, err := migratorReg.GetRouterUpdater(chainSel, perChainConfig.RouterVersion)
 			if err != nil {
 				return fmt.Errorf("error verifying existence of router updater for chain selector %d: %w", chainSel, err)
 			}
-			_, err = migraterReg.GetRampUpdater(chainSel, perChainConfig.RampVersion)
+			_, err = migratorReg.GetRampUpdater(chainSel, perChainConfig.RampVersion)
 			if err != nil {
 				return fmt.Errorf("error verifying existence of ramp updater for chain selector %d: %w", chainSel, err)
 			}
