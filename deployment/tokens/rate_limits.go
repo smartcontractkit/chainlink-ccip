@@ -2,11 +2,13 @@ package tokens
 
 import (
 	"fmt"
+	"math"
 	"math/big"
 
 	"github.com/Masterminds/semver/v3"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -20,24 +22,20 @@ type TPRLInput struct {
 }
 
 type TPRLConfig struct {
-	ChainSelector       uint64                 `yaml:"chain-selector" json:"chainSelector"`
-	ChainAdapterVersion *semver.Version        `yaml:"chain-adapter-version" json:"chainAdapterVersion"`
-	TokenRef            datastore.AddressRef   `yaml:"token-ref" json:"tokenRef"`
-	TokenPoolQualifier  string                 `yaml:"token-pool-qualifier" json:"tokenPoolQualifier"`
-	PoolType            string                 `yaml:"pool-type" json:"poolType"`
-	Inputs              map[uint64]TPRLRemotes `yaml:"inputs" json:"inputs"`
+	ChainAdapterVersion *semver.Version                        `yaml:"chain-adapter-version" json:"chainAdapterVersion"`
+	TokenRef            datastore.AddressRef                   `yaml:"token-ref" json:"tokenRef"`
+	TokenPoolRef        datastore.AddressRef                   `yaml:"token-pool-ref" json:"tokenPoolRef"`
+	RemoteOutbounds     map[uint64]RateLimiterConfigFloatInput `yaml:"remote-outbounds" json:"remoteOutbounds"`
 }
 
 type TPRLRemotes struct {
-	OutboundRateLimiterConfig RateLimiterConfig `yaml:"outbound-rate-limiter-config" json:"outboundRateLimiterConfig"`
-	// below are not specified by the user, filled in by the deployment system to pass to chain operations
-	InboundRateLimiterConfig RateLimiterConfig
-	ChainSelector            uint64
-	RemoteChainSelector      uint64
-	TokenRef                 datastore.AddressRef
-	TokenPoolQualifier       string
-	PoolType                 string
-	ExistingDataStore        datastore.DataStore
+	OutboundRateLimiterConfig RateLimiterConfig
+	InboundRateLimiterConfig  RateLimiterConfig
+	ChainSelector             uint64
+	RemoteChainSelector       uint64
+	TokenRef                  datastore.AddressRef
+	TokenPoolRef              datastore.AddressRef
+	ExistingDataStore         datastore.DataStore
 }
 
 // SetTokenPoolRateLimits returns a changeset that sets rate limits for token pools on multiple chains.
@@ -48,10 +46,9 @@ func SetTokenPoolRateLimits() cldf.ChangeSetV2[TPRLInput] {
 func setTokenPoolRateLimitsVerify() func(cldf.Environment, TPRLInput) error {
 	return func(e cldf.Environment, cfg TPRLInput) error {
 		for _, config := range cfg.Configs {
-			for remoteSelector, input := range config.Inputs {
-				if input.OutboundRateLimiterConfig.IsEnabled {
-					if input.OutboundRateLimiterConfig.Capacity == nil || input.OutboundRateLimiterConfig.Rate == nil ||
-						input.OutboundRateLimiterConfig.Capacity.Sign() <= 0 || input.OutboundRateLimiterConfig.Rate.Sign() <= 0 {
+			for remoteSelector, input := range config.RemoteOutbounds {
+				if input.IsEnabled {
+					if input.Capacity <= 0 || input.Rate <= 0 {
 						return fmt.Errorf("outbound rate limiter config for remote chain %d is enabled but capacity or rate is nil", remoteSelector)
 					}
 				}
@@ -68,38 +65,94 @@ func setTokenPoolRateLimitsApply() func(cldf.Environment, TPRLInput) (cldf.Chang
 		tokenPoolRegistry := GetTokenAdapterRegistry()
 		mcmsRegistry := changesets.GetRegistry()
 
-		family, err := chain_selectors.GetSelectorFamily(cfg.ChainSelector)
-		if err != nil {
-			return cldf.ChangesetOutput{}, err
-		}
-		tokenPoolAdapter, exists := tokenPoolRegistry.GetTokenAdapter(family, cfg.ChainAdapterVersion)
-		if !exists {
-			return cldf.ChangesetOutput{}, fmt.Errorf("no TokenPoolAdapter registered for chain family '%s'", family)
-		}
-		for remoteSelector, inputs := range cfg.Inputs {
-			inputs.ChainSelector = cfg.ChainSelector
-			inputs.TokenRef = cfg.TokenRef
-			inputs.TokenPoolQualifier = cfg.TokenPoolQualifier
-			inputs.PoolType = cfg.PoolType
-			inputs.RemoteChainSelector = remoteSelector
-			inputs.ExistingDataStore = e.DataStore
-			if !inputs.InboundRateLimiterConfig.IsEnabled {
-				// If the rate limiter is not enabled, set capacity and rate to 0 to disable it on chain.
-				inputs.InboundRateLimiterConfig.Capacity = big.NewInt(0)
-				inputs.InboundRateLimiterConfig.Rate = big.NewInt(0)
-			}
-			if !inputs.OutboundRateLimiterConfig.IsEnabled {
-				// If the rate limiter is not enabled, set capacity and rate to 0 to disable it on chain.
-				inputs.OutboundRateLimiterConfig.Capacity = big.NewInt(0)
-				inputs.OutboundRateLimiterConfig.Rate = big.NewInt(0)
-			}
-			rateLimitReport, err := cldf_ops.ExecuteSequence(
-				e.OperationsBundle, tokenPoolAdapter.SetTokenPoolRateLimits(), e.BlockChains, inputs)
+		for selector, config := range cfg.Configs {
+			family, err := chain_selectors.GetSelectorFamily(selector)
 			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to set rate limits for token pool %d on remote chain %d: %w", cfg.ChainSelector, remoteSelector, err)
+				return cldf.ChangesetOutput{}, err
 			}
-			batchOps = append(batchOps, rateLimitReport.Output.BatchOps...)
-			reports = append(reports, rateLimitReport.ExecutionReports...)
+			tokenPoolAdapter, exists := tokenPoolRegistry.GetTokenAdapter(family, config.ChainAdapterVersion)
+			if !exists {
+				return cldf.ChangesetOutput{}, fmt.Errorf("no TokenPoolAdapter registered for chain family '%s'", family)
+			}
+			tokenPool, err := datastore_utils.FindAndFormatRef(e.DataStore, config.TokenPoolRef, selector, datastore_utils.FullRef)
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve token pool ref on chain with selector %d: %w", selector, err)
+			}
+			tokenFull, err := datastore_utils.FindAndFormatRef(e.DataStore, config.TokenRef, selector, datastore_utils.FullRef)
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve token ref on chain with selector %d: %w", selector, err)
+			}
+			tokenBytes, err := datastore_utils.FindAndFormatRef(e.DataStore, config.TokenRef, selector, tokenPoolAdapter.AddressRefToBytes)
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve token ref on chain with selector %d: %w", selector, err)
+			}
+			decimals, err := tokenPoolAdapter.DeriveTokenDecimals(e, selector, tokenPool, tokenBytes)
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to get token decimals for token on chain with selector %d: %w", selector, err)
+			}
+			for remoteSelector, inputs := range config.RemoteOutbounds {
+				tprlRemote := TPRLRemotes{
+					ChainSelector:       selector,
+					RemoteChainSelector: remoteSelector,
+					TokenRef:            tokenFull,
+					TokenPoolRef:        tokenPool,
+					ExistingDataStore:   e.DataStore,
+				}
+
+				// We derive the inbound rate limiter config from counterpart's outbound config for simplicity
+				// My inbound rate limiter config should be the same as my counterpart's outbound config to avoid confusion,
+				// and I can derive it programmatically so it's less error-prone for users than requiring them to specify both
+				counterpart, ok := cfg.Configs[remoteSelector]
+				if !ok {
+					return cldf.ChangesetOutput{}, fmt.Errorf("no config provided for remote chain with selector %d", remoteSelector)
+				}
+				remoteInputs, ok := counterpart.RemoteOutbounds[selector]
+				if !ok {
+					return cldf.ChangesetOutput{}, fmt.Errorf("no inputs provided for remote chain with selector %d to chain with selector %d", selector, remoteSelector)
+				}
+
+				// remoteTokenPool, err := datastore_utils.FindAndFormatRef(e.DataStore, counterpart.TokenPoolRef, remoteSelector, datastore_utils.FullRef)
+				// if err != nil {
+				// 	return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve token pool ref on chain with selector %d: %w", remoteSelector, err)
+				// }
+				// remoteToken, err := datastore_utils.FindAndFormatRef(e.DataStore, counterpart.TokenRef, remoteSelector, datastore_utils.FullRef)
+				// if err != nil {
+				// 	return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve token ref on chain with selector %d: %w", remoteSelector, err)
+				// }
+				// remoteDecimals, err := tokenPoolAdapter.DeriveTokenDecimals(e, remoteSelector, remoteTokenPool, []byte(remoteToken.Address))
+				// if err != nil {
+				// 	return cldf.ChangesetOutput{}, fmt.Errorf("failed to get token decimals for token on chain with selector %d: %w", selector, err)
+				// }
+				if !inputs.IsEnabled {
+					tprlRemote.OutboundRateLimiterConfig.IsEnabled = false
+					tprlRemote.OutboundRateLimiterConfig.Capacity = big.NewInt(0)
+					tprlRemote.OutboundRateLimiterConfig.Rate = big.NewInt(0)
+				} else {
+					// We scale the rate limiter configs by the token decimals to convert from
+					// human-readable token amounts to the on-chain representation
+					tprlRemote.OutboundRateLimiterConfig.IsEnabled = true
+					tprlRemote.OutboundRateLimiterConfig.Capacity = big.NewInt(int64(inputs.Capacity * math.Pow10(int(decimals))))
+					tprlRemote.OutboundRateLimiterConfig.Rate = big.NewInt(int64(inputs.Rate * math.Pow10(int(decimals))))
+				}
+
+				if !remoteInputs.IsEnabled {
+					tprlRemote.InboundRateLimiterConfig.IsEnabled = false
+					tprlRemote.InboundRateLimiterConfig.Capacity = big.NewInt(0)
+					tprlRemote.InboundRateLimiterConfig.Rate = big.NewInt(0)
+				} else {
+					tprlRemote.InboundRateLimiterConfig.IsEnabled = true
+					// We set the inbound capacity to be 1.1x the outbound capacity of the counterpart to avoid accidentally hitting the rate limit due to minor timing differences in refilling
+					tprlRemote.InboundRateLimiterConfig.Capacity = big.NewInt(int64(remoteInputs.Capacity * 1.1 * math.Pow10(int(decimals))))
+					tprlRemote.InboundRateLimiterConfig.Rate = big.NewInt(int64(remoteInputs.Rate * 1.1 * math.Pow10(int(decimals))))
+				}
+				rateLimitReport, err := cldf_ops.ExecuteSequence(
+					e.OperationsBundle, tokenPoolAdapter.SetTokenPoolRateLimits(), e.BlockChains, tprlRemote)
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to set rate limits for token pool %d on remote chain %d: %w", selector, remoteSelector, err)
+				}
+				batchOps = append(batchOps, rateLimitReport.Output.BatchOps...)
+				reports = append(reports, rateLimitReport.ExecutionReports...)
+			}
 		}
 
 		return changesets.NewOutputBuilder(e, mcmsRegistry).

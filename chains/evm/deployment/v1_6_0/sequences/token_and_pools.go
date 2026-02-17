@@ -231,33 +231,21 @@ func (a *EVMAdapter) DeriveTokenPoolCounterpart(e deployment.Environment, chainS
 	return tokenPool, nil
 }
 
-func (a *EVMAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokensapi.TPRLInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+func (a *EVMAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokensapi.TPRLRemotes, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return cldf_ops.NewSequence(
 		"evm-adapter:set-token-pool-rate-limits",
 		tpops.Version,
 		"Set rate limits for a token pool across multiple EVM chains",
-		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokensapi.TPRLInput) (sequences.OnChainOutput, error) {
+		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokensapi.TPRLRemotes) (sequences.OnChainOutput, error) {
 			var result sequences.OnChainOutput
 			chain, ok := chains.EVMChains()[input.ChainSelector]
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
 
-			tpAddress, err := a.FindLatestAddressRef(
-				input.ExistingDataStore,
-				datastore.AddressRef{
-					ChainSelector: input.ChainSelector,
-					Qualifier:     input.TokenPoolQualifier,
-					Type:          datastore.ContractType(input.PoolType),
-				},
-			)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token pool with qualifier %q on chain %d: %w", input.TokenPoolQualifier, input.ChainSelector, err)
-			}
-
 			report, err := cldf_ops.ExecuteOperation(b, tpops.SetChainRateLimiterConfig, chain, evm_contract.FunctionInput[tpops.SetChainRateLimiterConfigArgs]{
 				ChainSelector: chain.Selector,
-				Address:       tpAddress,
+				Address:       common.HexToAddress(input.TokenPoolRef.Address),
 				Args: tpops.SetChainRateLimiterConfigArgs{
 					OutboundRateLimitConfig: token_pool.RateLimiterConfig{
 						IsEnabled: input.OutboundRateLimiterConfig.IsEnabled,

@@ -37,7 +37,7 @@ type TokenAdapter interface {
 	// This is usally done as they no longer have mint authority over the token.
 	ManualRegistration() *cldf_ops.Sequence[ManualRegistrationSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 	// SetTokenPoolRateLimits returns a sequence that sets rate limits on a token pool.
-	SetTokenPoolRateLimits() *cldf_ops.Sequence[TPRLInput, sequences.OnChainOutput, cldf_chain.BlockChains]
+	SetTokenPoolRateLimits() *cldf_ops.Sequence[TPRLRemotes, sequences.OnChainOutput, cldf_chain.BlockChains]
 	DeployToken() *cldf_ops.Sequence[DeployTokenInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 	DeployTokenVerify(e deployment.Environment, in any) error
 	DeployTokenPoolForToken() *cldf_ops.Sequence[DeployTokenPoolInput, sequences.OnChainOutput, cldf_chain.BlockChains]
@@ -51,6 +51,14 @@ type RateLimiterConfig struct {
 	Capacity *big.Int
 	// Rate is the rate at which the rate limiter bucket refills, in tokens per second.
 	Rate *big.Int
+}
+
+// RateLimiterConfigFloatInput is the user-friendly version of RateLimiterConfig that accepts 
+// float inputs for capacity and rate, which are then converted to big.Int internally after scaling by token decimals.
+type RateLimiterConfigFloatInput struct {
+	IsEnabled bool
+	Capacity float64
+	Rate float64
 }
 
 // RemoteChainConfig specifies configuration for a remote chain on a token pool.
