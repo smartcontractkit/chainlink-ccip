@@ -6,6 +6,7 @@ import {AdvancedPoolHooks} from "../../../pools/AdvancedPoolHooks.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {BaseTest} from "../../BaseTest.t.sol";
 import {TokenPoolHelper} from "../../helpers/TokenPoolHelper.sol";
+import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
@@ -30,11 +31,18 @@ contract AdvancedPoolHooksSetup is BaseTest {
     s_token = IERC20(address(new BurnMintERC20("LINK", "LNK", 18, 0, 0)));
     deal(address(s_token), OWNER, type(uint256).max);
 
-    // Create AdvancedPoolHooks with CCV threshold
-    s_advancedPoolHooks = new AdvancedPoolHooks(new address[](0), CCV_THRESHOLD_AMOUNT, address(0), new address[](0));
+    address[] memory authorizedCallers = new address[](1);
+    authorizedCallers[0] = OWNER;
+    s_advancedPoolHooks = new AdvancedPoolHooks(new address[](0), CCV_THRESHOLD_AMOUNT, address(0), authorizedCallers);
 
     s_tokenPool = new TokenPoolHelper(
       s_token, DEFAULT_TOKEN_DECIMALS, address(s_advancedPoolHooks), address(s_mockRMNRemote), address(s_sourceRouter)
+    );
+
+    address[] memory poolCallers = new address[](1);
+    poolCallers[0] = address(s_tokenPool);
+    s_advancedPoolHooks.applyAuthorizedCallerUpdates(
+      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: poolCallers, removedCallers: new address[](0)})
     );
 
     bytes[] memory remotePoolAddresses = new bytes[](1);
