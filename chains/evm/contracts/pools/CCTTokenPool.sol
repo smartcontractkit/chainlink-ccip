@@ -1,33 +1,25 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {IBurnMintERC20} from "../interfaces/IBurnMintERC20.sol";
-import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
-
+import {BaseERC20} from "../tmp/BaseERC20.sol";
+import {BurnMintERC20} from "../tmp/BurnMintERC20.sol";
 import {TokenPool} from "./TokenPool.sol";
 
-import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
-contract CCTTokenPool is TokenPool, BurnMintERC20, ITypeAndVersion {
+contract CCTTokenPool is TokenPool, BurnMintERC20 {
   function typeAndVersion() external pure virtual override returns (string memory) {
     return "CCTTokenPool 2.0.0-dev";
   }
 
-  error OnlyBridgeCanMint();
-
   constructor(
-    string memory name,
-    string memory symbol,
-    uint8 decimals_,
-    uint256 maxSupply_,
-    uint256 preMint,
+    BaseERC20.ConstructorParams memory tokenParams,
     address advancedPoolHooks,
     address rmnProxy,
     address router
   )
-    BurnMintERC20(name, symbol, decimals_, maxSupply_, preMint)
-    TokenPool(IERC20(address(this)), decimals_, advancedPoolHooks, rmnProxy, router)
+    BurnMintERC20(tokenParams)
+    TokenPool(IERC20(address(this)), tokenParams.decimals, advancedPoolHooks, rmnProxy, router)
   {}
 
   /// @notice Burns tokens held by the pool.
@@ -47,13 +39,6 @@ contract CCTTokenPool is TokenPool, BurnMintERC20, ITypeAndVersion {
     if (i_maxSupply != 0 && totalSupply() + amount > i_maxSupply) revert MaxSupplyExceeded(totalSupply() + amount);
 
     _mint(receiver, amount);
-  }
-
-  function mint(
-    address,
-    uint256
-  ) external virtual override {
-    revert OnlyBridgeCanMint();
   }
 
   /// @notice Signals which version of the pool interface is supported.
