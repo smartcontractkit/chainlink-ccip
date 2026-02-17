@@ -110,18 +110,18 @@ func setTokenPoolRateLimitsApply() func(cldf.Environment, TPRLInput) (cldf.Chang
 					return cldf.ChangesetOutput{}, fmt.Errorf("no inputs provided for remote chain with selector %d to chain with selector %d", selector, remoteSelector)
 				}
 
-				// remoteTokenPool, err := datastore_utils.FindAndFormatRef(e.DataStore, counterpart.TokenPoolRef, remoteSelector, datastore_utils.FullRef)
-				// if err != nil {
-				// 	return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve token pool ref on chain with selector %d: %w", remoteSelector, err)
-				// }
-				// remoteToken, err := datastore_utils.FindAndFormatRef(e.DataStore, counterpart.TokenRef, remoteSelector, datastore_utils.FullRef)
-				// if err != nil {
-				// 	return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve token ref on chain with selector %d: %w", remoteSelector, err)
-				// }
-				// remoteDecimals, err := tokenPoolAdapter.DeriveTokenDecimals(e, remoteSelector, remoteTokenPool, []byte(remoteToken.Address))
-				// if err != nil {
-				// 	return cldf.ChangesetOutput{}, fmt.Errorf("failed to get token decimals for token on chain with selector %d: %w", selector, err)
-				// }
+				remoteTokenPool, err := datastore_utils.FindAndFormatRef(e.DataStore, counterpart.TokenPoolRef, remoteSelector, datastore_utils.FullRef)
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve token pool ref on chain with selector %d: %w", remoteSelector, err)
+				}
+				remoteToken, err := datastore_utils.FindAndFormatRef(e.DataStore, counterpart.TokenRef, remoteSelector, datastore_utils.FullRef)
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve token ref on chain with selector %d: %w", remoteSelector, err)
+				}
+				remoteDecimals, err := tokenPoolAdapter.DeriveTokenDecimals(e, remoteSelector, remoteTokenPool, []byte(remoteToken.Address))
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to get token decimals for token on chain with selector %d: %w", selector, err)
+				}
 				if !inputs.IsEnabled {
 					tprlRemote.OutboundRateLimiterConfig.IsEnabled = false
 					tprlRemote.OutboundRateLimiterConfig.Capacity = big.NewInt(0)
@@ -139,10 +139,18 @@ func setTokenPoolRateLimitsApply() func(cldf.Environment, TPRLInput) (cldf.Chang
 					tprlRemote.InboundRateLimiterConfig.Capacity = big.NewInt(0)
 					tprlRemote.InboundRateLimiterConfig.Rate = big.NewInt(0)
 				} else {
-					tprlRemote.InboundRateLimiterConfig.IsEnabled = true
 					// We set the inbound capacity to be 1.1x the outbound capacity of the counterpart to avoid accidentally hitting the rate limit due to minor timing differences in refilling
-					tprlRemote.InboundRateLimiterConfig.Capacity = scaleFloatToBigInt(remoteInputs.Capacity, int(decimals), .10)
-					tprlRemote.InboundRateLimiterConfig.Rate = scaleFloatToBigInt(remoteInputs.Rate, int(decimals), .10)
+					scaleByDecimals := decimals
+					// https://github.com/smartcontractkit/chainlink-deployments/blob/cce886554ca0587492955784381321ce817fb6bb/domains/ccip/shared/tokendefaults.go#L1904
+					// Only old EVM pools need to scale by remote deciamls on inbound. Newer pools and non-EVM pools handle all conversions in local decimals.
+					// This is a hack. Avoiding it would require refactoring the token pool adapters to handle rate limit configs in a more structured way instead of
+					// just passing them as bytes through the registry, so for now we can live with this special case for old EVM pools since we're moving towards newer versions and non-EVM chains where this isn't an issue.
+					if family == chain_selectors.FamilyEVM && tokenPool.Version.LessThan(semver.MustParse("1.6.1")){
+						scaleByDecimals = remoteDecimals
+					}
+					tprlRemote.InboundRateLimiterConfig.IsEnabled = true
+					tprlRemote.InboundRateLimiterConfig.Capacity = scaleFloatToBigInt(remoteInputs.Capacity, int(scaleByDecimals), .10)
+					tprlRemote.InboundRateLimiterConfig.Rate = scaleFloatToBigInt(remoteInputs.Rate, int(scaleByDecimals), .10)
 				}
 				rateLimitReport, err := cldf_ops.ExecuteSequence(
 					e.OperationsBundle, tokenPoolAdapter.SetTokenPoolRateLimits(), e.BlockChains, tprlRemote)
