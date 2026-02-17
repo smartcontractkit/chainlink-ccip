@@ -350,6 +350,8 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
   }
 
   /// @inheritdoc IFeeQuoter
+  /// @dev If the chain is not enabled, it will return (0,0,CCIP_LOCK_OR_BURN_V1_RET_BYTES). CCIP contracts check for
+  /// chain enablement separately.
   function getTokenTransferFee(
     uint64 destChainSelector,
     address token
