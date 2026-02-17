@@ -96,7 +96,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
     uint32 feeUSDCents; // ──────╮ Minimum fee to charge per token transfer, multiples of 0.01 USD.
     uint32 destGasOverhead; //   │ Gas charged to execute the token transfer on the destination chain.
     //                           │ Data availability bytes that are returned from the source pool and sent to the dest
-    uint32 destBytesOverhead; // │ pool. Must be >= Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES. Set as multiple of 32 bytes.
+    uint32 destBytesOverhead; // │ pool. Must be >= Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES.
     bool isEnabled; // ──────────╯ Whether this token has custom transfer fees.
   }
 
@@ -917,9 +917,6 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
   }
 
   /// @notice Returns the token transfer cost parameters.
-  /// A basis point fee is calculated from the USD value of each token transfer.
-  /// For each individual transfer, this fee is between [minFeeUSD, maxFeeUSD].
-  /// Total transfer fee is the sum of each individual token transfer fee.
   /// @dev Assumes that tokenAmounts are validated to be listed tokens elsewhere.
   /// @dev Splitting one token transfer into multiple transfers is discouraged, as it will result in a transferFee
   /// equal or greater than the same amount aggregated/de-duped.
