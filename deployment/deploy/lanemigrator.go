@@ -109,7 +109,7 @@ func (r *LaneMigratorRegistry) GetRampUpdater(chainsel uint64, version *semver.V
 }
 
 func LaneMigrateToNewVersionChangeset(migratorReg *LaneMigratorRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) cldf.ChangeSetV2[LaneMigratorConfig] {
-	return cldf.CreateChangeSet(laneMigrateApply(migratorReg, mcmsRegistry), lanemigrateVerify(migratorReg))
+	return cldf.CreateChangeSet(laneMigrateApply(migratorReg, mcmsRegistry), laneMigrateVerify(migratorReg))
 }
 
 func laneMigrateApply(migratorReg *LaneMigratorRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, LaneMigratorConfig) (cldf.ChangesetOutput, error) {
