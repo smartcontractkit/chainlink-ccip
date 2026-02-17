@@ -99,6 +99,7 @@ type DeployChainContractsInput struct {
 	CREATE2Factory    common.Address
 	ExistingAddresses []datastore.AddressRef
 	ContractParams    ContractParams
+	DeployTestRouter  bool
 }
 
 var DeployChainContracts = cldf_ops.NewSequence(
@@ -193,18 +194,20 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, routerRef)
 
 		// Deploy Test Router
-		testRouterRef, err := contract_utils.MaybeDeployContract(b, router.DeployTestRouter, chain, contract_utils.DeployInput[router.ConstructorArgs]{
-			TypeAndVersion: deployment.NewTypeAndVersion(router.TestRouterContractType, *router.Version),
-			ChainSelector:  chain.Selector,
-			Args: router.ConstructorArgs{
-				WrappedNative: common.HexToAddress(wethRef.Address),
-				RMNProxy:      common.HexToAddress(rmnProxyRef.Address),
-			},
-		}, input.ExistingAddresses)
-		if err != nil {
-			return sequences.OnChainOutput{}, err
+		if input.DeployTestRouter {
+			testRouterRef, err := contract_utils.MaybeDeployContract(b, router.DeployTestRouter, chain, contract_utils.DeployInput[router.ConstructorArgs]{
+				TypeAndVersion: deployment.NewTypeAndVersion(router.TestRouterContractType, *router.Version),
+				ChainSelector:  chain.Selector,
+				Args: router.ConstructorArgs{
+					WrappedNative: common.HexToAddress(wethRef.Address),
+					RMNProxy:      common.HexToAddress(rmnProxyRef.Address),
+				},
+			}, input.ExistingAddresses)
+			if err != nil {
+				return sequences.OnChainOutput{}, err
+			}
+			addresses = append(addresses, testRouterRef)
 		}
-		addresses = append(addresses, testRouterRef)
 
 		// Deploy TokenAdminRegistry
 		tokenAdminRegistryRef, err := contract_utils.MaybeDeployContract(b, token_admin_registry.Deploy, chain, contract_utils.DeployInput[token_admin_registry.ConstructorArgs]{
