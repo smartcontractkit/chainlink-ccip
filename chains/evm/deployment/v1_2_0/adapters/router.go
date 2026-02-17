@@ -66,9 +66,9 @@ func (u *RouterUpdater) UpdateRouter() *cldf_ops.Sequence[deploy.RouterUpdaterCo
 			}
 			onRampAdds := make([]routerops.OnRamp, 0)
 			offRampAdds := make([]routerops.OffRamp, 0)
-			// this assumes that there is only one onRamp and offRamp per c,
-			// it will not work with 1.5 system where there can be multiple onRamps and offRamps per c
-			// for each remote c selector
+			// this assumes that there is only one onRamp and offRamp per chain,
+			// it will not work with 1.5 system where there can be multiple onRamps and offRamps per chain
+			// for each remote chain selector
 			for _, remoteChainSelector := range input.RemoteChainSelectors {
 				onRampAdds = append(onRampAdds, routerops.OnRamp{
 					DestChainSelector: remoteChainSelector,
