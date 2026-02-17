@@ -70,9 +70,9 @@ func basicDeployTokenAndPoolInput(chainReport operations.SequenceReport[sequence
 				Router:   routerAddress,
 			},
 			AdvancedPoolHooksConfig: tokens.AdvancedPoolHooksConfig{
-				Allowlist:         nil,            // disabled
+				Allowlist:         nil,              // disabled
 				PolicyEngine:      common.Address{}, // disabled
-				AuthorizedCallers: nil,            // anyone can call
+				AuthorizedCallers: nil,              // no initial callers; deploy sequence will authorize the deployed pool
 			},
 		},
 	}

@@ -2,8 +2,8 @@
 pragma solidity ^0.8.24;
 
 import {IAdvancedPoolHooks} from "../../interfaces/IAdvancedPoolHooks.sol";
-import {IExtractor} from "@chainlink/ace/policy-management/interfaces/IExtractor.sol";
-import {IPolicyEngine} from "@chainlink/ace/policy-management/interfaces/IPolicyEngine.sol";
+import {IExtractor} from "@chainlink/policy-management/interfaces/IExtractor.sol";
+import {IPolicyEngine} from "@chainlink/policy-management/interfaces/IPolicyEngine.sol";
 
 import {Pool} from "../../libraries/Pool.sol";
 

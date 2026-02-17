@@ -22,6 +22,8 @@ import {MockLombardMailbox} from "../mocks/MockLombardMailbox.sol";
 import {MockVerifier} from "../mocks/MockVerifier.sol";
 import {OnRampSetup} from "../onRamp/OnRamp/OnRampSetup.t.sol";
 
+import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
+
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts@5.3.0/token/ERC20/extensions/IERC20Metadata.sol";
 
@@ -201,6 +203,14 @@ contract e2e_lombard is OnRampSetup {
       address(s_mockRMNRemote),
       address(s_destRouter),
       DEFAULT_TOKEN_DECIMALS
+    );
+
+    // Add both pools as authorized callers on the hooks.
+    address[] memory poolCallers = new address[](2);
+    poolCallers[0] = address(s_sourceLombardPool);
+    poolCallers[1] = address(s_destLombardPool);
+    hooks.applyAuthorizedCallerUpdates(
+      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: poolCallers, removedCallers: new address[](0)})
     );
 
     // Update TokenSetup mappings used by the OnRampSetup helper functions.

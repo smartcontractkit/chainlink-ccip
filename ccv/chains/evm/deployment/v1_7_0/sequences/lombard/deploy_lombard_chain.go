@@ -3,6 +3,7 @@ package lombard
 import (
 	"fmt"
 	"math/big"
+	"slices"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
@@ -201,6 +202,36 @@ var DeployLombardChain = cldf_ops.NewSequence(
 		}
 		addresses = append(addresses, lombardTokenPoolRef)
 		lombardTokenPoolAddress := common.HexToAddress(lombardTokenPoolRef.Address)
+
+		// Add the newly deployed token pool as an authorized caller on the hooks.
+		{
+			getAuthorizedCallersReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.GetAllAuthorizedCallers, chain, contract_utils.FunctionInput[any]{
+				ChainSelector: input.ChainSelector,
+				Address:       advancedPoolHooksAddress,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get authorized callers from advanced pool hooks %s on %d: %w", advancedPoolHooksAddress, input.ChainSelector, err)
+			}
+
+			if !slices.Contains(getAuthorizedCallersReport.Output, lombardTokenPoolAddress) {
+				applyAuthorizedCallerUpdatesReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.ApplyAuthorizedCallerUpdates, chain, contract_utils.FunctionInput[advanced_pool_hooks.AuthorizedCallerArgs]{
+					ChainSelector: input.ChainSelector,
+					Address:       advancedPoolHooksAddress,
+					Args: advanced_pool_hooks.AuthorizedCallerArgs{
+						AddedCallers: []common.Address{lombardTokenPoolAddress},
+					},
+				})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to authorize token pool %s on advanced pool hooks %s on %d: %w", lombardTokenPoolAddress, advancedPoolHooksAddress, input.ChainSelector, err)
+				}
+
+				batchOp, err := contract_utils.NewBatchOperationFromWrites([]contract_utils.WriteOutput{applyAuthorizedCallerUpdatesReport.Output})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
+				}
+				batchOps = append(batchOps, batchOp)
+			}
+		}
 
 		// Configure token pool
 		configureTokenPoolReport, err := cldf_ops.ExecuteSequence(b, tokens_sequences.ConfigureTokenPool, chain, tokens_sequences.ConfigureTokenPoolInput{

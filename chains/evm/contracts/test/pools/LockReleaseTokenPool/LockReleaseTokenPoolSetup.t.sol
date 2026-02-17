@@ -49,6 +49,12 @@ contract LockReleaseTokenPoolSetup is BaseTest {
       address(s_lockBox)
     );
 
+    address[] memory hooksCallers = new address[](1);
+    hooksCallers[0] = address(s_lockReleaseTokenPoolWithAllowList);
+    advancedHooks.applyAuthorizedCallerUpdates(
+      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: hooksCallers, removedCallers: new address[](0)})
+    );
+
     // Configure allowed callers for the lockBox - both pools.
     address[] memory allowedCallers = new address[](2);
     allowedCallers[0] = address(s_lockReleaseTokenPool);
