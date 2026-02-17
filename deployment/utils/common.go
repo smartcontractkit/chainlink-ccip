@@ -88,7 +88,7 @@ func NewRegistererID(chainFamily string, version *semver.Version) string {
 	return fmt.Sprintf("%s-%s", chainFamily, version.String())
 }
 
-func NewIdFromSelector(chainSelector uint64, version *semver.Version) string {
+func NewIDFromSelector(chainSelector uint64, version *semver.Version) string {
 	chainFamily, err := chain_selectors.GetSelectorFamily(chainSelector)
 	if err != nil {
 		panic(fmt.Sprintf("invalid chain selector: %d", chainSelector))

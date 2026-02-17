@@ -32,7 +32,7 @@ func (u *RouterUpdater) UpdateRouter() *cldf_ops.Sequence[deploy.RouterUpdaterCo
 		func(b cldf_ops.Bundle, chains chain.BlockChains, input deploy.RouterUpdaterConfig) (output sequences.OnChainOutput, err error) {
 			c, ok := chains.EVMChains()[input.ChainSelector]
 			if !ok {
-				return sequences.OnChainOutput{}, fmt.Errorf("c with selector %d not found in environment", input.ChainSelector)
+				return sequences.OnChainOutput{}, fmt.Errorf("EVM chain with selector %d not found in environment", input.ChainSelector)
 			}
 			var writes []contract.WriteOutput
 			ds := datastore.NewMemoryDataStore()

@@ -184,23 +184,23 @@ func lanemigrateApply(migraterReg *LaneMigraterRegistry, mcmsRegistry *changeset
 	}
 }
 
-func lanemigrateVerify() func(cldf.Environment, LaneMigraterConfig) error {
+func lanemigrateVerify(migraterReg *LaneMigraterRegistry) func(cldf.Environment, LaneMigraterConfig) error {
 	return func(e cldf.Environment, input LaneMigraterConfig) error {
 		for chainSel, perChainConfig := range input.Input {
-			_, err := GetLaneMigraterRegistry().GetRouterUpdater(chainSel, perChainConfig.RouterVersion)
+			_, err := migraterReg.GetRouterUpdater(chainSel, perChainConfig.RouterVersion)
 			if err != nil {
 				return fmt.Errorf("error verifying existence of router updater for chain selector %d: %w", chainSel, err)
 			}
-			_, err = GetLaneMigraterRegistry().GetRampUpdater(chainSel, perChainConfig.RampVersion)
+			_, err = migraterReg.GetRampUpdater(chainSel, perChainConfig.RampVersion)
 			if err != nil {
 				return fmt.Errorf("error verifying existence of ramp updater for chain selector %d: %w", chainSel, err)
 			}
 			if !e.BlockChains.Exists(chainSel) {
-				return fmt.Errorf("error verifying existence of blockchain with selector %d in environment: %w", chainSel, err)
+				return fmt.Errorf("error verifying existence of blockchain with selector %d in environment: blockchain not found", chainSel)
 			}
 			for _, remoteChainSel := range perChainConfig.RemoteChains {
 				if !e.BlockChains.Exists(remoteChainSel) {
-					return fmt.Errorf("error verifying existence of remote blockchain with selector %d in environment: %w", remoteChainSel, err)
+					return fmt.Errorf("error verifying existence of remote blockchain with selector %d in environment: blockchain not found", remoteChainSel)
 				}
 			}
 			// verify that the existing addresses for the chain selector are present in the environment datastore
