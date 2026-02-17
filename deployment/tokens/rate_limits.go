@@ -48,7 +48,7 @@ func setTokenPoolRateLimitsVerify() func(cldf.Environment, TPRLInput) error {
 			for remoteSelector, input := range config.RemoteOutbounds {
 				if input.IsEnabled {
 					if input.Capacity <= 0 || input.Rate <= 0 {
-						return fmt.Errorf("outbound rate limiter config for remote chain %d is enabled but capacity or rate is nil", remoteSelector)
+						return fmt.Errorf("outbound rate limiter config for remote chain %d is enabled but capacity or rate is invalid", remoteSelector)
 					}
 				}
 			}
@@ -171,7 +171,6 @@ func setTokenPoolRateLimitsApply() func(cldf.Environment, TPRLInput) (cldf.Chang
 // The function never overflows because all arithmetic is done with
 // arbitrary‑precision types (big.Rat → big.Int).
 func scaleFloatToBigInt(value float64, decimals int, extraPercent float64) *big.Int {
-	fmt.Println("Scaling value:", value, "decimals:", decimals, "extraPercent:", extraPercent)
 	// -------------------------------------------------------------
 	// Turn the float into an *exact* rational.
 	// -------------------------------------------------------------
@@ -195,8 +194,8 @@ func scaleFloatToBigInt(value float64, decimals int, extraPercent float64) *big.
 	// Apply the optional static factor (e.g. +10 % → ×1.10).
 	// -------------------------------------------------------------
 	if extraPercent != 0 {
-		num := big.NewInt(int64(1 + extraPercent))
-		floatValue.Mul(floatValue, new(big.Float).SetInt(num))
+		num := big.NewFloat(1 + extraPercent)
+		floatValue.Mul(floatValue, num)
 	}
 
 	// -------------------------------------------------------------
