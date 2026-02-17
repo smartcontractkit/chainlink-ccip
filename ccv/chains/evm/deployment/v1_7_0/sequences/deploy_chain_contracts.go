@@ -32,7 +32,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/proxy"
-	proxy_latest "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/proxy"
 )
 
 type MockReceiverParams struct {
@@ -393,8 +392,8 @@ var DeployChainContracts = cldf_ops.NewSequence(
 					Type:           datastore.ContractType(executor.ProxyType),
 					Version:        executor.Version,
 					CREATE2Factory: input.CREATE2Factory,
-					ABI:            proxy_latest.ProxyABI,
-					BIN:            proxy_latest.ProxyBin,
+					ABI:            proxy.ABI,
+					BIN:            proxy.Bin,
 					ConstructorArgs: []any{
 						// To ensure consistent addresses, we have to deploy with the same constructor args on every chain.
 						// Instead of setting in the constructor, we set the target and fee aggregator after deployment.

@@ -18,6 +18,9 @@ type AcceptOwnershipArgs struct {
 	IsProposedOwner bool
 }
 
+var Bin = proxy.ProxyBin
+var ABI = proxy.ProxyABI
+
 var SetTarget = contract.NewWrite(contract.WriteParams[common.Address, *proxy.Proxy]{
 	Name:            "proxy:set-target",
 	Version:         Version,
