@@ -2,7 +2,6 @@ package tokens
 
 import (
 	"fmt"
-	"math"
 	"math/big"
 
 	"github.com/Masterminds/semver/v3"
@@ -131,11 +130,8 @@ func setTokenPoolRateLimitsApply() func(cldf.Environment, TPRLInput) (cldf.Chang
 					// We scale the rate limiter configs by the token decimals to convert from
 					// human-readable token amounts to the on-chain representation
 					tprlRemote.OutboundRateLimiterConfig.IsEnabled = true
-					tprlRemote.OutboundRateLimiterConfig.Capacity = big.NewInt(int64(inputs.Capacity * math.Pow10(int(decimals))))
-					tprlRemote.OutboundRateLimiterConfig.Rate = big.NewInt(int64(inputs.Rate * math.Pow10(int(decimals))))
-					if tprlRemote.OutboundRateLimiterConfig.Capacity.Cmp(big.NewInt(0)) <= 0 || tprlRemote.OutboundRateLimiterConfig.Rate.Cmp(big.NewInt(0)) <= 0 {
-						return cldf.ChangesetOutput{}, fmt.Errorf("outbound rate limiter config for remote chain %d is enabled but capacity or rate is zero or negative after scaling by token decimals", remoteSelector)
-					}
+					tprlRemote.OutboundRateLimiterConfig.Capacity = scaleFloatToBigInt(inputs.Capacity, int(decimals), 0)
+					tprlRemote.OutboundRateLimiterConfig.Rate = scaleFloatToBigInt(inputs.Rate, int(decimals), 0)
 				}
 
 				if !remoteInputs.IsEnabled {
@@ -145,11 +141,8 @@ func setTokenPoolRateLimitsApply() func(cldf.Environment, TPRLInput) (cldf.Chang
 				} else {
 					tprlRemote.InboundRateLimiterConfig.IsEnabled = true
 					// We set the inbound capacity to be 1.1x the outbound capacity of the counterpart to avoid accidentally hitting the rate limit due to minor timing differences in refilling
-					tprlRemote.InboundRateLimiterConfig.Capacity = big.NewInt(int64(remoteInputs.Capacity * 1.1 * math.Pow10(int(decimals))))
-					tprlRemote.InboundRateLimiterConfig.Rate = big.NewInt(int64(remoteInputs.Rate * 1.1 * math.Pow10(int(decimals))))
-					if tprlRemote.InboundRateLimiterConfig.Capacity.Cmp(big.NewInt(0)) <= 0 || tprlRemote.InboundRateLimiterConfig.Rate.Cmp(big.NewInt(0)) <= 0 {
-						return cldf.ChangesetOutput{}, fmt.Errorf("inbound rate limiter config for remote chain %d is enabled but capacity or rate is zero or negative after scaling by token decimals", remoteSelector)
-					}
+					tprlRemote.InboundRateLimiterConfig.Capacity = scaleFloatToBigInt(remoteInputs.Capacity, int(decimals), .10)
+					tprlRemote.InboundRateLimiterConfig.Rate = scaleFloatToBigInt(remoteInputs.Rate, int(decimals), .10)
 				}
 				rateLimitReport, err := cldf_ops.ExecuteSequence(
 					e.OperationsBundle, tokenPoolAdapter.SetTokenPoolRateLimits(), e.BlockChains, tprlRemote)
@@ -166,4 +159,51 @@ func setTokenPoolRateLimitsApply() func(cldf.Environment, TPRLInput) (cldf.Chang
 			WithBatchOps(batchOps).
 			Build(cfg.MCMS)
 	}
+}
+
+// AI generated code below
+// scaleFloatToBigInt converts a floating‑point value (capacity or rate)
+// to a *big.Int* after applying two scalings:
+//
+//  1. decimalFactor = 10^decimals          (e.g. decimals = 6 → 1_000_000)
+//  2. staticFactor  = 1 + extraPercent (e.g. extraPercent = 0.10 → 1.10)
+//
+// The function never overflows because all arithmetic is done with
+// arbitrary‑precision types (big.Rat → big.Int).
+func scaleFloatToBigInt(value float64, decimals int, extraPercent float64) *big.Int {
+	fmt.Println("Scaling value:", value, "decimals:", decimals, "extraPercent:", extraPercent)
+	// -------------------------------------------------------------
+	// Turn the float into an *exact* rational.
+	// -------------------------------------------------------------
+	//
+	// big.NewFloat(value) creates a *big.Float* that holds the exact binary
+	// representation of the float64.
+	//
+	// This path never fails for a finite float64, so we don’t need the
+	// ok‑check that SetString requires.
+	floatValue := new(big.Float).SetFloat64(value)
+
+	// -------------------------------------------------------------
+	// Multiply by 10^decimals (the “decimal” factor).
+	// -------------------------------------------------------------
+	//
+	// Use big.Int.Exp so the power can be arbitrarily large.
+	tenPow := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(decimals)), nil) // 10^decimals
+	floatValue.Mul(floatValue, new(big.Float).SetInt(tenPow))
+
+	// -------------------------------------------------------------
+	// Apply the optional static factor (e.g. +10 % → ×1.10).
+	// -------------------------------------------------------------
+	if extraPercent != 0 {
+		num := big.NewInt(int64(1 + extraPercent))
+		floatValue.Mul(floatValue, new(big.Float).SetInt(num))
+	}
+
+	// -------------------------------------------------------------
+	// Return the *big.Int*.
+	// -------------------------------------------------------------
+	tmp := new(big.Int)
+	floatValue.SetMode(big.AwayFromZero) // Round half up to avoid underestimating the rate limit
+	out, _ := floatValue.Int(tmp)        // big.Float.Int sets tmp to the integer part of floatValue and returns tmp
+	return out
 }

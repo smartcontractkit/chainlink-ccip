@@ -717,8 +717,8 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 			// Set some rate limiters for testing - one enabled and one disabled.
 			rls := []tokensapi.RateLimiterConfigFloatInput{
 				{
-					Capacity:  2,
-					Rate:      .2,
+					Capacity:  200,
+					Rate:      20,
 					IsEnabled: true,
 				},
 				{
