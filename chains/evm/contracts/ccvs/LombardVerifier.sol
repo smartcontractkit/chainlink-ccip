@@ -225,6 +225,13 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
     uint256 proofDataStartIndex = PAYLOAD_START_INDEX + rawPayloadLength;
     bytes calldata rawPayload = ccvData[PAYLOAD_START_INDEX:proofDataStartIndex];
 
+    _validatePayload(
+      rawPayload,
+      message.tokenTransfer[0].destTokenAddress,
+      message.tokenTransfer[0].tokenReceiver,
+      message.tokenTransfer[0].amount
+    );
+
     uint256 proofLength = uint16(bytes2(ccvData[proofDataStartIndex:proofDataStartIndex + RAW_PAYLOAD_LENGTH_SIZE]));
     uint256 proofStartIndex = proofDataStartIndex + RAW_PAYLOAD_LENGTH_SIZE;
 
@@ -254,6 +261,34 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
     }
     if (returnedMessageId != messageId) {
       revert InvalidMessageId(messageId, returnedMessageId);
+    }
+  }
+
+  function _validatePayload(
+    bytes calldata rawPayload,
+    bytes calldata expectedToken,
+    bytes calldata expectedReceiver,
+    uint256 expectedAmount
+  ) internal pure {
+    (,,,,, bytes memory msgBody) = abi.decode(rawPayload[4:], (bytes32, uint256, bytes32, address, address, bytes));
+
+    bytes32 rawToToken;
+    bytes32 rawRecipient;
+    uint256 amount;
+    assembly {
+      rawToToken := mload(add(msgBody, 0x21)) // bytes 1..32
+      rawRecipient := mload(add(msgBody, 0x61)) // bytes 65..96
+      amount := mload(add(msgBody, 0x81)) // bytes 97..128
+    }
+
+    if (rawToToken != bytes32(expectedToken)) {
+      revert InvalidMessageId(bytes32(expectedToken), rawToToken);
+    }
+    if (rawRecipient != bytes32(expectedReceiver)) {
+      revert InvalidReceiver(expectedReceiver);
+    }
+    if (amount != expectedAmount) {
+      revert InvalidMessageId(bytes32(expectedAmount), bytes32(amount));
     }
   }
 
