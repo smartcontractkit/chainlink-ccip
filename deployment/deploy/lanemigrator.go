@@ -109,10 +109,10 @@ func (r *LaneMigratorRegistry) GetRampUpdater(chainsel uint64, version *semver.V
 }
 
 func LaneMigrateToNewVersionChangeset(migratorReg *LaneMigratorRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) cldf.ChangeSetV2[LaneMigratorConfig] {
-	return cldf.CreateChangeSet(lanemigrateApply(migratorReg, mcmsRegistry), lanemigrateVerify(migratorReg))
+	return cldf.CreateChangeSet(laneMigrateApply(migratorReg, mcmsRegistry), lanemigrateVerify(migratorReg))
 }
 
-func lanemigrateApply(migratorReg *LaneMigratorRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, LaneMigratorConfig) (cldf.ChangesetOutput, error) {
+func laneMigrateApply(migratorReg *LaneMigratorRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, LaneMigratorConfig) (cldf.ChangesetOutput, error) {
 	return func(e cldf.Environment, input LaneMigratorConfig) (cldf.ChangesetOutput, error) {
 		batchOps := make([]mcms_types.BatchOperation, 0)
 		reports := make([]cldf_ops.Report[any, any], 0)
@@ -184,7 +184,7 @@ func lanemigrateApply(migratorReg *LaneMigratorRegistry, mcmsRegistry *changeset
 	}
 }
 
-func lanemigrateVerify(migratorReg *LaneMigratorRegistry) func(cldf.Environment, LaneMigratorConfig) error {
+func laneMigrateVerify(migratorReg *LaneMigratorRegistry) func(cldf.Environment, LaneMigratorConfig) error {
 	return func(e cldf.Environment, input LaneMigratorConfig) error {
 		for chainSel, perChainConfig := range input.Input {
 			_, err := migratorReg.GetRouterUpdater(chainSel, perChainConfig.RouterVersion)
