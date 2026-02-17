@@ -1,0 +1,214 @@
+package deploy
+
+import (
+	"fmt"
+	"sync"
+
+	"github.com/Masterminds/semver/v3"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	mcms_types "github.com/smartcontractkit/mcms/types"
+
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
+)
+
+var (
+	singletonLaneMigraterRegistry *LaneMigraterRegistry
+	lanemigraterOnce              sync.Once
+)
+
+type LaneMigraterConfig struct {
+	Input map[uint64]LaneMigraterConfigPerChain
+	MCMS  mcms.Input
+}
+
+type LaneMigraterConfigPerChain struct {
+	RemoteChains  []uint64
+	RouterVersion *semver.Version
+	RampVersion   *semver.Version
+}
+
+type RouterUpdaterConfig struct {
+	ChainSelector        uint64
+	RemoteChainSelectors []uint64
+	OnRamp               datastore.AddressRef
+	OffRamp              datastore.AddressRef
+	ExistingAddresses    []datastore.AddressRef
+}
+
+type RampUpdateInRouter interface {
+	UpdateRouter() *cldf_ops.Sequence[RouterUpdaterConfig, sequences.OnChainOutput, chain.BlockChains]
+}
+
+type RampUpdaterConfig struct {
+	ChainSelector        uint64
+	RemoteChainSelectors []uint64
+	RouterAddr           datastore.AddressRef
+	ExistingAddresses    []datastore.AddressRef
+}
+
+type RouterUpdateInRamp interface {
+	UpdateVersionWithRouter() *cldf_ops.Sequence[RampUpdaterConfig, sequences.OnChainOutput, chain.BlockChains]
+}
+
+type LaneMigraterRegistry struct {
+	RouterUpdater map[string]RampUpdateInRouter
+	RampUpdater   map[string]RouterUpdateInRamp
+}
+
+func newLaneMigraterRegistry() *LaneMigraterRegistry {
+	return &LaneMigraterRegistry{
+		RouterUpdater: make(map[string]RampUpdateInRouter),
+		RampUpdater:   make(map[string]RouterUpdateInRamp),
+	}
+}
+
+func GetLaneMigraterRegistry() *LaneMigraterRegistry {
+	lanemigraterOnce.Do(func() {
+		singletonLaneMigraterRegistry = newLaneMigraterRegistry()
+	})
+	return singletonLaneMigraterRegistry
+}
+
+func (r *LaneMigraterRegistry) RegisterRouterUpdater(chainfamily string, version *semver.Version, updater RampUpdateInRouter) {
+	id := utils.NewRegistererID(chainfamily, version)
+	if _, exists := r.RouterUpdater[id]; !exists {
+		r.RouterUpdater[id] = updater
+	}
+}
+
+func (r *LaneMigraterRegistry) RegisterRampUpdater(chainfamily string, version *semver.Version, updater RouterUpdateInRamp) {
+	id := utils.NewRegistererID(chainfamily, version)
+	if _, exists := r.RampUpdater[id]; !exists {
+		r.RampUpdater[id] = updater
+	}
+}
+
+func (r *LaneMigraterRegistry) GetRouterUpdater(chainsel uint64, version *semver.Version) (RampUpdateInRouter, error) {
+	id := utils.NewIdFromSelector(chainsel, version)
+	updater, exists := r.RouterUpdater[id]
+	if !exists {
+		return nil, utils.ErrNoAdapterRegistered(id, version)
+	}
+	return updater, nil
+}
+
+func (r *LaneMigraterRegistry) GetRampUpdater(chainsel uint64, version *semver.Version) (RouterUpdateInRamp, error) {
+	id := utils.NewIdFromSelector(chainsel, version)
+	updater, exists := r.RampUpdater[id]
+	if !exists {
+		return nil, utils.ErrNoAdapterRegistered(id, version)
+	}
+	return updater, nil
+}
+
+func LaneMigrateToNewVersionChangeset(migraterReg *LaneMigraterRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) cldf.ChangeSetV2[LaneMigraterConfig] {
+	return cldf.CreateChangeSet(lanemigrateApply(migraterReg, mcmsRegistry), lanemigrateVerify())
+}
+
+func lanemigrateApply(migraterReg *LaneMigraterRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, LaneMigraterConfig) (cldf.ChangesetOutput, error) {
+	return func(e cldf.Environment, input LaneMigraterConfig) (cldf.ChangesetOutput, error) {
+		batchOps := make([]mcms_types.BatchOperation, 0)
+		reports := make([]cldf_ops.Report[any, any], 0)
+		for chainSel, perChainConfig := range input.Input {
+			existingAddresses := e.DataStore.Addresses().Filter(datastore.AddressRefByChainSelector(chainSel))
+			routerUpdater, err := migraterReg.GetRouterUpdater(chainSel, perChainConfig.RouterVersion)
+			if err != nil {
+				return cldf.ChangesetOutput{}, err
+			}
+			rampUpdater, err := migraterReg.GetRampUpdater(chainSel, perChainConfig.RampVersion)
+			if err != nil {
+				return cldf.ChangesetOutput{}, err
+			}
+			// get the ramp address refs
+			onRampRef, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+				ChainSelector: chainSel,
+				Type:          "OnRamp", // does not work with 1.5 ramps
+				Version:       perChainConfig.RampVersion,
+			}, chainSel, datastore_utils.FullRef)
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("error finding onRamp address ref for chain selector %d: %w", chainSel, err)
+			}
+			offRampRef, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+				ChainSelector: chainSel,
+				Type:          "OffRamp", // does not work with 1.5 ramps
+				Version:       perChainConfig.RampVersion,
+			}, chainSel, datastore_utils.FullRef)
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("error finding offRamp address ref for chain selector %d: %w", chainSel, err)
+			}
+			routerRef, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+				ChainSelector: chainSel,
+				Type:          "Router",
+				Version:       perChainConfig.RouterVersion,
+			}, chainSel, datastore_utils.FullRef)
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("error finding router address ref for chain selector %d: %w", chainSel, err)
+			}
+			routerUpdateConfig := RouterUpdaterConfig{
+				ChainSelector:        chainSel,
+				RemoteChainSelectors: perChainConfig.RemoteChains,
+				OnRamp:               onRampRef,
+				OffRamp:              offRampRef,
+				ExistingAddresses:    existingAddresses,
+			}
+			report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, routerUpdater.UpdateRouter(), e.BlockChains, routerUpdateConfig)
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("error executing router update sequence for chain selector %d: %w", chainSel, err)
+			}
+			batchOps = append(batchOps, report.Output.BatchOps...)
+			reports = append(reports, report.ExecutionReports...)
+			rampUpdateConfig := RampUpdaterConfig{
+				ChainSelector:        chainSel,
+				RemoteChainSelectors: perChainConfig.RemoteChains,
+				RouterAddr:           routerRef,
+				ExistingAddresses:    existingAddresses,
+			}
+			updateRampRep, err := cldf_ops.ExecuteSequence(e.OperationsBundle, rampUpdater.UpdateVersionWithRouter(), e.BlockChains, rampUpdateConfig)
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("error executing ramp update sequence for chain selector %d: %w", chainSel, err)
+			}
+			batchOps = append(batchOps, updateRampRep.Output.BatchOps...)
+			reports = append(reports, updateRampRep.ExecutionReports...)
+		}
+		return changesets.NewOutputBuilder(e, mcmsRegistry).
+			WithReports(reports).
+			WithBatchOps(batchOps).
+			Build(input.MCMS)
+	}
+}
+
+func lanemigrateVerify() func(cldf.Environment, LaneMigraterConfig) error {
+	return func(e cldf.Environment, input LaneMigraterConfig) error {
+		for chainSel, perChainConfig := range input.Input {
+			_, err := GetLaneMigraterRegistry().GetRouterUpdater(chainSel, perChainConfig.RouterVersion)
+			if err != nil {
+				return fmt.Errorf("error verifying existence of router updater for chain selector %d: %w", chainSel, err)
+			}
+			_, err = GetLaneMigraterRegistry().GetRampUpdater(chainSel, perChainConfig.RampVersion)
+			if err != nil {
+				return fmt.Errorf("error verifying existence of ramp updater for chain selector %d: %w", chainSel, err)
+			}
+			if !e.BlockChains.Exists(chainSel) {
+				return fmt.Errorf("error verifying existence of blockchain with selector %d in environment: %w", chainSel, err)
+			}
+			for _, remoteChainSel := range perChainConfig.RemoteChains {
+				if !e.BlockChains.Exists(remoteChainSel) {
+					return fmt.Errorf("error verifying existence of remote blockchain with selector %d in environment: %w", remoteChainSel, err)
+				}
+			}
+			// verify that the existing addresses for the chain selector are present in the environment datastore
+			existingAddresses := e.DataStore.Addresses().Filter(datastore.AddressRefByChainSelector(chainSel))
+			if len(existingAddresses) == 0 {
+				return fmt.Errorf("error verifying existence of existing addresses for chain selector %d in environment datastore: no addresses found", chainSel)
+			}
+		}
+		return nil
+	}
+}
