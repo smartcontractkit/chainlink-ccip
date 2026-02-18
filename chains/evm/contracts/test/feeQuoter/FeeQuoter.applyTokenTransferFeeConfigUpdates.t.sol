@@ -15,6 +15,9 @@ contract FeeQuoter_applyTokenTransferFeeConfigUpdates is FeeQuoterSetup {
     tokenTransferFeeConfigs[0].feeUSDCents = uint32(bound(tokenTransferFeeConfigs[0].feeUSDCents, 0, type(uint8).max));
     tokenTransferFeeConfigs[1].feeUSDCents = uint32(bound(tokenTransferFeeConfigs[1].feeUSDCents, 0, type(uint8).max));
 
+    tokenTransferFeeConfigs[0].isEnabled = true;
+    tokenTransferFeeConfigs[1].isEnabled = true;
+
     FeeQuoter.TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs = _generateTokenTransferFeeConfigArgs(2, 2);
     tokenTransferFeeConfigArgs[0].destChainSelector = DEST_CHAIN_SELECTOR;
     tokenTransferFeeConfigArgs[1].destChainSelector = DEST_CHAIN_SELECTOR + 1;
@@ -267,6 +270,23 @@ contract FeeQuoter_applyTokenTransferFeeConfigUpdates is FeeQuoterSetup {
     tokenTransferFeeConfigArgs[0].destChainSelector = 0;
 
     vm.expectRevert(abi.encodeWithSelector(FeeQuoter.InvalidDestChainConfig.selector, 0));
+
+    s_feeQuoter.applyTokenTransferFeeConfigUpdates(
+      tokenTransferFeeConfigArgs, new FeeQuoter.TokenTransferFeeConfigRemoveArgs[](0)
+    );
+  }
+
+  function test_applyTokenTransferFeeConfigUpdates_RevertWhen_TokenTransferConfigMustBeEnabled() public {
+    FeeQuoter.TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs = _generateTokenTransferFeeConfigArgs(1, 1);
+    tokenTransferFeeConfigArgs[0].destChainSelector = DEST_CHAIN_SELECTOR;
+    address token = address(5);
+    tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].token = token;
+    tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].tokenTransferFeeConfig =
+      FeeQuoter.TokenTransferFeeConfig({feeUSDCents: 6, destGasOverhead: 9, destBytesOverhead: 312, isEnabled: false});
+
+    vm.expectRevert(
+      abi.encodeWithSelector(FeeQuoter.TokenTransferConfigMustBeEnabled.selector, DEST_CHAIN_SELECTOR, token)
+    );
 
     s_feeQuoter.applyTokenTransferFeeConfigUpdates(
       tokenTransferFeeConfigArgs, new FeeQuoter.TokenTransferFeeConfigRemoveArgs[](0)
