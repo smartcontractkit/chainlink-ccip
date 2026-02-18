@@ -738,31 +738,9 @@ func prepareContractMethod(funcInfo *FunctionInfo, isWrite bool) ContractMethodD
 
 	var methodBody string
 	if isWrite {
-		if len(methodArgs) > 0 {
-			methodBody = fmt.Sprintf("return c.contract.Transact(opts, \"%s\", %s)",
-				funcInfo.CallMethod, strings.Join(methodArgs, ", "))
-		} else {
-			methodBody = fmt.Sprintf("return c.contract.Transact(opts, \"%s\")", funcInfo.CallMethod)
-		}
+		methodBody = buildWriteMethodBody(funcInfo, methodArgs)
 	} else {
-		callArgsStr := ""
-		if len(methodArgs) > 0 {
-			callArgsStr = ", " + strings.Join(methodArgs, ", ")
-		}
-		if len(funcInfo.ReturnParams) > 1 {
-			methodBody = buildMultiReturnMethodBody(funcInfo, callArgsStr, returnType)
-		} else {
-			methodBody = fmt.Sprintf(
-				`var out []any
-	err := c.contract.Call(opts, &out, "%s"%s)
-	if err != nil {
-		var zero %s
-		return zero, err
-	}
-	return *abi.ConvertType(out[0], new(%s)).(*%s), nil`,
-				funcInfo.CallMethod, callArgsStr, returnType, returnType, returnType,
-			)
-		}
+		methodBody = buildReadMethodBody(funcInfo, methodArgs, returnType)
 	}
 
 	return ContractMethodData{
@@ -772,6 +750,34 @@ func prepareContractMethod(funcInfo *FunctionInfo, isWrite bool) ContractMethodD
 		Returns:    returns,
 		MethodBody: methodBody,
 	}
+}
+
+func buildWriteMethodBody(funcInfo *FunctionInfo, methodArgs []string) string {
+	if len(methodArgs) > 0 {
+		return fmt.Sprintf("return c.contract.Transact(opts, \"%s\", %s)",
+			funcInfo.CallMethod, strings.Join(methodArgs, ", "))
+	}
+	return fmt.Sprintf("return c.contract.Transact(opts, \"%s\")", funcInfo.CallMethod)
+}
+
+func buildReadMethodBody(funcInfo *FunctionInfo, methodArgs []string, returnType string) string {
+	callArgsStr := ""
+	if len(methodArgs) > 0 {
+		callArgsStr = ", " + strings.Join(methodArgs, ", ")
+	}
+	if len(funcInfo.ReturnParams) > 1 {
+		return buildMultiReturnMethodBody(funcInfo, callArgsStr, returnType)
+	}
+	return fmt.Sprintf(
+		`var out []any
+	err := c.contract.Call(opts, &out, "%s"%s)
+	if err != nil {
+		var zero %s
+		return zero, err
+	}
+	return *abi.ConvertType(out[0], new(%s)).(*%s), nil`,
+		funcInfo.CallMethod, callArgsStr, returnType, returnType, returnType,
+	)
 }
 
 func prepareParameters(params []ParameterInfo) []ParameterData {
