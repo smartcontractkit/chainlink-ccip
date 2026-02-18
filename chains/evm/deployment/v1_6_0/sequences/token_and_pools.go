@@ -231,33 +231,21 @@ func (a *EVMAdapter) DeriveTokenPoolCounterpart(e deployment.Environment, chainS
 	return tokenPool, nil
 }
 
-func (a *EVMAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokensapi.RateLimiterConfigInputs, sequences.OnChainOutput, cldf_chain.BlockChains] {
+func (a *EVMAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokensapi.TPRLRemotes, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return cldf_ops.NewSequence(
 		"evm-adapter:set-token-pool-rate-limits",
 		tpops.Version,
 		"Set rate limits for a token pool across multiple EVM chains",
-		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokensapi.RateLimiterConfigInputs) (sequences.OnChainOutput, error) {
+		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokensapi.TPRLRemotes) (sequences.OnChainOutput, error) {
 			var result sequences.OnChainOutput
 			chain, ok := chains.EVMChains()[input.ChainSelector]
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
 
-			tpAddress, err := a.FindLatestAddressRef(
-				input.ExistingDataStore,
-				datastore.AddressRef{
-					ChainSelector: input.ChainSelector,
-					Qualifier:     input.TokenPoolQualifier,
-					Type:          datastore.ContractType(input.PoolType),
-				},
-			)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token pool with qualifier %q on chain %d: %w", input.TokenPoolQualifier, input.ChainSelector, err)
-			}
-
 			report, err := cldf_ops.ExecuteOperation(b, tpops.SetChainRateLimiterConfig, chain, evm_contract.FunctionInput[tpops.SetChainRateLimiterConfigArgs]{
 				ChainSelector: chain.Selector,
-				Address:       tpAddress,
+				Address:       common.HexToAddress(input.TokenPoolRef.Address),
 				Args: tpops.SetChainRateLimiterConfigArgs{
 					OutboundRateLimitConfig: token_pool.RateLimiterConfig{
 						IsEnabled: input.OutboundRateLimiterConfig.IsEnabled,
@@ -300,41 +288,49 @@ func (a *EVMAdapter) ManualRegistration() *cldf_ops.Sequence[tokensapi.ManualReg
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token admin registry address for chain %d: %w", chain.Selector, err)
 			}
 
-			// NOTE: when resolving the token address, we first attempt to resolve it from the TokenRef, and if that fails, then we'll fall back to the TokenPoolRef
-			tokenRef, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, input.TokenRef, chain.Selector, datastore_utils.FullRef)
-			if err != nil {
-				b.Logger.Warnf("token address could not be resolved using TokenRef (%+v): %v", input.TokenRef, err)
-				b.Logger.Warnf("attempting to resolve token address using TokenPoolRef instead: (%+v)", input.TokenPoolRef)
+			// NOTE: the token address is derived using the following steps:
+			//   1. if it is already present in the TokenRef, then skip the datastore altogether and simply use the given address
+			//   2. if the token address is not present, then use whatever fields are defined in TokenRef to lookup the address in the DS
+			//   3. if step #2 produces multiple tokens or an error, then attempt to resolve the token address from the TokenPoolRef
+			//   4. if we still can't derive it from the TokenPoolRef, then give up
+			tokenRef := input.TokenRef
+			if tokenRef.Address == "" {
+				if tokRef, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, tokenRef, chain.Selector, datastore_utils.FullRef); err != nil {
+					b.Logger.Warnf("token address could not be resolved using TokenRef (%+v): %v", tokenRef, err)
+					b.Logger.Warnf("attempting to resolve token address using TokenPoolRef instead: (%+v)", input.TokenPoolRef)
 
-				tokenPoolRef, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, input.TokenPoolRef, chain.Selector, datastore_utils.FullRef)
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("token pool could not be resolved using TokenPoolRef (%+v): %w", input.TokenPoolRef, err)
-				}
-				tokenPoolAddrBytes, err := a.AddressRefToBytes(tokenPoolRef)
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to convert token pool address ref to bytes: %w", err)
-				}
-				tokenPoolAddr := common.BytesToAddress(tokenPoolAddrBytes)
-				if tokenPoolAddr == (common.Address{}) {
-					return sequences.OnChainOutput{}, fmt.Errorf("token pool address for ref (%+v) is zero address", tokenPoolRef)
-				}
+					tokenPoolRef, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, input.TokenPoolRef, chain.Selector, datastore_utils.FullRef)
+					if err != nil {
+						return sequences.OnChainOutput{}, fmt.Errorf("token pool could not be resolved using TokenPoolRef (%+v): %w", input.TokenPoolRef, err)
+					}
+					tokenPoolAddrBytes, err := a.AddressRefToBytes(tokenPoolRef)
+					if err != nil {
+						return sequences.OnChainOutput{}, fmt.Errorf("failed to convert token pool address ref to bytes: %w", err)
+					}
+					tokenPoolAddr := common.BytesToAddress(tokenPoolAddrBytes)
+					if tokenPoolAddr == (common.Address{}) {
+						return sequences.OnChainOutput{}, fmt.Errorf("token pool address for ref (%+v) is zero address", tokenPoolRef)
+					}
 
-				token, err := cldf_ops.ExecuteOperation(b,
-					tpops.GetToken,
-					chain,
-					evm_contract.FunctionInput[struct{}]{
+					token, err := cldf_ops.ExecuteOperation(b,
+						tpops.GetToken,
+						chain,
+						evm_contract.FunctionInput[struct{}]{
+							ChainSelector: chain.Selector,
+							Address:       tokenPoolAddr,
+							Args:          struct{}{},
+						},
+					)
+					if err != nil {
+						return sequences.OnChainOutput{}, fmt.Errorf("failed to get token address via GetToken operation: %w", err)
+					}
+
+					tokenRef = datastore.AddressRef{
 						ChainSelector: chain.Selector,
-						Address:       tokenPoolAddr,
-						Args:          struct{}{},
-					},
-				)
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to get token address via GetToken operation: %w", err)
-				}
-
-				tokenRef = datastore.AddressRef{
-					ChainSelector: chain.Selector,
-					Address:       token.Output.Hex(),
+						Address:       token.Output.Hex(),
+					}
+				} else {
+					tokenRef = tokRef
 				}
 			}
 
