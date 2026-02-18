@@ -14,6 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
+	routerops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	adapters1_5 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/adapters"
 	tokenadminops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
@@ -44,8 +45,8 @@ func (ci *ConfigImportAdapter) InitializeAdapter(e cldf.Environment, chainSelect
 	}
 	ci.FeeQuoter = fqRef
 	routerRef, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-		Type:          datastore.ContractType("Router"),
-		Version:       semver.MustParse("1.2.0"),
+		Type:          datastore.ContractType(routerops.ContractType),
+		Version:       routerops.Version,
 		ChainSelector: chainSelector,
 	}, chainSelector, evm_datastore_utils.ToEVMAddress)
 	if err != nil {
@@ -63,7 +64,7 @@ func (ci *ConfigImportAdapter) InitializeAdapter(e cldf.Environment, chainSelect
 	ci.TokenAdminReg = tokenAdminRegRef
 	onRampRef, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 		Type:    datastore.ContractType(onrampops.ContractType),
-		Version: semver.MustParse("1.6.0"),
+		Version: onrampops.Version,
 	}, chainSelector, evm_datastore_utils.ToEVMAddress)
 	if err != nil {
 		return fmt.Errorf("failed to find onramp contract ref for chain %d: %w", chainSelector, err)
@@ -71,7 +72,7 @@ func (ci *ConfigImportAdapter) InitializeAdapter(e cldf.Environment, chainSelect
 	ci.OnRamp = onRampRef
 	offRampRef, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 		Type:    datastore.ContractType(offrampops.ContractType),
-		Version: semver.MustParse("1.6.0"),
+		Version: offrampops.Version,
 	}, chainSelector, evm_datastore_utils.ToEVMAddress)
 	if err != nil {
 		return fmt.Errorf("failed to find offramp contract ref for chain %d: %w", chainSelector, err)

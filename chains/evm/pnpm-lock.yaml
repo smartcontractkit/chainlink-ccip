@@ -12,8 +12,8 @@ importers:
         specifier: 1.0.0
         version: 1.0.0
       '@chainlink/contracts':
-        specifier: 1.5.1-beta.0
-        version: 1.5.1-beta.0(ethers@5.8.0)
+        specifier: 1.5.0
+        version: 1.5.0(ethers@5.8.0)
       '@openzeppelin/contracts-4.8.3':
         specifier: npm:@openzeppelin/contracts@4.8.3
         version: '@openzeppelin/contracts@4.8.3'
@@ -57,8 +57,8 @@ packages:
   '@chainlink/ace@1.0.0':
     resolution: {integrity: sha512-lamF+fabw5cyIQ+7PA5QkEl0GyHmmH3lc875jrspo9VxsxiKbMxDcRDGPEuubFQS3Zcx7H/Z80C72+Xm/FgeqA==}
 
-  '@chainlink/contracts@1.5.1-beta.0':
-    resolution: {integrity: sha512-XSApjtbc+KWdgo+ek+417x12J9LOI1ztTtpvGIoosfsnqAGp7ewW7GUQiudqAUeRv9W10lC4uByqVyxnWg13hw==}
+  '@chainlink/contracts@1.5.0':
+    resolution: {integrity: sha512-1fGJwjvivqAxvVOTqZUEXGR54CATtg0vjcXgSIk4Cfoad2nUhSG/qaWHXjLg1CkNTeOoteoxGQcpP/HiA5HsUA==}
     engines: {node: '>=22', pnpm: '>=10'}
 
   '@chainlink/solhint-plugin-chainlink-solidity@https://codeload.github.com/smartcontractkit/chainlink-solhint-rules/tar.gz/1b4c0c2663fcd983589d4f33a2e73908624ed43c':
@@ -1208,7 +1208,7 @@ snapshots:
 
   '@chainlink/ace@1.0.0': {}
 
-  '@chainlink/contracts@1.5.1-beta.0(ethers@5.8.0)':
+  '@chainlink/contracts@1.5.0(ethers@5.8.0)':
     dependencies:
       '@arbitrum/nitro-contracts': 3.0.0
       '@changesets/cli': 2.29.8

@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {IAdvancedPoolHooks} from "../../../interfaces/IAdvancedPoolHooks.sol";
-import {IPolicyEngine} from "@chainlink/ace/policy-management/interfaces/IPolicyEngine.sol";
+import {IPolicyEngine} from "@chainlink/policy-management/interfaces/IPolicyEngine.sol";
 
 import {Pool} from "../../../libraries/Pool.sol";
 import {AdvancedPoolHooks} from "../../../pools/AdvancedPoolHooks.sol";
@@ -13,17 +13,11 @@ import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/Aut
 contract AdvancedPoolHooks_preflightCheck is AdvancedPoolHooksSetup {
   MockPolicyEngine internal s_mockPolicyEngine;
 
-  address internal s_authorizedCaller = makeAddr("authorizedCaller");
   address internal s_unauthorizedCaller = makeAddr("unauthorizedCaller");
-  AdvancedPoolHooks internal s_hooksWithAuthorizedCallers;
 
   function setUp() public virtual override {
     super.setUp();
     s_mockPolicyEngine = new MockPolicyEngine();
-
-    address[] memory authorizedCallers = new address[](1);
-    authorizedCallers[0] = s_authorizedCaller;
-    s_hooksWithAuthorizedCallers = new AdvancedPoolHooks(new address[](0), 0, address(0), authorizedCallers);
   }
 
   function _createLockOrBurnIn(
@@ -65,8 +59,9 @@ contract AdvancedPoolHooks_preflightCheck is AdvancedPoolHooksSetup {
   function test_preflightCheck_AllowListAndPolicyEngine() public {
     address[] memory allowedSenders = new address[](1);
     allowedSenders[0] = OWNER;
-    AdvancedPoolHooks hooksWithBoth =
-      new AdvancedPoolHooks(allowedSenders, 0, address(s_mockPolicyEngine), new address[](0));
+    address[] memory callers = new address[](1);
+    callers[0] = OWNER;
+    AdvancedPoolHooks hooksWithBoth = new AdvancedPoolHooks(allowedSenders, 0, address(s_mockPolicyEngine), callers);
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _createLockOrBurnIn(OWNER);
 
@@ -92,7 +87,9 @@ contract AdvancedPoolHooks_preflightCheck is AdvancedPoolHooksSetup {
   function test_preflightCheck_RevertWhen_SenderNotAllowed() public {
     address[] memory allowedSenders = new address[](1);
     allowedSenders[0] = OWNER;
-    AdvancedPoolHooks hooksWithAllowList = new AdvancedPoolHooks(allowedSenders, 0, address(0), new address[](0));
+    address[] memory callers = new address[](1);
+    callers[0] = OWNER;
+    AdvancedPoolHooks hooksWithAllowList = new AdvancedPoolHooks(allowedSenders, 0, address(0), callers);
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _createLockOrBurnIn(STRANGER);
 
@@ -100,34 +97,19 @@ contract AdvancedPoolHooks_preflightCheck is AdvancedPoolHooksSetup {
     hooksWithAllowList.preflightCheck(lockOrBurnIn, 5, "", lockOrBurnIn.amount);
   }
 
-  function test_preflightCheck_AnyoneCanInvoke_WhenAuthorizedCallersDisabled() public {
-    vm.stopPrank();
-    assertFalse(s_advancedPoolHooks.getAuthorizedCallersEnabled());
-
-    Pool.LockOrBurnInV1 memory lockOrBurnIn = _createLockOrBurnIn(OWNER);
-
-    vm.prank(s_unauthorizedCaller);
-    s_advancedPoolHooks.preflightCheck(lockOrBurnIn, 5, "", lockOrBurnIn.amount);
-  }
-
   function test_preflightCheck_OnlyAuthorizedCallersCanInvoke() public {
-    vm.stopPrank();
-    assertTrue(s_hooksWithAuthorizedCallers.getAuthorizedCallersEnabled());
-
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _createLockOrBurnIn(OWNER);
 
-    vm.prank(s_authorizedCaller);
-    s_hooksWithAuthorizedCallers.preflightCheck(lockOrBurnIn, 5, "", lockOrBurnIn.amount);
+    s_advancedPoolHooks.preflightCheck(lockOrBurnIn, 5, "", lockOrBurnIn.amount);
   }
 
   function test_preflightCheck_RevertWhen_UnauthorizedCaller() public {
     vm.stopPrank();
-    assertTrue(s_hooksWithAuthorizedCallers.getAuthorizedCallersEnabled());
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _createLockOrBurnIn(OWNER);
 
     vm.prank(s_unauthorizedCaller);
     vm.expectRevert(abi.encodeWithSelector(AuthorizedCallers.UnauthorizedCaller.selector, s_unauthorizedCaller));
-    s_hooksWithAuthorizedCallers.preflightCheck(lockOrBurnIn, 5, "", lockOrBurnIn.amount);
+    s_advancedPoolHooks.preflightCheck(lockOrBurnIn, 5, "", lockOrBurnIn.amount);
   }
 }

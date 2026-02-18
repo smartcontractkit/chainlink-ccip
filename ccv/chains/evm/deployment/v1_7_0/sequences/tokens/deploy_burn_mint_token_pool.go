@@ -74,13 +74,11 @@ var DeployBurnMintTokenPool = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to configure token pool with address %s on %s: %w", tpDeployReport.Output.Address, chain, err)
 		}
 
-		// If hooks authorized callers gating is enabled at deployment time, ensure the newly deployed token pool is authorized.
-		// Otherwise, calls to preflightCheck/postflightCheck will revert when executed by the token pool.
-		if len(input.AdvancedPoolHooksConfig.AuthorizedCallers) > 0 {
+		// Add the newly deployed token pool as an authorized caller on the hooks.
+		{
 			poolAddr := common.HexToAddress(tpDeployReport.Output.Address)
 			hooksAddr := common.HexToAddress(hooksDeployReport.Output.Address)
 
-			// Check if the pool is already an authorized caller.
 			getAuthorizedCallersReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.GetAllAuthorizedCallers, chain, evm_contract.FunctionInput[any]{
 				ChainSelector: input.ChainSel,
 				Address:       hooksAddr,

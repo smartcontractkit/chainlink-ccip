@@ -96,3 +96,14 @@ var UpdateSupportedTokens = contract.NewWrite(contract.WriteParams[SupportedToke
 		return lombardVerifier.UpdateSupportedTokens(opts, args.TokensToRemove, args.TokensToSet)
 	},
 })
+
+var GetVersionTag = contract.NewRead(contract.ReadParams[any, [4]byte, *lombard_verifier.LombardVerifier]{
+	Name:         "lombard-verifier:get-version-tag",
+	Version:      Version,
+	Description:  "Gets the version tag of the LombardVerifier contract",
+	ContractType: ContractType,
+	NewContract:  lombard_verifier.NewLombardVerifier,
+	CallContract: func(lombardVerifier *lombard_verifier.LombardVerifier, opts *bind.CallOpts, args any) ([4]byte, error) {
+		return lombardVerifier.VersionTag(opts)
+	},
+})

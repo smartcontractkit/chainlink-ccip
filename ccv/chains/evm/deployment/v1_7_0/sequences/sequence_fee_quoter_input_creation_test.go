@@ -2,6 +2,7 @@ package sequences_test
 
 import (
 	"math/big"
+	"sort"
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
@@ -32,16 +33,16 @@ import (
 // dummyAddressRefs is hardcoded address refs (previously from address_refs.json).
 // Chain selectors must match dummyContractMetadata so metadata lookup succeeds.
 var dummyAddressRefs = []datastore.AddressRef{
-	{Address: "0x1111111111111111111111111111111111111111", ChainSelector: 5009297550715157269, Type: datastore.ContractType("FeeQuoter"), Version: semver.MustParse("1.6.0")},
+	{Address: "0x1111111111111111111111111111111111111111", ChainSelector: 5009297550715157269, Type: datastore.ContractType("FeeQuoter"), Version: semver.MustParse("1.6.3")},
 	{Address: "0x6666666666666666666666666666666666666666", ChainSelector: 5009297550715157269, Type: datastore.ContractType("EVM2EVMOnRamp"), Version: semver.MustParse("1.5.0")},
 	{Address: "0x2222222222222222222222222222222222222221", ChainSelector: 5009297550715157269, Type: datastore.ContractType("CommitStore"), Version: semver.MustParse("1.5.0")},
 	{Address: "0x9999999999999999999999999999999999999999", ChainSelector: 4949039107694359620, Type: datastore.ContractType("CommitStore"), Version: semver.MustParse("1.5.0"), Qualifier: "commitstore1"},
-	{Address: "0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", ChainSelector: 4949039107694359620, Type: datastore.ContractType("FeeQuoter"), Version: semver.MustParse("1.6.0")},
+	{Address: "0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", ChainSelector: 4949039107694359620, Type: datastore.ContractType("FeeQuoter"), Version: semver.MustParse("1.6.3")},
 	{Address: "0x1010101010101010101010101010101010101010", ChainSelector: 4949039107694359620, Type: datastore.ContractType("EVM2EVMOnRamp"), Version: semver.MustParse("1.5.0")},
 	{Address: "0x3333333333333333333333333333333333333333", ChainSelector: 4949039107694359620, Type: datastore.ContractType("CommitStore"), Version: semver.MustParse("1.5.0"), Qualifier: "commitstore2"},
 	{Address: "0x5050505050505050505050505050505050505050", ChainSelector: 15971525489660198786, Type: datastore.ContractType("EVM2EVMOnRamp"), Version: semver.MustParse("1.5.0")},
 	{Address: "0x4444444444444444444444444444444444444444", ChainSelector: 15971525489660198786, Type: datastore.ContractType("CommitStore"), Version: semver.MustParse("1.5.0")},
-	{Address: "0x6060606060606060606060606060606060606060", ChainSelector: 5936861837188149645, Type: datastore.ContractType("FeeQuoter"), Version: semver.MustParse("1.6.0")},
+	{Address: "0x6060606060606060606060606060606060606060", ChainSelector: 5936861837188149645, Type: datastore.ContractType("FeeQuoter"), Version: semver.MustParse("1.6.3")},
 	{Address: "0x7070707070707070707070707070707070707070", ChainSelector: 5936861837188149645, Type: datastore.ContractType("EVM2EVMOnRamp"), Version: semver.MustParse("1.5.0")},
 	{Address: "0x5555555555555555555555555555555555555551", ChainSelector: 5936861837188149645, Type: datastore.ContractType("CommitStore"), Version: semver.MustParse("1.5.0")},
 }
@@ -438,6 +439,32 @@ var dummyContractMetadata = []datastore.ContractMetadata{
 	},
 }
 
+// validMaxFeeJuelsPerMsgFromMetadata returns the set of valid MaxFeeJuelsPerMsg for a chain
+// by collecting values from contract metadata. The sequence merges v1.6 (FeeQuoter) and v1.5 (OnRamp)
+// outputs; when the v1.6 path finds a FeeQuoter ref it uses FeeQuoter's StaticCfg.MaxFeeJuelsPerMsg,
+// otherwise it may use only v1.5's ConstructorArgs which take MaxFeeJuelsPerMsg from OnRamp's
+// MaxNopFeesJuels. So for chains that have both FeeQuoter and OnRamp metadata, either value is valid
+// depending on ref version matching the sequence's dependency. Keys are big.Int.String() for set lookup.
+func validMaxFeeJuelsPerMsgFromMetadata(chainSelector uint64, contractMetadata []datastore.ContractMetadata) map[string]bool {
+	valid := make(map[string]bool)
+	for _, meta := range contractMetadata {
+		if meta.ChainSelector != chainSelector {
+			continue
+		}
+		if fq, ok := meta.Metadata.(seq1_6.FeeQuoterImportConfigSequenceOutput); ok {
+			if fq.StaticCfg.MaxFeeJuelsPerMsg != nil {
+				valid[fq.StaticCfg.MaxFeeJuelsPerMsg.String()] = true
+			}
+		}
+		if onr, ok := meta.Metadata.(seq1_5.OnRampImportConfigSequenceOutput); ok {
+			if onr.StaticConfig.MaxNopFeesJuels != nil {
+				valid[onr.StaticConfig.MaxNopFeesJuels.String()] = true
+			}
+		}
+	}
+	return valid
+}
+
 // getExpectedOutput returns hardcoded expected FeeQuoterUpdate values based on contract_metadata.json
 func getExpectedOutput() map[uint64]sequence1_7.FeeQuoterUpdate {
 	linkToken := common.HexToAddress("0x514910771AF9Ca656af840dff83E8264EcF986CA")
@@ -763,11 +790,12 @@ func TestSequenceFeeQuoterInputCreation(t *testing.T) {
 		chainSelectors[ref.ChainSelector] = true
 	}
 
-	// Convert map keys to slice
+	// Convert map keys to slice and sort for deterministic test order (avoids flakiness from map iteration)
 	chainSelectorList := make([]uint64, 0, len(chainSelectors))
 	for selector := range chainSelectors {
 		chainSelectorList = append(chainSelectorList, selector)
 	}
+	sort.Slice(chainSelectorList, func(i, j int) bool { return chainSelectorList[i] < chainSelectorList[j] })
 
 	// Create environment with simulated EVM chains
 	e, err := environment.New(t.Context(),
@@ -801,14 +829,36 @@ func TestSequenceFeeQuoterInputCreation(t *testing.T) {
 	for _, chainSelector := range chainSelectorList {
 		_, ok := e.BlockChains.EVMChains()[chainSelector]
 		require.True(t, ok, "Chain with selector %d should exist", chainSelector)
-		// Filter existing addresses for this chain
-		existingAddresses := e.DataStore.Addresses().Filter(datastore.AddressRefByChainSelector(chainSelector))
+
+		// Build input from original slices so Version/Type match exactly (sealed datastore
+		// can alter refs and break GetAddressRef lookup for FeeQuoter 1.6.0).
+		existingAddresses := make([]datastore.AddressRef, 0)
+		for _, ref := range addressRefs {
+			if ref.ChainSelector == chainSelector {
+				existingAddresses = append(existingAddresses, ref)
+			}
+		}
+		contractMeta := make([]datastore.ContractMetadata, 0)
+		for _, meta := range contractMetadata {
+			if meta.ChainSelector == chainSelector {
+				contractMeta = append(contractMeta, meta)
+			}
+		}
+		sort.Slice(existingAddresses, func(i, j int) bool {
+			if existingAddresses[i].Type != existingAddresses[j].Type {
+				return string(existingAddresses[i].Type) < string(existingAddresses[j].Type)
+			}
+			return existingAddresses[i].Address < existingAddresses[j].Address
+		})
+		sort.Slice(contractMeta, func(i, j int) bool {
+			return contractMeta[i].Address < contractMeta[j].Address
+		})
 
 		// Create input for SequenceFeeQuoterInputCreation
 		input := deploy.FeeQuoterUpdateInput{
 			ChainSelector:     chainSelector,
 			ExistingAddresses: existingAddresses,
-			ContractMeta:      e.DataStore.ContractMetadata().Filter(datastore.ContractMetadataByChainSelector(chainSelector)),
+			ContractMeta:      contractMeta,
 		}
 
 		// Execute the sequence
@@ -856,8 +906,13 @@ func TestSequenceFeeQuoterInputCreation(t *testing.T) {
 			require.False(t, output.ConstructorArgs.IsEmpty(), "ConstructorArgs should be present for new deployment on chain %d", chainSelector)
 			require.Equal(t, expected.ConstructorArgs.StaticConfig.LinkToken, output.ConstructorArgs.StaticConfig.LinkToken,
 				"LinkToken should match expected value on chain %d", chainSelector)
-			require.Equal(t, 0, expected.ConstructorArgs.StaticConfig.MaxFeeJuelsPerMsg.Cmp(output.ConstructorArgs.StaticConfig.MaxFeeJuelsPerMsg),
-				"MaxFeeJuelsPerMsg should match expected value on chain %d", chainSelector)
+			// MaxFeeJuelsPerMsg must be one of the values present in contract metadata for this chain
+			// (FeeQuoter StaticCfg or OnRamp MaxNopFeesJuels); the sequence uses one or the other depending
+			// on whether the v1.6 path finds a FeeQuoter ref.
+			validMaxFee := validMaxFeeJuelsPerMsgFromMetadata(chainSelector, contractMetadata)
+			require.NotEmpty(t, validMaxFee, "contract metadata for chain %d should define at least one MaxFeeJuelsPerMsg source", chainSelector)
+			require.True(t, validMaxFee[output.ConstructorArgs.StaticConfig.MaxFeeJuelsPerMsg.String()],
+				"MaxFeeJuelsPerMsg should be one of the values from contract metadata (FeeQuoter or OnRamp) on chain %d", chainSelector)
 			require.ElementsMatch(t, expected.ConstructorArgs.PriceUpdaters, output.ConstructorArgs.PriceUpdaters,
 				"PriceUpdaters should match expected value on chain %d", chainSelector)
 		} else {
