@@ -40,12 +40,13 @@ lint-go-fix:
 	golangci-lint run --max-issues-per-linter 0 --max-same-issues 0 --color=always --timeout 15m run --verbose --fix
 
 .PHONY: anchor-go-gen
-anchor-go-gen:
-	cd ./contracts && find ./target -mindepth 1 ! -path './target/vendor*' ! -path './target/types*' -exec rm -rf {} + && anchor build --no-idl -- --tools-version v1.53 && \
-	for prog in access_controller base_token_pool ccip_common ccip_offramp ccip_router burnmint_token_pool example_ccip_receiver example_ccip_sender lockrelease_token_pool external_program_cpi_stub fee_quoter mcm rmn_remote test_ccip_invalid_receiver test_ccip_receiver test_token_pool timelock ping_pong_demo cctp_token_pool; do \
-		echo "Building IDL for $$prog..." && \
-		anchor idl build -p "$$prog" -o "target/idl/$${prog}.json" || exit 1; \
-	done && cd .. && ./scripts/anchor-go-gen.sh
+anchor-go-gen: build-contracts
+	./scripts/anchor-go-gen.sh
+
+.PHONY: anchor-go-gen-clean
+anchor-go-gen-clean:
+	cd ./contracts && find ./target -mindepth 1 ! -path './target/vendor*' ! -path './target/types*' -exec rm -rf {} +
+	$(MAKE) anchor-go-gen
 
 .PHONY: format
 format:
@@ -92,4 +93,4 @@ docker-update-contracts:
 		${ANCHOR_IMAGE} anchor keys sync
 
 .PHONY: solana-checks
-solana-checks: clippy anchor-go-gen format gomodtidy lint-go rust-tests go-tests build-contracts
+solana-checks: clippy anchor-go-gen-clean format gomodtidy lint-go rust-tests go-tests build-contracts

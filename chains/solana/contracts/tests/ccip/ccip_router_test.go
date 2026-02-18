@@ -40,14 +40,14 @@ import (
 )
 
 func TestCCIPRouter(t *testing.T) {
-	ccip_router.SetProgramID(config.CcipRouterProgram)
-	test_ccip_receiver.SetProgramID(config.CcipLogicReceiver)
-	test_token_pool.SetProgramID(config.CcipTokenPoolProgram)
-	fee_quoter.SetProgramID(config.FeeQuoterProgram)
-	ccip_offramp.SetProgramID(config.CcipOfframpProgram)
-	example_ccip_sender.SetProgramID(config.CcipBaseSender)
-	rmn_remote.SetProgramID(config.RMNRemoteProgram)
-	cctp_token_pool.SetProgramID(config.CctpTokenPoolProgram)
+	//ccip_router.SetProgramID(config.CcipRouterProgram)
+	//test_ccip_receiver.SetProgramID(config.CcipLogicReceiver)
+	//test_token_pool.SetProgramID(config.CcipTokenPoolProgram)
+	//fee_quoter.SetProgramID(config.FeeQuoterProgram)
+	//ccip_offramp.SetProgramID(config.CcipOfframpProgram)
+	//example_ccip_sender.SetProgramID(config.CcipBaseSender)
+	//rmn_remote.SetProgramID(config.RMNRemoteProgram)
+	//cctp_token_pool.SetProgramID(config.CctpTokenPoolProgram)
 
 	ctx := tests.Context(t)
 	user := solana.MustPrivateKeyFromBase58("ZZdVf32Npuhci4u4ir2NW9491Y3FTv2Gwk41HMpvgJoh81UM42LcNqAN8SXapHfPcr61QP7sJj7K2mKHt7qFCoV")
