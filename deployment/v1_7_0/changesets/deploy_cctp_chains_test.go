@@ -211,6 +211,7 @@ func TestDeployCCTPChains_Apply(t *testing.T) {
 			cfg: v1_7_0_changesets.DeployCCTPChainsConfig{
 				Chains: map[uint64]v1_7_0_changesets.CCTPChainConfig{
 					5009297550715157269: {
+						CCTPType:         adapters.Canonical,
 						TokenMessengerV1: "0x9999999999999999999999999999999999999999",
 						TokenMessengerV2: "0x9999999999999999999999999999999999999999",
 						USDCToken:        "0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
@@ -230,7 +231,9 @@ func TestDeployCCTPChains_Apply(t *testing.T) {
 			},
 			cfg: v1_7_0_changesets.DeployCCTPChainsConfig{
 				Chains: map[uint64]v1_7_0_changesets.CCTPChainConfig{
-					5009297550715157269: {},
+					5009297550715157269: {
+						CCTPType: adapters.Canonical,
+					},
 				},
 				MCMS: &cctpTest_BasicMCMSInput,
 			},
@@ -243,7 +246,9 @@ func TestDeployCCTPChains_Apply(t *testing.T) {
 			},
 			cfg: v1_7_0_changesets.DeployCCTPChainsConfig{
 				Chains: map[uint64]v1_7_0_changesets.CCTPChainConfig{
-					5009297550715157269: {},
+					5009297550715157269: {
+						CCTPType: adapters.Canonical,
+					},
 				},
 				MCMS: &cctpTest_BasicMCMSInput,
 			},
@@ -277,7 +282,7 @@ func TestDeployCCTPChains_Apply(t *testing.T) {
 				mockAdapter := &cctpTest_MockCCTPChain{
 					sequenceErrorMsg: tt.expectedSequenceErrorMsg,
 				}
-				cctpChainRegistry.RegisterCCTPChain("evm", mockAdapter)
+				cctpChainRegistry.RegisterCCTPChain("evm", adapters.Canonical, mockAdapter)
 			}
 
 			changeset := v1_7_0_changesets.DeployCCTPChains(cctpChainRegistry, mcmsRegistry)
@@ -306,6 +311,7 @@ func TestDeployCCTPChains_VerifyPreconditions(t *testing.T) {
 			cfg: v1_7_0_changesets.DeployCCTPChainsConfig{
 				Chains: map[uint64]v1_7_0_changesets.CCTPChainConfig{
 					5009297550715157269: {
+						CCTPType:         adapters.Canonical,
 						TokenMessengerV1: "0x9999999999999999999999999999999999999999",
 						TokenMessengerV2: "0x8888888888888888888888888888888888888888",
 						RemoteChains: map[uint64]adapters.RemoteCCTPChainConfig{
@@ -313,6 +319,7 @@ func TestDeployCCTPChains_VerifyPreconditions(t *testing.T) {
 						},
 					},
 					15971525489660198786: {
+						CCTPType:         adapters.Canonical,
 						TokenMessengerV1: "0x7777777777777777777777777777777777777777",
 						TokenMessengerV2: "0x6666666666666666666666666666666666666666",
 						RemoteChains: map[uint64]adapters.RemoteCCTPChainConfig{
@@ -328,6 +335,7 @@ func TestDeployCCTPChains_VerifyPreconditions(t *testing.T) {
 			cfg: v1_7_0_changesets.DeployCCTPChainsConfig{
 				Chains: map[uint64]v1_7_0_changesets.CCTPChainConfig{
 					5009297550715157269: {
+						CCTPType:         adapters.Canonical,
 						TokenMessengerV1: "0x9999999999999999999999999999999999999999",
 						TokenMessengerV2: "0x8888888888888888888888888888888888888888",
 					},
@@ -339,6 +347,7 @@ func TestDeployCCTPChains_VerifyPreconditions(t *testing.T) {
 			cfg: v1_7_0_changesets.DeployCCTPChainsConfig{
 				Chains: map[uint64]v1_7_0_changesets.CCTPChainConfig{
 					5009297550715157269: {
+						CCTPType:         adapters.Canonical,
 						TokenMessengerV1: "",
 						TokenMessengerV2: "0x8888888888888888888888888888888888888888",
 					},
@@ -346,22 +355,11 @@ func TestDeployCCTPChains_VerifyPreconditions(t *testing.T) {
 			},
 		},
 		{
-			desc: "failure - invalid CCTP v1 token messenger",
-			cfg: v1_7_0_changesets.DeployCCTPChainsConfig{
-				Chains: map[uint64]v1_7_0_changesets.CCTPChainConfig{
-					5009297550715157269: {
-						TokenMessengerV1: "not-an-address",
-						TokenMessengerV2: "0x8888888888888888888888888888888888888888",
-					},
-				},
-			},
-			expectedError: "invalid TokenMessengerV1",
-		},
-		{
 			desc: "success - empty CCTP v1 token messenger with CCTP_V1 lane in config",
 			cfg: v1_7_0_changesets.DeployCCTPChainsConfig{
 				Chains: map[uint64]v1_7_0_changesets.CCTPChainConfig{
 					5009297550715157269: {
+						CCTPType:         adapters.Canonical,
 						TokenMessengerV1: "",
 						TokenMessengerV2: "0x8888888888888888888888888888888888888888",
 						RemoteChains: map[uint64]adapters.RemoteCCTPChainConfig{
@@ -371,16 +369,42 @@ func TestDeployCCTPChains_VerifyPreconditions(t *testing.T) {
 						},
 					},
 					15971525489660198786: {
+						CCTPType:         adapters.Canonical,
 						TokenMessengerV2: "0x6666666666666666666666666666666666666666",
 					},
 				},
 			},
 		},
 		{
+			desc: "failure - invalid CCTP type",
+			cfg: v1_7_0_changesets.DeployCCTPChainsConfig{
+				Chains: map[uint64]v1_7_0_changesets.CCTPChainConfig{
+					5009297550715157269: {
+						CCTPType: "invalid-type",
+					},
+				},
+			},
+			expectedError: "invalid CCTP type",
+		},
+		{
+			desc: "failure - invalid CCTP v1 token messenger",
+			cfg: v1_7_0_changesets.DeployCCTPChainsConfig{
+				Chains: map[uint64]v1_7_0_changesets.CCTPChainConfig{
+					5009297550715157269: {
+						CCTPType:         adapters.Canonical,
+						TokenMessengerV1: "not-an-address",
+						TokenMessengerV2: "0x8888888888888888888888888888888888888888",
+					},
+				},
+			},
+			expectedError: "invalid TokenMessengerV1",
+		},
+		{
 			desc: "failure - invalid CCTP v2 token messenger",
 			cfg: v1_7_0_changesets.DeployCCTPChainsConfig{
 				Chains: map[uint64]v1_7_0_changesets.CCTPChainConfig{
 					5009297550715157269: {
+						CCTPType:         adapters.Canonical,
 						TokenMessengerV1: "0x9999999999999999999999999999999999999999",
 						TokenMessengerV2: "not-an-address",
 					},
@@ -392,7 +416,9 @@ func TestDeployCCTPChains_VerifyPreconditions(t *testing.T) {
 			desc: "failure - unknown chain selector",
 			cfg: v1_7_0_changesets.DeployCCTPChainsConfig{
 				Chains: map[uint64]v1_7_0_changesets.CCTPChainConfig{
-					0: {}, // Invalid chain selector
+					0: {
+						CCTPType: adapters.Canonical,
+					}, // Invalid chain selector
 				},
 			},
 			expectedError: "unknown chain selector",
@@ -402,6 +428,7 @@ func TestDeployCCTPChains_VerifyPreconditions(t *testing.T) {
 			cfg: v1_7_0_changesets.DeployCCTPChainsConfig{
 				Chains: map[uint64]v1_7_0_changesets.CCTPChainConfig{
 					5009297550715157269: {
+						CCTPType:         adapters.Canonical,
 						TokenMessengerV1: "0x9999999999999999999999999999999999999999",
 						TokenMessengerV2: "0x8888888888888888888888888888888888888888",
 						RemoteChains: map[uint64]adapters.RemoteCCTPChainConfig{
@@ -416,7 +443,9 @@ func TestDeployCCTPChains_VerifyPreconditions(t *testing.T) {
 			desc: "failure - invalid MCMS timelock action",
 			cfg: v1_7_0_changesets.DeployCCTPChainsConfig{
 				Chains: map[uint64]v1_7_0_changesets.CCTPChainConfig{
-					5009297550715157269: {},
+					5009297550715157269: {
+						CCTPType: adapters.Canonical,
+					},
 				},
 				MCMS: &mcms.Input{
 					OverridePreviousRoot: true,
@@ -439,7 +468,9 @@ func TestDeployCCTPChains_VerifyPreconditions(t *testing.T) {
 			desc: "failure - empty MCMS address ref",
 			cfg: v1_7_0_changesets.DeployCCTPChainsConfig{
 				Chains: map[uint64]v1_7_0_changesets.CCTPChainConfig{
-					5009297550715157269: {},
+					5009297550715157269: {
+						CCTPType: adapters.Canonical,
+					},
 				},
 				MCMS: &mcms.Input{
 					OverridePreviousRoot: true,
@@ -459,7 +490,9 @@ func TestDeployCCTPChains_VerifyPreconditions(t *testing.T) {
 			desc: "failure - empty timelock address ref",
 			cfg: v1_7_0_changesets.DeployCCTPChainsConfig{
 				Chains: map[uint64]v1_7_0_changesets.CCTPChainConfig{
-					5009297550715157269: {},
+					5009297550715157269: {
+						CCTPType: adapters.Canonical,
+					},
 				},
 				MCMS: &mcms.Input{
 					OverridePreviousRoot: true,
@@ -479,7 +512,9 @@ func TestDeployCCTPChains_VerifyPreconditions(t *testing.T) {
 			desc: "failure - zero valid until timestamp",
 			cfg: v1_7_0_changesets.DeployCCTPChainsConfig{
 				Chains: map[uint64]v1_7_0_changesets.CCTPChainConfig{
-					5009297550715157269: {},
+					5009297550715157269: {
+						CCTPType: adapters.Canonical,
+					},
 				},
 				MCMS: &mcms.Input{
 					OverridePreviousRoot: true,
@@ -503,6 +538,7 @@ func TestDeployCCTPChains_VerifyPreconditions(t *testing.T) {
 			cfg: v1_7_0_changesets.DeployCCTPChainsConfig{
 				Chains: map[uint64]v1_7_0_changesets.CCTPChainConfig{
 					5009297550715157269: {
+						CCTPType:         adapters.Canonical,
 						TokenMessengerV1: "0x9999999999999999999999999999999999999999",
 						TokenMessengerV2: "0x8888888888888888888888888888888888888888",
 						RemoteChains: map[uint64]adapters.RemoteCCTPChainConfig{
@@ -511,6 +547,7 @@ func TestDeployCCTPChains_VerifyPreconditions(t *testing.T) {
 						},
 					},
 					15971525489660198786: {
+						CCTPType:         adapters.Canonical,
 						TokenMessengerV1: "0x7777777777777777777777777777777777777777",
 						TokenMessengerV2: "0x6666666666666666666666666666666666666666",
 						RemoteChains: map[uint64]adapters.RemoteCCTPChainConfig{

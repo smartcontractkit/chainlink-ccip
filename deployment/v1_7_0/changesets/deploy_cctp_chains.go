@@ -39,6 +39,8 @@ type CCTPChainConfig struct {
 	RegisteredPoolRef datastore.AddressRef
 	// RemoteChains is the set of remote chains to configure.
 	RemoteChains map[uint64]adapters.RemoteCCTPChainConfig
+	// CCTPType specifies the type of the CCTP chain.
+	CCTPType adapters.CCTPType
 }
 
 // DeployCCTPChainsConfig is the configuration for the DeployCCTPChains changeset.
@@ -64,6 +66,9 @@ func makeVerifyDeployCCTPChains(_ *adapters.CCTPChainRegistry, _ *changesets.MCM
 		}
 
 		for chainSel, chainCfg := range cfg.Chains {
+			if !chainCfg.CCTPType.IsValid() {
+				return fmt.Errorf("invalid CCTP type for chain %d: %s", chainSel, chainCfg.CCTPType)
+			}
 			if _, err := chain_selectors.GetSelectorFamily(chainSel); err != nil {
 				return err
 			}
@@ -93,14 +98,14 @@ func makeApplyDeployCCTPChains(cctpChainRegistry *adapters.CCTPChainRegistry, mc
 		reports := make([]cldf_ops.Report[any, any], 0)
 
 		adaptersByChain := make(map[uint64]adapters.CCTPChain)
-		for chainSel := range cfg.Chains {
+		for chainSel, chainCfg := range cfg.Chains {
 			family, err := chain_selectors.GetSelectorFamily(chainSel)
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to get chain family for chain selector %d: %w", chainSel, err)
 			}
-			adapter, ok := cctpChainRegistry.GetCCTPChain(family)
+			adapter, ok := cctpChainRegistry.GetCCTPChain(family, chainCfg.CCTPType)
 			if !ok {
-				return cldf.ChangesetOutput{}, fmt.Errorf("no CCTP adapter registered for chain family '%s'", family)
+				return cldf.ChangesetOutput{}, fmt.Errorf("no CCTP adapter registered for chain family '%s' and type '%s'", family, chainCfg.CCTPType)
 			}
 			adaptersByChain[chainSel] = adapter
 		}
@@ -156,9 +161,9 @@ func makeApplyDeployCCTPChains(cctpChainRegistry *adapters.CCTPChainRegistry, mc
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to get chain family for remote chain selector %d: %w", remoteChainSelector, err)
 				}
-				adapter, ok := cctpChainRegistry.GetCCTPChain(family)
+				adapter, ok := cctpChainRegistry.GetCCTPChain(family, chainCfg.CCTPType)
 				if !ok {
-					return cldf.ChangesetOutput{}, fmt.Errorf("no CCTP adapter registered for chain family '%s'", family)
+					return cldf.ChangesetOutput{}, fmt.Errorf("no CCTP adapter registered for chain family '%s' and type '%s'", family, chainCfg.CCTPType)
 				}
 				remoteChains[remoteChainSelector] = adapter
 				remoteRegisteredPoolRefs[remoteChainSelector] = cfg.Chains[remoteChainSelector].RegisteredPoolRef

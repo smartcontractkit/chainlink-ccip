@@ -11,6 +11,22 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
+// CCTPType specifies the type of the CCTP chain (not to be confused with CCTP version, that being V1 or V2).
+// We support canonical CCTP chains, which are officially supported by CCTP, and non-canonical CCTP chains.
+// Tokens minted on non-canonical chains are backed by locked USDC on some canonical chain.
+type CCTPType string
+
+const (
+	// Canonical CCTP chains are officially supported by Circle.
+	Canonical CCTPType = "CANONICAL"
+	// NonCanonical CCTP chains are backed by locked USDC on some canonical CCTP chain.
+	NonCanonical CCTPType = "NON_CANONICAL"
+)
+
+func (t CCTPType) IsValid() bool {
+	return t == Canonical || t == NonCanonical
+}
+
 // RemoteCCTPChainConfig configures a CCTP-enabled chain for a remote counterpart.
 type RemoteCCTPChainConfig struct {
 	// FeeUSDCCents is the flat fee, in multiples of 0.01 USD cents, charged for verification on the remote chain.
@@ -110,31 +126,45 @@ type CCTPChain interface {
 // CCTPChainRegistry maintains a registry of CCTP chains.
 type CCTPChainRegistry struct {
 	mu sync.Mutex
-	m  map[string]CCTPChain
+	m  map[string]map[CCTPType]CCTPChain
 }
 
 // NewCCTPChainRegistry creates a new CCTP chain registry.
 func NewCCTPChainRegistry() *CCTPChainRegistry {
 	return &CCTPChainRegistry{
-		m: make(map[string]CCTPChain),
+		m: make(map[string]map[CCTPType]CCTPChain),
 	}
 }
 
 // RegisterCCTPChain allows CCTP chains to register their changeset logic.
-func (r *CCTPChainRegistry) RegisterCCTPChain(chainFamily string, adapter CCTPChain) {
+func (r *CCTPChainRegistry) RegisterCCTPChain(chainFamily string, cctpType CCTPType, adapter CCTPChain) {
+	if !cctpType.IsValid() {
+		panic(fmt.Errorf("invalid CCTP type: %s", cctpType))
+	}
+
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if _, exists := r.m[chainFamily]; exists {
-		panic(fmt.Errorf("CCTPChain '%s' already registered", chainFamily))
+	if _, exists := r.m[chainFamily]; !exists {
+		r.m[chainFamily] = make(map[CCTPType]CCTPChain)
 	}
-	r.m[chainFamily] = adapter
+	if _, exists := r.m[chainFamily][cctpType]; exists {
+		panic(fmt.Errorf("CCTPChain '%s %s' already registered", chainFamily, cctpType))
+	}
+	r.m[chainFamily][cctpType] = adapter
 }
 
 // GetCCTPChain retrieves a registered CCTP chain for the given chain family.
 // The boolean return value indicates whether a CCTP chain was found.
-func (r *CCTPChainRegistry) GetCCTPChain(chainFamily string) (CCTPChain, bool) {
+func (r *CCTPChainRegistry) GetCCTPChain(chainFamily string, cctpType CCTPType) (CCTPChain, bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	adapter, ok := r.m[chainFamily]
+	chainFamilyAdapters, ok := r.m[chainFamily]
+	if !ok {
+		return nil, false
+	}
+	adapter, ok := chainFamilyAdapters[cctpType]
+	if !ok {
+		return nil, false
+	}
 	return adapter, ok
 }
