@@ -132,14 +132,14 @@ func TestMigrateTo1_6_0(t *testing.T) {
 		e.DataStore,
 		datastore.AddressRef{
 			Type:    "OnRamp",
-			Version: semver.MustParse("1.7.0"),
+			Version: semver.MustParse("1.6.0"),
 		}, chain_selectors.ETHEREUM_MAINNET.Selector, evm_datastore_utils.ToEVMAddress)
 	require.NoError(t, err)
 	offRampAddr, err := datastore_utils.FindAndFormatRef(
 		e.DataStore,
 		datastore.AddressRef{
 			Type:    "OffRamp",
-			Version: semver.MustParse("1.7.0"),
+			Version: semver.MustParse("1.6.0"),
 		}, chain_selectors.ETHEREUM_MAINNET.Selector, evm_datastore_utils.ToEVMAddress)
 	require.NoError(t, err)
 	// query router

@@ -14,8 +14,6 @@ import (
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
-
 	offrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
 	onrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
@@ -94,7 +92,7 @@ func (r *LaneMigrater) UpdateVersionWithRouter() *cldf_ops.Sequence[deploy.RampU
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("error fetching existing destChainConfig for onRamp: %w", err)
 				}
-				existingDestChainCfg := existingDestChainCfgOut.Output.(onramp.GetDestChainConfig)
+				existingDestChainCfg := existingDestChainCfgOut.Output
 				if existingDestChainCfg.Router == (common.Address{}) {
 					return sequences.OnChainOutput{}, fmt.Errorf("no destchain config is set for remote chain %d on chain %d on onRamp."+
 						" configure lanes with test router first before migrating", remoteChainSelector, input.ChainSelector)
