@@ -183,16 +183,16 @@ var (
 				input.ExistingAddresses,
 				input.ChainSelector,
 				fq1_6.ContractType,
-				semver.MustParse("1.6.0"),
+				semver.MustParse("1.6.3"),
 				"",
 			)
 			if datastore_utils.IsAddressRefEmpty(fq16Ref) {
-				// try to find any fee quoter with version 1.6.3, if not found, return empty output
+				// try to find any fee quoter with version 1.6.0, if not found, return empty output
 				fq16Ref = datastore_utils.GetAddressRef(
 					input.ExistingAddresses,
 					input.ChainSelector,
 					fq1_6.ContractType,
-					semver.MustParse("1.6.3"),
+					semver.MustParse("1.6.0"),
 					"",
 				)
 				if datastore_utils.IsAddressRefEmpty(fq16Ref) {
