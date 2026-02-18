@@ -193,12 +193,9 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
 
     vm.startPrank(s_offRamp);
 
-    // The error will be InvalidMessageId because the contract reuses this error for token mismatches.
     vm.expectRevert(
       abi.encodeWithSelector(
-        LombardVerifier.InvalidMessageId.selector,
-        bytes32(message.tokenTransfer[0].destTokenAddress),
-        bytes32(invalidToken)
+        LombardVerifier.InvalidToken.selector, bytes32(message.tokenTransfer[0].destTokenAddress), bytes32(invalidToken)
       )
     );
     s_lombardVerifier.verifyMessage(message, messageId, ccvData);
@@ -244,11 +241,8 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
 
     vm.startPrank(s_offRamp);
 
-    // The error will be InvalidMessageId because the contract reuses this error for amount mismatches.
     vm.expectRevert(
-      abi.encodeWithSelector(
-        LombardVerifier.InvalidMessageId.selector, bytes32(message.tokenTransfer[0].amount), bytes32(invalidAmount)
-      )
+      abi.encodeWithSelector(LombardVerifier.InvalidAmount.selector, message.tokenTransfer[0].amount, invalidAmount)
     );
     s_lombardVerifier.verifyMessage(message, messageId, ccvData);
   }

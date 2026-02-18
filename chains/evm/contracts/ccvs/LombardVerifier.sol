@@ -34,6 +34,8 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
   error TokenNotSupported(address token);
   error MustTransferTokens();
   error InvalidVerifierResults();
+  error InvalidToken(bytes32 expected, bytes32 actual);
+  error InvalidAmount(uint256 expected, uint256 actual);
 
   /// @param remoteChainSelector CCIP selector of destination chain.
   /// @param lChainId The chain id of destination chain by Lombard Multi Chain Id conversion.
@@ -282,13 +284,13 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
     }
 
     if (rawToToken != bytes32(expectedToken)) {
-      revert InvalidMessageId(bytes32(expectedToken), rawToToken);
+      revert InvalidToken(bytes32(expectedToken), rawToToken);
     }
     if (rawRecipient != bytes32(expectedReceiver)) {
       revert InvalidReceiver(expectedReceiver);
     }
     if (amount != expectedAmount) {
-      revert InvalidMessageId(bytes32(expectedAmount), bytes32(amount));
+      revert InvalidAmount(expectedAmount, amount);
     }
   }
 

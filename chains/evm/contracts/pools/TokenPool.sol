@@ -950,7 +950,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
       return new address[](0);
     }
 
-    // The source fee amount is not classified as transferred value, meaning we have to subtract it from the amount when
+    // The source fee amount is not classified as transferred value, meaning we have to subtract it from the amount
     // before passing it into the hook.
     TokenTransferFeeConfig memory feeConfig = s_tokenTransferFeeConfig[remoteChainSelector];
     if (feeConfig.isEnabled) {
