@@ -11,10 +11,6 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/stretchr/testify/require"
 
-	evm_adapters "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/adapters"
-	v1_7_0 "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/changesets"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
@@ -22,6 +18,11 @@ import (
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	v1_7_0_changesets "github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/changesets"
+
+	evm_adapters "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/adapters"
+	v1_7_0 "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/changesets"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
 )
 
 func TestLaneMigrater(t *testing.T) {
@@ -82,10 +83,10 @@ func TestLaneMigrater(t *testing.T) {
 			})
 			require.NoError(t, err, "Failed to apply ConfigureChainsForLanes changeset")
 			// now apply the lane migrater
-			mReg := deploy.GetLaneMigraterRegistry()
+			mReg := deploy.GetLaneMigratorRegistry()
 			cs := deploy.LaneMigrateToNewVersionChangeset(mReg, mcmsRegistry)
-			_, err = cs.Apply(*e, deploy.LaneMigraterConfig{
-				Input: map[uint64]deploy.LaneMigraterConfigPerChain{
+			_, err = cs.Apply(*e, deploy.LaneMigratorConfig{
+				Input: map[uint64]deploy.LaneMigratorConfigPerChain{
 					chainA: {
 						RemoteChains:  []uint64{chainB},
 						RouterVersion: semver.MustParse("1.2.0"),

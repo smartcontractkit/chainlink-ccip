@@ -15,14 +15,16 @@ import (
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 
-	fqops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 
-	offrampops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/offramp"
-	onrampops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/onramp"
+	fqops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/fee_quoter"
+
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
+
+	offrampops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/offramp"
+	onrampops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/onramp"
 )
 
 const (
@@ -31,7 +33,7 @@ const (
 	DefaultMaxDataBytes             = 32_000
 )
 
-type LaneMigrater struct{}
+type LaneMigrator struct{}
 
 // UpdateVersionWithRouter is a sequence that updates Ramps to use the new Router and also updates the fee quoter dest chain config with default tx gas limit as 8M
 //
@@ -39,7 +41,7 @@ type LaneMigrater struct{}
 //
 // This sequence assumes that the destChainConfig on OnRamp and SourceChainConfig on OffRamp do not need to be updated, and only updates the Router address used by the Ramps.
 // If you need to update the destChainConfig or sourceChainConfig, please use the ConfigureChainForLanes sequence instead.
-func (r *LaneMigrater) UpdateVersionWithRouter() *cldf_ops.Sequence[deploy.RampUpdaterConfig, sequences.OnChainOutput, chain.BlockChains] {
+func (r *LaneMigrator) UpdateVersionWithRouter() *cldf_ops.Sequence[deploy.RampUpdaterConfig, sequences.OnChainOutput, chain.BlockChains] {
 	return cldf_ops.NewSequence(
 		"ramp-updater:sequence-update-ramps-with-router",
 		semver.MustParse("1.7.0"),
