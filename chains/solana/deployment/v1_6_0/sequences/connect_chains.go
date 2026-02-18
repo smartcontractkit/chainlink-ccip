@@ -86,10 +86,10 @@ var ConfigureLaneLegAsDest = operations.NewSequence(
 
 		// Add DestChain to OffRamp
 		offRampOut, err := operations.ExecuteOperation(b, offrampops.ConnectChains, chains.SolanaChains()[input.Dest.Selector], offrampops.ConnectChainsParams{
-			RemoteChainSelector: input.Source.Selector,
-			OffRamp:             offRampAddress,
-			SourceOnRamp:        input.Source.OnRamp,
-			EnabledAsSource:     !input.IsDisabled,
+			RemoteChainSelector:       input.Source.Selector,
+			OffRamp:                   offRampAddress,
+			SourceOnRamp:              input.Source.OnRamp,
+			EnabledAsSource:           !input.IsDisabled,
 			IsRMNVerificationDisabled: !input.Source.RMNVerificationEnabled,
 		})
 		if err != nil {
@@ -118,8 +118,8 @@ func TranslateFQ(fqc lanes.FeeQuoterDestChainConfig) fee_quoter.DestChainConfig 
 		MaxDataBytes:                      fqc.MaxDataBytes,
 		MaxPerMsgGasLimit:                 fqc.MaxPerMsgGasLimit,
 		DestGasOverhead:                   fqc.DestGasOverhead,
-		DestGasPerPayloadByteBase:         uint32(fqc.DestGasPerPayloadByteBase),
-		DestGasPerPayloadByteHigh:         uint32(fqc.DestGasPerPayloadByteHigh),
+		DestGasPerPayloadByteBase:         fqc.DestGasPerPayloadByteBase,
+		DestGasPerPayloadByteHigh:         fqc.DestGasPerPayloadByteHigh,
 		DestGasPerPayloadByteThreshold:    uint32(fqc.DestGasPerPayloadByteThreshold),
 		DestDataAvailabilityOverheadGas:   fqc.DestDataAvailabilityOverheadGas,
 		DestGasPerDataAvailabilityByte:    fqc.DestGasPerDataAvailabilityByte,
