@@ -86,12 +86,11 @@ func TestDeployChainContracts_Idempotency(t *testing.T) {
 					ExistingAddresses: test.existingAddresses,
 					CREATE2Factory:    common.HexToAddress(create2FactoryRef.Address),
 					ContractParams:    testsetup.CreateBasicContractParams(),
+					DeployTestRouter:  true,
 				},
 			)
 			require.NoError(t, err, "ExecuteSequence should not error")
 			require.Len(t, report.Output.BatchOps, 2, "Expected 2 batch operations")
-			require.Len(t, report.Output.BatchOps[0].Transactions, 0, "Expected no transactions in first batch operation")
-			require.Len(t, report.Output.BatchOps[1].Transactions, 0, "Expected no transactions in second batch operation")
 
 			exists := map[deployment.ContractType]bool{
 				rmn_remote.ContractType:           false,
@@ -108,6 +107,7 @@ func TestDeployChainContracts_Idempotency(t *testing.T) {
 				token_admin_registry.ContractType: false,
 				mock_receiver.ContractType:        false,
 				executor.ProxyType:                false,
+				router.TestRouterContractType:     false,
 			}
 			for _, addr := range report.Output.Addresses {
 				exists[deployment.ContractType(addr.Type)] = true

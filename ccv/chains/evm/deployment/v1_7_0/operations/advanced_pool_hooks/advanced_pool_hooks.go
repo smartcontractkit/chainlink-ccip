@@ -118,17 +118,6 @@ var GetThresholdAmount = contract.NewRead(contract.ReadParams[any, *big.Int, *ad
 	},
 })
 
-var GetAuthorizedCallersEnabled = contract.NewRead(contract.ReadParams[any, bool, *advanced_pool_hooks.AdvancedPoolHooks]{
-	Name:         "advanced-pool-hooks:get-authorized-callers-enabled",
-	Version:      Version,
-	Description:  "Gets whether only authorized callers can invoke preflightCheck/postflightCheck",
-	ContractType: ContractType,
-	NewContract:  advanced_pool_hooks.NewAdvancedPoolHooks,
-	CallContract: func(advancedPoolHooks *advanced_pool_hooks.AdvancedPoolHooks, opts *bind.CallOpts, args any) (bool, error) {
-		return advancedPoolHooks.GetAuthorizedCallersEnabled(opts)
-	},
-})
-
 var SetPolicyEngine = contract.NewWrite(contract.WriteParams[common.Address, *advanced_pool_hooks.AdvancedPoolHooks]{
 	Name:            "advanced-pool-hooks:set-policy-engine",
 	Version:         Version,
