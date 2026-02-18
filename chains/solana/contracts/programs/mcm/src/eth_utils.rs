@@ -263,19 +263,18 @@ mod tests {
     }
 
     mod domain_separators {
-        use anchor_lang::solana_program::keccak;
+        use solana_keccak_hasher::hash; // use keccak256 for EVM compatibility
 
         use super::*;
 
         #[test]
         fn verify_domain_separators() {
-            let metadata =
-                keccak::hash("MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_METADATA_SOLANA".as_bytes());
+            let metadata = hash("MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_METADATA_SOLANA".as_bytes());
             assert_eq!(
                 &metadata.to_bytes(),
                 MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_METADATA
             );
-            let op = keccak::hash("MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_OP_SOLANA".as_bytes());
+            let op = hash("MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_OP_SOLANA".as_bytes());
             assert_eq!(&op.to_bytes(), MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_OP);
         }
     }

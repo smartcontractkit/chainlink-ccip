@@ -470,7 +470,7 @@ fn get_validated_gas_price(dest_chain: &DestChain) -> Result<PackedPrice> {
 // Skip tests during IDL build since program_stubs is not available in newer Solana versions
 #[cfg(all(test, not(feature = "idl-build")))]
 mod tests {
-    use anchor_lang::solana_program::{
+    use solana_program::{
         entrypoint::SUCCESS,
         program_stubs::{set_syscall_stubs, SyscallStubs},
     };
@@ -555,7 +555,6 @@ mod tests {
             token: Pubkey::new_unique(),
             amount: 1,
         }];
-        set_syscall_stubs(Box::new(TestStubs));
         assert_eq!(
             fee_for_msg(
                 &message,
@@ -571,6 +570,7 @@ mod tests {
 
     #[test]
     fn network_fee_for_a_supported_token_with_disabled_billing() {
+        set_syscall_stubs(Box::new(TestStubs));
         let mut chain = sample_dest_chain();
 
         // Will have no effect because we're not using the network fee
@@ -590,7 +590,6 @@ mod tests {
             token: per_chain_per_token.mint,
             amount: 1,
         }];
-        set_syscall_stubs(Box::new(TestStubs));
         assert_eq!(
             fee_for_msg(
                 &message,
@@ -610,6 +609,7 @@ mod tests {
 
     #[test]
     fn network_fee_for_a_supported_token_with_enabled_billing() {
+        set_syscall_stubs(Box::new(TestStubs));
         let mut chain = sample_dest_chain();
 
         // Will have no effect because we're not using the network fee
@@ -629,7 +629,6 @@ mod tests {
             token: another_token_config.mint,
             amount: 1,
         }];
-        set_syscall_stubs(Box::new(TestStubs));
         assert_eq!(
             fee_for_msg(
                 &message,
@@ -650,6 +649,7 @@ mod tests {
 
     #[test]
     fn network_fee_for_a_supported_token_with_bps() {
+        set_syscall_stubs(Box::new(TestStubs));
         let mut chain = sample_dest_chain();
 
         // Will have no effect because we're not using the network fee
@@ -673,7 +673,6 @@ mod tests {
             token: another_token_config.mint,
             amount: 15_000_000_000_000_000,
         }];
-        set_syscall_stubs(Box::new(TestStubs));
         assert_eq!(
             fee_for_msg(
                 &message,
@@ -715,6 +714,7 @@ mod tests {
 
     #[test]
     fn network_fee_for_a_supported_token_with_no_fee_token_config() {
+        set_syscall_stubs(Box::new(TestStubs));
         let mut chain = sample_dest_chain();
 
         chain.config.network_fee_usdcents *= 0;
@@ -736,7 +736,6 @@ mod tests {
             token: another_per_chain_per_token_config.mint,
             amount: 15_000_000_000_000_000,
         }];
-        set_syscall_stubs(Box::new(TestStubs));
         assert_eq!(
             fee_for_msg(
                 &message,
@@ -777,6 +776,7 @@ mod tests {
 
     #[test]
     fn network_fee_for_multiple_tokens() {
+        set_syscall_stubs(Box::new(TestStubs));
         let (tokens, per_chains): (Vec<_>, Vec<_>) =
             (0..4).map(|_| sample_additional_token()).unzip();
 
@@ -791,7 +791,6 @@ mod tests {
 
         let tokens: Vec<_> = tokens.into_iter().map(Some).collect();
         let per_chains: Vec<_> = per_chains.into_iter().map(Some).collect();
-        set_syscall_stubs(Box::new(TestStubs));
 
         let mut chain = sample_dest_chain();
         chain.config.max_number_of_tokens_per_msg = 5;
@@ -990,8 +989,6 @@ mod tests {
 
     #[test]
     fn test_max_fee_juels_per_msg_validation() {
-        set_syscall_stubs(Box::new(TestStubs));
-
         // create custom billing configs with identical prices for deterministic testing
         let mut fee_token_config = sample_billing_config();
         let mut link_config = sample_billing_config();
@@ -1067,8 +1064,6 @@ mod tests {
 
     #[test]
     fn test_fee_juels_decimal_conversions() {
-        set_syscall_stubs(Box::new(TestStubs));
-
         // create test billing configs with identical prices
         let mut fee_token_config = sample_billing_config();
         let mut link_config = sample_billing_config();

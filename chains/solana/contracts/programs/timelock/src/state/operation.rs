@@ -209,7 +209,8 @@ impl From<&AccountMeta> for InstructionAccount {
 #[cfg(all(test, not(feature = "idl-build")))]
 mod tests {
     use super::*;
-    use anchor_lang::solana_program::{keccak::HASH_BYTES, pubkey::Pubkey};
+    use anchor_lang::solana_program::pubkey::Pubkey;
+    use solana_keccak_hasher::HASH_BYTES; // use keccak256 for EVM compatibility
 
     fn create_test_operation(
         instructions: Vec<InstructionData>,
