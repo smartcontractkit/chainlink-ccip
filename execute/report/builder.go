@@ -23,6 +23,7 @@ type ExecReportBuilder interface {
 type Option func(erb *execReportBuilder)
 
 // WithMaxGas limits how much gas can be used during execution.
+// Note: even if multiple reports are enabled, when the gas limit is reached a new report is not created.
 func WithMaxGas(maxGas uint64) func(*execReportBuilder) {
 	return func(erb *execReportBuilder) {
 		erb.maxGas = maxGas
@@ -37,6 +38,13 @@ func WithMaxReportSizeBytes(maxReportSizeBytes uint64) Option {
 }
 
 // WithMaxMessages configures the number of messages allowed to be in a report.
+// If this setting is used with multiple reports enabled, the builder may split multiple
+// messages from the same source into separate reports. This may cause issues with ordered
+// message execution, because the order of report execution is not guaranteed.
+//
+// A more sophisticated nonce management system could be implemented that discards messages
+// that could lead to this type of inconsistency. It would work by ensuring all messages
+// from the same source-chain/sender are included in the same report.
 func WithMaxMessages(maxMessages uint64) Option {
 	return func(erb *execReportBuilder) {
 		erb.maxMessages = maxMessages
@@ -191,10 +199,11 @@ func (b *execReportBuilder) Add(
 ) (exectypes.CommitData, error) {
 	b.checkInitialize()
 
-	// Validate nonces for multiple reports mode
-	if b.multipleReportsEnabled {
-		if err := b.validateNoncesForMultipleReports(commitReport); err != nil {
-			return commitReport, fmt.Errorf("multiple reports validate nonces: %w", err)
+	// Ensure that all messages allow out of order execution when multiple reports are enabled and per-source
+	// message batching is not being used.
+	if b.multipleReportsEnabled && b.maxMessages != 0 {
+		if err := b.validateAllMessagesAllowOOO(commitReport); err != nil {
+			return commitReport, fmt.Errorf("message with ordered execution detected with incompatible report builder parameters: %w", err)
 		}
 	}
 
@@ -317,7 +326,9 @@ func (b *execReportBuilder) shouldCreateNewExecReport() bool {
 	return len(b.execReports[currentIndex].ChainReports) >= int(b.maxSingleChainReports)
 }
 
-func (b *execReportBuilder) validateNoncesForMultipleReports(commitReport exectypes.CommitData) error {
+// validateAllMessagesAllowOOO checks that all messages in the commit report have nonces that allow out of
+// order execution (i.e., nonce of 0).
+func (b *execReportBuilder) validateAllMessagesAllowOOO(commitReport exectypes.CommitData) error {
 	for _, msg := range commitReport.Messages {
 		if msg.Header.Nonce > 0 {
 			b.lggr.Errorw("Found message with non-zero nonce when multiple reports are enabled",
