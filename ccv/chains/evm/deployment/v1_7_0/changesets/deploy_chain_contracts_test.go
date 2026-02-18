@@ -13,6 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/link_token"
 	cs_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
@@ -146,4 +147,43 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestDeployChainContracts_DeployTestRouter(t *testing.T) {
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{5009297550715157269}),
+	)
+	require.NoError(t, err, "Failed to create test environment")
+	require.NotNil(t, e, "Environment should be created")
+
+	mcmsRegistry := cs_core.GetRegistry()
+	create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[5009297550715157269], contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
+		ChainSelector:  5009297550715157269,
+		Args: create2_factory.ConstructorArgs{
+			AllowList: []common.Address{e.BlockChains.EVMChains()[5009297550715157269].DeployerKey.From},
+		},
+	}, nil)
+
+	out, err := changesets.DeployChainContracts(mcmsRegistry).Apply(*e, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
+		MCMS: mcms.Input{},
+		Cfg: changesets.DeployChainContractsCfg{
+			ChainSel:         5009297550715157269,
+			CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
+			Params:           testsetup.CreateBasicContractParams(),
+			DeployTestRouter: true,
+		},
+	})
+	require.NoError(t, err, "Failed to apply DeployChainContracts changeset")
+
+	newAddrs, err := out.DataStore.Addresses().Fetch()
+	require.NoError(t, err, "Failed to fetch addresses from datastore")
+	foundTestRouter := false
+	for _, addr := range newAddrs {
+		if addr.Type == datastore.ContractType(router.TestRouterContractType) {
+			require.NotEqual(t, common.Address{}, common.HexToAddress(addr.Address), "Test Router address should be set")
+			foundTestRouter = true
+		}
+	}
+	require.True(t, foundTestRouter, "Test Router should be deployed")
 }
