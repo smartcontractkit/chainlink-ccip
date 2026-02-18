@@ -7,6 +7,8 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 
+	fee_quoter_ops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
 	router_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/link_token"
@@ -74,7 +76,7 @@ func maybeDiscoverWETH(
 		return nil
 	}
 
-	routerRef, err := findExactlyOneRef(e, sel, datastore.ContractType(router_ops.ContractType), router_ops.Version)
+	routerRef, err := findFirstRef(e, sel, datastore.ContractType(router_ops.ContractType), router_ops.Version)
 	if err != nil {
 		return fmt.Errorf("cannot resolve Router to discover WETH: %w", err)
 	}
@@ -127,43 +129,98 @@ func maybeDiscoverLINK(
 		return nil
 	}
 
-	onRampRef, err := findExactlyOneRef(e, sel, datastore.ContractType(onramp_ops.ContractType), onramp_ops.Version)
-	if err != nil {
-		return fmt.Errorf("cannot resolve EVM2EVMOnRamp to discover LINK: %w", err)
-	}
-
 	chain, ok := e.BlockChains.EVMChains()[sel]
 	if !ok {
 		return fmt.Errorf("chain selector %d not found in environment EVM chains", sel)
 	}
 
-	onRampAddr := common.HexToAddress(onRampRef.Address)
-	onRampContract, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(onRampAddr, chain.Client)
-	if err != nil {
-		return fmt.Errorf("failed to bind EVM2EVMOnRamp at %s: %w", onRampAddr.Hex(), err)
-	}
+	linkAddr, onRampErr := discoverLINKFromOnRamp(e, sel, chain.Client)
+	if onRampErr != nil {
+		e.Logger.Infof("EVM2EVMOnRamp not available on chain %d, falling back to FeeQuoter: %v", sel, onRampErr)
 
-	opts := &bind.CallOpts{Context: e.OperationsBundle.GetContext()}
-	staticCfg, err := onRampContract.GetStaticConfig(opts)
-	if err != nil {
-		return fmt.Errorf("failed to call getStaticConfig on EVM2EVMOnRamp %s: %w", onRampAddr.Hex(), err)
+		var fqErr error
+		linkAddr, fqErr = discoverLINKFromFeeQuoter(e, sel, chain.Client)
+		if fqErr != nil {
+			return fmt.Errorf("cannot discover LINK from either EVM2EVMOnRamp (%v) or FeeQuoter (%v)", onRampErr, fqErr)
+		}
 	}
-
-	if staticCfg.LinkToken == (common.Address{}) {
-		return fmt.Errorf("EVM2EVMOnRamp %s returned zero address for LinkToken", onRampAddr.Hex())
-	}
-
-	e.Logger.Infof("Discovered LinkToken on chain %d: %s (via EVM2EVMOnRamp %s)", sel, staticCfg.LinkToken.Hex(), onRampAddr.Hex())
 
 	return outputDs.Addresses().Add(datastore.AddressRef{
-		Address:       staticCfg.LinkToken.Hex(),
+		Address:       linkAddr.Hex(),
 		ChainSelector: sel,
 		Type:          linkType,
 		Version:       link_token.Version,
 	})
 }
 
-func findExactlyOneRef(
+func discoverLINKFromOnRamp(e cldf_deployment.Environment, sel uint64, client bind.ContractBackend) (common.Address, error) {
+	onRampRef, err := findFirstRef(e, sel, datastore.ContractType(onramp_ops.ContractType), onramp_ops.Version)
+	if err != nil {
+		return common.Address{}, err
+	}
+
+	onRampAddr := common.HexToAddress(onRampRef.Address)
+	onRampContract, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(onRampAddr, client)
+	if err != nil {
+		return common.Address{}, fmt.Errorf("failed to bind EVM2EVMOnRamp at %s: %w", onRampAddr.Hex(), err)
+	}
+
+	opts := &bind.CallOpts{Context: e.OperationsBundle.GetContext()}
+	staticCfg, err := onRampContract.GetStaticConfig(opts)
+	if err != nil {
+		return common.Address{}, fmt.Errorf("failed to call getStaticConfig on EVM2EVMOnRamp %s: %w", onRampAddr.Hex(), err)
+	}
+
+	if staticCfg.LinkToken == (common.Address{}) {
+		return common.Address{}, fmt.Errorf("EVM2EVMOnRamp %s returned zero address for LinkToken", onRampAddr.Hex())
+	}
+
+	e.Logger.Infof("Discovered LinkToken on chain %d: %s (via EVM2EVMOnRamp %s)", sel, staticCfg.LinkToken.Hex(), onRampAddr.Hex())
+	return staticCfg.LinkToken, nil
+}
+
+func discoverLINKFromFeeQuoter(e cldf_deployment.Environment, sel uint64, client bind.ContractBackend) (common.Address, error) {
+	fqType := datastore.ContractType(fee_quoter_ops.ContractType)
+
+	// Search any FeeQuoter on this chain regardless of version.
+	// The v1.7.0 gobinding is ABI-compatible with v1.6.x for getStaticConfig().LinkToken.
+	fqRefs := e.DataStore.Addresses().Filter(
+		datastore.AddressRefByChainSelector(sel),
+		datastore.AddressRefByType(fqType),
+	)
+
+	for _, ref := range fqRefs {
+		if !common.IsHexAddress(ref.Address) {
+			continue
+		}
+
+		fqAddr := common.HexToAddress(ref.Address)
+		fqContract, err := fee_quoter.NewFeeQuoter(fqAddr, client)
+		if err != nil {
+			e.Logger.Warnf("Failed to bind FeeQuoter at %s: %v, trying next", fqAddr.Hex(), err)
+			continue
+		}
+
+		opts := &bind.CallOpts{Context: e.OperationsBundle.GetContext()}
+		staticCfg, err := fqContract.GetStaticConfig(opts)
+		if err != nil {
+			e.Logger.Warnf("Failed to call getStaticConfig on FeeQuoter %s: %v, trying next", fqAddr.Hex(), err)
+			continue
+		}
+
+		if staticCfg.LinkToken == (common.Address{}) {
+			e.Logger.Debugf("FeeQuoter %s returned zero LinkToken, skipping", fqAddr.Hex())
+			continue
+		}
+
+		e.Logger.Infof("Discovered LinkToken on chain %d: %s (via FeeQuoter %s v%s)", sel, staticCfg.LinkToken.Hex(), fqAddr.Hex(), ref.Version)
+		return staticCfg.LinkToken, nil
+	}
+
+	return common.Address{}, fmt.Errorf("no FeeQuoter with valid LinkToken found on chain %d", sel)
+}
+
+func findFirstRef(
 	e cldf_deployment.Environment,
 	sel uint64,
 	contractType datastore.ContractType,
@@ -175,19 +232,11 @@ func findExactlyOneRef(
 		datastore.AddressRefByVersion(version),
 	)
 
-	var valid []datastore.AddressRef
 	for _, ref := range refs {
-		if common.IsHexAddress(ref.Address) {
-			valid = append(valid, ref)
+		if common.IsHexAddress(ref.Address) && common.HexToAddress(ref.Address) != (common.Address{}) {
+			return ref, nil
 		}
 	}
 
-	switch len(valid) {
-	case 0:
-		return datastore.AddressRef{}, fmt.Errorf("no %s v%s found on chain %d", contractType, version, sel)
-	case 1:
-		return valid[0], nil
-	default:
-		return datastore.AddressRef{}, fmt.Errorf("expected exactly one %s v%s on chain %d, found %d", contractType, version, sel, len(valid))
-	}
+	return datastore.AddressRef{}, fmt.Errorf("no %s v%s found on chain %d", contractType, version, sel)
 }

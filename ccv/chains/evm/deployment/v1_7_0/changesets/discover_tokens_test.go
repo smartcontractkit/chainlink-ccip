@@ -8,6 +8,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/changesets"
+	fee_quoter_ops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
 	router_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/link_token"
@@ -237,7 +239,7 @@ func TestDiscoverTokens_ErrorsWhenSourceContractsMissing(t *testing.T) {
 		require.ErrorContains(t, err, "cannot resolve Router")
 	})
 
-	t.Run("errors when EVM2EVMOnRamp missing for LINK discovery", func(t *testing.T) {
+	t.Run("errors when both EVM2EVMOnRamp and FeeQuoter missing for LINK discovery", func(t *testing.T) {
 		e := newTestEnv(t)
 		chain := e.BlockChains.EVMChains()[testChainSel]
 
@@ -262,7 +264,8 @@ func TestDiscoverTokens_ErrorsWhenSourceContractsMissing(t *testing.T) {
 		_, err = changesets.DiscoverTokens.Apply(*e, changesets.DiscoverTokensCfg{
 			ChainSelectors: []uint64{testChainSel},
 		})
-		require.ErrorContains(t, err, "cannot resolve EVM2EVMOnRamp")
+		require.ErrorContains(t, err, "EVM2EVMOnRamp")
+		require.ErrorContains(t, err, "FeeQuoter")
 	})
 }
 
@@ -298,4 +301,69 @@ func TestDiscoverTokens_DiscoversTokensFromOnChainContracts(t *testing.T) {
 	require.Equal(t, expectedLINK.Hex(), linkRef.Address)
 	require.Equal(t, link_token.Version.String(), linkRef.Version.String())
 	require.Equal(t, testChainSel, linkRef.ChainSelector)
+}
+
+func TestDiscoverTokens_FallsBackToFeeQuoterForLINK(t *testing.T) {
+	e := newTestEnv(t)
+	chain := e.BlockChains.EVMChains()[testChainSel]
+
+	routerAddr, tx, _, err := router.DeployRouter(
+		chain.DeployerKey, chain.Client,
+		expectedWETH,
+		common.HexToAddress("0x01"),
+	)
+	require.NoError(t, err)
+	_, err = chain.Confirm(tx)
+	require.NoError(t, err)
+
+	fqAddr, tx, _, err := fee_quoter.DeployFeeQuoter(
+		chain.DeployerKey, chain.Client,
+		fee_quoter.FeeQuoterStaticConfig{
+			MaxFeeJuelsPerMsg: big.NewInt(1e18),
+			LinkToken:         expectedLINK,
+		},
+		[]common.Address{},
+		[]fee_quoter.FeeQuoterTokenTransferFeeConfigArgs{},
+		[]fee_quoter.FeeQuoterDestChainConfigArgs{},
+	)
+	require.NoError(t, err)
+	_, err = chain.Confirm(tx)
+	require.NoError(t, err)
+
+	ds := datastore.NewMemoryDataStore()
+	require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
+		ChainSelector: testChainSel,
+		Type:          datastore.ContractType(router_ops.ContractType),
+		Version:       router_ops.Version,
+		Address:       routerAddr.Hex(),
+	}))
+	require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
+		ChainSelector: testChainSel,
+		Type:          datastore.ContractType(fee_quoter_ops.ContractType),
+		Version:       fee_quoter_ops.Version,
+		Address:       fqAddr.Hex(),
+	}))
+	e.DataStore = ds.Seal()
+
+	out, err := changesets.DiscoverTokens.Apply(*e, changesets.DiscoverTokensCfg{
+		ChainSelectors: []uint64{testChainSel},
+	})
+	require.NoError(t, err)
+
+	addrs, err := out.DataStore.Addresses().Fetch()
+	require.NoError(t, err)
+	require.Len(t, addrs, 2, "expected WETH and LINK")
+
+	addrByType := make(map[datastore.ContractType]datastore.AddressRef)
+	for _, ref := range addrs {
+		addrByType[ref.Type] = ref
+	}
+
+	wethRef, ok := addrByType[datastore.ContractType(weth.ContractType)]
+	require.True(t, ok, "WETH9 should be discovered via Router")
+	require.Equal(t, expectedWETH.Hex(), wethRef.Address)
+
+	linkRef, ok := addrByType[datastore.ContractType(link_token.ContractType)]
+	require.True(t, ok, "LinkToken should be discovered via FeeQuoter fallback")
+	require.Equal(t, expectedLINK.Hex(), linkRef.Address)
 }
