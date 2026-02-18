@@ -105,9 +105,14 @@ func (m *cctpTest_MockCCTPChain) TokenAddress(d datastore.DataStore, b cldf_chai
 	return []byte("token-address"), nil
 }
 
-// AllowedCallerOnDest returns the address allowed to trigger message reception on the remote domain
-func (m *cctpTest_MockCCTPChain) AllowedCallerOnDest(d datastore.DataStore, b cldf_chain.BlockChains, chainSelector uint64) ([]byte, error) {
-	return []byte("allowed-caller-dest"), nil
+// CCTPV1AllowedCallerOnDest returns the address allowed to trigger message reception on the remote domain for CCTP V1.
+func (m *cctpTest_MockCCTPChain) CCTPV1AllowedCallerOnDest(d datastore.DataStore, b cldf_chain.BlockChains, chainSelector uint64) ([]byte, error) {
+	return []byte("allowed-caller-dest-v1"), nil
+}
+
+// CCTPV2AllowedCallerOnDest returns the address allowed to trigger message reception on the remote domain for CCTP V2.
+func (m *cctpTest_MockCCTPChain) CCTPV2AllowedCallerOnDest(d datastore.DataStore, b cldf_chain.BlockChains, chainSelector uint64) ([]byte, error) {
+	return []byte("allowed-caller-dest-v2"), nil
 }
 
 // AllowedCallerOnSource returns the address allowed to deposit tokens for burn on the remote chain

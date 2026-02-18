@@ -105,8 +105,10 @@ type RemoteCCTPChain interface {
 	PoolAddress(d datastore.DataStore, b cldf_chain.BlockChains, chainSelector uint64, registeredPoolRef datastore.AddressRef) ([]byte, error)
 	// TokenAddress returns the address of the token on the remote chain in bytes.
 	TokenAddress(d datastore.DataStore, b cldf_chain.BlockChains, chainSelector uint64) ([]byte, error)
-	// AllowedCallerOnDest returns the address allowed to trigger message reception on the remote domain.
-	AllowedCallerOnDest(d datastore.DataStore, b cldf_chain.BlockChains, chainSelector uint64) ([]byte, error)
+	// CCTPV1AllowedCallerOnDest returns the address allowed to trigger message reception on the remote domain for CCTP V1.
+	CCTPV1AllowedCallerOnDest(d datastore.DataStore, b cldf_chain.BlockChains, chainSelector uint64) ([]byte, error)
+	// CCTPV2AllowedCallerOnDest returns the address allowed to trigger message reception on the remote domain for CCTP V2.
+	CCTPV2AllowedCallerOnDest(d datastore.DataStore, b cldf_chain.BlockChains, chainSelector uint64) ([]byte, error)
 	// AllowedCallerOnSource returns the address allowed to deposit tokens for burn on the remote chain.
 	AllowedCallerOnSource(d datastore.DataStore, b cldf_chain.BlockChains, chainSelector uint64) ([]byte, error)
 	// MintRecipientOnDest returns the address that will receive tokens on the remote domain.
