@@ -627,9 +627,9 @@ func Test_Builder_Build(t *testing.T) {
 				reports: []exectypes.CommitData{
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						sender,
-						cciptypes.Bytes32{},                         // generate a correct root.
+						cciptypes.Bytes32{}, // generate a correct root.
 						[]cciptypes.SeqNum{100, 101, 102, 103, 104}, // executed
-						false,                                       // zeroNonces
+						false, // zeroNonces
 					),
 				},
 			},
@@ -650,9 +650,9 @@ func Test_Builder_Build(t *testing.T) {
 				reports: []exectypes.CommitData{
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						sender,
-						cciptypes.Bytes32{},                         // generate a correct root.
+						cciptypes.Bytes32{}, // generate a correct root.
 						[]cciptypes.SeqNum{100, 101, 102, 103, 104}, // executed
-						false,                                       // zeroNonces
+						false, // zeroNonces
 					),
 				},
 			},
@@ -1841,7 +1841,7 @@ func Test_Builder_MultiReport(t *testing.T) {
 			expectedChainReportsPerExec: []int{2, 1}, // 2 chains in first exec report, 1 in second
 		},
 		{
-			name: "non-zero nonces are allowed with multiple report generation when maxMessages is not used",
+			name: "non-zero nonces are not allowed with multiple report generation when maxMessages is used",
 			args: args{
 				maxReportSize: 9700,
 				maxMessages:   1,
@@ -1856,7 +1856,8 @@ func Test_Builder_MultiReport(t *testing.T) {
 					),
 				},
 			},
-			wantErr: "message with ordered execution detected with incompatible report builder parameters: messages with non-zero nonces detected",
+			wantErr: "message with ordered execution detected with incompatible report builder parameters: " +
+				"messages with non-zero nonces detected",
 		},
 		{
 			name: "non-zero nonces are allowed with multiple report generation when maxMessages is used",

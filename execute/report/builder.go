@@ -203,7 +203,8 @@ func (b *execReportBuilder) Add(
 	// message batching is not being used.
 	if b.multipleReportsEnabled && b.maxMessages != 0 {
 		if err := b.validateAllMessagesAllowOOO(commitReport); err != nil {
-			return commitReport, fmt.Errorf("message with ordered execution detected with incompatible report builder parameters: %w", err)
+			return commitReport, fmt.Errorf(
+				"message with ordered execution detected with incompatible report builder parameters: %w", err)
 		}
 	}
 
