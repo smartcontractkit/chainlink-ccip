@@ -703,7 +703,7 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 		if err != nil {
 			return nil, fmt.Errorf("failed to allow router to withdraw tokens for selector %d: %w", selector, err)
 		}
-		for _, dst := range adp {
+		for _, dst := range tokenAdapters {
 			if dst.ChainSelector() == selector {
 				continue
 			}
