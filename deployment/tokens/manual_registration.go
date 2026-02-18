@@ -15,7 +15,7 @@ import (
 )
 
 type ManualRegistrationInput struct {
-	ChainAdapterVersion *semver.Version       `yaml:"chain-adapter-version" json:"chainAdapterVersion"`
+	ChainAdapterVersion *semver.Version       `yaml:"chainAdapterVersion" json:"chainAdapterVersion"`
 	Registrations       []RegisterTokenConfig `yaml:"registrations" json:"registrations"`
 	MCMS                mcms.Input            `yaml:"mcms,omitempty" json:"mcms"`
 }
@@ -37,7 +37,7 @@ type RegisterTokenConfig struct {
 	// --
 	//  SVM: this field is always required.
 	// --
-	TokenPoolRef datastore.AddressRef `yaml:"token-pool-ref" json:"tokenPoolRef"`
+	TokenPoolRef datastore.AddressRef `yaml:"tokenPoolRef" json:"tokenPoolRef"`
 
 	// A reference to the token. The ChainSelector property should be omitted from
 	// the AddressRef, as it is already present in the RegisterTokenConfig struct.
@@ -50,21 +50,21 @@ type RegisterTokenConfig struct {
 	// --
 	//  SVM: this field is always required.
 	// --
-	TokenRef datastore.AddressRef `yaml:"token-ref" json:"tokenRef"`
+	TokenRef datastore.AddressRef `yaml:"tokenRef" json:"tokenRef"`
 
 	// The chain selector for the token being registered (required).
-	ChainSelector uint64 `yaml:"chain-selector" json:"chainSelector"`
+	ChainSelector uint64 `yaml:"chainSelector" json:"chainSelector"`
 
 	// The proposed owner of the token (required).
-	ProposedOwner string `yaml:"proposed-owner" json:"proposedOwner"`
+	ProposedOwner string `yaml:"proposedOwner" json:"proposedOwner"`
 
 	// Extra args specific to SVM manual registration. Only required for SVM chains.
-	SVMExtraArgs *SVMExtraArgs `yaml:"svm-extra-args,omitempty" json:"svmExtraArgs,omitempty"`
+	SVMExtraArgs *SVMExtraArgs `yaml:"svmExtraArgs,omitempty" json:"svmExtraArgs,omitempty"`
 }
 
 type SVMExtraArgs struct {
-	CustomerMintAuthorities []solana.PublicKey `yaml:"customer-mint-authorities,omitempty" json:"customerMintAuthorities,omitempty"`
-	SkipTokenPoolInit       bool               `yaml:"skip-token-pool-init" json:"skipTokenPoolInit"`
+	CustomerMintAuthorities []solana.PublicKey `yaml:"customerMintAuthorities,omitempty" json:"customerMintAuthorities,omitempty"`
+	SkipTokenPoolInit       bool               `yaml:"skipTokenPoolInit" json:"skipTokenPoolInit"`
 }
 
 func ManualRegistration() cldf.ChangeSetV2[ManualRegistrationInput] {
