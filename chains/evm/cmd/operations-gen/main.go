@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"text/template"
 
@@ -61,7 +62,7 @@ var (
 		"OnRamp":  "onramp",
 		"OffRamp": "offramp",
 	}
-	multiReturnTypeStrucName = func(funcName string) string {
+	multiReturnTypeStructName = func(funcName string) string {
 		return funcName + "Data"
 	}
 )
@@ -157,6 +158,7 @@ type TemplateData struct {
 	ABI               string
 	Bytecode          string
 	NeedsBigInt       bool
+	NeedsFmt          bool
 	HasWriteOps       bool
 	NoDeployment      bool
 	Constructor       *ConstructorData
@@ -553,6 +555,16 @@ func capitalize(s string) string {
 	return strings.ToUpper(s[:1]) + s[1:]
 }
 
+// returnParamGoName returns a valid Go field name for an ABI return parameter.
+// Unnamed return values (common in Solidity) get deterministic fallback names (Value0, Value1, ...)
+// so that both the result struct and the unpacking code use the same identifier.
+func returnParamGoName(param ParameterInfo, index int) string {
+	if strings.TrimSpace(param.Name) != "" {
+		return capitalize(param.Name)
+	}
+	return "Value" + strconv.Itoa(index)
+}
+
 func toKebabCase(s string) string {
 	return strings.ReplaceAll(toSnakeCase(s), "_", "-")
 }
@@ -648,12 +660,14 @@ func prepareTemplateData(info *ContractInfo) TemplateData {
 			// Generate result struct for read operations with multiple return values
 			if len(funcInfo.ReturnParams) > 1 {
 				data.ResultStructs = append(data.ResultStructs, StructDefData{
-					Name:   multiReturnTypeStrucName(funcInfo.Name),
-					Fields: prepareParameters(funcInfo.ReturnParams),
+					Name:   multiReturnTypeStructName(funcInfo.Name),
+					Fields: prepareReturnParameters(funcInfo.ReturnParams),
 				})
 			}
 		}
 	}
+
+	data.NeedsFmt = len(data.ResultStructs) > 0
 
 	var structNames []string
 	for name := range info.StructDefs {
@@ -732,7 +746,7 @@ func prepareContractMethod(funcInfo *FunctionInfo, isWrite bool) ContractMethodD
 		if len(funcInfo.ReturnParams) == 1 {
 			returnType = funcInfo.ReturnParams[0].GoType
 		} else if len(funcInfo.ReturnParams) > 1 {
-			returnType = multiReturnTypeStrucName(funcInfo.Name)
+			returnType = multiReturnTypeStructName(funcInfo.Name)
 		}
 		returns = fmt.Sprintf("(%s, error)", returnType)
 	}
@@ -786,6 +800,20 @@ func prepareParameters(params []ParameterInfo) []ParameterData {
 	return result
 }
 
+// prepareReturnParameters builds ParameterData for ABI return values, using returnParamGoName
+// so that unnamed returns get deterministic names (Value0, Value1, ...) consistent with
+// the unpacking code in buildMultiReturnCallBody.
+func prepareReturnParameters(params []ParameterInfo) []ParameterData {
+	var result []ParameterData
+	for i, param := range params {
+		result = append(result, ParameterData{
+			GoName: returnParamGoName(param, i),
+			GoType: param.GoType,
+		})
+	}
+	return result
+}
+
 // buildCallArgs extracts common logic for building argument types and call arguments
 func buildCallArgs(funcInfo *FunctionInfo, argsPrefix string) (argsType string, callArgs string) {
 	if len(funcInfo.Parameters) == 0 {
@@ -825,7 +853,8 @@ func prepareWriteOp(funcInfo *FunctionInfo) WriteOpData {
 }
 
 func buildMultiReturnCallBody(funcInfo *FunctionInfo, callArgsStr string) string {
-	structName := multiReturnTypeStrucName(funcInfo.Name)
+	structName := multiReturnTypeStructName(funcInfo.Name)
+	n := len(funcInfo.ReturnParams)
 	var b strings.Builder
 	b.WriteString("\tvar out []any\n")
 	b.WriteString(fmt.Sprintf("\terr := c.contract.Call(opts, &out, \"%s\"%s)\n", funcInfo.CallMethod, callArgsStr))
@@ -833,9 +862,13 @@ func buildMultiReturnCallBody(funcInfo *FunctionInfo, callArgsStr string) string
 	b.WriteString(fmt.Sprintf("\t\tvar zero %s\n", structName))
 	b.WriteString("\t\treturn zero, err\n")
 	b.WriteString("\t}\n")
+	b.WriteString(fmt.Sprintf("\tif len(out) != %d {\n", n))
+	b.WriteString(fmt.Sprintf("\t\tvar zero %s\n", structName))
+	b.WriteString(fmt.Sprintf("\t\treturn zero, fmt.Errorf(\"abi: got %%d outputs, need %d\", len(out))\n", n))
+	b.WriteString("\t}\n")
 	b.WriteString(fmt.Sprintf("\tvar result %s\n", structName))
 	for i, p := range funcInfo.ReturnParams {
-		goName := capitalize(p.Name)
+		goName := returnParamGoName(p, i)
 		b.WriteString(fmt.Sprintf("\tresult.%s = *abi.ConvertType(out[%d], new(%s)).(*%s)\n", goName, i, p.GoType, p.GoType))
 	}
 	b.WriteString("\treturn result, nil")
@@ -849,7 +882,7 @@ func prepareReadOp(funcInfo *FunctionInfo) ReadOpData {
 	if len(funcInfo.ReturnParams) == 1 {
 		returnType = funcInfo.ReturnParams[0].GoType
 	} else if len(funcInfo.ReturnParams) > 1 {
-		returnType = multiReturnTypeStrucName(funcInfo.Name)
+		returnType = multiReturnTypeStructName(funcInfo.Name)
 	}
 
 	return ReadOpData{

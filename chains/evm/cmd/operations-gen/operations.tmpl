@@ -6,6 +6,9 @@ import (
 {{- if .NeedsBigInt}}
 	"math/big"
 {{end}}
+{{- if .NeedsFmt}}
+"fmt"
+{{end}}
 	"strings"
 
 	"github.com/Masterminds/semver/v3"

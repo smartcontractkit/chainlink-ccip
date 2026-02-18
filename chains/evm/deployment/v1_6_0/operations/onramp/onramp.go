@@ -3,6 +3,8 @@
 package onramp
 
 import (
+	"fmt"
+
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
@@ -69,6 +71,10 @@ func (c *OnRampContract) GetDestChainConfig(opts *bind.CallOpts, args uint64) (G
 	if err != nil {
 		var zero GetDestChainConfigData
 		return zero, err
+	}
+	if len(out) != 3 {
+		var zero GetDestChainConfigData
+		return zero, fmt.Errorf("abi: got %d outputs, need 3", len(out))
 	}
 	var result GetDestChainConfigData
 	result.SequenceNumber = *abi.ConvertType(out[0], new(uint64)).(*uint64)
