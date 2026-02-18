@@ -52,8 +52,8 @@ type FeeQuoterDestChainConfig struct {
 	MaxDataBytes                      uint32
 	MaxPerMsgGasLimit                 uint32
 	DestGasOverhead                   uint32
-	DestGasPerPayloadByteBase         uint8
-	DestGasPerPayloadByteHigh         uint8
+	DestGasPerPayloadByteBase         uint32
+	DestGasPerPayloadByteHigh         uint32
 	DestGasPerPayloadByteThreshold    uint16
 	DestDataAvailabilityOverheadGas   uint32
 	DestGasPerDataAvailabilityByte    uint16
