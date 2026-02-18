@@ -35,23 +35,19 @@ type ConfigImportAdapter struct {
 }
 
 func (ci *ConfigImportAdapter) InitializeAdapter(e cldf.Environment, chainSelector uint64) error {
-	fqRef, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-		Type:          datastore.ContractType(fqops.ContractType),
-		Version:       semver.MustParse("1.6.3"),
-		ChainSelector: chainSelector,
-	}, chainSelector, evm_datastore_utils.ToEVMAddress)
+	fqRef, err := seq1_6.GetFeeQuoterAddress(
+		e.DataStore.Addresses().Filter(
+			datastore.AddressRefByChainSelector(chainSelector),
+			datastore.AddressRefByType(datastore.ContractType(fqops.ContractType)),
+		),
+		chainSelector)
 	if err != nil {
-		// if fee quoter ref is not found, try to find 1.6.0 fee quoter ref and use that, if that also fails, return an error
-		fqRef, err = datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-			Type:          datastore.ContractType(fqops.ContractType),
-			Version:       semver.MustParse("1.6.0"),
-			ChainSelector: chainSelector,
-		}, chainSelector, evm_datastore_utils.ToEVMAddress)
-		if err != nil {
-			return fmt.Errorf("failed to find fee quoter contract ref for chain %d: %w", chainSelector, err)
-		}
+		return fmt.Errorf("failed to find fee quoter contract ref for chain %d: %w", chainSelector, err)
 	}
-	ci.FeeQuoter = fqRef
+	ci.FeeQuoter, err = evm_datastore_utils.ToEVMAddress(fqRef)
+	if err != nil {
+		return fmt.Errorf("failed to convert fee quoter address to EVM address for chain %d: %w", chainSelector, err)
+	}
 	routerRef, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 		Type:          datastore.ContractType(routerops.ContractType),
 		Version:       routerops.Version,
