@@ -25,5 +25,5 @@ arrayvec = { version = "1.0.0", path = "../../crates/arrayvec" }
 level = "warn"
 check-cfg = [
     'cfg(target_os, values("solana"))',
-    'cfg(feature, values("anchor-debug", "custom-panic", "no-log-ix-name"))',
+    'cfg(feature, values("anchor-debug", "custom-panic", "custom-heap", "no-log-ix-name"))',
 ]

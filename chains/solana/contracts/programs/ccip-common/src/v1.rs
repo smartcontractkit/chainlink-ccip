@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_lang::Discriminator;
+#[allow(deprecated)]
 use solana_program::address_lookup_table::state::AddressLookupTable;
 use ethnum::U256;
 

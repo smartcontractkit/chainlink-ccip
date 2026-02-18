@@ -588,7 +588,6 @@ dependencies = [
  "base-token-pool",
  "build_commit",
  "ccip_common",
- "solana-program",
 ]
 
 [[package]]

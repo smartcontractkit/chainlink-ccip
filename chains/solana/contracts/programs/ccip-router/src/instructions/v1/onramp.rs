@@ -499,7 +499,7 @@ mod helpers {
                     minimum_balance.checked_sub(current_lamports).unwrap(),
                 )?;
             }
-            account_info.realloc(required_space, false)?;
+            account_info.resize(required_space)?;
 
             let mut nonce = load_nonce(account_info)?;
             require_eq!(nonce.version, 1, CcipRouterError::InvalidNonceVersion);

@@ -21,7 +21,6 @@ anchor-lang = { git = "https://github.com/coral-xyz/anchor", tag = "v0.32.1", fe
     "init-if-needed",
 ] }
 anchor-spl = { git = "https://github.com/coral-xyz/anchor", tag = "v0.32.1" }
-solana-program = "2"
 base-token-pool = { version = "1.6.1-candidate", path = "../base-token-pool/", features = [
     "no-entrypoint",
 ] }

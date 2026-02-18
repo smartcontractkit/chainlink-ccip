@@ -1,5 +1,6 @@
 use anchor_lang::{prelude::*, system_program, Discriminator};
 use anchor_spl::associated_token::get_associated_token_address_with_program_id;
+#[allow(deprecated)]
 use solana_program::{address_lookup_table::state::AddressLookupTable, log::sol_log};
 
 use ccip_common::router_accounts::TokenAdminRegistry;
@@ -189,7 +190,7 @@ impl TokenAdminRegistryTrait for Impl {
                     minimum_balance.checked_sub(current_lamports).unwrap(),
                 )?;
             }
-            acc_info.realloc(required_space, false)?;
+            acc_info.resize(required_space)?;
         }
 
         let mut token_admin_registry: TokenAdminRegistry;

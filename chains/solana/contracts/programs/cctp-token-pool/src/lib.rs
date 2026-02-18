@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
-use solana_program::instruction::{AccountMeta, Instruction};
-use solana_program::program::{get_return_data, invoke_signed};
+use anchor_lang::solana_program::instruction::{AccountMeta, Instruction};
+use anchor_lang::solana_program::program::{get_return_data, invoke_signed};
 
 use base_token_pool::common::*;
 use base_token_pool::rate_limiter::*;
@@ -33,7 +33,7 @@ const SUPPORTED_CCTP_MESSAGE_VERSION: u32 = 0;
 pub mod cctp_token_pool {
     use std::str::FromStr;
 
-    use solana_program::{program::invoke_signed, system_instruction::transfer};
+    use anchor_lang::solana_program::{program::invoke_signed, system_instruction::transfer};
 
     use super::*;
 

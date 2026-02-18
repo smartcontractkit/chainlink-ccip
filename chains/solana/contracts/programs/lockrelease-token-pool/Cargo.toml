@@ -37,5 +37,5 @@ build_commit = { path = "../../crates/build-commit" }
 level = "warn"
 check-cfg = [
     'cfg(target_os, values("solana"))',
-    'cfg(feature, values("anchor-debug", "custom-panic"))',
+    'cfg(feature, values("anchor-debug", "custom-panic", "custom-heap"))',
 ]

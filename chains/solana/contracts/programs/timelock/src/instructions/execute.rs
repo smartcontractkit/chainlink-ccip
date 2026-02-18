@@ -1,6 +1,6 @@
 use anchor_lang::solana_program::instruction::Instruction;
 use solana_keccak_hasher::HASH_BYTES;
-use anchor_lang::{prelude::*, solana_program};
+use anchor_lang::prelude::*;
 use anchor_lang::solana_program::program::invoke_signed;
 
 use access_controller::AccessController;

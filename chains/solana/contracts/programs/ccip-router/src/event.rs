@@ -38,22 +38,26 @@ pub mod events {
         }
 
         #[event]
+        #[allow(dead_code)]
         pub struct FeeTokenAdded {
             pub fee_token: Pubkey,
             pub enabled: bool,
         }
 
         #[event]
+        #[allow(dead_code)]
         pub struct FeeTokenEnabled {
             pub fee_token: Pubkey,
         }
 
         #[event]
+        #[allow(dead_code)]
         pub struct FeeTokenDisabled {
             pub fee_token: Pubkey,
         }
 
         #[event]
+        #[allow(dead_code)]
         pub struct FeeTokenRemoved {
             pub fee_token: Pubkey,
         }

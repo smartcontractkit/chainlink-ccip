@@ -11,6 +11,7 @@ use anchor_spl::{
 use ccip_common::seed;
 use ccip_common::v1::{load_token_admin_registry_checked, token_admin_registry_writable};
 use ccip_common::CommonCcipError;
+#[allow(deprecated)]
 use solana_program::{
     address_lookup_table::state::AddressLookupTable,
     instruction::Instruction,

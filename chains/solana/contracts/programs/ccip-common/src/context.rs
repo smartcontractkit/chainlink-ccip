@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
 #[cfg(not(feature = "idl-build"))]
+#[allow(deprecated)]
 use solana_program::address_lookup_table as address_lookup_table;
 #[cfg(not(feature = "idl-build"))]
 use anchor_spl::associated_token::get_associated_token_address_with_program_id;

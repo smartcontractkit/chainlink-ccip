@@ -30,5 +30,5 @@ rmn_remote = { version = "1.6.1-candidate", path = "../rmn-remote", features = [
 level = "warn"
 check-cfg = [
     'cfg(target_os, values("solana"))',
-    'cfg(feature, values("anchor-debug", "custom-panic"))',
+    'cfg(feature, values("anchor-debug", "custom-panic", "custom-heap"))',
 ]

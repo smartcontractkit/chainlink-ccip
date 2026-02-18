@@ -16,6 +16,7 @@ use ccip_common::{
     seed::{self, EXECUTION_REPORT_BUFFER},
     v1::token_admin_registry_writable,
 };
+#[allow(deprecated)]
 use solana_program::{
     address_lookup_table::state::AddressLookupTable,
     instruction::Instruction,
