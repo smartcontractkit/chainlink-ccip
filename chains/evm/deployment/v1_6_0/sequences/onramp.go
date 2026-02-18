@@ -29,7 +29,7 @@ type OnRampImportConfigSequenceInput struct {
 }
 
 type OnRampImportConfigSequenceOutput struct {
-	DestChainCfgs map[uint64]any // GetDestChainConfig returns any (manually added operation)
+	DestChainCfgs map[uint64]onrampops.GetDestChainConfigResult
 	StaticConfig  onrampops.StaticConfig
 	DynamicConfig onrampops.DynamicConfig
 }
@@ -72,7 +72,7 @@ var (
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
-			onRampDestConfigs := make(map[uint64]any)
+			onRampDestConfigs := make(map[uint64]onrampops.GetDestChainConfigResult)
 			for _, remoteChain := range input.RemoteChains {
 				report, err := operations.ExecuteOperation(b, onrampops.GetDestChainConfig, chain, contract.FunctionInput[uint64]{
 					ChainSelector: chain.Selector,
