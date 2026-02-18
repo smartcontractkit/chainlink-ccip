@@ -35,7 +35,6 @@ contract CCTTokenPool is TokenPool, BurnMintERC20 {
     uint256 amount,
     uint64 // remoteChainSelector
   ) internal virtual override {
-    if (receiver == address(this)) revert InvalidRecipient(receiver);
     if (i_maxSupply != 0 && totalSupply() + amount > i_maxSupply) revert MaxSupplyExceeded(totalSupply() + amount);
 
     _mint(receiver, amount);
