@@ -37,11 +37,19 @@ type ConfigImportAdapter struct {
 func (ci *ConfigImportAdapter) InitializeAdapter(e cldf.Environment, chainSelector uint64) error {
 	fqRef, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 		Type:          datastore.ContractType(fqops.ContractType),
-		Version:       fqops.Version,
+		Version:       semver.MustParse("1.6.0"),
 		ChainSelector: chainSelector,
 	}, chainSelector, evm_datastore_utils.ToEVMAddress)
 	if err != nil {
-		return fmt.Errorf("failed to find fee quoter contract ref for chain %d: %w", chainSelector, err)
+		// if fee quoter ref is not found, return try to find 1.6.3 fee quoter ref and use that, if that also fails, return an error
+		fqRef, err = datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+			Type:          datastore.ContractType(fqops.ContractType),
+			Version:       semver.MustParse("1.6.3"),
+			ChainSelector: chainSelector,
+		}, chainSelector, evm_datastore_utils.ToEVMAddress)
+		if err != nil {
+			return fmt.Errorf("failed to find fee quoter contract ref for chain %d: %w", chainSelector, err)
+		}
 	}
 	ci.FeeQuoter = fqRef
 	routerRef, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
