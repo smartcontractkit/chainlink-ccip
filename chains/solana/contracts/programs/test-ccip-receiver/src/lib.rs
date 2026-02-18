@@ -10,8 +10,8 @@ declare_id!("EvhgrPhTDt4LcSPS2kfJgH6T6XWZ6wT3X9ncDGLT1vui");
 /// Used to test CCIP Router execute.
 #[program]
 pub mod test_ccip_receiver {
-    use solana_program::instruction::Instruction;
-    use solana_program::program::invoke_signed;
+    use anchor_lang::solana_program::instruction::Instruction;
+    use anchor_lang::solana_program::program::invoke_signed;
 
     use super::*;
 

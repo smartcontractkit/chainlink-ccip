@@ -467,9 +467,10 @@ fn get_validated_gas_price(dest_chain: &DestChain) -> Result<PackedPrice> {
     Ok(price)
 }
 
-#[cfg(test)]
+// Skip tests during IDL build since program_stubs is not available in newer Solana versions
+#[cfg(all(test, not(feature = "idl-build")))]
 mod tests {
-    use solana_program::{
+    use anchor_lang::solana_program::{
         entrypoint::SUCCESS,
         program_stubs::{set_syscall_stubs, SyscallStubs},
     };

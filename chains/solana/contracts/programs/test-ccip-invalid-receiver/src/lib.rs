@@ -5,8 +5,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{Mint, TokenAccount};
 use example_ccip_receiver::Any2SVMMessage;
-use program::TestCcipInvalidReceiver;
-use solana_program::pubkey;
+use crate::program::TestCcipInvalidReceiver;
 
 declare_id!("FmyF3oW69MSAhyPSiZ69C4RKBdCPv5vAFTScisV7Me2j");
 

@@ -205,7 +205,8 @@ impl From<&AccountMeta> for InstructionAccount {
     }
 }
 
-#[cfg(test)]
+// Skip tests during IDL build since keccak is not available in newer Solana versions
+#[cfg(all(test, not(feature = "idl-build")))]
 mod tests {
     use super::*;
     use anchor_lang::solana_program::{keccak::HASH_BYTES, pubkey::Pubkey};

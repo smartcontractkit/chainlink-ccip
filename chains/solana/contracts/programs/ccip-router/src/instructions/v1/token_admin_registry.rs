@@ -160,7 +160,7 @@ impl TokenAdminRegistryTrait for Impl {
             msg!("Validating account to upgrade...");
             let data = acc_info.try_borrow_data()?;
             require!(
-                data[..8] == TokenAdminRegistry::DISCRIMINATOR,
+                data[..8] == *TokenAdminRegistry::DISCRIMINATOR,
                 CcipRouterError::InvalidInputsTokenAdminRegistryAccounts
             );
             require_eq!(

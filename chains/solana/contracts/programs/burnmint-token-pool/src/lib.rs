@@ -6,7 +6,7 @@ use anchor_spl::{
         instruction::{burn, mint_to},
     },
 };
-use solana_program::program_pack::Pack;
+use anchor_lang::solana_program::program_pack::Pack;
 
 use base_token_pool::{common::*, rate_limiter::*};
 declare_id!("41FGToCmdaWa1dgZLKFAjvmx6e6AjVTX7SVRibvsMGVB");

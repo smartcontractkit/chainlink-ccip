@@ -241,7 +241,8 @@ impl RootMetadataInput {
     }
 }
 
-#[cfg(test)]
+// Skip tests during IDL build since keccak is not available via anchor_lang::solana_program
+#[cfg(all(test, not(feature = "idl-build")))]
 mod tests {
     use super::*;
 

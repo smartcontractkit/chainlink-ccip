@@ -17,9 +17,9 @@ default = []
 idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
 
 [dependencies]
-solana-program = "2"
-anchor-lang = { git = "https://github.com/coral-xyz/anchor", branch = "master", features = [] }
-anchor-spl = { git = "https://github.com/coral-xyz/anchor", branch = "master" }
+anchor-lang = { git = "https://github.com/coral-xyz/anchor", tag = "v0.32.1", features = [
+] }
+anchor-spl = { git = "https://github.com/coral-xyz/anchor", tag = "v0.32.1" }
 example_ccip_receiver = { path = "../example-ccip-receiver", features = [
     "no-entrypoint",
 ] }

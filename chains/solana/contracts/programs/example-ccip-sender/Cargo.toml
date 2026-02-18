@@ -18,9 +18,10 @@ custom-heap = []
 idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
 
 [dependencies]
+anchor-lang = { git = "https://github.com/coral-xyz/anchor", tag = "v0.32.1", features = [
+] }
+anchor-spl = { git = "https://github.com/coral-xyz/anchor", tag = "v0.32.1" }
 solana-program = "2"
-anchor-lang = { git = "https://github.com/coral-xyz/anchor", branch = "master", features = [] }
-anchor-spl = { git = "https://github.com/coral-xyz/anchor", branch = "master" }
 ccip_router = { version = "1.6.1-candidate", path = "../ccip-router", features = [
     "no-entrypoint",
 ] }

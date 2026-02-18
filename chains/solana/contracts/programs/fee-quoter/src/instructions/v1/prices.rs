@@ -6,7 +6,7 @@ use crate::event::{UsdPerTokenUpdated, UsdPerUnitGasUpdated};
 use crate::instructions::interfaces::Prices;
 use crate::state::{BillingTokenConfigWrapper, DestChain, TimestampedPackedU224};
 use crate::{FeeQuoterError, TokenPriceUpdateIgnored};
-use solana_program::system_program;
+use anchor_lang::solana_program::system_program;
 
 pub struct Impl;
 impl Prices for Impl {

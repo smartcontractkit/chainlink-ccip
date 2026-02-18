@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use program::PingPongDemo;
+use crate::program::PingPongDemo;
 
 use ccip_router::cpi;
 use example_ccip_receiver::Any2SVMMessage;
@@ -187,7 +187,7 @@ pub mod ping_pong_demo {
 }
 
 mod helpers {
-    use solana_program::{instruction::Instruction, program::invoke_signed};
+    use anchor_lang::solana_program::{instruction::Instruction, program::invoke_signed};
 
     use super::*;
 

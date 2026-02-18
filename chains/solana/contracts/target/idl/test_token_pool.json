@@ -1,384 +1,1005 @@
 {
-  "version": "1.6.1-candidate",
-  "name": "test_token_pool",
+  "address": "JuCcZ4smxAYv9QHJ36jshA7pA3FuQ3vQeWLUeAtZduJ",
+  "metadata": {
+    "name": "test_token_pool",
+    "version": "1.6.1-candidate",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
   "instructions": [
     {
-      "name": "initialize",
+      "name": "accept_ownership",
+      "discriminator": [
+        172,
+        23,
+        43,
+        13,
+        238,
+        213,
+        85,
+        150
+      ],
       "accounts": [
         {
           "name": "state",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "mint",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "programData",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "poolType",
-          "type": {
-            "defined": "PoolType"
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  99,
+                  105,
+                  112,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
           }
         },
         {
-          "name": "router",
-          "type": "publicKey"
-        },
-        {
-          "name": "rmnRemote",
-          "type": "publicKey"
-        }
-      ]
-    },
-    {
-      "name": "transferOwnership",
-      "accounts": [
-        {
-          "name": "state",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "mint",
-          "isMut": false,
-          "isSigner": false
+          "name": "mint"
         },
         {
           "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        }
-      ],
-      "args": [
-        {
-          "name": "proposedOwner",
-          "type": "publicKey"
-        }
-      ]
-    },
-    {
-      "name": "acceptOwnership",
-      "accounts": [
-        {
-          "name": "state",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "mint",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
+          "signer": true
         }
       ],
       "args": []
     },
     {
-      "name": "setRouter",
+      "name": "append_remote_pool_addresses",
+      "discriminator": [
+        172,
+        57,
+        83,
+        55,
+        70,
+        112,
+        26,
+        197
+      ],
       "accounts": [
         {
           "name": "state",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "mint",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        }
-      ],
-      "args": [
-        {
-          "name": "newRouter",
-          "type": "publicKey"
-        }
-      ]
-    },
-    {
-      "name": "initChainRemoteConfig",
-      "accounts": [
-        {
-          "name": "state",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "chainConfig",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "remoteChainSelector",
-          "type": "u64"
-        },
-        {
-          "name": "mint",
-          "type": "publicKey"
-        },
-        {
-          "name": "cfg",
-          "type": {
-            "defined": "RemoteConfig"
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  99,
+                  105,
+                  112,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "mint"
+              }
+            ]
           }
-        }
-      ]
-    },
-    {
-      "name": "editChainRemoteConfig",
-      "accounts": [
-        {
-          "name": "state",
-          "isMut": false,
-          "isSigner": false
         },
         {
-          "name": "chainConfig",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "remoteChainSelector",
-          "type": "u64"
-        },
-        {
-          "name": "mint",
-          "type": "publicKey"
-        },
-        {
-          "name": "cfg",
-          "type": {
-            "defined": "RemoteConfig"
+          "name": "chain_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  99,
+                  105,
+                  112,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  99,
+                  104,
+                  97,
+                  105,
+                  110,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "remote_chain_selector"
+              },
+              {
+                "kind": "arg",
+                "path": "mint"
+              }
+            ]
           }
-        }
-      ]
-    },
-    {
-      "name": "appendRemotePoolAddresses",
-      "accounts": [
-        {
-          "name": "state",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "chainConfig",
-          "isMut": true,
-          "isSigner": false
         },
         {
           "name": "authority",
-          "isMut": true,
-          "isSigner": true
+          "writable": true,
+          "signer": true
         },
         {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "remoteChainSelector",
+          "name": "remote_chain_selector",
           "type": "u64"
         },
         {
-          "name": "mint",
-          "type": "publicKey"
+          "name": "_mint",
+          "type": "pubkey"
         },
         {
           "name": "addresses",
           "type": {
             "vec": {
-              "defined": "RemoteAddress"
+              "defined": {
+                "name": "RemoteAddress"
+              }
             }
           }
         }
       ]
     },
     {
-      "name": "setChainRateLimit",
+      "name": "delete_chain_config",
+      "discriminator": [
+        241,
+        159,
+        142,
+        210,
+        64,
+        173,
+        77,
+        179
+      ],
       "accounts": [
         {
           "name": "state",
-          "isMut": false,
-          "isSigner": false
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  99,
+                  105,
+                  112,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "mint"
+              }
+            ]
+          }
         },
         {
-          "name": "chainConfig",
-          "isMut": true,
-          "isSigner": false
+          "name": "chain_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  99,
+                  105,
+                  112,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  99,
+                  104,
+                  97,
+                  105,
+                  110,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "remote_chain_selector"
+              },
+              {
+                "kind": "arg",
+                "path": "mint"
+              }
+            ]
+          }
         },
         {
           "name": "authority",
-          "isMut": true,
-          "isSigner": true
+          "writable": true,
+          "signer": true
         },
         {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "remoteChainSelector",
+          "name": "remote_chain_selector",
           "type": "u64"
         },
         {
           "name": "mint",
-          "type": "publicKey"
-        },
-        {
-          "name": "inbound",
-          "type": {
-            "defined": "RateLimitConfig"
-          }
-        },
-        {
-          "name": "outbound",
-          "type": {
-            "defined": "RateLimitConfig"
-          }
+          "type": "pubkey"
         }
       ]
     },
     {
-      "name": "setRateLimitAdmin",
-      "accounts": [
-        {
-          "name": "state",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        }
+      "name": "derive_accounts_lock_or_burn_tokens",
+      "discriminator": [
+        20,
+        237,
+        184,
+        4,
+        166,
+        153,
+        108,
+        174
       ],
+      "accounts": [],
       "args": [
         {
-          "name": "mint",
-          "type": "publicKey"
+          "name": "stage",
+          "type": "string"
         },
         {
-          "name": "newRateLimitAdmin",
-          "type": "publicKey"
+          "name": "_lock_or_burn",
+          "type": {
+            "defined": {
+              "name": "LockOrBurnInV1"
+            }
+          }
         }
-      ]
+      ],
+      "returns": {
+        "defined": {
+          "name": "DeriveAccountsResponse"
+        }
+      }
     },
     {
-      "name": "deleteChainConfig",
+      "name": "derive_accounts_release_or_mint_tokens",
+      "discriminator": [
+        40,
+        91,
+        244,
+        228,
+        0,
+        2,
+        51,
+        238
+      ],
+      "accounts": [],
+      "args": [
+        {
+          "name": "stage",
+          "type": "string"
+        },
+        {
+          "name": "_release_or_mint",
+          "type": {
+            "defined": {
+              "name": "ReleaseOrMintInV1"
+            }
+          }
+        }
+      ],
+      "returns": {
+        "defined": {
+          "name": "DeriveAccountsResponse"
+        }
+      }
+    },
+    {
+      "name": "edit_chain_remote_config",
+      "discriminator": [
+        149,
+        112,
+        186,
+        72,
+        116,
+        217,
+        159,
+        175
+      ],
       "accounts": [
         {
           "name": "state",
-          "isMut": false,
-          "isSigner": false
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  99,
+                  105,
+                  112,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "mint"
+              }
+            ]
+          }
         },
         {
-          "name": "chainConfig",
-          "isMut": true,
-          "isSigner": false
+          "name": "chain_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  99,
+                  105,
+                  112,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  99,
+                  104,
+                  97,
+                  105,
+                  110,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "remote_chain_selector"
+              },
+              {
+                "kind": "arg",
+                "path": "mint"
+              }
+            ]
+          }
         },
         {
           "name": "authority",
-          "isMut": true,
-          "isSigner": true
+          "writable": true,
+          "signer": true
         },
         {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "remoteChainSelector",
+          "name": "remote_chain_selector",
           "type": "u64"
         },
         {
           "name": "mint",
-          "type": "publicKey"
+          "type": "pubkey"
+        },
+        {
+          "name": "cfg",
+          "type": {
+            "defined": {
+              "name": "RemoteConfig"
+            }
+          }
         }
       ]
     },
     {
-      "name": "releaseOrMintTokens",
+      "name": "init_chain_remote_config",
+      "discriminator": [
+        21,
+        150,
+        133,
+        36,
+        2,
+        116,
+        199,
+        129
+      ],
+      "accounts": [
+        {
+          "name": "state",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  99,
+                  105,
+                  112,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "chain_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  99,
+                  105,
+                  112,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  99,
+                  104,
+                  97,
+                  105,
+                  110,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "remote_chain_selector"
+              },
+              {
+                "kind": "arg",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "remote_chain_selector",
+          "type": "u64"
+        },
+        {
+          "name": "mint",
+          "type": "pubkey"
+        },
+        {
+          "name": "cfg",
+          "type": {
+            "defined": {
+              "name": "RemoteConfig"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "initialize",
+      "discriminator": [
+        175,
+        175,
+        109,
+        31,
+        13,
+        152,
+        155,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  99,
+                  105,
+                  112,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "program",
+          "address": "JuCcZ4smxAYv9QHJ36jshA7pA3FuQ3vQeWLUeAtZduJ"
+        },
+        {
+          "name": "program_data"
+        }
+      ],
+      "args": [
+        {
+          "name": "pool_type",
+          "type": {
+            "defined": {
+              "name": "PoolType"
+            }
+          }
+        },
+        {
+          "name": "router",
+          "type": "pubkey"
+        },
+        {
+          "name": "rmn_remote",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "lock_or_burn_tokens",
+      "discriminator": [
+        114,
+        161,
+        94,
+        29,
+        147,
+        25,
+        232,
+        191
+      ],
       "accounts": [
         {
           "name": "authority",
-          "isMut": false,
-          "isSigner": true
+          "signer": true
         },
         {
-          "name": "offrampProgram",
-          "isMut": false,
-          "isSigner": false,
+          "name": "state",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  99,
+                  105,
+                  112,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program"
+        },
+        {
+          "name": "mint",
+          "writable": true
+        },
+        {
+          "name": "pool_signer",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  99,
+                  105,
+                  112,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  115,
+                  105,
+                  103,
+                  110,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "pool_token_account",
+          "writable": true
+        },
+        {
+          "name": "rmn_remote"
+        },
+        {
+          "name": "rmn_remote_curses"
+        },
+        {
+          "name": "rmn_remote_config"
+        },
+        {
+          "name": "chain_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  99,
+                  105,
+                  112,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  99,
+                  104,
+                  97,
+                  105,
+                  110,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "lock_or_burn.remote_chain_selector"
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "lock_or_burn",
+          "type": {
+            "defined": {
+              "name": "LockOrBurnInV1"
+            }
+          }
+        }
+      ],
+      "returns": {
+        "defined": {
+          "name": "LockOrBurnOutV1"
+        }
+      }
+    },
+    {
+      "name": "release_or_mint_tokens",
+      "discriminator": [
+        92,
+        100,
+        150,
+        198,
+        252,
+        63,
+        164,
+        228
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  120,
+                  116,
+                  101,
+                  114,
+                  110,
+                  97,
+                  108,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108,
+                  115,
+                  95,
+                  115,
+                  105,
+                  103,
+                  110,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "const",
+                "value": [
+                  4,
+                  149,
+                  229,
+                  144,
+                  117,
+                  41,
+                  158,
+                  230,
+                  118,
+                  8,
+                  128,
+                  3,
+                  8,
+                  176,
+                  195,
+                  63,
+                  213,
+                  85,
+                  178,
+                  0,
+                  180,
+                  226,
+                  82,
+                  133,
+                  41,
+                  103,
+                  231,
+                  161,
+                  135,
+                  178,
+                  106,
+                  121
+                ]
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "offramp_program"
+            }
+          }
+        },
+        {
+          "name": "offramp_program",
           "docs": [
             "CHECK offramp program: exists only to derive the allowed offramp PDA",
             "and the authority PDA."
           ]
         },
         {
-          "name": "allowedOfframp",
-          "isMut": false,
-          "isSigner": false,
+          "name": "allowed_offramp",
           "docs": [
             "CHECK PDA of the router program verifying the signer is an allowed offramp.",
             "If PDA does not exist, the router doesn't allow this offramp"
@@ -386,189 +1007,648 @@
         },
         {
           "name": "state",
-          "isMut": false,
-          "isSigner": false
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  99,
+                  105,
+                  112,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
         },
         {
-          "name": "tokenProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "token_program"
         },
         {
           "name": "mint",
-          "isMut": true,
-          "isSigner": false
+          "writable": true
         },
         {
-          "name": "poolSigner",
-          "isMut": false,
-          "isSigner": false
+          "name": "pool_signer",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  99,
+                  105,
+                  112,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  115,
+                  105,
+                  103,
+                  110,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
         },
         {
-          "name": "poolTokenAccount",
-          "isMut": true,
-          "isSigner": false
+          "name": "pool_token_account",
+          "writable": true
         },
         {
-          "name": "chainConfig",
-          "isMut": true,
-          "isSigner": false
+          "name": "chain_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  99,
+                  105,
+                  112,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  99,
+                  104,
+                  97,
+                  105,
+                  110,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "release_or_mint.remote_chain_selector"
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
         },
         {
-          "name": "rmnRemote",
-          "isMut": false,
-          "isSigner": false
+          "name": "rmn_remote"
         },
         {
-          "name": "rmnRemoteCurses",
-          "isMut": false,
-          "isSigner": false
+          "name": "rmn_remote_curses"
         },
         {
-          "name": "rmnRemoteConfig",
-          "isMut": false,
-          "isSigner": false
+          "name": "rmn_remote_config"
         },
         {
-          "name": "receiverTokenAccount",
-          "isMut": true,
-          "isSigner": false
+          "name": "receiver_token_account",
+          "writable": true
         }
       ],
       "args": [
         {
-          "name": "releaseOrMint",
+          "name": "release_or_mint",
           "type": {
-            "defined": "ReleaseOrMintInV1"
+            "defined": {
+              "name": "ReleaseOrMintInV1"
+            }
           }
         }
       ],
       "returns": {
-        "defined": "ReleaseOrMintOutV1"
+        "defined": {
+          "name": "ReleaseOrMintOutV1"
+        }
       }
     },
     {
-      "name": "lockOrBurnTokens",
+      "name": "set_chain_rate_limit",
+      "discriminator": [
+        188,
+        188,
+        161,
+        37,
+        100,
+        249,
+        123,
+        170
+      ],
       "accounts": [
         {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
           "name": "state",
-          "isMut": false,
-          "isSigner": false
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  99,
+                  105,
+                  112,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "mint"
+              }
+            ]
+          }
         },
         {
-          "name": "tokenProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "chain_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  99,
+                  105,
+                  112,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  99,
+                  104,
+                  97,
+                  105,
+                  110,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "remote_chain_selector"
+              },
+              {
+                "kind": "arg",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "remote_chain_selector",
+          "type": "u64"
         },
         {
           "name": "mint",
-          "isMut": true,
-          "isSigner": false
+          "type": "pubkey"
         },
         {
-          "name": "poolSigner",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "poolTokenAccount",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "rmnRemote",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "rmnRemoteCurses",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "rmnRemoteConfig",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "chainConfig",
-          "isMut": true,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "lockOrBurn",
+          "name": "inbound",
           "type": {
-            "defined": "LockOrBurnInV1"
+            "defined": {
+              "name": "RateLimitConfig"
+            }
+          }
+        },
+        {
+          "name": "outbound",
+          "type": {
+            "defined": {
+              "name": "RateLimitConfig"
+            }
           }
         }
-      ],
-      "returns": {
-        "defined": "LockOrBurnOutV1"
-      }
+      ]
     },
     {
-      "name": "deriveAccountsReleaseOrMintTokens",
-      "accounts": [],
-      "args": [
+      "name": "set_rate_limit_admin",
+      "discriminator": [
+        21,
+        182,
+        126,
+        128,
+        31,
+        241,
+        37,
+        34
+      ],
+      "accounts": [
         {
-          "name": "stage",
-          "type": "string"
+          "name": "state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  99,
+                  105,
+                  112,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "mint"
+              }
+            ]
+          }
         },
         {
-          "name": "releaseOrMint",
-          "type": {
-            "defined": "ReleaseOrMintInV1"
-          }
+          "name": "authority",
+          "writable": true,
+          "signer": true
         }
       ],
-      "returns": {
-        "defined": "DeriveAccountsResponse"
-      }
+      "args": [
+        {
+          "name": "_mint",
+          "type": "pubkey"
+        },
+        {
+          "name": "new_rate_limit_admin",
+          "type": "pubkey"
+        }
+      ]
     },
     {
-      "name": "deriveAccountsLockOrBurnTokens",
-      "accounts": [],
-      "args": [
+      "name": "set_router",
+      "discriminator": [
+        236,
+        248,
+        107,
+        200,
+        151,
+        160,
+        44,
+        250
+      ],
+      "accounts": [
         {
-          "name": "stage",
-          "type": "string"
+          "name": "state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  99,
+                  105,
+                  112,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
         },
         {
-          "name": "lockOrBurn",
-          "type": {
-            "defined": "LockOrBurnInV1"
-          }
+          "name": "mint"
+        },
+        {
+          "name": "authority",
+          "signer": true
         }
       ],
-      "returns": {
-        "defined": "DeriveAccountsResponse"
-      }
+      "args": [
+        {
+          "name": "new_router",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "transfer_ownership",
+      "discriminator": [
+        65,
+        177,
+        215,
+        73,
+        53,
+        45,
+        99,
+        47
+      ],
+      "accounts": [
+        {
+          "name": "state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  99,
+                  105,
+                  112,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "proposed_owner",
+          "type": "pubkey"
+        }
+      ]
     }
   ],
   "accounts": [
     {
+      "name": "ChainConfig",
+      "discriminator": [
+        13,
+        177,
+        233,
+        141,
+        212,
+        29,
+        148,
+        56
+      ]
+    },
+    {
       "name": "State",
+      "discriminator": [
+        216,
+        146,
+        107,
+        94,
+        104,
+        75,
+        182,
+        177
+      ]
+    }
+  ],
+  "types": [
+    {
+      "name": "BaseChain",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "poolType",
+            "name": "remote",
             "type": {
-              "defined": "PoolType"
+              "defined": {
+                "name": "RemoteConfig"
+              }
             }
           },
           {
-            "name": "config",
+            "name": "inbound_rate_limit",
             "type": {
-              "defined": "BaseConfig"
+              "defined": {
+                "name": "RateLimitTokenBucket"
+              }
             }
+          },
+          {
+            "name": "outbound_rate_limit",
+            "type": {
+              "defined": {
+                "name": "RateLimitTokenBucket"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "BaseConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "token_program",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "decimals",
+            "type": "u8"
+          },
+          {
+            "name": "pool_signer",
+            "type": "pubkey"
+          },
+          {
+            "name": "pool_token_account",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "proposed_owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "rate_limit_admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "router_onramp_authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "router",
+            "type": "pubkey"
+          },
+          {
+            "name": "rebalancer",
+            "type": "pubkey"
+          },
+          {
+            "name": "can_accept_liquidity",
+            "type": "bool"
+          },
+          {
+            "name": "list_enabled",
+            "type": "bool"
+          },
+          {
+            "name": "allow_list",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "rmn_remote",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CcipAccountMeta",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pubkey",
+            "type": "pubkey"
+          },
+          {
+            "name": "is_signer",
+            "type": "bool"
+          },
+          {
+            "name": "is_writable",
+            "type": "bool"
           }
         ]
       }
@@ -581,16 +1661,113 @@
           {
             "name": "base",
             "type": {
-              "defined": "BaseChain"
+              "defined": {
+                "name": "BaseChain"
+              }
             }
           }
         ]
       }
-    }
-  ],
-  "types": [
+    },
+    {
+      "name": "DeriveAccountsResponse",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "ask_again_with",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "CcipAccountMeta"
+                }
+              }
+            }
+          },
+          {
+            "name": "accounts_to_save",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "CcipAccountMeta"
+                }
+              }
+            }
+          },
+          {
+            "name": "look_up_tables_to_save",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "current_stage",
+            "type": "string"
+          },
+          {
+            "name": "next_stage",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LockOrBurnInV1",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "receiver",
+            "type": "bytes"
+          },
+          {
+            "name": "remote_chain_selector",
+            "type": "u64"
+          },
+          {
+            "name": "original_sender",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "local_token",
+            "type": "pubkey"
+          },
+          {
+            "name": "msg_total_nonce",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LockOrBurnOutV1",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dest_token_address",
+            "type": {
+              "defined": {
+                "name": "RemoteAddress"
+              }
+            }
+          },
+          {
+            "name": "dest_pool_data",
+            "type": "bytes"
+          }
+        ]
+      }
+    },
     {
       "name": "PoolType",
+      "repr": {
+        "kind": "rust"
+      },
       "type": {
         "kind": "enum",
         "variants": [
@@ -602,6 +1779,188 @@
           },
           {
             "name": "Wrapped"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RateLimitConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "enabled",
+            "type": "bool"
+          },
+          {
+            "name": "capacity",
+            "type": "u64"
+          },
+          {
+            "name": "rate",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RateLimitTokenBucket",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "tokens",
+            "type": "u64"
+          },
+          {
+            "name": "last_updated",
+            "type": "u64"
+          },
+          {
+            "name": "cfg",
+            "type": {
+              "defined": {
+                "name": "RateLimitConfig"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ReleaseOrMintInV1",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "original_sender",
+            "type": {
+              "defined": {
+                "name": "RemoteAddress"
+              }
+            }
+          },
+          {
+            "name": "remote_chain_selector",
+            "type": "u64"
+          },
+          {
+            "name": "receiver",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "local_token",
+            "type": "pubkey"
+          },
+          {
+            "name": "source_pool_address",
+            "docs": [
+              "@dev WARNING: sourcePoolAddress should be checked prior to any processing of funds. Make sure it matches the",
+              "expected pool address for the given remoteChainSelector."
+            ],
+            "type": {
+              "defined": {
+                "name": "RemoteAddress"
+              }
+            }
+          },
+          {
+            "name": "source_pool_data",
+            "type": "bytes"
+          },
+          {
+            "name": "offchain_token_data",
+            "docs": [
+              "@dev WARNING: offchainTokenData is untrusted data."
+            ],
+            "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ReleaseOrMintOutV1",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "destination_amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RemoteAddress",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "address",
+            "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RemoteConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool_addresses",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "RemoteAddress"
+                }
+              }
+            }
+          },
+          {
+            "name": "token_address",
+            "type": {
+              "defined": {
+                "name": "RemoteAddress"
+              }
+            }
+          },
+          {
+            "name": "decimals",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "State",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool_type",
+            "type": {
+              "defined": {
+                "name": "PoolType"
+              }
+            }
+          },
+          {
+            "name": "config",
+            "type": {
+              "defined": {
+                "name": "BaseConfig"
+              }
+            }
           }
         ]
       }

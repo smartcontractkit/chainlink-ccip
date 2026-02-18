@@ -17,10 +17,13 @@ default = []
 idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
 
 [dependencies]
-solana-program = "2"
-anchor-lang = { git = "https://github.com/coral-xyz/anchor", branch = "master", features = [] }
-anchor-spl = { git = "https://github.com/coral-xyz/anchor", branch = "master" }
+anchor-lang = { git = "https://github.com/coral-xyz/anchor", tag = "v0.32.1", features = [
+] }
+anchor-spl = { git = "https://github.com/coral-xyz/anchor", tag = "v0.32.1" }
 
 [lints.rust.unexpected_cfgs]
 level = "warn"
-check-cfg = ['cfg(target_os, values("solana"))', 'cfg(feature, values("anchor-debug", "custom-panic"))']
+check-cfg = [
+    'cfg(target_os, values("solana"))',
+    'cfg(feature, values("anchor-debug", "custom-panic"))',
+]

@@ -4,7 +4,7 @@ anchor_version = "0.32.1"
 [features]
 seeds = false
 skip-lint = false
-resolution = false
+resolution = true
 
 [programs.localnet]
 access_controller = "6KsN58MTnRQ8FfPaXHiFPPFGDRioikj9CdPvPxZJdCjb"

@@ -17,9 +17,10 @@ default = []
 idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
 
 [dependencies]
-anchor-lang = { git = "https://github.com/coral-xyz/anchor", branch = "master", features = ["init-if-needed"] }
-anchor-spl = { git = "https://github.com/coral-xyz/anchor", branch = "master" }
-solana-program = "2"
+anchor-lang = { git = "https://github.com/coral-xyz/anchor", tag = "v0.32.1", features = [
+    "init-if-needed",
+] }
+anchor-spl = { git = "https://github.com/coral-xyz/anchor", tag = "v0.32.1" }
 spl-math = { version = "0.3.0", features = ["no-entrypoint"] }
 rmn_remote = { version = "1.6.1-candidate", path = "../rmn-remote", features = [
     "cpi",

@@ -6,7 +6,7 @@ use crate::context::{
     TransferOwnership, UpdateConfig, UpdateReferenceAddresses, UpdateSourceChain, ViewConfigOnly,
 };
 use crate::state::{
-    CodeVersion, DeriveAccountsExecuteParams, DeriveAccountsResponse, Ocr3ConfigInfo,
+    CodeVersion, DeriveAccountsExecuteParams, DeriveAccountsResponse, Ocr3ConfigInfoInput,
     SourceChainConfig,
 };
 use crate::OcrPluginType;
@@ -137,7 +137,7 @@ pub trait Admin {
         &self,
         ctx: Context<SetOcrConfig>,
         plugin_type: OcrPluginType,
-        config_info: Ocr3ConfigInfo,
+        config_info: Ocr3ConfigInfoInput,
         signers: Vec<[u8; 20]>,
         transmitters: Vec<Pubkey>,
     ) -> Result<()>;

@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_lang::Discriminator;
-use ethnum::U256;
 use solana_program::address_lookup_table::state::AddressLookupTable;
+use ethnum::U256;
 
 use crate::router_accounts::TokenAdminRegistryV1;
 use crate::{
@@ -316,7 +316,7 @@ pub mod token_admin_registry_writable {
     #[cfg(test)]
     mod tests {
         use super::*;
-        use solana_program::pubkey::Pubkey;
+        use anchor_lang::solana_program::pubkey::Pubkey;
 
         #[test]
         fn set_writable() {

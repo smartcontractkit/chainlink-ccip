@@ -18,10 +18,12 @@ default = ["no-entrypoint"]
 idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
 
 [dependencies]
-solana-program = "2"
-anchor-lang = { git = "https://github.com/coral-xyz/anchor", branch = "master", features = ["init-if-needed"] }
-anchor-spl = { git = "https://github.com/coral-xyz/anchor", branch = "master" }
+anchor-lang = { git = "https://github.com/coral-xyz/anchor", tag = "v0.32.1", features = [
+    "init-if-needed",
+] }
+anchor-spl = { git = "https://github.com/coral-xyz/anchor", tag = "v0.32.1" }
 ethnum = "1.5"
+solana-program = "2"
 
 [lints.rust.unexpected_cfgs]
 level = "warn"

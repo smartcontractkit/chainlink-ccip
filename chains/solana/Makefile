@@ -41,7 +41,7 @@ lint-go-fix:
 
 .PHONY: anchor-go-gen
 anchor-go-gen:
-	cd ./contracts && find ./target -mindepth 1 ! -path './target/vendor*' -exec rm -rf {} + && anchor build -- --tools-version v1.53 && cd .. && ./scripts/anchor-go-gen.sh
+	cd ./contracts && find ./target -mindepth 1 ! -path './target/vendor*' -exec rm -rf {} + && anchor build --no-idl -- --tools-version v1.53 && anchor idl build && cd .. && ./scripts/anchor-go-gen.sh
 
 .PHONY: format
 format:
@@ -61,7 +61,11 @@ test-token-pool-contracts-go-tests:
 
 .PHONY: build-contracts
 build-contracts:
-	cd ./contracts && anchor build -- --tools-version v1.53
+	cd ./contracts && anchor build --no-idl -- --tools-version v1.53 && \
+	for prog in access_controller ccip_offramp ccip_router burnmint_token_pool example_ccip_receiver example_ccip_sender lockrelease_token_pool external_program_cpi_stub fee_quoter mcm rmn_remote test_ccip_invalid_receiver test_ccip_receiver test_token_pool timelock ping_pong_demo cctp_token_pool; do \
+		echo "Building IDL for $$prog..." && \
+		anchor idl build -p "$$prog" -o "target/idl/$${prog}.json" || exit 1; \
+	done
 
 # Note on CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse
 # Sparse index significantly speeds up dependency fetching, supposedly default in 1.70 but anchor build was still using a slow git download

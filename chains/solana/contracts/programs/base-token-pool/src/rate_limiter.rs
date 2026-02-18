@@ -1,7 +1,7 @@
 use std::cmp::min;
 
 use anchor_lang::prelude::*;
-use solana_program::log::sol_log;
+use anchor_lang::solana_program::log::sol_log;
 
 use crate::common::CcipTokenPoolError;
 
