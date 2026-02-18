@@ -290,7 +290,7 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 	// Create CCTP chain registry and register adapter
 	cctpChainRegistry := adapters.NewCCTPChainRegistry()
 	adapter := &evm_adapters.CCTPChainAdapter{}
-	cctpChainRegistry.RegisterCCTPChain("evm", adapter)
+	cctpChainRegistry.RegisterCCTPChain("evm", adapters.Canonical, adapter)
 
 	// Create MCMS registry
 	mcmsRegistry := changesets.GetRegistry()
@@ -318,6 +318,7 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 	cfg := v1_7_0_changesets.DeployCCTPChainsConfig{
 		Chains: map[uint64]v1_7_0_changesets.CCTPChainConfig{
 			homeChainSelector: {
+				CCTPType:         adapters.Canonical,
 				TokenMessengerV1: homeSetup.TokenMessengerV1.Hex(),
 				TokenMessengerV2: homeSetup.TokenMessengerV2.Hex(),
 				USDCToken:        homeSetup.USDCToken.Hex(),
@@ -349,6 +350,7 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 				},
 			},
 			nonHomeChainSelector: {
+				CCTPType:         adapters.Canonical,
 				TokenMessengerV1: nonHomeSetup.TokenMessengerV1.Hex(),
 				TokenMessengerV2: nonHomeSetup.TokenMessengerV2.Hex(),
 				USDCToken:        nonHomeSetup.USDCToken.Hex(),
@@ -607,7 +609,7 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 	require.NoError(t, err, "Failed to get token address from adapter")
 	require.Equal(t, homeSetup.USDCToken.Bytes(), homeTokenAddress, "Token address should match")
 
-	homeAllowedCallerOnDest, err := adapter.AllowedCallerOnDest(e.DataStore, e.BlockChains, homeChainSelector)
+	homeAllowedCallerOnDest, err := adapter.CCTPV2AllowedCallerOnDest(e.DataStore, e.BlockChains, homeChainSelector)
 	require.NoError(t, err, "Failed to get allowed caller on dest from adapter")
 	require.Equal(t, homeCCTPMessageTransmitterProxyAddr.Bytes(), homeAllowedCallerOnDest, "Allowed caller on dest should match")
 
