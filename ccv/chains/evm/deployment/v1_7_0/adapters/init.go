@@ -18,7 +18,7 @@ func init() {
 	fqReg.RegisterConfigImporter(chainsel.FamilyEVM, semver.MustParse("1.6.0"), &adapters1_6.ConfigImportAdapter{})
 	fqReg.RegisterConfigImporter(chainsel.FamilyEVM, semver.MustParse("1.5.0"), &adapters1_5.ConfigImportAdapter{})
 
-	laneMigraterReg := deploy.GetLaneMigratorRegistry()
-	laneMigraterReg.RegisterRampUpdater(chainsel.FamilyEVM, semver.MustParse("1.7.0"), &LaneMigrator{})
-	laneMigraterReg.RegisterRouterUpdater(chainsel.FamilyEVM, semver.MustParse("1.2.0"), &adapters1_2.RouterUpdater{})
+	laneMigratorReg := deploy.GetLaneMigratorRegistry()
+	laneMigratorReg.RegisterRampUpdater(chainsel.FamilyEVM, semver.MustParse("1.7.0"), &LaneMigrator{})
+	laneMigratorReg.RegisterRouterUpdater(chainsel.FamilyEVM, semver.MustParse("1.2.0"), &adapters1_2.RouterUpdater{})
 }

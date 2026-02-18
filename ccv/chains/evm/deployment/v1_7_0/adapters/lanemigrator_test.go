@@ -25,7 +25,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
 )
 
-func TestLaneMigrater(t *testing.T) {
+func TestLaneMigrator(t *testing.T) {
 	tests := []struct {
 		desc string
 	}{
