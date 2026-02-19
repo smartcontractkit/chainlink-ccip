@@ -20,20 +20,20 @@ import (
 
 type TokenExpansionInput struct {
 	// per-chain configuration for token expansion
-	TokenExpansionInputPerChain map[uint64]TokenExpansionInputPerChain `yaml:"token-expansion-input-per-chain" json:"tokenExpansionInputPerChain"`
-	ChainAdapterVersion         *semver.Version                        `yaml:"chain-adapter-version" json:"chainAdapterVersion"`
+	TokenExpansionInputPerChain map[uint64]TokenExpansionInputPerChain `yaml:"tokenExpansionInputPerChain" json:"tokenExpansionInputPerChain"`
+	ChainAdapterVersion         *semver.Version                        `yaml:"chainAdapterVersion" json:"chainAdapterVersion"`
 	MCMS                        mcms.Input                             `yaml:"mcms,omitempty" json:"mcms"`
 }
 
 type TokenExpansionInputPerChain struct {
-	TokenPoolVersion *semver.Version `yaml:"token-pool-version" json:"tokenPoolVersion"`
+	TokenPoolVersion *semver.Version `yaml:"tokenPoolVersion" json:"tokenPoolVersion"`
 	// will deploy a token if DeployTokenInput is not nil,
 	// otherwise assumes token is already deployed and will look up the token address from the datastore based on the input parameters
-	DeployTokenInput *DeployTokenInput `yaml:"deploy-token-input" json:"deployTokenInput"`
+	DeployTokenInput *DeployTokenInput `yaml:"deployTokenInput" json:"deployTokenInput"`
 	// will deploy a token pool for the token if DeployTokenPoolInput is not nil
-	DeployTokenPoolInput *DeployTokenPoolInput `yaml:"deploy-token-pool-input" json:"deployTokenPoolInput"`
+	DeployTokenPoolInput *DeployTokenPoolInput `yaml:"deployTokenPoolInput" json:"deployTokenPoolInput"`
 	// if not nil, will try to fully configure the token for transfers, including registering the token and token pool on-chain and setting the pool on the token
-	TokenTransferConfig *TokenTransferConfig `yaml:"token-transfer-config" json:"tokenTransferConfig"`
+	TokenTransferConfig *TokenTransferConfig `yaml:"tokenTransferConfig" json:"tokenTransferConfig"`
 }
 
 type DeployTokenInput struct {
@@ -41,12 +41,12 @@ type DeployTokenInput struct {
 	Symbol   string   `yaml:"symbol" json:"symbol"`
 	Decimals uint8    `yaml:"decimals" json:"decimals"`
 	Supply   *big.Int `yaml:"supply" json:"supply"`
-	PreMint  *big.Int `yaml:"pre-mint" json:"preMint"`
+	PreMint  *big.Int `yaml:"preMint" json:"preMint"`
 	// Customer admin who will be granted admin rights on the token
 	// Use string to keep this struct chain-agnostic (EVM uses hex, Solana uses base58, etc.)
-	ExternalAdmin string `yaml:"external-admin" json:"externalAdmin"`
+	ExternalAdmin string `yaml:"externalAdmin" json:"externalAdmin"`
 	// Address to be set as the CCIP admin on the token contract, defaults to the timelock address
-	CCIPAdmin string
+	CCIPAdmin string `yaml:"ccipAdmin" json:"ccipAdmin"`
 	// list of addresses who may need special processing in order to send tokens
 	// e.g. for Solana, addresses that need associated token accounts created
 	Senders []string `yaml:"senders" json:"senders"`
@@ -54,12 +54,12 @@ type DeployTokenInput struct {
 	Type cldf.ContractType `yaml:"type" json:"type"`
 	// Solana Specific
 	// private key in base58 encoding for vanity addresses
-	TokenPrivKey string `yaml:"token-priv-key" json:"tokenPrivKey"`
+	TokenPrivKey string `yaml:"tokenPrivKey" json:"tokenPrivKey"`
 	// if true, the freeze authority will be revoked on token creation
 	// and it will be disabled FOREVER
-	DisableFreezeAuthority bool `yaml:"disable-freeze-authority" json:"disableFreezeAuthority"`
+	DisableFreezeAuthority bool `yaml:"disableFreezeAuthority" json:"disableFreezeAuthority"`
 	// Token metadata to be uploaded
-	TokenMetadata *TokenMetadata `yaml:"token-metadata,omitempty" json:"tokenMetadata,omitempty"`
+	TokenMetadata *TokenMetadata `yaml:"tokenMetadata,omitempty" json:"tokenMetadata,omitempty"`
 	// below are not specified by the user, filled in by the deployment system to pass to chain operations
 	ChainSelector     uint64
 	ExistingDataStore datastore.DataStore
@@ -74,49 +74,49 @@ type TokenMetadata struct {
 	// only to be provided on initial upload, it takes in name, symbol, uri
 	// after initial upload, those fields can be updated using the update inputs
 	// put the json in ccip/env/input dir in CLD
-	MetadataJSONPath string `yaml:"metadata-json-path" json:"metadataJsonPath"`
-	UpdateAuthority  string `yaml:"update-authority" json:"updateAuthority"` // used to set update authority of the token metadata PDA after initial upload
+	MetadataJSONPath string `yaml:"metadataJsonPath" json:"metadataJsonPath"`
+	UpdateAuthority  string `yaml:"updateAuthority" json:"updateAuthority"` // used to set update authority of the token metadata PDA after initial upload
 	// https://metaboss.dev/update.html#update-name
-	UpdateName string `yaml:"update-name" json:"updateName"` // used to update the name of the token metadata PDA after initial upload
+	UpdateName string `yaml:"updateName" json:"updateName"` // used to update the name of the token metadata PDA after initial upload
 	// https://metaboss.dev/update.html#update-symbol
-	UpdateSymbol string `yaml:"update-symbol" json:"updateSymbol"` // used to update the symbol of the token metadata PDA after initial upload
+	UpdateSymbol string `yaml:"updateSymbol" json:"updateSymbol"` // used to update the symbol of the token metadata PDA after initial upload
 	// https://metaboss.dev/update.html#update-uri
-	UpdateURI string `yaml:"update-uri" json:"updateUri"` // used to update the uri of the token metadata PDA after initial upload
+	UpdateURI string `yaml:"updateUri" json:"updateUri"` // used to update the uri of the token metadata PDA after initial upload
 }
 
 type DeployTokenPoolInput struct {
 	// TokenRef is a reference to the token in the datastore.
 	// If this is provided, it will be cross checked against the deployed token
-	TokenRef           *datastore.AddressRef `yaml:"token-ref" json:"tokenRef"`
-	TokenPoolQualifier string                `yaml:"token-pool-qualifier" json:"tokenPoolQualifier"`
-	PoolType           string                `yaml:"pool-type" json:"poolType"`
-	TokenPoolVersion   *semver.Version       `yaml:"token-pool-version" json:"tokenPoolVersion"`
+	TokenRef           *datastore.AddressRef `yaml:"tokenRef" json:"tokenRef"`
+	TokenPoolQualifier string                `yaml:"tokenPoolQualifier" json:"tokenPoolQualifier"`
+	PoolType           string                `yaml:"poolType" json:"poolType"`
+	TokenPoolVersion   *semver.Version       `yaml:"tokenPoolVersion" json:"tokenPoolVersion"`
 	Allowlist          []string              `yaml:"allowlist" json:"allowlist"`
 	// AcceptLiquidity is used by LockReleaseTokenPool (v1.5.1 only) to indicate
 	// whether the pool should accept liquidity from liquidity providers
-	AcceptLiquidity *bool `yaml:"accept-liquidity" json:"acceptLiquidity"`
+	AcceptLiquidity *bool `yaml:"acceptLiquidity" json:"acceptLiquidity"`
 	// BurnAddress is used by BurnToAddressMintTokenPool to specify the address
 	// where tokens will be burned to
-	BurnAddress string `yaml:"burn-address" json:"burnAddress"`
+	BurnAddress string `yaml:"burnAddress" json:"burnAddress"`
 	// TokenGovernor is used by BurnMintWithExternalMinterTokenPool kind of pools to specify the token governor contract address
 	// if it is not provided, the token governor will be fetched from the datastore based on the token symbol
-	TokenGovernor string `yaml:"token-governor,omitempty" json:"tokenGovernor,omitempty"`
+	TokenGovernor string `yaml:"tokenGovernor,omitempty" json:"tokenGovernor,omitempty"`
 	// below are not specified by the user, filled in by the deployment system to pass to chain operations
 	ChainSelector     uint64
 	ExistingDataStore datastore.DataStore
 }
 
 type RegisterTokenInput struct {
-	TokenRef   datastore.AddressRef `yaml:"token-ref" json:"tokenRef"`
-	TokenAdmin string               `yaml:"token-admin" json:"tokenAdmin"`
+	TokenRef   datastore.AddressRef `yaml:"tokenRef" json:"tokenRef"`
+	TokenAdmin string               `yaml:"tokenAdmin" json:"tokenAdmin"`
 	// below are not specified by the user, filled in by the deployment system to pass to chain operations
 	ChainSelector     uint64
 	ExistingDataStore datastore.DataStore
 }
 type SetPoolInput struct {
-	TokenRef           datastore.AddressRef `yaml:"token-ref" json:"tokenRef"`
-	TokenPoolQualifier string               `yaml:"token-pool-qualifier" json:"tokenPoolQualifier"`
-	PoolType           string               `yaml:"pool-type" json:"poolType"`
+	TokenRef           datastore.AddressRef `yaml:"tokenRef" json:"tokenRef"`
+	TokenPoolQualifier string               `yaml:"tokenPoolQualifier" json:"tokenPoolQualifier"`
+	PoolType           string               `yaml:"poolType" json:"poolType"`
 	// below are not specified by the user, filled in by the deployment system to pass to chain operations
 	ChainSelector     uint64
 	ExistingDataStore datastore.DataStore
