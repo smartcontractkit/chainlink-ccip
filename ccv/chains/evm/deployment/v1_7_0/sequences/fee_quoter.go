@@ -3,6 +3,7 @@ package sequences
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
@@ -179,25 +180,9 @@ var (
 		func(b cldf_ops.Bundle, chain evm.Chain, input deploy.FeeQuoterUpdateInput) (output FeeQuoterUpdate, err error) {
 			// check if FeeQuoter v1.6.3 is present in existing addresses, if not, we return empty output
 			// it means there is no existing fee quoter deployed from v1.6.3 deployment, and we can skip the config import from v1.6.3
-			fq16Ref := datastore_utils.GetAddressRef(
-				input.ExistingAddresses,
-				input.ChainSelector,
-				fq1_6.ContractType,
-				semver.MustParse("1.6.3"),
-				"",
-			)
-			if datastore_utils.IsAddressRefEmpty(fq16Ref) {
-				// try to find any fee quoter with version 1.6.0, if not found, return empty output
-				fq16Ref = datastore_utils.GetAddressRef(
-					input.ExistingAddresses,
-					input.ChainSelector,
-					fq1_6.ContractType,
-					semver.MustParse("1.6.0"),
-					"",
-				)
-				if datastore_utils.IsAddressRefEmpty(fq16Ref) {
-					return FeeQuoterUpdate{}, nil
-				}
+			_, err = seq1_6.GetFeeQuoterAddress(input.ExistingAddresses, input.ChainSelector)
+			if err != nil && strings.Contains(err.Error(), "no fee quoter address found") {
+				return FeeQuoterUpdate{}, nil
 			}
 			output.ChainSelector = input.ChainSelector
 			output.ExistingAddresses = input.ExistingAddresses
