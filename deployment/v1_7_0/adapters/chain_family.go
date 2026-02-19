@@ -5,10 +5,11 @@ import (
 	"math/big"
 	"sync"
 
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
 // CommitteeVerifierSignatureQuorumConfig specifies the quorum required for any given message.
@@ -55,6 +56,9 @@ type ExecutorDestChainConfig struct {
 
 // FeeQuoterDestChainConfig configures the FeeQuoter for a remote chain.
 type FeeQuoterDestChainConfig struct {
+	// If DestChainConfig already exists for this chain, whether to override it with the provided config.
+	// If false, the existing config will be preserved and result in a noop.
+	OverrideExistingConfig bool
 	// Whether this destination chain is enabled.
 	IsEnabled bool
 	// Maximum data payload size in bytes.
