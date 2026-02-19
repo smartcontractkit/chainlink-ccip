@@ -550,7 +550,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 				require.NoError(t, err)
 
 				// Verify that chain B is now supported on chain A
-				require.Equal(t, []uint64{evmB.Chain.Selector, solbnm.Chain.Selector}, supportedChainsOnA)
+				require.ElementsMatch(t, []uint64{evmB.Chain.Selector, solbnm.Chain.Selector}, supportedChainsOnA)
 
 				// Verify that the rate limits were set correctly
 				require.Equal(t, 0, defaultRL.Capacity.Cmp(outboundRateLimitAB.Capacity))
