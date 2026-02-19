@@ -319,7 +319,6 @@ var SetPool = operations.NewOperation(
 			}
 			// link the token + token pool lookup table + token mint
 			labels := datastore.NewLabelSet(input.TokenPool.String())
-			labels.Add(input.TokenPoolType)
 			addresses = append(addresses, datastore.AddressRef{
 				Address:       table.String(),
 				ChainSelector: chain.Selector,
