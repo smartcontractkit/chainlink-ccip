@@ -3,6 +3,7 @@ package sequences
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
@@ -179,14 +180,8 @@ var (
 		func(b cldf_ops.Bundle, chain evm.Chain, input deploy.FeeQuoterUpdateInput) (output FeeQuoterUpdate, err error) {
 			// check if FeeQuoter v1.6.3 is present in existing addresses, if not, we return empty output
 			// it means there is no existing fee quoter deployed from v1.6.3 deployment, and we can skip the config import from v1.6.3
-			fq16Ref := datastore_utils.GetAddressRef(
-				input.ExistingAddresses,
-				input.ChainSelector,
-				fq1_6.ContractType,
-				fq1_6.Version,
-				"",
-			)
-			if datastore_utils.IsAddressRefEmpty(fq16Ref) {
+			_, err = seq1_6.GetFeeQuoterAddress(input.ExistingAddresses, input.ChainSelector)
+			if err != nil && strings.Contains(err.Error(), "no fee quoter address found") {
 				return FeeQuoterUpdate{}, nil
 			}
 			output.ChainSelector = input.ChainSelector
@@ -201,13 +196,13 @@ var (
 				input.ChainSelector,
 			)
 			if err != nil {
-				return FeeQuoterUpdate{}, fmt.Errorf("failed to get FeeQuoter 1.6.3 address: %w", err)
+				return FeeQuoterUpdate{}, fmt.Errorf("failed to get FeeQuoter 1.6.x address: %w", err)
 			}
 			if len(metadataForFq16) == 0 {
-				return FeeQuoterUpdate{}, fmt.Errorf("no metadata found for FeeQuoter v1.6.3 on chain selector %d", input.ChainSelector)
+				return FeeQuoterUpdate{}, fmt.Errorf("no metadata found for FeeQuoter v1.6.x on chain selector %d", input.ChainSelector)
 			}
 			if len(metadataForFq16) > 1 {
-				return FeeQuoterUpdate{}, fmt.Errorf("multiple metadata entries found for FeeQuoter v1.6.3 on chain selector %d", input.ChainSelector)
+				return FeeQuoterUpdate{}, fmt.Errorf("multiple metadata entries found for FeeQuoter v1.6.x on chain selector %d", input.ChainSelector)
 			}
 			// Convert metadata to typed struct if needed
 			fqOutput, err := datastore_utils.ConvertMetadataToType[seq1_6.FeeQuoterImportConfigSequenceOutput](metadataForFq16[0].Metadata)

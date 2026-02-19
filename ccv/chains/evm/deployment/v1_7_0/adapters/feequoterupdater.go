@@ -7,15 +7,11 @@ import (
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	sequence1_7 "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
-)
 
-// feeQUpdateArgsFromConcrete converts the concrete v1.7 FeeQuoterUpdate to the type parameter (used as any when registered).
-func feeQUpdateArgsFromConcrete[T any](out sequence1_7.FeeQuoterUpdate) T {
-	return any(out).(T)
-}
+	sequence1_7 "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
+)
 
 // FeeQuoterUpdater uses FeeQUpdateArgs any so it implements deploy.FeeQuoterUpdater[any] and can be registered directly.
 // The implementation is for v1.7.0 and uses sequence1_7.FeeQuoterUpdate internally.
