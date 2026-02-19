@@ -25,7 +25,6 @@ import (
 	tarbindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
 	bnmpool "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/burn_mint_token_pool"
 	solanautils "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
-	solutils "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
 	solseqV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
 	deployapi "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
@@ -58,7 +57,6 @@ func TestTokensAndTokenPools(t *testing.T) {
 
 	// For simplicity, both EVM and Solana will use BurnMint token pools in this test
 	evmTokenPoolType := cciputils.BurnMintTokenPool
-	solTokenPoolType := cciputils.BurnMintTokenPool
 
 	// Preload Solana programs
 	programsPath, ds, err := PreloadSolanaEnvironment(t, solChainSel)
@@ -95,7 +93,6 @@ func TestTokensAndTokenPools(t *testing.T) {
 
 	// Registration happens automatically, so the `Register...`
 	// calls below aren't needed, but are left here for clarity
-	tokenRegistry := tokensapi.GetTokenAdapterRegistry()
 	// tokenRegistry.RegisterTokenAdapter(chainsel.FamilyEVM, v1_6_0, &evmAdapter)
 	// tokenRegistry.RegisterTokenAdapter(chainsel.FamilySolana, v1_6_0, &solAdapter)
 
@@ -105,29 +102,53 @@ func TestTokensAndTokenPools(t *testing.T) {
 	// token pool address in the datastore and fail.
 	//
 	// Define testing data for Solana
-	solTestData := struct {
+	solTestData := []struct {
 		TokenPoolQualifier string
+		TokenPoolType      string
 		Token              *tokensapi.DeployTokenInput
 		Deployer           *solana.PrivateKey
 		Chain              solchain.Chain
 		Deploy             deployapi.ContractDeploymentConfigPerChain
 	}{
-		TokenPoolQualifier: "",
-		Deployer:           solChain.DeployerKey,
-		Chain:              solChain,
-		Deploy:             NewDefaultDeploymentConfigForSolana(v1_6_0),
-		Token: &tokensapi.DeployTokenInput{
-			Decimals:               uint8(9),
-			Symbol:                 "SOL_TEST",
-			Name:                   "SOLANA Test Token",
-			Type:                   solutils.SPLTokens,
-			Supply:                 big.NewInt(math.MaxInt64),
-			PreMint:                big.NewInt(math.MaxInt64 / 2),
-			ExternalAdmin:          solana.NewWallet().PublicKey().String(),
-			DisableFreezeAuthority: true,
-			Senders:                []string{solChain.DeployerKey.PublicKey().String()},
-			TokenPrivKey:           "", // if empty, a new key will be generated
-			CCIPAdmin:              "", // default to timelock admin
+		{
+			TokenPoolQualifier: "",
+			TokenPoolType:      cciputils.BurnMintTokenPool.String(),
+			Deployer:           solChain.DeployerKey,
+			Chain:              solChain,
+			Deploy:             NewDefaultDeploymentConfigForSolana(v1_6_0),
+			Token: &tokensapi.DeployTokenInput{
+				Decimals:               uint8(9),
+				Symbol:                 "SOL_TEST",
+				Name:                   "SOLANA Test Token",
+				Type:                   solanautils.SPLTokens,
+				Supply:                 big.NewInt(math.MaxInt64),
+				PreMint:                big.NewInt(math.MaxInt64 / 2),
+				ExternalAdmin:          solana.NewWallet().PublicKey().String(),
+				DisableFreezeAuthority: true,
+				Senders:                []string{solChain.DeployerKey.PublicKey().String()},
+				TokenPrivKey:           "", // if empty, a new key will be generated
+				CCIPAdmin:              "", // default to timelock admin
+			},
+		},
+		{
+			TokenPoolQualifier: "",
+			TokenPoolType:      cciputils.LockReleaseTokenPool.String(),
+			Deployer:           solChain.DeployerKey,
+			Chain:              solChain,
+			Deploy:             NewDefaultDeploymentConfigForSolana(v1_6_0),
+			Token: &tokensapi.DeployTokenInput{
+				Decimals:               uint8(9),
+				Symbol:                 "SOL_TEST2",
+				Name:                   "SOLANA Test Token 2",
+				Type:                   solanautils.SPLTokens,
+				Supply:                 big.NewInt(math.MaxInt64),
+				PreMint:                big.NewInt(math.MaxInt64 / 2),
+				ExternalAdmin:          solana.NewWallet().PublicKey().String(),
+				DisableFreezeAuthority: true,
+				Senders:                []string{solChain.DeployerKey.PublicKey().String()},
+				TokenPrivKey:           "", // if empty, a new key will be generated
+				CCIPAdmin:              "", // default to timelock admin
+			},
 		},
 	}
 
@@ -187,7 +208,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 	}
 
 	// Construct deployment input
-	deployInput := map[uint64]deployapi.ContractDeploymentConfigPerChain{solChainSel: solTestData.Deploy}
+	deployInput := map[uint64]deployapi.ContractDeploymentConfigPerChain{solChainSel: solTestData[0].Deploy}
 	for _, data := range evmTestData {
 		deployInput[data.Chain.Selector] = data.Deploy
 	}
@@ -237,16 +258,16 @@ func TestTokensAndTokenPools(t *testing.T) {
 			require.Error(t, err)
 		}
 
+		solbnm, sollnr := solTestData[0], solTestData[1]
+		input := make(map[uint64]tokensapi.TokenExpansionInputPerChain)
 		// Define token expansion input
-		input := map[uint64]tokensapi.TokenExpansionInputPerChain{
-			solChainSel: {
-				TokenPoolVersion: v1_6_0,
-				DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
-					TokenPoolQualifier: solTestData.TokenPoolQualifier,
-					PoolType:           solTokenPoolType.String(),
-				},
-				DeployTokenInput: solTestData.Token,
+		input[solbnm.Chain.Selector] = tokensapi.TokenExpansionInputPerChain{
+			TokenPoolVersion: v1_6_0,
+			DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
+				TokenPoolQualifier: solbnm.TokenPoolQualifier,
+				PoolType:           solbnm.TokenPoolType,
 			},
+			DeployTokenInput: solbnm.Token,
 		}
 
 		// Add EVM chains to the input
@@ -261,7 +282,26 @@ func TestTokensAndTokenPools(t *testing.T) {
 			}
 		}
 
-		// Run token expansion
+		// Run token expansion for bnm
+		output, err = tokensapi.TokenExpansion().Apply(*env, tokensapi.TokenExpansionInput{
+			TokenExpansionInputPerChain: input,
+			ChainAdapterVersion:         v1_6_0,
+			MCMS:                        NewDefaultInputForMCMS("Token Expansion"),
+		})
+		require.NoError(t, err)
+		MergeAddresses(t, env, output.DataStore)
+
+		// Run token expansion for lnr
+		input = make(map[uint64]tokensapi.TokenExpansionInputPerChain)
+		// Define token expansion input
+		input[sollnr.Chain.Selector] = tokensapi.TokenExpansionInputPerChain{
+			TokenPoolVersion: v1_6_0,
+			DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
+				TokenPoolQualifier: sollnr.TokenPoolQualifier,
+				PoolType:           sollnr.TokenPoolType,
+			},
+			DeployTokenInput: sollnr.Token,
+		}
 		output, err = tokensapi.TokenExpansion().Apply(*env, tokensapi.TokenExpansionInput{
 			TokenExpansionInputPerChain: input,
 			ChainAdapterVersion:         v1_6_0,
@@ -400,49 +440,11 @@ func TestTokensAndTokenPools(t *testing.T) {
 		t.Run("Validate ConfigureTokenForTransfers", func(t *testing.T) {
 			require.Len(t, evmTestData, 2, "expected exactly two EVM test data entries for this test")
 			evmA, evmB := evmTestData[0], evmTestData[1]
+			solbnm, _ := solTestData[0], solTestData[1]
 			defaultRL := tokensapi.RateLimiterConfig{
 				Capacity:  big.NewInt(1_000_000_000),
 				Rate:      big.NewInt(100_000_000),
 				IsEnabled: true,
-			}
-
-			input := tokensapi.ConfigureTokensForTransfersConfig{
-				ChainAdapterVersion: v1_6_0,
-				MCMS:                NewDefaultInputForMCMS("Configure Tokens For Transfers"),
-				Tokens: []tokensapi.TokenTransferConfig{
-					{
-						ChainSelector: evmA.Chain.Selector,
-						ExternalAdmin: "", // inferred
-						TokenPoolRef: datastore.AddressRef{
-							ChainSelector: evmA.Chain.Selector,
-							Qualifier:     evmA.TokenPoolQualifier,
-							Type:          datastore.ContractType(evmTokenPoolType),
-							Version:       v1_5_1,
-						},
-						RegistryRef: datastore.AddressRef{
-							ChainSelector: evmA.Chain.Selector,
-							Address:       evmA.TAR.Address().Hex(),
-						},
-						RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
-							evmB.Chain.Selector: {
-								OutboundRateLimiterConfig: defaultRL,
-								InboundRateLimiterConfig:  defaultRL,
-								OutboundCCVs:              []datastore.AddressRef{},
-								InboundCCVs:               []datastore.AddressRef{},
-								RemoteToken: &datastore.AddressRef{
-									ChainSelector: evmB.Chain.Selector,
-									Qualifier:     evmB.Token.Symbol,
-									Type:          datastore.ContractType(evmB.Token.Type),
-								},
-								RemotePool: &datastore.AddressRef{
-									ChainSelector: evmB.Chain.Selector,
-									Qualifier:     evmB.TokenPoolQualifier,
-									Type:          datastore.ContractType(evmTokenPoolType),
-								},
-							},
-						},
-					},
-				},
 			}
 
 			// Query the latest on-chain state for chain A
@@ -474,10 +476,66 @@ func TestTokensAndTokenPools(t *testing.T) {
 			// configured on chain A. Thus, running this twice in a row tests the idempotency of
 			// the changeset.
 			for range 2 {
-				// Run the changeset
-				output, err = tokensapi.ConfigureTokensForTransfers(tokenRegistry, mcmsRegistry).Apply(*env, input)
+				// Run token expansion
+				output, err = tokensapi.TokenExpansion().Apply(*env, tokensapi.TokenExpansionInput{
+					TokenExpansionInputPerChain: map[uint64]tokensapi.TokenExpansionInputPerChain{
+						evmA.Chain.Selector: {
+							TokenPoolVersion: v1_6_0,
+							TokenTransferConfig: &tokensapi.TokenTransferConfig{
+								ChainSelector: evmA.Chain.Selector,
+								TokenPoolRef: datastore.AddressRef{
+									ChainSelector: evmA.Chain.Selector,
+									Qualifier:     evmA.TokenPoolQualifier,
+									Type:          datastore.ContractType(evmTokenPoolType),
+									Version:       v1_5_1,
+								},
+								RegistryRef: datastore.AddressRef{
+									ChainSelector: evmA.Chain.Selector,
+									Address:       evmA.TAR.Address().Hex(),
+								},
+								RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+									solbnm.Chain.Selector: {
+										OutboundRateLimiterConfig: defaultRL,
+										InboundRateLimiterConfig:  defaultRL,
+										OutboundCCVs:              []datastore.AddressRef{},
+										InboundCCVs:               []datastore.AddressRef{},
+										RemoteToken: &datastore.AddressRef{
+											ChainSelector: solbnm.Chain.Selector,
+											Qualifier:     solbnm.Token.Symbol,
+											Type:          datastore.ContractType(solbnm.Token.Type),
+										},
+										RemotePool: &datastore.AddressRef{
+											ChainSelector: solbnm.Chain.Selector,
+											Qualifier:     solbnm.TokenPoolQualifier,
+											Type:          datastore.ContractType(solbnm.TokenPoolType),
+										},
+									},
+									evmB.Chain.Selector: {
+										OutboundRateLimiterConfig: defaultRL,
+										InboundRateLimiterConfig:  defaultRL,
+										OutboundCCVs:              []datastore.AddressRef{},
+										InboundCCVs:               []datastore.AddressRef{},
+										RemoteToken: &datastore.AddressRef{
+											ChainSelector: evmB.Chain.Selector,
+											Qualifier:     evmB.Token.Symbol,
+											Type:          datastore.ContractType(evmB.Token.Type),
+										},
+										RemotePool: &datastore.AddressRef{
+											ChainSelector: evmB.Chain.Selector,
+											Qualifier:     evmB.TokenPoolQualifier,
+											Type:          datastore.ContractType(evmTokenPoolType),
+										},
+									},
+								},
+							},
+						},
+					},
+					ChainAdapterVersion: v1_6_0,
+					MCMS:                NewDefaultInputForMCMS("Deploy token to test"),
+				})
 				require.NoError(t, err)
 				MergeAddresses(t, env, output.DataStore)
+				testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
 
 				// Query the latest on-chain state for chain A
 				outboundRateLimitAB, err = poolA.GetCurrentOutboundRateLimiterState(&bind.CallOpts{Context: t.Context()}, evmB.Chain.Selector)
@@ -492,7 +550,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 				require.NoError(t, err)
 
 				// Verify that chain B is now supported on chain A
-				require.Equal(t, []uint64{evmB.Chain.Selector}, supportedChainsOnA)
+				require.Equal(t, []uint64{evmB.Chain.Selector, solbnm.Chain.Selector}, supportedChainsOnA)
 
 				// Verify that the rate limits were set correctly
 				require.Equal(t, 0, defaultRL.Capacity.Cmp(outboundRateLimitAB.Capacity))
@@ -523,26 +581,27 @@ func TestTokensAndTokenPools(t *testing.T) {
 		})
 
 		t.Run("Validate ManualRegistration", func(t *testing.T) {
+			solbnm, _ := solTestData[0], solTestData[1]
 			// Create Token Mint for testing manual registration
-			chain := env.BlockChains.SolanaChains()[solTestData.Chain.Selector]
-			externalAdmin := solana.MustPublicKeyFromBase58(solTestData.Token.ExternalAdmin)
+			chain := env.BlockChains.SolanaChains()[solbnm.Chain.Selector]
+			externalAdmin := solana.MustPublicKeyFromBase58(solbnm.Token.ExternalAdmin)
 			tokenPrivKey := solana.MustPrivateKeyFromBase58("42uJJqZk4gFz6Q6ghMiaYrFdDapXhbufQdTCGJDMeyv2wN6wNBbXkBBPibF7xQQZemzRaDH66ouJmjfvWhPJKtQC")
 			tokenSymbol := "MANUAL_TEST_TOKEN"
 			deployTokenInput := tokensapi.DeployTokenInput{
-				Decimals:          solTestData.Token.Decimals,
+				Decimals:          solbnm.Token.Decimals,
 				Symbol:            tokenSymbol,
-				Name:              solTestData.Token.Name,
-				Type:              solutils.SPLTokens,
+				Name:              solbnm.Token.Name,
+				Type:              solanautils.SPLTokens,
 				Supply:            big.NewInt(0),
 				TokenPrivKey:      tokenPrivKey.String(),
-				ChainSelector:     solTestData.Chain.Selector,
+				ChainSelector:     solbnm.Chain.Selector,
 				ExistingDataStore: env.DataStore,
 			}
 
 			// Run token expansion
 			output, err = tokensapi.TokenExpansion().Apply(*env, tokensapi.TokenExpansionInput{
 				TokenExpansionInputPerChain: map[uint64]tokensapi.TokenExpansionInputPerChain{
-					solTestData.Chain.Selector: {
+					solbnm.Chain.Selector: {
 						TokenPoolVersion: v1_6_0,
 						DeployTokenInput: &deployTokenInput,
 					},
@@ -555,25 +614,25 @@ func TestTokensAndTokenPools(t *testing.T) {
 
 			// Verify that the token exists in datastore
 			tokenAddr, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
-				ChainSelector: solTestData.Chain.Selector,
+				ChainSelector: solbnm.Chain.Selector,
 				Qualifier:     tokenSymbol,
-			}, solTestData.Chain.Selector, datastore_utils.FullRef)
+			}, solbnm.Chain.Selector, datastore_utils.FullRef)
 			require.NoError(t, err)
 			require.Equal(t, tokenPrivKey.PublicKey(), solana.MustPublicKeyFromBase58(tokenAddr.Address))
 			_, err = solanautils.GetTokenProgramID(deployment.ContractType(tokenAddr.Type))
 			require.NoError(t, err)
 			tokenPool, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
-				ChainSelector: solTestData.Chain.Selector,
+				ChainSelector: solbnm.Chain.Selector,
 				Type:          datastore.ContractType(common_utils.BurnMintTokenPool),
 				Version:       common_utils.Version_1_6_0,
-			}, solTestData.Chain.Selector, datastore_utils.FullRef)
+			}, solbnm.Chain.Selector, datastore_utils.FullRef)
 			require.NoError(t, err)
 			tokenPoolProgramId := solana.MustPublicKeyFromBase58(tokenPool.Address)
 
 			// Verify that no **pending** admin exists for the token at the moment. Also,
 			// The PDA for TokenAdminRegistry is not initialized
 			tokenMint := solana.MustPublicKeyFromBase58(tokenAddr.Address)
-			routerAdd, err := solAdapter.GetRouterAddress(env.DataStore, solTestData.Chain.Selector)
+			routerAdd, err := solAdapter.GetRouterAddress(env.DataStore, solbnm.Chain.Selector)
 			require.NoError(t, err)
 			routerProgramId := solana.PublicKeyFromBytes(routerAdd)
 			tokenAdminRegistryPDA, _, _ := state.FindTokenAdminRegistryPDA(tokenMint, routerProgramId)
@@ -596,11 +655,11 @@ func TestTokensAndTokenPools(t *testing.T) {
 					MCMS:                NewDefaultInputForMCMS("Manual Registration Solana"),
 					Registrations: []tokensapi.RegisterTokenConfig{
 						{
-							ChainSelector: solTestData.Chain.Selector,
-							ProposedOwner: solTestData.Token.ExternalAdmin,
+							ChainSelector: solbnm.Chain.Selector,
+							ProposedOwner: solbnm.Token.ExternalAdmin,
 							TokenPoolRef: datastore.AddressRef{
-								Qualifier: solTestData.TokenPoolQualifier,
-								Type:      datastore.ContractType(solTokenPoolType),
+								Qualifier: solbnm.TokenPoolQualifier,
+								Type:      datastore.ContractType(solbnm.TokenPoolType),
 							},
 							TokenRef: datastore.AddressRef{
 								Qualifier: tokenSymbol,
@@ -634,19 +693,142 @@ func TestTokensAndTokenPools(t *testing.T) {
 
 			// Validate the Multisig is stored
 			multisigAdd, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
-				ChainSelector: solTestData.Chain.Selector,
+				ChainSelector: solbnm.Chain.Selector,
 				Version:       common_utils.Version_1_6_0,
 				Qualifier:     tokenSymbol,
 				Type:          "TOKEN_MULTISIG",
-			}, solTestData.Chain.Selector, datastore_utils.FullRef)
+			}, solbnm.Chain.Selector, datastore_utils.FullRef)
 			require.NoError(t, err)
 			multisigPublicKey := solana.MustPublicKeyFromBase58(multisigAdd.Address)
 			require.False(t, multisigPublicKey.IsZero())
 		})
 
 		t.Run("Validate ConfigureTokenForTransfers", func(t *testing.T) {
-			// TODO: implement this once ConfigureTokenForTransfers is supported for Solana
-			t.Skip("Skipping Solana configure token for transfers test - changeset is not implemented yet")
+			evmA, evmB := evmTestData[0], evmTestData[1]
+			solbnm, _ := solTestData[0], solTestData[1]
+			defaultRL := tokensapi.RateLimiterConfig{
+				Capacity:  big.NewInt(1_000_000_000),
+				Rate:      big.NewInt(100_000_000),
+				IsEnabled: true,
+			}
+			chain := env.BlockChains.SolanaChains()[solbnm.Chain.Selector]
+
+			// Verify that the token exists in datastore
+			tokenAddr, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
+				ChainSelector: solbnm.Chain.Selector,
+				Qualifier:     solbnm.Token.Symbol,
+			}, solbnm.Chain.Selector, datastore_utils.FullRef)
+			require.NoError(t, err)
+			_, err = solanautils.GetTokenProgramID(deployment.ContractType(tokenAddr.Type))
+			require.NoError(t, err)
+			tokenPool, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
+				ChainSelector: solbnm.Chain.Selector,
+				Type:          datastore.ContractType(common_utils.BurnMintTokenPool),
+				Version:       common_utils.Version_1_6_0,
+			}, solbnm.Chain.Selector, datastore_utils.FullRef)
+			require.NoError(t, err)
+			tokenPoolProgramId := solana.MustPublicKeyFromBase58(tokenPool.Address)
+
+			// Verify that no **pending** admin exists for the token at the moment. Also,
+			// The PDA for TokenAdminRegistry is not initialized
+			tokenMint := solana.MustPublicKeyFromBase58(tokenAddr.Address)
+			routerAdd, err := solAdapter.GetRouterAddress(env.DataStore, solbnm.Chain.Selector)
+			require.NoError(t, err)
+			routerProgramId := solana.PublicKeyFromBytes(routerAdd)
+			tokenAdminRegistryPDA, _, _ := state.FindTokenAdminRegistryPDA(tokenMint, routerProgramId)
+
+			var tokenAdminRegistryAccount ccip_common.TokenAdminRegistry
+			tokenAdminRegistryErr := chain.GetAccountDataBorshInto(t.Context(), tokenAdminRegistryPDA, &tokenAdminRegistryAccount)
+			require.Error(t, tokenAdminRegistryErr)
+
+			// Verify that the PDA token pool has been initialized
+			tokenPoolStatePDA, _ := tokens.TokenPoolConfigAddress(tokenMint, tokenPoolProgramId)
+			var tokenPoolStateAccount burnmint_token_pool.State
+			tokenPoolStateErr := chain.GetAccountDataBorshInto(t.Context(), tokenPoolStatePDA, &tokenPoolStateAccount)
+			require.NoError(t, tokenPoolStateErr)
+
+			// Run token expansion
+			output, err = tokensapi.TokenExpansion().Apply(*env, tokensapi.TokenExpansionInput{
+				TokenExpansionInputPerChain: map[uint64]tokensapi.TokenExpansionInputPerChain{
+					solbnm.Chain.Selector: {
+						TokenPoolVersion: v1_6_0,
+						TokenTransferConfig: &tokensapi.TokenTransferConfig{
+							ChainSelector: solbnm.Chain.Selector,
+							TokenPoolRef: datastore.AddressRef{
+								ChainSelector: solbnm.Chain.Selector,
+								Address:       tokenPool.Address,
+							},
+							TokenRef: datastore.AddressRef{
+								ChainSelector: solbnm.Chain.Selector,
+								Address:       tokenAddr.Address,
+							},
+							RegistryRef: datastore.AddressRef{
+								ChainSelector: solbnm.Chain.Selector,
+								Address:       routerProgramId.String(),
+								Version:       v1_6_0,
+							},
+							RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+								evmA.Chain.Selector: {
+									OutboundRateLimiterConfig: defaultRL,
+									InboundRateLimiterConfig:  defaultRL,
+									OutboundCCVs:              []datastore.AddressRef{},
+									InboundCCVs:               []datastore.AddressRef{},
+									RemoteToken: &datastore.AddressRef{
+										ChainSelector: evmA.Chain.Selector,
+										Qualifier:     evmA.Token.Symbol,
+										Type:          datastore.ContractType(evmA.Token.Type),
+									},
+									RemotePool: &datastore.AddressRef{
+										ChainSelector: evmA.Chain.Selector,
+										Qualifier:     evmA.TokenPoolQualifier,
+										Type:          datastore.ContractType(evmTokenPoolType),
+									},
+								},
+								evmB.Chain.Selector: {
+									OutboundRateLimiterConfig: defaultRL,
+									InboundRateLimiterConfig:  defaultRL,
+									OutboundCCVs:              []datastore.AddressRef{},
+									InboundCCVs:               []datastore.AddressRef{},
+									RemoteToken: &datastore.AddressRef{
+										ChainSelector: evmB.Chain.Selector,
+										Qualifier:     evmB.Token.Symbol,
+										Type:          datastore.ContractType(evmB.Token.Type),
+									},
+									RemotePool: &datastore.AddressRef{
+										ChainSelector: evmB.Chain.Selector,
+										Qualifier:     evmB.TokenPoolQualifier,
+										Type:          datastore.ContractType(evmTokenPoolType),
+									},
+								},
+							},
+						},
+					},
+				},
+				ChainAdapterVersion: v1_6_0,
+				MCMS:                NewDefaultInputForMCMS("Deploy token to test"),
+			})
+			require.NoError(t, err)
+			MergeAddresses(t, env, output.DataStore)
+			testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
+
+			timelockSigner := solanautils.GetTimelockSignerPDA(
+				env.DataStore.Addresses().Filter(),
+				chain.Selector,
+				common_utils.CLLQualifier,
+			)
+
+			// Verify that a new admin was proposed for the specified token
+			var tokenAdminRegistryAccountAfter ccip_common.TokenAdminRegistry
+			tarErr := chain.GetAccountDataBorshInto(t.Context(), tokenAdminRegistryPDA, &tokenAdminRegistryAccountAfter)
+			require.NoError(t, tarErr)
+			require.Equal(t, timelockSigner, tokenAdminRegistryAccountAfter.Administrator)
+
+			var tokenPoolStateAccountAfter burnmint_token_pool.State
+			stateErr := chain.GetAccountDataBorshInto(t.Context(), tokenPoolStatePDA, &tokenPoolStateAccountAfter)
+			require.NoError(t, stateErr)
+			require.Equal(t, chain.DeployerKey.PublicKey(), tokenPoolStateAccountAfter.Config.Owner)
+			require.Equal(t, tokenMint, tokenPoolStateAccountAfter.Config.Mint)
+			require.Equal(t, chain.DeployerKey.PublicKey(), tokenPoolStateAccountAfter.Config.RateLimitAdmin)
 		})
 	})
 }
