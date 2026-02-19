@@ -21,10 +21,10 @@ type TPRLInput struct {
 }
 
 type TPRLConfig struct {
-	ChainAdapterVersion *semver.Version                        `yaml:"chain-adapter-version" json:"chainAdapterVersion"`
-	TokenRef            datastore.AddressRef                   `yaml:"token-ref" json:"tokenRef"`
-	TokenPoolRef        datastore.AddressRef                   `yaml:"token-pool-ref" json:"tokenPoolRef"`
-	RemoteOutbounds     map[uint64]RateLimiterConfigFloatInput `yaml:"remote-outbounds" json:"remoteOutbounds"`
+	ChainAdapterVersion *semver.Version                        `yaml:"chainAdapterVersion" json:"chainAdapterVersion"`
+	TokenRef            datastore.AddressRef                   `yaml:"tokenRef" json:"tokenRef"`
+	TokenPoolRef        datastore.AddressRef                   `yaml:"tokenPoolRef" json:"tokenPoolRef"`
+	RemoteOutbounds     map[uint64]RateLimiterConfigFloatInput `yaml:"remoteOutbounds" json:"remoteOutbounds"`
 }
 
 type TPRLRemotes struct {
