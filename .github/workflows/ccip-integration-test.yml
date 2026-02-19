@@ -28,6 +28,7 @@ jobs:
             e2e_should_run:
               - '!(chains/evm/**)'
               - 'chains/evm/gobindings/generated/!(latest/**)/**'
+              - '.github/workflows/ccip-integration-test.yml'
 
   integration-test-matrix:
     needs: [changes]
@@ -45,7 +46,6 @@ jobs:
             file: ccip_fees_test.go
             run: ""
             timeout: 12m
-            # DEBUG: /home/runner/work/chainlink-ccip/chainlink-ccip/integration-tests/smoke/ccip/ccip_token_transfer_test.go: directory not found
           - name: "Token Transfer Test"
             file: ccip_token_transfer_test.go
             run: "TestTokenTransfer_EVM2EVM"
