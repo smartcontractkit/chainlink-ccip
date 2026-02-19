@@ -39,7 +39,7 @@ func (c *CCTPChainAdapter) ConfigureCCTPChainForLanes() *operations.Sequence[ada
 }
 
 // CCTPV2AllowedCallerOnDest returns the address allowed to trigger message reception on the remote domain.
-// On dest, the caller of CCTPV2 is the CCTPMessageTransmitterProxy 1.7.0.
+// On dest, the caller of CCTPV2 is the CCTPMessageTransmitterProxy 2.0.0.
 func (c *CCTPChainAdapter) CCTPV2AllowedCallerOnDest(d datastore.DataStore, b chain.BlockChains, chainSelector uint64) ([]byte, error) {
 	allowedCallerOnDestAddressRef, err := datastore_utils.FindAndFormatRef(d, datastore.AddressRef{
 		Type:    datastore.ContractType(cctp_message_transmitter_proxy.ContractType),
