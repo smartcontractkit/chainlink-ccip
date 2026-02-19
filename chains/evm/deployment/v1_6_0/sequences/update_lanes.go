@@ -7,14 +7,15 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 
+	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
 	offrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
 	onrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
-	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
-	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
 var ConfigureLaneLegAsSource = operations.NewSequence(
@@ -180,7 +181,7 @@ func TranslateFQ(fqc lanes.FeeQuoterDestChainConfig) fqops.DestChainConfig {
 		DefaultTxGasLimit:                 fqc.DefaultTxGasLimit,
 		GasMultiplierWeiPerEth:            fqc.GasMultiplierWeiPerEth,
 		GasPriceStalenessThreshold:        fqc.GasPriceStalenessThreshold,
-		NetworkFeeUSDCents:                fqc.NetworkFeeUSDCents,
+		NetworkFeeUSDCents:                uint32(fqc.NetworkFeeUSDCents),
 	}
 }
 
