@@ -117,7 +117,7 @@ func TestUpdateToFeeQuoter_1_7(t *testing.T) {
 		fq16AddrRefs := e.DataStore.Addresses().Filter(
 			datastore.AddressRefByChainSelector(chainSel),
 			datastore.AddressRefByType(datastore.ContractType(fq16ops.ContractType)),
-			datastore.AddressRefByVersion(fq16ops.Version),
+			datastore.AddressRefByVersion(semver.MustParse("1.6.3")),
 		)
 		require.Len(t, fq16AddrRefs, 1, "Expected exactly 1 FeeQuoter address ref for version 1.6.3 and chain selector %d", chainSel)
 		fq16Addr := common.HexToAddress(fq16AddrRefs[0].Address)

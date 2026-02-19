@@ -183,11 +183,21 @@ var (
 				input.ExistingAddresses,
 				input.ChainSelector,
 				fq1_6.ContractType,
-				fq1_6.Version,
+				semver.MustParse("1.6.3"),
 				"",
 			)
 			if datastore_utils.IsAddressRefEmpty(fq16Ref) {
-				return FeeQuoterUpdate{}, nil
+				// try to find any fee quoter with version 1.6.0, if not found, return empty output
+				fq16Ref = datastore_utils.GetAddressRef(
+					input.ExistingAddresses,
+					input.ChainSelector,
+					fq1_6.ContractType,
+					semver.MustParse("1.6.0"),
+					"",
+				)
+				if datastore_utils.IsAddressRefEmpty(fq16Ref) {
+					return FeeQuoterUpdate{}, nil
+				}
 			}
 			output.ChainSelector = input.ChainSelector
 			output.ExistingAddresses = input.ExistingAddresses
@@ -201,13 +211,13 @@ var (
 				input.ChainSelector,
 			)
 			if err != nil {
-				return FeeQuoterUpdate{}, fmt.Errorf("failed to get FeeQuoter 1.6.3 address: %w", err)
+				return FeeQuoterUpdate{}, fmt.Errorf("failed to get FeeQuoter 1.6.x address: %w", err)
 			}
 			if len(metadataForFq16) == 0 {
-				return FeeQuoterUpdate{}, fmt.Errorf("no metadata found for FeeQuoter v1.6.3 on chain selector %d", input.ChainSelector)
+				return FeeQuoterUpdate{}, fmt.Errorf("no metadata found for FeeQuoter v1.6.x on chain selector %d", input.ChainSelector)
 			}
 			if len(metadataForFq16) > 1 {
-				return FeeQuoterUpdate{}, fmt.Errorf("multiple metadata entries found for FeeQuoter v1.6.3 on chain selector %d", input.ChainSelector)
+				return FeeQuoterUpdate{}, fmt.Errorf("multiple metadata entries found for FeeQuoter v1.6.x on chain selector %d", input.ChainSelector)
 			}
 			// Convert metadata to typed struct if needed
 			fqOutput, err := datastore_utils.ConvertMetadataToType[seq1_6.FeeQuoterImportConfigSequenceOutput](metadataForFq16[0].Metadata)
