@@ -14,10 +14,10 @@ jobs:
   detect_deployments_changes:
     runs-on: ubuntu-latest
     outputs:
-      run_solana_deployment: ${{ steps.filter.outputs.run_solana_deployment || steps.filter.outputs.deployment_workflow }}
-      run_evm_deployment: ${{ steps.filter.outputs.run_evm_deployment || steps.filter.outputs.deployment_workflow }}
-      run_deployment: ${{ steps.filter.outputs.run_deployment || steps.filter.outputs.deployment_workflow }}
-      run_crosschain_deployment: ${{ steps.filter.outputs.run_crosschain_deployment || steps.filter.outputs.deployment_workflow }}
+      run_solana_deployment: ${{ steps.filter.outputs.deployment_workflow == 'true' || steps.filter.outputs.run_solana_deployment == 'true' }}
+      run_evm_deployment: ${{ steps.filter.outputs.deployment_workflow == 'true' || steps.filter.outputs.run_evm_deployment == 'true' }}
+      run_deployment: ${{ steps.filter.outputs.deployment_workflow == 'true' || steps.filter.outputs.run_deployment == 'true' }}
+      run_crosschain_deployment: ${{ steps.filter.outputs.deployment_workflow == 'true' || steps.filter.outputs.run_crosschain_deployment == 'true' }}
     steps:
       - uses: actions/checkout@v4
       - name: Detect changes
