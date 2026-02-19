@@ -12,7 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -36,6 +35,74 @@ var (
 		"attestation": "0x720502893578a89a8a87982982ef781c18b193"
 	}`)
 )
+
+func Test_splitPathAndQuery(t *testing.T) {
+	tests := []struct {
+		name        string
+		requestPath string
+		wantPath    string
+		wantQuery   string
+	}{
+		{"no query", "v2/messages/0", "v2/messages/0", ""},
+		{"with query", "v2/messages/0?transactionHash=0xabc", "v2/messages/0", "transactionHash=0xabc"},
+		{"query with multiple params", "path?a=1&b=2", "path", "a=1&b=2"},
+		{"empty path with query", "?only=query", "", "only=query"},
+		{"question mark at end", "v2/messages/0?", "v2/messages/0", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pathPart, rawQuery := splitPathAndQuery(tt.requestPath)
+			require.Equal(t, tt.wantPath, pathPart)
+			require.Equal(t, tt.wantQuery, rawQuery)
+		})
+	}
+}
+
+func Test_HTTPClient_Get_Post_queryStringNotEscaped(t *testing.T) {
+	// Ensure that when we pass a path with "?", the request URL uses "?" and not "%3F".
+	var receivedURI string
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedURI = r.RequestURI
+		if strings.Contains(r.RequestURI, "%3F") {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte("query separator was escaped"))
+			return
+		}
+		if r.URL.RawQuery != "transactionHash=0xabc" {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte("unexpected query: " + r.URL.RawQuery))
+			return
+		}
+		_, _ = w.Write(validAttestationResponse)
+	}))
+	defer ts.Close()
+
+	base, err := url.ParseRequestURI(ts.URL)
+	require.NoError(t, err)
+
+	client, err := newHTTPClient(logger.Nop(), base.String(), time.Millisecond, longTimeout, 0)
+	require.NoError(t, err)
+
+	pathWithQuery := "v2/messages/0?transactionHash=0xabc"
+
+	// GET
+	receivedURI = ""
+	resp, status, err := client.Get(t.Context(), pathWithQuery)
+	require.NoError(t, err)
+	require.Equal(t, HTTPStatus(http.StatusOK), status)
+	require.Equal(t, []byte(validAttestationResponse), []byte(resp))
+	require.NotContains(t, receivedURI, "%3F", "GET: request URI must not contain escaped '?'")
+	require.Contains(t, receivedURI, "?transactionHash=", "GET: request URI must contain query string")
+
+	// POST
+	receivedURI = ""
+	resp, status, err = client.Post(t.Context(), pathWithQuery, []byte("{}"))
+	require.NoError(t, err)
+	require.Equal(t, HTTPStatus(http.StatusOK), status)
+	require.Equal(t, []byte(validAttestationResponse), []byte(resp))
+	require.NotContains(t, receivedURI, "%3F", "POST: request URI must not contain escaped '?'")
+	require.Contains(t, receivedURI, "?transactionHash=", "POST: request URI must contain query string")
+}
 
 func Test_NewHTTPClient_New(t *testing.T) {
 	tt := []struct {
@@ -234,7 +301,7 @@ func Test_HTTPClient_GetInstance(t *testing.T) {
 	client3, err := newHTTPClient(logger.Nop(), ts.URL, 1*time.Hour, longTimeout, 0)
 	require.NoError(t, err)
 
-	assert.True(t, client1 == client2)
+	require.True(t, client1 == client2)
 
 	// This not hang and return immediately
 	_, _, err = client1.Get(t.Context(), cciptypes.Bytes32{1, 2, 3}.String())
@@ -381,9 +448,9 @@ func Test_HTTPClient_RateLimiting_Parallel(t *testing.T) {
 			}
 
 			if tc.err != "" {
-				assert.True(t, errorFound)
+				require.True(t, errorFound)
 			}
-			assert.WithinDuration(t, start.Add(tc.testDuration), finish, 100*time.Millisecond)
+			require.WithinDuration(t, start.Add(tc.testDuration), finish, 100*time.Millisecond)
 		})
 	}
 }
