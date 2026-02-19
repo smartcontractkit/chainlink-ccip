@@ -14,10 +14,10 @@ jobs:
   detect_deployments_changes:
     runs-on: ubuntu-latest
     outputs:
-      run_solana_deployment: ${{ steps.filter.outputs.run_solana_deployment }}
-      run_evm_deployment: ${{ steps.filter.outputs.run_evm_deployment }}
-      run_deployment: ${{ steps.filter.outputs.run_deployment }}
-      run_crosschain_deployment: ${{ steps.filter.outputs.run_crosschain_deployment }}
+      run_solana_deployment: ${{ steps.filter.outputs.run_solana_deployment || steps.filter.outputs.deployment_workflow }}
+      run_evm_deployment: ${{ steps.filter.outputs.run_evm_deployment || steps.filter.outputs.deployment_workflow }}
+      run_deployment: ${{ steps.filter.outputs.run_deployment || steps.filter.outputs.deployment_workflow }}
+      run_crosschain_deployment: ${{ steps.filter.outputs.run_crosschain_deployment || steps.filter.outputs.deployment_workflow }}
     steps:
       - uses: actions/checkout@v4
       - name: Detect changes
@@ -36,6 +36,8 @@ jobs:
               - 'chains/solana/deployment/**'
             run_crosschain_deployment:
               - 'integration-tests/deployment/**'
+            deployment_workflow:
+              - '.github/workflows/test-deployments.yml'
 
   setup-go:
     runs-on: ubuntu-latest
@@ -61,7 +63,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install gotestsum
-        run: go install gotest.tools/gotestsum@latest
+        run: |
+          export PATH=$PATH:$HOME/go/bin
+          go install gotest.tools/gotestsum@latest
       - name: Test EVM Deployments
         id: run-tests
         continue-on-error: true
