@@ -30,6 +30,7 @@ pub mod pools {
         pub dest_pool_data: Vec<u8>,
     }
 
+    #[allow(dead_code)]
     #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
     pub(in super::super) struct ReleaseOrMintOutV1 {
         pub destination_amount: u64, // TODO: u256 on EVM?

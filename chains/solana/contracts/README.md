@@ -68,7 +68,7 @@ make contracts-go-tests
 
 Install `https://github.com/gagliardetto/anchor-go`
 
-Current version: [v0.2.3](https://github.com/gagliardetto/anchor-go/tree/v0.2.3)
+Current version: [v1.0.0](https://github.com/gagliardetto/anchor-go/tree/v1.0.0)
 
 To install `anchor-go` locally so that you can use the `anchor-go` command globally, follow these steps:
 
@@ -77,7 +77,7 @@ To install `anchor-go` locally so that you can use the `anchor-go` command globa
    ```bash
    git clone https://github.com/gagliardetto/anchor-go.git
    cd anchor-go
-   git checkout v0.2.3
+   git checkout v1.0.0
    ```
 
 2. **Install the command globally:**

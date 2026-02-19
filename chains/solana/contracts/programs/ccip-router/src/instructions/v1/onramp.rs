@@ -499,7 +499,7 @@ mod helpers {
                     minimum_balance.checked_sub(current_lamports).unwrap(),
                 )?;
             }
-            account_info.realloc(required_space, false)?;
+            account_info.resize(required_space)?;
 
             let mut nonce = load_nonce(account_info)?;
             require_eq!(nonce.version, 1, CcipRouterError::InvalidNonceVersion);
@@ -537,7 +537,7 @@ mod helpers {
     }
 
     pub(super) fn hash(msg: &SVM2AnyRampMessage) -> [u8; 32] {
-        use anchor_lang::solana_program::keccak;
+        use solana_keccak_hasher as keccak;
 
         // Push Data Size to ensure that the hash is unique
         let data_size = msg.data.len() as u16; // u16 > maximum transaction size, u8 may have overflow

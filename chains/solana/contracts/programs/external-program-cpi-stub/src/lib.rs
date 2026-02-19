@@ -3,7 +3,7 @@
  * Used to test CPIs made by other programs (with actual business logic).
  */
 use anchor_lang::prelude::*;
-use anchor_lang::solana_program::keccak;
+use solana_keccak_hasher as keccak;
 
 declare_id!("2zZwzyptLqwFJFEFxjPvrdhiGpH9pJ3MfrrmZX6NTKxm");
 

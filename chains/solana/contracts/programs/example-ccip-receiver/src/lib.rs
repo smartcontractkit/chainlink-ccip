@@ -14,7 +14,7 @@ pub const STATE: &[u8] = b"state";
 #[program]
 pub mod example_ccip_receiver {
     use anchor_spl::token_2022::spl_token_2022::{self, instruction::transfer_checked};
-    use solana_program::program::invoke_signed;
+    use anchor_lang::solana_program::program::invoke_signed;
 
     use super::*;
 

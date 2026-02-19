@@ -718,7 +718,7 @@ fn hash(
     recv_and_msg_account_keys: impl IntoIterator<Item = Pubkey>,
     on_ramp_address: &OnRampAddress,
 ) -> [u8; 32] {
-    use anchor_lang::solana_program::keccak;
+    use solana_keccak_hasher as keccak;
 
     // Calculate vectors size to ensure that the hash is unique
     let sender_size = msg.sender.len() as u16; // it should fit in a u8, but it's safer to use u16

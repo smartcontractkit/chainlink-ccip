@@ -1,4 +1,4 @@
-use anchor_lang::solana_program::keccak;
+use solana_keccak_hasher as keccak;
 
 pub const LEAF_DOMAIN_SEPARATOR: [u8; 32] = [0; 32];
 pub const INTERNAL_DOMAIN_SEPARATOR: [u8; 32] = {

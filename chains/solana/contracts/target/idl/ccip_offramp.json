@@ -1,187 +1,14 @@
 {
-  "version": "1.6.1-candidate",
-  "name": "ccip_offramp",
-  "constants": [
-    {
-      "name": "MAX_ORACLES",
-      "type": {
-        "defined": "usize"
-      },
-      "value": "16"
-    }
-  ],
+  "address": "offqSMQWgQud6WJz694LRzkeN5kMYpCHTpXQr3Rkcjm",
+  "metadata": {
+    "name": "ccip_offramp",
+    "version": "1.6.1-candidate",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
   "instructions": [
     {
-      "name": "initialize",
-      "docs": [
-        "Initialization Flow //",
-        "Initializes the CCIP Offramp, except for the config account (due to stack size limitations).",
-        "",
-        "The initialization of the Offramp is responsibility of Admin, nothing more than calling these",
-        "initialization methods should be done first.",
-        "",
-        "# Arguments",
-        "",
-        "* `ctx` - The context containing the accounts required for initialization."
-      ],
-      "accounts": [
-        {
-          "name": "referenceAddresses",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "router",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "feeQuoter",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "rmnRemote",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "offrampLookupTable",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "state",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "programData",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "initializeConfig",
-      "docs": [
-        "Initializes the CCIP Offramp Config account.",
-        "",
-        "The initialization of the Offramp is responsibility of Admin, nothing more than calling these",
-        "initialization methods should be done first.",
-        "",
-        "# Arguments",
-        "",
-        "* `ctx` - The context containing the accounts required for initialization of the config.",
-        "* `svm_chain_selector` - The chain selector for SVM.",
-        "* `enable_execution_after` - The minimum amount of time required between a message has been committed and can be manually executed."
-      ],
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "programData",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "svmChainSelector",
-          "type": "u64"
-        },
-        {
-          "name": "enableExecutionAfter",
-          "type": "i64"
-        }
-      ]
-    },
-    {
-      "name": "typeVersion",
-      "docs": [
-        "Returns the program type (name) and version.",
-        "Used by offchain code to easily determine which program & version is being interacted with.",
-        "",
-        "# Arguments",
-        "* `ctx` - The context"
-      ],
-      "accounts": [
-        {
-          "name": "clock",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [],
-      "returns": "string"
-    },
-    {
-      "name": "transferOwnership",
-      "docs": [
-        "Transfers the ownership of the router to a new proposed owner.",
-        "",
-        "Shared func signature with other programs",
-        "",
-        "# Arguments",
-        "",
-        "* `ctx` - The context containing the accounts required for the transfer.",
-        "* `proposed_owner` - The public key of the new proposed owner."
-      ],
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        }
-      ],
-      "args": [
-        {
-          "name": "proposedOwner",
-          "type": "publicKey"
-        }
-      ]
-    },
-    {
-      "name": "acceptOwnership",
+      "name": "accept_ownership",
       "docs": [
         "Accepts the ownership of the router by the proposed owner.",
         "",
@@ -192,107 +19,45 @@
         "* `ctx` - The context containing the accounts required for accepting ownership.",
         "The new owner must be a signer of the transaction."
       ],
+      "discriminator": [
+        172,
+        23,
+        43,
+        13,
+        238,
+        213,
+        85,
+        150
+      ],
       "accounts": [
         {
           "name": "config",
-          "isMut": true,
-          "isSigner": false
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
         },
         {
           "name": "authority",
-          "isMut": false,
-          "isSigner": true
+          "signer": true
         }
       ],
       "args": []
     },
     {
-      "name": "setDefaultCodeVersion",
-      "docs": [
-        "Sets the default code version to be used. This is then used by the slim routing layer to determine",
-        "which version of the versioned business logic module (`instructions`) to use. Only the admin may set this.",
-        "",
-        "Shared func signature with other programs",
-        "",
-        "# Arguments",
-        "",
-        "* `ctx` - The context containing the accounts required for updating the configuration.",
-        "* `code_version` - The new code version to be set as default."
-      ],
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        }
-      ],
-      "args": [
-        {
-          "name": "codeVersion",
-          "type": {
-            "defined": "CodeVersion"
-          }
-        }
-      ]
-    },
-    {
-      "name": "updateReferenceAddresses",
-      "docs": [
-        "Updates reference addresses in the offramp contract, such as",
-        "the CCIP router, Fee Quoter, and the Offramp Lookup Table.",
-        "Only the Admin may update these addresses.",
-        "",
-        "# Arguments",
-        "",
-        "* `ctx` - The context containing the accounts required for updating the reference addresses.",
-        "* `router` - The router address to be set.",
-        "* `fee_quoter` - The fee_quoter address to be set.",
-        "* `offramp_lookup_table` - The offramp_lookup_table address to be set.",
-        "* `rmn_remote` - The rmn_remote address to be set."
-      ],
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "referenceAddresses",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        }
-      ],
-      "args": [
-        {
-          "name": "router",
-          "type": "publicKey"
-        },
-        {
-          "name": "feeQuoter",
-          "type": "publicKey"
-        },
-        {
-          "name": "offrampLookupTable",
-          "type": "publicKey"
-        },
-        {
-          "name": "rmnRemote",
-          "type": "publicKey"
-        }
-      ]
-    },
-    {
-      "name": "addSourceChain",
+      "name": "add_source_chain",
       "docs": [
         "Adds a new source chain selector with its config to the offramp.",
         "",
@@ -301,246 +66,502 @@
         "",
         "# Arguments"
       ],
+      "discriminator": [
+        26,
+        58,
+        148,
+        88,
+        190,
+        27,
+        2,
+        144
+      ],
       "accounts": [
         {
-          "name": "sourceChain",
-          "isMut": true,
-          "isSigner": false,
+          "name": "source_chain",
           "docs": [
             "Adding a chain selector implies initializing the state for a new chain"
-          ]
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  111,
+                  117,
+                  114,
+                  99,
+                  101,
+                  95,
+                  99,
+                  104,
+                  97,
+                  105,
+                  110,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "new_chain_selector"
+              }
+            ]
+          }
         },
         {
           "name": "config",
-          "isMut": false,
-          "isSigner": false
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
         },
         {
           "name": "authority",
-          "isMut": true,
-          "isSigner": true
+          "writable": true,
+          "signer": true
         },
         {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "newChainSelector",
+          "name": "new_chain_selector",
           "type": "u64"
         },
         {
-          "name": "sourceChainConfig",
+          "name": "source_chain_config",
           "type": {
-            "defined": "SourceChainConfig"
+            "defined": {
+              "name": "SourceChainConfig"
+            }
           }
         }
       ]
     },
     {
-      "name": "disableSourceChainSelector",
+      "name": "buffer_execution_report",
       "docs": [
-        "Disables the source chain selector.",
+        "Initializes and/or inserts a chunk of report data to an execution report buffer.",
         "",
-        "The Admin is the only one able to disable the chain selector as source. This method is thought of as an emergency kill-switch.",
+        "When execution reports are too large to fit in a single transaction, they can be chopped",
+        "up in chunks first (as a special case, one chunk is also acceptable), and pre-buffered",
+        "via multiple calls to this instruction.",
+        "",
+        "There's no need to pre-initialize the buffer: all chunks can be sent concurrently, and the",
+        "first one to arrive will initialize the buffer.",
+        "",
+        "To benefit from buffering, the eventual call to `execute` or `manually_execute` must",
+        "include an additional `remaining_account` with the PDA derived from",
+        "[\"execution_report_buffer\", <buffer_id>, <caller_pubkey>].",
         "",
         "# Arguments",
         "",
-        "* `ctx` - The context containing the accounts required for disabling the chain selector.",
-        "* `source_chain_selector` - The source chain selector to be disabled."
+        "* `ctx` - The context containing the accounts required for buffering.",
+        "* `buffer_id` - An arbitrary buffer id defined by the caller (could be the message_id). Max 32 bytes.",
+        "* `report_length` - Total length in bytes of the execution report.",
+        "* `chunk` - The specific chunk to add to the buffer. Chunk must have a consistent size, except",
+        "the last one in the buffer, which may be smaller.",
+        "* `chunk_index` - The index of this chunk.",
+        "* `num_chunks` - The total number of chunks in the report."
+      ],
+      "discriminator": [
+        35,
+        202,
+        252,
+        220,
+        2,
+        82,
+        189,
+        23
       ],
       "accounts": [
         {
-          "name": "sourceChain",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        }
-      ],
-      "args": [
-        {
-          "name": "sourceChainSelector",
-          "type": "u64"
-        }
-      ]
-    },
-    {
-      "name": "updateSourceChainConfig",
-      "docs": [
-        "Updates the configuration of the source chain selector.",
-        "",
-        "The Admin is the only one able to update the source chain config.",
-        "",
-        "# Arguments",
-        "",
-        "* `ctx` - The context containing the accounts required for updating the chain selector.",
-        "* `source_chain_selector` - The source chain selector to be updated.",
-        "* `source_chain_config` - The new configuration for the source chain."
-      ],
-      "accounts": [
-        {
-          "name": "sourceChain",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        }
-      ],
-      "args": [
-        {
-          "name": "sourceChainSelector",
-          "type": "u64"
-        },
-        {
-          "name": "sourceChainConfig",
-          "type": {
-            "defined": "SourceChainConfig"
-          }
-        }
-      ]
-    },
-    {
-      "name": "updateSvmChainSelector",
-      "docs": [
-        "Updates the SVM chain selector in the offramp configuration.",
-        "",
-        "This method should only be used if there was an error with the initial configuration or if the solana chain selector changes.",
-        "",
-        "# Arguments",
-        "",
-        "* `ctx` - The context containing the accounts required for updating the configuration.",
-        "* `new_chain_selector` - The new chain selector for SVM."
-      ],
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        }
-      ],
-      "args": [
-        {
-          "name": "newChainSelector",
-          "type": "u64"
-        }
-      ]
-    },
-    {
-      "name": "updateEnableManualExecutionAfter",
-      "docs": [
-        "Updates the minimum amount of time required between a message being committed and when it can be manually executed.",
-        "",
-        "This is part of the OffRamp Configuration for SVM.",
-        "The Admin is the only one able to update this config.",
-        "",
-        "# Arguments",
-        "",
-        "* `ctx` - The context containing the accounts required for updating the configuration.",
-        "* `new_enable_manual_execution_after` - The new minimum amount of time required."
-      ],
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        }
-      ],
-      "args": [
-        {
-          "name": "newEnableManualExecutionAfter",
-          "type": "i64"
-        }
-      ]
-    },
-    {
-      "name": "setOcrConfig",
-      "docs": [
-        "Sets the OCR configuration.",
-        "Only CCIP Admin can set the OCR configuration.",
-        "",
-        "# Arguments",
-        "",
-        "* `ctx` - The context containing the accounts required for setting the OCR configuration.",
-        "* `plugin_type` - The type of OCR plugin [0: Commit, 1: Execution].",
-        "* `config_info` - The OCR configuration information.",
-        "* `signers` - The list of signers.",
-        "* `transmitters` - The list of transmitters."
-      ],
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "state",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        }
-      ],
-      "args": [
-        {
-          "name": "pluginType",
-          "type": {
-            "defined": "OcrPluginType"
+          "name": "execution_report_buffer",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  120,
+                  101,
+                  99,
+                  117,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  114,
+                  101,
+                  112,
+                  111,
+                  114,
+                  116,
+                  95,
+                  98,
+                  117,
+                  102,
+                  102,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "buffer_id"
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              }
+            ]
           }
         },
         {
-          "name": "configInfo",
-          "type": {
-            "defined": "Ocr3ConfigInfo"
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
           }
         },
         {
-          "name": "signers",
-          "type": {
-            "vec": {
-              "array": [
-                "u8",
-                20
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "buffer_id",
+          "type": "bytes"
+        },
+        {
+          "name": "report_length",
+          "type": "u32"
+        },
+        {
+          "name": "chunk",
+          "type": "bytes"
+        },
+        {
+          "name": "chunk_index",
+          "type": "u8"
+        },
+        {
+          "name": "num_chunks",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "close_commit_report_account",
+      "discriminator": [
+        109,
+        145,
+        129,
+        64,
+        226,
+        172,
+        61,
+        106
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "commit_report",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  109,
+                  109,
+                  105,
+                  116,
+                  95,
+                  114,
+                  101,
+                  112,
+                  111,
+                  114,
+                  116
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "source_chain_selector"
+              },
+              {
+                "kind": "arg",
+                "path": "root"
+              }
+            ]
+          }
+        },
+        {
+          "name": "reference_addresses",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  102,
+                  101,
+                  114,
+                  101,
+                  110,
+                  99,
+                  101,
+                  95,
+                  97,
+                  100,
+                  100,
+                  114,
+                  101,
+                  115,
+                  115,
+                  101,
+                  115
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "wsol_mint",
+          "address": "So11111111111111111111111111111111111111112"
+        },
+        {
+          "name": "fee_token_receiver",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "fee_billing_signer"
+              },
+              {
+                "kind": "account",
+                "path": "token_program"
+              },
+              {
+                "kind": "account",
+                "path": "wsol_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
               ]
             }
           }
         },
         {
-          "name": "transmitters",
-          "type": {
-            "vec": "publicKey"
+          "name": "fee_billing_signer"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "source_chain_selector",
+          "type": "u64"
+        },
+        {
+          "name": "root",
+          "type": "bytes"
+        }
+      ]
+    },
+    {
+      "name": "close_execution_report_buffer",
+      "docs": [
+        "Closes the execution report buffer to reclaim funds.",
+        "",
+        "Note this is only necessary when aborting a buffered transaction, or when a mistake",
+        "was made when buffering data. The buffer account will otherwise automatically close",
+        "and return funds to the caller whenever buffered execution succeeds."
+      ],
+      "discriminator": [
+        0,
+        16,
+        4,
+        246,
+        238,
+        95,
+        223,
+        31
+      ],
+      "accounts": [
+        {
+          "name": "execution_report_buffer",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  120,
+                  101,
+                  99,
+                  117,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  114,
+                  101,
+                  112,
+                  111,
+                  114,
+                  116,
+                  95,
+                  98,
+                  117,
+                  102,
+                  102,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "buffer_id"
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              }
+            ]
           }
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "_buffer_id",
+          "type": "bytes"
         }
       ]
     },
@@ -572,84 +593,138 @@
         "* `ss` - slice of S components of signatures",
         "* `raw_vs` - array of V components of signatures"
       ],
+      "discriminator": [
+        223,
+        140,
+        142,
+        165,
+        229,
+        208,
+        156,
+        74
+      ],
       "accounts": [
         {
           "name": "config",
-          "isMut": false,
-          "isSigner": false
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
         },
         {
-          "name": "referenceAddresses",
-          "isMut": false,
-          "isSigner": false
+          "name": "reference_addresses",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  102,
+                  101,
+                  114,
+                  101,
+                  110,
+                  99,
+                  101,
+                  95,
+                  97,
+                  100,
+                  100,
+                  114,
+                  101,
+                  115,
+                  115,
+                  101,
+                  115
+                ]
+              }
+            ]
+          }
         },
         {
-          "name": "sourceChain",
-          "isMut": true,
-          "isSigner": false
+          "name": "source_chain"
         },
         {
-          "name": "commitReport",
-          "isMut": true,
-          "isSigner": false
+          "name": "commit_report",
+          "writable": true
         },
         {
           "name": "authority",
-          "isMut": true,
-          "isSigner": true
+          "writable": true,
+          "signer": true
         },
         {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         },
         {
-          "name": "sysvarInstructions",
-          "isMut": false,
-          "isSigner": false
+          "name": "sysvar_instructions",
+          "address": "Sysvar1nstructions1111111111111111111111111"
         },
         {
-          "name": "feeBillingSigner",
-          "isMut": false,
-          "isSigner": false
+          "name": "fee_billing_signer",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  95,
+                  98,
+                  105,
+                  108,
+                  108,
+                  105,
+                  110,
+                  103,
+                  95,
+                  115,
+                  105,
+                  103,
+                  110,
+                  101,
+                  114
+                ]
+              }
+            ]
+          }
         },
         {
-          "name": "feeQuoter",
-          "isMut": false,
-          "isSigner": false
+          "name": "fee_quoter"
         },
         {
-          "name": "feeQuoterAllowedPriceUpdater",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "so that it can authorize the call made by this offramp"
-          ]
+          "name": "fee_quoter_allowed_price_updater"
         },
         {
-          "name": "feeQuoterConfig",
-          "isMut": false,
-          "isSigner": false
+          "name": "fee_quoter_config"
         },
         {
-          "name": "rmnRemote",
-          "isMut": false,
-          "isSigner": false
+          "name": "rmn_remote"
         },
         {
-          "name": "rmnRemoteCurses",
-          "isMut": false,
-          "isSigner": false
+          "name": "rmn_remote_curses"
         },
         {
-          "name": "rmnRemoteConfig",
-          "isMut": false,
-          "isSigner": false
+          "name": "rmn_remote_config"
         }
       ],
       "args": [
         {
-          "name": "reportContextByteWords",
+          "name": "_report_context_byte_words",
           "type": {
             "array": [
               {
@@ -663,11 +738,11 @@
           }
         },
         {
-          "name": "rawReport",
+          "name": "_raw_report",
           "type": "bytes"
         },
         {
-          "name": "rs",
+          "name": "_rs",
           "type": {
             "vec": {
               "array": [
@@ -678,7 +753,7 @@
           }
         },
         {
-          "name": "ss",
+          "name": "_ss",
           "type": {
             "vec": {
               "array": [
@@ -689,7 +764,7 @@
           }
         },
         {
-          "name": "rawVs",
+          "name": "_raw_vs",
           "type": {
             "array": [
               "u8",
@@ -700,7 +775,7 @@
       ]
     },
     {
-      "name": "commitPriceOnly",
+      "name": "commit_price_only",
       "docs": [
         "Commits a report to the router, with price updates only.",
         "",
@@ -721,74 +796,172 @@
         "* `ss` - slice of S components of signatures",
         "* `raw_vs` - array of V components of signatures"
       ],
+      "discriminator": [
+        186,
+        145,
+        195,
+        227,
+        207,
+        211,
+        226,
+        134
+      ],
       "accounts": [
         {
           "name": "config",
-          "isMut": false,
-          "isSigner": false
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
         },
         {
-          "name": "referenceAddresses",
-          "isMut": false,
-          "isSigner": false
+          "name": "reference_addresses",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  102,
+                  101,
+                  114,
+                  101,
+                  110,
+                  99,
+                  101,
+                  95,
+                  97,
+                  100,
+                  100,
+                  114,
+                  101,
+                  115,
+                  115,
+                  101,
+                  115
+                ]
+              }
+            ]
+          }
         },
         {
           "name": "authority",
-          "isMut": true,
-          "isSigner": true
+          "writable": true,
+          "signer": true
         },
         {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         },
         {
-          "name": "sysvarInstructions",
-          "isMut": false,
-          "isSigner": false
+          "name": "sysvar_instructions",
+          "address": "Sysvar1nstructions1111111111111111111111111"
         },
         {
-          "name": "feeBillingSigner",
-          "isMut": false,
-          "isSigner": false
+          "name": "fee_billing_signer",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  95,
+                  98,
+                  105,
+                  108,
+                  108,
+                  105,
+                  110,
+                  103,
+                  95,
+                  115,
+                  105,
+                  103,
+                  110,
+                  101,
+                  114
+                ]
+              }
+            ]
+          }
         },
         {
-          "name": "feeQuoter",
-          "isMut": false,
-          "isSigner": false
+          "name": "fee_quoter"
         },
         {
-          "name": "feeQuoterAllowedPriceUpdater",
-          "isMut": false,
-          "isSigner": false,
+          "name": "fee_quoter_allowed_price_updater",
           "docs": [
             "so that it can authorize the call made by this offramp"
-          ]
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  108,
+                  108,
+                  111,
+                  119,
+                  101,
+                  100,
+                  95,
+                  112,
+                  114,
+                  105,
+                  99,
+                  101,
+                  95,
+                  117,
+                  112,
+                  100,
+                  97,
+                  116,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "fee_billing_signer"
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "fee_quoter"
+            }
+          }
         },
         {
-          "name": "feeQuoterConfig",
-          "isMut": false,
-          "isSigner": false
+          "name": "fee_quoter_config"
         },
         {
-          "name": "rmnRemote",
-          "isMut": false,
-          "isSigner": false
+          "name": "rmn_remote"
         },
         {
-          "name": "rmnRemoteCurses",
-          "isMut": false,
-          "isSigner": false
+          "name": "rmn_remote_curses"
         },
         {
-          "name": "rmnRemoteConfig",
-          "isMut": false,
-          "isSigner": false
+          "name": "rmn_remote_config"
         }
       ],
       "args": [
         {
-          "name": "reportContextByteWords",
+          "name": "report_context_byte_words",
           "type": {
             "array": [
               {
@@ -802,7 +975,7 @@
           }
         },
         {
-          "name": "rawReport",
+          "name": "raw_report",
           "type": "bytes"
         },
         {
@@ -828,7 +1001,7 @@
           }
         },
         {
-          "name": "rawVs",
+          "name": "raw_vs",
           "type": {
             "array": [
               "u8",
@@ -839,326 +1012,7 @@
       ]
     },
     {
-      "name": "execute",
-      "docs": [
-        "Executes a message on the destination chain.",
-        "",
-        "The method name needs to be execute with Anchor encoding.",
-        "",
-        "This function is called by the OffChain when executing one Report to the SVM Router.",
-        "In this Flow only one message is sent, the Execution Report. This is different as EVM does,",
-        "this is because there is no try/catch mechanism to allow batch execution.",
-        "This message validates that the Merkle Tree Proof of the given message is correct and is stored in the Commit Report Account.",
-        "The message must be untouched to be executed.",
-        "This message emits the event ExecutionStateChanged with the new state of the message.",
-        "Finally, executes the CPI instruction to the receiver program in the ccip_receive message.",
-        "",
-        "# Arguments",
-        "",
-        "* `ctx` - The context containing the accounts required for the execute.",
-        "* `raw_execution_report` - the serialized execution report containing only one message and proofs",
-        "* `report_context_byte_words` - report_context after execution_report to match context for manually execute (proper decoding order)",
-        "*  consists of:",
-        "* report_context_byte_words[0]: ConfigDigest",
-        "* report_context_byte_words[1]: 24 byte padding, 8 byte sequence number"
-      ],
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "referenceAddresses",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "sourceChain",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "commitReport",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "offramp",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "allowedOfframp",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK PDA of the router program verifying the signer is an allowed offramp.",
-            "If PDA does not exist, the router doesn't allow this offramp. This is just used",
-            "so that token pools and receivers can then check that the caller is an actual offramp that",
-            "has been registered in the router as such for that source chain."
-          ]
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "sysvarInstructions",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "rmnRemote",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "rmnRemoteCurses",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "rmnRemoteConfig",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "rawExecutionReport",
-          "type": "bytes"
-        },
-        {
-          "name": "reportContextByteWords",
-          "type": {
-            "array": [
-              {
-                "array": [
-                  "u8",
-                  32
-                ]
-              },
-              2
-            ]
-          }
-        },
-        {
-          "name": "tokenIndexes",
-          "type": "bytes"
-        }
-      ]
-    },
-    {
-      "name": "manuallyExecute",
-      "docs": [
-        "Manually executes a report to the router.",
-        "",
-        "When a message is not being executed, then the user can trigger the execution manually.",
-        "No verification over the transmitter, but the message needs to be in some commit report.",
-        "It validates that the required time has passed since the commit and then executes the report.",
-        "",
-        "# Arguments",
-        "",
-        "* `ctx` - The context containing the accounts required for the execution.",
-        "* `raw_execution_report` - The serialized execution report containing the message and proofs."
-      ],
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "referenceAddresses",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "sourceChain",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "commitReport",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "offramp",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "allowedOfframp",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK PDA of the router program verifying the signer is an allowed offramp.",
-            "If PDA does not exist, the router doesn't allow this offramp. This is just used",
-            "so that token pools and receivers can then check that the caller is an actual offramp that",
-            "has been registered in the router as such for that source chain."
-          ]
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "sysvarInstructions",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "rmnRemote",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "rmnRemoteCurses",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "rmnRemoteConfig",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "rawExecutionReport",
-          "type": "bytes"
-        },
-        {
-          "name": "tokenIndexes",
-          "type": "bytes"
-        }
-      ]
-    },
-    {
-      "name": "bufferExecutionReport",
-      "docs": [
-        "Initializes and/or inserts a chunk of report data to an execution report buffer.",
-        "",
-        "When execution reports are too large to fit in a single transaction, they can be chopped",
-        "up in chunks first (as a special case, one chunk is also acceptable), and pre-buffered",
-        "via multiple calls to this instruction.",
-        "",
-        "There's no need to pre-initialize the buffer: all chunks can be sent concurrently, and the",
-        "first one to arrive will initialize the buffer.",
-        "",
-        "To benefit from buffering, the eventual call to `execute` or `manually_execute` must",
-        "include an additional `remaining_account` with the PDA derived from",
-        "[\"execution_report_buffer\", <buffer_id>, <caller_pubkey>].",
-        "",
-        "# Arguments",
-        "",
-        "* `ctx` - The context containing the accounts required for buffering.",
-        "* `buffer_id` - An arbitrary buffer id defined by the caller (could be the message_id). Max 32 bytes.",
-        "* `report_length` - Total length in bytes of the execution report.",
-        "* `chunk` - The specific chunk to add to the buffer. Chunk must have a consistent size, except",
-        "the last one in the buffer, which may be smaller.",
-        "* `chunk_index` - The index of this chunk.",
-        "* `num_chunks` - The total number of chunks in the report."
-      ],
-      "accounts": [
-        {
-          "name": "executionReportBuffer",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "bufferId",
-          "type": "bytes"
-        },
-        {
-          "name": "reportLength",
-          "type": "u32"
-        },
-        {
-          "name": "chunk",
-          "type": "bytes"
-        },
-        {
-          "name": "chunkIndex",
-          "type": "u8"
-        },
-        {
-          "name": "numChunks",
-          "type": "u8"
-        }
-      ]
-    },
-    {
-      "name": "closeExecutionReportBuffer",
-      "docs": [
-        "Closes the execution report buffer to reclaim funds.",
-        "",
-        "Note this is only necessary when aborting a buffered transaction, or when a mistake",
-        "was made when buffering data. The buffer account will otherwise automatically close",
-        "and return funds to the caller whenever buffered execution succeeds."
-      ],
-      "accounts": [
-        {
-          "name": "executionReportBuffer",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "bufferId",
-          "type": "bytes"
-        }
-      ]
-    },
-    {
-      "name": "deriveAccountsExecute",
+      "name": "derive_accounts_execute",
       "docs": [
         "Automatically derives all acounts required to call `ccip_execute`.",
         "",
@@ -1199,18 +1053,43 @@
         "`execute_caller`: If the execution will not be buffered, this should be empty.",
         "* `token_receiver`: Receiver of token transfers, if any (i.e. report.message.token_receiver)"
       ],
+      "discriminator": [
+        119,
+        242,
+        51,
+        244,
+        183,
+        138,
+        179,
+        159
+      ],
       "accounts": [
         {
           "name": "config",
-          "isMut": false,
-          "isSigner": false
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
         }
       ],
       "args": [
         {
           "name": "params",
           "type": {
-            "defined": "DeriveAccountsExecuteParams"
+            "defined": {
+              "name": "DeriveAccountsExecuteParams"
+            }
           }
         },
         {
@@ -1219,1221 +1098,827 @@
         }
       ],
       "returns": {
-        "defined": "DeriveAccountsResponse"
+        "defined": {
+          "name": "DeriveAccountsResponse"
+        }
       }
     },
     {
-      "name": "closeCommitReportAccount",
+      "name": "disable_source_chain_selector",
+      "docs": [
+        "Disables the source chain selector.",
+        "",
+        "The Admin is the only one able to disable the chain selector as source. This method is thought of as an emergency kill-switch.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for disabling the chain selector.",
+        "* `source_chain_selector` - The source chain selector to be disabled."
+      ],
+      "discriminator": [
+        58,
+        101,
+        54,
+        252,
+        248,
+        31,
+        226,
+        121
+      ],
       "accounts": [
         {
+          "name": "source_chain",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  111,
+                  117,
+                  114,
+                  99,
+                  101,
+                  95,
+                  99,
+                  104,
+                  97,
+                  105,
+                  110,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "source_chain_selector"
+              }
+            ]
+          }
+        },
+        {
           "name": "config",
-          "isMut": false,
-          "isSigner": false
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
         },
         {
-          "name": "commitReport",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "referenceAddresses",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "wsolMint",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "feeTokenReceiver",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "feeBillingSigner",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "tokenProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "authority",
+          "writable": true,
+          "signer": true
         }
       ],
       "args": [
         {
-          "name": "sourceChainSelector",
+          "name": "source_chain_selector",
           "type": "u64"
-        },
-        {
-          "name": "root",
-          "type": "bytes"
         }
       ]
-    }
-  ],
-  "accounts": [
-    {
-      "name": "Config",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "version",
-            "type": "u8"
-          },
-          {
-            "name": "defaultCodeVersion",
-            "type": "u8"
-          },
-          {
-            "name": "padding0",
-            "type": {
-              "array": [
-                "u8",
-                6
-              ]
-            }
-          },
-          {
-            "name": "svmChainSelector",
-            "type": "u64"
-          },
-          {
-            "name": "enableManualExecutionAfter",
-            "type": "i64"
-          },
-          {
-            "name": "padding1",
-            "type": {
-              "array": [
-                "u8",
-                8
-              ]
-            }
-          },
-          {
-            "name": "owner",
-            "type": "publicKey"
-          },
-          {
-            "name": "proposedOwner",
-            "type": "publicKey"
-          },
-          {
-            "name": "padding2",
-            "type": {
-              "array": [
-                "u8",
-                8
-              ]
-            }
-          },
-          {
-            "name": "ocr3",
-            "type": {
-              "array": [
-                {
-                  "defined": "Ocr3Config"
-                },
-                2
-              ]
-            }
-          }
-        ]
-      }
     },
     {
-      "name": "ReferenceAddresses",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "version",
-            "type": "u8"
-          },
-          {
-            "name": "router",
-            "type": "publicKey"
-          },
-          {
-            "name": "feeQuoter",
-            "type": "publicKey"
-          },
-          {
-            "name": "offrampLookupTable",
-            "type": "publicKey"
-          },
-          {
-            "name": "rmnRemote",
-            "type": "publicKey"
-          }
-        ]
-      }
-    },
-    {
-      "name": "GlobalState",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "latestPriceSequenceNumber",
-            "type": "u64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "ExecutionReportBuffer",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "version",
-            "type": "u8"
-          },
-          {
-            "name": "chunkBitmap",
-            "type": "u64"
-          },
-          {
-            "name": "numChunks",
-            "type": "u8"
-          },
-          {
-            "name": "chunkLength",
-            "type": "u32"
-          },
-          {
-            "name": "data",
-            "type": "bytes"
-          }
-        ]
-      }
-    },
-    {
-      "name": "SourceChain",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "version",
-            "type": "u8"
-          },
-          {
-            "name": "chainSelector",
-            "type": "u64"
-          },
-          {
-            "name": "state",
-            "type": {
-              "defined": "SourceChainState"
-            }
-          },
-          {
-            "name": "config",
-            "type": {
-              "defined": "SourceChainConfig"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "CommitReport",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "version",
-            "type": "u8"
-          },
-          {
-            "name": "chainSelector",
-            "type": "u64"
-          },
-          {
-            "name": "merkleRoot",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          },
-          {
-            "name": "timestamp",
-            "type": "i64"
-          },
-          {
-            "name": "minMsgNr",
-            "type": "u64"
-          },
-          {
-            "name": "maxMsgNr",
-            "type": "u64"
-          },
-          {
-            "name": "executionStates",
-            "type": "u128"
-          }
-        ]
-      }
-    }
-  ],
-  "types": [
-    {
-      "name": "CommitInput",
+      "name": "execute",
       "docs": [
-        "Input from an offchain node, containing the Merkle root and interval for",
-        "the source chain, and optionally some price updates alongside it"
+        "Executes a message on the destination chain.",
+        "",
+        "The method name needs to be execute with Anchor encoding.",
+        "",
+        "This function is called by the OffChain when executing one Report to the SVM Router.",
+        "In this Flow only one message is sent, the Execution Report. This is different as EVM does,",
+        "this is because there is no try/catch mechanism to allow batch execution.",
+        "This message validates that the Merkle Tree Proof of the given message is correct and is stored in the Commit Report Account.",
+        "The message must be untouched to be executed.",
+        "This message emits the event ExecutionStateChanged with the new state of the message.",
+        "Finally, executes the CPI instruction to the receiver program in the ccip_receive message.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for the execute.",
+        "* `raw_execution_report` - the serialized execution report containing only one message and proofs",
+        "* `report_context_byte_words` - report_context after execution_report to match context for manually execute (proper decoding order)",
+        "*  consists of:",
+        "* report_context_byte_words[0]: ConfigDigest",
+        "* report_context_byte_words[1]: 24 byte padding, 8 byte sequence number"
       ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "priceUpdates",
-            "type": {
-              "defined": "PriceUpdates"
-            }
-          },
-          {
-            "name": "merkleRoot",
-            "type": {
-              "option": {
-                "defined": "MerkleRoot"
-              }
-            }
-          },
-          {
-            "name": "rmnSignatures",
-            "type": {
-              "vec": {
-                "array": [
-                  "u8",
-                  64
+      "discriminator": [
+        130,
+        221,
+        242,
+        154,
+        13,
+        193,
+        189,
+        29
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
                 ]
               }
-            }
+            ]
           }
-        ]
-      }
-    },
-    {
-      "name": "PriceUpdates",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "tokenPriceUpdates",
-            "type": {
-              "vec": {
-                "defined": "TokenPriceUpdate"
+        },
+        {
+          "name": "reference_addresses",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  102,
+                  101,
+                  114,
+                  101,
+                  110,
+                  99,
+                  101,
+                  95,
+                  97,
+                  100,
+                  100,
+                  114,
+                  101,
+                  115,
+                  115,
+                  101,
+                  115
+                ]
               }
-            }
-          },
-          {
-            "name": "gasPriceUpdates",
-            "type": {
-              "vec": {
-                "defined": "GasPriceUpdate"
+            ]
+          }
+        },
+        {
+          "name": "source_chain",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  111,
+                  117,
+                  114,
+                  99,
+                  101,
+                  95,
+                  99,
+                  104,
+                  97,
+                  105,
+                  110,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "source_chain.chain_selector",
+                "account": "SourceChain"
               }
-            }
+            ]
           }
-        ]
-      }
-    },
-    {
-      "name": "TokenPriceUpdate",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "sourceToken",
-            "type": "publicKey"
-          },
-          {
-            "name": "usdPerToken",
-            "type": {
-              "array": [
-                "u8",
-                28
-              ]
-            }
+        },
+        {
+          "name": "commit_report",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  109,
+                  109,
+                  105,
+                  116,
+                  95,
+                  114,
+                  101,
+                  112,
+                  111,
+                  114,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "source_chain.chain_selector",
+                "account": "SourceChain"
+              },
+              {
+                "kind": "account",
+                "path": "commit_report.merkle_root",
+                "account": "CommitReport"
+              }
+            ]
           }
-        ]
-      }
-    },
-    {
-      "name": "GasPriceUpdate",
-      "docs": [
-        "Gas price for a given chain in USD; its value may contain tightly packed fields."
+        },
+        {
+          "name": "offramp",
+          "address": "offqSMQWgQud6WJz694LRzkeN5kMYpCHTpXQr3Rkcjm"
+        },
+        {
+          "name": "allowed_offramp",
+          "docs": [
+            "CHECK PDA of the router program verifying the signer is an allowed offramp.",
+            "If PDA does not exist, the router doesn't allow this offramp. This is just used",
+            "so that token pools and receivers can then check that the caller is an actual offramp that",
+            "has been registered in the router as such for that source chain."
+          ]
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "sysvar_instructions",
+          "address": "Sysvar1nstructions1111111111111111111111111"
+        },
+        {
+          "name": "rmn_remote"
+        },
+        {
+          "name": "rmn_remote_curses"
+        },
+        {
+          "name": "rmn_remote_config"
+        }
       ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "destChainSelector",
-            "type": "u64"
-          },
-          {
-            "name": "usdPerUnitGas",
-            "type": {
-              "array": [
-                "u8",
-                28
-              ]
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "MerkleRoot",
-      "docs": [
-        "Struct to hold a merkle root and an interval for a source chain"
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "sourceChainSelector",
-            "type": "u64"
-          },
-          {
-            "name": "onRampAddress",
-            "type": "bytes"
-          },
-          {
-            "name": "minSeqNr",
-            "type": "u64"
-          },
-          {
-            "name": "maxSeqNr",
-            "type": "u64"
-          },
-          {
-            "name": "merkleRoot",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "ConfigOcrPluginType",
-      "docs": [
-        "It's not possible to store enums in zero_copy accounts, so we wrap the discriminant",
-        "in a struct to store in config."
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "discriminant",
-            "type": "u8"
-          }
-        ]
-      }
-    },
-    {
-      "name": "ExecutionReportSingleChain",
-      "docs": [
-        "Report that is submitted by the execution DON at the execution phase. (including chain selector data)"
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "sourceChainSelector",
-            "type": "u64"
-          },
-          {
-            "name": "message",
-            "type": {
-              "defined": "Any2SVMRampMessage"
-            }
-          },
-          {
-            "name": "offchainTokenData",
-            "type": {
-              "vec": "bytes"
-            }
-          },
-          {
-            "name": "proofs",
-            "type": {
-              "vec": {
+      "args": [
+        {
+          "name": "raw_execution_report",
+          "type": "bytes"
+        },
+        {
+          "name": "report_context_byte_words",
+          "type": {
+            "array": [
+              {
                 "array": [
                   "u8",
                   32
                 ]
-              }
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "RampMessageHeader",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "messageId",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          },
-          {
-            "name": "sourceChainSelector",
-            "type": "u64"
-          },
-          {
-            "name": "destChainSelector",
-            "type": "u64"
-          },
-          {
-            "name": "sequenceNumber",
-            "type": "u64"
-          },
-          {
-            "name": "nonce",
-            "type": "u64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "Any2SVMRampExtraArgs",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "computeUnits",
-            "type": "u32"
-          },
-          {
-            "name": "isWritableBitmap",
-            "type": "u64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "Any2SVMRampMessage",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "header",
-            "type": {
-              "defined": "RampMessageHeader"
-            }
-          },
-          {
-            "name": "sender",
-            "type": "bytes"
-          },
-          {
-            "name": "data",
-            "type": "bytes"
-          },
-          {
-            "name": "tokenReceiver",
-            "type": "publicKey"
-          },
-          {
-            "name": "tokenAmounts",
-            "type": {
-              "vec": {
-                "defined": "Any2SVMTokenTransfer"
-              }
-            }
-          },
-          {
-            "name": "extraArgs",
-            "type": {
-              "defined": "Any2SVMRampExtraArgs"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "Any2SVMTokenTransfer",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "sourcePoolAddress",
-            "type": "bytes"
-          },
-          {
-            "name": "destTokenAddress",
-            "type": "publicKey"
-          },
-          {
-            "name": "destGasAmount",
-            "type": "u32"
-          },
-          {
-            "name": "extraData",
-            "type": "bytes"
-          },
-          {
-            "name": "amount",
-            "type": {
-              "defined": "CrossChainAmount"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "SVMTokenAmount",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "token",
-            "type": "publicKey"
-          },
-          {
-            "name": "amount",
-            "type": "u64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "CrossChainAmount",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "leBytes",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "DeriveAccountsExecuteParams",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "executeCaller",
-            "type": "publicKey"
-          },
-          {
-            "name": "tokenReceiver",
-            "type": "publicKey"
-          },
-          {
-            "name": "tokenTransfers",
-            "type": {
-              "vec": {
-                "defined": "TokenTransferAndOffchainData"
-              }
-            }
-          },
-          {
-            "name": "messageAccounts",
-            "type": {
-              "vec": {
-                "defined": "CcipAccountMeta"
-              }
-            }
-          },
-          {
-            "name": "sourceChainSelector",
-            "type": "u64"
-          },
-          {
-            "name": "originalSender",
-            "type": "bytes"
-          },
-          {
-            "name": "merkleRoot",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          },
-          {
-            "name": "bufferId",
-            "type": "bytes"
-          }
-        ]
-      }
-    },
-    {
-      "name": "TokenTransferAndOffchainData",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "transfer",
-            "type": {
-              "defined": "Any2SVMTokenTransfer"
-            }
-          },
-          {
-            "name": "data",
-            "type": "bytes"
-          }
-        ]
-      }
-    },
-    {
-      "name": "DeriveAccountsResponse",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "askAgainWith",
-            "docs": [
-              "If this vector is not empty, you must call the `derive_` method again including",
-              "exactly these accounts as the `remaining_accounts` field."
-            ],
-            "type": {
-              "vec": {
-                "defined": "CcipAccountMeta"
-              }
-            }
-          },
-          {
-            "name": "accountsToSave",
-            "docs": [
-              "You must append these accounts at the end of a separate list. When `next_stage`",
-              "is finally empty, this separate list will contain all the accounts to use for the",
-              "instruction of interest."
-            ],
-            "type": {
-              "vec": {
-                "defined": "CcipAccountMeta"
-              }
-            }
-          },
-          {
-            "name": "lookUpTablesToSave",
-            "docs": [
-              "Append these look up tables at the end of a list. It will contain all LUTs",
-              "that the instruction of interest can use."
-            ],
-            "type": {
-              "vec": "publicKey"
-            }
-          },
-          {
-            "name": "currentStage",
-            "docs": [
-              "Identifies the derivation stage."
-            ],
-            "type": "string"
-          },
-          {
-            "name": "nextStage",
-            "docs": [
-              "Identifies the next derivation stage. If empty, the derivation is complete."
-            ],
-            "type": "string"
-          }
-        ]
-      }
-    },
-    {
-      "name": "CcipAccountMeta",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "pubkey",
-            "type": "publicKey"
-          },
-          {
-            "name": "isSigner",
-            "type": "bool"
-          },
-          {
-            "name": "isWritable",
-            "type": "bool"
-          }
-        ]
-      }
-    },
-    {
-      "name": "Ocr3ConfigInfo",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "configDigest",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          },
-          {
-            "name": "f",
-            "type": "u8"
-          },
-          {
-            "name": "n",
-            "type": "u8"
-          },
-          {
-            "name": "isSignatureVerificationEnabled",
-            "type": "u8"
-          }
-        ]
-      }
-    },
-    {
-      "name": "Ocr3Config",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "pluginType",
-            "type": {
-              "defined": "ConfigOcrPluginType"
-            }
-          },
-          {
-            "name": "configInfo",
-            "type": {
-              "defined": "Ocr3ConfigInfo"
-            }
-          },
-          {
-            "name": "signers",
-            "type": {
-              "array": [
-                {
-                  "array": [
-                    "u8",
-                    20
-                  ]
-                },
-                16
-              ]
-            }
-          },
-          {
-            "name": "transmitters",
-            "type": {
-              "array": [
-                {
-                  "array": [
-                    "u8",
-                    32
-                  ]
-                },
-                16
-              ]
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "SourceChainConfig",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "isEnabled",
-            "type": "bool"
-          },
-          {
-            "name": "isRmnVerificationDisabled",
-            "type": "bool"
-          },
-          {
-            "name": "laneCodeVersion",
-            "type": {
-              "defined": "CodeVersion"
-            }
-          },
-          {
-            "name": "onRamp",
-            "type": {
-              "defined": "OnRampAddress"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "OnRampAddress",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "bytes",
-            "type": {
-              "array": [
-                "u8",
-                64
-              ]
-            }
-          },
-          {
-            "name": "len",
-            "type": "u32"
-          }
-        ]
-      }
-    },
-    {
-      "name": "SourceChainState",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "minSeqNr",
-            "type": "u64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "OcrPluginType",
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "Commit"
-          },
-          {
-            "name": "Execution"
-          }
-        ]
-      }
-    },
-    {
-      "name": "DeriveAccountsExecuteStage",
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "Start"
-          },
-          {
-            "name": "FinishMainAccountList"
-          },
-          {
-            "name": "RetrieveTokenLUTs"
-          },
-          {
-            "name": "RetrievePoolPrograms"
-          },
-          {
-            "name": "TokenTransferStaticAccounts",
-            "fields": [
-              {
-                "name": "token",
-                "type": "u32"
               },
+              2
+            ]
+          }
+        },
+        {
+          "name": "token_indexes",
+          "type": "bytes"
+        }
+      ]
+    },
+    {
+      "name": "initialize",
+      "docs": [
+        "Initialization Flow //",
+        "Initializes the CCIP Offramp, except for the config account (due to stack size limitations).",
+        "",
+        "The initialization of the Offramp is responsibility of Admin, nothing more than calling these",
+        "initialization methods should be done first.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for initialization."
+      ],
+      "discriminator": [
+        175,
+        175,
+        109,
+        31,
+        13,
+        152,
+        155,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "reference_addresses",
+          "writable": true,
+          "pda": {
+            "seeds": [
               {
-                "name": "page",
-                "type": "u32"
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  102,
+                  101,
+                  114,
+                  101,
+                  110,
+                  99,
+                  101,
+                  95,
+                  97,
+                  100,
+                  100,
+                  114,
+                  101,
+                  115,
+                  115,
+                  101,
+                  115
+                ]
               }
             ]
-          },
-          {
-            "name": "NestedTokenDerive",
-            "fields": [
-              {
-                "name": "token",
-                "type": "u32"
-              },
-              {
-                "name": "tokenSubstage",
-                "type": "string"
-              }
-            ]
           }
-        ]
-      }
-    },
-    {
-      "name": "MessageExecutionState",
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "Untouched"
-          },
-          {
-            "name": "InProgress"
-          },
-          {
-            "name": "Success"
-          },
-          {
-            "name": "Failure"
-          }
-        ]
-      }
-    },
-    {
-      "name": "CodeVersion",
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "Default"
-          },
-          {
-            "name": "V1"
-          }
-        ]
-      }
-    }
-  ],
-  "events": [
-    {
-      "name": "SourceChainConfigUpdated",
-      "fields": [
-        {
-          "name": "sourceChainSelector",
-          "type": "u64",
-          "index": false
         },
         {
-          "name": "sourceChainConfig",
-          "type": {
-            "defined": "SourceChainConfig"
-          },
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "SourceChainAdded",
-      "fields": [
-        {
-          "name": "sourceChainSelector",
-          "type": "u64",
-          "index": false
+          "name": "router"
         },
         {
-          "name": "sourceChainConfig",
-          "type": {
-            "defined": "SourceChainConfig"
-          },
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "OwnershipTransferRequested",
-      "fields": [
-        {
-          "name": "from",
-          "type": "publicKey",
-          "index": false
+          "name": "fee_quoter"
         },
         {
-          "name": "to",
-          "type": "publicKey",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "OwnershipTransferred",
-      "fields": [
-        {
-          "name": "from",
-          "type": "publicKey",
-          "index": false
+          "name": "rmn_remote"
         },
         {
-          "name": "to",
-          "type": "publicKey",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "ConfigSet",
-      "fields": [
-        {
-          "name": "svmChainSelector",
-          "type": "u64",
-          "index": false
-        },
-        {
-          "name": "enableManualExecutionAfter",
-          "type": "i64",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "ReferenceAddressesSet",
-      "fields": [
-        {
-          "name": "router",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "feeQuoter",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "offrampLookupTable",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "rmnRemote",
-          "type": "publicKey",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "CommitReportAccepted",
-      "fields": [
-        {
-          "name": "merkleRoot",
-          "type": {
-            "option": {
-              "defined": "MerkleRoot"
-            }
-          },
-          "index": false
-        },
-        {
-          "name": "priceUpdates",
-          "type": {
-            "defined": "PriceUpdates"
-          },
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "CommitReportPDAClosed",
-      "fields": [
-        {
-          "name": "sourceChainSelector",
-          "type": "u64",
-          "index": false
-        },
-        {
-          "name": "merkleRoot",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          },
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "SkippedAlreadyExecutedMessage",
-      "fields": [
-        {
-          "name": "sourceChainSelector",
-          "type": "u64",
-          "index": false
-        },
-        {
-          "name": "sequenceNumber",
-          "type": "u64",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "ExecutionStateChanged",
-      "fields": [
-        {
-          "name": "sourceChainSelector",
-          "type": "u64",
-          "index": false
-        },
-        {
-          "name": "sequenceNumber",
-          "type": "u64",
-          "index": false
-        },
-        {
-          "name": "messageId",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          },
-          "index": false
-        },
-        {
-          "name": "messageHash",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          },
-          "index": false
+          "name": "offramp_lookup_table"
         },
         {
           "name": "state",
-          "type": {
-            "defined": "MessageExecutionState"
-          },
-          "index": false
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "program",
+          "address": "offqSMQWgQud6WJz694LRzkeN5kMYpCHTpXQr3Rkcjm"
+        },
+        {
+          "name": "program_data"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initialize_config",
+      "docs": [
+        "Initializes the CCIP Offramp Config account.",
+        "",
+        "The initialization of the Offramp is responsibility of Admin, nothing more than calling these",
+        "initialization methods should be done first.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for initialization of the config.",
+        "* `svm_chain_selector` - The chain selector for SVM.",
+        "* `enable_execution_after` - The minimum amount of time required between a message has been committed and can be manually executed."
+      ],
+      "discriminator": [
+        208,
+        127,
+        21,
+        1,
+        194,
+        190,
+        196,
+        70
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "program",
+          "address": "offqSMQWgQud6WJz694LRzkeN5kMYpCHTpXQr3Rkcjm"
+        },
+        {
+          "name": "program_data"
+        }
+      ],
+      "args": [
+        {
+          "name": "svm_chain_selector",
+          "type": "u64"
+        },
+        {
+          "name": "enable_execution_after",
+          "type": "i64"
         }
       ]
     },
     {
-      "name": "ConfigSet",
-      "fields": [
+      "name": "manually_execute",
+      "docs": [
+        "Manually executes a report to the router.",
+        "",
+        "When a message is not being executed, then the user can trigger the execution manually.",
+        "No verification over the transmitter, but the message needs to be in some commit report.",
+        "It validates that the required time has passed since the commit and then executes the report.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for the execution.",
+        "* `raw_execution_report` - The serialized execution report containing the message and proofs."
+      ],
+      "discriminator": [
+        238,
+        219,
+        224,
+        11,
+        226,
+        248,
+        47,
+        192
+      ],
+      "accounts": [
         {
-          "name": "ocrPluginType",
-          "type": {
-            "defined": "OcrPluginType"
-          },
-          "index": false
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
         },
         {
-          "name": "configDigest",
-          "type": {
-            "array": [
-              "u8",
-              32
+          "name": "reference_addresses",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  102,
+                  101,
+                  114,
+                  101,
+                  110,
+                  99,
+                  101,
+                  95,
+                  97,
+                  100,
+                  100,
+                  114,
+                  101,
+                  115,
+                  115,
+                  101,
+                  115
+                ]
+              }
             ]
-          },
-          "index": false
+          }
+        },
+        {
+          "name": "source_chain",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  111,
+                  117,
+                  114,
+                  99,
+                  101,
+                  95,
+                  99,
+                  104,
+                  97,
+                  105,
+                  110,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "source_chain.chain_selector",
+                "account": "SourceChain"
+              }
+            ]
+          }
+        },
+        {
+          "name": "commit_report",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  109,
+                  109,
+                  105,
+                  116,
+                  95,
+                  114,
+                  101,
+                  112,
+                  111,
+                  114,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "source_chain.chain_selector",
+                "account": "SourceChain"
+              },
+              {
+                "kind": "account",
+                "path": "commit_report.merkle_root",
+                "account": "CommitReport"
+              }
+            ]
+          }
+        },
+        {
+          "name": "offramp",
+          "address": "offqSMQWgQud6WJz694LRzkeN5kMYpCHTpXQr3Rkcjm"
+        },
+        {
+          "name": "allowed_offramp",
+          "docs": [
+            "CHECK PDA of the router program verifying the signer is an allowed offramp.",
+            "If PDA does not exist, the router doesn't allow this offramp. This is just used",
+            "so that token pools and receivers can then check that the caller is an actual offramp that",
+            "has been registered in the router as such for that source chain."
+          ]
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "sysvar_instructions",
+          "address": "Sysvar1nstructions1111111111111111111111111"
+        },
+        {
+          "name": "rmn_remote"
+        },
+        {
+          "name": "rmn_remote_curses"
+        },
+        {
+          "name": "rmn_remote_config"
+        }
+      ],
+      "args": [
+        {
+          "name": "raw_execution_report",
+          "type": "bytes"
+        },
+        {
+          "name": "token_indexes",
+          "type": "bytes"
+        }
+      ]
+    },
+    {
+      "name": "set_default_code_version",
+      "docs": [
+        "Sets the default code version to be used. This is then used by the slim routing layer to determine",
+        "which version of the versioned business logic module (`instructions`) to use. Only the admin may set this.",
+        "",
+        "Shared func signature with other programs",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for updating the configuration.",
+        "* `code_version` - The new code version to be set as default."
+      ],
+      "discriminator": [
+        47,
+        151,
+        233,
+        254,
+        121,
+        82,
+        206,
+        152
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "code_version",
+          "type": {
+            "defined": {
+              "name": "CodeVersion"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "set_ocr_config",
+      "docs": [
+        "Sets the OCR configuration.",
+        "Only CCIP Admin can set the OCR configuration.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for setting the OCR configuration.",
+        "* `plugin_type` - The type of OCR plugin [0: Commit, 1: Execution].",
+        "* `config_info` - The OCR configuration information.",
+        "* `signers` - The list of signers.",
+        "* `transmitters` - The list of transmitters."
+      ],
+      "discriminator": [
+        4,
+        131,
+        107,
+        110,
+        250,
+        158,
+        244,
+        200
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "plugin_type",
+          "type": {
+            "defined": {
+              "name": "OcrPluginType"
+            }
+          }
+        },
+        {
+          "name": "config_info",
+          "type": {
+            "defined": {
+              "name": "Ocr3ConfigInfoInput"
+            }
+          }
         },
         {
           "name": "signers",
@@ -2444,48 +1929,641 @@
                 20
               ]
             }
-          },
-          "index": false
+          }
         },
         {
           "name": "transmitters",
           "type": {
-            "vec": "publicKey"
-          },
-          "index": false
-        },
-        {
-          "name": "f",
-          "type": "u8",
-          "index": false
+            "vec": "pubkey"
+          }
         }
       ]
     },
     {
-      "name": "Transmitted",
-      "fields": [
+      "name": "transfer_ownership",
+      "docs": [
+        "Transfers the ownership of the router to a new proposed owner.",
+        "",
+        "Shared func signature with other programs",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for the transfer.",
+        "* `proposed_owner` - The public key of the new proposed owner."
+      ],
+      "discriminator": [
+        65,
+        177,
+        215,
+        73,
+        53,
+        45,
+        99,
+        47
+      ],
+      "accounts": [
         {
-          "name": "ocrPluginType",
-          "type": {
-            "defined": "OcrPluginType"
-          },
-          "index": false
-        },
-        {
-          "name": "configDigest",
-          "type": {
-            "array": [
-              "u8",
-              32
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
             ]
-          },
-          "index": false
+          }
         },
         {
-          "name": "sequenceNumber",
-          "type": "u64",
-          "index": false
+          "name": "authority",
+          "signer": true
         }
+      ],
+      "args": [
+        {
+          "name": "proposed_owner",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "type_version",
+      "docs": [
+        "Returns the program type (name) and version.",
+        "Used by offchain code to easily determine which program & version is being interacted with.",
+        "",
+        "# Arguments",
+        "* `ctx` - The context"
+      ],
+      "discriminator": [
+        129,
+        251,
+        8,
+        243,
+        122,
+        229,
+        252,
+        164
+      ],
+      "accounts": [
+        {
+          "name": "clock",
+          "address": "SysvarC1ock11111111111111111111111111111111"
+        }
+      ],
+      "args": [],
+      "returns": "string"
+    },
+    {
+      "name": "update_enable_manual_execution_after",
+      "docs": [
+        "Updates the minimum amount of time required between a message being committed and when it can be manually executed.",
+        "",
+        "This is part of the OffRamp Configuration for SVM.",
+        "The Admin is the only one able to update this config.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for updating the configuration.",
+        "* `new_enable_manual_execution_after` - The new minimum amount of time required."
+      ],
+      "discriminator": [
+        157,
+        236,
+        73,
+        92,
+        84,
+        197,
+        152,
+        105
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "new_enable_manual_execution_after",
+          "type": "i64"
+        }
+      ]
+    },
+    {
+      "name": "update_reference_addresses",
+      "docs": [
+        "Updates reference addresses in the offramp contract, such as",
+        "the CCIP router, Fee Quoter, and the Offramp Lookup Table.",
+        "Only the Admin may update these addresses.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for updating the reference addresses.",
+        "* `router` - The router address to be set.",
+        "* `fee_quoter` - The fee_quoter address to be set.",
+        "* `offramp_lookup_table` - The offramp_lookup_table address to be set.",
+        "* `rmn_remote` - The rmn_remote address to be set."
+      ],
+      "discriminator": [
+        119,
+        179,
+        218,
+        249,
+        217,
+        184,
+        181,
+        9
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "reference_addresses",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  102,
+                  101,
+                  114,
+                  101,
+                  110,
+                  99,
+                  101,
+                  95,
+                  97,
+                  100,
+                  100,
+                  114,
+                  101,
+                  115,
+                  115,
+                  101,
+                  115
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "router",
+          "type": "pubkey"
+        },
+        {
+          "name": "fee_quoter",
+          "type": "pubkey"
+        },
+        {
+          "name": "offramp_lookup_table",
+          "type": "pubkey"
+        },
+        {
+          "name": "rmn_remote",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "update_source_chain_config",
+      "docs": [
+        "Updates the configuration of the source chain selector.",
+        "",
+        "The Admin is the only one able to update the source chain config.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for updating the chain selector.",
+        "* `source_chain_selector` - The source chain selector to be updated.",
+        "* `source_chain_config` - The new configuration for the source chain."
+      ],
+      "discriminator": [
+        52,
+        85,
+        37,
+        124,
+        209,
+        140,
+        181,
+        104
+      ],
+      "accounts": [
+        {
+          "name": "source_chain",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  111,
+                  117,
+                  114,
+                  99,
+                  101,
+                  95,
+                  99,
+                  104,
+                  97,
+                  105,
+                  110,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "source_chain_selector"
+              }
+            ]
+          }
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "source_chain_selector",
+          "type": "u64"
+        },
+        {
+          "name": "source_chain_config",
+          "type": {
+            "defined": {
+              "name": "SourceChainConfig"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "update_svm_chain_selector",
+      "docs": [
+        "Updates the SVM chain selector in the offramp configuration.",
+        "",
+        "This method should only be used if there was an error with the initial configuration or if the solana chain selector changes.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for updating the configuration.",
+        "* `new_chain_selector` - The new chain selector for SVM."
+      ],
+      "discriminator": [
+        164,
+        212,
+        71,
+        101,
+        166,
+        113,
+        26,
+        93
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "new_chain_selector",
+          "type": "u64"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "CommitReport",
+      "discriminator": [
+        46,
+        231,
+        247,
+        231,
+        174,
+        68,
+        34,
+        26
+      ]
+    },
+    {
+      "name": "Config",
+      "discriminator": [
+        155,
+        12,
+        170,
+        224,
+        30,
+        250,
+        204,
+        130
+      ]
+    },
+    {
+      "name": "ExecutionReportBuffer",
+      "discriminator": [
+        34,
+        31,
+        166,
+        249,
+        72,
+        98,
+        246,
+        232
+      ]
+    },
+    {
+      "name": "GlobalState",
+      "discriminator": [
+        163,
+        46,
+        74,
+        168,
+        216,
+        123,
+        133,
+        98
+      ]
+    },
+    {
+      "name": "ReferenceAddresses",
+      "discriminator": [
+        99,
+        5,
+        216,
+        212,
+        250,
+        75,
+        74,
+        12
+      ]
+    },
+    {
+      "name": "SourceChain",
+      "discriminator": [
+        242,
+        235,
+        220,
+        98,
+        252,
+        121,
+        191,
+        216
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "CommitReportAccepted",
+      "discriminator": [
+        44,
+        46,
+        77,
+        237,
+        70,
+        187,
+        170,
+        133
+      ]
+    },
+    {
+      "name": "CommitReportPDAClosed",
+      "discriminator": [
+        69,
+        240,
+        72,
+        149,
+        174,
+        18,
+        236,
+        46
+      ]
+    },
+    {
+      "name": "ConfigSet",
+      "discriminator": [
+        15,
+        104,
+        59,
+        16,
+        236,
+        241,
+        8,
+        6
+      ]
+    },
+    {
+      "name": "ExecutionStateChanged",
+      "discriminator": [
+        185,
+        176,
+        140,
+        112,
+        239,
+        78,
+        31,
+        249
+      ]
+    },
+    {
+      "name": "Ocr3ConfigSet",
+      "discriminator": [
+        131,
+        240,
+        21,
+        76,
+        61,
+        239,
+        79,
+        44
+      ]
+    },
+    {
+      "name": "OwnershipTransferRequested",
+      "discriminator": [
+        79,
+        54,
+        99,
+        123,
+        57,
+        244,
+        134,
+        35
+      ]
+    },
+    {
+      "name": "OwnershipTransferred",
+      "discriminator": [
+        172,
+        61,
+        205,
+        183,
+        250,
+        50,
+        38,
+        98
+      ]
+    },
+    {
+      "name": "ReferenceAddressesSet",
+      "discriminator": [
+        146,
+        234,
+        139,
+        115,
+        99,
+        143,
+        216,
+        191
+      ]
+    },
+    {
+      "name": "SkippedAlreadyExecutedMessage",
+      "discriminator": [
+        124,
+        136,
+        216,
+        231,
+        25,
+        232,
+        5,
+        239
+      ]
+    },
+    {
+      "name": "SourceChainAdded",
+      "discriminator": [
+        98,
+        127,
+        170,
+        88,
+        67,
+        55,
+        230,
+        8
+      ]
+    },
+    {
+      "name": "SourceChainConfigUpdated",
+      "discriminator": [
+        31,
+        205,
+        106,
+        132,
+        10,
+        220,
+        181,
+        30
+      ]
+    },
+    {
+      "name": "Transmitted",
+      "discriminator": [
+        144,
+        94,
+        142,
+        170,
+        49,
+        110,
+        67,
+        189
       ]
     }
   ],
@@ -2849,6 +2927,1085 @@
       "code": 9071,
       "name": "DefaultOwnerProposal",
       "msg": "Proposed owner is the default pubkey"
+    }
+  ],
+  "types": [
+    {
+      "name": "Any2SVMTokenTransfer",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "source_pool_address",
+            "type": "bytes"
+          },
+          {
+            "name": "dest_token_address",
+            "type": "pubkey"
+          },
+          {
+            "name": "dest_gas_amount",
+            "type": "u32"
+          },
+          {
+            "name": "extra_data",
+            "type": "bytes"
+          },
+          {
+            "name": "amount",
+            "type": {
+              "defined": {
+                "name": "CrossChainAmount"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "CcipAccountMeta",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pubkey",
+            "type": "pubkey"
+          },
+          {
+            "name": "is_signer",
+            "type": "bool"
+          },
+          {
+            "name": "is_writable",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CodeVersion",
+      "repr": {
+        "kind": "rust"
+      },
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Default"
+          },
+          {
+            "name": "V1"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CommitReport",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "chain_selector",
+            "type": "u64"
+          },
+          {
+            "name": "merkle_root",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          },
+          {
+            "name": "min_msg_nr",
+            "type": "u64"
+          },
+          {
+            "name": "max_msg_nr",
+            "type": "u64"
+          },
+          {
+            "name": "execution_states",
+            "type": "u128"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CommitReportAccepted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "merkle_root",
+            "type": {
+              "option": {
+                "defined": {
+                  "name": "MerkleRoot"
+                }
+              }
+            }
+          },
+          {
+            "name": "price_updates",
+            "type": {
+              "defined": {
+                "name": "PriceUpdates"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "CommitReportPDAClosed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "source_chain_selector",
+            "type": "u64"
+          },
+          {
+            "name": "merkle_root",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "Config",
+      "serialization": "bytemuck",
+      "repr": {
+        "kind": "c"
+      },
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "default_code_version",
+            "type": "u8"
+          },
+          {
+            "name": "_padding0",
+            "type": {
+              "array": [
+                "u8",
+                6
+              ]
+            }
+          },
+          {
+            "name": "svm_chain_selector",
+            "type": "u64"
+          },
+          {
+            "name": "enable_manual_execution_after",
+            "type": "i64"
+          },
+          {
+            "name": "_padding1",
+            "type": {
+              "array": [
+                "u8",
+                8
+              ]
+            }
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "proposed_owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "_padding2",
+            "type": {
+              "array": [
+                "u8",
+                8
+              ]
+            }
+          },
+          {
+            "name": "ocr3",
+            "type": {
+              "array": [
+                {
+                  "defined": {
+                    "name": "Ocr3Config"
+                  }
+                },
+                2
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ConfigOcrPluginType",
+      "docs": [
+        "It's not possible to store enums in zero_copy accounts, so we wrap the discriminant",
+        "in a struct to store in config."
+      ],
+      "repr": {
+        "kind": "c"
+      },
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "discriminant",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ConfigSet",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "svm_chain_selector",
+            "type": "u64"
+          },
+          {
+            "name": "enable_manual_execution_after",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CrossChainAmount",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "le_bytes",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "DeriveAccountsExecuteParams",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "execute_caller",
+            "type": "pubkey"
+          },
+          {
+            "name": "token_receiver",
+            "type": "pubkey"
+          },
+          {
+            "name": "token_transfers",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "TokenTransferAndOffchainData"
+                }
+              }
+            }
+          },
+          {
+            "name": "message_accounts",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "CcipAccountMeta"
+                }
+              }
+            }
+          },
+          {
+            "name": "source_chain_selector",
+            "type": "u64"
+          },
+          {
+            "name": "original_sender",
+            "type": "bytes"
+          },
+          {
+            "name": "merkle_root",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "buffer_id",
+            "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DeriveAccountsResponse",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "ask_again_with",
+            "docs": [
+              "If this vector is not empty, you must call the `derive_` method again including",
+              "exactly these accounts as the `remaining_accounts` field."
+            ],
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "CcipAccountMeta"
+                }
+              }
+            }
+          },
+          {
+            "name": "accounts_to_save",
+            "docs": [
+              "You must append these accounts at the end of a separate list. When `next_stage`",
+              "is finally empty, this separate list will contain all the accounts to use for the",
+              "instruction of interest."
+            ],
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "CcipAccountMeta"
+                }
+              }
+            }
+          },
+          {
+            "name": "look_up_tables_to_save",
+            "docs": [
+              "Append these look up tables at the end of a list. It will contain all LUTs",
+              "that the instruction of interest can use."
+            ],
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "current_stage",
+            "docs": [
+              "Identifies the derivation stage."
+            ],
+            "type": "string"
+          },
+          {
+            "name": "next_stage",
+            "docs": [
+              "Identifies the next derivation stage. If empty, the derivation is complete."
+            ],
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ExecutionReportBuffer",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "chunk_bitmap",
+            "type": "u64"
+          },
+          {
+            "name": "num_chunks",
+            "type": "u8"
+          },
+          {
+            "name": "chunk_length",
+            "type": "u32"
+          },
+          {
+            "name": "data",
+            "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ExecutionStateChanged",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "source_chain_selector",
+            "type": "u64"
+          },
+          {
+            "name": "sequence_number",
+            "type": "u64"
+          },
+          {
+            "name": "message_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "message_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "state",
+            "type": {
+              "defined": {
+                "name": "MessageExecutionState"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "GasPriceUpdate",
+      "docs": [
+        "Gas price for a given chain in USD; its value may contain tightly packed fields."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dest_chain_selector",
+            "type": "u64"
+          },
+          {
+            "name": "usd_per_unit_gas",
+            "type": {
+              "array": [
+                "u8",
+                28
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "GlobalState",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "latest_price_sequence_number",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MerkleRoot",
+      "docs": [
+        "Struct to hold a merkle root and an interval for a source chain"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "source_chain_selector",
+            "type": "u64"
+          },
+          {
+            "name": "on_ramp_address",
+            "type": "bytes"
+          },
+          {
+            "name": "min_seq_nr",
+            "type": "u64"
+          },
+          {
+            "name": "max_seq_nr",
+            "type": "u64"
+          },
+          {
+            "name": "merkle_root",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "MessageExecutionState",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Untouched"
+          },
+          {
+            "name": "InProgress"
+          },
+          {
+            "name": "Success"
+          },
+          {
+            "name": "Failure"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Ocr3Config",
+      "serialization": "bytemuck",
+      "repr": {
+        "kind": "c"
+      },
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "plugin_type",
+            "type": {
+              "defined": {
+                "name": "ConfigOcrPluginType"
+              }
+            }
+          },
+          {
+            "name": "config_info",
+            "type": {
+              "defined": {
+                "name": "Ocr3ConfigInfo"
+              }
+            }
+          },
+          {
+            "name": "signers",
+            "type": {
+              "array": [
+                {
+                  "array": [
+                    "u8",
+                    20
+                  ]
+                },
+                16
+              ]
+            }
+          },
+          {
+            "name": "transmitters",
+            "type": {
+              "array": [
+                {
+                  "array": [
+                    "u8",
+                    32
+                  ]
+                },
+                16
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "Ocr3ConfigInfo",
+      "serialization": "bytemuck",
+      "repr": {
+        "kind": "c"
+      },
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "config_digest",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "f",
+            "type": "u8"
+          },
+          {
+            "name": "n",
+            "type": "u8"
+          },
+          {
+            "name": "is_signature_verification_enabled",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Ocr3ConfigInfoInput",
+      "docs": [
+        "Input struct for instruction parameters (non-zero_copy, uses Borsh serialization)"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "config_digest",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "f",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Ocr3ConfigSet",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "ocr_plugin_type",
+            "type": {
+              "defined": {
+                "name": "OcrPluginType"
+              }
+            }
+          },
+          {
+            "name": "config_digest",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "signers",
+            "type": {
+              "vec": {
+                "array": [
+                  "u8",
+                  20
+                ]
+              }
+            }
+          },
+          {
+            "name": "transmitters",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "f",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OcrPluginType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Commit"
+          },
+          {
+            "name": "Execution"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OnRampAddress",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bytes",
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
+          },
+          {
+            "name": "len",
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OwnershipTransferRequested",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "from",
+            "type": "pubkey"
+          },
+          {
+            "name": "to",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OwnershipTransferred",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "from",
+            "type": "pubkey"
+          },
+          {
+            "name": "to",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PriceUpdates",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "token_price_updates",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "TokenPriceUpdate"
+                }
+              }
+            }
+          },
+          {
+            "name": "gas_price_updates",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "GasPriceUpdate"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ReferenceAddresses",
+      "serialization": "bytemuck",
+      "repr": {
+        "kind": "c"
+      },
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "router",
+            "type": "pubkey"
+          },
+          {
+            "name": "fee_quoter",
+            "type": "pubkey"
+          },
+          {
+            "name": "offramp_lookup_table",
+            "type": "pubkey"
+          },
+          {
+            "name": "rmn_remote",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ReferenceAddressesSet",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "router",
+            "type": "pubkey"
+          },
+          {
+            "name": "fee_quoter",
+            "type": "pubkey"
+          },
+          {
+            "name": "offramp_lookup_table",
+            "type": "pubkey"
+          },
+          {
+            "name": "rmn_remote",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SkippedAlreadyExecutedMessage",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "source_chain_selector",
+            "type": "u64"
+          },
+          {
+            "name": "sequence_number",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SourceChain",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "chain_selector",
+            "type": "u64"
+          },
+          {
+            "name": "state",
+            "type": {
+              "defined": {
+                "name": "SourceChainState"
+              }
+            }
+          },
+          {
+            "name": "config",
+            "type": {
+              "defined": {
+                "name": "SourceChainConfig"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "SourceChainAdded",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "source_chain_selector",
+            "type": "u64"
+          },
+          {
+            "name": "source_chain_config",
+            "type": {
+              "defined": {
+                "name": "SourceChainConfig"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "SourceChainConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "is_enabled",
+            "type": "bool"
+          },
+          {
+            "name": "is_rmn_verification_disabled",
+            "type": "bool"
+          },
+          {
+            "name": "lane_code_version",
+            "type": {
+              "defined": {
+                "name": "CodeVersion"
+              }
+            }
+          },
+          {
+            "name": "on_ramp",
+            "type": {
+              "defined": {
+                "name": "OnRampAddress"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "SourceChainConfigUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "source_chain_selector",
+            "type": "u64"
+          },
+          {
+            "name": "source_chain_config",
+            "type": {
+              "defined": {
+                "name": "SourceChainConfig"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "SourceChainState",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "min_seq_nr",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TokenPriceUpdate",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "source_token",
+            "type": "pubkey"
+          },
+          {
+            "name": "usd_per_token",
+            "type": {
+              "array": [
+                "u8",
+                28
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "TokenTransferAndOffchainData",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "transfer",
+            "type": {
+              "defined": {
+                "name": "Any2SVMTokenTransfer"
+              }
+            }
+          },
+          {
+            "name": "data",
+            "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Transmitted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "ocr_plugin_type",
+            "type": {
+              "defined": {
+                "name": "OcrPluginType"
+              }
+            }
+          },
+          {
+            "name": "config_digest",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "sequence_number",
+            "type": "u64"
+          }
+        ]
+      }
     }
   ]
 }

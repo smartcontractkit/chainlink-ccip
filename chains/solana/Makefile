@@ -1,7 +1,7 @@
 BIN_DIR = bin
 export GOPATH ?= $(shell go env GOPATH)
 export GO111MODULE ?= on
-export ANCHOR_VERSION ?=v0.29.0
+export ANCHOR_VERSION ?=v0.32.1
 export ANCHOR_IMAGE ?= backpackapp/build:$(ANCHOR_VERSION)
 export ANCHOR_BUILD_ARGS ?=
 # Allow overriding the output directory for docker builds
@@ -40,8 +40,13 @@ lint-go-fix:
 	golangci-lint run --max-issues-per-linter 0 --max-same-issues 0 --color=always --timeout 15m run --verbose --fix
 
 .PHONY: anchor-go-gen
-anchor-go-gen:
-	cd ./contracts && find ./target -mindepth 1 ! -path './target/vendor*' -exec rm -rf {} + && anchor build && cd .. && ./scripts/anchor-go-gen.sh
+anchor-go-gen: build-contracts
+	./scripts/anchor-go-gen.sh
+
+.PHONY: anchor-go-gen-clean
+anchor-go-gen-clean:
+	cd ./contracts && find ./target -mindepth 1 ! -path './target/vendor*' ! -path './target/types*' -exec rm -rf {} +
+	$(MAKE) anchor-go-gen
 
 .PHONY: format
 format:
@@ -61,7 +66,11 @@ test-token-pool-contracts-go-tests:
 
 .PHONY: build-contracts
 build-contracts:
-	cd ./contracts && anchor build
+	cd ./contracts && anchor build --no-idl -- --tools-version v1.53 && \
+	for prog in access_controller base_token_pool ccip_common ccip_offramp ccip_router burnmint_token_pool example_ccip_receiver example_ccip_sender lockrelease_token_pool external_program_cpi_stub fee_quoter mcm rmn_remote test_ccip_invalid_receiver test_ccip_receiver test_token_pool timelock ping_pong_demo cctp_token_pool; do \
+		echo "Building IDL for $$prog..." && \
+		anchor idl build -p "$$prog" -o "target/idl/$${prog}.json" || exit 1; \
+	done
 
 # Note on CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse
 # Sparse index significantly speeds up dependency fetching, supposedly default in 1.70 but anchor build was still using a slow git download
@@ -72,7 +81,7 @@ docker-build-contracts:
 		-v ${TARGET_DIR}:/workdir/target \
 		-e CARGO_TARGET_DIR=/workdir/target \
 		-e CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse \
-		${ANCHOR_IMAGE} anchor build ${ANCHOR_BUILD_ARGS}
+		${ANCHOR_IMAGE} anchor build -- --tools-version v1.53 ${ANCHOR_BUILD_ARGS}
 
 .PHONY: docker-update-contracts
 docker-update-contracts:
@@ -84,4 +93,4 @@ docker-update-contracts:
 		${ANCHOR_IMAGE} anchor keys sync
 
 .PHONY: solana-checks
-solana-checks: clippy anchor-go-gen format gomodtidy lint-go rust-tests go-tests build-contracts
+solana-checks: clippy anchor-go-gen-clean format gomodtidy lint-go rust-tests go-tests build-contracts

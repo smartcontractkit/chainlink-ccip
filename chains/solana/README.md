@@ -15,7 +15,7 @@
 
 ```bash
 # install anchor-go if needed
-go install github.com/gagliardetto/anchor-go@v0.2.3
+go install github.com/gagliardetto/anchor-go@v1.0.0
 
 # build contracts + IDL
 anchor build

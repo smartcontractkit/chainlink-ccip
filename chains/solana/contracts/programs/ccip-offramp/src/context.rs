@@ -130,6 +130,14 @@ pub struct CommitInput {
 }
 
 impl CommitInput {
+    /// During IDL build, return a default MerkleRoot to allow seeds to compile.
+    /// At runtime, this properly parses the raw data.
+    #[cfg(feature = "idl-build")]
+    pub fn root(_raw: &[u8]) -> Result<MerkleRoot> {
+        Ok(MerkleRoot::default())
+    }
+
+    #[cfg(not(feature = "idl-build"))]
     pub fn root(mut raw: &[u8]) -> Result<MerkleRoot> {
         CommitInput::deserialize(&mut raw)?
             .merkle_root
@@ -290,6 +298,67 @@ pub struct SetOcrConfig<'info> {
     pub authority: Signer<'info>,
 }
 
+/// IDL build version - uses simplified account definitions since IDL can't evaluate
+/// dynamic seeds that parse instruction data.
+#[cfg(feature = "idl-build")]
+#[derive(Accounts)]
+#[instruction(_report_context_byte_words: [[u8; 32]; 2], raw_report: Vec<u8>)]
+pub struct CommitReportContext<'info> {
+    #[account(
+        seeds = [seed::CONFIG],
+        bump,
+    )]
+    pub config: AccountLoader<'info, Config>,
+
+    #[account(
+        seeds = [seed::REFERENCE_ADDRESSES],
+        bump,
+    )]
+    pub reference_addresses: AccountLoader<'info, ReferenceAddresses>,
+
+    /// CHECK: IDL placeholder - at runtime uses dynamic seeds from parsed report
+    pub source_chain: UncheckedAccount<'info>,
+
+    /// CHECK: IDL placeholder - at runtime uses dynamic seeds from parsed report
+    #[account(mut)]
+    pub commit_report: UncheckedAccount<'info>,
+
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    pub system_program: Program<'info, System>,
+
+    /// CHECK: This is the sysvar instructions account
+    #[account(address = instructions::ID @ CcipOfframpError::InvalidInputsSysvarAccount)]
+    pub sysvar_instructions: UncheckedAccount<'info>,
+
+    /// CHECK: This is the signer for the billing CPIs
+    #[account(
+        seeds = [seed::FEE_BILLING_SIGNER],
+        bump
+    )]
+    pub fee_billing_signer: UncheckedAccount<'info>,
+
+    /// CHECK: fee quoter program account
+    pub fee_quoter: UncheckedAccount<'info>,
+
+    /// CHECK: fee quoter allowed price updater account
+    pub fee_quoter_allowed_price_updater: UncheckedAccount<'info>,
+
+    /// CHECK: fee quoter config account
+    pub fee_quoter_config: UncheckedAccount<'info>,
+
+    /// CHECK: RMN Remote program account
+    pub rmn_remote: UncheckedAccount<'info>,
+
+    /// CHECK: RMN Remote curses account
+    pub rmn_remote_curses: UncheckedAccount<'info>,
+
+    /// CHECK: RMN Remote config account
+    pub rmn_remote_config: UncheckedAccount<'info>,
+}
+
+/// Runtime version - uses full validation with dynamic seeds parsed from instruction data.
+#[cfg(not(feature = "idl-build"))]
 #[derive(Accounts)]
 #[instruction(_report_context_byte_words: [[u8; 32]; 2], raw_report: Vec<u8>)]
 pub struct CommitReportContext<'info> {

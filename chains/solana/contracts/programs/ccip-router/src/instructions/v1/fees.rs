@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface;
 use ccip_common::seed;
+#[allow(deprecated)]
 use solana_program::{program::invoke, system_instruction};
 
 use crate::messages::SVM2AnyMessage;

@@ -342,7 +342,7 @@ pub mod ccip_offramp {
     pub fn set_ocr_config(
         ctx: Context<SetOcrConfig>,
         plugin_type: OcrPluginType,
-        config_info: Ocr3ConfigInfo,
+        config_info: Ocr3ConfigInfoInput,
         signers: Vec<[u8; 20]>,
         transmitters: Vec<Pubkey>,
     ) -> Result<()> {
@@ -390,6 +390,22 @@ pub mod ccip_offramp {
     /// * `rs` - slice of R components of signatures
     /// * `ss` - slice of S components of signatures
     /// * `raw_vs` - array of V components of signatures
+    #[cfg(feature = "idl-build")]
+    pub fn commit<'info>(
+        _ctx: Context<'_, '_, 'info, 'info, CommitReportContext<'info>>,
+        _report_context_byte_words: [[u8; 32]; 2],
+        _raw_report: Vec<u8>,
+        _rs: Vec<[u8; 32]>,
+        _ss: Vec<[u8; 32]>,
+        _raw_vs: [u8; 32],
+    ) -> Result<()> {
+        Ok(())
+    }
+
+    /// * `rs` - slice of R components of signatures
+    /// * `ss` - slice of S components of signatures
+    /// * `raw_vs` - array of V components of signatures
+    #[cfg(not(feature = "idl-build"))]
     pub fn commit<'info>(
         ctx: Context<'_, '_, 'info, 'info, CommitReportContext<'info>>,
         report_context_byte_words: [[u8; 32]; 2],

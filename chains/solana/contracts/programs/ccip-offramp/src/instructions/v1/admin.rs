@@ -12,7 +12,7 @@ use crate::event::admin::{
 };
 use crate::instructions::interfaces::Admin;
 use crate::state::{
-    CodeVersion, Ocr3ConfigInfo, ReferenceAddresses, SourceChain, SourceChainConfig,
+    CodeVersion, Ocr3ConfigInfo, Ocr3ConfigInfoInput, ReferenceAddresses, SourceChain, SourceChainConfig,
     SourceChainState,
 };
 use crate::CcipOfframpError;
@@ -191,7 +191,7 @@ impl Admin for Impl {
         &self,
         ctx: Context<SetOcrConfig>,
         plugin_type: OcrPluginType,
-        config_info: Ocr3ConfigInfo,
+        config_info: Ocr3ConfigInfoInput,
         signers: Vec<[u8; 20]>,
         transmitters: Vec<Pubkey>,
     ) -> Result<()> {

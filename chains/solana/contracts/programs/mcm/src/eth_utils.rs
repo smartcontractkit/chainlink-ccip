@@ -14,10 +14,8 @@
 //!
 //! These separators ensure that hashes for different purposes cannot be reused or confused.
 use anchor_lang::prelude::*;
-use anchor_lang::solana_program::keccak::{hash, hashv, Hash, HASH_BYTES}; // use keccak256 for EVM compatibility
-use anchor_lang::solana_program::secp256k1_recover::{
-    secp256k1_recover, Secp256k1Pubkey, Secp256k1RecoverError,
-};
+use solana_keccak_hasher::{hash, hashv, Hash, HASH_BYTES}; // use keccak256 for EVM compatibility
+use solana_secp256k1_recover::{secp256k1_recover, Secp256k1Pubkey, Secp256k1RecoverError};
 
 use crate::error::*;
 use crate::state::root::RootMetadataInput;
@@ -243,7 +241,8 @@ impl RootMetadataInput {
     }
 }
 
-#[cfg(test)]
+// Skip tests during IDL build since keccak is not available via anchor_lang::solana_program
+#[cfg(all(test, not(feature = "idl-build")))]
 mod tests {
     use super::*;
 
@@ -264,19 +263,18 @@ mod tests {
     }
 
     mod domain_separators {
-        use anchor_lang::solana_program::keccak;
+        use solana_keccak_hasher::hash; // use keccak256 for EVM compatibility
 
         use super::*;
 
         #[test]
         fn verify_domain_separators() {
-            let metadata =
-                keccak::hash("MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_METADATA_SOLANA".as_bytes());
+            let metadata = hash("MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_METADATA_SOLANA".as_bytes());
             assert_eq!(
                 &metadata.to_bytes(),
                 MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_METADATA
             );
-            let op = keccak::hash("MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_OP_SOLANA".as_bytes());
+            let op = hash("MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_OP_SOLANA".as_bytes());
             assert_eq!(&op.to_bytes(), MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_OP);
         }
     }

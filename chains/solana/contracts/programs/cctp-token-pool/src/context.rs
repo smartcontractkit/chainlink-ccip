@@ -16,9 +16,9 @@ const MAX_POOL_CHAIN_CONFIG_V: u8 = 1;
 const ANCHOR_DISCRIMINATOR: usize = 8;
 
 pub const TOKEN_MESSENGER_MINTER: Pubkey =
-    solana_program::pubkey!("CCTPiPYPc6AsJuwueEnWgSgucamXDZwBd53dQ11YiKX3");
+    anchor_lang::pubkey!("CCTPiPYPc6AsJuwueEnWgSgucamXDZwBd53dQ11YiKX3");
 pub const MESSAGE_TRANSMITTER: Pubkey =
-    solana_program::pubkey!("CCTPmbSD7gX1bxKPAmg77w8oFzNFpaQiQUWD43TKaecd");
+    anchor_lang::pubkey!("CCTPmbSD7gX1bxKPAmg77w8oFzNFpaQiQUWD43TKaecd");
 
 pub const MESSAGE_SENT_EVENT_SEED: &[u8] = b"ccip_cctp_message_sent_event";
 

@@ -9,7 +9,7 @@
 
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::instruction::Instruction;
-use anchor_lang::solana_program::keccak::{hashv, HASH_BYTES};
+use solana_keccak_hasher::{hashv, HASH_BYTES};
 
 use crate::constants::ANCHOR_DISCRIMINATOR;
 
@@ -205,10 +205,12 @@ impl From<&AccountMeta> for InstructionAccount {
     }
 }
 
-#[cfg(test)]
+// Skip tests during IDL build since keccak is not available in newer Solana versions
+#[cfg(all(test, not(feature = "idl-build")))]
 mod tests {
     use super::*;
-    use anchor_lang::solana_program::{keccak::HASH_BYTES, pubkey::Pubkey};
+    use anchor_lang::solana_program::pubkey::Pubkey;
+    use solana_keccak_hasher::HASH_BYTES; // use keccak256 for EVM compatibility
 
     fn create_test_operation(
         instructions: Vec<InstructionData>,

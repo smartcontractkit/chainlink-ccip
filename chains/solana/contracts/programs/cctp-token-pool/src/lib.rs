@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::instruction::{AccountMeta, Instruction};
-use solana_program::program::{get_return_data, invoke_signed};
+use anchor_lang::solana_program::program::{get_return_data, invoke_signed};
 
 use base_token_pool::common::*;
 use base_token_pool::rate_limiter::*;

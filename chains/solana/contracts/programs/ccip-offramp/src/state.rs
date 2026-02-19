@@ -1,6 +1,5 @@
 use std::fmt::Display;
 
-use anchor_lang::prelude::borsh::{BorshDeserialize, BorshSerialize};
 use anchor_lang::prelude::*;
 
 use crate::messages::Any2SVMTokenTransfer;
@@ -8,7 +7,7 @@ use crate::{CcipOfframpError, ConfigOcrPluginType, OcrPluginType};
 
 // zero_copy is used to prevent hitting stack/heap memory limits
 #[account(zero_copy)]
-#[derive(InitSpace, AnchorSerialize, AnchorDeserialize)]
+#[derive(InitSpace)]
 pub struct Config {
     pub version: u8,
     pub default_code_version: u8,
@@ -148,7 +147,7 @@ impl ToMeta for CcipAccountMeta {
 }
 
 #[zero_copy]
-#[derive(AnchorSerialize, AnchorDeserialize, InitSpace, Default)]
+#[derive(InitSpace, Default)]
 pub struct Ocr3ConfigInfo {
     pub config_digest: [u8; 32], // 32-byte hash of configuration
     pub f: u8,                   // f+1 = number of signatures per report
@@ -156,11 +155,18 @@ pub struct Ocr3ConfigInfo {
     pub is_signature_verification_enabled: u8, // bool -> bytemuck::Pod compliant required for zero_copy
 }
 
+/// Input struct for instruction parameters (non-zero_copy, uses Borsh serialization)
+#[derive(Clone, AnchorSerialize, AnchorDeserialize)]
+pub struct Ocr3ConfigInfoInput {
+    pub config_digest: [u8; 32],
+    pub f: u8,
+}
+
 // TODO: do we need to verify signers and transmitters are different? (between the two groups)
 // signers: pubkey is 20-byte address, secp256k1 curve ECDSA
 // transmitters: 32-byte pubkey, ed25519
 
-#[derive(AnchorSerialize, AnchorDeserialize, InitSpace)]
+#[derive(InitSpace)]
 #[zero_copy]
 pub struct Ocr3Config {
     pub plugin_type: ConfigOcrPluginType, // plugin identifier for validation (example: ccip:commit = 0, ccip:execute = 1)
@@ -326,7 +332,7 @@ impl TryFrom<u128> for MessageExecutionState {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, InitSpace, BorshSerialize, BorshDeserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, InitSpace, AnchorSerialize, AnchorDeserialize)]
 #[repr(u8)]
 pub enum CodeVersion {
     Default = 0,

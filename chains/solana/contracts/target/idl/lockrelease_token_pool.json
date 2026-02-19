@@ -1,586 +1,270 @@
 {
-  "version": "1.6.1-candidate",
-  "name": "lockrelease_token_pool",
+  "address": "8eqh8wppT9c5rw4ERqNCffvU6cNFJWff9WmkcYtmGiqC",
+  "metadata": {
+    "name": "lockrelease_token_pool",
+    "version": "1.6.1-candidate",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
   "instructions": [
     {
-      "name": "initGlobalConfig",
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "programData",
-          "isMut": false,
-          "isSigner": false
-        }
+      "name": "accept_ownership",
+      "discriminator": [
+        172,
+        23,
+        43,
+        13,
+        238,
+        213,
+        85,
+        150
       ],
-      "args": [
-        {
-          "name": "routerAddress",
-          "type": "publicKey"
-        },
-        {
-          "name": "rmnAddress",
-          "type": "publicKey"
-        }
-      ]
-    },
-    {
-      "name": "updateSelfServedAllowed",
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "programData",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "selfServedAllowed",
-          "type": "bool"
-        }
-      ]
-    },
-    {
-      "name": "updateDefaultRouter",
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "programData",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "routerAddress",
-          "type": "publicKey"
-        }
-      ]
-    },
-    {
-      "name": "updateDefaultRmn",
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "programData",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "rmnAddress",
-          "type": "publicKey"
-        }
-      ]
-    },
-    {
-      "name": "initialize",
       "accounts": [
         {
           "name": "state",
-          "isMut": true,
-          "isSigner": false
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  99,
+                  105,
+                  112,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
         },
         {
-          "name": "mint",
-          "isMut": false,
-          "isSigner": false
+          "name": "mint"
         },
         {
           "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "programData",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
+          "signer": true
         }
       ],
       "args": []
     },
     {
-      "name": "typeVersion",
-      "docs": [
-        "Returns the program type (name) and version.",
-        "Used by offchain code to easily determine which program & version is being interacted with.",
-        "",
-        "# Arguments",
-        "* `ctx` - The context"
+      "name": "append_remote_pool_addresses",
+      "discriminator": [
+        172,
+        57,
+        83,
+        55,
+        70,
+        112,
+        26,
+        197
       ],
-      "accounts": [
-        {
-          "name": "clock",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [],
-      "returns": "string"
-    },
-    {
-      "name": "transferOwnership",
       "accounts": [
         {
           "name": "state",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "mint",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        }
-      ],
-      "args": [
-        {
-          "name": "proposedOwner",
-          "type": "publicKey"
-        }
-      ]
-    },
-    {
-      "name": "acceptOwnership",
-      "accounts": [
-        {
-          "name": "state",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "mint",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "setRouter",
-      "accounts": [
-        {
-          "name": "state",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "mint",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "programData",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "newRouter",
-          "type": "publicKey"
-        }
-      ]
-    },
-    {
-      "name": "setRmn",
-      "accounts": [
-        {
-          "name": "state",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "mint",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "programData",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "rmnAddress",
-          "type": "publicKey"
-        }
-      ]
-    },
-    {
-      "name": "initializeStateVersion",
-      "accounts": [
-        {
-          "name": "state",
-          "isMut": true,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "mint",
-          "type": "publicKey"
-        }
-      ]
-    },
-    {
-      "name": "initChainRemoteConfig",
-      "accounts": [
-        {
-          "name": "state",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "chainConfig",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "remoteChainSelector",
-          "type": "u64"
-        },
-        {
-          "name": "mint",
-          "type": "publicKey"
-        },
-        {
-          "name": "cfg",
-          "type": {
-            "defined": "RemoteConfig"
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  99,
+                  105,
+                  112,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "mint"
+              }
+            ]
           }
-        }
-      ]
-    },
-    {
-      "name": "editChainRemoteConfig",
-      "accounts": [
-        {
-          "name": "state",
-          "isMut": false,
-          "isSigner": false
         },
         {
-          "name": "chainConfig",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "remoteChainSelector",
-          "type": "u64"
-        },
-        {
-          "name": "mint",
-          "type": "publicKey"
-        },
-        {
-          "name": "cfg",
-          "type": {
-            "defined": "RemoteConfig"
+          "name": "chain_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  99,
+                  105,
+                  112,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  99,
+                  104,
+                  97,
+                  105,
+                  110,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "remote_chain_selector"
+              },
+              {
+                "kind": "arg",
+                "path": "mint"
+              }
+            ]
           }
-        }
-      ]
-    },
-    {
-      "name": "appendRemotePoolAddresses",
-      "accounts": [
-        {
-          "name": "state",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "chainConfig",
-          "isMut": true,
-          "isSigner": false
         },
         {
           "name": "authority",
-          "isMut": true,
-          "isSigner": true
+          "writable": true,
+          "signer": true
         },
         {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "remoteChainSelector",
+          "name": "remote_chain_selector",
           "type": "u64"
         },
         {
-          "name": "mint",
-          "type": "publicKey"
+          "name": "_mint",
+          "type": "pubkey"
         },
         {
           "name": "addresses",
           "type": {
             "vec": {
-              "defined": "RemoteAddress"
+              "defined": {
+                "name": "RemoteAddress"
+              }
             }
           }
         }
       ]
     },
     {
-      "name": "setChainRateLimit",
+      "name": "configure_allow_list",
+      "discriminator": [
+        18,
+        180,
+        102,
+        187,
+        209,
+        0,
+        130,
+        191
+      ],
       "accounts": [
         {
           "name": "state",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "chainConfig",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        }
-      ],
-      "args": [
-        {
-          "name": "remoteChainSelector",
-          "type": "u64"
-        },
-        {
-          "name": "mint",
-          "type": "publicKey"
-        },
-        {
-          "name": "inbound",
-          "type": {
-            "defined": "RateLimitConfig"
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  99,
+                  105,
+                  112,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
           }
         },
         {
-          "name": "outbound",
-          "type": {
-            "defined": "RateLimitConfig"
-          }
-        }
-      ]
-    },
-    {
-      "name": "setRateLimitAdmin",
-      "accounts": [
-        {
-          "name": "state",
-          "isMut": true,
-          "isSigner": false
+          "name": "mint"
         },
         {
           "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        }
-      ],
-      "args": [
-        {
-          "name": "mint",
-          "type": "publicKey"
+          "writable": true,
+          "signer": true
         },
         {
-          "name": "newRateLimitAdmin",
-          "type": "publicKey"
-        }
-      ]
-    },
-    {
-      "name": "deleteChainConfig",
-      "accounts": [
-        {
-          "name": "state",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "chainConfig",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        }
-      ],
-      "args": [
-        {
-          "name": "remoteChainSelector",
-          "type": "u64"
-        },
-        {
-          "name": "mint",
-          "type": "publicKey"
-        }
-      ]
-    },
-    {
-      "name": "configureAllowList",
-      "accounts": [
-        {
-          "name": "state",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "mint",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
           "name": "add",
           "type": {
-            "vec": "publicKey"
+            "vec": "pubkey"
           }
         },
         {
@@ -590,282 +274,861 @@
       ]
     },
     {
-      "name": "removeFromAllowList",
+      "name": "delete_chain_config",
+      "discriminator": [
+        241,
+        159,
+        142,
+        210,
+        64,
+        173,
+        77,
+        179
+      ],
       "accounts": [
         {
           "name": "state",
-          "isMut": true,
-          "isSigner": false
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  99,
+                  105,
+                  112,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "mint"
+              }
+            ]
+          }
         },
         {
-          "name": "mint",
-          "isMut": false,
-          "isSigner": false
+          "name": "chain_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  99,
+                  105,
+                  112,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  99,
+                  104,
+                  97,
+                  105,
+                  110,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "remote_chain_selector"
+              },
+              {
+                "kind": "arg",
+                "path": "mint"
+              }
+            ]
+          }
         },
         {
           "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
+          "writable": true,
+          "signer": true
         }
       ],
       "args": [
         {
-          "name": "remove",
+          "name": "remote_chain_selector",
+          "type": "u64"
+        },
+        {
+          "name": "mint",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "edit_chain_remote_config",
+      "discriminator": [
+        149,
+        112,
+        186,
+        72,
+        116,
+        217,
+        159,
+        175
+      ],
+      "accounts": [
+        {
+          "name": "state",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  99,
+                  105,
+                  112,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "chain_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  99,
+                  105,
+                  112,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  99,
+                  104,
+                  97,
+                  105,
+                  110,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "remote_chain_selector"
+              },
+              {
+                "kind": "arg",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "remote_chain_selector",
+          "type": "u64"
+        },
+        {
+          "name": "mint",
+          "type": "pubkey"
+        },
+        {
+          "name": "cfg",
           "type": {
-            "vec": "publicKey"
+            "defined": {
+              "name": "RemoteConfig"
+            }
           }
         }
       ]
     },
     {
-      "name": "releaseOrMintTokens",
+      "name": "init_chain_remote_config",
+      "discriminator": [
+        21,
+        150,
+        133,
+        36,
+        2,
+        116,
+        199,
+        129
+      ],
       "accounts": [
         {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "offrampProgram",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK offramp program: exists only to derive the allowed offramp PDA",
-            "and the authority PDA."
-          ]
-        },
-        {
-          "name": "allowedOfframp",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK PDA of the router program verifying the signer is an allowed offramp.",
-            "If PDA does not exist, the router doesn't allow this offramp"
-          ]
-        },
-        {
           "name": "state",
-          "isMut": false,
-          "isSigner": false
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  99,
+                  105,
+                  112,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "mint"
+              }
+            ]
+          }
         },
         {
-          "name": "tokenProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "chain_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  99,
+                  105,
+                  112,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  99,
+                  104,
+                  97,
+                  105,
+                  110,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "remote_chain_selector"
+              },
+              {
+                "kind": "arg",
+                "path": "mint"
+              }
+            ]
+          }
         },
         {
-          "name": "mint",
-          "isMut": true,
-          "isSigner": false
+          "name": "authority",
+          "writable": true,
+          "signer": true
         },
         {
-          "name": "poolSigner",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "poolTokenAccount",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "chainConfig",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "rmnRemote",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "rmnRemoteCurses",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "rmnRemoteConfig",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "receiverTokenAccount",
-          "isMut": true,
-          "isSigner": false
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "releaseOrMint",
+          "name": "remote_chain_selector",
+          "type": "u64"
+        },
+        {
+          "name": "mint",
+          "type": "pubkey"
+        },
+        {
+          "name": "cfg",
           "type": {
-            "defined": "ReleaseOrMintInV1"
+            "defined": {
+              "name": "RemoteConfig"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "init_global_config",
+      "discriminator": [
+        140,
+        136,
+        214,
+        48,
+        87,
+        0,
+        120,
+        255
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "program",
+          "address": "8eqh8wppT9c5rw4ERqNCffvU6cNFJWff9WmkcYtmGiqC"
+        },
+        {
+          "name": "program_data"
+        }
+      ],
+      "args": [
+        {
+          "name": "router_address",
+          "type": "pubkey"
+        },
+        {
+          "name": "rmn_address",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "initialize",
+      "discriminator": [
+        175,
+        175,
+        109,
+        31,
+        13,
+        152,
+        155,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  99,
+                  105,
+                  112,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "program",
+          "address": "8eqh8wppT9c5rw4ERqNCffvU6cNFJWff9WmkcYtmGiqC"
+        },
+        {
+          "name": "program_data"
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initialize_state_version",
+      "discriminator": [
+        54,
+        186,
+        181,
+        26,
+        2,
+        198,
+        200,
+        158
+      ],
+      "accounts": [
+        {
+          "name": "state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  99,
+                  105,
+                  112,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "mint"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "_mint",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "lock_or_burn_tokens",
+      "discriminator": [
+        114,
+        161,
+        94,
+        29,
+        147,
+        25,
+        232,
+        191
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "state",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  99,
+                  105,
+                  112,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program"
+        },
+        {
+          "name": "mint",
+          "writable": true
+        },
+        {
+          "name": "pool_signer",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  99,
+                  105,
+                  112,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  115,
+                  105,
+                  103,
+                  110,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "pool_token_account",
+          "writable": true
+        },
+        {
+          "name": "rmn_remote"
+        },
+        {
+          "name": "rmn_remote_curses"
+        },
+        {
+          "name": "rmn_remote_config"
+        },
+        {
+          "name": "chain_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  99,
+                  105,
+                  112,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  99,
+                  104,
+                  97,
+                  105,
+                  110,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "lock_or_burn.remote_chain_selector"
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "lock_or_burn",
+          "type": {
+            "defined": {
+              "name": "LockOrBurnInV1"
+            }
           }
         }
       ],
       "returns": {
-        "defined": "ReleaseOrMintOutV1"
+        "defined": {
+          "name": "LockOrBurnOutV1"
+        }
       }
     },
     {
-      "name": "lockOrBurnTokens",
+      "name": "provide_liquidity",
+      "discriminator": [
+        40,
+        110,
+        107,
+        116,
+        174,
+        127,
+        97,
+        204
+      ],
       "accounts": [
         {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
           "name": "state",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "tokenProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "mint",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "poolSigner",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "poolTokenAccount",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "rmnRemote",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "rmnRemoteCurses",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "rmnRemoteConfig",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "chainConfig",
-          "isMut": true,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "lockOrBurn",
-          "type": {
-            "defined": "LockOrBurnInV1"
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  99,
+                  105,
+                  112,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
           }
-        }
-      ],
-      "returns": {
-        "defined": "LockOrBurnOutV1"
-      }
-    },
-    {
-      "name": "setRebalancer",
-      "accounts": [
+        },
         {
-          "name": "state",
-          "isMut": true,
-          "isSigner": false
+          "name": "token_program"
         },
         {
           "name": "mint",
-          "isMut": false,
-          "isSigner": false
+          "writable": true
+        },
+        {
+          "name": "pool_signer",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  99,
+                  105,
+                  112,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  115,
+                  105,
+                  103,
+                  110,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "pool_token_account",
+          "writable": true
+        },
+        {
+          "name": "remote_token_account",
+          "writable": true
         },
         {
           "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        }
-      ],
-      "args": [
-        {
-          "name": "rebalancer",
-          "type": "publicKey"
-        }
-      ]
-    },
-    {
-      "name": "setCanAcceptLiquidity",
-      "accounts": [
-        {
-          "name": "state",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "mint",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        }
-      ],
-      "args": [
-        {
-          "name": "allow",
-          "type": "bool"
-        }
-      ]
-    },
-    {
-      "name": "provideLiquidity",
-      "accounts": [
-        {
-          "name": "state",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "tokenProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "mint",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "poolSigner",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "poolTokenAccount",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "remoteTokenAccount",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
+          "signer": true
         }
       ],
       "args": [
@@ -876,42 +1139,1176 @@
       ]
     },
     {
-      "name": "withdrawLiquidity",
+      "name": "release_or_mint_tokens",
+      "discriminator": [
+        92,
+        100,
+        150,
+        198,
+        252,
+        63,
+        164,
+        228
+      ],
       "accounts": [
         {
-          "name": "state",
-          "isMut": false,
-          "isSigner": false
+          "name": "authority",
+          "signer": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  120,
+                  116,
+                  101,
+                  114,
+                  110,
+                  97,
+                  108,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108,
+                  115,
+                  95,
+                  115,
+                  105,
+                  103,
+                  110,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "const",
+                "value": [
+                  113,
+                  179,
+                  90,
+                  202,
+                  245,
+                  125,
+                  141,
+                  246,
+                  8,
+                  132,
+                  0,
+                  73,
+                  169,
+                  26,
+                  164,
+                  68,
+                  173,
+                  167,
+                  244,
+                  230,
+                  168,
+                  217,
+                  242,
+                  187,
+                  176,
+                  247,
+                  109,
+                  115,
+                  172,
+                  116,
+                  227,
+                  231
+                ]
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "offramp_program"
+            }
+          }
         },
         {
-          "name": "tokenProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "offramp_program",
+          "docs": [
+            "CHECK offramp program: exists only to derive the allowed offramp PDA",
+            "and the authority PDA."
+          ]
+        },
+        {
+          "name": "allowed_offramp",
+          "docs": [
+            "CHECK PDA of the router program verifying the signer is an allowed offramp.",
+            "If PDA does not exist, the router doesn't allow this offramp"
+          ]
+        },
+        {
+          "name": "state",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  99,
+                  105,
+                  112,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program"
         },
         {
           "name": "mint",
-          "isMut": true,
-          "isSigner": false
+          "writable": true
         },
         {
-          "name": "poolSigner",
-          "isMut": false,
-          "isSigner": false
+          "name": "pool_signer",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  99,
+                  105,
+                  112,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  115,
+                  105,
+                  103,
+                  110,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
         },
         {
-          "name": "poolTokenAccount",
-          "isMut": true,
-          "isSigner": false
+          "name": "pool_token_account",
+          "writable": true
         },
         {
-          "name": "remoteTokenAccount",
-          "isMut": true,
-          "isSigner": false
+          "name": "chain_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  99,
+                  105,
+                  112,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  99,
+                  104,
+                  97,
+                  105,
+                  110,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "release_or_mint.remote_chain_selector"
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "rmn_remote"
+        },
+        {
+          "name": "rmn_remote_curses"
+        },
+        {
+          "name": "rmn_remote_config"
+        },
+        {
+          "name": "receiver_token_account",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "release_or_mint",
+          "type": {
+            "defined": {
+              "name": "ReleaseOrMintInV1"
+            }
+          }
+        }
+      ],
+      "returns": {
+        "defined": {
+          "name": "ReleaseOrMintOutV1"
+        }
+      }
+    },
+    {
+      "name": "remove_from_allow_list",
+      "discriminator": [
+        44,
+        46,
+        123,
+        213,
+        40,
+        11,
+        107,
+        18
+      ],
+      "accounts": [
+        {
+          "name": "state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  99,
+                  105,
+                  112,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint"
         },
         {
           "name": "authority",
-          "isMut": false,
-          "isSigner": true
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "remove",
+          "type": {
+            "vec": "pubkey"
+          }
+        }
+      ]
+    },
+    {
+      "name": "set_can_accept_liquidity",
+      "discriminator": [
+        118,
+        130,
+        209,
+        172,
+        190,
+        90,
+        146,
+        130
+      ],
+      "accounts": [
+        {
+          "name": "state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  99,
+                  105,
+                  112,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "allow",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "set_chain_rate_limit",
+      "discriminator": [
+        188,
+        188,
+        161,
+        37,
+        100,
+        249,
+        123,
+        170
+      ],
+      "accounts": [
+        {
+          "name": "state",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  99,
+                  105,
+                  112,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "chain_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  99,
+                  105,
+                  112,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  99,
+                  104,
+                  97,
+                  105,
+                  110,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "remote_chain_selector"
+              },
+              {
+                "kind": "arg",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "remote_chain_selector",
+          "type": "u64"
+        },
+        {
+          "name": "mint",
+          "type": "pubkey"
+        },
+        {
+          "name": "inbound",
+          "type": {
+            "defined": {
+              "name": "RateLimitConfig"
+            }
+          }
+        },
+        {
+          "name": "outbound",
+          "type": {
+            "defined": {
+              "name": "RateLimitConfig"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "set_rate_limit_admin",
+      "discriminator": [
+        21,
+        182,
+        126,
+        128,
+        31,
+        241,
+        37,
+        34
+      ],
+      "accounts": [
+        {
+          "name": "state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  99,
+                  105,
+                  112,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "_mint",
+          "type": "pubkey"
+        },
+        {
+          "name": "new_rate_limit_admin",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "set_rebalancer",
+      "discriminator": [
+        28,
+        161,
+        168,
+        250,
+        215,
+        4,
+        144,
+        154
+      ],
+      "accounts": [
+        {
+          "name": "state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  99,
+                  105,
+                  112,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "rebalancer",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "set_rmn",
+      "discriminator": [
+        252,
+        89,
+        60,
+        179,
+        198,
+        54,
+        169,
+        120
+      ],
+      "accounts": [
+        {
+          "name": "state",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  99,
+                  105,
+                  112,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "program",
+          "address": "8eqh8wppT9c5rw4ERqNCffvU6cNFJWff9WmkcYtmGiqC"
+        },
+        {
+          "name": "program_data"
+        }
+      ],
+      "args": [
+        {
+          "name": "rmn_address",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "set_router",
+      "discriminator": [
+        236,
+        248,
+        107,
+        200,
+        151,
+        160,
+        44,
+        250
+      ],
+      "accounts": [
+        {
+          "name": "state",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  99,
+                  105,
+                  112,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "program",
+          "address": "8eqh8wppT9c5rw4ERqNCffvU6cNFJWff9WmkcYtmGiqC"
+        },
+        {
+          "name": "program_data"
+        }
+      ],
+      "args": [
+        {
+          "name": "new_router",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "transfer_ownership",
+      "discriminator": [
+        65,
+        177,
+        215,
+        73,
+        53,
+        45,
+        99,
+        47
+      ],
+      "accounts": [
+        {
+          "name": "state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  99,
+                  105,
+                  112,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "proposed_owner",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "type_version",
+      "docs": [
+        "Returns the program type (name) and version.",
+        "Used by offchain code to easily determine which program & version is being interacted with.",
+        "",
+        "# Arguments",
+        "* `ctx` - The context"
+      ],
+      "discriminator": [
+        129,
+        251,
+        8,
+        243,
+        122,
+        229,
+        252,
+        164
+      ],
+      "accounts": [
+        {
+          "name": "clock",
+          "address": "SysvarC1ock11111111111111111111111111111111"
+        }
+      ],
+      "args": [],
+      "returns": "string"
+    },
+    {
+      "name": "update_default_rmn",
+      "discriminator": [
+        204,
+        186,
+        36,
+        125,
+        180,
+        133,
+        227,
+        162
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "program",
+          "address": "8eqh8wppT9c5rw4ERqNCffvU6cNFJWff9WmkcYtmGiqC"
+        },
+        {
+          "name": "program_data"
+        }
+      ],
+      "args": [
+        {
+          "name": "rmn_address",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "update_default_router",
+      "discriminator": [
+        29,
+        86,
+        6,
+        222,
+        73,
+        220,
+        6,
+        186
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "program",
+          "address": "8eqh8wppT9c5rw4ERqNCffvU6cNFJWff9WmkcYtmGiqC"
+        },
+        {
+          "name": "program_data"
+        }
+      ],
+      "args": [
+        {
+          "name": "router_address",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "update_self_served_allowed",
+      "discriminator": [
+        210,
+        165,
+        57,
+        132,
+        64,
+        203,
+        100,
+        73
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "program",
+          "address": "8eqh8wppT9c5rw4ERqNCffvU6cNFJWff9WmkcYtmGiqC"
+        },
+        {
+          "name": "program_data"
+        }
+      ],
+      "args": [
+        {
+          "name": "self_served_allowed",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "withdraw_liquidity",
+      "discriminator": [
+        149,
+        158,
+        33,
+        185,
+        47,
+        243,
+        253,
+        31
+      ],
+      "accounts": [
+        {
+          "name": "state",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  99,
+                  105,
+                  112,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program"
+        },
+        {
+          "name": "mint",
+          "writable": true
+        },
+        {
+          "name": "pool_signer",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  99,
+                  105,
+                  112,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  115,
+                  105,
+                  103,
+                  110,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "pool_token_account",
+          "writable": true
+        },
+        {
+          "name": "remote_token_account",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "signer": true
         }
       ],
       "args": [
@@ -924,6 +2321,217 @@
   ],
   "accounts": [
     {
+      "name": "ChainConfig",
+      "discriminator": [
+        13,
+        177,
+        233,
+        141,
+        212,
+        29,
+        148,
+        56
+      ]
+    },
+    {
+      "name": "PoolConfig",
+      "discriminator": [
+        26,
+        108,
+        14,
+        123,
+        116,
+        230,
+        129,
+        43
+      ]
+    },
+    {
+      "name": "State",
+      "discriminator": [
+        216,
+        146,
+        107,
+        94,
+        104,
+        75,
+        182,
+        177
+      ]
+    }
+  ],
+  "types": [
+    {
+      "name": "BaseChain",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "remote",
+            "type": {
+              "defined": {
+                "name": "RemoteConfig"
+              }
+            }
+          },
+          {
+            "name": "inbound_rate_limit",
+            "type": {
+              "defined": {
+                "name": "RateLimitTokenBucket"
+              }
+            }
+          },
+          {
+            "name": "outbound_rate_limit",
+            "type": {
+              "defined": {
+                "name": "RateLimitTokenBucket"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "BaseConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "token_program",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "decimals",
+            "type": "u8"
+          },
+          {
+            "name": "pool_signer",
+            "type": "pubkey"
+          },
+          {
+            "name": "pool_token_account",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "proposed_owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "rate_limit_admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "router_onramp_authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "router",
+            "type": "pubkey"
+          },
+          {
+            "name": "rebalancer",
+            "type": "pubkey"
+          },
+          {
+            "name": "can_accept_liquidity",
+            "type": "bool"
+          },
+          {
+            "name": "list_enabled",
+            "type": "bool"
+          },
+          {
+            "name": "allow_list",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "rmn_remote",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ChainConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "base",
+            "type": {
+              "defined": {
+                "name": "BaseChain"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "LockOrBurnInV1",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "receiver",
+            "type": "bytes"
+          },
+          {
+            "name": "remote_chain_selector",
+            "type": "u64"
+          },
+          {
+            "name": "original_sender",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "local_token",
+            "type": "pubkey"
+          },
+          {
+            "name": "msg_total_nonce",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LockOrBurnOutV1",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dest_token_address",
+            "type": {
+              "defined": {
+                "name": "RemoteAddress"
+              }
+            }
+          },
+          {
+            "name": "dest_pool_data",
+            "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
       "name": "PoolConfig",
       "type": {
         "kind": "struct",
@@ -933,16 +2541,174 @@
             "type": "u8"
           },
           {
-            "name": "selfServedAllowed",
+            "name": "self_served_allowed",
             "type": "bool"
           },
           {
             "name": "router",
-            "type": "publicKey"
+            "type": "pubkey"
           },
           {
-            "name": "rmnRemote",
-            "type": "publicKey"
+            "name": "rmn_remote",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RateLimitConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "enabled",
+            "type": "bool"
+          },
+          {
+            "name": "capacity",
+            "type": "u64"
+          },
+          {
+            "name": "rate",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RateLimitTokenBucket",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "tokens",
+            "type": "u64"
+          },
+          {
+            "name": "last_updated",
+            "type": "u64"
+          },
+          {
+            "name": "cfg",
+            "type": {
+              "defined": {
+                "name": "RateLimitConfig"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ReleaseOrMintInV1",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "original_sender",
+            "type": {
+              "defined": {
+                "name": "RemoteAddress"
+              }
+            }
+          },
+          {
+            "name": "remote_chain_selector",
+            "type": "u64"
+          },
+          {
+            "name": "receiver",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "local_token",
+            "type": "pubkey"
+          },
+          {
+            "name": "source_pool_address",
+            "docs": [
+              "@dev WARNING: sourcePoolAddress should be checked prior to any processing of funds. Make sure it matches the",
+              "expected pool address for the given remoteChainSelector."
+            ],
+            "type": {
+              "defined": {
+                "name": "RemoteAddress"
+              }
+            }
+          },
+          {
+            "name": "source_pool_data",
+            "type": "bytes"
+          },
+          {
+            "name": "offchain_token_data",
+            "docs": [
+              "@dev WARNING: offchainTokenData is untrusted data."
+            ],
+            "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ReleaseOrMintOutV1",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "destination_amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RemoteAddress",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "address",
+            "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RemoteConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool_addresses",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "RemoteAddress"
+                }
+              }
+            }
+          },
+          {
+            "name": "token_address",
+            "type": {
+              "defined": {
+                "name": "RemoteAddress"
+              }
+            }
+          },
+          {
+            "name": "decimals",
+            "type": "u8"
           }
         ]
       }
@@ -959,21 +2725,9 @@
           {
             "name": "config",
             "type": {
-              "defined": "BaseConfig"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "ChainConfig",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "base",
-            "type": {
-              "defined": "BaseChain"
+              "defined": {
+                "name": "BaseConfig"
+              }
             }
           }
         ]

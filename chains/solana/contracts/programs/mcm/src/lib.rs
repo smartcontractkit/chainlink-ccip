@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 
 declare_id!("5vNJx78mz7KVMjhuipyr9jKBKcMrKYGdjGkgE4LUmjKk");
 
-use program::Mcm;
+use crate::program::Mcm;
 
 mod constant;
 pub use constant::*;
