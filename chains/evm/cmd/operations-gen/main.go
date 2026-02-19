@@ -389,6 +389,16 @@ func collectAllStructDefs(info *ContractInfo) {
 	for _, funcInfo := range info.Functions {
 		collectStructDefs(funcInfo.Parameters, info.StructDefs)
 		collectStructDefs(funcInfo.ReturnParams, info.StructDefs)
+
+		if !funcInfo.IsWrite && len(funcInfo.ReturnParams) > 1 {
+			structName := multiReturnStructName(funcInfo.Name)
+			if _, exists := info.StructDefs[structName]; !exists {
+				info.StructDefs[structName] = &StructDef{
+					Name:   structName,
+					Fields: funcInfo.ReturnParams,
+				}
+			}
+		}
 	}
 }
 
@@ -720,33 +730,17 @@ func prepareContractMethod(funcInfo *FunctionInfo, isWrite bool) ContractMethodD
 	if !isWrite {
 		if len(funcInfo.ReturnParams) == 1 {
 			returnType = funcInfo.ReturnParams[0].GoType
+		} else if len(funcInfo.ReturnParams) > 1 {
+			returnType = multiReturnStructName(funcInfo.Name)
 		}
 		returns = fmt.Sprintf("(%s, error)", returnType)
 	}
 
 	var methodBody string
 	if isWrite {
-		if len(methodArgs) > 0 {
-			methodBody = fmt.Sprintf("return c.contract.Transact(opts, \"%s\", %s)",
-				funcInfo.CallMethod, strings.Join(methodArgs, ", "))
-		} else {
-			methodBody = fmt.Sprintf("return c.contract.Transact(opts, \"%s\")", funcInfo.CallMethod)
-		}
+		methodBody = buildWriteMethodBody(funcInfo, methodArgs)
 	} else {
-		callArgsStr := ""
-		if len(methodArgs) > 0 {
-			callArgsStr = ", " + strings.Join(methodArgs, ", ")
-		}
-		methodBody = fmt.Sprintf(
-			`var out []any
-	err := c.contract.Call(opts, &out, "%s"%s)
-	if err != nil {
-		var zero %s
-		return zero, err
-	}
-	return *abi.ConvertType(out[0], new(%s)).(*%s), nil`,
-			funcInfo.CallMethod, callArgsStr, returnType, returnType, returnType,
-		)
+		methodBody = buildReadMethodBody(funcInfo, methodArgs, returnType)
 	}
 
 	return ContractMethodData{
@@ -758,11 +752,43 @@ func prepareContractMethod(funcInfo *FunctionInfo, isWrite bool) ContractMethodD
 	}
 }
 
+func buildWriteMethodBody(funcInfo *FunctionInfo, methodArgs []string) string {
+	if len(methodArgs) > 0 {
+		return fmt.Sprintf("return c.contract.Transact(opts, \"%s\", %s)",
+			funcInfo.CallMethod, strings.Join(methodArgs, ", "))
+	}
+	return fmt.Sprintf("return c.contract.Transact(opts, \"%s\")", funcInfo.CallMethod)
+}
+
+func buildReadMethodBody(funcInfo *FunctionInfo, methodArgs []string, returnType string) string {
+	callArgsStr := ""
+	if len(methodArgs) > 0 {
+		callArgsStr = ", " + strings.Join(methodArgs, ", ")
+	}
+	if len(funcInfo.ReturnParams) > 1 {
+		return buildMultiReturnMethodBody(funcInfo, callArgsStr, returnType)
+	}
+	return fmt.Sprintf(
+		`var out []any
+	err := c.contract.Call(opts, &out, "%s"%s)
+	if err != nil {
+		var zero %s
+		return zero, err
+	}
+	return *abi.ConvertType(out[0], new(%s)).(*%s), nil`,
+		funcInfo.CallMethod, callArgsStr, returnType, returnType, returnType,
+	)
+}
+
 func prepareParameters(params []ParameterInfo) []ParameterData {
 	var result []ParameterData
-	for _, param := range params {
+	for i, param := range params {
+		name := capitalize(param.Name)
+		if name == "" {
+			name = fmt.Sprintf("Field%d", i)
+		}
 		result = append(result, ParameterData{
-			GoName: capitalize(param.Name),
+			GoName: name,
 			GoType: param.GoType,
 		})
 	}
@@ -807,12 +833,38 @@ func prepareWriteOp(funcInfo *FunctionInfo) WriteOpData {
 	}
 }
 
+func multiReturnStructName(funcName string) string {
+	return funcName + "Result"
+}
+
+func buildMultiReturnMethodBody(funcInfo *FunctionInfo, callArgsStr, returnType string) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "var out []any\n")
+	fmt.Fprintf(&b, "\terr := c.contract.Call(opts, &out, \"%s\"%s)\n", funcInfo.CallMethod, callArgsStr)
+	fmt.Fprintf(&b, "\toutstruct := new(%s)\n", returnType)
+	fmt.Fprintf(&b, "\tif err != nil {\n")
+	fmt.Fprintf(&b, "\t\treturn *outstruct, err\n")
+	fmt.Fprintf(&b, "\t}\n\n")
+	for i, p := range funcInfo.ReturnParams {
+		fieldName := capitalize(p.Name)
+		if fieldName == "" {
+			fieldName = fmt.Sprintf("Field%d", i)
+		}
+		fmt.Fprintf(&b, "\toutstruct.%s = *abi.ConvertType(out[%d], new(%s)).(*%s)\n",
+			fieldName, i, p.GoType, p.GoType)
+	}
+	fmt.Fprintf(&b, "\n\treturn *outstruct, nil")
+	return b.String()
+}
+
 func prepareReadOp(funcInfo *FunctionInfo) ReadOpData {
 	argsType, callArgs := buildCallArgs(funcInfo, "args")
 
 	returnType := anyType
 	if len(funcInfo.ReturnParams) == 1 {
 		returnType = funcInfo.ReturnParams[0].GoType
+	} else if len(funcInfo.ReturnParams) > 1 {
+		returnType = multiReturnStructName(funcInfo.Name)
 	}
 
 	return ReadOpData{

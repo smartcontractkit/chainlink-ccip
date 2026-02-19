@@ -125,7 +125,7 @@ func (ma *transfersTest_MockTokenAdapter) DeriveTokenAddress(e deployment.Enviro
 	return []byte("mocked-remote-token-address"), nil
 }
 
-func (ma *transfersTest_MockTokenAdapter) DeriveTokenDecimals(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) (uint8, error) {
+func (ma *transfersTest_MockTokenAdapter) DeriveTokenDecimals(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef, token []byte) (uint8, error) {
 	return 18, nil
 }
 
@@ -137,8 +137,8 @@ func (ma *transfersTest_MockTokenAdapter) ManualRegistration() *cldf_ops.Sequenc
 	return &cldf_ops.Sequence[tokens.ManualRegistrationSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains]{}
 }
 
-func (ma *transfersTest_MockTokenAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokens.RateLimiterConfigInputs, sequences.OnChainOutput, cldf_chain.BlockChains] {
-	return &cldf_ops.Sequence[tokens.RateLimiterConfigInputs, sequences.OnChainOutput, cldf_chain.BlockChains]{}
+func (ma *transfersTest_MockTokenAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokens.TPRLRemotes, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return &cldf_ops.Sequence[tokens.TPRLRemotes, sequences.OnChainOutput, cldf_chain.BlockChains]{}
 }
 
 func (ma *transfersTest_MockTokenAdapter) DeployToken() *cldf_ops.Sequence[tokens.DeployTokenInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
@@ -151,14 +151,6 @@ func (ma *transfersTest_MockTokenAdapter) DeployTokenVerify(e deployment.Environ
 
 func (ma *transfersTest_MockTokenAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokens.DeployTokenPoolInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return &cldf_ops.Sequence[tokens.DeployTokenPoolInput, sequences.OnChainOutput, cldf_chain.BlockChains]{}
-}
-
-func (ma *transfersTest_MockTokenAdapter) RegisterToken() *cldf_ops.Sequence[tokens.RegisterTokenInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
-	return &cldf_ops.Sequence[tokens.RegisterTokenInput, sequences.OnChainOutput, cldf_chain.BlockChains]{}
-}
-
-func (ma *transfersTest_MockTokenAdapter) SetPool() *cldf_ops.Sequence[tokens.SetPoolInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
-	return &cldf_ops.Sequence[tokens.SetPoolInput, sequences.OnChainOutput, cldf_chain.BlockChains]{}
 }
 
 var basicMCMSInput = mcms.Input{
