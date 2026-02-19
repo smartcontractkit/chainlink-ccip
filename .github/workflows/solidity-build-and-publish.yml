@@ -83,9 +83,9 @@ jobs:
           working-directory: chains/evm
 
       - name: Run native compile and generate wrappers
-        if: ${{ !(needs.tag-check.outputs.is-release-ccip == 'true' || needs.tag-check.outputs.is-pre-release-ccip == 'true') }}
         working-directory: chains/evm
-        run: make wrappers
+        # Make operations also generates wrappers
+        run: make operations
 
       - name: Check if Go solidity wrappers are updated
         working-directory: chains/evm
@@ -147,11 +147,6 @@ jobs:
         working-directory: chains/evm
         run: make wrappers
 
-      - name: Extract bytecode and abi from gobindings
-        run: |
-          cd chains/evm
-          make extract-bytecode-abi
-
       - name: Version package.json
         working-directory: chains/evm
         shell: bash
@@ -206,11 +201,6 @@ jobs:
         working-directory: chains/evm
         run: make wrappers
       
-      - name: Extract bytecode and abi from gobindings
-        run: |
-          cd chains/evm
-          make extract-bytecode-abi
-
       - name: Validate version
         working-directory: chains/evm
         shell: bash

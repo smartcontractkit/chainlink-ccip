@@ -114,7 +114,6 @@ func makeApply(tokenRegistry *TokenAdapterRegistry, mcmsRegistry *changesets.MCM
 			batchOps = append(batchOps, configureTokenReport.Output.BatchOps...)
 			reports = append(reports, configureTokenReport.ExecutionReports...)
 		}
-
 		return changesets.NewOutputBuilder(e, mcmsRegistry).
 			WithReports(reports).
 			WithBatchOps(batchOps).
@@ -158,7 +157,7 @@ func convertRemoteChainConfig(
 			}
 		}
 		outCfg.RemoteToken = common.LeftPadBytes(outCfg.RemoteToken, 32)
-		outCfg.RemoteDecimals, err = remoteAdapter.DeriveTokenDecimals(e, remoteChainSelector, fullRemotePoolRef)
+		outCfg.RemoteDecimals, err = remoteAdapter.DeriveTokenDecimals(e, remoteChainSelector, fullRemotePoolRef, outCfg.RemoteToken)
 		if err != nil {
 			return outCfg, fmt.Errorf("failed to get remote token decimals for remote chain selector %d: %w", remoteChainSelector, err)
 		}

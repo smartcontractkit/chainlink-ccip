@@ -574,7 +574,6 @@ func AddNodesToCapReg(
 
 func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.TestAdapter) (datastore.DataStore, error) {
 	// Get registries and define v1.6.0 alias
-	toknRegistry := tokensapi.GetTokenAdapterRegistry()
 	mcmsRegistry := changesetscore.GetRegistry()
 	v1_6_0 := semver.MustParse("1.6.0")
 
@@ -618,73 +617,43 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 		return nil
 	}
 
-	// Here we construct two maps. The deployment map defines the tokens and token pools to deploy.
-	// The mesh defines the token transfer configuration between all chains. Here, we define a full
-	// mesh that allows tokens to be transferred between all chains.
+	// The deployment map defines the tokens and token pools to deploy
+	// and the configurations for their cross-chain interactions. We deploy one token and token pool per chain, and configure them to be transferable to each other.
 	dply := map[uint64]tokensapi.TokenExpansionInputPerChain{}
-	mesh := map[uint64][]tokensapi.TokenTransferConfig{}
 	for _, srcAdapter := range adp {
 		srcCfg := srcAdapter.GetTokenExpansionConfig()
 		srcSel := srcAdapter.ChainSelector()
-		srcFamily, err := chainsel.GetSelectorFamily(srcSel)
-		if err != nil {
-			return nil, fmt.Errorf("getting chain family for selector %d: %w", srcSel, err)
-		}
+		srcFamily := srcAdapter.Family()
 		if srcFamily != chainsel.FamilyEVM && srcFamily != chainsel.FamilySolana {
 			continue // only EVM and Solana are supported for token transfers in 1.6
 		}
 
-		registryAddr, err := srcAdapter.GetRegistryAddress()
-		if err != nil {
-			return nil, fmt.Errorf("getting registry address for selector %d: %w", srcSel, err)
-		}
-
-		ttCfg := tokensapi.TokenTransferConfig{
-			RemoteChains:  map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{},
-			ChainSelector: srcSel,
-			ExternalAdmin: srcCfg.DeployTokenInput.ExternalAdmin,
-			RegistryRef: datastore.AddressRef{
-				Address:       registryAddr,
-				ChainSelector: srcSel,
-			},
-			TokenPoolRef: datastore.AddressRef{
-				Type:          datastore.ContractType(srcCfg.DeployTokenPoolInput.PoolType),
-				Qualifier:     srcCfg.DeployTokenPoolInput.TokenPoolQualifier,
-				Version:       srcCfg.TokenPoolVersion,
-				ChainSelector: srcSel,
-			},
-			TokenRef: datastore.AddressRef{
-				Qualifier:     srcCfg.DeployTokenInput.Symbol,
-				ChainSelector: srcSel,
-			},
-		}
-
 		for _, dstAdapter := range adp {
-			dstCfg := dstAdapter.GetTokenExpansionConfig()
+			// dstCfg := dstAdapter.GetTokenExpansionConfig()
 			dstSel := dstAdapter.ChainSelector()
 
 			if srcSel != dstSel {
-				ttCfg.RemoteChains[dstSel] = tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+				srcCfg.TokenTransferConfig.RemoteChains[dstSel] = tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
 					OutboundCCVs:              []datastore.AddressRef{}, // not needed for for 1.6
 					InboundCCVs:               []datastore.AddressRef{}, // not needed for for 1.6
 					OutboundRateLimiterConfig: disabledRL,
 					InboundRateLimiterConfig:  disabledRL,
-					RemoteToken: &datastore.AddressRef{
-						Type:          datastore.ContractType(dstCfg.DeployTokenInput.Type),
-						Qualifier:     dstCfg.DeployTokenInput.Symbol,
-						ChainSelector: dstSel,
-					},
-					RemotePool: &datastore.AddressRef{
-						Type:          datastore.ContractType(dstCfg.DeployTokenPoolInput.PoolType),
-						Qualifier:     dstCfg.DeployTokenPoolInput.TokenPoolQualifier,
-						Version:       dstCfg.TokenPoolVersion,
-						ChainSelector: dstSel,
-					},
+					// This is actually optional for 1.6 as the token and token pool addresses are
+					// inferred after deployment
+					// RemoteToken: &datastore.AddressRef{
+					// 	Type:          datastore.ContractType(dstCfg.DeployTokenInput.Type),
+					// 	Qualifier:     dstCfg.DeployTokenInput.Symbol,
+					// 	ChainSelector: dstSel,
+					// },
+					// RemotePool: &datastore.AddressRef{
+					// 	Type:          datastore.ContractType(dstCfg.DeployTokenPoolInput.PoolType),
+					// 	Qualifier:     dstCfg.DeployTokenPoolInput.TokenPoolQualifier,
+					// 	Version:       dstCfg.TokenPoolVersion,
+					// 	ChainSelector: dstSel,
+					// },
 				}
 			}
 		}
-
-		mesh[srcSel] = append(mesh[srcSel], ttCfg)
 		dply[srcSel] = srcCfg
 	}
 
@@ -703,23 +672,6 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 		return nil, fmt.Errorf("failed to merge datastore after token expansion: %w", err)
 	}
 
-	// Enable token transfers between all chains in the mesh.
-	for _, tokens := range mesh {
-		out, err = tokensapi.ConfigureTokensForTransfers(toknRegistry, mcmsRegistry).Apply(*env,
-			tokensapi.ConfigureTokensForTransfersConfig{
-				ChainAdapterVersion: v1_6_0,
-				Tokens:              tokens,
-				MCMS:                newInputForMCMS("Configure Tokens For Transfers"),
-			},
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to configure tokens for transfers: %w", err)
-		}
-		if err = mergeDS(out.DataStore); err != nil {
-			return nil, fmt.Errorf("failed to merge datastore after configuring tokens for transfers: %w", err)
-		}
-	}
-
 	// Allow the router to withdraw a sensible amount of tokens from the account that will be transferring tokens.
 	for _, adapter := range adp {
 		teConfig := adapter.GetTokenExpansionConfig()
@@ -730,6 +682,11 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 		tokenRef := datastore.AddressRef{
 			Type:          datastore.ContractType(teConfig.DeployTokenInput.Type),
 			Qualifier:     teConfig.DeployTokenInput.Symbol,
+			ChainSelector: selector,
+		}
+		tokenPoolRef := datastore.AddressRef{
+			Type:          datastore.ContractType(teConfig.DeployTokenPoolInput.PoolType),
+			Qualifier:     teConfig.DeployTokenPoolInput.TokenPoolQualifier,
 			ChainSelector: selector,
 		}
 
@@ -746,11 +703,22 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 			if dst.ChainSelector() == selector {
 				continue
 			}
+			dstTeConfig := dst.GetTokenExpansionConfig()
+			dstTokenRef := datastore.AddressRef{
+				Type:          datastore.ContractType(dstTeConfig.DeployTokenInput.Type),
+				Qualifier:     dstTeConfig.DeployTokenInput.Symbol,
+				ChainSelector: dst.ChainSelector(),
+			}
+			dstTokenPoolRef := datastore.AddressRef{
+				Type:          datastore.ContractType(dstTeConfig.DeployTokenPoolInput.PoolType),
+				Qualifier:     dstTeConfig.DeployTokenPoolInput.TokenPoolQualifier,
+				ChainSelector: dst.ChainSelector(),
+			}
 			// Set some rate limiters for testing - one enabled and one disabled.
-			rls := []tokensapi.RateLimiterConfig{
+			rls := []tokensapi.RateLimiterConfigFloatInput{
 				{
-					Capacity:  big.NewInt(2_000_000_000),
-					Rate:      big.NewInt(200_000_000),
+					Capacity:  1234567.89, // this is in tokens, not decimal adjusted
+					Rate:      123456.789, // this is in tokens per second, not decimal adjusted
 					IsEnabled: true,
 				},
 				{
@@ -758,16 +726,23 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 				},
 			}
 			for _, rl := range rls {
-				input := tokensapi.RateLimiterConfigInput{
-					ChainSelector:       selector,
-					TokenRef:            tokenRef,
-					TokenPoolQualifier:  teConfig.DeployTokenPoolInput.TokenPoolQualifier,
-					PoolType:            teConfig.DeployTokenPoolInput.PoolType,
-					ChainAdapterVersion: v1_6_0,
-					Inputs: map[uint64]tokensapi.RateLimiterConfigInputs{
+				input := tokensapi.TPRLInput{
+					Configs: map[uint64]tokensapi.TPRLConfig{
+						selector: {
+							ChainAdapterVersion: v1_6_0,
+							TokenRef:            tokenRef,
+							TokenPoolRef:        tokenPoolRef,
+							RemoteOutbounds: map[uint64]tokensapi.RateLimiterConfigFloatInput{
+								dst.ChainSelector(): rl,
+							},
+						},
 						dst.ChainSelector(): {
-							OutboundRateLimiterConfig: rl,
-							InboundRateLimiterConfig:  rl,
+							ChainAdapterVersion: v1_6_0,
+							TokenRef:            dstTokenRef,
+							TokenPoolRef:        dstTokenPoolRef,
+							RemoteOutbounds: map[uint64]tokensapi.RateLimiterConfigFloatInput{
+								selector: rl,
+							},
 						},
 					},
 				}
