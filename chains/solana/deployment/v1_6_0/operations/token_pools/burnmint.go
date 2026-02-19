@@ -68,8 +68,17 @@ var InitializeBurnMint = operations.NewOperation(
 		// use the deployer key if we can
 		mintAuthority := utils.GetTokenMintAuthority(chain, input.TokenMint)
 		signer := upgradeAuthority
-		if mintAuthority == chain.DeployerKey.PublicKey() {
-			signer = mintAuthority
+		var poolConfig burnmint_token_pool.PoolConfig
+		globalConfig, _ := tokens.TokenPoolGlobalConfigPDA(input.TokenPool)
+		err = chain.GetAccountDataBorshInto(context.Background(), globalConfig, &poolConfig)
+		if err == nil {
+			b.Logger.Info("Fetched existing pool config for token mint:", input.TokenMint.String())
+			if mintAuthority == chain.DeployerKey.PublicKey() &&
+				poolConfig.SelfServedAllowed {
+				signer = mintAuthority
+			}
+		} else {
+			b.Logger.Info("No existing pool config found for token mint, defaulting to upgrade authority as signer for initialization:", input.TokenMint.String())
 		}
 		configPDA, _, _ := state.FindConfigPDA(input.TokenPool)
 		ixn, err := burnmint_token_pool.NewInitializeInstruction(
