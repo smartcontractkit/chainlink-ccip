@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
@@ -20,6 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/proxy"
+	fqc "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/fee_quoter"
 )
 
 var ConfigureChainForLanes = cldf_ops.NewSequence(
@@ -41,6 +43,11 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 		onRampAdds := make([]router.OnRamp, 0, len(input.RemoteChains))
 		offRampAdds := make([]router.OffRamp, 0, len(input.RemoteChains))
 		destChainSelectorsPerExecutor := make(map[common.Address][]executor.RemoteChainConfigArgs)
+		feeQContract, err := fqc.NewFeeQuoter(common.HexToAddress(input.FeeQuoter), chain.Client)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to bind fee quoter contract at address %s on chain %s: %w",
+				input.FeeQuoter, chain.String(), err)
+		}
 		for remoteSelector, remoteConfig := range input.RemoteChains {
 			defaultInboundCCVs := make([]common.Address, 0, len(remoteConfig.DefaultInboundCCVs))
 			for _, ccv := range remoteConfig.DefaultInboundCCVs {
@@ -81,10 +88,6 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 				DefaultExecutor:      common.HexToAddress(remoteConfig.DefaultExecutor), // The proxy address
 				OffRamp:              remoteConfig.OffRamp,
 			})
-			feeQuoterArgs = append(feeQuoterArgs, fee_quoter.DestChainConfigArgs{
-				DestChainSelector: remoteSelector,
-				DestChainConfig:   remoteConfig.FeeQuoterDestChainConfig,
-			})
 			gasPriceUpdates = append(gasPriceUpdates, fee_quoter.GasPriceUpdate{
 				DestChainSelector: remoteSelector,
 				UsdPerUnitGas:     remoteConfig.FeeQuoterDestChainConfig.USDPerUnitGas,
@@ -111,6 +114,30 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 			destChainSelectorsPerExecutor[getTargetReport.Output] = append(destChainSelectorsPerExecutor[getTargetReport.Output], executor.RemoteChainConfigArgs{
 				DestChainSelector: remoteSelector,
 				Config:            remoteConfig.ExecutorDestChainConfig,
+			})
+			// Only add dest chain config for fee quoter if OverrideExistingConfig is true, or
+			// the config is not already set or enabled
+			// otherwise we assume the fee quoter dest chain config is already set up correctly, and we don't want to override it
+			if !remoteConfig.FeeQuoterDestChainConfig.OverrideExistingConfig {
+				// fetch dest chain config from fee quoter
+				// not using operation api as operation api defaults to already executed reports if run multiple times in same environment,
+				// it might return stale data if feequoter config is updated after the last operation execution report was generated.
+				// therefore call the onchain function directly to ensure we get the latest config for the dest chain
+				destChainCfg, err := feeQContract.GetDestChainConfig(&bind.CallOpts{
+					Context: b.GetContext(),
+				}, remoteSelector)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to get dest chain config for "+
+						"remote chain selector %d from fee quoter at address %s on chain %s: %w",
+						remoteSelector, input.FeeQuoter, chain.String(), err)
+				}
+				if destChainCfg != (fqc.FeeQuoterDestChainConfig{}) && destChainCfg.IsEnabled {
+					continue
+				}
+			}
+			feeQuoterArgs = append(feeQuoterArgs, fee_quoter.DestChainConfigArgs{
+				DestChainSelector: remoteSelector,
+				DestChainConfig:   remoteConfig.FeeQuoterDestChainConfig,
 			})
 		}
 
@@ -150,17 +177,18 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 			}
 			writes = append(writes, executorReport.Output)
 		}
-
-		// ApplyDestChainConfigUpdates on FeeQuoter
-		feeQuoterReport, err := cldf_ops.ExecuteOperation(b, fee_quoter.ApplyDestChainConfigUpdates, chain, contract.FunctionInput[[]fee_quoter.DestChainConfigArgs]{
-			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(input.FeeQuoter),
-			Args:          feeQuoterArgs,
-		})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to apply dest chain config updates to FeeQuoter(%s) on chain %s: %w", input.FeeQuoter, chain, err)
+		if len(feeQuoterArgs) > 0 {
+			// ApplyDestChainConfigUpdates on FeeQuoter
+			feeQuoterReport, err := cldf_ops.ExecuteOperation(b, fee_quoter.ApplyDestChainConfigUpdates, chain, contract.FunctionInput[[]fee_quoter.DestChainConfigArgs]{
+				ChainSelector: chain.Selector,
+				Address:       common.HexToAddress(input.FeeQuoter),
+				Args:          feeQuoterArgs,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to apply dest chain config updates to FeeQuoter(%s) on chain %s: %w", input.FeeQuoter, chain, err)
+			}
+			writes = append(writes, feeQuoterReport.Output)
 		}
-		writes = append(writes, feeQuoterReport.Output)
 
 		// UpdatePrices on FeeQuoter (gas prices only, as these are per dest chain)
 		feeQuoterUpdatePricesReport, err := cldf_ops.ExecuteOperation(b, fee_quoter.UpdatePrices, chain, contract.FunctionInput[fee_quoter.PriceUpdates]{
