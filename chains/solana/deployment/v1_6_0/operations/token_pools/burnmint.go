@@ -469,7 +469,12 @@ func GetAuthorityBurnMint(chain cldf_solana.Chain, program solana.PublicKey, tok
 	poolConfigPDA, _ := tokens.TokenPoolConfigAddress(tokenMint, program)
 	err := chain.GetAccountDataBorshInto(context.Background(), poolConfigPDA, &programData)
 	if err != nil {
-		return chain.DeployerKey.PublicKey()
+		// if there is no pool config, default to upgrade authority as the signer for initialization and ownership transfers
+		upgradeAuthority, err := utils.GetUpgradeAuthority(chain.Client, program)
+		if err != nil {
+			return solana.PublicKey{}
+		}
+		return upgradeAuthority
 	}
 	return programData.Config.Owner
 }
