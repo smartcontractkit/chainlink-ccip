@@ -90,7 +90,7 @@ func Test_HTTPClient_Get_Post_queryStringNotEscaped(t *testing.T) {
 	resp, status, err := client.Get(t.Context(), pathWithQuery)
 	require.NoError(t, err)
 	require.Equal(t, HTTPStatus(http.StatusOK), status)
-	require.Equal(t, []byte(validAttestationResponse), []byte(resp))
+	require.Equal(t, validAttestationResponse, []byte(resp))
 	require.NotContains(t, receivedURI, "%3F", "GET: request URI must not contain escaped '?'")
 	require.Contains(t, receivedURI, "?transactionHash=", "GET: request URI must contain query string")
 
@@ -99,7 +99,7 @@ func Test_HTTPClient_Get_Post_queryStringNotEscaped(t *testing.T) {
 	resp, status, err = client.Post(t.Context(), pathWithQuery, []byte("{}"))
 	require.NoError(t, err)
 	require.Equal(t, HTTPStatus(http.StatusOK), status)
-	require.Equal(t, []byte(validAttestationResponse), []byte(resp))
+	require.Equal(t, validAttestationResponse, []byte(resp))
 	require.NotContains(t, receivedURI, "%3F", "POST: request URI must not contain escaped '?'")
 	require.Contains(t, receivedURI, "?transactionHash=", "POST: request URI must contain query string")
 }
