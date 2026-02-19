@@ -266,17 +266,20 @@ func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualR
 				result.Addresses = append(result.Addresses, initTPOut.Output.Addresses...)
 				result.BatchOps = append(result.BatchOps, initTPOut.Output.BatchOps...)
 
-				transferOwnershipOut, err := operations.ExecuteOperation(b, transferOwnershipTPOp, chains.SolanaChains()[chain.Selector], tokenpoolops.TokenPoolTransferOwnershipInput{
-					Program:      tokenPool,
-					CurrentOwner: authority,
-					NewOwner:     solana.MustPublicKeyFromBase58(input.ProposedOwner),
-					TokenMint:    tokenMint,
-				})
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to transfer ownership: %w", err)
+				// if the token pool is not initialized above, we can't transfer ownership
+				if len(initTPOut.Output.BatchOps) == 0 {
+					transferOwnershipOut, err := operations.ExecuteOperation(b, transferOwnershipTPOp, chains.SolanaChains()[chain.Selector], tokenpoolops.TokenPoolTransferOwnershipInput{
+						Program:      tokenPool,
+						CurrentOwner: authority,
+						NewOwner:     solana.MustPublicKeyFromBase58(input.ProposedOwner),
+						TokenMint:    tokenMint,
+					})
+					if err != nil {
+						return sequences.OnChainOutput{}, fmt.Errorf("failed to transfer ownership: %w", err)
+					}
+					result.Addresses = append(result.Addresses, transferOwnershipOut.Output.Addresses...)
+					result.BatchOps = append(result.BatchOps, transferOwnershipOut.Output.BatchOps...)
 				}
-				result.Addresses = append(result.Addresses, transferOwnershipOut.Output.Addresses...)
-				result.BatchOps = append(result.BatchOps, transferOwnershipOut.Output.BatchOps...)
 			}
 			/////////////////////////////
 			/// Create Token Multisig ///

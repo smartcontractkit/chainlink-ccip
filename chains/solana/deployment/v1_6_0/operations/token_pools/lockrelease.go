@@ -65,11 +65,17 @@ var InitializeLockRelease = operations.NewOperation(
 			b.Logger.Info("LockReleaseTokenPool already initialized for token mint:", input.TokenMint.String())
 			return sequences.OnChainOutput{}, nil
 		}
+		// use the deployer key if we can
+		mintAuthority := utils.GetTokenMintAuthority(chain, input.TokenMint)
+		signer := upgradeAuthority
+		if mintAuthority == chain.DeployerKey.PublicKey() {
+			signer = mintAuthority
+		}
 		configPDA, _, _ := state.FindConfigPDA(input.TokenPool)
 		ixn, err := lockrelease_token_pool.NewInitializeInstruction(
 			poolConfigPDA,
 			input.TokenMint,
-			upgradeAuthority,
+			signer,
 			solana.SystemProgramID,
 			input.TokenPool,
 			programData.Address,
@@ -78,7 +84,7 @@ var InitializeLockRelease = operations.NewOperation(
 		if err != nil {
 			return sequences.OnChainOutput{}, err
 		}
-		if upgradeAuthority != chain.DeployerKey.PublicKey() {
+		if signer != chain.DeployerKey.PublicKey() {
 			b, err := utils.BuildMCMSBatchOperation(
 				chain.Selector,
 				[]solana.Instruction{ixn},
