@@ -42,28 +42,28 @@ var InitializeLockRelease = operations.NewOperation(
 	"lockrelease:initialize",
 	common_utils.Version_1_6_0,
 	"Initializes the LockReleaseTokenPool program",
-	func(b operations.Bundle, chain cldf_solana.Chain, input Params) (sequences.OnChainOutput, error) {
+	func(b operations.Bundle, chain cldf_solana.Chain, input Params) (PoolInitializeOut, error) {
 		batches := make([]types.BatchOperation, 0)
 		out, err := operations.ExecuteOperation(b, InitGlobalConfigLockRelease, chain, input)
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to initialize global config: %w", err)
+			return PoolInitializeOut{}, fmt.Errorf("failed to initialize global config: %w", err)
 		}
 		batches = append(batches, out.Output.BatchOps...)
 		lockrelease_token_pool.SetProgramID(input.TokenPool)
 		programData, err := utils.GetSolProgramData(chain.Client, input.TokenPool)
 		if err != nil {
-			return sequences.OnChainOutput{}, err
+			return PoolInitializeOut{}, err
 		}
 		upgradeAuthority, err := utils.GetUpgradeAuthority(chain.Client, input.TokenPool)
 		if err != nil {
-			return sequences.OnChainOutput{}, err
+			return PoolInitializeOut{}, err
 		}
 		poolConfigPDA, _ := tokens.TokenPoolConfigAddress(input.TokenMint, input.TokenPool)
 		var chainConfig test_token_pool.State
 		err = chain.GetAccountDataBorshInto(context.Background(), poolConfigPDA, &chainConfig)
 		if err == nil {
 			b.Logger.Info("LockReleaseTokenPool already initialized for token mint:", input.TokenMint.String())
-			return sequences.OnChainOutput{}, nil
+			return PoolInitializeOut{}, nil
 		}
 		// use the deployer key if we can
 		mintAuthority := utils.GetTokenMintAuthority(chain, input.TokenMint)
@@ -91,7 +91,7 @@ var InitializeLockRelease = operations.NewOperation(
 			configPDA,
 		).ValidateAndBuild()
 		if err != nil {
-			return sequences.OnChainOutput{}, err
+			return PoolInitializeOut{}, err
 		}
 		if signer != chain.DeployerKey.PublicKey() {
 			b, err := utils.BuildMCMSBatchOperation(
@@ -101,18 +101,18 @@ var InitializeLockRelease = operations.NewOperation(
 				common_utils.LockReleaseTokenPool.String(),
 			)
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute or create batch: %w", err)
+				return PoolInitializeOut{}, fmt.Errorf("failed to execute or create batch: %w", err)
 			}
 			batches = append(batches, b)
-			return sequences.OnChainOutput{BatchOps: batches}, nil
+			return PoolInitializeOut{OnChainOutput: sequences.OnChainOutput{BatchOps: batches}, Initializer: signer}, nil
 		} else {
 			err = chain.Confirm([]solana.Instruction{ixn})
 			if err != nil {
-				return sequences.OnChainOutput{}, err
+				return PoolInitializeOut{}, err
 			}
 		}
 
-		return sequences.OnChainOutput{}, nil
+		return PoolInitializeOut{Initializer: signer}, nil
 	})
 
 var InitGlobalConfigLockRelease = operations.NewOperation(
@@ -344,10 +344,9 @@ var TransferOwnershipLockRelease = operations.NewOperation(
 	"Transfers ownership of the LockReleaseTokenPool token mint PDA to a new authority",
 	func(b operations.Bundle, chain cldf_solana.Chain, input TokenPoolTransferOwnershipInput) (sequences.OnChainOutput, error) {
 		lockrelease_token_pool.SetProgramID(input.Program)
-		authority := GetAuthorityLockRelease(chain, input.Program, input.TokenMint)
-		if authority != input.CurrentOwner {
-			return sequences.OnChainOutput{}, fmt.Errorf("current owner %s does not match on-chain authority %s", input.CurrentOwner.String(), authority.String())
-		}
+		// there is a chance we perform an initialize and transfer ownership in the same sequence
+		// so we have to assume the input owner is correct, even if it doesn't match the current on-chain authority (since the initialize might be pending a proposal)
+		authority := input.CurrentOwner
 		tokenPoolConfigPDA, _ := tokens.TokenPoolConfigAddress(input.TokenMint, input.Program)
 		ixn, err := lockrelease_token_pool.NewTransferOwnershipInstruction(
 			input.NewOwner,

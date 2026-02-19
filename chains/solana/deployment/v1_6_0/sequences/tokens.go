@@ -237,14 +237,12 @@ func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualR
 			if input.SVMExtraArgs == nil || !input.SVMExtraArgs.SkipTokenPoolInit {
 				initTPOp := tokenpoolops.InitializeBurnMint
 				transferOwnershipTPOp := tokenpoolops.TransferOwnershipBurnMint
-				authority := tokenpoolops.GetAuthorityBurnMint(chain, tokenPool, tokenMint)
 				switch tokenPoolRef.Type.String() {
 				case common_utils.BurnMintTokenPool.String():
 					// Already set to burn mint
 				case common_utils.LockReleaseTokenPool.String():
 					initTPOp = tokenpoolops.InitializeLockRelease
 					transferOwnershipTPOp = tokenpoolops.TransferOwnershipLockRelease
-					authority = tokenpoolops.GetAuthorityLockRelease(chain, tokenPool, tokenMint)
 				default:
 					return sequences.OnChainOutput{}, fmt.Errorf("unsupported token pool type '%s' for Solana", tokenPoolRef.Type)
 				}
@@ -266,20 +264,18 @@ func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualR
 				result.Addresses = append(result.Addresses, initTPOut.Output.Addresses...)
 				result.BatchOps = append(result.BatchOps, initTPOut.Output.BatchOps...)
 
-				// if the token pool is not initialized above, we can't transfer ownership
-				if len(initTPOut.Output.BatchOps) == 0 {
-					transferOwnershipOut, err := operations.ExecuteOperation(b, transferOwnershipTPOp, chains.SolanaChains()[chain.Selector], tokenpoolops.TokenPoolTransferOwnershipInput{
-						Program:      tokenPool,
-						CurrentOwner: authority,
-						NewOwner:     solana.MustPublicKeyFromBase58(input.ProposedOwner),
-						TokenMint:    tokenMint,
-					})
-					if err != nil {
-						return sequences.OnChainOutput{}, fmt.Errorf("failed to transfer ownership: %w", err)
-					}
-					result.Addresses = append(result.Addresses, transferOwnershipOut.Output.Addresses...)
-					result.BatchOps = append(result.BatchOps, transferOwnershipOut.Output.BatchOps...)
+				authority := initTPOut.Output.Initializer
+				transferOwnershipOut, err := operations.ExecuteOperation(b, transferOwnershipTPOp, chains.SolanaChains()[chain.Selector], tokenpoolops.TokenPoolTransferOwnershipInput{
+					Program:      tokenPool,
+					CurrentOwner: authority,
+					NewOwner:     solana.MustPublicKeyFromBase58(input.ProposedOwner),
+					TokenMint:    tokenMint,
+				})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to transfer ownership: %w", err)
 				}
+				result.Addresses = append(result.Addresses, transferOwnershipOut.Output.Addresses...)
+				result.BatchOps = append(result.BatchOps, transferOwnershipOut.Output.BatchOps...)
 			}
 			/////////////////////////////
 			/// Create Token Multisig ///
