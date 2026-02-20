@@ -39,8 +39,10 @@ type CCTPChainConfig struct {
 	RegisteredPoolRef datastore.AddressRef
 	// RemoteChains is the set of remote chains to configure.
 	RemoteChains map[uint64]adapters.RemoteCCTPChainConfig
-	// CCTPType specifies the type of the CCTP chain.
-	CCTPType adapters.CCTPType
+	// USDCType specifies the type of the USDC on the chain.
+	USDCType adapters.USDCType
+	// TokenDecimals is the number of decimals of the USDC on the chain.
+	TokenDecimals uint8
 }
 
 // DeployCCTPChainsConfig is the configuration for the DeployCCTPChains changeset.
@@ -66,8 +68,8 @@ func makeVerifyDeployCCTPChains(_ *adapters.CCTPChainRegistry, _ *changesets.MCM
 		}
 
 		for chainSel, chainCfg := range cfg.Chains {
-			if !chainCfg.CCTPType.IsValid() {
-				return fmt.Errorf("invalid CCTP type for chain %d: %s", chainSel, chainCfg.CCTPType)
+			if !chainCfg.USDCType.IsValid() {
+				return fmt.Errorf("invalid CCTP type for chain %d: %s", chainSel, chainCfg.USDCType)
 			}
 			if _, err := chain_selectors.GetSelectorFamily(chainSel); err != nil {
 				return err
@@ -103,9 +105,9 @@ func makeApplyDeployCCTPChains(cctpChainRegistry *adapters.CCTPChainRegistry, mc
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to get chain family for chain selector %d: %w", chainSel, err)
 			}
-			adapter, ok := cctpChainRegistry.GetCCTPChain(family, chainCfg.CCTPType)
+			adapter, ok := cctpChainRegistry.GetCCTPChain(family, chainCfg.USDCType)
 			if !ok {
-				return cldf.ChangesetOutput{}, fmt.Errorf("no CCTP adapter registered for chain family '%s' and type '%s'", family, chainCfg.CCTPType)
+				return cldf.ChangesetOutput{}, fmt.Errorf("no CCTP adapter registered for chain family '%s' and type '%s'", family, chainCfg.USDCType)
 			}
 			adaptersByChain[chainSel] = adapter
 		}
@@ -126,6 +128,7 @@ func makeApplyDeployCCTPChains(cctpChainRegistry *adapters.CCTPChainRegistry, mc
 				FastFinalityBps:  chainCfg.FastFinalityBps,
 				StorageLocations: chainCfg.StorageLocations,
 				FeeAggregator:    chainCfg.FeeAggregator,
+				TokenDecimals:    chainCfg.TokenDecimals,
 			}
 			deployCCTPChainReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adaptersByChain[chainSel].DeployCCTPChain(), dep, in)
 			if err != nil {
@@ -157,15 +160,16 @@ func makeApplyDeployCCTPChains(cctpChainRegistry *adapters.CCTPChainRegistry, mc
 			remoteChains := make(map[uint64]adapters.RemoteCCTPChain)
 			remoteRegisteredPoolRefs := make(map[uint64]datastore.AddressRef)
 			for remoteChainSelector := range chainCfg.RemoteChains {
-				family, err := chain_selectors.GetSelectorFamily(remoteChainSelector)
+				remoteFamily, err := chain_selectors.GetSelectorFamily(remoteChainSelector)
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to get chain family for remote chain selector %d: %w", remoteChainSelector, err)
 				}
-				adapter, ok := cctpChainRegistry.GetCCTPChain(family, chainCfg.CCTPType)
+				remoteUSDCType := cfg.Chains[remoteChainSelector].USDCType
+				remoteAdapter, ok := cctpChainRegistry.GetCCTPChain(remoteFamily, remoteUSDCType)
 				if !ok {
-					return cldf.ChangesetOutput{}, fmt.Errorf("no CCTP adapter registered for chain family '%s' and type '%s'", family, chainCfg.CCTPType)
+					return cldf.ChangesetOutput{}, fmt.Errorf("no CCTP adapter registered for chain family '%s' and type '%s'", remoteFamily, remoteUSDCType)
 				}
-				remoteChains[remoteChainSelector] = adapter
+				remoteChains[remoteChainSelector] = remoteAdapter
 				remoteRegisteredPoolRefs[remoteChainSelector] = cfg.Chains[remoteChainSelector].RegisteredPoolRef
 			}
 			dep := adapters.ConfigureCCTPChainForLanesDeps{

@@ -20,11 +20,6 @@ var _ adapters.CCTPChain = &NonCanonicalCCTPChainAdapter{}
 // NonCanonicalCCTPChainAdapter is the adapter for non-canonical CCTP chains.
 type NonCanonicalCCTPChainAdapter struct{}
 
-// AddressRefToBytes returns the byte representation of an address for this chain family.
-func (c *NonCanonicalCCTPChainAdapter) AddressRefToBytes(ref datastore.AddressRef) ([]byte, error) {
-	return common.HexToAddress(ref.Address).Bytes(), nil
-}
-
 // DeployCCTPChain returns the sequence for deploying a CCTP chain.
 func (c *NonCanonicalCCTPChainAdapter) DeployCCTPChain() *operations.Sequence[adapters.DeployCCTPInput, seq_core.OnChainOutput, adapters.DeployCCTPChainDeps] {
 	return tokens.DeployNonCanonicalCCTPChain

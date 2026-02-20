@@ -11,19 +11,19 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
-// CCTPType specifies the type of the CCTP chain (not to be confused with CCTP version, that being V1 or V2).
-// We support canonical CCTP chains, which are officially supported by CCTP, and non-canonical CCTP chains.
-// Tokens minted on non-canonical chains are backed by locked USDC on some canonical chain.
-type CCTPType string
+// USDCType specifies the type of the USDC on the chain.
+// We support chains with canonical USDC, which are backed by CCTP, and chains wth non-canonical USDC.
+// Non-canonical USDC tokens are backed by locked USDC on some canonical chain.
+type USDCType string
 
 const (
-	// Canonical CCTP chains are officially supported by Circle.
-	Canonical CCTPType = "CANONICAL"
-	// NonCanonical CCTP chains are backed by locked USDC on some canonical CCTP chain.
-	NonCanonical CCTPType = "NON_CANONICAL"
+	// Canonical USDC is backed by CCTP.
+	Canonical USDCType = "CANONICAL"
+	// NonCanonical USDC is backed by locked, canonical USDC.
+	NonCanonical USDCType = "NON_CANONICAL"
 )
 
-func (t CCTPType) IsValid() bool {
+func (t USDCType) IsValid() bool {
 	return t == Canonical || t == NonCanonical
 }
 
@@ -42,6 +42,14 @@ type RemoteCCTPChainConfig struct {
 	DomainIdentifier uint32
 	// TokenTransferFeeConfig specifies the desired token transfer fee configuration for this remote chain.
 	TokenTransferFeeConfig tokens.TokenTransferFeeConfig
+	// DefaultFinalityInboundRateLimiterConfig specifies the desired rate limiter configuration for default-finality inbound traffic.
+	DefaultFinalityInboundRateLimiterConfig tokens.RateLimiterConfig
+	// DefaultFinalityOutboundRateLimiterConfig specifies the desired rate limiter configuration for default-finality outbound traffic.
+	DefaultFinalityOutboundRateLimiterConfig tokens.RateLimiterConfig
+	// CustomFinalityInboundRateLimiterConfig specifies the desired rate limiter configuration for custom-finality inbound traffic.
+	CustomFinalityInboundRateLimiterConfig tokens.RateLimiterConfig
+	// CustomFinalityOutboundRateLimiterConfig specifies the desired rate limiter configuration for custom-finality outbound traffic.
+	CustomFinalityOutboundRateLimiterConfig tokens.RateLimiterConfig
 }
 
 // ConfigureCCTPChainForLanesInput specifies the input for the ConfigureCCTPChainForLanes sequence.
@@ -78,6 +86,8 @@ type DeployCCTPInput struct {
 	StorageLocations []string
 	// FeeAggregator is the address to which fees are withdrawn.
 	FeeAggregator string
+	// TokenDecimals is the number of decimals of the USDC on the chain.
+	TokenDecimals uint8
 }
 
 // DeployCCTPChainDeps are the dependencies for the DeployCCTPChain sequence.
@@ -105,6 +115,8 @@ type RemoteCCTPChain interface {
 	PoolAddress(d datastore.DataStore, b cldf_chain.BlockChains, chainSelector uint64, registeredPoolRef datastore.AddressRef) ([]byte, error)
 	// TokenAddress returns the address of the token on the remote chain in bytes.
 	TokenAddress(d datastore.DataStore, b cldf_chain.BlockChains, chainSelector uint64) ([]byte, error)
+	// USDCType returns the type of the USDC on the remote chain.
+	USDCType() USDCType
 	// CCTPV1AllowedCallerOnDest returns the address allowed to trigger message reception on the remote domain for CCTP V1.
 	CCTPV1AllowedCallerOnDest(d datastore.DataStore, b cldf_chain.BlockChains, chainSelector uint64) ([]byte, error)
 	// CCTPV2AllowedCallerOnDest returns the address allowed to trigger message reception on the remote domain for CCTP V2.
@@ -128,43 +140,43 @@ type CCTPChain interface {
 // CCTPChainRegistry maintains a registry of CCTP chains.
 type CCTPChainRegistry struct {
 	mu sync.Mutex
-	m  map[string]map[CCTPType]CCTPChain
+	m  map[string]map[USDCType]CCTPChain
 }
 
 // NewCCTPChainRegistry creates a new CCTP chain registry.
 func NewCCTPChainRegistry() *CCTPChainRegistry {
 	return &CCTPChainRegistry{
-		m: make(map[string]map[CCTPType]CCTPChain),
+		m: make(map[string]map[USDCType]CCTPChain),
 	}
 }
 
 // RegisterCCTPChain allows CCTP chains to register their changeset logic.
-func (r *CCTPChainRegistry) RegisterCCTPChain(chainFamily string, cctpType CCTPType, adapter CCTPChain) {
-	if !cctpType.IsValid() {
-		panic(fmt.Errorf("invalid CCTP type: %s", cctpType))
+func (r *CCTPChainRegistry) RegisterCCTPChain(chainFamily string, adapter CCTPChain) {
+	if !adapter.USDCType().IsValid() {
+		panic(fmt.Errorf("invalid USDC type: %s", adapter.USDCType()))
 	}
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if _, exists := r.m[chainFamily]; !exists {
-		r.m[chainFamily] = make(map[CCTPType]CCTPChain)
+		r.m[chainFamily] = make(map[USDCType]CCTPChain)
 	}
-	if _, exists := r.m[chainFamily][cctpType]; exists {
-		panic(fmt.Errorf("CCTPChain '%s %s' already registered", chainFamily, cctpType))
+	if _, exists := r.m[chainFamily][adapter.USDCType()]; exists {
+		panic(fmt.Errorf("CCTPChain '%s %s' already registered", chainFamily, adapter.USDCType()))
 	}
-	r.m[chainFamily][cctpType] = adapter
+	r.m[chainFamily][adapter.USDCType()] = adapter
 }
 
 // GetCCTPChain retrieves a registered CCTP chain for the given chain family.
 // The boolean return value indicates whether a CCTP chain was found.
-func (r *CCTPChainRegistry) GetCCTPChain(chainFamily string, cctpType CCTPType) (CCTPChain, bool) {
+func (r *CCTPChainRegistry) GetCCTPChain(chainFamily string, usdcType USDCType) (CCTPChain, bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	chainFamilyAdapters, ok := r.m[chainFamily]
 	if !ok {
 		return nil, false
 	}
-	adapter, ok := chainFamilyAdapters[cctpType]
+	adapter, ok := chainFamilyAdapters[usdcType]
 	if !ok {
 		return nil, false
 	}

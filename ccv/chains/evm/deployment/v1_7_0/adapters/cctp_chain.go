@@ -23,11 +23,6 @@ var _ adapters.CCTPChain = &CCTPChainAdapter{}
 // CCTPChainAdapter is the adapter for CCTP chains.
 type CCTPChainAdapter struct{}
 
-// AddressRefToBytes returns the byte representation of an address for this chain family.
-func (c *CCTPChainAdapter) AddressRefToBytes(ref datastore.AddressRef) ([]byte, error) {
-	return common.HexToAddress(ref.Address).Bytes(), nil
-}
-
 // DeployCCTPChain returns the sequence for deploying a CCTP chain.
 func (c *CCTPChainAdapter) DeployCCTPChain() *operations.Sequence[adapters.DeployCCTPInput, seq_core.OnChainOutput, adapters.DeployCCTPChainDeps] {
 	return cctp.DeployCCTPChain
