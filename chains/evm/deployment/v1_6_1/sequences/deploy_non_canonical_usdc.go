@@ -19,14 +19,10 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 )
 
-const localTokenDecimals = 6
-
-var usdcQualifier = "USDC"
-
-var DeployNonCanonicalCCTPChain = cldf_ops.NewSequence(
-	"deploy-non-canonical-cctp-chain",
+var DeployNonCanonicalUSDC = cldf_ops.NewSequence(
+	"deploy-non-canonical-usdc",
 	semver.MustParse("1.6.1"),
-	"Deploys & configures the non-canonical CCTP contracts on a chain",
+	"Deploys the non-canonical USDC contracts on a chain",
 	func(b cldf_ops.Bundle, dep adapters.DeployCCTPChainDeps, input adapters.DeployCCTPInput) (output sequences.OnChainOutput, err error) {
 		addresses := make([]datastore.AddressRef, 0)
 		batchOps := make([]mcms_types.BatchOperation, 0)
@@ -71,10 +67,9 @@ var DeployNonCanonicalCCTPChain = cldf_ops.NewSequence(
 			burnMintWithLockReleaseFlagTokenPoolReport, err := cldf_ops.ExecuteOperation(b, burn_mint_with_lock_release_flag_token_pool.Deploy, chain, contract_utils.DeployInput[burn_mint_with_lock_release_flag_token_pool.ConstructorArgs]{
 				TypeAndVersion: deployment.NewTypeAndVersion(burn_mint_with_lock_release_flag_token_pool.ContractType, *burn_mint_with_lock_release_flag_token_pool.Version),
 				ChainSelector:  chain.Selector,
-				Qualifier:      &usdcQualifier,
 				Args: burn_mint_with_lock_release_flag_token_pool.ConstructorArgs{
 					Token:              usdcTokenAddress,
-					LocalTokenDecimals: localTokenDecimals,
+					LocalTokenDecimals: input.TokenDecimals,
 					RmnProxy:           common.HexToAddress(rmnProxyRef.Address),
 					Router:             common.HexToAddress(routerRef.Address),
 				},

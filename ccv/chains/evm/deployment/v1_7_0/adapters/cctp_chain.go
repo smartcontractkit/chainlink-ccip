@@ -78,6 +78,11 @@ func (c *CCTPChainAdapter) MintRecipientOnDest(d datastore.DataStore, b chain.Bl
 	return []byte{}, nil
 }
 
+// USDCType returns the type of the USDC on the chain.
+func (c *CCTPChainAdapter) USDCType() adapters.USDCType {
+	return adapters.Canonical
+}
+
 // PoolAddress returns the address of the token pool on the remote chain in bytes.
 func (c *CCTPChainAdapter) PoolAddress(d datastore.DataStore, b chain.BlockChains, chainSelector uint64, registeredPoolRef datastore.AddressRef) ([]byte, error) {
 	registeredPoolAddress, err := datastore_utils.FindAndFormatRef(d, registeredPoolRef, chainSelector, datastore_utils.FullRef)

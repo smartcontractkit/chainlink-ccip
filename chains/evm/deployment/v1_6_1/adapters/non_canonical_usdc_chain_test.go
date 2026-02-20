@@ -107,7 +107,7 @@ func setupNonCanonicalTestEnvironment(t *testing.T, e *deployment.Environment, c
 	}
 }
 
-func TestNonCanonicalCCTPChain_TwoChainsConnected(t *testing.T) {
+func TestNonCanonicalUSDCChain_TwoChainsConnected(t *testing.T) {
 	chainASelector := chain_selectors.ETHEREUM_TESTNET_SEPOLIA.Selector
 	chainBSelector := chain_selectors.ETHEREUM_TESTNET_SEPOLIA_ARBITRUM_1.Selector
 
@@ -126,9 +126,9 @@ func TestNonCanonicalCCTPChain_TwoChainsConnected(t *testing.T) {
 
 	chainA := e.BlockChains.EVMChains()[chainASelector]
 	chainB := e.BlockChains.EVMChains()[chainBSelector]
-	adapter := &evm_adapters.NonCanonicalCCTPChainAdapter{}
+	adapter := &evm_adapters.NonCanonicalUSDCChainAdapter{}
 
-	// Deploy non-canonical CCTP on chain A
+	// Deploy non-canonical USDC on chain A
 	deployReportA, err := operations.ExecuteSequence(e.OperationsBundle, adapter.DeployCCTPChain(), adapters.DeployCCTPChainDeps{
 		BlockChains: e.BlockChains,
 		DataStore:   e.DataStore,
@@ -136,7 +136,7 @@ func TestNonCanonicalCCTPChain_TwoChainsConnected(t *testing.T) {
 		ChainSelector: chainASelector,
 		USDCToken:     setupA.USDCToken.Hex(),
 	})
-	require.NoError(t, err, "Failed to deploy non-canonical CCTP on chain A")
+	require.NoError(t, err, "Failed to deploy non-canonical USDC on chain A")
 
 	ds = datastore.NewMemoryDataStore()
 	require.NoError(t, ds.Merge(e.DataStore))
@@ -145,7 +145,7 @@ func TestNonCanonicalCCTPChain_TwoChainsConnected(t *testing.T) {
 	}
 	e.DataStore = ds.Seal()
 
-	// Deploy non-canonical CCTP on chain B
+	// Deploy non-canonical USDC on chain B
 	deployReportB, err := operations.ExecuteSequence(e.OperationsBundle, adapter.DeployCCTPChain(), adapters.DeployCCTPChainDeps{
 		BlockChains: e.BlockChains,
 		DataStore:   e.DataStore,
@@ -153,7 +153,7 @@ func TestNonCanonicalCCTPChain_TwoChainsConnected(t *testing.T) {
 		ChainSelector: chainBSelector,
 		USDCToken:     setupB.USDCToken.Hex(),
 	})
-	require.NoError(t, err, "Failed to deploy non-canonical CCTP on chain B")
+	require.NoError(t, err, "Failed to deploy non-canonical USDC on chain B")
 
 	ds = datastore.NewMemoryDataStore()
 	require.NoError(t, ds.Merge(e.DataStore))

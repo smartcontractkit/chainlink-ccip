@@ -290,7 +290,7 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 	// Create CCTP chain registry and register adapter
 	cctpChainRegistry := adapters.NewCCTPChainRegistry()
 	adapter := &evm_adapters.CCTPChainAdapter{}
-	cctpChainRegistry.RegisterCCTPChain("evm", adapters.Canonical, adapter)
+	cctpChainRegistry.RegisterCCTPChain("evm", adapter)
 
 	// Create MCMS registry
 	mcmsRegistry := changesets.GetRegistry()
@@ -318,7 +318,8 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 	cfg := v1_7_0_changesets.DeployCCTPChainsConfig{
 		Chains: map[uint64]v1_7_0_changesets.CCTPChainConfig{
 			homeChainSelector: {
-				CCTPType:         adapters.Canonical,
+				USDCType:         adapters.Canonical,
+				TokenDecimals:    6,
 				TokenMessengerV1: homeSetup.TokenMessengerV1.Hex(),
 				TokenMessengerV2: homeSetup.TokenMessengerV2.Hex(),
 				USDCToken:        homeSetup.USDCToken.Hex(),
@@ -350,7 +351,8 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 				},
 			},
 			nonHomeChainSelector: {
-				CCTPType:         adapters.Canonical,
+				USDCType:         adapters.Canonical,
+				TokenDecimals:    6,
 				TokenMessengerV1: nonHomeSetup.TokenMessengerV1.Hex(),
 				TokenMessengerV2: nonHomeSetup.TokenMessengerV2.Hex(),
 				USDCToken:        nonHomeSetup.USDCToken.Hex(),

@@ -2,7 +2,6 @@ package sequences
 
 import (
 	"fmt"
-	"math/big"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
@@ -18,10 +17,10 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 )
 
-var ConfigureNonCanonicalCCTPChainForLanes = cldf_ops.NewSequence(
-	"configure-non-canonical-cctp-chain-for-lanes",
+var ConfigureNonCanonicalUSDCForLanes = cldf_ops.NewSequence(
+	"configure-non-canonical-usdc-for-lanes",
 	semver.MustParse("1.6.1"),
-	"Configures the non-canonical CCTP contracts on a chain for multiple remote chains",
+	"Configures the non-canonical USDC contracts on a chain for multiple remote chains",
 	func(b cldf_ops.Bundle, dep adapters.ConfigureCCTPChainForLanesDeps, input adapters.ConfigureCCTPChainForLanesInput) (output sequences.OnChainOutput, err error) {
 		addresses := make([]datastore.AddressRef, 0)
 		batchOps := make([]mcms_types.BatchOperation, 0)
@@ -59,20 +58,14 @@ var ConfigureNonCanonicalCCTPChainForLanes = cldf_ops.NewSequence(
 			remoteToken = common.LeftPadBytes(remoteToken, 32)
 			remotePool = common.LeftPadBytes(remotePool, 32)
 
-			// USDC does not use rate limiting.
-			disabledRateLimiter := tokens.RateLimiterConfig{
-				IsEnabled: false,
-				Capacity:  big.NewInt(0),
-				Rate:      big.NewInt(0),
-			}
 			remoteChains[remoteChainSelector] = tokens.RemoteChainConfig[[]byte, string]{
 				TokenTransferFeeConfig:                   remoteChainConfig.TokenTransferFeeConfig,
 				RemoteToken:                              remoteToken,
 				RemotePool:                               remotePool,
-				DefaultFinalityInboundRateLimiterConfig:  disabledRateLimiter,
-				DefaultFinalityOutboundRateLimiterConfig: disabledRateLimiter,
-				CustomFinalityInboundRateLimiterConfig:   disabledRateLimiter,
-				CustomFinalityOutboundRateLimiterConfig:  disabledRateLimiter,
+				DefaultFinalityInboundRateLimiterConfig:  remoteChainConfig.DefaultFinalityInboundRateLimiterConfig,
+				DefaultFinalityOutboundRateLimiterConfig: remoteChainConfig.DefaultFinalityOutboundRateLimiterConfig,
+				CustomFinalityInboundRateLimiterConfig:   remoteChainConfig.CustomFinalityInboundRateLimiterConfig,
+				CustomFinalityOutboundRateLimiterConfig:  remoteChainConfig.CustomFinalityOutboundRateLimiterConfig,
 			}
 		}
 

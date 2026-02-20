@@ -25,6 +25,7 @@ type DeploySiloedUSDCLockReleaseInput struct {
 	USDCToken     string
 	Router        string
 	RMN           string
+	TokenDecimals uint8
 	// Existing siloed pool address; optional.
 	SiloedUSDCTokenPool       string
 	LockReleaseChainSelectors []uint64
@@ -60,7 +61,7 @@ var DeploySiloedUSDCLockRelease = cldf_ops.NewSequence(
 				ChainSelector:  chain.Selector,
 				Args: siloed_usdc_token_pool.ConstructorArgs{
 					Token:              common.HexToAddress(input.USDCToken),
-					LocalTokenDecimals: localTokenDecimals,
+					LocalTokenDecimals: input.TokenDecimals,
 					AdvancedPoolHooks:  common.Address{},
 					RMNProxy:           common.HexToAddress(input.RMN),
 					Router:             common.HexToAddress(input.Router),

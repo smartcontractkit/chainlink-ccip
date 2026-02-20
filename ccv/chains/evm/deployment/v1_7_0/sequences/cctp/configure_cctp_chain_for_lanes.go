@@ -387,9 +387,13 @@ func buildUSDCTokenPoolProxyMechanismArgs(input adapters.ConfigureCCTPChainForLa
 // buildCCTPVerifierArgs builds set-domain args and remote-chain-config args for the CCTPVerifier.
 // allowedCallerOnSource is the current chain's verifier (source chain when sending to remote).
 func buildCCTPVerifierArgs(dep adapters.ConfigureCCTPChainForLanesDeps, input adapters.ConfigureCCTPChainForLanesInput, routerAddress common.Address) ([]cctp_verifier.SetDomainArgs, []cctp_verifier.RemoteChainConfigArgs, error) {
-	setDomainArgs := make([]cctp_verifier.SetDomainArgs, 0, len(input.RemoteChains))
-	remoteChainConfigArgs := make([]cctp_verifier.RemoteChainConfigArgs, 0, len(input.RemoteChains))
+	setDomainArgs := make([]cctp_verifier.SetDomainArgs, 0)
+	remoteChainConfigArgs := make([]cctp_verifier.RemoteChainConfigArgs, 0)
 	for remoteChainSelector, remoteChain := range input.RemoteChains {
+		if dep.RemoteChains[remoteChainSelector].USDCType() == adapters.NonCanonical {
+			// Non-canonical USDC chains do not support CCTP, so we don't need to perform any CCTP-specific operations.
+			continue
+		}
 		allowedCallerOnDest, err := dep.RemoteChains[remoteChainSelector].CCTPV2AllowedCallerOnDest(dep.DataStore, dep.BlockChains, remoteChainSelector)
 		if err != nil {
 			return nil, nil, err
@@ -430,8 +434,12 @@ func buildCCTPVerifierArgs(dep adapters.ConfigureCCTPChainForLanesDeps, input ad
 
 // buildCCTPV2PoolDomainUpdates builds domain updates for the CCTP V2 token pool.
 func buildCCTPV2PoolDomainUpdates(dep adapters.ConfigureCCTPChainForLanesDeps, input adapters.ConfigureCCTPChainForLanesInput) ([]usdc_token_pool_cctp_v2.DomainUpdate, error) {
-	out := make([]usdc_token_pool_cctp_v2.DomainUpdate, 0, len(input.RemoteChains))
+	out := make([]usdc_token_pool_cctp_v2.DomainUpdate, 0)
 	for remoteChainSelector, remoteChain := range input.RemoteChains {
+		if dep.RemoteChains[remoteChainSelector].USDCType() == adapters.NonCanonical {
+			// Non-canonical USDC chains do not support CCTP, so we don't need to perform any CCTP-specific operations.
+			continue
+		}
 		allowedCallerOnDest, err := dep.RemoteChains[remoteChainSelector].CCTPV2AllowedCallerOnDest(dep.DataStore, dep.BlockChains, remoteChainSelector)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get allowed caller on dest: %w", err)
@@ -459,8 +467,12 @@ func buildCCTPV2PoolDomainUpdates(dep adapters.ConfigureCCTPChainForLanesDeps, i
 // buildCCTPV1PoolDomainUpdates builds domain updates for the CCTP V1 token pool.
 // Only chains configured with CCTP_V1 mechanism are included.
 func buildCCTPV1PoolDomainUpdates(dep adapters.ConfigureCCTPChainForLanesDeps, input adapters.ConfigureCCTPChainForLanesInput) ([]usdc_token_pool.DomainUpdate, error) {
-	out := make([]usdc_token_pool.DomainUpdate, 0, len(input.RemoteChains))
+	out := make([]usdc_token_pool.DomainUpdate, 0)
 	for remoteChainSelector, remoteChain := range input.RemoteChains {
+		if dep.RemoteChains[remoteChainSelector].USDCType() == adapters.NonCanonical {
+			// Non-canonical USDC chains do not support CCTP, so we don't need to perform any CCTP-specific operations.
+			continue
+		}
 		if remoteChain.LockOrBurnMechanism != mechanismCCTPV1 {
 			continue
 		}
