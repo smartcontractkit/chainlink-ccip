@@ -23,6 +23,7 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
 
   error ZeroBridge();
   error ZeroLombardChainId();
+  error ZeroAllowedCaller();
   error PathNotExist(uint64 remoteChainSelector);
   error ExecutionError();
   error InvalidMessageLength(uint256 expected, uint256 actual);
@@ -33,6 +34,8 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
   error TokenNotSupported(address token);
   error MustTransferTokens();
   error InvalidVerifierResults();
+  error InvalidToken(bytes32 expected, bytes32 actual);
+  error InvalidAmount(uint256 expected, uint256 actual);
 
   /// @param remoteChainSelector CCIP selector of destination chain.
   /// @param lChainId The chain id of destination chain by Lombard Multi Chain Id conversion.
@@ -224,6 +227,13 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
     uint256 proofDataStartIndex = PAYLOAD_START_INDEX + rawPayloadLength;
     bytes calldata rawPayload = ccvData[PAYLOAD_START_INDEX:proofDataStartIndex];
 
+    _validatePayload(
+      rawPayload,
+      message.tokenTransfer[0].destTokenAddress,
+      message.tokenTransfer[0].tokenReceiver,
+      message.tokenTransfer[0].amount
+    );
+
     uint256 proofLength = uint16(bytes2(ccvData[proofDataStartIndex:proofDataStartIndex + RAW_PAYLOAD_LENGTH_SIZE]));
     uint256 proofStartIndex = proofDataStartIndex + RAW_PAYLOAD_LENGTH_SIZE;
 
@@ -253,6 +263,34 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
     }
     if (returnedMessageId != messageId) {
       revert InvalidMessageId(messageId, returnedMessageId);
+    }
+  }
+
+  function _validatePayload(
+    bytes calldata rawPayload,
+    bytes calldata expectedToken,
+    bytes calldata expectedReceiver,
+    uint256 expectedAmount
+  ) internal pure {
+    (,,,,, bytes memory msgBody) = abi.decode(rawPayload[4:], (bytes32, uint256, bytes32, address, address, bytes));
+
+    bytes32 rawToToken;
+    bytes32 rawRecipient;
+    uint256 amount;
+    assembly {
+      rawToToken := mload(add(msgBody, 0x21)) // bytes 1..32
+      rawRecipient := mload(add(msgBody, 0x61)) // bytes 65..96
+      amount := mload(add(msgBody, 0x81)) // bytes 97..128
+    }
+
+    if (rawToToken != bytes32(expectedToken)) {
+      revert InvalidToken(bytes32(expectedToken), rawToToken);
+    }
+    if (rawRecipient != bytes32(expectedReceiver)) {
+      revert InvalidReceiver(expectedReceiver);
+    }
+    if (amount != expectedAmount) {
+      revert InvalidAmount(expectedAmount, amount);
     }
   }
 
@@ -339,6 +377,9 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
     if (lChainId == bytes32(0)) {
       revert ZeroLombardChainId();
     }
+    if (allowedCaller == bytes32(0)) {
+      revert ZeroAllowedCaller();
+    }
 
     s_chainSelectorToPath[remoteChainSelector] = Path({lChainId: lChainId, allowedCaller: allowedCaller});
     s_supportedChains.add(uint256(remoteChainSelector));
@@ -369,6 +410,14 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
     RemoteChainConfigArgs[] calldata remoteChainConfigArgs
   ) external onlyOwner {
     _applyRemoteChainConfigUpdates(remoteChainConfigArgs);
+  }
+
+  /// @notice Updates senders that are allowed to use this verifier.
+  /// @param allowlistConfigArgsItems Array of AllowListConfigArgs, where each item is for a destChainSelector.
+  function applyAllowlistUpdates(
+    AllowlistConfigArgs[] calldata allowlistConfigArgsItems
+  ) external onlyOwner {
+    _applyAllowlistUpdates(allowlistConfigArgsItems);
   }
 
   /// @notice Exposes the version tag.

@@ -8,7 +8,7 @@ import {RateLimiter} from "../../../libraries/RateLimiter.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {AdvancedPoolHooksSetup} from "../AdvancedPoolHooks/AdvancedPoolHooksSetup.t.sol";
 
-contract TokenPoolV2_validateLockOrBurn is AdvancedPoolHooksSetup {
+contract TokenPool_validateLockOrBurn is AdvancedPoolHooksSetup {
   function test_validateLockOrBurn() public {
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _buildLockOrBurnIn(1000e18);
 

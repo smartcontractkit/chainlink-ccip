@@ -154,7 +154,7 @@ contract FeeQuoterSetup is TokenSetup {
             feeUSDCents: 2_00, // 1 USD
             destGasOverhead: 1,
             destBytesOverhead: 200,
-            isEnabled: false
+            isEnabled: true
           })
         })
       );

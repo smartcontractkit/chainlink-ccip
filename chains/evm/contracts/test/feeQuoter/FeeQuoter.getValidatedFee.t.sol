@@ -101,6 +101,48 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
     s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, message);
   }
 
+  function test_getValidatedFee_SVM_FeeIncreasesWithAccounts() public {
+    _setDestChainConfig(Internal.CHAIN_FAMILY_SELECTOR_SVM);
+
+    Client.EVM2AnyMessage memory messageNoAccounts = Client.EVM2AnyMessage({
+      receiver: abi.encode(OWNER),
+      data: "",
+      tokenAmounts: new Client.EVMTokenAmount[](0),
+      feeToken: s_sourceFeeToken,
+      extraArgs: Client._svmArgsToBytes(
+        Client.SVMExtraArgsV1({
+          computeUnits: GAS_LIMIT,
+          accountIsWritableBitmap: 0,
+          allowOutOfOrderExecution: true,
+          tokenReceiver: bytes32(0),
+          accounts: new bytes32[](0)
+        })
+      )
+    });
+
+    uint256 feeNoAccounts = s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, messageNoAccounts);
+
+    Client.EVM2AnyMessage memory messageWithAccounts = Client.EVM2AnyMessage({
+      receiver: abi.encode(OWNER),
+      data: "",
+      tokenAmounts: new Client.EVMTokenAmount[](0),
+      feeToken: s_sourceFeeToken,
+      extraArgs: Client._svmArgsToBytes(
+        Client.SVMExtraArgsV1({
+          computeUnits: GAS_LIMIT,
+          accountIsWritableBitmap: 0,
+          allowOutOfOrderExecution: true,
+          tokenReceiver: bytes32(0),
+          accounts: new bytes32[](10)
+        })
+      )
+    });
+
+    uint256 feeWithAccounts = s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, messageWithAccounts);
+
+    assertGt(feeWithAccounts, feeNoAccounts);
+  }
+
   function test_getValidatedFee_SUI() public {
     // Update config to add a Sui chain.
     vm.stopPrank();
@@ -271,6 +313,17 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
   function test_getValidatedFee_RevertWhen_DestinationChainNotEnabled() public {
     vm.expectRevert(abi.encodeWithSelector(FeeQuoter.DestinationChainNotEnabled.selector, DEST_CHAIN_SELECTOR + 1));
     s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR + 1, _generateEmptyMessage());
+  }
+
+  function test_getValidatedFee_RevertWhen_NoGasPriceAvailable() public {
+    uint64 chainWithoutGasPrice = DEST_CHAIN_SELECTOR + 1;
+
+    FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
+    destChainConfigArgs[0].destChainSelector = chainWithoutGasPrice;
+    s_feeQuoter.applyDestChainConfigUpdates(destChainConfigArgs);
+
+    vm.expectRevert(abi.encodeWithSelector(FeeQuoter.NoGasPriceAvailable.selector, chainWithoutGasPrice));
+    s_feeQuoter.getValidatedFee(chainWithoutGasPrice, _generateEmptyMessage());
   }
 
   function test_getValidatedFee_RevertWhen_MessageTooLarge() public {

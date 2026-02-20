@@ -949,6 +949,21 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
     if (address(s_advancedPoolHooks) == address(0)) {
       return new address[](0);
     }
+
+    // The source fee amount is not classified as transferred value, meaning we have to subtract it from the amount
+    // before passing it into the hook. The inbound amount is already post-fee so we only need to do this for outbound
+    // transfers.
+    if (direction == IPoolV2.MessageDirection.Outbound) {
+      TokenTransferFeeConfig memory feeConfig = s_tokenTransferFeeConfig[remoteChainSelector];
+      if (feeConfig.isEnabled) {
+        if (blockConfirmationRequested != WAIT_FOR_FINALITY) {
+          amount -= (amount * feeConfig.customBlockConfirmationTransferFeeBps) / BPS_DIVIDER;
+        } else {
+          amount -= (amount * feeConfig.defaultBlockConfirmationTransferFeeBps) / BPS_DIVIDER;
+        }
+      }
+    }
+
     return s_advancedPoolHooks.getRequiredCCVs(
       localToken, remoteChainSelector, amount, blockConfirmationRequested, extraData, direction
     );
