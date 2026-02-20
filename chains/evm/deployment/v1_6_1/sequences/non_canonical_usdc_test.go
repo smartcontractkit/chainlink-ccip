@@ -1,4 +1,4 @@
-package adapters_test
+package sequences_test
 
 import (
 	"math/big"
@@ -32,6 +32,17 @@ type nonCanonicalTestSetup struct {
 	RMN                common.Address
 	TokenAdminRegistry common.Address
 	USDCToken          common.Address
+}
+
+// nonCanonicalRemoteChainConfig returns a remote chain config with rate limiters disabled.
+// Capacity and Rate must be non-nil for ABI packing in applyChainUpdates (token pool expects *big.Int).
+func nonCanonicalRemoteChainConfig() adapters.RemoteCCTPChainConfig {
+	return adapters.RemoteCCTPChainConfig{
+		DefaultFinalityInboundRateLimiterConfig:  tokens.RateLimiterConfig{IsEnabled: false, Capacity: big.NewInt(0), Rate: big.NewInt(0)},
+		DefaultFinalityOutboundRateLimiterConfig: tokens.RateLimiterConfig{IsEnabled: false, Capacity: big.NewInt(0), Rate: big.NewInt(0)},
+		CustomFinalityInboundRateLimiterConfig:   tokens.RateLimiterConfig{IsEnabled: false, Capacity: big.NewInt(0), Rate: big.NewInt(0)},
+		CustomFinalityOutboundRateLimiterConfig:  tokens.RateLimiterConfig{IsEnabled: false, Capacity: big.NewInt(0), Rate: big.NewInt(0)},
+	}
 }
 
 func setupNonCanonicalTestEnvironment(t *testing.T, e *deployment.Environment, chainSelector uint64) nonCanonicalTestSetup {
@@ -133,6 +144,7 @@ func TestNonCanonicalUSDCChain_TwoChainsConnected(t *testing.T) {
 		BlockChains: e.BlockChains,
 		DataStore:   e.DataStore,
 	}, adapters.DeployCCTPInput{
+		TokenDecimals: 6,
 		ChainSelector: chainASelector,
 		USDCToken:     setupA.USDCToken.Hex(),
 	})
@@ -150,6 +162,7 @@ func TestNonCanonicalUSDCChain_TwoChainsConnected(t *testing.T) {
 		BlockChains: e.BlockChains,
 		DataStore:   e.DataStore,
 	}, adapters.DeployCCTPInput{
+		TokenDecimals: 6,
 		ChainSelector: chainBSelector,
 		USDCToken:     setupB.USDCToken.Hex(),
 	})
@@ -197,17 +210,7 @@ func TestNonCanonicalUSDCChain_TwoChainsConnected(t *testing.T) {
 			chainBSelector: poolRefB,
 		},
 		RemoteChains: map[uint64]adapters.RemoteCCTPChainConfig{
-			chainBSelector: {
-				TokenTransferFeeConfig: tokens.TokenTransferFeeConfig{
-					IsEnabled:                     true,
-					DestGasOverhead:               200_000,
-					DestBytesOverhead:             32,
-					DefaultFinalityFeeUSDCents:    100,
-					CustomFinalityFeeUSDCents:     200,
-					DefaultFinalityTransferFeeBps: 100,
-					CustomFinalityTransferFeeBps:  100,
-				},
-			},
+			chainBSelector: nonCanonicalRemoteChainConfig(),
 		},
 	})
 	require.NoError(t, err, "Failed to configure chain A for lanes")
@@ -228,17 +231,7 @@ func TestNonCanonicalUSDCChain_TwoChainsConnected(t *testing.T) {
 			chainASelector: poolRefA,
 		},
 		RemoteChains: map[uint64]adapters.RemoteCCTPChainConfig{
-			chainASelector: {
-				TokenTransferFeeConfig: tokens.TokenTransferFeeConfig{
-					IsEnabled:                     true,
-					DestGasOverhead:               200_000,
-					DestBytesOverhead:             32,
-					DefaultFinalityFeeUSDCents:    100,
-					CustomFinalityFeeUSDCents:     200,
-					DefaultFinalityTransferFeeBps: 100,
-					CustomFinalityTransferFeeBps:  100,
-				},
-			},
+			chainASelector: nonCanonicalRemoteChainConfig(),
 		},
 	})
 	require.NoError(t, err, "Failed to configure chain B for lanes")
