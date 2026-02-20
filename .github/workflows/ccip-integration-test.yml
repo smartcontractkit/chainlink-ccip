@@ -5,7 +5,7 @@ on:
   merge_group:
   push:
     branches:
-      - 'main'
+      - "main"
 
 jobs:
   changes:
@@ -36,7 +36,7 @@ jobs:
       # We explicitly have this env var not be "CL_DATABASE_URL" to avoid having it be used by core related tests
       # when they should not be using it, while still allowing us to DRY up the setup
       DB_URL: postgresql://postgres:postgres@localhost:5432/chainlink_test?sslmode=disable
-    
+
     strategy:
       fail-fast: false
       matrix:
@@ -51,6 +51,7 @@ jobs:
             name: "OOO Execution Test"
           - cmd: cd integration-tests/smoke/ccip && go test -run "^Test_CCIPMessaging_EVM2EVM$" ccip_messaging_test.go -timeout 20m -test.parallel=2 -count=1 -json
             name: "Messaging Test Test_CCIPMessaging_EVM2EVM"
+            # DEBUG: WTH?
           - cmd: cd integration-tests/smoke/ccip && go test -run "^Test_CCIPMessaging_EVM2Solana$" ccip_messaging_test.go -timeout 30m -test.parallel=2 -count=1 -json
             name: "Messaging Test Test_CCIPMessaging_EVM2Solana"
           - cmd: cd integration-tests/smoke/ccip && go test -run "^Test_CCIPMessaging_Solana2EVM$" ccip_messaging_test.go -timeout 30m -test.parallel=2 -count=1 -json
@@ -76,7 +77,7 @@ jobs:
             name: "CCIPReader Test"
           - cmd: cd integration-tests/smoke/ccip && go test -run "^Test_CCIPTopologies_EVM2EVM_RoleDON_AllSupportSource_SomeSupportDest$" ccip_topologies_test.go -timeout 20m -test.parallel=2 -count=1 -json
             name: "Test_CCIPTopologies_EVM2EVM_RoleDON_AllSupportSource_SomeSupportDest"
-    
+
     name: Integration Tests (${{ matrix.type.name }})
     runs-on: ubuntu-latest
     steps:
