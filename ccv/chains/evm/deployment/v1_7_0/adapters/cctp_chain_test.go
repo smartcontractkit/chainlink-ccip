@@ -25,12 +25,16 @@ import (
 	usdc_token_pool_proxy_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/usdc_token_pool_proxy"
 	versioned_verifier_resolver_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/versioned_verifier_resolver"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
+	non_canonical_adapters "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/adapters"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/burn_mint_with_lock_release_flag_token_pool"
 	cctp_message_transmitter_proxy_v1_6_2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_2/operations/cctp_message_transmitter_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_5/operations/usdc_token_pool_cctp_v2"
 	v1_6_1_burn_mint_token_pool "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_1/burn_mint_token_pool"
+	burn_mint_with_lock_release_flag_token_pool_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_1/burn_mint_with_lock_release_flag_token_pool"
 	usdc_token_pool_cctp_v2_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_5/usdc_token_pool_cctp_v2"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
@@ -45,6 +49,7 @@ import (
 
 const (
 	mechanismCCTPV2WithCCV = "CCTP_V2_WITH_CCV"
+	mechanismLockRelease   = "LOCK_RELEASE"
 )
 
 func convertMechanismToUint8(mechanism string) (uint8, error) {
@@ -219,6 +224,80 @@ func setupCCTPTestEnvironment(t *testing.T, e *deployment.Environment, chainSele
 		TokenMessengerV1:   tokenMessengerV1Addr,
 		TokenMessengerV2:   tokenMessengerV2Addr,
 		MessageTransmitter: messageTransmitterV2Addr,
+	}
+}
+
+type nonCanonicalTestSetup struct {
+	Router             common.Address
+	RMN                common.Address
+	TokenAdminRegistry common.Address
+	USDCToken          common.Address
+}
+
+func setupNonCanonicalTestEnvironment(t *testing.T, e *deployment.Environment, chainSelector uint64) nonCanonicalTestSetup {
+	chain := e.BlockChains.EVMChains()[chainSelector]
+
+	rmnProxyRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, rmn_proxy.Deploy, chain, contract_utils.DeployInput[rmn_proxy.ConstructorArgs]{
+		TypeAndVersion: deployment.NewTypeAndVersion(rmn_proxy.ContractType, *rmn_proxy.Version),
+		ChainSelector:  chainSelector,
+		Args:           rmn_proxy.ConstructorArgs{RMN: chain.DeployerKey.From},
+	}, nil)
+	require.NoError(t, err, "Failed to deploy RMN proxy")
+	rmnAddr := common.HexToAddress(rmnProxyRef.Address)
+
+	routerRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, router.Deploy, chain, contract_utils.DeployInput[router.ConstructorArgs]{
+		TypeAndVersion: deployment.NewTypeAndVersion(router.ContractType, *router.Version),
+		ChainSelector:  chainSelector,
+		Args: router.ConstructorArgs{
+			WrappedNative: common.Address{},
+			RMNProxy:      rmnAddr,
+		},
+	}, nil)
+	require.NoError(t, err, "Failed to deploy Router")
+	routerAddr := common.HexToAddress(routerRef.Address)
+
+	tarRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, token_admin_registry.Deploy, chain, contract_utils.DeployInput[token_admin_registry.ConstructorArgs]{
+		TypeAndVersion: deployment.NewTypeAndVersion(token_admin_registry.ContractType, *token_admin_registry.Version),
+		ChainSelector:  chainSelector,
+		Args:           token_admin_registry.ConstructorArgs{},
+	}, nil)
+	require.NoError(t, err, "Failed to deploy TokenAdminRegistry")
+	tarAddr := common.HexToAddress(tarRef.Address)
+
+	usdcAddr, tx, _, err := burn_mint_erc20_bindings.DeployBurnMintERC20(
+		chain.DeployerKey,
+		chain.Client,
+		"USD Coin",
+		"USDC",
+		6,
+		big.NewInt(0),
+		big.NewInt(0),
+	)
+	require.NoError(t, err, "Failed to deploy USDC token")
+	_, err = chain.Confirm(tx)
+	require.NoError(t, err, "Failed to confirm USDC deployment")
+
+	ds := datastore.NewMemoryDataStore()
+	if e.DataStore != nil {
+		require.NoError(t, ds.Merge(e.DataStore))
+	}
+	require.NoError(t, ds.Addresses().Add(rmnProxyRef))
+	require.NoError(t, ds.Addresses().Add(routerRef))
+	require.NoError(t, ds.Addresses().Add(tarRef))
+	require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
+		ChainSelector: chainSelector,
+		Address:       usdcAddr.Hex(),
+		Type:          datastore.ContractType(burn_mint_erc20.ContractType),
+		Version:       semver.MustParse("1.0.0"),
+		Qualifier:     "USDC",
+	}))
+	e.DataStore = ds.Seal()
+
+	return nonCanonicalTestSetup{
+		Router:             routerAddr,
+		RMN:                rmnAddr,
+		TokenAdminRegistry: tarAddr,
+		USDCToken:          usdcAddr,
 	}
 }
 
@@ -727,4 +806,239 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 	require.NotEqual(t, common.Address{}, homeCCTPV2TokenPoolAddr, "Home chain CCTP V2 token pool should be deployed")
 	require.NotEqual(t, common.Address{}, nonHomeCCTPTokenPoolAddr, "Non-home chain CCTP token pool should be deployed")
 	require.NotEqual(t, common.Address{}, nonHomeCCTPV2TokenPoolAddr, "Non-home chain CCTP V2 token pool should be deployed")
+}
+
+// remoteChainConfigForNonCanonical returns a remote chain config suitable for lanes to/from non-canonical chains.
+// Rate limiter Capacity/Rate must be non-nil for ABI packing in token pool configuration.
+func remoteChainConfigForNonCanonical() adapters.RemoteCCTPChainConfig {
+	return adapters.RemoteCCTPChainConfig{
+		DefaultFinalityInboundRateLimiterConfig:  tokens.RateLimiterConfig{IsEnabled: false, Capacity: big.NewInt(0), Rate: big.NewInt(0)},
+		DefaultFinalityOutboundRateLimiterConfig: tokens.RateLimiterConfig{IsEnabled: false, Capacity: big.NewInt(0), Rate: big.NewInt(0)},
+		CustomFinalityInboundRateLimiterConfig:   tokens.RateLimiterConfig{IsEnabled: false, Capacity: big.NewInt(0), Rate: big.NewInt(0)},
+		CustomFinalityOutboundRateLimiterConfig:  tokens.RateLimiterConfig{IsEnabled: false, Capacity: big.NewInt(0), Rate: big.NewInt(0)},
+		TokenTransferFeeConfig: tokens.TokenTransferFeeConfig{
+			IsEnabled:                     true,
+			DestGasOverhead:               200_000,
+			DestBytesOverhead:             32,
+			DefaultFinalityFeeUSDCents:    100,
+			CustomFinalityFeeUSDCents:     200,
+			DefaultFinalityTransferFeeBps: 100,
+			CustomFinalityTransferFeeBps:  100,
+		},
+	}
+}
+
+// TestCCTPChainAdapter_CanonicalToNonCanonicalChain connects a canonical 1.7.0 chain with a non-canonical 1.6.1 chain
+// via the DeployCCTPChains changeset: canonical chain gets proxy + CCTP verifier/pools; non-canonical gets
+// BurnMintWithLockReleaseFlagTokenPool; both sides see each other as remotes (LOCK_RELEASE on canonical side).
+func TestCCTPChainAdapter_CanonicalToNonCanonicalChain(t *testing.T) {
+	canonicalChainSelector := chain_selectors.ETHEREUM_TESTNET_SEPOLIA.Selector
+	nonCanonicalChainSelector := chain_selectors.ETHEREUM_TESTNET_SEPOLIA_ARBITRUM_1.Selector
+
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{canonicalChainSelector, nonCanonicalChainSelector}),
+	)
+	require.NoError(t, err, "Failed to create environment")
+	require.NotNil(t, e, "Environment should be created")
+
+	ds := datastore.NewMemoryDataStore()
+	e.DataStore = ds.Seal()
+
+	// Setup canonical chain (CCTP mocks, chain contracts, CCTP V1 proxy; CCTP V1 pool added below)
+	canonicalSetup := setupCCTPTestEnvironment(t, e, canonicalChainSelector)
+	canonicalChain := e.BlockChains.EVMChains()[canonicalChainSelector]
+
+	// Setup non-canonical chain (RMN, Router, TAR, USDC only)
+	nonCanonicalSetup := setupNonCanonicalTestEnvironment(t, e, nonCanonicalChainSelector)
+	nonCanonicalChain := e.BlockChains.EVMChains()[nonCanonicalChainSelector]
+
+	// Deploy CCTP V1 pool on canonical chain and add to datastore (required for proxy's CCTP V1 pool ref)
+	homeCCTPV1Pool, tx, _, err := v1_6_1_burn_mint_token_pool.DeployBurnMintTokenPool(
+		canonicalChain.DeployerKey, canonicalChain.Client,
+		canonicalSetup.USDCToken, 6, []common.Address{}, canonicalSetup.RMN, canonicalSetup.Router,
+	)
+	require.NoError(t, err, "Failed to deploy CCTP V1 pool on canonical chain")
+	_, err = canonicalChain.Confirm(tx)
+	require.NoError(t, err, "Failed to confirm CCTP V1 pool on canonical chain")
+
+	newDS := datastore.NewMemoryDataStore()
+	require.NoError(t, newDS.Merge(e.DataStore))
+	require.NoError(t, newDS.Addresses().Add(datastore.AddressRef{
+		ChainSelector: canonicalChainSelector,
+		Address:       homeCCTPV1Pool.Hex(),
+		Type:          datastore.ContractType("USDCTokenPool"),
+		Version:       semver.MustParse("1.6.2"),
+	}))
+	e.DataStore = newDS.Seal()
+
+	// CREATE2Factory for canonical chain was already deployed and added by setupCCTPTestEnvironment
+	canonicalCreate2FactoryRefs := e.DataStore.Addresses().Filter(
+		datastore.AddressRefByChainSelector(canonicalChainSelector),
+		datastore.AddressRefByType(datastore.ContractType(create2_factory.ContractType)),
+		datastore.AddressRefByVersion(semver.MustParse("1.7.0")),
+	)
+	require.Len(t, canonicalCreate2FactoryRefs, 1, "Expected exactly one CREATE2Factory for canonical chain")
+	canonicalCreate2FactoryRef := canonicalCreate2FactoryRefs[0]
+
+	// Register both adapters: canonical (1.7.0) and non-canonical (1.6.1)
+	cctpChainRegistry := adapters.NewCCTPChainRegistry()
+	cctpChainRegistry.RegisterCCTPChain("evm", &evm_adapters.CCTPChainAdapter{})
+	cctpChainRegistry.RegisterCCTPChain("evm", &non_canonical_adapters.NonCanonicalUSDCChainAdapter{})
+
+	mcmsRegistry := changesets.GetRegistry()
+
+	cfg := v1_7_0_changesets.DeployCCTPChainsConfig{
+		Chains: map[uint64]v1_7_0_changesets.CCTPChainConfig{
+			canonicalChainSelector: {
+				USDCType:         adapters.Canonical,
+				TokenDecimals:    6,
+				TokenMessengerV1: canonicalSetup.TokenMessengerV1.Hex(),
+				TokenMessengerV2: canonicalSetup.TokenMessengerV2.Hex(),
+				USDCToken:        canonicalSetup.USDCToken.Hex(),
+				RegisteredPoolRef: datastore.AddressRef{
+					Type:    datastore.ContractType(usdc_token_pool_proxy.ContractType),
+					Version: usdc_token_pool_proxy.Version,
+				},
+				DeployerContract: canonicalCreate2FactoryRef.Address,
+				StorageLocations: []string{"https://test.chain.link.fake"},
+				FeeAggregator:    common.HexToAddress("0x04").Hex(),
+				FastFinalityBps:  100,
+				RemoteChains: map[uint64]adapters.RemoteCCTPChainConfig{
+					nonCanonicalChainSelector: {
+						LockOrBurnMechanism: mechanismLockRelease,
+						TokenTransferFeeConfig: tokens.TokenTransferFeeConfig{
+							IsEnabled:                     true,
+							DestGasOverhead:               200_000,
+							DestBytesOverhead:             32,
+							DefaultFinalityFeeUSDCents:    100,
+							CustomFinalityFeeUSDCents:     200,
+							DefaultFinalityTransferFeeBps: 100,
+							CustomFinalityTransferFeeBps:  100,
+						},
+						DefaultFinalityInboundRateLimiterConfig:  tokens.RateLimiterConfig{IsEnabled: false, Capacity: big.NewInt(0), Rate: big.NewInt(0)},
+						DefaultFinalityOutboundRateLimiterConfig: tokens.RateLimiterConfig{IsEnabled: false, Capacity: big.NewInt(0), Rate: big.NewInt(0)},
+						CustomFinalityInboundRateLimiterConfig:   tokens.RateLimiterConfig{IsEnabled: false, Capacity: big.NewInt(0), Rate: big.NewInt(0)},
+						CustomFinalityOutboundRateLimiterConfig:  tokens.RateLimiterConfig{IsEnabled: false, Capacity: big.NewInt(0), Rate: big.NewInt(0)},
+					},
+				},
+			},
+			nonCanonicalChainSelector: {
+				USDCType:         adapters.NonCanonical,
+				TokenDecimals:    6,
+				TokenMessengerV1: "",
+				TokenMessengerV2: common.Address{}.Hex(),
+				USDCToken:        nonCanonicalSetup.USDCToken.Hex(),
+				DeployerContract: nonCanonicalSetup.Router.Hex(),
+				StorageLocations: []string{"https://test.chain.link.fake"},
+				FeeAggregator:    common.HexToAddress("0x04").Hex(),
+				FastFinalityBps:  100,
+				RegisteredPoolRef: datastore.AddressRef{
+					Type:    datastore.ContractType(burn_mint_with_lock_release_flag_token_pool.ContractType),
+					Version: burn_mint_with_lock_release_flag_token_pool.Version,
+				},
+				RemoteChains: map[uint64]adapters.RemoteCCTPChainConfig{
+					canonicalChainSelector: remoteChainConfigForNonCanonical(),
+				},
+			},
+		},
+	}
+
+	changeset := v1_7_0_changesets.DeployCCTPChains(cctpChainRegistry, mcmsRegistry)
+	output, err := changeset.Apply(*e, cfg)
+	require.NoError(t, err, "Failed to apply DeployCCTPChains changeset")
+
+	ds = datastore.NewMemoryDataStore()
+	require.NoError(t, ds.Merge(e.DataStore))
+	require.NoError(t, ds.Merge(output.DataStore.Seal()))
+	e.DataStore = ds.Seal()
+
+	outputAddresses, err := output.DataStore.Addresses().Fetch()
+	require.NoError(t, err, "Failed to fetch addresses from changeset output")
+
+	var canonicalProxyAddr, nonCanonicalPoolAddr common.Address
+	for _, addr := range outputAddresses {
+		switch addr.ChainSelector {
+		case canonicalChainSelector:
+			if deployment.ContractType(addr.Type) == usdc_token_pool_proxy.ContractType {
+				canonicalProxyAddr = common.HexToAddress(addr.Address)
+			}
+		case nonCanonicalChainSelector:
+			if addr.Type == datastore.ContractType(burn_mint_with_lock_release_flag_token_pool.ContractType) {
+				nonCanonicalPoolAddr = common.HexToAddress(addr.Address)
+			}
+		}
+	}
+
+	require.NotEqual(t, common.Address{}, canonicalProxyAddr, "Canonical chain should have USDCTokenPoolProxy")
+	require.NotEqual(t, common.Address{}, nonCanonicalPoolAddr, "Non-canonical chain should have BurnMintWithLockReleaseFlagTokenPool")
+
+	// Canonical: TokenAdminRegistry points to proxy
+	tokenConfigReport, err := operations.ExecuteOperation(
+		testsetup.BundleWithFreshReporter(e.OperationsBundle),
+		token_admin_registry.GetTokenConfig,
+		canonicalChain,
+		contract_utils.FunctionInput[common.Address]{
+			ChainSelector: canonicalChainSelector,
+			Address:       canonicalSetup.TokenAdminRegistry,
+			Args:          canonicalSetup.USDCToken,
+		},
+	)
+	require.NoError(t, err, "Failed to get token config on canonical chain")
+	require.Equal(t, canonicalProxyAddr, tokenConfigReport.Output.TokenPool, "Canonical TAR should point to proxy")
+
+	// Canonical: proxy reports LOCK_RELEASE for non-canonical remote
+	canonicalProxy, err := usdc_token_pool_proxy_bindings.NewUSDCTokenPoolProxy(canonicalProxyAddr, canonicalChain.Client)
+	require.NoError(t, err, "Failed to bind canonical proxy")
+	mechanism, err := canonicalProxy.GetLockOrBurnMechanism(nil, nonCanonicalChainSelector)
+	require.NoError(t, err, "Failed to get lock or burn mechanism for non-canonical remote")
+	expectedLockRelease, _ := convertMechanismToUint8(mechanismLockRelease)
+	require.Equal(t, expectedLockRelease, uint8(mechanism), "Canonical proxy should use LOCK_RELEASE for non-canonical remote")
+
+	// Non-canonical: TokenAdminRegistry points to BurnMintWithLockReleaseFlagTokenPool
+	nonCanonicalTokenConfigReport, err := operations.ExecuteOperation(
+		testsetup.BundleWithFreshReporter(e.OperationsBundle),
+		token_admin_registry.GetTokenConfig,
+		nonCanonicalChain,
+		contract_utils.FunctionInput[common.Address]{
+			ChainSelector: nonCanonicalChainSelector,
+			Address:       nonCanonicalSetup.TokenAdminRegistry,
+			Args:          nonCanonicalSetup.USDCToken,
+		},
+	)
+	require.NoError(t, err, "Failed to get token config on non-canonical chain")
+	require.Equal(t, nonCanonicalPoolAddr, nonCanonicalTokenConfigReport.Output.TokenPool, "Non-canonical TAR should point to lock-release pool")
+
+	// Non-canonical: pool supports canonical chain; remote token and remote pool match canonical USDC and proxy
+	nonCanonicalPool, err := burn_mint_with_lock_release_flag_token_pool_bindings.NewBurnMintWithLockReleaseFlagTokenPool(nonCanonicalPoolAddr, nonCanonicalChain.Client)
+	require.NoError(t, err, "Failed to bind non-canonical pool")
+	supported, err := nonCanonicalPool.GetSupportedChains(nil)
+	require.NoError(t, err, "Failed to get supported chains from non-canonical pool")
+	require.Contains(t, supported, canonicalChainSelector, "Non-canonical pool should support canonical chain")
+	remoteToken, err := nonCanonicalPool.GetRemoteToken(nil, canonicalChainSelector)
+	require.NoError(t, err, "Failed to get remote token from non-canonical pool")
+	require.Equal(t, common.LeftPadBytes(canonicalSetup.USDCToken.Bytes(), 32), remoteToken, "Non-canonical pool remote token should be canonical USDC")
+	remotePools, err := nonCanonicalPool.GetRemotePools(nil, canonicalChainSelector)
+	require.NoError(t, err, "Failed to get remote pools from non-canonical pool")
+	require.Contains(t, remotePools, common.LeftPadBytes(canonicalProxyAddr.Bytes(), 32), "Non-canonical pool should have canonical proxy as remote pool")
+
+	// Adapter methods: canonical chain uses 1.7.0 adapter
+	canonicalAdapter, _ := cctpChainRegistry.GetCCTPChain("evm", adapters.Canonical)
+	poolAddr, err := canonicalAdapter.PoolAddress(e.DataStore, e.BlockChains, canonicalChainSelector, datastore.AddressRef{
+		Type:    datastore.ContractType(usdc_token_pool_proxy.ContractType),
+		Version: usdc_token_pool_proxy.Version,
+	})
+	require.NoError(t, err, "Failed to get canonical pool address from adapter")
+	require.Equal(t, canonicalProxyAddr.Bytes(), poolAddr, "Canonical adapter pool address should match proxy")
+
+	// Adapter methods: non-canonical chain uses 1.6.1 adapter
+	nonCanonicalAdapter, _ := cctpChainRegistry.GetCCTPChain("evm", adapters.NonCanonical)
+	poolAddrNC, err := nonCanonicalAdapter.PoolAddress(e.DataStore, e.BlockChains, nonCanonicalChainSelector, datastore.AddressRef{
+		Type:    datastore.ContractType(burn_mint_with_lock_release_flag_token_pool.ContractType),
+		Version: burn_mint_with_lock_release_flag_token_pool.Version,
+	})
+	require.NoError(t, err, "Failed to get non-canonical pool address from adapter")
+	require.Equal(t, nonCanonicalPoolAddr.Bytes(), poolAddrNC, "Non-canonical adapter pool address should match")
+	tokenAddrNC, err := nonCanonicalAdapter.TokenAddress(e.DataStore, e.BlockChains, nonCanonicalChainSelector)
+	require.NoError(t, err, "Failed to get non-canonical token address from adapter")
+	require.Equal(t, nonCanonicalSetup.USDCToken.Bytes(), tokenAddrNC, "Non-canonical adapter token address should match")
 }

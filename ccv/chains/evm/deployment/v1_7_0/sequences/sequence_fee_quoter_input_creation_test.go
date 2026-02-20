@@ -33,7 +33,7 @@ import (
 // dummyAddressRefs is hardcoded address refs (previously from address_refs.json).
 // Chain selectors must match dummyContractMetadata so metadata lookup succeeds.
 var dummyAddressRefs = []datastore.AddressRef{
-	{Address: "0x1111111111111111111111111111111111111111", ChainSelector: 5009297550715157269, Type: datastore.ContractType("FeeQuoter"), Version: semver.MustParse("1.6.0")},
+	{Address: "0x1111111111111111111111111111111111111111", ChainSelector: 5009297550715157269, Type: datastore.ContractType("FeeQuoter"), Version: semver.MustParse("1.6.3")},
 	{Address: "0x6666666666666666666666666666666666666666", ChainSelector: 5009297550715157269, Type: datastore.ContractType("EVM2EVMOnRamp"), Version: semver.MustParse("1.5.0")},
 	{Address: "0x2222222222222222222222222222222222222221", ChainSelector: 5009297550715157269, Type: datastore.ContractType("CommitStore"), Version: semver.MustParse("1.5.0")},
 	{Address: "0x9999999999999999999999999999999999999999", ChainSelector: 4949039107694359620, Type: datastore.ContractType("CommitStore"), Version: semver.MustParse("1.5.0"), Qualifier: "commitstore1"},
@@ -42,7 +42,7 @@ var dummyAddressRefs = []datastore.AddressRef{
 	{Address: "0x3333333333333333333333333333333333333333", ChainSelector: 4949039107694359620, Type: datastore.ContractType("CommitStore"), Version: semver.MustParse("1.5.0"), Qualifier: "commitstore2"},
 	{Address: "0x5050505050505050505050505050505050505050", ChainSelector: 15971525489660198786, Type: datastore.ContractType("EVM2EVMOnRamp"), Version: semver.MustParse("1.5.0")},
 	{Address: "0x4444444444444444444444444444444444444444", ChainSelector: 15971525489660198786, Type: datastore.ContractType("CommitStore"), Version: semver.MustParse("1.5.0")},
-	{Address: "0x6060606060606060606060606060606060606060", ChainSelector: 5936861837188149645, Type: datastore.ContractType("FeeQuoter"), Version: semver.MustParse("1.6.0")},
+	{Address: "0x6060606060606060606060606060606060606060", ChainSelector: 5936861837188149645, Type: datastore.ContractType("FeeQuoter"), Version: semver.MustParse("1.6.3")},
 	{Address: "0x7070707070707070707070707070707070707070", ChainSelector: 5936861837188149645, Type: datastore.ContractType("EVM2EVMOnRamp"), Version: semver.MustParse("1.5.0")},
 	{Address: "0x5555555555555555555555555555555555555551", ChainSelector: 5936861837188149645, Type: datastore.ContractType("CommitStore"), Version: semver.MustParse("1.5.0")},
 }
