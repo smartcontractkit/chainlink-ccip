@@ -180,18 +180,19 @@ var (
 		func(b cldf_ops.Bundle, chain evm.Chain, input deploy.FeeQuoterUpdateInput) (output FeeQuoterUpdate, err error) {
 			// check if FeeQuoter v1.6.3 is present in existing addresses, if not, we return empty output
 			// it means there is no existing fee quoter deployed from v1.6.3 deployment, and we can skip the config import from v1.6.3
-			_, err = seq1_6.GetFeeQuoterAddress(input.ExistingAddresses, input.ChainSelector)
+			fq16AddressRef, err := seq1_6.GetFeeQuoterAddress(input.ExistingAddresses, input.ChainSelector)
 			if err != nil && strings.Contains(err.Error(), "no fee quoter address found") {
 				return FeeQuoterUpdate{}, nil
 			}
 			output.ChainSelector = input.ChainSelector
 			output.ExistingAddresses = input.ExistingAddresses
+
 			// get feeQuoter 1.6 address meta
 			metadataForFq16, err := datastore_utils.FilterContractMetaByContractTypeAndVersion(
 				input.ExistingAddresses,
 				input.ContractMeta,
 				fq1_6.ContractType,
-				fq1_6.Version,
+				fq16AddressRef.Version,
 				"",
 				input.ChainSelector,
 			)
