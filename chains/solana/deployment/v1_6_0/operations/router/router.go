@@ -357,7 +357,11 @@ var SetPool = operations.NewOperation(
 				b.Logger.Info("Token pool lookup table already set for this mint with the given admin:", tokenAdminRegistryAccount)
 				return sequences.OnChainOutput{}, nil
 			}
-			currentAdmin = tokenAdminRegistryAccount.Administrator
+			// If the admin is zero, it means we're performing a propose + accept + set sequence,
+			// so we should sign with the timelock (current authority)
+			if !tokenAdminRegistryAccount.Administrator.IsZero() {
+				currentAdmin = tokenAdminRegistryAccount.Administrator
+			}
 		}
 
 		routerConfigPDA, _, _ := state.FindConfigPDA(input.Router)
@@ -578,6 +582,7 @@ var AcceptTokenAdminRegistry = operations.NewOperation(
 			if input.Admin != timelockSigner {
 				return sequences.OnChainOutput{}, fmt.Errorf("no pending admin found for token admin registry, expected timelock signer %s but got %s", timelockSigner.String(), input.Admin.String())
 			}
+			pendingAdmin = input.Admin
 		} else if pendingAdmin != timelockSigner && pendingAdmin != chain.DeployerKey.PublicKey() {
 			// we can only sign as either the deployer or timelock
 			return sequences.OnChainOutput{}, fmt.Errorf("pending admin %s does not match timelock signer %s or deployer %s", pendingAdmin.String(), timelockSigner.String(), chain.DeployerKey.PublicKey().String())
