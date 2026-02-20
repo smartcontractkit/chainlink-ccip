@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 
 use ccip_common::{
     CommonCcipError, CHAIN_FAMILY_SELECTOR_APTOS, CHAIN_FAMILY_SELECTOR_EVM,
-    CHAIN_FAMILY_SELECTOR_SVM, CHAIN_FAMILY_SELECTOR_TVM,
+    CHAIN_FAMILY_SELECTOR_SUI, CHAIN_FAMILY_SELECTOR_SVM, CHAIN_FAMILY_SELECTOR_TVM,
 };
 
 use crate::context::{
@@ -305,10 +305,11 @@ fn validate_dest_chain_config(dest_chain_selector: u64, config: &DestChainConfig
     require!(
         matches!(
             u32::from_be_bytes(config.chain_family_selector),
-            CHAIN_FAMILY_SELECTOR_EVM
+            CHAIN_FAMILY_SELECTOR_APTOS
+                | CHAIN_FAMILY_SELECTOR_EVM
+                | CHAIN_FAMILY_SELECTOR_SUI
                 | CHAIN_FAMILY_SELECTOR_SVM
                 | CHAIN_FAMILY_SELECTOR_TVM
-                | CHAIN_FAMILY_SELECTOR_APTOS
         ),
         CommonCcipError::InvalidChainFamilySelector
     );
@@ -320,6 +321,17 @@ fn validate_dest_chain_config(dest_chain_selector: u64, config: &DestChainConfig
 mod tests {
     use super::*;
     use crate::instructions::v1::messages::tests::sample_dest_chain;
+
+    #[test]
+    fn validate_dest_chain_config_rejects_unknown_selector() {
+        let mut dest_chain = sample_dest_chain();
+        dest_chain.config.chain_family_selector = [0u8; 4];
+
+        assert_eq!(
+            validate_dest_chain_config(dest_chain.chain_selector, &dest_chain.config).unwrap_err(),
+            CommonCcipError::InvalidChainFamilySelector.into()
+        );
+    }
 
     #[test]
     fn validate_dest_chain_config_accepts_tvm() {
@@ -338,13 +350,26 @@ mod tests {
     }
 
     #[test]
-    fn validate_dest_chain_config_rejects_unknown_selector() {
+    fn validate_dest_chain_config_accepts_evm() {
         let mut dest_chain = sample_dest_chain();
-        dest_chain.config.chain_family_selector = [0u8; 4];
+        dest_chain.config.chain_family_selector = CHAIN_FAMILY_SELECTOR_EVM.to_be_bytes();
 
-        assert_eq!(
-            validate_dest_chain_config(dest_chain.chain_selector, &dest_chain.config).unwrap_err(),
-            CommonCcipError::InvalidChainFamilySelector.into()
-        );
+        validate_dest_chain_config(dest_chain.chain_selector, &dest_chain.config).unwrap();
+    }
+
+    #[test]
+    fn validate_dest_chain_config_accepts_sui() {
+        let mut dest_chain = sample_dest_chain();
+        dest_chain.config.chain_family_selector = CHAIN_FAMILY_SELECTOR_SUI.to_be_bytes();
+
+        validate_dest_chain_config(dest_chain.chain_selector, &dest_chain.config).unwrap();
+    }
+
+    #[test]
+    fn validate_dest_chain_config_accepts_svm() {
+        let mut dest_chain = sample_dest_chain();
+        dest_chain.config.chain_family_selector = CHAIN_FAMILY_SELECTOR_SVM.to_be_bytes();
+
+        validate_dest_chain_config(dest_chain.chain_selector, &dest_chain.config).unwrap();
     }
 }

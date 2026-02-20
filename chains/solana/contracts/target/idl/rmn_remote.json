@@ -257,6 +257,43 @@
       ]
     },
     {
+      "name": "setEventAuthorities",
+      "docs": [
+        "Overwrites the list of addresses authorized to invoke the `cpi_event` instruction.",
+        "",
+        "Only the CCIP Admin may perform this operation.",
+        "",
+        "# Arguments",
+        "* `ctx` - The context containing the accounts required for updating event authorities.",
+        "* `new_event_authorities` - The new list of event authority public keys."
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "newEventAuthorities",
+          "type": {
+            "vec": "publicKey"
+          }
+        }
+      ]
+    },
+    {
       "name": "verifyNotCursed",
       "docs": [
         "Verifies that the subject is not cursed AND that this chain is not globally cursed.",
@@ -277,7 +314,10 @@
         {
           "name": "config",
           "isMut": false,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "After the upgrade is made, this can be changed to Account<'info, Config>."
+          ]
         }
       ],
       "args": [
@@ -288,6 +328,72 @@
           }
         }
       ]
+    },
+    {
+      "name": "cpiEvent",
+      "docs": [
+        "Backwards-compatible way of implementing CPI events without other contracts needing to",
+        "add more accounts to make a self-CPI. Calls made to this instruction include the event data",
+        "in the instruction data, so offchain code can inspect it.",
+        "",
+        "Only event authorities can invoke this instruction. While there is basic onchain",
+        "authorization, the offchain is still expected to check the caller program to attribute the",
+        "event to it, as this method may be invoked by more than one program so that it can be reused.",
+        "",
+        "# Arguments",
+        "* `_ctx` - The context containing the accounts required for the CPI event.",
+        "* `_event_data` - The raw event data to be emitted."
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "eventData",
+          "type": "bytes"
+        }
+      ]
+    },
+    {
+      "name": "migrateConfigV1ToV2",
+      "docs": [
+        "Extends the Config PDA to allocate space for v2 fields, and migrates the onchain state",
+        "from v1 to v2. This is a permissionless operation, as the default values set for the new",
+        "v2 fields are backwards-compatible and safe.",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for the migration."
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "has the new property in it, so it can't be deserialized as Config before the migration has happened."
+          ]
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
     }
   ],
   "accounts": [
@@ -312,6 +418,12 @@
             "name": "defaultCodeVersion",
             "type": {
               "defined": "CodeVersion"
+            }
+          },
+          {
+            "name": "eventAuthorities",
+            "type": {
+              "vec": "publicKey"
             }
           }
         ]
@@ -446,6 +558,18 @@
           "index": false
         }
       ]
+    },
+    {
+      "name": "EventAuthoritiesSet",
+      "fields": [
+        {
+          "name": "eventAuthorities",
+          "type": {
+            "vec": "publicKey"
+          },
+          "index": false
+        }
+      ]
     }
   ],
   "errors": [
@@ -493,6 +617,11 @@
       "code": 9008,
       "name": "DefaultOwnerProposal",
       "msg": "Proposed owner is the default pubkey"
+    },
+    {
+      "code": 9009,
+      "name": "InvalidInputsConfigAccount",
+      "msg": "Config account has invalid space, data, or shape"
     }
   ]
 }

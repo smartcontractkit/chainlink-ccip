@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"os"
 	"time"
 
 	"github.com/Masterminds/semver/v3"
@@ -34,6 +35,7 @@ import (
 	rmnremoteops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/rmn_remote"
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/router"
 	solanaseqs "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/rmn_remote"
 	solCommonUtil "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testadapters"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
@@ -162,7 +164,7 @@ func (m *CCIP16Solana) DeployLocalNetwork(ctx context.Context, bc *blockchain.In
 	if err != nil {
 		return nil, fmt.Errorf("failed to get chain details: %w", err)
 	}
-	err = PreloadSolanaEnvironment(bc.ContractsDir, d.ChainSelector)
+	err = PreloadSolanaEnvironment(ctx, bc.ContractsDir, d.ChainSelector)
 	if err != nil {
 		return nil, fmt.Errorf("failed to preload Solana environment: %w", err)
 	}
@@ -203,12 +205,18 @@ var solanaContracts = map[string]datastore.ContractType{
 	"test_ccip_receiver":     datastore.ContractType("TestReceiver"),
 }
 
-func PreloadSolanaEnvironment(programsPath string, chainSelector uint64) error {
-	err := utils.DownloadSolanaCCIPProgramArtifacts(context.Background(), programsPath, utils.VersionToShortCommitSHA[utils.VersionSolanaV1_6_0])
-	if err != nil {
-		return err
+func PreloadSolanaEnvironment(ctx context.Context, programsPath string, chainSelector uint64) error {
+	l := zerolog.Ctx(ctx)
+
+	files, _ := os.ReadDir(programsPath)
+	if len(files) > 0 {
+		l.Info().Msg("Using pre-existing Solana contracts, without downloading fresh ones")
+		return nil
 	}
-	return nil
+
+	l.Info().Msgf("Downloading Solana contracts into %s", programsPath)
+	shortSha := utils.VersionToShortCommitSHA[utils.VersionSolanaV1_6_0]
+	return utils.DownloadSolanaCCIPProgramArtifacts(ctx, programsPath, shortSha)
 }
 
 // Populates datastore with the predeployed program addresses
@@ -331,6 +339,36 @@ func (m *CCIP16Solana) PostDeployContractsForSelector(ctx context.Context, env *
 	if err != nil {
 		return fmt.Errorf("failed to add price updater: %w", err)
 	}
+
+	cpiSigner, _, err := state.FindFeeBillingSignerPDA(routerID)
+	if err != nil {
+		return fmt.Errorf("failed to find billing signer PDA: %w", err)
+	}
+
+	rmnRemoteAddrRef, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
+		ChainSelector: selector,
+		Type:          datastore.ContractType("RMNRemote"),
+	}, selector, datastore_utils.FullRef)
+	if err != nil {
+		return fmt.Errorf("failed to get RMNRemote address: %w", err)
+	}
+	rmnRemoteAddr := solana.MustPublicKeyFromBase58(rmnRemoteAddrRef.Address)
+	if rmn_remote.ProgramID.IsZero() {
+		rmn_remote.ProgramID = rmnRemoteAddr
+	}
+	rmnConfig, _, err := state.FindConfigPDA(rmnRemoteAddr)
+	if err != nil {
+		return fmt.Errorf("failed to find RMNRemote config PDA: %w", err)
+	}
+	rmnIx, err := rmn_remote.NewSetEventAuthoritiesInstruction([]solana.PublicKey{cpiSigner}, rmnConfig, chain.DeployerKey.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+	if err != nil {
+		return fmt.Errorf("failed to build set event authorities instruction: %w", err)
+	}
+	err = chain.Confirm([]solana.Instruction{rmnIx})
+	if err != nil {
+		return fmt.Errorf("failed to set event authorities: %w", err)
+	}
+
 	for _, tokenPubKey := range []solana.PublicKey{
 		solana.WrappedSol,
 		solana.MustPublicKeyFromBase58(linkAddr.Address),

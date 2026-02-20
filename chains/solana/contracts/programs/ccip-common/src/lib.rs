@@ -37,13 +37,24 @@ pub enum CommonCcipError {
     InvalidTVMAddress,
     #[msg("Invalid Aptos address")]
     InvalidAptosAddress,
+    #[msg("Invalid Sui address")]
+    InvalidSuiAddress,
 }
 
-// https://github.com/smartcontractkit/chainlink/blob/ff8a597fd9df653f8967427498eaa5a04b19febb/contracts/src/v0.8/ccip/libraries/Internal.sol#L276
-pub const CHAIN_FAMILY_SELECTOR_EVM: u32 = 0x2812d52c;
-pub const CHAIN_FAMILY_SELECTOR_SVM: u32 = 0x1e10bdc4;
-pub const CHAIN_FAMILY_SELECTOR_TVM: u32 = 0x647e2ba9;
+// bytes4(keccak256("CCIP ChainFamilySelector APTOS"));
 pub const CHAIN_FAMILY_SELECTOR_APTOS: u32 = 0xac77ffec;
+
+// bytes4(keccak256("CCIP ChainFamilySelector EVM"));
+pub const CHAIN_FAMILY_SELECTOR_EVM: u32 = 0x2812d52c;
+
+// bytes4(keccak256("CCIP ChainFamilySelector SUI"));
+pub const CHAIN_FAMILY_SELECTOR_SUI: u32 = 0xc4e05953;
+
+// bytes4(keccak256("CCIP ChainFamilySelector SVM"));
+pub const CHAIN_FAMILY_SELECTOR_SVM: u32 = 0x1e10bdc4;
+
+// byte4(keccak256("CCIP ChainFamilySelector TVM"));
+pub const CHAIN_FAMILY_SELECTOR_TVM: u32 = 0x647e2ba9;
 
 // Duplicates the router ID to declare router accounts that must be visible from the common crate,
 // avoiding a circular dependency. This means this crate may only declare accounts that belong

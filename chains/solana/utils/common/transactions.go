@@ -392,6 +392,15 @@ type anchorType[T any] interface {
 	UnmarshalWithDecoder(decoder *bin.Decoder) (err error)
 }
 
+func UnmarshalAnchorType[T any, PT anchorType[T]](bytes []byte) (*T, error) {
+	var result T
+	err := PT(&result).UnmarshalWithDecoder(bin.NewBorshDecoder(bytes))
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
 func ExtractAnchorTypedReturnValue[T any, PT anchorType[T]](ctx context.Context, logs []string, programID string) (*T, error) {
 	var result T
 	bytes, err := ExtractReturnValue(ctx, logs, programID)

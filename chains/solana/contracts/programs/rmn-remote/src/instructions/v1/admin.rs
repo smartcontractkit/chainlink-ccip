@@ -1,9 +1,11 @@
 use anchor_lang::prelude::*;
 
+use crate::context::UpdateEventAuthorities;
+use crate::event::EventAuthoritiesSet;
+use crate::instructions::interfaces::Admin;
 use crate::{
-    instructions::interfaces::Admin, AcceptOwnership, CodeVersion, ConfigSet, Curse, CurseSubject,
-    OwnershipTransferRequested, OwnershipTransferred, RmnRemoteError, SubjectCursed,
-    SubjectUncursed, Uncurse, UpdateConfig,
+    AcceptOwnership, CodeVersion, ConfigSet, Curse, CurseSubject, OwnershipTransferRequested,
+    OwnershipTransferred, RmnRemoteError, SubjectCursed, SubjectUncursed, Uncurse, UpdateConfig,
 };
 
 pub struct Impl;
@@ -81,6 +83,19 @@ impl Admin for Impl {
 
         curses.cursed_subjects.retain(|c| c != &subject);
         emit!(SubjectUncursed { subject });
+        Ok(())
+    }
+
+    fn set_event_authorities(
+        &self,
+        ctx: Context<UpdateEventAuthorities>,
+        new_event_authorities: Vec<Pubkey>,
+    ) -> Result<()> {
+        ctx.accounts.config.event_authorities = new_event_authorities;
+        emit!(EventAuthoritiesSet {
+            event_authorities: ctx.accounts.config.event_authorities.clone(),
+        });
+
         Ok(())
     }
 }

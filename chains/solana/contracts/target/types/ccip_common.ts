@@ -110,6 +110,11 @@ export type CcipCommon = {
       "code": 10012,
       "name": "InvalidAptosAddress",
       "msg": "Invalid Aptos address"
+    },
+    {
+      "code": 10013,
+      "name": "InvalidSuiAddress",
+      "msg": "Invalid Sui address"
     }
   ]
 };
@@ -226,6 +231,11 @@ export const IDL: CcipCommon = {
       "code": 10012,
       "name": "InvalidAptosAddress",
       "msg": "Invalid Aptos address"
+    },
+    {
+      "code": 10013,
+      "name": "InvalidSuiAddress",
+      "msg": "Invalid Sui address"
     }
   ]
 };

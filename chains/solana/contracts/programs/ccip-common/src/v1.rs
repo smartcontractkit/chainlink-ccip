@@ -11,8 +11,25 @@ use crate::{
 
 pub const MIN_TOKEN_POOL_ACCOUNTS: usize = 13; // see TokenAccounts struct for all required accounts
 const U160_MAX: U256 = U256::from_words(u32::MAX as u128, u128::MAX);
-const EVM_PRECOMPILE_SPACE: u32 = 1024;
 pub const V1_TOKEN_ADMIN_REGISTRY_SIZE: usize = 169; // for migration v1->v2 of the TokenAdminRegistry, which adds the `supports_auto_derivation` field.
+
+/// 32-byte big-endian uint256 representation of 11 (0x0b)
+pub const APTOS_PRECOMPILE_SPACE: [u8; 32] = [
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0x0b,
+];
+
+/// 32-byte big-endian uint256 representation of 1024 (0x0400)
+pub const EVM_PRECOMPILE_SPACE: [u8; 32] = [
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x04,
+    0x00,
+];
+
+/// 32-byte big-endian uint256 representation of 0xdee9
+pub const SUI_PRECOMPILE_SPACE: [u8; 32] = [
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xde,
+    0xe9,
+];
 
 pub struct TokenAccounts<'a> {
     pub user_token_account: &'a AccountInfo<'a>,
@@ -387,9 +404,31 @@ pub mod token_admin_registry_writable {
     }
 }
 
+/// Returns true iff `a >= b` when both are interpreted as big-endian uint256.
+fn ge_be_u256(a: &[u8; 32], b: &[u8; 32]) -> bool {
+    // Big-endian uint256 compare == lexicographic compare
+    for i in 0..32 {
+        match a[i].cmp(&b[i]) {
+            std::cmp::Ordering::Greater => return true,
+            std::cmp::Ordering::Less => return false,
+            std::cmp::Ordering::Equal => {} // continue
+        }
+    }
+    true // equal
+}
+
 // address validation helpers based on the chain family selector
 pub fn validate_evm_address(address: &[u8]) -> Result<()> {
     require_eq!(address.len(), 32, CommonCcipError::InvalidEVMAddress);
+
+    let addr_32: &[u8; 32] = address
+        .try_into()
+        .expect("slice length is guaranteed to be 32");
+
+    require!(
+        ge_be_u256(addr_32, &EVM_PRECOMPILE_SPACE),
+        CommonCcipError::InvalidEVMAddress
+    );
 
     let address: U256 = U256::from_be_bytes(
         address
@@ -397,13 +436,7 @@ pub fn validate_evm_address(address: &[u8]) -> Result<()> {
             .map_err(|_| CommonCcipError::InvalidEncoding)?,
     );
     require!(address <= U160_MAX, CommonCcipError::InvalidEVMAddress);
-    if let Ok(small_address) = TryInto::<u32>::try_into(address) {
-        require_gte!(
-            small_address,
-            EVM_PRECOMPILE_SPACE,
-            CommonCcipError::InvalidEVMAddress
-        )
-    };
+
     Ok(())
 }
 
@@ -443,14 +476,32 @@ pub fn validate_tvm_address(address: &[u8]) -> Result<()> {
 pub fn validate_aptos_address(address: &[u8]) -> Result<()> {
     require_eq!(address.len(), 32, CommonCcipError::InvalidAptosAddress);
 
+    let addr_32: &[u8; 32] = address
+        .try_into()
+        .expect("slice length is guaranteed to be 32");
+
     require!(
-        address.iter().any(|b| *b != 0),
+        ge_be_u256(addr_32, &APTOS_PRECOMPILE_SPACE),
         CommonCcipError::InvalidAptosAddress
     );
 
     Ok(())
 }
 
+pub fn validate_sui_address(address: &[u8]) -> Result<()> {
+    require_eq!(address.len(), 32, CommonCcipError::InvalidSuiAddress);
+
+    let addr_32: &[u8; 32] = address
+        .try_into()
+        .expect("slice length is guaranteed to be 32");
+
+    require!(
+        ge_be_u256(addr_32, &SUI_PRECOMPILE_SPACE),
+        CommonCcipError::InvalidSuiAddress
+    );
+
+    Ok(())
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -552,6 +603,24 @@ mod tests {
         assert!(result.is_err());
     }
 
+    // -----------------------------
+    // Helpers for address tests
+    // -----------------------------
+
+    fn u256_to_32_be(x: U256) -> [u8; 32] {
+        x.to_be_bytes()
+    }
+
+    fn be32_with_last_byte(v: u8) -> [u8; 32] {
+        let mut a = [0u8; 32];
+        a[31] = v;
+        a
+    }
+
+    // -----------------------------
+    // TON / TVM address tests
+    // -----------------------------
+
     #[test]
     fn validate_tvm_address_accepts_len_36_nonzero_account_id() {
         // 36-byte TON address raw format:
@@ -584,9 +653,18 @@ mod tests {
         );
     }
 
+    // -----------------------------
+    // Aptos address tests
+    // -----------------------------
+
     #[test]
-    fn validate_aptos_address_accepts_len_32_nonzero() {
-        let addr = [1u8; 32];
+    fn validate_aptos_address_accepts_valid_ge_min() {
+        // exactly min
+        validate_aptos_address(&APTOS_PRECOMPILE_SPACE).unwrap();
+
+        // > min
+        let mut addr = APTOS_PRECOMPILE_SPACE;
+        addr[31] = 0x0c;
         validate_aptos_address(&addr).unwrap();
     }
 
@@ -600,11 +678,169 @@ mod tests {
     }
 
     #[test]
-    fn validate_aptos_address_rejects_all_zero() {
+    fn validate_aptos_address_rejects_zero_address() {
         let addr = [0u8; 32];
         assert_eq!(
             validate_aptos_address(&addr).unwrap_err(),
             CommonCcipError::InvalidAptosAddress.into()
+        );
+    }
+
+    #[test]
+    fn validate_aptos_address_rejects_lower_than_min() {
+        // 0x0a < 0x0b
+        let addr = be32_with_last_byte(0x0a);
+        assert_eq!(
+            validate_aptos_address(&addr).unwrap_err(),
+            CommonCcipError::InvalidAptosAddress.into()
+        );
+    }
+
+    // -----------------------------
+    // Sui address tests
+    // -----------------------------
+
+    #[test]
+    fn validate_sui_address_accepts_valid_ge_min() {
+        // exactly min
+        validate_sui_address(&SUI_PRECOMPILE_SPACE).unwrap();
+
+        // > min (increase last byte, staying >=)
+        let mut addr = SUI_PRECOMPILE_SPACE;
+        addr[31] = 0xea;
+        validate_sui_address(&addr).unwrap();
+    }
+
+    #[test]
+    fn validate_sui_address_rejects_wrong_len() {
+        let addr = [1u8; 31];
+        assert_eq!(
+            validate_sui_address(&addr).unwrap_err(),
+            CommonCcipError::InvalidSuiAddress.into()
+        );
+    }
+
+    #[test]
+    fn validate_sui_address_rejects_zero_address() {
+        let addr = [0u8; 32];
+        assert_eq!(
+            validate_sui_address(&addr).unwrap_err(),
+            CommonCcipError::InvalidSuiAddress.into()
+        );
+    }
+
+    #[test]
+    fn validate_sui_address_rejects_lower_than_min() {
+        // Make something just below 0xdee9: 0xdee8
+        let mut addr = SUI_PRECOMPILE_SPACE;
+        addr[31] = 0xe8;
+        assert_eq!(
+            validate_sui_address(&addr).unwrap_err(),
+            CommonCcipError::InvalidSuiAddress.into()
+        );
+    }
+
+    // -----------------------------
+    // EVM address tests
+    // -----------------------------
+
+    #[test]
+    fn validate_evm_address_accepts_valid_ge_min_and_le_u160max() {
+        // exactly min (1024)
+        validate_evm_address(&EVM_PRECOMPILE_SPACE).unwrap();
+
+        // > min but still small
+        let mut addr = EVM_PRECOMPILE_SPACE;
+        addr[31] = 0x01; // 0x0401
+        validate_evm_address(&addr).unwrap();
+
+        // a high-but-valid 160-bit address: U160_MAX itself
+        let high = u256_to_32_be(U160_MAX);
+        validate_evm_address(&high).unwrap();
+    }
+
+    #[test]
+    fn validate_evm_address_rejects_wrong_len() {
+        let addr = [1u8; 31];
+        assert_eq!(
+            validate_evm_address(&addr).unwrap_err(),
+            CommonCcipError::InvalidEVMAddress.into()
+        );
+    }
+
+    #[test]
+    fn validate_evm_address_rejects_zero_address() {
+        let addr = [0u8; 32];
+        assert_eq!(
+            validate_evm_address(&addr).unwrap_err(),
+            CommonCcipError::InvalidEVMAddress.into()
+        );
+    }
+
+    #[test]
+    fn validate_evm_address_rejects_lower_than_min() {
+        // 1023 (0x03ff) is below 1024
+        let addr = [
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0x03, 0xff,
+        ];
+        assert_eq!(
+            validate_evm_address(&addr).unwrap_err(),
+            CommonCcipError::InvalidEVMAddress.into()
+        );
+
+        // also check something very small like 1
+        let addr = be32_with_last_byte(1);
+        assert_eq!(
+            validate_evm_address(&addr).unwrap_err(),
+            CommonCcipError::InvalidEVMAddress.into()
+        );
+    }
+
+    #[test]
+    fn validate_evm_address_rejects_greater_than_u160max() {
+        // U160_MAX + 1 should fail the <= U160_MAX check
+        let too_big = u256_to_32_be(U160_MAX + U256::new(1));
+        assert_eq!(
+            validate_evm_address(&too_big).unwrap_err(),
+            CommonCcipError::InvalidEVMAddress.into()
+        );
+
+        // also fail for something with non-zero in the top 96 bits (definitely > u160 max)
+        let mut definitely_too_big = [0u8; 32];
+        definitely_too_big[0] = 1; // sets a high-order byte
+        definitely_too_big[31] = 0x10; // keep non-zero
+        assert_eq!(
+            validate_evm_address(&definitely_too_big).unwrap_err(),
+            CommonCcipError::InvalidEVMAddress.into()
+        );
+    }
+
+    // -----------------------------
+    // SVM address tests (Solana)
+    // -----------------------------
+
+    #[test]
+    fn validate_svm_address_accepts_valid_pubkey_bytes() {
+        let pk = Pubkey::new_unique();
+        validate_svm_address(pk.as_ref(), true).unwrap();
+    }
+
+    #[test]
+    fn validate_svm_address_rejects_wrong_len() {
+        let addr = [1u8; 31];
+        assert_eq!(
+            validate_svm_address(&addr, true).unwrap_err(),
+            CommonCcipError::InvalidSVMAddress.into()
+        );
+    }
+
+    #[test]
+    fn validate_svm_address_rejects_all_zero() {
+        let addr = [0u8; 32];
+        assert_eq!(
+            validate_svm_address(&addr, true).unwrap_err(),
+            CommonCcipError::InvalidSVMAddress.into()
         );
     }
 }
