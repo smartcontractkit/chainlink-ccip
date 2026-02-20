@@ -41,7 +41,7 @@ var (
 					domainUpdates := input.DomainsByChain[chainSelector][address]
 
 					// Execute the operation USDCTokenPoolSetDomains for this address
-					report, err := operations.ExecuteOperation(b, usdc_token_pool_ops.USDCTokenPoolSetDomains, chain, contract.FunctionInput[[]usdc_token_pool_ops.DomainUpdate]{
+					report, err := operations.ExecuteOperation(b, usdc_token_pool_ops.SetDomains, chain, contract.FunctionInput[[]usdc_token_pool_ops.DomainUpdate]{
 						ChainSelector: chain.Selector,
 						Address:       address,
 						Args:          domainUpdates,

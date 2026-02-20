@@ -4,15 +4,15 @@ on:
   workflow_dispatch:
     inputs:
       ton_ref:
-        description: 'Git ref (branch) of the TON relayer'
+        description: "Git ref (branch) of the TON relayer"
         required: false
         type: string
       contract_version:
-        description: 'Version of CCIP contracts to use'
+        description: "Version of CCIP contracts to use"
         required: false
         type: string
       chainlink_version:
-        description: 'Chainlink version to use (e.g., develop, gh ref, etc.)'
+        description: "Chainlink version to use (e.g., develop, gh ref, etc.)"
         required: false
         type: string
       custom_config:
@@ -22,7 +22,7 @@ on:
   pull_request:
   push:
     branches:
-      - 'main'
+      - "main"
 
 defaults:
   run:
@@ -40,13 +40,13 @@ jobs:
     strategy:
       matrix:
         test:
-        - name: TestE2ESmoke
-          config: >-
-            ${{ 
-                github.event_name == 'workflow_dispatch' &&
-                ( inputs.custom_config != '' && inputs.custom_config || 'env.toml' )
-                || 'env.toml'
-            }}
+          - name: TestE2ESmoke
+            config: >-
+              ${{ 
+                  github.event_name == 'workflow_dispatch' &&
+                  ( inputs.custom_config != '' && inputs.custom_config || 'env.toml' )
+                  || 'env.toml'
+              }}
       fail-fast: false
     steps:
       - name: Checkout code
@@ -82,7 +82,7 @@ jobs:
       - name: Install Just
         uses: extractions/setup-just@e33e0265a09d6d736e2ee1e0eb685ef1de4669ff # v3
         with:
-          just-version: '1.40.0'
+          just-version: "1.40.0"
       - name: Authenticate to AWS ECR
         uses: ./.github/actions/aws-ecr-auth
         with:
@@ -120,7 +120,18 @@ jobs:
           cd cmd/ccip && go install . && cd -
           ccip u ${{ matrix.test.config }}
           sleep 120 # wait for nodes to be ready, need a better way here
-      - name: Run smoke test
+      - name: Install gotestsum
+        run: go install gotest.tools/gotestsum@latest
+      - name: Smoke Tests
         working-directory: devenv/tests/e2e
-        run: |
-          go test -v -run ${{ matrix.test.name }} -timeout 20m
+        id: run-tests
+        continue-on-error: true
+        run: gotestsum --junitfile=test-results.xml --format=github-actions -- -run ${{ matrix.test.name }} -timeout 20m
+      - name: Analyze and upload test results
+        uses: smartcontractkit/.github/actions/branch-out-upload@branch-out-upload/v1
+        with:
+          junit-file-path: devenv/tests/e2e/test-results.xml
+          trunk-org-slug: chainlink
+          trunk-previous-step-outcome: ${{ steps.run-tests.outcome }}
+          trunk-token: ${{ secrets.TRUNK_API_KEY }}
+          trunk-job-url: ${{ format('https://github.com/{0}/actions/runs/{1}/job/{2}/attempts/{3}', github.repository, github.run_id, job.check_run_id, github.run_attempt) }}

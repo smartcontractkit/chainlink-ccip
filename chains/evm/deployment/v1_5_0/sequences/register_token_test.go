@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	evmcontract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/burn_mint_token_pool"
@@ -64,7 +64,7 @@ func TestRegisterToken(t *testing.T) {
 				e.OperationsBundle,
 				token_admin_registry.Deploy,
 				e.BlockChains.EVMChains()[chainSel],
-				evm_contract.DeployInput[token_admin_registry.ConstructorArgs]{
+				evmcontract.DeployInput[token_admin_registry.ConstructorArgs]{
 					ChainSelector:  chainSel,
 					TypeAndVersion: deployment.NewTypeAndVersion(token_admin_registry.ContractType, *token_admin_registry.Version),
 				},
@@ -126,7 +126,7 @@ func TestRegisterToken(t *testing.T) {
 				),
 				token_admin_registry.GetTokenConfig,
 				e.BlockChains.EVMChains()[chainSel],
-				evm_contract.FunctionInput[common.Address]{
+				evmcontract.FunctionInput[common.Address]{
 					ChainSelector: chainSel,
 					Address:       tokenAdminRegistryAddress,
 					Args:          tokenAddress,
@@ -136,12 +136,12 @@ func TestRegisterToken(t *testing.T) {
 			if input.ExternalAdmin != (common.Address{}) {
 				// We can propose an external admin, but we can't accept ownership or set the pool address since we don't control the admin.
 				require.Equal(t, input.ExternalAdmin, tokenConfigReport.Output.PendingAdministrator)
-				require.Equal(t, (common.Address{}), tokenConfigReport.Output.Administrator)
-				require.Equal(t, (common.Address{}), tokenConfigReport.Output.TokenPool)
+				require.Equal(t, common.Address{}, tokenConfigReport.Output.Administrator)
+				require.Equal(t, common.Address{}, tokenConfigReport.Output.TokenPool)
 			} else {
 				// No external admin means that the owner of the token admin registry will be proposed as the admin.
 				// Since the deployer key is the owner of the token admin registry, it can accept admin rights and set the pool address.
-				require.Equal(t, (common.Address{}), tokenConfigReport.Output.PendingAdministrator)
+				require.Equal(t, common.Address{}, tokenConfigReport.Output.PendingAdministrator)
 				require.Equal(t, e.BlockChains.EVMChains()[chainSel].DeployerKey.From, tokenConfigReport.Output.Administrator)
 				require.Equal(t, input.TokenPoolAddress, tokenConfigReport.Output.TokenPool)
 			}

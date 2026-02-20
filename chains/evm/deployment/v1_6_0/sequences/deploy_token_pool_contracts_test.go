@@ -162,13 +162,14 @@ func TestDeployTokenPool(t *testing.T) {
 
 			// Deploy and add a token to the datastore
 			tokenAddr := deployTestToken(t, chain, tokenSymbol, tokenDecimals)
-			err = ds.Addresses().Add(datastore.AddressRef{
+			ref := datastore.AddressRef{
 				Type:          datastore.ContractType(burn_mint_erc20.ContractType),
 				Version:       semver.MustParse("1.0.0"),
 				Address:       tokenAddr.Hex(),
 				ChainSelector: chainSelector,
 				Qualifier:     tokenSymbol,
-			})
+			}
+			err = ds.Addresses().Add(ref)
 			require.NoError(t, err, "Failed to add token address to datastore")
 
 			// Add Router address to the datastore (mock address for testing)
@@ -195,15 +196,17 @@ func TestDeployTokenPool(t *testing.T) {
 			e.DataStore = ds.Seal()
 
 			// Build input for DeployTokenPool sequence
+			poolQualifier := tc.poolType.String() + "-" + tc.poolVersion.String()
 			input := tokenapi.DeployTokenPoolInput{
-				TokenSymbol:       tokenSymbol,
-				PoolType:          string(tc.poolType),
-				TokenPoolVersion:  tc.poolVersion,
-				Allowlist:         tc.allowlist,
-				AcceptLiquidity:   tc.acceptLiquidity,
-				BurnAddress:       tc.burnAddress,
-				ChainSelector:     chainSelector,
-				ExistingDataStore: e.DataStore,
+				TokenRef:           &ref,
+				TokenPoolQualifier: poolQualifier,
+				PoolType:           string(tc.poolType),
+				TokenPoolVersion:   tc.poolVersion,
+				Allowlist:          tc.allowlist,
+				AcceptLiquidity:    tc.acceptLiquidity,
+				BurnAddress:        tc.burnAddress,
+				ChainSelector:      chainSelector,
+				ExistingDataStore:  e.DataStore,
 			}
 
 			// Execute the DeployTokenPool sequence
@@ -220,7 +223,7 @@ func TestDeployTokenPool(t *testing.T) {
 			for _, addr := range report.Output.Addresses {
 				if addr.Type == datastore.ContractType(tc.poolType) &&
 					addr.ChainSelector == chainSelector &&
-					addr.Qualifier == tokenSymbol {
+					addr.Qualifier == poolQualifier {
 					poolRef = addr
 					poolFound = true
 					break
@@ -306,13 +309,14 @@ func TestDeployTokenPool_AlreadyDeployed(t *testing.T) {
 
 	// Deploy and add a token to the datastore
 	tokenAddr := deployTestToken(t, chain, tokenSymbol, tokenDecimals)
-	err = ds.Addresses().Add(datastore.AddressRef{
+	ref := datastore.AddressRef{
 		Type:          datastore.ContractType(burn_mint_erc20.ContractType),
 		Version:       semver.MustParse("1.0.0"),
 		Address:       tokenAddr.Hex(),
 		ChainSelector: chainSelector,
 		Qualifier:     tokenSymbol,
-	})
+	}
+	err = ds.Addresses().Add(ref)
 	require.NoError(t, err, "Failed to add token address to datastore")
 
 	// Add Router address to the datastore
@@ -349,7 +353,6 @@ func TestDeployTokenPool_AlreadyDeployed(t *testing.T) {
 	e.DataStore = ds.Seal()
 
 	input := tokenapi.DeployTokenPoolInput{
-		TokenSymbol:       tokenSymbol,
 		PoolType:          string(poolType),
 		TokenPoolVersion:  utils.Version_1_6_1,
 		ChainSelector:     chainSelector,
@@ -381,7 +384,6 @@ func TestDeployTokenPool_MissingTokenPoolVersion(t *testing.T) {
 	e.DataStore = ds.Seal()
 
 	input := tokenapi.DeployTokenPoolInput{
-		TokenSymbol:       "TEST",
 		PoolType:          string(burn_mint_token_pool.ContractType),
 		TokenPoolVersion:  nil, // Missing version
 		ChainSelector:     chainSelector,
@@ -412,13 +414,14 @@ func TestDeployTokenPool_UnsupportedPoolType(t *testing.T) {
 
 	// Deploy and add a token to the datastore
 	tokenAddr := deployTestToken(t, chain, tokenSymbol, tokenDecimals)
-	err = ds.Addresses().Add(datastore.AddressRef{
+	ref := datastore.AddressRef{
 		Type:          datastore.ContractType(burn_mint_erc20.ContractType),
 		Version:       semver.MustParse("1.0.0"),
 		Address:       tokenAddr.Hex(),
 		ChainSelector: chainSelector,
 		Qualifier:     tokenSymbol,
-	})
+	}
+	err = ds.Addresses().Add(ref)
 	require.NoError(t, err, "Failed to add token address to datastore")
 
 	// Add Router address
@@ -444,7 +447,7 @@ func TestDeployTokenPool_UnsupportedPoolType(t *testing.T) {
 	e.DataStore = ds.Seal()
 
 	input := tokenapi.DeployTokenPoolInput{
-		TokenSymbol:       tokenSymbol,
+		TokenRef:          &ref,
 		PoolType:          "UnsupportedPoolType",
 		TokenPoolVersion:  utils.Version_1_6_1,
 		ChainSelector:     chainSelector,
@@ -475,13 +478,14 @@ func TestDeployTokenPool_MissingRouter(t *testing.T) {
 
 	// Deploy and add a token to the datastore
 	tokenAddr := deployTestToken(t, chain, tokenSymbol, tokenDecimals)
-	err = ds.Addresses().Add(datastore.AddressRef{
+	ref := datastore.AddressRef{
 		Type:          datastore.ContractType(burn_mint_erc20.ContractType),
 		Version:       semver.MustParse("1.0.0"),
 		Address:       tokenAddr.Hex(),
 		ChainSelector: chainSelector,
 		Qualifier:     tokenSymbol,
-	})
+	}
+	err = ds.Addresses().Add(ref)
 	require.NoError(t, err, "Failed to add token address to datastore")
 
 	// Note: Router is NOT added to the datastore
@@ -499,7 +503,6 @@ func TestDeployTokenPool_MissingRouter(t *testing.T) {
 	e.DataStore = ds.Seal()
 
 	input := tokenapi.DeployTokenPoolInput{
-		TokenSymbol:       tokenSymbol,
 		PoolType:          string(burn_mint_token_pool.ContractType),
 		TokenPoolVersion:  utils.Version_1_6_1,
 		ChainSelector:     chainSelector,
@@ -508,7 +511,7 @@ func TestDeployTokenPool_MissingRouter(t *testing.T) {
 
 	_, err = cldf_ops.ExecuteSequence(e.OperationsBundle, DeployTokenPool, e.BlockChains, input)
 	require.Error(t, err, "Should error when router is not found in datastore")
-	require.Contains(t, err.Error(), "is not found in datastore", "Error message should mention not found in datastore")
+	require.Contains(t, err.Error(), "token address must be provided either directly or via a datastore reference", "Error message should mention not found in datastore")
 }
 
 // TestDeployTokenPool_MissingRMNProxy verifies that the sequence fails
@@ -530,13 +533,14 @@ func TestDeployTokenPool_MissingRMNProxy(t *testing.T) {
 
 	// Deploy and add a token to the datastore
 	tokenAddr := deployTestToken(t, chain, tokenSymbol, tokenDecimals)
-	err = ds.Addresses().Add(datastore.AddressRef{
+	ref := datastore.AddressRef{
 		Type:          datastore.ContractType(burn_mint_erc20.ContractType),
 		Version:       semver.MustParse("1.0.0"),
 		Address:       tokenAddr.Hex(),
 		ChainSelector: chainSelector,
 		Qualifier:     tokenSymbol,
-	})
+	}
+	err = ds.Addresses().Add(ref)
 	require.NoError(t, err, "Failed to add token address to datastore")
 
 	// Add Router address
@@ -554,7 +558,6 @@ func TestDeployTokenPool_MissingRMNProxy(t *testing.T) {
 	e.DataStore = ds.Seal()
 
 	input := tokenapi.DeployTokenPoolInput{
-		TokenSymbol:       tokenSymbol,
 		PoolType:          string(burn_mint_token_pool.ContractType),
 		TokenPoolVersion:  utils.Version_1_6_1,
 		ChainSelector:     chainSelector,
@@ -563,7 +566,7 @@ func TestDeployTokenPool_MissingRMNProxy(t *testing.T) {
 
 	_, err = cldf_ops.ExecuteSequence(e.OperationsBundle, DeployTokenPool, e.BlockChains, input)
 	require.Error(t, err, "Should error when RMN proxy is not found in datastore")
-	require.Contains(t, err.Error(), "is not found in datastore", "Error message should mention not found in datastore")
+	require.Contains(t, err.Error(), "token address must be provided either directly or via a datastore reference", "Error message should mention not found in datastore")
 }
 
 // TestDeployTokenPool_MissingToken verifies that the sequence fails
@@ -572,7 +575,6 @@ func TestDeployTokenPool_MissingToken(t *testing.T) {
 	t.Parallel()
 
 	chainSelector := chain_selectors.ETHEREUM_MAINNET.Selector
-	tokenSymbol := "NONEXISTENT"
 
 	e, err := environment.New(t.Context(),
 		environment.WithEVMSimulated(t, []uint64{chainSelector}),
@@ -604,7 +606,6 @@ func TestDeployTokenPool_MissingToken(t *testing.T) {
 	e.DataStore = ds.Seal()
 
 	input := tokenapi.DeployTokenPoolInput{
-		TokenSymbol:       tokenSymbol, // Token not in datastore
 		PoolType:          string(burn_mint_token_pool.ContractType),
 		TokenPoolVersion:  utils.Version_1_6_1,
 		ChainSelector:     chainSelector,
@@ -613,7 +614,7 @@ func TestDeployTokenPool_MissingToken(t *testing.T) {
 
 	_, err = cldf_ops.ExecuteSequence(e.OperationsBundle, DeployTokenPool, e.BlockChains, input)
 	require.Error(t, err, "Should error when token is not found in datastore")
-	require.Contains(t, err.Error(), "is not found in datastore", "Error message should mention token not found")
+	require.Contains(t, err.Error(), "token address must be provided either directly or via a datastore reference", "Error message should mention token not found")
 }
 
 // deployTestToken deploys a BurnMintERC20 token for testing purposes and returns its address.

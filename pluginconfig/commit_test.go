@@ -410,8 +410,8 @@ func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
 				TokenPriceAsyncObserverDisabled: true,
 			},
 			expected: CommitOffchainConfig{
-				RMNEnabled:                         true,
-				RMNSignaturesTimeout:               defaultRMNSignaturesTimeout,
+				RMNEnabled:                         false,
+				RMNSignaturesTimeout:               0,
 				NewMsgScanBatchSize:                defaultNewMsgScanBatchSize,
 				MaxReportTransmissionCheckAttempts: defaultMaxReportTransmissionCheckAttempts,
 				MaxMerkleTreeSize:                  defaultEvmDefaultMaxMerkleTreeSize,
@@ -430,7 +430,7 @@ func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
 			name: "Custom values",
 			input: CommitOffchainConfig{
 				RMNEnabled:                         true,
-				RMNSignaturesTimeout:               5 * time.Minute,
+				RMNSignaturesTimeout:               0,
 				NewMsgScanBatchSize:                500,
 				MaxReportTransmissionCheckAttempts: 10,
 				MaxMerkleTreeSize:                  1000,
@@ -441,8 +441,8 @@ func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
 				TokenPriceAsyncObserverSyncTimeout: *commonconfig.MustNewDuration(10 * time.Second),
 			},
 			expected: CommitOffchainConfig{
-				RMNEnabled:                         true,
-				RMNSignaturesTimeout:               5 * time.Minute,
+				RMNEnabled:                         false,
+				RMNSignaturesTimeout:               0,
 				NewMsgScanBatchSize:                500,
 				MaxReportTransmissionCheckAttempts: 10,
 				MaxMerkleTreeSize:                  1000,
@@ -468,7 +468,7 @@ func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
 				MerkleRootAsyncObserverSyncTimeout: 10 * time.Minute,
 			},
 			expected: CommitOffchainConfig{
-				RMNEnabled:                         true,
+				RMNEnabled:                         false,
 				RMNSignaturesTimeout:               defaultRMNSignaturesTimeout,
 				NewMsgScanBatchSize:                300,
 				MaxReportTransmissionCheckAttempts: defaultMaxReportTransmissionCheckAttempts,
@@ -510,25 +510,21 @@ func TestCommitOffchainConfig_ApplyDefaultsAndValidate(t *testing.T) {
 			name: "Config with some values set applies remaining defaults and validates successfully",
 			input: CommitOffchainConfig{
 				NewMsgScanBatchSize: 100,
+				// ensure that an incorrect RMN value is changed to false
+				RMNEnabled: true,
 			},
 		},
 		{
 			name: "Config with all valid values doesn't change and validates successfully",
 			input: CommitOffchainConfig{
 				RemoteGasPriceBatchWriteFrequency:  *commonconfig.MustNewDuration(2 * time.Minute),
+				RMNSignaturesTimeout:               10 * time.Second,
 				NewMsgScanBatchSize:                100,
 				MaxReportTransmissionCheckAttempts: 10,
 				MaxMerkleTreeSize:                  1000,
+				RMNEnabled:                         false,
 				SignObservationPrefix:              defaultSignObservationPrefix,
 			},
-		},
-		{
-			name: "RMNEnabled throws an error if set to true",
-			input: CommitOffchainConfig{
-				NewMsgScanBatchSize: 100,
-				RMNEnabled:          true,
-			},
-			expectedError: "rmn has been deprecated, the RMNEnabled field must be set to false",
 		},
 	}
 
@@ -550,12 +546,7 @@ func TestCommitOffchainConfig_ApplyDefaultsAndValidate(t *testing.T) {
 				assert.NotZero(t, config.MaxMerkleTreeSize)
 				assert.NotZero(t, config.SignObservationPrefix)
 
-				// Check specific defaults
-				if !tt.input.RMNEnabled {
-					assert.Zero(t, config.RMNSignaturesTimeout)
-				} else {
-					assert.NotZero(t, config.RMNSignaturesTimeout)
-				}
+				assert.False(t, config.RMNEnabled)
 			}
 		})
 	}

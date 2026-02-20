@@ -81,8 +81,7 @@ contract USDCTokenPoolCCTPV2_lockOrBurn is USDCTokenPoolCCTPV2Setup {
       mintRecipient: extraMintRecipient,
       domainIdentifier: expectedDomain.domainIdentifier,
       destChainSelector: DEST_CHAIN_SELECTOR,
-      enabled: expectedDomain.enabled,
-      useLegacySourcePoolDataFormat: false
+      enabled: expectedDomain.enabled
     });
     vm.startPrank(OWNER);
     s_usdcTokenPool.setDomains(updates);

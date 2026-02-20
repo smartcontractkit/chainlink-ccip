@@ -130,6 +130,11 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 
 	lggr.Infow("Commit Offchain Config", "offchainConfig", offchainConfig)
 
+	if offchainConfig.RMNEnabled {
+		// we do this here to utilize logger without passing it downstream
+		lggr.Warnw("RMN has been deprecated, RMNEnabled is being set to false", "rmnEnabled", offchainConfig.RMNEnabled)
+		offchainConfig.RMNEnabled = false
+	}
 	if err = offchainConfig.ApplyDefaultsAndValidate(); err != nil {
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to validate commit offchain config: %w", err)
 	}

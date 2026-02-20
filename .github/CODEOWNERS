@@ -12,7 +12,7 @@
 .github/workflows/idl-compatibility-check.yml @smartcontractkit/ccip-onchain-solana
 
 # Deployment tooling
-/deployment @smartcontractkit/ccip-tooling
-/devenv @smartcontractkit/ccip-tooling
+/deployment @smartcontractkit/ccip-tooling @smartcontractkit/ccip-onchain @smartcontractkit/ccip-offchain
+/devenv @smartcontractkit/ccip-tooling @smartcontractkit/ccip-onchain @smartcontractkit/ccip-offchain
 /chains/evm/deployment @smartcontractkit/ccip-tooling @smartcontractkit/ccip-onchain
 /chains/solana/deployment @smartcontractkit/ccip-tooling @smartcontractkit/ccip-onchain-solana

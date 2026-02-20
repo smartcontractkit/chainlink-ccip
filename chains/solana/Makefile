@@ -37,7 +37,7 @@ lint-go:
 
 .PHONY: lint-go-fix
 lint-go-fix:
-	golangci-lint run --max-issues-per-linter 0 --max-same-issues 0 --color=always --timeout 15m run --verbose --fix
+	golangci-lint run --max-issues-per-linter 0 --max-same-issues 0 --color=always --timeout 15m --verbose --fix
 
 .PHONY: anchor-go-gen
 anchor-go-gen:

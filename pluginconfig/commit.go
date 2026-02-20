@@ -15,7 +15,7 @@ import (
 
 // We use this default value when the config is not set for a specific chain.
 const (
-	defaultRMNSignaturesTimeout               = 5 * time.Second
+	defaultRMNSignaturesTimeout               = 0
 	defaultNewMsgScanBatchSize                = merklemulti.MaxNumberTreeLeaves
 	defaultEvmDefaultMaxMerkleTreeSize        = merklemulti.MaxNumberTreeLeaves
 	defaultMaxReportTransmissionCheckAttempts = 5
@@ -165,10 +165,6 @@ const (
 
 //nolint:gocyclo // it is considered ok since we don't have complicated logic here
 func (c *CommitOffchainConfig) applyDefaults() {
-	if c.RMNEnabled && c.RMNSignaturesTimeout == 0 {
-		c.RMNSignaturesTimeout = defaultRMNSignaturesTimeout
-	}
-
 	if c.NewMsgScanBatchSize == 0 {
 		c.NewMsgScanBatchSize = defaultNewMsgScanBatchSize
 	}
@@ -224,6 +220,9 @@ func (c *CommitOffchainConfig) applyDefaults() {
 	if c.TokenPriceAsyncObserverSyncTimeout.Duration() == 0 {
 		c.TokenPriceAsyncObserverSyncTimeout = *commonconfig.MustNewDuration(defaultAsyncObserverSyncTimeout)
 	}
+	// RMN has been deprecated. Hardcode the configuration to avoid bringing down CCIP 1.6.
+	// https://smartcontract-it.atlassian.net/browse/INCIDENT-2243
+	c.RMNEnabled = false
 }
 
 //nolint:gocyclo // it is considered ok since we don't have complicated logic here
@@ -279,15 +278,19 @@ func (c *CommitOffchainConfig) Validate() error {
 		return fmt.Errorf("chain fee async observer sync freq (%s) or sync timeout (%s) not set",
 			c.ChainFeeAsyncObserverSyncFreq, c.ChainFeeAsyncObserverSyncTimeout)
 	}
-	if c.RMNEnabled {
-		return fmt.Errorf("rmn has been deprecated, the RMNEnabled field must be set to false")
-	}
 
 	// Options for multiple reports. These settings were added so that Solana can be configured
 	// to split merkle roots across multiple reports. The functions do not support RMN, so it is
 	// an error to use them unless RMNEnabled == false.
 	var errs []error
-
+	if c.RMNEnabled {
+		if c.MultipleReportsEnabled {
+			errs = append(errs, fmt.Errorf("multipleReports do not support RMN, RMNEnabled cannot be true"))
+		}
+		if c.MaxMerkleRootsPerReport != 0 {
+			errs = append(errs, fmt.Errorf("maxMerkleRootsPerReport does not support RMN, RMNEnabled cannot be true"))
+		}
+	}
 	if c.MaxMerkleRootsPerReport != 0 && !c.MultipleReportsEnabled {
 		errs = append(errs, fmt.Errorf("maxMerkleRootsPerReport cannot be used without MultipleReportsEnabled"))
 	}

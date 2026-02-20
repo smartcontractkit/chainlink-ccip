@@ -152,8 +152,8 @@ func (tp *TokenPool) SetupLookupTable(ctx context.Context, client *rpc.Client, a
 	return common.AwaitSlotChange(ctx, client)
 }
 
-func TokenPoolConfigAddress(token, programID solana.PublicKey) (solana.PublicKey, error) {
-	addr, _, err := solana.FindProgramAddress([][]byte{[]byte("ccip_tokenpool_config"), token.Bytes()}, programID)
+func TokenPoolConfigAddress(tokenMint, programID solana.PublicKey) (solana.PublicKey, error) {
+	addr, _, err := solana.FindProgramAddress([][]byte{[]byte("ccip_tokenpool_config"), tokenMint.Bytes()}, programID)
 	return addr, err
 }
 

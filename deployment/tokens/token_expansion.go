@@ -20,26 +20,20 @@ import (
 
 type TokenExpansionInput struct {
 	// per-chain configuration for token expansion
-	TokenExpansionInputPerChain map[uint64]TokenExpansionInputPerChain `yaml:"token-expansion-input-per-chain" json:"tokenExpansionInputPerChain"`
-	ChainAdapterVersion         *semver.Version                        `yaml:"chain-adapter-version" json:"chainAdapterVersion"`
+	TokenExpansionInputPerChain map[uint64]TokenExpansionInputPerChain `yaml:"tokenExpansionInputPerChain" json:"tokenExpansionInputPerChain"`
+	ChainAdapterVersion         *semver.Version                        `yaml:"chainAdapterVersion" json:"chainAdapterVersion"`
 	MCMS                        mcms.Input                             `yaml:"mcms,omitempty" json:"mcms"`
 }
 
 type TokenExpansionInputPerChain struct {
-	TokenPoolVersion *semver.Version  `yaml:"token-pool-version" json:"tokenPoolVersion"`
-	DeployTokenInput DeployTokenInput `yaml:"deploy-token-input" json:"deployTokenInput"`
-	// only necessary if we want to specifically query for a token pool with a given type + qualifier
-	TokenPoolQualifier string `yaml:"token-pool-qualifier" json:"tokenPoolQualifier"`
-	PoolType           string `yaml:"pool-type" json:"poolType"`
-	// only necessary if we want to set specific admin authorities. Will default to timelock admin otherwise
-	TARAdmin                string `yaml:"tar-admin" json:"tarAdmin"`
-	TokenPoolAdmin          string `yaml:"token-pool-admin" json:"tokenPoolAdmin"`
-	TokenPoolRateLimitAdmin string `yaml:"token-pool-rate-limit-admin" json:"tokenPoolRateLimitAdmin"`
-	// rate lmiter config per remote chain
-	// we will look up the remote token from the top level token expansion config
-	RemoteCounterpartUpdates map[uint64]RateLimiterConfig `yaml:"remote-counterpart-updates" json:"remoteCounterpartUpdates"`
-	// if true, will delete the remote counterpart token pool on the specified chains
-	RemoteCounterpartDeletes []uint64 `yaml:"remote-counterpart-deletes" json:"remoteCounterpartDeletes"`
+	TokenPoolVersion *semver.Version `yaml:"tokenPoolVersion" json:"tokenPoolVersion"`
+	// will deploy a token if DeployTokenInput is not nil,
+	// otherwise assumes token is already deployed and will look up the token address from the datastore based on the input parameters
+	DeployTokenInput *DeployTokenInput `yaml:"deployTokenInput" json:"deployTokenInput"`
+	// will deploy a token pool for the token if DeployTokenPoolInput is not nil
+	DeployTokenPoolInput *DeployTokenPoolInput `yaml:"deployTokenPoolInput" json:"deployTokenPoolInput"`
+	// if not nil, will try to fully configure the token for transfers, including registering the token and token pool on-chain and setting the pool on the token
+	TokenTransferConfig *TokenTransferConfig `yaml:"tokenTransferConfig" json:"tokenTransferConfig"`
 }
 
 type DeployTokenInput struct {
@@ -47,13 +41,12 @@ type DeployTokenInput struct {
 	Symbol   string   `yaml:"symbol" json:"symbol"`
 	Decimals uint8    `yaml:"decimals" json:"decimals"`
 	Supply   *big.Int `yaml:"supply" json:"supply"`
-	PreMint  *big.Int `yaml:"pre-mint" json:"preMint"`
+	PreMint  *big.Int `yaml:"preMint" json:"preMint"`
 	// Customer admin who will be granted admin rights on the token
-	// For EVM, expect to have only one Admin address to be passed on whereas Solana may have multiple multisig signers.
 	// Use string to keep this struct chain-agnostic (EVM uses hex, Solana uses base58, etc.)
-	ExternalAdmin []string `yaml:"external-admin" json:"externalAdmin"`
+	ExternalAdmin string `yaml:"externalAdmin" json:"externalAdmin"`
 	// Address to be set as the CCIP admin on the token contract, defaults to the timelock address
-	CCIPAdmin string
+	CCIPAdmin string `yaml:"ccipAdmin" json:"ccipAdmin"`
 	// list of addresses who may need special processing in order to send tokens
 	// e.g. for Solana, addresses that need associated token accounts created
 	Senders []string `yaml:"senders" json:"senders"`
@@ -61,52 +54,69 @@ type DeployTokenInput struct {
 	Type cldf.ContractType `yaml:"type" json:"type"`
 	// Solana Specific
 	// private key in base58 encoding for vanity addresses
-	TokenPrivKey string `yaml:"token-priv-key" json:"tokenPrivKey"`
+	TokenPrivKey string `yaml:"tokenPrivKey" json:"tokenPrivKey"`
 	// if true, the freeze authority will be revoked on token creation
 	// and it will be disabled FOREVER
-	DisableFreezeAuthority bool `yaml:"disable-freeze-authority" json:"disableFreezeAuthority"`
+	DisableFreezeAuthority bool `yaml:"disableFreezeAuthority" json:"disableFreezeAuthority"`
+	// Token metadata to be uploaded
+	TokenMetadata *TokenMetadata `yaml:"tokenMetadata,omitempty" json:"tokenMetadata,omitempty"`
 	// below are not specified by the user, filled in by the deployment system to pass to chain operations
 	ChainSelector     uint64
 	ExistingDataStore datastore.DataStore
 }
 
+// Right now this is only used for Solana tokens but we can extend this to other VMs if needed in the future
+type TokenMetadata struct {
+	// not specified by the user. Overwritten by the deployment system to pass
+	// the token address to chain operations for metadata upload and updates
+	TokenPubkey string `yaml:"token-pubkey" json:"tokenPubkey"`
+	// https://metaboss.dev/create.html#metadata
+	// only to be provided on initial upload, it takes in name, symbol, uri
+	// after initial upload, those fields can be updated using the update inputs
+	// put the json in ccip/env/input dir in CLD
+	MetadataJSONPath string `yaml:"metadataJsonPath" json:"metadataJsonPath"`
+	UpdateAuthority  string `yaml:"updateAuthority" json:"updateAuthority"` // used to set update authority of the token metadata PDA after initial upload
+	// https://metaboss.dev/update.html#update-name
+	UpdateName string `yaml:"updateName" json:"updateName"` // used to update the name of the token metadata PDA after initial upload
+	// https://metaboss.dev/update.html#update-symbol
+	UpdateSymbol string `yaml:"updateSymbol" json:"updateSymbol"` // used to update the symbol of the token metadata PDA after initial upload
+	// https://metaboss.dev/update.html#update-uri
+	UpdateURI string `yaml:"updateUri" json:"updateUri"` // used to update the uri of the token metadata PDA after initial upload
+}
+
 type DeployTokenPoolInput struct {
-	TokenSymbol        string          `yaml:"token-symbol" json:"tokenSymbol"`
-	TokenPoolQualifier string          `yaml:"token-pool-qualifier" json:"tokenPoolQualifier"`
-	PoolType           string          `yaml:"pool-type" json:"poolType"`
-	TokenPoolVersion   *semver.Version `yaml:"token-pool-version" json:"tokenPoolVersion"`
-	Allowlist          []string        `yaml:"allowlist" json:"allowlist"`
+	// TokenRef is a reference to the token in the datastore.
+	// If this is provided, it will be cross checked against the deployed token
+	TokenRef           *datastore.AddressRef `yaml:"tokenRef" json:"tokenRef"`
+	TokenPoolQualifier string                `yaml:"tokenPoolQualifier" json:"tokenPoolQualifier"`
+	PoolType           string                `yaml:"poolType" json:"poolType"`
+	TokenPoolVersion   *semver.Version       `yaml:"tokenPoolVersion" json:"tokenPoolVersion"`
+	Allowlist          []string              `yaml:"allowlist" json:"allowlist"`
 	// AcceptLiquidity is used by LockReleaseTokenPool (v1.5.1 only) to indicate
 	// whether the pool should accept liquidity from liquidity providers
-	AcceptLiquidity *bool `yaml:"accept-liquidity" json:"acceptLiquidity"`
+	AcceptLiquidity *bool `yaml:"acceptLiquidity" json:"acceptLiquidity"`
 	// BurnAddress is used by BurnToAddressMintTokenPool to specify the address
 	// where tokens will be burned to
-	BurnAddress string `yaml:"burn-address" json:"burnAddress"`
+	BurnAddress string `yaml:"burnAddress" json:"burnAddress"`
 	// TokenGovernor is used by BurnMintWithExternalMinterTokenPool kind of pools to specify the token governor contract address
 	// if it is not provided, the token governor will be fetched from the datastore based on the token symbol
-	TokenGovernor string `yaml:"token-governor,omitempty" json:"tokenGovernor,omitempty"`
+	TokenGovernor string `yaml:"tokenGovernor,omitempty" json:"tokenGovernor,omitempty"`
 	// below are not specified by the user, filled in by the deployment system to pass to chain operations
 	ChainSelector     uint64
 	ExistingDataStore datastore.DataStore
 }
+
 type RegisterTokenInput struct {
-	TokenSymbol string `yaml:"token-symbol" json:"tokenSymbol"`
-	TokenAdmin  string `yaml:"token-admin" json:"tokenAdmin"`
+	TokenRef   datastore.AddressRef `yaml:"tokenRef" json:"tokenRef"`
+	TokenAdmin string               `yaml:"tokenAdmin" json:"tokenAdmin"`
 	// below are not specified by the user, filled in by the deployment system to pass to chain operations
 	ChainSelector     uint64
 	ExistingDataStore datastore.DataStore
 }
 type SetPoolInput struct {
-	TokenSymbol        string `yaml:"token-symbol" json:"tokenSymbol"`
-	TokenPoolQualifier string `yaml:"token-pool-qualifier" json:"tokenPoolQualifier"`
-	PoolType           string `yaml:"pool-type" json:"poolType"`
-	// below are not specified by the user, filled in by the deployment system to pass to chain operations
-	ChainSelector     uint64
-	ExistingDataStore datastore.DataStore
-}
-type UpdateAuthoritiesInput struct {
-	TokenPoolAdmin          string `yaml:"token-pool-admin" json:"tokenPoolAdmin"`
-	TokenPoolRateLimitAdmin string `yaml:"token-pool-rate-limit-admin" json:"tokenPoolRateLimitAdmin"`
+	TokenRef           datastore.AddressRef `yaml:"tokenRef" json:"tokenRef"`
+	TokenPoolQualifier string               `yaml:"tokenPoolQualifier" json:"tokenPoolQualifier"`
+	PoolType           string               `yaml:"poolType" json:"poolType"`
 	// below are not specified by the user, filled in by the deployment system to pass to chain operations
 	ChainSelector     uint64
 	ExistingDataStore datastore.DataStore
@@ -150,6 +160,8 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 		ds := datastore.NewMemoryDataStore()
 		tokenPoolRegistry := GetTokenAdapterRegistry()
 		mcmsRegistry := changesets.GetRegistry()
+		allRemotes := make(map[uint64]RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef])
+		allTokenConfigs := make([]TokenTransferConfig, 0)
 		for selector, input := range cfg.TokenExpansionInputPerChain {
 			tmpDatastore := datastore.NewMemoryDataStore()
 			family, err := chain_selectors.GetSelectorFamily(selector)
@@ -163,117 +175,182 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 
 			// deploy token
 			deployTokenInput := input.DeployTokenInput
-			deployTokenInput.ExistingDataStore = e.DataStore
-			deployTokenInput.ChainSelector = selector
-			timelockAddr, err := datastore_utils.FindAndFormatRef(deployTokenInput.ExistingDataStore, datastore.AddressRef{
-				ChainSelector: deployTokenInput.ChainSelector,
-				Type:          datastore.ContractType(common_utils.RBACTimelock),
-				Qualifier:     cfg.MCMS.Qualifier,
-			}, deployTokenInput.ChainSelector, datastore_utils.FullRef)
-			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("couldn't find the RBACTimelock "+
-					"address in datastore for selector %v and qualifier %v %v", deployTokenInput.ChainSelector, cfg.MCMS.Qualifier, err)
-			}
-			// if token is deployed by CLL, set CCIP admin as RBACTimelock by default.
-			// If input has CCIPAdmin and which is external address, set that address as CCIPAdmin
-			// and we may not be able to register the token by CLL in that case.
-			if deployTokenInput.CCIPAdmin == "" {
-				deployTokenInput.CCIPAdmin = timelockAddr.Address
-			}
-			deployTokenReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, tokenPoolAdapter.DeployToken(), e.BlockChains, deployTokenInput)
-			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to manual register token and token pool %d: %w", selector, err)
-			}
-			batchOps = append(batchOps, deployTokenReport.Output.BatchOps...)
-			reports = append(reports, deployTokenReport.ExecutionReports...)
-			for _, r := range deployTokenReport.Output.Addresses {
-				if err := tmpDatastore.Addresses().Add(r); err != nil {
-					return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %v on chain with selector %d to datastore: %w", r.Type, r.Version, r, r.ChainSelector, err)
-				}
-				if err := ds.Addresses().Add(r); err != nil {
-					return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %v on chain with selector %d to datastore: %w", r.Type, r.Version, r, r.ChainSelector, err)
-				}
-			}
-			tmpDatastore.Merge(e.DataStore)
-			e.DataStore = tmpDatastore.Seal()
+			var tokenRef *datastore.AddressRef
+			var tokenPool *datastore.AddressRef
+			if deployTokenInput != nil {
+				deployTokenInput.ExistingDataStore = e.DataStore
+				deployTokenInput.ChainSelector = selector
 
-			// deploy token pool
-			tmpDatastore = datastore.NewMemoryDataStore()
-			deployTokenPoolInput := DeployTokenPoolInput{
-				TokenSymbol:        deployTokenInput.Symbol,
-				TokenPoolQualifier: input.TokenPoolQualifier,
-				PoolType:           input.PoolType,
-			}
-			deployTokenPoolInput.ExistingDataStore = e.DataStore
-			deployTokenPoolInput.ChainSelector = selector
-			deployTokenPoolReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, tokenPoolAdapter.DeployTokenPoolForToken(), e.BlockChains, deployTokenPoolInput)
-			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to manual register token and token pool %d: %w", selector, err)
-			}
-			batchOps = append(batchOps, deployTokenPoolReport.Output.BatchOps...)
-			reports = append(reports, deployTokenPoolReport.ExecutionReports...)
-			for _, r := range deployTokenPoolReport.Output.Addresses {
-				if err := tmpDatastore.Addresses().Add(r); err != nil {
-					return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %v on chain with selector %d to datastore: %w", r.Type, r.Version, r, r.ChainSelector, err)
-				}
-				if err := ds.Addresses().Add(r); err != nil {
-					return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %v on chain with selector %d to datastore: %w", r.Type, r.Version, r, r.ChainSelector, err)
-				}
-			}
-			tmpDatastore.Merge(e.DataStore)
-			e.DataStore = tmpDatastore.Seal()
+				// if token is deployed by CLL, set CCIP admin as RBACTimelock by default.
+				// If input has CCIPAdmin and which is external address, set that address as CCIPAdmin
+				// and we may not be able to register the token by CLL in that case.
+				if deployTokenInput.CCIPAdmin == "" {
+					filter := datastore.AddressRef{
+						Type:          datastore.ContractType(common_utils.RBACTimelock),
+						ChainSelector: deployTokenInput.ChainSelector,
+						Qualifier:     cfg.MCMS.Qualifier,
+					}
 
-			// register token
-			tmpDatastore = datastore.NewMemoryDataStore()
-			registerTokenInput := RegisterTokenInput{
-				TokenSymbol: deployTokenInput.Symbol,
-				TokenAdmin:  input.TARAdmin,
-			}
-			registerTokenInput.ExistingDataStore = e.DataStore
-			registerTokenInput.ChainSelector = selector
-			registerTokenReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, tokenPoolAdapter.RegisterToken(), e.BlockChains, registerTokenInput)
-			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to manual register token and token pool %d: %w", selector, err)
-			}
-			batchOps = append(batchOps, registerTokenReport.Output.BatchOps...)
-			reports = append(reports, registerTokenReport.ExecutionReports...)
-			for _, r := range registerTokenReport.Output.Addresses {
-				if err := tmpDatastore.Addresses().Add(r); err != nil {
-					return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %v on chain with selector %d to datastore: %w", r.Type, r.Version, r, r.ChainSelector, err)
-				}
-				if err := ds.Addresses().Add(r); err != nil {
-					return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %v on chain with selector %d to datastore: %w", r.Type, r.Version, r, r.ChainSelector, err)
-				}
-			}
-			tmpDatastore.Merge(e.DataStore)
-			e.DataStore = tmpDatastore.Seal()
+					timelockAddr, err := datastore_utils.FindAndFormatRef(
+						deployTokenInput.ExistingDataStore,
+						filter,
+						deployTokenInput.ChainSelector,
+						datastore_utils.FullRef,
+					)
+					if err != nil {
+						return cldf.ChangesetOutput{}, fmt.Errorf(
+							"couldn't find the RBACTimelock address in datastore for selector %d and qualifier %s: %w",
+							deployTokenInput.ChainSelector, cfg.MCMS.Qualifier, err,
+						)
+					}
 
-			// set pool
-			tmpDatastore = datastore.NewMemoryDataStore()
-			setPoolInput := SetPoolInput{
-				TokenSymbol:        deployTokenInput.Symbol,
-				TokenPoolQualifier: input.TokenPoolQualifier,
-				PoolType:           input.PoolType,
-			}
-			setPoolInput.ExistingDataStore = e.DataStore
-			setPoolInput.ChainSelector = selector
-			setPoolReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, tokenPoolAdapter.SetPool(), e.BlockChains, setPoolInput)
-			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to manual register token and token pool %d: %w", selector, err)
-			}
-			batchOps = append(batchOps, setPoolReport.Output.BatchOps...)
-			reports = append(reports, setPoolReport.ExecutionReports...)
-			for _, r := range setPoolReport.Output.Addresses {
-				if err := tmpDatastore.Addresses().Add(r); err != nil {
-					return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %v on chain with selector %d to datastore: %w", r.Type, r.Version, r, r.ChainSelector, err)
+					deployTokenInput.CCIPAdmin = timelockAddr.Address
 				}
-				if err := ds.Addresses().Add(r); err != nil {
-					return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %v on chain with selector %d to datastore: %w", r.Type, r.Version, r, r.ChainSelector, err)
+				deployTokenReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, tokenPoolAdapter.DeployToken(), e.BlockChains, *deployTokenInput)
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy token on chain %d: %w", selector, err)
+				}
+				batchOps = append(batchOps, deployTokenReport.Output.BatchOps...)
+				reports = append(reports, deployTokenReport.ExecutionReports...)
+				if len(deployTokenReport.Output.Addresses) != 0 {
+					tokenRef = &deployTokenReport.Output.Addresses[0]
+				}
+				for _, r := range deployTokenReport.Output.Addresses {
+					if err := tmpDatastore.Addresses().Add(r); err != nil {
+						return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %v on chain with selector %d to datastore: %w", r.Type, r.Version, r, r.ChainSelector, err)
+					}
+					if err := ds.Addresses().Add(r); err != nil {
+						return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %v on chain with selector %d to datastore: %w", r.Type, r.Version, r, r.ChainSelector, err)
+					}
+				}
+				tmpDatastore.Merge(e.DataStore)
+				e.DataStore = tmpDatastore.Seal()
+			}
+
+			if input.DeployTokenPoolInput != nil {
+				refToConnect := tokenRef
+				providedRef := input.DeployTokenPoolInput.TokenRef
+				if refToConnect == nil && providedRef == nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("no token deployed or provided for chain selector %d, cannot deploy token pool without token address", selector)
+				} else if refToConnect != nil && providedRef != nil {
+					// cross check the deployed token address with the provided token ref address
+					if refToConnect.Address != providedRef.Address {
+						return cldf.ChangesetOutput{}, fmt.Errorf("token address deployed does not match the provided token ref address for chain selector %d: deployed token address %s, provided token ref address %s", selector, refToConnect.Address, providedRef.Address)
+					}
+					if refToConnect.Qualifier != providedRef.Qualifier {
+						return cldf.ChangesetOutput{}, fmt.Errorf("token qualifier deployed does not match the provided token ref qualifier for chain selector %d: deployed token qualifier %s, provided token ref qualifier %s", selector, refToConnect.Qualifier, providedRef.Qualifier)
+					}
+				} else if refToConnect == nil {
+					// if token is not deployed by this changeset but token ref is provided, use the provided token ref
+					refToConnect = input.DeployTokenPoolInput.TokenRef
+				}
+				// deploy token pool
+				tmpDatastore = datastore.NewMemoryDataStore()
+				deployTokenPoolInput := DeployTokenPoolInput{
+					TokenRef:           refToConnect,
+					TokenPoolVersion:   input.TokenPoolVersion,
+					TokenPoolQualifier: input.DeployTokenPoolInput.TokenPoolQualifier,
+					PoolType:           input.DeployTokenPoolInput.PoolType,
+				}
+				deployTokenPoolInput.ExistingDataStore = e.DataStore
+				deployTokenPoolInput.ChainSelector = selector
+				deployTokenPoolReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, tokenPoolAdapter.DeployTokenPoolForToken(), e.BlockChains, deployTokenPoolInput)
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy token pool for token on chain %d: %w", selector, err)
+				}
+				batchOps = append(batchOps, deployTokenPoolReport.Output.BatchOps...)
+				reports = append(reports, deployTokenPoolReport.ExecutionReports...)
+				if len(deployTokenPoolReport.Output.Addresses) != 0 {
+					tokenPool = &deployTokenPoolReport.Output.Addresses[0]
+				} else {
+					tokenPool = &datastore.AddressRef{
+						ChainSelector: selector,
+						Qualifier:     input.DeployTokenPoolInput.TokenPoolQualifier,
+						Type:          datastore.ContractType(input.DeployTokenPoolInput.PoolType),
+						Version:       input.TokenPoolVersion,
+					}
+				}
+				for _, r := range deployTokenPoolReport.Output.Addresses {
+					if err := tmpDatastore.Addresses().Add(r); err != nil {
+						return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %v on chain with selector %d to datastore: %w", r.Type, r.Version, r, r.ChainSelector, err)
+					}
+					if err := ds.Addresses().Add(r); err != nil {
+						return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %v on chain with selector %d to datastore: %w", r.Type, r.Version, r, r.ChainSelector, err)
+					}
+				}
+				tmpDatastore.Merge(e.DataStore)
+				e.DataStore = tmpDatastore.Seal()
+			}
+			allRemotes[selector] = RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+				RemoteToken: tokenRef,
+				RemotePool:  tokenPool,
+			}
+			// if token transfer config is provided, we will update the remote chain config with the token and token pool addresses and
+			// save the token transfer config for processing after all tokens and token pools have been deployed
+			if input.TokenTransferConfig != nil {
+				actualPool := tokenPool
+				if actualPool == nil {
+					// if token pool is not deployed by this changeset, we expect the user to provide the token pool address in the TokenTransferConfig
+					actualPool = &input.TokenTransferConfig.TokenPoolRef
+				}
+				actualToken := tokenRef
+				if actualToken == nil {
+					// if token is not deployed by this changeset, we expect the user to provide the token address in the TokenTransferConfig
+					actualToken = &input.TokenTransferConfig.TokenRef
+				}
+				allRemotes[selector] = RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+					RemoteToken: actualToken,
+					RemotePool:  actualPool,
 				}
 			}
-			tmpDatastore.Merge(e.DataStore)
-			e.DataStore = tmpDatastore.Seal()
 		}
+
+		// now that we have all the token and token pools, we can loop through the token configs again
+		// and update the remote chain configs with the correct token and token pool addresses before configuring the tokens for transfers
+		for selector, input := range cfg.TokenExpansionInputPerChain {
+			if input.TokenTransferConfig != nil {
+				mergedPool, err := datastore_utils.MergeRefs(
+					&cfg.TokenExpansionInputPerChain[selector].TokenTransferConfig.TokenPoolRef,
+					allRemotes[selector].RemotePool,
+				)
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to merge token pool refs for chain selector %d: %w", selector, err)
+				}
+				cfg.TokenExpansionInputPerChain[selector].TokenTransferConfig.TokenPoolRef = mergedPool
+				mergedToken, err := datastore_utils.MergeRefs(
+					&cfg.TokenExpansionInputPerChain[selector].TokenTransferConfig.TokenRef,
+					allRemotes[selector].RemoteToken,
+				)
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to merge token refs for chain selector %d: %w", selector, err)
+				}
+				cfg.TokenExpansionInputPerChain[selector].TokenTransferConfig.TokenRef = mergedToken
+				for remoteSelector, remoteConfig := range input.TokenTransferConfig.RemoteChains {
+					if _, exists := allRemotes[remoteSelector]; exists {
+						if remoteConfig.RemoteToken == nil {
+							remoteConfig.RemoteToken = allRemotes[remoteSelector].RemoteToken
+						}
+						if remoteConfig.RemotePool == nil {
+							remoteConfig.RemotePool = allRemotes[remoteSelector].RemotePool
+						}
+						cfg.TokenExpansionInputPerChain[selector].TokenTransferConfig.RemoteChains[remoteSelector] = remoteConfig
+					} else {
+						allRemotes[remoteSelector] = remoteConfig
+					}
+				}
+				if len(input.TokenTransferConfig.RemoteChains) != 0 {
+					allTokenConfigs = append(allTokenConfigs, *input.TokenTransferConfig)
+				}
+			}
+		}
+
+		// finally, we process the token configs for transfers, which will register the tokens and token pools on-chain and set the pool on the token if necessary
+		transferOps, transferReports, err := processTokenConfigForChain(e, allTokenConfigs, cfg.ChainAdapterVersion)
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to process token configs for transfers: %w", err)
+		}
+		batchOps = append(batchOps, transferOps...)
+		reports = append(reports, transferReports...)
 
 		return changesets.NewOutputBuilder(e, mcmsRegistry).
 			WithReports(reports).

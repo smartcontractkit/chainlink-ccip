@@ -146,11 +146,6 @@ func (m *CCIP16Solana) GetEOAReceiverAddress(ctx context.Context, chainSelector 
 	return nil, nil
 }
 
-func (m *CCIP16Solana) GetTokenBalance(ctx context.Context, chainSelector uint64, address, tokenAddress []byte) (*big.Int, error) {
-	_ = zerolog.Ctx(ctx)
-	return big.NewInt(0), nil
-}
-
 func (m *CCIP16Solana) ExposeMetrics(
 	ctx context.Context,
 	source, dest uint64,

@@ -29,14 +29,19 @@ func SetupLocalSolNode(t *testing.T) string {
 // helper function to get a set of different random open ports
 func getPorts(t *testing.T) (rpcPort, wsPort, faucetPort, gossipPort string) {
 	t.Helper()
-	attempts := 5
+
+	const attempts = 5
 
 	for range attempts {
-		rpcPort = utils.MustRandomPort(t)
+		rpc := freeport.GetOne(t)
+		ws := freeport.GetOne(t)
 
-		portInt, _ := strconv.Atoi(rpcPort)
-		wsPort = strconv.Itoa(portInt + 1) // WS port must be RPC+1
+		rpcPort = strconv.Itoa(rpc)
+		wsPort = strconv.Itoa(ws)
 
+		if !utils.IsPortOpen(t, rpcPort) {
+			continue
+		}
 		if !utils.IsPortOpen(t, wsPort) {
 			continue
 		}
@@ -52,9 +57,9 @@ func getPorts(t *testing.T) (rpcPort, wsPort, faucetPort, gossipPort string) {
 			continue
 		}
 
-		// All distinct and open
 		return
 	}
+
 	panic(fmt.Sprintf("unable to find unique open ports after %d attempts", attempts))
 }
 
@@ -80,7 +85,8 @@ func SetupLocalSolNodeWithFlags(t *testing.T, flags ...string) (string, string) 
 		"--deactivate-feature", "EenyoWx9UMXYKpR8mW5Jmfmy2fRjzUtM7NduYMY8bx33",
 	}, flags...)
 
-	cmd := exec.Command("solana-test-validator", args...)
+	ctx := t.Context()
+	cmd := exec.CommandContext(ctx, "solana-test-validator", args...)
 
 	var stdErr bytes.Buffer
 	cmd.Stderr = &stdErr
@@ -120,9 +126,13 @@ func SetupLocalSolNodeWithFlags(t *testing.T, flags ...string) (string, string) 
 func FundTestAccounts(t *testing.T, keys []solana.PublicKey, url string) {
 	t.Helper()
 
+	ctx := t.Context()
+
 	for i := range keys {
 		account := keys[i].String()
-		_, err := exec.Command("solana", "airdrop", "100",
+		_, err := exec.CommandContext(
+			ctx,
+			"solana", "airdrop", "100",
 			account,
 			"--url", url,
 		).Output()

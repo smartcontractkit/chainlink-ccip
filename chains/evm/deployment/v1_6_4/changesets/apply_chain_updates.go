@@ -8,7 +8,7 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	token_pool_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/token_pool"
+	usdc_pool_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/operations/usdc_token_pool_cctp_v2"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_4/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
@@ -17,7 +17,7 @@ import (
 type ApplyChainUpdatesPerChainInput struct {
 	ChainSelector uint64
 	Address       common.Address
-	Updates       token_pool_ops.ApplyChainUpdatesArgs
+	Updates       usdc_pool_ops.ApplyChainUpdatesArgs
 }
 
 type ApplyChainUpdatesInput struct {
@@ -38,14 +38,14 @@ func applyChainUpdatesApply() func(cldf.Environment, ApplyChainUpdatesInput) (cl
 		reports := make([]cldf_ops.Report[any, any], 0)
 
 		addressesByChain := make(map[uint64][]common.Address)
-		updatesByChain := make(map[uint64]map[common.Address]token_pool_ops.ApplyChainUpdatesArgs)
+		updatesByChain := make(map[uint64]map[common.Address]usdc_pool_ops.ApplyChainUpdatesArgs)
 		for _, perChainInput := range input.ChainInputs {
 			// For each chain input, add the address to the addressesByChain map.
 			addressesByChain[perChainInput.ChainSelector] = append(addressesByChain[perChainInput.ChainSelector], perChainInput.Address)
 
 			// If the map for the chain selector doesn't exist yet, initialize it to prevent a nil pointer error.
 			if _, ok := updatesByChain[perChainInput.ChainSelector]; !ok {
-				updatesByChain[perChainInput.ChainSelector] = make(map[common.Address]token_pool_ops.ApplyChainUpdatesArgs)
+				updatesByChain[perChainInput.ChainSelector] = make(map[common.Address]usdc_pool_ops.ApplyChainUpdatesArgs)
 			}
 			updatesByChain[perChainInput.ChainSelector][perChainInput.Address] = perChainInput.Updates
 		}

@@ -13,7 +13,6 @@ package ccip
 //go:generate go run ./wrap ccip RMNProxy rmn_proxy_contract
 //go:generate go run ./wrap ccip RMNRemote rmn_remote
 //go:generate go run ./wrap ccip RMNHome rmn_home
-//go:generate go run ./wrap ccip HyperLiquidCompatibleERC20 hyper_liquid_compatible_erc20
 
 //go:generate go run ./wrap ccip BurnMintTokenPool burn_mint_token_pool
 //go:generate go run ./wrap ccip BurnFromMintTokenPool burn_from_mint_token_pool
@@ -26,7 +25,7 @@ package ccip
 //go:generate go run ./wrap ccip CCTPMessageTransmitterProxy cctp_message_transmitter_proxy
 //go:generate go run ./wrap ccip SiloedUSDCTokenPool siloed_usdc_token_pool
 //go:generate go run ./wrap ccip USDCTokenPoolCCTPV2 usdc_token_pool_cctp_v2
-//go:generate go run ./wrap ccip USDCTokenPoolProxy usdc_token_pool_proxy
+//go:generate go run ./wrap ccip USDCTokenPool usdc_token_pool
 //go:generate go run ./wrap ccip BurnMintWithLockReleaseFlagTokenPool burn_mint_with_lock_release_flag_token_pool
 
 // Helpers
