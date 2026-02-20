@@ -260,7 +260,7 @@ jobs:
         continue-on-error: true
         run: |
           run="${{ matrix.type.run }}"
-          run_cmd="gotestsum --junitfile=test-results.xml --format=standard-verbose -- ${{ matrix.type.file }} -timeout ${{ matrix.type.timeout }}"
+          run_cmd="gotestsum --junitfile=test-results.xml --format=github-actions -- ${{ matrix.type.file }} -timeout ${{ matrix.type.timeout }}"
           if [ -n "$run" ]; then
             run_cmd="$run_cmd -run $run"
           fi
