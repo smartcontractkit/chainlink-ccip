@@ -131,3 +131,8 @@ func initGlobalConfigTokenPool(
 
 	return sequences.OnChainOutput{}, nil
 }
+
+type PoolInitializeOut struct {
+	sequences.OnChainOutput
+	Initializer solana.PublicKey
+}
