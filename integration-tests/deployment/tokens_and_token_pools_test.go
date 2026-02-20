@@ -701,6 +701,50 @@ func TestTokensAndTokenPools(t *testing.T) {
 			require.NoError(t, err)
 			multisigPublicKey := solana.MustPublicKeyFromBase58(multisigAdd.Address)
 			require.False(t, multisigPublicKey.IsZero())
+
+			// Run the changeset with a new admin, overriding the previous pending admin
+			newExternalAdmin, _ := solana.NewRandomPrivateKey()
+			output, err = tokensapi.
+				ManualRegistration().
+				Apply(*env, tokensapi.ManualRegistrationInput{
+					ChainAdapterVersion: v1_6_0,
+					MCMS:                NewDefaultInputForMCMS("Manual Registration Solana"),
+					Registrations: []tokensapi.RegisterTokenConfig{
+						{
+							ChainSelector: solbnm.Chain.Selector,
+							ProposedOwner: newExternalAdmin.PublicKey().String(),
+							TokenPoolRef: datastore.AddressRef{
+								ChainSelector: solbnm.Chain.Selector,
+								Address:       tokenPool.Address,
+							},
+							TokenRef: datastore.AddressRef{
+								ChainSelector: solbnm.Chain.Selector,
+								Address:       tokenAddr.Address,
+							},
+							SVMExtraArgs: &tokensapi.SVMExtraArgs{
+								CustomerMintAuthorities: []solana.PublicKey{
+									newExternalAdmin.PublicKey(),
+								},
+							},
+						},
+					},
+				})
+			require.NoError(t, err)
+			MergeAddresses(t, env, output.DataStore)
+			testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
+
+			// Verify that a new admin was proposed for the specified token
+			tarErr = chain.GetAccountDataBorshInto(t.Context(), tokenAdminRegistryPDA, &tokenAdminRegistryAccountAfter)
+			require.NoError(t, tarErr)
+			require.Equal(t, solana.PublicKey{}, tokenAdminRegistryAccountAfter.Administrator)
+			require.Equal(t, newExternalAdmin.PublicKey(), tokenAdminRegistryAccountAfter.PendingAdministrator)
+
+			stateErr = chain.GetAccountDataBorshInto(t.Context(), tokenPoolStatePDA, &tokenPoolStateAccountAfter)
+			require.NoError(t, stateErr)
+			require.Equal(t, chain.DeployerKey.PublicKey(), tokenPoolStateAccountAfter.Config.Owner)
+			require.Equal(t, newExternalAdmin.PublicKey(), tokenPoolStateAccountAfter.Config.ProposedOwner)
+			require.Equal(t, tokenMint, tokenPoolStateAccountAfter.Config.Mint)
+			require.Equal(t, chain.DeployerKey.PublicKey(), tokenPoolStateAccountAfter.Config.RateLimitAdmin)
 		})
 
 		t.Run("Validate ConfigureTokenForTransfers", func(t *testing.T) {
