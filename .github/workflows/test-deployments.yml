@@ -57,11 +57,11 @@ jobs:
       - name: Test EVM Deployments
         id: run-tests
         continue-on-error: true
-        run: gotestsum --junitfile=test-results.xml --format=standard-verbose -- ./...
+        run: gotestsum --junitfile=test-results.xml --format=github-actions -- ./...
       - name: Analyze and upload test results
         uses: smartcontractkit/.github/actions/branch-out-upload@branch-out-upload/v1
         with:
-          junit-file-path: test-results.xml
+          junit-file-path: chains/evm/deployment/test-results.xml
           trunk-org-slug: chainlink
           trunk-previous-step-outcome: ${{ steps.run-tests.outcome }}
           trunk-token: ${{ secrets.TRUNK_API_KEY }}
@@ -85,11 +85,11 @@ jobs:
       - name: Test Solana Deployments
         id: run-tests
         continue-on-error: true
-        run: gotestsum --junitfile=test-results.xml --format=standard-verbose -- ./...
+        run: gotestsum --junitfile=test-results.xml --format=github-actions -- ./...
       - name: Analyze and upload test results
         uses: smartcontractkit/.github/actions/branch-out-upload@branch-out-upload/v1
         with:
-          junit-file-path: test-results.xml
+          junit-file-path: chains/solana/deployment/test-results.xml
           trunk-org-slug: chainlink
           trunk-previous-step-outcome: ${{ steps.run-tests.outcome }}
           trunk-token: ${{ secrets.TRUNK_API_KEY }}
@@ -113,11 +113,11 @@ jobs:
       - name: Test Crosschain Deployments
         id: run-tests
         continue-on-error: true
-        run: gotestsum --junitfile=test-results.xml --format=standard-verbose -- ./...
+        run: gotestsum --junitfile=test-results.xml --format=github-actions -- ./...
       - name: Analyze and upload test results
         uses: smartcontractkit/.github/actions/branch-out-upload@branch-out-upload/v1
         with:
-          junit-file-path: test-results.xml
+          junit-file-path: deployment/test-results.xml
           trunk-org-slug: chainlink
           trunk-previous-step-outcome: ${{ steps.run-tests.outcome }}
           trunk-token: ${{ secrets.TRUNK_API_KEY }}
@@ -150,11 +150,11 @@ jobs:
       - name: Test Crosschain Deployments
         id: run-tests
         continue-on-error: true
-        run: gotestsum --junitfile=test-results.xml --format=standard-verbose -- ./...
+        run: gotestsum --junitfile=test-results.xml --format=github-actions -- ./...
       - name: Analyze and upload test results
         uses: smartcontractkit/.github/actions/branch-out-upload@branch-out-upload/v1
         with:
-          junit-file-path: test-results.xml
+          junit-file-path: integration-tests/deployment/test-results.xml
           trunk-org-slug: chainlink
           trunk-previous-step-outcome: ${{ steps.run-tests.outcome }}
           trunk-token: ${{ secrets.TRUNK_API_KEY }}
