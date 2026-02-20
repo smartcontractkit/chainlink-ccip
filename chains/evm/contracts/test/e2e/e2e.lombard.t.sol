@@ -373,7 +373,14 @@ contract e2e_lombard is OnRampSetup {
     bytes[] memory verifierResults = new bytes[](2);
     verifierResults[0] = abi.encodePacked(s_sourceCommitteeVerifier.versionTag());
 
-    bytes memory fakePayload = bytes("fake payload data");
+    MessageV1Codec.MessageV1 memory messageV1 = this._decodeMessageV1(encodedMessage);
+
+    // Generate a valid Lombard payload that matches the token transfer data in the message.
+    bytes memory fakePayload = _generateValidLombardPayload(
+      messageV1.tokenTransfer[0].destTokenAddress,
+      messageV1.tokenTransfer[0].tokenReceiver,
+      messageV1.tokenTransfer[0].amount
+    );
     bytes memory fakeProof = bytes("fake signature data");
 
     verifierResults[1] = bytes.concat(
@@ -383,8 +390,6 @@ contract e2e_lombard is OnRampSetup {
       bytes2(uint16(fakeProof.length)),
       fakeProof
     );
-
-    MessageV1Codec.MessageV1 memory messageV1 = this._decodeMessageV1(encodedMessage);
 
     vm.expectCall(
       address(s_destCommitteeVerifier),
@@ -409,6 +414,37 @@ contract e2e_lombard is OnRampSetup {
 
     vm.resumeGasMetering();
     s_offRamp.execute(encodedMessage, ccvAddresses, verifierResults, 0);
+  }
+
+  /// @notice Generates a valid Lombard rawPayload for e2e testing.
+  /// @dev The rawPayload structure matches what Lombard bridge expects:
+  /// [version (4 bytes)][abi.encode(destinationChain, nonce, sender, recipient, destinationCaller, msgBody)]
+  /// where msgBody layout (read by assembly in _validatePayload):
+  ///   byte 0:       version (1 byte)
+  ///   bytes 1..32:  token (32 bytes)
+  ///   bytes 33..64: unused (32 bytes)
+  ///   bytes 65..96: recipient (32 bytes)
+  ///   bytes 97..128: amount (32 bytes)
+  function _generateValidLombardPayload(
+    bytes memory destToken,
+    bytes memory tokenReceiver,
+    uint256 amount
+  ) internal pure returns (bytes memory) {
+    bytes memory msgBody =
+      abi.encodePacked(bytes1(0), bytes32(destToken), bytes32(0), bytes32(tokenReceiver), bytes32(amount));
+
+    // Encode the full payload structure
+    bytes memory encodedData = abi.encode(
+      LOMBARD_CHAIN_ID, // destinationChain
+      uint256(1), // nonce
+      bytes32(uint256(uint160(OWNER))), // sender
+      address(0), // recipient (not used in validation)
+      address(0), // destinationCaller (not used in validation)
+      msgBody
+    );
+
+    // Prepend version tag (4 bytes)
+    return abi.encodePacked(bytes4(0x01000000), encodedData);
   }
 
   // External so we can pass `bytes memory` as calldata (for MessageV1Codec._decodeMessageV1).

@@ -48,6 +48,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
   error TooManySVMExtraArgsAccounts(uint256 numAccounts, uint256 maxAccounts);
   error InvalidSVMExtraArgsWritableBitmap(uint64 accountIsWritableBitmap, uint256 numAccounts);
   error TooManySuiExtraArgsReceiverObjectIds(uint256 numReceiverObjectIds, uint256 maxReceiverObjectIds);
+  error TokenTransferConfigMustBeEnabled(uint64 destChainSelector, address token);
 
   event FeeTokenAdded(address indexed feeToken);
   event FeeTokenRemoved(address indexed feeToken);
@@ -96,7 +97,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
     uint32 feeUSDCents; // ──────╮ Minimum fee to charge per token transfer, multiples of 0.01 USD.
     uint32 destGasOverhead; //   │ Gas charged to execute the token transfer on the destination chain.
     //                           │ Data availability bytes that are returned from the source pool and sent to the dest
-    uint32 destBytesOverhead; // │ pool. Must be >= Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES. Set as multiple of 32 bytes.
+    uint32 destBytesOverhead; // │ pool. Must be >= Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES.
     bool isEnabled; // ──────────╯ Whether this token has custom transfer fees.
   }
 
@@ -350,6 +351,8 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
   }
 
   /// @inheritdoc IFeeQuoter
+  /// @dev If the chain is not enabled, it will return (0,0,CCIP_LOCK_OR_BURN_V1_RET_BYTES). CCIP contracts check for
+  /// chain enablement separately.
   function getTokenTransferFee(
     uint64 destChainSelector,
     address token
@@ -384,6 +387,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
     TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs,
     TokenTransferFeeConfigRemoveArgs[] memory tokensToUseDefaultFeeConfigs
   ) internal {
+    // Loop over chains.
     for (uint256 i = 0; i < tokenTransferFeeConfigArgs.length; ++i) {
       TokenTransferFeeConfigArgs memory tokenTransferFeeConfigArg = tokenTransferFeeConfigArgs[i];
       uint64 destChainSelector = tokenTransferFeeConfigArg.destChainSelector;
@@ -392,10 +396,16 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
         revert InvalidDestChainConfig(destChainSelector);
       }
 
+      // Loop over tokens for the chain.
       for (uint256 j = 0; j < tokenTransferFeeConfigArg.tokenTransferFeeConfigs.length; ++j) {
         TokenTransferFeeConfig memory tokenTransferFeeConfig =
         tokenTransferFeeConfigArg.tokenTransferFeeConfigs[j].tokenTransferFeeConfig;
         address token = tokenTransferFeeConfigArg.tokenTransferFeeConfigs[j].token;
+
+        // Avoids setting it as disabled with non-zero values.
+        if (!tokenTransferFeeConfig.isEnabled) {
+          revert TokenTransferConfigMustBeEnabled(destChainSelector, token);
+        }
 
         if (tokenTransferFeeConfig.destBytesOverhead < Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES) {
           revert InvalidDestBytesOverhead(token, tokenTransferFeeConfig.destBytesOverhead);
@@ -687,7 +697,8 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
     if (!destChainConfig.isEnabled) revert DestinationChainNotEnabled(destChainSelector);
     if (!s_feeTokens.contains(message.feeToken)) revert FeeTokenNotSupported(message.feeToken);
 
-    uint256 gasLimit = _validateMessageAndResolveGasLimitForDestination(destChainSelector, destChainConfig, message);
+    (uint256 gasLimit, uint256 extraArgsDataLength) =
+      _validateMessageAndResolveGasLimitForDestination(destChainSelector, destChainConfig, message);
 
     // The below call asserts that feeToken is a supported token.
     uint224 feeTokenPrice = getValidatedTokenPrice(message.feeToken);
@@ -718,18 +729,25 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
       premiumFeeUSDWei *= 1e18; // 1.0x for other tokens
     }
 
-    uint256 destCallDataCost =
-      (message.data.length + tokenTransferBytesOverhead) * destChainConfig.destGasPerPayloadByteBase;
+    // extraArgsDataLength is 0 for EVM/Aptos/TVM. For SUI/SVM it captures the additional bytes from
+    // accounts and per-token constant overhead that the destination chain must process.
+    uint256 destCallDataCost = (message.data.length + extraArgsDataLength + tokenTransferBytesOverhead)
+      * destChainConfig.destGasPerPayloadByteBase;
 
     // We add the destination chain CCIP overhead (commit, exec), the token transfer gas, the calldata cost and the msg
     // gas limit to get the total gas the tx costs to execute on the destination chain.
     uint256 totalDestChainGas = destChainConfig.destGasOverhead + tokenTransferGas + destCallDataCost + gasLimit;
-    uint224 packedGasPrice = s_usdPerUnitGasByDestChainSelector[destChainSelector].value;
+
+    Internal.TimestampedPackedUint224 memory packedGasPrice = s_usdPerUnitGasByDestChainSelector[destChainSelector];
+
+    if (packedGasPrice.timestamp == 0) {
+      revert NoGasPriceAvailable(destChainSelector);
+    }
 
     // Total USD fee is in 36 decimals, feeTokenPrice is in 18 decimals USD for 1e18 smallest token denominations.
     // The result is the fee in the feeTokens smallest denominations (e.g. wei for ETH).
     // uint112(packedGasPrice) = executionGasPrice
-    return (totalDestChainGas * uint112(packedGasPrice) * 1e18 + premiumFeeUSDWei) / feeTokenPrice;
+    return (totalDestChainGas * uint112(packedGasPrice.value) * 1e18 + premiumFeeUSDWei) / feeTokenPrice;
   }
 
   /// @notice Validate the forwarded message to ensure it matches the configuration limits (message length, number of
@@ -738,11 +756,13 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
   /// @param destChainConfig The destination chain config.
   /// @param message The message to validate.
   /// @return gasLimit The gas limit to use for the message.
+  /// @return extraDataLength Additional data bytes that contribute to the destination payload size: accounts on SVM,
+  /// receiver object IDs on SUI, per-token constant overhead). Zero for EVM/Aptos/TVM.
   function _validateMessageAndResolveGasLimitForDestination(
     uint64 destChainSelector,
     DestChainConfig memory destChainConfig,
     Client.EVM2AnyMessage calldata message
-  ) internal view returns (uint256 gasLimit) {
+  ) internal view returns (uint256 gasLimit, uint256 extraDataLength) {
     uint256 dataLength = message.data.length;
     uint256 numberOfTokens = message.tokenAmounts.length;
 
@@ -791,8 +811,9 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
         // The messaging accounts needed for CCIP receiver on SUI are:
         // message receiver,
         // plus remaining accounts specified in Sui extraArgs. Each account is 32 bytes.
-        suiExpandedDataLength += ((receiverObjectIdsLength + Client.SUI_MESSAGING_ACCOUNTS_OVERHEAD)
-            * Client.SUI_ACCOUNT_BYTE_SIZE);
+        extraDataLength =
+          (receiverObjectIdsLength + Client.SUI_MESSAGING_ACCOUNTS_OVERHEAD) * Client.SUI_ACCOUNT_BYTE_SIZE;
+        suiExpandedDataLength += extraDataLength;
       }
 
       if (numberOfTokens > 0 && suiExtraArgsV1.tokenReceiver == bytes32(0)) {
@@ -804,7 +825,9 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
         );
       }
 
-      suiExpandedDataLength += (numberOfTokens * Client.SUI_TOKEN_TRANSFER_DATA_OVERHEAD);
+      uint256 tokenTransferDataOverhead = numberOfTokens * Client.SUI_TOKEN_TRANSFER_DATA_OVERHEAD;
+      extraDataLength += tokenTransferDataOverhead;
+      suiExpandedDataLength += tokenTransferDataOverhead;
 
       // The token destBytesOverhead can be very different per token so we have to take it into account as well.
       for (uint256 i = 0; i < numberOfTokens; ++i) {
@@ -846,8 +869,8 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
         // The messaging accounts needed for CCIP receiver on SVM are:
         // message receiver, offRamp PDA signer,
         // plus remaining accounts specified in SVM extraArgs. Each account is 32 bytes.
-        svmExpandedDataLength += ((accountsLength + Client.SVM_MESSAGING_ACCOUNTS_OVERHEAD)
-            * Client.SVM_ACCOUNT_BYTE_SIZE);
+        extraDataLength = (accountsLength + Client.SVM_MESSAGING_ACCOUNTS_OVERHEAD) * Client.SVM_ACCOUNT_BYTE_SIZE;
+        svmExpandedDataLength += extraDataLength;
       }
 
       if (numberOfTokens > 0 && svmExtraArgsV1.tokenReceiver == bytes32(0)) {
@@ -860,7 +883,9 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
         revert InvalidSVMExtraArgsWritableBitmap(svmExtraArgsV1.accountIsWritableBitmap, accountsLength);
       }
 
-      svmExpandedDataLength += (numberOfTokens * Client.SVM_TOKEN_TRANSFER_DATA_OVERHEAD);
+      uint256 tokenTransferDataOverhead = numberOfTokens * Client.SVM_TOKEN_TRANSFER_DATA_OVERHEAD;
+      extraDataLength += tokenTransferDataOverhead;
+      svmExpandedDataLength += tokenTransferDataOverhead;
 
       // The token destBytesOverhead can be very different per token so we have to take it into account as well.
       for (uint256 i = 0; i < numberOfTokens; ++i) {
@@ -882,7 +907,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
       revert InvalidChainFamilySelector(destChainConfig.chainFamilySelector);
     }
 
-    return gasLimit;
+    return (gasLimit, extraDataLength);
   }
 
   /// @notice Validates that the destAddress matches the expected format of the family.
@@ -915,9 +940,6 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
   }
 
   /// @notice Returns the token transfer cost parameters.
-  /// A basis point fee is calculated from the USD value of each token transfer.
-  /// For each individual transfer, this fee is between [minFeeUSD, maxFeeUSD].
-  /// Total transfer fee is the sum of each individual token transfer fee.
   /// @dev Assumes that tokenAmounts are validated to be listed tokens elsewhere.
   /// @dev Splitting one token transfer into multiple transfers is discouraged, as it will result in a transferFee
   /// equal or greater than the same amount aggregated/de-duped.
@@ -1069,6 +1091,11 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
       // extraData and offchainData, this caps the worst case abuse to the number of bytes reserved for offchainData.
       uint256 destPoolDataLength = onRampTokenTransfers[i].extraData.length;
       if (destPoolDataLength > Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES) {
+        // If the payload size is larger than Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES, it either
+        // - Must revert
+        // OR
+        // - Have a custom fee config with a destBytesOverhead that is large enough to accommodate the payload. We don't
+        // have to check if the config is enabled, because if it isn't, the value would be zero and the check would fail.
         if (destPoolDataLength > s_tokenTransferFeeConfig[destChainSelector][sourceToken].destBytesOverhead) {
           revert SourceTokenDataTooLarge(sourceToken);
         }

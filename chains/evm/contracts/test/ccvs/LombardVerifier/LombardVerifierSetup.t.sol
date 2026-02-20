@@ -102,4 +102,43 @@ contract LombardVerifierSetup is BaseVerifierSetup {
     bytes32 messageId = keccak256(MessageV1Codec._encodeMessageV1(message));
     return (message, messageId);
   }
+
+  /// @notice Generates a valid rawPayload for use in verifyMessage tests.
+  /// @dev The rawPayload structure matches what Lombard bridge expects:
+  /// [version (4 bytes)][abi.encode(destinationChain, nonce, sender, recipient, destinationCaller, msgBody)]
+  /// where msgBody layout (read by assembly in _validatePayload):
+  ///   byte 0:       version (1 byte)
+  ///   bytes 1..32:  token (32 bytes)
+  ///   bytes 33..64: unused (32 bytes)
+  ///   bytes 65..96: recipient (32 bytes)
+  ///   bytes 97..128: amount (32 bytes)
+  /// @param destToken The destination token address.
+  /// @param tokenReceiver The token receiver address.
+  /// @param amount The amount to transfer.
+  /// @return rawPayload The encoded payload.
+  function _generateValidRawPayload(
+    bytes memory destToken,
+    bytes memory tokenReceiver,
+    uint256 amount
+  ) internal pure returns (bytes memory) {
+    // Create msgBody matching the assembly offsets in _validatePayload:
+    //   mload(msgBody + 0x21) => bytes 1..32  = token
+    //   mload(msgBody + 0x61) => bytes 65..96 = recipient
+    //   mload(msgBody + 0x81) => bytes 97..128 = amount
+    bytes memory msgBody =
+      abi.encodePacked(bytes1(0), bytes32(destToken), bytes32(0), bytes32(tokenReceiver), bytes32(amount));
+
+    // Encode the full payload structure
+    bytes memory encodedData = abi.encode(
+      bytes32(LOMBARD_CHAIN_ID), // destinationChain
+      uint256(1), // nonce
+      bytes32(uint256(uint160(OWNER))), // sender
+      address(0), // recipient (not used in validation)
+      address(0), // destinationCaller (not used in validation)
+      msgBody
+    );
+
+    // Prepend version tag (4 bytes)
+    return abi.encodePacked(bytes4(0x01000000), encodedData);
+  }
 }

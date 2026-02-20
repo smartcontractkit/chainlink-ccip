@@ -1,6 +1,7 @@
 package sequences
 
 import (
+	"fmt"
 	"math/big"
 
 	"github.com/Masterminds/semver/v3"
@@ -70,24 +71,11 @@ func (a *EVMAdapter) GetFQAddress(ds datastore.DataStore, chainSelector uint64) 
 		datastore.AddressRefByType(datastore.ContractType(fee_quoter.ContractType)),
 		datastore.AddressRefByChainSelector(chainSelector),
 	)
-	latestVersion := semver.MustParse("1.6.0")
-	tooHighVersion := semver.MustParse("1.7.0")
-	var addr []byte
-	var err error
-	for _, ref := range refs {
-		v := ref.Version
-		// we want the latest version below 1.7.0
-		if v.GreaterThanEqual(latestVersion) &&
-			v.LessThan(tooHighVersion) {
-			latestVersion = v
-			addr, err = evm_datastore_utils.ToEVMAddressBytes(ref)
-			if err != nil {
-				return nil, err
-			}
-		}
-
+	ref, err := GetFeeQuoterAddress(refs, chainSelector)
+	if err != nil {
+		return nil, err
 	}
-	return addr, nil
+	return evm_datastore_utils.ToEVMAddressBytes(ref)
 }
 
 func (a *EVMAdapter) GetRouterAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error) {
@@ -163,3 +151,32 @@ var ConfigurePingPongSequence = operations.NewSequence(
 		return ccipapi.PingPongOutput{}, nil
 	},
 )
+
+// GetFeeQuoterAddress returns the address of the fee quoter contract for a given chain selector.
+// there may be multiple fee quoter addresses for a chain selector, so we return the one with the latest version below 1.7.0
+// (the next major version on or after 1.6.0).
+func GetFeeQuoterAddress(addresses []datastore.AddressRef, chainSelector uint64) (datastore.AddressRef, error) {
+	var refs []datastore.AddressRef
+	for _, ref := range addresses {
+		if ref.ChainSelector == chainSelector &&
+			ref.Type == datastore.ContractType(fee_quoter.ContractType) {
+			refs = append(refs, ref)
+		}
+	}
+	latestVersion := semver.MustParse("1.6.0")
+	tooHighVersion := semver.MustParse("1.7.0")
+	feeQRef := datastore.AddressRef{}
+	for _, ref := range refs {
+		v := ref.Version
+		// we want the latest version below 1.7.0
+		if v.GreaterThanEqual(latestVersion) &&
+			v.LessThan(tooHighVersion) {
+			latestVersion = v
+			feeQRef = ref
+		}
+	}
+	if feeQRef.Address == "" {
+		return datastore.AddressRef{}, fmt.Errorf("no fee quoter address found for chain selector %d", chainSelector)
+	}
+	return feeQRef, nil
+}

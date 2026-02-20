@@ -7,7 +7,7 @@ import {Pool} from "../../../libraries/Pool.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {AdvancedPoolHooksSetup} from "../AdvancedPoolHooks/AdvancedPoolHooksSetup.t.sol";
 
-contract TokenPoolV2_getFee is AdvancedPoolHooksSetup {
+contract TokenPool_getFee is AdvancedPoolHooksSetup {
   function test_getFee_DefaultFinality() public {
     uint16 defaultFeeBps = 250; // 2.50%
     IPoolV2.TokenTransferFeeConfig memory feeConfig = IPoolV2.TokenTransferFeeConfig({
