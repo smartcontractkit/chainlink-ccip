@@ -730,10 +730,8 @@ github.com/smartcontractkit/chain-selectors v1.0.96 h1:K3hK9kdPWiRFPXH5r5d1sSVBR
 github.com/smartcontractkit/chain-selectors v1.0.96/go.mod h1:qy7whtgG5g+7z0jt0nRyii9bLND9m15NZTzuQPkMZ5w=
 github.com/smartcontractkit/chainlink-aptos v0.0.0-20251024142440-51f2ad2652a2 h1:vGdeMwHO3ow88HvxfhA4DDPYNY0X9jmdux7L83UF/W8=
 github.com/smartcontractkit/chainlink-aptos v0.0.0-20251024142440-51f2ad2652a2/go.mod h1:iteU0WORHkArACVh/HoY/1bipV4TcNcJdTmom9uIT0E=
-github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20260220190158-93e59470b1fa h1:k5VkqYw6260cLa/9+r/OLtErD0TGJ4DxKpXK3LTXNWs=
-github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20260220190158-93e59470b1fa/go.mod h1:uFQVDhcQrxBhQmEL1Y0kuP1QI0rw8eK9k84Q0ESUYWw=
-github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20260220193131-bb5efe459a9f h1:uGr5yi2K54SMuR0YFQaNpaPAevD0W7Udtksp71F1fHE=
-github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20260220193131-bb5efe459a9f/go.mod h1:uFQVDhcQrxBhQmEL1Y0kuP1QI0rw8eK9k84Q0ESUYWw=
+github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20260220193544-8e613149755b h1:CyO8YPoBeD2S0XQ+qGcO/GxioSJ47zwUeIWEDfM7BbU=
+github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20260220193544-8e613149755b/go.mod h1:uFQVDhcQrxBhQmEL1Y0kuP1QI0rw8eK9k84Q0ESUYWw=
 github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm v0.0.0-20260116092715-df6a64d4bf00 h1:bsmRSGuUXKWRhhTxW2MQzJ/swIEqhZ83mjyhTSQuF/g=
 github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm v0.0.0-20260116092715-df6a64d4bf00/go.mod h1:Gl35ExaFLinqVhp50+Yq1GnMuHb3fnDtZUFPCtcfV3M=
 github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20260121163256-85accaf3d28d h1:xdFpzbApEMz4Rojg2Y2OjFlrh0wu7eB10V2tSZGW5y8=
