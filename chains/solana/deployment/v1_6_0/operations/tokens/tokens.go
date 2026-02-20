@@ -215,7 +215,7 @@ var CreateTokenMultisig = operations.NewOperation(
 					Type:          "TOKEN_MULTISIG",
 					Version:       Version,
 					Qualifier:     input.TokenSymbol,
-					Labels:        datastore.NewLabelSet("tokenMint", input.TokenMint.String()),
+					Labels:        datastore.NewLabelSet(input.TokenMint.String()),
 				},
 			},
 		}, nil

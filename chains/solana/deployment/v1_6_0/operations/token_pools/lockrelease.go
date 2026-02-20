@@ -347,6 +347,10 @@ var TransferOwnershipLockRelease = operations.NewOperation(
 		// there is a chance we perform an initialize and transfer ownership in the same sequence
 		// so we have to assume the input owner is correct, even if it doesn't match the current on-chain authority (since the initialize might be pending a proposal)
 		authority := input.CurrentOwner
+		if authority.IsZero() {
+			b.Logger.Info("Current owner not provided for lock release token pool with token mint:", input.TokenMint.String())
+			return sequences.OnChainOutput{}, fmt.Errorf("current owner must be provided for lock release token pool")
+		}
 		tokenPoolConfigPDA, _ := tokens.TokenPoolConfigAddress(input.TokenMint, input.Program)
 		ixn, err := lockrelease_token_pool.NewTransferOwnershipInstruction(
 			input.NewOwner,
@@ -355,7 +359,7 @@ var TransferOwnershipLockRelease = operations.NewOperation(
 			authority,
 		).ValidateAndBuild()
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to build add dest chain instruction: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to build transfer ownership instruction: %w", err)
 		}
 		if authority != chain.DeployerKey.PublicKey() {
 			batches, err := utils.BuildMCMSBatchOperation(
