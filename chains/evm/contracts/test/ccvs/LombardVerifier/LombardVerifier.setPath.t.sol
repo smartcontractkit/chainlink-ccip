@@ -37,6 +37,11 @@ contract LombardVerifier_setPath is LombardVerifierSetup {
     s_lombardVerifier.setPath(NEW_CHAIN_SELECTOR, bytes32(0), NEW_ALLOWED_CALLER);
   }
 
+  function test_setPath_RevertWhen_ZeroAllowedCaller() public {
+    vm.expectRevert(LombardVerifier.ZeroAllowedCaller.selector);
+    s_lombardVerifier.setPath(NEW_CHAIN_SELECTOR, NEW_LOMBARD_CHAIN_ID, bytes32(0));
+  }
+
   function test_setPath_RevertWhen_OnlyCallableByOwner() public {
     vm.startPrank(STRANGER);
 

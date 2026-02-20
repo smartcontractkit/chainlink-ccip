@@ -404,7 +404,7 @@ library ExtraArgsCodec {
 
       // Write static-length fields.
       mstore(ptr, mload(add(staticFields, 32)))
-      ptr := add(ptr, 11)
+      ptr := add(ptr, GENERIC_EXTRA_ARGS_V3_STATIC_LENGTH_SIZE)
     }
 
     // Write CCVs data.
@@ -537,11 +537,12 @@ library ExtraArgsCodec {
       }
 
       uint256 accountsLength;
+      bytes1 useATA;
 
       // Read static-length fields.
       assembly ("memory-safe") {
         // Read useATA (1 byte) - enum value.
-        let useATA := byte(0, calldataload(add(encoded.offset, 4)))
+        useATA := byte(0, calldataload(add(encoded.offset, 4)))
         mstore(executorArgs, useATA)
 
         // Read accountIsWritableBitmap (8 bytes).
@@ -550,6 +551,10 @@ library ExtraArgsCodec {
 
         // Read accounts length (1 byte).
         accountsLength := byte(0, calldataload(add(encoded.offset, 13)))
+      }
+
+      if (useATA > bytes1(uint8(SVMTokenReceiverUsage.USE_AS_IS))) {
+        revert InvalidDataLength(EncodingErrorLocation.DECODE_FIELD_CONTENT, 4);
       }
 
       uint256 offset = SVM_EXECUTOR_ARGS_V1_BASE_SIZE;
