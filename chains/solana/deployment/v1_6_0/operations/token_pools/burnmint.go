@@ -397,6 +397,10 @@ var TransferOwnershipBurnMint = operations.NewOperation(
 		// there is a chance we perform an initialize and transfer ownership in the same sequence
 		// so we have to assume the input owner is correct, even if it doesn't match the current on-chain authority (since the initialize might be pending a proposal)
 		authority := input.CurrentOwner
+		if authority.IsZero() {
+			b.Logger.Info("Current owner not provided for burn and mint token pool with token mint:", input.TokenMint.String())
+			return sequences.OnChainOutput{}, fmt.Errorf("current owner must be provided for burn and mint token pool")
+		}
 		tokenPoolConfigPDA, _ := tokens.TokenPoolConfigAddress(input.TokenMint, input.Program)
 		ixn, err := burnmint_token_pool.NewTransferOwnershipInstruction(
 			input.NewOwner,
