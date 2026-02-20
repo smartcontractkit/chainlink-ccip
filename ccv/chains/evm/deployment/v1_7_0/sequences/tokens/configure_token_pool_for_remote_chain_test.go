@@ -82,7 +82,8 @@ func checkTokenPoolConfigForRemoteChain(t *testing.T, e *deployment.Environment,
 		require.Contains(t, inboundCCVsToAddAboveThreshold, common.HexToAddress(ccv), "Inbound CCV to add above threshold should be in the list of required inbound CCVs to add above threshold")
 	}
 
-	outboundCCVsToAddAboveThreshold, err := tp.GetRequiredCCVs(nil, common.Address{}, remoteChainSel, thresholdAmountForAdditionalCCVs, 0, []byte{}, outbound)
+	outboundAmountForThresholdQuery := new(big.Int).Mul(thresholdAmountForAdditionalCCVs, big.NewInt(2)) // 2x so after fees we're still above threshold
+	outboundCCVsToAddAboveThreshold, err := tp.GetRequiredCCVs(nil, common.Address{}, remoteChainSel, outboundAmountForThresholdQuery, 0, []byte{}, outbound)
 	require.NoError(t, err, "Failed to get outbound CCVs to add above threshold from token pool")
 	for _, ccv := range input.RemoteChainConfig.OutboundCCVsToAddAboveThreshold {
 		require.Contains(t, outboundCCVsToAddAboveThreshold, common.HexToAddress(ccv), "Outbound CCV to add above threshold should be in the list of required outbound CCVs to add above threshold")

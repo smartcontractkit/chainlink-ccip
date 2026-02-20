@@ -34,6 +34,7 @@ var DeployLockReleaseTokenPool = cldf_ops.NewSequence(
 			Args: erc20_lock_box.ConstructorArgs{
 				Token: input.ConstructorArgs.Token,
 			},
+			Qualifier: &input.TokenSymbol,
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy ERC20 lock box to %s: %w", chain, err)

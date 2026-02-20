@@ -9,6 +9,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/cctp_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/cctp"
 	cctp_through_ccv_token_pool_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/cctp_through_ccv_token_pool"
+	cctp_message_transmitter_proxy_v1_6_2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_2/operations/cctp_message_transmitter_proxy"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	seq_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
@@ -22,11 +23,6 @@ var _ adapters.CCTPChain = &CCTPChainAdapter{}
 // CCTPChainAdapter is the adapter for CCTP chains.
 type CCTPChainAdapter struct{}
 
-// AddressRefToBytes returns the byte representation of an address for this chain family.
-func (c *CCTPChainAdapter) AddressRefToBytes(ref datastore.AddressRef) ([]byte, error) {
-	return common.HexToAddress(ref.Address).Bytes(), nil
-}
-
 // DeployCCTPChain returns the sequence for deploying a CCTP chain.
 func (c *CCTPChainAdapter) DeployCCTPChain() *operations.Sequence[adapters.DeployCCTPInput, seq_core.OnChainOutput, adapters.DeployCCTPChainDeps] {
 	return cctp.DeployCCTPChain
@@ -37,12 +33,25 @@ func (c *CCTPChainAdapter) ConfigureCCTPChainForLanes() *operations.Sequence[ada
 	return cctp.ConfigureCCTPChainForLanes
 }
 
-// AllowedCallerOnDest returns the address allowed to trigger message reception on the remote domain.
-// On dest, the caller of CCTP is the CCTPMessageTransmitterProxy.
-func (c *CCTPChainAdapter) AllowedCallerOnDest(d datastore.DataStore, b chain.BlockChains, chainSelector uint64) ([]byte, error) {
+// CCTPV2AllowedCallerOnDest returns the address allowed to trigger message reception on the remote domain.
+// On dest, the caller of CCTPV2 is the CCTPMessageTransmitterProxy 2.0.0.
+func (c *CCTPChainAdapter) CCTPV2AllowedCallerOnDest(d datastore.DataStore, b chain.BlockChains, chainSelector uint64) ([]byte, error) {
 	allowedCallerOnDestAddressRef, err := datastore_utils.FindAndFormatRef(d, datastore.AddressRef{
 		Type:    datastore.ContractType(cctp_message_transmitter_proxy.ContractType),
 		Version: cctp_message_transmitter_proxy.Version,
+	}, chainSelector, datastore_utils.FullRef)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find allowed caller on dest address: %w", err)
+	}
+	return common.FromHex(allowedCallerOnDestAddressRef.Address), nil
+}
+
+// CCTPV1AllowedCallerOnDest returns the address allowed to trigger message reception on the remote domain.
+// On dest, the caller of CCTPV1 is the CCTPMessageTransmitterProxy v1.6.2.
+func (c *CCTPChainAdapter) CCTPV1AllowedCallerOnDest(d datastore.DataStore, b chain.BlockChains, chainSelector uint64) ([]byte, error) {
+	allowedCallerOnDestAddressRef, err := datastore_utils.FindAndFormatRef(d, datastore.AddressRef{
+		Type:    datastore.ContractType(cctp_message_transmitter_proxy_v1_6_2.ContractType),
+		Version: cctp_message_transmitter_proxy_v1_6_2.Version,
 	}, chainSelector, datastore_utils.FullRef)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find allowed caller on dest address: %w", err)
@@ -67,6 +76,11 @@ func (c *CCTPChainAdapter) AllowedCallerOnSource(d datastore.DataStore, b chain.
 // On EVM, there is no mint recipient.
 func (c *CCTPChainAdapter) MintRecipientOnDest(d datastore.DataStore, b chain.BlockChains, chainSelector uint64) ([]byte, error) {
 	return []byte{}, nil
+}
+
+// USDCType returns the type of the USDC on the chain.
+func (c *CCTPChainAdapter) USDCType() adapters.USDCType {
+	return adapters.Canonical
 }
 
 // PoolAddress returns the address of the token pool on the remote chain in bytes.
