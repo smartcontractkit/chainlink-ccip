@@ -31,14 +31,14 @@ import (
 	cldf_ton_provider "github.com/smartcontractkit/chainlink-deployments-framework/chain/ton/provider"
 	testutils "github.com/smartcontractkit/chainlink-ton/deployment/utils"
 
-	// ccipTon "github.com/smartcontractkit/chainlink-ton/devenv"
-
 	ccipEVM "github.com/smartcontractkit/chainlink-ccip/devenv/chainimpl/ccip-evm"
 	ccipSolana "github.com/smartcontractkit/chainlink-ccip/devenv/chainimpl/ccip-solana"
+	ccipTon "github.com/smartcontractkit/chainlink-ton/devenv"
 
 	// Register test adapters
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/testadapter"
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/testadapter"
+	_ "github.com/smartcontractkit/chainlink-ton/deployment/testadapter"
 )
 
 type initOptions struct {
@@ -271,8 +271,7 @@ func NewCCIPImplFromNetwork(typ string, chainID string) (CCIP16ProductConfigurat
 	case "aptos":
 		panic("implement Aptos")
 	case "ton":
-		panic("TON temporarily disabled")
-		// return ccipTon.NewEmptyCCIP16TON(networkInfo), nil
+		return ccipTon.NewEmptyCCIP16TON(networkInfo), nil
 	default:
 		return nil, errors.New("unknown devenv network type " + typ)
 	}

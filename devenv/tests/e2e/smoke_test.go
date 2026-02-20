@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"fmt"
+	"math"
 	"math/big"
 	"os"
 	"testing"
@@ -20,16 +21,16 @@ import (
 	ccip "github.com/smartcontractkit/chainlink-ccip/devenv"
 )
 
+var supportedTokenFamilies = map[string]bool{
+	chainsel.FamilyEVM:    true,
+	chainsel.FamilySolana: true,
+}
+
 func TestE2ESmoke(t *testing.T) {
 	in, err := ccip.LoadOutput[ccip.Cfg]("../../env-out.toml")
 	require.NoError(t, err)
 	if in.ForkedEnvConfig != nil {
 		t.Skip("Skipping E2E tests on forked environments, not supported yet")
-	}
-	chainIDs, wsURLs := make([]string, 0), make([]string, 0)
-	for _, bc := range in.Blockchains {
-		chainIDs = append(chainIDs, bc.ChainID)
-		wsURLs = append(wsURLs, bc.Out.Nodes[0].ExternalWSUrl)
 	}
 
 	selectors, e, err := ccip.NewCLDFOperationsEnvironment(in.Blockchains, in.CLDF.DataStore)
@@ -52,48 +53,44 @@ func TestE2ESmoke(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	type testcase struct {
-		name         string
-		fromSelector uint64
-		toSelector   uint64
+	if os.Getenv("PARALLEL_E2E_TESTS") == "true" {
+		t.Parallel()
 	}
-	tcs := []testcase{}
-	for i := range selectors {
-		for j := range selectors {
+
+	type testpair struct {
+		fromChain ccip.CCIP16ProductConfiguration
+		toChain   ccip.CCIP16ProductConfiguration
+	}
+	matrix := []testpair{}
+	for _, i := range selectors {
+		for _, j := range selectors {
 			if i == j {
 				continue
 			}
-			fromFamily, _ := chainsel.GetSelectorFamily(selectors[i])
-			toFamily, _ := chainsel.GetSelectorFamily(selectors[j])
-			tcs = append(tcs, testcase{
-				name:         fmt.Sprintf("msg execution eoa receiver from %s to %s", fromFamily, toFamily),
-				fromSelector: selectors[i],
-				toSelector:   selectors[j],
+			matrix = append(matrix, testpair{
+				fromChain: selectorsToImpl[i],
+				toChain:   selectorsToImpl[j],
 			})
 		}
 	}
 
-	for _, tc := range tcs {
-		fromImpl := selectorsToImpl[tc.fromSelector]
-		toImpl := selectorsToImpl[tc.toSelector]
-		supportedTokenFamilies := map[string]bool{
-			chainsel.FamilyEVM:    true,
-			chainsel.FamilySolana: true,
-		}
+	for _, tc := range matrix {
+		fromImpl := tc.fromChain
+		toImpl := tc.toChain
+
+		laneTag := fmt.Sprintf("%s->%s", fromImpl.Family(), toImpl.Family())
+
+		name := fmt.Sprintf("%s msg execution EOA receiver", laneTag)
 		_, fromSupported := supportedTokenFamilies[fromImpl.Family()]
 		_, toSupported := supportedTokenFamilies[toImpl.Family()]
 		if fromSupported && toSupported {
-			tc.name += " with token transfer"
+			name += " with token transfer"
 		} else {
-			tc.name += " without token transfer"
+			name += " without token transfer"
 		}
-		// Capture the loop variable so each goroutine gets its own copy.
-		t.Run(tc.name, func(t *testing.T) {
-			if os.Getenv("PARALLEL_E2E_TESTS") == "true" {
-				t.Parallel()
-			}
 
-			t.Logf("Testing CCIP message from chain %d to chain %d", tc.fromSelector, tc.toSelector)
+		t.Run(name, func(t *testing.T) {
+			t.Logf("Testing CCIP message from chain %d to chain %d", tc.fromChain, tc.toChain)
 
 			receiver := toImpl.CCIPReceiver()
 			extraArgs, err := toImpl.GetExtraArgs(receiver, fromImpl.Family())
@@ -144,7 +141,7 @@ func TestE2ESmoke(t *testing.T) {
 					balance, err := toImpl.GetTokenBalance(t.Context(), dstTokenRef.Address, receiver)
 					require.NoError(t, err)
 
-					t.Log(fmt.Sprintf("Fetched receiver token balance on chain %d (%s)", tc.toSelector, toImpl.Family()),
+					t.Log(fmt.Sprintf("Fetched receiver token balance on chain %d (%s)", toImpl.ChainSelector(), toImpl.Family()),
 						"token.qualifier="+dstTokenRef.Qualifier,
 						"token.address="+dstTokenRef.Address,
 						"token.type="+dstTokenRef.Type,
@@ -161,7 +158,7 @@ func TestE2ESmoke(t *testing.T) {
 			}
 
 			msg, err := fromImpl.BuildMessage(testadapters.MessageComponents{
-				DestChainSelector: tc.toSelector,
+				DestChainSelector: toImpl.ChainSelector(),
 				Receiver:          receiver,
 				Data:              []byte("hello eoa"),
 				FeeToken:          "",
@@ -170,18 +167,67 @@ func TestE2ESmoke(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			seq, err := fromImpl.SendMessage(t.Context(), tc.toSelector, msg)
+			seq, err := fromImpl.SendMessage(t.Context(), toImpl.ChainSelector(), msg)
 			require.NoError(t, err)
 			seqNr := ccipocr3.SeqNum(seq)
 			seqNumRange := ccipocr3.NewSeqNumRange(seqNr, seqNr)
-			toImpl.ValidateCommit(t, tc.fromSelector, nil, seqNumRange)
-			toImpl.ValidateExec(t, tc.fromSelector, nil, []uint64{seq})
+			toImpl.ValidateCommit(t, fromImpl.ChainSelector(), nil, seqNumRange)
+			toImpl.ValidateExec(t, fromImpl.ChainSelector(), nil, []uint64{seq})
 
 			// TODO: once non-EVM tooling supports token transfers we can
 			// remove this if statement and always run the balance check.
 			if balanceCheck != nil {
 				require.Eventually(t, balanceCheck, 5*time.Second, time.Second)
 			}
+		})
+
+		t.Run(fmt.Sprintf("%s gas limit too high", laneTag), func(t *testing.T) {
+			receiver := toImpl.CCIPReceiver()
+
+			extraArgs, err := toImpl.GetExtraArgs(receiver, fromImpl.Family(), testadapters.NewGasLimitExtraArg(big.NewInt(math.MaxInt64)))
+			require.NoError(t, err)
+
+			msg, err := fromImpl.BuildMessage(testadapters.MessageComponents{
+				DestChainSelector: toImpl.ChainSelector(),
+				Receiver:          receiver,
+				Data:              []byte("hello world"),
+				ExtraArgs:         extraArgs,
+			})
+			require.NoError(t, err)
+
+			_, err = fromImpl.SendMessage(t.Context(), toImpl.ChainSelector(), msg)
+			require.Error(t, err)
+		})
+
+		t.Run(fmt.Sprintf("%s invalid extra args tag", laneTag), func(t *testing.T) {
+			msg, err := fromImpl.BuildMessage(testadapters.MessageComponents{
+				DestChainSelector: toImpl.ChainSelector(),
+				Receiver:          toImpl.CCIPReceiver(),
+				Data:              []byte("hello world"),
+				ExtraArgs:         []byte{1, 2, 3, 4, 99, 99}, // invalid extraArgs prefix
+			})
+			require.NoError(t, err)
+
+			_, err = fromImpl.SendMessage(t.Context(), toImpl.ChainSelector(), msg)
+			require.Error(t, err)
+		})
+
+		t.Run(fmt.Sprintf("%s invalid receiver", laneTag), func(t *testing.T) {
+			invalidReceiver := []byte{99}
+
+			extraArgs, err := toImpl.GetExtraArgs(invalidReceiver, fromImpl.Family(), testadapters.NewGasLimitExtraArg(big.NewInt(math.MaxInt64)))
+			require.NoError(t, err)
+
+			msg, err := fromImpl.BuildMessage(testadapters.MessageComponents{
+				DestChainSelector: toImpl.ChainSelector(),
+				Receiver:          invalidReceiver,
+				Data:              []byte("hello world"),
+				ExtraArgs:         extraArgs,
+			})
+			require.NoError(t, err)
+
+			_, err = fromImpl.SendMessage(t.Context(), toImpl.ChainSelector(), msg)
+			require.Error(t, err)
 		})
 	}
 }
