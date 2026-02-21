@@ -1,0 +1,32 @@
+version: "1.0"
+
+input:
+  base_path: "../../../../chains/evm"  # Directory containing abi/ and bytecode/ folders
+
+output:
+  base_path: "." # Directory for generated operations/
+
+# Access control aliases
+# - owner: Only contract owner can call (OnlyOwner)
+# - (none): Public/Read functions don't need access control
+
+contracts:
+  - contract_name: FeeQuoter
+    version: "2.0.0"
+    functions:
+      - name: applyDestChainConfigUpdates
+        access: owner
+      - name: updatePrices
+        access: owner
+      - name: applyAuthorizedCallerUpdates
+        access: owner
+      - name: applyTokenTransferFeeConfigUpdates
+        access: owner
+      - name: getDestChainConfig
+        access: public
+      - name: getTokenTransferFeeConfig
+        access: public
+      - name: getStaticConfig
+        access: public
+      - name: getAllAuthorizedCallers
+        access: public
