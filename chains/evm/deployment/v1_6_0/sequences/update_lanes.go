@@ -25,50 +25,50 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 		var result sequences.OnChainOutput
 		b.Logger.Infof("EVM Configuring lane leg as source. src: %+v, dest: %+v", input.Source, input.Dest)
 
-	result, err := sequences.RunAndMergeSequence(b, chains, FeeQuoterApplyDestChainConfigUpdatesSequence, FeeQuoterApplyDestChainConfigUpdatesSequenceInput{
-		Address:       common.BytesToAddress(input.Source.FeeQuoter),
-		ChainSelector: input.Source.Selector,
-		UpdatesByChain: []fqops.DestChainConfigArgs{
-			{
-				DestChainSelector: input.Dest.Selector,
-				DestChainConfig:   TranslateFQ(input.Dest.FeeQuoterDestChainConfig),
+		result, err := sequences.RunAndMergeSequence(b, chains, FeeQuoterApplyDestChainConfigUpdatesSequence, FeeQuoterApplyDestChainConfigUpdatesSequenceInput{
+			Address:       common.BytesToAddress(input.Source.FeeQuoter),
+			ChainSelector: input.Source.Selector,
+			UpdatesByChain: []fqops.DestChainConfigArgs{
+				{
+					DestChainSelector: input.Dest.Selector,
+					DestChainConfig:   TranslateFQ(input.Dest.FeeQuoterDestChainConfig),
+				},
 			},
-		},
-	}, result)
+		}, result)
 		if err != nil {
 			return result, err
 		}
 		b.Logger.Info("Destination configs updated on FeeQuoters")
 
-	result, err = sequences.RunAndMergeSequence(b, chains, FeeQuoterUpdatePricesSequence, FeeQuoterUpdatePricesSequenceInput{
-		Address:       common.BytesToAddress(input.Source.FeeQuoter),
-		ChainSelector: input.Source.Selector,
-		UpdatesByChain: fqops.PriceUpdates{
-			TokenPriceUpdates: TranslateTokenPrices(input.Source.TokenPrices),
-			GasPriceUpdates: []fqops.GasPriceUpdate{
-				{
-					DestChainSelector: input.Dest.Selector,
-					UsdPerUnitGas:     input.Dest.GasPrice,
+		result, err = sequences.RunAndMergeSequence(b, chains, FeeQuoterUpdatePricesSequence, FeeQuoterUpdatePricesSequenceInput{
+			Address:       common.BytesToAddress(input.Source.FeeQuoter),
+			ChainSelector: input.Source.Selector,
+			UpdatesByChain: fqops.PriceUpdates{
+				TokenPriceUpdates: TranslateTokenPrices(input.Source.TokenPrices),
+				GasPriceUpdates: []fqops.GasPriceUpdate{
+					{
+						DestChainSelector: input.Dest.Selector,
+						UsdPerUnitGas:     input.Dest.GasPrice,
+					},
 				},
 			},
-		},
-	}, result)
+		}, result)
 		if err != nil {
 			return result, err
 		}
 		b.Logger.Info("Gas prices updated on FeeQuoters")
 
-	result, err = sequences.RunAndMergeSequence(b, chains, OnRampApplyDestChainConfigUpdatesSequence, OnRampApplyDestChainConfigUpdatesSequenceInput{
-		Address:       common.BytesToAddress(input.Source.OnRamp),
-		ChainSelector: input.Source.Selector,
-		UpdatesByChain: []onrampops.DestChainConfigArgs{
-			{
-				Router:            common.BytesToAddress(input.Source.Router),
-				DestChainSelector: input.Dest.Selector,
-				AllowlistEnabled:  input.Dest.AllowListEnabled,
+		result, err = sequences.RunAndMergeSequence(b, chains, OnRampApplyDestChainConfigUpdatesSequence, OnRampApplyDestChainConfigUpdatesSequenceInput{
+			Address:       common.BytesToAddress(input.Source.OnRamp),
+			ChainSelector: input.Source.Selector,
+			UpdatesByChain: []onrampops.DestChainConfigArgs{
+				{
+					Router:            common.BytesToAddress(input.Source.Router),
+					DestChainSelector: input.Dest.Selector,
+					AllowlistEnabled:  input.Dest.AllowListEnabled,
+				},
 			},
-		},
-	}, result)
+		}, result)
 		if err != nil {
 			return result, err
 		}
@@ -105,16 +105,16 @@ var ConfigureLaneLegAsDest = operations.NewSequence(
 		var result sequences.OnChainOutput
 		b.Logger.Infof("EVM Configuring lane leg as destination. src: %+v, dest: %+v", input.Source, input.Dest)
 
-	result, err := sequences.RunAndMergeSequence(b, chains, OffRampApplySourceChainConfigUpdatesSequence, OffRampApplySourceChainConfigUpdatesSequenceInput{
-		Address:       common.BytesToAddress(input.Dest.OffRamp),
-		ChainSelector: input.Dest.Selector,
-		UpdatesByChain: []offrampops.SourceChainConfigArgs{
-			{
-				Router:              common.BytesToAddress(input.Dest.Router),
-				SourceChainSelector: input.Source.Selector,
-				// https://github.com/smartcontractkit/chainlink/blob/f7ca3d51db51258bb3b8ae22a8e1593d03bc040b/deployment/ccip/changeset/v1_6/cs_chain_contracts.go#L1148
-				OnRamp:                    common.LeftPadBytes(input.Source.OnRamp, 32),
-				IsEnabled:                 !input.IsDisabled,
+		result, err := sequences.RunAndMergeSequence(b, chains, OffRampApplySourceChainConfigUpdatesSequence, OffRampApplySourceChainConfigUpdatesSequenceInput{
+			Address:       common.BytesToAddress(input.Dest.OffRamp),
+			ChainSelector: input.Dest.Selector,
+			UpdatesByChain: []offrampops.SourceChainConfigArgs{
+				{
+					Router:              common.BytesToAddress(input.Dest.Router),
+					SourceChainSelector: input.Source.Selector,
+					// https://github.com/smartcontractkit/chainlink/blob/f7ca3d51db51258bb3b8ae22a8e1593d03bc040b/deployment/ccip/changeset/v1_6/cs_chain_contracts.go#L1148
+					OnRamp:                    common.LeftPadBytes(input.Source.OnRamp, 32),
+					IsEnabled:                 !input.IsDisabled,
 					IsRMNVerificationDisabled: !input.Source.RMNVerificationEnabled,
 				},
 			},
@@ -167,8 +167,8 @@ func TranslateFQ(fqc lanes.FeeQuoterDestChainConfig) fqops.DestChainConfig {
 		MaxDataBytes:                      fqc.MaxDataBytes,
 		MaxPerMsgGasLimit:                 fqc.MaxPerMsgGasLimit,
 		DestGasOverhead:                   fqc.DestGasOverhead,
-		DestGasPerPayloadByteBase:         fqc.DestGasPerPayloadByteBase,
-		DestGasPerPayloadByteHigh:         fqc.DestGasPerPayloadByteHigh,
+		DestGasPerPayloadByteBase:         uint8(fqc.DestGasPerPayloadByteBase),
+		DestGasPerPayloadByteHigh:         uint8(fqc.DestGasPerPayloadByteHigh),
 		DestGasPerPayloadByteThreshold:    fqc.DestGasPerPayloadByteThreshold,
 		DestDataAvailabilityOverheadGas:   fqc.DestDataAvailabilityOverheadGas,
 		DestGasPerDataAvailabilityByte:    fqc.DestGasPerDataAvailabilityByte,
