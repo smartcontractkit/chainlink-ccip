@@ -237,14 +237,12 @@ func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualR
 			if input.SVMExtraArgs == nil || !input.SVMExtraArgs.SkipTokenPoolInit {
 				initTPOp := tokenpoolops.InitializeBurnMint
 				transferOwnershipTPOp := tokenpoolops.TransferOwnershipBurnMint
-				authority := tokenpoolops.GetAuthorityBurnMint(chain, tokenPool, tokenMint)
 				switch tokenPoolRef.Type.String() {
 				case common_utils.BurnMintTokenPool.String():
 					// Already set to burn mint
 				case common_utils.LockReleaseTokenPool.String():
 					initTPOp = tokenpoolops.InitializeLockRelease
 					transferOwnershipTPOp = tokenpoolops.TransferOwnershipLockRelease
-					authority = tokenpoolops.GetAuthorityLockRelease(chain, tokenPool, tokenMint)
 				default:
 					return sequences.OnChainOutput{}, fmt.Errorf("unsupported token pool type '%s' for Solana", tokenPoolRef.Type)
 				}
@@ -266,6 +264,7 @@ func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualR
 				result.Addresses = append(result.Addresses, initTPOut.Output.Addresses...)
 				result.BatchOps = append(result.BatchOps, initTPOut.Output.BatchOps...)
 
+				authority := initTPOut.Output.Initializer
 				transferOwnershipOut, err := operations.ExecuteOperation(b, transferOwnershipTPOp, chains.SolanaChains()[chain.Selector], tokenpoolops.TokenPoolTransferOwnershipInput{
 					Program:      tokenPool,
 					CurrentOwner: authority,
@@ -314,38 +313,30 @@ func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualR
 		})
 }
 
-func (a *SolanaAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokenapi.RateLimiterConfigInputs, sequences.OnChainOutput, cldf_chain.BlockChains] {
+func (a *SolanaAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokenapi.TPRLRemotes, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return operations.NewSequence(
 		"SetTokenPoolRateLimits",
 		common_utils.Version_1_6_0,
 		"Sets rate limits for a token pool on Solana",
-		func(b operations.Bundle, chains cldf_chain.BlockChains, input tokenapi.RateLimiterConfigInputs) (sequences.OnChainOutput, error) {
+		func(b operations.Bundle, chains cldf_chain.BlockChains, input tokenapi.TPRLRemotes) (sequences.OnChainOutput, error) {
 			chain := chains.SolanaChains()[input.ChainSelector]
 
 			op := tokenpoolops.UpsertRateLimitsBurnMint
-			switch input.PoolType {
+			switch input.TokenPoolRef.Type.String() {
 			case common_utils.BurnMintTokenPool.String():
 				op = tokenpoolops.UpsertRateLimitsBurnMint
 			case common_utils.LockReleaseTokenPool.String():
 				op = tokenpoolops.UpsertRateLimitsLockRelease
 			default:
-				return sequences.OnChainOutput{}, fmt.Errorf("unsupported token pool type '%s' for Solana", input.PoolType)
+				return sequences.OnChainOutput{}, fmt.Errorf("unsupported token pool type '%s' for Solana", input.TokenPoolRef.Type.String())
 			}
 			tokenAddr, tokenProgramId, err := getTokenMintAndTokenProgram(input.ExistingDataStore, input.TokenRef, chain)
 			if err != nil {
 				return sequences.OnChainOutput{}, err
 			}
 
-			tokenPoolAddr, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, datastore.AddressRef{
-				ChainSelector: chain.Selector,
-				Qualifier:     input.TokenPoolQualifier,
-				Type:          datastore.ContractType(input.PoolType),
-			}, chain.Selector, datastore_utils.FullRef)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to find token pool address for symbol '%s' and qualifier '%s': %w", input.TokenRef.Qualifier, input.TokenPoolQualifier, err)
-			}
 			tokenMint := solana.MustPublicKeyFromBase58(tokenAddr.Address)
-			tokenPool := solana.MustPublicKeyFromBase58(tokenPoolAddr.Address)
+			tokenPool := solana.MustPublicKeyFromBase58(input.TokenPoolRef.Address)
 			rateLimitOut, err := operations.ExecuteOperation(b, op, chains.SolanaChains()[chain.Selector],
 				tokenpoolops.RemoteChainConfig{
 					TokenPool:                 tokenPool,

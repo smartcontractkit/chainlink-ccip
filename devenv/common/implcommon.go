@@ -638,7 +638,7 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 					InboundCCVs:               []datastore.AddressRef{}, // not needed for for 1.6
 					OutboundRateLimiterConfig: disabledRL,
 					InboundRateLimiterConfig:  disabledRL,
-					// This is actually optional for 1.6 as the token and token pool addresses are 
+					// This is actually optional for 1.6 as the token and token pool addresses are
 					// inferred after deployment
 					// RemoteToken: &datastore.AddressRef{
 					// 	Type:          datastore.ContractType(dstCfg.DeployTokenInput.Type),
@@ -684,6 +684,11 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 			Qualifier:     teConfig.DeployTokenInput.Symbol,
 			ChainSelector: selector,
 		}
+		tokenPoolRef := datastore.AddressRef{
+			Type:          datastore.ContractType(teConfig.DeployTokenPoolInput.PoolType),
+			Qualifier:     teConfig.DeployTokenPoolInput.TokenPoolQualifier,
+			ChainSelector: selector,
+		}
 
 		token, err := datastore_utils.FindAndFormatRef(env.DataStore, tokenRef, selector, datastore_utils.FullRef)
 		if err != nil {
@@ -698,11 +703,22 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 			if dst.ChainSelector() == selector {
 				continue
 			}
+			dstTeConfig := dst.GetTokenExpansionConfig()
+			dstTokenRef := datastore.AddressRef{
+				Type:          datastore.ContractType(dstTeConfig.DeployTokenInput.Type),
+				Qualifier:     dstTeConfig.DeployTokenInput.Symbol,
+				ChainSelector: dst.ChainSelector(),
+			}
+			dstTokenPoolRef := datastore.AddressRef{
+				Type:          datastore.ContractType(dstTeConfig.DeployTokenPoolInput.PoolType),
+				Qualifier:     dstTeConfig.DeployTokenPoolInput.TokenPoolQualifier,
+				ChainSelector: dst.ChainSelector(),
+			}
 			// Set some rate limiters for testing - one enabled and one disabled.
-			rls := []tokensapi.RateLimiterConfig{
+			rls := []tokensapi.RateLimiterConfigFloatInput{
 				{
-					Capacity:  big.NewInt(2_000_000_000),
-					Rate:      big.NewInt(200_000_000),
+					Capacity:  1234567.89, // this is in tokens, not decimal adjusted
+					Rate:      123456.789, // this is in tokens per second, not decimal adjusted
 					IsEnabled: true,
 				},
 				{
@@ -710,16 +726,23 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 				},
 			}
 			for _, rl := range rls {
-				input := tokensapi.RateLimiterConfigInput{
-					ChainSelector:       selector,
-					TokenRef:            tokenRef,
-					TokenPoolQualifier:  teConfig.DeployTokenPoolInput.TokenPoolQualifier,
-					PoolType:            teConfig.DeployTokenPoolInput.PoolType,
-					ChainAdapterVersion: v1_6_0,
-					Inputs: map[uint64]tokensapi.RateLimiterConfigInputs{
+				input := tokensapi.TPRLInput{
+					Configs: map[uint64]tokensapi.TPRLConfig{
+						selector: {
+							ChainAdapterVersion: v1_6_0,
+							TokenRef:            tokenRef,
+							TokenPoolRef:        tokenPoolRef,
+							RemoteOutbounds: map[uint64]tokensapi.RateLimiterConfigFloatInput{
+								dst.ChainSelector(): rl,
+							},
+						},
 						dst.ChainSelector(): {
-							OutboundRateLimiterConfig: rl,
-							InboundRateLimiterConfig:  rl,
+							ChainAdapterVersion: v1_6_0,
+							TokenRef:            dstTokenRef,
+							TokenPoolRef:        dstTokenPoolRef,
+							RemoteOutbounds: map[uint64]tokensapi.RateLimiterConfigFloatInput{
+								selector: rl,
+							},
 						},
 					},
 				}

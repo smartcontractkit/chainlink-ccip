@@ -38,7 +38,7 @@ type TokenTransferConfig struct {
 // ConfigureTokensForTransfersConfig is the configuration for the ConfigureTokensForTransfers changeset.
 type ConfigureTokensForTransfersConfig struct {
 	// ChainAdapterVersion specifies the version of the chain adapter to use for this chain.
-	ChainAdapterVersion *semver.Version `yaml:"chain-adapter-version" json:"chainAdapterVersion"`
+	ChainAdapterVersion *semver.Version `yaml:"chainAdapterVersion" json:"chainAdapterVersion"`
 	// Tokens specifies the tokens to configure for cross-chain transfers.
 	Tokens []TokenTransferConfig
 	// MCMS configures the resulting proposal.
