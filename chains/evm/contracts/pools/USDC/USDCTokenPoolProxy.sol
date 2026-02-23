@@ -118,6 +118,12 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
     return address(i_token) == token;
   }
 
+  /// @notice Gets the IERC20 token that this pool can lock or burn.
+  /// @return token The IERC20 token representation.
+  function getToken() public view returns (IERC20 token) {
+    return i_token;
+  }
+
   /// @inheritdoc IPoolV1
   /// @notice Lock or burn outgoing tokens to the correct pool based on the lock or burn mechanism.
   /// @param lockOrBurnIn Encoded data fields for the processing of tokens on the source chain.
