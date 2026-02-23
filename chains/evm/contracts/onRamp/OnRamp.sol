@@ -1096,7 +1096,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
     // Enforce max fee per message.
     if (feeTokenAmount > (uint256(i_maxUSDCentsPerMsg) * 1e34) / feeTokenPrice) {
-      revert FeeExceedsMaxAllowed(feeTokenAmount, i_maxUSDCentsPerMsg);
+      revert FeeExceedsMaxAllowed((feeTokenAmount * feeTokenPrice) / 1e34, i_maxUSDCentsPerMsg);
     }
 
     return (receipts, updatedGasLimitSum, feeTokenAmount);
