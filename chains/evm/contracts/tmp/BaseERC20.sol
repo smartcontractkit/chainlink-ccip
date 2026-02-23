@@ -16,6 +16,7 @@ contract BaseERC20 is IGetCCIPAdmin, ERC20, ITypeAndVersion, IERC165 {
   }
 
   error InvalidRecipient(address recipient);
+  error OnlyCCIPAdmin();
 
   event CCIPAdminTransferred(address indexed previousAdmin, address indexed newAdmin);
 
@@ -52,10 +53,10 @@ contract BaseERC20 is IGetCCIPAdmin, ERC20, ITypeAndVersion, IERC165 {
 
     address ccipAdmin = args.ccipAdmin == address(0) ? msg.sender : args.ccipAdmin;
 
-    s_ccipAdmin = ccipAdmin;
-
     // Mint the initial supply to the new Owner, saving gas by not calling if the mint amount is zero.
     if (args.preMint != 0) _mint(ccipAdmin, args.preMint);
+
+    _setCCIPAdmin(ccipAdmin);
   }
 
   /// @inheritdoc IERC165
@@ -114,16 +115,18 @@ contract BaseERC20 is IGetCCIPAdmin, ERC20, ITypeAndVersion, IERC165 {
   }
 
   /// @notice Transfers the CCIPAdmin role to a new address
-  /// @dev only the owner can call this function, NOT the current ccipAdmin, and 1-step ownership transfer is used.
-  /// @param newAdmin The address to transfer the CCIPAdmin role to. Setting to address(0) is a valid way to revoke
-  /// the role.
   function setCCIPAdmin(
     address newAdmin
   ) external virtual {
     if (msg.sender != s_ccipAdmin) {
-      revert(); // TODO
+      revert OnlyCCIPAdmin();
     }
+    _setCCIPAdmin(newAdmin);
+  }
 
+  function _setCCIPAdmin(
+    address newAdmin
+  ) internal virtual {
     address currentAdmin = s_ccipAdmin;
 
     s_ccipAdmin = newAdmin;
