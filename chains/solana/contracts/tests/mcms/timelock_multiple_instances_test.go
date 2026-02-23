@@ -440,7 +440,6 @@ func TestTimelockMultipleInstances(t *testing.T) {
 				require.True(t, ok)
 				genericExeIx.AccountValues = append(genericExeIx.AccountValues, op.RemainingAccounts()...)
 
-
 				testutils.SendAndFailWith(
 					ctx,
 					t,
@@ -602,7 +601,6 @@ func TestTimelockMultipleInstances(t *testing.T) {
 				require.True(t, ok)
 				genericExeIx.AccountValues = append(genericExeIx.AccountValues, op.RemainingAccounts()...)
 
-
 				// Expect a seeds mismatch or similar
 				testutils.SendAndFailWith(
 					ctx,
@@ -670,7 +668,6 @@ func TestTimelockMultipleInstances(t *testing.T) {
 				genericBypassIx, ok := bypassIx.(*solana.GenericInstruction)
 				require.True(t, ok)
 				genericBypassIx.AccountValues = append(genericBypassIx.AccountValues, op.RemainingAccounts()...)
-
 
 				testutils.SendAndFailWith(
 					ctx,

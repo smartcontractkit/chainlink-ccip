@@ -907,7 +907,7 @@ func NewInitializeBypasserOperationInstruction(
 
 // Builds a "initialize_instruction" instruction.
 // Append a new instruction to an existing standard operation. //  // # Parameters //  // - `ctx`: The context containing the operation account. // - `_timelock_id`: The timelock identifier (for PDA derivation). // - `_id`: The operation identifier. // - `program_id`: The target program for the instruction. // - `accounts`: The list of accounts required for the instruction.
-func NewInitializeInstructionInstruction(
+func NewInitializeInstruction(
 	// Params:
 	timelockIdParam [32]uint8,
 	idParam [32]uint8,

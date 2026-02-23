@@ -93,4 +93,4 @@ docker-update-contracts:
 		${ANCHOR_IMAGE} anchor keys sync
 
 .PHONY: solana-checks
-solana-checks: clippy anchor-go-gen-clean format gomodtidy lint-go rust-tests go-tests build-contracts
+solana-checks: clippy anchor-go-gen format gomodtidy lint-go rust-tests go-tests build-contracts

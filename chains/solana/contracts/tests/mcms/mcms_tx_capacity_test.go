@@ -1527,7 +1527,6 @@ func TestMcmsCapacity(t *testing.T) {
 
 					genericIx.AccountValues = append(genericIx.AccountValues, timelockOp.RemainingAccounts()...)
 
-
 					if tc.expectError {
 						testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment, []string{"Program log: Error: memory allocation failed, out of memory"}, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
 					} else {

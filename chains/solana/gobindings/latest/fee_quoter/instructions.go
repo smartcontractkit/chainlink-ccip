@@ -930,7 +930,7 @@ type AddBillingTokenConfigInstruction struct {
 	Config BillingTokenConfig `json:"config"`
 
 	// Accounts:
-	ConfigAccount              solanago.PublicKey `json:"config_account"`
+	ConfigAccount                     solanago.PublicKey `json:"config"`
 	BillingTokenConfig         solanago.PublicKey `json:"billing_token_config"`
 	BillingTokenConfigWritable bool               `json:"billing_token_config_writable"`
 	TokenProgram               solanago.PublicKey `json:"token_program"`
@@ -2645,7 +2645,7 @@ type UpdateBillingTokenConfigInstruction struct {
 	Config BillingTokenConfig `json:"config"`
 
 	// Accounts:
-	ConfigAccount              solanago.PublicKey `json:"config_account"`
+	ConfigAccount                     solanago.PublicKey `json:"config"`
 	BillingTokenConfig         solanago.PublicKey `json:"billing_token_config"`
 	BillingTokenConfigWritable bool               `json:"billing_token_config_writable"`
 	Authority                  solanago.PublicKey `json:"authority"`
