@@ -1,15 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.4;
 
-import {IBurnMintERC20} from "../interfaces/IBurnMintERC20.sol";
-
 import {BaseERC20} from "./BaseERC20.sol";
 
+import {IBurnMintERC20} from "../interfaces/IBurnMintERC20.sol";
+import {
+  AccessControlDefaultAdminRules
+} from "@openzeppelin/contracts@5.3.0/access/extensions/AccessControlDefaultAdminRules.sol";
 import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
 
 /// @notice A basic ERC20 compatible token contract with burn and minting roles.
 /// @dev The total supply can be limited during deployment.
-contract BurnMintERC20 is BaseERC20, IBurnMintERC20 {
+contract BurnMintERC20 is BaseERC20, AccessControlDefaultAdminRules, IBurnMintERC20 {
   function typeAndVersion() external pure virtual override returns (string memory) {
     return "CCT 2.0.0-dev";
   }
@@ -18,16 +20,32 @@ contract BurnMintERC20 is BaseERC20, IBurnMintERC20 {
 
   bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
   bytes32 public constant BURNER_ROLE = keccak256("BURNER_ROLE");
+  bytes32 public constant BURN_MINT_ADMIN_ROLE = keccak256("BURN_MINT_ADMIN_ROLE");
 
+  /// @param args The parameters for the ERC20 token, including name, symbol, decimals, max supply, and pre-mint amount.
+  /// @param burnMintRoleAdmin The address to grant the BURN_MINT_ADMIN_ROLE.
+  /// @param owner The address to set as the owner of the contract, which has the default admin role. If set to
+  /// address(0), the deployer will be set as the owner.
   constructor(
-    ConstructorParams memory args
-  ) BaseERC20(args) {}
+    ConstructorParams memory args,
+    address burnMintRoleAdmin,
+    address owner
+  ) BaseERC20(args) AccessControlDefaultAdminRules(0, owner == address(0) ? msg.sender : owner) {
+    // If a burn mint admin is specified, set it.
+    if (burnMintRoleAdmin == address(0)) {
+      _grantRole(BURN_MINT_ADMIN_ROLE, burnMintRoleAdmin);
+    }
+
+    _setRoleAdmin(MINTER_ROLE, BURN_MINT_ADMIN_ROLE);
+    _setRoleAdmin(BURNER_ROLE, BURN_MINT_ADMIN_ROLE);
+  }
 
   /// @inheritdoc IERC165
   function supportsInterface(
     bytes4 interfaceId
-  ) public pure virtual override returns (bool) {
-    return super.supportsInterface(interfaceId) || interfaceId == type(IBurnMintERC20).interfaceId;
+  ) public view virtual override(AccessControlDefaultAdminRules, BaseERC20) returns (bool) {
+    return AccessControlDefaultAdminRules.supportsInterface(interfaceId) || BaseERC20.supportsInterface(interfaceId)
+      || interfaceId == type(IBurnMintERC20).interfaceId;
   }
 
   // ================================================================
