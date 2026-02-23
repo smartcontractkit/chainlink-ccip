@@ -56,6 +56,10 @@ func (ma *productTest_MockTokenAdapter) DeployTokenPoolForToken() *cldf_ops.Sequ
 	return &cldf_ops.Sequence[tokens.DeployTokenPoolInput, sequences.OnChainOutput, cldf_chain.BlockChains]{}
 }
 
+func (ma *productTest_MockTokenAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokens.UpdateAuthoritiesInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return &cldf_ops.Sequence[tokens.UpdateAuthoritiesInput, sequences.OnChainOutput, cldf_chain.BlockChains]{}
+}
+
 func TestRegisterTokenAdapter(t *testing.T) {
 	tests := []struct {
 		desc         string

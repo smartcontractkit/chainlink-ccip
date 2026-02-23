@@ -37,7 +37,6 @@ func poolDiff(existingPoolAddresses []base_token_pool.RemoteAddress, newPoolAddr
 
 type TokenPoolTransferOwnershipInput struct {
 	Program      solana.PublicKey
-	CurrentOwner solana.PublicKey
 	NewOwner     solana.PublicKey
 	TokenMint    solana.PublicKey
 }

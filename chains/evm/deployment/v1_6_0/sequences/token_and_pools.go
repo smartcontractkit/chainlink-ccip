@@ -623,3 +623,8 @@ func (a *EVMAdapter) FindLatestAddressRef(ds datastore.DataStore, ref datastore.
 	// Construct the token pool instance
 	return common.BytesToAddress(addrBytes), nil
 }
+
+func (a *EVMAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokensapi.UpdateAuthoritiesInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	// TODO: implement me
+	return nil
+}

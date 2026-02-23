@@ -65,26 +65,11 @@ var InitializeLockRelease = operations.NewOperation(
 			b.Logger.Info("LockReleaseTokenPool already initialized for token mint:", input.TokenMint.String())
 			return PoolInitializeOut{}, nil
 		}
-		// use the deployer key if we can
-		mintAuthority := utils.GetTokenMintAuthority(chain, input.TokenMint)
-		signer := upgradeAuthority
-		var poolConfig lockrelease_token_pool.PoolConfig
-		globalConfig, _ := tokens.TokenPoolGlobalConfigPDA(input.TokenPool)
-		err = chain.GetAccountDataBorshInto(context.Background(), globalConfig, &poolConfig)
-		if err == nil {
-			b.Logger.Info("Fetched existing pool config for token mint:", input.TokenMint.String())
-			if mintAuthority == chain.DeployerKey.PublicKey() &&
-				poolConfig.SelfServedAllowed {
-				signer = mintAuthority
-			}
-		} else {
-			b.Logger.Info("No existing pool config found for token mint, defaulting to upgrade authority as signer for initialization:", input.TokenMint.String())
-		}
 		configPDA, _, _ := state.FindConfigPDA(input.TokenPool)
 		ixn, err := lockrelease_token_pool.NewInitializeInstruction(
 			poolConfigPDA,
 			input.TokenMint,
-			signer,
+			upgradeAuthority,
 			solana.SystemProgramID,
 			input.TokenPool,
 			programData.Address,
@@ -93,7 +78,7 @@ var InitializeLockRelease = operations.NewOperation(
 		if err != nil {
 			return PoolInitializeOut{}, err
 		}
-		if signer != chain.DeployerKey.PublicKey() {
+		if upgradeAuthority != chain.DeployerKey.PublicKey() {
 			b, err := utils.BuildMCMSBatchOperation(
 				chain.Selector,
 				[]solana.Instruction{ixn},
@@ -104,7 +89,7 @@ var InitializeLockRelease = operations.NewOperation(
 				return PoolInitializeOut{}, fmt.Errorf("failed to execute or create batch: %w", err)
 			}
 			batches = append(batches, b)
-			return PoolInitializeOut{OnChainOutput: sequences.OnChainOutput{BatchOps: batches}, Initializer: signer}, nil
+			return PoolInitializeOut{OnChainOutput: sequences.OnChainOutput{BatchOps: batches}, Initializer: upgradeAuthority}, nil
 		} else {
 			err = chain.Confirm([]solana.Instruction{ixn})
 			if err != nil {
@@ -112,7 +97,7 @@ var InitializeLockRelease = operations.NewOperation(
 			}
 		}
 
-		return PoolInitializeOut{Initializer: signer}, nil
+		return PoolInitializeOut{Initializer: upgradeAuthority}, nil
 	})
 
 var InitGlobalConfigLockRelease = operations.NewOperation(
@@ -152,14 +137,21 @@ var UpsertRemoteChainConfigLockRelease = operations.NewOperation(
 			},
 			Decimals: input.RemoteDecimals,
 		}
-		authority := GetAuthorityLockRelease(chain, input.TokenPool, input.TokenMint)
+		authority, err := GetAuthorityLockRelease(chain, input.TokenPool, input.TokenMint)
+		if err != nil {
+			// assume the authority is the upgrade authority if we fail to fetch the current authority, since the pool might not be initialized yet and there won't be an authority set on-chain yet (since the config account won't exist until initialization)
+			authority, err = utils.GetUpgradeAuthority(chain.Client, input.TokenPool)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get upgrade authority for lock release token pool: %w", err)
+			}
+		}
 		poolConfigPDA, _ := tokens.TokenPoolConfigAddress(input.TokenMint, input.TokenPool)
 		// check if remote chain config already exists
 		remoteChainConfigPDA, _, _ := tokens.TokenPoolChainConfigPDA(input.RemoteSelector, input.TokenMint, input.TokenPool)
 		isSupportedChain := false
 		existingConfig := base_token_pool.BaseChain{}
 		var remoteChainConfigAccount base_token_pool.BaseChain
-		err := chain.GetAccountDataBorshInto(context.Background(), remoteChainConfigPDA, &remoteChainConfigAccount)
+		err = chain.GetAccountDataBorshInto(context.Background(), remoteChainConfigPDA, &remoteChainConfigAccount)
 		if err == nil {
 			isSupportedChain = true
 			existingConfig = remoteChainConfigAccount
@@ -308,7 +300,14 @@ var UpsertRateLimitsLockRelease = operations.NewOperation(
 			Capacity: outboundCapacity,
 			Rate:     outboundRate,
 		}
-		authority := GetAuthorityLockRelease(chain, input.TokenPool, input.TokenMint)
+		authority, err := GetAuthorityLockRelease(chain, input.TokenPool, input.TokenMint)
+		if err != nil {
+			// assume the authority is the upgrade authority if we fail to fetch the current authority, since the pool might not be initialized yet and there won't be an authority set on-chain yet (since the config account won't exist until initialization)
+			authority, err = utils.GetUpgradeAuthority(chain.Client, input.TokenPool)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get upgrade authority for lock release token pool: %w", err)
+			}
+		}
 		poolConfigPDA, _ := tokens.TokenPoolConfigAddress(input.TokenMint, input.TokenPool)
 		// check if remote chain config already exists
 		remoteChainConfigPDA, _, _ := tokens.TokenPoolChainConfigPDA(input.RemoteSelector, input.TokenMint, input.TokenPool)
@@ -353,12 +352,17 @@ var TransferOwnershipLockRelease = operations.NewOperation(
 	"Transfers ownership of the LockReleaseTokenPool token mint PDA to a new authority",
 	func(b operations.Bundle, chain cldf_solana.Chain, input TokenPoolTransferOwnershipInput) (sequences.OnChainOutput, error) {
 		lockrelease_token_pool.SetProgramID(input.Program)
-		// there is a chance we perform an initialize and transfer ownership in the same sequence
-		// so we have to assume the input owner is correct, even if it doesn't match the current on-chain authority (since the initialize might be pending a proposal)
-		authority := input.CurrentOwner
-		if authority.IsZero() {
-			b.Logger.Info("Current owner not provided for lock release token pool with token mint:", input.TokenMint.String())
-			return sequences.OnChainOutput{}, fmt.Errorf("current owner must be provided for lock release token pool")
+		authority, err := GetAuthorityLockRelease(chain, input.Program, input.TokenMint)
+		if err != nil {
+			// assume the authority is the upgrade authority if we fail to fetch the current authority, since the pool might not be initialized yet and there won't be an authority set on-chain yet (since the config account won't exist until initialization)
+			authority, err = utils.GetUpgradeAuthority(chain.Client, input.Program)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get upgrade authority for lock release token pool: %w", err)
+			}
+		}
+		if authority == input.NewOwner {
+			b.Logger.Info("New owner is the same as the current owner for lock release token pool with token mint:", input.TokenMint.String())
+			return sequences.OnChainOutput{}, nil
 		}
 		tokenPoolConfigPDA, _ := tokens.TokenPoolConfigAddress(input.TokenMint, input.Program)
 		ixn, err := lockrelease_token_pool.NewTransferOwnershipInstruction(
@@ -391,17 +395,60 @@ var TransferOwnershipLockRelease = operations.NewOperation(
 	},
 )
 
-func GetAuthorityLockRelease(chain cldf_solana.Chain, program solana.PublicKey, tokenMint solana.PublicKey) solana.PublicKey {
+var AcceptOwnershipLockRelease = operations.NewOperation(
+	"lockrelease:accept-ownership",
+	common_utils.Version_1_6_0,
+	"Accepts ownership of the LockReleaseTokenPool token mint PDA",
+	func(b operations.Bundle, chain cldf_solana.Chain, input TokenPoolTransferOwnershipInput) (sequences.OnChainOutput, error) {
+		lockrelease_token_pool.SetProgramID(input.Program)
+		tokenPoolConfigPDA, _ := tokens.TokenPoolConfigAddress(input.TokenMint, input.Program)
+		authority, err := GetAuthorityLockRelease(chain, input.Program, input.TokenMint)
+		if err != nil {
+			// assume the authority is the upgrade authority if we fail to fetch the current authority, since the pool might not be initialized yet and there won't be an authority set on-chain yet (since the config account won't exist until initialization)
+			authority, err = utils.GetUpgradeAuthority(chain.Client, input.Program)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get upgrade authority for lock release token pool: %w", err)
+			}
+		}
+		if authority == input.NewOwner {
+			b.Logger.Info("New owner is the same as the current owner for lock release token pool with token mint:", input.TokenMint.String())
+			return sequences.OnChainOutput{}, nil
+		}
+		ixn, err := lockrelease_token_pool.NewAcceptOwnershipInstruction(
+			tokenPoolConfigPDA,
+			input.TokenMint,
+			input.NewOwner,
+		).ValidateAndBuild()
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to build accept ownership instruction: %w", err)
+		}
+		if input.NewOwner != chain.DeployerKey.PublicKey() {
+			batches, err := utils.BuildMCMSBatchOperation(
+				chain.Selector,
+				[]solana.Instruction{ixn},
+				input.Program.String(),
+				common_utils.LockReleaseTokenPool.String(),
+			)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute or create batch: %w", err)
+			}
+			return sequences.OnChainOutput{BatchOps: []types.BatchOperation{batches}}, nil
+		}
+
+		err = chain.Confirm([]solana.Instruction{ixn})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm accept ownership: %w", err)
+		}
+		return sequences.OnChainOutput{}, nil
+	},
+)
+
+func GetAuthorityLockRelease(chain cldf_solana.Chain, program solana.PublicKey, tokenMint solana.PublicKey) (solana.PublicKey, error) {
 	programData := lockrelease_token_pool.State{}
 	poolConfigPDA, _ := tokens.TokenPoolConfigAddress(tokenMint, program)
 	err := chain.GetAccountDataBorshInto(context.Background(), poolConfigPDA, &programData)
 	if err != nil {
-		// if there is no pool config, default to upgrade authority as the signer for initialization and ownership transfers
-		upgradeAuthority, err := utils.GetUpgradeAuthority(chain.Client, program)
-		if err != nil {
-			return solana.PublicKey{}
-		}
-		return upgradeAuthority
+		return solana.PublicKey{}, fmt.Errorf("failed to get account data for lock release token pool config PDA: %w", err)
 	}
-	return programData.Config.Owner
+	return programData.Config.Owner, nil
 }
