@@ -345,28 +345,28 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 		reports = append(reports, transferReports...)
 
 		// finally, we update the authorities on the tokens if necessary
-		// for selector, tokenConfig := range allTokenConfigs {
-		// 	family, err := chain_selectors.GetSelectorFamily(selector)
-		// 	if err != nil {
-		// 		return cldf.ChangesetOutput{}, err
-		// 	}
-		// 	tokenPoolAdapter, exists := tokenPoolRegistry.GetTokenAdapter(family, cfg.ChainAdapterVersion)
-		// 	if !exists {
-		// 		return cldf.ChangesetOutput{}, fmt.Errorf("no TokenPoolAdapter registered for chain family '%s'", family)
-		// 	}
-		// 	updateAuthoritiesInput := UpdateAuthoritiesInput{
-		// 		TokenRef:          tokenConfig.TokenRef,
-		// 		TokenPoolRef:      tokenConfig.TokenPoolRef,
-		// 		ChainSelector:     selector,
-		// 		ExistingDataStore: e.DataStore,
-		// 	}
-		// 	updateAuthoritiesReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, tokenPoolAdapter.UpdateAuthorities(), e.BlockChains, updateAuthoritiesInput)
-		// 	if err != nil {
-		// 		return cldf.ChangesetOutput{}, fmt.Errorf("failed to update authorities for token on chain %d: %w", selector, err)
-		// 	}
-		// 	batchOps = append(batchOps, updateAuthoritiesReport.Output.BatchOps...)
-		// 	reports = append(reports, updateAuthoritiesReport.ExecutionReports...)
-		// }
+		for selector, tokenConfig := range allTokenConfigs {
+			family, err := chain_selectors.GetSelectorFamily(selector)
+			if err != nil {
+				return cldf.ChangesetOutput{}, err
+			}
+			tokenPoolAdapter, exists := tokenPoolRegistry.GetTokenAdapter(family, cfg.ChainAdapterVersion)
+			if !exists {
+				return cldf.ChangesetOutput{}, fmt.Errorf("no TokenPoolAdapter registered for chain family '%s'", family)
+			}
+			updateAuthoritiesInput := UpdateAuthoritiesInput{
+				TokenRef:          tokenConfig.TokenRef,
+				TokenPoolRef:      tokenConfig.TokenPoolRef,
+				ChainSelector:     selector,
+				ExistingDataStore: e.DataStore,
+			}
+			updateAuthoritiesReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, tokenPoolAdapter.UpdateAuthorities(), e.BlockChains, updateAuthoritiesInput)
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to update authorities for token on chain %d: %w", selector, err)
+			}
+			batchOps = append(batchOps, updateAuthoritiesReport.Output.BatchOps...)
+			reports = append(reports, updateAuthoritiesReport.ExecutionReports...)
+		}
 
 		return changesets.NewOutputBuilder(e, mcmsRegistry).
 			WithReports(reports).
