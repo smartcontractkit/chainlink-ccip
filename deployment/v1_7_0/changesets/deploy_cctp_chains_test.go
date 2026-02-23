@@ -26,7 +26,7 @@ type cctpTest_MockReader struct{}
 
 func (m *cctpTest_MockReader) GetChainMetadata(_ deployment.Environment, _ uint64, input mcms.Input) (mcms_types.ChainMetadata, error) {
 	return mcms_types.ChainMetadata{
-		MCMAddress:      input.MCMSAddressRef.Address,
+		MCMAddress:      mcmsAddress,
 		StartingOpCount: 10,
 	}, nil
 }
@@ -34,7 +34,7 @@ func (m *cctpTest_MockReader) GetChainMetadata(_ deployment.Environment, _ uint6
 func (m *cctpTest_MockReader) GetTimelockRef(_ deployment.Environment, selector uint64, input mcms.Input) (datastore.AddressRef, error) {
 	return datastore.AddressRef{
 		ChainSelector: selector,
-		Address:       input.TimelockAddressRef.Address,
+		Address:       timelockAddress,
 		Type:          "Timelock",
 		Version:       semver.MustParse("1.0.0"),
 	}, nil
@@ -43,7 +43,7 @@ func (m *cctpTest_MockReader) GetTimelockRef(_ deployment.Environment, selector 
 func (m *cctpTest_MockReader) GetMCMSRef(_ deployment.Environment, selector uint64, input mcms.Input) (datastore.AddressRef, error) {
 	return datastore.AddressRef{
 		ChainSelector: selector,
-		Address:       input.MCMSAddressRef.Address,
+		Address:       mcmsAddress,
 		Type:          "MCM",
 		Version:       semver.MustParse("1.0.0"),
 	}, nil
@@ -125,14 +125,6 @@ var cctpTest_BasicMCMSInput = mcms.Input{
 	ValidUntil:           3759765795,
 	TimelockDelay:        mcms_types.MustParseDuration("1h"),
 	TimelockAction:       mcms_types.TimelockActionSchedule,
-	MCMSAddressRef: datastore.AddressRef{
-		Type:    "MCM",
-		Version: semver.MustParse("1.0.0"),
-	},
-	TimelockAddressRef: datastore.AddressRef{
-		Type:    "Timelock",
-		Version: semver.MustParse("1.0.0"),
-	},
 }
 
 func TestDeployCCTPChains_Apply(t *testing.T) {
@@ -423,54 +415,6 @@ func TestDeployCCTPChains_VerifyPreconditions(t *testing.T) {
 					ValidUntil:           3759765795,
 					TimelockDelay:        mcms_types.MustParseDuration("1h"),
 					TimelockAction:       "InvalidAction", // Invalid action
-					MCMSAddressRef: datastore.AddressRef{
-						Type:    "MCM",
-						Version: semver.MustParse("1.0.0"),
-					},
-					TimelockAddressRef: datastore.AddressRef{
-						Type:    "Timelock",
-						Version: semver.MustParse("1.0.0"),
-					},
-				},
-			},
-			expectedError: "failed to validate MCMS input",
-		},
-		{
-			desc: "failure - empty MCMS address ref",
-			cfg: v1_7_0_changesets.DeployCCTPChainsConfig{
-				Chains: map[uint64]v1_7_0_changesets.CCTPChainConfig{
-					5009297550715157269: {},
-				},
-				MCMS: &mcms.Input{
-					OverridePreviousRoot: true,
-					ValidUntil:           3759765795,
-					TimelockDelay:        mcms_types.MustParseDuration("1h"),
-					TimelockAction:       mcms_types.TimelockActionSchedule,
-					MCMSAddressRef:       datastore.AddressRef{}, // Empty ref
-					TimelockAddressRef: datastore.AddressRef{
-						Type:    "Timelock",
-						Version: semver.MustParse("1.0.0"),
-					},
-				},
-			},
-			expectedError: "failed to validate MCMS input",
-		},
-		{
-			desc: "failure - empty timelock address ref",
-			cfg: v1_7_0_changesets.DeployCCTPChainsConfig{
-				Chains: map[uint64]v1_7_0_changesets.CCTPChainConfig{
-					5009297550715157269: {},
-				},
-				MCMS: &mcms.Input{
-					OverridePreviousRoot: true,
-					ValidUntil:           3759765795,
-					TimelockDelay:        mcms_types.MustParseDuration("1h"),
-					TimelockAction:       mcms_types.TimelockActionSchedule,
-					MCMSAddressRef: datastore.AddressRef{
-						Type:    "MCM",
-						Version: semver.MustParse("1.0.0"),
-					},
-					TimelockAddressRef: datastore.AddressRef{}, // Empty ref
 				},
 			},
 			expectedError: "failed to validate MCMS input",
@@ -486,14 +430,6 @@ func TestDeployCCTPChains_VerifyPreconditions(t *testing.T) {
 					ValidUntil:           0, // Zero timestamp
 					TimelockDelay:        mcms_types.MustParseDuration("1h"),
 					TimelockAction:       mcms_types.TimelockActionSchedule,
-					MCMSAddressRef: datastore.AddressRef{
-						Type:    "MCM",
-						Version: semver.MustParse("1.0.0"),
-					},
-					TimelockAddressRef: datastore.AddressRef{
-						Type:    "Timelock",
-						Version: semver.MustParse("1.0.0"),
-					},
 				},
 			},
 			expectedError: "failed to validate MCMS input",
