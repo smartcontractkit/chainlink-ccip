@@ -9,6 +9,7 @@ import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/I
 import {FeeTokenHandler} from "../../libraries/FeeTokenHandler.sol";
 import {Pool} from "../../libraries/Pool.sol";
 import {USDCSourcePoolDataCodec} from "../../libraries/USDCSourcePoolDataCodec.sol";
+import {TokenPool} from "../TokenPool.sol";
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
@@ -453,6 +454,17 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
     (address pool,) = _getPoolForMechanism(remoteChainSelector);
 
     return IPoolV2(pool).getRemoteToken(remoteChainSelector);
+  }
+
+  /// @notice Gets the pool addresses on the remote chain.
+  /// @param remoteChainSelector Remote chain selector.
+  /// @dev To support non-evm chains, each value in the array is encoded into bytes.
+  function getRemotePools(
+    uint64 remoteChainSelector
+  ) external view returns (bytes[] memory) {
+    (address pool,) = _getPoolForMechanism(remoteChainSelector);
+
+    return TokenPool(pool).getRemotePools(remoteChainSelector);
   }
 
   /// @inheritdoc IPoolV2
