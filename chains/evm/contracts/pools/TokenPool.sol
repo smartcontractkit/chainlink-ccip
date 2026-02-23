@@ -266,7 +266,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   /// @param interfaceId The interface identifier, as specified in ERC-165.
   function supportsInterface(
     bytes4 interfaceId
-  ) public pure virtual override returns (bool) {
+  ) public view virtual override returns (bool) {
     return interfaceId == Pool.CCIP_POOL_V1 || interfaceId == type(IPoolV2).interfaceId
       || interfaceId == type(IPoolV1).interfaceId || interfaceId == type(IERC165).interfaceId;
   }

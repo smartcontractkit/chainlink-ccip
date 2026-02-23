@@ -4,17 +4,15 @@ pragma solidity ^0.8.4;
 import {IGetCCIPAdmin} from "../interfaces/IGetCCIPAdmin.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
-import {AccessControl} from "@openzeppelin/contracts@5.3.0/access/AccessControl.sol";
-import {IAccessControl} from "@openzeppelin/contracts@5.3.0/access/IAccessControl.sol";
 import {ERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/ERC20.sol";
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
 
 /// @notice A basic ERC20 compatible token contract with burn and minting roles.
 /// @dev The total supply can be limited during deployment.
-contract BaseERC20 is IGetCCIPAdmin, IERC165, ERC20, AccessControl, ITypeAndVersion {
+contract BaseERC20 is IGetCCIPAdmin, ERC20, ITypeAndVersion, IERC165 {
   function typeAndVersion() external pure virtual override returns (string memory) {
-    return "BasicERC20 2.0.0-dev";
+    return "BaseERC20 2.0.0-dev";
   }
 
   error InvalidRecipient(address recipient);
@@ -27,16 +25,13 @@ contract BaseERC20 is IGetCCIPAdmin, IERC165, ERC20, AccessControl, ITypeAndVers
   /// @param maxSupply_ The maximum supply of the token, 0 if unlimited
   /// @param preMint The amount of tokens to mint to the deployer upon construction. NOTE: the base version of this
   /// contract does not support minting additional tokens after deployment, so this should be set to the full supply.
-  /// @param additionalOwner The address to grant the DEFAULT_ADMIN_ROLE to, which can be used to transfer the CCIPAdmin
-  /// role. If address(0) is passed, the deployer will be used as the only owner. If non-zero, this address will receive
-  /// the preMinted tokens, if any.
   struct ConstructorParams {
     string name;
     string symbol;
     uint256 maxSupply;
     uint256 preMint;
     uint8 decimals;
-    address additionalOwner;
+    address ccipAdmin;
   }
 
   /// @dev The number of decimals for the token
@@ -49,31 +44,25 @@ contract BaseERC20 is IGetCCIPAdmin, IERC165, ERC20, AccessControl, ITypeAndVers
   /// and can only be transferred by the owner.
   address internal s_ccipAdmin;
 
-  /// @dev the underscores in parameter names are used to suppress compiler warnings about shadowing ERC20 functions
-
   constructor(
     ConstructorParams memory args
   ) ERC20(args.name, args.symbol) {
     i_decimals = args.decimals;
     i_maxSupply = args.maxSupply;
 
-    address owner = args.additionalOwner == address(0) ? msg.sender : args.additionalOwner;
+    address ccipAdmin = args.ccipAdmin == address(0) ? msg.sender : args.ccipAdmin;
 
-    s_ccipAdmin = owner;
+    s_ccipAdmin = ccipAdmin;
 
     // Mint the initial supply to the new Owner, saving gas by not calling if the mint amount is zero.
-    if (args.preMint != 0) _mint(owner, args.preMint);
-
-    // Set up the owner as the initial minter and burner.
-    _grantRole(DEFAULT_ADMIN_ROLE, owner);
+    if (args.preMint != 0) _mint(ccipAdmin, args.preMint);
   }
 
   /// @inheritdoc IERC165
   function supportsInterface(
     bytes4 interfaceId
-  ) public pure virtual override(AccessControl, IERC165) returns (bool) {
-    return interfaceId == type(IERC20).interfaceId || interfaceId == type(IERC165).interfaceId
-      || interfaceId == type(IAccessControl).interfaceId || interfaceId == type(IGetCCIPAdmin).interfaceId;
+  ) public view virtual returns (bool) {
+    return interfaceId == type(IERC20).interfaceId || interfaceId == type(IGetCCIPAdmin).interfaceId;
   }
 
   // ================================================================
@@ -130,7 +119,11 @@ contract BaseERC20 is IGetCCIPAdmin, IERC165, ERC20, AccessControl, ITypeAndVers
   /// the role.
   function setCCIPAdmin(
     address newAdmin
-  ) external virtual onlyRole(DEFAULT_ADMIN_ROLE) {
+  ) external virtual {
+    if (msg.sender != s_ccipAdmin) {
+      revert(); // TODO
+    }
+
     address currentAdmin = s_ccipAdmin;
 
     s_ccipAdmin = newAdmin;
