@@ -29,5 +29,8 @@ func (c *Input) Validate() error {
 		c.TimelockAction != mcms_types.TimelockActionCancel {
 		return fmt.Errorf("invalid timelock action: %s", c.TimelockAction)
 	}
+	if c.ValidUntil <= 0 {
+		return fmt.Errorf("failed to validate MCMS input: ValidUntil must be a positive unix timestamp")
+	}
 	return nil
 }
