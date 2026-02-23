@@ -2,15 +2,16 @@
 pragma solidity ^0.8.24;
 
 import {BaseERC20} from "../tmp/BaseERC20.sol";
-import {BurnMintERC20} from "../tmp/BurnMintERC20.sol";
 import {TokenPool} from "./TokenPool.sol";
 
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
-contract CCTTokenPool is TokenPool, BurnMintERC20 {
+contract CCTTokenPool is TokenPool, BaseERC20 {
   function typeAndVersion() external pure virtual override returns (string memory) {
     return "CCTTokenPool 2.0.0-dev";
   }
+
+  error MaxSupplyExceeded(uint256 supplyAfterMint);
 
   constructor(
     BaseERC20.ConstructorParams memory tokenParams,
@@ -18,7 +19,7 @@ contract CCTTokenPool is TokenPool, BurnMintERC20 {
     address rmnProxy,
     address router
   )
-    BurnMintERC20(tokenParams)
+    BaseERC20(tokenParams)
     TokenPool(IERC20(address(this)), tokenParams.decimals, advancedPoolHooks, rmnProxy, router)
   {}
 
@@ -44,7 +45,7 @@ contract CCTTokenPool is TokenPool, BurnMintERC20 {
   /// @param interfaceId The interface identifier, as specified in ERC-165.
   function supportsInterface(
     bytes4 interfaceId
-  ) public pure virtual override(BurnMintERC20, TokenPool) returns (bool) {
-    return BurnMintERC20.supportsInterface(interfaceId) || TokenPool.supportsInterface(interfaceId);
+  ) public view virtual override(BaseERC20, TokenPool) returns (bool) {
+    return BaseERC20.supportsInterface(interfaceId) || TokenPool.supportsInterface(interfaceId);
   }
 }
