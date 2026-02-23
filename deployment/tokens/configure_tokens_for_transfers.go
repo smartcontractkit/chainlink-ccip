@@ -92,11 +92,11 @@ func processTokenConfigForChain(e deployment.Environment, cfg []TokenTransferCon
 			if err != nil {
 				return nil, nil, fmt.Errorf("failed to get chain family for remote chain selector %d: %w", remoteChainSelector, err)
 			}
-			adapter, ok := tokenRegistry.GetTokenAdapter(family, chainAdapterVersion)
+			remoteAdapter, ok := tokenRegistry.GetTokenAdapter(family, token.TokenPoolRef.Version)
 			if !ok {
-				return nil, nil, fmt.Errorf("no token adapter registered for chain family '%s' and chain adapter version '%s'", family, chainAdapterVersion)
+				return nil, nil, fmt.Errorf("no token adapter registered for chain family '%s' and token version '%s'", family, token.TokenPoolRef.Version)
 			}
-			remoteChains[remoteChainSelector], err = convertRemoteChainConfig(e, adapter, token.ChainSelector, remoteChainSelector, inCfg)
+			remoteChains[remoteChainSelector], err = convertRemoteChainConfig(e, token.ChainSelector, remoteAdapter, remoteChainSelector, inCfg)
 			if err != nil {
 				return nil, nil, fmt.Errorf("failed to process remote chain config for remote chain selector %d: %w", remoteChainSelector, err)
 			}
@@ -106,9 +106,9 @@ func processTokenConfigForChain(e deployment.Environment, cfg []TokenTransferCon
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to get chain family for chain selector %d: %w", token.ChainSelector, err)
 		}
-		adapter, ok := tokenRegistry.GetTokenAdapter(family, chainAdapterVersion)
+		adapter, ok := tokenRegistry.GetTokenAdapter(family, token.TokenPoolRef.Version)
 		if !ok {
-			return nil, nil, fmt.Errorf("no token adapter registered for chain family '%s' and chain adapter version '%s'", family, chainAdapterVersion)
+			return nil, nil, fmt.Errorf("no token adapter registered for chain family '%s' and token version '%s'", family, token.TokenPoolRef.Version)
 		}
 		configureTokenReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adapter.ConfigureTokenForTransfersSequence(), e.BlockChains, ConfigureTokenForTransfersInput{
 			ChainSelector:     token.ChainSelector,

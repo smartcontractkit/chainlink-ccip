@@ -16,6 +16,7 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
@@ -24,29 +25,35 @@ import (
 
 type cctpTest_MockReader struct{}
 
-func (m *cctpTest_MockReader) GetChainMetadata(_ deployment.Environment, _ uint64, input mcms.Input) (mcms_types.ChainMetadata, error) {
+func (m *cctpTest_MockReader) GetMCMSRef(e deployment.Environment, selector uint64, input mcms.Input) (datastore.AddressRef, error) {
+	return datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+		ChainSelector: selector,
+		Type:          datastore.ContractType("MCM"),
+		Version:       semver.MustParse("1.0.0"),
+	}, selector, datastore_utils.FullRef)
+}
+
+func (m *cctpTest_MockReader) GetChainMetadata(e deployment.Environment, selector uint64, input mcms.Input) (mcms_types.ChainMetadata, error) {
+	mcmsRef, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+		ChainSelector: selector,
+		Type:          datastore.ContractType("MCM"),
+		Version:       semver.MustParse("1.0.0"),
+	}, selector, datastore_utils.FullRef)
+	if err != nil {
+		return mcms_types.ChainMetadata{}, err
+	}
 	return mcms_types.ChainMetadata{
-		MCMAddress:      input.MCMSAddressRef.Address,
 		StartingOpCount: 10,
+		MCMAddress:      mcmsRef.Address,
 	}, nil
 }
 
-func (m *cctpTest_MockReader) GetTimelockRef(_ deployment.Environment, selector uint64, input mcms.Input) (datastore.AddressRef, error) {
-	return datastore.AddressRef{
+func (m *cctpTest_MockReader) GetTimelockRef(e deployment.Environment, selector uint64, input mcms.Input) (datastore.AddressRef, error) {
+	return datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 		ChainSelector: selector,
-		Address:       input.TimelockAddressRef.Address,
 		Type:          "Timelock",
 		Version:       semver.MustParse("1.0.0"),
-	}, nil
-}
-
-func (m *cctpTest_MockReader) GetMCMSRef(_ deployment.Environment, selector uint64, input mcms.Input) (datastore.AddressRef, error) {
-	return datastore.AddressRef{
-		ChainSelector: selector,
-		Address:       input.MCMSAddressRef.Address,
-		Type:          "MCM",
-		Version:       semver.MustParse("1.0.0"),
-	}, nil
+	}, selector, datastore_utils.FullRef)
 }
 
 type cctpTest_MockCCTPChain struct {
@@ -125,14 +132,6 @@ var cctpTest_BasicMCMSInput = mcms.Input{
 	ValidUntil:           3759765795,
 	TimelockDelay:        mcms_types.MustParseDuration("1h"),
 	TimelockAction:       mcms_types.TimelockActionSchedule,
-	MCMSAddressRef: datastore.AddressRef{
-		Type:    "MCM",
-		Version: semver.MustParse("1.0.0"),
-	},
-	TimelockAddressRef: datastore.AddressRef{
-		Type:    "Timelock",
-		Version: semver.MustParse("1.0.0"),
-	},
 }
 
 func TestDeployCCTPChains_Apply(t *testing.T) {
@@ -423,77 +422,6 @@ func TestDeployCCTPChains_VerifyPreconditions(t *testing.T) {
 					ValidUntil:           3759765795,
 					TimelockDelay:        mcms_types.MustParseDuration("1h"),
 					TimelockAction:       "InvalidAction", // Invalid action
-					MCMSAddressRef: datastore.AddressRef{
-						Type:    "MCM",
-						Version: semver.MustParse("1.0.0"),
-					},
-					TimelockAddressRef: datastore.AddressRef{
-						Type:    "Timelock",
-						Version: semver.MustParse("1.0.0"),
-					},
-				},
-			},
-			expectedError: "failed to validate MCMS input",
-		},
-		{
-			desc: "failure - empty MCMS address ref",
-			cfg: v1_7_0_changesets.DeployCCTPChainsConfig{
-				Chains: map[uint64]v1_7_0_changesets.CCTPChainConfig{
-					5009297550715157269: {},
-				},
-				MCMS: &mcms.Input{
-					OverridePreviousRoot: true,
-					ValidUntil:           3759765795,
-					TimelockDelay:        mcms_types.MustParseDuration("1h"),
-					TimelockAction:       mcms_types.TimelockActionSchedule,
-					MCMSAddressRef:       datastore.AddressRef{}, // Empty ref
-					TimelockAddressRef: datastore.AddressRef{
-						Type:    "Timelock",
-						Version: semver.MustParse("1.0.0"),
-					},
-				},
-			},
-			expectedError: "failed to validate MCMS input",
-		},
-		{
-			desc: "failure - empty timelock address ref",
-			cfg: v1_7_0_changesets.DeployCCTPChainsConfig{
-				Chains: map[uint64]v1_7_0_changesets.CCTPChainConfig{
-					5009297550715157269: {},
-				},
-				MCMS: &mcms.Input{
-					OverridePreviousRoot: true,
-					ValidUntil:           3759765795,
-					TimelockDelay:        mcms_types.MustParseDuration("1h"),
-					TimelockAction:       mcms_types.TimelockActionSchedule,
-					MCMSAddressRef: datastore.AddressRef{
-						Type:    "MCM",
-						Version: semver.MustParse("1.0.0"),
-					},
-					TimelockAddressRef: datastore.AddressRef{}, // Empty ref
-				},
-			},
-			expectedError: "failed to validate MCMS input",
-		},
-		{
-			desc: "failure - zero valid until timestamp",
-			cfg: v1_7_0_changesets.DeployCCTPChainsConfig{
-				Chains: map[uint64]v1_7_0_changesets.CCTPChainConfig{
-					5009297550715157269: {},
-				},
-				MCMS: &mcms.Input{
-					OverridePreviousRoot: true,
-					ValidUntil:           0, // Zero timestamp
-					TimelockDelay:        mcms_types.MustParseDuration("1h"),
-					TimelockAction:       mcms_types.TimelockActionSchedule,
-					MCMSAddressRef: datastore.AddressRef{
-						Type:    "MCM",
-						Version: semver.MustParse("1.0.0"),
-					},
-					TimelockAddressRef: datastore.AddressRef{
-						Type:    "Timelock",
-						Version: semver.MustParse("1.0.0"),
-					},
 				},
 			},
 			expectedError: "failed to validate MCMS input",
