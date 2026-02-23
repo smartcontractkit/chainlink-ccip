@@ -214,3 +214,58 @@ func ConvertMetadataToType[T any](metadata interface{}) (T, error) {
 
 	return zero, fmt.Errorf("metadata is neither the expected type nor map[string]interface{}")
 }
+
+// Takes in two refs and merges them, giving precedence to non-empty fields in the first ref.
+// Returns an error if the refs are contradictory (e.g. both have non-empty but different addresses).
+func MergeRefs(ref1, ref2 *datastore.AddressRef) (datastore.AddressRef, error) {
+	merged := datastore.AddressRef{}
+	if ref1 == nil && ref2 == nil {
+		return merged, fmt.Errorf("both refs cannot be nil")
+	} else if ref1 == nil {
+		return *ref2, nil
+	} else if ref2 == nil {
+		return *ref1, nil
+	}
+
+	if ref1.ChainSelector != 0 && ref2.ChainSelector != 0 && ref1.ChainSelector != ref2.ChainSelector {
+		return merged, fmt.Errorf("conflicting chain selectors: %d and %d", ref1.ChainSelector, ref2.ChainSelector)
+	} else if ref1.ChainSelector != 0 {
+		merged.ChainSelector = ref1.ChainSelector
+	} else {
+		merged.ChainSelector = ref2.ChainSelector
+	}
+
+	if ref1.Type != "" && ref2.Type != "" && ref1.Type != ref2.Type {
+		return merged, fmt.Errorf("conflicting types: %s and %s", ref1.Type, ref2.Type)
+	} else if ref1.Type != "" {
+		merged.Type = ref1.Type
+	} else {
+		merged.Type = ref2.Type
+	}
+
+	if ref1.Version != nil && ref2.Version != nil && !ref1.Version.Equal(ref2.Version) {
+		return merged, fmt.Errorf("conflicting versions: %s and %s", ref1.Version, ref2.Version)
+	} else if ref1.Version != nil {
+		merged.Version = ref1.Version
+	} else {
+		merged.Version = ref2.Version
+	}
+
+	if ref1.Qualifier != "" && ref2.Qualifier != "" && ref1.Qualifier != ref2.Qualifier {
+		return merged, fmt.Errorf("conflicting qualifiers: %s and %s", ref1.Qualifier, ref2.Qualifier)
+	} else if ref1.Qualifier != "" {
+		merged.Qualifier = ref1.Qualifier
+	} else {
+		merged.Qualifier = ref2.Qualifier
+	}
+
+	if ref1.Address != "" && ref2.Address != "" && ref1.Address != ref2.Address {
+		return merged, fmt.Errorf("conflicting addresses: %s and %s", ref1.Address, ref2.Address)
+	} else if ref1.Address != "" {
+		merged.Address = ref1.Address
+	} else {
+		merged.Address = ref2.Address
+	}
+
+	return merged, nil
+}

@@ -30,7 +30,6 @@ const LANES_OP_COUNT = 42
 
 func (m *lanesTest_MockReader) GetChainMetadata(_ deployment.Environment, _ uint64, input mcms.Input) (mcms_types.ChainMetadata, error) {
 	return mcms_types.ChainMetadata{
-		MCMAddress:      input.MCMSAddressRef.Address,
 		StartingOpCount: LANES_OP_COUNT,
 	}, nil
 }
@@ -38,7 +37,6 @@ func (m *lanesTest_MockReader) GetChainMetadata(_ deployment.Environment, _ uint
 func (m *lanesTest_MockReader) GetTimelockRef(_ deployment.Environment, selector uint64, input mcms.Input) (datastore.AddressRef, error) {
 	return datastore.AddressRef{
 		ChainSelector: selector,
-		Address:       input.TimelockAddressRef.Address,
 		Type:          "Timelock",
 		Version:       semver.MustParse("1.0.0"),
 	}, nil
@@ -47,7 +45,6 @@ func (m *lanesTest_MockReader) GetTimelockRef(_ deployment.Environment, selector
 func (m *lanesTest_MockReader) GetMCMSRef(_ deployment.Environment, selector uint64, input mcms.Input) (datastore.AddressRef, error) {
 	return datastore.AddressRef{
 		ChainSelector: selector,
-		Address:       input.MCMSAddressRef.Address,
 		Type:          "MCM",
 		Version:       semver.MustParse("1.0.0"),
 	}, nil
@@ -148,14 +145,6 @@ var lanesTest_BasicMCMSInput = mcms.Input{
 	ValidUntil:           3759765795,
 	TimelockDelay:        mcms_types.MustParseDuration("1h"),
 	TimelockAction:       mcms_types.TimelockActionSchedule,
-	MCMSAddressRef: datastore.AddressRef{
-		Type:    "MCM",
-		Version: semver.MustParse("1.0.0"),
-	},
-	TimelockAddressRef: datastore.AddressRef{
-		Type:    "Timelock",
-		Version: semver.MustParse("1.0.0"),
-	},
 }
 
 func makeBaseChainDataStore(t *testing.T, chains []uint64) *datastore.MemoryDataStore {
