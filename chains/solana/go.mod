@@ -2,7 +2,10 @@ module github.com/smartcontractkit/chainlink-ccip/chains/solana
 
 go 1.25.3
 
-replace github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings => ./gobindings
+replace (
+	github.com/gagliardetto/anchor-go => github.com/Unheilbar/anchor-go v1.0.3
+	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings => ./gobindings
+)
 
 require (
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.3.0
@@ -20,12 +23,12 @@ require (
 )
 
 require (
+	github.com/Unheilbar/anchor-go v1.0.3 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.2 // indirect
 	github.com/cloudevents/sdk-go/binding/format/protobuf/v2 v2.16.1 // indirect
 	github.com/cloudevents/sdk-go/v2 v2.16.1 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/gabriel-vasile/mimetype v1.4.8 // indirect
-	github.com/gagliardetto/anchor-go v1.0.0 // indirect
 	github.com/gagliardetto/treeout v0.1.4 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect

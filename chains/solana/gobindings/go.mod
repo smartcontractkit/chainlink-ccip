@@ -2,9 +2,11 @@ module github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings
 
 go 1.24.2
 
+replace github.com/gagliardetto/anchor-go => github.com/Unheilbar/anchor-go v1.0.3
+
 require (
+	github.com/Unheilbar/anchor-go v1.0.3
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
-	github.com/gagliardetto/anchor-go v1.0.0
 	github.com/gagliardetto/binary v0.8.0
 	github.com/gagliardetto/gofuzz v1.2.2
 	github.com/gagliardetto/solana-go v1.13.0
