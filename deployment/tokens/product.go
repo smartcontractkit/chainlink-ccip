@@ -71,6 +71,9 @@ type RemoteChainConfig[R any, CCV any] struct {
 	// Decimals of the token on the remote chain.
 	RemoteDecimals uint8
 	// InboundRateLimiterConfig specifies the desired rate limiter configuration for inbound traffic.
+	// DO NOT SET THIS VALUE WHEN PASSING IN INPUTS
+	// This value is derived from the configuration specified for outbound traffic to the remote chain,
+	// as the same limits should apply in both directions.
 	InboundRateLimiterConfig RateLimiterConfigFloatInput
 	// OutboundRateLimiterConfig specifies the desired rate limiter configuration for outbound traffic.
 	OutboundRateLimiterConfig RateLimiterConfigFloatInput
