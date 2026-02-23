@@ -78,7 +78,7 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
 
   string public constant typeAndVersion = "LombardVerifier 2.0.0-dev";
   /// @notice Version tag used in the verifier payload to indicate the version of this verifier.
-  bytes4 private constant VERSION_TAG_V1_7_0 = bytes4(keccak256("LombardVerifier 1.7.0"));
+  bytes4 private constant VERSION_TAG_V2_0_0 = bytes4(keccak256("LombardVerifier 2.0.0"));
   /// @notice The size of the version tag in bytes.
   uint256 private constant VERSION_TAG_SIZE = 4;
   /// @notice The size of a bytes32 in bytes.
@@ -209,7 +209,7 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
       recipient: Internal._leftPadBytesToBytes32(tokenTransfer.tokenReceiver),
       amount: tokenTransfer.amount,
       destinationCaller: path.allowedCaller,
-      optionalMessage: bytes.concat(VERSION_TAG_V1_7_0, messageId)
+      optionalMessage: bytes.concat(VERSION_TAG_V2_0_0, messageId)
     });
 
     // Return raw bytes instead of abi.encode for gas efficiency.
@@ -228,8 +228,8 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
     _onlyOffRamp(message.sourceChainSelector);
 
     bytes4 versionPrefix = bytes4(ccvData[:VERSION_TAG_SIZE]);
-    if (versionPrefix != VERSION_TAG_V1_7_0) {
-      revert InvalidCCVVersion(VERSION_TAG_V1_7_0, versionPrefix);
+    if (versionPrefix != VERSION_TAG_V2_0_0) {
+      revert InvalidCCVVersion(VERSION_TAG_V2_0_0, versionPrefix);
     }
 
     if (ccvData.length < PAYLOAD_START_INDEX) {
@@ -275,8 +275,8 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
       // Load messageId from bytes 4-36.
       returnedMessageId := mload(add(bridgedMessage, 0x24))
     }
-    if (version != VERSION_TAG_V1_7_0) {
-      revert InvalidCCVVersion(VERSION_TAG_V1_7_0, version);
+    if (version != VERSION_TAG_V2_0_0) {
+      revert InvalidCCVVersion(VERSION_TAG_V2_0_0, version);
     }
     if (returnedMessageId != messageId) {
       revert InvalidMessageId(messageId, returnedMessageId);
@@ -442,7 +442,7 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
 
   /// @notice Exposes the version tag.
   function versionTag() public pure override returns (bytes4) {
-    return VERSION_TAG_V1_7_0;
+    return VERSION_TAG_V2_0_0;
   }
 
   // ================================================================

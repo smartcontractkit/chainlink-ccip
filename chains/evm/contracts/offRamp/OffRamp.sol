@@ -475,7 +475,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       address localTokenAddress = address(bytes20(tokenTransfer[0].destTokenAddress));
 
       // If the pool returns does not specify any CCVs, we fall back to the default CCVs. These will be deduplicated
-      // in the ensureCCVQuorumIsReached function. This is to maintain the same pre-1.7.0 security level for pools
+      // in the ensureCCVQuorumIsReached function. This is to maintain the same pre-v2 security level for pools
       // that do not support the V2 interface.
       requiredPoolCCVs = _getCCVsFromPool(
         localTokenAddress, sourceChainSelector, tokenTransfer[0].amount, finality, tokenTransfer[0].extraData
