@@ -48,6 +48,60 @@ contract AdvancedPoolHooks_applyCCVConfigUpdates is AdvancedPoolHooksSetup {
 
     assertEq(storedInbound.length, inboundCCVs.length);
     assertEq(storedInbound[0], inboundCCVs[0]);
+
+    // Verify getAllCCVConfigs returns the single configured chain.
+    AdvancedPoolHooks.CCVConfigArg[] memory allConfigs = s_advancedPoolHooks.getAllCCVConfigs();
+    assertEq(allConfigs.length, 1);
+    assertEq(allConfigs[0].remoteChainSelector, DEST_CHAIN_SELECTOR);
+    assertEq(allConfigs[0].outboundCCVs.length, 1);
+    assertEq(allConfigs[0].outboundCCVs[0], s_ccv1);
+    assertEq(allConfigs[0].inboundCCVs.length, 1);
+    assertEq(allConfigs[0].inboundCCVs[0], s_ccv2);
+  }
+
+  function test_applyCCVConfigUpdates_getAllCCVConfigs_multipleChains() public {
+    uint64 chainA = 111;
+    uint64 chainB = 222;
+
+    address[] memory outA = new address[](1);
+    outA[0] = s_ccv1;
+    address[] memory inB = new address[](1);
+    inB[0] = s_ccv2;
+
+    AdvancedPoolHooks.CCVConfigArg[] memory configArgs = new AdvancedPoolHooks.CCVConfigArg[](2);
+    configArgs[0] = AdvancedPoolHooks.CCVConfigArg({
+      remoteChainSelector: chainA,
+      outboundCCVs: outA,
+      thresholdOutboundCCVs: new address[](0),
+      inboundCCVs: new address[](0),
+      thresholdInboundCCVs: new address[](0)
+    });
+    configArgs[1] = AdvancedPoolHooks.CCVConfigArg({
+      remoteChainSelector: chainB,
+      outboundCCVs: new address[](0),
+      thresholdOutboundCCVs: new address[](0),
+      inboundCCVs: inB,
+      thresholdInboundCCVs: new address[](0)
+    });
+    s_advancedPoolHooks.applyCCVConfigUpdates(configArgs);
+
+    AdvancedPoolHooks.CCVConfigArg[] memory allConfigs = s_advancedPoolHooks.getAllCCVConfigs();
+    assertEq(allConfigs.length, 2);
+
+    // Clear chainA by setting empty arrays — should remove from the set.
+    AdvancedPoolHooks.CCVConfigArg[] memory clearArgs = new AdvancedPoolHooks.CCVConfigArg[](1);
+    clearArgs[0] = AdvancedPoolHooks.CCVConfigArg({
+      remoteChainSelector: chainA,
+      outboundCCVs: new address[](0),
+      thresholdOutboundCCVs: new address[](0),
+      inboundCCVs: new address[](0),
+      thresholdInboundCCVs: new address[](0)
+    });
+    s_advancedPoolHooks.applyCCVConfigUpdates(clearArgs);
+
+    allConfigs = s_advancedPoolHooks.getAllCCVConfigs();
+    assertEq(allConfigs.length, 1);
+    assertEq(allConfigs[0].remoteChainSelector, chainB);
   }
 
   // Reverts
