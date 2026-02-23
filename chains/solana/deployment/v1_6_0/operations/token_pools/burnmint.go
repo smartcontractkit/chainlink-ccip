@@ -294,6 +294,27 @@ var UpsertRemoteChainConfigBurnMint = operations.NewOperation(
 				return sequences.OnChainOutput{}, err
 			}
 			ixns = append(ixns, appendIxn)
+			trplixn, err := burnmint_token_pool.NewSetChainRateLimitInstruction(
+				input.RemoteSelector,
+				input.TokenMint,
+				burnmint_token_pool.RateLimitConfig{
+					Enabled:  false,
+					Capacity: 0,
+					Rate:     0,
+				},
+				burnmint_token_pool.RateLimitConfig{
+					Enabled:  false,
+					Capacity: 0,
+					Rate:     0,
+				},
+				poolConfigPDA,
+				remoteChainConfigPDA,
+				authority,
+			).ValidateAndBuild()
+			if err != nil {
+				return sequences.OnChainOutput{}, err
+			}
+			ixns = append(ixns, trplixn)
 		}
 		if authority != chain.DeployerKey.PublicKey() {
 			b, err := utils.BuildMCMSBatchOperation(
@@ -323,28 +344,16 @@ var UpsertRateLimitsBurnMint = operations.NewOperation(
 	"Initializes the BurnMintTokenPool rate limits for a remote chain",
 	func(b operations.Bundle, chain cldf_solana.Chain, input RemoteChainConfig) (sequences.OnChainOutput, error) {
 		burnmint_token_pool.SetProgramID(input.TokenPool)
-		var inboundCapacity uint64 = 0
-		if input.InboundRateLimiterConfig.Capacity != nil {
-			inboundCapacity = input.InboundRateLimiterConfig.Capacity.Uint64()
-		}
-		var inboundRate uint64 = 0
-		if input.InboundRateLimiterConfig.Rate != nil {
-			inboundRate = input.InboundRateLimiterConfig.Rate.Uint64()
-		}
-		inbound := base_token_pool.RateLimitConfig{
+		inboundCapacity := input.InboundRateLimiterConfig.Capacity.Uint64()
+		inboundRate := input.InboundRateLimiterConfig.Rate.Uint64()
+		inbound := burnmint_token_pool.RateLimitConfig{
 			Enabled:  input.InboundRateLimiterConfig.IsEnabled,
 			Capacity: inboundCapacity,
 			Rate:     inboundRate,
 		}
-		var outboundCapacity uint64 = 0
-		if input.OutboundRateLimiterConfig.Capacity != nil {
-			outboundCapacity = input.OutboundRateLimiterConfig.Capacity.Uint64()
-		}
-		var outboundRate uint64 = 0
-		if input.OutboundRateLimiterConfig.Rate != nil {
-			outboundRate = input.OutboundRateLimiterConfig.Rate.Uint64()
-		}
-		outbound := base_token_pool.RateLimitConfig{
+		outboundCapacity := input.OutboundRateLimiterConfig.Capacity.Uint64()
+		outboundRate := input.OutboundRateLimiterConfig.Rate.Uint64()
+		outbound := burnmint_token_pool.RateLimitConfig{
 			Enabled:  input.OutboundRateLimiterConfig.IsEnabled,
 			Capacity: outboundCapacity,
 			Rate:     outboundRate,

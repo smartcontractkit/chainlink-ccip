@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/big"
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
@@ -244,15 +243,15 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 									Version:       semver.MustParse("1.0.0"),
 									ChainSelector: 15971525489660198786,
 								},
-								InboundRateLimiterConfig: tokens.RateLimiterConfig{
+								InboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{
 									IsEnabled: true,
-									Capacity:  big.NewInt(1000),
-									Rate:      big.NewInt(100),
+									Capacity:  1000,
+									Rate:      100,
 								},
-								OutboundRateLimiterConfig: tokens.RateLimiterConfig{
+								OutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{
 									IsEnabled: true,
-									Capacity:  big.NewInt(1000),
-									Rate:      big.NewInt(100),
+									Capacity:  1000,
+									Rate:      100,
 								},
 							},
 						},
@@ -289,15 +288,15 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 									Version:       semver.MustParse("1.0.0"),
 									ChainSelector: 15971525489660198786,
 								},
-								InboundRateLimiterConfig: tokens.RateLimiterConfig{
+								InboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{
 									IsEnabled: true,
-									Capacity:  big.NewInt(1000),
-									Rate:      big.NewInt(100),
+									Capacity:  1000,
+									Rate:      100,
 								},
-								OutboundRateLimiterConfig: tokens.RateLimiterConfig{
+								OutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{
 									IsEnabled: true,
-									Capacity:  big.NewInt(1000),
-									Rate:      big.NewInt(100),
+									Capacity:  1000,
+									Rate:      100,
 								},
 							},
 						},
@@ -437,8 +436,8 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 									Version:       semver.MustParse("1.0.0"),
 									ChainSelector: 15971525489660198786,
 								},
-								InboundRateLimiterConfig:  tokens.RateLimiterConfig{IsEnabled: false},
-								OutboundRateLimiterConfig: tokens.RateLimiterConfig{IsEnabled: false},
+								InboundRateLimiterConfig:  tokens.RateLimiterConfigFloatInput{IsEnabled: false},
+								OutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{IsEnabled: false},
 							},
 						},
 					},
@@ -483,8 +482,8 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 									Version:       semver.MustParse("1.0.0"),
 									ChainSelector: 15971525489660198786,
 								},
-								InboundRateLimiterConfig:  tokens.RateLimiterConfig{IsEnabled: false},
-								OutboundRateLimiterConfig: tokens.RateLimiterConfig{IsEnabled: false},
+								InboundRateLimiterConfig:  tokens.RateLimiterConfigFloatInput{IsEnabled: false},
+								OutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{IsEnabled: false},
 							},
 						},
 					},
@@ -521,8 +520,8 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 									Version:       semver.MustParse("1.0.0"),
 									ChainSelector: 15971525489660198786,
 								},
-								InboundRateLimiterConfig:  tokens.RateLimiterConfig{IsEnabled: false},
-								OutboundRateLimiterConfig: tokens.RateLimiterConfig{IsEnabled: false},
+								InboundRateLimiterConfig:  tokens.RateLimiterConfigFloatInput{IsEnabled: false},
+								OutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{IsEnabled: false},
 							},
 						},
 					},
@@ -563,8 +562,8 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 									Version:       semver.MustParse("1.0.0"),
 									ChainSelector: 15971525489660198786,
 								},
-								InboundRateLimiterConfig:  tokens.RateLimiterConfig{IsEnabled: false},
-								OutboundRateLimiterConfig: tokens.RateLimiterConfig{IsEnabled: false},
+								InboundRateLimiterConfig:  tokens.RateLimiterConfigFloatInput{IsEnabled: false},
+								OutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{IsEnabled: false},
 							},
 						},
 					},

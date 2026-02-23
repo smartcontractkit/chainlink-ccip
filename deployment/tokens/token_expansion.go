@@ -161,7 +161,7 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 		tokenPoolRegistry := GetTokenAdapterRegistry()
 		mcmsRegistry := changesets.GetRegistry()
 		allRemotes := make(map[uint64]RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef])
-		allTokenConfigs := make([]TokenTransferConfig, 0)
+		allTokenConfigs := make(map[uint64]TokenTransferConfig, 0)
 		for selector, input := range cfg.TokenExpansionInputPerChain {
 			tmpDatastore := datastore.NewMemoryDataStore()
 			family, err := chain_selectors.GetSelectorFamily(selector)
@@ -339,7 +339,7 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 					}
 				}
 				if len(input.TokenTransferConfig.RemoteChains) != 0 {
-					allTokenConfigs = append(allTokenConfigs, *input.TokenTransferConfig)
+					allTokenConfigs[selector] = *input.TokenTransferConfig
 				}
 			}
 		}

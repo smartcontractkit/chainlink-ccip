@@ -130,6 +130,18 @@ func (a *SolanaAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to upsert remote chain config for token pool: %w", err)
 				}
+				localDecimals, err := utils.GetTokenDecimals(chain, tokenMint)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to get token decimals for token on chain with selector %d: %w", chain.Selector, err)
+				}
+				obRL, ibRL := tokenapi.GenerateTPRLConfigs(
+					remoteChainConfig.OutboundRateLimiterConfig,
+					remoteChainConfig.InboundRateLimiterConfig,
+					localDecimals,
+					remoteChainConfig.RemoteDecimals,
+					chain.Family(),
+					common_utils.Version_1_6_0,
+				)
 				result.Addresses = append(result.Addresses, upsertOut.Output.Addresses...)
 				result.BatchOps = append(result.BatchOps, upsertOut.Output.BatchOps...)
 				rateLimitOut, err := operations.ExecuteOperation(b, tprl, chains.SolanaChains()[chain.Selector],
@@ -138,8 +150,8 @@ func (a *SolanaAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[
 						TokenMint:                 tokenMint,
 						TokenProgramID:            tokenProgramId,
 						RemoteSelector:            remoteChainSelector,
-						InboundRateLimiterConfig:  remoteChainConfig.InboundRateLimiterConfig,
-						OutboundRateLimiterConfig: remoteChainConfig.OutboundRateLimiterConfig,
+						InboundRateLimiterConfig:  ibRL,
+						OutboundRateLimiterConfig: obRL,
 					})
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to set rate limits for token pool: %w", err)

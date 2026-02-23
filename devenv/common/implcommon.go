@@ -582,7 +582,7 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 	mcmsRegistry.RegisterMCMSReader(chainsel.FamilySolana, &solseq.SolanaAdapter{})
 
 	// To simplify testing, we disable rate limiting on all token transfers.
-	disabledRL := tokensapi.RateLimiterConfig{Capacity: big.NewInt(0), Rate: big.NewInt(0), IsEnabled: false}
+	disabledRL := tokensapi.RateLimiterConfigFloatInput{Capacity: 0, Rate: 0, IsEnabled: false}
 
 	// This will only store the addresses deployed during this setup.
 	outputDS := datastore.NewMemoryDataStore()
