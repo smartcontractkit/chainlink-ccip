@@ -176,13 +176,16 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
     i_token = token;
     i_rmnProxy = rmnProxy;
 
-    try IERC20Metadata(address(token)).decimals() returns (uint8 actualTokenDecimals) {
-      if (localTokenDecimals != actualTokenDecimals) {
-        revert InvalidDecimalArgs(localTokenDecimals, actualTokenDecimals);
+    // In the case the token is not yet fully deployed, we skip this check.
+    if (address(token).code.length > 0) {
+      try IERC20Metadata(address(token)).decimals() returns (uint8 actualTokenDecimals) {
+        if (localTokenDecimals != actualTokenDecimals) {
+          revert InvalidDecimalArgs(localTokenDecimals, actualTokenDecimals);
+        }
+      } catch {
+        // The decimals function doesn't exist, which is possible since it's optional in the ERC20 spec. We skip the check and
+        // assume the supplied token decimals are correct.
       }
-    } catch {
-      // The decimals function doesn't exist, which is possible since it's optional in the ERC20 spec. We skip the check and
-      // assume the supplied token decimals are correct.
     }
     i_tokenDecimals = localTokenDecimals;
     s_advancedPoolHooks = IAdvancedPoolHooks(advancedPoolHooks);
