@@ -121,7 +121,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
     address token; // ────────────╯ Token address.
   }
 
-  string public constant override typeAndVersion = "FeeQuoter 2.0.0-dev";
+  string public constant override typeAndVersion = "FeeQuoter 2.0.0";
 
   /// @dev Maximum fee that can be charged for a message. This is a guard to prevent massively overcharging due to
   /// misconfiguration.
