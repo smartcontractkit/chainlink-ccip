@@ -10,7 +10,7 @@ contracts/target/*
 !contracts/target/types/
 !contracts/target/vendor/
 !contracts/target/vendor/*
-contracts/programs/*/target
+**/target
 contracts/.anchor
 # keypair used by anchor/anchor test
 contracts/id.json
