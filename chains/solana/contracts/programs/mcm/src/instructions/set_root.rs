@@ -1,7 +1,9 @@
 use anchor_lang::prelude::*;
+use anchor_lang::solana_program::keccak::Hash;
 
 use crate::config::MultisigConfig;
 use crate::constant::*;
+use crate::eip712;
 use crate::error::*;
 use crate::eth_utils::*;
 use crate::event::*;
@@ -15,17 +17,59 @@ pub fn set_root(
     metadata: RootMetadataInput,
     metadata_proof: Vec<[u8; 32]>,
 ) -> Result<()> {
+    let signed_hash = compute_eth_message_hash(&root, valid_until);
+    set_root_internal(
+        ctx,
+        root,
+        valid_until,
+        metadata,
+        metadata_proof,
+        signed_hash,
+    )
+}
+
+pub fn set_root_eip712(
+    ctx: Context<SetRoot>,
+    _multisig_id: [u8; MULTISIG_ID_PADDED],
+    root: [u8; 32],
+    valid_until: u32,
+    metadata: RootMetadataInput,
+    metadata_proof: Vec<[u8; 32]>,
+) -> Result<()> {
+    let signed_hash = eip712::compute_message_hash(
+        &root,
+        valid_until,
+        ctx.accounts.multisig_config.chain_id,
+        &crate::ID,
+    );
+    set_root_internal(
+        ctx,
+        root,
+        valid_until,
+        metadata,
+        metadata_proof,
+        signed_hash,
+    )
+}
+
+fn set_root_internal(
+    ctx: Context<SetRoot>,
+    root: [u8; 32],
+    valid_until: u32,
+    metadata: RootMetadataInput,
+    metadata_proof: Vec<[u8; 32]>,
+    signed_hash: Hash,
+) -> Result<()> {
     require!(
         !ctx.accounts.seen_signed_hashes.seen,
         McmError::SignedHashAlreadySeen
     );
 
-    // verify ECDSA signatures on (root, validUntil) and ensure that the root group is successful
+    // verify ECDSA signatures and ensure that the root group is successful
     verify_ecdsa_signatures(
         &ctx.accounts.root_signatures.signatures,
         &ctx.accounts.multisig_config,
-        &root,
-        valid_until,
+        &signed_hash,
     )?;
 
     require!(
@@ -112,10 +156,8 @@ pub fn set_root(
 fn verify_ecdsa_signatures(
     signatures: &Vec<Signature>,
     multisig_config: &MultisigConfig,
-    root: &[u8; 32],
-    valid_until: u32,
+    signed_hash: &Hash,
 ) -> Result<()> {
-    let signed_hash = compute_eth_message_hash(root, valid_until);
     let mut previous_addr: [u8; EVM_ADDRESS_BYTES] = [0; EVM_ADDRESS_BYTES];
     let mut group_vote_counts: [u8; NUM_GROUPS] = [0; NUM_GROUPS];
 

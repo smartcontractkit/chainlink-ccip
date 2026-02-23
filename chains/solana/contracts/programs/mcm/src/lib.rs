@@ -19,6 +19,8 @@ pub use state::*;
 mod eth_utils;
 use eth_utils::*;
 
+mod eip712;
+
 mod instructions;
 use instructions::*;
 
@@ -199,6 +201,37 @@ pub mod mcm {
         metadata_proof: Vec<[u8; 32]>,
     ) -> Result<()> {
         instructions::set_root(
+            ctx,
+            multisig_id,
+            root,
+            valid_until,
+            metadata,
+            metadata_proof,
+        )
+    }
+
+    /// Set a new Merkle root using EIP-712 signature verification.
+    ///
+    /// This is identical to `set_root` but verifies signatures using EIP-712 typed
+    /// structured data hashing instead of Ethereum Personal Sign format.
+    ///
+    /// # Parameters
+    ///
+    /// - `ctx`: The context containing required accounts (same as `set_root`).
+    /// - `multisig_id`: The multisig instance identifier.
+    /// - `root`: The new Merkle root to set.
+    /// - `valid_until`: timestamp until which the root remains valid.
+    /// - `metadata`: Structured input containing chain_id, multisig, and operation counters.
+    /// - `metadata_proof`: Merkle proof validating the metadata.
+    pub fn set_root_eip712(
+        ctx: Context<SetRoot>,
+        multisig_id: [u8; MULTISIG_ID_PADDED],
+        root: [u8; 32],
+        valid_until: u32,
+        metadata: RootMetadataInput,
+        metadata_proof: Vec<[u8; 32]>,
+    ) -> Result<()> {
+        instructions::set_root_eip712(
             ctx,
             multisig_id,
             root,
