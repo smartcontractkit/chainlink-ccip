@@ -6,6 +6,11 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/gagliardetto/solana-go"
+
+	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/fee_quoter"
 	offrampops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/offramp"
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/router"
@@ -13,9 +18,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	ccipapi "github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
-	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
-	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
 var ConfigureLaneLegAsSource = operations.NewSequence(
@@ -86,10 +88,10 @@ var ConfigureLaneLegAsDest = operations.NewSequence(
 
 		// Add DestChain to OffRamp
 		offRampOut, err := operations.ExecuteOperation(b, offrampops.ConnectChains, chains.SolanaChains()[input.Dest.Selector], offrampops.ConnectChainsParams{
-			RemoteChainSelector: input.Source.Selector,
-			OffRamp:             offRampAddress,
-			SourceOnRamp:        input.Source.OnRamp,
-			EnabledAsSource:     !input.IsDisabled,
+			RemoteChainSelector:       input.Source.Selector,
+			OffRamp:                   offRampAddress,
+			SourceOnRamp:              input.Source.OnRamp,
+			EnabledAsSource:           !input.IsDisabled,
 			IsRMNVerificationDisabled: !input.Source.RMNVerificationEnabled,
 		})
 		if err != nil {
@@ -131,7 +133,7 @@ func TranslateFQ(fqc lanes.FeeQuoterDestChainConfig) fee_quoter.DestChainConfig 
 		DefaultTxGasLimit:                 fqc.DefaultTxGasLimit,
 		GasMultiplierWeiPerEth:            fqc.GasMultiplierWeiPerEth,
 		GasPriceStalenessThreshold:        fqc.GasPriceStalenessThreshold,
-		NetworkFeeUsdcents:                fqc.NetworkFeeUSDCents,
+		NetworkFeeUsdcents:                uint32(fqc.NetworkFeeUSDCents),
 	}
 }
 
