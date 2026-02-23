@@ -957,10 +957,11 @@ func TestTokensAndTokenPools(t *testing.T) {
 			require.NoError(t, tarErr)
 			require.Equal(t, timelockSigner, tokenAdminRegistryAccountAfter.Administrator)
 
+			// token pool should be configured with the timelock as the owner, and the proposed owner should be cleared since the token expansion changeset should transfer ownership of the pool to the timelock
 			var tokenPoolStateAccountAfter burnmint_token_pool.State
 			stateErr := chain.GetAccountDataBorshInto(t.Context(), tokenPoolStatePDA, &tokenPoolStateAccountAfter)
 			require.NoError(t, stateErr)
-			require.Equal(t, chain.DeployerKey.PublicKey(), tokenPoolStateAccountAfter.Config.Owner)
+			require.Equal(t, timelockSigner, tokenPoolStateAccountAfter.Config.Owner)
 			require.Equal(t, tokenMint, tokenPoolStateAccountAfter.Config.Mint)
 			require.Equal(t, chain.DeployerKey.PublicKey(), tokenPoolStateAccountAfter.Config.RateLimitAdmin)
 		})

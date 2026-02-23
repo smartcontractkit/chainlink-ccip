@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"errors"
 	"fmt"
 	"math"
@@ -10,8 +11,10 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/aws/smithy-go/ptr"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/gagliardetto/solana-go"
 	"github.com/rs/zerolog"
 
@@ -41,7 +44,22 @@ import (
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-ccip/devenv/blockchainutils"
+	mcmstypes "github.com/smartcontractkit/mcms/types"
 )
+
+var (
+	// TestXXXMCMSSigner is a throwaway private key used for signing MCMS proposals.
+	// in tests.
+	TestXXXMCMSSigner *ecdsa.PrivateKey
+)
+
+func init() {
+	key, err := crypto.GenerateKey()
+	if err != nil {
+		panic(err)
+	}
+	TestXXXMCMSSigner = key
+}
 
 func DeployContractsForSelector(ctx context.Context, env *deployment.Environment, cls []*simple_node_set.Input, selector uint64, ccipHomeSelector uint64, crAddr string) (datastore.DataStore, error) {
 	l := zerolog.Ctx(ctx)
@@ -147,11 +165,71 @@ func DeployContractsForSelector(ctx context.Context, env *deployment.Environment
 			},
 		)
 	}
+	// so we can get the LINK address etc.
+	tmp := datastore.NewMemoryDataStore()
+	tmp.Merge(env.DataStore)
+	tmp.Merge(out.DataStore.Seal())
+	runningDS.Merge(out.DataStore.Seal())
 
-	env.DataStore = out.DataStore.Seal()
-	runningDS.Merge(env.DataStore)
+	// For EVM only, set the timelock admin
+	var timelockAdmin common.Address
+	chain1, ok := env.BlockChains.EVMChains()[selector]
+	if ok {
+		timelockAdmin = chain1.DeployerKey.From
+	}
+	qualifier := "CLLCCIP"
+	cs := deployops.DeployMCMS(dReg, nil)
+	fcs := deployops.FinalizeDeployMCMS(dReg, nil)
+	output, err := cs.Apply(*env, deployops.MCMSDeploymentConfig{
+		AdapterVersion: version,
+		Chains: map[uint64]deployops.MCMSDeploymentConfigPerChain{
+			selector: {
+				Canceller:        SingleGroupMCMS(),
+				Bypasser:         SingleGroupMCMS(),
+				Proposer:         SingleGroupMCMS(),
+				TimelockMinDelay: big.NewInt(0),
+				Qualifier:        ptr.String(qualifier),
+				TimelockAdmin:    timelockAdmin,
+			},
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("deploying MCMS: %w", err)
+	}
+	runningDS.Merge(output.DataStore.Seal())
+	tmp.Merge(output.DataStore.Seal())
+	env.DataStore = tmp.Seal()
+
+	finalizeOutput, err := fcs.Apply(*env, deployops.MCMSDeploymentConfig{
+		AdapterVersion: version,
+		Chains: map[uint64]deployops.MCMSDeploymentConfigPerChain{
+			selector: {
+				Canceller:        SingleGroupMCMS(),
+				Bypasser:         SingleGroupMCMS(),
+				Proposer:         SingleGroupMCMS(),
+				TimelockMinDelay: big.NewInt(0),
+				Qualifier:        ptr.String(qualifier),
+				TimelockAdmin:    timelockAdmin,
+			},
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("finalizing MCMS deployment: %w", err)
+	}
+	runningDS.Merge(finalizeOutput.DataStore.Seal())
 
 	return runningDS.Seal(), nil
+}
+
+func SingleGroupMCMS() mcmstypes.Config {
+	publicKey := TestXXXMCMSSigner.Public().(*ecdsa.PublicKey)
+	// Convert the public key to an Ethereum address
+	address := crypto.PubkeyToAddress(*publicKey)
+	c, err := mcmstypes.NewConfig(1, []common.Address{address}, []mcmstypes.Config{})
+	if err != nil {
+		panic(err)
+	}
+	return c
 }
 
 // getTokenPricesForChain returns the token prices for fee tokens on a chain.
