@@ -29,7 +29,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   using EnumerableSet for EnumerableSet.Bytes32Set;
 
   error ZeroChainSelectorNotAllowed();
-  error ExecutionError(bytes32 messageId, bytes err);
+  error NoStateProgressMade(bytes32 messageId, bytes err);
   error OptionalCCVQuorumNotReached(uint256 wanted, uint256 got);
   error SourceChainNotEnabled(uint64 sourceChainSelector);
   error CanOnlySelfCall();
@@ -237,6 +237,14 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     (bool success, bytes memory err) = _callWithGasBuffer(
       abi.encodeCall(this.executeSingleMessage, (message, messageId, ccvs, verifierResults, gasLimitOverride))
     );
+
+    if (!success && originalState == Internal.MessageExecutionState.FAILURE) {
+      // If the message already failed previously, we have made no additional progress. Therefore, we revert the
+      // transaction to clearly signal that the message execution has failed. This helps wallets/tools that rely on
+      // transaction reverts to detect failed message executions.
+      revert NoStateProgressMade(messageId, err);
+    }
+
     Internal.MessageExecutionState newState =
       success ? Internal.MessageExecutionState.SUCCESS : Internal.MessageExecutionState.FAILURE;
 
