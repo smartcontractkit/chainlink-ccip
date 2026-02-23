@@ -1072,21 +1072,23 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
         s_dynamicConfig.feeQuoter
       ).quoteGasForExec(destChainSelector, gasLimitSum, bytesOverheadSum, message.feeToken);
 
+    // Example:
+    // - feeTokenPrice = $15 = 15e18
+    // - percentMultiplier = 10 = 100%
+    // - usdFeeCents = $1.50 = 150
+    // - feeTokenAmount = 150 * 100 * 1e32 / 15e18 = 1e17 (0.1 tokens of the fee token)
+    // Normally we'd multiple by 1e36, but since usdFeeCents has 2 decimals and percentMultiplier has 2 decimals, we use
+    // 1e32 here.
+    uint256 feeMultiplier = percentMultiplier * 1e32 / feeTokenPrice;
     // Transform the USD based fees into fee token amounts & sum them. For the executor, if the executor isn't
     // NO_EXECUTION_ADDRESS we also add the execution cost.
     for (uint256 i = 0; i < receipts.length; ++i) {
-      // Example:
-      // - feeTokenPrice = $15 = 15e18
-      // - usdFeeCents = $1.50 = 150
-      // - feeTokenAmount = 150 * 1e34 / 15e18 = 1e17 (0.1 tokens of the fee token)
-      // Normally we'd multiple by 1e36, but since usdFeeCents has 2 decimals and bpsMultiplier has 2 decimals, we use
-      // 1e32 here.
-      receipts[i].feeTokenAmount *= percentMultiplier * 1e32 / feeTokenPrice;
+      receipts[i].feeTokenAmount *= feeMultiplier;
 
       if (i == executorIndex) {
         // Update the fee of the executor to include execution costs.
         if (extraArgs.executor != Client.NO_EXECUTION_ADDRESS) {
-          // Add execution cost to the executor's fee. Execution cost should not be multiplied by bpsMultiplier.
+          // Add execution cost to the executor's fee. Execution cost should not be multiplied by percentMultiplier.
           receipts[i].feeTokenAmount += execCostInUSDCents * 1e34 / feeTokenPrice;
         }
       }
