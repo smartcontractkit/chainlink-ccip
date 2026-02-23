@@ -32,6 +32,7 @@ type SetRampConfigInput struct {
 
 // RampConfigApplier applies imported config (static, dynamic, dest chain config) to onRamp and offRamp contracts.
 type RampConfigApplier interface {
+	DeriveConfigImporterVersions() []*semver.Version
 	SequenceSetRampConfig() *cldf_ops.Sequence[SetRampConfigInput, sequences.OnChainOutput, chain.BlockChains]
 }
 
