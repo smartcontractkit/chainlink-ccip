@@ -20,4 +20,8 @@ func init() {
 	laneMigratorRegistry := deploy.GetLaneMigratorRegistry()
 	laneMigratorRegistry.RegisterRampUpdater(chainsel.FamilyEVM, semver.MustParse("1.6.0"), &LaneMigrater{})
 	laneMigratorRegistry.RegisterRouterUpdater(chainsel.FamilyEVM, semver.MustParse("1.2.0"), &adapters1_2_0.RouterUpdater{})
+
+	rampConfigReg := deploy.GetRampConfigUpdaterRegistry()
+	rampConfigReg.RegisterConfigImporter(chainsel.FamilyEVM, semver.MustParse("1.6.0"), &ConfigImportAdapter{})
+	rampConfigReg.RegisterRampConfigApplier(chainsel.FamilyEVM, semver.MustParse("1.6.0"), RampConfigApplier{})
 }
