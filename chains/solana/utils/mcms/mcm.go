@@ -190,7 +190,7 @@ func GetPreloadSignersIxs(signerAddresses [][20]uint8, msigID [32]byte, multisig
 		cfgSignersPDA,
 		authority,
 		solana.SystemProgramID,
-	).ValidateAndBuild()
+	)
 	if isErr != nil {
 		return nil, isErr
 	}
@@ -207,7 +207,7 @@ func GetPreloadSignersIxs(signerAddresses [][20]uint8, msigID [32]byte, multisig
 		multisigCfgPDA,
 		cfgSignersPDA,
 		authority,
-	).ValidateAndBuild()
+	)
 	if fsErr != nil {
 		return nil, fsErr
 	}
@@ -230,7 +230,7 @@ func GetAppendSignersIxs(signerAddresses [][20]uint8, msigID [32]byte, multisigC
 			multisigCfgPDA,
 			cfgSignersPDA,
 			authority,
-		).ValidateAndBuild()
+		)
 		if appendErr != nil {
 			return nil, appendErr
 		}
@@ -254,7 +254,7 @@ func GetMcmPreloadSignaturesIxs(signatures []mcm.Signature, msigID [32]byte, roo
 		signaturesPDA,
 		authority,
 		solana.SystemProgramID,
-	).ValidateAndBuild()
+	)
 	if isErr != nil {
 		return nil, isErr
 	}
@@ -273,7 +273,7 @@ func GetMcmPreloadSignaturesIxs(signatures []mcm.Signature, msigID [32]byte, roo
 		validUntil,
 		signaturesPDA,
 		authority,
-	).ValidateAndBuild()
+	)
 	if fsErr != nil {
 		return nil, fsErr
 	}
@@ -299,7 +299,7 @@ func GetAppendSignaturesIxs(signatures []mcm.Signature, msigID [32]byte, root [3
 			signatures[i:end],
 			signaturesPDA,
 			authority,
-		).ValidateAndBuild()
+		)
 		if appendErr != nil {
 			return nil, appendErr
 		}

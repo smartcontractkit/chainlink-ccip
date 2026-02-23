@@ -7,7 +7,9 @@ package ccip_common
 var ()
 
 // Event discriminators
-var ()
+var (
+	Event_IdlBuildTypeExport = [8]byte{116, 138, 204, 211, 57, 158, 245, 116}
+)
 
 // Instruction discriminators
 var ()

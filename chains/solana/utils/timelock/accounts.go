@@ -35,22 +35,22 @@ func (r RoleAccounts) RandomPick() solana.PrivateKey {
 func TestRoleAccounts(numAccounts int) ([]RoleAccounts, RoleMap) {
 	roles := []RoleAccounts{
 		{
-			Role:             timelock.Proposer_Role,
+			Role:             timelock.Role_Proposer,
 			Accounts:         mustCreateRoleAccounts(numAccounts),
 			AccessController: mustPrivateKey(),
 		},
 		{
-			Role:             timelock.Executor_Role,
+			Role:             timelock.Role_Executor,
 			Accounts:         mustCreateRoleAccounts(numAccounts),
 			AccessController: mustPrivateKey(),
 		},
 		{
-			Role:             timelock.Canceller_Role,
+			Role:             timelock.Role_Canceller,
 			Accounts:         mustCreateRoleAccounts(numAccounts),
 			AccessController: mustPrivateKey(),
 		},
 		{
-			Role:             timelock.Bypasser_Role,
+			Role:             timelock.Role_Bypasser,
 			Accounts:         mustCreateRoleAccounts(numAccounts),
 			AccessController: mustPrivateKey(),
 		},

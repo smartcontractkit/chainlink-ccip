@@ -25,6 +25,7 @@ var (
 	Event_FeeTokenDisabled                         = [8]byte{34, 139, 66, 75, 30, 17, 45, 151}
 	Event_FeeTokenEnabled                          = [8]byte{106, 180, 145, 189, 113, 180, 21, 15}
 	Event_FeeTokenRemoved                          = [8]byte{40, 31, 230, 252, 183, 150, 147, 201}
+	Event_IdlBuildTypeExport                       = [8]byte{116, 138, 204, 211, 57, 158, 245, 116}
 	Event_OfframpAdded                             = [8]byte{158, 77, 52, 73, 113, 247, 76, 150}
 	Event_OfframpRemoved                           = [8]byte{231, 81, 202, 9, 89, 193, 154, 37}
 	Event_OwnershipTransferRequested               = [8]byte{79, 54, 99, 123, 57, 244, 134, 35}

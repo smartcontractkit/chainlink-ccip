@@ -20,8 +20,6 @@ import (
 )
 
 func TestMcmSetConfig(t *testing.T) {
-	mcm.SetProgramID(config.McmProgram)
-
 	ctx := t.Context()
 
 	admin, err := solana.NewRandomPrivateKey()
@@ -72,7 +70,7 @@ func TestMcmSetConfig(t *testing.T) {
 			programData.Address,
 			rootMetadataPDA,
 			expiringRootAndOpCountPDA,
-		).ValidateAndBuild()
+		)
 		require.NoError(t, err)
 		testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 
@@ -92,7 +90,7 @@ func TestMcmSetConfig(t *testing.T) {
 			anotherAdmin.PublicKey(),
 			multisigConfigPDA,
 			user.PublicKey(),
-		).ValidateAndBuild()
+		)
 		require.NoError(t, err)
 		result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + mcms.UnauthorizedMcmError.String()})
 		require.NotNil(t, result)
@@ -103,7 +101,7 @@ func TestMcmSetConfig(t *testing.T) {
 			anotherAdmin.PublicKey(),
 			multisigConfigPDA,
 			admin.PublicKey(),
-		).ValidateAndBuild()
+		)
 		require.NoError(t, err)
 		result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, admin, config.DefaultCommitment)
 		require.NotNil(t, result)
@@ -113,7 +111,7 @@ func TestMcmSetConfig(t *testing.T) {
 			testMsigID,
 			multisigConfigPDA,
 			user.PublicKey(),
-		).ValidateAndBuild()
+		)
 		require.NoError(t, err)
 		result = testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + mcms.UnauthorizedMcmError.String()})
 		require.NotNil(t, result)
@@ -124,7 +122,7 @@ func TestMcmSetConfig(t *testing.T) {
 			testMsigID,
 			multisigConfigPDA,
 			anotherAdmin.PublicKey(),
-		).ValidateAndBuild()
+		)
 		require.NoError(t, err)
 		result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, anotherAdmin, config.DefaultCommitment)
 		require.NotNil(t, result)
@@ -135,9 +133,9 @@ func TestMcmSetConfig(t *testing.T) {
 			anotherAdmin.PublicKey(),
 			multisigConfigPDA,
 			anotherAdmin.PublicKey(),
-		).ValidateAndBuild()
+		)
 		require.NoError(t, err)
-		result = testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, anotherAdmin, config.DefaultCommitment, []string{"Error Code: " + mcm.InvalidInputs_McmError.String()})
+		result = testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, anotherAdmin, config.DefaultCommitment, []string{"Error Code: " + mcms.InvalidInputsMcmError.String()})
 		require.NotNil(t, result)
 
 		// Validate proposed set to 0-address after accepting ownership
@@ -155,7 +153,7 @@ func TestMcmSetConfig(t *testing.T) {
 			admin.PublicKey(),
 			multisigConfigPDA,
 			anotherAdmin.PublicKey(),
-		).ValidateAndBuild()
+		)
 		require.NoError(t, err)
 		result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, anotherAdmin, config.DefaultCommitment)
 		require.NotNil(t, result)
@@ -164,7 +162,7 @@ func TestMcmSetConfig(t *testing.T) {
 			testMsigID,
 			multisigConfigPDA,
 			admin.PublicKey(),
-		).ValidateAndBuild()
+		)
 		require.NoError(t, err)
 		result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, admin, config.DefaultCommitment)
 		require.NotNil(t, result)
@@ -238,7 +236,7 @@ func TestMcmSetConfig(t *testing.T) {
 					expiringRootAndOpCountPDA,
 					user.PublicKey(), // unauthorized user
 					solana.SystemProgramID,
-				).ValidateAndBuild()
+				)
 				require.NoError(t, err)
 
 				result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, user, config.DefaultCommitment, []string{"Error Code: " + mcms.UnauthorizedMcmError.String()})
@@ -259,7 +257,7 @@ func TestMcmSetConfig(t *testing.T) {
 					expiringRootAndOpCountPDA,
 					admin.PublicKey(),
 					solana.SystemProgramID,
-				).ValidateAndBuild()
+				)
 
 				require.NoError(t, err)
 
@@ -343,7 +341,7 @@ func TestMcmSetConfig(t *testing.T) {
 				configSignersPDA,
 				admin.PublicKey(),
 				solana.SystemProgramID,
-			).ValidateAndBuild()
+			)
 
 			require.NoError(t, err)
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{initSignersIx}, admin, config.DefaultCommitment)
@@ -362,7 +360,7 @@ func TestMcmSetConfig(t *testing.T) {
 				multisigConfigPDA,
 				configSignersPDA,
 				admin.PublicKey(),
-			).ValidateAndBuild()
+			)
 			require.NoError(t, err)
 
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{clearIx}, admin, config.DefaultCommitment)
@@ -401,7 +399,7 @@ func TestMcmSetConfig(t *testing.T) {
 				expiringRootAndOpCountPDA,
 				admin.PublicKey(),
 				solana.SystemProgramID,
-			).ValidateAndBuild()
+			)
 
 			require.NoError(t, err)
 
@@ -461,48 +459,48 @@ func TestMcmSetConfig(t *testing.T) {
 			},
 			{
 				name:                "should not be able to call set_config without finalized config_signers",
-				errorMsg:            "Error Code: " + mcm.SignersNotFinalized_McmError.String(),
+				errorMsg:            "Error Code: " + mcms.SignersNotFinalizedMcmError.String(),
 				modifyConfig:        func(c *mcms.McmConfigArgs) {},
 				skipFinalizeSigners: true,
 			},
 			{
 				name:     "length of signer addresses and signer groups length should be equal",
-				errorMsg: "Error Code: " + mcm.MismatchedInputSignerVectorsLength_McmError.String(),
+				errorMsg: "Error Code: " + mcms.MismatchedInputSignerVectorsLengthMcmError.String(),
 				modifyConfig: func(c *mcms.McmConfigArgs) {
 					c.SignerGroups = append(c.SignerGroups, 1)
 				},
 			},
 			{
 				name:     "every group index in signer group should be less than NUM_GROUPS",
-				errorMsg: "Error Code: " + mcm.MismatchedInputGroupArraysLength_McmError.String(),
+				errorMsg: "Error Code: " + mcms.MismatchedInputGroupArraysLengthMcmError.String(),
 				modifyConfig: func(c *mcms.McmConfigArgs) {
 					(c.SignerGroups)[0] = 32
 				},
 			},
 			{
 				name:     "the parent of root has to be 0",
-				errorMsg: "Error Code: " + mcm.GroupTreeNotWellFormed_McmError.String(),
+				errorMsg: "Error Code: " + mcms.GroupTreeNotWellFormedMcmError.String(),
 				modifyConfig: func(c *mcms.McmConfigArgs) {
 					(c.GroupParents)[0] = 1
 				},
 			},
 			{
 				name:     "the parent group should be at a higher index than the child group",
-				errorMsg: "Error Code: " + mcm.GroupTreeNotWellFormed_McmError.String(),
+				errorMsg: "Error Code: " + mcms.GroupTreeNotWellFormedMcmError.String(),
 				modifyConfig: func(c *mcms.McmConfigArgs) {
 					(c.GroupParents)[1] = 2
 				},
 			},
 			{
 				name:     "disabled group(with 0 quorum) should not have a signer",
-				errorMsg: "Error Code: " + mcm.SignerInDisabledGroup_McmError.String(),
+				errorMsg: "Error Code: " + mcms.SignerInDisabledGroupMcmError.String(),
 				modifyConfig: func(c *mcms.McmConfigArgs) {
 					(c.GroupQuorums)[3] = 0 // set quorum of group 3 to 0, but we still have signers in group 3
 				},
 			},
 			{
 				name:     "the group quorum should be able to be met(i.e. have more signers than the quorum)",
-				errorMsg: "Error Code: " + mcm.OutOfBoundsGroupQuorum_McmError.String(),
+				errorMsg: "Error Code: " + mcms.OutOfBoundsGroupQuorumMcmError.String(),
 				modifyConfig: func(c *mcms.McmConfigArgs) {
 					(c.GroupQuorums)[3] = 3 // set quorum of group 3 to 3, but we have two signers in group 3
 				},
@@ -548,7 +546,7 @@ func TestMcmSetConfig(t *testing.T) {
 						programData.Address,
 						failRootMetadataPDA,
 						failExpiringRootAndOpCountPDA,
-					).ValidateAndBuild()
+					)
 					require.NoError(t, initIxErr)
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 				})
@@ -576,7 +574,7 @@ func TestMcmSetConfig(t *testing.T) {
 						failConfigSignersPDA,
 						admin.PublicKey(),
 						solana.SystemProgramID,
-					).ValidateAndBuild()
+					)
 
 					require.NoError(t, initSignersErr)
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{initSignersIx}, admin, config.DefaultCommitment)
@@ -593,7 +591,7 @@ func TestMcmSetConfig(t *testing.T) {
 							failMultisigConfigPDA,
 							failConfigSignersPDA,
 							admin.PublicKey(),
-						).ValidateAndBuild()
+						)
 						require.NoError(t, finSignersIxErr)
 
 						testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{finalizeSignersIx}, admin, config.DefaultCommitment)
@@ -626,7 +624,7 @@ func TestMcmSetConfig(t *testing.T) {
 					failExpiringRootAndOpCountPDA,
 					admin.PublicKey(),
 					solana.SystemProgramID,
-				).ValidateAndBuild()
+				)
 				require.NoError(t, err)
 
 				result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, rpc.CommitmentConfirmed, []string{tt.errorMsg})
@@ -659,7 +657,7 @@ func TestMcmSetConfig(t *testing.T) {
 		}{
 			{
 				name:     "should not be able to initialize config_signers with empty",
-				errorMsg: "Error Code: " + mcm.OutOfBoundsNumOfSigners_McmError.String(),
+				errorMsg: "Error Code: " + mcms.OutOfBoundsNumOfSignersMcmError.String(),
 				modifyConfig: func(c *mcms.McmConfigArgs) {
 					// empty cfg.SignerAddresses
 					c.SignerAddresses = make([][20]byte, 0)
@@ -668,7 +666,7 @@ func TestMcmSetConfig(t *testing.T) {
 			},
 			{
 				name:     "should not be able to initialize config_signers with more than MAX_NUM_SIGNERS",
-				errorMsg: "Error Code: " + mcm.OutOfBoundsNumOfSigners_McmError.String(),
+				errorMsg: "Error Code: " + mcms.OutOfBoundsNumOfSignersMcmError.String(),
 				modifyConfig: func(c *mcms.McmConfigArgs) {
 					// replace cfg.SignerAddresses with more than MAX_NUM_SIGNERS(200)
 					privateKeys, err := eth.GenerateEthPrivateKeys(201)
@@ -692,7 +690,7 @@ func TestMcmSetConfig(t *testing.T) {
 			},
 			{
 				name:     "should not be able to append unsorted signer",
-				errorMsg: "Error Code: " + mcm.SignersAddressesMustBeStrictlyIncreasing_McmError.String(),
+				errorMsg: "Error Code: " + mcms.SignersAddressesMustBeStrictlyIncreasingMcmError.String(),
 				modifyConfig: func(c *mcms.McmConfigArgs) {
 					slices.Reverse(c.SignerAddresses)
 				},
@@ -700,14 +698,14 @@ func TestMcmSetConfig(t *testing.T) {
 			},
 			{
 				name:               "should not be able to append more signers than specified in total_signers",
-				errorMsg:           "Error Code: " + mcm.OutOfBoundsNumOfSigners_McmError.String(),
+				errorMsg:           "Error Code: " + mcms.OutOfBoundsNumOfSignersMcmError.String(),
 				modifyConfig:       func(c *mcms.McmConfigArgs) {},
 				failureStage:       AppendStage,
 				totalSignersOffset: -2,
 			},
 			{
 				name:               "should not be able to finalize unmatched total signers",
-				errorMsg:           "Error Code: " + mcm.OutOfBoundsNumOfSigners_McmError.String(),
+				errorMsg:           "Error Code: " + mcms.OutOfBoundsNumOfSignersMcmError.String(),
 				modifyConfig:       func(c *mcms.McmConfigArgs) {},
 				failureStage:       FinalizeStage,
 				totalSignersOffset: 2,
@@ -753,7 +751,7 @@ func TestMcmSetConfig(t *testing.T) {
 						programData.Address,
 						failRootMetadataPDA,
 						failExpiringRootAndOpCountPDA,
-					).ValidateAndBuild()
+					)
 					require.NoError(t, initIxErr)
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 				})
@@ -785,7 +783,7 @@ func TestMcmSetConfig(t *testing.T) {
 						failConfigSignersPDA,
 						admin.PublicKey(),
 						solana.SystemProgramID,
-					).ValidateAndBuild()
+					)
 					txs = append(txs, TxWithStage{
 						Instructions: []solana.Instruction{initSignersIx},
 						Stage:        InitStage,
@@ -812,7 +810,7 @@ func TestMcmSetConfig(t *testing.T) {
 					failMultisigConfigPDA,
 					failConfigSignersPDA,
 					admin.PublicKey(),
-				).ValidateAndBuild()
+				)
 				txs = append(txs, TxWithStage{
 					Instructions: []solana.Instruction{finalizeIx},
 					Stage:        FinalizeStage,

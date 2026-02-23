@@ -1655,6 +1655,19 @@
       ]
     },
     {
+      "name": "IdlBuildTypeExport",
+      "discriminator": [
+        116,
+        138,
+        204,
+        211,
+        57,
+        158,
+        245,
+        116
+      ]
+    },
+    {
       "name": "OwnershipTransferRequested",
       "discriminator": [
         79,
@@ -2375,6 +2388,22 @@
       }
     },
     {
+      "name": "GenericExtraArgsV2",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "gas_limit",
+            "type": "u128"
+          },
+          {
+            "name": "allow_out_of_order_execution",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
       "name": "GetFeeResult",
       "type": {
         "kind": "struct",
@@ -2406,6 +2435,35 @@
             "type": {
               "defined": {
                 "name": "ProcessedExtraArgs"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "IdlBuildTypeExport",
+      "docs": [
+        "Event used only during IDL build to ensure GenericExtraArgsV2 and related types",
+        "are exported in the IDL for Go bindings generation.",
+        "This event is never emitted at runtime."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "generic_extra_args_v2",
+            "type": {
+              "defined": {
+                "name": "GenericExtraArgsV2"
+              }
+            }
+          },
+          {
+            "name": "svm_extra_args_v1",
+            "type": {
+              "defined": {
+                "name": "SVMExtraArgsV1"
               }
             }
           }
@@ -2568,6 +2626,46 @@
           {
             "name": "extra_args",
             "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SVMExtraArgsV1",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "compute_units",
+            "type": "u32"
+          },
+          {
+            "name": "account_is_writable_bitmap",
+            "type": "u64"
+          },
+          {
+            "name": "allow_out_of_order_execution",
+            "type": "bool"
+          },
+          {
+            "name": "token_receiver",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "accounts",
+            "type": {
+              "vec": {
+                "array": [
+                  "u8",
+                  32
+                ]
+              }
+            }
           }
         ]
       }

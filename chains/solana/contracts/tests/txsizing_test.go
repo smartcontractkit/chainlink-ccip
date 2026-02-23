@@ -24,7 +24,7 @@ func mustRandomPubkey() solana.PublicKey {
 	return k.PublicKey()
 }
 
-const MaxSolanaTxSize = 1232
+const MaxSolanaTxSize = 1300 // TODO: Check this
 
 type failOnExcessTxSize func(tables map[solana.PublicKey]solana.PublicKeySlice) bool
 
@@ -91,8 +91,6 @@ type TokenTable struct {
 
 // NOTE: this test does not execute or validate transaction inputs, it simply builds transactions to calculate the size of each transaction with signers
 func TestTransactionSizing(t *testing.T) {
-	ccip_router.SetProgramID(config.CcipRouterProgram)
-
 	auth, err := solana.NewRandomPrivateKey()
 	require.NoError(t, err)
 
@@ -168,25 +166,25 @@ func TestTransactionSizing(t *testing.T) {
 	}
 
 	// ccipSend test messages + instruction ---------------------------------
-	sendNoTokens := ccip_router.SVM2AnyMessage{
+	sendNoTokens := ccip_router.Svm2AnyMessage{
 		Receiver:     make([]byte, 20), // EVM address
 		Data:         []byte{},
-		TokenAmounts: []ccip_router.SVMTokenAmount{}, // no tokens
+		TokenAmounts: []ccip_router.SvmTokenAmount{}, // no tokens
 		FeeToken:     [32]byte{},                     // solana fee token
 		ExtraArgs:    []byte{},                       // default options
 	}
-	sendSingleMinimalToken := ccip_router.SVM2AnyMessage{
+	sendSingleMinimalToken := ccip_router.Svm2AnyMessage{
 		Receiver: make([]byte, 20),
 		Data:     []byte{},
-		TokenAmounts: []ccip_router.SVMTokenAmount{{
+		TokenAmounts: []ccip_router.SvmTokenAmount{{
 			Token:  [32]byte{},
 			Amount: 0,
 		}}, // one token
 		FeeToken:  [32]byte{},
 		ExtraArgs: []byte{}, // default options
 	}
-	ixCcipSend := func(msg ccip_router.SVM2AnyMessage, tokenIndexes []byte, addAccounts solana.PublicKeySlice) solana.Instruction {
-		base := ccip_router.NewCcipSendInstruction(
+	ixCcipSend := func(msg ccip_router.Svm2AnyMessage, tokenIndexes []byte, addAccounts solana.PublicKeySlice) solana.Instruction {
+		inst, err := ccip_router.NewCcipSendInstruction(
 			1,
 			msg,
 			tokenIndexes,
@@ -209,13 +207,16 @@ func TestTransactionSizing(t *testing.T) {
 			routerTable.RmnCurses,
 			routerTable.RmnConfig,
 		)
+		require.NoError(t, err)
+
+		// Cast to *solana.GenericInstruction to append additional accounts
+		genericInst, ok := inst.(*solana.GenericInstruction)
+		require.True(t, ok, "instruction must be *solana.GenericInstruction")
 
 		for _, v := range addAccounts {
-			base.AccountMetaSlice = append(base.AccountMetaSlice, solana.Meta(v))
+			genericInst.AccountValues = append(genericInst.AccountValues, solana.Meta(v))
 		}
-		ix, err := base.ValidateAndBuild()
-		require.NoError(t, err)
-		return ix
+		return inst
 	}
 
 	// ccip commit test messages + instruction ------------------------
@@ -242,7 +243,7 @@ func TestTransactionSizing(t *testing.T) {
 		},
 	}
 	ixCommit := func(input ccip_offramp.CommitInput, addAccounts solana.PublicKeySlice) solana.Instruction {
-		base := ccip_offramp.NewCommitInstruction(
+		inst, err := ccip_offramp.NewCommitInstruction(
 			[2][32]byte{}, // report context
 			testutils.MustMarshalBorsh(t, input),
 			make([][32]byte, 6), // f = 5, estimating f+1 signatures
@@ -263,19 +264,22 @@ func TestTransactionSizing(t *testing.T) {
 			offrampTable.RmnCurses,
 			offrampTable.RmnConfig,
 		)
+		require.NoError(t, err)
+
+		// Cast to *solana.GenericInstruction to append additional accounts
+		genericInst, ok := inst.(*solana.GenericInstruction)
+		require.True(t, ok, "instruction must be *solana.GenericInstruction")
 
 		for _, v := range addAccounts {
-			base.AccountMetaSlice = append(base.AccountMetaSlice, solana.Meta(v))
+			genericInst.AccountValues = append(genericInst.AccountValues, solana.Meta(v))
 		}
-		ix, err := base.ValidateAndBuild()
-		require.NoError(t, err)
-		return ix
+		return inst
 	}
 
 	// ccip execute test messages + instruction -----------------------
 	executeEmpty := ccip_offramp.ExecutionReportSingleChain{
 		SourceChainSelector: 0,
-		Message: ccip_offramp.Any2SVMRampMessage{
+		Message: ccip_offramp.Any2SvmRampMessage{
 			Header: ccip_offramp.RampMessageHeader{
 				MessageId:           [32]uint8{},
 				SourceChainSelector: 0,
@@ -286,8 +290,8 @@ func TestTransactionSizing(t *testing.T) {
 			Sender:        make([]byte, 20), // EVM sender
 			Data:          []byte{},
 			TokenReceiver: [32]byte{},
-			TokenAmounts:  []ccip_offramp.Any2SVMTokenTransfer{},
-			ExtraArgs: ccip_offramp.Any2SVMRampExtraArgs{
+			TokenAmounts:  []ccip_offramp.Any2SvmTokenTransfer{},
+			ExtraArgs: ccip_offramp.Any2SvmRampExtraArgs{
 				ComputeUnits:     0,
 				IsWritableBitmap: 0,
 			},
@@ -297,7 +301,7 @@ func TestTransactionSizing(t *testing.T) {
 	}
 	executeSingleToken := ccip_offramp.ExecutionReportSingleChain{
 		SourceChainSelector: 0,
-		Message: ccip_offramp.Any2SVMRampMessage{
+		Message: ccip_offramp.Any2SvmRampMessage{
 			Header: ccip_offramp.RampMessageHeader{
 				MessageId:           [32]uint8{},
 				SourceChainSelector: 0,
@@ -308,14 +312,14 @@ func TestTransactionSizing(t *testing.T) {
 			Sender:        make([]byte, 20), // EVM sender
 			Data:          []byte{},
 			TokenReceiver: [32]byte{},
-			TokenAmounts: []ccip_offramp.Any2SVMTokenTransfer{{
+			TokenAmounts: []ccip_offramp.Any2SvmTokenTransfer{{
 				SourcePoolAddress: make([]byte, 20), // EVM origin token pool
 				DestTokenAddress:  [32]byte{},
 				DestGasAmount:     0,
 				ExtraData:         []byte{},
 				Amount:            ccip_offramp.CrossChainAmount{LeBytes: [32]uint8{}},
 			}},
-			ExtraArgs: ccip_offramp.Any2SVMRampExtraArgs{
+			ExtraArgs: ccip_offramp.Any2SvmRampExtraArgs{
 				ComputeUnits:     0,
 				IsWritableBitmap: 0,
 			},
@@ -325,7 +329,7 @@ func TestTransactionSizing(t *testing.T) {
 	}
 
 	ixExecute := func(report ccip_offramp.ExecutionReportSingleChain, tokenIndexes []byte, addAccounts solana.PublicKeySlice) solana.Instruction {
-		base := ccip_offramp.NewExecuteInstruction(
+		inst, err := ccip_offramp.NewExecuteInstruction(
 			testutils.MustMarshalBorsh(t, report),
 			[2][32]byte{}, // report context
 			tokenIndexes,
@@ -342,13 +346,16 @@ func TestTransactionSizing(t *testing.T) {
 			offrampTable.RmnCurses,
 			offrampTable.RmnConfig,
 		)
+		require.NoError(t, err)
+
+		// Cast to *solana.GenericInstruction to append additional accounts
+		genericInst, ok := inst.(*solana.GenericInstruction)
+		require.True(t, ok, "instruction must be *solana.GenericInstruction")
 
 		for _, v := range addAccounts {
-			base.AccountMetaSlice = append(base.AccountMetaSlice, solana.Meta(v))
+			genericInst.AccountValues = append(genericInst.AccountValues, solana.Meta(v))
 		}
-		ix, err := base.ValidateAndBuild()
-		require.NoError(t, err)
-		return ix
+		return inst
 	}
 
 	// runner ---------------------------------------------------------

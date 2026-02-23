@@ -23,8 +23,8 @@ import (
 func TestTimelockBypasserExecute(t *testing.T) {
 	ctx := t.Context()
 
-	timelock.SetProgramID(config.TimelockProgram)
-	access_controller.SetProgramID(config.AccessControllerProgram)
+	timelock.ProgramID = config.TimelockProgram
+	access_controller.ProgramID = config.AccessControllerProgram
 
 	admin, err := solana.NewRandomPrivateKey()
 	require.NoError(t, err)
@@ -101,11 +101,11 @@ func TestTimelockBypasserExecute(t *testing.T) {
 			config.TimelockProgram,
 			programData.Address,
 			config.AccessControllerProgram,
-			roleMap[timelock.Proposer_Role].AccessController.PublicKey(),
-			roleMap[timelock.Executor_Role].AccessController.PublicKey(),
-			roleMap[timelock.Canceller_Role].AccessController.PublicKey(),
-			roleMap[timelock.Bypasser_Role].AccessController.PublicKey(),
-		).ValidateAndBuild()
+			roleMap[timelock.Role_Proposer].AccessController.PublicKey(),
+			roleMap[timelock.Role_Executor].AccessController.PublicKey(),
+			roleMap[timelock.Role_Canceller].AccessController.PublicKey(),
+			roleMap[timelock.Role_Bypasser].AccessController.PublicKey(),
+		)
 		require.NoError(t, initErr)
 
 		testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{initTimelockIx}, admin, config.DefaultCommitment)
@@ -118,10 +118,10 @@ func TestTimelockBypasserExecute(t *testing.T) {
 
 		require.Equal(t, admin.PublicKey(), configAccount.Owner, "Owner doesn't match")
 		require.Equal(t, config.MinDelay, configAccount.MinDelay, "MinDelay doesn't match")
-		require.Equal(t, roleMap[timelock.Proposer_Role].AccessController.PublicKey(), configAccount.ProposerRoleAccessController, "ProposerRoleAccessController doesn't match")
-		require.Equal(t, roleMap[timelock.Executor_Role].AccessController.PublicKey(), configAccount.ExecutorRoleAccessController, "ExecutorRoleAccessController doesn't match")
-		require.Equal(t, roleMap[timelock.Canceller_Role].AccessController.PublicKey(), configAccount.CancellerRoleAccessController, "CancellerRoleAccessController doesn't match")
-		require.Equal(t, roleMap[timelock.Bypasser_Role].AccessController.PublicKey(), configAccount.BypasserRoleAccessController, "BypasserRoleAccessController doesn't match")
+		require.Equal(t, roleMap[timelock.Role_Proposer].AccessController.PublicKey(), configAccount.ProposerRoleAccessController, "ProposerRoleAccessController doesn't match")
+		require.Equal(t, roleMap[timelock.Role_Executor].AccessController.PublicKey(), configAccount.ExecutorRoleAccessController, "ExecutorRoleAccessController doesn't match")
+		require.Equal(t, roleMap[timelock.Role_Canceller].AccessController.PublicKey(), configAccount.CancellerRoleAccessController, "CancellerRoleAccessController doesn't match")
+		require.Equal(t, roleMap[timelock.Role_Bypasser].AccessController.PublicKey(), configAccount.BypasserRoleAccessController, "BypasserRoleAccessController doesn't match")
 	})
 
 	t.Run("setup:register access list & verify", func(t *testing.T) {
@@ -241,8 +241,8 @@ func TestTimelockBypasserExecute(t *testing.T) {
 
 			id := op.OperationID()
 			operationPDA := op.OperationPDA()
-			signer := roleMap[timelock.Bypasser_Role].RandomPick()
-			ac := roleMap[timelock.Bypasser_Role].AccessController
+			signer := roleMap[timelock.Role_Bypasser].RandomPick()
+			ac := roleMap[timelock.Role_Bypasser].AccessController
 
 			ixs, err := timelockutil.GetPreloadBypasserOperationIxs(config.TestTimelockID, op, signer.PublicKey(), ac.PublicKey())
 			require.NoError(t, err)
@@ -257,13 +257,13 @@ func TestTimelockBypasserExecute(t *testing.T) {
 			}
 
 			require.Equal(t,
-				timelock.Finalized_OperationState,
+				timelock.OperationState_Finalized,
 				opAccount.State,
 				"operation is not finalized",
 			)
 
 			t.Run("success: bypass_execute_batch", func(t *testing.T) {
-				ix := timelock.NewBypasserExecuteBatchInstruction(
+				ix, err := timelock.NewBypasserExecuteBatchInstruction(
 					config.TestTimelockID,
 					id,
 					operationPDA,
@@ -272,12 +272,12 @@ func TestTimelockBypasserExecute(t *testing.T) {
 					ac.PublicKey(),
 					signer.PublicKey(),
 				)
-				ix.AccountMetaSlice = append(ix.AccountMetaSlice, op.RemainingAccounts()...)
-
-				vIx, err := ix.ValidateAndBuild()
 				require.NoError(t, err)
+				genericIx, ok := ix.(*solana.GenericInstruction)
+				require.True(t, ok)
+				genericIx.AccountValues = append(genericIx.AccountValues, op.RemainingAccounts()...)
 
-				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{vIx}, signer, config.DefaultCommitment)
+				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, signer, config.DefaultCommitment)
 				require.NotNil(t, tx)
 
 				parsedLogs := common.ParseLogMessages(tx.Meta.LogMessages,

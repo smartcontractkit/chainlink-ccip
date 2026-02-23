@@ -27,7 +27,7 @@ func TestMessageHashing(t *testing.T) {
 
 	t.Run("AnyToSVM", func(t *testing.T) {
 		t.Parallel()
-		h, err := HashAnyToSVMMessage(ccip_offramp.Any2SVMRampMessage{
+		h, err := HashAnyToSVMMessage(ccip_offramp.Any2SvmRampMessage{
 			Sender:        sender,
 			TokenReceiver: solana.MustPublicKeyFromBase58("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTb"),
 			Data:          []byte{4, 5, 6},
@@ -38,11 +38,11 @@ func TestMessageHashing(t *testing.T) {
 				SequenceNumber:      89,
 				Nonce:               90,
 			},
-			ExtraArgs: ccip_offramp.Any2SVMRampExtraArgs{
+			ExtraArgs: ccip_offramp.Any2SvmRampExtraArgs{
 				ComputeUnits:     1000,
 				IsWritableBitmap: GenerateBitMapForIndexes([]int{0}),
 			},
-			TokenAmounts: []ccip_offramp.Any2SVMTokenTransfer{
+			TokenAmounts: []ccip_offramp.Any2SvmTokenTransfer{
 				{
 					SourcePoolAddress: []byte{0, 1, 2, 3},
 					DestTokenAddress:  solana.MustPublicKeyFromBase58("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTc"),
@@ -71,7 +71,7 @@ func TestMessageHashing(t *testing.T) {
 		}, GenericExtraArgsV2Tag)
 		require.NoError(t, err)
 
-		h, err := HashSVMToAnyMessage(ccip_router.SVM2AnyRampMessage{
+		h, err := HashSVMToAnyMessage(ccip_router.Svm2AnyRampMessage{
 			Header: ccip_router.RampMessageHeader{
 				MessageId:           [32]uint8{},
 				SourceChainSelector: 10,
@@ -86,7 +86,7 @@ func TestMessageHashing(t *testing.T) {
 			FeeToken:       solana.MustPublicKeyFromBase58("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTb"),
 			FeeTokenAmount: ccip_router.CrossChainAmount{LeBytes: tokens.ToLittleEndianU256(50)},
 			FeeValueJuels:  ccip_router.CrossChainAmount{LeBytes: tokens.ToLittleEndianU256(500)},
-			TokenAmounts: []ccip_router.SVM2AnyTokenTransfer{
+			TokenAmounts: []ccip_router.Svm2AnyTokenTransfer{
 				{
 					SourcePoolAddress: solana.MustPublicKeyFromBase58("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTc"),
 					DestTokenAddress:  []byte{0, 1, 2, 3},

@@ -76,7 +76,7 @@ func GetInitAccessControllersIxs(ctx context.Context, roleAcAccount solana.Publi
 	initIx, err := access_controller.NewInitializeInstruction(
 		roleAcAccount,
 		authority.PublicKey(),
-	).ValidateAndBuild()
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create initialize instruction: %w", err)
 	}
@@ -96,7 +96,7 @@ func GetBatchAddAccessIxs(ctx context.Context, timelockID [32]byte, roleAcAccoun
 	for i := 0; i < len(addresses); i += chunkSize {
 		end := min(i+chunkSize, len(addresses))
 		chunk := addresses[i:end]
-		ix := timelock.NewBatchAddAccessInstruction(
+		ix, err := timelock.NewBatchAddAccessInstruction(
 			timelockID,
 			role,
 			GetConfigPDA(timelockID),
@@ -104,14 +104,17 @@ func GetBatchAddAccessIxs(ctx context.Context, timelockID [32]byte, roleAcAccoun
 			roleAcAccount,
 			authority.PublicKey(),
 		)
-		for _, address := range chunk {
-			ix.Append(solana.Meta(address))
-		}
-		vIx, err := ix.ValidateAndBuild()
 		if err != nil {
-			return nil, fmt.Errorf("failed to build instruction for role %v: %w", role, err)
+			return nil, fmt.Errorf("failed to create instruction for role %v: %w", role, err)
 		}
-		ixs = append(ixs, vIx)
+		genericIx, ok := ix.(*solana.GenericInstruction)
+		if !ok {
+			return nil, fmt.Errorf("instruction is not *solana.GenericInstruction")
+		}
+		for _, address := range chunk {
+			genericIx.AccountValues = append(genericIx.AccountValues, solana.Meta(address))
+		}
+		ixs = append(ixs, genericIx)
 	}
 	return ixs, nil
 }
@@ -130,7 +133,7 @@ func GetPreloadOperationIxs(timelockID [32]byte, op Operation, authority solana.
 		proposerAc,
 		authority,
 		solana.SystemProgramID,
-	).ValidateAndBuild()
+	)
 	if ioErr != nil {
 		return nil, fmt.Errorf("failed to build initialize operation instruction: %w", ioErr)
 	}
@@ -148,7 +151,7 @@ func GetPreloadOperationIxs(timelockID [32]byte, op Operation, authority solana.
 			proposerAc,
 			authority,
 			solana.SystemProgramID,
-		).ValidateAndBuild()
+		)
 		if err != nil {
 			return nil, fmt.Errorf("failed building InitializeInstruction (ixIndex=%d): %w", ixIndex, err)
 		}
@@ -172,7 +175,7 @@ func GetPreloadOperationIxs(timelockID [32]byte, op Operation, authority solana.
 				proposerAc,
 				authority,
 				solana.SystemProgramID,
-			).ValidateAndBuild()
+			)
 			if err != nil {
 				return nil, fmt.Errorf("failed building AppendInstructionData (ixIndex=%d): %w", ixIndex, err)
 			}
@@ -189,7 +192,7 @@ func GetPreloadOperationIxs(timelockID [32]byte, op Operation, authority solana.
 		GetConfigPDA(timelockID),
 		proposerAc,
 		authority,
-	).ValidateAndBuild()
+	)
 	if foErr != nil {
 		return nil, fmt.Errorf("failed to build finalize operation instruction: %w", foErr)
 	}
@@ -211,7 +214,7 @@ func GetPreloadBypasserOperationIxs(timelockID [32]byte, op Operation, authority
 		bypasserAc,
 		authority,
 		solana.SystemProgramID,
-	).ValidateAndBuild()
+	)
 	if ioErr != nil {
 		return nil, fmt.Errorf("failed to build initialize operation instruction: %w", ioErr)
 	}
@@ -229,7 +232,7 @@ func GetPreloadBypasserOperationIxs(timelockID [32]byte, op Operation, authority
 			bypasserAc,
 			authority,
 			solana.SystemProgramID,
-		).ValidateAndBuild()
+		)
 		if err != nil {
 			return nil, fmt.Errorf("failed building InitializeInstruction (ixIndex=%d): %w", ixIndex, err)
 		}
@@ -253,7 +256,7 @@ func GetPreloadBypasserOperationIxs(timelockID [32]byte, op Operation, authority
 				bypasserAc,
 				authority,
 				solana.SystemProgramID,
-			).ValidateAndBuild()
+			)
 			if err != nil {
 				return nil, fmt.Errorf("failed building AppendInstructionData (ixIndex=%d): %w", ixIndex, err)
 			}
@@ -270,7 +273,7 @@ func GetPreloadBypasserOperationIxs(timelockID [32]byte, op Operation, authority
 		GetConfigPDA(timelockID),
 		bypasserAc,
 		authority,
-	).ValidateAndBuild()
+	)
 	if foErr != nil {
 		return nil, fmt.Errorf("failed to build finalize operation instruction: %w", foErr)
 	}
@@ -355,7 +358,7 @@ func WaitForOperationToBeReady(ctx context.Context, client *rpc.Client, opPDA so
 		return fmt.Errorf("failed to get account info: %w", err)
 	}
 
-	if opAccount.State == timelock.Done_OperationState {
+	if opAccount.State == timelock.OperationState_Done {
 		// skip waiting if operation is already done
 		return nil
 	}

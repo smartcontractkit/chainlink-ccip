@@ -23,8 +23,8 @@ import (
 func TestTimelockRBAC(t *testing.T) {
 	ctx := t.Context()
 
-	timelock.SetProgramID(config.TimelockProgram)
-	access_controller.SetProgramID(config.AccessControllerProgram)
+	//timelock.SetProgramID(config.TimelockProgram)
+	//access_controller.SetProgramID(config.AccessControllerProgram)
 
 	admin, err := solana.NewRandomPrivateKey()
 	require.NoError(t, err)
@@ -86,11 +86,11 @@ func TestTimelockRBAC(t *testing.T) {
 			config.TimelockProgram,
 			programData.Address,
 			config.AccessControllerProgram,
-			roleMap[timelock.Proposer_Role].AccessController.PublicKey(),
-			roleMap[timelock.Executor_Role].AccessController.PublicKey(),
-			roleMap[timelock.Canceller_Role].AccessController.PublicKey(),
-			roleMap[timelock.Bypasser_Role].AccessController.PublicKey(),
-		).ValidateAndBuild()
+			roleMap[timelock.Role_Proposer].AccessController.PublicKey(),
+			roleMap[timelock.Role_Executor].AccessController.PublicKey(),
+			roleMap[timelock.Role_Canceller].AccessController.PublicKey(),
+			roleMap[timelock.Role_Bypasser].AccessController.PublicKey(),
+		)
 		require.NoError(t, ierr)
 
 		result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{initTimelockIx}, anotherAdmin, config.DefaultCommitment, []string{"Error Code: " + timelockutil.UnauthorizedError.String()})
@@ -120,11 +120,11 @@ func TestTimelockRBAC(t *testing.T) {
 			config.TimelockProgram,
 			programData.Address,
 			config.AccessControllerProgram,
-			roleMap[timelock.Proposer_Role].AccessController.PublicKey(),
-			roleMap[timelock.Executor_Role].AccessController.PublicKey(),
-			roleMap[timelock.Canceller_Role].AccessController.PublicKey(),
-			roleMap[timelock.Bypasser_Role].AccessController.PublicKey(),
-		).ValidateAndBuild()
+			roleMap[timelock.Role_Proposer].AccessController.PublicKey(),
+			roleMap[timelock.Role_Executor].AccessController.PublicKey(),
+			roleMap[timelock.Role_Canceller].AccessController.PublicKey(),
+			roleMap[timelock.Role_Bypasser].AccessController.PublicKey(),
+		)
 		require.NoError(t, ierr)
 
 		testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{initTimelockIx}, admin, config.DefaultCommitment)
@@ -137,10 +137,10 @@ func TestTimelockRBAC(t *testing.T) {
 
 		require.Equal(t, admin.PublicKey(), configAccount.Owner, "Owner doesn't match")
 		require.Equal(t, config.MinDelay, configAccount.MinDelay, "MinDelay doesn't match")
-		require.Equal(t, roleMap[timelock.Proposer_Role].AccessController.PublicKey(), configAccount.ProposerRoleAccessController, "ProposerRoleAccessController doesn't match")
-		require.Equal(t, roleMap[timelock.Executor_Role].AccessController.PublicKey(), configAccount.ExecutorRoleAccessController, "ExecutorRoleAccessController doesn't match")
-		require.Equal(t, roleMap[timelock.Canceller_Role].AccessController.PublicKey(), configAccount.CancellerRoleAccessController, "CancellerRoleAccessController doesn't match")
-		require.Equal(t, roleMap[timelock.Bypasser_Role].AccessController.PublicKey(), configAccount.BypasserRoleAccessController, "BypasserRoleAccessController doesn't match")
+		require.Equal(t, roleMap[timelock.Role_Proposer].AccessController.PublicKey(), configAccount.ProposerRoleAccessController, "ProposerRoleAccessController doesn't match")
+		require.Equal(t, roleMap[timelock.Role_Executor].AccessController.PublicKey(), configAccount.ExecutorRoleAccessController, "ExecutorRoleAccessController doesn't match")
+		require.Equal(t, roleMap[timelock.Role_Canceller].AccessController.PublicKey(), configAccount.CancellerRoleAccessController, "CancellerRoleAccessController doesn't match")
+		require.Equal(t, roleMap[timelock.Role_Bypasser].AccessController.PublicKey(), configAccount.BypasserRoleAccessController, "BypasserRoleAccessController doesn't match")
 	})
 
 	t.Run("timelock:ownership", func(t *testing.T) {
@@ -150,7 +150,7 @@ func TestTimelockRBAC(t *testing.T) {
 				anotherAdmin.PublicKey(),
 				timelockutil.GetConfigPDA(config.TestTimelockID),
 				user.PublicKey(),
-			).ValidateAndBuild()
+			)
 			require.NoError(t, ierr)
 			result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + timelockutil.UnauthorizedError.String()})
 			require.NotNil(t, result)
@@ -162,9 +162,9 @@ func TestTimelockRBAC(t *testing.T) {
 				admin.PublicKey(),
 				timelockutil.GetConfigPDA(config.TestTimelockID),
 				admin.PublicKey(),
-			).ValidateAndBuild()
+			)
 			require.NoError(t, ierr)
-			result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, admin, config.DefaultCommitment, []string{"Error Code: " + timelock.InvalidInput_TimelockError.String()})
+			result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, admin, config.DefaultCommitment, []string{"Error Code: " + timelockutil.InvalidInputTimelockError.String()})
 			require.NotNil(t, result)
 		})
 
@@ -174,7 +174,7 @@ func TestTimelockRBAC(t *testing.T) {
 				anotherAdmin.PublicKey(),
 				timelockutil.GetConfigPDA(config.TestTimelockID),
 				admin.PublicKey(),
-			).ValidateAndBuild()
+			)
 			require.NoError(t, ierr)
 			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, admin, config.DefaultCommitment)
 			require.NotNil(t, result)
@@ -185,7 +185,7 @@ func TestTimelockRBAC(t *testing.T) {
 				config.TestTimelockID,
 				timelockutil.GetConfigPDA(config.TestTimelockID),
 				user.PublicKey(),
-			).ValidateAndBuild()
+			)
 			require.NoError(t, ierr)
 			result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + timelockutil.UnauthorizedError.String()})
 			require.NotNil(t, result)
@@ -196,7 +196,7 @@ func TestTimelockRBAC(t *testing.T) {
 				config.TestTimelockID,
 				timelockutil.GetConfigPDA(config.TestTimelockID),
 				anotherAdmin.PublicKey(),
-			).ValidateAndBuild()
+			)
 			require.NoError(t, ierr)
 			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, anotherAdmin, config.DefaultCommitment)
 			require.NotNil(t, result)
@@ -218,7 +218,7 @@ func TestTimelockRBAC(t *testing.T) {
 				admin.PublicKey(),
 				timelockutil.GetConfigPDA(config.TestTimelockID),
 				anotherAdmin.PublicKey(),
-			).ValidateAndBuild()
+			)
 			require.NoError(t, ierr)
 			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{tix}, anotherAdmin, config.DefaultCommitment)
 			require.NotNil(t, result)
@@ -227,7 +227,7 @@ func TestTimelockRBAC(t *testing.T) {
 				config.TestTimelockID,
 				timelockutil.GetConfigPDA(config.TestTimelockID),
 				admin.PublicKey(),
-			).ValidateAndBuild()
+			)
 			require.NoError(t, aerr)
 			result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{aix}, admin, config.DefaultCommitment)
 			require.NotNil(t, result)
@@ -278,9 +278,9 @@ func TestTimelockRBAC(t *testing.T) {
 		nonExecutableOp.AddInstruction(ix, []solana.PublicKey{})
 
 		t.Run("rbac: when try to schedule from non proposer role, it fails", func(t *testing.T) {
-			proposer := roleMap[timelock.Proposer_Role].RandomPick()
-			nonProposer := roleMap[timelock.Executor_Role].RandomPick()
-			ac := roleMap[timelock.Proposer_Role].AccessController
+			proposer := roleMap[timelock.Role_Proposer].RandomPick()
+			nonProposer := roleMap[timelock.Role_Executor].RandomPick()
+			ac := roleMap[timelock.Role_Proposer].AccessController
 
 			// preload the operation with proposer for access testing on schedule_batch
 			prixs, prierr := timelockutil.GetPreloadOperationIxs(config.TestTimelockID, nonExecutableOp, proposer.PublicKey(), ac.PublicKey())
@@ -297,21 +297,21 @@ func TestTimelockRBAC(t *testing.T) {
 				timelockutil.GetConfigPDA(config.TestTimelockID),
 				ac.PublicKey(),
 				nonProposer.PublicKey(),
-			).ValidateAndBuild()
+			)
 			require.NoError(t, scerr)
 			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, nonProposer, config.DefaultCommitment, []string{"Error Code: " + timelockutil.UnauthorizedError.String()})
 		})
 
 		t.Run("rbac: Should able to schedule tx with proposer role", func(t *testing.T) {
-			proposer := roleMap[timelock.Proposer_Role].RandomPick()
-			ac := roleMap[timelock.Proposer_Role].AccessController
+			proposer := roleMap[timelock.Role_Proposer].RandomPick()
+			ac := roleMap[timelock.Role_Proposer].AccessController
 
 			t.Run("rbac: when proposer's access is removed, it should not be able to schedule", func(t *testing.T) {
 				raIx, raerr := access_controller.NewRemoveAccessInstruction(
 					ac.PublicKey(),
 					admin.PublicKey(),
 					proposer.PublicKey(), // remove access of proposer
-				).ValidateAndBuild()
+				)
 				require.NoError(t, raerr)
 				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{raIx}, admin, config.DefaultCommitment)
 
@@ -327,7 +327,7 @@ func TestTimelockRBAC(t *testing.T) {
 					timelockutil.GetConfigPDA(config.TestTimelockID),
 					ac.PublicKey(),
 					proposer.PublicKey(),
-				).ValidateAndBuild()
+				)
 				require.NoError(t, scerr)
 				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, proposer, config.DefaultCommitment, []string{"Error Code: " + timelockutil.UnauthorizedError.String()})
 			})
@@ -336,7 +336,7 @@ func TestTimelockRBAC(t *testing.T) {
 				ac.PublicKey(),
 				admin.PublicKey(),
 				proposer.PublicKey(), // add access of proposer again
-			).ValidateAndBuild()
+			)
 			require.NoError(t, raerr)
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{raIx}, admin, config.DefaultCommitment)
 
@@ -369,7 +369,7 @@ func TestTimelockRBAC(t *testing.T) {
 				timelockutil.GetConfigPDA(config.TestTimelockID),
 				ac.PublicKey(),
 				proposer.PublicKey(),
-			).ValidateAndBuild()
+			)
 			require.NoError(t, sberr)
 
 			tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{sbix}, proposer, config.DefaultCommitment)
@@ -411,8 +411,8 @@ func TestTimelockRBAC(t *testing.T) {
 
 			t.Run("rbac: cancel scheduled tx", func(t *testing.T) {
 				t.Run("fail: should feed the right role access controller", func(t *testing.T) {
-					signer := roleMap[timelock.Canceller_Role].RandomPick()
-					ac := roleMap[timelock.Proposer_Role].AccessController
+					signer := roleMap[timelock.Role_Canceller].RandomPick()
+					ac := roleMap[timelock.Role_Proposer].AccessController
 
 					ix, cerr := timelock.NewCancelInstruction(
 						config.TestTimelockID,
@@ -421,7 +421,7 @@ func TestTimelockRBAC(t *testing.T) {
 						timelockutil.GetConfigPDA(config.TestTimelockID),
 						ac.PublicKey(),
 						signer.PublicKey(),
-					).ValidateAndBuild()
+					)
 
 					require.NoError(t, cerr)
 
@@ -430,8 +430,8 @@ func TestTimelockRBAC(t *testing.T) {
 				})
 
 				t.Run("fail: unauthorized on cancel attempt from non-canceller(proposer)", func(t *testing.T) {
-					signer := roleMap[timelock.Proposer_Role].RandomPick()
-					ac := roleMap[timelock.Canceller_Role].AccessController
+					signer := roleMap[timelock.Role_Proposer].RandomPick()
+					ac := roleMap[timelock.Role_Canceller].AccessController
 
 					ix, cerr := timelock.NewCancelInstruction(
 						config.TestTimelockID,
@@ -440,7 +440,7 @@ func TestTimelockRBAC(t *testing.T) {
 						timelockutil.GetConfigPDA(config.TestTimelockID),
 						ac.PublicKey(),
 						signer.PublicKey(),
-					).ValidateAndBuild()
+					)
 					require.NoError(t, cerr)
 
 					result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, signer, config.DefaultCommitment, []string{"Error Code: " + timelockutil.UnauthorizedError.String()})
@@ -448,8 +448,8 @@ func TestTimelockRBAC(t *testing.T) {
 				})
 
 				t.Run("success: Should able to cancel scheduled tx: PDA closed", func(t *testing.T) {
-					signer := roleMap[timelock.Canceller_Role].RandomPick()
-					ac := roleMap[timelock.Canceller_Role].AccessController
+					signer := roleMap[timelock.Role_Canceller].RandomPick()
+					ac := roleMap[timelock.Role_Canceller].AccessController
 
 					ix, cerr := timelock.NewCancelInstruction(
 						config.TestTimelockID,
@@ -458,7 +458,7 @@ func TestTimelockRBAC(t *testing.T) {
 						timelockutil.GetConfigPDA(config.TestTimelockID),
 						ac.PublicKey(),
 						signer.PublicKey(),
-					).ValidateAndBuild()
+					)
 					require.NoError(t, cerr)
 
 					tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, signer, config.DefaultCommitment)
@@ -485,14 +485,14 @@ func TestTimelockRBAC(t *testing.T) {
 		newMinDelay := uint64(14000)
 
 		t.Run("fail: only admin can call functions with only_admin macro", func(t *testing.T) {
-			signer := roleMap[timelock.Proposer_Role].RandomPick()
+			signer := roleMap[timelock.Role_Proposer].RandomPick()
 
 			ix, ierr := timelock.NewUpdateDelayInstruction(
 				config.TestTimelockID,
 				newMinDelay,
 				timelockutil.GetConfigPDA(config.TestTimelockID),
 				signer.PublicKey(),
-			).ValidateAndBuild()
+			)
 			require.NoError(t, ierr)
 
 			result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, signer, config.DefaultCommitment, []string{"Error Code: " + timelockutil.UnauthorizedError.String()})
@@ -513,7 +513,7 @@ func TestTimelockRBAC(t *testing.T) {
 				newMinDelay,
 				timelockutil.GetConfigPDA(config.TestTimelockID),
 				signer.PublicKey(),
-			).ValidateAndBuild()
+			)
 			require.NoError(t, err)
 
 			tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, signer, config.DefaultCommitment)
@@ -547,36 +547,36 @@ func TestTimelockRBAC(t *testing.T) {
 			}{
 				{
 					Name:   "authorized proposer",
-					Ac:     roleMap[timelock.Proposer_Role].AccessController,
-					Signer: roleMap[timelock.Proposer_Role].RandomPick(),
+					Ac:     roleMap[timelock.Role_Proposer].AccessController,
+					Signer: roleMap[timelock.Role_Proposer].RandomPick(),
 				},
 				{
 					Name:          "proper proposer ac, unauthorized signer",
-					Ac:            roleMap[timelock.Proposer_Role].AccessController, // valid
-					Signer:        roleMap[timelock.Bypasser_Role].RandomPick(),     // unauthorized signer
+					Ac:            roleMap[timelock.Role_Proposer].AccessController, // valid
+					Signer:        roleMap[timelock.Role_Bypasser].RandomPick(),     // unauthorized signer
 					ShouldFail:    true,
 					ExpectedError: "Error Code: " + timelockutil.UnauthorizedError.String(),
 				},
 				{
 					Name:          "invalid access controller (bypasser)",
-					Ac:            roleMap[timelock.Bypasser_Role].AccessController, // invalid access controller
-					Signer:        roleMap[timelock.Bypasser_Role].RandomPick(),
+					Ac:            roleMap[timelock.Role_Bypasser].AccessController, // invalid access controller
+					Signer:        roleMap[timelock.Role_Bypasser].RandomPick(),
 					ShouldFail:    true,
-					ExpectedError: "Error Code: " + timelock.InvalidAccessController_TimelockError.String(),
+					ExpectedError: "Error Code: " + timelockutil.InvalidAccessControllerTimelockError.String(),
 				},
 				{
 					Name:          "invalid access controller (canceller)",
-					Ac:            roleMap[timelock.Canceller_Role].AccessController, // invalid access controller
-					Signer:        roleMap[timelock.Canceller_Role].RandomPick(),
+					Ac:            roleMap[timelock.Role_Canceller].AccessController, // invalid access controller
+					Signer:        roleMap[timelock.Role_Canceller].RandomPick(),
 					ShouldFail:    true,
-					ExpectedError: "Error Code: " + timelock.InvalidAccessController_TimelockError.String(),
+					ExpectedError: "Error Code: " + timelockutil.InvalidAccessControllerTimelockError.String(),
 				},
 				{
 					Name:          "invalid access controller (executor)",
-					Ac:            roleMap[timelock.Executor_Role].AccessController, // invalid access controller
-					Signer:        roleMap[timelock.Executor_Role].RandomPick(),
+					Ac:            roleMap[timelock.Role_Executor].AccessController, // invalid access controller
+					Signer:        roleMap[timelock.Role_Executor].RandomPick(),
 					ShouldFail:    true,
-					ExpectedError: "Error Code: " + timelock.InvalidAccessController_TimelockError.String(),
+					ExpectedError: "Error Code: " + timelockutil.InvalidAccessControllerTimelockError.String(),
 				},
 			}
 
@@ -619,36 +619,36 @@ func TestTimelockRBAC(t *testing.T) {
 			}{
 				{
 					Name:   "authorized bypasser",
-					Ac:     roleMap[timelock.Bypasser_Role].AccessController,
-					Signer: roleMap[timelock.Bypasser_Role].RandomPick(),
+					Ac:     roleMap[timelock.Role_Bypasser].AccessController,
+					Signer: roleMap[timelock.Role_Bypasser].RandomPick(),
 				},
 				{
 					Name:          "proper bypasser ac, unauthorized signer",
-					Ac:            roleMap[timelock.Bypasser_Role].AccessController, // valid
-					Signer:        roleMap[timelock.Proposer_Role].RandomPick(),     // unauthorized signer
+					Ac:            roleMap[timelock.Role_Bypasser].AccessController, // valid
+					Signer:        roleMap[timelock.Role_Proposer].RandomPick(),     // unauthorized signer
 					ShouldFail:    true,
 					ExpectedError: "Error Code: " + timelockutil.UnauthorizedError.String(),
 				},
 				{
 					Name:          "invalid access controller (canceller)",
-					Ac:            roleMap[timelock.Canceller_Role].AccessController, // invalid access controller
-					Signer:        roleMap[timelock.Canceller_Role].RandomPick(),
+					Ac:            roleMap[timelock.Role_Canceller].AccessController, // invalid access controller
+					Signer:        roleMap[timelock.Role_Canceller].RandomPick(),
 					ShouldFail:    true,
-					ExpectedError: "Error Code: " + timelock.InvalidAccessController_TimelockError.String(),
+					ExpectedError: "Error Code: " + timelockutil.InvalidAccessControllerTimelockError.String(),
 				},
 				{
 					Name:          "invalid access controller (executor)",
-					Ac:            roleMap[timelock.Executor_Role].AccessController, // invalid access controller
-					Signer:        roleMap[timelock.Executor_Role].RandomPick(),
+					Ac:            roleMap[timelock.Role_Executor].AccessController, // invalid access controller
+					Signer:        roleMap[timelock.Role_Executor].RandomPick(),
 					ShouldFail:    true,
-					ExpectedError: "Error Code: " + timelock.InvalidAccessController_TimelockError.String(),
+					ExpectedError: "Error Code: " + timelockutil.InvalidAccessControllerTimelockError.String(),
 				},
 				{
 					Name:          "invalid access controller (proposer)",
-					Ac:            roleMap[timelock.Proposer_Role].AccessController, // invalid access controller
-					Signer:        roleMap[timelock.Proposer_Role].RandomPick(),
+					Ac:            roleMap[timelock.Role_Proposer].AccessController, // invalid access controller
+					Signer:        roleMap[timelock.Role_Proposer].RandomPick(),
 					ShouldFail:    true,
-					ExpectedError: "Error Code: " + timelock.InvalidAccessController_TimelockError.String(),
+					ExpectedError: "Error Code: " + timelockutil.InvalidAccessControllerTimelockError.String(),
 				},
 			}
 

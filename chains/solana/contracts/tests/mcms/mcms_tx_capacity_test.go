@@ -30,10 +30,10 @@ import (
 func TestMcmsCapacity(t *testing.T) {
 	ctx := t.Context()
 
-	mcm.SetProgramID(config.McmProgram)
-	timelock.SetProgramID(config.TimelockProgram)
-	access_controller.SetProgramID(config.AccessControllerProgram)
-	external_program_cpi_stub.SetProgramID(config.ExternalCpiStubProgram) // test target program
+	//mcm.SetProgramID(config.McmProgram)
+	//timelock.SetProgramID(config.TimelockProgram)
+	//access_controller.SetProgramID(config.AccessControllerProgram)
+	//external_program_cpi_stub.SetProgramID(config.ExternalCpiStubProgram) // test target program
 
 	// initial admin
 	admin, err := solana.NewRandomPrivateKey()
@@ -45,10 +45,10 @@ func TestMcmsCapacity(t *testing.T) {
 	solanaGoClient := testutils.DeployAllPrograms(t, testutils.PathToAnchorConfig, admin)
 
 	msigs := map[timelock.Role]timelockutil.RoleMultisigs{
-		timelock.Proposer_Role:  timelockutil.CreateRoleMultisigs(timelock.Proposer_Role, 1),
-		timelock.Canceller_Role: timelockutil.CreateRoleMultisigs(timelock.Canceller_Role, 1),
-		timelock.Executor_Role:  timelockutil.CreateRoleMultisigs(timelock.Executor_Role, 1),
-		timelock.Bypasser_Role:  timelockutil.CreateRoleMultisigs(timelock.Bypasser_Role, 1),
+		timelock.Role_Proposer:  timelockutil.CreateRoleMultisigs(timelock.Role_Proposer, 1),
+		timelock.Role_Canceller: timelockutil.CreateRoleMultisigs(timelock.Role_Canceller, 1),
+		timelock.Role_Executor:  timelockutil.CreateRoleMultisigs(timelock.Role_Executor, 1),
+		timelock.Role_Bypasser:  timelockutil.CreateRoleMultisigs(timelock.Role_Bypasser, 1),
 	}
 
 	require.NoError(t, err)
@@ -104,7 +104,7 @@ func TestMcmsCapacity(t *testing.T) {
 						programData.Address,
 						msig.RootMetadataPDA,
 						msig.ExpiringRootAndOpCountPDA,
-					).ValidateAndBuild()
+					)
 					require.NoError(t, initIxErr)
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 
@@ -139,7 +139,7 @@ func TestMcmsCapacity(t *testing.T) {
 							msig.ConfigSignersPDA,
 							admin.PublicKey(),
 							solana.SystemProgramID,
-						).ValidateAndBuild()
+						)
 						require.NoError(t, initSignersIxErr)
 						ixs = append(ixs, initSignersIx)
 
@@ -152,7 +152,7 @@ func TestMcmsCapacity(t *testing.T) {
 							msig.ConfigPDA,
 							msig.ConfigSignersPDA,
 							admin.PublicKey(),
-						).ValidateAndBuild()
+						)
 						require.NoError(t, finSignersIxErr)
 						ixs = append(ixs, finalizeSignersIx)
 
@@ -186,7 +186,7 @@ func TestMcmsCapacity(t *testing.T) {
 							msig.ExpiringRootAndOpCountPDA,
 							admin.PublicKey(),
 							solana.SystemProgramID,
-						).ValidateAndBuild()
+						)
 						require.NoError(t, setConfigErr)
 
 						tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
@@ -271,11 +271,11 @@ func TestMcmsCapacity(t *testing.T) {
 				config.TimelockProgram,
 				programData.Address,
 				config.AccessControllerProgram,
-				msigs[timelock.Proposer_Role].AccessController.PublicKey(),
-				msigs[timelock.Executor_Role].AccessController.PublicKey(),
-				msigs[timelock.Canceller_Role].AccessController.PublicKey(),
-				msigs[timelock.Bypasser_Role].AccessController.PublicKey(),
-			).ValidateAndBuild()
+				msigs[timelock.Role_Proposer].AccessController.PublicKey(),
+				msigs[timelock.Role_Executor].AccessController.PublicKey(),
+				msigs[timelock.Role_Canceller].AccessController.PublicKey(),
+				msigs[timelock.Role_Bypasser].AccessController.PublicKey(),
+			)
 			require.NoError(t, initTimelockErr)
 
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{initTimelockIx}, admin, config.DefaultCommitment)
@@ -288,10 +288,10 @@ func TestMcmsCapacity(t *testing.T) {
 
 			require.Equal(t, admin.PublicKey(), configAccount.Owner, "Owner doesn't match")
 			require.Equal(t, config.MinDelay, configAccount.MinDelay, "MinDelay doesn't match")
-			require.Equal(t, msigs[timelock.Proposer_Role].AccessController.PublicKey(), configAccount.ProposerRoleAccessController, "ProposerRoleAccessController doesn't match")
-			require.Equal(t, msigs[timelock.Executor_Role].AccessController.PublicKey(), configAccount.ExecutorRoleAccessController, "ExecutorRoleAccessController doesn't match")
-			require.Equal(t, msigs[timelock.Canceller_Role].AccessController.PublicKey(), configAccount.CancellerRoleAccessController, "CancellerRoleAccessController doesn't match")
-			require.Equal(t, msigs[timelock.Bypasser_Role].AccessController.PublicKey(), configAccount.BypasserRoleAccessController, "BypasserRoleAccessController doesn't match")
+			require.Equal(t, msigs[timelock.Role_Proposer].AccessController.PublicKey(), configAccount.ProposerRoleAccessController, "ProposerRoleAccessController doesn't match")
+			require.Equal(t, msigs[timelock.Role_Executor].AccessController.PublicKey(), configAccount.ExecutorRoleAccessController, "ExecutorRoleAccessController doesn't match")
+			require.Equal(t, msigs[timelock.Role_Canceller].AccessController.PublicKey(), configAccount.CancellerRoleAccessController, "CancellerRoleAccessController doesn't match")
+			require.Equal(t, msigs[timelock.Role_Bypasser].AccessController.PublicKey(), configAccount.BypasserRoleAccessController, "BypasserRoleAccessController doesn't match")
 		})
 
 		t.Run("register msig signers to each role", func(t *testing.T) {
@@ -330,7 +330,7 @@ func TestMcmsCapacity(t *testing.T) {
 							timelockutil.GetSignerPDA(config.TestTimelockID), // new proposed owner
 							msig.ConfigPDA,
 							admin.PublicKey(),
-						).ValidateAndBuild()
+						)
 						require.NoError(t, transferOwnershipErr)
 
 						testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
@@ -347,7 +347,7 @@ func TestMcmsCapacity(t *testing.T) {
 							msig.PaddedID,
 							msig.ConfigPDA,
 							timelockutil.GetSignerPDA(config.TestTimelockID),
-						).ValidateAndBuild()
+						)
 						require.NoError(t, acceptOwnershipixErr)
 
 						salt, sErr := timelockutil.SimpleSalt()
@@ -383,7 +383,7 @@ func TestMcmsCapacity(t *testing.T) {
 							"Ids don't match",
 						)
 
-						bypassExeIx := timelock.NewBypasserExecuteBatchInstruction(
+						bypassExeIx, bypassExeErr := timelock.NewBypasserExecuteBatchInstruction(
 							config.TestTimelockID,
 							acceptOwnershipOp.OperationID(),
 							acceptOwnershipOp.OperationPDA(),
@@ -392,12 +392,12 @@ func TestMcmsCapacity(t *testing.T) {
 							roleMsigs.AccessController.PublicKey(),
 							admin.PublicKey(), // bypass execute with admin previledges
 						)
-						bypassExeIx.AccountMetaSlice = append(bypassExeIx.AccountMetaSlice, acceptOwnershipOp.RemainingAccounts()...)
+						require.NoError(t, bypassExeErr)
+						genericBypassExeIx, ok := bypassExeIx.(*solana.GenericInstruction)
+						require.True(t, ok)
+						genericBypassExeIx.AccountValues = append(genericBypassExeIx.AccountValues, acceptOwnershipOp.RemainingAccounts()...)
 
-						vIx, vIxErr := bypassExeIx.ValidateAndBuild()
-						require.NoError(t, vIxErr)
-
-						acceptTx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{vIx}, admin, config.DefaultCommitment)
+						acceptTx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{bypassExeIx}, admin, config.DefaultCommitment)
 
 						parsedLogs := common.ParseLogMessages(acceptTx.Meta.LogMessages,
 							[]common.EventMapping{
@@ -430,7 +430,7 @@ func TestMcmsCapacity(t *testing.T) {
 		// -------------------------
 		directNoOpOverhead := func(t *testing.T) uint32 {
 			// Create the no-op instruction.
-			noOpDirectIx, nierr := external_program_cpi_stub.NewNoOpInstruction().ValidateAndBuild()
+			noOpDirectIx, nierr := external_program_cpi_stub.NewNoOpInstruction()
 			require.NoError(t, nierr)
 
 			// Measure its direct execution cost.
@@ -447,7 +447,7 @@ func TestMcmsCapacity(t *testing.T) {
 		// -------------------------
 		mcmExecuteOverhead := func(t *testing.T, directCU uint32) uint32 {
 			// Retrieve the executor multisig info.
-			executorMsig := msigs[timelock.Executor_Role].GetAnyMultisig()
+			executorMsig := msigs[timelock.Role_Executor].GetAnyMultisig()
 
 			// Get the current operation count.
 			var prevRootAndOpCount mcm.ExpiringRootAndOpCount
@@ -456,7 +456,7 @@ func TestMcmsCapacity(t *testing.T) {
 			currOpCount := prevRootAndOpCount.OpCount
 
 			// Create a no-op instruction.
-			noOpIx, nierr := external_program_cpi_stub.NewNoOpInstruction().ValidateAndBuild()
+			noOpIx, nierr := external_program_cpi_stub.NewNoOpInstruction()
 			require.NoError(t, nierr)
 
 			// Wrap the no-op in an MCM operation node.
@@ -511,7 +511,7 @@ func TestMcmsCapacity(t *testing.T) {
 				executorMsig.ConfigPDA,
 				admin.PublicKey(),
 				solana.SystemProgramID,
-			).ValidateAndBuild()
+			)
 			require.NoError(t, srerr)
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{setRootIx}, admin, config.DefaultCommitment)
 
@@ -519,7 +519,7 @@ func TestMcmsCapacity(t *testing.T) {
 			op := ops[0]
 			proofs, perr := op.Proofs()
 			require.NoError(t, perr)
-			executeIx := mcm.NewExecuteInstruction(
+			executeIx, executeIxErr := mcm.NewExecuteInstruction(
 				executorMsig.PaddedID,
 				config.TestChainID,
 				op.Nonce,
@@ -532,16 +532,17 @@ func TestMcmsCapacity(t *testing.T) {
 				executorMsig.SignerPDA,
 				admin.PublicKey(),
 			)
-			executeIx.AccountMetaSlice = append(executeIx.AccountMetaSlice, op.RemainingAccounts...)
-			vIx, vierr := executeIx.ValidateAndBuild()
-			require.NoError(t, vierr)
+			require.NoError(t, executeIxErr)
+			genericExecuteIx, ok := executeIx.(*solana.GenericInstruction)
+			require.True(t, ok)
+			genericExecuteIx.AccountValues = append(genericExecuteIx.AccountValues, op.RemainingAccounts...)
 
 			// Measure and log the compute units (CU) for MCM execution.
-			mcmCU := testutils.GetRequiredCU(ctx, t, solanaGoClient, []solana.Instruction{vIx}, admin, config.DefaultCommitment)
+			mcmCU := testutils.GetRequiredCU(ctx, t, solanaGoClient, []solana.Instruction{executeIx}, admin, config.DefaultCommitment)
 			t.Logf("MCM execute CU: %d", mcmCU)
 
 			// Execute the MCM operation.
-			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{vIx}, admin, config.DefaultCommitment, common.AddComputeUnitLimit(mcmCU))
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{executeIx}, admin, config.DefaultCommitment, common.AddComputeUnitLimit(mcmCU))
 			overhead := uint32(mcmCU) - directCU
 			t.Logf("MCM overhead: %d", overhead)
 			return overhead
@@ -560,7 +561,7 @@ func TestMcmsCapacity(t *testing.T) {
 				Salt:        salt,
 				Delay:       uint64(1),
 			}
-			noOpIx, nierr := external_program_cpi_stub.NewNoOpInstruction().ValidateAndBuild()
+			noOpIx, nierr := external_program_cpi_stub.NewNoOpInstruction()
 			require.NoError(t, nierr)
 			op.AddInstruction(noOpIx, []solana.PublicKey{config.ExternalCpiStubProgram})
 
@@ -569,7 +570,7 @@ func TestMcmsCapacity(t *testing.T) {
 				config.TestTimelockID,
 				op,
 				admin.PublicKey(),
-				msigs[timelock.Proposer_Role].AccessController.PublicKey(),
+				msigs[timelock.Role_Proposer].AccessController.PublicKey(),
 			)
 			require.NoError(t, oierr)
 			for _, ix := range opIxs {
@@ -581,9 +582,9 @@ func TestMcmsCapacity(t *testing.T) {
 				op.Delay,
 				op.OperationPDA(),
 				timelockutil.GetConfigPDA(config.TestTimelockID),
-				msigs[timelock.Proposer_Role].AccessController.PublicKey(),
+				msigs[timelock.Role_Proposer].AccessController.PublicKey(),
 				admin.PublicKey(),
-			).ValidateAndBuild()
+			)
 			require.NoError(t, scerr)
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{scheduleIx}, admin, config.DefaultCommitment)
 
@@ -592,23 +593,24 @@ func TestMcmsCapacity(t *testing.T) {
 			require.NoError(t, err)
 
 			// Build and measure the timelock execute instruction.
-			timelockExeIx := timelock.NewExecuteBatchInstruction(
+			timelockExeIx, timelockExeErr := timelock.NewExecuteBatchInstruction(
 				config.TestTimelockID,
 				op.OperationID(),
 				op.OperationPDA(),
 				config.TimelockEmptyOpID,
 				timelockutil.GetConfigPDA(config.TestTimelockID),
 				timelockutil.GetSignerPDA(config.TestTimelockID),
-				msigs[timelock.Executor_Role].AccessController.PublicKey(),
+				msigs[timelock.Role_Executor].AccessController.PublicKey(),
 				admin.PublicKey(),
 			)
-			timelockExeIx.AccountMetaSlice = append(timelockExeIx.AccountMetaSlice, op.RemainingAccounts()...)
-			timelockExeVIx, tverr := timelockExeIx.ValidateAndBuild()
-			require.NoError(t, tverr)
+			require.NoError(t, timelockExeErr)
+			genericTimelockExeIx, ok := timelockExeIx.(*solana.GenericInstruction)
+			require.True(t, ok)
+			genericTimelockExeIx.AccountValues = append(genericTimelockExeIx.AccountValues, op.RemainingAccounts()...)
 
-			timelockCU := testutils.GetRequiredCU(ctx, t, solanaGoClient, []solana.Instruction{timelockExeVIx}, admin, config.DefaultCommitment)
+			timelockCU := testutils.GetRequiredCU(ctx, t, solanaGoClient, []solana.Instruction{timelockExeIx}, admin, config.DefaultCommitment)
 			t.Logf("Timelock execute CU: %d", timelockCU)
-			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{timelockExeVIx}, admin, config.DefaultCommitment, common.AddComputeUnitLimit(timelockCU))
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{timelockExeIx}, admin, config.DefaultCommitment, common.AddComputeUnitLimit(timelockCU))
 			overhead := uint32(timelockCU) - directCU
 			t.Logf("Timelock overhead: %d", overhead)
 			return overhead
@@ -630,7 +632,7 @@ func TestMcmsCapacity(t *testing.T) {
 				Delay:       uint64(1),
 			}
 			for range count {
-				heavyIx, hverr := external_program_cpi_stub.NewComputeHeavyInstruction(iterationsPerInstr).ValidateAndBuild()
+				heavyIx, hverr := external_program_cpi_stub.NewComputeHeavyInstruction(iterationsPerInstr)
 				require.NoError(t, hverr)
 				op.AddInstruction(heavyIx, []solana.PublicKey{config.ExternalCpiStubProgram})
 			}
@@ -642,7 +644,7 @@ func TestMcmsCapacity(t *testing.T) {
 				config.TestTimelockID,
 				op,
 				admin.PublicKey(),
-				msigs[timelock.Proposer_Role].AccessController.PublicKey(),
+				msigs[timelock.Role_Proposer].AccessController.PublicKey(),
 			)
 			require.NoError(t, oierr)
 			for _, ix := range opIxs {
@@ -654,28 +656,29 @@ func TestMcmsCapacity(t *testing.T) {
 				op.Delay,
 				op.OperationPDA(),
 				timelockutil.GetConfigPDA(config.TestTimelockID),
-				msigs[timelock.Proposer_Role].AccessController.PublicKey(),
+				msigs[timelock.Role_Proposer].AccessController.PublicKey(),
 				admin.PublicKey(),
-			).ValidateAndBuild()
+			)
 			require.NoError(t, scerr)
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{scheduleIx}, admin, config.DefaultCommitment)
 			err = timelockutil.WaitForOperationToBeReady(ctx, solanaGoClient, op.OperationPDA(), config.DefaultCommitment)
 			require.NoError(t, err)
-			timelockExeIx := timelock.NewExecuteBatchInstruction(
+			timelockExeIx, timelockExeErr := timelock.NewExecuteBatchInstruction(
 				config.TestTimelockID,
 				op.OperationID(),
 				op.OperationPDA(),
 				config.TimelockEmptyOpID,
 				timelockutil.GetConfigPDA(config.TestTimelockID),
 				timelockutil.GetSignerPDA(config.TestTimelockID),
-				msigs[timelock.Executor_Role].AccessController.PublicKey(),
+				msigs[timelock.Role_Executor].AccessController.PublicKey(),
 				admin.PublicKey(),
 			)
-			timelockExeIx.AccountMetaSlice = append(timelockExeIx.AccountMetaSlice, op.RemainingAccounts()...)
-			timelockExeVIx, tverr := timelockExeIx.ValidateAndBuild()
-			require.NoError(t, tverr)
-			cu := testutils.GetRequiredCU(ctx, t, solanaGoClient, []solana.Instruction{timelockExeVIx}, admin, config.DefaultCommitment)
-			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{timelockExeVIx}, admin, config.DefaultCommitment, common.AddComputeUnitLimit(cu))
+			require.NoError(t, timelockExeErr)
+			genericTimelockExeIx, ok := timelockExeIx.(*solana.GenericInstruction)
+			require.True(t, ok)
+			genericTimelockExeIx.AccountValues = append(genericTimelockExeIx.AccountValues, op.RemainingAccounts()...)
+			cu := testutils.GetRequiredCU(ctx, t, solanaGoClient, []solana.Instruction{timelockExeIx}, admin, config.DefaultCommitment)
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{timelockExeIx}, admin, config.DefaultCommitment, common.AddComputeUnitLimit(cu))
 			return uint32(cu)
 		}
 
@@ -771,7 +774,7 @@ func TestMcmsCapacity(t *testing.T) {
 		t.Run("mcm::execute max tx size analysis", func(t *testing.T) {
 			t.Parallel()
 			// use executor multisig for testing
-			executorMsig := msigs[timelock.Executor_Role].GetAnyMultisig()
+			executorMsig := msigs[timelock.Role_Executor].GetAnyMultisig()
 
 			type memoTestSummary struct {
 				name        string
@@ -879,7 +882,7 @@ func TestMcmsCapacity(t *testing.T) {
 						executorMsig.ConfigPDA,
 						admin.PublicKey(),
 						solana.SystemProgramID,
-					).ValidateAndBuild()
+					)
 					require.NoError(t, srerr)
 
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{setRootIx}, admin, config.DefaultCommitment)
@@ -888,7 +891,7 @@ func TestMcmsCapacity(t *testing.T) {
 					proofs, prferr := ops[0].Proofs()
 					require.NoError(t, prferr)
 
-					executeIx := mcm.NewExecuteInstruction(
+					executeIx, executeIxErr := mcm.NewExecuteInstruction(
 						executorMsig.PaddedID,
 						config.TestChainID,
 						node.Nonce,
@@ -901,18 +904,18 @@ func TestMcmsCapacity(t *testing.T) {
 						executorMsig.SignerPDA,
 						admin.PublicKey(),
 					)
-					executeIx.AccountMetaSlice = append(executeIx.AccountMetaSlice, node.RemainingAccounts...)
-
-					vIx, verr := executeIx.ValidateAndBuild()
-					require.NoError(t, verr)
+					require.NoError(t, executeIxErr)
+					genericExecuteIx, ok := executeIx.(*solana.GenericInstruction)
+					require.True(t, ok)
+					genericExecuteIx.AccountValues = append(genericExecuteIx.AccountValues, node.RemainingAccounts...)
 
 					// measure final transaction size
-					tcResult.finalTxSize = measureInstructionSize(vIx)
+					tcResult.finalTxSize = measureInstructionSize(executeIx)
 
 					if tc.expectError {
-						testutils.SendAndFailWithRPCError(ctx, t, solanaGoClient, []solana.Instruction{vIx}, admin, config.DefaultCommitment, []string{"VersionedTransaction too large"}, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
+						testutils.SendAndFailWithRPCError(ctx, t, solanaGoClient, []solana.Instruction{executeIx}, admin, config.DefaultCommitment, []string{"VersionedTransaction too large"}, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
 					} else {
-						tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{vIx}, admin, config.DefaultCommitment, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
+						tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{executeIx}, admin, config.DefaultCommitment, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
 
 						parsedLogs := common.ParseLogMessages(tx.Meta.LogMessages,
 							[]common.EventMapping{
@@ -1004,7 +1007,7 @@ func TestMcmsCapacity(t *testing.T) {
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{authIx}, admin, config.DefaultCommitment)
 
 			// use proposer multisig for testing
-			proposerMsig := msigs[timelock.Proposer_Role].GetAnyMultisig()
+			proposerMsig := msigs[timelock.Role_Proposer].GetAnyMultisig()
 
 			testCases := []struct {
 				name         string
@@ -1132,7 +1135,7 @@ func TestMcmsCapacity(t *testing.T) {
 					}
 
 					// create and initialize operation accounts
-					ixs, prerr := timelockutil.GetPreloadOperationIxs(config.TestTimelockID, op, admin.PublicKey(), msigs[timelock.Proposer_Role].AccessController.PublicKey())
+					ixs, prerr := timelockutil.GetPreloadOperationIxs(config.TestTimelockID, op, admin.PublicKey(), msigs[timelock.Role_Proposer].AccessController.PublicKey())
 					require.NoError(t, prerr)
 					for _, ix := range ixs {
 						cu := testutils.GetRequiredCU(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
@@ -1152,9 +1155,9 @@ func TestMcmsCapacity(t *testing.T) {
 						op.Delay,
 						op.OperationPDA(),
 						timelockutil.GetConfigPDA(config.TestTimelockID),
-						msigs[timelock.Proposer_Role].AccessController.PublicKey(),
+						msigs[timelock.Role_Proposer].AccessController.PublicKey(),
 						proposerMsig.SignerPDA,
-					).ValidateAndBuild()
+					)
 					require.NoError(t, scerr)
 
 					// convert to MCM operation
@@ -1219,7 +1222,7 @@ func TestMcmsCapacity(t *testing.T) {
 						proposerMsig.ConfigPDA,
 						admin.PublicKey(),
 						solana.SystemProgramID,
-					).ValidateAndBuild()
+					)
 					require.NoError(t, srerr)
 
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{setRootIx}, admin, config.DefaultCommitment)
@@ -1228,7 +1231,7 @@ func TestMcmsCapacity(t *testing.T) {
 					proofs, prerr := ops[0].Proofs()
 					require.NoError(t, prerr)
 
-					executeIx := mcm.NewExecuteInstruction(
+					executeIx, executeIxErr := mcm.NewExecuteInstruction(
 						proposerMsig.PaddedID,
 						config.TestChainID,
 						node.Nonce,
@@ -1241,42 +1244,42 @@ func TestMcmsCapacity(t *testing.T) {
 						proposerMsig.SignerPDA,
 						admin.PublicKey(),
 					)
-					executeIx.AccountMetaSlice = append(executeIx.AccountMetaSlice, node.RemainingAccounts...)
-
-					vIx, verr := executeIx.ValidateAndBuild()
-					require.NoError(t, verr)
+					require.NoError(t, executeIxErr)
+					genericExecuteIx, ok := executeIx.(*solana.GenericInstruction)
+					require.True(t, ok)
+					genericExecuteIx.AccountValues = append(genericExecuteIx.AccountValues, node.RemainingAccounts...)
 
 					// measure final transaction size
-					tcResult.finalMcmTxSize = measureInstructionSize(vIx)
+					tcResult.finalMcmTxSize = measureInstructionSize(executeIx)
 
 					// mcm::execute { timelock::schedule_batch }
-					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{vIx}, admin, config.DefaultCommitment)
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{executeIx}, admin, config.DefaultCommitment)
 
 					err = timelockutil.WaitForOperationToBeReady(ctx, solanaGoClient, op.OperationPDA(), config.DefaultCommitment)
 					require.NoError(t, err)
 
-					tlExeIx := timelock.NewExecuteBatchInstruction(
+					tlExeIx, tlExeErr := timelock.NewExecuteBatchInstruction(
 						config.TestTimelockID,
 						op.OperationID(),
 						op.OperationPDA(),
 						config.TimelockEmptyOpID,
 						timelockutil.GetConfigPDA(config.TestTimelockID),
 						timelockutil.GetSignerPDA(config.TestTimelockID),
-						msigs[timelock.Executor_Role].AccessController.PublicKey(),
+						msigs[timelock.Role_Executor].AccessController.PublicKey(),
 						admin.PublicKey(),
 					)
-					tlExeIx.AccountMetaSlice = append(tlExeIx.AccountMetaSlice, op.RemainingAccounts()...)
-
-					tivIx, txerr := tlExeIx.ValidateAndBuild()
-					require.NoError(t, txerr)
+					require.NoError(t, tlExeErr)
+					genericTlExeIx, ok := tlExeIx.(*solana.GenericInstruction)
+					require.True(t, ok)
+					genericTlExeIx.AccountValues = append(genericTlExeIx.AccountValues, op.RemainingAccounts()...)
 
 					// measure execution size
-					tcResult.timelockTxSize = measureInstructionSize(tivIx)
+					tcResult.timelockTxSize = measureInstructionSize(tlExeIx)
 
 					if tc.expectError {
-						testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{tivIx}, admin, config.DefaultCommitment, []string{"Program log: Error: memory allocation failed, out of memory"}, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
+						testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{tlExeIx}, admin, config.DefaultCommitment, []string{"Program log: Error: memory allocation failed, out of memory"}, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
 					} else {
-						testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{tivIx}, admin, config.DefaultCommitment, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
+						testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{tlExeIx}, admin, config.DefaultCommitment, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
 
 						// verify recipients final balances,
 						// note: we can't verify the exact amount of treasury balance(tests in parallel execution)
@@ -1317,7 +1320,7 @@ func TestMcmsCapacity(t *testing.T) {
 		})
 
 		t.Run("mcm::execute{timelock::schedule_batch}/timelock::execute_batch for operation capacity analysis", func(t *testing.T) {
-			proposerMsig := msigs[timelock.Proposer_Role].GetAnyMultisig()
+			proposerMsig := msigs[timelock.Role_Proposer].GetAnyMultisig()
 
 			testCases := []struct {
 				name        string
@@ -1340,7 +1343,7 @@ func TestMcmsCapacity(t *testing.T) {
 					// pure test function that only log the length of the instruction data
 					bix, berr := external_program_cpi_stub.NewBigInstructionDataInstruction(
 						[]byte(strings.Repeat("A", tc.memoSize)),
-					).ValidateAndBuild()
+					)
 					require.NoError(t, berr)
 
 					salt, serr := timelockutil.SimpleSalt()
@@ -1354,7 +1357,7 @@ func TestMcmsCapacity(t *testing.T) {
 					}
 					timelockOp.AddInstruction(bix, []solana.PublicKey{config.ExternalCpiStubProgram})
 
-					ixs, perr := timelockutil.GetPreloadOperationIxs(config.TestTimelockID, timelockOp, proposerMsig.SignerPDA, msigs[timelock.Proposer_Role].AccessController.PublicKey())
+					ixs, perr := timelockutil.GetPreloadOperationIxs(config.TestTimelockID, timelockOp, proposerMsig.SignerPDA, msigs[timelock.Role_Proposer].AccessController.PublicKey())
 					require.NoError(t, perr)
 
 					mcmOpNodes := []mcms.McmOpNode{}
@@ -1371,9 +1374,9 @@ func TestMcmsCapacity(t *testing.T) {
 						timelockOp.Delay,
 						timelockOp.OperationPDA(),
 						timelockutil.GetConfigPDA(config.TestTimelockID),
-						msigs[timelock.Proposer_Role].AccessController.PublicKey(),
+						msigs[timelock.Role_Proposer].AccessController.PublicKey(),
 						proposerMsig.SignerPDA,
-					).ValidateAndBuild()
+					)
 					require.NoError(t, scerr)
 
 					opNode, onerr := mcms.IxToMcmTestOpNode(proposerMsig.ConfigPDA, proposerMsig.SignerPDA, scheduleIx, currOpCount+uint64(len(mcmOpNodes)))
@@ -1420,7 +1423,7 @@ func TestMcmsCapacity(t *testing.T) {
 						proposerMsig.ConfigPDA,
 						admin.PublicKey(),
 						solana.SystemProgramID,
-					).ValidateAndBuild()
+					)
 					require.NoError(t, srerr)
 
 					tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{setRootIx}, admin, config.DefaultCommitment)
@@ -1445,7 +1448,7 @@ func TestMcmsCapacity(t *testing.T) {
 						proofs, perr := op.Proofs()
 						require.NoError(t, perr)
 
-						executeIx := mcm.NewExecuteInstruction(
+						executeIx, execErr := mcm.NewExecuteInstruction(
 							proposerMsig.PaddedID,
 							config.TestChainID,
 							op.Nonce,
@@ -1458,12 +1461,12 @@ func TestMcmsCapacity(t *testing.T) {
 							proposerMsig.SignerPDA,
 							anyone.PublicKey(),
 						)
-						executeIx.AccountMetaSlice = append(executeIx.AccountMetaSlice, op.RemainingAccounts...)
+						require.NoError(t, execErr)
+						genericExeIx, ok := executeIx.(*solana.GenericInstruction)
+						require.True(t, ok)
+						genericExeIx.AccountValues = append(genericExeIx.AccountValues, op.RemainingAccounts...)
 
-						vIx, verr := executeIx.ValidateAndBuild()
-						require.NoError(t, verr)
-
-						exeTx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{vIx}, anyone, config.DefaultCommitment)
+						exeTx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{executeIx}, anyone, config.DefaultCommitment)
 						require.NotNil(t, exeTx)
 
 						if bytes.Equal(op.Data[:8], timelock.Instruction_ScheduleBatch[:]) {
@@ -1503,31 +1506,32 @@ func TestMcmsCapacity(t *testing.T) {
 						require.NoError(t, err, "failed to get account info")
 					}
 					require.Equal(t, timelockOp.OperationID(), opAccount.Id, "Operation ID does not match")
-					require.Equal(t, timelock.Scheduled_OperationState, opAccount.State, "Operation state is invalid")
+					require.Equal(t, timelock.OperationState_Scheduled, opAccount.State, "Operation state is invalid")
 
 					werr := timelockutil.WaitForOperationToBeReady(ctx, solanaGoClient, timelockOp.OperationPDA(), config.DefaultCommitment)
 					require.NoError(t, werr)
 
-					ix := timelock.NewExecuteBatchInstruction(
+					ix, ixErr := timelock.NewExecuteBatchInstruction(
 						config.TestTimelockID,
 						timelockOp.OperationID(),
 						timelockOp.OperationPDA(),
 						config.TimelockEmptyOpID,
 						timelockutil.GetConfigPDA(config.TestTimelockID),
 						timelockutil.GetSignerPDA(config.TestTimelockID),
-						msigs[timelock.Executor_Role].AccessController.PublicKey(),
+						msigs[timelock.Role_Executor].AccessController.PublicKey(),
 						admin.PublicKey(), // any authority, timelock worker
 					)
+					require.NoError(t, ixErr)
+					genericIx, ok := ix.(*solana.GenericInstruction)
+					require.True(t, ok)
 
-					ix.AccountMetaSlice = append(ix.AccountMetaSlice, timelockOp.RemainingAccounts()...)
+					genericIx.AccountValues = append(genericIx.AccountValues, timelockOp.RemainingAccounts()...)
 
-					vIx, vErr := ix.ValidateAndBuild()
-					require.NoError(t, vErr)
 
 					if tc.expectError {
-						testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{vIx}, admin, config.DefaultCommitment, []string{"Program log: Error: memory allocation failed, out of memory"}, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
+						testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment, []string{"Program log: Error: memory allocation failed, out of memory"}, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
 					} else {
-						tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{vIx}, admin, config.DefaultCommitment, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
+						tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
 
 						parsedLogs = common.ParseLogMessages(tx.Meta.LogMessages,
 							[]common.EventMapping{
@@ -1549,7 +1553,7 @@ func TestMcmsCapacity(t *testing.T) {
 						}
 
 						require.Equal(t,
-							timelock.Done_OperationState,
+							timelock.OperationState_Done,
 							opAccount.State,
 							"Executed operation should be marked as done",
 						)

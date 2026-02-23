@@ -654,7 +654,8 @@
           }
         },
         {
-          "name": "source_chain"
+          "name": "source_chain",
+          "writable": true
         },
         {
           "name": "commit_report",
@@ -707,7 +708,48 @@
           "name": "fee_quoter"
         },
         {
-          "name": "fee_quoter_allowed_price_updater"
+          "name": "fee_quoter_allowed_price_updater",
+          "docs": [
+            "so that it can authorize the call made by this offramp"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  108,
+                  108,
+                  111,
+                  119,
+                  101,
+                  100,
+                  95,
+                  112,
+                  114,
+                  105,
+                  99,
+                  101,
+                  95,
+                  117,
+                  112,
+                  100,
+                  97,
+                  116,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "fee_billing_signer"
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "fee_quoter"
+            }
+          }
         },
         {
           "name": "fee_quoter_config"
@@ -2463,6 +2505,19 @@
       ]
     },
     {
+      "name": "IdlBuildTypeExport",
+      "discriminator": [
+        116,
+        138,
+        204,
+        211,
+        57,
+        158,
+        245,
+        116
+      ]
+    },
+    {
       "name": "Ocr3ConfigSet",
       "discriminator": [
         131,
@@ -2931,6 +2986,68 @@
   ],
   "types": [
     {
+      "name": "Any2SVMRampExtraArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "compute_units",
+            "type": "u32"
+          },
+          {
+            "name": "is_writable_bitmap",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Any2SVMRampMessage",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "header",
+            "type": {
+              "defined": {
+                "name": "RampMessageHeader"
+              }
+            }
+          },
+          {
+            "name": "sender",
+            "type": "bytes"
+          },
+          {
+            "name": "data",
+            "type": "bytes"
+          },
+          {
+            "name": "token_receiver",
+            "type": "pubkey"
+          },
+          {
+            "name": "token_amounts",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "Any2SVMTokenTransfer"
+                }
+              }
+            }
+          },
+          {
+            "name": "extra_args",
+            "type": {
+              "defined": {
+                "name": "Any2SVMRampExtraArgs"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
       "name": "Any2SVMTokenTransfer",
       "type": {
         "kind": "struct",
@@ -2995,6 +3112,47 @@
           },
           {
             "name": "V1"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CommitInput",
+      "docs": [
+        "Input from an offchain node, containing the Merkle root and interval for",
+        "the source chain, and optionally some price updates alongside it"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "price_updates",
+            "type": {
+              "defined": {
+                "name": "PriceUpdates"
+              }
+            }
+          },
+          {
+            "name": "merkle_root",
+            "type": {
+              "option": {
+                "defined": {
+                  "name": "MerkleRoot"
+                }
+              }
+            }
+          },
+          {
+            "name": "rmn_signatures",
+            "type": {
+              "vec": {
+                "array": [
+                  "u8",
+                  64
+                ]
+              }
+            }
           }
         ]
       }
@@ -3362,6 +3520,46 @@
       }
     },
     {
+      "name": "ExecutionReportSingleChain",
+      "docs": [
+        "Report that is submitted by the execution DON at the execution phase. (including chain selector data)"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "source_chain_selector",
+            "type": "u64"
+          },
+          {
+            "name": "message",
+            "type": {
+              "defined": {
+                "name": "Any2SVMRampMessage"
+              }
+            }
+          },
+          {
+            "name": "offchain_token_data",
+            "type": {
+              "vec": "bytes"
+            }
+          },
+          {
+            "name": "proofs",
+            "type": {
+              "vec": {
+                "array": [
+                  "u8",
+                  32
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
       "name": "ExecutionStateChanged",
       "type": {
         "kind": "struct",
@@ -3435,6 +3633,99 @@
           {
             "name": "latest_price_sequence_number",
             "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "IdlBuildTypeExport",
+      "docs": [
+        "Event used only during IDL build to ensure CommitInput and related types",
+        "are exported in the IDL for Go bindings generation.",
+        "This event is never emitted at runtime."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "commit_input",
+            "type": {
+              "defined": {
+                "name": "CommitInput"
+              }
+            }
+          },
+          {
+            "name": "token_price_update",
+            "type": {
+              "defined": {
+                "name": "TokenPriceUpdate"
+              }
+            }
+          },
+          {
+            "name": "gas_price_update",
+            "type": {
+              "defined": {
+                "name": "GasPriceUpdate"
+              }
+            }
+          },
+          {
+            "name": "any2svm_ramp_message",
+            "type": {
+              "defined": {
+                "name": "Any2SVMRampMessage"
+              }
+            }
+          },
+          {
+            "name": "ramp_message_header",
+            "type": {
+              "defined": {
+                "name": "RampMessageHeader"
+              }
+            }
+          },
+          {
+            "name": "any2svm_ramp_extra_args",
+            "type": {
+              "defined": {
+                "name": "Any2SVMRampExtraArgs"
+              }
+            }
+          },
+          {
+            "name": "any2svm_token_transfer",
+            "type": {
+              "defined": {
+                "name": "Any2SVMTokenTransfer"
+              }
+            }
+          },
+          {
+            "name": "execution_report_single_chain",
+            "type": {
+              "defined": {
+                "name": "ExecutionReportSingleChain"
+              }
+            }
+          },
+          {
+            "name": "cross_chain_amount",
+            "type": {
+              "defined": {
+                "name": "CrossChainAmount"
+              }
+            }
+          },
+          {
+            "name": "svm_token_amount",
+            "type": {
+              "defined": {
+                "name": "SVMTokenAmount"
+              }
+            }
           }
         ]
       }
@@ -3750,6 +4041,39 @@
       }
     },
     {
+      "name": "RampMessageHeader",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "message_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "source_chain_selector",
+            "type": "u64"
+          },
+          {
+            "name": "dest_chain_selector",
+            "type": "u64"
+          },
+          {
+            "name": "sequence_number",
+            "type": "u64"
+          },
+          {
+            "name": "nonce",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
       "name": "ReferenceAddresses",
       "serialization": "bytemuck",
       "repr": {
@@ -3801,6 +4125,22 @@
           {
             "name": "rmn_remote",
             "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SVMTokenAmount",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "token",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
           }
         ]
       }

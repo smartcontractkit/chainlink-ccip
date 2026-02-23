@@ -1559,6 +1559,173 @@ func UnmarshalGetFeeResult(buf []byte) (*GetFeeResult, error) {
 	return obj, nil
 }
 
+// Event used only during IDL build to ensure SVM2AnyRampMessage and related types
+// are exported in the IDL for Go bindings generation.
+// This event is never emitted at runtime.
+type IdlBuildTypeExport struct {
+	Svm2AnyRampMessage   Svm2AnyRampMessage   `json:"svm2AnyRampMessage"`
+	Svm2AnyTokenTransfer Svm2AnyTokenTransfer `json:"svm2AnyTokenTransfer"`
+	RampMessageHeader    RampMessageHeader    `json:"rampMessageHeader"`
+	CrossChainAmount     CrossChainAmount     `json:"crossChainAmount"`
+	Nonce                Nonce                `json:"nonce"`
+}
+
+func (obj IdlBuildTypeExport) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
+	// Serialize `Svm2AnyRampMessage`:
+	err = encoder.Encode(obj.Svm2AnyRampMessage)
+	if err != nil {
+		return errors.NewField("Svm2AnyRampMessage", err)
+	}
+	// Serialize `Svm2AnyTokenTransfer`:
+	err = encoder.Encode(obj.Svm2AnyTokenTransfer)
+	if err != nil {
+		return errors.NewField("Svm2AnyTokenTransfer", err)
+	}
+	// Serialize `RampMessageHeader`:
+	err = encoder.Encode(obj.RampMessageHeader)
+	if err != nil {
+		return errors.NewField("RampMessageHeader", err)
+	}
+	// Serialize `CrossChainAmount`:
+	err = encoder.Encode(obj.CrossChainAmount)
+	if err != nil {
+		return errors.NewField("CrossChainAmount", err)
+	}
+	// Serialize `Nonce`:
+	err = encoder.Encode(obj.Nonce)
+	if err != nil {
+		return errors.NewField("Nonce", err)
+	}
+	return nil
+}
+
+func (obj IdlBuildTypeExport) Marshal() ([]byte, error) {
+	buf := bytes.NewBuffer(nil)
+	encoder := binary.NewBorshEncoder(buf)
+	err := obj.MarshalWithEncoder(encoder)
+	if err != nil {
+		return nil, fmt.Errorf("error while encoding IdlBuildTypeExport: %w", err)
+	}
+	return buf.Bytes(), nil
+}
+
+func (obj *IdlBuildTypeExport) UnmarshalWithDecoder(decoder *binary.Decoder) (err error) {
+	// Deserialize `Svm2AnyRampMessage`:
+	err = decoder.Decode(&obj.Svm2AnyRampMessage)
+	if err != nil {
+		return errors.NewField("Svm2AnyRampMessage", err)
+	}
+	// Deserialize `Svm2AnyTokenTransfer`:
+	err = decoder.Decode(&obj.Svm2AnyTokenTransfer)
+	if err != nil {
+		return errors.NewField("Svm2AnyTokenTransfer", err)
+	}
+	// Deserialize `RampMessageHeader`:
+	err = decoder.Decode(&obj.RampMessageHeader)
+	if err != nil {
+		return errors.NewField("RampMessageHeader", err)
+	}
+	// Deserialize `CrossChainAmount`:
+	err = decoder.Decode(&obj.CrossChainAmount)
+	if err != nil {
+		return errors.NewField("CrossChainAmount", err)
+	}
+	// Deserialize `Nonce`:
+	err = decoder.Decode(&obj.Nonce)
+	if err != nil {
+		return errors.NewField("Nonce", err)
+	}
+	return nil
+}
+
+func (obj *IdlBuildTypeExport) Unmarshal(buf []byte) error {
+	err := obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
+	if err != nil {
+		return fmt.Errorf("error while unmarshaling IdlBuildTypeExport: %w", err)
+	}
+	return nil
+}
+
+func UnmarshalIdlBuildTypeExport(buf []byte) (*IdlBuildTypeExport, error) {
+	obj := new(IdlBuildTypeExport)
+	err := obj.Unmarshal(buf)
+	if err != nil {
+		return nil, err
+	}
+	return obj, nil
+}
+
+type Nonce struct {
+	Version      uint8  `json:"version"`
+	OrderedNonce uint64 `json:"orderedNonce"`
+	TotalNonce   uint64 `json:"totalNonce"`
+}
+
+func (obj Nonce) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
+	// Serialize `Version`:
+	err = encoder.Encode(obj.Version)
+	if err != nil {
+		return errors.NewField("Version", err)
+	}
+	// Serialize `OrderedNonce`:
+	err = encoder.Encode(obj.OrderedNonce)
+	if err != nil {
+		return errors.NewField("OrderedNonce", err)
+	}
+	// Serialize `TotalNonce`:
+	err = encoder.Encode(obj.TotalNonce)
+	if err != nil {
+		return errors.NewField("TotalNonce", err)
+	}
+	return nil
+}
+
+func (obj Nonce) Marshal() ([]byte, error) {
+	buf := bytes.NewBuffer(nil)
+	encoder := binary.NewBorshEncoder(buf)
+	err := obj.MarshalWithEncoder(encoder)
+	if err != nil {
+		return nil, fmt.Errorf("error while encoding Nonce: %w", err)
+	}
+	return buf.Bytes(), nil
+}
+
+func (obj *Nonce) UnmarshalWithDecoder(decoder *binary.Decoder) (err error) {
+	// Deserialize `Version`:
+	err = decoder.Decode(&obj.Version)
+	if err != nil {
+		return errors.NewField("Version", err)
+	}
+	// Deserialize `OrderedNonce`:
+	err = decoder.Decode(&obj.OrderedNonce)
+	if err != nil {
+		return errors.NewField("OrderedNonce", err)
+	}
+	// Deserialize `TotalNonce`:
+	err = decoder.Decode(&obj.TotalNonce)
+	if err != nil {
+		return errors.NewField("TotalNonce", err)
+	}
+	return nil
+}
+
+func (obj *Nonce) Unmarshal(buf []byte) error {
+	err := obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
+	if err != nil {
+		return fmt.Errorf("error while unmarshaling Nonce: %w", err)
+	}
+	return nil
+}
+
+func UnmarshalNonce(buf []byte) (*Nonce, error) {
+	obj := new(Nonce)
+	err := obj.Unmarshal(buf)
+	if err != nil {
+		return nil, err
+	}
+	return obj, nil
+}
+
 type OfframpAdded struct {
 	SourceChainSelector uint64             `json:"sourceChainSelector"`
 	Offramp             solanago.PublicKey `json:"offramp"`

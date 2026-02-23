@@ -18,8 +18,6 @@ import (
 )
 
 func TestMcmMultipleInstances(t *testing.T) {
-	mcm.SetProgramID(config.McmProgram)
-
 	ctx := t.Context()
 
 	admin, err := solana.NewRandomPrivateKey()
@@ -72,7 +70,7 @@ func TestMcmMultipleInstances(t *testing.T) {
 				programData.Address,
 				rootMetadataPDA1,
 				expiringRootAndOpCountPDA1,
-			).ValidateAndBuild()
+			)
 			require.NoError(t, err)
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 
@@ -144,7 +142,7 @@ func TestMcmMultipleInstances(t *testing.T) {
 					expiringRootAndOpCountPDA1,
 					admin.PublicKey(),
 					solana.SystemProgramID,
-				).ValidateAndBuild()
+				)
 
 				require.NoError(t, err)
 
@@ -196,7 +194,7 @@ func TestMcmMultipleInstances(t *testing.T) {
 				programData.Address,
 				rootMetadataPDA2,
 				expiringRootAndOpCountPDA2,
-			).ValidateAndBuild()
+			)
 			require.NoError(t, err)
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 
@@ -267,7 +265,7 @@ func TestMcmMultipleInstances(t *testing.T) {
 					expiringRootAndOpCountPDA2,
 					admin.PublicKey(),
 					solana.SystemProgramID,
-				).ValidateAndBuild()
+				)
 
 				require.NoError(t, err)
 
@@ -288,7 +286,7 @@ func TestMcmMultipleInstances(t *testing.T) {
 					expiringRootAndOpCountPDA2,
 					admin.PublicKey(),
 					solana.SystemProgramID,
-				).ValidateAndBuild()
+				)
 
 				require.NoError(t, err)
 

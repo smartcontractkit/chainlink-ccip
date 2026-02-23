@@ -1204,6 +1204,66 @@ func UnmarshalGasPriceUpdate(buf []byte) (*GasPriceUpdate, error) {
 	return obj, nil
 }
 
+type GenericExtraArgsV2 struct {
+	GasLimit                 binary.Uint128 `json:"gasLimit"`
+	AllowOutOfOrderExecution bool           `json:"allowOutOfOrderExecution"`
+}
+
+func (obj GenericExtraArgsV2) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
+	// Serialize `GasLimit`:
+	err = encoder.Encode(obj.GasLimit)
+	if err != nil {
+		return errors.NewField("GasLimit", err)
+	}
+	// Serialize `AllowOutOfOrderExecution`:
+	err = encoder.Encode(obj.AllowOutOfOrderExecution)
+	if err != nil {
+		return errors.NewField("AllowOutOfOrderExecution", err)
+	}
+	return nil
+}
+
+func (obj GenericExtraArgsV2) Marshal() ([]byte, error) {
+	buf := bytes.NewBuffer(nil)
+	encoder := binary.NewBorshEncoder(buf)
+	err := obj.MarshalWithEncoder(encoder)
+	if err != nil {
+		return nil, fmt.Errorf("error while encoding GenericExtraArgsV2: %w", err)
+	}
+	return buf.Bytes(), nil
+}
+
+func (obj *GenericExtraArgsV2) UnmarshalWithDecoder(decoder *binary.Decoder) (err error) {
+	// Deserialize `GasLimit`:
+	err = decoder.Decode(&obj.GasLimit)
+	if err != nil {
+		return errors.NewField("GasLimit", err)
+	}
+	// Deserialize `AllowOutOfOrderExecution`:
+	err = decoder.Decode(&obj.AllowOutOfOrderExecution)
+	if err != nil {
+		return errors.NewField("AllowOutOfOrderExecution", err)
+	}
+	return nil
+}
+
+func (obj *GenericExtraArgsV2) Unmarshal(buf []byte) error {
+	err := obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
+	if err != nil {
+		return fmt.Errorf("error while unmarshaling GenericExtraArgsV2: %w", err)
+	}
+	return nil
+}
+
+func UnmarshalGenericExtraArgsV2(buf []byte) (*GenericExtraArgsV2, error) {
+	obj := new(GenericExtraArgsV2)
+	err := obj.Unmarshal(buf)
+	if err != nil {
+		return nil, err
+	}
+	return obj, nil
+}
+
 type GetFeeResult struct {
 	Token                       solanago.PublicKey            `json:"token"`
 	Amount                      uint64                        `json:"amount"`
@@ -1290,6 +1350,69 @@ func (obj *GetFeeResult) Unmarshal(buf []byte) error {
 
 func UnmarshalGetFeeResult(buf []byte) (*GetFeeResult, error) {
 	obj := new(GetFeeResult)
+	err := obj.Unmarshal(buf)
+	if err != nil {
+		return nil, err
+	}
+	return obj, nil
+}
+
+// Event used only during IDL build to ensure GenericExtraArgsV2 and related types
+// are exported in the IDL for Go bindings generation.
+// This event is never emitted at runtime.
+type IdlBuildTypeExport struct {
+	GenericExtraArgsV2 GenericExtraArgsV2 `json:"genericExtraArgsV2"`
+	SvmExtraArgsV1     SvmExtraArgsV1     `json:"svmExtraArgsV1"`
+}
+
+func (obj IdlBuildTypeExport) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
+	// Serialize `GenericExtraArgsV2`:
+	err = encoder.Encode(obj.GenericExtraArgsV2)
+	if err != nil {
+		return errors.NewField("GenericExtraArgsV2", err)
+	}
+	// Serialize `SvmExtraArgsV1`:
+	err = encoder.Encode(obj.SvmExtraArgsV1)
+	if err != nil {
+		return errors.NewField("SvmExtraArgsV1", err)
+	}
+	return nil
+}
+
+func (obj IdlBuildTypeExport) Marshal() ([]byte, error) {
+	buf := bytes.NewBuffer(nil)
+	encoder := binary.NewBorshEncoder(buf)
+	err := obj.MarshalWithEncoder(encoder)
+	if err != nil {
+		return nil, fmt.Errorf("error while encoding IdlBuildTypeExport: %w", err)
+	}
+	return buf.Bytes(), nil
+}
+
+func (obj *IdlBuildTypeExport) UnmarshalWithDecoder(decoder *binary.Decoder) (err error) {
+	// Deserialize `GenericExtraArgsV2`:
+	err = decoder.Decode(&obj.GenericExtraArgsV2)
+	if err != nil {
+		return errors.NewField("GenericExtraArgsV2", err)
+	}
+	// Deserialize `SvmExtraArgsV1`:
+	err = decoder.Decode(&obj.SvmExtraArgsV1)
+	if err != nil {
+		return errors.NewField("SvmExtraArgsV1", err)
+	}
+	return nil
+}
+
+func (obj *IdlBuildTypeExport) Unmarshal(buf []byte) error {
+	err := obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
+	if err != nil {
+		return fmt.Errorf("error while unmarshaling IdlBuildTypeExport: %w", err)
+	}
+	return nil
+}
+
+func UnmarshalIdlBuildTypeExport(buf []byte) (*IdlBuildTypeExport, error) {
+	obj := new(IdlBuildTypeExport)
 	err := obj.Unmarshal(buf)
 	if err != nil {
 		return nil, err
@@ -1846,6 +1969,99 @@ func (obj *Svm2AnyMessage) Unmarshal(buf []byte) error {
 
 func UnmarshalSvm2AnyMessage(buf []byte) (*Svm2AnyMessage, error) {
 	obj := new(Svm2AnyMessage)
+	err := obj.Unmarshal(buf)
+	if err != nil {
+		return nil, err
+	}
+	return obj, nil
+}
+
+type SvmExtraArgsV1 struct {
+	ComputeUnits             uint32      `json:"computeUnits"`
+	AccountIsWritableBitmap  uint64      `json:"accountIsWritableBitmap"`
+	AllowOutOfOrderExecution bool        `json:"allowOutOfOrderExecution"`
+	TokenReceiver            [32]uint8   `json:"tokenReceiver"`
+	Accounts                 [][32]uint8 `json:"accounts"`
+}
+
+func (obj SvmExtraArgsV1) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
+	// Serialize `ComputeUnits`:
+	err = encoder.Encode(obj.ComputeUnits)
+	if err != nil {
+		return errors.NewField("ComputeUnits", err)
+	}
+	// Serialize `AccountIsWritableBitmap`:
+	err = encoder.Encode(obj.AccountIsWritableBitmap)
+	if err != nil {
+		return errors.NewField("AccountIsWritableBitmap", err)
+	}
+	// Serialize `AllowOutOfOrderExecution`:
+	err = encoder.Encode(obj.AllowOutOfOrderExecution)
+	if err != nil {
+		return errors.NewField("AllowOutOfOrderExecution", err)
+	}
+	// Serialize `TokenReceiver`:
+	err = encoder.Encode(obj.TokenReceiver)
+	if err != nil {
+		return errors.NewField("TokenReceiver", err)
+	}
+	// Serialize `Accounts`:
+	err = encoder.Encode(obj.Accounts)
+	if err != nil {
+		return errors.NewField("Accounts", err)
+	}
+	return nil
+}
+
+func (obj SvmExtraArgsV1) Marshal() ([]byte, error) {
+	buf := bytes.NewBuffer(nil)
+	encoder := binary.NewBorshEncoder(buf)
+	err := obj.MarshalWithEncoder(encoder)
+	if err != nil {
+		return nil, fmt.Errorf("error while encoding SvmExtraArgsV1: %w", err)
+	}
+	return buf.Bytes(), nil
+}
+
+func (obj *SvmExtraArgsV1) UnmarshalWithDecoder(decoder *binary.Decoder) (err error) {
+	// Deserialize `ComputeUnits`:
+	err = decoder.Decode(&obj.ComputeUnits)
+	if err != nil {
+		return errors.NewField("ComputeUnits", err)
+	}
+	// Deserialize `AccountIsWritableBitmap`:
+	err = decoder.Decode(&obj.AccountIsWritableBitmap)
+	if err != nil {
+		return errors.NewField("AccountIsWritableBitmap", err)
+	}
+	// Deserialize `AllowOutOfOrderExecution`:
+	err = decoder.Decode(&obj.AllowOutOfOrderExecution)
+	if err != nil {
+		return errors.NewField("AllowOutOfOrderExecution", err)
+	}
+	// Deserialize `TokenReceiver`:
+	err = decoder.Decode(&obj.TokenReceiver)
+	if err != nil {
+		return errors.NewField("TokenReceiver", err)
+	}
+	// Deserialize `Accounts`:
+	err = decoder.Decode(&obj.Accounts)
+	if err != nil {
+		return errors.NewField("Accounts", err)
+	}
+	return nil
+}
+
+func (obj *SvmExtraArgsV1) Unmarshal(buf []byte) error {
+	err := obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
+	if err != nil {
+		return fmt.Errorf("error while unmarshaling SvmExtraArgsV1: %w", err)
+	}
+	return nil
+}
+
+func UnmarshalSvmExtraArgsV1(buf []byte) (*SvmExtraArgsV1, error) {
+	obj := new(SvmExtraArgsV1)
 	err := obj.Unmarshal(buf)
 	if err != nil {
 		return nil, err

@@ -2,3 +2,178 @@
 // This file contains parsers for the types defined in the IDL.
 
 package ccip_common
+
+import (
+	"bytes"
+	"fmt"
+	errors "github.com/gagliardetto/anchor-go/errors"
+	binary "github.com/gagliardetto/binary"
+	solanago "github.com/gagliardetto/solana-go"
+)
+
+// Event used only during IDL build to ensure TokenAdminRegistry
+// is exported in the IDL for Go bindings generation.
+// This event is never emitted at runtime.
+type IdlBuildTypeExport struct {
+	TokenAdminRegistry TokenAdminRegistry `json:"tokenAdminRegistry"`
+}
+
+func (obj IdlBuildTypeExport) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
+	// Serialize `TokenAdminRegistry`:
+	err = encoder.Encode(obj.TokenAdminRegistry)
+	if err != nil {
+		return errors.NewField("TokenAdminRegistry", err)
+	}
+	return nil
+}
+
+func (obj IdlBuildTypeExport) Marshal() ([]byte, error) {
+	buf := bytes.NewBuffer(nil)
+	encoder := binary.NewBorshEncoder(buf)
+	err := obj.MarshalWithEncoder(encoder)
+	if err != nil {
+		return nil, fmt.Errorf("error while encoding IdlBuildTypeExport: %w", err)
+	}
+	return buf.Bytes(), nil
+}
+
+func (obj *IdlBuildTypeExport) UnmarshalWithDecoder(decoder *binary.Decoder) (err error) {
+	// Deserialize `TokenAdminRegistry`:
+	err = decoder.Decode(&obj.TokenAdminRegistry)
+	if err != nil {
+		return errors.NewField("TokenAdminRegistry", err)
+	}
+	return nil
+}
+
+func (obj *IdlBuildTypeExport) Unmarshal(buf []byte) error {
+	err := obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
+	if err != nil {
+		return fmt.Errorf("error while unmarshaling IdlBuildTypeExport: %w", err)
+	}
+	return nil
+}
+
+func UnmarshalIdlBuildTypeExport(buf []byte) (*IdlBuildTypeExport, error) {
+	obj := new(IdlBuildTypeExport)
+	err := obj.Unmarshal(buf)
+	if err != nil {
+		return nil, err
+	}
+	return obj, nil
+}
+
+type TokenAdminRegistry struct {
+	Version                uint8              `json:"version"`
+	Administrator          solanago.PublicKey `json:"administrator"`
+	PendingAdministrator   solanago.PublicKey `json:"pendingAdministrator"`
+	LookupTable            solanago.PublicKey `json:"lookupTable"`
+	WritableIndexes        [2]binary.Uint128  `json:"writableIndexes"`
+	Mint                   solanago.PublicKey `json:"mint"`
+	SupportsAutoDerivation bool               `json:"supportsAutoDerivation"`
+}
+
+func (obj TokenAdminRegistry) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
+	// Serialize `Version`:
+	err = encoder.Encode(obj.Version)
+	if err != nil {
+		return errors.NewField("Version", err)
+	}
+	// Serialize `Administrator`:
+	err = encoder.Encode(obj.Administrator)
+	if err != nil {
+		return errors.NewField("Administrator", err)
+	}
+	// Serialize `PendingAdministrator`:
+	err = encoder.Encode(obj.PendingAdministrator)
+	if err != nil {
+		return errors.NewField("PendingAdministrator", err)
+	}
+	// Serialize `LookupTable`:
+	err = encoder.Encode(obj.LookupTable)
+	if err != nil {
+		return errors.NewField("LookupTable", err)
+	}
+	// Serialize `WritableIndexes`:
+	err = encoder.Encode(obj.WritableIndexes)
+	if err != nil {
+		return errors.NewField("WritableIndexes", err)
+	}
+	// Serialize `Mint`:
+	err = encoder.Encode(obj.Mint)
+	if err != nil {
+		return errors.NewField("Mint", err)
+	}
+	// Serialize `SupportsAutoDerivation`:
+	err = encoder.Encode(obj.SupportsAutoDerivation)
+	if err != nil {
+		return errors.NewField("SupportsAutoDerivation", err)
+	}
+	return nil
+}
+
+func (obj TokenAdminRegistry) Marshal() ([]byte, error) {
+	buf := bytes.NewBuffer(nil)
+	encoder := binary.NewBorshEncoder(buf)
+	err := obj.MarshalWithEncoder(encoder)
+	if err != nil {
+		return nil, fmt.Errorf("error while encoding TokenAdminRegistry: %w", err)
+	}
+	return buf.Bytes(), nil
+}
+
+func (obj *TokenAdminRegistry) UnmarshalWithDecoder(decoder *binary.Decoder) (err error) {
+	// Deserialize `Version`:
+	err = decoder.Decode(&obj.Version)
+	if err != nil {
+		return errors.NewField("Version", err)
+	}
+	// Deserialize `Administrator`:
+	err = decoder.Decode(&obj.Administrator)
+	if err != nil {
+		return errors.NewField("Administrator", err)
+	}
+	// Deserialize `PendingAdministrator`:
+	err = decoder.Decode(&obj.PendingAdministrator)
+	if err != nil {
+		return errors.NewField("PendingAdministrator", err)
+	}
+	// Deserialize `LookupTable`:
+	err = decoder.Decode(&obj.LookupTable)
+	if err != nil {
+		return errors.NewField("LookupTable", err)
+	}
+	// Deserialize `WritableIndexes`:
+	err = decoder.Decode(&obj.WritableIndexes)
+	if err != nil {
+		return errors.NewField("WritableIndexes", err)
+	}
+	// Deserialize `Mint`:
+	err = decoder.Decode(&obj.Mint)
+	if err != nil {
+		return errors.NewField("Mint", err)
+	}
+	// Deserialize `SupportsAutoDerivation`:
+	err = decoder.Decode(&obj.SupportsAutoDerivation)
+	if err != nil {
+		return errors.NewField("SupportsAutoDerivation", err)
+	}
+	return nil
+}
+
+func (obj *TokenAdminRegistry) Unmarshal(buf []byte) error {
+	err := obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
+	if err != nil {
+		return fmt.Errorf("error while unmarshaling TokenAdminRegistry: %w", err)
+	}
+	return nil
+}
+
+func UnmarshalTokenAdminRegistry(buf []byte) (*TokenAdminRegistry, error) {
+	obj := new(TokenAdminRegistry)
+	err := obj.Unmarshal(buf)
+	if err != nil {
+		return nil, err
+	}
+	return obj, nil
+}

@@ -43,6 +43,13 @@ func ParseAnyEvent(eventData []byte) (any, error) {
 			return nil, fmt.Errorf("failed to unmarshal event as ExecutionStateChanged: %w", err)
 		}
 		return value, nil
+	case Event_IdlBuildTypeExport:
+		value := new(IdlBuildTypeExport)
+		err := value.UnmarshalWithDecoder(decoder)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal event as IdlBuildTypeExport: %w", err)
+		}
+		return value, nil
 	case Event_Ocr3ConfigSet:
 		value := new(Ocr3ConfigSet)
 		err := value.UnmarshalWithDecoder(decoder)
@@ -168,6 +175,23 @@ func ParseEvent_ExecutionStateChanged(eventData []byte) (*ExecutionStateChanged,
 	err = event.UnmarshalWithDecoder(decoder)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal event of type ExecutionStateChanged: %w", err)
+	}
+	return event, nil
+}
+
+func ParseEvent_IdlBuildTypeExport(eventData []byte) (*IdlBuildTypeExport, error) {
+	decoder := binary.NewBorshDecoder(eventData)
+	discriminator, err := decoder.ReadDiscriminator()
+	if err != nil {
+		return nil, fmt.Errorf("failed to peek discriminator: %w", err)
+	}
+	if discriminator != Event_IdlBuildTypeExport {
+		return nil, fmt.Errorf("expected discriminator %v, got %s", Event_IdlBuildTypeExport, binary.FormatDiscriminator(discriminator))
+	}
+	event := new(IdlBuildTypeExport)
+	err = event.UnmarshalWithDecoder(decoder)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal event of type IdlBuildTypeExport: %w", err)
 	}
 	return event, nil
 }

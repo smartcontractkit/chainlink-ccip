@@ -100,3 +100,13 @@ pub struct PriceUpdaterAdded {
 pub struct PriceUpdaterRemoved {
     pub price_updater: Pubkey,
 }
+
+/// Event used only during IDL build to ensure GenericExtraArgsV2 and related types
+/// are exported in the IDL for Go bindings generation.
+/// This event is never emitted at runtime.
+#[cfg(feature = "idl-build")]
+#[event]
+pub struct IdlBuildTypeExport {
+    pub generic_extra_args_v2: crate::extra_args::GenericExtraArgsV2,
+    pub svm_extra_args_v1: crate::extra_args::SVMExtraArgsV1,
+}

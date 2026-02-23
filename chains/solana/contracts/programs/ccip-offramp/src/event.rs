@@ -73,3 +73,21 @@ pub mod admin {
         pub rmn_remote: Pubkey,
     }
 }
+
+/// Event used only during IDL build to ensure CommitInput and related types
+/// are exported in the IDL for Go bindings generation.
+/// This event is never emitted at runtime.
+#[cfg(feature = "idl-build")]
+#[event]
+pub struct IdlBuildTypeExport {
+    pub commit_input: crate::context::CommitInput,
+    pub token_price_update: crate::context::TokenPriceUpdate,
+    pub gas_price_update: crate::context::GasPriceUpdate,
+    pub any2svm_ramp_message: crate::messages::Any2SVMRampMessage,
+    pub ramp_message_header: crate::messages::RampMessageHeader,
+    pub any2svm_ramp_extra_args: crate::messages::Any2SVMRampExtraArgs,
+    pub any2svm_token_transfer: crate::messages::Any2SVMTokenTransfer,
+    pub execution_report_single_chain: crate::messages::ExecutionReportSingleChain,
+    pub cross_chain_amount: crate::messages::CrossChainAmount,
+    pub svm_token_amount: crate::messages::SVMTokenAmount,
+}

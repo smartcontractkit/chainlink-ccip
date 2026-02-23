@@ -11,6 +11,170 @@ import (
 	solanago "github.com/gagliardetto/solana-go"
 )
 
+type Any2SvmRampExtraArgs struct {
+	ComputeUnits     uint32 `json:"computeUnits"`
+	IsWritableBitmap uint64 `json:"isWritableBitmap"`
+}
+
+func (obj Any2SvmRampExtraArgs) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
+	// Serialize `ComputeUnits`:
+	err = encoder.Encode(obj.ComputeUnits)
+	if err != nil {
+		return errors.NewField("ComputeUnits", err)
+	}
+	// Serialize `IsWritableBitmap`:
+	err = encoder.Encode(obj.IsWritableBitmap)
+	if err != nil {
+		return errors.NewField("IsWritableBitmap", err)
+	}
+	return nil
+}
+
+func (obj Any2SvmRampExtraArgs) Marshal() ([]byte, error) {
+	buf := bytes.NewBuffer(nil)
+	encoder := binary.NewBorshEncoder(buf)
+	err := obj.MarshalWithEncoder(encoder)
+	if err != nil {
+		return nil, fmt.Errorf("error while encoding Any2SvmRampExtraArgs: %w", err)
+	}
+	return buf.Bytes(), nil
+}
+
+func (obj *Any2SvmRampExtraArgs) UnmarshalWithDecoder(decoder *binary.Decoder) (err error) {
+	// Deserialize `ComputeUnits`:
+	err = decoder.Decode(&obj.ComputeUnits)
+	if err != nil {
+		return errors.NewField("ComputeUnits", err)
+	}
+	// Deserialize `IsWritableBitmap`:
+	err = decoder.Decode(&obj.IsWritableBitmap)
+	if err != nil {
+		return errors.NewField("IsWritableBitmap", err)
+	}
+	return nil
+}
+
+func (obj *Any2SvmRampExtraArgs) Unmarshal(buf []byte) error {
+	err := obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
+	if err != nil {
+		return fmt.Errorf("error while unmarshaling Any2SvmRampExtraArgs: %w", err)
+	}
+	return nil
+}
+
+func UnmarshalAny2SvmRampExtraArgs(buf []byte) (*Any2SvmRampExtraArgs, error) {
+	obj := new(Any2SvmRampExtraArgs)
+	err := obj.Unmarshal(buf)
+	if err != nil {
+		return nil, err
+	}
+	return obj, nil
+}
+
+type Any2SvmRampMessage struct {
+	Header        RampMessageHeader      `json:"header"`
+	Sender        []byte                 `json:"sender"`
+	Data          []byte                 `json:"data"`
+	TokenReceiver solanago.PublicKey     `json:"tokenReceiver"`
+	TokenAmounts  []Any2SvmTokenTransfer `json:"tokenAmounts"`
+	ExtraArgs     Any2SvmRampExtraArgs   `json:"extraArgs"`
+}
+
+func (obj Any2SvmRampMessage) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
+	// Serialize `Header`:
+	err = encoder.Encode(obj.Header)
+	if err != nil {
+		return errors.NewField("Header", err)
+	}
+	// Serialize `Sender`:
+	err = encoder.Encode(obj.Sender)
+	if err != nil {
+		return errors.NewField("Sender", err)
+	}
+	// Serialize `Data`:
+	err = encoder.Encode(obj.Data)
+	if err != nil {
+		return errors.NewField("Data", err)
+	}
+	// Serialize `TokenReceiver`:
+	err = encoder.Encode(obj.TokenReceiver)
+	if err != nil {
+		return errors.NewField("TokenReceiver", err)
+	}
+	// Serialize `TokenAmounts`:
+	err = encoder.Encode(obj.TokenAmounts)
+	if err != nil {
+		return errors.NewField("TokenAmounts", err)
+	}
+	// Serialize `ExtraArgs`:
+	err = encoder.Encode(obj.ExtraArgs)
+	if err != nil {
+		return errors.NewField("ExtraArgs", err)
+	}
+	return nil
+}
+
+func (obj Any2SvmRampMessage) Marshal() ([]byte, error) {
+	buf := bytes.NewBuffer(nil)
+	encoder := binary.NewBorshEncoder(buf)
+	err := obj.MarshalWithEncoder(encoder)
+	if err != nil {
+		return nil, fmt.Errorf("error while encoding Any2SvmRampMessage: %w", err)
+	}
+	return buf.Bytes(), nil
+}
+
+func (obj *Any2SvmRampMessage) UnmarshalWithDecoder(decoder *binary.Decoder) (err error) {
+	// Deserialize `Header`:
+	err = decoder.Decode(&obj.Header)
+	if err != nil {
+		return errors.NewField("Header", err)
+	}
+	// Deserialize `Sender`:
+	err = decoder.Decode(&obj.Sender)
+	if err != nil {
+		return errors.NewField("Sender", err)
+	}
+	// Deserialize `Data`:
+	err = decoder.Decode(&obj.Data)
+	if err != nil {
+		return errors.NewField("Data", err)
+	}
+	// Deserialize `TokenReceiver`:
+	err = decoder.Decode(&obj.TokenReceiver)
+	if err != nil {
+		return errors.NewField("TokenReceiver", err)
+	}
+	// Deserialize `TokenAmounts`:
+	err = decoder.Decode(&obj.TokenAmounts)
+	if err != nil {
+		return errors.NewField("TokenAmounts", err)
+	}
+	// Deserialize `ExtraArgs`:
+	err = decoder.Decode(&obj.ExtraArgs)
+	if err != nil {
+		return errors.NewField("ExtraArgs", err)
+	}
+	return nil
+}
+
+func (obj *Any2SvmRampMessage) Unmarshal(buf []byte) error {
+	err := obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
+	if err != nil {
+		return fmt.Errorf("error while unmarshaling Any2SvmRampMessage: %w", err)
+	}
+	return nil
+}
+
+func UnmarshalAny2SvmRampMessage(buf []byte) (*Any2SvmRampMessage, error) {
+	obj := new(Any2SvmRampMessage)
+	err := obj.Unmarshal(buf)
+	if err != nil {
+		return nil, err
+	}
+	return obj, nil
+}
+
 type Any2SvmTokenTransfer struct {
 	SourcePoolAddress []byte             `json:"sourcePoolAddress"`
 	DestTokenAddress  solanago.PublicKey `json:"destTokenAddress"`
@@ -191,6 +355,100 @@ func (value CodeVersion) String() string {
 	default:
 		return ""
 	}
+}
+
+// Input from an offchain node, containing the Merkle root and interval for
+// the source chain, and optionally some price updates alongside it
+type CommitInput struct {
+	PriceUpdates  PriceUpdates `json:"priceUpdates"`
+	MerkleRoot    *MerkleRoot  `bin:"optional" json:"merkleRoot,omitempty"`
+	RmnSignatures [][64]uint8  `json:"rmnSignatures"`
+}
+
+func (obj CommitInput) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
+	// Serialize `PriceUpdates`:
+	err = encoder.Encode(obj.PriceUpdates)
+	if err != nil {
+		return errors.NewField("PriceUpdates", err)
+	}
+	// Serialize `MerkleRoot` (optional):
+	{
+		if obj.MerkleRoot == nil {
+			err = encoder.WriteOption(false)
+			if err != nil {
+				return errors.NewOption("MerkleRoot", fmt.Errorf("error while encoding optionality: %w", err))
+			}
+		} else {
+			err = encoder.WriteOption(true)
+			if err != nil {
+				return errors.NewOption("MerkleRoot", fmt.Errorf("error while encoding optionality: %w", err))
+			}
+			err = encoder.Encode(obj.MerkleRoot)
+			if err != nil {
+				return errors.NewField("MerkleRoot", err)
+			}
+		}
+	}
+	// Serialize `RmnSignatures`:
+	err = encoder.Encode(obj.RmnSignatures)
+	if err != nil {
+		return errors.NewField("RmnSignatures", err)
+	}
+	return nil
+}
+
+func (obj CommitInput) Marshal() ([]byte, error) {
+	buf := bytes.NewBuffer(nil)
+	encoder := binary.NewBorshEncoder(buf)
+	err := obj.MarshalWithEncoder(encoder)
+	if err != nil {
+		return nil, fmt.Errorf("error while encoding CommitInput: %w", err)
+	}
+	return buf.Bytes(), nil
+}
+
+func (obj *CommitInput) UnmarshalWithDecoder(decoder *binary.Decoder) (err error) {
+	// Deserialize `PriceUpdates`:
+	err = decoder.Decode(&obj.PriceUpdates)
+	if err != nil {
+		return errors.NewField("PriceUpdates", err)
+	}
+	// Deserialize `MerkleRoot` (optional):
+	{
+		ok, err := decoder.ReadOption()
+		if err != nil {
+			return errors.NewOption("MerkleRoot", fmt.Errorf("error while reading optionality: %w", err))
+		}
+		if ok {
+			err = decoder.Decode(&obj.MerkleRoot)
+			if err != nil {
+				return errors.NewField("MerkleRoot", err)
+			}
+		}
+	}
+	// Deserialize `RmnSignatures`:
+	err = decoder.Decode(&obj.RmnSignatures)
+	if err != nil {
+		return errors.NewField("RmnSignatures", err)
+	}
+	return nil
+}
+
+func (obj *CommitInput) Unmarshal(buf []byte) error {
+	err := obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
+	if err != nil {
+		return fmt.Errorf("error while unmarshaling CommitInput: %w", err)
+	}
+	return nil
+}
+
+func UnmarshalCommitInput(buf []byte) (*CommitInput, error) {
+	obj := new(CommitInput)
+	err := obj.Unmarshal(buf)
+	if err != nil {
+		return nil, err
+	}
+	return obj, nil
 }
 
 type CommitReport struct {
@@ -1082,6 +1340,89 @@ func UnmarshalExecutionReportBuffer(buf []byte) (*ExecutionReportBuffer, error) 
 	return obj, nil
 }
 
+// Report that is submitted by the execution DON at the execution phase. (including chain selector data)
+type ExecutionReportSingleChain struct {
+	SourceChainSelector uint64             `json:"sourceChainSelector"`
+	Message             Any2SvmRampMessage `json:"message"`
+	OffchainTokenData   [][]byte           `json:"offchainTokenData"`
+	Proofs              [][32]uint8        `json:"proofs"`
+}
+
+func (obj ExecutionReportSingleChain) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
+	// Serialize `SourceChainSelector`:
+	err = encoder.Encode(obj.SourceChainSelector)
+	if err != nil {
+		return errors.NewField("SourceChainSelector", err)
+	}
+	// Serialize `Message`:
+	err = encoder.Encode(obj.Message)
+	if err != nil {
+		return errors.NewField("Message", err)
+	}
+	// Serialize `OffchainTokenData`:
+	err = encoder.Encode(obj.OffchainTokenData)
+	if err != nil {
+		return errors.NewField("OffchainTokenData", err)
+	}
+	// Serialize `Proofs`:
+	err = encoder.Encode(obj.Proofs)
+	if err != nil {
+		return errors.NewField("Proofs", err)
+	}
+	return nil
+}
+
+func (obj ExecutionReportSingleChain) Marshal() ([]byte, error) {
+	buf := bytes.NewBuffer(nil)
+	encoder := binary.NewBorshEncoder(buf)
+	err := obj.MarshalWithEncoder(encoder)
+	if err != nil {
+		return nil, fmt.Errorf("error while encoding ExecutionReportSingleChain: %w", err)
+	}
+	return buf.Bytes(), nil
+}
+
+func (obj *ExecutionReportSingleChain) UnmarshalWithDecoder(decoder *binary.Decoder) (err error) {
+	// Deserialize `SourceChainSelector`:
+	err = decoder.Decode(&obj.SourceChainSelector)
+	if err != nil {
+		return errors.NewField("SourceChainSelector", err)
+	}
+	// Deserialize `Message`:
+	err = decoder.Decode(&obj.Message)
+	if err != nil {
+		return errors.NewField("Message", err)
+	}
+	// Deserialize `OffchainTokenData`:
+	err = decoder.Decode(&obj.OffchainTokenData)
+	if err != nil {
+		return errors.NewField("OffchainTokenData", err)
+	}
+	// Deserialize `Proofs`:
+	err = decoder.Decode(&obj.Proofs)
+	if err != nil {
+		return errors.NewField("Proofs", err)
+	}
+	return nil
+}
+
+func (obj *ExecutionReportSingleChain) Unmarshal(buf []byte) error {
+	err := obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
+	if err != nil {
+		return fmt.Errorf("error while unmarshaling ExecutionReportSingleChain: %w", err)
+	}
+	return nil
+}
+
+func UnmarshalExecutionReportSingleChain(buf []byte) (*ExecutionReportSingleChain, error) {
+	obj := new(ExecutionReportSingleChain)
+	err := obj.Unmarshal(buf)
+	if err != nil {
+		return nil, err
+	}
+	return obj, nil
+}
+
 type ExecutionStateChanged struct {
 	SourceChainSelector uint64                `json:"sourceChainSelector"`
 	SequenceNumber      uint64                `json:"sequenceNumber"`
@@ -1278,6 +1619,157 @@ func (obj *GlobalState) Unmarshal(buf []byte) error {
 
 func UnmarshalGlobalState(buf []byte) (*GlobalState, error) {
 	obj := new(GlobalState)
+	err := obj.Unmarshal(buf)
+	if err != nil {
+		return nil, err
+	}
+	return obj, nil
+}
+
+// Event used only during IDL build to ensure CommitInput and related types
+// are exported in the IDL for Go bindings generation.
+// This event is never emitted at runtime.
+type IdlBuildTypeExport struct {
+	CommitInput                CommitInput                `json:"commitInput"`
+	TokenPriceUpdate           TokenPriceUpdate           `json:"tokenPriceUpdate"`
+	GasPriceUpdate             GasPriceUpdate             `json:"gasPriceUpdate"`
+	Any2SvmRampMessage         Any2SvmRampMessage         `json:"any2SvmRampMessage"`
+	RampMessageHeader          RampMessageHeader          `json:"rampMessageHeader"`
+	Any2SvmRampExtraArgs       Any2SvmRampExtraArgs       `json:"any2SvmRampExtraArgs"`
+	Any2SvmTokenTransfer       Any2SvmTokenTransfer       `json:"any2SvmTokenTransfer"`
+	ExecutionReportSingleChain ExecutionReportSingleChain `json:"executionReportSingleChain"`
+	CrossChainAmount           CrossChainAmount           `json:"crossChainAmount"`
+	SvmTokenAmount             SvmTokenAmount             `json:"svmTokenAmount"`
+}
+
+func (obj IdlBuildTypeExport) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
+	// Serialize `CommitInput`:
+	err = encoder.Encode(obj.CommitInput)
+	if err != nil {
+		return errors.NewField("CommitInput", err)
+	}
+	// Serialize `TokenPriceUpdate`:
+	err = encoder.Encode(obj.TokenPriceUpdate)
+	if err != nil {
+		return errors.NewField("TokenPriceUpdate", err)
+	}
+	// Serialize `GasPriceUpdate`:
+	err = encoder.Encode(obj.GasPriceUpdate)
+	if err != nil {
+		return errors.NewField("GasPriceUpdate", err)
+	}
+	// Serialize `Any2SvmRampMessage`:
+	err = encoder.Encode(obj.Any2SvmRampMessage)
+	if err != nil {
+		return errors.NewField("Any2SvmRampMessage", err)
+	}
+	// Serialize `RampMessageHeader`:
+	err = encoder.Encode(obj.RampMessageHeader)
+	if err != nil {
+		return errors.NewField("RampMessageHeader", err)
+	}
+	// Serialize `Any2SvmRampExtraArgs`:
+	err = encoder.Encode(obj.Any2SvmRampExtraArgs)
+	if err != nil {
+		return errors.NewField("Any2SvmRampExtraArgs", err)
+	}
+	// Serialize `Any2SvmTokenTransfer`:
+	err = encoder.Encode(obj.Any2SvmTokenTransfer)
+	if err != nil {
+		return errors.NewField("Any2SvmTokenTransfer", err)
+	}
+	// Serialize `ExecutionReportSingleChain`:
+	err = encoder.Encode(obj.ExecutionReportSingleChain)
+	if err != nil {
+		return errors.NewField("ExecutionReportSingleChain", err)
+	}
+	// Serialize `CrossChainAmount`:
+	err = encoder.Encode(obj.CrossChainAmount)
+	if err != nil {
+		return errors.NewField("CrossChainAmount", err)
+	}
+	// Serialize `SvmTokenAmount`:
+	err = encoder.Encode(obj.SvmTokenAmount)
+	if err != nil {
+		return errors.NewField("SvmTokenAmount", err)
+	}
+	return nil
+}
+
+func (obj IdlBuildTypeExport) Marshal() ([]byte, error) {
+	buf := bytes.NewBuffer(nil)
+	encoder := binary.NewBorshEncoder(buf)
+	err := obj.MarshalWithEncoder(encoder)
+	if err != nil {
+		return nil, fmt.Errorf("error while encoding IdlBuildTypeExport: %w", err)
+	}
+	return buf.Bytes(), nil
+}
+
+func (obj *IdlBuildTypeExport) UnmarshalWithDecoder(decoder *binary.Decoder) (err error) {
+	// Deserialize `CommitInput`:
+	err = decoder.Decode(&obj.CommitInput)
+	if err != nil {
+		return errors.NewField("CommitInput", err)
+	}
+	// Deserialize `TokenPriceUpdate`:
+	err = decoder.Decode(&obj.TokenPriceUpdate)
+	if err != nil {
+		return errors.NewField("TokenPriceUpdate", err)
+	}
+	// Deserialize `GasPriceUpdate`:
+	err = decoder.Decode(&obj.GasPriceUpdate)
+	if err != nil {
+		return errors.NewField("GasPriceUpdate", err)
+	}
+	// Deserialize `Any2SvmRampMessage`:
+	err = decoder.Decode(&obj.Any2SvmRampMessage)
+	if err != nil {
+		return errors.NewField("Any2SvmRampMessage", err)
+	}
+	// Deserialize `RampMessageHeader`:
+	err = decoder.Decode(&obj.RampMessageHeader)
+	if err != nil {
+		return errors.NewField("RampMessageHeader", err)
+	}
+	// Deserialize `Any2SvmRampExtraArgs`:
+	err = decoder.Decode(&obj.Any2SvmRampExtraArgs)
+	if err != nil {
+		return errors.NewField("Any2SvmRampExtraArgs", err)
+	}
+	// Deserialize `Any2SvmTokenTransfer`:
+	err = decoder.Decode(&obj.Any2SvmTokenTransfer)
+	if err != nil {
+		return errors.NewField("Any2SvmTokenTransfer", err)
+	}
+	// Deserialize `ExecutionReportSingleChain`:
+	err = decoder.Decode(&obj.ExecutionReportSingleChain)
+	if err != nil {
+		return errors.NewField("ExecutionReportSingleChain", err)
+	}
+	// Deserialize `CrossChainAmount`:
+	err = decoder.Decode(&obj.CrossChainAmount)
+	if err != nil {
+		return errors.NewField("CrossChainAmount", err)
+	}
+	// Deserialize `SvmTokenAmount`:
+	err = decoder.Decode(&obj.SvmTokenAmount)
+	if err != nil {
+		return errors.NewField("SvmTokenAmount", err)
+	}
+	return nil
+}
+
+func (obj *IdlBuildTypeExport) Unmarshal(buf []byte) error {
+	err := obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
+	if err != nil {
+		return fmt.Errorf("error while unmarshaling IdlBuildTypeExport: %w", err)
+	}
+	return nil
+}
+
+func UnmarshalIdlBuildTypeExport(buf []byte) (*IdlBuildTypeExport, error) {
+	obj := new(IdlBuildTypeExport)
 	err := obj.Unmarshal(buf)
 	if err != nil {
 		return nil, err
@@ -1979,6 +2471,99 @@ func UnmarshalPriceUpdates(buf []byte) (*PriceUpdates, error) {
 	return obj, nil
 }
 
+type RampMessageHeader struct {
+	MessageId           [32]uint8 `json:"messageId"`
+	SourceChainSelector uint64    `json:"sourceChainSelector"`
+	DestChainSelector   uint64    `json:"destChainSelector"`
+	SequenceNumber      uint64    `json:"sequenceNumber"`
+	Nonce               uint64    `json:"nonce"`
+}
+
+func (obj RampMessageHeader) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
+	// Serialize `MessageId`:
+	err = encoder.Encode(obj.MessageId)
+	if err != nil {
+		return errors.NewField("MessageId", err)
+	}
+	// Serialize `SourceChainSelector`:
+	err = encoder.Encode(obj.SourceChainSelector)
+	if err != nil {
+		return errors.NewField("SourceChainSelector", err)
+	}
+	// Serialize `DestChainSelector`:
+	err = encoder.Encode(obj.DestChainSelector)
+	if err != nil {
+		return errors.NewField("DestChainSelector", err)
+	}
+	// Serialize `SequenceNumber`:
+	err = encoder.Encode(obj.SequenceNumber)
+	if err != nil {
+		return errors.NewField("SequenceNumber", err)
+	}
+	// Serialize `Nonce`:
+	err = encoder.Encode(obj.Nonce)
+	if err != nil {
+		return errors.NewField("Nonce", err)
+	}
+	return nil
+}
+
+func (obj RampMessageHeader) Marshal() ([]byte, error) {
+	buf := bytes.NewBuffer(nil)
+	encoder := binary.NewBorshEncoder(buf)
+	err := obj.MarshalWithEncoder(encoder)
+	if err != nil {
+		return nil, fmt.Errorf("error while encoding RampMessageHeader: %w", err)
+	}
+	return buf.Bytes(), nil
+}
+
+func (obj *RampMessageHeader) UnmarshalWithDecoder(decoder *binary.Decoder) (err error) {
+	// Deserialize `MessageId`:
+	err = decoder.Decode(&obj.MessageId)
+	if err != nil {
+		return errors.NewField("MessageId", err)
+	}
+	// Deserialize `SourceChainSelector`:
+	err = decoder.Decode(&obj.SourceChainSelector)
+	if err != nil {
+		return errors.NewField("SourceChainSelector", err)
+	}
+	// Deserialize `DestChainSelector`:
+	err = decoder.Decode(&obj.DestChainSelector)
+	if err != nil {
+		return errors.NewField("DestChainSelector", err)
+	}
+	// Deserialize `SequenceNumber`:
+	err = decoder.Decode(&obj.SequenceNumber)
+	if err != nil {
+		return errors.NewField("SequenceNumber", err)
+	}
+	// Deserialize `Nonce`:
+	err = decoder.Decode(&obj.Nonce)
+	if err != nil {
+		return errors.NewField("Nonce", err)
+	}
+	return nil
+}
+
+func (obj *RampMessageHeader) Unmarshal(buf []byte) error {
+	err := obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
+	if err != nil {
+		return fmt.Errorf("error while unmarshaling RampMessageHeader: %w", err)
+	}
+	return nil
+}
+
+func UnmarshalRampMessageHeader(buf []byte) (*RampMessageHeader, error) {
+	obj := new(RampMessageHeader)
+	err := obj.Unmarshal(buf)
+	if err != nil {
+		return nil, err
+	}
+	return obj, nil
+}
+
 type ReferenceAddresses struct {
 	Version            uint8              `json:"version"`
 	Router             solanago.PublicKey `json:"router"`
@@ -2147,6 +2732,66 @@ func (obj *ReferenceAddressesSet) Unmarshal(buf []byte) error {
 
 func UnmarshalReferenceAddressesSet(buf []byte) (*ReferenceAddressesSet, error) {
 	obj := new(ReferenceAddressesSet)
+	err := obj.Unmarshal(buf)
+	if err != nil {
+		return nil, err
+	}
+	return obj, nil
+}
+
+type SvmTokenAmount struct {
+	Token  solanago.PublicKey `json:"token"`
+	Amount uint64             `json:"amount"`
+}
+
+func (obj SvmTokenAmount) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
+	// Serialize `Token`:
+	err = encoder.Encode(obj.Token)
+	if err != nil {
+		return errors.NewField("Token", err)
+	}
+	// Serialize `Amount`:
+	err = encoder.Encode(obj.Amount)
+	if err != nil {
+		return errors.NewField("Amount", err)
+	}
+	return nil
+}
+
+func (obj SvmTokenAmount) Marshal() ([]byte, error) {
+	buf := bytes.NewBuffer(nil)
+	encoder := binary.NewBorshEncoder(buf)
+	err := obj.MarshalWithEncoder(encoder)
+	if err != nil {
+		return nil, fmt.Errorf("error while encoding SvmTokenAmount: %w", err)
+	}
+	return buf.Bytes(), nil
+}
+
+func (obj *SvmTokenAmount) UnmarshalWithDecoder(decoder *binary.Decoder) (err error) {
+	// Deserialize `Token`:
+	err = decoder.Decode(&obj.Token)
+	if err != nil {
+		return errors.NewField("Token", err)
+	}
+	// Deserialize `Amount`:
+	err = decoder.Decode(&obj.Amount)
+	if err != nil {
+		return errors.NewField("Amount", err)
+	}
+	return nil
+}
+
+func (obj *SvmTokenAmount) Unmarshal(buf []byte) error {
+	err := obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
+	if err != nil {
+		return fmt.Errorf("error while unmarshaling SvmTokenAmount: %w", err)
+	}
+	return nil
+}
+
+func UnmarshalSvmTokenAmount(buf []byte) (*SvmTokenAmount, error) {
+	obj := new(SvmTokenAmount)
 	err := obj.Unmarshal(buf)
 	if err != nil {
 		return nil, err

@@ -142,3 +142,16 @@ pub mod events {
         }
     }
 }
+
+/// Event used only during IDL build to ensure SVM2AnyRampMessage and related types
+/// are exported in the IDL for Go bindings generation.
+/// This event is never emitted at runtime.
+#[cfg(feature = "idl-build")]
+#[event]
+pub struct IdlBuildTypeExport {
+    pub svm2any_ramp_message: crate::messages::SVM2AnyRampMessage,
+    pub svm2any_token_transfer: crate::messages::SVM2AnyTokenTransfer,
+    pub ramp_message_header: crate::messages::RampMessageHeader,
+    pub cross_chain_amount: crate::messages::CrossChainAmount,
+    pub nonce: crate::state::Nonce,
+}

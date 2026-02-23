@@ -24,6 +24,15 @@ import (
 const GenericExtraArgsV2Tag = "181dcf10"
 const SVMExtraArgsV1Tag = "1f3b3aba"
 
+// SVMExtraArgsV1 is the extra args structure for SVM (Solana) destination chains
+type SVMExtraArgsV1 struct {
+	ComputeUnits             uint32
+	AccountIsWritableBitmap  uint64
+	AllowOutOfOrderExecution bool
+	TokenReceiver            [32]uint8
+	Accounts                 [][32]uint8
+}
+
 var leafDomainSeparator = [32]byte{}
 
 func HashCommitReport(ctx [2][32]byte, report ccip_offramp.CommitInput) ([]byte, error) {
@@ -71,10 +80,10 @@ func NextCommitReportContext() [2][32]byte {
 	return CreateReportContext(reportSequence)
 }
 
-func CreateNextMessage(ctx context.Context, solanaGoClient *rpc.Client, remainingAccounts []solana.PublicKey) (ccip_offramp.Any2SVMRampMessage, [32]byte, error) {
+func CreateNextMessage(ctx context.Context, solanaGoClient *rpc.Client, remainingAccounts []solana.PublicKey) (ccip_offramp.Any2SvmRampMessage, [32]byte, error) {
 	nextSeq, err := NextSequenceNumber(ctx, solanaGoClient, config.OfframpEvmSourceChainPDA)
 	if err != nil {
-		return ccip_offramp.Any2SVMRampMessage{}, [32]byte{}, err
+		return ccip_offramp.Any2SvmRampMessage{}, [32]byte{}, err
 	}
 	msg := CreateDefaultMessageWith(config.EvmChainSelector, nextSeq)
 
@@ -88,12 +97,12 @@ func NextSequenceNumber(ctx context.Context, solanaGoClient *rpc.Client, sourceC
 	return chainStateAccount.State.MinSeqNr, err
 }
 
-func CreateDefaultMessageWith(sourceChainSelector uint64, sequenceNumber uint64) ccip_offramp.Any2SVMRampMessage {
+func CreateDefaultMessageWith(sourceChainSelector uint64, sequenceNumber uint64) ccip_offramp.Any2SvmRampMessage {
 	sourceHash, _ := hex.DecodeString("4571dc5d4711693551f54a96307bf71121e2a1abd21d8ae04b8e05f447821064")
 	var messageID [32]byte
 	copy(messageID[:], sourceHash)
 
-	message := ccip_offramp.Any2SVMRampMessage{
+	message := ccip_offramp.Any2SvmRampMessage{
 		Header: ccip_offramp.RampMessageHeader{
 			MessageId:           messageID,
 			SourceChainSelector: sourceChainSelector,
@@ -103,7 +112,7 @@ func CreateDefaultMessageWith(sourceChainSelector uint64, sequenceNumber uint64)
 		},
 		Sender: []byte{1, 2, 3},
 		Data:   []byte{4, 5, 6},
-		ExtraArgs: ccip_offramp.Any2SVMRampExtraArgs{
+		ExtraArgs: ccip_offramp.Any2SvmRampExtraArgs{
 			ComputeUnits:     1000,
 			IsWritableBitmap: GenerateBitMapForIndexes([]int{0, 1}),
 		},
@@ -113,7 +122,7 @@ func CreateDefaultMessageWith(sourceChainSelector uint64, sequenceNumber uint64)
 
 // Remaining accounts is passed separately as they're conceptually part of the message so they must be hashed alongside it,
 // but they are not embedded in the message itself, as it would be redundant with `remaining_accounts`.
-func MakeAnyToSVMMessage(tokenReceiver solana.PublicKey, chainSelector uint64, solanaChainSelector uint64, data []byte, msgAccounts []solana.PublicKey) (ccip_offramp.Any2SVMRampMessage, [32]byte, error) {
+func MakeAnyToSVMMessage(tokenReceiver solana.PublicKey, chainSelector uint64, solanaChainSelector uint64, data []byte, msgAccounts []solana.PublicKey) (ccip_offramp.Any2SvmRampMessage, [32]byte, error) {
 	msg := CreateDefaultMessageWith(chainSelector, 1)
 	msg.Header.DestChainSelector = solanaChainSelector
 	msg.TokenReceiver = tokenReceiver
@@ -124,7 +133,7 @@ func MakeAnyToSVMMessage(tokenReceiver solana.PublicKey, chainSelector uint64, s
 	return msg, msg.Header.MessageId, err
 }
 
-func HashAnyToSVMMessage(msg ccip_offramp.Any2SVMRampMessage, onRampAddress []byte, msgAccounts []solana.PublicKey) ([]byte, error) {
+func HashAnyToSVMMessage(msg ccip_offramp.Any2SvmRampMessage, onRampAddress []byte, msgAccounts []solana.PublicKey) ([]byte, error) {
 	hash := sha3.NewLegacyKeccak256()
 
 	hash.Write(leafDomainSeparator[:])
@@ -203,7 +212,7 @@ func MerkleFrom(leaves [][32]byte) ([32]byte, error) {
 	return tree.Root(), nil
 }
 
-func HashSVMToAnyMessage(msg ccip_router.SVM2AnyRampMessage) ([]byte, error) {
+func HashSVMToAnyMessage(msg ccip_router.Svm2AnyRampMessage) ([]byte, error) {
 	hash := sha3.NewLegacyKeccak256()
 
 	hash.Write(leafDomainSeparator[:])

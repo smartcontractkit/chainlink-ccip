@@ -2800,6 +2800,19 @@
       ]
     },
     {
+      "name": "IdlBuildTypeExport",
+      "discriminator": [
+        116,
+        138,
+        204,
+        211,
+        57,
+        158,
+        245,
+        116
+      ]
+    },
+    {
       "name": "OfframpAdded",
       "discriminator": [
         158,
@@ -3566,6 +3579,79 @@
           {
             "name": "token",
             "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "IdlBuildTypeExport",
+      "docs": [
+        "Event used only during IDL build to ensure SVM2AnyRampMessage and related types",
+        "are exported in the IDL for Go bindings generation.",
+        "This event is never emitted at runtime."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "svm2any_ramp_message",
+            "type": {
+              "defined": {
+                "name": "SVM2AnyRampMessage"
+              }
+            }
+          },
+          {
+            "name": "svm2any_token_transfer",
+            "type": {
+              "defined": {
+                "name": "SVM2AnyTokenTransfer"
+              }
+            }
+          },
+          {
+            "name": "ramp_message_header",
+            "type": {
+              "defined": {
+                "name": "RampMessageHeader"
+              }
+            }
+          },
+          {
+            "name": "cross_chain_amount",
+            "type": {
+              "defined": {
+                "name": "CrossChainAmount"
+              }
+            }
+          },
+          {
+            "name": "nonce",
+            "type": {
+              "defined": {
+                "name": "Nonce"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "Nonce",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "ordered_nonce",
+            "type": "u64"
+          },
+          {
+            "name": "total_nonce",
+            "type": "u64"
           }
         ]
       }

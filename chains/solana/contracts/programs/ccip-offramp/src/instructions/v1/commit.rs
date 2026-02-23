@@ -14,8 +14,6 @@ use crate::{CcipOfframpError, PriceOnlyCommitReportContext};
 
 pub struct Impl;
 impl Commit for Impl {
-    /// During IDL build, this function returns Ok(()) immediately since the account types
-    /// differ between IDL build and runtime (to work around dynamic seed evaluation issues).
     #[cfg(feature = "idl-build")]
     fn commit<'info>(
         &self,

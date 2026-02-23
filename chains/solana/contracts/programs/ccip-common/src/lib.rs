@@ -107,3 +107,12 @@ pub mod router_accounts {
         }
     }
 }
+
+/// Event used only during IDL build to ensure TokenAdminRegistry
+/// is exported in the IDL for Go bindings generation.
+/// This event is never emitted at runtime.
+#[cfg(feature = "idl-build")]
+#[event]
+pub struct IdlBuildTypeExport {
+    pub token_admin_registry: router_accounts::TokenAdminRegistry,
+}

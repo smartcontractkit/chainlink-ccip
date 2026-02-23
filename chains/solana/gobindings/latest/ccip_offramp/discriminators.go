@@ -19,6 +19,7 @@ var (
 	Event_CommitReportPdaClosed         = [8]byte{69, 240, 72, 149, 174, 18, 236, 46}
 	Event_ConfigSet                     = [8]byte{15, 104, 59, 16, 236, 241, 8, 6}
 	Event_ExecutionStateChanged         = [8]byte{185, 176, 140, 112, 239, 78, 31, 249}
+	Event_IdlBuildTypeExport            = [8]byte{116, 138, 204, 211, 57, 158, 245, 116}
 	Event_Ocr3ConfigSet                 = [8]byte{131, 240, 21, 76, 61, 239, 79, 44}
 	Event_OwnershipTransferRequested    = [8]byte{79, 54, 99, 123, 57, 244, 134, 35}
 	Event_OwnershipTransferred          = [8]byte{172, 61, 205, 183, 250, 50, 38, 98}

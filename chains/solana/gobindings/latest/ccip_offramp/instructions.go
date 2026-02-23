@@ -345,8 +345,8 @@ func NewCommitInstruction(
 		accounts__.Append(solanago.NewAccountMeta(configAccount, false, false))
 		// Account 1 "reference_addresses": Read-only, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(referenceAddressesAccount, false, false))
-		// Account 2 "source_chain": Read-only, Non-signer, Required
-		accounts__.Append(solanago.NewAccountMeta(sourceChainAccount, false, false))
+		// Account 2 "source_chain": Writable, Non-signer, Required
+		accounts__.Append(solanago.NewAccountMeta(sourceChainAccount, true, false))
 		// Account 3 "commit_report": Writable, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(commitReportAccount, true, false))
 		// Account 4 "authority": Writable, Signer, Required
@@ -360,6 +360,7 @@ func NewCommitInstruction(
 		// Account 8 "fee_quoter": Read-only, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(feeQuoterAccount, false, false))
 		// Account 9 "fee_quoter_allowed_price_updater": Read-only, Non-signer, Required
+		// so that it can authorize the call made by this offramp
 		accounts__.Append(solanago.NewAccountMeta(feeQuoterAllowedPriceUpdaterAccount, false, false))
 		// Account 10 "fee_quoter_config": Read-only, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(feeQuoterConfigAccount, false, false))

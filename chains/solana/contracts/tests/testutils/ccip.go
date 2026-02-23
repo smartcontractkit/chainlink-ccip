@@ -20,7 +20,7 @@ func DeriveSendAccounts(
 	ctx context.Context,
 	t *testing.T,
 	authority solana.PrivateKey,
-	message ccip_router.SVM2AnyMessage,
+	message ccip_router.Svm2AnyMessage,
 	destChainSelector uint64,
 	solanaGoClient *rpc.Client,
 	router solana.PublicKey,
@@ -41,15 +41,19 @@ func DeriveSendAccounts(
 			Message:           message,
 		}
 
-		deriveRaw := ccip_router.NewDeriveAccountsCcipSendInstruction(
+		deriveInst, err := ccip_router.NewDeriveAccountsCcipSendInstruction(
 			params,
 			stage,
 			routerConfigPDA,
 		)
-		deriveRaw.AccountMetaSlice = append(deriveRaw.AccountMetaSlice, askWith...)
-		derive, err := deriveRaw.ValidateAndBuild()
 		require.NoError(t, err)
-		tx := SimulateTransaction(ctx, t, solanaGoClient, []solana.Instruction{derive}, authority)
+
+		// Cast to *solana.GenericInstruction to append additional accounts
+		genericInst, ok := deriveInst.(*solana.GenericInstruction)
+		require.True(t, ok, "instruction must be *solana.GenericInstruction")
+		genericInst.AccountValues = append(genericInst.AccountValues, askWith...)
+
+		tx := SimulateTransaction(ctx, t, solanaGoClient, []solana.Instruction{genericInst}, authority)
 		derivation, err := common.ExtractAnchorTypedReturnValue[ccip_router.DeriveAccountsResponse](ctx, tx.Value.Logs, router.String())
 		if err != nil {
 			fmt.Printf("Error deriving accounts for stage %s: %v\n", stage, err)
@@ -62,7 +66,8 @@ func DeriveSendAccounts(
 
 		isStartOfToken := re.MatchString(derivation.CurrentStage)
 		if isStartOfToken {
-			tokenIndices = append(tokenIndices, tokenIndex-byte(cap(ccip_router.NewCcipSendInstructionBuilder().AccountMetaSlice)))
+			// NewCcipSendInstruction has 18 required accounts
+			tokenIndices = append(tokenIndices, tokenIndex-byte(18))
 		}
 		tokenIndex += byte(len(derivation.AccountsToSave))
 
@@ -122,23 +127,27 @@ func DeriveExecutionAccounts(
 		offrampConfigPDA, _, err := state.FindConfigPDA(offramp)
 		require.NoError(t, err)
 
-		deriveRaw := ccip_offramp.NewDeriveAccountsExecuteInstruction(
+		deriveInst, err := ccip_offramp.NewDeriveAccountsExecuteInstruction(
 			params,
 			stage,
 			offrampConfigPDA,
 		)
-		deriveRaw.AccountMetaSlice = append(deriveRaw.AccountMetaSlice, askWith...)
-		derive, err := deriveRaw.ValidateAndBuild()
 		require.NoError(t, err)
 
+		// Cast to *solana.GenericInstruction to append additional accounts
+		genericInst, ok := deriveInst.(*solana.GenericInstruction)
+		require.True(t, ok, "instruction must be *solana.GenericInstruction")
+		genericInst.AccountValues = append(genericInst.AccountValues, askWith...)
+
 		fmt.Printf("Stage: %s\n", stage)
-		tx := SimulateTransaction(ctx, t, solanaGoClient, []solana.Instruction{derive}, transmitter)
+		tx := SimulateTransaction(ctx, t, solanaGoClient, []solana.Instruction{genericInst}, transmitter)
 		derivation, err := common.ExtractAnchorTypedReturnValue[ccip_offramp.DeriveAccountsResponse](ctx, tx.Value.Logs, offramp.String())
 		require.NoError(t, err)
 
 		isStartOfToken := re.MatchString(derivation.CurrentStage)
 		if isStartOfToken {
-			tokenIndices = append(tokenIndices, tokenIndex-byte(cap(ccip_offramp.NewExecuteInstructionBuilder().AccountMetaSlice)))
+			// NewExecuteInstruction has 22 required accounts
+			tokenIndices = append(tokenIndices, tokenIndex-byte(22))
 		}
 		tokenIndex += byte(len(derivation.AccountsToSave))
 

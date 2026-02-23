@@ -6,6 +6,21 @@
     "spec": "0.1.0"
   },
   "instructions": [],
+  "events": [
+    {
+      "name": "IdlBuildTypeExport",
+      "discriminator": [
+        116,
+        138,
+        204,
+        211,
+        57,
+        158,
+        245,
+        116
+      ]
+    }
+  ],
   "errors": [
     {
       "code": 10000,
@@ -71,6 +86,70 @@
       "code": 10012,
       "name": "InvalidAptosAddress",
       "msg": "Invalid Aptos address"
+    }
+  ],
+  "types": [
+    {
+      "name": "IdlBuildTypeExport",
+      "docs": [
+        "Event used only during IDL build to ensure TokenAdminRegistry",
+        "is exported in the IDL for Go bindings generation.",
+        "This event is never emitted at runtime."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "token_admin_registry",
+            "type": {
+              "defined": {
+                "name": "TokenAdminRegistry"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "TokenAdminRegistry",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "administrator",
+            "type": "pubkey"
+          },
+          {
+            "name": "pending_administrator",
+            "type": "pubkey"
+          },
+          {
+            "name": "lookup_table",
+            "type": "pubkey"
+          },
+          {
+            "name": "writable_indexes",
+            "type": {
+              "array": [
+                "u128",
+                2
+              ]
+            }
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "supports_auto_derivation",
+            "type": "bool"
+          }
+        ]
+      }
     }
   ]
 }
