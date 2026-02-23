@@ -611,7 +611,7 @@ func (a *SolanaAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokenapi.UpdateAu
 				return sequences.OnChainOutput{}, fmt.Errorf("unsupported token pool type '%s' for Solana", tokenPoolRef.Type)
 			}
 
-			fmt.Printf("Transferring ownership of token pool %s to timelock signer %s\n", tokenPool.String(), timelockSigner.String())
+			b.Logger.Infof("Transferring ownership of token pool %s to timelock signer %s", tokenPool.String(), timelockSigner.String())
 			transferOwnershipOut, err := operations.ExecuteOperation(b, transferOwnershipTPOp, chains.SolanaChains()[chain.Selector], tokenpoolops.TokenPoolTransferOwnershipInput{
 				Program:      tokenPool,
 				NewOwner:     timelockSigner,
@@ -623,7 +623,7 @@ func (a *SolanaAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokenapi.UpdateAu
 			result.Addresses = append(result.Addresses, transferOwnershipOut.Output.Addresses...)
 			result.BatchOps = append(result.BatchOps, transferOwnershipOut.Output.BatchOps...)
 
-			fmt.Printf("Accepting ownership of token pool %s by timelock signer %s\n", tokenPool.String(), timelockSigner.String())
+			b.Logger.Infof("Accepting ownership of token pool %s by timelock signer %s", tokenPool.String(), timelockSigner.String())
 			acceptOwnershipOut, err := operations.ExecuteOperation(b, acceptOwnershipTPOp, chains.SolanaChains()[chain.Selector], tokenpoolops.TokenPoolTransferOwnershipInput{
 				Program:      tokenPool,
 				NewOwner:     timelockSigner,

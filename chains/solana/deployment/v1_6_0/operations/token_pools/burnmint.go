@@ -60,7 +60,7 @@ var InitializeBurnMint = operations.NewOperation(
 		}
 		poolConfigPDA, _ := tokens.TokenPoolConfigAddress(input.TokenMint, input.TokenPool)
 		var chainConfig test_token_pool.State
-		err = chain.GetAccountDataBorshInto(context.Background(), poolConfigPDA, &chainConfig)
+		err = chain.GetAccountDataBorshInto(b.GetContext(), poolConfigPDA, &chainConfig)
 		if err == nil {
 			b.Logger.Info("BurnMintTokenPool already initialized for token mint:", input.TokenMint.String())
 			return PoolInitializeOut{}, nil
@@ -208,7 +208,7 @@ var UpsertRemoteChainConfigBurnMint = operations.NewOperation(
 		isSupportedChain := false
 		existingConfig := base_token_pool.BaseChain{}
 		var remoteChainConfigAccount base_token_pool.BaseChain
-		err = chain.GetAccountDataBorshInto(context.Background(), remoteChainConfigPDA, &remoteChainConfigAccount)
+		err = chain.GetAccountDataBorshInto(b.GetContext(), remoteChainConfigPDA, &remoteChainConfigAccount)
 		if err == nil {
 			isSupportedChain = true
 			existingConfig = remoteChainConfigAccount
