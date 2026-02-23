@@ -146,6 +146,71 @@ contract SiloedUSDCTokenPool_releaseOrMint is SiloedUSDCTokenPoolSetup {
     assertEq(s_usdcTokenPool.getExcludedTokensByChain(SOURCE_CHAIN_SELECTOR), remainingExcludedTokens);
   }
 
+  function test_releaseOrMint_RevertWhen_InsufficientLiquidity_ProposedChainHasNoExcludedLiquidity() public {
+    vm.startPrank(OWNER);
+    s_usdcTokenPool.proposeCCTPMigration(SOURCE_CHAIN_SELECTOR);
+    vm.stopPrank();
+
+    uint256 releaseAmount = 100e6;
+    Pool.ReleaseOrMintInV1 memory releaseOrMintIn = Pool.ReleaseOrMintInV1({
+      originalSender: s_originalSender,
+      receiver: s_recipient,
+      sourceDenominatedAmount: releaseAmount,
+      localToken: address(s_USDCToken),
+      remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+      sourcePoolAddress: s_sourcePoolAddress,
+      sourcePoolData: abi.encode(LOCK_RELEASE_FLAG),
+      offchainTokenData: ""
+    });
+
+    vm.startPrank(s_routerAllowedOffRamp);
+    vm.expectRevert(abi.encodeWithSelector(SiloedUSDCTokenPool.InsufficientLiquidity.selector, 0, releaseAmount));
+    s_usdcTokenPool.releaseOrMint(releaseOrMintIn);
+  }
+
+  function test_releaseOrMint_RevertWhen_InsufficientLiquidity_MigratedChainHasNoExcludedLiquidity() public {
+    vm.startPrank(OWNER);
+    s_usdcTokenPool.proposeCCTPMigration(SOURCE_CHAIN_SELECTOR);
+    address circleMigrator = makeAddr("circleMigrator");
+    s_usdcTokenPool.setCircleMigratorAddress(circleMigrator);
+
+    uint256 excludedAmount = 200e6;
+    s_usdcTokenPool.excludeTokensFromBurn(SOURCE_CHAIN_SELECTOR, excludedAmount);
+    vm.stopPrank();
+
+    vm.startPrank(circleMigrator);
+    s_usdcTokenPool.burnLockedUSDC();
+    vm.stopPrank();
+
+    Pool.ReleaseOrMintInV1 memory releaseOrMintIn = Pool.ReleaseOrMintInV1({
+      originalSender: s_originalSender,
+      receiver: s_recipient,
+      sourceDenominatedAmount: excludedAmount,
+      localToken: address(s_USDCToken),
+      remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+      sourcePoolAddress: s_sourcePoolAddress,
+      sourcePoolData: abi.encode(LOCK_RELEASE_FLAG),
+      offchainTokenData: ""
+    });
+
+    // Consume the full excluded reserve with a valid post-migration in-flight message.
+    vm.startPrank(s_routerAllowedOffRamp);
+    s_usdcTokenPool.releaseOrMint(releaseOrMintIn);
+    vm.stopPrank();
+
+    assertEq(s_usdcTokenPool.getExcludedTokensByChain(SOURCE_CHAIN_SELECTOR), 0);
+
+    // Simulate unexpected liquidity appearing in the lockbox after migration.
+    uint256 unexpectedLiquidity = 100e6;
+    deal(address(s_USDCToken), address(s_sourceLockBox), unexpectedLiquidity);
+
+    releaseOrMintIn.sourceDenominatedAmount = unexpectedLiquidity;
+
+    vm.startPrank(s_routerAllowedOffRamp);
+    vm.expectRevert(abi.encodeWithSelector(SiloedUSDCTokenPool.InsufficientLiquidity.selector, 0, unexpectedLiquidity));
+    s_usdcTokenPool.releaseOrMint(releaseOrMintIn);
+  }
+
   // Reverts
 
   function test_releaseOrMint_RevertWhen_InsufficientLiquidity_InsufficientExcludedTokens() public {

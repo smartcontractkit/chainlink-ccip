@@ -80,16 +80,23 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
     // Since USDC is 6 decimals on all chains, we don't need to convert to a different denomination.
     _validateReleaseOrMint(releaseOrMintIn, releaseOrMintIn.sourceDenominatedAmount, blockConfirmationRequested);
 
-    uint256 excludedTokens = s_tokensExcludedFromBurn[releaseOrMintIn.remoteChainSelector];
-    if (excludedTokens != 0) {
-      // The existence of excluded tokens indicates a migration has been proposed or executed for this chain.
-      // During this period, any tokens being released should come from those excluded tokens reserved for processing inflight messages.
+    uint64 remoteChainSelector = releaseOrMintIn.remoteChainSelector;
+    uint256 excludedTokens = s_tokensExcludedFromBurn[remoteChainSelector];
+    if (
+      excludedTokens != 0 || remoteChainSelector == s_proposedUSDCMigrationChain
+        || s_migratedChains.contains(remoteChainSelector)
+    ) {
+      // Circle's migration procedure requires a lane-level supply lock once migration is proposed/completed.
+      // For those lanes, releaseOrMint must only consume the explicitly excluded in-flight reserve, and this
+      // guard must still apply when excludedTokens == 0 to prevent releasing newly deposited lockbox liquidity.
       if (releaseOrMintIn.sourceDenominatedAmount > excludedTokens) {
         revert InsufficientLiquidity(excludedTokens, releaseOrMintIn.sourceDenominatedAmount);
       }
-      s_tokensExcludedFromBurn[releaseOrMintIn.remoteChainSelector] -= releaseOrMintIn.sourceDenominatedAmount;
+      s_tokensExcludedFromBurn[remoteChainSelector] -= releaseOrMintIn.sourceDenominatedAmount;
       // During a proposed migration, the lockbox balance is the source of truth. Any release here reduces the
       // lockbox balance, so burnLockedUSDC will not over-burn even without separate per-chain accounting.
+      // Keeping excludedTokens in sync with each in-flight release preserves burnLockedUSDC accounting:
+      // burnableUSDC = lockboxBalance - excludedInFlight.
     }
     // No excluded tokens is the common path, as it means no migration has occurred yet, and any released
     // tokens should come from the stored token balance of previously deposited tokens.
