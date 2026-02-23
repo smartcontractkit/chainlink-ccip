@@ -715,7 +715,6 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 					OutboundCCVs:              []datastore.AddressRef{}, // not needed for for 1.6
 					InboundCCVs:               []datastore.AddressRef{}, // not needed for for 1.6
 					OutboundRateLimiterConfig: disabledRL,
-					InboundRateLimiterConfig:  disabledRL,
 					// This is actually optional for 1.6 as the token and token pool addresses are
 					// inferred after deployment
 					// RemoteToken: &datastore.AddressRef{
