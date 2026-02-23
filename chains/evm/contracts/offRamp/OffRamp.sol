@@ -49,6 +49,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   error InvalidOffRamp(address expected, bytes got);
   error InboundImplementationNotFound(address ccvAddress, bytes verifierResults);
   error InvalidGasLimitOverride(uint32 messageGasLimit, uint32 gasLimitOverride);
+  error InvalidOptionalThreshold(uint8 wanted, uint256 got);
   error GasCannotBeZero();
 
   /// @dev Atlas depends on various events, if changing, please notify Atlas.
@@ -672,12 +673,17 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     uint64 sourceChainSelector,
     address receiver
   ) internal view returns (address[] memory requiredCCV, address[] memory optionalCCVs, uint8 optionalThreshold) {
-    // Only query for custom CCVs if the receiver supports the interface..
+    // Only query for custom CCVs if the receiver supports the interface.
     if (receiver._supportsInterfaceReverting(type(IAny2EVMMessageReceiverV2).interfaceId)) {
       (requiredCCV, optionalCCVs, optionalThreshold) = IAny2EVMMessageReceiverV2(receiver).getCCVs(sourceChainSelector);
 
       CCVConfigValidation._assertNoDuplicates(requiredCCV);
       CCVConfigValidation._assertNoDuplicates(optionalCCVs);
+
+      // The threshold cannot be higher than the number of optional CCVs.
+      if (optionalThreshold > optionalCCVs.length) {
+        revert InvalidOptionalThreshold(optionalThreshold, optionalCCVs.length);
+      }
 
       // If the receiver specified empty required and optional CCVs, we fall back to the default CCVs.
       // If they did specify something, we use what they specified.
