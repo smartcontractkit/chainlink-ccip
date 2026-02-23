@@ -48,4 +48,12 @@ contract CCTTokenPool is TokenPool, BaseERC20 {
   ) public view virtual override(BaseERC20, TokenPool) returns (bool) {
     return BaseERC20.supportsInterface(interfaceId) || TokenPool.supportsInterface(interfaceId);
   }
+
+  /// @notice Overrides the default CCIP admin role setter to require the caller to be the owner.
+  /// @param newAdmin The address of the new CCIP admin.
+  function setCCIPAdmin(
+    address newAdmin
+  ) external virtual override onlyOwner {
+    _setCCIPAdmin(newAdmin);
+  }
 }

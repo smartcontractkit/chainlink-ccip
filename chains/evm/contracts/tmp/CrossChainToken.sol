@@ -11,9 +11,9 @@ import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165
 
 /// @notice A basic ERC20 compatible token contract with burn and minting roles.
 /// @dev The total supply can be limited during deployment.
-contract BurnMintERC20 is BaseERC20, AccessControlDefaultAdminRules, IBurnMintERC20 {
+contract CrossChainToken is BaseERC20, AccessControlDefaultAdminRules, IBurnMintERC20 {
   function typeAndVersion() external pure virtual override returns (string memory) {
-    return "CCT 2.0.0-dev";
+    return "CrossChainToken 2.0.0-dev";
   }
 
   error MaxSupplyExceeded(uint256 supplyAfterMint);
@@ -106,5 +106,13 @@ contract BurnMintERC20 is BaseERC20, AccessControlDefaultAdminRules, IBurnMintER
   ) public virtual {
     grantRole(MINTER_ROLE, burnAndMinter);
     grantRole(BURNER_ROLE, burnAndMinter);
+  }
+
+  /// @notice Overrides the default CCIP admin role setter to require the caller to have the DEFAULT_ADMIN_ROLE.
+  /// @param newAdmin The address of the new CCIP admin.
+  function setCCIPAdmin(
+    address newAdmin
+  ) external virtual override onlyRole(DEFAULT_ADMIN_ROLE) {
+    _setCCIPAdmin(newAdmin);
   }
 }
