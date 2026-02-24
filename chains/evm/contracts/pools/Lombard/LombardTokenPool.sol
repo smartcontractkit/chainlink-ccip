@@ -57,7 +57,7 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
   string public constant override typeAndVersion = "LombardTokenPool 2.0.0-dev";
 
   /// @notice Supported bridge message version.
-  uint8 internal constant SUPPORTED_BRIDGE_MSG_VERSION = 1;
+  uint8 internal constant SUPPORTED_BRIDGE_MSG_VERSION = 2;
   /// @notice The address of bridge contract.
   IBridgeV2 public immutable i_bridge;
   /// @notice Lombard verifier resolver address. lockOrBurn fetches the outbound implementation and forwards tokens to it.

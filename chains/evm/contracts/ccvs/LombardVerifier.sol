@@ -81,7 +81,7 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
   uint256 private constant PAYLOAD_START_INDEX = VERSION_TAG_SIZE + RAW_PAYLOAD_LENGTH_SIZE;
 
   /// @notice Supported bridge message version.
-  uint8 internal constant SUPPORTED_BRIDGE_MSG_VERSION = 1;
+  uint8 internal constant SUPPORTED_BRIDGE_MSG_VERSION = 2;
   /// @notice The address of bridge contract.
   IBridgeV3 public immutable i_bridge;
 
