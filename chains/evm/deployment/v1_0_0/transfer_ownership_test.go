@@ -177,6 +177,7 @@ func TestTransferOwnership(t *testing.T) {
 			ValidUntil:           3759765795,
 			TimelockDelay:        mcms_types.MustParseDuration("0s"),
 			TimelockAction:       mcms_types.TimelockActionSchedule,
+			Qualifier:            "test",
 			Description:          "Transfer ownership test",
 		},
 	}
@@ -238,6 +239,7 @@ func TestTransferOwnership(t *testing.T) {
 			ValidUntil:           3759765795,
 			TimelockDelay:        mcms_types.MustParseDuration("0s"),
 			TimelockAction:       mcms_types.TimelockActionSchedule,
+			Qualifier:            "test",
 			Description:          "Transfer ownership test",
 		},
 	}

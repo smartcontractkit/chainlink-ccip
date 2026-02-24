@@ -51,6 +51,7 @@ func (m *cctpTest_MockReader) GetChainMetadata(e deployment.Environment, selecto
 func (m *cctpTest_MockReader) GetTimelockRef(e deployment.Environment, selector uint64, input mcms.Input) (datastore.AddressRef, error) {
 	return datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 		ChainSelector: selector,
+		Address:       timelockAddress,
 		Type:          "Timelock",
 		Version:       semver.MustParse("1.0.0"),
 	}, selector, datastore_utils.FullRef)
@@ -422,6 +423,21 @@ func TestDeployCCTPChains_VerifyPreconditions(t *testing.T) {
 					ValidUntil:           3759765795,
 					TimelockDelay:        mcms_types.MustParseDuration("1h"),
 					TimelockAction:       "InvalidAction", // Invalid action
+				},
+			},
+			expectedError: "failed to validate MCMS input",
+		},
+		{
+			desc: "failure - zero valid until timestamp",
+			cfg: v1_7_0_changesets.DeployCCTPChainsConfig{
+				Chains: map[uint64]v1_7_0_changesets.CCTPChainConfig{
+					5009297550715157269: {},
+				},
+				MCMS: &mcms.Input{
+					OverridePreviousRoot: true,
+					ValidUntil:           0, // Zero timestamp
+					TimelockDelay:        mcms_types.MustParseDuration("1h"),
+					TimelockAction:       mcms_types.TimelockActionSchedule,
 				},
 			},
 			expectedError: "failed to validate MCMS input",
