@@ -285,7 +285,7 @@ pub struct CcipSend<'info> {
         bump,
         constraint = valid_version(dest_chain_state.version, MAX_CHAINSTATE_V) @ CcipRouterError::InvalidVersion,
     )]
-    pub dest_chain_state: Box<Account<'info, DestChain>>,
+    pub dest_chain_state: Account<'info, DestChain>,
 
     /// CHECK this represents the PDA where the message counters are stored. As it may be initialized or not,
     /// and it may be in it's v1 or v2 form, it is an UncheckedAccount and the code handles all cases manually.
