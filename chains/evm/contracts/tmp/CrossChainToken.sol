@@ -31,8 +31,7 @@ contract CrossChainToken is BaseERC20, AccessControlDefaultAdminRules, IBurnMint
     address burnMintRoleAdmin,
     address owner
   ) BaseERC20(args) AccessControlDefaultAdminRules(0, owner == address(0) ? msg.sender : owner) {
-    // If a burn mint admin is specified, set it.
-    if (burnMintRoleAdmin == address(0)) {
+    if (burnMintRoleAdmin != address(0)) {
       _grantRole(BURN_MINT_ADMIN_ROLE, burnMintRoleAdmin);
     }
 
