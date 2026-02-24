@@ -9,6 +9,7 @@ import {SiloedLockReleaseTokenPool} from "../SiloedLockReleaseTokenPool.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
+import {EnumerableMap} from "@openzeppelin/contracts@5.3.0/utils/structs/EnumerableMap.sol";
 import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/EnumerableSet.sol";
 
 /// @notice A token pool for USDC which inherits the Siloed token functionality while adding the CCTP migration functionality.
@@ -20,6 +21,7 @@ import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/Enumera
 /// balances under CCTP accounting rules defined at:
 /// https://github.com/circlefin/stablecoin-evm/blob/master/doc/bridged_USDC_standard.md
 contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
+  using EnumerableMap for EnumerableMap.UintToAddressMap;
   using EnumerableSet for EnumerableSet.UintSet;
 
   event CCTPMigrationProposed(uint64 remoteChainSelector);
@@ -35,6 +37,7 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
   error ExistingMigrationProposal();
   error NoMigrationProposalPending();
   error ChainAlreadyMigrated(uint64 remoteChainSelector);
+  error LockBoxCannotBeShared(uint64 chainSelectorA, uint64 chainSelectorB, address lockBox);
   error InsufficientLiquidity(uint256 availableLiquidity, uint256 requestedAmount);
 
   /// @notice The address of the circle-controlled wallet which will execute a CCTP lane migration
@@ -72,6 +75,36 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
   /// @dev Using a function because constant state variables cannot be overridden by child contracts.
   function typeAndVersion() external pure virtual override returns (string memory) {
     return "SiloedUSDCTokenPool 2.0.0-dev";
+  }
+
+  /// @notice Configure lockboxes.
+  /// @param lockBoxConfigs The lockbox configurations to set.
+  /// @dev USDC lanes must remain fully siloed to keep migration burn accounting lane-specific.
+  /// Sharing one lockbox across selectors would couple balances across lanes and break migration assumptions.
+  function configureLockBoxes(
+    LockBoxConfig[] calldata lockBoxConfigs
+  ) external override onlyOwner {
+    for (uint256 i = 0; i < lockBoxConfigs.length; ++i) {
+      address lockBox = lockBoxConfigs[i].lockBox;
+      if (lockBox == address(0)) revert ZeroAddressInvalid();
+
+      if (!ILockBox(lockBox).isTokenSupported(address(i_token))) {
+        revert InvalidToken(address(i_token));
+      }
+      s_lockBoxes.set(lockBoxConfigs[i].remoteChainSelector, lockBox);
+    }
+
+    // Validate globally after applying updates so checks are order-independent for batched updates.
+    uint256 length = s_lockBoxes.length();
+    for (uint256 i = 0; i < length; ++i) {
+      (uint256 chainSelectorA, address lockBoxA) = s_lockBoxes.at(i);
+      for (uint256 j = i + 1; j < length; ++j) {
+        (uint256 chainSelectorB, address lockBoxB) = s_lockBoxes.at(j);
+        if (lockBoxA == lockBoxB) {
+          revert LockBoxCannotBeShared(uint64(chainSelectorA), uint64(chainSelectorB), lockBoxA);
+        }
+      }
+    }
   }
 
   /// @notice Mint tokens from the pool to the recipient.

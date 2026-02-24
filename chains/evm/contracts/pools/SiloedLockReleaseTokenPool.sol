@@ -83,7 +83,7 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
   /// @param lockBoxConfigs The lockbox configurations to set.
   function configureLockBoxes(
     LockBoxConfig[] calldata lockBoxConfigs
-  ) external onlyOwner {
+  ) external virtual onlyOwner {
     for (uint256 i = 0; i < lockBoxConfigs.length; ++i) {
       address lockBox = lockBoxConfigs[i].lockBox;
       if (lockBox == address(0)) revert ZeroAddressInvalid();
