@@ -35,7 +35,7 @@ contract TokenPool_getFee is AdvancedPoolHooksSetup {
 
   function test_getFee_CustomFinality() public {
     uint16 customFeeBps = 400; // 4%
-    uint16 minBlockConfirmation = 5;
+    uint16 minBlockConfirmations = 5;
     IPoolV2.TokenTransferFeeConfig memory feeConfig = IPoolV2.TokenTransferFeeConfig({
       destGasOverhead: 60_000,
       destBytesOverhead: Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES,
@@ -47,13 +47,13 @@ contract TokenPool_getFee is AdvancedPoolHooksSetup {
     });
 
     vm.startPrank(OWNER);
-    // Enable custom block confirmations by setting minBlockConfirmation > 0
-    s_tokenPool.setMinBlockConfirmation(minBlockConfirmation);
+    // Enable custom block confirmations by setting minBlockConfirmations > 0.
+    s_tokenPool.setMinBlockConfirmations(minBlockConfirmations);
     _applyFeeConfig(feeConfig);
 
     uint256 amount = 1_500e6;
     (uint256 usdFeeCents, uint32 destGasOverhead, uint32 destBytesOverhead, uint16 tokenFeeBps, bool isEnabled) =
-      s_tokenPool.getFee(address(s_token), DEST_CHAIN_SELECTOR, amount, address(0), minBlockConfirmation, "");
+      s_tokenPool.getFee(address(s_token), DEST_CHAIN_SELECTOR, amount, address(0), minBlockConfirmations, "");
 
     assertEq(usdFeeCents, feeConfig.customBlockConfirmationFeeUSDCents);
     assertEq(destGasOverhead, feeConfig.destGasOverhead);
@@ -83,11 +83,11 @@ contract TokenPool_getFee is AdvancedPoolHooksSetup {
     s_tokenPool.getFee(address(s_token), DEST_CHAIN_SELECTOR, 1e18, address(0), requestedBlockConfirmation, "");
   }
 
-  function test_getFee_RevertWhen_InvalidMinBlockConfirmation() public {
-    uint16 minBlockConfirmation = 10;
+  function test_getFee_RevertWhen_InvalidMinBlockConfirmations() public {
+    uint16 minBlockConfirmations = 10;
 
     // Set custom block confirmation config with minimum of 10 blocks
-    s_tokenPool.setMinBlockConfirmation(minBlockConfirmation);
+    s_tokenPool.setMinBlockConfirmations(minBlockConfirmations);
 
     IPoolV2.TokenTransferFeeConfig memory feeConfig = IPoolV2.TokenTransferFeeConfig({
       destGasOverhead: 50_000,
@@ -105,7 +105,7 @@ contract TokenPool_getFee is AdvancedPoolHooksSetup {
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        TokenPool.InvalidMinBlockConfirmation.selector, requestedBlockConfirmation, minBlockConfirmation
+        TokenPool.InvalidMinBlockConfirmations.selector, requestedBlockConfirmation, minBlockConfirmations
       )
     );
     s_tokenPool.getFee(address(s_token), DEST_CHAIN_SELECTOR, amount, address(0), requestedBlockConfirmation, "");
@@ -143,10 +143,10 @@ contract TokenPool_getFee is AdvancedPoolHooksSetup {
   }
 
   function test_getFee_DisabledConfig_CustomFinality_ReturnsZeros() public {
-    uint16 minBlockConfirmation = 5;
+    uint16 minBlockConfirmations = 5;
 
     vm.startPrank(OWNER);
-    s_tokenPool.setMinBlockConfirmation(minBlockConfirmation);
+    s_tokenPool.setMinBlockConfirmations(minBlockConfirmations);
 
     // First enable a config
     IPoolV2.TokenTransferFeeConfig memory feeConfig = IPoolV2.TokenTransferFeeConfig({
@@ -168,7 +168,7 @@ contract TokenPool_getFee is AdvancedPoolHooksSetup {
 
     uint256 amount = 1_500e6;
     (uint256 usdFeeCents, uint32 destGasOverhead, uint32 destBytesOverhead, uint16 tokenFeeBps, bool isEnabled) =
-      s_tokenPool.getFee(address(s_token), DEST_CHAIN_SELECTOR, amount, address(0), minBlockConfirmation, "");
+      s_tokenPool.getFee(address(s_token), DEST_CHAIN_SELECTOR, amount, address(0), minBlockConfirmations, "");
 
     // Should return all zeros with isEnabled=false when disabled, even for custom finality
     assertEq(usdFeeCents, 0, "Fee should be zero");

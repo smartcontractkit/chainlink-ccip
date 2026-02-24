@@ -83,7 +83,7 @@ contract TokenPoolHelper is TokenPool {
     _onlyOffRamp(remoteChainSelector);
   }
 
-  function getCustomMinBlockConfirmation() external view returns (uint16 minBlockConfirmations) {
+  function getCustomMinBlockConfirmations() external view returns (uint16 minBlockConfirmations) {
     return s_minBlockConfirmations;
   }
 

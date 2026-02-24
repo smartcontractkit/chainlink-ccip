@@ -88,12 +88,19 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
     super.configureLockBoxes(lockBoxConfigs);
     // Validate globally after applying updates so checks are order-independent for batched updates.
     uint256 length = s_lockBoxes.length();
+    uint64[] memory chainSelectors = new uint64[](length);
+    address[] memory lockBoxes = new address[](length);
     for (uint256 i = 0; i < length; ++i) {
-      (uint256 chainSelectorA, address lockBoxA) = s_lockBoxes.at(i);
+      (uint256 chainSelector, address lockBox) = s_lockBoxes.at(i);
+      chainSelectors[i] = uint64(chainSelector);
+      lockBoxes[i] = lockBox;
+    }
+
+    for (uint256 i = 0; i < length; ++i) {
+      address lockBoxA = lockBoxes[i];
       for (uint256 j = i + 1; j < length; ++j) {
-        (uint256 chainSelectorB, address lockBoxB) = s_lockBoxes.at(j);
-        if (lockBoxA == lockBoxB) {
-          revert LockBoxCannotBeShared(uint64(chainSelectorA), uint64(chainSelectorB), lockBoxA);
+        if (lockBoxA == lockBoxes[j]) {
+          revert LockBoxCannotBeShared(chainSelectors[i], chainSelectors[j], lockBoxA);
         }
       }
     }

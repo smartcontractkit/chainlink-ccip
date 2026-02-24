@@ -32,7 +32,7 @@ contract TokenPool_validateLockOrBurn is AdvancedPoolHooksSetup {
   }
 
   function test_validateLockOrBurn_WithFastFinality() public {
-    uint16 minBlockConfirmation = 5;
+    uint16 minBlockConfirmations = 5;
     RateLimiter.Config memory outboundFastConfig = RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24});
     RateLimiter.Config memory inboundFastConfig = RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24});
     TokenPool.RateLimitConfigArgs[] memory rateLimitArgs = new TokenPool.RateLimitConfigArgs[](1);
@@ -42,7 +42,7 @@ contract TokenPool_validateLockOrBurn is AdvancedPoolHooksSetup {
       outboundRateLimiterConfig: outboundFastConfig,
       inboundRateLimiterConfig: inboundFastConfig
     });
-    s_tokenPool.setMinBlockConfirmation(minBlockConfirmation);
+    s_tokenPool.setMinBlockConfirmations(minBlockConfirmations);
     s_tokenPool.setRateLimitConfig(rateLimitArgs);
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _buildLockOrBurnIn(1000e18);
@@ -74,7 +74,7 @@ contract TokenPool_validateLockOrBurn is AdvancedPoolHooksSetup {
     vm.startPrank(OWNER);
     s_tokenPool.setDynamicConfig(address(s_sourceRouter), address(0), address(0));
     // Enable custom block confirmation handling so consumption emits.
-    s_tokenPool.setMinBlockConfirmation(1);
+    s_tokenPool.setMinBlockConfirmations(1);
     s_tokenPool.setRateLimitConfig(rateLimitArgs);
 
     TokenPool.TokenTransferFeeConfigArgs[] memory feeConfigArgs = new TokenPool.TokenTransferFeeConfigArgs[](1);
@@ -143,22 +143,22 @@ contract TokenPool_validateLockOrBurn is AdvancedPoolHooksSetup {
     assertEq(outboundBucket.tokens, _getOutboundRateLimiterConfig().capacity - expectedAmount);
   }
 
-  function test_validateLockOrBurn_RevertWhen_InvalidMinBlockConfirmation() public {
-    uint16 minBlockConfirmation = 5;
-    s_tokenPool.setMinBlockConfirmation(minBlockConfirmation);
+  function test_validateLockOrBurn_RevertWhen_InvalidMinBlockConfirmations() public {
+    uint16 minBlockConfirmations = 5;
+    s_tokenPool.setMinBlockConfirmations(minBlockConfirmations);
     vm.startPrank(s_allowedOnRamp);
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        TokenPool.InvalidMinBlockConfirmation.selector, minBlockConfirmation - 1, minBlockConfirmation
+        TokenPool.InvalidMinBlockConfirmations.selector, minBlockConfirmations - 1, minBlockConfirmations
       )
     );
-    s_tokenPool.validateLockOrBurn(_buildLockOrBurnIn(1000e18), minBlockConfirmation - 1, "", 0);
+    s_tokenPool.validateLockOrBurn(_buildLockOrBurnIn(1000e18), minBlockConfirmations - 1, "", 0);
   }
 
   function test_validateLockOrBurn_RevertWhen_CustomBlockConfirmationsNotEnabled() public {
     vm.startPrank(OWNER);
-    s_tokenPool.setMinBlockConfirmation(0);
+    s_tokenPool.setMinBlockConfirmations(0);
 
     vm.startPrank(s_allowedOnRamp);
 

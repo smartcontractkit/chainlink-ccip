@@ -9,11 +9,11 @@ import {AdvancedPoolHooksSetup} from "../AdvancedPoolHooks/AdvancedPoolHooksSetu
 
 contract TokenPool_applyFee is AdvancedPoolHooksSetup {
   function test_applyFee_CustomFinality() public {
-    uint16 minBlockConfirmation = 5;
+    uint16 minBlockConfirmations = 5;
     uint16 defaultBlockConfirmationTransferFeeBps = 100;
     uint16 customBlockConfirmationTransferFeeBps = 500;
     uint256 amount = 1_000e18;
-    s_tokenPool.setMinBlockConfirmation(minBlockConfirmation);
+    s_tokenPool.setMinBlockConfirmations(minBlockConfirmations);
     TokenPool.TokenTransferFeeConfigArgs[] memory feeConfigArgs = new TokenPool.TokenTransferFeeConfigArgs[](1);
     feeConfigArgs[0] = TokenPool.TokenTransferFeeConfigArgs({
       destChainSelector: DEST_CHAIN_SELECTOR,
@@ -37,7 +37,7 @@ contract TokenPool_applyFee is AdvancedPoolHooksSetup {
       localToken: address(s_token)
     });
 
-    uint256 amountAfterFee = s_tokenPool.applyFee(lockOrBurnIn, minBlockConfirmation);
+    uint256 amountAfterFee = s_tokenPool.applyFee(lockOrBurnIn, minBlockConfirmations);
     assertEq(amountAfterFee, amount - ((amount * customBlockConfirmationTransferFeeBps) / BPS_DIVIDER));
   }
 

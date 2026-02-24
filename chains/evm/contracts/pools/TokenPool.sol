@@ -42,7 +42,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   using RateLimiter for RateLimiter.TokenBucket;
   using SafeERC20 for IERC20;
 
-  error InvalidMinBlockConfirmation(uint16 requested, uint16 minBlockConfirmations);
+  error InvalidMinBlockConfirmations(uint16 requested, uint16 minBlockConfirmations);
   error CustomBlockConfirmationsNotEnabled();
   error InvalidTransferFeeBps(uint256 bps);
   error InvalidTokenTransferFeeConfig(uint64 destChainSelector);
@@ -93,7 +93,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
     RateLimiter.Config outboundRateLimiterConfig,
     RateLimiter.Config inboundRateLimiterConfig
   );
-  event MinBlockConfirmationSet(uint16 minBlockConfirmations);
+  event MinBlockConfirmationsSet(uint16 minBlockConfirmations);
   event AdvancedPoolHooksUpdated(IAdvancedPoolHooks oldHook, IAdvancedPoolHooks newHook);
 
   struct ChainUpdate {
@@ -217,7 +217,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   }
 
   /// @notice Gets the minimum block confirmations required for custom finality transfers.
-  function getMinBlockConfirmation() public view virtual returns (uint16 minBlockConfirmations) {
+  function getMinBlockConfirmations() public view virtual returns (uint16 minBlockConfirmations) {
     return s_minBlockConfirmations;
   }
 
@@ -246,12 +246,12 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
 
   /// @notice Sets the minimum block confirmations required for custom finality transfers.
   /// @param minBlockConfirmations The minimum block confirmations required for custom finality transfers.
-  function setMinBlockConfirmation(
+  function setMinBlockConfirmations(
     uint16 minBlockConfirmations
   ) public virtual onlyOwner {
     // Since 0 means default finality it is a valid value.
     s_minBlockConfirmations = minBlockConfirmations;
-    emit MinBlockConfirmationSet(minBlockConfirmations);
+    emit MinBlockConfirmationsSet(minBlockConfirmations);
   }
 
   /// @notice Updates the advanced pool hook.
@@ -428,7 +428,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
         revert CustomBlockConfirmationsNotEnabled();
       }
       if (blockConfirmationRequested < minBlockConfirmationsConfigured) {
-        revert InvalidMinBlockConfirmation(blockConfirmationRequested, minBlockConfirmationsConfigured);
+        revert InvalidMinBlockConfirmations(blockConfirmationRequested, minBlockConfirmationsConfigured);
       }
       _consumeCustomBlockConfirmationOutboundRateLimit(
         lockOrBurnIn.localToken, lockOrBurnIn.remoteChainSelector, amount
@@ -1058,7 +1058,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
 
     if (blockConfirmationRequested != WAIT_FOR_FINALITY) {
       if (blockConfirmationRequested < minBlockConfirmationsConfigured) {
-        revert InvalidMinBlockConfirmation(blockConfirmationRequested, minBlockConfirmationsConfigured);
+        revert InvalidMinBlockConfirmations(blockConfirmationRequested, minBlockConfirmationsConfigured);
       }
       return (
         feeConfig.customBlockConfirmationFeeUSDCents,
