@@ -28,11 +28,13 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
   uint8 private constant REMOTE_TOKEN_DECIMALS = 6;
   bytes private constant LOCK_RELEASE_INIT_CODE = type(LockReleaseTokenPool).creationCode;
 
+  bytes32 internal constant DYNAMIC_SALT = keccak256(abi.encodePacked(FAKE_SALT, OWNER));
+
   address internal s_burnMintOffRamp = makeAddr("burn_mint_offRamp");
   bytes32 private constant DYNAMIC_SALT = keccak256(abi.encodePacked(FAKE_SALT, OWNER));
 
   function setUp() public override {
-    TokenPoolFactorySetup.setUp();
+    super.setUp();
 
     Router.OffRamp[] memory offRampUpdates = new Router.OffRamp[](1);
     offRampUpdates[0] = Router.OffRamp({sourceChainSelector: DEST_CHAIN_SELECTOR, offRamp: s_burnMintOffRamp});
@@ -216,7 +218,7 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
 
   function test_deployTokenPoolWithExistingToken_ExistingRemoteToken_AndPredictPool() public {
     FactoryBurnMintERC20 newRemoteToken =
-      new FactoryBurnMintERC20("TestToken", "TT", 18, type(uint256).max, PREMINT_AMOUNT, OWNER);
+      new FactoryBurnMintERC20("TestToken", "TT", LOCAL_TOKEN_DECIMALS, type(uint256).max, PREMINT_AMOUNT, OWNER);
 
     // We have to create a new factory, registry module, and token admin registry to simulate the other chain
     TokenAdminRegistry newTokenAdminRegistry = new TokenAdminRegistry();
@@ -440,10 +442,10 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
     newTokenAdminRegistry.addRegistryModule(address(newRegistryModule));
 
     FactoryBurnMintERC20 newLocalToken =
-      new FactoryBurnMintERC20("TestToken", "TEST", 18, type(uint256).max, PREMINT_AMOUNT, OWNER);
+      new FactoryBurnMintERC20("TestToken", "TEST", LOCAL_TOKEN_DECIMALS, type(uint256).max, PREMINT_AMOUNT, OWNER);
 
     FactoryBurnMintERC20 newRemoteToken =
-      new FactoryBurnMintERC20("TestToken", "TEST", 18, type(uint256).max, PREMINT_AMOUNT, OWNER);
+      new FactoryBurnMintERC20("TestToken", "TEST", LOCAL_TOKEN_DECIMALS, type(uint256).max, PREMINT_AMOUNT, OWNER);
 
     ERC20LockBox localLockBox = new ERC20LockBox(address(newLocalToken));
     ERC20LockBox remoteLockBox = new ERC20LockBox(address(newRemoteToken));
@@ -779,9 +781,9 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
 
   function test_deployTokenPoolWithExistingToken_RevertWhen_InvalidLockBoxToken() public {
     FactoryBurnMintERC20 token =
-      new FactoryBurnMintERC20("TestToken", "TT", 6, type(uint256).max, PREMINT_AMOUNT, OWNER);
+      new FactoryBurnMintERC20("TestToken", "TT", LOCAL_TOKEN_DECIMALS, type(uint256).max, PREMINT_AMOUNT, OWNER);
     FactoryBurnMintERC20 otherToken =
-      new FactoryBurnMintERC20("TestToken", "TT", 6, type(uint256).max, PREMINT_AMOUNT, OWNER);
+      new FactoryBurnMintERC20("TestToken", "TT", LOCAL_TOKEN_DECIMALS, type(uint256).max, PREMINT_AMOUNT, OWNER);
     ERC20LockBox lockBox = new ERC20LockBox(address(otherToken));
 
     TokenPoolFactory.RemoteTokenPoolInfo[] memory remotes = new TokenPoolFactory.RemoteTokenPoolInfo[](0);
