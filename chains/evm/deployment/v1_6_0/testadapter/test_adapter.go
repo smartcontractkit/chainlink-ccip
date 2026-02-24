@@ -202,7 +202,7 @@ func (a *EVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, 
 		it, err := onRamp.FilterCCIPMessageSent(&bind.FilterOpts{
 			Start:   blockNum,
 			End:     &blockNum,
-			Context: context.Background(),
+			Context: ctx,
 		}, []uint64{destChainSelector}, []uint64{})
 		if err != nil {
 			return 0, fmt.Errorf("failed to filter CCIPMessageSent events: %w", err)
@@ -370,15 +370,16 @@ func (a *EVMAdapter) GetTokenExpansionConfig() tokensapi.TokenExpansionInputPerC
 	suffix := strconv.FormatUint(a.Selector, 10) + "-" + a.Family()
 	admin := a.Chain.DeployerKey.From.Hex()
 	deci := uint8(18)
+	registryAddr, err := a.GetRegistryAddress()
+	if err != nil {
+		return tokensapi.TokenExpansionInputPerChain{}
+	}
 
 	oneToken := new(big.Int).Exp(big.NewInt(10), new(big.Int).SetUint64(uint64(deci)), nil)
 	mintAmnt := new(big.Int).Mul(oneToken, big.NewInt(1_000_000)) // pre-mint 1 million tokens
 
 	return tokensapi.TokenExpansionInputPerChain{
-		TokenPoolVersion:        cciputils.Version_1_5_1,
-		TokenPoolRateLimitAdmin: admin,
-		TokenPoolAdmin:          admin,
-		TARAdmin:                admin,
+		TokenPoolVersion: cciputils.Version_1_5_1,
 		DeployTokenInput: &tokensapi.DeployTokenInput{
 			Decimals:               deci,
 			Symbol:                 "TEST_TOKEN_" + suffix,
@@ -396,9 +397,15 @@ func (a *EVMAdapter) GetTokenExpansionConfig() tokensapi.TokenExpansionInputPerC
 			PoolType:           cciputils.BurnMintTokenPool.String(),
 			TokenPoolQualifier: "TEST TOKEN POOL " + suffix,
 		},
-		// optional fields left empty, but included here for completeness
-		RemoteCounterpartUpdates: map[uint64]tokensapi.RateLimiterConfig{},
-		RemoteCounterpartDeletes: []uint64{},
+		TokenTransferConfig: &tokensapi.TokenTransferConfig{
+			ChainSelector: a.Selector,
+			ExternalAdmin: admin,
+			RegistryRef: datastore.AddressRef{
+				ChainSelector: a.Selector,
+				Address:       registryAddr,
+			},
+			RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{},
+		},
 	}
 }
 
@@ -425,7 +432,7 @@ func ConfirmCommitWithExpectedSeqNumRange(
 ) (*offramp.OffRampCommitReportAccepted, error) {
 	sink := make(chan *offramp.OffRampCommitReportAccepted)
 	subscription, err := offRamp.WatchCommitReportAccepted(&bind.WatchOpts{
-		Context: context.Background(),
+		Context: t.Context(),
 		Start:   startBlock,
 	}, sink)
 	if err != nil {
@@ -591,7 +598,7 @@ func ConfirmExecWithSeqNrs(
 	defer tick.Stop()
 	sink := make(chan *offramp.OffRampExecutionStateChanged)
 	subscription, err := offRamp.WatchExecutionStateChanged(&bind.WatchOpts{
-		Context: context.Background(),
+		Context: t.Context(),
 		Start:   startBlock,
 	}, sink, nil, nil, nil)
 	if err != nil {

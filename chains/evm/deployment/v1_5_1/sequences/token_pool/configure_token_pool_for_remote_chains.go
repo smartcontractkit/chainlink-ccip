@@ -101,6 +101,19 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get supported chains: %w", err)
 		}
+		localDecimals, err := tp.GetTokenDecimals(&bind.CallOpts{Context: b.GetContext()})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to get token decimals: %w", err)
+		}
+
+		inputORL, inputIRL := tokensapi.GenerateTPRLConfigs(
+			input.RemoteChainConfig.OutboundRateLimiterConfig,
+			input.RemoteChainConfig.InboundRateLimiterConfig,
+			localDecimals,
+			input.RemoteChainConfig.RemoteDecimals,
+			chain.Family(),
+			tpops.Version,
+		)
 
 		// Token pool remote chain configuration can vary depending on whether the remote
 		// pool is or isn't supported. The different cases to consider are recorded below
@@ -124,8 +137,6 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 				// If the remote token onchain matches the one provided as input, then we won't call
 				// ApplyChainUpdates and instead handle the onchain updates via SetRateLimiterConfig
 				// and AddRemotePool.
-				inputORL := input.RemoteChainConfig.DefaultFinalityOutboundRateLimiterConfig
-				inputIRL := input.RemoteChainConfig.DefaultFinalityInboundRateLimiterConfig
 				remoteTP := input.RemoteChainConfig.RemotePool
 				remoteCS := input.RemoteChainSelector
 
@@ -219,14 +230,14 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 							RemoteChainSelector: input.RemoteChainSelector,
 							RemoteTokenAddress:  input.RemoteChainConfig.RemoteToken,
 							OutboundRateLimiterConfig: token_pool.RateLimiterConfig{
-								IsEnabled: input.RemoteChainConfig.DefaultFinalityOutboundRateLimiterConfig.IsEnabled,
-								Capacity:  input.RemoteChainConfig.DefaultFinalityOutboundRateLimiterConfig.Capacity,
-								Rate:      input.RemoteChainConfig.DefaultFinalityOutboundRateLimiterConfig.Rate,
+								IsEnabled: inputORL.IsEnabled,
+								Capacity:  inputORL.Capacity,
+								Rate:      inputORL.Rate,
 							},
 							InboundRateLimiterConfig: token_pool.RateLimiterConfig{
-								IsEnabled: input.RemoteChainConfig.DefaultFinalityInboundRateLimiterConfig.IsEnabled,
-								Capacity:  input.RemoteChainConfig.DefaultFinalityInboundRateLimiterConfig.Capacity,
-								Rate:      input.RemoteChainConfig.DefaultFinalityInboundRateLimiterConfig.Rate,
+								IsEnabled: inputIRL.IsEnabled,
+								Capacity:  inputIRL.Capacity,
+								Rate:      inputIRL.Rate,
 							},
 						},
 					},
