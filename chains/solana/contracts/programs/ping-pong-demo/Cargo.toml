@@ -1,6 +1,6 @@
 [package]
 name = "ping_pong_demo"
-version = "1.6.1-candidate"
+version = "1.6.1"
 description = "Created with Anchor"
 edition = "2021"
 
@@ -22,7 +22,7 @@ anchor-spl = "0.29.0"
 example_ccip_receiver = { path = "../example-ccip-receiver", features = [
     "no-entrypoint",
 ] }
-ccip_router = { version = "1.6.1-candidate", path = "../ccip-router", features = [
+ccip_router = { version = "1.6.1", path = "../ccip-router", features = [
     "cpi",
 ] }
 

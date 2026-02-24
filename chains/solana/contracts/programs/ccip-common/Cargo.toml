@@ -1,6 +1,6 @@
 [package]
 name = "ccip_common"
-version = "1.6.1-candidate"
+version = "1.6.1"
 edition = "2021"
 
 [lib]

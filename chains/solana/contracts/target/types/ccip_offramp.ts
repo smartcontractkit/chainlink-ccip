@@ -1,5 +1,5 @@
 export type CcipOfframp = {
-  "version": "1.6.1-candidate",
+  "version": "1.6.1",
   "name": "ccip_offramp",
   "constants": [
     {
@@ -2854,7 +2854,7 @@ export type CcipOfframp = {
 };
 
 export const IDL: CcipOfframp = {
-  "version": "1.6.1-candidate",
+  "version": "1.6.1",
   "name": "ccip_offramp",
   "constants": [
     {

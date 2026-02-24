@@ -1,6 +1,6 @@
 [package]
 name = "ccip_router"
-version = "1.6.1-candidate"
+version = "1.6.1"
 description = "Created with Anchor"
 edition = "2021"
 build = "build.rs"
@@ -22,13 +22,13 @@ anchor-lang = { version = "0.29.0", features = ["init-if-needed"] }
 anchor-spl = "0.29.0"
 bytemuck = "1.7"
 ethnum = "1.5"
-fee_quoter = { version = "1.6.1-candidate", path = "../fee-quoter", features = [
+fee_quoter = { version = "1.6.1", path = "../fee-quoter", features = [
     "cpi",
 ] }
-rmn_remote = { version = "1.6.1-candidate", path = "../rmn-remote", features = [
+rmn_remote = { version = "1.6.1", path = "../rmn-remote", features = [
     "cpi",
 ] }
-ccip_common = { version = "1.6.1-candidate", path = "../ccip-common" }
+ccip_common = { version = "1.6.1", path = "../ccip-common" }
 
 [dev-dependencies]
 hex = "0.4.3"
