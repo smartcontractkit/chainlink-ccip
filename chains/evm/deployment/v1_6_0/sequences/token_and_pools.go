@@ -24,6 +24,7 @@ import (
 	// between these two versions.
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/token_pool"
 
+	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
@@ -707,11 +708,49 @@ func (a *EVMAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokensapi.UpdateAuth
 		"Update authorities for a token and token pool on EVM Chain",
 		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokensapi.UpdateAuthoritiesInput) (sequences.OnChainOutput, error) {
 			var result sequences.OnChainOutput
-			// chain, ok := chains.EVMChains()[input.ChainSelector]
-			// if !ok {
-			// 	return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
-			// }
+			chain, ok := chains.EVMChains()[input.ChainSelector]
+			if !ok {
+				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
+			}
 
+			filter := datastore.AddressRef{
+				Type:          datastore.ContractType(cciputils.RBACTimelock),
+				ChainSelector: chain.Selector,
+				Qualifier:     cciputils.CLLQualifier,
+			}
+
+			timelockAddr, err := datastore_utils.FindAndFormatRef(
+				input.ExistingDataStore,
+				filter,
+				chain.Selector,
+				datastore_utils.FullRef,
+			)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to find timelock address for chain %d: %w", input.ChainSelector, err)
+			}
+
+			result, err = sequences.RunAndMergeSequence(b, chains,
+				a.SequenceTransferOwnershipViaMCMS(),
+				deployops.TransferOwnershipPerChainInput{
+					ChainSelector: chain.Selector,
+					CurrentOwner:  chain.DeployerKey.From.Hex(),
+					ProposedOwner: timelockAddr.Address,
+					ContractRef:   []datastore.AddressRef{input.TokenPoolRef},
+				}, result)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to transfer ownership to proposed owner on chain %d: %w", input.ChainSelector, err)
+			}
+			result, err = sequences.RunAndMergeSequence(b, chains,
+				a.SequenceAcceptOwnership(),
+				deployops.TransferOwnershipPerChainInput{
+					ChainSelector: chain.Selector,
+					CurrentOwner:  chain.DeployerKey.From.Hex(),
+					ProposedOwner: timelockAddr.Address,
+					ContractRef:   []datastore.AddressRef{input.TokenPoolRef},
+				}, result)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to accept ownership on chain %d: %w", input.ChainSelector, err)
+			}
 			return result, nil
 		})
 }

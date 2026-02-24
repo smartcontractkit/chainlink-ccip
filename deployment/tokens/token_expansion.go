@@ -5,12 +5,12 @@ import (
 	"math/big"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/ethereum/go-ethereum/common"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
-	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
@@ -35,6 +35,9 @@ type TokenExpansionInputPerChain struct {
 	DeployTokenPoolInput *DeployTokenPoolInput `yaml:"deployTokenPoolInput" json:"deployTokenPoolInput"`
 	// if not nil, will try to fully configure the token for transfers, including registering the token and token pool on-chain and setting the pool on the token
 	TokenTransferConfig *TokenTransferConfig `yaml:"tokenTransferConfig" json:"tokenTransferConfig"`
+	// if true, the ownership transfer to the timelock and acceptance of ownership by the timelock
+	// will be skipped for token pools at the end of the changeset.
+	SkipOwnershipTransfer bool `yaml:"skipOwnershipTransfer" json:"skipOwnershipTransfer"`
 }
 
 type DeployTokenInput struct {
@@ -179,7 +182,7 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 				// and we may not be able to register the token by CLL in that case.
 				if deployTokenInput.CCIPAdmin == "" {
 					filter := datastore.AddressRef{
-						Type:          datastore.ContractType(common_utils.RBACTimelock),
+						Type:          datastore.ContractType(utils.RBACTimelock),
 						ChainSelector: deployTokenInput.ChainSelector,
 						Qualifier:     utils.CLLQualifier,
 					}
@@ -355,9 +358,32 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 			if !exists {
 				return cldf.ChangesetOutput{}, fmt.Errorf("no TokenPoolAdapter registered for chain family '%s'", family)
 			}
+			fullPoolRef, err := datastore_utils.FindAndFormatRef(e.DataStore, tokenConfig.TokenPoolRef, selector, datastore_utils.FullRef)
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to find full token pool ref for chain selector %d: %w", selector, err)
+			}
+			fullTokenRef, err := datastore_utils.FindAndFormatRef(e.DataStore, tokenConfig.TokenRef, selector, datastore_utils.FullRef)
+			if err != nil {
+				e.Logger.Warnf("failed to find full token ref for chain selector %d, will try to derive it: %v", selector, err)
+				tokenBytes, err := tokenPoolAdapter.DeriveTokenAddress(e, selector, tokenConfig.TokenPoolRef)
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to derive token address for chain selector %d: %w", selector, err)
+				}
+				fullTokenRef = datastore.AddressRef{
+					ChainSelector: selector,
+					Type:          tokenConfig.TokenRef.Type,
+					Version:       tokenConfig.TokenRef.Version,
+					Qualifier:     tokenConfig.TokenRef.Qualifier,
+					Address:       common.Bytes2Hex(tokenBytes),
+				}
+			}
+			if cfg.TokenExpansionInputPerChain[selector].SkipOwnershipTransfer {
+				e.Logger.Infof("skipping ownership transfer for token pool %s on chain with selector %d", fullPoolRef, selector)
+				continue
+			}
 			updateAuthoritiesInput := UpdateAuthoritiesInput{
-				TokenRef:          tokenConfig.TokenRef,
-				TokenPoolRef:      tokenConfig.TokenPoolRef,
+				TokenRef:          fullTokenRef,
+				TokenPoolRef:      fullPoolRef,
 				ChainSelector:     selector,
 				ExistingDataStore: e.DataStore,
 			}
