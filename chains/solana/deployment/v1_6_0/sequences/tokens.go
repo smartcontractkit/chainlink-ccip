@@ -46,9 +46,6 @@ func (a *SolanaAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[
 				return sequences.OnChainOutput{}, err
 			}
 			tpAddr := solana.MustPublicKeyFromBase58(input.TokenPoolAddress)
-			if err != nil {
-				return sequences.OnChainOutput{}, err
-			}
 
 			// if no token admin provided, ccip admin becomes the admin
 			var tokenAdmin solana.PublicKey
@@ -130,6 +127,18 @@ func (a *SolanaAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to upsert remote chain config for token pool: %w", err)
 				}
+				localDecimals, err := utils.GetTokenDecimals(chain, tokenMint)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to get token decimals for token on chain with selector %d: %w", chain.Selector, err)
+				}
+				obRL, ibRL := tokenapi.GenerateTPRLConfigs(
+					remoteChainConfig.OutboundRateLimiterConfig,
+					remoteChainConfig.InboundRateLimiterConfig,
+					localDecimals,
+					remoteChainConfig.RemoteDecimals,
+					chain.Family(),
+					common_utils.Version_1_6_0,
+				)
 				result.Addresses = append(result.Addresses, upsertOut.Output.Addresses...)
 				result.BatchOps = append(result.BatchOps, upsertOut.Output.BatchOps...)
 				rateLimitOut, err := operations.ExecuteOperation(b, tprl, chains.SolanaChains()[chain.Selector],
@@ -138,8 +147,8 @@ func (a *SolanaAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[
 						TokenMint:                 tokenMint,
 						TokenProgramID:            tokenProgramId,
 						RemoteSelector:            remoteChainSelector,
-						InboundRateLimiterConfig:  remoteChainConfig.InboundRateLimiterConfig,
-						OutboundRateLimiterConfig: remoteChainConfig.OutboundRateLimiterConfig,
+						InboundRateLimiterConfig:  ibRL,
+						OutboundRateLimiterConfig: obRL,
 					})
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to set rate limits for token pool: %w", err)
@@ -264,10 +273,8 @@ func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualR
 				result.Addresses = append(result.Addresses, initTPOut.Output.Addresses...)
 				result.BatchOps = append(result.BatchOps, initTPOut.Output.BatchOps...)
 
-				authority := initTPOut.Output.Initializer
 				transferOwnershipOut, err := operations.ExecuteOperation(b, transferOwnershipTPOp, chains.SolanaChains()[chain.Selector], tokenpoolops.TokenPoolTransferOwnershipInput{
 					Program:      tokenPool,
-					CurrentOwner: authority,
 					NewOwner:     solana.MustPublicKeyFromBase58(input.ProposedOwner),
 					TokenMint:    tokenMint,
 				})
@@ -561,4 +568,73 @@ func getTokenMintAndTokenProgram(store datastore.DataStore, tokenRef datastore.A
 		return datastore.AddressRef{}, solana.PublicKey{}, fmt.Errorf("failed to get token program ID for token type '%s': %w", tokenAddr.Type, err)
 	}
 	return tokenAddr, tokenProgramId, nil
+}
+
+func (a *SolanaAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokenapi.UpdateAuthoritiesInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return cldf_ops.NewSequence(
+		"svm-adapter:update-authorities",
+		common_utils.Version_1_6_0,
+		"Update authorities for a token and token pool on Solana Chain",
+		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokenapi.UpdateAuthoritiesInput) (sequences.OnChainOutput, error) {
+			var result sequences.OnChainOutput
+			chain, ok := chains.SolanaChains()[input.ChainSelector]
+			if !ok {
+				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
+			}
+			tokenRef, _, err := getTokenMintAndTokenProgram(input.ExistingDataStore, input.TokenRef, chain)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token and token program address using the specified reference (%+v): %w", input.TokenRef, err)
+			}
+
+			timelockSigner := utils.GetTimelockSignerPDA(
+				input.ExistingDataStore.Addresses().Filter(),
+				chain.Selector,
+				common_utils.CLLQualifier,
+			)
+
+			tokenPoolRef, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, input.TokenPoolRef, chain.Selector, datastore_utils.FullRef)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to find token pool address using the specified reference (%+v): %w", input.TokenPoolRef, err)
+			}
+			tokenMint := solana.MustPublicKeyFromBase58(tokenRef.Address)
+			tokenPool := solana.MustPublicKeyFromBase58(tokenPoolRef.Address)
+
+			transferOwnershipTPOp := tokenpoolops.TransferOwnershipBurnMint
+			acceptOwnershipTPOp := tokenpoolops.AcceptOwnershipBurnMint
+			switch tokenPoolRef.Type.String() {
+			case common_utils.BurnMintTokenPool.String():
+				// Already set to burn mint
+			case common_utils.LockReleaseTokenPool.String():
+				transferOwnershipTPOp = tokenpoolops.TransferOwnershipLockRelease
+				acceptOwnershipTPOp = tokenpoolops.AcceptOwnershipLockRelease
+			default:
+				return sequences.OnChainOutput{}, fmt.Errorf("unsupported token pool type '%s' for Solana", tokenPoolRef.Type)
+			}
+
+			b.Logger.Infof("Transferring ownership of token pool %s to timelock signer %s", tokenPool.String(), timelockSigner.String())
+			transferOwnershipOut, err := operations.ExecuteOperation(b, transferOwnershipTPOp, chains.SolanaChains()[chain.Selector], tokenpoolops.TokenPoolTransferOwnershipInput{
+				Program:      tokenPool,
+				NewOwner:     timelockSigner,
+				TokenMint:    tokenMint,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to transfer ownership: %w", err)
+			}
+			result.Addresses = append(result.Addresses, transferOwnershipOut.Output.Addresses...)
+			result.BatchOps = append(result.BatchOps, transferOwnershipOut.Output.BatchOps...)
+
+			b.Logger.Infof("Accepting ownership of token pool %s by timelock signer %s", tokenPool.String(), timelockSigner.String())
+			acceptOwnershipOut, err := operations.ExecuteOperation(b, acceptOwnershipTPOp, chains.SolanaChains()[chain.Selector], tokenpoolops.TokenPoolTransferOwnershipInput{
+				Program:      tokenPool,
+				NewOwner:     timelockSigner,
+				TokenMint:    tokenMint,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to accept ownership: %w", err)
+			}
+			result.Addresses = append(result.Addresses, acceptOwnershipOut.Output.Addresses...)
+			result.BatchOps = append(result.BatchOps, acceptOwnershipOut.Output.BatchOps...)
+
+			return result, nil
+		})
 }

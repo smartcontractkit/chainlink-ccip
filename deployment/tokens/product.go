@@ -41,6 +41,7 @@ type TokenAdapter interface {
 	DeployToken() *cldf_ops.Sequence[DeployTokenInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 	DeployTokenVerify(e deployment.Environment, in any) error
 	DeployTokenPoolForToken() *cldf_ops.Sequence[DeployTokenPoolInput, sequences.OnChainOutput, cldf_chain.BlockChains]
+	UpdateAuthorities() *cldf_ops.Sequence[UpdateAuthoritiesInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 }
 
 // RateLimiterConfig specifies configuration for a rate limiter on a token pool.
@@ -71,9 +72,12 @@ type RemoteChainConfig[R any, CCV any] struct {
 	// Decimals of the token on the remote chain.
 	RemoteDecimals uint8
 	// InboundRateLimiterConfig specifies the desired rate limiter configuration for inbound traffic.
-	InboundRateLimiterConfig RateLimiterConfig
+	// DO NOT SET THIS VALUE WHEN PASSING IN INPUTS
+	// This value is derived from the configuration specified for outbound traffic to the remote chain,
+	// as the same limits should apply in both directions.
+	InboundRateLimiterConfig RateLimiterConfigFloatInput
 	// OutboundRateLimiterConfig specifies the desired rate limiter configuration for outbound traffic.
-	OutboundRateLimiterConfig RateLimiterConfig
+	OutboundRateLimiterConfig RateLimiterConfigFloatInput
 	// OutboundCCVs specifies the verifiers to apply to outbound traffic.
 	OutboundCCVs []CCV
 	// InboundCCVs specifies the verifiers to apply to inbound traffic.

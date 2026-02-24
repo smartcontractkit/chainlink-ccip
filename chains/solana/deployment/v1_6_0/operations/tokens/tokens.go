@@ -1,7 +1,6 @@
 package tokens
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
@@ -43,7 +42,7 @@ var DeployLINK = operations.NewOperation(
 	"Deploys the LINK token contract",
 	func(b operations.Bundle, chain cldf_solana.Chain, input Params) (datastore.AddressRef, error) {
 		instructions, err := tokens.CreateToken(
-			context.Background(),
+			b.GetContext(),
 			solana.TokenProgramID,
 			input.TokenPrivKey.PublicKey(),
 			chain.DeployerKey.PublicKey(),
@@ -96,7 +95,7 @@ var DeploySolanaToken = operations.NewOperation(
 			mint = privKey.PublicKey()
 		}
 		instructions, err := tokens.CreateTokenWith(
-			context.Background(),
+			b.GetContext(),
 			tokenProgramID,
 			mint,
 			tokenAdminPubKey,
@@ -215,7 +214,7 @@ var CreateTokenMultisig = operations.NewOperation(
 					Type:          "TOKEN_MULTISIG",
 					Version:       Version,
 					Qualifier:     input.TokenSymbol,
-					Labels:        datastore.NewLabelSet("tokenMint", input.TokenMint.String()),
+					Labels:        datastore.NewLabelSet(input.TokenMint.String()),
 				},
 			},
 		}, nil
@@ -248,10 +247,10 @@ var UpsertTokenMetadata = operations.NewOperation(
 		}
 		mintMetadata, metadataPDA, err := tokens.GetTokenMetadata(b.GetContext(), chain.Client, tokenMint)
 		if err != nil {
-			fmt.Println("error getting metadata account data, skipping update for", tokenMint.String(), ":", err)
+			b.Logger.Infof("error getting metadata account data, skipping update for %s: %v", tokenMint.String(), err)
 			return sequences.OnChainOutput{}, nil
 		}
-		fmt.Println("Metadata", metadataPDA)
+		b.Logger.Infof("Metadata %s", metadataPDA)
 		newData := tokens.GetTokenDataV2(mintMetadata)
 		newUpdateAuthority := mintMetadata.UpdateAuthority
 		if metadata.UpdateAuthority != "" {
