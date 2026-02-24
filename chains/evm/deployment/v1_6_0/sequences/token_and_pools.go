@@ -138,31 +138,8 @@ func (a *EVMAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[tok
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to register token on chain %d: %w", input.ChainSelector, err)
 			}
-
-			setPoolReport, err := cldf_ops.ExecuteOperation(b,
-				tarops.SetPool,
-				chain,
-				evm_contract.FunctionInput[tarops.SetPoolArgs]{
-					Address:       tarAddress,
-					ChainSelector: input.ChainSelector,
-					Args: tarops.SetPoolArgs{
-						TokenPoolAddress: tpAddr,
-						TokenAddress:     tokenAddress,
-					},
-				},
-			)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to set pool for token %q on chain selector %d: %w", input.TokenRef.Qualifier, input.ChainSelector, err)
-			}
-
-			setPoolBatchOp, err := evm_contract.NewBatchOperationFromWrites([]evm_contract.WriteOutput{setPoolReport.Output})
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
-			}
-
 			result.Addresses = append(result.Addresses, registerReport.Output.Addresses...)
 			result.BatchOps = append(result.BatchOps, registerReport.Output.BatchOps...)
-			result.BatchOps = append(result.BatchOps, setPoolBatchOp)
 
 			return result, nil
 		})
