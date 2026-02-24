@@ -957,7 +957,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 			require.NoError(t, stateErr)
 			require.Equal(t, timelockSigner, tokenPoolStateAccountAfter.Config.Owner)
 			require.Equal(t, tokenMint, tokenPoolStateAccountAfter.Config.Mint)
-			require.Equal(t, chain.DeployerKey.PublicKey(), tokenPoolStateAccountAfter.Config.RateLimitAdmin)
+			require.Equal(t, timelockSigner, tokenPoolStateAccountAfter.Config.RateLimitAdmin)
 		})
 	})
 }

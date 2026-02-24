@@ -274,9 +274,9 @@ func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualR
 				result.BatchOps = append(result.BatchOps, initTPOut.Output.BatchOps...)
 
 				transferOwnershipOut, err := operations.ExecuteOperation(b, transferOwnershipTPOp, chains.SolanaChains()[chain.Selector], tokenpoolops.TokenPoolTransferOwnershipInput{
-					Program:      tokenPool,
-					NewOwner:     solana.MustPublicKeyFromBase58(input.ProposedOwner),
-					TokenMint:    tokenMint,
+					Program:   tokenPool,
+					NewOwner:  solana.MustPublicKeyFromBase58(input.ProposedOwner),
+					TokenMint: tokenMint,
 				})
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to transfer ownership: %w", err)
@@ -601,21 +601,34 @@ func (a *SolanaAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokenapi.UpdateAu
 
 			transferOwnershipTPOp := tokenpoolops.TransferOwnershipBurnMint
 			acceptOwnershipTPOp := tokenpoolops.AcceptOwnershipBurnMint
+			tprlAdminTPOp := tokenpoolops.UpdateRateLimitAdminBurnMint
 			switch tokenPoolRef.Type.String() {
 			case common_utils.BurnMintTokenPool.String():
 				// Already set to burn mint
 			case common_utils.LockReleaseTokenPool.String():
 				transferOwnershipTPOp = tokenpoolops.TransferOwnershipLockRelease
 				acceptOwnershipTPOp = tokenpoolops.AcceptOwnershipLockRelease
+				tprlAdminTPOp = tokenpoolops.UpdateRateLimitAdminLockRelease
 			default:
 				return sequences.OnChainOutput{}, fmt.Errorf("unsupported token pool type '%s' for Solana", tokenPoolRef.Type)
 			}
 
+			tprlAdminOut, err := operations.ExecuteOperation(b, tprlAdminTPOp, chains.SolanaChains()[chain.Selector], tokenpoolops.TokenPoolTransferOwnershipInput{
+				Program:   tokenPool,
+				TokenMint: tokenMint,
+				NewOwner:  timelockSigner,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to update TPRL admin: %w", err)
+			}
+			result.Addresses = append(result.Addresses, tprlAdminOut.Output.Addresses...)
+			result.BatchOps = append(result.BatchOps, tprlAdminOut.Output.BatchOps...)
+
 			b.Logger.Infof("Transferring ownership of token pool %s to timelock signer %s", tokenPool.String(), timelockSigner.String())
 			transferOwnershipOut, err := operations.ExecuteOperation(b, transferOwnershipTPOp, chains.SolanaChains()[chain.Selector], tokenpoolops.TokenPoolTransferOwnershipInput{
-				Program:      tokenPool,
-				NewOwner:     timelockSigner,
-				TokenMint:    tokenMint,
+				Program:   tokenPool,
+				NewOwner:  timelockSigner,
+				TokenMint: tokenMint,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to transfer ownership: %w", err)
@@ -625,9 +638,9 @@ func (a *SolanaAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokenapi.UpdateAu
 
 			b.Logger.Infof("Accepting ownership of token pool %s by timelock signer %s", tokenPool.String(), timelockSigner.String())
 			acceptOwnershipOut, err := operations.ExecuteOperation(b, acceptOwnershipTPOp, chains.SolanaChains()[chain.Selector], tokenpoolops.TokenPoolTransferOwnershipInput{
-				Program:      tokenPool,
-				NewOwner:     timelockSigner,
-				TokenMint:    tokenMint,
+				Program:   tokenPool,
+				NewOwner:  timelockSigner,
+				TokenMint: tokenMint,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to accept ownership: %w", err)

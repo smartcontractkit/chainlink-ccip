@@ -391,7 +391,6 @@ func (a *EVMAdapter) GetTokenExpansionConfig() tokensapi.TokenExpansionInputPerC
 			ExternalAdmin:          "",                       // not needed for tests
 			DisableFreezeAuthority: false,                    // not applicable for EVM
 			TokenPrivKey:           "",                       // not applicable for EVM
-			CCIPAdmin:              admin,                    // deployer is the admin (if empty defaults to timelock)
 		},
 		DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
 			PoolType:           cciputils.BurnMintTokenPool.String(),
@@ -399,7 +398,6 @@ func (a *EVMAdapter) GetTokenExpansionConfig() tokensapi.TokenExpansionInputPerC
 		},
 		TokenTransferConfig: &tokensapi.TokenTransferConfig{
 			ChainSelector: a.Selector,
-			ExternalAdmin: admin,
 			RegistryRef: datastore.AddressRef{
 				ChainSelector: a.Selector,
 				Address:       registryAddr,
