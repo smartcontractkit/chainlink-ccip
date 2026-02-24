@@ -29,7 +29,7 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
   error ZeroLombardChainId();
   error PathNotExist(uint64 remoteChainSelector);
   error InvalidMessageVersion(uint8 expected, uint8 received);
-  error RemoteTokenMismatch(bytes32 bridge, bytes32 pool);
+  error BridgeDestinationTokenOrAdapterMismatch(bytes32 bridgeToken, bytes32 remoteToken, bytes32 remoteAdapter);
   error InvalidReceiver(bytes receiver);
   error ChainNotSupported(uint64 remoteChainSelector);
   error InvalidAllowedCaller(bytes allowedCaller);
@@ -40,11 +40,17 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
   /// @param remoteChainSelector CCIP selector of destination chain.
   /// @param lChainId The chain ID according to Lombard Multi Chain ID convention.
   /// @param allowedCaller The address that's allowed to call the bridge on the destination chain.
-  event PathSet(uint64 indexed remoteChainSelector, bytes32 indexed lChainId, bytes32 allowedCaller);
+  /// @param remoteAdapter Optional remote adapter token identifier accepted by the bridge.
+  event PathSet(
+    uint64 indexed remoteChainSelector, bytes32 indexed lChainId, bytes32 allowedCaller, bytes32 remoteAdapter
+  );
   /// @param remoteChainSelector CCIP selector of destination chain.
   /// @param lChainId The chain id of destination chain by Lombard Multi Chain Id conversion.
   /// @param allowedCaller The address that's allowed to call the bridge on the destination chain.
-  event PathRemoved(uint64 indexed remoteChainSelector, bytes32 indexed lChainId, bytes32 allowedCaller);
+  /// @param remoteAdapter Optional remote adapter token identifier accepted by the bridge.
+  event PathRemoved(
+    uint64 indexed remoteChainSelector, bytes32 indexed lChainId, bytes32 allowedCaller, bytes32 remoteAdapter
+  );
   event LombardConfigurationSet(address indexed verifier, address indexed bridge, address indexed tokenAdapter);
 
   struct Path {
@@ -52,12 +58,14 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
     bytes32 allowedCaller;
     /// @notice Lombard chain id of destination chain.
     bytes32 lChainId;
+    /// @notice Optional destination adapter token identifier accepted by the bridge.
+    bytes32 remoteAdapter;
   }
 
   string public constant override typeAndVersion = "LombardTokenPool 2.0.0-dev";
 
   /// @notice Supported bridge message version.
-  uint8 internal constant SUPPORTED_BRIDGE_MSG_VERSION = 1;
+  uint8 internal constant SUPPORTED_BRIDGE_MSG_VERSION = 2;
   /// @notice The address of bridge contract.
   IBridgeV2 public immutable i_bridge;
   /// @notice Lombard verifier resolver address. lockOrBurn fetches the outbound implementation and forwards tokens to it.
@@ -159,8 +167,8 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
     // verify bridge destination token equal to pool
     bytes32 bridgeDestToken = i_bridge.getAllowedDestinationToken(path.lChainId, sourceTokenOrAdapter);
     bytes32 poolDestToken = abi.decode(getRemoteToken(lockOrBurnIn.remoteChainSelector), (bytes32));
-    if (bridgeDestToken != poolDestToken) {
-      revert RemoteTokenMismatch(bridgeDestToken, poolDestToken);
+    if (bridgeDestToken != poolDestToken && bridgeDestToken != path.remoteAdapter) {
+      revert BridgeDestinationTokenOrAdapterMismatch(bridgeDestToken, poolDestToken, path.remoteAdapter);
     }
 
     if (lockOrBurnIn.receiver.length != 32) {
@@ -230,7 +238,7 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
 
   /// @notice Gets the path for a given CCIP chain selector.
   /// @param remoteChainSelector CCIP chain selector of remote chain.
-  /// @return Path struct containing lChainId and allowedCaller.
+  /// @return Path struct containing lChainId, allowedCaller, and remoteAdapter.
   function getPath(
     uint64 remoteChainSelector
   ) external view returns (Path memory) {
@@ -241,10 +249,12 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
   /// @param remoteChainSelector CCIP chain selector of remote chain.
   /// @param lChainId Lombard chain id of remote chain.
   /// @param allowedCaller The address of TokenPool on destination chain.
+  /// @param remoteAdapter Optional remote adapter token identifier accepted by the bridge.
   function setPath(
     uint64 remoteChainSelector,
     bytes32 lChainId,
-    bytes calldata allowedCaller
+    bytes calldata allowedCaller,
+    bytes32 remoteAdapter
   ) external onlyOwner {
     if (!isSupportedChain(remoteChainSelector)) {
       revert ChainNotSupported(remoteChainSelector);
@@ -264,9 +274,10 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
     }
     bytes32 decodedAllowedCaller = abi.decode(allowedCaller, (bytes32));
 
-    s_chainSelectorToPath[remoteChainSelector] = Path({lChainId: lChainId, allowedCaller: decodedAllowedCaller});
+    s_chainSelectorToPath[remoteChainSelector] =
+      Path({lChainId: lChainId, allowedCaller: decodedAllowedCaller, remoteAdapter: remoteAdapter});
 
-    emit PathSet(remoteChainSelector, lChainId, decodedAllowedCaller);
+    emit PathSet(remoteChainSelector, lChainId, decodedAllowedCaller, remoteAdapter);
   }
 
   /// @notice Removes path mapping for a destination chain.
@@ -282,7 +293,7 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
 
     delete s_chainSelectorToPath[remoteChainSelector];
 
-    emit PathRemoved(remoteChainSelector, path.lChainId, path.allowedCaller);
+    emit PathRemoved(remoteChainSelector, path.lChainId, path.allowedCaller, path.remoteAdapter);
   }
 
   // ================================================================
