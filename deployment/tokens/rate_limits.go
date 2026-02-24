@@ -20,21 +20,28 @@ type TPRLInput struct {
 	MCMS    mcms.Input            `yaml:"mcms,omitempty" json:"mcms"`
 }
 
+type RemoteOutbounds struct {
+	DefaultFinality RateLimiterConfigFloatInput
+	CustomFinality  RateLimiterConfigFloatInput
+}
+
 type TPRLConfig struct {
-	ChainAdapterVersion *semver.Version                        `yaml:"chainAdapterVersion" json:"chainAdapterVersion"`
-	TokenRef            datastore.AddressRef                   `yaml:"tokenRef" json:"tokenRef"`
-	TokenPoolRef        datastore.AddressRef                   `yaml:"tokenPoolRef" json:"tokenPoolRef"`
-	RemoteOutbounds     map[uint64]RateLimiterConfigFloatInput `yaml:"remoteOutbounds" json:"remoteOutbounds"`
+	ChainAdapterVersion *semver.Version            `yaml:"chainAdapterVersion" json:"chainAdapterVersion"`
+	TokenRef            datastore.AddressRef       `yaml:"tokenRef" json:"tokenRef"`
+	TokenPoolRef        datastore.AddressRef       `yaml:"tokenPoolRef" json:"tokenPoolRef"`
+	RemoteOutbounds     map[uint64]RemoteOutbounds `yaml:"remoteOutbounds" json:"remoteOutbounds"`
 }
 
 type TPRLRemotes struct {
-	OutboundRateLimiterConfig RateLimiterConfig
-	InboundRateLimiterConfig  RateLimiterConfig
-	ChainSelector             uint64
-	RemoteChainSelector       uint64
-	TokenRef                  datastore.AddressRef
-	TokenPoolRef              datastore.AddressRef
-	ExistingDataStore         datastore.DataStore
+	DefaultFinalityOutboundRateLimiterConfig RateLimiterConfig
+	DefaultFinalityInboundRateLimiterConfig  RateLimiterConfig
+	CustomFinalityOutboundRateLimiterConfig  RateLimiterConfig
+	CustomFinalityInboundRateLimiterConfig   RateLimiterConfig
+	ChainSelector                            uint64
+	RemoteChainSelector                      uint64
+	TokenRef                                 datastore.AddressRef
+	TokenPoolRef                             datastore.AddressRef
+	ExistingDataStore                        datastore.DataStore
 }
 
 // SetTokenPoolRateLimits returns a changeset that sets rate limits for token pools on multiple chains.
@@ -46,8 +53,13 @@ func setTokenPoolRateLimitsVerify() func(cldf.Environment, TPRLInput) error {
 	return func(e cldf.Environment, cfg TPRLInput) error {
 		for _, config := range cfg.Configs {
 			for remoteSelector, input := range config.RemoteOutbounds {
-				if input.IsEnabled {
-					if input.Capacity <= 0 || input.Rate <= 0 {
+				if input.DefaultFinality.IsEnabled {
+					if input.DefaultFinality.Capacity <= 0 || input.DefaultFinality.Rate <= 0 {
+						return fmt.Errorf("outbound rate limiter config for remote chain %d is enabled but capacity or rate is invalid", remoteSelector)
+					}
+				}
+				if input.CustomFinality.IsEnabled {
+					if input.CustomFinality.Capacity <= 0 || input.CustomFinality.Rate <= 0 {
 						return fmt.Errorf("outbound rate limiter config for remote chain %d is enabled but capacity or rate is invalid", remoteSelector)
 					}
 				}
@@ -130,7 +142,8 @@ func setTokenPoolRateLimitsApply() func(cldf.Environment, TPRLInput) (cldf.Chang
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to get token decimals for token on chain with selector %d: %w", selector, err)
 				}
-				tprlRemote.OutboundRateLimiterConfig, tprlRemote.InboundRateLimiterConfig = GenerateTPRLConfigs(inputs, remoteInputs, decimals, remoteDecimals, family, tokenPool.Version)
+				tprlRemote.DefaultFinalityOutboundRateLimiterConfig, tprlRemote.DefaultFinalityInboundRateLimiterConfig = GenerateTPRLConfigs(inputs.DefaultFinality, remoteInputs.DefaultFinality, decimals, remoteDecimals, family, tokenPool.Version)
+				tprlRemote.CustomFinalityOutboundRateLimiterConfig, tprlRemote.CustomFinalityInboundRateLimiterConfig = GenerateTPRLConfigs(inputs.CustomFinality, remoteInputs.CustomFinality, decimals, remoteDecimals, family, tokenPool.Version)
 				rateLimitReport, err := cldf_ops.ExecuteSequence(
 					e.OperationsBundle, tokenPoolAdapter.SetTokenPoolRateLimits(), e.BlockChains, tprlRemote)
 				if err != nil {

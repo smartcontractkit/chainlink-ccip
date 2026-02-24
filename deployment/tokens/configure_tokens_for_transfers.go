@@ -94,9 +94,9 @@ func processTokenConfigForChain(e deployment.Environment, cfg map[uint64]TokenTr
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to get chain family for chain selector %d: %w", selector, err)
 		}
-		adapter, ok := tokenRegistry.GetTokenAdapter(family, chainAdapterVersion)
+		adapter, ok := tokenRegistry.GetTokenAdapter(family, token.TokenPoolRef.Version)
 		if !ok {
-			return nil, nil, fmt.Errorf("no token adapter registered for chain family '%s' and chain adapter version '%s'", family, chainAdapterVersion)
+			return nil, nil, fmt.Errorf("no token adapter registered for chain family '%s' and version '%s'", family, token.TokenPoolRef.Version)
 		}
 
 		remoteChains := make(map[uint64]RemoteChainConfig[[]byte, string], len(token.RemoteChains))
@@ -105,9 +105,9 @@ func processTokenConfigForChain(e deployment.Environment, cfg map[uint64]TokenTr
 			if err != nil {
 				return nil, nil, fmt.Errorf("failed to get chain family for remote chain selector %d: %w", remoteChainSelector, err)
 			}
-			remoteAdapter, ok := tokenRegistry.GetTokenAdapter(remoteFamily, chainAdapterVersion)
+			remoteAdapter, ok := tokenRegistry.GetTokenAdapter(remoteFamily, inCfg.RemotePool.Version)
 			if !ok {
-				return nil, nil, fmt.Errorf("no token adapter registered for chain family '%s' and chain adapter version '%s'", remoteFamily, chainAdapterVersion)
+				return nil, nil, fmt.Errorf("no token adapter registered for chain family '%s' and version '%s'", remoteFamily, inCfg.RemotePool.Version)
 			}
 			counterpart, ok := cfg[remoteChainSelector]
 			if !ok {
@@ -117,7 +117,15 @@ func processTokenConfigForChain(e deployment.Environment, cfg map[uint64]TokenTr
 			if !ok {
 				return nil, nil, fmt.Errorf("missing remote chain config for chain selector %d in token transfer config for remote chain selector %d", selector, remoteChainSelector)
 			}
-			remoteChains[remoteChainSelector], err = convertRemoteChainConfig(e, remoteAdapter, selector, remoteChainSelector, inCfg, counterpartRemoteChainCfg.OutboundRateLimiterConfig)
+			remoteChains[remoteChainSelector], err = convertRemoteChainConfig(
+				e,
+				selector,
+				remoteAdapter,
+				remoteChainSelector,
+				inCfg,
+				counterpartRemoteChainCfg.DefaultFinalityOutboundRateLimiterConfig,
+				counterpartRemoteChainCfg.CustomFinalityOutboundRateLimiterConfig,
+			)
 			if err != nil {
 				return nil, nil, fmt.Errorf("failed to process remote chain config for remote chain selector %d: %w", remoteChainSelector, err)
 			}
@@ -149,15 +157,18 @@ func convertRemoteChainConfig(
 	remoteAdapter TokenAdapter,
 	remoteChainSelector uint64,
 	inCfg RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef],
-	chainSelectorOutboundTprl RateLimiterConfigFloatInput,
+	chainSelectorDefaultFinalityOutboundTprl RateLimiterConfigFloatInput,
+	chainSelectorCustomFinalityOutboundTprl RateLimiterConfigFloatInput,
 ) (RemoteChainConfig[[]byte, string], error) {
 	// a chain's inbound rate limiter config should be based on the remote chain's outbound rate limiter config
 	// to ensure that the remote chain is configured to allow the desired traffic from this chain.
 	// The values here should NOT be passed in decimal adjusted but rather the adapters should be responsible for performing
 	// any necessary decimal adjustments based on the token decimals on each chain.
 	outCfg := RemoteChainConfig[[]byte, string]{
-		InboundRateLimiterConfig:  chainSelectorOutboundTprl,
-		OutboundRateLimiterConfig: inCfg.OutboundRateLimiterConfig,
+		DefaultFinalityInboundRateLimiterConfig:  chainSelectorDefaultFinalityOutboundTprl,
+		CustomFinalityInboundRateLimiterConfig:   chainSelectorCustomFinalityOutboundTprl,
+		DefaultFinalityOutboundRateLimiterConfig: inCfg.DefaultFinalityOutboundRateLimiterConfig,
+		CustomFinalityOutboundRateLimiterConfig:  inCfg.CustomFinalityOutboundRateLimiterConfig,
 	}
 	if inCfg.RemotePool != nil {
 		fullRemotePoolRef, err := datastore_utils.FindAndFormatRef(e.DataStore, *inCfg.RemotePool, remoteChainSelector, datastore_utils.FullRef)
@@ -181,7 +192,7 @@ func convertRemoteChainConfig(
 			}
 		}
 		outCfg.RemoteToken = common.LeftPadBytes(outCfg.RemoteToken, 32)
-		outCfg.RemoteDecimals, err = adapter.DeriveTokenDecimals(e, remoteChainSelector, fullRemotePoolRef, outCfg.RemoteToken)
+		outCfg.RemoteDecimals, err = remoteAdapter.DeriveTokenDecimals(e, remoteChainSelector, fullRemotePoolRef, outCfg.RemoteToken)
 		if err != nil {
 			return outCfg, fmt.Errorf("failed to get remote token decimals for remote chain selector %d: %w", remoteChainSelector, err)
 		}
