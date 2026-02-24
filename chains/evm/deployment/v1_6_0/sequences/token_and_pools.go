@@ -375,9 +375,7 @@ func (a *EVMAdapter) DeployToken() *cldf_ops.Sequence[tokensapi.DeployTokenInput
 	return DeployToken
 }
 
-func (a *EVMAdapter) DeployTokenVerify(e deployment.Environment, in any) error {
-	input := in.(tokensapi.DeployTokenInput)
-
+func (a *EVMAdapter) DeployTokenVerify(e deployment.Environment, input tokensapi.DeployTokenInput) error {
 	tokenAddr, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, datastore.AddressRef{
 		ChainSelector: input.ChainSelector,
 		Type:          datastore.ContractType(input.Type),
