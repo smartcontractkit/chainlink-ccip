@@ -28,21 +28,21 @@ var (
 // Instruction discriminators
 var (
 	Instruction_Initialize            = [8]byte{175, 175, 109, 31, 13, 152, 155, 237}
-	Instruction_TransferOwnership     = [8]byte{32, 215, 22, 144, 238, 243, 169, 0}
-	Instruction_AcceptOwnership       = [8]byte{30, 43, 213, 84, 172, 203, 104, 84}
-	Instruction_UpdatePauser          = [8]byte{50, 105, 195, 115, 171, 50, 174, 208}
-	Instruction_UpdateAttesterManager = [8]byte{182, 102, 82, 193, 114, 23, 136, 28}
+	Instruction_TransferOwnership     = [8]byte{65, 177, 215, 73, 53, 45, 99, 47}
+	Instruction_AcceptOwnership       = [8]byte{172, 23, 43, 13, 238, 213, 85, 150}
+	Instruction_UpdatePauser          = [8]byte{140, 171, 211, 132, 57, 201, 16, 254}
+	Instruction_UpdateAttesterManager = [8]byte{175, 245, 178, 104, 85, 179, 71, 16}
 	Instruction_Pause                 = [8]byte{211, 22, 221, 251, 74, 121, 193, 47}
 	Instruction_Unpause               = [8]byte{169, 144, 4, 38, 10, 141, 188, 255}
-	Instruction_SetMaxMessageBodySize = [8]byte{65, 253, 228, 206, 175, 142, 187, 236}
-	Instruction_EnableAttester        = [8]byte{192, 188, 93, 98, 135, 94, 228, 231}
-	Instruction_DisableAttester       = [8]byte{251, 15, 244, 129, 122, 249, 39, 186}
-	Instruction_SetSignatureThreshold = [8]byte{141, 59, 7, 30, 148, 81, 137, 228}
-	Instruction_SendMessage           = [8]byte{195, 115, 158, 27, 54, 120, 111, 248}
-	Instruction_SendMessageWithCaller = [8]byte{114, 189, 64, 215, 222, 158, 166, 165}
-	Instruction_ReplaceMessage        = [8]byte{33, 205, 169, 153, 155, 222, 202, 175}
-	Instruction_ReceiveMessage        = [8]byte{179, 50, 206, 252, 232, 200, 113, 33}
-	Instruction_ReclaimEventAccount   = [8]byte{19, 14, 62, 206, 68, 220, 253, 145}
-	Instruction_GetNoncePda           = [8]byte{104, 113, 166, 215, 80, 120, 102, 215}
-	Instruction_IsNonceUsed           = [8]byte{178, 46, 66, 103, 48, 234, 218, 17}
+	Instruction_SetMaxMessageBodySize = [8]byte{168, 178, 8, 117, 217, 167, 219, 31}
+	Instruction_EnableAttester        = [8]byte{2, 11, 193, 115, 5, 148, 4, 198}
+	Instruction_DisableAttester       = [8]byte{61, 171, 131, 95, 172, 15, 227, 229}
+	Instruction_SetSignatureThreshold = [8]byte{163, 19, 154, 168, 82, 209, 214, 219}
+	Instruction_SendMessage           = [8]byte{57, 40, 34, 178, 189, 10, 65, 26}
+	Instruction_SendMessageWithCaller = [8]byte{212, 47, 34, 52, 91, 32, 176, 204}
+	Instruction_ReplaceMessage        = [8]byte{189, 189, 210, 163, 149, 205, 69, 229}
+	Instruction_ReceiveMessage        = [8]byte{38, 144, 127, 225, 31, 225, 238, 25}
+	Instruction_ReclaimEventAccount   = [8]byte{94, 198, 180, 159, 131, 236, 15, 174}
+	Instruction_GetNoncePda           = [8]byte{114, 70, 229, 212, 223, 50, 33, 39}
+	Instruction_IsNonceUsed           = [8]byte{144, 72, 107, 148, 35, 218, 31, 187}
 )

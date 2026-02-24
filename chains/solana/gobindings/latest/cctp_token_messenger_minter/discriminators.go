@@ -35,22 +35,22 @@ var (
 // Instruction discriminators
 var (
 	Instruction_Initialize                 = [8]byte{175, 175, 109, 31, 13, 152, 155, 237}
-	Instruction_TransferOwnership          = [8]byte{32, 215, 22, 144, 238, 243, 169, 0}
-	Instruction_AcceptOwnership            = [8]byte{30, 43, 213, 84, 172, 203, 104, 84}
-	Instruction_AddRemoteTokenMessenger    = [8]byte{143, 41, 45, 116, 94, 162, 27, 163}
-	Instruction_RemoveRemoteTokenMessenger = [8]byte{132, 200, 94, 250, 250, 168, 248, 69}
-	Instruction_DepositForBurn             = [8]byte{59, 127, 15, 175, 29, 77, 110, 231}
-	Instruction_DepositForBurnWithCaller   = [8]byte{117, 211, 127, 149, 226, 14, 31, 102}
-	Instruction_ReplaceDepositForBurn      = [8]byte{158, 63, 89, 207, 246, 187, 157, 53}
-	Instruction_HandleReceiveMessage       = [8]byte{74, 36, 85, 83, 178, 174, 83, 194}
-	Instruction_SetTokenController         = [8]byte{250, 165, 225, 251, 235, 4, 27, 16}
+	Instruction_TransferOwnership          = [8]byte{65, 177, 215, 73, 53, 45, 99, 47}
+	Instruction_AcceptOwnership            = [8]byte{172, 23, 43, 13, 238, 213, 85, 150}
+	Instruction_AddRemoteTokenMessenger    = [8]byte{12, 149, 172, 165, 111, 202, 24, 33}
+	Instruction_RemoveRemoteTokenMessenger = [8]byte{65, 114, 66, 85, 169, 98, 177, 146}
+	Instruction_DepositForBurn             = [8]byte{215, 60, 61, 46, 114, 55, 128, 176}
+	Instruction_DepositForBurnWithCaller   = [8]byte{167, 222, 19, 114, 85, 21, 14, 118}
+	Instruction_ReplaceDepositForBurn      = [8]byte{7, 27, 93, 132, 1, 80, 19, 163}
+	Instruction_HandleReceiveMessage       = [8]byte{133, 102, 1, 180, 145, 11, 138, 180}
+	Instruction_SetTokenController         = [8]byte{88, 6, 98, 10, 79, 59, 15, 24}
 	Instruction_Pause                      = [8]byte{211, 22, 221, 251, 74, 121, 193, 47}
 	Instruction_Unpause                    = [8]byte{169, 144, 4, 38, 10, 141, 188, 255}
-	Instruction_UpdatePauser               = [8]byte{50, 105, 195, 115, 171, 50, 174, 208}
-	Instruction_SetMaxBurnAmountPerMessage = [8]byte{156, 238, 101, 208, 125, 176, 161, 17}
-	Instruction_AddLocalToken              = [8]byte{63, 248, 65, 7, 77, 218, 245, 130}
-	Instruction_RemoveLocalToken           = [8]byte{197, 230, 91, 120, 168, 1, 35, 239}
-	Instruction_LinkTokenPair              = [8]byte{196, 165, 88, 229, 40, 62, 172, 200}
-	Instruction_UnlinkTokenPair            = [8]byte{126, 89, 180, 25, 43, 94, 181, 102}
-	Instruction_BurnTokenCustody           = [8]byte{63, 72, 109, 220, 231, 4, 15, 67}
+	Instruction_UpdatePauser               = [8]byte{140, 171, 211, 132, 57, 201, 16, 254}
+	Instruction_SetMaxBurnAmountPerMessage = [8]byte{30, 128, 145, 240, 70, 237, 109, 207}
+	Instruction_AddLocalToken              = [8]byte{213, 199, 205, 18, 98, 124, 73, 198}
+	Instruction_RemoveLocalToken           = [8]byte{27, 43, 66, 170, 188, 44, 109, 97}
+	Instruction_LinkTokenPair              = [8]byte{68, 162, 24, 104, 125, 46, 130, 12}
+	Instruction_UnlinkTokenPair            = [8]byte{52, 198, 100, 114, 104, 174, 85, 58}
+	Instruction_BurnTokenCustody           = [8]byte{233, 136, 180, 175, 112, 41, 62, 71}
 )

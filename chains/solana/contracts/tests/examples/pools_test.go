@@ -262,8 +262,11 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 					})
 
 					t.Run("Cannot re-initialize the state version", func(t *testing.T) {
-						var state tokenpool.State
-						err := common.GetAccountDataBorshInto(ctx, solanaGoClient, poolConfig, config.DefaultCommitment, &state)
+						stateData, err := solanaGoClient.GetAccountInfoWithOpts(ctx, poolConfig, &rpc.GetAccountInfoOpts{
+							Commitment: config.DefaultCommitment,
+						})
+						require.NoError(t, err)
+						state, err := tokenpool.ParseAccount_State(stateData.Value.Data.GetBinary())
 						require.NoError(t, err)
 						require.Equal(t, state.Version, uint8(1))
 

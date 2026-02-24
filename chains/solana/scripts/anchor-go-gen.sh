@@ -34,10 +34,40 @@ do
   generate_bindings "${idl_path_str}"
 done
 
+# Fix vendor IDL instruction discriminators: The vendor .so files were compiled with
+# old Anchor (snake_case discriminators), but the vendor IDL JSON files use the new
+# Anchor format (camelCase discriminators). Recompute instruction discriminators using
+# snake_case naming to match the deployed .so binaries.
+python3 - << 'PYEOF'
+import hashlib, json, re, glob
+
+def camel_to_snake(name):
+    s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
+    return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
+
+for path in glob.glob('contracts/target/vendor/*.json'):
+    with open(path) as f:
+        idl = json.load(f)
+    modified = False
+    for ix in idl.get('instructions', []):
+        snake = camel_to_snake(ix['name'])
+        correct = list(hashlib.sha256(f'global:{snake}'.encode()).digest()[:8])
+        if ix['discriminator'] != correct:
+            ix['discriminator'] = correct
+            modified = True
+    if modified:
+        with open(path, 'w') as f:
+            json.dump(idl, f, indent=2)
+            f.write('\n')
+PYEOF
+
 for idl_path_str in "contracts/target/vendor"/*.json
 do
   generate_bindings "${idl_path_str}"
 done
+
+# Restore original vendor IDLs (we only modified them temporarily for generation)
+git checkout -- contracts/target/vendor/*.json
 
 # Fix anchor-go name collision in fee_quoter: "config" is both an instruction arg
 # (BillingTokenConfig) and an account (PublicKey), both PascalCased to "Config".
