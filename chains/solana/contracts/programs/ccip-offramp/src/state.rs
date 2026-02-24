@@ -160,6 +160,8 @@ pub struct Ocr3ConfigInfo {
 pub struct Ocr3ConfigInfoInput {
     pub config_digest: [u8; 32],
     pub f: u8,
+    pub n: u8,
+    pub is_signature_verification_enabled: u8,
 }
 
 // TODO: do we need to verify signers and transmitters are different? (between the two groups)

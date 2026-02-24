@@ -2061,8 +2061,10 @@ func UnmarshalOcr3ConfigInfo(buf []byte) (*Ocr3ConfigInfo, error) {
 
 // Input struct for instruction parameters (non-zero_copy, uses Borsh serialization)
 type Ocr3ConfigInfoInput struct {
-	ConfigDigest [32]uint8 `json:"config_digest"`
-	F            uint8     `json:"f"`
+	ConfigDigest                   [32]uint8 `json:"config_digest"`
+	F                              uint8     `json:"f"`
+	N                              uint8     `json:"n"`
+	IsSignatureVerificationEnabled uint8     `json:"is_signature_verification_enabled"`
 }
 
 func (obj Ocr3ConfigInfoInput) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
@@ -2075,6 +2077,16 @@ func (obj Ocr3ConfigInfoInput) MarshalWithEncoder(encoder *binary.Encoder) (err 
 	err = encoder.Encode(obj.F)
 	if err != nil {
 		return errors.NewField("F", err)
+	}
+	// Serialize `N`:
+	err = encoder.Encode(obj.N)
+	if err != nil {
+		return errors.NewField("N", err)
+	}
+	// Serialize `IsSignatureVerificationEnabled`:
+	err = encoder.Encode(obj.IsSignatureVerificationEnabled)
+	if err != nil {
+		return errors.NewField("IsSignatureVerificationEnabled", err)
 	}
 	return nil
 }
@@ -2099,6 +2111,16 @@ func (obj *Ocr3ConfigInfoInput) UnmarshalWithDecoder(decoder *binary.Decoder) (e
 	err = decoder.Decode(&obj.F)
 	if err != nil {
 		return errors.NewField("F", err)
+	}
+	// Deserialize `N`:
+	err = decoder.Decode(&obj.N)
+	if err != nil {
+		return errors.NewField("N", err)
+	}
+	// Deserialize `IsSignatureVerificationEnabled`:
+	err = decoder.Decode(&obj.IsSignatureVerificationEnabled)
+	if err != nil {
+		return errors.NewField("IsSignatureVerificationEnabled", err)
 	}
 	return nil
 }

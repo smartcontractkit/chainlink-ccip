@@ -205,8 +205,8 @@ impl Admin for Impl {
             Ocr3ConfigInfo {
                 config_digest: config_info.config_digest,
                 f: config_info.f,
-                n: signers.len() as u8,
-                is_signature_verification_enabled: if is_commit { 1 } else { 0 },
+                n: config_info.n,
+                is_signature_verification_enabled: config_info.is_signature_verification_enabled,
             },
             signers,
             transmitters,

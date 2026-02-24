@@ -325,9 +325,8 @@ pub struct CommitReportContext<'info> {
     pub source_chain: Account<'info, SourceChain>,
 
     #[cfg(feature = "idl-build")]
-    /// CHECK: Runtime uses dynamic seeds from parsed report
     #[account(mut)]
-    pub source_chain: UncheckedAccount<'info>,
+    pub source_chain: Account<'info, SourceChain>,
 
     #[cfg(not(feature = "idl-build"))]
     #[account(

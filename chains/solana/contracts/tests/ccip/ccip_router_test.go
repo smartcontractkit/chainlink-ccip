@@ -2309,8 +2309,10 @@ func TestCCIPRouter(t *testing.T) {
 					instruction, err := ccip_offramp.NewSetOcrConfigInstruction(
 						ccip_offramp.OcrPluginType(v.plugin),
 						ccip_offramp.Ocr3ConfigInfoInput{
-							ConfigDigest: config.ConfigDigest,
-							F:            config.OcrF,
+							ConfigDigest:                   config.ConfigDigest,
+							F:                              config.OcrF,
+							N:                              uint8(len(v.signers)),
+							IsSignatureVerificationEnabled: v.verifySig,
 						},
 						v.signers,
 						v.transmitters,
@@ -2369,8 +2371,10 @@ func TestCCIPRouter(t *testing.T) {
 				instruction, err := ccip_offramp.NewSetOcrConfigInstruction(
 					ccip_offramp.OcrPluginType(100),
 					ccip_offramp.Ocr3ConfigInfoInput{
-						ConfigDigest: config.ConfigDigest,
-						F:            config.OcrF,
+						ConfigDigest:                   config.ConfigDigest,
+						F:                              config.OcrF,
+						N:                              uint8(len(signerAddresses)),
+						IsSignatureVerificationEnabled: 1,
 					},
 					signerAddresses,
 					transmitterPubKeys,
@@ -2388,8 +2392,10 @@ func TestCCIPRouter(t *testing.T) {
 				instruction, err := ccip_offramp.NewSetOcrConfigInstruction(
 					ccip_offramp.OcrPluginType(testutils.OcrCommitPlugin),
 					ccip_offramp.Ocr3ConfigInfoInput{
-						ConfigDigest: config.ConfigDigest,
-						F:            0,
+						ConfigDigest:                   config.ConfigDigest,
+						F:                              0,
+						N:                              uint8(len(signerAddresses)),
+						IsSignatureVerificationEnabled: 1,
 					},
 					signerAddresses,
 					transmitterPubKeys,
@@ -2411,8 +2417,10 @@ func TestCCIPRouter(t *testing.T) {
 				instruction, err := ccip_offramp.NewSetOcrConfigInstruction(
 					ccip_offramp.OcrPluginType(testutils.OcrCommitPlugin),
 					ccip_offramp.Ocr3ConfigInfoInput{
-						ConfigDigest: config.ConfigDigest,
-						F:            config.OcrF,
+						ConfigDigest:                   config.ConfigDigest,
+						F:                              config.OcrF,
+						N:                              uint8(len(signerAddresses)),
+						IsSignatureVerificationEnabled: 1,
 					},
 					signerAddresses,
 					invalidTransmitters,
@@ -2435,8 +2443,10 @@ func TestCCIPRouter(t *testing.T) {
 				instruction, err := ccip_offramp.NewSetOcrConfigInstruction(
 					ccip_offramp.OcrPluginType(testutils.OcrCommitPlugin),
 					ccip_offramp.Ocr3ConfigInfoInput{
-						ConfigDigest: config.ConfigDigest,
-						F:            config.OcrF,
+						ConfigDigest:                   config.ConfigDigest,
+						F:                              config.OcrF,
+						N:                              uint8(len(invalidSigners)),
+						IsSignatureVerificationEnabled: 1,
 					},
 					invalidSigners,
 					transmitterPubKeys,
@@ -2457,8 +2467,10 @@ func TestCCIPRouter(t *testing.T) {
 				instruction, err := ccip_offramp.NewSetOcrConfigInstruction(
 					ccip_offramp.OcrPluginType(testutils.OcrCommitPlugin),
 					ccip_offramp.Ocr3ConfigInfoInput{
-						ConfigDigest: config.ConfigDigest,
-						F:            config.OcrF,
+						ConfigDigest:                   config.ConfigDigest,
+						F:                              config.OcrF,
+						N:                              uint8(len(invalidSigners)),
+						IsSignatureVerificationEnabled: 1,
 					},
 					invalidSigners,
 					transmitterPubKeys,
@@ -2482,8 +2494,10 @@ func TestCCIPRouter(t *testing.T) {
 				instruction, err := ccip_offramp.NewSetOcrConfigInstruction(
 					ccip_offramp.OcrPluginType(testutils.OcrCommitPlugin),
 					ccip_offramp.Ocr3ConfigInfoInput{
-						ConfigDigest: config.ConfigDigest,
-						F:            config.OcrF,
+						ConfigDigest:                   config.ConfigDigest,
+						F:                              config.OcrF,
+						N:                              uint8(len(signerAddresses)),
+						IsSignatureVerificationEnabled: 1,
 					},
 					signerAddresses,
 					invalidTransmitters,
@@ -2507,8 +2521,10 @@ func TestCCIPRouter(t *testing.T) {
 				instruction, err := ccip_offramp.NewSetOcrConfigInstruction(
 					ccip_offramp.OcrPluginType(testutils.OcrCommitPlugin),
 					ccip_offramp.Ocr3ConfigInfoInput{
-						ConfigDigest: config.ConfigDigest,
-						F:            config.OcrF,
+						ConfigDigest:                   config.ConfigDigest,
+						F:                              config.OcrF,
+						N:                              uint8(len(repeatedSignerAddresses)),
+						IsSignatureVerificationEnabled: 1,
 					},
 					repeatedSignerAddresses,
 					oneTransmitter,
@@ -2528,8 +2544,10 @@ func TestCCIPRouter(t *testing.T) {
 				instruction, err := ccip_offramp.NewSetOcrConfigInstruction(
 					ccip_offramp.OcrPluginType(testutils.OcrCommitPlugin),
 					ccip_offramp.Ocr3ConfigInfoInput{
-						ConfigDigest: config.ConfigDigest,
-						F:            config.OcrF,
+						ConfigDigest:                   config.ConfigDigest,
+						F:                              config.OcrF,
+						N:                              uint8(len(signerAddresses)),
+						IsSignatureVerificationEnabled: 1,
 					},
 					signerAddresses,
 					invalidTransmitterPubKeys,
@@ -2551,8 +2569,10 @@ func TestCCIPRouter(t *testing.T) {
 				instruction, err := ccip_offramp.NewSetOcrConfigInstruction(
 					ccip_offramp.OcrPluginType(testutils.OcrCommitPlugin),
 					ccip_offramp.Ocr3ConfigInfoInput{
-						ConfigDigest: config.ConfigDigest,
-						F:            config.OcrF,
+						ConfigDigest:                   config.ConfigDigest,
+						F:                              config.OcrF,
+						N:                              uint8(len(invalidSignerAddresses)),
+						IsSignatureVerificationEnabled: 1,
 					},
 					invalidSignerAddresses,
 					transmitterPubKeys,
