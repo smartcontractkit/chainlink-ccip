@@ -13,7 +13,8 @@ import {MockE2EUSDCTransmitter} from "../../mocks/MockE2EUSDCTransmitter.sol";
 import {MockE2EUSDCTransmitterCCTPV2} from "../../mocks/MockE2EUSDCTransmitterCCTPV2.sol";
 import {MockUSDCTokenMessenger} from "../../mocks/MockUSDCTokenMessenger.sol";
 
-import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
+import {BaseERC20} from "../../../tmp/BaseERC20.sol";
+import {CrossChainToken} from "../../../tmp/CrossChainToken.sol";
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
 
@@ -71,7 +72,13 @@ contract USDCSetup is BaseTest {
 
   function setUp() public virtual override {
     super.setUp();
-    BurnMintERC20 usdcToken = new BurnMintERC20("USD Coin", "USDC", 6, 0, 0);
+    CrossChainToken usdcToken = new CrossChainToken(
+      BaseERC20.ConstructorParams({
+        name: "USD Coin", symbol: "USDC", decimals: 6, maxSupply: 0, preMint: 0, ccipAdmin: OWNER
+      }),
+      OWNER,
+      OWNER
+    );
     s_USDCToken = IERC20(address(usdcToken));
 
     s_tokenAdminRegistry = new TokenAdminRegistry();

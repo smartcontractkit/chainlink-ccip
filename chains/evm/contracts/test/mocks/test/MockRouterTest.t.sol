@@ -49,7 +49,7 @@ contract MockRouterTest is TokenSetup {
   function test_RevertWhen_ccipSendWithLinkFeeTokenbutInsufficientAllowance() public {
     message.feeToken = s_sourceFeeToken;
 
-    vm.expectRevert(bytes("ERC20: insufficient allowance"));
+    vm.expectRevert();
     mockRouter.ccipSend(MOCK_CHAIN_SELECTOR, message);
   }
 

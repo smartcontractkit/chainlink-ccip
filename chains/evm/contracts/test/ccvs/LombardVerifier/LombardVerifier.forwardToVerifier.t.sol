@@ -9,7 +9,8 @@ import {BaseVerifier} from "../../../ccvs/components/BaseVerifier.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {LombardVerifierSetup} from "./LombardVerifierSetup.t.sol";
 
-import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
+import {BaseERC20} from "../../../tmp/BaseERC20.sol";
+import {CrossChainToken} from "../../../tmp/CrossChainToken.sol";
 
 contract LombardVerifier_forwardToVerifier is LombardVerifierSetup {
   function setUp() public override {
@@ -49,8 +50,24 @@ contract LombardVerifier_forwardToVerifier is LombardVerifierSetup {
 
   function test_forwardToVerifier_WithAdapter() public {
     // Add a token with an adapter.
-    address tokenWithAdapter = address(new BurnMintERC20("Token With Adapter", "TWA", 18, 0, 0));
-    address adapter = address(new BurnMintERC20("Adapter", "ADP", 18, 0, 0));
+    address tokenWithAdapter = address(
+      new CrossChainToken(
+        BaseERC20.ConstructorParams({
+          name: "Token With Adapter", symbol: "TWA", decimals: 18, maxSupply: 0, preMint: 0, ccipAdmin: OWNER
+        }),
+        OWNER,
+        OWNER
+      )
+    );
+    address adapter = address(
+      new CrossChainToken(
+        BaseERC20.ConstructorParams({
+          name: "Adapter", symbol: "ADP", decimals: 18, maxSupply: 0, preMint: 0, ccipAdmin: OWNER
+        }),
+        OWNER,
+        OWNER
+      )
+    );
 
     deal(adapter, address(s_lombardVerifier), TRANSFER_AMOUNT);
 

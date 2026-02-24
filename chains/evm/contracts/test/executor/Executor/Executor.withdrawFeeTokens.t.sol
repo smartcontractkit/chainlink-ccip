@@ -4,7 +4,8 @@ pragma solidity ^0.8.24;
 import {FeeTokenHandler} from "../../../libraries/FeeTokenHandler.sol";
 import {ExecutorSetup} from "./ExecutorSetup.t.sol";
 
-import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
+import {BaseERC20} from "../../../tmp/BaseERC20.sol";
+import {CrossChainToken} from "../../../tmp/CrossChainToken.sol";
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
 contract Executor_withdrawFeeTokens is ExecutorSetup {
@@ -37,7 +38,15 @@ contract Executor_withdrawFeeTokens is ExecutorSetup {
     uint256 feeAmount1 = 1000 ether;
     uint256 feeAmount2 = 500 ether;
 
-    address token2 = address(new BurnMintERC20("Token2", "TK2", 18, 0, 0));
+    address token2 = address(
+      new CrossChainToken(
+        BaseERC20.ConstructorParams({
+          name: "Token2", symbol: "TK2", decimals: 18, maxSupply: 0, preMint: 0, ccipAdmin: OWNER
+        }),
+        OWNER,
+        OWNER
+      )
+    );
 
     // Give the Executor some fee tokens.
     deal(s_sourceFeeToken, address(s_executor), feeAmount1);

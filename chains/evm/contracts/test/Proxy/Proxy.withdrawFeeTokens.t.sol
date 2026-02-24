@@ -4,7 +4,8 @@ pragma solidity ^0.8.24;
 import {FeeTokenHandler} from "../../libraries/FeeTokenHandler.sol";
 import {ProxySetup} from "./ProxySetup.t.sol";
 
-import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
+import {BaseERC20} from "../../tmp/BaseERC20.sol";
+import {CrossChainToken} from "../../tmp/CrossChainToken.sol";
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
 contract Proxy_withdrawFeeTokens is ProxySetup {
@@ -13,7 +14,15 @@ contract Proxy_withdrawFeeTokens is ProxySetup {
 
   function setUp() public override {
     super.setUp();
-    s_feeToken = address(new BurnMintERC20("Chainlink Token", "LINK", 18, 0, 0));
+    s_feeToken = address(
+      new CrossChainToken(
+        BaseERC20.ConstructorParams({
+          name: "Chainlink Token", symbol: "LINK", decimals: 18, maxSupply: 0, preMint: 0, ccipAdmin: OWNER
+        }),
+        OWNER,
+        OWNER
+      )
+    );
     // Set the fee aggregator for the proxy
     s_proxy.setFeeAggregator(FEE_AGGREGATOR);
     vm.stopPrank();
@@ -51,7 +60,15 @@ contract Proxy_withdrawFeeTokens is ProxySetup {
     uint256 feeAmount1 = 1000e18;
     uint256 feeAmount2 = 500e18;
 
-    address token2 = address(new BurnMintERC20("Token2", "TK2", 18, 0, 0));
+    address token2 = address(
+      new CrossChainToken(
+        BaseERC20.ConstructorParams({
+          name: "Token2", symbol: "TK2", decimals: 18, maxSupply: 0, preMint: 0, ccipAdmin: OWNER
+        }),
+        OWNER,
+        OWNER
+      )
+    );
 
     // Give the proxy some fee tokens.
     deal(s_feeToken, address(s_proxy), feeAmount1);

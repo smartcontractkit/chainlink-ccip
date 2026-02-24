@@ -4,7 +4,8 @@ pragma solidity ^0.8.24;
 import {Executor} from "../../../executor/Executor.sol";
 import {BaseTest} from "../../BaseTest.t.sol";
 
-import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
+import {BaseERC20} from "../../../tmp/BaseERC20.sol";
+import {CrossChainToken} from "../../../tmp/CrossChainToken.sol";
 
 contract ExecutorSetup is BaseTest {
   address internal constant INITIAL_CCV = address(121212);
@@ -26,7 +27,15 @@ contract ExecutorSetup is BaseTest {
     });
 
     s_executor = new Executor(INITIAL_MAX_CCVS, dynamicConfig);
-    s_sourceFeeToken = address(new BurnMintERC20("test", "test", 18, 0, 0));
+    s_sourceFeeToken = address(
+      new CrossChainToken(
+        BaseERC20.ConstructorParams({
+          name: "test", symbol: "test", decimals: 18, maxSupply: 0, preMint: 0, ccipAdmin: OWNER
+        }),
+        OWNER,
+        OWNER
+      )
+    );
 
     address[] memory ccvs = new address[](1);
     ccvs[0] = INITIAL_CCV;

@@ -18,7 +18,7 @@ pragma solidity ^0.8.24;
 
 import {IMessageTransmitterWithRelay} from "./interfaces/IMessageTransmitterWithRelay.sol";
 
-import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
+import {CrossChainToken} from "../../tmp/CrossChainToken.sol";
 
 // solhint-disable
 contract MockE2EUSDCTransmitter is IMessageTransmitterWithRelay {
@@ -29,7 +29,7 @@ contract MockE2EUSDCTransmitter is IMessageTransmitterWithRelay {
   // Next available nonce from this source domain
   uint64 public nextAvailableNonce;
 
-  BurnMintERC20 internal immutable i_token;
+  CrossChainToken internal immutable i_token;
 
   /**
    * @notice Emitted when a new message is dispatched
@@ -46,7 +46,7 @@ contract MockE2EUSDCTransmitter is IMessageTransmitterWithRelay {
     i_localDomain = _localDomain;
     s_shouldSucceed = true;
 
-    i_token = BurnMintERC20(token);
+    i_token = CrossChainToken(token);
   }
 
   /// @param message The original message on the source chain

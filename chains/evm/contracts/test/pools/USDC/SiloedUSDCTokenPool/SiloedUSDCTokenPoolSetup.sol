@@ -4,9 +4,9 @@ pragma solidity ^0.8.24;
 import {ERC20LockBox} from "../../../../pools/ERC20LockBox.sol";
 import {SiloedLockReleaseTokenPool} from "../../../../pools/SiloedLockReleaseTokenPool.sol";
 import {SiloedUSDCTokenPool} from "../../../../pools/USDC/SiloedUSDCTokenPool.sol";
+import {CrossChainToken} from "../../../../tmp/CrossChainToken.sol";
 import {USDCSetup} from "../USDCSetup.t.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
-import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
 contract SiloedUSDCTokenPoolSetup is USDCSetup {
   SiloedUSDCTokenPool internal s_usdcTokenPool;
@@ -39,7 +39,7 @@ contract SiloedUSDCTokenPoolSetup is USDCSetup {
       AuthorizedCallers.AuthorizedCallerArgs({addedCallers: authorizedCallers, removedCallers: new address[](0)})
     );
 
-    BurnMintERC20(address(s_USDCToken)).grantMintAndBurnRoles(address(s_usdcTokenPool));
+    CrossChainToken(address(s_USDCToken)).grantMintAndBurnRoles(address(s_usdcTokenPool));
 
     s_tokenAdminRegistry.proposeAdministrator(address(s_USDCToken), OWNER);
     s_tokenAdminRegistry.acceptAdminRole(address(s_USDCToken));

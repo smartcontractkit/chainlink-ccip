@@ -4,9 +4,10 @@ pragma solidity ^0.8.24;
 import {Router} from "../../../Router.sol";
 import {ERC20LockBox} from "../../../pools/ERC20LockBox.sol";
 import {SiloedLockReleaseTokenPool} from "../../../pools/SiloedLockReleaseTokenPool.sol";
+import {BaseERC20} from "../../../tmp/BaseERC20.sol";
+import {CrossChainToken} from "../../../tmp/CrossChainToken.sol";
 import {BaseTest} from "../../BaseTest.t.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
-import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
@@ -23,7 +24,17 @@ contract SiloedLockReleaseTokenPool_getAllLockBoxConfigs is BaseTest {
   function setUp() public override {
     super.setUp();
 
-    s_token = IERC20(address(new BurnMintERC20("TEST", "TST", 18, 0, 0)));
+    s_token = IERC20(
+      address(
+        new CrossChainToken(
+          BaseERC20.ConstructorParams({
+            name: "TEST", symbol: "TST", decimals: 18, maxSupply: 0, preMint: 0, ccipAdmin: OWNER
+          }),
+          OWNER,
+          OWNER
+        )
+      )
+    );
     s_sharedLockBox = new ERC20LockBox(address(s_token));
     s_isolatedLockBox = new ERC20LockBox(address(s_token));
 
