@@ -14,13 +14,12 @@ import (
 )
 
 func HasAccess(ctx context.Context, client *rpc.Client, accessController solana.PublicKey, address solana.PublicKey, commitment rpc.CommitmentType) (bool, error) {
-	var ac access_controller.AccessController
-	err := common.GetAccountDataBorshInto(
+	ac, err := common.GetParsedAccountData(
 		ctx,
 		client,
 		accessController,
 		commitment,
-		&ac,
+		access_controller.ParseAccount_AccessController,
 	)
 	if err != nil {
 		return false, fmt.Errorf("failed to get account data: %w", err)

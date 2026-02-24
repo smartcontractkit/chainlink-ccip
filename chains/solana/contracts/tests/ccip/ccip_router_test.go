@@ -873,7 +873,7 @@ func TestCCIPRouter(t *testing.T) {
 
 			// Fetch account data
 			var configAccount ccip_router.Config
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.RouterConfigPDA, config.DefaultCommitment, &configAccount)
+			err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, config.RouterConfigPDA, config.DefaultCommitment, &configAccount)
 			if err != nil {
 				require.NoError(t, err, "failed to get account info")
 			}
@@ -896,7 +896,7 @@ func TestCCIPRouter(t *testing.T) {
 			t.Run("When an admin tries to make the update, it succeeds", func(t *testing.T) {
 				// Fetch account data
 				var configAccount ccip_router.Config
-				require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, config.RouterConfigPDA, config.DefaultCommitment, &configAccount))
+				require.NoError(t, common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, config.RouterConfigPDA, config.DefaultCommitment, &configAccount))
 				require.Equal(t, token0.Mint, configAccount.LinkTokenMint) // initially set to token0 mint
 
 				ix, err := ccip_router.NewSetLinkTokenMintInstruction(
@@ -916,7 +916,7 @@ func TestCCIPRouter(t *testing.T) {
 				require.Equal(t, link22.mint, configSetEvent.LinkTokenMint)
 
 				// Check the onchain state
-				require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, config.RouterConfigPDA, config.DefaultCommitment, &configAccount))
+				require.NoError(t, common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, config.RouterConfigPDA, config.DefaultCommitment, &configAccount))
 				require.Equal(t, link22.mint, configAccount.LinkTokenMint)
 			})
 		})
@@ -959,7 +959,7 @@ func TestCCIPRouter(t *testing.T) {
 
 			// Fetch account data
 			var fqConfig fee_quoter.Config
-			require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, config.FqConfigPDA, config.DefaultCommitment, &fqConfig))
+			require.NoError(t, common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, config.FqConfigPDA, config.DefaultCommitment, &fqConfig))
 
 			require.Equal(t, token0.Mint, fqConfig.LinkTokenMint) // to be changed in the next tests
 			require.Equal(t, token0Decimals, fqConfig.LinkTokenLocalDecimals)
@@ -983,7 +983,7 @@ func TestCCIPRouter(t *testing.T) {
 			t.Run("When an admin tries to make the update, it succeeds", func(t *testing.T) {
 				// Fetch account data
 				var configAccount fee_quoter.Config
-				require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, config.FqConfigPDA, config.DefaultCommitment, &configAccount))
+				require.NoError(t, common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, config.FqConfigPDA, config.DefaultCommitment, &configAccount))
 				require.Equal(t, token0.Mint, configAccount.LinkTokenMint)             // initially set to token0 mint
 				require.Equal(t, token0Decimals, configAccount.LinkTokenLocalDecimals) // initially set to token0 mint decimals
 
@@ -1004,7 +1004,7 @@ func TestCCIPRouter(t *testing.T) {
 				require.Equal(t, link22Decimals, configSetEvent.LinkTokenDecimals)
 
 				// Check the onchain state
-				require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, config.FqConfigPDA, config.DefaultCommitment, &configAccount))
+				require.NoError(t, common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, config.FqConfigPDA, config.DefaultCommitment, &configAccount))
 				require.Equal(t, link22.mint, configAccount.LinkTokenMint)
 				require.Equal(t, link22Decimals, configAccount.LinkTokenLocalDecimals)
 			})
@@ -1025,7 +1025,7 @@ func TestCCIPRouter(t *testing.T) {
 			t.Run("When an admin tries to make the update, it succeeds", func(t *testing.T) {
 				// Check that initial value is different to what is going to be set
 				var fqConfig fee_quoter.Config
-				require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, config.FqConfigPDA, config.DefaultCommitment, &fqConfig))
+				require.NoError(t, common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, config.FqConfigPDA, config.DefaultCommitment, &fqConfig))
 				require.NotEqual(t, defaultMaxFeeJuelsPerMsg, fqConfig.MaxFeeJuelsPerMsg)
 
 				// Actually update it
@@ -1044,7 +1044,7 @@ func TestCCIPRouter(t *testing.T) {
 				require.Equal(t, defaultMaxFeeJuelsPerMsg, configSetEvent.MaxFeeJuelsPerMsg)
 
 				// Check that the final value is the expected one
-				require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, config.FqConfigPDA, config.DefaultCommitment, &fqConfig))
+				require.NoError(t, common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, config.FqConfigPDA, config.DefaultCommitment, &fqConfig))
 				require.Equal(t, defaultMaxFeeJuelsPerMsg, fqConfig.MaxFeeJuelsPerMsg)
 			})
 		})
@@ -1163,7 +1163,7 @@ func TestCCIPRouter(t *testing.T) {
 
 			// Fetch account data
 			var offrampConfig ccip_offramp.Config
-			require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, config.OfframpConfigPDA, config.DefaultCommitment, &offrampConfig))
+			require.NoError(t, common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, config.OfframpConfigPDA, config.DefaultCommitment, &offrampConfig))
 			require.Equal(t, invalidSVMChainSelector, offrampConfig.SvmChainSelector)
 			require.Equal(t, config.EnableExecutionAfter, offrampConfig.EnableManualExecutionAfter)
 			require.Equal(t, legacyAdmin.PublicKey(), offrampConfig.Owner)
@@ -1171,12 +1171,12 @@ func TestCCIPRouter(t *testing.T) {
 
 			// check price sequence start
 			var state ccip_offramp.GlobalState
-			require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, config.OfframpStatePDA, config.DefaultCommitment, &state))
+			require.NoError(t, common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, config.OfframpStatePDA, config.DefaultCommitment, &state))
 			require.Equal(t, uint64(0), state.LatestPriceSequenceNumber)
 
 			// check reference addresses
 			var referenceAddresses ccip_offramp.ReferenceAddresses
-			require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, config.OfframpReferenceAddressesPDA, config.DefaultCommitment, &referenceAddresses))
+			require.NoError(t, common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, config.OfframpReferenceAddressesPDA, config.DefaultCommitment, &referenceAddresses))
 			require.Equal(t, testReferenceAddresses.FeeQuoter, referenceAddresses.FeeQuoter)
 			require.Equal(t, testReferenceAddresses.OfframpLookupTable, referenceAddresses.OfframpLookupTable)
 			require.Equal(t, testReferenceAddresses.Router, referenceAddresses.Router)
@@ -1228,7 +1228,7 @@ func TestCCIPRouter(t *testing.T) {
 
 				// check state
 				var referenceAddresses ccip_offramp.ReferenceAddresses
-				require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, config.OfframpReferenceAddressesPDA, config.DefaultCommitment, &referenceAddresses))
+				require.NoError(t, common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, config.OfframpReferenceAddressesPDA, config.DefaultCommitment, &referenceAddresses))
 				require.Equal(t, config.FeeQuoterProgram, referenceAddresses.FeeQuoter)
 				require.Equal(t, lookupTableAddr, referenceAddresses.OfframpLookupTable)
 				require.Equal(t, config.CcipRouterProgram, referenceAddresses.Router)
@@ -1262,7 +1262,7 @@ func TestCCIPRouter(t *testing.T) {
 				require.Equal(t, config.SvmChainSelector, configSetEvent.SvmChainSelector)
 
 				var configAccount ccip_router.Config
-				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.RouterConfigPDA, config.DefaultCommitment, &configAccount)
+				err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, config.RouterConfigPDA, config.DefaultCommitment, &configAccount)
 				require.NoError(t, err, "failed to get account info")
 				require.Equal(t, config.SvmChainSelector, configAccount.SvmChainSelector)
 			})
@@ -1282,7 +1282,7 @@ func TestCCIPRouter(t *testing.T) {
 				require.Equal(t, config.SvmChainSelector, configSetEvent.SvmChainSelector)
 
 				var configAccount ccip_offramp.Config
-				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.OfframpConfigPDA, config.DefaultCommitment, &configAccount)
+				err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, config.OfframpConfigPDA, config.DefaultCommitment, &configAccount)
 				require.NoError(t, err, "failed to get account info")
 				require.Equal(t, config.SvmChainSelector, configAccount.SvmChainSelector)
 			})
@@ -1401,7 +1401,7 @@ func TestCCIPRouter(t *testing.T) {
 				require.NotNil(t, result)
 
 				var destChainStateAccount ccip_router.DestChain
-				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.EvmDestChainStatePDA, config.DefaultCommitment, &destChainStateAccount)
+				err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, config.EvmDestChainStatePDA, config.DefaultCommitment, &destChainStateAccount)
 				require.NoError(t, err, "failed to get account info")
 				require.Equal(t, uint64(0), destChainStateAccount.State.SequenceNumber)
 				require.Equal(t, ccip_router.DestChainConfig{}, destChainStateAccount.Config)
@@ -1421,7 +1421,7 @@ func TestCCIPRouter(t *testing.T) {
 				require.NotNil(t, result)
 
 				var destChainAccount fee_quoter.DestChain
-				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.FqEvmDestChainPDA, config.DefaultCommitment, &destChainAccount)
+				err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, config.FqEvmDestChainPDA, config.DefaultCommitment, &destChainAccount)
 				require.NoError(t, err, "failed to get account info")
 				require.Equal(t, fee_quoter.TimestampedPackedU224{}, destChainAccount.State.UsdPerUnitGas)
 				require.Equal(t, validFqDestChainConfig, destChainAccount.Config)
@@ -1441,7 +1441,7 @@ func TestCCIPRouter(t *testing.T) {
 				require.NotNil(t, result)
 
 				var sourceChainStateAccount ccip_offramp.SourceChain
-				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.OfframpEvmSourceChainPDA, config.DefaultCommitment, &sourceChainStateAccount)
+				err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, config.OfframpEvmSourceChainPDA, config.DefaultCommitment, &sourceChainStateAccount)
 				require.NoError(t, err, "failed to get account info")
 				require.Equal(t, uint64(1), sourceChainStateAccount.State.MinSeqNr)
 				require.Equal(t, true, sourceChainStateAccount.Config.IsEnabled)
@@ -1475,7 +1475,7 @@ func TestCCIPRouter(t *testing.T) {
 				require.NotNil(t, result)
 
 				var destChainStateAccount ccip_router.DestChain
-				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.SvmDestChainStatePDA, config.DefaultCommitment, &destChainStateAccount)
+				err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, config.SvmDestChainStatePDA, config.DefaultCommitment, &destChainStateAccount)
 				require.NoError(t, err, "failed to get account info")
 				require.Equal(t, uint64(0), destChainStateAccount.State.SequenceNumber)
 			})
@@ -1503,7 +1503,7 @@ func TestCCIPRouter(t *testing.T) {
 				require.NotNil(t, result)
 
 				var destChainStateAccount fee_quoter.DestChain
-				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.FqSvmDestChainPDA, config.DefaultCommitment, &destChainStateAccount)
+				err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, config.FqSvmDestChainPDA, config.DefaultCommitment, &destChainStateAccount)
 				require.NoError(t, err, "failed to get account info")
 				require.Equal(t, fee_quoter.TimestampedPackedU224{}, destChainStateAccount.State.UsdPerUnitGas)
 			})
@@ -1525,7 +1525,7 @@ func TestCCIPRouter(t *testing.T) {
 				require.NotNil(t, result)
 
 				var sourceChainStateAccount ccip_offramp.SourceChain
-				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.OfframpSvmSourceChainPDA, config.DefaultCommitment, &sourceChainStateAccount)
+				err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, config.OfframpSvmSourceChainPDA, config.DefaultCommitment, &sourceChainStateAccount)
 				require.NoError(t, err, "failed to get account info")
 				require.Equal(t, uint64(1), sourceChainStateAccount.State.MinSeqNr)
 				require.Equal(t, true, sourceChainStateAccount.Config.IsEnabled)
@@ -1535,7 +1535,7 @@ func TestCCIPRouter(t *testing.T) {
 
 		t.Run("Onramp lane ccip version", func(t *testing.T) {
 			var initial ccip_router.DestChain
-			require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, config.SvmDestChainStatePDA, config.DefaultCommitment, &initial))
+			require.NoError(t, common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, config.SvmDestChainStatePDA, config.DefaultCommitment, &initial))
 			require.Equal(t, ccip_router.RestoreOnAction_None, initial.State.RestoreOnAction)
 
 			t.Run("When a non-admin tries to bump the onramp ccip version for a dest chain, it fails", func(t *testing.T) {
@@ -1561,7 +1561,7 @@ func TestCCIPRouter(t *testing.T) {
 				require.NotNil(t, result)
 
 				var routerDestChain ccip_router.DestChain
-				require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, config.SvmDestChainStatePDA, config.DefaultCommitment, &routerDestChain))
+				require.NoError(t, common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, config.SvmDestChainStatePDA, config.DefaultCommitment, &routerDestChain))
 				require.Equal(t, ccip_router.RestoreOnAction_Rollback, routerDestChain.State.RestoreOnAction)
 			})
 
@@ -1588,7 +1588,7 @@ func TestCCIPRouter(t *testing.T) {
 				require.NotNil(t, result)
 
 				var routerDestChain ccip_router.DestChain
-				require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, config.SvmDestChainStatePDA, config.DefaultCommitment, &routerDestChain))
+				require.NoError(t, common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, config.SvmDestChainStatePDA, config.DefaultCommitment, &routerDestChain))
 				require.Equal(t, ccip_router.RestoreOnAction_Upgrade, routerDestChain.State.RestoreOnAction)
 			})
 
@@ -1633,7 +1633,7 @@ func TestCCIPRouter(t *testing.T) {
 		t.Run("When an admin disables the chain selector, it is no longer enabled", func(t *testing.T) {
 			t.Run("Offramp: Source", func(t *testing.T) {
 				var initial ccip_offramp.SourceChain
-				err := common.GetAccountDataBorshInto(ctx, solanaGoClient, config.OfframpEvmSourceChainPDA, config.DefaultCommitment, &initial)
+				err := common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, config.OfframpEvmSourceChainPDA, config.DefaultCommitment, &initial)
 				require.NoError(t, err, "failed to get account info")
 				require.Equal(t, true, initial.Config.IsEnabled)
 
@@ -1647,14 +1647,14 @@ func TestCCIPRouter(t *testing.T) {
 				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, legacyAdmin, config.DefaultCommitment)
 
 				var final ccip_offramp.SourceChain
-				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.OfframpEvmSourceChainPDA, config.DefaultCommitment, &final)
+				err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, config.OfframpEvmSourceChainPDA, config.DefaultCommitment, &final)
 				require.NoError(t, err, "failed to get account info")
 				require.Equal(t, false, final.Config.IsEnabled)
 			})
 
 			t.Run("Fee Quoter: Dest", func(t *testing.T) {
 				var initial fee_quoter.DestChain
-				err := common.GetAccountDataBorshInto(ctx, solanaGoClient, config.FqEvmDestChainPDA, config.DefaultCommitment, &initial)
+				err := common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, config.FqEvmDestChainPDA, config.DefaultCommitment, &initial)
 				require.NoError(t, err, "failed to get account info")
 				require.Equal(t, true, initial.Config.IsEnabled)
 
@@ -1668,7 +1668,7 @@ func TestCCIPRouter(t *testing.T) {
 				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, legacyAdmin, config.DefaultCommitment)
 
 				var final fee_quoter.DestChain
-				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.FqEvmDestChainPDA, config.DefaultCommitment, &final)
+				err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, config.FqEvmDestChainPDA, config.DefaultCommitment, &final)
 				require.NoError(t, err, "failed to get account info")
 				require.Equal(t, false, final.Config.IsEnabled)
 			})
@@ -1727,7 +1727,7 @@ func TestCCIPRouter(t *testing.T) {
 		t.Run("When an admin updates the chain state config, it is configured", func(t *testing.T) {
 			t.Run("Offramp: Source", func(t *testing.T) {
 				var initialSource ccip_offramp.SourceChain
-				serr := common.GetAccountDataBorshInto(ctx, solanaGoClient, config.OfframpEvmSourceChainPDA, config.DefaultCommitment, &initialSource)
+				serr := common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, config.OfframpEvmSourceChainPDA, config.DefaultCommitment, &initialSource)
 				require.NoError(t, serr, "failed to get account info")
 
 				updated := initialSource.Config
@@ -1746,14 +1746,14 @@ func TestCCIPRouter(t *testing.T) {
 				require.NotNil(t, result)
 
 				var final ccip_offramp.SourceChain
-				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.OfframpEvmSourceChainPDA, config.DefaultCommitment, &final)
+				err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, config.OfframpEvmSourceChainPDA, config.DefaultCommitment, &final)
 				require.NoError(t, err, "failed to get account info")
 				require.Equal(t, updated, final.Config)
 			})
 
 			t.Run("Fee Quoter: Dest", func(t *testing.T) {
 				var initialDest fee_quoter.DestChain
-				derr := common.GetAccountDataBorshInto(ctx, solanaGoClient, config.FqEvmDestChainPDA, config.DefaultCommitment, &initialDest)
+				derr := common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, config.FqEvmDestChainPDA, config.DefaultCommitment, &initialDest)
 				require.NoError(t, derr, "failed to get account info")
 
 				updated := initialDest.Config
@@ -1772,7 +1772,7 @@ func TestCCIPRouter(t *testing.T) {
 				require.NotNil(t, result)
 
 				var final fee_quoter.DestChain
-				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.FqEvmDestChainPDA, config.DefaultCommitment, &final)
+				err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, config.FqEvmDestChainPDA, config.DefaultCommitment, &final)
 				require.NoError(t, err, "failed to get account info")
 				require.Equal(t, updated, final.Config)
 			})
@@ -1792,7 +1792,7 @@ func TestCCIPRouter(t *testing.T) {
 
 		t.Run("When an authorized user tries updates the fee aggregator, it succeeds", func(t *testing.T) {
 			var configAccount ccip_router.Config
-			err := common.GetAccountDataBorshInto(ctx, solanaGoClient, config.RouterConfigPDA, config.DefaultCommitment, &configAccount)
+			err := common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, config.RouterConfigPDA, config.DefaultCommitment, &configAccount)
 			require.NoError(t, err, "failed to get account info")
 			require.NotEqual(t, feeAggregator.PublicKey(), configAccount.FeeAggregator) // at this point, the fee aggregator is different
 
@@ -1810,7 +1810,7 @@ func TestCCIPRouter(t *testing.T) {
 			require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "ConfigSet", &configSetEvent, config.PrintEvents))
 			require.Equal(t, feeAggregator.PublicKey(), configSetEvent.FeeAggregator)
 
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.RouterConfigPDA, config.DefaultCommitment, &configAccount)
+			err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, config.RouterConfigPDA, config.DefaultCommitment, &configAccount)
 			require.NoError(t, err, "failed to get account info")
 			require.Equal(t, feeAggregator.PublicKey(), configAccount.FeeAggregator) // now the fee aggregator is updated
 		})
@@ -1876,7 +1876,7 @@ func TestCCIPRouter(t *testing.T) {
 
 			// Validate proposed set to 0-address
 			var configAccount ccip_router.Config
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.RouterConfigPDA, config.DefaultCommitment, &configAccount)
+			err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, config.RouterConfigPDA, config.DefaultCommitment, &configAccount)
 			if err != nil {
 				require.NoError(t, err, "failed to get account info")
 			}
@@ -1944,7 +1944,7 @@ func TestCCIPRouter(t *testing.T) {
 
 			// Validate proposed set to 0-address
 			var configAccount fee_quoter.Config
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.FqConfigPDA, config.DefaultCommitment, &configAccount)
+			err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, config.FqConfigPDA, config.DefaultCommitment, &configAccount)
 			if err != nil {
 				require.NoError(t, err, "failed to get account info")
 			}
@@ -2012,7 +2012,7 @@ func TestCCIPRouter(t *testing.T) {
 
 			// Validate proposed set to 0-address
 			var configAccount ccip_offramp.Config
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.OfframpConfigPDA, config.DefaultCommitment, &configAccount)
+			err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, config.OfframpConfigPDA, config.DefaultCommitment, &configAccount)
 			if err != nil {
 				require.NoError(t, err, "failed to get account info")
 			}
@@ -2082,7 +2082,7 @@ func TestCCIPRouter(t *testing.T) {
 
 			// Validate proposed set to 0-address
 			var configAccount rmn_remote.Config
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.RMNRemoteConfigPDA, config.DefaultCommitment, &configAccount)
+			err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, config.RMNRemoteConfigPDA, config.DefaultCommitment, &configAccount)
 			if err != nil {
 				require.NoError(t, err, "failed to get account info")
 			}
@@ -2167,7 +2167,7 @@ func TestCCIPRouter(t *testing.T) {
 					t.Run("Pre-condition: Does not support token by default", func(t *testing.T) {
 						tokenBillingPDA := getFqTokenConfigPDA(token.Mint)
 						var tokenConfigAccount fee_quoter.BillingTokenConfigWrapper
-						err := common.GetAccountDataBorshInto(ctx, solanaGoClient, tokenBillingPDA, config.DefaultCommitment, &tokenConfigAccount)
+						err := common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, tokenBillingPDA, config.DefaultCommitment, &tokenConfigAccount)
 						require.EqualError(t, err, "not found")
 					})
 
@@ -2208,7 +2208,7 @@ func TestCCIPRouter(t *testing.T) {
 						testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ixConfig}, ccipAdmin, config.DefaultCommitment)
 
 						var tokenConfigAccount fee_quoter.BillingTokenConfigWrapper
-						aerr := common.GetAccountDataBorshInto(ctx, solanaGoClient, tokenBillingPDA, config.DefaultCommitment, &tokenConfigAccount)
+						aerr := common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, tokenBillingPDA, config.DefaultCommitment, &tokenConfigAccount)
 						require.NoError(t, aerr)
 
 						require.Equal(t, tokenConfig, tokenConfigAccount.Config)
@@ -2217,7 +2217,7 @@ func TestCCIPRouter(t *testing.T) {
 					t.Run("When an unauthorized user updates token with correct configuration it fails", func(t *testing.T) {
 						tokenBillingPDA := getFqTokenConfigPDA(token.Mint)
 						var initial fee_quoter.BillingTokenConfigWrapper
-						ierr := common.GetAccountDataBorshInto(ctx, solanaGoClient, tokenBillingPDA, config.DefaultCommitment, &initial)
+						ierr := common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, tokenBillingPDA, config.DefaultCommitment, &initial)
 						require.NoError(t, ierr)
 
 						tokenConfig := initial.Config
@@ -2228,7 +2228,7 @@ func TestCCIPRouter(t *testing.T) {
 						testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ixConfig}, legacyAdmin, config.DefaultCommitment, []string{ccip.Unauthorized_CcipRouterError.String()})
 
 						var final fee_quoter.BillingTokenConfigWrapper
-						ferr := common.GetAccountDataBorshInto(ctx, solanaGoClient, tokenBillingPDA, config.DefaultCommitment, &final)
+						ferr := common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, tokenBillingPDA, config.DefaultCommitment, &final)
 						require.NoError(t, ferr)
 
 						require.Equal(t, initial.Config, final.Config) // it was not updated, same values as initial
@@ -2237,7 +2237,7 @@ func TestCCIPRouter(t *testing.T) {
 					t.Run("When admin updates token it is updated", func(t *testing.T) {
 						tokenBillingPDA := getFqTokenConfigPDA(token.Mint)
 						var initial fee_quoter.BillingTokenConfigWrapper
-						ierr := common.GetAccountDataBorshInto(ctx, solanaGoClient, tokenBillingPDA, config.DefaultCommitment, &initial)
+						ierr := common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, tokenBillingPDA, config.DefaultCommitment, &initial)
 						require.NoError(t, ierr)
 
 						tokenConfig := initial.Config
@@ -2254,7 +2254,7 @@ func TestCCIPRouter(t *testing.T) {
 						require.Equal(t, tokenConfig.PremiumMultiplierWeiPerEth, premiumMultiplierWeiPerEthUpdatedEvent.PremiumMultiplierWeiPerEth)
 
 						var final fee_quoter.BillingTokenConfigWrapper
-						ferr := common.GetAccountDataBorshInto(ctx, solanaGoClient, tokenBillingPDA, rpc.CommitmentProcessed, &final)
+						ferr := common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, tokenBillingPDA, rpc.CommitmentProcessed, &final)
 						require.NoError(t, ferr)
 
 						require.NotEqual(t, initial.Config.PremiumMultiplierWeiPerEth, final.Config.PremiumMultiplierWeiPerEth) // it was updated
@@ -2333,7 +2333,7 @@ func TestCCIPRouter(t *testing.T) {
 
 					// check config state
 					var configAccount ccip_offramp.Config
-					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.OfframpConfigPDA, config.DefaultCommitment, &configAccount)
+					err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, config.OfframpConfigPDA, config.DefaultCommitment, &configAccount)
 					if err != nil {
 						require.NoError(t, err, "failed to get account info")
 					}
@@ -2618,7 +2618,7 @@ func TestCCIPRouter(t *testing.T) {
 
 					// Validate Token Pool Registry PDA
 					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
-					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token0.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+					err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, token0.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
 					require.NoError(t, err)
 					require.Equal(t, uint8(2), tokenAdminRegistry.Version)
 					require.Equal(t, token0PoolAdmin.PublicKey(), tokenAdminRegistry.PendingAdministrator)
@@ -2665,7 +2665,7 @@ func TestCCIPRouter(t *testing.T) {
 
 					// Validate Token Pool Registry PDA
 					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
-					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token0.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+					err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, token0.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
 					require.NoError(t, err)
 					require.Equal(t, uint8(2), tokenAdminRegistry.Version)
 					require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.PendingAdministrator)
@@ -2766,7 +2766,7 @@ func TestCCIPRouter(t *testing.T) {
 
 					// Validate Token Pool Registry PDA
 					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
-					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token0.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+					err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, token0.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
 					require.NoError(t, err)
 					require.Equal(t, token0PoolAdmin.PublicKey(), tokenAdminRegistry.Administrator)
 					require.Equal(t, uint8(2), tokenAdminRegistry.Version)
@@ -2787,7 +2787,7 @@ func TestCCIPRouter(t *testing.T) {
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, token0PoolAdmin, config.DefaultCommitment)
 
 					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
-					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token0.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+					err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, token0.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
 					require.NoError(t, err)
 					require.Equal(t, true, tokenAdminRegistry.SupportsAutoDerivation)
 				})
@@ -2807,7 +2807,7 @@ func TestCCIPRouter(t *testing.T) {
 
 					// Validate Token Pool Registry PDA
 					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
-					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token0.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+					err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, token0.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
 					require.NoError(t, err)
 					require.Equal(t, token0PoolAdmin.PublicKey(), tokenAdminRegistry.Administrator)
 					require.Equal(t, uint8(2), tokenAdminRegistry.Version)
@@ -2857,7 +2857,7 @@ func TestCCIPRouter(t *testing.T) {
 
 					// Validate Token Pool Registry PDA
 					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
-					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token0.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+					err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, token0.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
 					require.NoError(t, err)
 					require.Equal(t, token0PoolAdmin.PublicKey(), tokenAdminRegistry.Administrator)
 					require.Equal(t, uint8(2), tokenAdminRegistry.Version)
@@ -2904,7 +2904,7 @@ func TestCCIPRouter(t *testing.T) {
 
 					// Validate Token Pool Registry PDA
 					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
-					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token0.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+					err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, token0.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
 					require.NoError(t, err)
 					require.Equal(t, token1PoolAdmin.PublicKey(), tokenAdminRegistry.Administrator)
 					require.Equal(t, uint8(2), tokenAdminRegistry.Version)
@@ -2955,7 +2955,7 @@ func TestCCIPRouter(t *testing.T) {
 
 					// Validate Token Pool Registry PDA
 					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
-					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, usdcPool.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+					err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, usdcPool.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
 					require.NoError(t, err)
 					require.Equal(t, uint8(2), tokenAdminRegistry.Version)
 					require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.Administrator)
@@ -2976,7 +2976,7 @@ func TestCCIPRouter(t *testing.T) {
 
 					// Validate Token Pool Registry PDA
 					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
-					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, usdcPool.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+					err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, usdcPool.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
 					require.NoError(t, err)
 					require.Equal(t, uint8(2), tokenAdminRegistry.Version)
 					require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.PendingAdministrator)
@@ -2999,7 +2999,7 @@ func TestCCIPRouter(t *testing.T) {
 
 					// Validate Token Pool Registry PDA
 					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
-					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, usdcPool.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+					err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, usdcPool.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
 					require.NoError(t, err)
 					require.Equal(t, usdcPoolAdmin.PublicKey(), tokenAdminRegistry.Administrator)
 					require.Equal(t, uint8(2), tokenAdminRegistry.Version)
@@ -3022,7 +3022,7 @@ func TestCCIPRouter(t *testing.T) {
 
 					// Validate Token Pool Registry PDA
 					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
-					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, usdcPool.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+					err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, usdcPool.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
 					require.NoError(t, err)
 					require.Equal(t, usdcPoolAdmin.PublicKey(), tokenAdminRegistry.Administrator)
 					require.Equal(t, uint8(2), tokenAdminRegistry.Version)
@@ -3093,7 +3093,7 @@ func TestCCIPRouter(t *testing.T) {
 
 					// Validate Token Pool Registry PDA
 					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
-					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token1.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+					err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, token1.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
 					require.NoError(t, err)
 					require.Equal(t, uint8(2), tokenAdminRegistry.Version)
 					require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.Administrator)
@@ -3116,7 +3116,7 @@ func TestCCIPRouter(t *testing.T) {
 				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, token1PoolAdmin, config.DefaultCommitment)
 
 				tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
-				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token1.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+				err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, token1.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
 				require.NoError(t, err)
 				require.Equal(t, uint8(2), tokenAdminRegistry.Version)
 				require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.Administrator)
@@ -3137,7 +3137,7 @@ func TestCCIPRouter(t *testing.T) {
 				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, token1PoolAdmin, config.DefaultCommitment)
 
 				tokenAdminRegistry = ccip_common.TokenAdminRegistry{}
-				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token1.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+				err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, token1.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
 				require.NoError(t, err)
 				require.Equal(t, uint8(2), tokenAdminRegistry.Version)
 				require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.Administrator)
@@ -3183,7 +3183,7 @@ func TestCCIPRouter(t *testing.T) {
 
 					// Validate Token Pool Registry PDA
 					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
-					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token1.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+					err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, token1.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
 					require.NoError(t, err)
 					require.Equal(t, uint8(2), tokenAdminRegistry.Version)
 					require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.PendingAdministrator)
@@ -3226,7 +3226,7 @@ func TestCCIPRouter(t *testing.T) {
 
 					// Validate Token Pool Registry PDA
 					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
-					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token1.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+					err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, token1.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
 					require.NoError(t, err)
 					require.Equal(t, token1PoolAdmin.PublicKey(), tokenAdminRegistry.Administrator)
 					require.Equal(t, uint8(2), tokenAdminRegistry.Version)
@@ -3246,7 +3246,7 @@ func TestCCIPRouter(t *testing.T) {
 
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, token1PoolAdmin, config.DefaultCommitment)
 					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
-					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token1.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+					err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, token1.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
 					require.NoError(t, err)
 					require.Equal(t, true, tokenAdminRegistry.SupportsAutoDerivation)
 				})
@@ -3279,7 +3279,7 @@ func TestCCIPRouter(t *testing.T) {
 
 					// Validate Token Pool Registry PDA
 					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
-					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token1.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+					err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, token1.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
 					require.NoError(t, err)
 					require.Equal(t, token1PoolAdmin.PublicKey(), tokenAdminRegistry.Administrator)
 					require.Equal(t, uint8(2), tokenAdminRegistry.Version)
@@ -3326,7 +3326,7 @@ func TestCCIPRouter(t *testing.T) {
 
 					// Validate Token Pool Registry PDA
 					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
-					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token1.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+					err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, token1.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
 					require.NoError(t, err)
 					require.Equal(t, token0PoolAdmin.PublicKey(), tokenAdminRegistry.Administrator)
 					require.Equal(t, uint8(2), tokenAdminRegistry.Version)
@@ -3377,7 +3377,7 @@ func TestCCIPRouter(t *testing.T) {
 
 					// Validate Token Pool Registry PDA
 					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
-					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, linkPool.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+					err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, linkPool.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
 					require.NoError(t, err)
 					require.Equal(t, uint8(2), tokenAdminRegistry.Version)
 					require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.Administrator)
@@ -3398,7 +3398,7 @@ func TestCCIPRouter(t *testing.T) {
 
 					// Validate Token Pool Registry PDA
 					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
-					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, linkPool.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+					err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, linkPool.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
 					require.NoError(t, err)
 					require.Equal(t, uint8(2), tokenAdminRegistry.Version)
 					require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.PendingAdministrator)
@@ -3425,7 +3425,7 @@ func TestCCIPRouter(t *testing.T) {
 
 					// Validate Token Pool Registry PDA
 					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
-					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, linkPool.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+					err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, linkPool.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
 					require.NoError(t, err)
 					require.Equal(t, legacyAdmin.PublicKey(), tokenAdminRegistry.Administrator)
 					require.Equal(t, uint8(2), tokenAdminRegistry.Version)
@@ -3625,7 +3625,7 @@ func TestCCIPRouter(t *testing.T) {
 			require.NotNil(t, result)
 
 			var curses rmn_remote.Curses
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.RMNRemoteCursesPDA, config.DefaultCommitment, &curses)
+			err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, config.RMNRemoteCursesPDA, config.DefaultCommitment, &curses)
 			require.NoError(t, err, "failed to get account info")
 			require.Equal(t, len(curses.CursedSubjects), 1)
 			require.Equal(t, curses.CursedSubjects[0], globalCurse)
@@ -3758,7 +3758,7 @@ func TestCCIPRouter(t *testing.T) {
 			require.NotNil(t, result)
 
 			var curses rmn_remote.Curses
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.RMNRemoteCursesPDA, config.DefaultCommitment, &curses)
+			err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, config.RMNRemoteCursesPDA, config.DefaultCommitment, &curses)
 			require.NoError(t, err, "failed to get account info")
 			require.Equal(t, len(curses.CursedSubjects), 0)
 		})
@@ -3781,7 +3781,7 @@ func TestCCIPRouter(t *testing.T) {
 			require.NotNil(t, result)
 
 			var curses rmn_remote.Curses
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.RMNRemoteCursesPDA, config.DefaultCommitment, &curses)
+			err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, config.RMNRemoteCursesPDA, config.DefaultCommitment, &curses)
 			require.NoError(t, err, "failed to get account info")
 			require.Equal(t, len(curses.CursedSubjects), 1)
 			require.Equal(t, curses.CursedSubjects[0], svmCurse)
@@ -3797,7 +3797,7 @@ func TestCCIPRouter(t *testing.T) {
 			result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, ccipAdmin, config.DefaultCommitment)
 			require.NotNil(t, result)
 
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.RMNRemoteCursesPDA, config.DefaultCommitment, &curses)
+			err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, config.RMNRemoteCursesPDA, config.DefaultCommitment, &curses)
 			require.NoError(t, err, "failed to get account info")
 			require.Equal(t, len(curses.CursedSubjects), 2)
 			require.Equal(t, curses.CursedSubjects[0], svmCurse)
@@ -3814,7 +3814,7 @@ func TestCCIPRouter(t *testing.T) {
 			result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, ccipAdmin, config.DefaultCommitment)
 			require.NotNil(t, result)
 
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.RMNRemoteCursesPDA, config.DefaultCommitment, &curses)
+			err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, config.RMNRemoteCursesPDA, config.DefaultCommitment, &curses)
 			require.NoError(t, err, "failed to get account info")
 			require.Equal(t, len(curses.CursedSubjects), 1)
 			require.Equal(t, curses.CursedSubjects[0], evmCurse)
@@ -3905,7 +3905,7 @@ func TestCCIPRouter(t *testing.T) {
 			require.NotNil(t, result)
 
 			var curses rmn_remote.Curses
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.RMNRemoteCursesPDA, config.DefaultCommitment, &curses)
+			err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, config.RMNRemoteCursesPDA, config.DefaultCommitment, &curses)
 			require.NoError(t, err, "failed to get account info")
 			require.Equal(t, len(curses.CursedSubjects), 0)
 		})
@@ -4127,7 +4127,7 @@ func TestCCIPRouter(t *testing.T) {
 
 		t.Run("When sending with an empty but enabled allowlist, it fails", func(t *testing.T) {
 			var initialDestChain ccip_router.DestChain
-			err := common.GetAccountDataBorshInto(ctx, solanaGoClient, config.EvmDestChainStatePDA, config.DefaultCommitment, &initialDestChain)
+			err := common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, config.EvmDestChainStatePDA, config.DefaultCommitment, &initialDestChain)
 			require.NoError(t, err, "failed to get account info")
 			modifiedDestChain := initialDestChain
 			modifiedDestChain.Config.AllowListEnabled = true
@@ -4235,13 +4235,13 @@ func TestCCIPRouter(t *testing.T) {
 			require.NotNil(t, result)
 
 			var chainStateAccount ccip_router.DestChain
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, destinationChainStatePDA, config.DefaultCommitment, &chainStateAccount)
+			err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, destinationChainStatePDA, config.DefaultCommitment, &chainStateAccount)
 			require.NoError(t, err, "failed to get account info")
 			// Do not check source chain config, as it may have been updated by other tests in ccip offramp
 			require.Equal(t, uint64(1), chainStateAccount.State.SequenceNumber)
 
 			var nonceCounterAccount ccip_router.Nonce
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, nonceEvmPDA, config.DefaultCommitment, &nonceCounterAccount)
+			err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, nonceEvmPDA, config.DefaultCommitment, &nonceCounterAccount)
 			require.NoError(t, err, "failed to get account info")
 			require.Equal(t, uint64(1), nonceCounterAccount.OrderedNonce)
 
@@ -4310,13 +4310,13 @@ func TestCCIPRouter(t *testing.T) {
 			require.NotNil(t, result)
 
 			var chainStateAccount ccip_router.DestChain
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, destinationChainStatePDA, config.DefaultCommitment, &chainStateAccount)
+			err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, destinationChainStatePDA, config.DefaultCommitment, &chainStateAccount)
 			require.NoError(t, err, "failed to get account info")
 			// Do not check source chain config, as it may have been updated by other tests in ccip offramp
 			require.Equal(t, uint64(2), chainStateAccount.State.SequenceNumber)
 
 			var nonceCounterAccount ccip_router.Nonce
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, nonceEvmPDA, config.DefaultCommitment, &nonceCounterAccount)
+			err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, nonceEvmPDA, config.DefaultCommitment, &nonceCounterAccount)
 			require.NoError(t, err, "failed to get account info")
 			require.Equal(t, uint64(1), nonceCounterAccount.OrderedNonce)
 			fullNonces.evm.user++ // we just sent a successful message from the user to EVM
@@ -4379,13 +4379,13 @@ func TestCCIPRouter(t *testing.T) {
 			require.NotNil(t, result)
 
 			var chainStateAccount ccip_router.DestChain
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, destinationChainStatePDA, config.DefaultCommitment, &chainStateAccount)
+			err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, destinationChainStatePDA, config.DefaultCommitment, &chainStateAccount)
 			require.NoError(t, err, "failed to get account info")
 			// Do not check source chain config, as it may have been updated by other tests in ccip offramp
 			require.Equal(t, uint64(3), chainStateAccount.State.SequenceNumber)
 
 			var nonceCounterAccount ccip_router.Nonce
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, nonceEvmPDA, config.DefaultCommitment, &nonceCounterAccount)
+			err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, nonceEvmPDA, config.DefaultCommitment, &nonceCounterAccount)
 			require.NoError(t, err, "failed to get account info")
 			require.Equal(t, uint64(2), nonceCounterAccount.OrderedNonce)
 			fullNonces.evm.user++ // we just sent a successful message from the user to EVM
@@ -4449,13 +4449,13 @@ func TestCCIPRouter(t *testing.T) {
 			require.NotNil(t, result)
 
 			var chainStateAccount ccip_router.DestChain
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, destinationChainStatePDA, config.DefaultCommitment, &chainStateAccount)
+			err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, destinationChainStatePDA, config.DefaultCommitment, &chainStateAccount)
 			require.NoError(t, err, "failed to get account info")
 			// Do not check source chain config, as it may have been updated by other tests in ccip offramp
 			require.Equal(t, uint64(4), chainStateAccount.State.SequenceNumber)
 
 			var nonceCounterAccount ccip_router.Nonce
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, nonceEvmPDA, config.DefaultCommitment, &nonceCounterAccount)
+			err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, nonceEvmPDA, config.DefaultCommitment, &nonceCounterAccount)
 			require.NoError(t, err, "failed to get account info")
 			require.Equal(t, uint64(2), nonceCounterAccount.OrderedNonce)
 			fullNonces.evm.user++
@@ -4518,13 +4518,13 @@ func TestCCIPRouter(t *testing.T) {
 			require.NotNil(t, result)
 
 			var chainStateAccount ccip_router.DestChain
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, destinationChainStatePDA, config.DefaultCommitment, &chainStateAccount)
+			err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, destinationChainStatePDA, config.DefaultCommitment, &chainStateAccount)
 			require.NoError(t, err, "failed to get account info")
 			// Do not check source chain config, as it may have been updated by other tests in ccip offramp
 			require.Equal(t, uint64(5), chainStateAccount.State.SequenceNumber)
 
 			var nonceCounterAccount ccip_router.Nonce
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, nonceEvmPDA, config.DefaultCommitment, &nonceCounterAccount)
+			err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, nonceEvmPDA, config.DefaultCommitment, &nonceCounterAccount)
 			require.NoError(t, err, "failed to get account info")
 			require.Equal(t, uint64(3), nonceCounterAccount.OrderedNonce)
 			fullNonces.evm.user++ // we just sent a successful message from the user to EVM
@@ -4808,13 +4808,13 @@ func TestCCIPRouter(t *testing.T) {
 			require.NotNil(t, result)
 
 			var chainStateAccount ccip_router.DestChain
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, destinationChainStatePDA, config.DefaultCommitment, &chainStateAccount)
+			err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, destinationChainStatePDA, config.DefaultCommitment, &chainStateAccount)
 			require.NoError(t, err, "failed to get account info")
 			// Do not check source chain config, as it may have been updated by other tests in ccip offramp
 			require.Equal(t, uint64(6), chainStateAccount.State.SequenceNumber)
 
 			var nonceCounterAccount ccip_router.Nonce
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, anotherUserNonceEVMPDA, config.DefaultCommitment, &nonceCounterAccount)
+			err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, anotherUserNonceEVMPDA, config.DefaultCommitment, &nonceCounterAccount)
 			require.NoError(t, err, "failed to get account info")
 			require.Equal(t, uint64(1), nonceCounterAccount.OrderedNonce)
 			fullNonces.evm.anotherUser++ // we just sent a successful message from anotherUser to EVM
@@ -5031,7 +5031,7 @@ func TestCCIPRouter(t *testing.T) {
 
 		t.Run("When sending with an enabled allowlist including the sender, it succeeds", func(t *testing.T) {
 			var initialDestChain ccip_router.DestChain
-			err := common.GetAccountDataBorshInto(ctx, solanaGoClient, config.EvmDestChainStatePDA, config.DefaultCommitment, &initialDestChain)
+			err := common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, config.EvmDestChainStatePDA, config.DefaultCommitment, &initialDestChain)
 			require.NoError(t, err, "failed to get account info")
 			modifiedDestChain := initialDestChain
 			modifiedDestChain.Config.AllowListEnabled = true
@@ -5053,7 +5053,7 @@ func TestCCIPRouter(t *testing.T) {
 			require.NotNil(t, result)
 
 			var parsedDestChain ccip_router.DestChain
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.EvmDestChainStatePDA, config.DefaultCommitment, &parsedDestChain)
+			err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, config.EvmDestChainStatePDA, config.DefaultCommitment, &parsedDestChain)
 			require.NoError(t, err, "failed to get account info")
 
 			// This proves we're able to update the config with a dynamically sized element
@@ -5609,7 +5609,7 @@ func TestCCIPRouter(t *testing.T) {
 			}
 
 			var nonces ccip_router.Nonce
-			require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, nonceEvmPDA, rpc.CommitmentFinalized, &nonces)) // read finalized, not just confirmed, as that is what the derivation will use
+			require.NoError(t, common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, nonceEvmPDA, rpc.CommitmentFinalized, &nonces)) // read finalized, not just confirmed, as that is what the derivation will use
 			fmt.Printf("Current nonces: %+v from PDA %s\n", nonces, nonceEvmPDA)
 
 			messageSendEvent, _, _ := solana.FindProgramAddress([][]byte{
@@ -6293,11 +6293,11 @@ func TestCCIPRouter(t *testing.T) {
 			gasPrice := common.To28BytesBE(321)
 
 			var tokenPriceAccount fee_quoter.BillingTokenConfigWrapper
-			require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, wsol.fqBillingConfigPDA, config.DefaultCommitment, &tokenPriceAccount))
+			require.NoError(t, common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, wsol.fqBillingConfigPDA, config.DefaultCommitment, &tokenPriceAccount))
 			require.NotEqual(t, tokenPrice, tokenPriceAccount.Config.UsdPerToken.Value)
 
 			var gasPriceAccount fee_quoter.DestChain
-			require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, config.FqEvmDestChainPDA, config.DefaultCommitment, &gasPriceAccount))
+			require.NoError(t, common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, config.FqEvmDestChainPDA, config.DefaultCommitment, &gasPriceAccount))
 			require.NotEqual(t, gasPrice, gasPriceAccount.State.UsdPerUnitGas.Value)
 
 			// Update prices
@@ -6330,10 +6330,10 @@ func TestCCIPRouter(t *testing.T) {
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{raw}, testPriceUpdater, config.DefaultCommitment)
 
 			// Check that final onchain prices match the new ones
-			require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, wsol.fqBillingConfigPDA, config.DefaultCommitment, &tokenPriceAccount))
+			require.NoError(t, common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, wsol.fqBillingConfigPDA, config.DefaultCommitment, &tokenPriceAccount))
 			require.Equal(t, tokenPrice, tokenPriceAccount.Config.UsdPerToken.Value)
 
-			require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, config.FqEvmDestChainPDA, config.DefaultCommitment, &gasPriceAccount))
+			require.NoError(t, common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, config.FqEvmDestChainPDA, config.DefaultCommitment, &gasPriceAccount))
 			require.Equal(t, gasPrice, gasPriceAccount.State.UsdPerUnitGas.Value)
 		})
 
@@ -6342,7 +6342,7 @@ func TestCCIPRouter(t *testing.T) {
 			anotherTokenPrice := common.To28BytesBE(234)
 
 			var tokenPriceAccount fee_quoter.BillingTokenConfigWrapper
-			require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, wsol.fqBillingConfigPDA, config.DefaultCommitment, &tokenPriceAccount))
+			require.NoError(t, common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, wsol.fqBillingConfigPDA, config.DefaultCommitment, &tokenPriceAccount))
 			require.Equal(t, tokenPrice, tokenPriceAccount.Config.UsdPerToken.Value)
 
 			// This token isn't registered as a billing token.
@@ -6384,7 +6384,7 @@ func TestCCIPRouter(t *testing.T) {
 			require.Equal(t, updateIgnoredEvent.Value, anotherTokenPrice)
 
 			// Check that final onchain price matches the new one
-			require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, wsol.fqBillingConfigPDA, config.DefaultCommitment, &tokenPriceAccount))
+			require.NoError(t, common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, wsol.fqBillingConfigPDA, config.DefaultCommitment, &tokenPriceAccount))
 			require.Equal(t, anotherTokenPrice, tokenPriceAccount.Config.UsdPerToken.Value)
 
 			// This token continues to be unregistered for billing.
@@ -6482,7 +6482,7 @@ func TestCCIPRouter(t *testing.T) {
 						},
 						RunStateValidations: func(t *testing.T) {
 							var tokenConfig fee_quoter.BillingTokenConfigWrapper
-							require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, wsol.fqBillingConfigPDA, config.DefaultCommitment, &tokenConfig))
+							require.NoError(t, common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, wsol.fqBillingConfigPDA, config.DefaultCommitment, &tokenConfig))
 							require.Equal(t, common.To28BytesBE(1), tokenConfig.Config.UsdPerToken.Value)
 							require.Greater(t, tokenConfig.Config.UsdPerToken.Timestamp, int64(0))
 						},
@@ -6509,7 +6509,7 @@ func TestCCIPRouter(t *testing.T) {
 						},
 						RunStateValidations: func(t *testing.T) {
 							var chainState fee_quoter.DestChain
-							require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, config.FqEvmDestChainPDA, config.DefaultCommitment, &chainState))
+							require.NoError(t, common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, config.FqEvmDestChainPDA, config.DefaultCommitment, &chainState))
 							require.Equal(t, common.To28BytesBE(1), chainState.State.UsdPerUnitGas.Value)
 							require.Greater(t, chainState.State.UsdPerUnitGas.Timestamp, int64(0))
 						},
@@ -6536,7 +6536,7 @@ func TestCCIPRouter(t *testing.T) {
 						},
 						RunStateValidations: func(t *testing.T) {
 							var chainState fee_quoter.DestChain
-							require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, config.FqSvmDestChainPDA, config.DefaultCommitment, &chainState))
+							require.NoError(t, common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, config.FqSvmDestChainPDA, config.DefaultCommitment, &chainState))
 							require.Equal(t, common.To28BytesBE(2), chainState.State.UsdPerUnitGas.Value)
 							require.Greater(t, chainState.State.UsdPerUnitGas.Timestamp, int64(0))
 						},
@@ -6600,22 +6600,22 @@ func TestCCIPRouter(t *testing.T) {
 						},
 						RunStateValidations: func(t *testing.T) {
 							var wsolTokenConfig fee_quoter.BillingTokenConfigWrapper
-							require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, wsol.fqBillingConfigPDA, config.DefaultCommitment, &wsolTokenConfig))
+							require.NoError(t, common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, wsol.fqBillingConfigPDA, config.DefaultCommitment, &wsolTokenConfig))
 							require.Equal(t, common.To28BytesBE(3), wsolTokenConfig.Config.UsdPerToken.Value)
 							require.Greater(t, wsolTokenConfig.Config.UsdPerToken.Timestamp, int64(0))
 
 							var link22Config fee_quoter.BillingTokenConfigWrapper
-							require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, link22.fqBillingConfigPDA, config.DefaultCommitment, &link22Config))
+							require.NoError(t, common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, link22.fqBillingConfigPDA, config.DefaultCommitment, &link22Config))
 							require.Equal(t, common.To28BytesBE(4), link22Config.Config.UsdPerToken.Value)
 							require.Greater(t, link22Config.Config.UsdPerToken.Timestamp, int64(0))
 
 							var evmChainState fee_quoter.DestChain
-							require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, config.FqEvmDestChainPDA, config.DefaultCommitment, &evmChainState))
+							require.NoError(t, common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, config.FqEvmDestChainPDA, config.DefaultCommitment, &evmChainState))
 							require.Equal(t, common.To28BytesBE(5), evmChainState.State.UsdPerUnitGas.Value)
 							require.Greater(t, evmChainState.State.UsdPerUnitGas.Timestamp, int64(0))
 
 							var solanaChainState fee_quoter.DestChain
-							require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, config.FqSvmDestChainPDA, config.DefaultCommitment, &solanaChainState))
+							require.NoError(t, common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, config.FqSvmDestChainPDA, config.DefaultCommitment, &solanaChainState))
 							require.Equal(t, common.To28BytesBE(6), solanaChainState.State.UsdPerUnitGas.Value)
 							require.Greater(t, solanaChainState.State.UsdPerUnitGas.Timestamp, int64(0))
 						},
@@ -6640,13 +6640,13 @@ func TestCCIPRouter(t *testing.T) {
 						},
 						RunStateValidations: func(t *testing.T) {
 							var wsolTokenConfig fee_quoter.BillingTokenConfigWrapper
-							require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, wsol.fqBillingConfigPDA, config.DefaultCommitment, &wsolTokenConfig))
+							require.NoError(t, common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, wsol.fqBillingConfigPDA, config.DefaultCommitment, &wsolTokenConfig))
 							// the price is NOT the one sent in this commit
 							require.NotEqual(t, common.To28BytesBE(1), wsolTokenConfig.Config.UsdPerToken.Value)
 							require.Greater(t, wsolTokenConfig.Config.UsdPerToken.Timestamp, int64(0))
 
 							var evmChainState fee_quoter.DestChain
-							require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, config.FqEvmDestChainPDA, config.DefaultCommitment, &evmChainState))
+							require.NoError(t, common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, config.FqEvmDestChainPDA, config.DefaultCommitment, &evmChainState))
 							// the price is NOT the one sent in this commit
 							require.NotEqual(t, common.To28BytesBE(1), evmChainState.State.UsdPerUnitGas.Value)
 							require.Greater(t, evmChainState.State.UsdPerUnitGas.Timestamp, int64(0))
@@ -6742,18 +6742,18 @@ func TestCCIPRouter(t *testing.T) {
 						require.Equal(t, reportSequence, transmittedEvent.SequenceNumber)
 
 						var chainStateAccount ccip_offramp.SourceChain
-						err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.OfframpEvmSourceChainPDA, config.DefaultCommitment, &chainStateAccount)
+						err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, config.OfframpEvmSourceChainPDA, config.DefaultCommitment, &chainStateAccount)
 						require.NoError(t, err, "failed to get account info")
 						require.Equal(t, currentMinSeqNr, chainStateAccount.State.MinSeqNr) // state now holds the "advanced outer" sequence number, which is the minimum for the next report
 						// Do not check dest chain config, as it may have been updated by other tests in ccip onramp
 
 						var rootAccount ccip_offramp.CommitReport
-						err = common.GetAccountDataBorshInto(ctx, solanaGoClient, rootPDA, config.DefaultCommitment, &rootAccount)
+						err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, rootPDA, config.DefaultCommitment, &rootAccount)
 						require.NoError(t, err, "failed to get account info")
 						require.NotEqual(t, bin.Uint128{Lo: 0, Hi: 0}, rootAccount.Timestamp)
 
 						var globalState ccip_offramp.GlobalState
-						err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.OfframpStatePDA, config.DefaultCommitment, &globalState)
+						err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, config.OfframpStatePDA, config.DefaultCommitment, &globalState)
 						require.NoError(t, err)
 
 						switch testcase.PriceSequenceComparator {
@@ -7323,13 +7323,13 @@ func TestCCIPRouter(t *testing.T) {
 				require.Equal(t, ccip.ReportSequence(), transmittedEvent.SequenceNumber)
 
 				var chainStateAccount ccip_offramp.SourceChain
-				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.OfframpEvmSourceChainPDA, config.DefaultCommitment, &chainStateAccount)
+				err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, config.OfframpEvmSourceChainPDA, config.DefaultCommitment, &chainStateAccount)
 				require.NoError(t, err, "failed to get account info")
 				require.Equal(t, currentMinSeqNr, chainStateAccount.State.MinSeqNr)
 				// Do not check dest chain config, as it may have been updated by other tests in ccip onramp
 
 				var rootAccount ccip_offramp.CommitReport
-				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, rootPDA, config.DefaultCommitment, &rootAccount)
+				err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, rootPDA, config.DefaultCommitment, &rootAccount)
 				require.NoError(t, err, "failed to get account info")
 				require.NotEqual(t, bin.Uint128{Lo: 0, Hi: 0}, rootAccount.Timestamp)
 			})
@@ -7751,7 +7751,7 @@ func TestCCIPRouter(t *testing.T) {
 				require.Equal(t, ccip_offramp.MessageExecutionState_Success, executionEvents[1].State)
 
 				var rootAccount ccip_offramp.CommitReport
-				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, rootPDA, config.DefaultCommitment, &rootAccount)
+				err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, rootPDA, config.DefaultCommitment, &rootAccount)
 				require.NoError(t, err, "failed to get account info")
 				require.NotEqual(t, bin.Uint128{Lo: 0, Hi: 0}, rootAccount.Timestamp)
 				require.Equal(t, bin.Uint128{Lo: 2, Hi: 0}, rootAccount.ExecutionStates)
@@ -7884,7 +7884,7 @@ func TestCCIPRouter(t *testing.T) {
 				require.Equal(t, ccip_offramp.MessageExecutionState_Success, executionEvents[1].State)
 
 				var rootAccount ccip_offramp.CommitReport
-				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, rootPDA, config.DefaultCommitment, &rootAccount)
+				err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, rootPDA, config.DefaultCommitment, &rootAccount)
 				require.NoError(t, err, "failed to get account info")
 				require.NotEqual(t, bin.Uint128{Lo: 0, Hi: 0}, rootAccount.Timestamp)
 				require.Equal(t, bin.Uint128{Lo: 2, Hi: 0}, rootAccount.ExecutionStates)
@@ -8820,7 +8820,7 @@ func TestCCIPRouter(t *testing.T) {
 				require.Equal(t, ccip_offramp.MessageExecutionState_Success, executionEvents[1].State)
 
 				var rootAccount ccip_offramp.CommitReport
-				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, rootPDA, config.DefaultCommitment, &rootAccount)
+				err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, rootPDA, config.DefaultCommitment, &rootAccount)
 				require.NoError(t, err, "failed to get account info")
 				require.NotEqual(t, bin.Uint128{Lo: 0, Hi: 0}, rootAccount.Timestamp)
 				require.Equal(t, bin.Uint128{Lo: 10, Hi: 0}, rootAccount.ExecutionStates)
@@ -10100,7 +10100,7 @@ func TestCCIPRouter(t *testing.T) {
 				t.Run("Router authorization of offramp for lanes", func(t *testing.T) {
 					// Check SVM is an accepted source chain
 					var sourceChain ccip_offramp.SourceChain
-					require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, config.OfframpSvmSourceChainPDA, config.DefaultCommitment, &sourceChain))
+					require.NoError(t, common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, config.OfframpSvmSourceChainPDA, config.DefaultCommitment, &sourceChain))
 					t.Log(sourceChain.Config)
 					require.Equal(t, sourceChain.Config.OnRamp.Bytes[0:32], config.CcipRouterProgram[:])
 
@@ -10467,7 +10467,7 @@ func TestCCIPRouter(t *testing.T) {
 							require.Equal(t, ccip_offramp.MessageExecutionState_Success, executionEvents[1].State)
 
 							var rootAccount ccip_offramp.CommitReport
-							err = common.GetAccountDataBorshInto(ctx, solanaGoClient, rootPDA, config.DefaultCommitment, &rootAccount)
+							err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, rootPDA, config.DefaultCommitment, &rootAccount)
 							require.NoError(t, err, "failed to get account info")
 							require.NotEqual(t, bin.Uint128{Lo: 0, Hi: 0}, rootAccount.Timestamp)
 							require.Equal(t, bin.Uint128{Lo: 2, Hi: 0}, rootAccount.ExecutionStates)
@@ -10532,7 +10532,7 @@ func TestCCIPRouter(t *testing.T) {
 						require.Equal(t, ccip_offramp.MessageExecutionState_Success, executionEvents[1].State)
 
 						var rootAccount ccip_offramp.CommitReport
-						err = common.GetAccountDataBorshInto(ctx, solanaGoClient, rootPDA, config.DefaultCommitment, &rootAccount)
+						err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, rootPDA, config.DefaultCommitment, &rootAccount)
 						require.NoError(t, err, "failed to get account info")
 						require.NotEqual(t, bin.Uint128{Lo: 0, Hi: 0}, rootAccount.Timestamp)
 						require.Equal(t, bin.Uint128{Lo: 10, Hi: 0}, rootAccount.ExecutionStates)
@@ -10816,7 +10816,7 @@ func TestCCIPRouter(t *testing.T) {
 				require.Equal(t, ccip_offramp.MessageExecutionState_Success, executionEvents[1].State)
 
 				var rootAccount ccip_offramp.CommitReport
-				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, rootPDA, config.DefaultCommitment, &rootAccount)
+				err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, rootPDA, config.DefaultCommitment, &rootAccount)
 				require.NoError(t, err, "failed to get account info")
 				require.NotEqual(t, bin.Uint128{Lo: 0, Hi: 0}, rootAccount.Timestamp)
 				require.Equal(t, bin.Uint128{Lo: 2, Hi: 0}, rootAccount.ExecutionStates)
@@ -10957,7 +10957,7 @@ func TestCCIPRouter(t *testing.T) {
 				require.Equal(t, ccip_offramp.MessageExecutionState_Success, executionEvents[1].State)
 
 				var rootAccount ccip_offramp.CommitReport
-				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, rootPDA, config.DefaultCommitment, &rootAccount)
+				err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, rootPDA, config.DefaultCommitment, &rootAccount)
 				require.NoError(t, err, "failed to get account info")
 				require.NotEqual(t, bin.Uint128{Lo: 0, Hi: 0}, rootAccount.Timestamp)
 				require.Equal(t, bin.Uint128{Lo: 2, Hi: 0}, rootAccount.ExecutionStates)
@@ -11311,7 +11311,7 @@ func TestCCIPRouter(t *testing.T) {
 				require.Equal(t, ccip_offramp.MessageExecutionState_Success, executionEvents[1].State)
 
 				var rootAccount ccip_offramp.CommitReport
-				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, rootPDA, config.DefaultCommitment, &rootAccount)
+				err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, rootPDA, config.DefaultCommitment, &rootAccount)
 				require.NoError(t, err, "failed to get account info")
 				require.NotEqual(t, bin.Uint128{Lo: 0, Hi: 0}, rootAccount.Timestamp)
 				require.Equal(t, bin.Uint128{Lo: 2, Hi: 0}, rootAccount.ExecutionStates)

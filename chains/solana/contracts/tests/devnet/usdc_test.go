@@ -116,7 +116,7 @@ func TestCctpDevnet(t *testing.T) {
 			fmt.Println("Nonce:", returnedNonce)
 			fmt.Println("Result return data:", result.Meta.ReturnData.Data.String())
 
-			require.NoError(t, common.GetAccountDataBorshInto(ctx, client, messageSentEventKeypair.PublicKey(), config.DefaultCommitment, &messageSent))
+			require.NoError(t, common.GetAccountDataBorshIntoAnchor(ctx, client, messageSentEventKeypair.PublicKey(), config.DefaultCommitment, &messageSent))
 			fmt.Println("Message Sent Event Account Data:", messageSent)
 			fmt.Println("Message Sent Event Bytes (hex):", hex.EncodeToString(messageSent.Message))
 		})

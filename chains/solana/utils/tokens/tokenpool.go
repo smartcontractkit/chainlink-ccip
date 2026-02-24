@@ -250,7 +250,7 @@ func ParseTokenLookupTableWithChain(ctx context.Context, client *rpc.Client, tok
 	poolChainConfig := token.Chain[chainSelector]
 
 	tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
-	err := common.GetAccountDataBorshInto(ctx, client, token.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+	err := common.GetAccountDataBorshIntoAnchor(ctx, client, token.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
 	if err != nil {
 		return nil, nil, err
 	}

@@ -87,8 +87,7 @@ func GetInitAccessControllersIxs(ctx context.Context, roleAcAccount solana.Publi
 
 // instructions builder for adding access to a role
 func GetBatchAddAccessIxs(ctx context.Context, timelockID [32]byte, roleAcAccount solana.PublicKey, role timelock.Role, addresses []solana.PublicKey, authority solana.PrivateKey, chunkSize int, client *rpc.Client) ([]solana.Instruction, error) {
-	var ac access_controller.AccessController
-	err := common.GetAccountDataBorshInto(ctx, client, roleAcAccount, config.DefaultCommitment, &ac)
+	ac, err := common.GetParsedAccountData(ctx, client, roleAcAccount, config.DefaultCommitment, access_controller.ParseAccount_AccessController)
 	if err != nil {
 		return nil, fmt.Errorf("access controller for role %s is not initialized: %w", role, err)
 	}
@@ -352,8 +351,7 @@ func WaitForOperationToBeReady(ctx context.Context, client *rpc.Client, opPDA so
 	const pollInterval = 500 * time.Millisecond
 	const timeBuffer = 2 * time.Second
 
-	var opAccount timelock.Operation
-	err := common.GetAccountDataBorshInto(ctx, client, opPDA, commitment, &opAccount)
+	opAccount, err := common.GetParsedAccountData(ctx, client, opPDA, commitment, timelock.ParseAccount_Operation)
 	if err != nil {
 		return fmt.Errorf("failed to get account info: %w", err)
 	}
@@ -392,13 +390,12 @@ func GetBlockedFunctionSelectors(
 	configPubKey solana.PublicKey,
 	commitment rpc.CommitmentType,
 ) ([][]byte, error) {
-	var config timelock.Config
-	err := common.GetAccountDataBorshInto(ctx, client, configPubKey, commitment, &config)
+	tlConfig, err := common.GetParsedAccountData(ctx, client, configPubKey, commitment, timelock.ParseAccount_Config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch config account data: %w", err)
 	}
 
-	blockedCount := config.BlockedSelectors.Len
+	blockedCount := tlConfig.BlockedSelectors.Len
 	if blockedCount == 0 {
 		return nil, nil
 	}
@@ -406,7 +403,7 @@ func GetBlockedFunctionSelectors(
 	// convert to [][]byte for easier comparison
 	selectors := make([][]byte, blockedCount)
 	for i := range blockedCount {
-		selectors[i] = config.BlockedSelectors.Xs[i][:] // Convert [8]byte to []byte
+		selectors[i] = tlConfig.BlockedSelectors.Xs[i][:] // Convert [8]byte to []byte
 	}
 
 	return selectors, nil

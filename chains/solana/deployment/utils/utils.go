@@ -71,7 +71,7 @@ func GetSolProgramData(client *solrpc.Client, programID solana.PublicKey) (struc
 func ExtendLookupTable(chain cldf_solana.Chain, offRampID solana.PublicKey, lookUpTableEntries []solana.PublicKey) error {
 	var referenceAddressesAccount ccip_offramp.ReferenceAddresses
 	offRampReferenceAddressesPDA, _, _ := state.FindOfframpReferenceAddressesPDA(offRampID)
-	err := chain.GetAccountDataBorshInto(context.Background(), offRampReferenceAddressesPDA, &referenceAddressesAccount)
+	err := common.GetAccountDataBorshIntoAnchor(context.Background(), chain.Client, offRampReferenceAddressesPDA, cldf_solana.SolDefaultCommitment, &referenceAddressesAccount)
 	if err != nil {
 		return fmt.Errorf("failed to get offramp reference addresses: %w", err)
 	}

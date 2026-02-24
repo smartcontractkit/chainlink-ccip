@@ -96,7 +96,7 @@ func TestTimelockMultipleInstances(t *testing.T) {
 				testutils.SendAndConfirm(ctx, t, solanaGoClient, initAccIxs, instance.Admin, config.DefaultCommitment, common.AddSigners(data.AccessController))
 
 				var ac access_controller.AccessController
-				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, data.AccessController.PublicKey(), config.DefaultCommitment, &ac)
+				err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, data.AccessController.PublicKey(), config.DefaultCommitment, &ac)
 				if err != nil {
 					require.NoError(t, err, "failed to get account info")
 				}
@@ -138,7 +138,7 @@ func TestTimelockMultipleInstances(t *testing.T) {
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{initTimelockIx}, deployer, config.DefaultCommitment)
 
 			var configAccount timelock.Config
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, instance.ConfigPDA, config.DefaultCommitment, &configAccount)
+			err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, instance.ConfigPDA, config.DefaultCommitment, &configAccount)
 			if err != nil {
 				require.NoError(t, err, "failed to get account info")
 			}
@@ -179,7 +179,7 @@ func TestTimelockMultipleInstances(t *testing.T) {
 
 				// Validate proposed set to 0-address after accepting ownership
 				var configAccount timelock.Config
-				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, timelockutil.GetConfigPDA(instance.ID), config.DefaultCommitment, &configAccount)
+				err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, timelockutil.GetConfigPDA(instance.ID), config.DefaultCommitment, &configAccount)
 				if err != nil {
 					require.NoError(t, err, "failed to get account info")
 				}

@@ -56,7 +56,7 @@ func TestTimelockRBAC(t *testing.T) {
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, initAccIxs, admin, config.DefaultCommitment, common.AddSigners(data.AccessController))
 
 			var ac access_controller.AccessController
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, data.AccessController.PublicKey(), config.DefaultCommitment, &ac)
+			err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, data.AccessController.PublicKey(), config.DefaultCommitment, &ac)
 			if err != nil {
 				require.NoError(t, err, "failed to get account info")
 			}
@@ -130,7 +130,7 @@ func TestTimelockRBAC(t *testing.T) {
 		testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{initTimelockIx}, admin, config.DefaultCommitment)
 
 		var configAccount timelock.Config
-		err = common.GetAccountDataBorshInto(ctx, solanaGoClient, timelockutil.GetConfigPDA(config.TestTimelockID), config.DefaultCommitment, &configAccount)
+		err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, timelockutil.GetConfigPDA(config.TestTimelockID), config.DefaultCommitment, &configAccount)
 		if err != nil {
 			require.NoError(t, err, "failed to get account info")
 		}
@@ -203,7 +203,7 @@ func TestTimelockRBAC(t *testing.T) {
 
 			// Validate proposed set to 0-address after accepting ownership
 			var configAccount timelock.Config
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, timelockutil.GetConfigPDA(config.TestTimelockID), config.DefaultCommitment, &configAccount)
+			err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, timelockutil.GetConfigPDA(config.TestTimelockID), config.DefaultCommitment, &configAccount)
 			if err != nil {
 				require.NoError(t, err, "failed to get account info")
 			}
@@ -233,7 +233,7 @@ func TestTimelockRBAC(t *testing.T) {
 			require.NotNil(t, result)
 
 			var configAccount timelock.Config
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, timelockutil.GetConfigPDA(config.TestTimelockID), config.DefaultCommitment, &configAccount)
+			err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, timelockutil.GetConfigPDA(config.TestTimelockID), config.DefaultCommitment, &configAccount)
 			if err != nil {
 				require.NoError(t, err, "failed to get account info")
 			}
@@ -393,7 +393,7 @@ func TestTimelockRBAC(t *testing.T) {
 			}
 
 			var opAccount timelock.Operation
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, nonExecutableOp2.OperationPDA(), config.DefaultCommitment, &opAccount)
+			err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, nonExecutableOp2.OperationPDA(), config.DefaultCommitment, &opAccount)
 			if err != nil {
 				require.NoError(t, err, "failed to get account info")
 			}
@@ -503,7 +503,7 @@ func TestTimelockRBAC(t *testing.T) {
 			signer := admin
 
 			var oldConfigAccount timelock.Config
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, timelockutil.GetConfigPDA(config.TestTimelockID), config.DefaultCommitment, &oldConfigAccount)
+			err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, timelockutil.GetConfigPDA(config.TestTimelockID), config.DefaultCommitment, &oldConfigAccount)
 			if err != nil {
 				require.NoError(t, err, "failed to get account info")
 			}
@@ -530,7 +530,7 @@ func TestTimelockRBAC(t *testing.T) {
 			require.Equal(t, newMinDelay, event.NewDuration)
 
 			var newConfigAccount timelock.Config
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, timelockutil.GetConfigPDA(config.TestTimelockID), config.DefaultCommitment, &newConfigAccount)
+			err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, timelockutil.GetConfigPDA(config.TestTimelockID), config.DefaultCommitment, &newConfigAccount)
 			if err != nil {
 				require.NoError(t, err, "failed to get account info")
 			}

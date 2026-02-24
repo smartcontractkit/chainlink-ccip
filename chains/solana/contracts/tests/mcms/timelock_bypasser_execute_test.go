@@ -71,7 +71,7 @@ func TestTimelockBypasserExecute(t *testing.T) {
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, initAccIxs, admin, config.DefaultCommitment, common.AddSigners(data.AccessController))
 
 			var ac access_controller.AccessController
-			acAccErr := common.GetAccountDataBorshInto(ctx, solanaGoClient, data.AccessController.PublicKey(), config.DefaultCommitment, &ac)
+			acAccErr := common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, data.AccessController.PublicKey(), config.DefaultCommitment, &ac)
 			if acAccErr != nil {
 				require.NoError(t, acAccErr, "failed to get account info")
 			}
@@ -111,7 +111,7 @@ func TestTimelockBypasserExecute(t *testing.T) {
 		testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{initTimelockIx}, admin, config.DefaultCommitment)
 
 		var configAccount timelock.Config
-		cfgErr := common.GetAccountDataBorshInto(ctx, solanaGoClient, timelockutil.GetConfigPDA(config.TestTimelockID), config.DefaultCommitment, &configAccount)
+		cfgErr := common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, timelockutil.GetConfigPDA(config.TestTimelockID), config.DefaultCommitment, &configAccount)
 		if cfgErr != nil {
 			require.NoError(t, cfgErr, "failed to get account info")
 		}
@@ -251,7 +251,7 @@ func TestTimelockBypasserExecute(t *testing.T) {
 			}
 
 			var opAccount timelock.Operation
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, operationPDA, config.DefaultCommitment, &opAccount)
+			err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, operationPDA, config.DefaultCommitment, &opAccount)
 			if err != nil {
 				require.NoError(t, err, "failed to get account info")
 			}

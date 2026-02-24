@@ -223,7 +223,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 
 			// get config and validate
 			var configAccount mcm.MultisigConfig
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, multisigConfigPDA, config.DefaultCommitment, &configAccount)
+			err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, multisigConfigPDA, config.DefaultCommitment, &configAccount)
 			require.NoError(t, err, "failed to get account info")
 
 			require.Equal(t, config.TestChainID, configAccount.ChainId)
@@ -266,7 +266,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 				}
 
 				var cfgSignersAccount mcm.ConfigSigners
-				queryErr := common.GetAccountDataBorshInto(ctx, solanaGoClient, configSignersPDA, config.DefaultCommitment, &cfgSignersAccount)
+				queryErr := common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, configSignersPDA, config.DefaultCommitment, &cfgSignersAccount)
 				require.NoError(t, queryErr, "failed to get account info")
 
 				require.Equal(t, true, cfgSignersAccount.IsFinalized)
@@ -298,7 +298,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 
 			// get config and validate
 			var configAccount mcm.MultisigConfig
-			configErr = common.GetAccountDataBorshInto(ctx, solanaGoClient, multisigConfigPDA, config.DefaultCommitment, &configAccount)
+			configErr = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, multisigConfigPDA, config.DefaultCommitment, &configAccount)
 			require.NoError(t, configErr, "failed to get account info")
 
 			require.Equal(t, config.TestChainID, configAccount.ChainId)
@@ -398,7 +398,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 				}
 
 				var sigAccount mcm.RootSignatures
-				queryErr := common.GetAccountDataBorshInto(ctx, solanaGoClient, signaturesPDA, config.DefaultCommitment, &sigAccount)
+				queryErr := common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, signaturesPDA, config.DefaultCommitment, &sigAccount)
 				require.NoError(t, queryErr, "failed to get account info")
 
 				require.Equal(t, true, sigAccount.IsFinalized)
@@ -485,7 +485,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 
 			var newRootAndOpCount mcm.ExpiringRootAndOpCount
 
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, expiringRootAndOpCountPDA, config.DefaultCommitment, &newRootAndOpCount)
+			err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, expiringRootAndOpCountPDA, config.DefaultCommitment, &newRootAndOpCount)
 			require.NoError(t, err, "failed to get account info")
 
 			require.Equal(t, rootValidationData.Root, newRootAndOpCount.Root)
@@ -494,7 +494,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 
 			// get config and validate
 			var newRootMetadata mcm.RootMetadata
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, rootMetadataPDA, config.DefaultCommitment, &newRootMetadata)
+			err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, rootMetadataPDA, config.DefaultCommitment, &newRootMetadata)
 			require.NoError(t, err, "failed to get account info")
 
 			require.Equal(t, rootValidationData.Metadata.ChainId, newRootMetadata.ChainId)
@@ -509,7 +509,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 		t.Run("change config scenario, clear root and set a new root", func(t *testing.T) {
 			// keep current op count
 			var prevRootAndOpCount mcm.ExpiringRootAndOpCount
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, expiringRootAndOpCountPDA, config.DefaultCommitment, &prevRootAndOpCount)
+			err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, expiringRootAndOpCountPDA, config.DefaultCommitment, &prevRootAndOpCount)
 			require.NoError(t, err, "failed to get account info")
 			currentOpCount := prevRootAndOpCount.OpCount
 
@@ -535,7 +535,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 				}
 
 				var cfgSignersAccount mcm.ConfigSigners
-				queryErr := common.GetAccountDataBorshInto(ctx, solanaGoClient, configSignersPDA, config.DefaultCommitment, &cfgSignersAccount)
+				queryErr := common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, configSignersPDA, config.DefaultCommitment, &cfgSignersAccount)
 				require.NoError(t, queryErr, "failed to get account info")
 				require.Equal(t, true, cfgSignersAccount.IsFinalized)
 				// check if the addresses are registered correctly
@@ -581,7 +581,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 
 				// get config and validate
 				var configAccount mcm.MultisigConfig
-				configErr = common.GetAccountDataBorshInto(ctx, solanaGoClient, multisigConfigPDA, config.DefaultCommitment, &configAccount)
+				configErr = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, multisigConfigPDA, config.DefaultCommitment, &configAccount)
 				require.NoError(t, configErr, "failed to get account info")
 
 				require.Equal(t, config.TestChainID, configAccount.ChainId)
@@ -598,7 +598,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 				// get root, metadata and validate
 				var clearedRootAndOpCount mcm.ExpiringRootAndOpCount
 
-				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, expiringRootAndOpCountPDA, config.DefaultCommitment, &clearedRootAndOpCount)
+				err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, expiringRootAndOpCountPDA, config.DefaultCommitment, &clearedRootAndOpCount)
 				require.NoError(t, err, "failed to get account info")
 
 				require.Equal(t, config.McmEmptyRoot, clearedRootAndOpCount.Root)
@@ -606,7 +606,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 				require.Equal(t, currentOpCount, clearedRootAndOpCount.OpCount)
 
 				var clearedRootMetadata mcm.RootMetadata
-				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, rootMetadataPDA, config.DefaultCommitment, &clearedRootMetadata)
+				err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, rootMetadataPDA, config.DefaultCommitment, &clearedRootMetadata)
 				require.NoError(t, err, "failed to get account info")
 
 				require.Equal(t, configAccount.ChainId, clearedRootMetadata.ChainId) // reset to config.chainid
@@ -658,7 +658,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 					}
 
 					var sigAccount mcm.RootSignatures
-					queryErr := common.GetAccountDataBorshInto(ctx, solanaGoClient, signaturesPDA, config.DefaultCommitment, &sigAccount)
+					queryErr := common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, signaturesPDA, config.DefaultCommitment, &sigAccount)
 					require.NoError(t, queryErr, "failed to get account info")
 
 					require.Equal(t, true, sigAccount.IsFinalized)
@@ -706,7 +706,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 
 				var newRootAndOpCount mcm.ExpiringRootAndOpCount
 
-				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, expiringRootAndOpCountPDA, config.DefaultCommitment, &newRootAndOpCount)
+				err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, expiringRootAndOpCountPDA, config.DefaultCommitment, &newRootAndOpCount)
 				require.NoError(t, err, "failed to get account info")
 
 				require.Equal(t, rootValidationData.Root, newRootAndOpCount.Root)
@@ -715,7 +715,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 
 				// get config and validate
 				var newRootMetadata mcm.RootMetadata
-				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, rootMetadataPDA, config.DefaultCommitment, &newRootMetadata)
+				err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, rootMetadataPDA, config.DefaultCommitment, &newRootMetadata)
 				require.NoError(t, err, "failed to get account info")
 
 				require.Equal(t, rootValidationData.Metadata.ChainId, newRootMetadata.ChainId)
@@ -781,7 +781,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 			}
 
 			var stubAccountValue external_program_cpi_stub.Value
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.StubAccountPDA, config.DefaultCommitment, &stubAccountValue)
+			err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, config.StubAccountPDA, config.DefaultCommitment, &stubAccountValue)
 			require.NoError(t, err, "failed to get account info")
 
 			require.Equal(t, uint8(2), stubAccountValue.Value)
@@ -983,7 +983,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 
 					// get config and validate
 					var configAccount mcm.MultisigConfig
-					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, multisigConfigPDA, config.DefaultCommitment, &configAccount)
+					err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, multisigConfigPDA, config.DefaultCommitment, &configAccount)
 					require.NoError(t, err, "failed to get account info")
 
 					require.Equal(t, config.TestChainID, configAccount.ChainId)
@@ -1009,7 +1009,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 					}
 
 					var cfgSignersAccount mcm.ConfigSigners
-					queryErr := common.GetAccountDataBorshInto(ctx, solanaGoClient, configSignersPDA, config.DefaultCommitment, &cfgSignersAccount)
+					queryErr := common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, configSignersPDA, config.DefaultCommitment, &cfgSignersAccount)
 					require.NoError(t, queryErr, "failed to get account info")
 
 					require.Equal(t, true, cfgSignersAccount.IsFinalized)
@@ -1039,7 +1039,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 
 					// get config and validate
 					var configAccount mcm.MultisigConfig
-					configErr = common.GetAccountDataBorshInto(ctx, solanaGoClient, multisigConfigPDA, config.DefaultCommitment, &configAccount)
+					configErr = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, multisigConfigPDA, config.DefaultCommitment, &configAccount)
 					require.NoError(t, configErr, "failed to get account info")
 
 					require.Equal(t, config.TestChainID, configAccount.ChainId)

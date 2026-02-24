@@ -76,7 +76,7 @@ func TestMcmSetConfig(t *testing.T) {
 
 		// get config and validate
 		var configAccount mcm.MultisigConfig
-		err = common.GetAccountDataBorshInto(ctx, solanaGoClient, multisigConfigPDA, config.DefaultCommitment, &configAccount)
+		err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, multisigConfigPDA, config.DefaultCommitment, &configAccount)
 		require.NoError(t, err, "failed to get account info")
 
 		require.Equal(t, config.TestChainID, configAccount.ChainId)
@@ -140,7 +140,7 @@ func TestMcmSetConfig(t *testing.T) {
 
 		// Validate proposed set to 0-address after accepting ownership
 		var configAccount mcm.MultisigConfig
-		err = common.GetAccountDataBorshInto(ctx, solanaGoClient, multisigConfigPDA, config.DefaultCommitment, &configAccount)
+		err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, multisigConfigPDA, config.DefaultCommitment, &configAccount)
 		if err != nil {
 			require.NoError(t, err, "failed to get account info")
 		}
@@ -167,7 +167,7 @@ func TestMcmSetConfig(t *testing.T) {
 		result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, admin, config.DefaultCommitment)
 		require.NotNil(t, result)
 
-		err = common.GetAccountDataBorshInto(ctx, solanaGoClient, multisigConfigPDA, config.DefaultCommitment, &configAccount)
+		err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, multisigConfigPDA, config.DefaultCommitment, &configAccount)
 		if err != nil {
 			require.NoError(t, err, "failed to get account info")
 		}
@@ -211,7 +211,7 @@ func TestMcmSetConfig(t *testing.T) {
 			}
 
 			var cfgSignersAccount mcm.ConfigSigners
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, configSignersPDA, config.DefaultCommitment, &cfgSignersAccount)
+			err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, configSignersPDA, config.DefaultCommitment, &cfgSignersAccount)
 			require.NoError(t, err, "failed to get account info")
 
 			require.Equal(t, true, cfgSignersAccount.IsFinalized)
@@ -283,7 +283,7 @@ func TestMcmSetConfig(t *testing.T) {
 
 				// get config and validate
 				var configAccount mcm.MultisigConfig
-				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, multisigConfigPDA, config.DefaultCommitment, &configAccount)
+				err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, multisigConfigPDA, config.DefaultCommitment, &configAccount)
 				require.NoError(t, err, "failed to get account info")
 
 				require.Equal(t, config.TestChainID, configAccount.ChainId)
@@ -375,7 +375,7 @@ func TestMcmSetConfig(t *testing.T) {
 			}
 
 			var cfgSignersAccount mcm.ConfigSigners
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, configSignersPDA, config.DefaultCommitment, &cfgSignersAccount)
+			err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, configSignersPDA, config.DefaultCommitment, &cfgSignersAccount)
 			require.NoError(t, err, "failed to get account info")
 
 			require.Equal(t, true, cfgSignersAccount.IsFinalized)
@@ -424,7 +424,7 @@ func TestMcmSetConfig(t *testing.T) {
 
 			// get config and validate
 			var configAccount mcm.MultisigConfig
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, multisigConfigPDA, config.DefaultCommitment, &configAccount)
+			err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, multisigConfigPDA, config.DefaultCommitment, &configAccount)
 			require.NoError(t, err, "failed to get account info")
 
 			require.Equal(t, config.TestChainID, configAccount.ChainId)
@@ -597,7 +597,7 @@ func TestMcmSetConfig(t *testing.T) {
 						testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{finalizeSignersIx}, admin, config.DefaultCommitment)
 
 						var cfgSignersAccount mcm.ConfigSigners
-						err = common.GetAccountDataBorshInto(ctx, solanaGoClient, failConfigSignersPDA, config.DefaultCommitment, &cfgSignersAccount)
+						err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, failConfigSignersPDA, config.DefaultCommitment, &cfgSignersAccount)
 						require.NoError(t, err, "failed to get account info")
 
 						require.Equal(t, true, cfgSignersAccount.IsFinalized)

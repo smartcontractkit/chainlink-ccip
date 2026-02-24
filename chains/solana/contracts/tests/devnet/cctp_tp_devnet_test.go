@@ -53,7 +53,7 @@ func TestCctpTpDevnet(t *testing.T) {
 
 	var referenceAddresses ccip_offramp.ReferenceAddresses
 	t.Run("Read Reference Addresses", func(t *testing.T) {
-		require.NoError(t, common.GetAccountDataBorshInto(ctx, client, offrampPDAs.referenceAddresses, rpc.CommitmentConfirmed, &referenceAddresses))
+		require.NoError(t, common.GetAccountDataBorshIntoAnchor(ctx, client, offrampPDAs.referenceAddresses, rpc.CommitmentConfirmed, &referenceAddresses))
 		fmt.Printf("Reference Addresses: %+v\n", referenceAddresses)
 	})
 
@@ -254,7 +254,7 @@ func TestCctpTpDevnet(t *testing.T) {
 
 		// 	// validate state
 		// 	var configAccount cctp_token_pool.State
-		// 	require.NoError(t, common.GetAccountDataBorshInto(ctx, client, cctpPool.state, config.DefaultCommitment, &configAccount))
+		// 	require.NoError(t, common.GetAccountDataBorshIntoAnchor(ctx, client, cctpPool.state, config.DefaultCommitment, &configAccount))
 		// 	require.Equal(t, cctpPool.tokenAccount, configAccount.Config.PoolTokenAccount)
 
 		// 	// validate events
@@ -376,7 +376,7 @@ func TestCctpTpDevnet(t *testing.T) {
 		require.NoError(t, err)
 
 		var nonces ccip_router.Nonce
-		err = common.GetAccountDataBorshInto(ctx, client, routerNoncesPDA, rpc.CommitmentConfirmed, &nonces)
+		err = common.GetAccountDataBorshIntoAnchor(ctx, client, routerNoncesPDA, rpc.CommitmentConfirmed, &nonces)
 		if err != nil {
 			fmt.Println("WARNING: Nonce account error, initializing it !!! - This is normal for the first message of a sender to a chain")
 			fmt.Println(err)

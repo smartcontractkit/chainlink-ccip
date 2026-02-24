@@ -110,7 +110,7 @@ func TestMcmsCapacity(t *testing.T) {
 
 					// get config and validate
 					var configAccount mcm.MultisigConfig
-					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, msig.ConfigPDA, config.DefaultCommitment, &configAccount)
+					err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, msig.ConfigPDA, config.DefaultCommitment, &configAccount)
 					require.NoError(t, err, "failed to get account info")
 
 					require.Equal(t, config.TestChainID, configAccount.ChainId)
@@ -161,7 +161,7 @@ func TestMcmsCapacity(t *testing.T) {
 						}
 
 						var cfgSignersAccount mcm.ConfigSigners
-						err = common.GetAccountDataBorshInto(ctx, solanaGoClient, msig.ConfigSignersPDA, config.DefaultCommitment, &cfgSignersAccount)
+						err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, msig.ConfigSignersPDA, config.DefaultCommitment, &cfgSignersAccount)
 						require.NoError(t, err, "failed to get account info")
 
 						require.Equal(t, true, cfgSignersAccount.IsFinalized)
@@ -210,7 +210,7 @@ func TestMcmsCapacity(t *testing.T) {
 
 						// get config and validate
 						var configAccount mcm.MultisigConfig
-						err = common.GetAccountDataBorshInto(ctx, solanaGoClient, msig.ConfigPDA, config.DefaultCommitment, &configAccount)
+						err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, msig.ConfigPDA, config.DefaultCommitment, &configAccount)
 						require.NoError(t, err, "failed to get account info")
 
 						require.Equal(t, config.TestChainID, configAccount.ChainId)
@@ -241,7 +241,7 @@ func TestMcmsCapacity(t *testing.T) {
 				testutils.SendAndConfirm(ctx, t, solanaGoClient, initAccIxs, admin, config.DefaultCommitment, common.AddSigners(roleMsigs.AccessController))
 
 				var ac access_controller.AccessController
-				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, roleMsigs.AccessController.PublicKey(), config.DefaultCommitment, &ac)
+				err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, roleMsigs.AccessController.PublicKey(), config.DefaultCommitment, &ac)
 				if err != nil {
 					require.NoError(t, err, "failed to get account info")
 				}
@@ -281,7 +281,7 @@ func TestMcmsCapacity(t *testing.T) {
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{initTimelockIx}, admin, config.DefaultCommitment)
 
 			var configAccount timelock.Config
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, timelockutil.GetConfigPDA(config.TestTimelockID), config.DefaultCommitment, &configAccount)
+			err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, timelockutil.GetConfigPDA(config.TestTimelockID), config.DefaultCommitment, &configAccount)
 			if err != nil {
 				require.NoError(t, err, "failed to get account info")
 			}
@@ -336,7 +336,7 @@ func TestMcmsCapacity(t *testing.T) {
 						testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 
 						var configAccount mcm.MultisigConfig
-						err = common.GetAccountDataBorshInto(ctx, solanaGoClient, msig.ConfigPDA, config.DefaultCommitment, &configAccount)
+						err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, msig.ConfigPDA, config.DefaultCommitment, &configAccount)
 						if err != nil {
 							require.NoError(t, err, "failed to get account info")
 						}
@@ -372,7 +372,7 @@ func TestMcmsCapacity(t *testing.T) {
 						}
 
 						var opAccount timelock.Operation
-						err = common.GetAccountDataBorshInto(ctx, solanaGoClient, operationPDA, config.DefaultCommitment, &opAccount)
+						err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, operationPDA, config.DefaultCommitment, &opAccount)
 						if err != nil {
 							require.NoError(t, err, "failed to get account info")
 						}
@@ -412,7 +412,7 @@ func TestMcmsCapacity(t *testing.T) {
 							require.Equal(t, ixx.Data, common.NormalizeData(event.Data))
 						}
 
-						err = common.GetAccountDataBorshInto(ctx, solanaGoClient, msig.ConfigPDA, config.DefaultCommitment, &configAccount)
+						err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, msig.ConfigPDA, config.DefaultCommitment, &configAccount)
 						if err != nil {
 							require.NoError(t, err, "failed to get account info")
 						}
@@ -451,7 +451,7 @@ func TestMcmsCapacity(t *testing.T) {
 
 			// Get the current operation count.
 			var prevRootAndOpCount mcm.ExpiringRootAndOpCount
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, executorMsig.ExpiringRootAndOpCountPDA, config.DefaultCommitment, &prevRootAndOpCount)
+			err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, executorMsig.ExpiringRootAndOpCountPDA, config.DefaultCommitment, &prevRootAndOpCount)
 			require.NoError(t, err, "failed to get account info")
 			currOpCount := prevRootAndOpCount.OpCount
 
@@ -797,7 +797,7 @@ func TestMcmsCapacity(t *testing.T) {
 
 			// get current root and op count for nonce management
 			var prevRootAndOpCount mcm.ExpiringRootAndOpCount
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, executorMsig.ExpiringRootAndOpCountPDA, config.DefaultCommitment, &prevRootAndOpCount)
+			err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, executorMsig.ExpiringRootAndOpCountPDA, config.DefaultCommitment, &prevRootAndOpCount)
 			require.NoError(t, err, "failed to get account info")
 
 			for opIdx, tc := range testCases {
@@ -1051,7 +1051,7 @@ func TestMcmsCapacity(t *testing.T) {
 
 			// get current root and op count
 			var prevRootAndOpCount mcm.ExpiringRootAndOpCount
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, proposerMsig.ExpiringRootAndOpCountPDA, config.DefaultCommitment, &prevRootAndOpCount)
+			err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, proposerMsig.ExpiringRootAndOpCountPDA, config.DefaultCommitment, &prevRootAndOpCount)
 			require.NoError(t, err, "failed to get account info")
 
 			for opIdx, tc := range testCases {
@@ -1334,7 +1334,7 @@ func TestMcmsCapacity(t *testing.T) {
 			for _, tc := range testCases {
 				// get current root and op count for nonce management
 				var proposerPrevRootAndOpCount mcm.ExpiringRootAndOpCount
-				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, proposerMsig.ExpiringRootAndOpCountPDA, config.DefaultCommitment, &proposerPrevRootAndOpCount)
+				err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, proposerMsig.ExpiringRootAndOpCountPDA, config.DefaultCommitment, &proposerPrevRootAndOpCount)
 				require.NoError(t, err, "failed to get account info")
 
 				currOpCount := proposerPrevRootAndOpCount.OpCount
@@ -1501,7 +1501,7 @@ func TestMcmsCapacity(t *testing.T) {
 
 					// read timelock operation
 					var opAccount timelock.Operation
-					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, timelockOp.OperationPDA(), config.DefaultCommitment, &opAccount)
+					err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, timelockOp.OperationPDA(), config.DefaultCommitment, &opAccount)
 					if err != nil {
 						require.NoError(t, err, "failed to get account info")
 					}
@@ -1546,7 +1546,7 @@ func TestMcmsCapacity(t *testing.T) {
 							require.Equal(t, ixx.Data, common.NormalizeData(event.Data))
 						}
 
-						err = common.GetAccountDataBorshInto(ctx, solanaGoClient, timelockOp.OperationPDA(), config.DefaultCommitment, &opAccount)
+						err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, timelockOp.OperationPDA(), config.DefaultCommitment, &opAccount)
 						if err != nil {
 							require.NoError(t, err, "failed to get account info")
 						}

@@ -92,9 +92,11 @@ func CreateNextMessage(ctx context.Context, solanaGoClient *rpc.Client, remainin
 }
 
 func NextSequenceNumber(ctx context.Context, solanaGoClient *rpc.Client, sourceChainStatePDA solana.PublicKey) (uint64, error) {
-	var chainStateAccount ccip_offramp.SourceChain
-	err := common.GetAccountDataBorshInto(ctx, solanaGoClient, sourceChainStatePDA, config.DefaultCommitment, &chainStateAccount)
-	return chainStateAccount.State.MinSeqNr, err
+	chainStateAccount, err := common.GetParsedAccountData(ctx, solanaGoClient, sourceChainStatePDA, config.DefaultCommitment, ccip_offramp.ParseAccount_SourceChain)
+	if err != nil {
+		return 0, err
+	}
+	return chainStateAccount.State.MinSeqNr, nil
 }
 
 func CreateDefaultMessageWith(sourceChainSelector uint64, sequenceNumber uint64) ccip_offramp.Any2SvmRampMessage {

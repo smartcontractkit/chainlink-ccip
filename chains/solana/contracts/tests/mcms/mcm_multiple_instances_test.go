@@ -76,7 +76,7 @@ func TestMcmMultipleInstances(t *testing.T) {
 
 			// get config and validate
 			var configAccount mcm.MultisigConfig
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, multisigConfigPDA1, config.DefaultCommitment, &configAccount)
+			err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, multisigConfigPDA1, config.DefaultCommitment, &configAccount)
 			require.NoError(t, err, "failed to get account info")
 
 			require.Equal(t, config.TestChainID, configAccount.ChainId)
@@ -118,7 +118,7 @@ func TestMcmMultipleInstances(t *testing.T) {
 				}
 
 				var cfgSignersAccount mcm.ConfigSigners
-				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, configSignersPDA1, config.DefaultCommitment, &cfgSignersAccount)
+				err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, configSignersPDA1, config.DefaultCommitment, &cfgSignersAccount)
 				require.NoError(t, err, "failed to get account info")
 
 				require.Equal(t, true, cfgSignersAccount.IsFinalized)
@@ -151,7 +151,7 @@ func TestMcmMultipleInstances(t *testing.T) {
 
 				// get config and validate
 				var configAccount mcm.MultisigConfig
-				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, multisigConfigPDA1, config.DefaultCommitment, &configAccount)
+				err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, multisigConfigPDA1, config.DefaultCommitment, &configAccount)
 				require.NoError(t, err, "failed to get account info")
 
 				require.Equal(t, config.TestChainID, configAccount.ChainId)
@@ -200,7 +200,7 @@ func TestMcmMultipleInstances(t *testing.T) {
 
 			// get config and validate
 			var configAccount mcm.MultisigConfig
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, multisigConfigPDA2, config.DefaultCommitment, &configAccount)
+			err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, multisigConfigPDA2, config.DefaultCommitment, &configAccount)
 			require.NoError(t, err, "failed to get account info")
 
 			require.Equal(t, config.TestChainID, configAccount.ChainId)
@@ -241,7 +241,7 @@ func TestMcmMultipleInstances(t *testing.T) {
 				}
 
 				var cfgSignersAccount mcm.ConfigSigners
-				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, configSignersPDA2, config.DefaultCommitment, &cfgSignersAccount)
+				err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, configSignersPDA2, config.DefaultCommitment, &cfgSignersAccount)
 				require.NoError(t, err, "failed to get account info")
 
 				require.Equal(t, true, cfgSignersAccount.IsFinalized)
@@ -295,7 +295,7 @@ func TestMcmMultipleInstances(t *testing.T) {
 
 				// get config and validate
 				var configAccount mcm.MultisigConfig
-				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, multisigConfigPDA2, config.DefaultCommitment, &configAccount)
+				err = common.GetAccountDataBorshIntoAnchor(ctx, solanaGoClient, multisigConfigPDA2, config.DefaultCommitment, &configAccount)
 				require.NoError(t, err, "failed to get account info")
 
 				require.Equal(t, config.TestChainID, configAccount.ChainId)
