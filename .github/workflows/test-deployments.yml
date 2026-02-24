@@ -73,7 +73,7 @@ jobs:
           trunk-job-url: ${{ format('https://github.com/{0}/actions/runs/{1}/job/{2}/attempts/{3}', github.repository, github.run_id, job.check_run_id, github.run_attempt) }}
 
   test-ccv-evm-deployments:
-    needs: [detect_deployments_changes, setup-go]
+    needs: [detect_deployments_changes]
     if: ${{ needs.detect_deployments_changes.outputs.run_ccv_evm_deployment == 'true' }}
     runs-on: ubuntu-latest
     defaults:
