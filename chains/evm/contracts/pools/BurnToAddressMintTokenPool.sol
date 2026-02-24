@@ -17,7 +17,9 @@ import {SafeERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/utils/SafeERC
 contract BurnToAddressMintTokenPool is BurnMintTokenPoolAbstract, ITypeAndVersion {
   using SafeERC20 for IERC20;
 
-  string public constant override typeAndVersion = "BurnToAddressTokenPool 1.7.0-dev";
+  function typeAndVersion() external pure virtual override returns (string memory) {
+    return "BurnToAddressTokenPool 2.0.0-dev";
+  }
 
   /// @notice The address where tokens are sent during a call to lockOrBurn, functionally burning but without decreasing
   /// total supply. This address is expected to have no ability to recover the tokens sent to it, and will thus be locked forever.

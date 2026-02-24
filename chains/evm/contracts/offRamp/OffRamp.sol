@@ -95,7 +95,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   }
 
   // STATIC CONFIG
-  string public constant override typeAndVersion = "OffRamp 1.7.0-dev";
+  string public constant override typeAndVersion = "OffRamp 2.0.0-dev";
   /// @dev Hash of encoded address(0) used for empty address checks.
   bytes32 internal constant EMPTY_ENCODED_ADDRESS_HASH = keccak256(abi.encode(address(0)));
   /// @dev ChainSelector of this chain.

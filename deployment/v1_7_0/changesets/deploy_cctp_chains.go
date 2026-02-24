@@ -3,12 +3,15 @@ package changesets
 import (
 	"fmt"
 
+	"github.com/ethereum/go-ethereum/common"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
+
+	mcms_types "github.com/smartcontractkit/mcms/types"
+
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
@@ -17,8 +20,10 @@ import (
 
 // CCTPChainConfig specifies configuration required for a chain to deploy CCTP.
 type CCTPChainConfig struct {
-	// TokenMessenger is the address of the TokenMessenger contract.
-	TokenMessenger string
+	// TokenMessengerV1 is the address of the CCTP v1 TokenMessenger contract.
+	TokenMessengerV1 string
+	// TokenMessengerV2 is the address of the CCTP v2 TokenMessenger contract.
+	TokenMessengerV2 string
 	// USDCToken is the address of the USDCToken contract.
 	USDCToken string
 	// DeployerContract is a contract that can be used to deploy other contracts.
@@ -30,6 +35,8 @@ type CCTPChainConfig struct {
 	StorageLocations []string
 	// FeeAggregator is the address to which fees are withdrawn.
 	FeeAggregator string
+	// RegisteredPoolRef is a reference to the pool that should be set on the registry on this chain.
+	RegisteredPoolRef datastore.AddressRef
 	// RemoteChains is the set of remote chains to configure.
 	RemoteChains map[uint64]adapters.RemoteCCTPChainConfig
 }
@@ -60,9 +67,18 @@ func makeVerifyDeployCCTPChains(_ *adapters.CCTPChainRegistry, _ *changesets.MCM
 			if _, err := chain_selectors.GetSelectorFamily(chainSel); err != nil {
 				return err
 			}
+			if !common.IsHexAddress(chainCfg.TokenMessengerV2) {
+				return fmt.Errorf("invalid TokenMessengerV2 for chain %d", chainSel)
+			}
+			if chainCfg.TokenMessengerV1 != "" && !common.IsHexAddress(chainCfg.TokenMessengerV1) {
+				return fmt.Errorf("invalid TokenMessengerV1 for chain %d", chainSel)
+			}
 			for remoteChainSelector := range chainCfg.RemoteChains {
 				if _, err := chain_selectors.GetSelectorFamily(remoteChainSelector); err != nil {
 					return err
+				}
+				if _, ok := cfg.Chains[remoteChainSelector]; !ok {
+					return fmt.Errorf("remote chain selector %d not found in chains", remoteChainSelector)
 				}
 			}
 		}
@@ -98,7 +114,8 @@ func makeApplyDeployCCTPChains(cctpChainRegistry *adapters.CCTPChainRegistry, mc
 			}
 			in := adapters.DeployCCTPInput{
 				ChainSelector:    chainSel,
-				TokenMessenger:   chainCfg.TokenMessenger,
+				TokenMessengerV1: chainCfg.TokenMessengerV1,
+				TokenMessengerV2: chainCfg.TokenMessengerV2,
 				USDCToken:        chainCfg.USDCToken,
 				DeployerContract: chainCfg.DeployerContract,
 				FastFinalityBps:  chainCfg.FastFinalityBps,
@@ -133,6 +150,7 @@ func makeApplyDeployCCTPChains(cctpChainRegistry *adapters.CCTPChainRegistry, mc
 		}
 		for chainSel, chainCfg := range cfg.Chains {
 			remoteChains := make(map[uint64]adapters.RemoteCCTPChain)
+			remoteRegisteredPoolRefs := make(map[uint64]datastore.AddressRef)
 			for remoteChainSelector := range chainCfg.RemoteChains {
 				family, err := chain_selectors.GetSelectorFamily(remoteChainSelector)
 				if err != nil {
@@ -143,6 +161,7 @@ func makeApplyDeployCCTPChains(cctpChainRegistry *adapters.CCTPChainRegistry, mc
 					return cldf.ChangesetOutput{}, fmt.Errorf("no CCTP adapter registered for chain family '%s'", family)
 				}
 				remoteChains[remoteChainSelector] = adapter
+				remoteRegisteredPoolRefs[remoteChainSelector] = cfg.Chains[remoteChainSelector].RegisteredPoolRef
 			}
 			dep := adapters.ConfigureCCTPChainForLanesDeps{
 				BlockChains:  e.BlockChains,
@@ -150,9 +169,11 @@ func makeApplyDeployCCTPChains(cctpChainRegistry *adapters.CCTPChainRegistry, mc
 				RemoteChains: remoteChains,
 			}
 			in := adapters.ConfigureCCTPChainForLanesInput{
-				ChainSelector: chainSel,
-				USDCToken:     chainCfg.USDCToken,
-				RemoteChains:  chainCfg.RemoteChains,
+				ChainSelector:            chainSel,
+				USDCToken:                chainCfg.USDCToken,
+				RegisteredPoolRef:        chainCfg.RegisteredPoolRef,
+				RemoteRegisteredPoolRefs: remoteRegisteredPoolRefs,
+				RemoteChains:             chainCfg.RemoteChains,
 			}
 			configureCCTPChainForLanesReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adaptersByChain[chainSel].ConfigureCCTPChainForLanes(), dep, in)
 			if err != nil {

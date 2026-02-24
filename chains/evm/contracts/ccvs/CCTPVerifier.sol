@@ -32,7 +32,6 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   error InvalidToken(bytes token);
   error InvalidTokenTransferLength(uint256 length);
   error InvalidVerifierArgsLength(uint256 length);
-  error MaxFeeExceedsUint32(uint256 maxFee);
   error OnlyCallableByOwnerOrAllowlistAdmin();
   error ReceiveMessageCallFailed();
   error InvalidFastFinalityBps(uint16 fastFinalityBps);
@@ -79,7 +78,7 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
     uint16 fastFinalityBps; // ─╯ Basis points charged for fast finality on destination.
   }
 
-  string public constant override typeAndVersion = "CCTPVerifier 1.7.0-dev";
+  string public constant override typeAndVersion = "CCTPVerifier 2.0.0-dev";
   /// @notice The preimage is bytes4(keccak256("CCTPVerifier 1.7.0")).
   bytes4 private constant VERSION_TAG_V1_7_0 = 0x8e1d1a9d;
   /// @notice CCTP contracts use the number 1 to represent V2, as 0 represents V1.
@@ -264,8 +263,6 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
         // Neither scenario results in a user paying more than they were expecting to.
         maxFee = tokenTransfer.amount * s_dynamicConfig.fastFinalityBps / BPS_DIVIDER;
       }
-
-      if (maxFee > type(uint32).max) revert MaxFeeExceedsUint32(maxFee);
     }
 
     i_tokenMessenger.depositForBurnWithHook(
@@ -274,7 +271,7 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
       decodedReceiver,
       address(i_usdcToken),
       domain.allowedCallerOnDest,
-      uint32(maxFee),
+      maxFee,
       params.finalityThreshold,
       // The hook data includes the version tag and the message ID.
       // The version tag allows the destination verifier entity to route the message to the correct implementation.
@@ -451,7 +448,7 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   }
 
   /// @notice Exposes the version tag.
-  function versionTag() public pure returns (bytes4) {
+  function versionTag() public pure override returns (bytes4) {
     return VERSION_TAG_V1_7_0;
   }
 

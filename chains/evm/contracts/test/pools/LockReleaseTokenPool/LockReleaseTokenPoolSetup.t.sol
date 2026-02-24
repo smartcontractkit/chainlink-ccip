@@ -39,7 +39,7 @@ contract LockReleaseTokenPoolSetup is BaseTest {
 
     s_allowedList.push(vm.randomAddress());
     s_allowedList.push(OWNER);
-    AdvancedPoolHooks advancedHooks = new AdvancedPoolHooks(s_allowedList, 0);
+    AdvancedPoolHooks advancedHooks = new AdvancedPoolHooks(s_allowedList, 0, address(0), new address[](0));
     s_lockReleaseTokenPoolWithAllowList = new LockReleaseTokenPool(
       s_token,
       DEFAULT_TOKEN_DECIMALS,
@@ -47,6 +47,12 @@ contract LockReleaseTokenPoolSetup is BaseTest {
       address(s_mockRMNRemote),
       address(s_sourceRouter),
       address(s_lockBox)
+    );
+
+    address[] memory hooksCallers = new address[](1);
+    hooksCallers[0] = address(s_lockReleaseTokenPoolWithAllowList);
+    advancedHooks.applyAuthorizedCallerUpdates(
+      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: hooksCallers, removedCallers: new address[](0)})
     );
 
     // Configure allowed callers for the lockBox - both pools.

@@ -3,6 +3,7 @@ package tokens
 import (
 	"fmt"
 
+	"github.com/ethereum/go-ethereum/common"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
@@ -20,6 +21,8 @@ type TokenTransferConfig struct {
 	// TokenPoolRef is a reference to the token pool in the datastore.
 	// Populate the reference as needed to match the desired token pool.
 	TokenPoolRef datastore.AddressRef
+	// TokenRef is a reference to the token in the datastore. This is only needed if the token address cannot be derived from the pool reference.
+	TokenRef datastore.AddressRef
 	// ExternalAdmin is specified when we want to propose an admin that we don't control.
 	// Leave empty to use internal administration.
 	ExternalAdmin string
@@ -69,15 +72,6 @@ func makeApply(tokenRegistry *TokenAdapterRegistry, mcmsRegistry *changesets.MCM
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve registry ref on chain with selector %d: %w", token.ChainSelector, err)
 			}
 
-			family, err := chain_selectors.GetSelectorFamily(token.ChainSelector)
-			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to get chain family for chain selector %d: %w", token.ChainSelector, err)
-			}
-			adapter, ok := tokenRegistry.GetTokenAdapter(family, tokenPool.Version)
-			if !ok {
-				return cldf.ChangesetOutput{}, fmt.Errorf("no token adapter registered for chain family '%s' and token pool version '%s'", family, tokenPool.Version)
-			}
-
 			remoteChains := make(map[uint64]RemoteChainConfig[[]byte, string], len(token.RemoteChains))
 			for remoteChainSelector, inCfg := range token.RemoteChains {
 				remoteFamily, err := chain_selectors.GetSelectorFamily(remoteChainSelector)
@@ -93,13 +87,25 @@ func makeApply(tokenRegistry *TokenAdapterRegistry, mcmsRegistry *changesets.MCM
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to process remote chain config for remote chain selector %d: %w", remoteChainSelector, err)
 				}
 			}
+
+			family, err := chain_selectors.GetSelectorFamily(token.ChainSelector)
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to get chain family for chain selector %d: %w", token.ChainSelector, err)
+			}
+			adapter, ok := tokenRegistry.GetTokenAdapter(family, tokenPool.Version)
+			if !ok {
+				return cldf.ChangesetOutput{}, fmt.Errorf("no token adapter registered for chain family '%s' and token pool version '%s'", family, tokenPool.Version)
+			}
 			configureTokenReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adapter.ConfigureTokenForTransfersSequence(), e.BlockChains, ConfigureTokenForTransfersInput{
-				ChainSelector:    token.ChainSelector,
-				TokenPoolAddress: tokenPool.Address,
-				RemoteChains:     remoteChains,
-				ExternalAdmin:    token.ExternalAdmin,
-				RegistryAddress:  registry.Address,
-				MinFinalityValue: token.MinFinalityValue,
+				ChainSelector:     token.ChainSelector,
+				TokenPoolAddress:  tokenPool.Address,
+				RemoteChains:      remoteChains,
+				ExternalAdmin:     token.ExternalAdmin,
+				RegistryAddress:   registry.Address,
+				TokenRef:          token.TokenRef,
+				MinFinalityValue:  token.MinFinalityValue,
+				PoolType:          tokenPool.Type.String(),
+				ExistingDataStore: e.DataStore,
 			})
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to configure token pool on chain with selector %d: %w", token.ChainSelector, err)
@@ -150,6 +156,15 @@ func convertRemoteChainConfig(
 			if err != nil {
 				return outCfg, fmt.Errorf("failed to get remote token address via pool ref (%s) for remote chain selector %d: %w", datastore_utils.SprintRef(*inCfg.RemotePool), remoteChainSelector, err)
 			}
+		}
+		outCfg.RemoteToken = common.LeftPadBytes(outCfg.RemoteToken, 32)
+		outCfg.RemoteDecimals, err = remoteAdapter.DeriveTokenDecimals(e, remoteChainSelector, fullRemotePoolRef)
+		if err != nil {
+			return outCfg, fmt.Errorf("failed to get remote token decimals for remote chain selector %d: %w", remoteChainSelector, err)
+		}
+		outCfg.RemotePool, err = remoteAdapter.DeriveTokenPoolCounterpart(e, remoteChainSelector, outCfg.RemotePool, outCfg.RemoteToken)
+		if err != nil {
+			return outCfg, fmt.Errorf("failed to derive remote pool counterpart for remote chain selector %d: %w", remoteChainSelector, err)
 		}
 	}
 	for _, ccvRef := range inCfg.OutboundCCVs {

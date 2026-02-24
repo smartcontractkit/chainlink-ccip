@@ -9,9 +9,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/fee_quoter"
+	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
-	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
 
 var ContractType cldf_deployment.ContractType = "FeeQuoter"
@@ -34,6 +35,13 @@ type ConstructorArgs struct {
 	PriceUpdaters              []common.Address
 	TokenTransferFeeConfigArgs []TokenTransferFeeConfigArgs
 	DestChainConfigArgs        []DestChainConfigArgs
+}
+
+func (a ConstructorArgs) IsEmpty() bool {
+	return (a.StaticConfig == StaticConfig{}) &&
+		len(a.PriceUpdaters) == 0 &&
+		len(a.TokenTransferFeeConfigArgs) == 0 &&
+		len(a.DestChainConfigArgs) == 0
 }
 
 type ApplyFeeTokensUpdatesArgs struct {

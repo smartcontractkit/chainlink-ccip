@@ -1,15 +1,12 @@
 package mcms
 
 import (
-	"errors"
 	"fmt"
+	"time"
 
-	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
-	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 )
 
-// Input is the configuration for the MCMS proposal.
 type Input struct {
 	// OverridePreviousRoot indicates whether to override the root of the MCMS contract.
 	OverridePreviousRoot bool
@@ -20,35 +17,27 @@ type Input struct {
 	TimelockDelay mcms_types.Duration
 	// TimelockAction is the action to perform on the timelock contract (schedule, bypass, or cancel).
 	TimelockAction mcms_types.TimelockAction
-	// MCMSAddressRef is a reference to the MCMS contract address in the datastore.
-	MCMSAddressRef datastore.AddressRef
-	// TimelockAddressRef is a reference to the timelock contract address in the datastore.
-	TimelockAddressRef datastore.AddressRef
 	// Qualifier is a string used to qualify the MCMS + Timelock contract addresses.
 	Qualifier string
 	// Description is a human-readable description of the proposal.
 	Description string
 }
 
-// Validate validates the MCMS input.
+// TODO : need to put more validation here
 func (c *Input) Validate() error {
 	if c.TimelockAction != mcms_types.TimelockActionSchedule &&
 		c.TimelockAction != mcms_types.TimelockActionBypass &&
 		c.TimelockAction != mcms_types.TimelockActionCancel {
 		return fmt.Errorf("invalid timelock action: %s", c.TimelockAction)
 	}
-
-	if datastore_utils.IsAddressRefEmpty(c.MCMSAddressRef) {
-		return errors.New("mcms address ref is empty")
+	if c.ValidUntil <= 0 {
+		return fmt.Errorf("failed to validate MCMS input: ValidUntil must be a positive unix timestamp")
 	}
-
-	if datastore_utils.IsAddressRefEmpty(c.TimelockAddressRef) {
-		return errors.New("timelock address ref is empty")
+	// check if ValidUntil is in the past
+	// current time in utc plus 10 minutes to account for any potential clock drift or delays in proposal creation
+	// this is to prevent proposals from being created with a ValidUntil that is already expired
+	if c.ValidUntil < uint32(time.Now().Add(10*time.Minute).UTC().Unix()) {
+		return fmt.Errorf("failed to validate MCMS input: ValidUntil must be in the future")
 	}
-
-	if c.ValidUntil == 0 {
-		return errors.New("valid until timestamp must be set")
-	}
-
 	return nil
 }

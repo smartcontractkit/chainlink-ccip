@@ -24,8 +24,13 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
     (MessageV1Codec.MessageV1 memory message, bytes32 messageId) =
       _createForwardMessage(address(s_testToken), address(12));
 
+    // Generate a valid rawPayload that matches the message token transfer data.
+    bytes memory rawPayload = _generateValidRawPayload(
+      message.tokenTransfer[0].destTokenAddress, message.tokenTransfer[0].tokenReceiver, message.tokenTransfer[0].amount
+    );
+
     // Proofs are not used. Using raw bytes format.
-    bytes memory ccvData = _encodeCcvData("", "");
+    bytes memory ccvData = _encodeCcvData(rawPayload, "");
 
     vm.startPrank(s_onRamp);
 
@@ -41,25 +46,30 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
     (MessageV1Codec.MessageV1 memory message, bytes32 messageId) =
       _createForwardMessage(address(s_testToken), address(12));
 
+    bytes32 wrongMessageId = keccak256("messageId");
+    bytes memory rawPayload = _generateValidRawPayload(
+      message.tokenTransfer[0].destTokenAddress, message.tokenTransfer[0].tokenReceiver, message.tokenTransfer[0].amount
+    );
+
     vm.startPrank(s_onRamp);
 
-    // This sets the messageId in the mock mailbox to `messageId`.
-    s_lombardVerifier.forwardToVerifier(message, messageId, address(0), 0, "");
+    // This sets the messageId in the mock mailbox to `wrongMessageId`.
+    s_lombardVerifier.forwardToVerifier(message, wrongMessageId, address(0), 0, "");
 
     vm.startPrank(s_offRamp);
 
     // Wrong messageId.
-    vm.expectRevert(
-      abi.encodeWithSelector(LombardVerifier.InvalidMessageId.selector, keccak256("messageId"), messageId)
-    );
-    s_lombardVerifier.verifyMessage(
-      message, keccak256("messageId"), _encodeCcvData(abi.encodePacked("", bytes32(uint256(0x01))), "")
-    );
+    vm.expectRevert(abi.encodeWithSelector(LombardVerifier.InvalidMessageId.selector, messageId, wrongMessageId));
+    s_lombardVerifier.verifyMessage(message, messageId, _encodeCcvData(rawPayload, ""));
   }
 
   function test_verifyMessage_RevertWhen_InvalidMessageLength() public {
     (MessageV1Codec.MessageV1 memory message, bytes32 messageId) =
       _createForwardMessage(address(s_testToken), address(12));
+
+    bytes memory rawPayload = _generateValidRawPayload(
+      message.tokenTransfer[0].destTokenAddress, message.tokenTransfer[0].tokenReceiver, message.tokenTransfer[0].amount
+    );
 
     bytes memory shortMessageId = new bytes(20);
 
@@ -69,7 +79,7 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
     vm.startPrank(s_offRamp);
 
     vm.expectRevert(abi.encodeWithSelector(LombardVerifier.InvalidMessageLength.selector, 36, shortMessageId.length));
-    s_lombardVerifier.verifyMessage(message, messageId, _encodeCcvData("", ""));
+    s_lombardVerifier.verifyMessage(message, messageId, _encodeCcvData(rawPayload, ""));
   }
 
   function test_verifyMessage_RevertWhen_CallerIsNotOffRamp() public {
@@ -90,13 +100,20 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
   }
 
   function test_verifyMessage_RevertWhen_ExecutionError() public {
+    (MessageV1Codec.MessageV1 memory message, bytes32 messageId) =
+      _createForwardMessage(address(s_testToken), address(12));
+
+    bytes memory rawPayload = _generateValidRawPayload(
+      message.tokenTransfer[0].destTokenAddress, message.tokenTransfer[0].tokenReceiver, message.tokenTransfer[0].amount
+    );
+
     // Make the mailbox fail.
     s_mockMailbox.setShouldSucceed(false);
 
     vm.startPrank(s_offRamp);
 
     vm.expectRevert(abi.encodeWithSelector(LombardVerifier.ExecutionError.selector));
-    s_lombardVerifier.verifyMessage(_createBasicMessageV1(DEST_CHAIN_SELECTOR), bytes32(0), _encodeCcvData("", ""));
+    s_lombardVerifier.verifyMessage(message, messageId, _encodeCcvData(rawPayload, ""));
   }
 
   function test_verifyMessage_RevertWhen_CursedByRMN() public {
@@ -137,19 +154,96 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
   }
 
   function test_verifyMessage_RevertWhen_InvalidVerifierResults_CcvDataTooShortForProof() public {
+    (MessageV1Codec.MessageV1 memory message, bytes32 messageId) =
+      _createForwardMessage(address(s_testToken), address(12));
+
+    bytes memory rawPayload = _generateValidRawPayload(
+      message.tokenTransfer[0].destTokenAddress, message.tokenTransfer[0].tokenReceiver, message.tokenTransfer[0].amount
+    );
+
     vm.startPrank(s_offRamp);
 
-    // ccvData with version tag (4) + rawPayloadLength (2) + rawPayload (0) + proofLength (2) claiming 10 bytes,
+    // ccvData with version tag (4) + rawPayloadLength (2) + rawPayload (variable) + proofLength (2) claiming 10 bytes,
     // but only providing 5 bytes of proof.
-    // Total: 4 + 2 + 0 + 2 + 5 = 13 bytes, but needs at least 4 + 2 + 0 + 2 + 10 = 18 bytes.
     bytes memory tooShortCcvData = bytes.concat(
       VERSION_TAG_V1_7_0,
-      bytes2(uint16(0)), // rawPayloadLength = 0
+      bytes2(uint16(rawPayload.length)), // rawPayloadLength
+      rawPayload,
       bytes2(uint16(10)), // proofLength = 10
       bytes5(0) // only 5 bytes instead of 10
     );
 
     vm.expectRevert(LombardVerifier.InvalidVerifierResults.selector);
-    s_lombardVerifier.verifyMessage(_createBasicMessageV1(DEST_CHAIN_SELECTOR), bytes32(0), tooShortCcvData);
+    s_lombardVerifier.verifyMessage(message, messageId, tooShortCcvData);
+  }
+
+  function test_verifyMessage_RevertWhen_InvalidToken() public {
+    (MessageV1Codec.MessageV1 memory message, bytes32 messageId) =
+      _createForwardMessage(address(s_testToken), address(12));
+
+    // Generate a rawPayload with a different (invalid) token address.
+    bytes memory invalidToken = abi.encodePacked(makeAddr("wrongToken"));
+    bytes memory rawPayload =
+      _generateValidRawPayload(invalidToken, message.tokenTransfer[0].tokenReceiver, message.tokenTransfer[0].amount);
+
+    bytes memory ccvData = _encodeCcvData(rawPayload, "");
+
+    vm.startPrank(s_onRamp);
+    s_lombardVerifier.forwardToVerifier(message, messageId, address(0), 0, "");
+
+    vm.startPrank(s_offRamp);
+
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        LombardVerifier.InvalidToken.selector, bytes32(message.tokenTransfer[0].destTokenAddress), bytes32(invalidToken)
+      )
+    );
+    s_lombardVerifier.verifyMessage(message, messageId, ccvData);
+  }
+
+  function test_verifyMessage_RevertWhen_InvalidReceiver() public {
+    (MessageV1Codec.MessageV1 memory message, bytes32 messageId) =
+      _createForwardMessage(address(s_testToken), address(12));
+
+    // Generate a rawPayload with a different (invalid) receiver address.
+    bytes memory invalidReceiver = abi.encodePacked(address(999));
+    bytes memory rawPayload = _generateValidRawPayload(
+      message.tokenTransfer[0].destTokenAddress, invalidReceiver, message.tokenTransfer[0].amount
+    );
+
+    bytes memory ccvData = _encodeCcvData(rawPayload, "");
+
+    vm.startPrank(s_onRamp);
+    s_lombardVerifier.forwardToVerifier(message, messageId, address(0), 0, "");
+
+    vm.startPrank(s_offRamp);
+
+    vm.expectRevert(
+      abi.encodeWithSelector(LombardVerifier.InvalidReceiver.selector, message.tokenTransfer[0].tokenReceiver)
+    );
+    s_lombardVerifier.verifyMessage(message, messageId, ccvData);
+  }
+
+  function test_verifyMessage_RevertWhen_InvalidAmount() public {
+    (MessageV1Codec.MessageV1 memory message, bytes32 messageId) =
+      _createForwardMessage(address(s_testToken), address(12));
+
+    // Generate a rawPayload with a different (invalid) amount.
+    uint256 invalidAmount = message.tokenTransfer[0].amount + 100;
+    bytes memory rawPayload = _generateValidRawPayload(
+      message.tokenTransfer[0].destTokenAddress, message.tokenTransfer[0].tokenReceiver, invalidAmount
+    );
+
+    bytes memory ccvData = _encodeCcvData(rawPayload, "");
+
+    vm.startPrank(s_onRamp);
+    s_lombardVerifier.forwardToVerifier(message, messageId, address(0), 0, "");
+
+    vm.startPrank(s_offRamp);
+
+    vm.expectRevert(
+      abi.encodeWithSelector(LombardVerifier.InvalidAmount.selector, message.tokenTransfer[0].amount, invalidAmount)
+    );
+    s_lombardVerifier.verifyMessage(message, messageId, ccvData);
   }
 }

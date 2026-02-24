@@ -4,9 +4,10 @@ import (
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
-	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/stretchr/testify/require"
+
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 )
 
 func TestFindAndFormatRef(t *testing.T) {
@@ -93,6 +94,109 @@ func TestFindAndFormatRef(t *testing.T) {
 				return
 			}
 			require.Equal(t, test.ref.Address, addr)
+		})
+	}
+}
+
+func TestFindAndFormatFirstRef(t *testing.T) {
+	// Setup datastore with multiple refs
+	ds := datastore.NewMemoryDataStore()
+	err := ds.Addresses().Add(datastore.AddressRef{
+		ChainSelector: 111,
+		Address:       "0x01",
+		Type:          datastore.ContractType("TestContract1"),
+		Qualifier:     "For testing",
+	})
+	require.NoError(t, err)
+	err = ds.Addresses().Add(datastore.AddressRef{
+		ChainSelector: 111,
+		Address:       "0x02",
+		Type:          datastore.ContractType("TestContract2"),
+		Qualifier:     "For testing",
+	})
+	require.NoError(t, err)
+	err = ds.Addresses().Add(datastore.AddressRef{
+		ChainSelector: 222,
+		Address:       "0x03",
+		Type:          datastore.ContractType("TestContract3"),
+		Qualifier:     "For testing",
+	})
+	require.NoError(t, err)
+
+	tests := []struct {
+		name            string
+		chainSelector   uint64
+		refs            []datastore.AddressRef
+		expectedAddress string
+		expectedErr     string
+	}{
+		{
+			name:          "find first ref",
+			chainSelector: 111,
+			refs: []datastore.AddressRef{
+				{
+					Type: datastore.ContractType("TestContract1"),
+				}, {
+					Type: datastore.ContractType("TestContract2"),
+				},
+			},
+			expectedAddress: "0x01",
+			expectedErr:     "",
+		}, {
+			name:          "find second ref",
+			chainSelector: 111,
+			refs: []datastore.AddressRef{
+				{
+					Type: datastore.ContractType("TestContract3"),
+				}, {
+					Type: datastore.ContractType("TestContract2"),
+				},
+			},
+			expectedAddress: "0x02",
+			expectedErr:     "",
+		}, {
+			name:          "find no refs",
+			chainSelector: 333,
+			refs: []datastore.AddressRef{
+				{
+					Type: datastore.ContractType("TestContract1"),
+				}, {
+					Type: datastore.ContractType("TestContract2"),
+				}, {
+					Type: datastore.ContractType("TestContract3"),
+				},
+			},
+			expectedAddress: "",
+			expectedErr:     "any of the provided refs",
+		}, {
+			name:            "no refs provided",
+			chainSelector:   111,
+			refs:            []datastore.AddressRef{},
+			expectedAddress: "",
+			expectedErr:     "at least one address ref must be specified",
+		}, {
+			name:          "non-unique ref found",
+			chainSelector: 111,
+			refs: []datastore.AddressRef{
+				{
+					ChainSelector: 111, // Matches two entries in the datastore, should error out and not continue to the next ref
+				}, {
+					ChainSelector: 222,
+					Type:          datastore.ContractType("TestContract3"),
+				},
+			},
+			expectedAddress: "",
+			expectedErr:     "found 2",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			addr, err := datastore_utils.FindAndFormatFirstRef(ds.Seal(), tt.chainSelector, func(ref datastore.AddressRef) (string, error) { return ref.Address, nil }, tt.refs...)
+			if tt.expectedErr != "" {
+				require.ErrorContains(t, err, tt.expectedErr)
+				return
+			}
+			require.Equal(t, tt.expectedAddress, addr)
 		})
 	}
 }
