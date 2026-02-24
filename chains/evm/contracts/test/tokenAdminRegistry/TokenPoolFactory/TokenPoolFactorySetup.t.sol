@@ -6,41 +6,31 @@ import {RegistryModuleOwnerCustom} from "../../../tokenAdminRegistry/RegistryMod
 import {FactoryBurnMintERC20} from "../../../tokenAdminRegistry/TokenPoolFactory/FactoryBurnMintERC20.sol";
 import {TokenPoolFactory} from "../../../tokenAdminRegistry/TokenPoolFactory/TokenPoolFactory.sol";
 import {TokenAdminRegistrySetup} from "../TokenAdminRegistry/TokenAdminRegistrySetup.t.sol";
-import {Create2} from "@openzeppelin/contracts@5.3.0/utils/Create2.sol";
 
 contract TokenPoolFactorySetup is TokenAdminRegistrySetup {
-  using Create2 for bytes32;
-
   TokenPoolFactory internal s_tokenPoolFactory;
   RegistryModuleOwnerCustom internal s_registryModuleOwnerCustom;
-
-  bytes internal s_poolInitCode;
-  bytes internal s_poolInitArgs;
-
-  bytes32 internal constant FAKE_SALT = keccak256(abi.encode("FAKE_SALT"));
-
   address internal s_rmnProxy = address(0x1234);
 
-  bytes internal s_tokenCreationParams;
-  bytes internal s_tokenInitCode;
-
+  bytes internal constant POOL_INIT_CODE = type(BurnMintTokenPool).creationCode;
   uint256 public constant PREMINT_AMOUNT = 100 ether;
+  bytes32 internal constant FAKE_SALT = keccak256(abi.encode("FAKE_SALT"));
+
+  bytes internal constant TOKEN_CREATION_PARAMS =
+    abi.encode("TestToken", "TT", 18, type(uint256).max, PREMINT_AMOUNT, OWNER);
+  bytes internal constant TOKEN_INIT_CODE =
+    abi.encodePacked(type(FactoryBurnMintERC20).creationCode, TOKEN_CREATION_PARAMS);
+
+  bytes internal s_poolInitArgs;
 
   function setUp() public virtual override {
-    TokenAdminRegistrySetup.setUp();
+    super.setUp();
 
     s_registryModuleOwnerCustom = new RegistryModuleOwnerCustom(address(s_tokenAdminRegistry));
     s_tokenAdminRegistry.addRegistryModule(address(s_registryModuleOwnerCustom));
 
     s_tokenPoolFactory =
       new TokenPoolFactory(s_tokenAdminRegistry, s_registryModuleOwnerCustom, s_rmnProxy, address(s_sourceRouter));
-
-    // Create Init Code for BurnMintERC20 TestToken with 18 decimals and supply cap of max uint256 value
-    s_tokenCreationParams = abi.encode("TestToken", "TT", 18, type(uint256).max, PREMINT_AMOUNT, OWNER);
-
-    s_tokenInitCode = abi.encodePacked(type(FactoryBurnMintERC20).creationCode, s_tokenCreationParams);
-
-    s_poolInitCode = type(BurnMintTokenPool).creationCode;
 
     s_poolInitArgs = abi.encode(address(0), address(0x1234), s_sourceRouter);
   }
