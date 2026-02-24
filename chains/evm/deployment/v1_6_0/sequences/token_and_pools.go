@@ -623,3 +623,19 @@ func (a *EVMAdapter) FindLatestAddressRef(ds datastore.DataStore, ref datastore.
 	// Construct the token pool instance
 	return common.BytesToAddress(addrBytes), nil
 }
+
+func (a *EVMAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokensapi.UpdateAuthoritiesInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return cldf_ops.NewSequence(
+		"evm-adapter:update-authorities",
+		tarops.Version,
+		"Update authorities for a token and token pool on EVM Chain",
+		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokensapi.UpdateAuthoritiesInput) (sequences.OnChainOutput, error) {
+			var result sequences.OnChainOutput
+			// chain, ok := chains.EVMChains()[input.ChainSelector]
+			// if !ok {
+			// 	return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
+			// }
+
+			return result, nil
+		})
+}

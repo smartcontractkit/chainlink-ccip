@@ -440,10 +440,9 @@ func TestTokensAndTokenPools(t *testing.T) {
 		t.Run("Validate ConfigureTokenForTransfers", func(t *testing.T) {
 			require.Len(t, evmTestData, 2, "expected exactly two EVM test data entries for this test")
 			evmA, evmB := evmTestData[0], evmTestData[1]
-			solbnm, _ := solTestData[0], solTestData[1]
-			defaultRL := tokensapi.RateLimiterConfig{
-				Capacity:  big.NewInt(1_000_000_000),
-				Rate:      big.NewInt(100_000_000),
+			defaultRL := tokensapi.RateLimiterConfigFloatInput{
+				Capacity:  100,
+				Rate:      10,
 				IsEnabled: true,
 			}
 
@@ -494,27 +493,10 @@ func TestTokensAndTokenPools(t *testing.T) {
 									Address:       evmA.TAR.Address().Hex(),
 								},
 								RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
-									solbnm.Chain.Selector: {
-										DefaultFinalityOutboundRateLimiterConfig: defaultRL,
-										DefaultFinalityInboundRateLimiterConfig:  defaultRL,
-										OutboundCCVs:                             []datastore.AddressRef{},
-										InboundCCVs:                              []datastore.AddressRef{},
-										RemoteToken: &datastore.AddressRef{
-											ChainSelector: solbnm.Chain.Selector,
-											Qualifier:     solbnm.Token.Symbol,
-											Type:          datastore.ContractType(solbnm.Token.Type),
-										},
-										RemotePool: &datastore.AddressRef{
-											ChainSelector: solbnm.Chain.Selector,
-											Qualifier:     solbnm.TokenPoolQualifier,
-											Type:          datastore.ContractType(solbnm.TokenPoolType),
-										},
-									},
 									evmB.Chain.Selector: {
-										DefaultFinalityOutboundRateLimiterConfig: defaultRL,
-										DefaultFinalityInboundRateLimiterConfig:  defaultRL,
-										OutboundCCVs:                             []datastore.AddressRef{},
-										InboundCCVs:                              []datastore.AddressRef{},
+										OutboundRateLimiterConfig: defaultRL,
+										OutboundCCVs:              []datastore.AddressRef{},
+										InboundCCVs:               []datastore.AddressRef{},
 										RemoteToken: &datastore.AddressRef{
 											ChainSelector: evmB.Chain.Selector,
 											Qualifier:     evmB.Token.Symbol,
@@ -523,6 +505,39 @@ func TestTokensAndTokenPools(t *testing.T) {
 										RemotePool: &datastore.AddressRef{
 											ChainSelector: evmB.Chain.Selector,
 											Qualifier:     evmB.TokenPoolQualifier,
+											Type:          datastore.ContractType(evmTokenPoolType),
+										},
+									},
+								},
+							},
+						},
+						evmB.Chain.Selector: {
+							TokenPoolVersion: v1_6_0,
+							TokenTransferConfig: &tokensapi.TokenTransferConfig{
+								ChainSelector: evmB.Chain.Selector,
+								TokenPoolRef: datastore.AddressRef{
+									ChainSelector: evmB.Chain.Selector,
+									Qualifier:     evmB.TokenPoolQualifier,
+									Type:          datastore.ContractType(evmTokenPoolType),
+									Version:       v1_5_1,
+								},
+								RegistryRef: datastore.AddressRef{
+									ChainSelector: evmB.Chain.Selector,
+									Address:       evmB.TAR.Address().Hex(),
+								},
+								RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+									evmA.Chain.Selector: {
+										OutboundRateLimiterConfig: defaultRL,
+										OutboundCCVs:              []datastore.AddressRef{},
+										InboundCCVs:               []datastore.AddressRef{},
+										RemoteToken: &datastore.AddressRef{
+											ChainSelector: evmA.Chain.Selector,
+											Qualifier:     evmA.Token.Symbol,
+											Type:          datastore.ContractType(evmA.Token.Type),
+										},
+										RemotePool: &datastore.AddressRef{
+											ChainSelector: evmA.Chain.Selector,
+											Qualifier:     evmA.TokenPoolQualifier,
 											Type:          datastore.ContractType(evmTokenPoolType),
 										},
 									},
@@ -550,14 +565,19 @@ func TestTokensAndTokenPools(t *testing.T) {
 				require.NoError(t, err)
 
 				// Verify that chain B is now supported on chain A
-				require.ElementsMatch(t, []uint64{evmB.Chain.Selector, solbnm.Chain.Selector}, supportedChainsOnA)
+				require.ElementsMatch(t, []uint64{evmB.Chain.Selector}, supportedChainsOnA)
 
+				// scale rate limits by decimals (i.e. convert from float input to big.Int with 18 decimals)
+				obCapacity := tokensapi.ScaleFloatToBigInt(defaultRL.Capacity, 18, 0)
+				obRate := tokensapi.ScaleFloatToBigInt(defaultRL.Rate, 18, 0)
+				inbCapacity := tokensapi.ScaleFloatToBigInt(defaultRL.Capacity, 18, .10)
+				inbRate := tokensapi.ScaleFloatToBigInt(defaultRL.Rate, 18, .10)
 				// Verify that the rate limits were set correctly
-				require.Equal(t, 0, defaultRL.Capacity.Cmp(outboundRateLimitAB.Capacity))
-				require.Equal(t, 0, defaultRL.Rate.Cmp(outboundRateLimitAB.Rate))
+				require.Equal(t, obCapacity, outboundRateLimitAB.Capacity)
+				require.Equal(t, obRate, outboundRateLimitAB.Rate)
 				require.True(t, outboundRateLimitAB.IsEnabled)
-				require.Equal(t, 0, defaultRL.Capacity.Cmp(inboundRateLimitAB.Capacity))
-				require.Equal(t, 0, defaultRL.Rate.Cmp(inboundRateLimitAB.Rate))
+				require.Equal(t, inbCapacity, inboundRateLimitAB.Capacity)
+				require.Equal(t, inbRate, inboundRateLimitAB.Rate)
 				require.True(t, inboundRateLimitAB.IsEnabled)
 
 				// Verify that the remote token pool was set correctly
@@ -701,14 +721,58 @@ func TestTokensAndTokenPools(t *testing.T) {
 			require.NoError(t, err)
 			multisigPublicKey := solana.MustPublicKeyFromBase58(multisigAdd.Address)
 			require.False(t, multisigPublicKey.IsZero())
+
+			// Run the changeset with a new admin, overriding the previous pending admin
+			newExternalAdmin, _ := solana.NewRandomPrivateKey()
+			output, err = tokensapi.
+				ManualRegistration().
+				Apply(*env, tokensapi.ManualRegistrationInput{
+					ChainAdapterVersion: v1_6_0,
+					MCMS:                NewDefaultInputForMCMS("Manual Registration Solana"),
+					Registrations: []tokensapi.RegisterTokenConfig{
+						{
+							ChainSelector: solbnm.Chain.Selector,
+							ProposedOwner: newExternalAdmin.PublicKey().String(),
+							TokenPoolRef: datastore.AddressRef{
+								ChainSelector: solbnm.Chain.Selector,
+								Address:       tokenPool.Address,
+							},
+							TokenRef: datastore.AddressRef{
+								ChainSelector: solbnm.Chain.Selector,
+								Address:       tokenAddr.Address,
+							},
+							SVMExtraArgs: &tokensapi.SVMExtraArgs{
+								CustomerMintAuthorities: []solana.PublicKey{
+									newExternalAdmin.PublicKey(),
+								},
+							},
+						},
+					},
+				})
+			require.NoError(t, err)
+			MergeAddresses(t, env, output.DataStore)
+			testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
+
+			// Verify that a new admin was proposed for the specified token
+			tarErr = chain.GetAccountDataBorshInto(t.Context(), tokenAdminRegistryPDA, &tokenAdminRegistryAccountAfter)
+			require.NoError(t, tarErr)
+			require.Equal(t, solana.PublicKey{}, tokenAdminRegistryAccountAfter.Administrator)
+			require.Equal(t, newExternalAdmin.PublicKey(), tokenAdminRegistryAccountAfter.PendingAdministrator)
+
+			stateErr = chain.GetAccountDataBorshInto(t.Context(), tokenPoolStatePDA, &tokenPoolStateAccountAfter)
+			require.NoError(t, stateErr)
+			require.Equal(t, chain.DeployerKey.PublicKey(), tokenPoolStateAccountAfter.Config.Owner)
+			require.Equal(t, newExternalAdmin.PublicKey(), tokenPoolStateAccountAfter.Config.ProposedOwner)
+			require.Equal(t, tokenMint, tokenPoolStateAccountAfter.Config.Mint)
+			require.Equal(t, chain.DeployerKey.PublicKey(), tokenPoolStateAccountAfter.Config.RateLimitAdmin)
 		})
 
 		t.Run("Validate ConfigureTokenForTransfers", func(t *testing.T) {
 			evmA, evmB := evmTestData[0], evmTestData[1]
 			solbnm, _ := solTestData[0], solTestData[1]
-			defaultRL := tokensapi.RateLimiterConfig{
-				Capacity:  big.NewInt(1_000_000_000),
-				Rate:      big.NewInt(100_000_000),
+			defaultRL := tokensapi.RateLimiterConfigFloatInput{
+				Capacity:  1000,
+				Rate:      100,
 				IsEnabled: true,
 			}
 			chain := env.BlockChains.SolanaChains()[solbnm.Chain.Selector]
@@ -769,10 +833,9 @@ func TestTokensAndTokenPools(t *testing.T) {
 							},
 							RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
 								evmA.Chain.Selector: {
-									DefaultFinalityOutboundRateLimiterConfig: defaultRL,
-									DefaultFinalityInboundRateLimiterConfig:  defaultRL,
-									OutboundCCVs:                             []datastore.AddressRef{},
-									InboundCCVs:                              []datastore.AddressRef{},
+									OutboundRateLimiterConfig: defaultRL,
+									OutboundCCVs:              []datastore.AddressRef{},
+									InboundCCVs:               []datastore.AddressRef{},
 									RemoteToken: &datastore.AddressRef{
 										ChainSelector: evmA.Chain.Selector,
 										Qualifier:     evmA.Token.Symbol,
@@ -785,10 +848,9 @@ func TestTokensAndTokenPools(t *testing.T) {
 									},
 								},
 								evmB.Chain.Selector: {
-									DefaultFinalityOutboundRateLimiterConfig: defaultRL,
-									DefaultFinalityInboundRateLimiterConfig:  defaultRL,
-									OutboundCCVs:                             []datastore.AddressRef{},
-									InboundCCVs:                              []datastore.AddressRef{},
+									OutboundRateLimiterConfig: defaultRL,
+									OutboundCCVs:              []datastore.AddressRef{},
+									InboundCCVs:               []datastore.AddressRef{},
 									RemoteToken: &datastore.AddressRef{
 										ChainSelector: evmB.Chain.Selector,
 										Qualifier:     evmB.Token.Symbol,
@@ -798,6 +860,72 @@ func TestTokensAndTokenPools(t *testing.T) {
 										ChainSelector: evmB.Chain.Selector,
 										Qualifier:     evmB.TokenPoolQualifier,
 										Type:          datastore.ContractType(evmTokenPoolType),
+									},
+								},
+							},
+						},
+					},
+					evmA.Chain.Selector: {
+						TokenPoolVersion: v1_6_0,
+						TokenTransferConfig: &tokensapi.TokenTransferConfig{
+							ChainSelector: evmA.Chain.Selector,
+							TokenPoolRef: datastore.AddressRef{
+								ChainSelector: evmA.Chain.Selector,
+								Qualifier:     evmA.TokenPoolQualifier,
+								Type:          datastore.ContractType(evmTokenPoolType),
+								Version:       v1_5_1,
+							},
+							RegistryRef: datastore.AddressRef{
+								ChainSelector: evmA.Chain.Selector,
+								Address:       evmA.TAR.Address().Hex(),
+							},
+							RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+								solbnm.Chain.Selector: {
+									OutboundRateLimiterConfig: defaultRL,
+									OutboundCCVs:              []datastore.AddressRef{},
+									InboundCCVs:               []datastore.AddressRef{},
+									RemoteToken: &datastore.AddressRef{
+										ChainSelector: solbnm.Chain.Selector,
+										Qualifier:     solbnm.Token.Symbol,
+										Type:          datastore.ContractType(solbnm.Token.Type),
+									},
+									RemotePool: &datastore.AddressRef{
+										ChainSelector: solbnm.Chain.Selector,
+										Qualifier:     solbnm.TokenPoolQualifier,
+										Type:          datastore.ContractType(solbnm.TokenPoolType),
+									},
+								},
+							},
+						},
+					},
+					evmB.Chain.Selector: {
+						TokenPoolVersion: v1_6_0,
+						TokenTransferConfig: &tokensapi.TokenTransferConfig{
+							ChainSelector: evmB.Chain.Selector,
+							TokenPoolRef: datastore.AddressRef{
+								ChainSelector: evmB.Chain.Selector,
+								Qualifier:     evmB.TokenPoolQualifier,
+								Type:          datastore.ContractType(evmTokenPoolType),
+								Version:       v1_5_1,
+							},
+							RegistryRef: datastore.AddressRef{
+								ChainSelector: evmB.Chain.Selector,
+								Address:       evmB.TAR.Address().Hex(),
+							},
+							RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+								solbnm.Chain.Selector: {
+									OutboundRateLimiterConfig: defaultRL,
+									OutboundCCVs:              []datastore.AddressRef{},
+									InboundCCVs:               []datastore.AddressRef{},
+									RemoteToken: &datastore.AddressRef{
+										ChainSelector: solbnm.Chain.Selector,
+										Qualifier:     solbnm.Token.Symbol,
+										Type:          datastore.ContractType(solbnm.Token.Type),
+									},
+									RemotePool: &datastore.AddressRef{
+										ChainSelector: solbnm.Chain.Selector,
+										Qualifier:     solbnm.TokenPoolQualifier,
+										Type:          datastore.ContractType(solbnm.TokenPoolType),
 									},
 								},
 							},
@@ -823,10 +951,11 @@ func TestTokensAndTokenPools(t *testing.T) {
 			require.NoError(t, tarErr)
 			require.Equal(t, timelockSigner, tokenAdminRegistryAccountAfter.Administrator)
 
+			// token pool should be configured with the timelock as the owner, and the proposed owner should be cleared since the token expansion changeset should transfer ownership of the pool to the timelock
 			var tokenPoolStateAccountAfter burnmint_token_pool.State
 			stateErr := chain.GetAccountDataBorshInto(t.Context(), tokenPoolStatePDA, &tokenPoolStateAccountAfter)
 			require.NoError(t, stateErr)
-			require.Equal(t, chain.DeployerKey.PublicKey(), tokenPoolStateAccountAfter.Config.Owner)
+			require.Equal(t, timelockSigner, tokenPoolStateAccountAfter.Config.Owner)
 			require.Equal(t, tokenMint, tokenPoolStateAccountAfter.Config.Mint)
 			require.Equal(t, chain.DeployerKey.PublicKey(), tokenPoolStateAccountAfter.Config.RateLimitAdmin)
 		})

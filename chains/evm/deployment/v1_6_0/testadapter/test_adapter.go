@@ -202,7 +202,7 @@ func (a *EVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, 
 		it, err := onRamp.FilterCCIPMessageSent(&bind.FilterOpts{
 			Start:   blockNum,
 			End:     &blockNum,
-			Context: context.Background(),
+			Context: ctx,
 		}, []uint64{destChainSelector}, []uint64{})
 		if err != nil {
 			return 0, fmt.Errorf("failed to filter CCIPMessageSent events: %w", err)
@@ -432,7 +432,7 @@ func ConfirmCommitWithExpectedSeqNumRange(
 ) (*offramp.OffRampCommitReportAccepted, error) {
 	sink := make(chan *offramp.OffRampCommitReportAccepted)
 	subscription, err := offRamp.WatchCommitReportAccepted(&bind.WatchOpts{
-		Context: context.Background(),
+		Context: t.Context(),
 		Start:   startBlock,
 	}, sink)
 	if err != nil {
@@ -598,7 +598,7 @@ func ConfirmExecWithSeqNrs(
 	defer tick.Stop()
 	sink := make(chan *offramp.OffRampExecutionStateChanged)
 	subscription, err := offRamp.WatchExecutionStateChanged(&bind.WatchOpts{
-		Context: context.Background(),
+		Context: t.Context(),
 		Start:   startBlock,
 	}, sink, nil, nil, nil)
 	if err != nil {

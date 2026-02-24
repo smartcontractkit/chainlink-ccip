@@ -106,20 +106,12 @@ type DeployTokenPoolInput struct {
 	ExistingDataStore datastore.DataStore
 }
 
-type RegisterTokenInput struct {
-	TokenRef   datastore.AddressRef `yaml:"tokenRef" json:"tokenRef"`
-	TokenAdmin string               `yaml:"tokenAdmin" json:"tokenAdmin"`
+type UpdateAuthoritiesInput struct {
 	// below are not specified by the user, filled in by the deployment system to pass to chain operations
 	ChainSelector     uint64
 	ExistingDataStore datastore.DataStore
-}
-type SetPoolInput struct {
-	TokenRef           datastore.AddressRef `yaml:"tokenRef" json:"tokenRef"`
-	TokenPoolQualifier string               `yaml:"tokenPoolQualifier" json:"tokenPoolQualifier"`
-	PoolType           string               `yaml:"poolType" json:"poolType"`
-	// below are not specified by the user, filled in by the deployment system to pass to chain operations
-	ChainSelector     uint64
-	ExistingDataStore datastore.DataStore
+	TokenRef          datastore.AddressRef
+	TokenPoolRef      datastore.AddressRef
 }
 
 func TokenExpansion() cldf.ChangeSetV2[TokenExpansionInput] {
@@ -161,7 +153,7 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 		tokenPoolRegistry := GetTokenAdapterRegistry()
 		mcmsRegistry := changesets.GetRegistry()
 		allRemotes := make(map[uint64]RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef])
-		allTokenConfigs := make([]TokenTransferConfig, 0)
+		allTokenConfigs := make(map[uint64]TokenTransferConfig, 0)
 		for selector, input := range cfg.TokenExpansionInputPerChain {
 			tmpDatastore := datastore.NewMemoryDataStore()
 			family, err := chain_selectors.GetSelectorFamily(selector)
@@ -339,18 +331,42 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 					}
 				}
 				if len(input.TokenTransferConfig.RemoteChains) != 0 {
-					allTokenConfigs = append(allTokenConfigs, *input.TokenTransferConfig)
+					allTokenConfigs[selector] = *input.TokenTransferConfig
 				}
 			}
 		}
 
-		// finally, we process the token configs for transfers, which will register the tokens and token pools on-chain and set the pool on the token if necessary
-		transferOps, transferReports, err := processTokenConfigForChain(e, allTokenConfigs)
+		// we process the token configs for transfers, which will register the tokens and token pools on-chain and set the pool on the token if necessary
+		transferOps, transferReports, err := processTokenConfigForChain(e, allTokenConfigs, cfg.ChainAdapterVersion)
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to process token configs for transfers: %w", err)
 		}
 		batchOps = append(batchOps, transferOps...)
 		reports = append(reports, transferReports...)
+
+		// finally, we update the authorities on the tokens if necessary
+		for selector, tokenConfig := range allTokenConfigs {
+			family, err := chain_selectors.GetSelectorFamily(selector)
+			if err != nil {
+				return cldf.ChangesetOutput{}, err
+			}
+			tokenPoolAdapter, exists := tokenPoolRegistry.GetTokenAdapter(family, cfg.ChainAdapterVersion)
+			if !exists {
+				return cldf.ChangesetOutput{}, fmt.Errorf("no TokenPoolAdapter registered for chain family '%s'", family)
+			}
+			updateAuthoritiesInput := UpdateAuthoritiesInput{
+				TokenRef:          tokenConfig.TokenRef,
+				TokenPoolRef:      tokenConfig.TokenPoolRef,
+				ChainSelector:     selector,
+				ExistingDataStore: e.DataStore,
+			}
+			updateAuthoritiesReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, tokenPoolAdapter.UpdateAuthorities(), e.BlockChains, updateAuthoritiesInput)
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to update authorities for token on chain %d: %w", selector, err)
+			}
+			batchOps = append(batchOps, updateAuthoritiesReport.Output.BatchOps...)
+			reports = append(reports, updateAuthoritiesReport.ExecutionReports...)
+		}
 
 		return changesets.NewOutputBuilder(e, mcmsRegistry).
 			WithReports(reports).
