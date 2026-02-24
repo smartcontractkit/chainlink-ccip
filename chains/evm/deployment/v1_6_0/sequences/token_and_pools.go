@@ -64,6 +64,15 @@ func (a *EVMAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[tok
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token admin registry address for chain %d: %w", input.ChainSelector, err)
 			}
 
+			filters := datastore.AddressRef{
+				ChainSelector: input.ChainSelector,
+				Address:       tpAddr.String(),
+			}
+			fullTpRef, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, filters, input.ChainSelector, datastore_utils.FullRef)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to find token pool in datastore using ref (%+v): %w", filters, err)
+			}
+
 			token, err := cldf_ops.ExecuteOperation(b,
 				tpops.GetToken,
 				chain,
@@ -122,6 +131,7 @@ func (a *EVMAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[tok
 				chain,
 				tpseq.ConfigureTokenPoolForRemoteChainsInput{
 					TokenPoolAddress: tpAddr,
+					TokenPoolVersion: fullTpRef.Version,
 					RemoteChains:     input.RemoteChains,
 				},
 			)
