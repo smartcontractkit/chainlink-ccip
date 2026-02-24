@@ -110,7 +110,7 @@ func TestE2ESmoke(t *testing.T) {
 			_, fromSupported := supportedTokenFamilies[fromImpl.Family()]
 			_, toSupported := supportedTokenFamilies[toImpl.Family()]
 			if !fromSupported || !toSupported {
-				t.Skip("Token transfers not supported on %s", laneTag)
+				t.Skip("Token transfers not supported on " + laneTag)
 			}
 
 			srcChainSel, srcTokenCfg := fromImpl.ChainSelector(), fromImpl.GetTokenExpansionConfig().DeployTokenInput
