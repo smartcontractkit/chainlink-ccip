@@ -430,7 +430,7 @@ func (a *SolanaAdapter) DeployToken() *cldf_ops.Sequence[tokenapi.DeployTokenInp
 	)
 }
 
-func (a *SolanaAdapter) DeployTokenVerify(e deployment.Environment, in any) error {
+func (a *SolanaAdapter) DeployTokenVerify(e deployment.Environment, in tokenapi.DeployTokenInput) error {
 	return nil
 }
 
