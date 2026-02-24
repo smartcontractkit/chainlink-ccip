@@ -29,10 +29,10 @@ func makeFirstPassInput(chainSel uint64, remoteChainSel uint64, tokenPoolAddress
 		RemoteChainConfig: tokens_core.RemoteChainConfig[[]byte, string]{
 			RemoteToken:                              common.LeftPadBytes(common.FromHex("0x123"), 32),
 			RemotePool:                               common.LeftPadBytes(common.FromHex("0x456"), 32),
-			DefaultFinalityInboundRateLimiterConfig:  testsetup.CreateRateLimiterConfig(200, 2000),
-			DefaultFinalityOutboundRateLimiterConfig: testsetup.CreateRateLimiterConfig(100, 1000),
-			CustomFinalityInboundRateLimiterConfig:   testsetup.CreateRateLimiterConfig(300, 3000),
-			CustomFinalityOutboundRateLimiterConfig:  testsetup.CreateRateLimiterConfig(200, 2000),
+			DefaultFinalityInboundRateLimiterConfig:  testsetup.CreateRateLimiterConfigFloatInput(200, 2000),
+			DefaultFinalityOutboundRateLimiterConfig: testsetup.CreateRateLimiterConfigFloatInput(100, 1000),
+			CustomFinalityInboundRateLimiterConfig:   testsetup.CreateRateLimiterConfigFloatInput(300, 3000),
+			CustomFinalityOutboundRateLimiterConfig:  testsetup.CreateRateLimiterConfigFloatInput(200, 2000),
 			OutboundCCVs:                             []string{"0x789"},
 			InboundCCVs:                              []string{"0xabc"},
 			OutboundCCVsToAddAboveThreshold:          []string{"0xdef"},
@@ -50,19 +50,21 @@ func checkTokenPoolConfigForRemoteChain(t *testing.T, e *deployment.Environment,
 	require.Len(t, supportedChains, 1, "There should be 1 supported remote chain in the token pool")
 	require.Equal(t, remoteChainSel, supportedChains[0], "Remote chain in token pool should match expected")
 
+	// Token decimals from basicDeployTokenAndPoolInput; on-chain rate/capacity are scaled by 10^decimals (inbound also 1.1x).
+	const decimals = 18
 	currentRateLimiterState, err := tp.GetCurrentRateLimiterState(nil, remoteChainSel, false)
 	require.NoError(t, err, "Failed to get current rate limiter state from token pool")
 	inboundRateLimiterReport := currentRateLimiterState.InboundRateLimiterState
-	require.NoError(t, err, "Failed to get inbound rate limiter config from token pool")
 	require.Equal(t, input.RemoteChainConfig.DefaultFinalityInboundRateLimiterConfig.IsEnabled, inboundRateLimiterReport.IsEnabled, "Inbound rate limiter enabled state should match")
-	require.Equal(t, input.RemoteChainConfig.DefaultFinalityInboundRateLimiterConfig.Rate, inboundRateLimiterReport.Rate, "Inbound rate limiter rate should match")
-	require.Equal(t, input.RemoteChainConfig.DefaultFinalityInboundRateLimiterConfig.Capacity, inboundRateLimiterReport.Capacity, "Inbound rate limiter capacity should match")
+	expectedInboundRate := tokens_core.ScaleFloatToBigInt(input.RemoteChainConfig.DefaultFinalityInboundRateLimiterConfig.Rate, decimals, 0.10)
+	expectedInboundCapacity := tokens_core.ScaleFloatToBigInt(input.RemoteChainConfig.DefaultFinalityInboundRateLimiterConfig.Capacity, decimals, 0.10)
+	requireScaledRateLimiterMatch(t, expectedInboundRate, expectedInboundCapacity, inboundRateLimiterReport.Rate, inboundRateLimiterReport.Capacity, "Inbound")
 
 	outboundRateLimiterReport := currentRateLimiterState.OutboundRateLimiterState
-	require.NoError(t, err, "Failed to get outbound rate limiter config from token pool")
 	require.Equal(t, input.RemoteChainConfig.DefaultFinalityOutboundRateLimiterConfig.IsEnabled, outboundRateLimiterReport.IsEnabled, "Outbound rate limiter enabled state should match")
-	require.Equal(t, input.RemoteChainConfig.DefaultFinalityOutboundRateLimiterConfig.Rate, outboundRateLimiterReport.Rate, "Outbound rate limiter rate should match")
-	require.Equal(t, input.RemoteChainConfig.DefaultFinalityOutboundRateLimiterConfig.Capacity, outboundRateLimiterReport.Capacity, "Outbound rate limiter capacity should match")
+	expectedOutboundRate := tokens_core.ScaleFloatToBigInt(input.RemoteChainConfig.DefaultFinalityOutboundRateLimiterConfig.Rate, decimals, 0)
+	expectedOutboundCapacity := tokens_core.ScaleFloatToBigInt(input.RemoteChainConfig.DefaultFinalityOutboundRateLimiterConfig.Capacity, decimals, 0)
+	requireScaledRateLimiterMatch(t, expectedOutboundRate, expectedOutboundCapacity, outboundRateLimiterReport.Rate, outboundRateLimiterReport.Capacity, "Outbound")
 
 	inboundCCVs, err := tp.GetRequiredCCVs(nil, common.Address{}, remoteChainSel, big.NewInt(0), 0, []byte{}, inbound)
 	require.NoError(t, err, "Failed to get inbound CCVs from token pool")
@@ -82,7 +84,8 @@ func checkTokenPoolConfigForRemoteChain(t *testing.T, e *deployment.Environment,
 		require.Contains(t, inboundCCVsToAddAboveThreshold, common.HexToAddress(ccv), "Inbound CCV to add above threshold should be in the list of required inbound CCVs to add above threshold")
 	}
 
-	outboundCCVsToAddAboveThreshold, err := tp.GetRequiredCCVs(nil, common.Address{}, remoteChainSel, thresholdAmountForAdditionalCCVs, 0, []byte{}, outbound)
+	outboundAmountForThresholdQuery := new(big.Int).Mul(thresholdAmountForAdditionalCCVs, big.NewInt(2)) // 2x so after fees we're still above threshold
+	outboundCCVsToAddAboveThreshold, err := tp.GetRequiredCCVs(nil, common.Address{}, remoteChainSel, outboundAmountForThresholdQuery, 0, []byte{}, outbound)
 	require.NoError(t, err, "Failed to get outbound CCVs to add above threshold from token pool")
 	for _, ccv := range input.RemoteChainConfig.OutboundCCVsToAddAboveThreshold {
 		require.Contains(t, outboundCCVsToAddAboveThreshold, common.HexToAddress(ccv), "Outbound CCV to add above threshold should be in the list of required outbound CCVs to add above threshold")
@@ -110,10 +113,10 @@ func TestConfigureTokenPoolForRemoteChain(t *testing.T) {
 			desc: "update rate limits on second pass",
 			makeSecondPassInput: func(chainSel uint64, remoteChainSel uint64, tokenPoolAddress common.Address, advancedPoolHooksAddress common.Address) tokens.ConfigureTokenPoolForRemoteChainInput {
 				secondPassInput := makeFirstPassInput(chainSel, remoteChainSel, tokenPoolAddress, advancedPoolHooksAddress)
-				secondPassInput.RemoteChainConfig.DefaultFinalityInboundRateLimiterConfig.Capacity = big.NewInt(6000)
-				secondPassInput.RemoteChainConfig.DefaultFinalityInboundRateLimiterConfig.Rate = big.NewInt(600)
-				secondPassInput.RemoteChainConfig.DefaultFinalityOutboundRateLimiterConfig.Capacity = big.NewInt(5000)
-				secondPassInput.RemoteChainConfig.DefaultFinalityOutboundRateLimiterConfig.Rate = big.NewInt(500)
+				secondPassInput.RemoteChainConfig.DefaultFinalityInboundRateLimiterConfig.Capacity = 6000
+				secondPassInput.RemoteChainConfig.DefaultFinalityInboundRateLimiterConfig.Rate = 600
+				secondPassInput.RemoteChainConfig.DefaultFinalityOutboundRateLimiterConfig.Capacity = 5000
+				secondPassInput.RemoteChainConfig.DefaultFinalityOutboundRateLimiterConfig.Rate = 500
 				return secondPassInput
 			},
 		},

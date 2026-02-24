@@ -132,8 +132,8 @@ func (a *SolanaAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to get token decimals for token on chain with selector %d: %w", chain.Selector, err)
 				}
 				obRL, ibRL := tokenapi.GenerateTPRLConfigs(
-					remoteChainConfig.OutboundRateLimiterConfig,
-					remoteChainConfig.InboundRateLimiterConfig,
+					remoteChainConfig.DefaultFinalityOutboundRateLimiterConfig,
+					remoteChainConfig.DefaultFinalityInboundRateLimiterConfig,
 					localDecimals,
 					remoteChainConfig.RemoteDecimals,
 					chain.Family(),
@@ -350,8 +350,8 @@ func (a *SolanaAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokenapi.TPR
 					TokenMint:                 tokenMint,
 					TokenProgramID:            tokenProgramId,
 					RemoteSelector:            input.RemoteChainSelector,
-					InboundRateLimiterConfig:  input.InboundRateLimiterConfig,
-					OutboundRateLimiterConfig: input.OutboundRateLimiterConfig,
+					InboundRateLimiterConfig:  input.DefaultFinalityInboundRateLimiterConfig,
+					OutboundRateLimiterConfig: input.DefaultFinalityOutboundRateLimiterConfig,
 				})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to set rate limits for token pool: %w", err)
