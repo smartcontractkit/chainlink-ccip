@@ -53,4 +53,9 @@ contract SiloedUSDCTokenPool_proposeCCTPMigration is SiloedUSDCTokenPoolSetup {
     vm.expectRevert(abi.encodeWithSelector(SiloedUSDCTokenPool.ChainAlreadyMigrated.selector, DEST_CHAIN_SELECTOR));
     s_usdcTokenPool.proposeCCTPMigration(DEST_CHAIN_SELECTOR);
   }
+
+  function test_proposeCCTPMigration_RevertWhen_InvalidChainSelector() public {
+    vm.expectRevert(abi.encodeWithSelector(SiloedUSDCTokenPool.InvalidChainSelector.selector));
+    s_usdcTokenPool.proposeCCTPMigration(0);
+  }
 }

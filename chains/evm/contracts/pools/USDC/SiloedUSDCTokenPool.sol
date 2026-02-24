@@ -34,6 +34,7 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
   );
 
   error OnlyCircle();
+  error InvalidChainSelector();
   error ExistingMigrationProposal();
   error NoMigrationProposalPending();
   error ChainAlreadyMigrated(uint64 remoteChainSelector);
@@ -196,6 +197,9 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
   function proposeCCTPMigration(
     uint64 remoteChainSelector
   ) external onlyOwner {
+    // Selector 0 is reserved as the "no proposal pending" sentinel in state.
+    if (remoteChainSelector == 0) revert InvalidChainSelector();
+
     // Prevent overwriting existing migration proposals until the current one is finished
     if (s_proposedUSDCMigrationChain != 0) revert ExistingMigrationProposal();
     if (s_migratedChains.contains(remoteChainSelector)) revert ChainAlreadyMigrated(remoteChainSelector);
@@ -251,6 +255,8 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
     uint64 remoteChainSelector,
     uint256 lockedUSDCToBurn
   ) external onlyOwner {
+    // Selector 0 is reserved as the "no proposal pending" sentinel in state.
+    if (remoteChainSelector == 0) revert InvalidChainSelector();
     if (s_proposedUSDCMigrationChain != remoteChainSelector) revert NoMigrationProposalPending();
     s_lockedUSDCToBurn = lockedUSDCToBurn;
 
@@ -269,6 +275,8 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
     uint64 remoteChainSelector,
     uint256 amount
   ) external onlyOwner {
+    // Selector 0 is reserved as the "no proposal pending" sentinel in state.
+    if (remoteChainSelector == 0) revert InvalidChainSelector();
     if (s_proposedUSDCMigrationChain != remoteChainSelector) revert NoMigrationProposalPending();
 
     s_tokensExcludedFromBurn[remoteChainSelector] += amount;

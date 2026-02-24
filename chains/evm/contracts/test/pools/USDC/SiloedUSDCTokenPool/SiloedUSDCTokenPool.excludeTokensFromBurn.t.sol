@@ -29,4 +29,9 @@ contract SiloedUSDCTokenPool_excludeTokensFromBurn is SiloedUSDCTokenPoolSetup {
     vm.expectRevert(abi.encodeWithSelector(SiloedUSDCTokenPool.NoMigrationProposalPending.selector));
     s_usdcTokenPool.excludeTokensFromBurn(SOURCE_CHAIN_SELECTOR, 1e6);
   }
+
+  function test_excludeTokensFromBurn_RevertWhen_InvalidChainSelector() public {
+    vm.expectRevert(abi.encodeWithSelector(SiloedUSDCTokenPool.InvalidChainSelector.selector));
+    s_usdcTokenPool.excludeTokensFromBurn(0, 1e6);
+  }
 }

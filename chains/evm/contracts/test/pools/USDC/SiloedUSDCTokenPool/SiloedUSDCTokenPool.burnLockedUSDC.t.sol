@@ -153,4 +153,9 @@ contract SiloedUSDCTokenPool_burnLockedUSDC is SiloedUSDCTokenPoolSetup {
     vm.expectRevert(abi.encodeWithSelector(SiloedUSDCTokenPool.NoMigrationProposalPending.selector));
     s_usdcTokenPool.burnLockedUSDC();
   }
+
+  function test_setLockedUSDCToBurn_RevertWhen_InvalidChainSelector() public {
+    vm.expectRevert(abi.encodeWithSelector(SiloedUSDCTokenPool.InvalidChainSelector.selector));
+    s_usdcTokenPool.setLockedUSDCToBurn(0, 1e6);
+  }
 }
