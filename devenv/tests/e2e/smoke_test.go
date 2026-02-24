@@ -200,6 +200,10 @@ func TestE2ESmoke(t *testing.T) {
 		})
 
 		t.Run(fmt.Sprintf("%s invalid extra args tag", laneTag), func(t *testing.T) {
+			if fromImpl.Family() == chainsel.FamilyTon {
+				t.Skip("TON expects a well-formatted BOC or BuildMessage will fail")
+			}
+
 			msg, err := fromImpl.BuildMessage(testadapters.MessageComponents{
 				DestChainSelector: toImpl.ChainSelector(),
 				Receiver:          toImpl.CCIPReceiver(),
