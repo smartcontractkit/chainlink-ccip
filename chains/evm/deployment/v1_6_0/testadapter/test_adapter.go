@@ -225,6 +225,10 @@ func (a *EVMAdapter) CCIPReceiver() []byte {
 	return common.LeftPadBytes(common.HexToAddress("0xdead").Bytes(), 32)
 }
 
+func (a *EVMAdapter) SetReceiverRejectAll(ctx context.Context, rejectAll bool) error {
+	return errors.ErrUnsupported
+}
+
 func (a *EVMAdapter) NativeFeeToken() string {
 	return "0x0"
 }

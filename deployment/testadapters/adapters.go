@@ -98,6 +98,10 @@ type TestAdapter interface {
 	// // CCIPReceiver returns a CCIP receiver for the given chain family.
 	CCIPReceiver() []byte
 
+	// SetReceiverRejectAll configures the receiver to reject all incoming messages.
+	// This is used for test cases with a a failing receiver.
+	SetReceiverRejectAll(ctx context.Context, rejectAll bool) error
+
 	// NativeFeeToken returns the native fee token for the given chain family.
 	NativeFeeToken() string
 

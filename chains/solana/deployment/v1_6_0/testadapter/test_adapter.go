@@ -27,6 +27,7 @@ import (
 	solutils "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_offramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/test_ccip_receiver"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_0/ccip_router"
 	solccip "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/ccip"
 	solcommon "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
@@ -331,6 +332,33 @@ func (a *SVMAdapter) CCIPReceiver() []byte {
 		panic(fmt.Sprintf("failed to get TestReceiver address: %v", err))
 	}
 	return receiver.Bytes()
+}
+
+func (a *SVMAdapter) SetReceiverRejectAll(ctx context.Context, rejectAll bool) error {
+	receiverProgram, err := a.getAddress("TestReceiver")
+	if err != nil {
+		return err
+	}
+	receiverTargetAccountPDA, _, _ := solana.FindProgramAddress([][]byte{[]byte("counter")}, receiverProgram)
+	// Set reject all flag in receiver to force reverts
+	deployer := a.Chain.DeployerKey
+	ix, err := test_ccip_receiver.NewSetRejectAllInstruction(true, receiverTargetAccountPDA, deployer.PublicKey()).ValidateAndBuild()
+	if err != nil {
+		return err
+	}
+	ixData, err := ix.Data()
+	if err != nil {
+		return err
+	}
+	rejectAllIx := solana.NewInstruction(receiverProgram, ix.Accounts(), ixData)
+	result, err := solcommon.SendAndConfirm(ctx, a.Client, []solana.Instruction{rejectAllIx}, *deployer, solconfig.DefaultCommitment)
+	if err != nil {
+		return fmt.Errorf("failed to send and confirm transaction: %w", err)
+	}
+	if result.Meta.Err != nil {
+		return fmt.Errorf("failed to send and confirm transaction: %v", result.Meta.Err)
+	}
+	return nil
 }
 
 func (a *SVMAdapter) NativeFeeToken() string {
