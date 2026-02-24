@@ -242,9 +242,9 @@ func (a *EVMAdapter) GetExtraArgs(receiver []byte, sourceFamily string, opts ...
 		}
 		for _, opt := range opts {
 			switch opt.Name {
-			case testadapters.EXTRA_ARG_GAS_LIMIT:
+			case testadapters.ExtraArgGasLimit:
 				extraArgs.GasLimit = opt.Value.(*big.Int)
-			case testadapters.EXTRA_ARG_OOO:
+			case testadapters.ExtraArgOOO:
 				extraArgs.AllowOutOfOrderExecution = opt.Value.(bool)
 			default:
 				// unsupported arg
@@ -262,9 +262,9 @@ func (a *EVMAdapter) GetExtraArgs(receiver []byte, sourceFamily string, opts ...
 		}
 		for _, opt := range opts {
 			switch opt.Name {
-			case testadapters.EXTRA_ARG_GAS_LIMIT:
+			case testadapters.ExtraArgGasLimit:
 				extraArgs.GasLimit = opt.Value.(*big.Int)
-			case testadapters.EXTRA_ARG_OOO:
+			case testadapters.ExtraArgOOO:
 				extraArgs.AllowOutOfOrderExecution = opt.Value.(bool)
 			default:
 				// unsupported arg

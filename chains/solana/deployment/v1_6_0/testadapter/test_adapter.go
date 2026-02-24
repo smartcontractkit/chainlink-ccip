@@ -387,7 +387,7 @@ func (a *SVMAdapter) GetExtraArgs(receiver []byte, sourceFamily string, opts ...
 		}
 		for _, opt := range opts {
 			switch opt.Name {
-			case testadapters.EXTRA_ARG_GAS_LIMIT:
+			case testadapters.ExtraArgGasLimit:
 				unitsBig := opt.Value.(*big.Int)
 				if !unitsBig.IsUint64() {
 					return nil, fmt.Errorf("ComputeUnits is larger than uint32: %d", unitsBig)
@@ -397,7 +397,7 @@ func (a *SVMAdapter) GetExtraArgs(receiver []byte, sourceFamily string, opts ...
 					return nil, fmt.Errorf("ComputeUnits is larger than uint32: %d", units)
 				}
 				extraArgs.ComputeUnits = uint32(units)
-			case testadapters.EXTRA_ARG_OOO:
+			case testadapters.ExtraArgOOO:
 				extraArgs.AllowOutOfOrderExecution = opt.Value.(bool)
 			default:
 				// unsupported arg

@@ -47,8 +47,8 @@ type MessageComponents struct {
 	TokenAmounts []TokenAmount
 }
 
-const EXTRA_ARG_GAS_LIMIT = "gasLimit|computeUnits"
-const EXTRA_ARG_OOO = "outOfOrderExecutionEnabled"
+const ExtraArgGasLimit = "gasLimit|computeUnits"
+const ExtraArgOOO = "outOfOrderExecutionEnabled"
 
 // ExtraArgOpt is a generic representation of an extra arg that can be applied
 // to any kind of ccip message.
@@ -60,14 +60,14 @@ type ExtraArgOpt struct {
 
 func NewOutOfOrderExtraArg(outOfOrder bool) ExtraArgOpt {
 	return ExtraArgOpt{
-		Name:  EXTRA_ARG_OOO,
+		Name:  ExtraArgOOO,
 		Value: outOfOrder,
 	}
 }
 
 func NewGasLimitExtraArg(gasLimit *big.Int) ExtraArgOpt {
 	return ExtraArgOpt{
-		Name:  EXTRA_ARG_GAS_LIMIT,
+		Name:  ExtraArgGasLimit,
 		Value: gasLimit,
 	}
 }
