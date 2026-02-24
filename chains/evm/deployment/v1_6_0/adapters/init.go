@@ -23,5 +23,6 @@ func init() {
 
 	rampConfigReg := deploy.GetRampConfigUpdaterRegistry()
 	rampConfigReg.RegisterConfigImporter(chainsel.FamilyEVM, semver.MustParse("1.6.0"), &ConfigImportAdapter{})
-	rampConfigReg.RegisterRampConfigApplier(chainsel.FamilyEVM, semver.MustParse("1.6.0"), RampConfigApplier{})
+	rampConfigReg.RegisterRampConfigApplier(chainsel.FamilyEVM, semver.MustParse("1.6.0"), RampConfigApplier[any]{})
+	rampConfigReg.RegisterImporterVersionResolver(chainsel.FamilyEVM, &adapters1_2_0.LaneVersionResolver{})
 }

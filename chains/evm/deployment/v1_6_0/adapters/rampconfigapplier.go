@@ -17,29 +17,33 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
-// RampConfigApplier implements deploy.RampConfigApplier for EVM 1.6.
-// It applies imported onRamp/offRamp config (dynamic config and dest/source chain config) to the contracts.
-// Static config is set at deployment and is not updated here.
-type RampConfigApplier struct{}
+// evmRampConfigSetArgs is the output of SequenceRampConfigInputCreation and input to SequenceSetRampConfig for EVM 1.6.
+// Used as the concrete type when RampConfigSetArgs is any for deploy.RampConfigApplier[any].
+type evmRampConfigSetArgs struct {
+	ChainSelector        uint64
+	OnRampAddr           common.Address
+	OffRampAddr          common.Address
+	OnRampDynamicConfig  onrampops.DynamicConfig
+	OffRampDynamicConfig offrampops.DynamicConfig
+	OnRampDestArgs       []onrampops.DestChainConfigArgs
+	OffRampSourceArgs    []offrampops.SourceChainConfigArgs
+}
 
-// SequenceSetRampConfig returns a sequence that sets onRamp and offRamp dynamic config and dest/source chain config
-// from the imported config output.
-func (r RampConfigApplier) SequenceSetRampConfig() *cldf_ops.Sequence[deploy.SetRampConfigInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+// RampConfigApplier uses RampConfigSetArgs any so it implements deploy.RampConfigApplier[any] and can be registered directly.
+type RampConfigApplier[RampConfigSetArgs any] struct{}
+
+// SequenceRampConfigInputCreation parses consolidated contract metadata and produces ramp config set args.
+func (r RampConfigApplier[RampConfigSetArgs]) SequenceRampConfigInputCreation() *cldf_ops.Sequence[deploy.SetRampConfigInput, RampConfigSetArgs, cldf_chain.BlockChains] {
 	return cldf_ops.NewSequence(
-		"ramp-config-applier:set-ramp-config",
+		"ramp-config-applier:input-creation",
 		semver.MustParse("1.6.0"),
-		"Sets onRamp and offRamp dynamic config and dest/source chain config from imported config",
-		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input deploy.SetRampConfigInput) (sequences.OnChainOutput, error) {
-			chain, ok := chains.EVMChains()[input.ChainSelector]
-			if !ok {
-				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found", input.ChainSelector)
-			}
-
+		"Creates ramp config set args from imported contract metadata",
+		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input deploy.SetRampConfigInput) (RampConfigSetArgs, error) {
 			var onRampMeta *seq1_6.OnRampImportConfigSequenceOutput
 			var offRampMeta *seq1_6.OffRampImportConfigSequenceOutput
 			var onRampAddr, offRampAddr common.Address
 
-			for _, c := range input.ImportOutput {
+			for _, c := range input.ContractMeta {
 				if c.ChainSelector != input.ChainSelector {
 					continue
 				}
@@ -54,26 +58,14 @@ func (r RampConfigApplier) SequenceSetRampConfig() *cldf_ops.Sequence[deploy.Set
 			}
 
 			if onRampMeta == nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("onRamp import config metadata not found in import output for chain %d", input.ChainSelector)
+				var zero RampConfigSetArgs
+				return zero, fmt.Errorf("onRamp import config metadata not found in import output for chain %d", input.ChainSelector)
 			}
 			if offRampMeta == nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("offRamp import config metadata not found in import output for chain %d", input.ChainSelector)
+				var zero RampConfigSetArgs
+				return zero, fmt.Errorf("offRamp import config metadata not found in import output for chain %d", input.ChainSelector)
 			}
 
-			var writes []contract.WriteOutput
-
-			// Set OnRamp dynamic config
-			onRampDynamicReport, err := cldf_ops.ExecuteOperation(b, onrampops.SetDynamicConfig, chain, contract.FunctionInput[onrampops.DynamicConfig]{
-				ChainSelector: input.ChainSelector,
-				Address:       onRampAddr,
-				Args:          onRampMeta.DynamicConfig,
-			})
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to set onRamp dynamic config: %w", err)
-			}
-			writes = append(writes, onRampDynamicReport.Output)
-
-			// Apply OnRamp dest chain config updates
 			onRampDestArgs := make([]onrampops.DestChainConfigArgs, 0, len(onRampMeta.DestChainCfgs))
 			for destSel, cfg := range onRampMeta.DestChainCfgs {
 				onRampDestArgs = append(onRampDestArgs, onrampops.DestChainConfigArgs{
@@ -82,30 +74,6 @@ func (r RampConfigApplier) SequenceSetRampConfig() *cldf_ops.Sequence[deploy.Set
 					AllowlistEnabled:  cfg.AllowlistEnabled,
 				})
 			}
-			if len(onRampDestArgs) > 0 {
-				onRampDestReport, err := cldf_ops.ExecuteOperation(b, onrampops.ApplyDestChainConfigUpdates, chain, contract.FunctionInput[[]onrampops.DestChainConfigArgs]{
-					ChainSelector: input.ChainSelector,
-					Address:       onRampAddr,
-					Args:          onRampDestArgs,
-				})
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to apply onRamp dest chain config: %w", err)
-				}
-				writes = append(writes, onRampDestReport.Output)
-			}
-
-			// Set OffRamp dynamic config
-			offRampDynamicReport, err := cldf_ops.ExecuteOperation(b, offrampops.SetDynamicConfig, chain, contract.FunctionInput[offrampops.DynamicConfig]{
-				ChainSelector: input.ChainSelector,
-				Address:       offRampAddr,
-				Args:          offRampMeta.DynamicConfig,
-			})
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to set offRamp dynamic config: %w", err)
-			}
-			writes = append(writes, offRampDynamicReport.Output)
-
-			// Apply OffRamp source chain config updates
 			offRampSourceArgs := make([]offrampops.SourceChainConfigArgs, 0, len(offRampMeta.SourceChainCfgs))
 			for srcSel, cfg := range offRampMeta.SourceChainCfgs {
 				offRampSourceArgs = append(offRampSourceArgs, offrampops.SourceChainConfigArgs{
@@ -116,11 +84,78 @@ func (r RampConfigApplier) SequenceSetRampConfig() *cldf_ops.Sequence[deploy.Set
 					OnRamp:                    cfg.OnRamp,
 				})
 			}
-			if len(offRampSourceArgs) > 0 {
+
+			result := evmRampConfigSetArgs{
+				ChainSelector:        input.ChainSelector,
+				OnRampAddr:           onRampAddr,
+				OffRampAddr:          offRampAddr,
+				OnRampDynamicConfig:  onRampMeta.DynamicConfig,
+				OffRampDynamicConfig: offRampMeta.DynamicConfig,
+				OnRampDestArgs:       onRampDestArgs,
+				OffRampSourceArgs:    offRampSourceArgs,
+			}
+			return any(result).(RampConfigSetArgs), nil
+		},
+	)
+}
+
+// SequenceSetRampConfig applies the ramp config set args to onRamp and offRamp contracts.
+func (r RampConfigApplier[RampConfigSetArgs]) SequenceSetRampConfig() *cldf_ops.Sequence[RampConfigSetArgs, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return cldf_ops.NewSequence(
+		"ramp-config-applier:set-ramp-config",
+		semver.MustParse("1.6.0"),
+		"Sets onRamp and offRamp dynamic config and dest/source chain config from created args",
+		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, args RampConfigSetArgs) (sequences.OnChainOutput, error) {
+			evmArgs, ok := any(args).(evmRampConfigSetArgs)
+			if !ok {
+				return sequences.OnChainOutput{}, fmt.Errorf("ramp config set args has unexpected type")
+			}
+			chain, ok := chains.EVMChains()[evmArgs.ChainSelector]
+			if !ok {
+				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found", evmArgs.ChainSelector)
+			}
+
+			var writes []contract.WriteOutput
+
+			// Set OnRamp dynamic config
+			onRampDynamicReport, err := cldf_ops.ExecuteOperation(b, onrampops.SetDynamicConfig, chain, contract.FunctionInput[onrampops.DynamicConfig]{
+				ChainSelector: evmArgs.ChainSelector,
+				Address:       evmArgs.OnRampAddr,
+				Args:          evmArgs.OnRampDynamicConfig,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to set onRamp dynamic config: %w", err)
+			}
+			writes = append(writes, onRampDynamicReport.Output)
+
+			if len(evmArgs.OnRampDestArgs) > 0 {
+				onRampDestReport, err := cldf_ops.ExecuteOperation(b, onrampops.ApplyDestChainConfigUpdates, chain, contract.FunctionInput[[]onrampops.DestChainConfigArgs]{
+					ChainSelector: evmArgs.ChainSelector,
+					Address:       evmArgs.OnRampAddr,
+					Args:          evmArgs.OnRampDestArgs,
+				})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to apply onRamp dest chain config: %w", err)
+				}
+				writes = append(writes, onRampDestReport.Output)
+			}
+
+			// Set OffRamp dynamic config
+			offRampDynamicReport, err := cldf_ops.ExecuteOperation(b, offrampops.SetDynamicConfig, chain, contract.FunctionInput[offrampops.DynamicConfig]{
+				ChainSelector: evmArgs.ChainSelector,
+				Address:       evmArgs.OffRampAddr,
+				Args:          evmArgs.OffRampDynamicConfig,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to set offRamp dynamic config: %w", err)
+			}
+			writes = append(writes, offRampDynamicReport.Output)
+
+			if len(evmArgs.OffRampSourceArgs) > 0 {
 				offRampSourceReport, err := cldf_ops.ExecuteOperation(b, offrampops.ApplySourceChainConfigUpdates, chain, contract.FunctionInput[[]offrampops.SourceChainConfigArgs]{
-					ChainSelector: input.ChainSelector,
-					Address:       offRampAddr,
-					Args:          offRampSourceArgs,
+					ChainSelector: evmArgs.ChainSelector,
+					Address:       evmArgs.OffRampAddr,
+					Args:          evmArgs.OffRampSourceArgs,
 				})
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to apply offRamp source chain config: %w", err)

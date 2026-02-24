@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/Masterminds/semver/v3"
+	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -22,25 +23,28 @@ var (
 	rampConfigUpdaterOnce              sync.Once
 )
 
-// SetRampConfigInput is the input for the RampConfigApplier sequence. It carries the contract
-// metadata from ConfigImporter.SequenceImportConfig() so that static config, dynamic config and
-// dest/source chain config can be applied to onRamp and offRamp contracts.
+// SetRampConfigInput is the input for the RampConfigApplier input-creation sequence. It carries the contract
+// metadata from ConfigImporter.SequenceImportConfig() and existing addresses so that static config, dynamic
+// config and dest/source chain config can be applied to onRamp and offRamp contracts.
 type SetRampConfigInput struct {
-	ChainSelector uint64
-	ImportOutput  []datastore.ContractMetadata
+	ChainSelector     uint64
+	ExistingAddresses []datastore.AddressRef
+	ContractMeta      []datastore.ContractMetadata
 }
 
-// RampConfigApplier applies imported config (static, dynamic, dest chain config) to onRamp and offRamp contracts.
-type RampConfigApplier interface {
-	DeriveConfigImporterVersions() []*semver.Version
-	SequenceSetRampConfig() *cldf_ops.Sequence[SetRampConfigInput, sequences.OnChainOutput, chain.BlockChains]
+// RampConfigApplier provides methods to create ramp config set args from imported metadata and then apply them.
+// It follows the same pattern as FeeQuoterUpdater: first create the input/args, then run the updater sequence.
+type RampConfigApplier[RampConfigSetArgs any] interface {
+	SequenceRampConfigInputCreation() *cldf_ops.Sequence[SetRampConfigInput, RampConfigSetArgs, chain.BlockChains]
+	SequenceSetRampConfig() *cldf_ops.Sequence[RampConfigSetArgs, sequences.OnChainOutput, chain.BlockChains]
 }
 
 // RampConfigUpdaterRegistry holds ConfigImporter and RampConfigApplier per chain family+version for the UpdateRampConfig changeset.
 type RampConfigUpdaterRegistry struct {
-	ConfigImporter    map[string]ConfigImporter
-	RampConfigApplier map[string]RampConfigApplier
-	mu                sync.Mutex
+	ConfigImporter          map[string]ConfigImporter
+	RampConfigApplier       map[string]RampConfigApplier[any]
+	ImporterVersionResolver map[string]LaneVersionResolver
+	mu                      sync.Mutex
 }
 
 func (r *RampConfigUpdaterRegistry) RegisterConfigImporter(family string, version *semver.Version, importer ConfigImporter) {
@@ -60,7 +64,7 @@ func (r *RampConfigUpdaterRegistry) GetConfigImporter(chainsel uint64, version *
 	return importer, ok
 }
 
-func (r *RampConfigUpdaterRegistry) RegisterRampConfigApplier(family string, version *semver.Version, applier RampConfigApplier) {
+func (r *RampConfigUpdaterRegistry) RegisterRampConfigApplier(family string, version *semver.Version, applier RampConfigApplier[any]) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	id := utils.NewRegistererID(family, version)
@@ -69,7 +73,7 @@ func (r *RampConfigUpdaterRegistry) RegisterRampConfigApplier(family string, ver
 	}
 }
 
-func (r *RampConfigUpdaterRegistry) GetRampConfigApplier(chainsel uint64, version *semver.Version) (RampConfigApplier, bool) {
+func (r *RampConfigUpdaterRegistry) GetRampConfigApplier(chainsel uint64, version *semver.Version) (RampConfigApplier[any], bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	id := utils.NewIDFromSelector(chainsel, version)
@@ -77,10 +81,30 @@ func (r *RampConfigUpdaterRegistry) GetRampConfigApplier(chainsel uint64, versio
 	return applier, ok
 }
 
+func (r *RampConfigUpdaterRegistry) RegisterImporterVersionResolver(family string, resolver LaneVersionResolver) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if _, exists := r.ImporterVersionResolver[family]; !exists {
+		r.ImporterVersionResolver[family] = resolver
+	}
+}
+
+func (r *RampConfigUpdaterRegistry) GetImporterVersionResolver(chainSel uint64) (LaneVersionResolver, bool) {
+	family, err := chain_selectors.GetSelectorFamily(chainSel)
+	if err != nil {
+		return nil, false
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	resolver, ok := r.ImporterVersionResolver[family]
+	return resolver, ok
+}
+
 func newRampConfigUpdaterRegistry() *RampConfigUpdaterRegistry {
 	return &RampConfigUpdaterRegistry{
-		ConfigImporter:    make(map[string]ConfigImporter),
-		RampConfigApplier: make(map[string]RampConfigApplier),
+		ConfigImporter:          make(map[string]ConfigImporter),
+		RampConfigApplier:       make(map[string]RampConfigApplier[any]),
+		ImporterVersionResolver: make(map[string]LaneVersionResolver),
 	}
 }
 
@@ -102,9 +126,6 @@ type UpdateRampConfigInput struct {
 
 // UpdateRampConfigInputPerChain is the per-chain input for UpdateRampConfig.
 type UpdateRampConfigInputPerChain struct {
-	// ImportRampConfigFromVersions specifies adapter versions to use for importing config from chain.
-	// Config is read from existing onRamp/offRamp contracts and then re-applied (e.g. after migration).
-	ImportRampConfigFromVersions []*semver.Version
 	// RampsVersion is the version of the RampConfigApplier to use for setting config on ramps.
 	RampsVersion *semver.Version
 }
@@ -126,9 +147,6 @@ func updateRampConfigVerify() func(cldf.Environment, UpdateRampConfigInput) erro
 			if perChainInput.RampsVersion == nil {
 				return fmt.Errorf("ramps version is required for chain selector %d", chainSel)
 			}
-			if len(perChainInput.ImportRampConfigFromVersions) == 0 {
-				return fmt.Errorf("at least one import config version is required for chain selector %d", chainSel)
-			}
 		}
 		return nil
 	}
@@ -142,15 +160,22 @@ func updateRampConfigApply(registry *RampConfigUpdaterRegistry, mcmsRegistry *ch
 		for chainSel, perChainInput := range input.Chains {
 			rampConfigApplier, ok := registry.GetRampConfigApplier(chainSel, perChainInput.RampsVersion)
 			if !ok {
-				return cldf.ChangesetOutput{}, utils.ErrNoAdapterRegistered("RampConfigApplier", perChainInput.RampsVersion)
+				return cldf.ChangesetOutput{}, utils.ErrNoAdapterForSelectorRegistered("RampConfigApplier", chainSel, perChainInput.RampsVersion)
 			}
-
+			versionResolver, ok := registry.GetImporterVersionResolver(chainSel)
+			if !ok {
+				return cldf.ChangesetOutput{}, utils.ErrNoAdapterForSelectorRegistered("LaneVersionResolver", chainSel, nil)
+			}
+			importCfgFromVersions, _, err := versionResolver.DeriveLaneVersionsForChain(e, chainSel)
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to derive lane versions for chain %d: %w", chainSel, err)
+			}
 			// Loop through all ImportRampConfigFromVersions and consolidate contract metadata
 			contractMeta := make([]datastore.ContractMetadata, 0)
-			for _, version := range perChainInput.ImportRampConfigFromVersions {
+			for _, version := range importCfgFromVersions {
 				configImporter, ok := registry.GetConfigImporter(chainSel, version)
 				if !ok {
-					return cldf.ChangesetOutput{}, utils.ErrNoAdapterRegistered("ConfigImporter", version)
+					return cldf.ChangesetOutput{}, utils.ErrNoAdapterForSelectorRegistered("ConfigImporter", chainSel, version)
 				}
 				err := configImporter.InitializeAdapter(e, chainSel)
 				if err != nil {
@@ -179,16 +204,24 @@ func updateRampConfigApply(registry *RampConfigUpdaterRegistry, mcmsRegistry *ch
 				reports = append(reports, importReport.ExecutionReports...)
 			}
 
-			// Run SequenceSetRampConfig once with all consolidated contract metadata
-			setReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, rampConfigApplier.SequenceSetRampConfig(), e.BlockChains, SetRampConfigInput{
-				ChainSelector: chainSel,
-				ImportOutput:  contractMeta,
+			// Create ramp config set args from consolidated contract metadata
+			inputCreationReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, rampConfigApplier.SequenceRampConfigInputCreation(), e.BlockChains, SetRampConfigInput{
+				ChainSelector:     chainSel,
+				ExistingAddresses: e.DataStore.Addresses().Filter(datastore.AddressRefByChainSelector(chainSel)),
+				ContractMeta:      contractMeta,
 			})
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to create ramp config input for chain %d: %w", chainSel, err)
+			}
+
+			// Run SequenceSetRampConfig with the created args
+			setReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, rampConfigApplier.SequenceSetRampConfig(), e.BlockChains, inputCreationReport.Output)
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to set ramp config on chain %d: %w", chainSel, err)
 			}
 
 			batchOps = append(batchOps, setReport.Output.BatchOps...)
+			reports = append(reports, inputCreationReport.ExecutionReports...)
 			reports = append(reports, setReport.ExecutionReports...)
 		}
 
