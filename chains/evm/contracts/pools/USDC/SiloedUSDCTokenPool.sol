@@ -84,17 +84,8 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
   /// Sharing one lockbox across selectors would couple balances across lanes and break migration assumptions.
   function configureLockBoxes(
     LockBoxConfig[] calldata lockBoxConfigs
-  ) external override onlyOwner {
-    for (uint256 i = 0; i < lockBoxConfigs.length; ++i) {
-      address lockBox = lockBoxConfigs[i].lockBox;
-      if (lockBox == address(0)) revert ZeroAddressInvalid();
-
-      if (!ILockBox(lockBox).isTokenSupported(address(i_token))) {
-        revert InvalidToken(address(i_token));
-      }
-      s_lockBoxes.set(lockBoxConfigs[i].remoteChainSelector, lockBox);
-    }
-
+  ) public override onlyOwner {
+    super.configureLockBoxes(lockBoxConfigs);
     // Validate globally after applying updates so checks are order-independent for batched updates.
     uint256 length = s_lockBoxes.length();
     for (uint256 i = 0; i < length; ++i) {

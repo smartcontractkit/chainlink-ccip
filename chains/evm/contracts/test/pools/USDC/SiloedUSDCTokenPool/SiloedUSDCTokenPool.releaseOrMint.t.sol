@@ -127,15 +127,12 @@ contract SiloedUSDCTokenPool_releaseOrMint is SiloedUSDCTokenPoolSetup {
     uint256 newExcludedAmount = s_usdcTokenPool.getExcludedTokensByChain(SOURCE_CHAIN_SELECTOR);
     assertEq(newExcludedAmount, excludedAmount - releaseAmount);
 
-    vm.stopPrank();
     vm.startPrank(OWNER);
     s_usdcTokenPool.setLockedUSDCToBurn(SOURCE_CHAIN_SELECTOR, availableTokens);
-    vm.stopPrank();
 
     // Execute the migration to mark the chain as migrated
     vm.startPrank(circleMigrator);
     s_usdcTokenPool.burnLockedUSDC();
-    vm.stopPrank();
 
     // Verify the chain is now migrated and tokens are still excluded
     assertEq(s_usdcTokenPool.getExcludedTokensByChain(SOURCE_CHAIN_SELECTOR), newExcludedAmount);
@@ -154,7 +151,6 @@ contract SiloedUSDCTokenPool_releaseOrMint is SiloedUSDCTokenPoolSetup {
   function test_releaseOrMint_RevertWhen_InsufficientLiquidity_ProposedChainHasNoExcludedLiquidity() public {
     vm.startPrank(OWNER);
     s_usdcTokenPool.proposeCCTPMigration(SOURCE_CHAIN_SELECTOR);
-    vm.stopPrank();
 
     uint256 releaseAmount = 100e6;
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = Pool.ReleaseOrMintInV1({
@@ -182,11 +178,9 @@ contract SiloedUSDCTokenPool_releaseOrMint is SiloedUSDCTokenPoolSetup {
     uint256 excludedAmount = 200e6;
     s_usdcTokenPool.excludeTokensFromBurn(SOURCE_CHAIN_SELECTOR, excludedAmount);
     s_usdcTokenPool.setLockedUSDCToBurn(SOURCE_CHAIN_SELECTOR, DEFAULT_LIQUIDITY);
-    vm.stopPrank();
 
     vm.startPrank(circleMigrator);
     s_usdcTokenPool.burnLockedUSDC();
-    vm.stopPrank();
 
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = Pool.ReleaseOrMintInV1({
       originalSender: s_originalSender,
@@ -202,7 +196,6 @@ contract SiloedUSDCTokenPool_releaseOrMint is SiloedUSDCTokenPoolSetup {
     // Consume the full excluded reserve with a valid post-migration in-flight message.
     vm.startPrank(s_routerAllowedOffRamp);
     s_usdcTokenPool.releaseOrMint(releaseOrMintIn);
-    vm.stopPrank();
 
     assertEq(s_usdcTokenPool.getExcludedTokensByChain(SOURCE_CHAIN_SELECTOR), 0);
 

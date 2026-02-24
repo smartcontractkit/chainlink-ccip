@@ -42,7 +42,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   using RateLimiter for RateLimiter.TokenBucket;
   using SafeERC20 for IERC20;
 
-  error InvalidMinBlockConfirmation(uint16 requested, uint16 minBlockConfirmation);
+  error InvalidMinBlockConfirmation(uint16 requested, uint16 minBlockConfirmations);
   error CustomBlockConfirmationsNotEnabled();
   error InvalidTransferFeeBps(uint256 bps);
   error InvalidTokenTransferFeeConfig(uint64 destChainSelector);
@@ -93,7 +93,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
     RateLimiter.Config outboundRateLimiterConfig,
     RateLimiter.Config inboundRateLimiterConfig
   );
-  event MinBlockConfirmationSet(uint16 minBlockConfirmation);
+  event MinBlockConfirmationSet(uint16 minBlockConfirmations);
   event AdvancedPoolHooksUpdated(IAdvancedPoolHooks oldHook, IAdvancedPoolHooks newHook);
 
   struct ChainUpdate {
@@ -139,13 +139,14 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   /// @dev The address of the router.
   IRouter internal s_router;
   /// @dev Minimum block confirmation on the source chain, 0 means the default finality.
-  uint16 internal s_minBlockConfirmation;
+  uint16 internal s_minBlockConfirmations;
   /// @dev Optional advanced pool hooks contract for additional features like allowlists and CCV management.
   IAdvancedPoolHooks internal s_advancedPoolHooks;
   // Separate buckets provide isolated rate limits for transfers with custom block confirmation, as their risk profiles differ from default transfers.
   mapping(uint64 remoteChainSelector => RateLimiter.TokenBucket tokenBucketOutbound) internal
-    s_outboundRateLimiterConfig;
-  mapping(uint64 remoteChainSelector => RateLimiter.TokenBucket tokenBucketInbound) internal s_inboundRateLimiterConfig;
+    s_customBlockConfirmationOutboundRateLimiterConfig;
+  mapping(uint64 remoteChainSelector => RateLimiter.TokenBucket tokenBucketInbound) internal
+    s_customBlockConfirmationInboundRateLimiterConfig;
   /// @dev A set of allowed chain selectors. We want the allowlist to be enumerable to
   /// be able to quickly determine (without parsing logs) who can access the pool.
   /// @dev The chain selectors are in uint256 format because of the EnumerableSet implementation.
@@ -216,8 +217,8 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   }
 
   /// @notice Gets the minimum block confirmations required for custom finality transfers.
-  function getMinBlockConfirmation() public view virtual returns (uint16 minBlockConfirmation) {
-    return s_minBlockConfirmation;
+  function getMinBlockConfirmation() public view virtual returns (uint16 minBlockConfirmations) {
+    return s_minBlockConfirmations;
   }
 
   /// @notice Gets the advanced pool hook contract address used by this pool.
@@ -244,13 +245,13 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   }
 
   /// @notice Sets the minimum block confirmations required for custom finality transfers.
-  /// @param minBlockConfirmation The minimum block confirmations required for custom finality transfers.
+  /// @param minBlockConfirmations The minimum block confirmations required for custom finality transfers.
   function setMinBlockConfirmation(
-    uint16 minBlockConfirmation
+    uint16 minBlockConfirmations
   ) public virtual onlyOwner {
     // Since 0 means default finality it is a valid value.
-    s_minBlockConfirmation = minBlockConfirmation;
-    emit MinBlockConfirmationSet(minBlockConfirmation);
+    s_minBlockConfirmations = minBlockConfirmations;
+    emit MinBlockConfirmationSet(minBlockConfirmations);
   }
 
   /// @notice Updates the advanced pool hook.
@@ -422,12 +423,12 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
     uint256 amount = lockOrBurnIn.amount - feeAmount;
     // If custom block confirmations are requested, validate against the minimum and apply the custom rate limit.
     if (blockConfirmationRequested != WAIT_FOR_FINALITY) {
-      uint16 minBlockConfirmationConfigured = s_minBlockConfirmation;
-      if (minBlockConfirmationConfigured == WAIT_FOR_FINALITY) {
+      uint16 minBlockConfirmationsConfigured = s_minBlockConfirmations;
+      if (minBlockConfirmationsConfigured == WAIT_FOR_FINALITY) {
         revert CustomBlockConfirmationsNotEnabled();
       }
-      if (blockConfirmationRequested < minBlockConfirmationConfigured) {
-        revert InvalidMinBlockConfirmation(blockConfirmationRequested, minBlockConfirmationConfigured);
+      if (blockConfirmationRequested < minBlockConfirmationsConfigured) {
+        revert InvalidMinBlockConfirmation(blockConfirmationRequested, minBlockConfirmationsConfigured);
       }
       _consumeCustomBlockConfirmationOutboundRateLimit(
         lockOrBurnIn.localToken, lockOrBurnIn.remoteChainSelector, amount
@@ -806,7 +807,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
     uint64 remoteChainSelector,
     uint256 amount
   ) internal virtual {
-    s_outboundRateLimiterConfig[remoteChainSelector]._consume(amount, token);
+    s_customBlockConfirmationOutboundRateLimiterConfig[remoteChainSelector]._consume(amount, token);
 
     emit CustomBlockConfirmationOutboundRateLimitConsumed({
       token: token, remoteChainSelector: remoteChainSelector, amount: amount
@@ -821,7 +822,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
     uint64 remoteChainSelector,
     uint256 amount
   ) internal virtual {
-    s_inboundRateLimiterConfig[remoteChainSelector]._consume(amount, token);
+    s_customBlockConfirmationInboundRateLimiterConfig[remoteChainSelector]._consume(amount, token);
 
     emit CustomBlockConfirmationInboundRateLimitConsumed({
       token: token, remoteChainSelector: remoteChainSelector, amount: amount
@@ -847,8 +848,8 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   {
     if (customBlockConfirmation) {
       return (
-        s_outboundRateLimiterConfig[remoteChainSelector]._currentTokenBucketState(),
-        s_inboundRateLimiterConfig[remoteChainSelector]._currentTokenBucketState()
+        s_customBlockConfirmationOutboundRateLimiterConfig[remoteChainSelector]._currentTokenBucketState(),
+        s_customBlockConfirmationInboundRateLimiterConfig[remoteChainSelector]._currentTokenBucketState()
       );
     }
     RemoteChainConfig storage config = s_remoteChainConfigs[remoteChainSelector];
@@ -872,8 +873,12 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
       if (!isSupportedChain(remoteChainSelector)) revert NonExistentChain(remoteChainSelector);
 
       if (configArgs.customBlockConfirmation) {
-        s_outboundRateLimiterConfig[remoteChainSelector]._setTokenBucketConfig(configArgs.outboundRateLimiterConfig);
-        s_inboundRateLimiterConfig[remoteChainSelector]._setTokenBucketConfig(configArgs.inboundRateLimiterConfig);
+        s_customBlockConfirmationOutboundRateLimiterConfig[remoteChainSelector]._setTokenBucketConfig(
+          configArgs.outboundRateLimiterConfig
+        );
+        s_customBlockConfirmationInboundRateLimiterConfig[remoteChainSelector]._setTokenBucketConfig(
+          configArgs.inboundRateLimiterConfig
+        );
       } else {
         s_remoteChainConfigs[remoteChainSelector].outboundRateLimiterConfig
           ._setTokenBucketConfig(configArgs.outboundRateLimiterConfig);
@@ -1040,8 +1045,8 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
     virtual
     returns (uint256 feeUSDCents, uint32 destGasOverhead, uint32 destBytesOverhead, uint16 tokenFeeBps, bool isEnabled)
   {
-    uint16 minBlockConfirmationConfigured = s_minBlockConfirmation;
-    if (blockConfirmationRequested != WAIT_FOR_FINALITY && minBlockConfirmationConfigured == 0) {
+    uint16 minBlockConfirmationsConfigured = s_minBlockConfirmations;
+    if (blockConfirmationRequested != WAIT_FOR_FINALITY && minBlockConfirmationsConfigured == 0) {
       revert CustomBlockConfirmationsNotEnabled();
     }
     TokenTransferFeeConfig memory feeConfig = s_tokenTransferFeeConfig[destChainSelector];
@@ -1052,8 +1057,8 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
     }
 
     if (blockConfirmationRequested != WAIT_FOR_FINALITY) {
-      if (blockConfirmationRequested < minBlockConfirmationConfigured) {
-        revert InvalidMinBlockConfirmation(blockConfirmationRequested, minBlockConfirmationConfigured);
+      if (blockConfirmationRequested < minBlockConfirmationsConfigured) {
+        revert InvalidMinBlockConfirmation(blockConfirmationRequested, minBlockConfirmationsConfigured);
       }
       return (
         feeConfig.customBlockConfirmationFeeUSDCents,
