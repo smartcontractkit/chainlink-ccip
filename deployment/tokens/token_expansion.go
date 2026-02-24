@@ -9,6 +9,7 @@ import (
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
@@ -180,7 +181,7 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 					filter := datastore.AddressRef{
 						Type:          datastore.ContractType(common_utils.RBACTimelock),
 						ChainSelector: deployTokenInput.ChainSelector,
-						Qualifier:     cfg.MCMS.Qualifier,
+						Qualifier:     utils.CLLQualifier,
 					}
 
 					timelockAddr, err := datastore_utils.FindAndFormatRef(
@@ -192,7 +193,7 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 					if err != nil {
 						return cldf.ChangesetOutput{}, fmt.Errorf(
 							"couldn't find the RBACTimelock address in datastore for selector %d and qualifier %s: %w",
-							deployTokenInput.ChainSelector, cfg.MCMS.Qualifier, err,
+							deployTokenInput.ChainSelector, utils.CLLQualifier, err,
 						)
 					}
 
