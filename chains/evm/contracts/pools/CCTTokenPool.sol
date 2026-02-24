@@ -51,8 +51,6 @@ contract CCTTokenPool is TokenPool, BaseERC20 {
     address to,
     uint256 value
   ) internal virtual override {
-    if (to == address(this) && from == address(0)) revert InvalidRecipient(to);
-
     ERC20._update(from, to, value);
   }
 

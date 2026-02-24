@@ -104,10 +104,9 @@ contract CCTTokenPool_sendReceive is CCTTokenPoolSetup {
     assertEq(SEND_AMOUNT, IERC20(address(s_cctPool)).balanceOf(address(s_cctPool)));
   }
 
-  function test_sendReceive_RevertWhen_MintToPoolBlocked() public {
+  function test_sendReceive_MintToPoolAllowed() public {
     vm.startPrank(s_allowedOffRamp);
 
-    vm.expectRevert(abi.encodeWithSelector(BaseERC20.InvalidRecipient.selector, address(s_destCCTPool)));
     s_destCCTPool.releaseOrMint(
       Pool.ReleaseOrMintInV1({
         originalSender: abi.encode(s_sender),
