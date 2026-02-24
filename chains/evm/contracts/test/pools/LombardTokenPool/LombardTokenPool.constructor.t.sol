@@ -4,21 +4,29 @@ pragma solidity ^0.8.24;
 import {IBridgeV2} from "../../../interfaces/lombard/IBridgeV2.sol";
 import {LombardTokenPool} from "../../../pools/Lombard/LombardTokenPool.sol";
 
+import {BaseERC20} from "../../../tmp/BaseERC20.sol";
+import {CrossChainToken} from "../../../tmp/CrossChainToken.sol";
+import {BaseTest} from "../../BaseTest.t.sol";
 import {MockLombardBridge} from "../../mocks/MockLombardBridge.sol";
 import {MockVerifier} from "../../mocks/MockVerifier.sol";
-import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts@5.3.0/token/ERC20/extensions/IERC20Metadata.sol";
-import {Test} from "forge-std/Test.sol";
 
-contract LombardTokenPool_constructor is Test {
-  BurnMintERC20 internal s_token;
+contract LombardTokenPool_constructor is BaseTest {
+  CrossChainToken internal s_token;
   MockLombardBridge internal s_bridge;
   address internal s_resolver;
   address internal constant RMN = address(0xAA01);
   address internal constant ROUTER = address(0xBB02);
 
-  function setUp() public {
-    s_token = new BurnMintERC20("Lombard", "LBD", 18, 0, 0);
+  function setUp() public override {
+    super.setUp();
+    s_token = new CrossChainToken(
+      BaseERC20.ConstructorParams({
+        name: "Lombard", symbol: "LBD", decimals: 18, maxSupply: 0, preMint: 0, ccipAdmin: OWNER
+      }),
+      OWNER,
+      OWNER
+    );
     s_resolver = address(new MockVerifier(""));
     s_bridge = new MockLombardBridge();
   }

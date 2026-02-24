@@ -3,8 +3,8 @@ pragma solidity ^0.8.24;
 
 import {IBurnMintERC20} from "../../../interfaces/IBurnMintERC20.sol";
 import {BurnToAddressMintTokenPool} from "../../../pools/BurnToAddressMintTokenPool.sol";
+import {CrossChainToken} from "../../../tmp/CrossChainToken.sol";
 import {TokenPoolSetup} from "../TokenPool/TokenPoolSetup.t.sol";
-import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
 contract BurnToAddressMintTokenPoolSetup is TokenPoolSetup {
   BurnToAddressMintTokenPool internal s_pool;
@@ -23,7 +23,7 @@ contract BurnToAddressMintTokenPoolSetup is TokenPoolSetup {
       BURN_ADDRESS
     );
 
-    BurnMintERC20(address(s_token)).grantMintAndBurnRoles(address(s_pool));
+    CrossChainToken(address(s_token)).grantMintAndBurnRoles(address(s_pool));
 
     _applyChainUpdates(address(s_pool));
   }
