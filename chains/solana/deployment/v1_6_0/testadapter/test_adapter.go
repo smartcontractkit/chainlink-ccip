@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"math"
 	"math/big"
 	"slices"
 	"strconv"
@@ -377,13 +378,32 @@ func (a *SVMAdapter) GetExtraArgs(receiver []byte, sourceFamily string, opts ...
 
 	switch sourceFamily {
 	case chain_selectors.FamilyEVM:
-		return ccipcommon.SerializeClientSVMExtraArgsV1(msg_hasher163.ClientSVMExtraArgsV1{
+		extraArgs := msg_hasher163.ClientSVMExtraArgsV1{
 			AccountIsWritableBitmap:  solccip.GenerateBitMapForIndexes([]int{0, 1}),
 			Accounts:                 accounts,
 			TokenReceiver:            receiverProgram,
 			ComputeUnits:             100_000,
 			AllowOutOfOrderExecution: true,
-		})
+		}
+		for _, opt := range opts {
+			switch opt.Name {
+			case testadapters.EXTRA_ARG_GAS_LIMIT:
+				unitsBig := opt.Value.(*big.Int)
+				if !unitsBig.IsUint64() {
+					return nil, fmt.Errorf("ComputeUnits is larger than uint32: %d", unitsBig)
+				}
+				units := unitsBig.Uint64()
+				if units <= math.MaxUint32 {
+					return nil, fmt.Errorf("ComputeUnits is larger than uint32: %d", units)
+				}
+				extraArgs.ComputeUnits = uint32(units)
+			case testadapters.EXTRA_ARG_OOO:
+				extraArgs.AllowOutOfOrderExecution = opt.Value.(bool)
+			default:
+				// unsupported arg
+			}
+		}
+		return ccipcommon.SerializeClientSVMExtraArgsV1(extraArgs)
 	case chain_selectors.FamilySolana:
 		panic("unimplemented GetExtraArgs(solana->solana)")
 	default:
