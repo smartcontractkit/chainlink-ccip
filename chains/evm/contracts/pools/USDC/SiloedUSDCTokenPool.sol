@@ -26,6 +26,7 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
   event CCTPMigrationExecuted(uint64 remoteChainSelector, uint256 USDCBurned);
   event CCTPMigrationCancelled(uint64 existingProposalSelector);
   event CircleMigratorAddressSet(address migratorAddress);
+  event LockedUSDCToBurnSet(uint64 indexed remoteChainSelector, uint256 lockedUSDCToBurn);
   event TokensExcludedFromBurn(
     uint64 indexed remoteChainSelector, uint256 amount, uint256 burnableAmountAfterExclusion
   );
@@ -42,6 +43,10 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
 
   /// @notice The tokens excluded from being burned in a CCTP-migration.
   mapping(uint64 remoteChainSelector => uint256 excludedTokens) internal s_tokensExcludedFromBurn;
+  /// @notice Snapshot of locked USDC for the currently proposed migration lane.
+  /// @dev Set by the owner using offchain net accounting of lockbox Deposit/Withdrawal events for the lane's lockbox.
+  /// This avoids using raw lockbox balance as burn input, which could include direct transfers that were never bridged.
+  uint256 internal s_lockedUSDCToBurn;
 
   /// @notice The chains that have been migrated to CCTP.
   EnumerableSet.UintSet internal s_migratedChains;
@@ -161,6 +166,7 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
     // Prevent overwriting existing migration proposals until the current one is finished
     if (s_proposedUSDCMigrationChain != 0) revert ExistingMigrationProposal();
     if (s_migratedChains.contains(remoteChainSelector)) revert ChainAlreadyMigrated(remoteChainSelector);
+    delete s_lockedUSDCToBurn;
     s_proposedUSDCMigrationChain = remoteChainSelector;
 
     emit CCTPMigrationProposed(remoteChainSelector);
@@ -177,6 +183,7 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
     // If a migration is cancelled, the tokens excluded from burn should be reset, and must be manually
     // re-excluded if the proposal is re-proposed in the future
     delete s_tokensExcludedFromBurn[currentProposalChainSelector];
+    delete s_lockedUSDCToBurn;
 
     emit CCTPMigrationCancelled(currentProposalChainSelector);
   }
@@ -198,6 +205,23 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
     s_circleUSDCMigrator = migrator;
 
     emit CircleMigratorAddressSet(migrator);
+  }
+
+  /// @notice Sets the locked-USDC snapshot that burnLockedUSDC should use for the current migration proposal.
+  /// @dev The owner computes this value offchain as:
+  /// netLockedUSDC = sum(Deposit events) - sum(Withdrawal events)
+  /// on the lockbox configured for the proposed lane. This tracks only bridged liquidity movements and intentionally
+  /// excludes direct token transfers to the lockbox, so burnLockedUSDC cannot burn non-bridged USDC.
+  /// @param remoteChainSelector The lane being migrated. Must match the active proposal.
+  /// @param lockedUSDCToBurn The offchain-computed locked-USDC snapshot for the proposed lane.
+  function setLockedUSDCToBurn(
+    uint64 remoteChainSelector,
+    uint256 lockedUSDCToBurn
+  ) external onlyOwner {
+    if (s_proposedUSDCMigrationChain != remoteChainSelector) revert NoMigrationProposalPending();
+    s_lockedUSDCToBurn = lockedUSDCToBurn;
+
+    emit LockedUSDCToBurnSet(remoteChainSelector, lockedUSDCToBurn);
   }
 
   /// @notice Exclude tokens to be burned in a CCTP-migration because the amount are locked in an undelivered message.
@@ -232,6 +256,12 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
     return s_tokensExcludedFromBurn[remoteChainSelector];
   }
 
+  /// @notice Gets the locked-USDC snapshot currently configured for burnLockedUSDC.
+  /// @return lockedUSDCToBurn The owner-set locked-USDC snapshot.
+  function getLockedUSDCToBurn() external view returns (uint256 lockedUSDCToBurn) {
+    return s_lockedUSDCToBurn;
+  }
+
   /// @notice Burn USDC locked for a specific lane so that destination USDC can be converted from
   /// non-canonical to canonical USDC.
   /// @dev This function can only be called by an address specified by the owner to be controlled by circle
@@ -244,8 +274,8 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
     if (burnChainSelector == 0) revert NoMigrationProposalPending();
 
     ILockBox lockBox = getLockBox(burnChainSelector);
-    // Burnable tokens is the total locked minus the amount excluded from burn
-    uint256 tokensToBurn = i_token.balanceOf(address(lockBox)) - s_tokensExcludedFromBurn[burnChainSelector];
+    // Burnable tokens is the owner-set locked snapshot minus the amount excluded from burn.
+    uint256 tokensToBurn = s_lockedUSDCToBurn - s_tokensExcludedFromBurn[burnChainSelector];
 
     // The CCTP burn function will attempt to burn out of the contract that calls it, so we need to withdraw the tokens
     // from the lock box first otherwise the burn will revert.
@@ -253,6 +283,7 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
 
     // Even though USDC is a trusted call, ensure CEI by updating state first
     delete s_proposedUSDCMigrationChain;
+    delete s_lockedUSDCToBurn;
 
     // This should only be called after this contract has been granted a "zero allowance minter role" on USDC by Circle,
     // otherwise the call will revert. Executing this burn will functionally convert all USDC on the destination chain

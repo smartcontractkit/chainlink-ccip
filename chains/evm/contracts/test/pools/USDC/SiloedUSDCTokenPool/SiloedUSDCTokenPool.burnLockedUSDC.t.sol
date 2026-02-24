@@ -55,6 +55,7 @@ contract SiloedUSDCTokenPool_burnLockedUSDC is SiloedUSDCTokenPoolSetup {
       DEST_CHAIN_SELECTOR,
       "Current proposed chain migration does not match expected for DEST_CHAIN_SELECTOR"
     );
+    s_usdcTokenPool.setLockedUSDCToBurn(DEST_CHAIN_SELECTOR, amount);
 
     // Impersonate the set circle address and execute the proposal
     vm.startPrank(CIRCLE);
@@ -76,6 +77,40 @@ contract SiloedUSDCTokenPool_burnLockedUSDC is SiloedUSDCTokenPoolSetup {
       0,
       "No tokens should be locked for DEST_CHAIN_SELECTOR after CCTP-approved burn"
     );
+  }
+
+  function test_burnLockedUSDC_UsesConfiguredSnapshotAmount() public {
+    uint256 bridgedLockedAmount = 700e6;
+    uint256 directDonationAmount = 300e6;
+
+    deal(address(s_USDCToken), address(s_usdcTokenPool), bridgedLockedAmount);
+
+    vm.startPrank(s_routerAllowedOnRamp);
+    s_usdcTokenPool.lockOrBurn(
+      Pool.LockOrBurnInV1({
+        originalSender: OWNER,
+        receiver: abi.encodePacked(STRANGER),
+        amount: bridgedLockedAmount,
+        remoteChainSelector: DEST_CHAIN_SELECTOR,
+        localToken: address(s_USDCToken)
+      })
+    );
+
+    // Simulate external USDC sent directly to the lockbox, bypassing bridge accounting.
+    deal(address(s_USDCToken), address(s_destLockBox), bridgedLockedAmount + directDonationAmount);
+
+    vm.startPrank(OWNER);
+    s_usdcTokenPool.setCircleMigratorAddress(CIRCLE);
+    s_usdcTokenPool.proposeCCTPMigration(DEST_CHAIN_SELECTOR);
+    s_usdcTokenPool.setLockedUSDCToBurn(DEST_CHAIN_SELECTOR, bridgedLockedAmount);
+    vm.stopPrank();
+
+    vm.startPrank(CIRCLE);
+    s_usdcTokenPool.burnLockedUSDC();
+    vm.stopPrank();
+
+    // The direct donation should not be burned.
+    assertEq(s_USDCToken.balanceOf(address(s_destLockBox)), directDonationAmount);
   }
 
   // Reverts

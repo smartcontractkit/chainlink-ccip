@@ -127,6 +127,11 @@ contract SiloedUSDCTokenPool_releaseOrMint is SiloedUSDCTokenPoolSetup {
     uint256 newExcludedAmount = s_usdcTokenPool.getExcludedTokensByChain(SOURCE_CHAIN_SELECTOR);
     assertEq(newExcludedAmount, excludedAmount - releaseAmount);
 
+    vm.stopPrank();
+    vm.startPrank(OWNER);
+    s_usdcTokenPool.setLockedUSDCToBurn(SOURCE_CHAIN_SELECTOR, availableTokens);
+    vm.stopPrank();
+
     // Execute the migration to mark the chain as migrated
     vm.startPrank(circleMigrator);
     s_usdcTokenPool.burnLockedUSDC();
@@ -176,6 +181,7 @@ contract SiloedUSDCTokenPool_releaseOrMint is SiloedUSDCTokenPoolSetup {
 
     uint256 excludedAmount = 200e6;
     s_usdcTokenPool.excludeTokensFromBurn(SOURCE_CHAIN_SELECTOR, excludedAmount);
+    s_usdcTokenPool.setLockedUSDCToBurn(SOURCE_CHAIN_SELECTOR, DEFAULT_LIQUIDITY);
     vm.stopPrank();
 
     vm.startPrank(circleMigrator);
