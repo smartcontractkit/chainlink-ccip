@@ -66,10 +66,12 @@ jobs:
             file: ccip_messaging_test.go
             run: "^Test_CCIPMessaging_EVM2Solana$"
             timeout: 30m
+            additional-args: "-v"
           - name: "Messaging Test Test_CCIPMessaging_Solana2EVM"
             file: ccip_messaging_test.go
             run: "^Test_CCIPMessaging_Solana2EVM$"
             timeout: 30m
+            additional-args: "-v"
           - name: "Messaging Test Test_CCIPMessaging_EVM2SolanaMultiExecReports"
             file: ccip_messaging_test.go
             run: "^Test_CCIPMessaging_EVM2SolanaMultiExecReports$"
@@ -260,7 +262,7 @@ jobs:
         continue-on-error: true
         run: |
           run="${{ matrix.type.run }}"
-          run_cmd="gotestsum --junitfile=test-results.xml --format=github-actions -- ${{ matrix.type.file }} -timeout ${{ matrix.type.timeout }}"
+          run_cmd="gotestsum --junitfile=test-results.xml --format=github-actions -- ${{ matrix.type.file }} -timeout ${{ matrix.type.timeout }}" -${{ matrix.type.additional-args }}
           if [ -n "$run" ]; then
             run_cmd="$run_cmd -run $run"
           fi

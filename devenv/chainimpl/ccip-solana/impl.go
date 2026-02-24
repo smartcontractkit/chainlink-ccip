@@ -215,7 +215,7 @@ func PreloadSolanaEnvironment(ctx context.Context, programsPath string, chainSel
 	}
 
 	l.Info().Msgf("Downloading Solana contracts into %s", programsPath)
-	shortSha := utils.VersionToShortCommitSHA[utils.VersionSolanaV1_6_0]
+	shortSha := utils.VersionToShortCommitSHA[utils.VersionSolanaV1_6_1]
 	return utils.DownloadSolanaCCIPProgramArtifacts(ctx, programsPath, shortSha)
 }
 
