@@ -284,6 +284,7 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 			// if token transfer config is provided, we will update the remote chain config with the token and token pool addresses and
 			// save the token transfer config for processing after all tokens and token pools have been deployed
 			if input.TokenTransferConfig != nil {
+				input.TokenTransferConfig.ChainSelector = selector
 				actualPool := tokenPool
 				if actualPool == nil {
 					// if token pool is not deployed by this changeset, we expect the user to provide the token pool address in the TokenTransferConfig
