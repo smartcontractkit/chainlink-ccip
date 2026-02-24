@@ -379,7 +379,6 @@ func (a *EVMAdapter) GetTokenExpansionConfig() tokensapi.TokenExpansionInputPerC
 	mintAmnt := new(big.Int).Mul(oneToken, big.NewInt(1_000_000)) // pre-mint 1 million tokens
 
 	return tokensapi.TokenExpansionInputPerChain{
-		SkipOwnershipTransfer: true, // https://smartcontract-it.atlassian.net/browse/NONEVM-2902
 		TokenPoolVersion:      cciputils.Version_1_5_1,
 		DeployTokenInput: &tokensapi.DeployTokenInput{
 			Decimals:               deci,

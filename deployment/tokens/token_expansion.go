@@ -112,10 +112,9 @@ type DeployTokenPoolInput struct {
 
 type UpdateAuthoritiesInput struct {
 	// below are not specified by the user, filled in by the deployment system to pass to chain operations
-	ChainSelector     uint64
-	ExistingDataStore datastore.DataStore
-	TokenRef          datastore.AddressRef
-	TokenPoolRef      datastore.AddressRef
+	ChainSelector uint64
+	TokenRef      datastore.AddressRef
+	TokenPoolRef  datastore.AddressRef
 }
 
 func TokenExpansion() cldf.ChangeSetV2[TokenExpansionInput] {
@@ -383,12 +382,11 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 				continue
 			}
 			updateAuthoritiesInput := UpdateAuthoritiesInput{
-				TokenRef:          fullTokenRef,
-				TokenPoolRef:      fullPoolRef,
-				ChainSelector:     selector,
-				ExistingDataStore: e.DataStore,
+				TokenRef:      fullTokenRef,
+				TokenPoolRef:  fullPoolRef,
+				ChainSelector: selector,
 			}
-			updateAuthoritiesReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, tokenPoolAdapter.UpdateAuthorities(), e.BlockChains, updateAuthoritiesInput)
+			updateAuthoritiesReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, tokenPoolAdapter.UpdateAuthorities(), &e, updateAuthoritiesInput)
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to update authorities for token on chain %d: %w", selector, err)
 			}

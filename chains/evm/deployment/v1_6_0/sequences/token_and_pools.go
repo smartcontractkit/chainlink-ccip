@@ -28,6 +28,7 @@ import (
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
@@ -701,14 +702,14 @@ func (a *EVMAdapter) FindLatestAddressRef(ds datastore.DataStore, ref datastore.
 	return common.BytesToAddress(addrBytes), nil
 }
 
-func (a *EVMAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokensapi.UpdateAuthoritiesInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+func (a *EVMAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokensapi.UpdateAuthoritiesInput, sequences.OnChainOutput, *deployment.Environment] {
 	return cldf_ops.NewSequence(
 		"evm-adapter:update-authorities",
 		tarops.Version,
 		"Update authorities for a token and token pool on EVM Chain",
-		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokensapi.UpdateAuthoritiesInput) (sequences.OnChainOutput, error) {
+		func(b cldf_ops.Bundle, e *deployment.Environment, input tokensapi.UpdateAuthoritiesInput) (sequences.OnChainOutput, error) {
 			var result sequences.OnChainOutput
-			chain, ok := chains.EVMChains()[input.ChainSelector]
+			chain, ok := e.BlockChains.EVMChains()[input.ChainSelector]
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
@@ -720,7 +721,7 @@ func (a *EVMAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokensapi.UpdateAuth
 			}
 
 			timelockAddr, err := datastore_utils.FindAndFormatRef(
-				input.ExistingDataStore,
+				e.DataStore,
 				filter,
 				chain.Selector,
 				datastore_utils.FullRef,
@@ -729,7 +730,12 @@ func (a *EVMAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokensapi.UpdateAuth
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to find timelock address for chain %d: %w", input.ChainSelector, err)
 			}
 
-			result, err = sequences.RunAndMergeSequence(b, chains,
+			err = a.InitializeTimelockAddress(*e, mcms.Input{Qualifier: cciputils.CLLQualifier})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to initialize timelock address for chain %d: %w", input.ChainSelector, err)
+			}
+
+			result, err = sequences.RunAndMergeSequence(b, e.BlockChains,
 				a.SequenceTransferOwnershipViaMCMS(),
 				deployops.TransferOwnershipPerChainInput{
 					ChainSelector: chain.Selector,
@@ -740,7 +746,7 @@ func (a *EVMAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokensapi.UpdateAuth
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to transfer ownership to proposed owner on chain %d: %w", input.ChainSelector, err)
 			}
-			result, err = sequences.RunAndMergeSequence(b, chains,
+			result, err = sequences.RunAndMergeSequence(b, e.BlockChains,
 				a.SequenceAcceptOwnership(),
 				deployops.TransferOwnershipPerChainInput{
 					ChainSelector: chain.Selector,
