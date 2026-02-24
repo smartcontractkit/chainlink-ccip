@@ -4,18 +4,31 @@ pragma solidity ^0.8.24;
 import {FeeTokenHandler} from "../../../../libraries/FeeTokenHandler.sol";
 import {USDCTokenPoolProxySetup} from "./USDCTokenPoolProxySetup.t.sol";
 
-import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
+import {BaseERC20} from "../../../../tmp/BaseERC20.sol";
+import {CrossChainToken} from "../../../../tmp/CrossChainToken.sol";
 
 contract USDCTokenPoolProxy_withdrawFeeTokens is USDCTokenPoolProxySetup {
   address internal s_feeAggregator = makeAddr("feeAggregator");
-  BurnMintERC20 internal s_feeToken1;
-  BurnMintERC20 internal s_feeToken2;
+  CrossChainToken internal s_feeToken1;
+  CrossChainToken internal s_feeToken2;
 
   function setUp() public override {
     super.setUp();
 
-    s_feeToken1 = new BurnMintERC20("FeeToken1", "FT1", 18, 0, 0);
-    s_feeToken2 = new BurnMintERC20("FeeToken2", "FT2", 18, 0, 0);
+    s_feeToken1 = new CrossChainToken(
+      BaseERC20.ConstructorParams({
+        name: "FeeToken1", symbol: "FT1", decimals: 18, maxSupply: 0, preMint: 0, ccipAdmin: OWNER
+      }),
+      OWNER,
+      OWNER
+    );
+    s_feeToken2 = new CrossChainToken(
+      BaseERC20.ConstructorParams({
+        name: "FeeToken2", symbol: "FT2", decimals: 18, maxSupply: 0, preMint: 0, ccipAdmin: OWNER
+      }),
+      OWNER,
+      OWNER
+    );
   }
 
   function test_withdrawFeeTokens() public {

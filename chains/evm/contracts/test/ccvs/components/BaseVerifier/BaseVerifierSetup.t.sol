@@ -5,9 +5,10 @@ import {IRouter} from "../../../../interfaces/IRouter.sol";
 
 import {BaseVerifier} from "../../../../ccvs/components/BaseVerifier.sol";
 import {MessageV1Codec} from "../../../../libraries/MessageV1Codec.sol";
+import {BaseERC20} from "../../../../tmp/BaseERC20.sol";
+import {CrossChainToken} from "../../../../tmp/CrossChainToken.sol";
 import {FeeQuoterSetup} from "../../../feeQuoter/FeeQuoterSetup.t.sol";
 import {BaseVerifierTestHelper} from "../../../helpers/BaseVerifierTestHelper.sol";
-import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
 contract BaseVerifierSetup is FeeQuoterSetup {
   address internal constant FEE_AGGREGATOR = 0xa33CDB32eAEce34F6affEfF4899cef45744EDea3;
@@ -32,7 +33,15 @@ contract BaseVerifierSetup is FeeQuoterSetup {
       address(s_router), abi.encodeWithSelector(IRouter.getOnRamp.selector, DEST_CHAIN_SELECTOR), abi.encode(s_onRamp)
     );
     s_offRamp = makeAddr("OffRamp");
-    s_sourceFeeToken = address(new BurnMintERC20("Chainlink Token", "LINK", 18, 0, 0));
+    s_sourceFeeToken = address(
+      new CrossChainToken(
+        BaseERC20.ConstructorParams({
+          name: "Chainlink Token", symbol: "LINK", decimals: 18, maxSupply: 0, preMint: 0, ccipAdmin: OWNER
+        }),
+        OWNER,
+        OWNER
+      )
+    );
 
     s_baseVerifier = new BaseVerifierTestHelper(s_storageLocations, address(s_mockRMNRemote));
 

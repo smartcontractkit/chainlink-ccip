@@ -5,12 +5,13 @@ import {CCTPVerifier} from "../../../ccvs/CCTPVerifier.sol";
 import {BaseVerifier} from "../../../ccvs/components/BaseVerifier.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {CCTPMessageTransmitterProxy} from "../../../pools/USDC/CCTPMessageTransmitterProxy.sol";
+import {BaseERC20} from "../../../tmp/BaseERC20.sol";
+import {CrossChainToken} from "../../../tmp/CrossChainToken.sol";
 import {CCTPHelper} from "../../helpers/CCTPHelper.sol";
 import {MockE2EUSDCTransmitterCCTPV2} from "../../mocks/MockE2EUSDCTransmitterCCTPV2.sol";
 import {MockUSDCTokenMessenger} from "../../mocks/MockUSDCTokenMessenger.sol";
 import {BaseVerifierSetup} from "../components/BaseVerifier/BaseVerifierSetup.t.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
-import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
@@ -45,7 +46,13 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
     s_tokenReceiverAddress = makeAddr("tokenReceiver");
     s_tokenReceiver = abi.encode(s_tokenReceiverAddress);
 
-    BurnMintERC20 usdcToken = new BurnMintERC20("USD Coin", "USDC", 6, 0, 0);
+    CrossChainToken usdcToken = new CrossChainToken(
+      BaseERC20.ConstructorParams({
+        name: "USD Coin", symbol: "USDC", decimals: 6, maxSupply: 0, preMint: 0, ccipAdmin: OWNER
+      }),
+      OWNER,
+      OWNER
+    );
     s_USDCToken = IERC20(address(usdcToken));
 
     s_mockMessageTransmitter = new MockE2EUSDCTransmitterCCTPV2(1, LOCAL_DOMAIN_IDENTIFIER, address(s_USDCToken));
@@ -88,8 +95,8 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
     s_cctpVerifier.setDomains(domains);
 
     // Grant mint and burn roles to the token messenger and the message transmitter.
-    BurnMintERC20(address(s_USDCToken)).grantMintAndBurnRoles(address(s_mockTokenMessenger));
-    BurnMintERC20(address(s_USDCToken)).grantMintAndBurnRoles(address(s_mockMessageTransmitter));
+    CrossChainToken(address(s_USDCToken)).grantMintAndBurnRoles(address(s_mockTokenMessenger));
+    CrossChainToken(address(s_USDCToken)).grantMintAndBurnRoles(address(s_mockMessageTransmitter));
 
     // Ensure that the verifier is allowed to call the message transmitter proxy.
     address[] memory addedCallers = new address[](1);

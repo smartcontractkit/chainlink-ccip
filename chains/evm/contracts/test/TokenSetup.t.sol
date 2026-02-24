@@ -6,10 +6,11 @@ import {BurnMintTokenPool} from "../pools/BurnMintTokenPool.sol";
 import {ERC20LockBox} from "../pools/ERC20LockBox.sol";
 import {LockReleaseTokenPool} from "../pools/LockReleaseTokenPool.sol";
 import {TokenPool} from "../pools/TokenPool.sol";
+import {BaseERC20} from "../tmp/BaseERC20.sol";
+import {CrossChainToken} from "../tmp/CrossChainToken.sol";
 import {TokenAdminRegistry} from "../tokenAdminRegistry/TokenAdminRegistry.sol";
 import {BaseTest} from "./BaseTest.t.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
-import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
@@ -29,12 +30,25 @@ contract TokenSetup is BaseTest {
 
   mapping(address token => ERC20LockBox lockBox) internal s_lockBoxes;
 
+  function _deployCrossChainToken(
+    string memory tokenName,
+    uint8 decimals
+  ) internal returns (CrossChainToken) {
+    return new CrossChainToken(
+      BaseERC20.ConstructorParams({
+        name: tokenName, symbol: tokenName, decimals: decimals, maxSupply: 0, preMint: 0, ccipAdmin: OWNER
+      }),
+      OWNER,
+      OWNER
+    );
+  }
+
   function _deploySourceToken(
     string memory tokenName,
     uint256 dealAmount,
     uint8 decimals
   ) internal returns (address) {
-    BurnMintERC20 token = new BurnMintERC20(tokenName, tokenName, decimals, 0, 0);
+    CrossChainToken token = _deployCrossChainToken(tokenName, decimals);
     s_sourceTokens.push(address(token));
     deal(address(token), OWNER, dealAmount);
     return address(token);
@@ -44,7 +58,7 @@ contract TokenSetup is BaseTest {
     string memory tokenName,
     uint256 dealAmount
   ) internal returns (address) {
-    BurnMintERC20 token = new BurnMintERC20(tokenName, tokenName, 18, 0, 0);
+    CrossChainToken token = _deployCrossChainToken(tokenName, 18);
     s_destTokens.push(address(token));
     deal(address(token), OWNER, dealAmount);
     return address(token);
@@ -92,7 +106,7 @@ contract TokenSetup is BaseTest {
     BurnMintTokenPool pool = new BurnMintTokenPool(
       IBurnMintERC20(address(token)), DEFAULT_TOKEN_DECIMALS, address(0), address(s_mockRMNRemote), router
     );
-    BurnMintERC20(token).grantMintAndBurnRoles(address(pool));
+    CrossChainToken(token).grantMintAndBurnRoles(address(pool));
 
     if (isSourcePool) {
       s_sourcePoolByToken[address(token)] = address(pool);

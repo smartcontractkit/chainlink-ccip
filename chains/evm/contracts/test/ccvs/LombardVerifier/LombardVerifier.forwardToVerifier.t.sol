@@ -11,7 +11,8 @@ import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {MockLombardAdapter} from "../../mocks/MockLombardAdapter.sol";
 import {LombardVerifierSetup} from "./LombardVerifierSetup.t.sol";
 
-import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
+import {BaseERC20} from "../../../tmp/BaseERC20.sol";
+import {CrossChainToken} from "../../../tmp/CrossChainToken.sol";
 
 contract LombardVerifier_forwardToVerifier is LombardVerifierSetup {
   bytes32 internal constant REMOTE_ADAPTER = bytes32("REMOTE_ADAPTER");
@@ -53,7 +54,15 @@ contract LombardVerifier_forwardToVerifier is LombardVerifierSetup {
 
   function test_forwardToVerifier_WithAdapter() public {
     // Add a token with an adapter.
-    address tokenWithAdapter = address(new BurnMintERC20("Token With Adapter", "TWA", 18, 0, 0));
+    address tokenWithAdapter = address(
+      new CrossChainToken(
+        BaseERC20.ConstructorParams({
+          name: "Token With Adapter", symbol: "TWA", decimals: 18, maxSupply: 0, preMint: 0, ccipAdmin: OWNER
+        }),
+        OWNER,
+        OWNER
+      )
+    );
     address adapter = address(new MockLombardAdapter(address(s_mockBridge), tokenWithAdapter));
 
     deal(tokenWithAdapter, address(s_lombardVerifier), TRANSFER_AMOUNT);

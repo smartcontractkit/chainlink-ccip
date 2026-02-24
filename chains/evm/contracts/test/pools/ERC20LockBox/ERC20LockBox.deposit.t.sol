@@ -2,9 +2,10 @@
 pragma solidity ^0.8.24;
 
 import {ERC20LockBox} from "../../../pools/ERC20LockBox.sol";
+import {BaseERC20} from "../../../tmp/BaseERC20.sol";
+import {CrossChainToken} from "../../../tmp/CrossChainToken.sol";
 import {ERC20LockBoxSetup} from "./ERC20LockBoxSetup.t.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
-import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
 contract ERC20LockBox_deposit is ERC20LockBoxSetup {
   function testFuzz_deposit_Success(
@@ -116,7 +117,13 @@ contract ERC20LockBox_deposit is ERC20LockBoxSetup {
 
   function test_deposit_RevertWhen_UnsupportedToken() public {
     uint256 amount = 1000e18;
-    BurnMintERC20 unsupportedToken = new BurnMintERC20("BAD", "BAD", 18, 0, 0);
+    CrossChainToken unsupportedToken = new CrossChainToken(
+      BaseERC20.ConstructorParams({
+        name: "BAD", symbol: "BAD", decimals: 18, maxSupply: 0, preMint: 0, ccipAdmin: OWNER
+      }),
+      OWNER,
+      OWNER
+    );
 
     vm.startPrank(s_allowedCaller);
     deal(address(unsupportedToken), s_allowedCaller, amount);
