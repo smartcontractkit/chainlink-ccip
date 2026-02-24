@@ -88,6 +88,21 @@ func CreateRateLimiterConfig(rate int64, capacity int64) tokens.RateLimiterConfi
 	}
 }
 
+func CreateRateLimiterConfigFloatInput(rate float64, capacity float64) tokens.RateLimiterConfigFloatInput {
+	if rate == 0 && capacity == 0 {
+		return tokens.RateLimiterConfigFloatInput{
+			IsEnabled: false,
+			Rate:      0,
+			Capacity:  0,
+		}
+	}
+	return tokens.RateLimiterConfigFloatInput{
+		IsEnabled: true,
+		Rate:      rate,
+		Capacity:  capacity,
+	}
+}
+
 // CreateBasicContractParams creates a basic set of contract deployment params with reasonable defaults for testing
 func CreateBasicContractParams() sequences.ContractParams {
 	usdPerLink, _ := new(big.Int).SetString("15000000000000000000", 10)   // $15

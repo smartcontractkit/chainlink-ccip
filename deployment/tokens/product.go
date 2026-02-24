@@ -41,6 +41,7 @@ type TokenAdapter interface {
 	DeployToken() *cldf_ops.Sequence[DeployTokenInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 	DeployTokenVerify(e deployment.Environment, in any) error
 	DeployTokenPoolForToken() *cldf_ops.Sequence[DeployTokenPoolInput, sequences.OnChainOutput, cldf_chain.BlockChains]
+	UpdateAuthorities() *cldf_ops.Sequence[UpdateAuthoritiesInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 }
 
 // RateLimiterConfig specifies configuration for a rate limiter on a token pool.
@@ -74,9 +75,12 @@ type TokenTransferFeeConfig struct {
 // RateLimiterConfigFloatInput is the user-friendly version of RateLimiterConfig that accepts
 // float inputs for capacity and rate, which are then converted to big.Int internally after scaling by token decimals.
 type RateLimiterConfigFloatInput struct {
+	// IsEnabled specifies whether the rate limiter should be enabled.
 	IsEnabled bool
-	Capacity  float64
-	Rate      float64
+	// Capacity is the maximum number of tokens that can be in a rate limiter bucket.
+	Capacity float64
+	// Rate is the rate at which the rate limiter bucket refills, in tokens per second.
+	Rate float64
 }
 
 // RemoteChainConfig specifies configuration for a remote chain on a token pool.
@@ -87,13 +91,17 @@ type RemoteChainConfig[R any, CCV any] struct {
 	// The token pool on the remote chain.
 	RemotePool R
 	// DefaultFinalityInboundRateLimiterConfig specifies the desired rate limiter configuration for default-finality inbound traffic.
-	DefaultFinalityInboundRateLimiterConfig RateLimiterConfig
+	// DO NOT SET THIS VALUE WHEN PASSING IN INPUTS.
+	// This value is derived from the configuration specified for outbound traffic to the remote chain, as the same limits should apply in both directions.
+	DefaultFinalityInboundRateLimiterConfig RateLimiterConfigFloatInput
 	// DefaultFinalityOutboundRateLimiterConfig specifies the desired rate limiter configuration for default-finality outbound traffic.
-	DefaultFinalityOutboundRateLimiterConfig RateLimiterConfig
+	DefaultFinalityOutboundRateLimiterConfig RateLimiterConfigFloatInput
 	// CustomFinalityInboundRateLimiterConfig specifies the desired rate limiter configuration for custom-finality inbound traffic.
-	CustomFinalityInboundRateLimiterConfig RateLimiterConfig
+	// DO NOT SET THIS VALUE WHEN PASSING IN INPUTS.
+	// This value is derived from the configuration specified for outbound traffic to the remote chain, as the same limits should apply in both directions.
+	CustomFinalityInboundRateLimiterConfig RateLimiterConfigFloatInput
 	// CustomFinalityOutboundRateLimiterConfig specifies the desired rate limiter configuration for custom-finality outbound traffic.
-	CustomFinalityOutboundRateLimiterConfig RateLimiterConfig
+	CustomFinalityOutboundRateLimiterConfig RateLimiterConfigFloatInput
 	// Decimals of the token on the remote chain.
 	RemoteDecimals uint8
 	// OutboundCCVs specifies the verifiers to apply to outbound traffic.

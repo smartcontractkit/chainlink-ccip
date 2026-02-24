@@ -60,31 +60,16 @@ var InitializeBurnMint = operations.NewOperation(
 		}
 		poolConfigPDA, _ := tokens.TokenPoolConfigAddress(input.TokenMint, input.TokenPool)
 		var chainConfig test_token_pool.State
-		err = chain.GetAccountDataBorshInto(context.Background(), poolConfigPDA, &chainConfig)
+		err = chain.GetAccountDataBorshInto(b.GetContext(), poolConfigPDA, &chainConfig)
 		if err == nil {
 			b.Logger.Info("BurnMintTokenPool already initialized for token mint:", input.TokenMint.String())
 			return PoolInitializeOut{}, nil
-		}
-		// use the deployer key if we can
-		mintAuthority := utils.GetTokenMintAuthority(chain, input.TokenMint)
-		signer := upgradeAuthority
-		var poolConfig burnmint_token_pool.PoolConfig
-		globalConfig, _ := tokens.TokenPoolGlobalConfigPDA(input.TokenPool)
-		err = chain.GetAccountDataBorshInto(context.Background(), globalConfig, &poolConfig)
-		if err == nil {
-			b.Logger.Info("Fetched existing pool config for token mint:", input.TokenMint.String())
-			if mintAuthority == chain.DeployerKey.PublicKey() &&
-				poolConfig.SelfServedAllowed {
-				signer = mintAuthority
-			}
-		} else {
-			b.Logger.Info("No existing pool config found for token mint, defaulting to upgrade authority as signer for initialization:", input.TokenMint.String())
 		}
 		configPDA, _, _ := state.FindConfigPDA(input.TokenPool)
 		ixn, err := burnmint_token_pool.NewInitializeInstruction(
 			poolConfigPDA,
 			input.TokenMint,
-			signer,
+			upgradeAuthority,
 			solana.SystemProgramID,
 			input.TokenPool,
 			programData.Address,
@@ -93,7 +78,7 @@ var InitializeBurnMint = operations.NewOperation(
 		if err != nil {
 			return PoolInitializeOut{}, err
 		}
-		if signer != chain.DeployerKey.PublicKey() {
+		if upgradeAuthority != chain.DeployerKey.PublicKey() {
 			b, err := utils.BuildMCMSBatchOperation(
 				chain.Selector,
 				[]solana.Instruction{ixn},
@@ -105,7 +90,7 @@ var InitializeBurnMint = operations.NewOperation(
 			}
 			batches = append(batches, b)
 			return PoolInitializeOut{
-				OnChainOutput: sequences.OnChainOutput{BatchOps: batches}, Initializer: signer}, nil
+				OnChainOutput: sequences.OnChainOutput{BatchOps: batches}, Initializer: upgradeAuthority}, nil
 		} else {
 			err = chain.Confirm([]solana.Instruction{ixn})
 			if err != nil {
@@ -113,7 +98,7 @@ var InitializeBurnMint = operations.NewOperation(
 			}
 		}
 
-		return PoolInitializeOut{Initializer: signer}, nil
+		return PoolInitializeOut{Initializer: upgradeAuthority}, nil
 	})
 
 var InitGlobalConfigBurnMint = operations.NewOperation(
@@ -150,7 +135,14 @@ var TransferMintAuthorityBurnMint = operations.NewOperation(
 		if err != nil {
 			return sequences.OnChainOutput{}, err
 		}
-		authority := GetAuthorityBurnMint(chain, input.TokenPool, input.TokenMint)
+		authority, err := GetAuthorityBurnMint(chain, input.TokenPool, input.TokenMint)
+		if err != nil {
+			// assume the authority is the upgrade authority if we fail to fetch the current authority, since the pool might not be initialized yet and there won't be an authority set on-chain yet (since the config account won't exist until initialization)
+			authority, err = utils.GetUpgradeAuthority(chain.Client, input.TokenPool)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get upgrade authority for burn mint token pool: %w", err)
+			}
+		}
 		poolConfigPDA, _ := tokens.TokenPoolConfigAddress(input.TokenMint, input.TokenPool)
 		poolSignerPDA, _ := tokens.TokenPoolSignerAddress(input.TokenMint, input.TokenPool)
 		batches := make([]types.BatchOperation, 0)
@@ -202,14 +194,21 @@ var UpsertRemoteChainConfigBurnMint = operations.NewOperation(
 			},
 			Decimals: input.RemoteDecimals,
 		}
-		authority := GetAuthorityBurnMint(chain, input.TokenPool, input.TokenMint)
+		authority, err := GetAuthorityBurnMint(chain, input.TokenPool, input.TokenMint)
+		if err != nil {
+			// assume the authority is the upgrade authority if we fail to fetch the current authority, since the pool might not be initialized yet and there won't be an authority set on-chain yet (since the config account won't exist until initialization)
+			authority, err = utils.GetUpgradeAuthority(chain.Client, input.TokenPool)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get upgrade authority for burn mint token pool: %w", err)
+			}
+		}
 		poolConfigPDA, _ := tokens.TokenPoolConfigAddress(input.TokenMint, input.TokenPool)
 		// check if remote chain config already exists
 		remoteChainConfigPDA, _, _ := tokens.TokenPoolChainConfigPDA(input.RemoteSelector, input.TokenMint, input.TokenPool)
 		isSupportedChain := false
 		existingConfig := base_token_pool.BaseChain{}
 		var remoteChainConfigAccount base_token_pool.BaseChain
-		err := chain.GetAccountDataBorshInto(context.Background(), remoteChainConfigPDA, &remoteChainConfigAccount)
+		err = chain.GetAccountDataBorshInto(b.GetContext(), remoteChainConfigPDA, &remoteChainConfigAccount)
 		if err == nil {
 			isSupportedChain = true
 			existingConfig = remoteChainConfigAccount
@@ -294,6 +293,27 @@ var UpsertRemoteChainConfigBurnMint = operations.NewOperation(
 				return sequences.OnChainOutput{}, err
 			}
 			ixns = append(ixns, appendIxn)
+			trplixn, err := burnmint_token_pool.NewSetChainRateLimitInstruction(
+				input.RemoteSelector,
+				input.TokenMint,
+				burnmint_token_pool.RateLimitConfig{
+					Enabled:  false,
+					Capacity: 0,
+					Rate:     0,
+				},
+				burnmint_token_pool.RateLimitConfig{
+					Enabled:  false,
+					Capacity: 0,
+					Rate:     0,
+				},
+				poolConfigPDA,
+				remoteChainConfigPDA,
+				authority,
+			).ValidateAndBuild()
+			if err != nil {
+				return sequences.OnChainOutput{}, err
+			}
+			ixns = append(ixns, trplixn)
 		}
 		if authority != chain.DeployerKey.PublicKey() {
 			b, err := utils.BuildMCMSBatchOperation(
@@ -323,33 +343,28 @@ var UpsertRateLimitsBurnMint = operations.NewOperation(
 	"Initializes the BurnMintTokenPool rate limits for a remote chain",
 	func(b operations.Bundle, chain cldf_solana.Chain, input RemoteChainConfig) (sequences.OnChainOutput, error) {
 		burnmint_token_pool.SetProgramID(input.TokenPool)
-		var inboundCapacity uint64 = 0
-		if input.InboundRateLimiterConfig.Capacity != nil {
-			inboundCapacity = input.InboundRateLimiterConfig.Capacity.Uint64()
-		}
-		var inboundRate uint64 = 0
-		if input.InboundRateLimiterConfig.Rate != nil {
-			inboundRate = input.InboundRateLimiterConfig.Rate.Uint64()
-		}
-		inbound := base_token_pool.RateLimitConfig{
+		inboundCapacity := input.InboundRateLimiterConfig.Capacity.Uint64()
+		inboundRate := input.InboundRateLimiterConfig.Rate.Uint64()
+		inbound := burnmint_token_pool.RateLimitConfig{
 			Enabled:  input.InboundRateLimiterConfig.IsEnabled,
 			Capacity: inboundCapacity,
 			Rate:     inboundRate,
 		}
-		var outboundCapacity uint64 = 0
-		if input.OutboundRateLimiterConfig.Capacity != nil {
-			outboundCapacity = input.OutboundRateLimiterConfig.Capacity.Uint64()
-		}
-		var outboundRate uint64 = 0
-		if input.OutboundRateLimiterConfig.Rate != nil {
-			outboundRate = input.OutboundRateLimiterConfig.Rate.Uint64()
-		}
-		outbound := base_token_pool.RateLimitConfig{
+		outboundCapacity := input.OutboundRateLimiterConfig.Capacity.Uint64()
+		outboundRate := input.OutboundRateLimiterConfig.Rate.Uint64()
+		outbound := burnmint_token_pool.RateLimitConfig{
 			Enabled:  input.OutboundRateLimiterConfig.IsEnabled,
 			Capacity: outboundCapacity,
 			Rate:     outboundRate,
 		}
-		authority := GetAuthorityBurnMint(chain, input.TokenPool, input.TokenMint)
+		authority, err := GetAuthorityBurnMint(chain, input.TokenPool, input.TokenMint)
+		if err != nil {
+			// assume the authority is the upgrade authority if we fail to fetch the current authority, since the pool might not be initialized yet and there won't be an authority set on-chain yet (since the config account won't exist until initialization)
+			authority, err = utils.GetUpgradeAuthority(chain.Client, input.TokenPool)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get upgrade authority for burn mint token pool: %w", err)
+			}
+		}
 		poolConfigPDA, _ := tokens.TokenPoolConfigAddress(input.TokenMint, input.TokenPool)
 		// check if remote chain config already exists
 		remoteChainConfigPDA, _, _ := tokens.TokenPoolChainConfigPDA(input.RemoteSelector, input.TokenMint, input.TokenPool)
@@ -394,9 +409,18 @@ var TransferOwnershipBurnMint = operations.NewOperation(
 	"Transfers ownership of the BurnMintTokenPool token mint PDA to a new authority",
 	func(b operations.Bundle, chain cldf_solana.Chain, input TokenPoolTransferOwnershipInput) (sequences.OnChainOutput, error) {
 		burnmint_token_pool.SetProgramID(input.Program)
-		// there is a chance we perform an initialize and transfer ownership in the same sequence
-		// so we have to assume the input owner is correct, even if it doesn't match the current on-chain authority (since the initialize might be pending a proposal)
-		authority := input.CurrentOwner
+		authority, err := GetAuthorityBurnMint(chain, input.Program, input.TokenMint)
+		if err != nil {
+			// assume the authority is the upgrade authority if we fail to fetch the current authority, since the pool might not be initialized yet and there won't be an authority set on-chain yet (since the config account won't exist until initialization)
+			authority, err = utils.GetUpgradeAuthority(chain.Client, input.Program)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get upgrade authority for burn mint token pool: %w", err)
+			}
+		}
+		if authority == input.NewOwner {
+			b.Logger.Info("New owner is the same as the current owner for burn mint token pool with token mint:", input.TokenMint.String())
+			return sequences.OnChainOutput{}, nil
+		}
 		tokenPoolConfigPDA, _ := tokens.TokenPoolConfigAddress(input.TokenMint, input.Program)
 		ixn, err := burnmint_token_pool.NewTransferOwnershipInstruction(
 			input.NewOwner,
@@ -405,7 +429,7 @@ var TransferOwnershipBurnMint = operations.NewOperation(
 			authority,
 		).ValidateAndBuild()
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to build add dest chain instruction: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to build transfer ownership instruction: %w", err)
 		}
 		if authority != chain.DeployerKey.PublicKey() {
 			batches, err := utils.BuildMCMSBatchOperation(
@@ -428,20 +452,32 @@ var TransferOwnershipBurnMint = operations.NewOperation(
 	},
 )
 
-var AcceptOwnership = operations.NewOperation(
+var AcceptOwnershipBurnMint = operations.NewOperation(
 	"burnmint:accept-ownership",
 	common_utils.Version_1_6_0,
 	"Accepts ownership of the BurnMintTokenPool token mint PDA",
 	func(b operations.Bundle, chain cldf_solana.Chain, input TokenPoolTransferOwnershipInput) (sequences.OnChainOutput, error) {
 		burnmint_token_pool.SetProgramID(input.Program)
 		tokenPoolConfigPDA, _ := tokens.TokenPoolConfigAddress(input.TokenMint, input.Program)
+		authority, err := GetAuthorityBurnMint(chain, input.Program, input.TokenMint)
+		if err != nil {
+			// assume the authority is the upgrade authority if we fail to fetch the current authority, since the pool might not be initialized yet and there won't be an authority set on-chain yet (since the config account won't exist until initialization)
+			authority, err = utils.GetUpgradeAuthority(chain.Client, input.Program)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get upgrade authority for burn mint token pool: %w", err)
+			}
+		}
+		if authority == input.NewOwner {
+			b.Logger.Info("New owner is the same as the current owner for burn mint token pool with token mint:", input.TokenMint.String())
+			return sequences.OnChainOutput{}, nil
+		}
 		ixn, err := burnmint_token_pool.NewAcceptOwnershipInstruction(
 			tokenPoolConfigPDA,
 			input.TokenMint,
 			input.NewOwner,
 		).ValidateAndBuild()
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to build add dest chain instruction: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to build accept ownership instruction: %w", err)
 		}
 		if input.NewOwner != chain.DeployerKey.PublicKey() {
 			batches, err := utils.BuildMCMSBatchOperation(
@@ -464,17 +500,12 @@ var AcceptOwnership = operations.NewOperation(
 	},
 )
 
-func GetAuthorityBurnMint(chain cldf_solana.Chain, program solana.PublicKey, tokenMint solana.PublicKey) solana.PublicKey {
+func GetAuthorityBurnMint(chain cldf_solana.Chain, program solana.PublicKey, tokenMint solana.PublicKey) (solana.PublicKey, error) {
 	programData := burnmint_token_pool.State{}
 	poolConfigPDA, _ := tokens.TokenPoolConfigAddress(tokenMint, program)
 	err := chain.GetAccountDataBorshInto(context.Background(), poolConfigPDA, &programData)
 	if err != nil {
-		// if there is no pool config, default to upgrade authority as the signer for initialization and ownership transfers
-		upgradeAuthority, err := utils.GetUpgradeAuthority(chain.Client, program)
-		if err != nil {
-			return solana.PublicKey{}
-		}
-		return upgradeAuthority
+		return solana.PublicKey{}, fmt.Errorf("failed to get account data for burn mint token pool config PDA: %w", err)
 	}
-	return programData.Config.Owner
+	return programData.Config.Owner, nil
 }

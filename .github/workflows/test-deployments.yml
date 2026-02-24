@@ -19,6 +19,7 @@ jobs:
       run_evm_deployment: ${{ steps.filter.outputs.deployment_workflow == 'true' || steps.filter.outputs.run_evm_deployment == 'true' }}
       run_deployment: ${{ steps.filter.outputs.deployment_workflow == 'true' || steps.filter.outputs.run_deployment == 'true' }}
       run_crosschain_deployment: ${{ steps.filter.outputs.deployment_workflow == 'true' || steps.filter.outputs.run_crosschain_deployment == 'true' }}
+      run_ccv_evm_deployment: ${{ steps.filter.outputs.deployment_workflow == 'true' || steps.filter.outputs.run_ccv_evm_deployment == 'true' }}
     steps:
       - uses: actions/checkout@v4
       - name: Detect changes

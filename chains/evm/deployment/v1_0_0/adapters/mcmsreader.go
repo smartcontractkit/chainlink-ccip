@@ -3,7 +3,6 @@ package adapters
 import (
 	"fmt"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	mcms_types "github.com/smartcontractkit/mcms/types"
@@ -16,8 +15,6 @@ import (
 	mcms_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 )
 
-var Version = semver.MustParse("1.0.0")
-
 type EVMMCMSReader struct{}
 
 func (r *EVMMCMSReader) GetChainMetadata(e deployment.Environment, chainSelector uint64, input mcms_utils.Input) (mcms_types.ChainMetadata, error) {
@@ -26,29 +23,11 @@ func (r *EVMMCMSReader) GetChainMetadata(e deployment.Environment, chainSelector
 		return mcms_types.ChainMetadata{}, fmt.Errorf("EVM chain with selector %d not found", chainSelector)
 	}
 	inspector := mcmsevmsdk.NewInspector(chain.Client)
-	// find mcms address
-	// populate contract type from TimelockAction
-	var addrType datastore.ContractType
-	switch input.TimelockAction {
-	case mcms_types.TimelockActionSchedule:
-		addrType = datastore.ContractType(utils.ProposerManyChainMultisig)
-	case mcms_types.TimelockActionBypass:
-		addrType = datastore.ContractType(utils.BypasserManyChainMultisig)
-	case mcms_types.TimelockActionCancel:
-		addrType = datastore.ContractType(utils.CancellerManyChainMultisig)
-	default:
-		return mcms_types.ChainMetadata{}, fmt.Errorf("unsupported timelock action: %s", input.TimelockAction)
+	mcmsAddr, err := r.GetMCMSRef(e, chainSelector, input)
+	if err != nil {
+		return mcms_types.ChainMetadata{}, fmt.Errorf("failed to get MCMS address for chain %d: %w", chainSelector, err)
 	}
-
-	// Use GetAddressRef with qualifier to properly filter MCMS addresses
-	mcmAddressRef := datastore_utils.GetAddressRef(
-		e.DataStore.Addresses().Filter(),
-		chainSelector,
-		deployment.ContractType(addrType),
-		Version,
-		input.Qualifier,
-	)
-	addrRef, err := evm_datastore_utils.ToEVMAddress(mcmAddressRef)
+	addrRef, err := datastore_utils.FindAndFormatRef(e.DataStore, mcmsAddr, chainSelector, evm_datastore_utils.ToEVMAddress)
 	if err != nil {
 		return mcms_types.ChainMetadata{}, fmt.Errorf("failed to find MCMS address for chain %d: %w", chainSelector, err)
 	}

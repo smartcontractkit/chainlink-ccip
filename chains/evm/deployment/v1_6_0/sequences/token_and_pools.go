@@ -248,14 +248,14 @@ func (a *EVMAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokensapi.TPRLR
 				Address:       common.HexToAddress(input.TokenPoolRef.Address),
 				Args: tpops.SetChainRateLimiterConfigArgs{
 					OutboundRateLimitConfig: token_pool.RateLimiterConfig{
-						IsEnabled: input.OutboundRateLimiterConfig.IsEnabled,
-						Capacity:  input.OutboundRateLimiterConfig.Capacity,
-						Rate:      input.OutboundRateLimiterConfig.Rate,
+						IsEnabled: input.DefaultFinalityOutboundRateLimiterConfig.IsEnabled,
+						Capacity:  input.DefaultFinalityOutboundRateLimiterConfig.Capacity,
+						Rate:      input.DefaultFinalityOutboundRateLimiterConfig.Rate,
 					},
 					InboundRateLimitConfig: token_pool.RateLimiterConfig{
-						IsEnabled: input.InboundRateLimiterConfig.IsEnabled,
-						Capacity:  input.InboundRateLimiterConfig.Capacity,
-						Rate:      input.InboundRateLimiterConfig.Rate,
+						IsEnabled: input.DefaultFinalityInboundRateLimiterConfig.IsEnabled,
+						Capacity:  input.DefaultFinalityInboundRateLimiterConfig.Capacity,
+						Rate:      input.DefaultFinalityInboundRateLimiterConfig.Rate,
 					},
 					RemoteChainSelector: input.RemoteChainSelector,
 				},
@@ -622,4 +622,20 @@ func (a *EVMAdapter) FindLatestAddressRef(ds datastore.DataStore, ref datastore.
 
 	// Construct the token pool instance
 	return common.BytesToAddress(addrBytes), nil
+}
+
+func (a *EVMAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokensapi.UpdateAuthoritiesInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return cldf_ops.NewSequence(
+		"evm-adapter:update-authorities",
+		tarops.Version,
+		"Update authorities for a token and token pool on EVM Chain",
+		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokensapi.UpdateAuthoritiesInput) (sequences.OnChainOutput, error) {
+			var result sequences.OnChainOutput
+			// chain, ok := chains.EVMChains()[input.ChainSelector]
+			// if !ok {
+			// 	return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
+			// }
+
+			return result, nil
+		})
 }

@@ -29,9 +29,8 @@ type UpdateFeeQuoterInput struct {
 }
 
 type UpdateFeeQuoterInputPerChain struct {
-	ImportFeeQuoterConfigFromVersions []*semver.Version
-	FeeQuoterVersion                  *semver.Version
-	RampsVersion                      *semver.Version
+	FeeQuoterVersion *semver.Version
+	RampsVersion     *semver.Version
 }
 
 type FeeQuoterUpdateInput struct {
@@ -64,10 +63,11 @@ type RampUpdater interface {
 }
 
 type FQAndRampUpdaterRegistry struct {
-	FeeQuoterUpdater map[string]FeeQuoterUpdater[any]
-	RampUpdater      map[string]RampUpdater
-	ConfigImporter   map[string]ConfigImporter
-	mu               sync.Mutex
+	FeeQuoterUpdater            map[string]FeeQuoterUpdater[any]
+	RampUpdater                 map[string]RampUpdater
+	ConfigImporter              map[string]ConfigImporter
+	ImportconfigVersionResolver map[string]LaneVersionResolver
+	mu                          sync.Mutex
 }
 
 func (r *FQAndRampUpdaterRegistry) RegisterFeeQuoterUpdater(family string, version *semver.Version, updater FeeQuoterUpdater[any]) {
@@ -94,6 +94,14 @@ func (r *FQAndRampUpdaterRegistry) RegisterConfigImporter(family string, version
 	id := utils.NewRegistererID(family, version)
 	if _, exists := r.ConfigImporter[id]; !exists {
 		r.ConfigImporter[id] = importer
+	}
+}
+
+func (r *FQAndRampUpdaterRegistry) RegisterConfigImporterVersionResolver(family string, resolver LaneVersionResolver) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if _, exists := r.ImportconfigVersionResolver[family]; !exists {
+		r.ImportconfigVersionResolver[family] = resolver
 	}
 }
 
@@ -134,6 +142,18 @@ func (r *FQAndRampUpdaterRegistry) GetRampUpdater(chainsel uint64, version *semv
 	id := utils.NewRegistererID(family, version)
 	updater, ok := r.RampUpdater[id]
 	return updater, ok
+}
+
+func (r *FQAndRampUpdaterRegistry) GetConfigImporterVersionResolver(chainsel uint64) (LaneVersionResolver, bool) {
+	// Get the chain family from the chain selector
+	family, err := chain_selectors.GetSelectorFamily(chainsel)
+	if err != nil {
+		return nil, false
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	resolver, ok := r.ImportconfigVersionResolver[family]
+	return resolver, ok
 }
 
 func newFQUpdaterRegistry() *FQAndRampUpdaterRegistry {
@@ -190,11 +210,20 @@ func updateFeeQuoterApply(fquRegistry *FQAndRampUpdaterRegistry, mcmsRegistry *c
 			if !ok {
 				return cldf.ChangesetOutput{}, utils.ErrNoAdapterRegistered("RampUpdater", perChainInput.RampsVersion)
 			}
+			versionResolver, ok := fquRegistry.GetConfigImporterVersionResolver(chainSel)
+			if !ok {
+				return cldf.ChangesetOutput{}, utils.ErrNoAdapterRegistered("ConfigImporterVersionResolver", nil)
+			}
+			// Resolve the config importer version to use for this chain
+			_, configImporterVersions, err := versionResolver.DeriveLaneVersionsForChain(e, chainSel)
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve config importer version for chain %d: %w", chainSel, err)
+			}
 			contractMeta := make([]datastore.ContractMetadata, 0)
-			for _, version := range perChainInput.ImportFeeQuoterConfigFromVersions {
+			for _, version := range configImporterVersions {
 				configImporter, ok := fquRegistry.GetConfigImporter(chainSel, version)
 				if !ok {
-					return cldf.ChangesetOutput{}, utils.ErrNoAdapterRegistered("ConfigImporter", perChainInput.FeeQuoterVersion)
+					return cldf.ChangesetOutput{}, utils.ErrNoAdapterRegistered("ConfigImporter", version)
 				}
 				err := configImporter.InitializeAdapter(e, chainSel)
 				if err != nil {

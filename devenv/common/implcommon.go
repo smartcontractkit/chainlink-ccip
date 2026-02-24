@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"errors"
 	"fmt"
 	"math"
@@ -10,8 +11,10 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/aws/smithy-go/ptr"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/gagliardetto/solana-go"
 	"github.com/rs/zerolog"
 
@@ -41,7 +44,22 @@ import (
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-ccip/devenv/blockchainutils"
+	mcmstypes "github.com/smartcontractkit/mcms/types"
 )
+
+var (
+	// TestXXXMCMSSigner is a throwaway private key used for signing MCMS proposals.
+	// in tests.
+	TestXXXMCMSSigner *ecdsa.PrivateKey
+)
+
+func init() {
+	key, err := crypto.GenerateKey()
+	if err != nil {
+		panic(err)
+	}
+	TestXXXMCMSSigner = key
+}
 
 func DeployContractsForSelector(ctx context.Context, env *deployment.Environment, cls []*simple_node_set.Input, selector uint64, ccipHomeSelector uint64, crAddr string) (datastore.DataStore, error) {
 	l := zerolog.Ctx(ctx)
@@ -147,11 +165,71 @@ func DeployContractsForSelector(ctx context.Context, env *deployment.Environment
 			},
 		)
 	}
+	// so we can get the LINK address etc.
+	tmp := datastore.NewMemoryDataStore()
+	tmp.Merge(env.DataStore)
+	tmp.Merge(out.DataStore.Seal())
+	runningDS.Merge(out.DataStore.Seal())
 
-	env.DataStore = out.DataStore.Seal()
-	runningDS.Merge(env.DataStore)
+	// For EVM only, set the timelock admin
+	var timelockAdmin common.Address
+	chain1, ok := env.BlockChains.EVMChains()[selector]
+	if ok {
+		timelockAdmin = chain1.DeployerKey.From
+	}
+	qualifier := "CLLCCIP"
+	cs := deployops.DeployMCMS(dReg, nil)
+	fcs := deployops.FinalizeDeployMCMS(dReg, nil)
+	output, err := cs.Apply(*env, deployops.MCMSDeploymentConfig{
+		AdapterVersion: version,
+		Chains: map[uint64]deployops.MCMSDeploymentConfigPerChain{
+			selector: {
+				Canceller:        SingleGroupMCMS(),
+				Bypasser:         SingleGroupMCMS(),
+				Proposer:         SingleGroupMCMS(),
+				TimelockMinDelay: big.NewInt(0),
+				Qualifier:        ptr.String(qualifier),
+				TimelockAdmin:    timelockAdmin,
+			},
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("deploying MCMS: %w", err)
+	}
+	runningDS.Merge(output.DataStore.Seal())
+	tmp.Merge(output.DataStore.Seal())
+	env.DataStore = tmp.Seal()
+
+	finalizeOutput, err := fcs.Apply(*env, deployops.MCMSDeploymentConfig{
+		AdapterVersion: version,
+		Chains: map[uint64]deployops.MCMSDeploymentConfigPerChain{
+			selector: {
+				Canceller:        SingleGroupMCMS(),
+				Bypasser:         SingleGroupMCMS(),
+				Proposer:         SingleGroupMCMS(),
+				TimelockMinDelay: big.NewInt(0),
+				Qualifier:        ptr.String(qualifier),
+				TimelockAdmin:    timelockAdmin,
+			},
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("finalizing MCMS deployment: %w", err)
+	}
+	runningDS.Merge(finalizeOutput.DataStore.Seal())
 
 	return runningDS.Seal(), nil
+}
+
+func SingleGroupMCMS() mcmstypes.Config {
+	publicKey := TestXXXMCMSSigner.Public().(*ecdsa.PublicKey)
+	// Convert the public key to an Ethereum address
+	address := crypto.PubkeyToAddress(*publicKey)
+	c, err := mcmstypes.NewConfig(1, []common.Address{address}, []mcmstypes.Config{})
+	if err != nil {
+		panic(err)
+	}
+	return c
 }
 
 // getTokenPricesForChain returns the token prices for fee tokens on a chain.
@@ -582,7 +660,7 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 	mcmsRegistry.RegisterMCMSReader(chainsel.FamilySolana, &solseq.SolanaAdapter{})
 
 	// To simplify testing, we disable rate limiting on all token transfers.
-	disabledRL := tokensapi.RateLimiterConfig{Capacity: big.NewInt(0), Rate: big.NewInt(0), IsEnabled: false}
+	disabledRL := tokensapi.RateLimiterConfigFloatInput{Capacity: 0, Rate: 0, IsEnabled: false}
 
 	// This will only store the addresses deployed during this setup.
 	outputDS := datastore.NewMemoryDataStore()
@@ -634,10 +712,9 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 
 			if srcSel != dstSel {
 				srcCfg.TokenTransferConfig.RemoteChains[dstSel] = tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
-					OutboundCCVs:              []datastore.AddressRef{}, // not needed for for 1.6
-					InboundCCVs:               []datastore.AddressRef{}, // not needed for for 1.6
-					OutboundRateLimiterConfig: disabledRL,
-					InboundRateLimiterConfig:  disabledRL,
+					OutboundCCVs:                             []datastore.AddressRef{}, // not needed for for 1.6
+					InboundCCVs:                              []datastore.AddressRef{}, // not needed for for 1.6
+					DefaultFinalityOutboundRateLimiterConfig: disabledRL,
 					// This is actually optional for 1.6 as the token and token pool addresses are
 					// inferred after deployment
 					// RemoteToken: &datastore.AddressRef{
@@ -732,16 +809,22 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 							ChainAdapterVersion: v1_6_0,
 							TokenRef:            tokenRef,
 							TokenPoolRef:        tokenPoolRef,
-							RemoteOutbounds: map[uint64]tokensapi.RateLimiterConfigFloatInput{
-								dst.ChainSelector(): rl,
+							RemoteOutbounds: map[uint64]tokensapi.RemoteOutbounds{
+								dst.ChainSelector(): {
+									DefaultFinality: rl,
+									CustomFinality:  rl,
+								},
 							},
 						},
 						dst.ChainSelector(): {
 							ChainAdapterVersion: v1_6_0,
 							TokenRef:            dstTokenRef,
 							TokenPoolRef:        dstTokenPoolRef,
-							RemoteOutbounds: map[uint64]tokensapi.RateLimiterConfigFloatInput{
-								selector: rl,
+							RemoteOutbounds: map[uint64]tokensapi.RemoteOutbounds{
+								selector: {
+									DefaultFinality: rl,
+									CustomFinality:  rl,
+								},
 							},
 						},
 					},

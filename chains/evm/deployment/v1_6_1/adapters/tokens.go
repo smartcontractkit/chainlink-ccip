@@ -48,11 +48,6 @@ func (t *TokenAdapter) DeriveTokenAddress(e deployment.Environment, chainSelecto
 	})
 }
 
-func (t *TokenAdapter) ManualRegistration() *cldf_ops.Sequence[tokens.ManualRegistrationSequenceInput, sequences.OnChainOutput, chain.BlockChains] {
-	// TODO implement me
-	return nil
-}
-
 func (t *TokenAdapter) DeployToken() *cldf_ops.Sequence[tokens.DeployTokenInput, sequences.OnChainOutput, chain.BlockChains] {
 	// TODO implement me
 	return nil
@@ -68,12 +63,12 @@ func (t *TokenAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokens.Deplo
 	return nil
 }
 
-func (t *TokenAdapter) RegisterToken() *cldf_ops.Sequence[tokens.RegisterTokenInput, sequences.OnChainOutput, chain.BlockChains] {
+func (t *TokenAdapter) ManualRegistration() *cldf_ops.Sequence[tokens.ManualRegistrationSequenceInput, sequences.OnChainOutput, chain.BlockChains] {
 	// TODO implement me
 	return nil
 }
 
-func (t *TokenAdapter) SetPool() *cldf_ops.Sequence[tokens.SetPoolInput, sequences.OnChainOutput, chain.BlockChains] {
+func (t *TokenAdapter) SetPool() *cldf_ops.Sequence[tokens.TPRLRemotes, sequences.OnChainOutput, chain.BlockChains] {
 	// TODO implement me
 	return nil
 }
@@ -97,7 +92,12 @@ func (t *TokenAdapter) DeriveTokenPoolCounterpart(e deployment.Environment, chai
 	return tokenPool, nil
 }
 
-func (t *TokenAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokens.TPRLRemotes, sequences.OnChainOutput, chain.BlockChains] {
+func (t *TokenAdapter) SetTokenPoolRateLimits() *operations.Sequence[tokens.TPRLRemotes, sequences.OnChainOutput, chain.BlockChains] {
+	// TODO implement me
+	return nil
+}
+
+func (t *TokenAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokens.UpdateAuthoritiesInput, sequences.OnChainOutput, chain.BlockChains] {
 	// TODO implement me
 	return nil
 }

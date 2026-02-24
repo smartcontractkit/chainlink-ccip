@@ -466,6 +466,21 @@ func TestDeployCCTPChains_VerifyPreconditions(t *testing.T) {
 			expectedError: "failed to validate MCMS input",
 		},
 		{
+			desc: "failure - zero valid until timestamp",
+			cfg: v1_7_0_changesets.DeployCCTPChainsConfig{
+				Chains: map[uint64]v1_7_0_changesets.CCTPChainConfig{
+					5009297550715157269: {},
+				},
+				MCMS: &mcms.Input{
+					OverridePreviousRoot: true,
+					ValidUntil:           0, // Zero timestamp
+					TimelockDelay:        mcms_types.MustParseDuration("1h"),
+					TimelockAction:       mcms_types.TimelockActionSchedule,
+				},
+			},
+			expectedError: "failed to validate MCMS input",
+		},
+		{
 			desc: "failure - multiple remote chains with one having unknown selector",
 			cfg: v1_7_0_changesets.DeployCCTPChainsConfig{
 				Chains: map[uint64]v1_7_0_changesets.CCTPChainConfig{

@@ -204,7 +204,7 @@ var solanaContracts = map[string]datastore.ContractType{
 }
 
 func PreloadSolanaEnvironment(programsPath string, chainSelector uint64) error {
-	err := utils.DownloadSolanaCCIPProgramArtifacts(context.Background(), programsPath, utils.VersionToShortCommitSHA[utils.VersionSolanaV0_1_1])
+	err := utils.DownloadSolanaCCIPProgramArtifacts(context.Background(), programsPath, utils.VersionToShortCommitSHA[utils.VersionSolanaV1_6_0])
 	if err != nil {
 		return err
 	}
