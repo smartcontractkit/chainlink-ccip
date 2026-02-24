@@ -11,9 +11,9 @@ contract CCTTokenPool_lockOrBurn is CCTTokenPoolSetup {
   function test_lockOrBurn() public {
     uint256 burnAmount = 1_000e18;
 
-    // The onRamp calls lockOrBurn, and _lockOrBurn burns from msg.sender (the onRamp).
-    // Give the onRamp tokens to burn.
-    deal(address(s_cctPool), s_allowedOnRamp, burnAmount);
+    // The Router transfers tokens to the pool before the OnRamp calls lockOrBurn.
+    // _lockOrBurn burns from address(this) (the pool).
+    deal(address(s_cctPool), address(s_cctPool), burnAmount);
 
     uint256 supplyBefore = IERC20(address(s_cctPool)).totalSupply();
 
@@ -25,7 +25,7 @@ contract CCTTokenPool_lockOrBurn is CCTTokenPoolSetup {
     });
 
     vm.expectEmit();
-    emit IERC20.Transfer(s_allowedOnRamp, address(0), burnAmount);
+    emit IERC20.Transfer(address(s_cctPool), address(0), burnAmount);
 
     vm.expectEmit();
     emit TokenPool.LockedOrBurned({
@@ -42,7 +42,7 @@ contract CCTTokenPool_lockOrBurn is CCTTokenPoolSetup {
       })
     );
 
-    assertEq(0, IERC20(address(s_cctPool)).balanceOf(s_allowedOnRamp));
+    assertEq(0, IERC20(address(s_cctPool)).balanceOf(address(s_cctPool)));
     assertEq(supplyBefore - burnAmount, IERC20(address(s_cctPool)).totalSupply());
   }
 

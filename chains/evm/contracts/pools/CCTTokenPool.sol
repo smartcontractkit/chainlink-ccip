@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {BaseERC20} from "../tmp/BaseERC20.sol";
 import {TokenPool} from "./TokenPool.sol";
 
+import {ERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/ERC20.sol";
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
 contract CCTTokenPool is TokenPool, BaseERC20 {
@@ -23,12 +24,13 @@ contract CCTTokenPool is TokenPool, BaseERC20 {
     TokenPool(IERC20(address(this)), tokenParams.decimals, advancedPoolHooks, rmnProxy, router)
   {}
 
-  /// @notice Burns tokens held by the pool.
+  /// @notice Burns tokens held by the pool. The Router transfers tokens to
+  /// this contract before the OnRamp calls lockOrBurn, so the burn is from self.
   function _lockOrBurn(
     uint64, // remoteChainSelector
     uint256 amount
   ) internal virtual override {
-    _burn(_msgSender(), amount);
+    _burn(address(this), amount);
   }
 
   function _releaseOrMint(
@@ -39,6 +41,19 @@ contract CCTTokenPool is TokenPool, BaseERC20 {
     if (i_maxSupply != 0 && totalSupply() + amount > i_maxSupply) revert MaxSupplyExceeded(totalSupply() + amount);
 
     _mint(receiver, amount);
+  }
+
+  /// @dev Overrides BaseERC20._update to allow this contract to receive its own tokens.
+  /// The CCIP Router transfers tokens to the pool (which IS this contract) before
+  /// lockOrBurn is called, so transfers to address(this) must be permitted.
+  function _update(
+    address from,
+    address to,
+    uint256 value
+  ) internal virtual override {
+    if (to == address(this) && from == address(0)) revert InvalidRecipient(to);
+
+    ERC20._update(from, to, value);
   }
 
   /// @notice Signals which version of the pool interface is supported.
