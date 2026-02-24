@@ -8158,7 +8158,7 @@ func TestCCIPRouter(t *testing.T) {
 					solana.NewAccountMeta(solana.SystemProgramID, false, false),
 				)
 
-				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"Error Message: Source chain selector not supported."})
+				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{genericRaw}, transmitter, config.DefaultCommitment, []string{"Error Message: Source chain selector not supported."})
 			})
 
 			t.Run("When executing a report with a wrong external execution signer PDA, it fails", func(t *testing.T) {
@@ -8247,7 +8247,7 @@ func TestCCIPRouter(t *testing.T) {
 					solana.NewAccountMeta(solana.SystemProgramID, false, false),
 				)
 
-				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{ccip.InvalidInputsExternalExecutionSignerAccount_CcipOfframpError.String()})
+				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{genericRaw}, transmitter, config.DefaultCommitment, []string{ccip.InvalidInputsExternalExecutionSignerAccount_CcipOfframpError.String()})
 			})
 
 			t.Run("execute fails with a global curse active", func(t *testing.T) {
@@ -8350,10 +8350,21 @@ func TestCCIPRouter(t *testing.T) {
 					solana.NewAccountMeta(solana.SystemProgramID, false, false),
 				)
 
-				result = testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"Error Code: GloballyCursed"})
+				result = testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{genericRaw}, transmitter, config.DefaultCommitment, []string{"Error Code: GloballyCursed"})
 				require.NotNil(t, result)
 
 				// Manually execution fails in the same way
+				// Temporarily set enable_manual_execution_after to -1 so the time check passes
+				// and the curse check is reached
+				updateIx, err := ccip_offramp.NewUpdateEnableManualExecutionAfterInstruction(
+					int64(-1),
+					config.OfframpConfigPDA,
+					ccipAdmin.PublicKey(),
+				)
+				require.NoError(t, err)
+				result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{updateIx}, ccipAdmin, config.DefaultCommitment)
+				require.NotNil(t, result)
+
 				manual, err := ccip_offramp.NewManuallyExecuteInstruction(
 					testutils.MustMarshalBorsh(t, executionReport),
 					[]byte{},
@@ -8385,7 +8396,17 @@ func TestCCIPRouter(t *testing.T) {
 					solana.NewAccountMeta(solana.SystemProgramID, false, false),
 				)
 
-				result = testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{genericManual}, transmitter, config.DefaultCommitment, []string{"Error Code: GloballyCursed"})
+				result = testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{genericManual}, user, config.DefaultCommitment, []string{"Error Code: GloballyCursed"})
+				require.NotNil(t, result)
+
+				// Restore enable_manual_execution_after to original value
+				updateIx, err = ccip_offramp.NewUpdateEnableManualExecutionAfterInstruction(
+					config.EnableExecutionAfter,
+					config.OfframpConfigPDA,
+					ccipAdmin.PublicKey(),
+				)
+				require.NoError(t, err)
+				result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{updateIx}, ccipAdmin, config.DefaultCommitment)
 				require.NotNil(t, result)
 
 				// Curse is removed
@@ -8503,7 +8524,7 @@ func TestCCIPRouter(t *testing.T) {
 					solana.NewAccountMeta(solana.SystemProgramID, false, false),
 				)
 
-				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"AnchorError caused by account: commit_report. Error Code: " + common.ConstraintSeeds_AnchorError.String()})
+				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{genericRaw}, transmitter, config.DefaultCommitment, []string{"AnchorError caused by account: commit_report. Error Code: " + common.ConstraintSeeds_AnchorError.String()})
 			})
 
 			// TODO review test case, code does not match the test name
@@ -8596,7 +8617,7 @@ func TestCCIPRouter(t *testing.T) {
 					solana.NewAccountMeta(solana.SystemProgramID, false, false),
 				)
 
-				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"Error Code: " + ccip.UnsupportedDestinationChainSelector_CcipOfframpError.String()})
+				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{genericRaw}, transmitter, config.DefaultCommitment, []string{"Error Code: " + ccip.UnsupportedDestinationChainSelector_CcipOfframpError.String()})
 			})
 
 			t.Run("When executing a report with nonexisting PDA for the Merkle Root, it fails", func(t *testing.T) {
@@ -8825,6 +8846,10 @@ func TestCCIPRouter(t *testing.T) {
 					config.RMNRemoteConfigPDA,
 				)
 				require.NoError(t, err)
+
+				genericRaw, ok = raw.(*solana.GenericInstruction)
+				require.True(t, ok, "instruction must be *solana.GenericInstruction")
+
 				genericRaw.AccountValues = append(
 					genericRaw.AccountValues,
 					solana.NewAccountMeta(config.CcipLogicReceiver, false, false),
@@ -8953,7 +8978,7 @@ func TestCCIPRouter(t *testing.T) {
 
 				// failed ccipReceiver - init account requires mutable authority
 				// ccipSigner is not a mutable account
-				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"writable privilege escalated", "Cross-program invocation with unauthorized signer or writable account"})
+				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{genericRaw}, transmitter, config.DefaultCommitment, []string{"writable privilege escalated", "Cross-program invocation with unauthorized signer or writable account"})
 			})
 
 			t.Run("When executing a report with an account with read permissions but sent as write, it uses the correct permissions", func(t *testing.T) {
@@ -9051,7 +9076,7 @@ func TestCCIPRouter(t *testing.T) {
 				)
 
 				// Fails in the CCIP Receiver contract as it expects the config.ReceiverExternalExecutionConfigPDA account to be writable, but it was sent as read only (the same way it was configured on source).
-				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"Program log: Instruction: CcipReceive Program log: AnchorError caused by account: external_execution_config. Error Code: ConstraintMut. Error Number: 2000. Error Message: A mut constraint was violated."})
+				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{genericRaw}, transmitter, config.DefaultCommitment, []string{"Program log: Instruction: CcipReceive Program log: AnchorError caused by account: external_execution_config. Error Code: ConstraintMut. Error Number: 2000. Error Message: A mut constraint was violated."})
 			})
 
 			t.Run("message can be executed with empty Any2SVMRampMessage.Data", func(t *testing.T) {
@@ -10356,7 +10381,7 @@ func TestCCIPRouter(t *testing.T) {
 						fmt.Printf("User: %s\n", user.PublicKey().String())
 						fmt.Printf("Transmitter: %s\n", transmitter.PublicKey().String())
 
-						testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{ccip.ManualExecutionNotAllowed_CcipOfframpError.String()})
+						testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{genericRaw}, user, config.DefaultCommitment, []string{ccip.ManualExecutionNotAllowed_CcipOfframpError.String()})
 					})
 
 					t.Run("When transmitter manually executing before the period of time has passed, it fails", func(t *testing.T) {
@@ -10397,7 +10422,7 @@ func TestCCIPRouter(t *testing.T) {
 							solana.NewAccountMeta(solana.SystemProgramID, false, false),
 						)
 
-						testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{ccip.ManualExecutionNotAllowed_CcipOfframpError.String()})
+						testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{genericRaw}, transmitter, config.DefaultCommitment, []string{ccip.ManualExecutionNotAllowed_CcipOfframpError.String()})
 					})
 				})
 
@@ -10466,7 +10491,7 @@ func TestCCIPRouter(t *testing.T) {
 							testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{rejectIx}, user, config.DefaultCommitment)
 
 							// Check that it fails
-							testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"RejectAll"})
+							testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{genericRaw}, user, config.DefaultCommitment, []string{"RejectAll"})
 
 							acceptIx, err2 := test_ccip_receiver.NewSetRejectAllInstruction(
 								false,
@@ -10762,7 +10787,7 @@ func TestCCIPRouter(t *testing.T) {
 					solana.NewAccountMeta(solana.SystemProgramID, false, false),
 				)
 
-				testutils.SendAndFailWithRPCError(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"VersionedTransaction too large"})
+				testutils.SendAndFailWithRPCError(ctx, t, solanaGoClient, []solana.Instruction{genericRaw}, transmitter, config.DefaultCommitment, []string{"VersionedTransaction too large"})
 
 				// We failed to execute, so we will attempt buffering now. We first build the buffering execution instruction, which
 				// is identical except it includes an empty report, and an additional PDA.
