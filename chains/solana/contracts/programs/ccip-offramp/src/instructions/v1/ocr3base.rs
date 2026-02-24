@@ -1,9 +1,9 @@
 use anchor_lang::prelude::*;
-use solana_program::sysvar;
 use solana_keccak_hasher as keccak;
+use solana_program::sysvar;
 use solana_secp256k1_recover::*;
 
-use crate::ocr3base::{ConfigSet, Transmitted, MAX_ORACLES};
+use crate::ocr3base::{Ocr3ConfigSet, Transmitted, MAX_ORACLES};
 use crate::state::{Ocr3Config, Ocr3ConfigInfo};
 use crate::CcipOfframpError;
 use crate::OcrPluginType;
@@ -119,7 +119,7 @@ pub fn ocr3_set(
     ocr3_config.config_info.f = cfg.f;
     ocr3_config.config_info.config_digest = cfg.config_digest;
 
-    emit!(ConfigSet {
+    emit!(Ocr3ConfigSet {
         ocr_plugin_type: ocr3_config.plugin_type.try_into()?,
         config_digest: ocr3_config.config_info.config_digest,
         signers,

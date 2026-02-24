@@ -3895,6 +3895,14 @@
           {
             "name": "f",
             "type": "u8"
+          },
+          {
+            "name": "n",
+            "type": "u8"
+          },
+          {
+            "name": "is_signature_verification_enabled",
+            "type": "u8"
           }
         ]
       }

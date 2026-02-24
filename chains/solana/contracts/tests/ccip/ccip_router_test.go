@@ -2324,9 +2324,9 @@ func TestCCIPRouter(t *testing.T) {
 					result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment)
 					require.NotNil(t, result)
 
-					// Check event ConfigSet
+					// Check event Ocr3ConfigSet
 					configSetEvent := ccip.EventConfigSet{}
-					require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "ConfigSet", &configSetEvent, config.PrintEvents))
+					require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "Ocr3ConfigSet", &configSetEvent, config.PrintEvents))
 					require.Equal(t, uint8(v.plugin), configSetEvent.OcrPluginType)
 					require.Equal(t, config.ConfigDigest, configSetEvent.ConfigDigest)
 					require.Equal(t, config.OcrF, configSetEvent.F)
@@ -4198,6 +4198,7 @@ func TestCCIPRouter(t *testing.T) {
 			)
 
 			require.NoError(t, err)
+			instruction.(*solana.GenericInstruction).AccountValues[7].IsWritable = true
 			result = testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: SenderNotAllowed"})
 			require.NotNil(t, result)
 
@@ -4250,6 +4251,7 @@ func TestCCIPRouter(t *testing.T) {
 			)
 
 			require.NoError(t, err)
+			instruction.(*solana.GenericInstruction).AccountValues[7].IsWritable = true
 
 			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment)
 			require.NotNil(t, result)
@@ -4326,6 +4328,7 @@ func TestCCIPRouter(t *testing.T) {
 			)
 
 			require.NoError(t, err)
+			instruction.(*solana.GenericInstruction).AccountValues[7].IsWritable = true
 			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment)
 			require.NotNil(t, result)
 
@@ -4395,6 +4398,7 @@ func TestCCIPRouter(t *testing.T) {
 			)
 
 			require.NoError(t, err)
+			instruction.(*solana.GenericInstruction).AccountValues[7].IsWritable = true
 			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment)
 			require.NotNil(t, result)
 
@@ -4465,6 +4469,7 @@ func TestCCIPRouter(t *testing.T) {
 			)
 
 			require.NoError(t, err)
+			instruction.(*solana.GenericInstruction).AccountValues[7].IsWritable = true
 			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment)
 			require.NotNil(t, result)
 
@@ -4534,6 +4539,7 @@ func TestCCIPRouter(t *testing.T) {
 			)
 
 			require.NoError(t, err)
+			instruction.(*solana.GenericInstruction).AccountValues[7].IsWritable = true
 			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment)
 			require.NotNil(t, result)
 
@@ -4784,6 +4790,7 @@ func TestCCIPRouter(t *testing.T) {
 			)
 
 			require.NoError(t, err)
+			instruction.(*solana.GenericInstruction).AccountValues[7].IsWritable = true
 			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, anotherUser, config.DefaultCommitment, []string{ccip.InvalidInputsAtaAddress_CcipRouterError.String()})
 		})
 
@@ -4824,6 +4831,7 @@ func TestCCIPRouter(t *testing.T) {
 			)
 
 			require.NoError(t, err)
+			instruction.(*solana.GenericInstruction).AccountValues[7].IsWritable = true
 			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, anotherUser, config.DefaultCommitment)
 			require.NotNil(t, result)
 
@@ -5113,6 +5121,7 @@ func TestCCIPRouter(t *testing.T) {
 			)
 
 			require.NoError(t, err)
+			instruction.(*solana.GenericInstruction).AccountValues[7].IsWritable = true
 			result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment)
 			require.NotNil(t, result)
 
@@ -5260,6 +5269,7 @@ func TestCCIPRouter(t *testing.T) {
 					// Cast to *solana.GenericInstruction to append additional accounts
 					genericTx, ok := tx.(*solana.GenericInstruction)
 					require.True(t, ok, "instruction must be *solana.GenericInstruction")
+					genericTx.AccountValues[7].IsWritable = true
 
 					tokenMetas, addressTables, err := tokens.ParseTokenLookupTable(ctx, solanaGoClient, token0, userTokenAccount)
 					require.NoError(t, err)
@@ -5348,6 +5358,7 @@ func TestCCIPRouter(t *testing.T) {
 					)
 
 					require.NoError(t, err)
+					instruction.(*solana.GenericInstruction).AccountValues[7].IsWritable = true
 					result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment)
 					require.NotNil(t, result)
 
@@ -5398,6 +5409,7 @@ func TestCCIPRouter(t *testing.T) {
 			)
 
 			require.NoError(t, err)
+			instruction.(*solana.GenericInstruction).AccountValues[7].IsWritable = true
 			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, tokenlessUser, config.DefaultCommitment, []string{"insufficient funds"})
 		})
 
