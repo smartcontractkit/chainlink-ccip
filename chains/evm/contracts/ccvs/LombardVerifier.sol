@@ -36,7 +36,7 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
   error InvalidVerifierResults();
   error InvalidToken(bytes32 expected, bytes32 actual);
   error InvalidAmount(uint256 expected, uint256 actual);
-  error BridgeDestinationTokenOrAdapterMismatch(bytes32 bridgeToken, bytes32 remoteToken, bytes32 remoteAdapter);
+  error RemoteTokenOrAdapterMismatch(bytes32 bridgeToken, bytes32 remoteToken, bytes32 remoteAdapter);
 
   /// @param remoteChainSelector CCIP selector of destination chain.
   /// @param lChainId The chain id of destination chain by Lombard Multi Chain Id conversion.
@@ -194,10 +194,10 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
     }
 
     {
-      bytes32 bridgeDestToken = i_bridge.getAllowedDestinationToken(path.lChainId, sourceToken);
+      bytes32 remoteToken = i_bridge.getAllowedDestinationToken(path.lChainId, sourceToken);
       bytes32 expectedDestToken = Internal._leftPadBytesToBytes32(tokenTransfer.destTokenAddress);
-      if (bridgeDestToken != expectedDestToken && bridgeDestToken != path.remoteAdapter) {
-        revert BridgeDestinationTokenOrAdapterMismatch(bridgeDestToken, expectedDestToken, path.remoteAdapter);
+      if (remoteToken != expectedDestToken && remoteToken != path.remoteAdapter) {
+        revert RemoteTokenOrAdapterMismatch(remoteToken, expectedDestToken, path.remoteAdapter);
       }
     }
 

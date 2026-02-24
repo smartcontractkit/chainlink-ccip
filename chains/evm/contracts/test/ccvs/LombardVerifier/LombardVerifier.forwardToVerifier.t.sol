@@ -79,19 +79,19 @@ contract LombardVerifier_forwardToVerifier is LombardVerifierSetup {
     assertEq(payloadHash, s_mockBridge.s_lastPayloadHash());
   }
 
-  function test_forwardToVerifier_RevertWhen_BridgeDestinationTokenOrAdapterMismatch() public {
+  function test_forwardToVerifier_RevertWhen_RemoteTokenOrAdapterMismatch() public {
     (MessageV1Codec.MessageV1 memory message, bytes32 messageId) =
       _createForwardMessage(address(s_testToken), makeAddr("receiver"));
-    bytes32 bridgeDestToken = bytes32("differentToken");
+    bytes32 remoteToken = bytes32("differentToken");
 
     changePrank(OWNER);
-    s_mockBridge.setAllowedDestinationToken(LOMBARD_CHAIN_ID, address(s_testToken), bridgeDestToken);
+    s_mockBridge.setAllowedDestinationToken(LOMBARD_CHAIN_ID, address(s_testToken), remoteToken);
     changePrank(s_onRamp);
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        LombardVerifier.BridgeDestinationTokenOrAdapterMismatch.selector,
-        bridgeDestToken,
+        LombardVerifier.RemoteTokenOrAdapterMismatch.selector,
+        remoteToken,
         bytes32(message.tokenTransfer[0].destTokenAddress),
         bytes32(0)
       )

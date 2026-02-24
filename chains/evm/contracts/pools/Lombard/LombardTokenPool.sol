@@ -29,7 +29,7 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
   error ZeroLombardChainId();
   error PathNotExist(uint64 remoteChainSelector);
   error InvalidMessageVersion(uint8 expected, uint8 received);
-  error BridgeDestinationTokenOrAdapterMismatch(bytes32 bridgeToken, bytes32 remoteToken, bytes32 remoteAdapter);
+  error RemoteTokenOrAdapterMismatch(bytes32 bridgeToken, bytes32 remoteToken, bytes32 remoteAdapter);
   error InvalidReceiver(bytes receiver);
   error ChainNotSupported(uint64 remoteChainSelector);
   error InvalidAllowedCaller(bytes allowedCaller);
@@ -165,10 +165,10 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
     // For some tokens we need to override the source token with an adapter
     address sourceTokenOrAdapter = i_tokenAdapter != address(0) ? i_tokenAdapter : address(i_token);
     // verify bridge destination token equal to pool
-    bytes32 bridgeDestToken = i_bridge.getAllowedDestinationToken(path.lChainId, sourceTokenOrAdapter);
+    bytes32 remoteToken = i_bridge.getAllowedDestinationToken(path.lChainId, sourceTokenOrAdapter);
     bytes32 poolDestToken = abi.decode(getRemoteToken(lockOrBurnIn.remoteChainSelector), (bytes32));
-    if (bridgeDestToken != poolDestToken && bridgeDestToken != path.remoteAdapter) {
-      revert BridgeDestinationTokenOrAdapterMismatch(bridgeDestToken, poolDestToken, path.remoteAdapter);
+    if (remoteToken != poolDestToken && remoteToken != path.remoteAdapter) {
+      revert RemoteTokenOrAdapterMismatch(remoteToken, poolDestToken, path.remoteAdapter);
     }
 
     if (lockOrBurnIn.receiver.length != 32) {

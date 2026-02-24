@@ -193,12 +193,12 @@ contract LombardTokenPool_lockOrBurn is LombardTokenPoolSetup {
     );
   }
 
-  function test_lockOrBurn_V1_RevertWhen_BridgeDestinationTokenOrAdapterMismatch() public {
+  function test_lockOrBurn_V1_RevertWhen_RemoteTokenOrAdapterMismatch() public {
     _configurePathAndBridgeRemoteToken(bytes32("differentToken"), bytes32(0));
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        LombardTokenPool.BridgeDestinationTokenOrAdapterMismatch.selector,
+        LombardTokenPool.RemoteTokenOrAdapterMismatch.selector,
         bytes32("differentToken"),
         bytes32(uint256(uint160(s_remoteToken))),
         bytes32(0)

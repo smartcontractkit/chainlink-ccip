@@ -56,10 +56,10 @@ contract LombardTokenPool_constructor is Test {
   }
 
   function test_constructor_RevertsWhen_InvalidMessageVersion() public {
-    uint8 wrongVersion = 2;
+    uint8 wrongVersion = 3;
     vm.mockCall(address(s_bridge), abi.encodeWithSelector(IBridgeV2.MSG_VERSION.selector), abi.encode(wrongVersion));
 
-    vm.expectRevert(abi.encodeWithSelector(LombardTokenPool.InvalidMessageVersion.selector, 1, wrongVersion));
+    vm.expectRevert(abi.encodeWithSelector(LombardTokenPool.InvalidMessageVersion.selector, 2, wrongVersion));
     new LombardTokenPool(
       IERC20Metadata(address(s_token)), s_resolver, s_bridge, address(0), address(0), RMN, ROUTER, 18
     );
