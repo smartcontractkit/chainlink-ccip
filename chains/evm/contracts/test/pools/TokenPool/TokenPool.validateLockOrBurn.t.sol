@@ -38,7 +38,7 @@ contract TokenPool_validateLockOrBurn is AdvancedPoolHooksSetup {
     TokenPool.RateLimitConfigArgs[] memory rateLimitArgs = new TokenPool.RateLimitConfigArgs[](1);
     rateLimitArgs[0] = TokenPool.RateLimitConfigArgs({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
-      customBlockConfirmation: true,
+      customBlockConfirmations: true,
       outboundRateLimiterConfig: outboundFastConfig,
       inboundRateLimiterConfig: inboundFastConfig
     });
@@ -48,7 +48,7 @@ contract TokenPool_validateLockOrBurn is AdvancedPoolHooksSetup {
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _buildLockOrBurnIn(1000e18);
 
     vm.expectEmit();
-    emit TokenPool.CustomBlockConfirmationOutboundRateLimitConsumed(
+    emit TokenPool.CustomBlockConfirmationsOutboundRateLimitConsumed(
       DEST_CHAIN_SELECTOR, address(s_token), lockOrBurnIn.amount
     );
 
@@ -66,7 +66,7 @@ contract TokenPool_validateLockOrBurn is AdvancedPoolHooksSetup {
     TokenPool.RateLimitConfigArgs[] memory rateLimitArgs = new TokenPool.RateLimitConfigArgs[](1);
     rateLimitArgs[0] = TokenPool.RateLimitConfigArgs({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
-      customBlockConfirmation: true,
+      customBlockConfirmations: true,
       outboundRateLimiterConfig: outboundFastConfig,
       inboundRateLimiterConfig: inboundFastConfig
     });
@@ -83,10 +83,10 @@ contract TokenPool_validateLockOrBurn is AdvancedPoolHooksSetup {
       tokenTransferFeeConfig: IPoolV2.TokenTransferFeeConfig({
         destGasOverhead: 50_000,
         destBytesOverhead: Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES,
-        defaultBlockConfirmationFeeUSDCents: 0,
-        customBlockConfirmationFeeUSDCents: 0,
-        defaultBlockConfirmationTransferFeeBps: 0,
-        customBlockConfirmationTransferFeeBps: 250, // 2.5%
+        defaultBlockConfirmationsFeeUSDCents: 0,
+        customBlockConfirmationsFeeUSDCents: 0,
+        defaultBlockConfirmationsTransferFeeBps: 0,
+        customBlockConfirmationsTransferFeeBps: 250, // 2.5%
         isEnabled: true
       })
     });
@@ -98,7 +98,7 @@ contract TokenPool_validateLockOrBurn is AdvancedPoolHooksSetup {
     uint256 expectedAmount = lockOrBurnIn.amount - fee;
 
     vm.expectEmit();
-    emit TokenPool.CustomBlockConfirmationOutboundRateLimitConsumed(
+    emit TokenPool.CustomBlockConfirmationsOutboundRateLimitConsumed(
       DEST_CHAIN_SELECTOR, address(s_token), expectedAmount
     );
 
@@ -118,10 +118,10 @@ contract TokenPool_validateLockOrBurn is AdvancedPoolHooksSetup {
       tokenTransferFeeConfig: IPoolV2.TokenTransferFeeConfig({
         destGasOverhead: 50_000,
         destBytesOverhead: Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES,
-        defaultBlockConfirmationFeeUSDCents: 0,
-        customBlockConfirmationFeeUSDCents: 0,
-        defaultBlockConfirmationTransferFeeBps: defaultFeeBps,
-        customBlockConfirmationTransferFeeBps: 0,
+        defaultBlockConfirmationsFeeUSDCents: 0,
+        customBlockConfirmationsFeeUSDCents: 0,
+        defaultBlockConfirmationsTransferFeeBps: defaultFeeBps,
+        customBlockConfirmationsTransferFeeBps: 0,
         isEnabled: true
       })
     });

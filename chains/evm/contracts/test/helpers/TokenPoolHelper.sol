@@ -90,12 +90,12 @@ contract TokenPoolHelper is TokenPool {
   function getFastOutboundBucket(
     uint64 remoteChainSelector
   ) external view returns (RateLimiter.TokenBucket memory bucket) {
-    return s_customBlockConfirmationOutboundRateLimiterConfig[remoteChainSelector];
+    return s_customBlockConfirmationsOutboundRateLimiterConfig[remoteChainSelector];
   }
 
   function getFastInboundBucket(
     uint64 remoteChainSelector
   ) external view returns (RateLimiter.TokenBucket memory bucket) {
-    return s_customBlockConfirmationInboundRateLimiterConfig[remoteChainSelector];
+    return s_customBlockConfirmationsInboundRateLimiterConfig[remoteChainSelector];
   }
 }

@@ -138,10 +138,10 @@ contract LockReleaseTokenPool_lockOrBurn is LockReleaseTokenPoolSetup {
     IPoolV2.TokenTransferFeeConfig memory feeConfig = IPoolV2.TokenTransferFeeConfig({
       destGasOverhead: 50_000,
       destBytesOverhead: 32,
-      defaultBlockConfirmationFeeUSDCents: 0,
-      customBlockConfirmationFeeUSDCents: 0,
-      defaultBlockConfirmationTransferFeeBps: defaultFeeBps,
-      customBlockConfirmationTransferFeeBps: 0,
+      defaultBlockConfirmationsFeeUSDCents: 0,
+      customBlockConfirmationsFeeUSDCents: 0,
+      defaultBlockConfirmationsTransferFeeBps: defaultFeeBps,
+      customBlockConfirmationsTransferFeeBps: 0,
       isEnabled: true
     });
 

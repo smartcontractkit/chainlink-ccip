@@ -10,8 +10,8 @@ import {AdvancedPoolHooksSetup} from "../AdvancedPoolHooks/AdvancedPoolHooksSetu
 contract TokenPool_applyFee is AdvancedPoolHooksSetup {
   function test_applyFee_CustomFinality() public {
     uint16 minBlockConfirmations = 5;
-    uint16 defaultBlockConfirmationTransferFeeBps = 100;
-    uint16 customBlockConfirmationTransferFeeBps = 500;
+    uint16 defaultBlockConfirmationsTransferFeeBps = 100;
+    uint16 customBlockConfirmationsTransferFeeBps = 500;
     uint256 amount = 1_000e18;
     s_tokenPool.setMinBlockConfirmations(minBlockConfirmations);
     TokenPool.TokenTransferFeeConfigArgs[] memory feeConfigArgs = new TokenPool.TokenTransferFeeConfigArgs[](1);
@@ -20,10 +20,10 @@ contract TokenPool_applyFee is AdvancedPoolHooksSetup {
       tokenTransferFeeConfig: IPoolV2.TokenTransferFeeConfig({
         destGasOverhead: 50_000,
         destBytesOverhead: Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES,
-        defaultBlockConfirmationFeeUSDCents: 0,
-        customBlockConfirmationFeeUSDCents: 0,
-        defaultBlockConfirmationTransferFeeBps: defaultBlockConfirmationTransferFeeBps,
-        customBlockConfirmationTransferFeeBps: customBlockConfirmationTransferFeeBps,
+        defaultBlockConfirmationsFeeUSDCents: 0,
+        customBlockConfirmationsFeeUSDCents: 0,
+        defaultBlockConfirmationsTransferFeeBps: defaultBlockConfirmationsTransferFeeBps,
+        customBlockConfirmationsTransferFeeBps: customBlockConfirmationsTransferFeeBps,
         isEnabled: true
       })
     });
@@ -38,11 +38,11 @@ contract TokenPool_applyFee is AdvancedPoolHooksSetup {
     });
 
     uint256 amountAfterFee = s_tokenPool.applyFee(lockOrBurnIn, minBlockConfirmations);
-    assertEq(amountAfterFee, amount - ((amount * customBlockConfirmationTransferFeeBps) / BPS_DIVIDER));
+    assertEq(amountAfterFee, amount - ((amount * customBlockConfirmationsTransferFeeBps) / BPS_DIVIDER));
   }
 
   function test_applyFee_DefaultFinality() public {
-    uint16 defaultBlockConfirmationTransferFeeBps = 250; // 2.5%
+    uint16 defaultBlockConfirmationsTransferFeeBps = 250; // 2.5%
     uint256 amount = 1_000e18;
 
     vm.startPrank(OWNER);
@@ -52,10 +52,10 @@ contract TokenPool_applyFee is AdvancedPoolHooksSetup {
       tokenTransferFeeConfig: IPoolV2.TokenTransferFeeConfig({
         destGasOverhead: 50_000,
         destBytesOverhead: Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES,
-        defaultBlockConfirmationFeeUSDCents: 0,
-        customBlockConfirmationFeeUSDCents: 0,
-        defaultBlockConfirmationTransferFeeBps: defaultBlockConfirmationTransferFeeBps,
-        customBlockConfirmationTransferFeeBps: 0,
+        defaultBlockConfirmationsFeeUSDCents: 0,
+        customBlockConfirmationsFeeUSDCents: 0,
+        defaultBlockConfirmationsTransferFeeBps: defaultBlockConfirmationsTransferFeeBps,
+        customBlockConfirmationsTransferFeeBps: 0,
         isEnabled: true
       })
     });
@@ -70,6 +70,6 @@ contract TokenPool_applyFee is AdvancedPoolHooksSetup {
     });
 
     uint256 amountAfterFee = s_tokenPool.applyFee(lockOrBurnIn, 0);
-    assertEq(amountAfterFee, amount - ((amount * defaultBlockConfirmationTransferFeeBps) / BPS_DIVIDER));
+    assertEq(amountAfterFee, amount - ((amount * defaultBlockConfirmationsTransferFeeBps) / BPS_DIVIDER));
   }
 }
