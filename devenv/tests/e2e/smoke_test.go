@@ -184,7 +184,7 @@ func TestE2ESmoke(t *testing.T) {
 		t.Run(fmt.Sprintf("%s gas limit too high", laneTag), func(t *testing.T) {
 			receiver := toImpl.CCIPReceiver()
 
-			extraArgs, err := toImpl.GetExtraArgs(receiver, fromImpl.Family(), testadapters.NewGasLimitExtraArg(big.NewInt(math.MaxInt32)))
+			extraArgs, err := toImpl.GetExtraArgs(receiver, fromImpl.Family(), testadapters.NewGasLimitExtraArg(big.NewInt(math.MaxUint32)))
 			require.NoError(t, err)
 
 			msg, err := fromImpl.BuildMessage(testadapters.MessageComponents{
