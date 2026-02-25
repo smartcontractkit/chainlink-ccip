@@ -39,6 +39,7 @@ contract SiloedUSDCTokenPool_proposeCCTPMigration is SiloedUSDCTokenPoolSetup {
 
     // Provide some liquidity to the lockbox and exclude tokens to allow burning
     deal(address(s_USDCToken), address(s_destLockBox), 1000e6);
+    s_usdcTokenPool.setLockedUSDCToBurn(DEST_CHAIN_SELECTOR, 1000e6);
     s_usdcTokenPool.excludeTokensFromBurn(DEST_CHAIN_SELECTOR, 100e6);
 
     // Stop the OWNER prank so that the circle migrator can be set
@@ -51,5 +52,10 @@ contract SiloedUSDCTokenPool_proposeCCTPMigration is SiloedUSDCTokenPoolSetup {
     vm.startPrank(OWNER);
     vm.expectRevert(abi.encodeWithSelector(SiloedUSDCTokenPool.ChainAlreadyMigrated.selector, DEST_CHAIN_SELECTOR));
     s_usdcTokenPool.proposeCCTPMigration(DEST_CHAIN_SELECTOR);
+  }
+
+  function test_proposeCCTPMigration_RevertWhen_InvalidChainSelector() public {
+    vm.expectRevert(abi.encodeWithSelector(SiloedUSDCTokenPool.InvalidChainSelector.selector));
+    s_usdcTokenPool.proposeCCTPMigration(0);
   }
 }

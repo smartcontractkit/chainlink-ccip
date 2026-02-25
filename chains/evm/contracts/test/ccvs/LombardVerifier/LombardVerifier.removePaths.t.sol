@@ -11,12 +11,13 @@ contract LombardVerifier_removePaths is LombardVerifierSetup {
     LombardVerifier.Path memory pathBefore = s_lombardVerifier.getPath(DEST_CHAIN_SELECTOR);
     assertEq(pathBefore.lChainId, LOMBARD_CHAIN_ID);
     assertEq(pathBefore.allowedCaller, ALLOWED_CALLER);
+    assertEq(pathBefore.remoteAdapter, bytes32(0));
 
     uint64[] memory chainsToRemove = new uint64[](1);
     chainsToRemove[0] = DEST_CHAIN_SELECTOR;
 
     vm.expectEmit();
-    emit LombardVerifier.PathRemoved(DEST_CHAIN_SELECTOR, LOMBARD_CHAIN_ID, ALLOWED_CALLER);
+    emit LombardVerifier.PathRemoved(DEST_CHAIN_SELECTOR, LOMBARD_CHAIN_ID, ALLOWED_CALLER, bytes32(0));
 
     s_lombardVerifier.removePaths(chainsToRemove);
 
@@ -24,6 +25,7 @@ contract LombardVerifier_removePaths is LombardVerifierSetup {
     LombardVerifier.Path memory pathAfter = s_lombardVerifier.getPath(DEST_CHAIN_SELECTOR);
     assertEq(pathAfter.lChainId, bytes32(0));
     assertEq(pathAfter.allowedCaller, bytes32(0));
+    assertEq(pathAfter.remoteAdapter, bytes32(0));
 
     // Verify chain is removed from supported chains.
     uint64[] memory supportedChains = s_lombardVerifier.getSupportedChains();

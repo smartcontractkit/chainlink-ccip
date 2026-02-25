@@ -120,8 +120,8 @@ contract BurnMintTokenPool_lockOrBurn is BurnMintTokenPoolSetup {
   }
 
   function test_lockOrBurn_FeeNotApplied_LegacyLockOrBurn() public {
-    uint16 defaultBlockConfirmationTransferFeeBps = 100;
-    uint16 customBlockConfirmationTransferFeeBps = 500;
+    uint16 defaultBlockConfirmationsTransferFeeBps = 100;
+    uint16 customBlockConfirmationsTransferFeeBps = 500;
     uint256 amount = 1000e18;
 
     // Mint tokens to the pool so they can be burned
@@ -133,10 +133,10 @@ contract BurnMintTokenPool_lockOrBurn is BurnMintTokenPoolSetup {
       tokenTransferFeeConfig: IPoolV2.TokenTransferFeeConfig({
         destGasOverhead: 50_000,
         destBytesOverhead: Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES,
-        defaultBlockConfirmationFeeUSDCents: 0,
-        customBlockConfirmationFeeUSDCents: 0,
-        defaultBlockConfirmationTransferFeeBps: defaultBlockConfirmationTransferFeeBps,
-        customBlockConfirmationTransferFeeBps: customBlockConfirmationTransferFeeBps,
+        defaultBlockConfirmationsFeeUSDCents: 0,
+        customBlockConfirmationsFeeUSDCents: 0,
+        defaultBlockConfirmationsTransferFeeBps: defaultBlockConfirmationsTransferFeeBps,
+        customBlockConfirmationsTransferFeeBps: customBlockConfirmationsTransferFeeBps,
         isEnabled: true
       })
     });

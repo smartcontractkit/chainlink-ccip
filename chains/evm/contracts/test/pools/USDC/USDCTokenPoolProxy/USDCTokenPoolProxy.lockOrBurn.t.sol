@@ -200,7 +200,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
   function test_lockOrBurn_LockReleaseV2() public {
     uint256 amount = 500;
     bytes memory tokenArgs = abi.encode(1, 2, 3);
-    uint16 blockConfirmationRequested = 2;
+    uint16 blockConfirmationsRequested = 2;
     bytes memory destTokenAddress = abi.encode(address(s_USDCToken));
 
     // Enable IPoolV2 interface for lock release pool.
@@ -230,7 +230,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
     // Mock the lock release pool's IPoolV2.lockOrBurn.
     vm.mockCall(
       address(s_lockReleasePool),
-      abi.encodeCall(IPoolV2.lockOrBurn, (lockOrBurnIn, blockConfirmationRequested, tokenArgs)),
+      abi.encodeCall(IPoolV2.lockOrBurn, (lockOrBurnIn, blockConfirmationsRequested, tokenArgs)),
       abi.encode(expectedOutput, amount)
     );
 
@@ -238,12 +238,12 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
 
     vm.expectCall(
       address(s_lockReleasePool),
-      abi.encodeCall(IPoolV2.lockOrBurn, (lockOrBurnIn, blockConfirmationRequested, tokenArgs))
+      abi.encodeCall(IPoolV2.lockOrBurn, (lockOrBurnIn, blockConfirmationsRequested, tokenArgs))
     );
     vm.expectCall(address(s_USDCToken), abi.encodeCall(IERC20.transfer, (address(s_lockReleasePool), amount)));
 
     (Pool.LockOrBurnOutV1 memory result, uint256 destTokenAmount) =
-      s_usdcTokenPoolProxy.lockOrBurn(lockOrBurnIn, blockConfirmationRequested, tokenArgs);
+      s_usdcTokenPoolProxy.lockOrBurn(lockOrBurnIn, blockConfirmationsRequested, tokenArgs);
     assertEq(result.destTokenAddress, expectedOutput.destTokenAddress);
     assertEq(result.destPoolData, expectedOutput.destPoolData);
     assertEq(destTokenAmount, amount);
@@ -252,7 +252,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
   function test_lockOrBurn_CCTPV2WithCCV() public {
     uint256 amount = 400;
     bytes memory tokenArgs = abi.encode(abi.encode(1, 2, 3));
-    uint16 blockConfirmationRequested = 1;
+    uint16 blockConfirmationsRequested = 1;
     bytes memory destTokenAddress = abi.encode(address(s_USDCToken));
     address verifierImpl = makeAddr("verifierImpl");
 
@@ -285,12 +285,12 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
 
     vm.expectCall(
       address(s_cctpThroughCCVTokenPool),
-      abi.encodeWithSelector(IPoolV2.lockOrBurn.selector, lockOrBurnIn, blockConfirmationRequested, tokenArgs)
+      abi.encodeWithSelector(IPoolV2.lockOrBurn.selector, lockOrBurnIn, blockConfirmationsRequested, tokenArgs)
     );
     vm.expectCall(address(s_USDCToken), abi.encodeWithSelector(IERC20.transfer.selector, verifierImpl, amount));
 
     (Pool.LockOrBurnOutV1 memory result, uint256 destTokenAmount) =
-      s_usdcTokenPoolProxy.lockOrBurn(lockOrBurnIn, blockConfirmationRequested, tokenArgs);
+      s_usdcTokenPoolProxy.lockOrBurn(lockOrBurnIn, blockConfirmationsRequested, tokenArgs);
     assertEq(result.destTokenAddress, expectedOutput.destTokenAddress);
     assertEq(result.destPoolData, expectedOutput.destPoolData);
     assertEq(destTokenAmount, amount);
@@ -343,7 +343,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
   function test_lockOrBurn_CCTPV2WithCCV_RevertWhen_ChainNotSupportedByVerifier() public {
     uint256 amount = 100;
     bytes memory tokenArgs = abi.encode(abi.encode(1, 2, 3));
-    uint16 blockConfirmationRequested = 1;
+    uint16 blockConfirmationsRequested = 1;
     address verifierImpl = address(0);
 
     vm.mockCall(
@@ -365,7 +365,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
         amount: amount,
         localToken: address(s_USDCToken)
       }),
-      blockConfirmationRequested,
+      blockConfirmationsRequested,
       tokenArgs
     );
   }
