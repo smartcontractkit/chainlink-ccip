@@ -28,7 +28,6 @@ import (
 )
 
 func TestUpdateToFeeQuoter_1_7(t *testing.T) {
-	t.Skip("will re-enable when we have the fee quoter 1.7.0 implementation of feequoter updater points to updated changeset")
 	chains := []uint64{
 		chain_selectors.ETHEREUM_MAINNET.Selector,
 		chain_selectors.AVALANCHE_MAINNET.Selector,
@@ -115,13 +114,13 @@ func TestUpdateToFeeQuoter_1_7(t *testing.T) {
 		fq16AddrRefs := e.DataStore.Addresses().Filter(
 			datastore.AddressRefByChainSelector(chainSel),
 			datastore.AddressRefByType(datastore.ContractType(fq16ops.ContractType)),
-			datastore.AddressRefByVersion(semver.MustParse("1.6.3")),
+			datastore.AddressRefByVersion(fq16ops.Version),
 		)
-		require.Len(t, fq16AddrRefs, 1, "Expected exactly 1 FeeQuoter address ref for version 1.6.3 and chain selector %d", chainSel)
+		require.Len(t, fq16AddrRefs, 1, "Expected exactly 1 FeeQuoter address ref for version 1.6.0 and chain selector %d", chainSel)
 		fq16Addr := common.HexToAddress(fq16AddrRefs[0].Address)
 		// check that the new fee quoter has the same config as the old fee quoter
 		fq16Contract, err := fq16.NewFeeQuoter(fq16Addr, chain.Client)
-		require.NoError(t, err, "Failed to instantiate old FeeQuoter 1.6.3 contract for chain selector %d", chainSel)
+		require.NoError(t, err, "Failed to instantiate old FeeQuoter 1.6.0 contract for chain selector %d", chainSel)
 		staticConfig16, err := fq16Contract.GetStaticConfig(nil)
 		require.NoError(t, err, "Failed to get FeeQuoter config for old contract for chain selector %d", chainSel)
 		staticConfig17, err := fq17Contract.GetStaticConfig(nil)
