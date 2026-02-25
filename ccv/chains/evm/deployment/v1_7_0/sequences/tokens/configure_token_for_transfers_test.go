@@ -146,7 +146,7 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 		// Verify configuration for second remote chain
 		checkRemoteChainConfiguration(t, tp, remoteChainSel2, input.RemoteChains[remoteChainSel2])
 
-		minBlockConfirmation, err := tp.GetMinBlockConfirmation(nil)
+		minBlockConfirmation, err := tp.GetMinBlockConfirmations(nil)
 		require.NoError(t, err, "Failed to get configured min block confirmation")
 		require.Equal(t, input.MinFinalityValue, minBlockConfirmation, "Min block confirmation should match input")
 
@@ -272,7 +272,7 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 		tp, err := tp_bindings.NewTokenPool(common.HexToAddress(tokenPoolAddress), e.BlockChains.EVMChains()[chainSel].Client)
 		require.NoError(t, err, "Failed to instantiate token pool contract")
 
-		minBlockConfirmation, err := tp.GetMinBlockConfirmation(nil)
+		minBlockConfirmation, err := tp.GetMinBlockConfirmations(nil)
 		require.NoError(t, err, "Failed to get configured min block confirmation")
 		require.Equal(t, uint16(0), minBlockConfirmation, "Min block confirmation should remain default")
 		customFinalityInboundRateLimiterConfig := input.RemoteChains[remoteChainSel].CustomFinalityInboundRateLimiterConfig
