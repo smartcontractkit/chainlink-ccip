@@ -5,6 +5,8 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
+	mcms_types "github.com/smartcontractkit/mcms/types"
+
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/token_pool"
 	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	v1_5_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
@@ -12,7 +14,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	mcms_types "github.com/smartcontractkit/mcms/types"
 )
 
 var ConfigureTokenForTransfers = cldf_ops.NewSequence(
@@ -59,7 +60,7 @@ var ConfigureTokenForTransfers = cldf_ops.NewSequence(
 		}
 
 		// Configure minimum block confirmation
-		configureMinBlockConfirmationReport, err := cldf_ops.ExecuteOperation(b, token_pool.SetMinBlockConfirmation, chain, evm_contract.FunctionInput[uint16]{
+		configureMinBlockConfirmationReport, err := cldf_ops.ExecuteOperation(b, token_pool.SetMinBlockConfirmations, chain, evm_contract.FunctionInput[uint16]{
 			ChainSelector: input.ChainSelector,
 			Address:       tokenPoolAddress,
 			Args:          input.MinFinalityValue,
