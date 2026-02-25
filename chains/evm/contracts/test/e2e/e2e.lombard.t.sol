@@ -120,12 +120,15 @@ contract e2e_lombard is OnRampSetup {
 
     s_sourceLombardVerifier.applyRemoteChainConfigUpdates(destChainConfigs);
     s_sourceLombardVerifier.setPath(
-      DEST_CHAIN_SELECTOR, LOMBARD_CHAIN_ID, bytes32(bytes20(address(s_destLombardVerifier)))
+      DEST_CHAIN_SELECTOR, LOMBARD_CHAIN_ID, bytes32(bytes20(address(s_destLombardVerifier))), bytes32(0)
     );
 
     LombardVerifier.SupportedTokenArgs[] memory tokensToAdd = new LombardVerifier.SupportedTokenArgs[](1);
     tokensToAdd[0] = LombardVerifier.SupportedTokenArgs({localToken: s_sourceFeeToken, localAdapter: address(0)});
     s_sourceLombardVerifier.updateSupportedTokens(new address[](0), tokensToAdd);
+    s_lombardBridge.setAllowedDestinationToken(
+      LOMBARD_CHAIN_ID, s_sourceFeeToken, bytes32(uint256(uint160(s_destFeeToken)))
+    );
 
     // Configure destination Lombard verifier for verifyMessage (offRamp authorization check uses sourceChainSelector).
     BaseVerifier.RemoteChainConfigArgs[] memory lombardSourceConfig = new BaseVerifier.RemoteChainConfigArgs[](1);

@@ -2,7 +2,6 @@ package token_pools
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 
 	"github.com/gagliardetto/solana-go"
@@ -36,10 +35,9 @@ func poolDiff(existingPoolAddresses []base_token_pool.RemoteAddress, newPoolAddr
 }
 
 type TokenPoolTransferOwnershipInput struct {
-	Program      solana.PublicKey
-	CurrentOwner solana.PublicKey
-	NewOwner     solana.PublicKey
-	TokenMint    solana.PublicKey
+	Program   solana.PublicKey
+	NewOwner  solana.PublicKey
+	TokenMint solana.PublicKey
 }
 
 type Params struct {
@@ -99,7 +97,7 @@ func initGlobalConfigTokenPool(
 
 	// Check if already initialized.
 	var chainConfig base_token_pool.BaseConfig
-	_ = chain.GetAccountDataBorshInto(context.Background(), configPDA, &chainConfig)
+	_ = chain.GetAccountDataBorshInto(b.GetContext(), configPDA, &chainConfig)
 	if !chainConfig.TokenProgram.IsZero() {
 		b.Logger.Info(p.LogName+" global config already initialized for token pool:", input.TokenPool.String())
 		return sequences.OnChainOutput{}, nil
@@ -130,4 +128,9 @@ func initGlobalConfigTokenPool(
 	}
 
 	return sequences.OnChainOutput{}, nil
+}
+
+type PoolInitializeOut struct {
+	sequences.OnChainOutput
+	Initializer solana.PublicKey
 }

@@ -39,10 +39,10 @@ contract CCTPThroughCCVTokenPool_getTokenTransferFeeConfig is CCTPThroughCCVToke
     IPoolV2.TokenTransferFeeConfig memory feeConfig = IPoolV2.TokenTransferFeeConfig({
       destGasOverhead: 50_000,
       destBytesOverhead: 32,
-      defaultBlockConfirmationFeeUSDCents: 100,
-      customBlockConfirmationFeeUSDCents: 150,
-      defaultBlockConfirmationTransferFeeBps: 0,
-      customBlockConfirmationTransferFeeBps: 0,
+      defaultBlockConfirmationsFeeUSDCents: 100,
+      customBlockConfirmationsFeeUSDCents: 150,
+      defaultBlockConfirmationsTransferFeeBps: 0,
+      customBlockConfirmationsTransferFeeBps: 0,
       isEnabled: true
     });
 
@@ -59,11 +59,11 @@ contract CCTPThroughCCVTokenPool_getTokenTransferFeeConfig is CCTPThroughCCVToke
 
     assertEq(returnedFeeConfig.destGasOverhead, feeConfig.destGasOverhead);
     assertEq(returnedFeeConfig.destBytesOverhead, feeConfig.destBytesOverhead);
-    assertEq(returnedFeeConfig.defaultBlockConfirmationFeeUSDCents, feeConfig.defaultBlockConfirmationFeeUSDCents);
-    assertEq(returnedFeeConfig.customBlockConfirmationFeeUSDCents, feeConfig.customBlockConfirmationFeeUSDCents);
-    assertEq(returnedFeeConfig.defaultBlockConfirmationTransferFeeBps, 0);
+    assertEq(returnedFeeConfig.defaultBlockConfirmationsFeeUSDCents, feeConfig.defaultBlockConfirmationsFeeUSDCents);
+    assertEq(returnedFeeConfig.customBlockConfirmationsFeeUSDCents, feeConfig.customBlockConfirmationsFeeUSDCents);
+    assertEq(returnedFeeConfig.defaultBlockConfirmationsTransferFeeBps, 0);
     // Custom block confirmation transfer fee bps should be overridden by the CCTPVerifier's fast finality bps.
-    assertEq(returnedFeeConfig.customBlockConfirmationTransferFeeBps, FAST_FINALITY_BPS);
+    assertEq(returnedFeeConfig.customBlockConfirmationsTransferFeeBps, FAST_FINALITY_BPS);
     assertEq(returnedFeeConfig.isEnabled, feeConfig.isEnabled);
   }
 

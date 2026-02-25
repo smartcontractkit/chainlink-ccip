@@ -177,9 +177,6 @@ func (b *OutputBuilder) getTimelockAddresses(
 		if err != nil {
 			return nil, fmt.Errorf("failed to get timelock ref for chain with selector %d: %w", op.ChainSelector, err)
 		}
-		if err != nil {
-			return nil, fmt.Errorf("failed to resolve timelock ref on chain with selector %d: %w", op.ChainSelector, err)
-		}
 		timelocks[op.ChainSelector] = timelockRef.Address
 	}
 

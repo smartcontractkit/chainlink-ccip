@@ -55,3 +55,4 @@ package ccip
 
 // Extract bytecode and ABI from generated wrappers
 //go:generate go run github.com/smartcontractkit/chainlink-evm/gethwrappers/helpers/extract_bytecode -input=generated -bytecode=../bytecode -abi=../abi
+//go:generate go run github.com/smartcontractkit/chainlink-evm/gethwrappers/helpers/extract_bytecode -input=../../../ccv/chains/evm/gobindings/generated -bytecode=../bytecode -abi=../abi

@@ -94,23 +94,23 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 				remoteChainSel1: {
 					RemoteToken:                              common.LeftPadBytes(common.FromHex("0x123"), 32),
 					RemotePool:                               common.LeftPadBytes(common.FromHex("0x456"), 32),
-					DefaultFinalityInboundRateLimiterConfig:  testsetup.CreateRateLimiterConfig(100, 1000),
-					DefaultFinalityOutboundRateLimiterConfig: testsetup.CreateRateLimiterConfig(150, 1500),
+					DefaultFinalityInboundRateLimiterConfig:  testsetup.CreateRateLimiterConfigFloatInput(100, 1000),
+					DefaultFinalityOutboundRateLimiterConfig: testsetup.CreateRateLimiterConfigFloatInput(150, 1500),
 					OutboundCCVs:                             []string{"0x789"},
 					InboundCCVs:                              []string{"0xabc"},
-					CustomFinalityInboundRateLimiterConfig:   testsetup.CreateRateLimiterConfig(60, 600),
-					CustomFinalityOutboundRateLimiterConfig:  testsetup.CreateRateLimiterConfig(70, 700),
+					CustomFinalityInboundRateLimiterConfig:   testsetup.CreateRateLimiterConfigFloatInput(60, 600),
+					CustomFinalityOutboundRateLimiterConfig:  testsetup.CreateRateLimiterConfigFloatInput(70, 700),
 					TokenTransferFeeConfig:                   testsetup.CreateBasicTokenTransferFeeConfig(),
 				},
 				remoteChainSel2: {
 					RemoteToken:                              common.LeftPadBytes(common.FromHex("0x321"), 32),
 					RemotePool:                               common.LeftPadBytes(common.FromHex("0x654"), 32),
-					DefaultFinalityInboundRateLimiterConfig:  testsetup.CreateRateLimiterConfig(200, 2000),
-					DefaultFinalityOutboundRateLimiterConfig: testsetup.CreateRateLimiterConfig(250, 2500),
+					DefaultFinalityInboundRateLimiterConfig:  testsetup.CreateRateLimiterConfigFloatInput(200, 2000),
+					DefaultFinalityOutboundRateLimiterConfig: testsetup.CreateRateLimiterConfigFloatInput(250, 2500),
 					OutboundCCVs:                             []string{"0xdef"},
 					InboundCCVs:                              []string{"0x012"},
-					CustomFinalityInboundRateLimiterConfig:   testsetup.CreateRateLimiterConfig(80, 800),
-					CustomFinalityOutboundRateLimiterConfig:  testsetup.CreateRateLimiterConfig(90, 900),
+					CustomFinalityInboundRateLimiterConfig:   testsetup.CreateRateLimiterConfigFloatInput(80, 800),
+					CustomFinalityOutboundRateLimiterConfig:  testsetup.CreateRateLimiterConfigFloatInput(90, 900),
 					TokenTransferFeeConfig:                   testsetup.CreateBasicTokenTransferFeeConfig(),
 				},
 			},
@@ -248,12 +248,12 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 				remoteChainSel: {
 					RemoteToken:                              common.LeftPadBytes(common.FromHex("0x777"), 32),
 					RemotePool:                               common.LeftPadBytes(common.FromHex("0x888"), 32),
-					DefaultFinalityInboundRateLimiterConfig:  testsetup.CreateRateLimiterConfig(500, 5000),
-					DefaultFinalityOutboundRateLimiterConfig: testsetup.CreateRateLimiterConfig(600, 6000),
+					DefaultFinalityInboundRateLimiterConfig:  testsetup.CreateRateLimiterConfigFloatInput(500, 5000),
+					DefaultFinalityOutboundRateLimiterConfig: testsetup.CreateRateLimiterConfigFloatInput(600, 6000),
 					OutboundCCVs:                             []string{"0x999"},
 					InboundCCVs:                              []string{"0xaa0"},
-					CustomFinalityInboundRateLimiterConfig:   testsetup.CreateRateLimiterConfig(11, 111),
-					CustomFinalityOutboundRateLimiterConfig:  testsetup.CreateRateLimiterConfig(22, 222),
+					CustomFinalityInboundRateLimiterConfig:   testsetup.CreateRateLimiterConfigFloatInput(11, 111),
+					CustomFinalityOutboundRateLimiterConfig:  testsetup.CreateRateLimiterConfigFloatInput(22, 222),
 					TokenTransferFeeConfig:                   testsetup.CreateBasicTokenTransferFeeConfig(),
 				},
 			},
@@ -281,22 +281,27 @@ func TestConfigureTokenForTransfers(t *testing.T) {
 	})
 }
 
-// checkRemoteChainConfiguration verifies the configuration for a remote chain on the token pool
+const testTokenDecimals = 18
+
+// checkRemoteChainConfiguration verifies the configuration for a remote chain on the token pool.
+// Rate/capacity are in token units in config; on-chain values are scaled by 10^decimals (inbound also by 1.1x).
 func checkRemoteChainConfiguration(t *testing.T, tp *tp_bindings.TokenPool, remoteChainSel uint64, config tokens_core.RemoteChainConfig[[]byte, string]) {
 	rateLimiterStates, err := tp.GetCurrentRateLimiterState(nil, remoteChainSel, false)
 	require.NoError(t, err, "Failed to get rate limiter state")
 
-	// Check inbound rate limiter
+	// Check inbound rate limiter (scaled by 10^decimals and 1.1x)
 	inboundRateLimiter := rateLimiterStates.InboundRateLimiterState
 	require.Equal(t, config.DefaultFinalityInboundRateLimiterConfig.IsEnabled, inboundRateLimiter.IsEnabled, "Inbound rate limiter enabled state should match")
-	require.Equal(t, config.DefaultFinalityInboundRateLimiterConfig.Rate, inboundRateLimiter.Rate, "Inbound rate limiter rate should match")
-	require.Equal(t, config.DefaultFinalityInboundRateLimiterConfig.Capacity, inboundRateLimiter.Capacity, "Inbound rate limiter capacity should match")
+	expectedInboundRate := tokens_core.ScaleFloatToBigInt(config.DefaultFinalityInboundRateLimiterConfig.Rate, testTokenDecimals, 0.10)
+	expectedInboundCapacity := tokens_core.ScaleFloatToBigInt(config.DefaultFinalityInboundRateLimiterConfig.Capacity, testTokenDecimals, 0.10)
+	requireScaledRateLimiterMatch(t, expectedInboundRate, expectedInboundCapacity, inboundRateLimiter.Rate, inboundRateLimiter.Capacity, "Inbound")
 
-	// Check outbound rate limiter
+	// Check outbound rate limiter (scaled by 10^decimals only)
 	outboundRateLimiter := rateLimiterStates.OutboundRateLimiterState
 	require.Equal(t, config.DefaultFinalityOutboundRateLimiterConfig.IsEnabled, outboundRateLimiter.IsEnabled, "Outbound rate limiter enabled state should match")
-	require.Equal(t, config.DefaultFinalityOutboundRateLimiterConfig.Rate, outboundRateLimiter.Rate, "Outbound rate limiter rate should match")
-	require.Equal(t, config.DefaultFinalityOutboundRateLimiterConfig.Capacity, outboundRateLimiter.Capacity, "Outbound rate limiter capacity should match")
+	expectedOutboundRate := tokens_core.ScaleFloatToBigInt(config.DefaultFinalityOutboundRateLimiterConfig.Rate, testTokenDecimals, 0)
+	expectedOutboundCapacity := tokens_core.ScaleFloatToBigInt(config.DefaultFinalityOutboundRateLimiterConfig.Capacity, testTokenDecimals, 0)
+	requireScaledRateLimiterMatch(t, expectedOutboundRate, expectedOutboundCapacity, outboundRateLimiter.Rate, outboundRateLimiter.Capacity, "Outbound")
 
 	// Check remote token
 	remoteToken, err := tp.GetRemoteToken(nil, remoteChainSel)
@@ -327,8 +332,8 @@ func assertCustomBlockConfirmationBucket(
 	t *testing.T,
 	tp *tp_bindings.TokenPool,
 	remoteChainSel uint64,
-	expectedInbound *tokens_core.RateLimiterConfig,
-	expectedOutbound *tokens_core.RateLimiterConfig,
+	expectedInbound *tokens_core.RateLimiterConfigFloatInput,
+	expectedOutbound *tokens_core.RateLimiterConfigFloatInput,
 ) {
 	require.NotNil(t, expectedOutbound, "expected outbound rate limiter config must be provided for selector %d", remoteChainSel)
 	require.NotNil(t, expectedInbound, "expected inbound rate limiter config must be provided for selector %d", remoteChainSel)
@@ -336,28 +341,38 @@ func assertCustomBlockConfirmationBucket(
 	states, err := tp.GetCurrentRateLimiterState(nil, remoteChainSel, true)
 	require.NoError(t, err, "Failed to get custom block confirmation buckets for selector %d", remoteChainSel)
 
-	assertBucketMatchesConfig(t, states.OutboundRateLimiterState, *expectedOutbound)
-	assertBucketMatchesConfig(t, states.InboundRateLimiterState, *expectedInbound)
+	assertBucketMatchesConfig(t, states.OutboundRateLimiterState, *expectedOutbound, testTokenDecimals, false)
+	assertBucketMatchesConfig(t, states.InboundRateLimiterState, *expectedInbound, testTokenDecimals, true)
 }
 
-func assertBucketMatchesConfig(t *testing.T, actual tp_bindings.RateLimiterTokenBucket, expected tokens_core.RateLimiterConfig) {
+func requireScaledRateLimiterMatch(t *testing.T, expectedRate, expectedCapacity *big.Int, actualRate, actualCapacity *big.Int, label string) {
+	if actualRate == nil {
+		actualRate = big.NewInt(0)
+	}
+	if actualCapacity == nil {
+		actualCapacity = big.NewInt(0)
+	}
+	require.Zero(t, expectedRate.Cmp(actualRate), "%s rate limiter rate should match (scaled)", label)
+	require.Zero(t, expectedCapacity.Cmp(actualCapacity), "%s rate limiter capacity should match (scaled)", label)
+}
+
+// assertBucketMatchesConfig compares actual on-chain rate limiter state to expected token-unit config,
+// scaling expected by 10^decimals and (for inbound) 1.1x to match GenerateTPRLConfigs.
+func assertBucketMatchesConfig(t *testing.T, actual tp_bindings.RateLimiterTokenBucket, expected tokens_core.RateLimiterConfigFloatInput, decimals int, isInbound bool) {
 	require.Equal(t, expected.IsEnabled, actual.IsEnabled, "Rate limiter enabled mismatch")
 
-	expectedCapacity := big.NewInt(0)
-	if expected.Capacity != nil {
-		expectedCapacity = expected.Capacity
+	extraPercent := 0.0
+	if isInbound {
+		extraPercent = 0.10
 	}
+	expectedCapacity := tokens_core.ScaleFloatToBigInt(expected.Capacity, decimals, extraPercent)
+	expectedRate := tokens_core.ScaleFloatToBigInt(expected.Rate, decimals, extraPercent)
 	if actual.Capacity == nil {
 		actual.Capacity = big.NewInt(0)
-	}
-	require.Zero(t, expectedCapacity.Cmp(actual.Capacity), "Rate limiter capacity mismatch")
-
-	expectedRate := big.NewInt(0)
-	if expected.Rate != nil {
-		expectedRate = expected.Rate
 	}
 	if actual.Rate == nil {
 		actual.Rate = big.NewInt(0)
 	}
+	require.Zero(t, expectedCapacity.Cmp(actual.Capacity), "Rate limiter capacity mismatch")
 	require.Zero(t, expectedRate.Cmp(actual.Rate), "Rate limiter rate mismatch")
 }

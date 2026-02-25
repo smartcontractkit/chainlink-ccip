@@ -97,6 +97,7 @@ contract SiloedUSDCTokenPool_releaseOrMint is SiloedUSDCTokenPoolSetup {
     // Set up the circle migrator address
     address circleMigrator = makeAddr("circleMigrator");
     s_usdcTokenPool.setCircleMigratorAddress(circleMigrator);
+    s_usdcTokenPool.setLockedUSDCToBurn(SOURCE_CHAIN_SELECTOR, DEFAULT_LIQUIDITY);
 
     // Exclude some tokens from burn (liquidity already provided in setUp)
     uint256 excludedAmount = 500e6;
@@ -127,10 +128,12 @@ contract SiloedUSDCTokenPool_releaseOrMint is SiloedUSDCTokenPoolSetup {
     uint256 newExcludedAmount = s_usdcTokenPool.getExcludedTokensByChain(SOURCE_CHAIN_SELECTOR);
     assertEq(newExcludedAmount, excludedAmount - releaseAmount);
 
+    vm.startPrank(OWNER);
+    s_usdcTokenPool.setLockedUSDCToBurn(SOURCE_CHAIN_SELECTOR, availableTokens);
+
     // Execute the migration to mark the chain as migrated
     vm.startPrank(circleMigrator);
     s_usdcTokenPool.burnLockedUSDC();
-    vm.stopPrank();
 
     // Verify the chain is now migrated and tokens are still excluded
     assertEq(s_usdcTokenPool.getExcludedTokensByChain(SOURCE_CHAIN_SELECTOR), newExcludedAmount);
@@ -146,12 +149,75 @@ contract SiloedUSDCTokenPool_releaseOrMint is SiloedUSDCTokenPoolSetup {
     assertEq(s_usdcTokenPool.getExcludedTokensByChain(SOURCE_CHAIN_SELECTOR), remainingExcludedTokens);
   }
 
+  function test_releaseOrMint_RevertWhen_InsufficientLiquidity_ProposedChainHasNoExcludedLiquidity() public {
+    vm.startPrank(OWNER);
+    s_usdcTokenPool.proposeCCTPMigration(SOURCE_CHAIN_SELECTOR);
+
+    uint256 releaseAmount = 100e6;
+    Pool.ReleaseOrMintInV1 memory releaseOrMintIn = Pool.ReleaseOrMintInV1({
+      originalSender: s_originalSender,
+      receiver: s_recipient,
+      sourceDenominatedAmount: releaseAmount,
+      localToken: address(s_USDCToken),
+      remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+      sourcePoolAddress: s_sourcePoolAddress,
+      sourcePoolData: abi.encode(LOCK_RELEASE_FLAG),
+      offchainTokenData: ""
+    });
+
+    vm.startPrank(s_routerAllowedOffRamp);
+    vm.expectRevert(abi.encodeWithSelector(SiloedUSDCTokenPool.InsufficientLiquidity.selector, 0, releaseAmount));
+    s_usdcTokenPool.releaseOrMint(releaseOrMintIn);
+  }
+
+  function test_releaseOrMint_RevertWhen_InsufficientLiquidity_MigratedChainHasNoExcludedLiquidity() public {
+    vm.startPrank(OWNER);
+    s_usdcTokenPool.proposeCCTPMigration(SOURCE_CHAIN_SELECTOR);
+    address circleMigrator = makeAddr("circleMigrator");
+    s_usdcTokenPool.setCircleMigratorAddress(circleMigrator);
+
+    uint256 excludedAmount = 200e6;
+    s_usdcTokenPool.setLockedUSDCToBurn(SOURCE_CHAIN_SELECTOR, DEFAULT_LIQUIDITY);
+    s_usdcTokenPool.excludeTokensFromBurn(SOURCE_CHAIN_SELECTOR, excludedAmount);
+
+    vm.startPrank(circleMigrator);
+    s_usdcTokenPool.burnLockedUSDC();
+
+    Pool.ReleaseOrMintInV1 memory releaseOrMintIn = Pool.ReleaseOrMintInV1({
+      originalSender: s_originalSender,
+      receiver: s_recipient,
+      sourceDenominatedAmount: excludedAmount,
+      localToken: address(s_USDCToken),
+      remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+      sourcePoolAddress: s_sourcePoolAddress,
+      sourcePoolData: abi.encode(LOCK_RELEASE_FLAG),
+      offchainTokenData: ""
+    });
+
+    // Consume the full excluded reserve with a valid post-migration in-flight message.
+    vm.startPrank(s_routerAllowedOffRamp);
+    s_usdcTokenPool.releaseOrMint(releaseOrMintIn);
+
+    assertEq(s_usdcTokenPool.getExcludedTokensByChain(SOURCE_CHAIN_SELECTOR), 0);
+
+    // Simulate unexpected liquidity appearing in the lockbox after migration.
+    uint256 unexpectedLiquidity = 100e6;
+    deal(address(s_USDCToken), address(s_sourceLockBox), unexpectedLiquidity);
+
+    releaseOrMintIn.sourceDenominatedAmount = unexpectedLiquidity;
+
+    vm.startPrank(s_routerAllowedOffRamp);
+    vm.expectRevert(abi.encodeWithSelector(SiloedUSDCTokenPool.InsufficientLiquidity.selector, 0, unexpectedLiquidity));
+    s_usdcTokenPool.releaseOrMint(releaseOrMintIn);
+  }
+
   // Reverts
 
   function test_releaseOrMint_RevertWhen_InsufficientLiquidity_InsufficientExcludedTokens() public {
     // Propose a CCTP migration to enable excluded tokens tracking.
     vm.startPrank(OWNER);
     s_usdcTokenPool.proposeCCTPMigration(SOURCE_CHAIN_SELECTOR);
+    s_usdcTokenPool.setLockedUSDCToBurn(SOURCE_CHAIN_SELECTOR, DEFAULT_LIQUIDITY);
 
     // Exclude only a small amount of tokens from burn.
     uint256 excludedAmount = 100e6;

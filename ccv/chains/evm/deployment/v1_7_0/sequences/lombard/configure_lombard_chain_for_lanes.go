@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"math/big"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
@@ -125,21 +124,21 @@ var ConfigureLombardChainForLanes = cldf_ops.NewSequence(
 				RemoteToken:            common.LeftPadBytes(remoteTokenAddress, 32),
 				TokenTransferFeeConfig: remoteChain.TokenTransferFeeConfig,
 				// Lombard does not use rate limiters
-				DefaultFinalityOutboundRateLimiterConfig: tokens_core.RateLimiterConfig{
-					Capacity: big.NewInt(0),
-					Rate:     big.NewInt(0),
+				DefaultFinalityOutboundRateLimiterConfig: tokens_core.RateLimiterConfigFloatInput{
+					Capacity: 0,
+					Rate:     0,
 				},
-				CustomFinalityOutboundRateLimiterConfig: tokens_core.RateLimiterConfig{
-					Capacity: big.NewInt(0),
-					Rate:     big.NewInt(0),
+				CustomFinalityOutboundRateLimiterConfig: tokens_core.RateLimiterConfigFloatInput{
+					Capacity: 0,
+					Rate:     0,
 				},
-				DefaultFinalityInboundRateLimiterConfig: tokens_core.RateLimiterConfig{
-					Capacity: big.NewInt(0),
-					Rate:     big.NewInt(0),
+				DefaultFinalityInboundRateLimiterConfig: tokens_core.RateLimiterConfigFloatInput{
+					Capacity: 0,
+					Rate:     0,
 				},
-				CustomFinalityInboundRateLimiterConfig: tokens_core.RateLimiterConfig{
-					Capacity: big.NewInt(0),
-					Rate:     big.NewInt(0),
+				CustomFinalityInboundRateLimiterConfig: tokens_core.RateLimiterConfigFloatInput{
+					Capacity: 0,
+					Rate:     0,
 				},
 			}
 

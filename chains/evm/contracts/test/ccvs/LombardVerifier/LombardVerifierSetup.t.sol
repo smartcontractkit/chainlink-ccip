@@ -24,6 +24,7 @@ contract LombardVerifierSetup is BaseVerifierSetup {
   bytes32 internal constant LOMBARD_CHAIN_ID = bytes32(uint256(10000));
   bytes32 internal constant ALLOWED_CALLER = bytes32(uint256(0x123456));
   uint256 internal constant TRANSFER_AMOUNT = 1e18;
+  address internal s_destToken = makeAddr("destToken");
 
   function setUp() public virtual override {
     super.setUp();
@@ -46,6 +47,7 @@ contract LombardVerifierSetup is BaseVerifierSetup {
     LombardVerifier.SupportedTokenArgs[] memory tokensToAdd = new LombardVerifier.SupportedTokenArgs[](1);
     tokensToAdd[0] = LombardVerifier.SupportedTokenArgs({localToken: address(s_testToken), localAdapter: address(0)});
     s_lombardVerifier.updateSupportedTokens(new address[](0), tokensToAdd);
+    s_mockBridge.setAllowedDestinationToken(LOMBARD_CHAIN_ID, address(s_testToken), bytes32(abi.encode(s_destToken)));
 
     // Set up remote chain config with the router.
     BaseVerifier.RemoteChainConfigArgs[] memory remoteChainConfigs = new BaseVerifier.RemoteChainConfigArgs[](2);
@@ -54,7 +56,7 @@ contract LombardVerifierSetup is BaseVerifierSetup {
     s_lombardVerifier.applyRemoteChainConfigUpdates(remoteChainConfigs);
 
     // Set the path for the destination chain.
-    s_lombardVerifier.setPath(DEST_CHAIN_SELECTOR, LOMBARD_CHAIN_ID, ALLOWED_CALLER);
+    s_lombardVerifier.setPath(DEST_CHAIN_SELECTOR, LOMBARD_CHAIN_ID, ALLOWED_CALLER, bytes32(0));
 
     // Mock the router to return true for the valid offRamp.
     vm.mockCall(
@@ -77,7 +79,7 @@ contract LombardVerifierSetup is BaseVerifierSetup {
       amount: TRANSFER_AMOUNT,
       sourcePoolAddress: abi.encode(makeAddr("sourcePool")),
       sourceTokenAddress: abi.encode(sourceToken),
-      destTokenAddress: abi.encodePacked(makeAddr("destToken")),
+      destTokenAddress: abi.encode(s_destToken),
       tokenReceiver: abi.encodePacked(receiver),
       extraData: ""
     });

@@ -39,6 +39,25 @@ const (
 	inbound  = 1
 )
 
+// requireRateLimiterScaled asserts that on-chain rate limiter state matches the expected token amounts
+// after scaling by decimals and (for inbound) the 1.1x factor used in GenerateTPRLConfigs.
+func requireRateLimiterScaled(t *testing.T, rate, capacity float64, actualRate, actualCapacity *big.Int, decimals int, isInbound bool) {
+	extraPercent := 0.0
+	if isInbound {
+		extraPercent = 0.10
+	}
+	expectedRate := tokens.ScaleFloatToBigInt(rate, decimals, extraPercent)
+	expectedCapacity := tokens.ScaleFloatToBigInt(capacity, decimals, extraPercent)
+	if actualRate == nil {
+		actualRate = big.NewInt(0)
+	}
+	if actualCapacity == nil {
+		actualCapacity = big.NewInt(0)
+	}
+	require.Zero(t, expectedRate.Cmp(actualRate), "Rate limiter rate should match (scaled)")
+	require.Zero(t, expectedCapacity.Cmp(actualCapacity), "Rate limiter capacity should match (scaled)")
+}
+
 func TestTokenAdapter(t *testing.T) {
 	tokenAdapterRegistry := tokens.GetTokenAdapterRegistry()
 	tokenAdapterRegistry.RegisterTokenAdapter("evm", semver.MustParse("1.7.0"), &adapters.TokenAdapter{})
@@ -166,25 +185,25 @@ func TestTokenAdapter(t *testing.T) {
 						Version:   remotePoolVersion,
 						Qualifier: "TEST",
 					},
-					DefaultFinalityInboundRateLimiterConfig: tokens.RateLimiterConfig{
+					DefaultFinalityInboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{
 						IsEnabled: true,
-						Rate:      big.NewInt(10),
-						Capacity:  big.NewInt(100),
+						Rate:      10,
+						Capacity:  100,
 					},
-					DefaultFinalityOutboundRateLimiterConfig: tokens.RateLimiterConfig{
+					DefaultFinalityOutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{
 						IsEnabled: true,
-						Rate:      big.NewInt(10),
-						Capacity:  big.NewInt(100),
+						Rate:      10,
+						Capacity:  100,
 					},
-					CustomFinalityInboundRateLimiterConfig: tokens.RateLimiterConfig{
+					CustomFinalityInboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{
 						IsEnabled: true,
-						Rate:      big.NewInt(10),
-						Capacity:  big.NewInt(100),
+						Rate:      10,
+						Capacity:  100,
 					},
-					CustomFinalityOutboundRateLimiterConfig: tokens.RateLimiterConfig{
+					CustomFinalityOutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{
 						IsEnabled: true,
-						Rate:      big.NewInt(10),
-						Capacity:  big.NewInt(100),
+						Rate:      10,
+						Capacity:  100,
 					},
 					OutboundCCVs: ccvs,
 					InboundCCVs:  ccvs,
@@ -307,12 +326,12 @@ func TestTokenAdapter(t *testing.T) {
 					})
 					require.NoError(t, err, "Failed to get rate limiter config from token pool")
 					currentStates := rateLimiterStateReport.Output
-					require.Equal(t, getRemoteChainConfig(nil, nil).DefaultFinalityInboundRateLimiterConfig.IsEnabled, currentStates.InboundRateLimiterState.IsEnabled, "Inbound rate limiter enabled state should match")
-					require.Equal(t, getRemoteChainConfig(nil, nil).DefaultFinalityInboundRateLimiterConfig.Rate, currentStates.InboundRateLimiterState.Rate, "Inbound rate limiter rate should match")
-					require.Equal(t, getRemoteChainConfig(nil, nil).DefaultFinalityInboundRateLimiterConfig.Capacity, currentStates.InboundRateLimiterState.Capacity, "Inbound rate limiter capacity should match")
-					require.Equal(t, getRemoteChainConfig(nil, nil).DefaultFinalityOutboundRateLimiterConfig.IsEnabled, currentStates.OutboundRateLimiterState.IsEnabled, "Outbound rate limiter enabled state should match")
-					require.Equal(t, getRemoteChainConfig(nil, nil).DefaultFinalityOutboundRateLimiterConfig.Rate, currentStates.OutboundRateLimiterState.Rate, "Outbound rate limiter rate should match")
-					require.Equal(t, getRemoteChainConfig(nil, nil).DefaultFinalityOutboundRateLimiterConfig.Capacity, currentStates.OutboundRateLimiterState.Capacity, "Outbound rate limiter capacity should match")
+					cfg := getRemoteChainConfig(nil, nil)
+					const decimals = 18
+					require.Equal(t, cfg.DefaultFinalityInboundRateLimiterConfig.IsEnabled, currentStates.InboundRateLimiterState.IsEnabled, "Inbound rate limiter enabled state should match")
+					requireRateLimiterScaled(t, cfg.DefaultFinalityInboundRateLimiterConfig.Rate, cfg.DefaultFinalityInboundRateLimiterConfig.Capacity, currentStates.InboundRateLimiterState.Rate, currentStates.InboundRateLimiterState.Capacity, decimals, true)
+					require.Equal(t, cfg.DefaultFinalityOutboundRateLimiterConfig.IsEnabled, currentStates.OutboundRateLimiterState.IsEnabled, "Outbound rate limiter enabled state should match")
+					requireRateLimiterScaled(t, cfg.DefaultFinalityOutboundRateLimiterConfig.Rate, cfg.DefaultFinalityOutboundRateLimiterConfig.Capacity, currentStates.OutboundRateLimiterState.Rate, currentStates.OutboundRateLimiterState.Capacity, decimals, false)
 				}
 
 				// Chain A has a 1.7.0 token pool so should have set CCVs

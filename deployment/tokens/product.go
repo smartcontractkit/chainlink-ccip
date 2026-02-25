@@ -29,20 +29,19 @@ type TokenAdapter interface {
 	// For example, if this address is stored on the pool, this method should fetch it.
 	DeriveTokenAddress(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) ([]byte, error)
 	// DeriveTokenDecimals derives the token decimals from the given token pool reference.
-	DeriveTokenDecimals(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) (uint8, error)
+	DeriveTokenDecimals(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef, token []byte) (uint8, error)
 	// For some chains, the token pool address is not the deployed address and must be derived from the token reference.
 	// This method performs that derivation.
 	DeriveTokenPoolCounterpart(e deployment.Environment, chainSelector uint64, tokenPool []byte, token []byte) ([]byte, error)
 	// ManualRegistration manually registers a customer token with the token admin registry.
 	// This is usally done as they no longer have mint authority over the token.
-	ManualRegistration() *cldf_ops.Sequence[ManualRegistrationInput, sequences.OnChainOutput, cldf_chain.BlockChains]
+	ManualRegistration() *cldf_ops.Sequence[ManualRegistrationSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 	// SetTokenPoolRateLimits returns a sequence that sets rate limits on a token pool.
-	SetTokenPoolRateLimits() *cldf_ops.Sequence[RateLimiterConfigInputs, sequences.OnChainOutput, cldf_chain.BlockChains]
+	SetTokenPoolRateLimits() *cldf_ops.Sequence[TPRLRemotes, sequences.OnChainOutput, cldf_chain.BlockChains]
 	DeployToken() *cldf_ops.Sequence[DeployTokenInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 	DeployTokenVerify(e deployment.Environment, in any) error
 	DeployTokenPoolForToken() *cldf_ops.Sequence[DeployTokenPoolInput, sequences.OnChainOutput, cldf_chain.BlockChains]
-	RegisterToken() *cldf_ops.Sequence[RegisterTokenInput, sequences.OnChainOutput, cldf_chain.BlockChains]
-	SetPool() *cldf_ops.Sequence[SetPoolInput, sequences.OnChainOutput, cldf_chain.BlockChains]
+	UpdateAuthorities() *cldf_ops.Sequence[UpdateAuthoritiesInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 }
 
 // RateLimiterConfig specifies configuration for a rate limiter on a token pool.
@@ -73,6 +72,17 @@ type TokenTransferFeeConfig struct {
 	IsEnabled bool
 }
 
+// RateLimiterConfigFloatInput is the user-friendly version of RateLimiterConfig that accepts
+// float inputs for capacity and rate, which are then converted to big.Int internally after scaling by token decimals.
+type RateLimiterConfigFloatInput struct {
+	// IsEnabled specifies whether the rate limiter should be enabled.
+	IsEnabled bool
+	// Capacity is the maximum number of tokens that can be in a rate limiter bucket.
+	Capacity float64
+	// Rate is the rate at which the rate limiter bucket refills, in tokens per second.
+	Rate float64
+}
+
 // RemoteChainConfig specifies configuration for a remote chain on a token pool.
 type RemoteChainConfig[R any, CCV any] struct {
 	// The token on the remote chain.
@@ -81,13 +91,17 @@ type RemoteChainConfig[R any, CCV any] struct {
 	// The token pool on the remote chain.
 	RemotePool R
 	// DefaultFinalityInboundRateLimiterConfig specifies the desired rate limiter configuration for default-finality inbound traffic.
-	DefaultFinalityInboundRateLimiterConfig RateLimiterConfig
+	// DO NOT SET THIS VALUE WHEN PASSING IN INPUTS.
+	// This value is derived from the configuration specified for outbound traffic to the remote chain, as the same limits should apply in both directions.
+	DefaultFinalityInboundRateLimiterConfig RateLimiterConfigFloatInput
 	// DefaultFinalityOutboundRateLimiterConfig specifies the desired rate limiter configuration for default-finality outbound traffic.
-	DefaultFinalityOutboundRateLimiterConfig RateLimiterConfig
+	DefaultFinalityOutboundRateLimiterConfig RateLimiterConfigFloatInput
 	// CustomFinalityInboundRateLimiterConfig specifies the desired rate limiter configuration for custom-finality inbound traffic.
-	CustomFinalityInboundRateLimiterConfig RateLimiterConfig
+	// DO NOT SET THIS VALUE WHEN PASSING IN INPUTS.
+	// This value is derived from the configuration specified for outbound traffic to the remote chain, as the same limits should apply in both directions.
+	CustomFinalityInboundRateLimiterConfig RateLimiterConfigFloatInput
 	// CustomFinalityOutboundRateLimiterConfig specifies the desired rate limiter configuration for custom-finality outbound traffic.
-	CustomFinalityOutboundRateLimiterConfig RateLimiterConfig
+	CustomFinalityOutboundRateLimiterConfig RateLimiterConfigFloatInput
 	// Decimals of the token on the remote chain.
 	RemoteDecimals uint8
 	// OutboundCCVs specifies the verifiers to apply to outbound traffic.
