@@ -144,7 +144,7 @@ func (ma *transfersTest_MockTokenAdapter) DeployToken() *cldf_ops.Sequence[token
 	return &cldf_ops.Sequence[tokens.DeployTokenInput, sequences.OnChainOutput, cldf_chain.BlockChains]{}
 }
 
-func (ma *transfersTest_MockTokenAdapter) DeployTokenVerify(e deployment.Environment, in any) error {
+func (ma *transfersTest_MockTokenAdapter) DeployTokenVerify(e deployment.Environment, in tokens.DeployTokenInput) error {
 	return nil
 }
 
@@ -152,8 +152,8 @@ func (ma *transfersTest_MockTokenAdapter) DeployTokenPoolForToken() *cldf_ops.Se
 	return &cldf_ops.Sequence[tokens.DeployTokenPoolInput, sequences.OnChainOutput, cldf_chain.BlockChains]{}
 }
 
-func (ma *transfersTest_MockTokenAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokens.UpdateAuthoritiesInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
-	return &cldf_ops.Sequence[tokens.UpdateAuthoritiesInput, sequences.OnChainOutput, cldf_chain.BlockChains]{}
+func (ma *transfersTest_MockTokenAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokens.UpdateAuthoritiesInput, sequences.OnChainOutput, *deployment.Environment] {
+	return &cldf_ops.Sequence[tokens.UpdateAuthoritiesInput, sequences.OnChainOutput, *deployment.Environment]{}
 }
 
 var basicMCMSInput = mcms.Input{
@@ -494,38 +494,10 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 							},
 						},
 					},
-					{
-						ChainSelector: 15971525489660198786,
-						TokenPoolRef: datastore.AddressRef{
-							Type:          "TokenPool",
-							Version:       semver.MustParse("1.0.0"),
-							ChainSelector: 15971525489660198786,
-						},
-						RegistryRef: datastore.AddressRef{
-							Type:          "Registry",
-							Version:       semver.MustParse("1.0.0"),
-							ChainSelector: 15971525489660198786,
-						},
-						RemoteChains: map[uint64]tokens.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
-							5009297550715157269: {
-								RemoteToken: &datastore.AddressRef{
-									Type:          "Token",
-									Version:       semver.MustParse("1.0.0"),
-									ChainSelector: 5009297550715157269,
-								},
-								RemotePool: &datastore.AddressRef{
-									Type:          "TokenPool",
-									Version:       semver.MustParse("1.0.0"),
-									ChainSelector: 5009297550715157269,
-								},
-								OutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{IsEnabled: false},
-							},
-						},
-					},
 				},
 				MCMS: basicMCMSInput,
 			},
-			expectedSequenceErrorMsg: "failed to resolve remote pool ref",
+			expectedSequenceErrorMsg: "missing token transfer config for remote chain",
 		},
 		{
 			desc: "failure to resolve remote token ref",
