@@ -8,8 +8,8 @@ import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/I
 import {RateLimiter} from "../../libraries/RateLimiter.sol";
 import {ERC20LockBox} from "../../pools/ERC20LockBox.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
+import {CrossChainToken} from "../../tmp/CrossChainToken.sol";
 import {RegistryModuleOwnerCustom} from "../RegistryModuleOwnerCustom.sol";
-import {FactoryBurnMintERC20} from "./FactoryBurnMintERC20.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
 import {Create2} from "@openzeppelin/contracts@5.3.0/utils/Create2.sol";
@@ -136,16 +136,15 @@ contract TokenPoolFactory is ITypeAndVersion {
     // Deploy the token pool.
     address pool = _createTokenPool(remoteTokenPools, tokenPoolInitCode, localConfig);
 
+    CrossChainToken crossChainToken = CrossChainToken(token);
+
     if (localPoolType == PoolType.BURN_MINT) {
-      // Grant the mint and burn roles to the pool for the token.
-      FactoryBurnMintERC20(token).grantMintAndBurnRoles(pool);
+      crossChainToken.grantMintAndBurnRoles(pool);
+      crossChainToken.renounceRole(crossChainToken.BURN_MINT_ADMIN_ROLE(), address(this));
     }
 
-    // Set the token pool for token in the token admin registry since this contract is the token and pool owner.
+    // Set the token pool for token in the token admin registry since this contract is the ccipAdmin.
     _setTokenPoolInTokenAdminRegistry(token, pool);
-
-    // Begin the 2 step ownership transfer of the newly deployed token to the msg.sender.
-    IOwnable(token).transferOwnership(msg.sender);
 
     return (token, pool);
   }
@@ -392,7 +391,7 @@ contract TokenPoolFactory is ITypeAndVersion {
     address token,
     address pool
   ) private {
-    i_registryModuleOwnerCustom.registerAdminViaOwner(token);
+    i_registryModuleOwnerCustom.registerAdminViaGetCCIPAdmin(token);
     i_tokenAdminRegistry.acceptAdminRole(token);
     i_tokenAdminRegistry.setPool(token, pool);
 

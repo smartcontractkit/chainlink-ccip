@@ -7,7 +7,8 @@ import {ICCIPRouter} from "../../../applications/EtherSenderReceiver.sol";
 
 import {EtherSenderReceiverHelper} from "../../helpers/EtherSenderReceiverHelper.sol";
 
-import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
+import {BaseERC20} from "../../../tmp/BaseERC20.sol";
+import {CrossChainToken} from "../../../tmp/CrossChainToken.sol";
 import {WETH9} from "@chainlink/contracts/src/v0.8/vendor/canonical-weth/WETH9.sol";
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
@@ -25,7 +26,17 @@ contract EtherSenderReceiverTestSetup is Test {
   function setUp() public {
     vm.startPrank(OWNER);
 
-    s_linkToken = IERC20(address(new BurnMintERC20("Chainlink Token", "LINK", 18, 0, 0)));
+    s_linkToken = IERC20(
+      address(
+        new CrossChainToken(
+          BaseERC20.ConstructorParams({
+            name: "Chainlink Token", symbol: "LINK", decimals: 18, maxSupply: 0, preMint: 0, ccipAdmin: OWNER
+          }),
+          OWNER,
+          OWNER
+        )
+      )
+    );
     s_someOtherWeth = new WETH9();
     s_weth = new WETH9();
     vm.mockCall(ROUTER, abi.encodeWithSelector(ICCIPRouter.getWrappedNative.selector), abi.encode(address(s_weth)));

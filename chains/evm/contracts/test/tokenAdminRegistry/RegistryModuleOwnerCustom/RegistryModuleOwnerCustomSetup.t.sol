@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {BaseERC20} from "../../../tmp/BaseERC20.sol";
+import {CrossChainToken} from "../../../tmp/CrossChainToken.sol";
 import {RegistryModuleOwnerCustom} from "../../../tokenAdminRegistry/RegistryModuleOwnerCustom.sol";
 import {TokenAdminRegistry} from "../../../tokenAdminRegistry/TokenAdminRegistry.sol";
-import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
 import {Test} from "forge-std/Test.sol";
 
@@ -18,7 +19,15 @@ contract RegistryModuleOwnerCustomSetup is Test {
     vm.startPrank(OWNER);
 
     s_tokenAdminRegistry = new TokenAdminRegistry();
-    s_token = address(new BurnMintERC20("Test", "TST", 18, 0, 0));
+    s_token = address(
+      new CrossChainToken(
+        BaseERC20.ConstructorParams({
+          name: "Test", symbol: "TST", decimals: 18, maxSupply: 0, preMint: 0, ccipAdmin: OWNER
+        }),
+        OWNER,
+        OWNER
+      )
+    );
     s_registryModuleOwnerCustom = new RegistryModuleOwnerCustom(address(s_tokenAdminRegistry));
     s_tokenAdminRegistry.addRegistryModule(address(s_registryModuleOwnerCustom));
   }

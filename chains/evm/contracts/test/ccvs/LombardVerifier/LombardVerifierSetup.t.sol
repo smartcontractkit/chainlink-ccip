@@ -11,7 +11,8 @@ import {MockLombardBridge} from "../../mocks/MockLombardBridge.sol";
 import {MockLombardMailbox} from "../../mocks/MockLombardMailbox.sol";
 import {BaseVerifierSetup} from "../components/BaseVerifier/BaseVerifierSetup.t.sol";
 
-import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
+import {BaseERC20} from "../../../tmp/BaseERC20.sol";
+import {CrossChainToken} from "../../../tmp/CrossChainToken.sol";
 
 contract LombardVerifierSetup is BaseVerifierSetup {
   bytes4 internal constant VERSION_TAG_V1_7_0 = bytes4(keccak256("LombardVerifier 1.7.0"));
@@ -19,7 +20,7 @@ contract LombardVerifierSetup is BaseVerifierSetup {
   LombardVerifier internal s_lombardVerifier;
   MockLombardBridge internal s_mockBridge;
   MockLombardMailbox internal s_mockMailbox;
-  BurnMintERC20 internal s_testToken;
+  CrossChainToken internal s_testToken;
 
   bytes32 internal constant LOMBARD_CHAIN_ID = bytes32(uint256(10000));
   bytes32 internal constant ALLOWED_CALLER = bytes32(uint256(0x123456));
@@ -41,7 +42,13 @@ contract LombardVerifierSetup is BaseVerifierSetup {
     );
 
     // Deploy test token and add it as a supported token.
-    s_testToken = new BurnMintERC20("Test Token", "TEST", 18, 0, 0);
+    s_testToken = new CrossChainToken(
+      BaseERC20.ConstructorParams({
+        name: "Test Token", symbol: "TEST", decimals: 18, maxSupply: 0, preMint: 0, ccipAdmin: OWNER
+      }),
+      OWNER,
+      OWNER
+    );
     deal(address(s_testToken), address(s_lombardVerifier), TRANSFER_AMOUNT);
     LombardVerifier.SupportedTokenArgs[] memory tokensToAdd = new LombardVerifier.SupportedTokenArgs[](1);
     tokensToAdd[0] = LombardVerifier.SupportedTokenArgs({localToken: address(s_testToken), localAdapter: address(0)});

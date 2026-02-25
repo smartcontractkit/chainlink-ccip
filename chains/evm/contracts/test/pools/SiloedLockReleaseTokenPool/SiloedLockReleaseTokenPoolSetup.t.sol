@@ -5,9 +5,10 @@ import {Router} from "../../../Router.sol";
 import {ERC20LockBox} from "../../../pools/ERC20LockBox.sol";
 import {SiloedLockReleaseTokenPool} from "../../../pools/SiloedLockReleaseTokenPool.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
+import {BaseERC20} from "../../../tmp/BaseERC20.sol";
+import {CrossChainToken} from "../../../tmp/CrossChainToken.sol";
 import {BaseTest} from "../../BaseTest.t.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
-import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
@@ -30,7 +31,17 @@ contract SiloedLockReleaseTokenPoolSetup is BaseTest {
 
   function setUp() public virtual override {
     super.setUp();
-    s_token = IERC20(address(new BurnMintERC20("LINK", "LNK", 18, 0, 0)));
+    s_token = IERC20(
+      address(
+        new CrossChainToken(
+          BaseERC20.ConstructorParams({
+            name: "LINK", symbol: "LNK", decimals: 18, maxSupply: 0, preMint: 0, ccipAdmin: OWNER
+          }),
+          OWNER,
+          OWNER
+        )
+      )
+    );
     deal(address(s_token), OWNER, type(uint256).max);
 
     s_lockBox = new ERC20LockBox(address(s_token));

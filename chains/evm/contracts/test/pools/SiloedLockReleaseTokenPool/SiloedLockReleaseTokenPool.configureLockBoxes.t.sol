@@ -5,9 +5,10 @@ import {Router} from "../../../Router.sol";
 import {ERC20LockBox} from "../../../pools/ERC20LockBox.sol";
 import {SiloedLockReleaseTokenPool} from "../../../pools/SiloedLockReleaseTokenPool.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
+import {BaseERC20} from "../../../tmp/BaseERC20.sol";
+import {CrossChainToken} from "../../../tmp/CrossChainToken.sol";
 import {BaseTest} from "../../BaseTest.t.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
-import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
@@ -15,11 +16,15 @@ contract SiloedLockReleaseTokenPool_configureLockBoxes is BaseTest {
   uint64 internal constant SILOED_CHAIN_SELECTOR = DEST_CHAIN_SELECTOR + 5;
 
   SiloedLockReleaseTokenPool internal s_pool;
-  BurnMintERC20 internal s_token;
+  CrossChainToken internal s_token;
 
   function setUp() public override {
     super.setUp();
-    s_token = new BurnMintERC20("TKN", "T", 18, 0, 0);
+    s_token = new CrossChainToken(
+      BaseERC20.ConstructorParams({name: "TKN", symbol: "T", decimals: 18, maxSupply: 0, preMint: 0, ccipAdmin: OWNER}),
+      OWNER,
+      OWNER
+    );
     deal(address(s_token), OWNER, type(uint256).max);
 
     s_pool = new SiloedLockReleaseTokenPool(
