@@ -38,10 +38,10 @@ type nonCanonicalTestSetup struct {
 // Capacity and Rate must be non-nil for ABI packing in applyChainUpdates (token pool expects *big.Int).
 func nonCanonicalRemoteChainConfig() adapters.RemoteCCTPChainConfig {
 	return adapters.RemoteCCTPChainConfig{
-		DefaultFinalityInboundRateLimiterConfig:  tokens.RateLimiterConfig{IsEnabled: false, Capacity: big.NewInt(0), Rate: big.NewInt(0)},
-		DefaultFinalityOutboundRateLimiterConfig: tokens.RateLimiterConfig{IsEnabled: false, Capacity: big.NewInt(0), Rate: big.NewInt(0)},
-		CustomFinalityInboundRateLimiterConfig:   tokens.RateLimiterConfig{IsEnabled: false, Capacity: big.NewInt(0), Rate: big.NewInt(0)},
-		CustomFinalityOutboundRateLimiterConfig:  tokens.RateLimiterConfig{IsEnabled: false, Capacity: big.NewInt(0), Rate: big.NewInt(0)},
+		DefaultFinalityInboundRateLimiterConfig:  tokens.RateLimiterConfigFloatInput{IsEnabled: false, Capacity: 0, Rate: 0},
+		DefaultFinalityOutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{IsEnabled: false, Capacity: 0, Rate: 0},
+		CustomFinalityInboundRateLimiterConfig:   tokens.RateLimiterConfigFloatInput{IsEnabled: false, Capacity: 0, Rate: 0},
+		CustomFinalityOutboundRateLimiterConfig:  tokens.RateLimiterConfigFloatInput{IsEnabled: false, Capacity: 0, Rate: 0},
 	}
 }
 
