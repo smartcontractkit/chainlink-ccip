@@ -180,7 +180,7 @@ func laneMigrateApply(migratorReg *LaneMigratorRegistry, mcmsRegistry *changeset
 		}
 		return changesets.NewOutputBuilder(e, mcmsRegistry).
 			WithReports(reports).
-			WithBatchOps(batchOps).
+			WithSingleBatchOpPerChain(batchOps).
 			Build(input.MCMS)
 	}
 }
