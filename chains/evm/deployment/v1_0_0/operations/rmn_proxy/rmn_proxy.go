@@ -49,3 +49,14 @@ var SetRMN = contract.NewWrite(contract.WriteParams[SetRMNArgs, *rmn_proxy_contr
 		return rmnProxy.SetARM(opts, args.RMN)
 	},
 })
+
+var GetRMN = contract.NewRead(contract.ReadParams[any, common.Address, *rmn_proxy_contract.RMNProxy]{
+	Name:         "rmn_proxy:get-rmn",
+	Version:      Version,
+	Description:  "Gets the RMN address set on the RMNProxy",
+	ContractType: ContractType,
+	NewContract:  rmn_proxy_contract.NewRMNProxy,
+	CallContract: func(rmnProxy *rmn_proxy_contract.RMNProxy, opts *bind.CallOpts, args any) (common.Address, error) {
+		return rmnProxy.GetARM(opts)
+	},
+})
