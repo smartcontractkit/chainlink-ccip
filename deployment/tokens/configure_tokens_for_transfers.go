@@ -178,7 +178,11 @@ func convertRemoteChainConfig(
 		if inCfg.RemoteToken != nil {
 			outCfg.RemoteToken, err = datastore_utils.FindAndFormatRef(e.DataStore, *inCfg.RemoteToken, remoteChainSelector, adapter.AddressRefToBytes)
 			if err != nil {
-				return outCfg, fmt.Errorf("failed to resolve remote token ref %s: %w", datastore_utils.SprintRef(*inCfg.RemoteToken), err)
+				e.Logger.Warnf("failed to resolve remote token ref %s: %v. Will attempt to derive remote token address from pool reference", datastore_utils.SprintRef(*inCfg.RemoteToken), err)
+				outCfg.RemoteToken, err = adapter.DeriveTokenAddress(e, remoteChainSelector, fullRemotePoolRef)
+				if err != nil {
+					return outCfg, fmt.Errorf("failed to get remote token address via pool ref (%s) for remote chain selector %d: %w", datastore_utils.SprintRef(*inCfg.RemotePool), remoteChainSelector, err)
+				}
 			}
 		} else {
 			outCfg.RemoteToken, err = adapter.DeriveTokenAddress(e, remoteChainSelector, fullRemotePoolRef)

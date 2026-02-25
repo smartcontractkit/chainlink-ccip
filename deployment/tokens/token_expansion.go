@@ -284,27 +284,6 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 			// save the token transfer config for processing after all tokens and token pools have been deployed
 			if input.TokenTransferConfig != nil {
 				input.TokenTransferConfig.ChainSelector = selector
-				actualPool := tokenPool
-				if actualPool == nil {
-					// if token pool is not deployed by this changeset, we expect the user to provide the token pool address in the TokenTransferConfig
-					actualPool = &input.TokenTransferConfig.TokenPoolRef
-				}
-				actualToken := tokenRef
-				if actualToken == nil {
-					// if token is not deployed by this changeset, we expect the user to provide the token address in the TokenTransferConfig
-					actualToken = &input.TokenTransferConfig.TokenRef
-				}
-				allRemotes[selector] = RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
-					RemoteToken: actualToken,
-					RemotePool:  actualPool,
-				}
-			}
-		}
-
-		// now that we have all the token and token pools, we can loop through the token configs again
-		// and update the remote chain configs with the correct token and token pool addresses before configuring the tokens for transfers
-		for selector, input := range cfg.TokenExpansionInputPerChain {
-			if input.TokenTransferConfig != nil {
 				mergedPool, err := datastore_utils.MergeRefs(
 					&cfg.TokenExpansionInputPerChain[selector].TokenTransferConfig.TokenPoolRef,
 					allRemotes[selector].RemotePool,
@@ -321,6 +300,17 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to merge token refs for chain selector %d: %w", selector, err)
 				}
 				cfg.TokenExpansionInputPerChain[selector].TokenTransferConfig.TokenRef = mergedToken
+				allRemotes[selector] = RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+					RemoteToken: &mergedToken,
+					RemotePool:  &mergedPool,
+				}
+			}
+		}
+
+		// now that we have all the token and token pools, we can loop through the token configs again
+		// and update the remote chain configs with the correct token and token pool addresses before configuring the tokens for transfers
+		for selector, input := range cfg.TokenExpansionInputPerChain {
+			if input.TokenTransferConfig != nil {
 				for remoteSelector, remoteConfig := range input.TokenTransferConfig.RemoteChains {
 					if _, exists := allRemotes[remoteSelector]; exists {
 						if remoteConfig.RemoteToken == nil {
