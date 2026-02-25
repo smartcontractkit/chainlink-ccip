@@ -72,8 +72,10 @@ type FeeQuoterParams struct {
 	MaxFeeJuelsPerMsg              *big.Int
 	LINKPremiumMultiplierWeiPerEth uint64
 	WETHPremiumMultiplierWeiPerEth uint64
-	USDPerLINK                     *big.Int
-	USDPerWETH                     *big.Int
+	// USDPerLINK can be nil if setting a LINK price is not desired.
+	USDPerLINK *big.Int
+	// USDPerWETH can be nil if setting a WETH price is not desired.
+	USDPerWETH *big.Int
 }
 
 type ExecutorParams struct {
@@ -162,21 +164,29 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		}
 		addresses = append(addresses, rmnProxyRef)
 
-		// Set the RMNRemote on the RMNProxy
-		// Included in case the RMNRemote got deployed but the RMNProxy already existed.
-		// In this case, we would not have set the RMNRemote in the constructor.
-		// We would need to update the RMN on the existing RMNProxy.
-		setRMNReport, err := cldf_ops.ExecuteOperation(b, rmn_proxy.SetRMN, chain, contract_utils.FunctionInput[rmn_proxy.SetRMNArgs]{
+		// Fetch the RMN contract address set on the RMNProxy
+		rmnAddressReport, err := cldf_ops.ExecuteOperation(b, rmn_proxy.GetRMN, chain, contract_utils.FunctionInput[any]{
 			ChainSelector: chain.Selector,
 			Address:       common.HexToAddress(rmnProxyRef.Address),
-			Args: rmn_proxy.SetRMNArgs{
-				RMN: common.HexToAddress(rmnRemoteRef.Address),
-			},
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, err
 		}
-		writes = append(writes, setRMNReport.Output)
+
+		// Set the RMNRemote on the RMNProxy if diff exists
+		if rmnAddressReport.Output != common.HexToAddress(rmnRemoteRef.Address) {
+			setRMNReport, err := cldf_ops.ExecuteOperation(b, rmn_proxy.SetRMN, chain, contract_utils.FunctionInput[rmn_proxy.SetRMNArgs]{
+				ChainSelector: chain.Selector,
+				Address:       common.HexToAddress(rmnProxyRef.Address),
+				Args: rmn_proxy.SetRMNArgs{
+					RMN: common.HexToAddress(rmnRemoteRef.Address),
+				},
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, err
+			}
+			writes = append(writes, setRMNReport.Output)
+		}
 
 		// Deploy Router
 		routerRef, err := contract_utils.MaybeDeployContract(b, router.Deploy, chain, contract_utils.DeployInput[router.ConstructorArgs]{
@@ -192,6 +202,28 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		}
 		addresses = append(addresses, routerRef)
 
+		// Fetch the wrapped native address set on the Router
+		wrappedNativeAddressReport, err := cldf_ops.ExecuteOperation(b, router.GetWrappedNative, chain, contract_utils.FunctionInput[any]{
+			ChainSelector: chain.Selector,
+			Address:       common.HexToAddress(routerRef.Address),
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, err
+		}
+
+		// Set wrapped native on the Router if diff exists
+		if wrappedNativeAddressReport.Output != common.HexToAddress(wethRef.Address) {
+			setWrappedNativeReport, err := cldf_ops.ExecuteOperation(b, router.SetWrappedNative, chain, contract_utils.FunctionInput[common.Address]{
+				ChainSelector: chain.Selector,
+				Address:       common.HexToAddress(routerRef.Address),
+				Args:          common.HexToAddress(wethRef.Address),
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, err
+			}
+			writes = append(writes, setWrappedNativeReport.Output)
+		}
+
 		// Deploy Test Router
 		if input.DeployTestRouter {
 			testRouterRef, err := contract_utils.MaybeDeployContract(b, router.DeployTestRouter, chain, contract_utils.DeployInput[router.ConstructorArgs]{
@@ -206,6 +238,28 @@ var DeployChainContracts = cldf_ops.NewSequence(
 				return sequences.OnChainOutput{}, err
 			}
 			addresses = append(addresses, testRouterRef)
+
+			// Fetch the wrapped native address set on the Test Router
+			wrappedNativeAddressReport, err = cldf_ops.ExecuteOperation(b, router.GetWrappedNative, chain, contract_utils.FunctionInput[any]{
+				ChainSelector: chain.Selector,
+				Address:       common.HexToAddress(testRouterRef.Address),
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, err
+			}
+
+			// Set wrapped native on the Test Router if diff exists
+			if wrappedNativeAddressReport.Output != common.HexToAddress(wethRef.Address) {
+				setWrappedNativeReport, err := cldf_ops.ExecuteOperation(b, router.SetWrappedNative, chain, contract_utils.FunctionInput[common.Address]{
+					ChainSelector: chain.Selector,
+					Address:       common.HexToAddress(testRouterRef.Address),
+					Args:          common.HexToAddress(wethRef.Address),
+				})
+				if err != nil {
+					return sequences.OnChainOutput{}, err
+				}
+				writes = append(writes, setWrappedNativeReport.Output)
+			}
 		}
 
 		// Deploy TokenAdminRegistry
@@ -271,27 +325,32 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		}
 		addresses = append(addresses, feeQuoterRef)
 
-		// Set initial prices on FeeQuoter
-		updatePricesReport, err := cldf_ops.ExecuteOperation(b, fee_quoter.UpdatePrices, chain, contract_utils.FunctionInput[fee_quoter.PriceUpdates]{
-			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(feeQuoterRef.Address),
-			Args: fee_quoter.PriceUpdates{
-				TokenPriceUpdates: []fee_quoter.TokenPriceUpdate{
-					{
-						SourceToken: common.HexToAddress(linkRef.Address),
-						UsdPerToken: input.ContractParams.FeeQuoter.USDPerLINK,
-					},
-					{
-						SourceToken: common.HexToAddress(wethRef.Address),
-						UsdPerToken: input.ContractParams.FeeQuoter.USDPerWETH,
-					},
-				},
-			},
-		})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to set initial prices on FeeQuoter: %w", err)
+		var tokenPriceUpdates []fee_quoter.TokenPriceUpdate
+		if input.ContractParams.FeeQuoter.USDPerLINK != nil {
+			tokenPriceUpdates = append(tokenPriceUpdates, fee_quoter.TokenPriceUpdate{
+				SourceToken: common.HexToAddress(linkRef.Address),
+				UsdPerToken: input.ContractParams.FeeQuoter.USDPerLINK,
+			})
 		}
-		writes = append(writes, updatePricesReport.Output)
+		if input.ContractParams.FeeQuoter.USDPerWETH != nil {
+			tokenPriceUpdates = append(tokenPriceUpdates, fee_quoter.TokenPriceUpdate{
+				SourceToken: common.HexToAddress(wethRef.Address),
+				UsdPerToken: input.ContractParams.FeeQuoter.USDPerWETH,
+			})
+		}
+		if len(tokenPriceUpdates) > 0 {
+			updatePricesReport, err := cldf_ops.ExecuteOperation(b, fee_quoter.UpdatePrices, chain, contract_utils.FunctionInput[fee_quoter.PriceUpdates]{
+				ChainSelector: chain.Selector,
+				Address:       common.HexToAddress(feeQuoterRef.Address),
+				Args: fee_quoter.PriceUpdates{
+					TokenPriceUpdates: tokenPriceUpdates,
+				},
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to update token prices on FeeQuoter: %w", err)
+			}
+			writes = append(writes, updatePricesReport.Output)
+		}
 
 		// Deploy OffRamp
 		offRampRef, err := contract_utils.MaybeDeployContract(b, offramp.Deploy, chain, contract_utils.DeployInput[offramp.ConstructorArgs]{
@@ -334,6 +393,36 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		}
 		addresses = append(addresses, onRampRef)
 
+		// Fetch the dynamic config on the OnRamp
+		dynamicConfigReport, err := cldf_ops.ExecuteOperation(b, onramp.GetDynamicConfig, chain, contract_utils.FunctionInput[struct{}]{
+			ChainSelector: chain.Selector,
+			Address:       common.HexToAddress(onRampRef.Address),
+			Args:          struct{}{},
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to get dynamic config on OnRamp: %w", err)
+		}
+
+		// Set dynamic config on the OnRamp if there is a diff
+		if dynamicConfigReport.Output.FeeQuoter != common.HexToAddress(feeQuoterRef.Address) ||
+			(dynamicConfigReport.Output.FeeAggregator != input.ContractParams.OnRamp.FeeAggregator && input.ContractParams.OnRamp.FeeAggregator != (common.Address{})) {
+			setDynamicConfigReport, err := cldf_ops.ExecuteOperation(b, onramp.SetDynamicConfig, chain, contract_utils.FunctionInput[onramp.SetDynamicConfigArgs]{
+				ChainSelector: chain.Selector,
+				Address:       common.HexToAddress(onRampRef.Address),
+				Args: onramp.SetDynamicConfigArgs{
+					DynamicConfig: onramp.DynamicConfig{
+						FeeQuoter:              common.HexToAddress(feeQuoterRef.Address),
+						ReentrancyGuardEntered: false, // This should never be true.
+						FeeAggregator:          input.ContractParams.OnRamp.FeeAggregator,
+					},
+				},
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to set dynamic config on OnRamp: %w", err)
+			}
+			writes = append(writes, setDynamicConfigReport.Output)
+		}
+
 		// TODO: validate prior to deploying that qualifiers are unique?
 		var committeeVerifierBatchOps []mcms_types.BatchOperation
 		for _, committeeVerifierParams := range input.ContractParams.CommitteeVerifiers {
@@ -370,6 +459,35 @@ var DeployChainContracts = cldf_ops.NewSequence(
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy Executor: %w, params: %+v", err, executorParam)
 			}
 			addresses = append(addresses, executorRef)
+
+			// Fetch the dynamic config on the Executor
+			dynamicConfigReport, err := cldf_ops.ExecuteOperation(b, executor.GetDynamicConfig, chain, contract_utils.FunctionInput[struct{}]{
+				ChainSelector: chain.Selector,
+				Address:       common.HexToAddress(executorRef.Address),
+				Args:          struct{}{},
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get dynamic config on Executor: %w", err)
+			}
+
+			// Set dynamic config on the Executor if diff exists
+			if (dynamicConfigReport.Output.FeeAggregator != executorParam.DynamicConfig.FeeAggregator && executorParam.DynamicConfig.FeeAggregator != (common.Address{})) ||
+				dynamicConfigReport.Output.MinBlockConfirmations != executorParam.DynamicConfig.MinBlockConfirmations ||
+				dynamicConfigReport.Output.CcvAllowlistEnabled != executorParam.DynamicConfig.CcvAllowlistEnabled {
+				setDynamicConfigReport, err := cldf_ops.ExecuteOperation(b, executor.SetDynamicConfig, chain, contract_utils.FunctionInput[executor.SetDynamicConfigArgs]{
+					ChainSelector: chain.Selector,
+					Address:       common.HexToAddress(executorRef.Address),
+					Args: executor.SetDynamicConfigArgs{
+						FeeAggregator:         executorParam.DynamicConfig.FeeAggregator,
+						MinBlockConfirmations: executorParam.DynamicConfig.MinBlockConfirmations,
+						CcvAllowlistEnabled:   executorParam.DynamicConfig.CcvAllowlistEnabled,
+					},
+				})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to set dynamic config on Executor: %w", err)
+				}
+				writes = append(writes, setDynamicConfigReport.Output)
+			}
 
 			// Deploy ExecutorProxy via CREATE2
 			var executorProxyRef *datastore.AddressRef
@@ -426,27 +544,49 @@ var DeployChainContracts = cldf_ops.NewSequence(
 				writes = append(writes, acceptOwnershipReport.Output)
 			}
 
-			// Set target on the ExecutorProxy
-			setTargetReport, err := cldf_ops.ExecuteOperation(b, proxy.SetTarget, chain, contract_utils.FunctionInput[common.Address]{
+			// Fetch the target on the ExecutorProxy
+			targetReport, err := cldf_ops.ExecuteOperation(b, proxy.GetTarget, chain, contract_utils.FunctionInput[any]{
 				ChainSelector: chain.Selector,
 				Address:       common.HexToAddress(executorProxyRef.Address),
-				Args:          common.HexToAddress(executorRef.Address),
 			})
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to set target on ExecutorProxy: %w", err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get target on ExecutorProxy: %w", err)
 			}
-			writes = append(writes, setTargetReport.Output)
 
-			// Set fee aggregator on the ExecutorProxy
-			setFeeAggregatorReport, err := cldf_ops.ExecuteOperation(b, proxy.SetFeeAggregator, chain, contract_utils.FunctionInput[common.Address]{
+			// Set target on the ExecutorProxy if diff exists
+			if targetReport.Output != common.HexToAddress(executorRef.Address) {
+				setTargetReport, err := cldf_ops.ExecuteOperation(b, proxy.SetTarget, chain, contract_utils.FunctionInput[common.Address]{
+					ChainSelector: chain.Selector,
+					Address:       common.HexToAddress(executorProxyRef.Address),
+					Args:          common.HexToAddress(executorRef.Address),
+				})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to set target on ExecutorProxy: %w", err)
+				}
+				writes = append(writes, setTargetReport.Output)
+			}
+
+			// Fetch the fee aggregator on the ExecutorProxy
+			feeAggregatorReport, err := cldf_ops.ExecuteOperation(b, proxy.GetFeeAggregator, chain, contract_utils.FunctionInput[any]{
 				ChainSelector: chain.Selector,
 				Address:       common.HexToAddress(executorProxyRef.Address),
-				Args:          executorParam.DynamicConfig.FeeAggregator,
 			})
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to set fee aggregator on ExecutorProxy: %w", err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get fee aggregator on ExecutorProxy: %w", err)
 			}
-			writes = append(writes, setFeeAggregatorReport.Output)
+
+			// Set fee aggregator on the ExecutorProxy if diff exists
+			if feeAggregatorReport.Output != executorParam.DynamicConfig.FeeAggregator {
+				setFeeAggregatorReport, err := cldf_ops.ExecuteOperation(b, proxy.SetFeeAggregator, chain, contract_utils.FunctionInput[common.Address]{
+					ChainSelector: chain.Selector,
+					Address:       common.HexToAddress(executorProxyRef.Address),
+					Args:          executorParam.DynamicConfig.FeeAggregator,
+				})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to set fee aggregator on ExecutorProxy: %w", err)
+				}
+				writes = append(writes, setFeeAggregatorReport.Output)
+			}
 		}
 
 		for _, mockReceiverParams := range input.ContractParams.MockReceivers {
