@@ -456,6 +456,13 @@ var UpdateRateLimitAdminLockRelease = operations.NewOperation(
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get upgrade authority for lock release token pool: %w", err)
 			}
+			// if we had to assume the authority, then the pool isn't initialized yet and therefore
+			// there won't be an authority set on-chain yet, so we can skip the update since the initializer
+			// will be able to set the correct authority during initialization
+			if authority == input.NewOwner {
+				b.Logger.Info("New owner is the same as the current owner for lock release token pool with token mint:", input.TokenMint.String())
+				return sequences.OnChainOutput{}, nil
+			}
 		}
 		poolConfigPDA, _ := tokens.TokenPoolConfigAddress(input.TokenMint, input.Program)
 		ixn, err := lockrelease_token_pool.NewSetRateLimitAdminInstruction(
