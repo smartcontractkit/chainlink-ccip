@@ -261,7 +261,7 @@ func TestDeployCCTPChains_Apply(t *testing.T) {
 			}
 
 			cctpChainRegistry := adapters.NewCCTPChainRegistry()
-			mcmsRegistry := changesets.GetRegistry()
+			mcmsRegistry := changesets.NewMCMSReaderRegistry()
 			mcmsRegistry.RegisterMCMSReader("evm", &cctpTest_MockReader{})
 
 			// Register mock adapter for successful tests

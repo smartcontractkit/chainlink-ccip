@@ -187,6 +187,7 @@ var ConfigureLombardChainForLanes = cldf_ops.NewSequence(
 					RemoteChainSelector: remoteChainSelector,
 					LChainId:            lchainID,
 					AllowedCaller:       allowedCaller,
+					RemoteAdapter:       [32]byte{},
 				},
 			})
 			if err != nil {
