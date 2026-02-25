@@ -95,6 +95,46 @@ func (c *USDCTokenPoolCCTPV2Contract) TransferOwnership(opts *bind.TransactOpts,
 	return c.contract.Transact(opts, "transferOwnership", args)
 }
 
+func (c *USDCTokenPoolCCTPV2Contract) GetSupportedChains(opts *bind.CallOpts) ([]uint64, error) {
+	var out []any
+	err := c.contract.Call(opts, &out, "getSupportedChains")
+	if err != nil {
+		var zero []uint64
+		return zero, err
+	}
+	return *abi.ConvertType(out[0], new([]uint64)).(*[]uint64), nil
+}
+
+func (c *USDCTokenPoolCCTPV2Contract) GetRemoteToken(opts *bind.CallOpts, args uint64) ([]byte, error) {
+	var out []any
+	err := c.contract.Call(opts, &out, "getRemoteToken", args)
+	if err != nil {
+		var zero []byte
+		return zero, err
+	}
+	return *abi.ConvertType(out[0], new([]byte)).(*[]byte), nil
+}
+
+func (c *USDCTokenPoolCCTPV2Contract) GetRemotePools(opts *bind.CallOpts, args uint64) ([][]byte, error) {
+	var out []any
+	err := c.contract.Call(opts, &out, "getRemotePools", args)
+	if err != nil {
+		var zero [][]byte
+		return zero, err
+	}
+	return *abi.ConvertType(out[0], new([][]byte)).(*[][]byte), nil
+}
+
+func (c *USDCTokenPoolCCTPV2Contract) GetAllAuthorizedCallers(opts *bind.CallOpts) ([]common.Address, error) {
+	var out []any
+	err := c.contract.Call(opts, &out, "getAllAuthorizedCallers")
+	if err != nil {
+		var zero []common.Address
+		return zero, err
+	}
+	return *abi.ConvertType(out[0], new([]common.Address)).(*[]common.Address), nil
+}
+
 type AuthorizedCallerArgs struct {
 	AddedCallers   []common.Address
 	RemovedCallers []common.Address
@@ -285,5 +325,49 @@ var TransferOwnership = contract.NewWrite(contract.WriteParams[common.Address, *
 		args common.Address,
 	) (*types.Transaction, error) {
 		return c.TransferOwnership(opts, args)
+	},
+})
+
+var GetSupportedChains = contract.NewRead(contract.ReadParams[struct{}, []uint64, *USDCTokenPoolCCTPV2Contract]{
+	Name:         "usdc-token-pool-cctp-v2:get-supported-chains",
+	Version:      Version,
+	Description:  "Calls getSupportedChains on the contract",
+	ContractType: ContractType,
+	NewContract:  NewUSDCTokenPoolCCTPV2Contract,
+	CallContract: func(c *USDCTokenPoolCCTPV2Contract, opts *bind.CallOpts, args struct{}) ([]uint64, error) {
+		return c.GetSupportedChains(opts)
+	},
+})
+
+var GetRemoteToken = contract.NewRead(contract.ReadParams[uint64, []byte, *USDCTokenPoolCCTPV2Contract]{
+	Name:         "usdc-token-pool-cctp-v2:get-remote-token",
+	Version:      Version,
+	Description:  "Calls getRemoteToken on the contract",
+	ContractType: ContractType,
+	NewContract:  NewUSDCTokenPoolCCTPV2Contract,
+	CallContract: func(c *USDCTokenPoolCCTPV2Contract, opts *bind.CallOpts, args uint64) ([]byte, error) {
+		return c.GetRemoteToken(opts, args)
+	},
+})
+
+var GetRemotePools = contract.NewRead(contract.ReadParams[uint64, [][]byte, *USDCTokenPoolCCTPV2Contract]{
+	Name:         "usdc-token-pool-cctp-v2:get-remote-pools",
+	Version:      Version,
+	Description:  "Calls getRemotePools on the contract",
+	ContractType: ContractType,
+	NewContract:  NewUSDCTokenPoolCCTPV2Contract,
+	CallContract: func(c *USDCTokenPoolCCTPV2Contract, opts *bind.CallOpts, args uint64) ([][]byte, error) {
+		return c.GetRemotePools(opts, args)
+	},
+})
+
+var GetAllAuthorizedCallers = contract.NewRead(contract.ReadParams[struct{}, []common.Address, *USDCTokenPoolCCTPV2Contract]{
+	Name:         "usdc-token-pool-cctp-v2:get-all-authorized-callers",
+	Version:      Version,
+	Description:  "Calls getAllAuthorizedCallers on the contract",
+	ContractType: ContractType,
+	NewContract:  NewUSDCTokenPoolCCTPV2Contract,
+	CallContract: func(c *USDCTokenPoolCCTPV2Contract, opts *bind.CallOpts, args struct{}) ([]common.Address, error) {
+		return c.GetAllAuthorizedCallers(opts)
 	},
 })

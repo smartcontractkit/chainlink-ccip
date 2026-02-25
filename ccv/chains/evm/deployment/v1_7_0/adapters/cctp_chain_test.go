@@ -31,7 +31,6 @@ import (
 	cctp_message_transmitter_proxy_v1_6_2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_2/operations/cctp_message_transmitter_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_5/operations/usdc_token_pool_cctp_v2"
 	v1_6_1_burn_mint_token_pool "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_1/burn_mint_token_pool"
-	usdc_token_pool_cctp_v2_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_5/usdc_token_pool_cctp_v2"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
@@ -529,7 +528,7 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 	require.Equal(t, homeCCTPTokenPoolAddr, homePools.CctpV2PoolWithCCV, "CCTP V2-with-CCV pool should match on home chain")
 
 	// Check CCTP V2 token pool authorized callers on home chain (proxy must be authorized)
-	homeCCTPV2TokenPool, err := usdc_token_pool_cctp_v2_bindings.NewUSDCTokenPoolCCTPV2(homeCCTPV2TokenPoolAddr, homeChain.Client)
+	homeCCTPV2TokenPool, err := usdc_token_pool_cctp_v2.NewUSDCTokenPoolCCTPV2Contract(homeCCTPV2TokenPoolAddr, homeChain.Client)
 	require.NoError(t, err, "Failed to instantiate CCTP V2 token pool contract on home chain")
 	homeCCTPV2AuthorizedCallers, err := homeCCTPV2TokenPool.GetAllAuthorizedCallers(nil)
 	require.NoError(t, err, "Failed to get authorized callers from CCTP V2 token pool on home chain")
@@ -672,7 +671,7 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 	require.Equal(t, nonHomeSetup.Router, nonHomeVerifierRemoteChainConfig.Router, "CCTPVerifier remote chain config Router should match on non-home chain")
 
 	// Check CCTP V2 token pool domain on non-home chain
-	nonHomeCCTPV2TokenPool, err := usdc_token_pool_cctp_v2_bindings.NewUSDCTokenPoolCCTPV2(nonHomeCCTPV2TokenPoolAddr, nonHomeChain.Client)
+	nonHomeCCTPV2TokenPool, err := usdc_token_pool_cctp_v2.NewUSDCTokenPoolCCTPV2Contract(nonHomeCCTPV2TokenPoolAddr, nonHomeChain.Client)
 	require.NoError(t, err, "Failed to instantiate CCTP V2 token pool contract on non-home chain")
 	nonHomeCCTPV2Domain, err := nonHomeCCTPV2TokenPool.GetDomain(nil, homeChainSelector)
 	require.NoError(t, err, "Failed to get domain from CCTP V2 token pool on non-home chain")

@@ -77,7 +77,7 @@ var Initialize = operations.NewOperation(
 		}
 		authority := GetAuthority(chain, input.OffRamp)
 		table, err := common.SetupLookupTable(
-			context.Background(),
+			b.GetContext(),
 			chain.Client,
 			*chain.DeployerKey,
 			[]solana.PublicKey{

@@ -174,3 +174,12 @@ func GetTokenMintAuthority(chain cldf_solana.Chain, tokenMint solana.PublicKey) 
 	}
 	return mintAuthority
 }
+
+func GetTokenDecimals(chain cldf_solana.Chain, tokenMint solana.PublicKey) (uint8, error) {
+	var mintData token.Mint
+	err := chain.GetAccountDataBorshInto(context.Background(), tokenMint, &mintData)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get account data: %w", err)
+	}
+	return mintData.Decimals, nil
+}
