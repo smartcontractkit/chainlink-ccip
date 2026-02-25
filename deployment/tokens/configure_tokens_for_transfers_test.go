@@ -496,28 +496,8 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 					},
 					{
 						ChainSelector: 15971525489660198786,
-						TokenPoolRef: datastore.AddressRef{
-							Type:          "TokenPool",
-							Version:       semver.MustParse("1.0.0"),
-							ChainSelector: 15971525489660198786,
-						},
-						RegistryRef: datastore.AddressRef{
-							Type:          "Registry",
-							Version:       semver.MustParse("1.0.0"),
-							ChainSelector: 15971525489660198786,
-						},
 						RemoteChains: map[uint64]tokens.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
 							5009297550715157269: {
-								RemoteToken: &datastore.AddressRef{
-									Type:          "Token",
-									Version:       semver.MustParse("1.0.0"),
-									ChainSelector: 5009297550715157269,
-								},
-								RemotePool: &datastore.AddressRef{
-									Type:          "TokenPool",
-									Version:       semver.MustParse("1.0.0"),
-									ChainSelector: 5009297550715157269,
-								},
 								OutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{IsEnabled: false},
 							},
 						},
