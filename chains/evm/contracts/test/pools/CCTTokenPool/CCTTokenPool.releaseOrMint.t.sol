@@ -2,8 +2,8 @@
 pragma solidity ^0.8.24;
 
 import {Pool} from "../../../libraries/Pool.sol";
-import {CCTTokenPool} from "../../../pools/CCTTokenPool.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
+import {BaseERC20} from "../../../tmp/BaseERC20.sol";
 import {CCTTokenPoolSetup} from "./CCTTokenPoolSetup.t.sol";
 
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
@@ -42,9 +42,7 @@ contract CCTTokenPool_releaseOrMint is CCTTokenPoolSetup {
     vm.startPrank(s_allowedOffRamp);
 
     vm.expectRevert(
-      abi.encodeWithSelector(
-        CCTTokenPool.MaxSupplyExceeded.selector, IERC20(address(s_cctPool)).totalSupply() + tooMuch
-      )
+      abi.encodeWithSelector(BaseERC20.MaxSupplyExceeded.selector, IERC20(address(s_cctPool)).totalSupply() + tooMuch)
     );
     s_cctPool.releaseOrMint(
       Pool.ReleaseOrMintInV1({

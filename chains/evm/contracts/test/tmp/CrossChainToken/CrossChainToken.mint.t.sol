@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {BaseERC20} from "../../../tmp/BaseERC20.sol";
-import {CrossChainToken} from "../../../tmp/CrossChainToken.sol";
 import {CrossChainTokenSetup} from "./CrossChainTokenSetup.t.sol";
 
 import {IAccessControl} from "@openzeppelin/contracts@5.3.0/access/IAccessControl.sol";
@@ -42,9 +41,7 @@ contract CrossChainToken_mint is CrossChainTokenSetup {
     vm.startPrank(s_minter);
 
     vm.expectRevert(
-      abi.encodeWithSelector(
-        CrossChainToken.MaxSupplyExceeded.selector, s_crossChainToken.totalSupply() + remaining + 1
-      )
+      abi.encodeWithSelector(BaseERC20.MaxSupplyExceeded.selector, s_crossChainToken.totalSupply() + remaining + 1)
     );
     s_crossChainToken.mint(makeAddr("receiver"), remaining + 1);
   }

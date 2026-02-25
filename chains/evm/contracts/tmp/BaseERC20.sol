@@ -16,6 +16,7 @@ contract BaseERC20 is IGetCCIPAdmin, ERC20, ITypeAndVersion, IERC165 {
   }
 
   error InvalidRecipient(address recipient);
+  error MaxSupplyExceeded(uint256 supplyAfterMint);
   error OnlyCCIPAdmin();
 
   event CCIPAdminTransferred(address indexed previousAdmin, address indexed newAdmin);
@@ -53,8 +54,11 @@ contract BaseERC20 is IGetCCIPAdmin, ERC20, ITypeAndVersion, IERC165 {
 
     address ccipAdmin = args.ccipAdmin == address(0) ? msg.sender : args.ccipAdmin;
 
-    // Mint the initial supply to the new Owner, saving gas by not calling if the mint amount is zero.
-    if (args.preMint != 0) _mint(ccipAdmin, args.preMint);
+    // Mint the initial supply to the ccipAdmin, saving gas by not calling if the mint amount is zero.
+    if (args.preMint != 0) {
+      if (args.maxSupply != 0 && args.preMint > args.maxSupply) revert MaxSupplyExceeded(args.preMint);
+      _mint(ccipAdmin, args.preMint);
+    }
 
     _setCCIPAdmin(ccipAdmin);
   }
@@ -94,7 +98,7 @@ contract BaseERC20 is IGetCCIPAdmin, ERC20, ITypeAndVersion, IERC165 {
   }
 
   /// @dev This check applies to transfer, minting, and burning.
-  /// @dev Disallows approving for address(this).
+  /// @dev Disallows transferring/minting to address(this).
   function _update(
     address from,
     address to,

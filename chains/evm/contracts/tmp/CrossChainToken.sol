@@ -16,8 +16,6 @@ contract CrossChainToken is BaseERC20, AccessControlDefaultAdminRules, IBurnMint
     return "CrossChainToken 2.0.0-dev";
   }
 
-  error MaxSupplyExceeded(uint256 supplyAfterMint);
-
   bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
   bytes32 public constant BURNER_ROLE = keccak256("BURNER_ROLE");
   bytes32 public constant BURN_MINT_ADMIN_ROLE = keccak256("BURN_MINT_ADMIN_ROLE");

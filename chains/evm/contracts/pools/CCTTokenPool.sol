@@ -12,8 +12,6 @@ contract CCTTokenPool is TokenPool, BaseERC20 {
     return "CCTTokenPool 2.0.0-dev";
   }
 
-  error MaxSupplyExceeded(uint256 supplyAfterMint);
-
   constructor(
     BaseERC20.ConstructorParams memory tokenParams,
     address advancedPoolHooks,
