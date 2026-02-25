@@ -115,4 +115,38 @@ with open(file_path, 'w') as f:
 PYEOF
 fi
 
+# Fix anchor-go name collision in timelock: The IDL has instructions named "initialize"
+# and "initializeInstruction" (and similarly "initializeBypasserInstruction"). The generator
+# maps both to the same Go name (e.g. NewInitializeInstruction). Rename the *Instruction
+# variants to append an extra "Instruction" suffix to disambiguate.
+TL_INSTRUCTIONS="./gobindings/latest/timelock/instructions.go"
+if [ -f "$TL_INSTRUCTIONS" ]; then
+  python3 - "$TL_INSTRUCTIONS" << 'PYEOF'
+import re, sys
+
+file_path = sys.argv[1]
+with open(file_path, 'r') as f:
+    content = f.read()
+
+# For each pair, rename the "*Instruction" variant (from "initializeInstruction" and
+# "initializeBypasserInstruction" IDL names) by appending an extra "Instruction" suffix.
+# The discriminator constants (Instruction_Xxx) must NOT be renamed.
+renames = {
+    'InitializeInstruction': '__DISC_PROTECT_INIT_IX__',
+    'InitializeBypasserInstruction': '__DISC_PROTECT_INIT_BYP_IX__',
+}
+for name, placeholder in renames.items():
+    # Protect discriminator constants from replacement (placeholder must NOT contain the target)
+    content = content.replace('Instruction_' + name, placeholder)
+    # Rename all remaining occurrences (struct, methods, constructors, string literals)
+    # Use negative lookahead to avoid matching longer names (e.g. InitializeInstructionOperation)
+    content = re.sub(re.escape(name) + r'(?!Operation)', name + 'Instruction', content)
+    # Restore discriminator constants
+    content = content.replace(placeholder, 'Instruction_' + name)
+
+with open(file_path, 'w') as f:
+    f.write(content)
+PYEOF
+fi
+
 go fmt ./...

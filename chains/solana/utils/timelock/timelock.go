@@ -87,7 +87,7 @@ func GetInitAccessControllersIxs(ctx context.Context, roleAcAccount solana.Publi
 
 // instructions builder for adding access to a role
 func GetBatchAddAccessIxs(ctx context.Context, timelockID [32]byte, roleAcAccount solana.PublicKey, role timelock.Role, addresses []solana.PublicKey, authority solana.PrivateKey, chunkSize int, client *rpc.Client) ([]solana.Instruction, error) {
-	ac, err := common.GetParsedAccountData(ctx, client, roleAcAccount, config.DefaultCommitment, access_controller.ParseAccount_AccessController)
+	_, err := common.GetParsedAccountData(ctx, client, roleAcAccount, config.DefaultCommitment, access_controller.ParseAccount_AccessController)
 	if err != nil {
 		return nil, fmt.Errorf("access controller for role %s is not initialized: %w", role, err)
 	}

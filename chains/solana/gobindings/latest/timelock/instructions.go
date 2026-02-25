@@ -767,7 +767,7 @@ func NewInitializeInstruction(
 
 // Builds a "initialize_bypasser_instruction" instruction.
 // Initialize an instruction for a bypasser operation. //  // # Parameters //  // - `ctx`: The context containing the bypasser operation account. // - `_timelock_id`: The timelock identifier. // - `_id`: The operation identifier. // - `program_id`: The target program for the instruction. // - `accounts`: The list of accounts required for the instruction.
-func NewInitializeBypasserInstruction(
+func NewInitializeBypasserInstructionInstruction(
 	// Params:
 	timelockIdParam [32]uint8,
 	idParam [32]uint8,
@@ -907,7 +907,7 @@ func NewInitializeBypasserOperationInstruction(
 
 // Builds a "initialize_instruction" instruction.
 // Append a new instruction to an existing standard operation. //  // # Parameters //  // - `ctx`: The context containing the operation account. // - `_timelock_id`: The timelock identifier (for PDA derivation). // - `_id`: The operation identifier. // - `program_id`: The target program for the instruction. // - `accounts`: The list of accounts required for the instruction.
-func NewInitializeInstruction(
+func NewInitializeInstructionInstruction(
 	// Params:
 	timelockIdParam [32]uint8,
 	idParam [32]uint8,
@@ -3226,7 +3226,7 @@ func UnmarshalInitializeInstruction(buf []byte) (*InitializeInstruction, error) 
 	return obj, nil
 }
 
-type InitializeBypasserInstruction struct {
+type InitializeBypasserInstructionInstruction struct {
 	TimelockId [32]uint8            `json:"_timelock_id"`
 	Id         [32]uint8            `json:"_id"`
 	ProgramId  solanago.PublicKey   `json:"program_id"`
@@ -3243,20 +3243,20 @@ type InitializeBypasserInstruction struct {
 	SystemProgram        solanago.PublicKey `json:"system_program"`
 }
 
-func (obj *InitializeBypasserInstruction) GetDiscriminator() []byte {
+func (obj *InitializeBypasserInstructionInstruction) GetDiscriminator() []byte {
 	return Instruction_InitializeBypasserInstruction[:]
 }
 
-// UnmarshalWithDecoder unmarshals the InitializeBypasserInstruction from Borsh-encoded bytes prefixed with its discriminator.
-func (obj *InitializeBypasserInstruction) UnmarshalWithDecoder(decoder *binary.Decoder) error {
+// UnmarshalWithDecoder unmarshals the InitializeBypasserInstructionInstruction from Borsh-encoded bytes prefixed with its discriminator.
+func (obj *InitializeBypasserInstructionInstruction) UnmarshalWithDecoder(decoder *binary.Decoder) error {
 	var err error
 	// Read the discriminator and check it against the expected value:
 	discriminator, err := decoder.ReadDiscriminator()
 	if err != nil {
-		return fmt.Errorf("failed to read instruction discriminator for %s: %w", "InitializeBypasserInstruction", err)
+		return fmt.Errorf("failed to read instruction discriminator for %s: %w", "InitializeBypasserInstructionInstruction", err)
 	}
 	if discriminator != Instruction_InitializeBypasserInstruction {
-		return fmt.Errorf("instruction discriminator mismatch for %s: expected %s, got %s", "InitializeBypasserInstruction", Instruction_InitializeBypasserInstruction, discriminator)
+		return fmt.Errorf("instruction discriminator mismatch for %s: expected %s, got %s", "InitializeBypasserInstructionInstruction", Instruction_InitializeBypasserInstruction, discriminator)
 	}
 	// Deserialize `TimelockId`:
 	err = decoder.Decode(&obj.TimelockId)
@@ -3281,7 +3281,7 @@ func (obj *InitializeBypasserInstruction) UnmarshalWithDecoder(decoder *binary.D
 	return nil
 }
 
-func (obj *InitializeBypasserInstruction) UnmarshalAccountIndices(buf []byte) ([]uint8, error) {
+func (obj *InitializeBypasserInstructionInstruction) UnmarshalAccountIndices(buf []byte) ([]uint8, error) {
 	// UnmarshalAccountIndices decodes account indices from Borsh-encoded bytes
 	decoder := binary.NewBorshDecoder(buf)
 	indices := make([]uint8, 0)
@@ -3325,7 +3325,7 @@ func (obj *InitializeBypasserInstruction) UnmarshalAccountIndices(buf []byte) ([
 	return indices, nil
 }
 
-func (obj *InitializeBypasserInstruction) PopulateFromAccountIndices(indices []uint8, accountKeys []solanago.PublicKey) error {
+func (obj *InitializeBypasserInstructionInstruction) PopulateFromAccountIndices(indices []uint8, accountKeys []solanago.PublicKey) error {
 	// PopulateFromAccountIndices sets account public keys from indices and account keys array
 	if len(indices) != 5 {
 		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 5, len(indices))
@@ -3364,7 +3364,7 @@ func (obj *InitializeBypasserInstruction) PopulateFromAccountIndices(indices []u
 	return nil
 }
 
-func (obj *InitializeBypasserInstruction) GetAccountKeys() []solanago.PublicKey {
+func (obj *InitializeBypasserInstructionInstruction) GetAccountKeys() []solanago.PublicKey {
 	keys := make([]solanago.PublicKey, 0)
 	keys = append(keys, obj.Operation)
 	keys = append(keys, obj.Config)
@@ -3374,19 +3374,19 @@ func (obj *InitializeBypasserInstruction) GetAccountKeys() []solanago.PublicKey 
 	return keys
 }
 
-// Unmarshal unmarshals the InitializeBypasserInstruction from Borsh-encoded bytes prefixed with the discriminator.
-func (obj *InitializeBypasserInstruction) Unmarshal(buf []byte) error {
+// Unmarshal unmarshals the InitializeBypasserInstructionInstruction from Borsh-encoded bytes prefixed with the discriminator.
+func (obj *InitializeBypasserInstructionInstruction) Unmarshal(buf []byte) error {
 	var err error
 	err = obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
 	if err != nil {
-		return fmt.Errorf("error while unmarshaling InitializeBypasserInstruction: %w", err)
+		return fmt.Errorf("error while unmarshaling InitializeBypasserInstructionInstruction: %w", err)
 	}
 	return nil
 }
 
-// UnmarshalInitializeBypasserInstruction unmarshals the instruction from Borsh-encoded bytes prefixed with the discriminator.
-func UnmarshalInitializeBypasserInstruction(buf []byte) (*InitializeBypasserInstruction, error) {
-	obj := new(InitializeBypasserInstruction)
+// UnmarshalInitializeBypasserInstructionInstruction unmarshals the instruction from Borsh-encoded bytes prefixed with the discriminator.
+func UnmarshalInitializeBypasserInstructionInstruction(buf []byte) (*InitializeBypasserInstructionInstruction, error) {
+	obj := new(InitializeBypasserInstructionInstruction)
 	var err error
 	err = obj.Unmarshal(buf)
 	if err != nil {
@@ -3564,7 +3564,7 @@ func UnmarshalInitializeBypasserOperationInstruction(buf []byte) (*InitializeByp
 	return obj, nil
 }
 
-type InitializeInstruction struct {
+type InitializeInstructionInstruction struct {
 	TimelockId [32]uint8            `json:"_timelock_id"`
 	Id         [32]uint8            `json:"_id"`
 	ProgramId  solanago.PublicKey   `json:"program_id"`
@@ -3581,20 +3581,20 @@ type InitializeInstruction struct {
 	SystemProgram        solanago.PublicKey `json:"system_program"`
 }
 
-func (obj *InitializeInstruction) GetDiscriminator() []byte {
+func (obj *InitializeInstructionInstruction) GetDiscriminator() []byte {
 	return Instruction_InitializeInstruction[:]
 }
 
-// UnmarshalWithDecoder unmarshals the InitializeInstruction from Borsh-encoded bytes prefixed with its discriminator.
-func (obj *InitializeInstruction) UnmarshalWithDecoder(decoder *binary.Decoder) error {
+// UnmarshalWithDecoder unmarshals the InitializeInstructionInstruction from Borsh-encoded bytes prefixed with its discriminator.
+func (obj *InitializeInstructionInstruction) UnmarshalWithDecoder(decoder *binary.Decoder) error {
 	var err error
 	// Read the discriminator and check it against the expected value:
 	discriminator, err := decoder.ReadDiscriminator()
 	if err != nil {
-		return fmt.Errorf("failed to read instruction discriminator for %s: %w", "InitializeInstruction", err)
+		return fmt.Errorf("failed to read instruction discriminator for %s: %w", "InitializeInstructionInstruction", err)
 	}
 	if discriminator != Instruction_InitializeInstruction {
-		return fmt.Errorf("instruction discriminator mismatch for %s: expected %s, got %s", "InitializeInstruction", Instruction_InitializeInstruction, discriminator)
+		return fmt.Errorf("instruction discriminator mismatch for %s: expected %s, got %s", "InitializeInstructionInstruction", Instruction_InitializeInstruction, discriminator)
 	}
 	// Deserialize `TimelockId`:
 	err = decoder.Decode(&obj.TimelockId)
@@ -3619,7 +3619,7 @@ func (obj *InitializeInstruction) UnmarshalWithDecoder(decoder *binary.Decoder) 
 	return nil
 }
 
-func (obj *InitializeInstruction) UnmarshalAccountIndices(buf []byte) ([]uint8, error) {
+func (obj *InitializeInstructionInstruction) UnmarshalAccountIndices(buf []byte) ([]uint8, error) {
 	// UnmarshalAccountIndices decodes account indices from Borsh-encoded bytes
 	decoder := binary.NewBorshDecoder(buf)
 	indices := make([]uint8, 0)
@@ -3663,7 +3663,7 @@ func (obj *InitializeInstruction) UnmarshalAccountIndices(buf []byte) ([]uint8, 
 	return indices, nil
 }
 
-func (obj *InitializeInstruction) PopulateFromAccountIndices(indices []uint8, accountKeys []solanago.PublicKey) error {
+func (obj *InitializeInstructionInstruction) PopulateFromAccountIndices(indices []uint8, accountKeys []solanago.PublicKey) error {
 	// PopulateFromAccountIndices sets account public keys from indices and account keys array
 	if len(indices) != 5 {
 		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 5, len(indices))
@@ -3702,7 +3702,7 @@ func (obj *InitializeInstruction) PopulateFromAccountIndices(indices []uint8, ac
 	return nil
 }
 
-func (obj *InitializeInstruction) GetAccountKeys() []solanago.PublicKey {
+func (obj *InitializeInstructionInstruction) GetAccountKeys() []solanago.PublicKey {
 	keys := make([]solanago.PublicKey, 0)
 	keys = append(keys, obj.Operation)
 	keys = append(keys, obj.Config)
@@ -3712,19 +3712,19 @@ func (obj *InitializeInstruction) GetAccountKeys() []solanago.PublicKey {
 	return keys
 }
 
-// Unmarshal unmarshals the InitializeInstruction from Borsh-encoded bytes prefixed with the discriminator.
-func (obj *InitializeInstruction) Unmarshal(buf []byte) error {
+// Unmarshal unmarshals the InitializeInstructionInstruction from Borsh-encoded bytes prefixed with the discriminator.
+func (obj *InitializeInstructionInstruction) Unmarshal(buf []byte) error {
 	var err error
 	err = obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
 	if err != nil {
-		return fmt.Errorf("error while unmarshaling InitializeInstruction: %w", err)
+		return fmt.Errorf("error while unmarshaling InitializeInstructionInstruction: %w", err)
 	}
 	return nil
 }
 
-// UnmarshalInitializeInstruction unmarshals the instruction from Borsh-encoded bytes prefixed with the discriminator.
-func UnmarshalInitializeInstruction(buf []byte) (*InitializeInstruction, error) {
-	obj := new(InitializeInstruction)
+// UnmarshalInitializeInstructionInstruction unmarshals the instruction from Borsh-encoded bytes prefixed with the discriminator.
+func UnmarshalInitializeInstructionInstruction(buf []byte) (*InitializeInstructionInstruction, error) {
+	obj := new(InitializeInstructionInstruction)
 	var err error
 	err = obj.Unmarshal(buf)
 	if err != nil {
@@ -4649,11 +4649,11 @@ func ParseInstruction(instructionData []byte, accountIndicesData []byte, account
 		}
 		return instruction, nil
 	case Instruction_InitializeBypasserInstruction:
-		instruction := new(InitializeBypasserInstruction)
+		instruction := new(InitializeBypasserInstructionInstruction)
 		decoder := binary.NewBorshDecoder(instructionData)
 		err := instruction.UnmarshalWithDecoder(decoder)
 		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal instruction as InitializeBypasserInstruction: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal instruction as InitializeBypasserInstructionInstruction: %w", err)
 		}
 		if accountIndicesData != nil && len(accountIndicesData) > 0 {
 			indices, err := instruction.UnmarshalAccountIndices(accountIndicesData)
@@ -4685,11 +4685,11 @@ func ParseInstruction(instructionData []byte, accountIndicesData []byte, account
 		}
 		return instruction, nil
 	case Instruction_InitializeInstruction:
-		instruction := new(InitializeInstruction)
+		instruction := new(InitializeInstructionInstruction)
 		decoder := binary.NewBorshDecoder(instructionData)
 		err := instruction.UnmarshalWithDecoder(decoder)
 		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal instruction as InitializeInstruction: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal instruction as InitializeInstructionInstruction: %w", err)
 		}
 		if accountIndicesData != nil && len(accountIndicesData) > 0 {
 			indices, err := instruction.UnmarshalAccountIndices(accountIndicesData)
