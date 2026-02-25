@@ -380,6 +380,9 @@ func TestDeployCCTPChains_VerifyPreconditions(t *testing.T) {
 					15971525489660198786: {
 						USDCType:         adapters.Canonical,
 						TokenMessengerV2: "0x6666666666666666666666666666666666666666",
+						RemoteChains: map[uint64]adapters.RemoteCCTPChainConfig{
+							5009297550715157269: {},
+						},
 					},
 				},
 			},

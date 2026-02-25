@@ -84,8 +84,12 @@ func makeVerifyDeployCCTPChains(_ *adapters.CCTPChainRegistry, _ *changesets.MCM
 				if _, err := chain_selectors.GetSelectorFamily(remoteChainSelector); err != nil {
 					return err
 				}
-				if _, ok := cfg.Chains[remoteChainSelector]; !ok {
+				remoteChainCfg, ok := cfg.Chains[remoteChainSelector]
+				if !ok {
 					return fmt.Errorf("remote chain selector %d not found in chains", remoteChainSelector)
+				}
+				if _, ok := remoteChainCfg.RemoteChains[chainSel]; !ok {
+					return fmt.Errorf("chain %d has remote %d but chain %d does not define a remote chain config for %d (each remote must point back to the current chain)", chainSel, remoteChainSelector, remoteChainSelector, chainSel)
 				}
 			}
 		}
@@ -159,7 +163,10 @@ func makeApplyDeployCCTPChains(cctpChainRegistry *adapters.CCTPChainRegistry, mc
 		for chainSel, chainCfg := range cfg.Chains {
 			remoteChains := make(map[uint64]adapters.RemoteCCTPChain)
 			remoteRegisteredPoolRefs := make(map[uint64]datastore.AddressRef)
-			for remoteChainSelector := range chainCfg.RemoteChains {
+			// Build remote chain configs with inbound rate limits derived from the counterpart's outbound
+			// (same as configure_tokens_for_transfers: a chain's inbound from remote = remote's outbound to this chain).
+			remoteChainConfigs := make(map[uint64]adapters.RemoteCCTPChainConfig, len(chainCfg.RemoteChains))
+			for remoteChainSelector, remoteCfg := range chainCfg.RemoteChains {
 				remoteFamily, err := chain_selectors.GetSelectorFamily(remoteChainSelector)
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to get chain family for remote chain selector %d: %w", remoteChainSelector, err)
@@ -171,6 +178,13 @@ func makeApplyDeployCCTPChains(cctpChainRegistry *adapters.CCTPChainRegistry, mc
 				}
 				remoteChains[remoteChainSelector] = remoteAdapter
 				remoteRegisteredPoolRefs[remoteChainSelector] = cfg.Chains[remoteChainSelector].RegisteredPoolRef
+
+				// Derive the inbound rate limiter configs from the counterpart's outbound rate limiter configs.
+				derived := remoteCfg
+				counterpartCfg := cfg.Chains[remoteChainSelector].RemoteChains[chainSel]
+				derived.DefaultFinalityInboundRateLimiterConfig = counterpartCfg.DefaultFinalityOutboundRateLimiterConfig
+				derived.CustomFinalityInboundRateLimiterConfig = counterpartCfg.CustomFinalityOutboundRateLimiterConfig
+				remoteChainConfigs[remoteChainSelector] = derived
 			}
 			dep := adapters.ConfigureCCTPChainForLanesDeps{
 				BlockChains:  e.BlockChains,
@@ -182,7 +196,7 @@ func makeApplyDeployCCTPChains(cctpChainRegistry *adapters.CCTPChainRegistry, mc
 				USDCToken:                chainCfg.USDCToken,
 				RegisteredPoolRef:        chainCfg.RegisteredPoolRef,
 				RemoteRegisteredPoolRefs: remoteRegisteredPoolRefs,
-				RemoteChains:             chainCfg.RemoteChains,
+				RemoteChains:             remoteChainConfigs,
 			}
 			configureCCTPChainForLanesReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adaptersByChain[chainSel].ConfigureCCTPChainForLanes(), dep, in)
 			if err != nil {

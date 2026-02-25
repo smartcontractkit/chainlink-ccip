@@ -347,10 +347,10 @@ func buildRemoteChainConfigs(dep adapters.ConfigureCCTPChainForLanesDeps, input 
 			RemotePool:                               common.LeftPadBytes(remotePoolAddress, 32),
 			RemoteToken:                              common.LeftPadBytes(remoteTokenAddress, 32),
 			TokenTransferFeeConfig:                   remoteChain.TokenTransferFeeConfig,
-			DefaultFinalityOutboundRateLimiterConfig: tokens_core.RateLimiterConfigFloatInput{Capacity: 0, Rate: 0},
-			CustomFinalityOutboundRateLimiterConfig:  tokens_core.RateLimiterConfigFloatInput{Capacity: 0, Rate: 0},
-			DefaultFinalityInboundRateLimiterConfig:  tokens_core.RateLimiterConfigFloatInput{Capacity: 0, Rate: 0},
-			CustomFinalityInboundRateLimiterConfig:   tokens_core.RateLimiterConfigFloatInput{Capacity: 0, Rate: 0},
+			DefaultFinalityOutboundRateLimiterConfig: remoteChain.DefaultFinalityOutboundRateLimiterConfig,
+			CustomFinalityOutboundRateLimiterConfig:  remoteChain.CustomFinalityOutboundRateLimiterConfig,
+			DefaultFinalityInboundRateLimiterConfig:  remoteChain.DefaultFinalityInboundRateLimiterConfig,
+			CustomFinalityInboundRateLimiterConfig:   remoteChain.CustomFinalityInboundRateLimiterConfig,
 		}
 	}
 	return configs, nil

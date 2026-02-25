@@ -43,13 +43,17 @@ type RemoteCCTPChainConfig struct {
 	// TokenTransferFeeConfig specifies the desired token transfer fee configuration for this remote chain.
 	TokenTransferFeeConfig tokens.TokenTransferFeeConfig
 	// DefaultFinalityInboundRateLimiterConfig specifies the desired rate limiter configuration for default-finality inbound traffic.
-	DefaultFinalityInboundRateLimiterConfig tokens.RateLimiterConfig
+	// DO NOT SET THIS VALUE WHEN PASSING IN INPUTS.
+	// This value is derived from the configuration specified for outbound traffic to the remote chain, as the same limits should apply in both directions.
+	DefaultFinalityInboundRateLimiterConfig tokens.RateLimiterConfigFloatInput
 	// DefaultFinalityOutboundRateLimiterConfig specifies the desired rate limiter configuration for default-finality outbound traffic.
-	DefaultFinalityOutboundRateLimiterConfig tokens.RateLimiterConfig
+	DefaultFinalityOutboundRateLimiterConfig tokens.RateLimiterConfigFloatInput
 	// CustomFinalityInboundRateLimiterConfig specifies the desired rate limiter configuration for custom-finality inbound traffic.
-	CustomFinalityInboundRateLimiterConfig tokens.RateLimiterConfig
+	// DO NOT SET THIS VALUE WHEN PASSING IN INPUTS.
+	// This value is derived from the configuration specified for outbound traffic to the remote chain, as the same limits should apply in both directions.
+	CustomFinalityInboundRateLimiterConfig tokens.RateLimiterConfigFloatInput
 	// CustomFinalityOutboundRateLimiterConfig specifies the desired rate limiter configuration for custom-finality outbound traffic.
-	CustomFinalityOutboundRateLimiterConfig tokens.RateLimiterConfig
+	CustomFinalityOutboundRateLimiterConfig tokens.RateLimiterConfigFloatInput
 }
 
 // ConfigureCCTPChainForLanesInput specifies the input for the ConfigureCCTPChainForLanes sequence.
