@@ -811,10 +811,10 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 // Rate limiter Capacity/Rate must be non-nil for ABI packing in token pool configuration.
 func remoteChainConfigForNonCanonical() adapters.RemoteCCTPChainConfig {
 	return adapters.RemoteCCTPChainConfig{
-		DefaultFinalityInboundRateLimiterConfig:  tokens.RateLimiterConfig{IsEnabled: false, Capacity: big.NewInt(0), Rate: big.NewInt(0)},
-		DefaultFinalityOutboundRateLimiterConfig: tokens.RateLimiterConfig{IsEnabled: false, Capacity: big.NewInt(0), Rate: big.NewInt(0)},
-		CustomFinalityInboundRateLimiterConfig:   tokens.RateLimiterConfig{IsEnabled: false, Capacity: big.NewInt(0), Rate: big.NewInt(0)},
-		CustomFinalityOutboundRateLimiterConfig:  tokens.RateLimiterConfig{IsEnabled: false, Capacity: big.NewInt(0), Rate: big.NewInt(0)},
+		DefaultFinalityInboundRateLimiterConfig:  tokens.RateLimiterConfigFloatInput{IsEnabled: false, Capacity: 0, Rate: 0},
+		DefaultFinalityOutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{IsEnabled: false, Capacity: 0, Rate: 0},
+		CustomFinalityInboundRateLimiterConfig:   tokens.RateLimiterConfigFloatInput{IsEnabled: false, Capacity: 0, Rate: 0},
+		CustomFinalityOutboundRateLimiterConfig:  tokens.RateLimiterConfigFloatInput{IsEnabled: false, Capacity: 0, Rate: 0},
 		TokenTransferFeeConfig: tokens.TokenTransferFeeConfig{
 			IsEnabled:                     true,
 			DestGasOverhead:               200_000,
@@ -914,10 +914,10 @@ func TestCCTPChainAdapter_CanonicalToNonCanonicalChain(t *testing.T) {
 							DefaultFinalityTransferFeeBps: 100,
 							CustomFinalityTransferFeeBps:  100,
 						},
-						DefaultFinalityInboundRateLimiterConfig:  tokens.RateLimiterConfig{IsEnabled: false, Capacity: big.NewInt(0), Rate: big.NewInt(0)},
-						DefaultFinalityOutboundRateLimiterConfig: tokens.RateLimiterConfig{IsEnabled: false, Capacity: big.NewInt(0), Rate: big.NewInt(0)},
-						CustomFinalityInboundRateLimiterConfig:   tokens.RateLimiterConfig{IsEnabled: false, Capacity: big.NewInt(0), Rate: big.NewInt(0)},
-						CustomFinalityOutboundRateLimiterConfig:  tokens.RateLimiterConfig{IsEnabled: false, Capacity: big.NewInt(0), Rate: big.NewInt(0)},
+						DefaultFinalityInboundRateLimiterConfig:  tokens.RateLimiterConfigFloatInput{IsEnabled: false, Capacity: 0, Rate: 0},
+						DefaultFinalityOutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{IsEnabled: false, Capacity: 0, Rate: 0},
+						CustomFinalityInboundRateLimiterConfig:   tokens.RateLimiterConfigFloatInput{IsEnabled: false, Capacity: 0, Rate: 0},
+						CustomFinalityOutboundRateLimiterConfig:  tokens.RateLimiterConfigFloatInput{IsEnabled: false, Capacity: 0, Rate: 0},
 					},
 				},
 			},
