@@ -25,6 +25,7 @@ func init() {
 		panic(err)
 	}
 	laneapi.GetLaneAdapterRegistry().RegisterLaneAdapter(chain_selectors.FamilySolana, v, &SolanaAdapter{})
+	laneapi.GetDisableLaneAdapterRegistry().RegisterDisableLaneAdapter(chain_selectors.FamilySolana, v, &SolanaAdapter{})
 	deployapi.GetRegistry().RegisterDeployer(chain_selectors.FamilySolana, v, &SolanaAdapter{})
 	deployapi.GetTransferOwnershipRegistry().RegisterAdapter(chain_selectors.FamilySolana, v, &SolanaAdapter{})
 	mcmsreaderapi.GetRegistry().RegisterMCMSReader(chain_selectors.FamilySolana, &SolanaAdapter{})
