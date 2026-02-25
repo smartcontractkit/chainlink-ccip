@@ -20,10 +20,10 @@ contract TokenPool_getRequiredCCVs is AdvancedPoolHooksSetup {
     IPoolV2.TokenTransferFeeConfig memory feeConfig = IPoolV2.TokenTransferFeeConfig({
       destGasOverhead: 50_000,
       destBytesOverhead: Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES,
-      defaultBlockConfirmationFeeUSDCents: 100, // $1.00
-      customBlockConfirmationFeeUSDCents: 150, // $1.50
-      defaultBlockConfirmationTransferFeeBps: DEFAULT_FEE_BPS,
-      customBlockConfirmationTransferFeeBps: CUSTOM_FEE_BPS,
+      defaultBlockConfirmationsFeeUSDCents: 100, // $1.00
+      customBlockConfirmationsFeeUSDCents: 150, // $1.50
+      defaultBlockConfirmationsTransferFeeBps: DEFAULT_FEE_BPS,
+      customBlockConfirmationsTransferFeeBps: CUSTOM_FEE_BPS,
       isEnabled: true
     });
 
@@ -34,7 +34,7 @@ contract TokenPool_getRequiredCCVs is AdvancedPoolHooksSetup {
     s_tokenPool.applyTokenTransferFeeConfigUpdates(feeConfigArgs, new uint64[](0));
   }
 
-  function test_getRequiredCCVs_WithDefaultBlockConfirmation_AppliesDefaultFeeBps() public {
+  function test_getRequiredCCVs_WithDefaultBlockConfirmations_AppliesDefaultFeeBps() public {
     uint256 amount = 10_000e18;
     uint256 expectedAmountAfterFee = amount - (amount * DEFAULT_FEE_BPS) / BPS_DIVIDER; // 9,900e18 (1% fee deducted)
 
@@ -59,7 +59,7 @@ contract TokenPool_getRequiredCCVs is AdvancedPoolHooksSetup {
     );
   }
 
-  function test_getRequiredCCVs_WithCustomBlockConfirmation_AppliesCustomFeeBps() public {
+  function test_getRequiredCCVs_WithCustomBlockConfirmations_AppliesCustomFeeBps() public {
     uint256 amount = 10_000e18;
     uint256 expectedAmountAfterFee = amount - (amount * CUSTOM_FEE_BPS) / BPS_DIVIDER; // 9,800e18 (2% fee deducted)
 

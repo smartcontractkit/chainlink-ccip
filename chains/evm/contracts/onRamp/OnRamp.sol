@@ -46,7 +46,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   error ReentrancyGuardReentrantCall();
   error DestinationChainNotSupported(uint64 destChainSelector);
   error InvalidDestChainAddress(bytes destChainAddress);
-  error CustomBlockConfirmationNotSupportedOnPoolV1();
+  error CustomBlockConfirmationsNotSupportedOnPoolV1();
   error TokenArgsNotSupportedOnPoolV1();
   error InsufficientFeeTokenAmount();
   error TokenReceiverNotAllowed(uint64 destChainSelector);
@@ -712,7 +712,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   /// @param destChainSelector Target destination chain selector of the message.
   /// @param receiver Message receiver in abi-encoded format (as expected by the pool on EVM source chains).
   /// @param originalSender Message sender.
-  /// @param blockConfirmationRequested Requested block confirmation.
+  /// @param blockConfirmationsRequested Requested block confirmations.
   /// @param tokenArgs Additional token arguments from the message.
   /// @return TokenTransferV1 token transfer encoding for MessageV1.
   function _lockOrBurnSingleToken(
@@ -720,7 +720,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     uint64 destChainSelector,
     bytes memory receiver,
     address originalSender,
-    uint16 blockConfirmationRequested,
+    uint16 blockConfirmationsRequested,
     bytes memory tokenArgs
   ) internal returns (MessageV1Codec.TokenTransferV1 memory) {
     if (tokenAndAmount.amount == 0) revert CannotSendZeroTokens();
@@ -751,12 +751,12 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       // Use the V2 overload which returns a potentially adjusted destination amount.
       if (IERC165(address(sourcePool)).supportsInterface(type(IPoolV2).interfaceId)) {
         (poolReturnData, destTokenAmount) =
-          IPoolV2(address(sourcePool)).lockOrBurn(lockOrBurnInput, blockConfirmationRequested, tokenArgs);
+          IPoolV2(address(sourcePool)).lockOrBurn(lockOrBurnInput, blockConfirmationsRequested, tokenArgs);
       } else {
-        // V1 pools don't understand `blockConfirmationRequested`/`tokenArgs`.
-        // We enforce default for `blockConfirmationRequested` and no `tokenArgs` to avoid silent mis-interpretation.
-        if (blockConfirmationRequested != 0) {
-          revert CustomBlockConfirmationNotSupportedOnPoolV1();
+        // V1 pools don't understand `blockConfirmationsRequested`/`tokenArgs`.
+        // We enforce default for `blockConfirmationsRequested` and no `tokenArgs` to avoid silent mis-interpretation.
+        if (blockConfirmationsRequested != 0) {
+          revert CustomBlockConfirmationsNotSupportedOnPoolV1();
         }
         if (tokenArgs.length != 0) {
           revert TokenArgsNotSupportedOnPoolV1();
