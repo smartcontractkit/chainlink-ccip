@@ -947,8 +947,7 @@ func TestConfigureChainsForLanes_Apply(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.desc, func(t *testing.T) {
-			// Register MCMS reader
-			mcmsRegistry := changesets.GetRegistry()
+			mcmsRegistry := changesets.NewMCMSReaderRegistry()
 			mcmsRegistry.RegisterMCMSReader("evm", &lanesTest_MockReader{})
 
 			// Register chain family adapter with appropriate error condition
