@@ -581,7 +581,7 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 
 			blockedSelectors, bserr := timelockutil.GetBlockedFunctionSelectors(ctx, solanaGoClient, timelockutil.GetConfigPDA(config.TestTimelockID), config.DefaultCommitment)
 			require.NoError(t, bserr)
-			require.Contains(t, blockedSelectors, external_program_cpi_stub.Instruction_Initialize)
+			require.Contains(t, blockedSelectors, external_program_cpi_stub.Instruction_Initialize[:])
 		})
 
 		t.Run("not able to block function that is already blocked", func(t *testing.T) {
@@ -629,7 +629,7 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 
 			blockedSelectors, bserr := timelockutil.GetBlockedFunctionSelectors(ctx, solanaGoClient, timelockutil.GetConfigPDA(config.TestTimelockID), config.DefaultCommitment)
 			require.NoError(t, bserr)
-			require.NotContains(t, blockedSelectors, external_program_cpi_stub.Instruction_Initialize)
+			require.NotContains(t, blockedSelectors, external_program_cpi_stub.Instruction_Initialize[:])
 		})
 
 		t.Run("not able to unblock function that is not blocked", func(t *testing.T) {

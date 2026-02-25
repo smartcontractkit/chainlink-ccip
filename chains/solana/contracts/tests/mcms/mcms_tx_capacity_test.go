@@ -1014,8 +1014,8 @@ func TestMcmsCapacity(t *testing.T) {
 				numTransfers int
 				expectError  bool
 			}{
-				{"max_batch_16", 16, false},
-				{"oom_batch_17", 17, true}, // OOM on timelock::execute_batch
+				{"max_batch_20", 20, false},
+				{"tx_too_large_batch_21", 21, true}, // tx too large on timelock::execute_batch
 			}
 
 			type timelockTestSummary struct {
@@ -1277,7 +1277,7 @@ func TestMcmsCapacity(t *testing.T) {
 					tcResult.timelockTxSize = measureInstructionSize(tlExeIx)
 
 					if tc.expectError {
-						testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{tlExeIx}, admin, config.DefaultCommitment, []string{"Program log: Error: memory allocation failed, out of memory"}, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
+						testutils.SendAndFailWithRPCError(ctx, t, solanaGoClient, []solana.Instruction{tlExeIx}, admin, config.DefaultCommitment, []string{"VersionedTransaction too large"}, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
 					} else {
 						testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{tlExeIx}, admin, config.DefaultCommitment, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
 
@@ -1327,8 +1327,11 @@ func TestMcmsCapacity(t *testing.T) {
 				memoSize    int
 				expectError bool
 			}{
-				{"oom_cpi_instruction", 5096, false},
-				{"oom_cpi_instruction", 5097, true}, // OOM on timelock::execute_batch
+				// NOTE: With Anchor 32, the OOM boundary for timelock::execute_batch moved
+				// beyond the MCM Execute tx size limit (~5389 bytes memo = 15 MCM ops max
+				// at Merkle depth 4). Values above 5389 create 16+ ops (depth 5), which
+				// causes MCM Execute transactions to exceed the Solana tx size limit.
+				{"max_cpi_instruction", 5389, false},
 			}
 
 			for _, tc := range testCases {
