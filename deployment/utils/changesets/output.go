@@ -117,6 +117,27 @@ func (b *OutputBuilder) WithBatchOps(ops []mcms_types.BatchOperation) *OutputBui
 	return b
 }
 
+// WithSingleBatchOpPerChain sets the batch operations on the OutputBuilder, ensuring that there is at most one batch operation per chain selector.
+// It is helpful to enforce the atomicity guarantees of MCMS proposals, which require that all operations for a given chain be included in a single batch operation.
+func (b *OutputBuilder) WithSingleBatchOpPerChain(ops []mcms_types.BatchOperation) *OutputBuilder {
+	// Filter out any batch operations that have no transactions.
+	txPerChains := make(map[mcms_types.ChainSelector][]mcms_types.Transaction)
+	for _, op := range ops {
+		if len(op.Transactions) > 0 {
+			txPerChains[op.ChainSelector] = append(txPerChains[op.ChainSelector], op.Transactions...)
+		}
+	}
+	filteredOps := make([]mcms_types.BatchOperation, 0, len(txPerChains))
+	for chainSelector, txs := range txPerChains {
+		filteredOps = append(filteredOps, mcms_types.BatchOperation{
+			ChainSelector: chainSelector,
+			Transactions:  txs,
+		})
+	}
+	b.batchOps = filteredOps
+	return b
+}
+
 // Build constructs the final ChangesetOutput, including building an MCMS proposal if there are write operations that have not been executed.
 func (b *OutputBuilder) Build(input mcms_utils.Input) (deployment.ChangesetOutput, error) {
 	if len(b.batchOps) == 0 {
