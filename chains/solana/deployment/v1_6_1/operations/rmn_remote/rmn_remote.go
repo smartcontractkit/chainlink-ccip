@@ -15,6 +15,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/rmn_remote"
+	rmn161 "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_1/rmn_remote"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	api "github.com/smartcontractkit/chainlink-ccip/deployment/fastcurse"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -258,6 +259,45 @@ var Uncurse = operations.NewOperation(
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm uncurse instruction: %w", err)
 				}
+			}
+		}
+		return sequences.OnChainOutput{BatchOps: batches}, nil
+	},
+)
+
+var SetEventAuthorities = operations.NewOperation(
+	"rmn-remote:set-event-authorities",
+	Version,
+	"Sets the event authorities list on the RMNRemote contract",
+	func(b operations.Bundle, chain cldf_solana.Chain, input EventAuthoritiesInput) (sequences.OnChainOutput, error) {
+		authority := GetAuthority(chain, input.RMNRemote)
+
+		ixn, err := rmn161.NewSetEventAuthoritiesInstruction(
+			input.EventAuthorities,
+			input.RMNRemoteConfigPDA,
+			authority,
+			solana.SystemProgramID,
+		).ValidateAndBuild()
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to build set event authorities instruction: %w", err)
+		}
+
+		batches := make([]types.BatchOperation, 0)
+		if authority != chain.DeployerKey.PublicKey() {
+			b, err := utils.BuildMCMSBatchOperation(
+				chain.Selector,
+				[]solana.Instruction{ixn},
+				input.RMNRemote.String(),
+				ContractType.String(),
+			)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute or create batch: %w", err)
+			}
+			batches = append(batches, b)
+		} else {
+			err := chain.Confirm([]solana.Instruction{ixn})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm set-event-authorities instruction: %w", err)
 			}
 		}
 		return sequences.OnChainOutput{BatchOps: batches}, nil
