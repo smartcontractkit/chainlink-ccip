@@ -33,7 +33,7 @@ contract AdvancedPoolHooksExtractor_extract is AdvancedPoolHooksExtractorSetup {
     assertEq(s_extractor.PARAM_TOKEN(), params[5].name);
     assertEq(s_localToken, abi.decode(params[5].value, (address)));
 
-    assertEq(s_extractor.PARAM_BLOCK_CONFIRMATION_REQUESTED(), params[6].name);
+    assertEq(s_extractor.PARAM_BLOCK_CONFIRMATIONS_REQUESTED(), params[6].name);
     assertEq(BLOCK_CONFIRMATION_REQUESTED, abi.decode(params[6].value, (uint16)));
   }
 
@@ -59,7 +59,7 @@ contract AdvancedPoolHooksExtractor_extract is AdvancedPoolHooksExtractorSetup {
     assertEq(s_extractor.PARAM_TOKEN(), params[4].name);
     assertEq(s_localToken, abi.decode(params[4].value, (address)));
 
-    assertEq(s_extractor.PARAM_BLOCK_CONFIRMATION_REQUESTED(), params[5].name);
+    assertEq(s_extractor.PARAM_BLOCK_CONFIRMATIONS_REQUESTED(), params[5].name);
     assertEq(BLOCK_CONFIRMATION_REQUESTED, abi.decode(params[5].value, (uint16)));
 
     assertEq(s_extractor.PARAM_SOURCE_POOL_ADDRESS(), params[6].name);

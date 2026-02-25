@@ -97,6 +97,7 @@ contract SiloedUSDCTokenPool_releaseOrMint is SiloedUSDCTokenPoolSetup {
     // Set up the circle migrator address
     address circleMigrator = makeAddr("circleMigrator");
     s_usdcTokenPool.setCircleMigratorAddress(circleMigrator);
+    s_usdcTokenPool.setLockedUSDCToBurn(SOURCE_CHAIN_SELECTOR, DEFAULT_LIQUIDITY);
 
     // Exclude some tokens from burn (liquidity already provided in setUp)
     uint256 excludedAmount = 500e6;
@@ -176,8 +177,8 @@ contract SiloedUSDCTokenPool_releaseOrMint is SiloedUSDCTokenPoolSetup {
     s_usdcTokenPool.setCircleMigratorAddress(circleMigrator);
 
     uint256 excludedAmount = 200e6;
-    s_usdcTokenPool.excludeTokensFromBurn(SOURCE_CHAIN_SELECTOR, excludedAmount);
     s_usdcTokenPool.setLockedUSDCToBurn(SOURCE_CHAIN_SELECTOR, DEFAULT_LIQUIDITY);
+    s_usdcTokenPool.excludeTokensFromBurn(SOURCE_CHAIN_SELECTOR, excludedAmount);
 
     vm.startPrank(circleMigrator);
     s_usdcTokenPool.burnLockedUSDC();
@@ -216,6 +217,7 @@ contract SiloedUSDCTokenPool_releaseOrMint is SiloedUSDCTokenPoolSetup {
     // Propose a CCTP migration to enable excluded tokens tracking.
     vm.startPrank(OWNER);
     s_usdcTokenPool.proposeCCTPMigration(SOURCE_CHAIN_SELECTOR);
+    s_usdcTokenPool.setLockedUSDCToBurn(SOURCE_CHAIN_SELECTOR, DEFAULT_LIQUIDITY);
 
     // Exclude only a small amount of tokens from burn.
     uint256 excludedAmount = 100e6;

@@ -12,6 +12,7 @@ contract SiloedUSDCTokenPool_excludeTokensFromBurn is SiloedUSDCTokenPoolSetup {
 
     // Propose migration
     s_usdcTokenPool.proposeCCTPMigration(DEST_CHAIN_SELECTOR);
+    s_usdcTokenPool.setLockedUSDCToBurn(DEST_CHAIN_SELECTOR, amount);
 
     // Exclude tokens
     uint256 excludeAmount = 500e6;

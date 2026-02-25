@@ -279,8 +279,7 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
 
     s_tokensExcludedFromBurn[remoteChainSelector] += amount;
 
-    uint256 burnableAmountAfterExclusion =
-      i_token.balanceOf(address(getLockBox(remoteChainSelector))) - s_tokensExcludedFromBurn[remoteChainSelector];
+    uint256 burnableAmountAfterExclusion = s_lockedUSDCToBurn - s_tokensExcludedFromBurn[remoteChainSelector];
 
     emit TokensExcludedFromBurn(remoteChainSelector, amount, burnableAmountAfterExclusion);
   }
@@ -316,20 +315,19 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
     // Burnable tokens is the owner-set locked snapshot minus the amount excluded from burn.
     uint256 tokensToBurn = s_lockedUSDCToBurn - s_tokensExcludedFromBurn[burnChainSelector];
 
+    // Apply migration state updates before external calls to preserve CEI.
+    delete s_proposedUSDCMigrationChain;
+    delete s_lockedUSDCToBurn;
+    s_migratedChains.add(burnChainSelector);
+
     // The CCTP burn function will attempt to burn out of the contract that calls it, so we need to withdraw the tokens
     // from the lock box first otherwise the burn will revert.
     lockBox.withdraw(address(i_token), burnChainSelector, tokensToBurn, address(this));
-
-    // Even though USDC is a trusted call, ensure CEI by updating state first
-    delete s_proposedUSDCMigrationChain;
-    delete s_lockedUSDCToBurn;
 
     // This should only be called after this contract has been granted a "zero allowance minter role" on USDC by Circle,
     // otherwise the call will revert. Executing this burn will functionally convert all USDC on the destination chain
     // to canonical USDC by removing the canonical USDC backing it from circulation.
     IBurnMintERC20(address(i_token)).burn(tokensToBurn);
-
-    s_migratedChains.add(burnChainSelector);
 
     emit CCTPMigrationExecuted(burnChainSelector, tokensToBurn);
   }

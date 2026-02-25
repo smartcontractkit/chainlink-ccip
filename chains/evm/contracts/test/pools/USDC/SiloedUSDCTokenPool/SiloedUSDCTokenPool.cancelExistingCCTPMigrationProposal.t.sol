@@ -26,6 +26,7 @@ contract SiloedUSDCTokenPool_cancelExistingCCTPMigrationProposal is SiloedUSDCTo
 
     // Propose migration and exclude some tokens
     s_usdcTokenPool.proposeCCTPMigration(DEST_CHAIN_SELECTOR);
+    s_usdcTokenPool.setLockedUSDCToBurn(DEST_CHAIN_SELECTOR, amount);
 
     // Exclude some tokens
     s_usdcTokenPool.excludeTokensFromBurn(DEST_CHAIN_SELECTOR, amount);

@@ -39,8 +39,8 @@ contract SiloedUSDCTokenPool_proposeCCTPMigration is SiloedUSDCTokenPoolSetup {
 
     // Provide some liquidity to the lockbox and exclude tokens to allow burning
     deal(address(s_USDCToken), address(s_destLockBox), 1000e6);
-    s_usdcTokenPool.excludeTokensFromBurn(DEST_CHAIN_SELECTOR, 100e6);
     s_usdcTokenPool.setLockedUSDCToBurn(DEST_CHAIN_SELECTOR, 1000e6);
+    s_usdcTokenPool.excludeTokensFromBurn(DEST_CHAIN_SELECTOR, 100e6);
 
     // Stop the OWNER prank so that the circle migrator can be set
     vm.stopPrank();
