@@ -9809,7 +9809,7 @@ func TestCCIPRouter(t *testing.T) {
 						solana.NewAccountMeta(solana.SystemProgramID, false, false),
 					)
 
-					cu := testutils.GetRequiredCU(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment)
+					cu := testutils.GetRequiredCU(ctx, t, solanaGoClient, []solana.Instruction{genericRaw}, transmitter, config.DefaultCommitment)
 
 					// This validation is like a snapshot for gas consumption
 					require.LessOrEqual(t, cu, uint32(110_000))
@@ -9918,7 +9918,7 @@ func TestCCIPRouter(t *testing.T) {
 
 					maps.Copy(addressTables, offrampLookupTable) // commonly used ccip addresses - required otherwise tx is too large
 
-					cu := testutils.GetRequiredCUWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, addressTables)
+					cu := testutils.GetRequiredCUWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{genericRaw}, transmitter, config.DefaultCommitment, addressTables)
 
 					// This validation is like a snapshot for gas consumption
 					// Execute: 1 Token Transfer + Message Execution
@@ -10040,7 +10040,7 @@ func TestCCIPRouter(t *testing.T) {
 
 					maps.Copy(addressTables, offrampLookupTable) // commonly used ccip addresses - required otherwise tx is too large
 
-					cu := testutils.GetRequiredCUWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, addressTables)
+					cu := testutils.GetRequiredCUWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{genericRaw}, transmitter, config.DefaultCommitment, addressTables)
 
 					// This validation is like a snapshot for gas consumption
 					// Execute: 1 Token Transfer + Message Execution
@@ -10505,7 +10505,7 @@ func TestCCIPRouter(t *testing.T) {
 						})
 
 						t.Run("When the receiver is accepting calls, it succeeds", func(t *testing.T) {
-							tx = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment)
+							tx = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{genericRaw}, user, config.DefaultCommitment)
 
 							executionEvents, err2 := common.ParseMultipleEvents[ccip.EventExecutionStateChanged](tx.Meta.LogMessages, "ExecutionStateChanged", config.PrintEvents)
 							require.NoError(t, err2)
@@ -11330,7 +11330,7 @@ func TestCCIPRouter(t *testing.T) {
 				enc := bin.NewBorshEncoder(instrData)
 				err = enc.WriteBytes(ccip_offramp.Instruction_Execute[:], false)
 				require.NoError(t, err)
-				err = enc.Encode(executionReport)
+				err = enc.Encode([]byte{})
 				require.NoError(t, err)
 				err = enc.Encode(reportContext)
 				require.NoError(t, err)
@@ -11476,7 +11476,7 @@ func TestCCIPRouter(t *testing.T) {
 				genericRaw.AccountValues = append(genericRaw.AccountValues, tokenMetas...)
 				// maps.Copy(addressTables, offrampLookupTable) // commonly used ccip addresses - required otherwise tx is too large
 
-				testutils.SendAndFailWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{execIx}, transmitter, config.DefaultCommitment, addressTables, []string{"Error Code: " + common.AccountNotInitialized_AnchorError.String()})
+				testutils.SendAndFailWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{genericRaw}, transmitter, config.DefaultCommitment, addressTables, []string{"Error Code: " + common.AccountNotInitialized_AnchorError.String()})
 
 				// create associated token account for user --------------------
 				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ixATA}, legacyAdmin, config.DefaultCommitment)

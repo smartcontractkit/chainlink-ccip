@@ -146,8 +146,8 @@ func DeriveExecutionAccounts(
 
 		isStartOfToken := re.MatchString(derivation.CurrentStage)
 		if isStartOfToken {
-			// NewExecuteInstruction has 22 required accounts
-			tokenIndices = append(tokenIndices, tokenIndex-byte(22))
+			// NewExecuteInstruction has 12 required accounts
+			tokenIndices = append(tokenIndices, tokenIndex-byte(12))
 		}
 		tokenIndex += byte(len(derivation.AccountsToSave))
 
