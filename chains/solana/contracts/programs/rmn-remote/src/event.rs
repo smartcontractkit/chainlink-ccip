@@ -28,3 +28,8 @@ pub struct SubjectCursed {
 pub struct SubjectUncursed {
     pub subject: CurseSubject,
 }
+
+#[event]
+pub struct EventAuthoritiesSet {
+    pub event_authorities: Vec<Pubkey>,
+}
