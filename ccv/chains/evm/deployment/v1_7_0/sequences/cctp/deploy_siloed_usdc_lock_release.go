@@ -25,6 +25,7 @@ type DeploySiloedUSDCLockReleaseInput struct {
 	USDCToken     string
 	Router        string
 	RMN           string
+	TokenDecimals uint8
 	// Existing siloed pool address; optional.
 	SiloedUSDCTokenPool       string
 	LockReleaseChainSelectors []uint64
@@ -60,7 +61,7 @@ var DeploySiloedUSDCLockRelease = cldf_ops.NewSequence(
 				ChainSelector:  chain.Selector,
 				Args: siloed_usdc_token_pool.ConstructorArgs{
 					Token:              common.HexToAddress(input.USDCToken),
-					LocalTokenDecimals: localTokenDecimals,
+					LocalTokenDecimals: input.TokenDecimals,
 					AdvancedPoolHooks:  common.Address{},
 					RMNProxy:           common.HexToAddress(input.RMN),
 					Router:             common.HexToAddress(input.Router),
@@ -79,9 +80,11 @@ var DeploySiloedUSDCLockRelease = cldf_ops.NewSequence(
 		if len(input.LockReleaseChainSelectors) > 0 {
 			configs := make([]siloed_usdc_token_pool.LockBoxConfig, 0, len(input.LockReleaseChainSelectors))
 			for _, sel := range input.LockReleaseChainSelectors {
+				qualifier := fmt.Sprintf("remoteChainSelector(%d)", sel)
 				lbReport, err := cldf_ops.ExecuteOperation(b, erc20_lock_box.Deploy, chain, contract_utils.DeployInput[erc20_lock_box.ConstructorArgs]{
 					TypeAndVersion: deployment.NewTypeAndVersion(erc20_lock_box.ContractType, *erc20_lock_box.Version),
 					ChainSelector:  chain.Selector,
+					Qualifier:      &qualifier,
 					Args: erc20_lock_box.ConstructorArgs{
 						Token: common.HexToAddress(input.USDCToken),
 					},

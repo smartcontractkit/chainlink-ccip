@@ -33,13 +33,10 @@ import (
 )
 
 const (
-	localTokenDecimals                = 6
 	cctpV1SupportedUSDCVersion uint32 = 0
 )
 
 var (
-	cctpQualifier = "CCTP"
-
 	// CCTP V1 uses the USDCTokenPool v1.6.5 implementation.
 	cctpV1Version      = semver.MustParse("1.6.5")
 	cctpV1ContractType = deployment.ContractType("USDCTokenPool")
@@ -93,7 +90,6 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 		cctpV2MessageTransmitterProxyRef, err := contract_utils.MaybeDeployContract(b, cctp_message_transmitter_proxy.Deploy, chain, contract_utils.DeployInput[cctp_message_transmitter_proxy.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(cctp_message_transmitter_proxy.ContractType, *cctp_message_transmitter_proxy.Version),
 			ChainSelector:  chain.Selector,
-			Qualifier:      &cctpQualifier,
 			Args: cctp_message_transmitter_proxy.ConstructorArgs{
 				TokenMessenger: tokenMessengerV2Address,
 			},
@@ -108,7 +104,6 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 		cctpVerifierRef, err := contract_utils.MaybeDeployContract(b, cctp_verifier.Deploy, chain, contract_utils.DeployInput[cctp_verifier.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(cctp_verifier.ContractType, *cctp_verifier.Version),
 			ChainSelector:  chain.Selector,
-			Qualifier:      &cctpQualifier,
 			Args: cctp_verifier.ConstructorArgs{
 				TokenMessenger:          tokenMessengerV2Address,
 				MessageTransmitterProxy: cctpV2MessageTransmitterProxyAddress,
@@ -138,10 +133,9 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 		cctpV2WithCCVsTokenPoolRef, err := contract_utils.MaybeDeployContract(b, cctp_through_ccv_token_pool.Deploy, chain, contract_utils.DeployInput[cctp_through_ccv_token_pool.ConstructorArgs]{
 			ChainSelector:  chain.Selector,
 			TypeAndVersion: deployment.NewTypeAndVersion(cctp_through_ccv_token_pool.ContractType, *cctp_through_ccv_token_pool.Version),
-			Qualifier:      &cctpQualifier,
 			Args: cctp_through_ccv_token_pool.ConstructorArgs{
 				Token:              usdcTokenAddress,
-				LocalTokenDecimals: localTokenDecimals,
+				LocalTokenDecimals: input.TokenDecimals,
 				RMNProxy:           rmnAddress,
 				Router:             routerAddress,
 				CCTPVerifier:       cctpVerifierAddress,
@@ -160,6 +154,7 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 			// Lockboxes are deployed per lane and are therefore deployed during ConfigureCCTPChainForLanes.
 			siloedLockReleaseReport, err := cldf_ops.ExecuteSequence(b, DeploySiloedUSDCLockRelease, dep.BlockChains, DeploySiloedUSDCLockReleaseInput{
 				ChainSelector: input.ChainSelector,
+				TokenDecimals: input.TokenDecimals,
 				USDCToken:     input.USDCToken,
 				RMN:           rmnAddress.Hex(),
 				Router:        routerAddress.Hex(),
@@ -226,7 +221,6 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 		usdcTokenPoolProxyRef, err := contract_utils.MaybeDeployContract(b, usdc_token_pool_proxy.Deploy, chain, contract_utils.DeployInput[usdc_token_pool_proxy.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(usdc_token_pool_proxy.ContractType, *usdc_token_pool_proxy.Version),
 			ChainSelector:  chain.Selector,
-			Qualifier:      &cctpQualifier,
 			Args: usdc_token_pool_proxy.ConstructorArgs{
 				Token: usdcTokenAddress,
 				Pools: usdc_token_pool_proxy.USDCTokenPoolProxyPoolAddresses{
@@ -398,7 +392,6 @@ func deployOrResolveCCTPVerifierResolver(
 		datastore.AddressRefByChainSelector(chain.Selector),
 		datastore.AddressRefByType(datastore.ContractType(cctp_verifier.ResolverType)),
 		datastore.AddressRefByVersion(cctp_verifier.Version),
-		datastore.AddressRefByQualifier(cctpQualifier),
 	)
 	if len(refs) == 0 {
 		if create2FactoryAddress == (common.Address{}) {
@@ -406,7 +399,6 @@ func deployOrResolveCCTPVerifierResolver(
 		}
 		report, err := cldf_ops.ExecuteSequence(b, v1_7_0_sequences.DeployVerifierResolverViaCREATE2, chain, v1_7_0_sequences.DeployVerifierResolverViaCREATE2Input{
 			ChainSelector:  chainSelector,
-			Qualifier:      cctpQualifier,
 			Type:           datastore.ContractType(cctp_verifier.ResolverType),
 			Version:        cctp_verifier.Version,
 			CREATE2Factory: create2FactoryAddress,
