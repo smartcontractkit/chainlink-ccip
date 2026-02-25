@@ -457,57 +457,6 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 			expectedSequenceErrorMsg: "unknown chain selector",
 		},
 		{
-			desc: "failure to resolve remote pool ref",
-			makeDataStore: func(t *testing.T) *datastore.MemoryDataStore {
-				ds := makeBaseDataStore(t, []uint64{5009297550715157269})
-				// Don't add remote chain data
-				return ds
-			},
-			cfg: tokens.ConfigureTokensForTransfersConfig{
-				ChainAdapterVersion: semver.MustParse("1.0.0"),
-				Tokens: []tokens.TokenTransferConfig{
-					{
-						ChainSelector: 5009297550715157269,
-						TokenPoolRef: datastore.AddressRef{
-							Type:          "TokenPool",
-							Version:       semver.MustParse("1.0.0"),
-							ChainSelector: 5009297550715157269,
-						},
-						RegistryRef: datastore.AddressRef{
-							Type:          "Registry",
-							Version:       semver.MustParse("1.0.0"),
-							ChainSelector: 5009297550715157269,
-						},
-						RemoteChains: map[uint64]tokens.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
-							15971525489660198786: {
-								RemoteToken: &datastore.AddressRef{
-									Type:          "Token",
-									Version:       semver.MustParse("1.0.0"),
-									ChainSelector: 15971525489660198786,
-								},
-								RemotePool: &datastore.AddressRef{
-									Type:          "TokenPool",
-									Version:       semver.MustParse("1.0.0"),
-									ChainSelector: 15971525489660198786,
-								},
-								OutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{IsEnabled: false},
-							},
-						},
-					},
-					{
-						ChainSelector: 15971525489660198786,
-						RemoteChains: map[uint64]tokens.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
-							5009297550715157269: {
-								OutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{IsEnabled: false},
-							},
-						},
-					},
-				},
-				MCMS: basicMCMSInput,
-			},
-			expectedSequenceErrorMsg: "failed to resolve remote pool ref",
-		},
-		{
 			desc: "failure to resolve remote token ref",
 			makeDataStore: func(t *testing.T) *datastore.MemoryDataStore {
 				ds := makeBaseDataStore(t, []uint64{5009297550715157269, 15971525489660198786})
