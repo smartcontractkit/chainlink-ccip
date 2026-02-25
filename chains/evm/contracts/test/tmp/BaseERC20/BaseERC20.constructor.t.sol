@@ -48,6 +48,18 @@ contract BaseERC20_constructor is BaseERC20Setup {
     assertTrue(s_baseERC20.supportsInterface(type(IGetCCIPAdmin).interfaceId));
   }
 
+  function test_constructor_RevertWhen_MaxSupplyExceeded() public {
+    uint256 maxSupply = 500e18;
+    uint256 preMint = maxSupply + 1;
+
+    vm.expectRevert(abi.encodeWithSelector(BaseERC20.MaxSupplyExceeded.selector, preMint));
+    new BaseERC20(
+      BaseERC20.ConstructorParams({
+        name: "Over", symbol: "OVR", decimals: 18, maxSupply: maxSupply, preMint: preMint, ccipAdmin: OWNER
+      })
+    );
+  }
+
   function test_typeAndVersion() public view {
     assertEq("BaseERC20 2.0.0-dev", s_baseERC20.typeAndVersion());
   }

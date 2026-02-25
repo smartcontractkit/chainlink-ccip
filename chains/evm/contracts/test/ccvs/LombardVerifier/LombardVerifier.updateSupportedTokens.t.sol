@@ -48,7 +48,6 @@ contract LombardVerifier_updateSupportedTokens is LombardVerifierSetup {
     );
     MockLombardAdapter adapter = new MockLombardAdapter(address(s_lombardVerifier.i_bridge()), address(newToken));
 
-
     LombardVerifier.SupportedTokenArgs[] memory tokensToAdd = new LombardVerifier.SupportedTokenArgs[](1);
     tokensToAdd[0] = LombardVerifier.SupportedTokenArgs({localToken: address(newToken), localAdapter: address(adapter)});
 
@@ -106,7 +105,6 @@ contract LombardVerifier_updateSupportedTokens is LombardVerifierSetup {
       OWNER
     );
     MockLombardAdapter adapter = new MockLombardAdapter(address(s_lombardVerifier.i_bridge()), address(newToken));
-
 
     LombardVerifier.SupportedTokenArgs[] memory tokensToAdd = new LombardVerifier.SupportedTokenArgs[](1);
     tokensToAdd[0] = LombardVerifier.SupportedTokenArgs({localToken: address(newToken), localAdapter: address(adapter)});
