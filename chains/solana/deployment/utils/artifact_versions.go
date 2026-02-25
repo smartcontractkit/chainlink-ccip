@@ -25,7 +25,7 @@ var VersionToShortCommitSHA = map[string]string{
 	VersionSolanaV0_1_1TokenPools: "ee587a6c0562",
 	VersionSolanaV0_1_0:           "be8d09930aaa",
 	VersionSolanaV1_6_0:           "d0d81df31957",
-	VersionSolanaV1_6_1:           "10b851bd2104",
+	VersionSolanaV1_6_1:           "cb23ec38649f",
 }
 
 var VersionToFullCommitSHA = map[string]string{
@@ -34,5 +34,5 @@ var VersionToFullCommitSHA = map[string]string{
 	VersionSolanaV0_1_1TokenPools: "ee587a6c056204009310019b790ed6d474825316",
 	VersionSolanaV0_1_0:           "be8d09930aaaae31b574ef316ca73021fe272b08",
 	VersionSolanaV1_6_0:           "d0d81df3195728091cad1b0569a2980201a92e97",
-	VersionSolanaV1_6_1:           "10b851bd210430f58f2cbb507fe76be9a366571c",
+	VersionSolanaV1_6_1:           "cb23ec38649f9d23aabd0350e30d3d649ebc2174",
 }
