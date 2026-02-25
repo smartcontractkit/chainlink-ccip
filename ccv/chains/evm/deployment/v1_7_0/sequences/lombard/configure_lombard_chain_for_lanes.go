@@ -7,12 +7,13 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
+	mcms_types "github.com/smartcontractkit/mcms/types"
+
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	tokens_core "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
@@ -187,6 +188,7 @@ var ConfigureLombardChainForLanes = cldf_ops.NewSequence(
 					RemoteChainSelector: remoteChainSelector,
 					LChainId:            lchainID,
 					AllowedCaller:       allowedCaller,
+					RemoteAdapter:       [32]byte{}, // Skipping for now TODO : complete
 				},
 			})
 			if err != nil {

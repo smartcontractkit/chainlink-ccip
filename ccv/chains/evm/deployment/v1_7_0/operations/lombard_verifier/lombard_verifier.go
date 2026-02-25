@@ -28,6 +28,7 @@ type RemotePathArgs struct {
 	RemoteChainSelector uint64
 	AllowedCaller       [32]byte
 	LChainId            [32]byte
+	RemoteAdapter       [32]byte
 }
 
 type ConstructorArgs struct {
@@ -79,7 +80,7 @@ var SetRemotePath = contract.NewWrite(contract.WriteParams[RemotePathArgs, *lomb
 	IsAllowedCaller: contract.OnlyOwner[*lombard_verifier.LombardVerifier, RemotePathArgs],
 	Validate:        func(RemotePathArgs) error { return nil },
 	CallContract: func(lombardVerifier *lombard_verifier.LombardVerifier, opts *bind.TransactOpts, args RemotePathArgs) (*types.Transaction, error) {
-		return lombardVerifier.SetPath(opts, args.RemoteChainSelector, args.LChainId, args.AllowedCaller)
+		return lombardVerifier.SetPath(opts, args.RemoteChainSelector, args.LChainId, args.AllowedCaller, args.RemoteAdapter)
 	},
 })
 
