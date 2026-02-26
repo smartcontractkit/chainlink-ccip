@@ -59,7 +59,7 @@ var ConfigureTokenForTransfers = cldf_ops.NewSequence(
 		}
 
 		// Configure minimum block confirmation
-		configureMinBlockConfirmationReport, err := cldf_ops.ExecuteOperation(b, token_pool.SetMinBlockConfirmation, chain, evm_contract.FunctionInput[uint16]{
+		configureMinBlockConfirmationReport, err := cldf_ops.ExecuteOperation(b, token_pool.SetMinBlockConfirmations, chain, evm_contract.FunctionInput[uint16]{
 			ChainSelector: input.ChainSelector,
 			Address:       tokenPoolAddress,
 			Args:          input.MinFinalityValue,

@@ -26,12 +26,12 @@ require (
 	github.com/ethereum/go-ethereum v1.16.8
 	github.com/gagliardetto/solana-go v1.13.0
 	github.com/smartcontractkit/chain-selectors v1.0.96
-	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20260225205429-ab33460fd1fe
+	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20260225215717-66cf382b00c4
 	github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment v0.1.1-solana.0.20251125153543-0b618525aa03
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20260121163256-85accaf3d28d
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment v0.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20260206132835-4c50734ccf2a
-	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260225205429-ab33460fd1fe
+	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260225215717-66cf382b00c4
 	github.com/smartcontractkit/chainlink-deployments-framework v0.80.2
 	github.com/smartcontractkit/chainlink-evm v0.3.3
 	github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20260119171452-39c98c3b33cd
@@ -40,7 +40,7 @@ require (
 )
 
 require (
-	github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm v0.0.0-20260225205429-ab33460fd1fe
+	github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm v0.0.0-20260225215717-66cf382b00c4
 	github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment v0.0.0-20260116092715-df6a64d4bf00
 )
 

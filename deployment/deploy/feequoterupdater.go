@@ -311,7 +311,7 @@ func updateFeeQuoterApply(fquRegistry *FQAndRampUpdaterRegistry, mcmsRegistry *c
 		return changesets.NewOutputBuilder(e, mcmsRegistry).
 			WithReports(reports).
 			WithDataStore(ds).
-			WithBatchOps(batchOps).
+			WithSingleBatchOpPerChain(batchOps).
 			Build(input.MCMS)
 	}
 }
