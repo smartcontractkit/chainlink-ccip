@@ -360,6 +360,11 @@ func (a *SolanaAdapter) GrantAdminRoleToTimelock() *operations.Sequence[deployop
 	return nil
 }
 
+func (a *SolanaAdapter) UpdateMCMSConfig() *operations.Sequence[deployops.UpdateMCMSConfigInputPerChainWithSelector, sequences.OnChainOutput, chain.BlockChains] {
+	// TODO: Implement for Solana
+	return nil
+}
+
 func getRefsAsOwnable(
 	refs []cldf_datastore.AddressRef,
 	transferAccessController bool) []mcmsops.OwnableContract {

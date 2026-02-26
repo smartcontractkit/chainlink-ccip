@@ -42,6 +42,12 @@ type SeqGrantAdminRoleOfTimelockToTimelockInput struct {
 	NewAdminTimelockAddress common.Address
 }
 
+type SeqSetMCMSConfigInput struct {
+	ChainSelector uint64
+	MCMConfig     *types.Config
+	MCMContracts  []datastore.AddressRef
+}
+
 var SeqDeployMCMWithConfig = cldf_ops.NewSequence(
 	"seq-deploy-mcm-with-config",
 	semver.MustParse("1.0.0"),
@@ -105,6 +111,39 @@ var SeqDeployMCMWithConfig = cldf_ops.NewSequence(
 		return sequences.OnChainOutput{
 			Addresses: []datastore.AddressRef{mcmAddr},
 		}, nil
+	},
+)
+
+var SeqSetMCMSConfigs = cldf_ops.NewSequence(
+	"seq-set-mcm-config",
+	semver.MustParse("1.0.0"),
+	"Sets config on previously deployed MCM contract",
+	func(b cldf_ops.Bundle, chain cldf_evm.Chain, in SeqSetMCMSConfigInput) (output sequences.OnChainOutput, err error) {
+		for _, mcmContract := range in.MCMContracts {
+			// Set config on contract
+			groupQuorums, groupParents, signerAddresses, signerGroups, err := sdk.ExtractSetConfigInputs(in.MCMConfig)
+			if err != nil {
+				return sequences.OnChainOutput{}, err
+			}
+			report, err := cldf_ops.ExecuteOperation(b, ops.OpEVMSetConfigMCM, chain,
+				contract.FunctionInput[ops.OpSetConfigMCMInput]{
+					ChainSelector: in.ChainSelector,
+					Address:       common.HexToAddress(mcmContract.Address),
+					Args: ops.OpSetConfigMCMInput{
+						SignerAddresses: signerAddresses,
+						SignerGroups:    signerGroups,
+						GroupQuorums:    groupQuorums,
+						GroupParents:    groupParents,
+					},
+				})
+			batchOp, err := contract.NewBatchOperationFromWrites([]contract.WriteOutput{report.Output})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
+			}
+			output.BatchOps = append(output.BatchOps, batchOp)
+		}
+
+		return output, nil
 	},
 )
 

@@ -124,6 +124,155 @@ func TestDeployMCMS(t *testing.T) {
 	require.True(t, hasRole, "Call Proxy should have admin role for EXECUTOR_ROLE")
 }
 
+func TestUpdateMCMSConfig(t *testing.T) {
+	t.Parallel()
+	selector1 := chainsel.TEST_90000001.Selector
+	selector2 := chainsel.TEST_90000002.Selector
+	env, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{selector1, selector2}),
+	)
+	require.NoError(t, err)
+	env.Logger = logger.Test(t)
+	evmChain1 := env.BlockChains.EVMChains()[selector1]
+	evmChain2 := env.BlockChains.EVMChains()[selector2]
+
+	evmDeployer := &adapters.EVMDeployer{}
+	dReg := deployops.GetRegistry()
+	dReg.RegisterDeployer(chainsel.FamilyEVM, deployops.MCMSVersion, evmDeployer)
+
+	// deploy one set of MCMs and timelock, and then update the config?
+
+	// deploy one set of timelock and MCMS contracts on each chain
+	deployMCMS := deployops.DeployMCMS(dReg, nil)
+	output, err := deployMCMS.Apply(*env, deployops.MCMSDeploymentConfig{
+		AdapterVersion: semver.MustParse("1.0.0"),
+		Chains: map[uint64]deployops.MCMSDeploymentConfigPerChain{
+			selector1: {
+				Canceller:        testhelpers.SingleGroupMCMS(),
+				Bypasser:         testhelpers.SingleGroupMCMS(),
+				Proposer:         testhelpers.SingleGroupMCMS(),
+				TimelockMinDelay: big.NewInt(0),
+				Qualifier:        ptr.String("CLLCCIP"),
+				TimelockAdmin:    evmChain1.DeployerKey.From,
+			},
+			selector2: {
+				Canceller:        testhelpers.SingleGroupMCMS(),
+				Bypasser:         testhelpers.SingleGroupMCMS(),
+				Proposer:         testhelpers.SingleGroupMCMS(),
+				TimelockMinDelay: big.NewInt(0),
+				Qualifier:        ptr.String("CLLCCIP"),
+				TimelockAdmin:    evmChain2.DeployerKey.From,
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.Greater(t, len(output.Reports), 0)
+
+	ds := output.DataStore
+	addresses, err := output.DataStore.Addresses().Fetch()
+	require.NoError(t, err)
+	for _, addr := range addresses {
+		t.Logf("Adding address %s of type %s on chain %d to datastore", addr.Address, addr.Type, addr.ChainSelector)
+		require.NoError(t, ds.Addresses().Add(addr))
+	}
+	env.DataStore = ds.Seal()
+
+	// get recently deployed MCMS addresses
+	mcmsRefs := make(map[uint64][]datastore.AddressRef)
+	for _, sel := range []uint64{selector1, selector2} {
+		cancellerRef, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
+			ChainSelector: sel,
+			Type:          datastore.ContractType(deploymentutils.CancellerManyChainMultisig),
+			Qualifier:     "CLLCCIP",
+			Version:       semver.MustParse("1.0.0"),
+		}, sel, datastore_utils.FullRef)
+		require.NoError(t, err)
+		bypasserRef, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
+			ChainSelector: sel,
+			Type:          datastore.ContractType(deploymentutils.CancellerManyChainMultisig),
+			Qualifier:     "CLLCCIP",
+			Version:       semver.MustParse("1.0.0"),
+		}, sel, datastore_utils.FullRef)
+		require.NoError(t, err)
+		proposerRef, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
+			ChainSelector: sel,
+			Type:          datastore.ContractType(deploymentutils.CancellerManyChainMultisig),
+			Qualifier:     "CLLCCIP",
+			Version:       semver.MustParse("1.0.0"),
+		}, sel, datastore_utils.FullRef)
+		require.NoError(t, err)
+		mcmsRefs[sel] = append(mcmsRefs[sel], cancellerRef, bypasserRef, proposerRef)
+	}
+
+	// check that deployed config is correct
+	for _, sel := range []uint64{selector1, selector2} {
+		for _, ref := range mcmsRefs[sel] {
+			evmChain := env.BlockChains.EVMChains()[sel]
+			mcmsContract, err := bindings.NewManyChainMultiSig(common.HexToAddress(ref.Address), evmChain.Client)
+			require.NoError(t, err)
+
+			// type ManyChainMultiSigConfig struct {
+			// 	Signers      []ManyChainMultiSigSigner
+			// 	GroupQuorums [32]uint8
+			// 	GroupParents [32]uint8
+			// }
+
+			// type ManyChainMultiSigSigner struct {
+			// 	Addr  common.Address
+			// 	Index uint8
+			// 	Group uint8
+			// }
+
+			// binding is done, now check config
+			config, err := mcmsContract.GetConfig(&bind.CallOpts{
+				Context: t.Context(),
+			})
+			require.NoError(t, err)
+
+			numOfSigners := len(config.Signers)
+			require.Equal(t, numOfSigners, len(testhelpers.SingleGroupMCMS().Signers)) // should be 1
+		}
+	}
+
+	// update the config for each MCMS contract
+	updateMcmsConfigMCMS := deployops.UpdateMCMSConfig(dReg, nil)
+	output, err = updateMcmsConfigMCMS.Apply(*env, deployops.UpdateMCMSConfigInput{
+		AdapterVersion: semver.MustParse("1.0.0"),
+		Chains: map[uint64]deployops.UpdateMCMSConfigInputPerChain{
+			selector1: {
+				MCMConfig:    testhelpers.SingleGroupMCMSTwoSigners(),
+				MCMContracts: mcmsRefs[selector1],
+			},
+			selector2: {
+				MCMConfig:    testhelpers.SingleGroupMCMSTwoSigners(),
+				MCMContracts: mcmsRefs[selector2],
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.Greater(t, len(output.Reports), 0)
+	require.Equal(t, 1, len(output.MCMSTimelockProposals))
+	testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
+
+	// check that MCMS configs are updated correctly
+	for _, sel := range []uint64{selector1, selector2} {
+		for _, ref := range mcmsRefs[sel] {
+			evmChain := env.BlockChains.EVMChains()[sel]
+			mcmsContract, err := bindings.NewManyChainMultiSig(common.HexToAddress(ref.Address), evmChain.Client)
+			require.NoError(t, err)
+
+			// binding is done, now check config
+			config, err := mcmsContract.GetConfig(&bind.CallOpts{
+				Context: t.Context(),
+			})
+			require.NoError(t, err)
+
+			numOfSigners := len(config.Signers)
+			require.Equal(t, numOfSigners, len(testhelpers.SingleGroupMCMSTwoSigners().Signers)) // should be 1
+		}
+	}
+}
+
 func TestGrantAdminRoleToTimelock(t *testing.T) {
 	t.Parallel()
 	selector1 := chainsel.TEST_90000001.Selector

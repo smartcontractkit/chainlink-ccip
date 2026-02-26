@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"slices"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
@@ -60,6 +61,101 @@ type GrantAdminRoleToTimelockConfigPerChain struct {
 type GrantAdminRoleToTimelockConfig struct {
 	Chains         map[uint64]GrantAdminRoleToTimelockConfigPerChain `json:"chains"`
 	AdapterVersion *semver.Version                                   `json:"adapterVersion"`
+}
+
+type UpdateMCMSConfigInputPerChainWithSelector struct {
+	UpdateMCMSConfigInputPerChain
+	ChainSelector uint64
+}
+
+type UpdateMCMSConfigInputPerChain struct {
+	MCMConfig    mcmstypes.Config
+	MCMContracts []datastore.AddressRef
+}
+
+type UpdateMCMSConfigInput struct {
+	Chains         map[uint64]UpdateMCMSConfigInputPerChain `json:"chains"`
+	AdapterVersion *semver.Version                          `json:"adapterVersion"`
+}
+
+func UpdateMCMSConfig(deployerReg *DeployerRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) cldf.ChangeSetV2[UpdateMCMSConfigInput] {
+	return cldf.CreateChangeSet(
+		updateMCMSConfigApply(deployerReg, mcmsRegistry),
+		updateMCMSConfigVerify(deployerReg, mcmsRegistry),
+	)
+}
+
+func updateMCMSConfigVerify(_ *DeployerRegistry, _ *changesets.MCMSReaderRegistry) func(cldf.Environment, UpdateMCMSConfigInput) error {
+	return func(e cldf.Environment, cfg UpdateMCMSConfigInput) error {
+		if cfg.AdapterVersion == nil {
+			return errors.New("adapter version is required")
+		}
+
+		validTypes := []string{utils.BypasserManyChainMultisig.String(), utils.ProposerManyChainMultisig.String(),
+			utils.CancellerManyChainMultisig.String()}
+
+		// validate each contract
+		for _, chainCfg := range cfg.Chains {
+			for _, contract := range chainCfg.MCMContracts {
+				if !slices.Contains(validTypes, contract.Type.String()) {
+					return errors.New("type of contract needs to be mcms")
+				}
+				if len(contract.Qualifier) == 0 {
+					return errors.New("mcms contract qualifier cannot be empty")
+				}
+				if len(contract.Version.String()) == 0 {
+					return errors.New("mcms contract version cannot be empty")
+				}
+			}
+		}
+
+		return nil
+	}
+}
+
+func updateMCMSConfigApply(d *DeployerRegistry, _ *changesets.MCMSReaderRegistry) func(cldf.Environment, UpdateMCMSConfigInput) (cldf.ChangesetOutput, error) {
+	return func(e cldf.Environment, cfg UpdateMCMSConfigInput) (cldf.ChangesetOutput, error) {
+		for selector, chainCfg := range cfg.Chains {
+			family, err := chain_selectors.GetSelectorFamily(selector)
+			if err != nil {
+				return cldf.ChangesetOutput{}, err
+			}
+			deployer, exists := d.GetDeployer(family, cfg.AdapterVersion)
+			if !exists {
+				return cldf.ChangesetOutput{}, fmt.Errorf("no deployer registered for chain family %s and version %s", family, cfg.AdapterVersion.String())
+			}
+
+			// If partial refs are provided, resolve to full refs
+			mcmsContracts := []datastore.AddressRef{}
+			for _, contract := range chainCfg.MCMContracts {
+				mcmsQualifier := contract.Qualifier
+				mcmsRef, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+					ChainSelector: selector,
+					Type:          contract.Type,
+					Version:       contract.Version,
+					Qualifier:     mcmsQualifier,
+				}, selector, datastore_utils.FullRef)
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to find mcms ref with qualifier %s on chain with selector %d", mcmsQualifier, selector)
+				}
+
+				mcmsContracts = append(mcmsContracts, mcmsRef)
+			}
+
+			// Call the set mcms config sequence
+			seqCfg := UpdateMCMSConfigInputPerChainWithSelector{
+				UpdateMCMSConfigInputPerChain: chainCfg,
+				ChainSelector:                 selector,
+			}
+
+			_, err = cldf_ops.ExecuteSequence(e.OperationsBundle, deployer.UpdateMCMSConfig(), e.BlockChains, seqCfg)
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to Update MCMS Config on chain with selector %d: %w", selector, err)
+			}
+		}
+
+		return cldf.ChangesetOutput{}, nil
+	}
 }
 
 func GrantAdminRoleToTimelock(deployerReg *DeployerRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) cldf.ChangeSetV2[GrantAdminRoleToTimelockConfig] {

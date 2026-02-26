@@ -56,6 +56,12 @@ func (a *EVMAdapter) GrantAdminRoleToTimelock() *operations.Sequence[deployops.G
 	return evmDeployer.GrantAdminRoleToTimelock()
 }
 
+// Updates MCMs Config on specified MCMS contracts
+func (a *EVMAdapter) UpdateMCMSConfig() *operations.Sequence[deployops.UpdateMCMSConfigInputPerChainWithSelector, sequences.OnChainOutput, chain.BlockChains] {
+	evmDeployer := &evm1_0_0.EVMDeployer{}
+	return evmDeployer.UpdateMCMSConfig()
+}
+
 var DeployChainContracts = cldf_ops.NewSequence(
 	"deploy-chain-contracts",
 	semver.MustParse("1.6.0"),
@@ -196,8 +202,8 @@ var DeployChainContracts = cldf_ops.NewSequence(
 					common.HexToAddress(linkRef.Address),
 					common.HexToAddress(wethRef.Address),
 				},
-				TokenPriceFeeds:                []fqops.TokenPriceFeedUpdate{},
-				TokenTransferFeeConfigArgs:     []fqops.TokenTransferFeeConfigArgs{},
+				TokenPriceFeeds:            []fqops.TokenPriceFeedUpdate{},
+				TokenTransferFeeConfigArgs: []fqops.TokenTransferFeeConfigArgs{},
 				PremiumMultiplierWeiPerEthArgs: []fqops.PremiumMultiplierWeiPerEthArgs{
 					{
 						PremiumMultiplierWeiPerEth: input.LinkPremiumMultiplier,
@@ -339,14 +345,14 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, err
 		}
 
-	// Add Authorized Caller to FQ
-	_, err = cldf_ops.ExecuteOperation(b, fqops.ApplyAuthorizedCallerUpdates, chain, contract.FunctionInput[fqops.AuthorizedCallerArgs]{
-		ChainSelector: chain.Selector,
-		Address:       common.HexToAddress(feeQuoterRef.Address),
-		Args: fqops.AuthorizedCallerArgs{
-			AddedCallers: []common.Address{
-				common.HexToAddress(offRampRef.Address),
-			},
+		// Add Authorized Caller to FQ
+		_, err = cldf_ops.ExecuteOperation(b, fqops.ApplyAuthorizedCallerUpdates, chain, contract.FunctionInput[fqops.AuthorizedCallerArgs]{
+			ChainSelector: chain.Selector,
+			Address:       common.HexToAddress(feeQuoterRef.Address),
+			Args: fqops.AuthorizedCallerArgs{
+				AddedCallers: []common.Address{
+					common.HexToAddress(offRampRef.Address),
+				},
 			},
 		})
 		if err != nil {
