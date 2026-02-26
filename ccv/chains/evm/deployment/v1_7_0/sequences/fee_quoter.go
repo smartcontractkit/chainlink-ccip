@@ -186,6 +186,7 @@ var (
 			}
 			output.ChainSelector = input.ChainSelector
 			output.ExistingAddresses = input.ExistingAddresses
+
 			// get feeQuoter 1.6 address meta
 			metadataForFq16, err := datastore_utils.FilterContractMetaByContractTypeAndVersion(
 				input.ExistingAddresses,

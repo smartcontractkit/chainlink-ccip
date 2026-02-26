@@ -15,7 +15,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	v1_6_1_tokens "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/sequences"
-	cctp_message_transmitter_proxy_v1_6_2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_2/operations/cctp_message_transmitter_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_5/operations/usdc_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_5/operations/usdc_token_pool_cctp_v2"
 	tokens_core "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
@@ -348,10 +347,10 @@ func buildRemoteChainConfigs(dep adapters.ConfigureCCTPChainForLanesDeps, input 
 			RemotePool:                               common.LeftPadBytes(remotePoolAddress, 32),
 			RemoteToken:                              common.LeftPadBytes(remoteTokenAddress, 32),
 			TokenTransferFeeConfig:                   remoteChain.TokenTransferFeeConfig,
-			DefaultFinalityOutboundRateLimiterConfig: tokens_core.RateLimiterConfigFloatInput{Capacity: 0, Rate: 0},
-			CustomFinalityOutboundRateLimiterConfig:  tokens_core.RateLimiterConfigFloatInput{Capacity: 0, Rate: 0},
-			DefaultFinalityInboundRateLimiterConfig:  tokens_core.RateLimiterConfigFloatInput{Capacity: 0, Rate: 0},
-			CustomFinalityInboundRateLimiterConfig:   tokens_core.RateLimiterConfigFloatInput{Capacity: 0, Rate: 0},
+			DefaultFinalityOutboundRateLimiterConfig: remoteChain.DefaultFinalityOutboundRateLimiterConfig,
+			CustomFinalityOutboundRateLimiterConfig:  remoteChain.CustomFinalityOutboundRateLimiterConfig,
+			DefaultFinalityInboundRateLimiterConfig:  remoteChain.DefaultFinalityInboundRateLimiterConfig,
+			CustomFinalityInboundRateLimiterConfig:   remoteChain.CustomFinalityInboundRateLimiterConfig,
 		}
 	}
 	return configs, nil
@@ -387,10 +386,14 @@ func buildUSDCTokenPoolProxyMechanismArgs(input adapters.ConfigureCCTPChainForLa
 // buildCCTPVerifierArgs builds set-domain args and remote-chain-config args for the CCTPVerifier.
 // allowedCallerOnSource is the current chain's verifier (source chain when sending to remote).
 func buildCCTPVerifierArgs(dep adapters.ConfigureCCTPChainForLanesDeps, input adapters.ConfigureCCTPChainForLanesInput, routerAddress common.Address) ([]cctp_verifier.SetDomainArgs, []cctp_verifier.RemoteChainConfigArgs, error) {
-	setDomainArgs := make([]cctp_verifier.SetDomainArgs, 0, len(input.RemoteChains))
-	remoteChainConfigArgs := make([]cctp_verifier.RemoteChainConfigArgs, 0, len(input.RemoteChains))
+	setDomainArgs := make([]cctp_verifier.SetDomainArgs, 0)
+	remoteChainConfigArgs := make([]cctp_verifier.RemoteChainConfigArgs, 0)
 	for remoteChainSelector, remoteChain := range input.RemoteChains {
-		allowedCallerOnDest, err := dep.RemoteChains[remoteChainSelector].AllowedCallerOnDest(dep.DataStore, dep.BlockChains, remoteChainSelector)
+		if dep.RemoteChains[remoteChainSelector].USDCType() == adapters.NonCanonical {
+			// Non-canonical USDC chains do not support CCTP, so we don't need to perform any CCTP-specific operations.
+			continue
+		}
+		allowedCallerOnDest, err := dep.RemoteChains[remoteChainSelector].CCTPV2AllowedCallerOnDest(dep.DataStore, dep.BlockChains, remoteChainSelector)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -430,9 +433,13 @@ func buildCCTPVerifierArgs(dep adapters.ConfigureCCTPChainForLanesDeps, input ad
 
 // buildCCTPV2PoolDomainUpdates builds domain updates for the CCTP V2 token pool.
 func buildCCTPV2PoolDomainUpdates(dep adapters.ConfigureCCTPChainForLanesDeps, input adapters.ConfigureCCTPChainForLanesInput) ([]usdc_token_pool_cctp_v2.DomainUpdate, error) {
-	out := make([]usdc_token_pool_cctp_v2.DomainUpdate, 0, len(input.RemoteChains))
+	out := make([]usdc_token_pool_cctp_v2.DomainUpdate, 0)
 	for remoteChainSelector, remoteChain := range input.RemoteChains {
-		allowedCallerOnDest, err := dep.RemoteChains[remoteChainSelector].AllowedCallerOnDest(dep.DataStore, dep.BlockChains, remoteChainSelector)
+		if dep.RemoteChains[remoteChainSelector].USDCType() == adapters.NonCanonical {
+			// Non-canonical USDC chains do not support CCTP, so we don't need to perform any CCTP-specific operations.
+			continue
+		}
+		allowedCallerOnDest, err := dep.RemoteChains[remoteChainSelector].CCTPV2AllowedCallerOnDest(dep.DataStore, dep.BlockChains, remoteChainSelector)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get allowed caller on dest: %w", err)
 		}
@@ -459,20 +466,19 @@ func buildCCTPV2PoolDomainUpdates(dep adapters.ConfigureCCTPChainForLanesDeps, i
 // buildCCTPV1PoolDomainUpdates builds domain updates for the CCTP V1 token pool.
 // Only chains configured with CCTP_V1 mechanism are included.
 func buildCCTPV1PoolDomainUpdates(dep adapters.ConfigureCCTPChainForLanesDeps, input adapters.ConfigureCCTPChainForLanesInput) ([]usdc_token_pool.DomainUpdate, error) {
-	out := make([]usdc_token_pool.DomainUpdate, 0, len(input.RemoteChains))
+	out := make([]usdc_token_pool.DomainUpdate, 0)
 	for remoteChainSelector, remoteChain := range input.RemoteChains {
+		if dep.RemoteChains[remoteChainSelector].USDCType() == adapters.NonCanonical {
+			// Non-canonical USDC chains do not support CCTP, so we don't need to perform any CCTP-specific operations.
+			continue
+		}
 		if remoteChain.LockOrBurnMechanism != mechanismCCTPV1 {
 			continue
 		}
-		legacyRefs := dep.DataStore.Addresses().Filter(
-			datastore.AddressRefByChainSelector(remoteChainSelector),
-			datastore.AddressRefByType(datastore.ContractType(cctp_message_transmitter_proxy_v1_6_2.ContractType)),
-			datastore.AddressRefByVersion(cctp_message_transmitter_proxy_v1_6_2.Version),
-		)
-		if len(legacyRefs) != 1 {
-			return nil, fmt.Errorf("expected exactly 1 CCTPMessageTransmitterProxy v1.6.2 ref on remote chain %d, found %d", remoteChainSelector, len(legacyRefs))
+		allowedCallerOnDest, err := dep.RemoteChains[remoteChainSelector].CCTPV1AllowedCallerOnDest(dep.DataStore, dep.BlockChains, remoteChainSelector)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get allowed caller on dest: %w", err)
 		}
-		allowedCallerOnDest := common.FromHex(legacyRefs[0].Address)
 		mintRecipientOnDest, err := dep.RemoteChains[remoteChainSelector].MintRecipientOnDest(dep.DataStore, dep.BlockChains, remoteChainSelector)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get mint recipient on dest: %w", err)
