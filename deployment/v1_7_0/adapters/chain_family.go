@@ -112,7 +112,7 @@ type RemoteChainConfig[RemoteContract any, LocalContract any] struct {
 	// Execution gas cost, excluding pool/CCV/receiver gas.
 	BaseExecutionGasCost uint32
 	// Whether token receiver is allowed on the destination chain.
-	TokenReceiverAllowed bool
+	TokenReceiverAllowed *bool
 	// Message network fee in USD cents.
 	MessageNetworkFeeUSDCents uint16
 	// Token network fee in USD cents.
