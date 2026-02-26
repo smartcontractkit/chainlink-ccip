@@ -98,6 +98,45 @@ func (d *SolanaAdapter) DeployMCMS() *operations.Sequence[ccipapi.MCMSDeployment
 	)
 }
 
+func (a *SolanaAdapter) UpdateMCMSConfig() *operations.Sequence[deployops.UpdateMCMSConfigInputPerChainWithSelector, sequences.OnChainOutput, chain.BlockChains] {
+	return operations.NewSequence(
+		"update-mcms-config",
+		semver.MustParse("1.0.0"),
+		"Updates Config of specified MCMS Contracts",
+		func(b operations.Bundle, chains cldf_chain.BlockChains, in ccipapi.UpdateMCMSConfigInputPerChainWithSelector) (output sequences.OnChainOutput, err error) {
+			chain, ok := chains.SolanaChains()[in.ChainSelector]
+			if !ok {
+				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found in environment", in.ChainSelector)
+			}
+
+			// Set config for each inputted contract
+			for _, contract := range in.MCMContracts {
+				deps := mcmsops.Deps{
+					Chain:             chain,
+					ExistingAddresses: in.ExistingAddresses,
+					Qualifier:         contract.Qualifier,
+				}
+				configureOpInput := ccipapi.MCMSDeploymentConfigPerChain{
+					Canceller:       in.MCMConfig,
+					Bypasser:        in.MCMConfig,
+					Proposer:        in.MCMConfig,
+					Qualifier:       &contract.Qualifier,
+					ContractVersion: contract.Version.String(),
+				}
+				configureOpOutput, err := configureMCM(b, deps, configureOpInput, solana.MustPublicKeyFromBase58(contract.Address))
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to configure MCMs: %w", err)
+				}
+
+				output.Addresses = append(output.Addresses, configureOpOutput.NewAddresses...)
+				output.BatchOps = append(output.BatchOps, configureOpOutput.BatchOps...)
+			}
+
+			return output, nil
+		},
+	)
+}
+
 func (d *SolanaAdapter) FinalizeDeployMCMS() *operations.Sequence[ccipapi.MCMSDeploymentConfigPerChainWithAddress, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return operations.NewSequence(
 		"finalize-deploy-mcms",
@@ -360,10 +399,7 @@ func (a *SolanaAdapter) GrantAdminRoleToTimelock() *operations.Sequence[deployop
 	return nil
 }
 
-func (a *SolanaAdapter) UpdateMCMSConfig() *operations.Sequence[deployops.UpdateMCMSConfigInputPerChainWithSelector, sequences.OnChainOutput, chain.BlockChains] {
-	// TODO: Implement for Solana
-	return nil
-}
+// PUT BACK HERE
 
 func getRefsAsOwnable(
 	refs []cldf_datastore.AddressRef,

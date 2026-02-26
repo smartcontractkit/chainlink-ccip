@@ -65,7 +65,8 @@ type GrantAdminRoleToTimelockConfig struct {
 
 type UpdateMCMSConfigInputPerChainWithSelector struct {
 	UpdateMCMSConfigInputPerChain
-	ChainSelector uint64
+	ChainSelector     uint64
+	ExistingAddresses []datastore.AddressRef // needed for Solana
 }
 
 type UpdateMCMSConfigInputPerChain struct {
@@ -150,10 +151,14 @@ func updateMCMSConfigApply(d *DeployerRegistry, mcmsRegistry *changesets.MCMSRea
 				mcmsContracts = append(mcmsContracts, mcmsRef)
 			}
 
+			// find existing addresses for this chain from the env
+			existingAddrs := d.ExistingAddressesForChain(e, selector)
+
 			// Call the set mcms config sequence
 			seqCfg := UpdateMCMSConfigInputPerChainWithSelector{
 				UpdateMCMSConfigInputPerChain: chainCfg,
 				ChainSelector:                 selector,
+				ExistingAddresses:             existingAddrs,
 			}
 
 			report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, deployer.UpdateMCMSConfig(), e.BlockChains, seqCfg)
