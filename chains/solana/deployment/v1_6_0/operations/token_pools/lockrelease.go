@@ -449,6 +449,15 @@ var UpdateRateLimitAdminLockRelease = operations.NewOperation(
 	"Updates the rate limit admin for a LockReleaseTokenPool remote chain config",
 	func(b operations.Bundle, chain cldf_solana.Chain, input TokenPoolTransferOwnershipInput) (sequences.OnChainOutput, error) {
 		lockrelease_token_pool.SetProgramID(input.Program)
+		poolConfigPDA, _ := tokens.TokenPoolConfigAddress(input.TokenMint, input.Program)
+		var chainConfig test_token_pool.State
+		err := chain.GetAccountDataBorshInto(b.GetContext(), poolConfigPDA, &chainConfig)
+		if err == nil {
+			if chainConfig.Config.RateLimitAdmin == input.NewOwner {
+				b.Logger.Info("New owner is the same as the current rate limit admin for lock release token pool with token mint:", input.TokenMint.String())
+				return sequences.OnChainOutput{}, nil
+			}
+		}
 		authority, err := GetAuthorityLockRelease(chain, input.Program, input.TokenMint)
 		if err != nil {
 			// assume the authority is the upgrade authority if we fail to fetch the current authority, since the pool might not be initialized yet and there won't be an authority set on-chain yet (since the config account won't exist until initialization)
@@ -464,7 +473,6 @@ var UpdateRateLimitAdminLockRelease = operations.NewOperation(
 				return sequences.OnChainOutput{}, nil
 			}
 		}
-		poolConfigPDA, _ := tokens.TokenPoolConfigAddress(input.TokenMint, input.Program)
 		ixn, err := lockrelease_token_pool.NewSetRateLimitAdminInstruction(
 			input.TokenMint,
 			input.NewOwner,
