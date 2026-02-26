@@ -49,6 +49,20 @@ contract AdvancedPoolHooks_applyCCVConfigUpdates is AdvancedPoolHooksSetup {
     assertEq(storedInbound.length, inboundCCVs.length);
     assertEq(storedInbound[0], inboundCCVs[0]);
 
+    // Verify getCCVConfig returns the correct config for the chain.
+    AdvancedPoolHooks.CCVConfig memory singleConfig = s_advancedPoolHooks.getCCVConfig(DEST_CHAIN_SELECTOR);
+    assertEq(singleConfig.outboundCCVs.length, 1);
+    assertEq(singleConfig.outboundCCVs[0], s_ccv1);
+    assertEq(singleConfig.inboundCCVs.length, 1);
+    assertEq(singleConfig.inboundCCVs[0], s_ccv2);
+    assertEq(singleConfig.thresholdOutboundCCVs.length, 0);
+    assertEq(singleConfig.thresholdInboundCCVs.length, 0);
+
+    // Verify getCCVConfig returns empty for unconfigured chain.
+    AdvancedPoolHooks.CCVConfig memory emptyConfig = s_advancedPoolHooks.getCCVConfig(999);
+    assertEq(emptyConfig.outboundCCVs.length, 0);
+    assertEq(emptyConfig.inboundCCVs.length, 0);
+
     // Verify getAllCCVConfigs returns the single configured chain.
     AdvancedPoolHooks.CCVConfigArg[] memory allConfigs = s_advancedPoolHooks.getAllCCVConfigs();
     assertEq(allConfigs.length, 1);
