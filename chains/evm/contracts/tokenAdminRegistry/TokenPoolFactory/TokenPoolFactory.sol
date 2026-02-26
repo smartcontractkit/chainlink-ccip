@@ -94,6 +94,19 @@ contract TokenPoolFactory is ITypeAndVersion {
     i_ccipRouter = ccipRouter;
   }
 
+  /// @notice Returns the static configuration of the factory.
+  /// @return rmnProxy The address of the RMNProxy contract.
+  /// @return tokenAdminRegistry The address of the token admin registry.
+  /// @return registryModuleOwnerCustom The address of the registry module for owner-based registration.
+  /// @return ccipRouter The address of the CCIP router.
+  function getStaticConfig()
+    external
+    view
+    returns (address rmnProxy, address tokenAdminRegistry, address registryModuleOwnerCustom, address ccipRouter)
+  {
+    return (i_rmnProxy, address(i_tokenAdminRegistry), address(i_registryModuleOwnerCustom), i_ccipRouter);
+  }
+
   // ================================================================
   // │                   Top-Level Deployment                       │
   // ================================================================

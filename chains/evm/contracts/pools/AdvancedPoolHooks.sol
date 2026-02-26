@@ -16,6 +16,7 @@ import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/Enumera
 /// @dev This is a standalone contract that can optionally be used by TokenPools.
 contract AdvancedPoolHooks is IAdvancedPoolHooks, ITypeAndVersion, AuthorizedCallers {
   using EnumerableSet for EnumerableSet.AddressSet;
+  using EnumerableSet for EnumerableSet.UintSet;
 
   function typeAndVersion() external pure virtual override returns (string memory) {
     return "AdvancedPoolHooks 2.0.0-dev";
@@ -71,6 +72,9 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, ITypeAndVersion, AuthorizedCal
 
   /// @dev Stores verifier (CCV) requirements keyed by remote chain selector.
   mapping(uint64 remoteChainSelector => CCVConfig ccvConfig) internal s_verifierConfig;
+
+  /// @dev Tracks all remote chain selectors that have CCV configurations.
+  EnumerableSet.UintSet internal s_configuredChainSelectors;
 
   constructor(
     address[] memory allowlist,
@@ -197,6 +201,36 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, ITypeAndVersion, AuthorizedCal
   // │                          CCV                                 │
   // ================================================================
 
+  /// @notice Returns the full CCV configuration for a given remote chain selector.
+  /// @param remoteChainSelector The remote chain selector.
+  /// @return The CCV configuration containing outbound, threshold outbound, inbound, and threshold inbound CCVs.
+  function getCCVConfig(
+    uint64 remoteChainSelector
+  ) external view returns (CCVConfig memory) {
+    return s_verifierConfig[remoteChainSelector];
+  }
+
+  /// @notice Returns all CCV configurations across every configured remote chain selector.
+  /// @return The array of CCVConfigArg structs, one per configured chain selector.
+  function getAllCCVConfigs() external view returns (CCVConfigArg[] memory) {
+    uint256 length = s_configuredChainSelectors.length();
+    CCVConfigArg[] memory configs = new CCVConfigArg[](length);
+
+    for (uint256 i = 0; i < length; ++i) {
+      uint64 selector = uint64(s_configuredChainSelectors.at(i));
+      CCVConfig storage cfg = s_verifierConfig[selector];
+      configs[i] = CCVConfigArg({
+        remoteChainSelector: selector,
+        outboundCCVs: cfg.outboundCCVs,
+        thresholdOutboundCCVs: cfg.thresholdOutboundCCVs,
+        inboundCCVs: cfg.inboundCCVs,
+        thresholdInboundCCVs: cfg.thresholdInboundCCVs
+      });
+    }
+
+    return configs;
+  }
+
   /// @notice Updates the CCV configuration for specified remote chains.
   /// If the array includes address(0), it indicates that the default CCV should be used alongside any other specified CCVs.
   /// @dev Additional CCVs should only be configured for transfers at or above the threshold amount and should not duplicate base CCVs.
@@ -246,6 +280,14 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, ITypeAndVersion, AuthorizedCal
         inboundCCVs: inboundCCVs,
         thresholdInboundCCVs: thresholdInboundCCVs
       });
+
+      // If the config has no CCVs, remove it from the configured selectors. Otherwise, add it.
+      if (outboundCCVs.length > 0 || inboundCCVs.length > 0) {
+        s_configuredChainSelectors.add(remoteChainSelector);
+      } else {
+        s_configuredChainSelectors.remove(remoteChainSelector);
+      }
+
       emit CCVConfigUpdated({
         remoteChainSelector: remoteChainSelector,
         outboundCCVs: outboundCCVs,

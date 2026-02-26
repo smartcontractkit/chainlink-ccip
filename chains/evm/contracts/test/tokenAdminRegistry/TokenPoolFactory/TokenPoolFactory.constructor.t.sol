@@ -12,6 +12,16 @@ import {Create2} from "@openzeppelin/contracts@5.3.0/utils/Create2.sol";
 contract TokenPoolFactory_constructor is TokenPoolFactorySetup {
   using Create2 for bytes32;
 
+  function test_constructor_getStaticConfig() public view {
+    (address rmnProxy, address tokenAdminRegistry, address registryModuleOwnerCustom, address ccipRouter) =
+      s_tokenPoolFactory.getStaticConfig();
+
+    assertEq(rmnProxy, s_rmnProxy);
+    assertEq(tokenAdminRegistry, address(s_tokenAdminRegistry));
+    assertEq(registryModuleOwnerCustom, address(s_registryModuleOwnerCustom));
+    assertEq(ccipRouter, address(s_sourceRouter));
+  }
+
   function test_constructor_RevertWhen_InvalidZeroAddress() public {
     // Revert cause the tokenAdminRegistry is address(0).
     vm.expectRevert(TokenPoolFactory.InvalidZeroAddress.selector);

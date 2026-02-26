@@ -12,7 +12,7 @@ OPTIMIZE_RUNS_TOKEN_POOL=50000
 OPTIMIZE_RUNS_ONRAMP=1500
 OPTIMIZE_RUNS_OFFRAMP=30000
 OPTIMIZE_RUNS_FEE_QUOTER=27500
-OPTIMIZE_RUNS_CCV_POOL=20000
+OPTIMIZE_RUNS_CCV_POOL=19000
 
 
 PROJECT="ccip"
@@ -37,6 +37,7 @@ compileContract() {
     command="forge $args \
     $(getOptimizations "$1" "$contract") \
     --extra-output-files bin abi metadata \
+    --sizes \
     --build-info \
     --build-info-path $dir/build \
     -o $dir"

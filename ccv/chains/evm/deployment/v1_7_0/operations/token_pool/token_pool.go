@@ -103,7 +103,7 @@ type TokenTransferFeeConfigArgs struct {
 	TokenTransferFeeConfigUpdates []TokenTransferFeeConfigUpdate
 }
 
-var SetMinBlockConfirmation = contract.NewWrite(contract.WriteParams[uint16, *token_pool.TokenPool]{
+var SetMinBlockConfirmations = contract.NewWrite(contract.WriteParams[uint16, *token_pool.TokenPool]{
 	Name:            "token-pool:set-min-block-confirmation",
 	Version:         Version,
 	Description:     "Sets the minimum block confirmation required for a TokenPool",
@@ -113,7 +113,7 @@ var SetMinBlockConfirmation = contract.NewWrite(contract.WriteParams[uint16, *to
 	IsAllowedCaller: contract.OnlyOwner[*token_pool.TokenPool, uint16],
 	Validate:        func(uint16) error { return nil },
 	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.TransactOpts, args uint16) (*types.Transaction, error) {
-		return tokenPool.SetMinBlockConfirmation(opts, args)
+		return tokenPool.SetMinBlockConfirmations(opts, args)
 	},
 })
 
@@ -183,7 +183,7 @@ var SetRateLimitConfig = contract.NewWrite(contract.WriteParams[[]SetRateLimitCo
 		for _, arg := range args {
 			rateLimitConfigArgs = append(rateLimitConfigArgs, token_pool.TokenPoolRateLimitConfigArgs{
 				RemoteChainSelector:       arg.RemoteChainSelector,
-				CustomBlockConfirmation:   arg.CustomBlockConfirmation,
+				CustomBlockConfirmations:  arg.CustomBlockConfirmation,
 				OutboundRateLimiterConfig: token_pool.RateLimiterConfig(arg.OutboundRateLimiterConfig),
 				InboundRateLimiterConfig:  token_pool.RateLimiterConfig(arg.InboundRateLimiterConfig),
 			})
@@ -249,13 +249,13 @@ var ApplyTokenTransferFeeConfigUpdates = contract.NewWrite(contract.WriteParams[
 			tokenTransferFeeConfigUpdates = append(tokenTransferFeeConfigUpdates, token_pool.TokenPoolTokenTransferFeeConfigArgs{
 				DestChainSelector: arg.DestChainSelector,
 				TokenTransferFeeConfig: token_pool.IPoolV2TokenTransferFeeConfig{
-					DestGasOverhead:                        arg.DestGasOverhead,
-					DestBytesOverhead:                      arg.DestBytesOverhead,
-					DefaultBlockConfirmationFeeUSDCents:    arg.DefaultBlockConfirmationFeeUSDCents,
-					CustomBlockConfirmationFeeUSDCents:     arg.CustomBlockConfirmationFeeUSDCents,
-					DefaultBlockConfirmationTransferFeeBps: arg.DefaultBlockConfirmationTransferFeeBps,
-					CustomBlockConfirmationTransferFeeBps:  arg.CustomBlockConfirmationTransferFeeBps,
-					IsEnabled:                              arg.IsEnabled,
+					DestGasOverhead:                         arg.DestGasOverhead,
+					DestBytesOverhead:                       arg.DestBytesOverhead,
+					DefaultBlockConfirmationsFeeUSDCents:    arg.DefaultBlockConfirmationFeeUSDCents,
+					CustomBlockConfirmationsFeeUSDCents:     arg.CustomBlockConfirmationFeeUSDCents,
+					DefaultBlockConfirmationsTransferFeeBps: arg.DefaultBlockConfirmationTransferFeeBps,
+					CustomBlockConfirmationsTransferFeeBps:  arg.CustomBlockConfirmationTransferFeeBps,
+					IsEnabled:                               arg.IsEnabled,
 				},
 			})
 		}
@@ -303,7 +303,7 @@ var GetMinBlockConfirmation = contract.NewRead(contract.ReadParams[any, uint16, 
 	ContractType: ContractType,
 	NewContract:  token_pool.NewTokenPool,
 	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.CallOpts, args any) (uint16, error) {
-		return tokenPool.GetMinBlockConfirmation(opts)
+		return tokenPool.GetMinBlockConfirmations(opts)
 	},
 })
 

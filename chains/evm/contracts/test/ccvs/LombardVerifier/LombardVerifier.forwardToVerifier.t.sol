@@ -37,7 +37,7 @@ contract LombardVerifier_forwardToVerifier is LombardVerifierSetup {
           bytes32(uint256(uint160(receiver))),
           TRANSFER_AMOUNT,
           ALLOWED_CALLER,
-          abi.encodePacked(bytes4(keccak256("LombardVerifier 1.7.0")), messageId)
+          abi.encodePacked(bytes4(keccak256("LombardVerifier 2.0.0")), messageId)
         )
       )
     );
