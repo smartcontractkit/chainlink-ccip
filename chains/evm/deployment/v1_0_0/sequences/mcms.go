@@ -136,6 +136,10 @@ var SeqSetMCMSConfigs = cldf_ops.NewSequence(
 						GroupParents:    groupParents,
 					},
 				})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to update mcms config on chain %d for contract with address %s: %w",
+					in.ChainSelector, mcmContract.Address, err)
+			}
 			batchOp, err := contract.NewBatchOperationFromWrites([]contract.WriteOutput{report.Output})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
