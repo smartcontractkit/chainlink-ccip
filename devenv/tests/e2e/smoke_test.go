@@ -13,6 +13,7 @@ import (
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
@@ -35,23 +36,27 @@ func TestE2ESmoke(t *testing.T) {
 
 	selectors, e, err := ccip.NewCLDFOperationsEnvironment(in.Blockchains, in.CLDF.DataStore)
 	require.NoError(t, err)
-	selectorsToImpl := make(map[uint64]ccip.CCIP16ProductConfiguration)
-
-	for _, bc := range in.Blockchains {
-		i, err := ccip.NewCCIPImplFromNetwork(bc.Type, bc.ChainID)
-		require.NoError(t, err)
-		i.SetCLDF(e)
-		family, err := chainsel.GetSelectorFamily(i.ChainSelector())
-		require.NoError(t, err)
-		networkInfo, err := chainsel.GetChainDetailsByChainIDAndFamily(bc.ChainID, family)
-		require.NoError(t, err)
-		selectorsToImpl[networkInfo.ChainSelector] = i
-	}
 
 	t.Cleanup(func() {
 		_, err := framework.SaveContainerLogs(fmt.Sprintf("%s-%s", framework.DefaultCTFLogsDir, t.Name()))
 		require.NoError(t, err)
 	})
+
+	RunSmokeTests(t, e, selectors)
+}
+
+func RunSmokeTests(t *testing.T, e *deployment.Environment, selectors []uint64) {
+	selectorsToImpl := make(map[uint64]ccip.CCIP16ProductConfiguration)
+	for _, selector := range selectors {
+		family, err := chainsel.GetSelectorFamily(selector)
+		require.NoError(t, err)
+		chainID, err := chainsel.GetChainIDFromSelector(selector)
+		require.NoError(t, err)
+		i, err := ccip.NewCCIPImplFromNetwork(family, chainID)
+		require.NoError(t, err)
+		i.SetCLDF(e)
+		selectorsToImpl[selector] = i
+	}
 
 	if os.Getenv("PARALLEL_E2E_TESTS") == "true" {
 		t.Parallel()
@@ -199,6 +204,8 @@ func TestE2ESmoke(t *testing.T) {
 			require.Error(t, err)
 		})
 
+		// TODO: send data payload larger than limit
+
 		t.Run(fmt.Sprintf("%s invalid extra args tag", laneTag), func(t *testing.T) {
 			if fromImpl.Family() == chainsel.FamilyTon {
 				t.Skip("TON expects a well-formatted BOC or BuildMessage will fail")
@@ -209,6 +216,23 @@ func TestE2ESmoke(t *testing.T) {
 				Receiver:          toImpl.CCIPReceiver(),
 				Data:              []byte("hello world"),
 				ExtraArgs:         []byte{1, 2, 3, 4, 99, 99}, // invalid extraArgs prefix
+			})
+			require.NoError(t, err)
+
+			_, err = fromImpl.SendMessage(t.Context(), toImpl.ChainSelector(), msg)
+			require.Error(t, err)
+		})
+
+		t.Run(fmt.Sprintf("%s invalid/unconfigured chain selector", laneTag), func(t *testing.T) {
+			receiver := toImpl.CCIPReceiver()
+			extraArgs, err := toImpl.GetExtraArgs(receiver, fromImpl.Family())
+			require.NoError(t, err)
+
+			msg, err := fromImpl.BuildMessage(testadapters.MessageComponents{
+				DestChainSelector: 1, // invalid/unconfigured chain selector
+				Receiver:          toImpl.CCIPReceiver(),
+				Data:              []byte("hello world"),
+				ExtraArgs:         extraArgs,
 			})
 			require.NoError(t, err)
 
@@ -229,6 +253,32 @@ func TestE2ESmoke(t *testing.T) {
 			msg, err := fromImpl.BuildMessage(testadapters.MessageComponents{
 				DestChainSelector: toImpl.ChainSelector(),
 				Receiver:          invalidReceiver,
+				Data:              []byte("hello world"),
+				ExtraArgs:         extraArgs,
+			})
+			require.NoError(t, err)
+
+			_, err = fromImpl.SendMessage(t.Context(), toImpl.ChainSelector(), msg)
+			require.Error(t, err)
+		})
+
+		// TODO: message with not enough gas
+		// then manual re-exec with higher limit
+
+		// TODO: test whitelisting
+
+		t.Run(fmt.Sprintf("%s OOO flag is required on non-EVMs", laneTag), func(t *testing.T) {
+			if fromImpl.Family() != chainsel.FamilyEVM || toImpl.Family() != chainsel.FamilyEVM {
+				t.Skip("EVM->EVM still supports OOO, depending on config")
+			}
+
+			receiver := toImpl.CCIPReceiver()
+			extraArgs, err := toImpl.GetExtraArgs(receiver, fromImpl.Family(), testadapters.NewOutOfOrderExtraArg(false))
+			require.NoError(t, err)
+
+			msg, err := fromImpl.BuildMessage(testadapters.MessageComponents{
+				DestChainSelector: toImpl.ChainSelector(),
+				Receiver:          receiver,
 				Data:              []byte("hello world"),
 				ExtraArgs:         extraArgs,
 			})

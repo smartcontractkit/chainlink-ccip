@@ -243,36 +243,24 @@ func NewDefaultCLDFBundle(e *deployment.Environment) operations.Bundle {
 	)
 }
 
-func NewCCIPImplFromNetwork(typ string, chainID string) (CCIP16ProductConfiguration, error) {
-	// TODO: extract to method
-	var family string
-	switch typ {
-	case "anvil", "geth":
-		family = chainsel.FamilyEVM
-	case "solana":
-		family = chainsel.FamilySolana
-	case "ton":
-		family = chainsel.FamilyTon
-	default:
-		return nil, fmt.Errorf("unsupported blockchain type: %s", typ)
-	}
+func NewCCIPImplFromNetwork(family string, chainID string) (CCIP16ProductConfiguration, error) {
 	networkInfo, err := chainsel.GetChainDetailsByChainIDAndFamily(chainID, family)
 	if err != nil {
 		return nil, err
 	}
 
-	switch typ {
-	case "anvil", "geth":
+	switch family {
+	case chainsel.FamilyEVM:
 		return ccipEVM.NewEmptyCCIP16EVM(networkInfo), nil
-	case "solana":
+	case chainsel.FamilySolana:
 		return ccipSolana.NewEmptyCCIP16Solana(networkInfo), nil
-	case "sui":
+	case chainsel.FamilySui:
 		panic("implement Sui")
-	case "aptos":
+	case chainsel.FamilyAptos:
 		panic("implement Aptos")
-	case "ton":
+	case chainsel.FamilyTon:
 		return ccipTon.NewEmptyCCIP16TON(networkInfo), nil
 	default:
-		return nil, errors.New("unknown devenv network type " + typ)
+		return nil, errors.New("unsupported devenv chain family " + family)
 	}
 }
