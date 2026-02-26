@@ -10,8 +10,12 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	tpops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/operations/token_pool"
+	tpops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/token_pool"
+
+	// NOTE: the token pool contracts for v1.6.1 are still children of the abstract v1.5.1
+	// TokenPool.sol contract so we can still use the 1.5.1 bindings to read onchain state
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/token_pool"
+
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
@@ -179,9 +183,9 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 						ChainSelector: chain.Selector,
 						Address:       input.TokenPoolAddress,
 						Args: tpops.SetChainRateLimiterConfigArgs{
-							OutboundRateLimitConfig: token_pool.RateLimiterConfig{IsEnabled: inputORL.IsEnabled, Capacity: inputORL.Capacity, Rate: inputORL.Rate},
-							InboundRateLimitConfig:  token_pool.RateLimiterConfig{IsEnabled: inputIRL.IsEnabled, Capacity: inputIRL.Capacity, Rate: inputIRL.Rate},
-							RemoteChainSelector:     remoteCS,
+							OutboundConfig:      tpops.Config{IsEnabled: inputORL.IsEnabled, Capacity: inputORL.Capacity, Rate: inputORL.Rate},
+							InboundConfig:       tpops.Config{IsEnabled: inputIRL.IsEnabled, Capacity: inputIRL.Capacity, Rate: inputIRL.Rate},
+							RemoteChainSelector: remoteCS,
 						},
 					})
 					if err != nil {
@@ -228,17 +232,17 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 				Address:       input.TokenPoolAddress,
 				Args: tpops.ApplyChainUpdatesArgs{
 					RemoteChainSelectorsToRemove: remotesToDel,
-					ChainsToAdd: []token_pool.TokenPoolChainUpdate{
+					ChainsToAdd: []tpops.ChainUpdate{
 						{
 							RemotePoolAddresses: [][]byte{paddedRemoteTokenPoolAddress},
 							RemoteChainSelector: input.RemoteChainSelector,
 							RemoteTokenAddress:  input.RemoteChainConfig.RemoteToken,
-							OutboundRateLimiterConfig: token_pool.RateLimiterConfig{
+							OutboundRateLimiterConfig: tpops.Config{
 								IsEnabled: inputORL.IsEnabled,
 								Capacity:  inputORL.Capacity,
 								Rate:      inputORL.Rate,
 							},
-							InboundRateLimiterConfig: token_pool.RateLimiterConfig{
+							InboundRateLimiterConfig: tpops.Config{
 								IsEnabled: inputIRL.IsEnabled,
 								Capacity:  inputIRL.Capacity,
 								Rate:      inputIRL.Rate,

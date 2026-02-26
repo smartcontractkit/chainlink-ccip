@@ -14,10 +14,10 @@ jobs:
   detect_deployments_changes:
     runs-on: ubuntu-latest
     outputs:
-      run_solana_deployment: ${{ steps.filter.outputs.deployment_workflow == 'true' || steps.filter.outputs.run_solana_deployment == 'true' }}
-      run_evm_deployment: ${{ steps.filter.outputs.deployment_workflow == 'true' || steps.filter.outputs.run_evm_deployment == 'true' }}
-      run_deployment: ${{ steps.filter.outputs.deployment_workflow == 'true' || steps.filter.outputs.run_deployment == 'true' }}
-      run_crosschain_deployment: ${{ steps.filter.outputs.deployment_workflow == 'true' || steps.filter.outputs.run_crosschain_deployment == 'true' }}
+      run_solana_deployment: ${{ steps.filter.outputs.run_deployment == 'true' || steps.filter.outputs.run_solana_deployment == 'true' }}
+      run_evm_deployment: ${{ steps.filter.outputs.run_deployment == 'true' || steps.filter.outputs.run_evm_deployment == 'true' }}
+      run_deployment: ${{ steps.filter.outputs.run_deployment == 'true' }}
+      run_crosschain_deployment: ${{ steps.filter.outputs.run_deployment == 'true' || steps.filter.outputs.run_solana_deployment == 'true' || steps.filter.outputs.run_evm_deployment == 'true' || steps.filter.outputs.run_crosschain_deployment == 'true' }}
     steps:
       - uses: actions/checkout@v4
       - name: Detect changes
@@ -28,6 +28,7 @@ jobs:
           filters: |
             run_deployment:
               - 'deployment/**'
+              - '.github/workflows/test-deployments.yml'
             run_evm_deployment:
               - 'chains/evm/gobindings/generated/**'
               - 'chains/evm/deployment/**'
@@ -36,8 +37,6 @@ jobs:
               - 'chains/solana/deployment/**'
             run_crosschain_deployment:
               - 'integration-tests/deployment/**'
-            deployment_workflow:
-              - '.github/workflows/test-deployments.yml'
 
   test-evm-deployments:
     needs: [detect_deployments_changes]
@@ -125,12 +124,7 @@ jobs:
 
   test-deployments-crosschain:
     needs: [detect_deployments_changes]
-    if: |-
-      ${{
-        needs.detect_deployments_changes.outputs.run_crosschain_deployment == 'true' ||
-        needs.detect_deployments_changes.outputs.run_evm_deployment == 'true' ||
-        needs.detect_deployments_changes.outputs.run_solana_deployment == 'true'
-      }}
+    if: ${{ needs.detect_deployments_changes.outputs.run_crosschain_deployment == 'true' }}
     runs-on: ubuntu-latest
     defaults:
       run:

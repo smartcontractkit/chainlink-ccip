@@ -39,9 +39,9 @@ type TokenAdapter interface {
 	// SetTokenPoolRateLimits returns a sequence that sets rate limits on a token pool.
 	SetTokenPoolRateLimits() *cldf_ops.Sequence[TPRLRemotes, sequences.OnChainOutput, cldf_chain.BlockChains]
 	DeployToken() *cldf_ops.Sequence[DeployTokenInput, sequences.OnChainOutput, cldf_chain.BlockChains]
-	DeployTokenVerify(e deployment.Environment, in any) error
+	DeployTokenVerify(e deployment.Environment, in DeployTokenInput) error
 	DeployTokenPoolForToken() *cldf_ops.Sequence[DeployTokenPoolInput, sequences.OnChainOutput, cldf_chain.BlockChains]
-	UpdateAuthorities() *cldf_ops.Sequence[UpdateAuthoritiesInput, sequences.OnChainOutput, cldf_chain.BlockChains]
+	UpdateAuthorities() *cldf_ops.Sequence[UpdateAuthoritiesInput, sequences.OnChainOutput, *deployment.Environment]
 }
 
 // RateLimiterConfig specifies configuration for a rate limiter on a token pool.
