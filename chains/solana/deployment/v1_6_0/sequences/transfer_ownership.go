@@ -1,7 +1,6 @@
 package sequences
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
@@ -80,7 +79,7 @@ func (a *SolanaAdapter) GetChainMetadata(e deployment.Environment, chainSelector
 		id,
 		seed,
 	)
-	opcount, err := inspector.GetOpCount(context.Background(), executor)
+	opcount, err := inspector.GetOpCount(e.GetContext(), executor)
 	if err != nil {
 		return mcms_types.ChainMetadata{}, fmt.Errorf("failed to get op count for chain %d: %w", chainSelector, err)
 	}

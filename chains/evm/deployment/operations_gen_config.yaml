@@ -11,6 +11,27 @@ output:
 # - (none): Public/Read functions don't need access control
 
 contracts:
+  # 1.6.3
+  - contract_name: FeeQuoter
+    version: "1.6.3"
+    functions:
+      - name: applyDestChainConfigUpdates
+        access: owner
+      - name: updatePrices
+        access: owner
+      - name: applyAuthorizedCallerUpdates
+        access: owner
+      - name: applyTokenTransferFeeConfigUpdates
+        access: owner
+      - name: getDestChainConfig
+        access: public
+      - name: getTokenTransferFeeConfig
+        access: public
+      - name: getStaticConfig
+        access: public
+      - name: getAllAuthorizedCallers
+        access: public
+
   # 1.6.2
   - contract_name: CCTPMessageTransmitterProxy
     version: "1.6.2"

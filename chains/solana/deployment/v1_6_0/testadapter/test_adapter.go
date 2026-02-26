@@ -578,7 +578,6 @@ func (a *SVMAdapter) GetTokenExpansionConfig() tokensapi.TokenExpansionInputPerC
 			ExternalAdmin:          "",                        // not needed for tests
 			DisableFreezeAuthority: false,                     // don't revoke freeze authority after token creation
 			TokenPrivKey:           "",                        // if empty, a new keypair will be generated
-			CCIPAdmin:              admin,                     // deployer is the admin (if empty defaults to timelock)
 		},
 		DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
 			PoolType:           cciputils.BurnMintTokenPool.String(),
@@ -586,7 +585,6 @@ func (a *SVMAdapter) GetTokenExpansionConfig() tokensapi.TokenExpansionInputPerC
 		},
 		TokenTransferConfig: &tokensapi.TokenTransferConfig{
 			ChainSelector: a.Selector,
-			ExternalAdmin: admin,
 			RegistryRef: datastore.AddressRef{
 				ChainSelector: a.Selector,
 				Address:       registryAddr,

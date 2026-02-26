@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"errors"
 	"fmt"
 	"math"
@@ -10,8 +11,10 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/aws/smithy-go/ptr"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/gagliardetto/solana-go"
 	"github.com/rs/zerolog"
 
@@ -41,7 +44,22 @@ import (
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-ccip/devenv/blockchainutils"
+	mcmstypes "github.com/smartcontractkit/mcms/types"
 )
+
+var (
+	// TestXXXMCMSSigner is a throwaway private key used for signing MCMS proposals.
+	// in tests.
+	TestXXXMCMSSigner *ecdsa.PrivateKey
+)
+
+func init() {
+	key, err := crypto.GenerateKey()
+	if err != nil {
+		panic(err)
+	}
+	TestXXXMCMSSigner = key
+}
 
 func DeployContractsForSelector(ctx context.Context, env *deployment.Environment, cls []*simple_node_set.Input, selector uint64, ccipHomeSelector uint64, crAddr string) (datastore.DataStore, error) {
 	l := zerolog.Ctx(ctx)
@@ -147,11 +165,71 @@ func DeployContractsForSelector(ctx context.Context, env *deployment.Environment
 			},
 		)
 	}
+	// so we can get the LINK address etc.
+	tmp := datastore.NewMemoryDataStore()
+	tmp.Merge(env.DataStore)
+	tmp.Merge(out.DataStore.Seal())
+	runningDS.Merge(out.DataStore.Seal())
 
-	env.DataStore = out.DataStore.Seal()
-	runningDS.Merge(env.DataStore)
+	// For EVM only, set the timelock admin
+	var timelockAdmin common.Address
+	chain1, ok := env.BlockChains.EVMChains()[selector]
+	if ok {
+		timelockAdmin = chain1.DeployerKey.From
+	}
+	qualifier := "CLLCCIP"
+	cs := deployops.DeployMCMS(dReg, nil)
+	fcs := deployops.FinalizeDeployMCMS(dReg, nil)
+	output, err := cs.Apply(*env, deployops.MCMSDeploymentConfig{
+		AdapterVersion: version,
+		Chains: map[uint64]deployops.MCMSDeploymentConfigPerChain{
+			selector: {
+				Canceller:        SingleGroupMCMS(),
+				Bypasser:         SingleGroupMCMS(),
+				Proposer:         SingleGroupMCMS(),
+				TimelockMinDelay: big.NewInt(0),
+				Qualifier:        ptr.String(qualifier),
+				TimelockAdmin:    timelockAdmin,
+			},
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("deploying MCMS: %w", err)
+	}
+	runningDS.Merge(output.DataStore.Seal())
+	tmp.Merge(output.DataStore.Seal())
+	env.DataStore = tmp.Seal()
+
+	finalizeOutput, err := fcs.Apply(*env, deployops.MCMSDeploymentConfig{
+		AdapterVersion: version,
+		Chains: map[uint64]deployops.MCMSDeploymentConfigPerChain{
+			selector: {
+				Canceller:        SingleGroupMCMS(),
+				Bypasser:         SingleGroupMCMS(),
+				Proposer:         SingleGroupMCMS(),
+				TimelockMinDelay: big.NewInt(0),
+				Qualifier:        ptr.String(qualifier),
+				TimelockAdmin:    timelockAdmin,
+			},
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("finalizing MCMS deployment: %w", err)
+	}
+	runningDS.Merge(finalizeOutput.DataStore.Seal())
 
 	return runningDS.Seal(), nil
+}
+
+func SingleGroupMCMS() mcmstypes.Config {
+	publicKey := TestXXXMCMSSigner.Public().(*ecdsa.PublicKey)
+	// Convert the public key to an Ethereum address
+	address := crypto.PubkeyToAddress(*publicKey)
+	c, err := mcmstypes.NewConfig(1, []common.Address{address}, []mcmstypes.Config{})
+	if err != nil {
+		panic(err)
+	}
+	return c
 }
 
 // getTokenPricesForChain returns the token prices for fee tokens on a chain.
@@ -582,7 +660,7 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 	mcmsRegistry.RegisterMCMSReader(chainsel.FamilySolana, &solseq.SolanaAdapter{})
 
 	// To simplify testing, we disable rate limiting on all token transfers.
-	disabledRL := tokensapi.RateLimiterConfig{Capacity: big.NewInt(0), Rate: big.NewInt(0), IsEnabled: false}
+	disabledRL := tokensapi.RateLimiterConfigFloatInput{Capacity: 0, Rate: 0, IsEnabled: false}
 
 	// This will only store the addresses deployed during this setup.
 	outputDS := datastore.NewMemoryDataStore()
@@ -693,6 +771,11 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 			Qualifier:     teConfig.DeployTokenInput.Symbol,
 			ChainSelector: selector,
 		}
+		tokenPoolRef := datastore.AddressRef{
+			Type:          datastore.ContractType(teConfig.DeployTokenPoolInput.PoolType),
+			Qualifier:     teConfig.DeployTokenPoolInput.TokenPoolQualifier,
+			ChainSelector: selector,
+		}
 
 		token, err := datastore_utils.FindAndFormatRef(env.DataStore, tokenRef, selector, datastore_utils.FullRef)
 		if err != nil {
@@ -707,11 +790,22 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 			if dst.ChainSelector() == selector {
 				continue
 			}
+			dstTeConfig := dst.GetTokenExpansionConfig()
+			dstTokenRef := datastore.AddressRef{
+				Type:          datastore.ContractType(dstTeConfig.DeployTokenInput.Type),
+				Qualifier:     dstTeConfig.DeployTokenInput.Symbol,
+				ChainSelector: dst.ChainSelector(),
+			}
+			dstTokenPoolRef := datastore.AddressRef{
+				Type:          datastore.ContractType(dstTeConfig.DeployTokenPoolInput.PoolType),
+				Qualifier:     dstTeConfig.DeployTokenPoolInput.TokenPoolQualifier,
+				ChainSelector: dst.ChainSelector(),
+			}
 			// Set some rate limiters for testing - one enabled and one disabled.
-			rls := []tokensapi.RateLimiterConfig{
+			rls := []tokensapi.RateLimiterConfigFloatInput{
 				{
-					Capacity:  big.NewInt(2_000_000_000),
-					Rate:      big.NewInt(200_000_000),
+					Capacity:  1234567.89, // this is in tokens, not decimal adjusted
+					Rate:      123456.789, // this is in tokens per second, not decimal adjusted
 					IsEnabled: true,
 				},
 				{
@@ -719,16 +813,23 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 				},
 			}
 			for _, rl := range rls {
-				input := tokensapi.RateLimiterConfigInput{
-					ChainSelector:       selector,
-					TokenRef:            tokenRef,
-					TokenPoolQualifier:  teConfig.DeployTokenPoolInput.TokenPoolQualifier,
-					PoolType:            teConfig.DeployTokenPoolInput.PoolType,
-					ChainAdapterVersion: v1_6_0,
-					Inputs: map[uint64]tokensapi.RateLimiterConfigInputs{
+				input := tokensapi.TPRLInput{
+					Configs: map[uint64]tokensapi.TPRLConfig{
+						selector: {
+							ChainAdapterVersion: v1_6_0,
+							TokenRef:            tokenRef,
+							TokenPoolRef:        tokenPoolRef,
+							RemoteOutbounds: map[uint64]tokensapi.RateLimiterConfigFloatInput{
+								dst.ChainSelector(): rl,
+							},
+						},
 						dst.ChainSelector(): {
-							OutboundRateLimiterConfig: rl,
-							InboundRateLimiterConfig:  rl,
+							ChainAdapterVersion: v1_6_0,
+							TokenRef:            dstTokenRef,
+							TokenPoolRef:        dstTokenPoolRef,
+							RemoteOutbounds: map[uint64]tokensapi.RateLimiterConfigFloatInput{
+								selector: rl,
+							},
 						},
 					},
 				}

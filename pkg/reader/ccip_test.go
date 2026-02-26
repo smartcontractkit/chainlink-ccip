@@ -60,7 +60,8 @@ func TestCCIPChainReader_Sync_HappyPath_BindsContractsSuccessfully(t *testing.T)
 	s1Onramp := []byte{0x1}
 	s2Onramp := []byte{0x2}
 	destNonceMgr := []byte{0x3}
-	offRamp := []byte{0x4}
+	s1NonceMgr := []byte{0x4}
+	offRamp := []byte{0x5}
 
 	mockAddrCodec := internal.NewMockAddressCodecHex(t)
 	destExtended := readermocks.NewMockExtended(t)
@@ -82,6 +83,8 @@ func TestCCIPChainReader_Sync_HappyPath_BindsContractsSuccessfully(t *testing.T)
 	mockExpectChainAccessorSyncCall(chainAccessors[destChain], consts.ContractNameOffRamp, offRamp, nil)
 	// NonceManager dest chain
 	mockExpectChainAccessorSyncCall(chainAccessors[destChain], consts.ContractNameNonceManager, destNonceMgr, nil)
+	// NonceManager sourceChain1
+	mockExpectChainAccessorSyncCall(chainAccessors[sourceChain1], consts.ContractNameNonceManager, s1NonceMgr, nil)
 	ccipReader, err := newCCIPChainReaderInternal(
 		ctx,
 		logger.Test(t),
@@ -105,7 +108,8 @@ func TestCCIPChainReader_Sync_HappyPath_BindsContractsSuccessfully(t *testing.T)
 			sourceChain2: s2Onramp,
 		},
 		consts.ContractNameNonceManager: {
-			destChain: destNonceMgr,
+			destChain:    destNonceMgr,
+			sourceChain1: s1NonceMgr,
 		},
 	}
 

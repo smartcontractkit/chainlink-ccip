@@ -97,6 +97,26 @@ func (c *FeeQuoterContract) GetTokenTransferFeeConfig(opts *bind.CallOpts, destC
 	return *abi.ConvertType(out[0], new(TokenTransferFeeConfig)).(*TokenTransferFeeConfig), nil
 }
 
+func (c *FeeQuoterContract) GetStaticConfig(opts *bind.CallOpts) (StaticConfig, error) {
+	var out []any
+	err := c.contract.Call(opts, &out, "getStaticConfig")
+	if err != nil {
+		var zero StaticConfig
+		return zero, err
+	}
+	return *abi.ConvertType(out[0], new(StaticConfig)).(*StaticConfig), nil
+}
+
+func (c *FeeQuoterContract) GetAllAuthorizedCallers(opts *bind.CallOpts) ([]common.Address, error) {
+	var out []any
+	err := c.contract.Call(opts, &out, "getAllAuthorizedCallers")
+	if err != nil {
+		var zero []common.Address
+		return zero, err
+	}
+	return *abi.ConvertType(out[0], new([]common.Address)).(*[]common.Address), nil
+}
+
 type AuthorizedCallerArgs struct {
 	AddedCallers   []common.Address
 	RemovedCallers []common.Address
@@ -317,5 +337,27 @@ var GetTokenTransferFeeConfig = contract.NewRead(contract.ReadParams[GetTokenTra
 	NewContract:  NewFeeQuoterContract,
 	CallContract: func(c *FeeQuoterContract, opts *bind.CallOpts, args GetTokenTransferFeeConfigArgs) (TokenTransferFeeConfig, error) {
 		return c.GetTokenTransferFeeConfig(opts, args.DestChainSelector, args.Token)
+	},
+})
+
+var GetStaticConfig = contract.NewRead(contract.ReadParams[struct{}, StaticConfig, *FeeQuoterContract]{
+	Name:         "fee-quoter:get-static-config",
+	Version:      Version,
+	Description:  "Calls getStaticConfig on the contract",
+	ContractType: ContractType,
+	NewContract:  NewFeeQuoterContract,
+	CallContract: func(c *FeeQuoterContract, opts *bind.CallOpts, args struct{}) (StaticConfig, error) {
+		return c.GetStaticConfig(opts)
+	},
+})
+
+var GetAllAuthorizedCallers = contract.NewRead(contract.ReadParams[struct{}, []common.Address, *FeeQuoterContract]{
+	Name:         "fee-quoter:get-all-authorized-callers",
+	Version:      Version,
+	Description:  "Calls getAllAuthorizedCallers on the contract",
+	ContractType: ContractType,
+	NewContract:  NewFeeQuoterContract,
+	CallContract: func(c *FeeQuoterContract, opts *bind.CallOpts, args struct{}) ([]common.Address, error) {
+		return c.GetAllAuthorizedCallers(opts)
 	},
 })

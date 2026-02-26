@@ -205,7 +205,7 @@ func (a *EVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, 
 		it, err := onRamp.FilterCCIPMessageSent(&bind.FilterOpts{
 			Start:   blockNum,
 			End:     &blockNum,
-			Context: context.Background(),
+			Context: ctx,
 		}, []uint64{destChainSelector}, []uint64{})
 		if err != nil {
 			return 0, fmt.Errorf("failed to filter CCIPMessageSent events: %w", err)
@@ -418,7 +418,7 @@ func (a *EVMAdapter) GetTokenExpansionConfig() tokensapi.TokenExpansionInputPerC
 	mintAmnt := new(big.Int).Mul(oneToken, big.NewInt(1_000_000)) // pre-mint 1 million tokens
 
 	return tokensapi.TokenExpansionInputPerChain{
-		TokenPoolVersion: cciputils.Version_1_5_1,
+		TokenPoolVersion:      cciputils.Version_1_5_1,
 		DeployTokenInput: &tokensapi.DeployTokenInput{
 			Decimals:               deci,
 			Symbol:                 "TEST_TOKEN_" + suffix,
@@ -430,7 +430,6 @@ func (a *EVMAdapter) GetTokenExpansionConfig() tokensapi.TokenExpansionInputPerC
 			ExternalAdmin:          "",                       // not needed for tests
 			DisableFreezeAuthority: false,                    // not applicable for EVM
 			TokenPrivKey:           "",                       // not applicable for EVM
-			CCIPAdmin:              admin,                    // deployer is the admin (if empty defaults to timelock)
 		},
 		DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
 			PoolType:           cciputils.BurnMintTokenPool.String(),
@@ -438,7 +437,6 @@ func (a *EVMAdapter) GetTokenExpansionConfig() tokensapi.TokenExpansionInputPerC
 		},
 		TokenTransferConfig: &tokensapi.TokenTransferConfig{
 			ChainSelector: a.Selector,
-			ExternalAdmin: admin,
 			RegistryRef: datastore.AddressRef{
 				ChainSelector: a.Selector,
 				Address:       registryAddr,
@@ -471,7 +469,7 @@ func ConfirmCommitWithExpectedSeqNumRange(
 ) (*offramp.OffRampCommitReportAccepted, error) {
 	sink := make(chan *offramp.OffRampCommitReportAccepted)
 	subscription, err := offRamp.WatchCommitReportAccepted(&bind.WatchOpts{
-		Context: context.Background(),
+		Context: t.Context(),
 		Start:   startBlock,
 	}, sink)
 	if err != nil {
@@ -637,7 +635,7 @@ func ConfirmExecWithSeqNrs(
 	defer tick.Stop()
 	sink := make(chan *offramp.OffRampExecutionStateChanged)
 	subscription, err := offRamp.WatchExecutionStateChanged(&bind.WatchOpts{
-		Context: context.Background(),
+		Context: t.Context(),
 		Start:   startBlock,
 	}, sink, nil, nil, nil)
 	if err != nil {
