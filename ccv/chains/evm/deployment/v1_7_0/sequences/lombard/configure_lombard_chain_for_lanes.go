@@ -181,6 +181,11 @@ var ConfigureLombardChainForLanes = cldf_ops.NewSequence(
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to convert lombardChainID to bytes32: %w", err)
 			}
 
+			remoteAdapter, err := toBytes32LeftPad(common.HexToAddress(remoteChain.RemoteAdapter).Bytes())
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to convert remote adapter to bytes32 for remote chain %d: %w", remoteChainSelector, err)
+			}
+
 			setRemotePathReport, err := cldf_ops.ExecuteOperation(b, lombard_verifier.SetRemotePath, chain, contract_utils.FunctionInput[lombard_verifier.RemotePathArgs]{
 				ChainSelector: chain.Selector,
 				Address:       lombardVerifierAddress,
@@ -188,7 +193,7 @@ var ConfigureLombardChainForLanes = cldf_ops.NewSequence(
 					RemoteChainSelector: remoteChainSelector,
 					LChainId:            lchainID,
 					AllowedCaller:       allowedCaller,
-					RemoteAdapter:       [32]byte{}, // Skipping for now TODO : complete
+					RemoteAdapter:       remoteAdapter,
 				},
 			})
 			if err != nil {
