@@ -92,7 +92,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
     DestChainConfig destChainConfig; // Config to update for the chain selector.
   }
 
-  /// @dev No need to write for future non-EVMs that only support 1.7. This is a legacy struct for pre 1.7 pools.
+  /// @dev No need to write for future non-EVMs that only support v2. This is a legacy struct for pre v2 pools.
   struct TokenTransferFeeConfig {
     uint32 feeUSDCents; // ──────╮ Minimum fee to charge per token transfer, multiples of 0.01 USD.
     uint32 destGasOverhead; //   │ Gas charged to execute the token transfer on the destination chain.
@@ -685,7 +685,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ILegacyFeeQuoter, ITypeAndV
   // │                       Legacy functions                       │
   // ================================================================
 
-  // Legacy functions are still required for pre-1.7 CCIP but can be removed once all lanes are migrated to 1.7+.
+  // Legacy functions are still required for pre-v2 CCIP but can be removed once all lanes are migrated to v2+.
 
   /// @inheritdoc ILegacyFeeQuoter
   /// @dev The function should always validate message.extraArgs, message.receiver and family-specific configs.

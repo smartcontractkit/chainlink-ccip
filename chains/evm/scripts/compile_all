@@ -37,6 +37,7 @@ compileContract() {
     command="forge $args \
     $(getOptimizations "$1" "$contract") \
     --extra-output-files bin abi metadata \
+    --sizes \
     --build-info \
     --build-info-path $dir/build \
     -o $dir"

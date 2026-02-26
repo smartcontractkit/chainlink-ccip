@@ -39,6 +39,11 @@ contract LockReleaseTokenPool is TokenPool, ITypeAndVersion {
     i_lockBox = lockBoxContract;
   }
 
+  /// @notice Gets the lock box address.
+  function getLockBox() external view returns (address) {
+    return address(i_lockBox);
+  }
+
   /// @inheritdoc TokenPool
   /// @dev The router has already transferred the full amount to this contract before calling lockOrBurn.
   /// For V1 the amount = full amount. For V2 the amount = destTokenAmount (after fees), and fees remain on this contract.

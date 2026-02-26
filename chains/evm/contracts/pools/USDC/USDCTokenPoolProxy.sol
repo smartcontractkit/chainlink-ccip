@@ -314,6 +314,14 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
     emit PoolAddressesUpdated(pools);
   }
 
+  /// @notice Returns the static (immutable) configuration of the proxy.
+  /// @return token The USDC token address.
+  /// @return router The CCIP router address.
+  /// @return cctpVerifier The CCTP verifier resolver address.
+  function getStaticConfig() external view returns (address token, address router, address cctpVerifier) {
+    return (address(i_token), address(i_router), address(i_cctpVerifier));
+  }
+
   /// @notice Get the current pool addresses that this token pool will route a message to.
   /// @return The current pool addresses that this token pool will route a message to.
   function getPools() public view returns (PoolAddresses memory) {

@@ -39,6 +39,11 @@ contract USDCTokenPoolProxy_constructor is USDCSetup {
     assertEq(pools.cctpV1Pool, s_cctpV1Pool);
     assertEq(pools.cctpV2Pool, s_cctpV2Pool);
 
+    (address token, address router, address cctpVerifier) = proxy.getStaticConfig();
+    assertEq(token, address(s_USDCToken));
+    assertEq(router, address(s_router));
+    assertEq(cctpVerifier, s_cctpVerifier);
+
     assertTrue(proxy.supportsInterface(type(IPoolV1).interfaceId));
     assertTrue(proxy.supportsInterface(type(IERC165).interfaceId));
     assertTrue(proxy.isSupportedToken(address(s_USDCToken)));
