@@ -68,4 +68,28 @@ func TestMakeAllowlistUpdates(t *testing.T) {
 		require.Empty(t, toAdd)
 		require.Empty(t, toRemove)
 	})
+
+	// Empty input fallback: empty added/removed slices behave like nil (desired = current, no updates).
+	t.Run("empty added and empty removed slices fallback to current", func(t *testing.T) {
+		current := []common.Address{addr("0x01"), addr("0x02")}
+		toAdd, toRemove := makeAllowlistUpdates(current, []string{}, []string{})
+		require.Empty(t, toAdd, "empty added should not produce toAdd")
+		require.Empty(t, toRemove, "empty removed should not produce toRemove")
+	})
+
+	t.Run("empty added with non-empty removed", func(t *testing.T) {
+		current := []common.Address{addr("0x01"), addr("0x02")}
+		toAdd, toRemove := makeAllowlistUpdates(current, []string{}, []string{"0x02"})
+		require.Empty(t, toAdd)
+		require.Len(t, toRemove, 1)
+		require.Equal(t, addr("0x02"), toRemove[0])
+	})
+
+	t.Run("empty removed with non-empty added", func(t *testing.T) {
+		current := []common.Address{addr("0x01")}
+		toAdd, toRemove := makeAllowlistUpdates(current, []string{"0x02"}, []string{})
+		require.Len(t, toAdd, 1)
+		require.Equal(t, addr("0x02"), toAdd[0])
+		require.Empty(t, toRemove)
+	})
 }

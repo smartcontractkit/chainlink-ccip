@@ -337,9 +337,8 @@ func maybeAddOnRampDestChainConfigArg(b cldf_ops.Bundle, chain evm.Chain, chainS
 		DestChainSelector:         remoteSelector,
 		AddressBytesLength:        remoteConfig.AddressBytesLength,
 		BaseExecutionGasCost:      remoteConfig.BaseExecutionGasCost,
-		TokenReceiverAllowed:      false, // TODO @kylesmartin: Add to core deployment input
-		MessageNetworkFeeUSDCents: 0,     // TODO @kylesmartin: Add to core deployment input
-		TokenNetworkFeeUSDCents:   0,     // TODO @kylesmartin: Add to core deployment input
+		MessageNetworkFeeUSDCents: remoteConfig.MessageNetworkFeeUSDCents,
+		TokenNetworkFeeUSDCents:   remoteConfig.TokenNetworkFeeUSDCents,
 		DefaultCCVs:               defaultOutboundCCVs,
 		LaneMandatedCCVs:          laneMandatedOutboundCCVs,
 		DefaultExecutor:           common.HexToAddress(remoteConfig.DefaultExecutor),
@@ -355,7 +354,11 @@ func maybeAddOnRampDestChainConfigArg(b cldf_ops.Bundle, chain evm.Chain, chainS
 	}
 	curOn := onRampCurrentReport.Output
 	// Fall back to on-chain value if inputted value is empty
-	// TODO @kylesmartin: Check tokenReceiverAllowed (should be pointer)
+	if remoteConfig.TokenReceiverAllowed == nil {
+		desiredOnRampArg.TokenReceiverAllowed = curOn.TokenReceiverAllowed
+	} else {
+		desiredOnRampArg.TokenReceiverAllowed = *remoteConfig.TokenReceiverAllowed
+	}
 	if desiredOnRampArg.MessageNetworkFeeUSDCents == 0 {
 		desiredOnRampArg.MessageNetworkFeeUSDCents = curOn.MessageNetworkFeeUSDCents
 	}
@@ -509,4 +512,3 @@ func filterExecutorDestChains(b cldf_ops.Bundle, chain evm.Chain, chainSelector 
 	}
 	return out, nil
 }
-

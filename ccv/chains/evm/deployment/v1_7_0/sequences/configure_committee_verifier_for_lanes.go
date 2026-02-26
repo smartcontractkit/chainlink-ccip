@@ -53,7 +53,6 @@ var ConfigureCommitteeVerifierForLanes = cldf_ops.NewSequence(
 		remoteChainConfigArgs := make([]committee_verifier.RemoteChainConfigArgs, 0, len(input.RemoteChains))
 		allowlistArgs := make([]committee_verifier.AllowlistConfigArgs, 0, len(input.RemoteChains))
 		signatureConfigs := make([]committee_verifier.SignatureConfig, 0, len(input.RemoteChains))
-		outboundImplementationArgs := make([]versioned_verifier_resolver.OutboundImplementationArgs, 0, len(input.RemoteChains))
 
 		for remoteSelector, remoteConfig := range input.RemoteChains {
 			desiredRemoteChainArg := committee_verifier.RemoteChainConfigArgs{
@@ -129,11 +128,29 @@ var ConfigureCommitteeVerifierForLanes = cldf_ops.NewSequence(
 			if curSig.Threshold != desiredSig.Threshold || !UnorderedSliceEqual(curSig.Signers, desiredSig.Signers, func(x, y common.Address) bool { return x == y }) {
 				signatureConfigs = append(signatureConfigs, desiredSig)
 			}
+		}
 
-			outboundImplementationArgs = append(outboundImplementationArgs, versioned_verifier_resolver.OutboundImplementationArgs{
-				DestChainSelector: remoteSelector,
-				Verifier:          common.HexToAddress(committeeVerifier),
-			})
+		// Build outbound implementation args only for remotes where on-chain verifier differs (idempotent).
+		currentOutboundReport, err := cldf_ops.ExecuteOperation(b, versioned_verifier_resolver.GetAllOutboundImplementations, chain, contract.FunctionInput[any]{
+			ChainSelector: chain.Selector,
+			Address:       common.HexToAddress(committeeVerifierResolver),
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to get outbound implementations from CommitteeVerifierResolver on chain %s: %w", chain, err)
+		}
+		currentOutbound := make(map[uint64]common.Address)
+		for _, o := range currentOutboundReport.Output {
+			currentOutbound[o.DestChainSelector] = o.Verifier
+		}
+		outboundImplementationArgs := make([]versioned_verifier_resolver.OutboundImplementationArgs, 0, len(input.RemoteChains))
+		committeeVerifierAddr := common.HexToAddress(committeeVerifier)
+		for remoteSelector := range input.RemoteChains {
+			if currentOutbound[remoteSelector] != committeeVerifierAddr {
+				outboundImplementationArgs = append(outboundImplementationArgs, versioned_verifier_resolver.OutboundImplementationArgs{
+					DestChainSelector: remoteSelector,
+					Verifier:          committeeVerifierAddr,
+				})
+			}
 		}
 
 		// Apply remote chain config updates only when there are changes.
@@ -177,8 +194,7 @@ var ConfigureCommitteeVerifierForLanes = cldf_ops.NewSequence(
 			writes = append(writes, committeeVerifierSignatureConfigReport.Output)
 		}
 
-		// Apply inbound implementation updates on CommitteeVerifierResolver
-		// Get the version tag from the CommitteeVerifier
+		// Apply inbound implementation updates on CommitteeVerifierResolver only when not already set (idempotent).
 		committeeVerifierVersionTagReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.GetVersionTag, chain, contract.FunctionInput[any]{
 			ChainSelector: chain.Selector,
 			Address:       common.HexToAddress(committeeVerifier),
@@ -186,31 +202,48 @@ var ConfigureCommitteeVerifierForLanes = cldf_ops.NewSequence(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get version tag from CommitteeVerifier on chain %s: %w", chain, err)
 		}
-		committeeVerifierResolverInboundImplementationUpdatesReport, err := cldf_ops.ExecuteOperation(b, versioned_verifier_resolver.ApplyInboundImplementationUpdates, chain, contract.FunctionInput[[]versioned_verifier_resolver.InboundImplementationArgs]{
+		desiredInbound := versioned_verifier_resolver.InboundImplementationArgs{
+			Version:  committeeVerifierVersionTagReport.Output,
+			Verifier: common.HexToAddress(committeeVerifier),
+		}
+		currentInboundReport, err := cldf_ops.ExecuteOperation(b, versioned_verifier_resolver.GetAllInboundImplementations, chain, contract.FunctionInput[any]{
 			ChainSelector: chain.Selector,
 			Address:       common.HexToAddress(committeeVerifierResolver),
-			Args: []versioned_verifier_resolver.InboundImplementationArgs{
-				{
-					Version:  committeeVerifierVersionTagReport.Output,
-					Verifier: common.HexToAddress(committeeVerifier),
-				},
-			},
 		})
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to apply inbound implementation updates to CommitteeVerifierResolver on chain %s: %w", chain, err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to get inbound implementations from CommitteeVerifierResolver on chain %s: %w", chain, err)
 		}
-		writes = append(writes, committeeVerifierResolverInboundImplementationUpdatesReport.Output)
+		inboundAlreadySet := false
+		for _, cur := range currentInboundReport.Output {
+			if cur.Version == desiredInbound.Version && cur.Verifier == desiredInbound.Verifier {
+				inboundAlreadySet = true
+				break
+			}
+		}
+		if !inboundAlreadySet {
+			committeeVerifierResolverInboundImplementationUpdatesReport, err := cldf_ops.ExecuteOperation(b, versioned_verifier_resolver.ApplyInboundImplementationUpdates, chain, contract.FunctionInput[[]versioned_verifier_resolver.InboundImplementationArgs]{
+				ChainSelector: chain.Selector,
+				Address:       common.HexToAddress(committeeVerifierResolver),
+				Args:          []versioned_verifier_resolver.InboundImplementationArgs{desiredInbound},
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to apply inbound implementation updates to CommitteeVerifierResolver on chain %s: %w", chain, err)
+			}
+			writes = append(writes, committeeVerifierResolverInboundImplementationUpdatesReport.Output)
+		}
 
-		// Apply outbound implementation updates on CommitteeVerifierResolver
-		committeeVerifierResolverOutboundImplementationUpdatesReport, err := cldf_ops.ExecuteOperation(b, versioned_verifier_resolver.ApplyOutboundImplementationUpdates, chain, contract.FunctionInput[[]versioned_verifier_resolver.OutboundImplementationArgs]{
-			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(committeeVerifierResolver),
-			Args:          outboundImplementationArgs,
-		})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to apply outbound implementation updates to CommitteeVerifierResolver on chain %s: %w", chain, err)
+		// Apply outbound implementation updates on CommitteeVerifierResolver only when there are changes (idempotent).
+		if len(outboundImplementationArgs) > 0 {
+			committeeVerifierResolverOutboundImplementationUpdatesReport, err := cldf_ops.ExecuteOperation(b, versioned_verifier_resolver.ApplyOutboundImplementationUpdates, chain, contract.FunctionInput[[]versioned_verifier_resolver.OutboundImplementationArgs]{
+				ChainSelector: chain.Selector,
+				Address:       common.HexToAddress(committeeVerifierResolver),
+				Args:          outboundImplementationArgs,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to apply outbound implementation updates to CommitteeVerifierResolver on chain %s: %w", chain, err)
+			}
+			writes = append(writes, committeeVerifierResolverOutboundImplementationUpdatesReport.Output)
 		}
-		writes = append(writes, committeeVerifierResolverOutboundImplementationUpdatesReport.Output)
 
 		batchOps, err := contract.NewBatchOperationFromWrites(writes)
 		if err != nil {
