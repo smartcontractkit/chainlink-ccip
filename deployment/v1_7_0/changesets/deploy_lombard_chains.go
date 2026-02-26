@@ -3,6 +3,7 @@ package changesets
 import (
 	"fmt"
 
+	"github.com/ethereum/go-ethereum/common"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -18,7 +19,9 @@ type LombardChainConfig struct {
 	// Bridge is the address of the Bridge contract provided by Lombard
 	Bridge string
 	// Token is the address of the token to be used in the LombardTokenPool.
-	Token          string
+	Token string
+	// Adapter is the optional adapter address used by LombardTokenPool.
+	Adapter        string
 	TokenQualifier string
 	// DeployerContract is a contract that can be used to deploy other contracts.
 	// i.e. A CREATE2Factory contract on Ethereum can enable consistent deployments.
@@ -59,9 +62,16 @@ func makeVerifyDeployLombardChains(_ *adapters.LombardChainRegistry, _ *changese
 			if _, err := chain_selectors.GetSelectorFamily(chainSel); err != nil {
 				return err
 			}
+			if chainCfg.Adapter != "" && !common.IsHexAddress(chainCfg.Adapter) {
+				return fmt.Errorf("invalid adapter address for chain %d: %s", chainSel, chainCfg.Adapter)
+			}
 			for remoteChainSelector := range chainCfg.RemoteChains {
 				if _, err := chain_selectors.GetSelectorFamily(remoteChainSelector); err != nil {
 					return err
+				}
+				remoteCfg := chainCfg.RemoteChains[remoteChainSelector]
+				if remoteCfg.RemoteAdapter != "" && !common.IsHexAddress(remoteCfg.RemoteAdapter) {
+					return fmt.Errorf("invalid remote adapter for chain %d remote %d: %s", chainSel, remoteChainSelector, remoteCfg.RemoteAdapter)
 				}
 			}
 		}
@@ -100,6 +110,7 @@ func makeApplyDeployLombardChains(lombardChainRegistry *adapters.LombardChainReg
 				ChainSelector:    chainSel,
 				Bridge:           chainCfg.Bridge,
 				Token:            chainCfg.Token,
+				Adapter:          chainCfg.Adapter,
 				TokenQualifier:   chainCfg.TokenQualifier,
 				DeployerContract: chainCfg.DeployerContract,
 				StorageLocations: chainCfg.StorageLocations,
