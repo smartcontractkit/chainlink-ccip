@@ -14,7 +14,7 @@ import {BaseVerifierSetup} from "../components/BaseVerifier/BaseVerifierSetup.t.
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
 contract LombardVerifierSetup is BaseVerifierSetup {
-  bytes4 internal constant VERSION_TAG_V1_7_0 = bytes4(keccak256("LombardVerifier 1.7.0"));
+  bytes4 internal constant VERSION_TAG_V2_0_0 = bytes4(keccak256("LombardVerifier 2.0.0"));
 
   LombardVerifier internal s_lombardVerifier;
   MockLombardBridge internal s_mockBridge;
@@ -32,7 +32,7 @@ contract LombardVerifierSetup is BaseVerifierSetup {
     s_mockBridge = new MockLombardBridge();
     s_mockMailbox = MockLombardMailbox(s_mockBridge.s_mailbox());
     // Set default execution result matching the version tag format.
-    s_mockMailbox.setMessageId(abi.encodePacked(VERSION_TAG_V1_7_0, bytes32(0)));
+    s_mockMailbox.setMessageId(abi.encodePacked(VERSION_TAG_V2_0_0, bytes32(0)));
 
     s_lombardVerifier = new LombardVerifier(
       LombardVerifier.DynamicConfig({feeAggregator: FEE_AGGREGATOR}),

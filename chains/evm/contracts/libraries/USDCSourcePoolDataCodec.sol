@@ -9,7 +9,7 @@ library USDCSourcePoolDataCodec {
   /// @dev The preimage is bytes4(keccak256("NO_CCTP_USE_LOCK_RELEASE")).
   bytes4 public constant LOCK_RELEASE_FLAG = 0xfa7c07de;
 
-  /// @dev There are two different tags for CCTP V2 to allow for CCIP V1.7 Compatibility which will enable fast transfers.
+  /// @dev There are two different tags for CCTP V2 to allow for CCIP V2 Compatibility which will enable fast transfers.
   /// Both tags will route to the same CCTP V2 pool, but will allow for pools to identify the type of transfer (slow or fast).
 
   /// @dev The preimage is bytes4(keccak256("CCTP_V2"))

@@ -159,7 +159,7 @@ contract OnRamp_getFee is OnRampSetup {
     uint256 protocolFeeUsdCents = (uint256(MESSAGE_NETWORK_FEE_USD_CENTS) * premiumPercentMultiplier) / 100;
     assertGt(protocolFeeUsdCents, 0);
 
-    uint256 expectedFeeTokenAmount = ((MAX_USD_CENTS_PER_MESSAGE + protocolFeeUsdCents) * 1e34) / 1e18;
+    uint256 expectedFeeTokenAmount = MAX_USD_CENTS_PER_MESSAGE + protocolFeeUsdCents;
 
     vm.expectRevert(
       abi.encodeWithSelector(OnRamp.FeeExceedsMaxAllowed.selector, expectedFeeTokenAmount, MAX_USD_CENTS_PER_MESSAGE)

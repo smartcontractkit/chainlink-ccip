@@ -25,7 +25,7 @@ contract CREATE2Factory is ITypeAndVersion, Ownable2StepMsgSender {
   event CallerRemoved(address indexed caller);
   event ContractDeployed(address indexed contractAddress);
 
-  string public constant override typeAndVersion = "CREATE2Factory 1.7.0";
+  string public constant override typeAndVersion = "CREATE2Factory 2.0.0";
 
   /// @notice Addresses that are allowed to call createAndCall.
   EnumerableSet.AddressSet private s_allowList;

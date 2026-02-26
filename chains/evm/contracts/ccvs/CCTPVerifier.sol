@@ -79,8 +79,8 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   }
 
   string public constant override typeAndVersion = "CCTPVerifier 2.0.0-dev";
-  /// @notice The preimage is bytes4(keccak256("CCTPVerifier 1.7.0")).
-  bytes4 private constant VERSION_TAG_V1_7_0 = 0x8e1d1a9d;
+  /// @notice The preimage is bytes4(keccak256("CCTPVerifier 2.0.0")).
+  bytes4 private constant VERSION_TAG_V2_0_0 = 0x35a25838;
   /// @notice CCTP contracts use the number 1 to represent V2, as 0 represents V1.
   uint32 private constant SUPPORTED_CCTP_VERSION = 1;
   /// @notice The division factor for basis points. This also represents the maximum bps fee.
@@ -276,7 +276,7 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
       // The hook data includes the version tag and the message ID.
       // The version tag allows the destination verifier entity to route the message to the correct implementation.
       // Inclusion of the message ID ensures that the contents of the CCIP message can't be tampered with on destination.
-      bytes.concat(VERSION_TAG_V1_7_0, params.messageId)
+      bytes.concat(VERSION_TAG_V2_0_0, params.messageId)
     );
 
     // We do not return the verifier version here.
@@ -296,13 +296,13 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
     if (verifierResults.length < MINIMUM_VERIFIER_RESULT_SIZE) revert InvalidVerifierResults();
 
     bytes4 versionPrefix = bytes4(verifierResults[:VERIFIER_VERSION_SIZE]);
-    if (versionPrefix != VERSION_TAG_V1_7_0) revert InvalidCCVVersion(VERSION_TAG_V1_7_0, versionPrefix);
+    if (versionPrefix != VERSION_TAG_V2_0_0) revert InvalidCCVVersion(VERSION_TAG_V2_0_0, versionPrefix);
 
     // The attested version is the first 4 bytes of the hook data, which occupies the last 36 bytes of the CCTP message.
     // We exclude the last 32 bytes of the hook data, which contains the message ID, to get the version.
     bytes4 attestedVersion =
       bytes4(verifierResults[VERIFIER_VERSION_START:VERIFIER_VERSION_START + VERIFIER_VERSION_SIZE]);
-    if (attestedVersion != VERSION_TAG_V1_7_0) revert InvalidCCVVersion(VERSION_TAG_V1_7_0, attestedVersion);
+    if (attestedVersion != VERSION_TAG_V2_0_0) revert InvalidCCVVersion(VERSION_TAG_V2_0_0, attestedVersion);
 
     // The attested message ID should match the hash passed into this function.
     // If not, there is a mismatch between what was attested and what was computed within this transaction.
@@ -449,7 +449,7 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
 
   /// @notice Exposes the version tag.
   function versionTag() public pure override returns (bytes4) {
-    return VERSION_TAG_V1_7_0;
+    return VERSION_TAG_V2_0_0;
   }
 
   // ================================================================
