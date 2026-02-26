@@ -176,6 +176,32 @@ func NewEnvironment() (*Cfg, error) {
 		}
 	}
 
+	impls := make([]CCIP16ProductConfiguration, 0)
+	for _, bc := range in.Blockchains {
+		var family string
+		switch bc.Type {
+		case "anvil", "geth":
+			family = chainsel.FamilyEVM
+		case "solana":
+			family = chainsel.FamilySolana
+		case "ton":
+			family = chainsel.FamilyTon
+		default:
+			return nil, fmt.Errorf("unsupported blockchain type: %s", bc.Type)
+		}
+		impl, err := NewCCIPImplFromNetwork(family, bc.ChainID)
+		if err != nil {
+			return nil, err
+		}
+		impls = append(impls, impl)
+	}
+	for i, impl := range impls {
+		_, err := impl.DeployLocalNetwork(ctx, in.Blockchains[i])
+		if err != nil {
+			return nil, fmt.Errorf("failed to deploy local networks: %w", err)
+		}
+	}
+
 	var initOpts []InitOption
 	if in.ForkedEnvConfig != nil {
 		// Load DataStore with addresses from config
@@ -196,29 +222,6 @@ func NewEnvironment() (*Cfg, error) {
 	selectors, e, err := NewCLDFOperationsEnvironment(in.Blockchains, in.CLDF.DataStore)
 	if err != nil {
 		return nil, fmt.Errorf("creating CLDF operations environment: %w", err)
-	}
-
-	impls := make([]CCIP16ProductConfiguration, 0)
-	for _, selector := range selectors {
-		family, err := chainsel.GetSelectorFamily(selector)
-		if err != nil {
-			return nil, err
-		}
-		chainID, err := chainsel.GetChainIDFromSelector(selector)
-		if err != nil {
-			return nil, err
-		}
-		impl, err := NewCCIPImplFromNetwork(family, chainID)
-		if err != nil {
-			return nil, err
-		}
-		impls = append(impls, impl)
-	}
-	for i, impl := range impls {
-		_, err := impl.DeployLocalNetwork(ctx, in.Blockchains[i])
-		if err != nil {
-			return nil, fmt.Errorf("failed to deploy local networks: %w", err)
-		}
 	}
 
 	L.Info().Any("Selectors", selectors).Msg("Deploying for chain selectors")
