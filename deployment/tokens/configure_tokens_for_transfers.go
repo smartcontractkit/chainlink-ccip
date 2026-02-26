@@ -3,6 +3,7 @@ package tokens
 import (
 	"fmt"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
@@ -19,6 +20,8 @@ import (
 type TokenTransferConfig struct {
 	// ChainSelector identifies the chain on which the token lives.
 	ChainSelector uint64
+	// ChainAdapterVersion specifies the version of the chain adapter to use for this chain.
+	ChainAdapterVersion *semver.Version
 	// TokenPoolRef is a reference to the token pool in the datastore.
 	// Populate the reference as needed to match the desired token pool.
 	TokenPoolRef datastore.AddressRef
@@ -64,7 +67,7 @@ func makeApply(tokenRegistry *TokenAdapterRegistry, mcmsRegistry *changesets.MCM
 		for _, config := range cfg.Tokens {
 			configs[config.ChainSelector] = config
 		}
-		batchOps, reports, err := processTokenConfigForChain(e, configs)
+		batchOps, reports, err := processTokenConfigForChain(e, configs, nil)
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to process token configs for chains: %w", err)
 		}
@@ -75,7 +78,7 @@ func makeApply(tokenRegistry *TokenAdapterRegistry, mcmsRegistry *changesets.MCM
 	}
 }
 
-func processTokenConfigForChain(e deployment.Environment, cfg map[uint64]TokenTransferConfig) ([]mcms_types.BatchOperation, []cldf_ops.Report[any, any], error) {
+func processTokenConfigForChain(e deployment.Environment, cfg map[uint64]TokenTransferConfig, chainAdapterVersion *semver.Version) ([]mcms_types.BatchOperation, []cldf_ops.Report[any, any], error) {
 	tokenRegistry := GetTokenAdapterRegistry()
 	batchOps := make([]mcms_types.BatchOperation, 0)
 	reports := make([]cldf_ops.Report[any, any], 0)
@@ -94,7 +97,8 @@ func processTokenConfigForChain(e deployment.Environment, cfg map[uint64]TokenTr
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to get chain family for chain selector %d: %w", selector, err)
 		}
-		adapter, ok := tokenRegistry.GetTokenAdapter(family, token.TokenPoolRef.Version)
+		av := Coalesce(chainAdapterVersion, *token.TokenPoolRef.Version)
+		adapter, ok := tokenRegistry.GetTokenAdapter(family, &av)
 		if !ok {
 			return nil, nil, fmt.Errorf("no token adapter registered for chain family '%s' and version '%s'", family, token.TokenPoolRef.Version)
 		}
@@ -105,9 +109,10 @@ func processTokenConfigForChain(e deployment.Environment, cfg map[uint64]TokenTr
 			if err != nil {
 				return nil, nil, fmt.Errorf("failed to get chain family for remote chain selector %d: %w", remoteChainSelector, err)
 			}
-			remoteAdapter, ok := tokenRegistry.GetTokenAdapter(remoteFamily, inCfg.RemotePool.Version)
+			av := Coalesce(chainAdapterVersion, *inCfg.RemotePool.Version)
+			remoteAdapter, ok := tokenRegistry.GetTokenAdapter(remoteFamily, &av)
 			if !ok {
-				return nil, nil, fmt.Errorf("no token adapter registered for chain family '%s' and version '%s'", remoteFamily, inCfg.RemotePool.Version)
+				return nil, nil, fmt.Errorf("no token adapter registered for chain family '%s' and version '%s'", remoteFamily, chainAdapterVersion)
 			}
 			counterpart, ok := cfg[remoteChainSelector]
 			if !ok {
@@ -230,4 +235,15 @@ func convertRemoteChainConfig(
 		outCfg.InboundCCVsToAddAboveThreshold = append(outCfg.InboundCCVsToAddAboveThreshold, fullCCVRef.Address)
 	}
 	return outCfg, nil
+}
+
+func Coalesce[T any](p *T, fallback T) T {
+	if p != nil {
+		return *p
+	}
+	return fallback
+}
+
+func To[T any](v T) *T {
+	return &v
 }

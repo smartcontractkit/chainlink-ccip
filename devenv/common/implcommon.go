@@ -105,7 +105,7 @@ func DeployContractsForSelector(ctx context.Context, env *deployment.Environment
 				// TON SPECIFIC CONFIG
 				ContractVersion: contractVersion,
 				// PING PONG DEMO - deploy for cross-chain testing
-				DeployPingPongDapp: true,
+				DeployPingPongDapp: false,
 			},
 		},
 	})

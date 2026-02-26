@@ -221,6 +221,15 @@ func (m *CCIP16EVM) PreDeployContractsForSelector(ctx context.Context, env *depl
 }
 
 func (m *CCIP16EVM) PostDeployContractsForSelector(ctx context.Context, env *deployment.Environment, cls []*simple_node_set.Input, selector uint64, ccipHomeSelector uint64, crAddr string) error {
+	for _, s := range env.BlockChains.All() {
+		if s.ChainSelector() == selector {
+			continue
+		}
+		err := updatePrices(env.DataStore, selector, s.ChainSelector(), env.BlockChains.EVMChains()[selector])
+		if err != nil {
+			return fmt.Errorf("failed to update prices: %w", err)
+		}
+	}
 	return nil
 }
 
