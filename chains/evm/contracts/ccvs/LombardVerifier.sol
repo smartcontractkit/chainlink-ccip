@@ -41,19 +41,14 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
   /// @param remoteChainSelector CCIP selector of destination chain.
   /// @param lChainId The chain id of destination chain by Lombard Multi Chain Id conversion.
   /// @param allowedCaller The address of TokenPool on destination chain allowed to handle GMP message.
-  /// @param remoteAdapter Optional remote adapter token identifier accepted by the bridge.
-  event PathSet(
-    uint64 indexed remoteChainSelector, bytes32 indexed lChainId, bytes32 allowedCaller, bytes32 remoteAdapter
-  );
+  event PathSet(uint64 indexed remoteChainSelector, bytes32 indexed lChainId, bytes32 allowedCaller);
   /// @param remoteChainSelector CCIP selector of destination chain.
   /// @param lChainId The chain id of destination chain by Lombard Multi Chain Id conversion.
   /// @param allowedCaller The address that's allowed to call the bridge on the destination chain.
-  /// @param remoteAdapter Optional remote adapter token identifier accepted by the bridge.
-  event PathRemoved(
-    uint64 indexed remoteChainSelector, bytes32 indexed lChainId, bytes32 allowedCaller, bytes32 remoteAdapter
-  );
+  event PathRemoved(uint64 indexed remoteChainSelector, bytes32 indexed lChainId, bytes32 allowedCaller);
   event SupportedTokenRemoved(address token);
   event SupportedTokenSet(address localToken, address localAdapter);
+  event RemoteAdapterSet(uint64 indexed remoteChainSelector, address indexed token, bytes32 remoteAdapter);
   event DynamicConfigSet(DynamicConfig dynamicConfig);
 
   struct DynamicConfig {
@@ -65,7 +60,14 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
     bytes32 allowedCaller;
     /// @notice Lombard chain id of destination chain.
     bytes32 lChainId;
-    /// @notice Optional destination adapter token identifier accepted by the bridge.
+  }
+
+  struct RemoteAdapterArgs {
+    /// @notice CCIP chain selector of remote chain.
+    uint64 remoteChainSelector;
+    /// @notice The local token address.
+    address token;
+    /// @notice The remote adapter token identifier accepted by the bridge.
     bytes32 remoteAdapter;
   }
 
@@ -101,6 +103,8 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
   EnumerableSet.UintSet internal s_supportedChains;
   /// @notice Mapping of CCIP chain selector to chain specific config.
   mapping(uint64 chainSelector => Path path) internal s_chainSelectorToPath;
+  /// @notice Mapping of (remote chain selector, local token) to the optional remote adapter token identifier.
+  mapping(uint64 remoteChainSelector => mapping(address token => bytes32 remoteAdapter)) internal s_remoteAdapters;
 
   DynamicConfig private s_dynamicConfig;
 
@@ -194,10 +198,13 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
     }
 
     {
+      bytes32 remoteAdapter = s_remoteAdapters[destChainSelector][sourceToken];
       bytes32 remoteToken = i_bridge.getAllowedDestinationToken(path.lChainId, sourceToken);
       bytes32 expectedDestToken = Internal._leftPadBytesToBytes32(tokenTransfer.destTokenAddress);
-      if (remoteToken != expectedDestToken && remoteToken != path.remoteAdapter) {
-        revert RemoteTokenOrAdapterMismatch(remoteToken, expectedDestToken, path.remoteAdapter);
+      if (remoteToken != expectedDestToken) {
+        if (remoteAdapter == bytes32(0) || remoteToken != remoteAdapter) {
+          revert RemoteTokenOrAdapterMismatch(remoteToken, expectedDestToken, remoteAdapter);
+        }
       }
     }
 
@@ -375,23 +382,32 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
 
   /// @notice Gets the path for a given CCIP chain selector.
   /// @param remoteChainSelector CCIP chain selector of remote chain.
-  /// @return Path struct containing lChainId, allowedCaller, and remoteAdapter.
+  /// @return Path struct containing lChainId and allowedCaller.
   function getPath(
     uint64 remoteChainSelector
   ) external view returns (Path memory) {
     return s_chainSelectorToPath[remoteChainSelector];
   }
 
+  /// @notice Gets the remote adapter for a given remote chain and local token.
+  /// @param remoteChainSelector CCIP chain selector of remote chain.
+  /// @param token The local token address.
+  /// @return The remote adapter token identifier, or bytes32(0) if not set.
+  function getRemoteAdapter(
+    uint64 remoteChainSelector,
+    address token
+  ) external view returns (bytes32) {
+    return s_remoteAdapters[remoteChainSelector][token];
+  }
+
   /// @notice Sets the lChainId and allowed caller for a CCIP chain selector.
   /// @param remoteChainSelector CCIP chain selector of remote chain.
   /// @param lChainId Lombard chain id of remote chain.
   /// @param allowedCaller The address of LombardVerifier on destination chain.
-  /// @param remoteAdapter Optional remote adapter token identifier accepted by the bridge.
   function setPath(
     uint64 remoteChainSelector,
     bytes32 lChainId,
-    bytes32 allowedCaller,
-    bytes32 remoteAdapter
+    bytes32 allowedCaller
   ) external onlyOwner {
     if (lChainId == bytes32(0)) {
       revert ZeroLombardChainId();
@@ -400,11 +416,22 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
       revert ZeroAllowedCaller();
     }
 
-    s_chainSelectorToPath[remoteChainSelector] =
-      Path({lChainId: lChainId, allowedCaller: allowedCaller, remoteAdapter: remoteAdapter});
+    s_chainSelectorToPath[remoteChainSelector] = Path({lChainId: lChainId, allowedCaller: allowedCaller});
     s_supportedChains.add(uint256(remoteChainSelector));
 
-    emit PathSet(remoteChainSelector, lChainId, allowedCaller, remoteAdapter);
+    emit PathSet(remoteChainSelector, lChainId, allowedCaller);
+  }
+
+  /// @notice Sets remote adapter token identifiers for (remote chain, token) pairs.
+  /// @param remoteAdapterArgs Array of remote adapter configurations to set.
+  function setRemoteAdapters(
+    RemoteAdapterArgs[] calldata remoteAdapterArgs
+  ) external onlyOwner {
+    for (uint256 i = 0; i < remoteAdapterArgs.length; ++i) {
+      RemoteAdapterArgs calldata args = remoteAdapterArgs[i];
+      s_remoteAdapters[args.remoteChainSelector][args.token] = args.remoteAdapter;
+      emit RemoteAdapterSet(args.remoteChainSelector, args.token, args.remoteAdapter);
+    }
   }
 
   /// @notice Removes the path for the given CCIP chain selectors. This disables any traffic to those chains.
@@ -422,7 +449,7 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
 
       delete s_chainSelectorToPath[remoteChainSelector];
 
-      emit PathRemoved(remoteChainSelector, path.lChainId, path.allowedCaller, path.remoteAdapter);
+      emit PathRemoved(remoteChainSelector, path.lChainId, path.allowedCaller);
     }
   }
 
