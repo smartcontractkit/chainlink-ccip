@@ -152,6 +152,12 @@ func TestConfigureTokenPoolForRemoteChain(t *testing.T) {
 				return secondPassInput
 			},
 		},
+		{
+			desc: "idempotent second pass same config",
+			makeSecondPassInput: func(chainSel uint64, remoteChainSel uint64, tokenPoolAddress common.Address, advancedPoolHooksAddress common.Address) tokens.ConfigureTokenPoolForRemoteChainInput {
+				return makeFirstPassInput(chainSel, remoteChainSel, tokenPoolAddress, advancedPoolHooksAddress)
+			},
+		},
 	}
 
 	for _, test := range tests {
