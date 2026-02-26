@@ -729,6 +729,7 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 			)
 			e := deployment.Environment{
 				OperationsBundle: bundle,
+				Logger:           lggr,
 				DataStore:        ds.Seal(),
 			}
 
