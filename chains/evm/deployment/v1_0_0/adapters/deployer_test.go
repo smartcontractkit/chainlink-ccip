@@ -13,6 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/smartcontractkit/mcms/sdk/evm/bindings"
+	mcms_types "github.com/smartcontractkit/mcms/types"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
@@ -22,6 +23,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	deploymentutils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 )
 
 func TestDeployMCMS(t *testing.T) {
@@ -140,8 +142,6 @@ func TestUpdateMCMSConfig(t *testing.T) {
 	dReg := deployops.GetRegistry()
 	dReg.RegisterDeployer(chainsel.FamilyEVM, deployops.MCMSVersion, evmDeployer)
 
-	// deploy one set of MCMs and timelock, and then update the config?
-
 	// deploy one set of timelock and MCMS contracts on each chain
 	deployMCMS := deployops.DeployMCMS(dReg, nil)
 	output, err := deployMCMS.Apply(*env, deployops.MCMSDeploymentConfig{
@@ -167,15 +167,7 @@ func TestUpdateMCMSConfig(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Greater(t, len(output.Reports), 0)
-
-	ds := output.DataStore
-	addresses, err := output.DataStore.Addresses().Fetch()
-	require.NoError(t, err)
-	for _, addr := range addresses {
-		t.Logf("Adding address %s of type %s on chain %d to datastore", addr.Address, addr.Type, addr.ChainSelector)
-		require.NoError(t, ds.Addresses().Add(addr))
-	}
-	env.DataStore = ds.Seal()
+	env.DataStore = output.DataStore.Seal()
 
 	// get recently deployed MCMS addresses
 	mcmsRefs := make(map[uint64][]datastore.AddressRef)
@@ -211,18 +203,6 @@ func TestUpdateMCMSConfig(t *testing.T) {
 			mcmsContract, err := bindings.NewManyChainMultiSig(common.HexToAddress(ref.Address), evmChain.Client)
 			require.NoError(t, err)
 
-			// type ManyChainMultiSigConfig struct {
-			// 	Signers      []ManyChainMultiSigSigner
-			// 	GroupQuorums [32]uint8
-			// 	GroupParents [32]uint8
-			// }
-
-			// type ManyChainMultiSigSigner struct {
-			// 	Addr  common.Address
-			// 	Index uint8
-			// 	Group uint8
-			// }
-
 			// binding is done, now check config
 			config, err := mcmsContract.GetConfig(&bind.CallOpts{
 				Context: t.Context(),
@@ -248,11 +228,17 @@ func TestUpdateMCMSConfig(t *testing.T) {
 				MCMContracts: mcmsRefs[selector2],
 			},
 		},
+		MCMS: mcms.Input{
+			OverridePreviousRoot: false,
+			ValidUntil:           3759765795,
+			TimelockDelay:        mcms_types.MustParseDuration("0s"),
+			TimelockAction:       mcms_types.TimelockActionSchedule,
+			Qualifier:            "CLLCCIP",
+			Description:          "update mcms config test",
+		},
 	})
 	require.NoError(t, err)
 	require.Greater(t, len(output.Reports), 0)
-	require.Equal(t, 1, len(output.MCMSTimelockProposals))
-	testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
 
 	// check that MCMS configs are updated correctly
 	for _, sel := range []uint64{selector1, selector2} {
@@ -260,15 +246,13 @@ func TestUpdateMCMSConfig(t *testing.T) {
 			evmChain := env.BlockChains.EVMChains()[sel]
 			mcmsContract, err := bindings.NewManyChainMultiSig(common.HexToAddress(ref.Address), evmChain.Client)
 			require.NoError(t, err)
-
-			// binding is done, now check config
 			config, err := mcmsContract.GetConfig(&bind.CallOpts{
 				Context: t.Context(),
 			})
 			require.NoError(t, err)
 
 			numOfSigners := len(config.Signers)
-			require.Equal(t, numOfSigners, len(testhelpers.SingleGroupMCMSTwoSigners().Signers)) // should be 1
+			require.Equal(t, numOfSigners, len(testhelpers.SingleGroupMCMSTwoSigners().Signers)) // should be 2
 		}
 	}
 }

@@ -53,8 +53,9 @@ func (a *EVMDeployer) UpdateMCMSConfig() *cldf_ops.Sequence[ccipapi.UpdateMCMSCo
 			if err != nil {
 				return sequtil.OnChainOutput{}, fmt.Errorf("failed to update mcms config on chain %d: %w", in.ChainSelector, err)
 			}
+			output.BatchOps = append(output.BatchOps, report.Output.BatchOps...)
 
-			return report.Output, nil
+			return output, nil
 		})
 }
 

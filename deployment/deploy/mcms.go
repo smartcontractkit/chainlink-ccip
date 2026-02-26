@@ -76,6 +76,7 @@ type UpdateMCMSConfigInputPerChain struct {
 type UpdateMCMSConfigInput struct {
 	Chains         map[uint64]UpdateMCMSConfigInputPerChain `json:"chains"`
 	AdapterVersion *semver.Version                          `json:"adapterVersion"`
+	MCMS           mcms.Input                               `json:"mcms"`
 }
 
 func UpdateMCMSConfig(deployerReg *DeployerRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) cldf.ChangeSetV2[UpdateMCMSConfigInput] {
@@ -89,6 +90,11 @@ func updateMCMSConfigVerify(_ *DeployerRegistry, _ *changesets.MCMSReaderRegistr
 	return func(e cldf.Environment, cfg UpdateMCMSConfigInput) error {
 		if cfg.AdapterVersion == nil {
 			return errors.New("adapter version is required")
+		}
+
+		// validate mcms input
+		if err := cfg.MCMS.Validate(); err != nil {
+			return err
 		}
 
 		validTypes := []string{utils.BypasserManyChainMultisig.String(), utils.ProposerManyChainMultisig.String(),
@@ -113,8 +119,10 @@ func updateMCMSConfigVerify(_ *DeployerRegistry, _ *changesets.MCMSReaderRegistr
 	}
 }
 
-func updateMCMSConfigApply(d *DeployerRegistry, _ *changesets.MCMSReaderRegistry) func(cldf.Environment, UpdateMCMSConfigInput) (cldf.ChangesetOutput, error) {
+func updateMCMSConfigApply(d *DeployerRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, UpdateMCMSConfigInput) (cldf.ChangesetOutput, error) {
 	return func(e cldf.Environment, cfg UpdateMCMSConfigInput) (cldf.ChangesetOutput, error) {
+		batchOps := make([]mcms_types.BatchOperation, 0)
+		reports := make([]cldf_ops.Report[any, any], 0)
 		for selector, chainCfg := range cfg.Chains {
 			family, err := chain_selectors.GetSelectorFamily(selector)
 			if err != nil {
@@ -148,13 +156,18 @@ func updateMCMSConfigApply(d *DeployerRegistry, _ *changesets.MCMSReaderRegistry
 				ChainSelector:                 selector,
 			}
 
-			_, err = cldf_ops.ExecuteSequence(e.OperationsBundle, deployer.UpdateMCMSConfig(), e.BlockChains, seqCfg)
+			report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, deployer.UpdateMCMSConfig(), e.BlockChains, seqCfg)
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to Update MCMS Config on chain with selector %d: %w", selector, err)
 			}
+			batchOps = append(batchOps, report.Output.BatchOps...)
+			reports = append(reports, report.ExecutionReports...)
 		}
 
-		return cldf.ChangesetOutput{}, nil
+		return changesets.NewOutputBuilder(e, mcmsRegistry).
+			WithReports(reports).
+			WithBatchOps(batchOps).
+			Build(cfg.MCMS)
 	}
 }
 
