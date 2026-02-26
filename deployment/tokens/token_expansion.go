@@ -135,11 +135,13 @@ func tokenExpansionVerify() func(cldf.Environment, TokenExpansionInput) error {
 			}
 			// deploy token
 			deployTokenInput := input.DeployTokenInput
-			deployTokenInput.ExistingDataStore = e.DataStore
-			deployTokenInput.ChainSelector = selector
-			err = tokenPoolAdapter.DeployTokenVerify(e, *deployTokenInput)
-			if err != nil {
-				return fmt.Errorf("failed to verify deploy token input for chain selector %d: %w", selector, err)
+			if deployTokenInput != nil {
+				deployTokenInput.ExistingDataStore = e.DataStore
+				deployTokenInput.ChainSelector = selector
+				err = tokenPoolAdapter.DeployTokenVerify(e, *deployTokenInput)
+				if err != nil {
+					return fmt.Errorf("failed to verify deploy token input for chain selector %d: %w", selector, err)
+				}
 			}
 		}
 		return nil
