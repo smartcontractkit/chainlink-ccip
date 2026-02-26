@@ -58,20 +58,29 @@ var ConfigureTokenForTransfers = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("token %s is not supported by token pool %s", tokenAddress, tokenPoolAddress)
 		}
 
-		// Configure minimum block confirmation
-		configureMinBlockConfirmationReport, err := cldf_ops.ExecuteOperation(b, token_pool.SetMinBlockConfirmations, chain, evm_contract.FunctionInput[uint16]{
+		// Configure minimum block confirmation (skip if already set to desired value).
+		currentMinBlockReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetMinBlockConfirmation, chain, evm_contract.FunctionInput[any]{
 			ChainSelector: input.ChainSelector,
 			Address:       tokenPoolAddress,
-			Args:          input.MinFinalityValue,
 		})
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to configure minimum block confirmation for token pool with address %s on %s: %w", input.TokenPoolAddress, chain, err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to get min block confirmation from token pool with address %s on %s: %w", input.TokenPoolAddress, chain, err)
 		}
-		configureMinBlockConfirmationOps, err := evm_contract.NewBatchOperationFromWrites([]evm_contract.WriteOutput{configureMinBlockConfirmationReport.Output})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from write outputs: %w", err)
+		if currentMinBlockReport.Output != input.MinFinalityValue {
+			configureMinBlockConfirmationReport, err := cldf_ops.ExecuteOperation(b, token_pool.SetMinBlockConfirmations, chain, evm_contract.FunctionInput[uint16]{
+				ChainSelector: input.ChainSelector,
+				Address:       tokenPoolAddress,
+				Args:          input.MinFinalityValue,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to configure minimum block confirmation for token pool with address %s on %s: %w", input.TokenPoolAddress, chain, err)
+			}
+			configureMinBlockConfirmationOps, err := evm_contract.NewBatchOperationFromWrites([]evm_contract.WriteOutput{configureMinBlockConfirmationReport.Output})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from write outputs: %w", err)
+			}
+			ops = append(ops, configureMinBlockConfirmationOps)
 		}
-		ops = append(ops, configureMinBlockConfirmationOps)
 
 		// Get the advanced pool hooks address
 		advancedPoolHooksAddress, err := cldf_ops.ExecuteOperation(b, token_pool.GetAdvancedPoolHooks, chain, evm_contract.FunctionInput[any]{

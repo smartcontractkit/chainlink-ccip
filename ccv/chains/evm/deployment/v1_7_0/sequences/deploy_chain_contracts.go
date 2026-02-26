@@ -404,8 +404,11 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		}
 
 		// Set dynamic config on the OnRamp if there is a diff
-		if dynamicConfigReport.Output.FeeQuoter != common.HexToAddress(feeQuoterRef.Address) ||
-			(dynamicConfigReport.Output.FeeAggregator != input.ContractParams.OnRamp.FeeAggregator && input.ContractParams.OnRamp.FeeAggregator != (common.Address{})) {
+		desiredFeeAggregator := dynamicConfigReport.Output.FeeAggregator
+		if input.ContractParams.OnRamp.FeeAggregator != (common.Address{}) {
+			desiredFeeAggregator = input.ContractParams.OnRamp.FeeAggregator
+		}
+		if dynamicConfigReport.Output.FeeQuoter != common.HexToAddress(feeQuoterRef.Address) || desiredFeeAggregator != dynamicConfigReport.Output.FeeAggregator {
 			setDynamicConfigReport, err := cldf_ops.ExecuteOperation(b, onramp.SetDynamicConfig, chain, contract_utils.FunctionInput[onramp.SetDynamicConfigArgs]{
 				ChainSelector: chain.Selector,
 				Address:       common.HexToAddress(onRampRef.Address),
@@ -471,7 +474,11 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			}
 
 			// Set dynamic config on the Executor if diff exists
-			if (dynamicConfigReport.Output.FeeAggregator != executorParam.DynamicConfig.FeeAggregator && executorParam.DynamicConfig.FeeAggregator != (common.Address{})) ||
+			desiredFeeAggregator := dynamicConfigReport.Output.FeeAggregator
+			if executorParam.DynamicConfig.FeeAggregator != (common.Address{}) {
+				desiredFeeAggregator = executorParam.DynamicConfig.FeeAggregator
+			}
+			if desiredFeeAggregator != dynamicConfigReport.Output.FeeAggregator ||
 				dynamicConfigReport.Output.MinBlockConfirmations != executorParam.DynamicConfig.MinBlockConfirmations ||
 				dynamicConfigReport.Output.CcvAllowlistEnabled != executorParam.DynamicConfig.CcvAllowlistEnabled {
 				setDynamicConfigReport, err := cldf_ops.ExecuteOperation(b, executor.SetDynamicConfig, chain, contract_utils.FunctionInput[executor.SetDynamicConfigArgs]{

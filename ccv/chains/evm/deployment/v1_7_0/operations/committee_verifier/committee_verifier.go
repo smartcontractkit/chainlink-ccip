@@ -26,6 +26,8 @@ type ConstructorArgs struct {
 	RMN              common.Address
 }
 
+type Fee = committee_verifier.GetFee
+
 type ResolverConstructorArgs struct{}
 
 type SetDynamicConfigArgs struct {
@@ -170,5 +172,27 @@ var GetSignatureConfig = contract.NewRead(contract.ReadParams[uint64, SignatureC
 			Threshold:           threshold,
 			SourceChainSelector: args,
 		}, nil
+	},
+})
+
+var GetDynamicConfig = contract.NewRead(contract.ReadParams[struct{}, DynamicConfig, *committee_verifier.CommitteeVerifier]{
+	Name:         "committee-verifier:get-dynamic-config",
+	Version:      Version,
+	Description:  "Gets the dynamic configuration on the CommitteeVerifier",
+	ContractType: ContractType,
+	NewContract:  committee_verifier.NewCommitteeVerifier,
+	CallContract: func(committeeVerifier *committee_verifier.CommitteeVerifier, opts *bind.CallOpts, args struct{}) (DynamicConfig, error) {
+		return committeeVerifier.GetDynamicConfig(opts)
+	},
+})
+
+var GetFee = contract.NewRead(contract.ReadParams[uint64, Fee, *committee_verifier.CommitteeVerifier]{
+	Name:         "committee-verifier:get-fee",
+	Version:      Version,
+	Description:  "Gets the fee for a given remote chain selector",
+	ContractType: ContractType,
+	NewContract:  committee_verifier.NewCommitteeVerifier,
+	CallContract: func(committeeVerifier *committee_verifier.CommitteeVerifier, opts *bind.CallOpts, destChainSelector uint64) (Fee, error) {
+		return committeeVerifier.GetFee(opts, destChainSelector, committee_verifier.ClientEVM2AnyMessage{}, []byte{}, 0)
 	},
 })

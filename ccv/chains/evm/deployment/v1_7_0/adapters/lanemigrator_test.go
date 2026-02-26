@@ -85,6 +85,7 @@ func TestLaneMigrator(t *testing.T) {
 			require.NoError(t, err, "Failed to apply ConfigureChainsForLanes changeset")
 			// now apply the lane migrater
 			mReg := deploy.GetLaneMigratorRegistry()
+			e.OperationsBundle = testsetup.BundleWithFreshReporter(e.OperationsBundle)
 			cs := deploy.LaneMigrateToNewVersionChangeset(mReg, mcmsRegistry)
 			_, err = cs.Apply(*e, deploy.LaneMigratorConfig{
 				Input: map[uint64]deploy.LaneMigratorConfigPerChain{

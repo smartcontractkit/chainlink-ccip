@@ -121,10 +121,7 @@ func makeApply(chainFamilyRegistry *adapters.ChainFamilyRegistry, mcmsRegistry *
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to process remote chain config for selector %d: %w", remoteChainSelector, err)
 				}
 			}
-			// Use a fresh reporter so the sequence reads current on-chain state (e.g. Executor proxy
-			// target after SetTarget) instead of cached operation reports from a prior DeployChainContracts run.
-			freshBundle := cldf_ops.NewBundle(e.GetContext, e.Logger, cldf_ops.NewMemoryReporter())
-			configureChainForLanesReport, err := cldf_ops.ExecuteSequence(freshBundle, adapter.ConfigureChainForLanes(), e.BlockChains, adapters.ConfigureChainForLanesInput{
+			configureChainForLanesReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adapter.ConfigureChainForLanes(), e.BlockChains, adapters.ConfigureChainForLanesInput{
 				ChainSelector:      chain.ChainSelector,
 				Router:             router.Address,
 				OnRamp:             onRamp.Address,
