@@ -61,6 +61,7 @@ type IntTest struct {
 	tokenObserverConfig []pluginconfig.TokenDataObserverConfig
 	tokenChainReader    map[cciptypes.ChainSelector]contractreader.Extended
 	offChainCfg         pluginconfig.ExecuteOffchainConfig
+	estimateProvider    cciptypes.EstimateProvider
 }
 
 func SetupSimpleTest(t *testing.T,
@@ -103,6 +104,10 @@ func SetupSimpleTest(t *testing.T,
 
 func (it *IntTest) WithOffChainConfig(cfg pluginconfig.ExecuteOffchainConfig) {
 	it.offChainCfg = cfg
+}
+
+func (it *IntTest) WithEstimateProvider(ep cciptypes.EstimateProvider) {
+	it.estimateProvider = ep
 }
 
 func (it *IntTest) WithMessages(
@@ -284,9 +289,15 @@ func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
 	)
 	require.NoError(it.t, err)
 
-	ep := cciptypesmocks.NewMockEstimateProvider(it.t)
-	ep.EXPECT().CalculateMessageMaxGas(mock.Anything).Return(uint64(0)).Maybe()
-	ep.EXPECT().CalculateMerkleTreeGas(mock.Anything).Return(uint64(0)).Maybe()
+	var ep cciptypes.EstimateProvider
+	if it.estimateProvider != nil {
+		ep = it.estimateProvider
+	} else {
+		mockEp := cciptypesmocks.NewMockEstimateProvider(it.t)
+		mockEp.EXPECT().CalculateMessageMaxGas(mock.Anything).Return(uint64(0)).Maybe()
+		mockEp.EXPECT().CalculateMerkleTreeGas(mock.Anything).Return(uint64(0)).Maybe()
+		ep = mockEp
+	}
 
 	oracleIDToP2pID := testhelpers.CreateOracleIDToP2pID(1, 2, 3)
 	nodesSetup := []nodeSetup{
@@ -480,6 +491,18 @@ type msgOption func(*cciptypes.Message)
 func withTokens(tokenAmounts ...cciptypes.RampTokenAmount) msgOption {
 	return func(m *cciptypes.Message) {
 		m.TokenAmounts = tokenAmounts
+	}
+}
+
+func WithExtraArgs(extraArgs []byte) msgOption {
+	return func(m *cciptypes.Message) {
+		m.ExtraArgs = extraArgs
+	}
+}
+
+func WithData(data []byte) msgOption {
+	return func(m *cciptypes.Message) {
+		m.Data = data
 	}
 }
 

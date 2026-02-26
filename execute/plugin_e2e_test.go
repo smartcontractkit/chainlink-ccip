@@ -1,24 +1,28 @@
 package execute
 
 import (
+	"math/big"
 	"testing"
 	"time"
 
-	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
-
-	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
-
+	"github.com/ethereum/go-ethereum/accounts/abi"
+	sel "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/message_hasher"
+	"github.com/smartcontractkit/chainlink-ccip/internal"
+	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ccipevm"
 	"github.com/stretchr/testify/require"
 
+	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-
-	ocrtypecodec "github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1"
-
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/cache"
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks/inmem"
+	ocrtypecodec "github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1"
+	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
 var ocrTypeCodec = ocrtypecodec.DefaultExecCodec
@@ -641,4 +645,173 @@ func makeMessageWithData(seqNum, byteSize int, src, dst cciptypes.ChainSelector)
 
 	msg.Message.Data = largeData
 	return msg
+}
+
+// TestPlugin_SingleMaxGasMessageFitsInReport verifies that a single message consuming
+// the per-message gas limit (7M) fits within a report when the batch gas limit is 8M.
+func TestPlugin_SingleMaxGasMessageFitsInReport(t *testing.T) {
+	const (
+		maxPerMsgGasLimit = 7_000_000
+		batchGasLimit     = 8_000_000
+	)
+
+	ctx := t.Context()
+	srcSelector := cciptypes.ChainSelector(sel.ETHEREUM_TESTNET_SEPOLIA.Selector)
+	dstSelector := cciptypes.ChainSelector(sel.ETHEREUM_MAINNET_BASE_1.Selector)
+
+	extraArgs := mustSerializeEVMExtraArgs(t, maxPerMsgGasLimit)
+	data := rand.RandomBytes(30_000)
+
+	messages := []inmem.MessagesWithMetadata{
+		makeMsgWithMetadata(100, srcSelector, dstSelector, false, WithExtraArgs(extraArgs), WithData(data)),
+	}
+
+	intTest := SetupSimpleTest(t, logger.Test(t), []cciptypes.ChainSelector{srcSelector}, dstSelector)
+	intTest.WithMessages(messages, 1000, time.Now().Add(-4*time.Hour), 1, srcSelector)
+
+	extraCodecMap := cciptypes.ExtraDataCodecMap{
+		"evm": ccipevm.ExtraDataDecoder{},
+	}
+	ep := ccipevm.NewGasEstimateProvider(extraCodecMap)
+	intTest.WithEstimateProvider(ep)
+
+	intTest.WithOffChainConfig(pluginconfig.ExecuteOffchainConfig{
+		MessageVisibilityInterval: *commonconfig.MustNewDuration(8 * time.Hour),
+		BatchGasLimit:             batchGasLimit,
+		MaxCommitReportsToFetch:   10,
+	})
+
+	runner := intTest.Start()
+	defer intTest.Close()
+
+	// Contract Discovery round
+	outcome := runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
+	require.Equal(t, exectypes.Initialized, outcome.State)
+
+	// Round 1 - Get Commit Reports
+	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
+	require.Len(t, outcome.CommitReports, 1)
+
+	// Round 2 - Get Messages
+	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
+	require.Len(t, outcome.CommitReports, 1)
+
+	// Round 3 - Filter: the 7M message should fit within the 8M batch gas limit.
+	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
+	require.Len(t, outcome.Reports, 1)
+	require.Len(t, outcome.Reports[0].ChainReports, 1)
+	sequenceNumbers := extractSequenceNumbers(outcome.Reports[0].ChainReports[0].Messages)
+	require.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{100})
+}
+
+// TestPlugin_CombinedMessageAndUSDCPTTFitInReport verifies that a regular 3.5M gas message
+// and a 3.5M gas pool token transfer (PTT) with USDC can be combined into a single report
+// when the batch gas limit is 8M (total 7M < 8M).
+func TestPlugin_CombinedMessageAndUSDCPTTFitInReport(t *testing.T) {
+	const (
+		perMsgGasLimit = 3_500_000
+		batchGasLimit  = 8_000_000
+	)
+
+	ctx := t.Context()
+	sourceChain := cciptypes.ChainSelector(sel.ETHEREUM_TESTNET_SEPOLIA.Selector)
+	destChain := cciptypes.ChainSelector(sel.ETHEREUM_MAINNET_BASE_1.Selector)
+
+	usdcAddress := "0x3765b189a8fe4a0bc34457835f01c9d178dbea60"
+	usdcAddressBytes, err := cciptypes.NewUnknownAddressFromHex(usdcAddress)
+	require.NoError(t, err)
+
+	extraArgs := mustSerializeEVMExtraArgs(t, perMsgGasLimit)
+	destExecData := mustABIEncodeUint32(t, 0)
+
+	messages := []inmem.MessagesWithMetadata{
+		makeMsgWithMetadata(100, sourceChain, destChain, false, WithExtraArgs(extraArgs), WithData(rand.RandomBytes(1_000))),
+		makeMsgWithMetadata(101, sourceChain, destChain, false, WithExtraArgs(extraArgs), withTokens(cciptypes.RampTokenAmount{
+			SourcePoolAddress: usdcAddressBytes,
+			DestExecData:      destExecData,
+			ExtraData:         readerpkg.NewSourceTokenDataPayload(1, 0).ToBytes(),
+		}), WithData(rand.RandomBytes(1_000))),
+	}
+
+	events := []*readerpkg.MessageSentEvent{
+		newMessageSentEvent(0, 6, 1, []byte{1}),
+	}
+
+	// 65-byte CCTP attestation (ECDSA signature: 32-byte r, 32-byte s, 1-byte v).
+	usdcAttestation := "0x" +
+		"f431ec6d73575487b1b63bfa90f2ec5ee2a40bbd4eaa8271fb7da56f1d9cde1a" + // r
+		"3af1e80babe1b8e3c9d49e6f3210c1db7204c2a98de30e8f1eb97321d6a598bc" + // s
+		"1c" // v
+
+	usdcAttestations := map[string]string{
+		"0x0f43587da5355551d234a2ba24dde8edfe0e385346465d6d53653b6aa642992e": `{
+			"status": "complete",
+			"attestation": "` + usdcAttestation + `"
+		}`,
+	}
+
+	intTest := SetupSimpleTest(t, logger.Test(t), []cciptypes.ChainSelector{sourceChain}, destChain)
+	intTest.WithMessages(messages, 1000, time.Now().Add(-4*time.Hour), 1, sourceChain)
+	intTest.WithUSDC(usdcAddress, usdcAttestations, events, sourceChain)
+
+	extraCodecMap := cciptypes.ExtraDataCodecMap{
+		"evm": ccipevm.ExtraDataDecoder{},
+	}
+	ep := ccipevm.NewGasEstimateProvider(extraCodecMap)
+	intTest.WithEstimateProvider(ep)
+
+	intTest.WithOffChainConfig(pluginconfig.ExecuteOffchainConfig{
+		MessageVisibilityInterval: *commonconfig.MustNewDuration(8 * time.Hour),
+		BatchGasLimit:             batchGasLimit,
+		MaxCommitReportsToFetch:   10,
+	})
+
+	runner := intTest.Start()
+	defer intTest.Close()
+
+	// Contract Discovery round
+	outcome := runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
+	require.Equal(t, exectypes.Initialized, outcome.State)
+
+	// Round 1 - Get Commit Reports
+	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
+	require.Len(t, outcome.CommitReports, 1)
+
+	// Round 2 - Get Messages
+	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
+	require.Len(t, outcome.CommitReports, 1)
+
+	// Round 3 - Filter: both the 3.5M regular message and the 3.5M USDC PTT should
+	// be combined into a single report (total 7M < 8M batch gas limit).
+	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
+	require.Len(t, outcome.Reports, 1)
+	require.Len(t, outcome.Reports[0].ChainReports, 1)
+
+	chainReport := outcome.Reports[0].ChainReports[0]
+	sequenceNumbers := extractSequenceNumbers(chainReport.Messages)
+	require.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{100, 101})
+
+	// Verify USDC attestation proof is present on the PTT message (index 1).
+	require.Len(t, chainReport.OffchainTokenData, 1)
+	require.Len(t, chainReport.OffchainTokenData[0], 1, "USDC PTT message should have exactly one token attestation")
+	require.Equal(t, internal.MustDecodeRaw(usdcAttestation), chainReport.OffchainTokenData[0][0])
+	require.Len(t, chainReport.OffchainTokenData[0][0], 65, "CCTP attestation should be 65 bytes (ECDSA signature)")
+}
+
+func mustSerializeEVMExtraArgs(t *testing.T, gasLimit uint64) []byte {
+	t.Helper()
+	extraArgs, err := ccipevm.SerializeEVMExtraArgsV1(message_hasher.ClientEVMExtraArgsV1{
+		GasLimit: new(big.Int).SetUint64(gasLimit),
+	})
+	require.NoError(t, err)
+	return extraArgs
+}
+
+func mustABIEncodeUint32(t *testing.T, value uint32) []byte {
+	t.Helper()
+	uint32Type, err := abi.NewType("uint32", "", nil)
+	require.NoError(t, err)
+	encoded, err := abi.Arguments{{Type: uint32Type}}.Pack(value)
+	require.NoError(t, err)
+	return encoded
 }
