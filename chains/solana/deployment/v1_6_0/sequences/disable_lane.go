@@ -11,22 +11,21 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
-	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
-var DisableRemoteChainSequence = operations.NewSequence(
+var DisableRemoteChainSequence = cldf_ops.NewSequence(
 	"DisableRemoteChain",
 	semver.MustParse("1.6.0"),
 	"Disables both sending to and receiving from a remote chain on a Solana chain",
-	func(b operations.Bundle, chains cldf_chain.BlockChains, input lanes.DisableRemoteChainInput) (sequences.OnChainOutput, error) {
+	func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input lanes.DisableRemoteChainInput) (sequences.OnChainOutput, error) {
 		var result sequences.OnChainOutput
 		b.Logger.Infof("SVM Disabling remote chain %d on chain %d", input.RemoteChainSelector, input.LocalChainSelector)
 
 		feeQuoterAddress := solana.PublicKeyFromBytes(input.FeeQuoter)
 		offRampAddress := solana.PublicKeyFromBytes(input.OffRamp)
 
-		fqOut, err := operations.ExecuteOperation(
+		fqOut, err := cldf_ops.ExecuteOperation(
 			b,
 			fqops.DisableDestChain,
 			chains.SolanaChains()[input.LocalChainSelector],
@@ -40,7 +39,7 @@ var DisableRemoteChainSequence = operations.NewSequence(
 		}
 		result.BatchOps = append(result.BatchOps, fqOut.Output.BatchOps...)
 
-		offrampOut, err := operations.ExecuteOperation(
+		offrampOut, err := cldf_ops.ExecuteOperation(
 			b,
 			offrampops.DisableSourceChain,
 			chains.SolanaChains()[input.LocalChainSelector],

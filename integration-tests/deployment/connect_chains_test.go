@@ -400,7 +400,7 @@ func TestDisableLane_EVM2SVM(t *testing.T) {
 	require.True(t, exists, "must have ChainAdapter registered for dest chain family")
 	checkBidirectionalLaneConnectivity(t, e, chain1, chain2, srcAdapter, destAdapter, false, false)
 
-	disableOut, err := lanesapi.DisableLane(lanesapi.GetDisableLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.DisableLaneConfig{
+	disableOut, err := lanesapi.DisableLane(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.DisableLaneConfig{
 		Lanes: []lanesapi.DisableLanePair{
 			{
 				ChainA:  chain_selectors.SOLANA_MAINNET.Selector,

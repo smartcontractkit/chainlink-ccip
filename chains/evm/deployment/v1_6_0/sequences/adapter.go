@@ -32,7 +32,6 @@ func init() {
 		panic(err)
 	}
 	ccipapi.GetLaneAdapterRegistry().RegisterLaneAdapter(chain_selectors.FamilyEVM, v, &EVMAdapter{})
-	ccipapi.GetDisableLaneAdapterRegistry().RegisterDisableLaneAdapter(chain_selectors.FamilyEVM, v, &EVMAdapter{})
 	ccipapi.GetPingPongAdapterRegistry().RegisterPingPongAdapter(chain_selectors.FamilyEVM, v, &EVMAdapter{})
 	deployops.GetRegistry().RegisterDeployer(chain_selectors.FamilyEVM, v, &EVMAdapter{})
 	deployops.GetTransferOwnershipRegistry().RegisterAdapter(chain_selectors.FamilyEVM, v, &EVMAdapter{})

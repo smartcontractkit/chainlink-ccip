@@ -2,15 +2,11 @@ package lanes
 
 import (
 	"fmt"
-	"sync"
 
 	"github.com/Masterminds/semver/v3"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
-	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
-	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
@@ -40,75 +36,13 @@ type DisableLaneConfig struct {
 	MCMS  mcms.Input
 }
 
-// DisableLaneAdapter defines chain-family-specific logic for disabling a lane.
-type DisableLaneAdapter interface {
-	DisableRemoteChain() *cldf_ops.Sequence[DisableRemoteChainInput, sequences.OnChainOutput, cldf_chain.BlockChains]
-
-	GetOnRampAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error)
-	GetOffRampAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error)
-	GetRouterAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error)
-	GetFQAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error)
-}
-
-// DisableLaneAdapterRegistry maintains a registry of DisableLaneAdapters.
-type DisableLaneAdapterRegistry struct {
-	mu sync.Mutex
-	m  map[disableLaneAdapterID]DisableLaneAdapter
-}
-
-type disableLaneAdapterID string
-
-func newDisableLaneAdapterRegistry() *DisableLaneAdapterRegistry {
-	return &DisableLaneAdapterRegistry{
-		m: make(map[disableLaneAdapterID]DisableLaneAdapter),
-	}
-}
-
-func (r *DisableLaneAdapterRegistry) RegisterDisableLaneAdapter(chainFamily string, version *semver.Version, adapter DisableLaneAdapter) {
-	id := newDisableLaneAdapterID(chainFamily, version)
-
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	if _, exists := r.m[id]; exists {
-		panic(fmt.Errorf("DisableLaneAdapter '%s %s' already registered", chainFamily, version))
-	}
-	r.m[id] = adapter
-}
-
-func (r *DisableLaneAdapterRegistry) GetDisableLaneAdapter(chainFamily string, version *semver.Version) (DisableLaneAdapter, bool) {
-	id := newDisableLaneAdapterID(chainFamily, version)
-
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	adapter, ok := r.m[id]
-	return adapter, ok
-}
-
-var (
-	singletonDisableLaneRegistry *DisableLaneAdapterRegistry
-	onceDisableLane              sync.Once
-)
-
-func GetDisableLaneAdapterRegistry() *DisableLaneAdapterRegistry {
-	onceDisableLane.Do(func() {
-		singletonDisableLaneRegistry = newDisableLaneAdapterRegistry()
-	})
-	return singletonDisableLaneRegistry
-}
-
-func newDisableLaneAdapterID(chainFamily string, version *semver.Version) disableLaneAdapterID {
-	return disableLaneAdapterID(fmt.Sprintf("%s-%s", chainFamily, version.String()))
-}
-
 // DisableLane returns a changeset that disables bidirectional CCIP lanes.
 func DisableLane(
-	disableRegistry *DisableLaneAdapterRegistry,
+	laneRegistry *LaneAdapterRegistry,
 	mcmsRegistry *changesets.MCMSReaderRegistry,
 ) cldf.ChangeSetV2[DisableLaneConfig] {
 	return cldf.CreateChangeSet(
-		makeDisableApply(disableRegistry, mcmsRegistry),
+		makeDisableApply(laneRegistry, mcmsRegistry),
 		makeDisableVerify(),
 	)
 }
@@ -120,7 +54,7 @@ func makeDisableVerify() func(cldf.Environment, DisableLaneConfig) error {
 }
 
 func makeDisableApply(
-	disableRegistry *DisableLaneAdapterRegistry,
+	laneRegistry *LaneAdapterRegistry,
 	mcmsRegistry *changesets.MCMSReaderRegistry,
 ) func(cldf.Environment, DisableLaneConfig) (cldf.ChangesetOutput, error) {
 	return func(e cldf.Environment, cfg DisableLaneConfig) (cldf.ChangesetOutput, error) {
@@ -137,23 +71,23 @@ func makeDisableApply(
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to get chain family for selector %d: %w", lane.ChainB, err)
 			}
 
-			chainAAdapter, exists := disableRegistry.GetDisableLaneAdapter(chainAFamily, lane.Version)
+			chainAAdapter, exists := laneRegistry.GetLaneAdapter(chainAFamily, lane.Version)
 			if !exists {
-				return cldf.ChangesetOutput{}, fmt.Errorf("no DisableLaneAdapter registered for chain family '%s' version %s", chainAFamily, lane.Version)
+				return cldf.ChangesetOutput{}, fmt.Errorf("no LaneAdapter registered for chain family '%s' version %s", chainAFamily, lane.Version)
 			}
-			chainBAdapter, exists := disableRegistry.GetDisableLaneAdapter(chainBFamily, lane.Version)
+			chainBAdapter, exists := laneRegistry.GetLaneAdapter(chainBFamily, lane.Version)
 			if !exists {
-				return cldf.ChangesetOutput{}, fmt.Errorf("no DisableLaneAdapter registered for chain family '%s' version %s", chainBFamily, lane.Version)
+				return cldf.ChangesetOutput{}, fmt.Errorf("no LaneAdapter registered for chain family '%s' version %s", chainBFamily, lane.Version)
 			}
 
 			chainADef := &ChainDefinition{Selector: lane.ChainA}
 			chainBDef := &ChainDefinition{Selector: lane.ChainB}
 
-			err = populateDisableAddresses(e.DataStore, chainADef, chainAAdapter)
+			err = populateAddresses(e.DataStore, chainADef, chainAAdapter)
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("error fetching addresses for chain %d: %w", lane.ChainA, err)
 			}
-			err = populateDisableAddresses(e.DataStore, chainBDef, chainBAdapter)
+			err = populateAddresses(e.DataStore, chainBDef, chainBAdapter)
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("error fetching addresses for chain %d: %w", lane.ChainB, err)
 			}
@@ -161,7 +95,7 @@ func makeDisableApply(
 			type disablePair struct {
 				local   *ChainDefinition
 				remote  *ChainDefinition
-				adapter DisableLaneAdapter
+				adapter LaneAdapter
 			}
 			for _, pair := range []disablePair{
 				{local: chainADef, remote: chainBDef, adapter: chainAAdapter},
@@ -193,25 +127,4 @@ func makeDisableApply(
 			WithBatchOps(batchOps).
 			Build(cfg.MCMS)
 	}
-}
-
-func populateDisableAddresses(ds datastore.DataStore, chainDef *ChainDefinition, adapter DisableLaneAdapter) error {
-	var err error
-	chainDef.OnRamp, err = adapter.GetOnRampAddress(ds, chainDef.Selector)
-	if err != nil {
-		return fmt.Errorf("error fetching onramp address for chain %d: %w", chainDef.Selector, err)
-	}
-	chainDef.OffRamp, err = adapter.GetOffRampAddress(ds, chainDef.Selector)
-	if err != nil {
-		return fmt.Errorf("error fetching offramp address for chain %d: %w", chainDef.Selector, err)
-	}
-	chainDef.FeeQuoter, err = adapter.GetFQAddress(ds, chainDef.Selector)
-	if err != nil {
-		return fmt.Errorf("error fetching fee quoter address for chain %d: %w", chainDef.Selector, err)
-	}
-	chainDef.Router, err = adapter.GetRouterAddress(ds, chainDef.Selector)
-	if err != nil {
-		return fmt.Errorf("error fetching router address for chain %d: %w", chainDef.Selector, err)
-	}
-	return nil
 }
