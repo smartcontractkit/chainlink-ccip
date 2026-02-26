@@ -103,7 +103,7 @@ type TokenTransferFeeConfigArgs struct {
 	TokenTransferFeeConfigUpdates []TokenTransferFeeConfigUpdate
 }
 
-var SetMinBlockConfirmation = contract.NewWrite(contract.WriteParams[uint16, *token_pool.TokenPool]{
+var SetMinBlockConfirmations = contract.NewWrite(contract.WriteParams[uint16, *token_pool.TokenPool]{
 	Name:            "token-pool:set-min-block-confirmation",
 	Version:         Version,
 	Description:     "Sets the minimum block confirmation required for a TokenPool",
