@@ -12,7 +12,6 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	mcms_types "github.com/smartcontractkit/mcms/types"
 	mcmstypes "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
@@ -122,7 +121,7 @@ func updateMCMSConfigVerify(_ *DeployerRegistry, _ *changesets.MCMSReaderRegistr
 
 func updateMCMSConfigApply(d *DeployerRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, UpdateMCMSConfigInput) (cldf.ChangesetOutput, error) {
 	return func(e cldf.Environment, cfg UpdateMCMSConfigInput) (cldf.ChangesetOutput, error) {
-		batchOps := make([]mcms_types.BatchOperation, 0)
+		batchOps := make([]mcmstypes.BatchOperation, 0)
 		reports := make([]cldf_ops.Report[any, any], 0)
 		for selector, chainCfg := range cfg.Chains {
 			family, err := chain_selectors.GetSelectorFamily(selector)
@@ -298,7 +297,7 @@ func deployMCMSApply(
 	finalize bool) func(cldf.Environment, MCMSDeploymentConfig) (cldf.ChangesetOutput, error) {
 	return func(e cldf.Environment, cfg MCMSDeploymentConfig) (cldf.ChangesetOutput, error) {
 		reports := make([]cldf_ops.Report[any, any], 0)
-		batchOps := make([]mcms_types.BatchOperation, 0)
+		batchOps := make([]mcmstypes.BatchOperation, 0)
 		ds := datastore.NewMemoryDataStore()
 		for selector, mcmsCfg := range cfg.Chains {
 			family, err := chain_selectors.GetSelectorFamily(selector)
