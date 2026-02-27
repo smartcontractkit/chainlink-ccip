@@ -1,0 +1,8 @@
+packages:
+  github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/offchain/shared:
+    config:
+      dir: ./v1_7_0/offchain/internal/mocks
+      pkgname: ccvmocks
+      filename: mock_jd_client.go
+    interfaces:
+      JDClient:
