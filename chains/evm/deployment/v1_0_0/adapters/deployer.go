@@ -10,6 +10,7 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	ccipapi "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
+	ccipapiTmp "github.com/smartcontractkit/chainlink-ccip/deployment/deployTmp"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	sequtil "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 
@@ -32,12 +33,12 @@ func (a *EVMDeployer) SetOCR3Config() *cldf_ops.Sequence[ccipapi.SetOCR3ConfigIn
 	return nil
 }
 
-func (a *EVMDeployer) UpdateMCMSConfig() *cldf_ops.Sequence[ccipapi.UpdateMCMSConfigInputPerChainWithSelector, sequtil.OnChainOutput, cldf_chain.BlockChains] {
+func (a *EVMDeployer) UpdateMCMSConfig() *cldf_ops.Sequence[ccipapiTmp.UpdateMCMSConfigInputPerChainWithSelector, sequtil.OnChainOutput, cldf_chain.BlockChains] {
 	return cldf_ops.NewSequence(
 		"update-mcms-config",
 		semver.MustParse("1.0.0"),
 		"Updates MCMS Configs of the specified contracts with the specified configs",
-		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, in ccipapi.UpdateMCMSConfigInputPerChainWithSelector) (output sequtil.OnChainOutput, err error) {
+		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, in ccipapiTmp.UpdateMCMSConfigInputPerChainWithSelector) (output sequtil.OnChainOutput, err error) {
 			evmChain, ok := chains.EVMChains()[in.ChainSelector]
 			if !ok {
 				return sequtil.OnChainOutput{}, fmt.Errorf("chain with selector %d not found in environment", in.ChainSelector)
