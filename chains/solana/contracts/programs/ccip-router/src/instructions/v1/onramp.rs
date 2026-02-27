@@ -296,11 +296,15 @@ impl OnRamp for Impl {
         let message_id = &helpers::hash(&new_message);
         new_message.header.message_id.clone_from(message_id);
 
-        emit!(events::CCIPMessageSent {
+        let ccip_message_sent_event = events::CCIPMessageSent {
             dest_chain_selector,
             sequence_number: new_message.header.sequence_number,
             message: new_message,
-        });
+        };
+
+        emit!(ccip_message_sent_event);
+
+        helpers::rmn_emit_cpi_event(&ctx, ccip_message_sent_event)?;
 
         Ok(*message_id)
     }
@@ -366,10 +370,14 @@ impl OnRamp for Impl {
 }
 
 mod helpers {
-    use anchor_lang::system_program;
+    use anchor_lang::{system_program, Event};
     use ccip_common::{
-        v1::{validate_evm_address, validate_svm_address},
-        CommonCcipError, CHAIN_FAMILY_SELECTOR_EVM, CHAIN_FAMILY_SELECTOR_SVM,
+        v1::{
+            validate_aptos_address, validate_evm_address, validate_sui_address,
+            validate_svm_address, validate_tvm_address,
+        },
+        CommonCcipError, CHAIN_FAMILY_SELECTOR_APTOS, CHAIN_FAMILY_SELECTOR_EVM,
+        CHAIN_FAMILY_SELECTOR_SUI, CHAIN_FAMILY_SELECTOR_SVM, CHAIN_FAMILY_SELECTOR_TVM,
     };
     use rmn_remote::state::CurseSubject;
 
@@ -393,6 +401,23 @@ mod helpers {
             cpi_context,
             CurseSubject::from_chain_selector(dest_chain_selector),
         )
+    }
+
+    pub(super) fn rmn_emit_cpi_event<'info>(
+        ctx: &Context<'_, '_, 'info, 'info, CcipSend<'_>>,
+        event: events::CCIPMessageSent,
+    ) -> Result<()> {
+        let cpi_program = ctx.accounts.rmn_remote.to_account_info();
+        let cpi_accounts = rmn_remote::cpi::accounts::CpiEvent {
+            config: ctx.accounts.rmn_remote_config.to_account_info(),
+            // Re-using the signer from the FQ calls for backwards-compatibility, so we don't introduce
+            // a new account that might break existing user integrations to send messages.
+            authority: ctx.accounts.fee_billing_signer.to_account_info(),
+        };
+        let seeds = &[seed::FEE_BILLING_SIGNER, &[ctx.bumps.fee_billing_signer]];
+        let signer_seeds = &[&seeds[..]];
+        let cpi_context = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer_seeds);
+        rmn_remote::cpi::cpi_event(cpi_context, event.data())
     }
 
     pub(super) fn token_transfer(
@@ -582,8 +607,11 @@ mod helpers {
     ) -> Result<()> {
         let selector = u32::from_be_bytes(chain_family_selector);
         match selector {
+            CHAIN_FAMILY_SELECTOR_APTOS => validate_aptos_address(dest_token_address),
             CHAIN_FAMILY_SELECTOR_EVM => validate_evm_address(dest_token_address),
+            CHAIN_FAMILY_SELECTOR_SUI => validate_sui_address(dest_token_address),
             CHAIN_FAMILY_SELECTOR_SVM => validate_svm_address(dest_token_address, true),
+            CHAIN_FAMILY_SELECTOR_TVM => validate_tvm_address(dest_token_address),
             _ => Err(CommonCcipError::InvalidChainFamilySelector.into()),
         }
     }
@@ -718,6 +746,16 @@ mod helpers {
                 )
                 .unwrap_err(),
                 CcipRouterError::SourceTokenDataTooLarge.into()
+            );
+        }
+
+        #[test]
+        fn validate_transfer_dest_address_rejects_unknown_selector() {
+            let selector = [0u8; 4];
+            let addr = [1u8; 32];
+            assert_eq!(
+                validate_transfer_dest_address(selector, &addr).unwrap_err(),
+                CommonCcipError::InvalidChainFamilySelector.into()
             );
         }
     }

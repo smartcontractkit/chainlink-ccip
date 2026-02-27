@@ -1,6 +1,7 @@
 use std::fmt::Display;
 
 use anchor_lang::prelude::*;
+use anchor_lang::solana_program::pubkey::PUBKEY_BYTES;
 
 /// Abstract curse subject.
 ///
@@ -61,6 +62,15 @@ pub struct Config {
 
     pub proposed_owner: Pubkey,
     pub default_code_version: CodeVersion,
+
+    #[max_len(0)] // just for INIT_SPACE calculation
+    pub event_authorities: Vec<Pubkey>,
+}
+
+impl Config {
+    pub fn dynamic_len(event_authorities_len: usize) -> usize {
+        Config::INIT_SPACE + event_authorities_len * PUBKEY_BYTES
+    }
 }
 
 #[account]
