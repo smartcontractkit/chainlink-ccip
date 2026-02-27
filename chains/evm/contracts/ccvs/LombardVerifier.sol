@@ -198,10 +198,10 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
     }
 
     {
-      bytes32 remoteAdapter = s_remoteAdapters[destChainSelector][sourceToken];
       bytes32 remoteToken = i_bridge.getAllowedDestinationToken(path.lChainId, sourceToken);
       bytes32 expectedDestToken = Internal._leftPadBytesToBytes32(tokenTransfer.destTokenAddress);
       if (remoteToken != expectedDestToken) {
+        bytes32 remoteAdapter = s_remoteAdapters[destChainSelector][sourceToken];
         if (remoteAdapter == bytes32(0) || remoteToken != remoteAdapter) {
           revert RemoteTokenOrAdapterMismatch(remoteToken, expectedDestToken, remoteAdapter);
         }
