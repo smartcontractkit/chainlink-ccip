@@ -227,7 +227,10 @@ func (a *EVMAdapter) CCIPReceiver() []byte {
 }
 
 func (a *EVMAdapter) InvalidCCIPReceivers() [][]byte {
-	return [][]byte{[]byte{99}}
+	return [][]byte{
+		[]byte{99}, // invalid addres
+		common.LeftPadBytes(common.Address{}.Bytes(), 32), // evm zero address
+	}
 }
 
 func (a *EVMAdapter) SetReceiverRejectAll(ctx context.Context, rejectAll bool) error {
