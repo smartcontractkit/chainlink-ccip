@@ -32,6 +32,33 @@ func (a *EVMDeployer) SetOCR3Config() *cldf_ops.Sequence[ccipapi.SetOCR3ConfigIn
 	return nil
 }
 
+func (a *EVMDeployer) UpdateMCMSConfig() *cldf_ops.Sequence[ccipapi.UpdateMCMSConfigInputPerChainWithSelector, sequtil.OnChainOutput, cldf_chain.BlockChains] {
+	return cldf_ops.NewSequence(
+		"update-mcms-config",
+		semver.MustParse("1.0.0"),
+		"Updates MCMS Configs of the specified contracts with the specified configs",
+		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, in ccipapi.UpdateMCMSConfigInputPerChainWithSelector) (output sequtil.OnChainOutput, err error) {
+			evmChain, ok := chains.EVMChains()[in.ChainSelector]
+			if !ok {
+				return sequtil.OnChainOutput{}, fmt.Errorf("chain with selector %d not found in environment", in.ChainSelector)
+			}
+
+			// create sequence input
+			seqInput := seq.SeqSetMCMSConfigInput{
+				ChainSelector: in.ChainSelector,
+				MCMConfig:     &in.MCMConfig,
+				MCMContracts:  in.MCMContracts,
+			}
+			report, err := cldf_ops.ExecuteSequence(b, seq.SeqSetMCMSConfigs, evmChain, seqInput)
+			if err != nil {
+				return sequtil.OnChainOutput{}, fmt.Errorf("failed to update mcms config on chain %d: %w", in.ChainSelector, err)
+			}
+			output.BatchOps = append(output.BatchOps, report.Output.BatchOps...)
+
+			return output, nil
+		})
+}
+
 func (a *EVMDeployer) GrantAdminRoleToTimelock() *cldf_ops.Sequence[ccipapi.GrantAdminRoleToTimelockConfigPerChainWithSelector, sequtil.OnChainOutput, cldf_chain.BlockChains] {
 	return cldf_ops.NewSequence(
 		"grant-admin-role-of-timelock-to-timelock",
@@ -51,7 +78,7 @@ func (a *EVMDeployer) GrantAdminRoleToTimelock() *cldf_ops.Sequence[ccipapi.Gran
 			}
 			report, err := cldf_ops.ExecuteSequence(b, seq.SeqGrantAdminRoleOfTimelockToTimelock, evmChain, seqInput)
 			if err != nil {
-				return sequtil.OnChainOutput{}, fmt.Errorf("failed to deploy and configure proposer MCM on chain %d: %w", in.ChainSelector, err)
+				return sequtil.OnChainOutput{}, fmt.Errorf("failed to grant admin role to timelock on chain %d: %w", in.ChainSelector, err)
 			}
 
 			return report.Output, nil
