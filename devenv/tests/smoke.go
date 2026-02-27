@@ -292,6 +292,52 @@ func RunSmokeTests(t *testing.T, e *deployment.Environment, selectors []uint64) 
 			// Note: The actual implementation of manual re-execution would depend on the capabilities of the test adapters and the underlying chains
 			// For this example, we'll just log the intention to re-execute with a higher gas limit
 			t.Log("Initial execution failed due to insufficient gas, attempting manual re-execution with higher gas limit for message", seq, seqNr)
+
+			// TODO set a require.Eventually() here to poll for the message to be re-executed with the higher gas limit and succeed?
+		})
+
+		// WIP: receiver fails
+		// then manual re-exec with higher limit
+		t.Run(fmt.Sprintf("%s receiver fails; manual re-exec", laneTag), func(t *testing.T) {
+			receiver := toImpl.CCIPReceiver()
+
+			err := toImpl.SetReceiverRejectAll(t.Context(), true)
+			require.NoError(t, err)
+			t.Cleanup(func() {
+				err := toImpl.SetReceiverRejectAll(t.Context(), false)
+				require.NoError(t, err)
+			})
+
+			extraArgs, err := toImpl.GetExtraArgs(receiver, fromImpl.Family())
+			require.NoError(t, err)
+
+			msg, err := fromImpl.BuildMessage(testadapters.MessageComponents{
+				DestChainSelector: toImpl.ChainSelector(),
+				Receiver:          receiver,
+				Data:              []byte("hello world"),
+				ExtraArgs:         extraArgs,
+			})
+			require.NoError(t, err)
+
+			seq, err := fromImpl.SendMessage(t.Context(), toImpl.ChainSelector(), msg)
+			require.Error(t, err)
+
+			// I am not sure if we can grab seq when SendMessage fails.
+
+			seqNr := ccipocr3.SeqNum(seq)
+			seqNumRange := ccipocr3.NewSeqNumRange(seqNr, seqNr)
+			toImpl.ValidateCommit(t, fromImpl.ChainSelector(), nil, seqNumRange)
+			toImpl.ValidateExec(t, fromImpl.ChainSelector(), nil, []uint64{seq})
+
+			err = toImpl.SetReceiverRejectAll(t.Context(), false)
+			require.NoError(t, err)
+
+			// Assuming the error is due to not enough gas, we can attempt a manual re-execution with a higher gas limit
+			// Note: The actual implementation of manual re-execution would depend on the capabilities of the test adapters and the underlying chains
+			// For this example, we'll just log the intention to re-execute with a higher gas limit
+			t.Log("Initial execution failed due to logical error, attempting manual re-execution after fixing error", seq, seqNr)
+
+			// TODO set a require.Eventually() here to poll for the message to be re-executed with the higher gas limit and succeed?
 		})
 
 		t.Run(fmt.Sprintf("%s allowlist enabled", laneTag), func(t *testing.T) {
