@@ -131,8 +131,8 @@ type TestAdapter interface {
 	// GetTokenBalance gets the token balance of the given owner address for the given token address.
 	GetTokenBalance(ctx context.Context, tokenAddress string, ownerAddress []byte) (*big.Int, error)
 
-	// GetTokenExpansionConfig returns a token expansion deployment config with sensible defaults for testing cross-chain token
-	// transfers.
+	// GetTokenExpansionConfig returns a token expansion deployment config with sensible defaults for testing
+	// cross-chain token transfers.
 	GetTokenExpansionConfig() tokensapi.TokenExpansionInputPerChain
 
 	// GetRegistryAddress returns the address of the contract on which the token pool must be registered.
@@ -144,9 +144,13 @@ type TestAdapter interface {
 	// UpdateSenderAllowlistStatus adds/removes senders to/from the whitelist
 	UpdateSenderAllowlistStatus(ctx context.Context, destChainSelector uint64, included bool) error
 
-	// SetSourceChainCursed sets the source chain as cursed in the router, which means that messages from that source chain
+	// SetSourceChainCursed sets the source chain as cursed, which means that messages from that source chain will not
+	// be executed.
+	RMNSetSrcChainCursed(ctx context.Context, sourceChainSelector uint64, cursed bool) error
+
+	// RMNSetDestChainCursed sets the destination chain as cursed, which means that messages to that destination chain
 	// will not be executed.
-	RMNSetSourceChainCursed(ctx context.Context, sourceChainSelector uint64, cursed bool) error
+	RMNSetDestChainCursed(ctx context.Context, destChainSelector uint64, cursed bool) error
 }
 
 type TestAdapterFactory = func(env *deployment.Environment, selector uint64) TestAdapter
