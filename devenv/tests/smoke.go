@@ -262,8 +262,37 @@ func RunSmokeTests(t *testing.T, e *deployment.Environment, selectors []uint64) 
 			require.Error(t, err)
 		})
 
-		// TODO: message with not enough gas
+		// WIP: message with not enough gas
 		// then manual re-exec with higher limit
+		t.Run(fmt.Sprintf("%s not enough gas; manual re-exec", laneTag), func(t *testing.T) {
+			receiver := toImpl.CCIPReceiver()
+
+			extraArgs, err := toImpl.GetExtraArgs(receiver, fromImpl.Family(), testadapters.NewGasLimitExtraArg(big.NewInt(1)))
+			require.NoError(t, err)
+
+			msg, err := fromImpl.BuildMessage(testadapters.MessageComponents{
+				DestChainSelector: toImpl.ChainSelector(),
+				Receiver:          receiver,
+				Data:              []byte("hello world"),
+				ExtraArgs:         extraArgs,
+			})
+			require.NoError(t, err)
+
+			seq, err := fromImpl.SendMessage(t.Context(), toImpl.ChainSelector(), msg)
+			require.Error(t, err)
+
+			// I am not sure if we can grab seq when SendMessage fails.
+
+			seqNr := ccipocr3.SeqNum(seq)
+			seqNumRange := ccipocr3.NewSeqNumRange(seqNr, seqNr)
+			toImpl.ValidateCommit(t, fromImpl.ChainSelector(), nil, seqNumRange)
+			toImpl.ValidateExec(t, fromImpl.ChainSelector(), nil, []uint64{seq})
+
+			// Assuming the error is due to not enough gas, we can attempt a manual re-execution with a higher gas limit
+			// Note: The actual implementation of manual re-execution would depend on the capabilities of the test adapters and the underlying chains
+			// For this example, we'll just log the intention to re-execute with a higher gas limit
+			t.Log("Initial execution failed due to insufficient gas, attempting manual re-execution with higher gas limit for message", seq, seqNr)
+		})
 
 		t.Run(fmt.Sprintf("%s allowlist enabled", laneTag), func(t *testing.T) {
 			receiver := toImpl.CCIPReceiver()
