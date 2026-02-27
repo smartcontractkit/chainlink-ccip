@@ -31,7 +31,6 @@ import (
 	onrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
-	deployopsTmp "github.com/smartcontractkit/chainlink-ccip/deployment/deployTmp"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
@@ -58,7 +57,7 @@ func (a *EVMAdapter) GrantAdminRoleToTimelock() *operations.Sequence[deployops.G
 }
 
 // Updates MCMs Config on specified MCMS contracts
-func (a *EVMAdapter) UpdateMCMSConfig() *operations.Sequence[deployopsTmp.UpdateMCMSConfigInputPerChainWithSelector, sequences.OnChainOutput, chain.BlockChains] {
+func (a *EVMAdapter) UpdateMCMSConfig() *operations.Sequence[deployops.UpdateMCMSConfigInputPerChainWithSelector, sequences.OnChainOutput, chain.BlockChains] {
 	evmDeployer := &evm1_0_0.EVMDeployer{}
 	return evmDeployer.UpdateMCMSConfig()
 }
