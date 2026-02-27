@@ -98,8 +98,7 @@ flowchart LR
 	chainlink-ccip/deployment --> chainlink-deployments-framework
 	chainlink-ccip/deployment --> chainlink-evm
 	click chainlink-ccip/deployment href "https://github.com/smartcontractkit/chainlink-ccip"
-	chainlink-ccip/devenv --> chainlink-ccip/ccv/chains/evm
-	chainlink-ccip/devenv --> chainlink-ccip/chains/evm/deployment
+	chainlink-ccip/devenv --> chainlink-ccip/ccv/chains/evm/deployment
 	chainlink-ccip/devenv --> chainlink-ccip/chains/solana/deployment
 	click chainlink-ccip/devenv href "https://github.com/smartcontractkit/chainlink-ccip"
 	chainlink-ccip/integration-tests --> chainlink-ccip/ccv/chains/evm/deployment
@@ -145,7 +144,7 @@ flowchart LR
 	chainlink-framework/chains --> chainlink-common
 	chainlink-framework/chains --> chainlink-framework/multinode
 	click chainlink-framework/chains href "https://github.com/smartcontractkit/chainlink-framework"
-	chainlink-framework/metrics --> chainlink-common
+	chainlink-framework/metrics
 	click chainlink-framework/metrics href "https://github.com/smartcontractkit/chainlink-framework"
 	chainlink-framework/multinode
 	click chainlink-framework/multinode href "https://github.com/smartcontractkit/chainlink-framework"
