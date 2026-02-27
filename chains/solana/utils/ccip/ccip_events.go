@@ -1,6 +1,8 @@
 package ccip
 
 import (
+	"fmt"
+
 	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 
@@ -17,6 +19,38 @@ type EventCCIPMessageSent struct {
 	DestinationChainSelector uint64
 	SequenceNumber           uint64
 	Message                  ccip_router.SVM2AnyRampMessage
+}
+
+var eventCCIPMessageSentDiscriminator = [8]byte{23, 77, 73, 183, 123, 185, 115, 57}
+
+func (obj *EventCCIPMessageSent) UnmarshalWithDecoder(decoder *bin.Decoder) (err error) {
+	// Read and check account discriminator:
+	{
+		discriminator, decoderErr := decoder.ReadTypeID()
+		if decoderErr != nil {
+			return decoderErr
+		}
+		if !discriminator.Equal(eventCCIPMessageSentDiscriminator[:]) {
+			return fmt.Errorf("wrong discriminator: wanted %v, got %v",
+				eventCCIPMessageSentDiscriminator, discriminator)
+		}
+	}
+	// Deserialize `DestinationChainSelector`:
+	err = decoder.Decode(&obj.DestinationChainSelector)
+	if err != nil {
+		return err
+	}
+	// Deserialize `SequenceNumber`:
+	err = decoder.Decode(&obj.SequenceNumber)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Message`:
+	err = decoder.Decode(&obj.Message)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 type EventCommitReportAccepted struct {

@@ -2,16 +2,14 @@
 
 This document describes the changes introduced in the different versions of the **Chainlink CCIP Solana programs**, located in [`chains/solana/contracts/programs`](https://github.com/smartcontractkit/chainlink-ccip/tree/main/chains/solana/contracts/programs).
 
-<!-- --- -->
-<!-- ## [Unreleased] (1.6.1) -->
-<!-- ### Added
-- (Placeholder for upcoming features) -->
+---
 
-<!-- ### Changed -->
-<!-- - (Placeholder for changes) -->
+## [1.6.1]
 
-<!-- ### Fixed
-- (Placeholder for bug fixes) -->
+### Added
+
+- [FeeQuoter] Support for other non-EVM families
+- [RMNRemote] Support for backwards-compatible CPI Events without requiring additional accounts
 
 ---
 
@@ -20,7 +18,6 @@ This document describes the changes introduced in the different versions of the 
 ### Changed
 
 - [Token Pools] Allow setting rate limit with rate and capacity set to 0 [#1290](https://github.com/smartcontractkit/chainlink-ccip/pull/1290)
-
 
 ---
 
