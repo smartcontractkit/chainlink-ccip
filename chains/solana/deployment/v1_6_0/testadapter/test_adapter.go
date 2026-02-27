@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"math"
 	"math/big"
 	"slices"
 	"strconv"
@@ -27,6 +28,7 @@ import (
 	solutils "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_offramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/test_ccip_receiver"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_0/ccip_router"
 	solccip "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/ccip"
 	solcommon "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
@@ -333,6 +335,33 @@ func (a *SVMAdapter) CCIPReceiver() []byte {
 	return receiver.Bytes()
 }
 
+func (a *SVMAdapter) SetReceiverRejectAll(ctx context.Context, rejectAll bool) error {
+	receiverProgram, err := a.getAddress("TestReceiver")
+	if err != nil {
+		return err
+	}
+	receiverTargetAccountPDA, _, _ := solana.FindProgramAddress([][]byte{[]byte("counter")}, receiverProgram)
+	// Set reject all flag in receiver to force reverts
+	deployer := a.Chain.DeployerKey
+	ix, err := test_ccip_receiver.NewSetRejectAllInstruction(true, receiverTargetAccountPDA, deployer.PublicKey()).ValidateAndBuild()
+	if err != nil {
+		return err
+	}
+	ixData, err := ix.Data()
+	if err != nil {
+		return err
+	}
+	rejectAllIx := solana.NewInstruction(receiverProgram, ix.Accounts(), ixData)
+	result, err := solcommon.SendAndConfirm(ctx, a.Client, []solana.Instruction{rejectAllIx}, *deployer, solconfig.DefaultCommitment)
+	if err != nil {
+		return fmt.Errorf("failed to send and confirm transaction: %w", err)
+	}
+	if result.Meta.Err != nil {
+		return fmt.Errorf("failed to send and confirm transaction: %v", result.Meta.Err)
+	}
+	return nil
+}
+
 func (a *SVMAdapter) NativeFeeToken() string {
 	return solana.SolMint.String()
 }
@@ -349,13 +378,32 @@ func (a *SVMAdapter) GetExtraArgs(receiver []byte, sourceFamily string, opts ...
 
 	switch sourceFamily {
 	case chain_selectors.FamilyEVM:
-		return ccipcommon.SerializeClientSVMExtraArgsV1(msg_hasher163.ClientSVMExtraArgsV1{
+		extraArgs := msg_hasher163.ClientSVMExtraArgsV1{
 			AccountIsWritableBitmap:  solccip.GenerateBitMapForIndexes([]int{0, 1}),
 			Accounts:                 accounts,
 			TokenReceiver:            receiverProgram,
 			ComputeUnits:             100_000,
 			AllowOutOfOrderExecution: true,
-		})
+		}
+		for _, opt := range opts {
+			switch opt.Name {
+			case testadapters.ExtraArgGasLimit:
+				unitsBig := opt.Value.(*big.Int)
+				if !unitsBig.IsUint64() {
+					return nil, fmt.Errorf("ComputeUnits is larger than uint32: %d", unitsBig)
+				}
+				units := unitsBig.Uint64()
+				if units <= math.MaxUint32 {
+					return nil, fmt.Errorf("ComputeUnits is larger than uint32: %d", units)
+				}
+				extraArgs.ComputeUnits = uint32(units)
+			case testadapters.ExtraArgOOO:
+				extraArgs.AllowOutOfOrderExecution = opt.Value.(bool)
+			default:
+				// unsupported arg
+			}
+		}
+		return ccipcommon.SerializeClientSVMExtraArgsV1(extraArgs)
 	case chain_selectors.FamilySolana:
 		panic("unimplemented GetExtraArgs(solana->solana)")
 	default:

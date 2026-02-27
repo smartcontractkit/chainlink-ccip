@@ -122,6 +122,22 @@ contracts:
         access: public
 
   - contract_name: FeeQuoter
+    version: "1.6.3"
+    functions:
+      - name: applyDestChainConfigUpdates
+        access: owner
+      - name: updatePrices
+        access: owner
+      - name: applyAuthorizedCallerUpdates
+        access: owner
+      - name: applyTokenTransferFeeConfigUpdates
+        access: owner
+      - name: getDestChainConfig
+        access: public
+      - name: getTokenTransferFeeConfig
+        access: public
+
+  - contract_name: FeeQuoter
     version: "1.6.0"
     functions:
       - name: applyDestChainConfigUpdates

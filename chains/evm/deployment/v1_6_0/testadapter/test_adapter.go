@@ -16,6 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
+	"github.com/xssnick/tonutils-go/tlb"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
@@ -23,6 +24,8 @@ import (
 	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+
+	ton_onramp "github.com/smartcontractkit/chainlink-ton/pkg/ccip/bindings/onramp"
 
 	bnmERC20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
@@ -222,6 +225,10 @@ func (a *EVMAdapter) CCIPReceiver() []byte {
 	return common.LeftPadBytes(common.HexToAddress("0xdead").Bytes(), 32)
 }
 
+func (a *EVMAdapter) SetReceiverRejectAll(ctx context.Context, rejectAll bool) error {
+	return errors.ErrUnsupported
+}
+
 func (a *EVMAdapter) NativeFeeToken() string {
 	return "0x0"
 }
@@ -229,13 +236,45 @@ func (a *EVMAdapter) NativeFeeToken() string {
 func (a *EVMAdapter) GetExtraArgs(receiver []byte, sourceFamily string, opts ...testadapters.ExtraArgOpt) ([]byte, error) {
 	switch sourceFamily {
 	case chain_selectors.FamilyEVM:
-		return ccipcommon.SerializeClientGenericExtraArgsV2(msg_hasher163.ClientGenericExtraArgsV2{
+		extraArgs := msg_hasher163.ClientGenericExtraArgsV2{
 			GasLimit:                 new(big.Int).SetUint64(100_000),
 			AllowOutOfOrderExecution: true,
-		})
+		}
+		for _, opt := range opts {
+			switch opt.Name {
+			case testadapters.ExtraArgGasLimit:
+				extraArgs.GasLimit = opt.Value.(*big.Int)
+			case testadapters.ExtraArgOOO:
+				extraArgs.AllowOutOfOrderExecution = opt.Value.(bool)
+			default:
+				// unsupported arg
+			}
+		}
+		return ccipcommon.SerializeClientGenericExtraArgsV2(extraArgs)
 	case chain_selectors.FamilySolana:
 		// EVM allows empty extraArgs
 		return nil, nil
+	case chain_selectors.FamilyTon:
+		// TODO: maybe for 1.6 we should look up the source adapter and use a 1.6 method to encode? would be good to avoid other chain SDKs
+		extraArgs := ton_onramp.GenericExtraArgsV2{
+			GasLimit:                 big.NewInt(1000000),
+			AllowOutOfOrderExecution: true,
+		}
+		for _, opt := range opts {
+			switch opt.Name {
+			case testadapters.ExtraArgGasLimit:
+				extraArgs.GasLimit = opt.Value.(*big.Int)
+			case testadapters.ExtraArgOOO:
+				extraArgs.AllowOutOfOrderExecution = opt.Value.(bool)
+			default:
+				// unsupported arg
+			}
+		}
+		extraArgsCell, err := tlb.ToCell(extraArgs)
+		if err != nil {
+			return nil, err
+		}
+		return extraArgsCell.ToBOC(), nil
 	default:
 		// TODO: add support for other families
 		return nil, fmt.Errorf("unsupported source family: %s", sourceFamily)

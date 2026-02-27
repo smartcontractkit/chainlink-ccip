@@ -154,7 +154,7 @@ func checkForkedEnvIsSet(in *Cfg) error {
 
 // NewEnvironment creates a new CCIP environment either locally in Docker or remotely in K8s.
 func NewEnvironment() (*Cfg, error) {
-	ctx, cancelFunc := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancelFunc := context.WithTimeout(context.Background(), 15*time.Minute)
 	defer cancelFunc()
 	tr := NewTimeTracker(Plog)
 	ctx = L.WithContext(ctx)
@@ -178,7 +178,18 @@ func NewEnvironment() (*Cfg, error) {
 
 	impls := make([]CCIP16ProductConfiguration, 0)
 	for _, bc := range in.Blockchains {
-		impl, err := NewCCIPImplFromNetwork(bc.Type, bc.ChainID)
+		var family string
+		switch bc.Type {
+		case "anvil", "geth":
+			family = chainsel.FamilyEVM
+		case "solana":
+			family = chainsel.FamilySolana
+		case "ton":
+			family = chainsel.FamilyTon
+		default:
+			return nil, fmt.Errorf("unsupported blockchain type: %s", bc.Type)
+		}
+		impl, err := NewCCIPImplFromNetwork(family, bc.ChainID)
 		if err != nil {
 			return nil, err
 		}
