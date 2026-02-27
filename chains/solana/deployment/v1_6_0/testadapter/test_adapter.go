@@ -336,6 +336,10 @@ func (a *SVMAdapter) CCIPReceiver() []byte {
 	return receiver.Bytes()
 }
 
+func (a *SVMAdapter) EOAReceiver(t *testing.T) []byte {
+	panic("not implemented")
+}
+
 func (a *SVMAdapter) InvalidCCIPReceivers() [][]byte {
 	// GetExtraArgs fails with invalid pubkey receivers, we'd need to construct a raw payload to test against the contracts
 	return make([][]byte, 0)
