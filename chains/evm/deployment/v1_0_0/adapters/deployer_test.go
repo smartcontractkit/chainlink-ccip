@@ -19,6 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations"
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
+	deployopsTmp "github.com/smartcontractkit/chainlink-ccip/deployment/deployTmp"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	deploymentutils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
@@ -142,6 +143,9 @@ func TestUpdateMCMSConfig(t *testing.T) {
 	dReg := deployops.GetRegistry()
 	dReg.RegisterDeployer(chainsel.FamilyEVM, deployops.MCMSVersion, evmDeployer)
 
+	dRegTmp := deployopsTmp.GetRegistry()
+	dRegTmp.RegisterDeployer(chainsel.FamilyEVM, deployops.MCMSVersion, evmDeployer)
+
 	// deploy one set of timelock and MCMS contracts on each chain
 	deployMCMS := deployops.DeployMCMS(dReg, nil)
 	output, err := deployMCMS.Apply(*env, deployops.MCMSDeploymentConfig{
@@ -215,10 +219,10 @@ func TestUpdateMCMSConfig(t *testing.T) {
 	}
 
 	// update the config for each MCMS contract
-	updateMcmsConfigMCMS := deployops.UpdateMCMSConfig(dReg, nil)
-	output, err = updateMcmsConfigMCMS.Apply(*env, deployops.UpdateMCMSConfigInput{
+	updateMcmsConfigMCMS := deployopsTmp.UpdateMCMSConfig(dRegTmp, nil)
+	output, err = updateMcmsConfigMCMS.Apply(*env, deployopsTmp.UpdateMCMSConfigInput{
 		AdapterVersion: semver.MustParse("1.0.0"),
-		Chains: map[uint64]deployops.UpdateMCMSConfigInputPerChain{
+		Chains: map[uint64]deployopsTmp.UpdateMCMSConfigInputPerChain{
 			selector1: {
 				MCMConfig:    testhelpers.SingleGroupMCMSTwoSigners(),
 				MCMContracts: mcmsRefs[selector1],
