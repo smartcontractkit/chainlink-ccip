@@ -98,6 +98,9 @@ type TestAdapter interface {
 	// // CCIPReceiver returns a CCIP receiver for the given chain family.
 	CCIPReceiver() []byte
 
+	// InvalidReceivers returns a slice of invalid receivers for the given chain family, to be used in negative test cases.
+	InvalidCCIPReceivers() [][]byte
+
 	// SetReceiverRejectAll configures the receiver to reject all incoming messages.
 	// This is used for test cases with a a failing receiver.
 	SetReceiverRejectAll(ctx context.Context, rejectAll bool) error

@@ -253,21 +253,25 @@ func RunSmokeTests(t *testing.T, e *deployment.Environment, selectors []uint64) 
 				// TODO call skip in a getInvalidReceivers interface maybe
 				t.Skip("GetExtraArgs fails with invalid pubkey receivers, we'd need to construct a raw payload to test against the contract")
 			}
-			invalidReceiver := []byte{99}
 
-			extraArgs, err := toImpl.GetExtraArgs(invalidReceiver, fromImpl.Family(), testadapters.NewGasLimitExtraArg(big.NewInt(math.MaxInt64)))
-			require.NoError(t, err)
+			invalidReceivers := toImpl.InvalidCCIPReceivers()
 
-			msg, err := fromImpl.BuildMessage(testadapters.MessageComponents{
-				DestChainSelector: toImpl.ChainSelector(),
-				Receiver:          invalidReceiver,
-				Data:              []byte("hello world"),
-				ExtraArgs:         extraArgs,
-			})
-			require.NoError(t, err)
+			for _, invalidReceiver := range invalidReceivers {
 
-			_, err = fromImpl.SendMessage(t.Context(), toImpl.ChainSelector(), msg)
-			require.Error(t, err)
+				extraArgs, err := toImpl.GetExtraArgs(invalidReceiver, fromImpl.Family(), testadapters.NewGasLimitExtraArg(big.NewInt(math.MaxInt64)))
+				require.NoError(t, err)
+
+				msg, err := fromImpl.BuildMessage(testadapters.MessageComponents{
+					DestChainSelector: toImpl.ChainSelector(),
+					Receiver:          invalidReceiver,
+					Data:              []byte("hello world"),
+					ExtraArgs:         extraArgs,
+				})
+				require.NoError(t, err)
+
+				_, err = fromImpl.SendMessage(t.Context(), toImpl.ChainSelector(), msg)
+				require.Error(t, err)
+			}
 		})
 
 		// WIP: message with not enough gas
