@@ -118,7 +118,6 @@ func TestE2ESmoke(t *testing.T) {
 			})
 			require.NoError(t, err, "Failed to apply UpdateFeeQuoterChangeset changeset")
 			fq2Deployed[fromImpl.ChainSelector()] = true
-			tc.name += " with FQ 2.0"
 		}
 		// Capture the loop variable so each goroutine gets its own copy.
 		t.Run(tc.name, func(t *testing.T) {
