@@ -237,14 +237,14 @@ func (a *EVMAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokensapi.TPRLR
 						Address:       common.HexToAddress(input.TokenPoolRef.Address),
 						Args: tpOpsV1_5_1.SetChainRateLimiterConfigArgs{
 							OutboundRateLimitConfig: token_pool.RateLimiterConfig{
-								IsEnabled: input.OutboundRateLimiterConfig.IsEnabled,
-								Capacity:  input.OutboundRateLimiterConfig.Capacity,
-								Rate:      input.OutboundRateLimiterConfig.Rate,
+								IsEnabled: input.DefaultFinalityOutboundRateLimiterConfig.IsEnabled,
+								Capacity:  input.DefaultFinalityOutboundRateLimiterConfig.Capacity,
+								Rate:      input.DefaultFinalityOutboundRateLimiterConfig.Rate,
 							},
 							InboundRateLimitConfig: token_pool.RateLimiterConfig{
-								IsEnabled: input.InboundRateLimiterConfig.IsEnabled,
-								Capacity:  input.InboundRateLimiterConfig.Capacity,
-								Rate:      input.InboundRateLimiterConfig.Rate,
+								IsEnabled: input.DefaultFinalityInboundRateLimiterConfig.IsEnabled,
+								Capacity:  input.DefaultFinalityInboundRateLimiterConfig.Capacity,
+								Rate:      input.DefaultFinalityInboundRateLimiterConfig.Rate,
 							},
 							RemoteChainSelector: input.RemoteChainSelector,
 						},
@@ -261,14 +261,14 @@ func (a *EVMAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokensapi.TPRLR
 						Address:       common.HexToAddress(input.TokenPoolRef.Address),
 						Args: tpOpsV1_6_1.SetChainRateLimiterConfigArgs{
 							OutboundConfig: tpOpsV1_6_1.Config{
-								IsEnabled: input.OutboundRateLimiterConfig.IsEnabled,
-								Capacity:  input.OutboundRateLimiterConfig.Capacity,
-								Rate:      input.OutboundRateLimiterConfig.Rate,
+								IsEnabled: input.DefaultFinalityOutboundRateLimiterConfig.IsEnabled,
+								Capacity:  input.DefaultFinalityOutboundRateLimiterConfig.Capacity,
+								Rate:      input.DefaultFinalityOutboundRateLimiterConfig.Rate,
 							},
 							InboundConfig: tpOpsV1_6_1.Config{
-								IsEnabled: input.InboundRateLimiterConfig.IsEnabled,
-								Capacity:  input.InboundRateLimiterConfig.Capacity,
-								Rate:      input.InboundRateLimiterConfig.Rate,
+								IsEnabled: input.DefaultFinalityInboundRateLimiterConfig.IsEnabled,
+								Capacity:  input.DefaultFinalityInboundRateLimiterConfig.Capacity,
+								Rate:      input.DefaultFinalityInboundRateLimiterConfig.Rate,
 							},
 							RemoteChainSelector: input.RemoteChainSelector,
 						},
