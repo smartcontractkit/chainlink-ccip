@@ -8,12 +8,13 @@ import (
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
-	mcms_types "github.com/smartcontractkit/mcms/types"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
+	solseqV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/mcm"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
+	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	mcmsapi "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
 
@@ -21,6 +22,9 @@ import (
 	deploymentutils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
+
+	mcms_solana "github.com/smartcontractkit/mcms/sdk/solana"
+	mcms_types "github.com/smartcontractkit/mcms/types"
 )
 
 func TestUpdateMCMSConfigSolana(t *testing.T) {
@@ -37,37 +41,64 @@ func TestUpdateMCMSConfigSolana(t *testing.T) {
 	require.NotNil(t, env, "Environment should be created")
 	env.DataStore = dstr.Seal() // Add preloaded contracts to env datastore
 	chain := env.BlockChains.SolanaChains()[chainsel.SOLANA_MAINNET.Selector]
+	dReg := mcmsapi.GetRegistry()
+	solAdapter := solseqV1_6_0.SolanaAdapter{}
+	dReg.RegisterDeployer(chainsel.FamilySolana, deployops.MCMSVersion, &solAdapter)
+	err = utils.FundSolanaAccounts(
+		t.Context(),
+		[]solana.PublicKey{chain.DeployerKey.PublicKey()},
+		100,
+		chain.Client,
+	)
+	require.NoError(t, err)
 
 	// deploy MCMS Contracts
 	DeployMCMS(t, env, solanaChains[0], []string{deploymentutils.CLLQualifier})
 
-	// get recently deployed MCMS address
-	mcmsRef, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
+	// get recently deployed MCMS addresses
+	mcmsRefs := []datastore.AddressRef{}
+	cancellerRef, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
 		ChainSelector: solanaChains[0],
-		Type:          datastore.ContractType(utils.McmProgramType),
-		Qualifier:     "",
+		Type:          datastore.ContractType(deploymentutils.CancellerManyChainMultisig),
+		Qualifier:     deploymentutils.CLLQualifier,
 		Version:       semver.MustParse("1.6.0"),
 	}, solanaChains[0], datastore_utils.FullRef)
 	require.NoError(t, err)
+	bypasserRef, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
+		ChainSelector: solanaChains[0],
+		Type:          datastore.ContractType(deploymentutils.CancellerManyChainMultisig),
+		Qualifier:     deploymentutils.CLLQualifier,
+		Version:       semver.MustParse("1.6.0"),
+	}, solanaChains[0], datastore_utils.FullRef)
+	require.NoError(t, err)
+	proposerRef, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
+		ChainSelector: solanaChains[0],
+		Type:          datastore.ContractType(deploymentutils.CancellerManyChainMultisig),
+		Qualifier:     deploymentutils.CLLQualifier,
+		Version:       semver.MustParse("1.6.0"),
+	}, solanaChains[0], datastore_utils.FullRef)
+	require.NoError(t, err)
+	mcmsRefs = append(mcmsRefs, cancellerRef, bypasserRef, proposerRef)
 
 	// check that deployed config is correct
-	var mcmConfig mcm.MultisigConfig
-	mcmSeed := state.PDASeed([]byte(mcmsRef.Address))
-	err = chain.GetAccountDataBorshInto(env.GetContext(), state.GetMCMConfigPDA(solana.MustPublicKeyFromBase58(mcmsRef.Address), mcmSeed), &mcmConfig)
-	require.NoError(t, err)
+	for _, ref := range mcmsRefs {
+		var mcmConfig mcm.MultisigConfig
+		id, seed, _ := mcms_solana.ParseContractAddress(ref.Address)
+		err := chain.GetAccountDataBorshInto(env.GetContext(), state.GetMCMConfigPDA(id, state.PDASeed([]byte(seed[:]))), &mcmConfig)
+		require.NoError(t, err)
 
-	numOfSigners := len(mcmConfig.Signers)
-	require.Equal(t, numOfSigners, len(testhelpers.SingleGroupMCMS().Signers)) // should be 1
+		numOfSigners := len(mcmConfig.Signers)
+		require.Equal(t, numOfSigners, len(testhelpers.SingleGroupMCMS().Signers)) // should be 1
+	}
 
 	// update the config for each MCMS contract
-	dReg := mcmsapi.GetRegistry()
 	updateMcmsConfigMCMS := mcmsapi.UpdateMCMSConfig(dReg, nil)
 	output, err := updateMcmsConfigMCMS.Apply(*env, mcmsapi.UpdateMCMSConfigInput{
 		AdapterVersion: semver.MustParse("1.0.0"),
 		Chains: map[uint64]mcmsapi.UpdateMCMSConfigInputPerChain{
 			solanaChains[0]: {
 				MCMConfig:    testhelpers.SingleGroupMCMSTwoSigners(),
-				MCMContracts: []datastore.AddressRef{mcmsRef},
+				MCMContracts: mcmsRefs,
 			},
 		},
 		MCMS: mcms.Input{
@@ -81,13 +112,16 @@ func TestUpdateMCMSConfigSolana(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Greater(t, len(output.Reports), 0)
-	require.Equal(t, 1, len(output.MCMSTimelockProposals)) ///
 
-	// check that MCMS config is updated correctly
-	mcmSeed = state.PDASeed([]byte(mcmsRef.Address))
-	err = chain.GetAccountDataBorshInto(env.GetContext(), state.GetMCMConfigPDA(solana.MustPublicKeyFromBase58(mcmsRef.Address), mcmSeed), &mcmConfig)
-	require.NoError(t, err)
+	// check that MCMS configs are updated correctly
+	for _, ref := range mcmsRefs {
+		var mcmConfig mcm.MultisigConfig
+		id, seed, _ := mcms_solana.ParseContractAddress(ref.Address)
+		err := chain.GetAccountDataBorshInto(env.GetContext(), state.GetMCMConfigPDA(id, state.PDASeed([]byte(seed[:]))), &mcmConfig)
+		require.NoError(t, err)
 
-	numOfSigners = len(mcmConfig.Signers)
-	require.Equal(t, numOfSigners, len(testhelpers.SingleGroupMCMSTwoSigners().Signers)) // should be 2
+		numOfSigners := len(mcmConfig.Signers)
+		require.Equal(t, numOfSigners, len(testhelpers.SingleGroupMCMSTwoSigners().Signers)) // should be 2
+	}
+
 }

@@ -385,7 +385,8 @@ func (a *SolanaAdapter) UpdateMCMSConfig() *operations.Sequence[deployops.Update
 					Qualifier:       &contract.Qualifier,
 					ContractVersion: contract.Version.String(),
 				}
-				configureOpOutput, err := configureMCM(b, deps, configureOpInput, solana.MustPublicKeyFromBase58(contract.Address))
+				id, _, _ := mcms_solana.ParseContractAddress(contract.Address)
+				configureOpOutput, err := configureMCM(b, deps, configureOpInput, id)
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to configure MCMs: %w", err)
 				}
