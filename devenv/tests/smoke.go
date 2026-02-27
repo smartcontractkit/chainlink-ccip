@@ -185,7 +185,26 @@ func RunSmokeTests(t *testing.T, e *deployment.Environment, selectors []uint64) 
 			require.Error(t, err)
 		})
 
-		// TODO: send data payload larger than limit
+		t.Run(fmt.Sprintf("%s payload larger than limit", laneTag), func(t *testing.T) {
+			receiver := toImpl.CCIPReceiver()
+
+			extraArgs, err := toImpl.GetExtraArgs(receiver, fromImpl.Family())
+			require.NoError(t, err)
+
+			// Construct a payload that exceeds the typical 32KB limit
+			oversizedData := make([]byte, 33*1024) // 33 KB of data
+
+			msg, err := fromImpl.BuildMessage(testadapters.MessageComponents{
+				DestChainSelector: toImpl.ChainSelector(),
+				Receiver:          receiver,
+				Data:              oversizedData,
+				ExtraArgs:         extraArgs,
+			})
+			require.NoError(t, err)
+
+			_, err = fromImpl.SendMessage(t.Context(), toImpl.ChainSelector(), msg)
+			require.Error(t, err)
+		})
 
 		t.Run(fmt.Sprintf("%s invalid extra args tag", laneTag), func(t *testing.T) {
 			if fromImpl.Family() == chainsel.FamilyTon {
