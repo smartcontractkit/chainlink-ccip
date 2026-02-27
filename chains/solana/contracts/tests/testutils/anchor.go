@@ -146,3 +146,27 @@ func WaitForNewBlock(ctx context.Context, client *rpc.Client, height uint64, com
 		}
 	}
 }
+
+func GetProgramID(tx *solana.Transaction, meta *rpc.TransactionMeta, programIDIndex uint16) (solana.PublicKey, error) {
+	allKeys := getAllKeys(tx, meta)
+
+	if int(programIDIndex) >= len(allKeys) {
+		return solana.PublicKey{}, fmt.Errorf("programID index %d out of bounds (total keys: %d)", programIDIndex, len(allKeys))
+	}
+
+	return allKeys[programIDIndex], nil
+}
+
+func getAllKeys(tx *solana.Transaction, meta *rpc.TransactionMeta) []solana.PublicKey {
+	allKeys := make([]solana.PublicKey, 0, len(tx.Message.AccountKeys))
+	allKeys = append(allKeys, tx.Message.AccountKeys...)
+
+	if meta != nil && meta.LoadedAddresses.Writable != nil {
+		allKeys = append(allKeys, meta.LoadedAddresses.Writable...)
+	}
+	if meta != nil && meta.LoadedAddresses.ReadOnly != nil {
+		allKeys = append(allKeys, meta.LoadedAddresses.ReadOnly...)
+	}
+
+	return allKeys
+}
