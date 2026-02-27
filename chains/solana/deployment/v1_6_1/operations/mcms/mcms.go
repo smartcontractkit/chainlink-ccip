@@ -37,7 +37,7 @@ var (
 
 var AccessControllerDeploy = operations.NewOperation(
 	"access-controller:deploy",
-	common_utils.Version_1_6_0,
+	common_utils.Version_1_6_1,
 	"Deploys the Access Controller program",
 	func(b operations.Bundle, chain cldf_solana.Chain, input []cldf_datastore.AddressRef) (cldf_datastore.AddressRef, error) {
 		return utils.MaybeDeployContract(
@@ -45,7 +45,7 @@ var AccessControllerDeploy = operations.NewOperation(
 			chain,
 			input,
 			utils.AccessControllerProgramType,
-			common_utils.Version_1_6_0,
+			common_utils.Version_1_6_1,
 			"",
 			AccessControllerProgramName)
 	},
@@ -53,7 +53,7 @@ var AccessControllerDeploy = operations.NewOperation(
 
 var TimelockDeploy = operations.NewOperation(
 	"timelock:deploy",
-	common_utils.Version_1_6_0,
+	common_utils.Version_1_6_1,
 	"Deploys the Timelock program",
 	func(b operations.Bundle, chain cldf_solana.Chain, input []cldf_datastore.AddressRef) (cldf_datastore.AddressRef, error) {
 		return utils.MaybeDeployContract(
@@ -61,7 +61,7 @@ var TimelockDeploy = operations.NewOperation(
 			chain,
 			input,
 			utils.TimelockProgramType,
-			common_utils.Version_1_6_0,
+			common_utils.Version_1_6_1,
 			"",
 			TimelockProgramName)
 	},
@@ -69,7 +69,7 @@ var TimelockDeploy = operations.NewOperation(
 
 var McmDeploy = operations.NewOperation(
 	"mcm:deploy",
-	common_utils.Version_1_6_0,
+	common_utils.Version_1_6_1,
 	"Deploys the Many Chain Multi Sig program",
 	func(b operations.Bundle, chain cldf_solana.Chain, input []cldf_datastore.AddressRef) (cldf_datastore.AddressRef, error) {
 		return utils.MaybeDeployContract(
@@ -77,7 +77,7 @@ var McmDeploy = operations.NewOperation(
 			chain,
 			input,
 			utils.McmProgramType,
-			common_utils.Version_1_6_0,
+			common_utils.Version_1_6_1,
 			"",
 			McmProgramName)
 	},
@@ -85,49 +85,49 @@ var McmDeploy = operations.NewOperation(
 
 var InitAccessControllerOp = operations.NewOperation(
 	"init-access-controller",
-	common_utils.Version_1_6_0,
+	common_utils.Version_1_6_1,
 	"Initializes access controller for solana",
 	initAccessController,
 )
 
 var InitMCMOp = operations.NewOperation(
 	"init-mcm-program",
-	common_utils.Version_1_6_0,
+	common_utils.Version_1_6_1,
 	"Initializes MCMProgram for solana",
 	initMCM,
 )
 
 var ConfigureMCMOp = operations.NewOperation(
 	"configure-mcm-program",
-	common_utils.Version_1_6_0,
+	common_utils.Version_1_6_1,
 	"Configures MCMProgram for solana",
 	configureMCM,
 )
 
 var InitTimelockOp = operations.NewOperation(
 	"init-timelock-program",
-	common_utils.Version_1_6_0,
+	common_utils.Version_1_6_1,
 	"Initializes timelock for solana",
 	initTimelock,
 )
 
 var AddAccessOp = operations.NewOperation(
 	"add-access-op",
-	common_utils.Version_1_6_0,
+	common_utils.Version_1_6_1,
 	"Adds access to provided role for timelock",
 	addAccess,
 )
 
 var TransferOwnershipOp = operations.NewOperation(
 	"transfer-ownership-op",
-	common_utils.Version_1_6_0,
+	common_utils.Version_1_6_1,
 	"Transfers ownership of programs to timelock",
 	transferToTimelockSolanaOp,
 )
 
 var AcceptOwnershipOp = operations.NewOperation(
 	"accept-ownership-op",
-	common_utils.Version_1_6_0,
+	common_utils.Version_1_6_1,
 	"Accepts ownership of programs from timelock",
 	acceptOwnershipTimelockSolanaOp,
 )
@@ -196,7 +196,7 @@ func initAccessController(b operations.Bundle, deps Deps, in InitAccessControlle
 		deps.ExistingAddresses,
 		in.ChainSel,
 		in.ContractType,
-		common_utils.Version_1_6_0,
+		common_utils.Version_1_6_1,
 		deps.Qualifier,
 	)
 
@@ -232,7 +232,7 @@ func initAccessController(b operations.Bundle, deps Deps, in InitAccessControlle
 		ChainSelector: deps.Chain.Selector,
 		Type:          cldf_datastore.ContractType(in.ContractType),
 		Qualifier:     deps.Qualifier,
-		Version:       common_utils.Version_1_6_0,
+		Version:       common_utils.Version_1_6_1,
 	}, nil
 }
 
@@ -287,7 +287,7 @@ func initMCM(b operations.Bundle, deps Deps, in InitMCMInput) (MCMOutput, error)
 		deps.ExistingAddresses,
 		in.ChainSel,
 		in.ContractType,
-		common_utils.Version_1_6_0,
+		common_utils.Version_1_6_1,
 		deps.Qualifier,
 	)
 	var outType cldf_datastore.ContractType
@@ -349,17 +349,16 @@ func initMCM(b operations.Bundle, deps Deps, in InitMCMInput) (MCMOutput, error)
 				ChainSelector: deps.Chain.Selector,
 				Type:          outType,
 				Qualifier:     deps.Qualifier,
-				Version:       common_utils.Version_1_6_0,
+				Version:       common_utils.Version_1_6_1,
 			},
 			{
 				Address:       string(seed[:]),
 				ChainSelector: deps.Chain.Selector,
 				Type:          cldf_datastore.ContractType(in.ContractType),
 				Qualifier:     deps.Qualifier,
-				Version:       common_utils.Version_1_6_0,
+				Version:       common_utils.Version_1_6_1,
 			},
-		},
-	}, nil
+		}}, nil
 }
 
 func configureMCM(b operations.Bundle, deps Deps, in InitMCMInput) (MCMOutput, error) {
@@ -372,7 +371,7 @@ func configureMCM(b operations.Bundle, deps Deps, in InitMCMInput) (MCMOutput, e
 		deps.ExistingAddresses,
 		in.ChainSel,
 		in.ContractType,
-		common_utils.Version_1_6_0,
+		common_utils.Version_1_6_1,
 		deps.Qualifier,
 	)
 	seed := mcms_solana.PDASeed([]byte(ref.Address))
@@ -480,7 +479,7 @@ func initTimelock(b operations.Bundle, deps Deps, in InitTimelockInput) (MCMOutp
 		deps.ExistingAddresses,
 		in.ChainSel,
 		in.ContractType,
-		common_utils.Version_1_6_0,
+		common_utils.Version_1_6_1,
 		deps.Qualifier,
 	)
 
@@ -531,22 +530,20 @@ func initTimelock(b operations.Bundle, deps Deps, in InitTimelockInput) (MCMOutp
 				ChainSelector: deps.Chain.Selector,
 				Type:          cldf_datastore.ContractType(common_utils.RBACTimelock),
 				Qualifier:     deps.Qualifier,
-				Version:       common_utils.Version_1_6_0,
+				Version:       common_utils.Version_1_6_1,
 			},
 			{
 				Address:       string(seed[:]),
 				ChainSelector: deps.Chain.Selector,
 				Type:          cldf_datastore.ContractType(in.ContractType),
 				Qualifier:     deps.Qualifier,
-				Version:       common_utils.Version_1_6_0,
+				Version:       common_utils.Version_1_6_1,
 			},
-		},
-	}, nil
+		}}, nil
 }
 
 func initializeTimelock(b operations.Bundle, deps Deps, timelockProgram solana.PublicKey,
-	timelockID state.PDASeed, minDelay *big.Int,
-) ([]solana.Instruction, error) {
+	timelockID state.PDASeed, minDelay *big.Int) ([]solana.Instruction, error) {
 	if minDelay == nil {
 		minDelay = big.NewInt(0)
 	}
@@ -578,35 +575,35 @@ func initializeTimelock(b operations.Bundle, deps Deps, timelockProgram solana.P
 		deps.ExistingAddresses,
 		deps.Chain.Selector,
 		utils.AccessControllerProgramType,
-		common_utils.Version_1_6_0,
+		common_utils.Version_1_6_1,
 		"",
 	)
 	proposerAccount := datastore.GetAddressRef(
 		deps.ExistingAddresses,
 		deps.Chain.Selector,
 		utils.ProposerAccessControllerAccount,
-		common_utils.Version_1_6_0,
+		common_utils.Version_1_6_1,
 		deps.Qualifier,
 	)
 	executorAccount := datastore.GetAddressRef(
 		deps.ExistingAddresses,
 		deps.Chain.Selector,
 		utils.ExecutorAccessControllerAccount,
-		common_utils.Version_1_6_0,
+		common_utils.Version_1_6_1,
 		deps.Qualifier,
 	)
 	cancellerAccount := datastore.GetAddressRef(
 		deps.ExistingAddresses,
 		deps.Chain.Selector,
 		utils.CancellerAccessControllerAccount,
-		common_utils.Version_1_6_0,
+		common_utils.Version_1_6_1,
 		deps.Qualifier,
 	)
 	bypasserAccount := datastore.GetAddressRef(
 		deps.ExistingAddresses,
 		deps.Chain.Selector,
 		utils.BypasserAccessControllerAccount,
-		common_utils.Version_1_6_0,
+		common_utils.Version_1_6_1,
 		deps.Qualifier,
 	)
 
@@ -651,14 +648,14 @@ func addAccess(b operations.Bundle, deps Deps, in AddAccessInput) (MCMOutput, er
 		deps.ExistingAddresses,
 		deps.Chain.Selector,
 		utils.AccessControllerProgramType,
-		common_utils.Version_1_6_0,
+		common_utils.Version_1_6_1,
 		"",
 	)
 	timelockProgram := datastore.GetAddressRef(
 		deps.ExistingAddresses,
 		deps.Chain.Selector,
 		common_utils.RBACTimelock,
-		common_utils.Version_1_6_0,
+		common_utils.Version_1_6_1,
 		in.Qualifier,
 	)
 	id, seed, _ := mcms_solana.ParseContractAddress(timelockProgram.Address)
@@ -684,7 +681,7 @@ func addAccess(b operations.Bundle, deps Deps, in AddAccessInput) (MCMOutput, er
 		deps.ExistingAddresses,
 		deps.Chain.Selector,
 		roleAccessController,
-		common_utils.Version_1_6_0,
+		common_utils.Version_1_6_1,
 		in.Qualifier,
 	)
 

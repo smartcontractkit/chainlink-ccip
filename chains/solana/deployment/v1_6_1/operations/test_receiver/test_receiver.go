@@ -14,9 +14,11 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
-var ContractType cldf_deployment.ContractType = "TestReceiver"
-var Version *semver.Version = semver.MustParse("1.6.0")
-var ProgramName = "test_ccip_receiver"
+var (
+	ContractType cldf_deployment.ContractType = "TestReceiver"
+	Version      *semver.Version              = semver.MustParse("1.6.1")
+	ProgramName                               = "test_ccip_receiver"
+)
 
 var Deploy = operations.NewOperation(
 	"receiver:deploy",
@@ -37,7 +39,7 @@ var Deploy = operations.NewOperation(
 var Initialize = operations.NewOperation(
 	"receiver:initialize",
 	Version,
-	"Initializes the Receiver 1.6.0 contract",
+	"Initializes the Receiver 1.6.1 contract",
 	func(b operations.Bundle, chain cldf_solana.Chain, input Params) (sequences.OnChainOutput, error) {
 		test_ccip_receiver.SetProgramID(input.Receiver)
 		externalExecutionConfigPDA, _, _ := solana.FindProgramAddress([][]byte{[]byte("external_execution_config")}, input.Receiver)

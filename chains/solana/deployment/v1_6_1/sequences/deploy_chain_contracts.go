@@ -30,8 +30,8 @@ func (a *SolanaAdapter) DeployChainContracts() *cldf_ops.Sequence[deployops.Cont
 
 var DeployChainContracts = cldf_ops.NewSequence(
 	"deploy-chain-contracts",
-	semver.MustParse("1.6.0"),
-	"Deploys all required contracts for CCIP 1.6.0 to a Solana chain",
+	semver.MustParse("1.6.1"),
+	"Deploys all required contracts for CCIP 1.6.1 to a Solana chain",
 	func(b operations.Bundle, chains cldf_chain.BlockChains, input deployops.ContractDeploymentConfigPerChainWithAddress) (output sequences.OnChainOutput, err error) {
 		chain := chains.SolanaChains()[input.ChainSelector]
 		addresses := make([]datastore.AddressRef, 0)

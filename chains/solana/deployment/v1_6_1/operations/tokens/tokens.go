@@ -22,7 +22,7 @@ import (
 
 var (
 	LinkContractType cldf_deployment.ContractType = "LINK"
-	Version          *semver.Version              = semver.MustParse("1.6.0")
+	Version          *semver.Version              = semver.MustParse("1.6.1")
 )
 
 type Params struct {

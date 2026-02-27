@@ -30,7 +30,7 @@ var (
 	DestChainType            cldf_deployment.ContractType = "RemoteDest"
 	TokenPoolLookupTableType cldf_deployment.ContractType = "TokenPoolLookupTable"
 	ProgramName                                           = "ccip_router"
-	Version                  *semver.Version              = semver.MustParse("1.6.0")
+	Version                  *semver.Version              = semver.MustParse("1.6.1")
 )
 
 type ConnectChainsParams struct {
@@ -60,7 +60,7 @@ var Deploy = operations.NewOperation(
 var Initialize = operations.NewOperation(
 	"router:initialize",
 	Version,
-	"Initializes the Router 1.6.0 contract",
+	"Initializes the Router 1.6.1 contract",
 	func(b operations.Bundle, chain cldf_solana.Chain, input Params) (sequences.OnChainOutput, error) {
 		ccip_router.SetProgramID(input.Router)
 		programData, err := utils.GetSolProgramData(chain.Client, input.Router)
@@ -95,7 +95,7 @@ var Initialize = operations.NewOperation(
 var ConnectChains = operations.NewOperation(
 	"router:connect-chains",
 	Version,
-	"Connects the Router 1.6.0 contract to other chains",
+	"Connects the Router 1.6.1 contract to other chains",
 	func(b operations.Bundle, chain cldf_solana.Chain, input ConnectChainsParams) (sequences.OnChainOutput, error) {
 		ccip_router.SetProgramID(input.Router)
 		isUpdate := false
@@ -178,7 +178,7 @@ var ConnectChains = operations.NewOperation(
 var AddOffRamp = operations.NewOperation(
 	"router:add-off-ramp",
 	Version,
-	"Adds an OffRamp to the Router 1.6.0 contract for a given chain",
+	"Adds an OffRamp to the Router 1.6.1 contract for a given chain",
 	func(b operations.Bundle, chain cldf_solana.Chain, input ConnectChainsParams) (sequences.OnChainOutput, error) {
 		ccip_router.SetProgramID(input.Router)
 		authority := GetAuthority(chain, input.Router)
@@ -226,7 +226,7 @@ var AddOffRamp = operations.NewOperation(
 var TransferOwnership = operations.NewOperation(
 	"router:transfer-ownership",
 	Version,
-	"Transfers ownership of the Router 1.6.0 contract to a new authority",
+	"Transfers ownership of the Router 1.6.1 contract to a new authority",
 	func(b operations.Bundle, chain cldf_solana.Chain, input utils.TransferOwnershipParams) (sequences.OnChainOutput, error) {
 		ccip_router.SetProgramID(input.Program)
 		authority := GetAuthority(chain, input.Program)
@@ -266,7 +266,7 @@ var TransferOwnership = operations.NewOperation(
 var AcceptOwnership = operations.NewOperation(
 	"router:accept-ownership",
 	Version,
-	"Accepts ownership of the Router 1.6.0 contract",
+	"Accepts ownership of the Router 1.6.1 contract",
 	func(b operations.Bundle, chain cldf_solana.Chain, input utils.TransferOwnershipParams) (sequences.OnChainOutput, error) {
 		ccip_router.SetProgramID(input.Program)
 		configPDA, _, _ := state.FindConfigPDA(input.Program)
@@ -301,55 +301,13 @@ var AcceptOwnership = operations.NewOperation(
 var SetPool = operations.NewOperation(
 	"router:set-pool",
 	Version,
-	"Sets the pool of the Router 1.6.0 contract",
+	"Sets the pool of the Router 1.6.1 contract",
 	func(b operations.Bundle, chain cldf_solana.Chain, input PoolParams) (sequences.OnChainOutput, error) {
 		ccip_router.SetProgramID(input.Router)
 		addresses := make([]datastore.AddressRef, 0)
-		// Only works for BnM and LnR pools for now
-		tokenAdminRegistryPDA, _, _ := state.FindTokenAdminRegistryPDA(input.TokenMint, input.Router)
-		if input.TokenPoolLookupTable.IsZero() {
-			tokenPoolConfigPDA, _ := tokens.TokenPoolConfigAddress(input.TokenMint, input.TokenPool)
-			tokenPoolSigner, _ := tokens.TokenPoolSignerAddress(input.TokenMint, input.TokenPool)
-			poolTokenAccount, _, _ := tokens.FindAssociatedTokenAddress(input.TokenProgramID, input.TokenMint, tokenPoolSigner)
-			feeTokenConfigPDA, _, _ := state.FindFqBillingTokenConfigPDA(input.TokenMint, input.FeeQuoter)
-			routerPoolSignerPDA, _, _ := state.FindExternalTokenPoolsSignerPDA(input.TokenPool, input.Router)
-			table, err := common.CreateLookupTable(b.GetContext(), chain.Client, *chain.DeployerKey)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to create lookup table: %w", err)
-			}
-			// link the token + token pool lookup table + token mint
-			labels := datastore.NewLabelSet(input.TokenPool.String())
-			addresses = append(addresses, datastore.AddressRef{
-				Address:       table.String(),
-				ChainSelector: chain.Selector,
-				Labels:        labels,
-				Type:          datastore.ContractType(TokenPoolLookupTableType),
-				Version:       Version,
-				Qualifier:     input.TokenMint.String(),
-			})
-			list := solana.PublicKeySlice{
-				table,                 // 0
-				tokenAdminRegistryPDA, // 1
-				input.TokenPool,       // 2
-				tokenPoolConfigPDA,    // 3 - writable
-				poolTokenAccount,      // 4 - writable
-				tokenPoolSigner,       // 5
-				input.TokenProgramID,  // 6
-				input.TokenMint,       // 7 - writable
-				feeTokenConfigPDA,     // 8
-				routerPoolSignerPDA,   // 9
-			}
-			if err = common.ExtendLookupTable(b.GetContext(), chain.Client, table, *chain.DeployerKey, list); err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to extend lookup table for token pool (mint: %s): %w", input.TokenMint.String(), err)
-			}
-			if err := common.AwaitSlotChange(b.GetContext(), chain.Client); err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to await slot change while extending lookup table: %w", err)
-			}
-			input.TokenPoolLookupTable = table
-		}
-		writableIndexes := []uint8{3, 4, 7}
 		// we can only sign as either the deployer or the token admin
 		// if there is no admin set, we assume the router authority is timelock
+		tokenAdminRegistryPDA, _, _ := state.FindTokenAdminRegistryPDA(input.TokenMint, input.Router)
 		currentAdmin := GetAuthority(chain, input.Router)
 		var tokenAdminRegistryAccount ccip_common.TokenAdminRegistry
 		if err := chain.GetAccountDataBorshInto(b.GetContext(), tokenAdminRegistryPDA, &tokenAdminRegistryAccount); err == nil {
@@ -363,6 +321,45 @@ var SetPool = operations.NewOperation(
 				currentAdmin = tokenAdminRegistryAccount.Administrator
 			}
 		}
+		// Only works for BnM and LnR pools for now
+		tokenPoolConfigPDA, _ := tokens.TokenPoolConfigAddress(input.TokenMint, input.TokenPool)
+		tokenPoolSigner, _ := tokens.TokenPoolSignerAddress(input.TokenMint, input.TokenPool)
+		poolTokenAccount, _, _ := tokens.FindAssociatedTokenAddress(input.TokenProgramID, input.TokenMint, tokenPoolSigner)
+		feeTokenConfigPDA, _, _ := state.FindFqBillingTokenConfigPDA(input.TokenMint, input.FeeQuoter)
+		routerPoolSignerPDA, _, _ := state.FindExternalTokenPoolsSignerPDA(input.TokenPool, input.Router)
+		table, err := common.CreateLookupTable(b.GetContext(), chain.Client, *chain.DeployerKey)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to create lookup table: %w", err)
+		}
+		// link the token + token pool lookup table + token mint
+		labels := datastore.NewLabelSet(input.TokenPool.String())
+		addresses = append(addresses, datastore.AddressRef{
+			Address:       table.String(),
+			ChainSelector: chain.Selector,
+			Labels:        labels,
+			Type:          datastore.ContractType(TokenPoolLookupTableType),
+			Version:       Version,
+			Qualifier:     input.TokenMint.String(),
+		})
+		list := solana.PublicKeySlice{
+			table,                 // 0
+			tokenAdminRegistryPDA, // 1
+			input.TokenPool,       // 2
+			tokenPoolConfigPDA,    // 3 - writable
+			poolTokenAccount,      // 4 - writable
+			tokenPoolSigner,       // 5
+			input.TokenProgramID,  // 6
+			input.TokenMint,       // 7 - writable
+			feeTokenConfigPDA,     // 8
+			routerPoolSignerPDA,   // 9
+		}
+		if err = common.ExtendLookupTable(b.GetContext(), chain.Client, table, *chain.DeployerKey, list); err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to extend lookup table for token pool (mint: %s): %w", input.TokenMint.String(), err)
+		}
+		if err := common.AwaitSlotChange(b.GetContext(), chain.Client); err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to await slot change while extending lookup table: %w", err)
+		}
+		writableIndexes := []uint8{3, 4, 7}
 
 		routerConfigPDA, _, _ := state.FindConfigPDA(input.Router)
 		base := ccip_router.NewSetPoolInstruction(
@@ -370,10 +367,10 @@ var SetPool = operations.NewOperation(
 			routerConfigPDA,
 			tokenAdminRegistryPDA,
 			input.TokenMint,
-			input.TokenPoolLookupTable,
+			table,
 			currentAdmin,
 		)
-		base.AccountMetaSlice = append(base.AccountMetaSlice, solana.Meta(input.TokenPoolLookupTable))
+		base.AccountMetaSlice = append(base.AccountMetaSlice, solana.Meta(table))
 		tempIx, err := base.ValidateAndBuild()
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to build router set pool instruction: %w", err)
@@ -412,7 +409,7 @@ var SetPool = operations.NewOperation(
 var RegisterTokenAdminRegistry = operations.NewOperation(
 	"router:register-token-admin-registry",
 	Version,
-	"Registers a Token Admin Registry with the Router 1.6.0 contract",
+	"Registers a Token Admin Registry with the Router 1.6.1 contract",
 	func(b operations.Bundle, chain cldf_solana.Chain, input TokenAdminRegistryParams) (TokenAdminRegistryOut, error) {
 		ccip_router.SetProgramID(input.Router)
 		routerConfigPDA, _, _ := state.FindConfigPDA(input.Router)
@@ -560,16 +557,18 @@ var RegisterTokenAdminRegistry = operations.NewOperation(
 var AcceptTokenAdminRegistry = operations.NewOperation(
 	"router:accept-token-admin-registry",
 	Version,
-	"Accepts a Token Admin Registry with the Router 1.6.0 contract",
+	"Accepts a Token Admin Registry with the Router 1.6.1 contract",
 	func(b operations.Bundle, chain cldf_solana.Chain, input TokenAdminRegistryParams) (sequences.OnChainOutput, error) {
 		ccip_router.SetProgramID(input.Router)
 		routerConfigPDA, _, _ := state.FindConfigPDA(input.Router)
 		tokenAdminRegistryPDA, _, _ := state.FindTokenAdminRegistryPDA(input.TokenMint, input.Router)
 		var pendingAdmin solana.PublicKey
+		var currentAdmin solana.PublicKey
 		var tokenAdminRegistryAccount ccip_common.TokenAdminRegistry
 		if err := chain.GetAccountDataBorshInto(b.GetContext(), tokenAdminRegistryPDA, &tokenAdminRegistryAccount); err == nil {
 			// NOTE: only set pendingAdmin if the account exists / fetch succeeds
 			pendingAdmin = tokenAdminRegistryAccount.PendingAdministrator
+			currentAdmin = tokenAdminRegistryAccount.Administrator
 		}
 		timelockSigner := utils.GetTimelockSignerPDA(
 			input.ExistingAddresses,
@@ -579,6 +578,10 @@ var AcceptTokenAdminRegistry = operations.NewOperation(
 		if pendingAdmin.IsZero() {
 			// if there is no pending admin, we assume the authority is timelock
 			// but we need to confirm that timelock is indeed the authority
+			if currentAdmin == timelockSigner {
+				b.Logger.Info("No pending admin found, but timelock is already the current admin, skipping accept admin role for token admin registry")
+				return sequences.OnChainOutput{}, nil
+			}
 			if input.Admin != timelockSigner {
 				return sequences.OnChainOutput{}, fmt.Errorf("no pending admin found for token admin registry, expected timelock signer %s but got %s", timelockSigner.String(), input.Admin.String())
 			}
@@ -631,7 +634,7 @@ var AcceptTokenAdminRegistry = operations.NewOperation(
 var TransferTokenAdminRegistry = operations.NewOperation(
 	"router:transfer-token-admin-registry",
 	Version,
-	"Transfers a Token Admin Registry with the Router 1.6.0 contract",
+	"Transfers a Token Admin Registry with the Router 1.6.1 contract",
 	func(b operations.Bundle, chain cldf_solana.Chain, input TokenAdminRegistryParams) (sequences.OnChainOutput, error) {
 		ccip_router.SetProgramID(input.Router)
 		routerConfigPDA, _, _ := state.FindConfigPDA(input.Router)
@@ -707,13 +710,12 @@ type Params struct {
 }
 
 type PoolParams struct {
-	Router               solana.PublicKey
-	FeeQuoter            solana.PublicKey
-	TokenMint            solana.PublicKey
-	TokenProgramID       solana.PublicKey
-	TokenPool            solana.PublicKey
-	TokenPoolLookupTable solana.PublicKey
-	TokenPoolType        string
+	Router         solana.PublicKey
+	FeeQuoter      solana.PublicKey
+	TokenMint      solana.PublicKey
+	TokenProgramID solana.PublicKey
+	TokenPool      solana.PublicKey
+	TokenPoolType  string
 }
 
 type TokenAdminRegistryParams struct {

@@ -20,8 +20,8 @@ import (
 
 var ConfigureLaneLegAsSource = operations.NewSequence(
 	"ConfigureLaneLegAsSource",
-	semver.MustParse("1.6.0"),
-	"Configures lane leg as source on CCIP 1.6.0",
+	semver.MustParse("1.6.1"),
+	"Configures lane leg as source on CCIP 1.6.1",
 	func(b operations.Bundle, chains cldf_chain.BlockChains, input lanes.UpdateLanesInput) (sequences.OnChainOutput, error) {
 		var result sequences.OnChainOutput
 		b.Logger.Infof("SVM Configuring lane leg as source: %+v", input)
@@ -62,8 +62,8 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 
 var ConfigureLaneLegAsDest = operations.NewSequence(
 	"ConfigureLaneLegAsDest",
-	semver.MustParse("1.6.0"),
-	"Configures lane leg as destination on CCIP 1.6.0",
+	semver.MustParse("1.6.1"),
+	"Configures lane leg as destination on CCIP 1.6.1",
 	func(b operations.Bundle, chains cldf_chain.BlockChains, input lanes.UpdateLanesInput) (sequences.OnChainOutput, error) {
 		var result sequences.OnChainOutput
 		b.Logger.Infof("SVM Configuring lane leg as destination: %+v", input)
@@ -86,10 +86,10 @@ var ConfigureLaneLegAsDest = operations.NewSequence(
 
 		// Add DestChain to OffRamp
 		offRampOut, err := operations.ExecuteOperation(b, offrampops.ConnectChains, chains.SolanaChains()[input.Dest.Selector], offrampops.ConnectChainsParams{
-			RemoteChainSelector: input.Source.Selector,
-			OffRamp:             offRampAddress,
-			SourceOnRamp:        input.Source.OnRamp,
-			EnabledAsSource:     !input.IsDisabled,
+			RemoteChainSelector:       input.Source.Selector,
+			OffRamp:                   offRampAddress,
+			SourceOnRamp:              input.Source.OnRamp,
+			EnabledAsSource:           !input.IsDisabled,
 			IsRMNVerificationDisabled: !input.Source.RMNVerificationEnabled,
 		})
 		if err != nil {

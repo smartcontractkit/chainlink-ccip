@@ -85,8 +85,8 @@ func (a *FeesAdapter) GetOnchainTokenTransferFeeConfig(e cldf.Environment, src u
 func (a *FeesAdapter) SetTokenTransferFee(e cldf.Environment) *operations.Sequence[fees.SetTokenTransferFeeSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return operations.NewSequence(
 		"SetTokenTransferFee",
-		semver.MustParse("1.6.0"),
-		"Sets token transfer fee configuration on CCIP 1.6.0 FeeQuoter contracts",
+		semver.MustParse("1.6.1"),
+		"Sets token transfer fee configuration on CCIP 1.6.1 FeeQuoter contracts",
 		func(b operations.Bundle, chains cldf_chain.BlockChains, input fees.SetTokenTransferFeeSequenceInput) (sequences.OnChainOutput, error) {
 			var result sequences.OnChainOutput
 			src := input.Selector

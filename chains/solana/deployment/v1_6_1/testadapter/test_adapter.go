@@ -53,7 +53,7 @@ var (
 )
 
 func init() {
-	testadapters.GetTestAdapterRegistry().RegisterTestAdapter(chain_selectors.FamilySolana, semver.MustParse("1.6.0"), NewSVMAdapter)
+	testadapters.GetTestAdapterRegistry().RegisterTestAdapter(chain_selectors.FamilySolana, semver.MustParse("1.6.1"), NewSVMAdapter)
 }
 
 type SVMAdapter struct {
@@ -518,7 +518,7 @@ func (a *SVMAdapter) GetTokenExpansionConfig() tokensapi.TokenExpansionInputPerC
 	mintAmnt := new(big.Int).Mul(oneToken, big.NewInt(1_000_000)) // pre-mint 1 million tokens
 
 	return tokensapi.TokenExpansionInputPerChain{
-		TokenPoolVersion: cciputils.Version_1_6_0,
+		TokenPoolVersion: cciputils.Version_1_6_1,
 		DeployTokenInput: &tokensapi.DeployTokenInput{
 			Decimals:               DefaultTokenDecimals,
 			Symbol:                 "TEST_TOKEN_" + suffix,

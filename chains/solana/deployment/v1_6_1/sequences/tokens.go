@@ -25,7 +25,7 @@ import (
 func (a *SolanaAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[tokenapi.ConfigureTokenForTransfersInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return cldf_ops.NewSequence(
 		"solana-adapter:configure-token-for-transfers",
-		common_utils.Version_1_6_0,
+		common_utils.Version_1_6_1,
 		"Configure a token for cross-chain transfers across multiple chains",
 		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokenapi.ConfigureTokenForTransfersInput) (sequences.OnChainOutput, error) {
 			var result sequences.OnChainOutput
@@ -137,7 +137,7 @@ func (a *SolanaAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[
 					localDecimals,
 					remoteChainConfig.RemoteDecimals,
 					chain.Family(),
-					common_utils.Version_1_6_0,
+					common_utils.Version_1_6_1,
 				)
 				result.Addresses = append(result.Addresses, upsertOut.Output.Addresses...)
 				result.BatchOps = append(result.BatchOps, upsertOut.Output.BatchOps...)
@@ -193,7 +193,7 @@ func (a *SolanaAdapter) DeriveTokenPoolCounterpart(e deployment.Environment, cha
 func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualRegistrationSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return cldf_ops.NewSequence(
 		"svm-adapter:manual-registration",
-		common_utils.Version_1_6_0,
+		common_utils.Version_1_6_1,
 		"Manually register a token and token pool on Solana Chain",
 		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokenapi.ManualRegistrationSequenceInput) (sequences.OnChainOutput, error) {
 			var result sequences.OnChainOutput
@@ -323,7 +323,7 @@ func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualR
 func (a *SolanaAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokenapi.TPRLRemotes, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return operations.NewSequence(
 		"SetTokenPoolRateLimits",
-		common_utils.Version_1_6_0,
+		common_utils.Version_1_6_1,
 		"Sets rate limits for a token pool on Solana",
 		func(b operations.Bundle, chains cldf_chain.BlockChains, input tokenapi.TPRLRemotes) (sequences.OnChainOutput, error) {
 			chain := chains.SolanaChains()[input.ChainSelector]
@@ -366,7 +366,7 @@ func (a *SolanaAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokenapi.TPR
 func (a *SolanaAdapter) DeployToken() *cldf_ops.Sequence[tokenapi.DeployTokenInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return operations.NewSequence(
 		"DeployToken",
-		common_utils.Version_1_6_0,
+		common_utils.Version_1_6_1,
 		"Deploys a token contract on Solana",
 		func(b operations.Bundle, chains cldf_chain.BlockChains, input tokenapi.DeployTokenInput) (sequences.OnChainOutput, error) {
 			var result sequences.OnChainOutput
@@ -437,7 +437,7 @@ func (a *SolanaAdapter) DeployTokenVerify(e deployment.Environment, in tokenapi.
 func (a *SolanaAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokenapi.DeployTokenPoolInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return operations.NewSequence(
 		"DeployTokenPoolForToken",
-		common_utils.Version_1_6_0,
+		common_utils.Version_1_6_1,
 		"Configures a token pool for a given token on Solana. Doesn't actually deploy a new token pool contract, as Solana token pools are just accounts.",
 		func(b operations.Bundle, chains cldf_chain.BlockChains, input tokenapi.DeployTokenPoolInput) (sequences.OnChainOutput, error) {
 			var result sequences.OnChainOutput
@@ -573,7 +573,7 @@ func getTokenMintAndTokenProgram(store datastore.DataStore, tokenRef datastore.A
 func (a *SolanaAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokenapi.UpdateAuthoritiesInput, sequences.OnChainOutput, *deployment.Environment] {
 	return cldf_ops.NewSequence(
 		"svm-adapter:update-authorities",
-		common_utils.Version_1_6_0,
+		common_utils.Version_1_6_1,
 		"Update authorities for a token and token pool on Solana Chain",
 		func(b cldf_ops.Bundle, e *deployment.Environment, input tokenapi.UpdateAuthoritiesInput) (sequences.OnChainOutput, error) {
 			var result sequences.OnChainOutput

@@ -41,7 +41,7 @@ func (a *SolanaAdapter) GetChainMetadata(e deployment.Environment, chainSelector
 			e.DataStore.Addresses().Filter(),
 			chainSelector,
 			common_utils.ProposerManyChainMultisig,
-			common_utils.Version_1_6_0,
+			common_utils.Version_1_6_1,
 			input.Qualifier,
 		)
 		id, seed, err = mcms_solana.ParseContractAddress(addr.Address)
@@ -53,7 +53,7 @@ func (a *SolanaAdapter) GetChainMetadata(e deployment.Environment, chainSelector
 			e.DataStore.Addresses().Filter(),
 			chainSelector,
 			common_utils.CancellerManyChainMultisig,
-			common_utils.Version_1_6_0,
+			common_utils.Version_1_6_1,
 			input.Qualifier,
 		)
 		id, seed, err = mcms_solana.ParseContractAddress(addr.Address)
@@ -65,7 +65,7 @@ func (a *SolanaAdapter) GetChainMetadata(e deployment.Environment, chainSelector
 			e.DataStore.Addresses().Filter(),
 			chainSelector,
 			common_utils.BypasserManyChainMultisig,
-			common_utils.Version_1_6_0,
+			common_utils.Version_1_6_1,
 			input.Qualifier,
 		)
 		id, seed, err = mcms_solana.ParseContractAddress(addr.Address)
@@ -87,21 +87,21 @@ func (a *SolanaAdapter) GetChainMetadata(e deployment.Environment, chainSelector
 		e.DataStore.Addresses().Filter(),
 		chainSelector,
 		utils.ProposerAccessControllerAccount,
-		common_utils.Version_1_6_0,
+		common_utils.Version_1_6_1,
 		input.Qualifier,
 	)
 	cancellerAccount := datastore.GetAddressRef(
 		e.DataStore.Addresses().Filter(),
 		chainSelector,
 		utils.CancellerAccessControllerAccount,
-		common_utils.Version_1_6_0,
+		common_utils.Version_1_6_1,
 		input.Qualifier,
 	)
 	bypasserAccount := datastore.GetAddressRef(
 		e.DataStore.Addresses().Filter(),
 		chainSelector,
 		utils.BypasserAccessControllerAccount,
-		common_utils.Version_1_6_0,
+		common_utils.Version_1_6_1,
 		input.Qualifier,
 	)
 	metadata, err := mcms_solana.NewChainMetadata(
@@ -122,7 +122,7 @@ func (a *SolanaAdapter) GetTimelockRef(e deployment.Environment, chainSelector u
 		e.DataStore.Addresses().Filter(),
 		chainSelector,
 		common_utils.RBACTimelock,
-		common_utils.Version_1_6_0,
+		common_utils.Version_1_6_1,
 		input.Qualifier,
 	)
 	return ref, nil
@@ -133,7 +133,7 @@ func (a *SolanaAdapter) GetMCMSRef(e deployment.Environment, chainSelector uint6
 		e.DataStore.Addresses().Filter(),
 		chainSelector,
 		utils.McmProgramType,
-		common_utils.Version_1_6_0,
+		common_utils.Version_1_6_1,
 		input.Qualifier,
 	)
 	return mcmAddress, nil

@@ -11,7 +11,7 @@ func init() {
 	curseRegistry := fastcurse.GetCurseRegistry()
 	curseRegistry.RegisterNewCurse(fastcurse.CurseRegistryInput{
 		CursingFamily:       chainsel.FamilySolana,
-		CursingVersion:      semver.MustParse("1.6.0"),
+		CursingVersion:      semver.MustParse("1.6.1"),
 		CurseAdapter:        NewCurseAdapter(),
 		CurseSubjectAdapter: NewCurseAdapter(),
 	})

@@ -24,7 +24,7 @@ import (
 var (
 	ContractType cldf_deployment.ContractType = "RMNRemote"
 	ProgramName                               = "rmn_remote"
-	Version      *semver.Version              = semver.MustParse("1.6.0")
+	Version      *semver.Version              = semver.MustParse("1.6.1")
 )
 
 type CurseInput struct {
@@ -59,7 +59,7 @@ var Deploy = operations.NewOperation(
 var Initialize = operations.NewOperation(
 	"rmn-remote:initialize",
 	Version,
-	"Initializes the RMNRemote 1.6.0 contract",
+	"Initializes the RMNRemote 1.6.1 contract",
 	func(b operations.Bundle, chain cldf_solana.Chain, input Params) (sequences.OnChainOutput, error) {
 		rmn_remote.SetProgramID(input.RMNRemote)
 		programData, err := utils.GetSolProgramData(chain.Client, input.RMNRemote)
@@ -91,7 +91,7 @@ var Initialize = operations.NewOperation(
 var TransferOwnership = operations.NewOperation(
 	"rmn-remote:transfer-ownership",
 	Version,
-	"Transfers ownership of the RMNRemote 1.6.0 contract to a new authority",
+	"Transfers ownership of the RMNRemote 1.6.1 contract to a new authority",
 	func(b operations.Bundle, chain cldf_solana.Chain, input utils.TransferOwnershipParams) (sequences.OnChainOutput, error) {
 		rmn_remote.SetProgramID(input.Program)
 		authority := GetAuthority(chain, input.Program)
@@ -133,7 +133,7 @@ var TransferOwnership = operations.NewOperation(
 var AcceptOwnership = operations.NewOperation(
 	"rmn-remote:accept-ownership",
 	Version,
-	"Accepts ownership of the RMNRemote 1.6.0 contract",
+	"Accepts ownership of the RMNRemote 1.6.1 contract",
 	func(b operations.Bundle, chain cldf_solana.Chain, input utils.TransferOwnershipParams) (sequences.OnChainOutput, error) {
 		rmn_remote.SetProgramID(input.Program)
 		configPDA, _, _ := state.FindConfigPDA(input.Program)

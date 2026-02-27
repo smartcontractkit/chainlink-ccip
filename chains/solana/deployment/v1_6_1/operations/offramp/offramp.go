@@ -27,7 +27,7 @@ var (
 	ContractType    cldf_deployment.ContractType = "OffRamp"
 	SourceChainType cldf_deployment.ContractType = "RemoteSource"
 	ProgramName                                  = "ccip_offramp"
-	Version         *semver.Version              = semver.MustParse("1.6.0")
+	Version         *semver.Version              = semver.MustParse("1.6.1")
 )
 
 type Params struct {
@@ -70,7 +70,7 @@ var Deploy = operations.NewOperation(
 var Initialize = operations.NewOperation(
 	"off-ramp:initialize",
 	Version,
-	"Initializes the OffRamp 1.6.0 contract",
+	"Initializes the OffRamp 1.6.1 contract",
 	func(b operations.Bundle, chain cldf_solana.Chain, input Params) (sequences.OnChainOutput, error) {
 		ccip_offramp.SetProgramID(input.OffRamp)
 		programData, err := utils.GetSolProgramData(chain.Client, input.OffRamp)
@@ -123,7 +123,7 @@ var Initialize = operations.NewOperation(
 var InitializeConfig = operations.NewOperation(
 	"off-ramp:initialize-config",
 	Version,
-	"Initializes the config of the OffRamp 1.6.0 contract",
+	"Initializes the config of the OffRamp 1.6.1 contract",
 	func(b operations.Bundle, chain cldf_solana.Chain, input Params) (sequences.OnChainOutput, error) {
 		ccip_offramp.SetProgramID(input.OffRamp)
 		programData, err := utils.GetSolProgramData(chain.Client, input.OffRamp)
@@ -155,7 +155,7 @@ var InitializeConfig = operations.NewOperation(
 var ConnectChains = operations.NewOperation(
 	"off-ramp:connect-chains",
 	Version,
-	"Connects the OffRamp 1.6.0 contract to other chains",
+	"Connects the OffRamp 1.6.1 contract to other chains",
 	func(b operations.Bundle, chain cldf_solana.Chain, input ConnectChainsParams) (sequences.OnChainOutput, error) {
 		b.Logger.Infof("Connecting OffRamp to remote chain %+v", input)
 		ccip_offramp.SetProgramID(input.OffRamp)
@@ -247,7 +247,7 @@ var ConnectChains = operations.NewOperation(
 var SetOcr3 = operations.NewOperation(
 	"off-ramp:set-ocr3",
 	Version,
-	"Sets the OCR3 configuration for the OffRamp 1.6.0 contract",
+	"Sets the OCR3 configuration for the OffRamp 1.6.1 contract",
 	func(b operations.Bundle, chain cldf_solana.Chain, input SetOcr3Params) (sequences.OnChainOutput, error) {
 		ccip_offramp.SetProgramID(input.OffRamp)
 		authority := GetAuthority(chain, input.OffRamp)
@@ -322,7 +322,7 @@ var SetOcr3 = operations.NewOperation(
 var TransferOwnership = operations.NewOperation(
 	"off-ramp:transfer-ownership",
 	Version,
-	"Transfers ownership of the OffRamp 1.6.0 contract to a new authority",
+	"Transfers ownership of the OffRamp 1.6.1 contract to a new authority",
 	func(b operations.Bundle, chain cldf_solana.Chain, input utils.TransferOwnershipParams) (sequences.OnChainOutput, error) {
 		ccip_offramp.SetProgramID(input.Program)
 		authority := GetAuthority(chain, input.Program)
@@ -362,7 +362,7 @@ var TransferOwnership = operations.NewOperation(
 var AcceptOwnership = operations.NewOperation(
 	"off-ramp:accept-ownership",
 	Version,
-	"Accepts ownership of the OffRamp 1.6.0 contract",
+	"Accepts ownership of the OffRamp 1.6.1 contract",
 	func(b operations.Bundle, chain cldf_solana.Chain, input utils.TransferOwnershipParams) (sequences.OnChainOutput, error) {
 		ccip_offramp.SetProgramID(input.Program)
 		configPDA, _, _ := state.FindConfigPDA(input.Program)

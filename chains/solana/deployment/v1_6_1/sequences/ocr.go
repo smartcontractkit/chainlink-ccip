@@ -19,7 +19,7 @@ func (a *SolanaAdapter) SetOCR3Config() *cldf_ops.Sequence[deployops.SetOCR3Conf
 
 var SetOCR3Config = cldf_ops.NewSequence(
 	"setocr3config",
-	semver.MustParse("1.6.0"),
+	semver.MustParse("1.6.1"),
 	"Set OCR3 Config on Solana chains",
 	func(b operations.Bundle, chains cldf_chain.BlockChains, input deployops.SetOCR3ConfigInput) (output sequences.OnChainOutput, err error) {
 		var result sequences.OnChainOutput

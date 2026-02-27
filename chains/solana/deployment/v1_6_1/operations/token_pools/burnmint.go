@@ -24,7 +24,7 @@ var BurnMintProgramName = "burnmint_token_pool"
 
 var DeployBurnMint = operations.NewOperation(
 	"burnmint:deploy",
-	common_utils.Version_1_6_0,
+	common_utils.Version_1_6_1,
 	"Deploys the BurnMintTokenPool program",
 	func(b operations.Bundle, chain cldf_solana.Chain, input []datastore.AddressRef) (datastore.AddressRef, error) {
 		return utils.MaybeDeployContract(
@@ -32,7 +32,7 @@ var DeployBurnMint = operations.NewOperation(
 			chain,
 			input,
 			common_utils.BurnMintTokenPool,
-			common_utils.Version_1_6_0,
+			common_utils.Version_1_6_1,
 			"",
 			BurnMintProgramName)
 	},
@@ -40,7 +40,7 @@ var DeployBurnMint = operations.NewOperation(
 
 var InitializeBurnMint = operations.NewOperation(
 	"burnmint:initialize",
-	common_utils.Version_1_6_0,
+	common_utils.Version_1_6_1,
 	"Initializes the BurnMintTokenPool program",
 	func(b operations.Bundle, chain cldf_solana.Chain, input Params) (PoolInitializeOut, error) {
 		batches := make([]types.BatchOperation, 0)
@@ -104,7 +104,7 @@ var InitializeBurnMint = operations.NewOperation(
 
 var InitGlobalConfigBurnMint = operations.NewOperation(
 	"burnmint:global_config",
-	common_utils.Version_1_6_0,
+	common_utils.Version_1_6_1,
 	"Initializes the BurnMintTokenPool global config",
 	func(b operations.Bundle, chain cldf_solana.Chain, input Params) (sequences.OnChainOutput, error) {
 		return initGlobalConfigTokenPool(b, chain, input, initGlobalCfgParams{
@@ -128,7 +128,7 @@ var InitGlobalConfigBurnMint = operations.NewOperation(
 
 var TransferMintAuthorityBurnMint = operations.NewOperation(
 	"burnmint:transfer_mint_authority",
-	common_utils.Version_1_6_0,
+	common_utils.Version_1_6_1,
 	"Transfers the mint authority of the token pool's mint",
 	func(b operations.Bundle, chain cldf_solana.Chain, input Params) (sequences.OnChainOutput, error) {
 		burnmint_token_pool.SetProgramID(input.TokenPool)
@@ -184,7 +184,7 @@ var TransferMintAuthorityBurnMint = operations.NewOperation(
 
 var UpsertRemoteChainConfigBurnMint = operations.NewOperation(
 	"burnmint:init_chain_remote_config",
-	common_utils.Version_1_6_0,
+	common_utils.Version_1_6_1,
 	"Initializes the BurnMintTokenPool chain remote config",
 	func(b operations.Bundle, chain cldf_solana.Chain, input RemoteChainConfig) (sequences.OnChainOutput, error) {
 		burnmint_token_pool.SetProgramID(input.TokenPool)
@@ -340,7 +340,7 @@ var UpsertRemoteChainConfigBurnMint = operations.NewOperation(
 
 var UpsertRateLimitsBurnMint = operations.NewOperation(
 	"burnmint:rate_limits",
-	common_utils.Version_1_6_0,
+	common_utils.Version_1_6_1,
 	"Initializes the BurnMintTokenPool rate limits for a remote chain",
 	func(b operations.Bundle, chain cldf_solana.Chain, input RemoteChainConfig) (sequences.OnChainOutput, error) {
 		burnmint_token_pool.SetProgramID(input.TokenPool)
@@ -406,7 +406,7 @@ var UpsertRateLimitsBurnMint = operations.NewOperation(
 
 var TransferOwnershipBurnMint = operations.NewOperation(
 	"burnmint:transfer-ownership",
-	common_utils.Version_1_6_0,
+	common_utils.Version_1_6_1,
 	"Transfers ownership of the BurnMintTokenPool token mint PDA to a new authority",
 	func(b operations.Bundle, chain cldf_solana.Chain, input TokenPoolTransferOwnershipInput) (sequences.OnChainOutput, error) {
 		burnmint_token_pool.SetProgramID(input.Program)
@@ -455,7 +455,7 @@ var TransferOwnershipBurnMint = operations.NewOperation(
 
 var AcceptOwnershipBurnMint = operations.NewOperation(
 	"burnmint:accept-ownership",
-	common_utils.Version_1_6_0,
+	common_utils.Version_1_6_1,
 	"Accepts ownership of the BurnMintTokenPool token mint PDA",
 	func(b operations.Bundle, chain cldf_solana.Chain, input TokenPoolTransferOwnershipInput) (sequences.OnChainOutput, error) {
 		burnmint_token_pool.SetProgramID(input.Program)
@@ -503,10 +503,19 @@ var AcceptOwnershipBurnMint = operations.NewOperation(
 
 var UpdateRateLimitAdminBurnMint = operations.NewOperation(
 	"burnmint:update-rate-limit-admin",
-	common_utils.Version_1_6_0,
+	common_utils.Version_1_6_1,
 	"Updates the rate limit admin for a BurnMintTokenPool remote chain config",
 	func(b operations.Bundle, chain cldf_solana.Chain, input TokenPoolTransferOwnershipInput) (sequences.OnChainOutput, error) {
 		burnmint_token_pool.SetProgramID(input.Program)
+		poolConfigPDA, _ := tokens.TokenPoolConfigAddress(input.TokenMint, input.Program)
+		var chainConfig test_token_pool.State
+		err := chain.GetAccountDataBorshInto(b.GetContext(), poolConfigPDA, &chainConfig)
+		if err == nil {
+			if chainConfig.Config.RateLimitAdmin == input.NewOwner {
+				b.Logger.Info("New owner is the same as the current rate limit admin for burn mint token pool with token mint:", input.TokenMint.String())
+				return sequences.OnChainOutput{}, nil
+			}
+		}
 		authority, err := GetAuthorityBurnMint(chain, input.Program, input.TokenMint)
 		if err != nil {
 			// assume the authority is the upgrade authority if we fail to fetch the current authority, since the pool might not be initialized yet and there won't be an authority set on-chain yet (since the config account won't exist until initialization)
@@ -522,7 +531,6 @@ var UpdateRateLimitAdminBurnMint = operations.NewOperation(
 				return sequences.OnChainOutput{}, nil
 			}
 		}
-		poolConfigPDA, _ := tokens.TokenPoolConfigAddress(input.TokenMint, input.Program)
 		ixn, err := burnmint_token_pool.NewSetRateLimitAdminInstruction(
 			input.TokenMint,
 			input.NewOwner,

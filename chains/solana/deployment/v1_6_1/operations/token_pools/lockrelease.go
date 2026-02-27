@@ -24,7 +24,7 @@ var LockReleaseProgramName = "lockrelease_token_pool"
 
 var DeployLockRelease = operations.NewOperation(
 	"lockrelease:deploy",
-	common_utils.Version_1_6_0,
+	common_utils.Version_1_6_1,
 	"Deploys the LockReleaseTokenPool program",
 	func(b operations.Bundle, chain cldf_solana.Chain, input []datastore.AddressRef) (datastore.AddressRef, error) {
 		return utils.MaybeDeployContract(
@@ -32,7 +32,7 @@ var DeployLockRelease = operations.NewOperation(
 			chain,
 			input,
 			common_utils.LockReleaseTokenPool,
-			common_utils.Version_1_6_0,
+			common_utils.Version_1_6_1,
 			"",
 			LockReleaseProgramName)
 	},
@@ -40,7 +40,7 @@ var DeployLockRelease = operations.NewOperation(
 
 var InitializeLockRelease = operations.NewOperation(
 	"lockrelease:initialize",
-	common_utils.Version_1_6_0,
+	common_utils.Version_1_6_1,
 	"Initializes the LockReleaseTokenPool program",
 	func(b operations.Bundle, chain cldf_solana.Chain, input Params) (PoolInitializeOut, error) {
 		batches := make([]types.BatchOperation, 0)
@@ -102,7 +102,7 @@ var InitializeLockRelease = operations.NewOperation(
 
 var InitGlobalConfigLockRelease = operations.NewOperation(
 	"lockrelease:global_config",
-	common_utils.Version_1_6_0,
+	common_utils.Version_1_6_1,
 	"Initializes the LockReleaseTokenPool global config",
 	func(b operations.Bundle, chain cldf_solana.Chain, input Params) (sequences.OnChainOutput, error) {
 		return initGlobalConfigTokenPool(b, chain, input, initGlobalCfgParams{
@@ -126,7 +126,7 @@ var InitGlobalConfigLockRelease = operations.NewOperation(
 
 var UpsertRemoteChainConfigLockRelease = operations.NewOperation(
 	"lockrelease:init_chain_remote_config",
-	common_utils.Version_1_6_0,
+	common_utils.Version_1_6_1,
 	"Initializes the LockReleaseTokenPool chain remote config",
 	func(b operations.Bundle, chain cldf_solana.Chain, input RemoteChainConfig) (sequences.OnChainOutput, error) {
 		lockrelease_token_pool.SetProgramID(input.TokenPool)
@@ -282,7 +282,7 @@ var UpsertRemoteChainConfigLockRelease = operations.NewOperation(
 
 var UpsertRateLimitsLockRelease = operations.NewOperation(
 	"lockrelease:rate_limits",
-	common_utils.Version_1_6_0,
+	common_utils.Version_1_6_1,
 	"Initializes the LockReleaseTokenPool rate limits for a remote chain",
 	func(b operations.Bundle, chain cldf_solana.Chain, input RemoteChainConfig) (sequences.OnChainOutput, error) {
 		lockrelease_token_pool.SetProgramID(input.TokenPool)
@@ -348,7 +348,7 @@ var UpsertRateLimitsLockRelease = operations.NewOperation(
 
 var TransferOwnershipLockRelease = operations.NewOperation(
 	"lockrelease:transfer-ownership",
-	common_utils.Version_1_6_0,
+	common_utils.Version_1_6_1,
 	"Transfers ownership of the LockReleaseTokenPool token mint PDA to a new authority",
 	func(b operations.Bundle, chain cldf_solana.Chain, input TokenPoolTransferOwnershipInput) (sequences.OnChainOutput, error) {
 		lockrelease_token_pool.SetProgramID(input.Program)
@@ -397,7 +397,7 @@ var TransferOwnershipLockRelease = operations.NewOperation(
 
 var AcceptOwnershipLockRelease = operations.NewOperation(
 	"lockrelease:accept-ownership",
-	common_utils.Version_1_6_0,
+	common_utils.Version_1_6_1,
 	"Accepts ownership of the LockReleaseTokenPool token mint PDA",
 	func(b operations.Bundle, chain cldf_solana.Chain, input TokenPoolTransferOwnershipInput) (sequences.OnChainOutput, error) {
 		lockrelease_token_pool.SetProgramID(input.Program)
@@ -445,10 +445,19 @@ var AcceptOwnershipLockRelease = operations.NewOperation(
 
 var UpdateRateLimitAdminLockRelease = operations.NewOperation(
 	"lockrelease:update-rate-limit-admin",
-	common_utils.Version_1_6_0,
+	common_utils.Version_1_6_1,
 	"Updates the rate limit admin for a LockReleaseTokenPool remote chain config",
 	func(b operations.Bundle, chain cldf_solana.Chain, input TokenPoolTransferOwnershipInput) (sequences.OnChainOutput, error) {
 		lockrelease_token_pool.SetProgramID(input.Program)
+		poolConfigPDA, _ := tokens.TokenPoolConfigAddress(input.TokenMint, input.Program)
+		var chainConfig test_token_pool.State
+		err := chain.GetAccountDataBorshInto(b.GetContext(), poolConfigPDA, &chainConfig)
+		if err == nil {
+			if chainConfig.Config.RateLimitAdmin == input.NewOwner {
+				b.Logger.Info("New owner is the same as the current rate limit admin for lock release token pool with token mint:", input.TokenMint.String())
+				return sequences.OnChainOutput{}, nil
+			}
+		}
 		authority, err := GetAuthorityLockRelease(chain, input.Program, input.TokenMint)
 		if err != nil {
 			// assume the authority is the upgrade authority if we fail to fetch the current authority, since the pool might not be initialized yet and there won't be an authority set on-chain yet (since the config account won't exist until initialization)
@@ -464,7 +473,6 @@ var UpdateRateLimitAdminLockRelease = operations.NewOperation(
 				return sequences.OnChainOutput{}, nil
 			}
 		}
-		poolConfigPDA, _ := tokens.TokenPoolConfigAddress(input.TokenMint, input.Program)
 		ixn, err := lockrelease_token_pool.NewSetRateLimitAdminInstruction(
 			input.TokenMint,
 			input.NewOwner,

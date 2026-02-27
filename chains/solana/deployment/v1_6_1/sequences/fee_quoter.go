@@ -27,8 +27,8 @@ func (a *SolanaAdapter) SetTokenTransferFee() *cldf_ops.Sequence[FeeQuoterSetTok
 
 var SetTokenTransferFeeConfig = cldf_ops.NewSequence(
 	"fee-quoter:set-token-transfer-fee-config",
-	semver.MustParse("1.6.0"),
-	"Sets token transfer fee configs on the FeeQuoter 1.6.0 contract",
+	semver.MustParse("1.6.1"),
+	"Sets token transfer fee configs on the FeeQuoter 1.6.1 contract",
 	func(b operations.Bundle, chains cldf_chain.BlockChains, input FeeQuoterSetTokenTransferFeeConfigSequenceInput) (sequences.OnChainOutput, error) {
 		var result sequences.OnChainOutput
 		chain, ok := chains.SolanaChains()[input.Selector]

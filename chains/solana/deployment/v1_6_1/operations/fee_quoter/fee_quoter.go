@@ -21,7 +21,7 @@ import (
 var (
 	ContractType cldf_deployment.ContractType = "FeeQuoter"
 	ProgramName                               = "fee_quoter"
-	Version      *semver.Version              = semver.MustParse("1.6.0")
+	Version      *semver.Version              = semver.MustParse("1.6.1")
 )
 
 type ConnectChainsParams struct {
@@ -50,7 +50,7 @@ var Deploy = operations.NewOperation(
 var Initialize = operations.NewOperation(
 	"fee-quoter:initialize",
 	Version,
-	"Initializes the FeeQuoter 1.6.0 contract",
+	"Initializes the FeeQuoter 1.6.1 contract",
 	func(b operations.Bundle, chain cldf_solana.Chain, input Params) (sequences.OnChainOutput, error) {
 		fee_quoter.SetProgramID(input.FeeQuoter)
 		programData, err := utils.GetSolProgramData(chain.Client, input.FeeQuoter)
@@ -83,7 +83,7 @@ var Initialize = operations.NewOperation(
 var AddPriceUpdater = operations.NewOperation(
 	"fee-quoter:add-price-updater",
 	Version,
-	"Adds a price updater to the FeeQuoter 1.6.0 contract",
+	"Adds a price updater to the FeeQuoter 1.6.1 contract",
 	func(b operations.Bundle, chain cldf_solana.Chain, input Params) (sequences.OnChainOutput, error) {
 		fee_quoter.SetProgramID(input.FeeQuoter)
 		authority := GetAuthority(chain, input.FeeQuoter)
@@ -123,7 +123,7 @@ var AddPriceUpdater = operations.NewOperation(
 var ConnectChains = operations.NewOperation(
 	"fee-quoter:connect-chains",
 	Version,
-	"Connects the FeeQuoter 1.6.0 contract to other chains",
+	"Connects the FeeQuoter 1.6.1 contract to other chains",
 	func(b operations.Bundle, chain cldf_solana.Chain, input ConnectChainsParams) (sequences.OnChainOutput, error) {
 		fee_quoter.SetProgramID(input.FeeQuoter)
 		isUpdate := false
@@ -188,7 +188,7 @@ var ConnectChains = operations.NewOperation(
 var TransferOwnership = operations.NewOperation(
 	"fee-quoter:transfer-ownership",
 	Version,
-	"Transfers ownership of the FeeQuoter 1.6.0 contract to a new authority",
+	"Transfers ownership of the FeeQuoter 1.6.1 contract to a new authority",
 	func(b operations.Bundle, chain cldf_solana.Chain, input utils.TransferOwnershipParams) (sequences.OnChainOutput, error) {
 		fee_quoter.SetProgramID(input.Program)
 		authority := GetAuthority(chain, input.Program)
@@ -228,7 +228,7 @@ var TransferOwnership = operations.NewOperation(
 var AcceptOwnership = operations.NewOperation(
 	"fee-quoter:accept-ownership",
 	Version,
-	"Accepts ownership of the FeeQuoter 1.6.0 contract",
+	"Accepts ownership of the FeeQuoter 1.6.1 contract",
 	func(b operations.Bundle, chain cldf_solana.Chain, input utils.TransferOwnershipParams) (sequences.OnChainOutput, error) {
 		fee_quoter.SetProgramID(input.Program)
 		configPDA, _, _ := state.FindConfigPDA(input.Program)
@@ -289,7 +289,7 @@ type SetTokenTransferFeeConfigInput struct {
 var SetTokenTransferFeeConfig = operations.NewOperation(
 	"fee-quoter:set-token-transfer-fee-config",
 	Version,
-	"Sets token transfer fee config on the FeeQuoter 1.6.0 contract",
+	"Sets token transfer fee config on the FeeQuoter 1.6.1 contract",
 	func(b operations.Bundle, chain cldf_solana.Chain, input SetTokenTransferFeeConfigInput) (sequences.OnChainOutput, error) {
 		fee_quoter.SetProgramID(input.FeeQuoter)
 		authority := GetAuthority(chain, input.FeeQuoter)
