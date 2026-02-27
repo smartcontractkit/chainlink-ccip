@@ -242,52 +242,6 @@ var ConnectChains = operations.NewOperation(
 	},
 )
 
-type DisableSourceChainParams struct {
-	OffRamp             solana.PublicKey
-	RemoteChainSelector uint64
-}
-
-var DisableSourceChain = operations.NewOperation(
-	"off-ramp:disable-source-chain",
-	Version,
-	"Disables a source chain on the OffRamp, preventing receiving from that chain",
-	func(b operations.Bundle, chain cldf_solana.Chain, input DisableSourceChainParams) (sequences.OnChainOutput, error) {
-		ccip_offramp.SetProgramID(input.OffRamp)
-		authority := GetAuthority(chain, input.OffRamp)
-		offRampConfigPDA, _, _ := state.FindOfframpConfigPDA(input.OffRamp)
-		offRampSourceChainPDA, _, _ := state.FindOfframpSourceChainPDA(input.RemoteChainSelector, input.OffRamp)
-
-		instruction, err := ccip_offramp.NewDisableSourceChainSelectorInstruction(
-			input.RemoteChainSelector,
-			offRampSourceChainPDA,
-			offRampConfigPDA,
-			authority,
-		).ValidateAndBuild()
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to build disable source chain instruction: %w", err)
-		}
-
-		if authority != chain.DeployerKey.PublicKey() {
-			batches, err := utils.BuildMCMSBatchOperation(
-				chain.Selector,
-				[]solana.Instruction{instruction},
-				input.OffRamp.String(),
-				ContractType.String(),
-			)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to create MCMS batch for disable source chain: %w", err)
-			}
-			return sequences.OnChainOutput{BatchOps: []types.BatchOperation{batches}}, nil
-		}
-
-		err = chain.Confirm([]solana.Instruction{instruction})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm disable source chain: %w", err)
-		}
-		return sequences.OnChainOutput{}, nil
-	},
-)
-
 var SetOcr3 = operations.NewOperation(
 	"off-ramp:set-ocr3",
 	Version,
