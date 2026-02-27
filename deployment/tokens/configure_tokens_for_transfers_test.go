@@ -518,7 +518,9 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 				},
 				MCMS: basicMCMSInput,
 			},
-			expectedSequenceErrorMsg: "missing token transfer config for remote chain",
+			// Datastore has no addresses for chain 15971525489660198786. Depending on map iteration order we either
+			// fail resolving the token pool for that chain or fail resolving the remote pool ref when converting config.
+			expectedSequenceErrorMsg: "failed to resolve",
 		},
 		{
 			desc: "failure to resolve remote token ref",

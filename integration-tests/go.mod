@@ -26,8 +26,10 @@ require (
 	github.com/ethereum/go-ethereum v1.17.0
 	github.com/gagliardetto/solana-go v1.13.0
 	github.com/smartcontractkit/chain-selectors v1.0.97
-	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20260121163256-85accaf3d28d
-	github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment v0.0.0-00010101000000-000000000000
+	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20260226020752-a84269b47491
+	github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm v0.0.0-20260226020752-a84269b47491
+	github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment v0.0.0-00010101000000-000000000000
+	github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment v0.0.0-20260226020752-a84269b47491
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20260121163256-85accaf3d28d
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment v0.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20260206132835-4c50734ccf2a
@@ -91,6 +93,8 @@ require (
 	github.com/cpuguy83/dockercfg v0.3.2 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.7 // indirect
 	github.com/crate-crypto/go-eth-kzg v1.4.0 // indirect
+	github.com/creachadair/jrpc2 v1.2.0 // indirect
+	github.com/creachadair/mds v0.13.4 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dchest/siphash v1.2.3 // indirect
 	github.com/deckarep/golang-set/v2 v2.6.0 // indirect
