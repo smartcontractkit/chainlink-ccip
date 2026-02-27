@@ -405,6 +405,28 @@ func RunSmokeTests(t *testing.T, e *deployment.Environment, selectors []uint64) 
 
 		})
 
+		t.Run(fmt.Sprintf("%s RMN - arbitrary message from a cursed source chain", laneTag), func(t *testing.T) {
+			err := toImpl.RMNSetSourceChainCursed(t.Context(), fromImpl.ChainSelector(), true)
+			require.NoError(t, err)
+			t.Cleanup(func() {
+				err := toImpl.RMNSetSourceChainCursed(t.Context(), fromImpl.ChainSelector(), false)
+				require.NoError(t, err)
+			})
+
+			receiver := toImpl.CCIPReceiver()
+
+			extraArgs, err := toImpl.GetExtraArgs(receiver, fromImpl.Family())
+			require.NoError(t, err)
+
+			_, err = fromImpl.BuildMessage(testadapters.MessageComponents{
+				DestChainSelector: toImpl.ChainSelector(),
+				Receiver:          receiver,
+				Data:              []byte("hello world"),
+				ExtraArgs:         extraArgs,
+			})
+			require.Error(t, err)
+		})
+
 		t.Run(fmt.Sprintf("%s OOO flag is required on non-EVMs", laneTag), func(t *testing.T) {
 			if fromImpl.Family() != chainsel.FamilyEVM || toImpl.Family() != chainsel.FamilyEVM {
 				t.Skip("EVM->EVM still supports OOO, depending on config")
