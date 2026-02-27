@@ -45,7 +45,7 @@ func TestUpdateMCMSConfigSolana(t *testing.T) {
 	mcmsRef, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
 		ChainSelector: solanaChains[0],
 		Type:          datastore.ContractType(utils.McmProgramType),
-		Qualifier:     deploymentutils.CLLQualifier,
+		Qualifier:     "",
 		Version:       semver.MustParse("1.6.0"),
 	}, solanaChains[0], datastore_utils.FullRef)
 	require.NoError(t, err)
