@@ -98,7 +98,7 @@ func processTokenConfigForChain(e deployment.Environment, cfg map[uint64]TokenTr
 		}
 		adapter, ok := tokenRegistry.GetTokenAdapter(family, token.TokenPoolRef.Version)
 		if !ok {
-			return nil, nil, nil, fmt.Errorf("no token adapter registered for chain family '%s' and chain adapter version '%s'", family, chainAdapterVersion)
+			return nil, nil, nil, fmt.Errorf("no token adapter registered for chain family '%s' and version '%s'", family, token.TokenPoolRef.Version)
 		}
 
 		remoteChains := make(map[uint64]RemoteChainConfig[[]byte, string], len(token.RemoteChains))
@@ -109,7 +109,7 @@ func processTokenConfigForChain(e deployment.Environment, cfg map[uint64]TokenTr
 			}
 			remoteAdapter, ok := tokenRegistry.GetTokenAdapter(remoteFamily, inCfg.RemotePool.Version)
 			if !ok {
-				return nil, nil, nil, fmt.Errorf("no token adapter registered for chain family '%s' and chain adapter version '%s'", remoteFamily, chainAdapterVersion)
+				return nil, nil, nil, fmt.Errorf("no token adapter registered for chain family '%s' and version '%s'", remoteFamily, inCfg.RemotePool.Version)
 			}
 			counterpart, ok := cfg[remoteChainSelector]
 			if !ok {
@@ -191,7 +191,7 @@ func convertRemoteChainConfig(
 			outCfg.RemoteToken, err = datastore_utils.FindAndFormatRef(e.DataStore, *inCfg.RemoteToken, remoteChainSelector, remoteAdapter.AddressRefToBytes)
 			if err != nil {
 				e.Logger.Warnf("failed to resolve remote token ref %s: %v. Will attempt to derive remote token address from pool reference", datastore_utils.SprintRef(*inCfg.RemoteToken), err)
-				outCfg.RemoteToken, err = adapter.DeriveTokenAddress(e, remoteChainSelector, fullRemotePoolRef)
+				outCfg.RemoteToken, err = remoteAdapter.DeriveTokenAddress(e, remoteChainSelector, fullRemotePoolRef)
 				if err != nil {
 					return outCfg, fmt.Errorf("failed to resolve remote token ref via pool ref (%s) for remote chain selector %d: %w", datastore_utils.SprintRef(*inCfg.RemotePool), remoteChainSelector, err)
 				}
