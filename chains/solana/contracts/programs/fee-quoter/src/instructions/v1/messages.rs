@@ -1,7 +1,13 @@
 use anchor_lang::prelude::*;
 
-use ccip_common::v1::{validate_evm_address, validate_svm_address};
-use ccip_common::{CommonCcipError, CHAIN_FAMILY_SELECTOR_EVM, CHAIN_FAMILY_SELECTOR_SVM};
+use ccip_common::v1::{
+    validate_aptos_address, validate_evm_address, validate_sui_address, validate_svm_address,
+    validate_tvm_address,
+};
+use ccip_common::{
+    CommonCcipError, CHAIN_FAMILY_SELECTOR_APTOS, CHAIN_FAMILY_SELECTOR_EVM,
+    CHAIN_FAMILY_SELECTOR_SUI, CHAIN_FAMILY_SELECTOR_SVM, CHAIN_FAMILY_SELECTOR_TVM,
+};
 
 use crate::extra_args::{
     GenericExtraArgsV2, SVMExtraArgsV1, GENERIC_EXTRA_ARGS_V2_TAG, SVM_EXTRA_ARGS_MAX_ACCOUNTS,
@@ -69,10 +75,13 @@ fn validate_dest_family_address(
 ) -> Result<()> {
     let selector = u32::from_be_bytes(chain_family_selector);
     match selector {
+        CHAIN_FAMILY_SELECTOR_APTOS => validate_aptos_address(&msg.receiver),
         CHAIN_FAMILY_SELECTOR_EVM => validate_evm_address(&msg.receiver),
+        CHAIN_FAMILY_SELECTOR_SUI => validate_sui_address(&msg.receiver),
         CHAIN_FAMILY_SELECTOR_SVM => {
             validate_svm_address(&msg.receiver, msg_extra_args.gas_limit > 0)
         }
+        CHAIN_FAMILY_SELECTOR_TVM => validate_tvm_address(&msg.receiver),
         _ => Err(CommonCcipError::InvalidChainFamilySelector.into()),
     }
 }
@@ -326,36 +335,72 @@ pub mod tests {
     }
 
     #[test]
-    fn process_extra_args_matches_family() {
+    fn process_extra_args_matches_family_evm_and_unknown() {
         let evm_dest_chain = sample_dest_chain();
-        let mut svm_dest_chain = sample_dest_chain();
-        svm_dest_chain.config.chain_family_selector = CHAIN_FAMILY_SELECTOR_SVM.to_be_bytes();
-        let evm_tag_bytes = GENERIC_EXTRA_ARGS_V2_TAG.to_be_bytes().to_vec();
-        let svm_tag_bytes = SVM_EXTRA_ARGS_V1_TAG.to_be_bytes().to_vec();
         let mut none_dest_chain = sample_dest_chain();
         none_dest_chain.config.chain_family_selector = [0; 4];
 
-        // evm - tag but no data fails
+        let svm_tag_bytes = SVM_EXTRA_ARGS_V1_TAG.to_be_bytes().to_vec();
+
+        // EVM behaves like generic.
+        assert_generic_family_behaviour(&evm_dest_chain, &svm_tag_bytes);
+
+        // Unknown family selector also behaves like generic.
+        assert_generic_family_behaviour(&none_dest_chain, &svm_tag_bytes);
+    }
+
+    #[test]
+    fn process_extra_args_matches_family_svm() {
+        let mut svm_dest_chain = sample_dest_chain();
+        svm_dest_chain.config.chain_family_selector = CHAIN_FAMILY_SELECTOR_SVM.to_be_bytes();
+
+        let generic_tag_bytes = GENERIC_EXTRA_ARGS_V2_TAG.to_be_bytes().to_vec();
+        assert_svm_family_behaviour(&svm_dest_chain, &generic_tag_bytes);
+    }
+
+    #[test]
+    fn process_extra_args_matches_family_tvm() {
+        let mut tvm_dest_chain = sample_dest_chain();
+        tvm_dest_chain.config.chain_family_selector = CHAIN_FAMILY_SELECTOR_TVM.to_be_bytes();
+
+        let svm_tag_bytes = SVM_EXTRA_ARGS_V1_TAG.to_be_bytes().to_vec();
+        assert_generic_family_behaviour(&tvm_dest_chain, &svm_tag_bytes);
+    }
+
+    #[test]
+    fn process_extra_args_matches_family_aptos() {
+        let mut aptos_dest_chain = sample_dest_chain();
+        aptos_dest_chain.config.chain_family_selector = CHAIN_FAMILY_SELECTOR_APTOS.to_be_bytes();
+
+        let svm_tag_bytes = SVM_EXTRA_ARGS_V1_TAG.to_be_bytes().to_vec();
+        assert_generic_family_behaviour(&aptos_dest_chain, &svm_tag_bytes);
+    }
+
+    fn assert_generic_family_behaviour(dest_chain: &DestChain, other_family_tag: &[u8]) {
+        let generic_tag_bytes = GENERIC_EXTRA_ARGS_V2_TAG.to_be_bytes().to_vec();
+
+        // tag but no data fails
         assert_eq!(
-            process_extra_args(&evm_dest_chain.config, &evm_tag_bytes, false).unwrap_err(),
+            process_extra_args(&dest_chain.config, &generic_tag_bytes, false).unwrap_err(),
             FeeQuoterError::InvalidInputsMissingDataAfterExtraArgs.into()
         );
 
-        // evm - default case: (no data or tag)
-        let extra_args = process_extra_args(&evm_dest_chain.config, &[], false).unwrap();
+        // default case: (no data or tag)
+        let extra_args = process_extra_args(&dest_chain.config, &[], false).unwrap();
         assert_eq!(
             extra_args.bytes[..4],
             GENERIC_EXTRA_ARGS_V2_TAG.to_be_bytes()
         );
         assert_eq!(
             extra_args.gas_limit,
-            evm_dest_chain.config.default_tx_gas_limit as u128
+            dest_chain.config.default_tx_gas_limit as u128
         );
         assert!(!extra_args.allow_out_of_order_execution);
+        assert_eq!(extra_args.token_receiver, None);
 
-        // evm - passed in data
+        // passed in data
         let extra_args = process_extra_args(
-            &evm_dest_chain.config,
+            &dest_chain.config,
             &GenericExtraArgsV2 {
                 gas_limit: 100,
                 allow_out_of_order_execution: true,
@@ -372,32 +417,17 @@ pub mod tests {
         assert!(extra_args.allow_out_of_order_execution);
         assert_eq!(extra_args.token_receiver, None);
 
-        // unknown family - uses generic (same as evm) tag
-        let extra_args = process_extra_args(
-            &none_dest_chain.config,
-            &GenericExtraArgsV2 {
-                gas_limit: 100,
-                allow_out_of_order_execution: true,
-            }
-            .serialize_with_tag(),
-            false,
-        )
-        .unwrap();
+        // fail to match an unrelated family's tag
         assert_eq!(
-            extra_args.bytes[..4],
-            GENERIC_EXTRA_ARGS_V2_TAG.to_be_bytes()
-        );
-        assert_eq!(extra_args.gas_limit, 100);
-        assert!(extra_args.allow_out_of_order_execution);
-        assert_eq!(extra_args.token_receiver, None);
-
-        // evm - fail to match
-        assert_eq!(
-            process_extra_args(&evm_dest_chain.config, &svm_tag_bytes, false).unwrap_err(),
+            process_extra_args(&dest_chain.config, other_family_tag, false).unwrap_err(),
             FeeQuoterError::InvalidExtraArgsTag.into()
         );
+    }
 
-        // svm - default case
+    fn assert_svm_family_behaviour(svm_dest_chain: &DestChain, generic_tag_bytes: &[u8]) {
+        let svm_tag_bytes = SVM_EXTRA_ARGS_V1_TAG.to_be_bytes().to_vec();
+
+        // default case requires the SVM tag bytes
         let extra_args = process_extra_args(&svm_dest_chain.config, &svm_tag_bytes, false).unwrap();
         assert_eq!(extra_args.bytes[..4], SVM_EXTRA_ARGS_V1_TAG.to_be_bytes());
         assert_eq!(
@@ -408,19 +438,19 @@ pub mod tests {
         assert_eq!(extra_args.token_receiver, None);
         assert!(!extra_args.allow_out_of_order_execution);
 
-        // svm - empty tag (no data) fails
+        // empty tag (no data) fails
         assert_eq!(
             process_extra_args(&svm_dest_chain.config, &[], false).unwrap_err(),
             FeeQuoterError::InvalidInputsMissingExtraArgs.into()
         );
 
-        // svm - contains tokens but no receiver address
+        // contains tokens but no receiver address
         assert_eq!(
             process_extra_args(&svm_dest_chain.config, &svm_tag_bytes, true).unwrap_err(),
             FeeQuoterError::InvalidTokenReceiver.into(),
         );
 
-        // svm - passed in data
+        // passed in data
         let token_receiver = Pubkey::try_from("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTa")
             .unwrap()
             .to_bytes();
@@ -445,9 +475,9 @@ pub mod tests {
         assert_eq!(extra_args.token_receiver, Some(token_receiver.to_vec()));
         assert!(extra_args.allow_out_of_order_execution);
 
-        // svm - fail to match
+        // fail to match generic tag
         assert_eq!(
-            process_extra_args(&svm_dest_chain.config, &evm_tag_bytes, false).unwrap_err(),
+            process_extra_args(&svm_dest_chain.config, generic_tag_bytes, false).unwrap_err(),
             FeeQuoterError::InvalidExtraArgsTag.into()
         );
     }

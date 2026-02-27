@@ -806,9 +806,17 @@ func TestCCIPRouter(t *testing.T) {
 				config.RMNRemoteProgram,
 				programData.Address,
 			).ValidateAndBuild()
-
 			require.NoError(t, err)
-			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, legacyAdmin, config.DefaultCommitment)
+
+			ix2, err := rmn_remote.NewSetEventAuthoritiesInstruction(
+				[]solana.PublicKey{config.BillingSignerPDA},
+				config.RMNRemoteConfigPDA,
+				legacyAdmin.PublicKey(),
+				solana.SystemProgramID,
+			).ValidateAndBuild()
+			require.NoError(t, err)
+
+			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix, ix2}, legacyAdmin, config.DefaultCommitment)
 			require.NotNil(t, result)
 		})
 	})
@@ -2078,6 +2086,22 @@ func TestCCIPRouter(t *testing.T) {
 				require.NoError(t, err, "failed to get account info")
 			}
 			require.Equal(t, solana.PublicKey{}, configAccount.ProposedOwner)
+		})
+	})
+
+	/////////////////////
+	// RMNRemote Tests //
+	/////////////////////
+	t.Run("RMNRemote", func(t *testing.T) {
+		t.Run("Unauthorized event authorities cannot invoke cpi_event", func(t *testing.T) {
+			ix, err := rmn_remote.NewCpiEventInstruction(
+				[]byte("test"),
+				config.RMNRemoteConfigPDA,
+				anotherUser.PublicKey(), // not an authorized event authority
+			).ValidateAndBuild()
+			require.NoError(t, err)
+			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, anotherUser, config.DefaultCommitment, []string{"Error Code: " + ccip.Unauthorized_RmnRemoteError.String()})
+			// the positive case of successful cpi_event calls is covered in the CCIP Send onramp tests
 		})
 	})
 
@@ -4270,6 +4294,28 @@ func TestCCIPRouter(t *testing.T) {
 			hash, err := ccip.HashSVMToAnyMessage(ccipMessageSentEvent.Message)
 			require.NoError(t, err)
 			require.Equal(t, hash, ccipMessageSentEvent.Message.Header.MessageId[:])
+
+			tx, err := result.Transaction.GetTransaction()
+			require.NoError(t, err)
+
+			foundEvent := false
+			for _, innerIx := range result.Meta.InnerInstructions {
+				for _, ix := range innerIx.Instructions {
+					programID, err := testutils.GetProgramID(tx, result.Meta, ix.ProgramIDIndex)
+					require.NoError(t, err)
+					if programID == config.RMNRemoteProgram && [8]byte(ix.Data[0:8]) == [8]byte(rmn_remote.Instruction_CpiEvent[:]) {
+						foundEvent = true
+						lenPrefix := binary.LittleEndian.Uint32(ix.Data[8:12])
+						require.Equal(t, uint32(288), lenPrefix) // this event with this msg data & receiver is 288 bytes long
+						eventData := ix.Data[12:]
+						cpiEvent, err := common.UnmarshalAnchorType[ccip.EventCCIPMessageSent](eventData)
+						require.NoError(t, err)
+						require.Equal(t, ccipMessageSentEvent, *cpiEvent)
+						break
+					}
+				}
+			}
+			require.True(t, foundEvent, "Did not find CCIPMessageSent event emitted via CPI to RMNRemote")
 		})
 
 		t.Run("When sending a CCIP Message with ExtraArgs overrides Emits CCIPMessageSent", func(t *testing.T) {
@@ -4956,6 +5002,8 @@ func TestCCIPRouter(t *testing.T) {
 			})
 
 			t.Run("two tokens", func(t *testing.T) {
+				t.Skip() // we will no longer support 2 tokens at once
+
 				_, initBal0, err := tokens.TokenBalance(ctx, solanaGoClient, token0.User[user.PublicKey()], config.DefaultCommitment)
 				require.NoError(t, err)
 				_, initBal1, err := tokens.TokenBalance(ctx, solanaGoClient, token1.User[user.PublicKey()], config.DefaultCommitment)
@@ -5513,6 +5561,8 @@ func TestCCIPRouter(t *testing.T) {
 		})
 
 		t.Run("Two tokens transferred with derived accounts", func(t *testing.T) {
+			t.Skip() // we will no longer support 2 tokens at once
+
 			_, initBal0, err := tokens.TokenBalance(ctx, solanaGoClient, token0.User[user.PublicKey()], config.DefaultCommitment)
 			require.NoError(t, err)
 			_, initBal1, err := tokens.TokenBalance(ctx, solanaGoClient, token1.User[user.PublicKey()], config.DefaultCommitment)
@@ -5698,7 +5748,7 @@ func TestCCIPRouter(t *testing.T) {
 
 		token0ATAIx, token0SenderATA, err := tokens.CreateAssociatedTokenAccount(token0.Program, token0.Mint, senderPDA, user.PublicKey())
 		require.NoError(t, err)
-		token1ATAIx, token1SenderATA, err := tokens.CreateAssociatedTokenAccount(token1.Program, token1.Mint, senderPDA, user.PublicKey())
+		token1ATAIx /*token1SenderATA*/, _, err := tokens.CreateAssociatedTokenAccount(token1.Program, token1.Mint, senderPDA, user.PublicKey())
 		require.NoError(t, err)
 
 		t.Run("setup", func(t *testing.T) {
@@ -5832,14 +5882,14 @@ func TestCCIPRouter(t *testing.T) {
 										Token:  token0.Mint,
 										Amount: 1,
 									},
-									{
-										Token:  token1.Mint,
-										Amount: 2,
-									},
+									// {
+									// 	Token:  token1.Mint,
+									// 	Amount: 2,
+									// },
 								},
 								[]byte{1, 2, 3}, // message data
 								fc.feeToken,     // empty fee token to indicate native SOL
-								[]uint8{2, 16},
+								[]uint8{1},      // []uint8{2, 16},
 								senderState,
 								cc.senderChainConfig,
 								senderPDA,
@@ -5868,17 +5918,17 @@ func TestCCIPRouter(t *testing.T) {
 							base.AccountMetaSlice = append(
 								base.AccountMetaSlice,
 								solana.Meta(token0.User[user.PublicKey()]).WRITE(),
-								solana.Meta(token1.User[user.PublicKey()]).WRITE(),
+								// solana.Meta(token1.User[user.PublicKey()]).WRITE(),
 							)
 
 							// pass token pool accounts with the sender program ATA
 							tokenMetas0, addressTables, err := tokens.ParseTokenLookupTableWithChain(ctx, solanaGoClient, token0, token0SenderATA, cc.chainSelector)
 							require.NoError(t, err)
 							base.AccountMetaSlice = append(base.AccountMetaSlice, tokenMetas0...)
-							tokenMetas1, addressTables1, err := tokens.ParseTokenLookupTableWithChain(ctx, solanaGoClient, token1, token1SenderATA, cc.chainSelector)
-							require.NoError(t, err)
-							base.AccountMetaSlice = append(base.AccountMetaSlice, tokenMetas1...)
-							addressTables[token1.PoolLookupTable] = addressTables1[token1.PoolLookupTable]
+							// tokenMetas1, addressTables1, err := tokens.ParseTokenLookupTableWithChain(ctx, solanaGoClient, token1, token1SenderATA, cc.chainSelector)
+							// require.NoError(t, err)
+							// base.AccountMetaSlice = append(base.AccountMetaSlice, tokenMetas1...)
+							// addressTables[token1.PoolLookupTable] = addressTables1[token1.PoolLookupTable]
 							maps.Copy(addressTables, ccipSendLookupTable)
 
 							ix, err := base.ValidateAndBuild()
@@ -5886,10 +5936,10 @@ func TestCCIPRouter(t *testing.T) {
 
 							ixApprove0, err := tokens.TokenApproveChecked(1, token0Decimals, token0.Program, token0.User[user.PublicKey()], token0.Mint, senderPDA, user.PublicKey(), nil)
 							require.NoError(t, err)
-							ixApprove1, err := tokens.TokenApproveChecked(2, token1Decimals, token1.Program, token1.User[user.PublicKey()], token1.Mint, senderPDA, user.PublicKey(), nil)
-							require.NoError(t, err)
+							// ixApprove1, err := tokens.TokenApproveChecked(2, token1Decimals, token1.Program, token1.User[user.PublicKey()], token1.Mint, senderPDA, user.PublicKey(), nil)
+							// require.NoError(t, err)
 
-							testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{ixApprove0, ixApprove1, ix}, user, config.DefaultCommitment, addressTables, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
+							testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{ixApprove0 /*ixApprove1,*/, ix}, user, config.DefaultCommitment, addressTables, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
 						})
 
 						t.Run("When paying with "+fc.name+" and transferring link, it works", func(t *testing.T) {
@@ -5900,14 +5950,14 @@ func TestCCIPRouter(t *testing.T) {
 										Token:  token0.Mint,
 										Amount: 1,
 									},
-									{
-										Token:  linkPool.Mint,
-										Amount: 2,
-									},
+									// {
+									// 	Token:  linkPool.Mint,
+									// 	Amount: 2,
+									// },
 								},
 								[]byte{1, 2, 3}, // message data
 								fc.feeToken,     // empty fee token to indicate native SOL
-								[]uint8{2, 16},
+								[]uint8{1},      // []uint8{2, 16},
 								senderState,
 								cc.senderChainConfig,
 								senderPDA,
@@ -5936,17 +5986,17 @@ func TestCCIPRouter(t *testing.T) {
 							base.AccountMetaSlice = append(
 								base.AccountMetaSlice,
 								solana.Meta(token0.User[user.PublicKey()]).WRITE(),
-								solana.Meta(linkPool.User[user.PublicKey()]).WRITE(),
+								// solana.Meta(linkPool.User[user.PublicKey()]).WRITE(),
 							)
 
 							// pass token pool accounts with the sender program ATA
 							tokenMetas0, addressTables, err := tokens.ParseTokenLookupTableWithChain(ctx, solanaGoClient, token0, token0SenderATA, cc.chainSelector)
 							require.NoError(t, err)
 							base.AccountMetaSlice = append(base.AccountMetaSlice, tokenMetas0...)
-							tokenMetasLink, addressTablesLink, err := tokens.ParseTokenLookupTableWithChain(ctx, solanaGoClient, linkPool, link22SenderATA, cc.chainSelector)
-							require.NoError(t, err)
-							base.AccountMetaSlice = append(base.AccountMetaSlice, tokenMetasLink...)
-							addressTables[linkPool.PoolLookupTable] = addressTablesLink[linkPool.PoolLookupTable]
+							// tokenMetasLink, addressTablesLink, err := tokens.ParseTokenLookupTableWithChain(ctx, solanaGoClient, linkPool, link22SenderATA, cc.chainSelector)
+							// require.NoError(t, err)
+							// base.AccountMetaSlice = append(base.AccountMetaSlice, tokenMetasLink...)
+							// addressTables[linkPool.PoolLookupTable] = addressTablesLink[linkPool.PoolLookupTable]
 							maps.Copy(addressTables, ccipSendLookupTable)
 
 							ix, err := base.ValidateAndBuild()

@@ -143,7 +143,7 @@ func (ma *transfersTest_MockTokenAdapter) DeployToken() *cldf_ops.Sequence[token
 	return &cldf_ops.Sequence[tokens.DeployTokenInput, sequences.OnChainOutput, cldf_chain.BlockChains]{}
 }
 
-func (ma *transfersTest_MockTokenAdapter) DeployTokenVerify(e deployment.Environment, in any) error {
+func (ma *transfersTest_MockTokenAdapter) DeployTokenVerify(e deployment.Environment, in tokens.DeployTokenInput) error {
 	return nil
 }
 
@@ -151,8 +151,8 @@ func (ma *transfersTest_MockTokenAdapter) DeployTokenPoolForToken() *cldf_ops.Se
 	return &cldf_ops.Sequence[tokens.DeployTokenPoolInput, sequences.OnChainOutput, cldf_chain.BlockChains]{}
 }
 
-func (ma *transfersTest_MockTokenAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokens.UpdateAuthoritiesInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
-	return &cldf_ops.Sequence[tokens.UpdateAuthoritiesInput, sequences.OnChainOutput, cldf_chain.BlockChains]{}
+func (ma *transfersTest_MockTokenAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokens.UpdateAuthoritiesInput, sequences.OnChainOutput, *deployment.Environment] {
+	return &cldf_ops.Sequence[tokens.UpdateAuthoritiesInput, sequences.OnChainOutput, *deployment.Environment]{}
 }
 
 var basicMCMSInput = mcms.Input{
@@ -518,7 +518,8 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 				},
 				MCMS: basicMCMSInput,
 			},
-			expectedSequenceErrorMsg: "failed to resolve remote pool ref",
+			// Datastore has no addresses for chain 15971525489660198786; error may be "failed to resolve token pool ref" or "failed to resolve remote pool ref" depending on map iteration order.
+			expectedSequenceErrorMsg: "failed to resolve",
 		},
 		{
 			desc: "failure to resolve remote token ref",
@@ -747,6 +748,7 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 			)
 			e := deployment.Environment{
 				OperationsBundle: bundle,
+				Logger:           lggr,
 				DataStore:        ds.Seal(),
 			}
 
