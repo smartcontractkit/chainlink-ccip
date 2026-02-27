@@ -81,6 +81,7 @@ func TestUpdateMCMSConfigSolana(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Greater(t, len(output.Reports), 0)
+	require.Equal(t, 1, len(output.MCMSTimelockProposals)) ///
 
 	// check that MCMS config is updated correctly
 	mcmSeed = state.PDASeed([]byte(mcmsRef.Address))
