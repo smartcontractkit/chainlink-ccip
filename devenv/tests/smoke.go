@@ -246,7 +246,57 @@ func RunSmokeTests(t *testing.T, e *deployment.Environment, selectors []uint64) 
 		// TODO: message with not enough gas
 		// then manual re-exec with higher limit
 
-		// TODO: test whitelisting
+		t.Run(fmt.Sprintf("%s allowlist enabled", laneTag), func(t *testing.T) {
+			receiver := toImpl.CCIPReceiver()
+
+			err, cleanupAllowlistStatus := fromImpl.SetAllowlist(t.Context(), toImpl.ChainSelector(), true)
+			require.NoError(t, err)
+			t.Cleanup(cleanupAllowlistStatus)
+
+			t.Run("sender allowed", func(t *testing.T) {
+				err, cleanupAllowlistSenderStatus := fromImpl.UpdateSenderAllowlistStatus(t.Context(), toImpl.ChainSelector(), true)
+				require.NoError(t, err)
+				t.Cleanup(cleanupAllowlistSenderStatus)
+
+				extraArgs, err := toImpl.GetExtraArgs(receiver, fromImpl.Family())
+				require.NoError(t, err)
+
+				msg, err := fromImpl.BuildMessage(testadapters.MessageComponents{
+					DestChainSelector: toImpl.ChainSelector(),
+					Receiver:          receiver,
+					Data:              []byte("hello world"),
+					ExtraArgs:         extraArgs,
+				})
+				require.NoError(t, err)
+
+				seq, err := fromImpl.SendMessage(t.Context(), toImpl.ChainSelector(), msg)
+				require.NoError(t, err)
+				seqNr := ccipocr3.SeqNum(seq)
+				seqNumRange := ccipocr3.NewSeqNumRange(seqNr, seqNr)
+				toImpl.ValidateCommit(t, fromImpl.ChainSelector(), nil, seqNumRange)
+				toImpl.ValidateExec(t, fromImpl.ChainSelector(), nil, []uint64{seq})
+			})
+
+			t.Run("sender not allowed", func(t *testing.T) {
+				err, cleanupAllowlistSenderStatus := fromImpl.UpdateSenderAllowlistStatus(t.Context(), toImpl.ChainSelector(), false)
+				require.NoError(t, err)
+				t.Cleanup(cleanupAllowlistSenderStatus)
+
+				extraArgs, err := toImpl.GetExtraArgs(receiver, fromImpl.Family())
+				require.NoError(t, err)
+
+				msg, err := fromImpl.BuildMessage(testadapters.MessageComponents{
+					DestChainSelector: toImpl.ChainSelector(),
+					Receiver:          receiver,
+					Data:              []byte("hello world"),
+					ExtraArgs:         extraArgs,
+				})
+				require.NoError(t, err)
+
+				_, err = fromImpl.SendMessage(t.Context(), toImpl.ChainSelector(), msg)
+				require.Error(t, err)
+			})
+		})
 
 		t.Run(fmt.Sprintf("%s OOO flag is required on non-EVMs", laneTag), func(t *testing.T) {
 			if fromImpl.Family() != chainsel.FamilyEVM || toImpl.Family() != chainsel.FamilyEVM {
