@@ -21,6 +21,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccip/consts"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
@@ -333,6 +334,11 @@ func (a *SVMAdapter) CCIPReceiver() []byte {
 		panic(fmt.Sprintf("failed to get TestReceiver address: %v", err))
 	}
 	return receiver.Bytes()
+}
+
+func (a *SVMAdapter) InvalidCCIPReceivers() [][]byte {
+	// GetExtraArgs fails with invalid pubkey receivers, we'd need to construct a raw payload to test against the contracts
+	return make([][]byte, 0)
 }
 
 func (a *SVMAdapter) SetReceiverRejectAll(ctx context.Context, rejectAll bool) error {
