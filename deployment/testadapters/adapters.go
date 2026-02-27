@@ -132,6 +132,12 @@ type TestAdapter interface {
 
 	// GetRegistryAddress returns the address of the contract on which the token pool must be registered.
 	GetRegistryAddress() (string, error)
+
+	// SetAllowlist activates/deactivates the whitelist
+	SetAllowlist(ctx context.Context, destChainSelector uint64, enabled bool) (err error, cleanup func() /*err?*/)
+
+	// UpdateSenderAllowlistStatus adds/removes senders to/from the whitelist
+	UpdateSenderAllowlistStatus(ctx context.Context, destChainSelector uint64, included bool) (err error, cleanup func() /*err?*/)
 }
 
 type TestAdapterFactory = func(env *deployment.Environment, selector uint64) TestAdapter
