@@ -134,10 +134,10 @@ type TestAdapter interface {
 	GetRegistryAddress() (string, error)
 
 	// SetAllowlist activates/deactivates the whitelist
-	SetAllowlist(ctx context.Context, destChainSelector uint64, enabled bool) (err error, cleanup func() /*err?*/)
+	SetAllowlist(ctx context.Context, destChainSelector uint64, enabled bool) error
 
 	// UpdateSenderAllowlistStatus adds/removes senders to/from the whitelist
-	UpdateSenderAllowlistStatus(ctx context.Context, destChainSelector uint64, included bool) (err error, cleanup func() /*err?*/)
+	UpdateSenderAllowlistStatus(ctx context.Context, destChainSelector uint64, included bool) error
 }
 
 type TestAdapterFactory = func(env *deployment.Environment, selector uint64) TestAdapter
