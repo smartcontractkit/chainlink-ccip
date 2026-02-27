@@ -70,6 +70,28 @@ var ApplyOutboundImplementationUpdates = contract.NewWrite(contract.WriteParams[
 	},
 })
 
+var GetAllInboundImplementations = contract.NewRead(contract.ReadParams[any, []InboundImplementationArgs, *versioned_verifier_resolver.VersionedVerifierResolver]{
+	Name:         "versioned-verifier-resolver:get-all-inbound-implementations",
+	Version:      Version,
+	Description:  "Gets all inbound verifier implementations from the resolver",
+	ContractType: ContractType,
+	NewContract:  versioned_verifier_resolver.NewVersionedVerifierResolver,
+	CallContract: func(resolver *versioned_verifier_resolver.VersionedVerifierResolver, opts *bind.CallOpts, _ any) ([]InboundImplementationArgs, error) {
+		return resolver.GetAllInboundImplementations(opts)
+	},
+})
+
+var GetAllOutboundImplementations = contract.NewRead(contract.ReadParams[any, []OutboundImplementationArgs, *versioned_verifier_resolver.VersionedVerifierResolver]{
+	Name:         "versioned-verifier-resolver:get-all-outbound-implementations",
+	Version:      Version,
+	Description:  "Gets all outbound verifier implementations from the resolver",
+	ContractType: ContractType,
+	NewContract:  versioned_verifier_resolver.NewVersionedVerifierResolver,
+	CallContract: func(resolver *versioned_verifier_resolver.VersionedVerifierResolver, opts *bind.CallOpts, _ any) ([]OutboundImplementationArgs, error) {
+		return resolver.GetAllOutboundImplementations(opts)
+	},
+})
+
 var AcceptOwnership = contract.NewWrite(contract.WriteParams[AcceptOwnershipArgs, *versioned_verifier_resolver.VersionedVerifierResolver]{
 	Name:         "versioned-verifier-resolver:accept-ownership",
 	Version:      Version,

@@ -51,6 +51,8 @@ type ApplyFeeTokensUpdatesArgs struct {
 
 type AuthorizedCallerArgs = fee_quoter.AuthorizedCallersAuthorizedCallerArgs
 
+type TimestampedPackedUint224 = fee_quoter.InternalTimestampedPackedUint224
+
 type ApplyTokenTransferFeeConfigUpdatesArgs struct {
 	TokenTransferFeeConfigArgs   []TokenTransferFeeConfigArgs
 	TokensToUseDefaultFeeConfigs []TokenTransferFeeConfigRemoveArgs
@@ -137,6 +139,17 @@ var UpdatePrices = contract.NewWrite(contract.WriteParams[PriceUpdates, *fee_quo
 	Validate: func(PriceUpdates) error { return nil },
 	CallContract: func(feeQuoter *fee_quoter.FeeQuoter, opts *bind.TransactOpts, args PriceUpdates) (*types.Transaction, error) {
 		return feeQuoter.UpdatePrices(opts, args)
+	},
+})
+
+var GetDestinationChainGasPrice = contract.NewRead(contract.ReadParams[uint64, TimestampedPackedUint224, *fee_quoter.FeeQuoter]{
+	Name:         "fee-quoter-v2:get-destination-chain-gas-price",
+	Version:      Version,
+	Description:  "Gets destination chain gas price from the FeeQuoter",
+	ContractType: ContractType,
+	NewContract:  fee_quoter.NewFeeQuoter,
+	CallContract: func(feeQuoter *fee_quoter.FeeQuoter, opts *bind.CallOpts, destChainSelector uint64) (TimestampedPackedUint224, error) {
+		return feeQuoter.GetDestinationChainGasPrice(opts, destChainSelector)
 	},
 })
 

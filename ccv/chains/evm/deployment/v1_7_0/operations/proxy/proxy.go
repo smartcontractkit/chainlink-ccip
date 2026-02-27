@@ -75,3 +75,14 @@ var GetTarget = contract.NewRead(contract.ReadParams[any, common.Address, *proxy
 		return proxy.GetTarget(opts)
 	},
 })
+
+var GetFeeAggregator = contract.NewRead(contract.ReadParams[any, common.Address, *proxy.Proxy]{
+	Name:         "proxy:get-fee-aggregator",
+	Version:      Version,
+	Description:  "Gets the fee aggregator address on the proxy",
+	ContractType: ContractType,
+	NewContract:  proxy.NewProxy,
+	CallContract: func(proxy *proxy.Proxy, opts *bind.CallOpts, args any) (common.Address, error) {
+		return proxy.GetFeeAggregator(opts)
+	},
+})

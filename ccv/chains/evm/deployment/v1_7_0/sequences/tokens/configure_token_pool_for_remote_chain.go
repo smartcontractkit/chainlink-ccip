@@ -3,11 +3,13 @@ package tokens
 import (
 	"bytes"
 	"fmt"
+	"math/big"
 	"slices"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 
+	burn_mint_token_pool_latest "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/burn_mint_token_pool"
 	tp_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/token_pool"
 	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
@@ -18,6 +20,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/advanced_pool_hooks"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/token_pool"
+	v17seq "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 )
 
 // ConfigureTokenPoolForRemoteChainInput is the input for the ConfigureTokenPoolForRemoteChain sequence.
@@ -77,24 +80,17 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 			token_pool.Version,
 		)
 
-		// Update token transfer fee configuration for the remote chain
-		if input.RemoteChainConfig.TokenTransferFeeConfig.IsEnabled {
+		// Update token transfer fee configuration for the remote chain.
+		tokenTransferFeeConfigUpdates, err := makeTokenTransferFeeConfigUpdates(b, chain, input, input.RemoteChainSelector)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to make token transfer fee config updates: %w", err)
+		}
+		if len(tokenTransferFeeConfigUpdates) > 0 {
 			applyTokenTransferFeeConfigUpdatesReport, err := cldf_ops.ExecuteOperation(b, token_pool.ApplyTokenTransferFeeConfigUpdates, chain, evm_contract.FunctionInput[token_pool.TokenTransferFeeConfigArgs]{
 				ChainSelector: input.ChainSelector,
 				Address:       input.TokenPoolAddress,
 				Args: token_pool.TokenTransferFeeConfigArgs{
-					TokenTransferFeeConfigUpdates: []token_pool.TokenTransferFeeConfigUpdate{
-						{
-							DestChainSelector:                      input.RemoteChainSelector,
-							DestGasOverhead:                        input.RemoteChainConfig.TokenTransferFeeConfig.DestGasOverhead,
-							DestBytesOverhead:                      input.RemoteChainConfig.TokenTransferFeeConfig.DestBytesOverhead,
-							DefaultBlockConfirmationFeeUSDCents:    input.RemoteChainConfig.TokenTransferFeeConfig.DefaultFinalityFeeUSDCents,
-							CustomBlockConfirmationFeeUSDCents:     input.RemoteChainConfig.TokenTransferFeeConfig.CustomFinalityFeeUSDCents,
-							DefaultBlockConfirmationTransferFeeBps: input.RemoteChainConfig.TokenTransferFeeConfig.DefaultFinalityTransferFeeBps,
-							CustomBlockConfirmationTransferFeeBps:  input.RemoteChainConfig.TokenTransferFeeConfig.CustomFinalityTransferFeeBps,
-							IsEnabled:                              input.RemoteChainConfig.TokenTransferFeeConfig.IsEnabled,
-						},
-					},
+					TokenTransferFeeConfigUpdates: tokenTransferFeeConfigUpdates,
 				},
 			})
 			if err != nil {
@@ -103,41 +99,28 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 			writes = append(writes, applyTokenTransferFeeConfigUpdatesReport.Output)
 		}
 
-		// Set the requested CCVs
-		inboundCCVs := make([]common.Address, len(input.RemoteChainConfig.InboundCCVs))
-		for i, addr := range input.RemoteChainConfig.InboundCCVs {
-			inboundCCVs[i] = common.HexToAddress(addr)
-		}
-		outboundCCVs := make([]common.Address, len(input.RemoteChainConfig.OutboundCCVs))
-		for i, addr := range input.RemoteChainConfig.OutboundCCVs {
-			outboundCCVs[i] = common.HexToAddress(addr)
-		}
-		outboundCCVsToAddAboveThreshold := make([]common.Address, len(input.RemoteChainConfig.OutboundCCVsToAddAboveThreshold))
-		for i, addr := range input.RemoteChainConfig.OutboundCCVsToAddAboveThreshold {
-			outboundCCVsToAddAboveThreshold[i] = common.HexToAddress(addr)
-		}
-		inboundCCVsToAddAboveThreshold := make([]common.Address, len(input.RemoteChainConfig.InboundCCVsToAddAboveThreshold))
-		for i, addr := range input.RemoteChainConfig.InboundCCVsToAddAboveThreshold {
-			inboundCCVsToAddAboveThreshold[i] = common.HexToAddress(addr)
-		}
-		if len(inboundCCVs) > 0 || len(outboundCCVs) > 0 || len(outboundCCVsToAddAboveThreshold) > 0 || len(inboundCCVsToAddAboveThreshold) > 0 {
-			setCCVsReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.ApplyCCVConfigUpdates, chain, evm_contract.FunctionInput[[]advanced_pool_hooks.CCVConfigArg]{
-				ChainSelector: input.ChainSelector,
-				Address:       input.AdvancedPoolHooks,
-				Args: []advanced_pool_hooks.CCVConfigArg{
-					{
-						RemoteChainSelector:   input.RemoteChainSelector,
-						OutboundCCVs:          outboundCCVs,
-						ThresholdOutboundCCVs: outboundCCVsToAddAboveThreshold,
-						InboundCCVs:           inboundCCVs,
-						ThresholdInboundCCVs:  inboundCCVsToAddAboveThreshold,
-					},
-				},
-			})
+		// Set CCVs for the remote chain (idempotent: only apply when on-chain differs from desired)
+		if input.AdvancedPoolHooks != (common.Address{}) {
+			ccvArg, needCCVUpdate, err := makeCCVUpdates(b, chain, input.ChainSelector, input.AdvancedPoolHooks, input.RemoteChainSelector,
+				input.RemoteChainConfig.InboundCCVs,
+				input.RemoteChainConfig.OutboundCCVs,
+				input.RemoteChainConfig.InboundCCVsToAddAboveThreshold,
+				input.RemoteChainConfig.OutboundCCVsToAddAboveThreshold,
+			)
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to set CCVs: %w", err)
+				return sequences.OnChainOutput{}, fmt.Errorf("make CCV updates: %w", err)
 			}
-			writes = append(writes, setCCVsReport.Output)
+			if needCCVUpdate && ccvArg != nil {
+				setCCVsReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.ApplyCCVConfigUpdates, chain, evm_contract.FunctionInput[[]advanced_pool_hooks.CCVConfigArg]{
+					ChainSelector: input.ChainSelector,
+					Address:       input.AdvancedPoolHooks,
+					Args:          []advanced_pool_hooks.CCVConfigArg{*ccvArg},
+				})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to set CCVs: %w", err)
+				}
+				writes = append(writes, setCCVsReport.Output)
+			}
 		}
 
 		// Get remote chains that are currently supported by the token pools
@@ -178,8 +161,6 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 					input.TokenPoolAddress,
 					input.RemoteChainSelector,
 					false,
-					localDecimalsReport.Output,
-					input.RemoteChainConfig.RemoteDecimals,
 					customFinalityInboundRateLimiterConfig,
 					customFinalityOutboundRateLimiterConfig,
 					defaultFinalityInboundRateLimiterConfig,
@@ -200,8 +181,6 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 					input.TokenPoolAddress,
 					input.RemoteChainSelector,
 					true,
-					localDecimalsReport.Output,
-					input.RemoteChainConfig.RemoteDecimals,
 					customFinalityInboundRateLimiterConfig,
 					customFinalityOutboundRateLimiterConfig,
 					defaultFinalityInboundRateLimiterConfig,
@@ -274,6 +253,7 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to apply chain updates: %w", err)
 		}
 		writes = append(writes, applyChainUpdatesReport.Output)
+
 		// Check and update custom finality rate limiters
 		customFinalityRateLimitersReport, err := maybeUpdateRateLimiters(
 			b,
@@ -282,8 +262,6 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 			input.TokenPoolAddress,
 			input.RemoteChainSelector,
 			true,
-			localDecimalsReport.Output,
-			input.RemoteChainConfig.RemoteDecimals,
 			customFinalityInboundRateLimiterConfig,
 			customFinalityOutboundRateLimiterConfig,
 			defaultFinalityInboundRateLimiterConfig,
@@ -314,8 +292,6 @@ func maybeUpdateRateLimiters(
 	tokenPoolAddress common.Address,
 	remoteChainSelector uint64,
 	customBlockConfirmation bool,
-	localDecimals uint8,
-	remoteDecimals uint8,
 	customFinalityInboundConfig tokens.RateLimiterConfig,
 	customFinalityOutboundConfig tokens.RateLimiterConfig,
 	defaultFinalityInboundConfig tokens.RateLimiterConfig,
@@ -342,9 +318,12 @@ func maybeUpdateRateLimiters(
 	}
 	currentStates := rateLimiterStateReport.Output
 
-	// Update the rate limiters if they do not match the desired config
-	if !rateLimiterConfigsEqual(currentStates.InboundRateLimiterState, desiredInboundRateLimiterConfig) ||
-		!rateLimiterConfigsEqual(currentStates.OutboundRateLimiterState, desiredOutboundRateLimiterConfig) {
+	// Update the rate limiters if they do not match the desired config.
+	// We only allow updates to the rate limiters, we do not allow disabling them.
+	// This is to reduce the risk of accidentally disabling the rate limiters.
+	// Disabling traffic on a token is allowed, as in this case IsEnabled would be true with rate = capacity = 0.
+	if (!rateLimiterConfigsEqual(currentStates.InboundRateLimiterState, desiredInboundRateLimiterConfig) && desiredInboundRateLimiterConfig.IsEnabled) ||
+		(!rateLimiterConfigsEqual(currentStates.OutboundRateLimiterState, desiredOutboundRateLimiterConfig) && desiredOutboundRateLimiterConfig.IsEnabled) {
 		setInboundRateLimiterReport, err := cldf_ops.ExecuteOperation(b, token_pool.SetRateLimitConfig, chain, evm_contract.FunctionInput[[]token_pool.SetRateLimitConfigArg]{
 			ChainSelector: chainSelector,
 			Address:       tokenPoolAddress,
@@ -371,4 +350,162 @@ func rateLimiterConfigsEqual(current tp_bindings.RateLimiterTokenBucket, desired
 	return current.IsEnabled == desired.IsEnabled &&
 		current.Capacity.Cmp(desired.Capacity) == 0 &&
 		current.Rate.Cmp(desired.Rate) == 0
+}
+
+func makeTokenTransferFeeConfigUpdates(b cldf_ops.Bundle, chain evm.Chain, input ConfigureTokenPoolForRemoteChainInput, remoteChainSelector uint64) ([]token_pool.TokenTransferFeeConfigUpdate, error) {
+	desiredTokenTransferFeeConfig := input.RemoteChainConfig.TokenTransferFeeConfig
+	if !desiredTokenTransferFeeConfig.IsEnabled {
+		return nil, nil
+	}
+
+	report, err := cldf_ops.ExecuteOperation(b, token_pool.GetTokenTransferFeeConfig, chain, evm_contract.FunctionInput[uint64]{
+		ChainSelector: input.ChainSelector,
+		Address:       input.TokenPoolAddress,
+		Args:          remoteChainSelector,
+	})
+	if err != nil {
+		// Print the token pool address and type and version
+		boundTP, _ := burn_mint_token_pool_latest.NewBurnMintTokenPool(input.TokenPoolAddress, chain.Client)
+		typeAndVersion, _ := boundTP.TypeAndVersion(nil)
+		fmt.Println(typeAndVersion)
+		fmt.Println(input.TokenPoolAddress)
+		return nil, fmt.Errorf("failed to get token transfer fee config: %w", err)
+	}
+
+	currentTokenTransferFeeConfig := report.Output
+
+	// Fall back to on-chain values if inputted values are empty
+	if desiredTokenTransferFeeConfig.DestGasOverhead == 0 {
+		desiredTokenTransferFeeConfig.DestGasOverhead = currentTokenTransferFeeConfig.DestGasOverhead
+	}
+	if desiredTokenTransferFeeConfig.DestBytesOverhead == 0 {
+		desiredTokenTransferFeeConfig.DestBytesOverhead = currentTokenTransferFeeConfig.DestBytesOverhead
+	}
+	if desiredTokenTransferFeeConfig.DefaultFinalityFeeUSDCents == 0 {
+		desiredTokenTransferFeeConfig.DefaultFinalityFeeUSDCents = currentTokenTransferFeeConfig.DefaultBlockConfirmationsFeeUSDCents
+	}
+	if desiredTokenTransferFeeConfig.CustomFinalityFeeUSDCents == 0 {
+		desiredTokenTransferFeeConfig.CustomFinalityFeeUSDCents = currentTokenTransferFeeConfig.CustomBlockConfirmationsFeeUSDCents
+	}
+	if desiredTokenTransferFeeConfig.DefaultFinalityTransferFeeBps == 0 {
+		desiredTokenTransferFeeConfig.DefaultFinalityTransferFeeBps = currentTokenTransferFeeConfig.DefaultBlockConfirmationsTransferFeeBps
+	}
+	if desiredTokenTransferFeeConfig.CustomFinalityTransferFeeBps == 0 {
+		desiredTokenTransferFeeConfig.CustomFinalityTransferFeeBps = currentTokenTransferFeeConfig.CustomBlockConfirmationsTransferFeeBps
+	}
+
+	updates := make([]token_pool.TokenTransferFeeConfigUpdate, 0)
+
+	if desiredTokenTransferFeeConfig.DestGasOverhead != currentTokenTransferFeeConfig.DestGasOverhead ||
+		desiredTokenTransferFeeConfig.DestBytesOverhead != currentTokenTransferFeeConfig.DestBytesOverhead ||
+		desiredTokenTransferFeeConfig.DefaultFinalityFeeUSDCents != currentTokenTransferFeeConfig.DefaultBlockConfirmationsFeeUSDCents ||
+		desiredTokenTransferFeeConfig.CustomFinalityFeeUSDCents != currentTokenTransferFeeConfig.CustomBlockConfirmationsFeeUSDCents ||
+		desiredTokenTransferFeeConfig.DefaultFinalityTransferFeeBps != currentTokenTransferFeeConfig.DefaultBlockConfirmationsTransferFeeBps ||
+		desiredTokenTransferFeeConfig.CustomFinalityTransferFeeBps != currentTokenTransferFeeConfig.CustomBlockConfirmationsTransferFeeBps {
+		updates = append(updates, token_pool.TokenTransferFeeConfigUpdate{
+			DestChainSelector:                      remoteChainSelector,
+			DestGasOverhead:                        desiredTokenTransferFeeConfig.DestGasOverhead,
+			DestBytesOverhead:                      desiredTokenTransferFeeConfig.DestBytesOverhead,
+			DefaultBlockConfirmationFeeUSDCents:    desiredTokenTransferFeeConfig.DefaultFinalityFeeUSDCents,
+			CustomBlockConfirmationFeeUSDCents:     desiredTokenTransferFeeConfig.CustomFinalityFeeUSDCents,
+			DefaultBlockConfirmationTransferFeeBps: desiredTokenTransferFeeConfig.DefaultFinalityTransferFeeBps,
+			CustomBlockConfirmationTransferFeeBps:  desiredTokenTransferFeeConfig.CustomFinalityTransferFeeBps,
+			IsEnabled:                              true,
+		})
+	}
+
+	return updates, nil
+}
+
+// makeCCVUpdates returns the CCV config update to apply for the remote chain, or (nil, false, nil) if on-chain
+// state already matches desired. Uses GetRequiredCCVs(amount=0) for standard CCVs and GetRequiredCCVs(amount>threshold)
+// to derive threshold-only CCVs; if an input list is empty, the on-chain value is used for comparison.
+func makeCCVUpdates(b cldf_ops.Bundle, chain evm.Chain, chainSelector uint64, advancedPoolHooksAddr common.Address, remoteChainSelector uint64, inboundCCVs, outboundCCVs, inboundCCVsToAddAboveThreshold, outboundCCVsToAddAboveThreshold []string) (arg *advanced_pool_hooks.CCVConfigArg, needUpdate bool, err error) {
+	// MessageDirection: Outbound = 0, Inbound = 1 (IPoolV2.MessageDirection)
+	const directionInbound uint8 = 1
+	const directionOutbound uint8 = 0
+
+	thresholdReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.GetThresholdAmount, chain, evm_contract.FunctionInput[any]{
+		ChainSelector: chainSelector,
+		Address:       advancedPoolHooksAddr,
+	})
+	if err != nil {
+		return nil, false, fmt.Errorf("get threshold amount: %w", err)
+	}
+	threshold := thresholdReport.Output
+	amountAboveThreshold := new(big.Int).Add(threshold, big.NewInt(1))
+
+	getRequiredCCVs := func(amount *big.Int, direction uint8) ([]common.Address, error) {
+		report, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.GetRequiredCCVs, chain, evm_contract.FunctionInput[advanced_pool_hooks.GetRequiredCCVsArgs]{
+			ChainSelector: chainSelector,
+			Address:       advancedPoolHooksAddr,
+			Args: advanced_pool_hooks.GetRequiredCCVsArgs{
+				RemoteChainSelector: remoteChainSelector,
+				Amount:              amount,
+				Direction:           direction,
+			},
+		})
+		if err != nil {
+			return nil, err
+		}
+		return report.Output, nil
+	}
+
+	stdInbound, err := getRequiredCCVs(big.NewInt(0), directionInbound)
+	if err != nil {
+		return nil, false, fmt.Errorf("get required CCVs inbound amount=0: %w", err)
+	}
+	stdOutbound, err := getRequiredCCVs(big.NewInt(0), directionOutbound)
+	if err != nil {
+		return nil, false, fmt.Errorf("get required CCVs outbound amount=0: %w", err)
+	}
+	aboveInbound, err := getRequiredCCVs(amountAboveThreshold, directionInbound)
+	if err != nil {
+		return nil, false, fmt.Errorf("get required CCVs inbound above threshold: %w", err)
+	}
+	aboveOutbound, err := getRequiredCCVs(amountAboveThreshold, directionOutbound)
+	if err != nil {
+		return nil, false, fmt.Errorf("get required CCVs outbound above threshold: %w", err)
+	}
+	onChainThresholdInbound := v17seq.AddressesNotIn(aboveInbound, stdInbound)
+	onChainThresholdOutbound := v17seq.AddressesNotIn(aboveOutbound, stdOutbound)
+
+	parse := func(ss []string) []common.Address {
+		out := make([]common.Address, len(ss))
+		for i, s := range ss {
+			out[i] = common.HexToAddress(s)
+		}
+		return out
+	}
+	desiredInbound := parse(inboundCCVs)
+	if len(desiredInbound) == 0 {
+		desiredInbound = stdInbound
+	}
+	desiredOutbound := parse(outboundCCVs)
+	if len(desiredOutbound) == 0 {
+		desiredOutbound = stdOutbound
+	}
+	desiredThresholdInbound := parse(inboundCCVsToAddAboveThreshold)
+	if len(desiredThresholdInbound) == 0 {
+		desiredThresholdInbound = onChainThresholdInbound
+	}
+	desiredThresholdOutbound := parse(outboundCCVsToAddAboveThreshold)
+	if len(desiredThresholdOutbound) == 0 {
+		desiredThresholdOutbound = onChainThresholdOutbound
+	}
+
+	addrEq := func(a, b common.Address) bool { return a == b }
+	if v17seq.UnorderedSliceEqual(desiredInbound, stdInbound, addrEq) &&
+		v17seq.UnorderedSliceEqual(desiredOutbound, stdOutbound, addrEq) &&
+		v17seq.UnorderedSliceEqual(desiredThresholdInbound, onChainThresholdInbound, addrEq) &&
+		v17seq.UnorderedSliceEqual(desiredThresholdOutbound, onChainThresholdOutbound, addrEq) {
+		return nil, false, nil
+	}
+	return &advanced_pool_hooks.CCVConfigArg{
+		RemoteChainSelector:   remoteChainSelector,
+		OutboundCCVs:          desiredOutbound,
+		ThresholdOutboundCCVs: desiredThresholdOutbound,
+		InboundCCVs:           desiredInbound,
+		ThresholdInboundCCVs:  desiredThresholdInbound,
+	}, true, nil
 }

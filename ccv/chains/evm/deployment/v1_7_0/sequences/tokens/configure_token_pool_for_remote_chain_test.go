@@ -102,8 +102,9 @@ func checkTokenPoolConfigForRemoteChain(t *testing.T, e *deployment.Environment,
 
 func TestConfigureTokenPoolForRemoteChain(t *testing.T) {
 	tests := []struct {
-		desc                string
-		makeSecondPassInput func(chainSel uint64, remoteChainSel uint64, tokenPoolAddress common.Address, advancedPoolHooksAddress common.Address) tokens.ConfigureTokenPoolForRemoteChainInput
+		desc                              string
+		makeSecondPassInput               func(chainSel uint64, remoteChainSel uint64, tokenPoolAddress common.Address, advancedPoolHooksAddress common.Address) tokens.ConfigureTokenPoolForRemoteChainInput
+		checkWithFirstPassInputAfterSecond bool // when true, assert on-chain state matches first pass (for empty-input fallback tests)
 	}{
 		{
 			desc: "initial configuration",
@@ -151,6 +152,24 @@ func TestConfigureTokenPoolForRemoteChain(t *testing.T) {
 				secondPassInput.RemoteChainConfig.OutboundCCVs = []string{"0x789", "0x790"}
 				return secondPassInput
 			},
+		},
+		{
+			desc: "idempotent second pass same config",
+			makeSecondPassInput: func(chainSel uint64, remoteChainSel uint64, tokenPoolAddress common.Address, advancedPoolHooksAddress common.Address) tokens.ConfigureTokenPoolForRemoteChainInput {
+				return makeFirstPassInput(chainSel, remoteChainSel, tokenPoolAddress, advancedPoolHooksAddress)
+			},
+		},
+		{
+			desc: "second pass with empty CCV lists falls back to on-chain",
+			makeSecondPassInput: func(chainSel uint64, remoteChainSel uint64, tokenPoolAddress common.Address, advancedPoolHooksAddress common.Address) tokens.ConfigureTokenPoolForRemoteChainInput {
+				secondPassInput := makeFirstPassInput(chainSel, remoteChainSel, tokenPoolAddress, advancedPoolHooksAddress)
+				secondPassInput.RemoteChainConfig.InboundCCVs = nil
+				secondPassInput.RemoteChainConfig.OutboundCCVs = nil
+				secondPassInput.RemoteChainConfig.InboundCCVsToAddAboveThreshold = nil
+				secondPassInput.RemoteChainConfig.OutboundCCVsToAddAboveThreshold = nil
+				return secondPassInput
+			},
+			checkWithFirstPassInputAfterSecond: true, // empty CCV input should fall back to on-chain, so state stays as first pass
 		},
 	}
 
@@ -223,7 +242,11 @@ func TestConfigureTokenPoolForRemoteChain(t *testing.T) {
 				)
 				require.NoError(t, err, "ExecuteSequence should not error")
 
-				checkTokenPoolConfigForRemoteChain(t, e, chainSel, remoteChainSel, secondPassInput)
+				checkInput := secondPassInput
+				if test.checkWithFirstPassInputAfterSecond {
+					checkInput = firstPassInput
+				}
+				checkTokenPoolConfigForRemoteChain(t, e, chainSel, remoteChainSel, checkInput)
 			}
 		})
 	}

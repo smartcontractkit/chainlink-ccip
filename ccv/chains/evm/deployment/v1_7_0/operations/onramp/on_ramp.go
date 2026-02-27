@@ -100,3 +100,14 @@ var GetDestChainConfig = contract.NewRead(contract.ReadParams[uint64, DestChainC
 		return onRamp.GetDestChainConfig(opts, args)
 	},
 })
+
+var GetDynamicConfig = contract.NewRead(contract.ReadParams[struct{}, DynamicConfig, *onramp.OnRamp]{
+	Name:         "on-ramp:get-dynamic-config",
+	Version:      Version,
+	Description:  "Gets the dynamic configuration on the OnRamp",
+	ContractType: ContractType,
+	NewContract:  onramp.NewOnRamp,
+	CallContract: func(onRamp *onramp.OnRamp, opts *bind.CallOpts, args struct{}) (DynamicConfig, error) {
+		return onRamp.GetDynamicConfig(opts)
+	},
+})
