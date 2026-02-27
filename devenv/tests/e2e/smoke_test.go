@@ -7,8 +7,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/stretchr/testify/require"
 
+	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -16,6 +18,7 @@ import (
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 
+	_ "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testadapters"
 	ccip "github.com/smartcontractkit/chainlink-ccip/devenv"
 )
@@ -56,8 +59,11 @@ func TestE2ESmoke(t *testing.T) {
 		name         string
 		fromSelector uint64
 		toSelector   uint64
+		needFQ2Check bool
 	}
 	tcs := []testcase{}
+	// build this separately so we can run after the non-2.0 FQ tests
+	fq2tcs := []testcase{}
 	for i := range selectors {
 		for j := range selectors {
 			if i == j {
@@ -70,8 +76,19 @@ func TestE2ESmoke(t *testing.T) {
 				fromSelector: selectors[i],
 				toSelector:   selectors[j],
 			})
+			if fromFamily == chainsel.FamilyEVM {
+				fq2tcs = append(fq2tcs, testcase{
+					name:         fmt.Sprintf("msg execution eoa receiver from %s to %s with 2.0 fee quoter", fromFamily, toFamily),
+					fromSelector: selectors[i],
+					toSelector:   selectors[j],
+					needFQ2Check: true,
+				})
+			}
 		}
 	}
+
+	fq2Deployed := make(map[uint64]bool)
+	tcs = append(tcs, fq2tcs...)
 
 	for _, tc := range tcs {
 		fromImpl := selectorsToImpl[tc.fromSelector]
@@ -86,6 +103,22 @@ func TestE2ESmoke(t *testing.T) {
 			tc.name += " with token transfer"
 		} else {
 			tc.name += " without token transfer"
+		}
+		if tc.needFQ2Check && !fq2Deployed[fromImpl.ChainSelector()] {
+			// deploy the 2.0 FQ and check that it can read the updated prices
+			fqInput := make(map[uint64]deployops.UpdateFeeQuoterInputPerChain)
+			fqInput[fromImpl.ChainSelector()] = deployops.UpdateFeeQuoterInputPerChain{
+				FeeQuoterVersion: semver.MustParse("1.7.0"),
+				RampsVersion:     semver.MustParse("1.6.0"),
+			}
+			fqReg := deployops.GetFQAndRampUpdaterRegistry()
+			fqUpdateChangeset := deployops.UpdateFeeQuoterChangeset(fqReg, nil)
+			_, err = fqUpdateChangeset.Apply(*e, deployops.UpdateFeeQuoterInput{
+				Chains: fqInput,
+			})
+			require.NoError(t, err, "Failed to apply UpdateFeeQuoterChangeset changeset")
+			fq2Deployed[fromImpl.ChainSelector()] = true
+			tc.name += " with FQ 2.0"
 		}
 		// Capture the loop variable so each goroutine gets its own copy.
 		t.Run(tc.name, func(t *testing.T) {
