@@ -98,6 +98,11 @@ type TestAdapter interface {
 	// // CCIPReceiver returns a CCIP receiver for the given chain family.
 	CCIPReceiver() []byte
 
+	// EOAReceiver returns an EOA receiver for the given chain family, to be used in test cases where the receiver is expected
+	// to be an EOA and not a contract.
+	// t paramter allows the adapter to skip the test if EOA receivers are not supported for that chain family.
+	EOAReceiver(t *testing.T) []byte
+
 	// InvalidReceivers returns a slice of invalid receivers for the given chain family, to be used in negative test cases.
 	InvalidCCIPReceivers() [][]byte
 

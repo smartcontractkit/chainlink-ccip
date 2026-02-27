@@ -65,8 +65,31 @@ func RunSmokeTests(t *testing.T, e *deployment.Environment, selectors []uint64) 
 		toImpl := tc.toChain
 		laneTag := fmt.Sprintf("%s->%s", fromImpl.Family(), toImpl.Family())
 
-		t.Run(fmt.Sprintf("%s message", laneTag), func(t *testing.T) {
+		t.Run(fmt.Sprintf("%s message to contract", laneTag), func(t *testing.T) {
 			receiver := toImpl.CCIPReceiver()
+			extraArgs, err := toImpl.GetExtraArgs(receiver, fromImpl.Family())
+			require.NoError(t, err)
+
+			msg, err := fromImpl.BuildMessage(testadapters.MessageComponents{
+				DestChainSelector: toImpl.ChainSelector(),
+				Receiver:          receiver,
+				Data:              []byte("hello contract"),
+				FeeToken:          "",
+				ExtraArgs:         extraArgs,
+				TokenAmounts:      nil,
+			})
+			require.NoError(t, err)
+
+			seq, err := fromImpl.SendMessage(t.Context(), toImpl.ChainSelector(), msg)
+			require.NoError(t, err)
+			seqNr := ccipocr3.SeqNum(seq)
+			seqNumRange := ccipocr3.NewSeqNumRange(seqNr, seqNr)
+			toImpl.ValidateCommit(t, fromImpl.ChainSelector(), nil, seqNumRange)
+			toImpl.ValidateExec(t, fromImpl.ChainSelector(), nil, []uint64{seq})
+		})
+
+		t.Run(fmt.Sprintf("%s message to eoa", laneTag), func(t *testing.T) {
+			receiver := toImpl.EOAReceiver(t)
 			extraArgs, err := toImpl.GetExtraArgs(receiver, fromImpl.Family())
 			require.NoError(t, err)
 

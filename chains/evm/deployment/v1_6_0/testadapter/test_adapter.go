@@ -226,6 +226,10 @@ func (a *EVMAdapter) CCIPReceiver() []byte {
 	return common.LeftPadBytes(common.HexToAddress("0xdead").Bytes(), 32)
 }
 
+func (a *EVMAdapter) EOAReceiver(t *testing.T) []byte {
+	panic("not implemented")
+}
+
 func (a *EVMAdapter) InvalidCCIPReceivers() [][]byte {
 	return [][]byte{
 		[]byte{99}, // invalid addres
