@@ -15,6 +15,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
+	"github.com/smartcontractkit/chainlink-testing-framework/framework/clclient"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 
@@ -118,6 +119,12 @@ func TestE2ESmoke(t *testing.T) {
 			})
 			require.NoError(t, err, "Failed to apply UpdateFeeQuoterChangeset changeset")
 			fq2Deployed[fromImpl.ChainSelector()] = true
+			allNodeClients, err := clclient.New(in.NodeSets[0].Out.CLNodes)
+			require.NoError(t, err, "Failed to create chainlink clients")
+			ccip.DeleteJobs(allNodeClients, in.Jobs)
+			time.Sleep(10 * time.Second) // wait for jobs to be deleted
+			ccip.CreateJobs(allNodeClients, in.NodeKeyBundles)
+			time.Sleep(60 * time.Second) // wait for the new jobs to be scheduled and picked up by the nodes
 		}
 		// Capture the loop variable so each goroutine gets its own copy.
 		t.Run(tc.name, func(t *testing.T) {

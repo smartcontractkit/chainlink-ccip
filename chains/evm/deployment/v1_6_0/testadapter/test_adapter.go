@@ -194,21 +194,19 @@ func (a *EVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, 
 
 			// 3️⃣ tolerance = pct * maxAbs  (as a rational number)
 			//    toleranceRat = pct * maxAbs
+			tolerance := 0.1
 			maxAbsRat := new(big.Rat).SetInt(maxAbs)
-			tolRat := new(big.Rat).Mul(new(big.Rat).SetFloat64(0.10), maxAbsRat)
+			tolRat := new(big.Rat).Mul(new(big.Rat).SetFloat64(tolerance), maxAbsRat)
 
 			// Convert diff (int) to a rational for comparison
 			diffRat := new(big.Rat).SetInt(diff)
 
 			// diff ≤ tolerance ?
 			if diffRat.Cmp(tolRat) >= 0 {
-				l.Warn().
-					Str("destChainSelector", strconv.FormatUint(destChainSelector, 10)).
-					Str("fee", fee.String()).
-					Str("lastFee", lastFee.String()).
-					Msgf("Fee difference is greater than 10%% tolerance,")
+				fmt.Printf("fee difference %s exceeds %.2f%% tolerance compared to last fee %s for dest chain %d\n", diff.String(), tolerance*100, lastFee.String(), destChainSelector)
+			} else {
+				fmt.Printf("fee %s is within %.2f%% tolerance compared to last fee %s for dest chain %d\n", fee.String(), tolerance*100, lastFee.String(), destChainSelector)
 			}
-
 		} else {
 			a.lastFeeByDest[destChainSelector] = fee
 		}
