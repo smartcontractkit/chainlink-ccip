@@ -106,6 +106,9 @@ contracts:
 
   - contract_name: LockReleaseTokenPool
     version: "1.6.1"
+    functions:
+      - name: getRebalancer
+        access: public
 
   - contract_name: SiloedLockReleaseTokenPool
     version: "1.6.1"
