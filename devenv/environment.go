@@ -37,6 +37,14 @@ import (
 )
 
 var Plog = log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).Level(zerolog.DebugLevel).With().Fields(map[string]any{"component": "ccip"}).Logger()
+var NodeKeyBundles map[string]map[string]clclient.NodeKeysBundle
+var AllNodeClients []*clclient.ChainlinkClient
+var NodeToJobIDs map[string]string
+
+func init() {
+	NodeKeyBundles = make(map[string]map[string]clclient.NodeKeysBundle)
+	NodeToJobIDs = make(map[string]string)
+}
 
 func getCommonNodeConfig(capRegAddr string) string {
 	return fmt.Sprintf(`
@@ -80,12 +88,14 @@ func getCommonNodeConfig(capRegAddr string) string {
 }
 
 type Cfg struct {
-	CLDF               CLDF                `toml:"cldf"                  validate:"required"`
-	JD                 *jd.Input           `toml:"jd"`
-	Blockchains        []*blockchain.Input `toml:"blockchains"           validate:"required"`
-	NodeSets           []*ns.Input         `toml:"nodesets"              validate:"required"`
-	CLNodesFundingETH  float64             `toml:"cl_nodes_funding_eth"`
-	CLNodesFundingLink float64             `toml:"cl_nodes_funding_link"`
+	CLDF               CLDF                                          `toml:"cldf"                  validate:"required"`
+	JD                 *jd.Input                                     `toml:"jd"`
+	Blockchains        []*blockchain.Input                           `toml:"blockchains"           validate:"required"`
+	NodeSets           []*ns.Input                                   `toml:"nodesets"              validate:"required"`
+	CLNodesFundingETH  float64                                       `toml:"cl_nodes_funding_eth"`
+	CLNodesFundingLink float64                                       `toml:"cl_nodes_funding_link"`
+	NodeKeyBundles     map[string]map[string]clclient.NodeKeysBundle `toml:"node_key_bundles"`
+	Jobs               map[string]string                             `toml:"jobs"`
 	// NodeConfigOverrides allows users to provide custom TOML configuration that will be
 	// appended to the generated node configuration. This is useful for testnets/mainnets
 	// where you need to customize settings like FinalityDepth, LogPollInterval, etc.
@@ -462,10 +472,12 @@ func NewEnvironment() (*Cfg, error) {
 		}
 	}
 
-	err = CreateJobs(ctx, allNodeClients, nodeKeyBundles)
+	in.NodeKeyBundles = nodeKeyBundles
+	err = CreateJobs(allNodeClients, nodeKeyBundles)
 	if err != nil {
 		return nil, fmt.Errorf("creating CCIP jobs: %w", err)
 	}
+	in.Jobs = NodeToJobIDs
 
 	err = devenvcommon.AddNodesToContracts(ctx, e, in.NodeSets, nodeKeyBundles, homeChainSelector, selectors, homeChainType, in.Blockchains)
 	if err != nil {
@@ -556,7 +568,7 @@ func NewCCIPSpecToml(spec SpecArgs) (string, error) {
 	return string(marshaled), nil
 }
 
-func CreateJobs(ctx context.Context, nodeClients []*clclient.ChainlinkClient, nodeKeyBundles map[string]map[string]clclient.NodeKeysBundle) error {
+func CreateJobs(nodeClients []*clclient.ChainlinkClient, nodeKeyBundles map[string]map[string]clclient.NodeKeysBundle) error {
 	bootstrapNode := nodeClients[0]
 	bootstrapKeys, err := bootstrapNode.MustReadOCR2Keys()
 	if err != nil {
@@ -590,10 +602,11 @@ func CreateJobs(ctx context.Context, nodeClients []*clclient.ChainlinkClient, no
 	if err != nil {
 		return fmt.Errorf("creating CCIP job spec: %w", err)
 	}
-	_, _, err = bootstrapNode.CreateJobRaw(raw)
+	job, _, err := bootstrapNode.CreateJobRaw(raw)
 	if err != nil {
 		return fmt.Errorf("creating CCIP job: %w", err)
 	}
+	NodeToJobIDs[bootstrapNode.Config.URL] = job.Data.ID
 	for _, node := range workerNodes {
 		nodeP2PIds, err := node.MustReadP2PKeys()
 		if err != nil {
@@ -628,9 +641,28 @@ func CreateJobs(ctx context.Context, nodeClients []*clclient.ChainlinkClient, no
 			return fmt.Errorf("creating CCIP job spec: %w", err)
 		}
 		L.Info().Str("RawSpec", raw).Msg("Creating CCIP job on worker node")
-		_, _, err = node.CreateJobRaw(raw)
+		job, _, err := node.CreateJobRaw(raw)
 		if err != nil {
 			return fmt.Errorf("creating CCIP job: %w", err)
+		}
+		NodeToJobIDs[node.Config.URL] = job.Data.ID
+	}
+	return nil
+}
+
+func DeleteJobs(nodeClients []*clclient.ChainlinkClient, jobs map[string]string) error {
+	for _, node := range nodeClients {
+		jobID, ok := jobs[node.Config.URL]
+		if !ok {
+			panic(fmt.Sprintf("no job ID found for node %s, cannot delete job", node.Config.URL))
+		}
+		_, err := node.DeleteSpec(jobID)
+		if err != nil {
+			return fmt.Errorf("deleting CCIP job: %w", err)
+		}
+		_, err = node.DeleteJob(jobID)
+		if err != nil {
+			return fmt.Errorf("deleting CCIP job: %w", err)
 		}
 	}
 	return nil

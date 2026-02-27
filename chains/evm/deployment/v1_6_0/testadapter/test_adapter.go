@@ -51,7 +51,8 @@ func init() {
 }
 
 type EVMAdapter struct {
-	state testadapters.StateProvider
+	state         testadapters.StateProvider
+	lastFeeByDest map[uint64]*big.Int
 	cldf_evm.Chain
 }
 
@@ -64,8 +65,9 @@ func NewEVMAdapter(env *deployment.Environment, selector uint64) testadapters.Te
 
 	s := &testadapters.DataStoreStateProvider{Selector: selector, DS: env.DataStore}
 	return &EVMAdapter{
-		state: s,
-		Chain: c,
+		state:         s,
+		lastFeeByDest: make(map[uint64]*big.Int),
+		Chain:         c,
 	}
 }
 
@@ -170,6 +172,43 @@ func (a *EVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, 
 		fee, err := r.GetFee(&bind.CallOpts{Context: ctx}, destChainSelector, msg)
 		if err != nil {
 			return 0, fmt.Errorf("failed to get EVM fee: %w", deployment.MaybeDataErr(err))
+		}
+		lastFee, ok := a.lastFeeByDest[destChainSelector]
+		if ok {
+			// 1️⃣ absolute difference: |a - b|
+			diff := new(big.Int).Sub(lastFee, fee) // a - b
+			if diff.Sign() < 0 {                   // make it positive
+				diff.Neg(diff)
+			}
+
+			// 2️⃣ larger absolute value: max(|a|, |b|)
+			absA := new(big.Int).Abs(new(big.Int).Set(lastFee))
+			absB := new(big.Int).Abs(new(big.Int).Set(fee))
+
+			maxAbs := new(big.Int)
+			if absA.Cmp(absB) >= 0 {
+				maxAbs.Set(absA)
+			} else {
+				maxAbs.Set(absB)
+			}
+
+			// 3️⃣ tolerance = pct * maxAbs  (as a rational number)
+			//    toleranceRat = pct * maxAbs
+			tolerance := 0.1
+			maxAbsRat := new(big.Rat).SetInt(maxAbs)
+			tolRat := new(big.Rat).Mul(new(big.Rat).SetFloat64(tolerance), maxAbsRat)
+
+			// Convert diff (int) to a rational for comparison
+			diffRat := new(big.Rat).SetInt(diff)
+
+			// diff ≤ tolerance ?
+			if diffRat.Cmp(tolRat) >= 0 {
+				fmt.Printf("fee difference %s exceeds %.2f%% tolerance compared to last fee %s for dest chain %d\n", diff.String(), tolerance*100, lastFee.String(), destChainSelector)
+			} else {
+				fmt.Printf("fee %s is within %.2f%% tolerance compared to last fee %s for dest chain %d\n", fee.String(), tolerance*100, lastFee.String(), destChainSelector)
+			}
+		} else {
+			a.lastFeeByDest[destChainSelector] = fee
 		}
 
 		sender.Value = fee

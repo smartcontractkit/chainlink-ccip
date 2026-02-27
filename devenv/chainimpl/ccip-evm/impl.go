@@ -8,6 +8,7 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
@@ -19,6 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 
+	latestfq "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/devenv/blockchainutils"
 
@@ -28,6 +30,7 @@ import (
 
 	evmseqs "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testadapters"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 )
 
 type SourceDestPair struct {
@@ -78,43 +81,92 @@ func (m *CCIP16EVM) ChainSelector() uint64 {
 	return m.chainDetails.ChainSelector
 }
 
-func updatePrices(datastore datastore.DataStore, src, dest uint64, srcChain cldf_evm.Chain) error {
+func UpdatePrices(ds datastore.DataStore, src, dest uint64, srcChain cldf_evm.Chain) error {
 	a := &evmseqs.EVMAdapter{}
-	fqAddr, err := a.GetFQAddress(datastore, src)
+	fqAddr, err := a.GetFQAddress(ds, src)
 	if err != nil {
 		return fmt.Errorf("failed to get fee quoter address: %w", err)
 	}
-	fq, err := fee_quoter.NewFeeQuoter(
-		common.BytesToAddress(fqAddr),
-		srcChain.Client)
+	hexaddr := common.BytesToAddress(fqAddr)
+	fullref, err := datastore_utils.FindAndFormatRef(
+		ds,
+		datastore.AddressRef{
+			ChainSelector: src,
+			Address:       hexaddr.Hex(),
+		},
+		src,
+		datastore_utils.FullRef,
+	)
 	if err != nil {
-		return fmt.Errorf("failed to create fee quoter instance: %w", err)
-	}
-	feeTokens, err := fq.GetFeeTokens(nil)
-	if err != nil {
-		return fmt.Errorf("failed to get fee tokens from fee quoter: %w", err)
+		return fmt.Errorf("failed to find full ref for offramp ops contract: %w", err)
 	}
 	sender := srcChain.DeployerKey
-	tx, err := fq.UpdatePrices(sender, fee_quoter.InternalPriceUpdates{
-		TokenPriceUpdates: []fee_quoter.InternalTokenPriceUpdate{
-			{
-				SourceToken: feeTokens[0],
-				UsdPerToken: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(2000)),
+	var tx *types.Transaction
+	fmt.Printf("Updating prices on fee quoter ref %+v\n", fullref)
+	if fullref.Version.LessThan(semver.MustParse("1.7.0")) {
+		fq, err := fee_quoter.NewFeeQuoter(
+			common.BytesToAddress(fqAddr),
+			srcChain.Client)
+		if err != nil {
+			return fmt.Errorf("failed to create fee quoter instance: %w", err)
+		}
+		feeTokens, err := fq.GetFeeTokens(nil)
+		if err != nil {
+			return fmt.Errorf("failed to get fee tokens from fee quoter: %w", err)
+		}
+		tx, err = fq.UpdatePrices(sender, fee_quoter.InternalPriceUpdates{
+			TokenPriceUpdates: []fee_quoter.InternalTokenPriceUpdate{
+				{
+					SourceToken: feeTokens[0],
+					UsdPerToken: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(2000)),
+				},
+				{
+					SourceToken: feeTokens[1],
+					UsdPerToken: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(2000)),
+				},
 			},
-			{
-				SourceToken: feeTokens[1],
-				UsdPerToken: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(2000)),
+			GasPriceUpdates: []fee_quoter.InternalGasPriceUpdate{
+				{
+					DestChainSelector: dest,
+					UsdPerUnitGas:     big.NewInt(20000e9),
+				},
 			},
-		},
-		GasPriceUpdates: []fee_quoter.InternalGasPriceUpdate{
-			{
-				DestChainSelector: dest,
-				UsdPerUnitGas:     big.NewInt(20000e9),
+		})
+		if err != nil {
+			return fmt.Errorf("failed to update prices: %w", err)
+		}
+	} else {
+		fq, err := latestfq.NewFeeQuoter(
+			common.BytesToAddress(fqAddr),
+			srcChain.Client)
+		if err != nil {
+			return fmt.Errorf("failed to create fee quoter instance: %w", err)
+		}
+		feeTokens, err := fq.GetFeeTokens(nil)
+		if err != nil {
+			return fmt.Errorf("failed to get fee tokens from fee quoter: %w", err)
+		}
+		tx, err = fq.UpdatePrices(sender, latestfq.InternalPriceUpdates{
+			TokenPriceUpdates: []latestfq.InternalTokenPriceUpdate{
+				{
+					SourceToken: feeTokens[0],
+					UsdPerToken: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(2000)),
+				},
+				{
+					SourceToken: feeTokens[1],
+					UsdPerToken: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(2000)),
+				},
 			},
-		},
-	})
-	if err != nil {
-		return fmt.Errorf("failed to update prices: %w", err)
+			GasPriceUpdates: []latestfq.InternalGasPriceUpdate{
+				{
+					DestChainSelector: dest,
+					UsdPerUnitGas:     big.NewInt(20000e9),
+				},
+			},
+		})
+		if err != nil {
+			return fmt.Errorf("failed to update prices: %w", err)
+		}
 	}
 	_, err = srcChain.Confirm(tx)
 	if err != nil {
@@ -221,6 +273,15 @@ func (m *CCIP16EVM) PreDeployContractsForSelector(ctx context.Context, env *depl
 }
 
 func (m *CCIP16EVM) PostDeployContractsForSelector(ctx context.Context, env *deployment.Environment, cls []*simple_node_set.Input, selector uint64, ccipHomeSelector uint64, crAddr string) error {
+	for _, s := range env.BlockChains.All() {
+		if s.ChainSelector() == selector {
+			continue
+		}
+		err := UpdatePrices(env.DataStore, selector, s.ChainSelector(), env.BlockChains.EVMChains()[selector])
+		if err != nil {
+			return fmt.Errorf("failed to update prices: %w", err)
+		}
+	}
 	return nil
 }
 

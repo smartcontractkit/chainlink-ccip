@@ -17,6 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/fee_quoter"
 	fq16ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
 	onrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
+	fq163ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_3/operations/fee_quoter"
 	fq16 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
@@ -114,7 +115,7 @@ func TestUpdateToFeeQuoter_1_7(t *testing.T) {
 		fq16AddrRefs := e.DataStore.Addresses().Filter(
 			datastore.AddressRefByChainSelector(chainSel),
 			datastore.AddressRefByType(datastore.ContractType(fq16ops.ContractType)),
-			datastore.AddressRefByVersion(fq16ops.Version),
+			datastore.AddressRefByVersion(fq163ops.Version),
 		)
 		require.Len(t, fq16AddrRefs, 1, "Expected exactly 1 FeeQuoter address ref for version 1.6.0 and chain selector %d", chainSel)
 		fq16Addr := common.HexToAddress(fq16AddrRefs[0].Address)
