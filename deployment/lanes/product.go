@@ -16,7 +16,6 @@ type LaneAdapter interface {
 	// high level API
 	ConfigureLaneLegAsSource() *cldf_ops.Sequence[UpdateLanesInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 	ConfigureLaneLegAsDest() *cldf_ops.Sequence[UpdateLanesInput, sequences.OnChainOutput, cldf_chain.BlockChains]
-	DisableRemoteChain() *cldf_ops.Sequence[DisableRemoteChainInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 
 	// helpers to expose lower level functionality if needed
 	// needed for populating values in chain specific configs
