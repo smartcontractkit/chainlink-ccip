@@ -65,8 +65,31 @@ func RunSmokeTests(t *testing.T, e *deployment.Environment, selectors []uint64) 
 		toImpl := tc.toChain
 		laneTag := fmt.Sprintf("%s->%s", fromImpl.Family(), toImpl.Family())
 
-		t.Run(fmt.Sprintf("%s message", laneTag), func(t *testing.T) {
+		t.Run(fmt.Sprintf("%s message to contract", laneTag), func(t *testing.T) {
 			receiver := toImpl.CCIPReceiver()
+			extraArgs, err := toImpl.GetExtraArgs(receiver, fromImpl.Family())
+			require.NoError(t, err)
+
+			msg, err := fromImpl.BuildMessage(testadapters.MessageComponents{
+				DestChainSelector: toImpl.ChainSelector(),
+				Receiver:          receiver,
+				Data:              []byte("hello contract"),
+				FeeToken:          "",
+				ExtraArgs:         extraArgs,
+				TokenAmounts:      nil,
+			})
+			require.NoError(t, err)
+
+			seq, err := fromImpl.SendMessage(t.Context(), toImpl.ChainSelector(), msg)
+			require.NoError(t, err)
+			seqNr := ccipocr3.SeqNum(seq)
+			seqNumRange := ccipocr3.NewSeqNumRange(seqNr, seqNr)
+			toImpl.ValidateCommit(t, fromImpl.ChainSelector(), nil, seqNumRange)
+			toImpl.ValidateExec(t, fromImpl.ChainSelector(), nil, []uint64{seq})
+		})
+
+		t.Run(fmt.Sprintf("%s message to eoa", laneTag), func(t *testing.T) {
+			receiver := toImpl.EOAReceiver(t)
 			extraArgs, err := toImpl.GetExtraArgs(receiver, fromImpl.Family())
 			require.NoError(t, err)
 
@@ -185,7 +208,26 @@ func RunSmokeTests(t *testing.T, e *deployment.Environment, selectors []uint64) 
 			require.Error(t, err)
 		})
 
-		// TODO: send data payload larger than limit
+		t.Run(fmt.Sprintf("%s payload larger than limit", laneTag), func(t *testing.T) {
+			receiver := toImpl.CCIPReceiver()
+
+			extraArgs, err := toImpl.GetExtraArgs(receiver, fromImpl.Family())
+			require.NoError(t, err)
+
+			// Construct a payload that exceeds the typical 32KB limit
+			oversizedData := make([]byte, 33*1024) // 33 KB of data
+
+			msg, err := fromImpl.BuildMessage(testadapters.MessageComponents{
+				DestChainSelector: toImpl.ChainSelector(),
+				Receiver:          receiver,
+				Data:              oversizedData,
+				ExtraArgs:         extraArgs,
+			})
+			require.NoError(t, err)
+
+			_, err = fromImpl.SendMessage(t.Context(), toImpl.ChainSelector(), msg)
+			require.Error(t, err)
+		})
 
 		t.Run(fmt.Sprintf("%s invalid extra args tag", laneTag), func(t *testing.T) {
 			if fromImpl.Family() == chainsel.FamilyTon {
@@ -226,27 +268,209 @@ func RunSmokeTests(t *testing.T, e *deployment.Environment, selectors []uint64) 
 				t.Skip("GetExtraArgs fails with invalid pubkey receivers, we'd need to construct a raw payload to test against the contract")
 			}
 
-			invalidReceiver := []byte{99}
+			invalidReceivers := toImpl.InvalidCCIPReceivers()
 
-			extraArgs, err := toImpl.GetExtraArgs(invalidReceiver, fromImpl.Family(), testadapters.NewGasLimitExtraArg(big.NewInt(math.MaxInt64)))
+			for _, invalidReceiver := range invalidReceivers {
+
+				extraArgs, err := toImpl.GetExtraArgs(invalidReceiver, fromImpl.Family(), testadapters.NewGasLimitExtraArg(big.NewInt(math.MaxInt64)))
+				require.NoError(t, err)
+
+				msg, err := fromImpl.BuildMessage(testadapters.MessageComponents{
+					DestChainSelector: toImpl.ChainSelector(),
+					Receiver:          invalidReceiver,
+					Data:              []byte("hello world"),
+					ExtraArgs:         extraArgs,
+				})
+				require.NoError(t, err)
+
+				_, err = fromImpl.SendMessage(t.Context(), toImpl.ChainSelector(), msg)
+				require.Error(t, err)
+			}
+		})
+
+		// WIP: message with not enough gas
+		// then manual re-exec with higher limit
+		t.Run(fmt.Sprintf("%s not enough gas; manual re-exec", laneTag), func(t *testing.T) {
+			receiver := toImpl.CCIPReceiver()
+
+			extraArgs, err := toImpl.GetExtraArgs(receiver, fromImpl.Family(), testadapters.NewGasLimitExtraArg(big.NewInt(1)))
 			require.NoError(t, err)
 
 			msg, err := fromImpl.BuildMessage(testadapters.MessageComponents{
 				DestChainSelector: toImpl.ChainSelector(),
-				Receiver:          invalidReceiver,
+				Receiver:          receiver,
 				Data:              []byte("hello world"),
 				ExtraArgs:         extraArgs,
 			})
 			require.NoError(t, err)
 
-			_, err = fromImpl.SendMessage(t.Context(), toImpl.ChainSelector(), msg)
+			seq, err := fromImpl.SendMessage(t.Context(), toImpl.ChainSelector(), msg)
+			require.Error(t, err)
+
+			// I am not sure if we can grab seq when SendMessage fails.
+
+			seqNr := ccipocr3.SeqNum(seq)
+			seqNumRange := ccipocr3.NewSeqNumRange(seqNr, seqNr)
+			toImpl.ValidateCommit(t, fromImpl.ChainSelector(), nil, seqNumRange)
+			toImpl.ValidateExec(t, fromImpl.ChainSelector(), nil, []uint64{seq})
+
+			// Assuming the error is due to not enough gas, we can attempt a manual re-execution with a higher gas limit
+			// Note: The actual implementation of manual re-execution would depend on the capabilities of the test adapters and the underlying chains
+			// For this example, we'll just log the intention to re-execute with a higher gas limit
+			t.Log("Initial execution failed due to insufficient gas, attempting manual re-execution with higher gas limit for message", seq, seqNr)
+
+			// TODO set a require.Eventually() here to poll for the message to be re-executed with the higher gas limit and succeed?
+		})
+
+		// WIP: receiver fails
+		// then manual re-exec with higher limit
+		t.Run(fmt.Sprintf("%s receiver fails; manual re-exec", laneTag), func(t *testing.T) {
+			receiver := toImpl.CCIPReceiver()
+
+			err := toImpl.SetReceiverRejectAll(t.Context(), true)
+			require.NoError(t, err)
+			t.Cleanup(func() {
+				err := toImpl.SetReceiverRejectAll(t.Context(), false)
+				require.NoError(t, err)
+			})
+
+			extraArgs, err := toImpl.GetExtraArgs(receiver, fromImpl.Family())
+			require.NoError(t, err)
+
+			msg, err := fromImpl.BuildMessage(testadapters.MessageComponents{
+				DestChainSelector: toImpl.ChainSelector(),
+				Receiver:          receiver,
+				Data:              []byte("hello world"),
+				ExtraArgs:         extraArgs,
+			})
+			require.NoError(t, err)
+
+			seq, err := fromImpl.SendMessage(t.Context(), toImpl.ChainSelector(), msg)
+			require.Error(t, err)
+
+			// I am not sure if we can grab seq when SendMessage fails.
+
+			seqNr := ccipocr3.SeqNum(seq)
+			seqNumRange := ccipocr3.NewSeqNumRange(seqNr, seqNr)
+			toImpl.ValidateCommit(t, fromImpl.ChainSelector(), nil, seqNumRange)
+			toImpl.ValidateExec(t, fromImpl.ChainSelector(), nil, []uint64{seq})
+
+			err = toImpl.SetReceiverRejectAll(t.Context(), false)
+			require.NoError(t, err)
+
+			// Assuming the error is due to not enough gas, we can attempt a manual re-execution with a higher gas limit
+			// Note: The actual implementation of manual re-execution would depend on the capabilities of the test adapters and the underlying chains
+			// For this example, we'll just log the intention to re-execute with a higher gas limit
+			t.Log("Initial execution failed due to logical error, attempting manual re-execution after fixing error", seq, seqNr)
+
+			// TODO set a require.Eventually() here to poll for the message to be re-executed with the higher gas limit and succeed?
+		})
+
+		t.Run(fmt.Sprintf("%s allowlist enabled", laneTag), func(t *testing.T) {
+			receiver := toImpl.CCIPReceiver()
+
+			err := fromImpl.SetAllowlist(t.Context(), toImpl.ChainSelector(), true)
+			require.NoError(t, err)
+			t.Cleanup(func() {
+				err := fromImpl.SetAllowlist(t.Context(), toImpl.ChainSelector(), false)
+				require.NoError(t, err)
+			})
+
+			t.Run("sender not allowed", func(t *testing.T) {
+				err := fromImpl.UpdateSenderAllowlistStatus(t.Context(), toImpl.ChainSelector(), false)
+				require.NoError(t, err)
+				t.Cleanup(func() {
+					err := fromImpl.UpdateSenderAllowlistStatus(t.Context(), toImpl.ChainSelector(), true)
+					require.NoError(t, err)
+				})
+
+				extraArgs, err := toImpl.GetExtraArgs(receiver, fromImpl.Family())
+				require.NoError(t, err)
+
+				msg, err := fromImpl.BuildMessage(testadapters.MessageComponents{
+					DestChainSelector: toImpl.ChainSelector(),
+					Receiver:          receiver,
+					Data:              []byte("hello world"),
+					ExtraArgs:         extraArgs,
+				})
+				require.NoError(t, err)
+
+				_, err = fromImpl.SendMessage(t.Context(), toImpl.ChainSelector(), msg)
+				require.Error(t, err)
+			})
+
+			t.Run("sender allowed", func(t *testing.T) {
+				err := fromImpl.UpdateSenderAllowlistStatus(t.Context(), toImpl.ChainSelector(), true)
+				require.NoError(t, err)
+				t.Cleanup(func() {
+					err := fromImpl.UpdateSenderAllowlistStatus(t.Context(), toImpl.ChainSelector(), false)
+					require.NoError(t, err)
+				})
+
+				extraArgs, err := toImpl.GetExtraArgs(receiver, fromImpl.Family())
+				require.NoError(t, err)
+
+				msg, err := fromImpl.BuildMessage(testadapters.MessageComponents{
+					DestChainSelector: toImpl.ChainSelector(),
+					Receiver:          receiver,
+					Data:              []byte("hello world"),
+					ExtraArgs:         extraArgs,
+				})
+				require.NoError(t, err)
+
+				seq, err := fromImpl.SendMessage(t.Context(), toImpl.ChainSelector(), msg)
+				require.NoError(t, err)
+				seqNr := ccipocr3.SeqNum(seq)
+				seqNumRange := ccipocr3.NewSeqNumRange(seqNr, seqNr)
+				toImpl.ValidateCommit(t, fromImpl.ChainSelector(), nil, seqNumRange)
+				toImpl.ValidateExec(t, fromImpl.ChainSelector(), nil, []uint64{seq})
+			})
+
+		})
+
+		t.Run(fmt.Sprintf("%s RMN - arbitrary message from a cursed source chain", laneTag), func(t *testing.T) {
+			err := toImpl.RMNCursed(t.Context(), fromImpl.ChainSelector(), true)
+			require.NoError(t, err)
+			t.Cleanup(func() {
+				err := toImpl.RMNCursed(t.Context(), fromImpl.ChainSelector(), false)
+				require.NoError(t, err)
+			})
+
+			receiver := toImpl.CCIPReceiver()
+
+			extraArgs, err := toImpl.GetExtraArgs(receiver, fromImpl.Family())
+			require.NoError(t, err)
+
+			_, err = fromImpl.BuildMessage(testadapters.MessageComponents{
+				DestChainSelector: toImpl.ChainSelector(),
+				Receiver:          receiver,
+				Data:              []byte("hello world"),
+				ExtraArgs:         extraArgs,
+			})
 			require.Error(t, err)
 		})
 
-		// TODO: message with not enough gas
-		// then manual re-exec with higher limit
+		t.Run(fmt.Sprintf("%s RMN - arbitrary message to a cursed chain", laneTag), func(t *testing.T) {
+			err := toImpl.RMNCursed(t.Context(), toImpl.ChainSelector(), true)
+			require.NoError(t, err)
+			t.Cleanup(func() {
+				err := toImpl.RMNCursed(t.Context(), toImpl.ChainSelector(), false)
+				require.NoError(t, err)
+			})
 
-		// TODO: test whitelisting
+			receiver := toImpl.CCIPReceiver()
+
+			extraArgs, err := toImpl.GetExtraArgs(receiver, fromImpl.Family())
+			require.NoError(t, err)
+
+			_, err = fromImpl.BuildMessage(testadapters.MessageComponents{
+				DestChainSelector: toImpl.ChainSelector(),
+				Receiver:          receiver,
+				Data:              []byte("hello world"),
+				ExtraArgs:         extraArgs,
+			})
+			require.Error(t, err)
+		})
 
 		t.Run(fmt.Sprintf("%s OOO flag is required on non-EVMs", laneTag), func(t *testing.T) {
 			if fromImpl.Family() != chainsel.FamilyEVM || toImpl.Family() != chainsel.FamilyEVM {

@@ -19,6 +19,7 @@ import (
 	"github.com/xssnick/tonutils-go/tlb"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
@@ -225,6 +226,17 @@ func (a *EVMAdapter) CCIPReceiver() []byte {
 	return common.LeftPadBytes(common.HexToAddress("0xdead").Bytes(), 32)
 }
 
+func (a *EVMAdapter) EOAReceiver(t *testing.T) []byte {
+	panic("not implemented")
+}
+
+func (a *EVMAdapter) InvalidCCIPReceivers() [][]byte {
+	return [][]byte{
+		[]byte{99}, // invalid addres
+		common.LeftPadBytes(common.Address{}.Bytes(), 32), // evm zero address
+	}
+}
+
 func (a *EVMAdapter) SetReceiverRejectAll(ctx context.Context, rejectAll bool) error {
 	return errors.ErrUnsupported
 }
@@ -418,7 +430,7 @@ func (a *EVMAdapter) GetTokenExpansionConfig() tokensapi.TokenExpansionInputPerC
 	mintAmnt := new(big.Int).Mul(oneToken, big.NewInt(1_000_000)) // pre-mint 1 million tokens
 
 	return tokensapi.TokenExpansionInputPerChain{
-		TokenPoolVersion:      cciputils.Version_1_5_1,
+		TokenPoolVersion: cciputils.Version_1_5_1,
 		DeployTokenInput: &tokensapi.DeployTokenInput{
 			Decimals:               deci,
 			Symbol:                 "TEST_TOKEN_" + suffix,
