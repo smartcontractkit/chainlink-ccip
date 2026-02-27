@@ -721,23 +721,7 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 
 			if srcSel != dstSel {
 				srcCfg.TokenTransferConfig.RemoteChains[dstSel] = tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
-					OutboundCCVs:              []datastore.AddressRef{}, // not needed for for 1.6
-					InboundCCVs:               []datastore.AddressRef{}, // not needed for for 1.6
 					OutboundRateLimiterConfig: disabledRL,
-					InboundRateLimiterConfig:  disabledRL,
-					// This is actually optional for 1.6 as the token and token pool addresses are
-					// inferred after deployment
-					// RemoteToken: &datastore.AddressRef{
-					// 	Type:          datastore.ContractType(dstCfg.DeployTokenInput.Type),
-					// 	Qualifier:     dstCfg.DeployTokenInput.Symbol,
-					// 	ChainSelector: dstSel,
-					// },
-					// RemotePool: &datastore.AddressRef{
-					// 	Type:          datastore.ContractType(dstCfg.DeployTokenPoolInput.PoolType),
-					// 	Qualifier:     dstCfg.DeployTokenPoolInput.TokenPoolQualifier,
-					// 	Version:       dstCfg.TokenPoolVersion,
-					// 	ChainSelector: dstSel,
-					// },
 				}
 			}
 		}
