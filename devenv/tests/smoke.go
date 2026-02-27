@@ -429,10 +429,10 @@ func RunSmokeTests(t *testing.T, e *deployment.Environment, selectors []uint64) 
 		})
 
 		t.Run(fmt.Sprintf("%s RMN - arbitrary message from a cursed source chain", laneTag), func(t *testing.T) {
-			err := toImpl.RMNSetSrcChainCursed(t.Context(), fromImpl.ChainSelector(), true)
+			err := toImpl.RMNCursed(t.Context(), fromImpl.ChainSelector(), true)
 			require.NoError(t, err)
 			t.Cleanup(func() {
-				err := toImpl.RMNSetSrcChainCursed(t.Context(), fromImpl.ChainSelector(), false)
+				err := toImpl.RMNCursed(t.Context(), fromImpl.ChainSelector(), false)
 				require.NoError(t, err)
 			})
 
@@ -451,10 +451,10 @@ func RunSmokeTests(t *testing.T, e *deployment.Environment, selectors []uint64) 
 		})
 
 		t.Run(fmt.Sprintf("%s RMN - arbitrary message to a cursed chain", laneTag), func(t *testing.T) {
-			err := toImpl.RMNSetDestChainCursed(t.Context(), toImpl.ChainSelector(), true)
+			err := toImpl.RMNCursed(t.Context(), toImpl.ChainSelector(), true)
 			require.NoError(t, err)
 			t.Cleanup(func() {
-				err := toImpl.RMNSetDestChainCursed(t.Context(), toImpl.ChainSelector(), false)
+				err := toImpl.RMNCursed(t.Context(), toImpl.ChainSelector(), false)
 				require.NoError(t, err)
 			})
 
