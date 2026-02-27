@@ -11,6 +11,7 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/mcm"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	mcmsapi "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
@@ -40,41 +41,23 @@ func TestUpdateMCMSConfigSolana(t *testing.T) {
 	// deploy MCMS Contracts
 	DeployMCMS(t, env, solanaChains[0], []string{deploymentutils.CLLQualifier})
 
-	// get recently deployed MCMS addresses
-	mcmsRefs := []datastore.AddressRef{}
-	cancellerRef, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
+	// get recently deployed MCMS address
+	mcmsRef, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
 		ChainSelector: solanaChains[0],
-		Type:          datastore.ContractType(deploymentutils.CancellerManyChainMultisig),
+		Type:          datastore.ContractType(utils.McmProgramType),
 		Qualifier:     deploymentutils.CLLQualifier,
-		Version:       semver.MustParse("1.0.0"),
+		Version:       semver.MustParse("1.6.0"),
 	}, solanaChains[0], datastore_utils.FullRef)
 	require.NoError(t, err)
-	bypasserRef, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
-		ChainSelector: solanaChains[0],
-		Type:          datastore.ContractType(deploymentutils.CancellerManyChainMultisig),
-		Qualifier:     deploymentutils.CLLQualifier,
-		Version:       semver.MustParse("1.0.0"),
-	}, solanaChains[0], datastore_utils.FullRef)
-	require.NoError(t, err)
-	proposerRef, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
-		ChainSelector: solanaChains[0],
-		Type:          datastore.ContractType(deploymentutils.CancellerManyChainMultisig),
-		Qualifier:     deploymentutils.CLLQualifier,
-		Version:       semver.MustParse("1.0.0"),
-	}, solanaChains[0], datastore_utils.FullRef)
-	require.NoError(t, err)
-	mcmsRefs = append(mcmsRefs, cancellerRef, bypasserRef, proposerRef)
 
 	// check that deployed config is correct
-	for _, ref := range mcmsRefs {
-		var mcmConfig mcm.MultisigConfig
-		mcmSeed := state.PDASeed([]byte(ref.Address))
-		err := chain.GetAccountDataBorshInto(env.GetContext(), state.GetMCMConfigPDA(solana.MustPublicKeyFromBase58(ref.Address), mcmSeed), &mcmConfig)
-		require.NoError(t, err)
+	var mcmConfig mcm.MultisigConfig
+	mcmSeed := state.PDASeed([]byte(mcmsRef.Address))
+	err = chain.GetAccountDataBorshInto(env.GetContext(), state.GetMCMConfigPDA(solana.MustPublicKeyFromBase58(mcmsRef.Address), mcmSeed), &mcmConfig)
+	require.NoError(t, err)
 
-		numOfSigners := len(mcmConfig.Signers)
-		require.Equal(t, numOfSigners, len(testhelpers.SingleGroupMCMS().Signers)) // should be 1
-	}
+	numOfSigners := len(mcmConfig.Signers)
+	require.Equal(t, numOfSigners, len(testhelpers.SingleGroupMCMS().Signers)) // should be 1
 
 	// update the config for each MCMS contract
 	dReg := mcmsapi.GetRegistry()
@@ -84,7 +67,7 @@ func TestUpdateMCMSConfigSolana(t *testing.T) {
 		Chains: map[uint64]mcmsapi.UpdateMCMSConfigInputPerChain{
 			solanaChains[0]: {
 				MCMConfig:    testhelpers.SingleGroupMCMSTwoSigners(),
-				MCMContracts: mcmsRefs,
+				MCMContracts: []datastore.AddressRef{mcmsRef},
 			},
 		},
 		MCMS: mcms.Input{
@@ -99,15 +82,11 @@ func TestUpdateMCMSConfigSolana(t *testing.T) {
 	require.NoError(t, err)
 	require.Greater(t, len(output.Reports), 0)
 
-	// check that MCMS configs are updated correctly
-	for _, ref := range mcmsRefs {
-		var mcmConfig mcm.MultisigConfig
-		mcmSeed := state.PDASeed([]byte(ref.Address))
-		err := chain.GetAccountDataBorshInto(env.GetContext(), state.GetMCMConfigPDA(solana.MustPublicKeyFromBase58(ref.Address), mcmSeed), &mcmConfig)
-		require.NoError(t, err)
+	// check that MCMS config is updated correctly
+	mcmSeed = state.PDASeed([]byte(mcmsRef.Address))
+	err = chain.GetAccountDataBorshInto(env.GetContext(), state.GetMCMConfigPDA(solana.MustPublicKeyFromBase58(mcmsRef.Address), mcmSeed), &mcmConfig)
+	require.NoError(t, err)
 
-		numOfSigners := len(mcmConfig.Signers)
-		require.Equal(t, numOfSigners, len(testhelpers.SingleGroupMCMSTwoSigners().Signers)) // should be 2
-	}
-
+	numOfSigners = len(mcmConfig.Signers)
+	require.Equal(t, numOfSigners, len(testhelpers.SingleGroupMCMSTwoSigners().Signers)) // should be 2
 }
