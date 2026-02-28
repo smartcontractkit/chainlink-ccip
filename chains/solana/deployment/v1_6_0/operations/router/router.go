@@ -430,6 +430,15 @@ var RegisterTokenAdminRegistry = operations.NewOperation(
 				return TokenAdminRegistryOut{}, nil
 			}
 			pendingAdmin = tokenAdminRegistryAccount.PendingAdministrator
+			// there is already an admin registered, we need to transfer
+			if !tokenAdminRegistryAccount.Administrator.IsZero() {
+				out, err := operations.ExecuteOperation(b, TransferTokenAdminRegistry, chain, input)
+				if err != nil {
+					return TokenAdminRegistryOut{}, fmt.Errorf("failed to transfer token admin registry: %w", err)
+				}
+				b.Logger.Infof("Token admin registry transfer initiated. Pending admin: %s", out.Output.PendingSigner.String())
+				return out.Output, nil
+			}
 		}
 		// this is the key that will need to accept the admin registration
 		pendingSigner := input.Admin
@@ -635,7 +644,7 @@ var TransferTokenAdminRegistry = operations.NewOperation(
 	"router:transfer-token-admin-registry",
 	Version,
 	"Transfers a Token Admin Registry with the Router 1.6.0 contract",
-	func(b operations.Bundle, chain cldf_solana.Chain, input TokenAdminRegistryParams) (sequences.OnChainOutput, error) {
+	func(b operations.Bundle, chain cldf_solana.Chain, input TokenAdminRegistryParams) (TokenAdminRegistryOut, error) {
 		ccip_router.SetProgramID(input.Router)
 		routerConfigPDA, _, _ := state.FindConfigPDA(input.Router)
 		tokenAdminRegistryPDA, _, _ := state.FindTokenAdminRegistryPDA(input.TokenMint, input.Router)
@@ -660,11 +669,11 @@ var TransferTokenAdminRegistry = operations.NewOperation(
 			currentAdmin,
 		).ValidateAndBuild()
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to generate instructions: %w", err)
+			return TokenAdminRegistryOut{}, fmt.Errorf("failed to generate instructions: %w", err)
 		}
 		ixData, err := tempIx.Data()
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to extract data payload router accept admin role token admin registry instruction: %w", err)
+			return TokenAdminRegistryOut{}, fmt.Errorf("failed to extract data payload router accept admin role token admin registry instruction: %w", err)
 		}
 		ixn := solana.NewInstruction(input.Router, tempIx.Accounts(), ixData)
 		// now we need a proposal if the admin is not the deployer
@@ -676,19 +685,24 @@ var TransferTokenAdminRegistry = operations.NewOperation(
 				ContractType.String(),
 			)
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute or create batch: %w", err)
+				return TokenAdminRegistryOut{}, fmt.Errorf("failed to execute or create batch: %w", err)
 			}
-			return sequences.OnChainOutput{
-				BatchOps: []types.BatchOperation{batches},
+			return TokenAdminRegistryOut{
+				PendingSigner: input.Admin,
+				OnChainOutput: sequences.OnChainOutput{
+					BatchOps: []types.BatchOperation{batches},
+				},
 			}, nil
 		}
 
 		err = chain.Confirm([]solana.Instruction{ixn})
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm register token admin registry: %w", err)
+			return TokenAdminRegistryOut{}, fmt.Errorf("failed to confirm register token admin registry: %w", err)
 		}
 
-		return sequences.OnChainOutput{}, nil
+		return TokenAdminRegistryOut{
+			PendingSigner: input.Admin,
+		}, nil
 	},
 )
 
