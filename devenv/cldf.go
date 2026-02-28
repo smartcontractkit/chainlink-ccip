@@ -216,6 +216,7 @@ func NewCLDFOperationsEnvironment(bc []*blockchain.Input, dataStore datastore.Da
 	lggr, err := logger.NewWith(func(config *zap.Config) {
 		config.Development = true
 		config.Encoding = "console"
+		config.EncoderConfig = zap.NewDevelopmentEncoderConfig()
 	})
 	if err != nil {
 		return nil, nil, err
