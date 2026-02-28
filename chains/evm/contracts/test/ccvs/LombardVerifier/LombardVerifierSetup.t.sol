@@ -56,7 +56,7 @@ contract LombardVerifierSetup is BaseVerifierSetup {
     s_lombardVerifier.applyRemoteChainConfigUpdates(remoteChainConfigs);
 
     // Set the path for the destination chain.
-    s_lombardVerifier.setPath(DEST_CHAIN_SELECTOR, LOMBARD_CHAIN_ID, ALLOWED_CALLER, bytes32(0));
+    s_lombardVerifier.setPath(DEST_CHAIN_SELECTOR, LOMBARD_CHAIN_ID, ALLOWED_CALLER);
 
     // Mock the router to return true for the valid offRamp.
     vm.mockCall(
