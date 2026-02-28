@@ -32,7 +32,6 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
   error RemoteTokenOrAdapterMismatch(bytes32 bridgeToken, bytes32 remoteToken, bytes32 remoteAdapter);
   error InvalidReceiver(bytes receiver);
   error ChainNotSupported(uint64 remoteChainSelector);
-  error InvalidAllowedCaller(bytes allowedCaller);
   error ExecutionError();
   error HashMismatch();
 
@@ -255,7 +254,7 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
   function setPath(
     uint64 remoteChainSelector,
     bytes32 lChainId,
-    bytes calldata allowedCaller,
+    bytes32 allowedCaller,
     bytes32 remoteAdapter
   ) external onlyOwner {
     if (!isSupportedChain(remoteChainSelector)) {
@@ -267,19 +266,15 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
     }
 
     // only remote pool is expected allowed caller.
-    if (!isRemotePool(remoteChainSelector, allowedCaller)) {
-      revert InvalidRemotePoolForChain(remoteChainSelector, allowedCaller);
+    bytes memory encodedAllowedCaller = abi.encode(allowedCaller);
+    if (!isRemotePool(remoteChainSelector, encodedAllowedCaller)) {
+      revert InvalidRemotePoolForChain(remoteChainSelector, encodedAllowedCaller);
     }
-
-    if (allowedCaller.length != 32) {
-      revert InvalidAllowedCaller(allowedCaller);
-    }
-    bytes32 decodedAllowedCaller = abi.decode(allowedCaller, (bytes32));
 
     s_chainSelectorToPath[remoteChainSelector] =
-      Path({lChainId: lChainId, allowedCaller: decodedAllowedCaller, remoteAdapter: remoteAdapter});
+      Path({lChainId: lChainId, allowedCaller: allowedCaller, remoteAdapter: remoteAdapter});
 
-    emit PathSet(remoteChainSelector, lChainId, decodedAllowedCaller, remoteAdapter);
+    emit PathSet(remoteChainSelector, lChainId, allowedCaller, remoteAdapter);
   }
 
   /// @notice Removes path mapping for a destination chain.
