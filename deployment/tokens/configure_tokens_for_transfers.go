@@ -170,58 +170,57 @@ func convertRemoteChainConfig(
 		RemoteToken:               nil,
 		RemotePool:                nil,
 	}
-	if inCfg.RemotePool == nil {
-		return outCfg, fmt.Errorf("remote pool ref must be provided for remote chain selector %d", remoteChainSelector)
-	}
 
-	// Get remote pool info
-	fullRemotePoolRef, err := datastore_utils.FindAndFormatRef(e.DataStore, *inCfg.RemotePool, remoteChainSelector, datastore_utils.FullRef)
-	if err != nil {
-		return outCfg, fmt.Errorf("failed to resolve remote pool ref %s: %w", datastore_utils.SprintRef(*inCfg.RemotePool), err)
-	}
-	remotePoolBytes, err := adapter.AddressRefToBytes(fullRemotePoolRef)
-	if err != nil {
-		return outCfg, fmt.Errorf("failed to convert remote pool ref %s to bytes: %w", datastore_utils.SprintRef(*inCfg.RemotePool), err)
-	}
-
-	// Get remote token info
-	var remoteTokenBytes []byte
-	if inCfg.RemoteToken == nil {
-		e.Logger.Warnf(
-			"remote token ref not provided for remote chain selector %d - will attempt to derive remote token address from pool ref (%s)",
-			remoteChainSelector, datastore_utils.SprintRef(fullRemotePoolRef),
-		)
-		remoteTokenBytes, err = adapter.DeriveTokenAddress(e, remoteChainSelector, fullRemotePoolRef)
+	if inCfg.RemotePool != nil {
+		// Get remote pool info
+		fullRemotePoolRef, err := datastore_utils.FindAndFormatRef(e.DataStore, *inCfg.RemotePool, remoteChainSelector, datastore_utils.FullRef)
 		if err != nil {
-			return outCfg, fmt.Errorf("failed to resolve remote token ref via pool ref (%s) for remote chain selector %d: %w", datastore_utils.SprintRef(fullRemotePoolRef), remoteChainSelector, err)
+			return outCfg, fmt.Errorf("failed to resolve remote pool ref %s: %w", datastore_utils.SprintRef(*inCfg.RemotePool), err)
 		}
-	} else {
-		fullRemoteTokenRef, err := datastore_utils.FindAndFormatRef(e.DataStore, *inCfg.RemoteToken, remoteChainSelector, datastore_utils.FullRef)
+		remotePoolBytes, err := adapter.AddressRefToBytes(fullRemotePoolRef)
 		if err != nil {
-			return outCfg, fmt.Errorf("failed to resolve remote token ref %s: %w", datastore_utils.SprintRef(*inCfg.RemoteToken), err)
+			return outCfg, fmt.Errorf("failed to convert remote pool ref %s to bytes: %w", datastore_utils.SprintRef(*inCfg.RemotePool), err)
 		}
-		remoteTokenBytes, err = adapter.AddressRefToBytes(fullRemoteTokenRef)
-		if err != nil {
-			return outCfg, fmt.Errorf("failed to convert remote token ref %s to bytes: %w", datastore_utils.SprintRef(*inCfg.RemoteToken), err)
+
+		// Get remote token info
+		var remoteTokenBytes []byte
+		if inCfg.RemoteToken == nil {
+			e.Logger.Warnf(
+				"remote token ref not provided for remote chain selector %d - will attempt to derive remote token address from pool ref (%s)",
+				remoteChainSelector, datastore_utils.SprintRef(fullRemotePoolRef),
+			)
+			remoteTokenBytes, err = adapter.DeriveTokenAddress(e, remoteChainSelector, fullRemotePoolRef)
+			if err != nil {
+				return outCfg, fmt.Errorf("failed to resolve remote token ref via pool ref (%s) for remote chain selector %d: %w", datastore_utils.SprintRef(fullRemotePoolRef), remoteChainSelector, err)
+			}
+		} else {
+			fullRemoteTokenRef, err := datastore_utils.FindAndFormatRef(e.DataStore, *inCfg.RemoteToken, remoteChainSelector, datastore_utils.FullRef)
+			if err != nil {
+				return outCfg, fmt.Errorf("failed to resolve remote token ref %s: %w", datastore_utils.SprintRef(*inCfg.RemoteToken), err)
+			}
+			remoteTokenBytes, err = adapter.AddressRefToBytes(fullRemoteTokenRef)
+			if err != nil {
+				return outCfg, fmt.Errorf("failed to convert remote token ref %s to bytes: %w", datastore_utils.SprintRef(*inCfg.RemoteToken), err)
+			}
 		}
-	}
 
-	// Populate RemoteToken
-	remoteTokenBytes = common.LeftPadBytes(remoteTokenBytes, 32)
-	outCfg.RemoteToken = remoteTokenBytes
+		// Populate RemoteToken
+		remoteTokenBytes = common.LeftPadBytes(remoteTokenBytes, 32)
+		outCfg.RemoteToken = remoteTokenBytes
 
-	// Populate RemotePool
-	if remotePool, err := adapter.DeriveTokenPoolCounterpart(e, remoteChainSelector, remotePoolBytes, remoteTokenBytes); err != nil {
-		return outCfg, fmt.Errorf("failed to derive remote pool counterpart for remote chain selector %d: %w", remoteChainSelector, err)
-	} else {
-		outCfg.RemotePool = remotePool
-	}
+		// Populate RemotePool
+		if remotePool, err := adapter.DeriveTokenPoolCounterpart(e, remoteChainSelector, remotePoolBytes, remoteTokenBytes); err != nil {
+			return outCfg, fmt.Errorf("failed to derive remote pool counterpart for remote chain selector %d: %w", remoteChainSelector, err)
+		} else {
+			outCfg.RemotePool = remotePool
+		}
 
-	// Populate decimals
-	if decimals, err := adapter.DeriveTokenDecimals(e, remoteChainSelector, fullRemotePoolRef, remoteTokenBytes); err != nil {
-		return outCfg, fmt.Errorf("failed to get remote token decimals for remote chain selector %d: %w", remoteChainSelector, err)
-	} else {
-		outCfg.RemoteDecimals = decimals
+		// Populate decimals
+		if decimals, err := adapter.DeriveTokenDecimals(e, remoteChainSelector, fullRemotePoolRef, remoteTokenBytes); err != nil {
+			return outCfg, fmt.Errorf("failed to get remote token decimals for remote chain selector %d: %w", remoteChainSelector, err)
+		} else {
+			outCfg.RemoteDecimals = decimals
+		}
 	}
 
 	// Populate CCVs
