@@ -102,7 +102,7 @@ contract LombardTokenPool_lockOrBurn is LombardTokenPoolSetup {
     _applyChainUpdates(address(adapterPool));
 
     bytes32 destToken = bytes32(uint256(uint160(s_initialRemoteToken)));
-    adapterPool.setPath(DEST_CHAIN_SELECTOR, L_CHAIN_ID, abi.encode(s_initialRemotePool), bytes32(0));
+    adapterPool.setPath(DEST_CHAIN_SELECTOR, L_CHAIN_ID, bytes32(uint256(uint160(s_initialRemotePool))), bytes32(0));
     s_bridge.setAllowedDestinationToken(L_CHAIN_ID, tokenAdapter, destToken);
     changePrank(s_allowedOnRamp);
 
@@ -240,7 +240,7 @@ contract LombardTokenPool_lockOrBurn is LombardTokenPoolSetup {
     bytes32 remoteAdapter
   ) internal {
     changePrank(OWNER);
-    s_pool.setPath(DEST_CHAIN_SELECTOR, L_CHAIN_ID, abi.encode(s_remotePool), remoteAdapter);
+    s_pool.setPath(DEST_CHAIN_SELECTOR, L_CHAIN_ID, bytes32(uint256(uint160(s_remotePool))), remoteAdapter);
     s_bridge.setAllowedDestinationToken(L_CHAIN_ID, address(s_token), remoteTokenId);
     changePrank(s_allowedOnRamp);
   }

@@ -9,7 +9,7 @@ contract LombardTokenPool_removePath is LombardTokenPoolSetup {
   bytes32 internal constant REMOTE_ADAPTER = bytes32("REMOTE_ADAPTER");
 
   function test_removePath_RemovesConfig() public {
-    s_pool.setPath(DEST_CHAIN_SELECTOR, L_CHAIN_ID, abi.encode(s_remotePool), REMOTE_ADAPTER);
+    s_pool.setPath(DEST_CHAIN_SELECTOR, L_CHAIN_ID, bytes32(uint256(uint160(s_remotePool))), REMOTE_ADAPTER);
 
     vm.expectEmit();
     emit LombardTokenPool.PathRemoved(
