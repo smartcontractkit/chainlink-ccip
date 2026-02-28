@@ -10,7 +10,7 @@ require (
 	github.com/ethereum/go-ethereum v1.17.0
 	github.com/smartcontractkit/chain-selectors v1.0.97
 	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20260228012932-8fe72a07ba85
-	github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm v0.0.0-20260228012932-8fe72a07ba85
+	github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm v0.0.0-20260228203345-70388b2b23a1
 	github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment v0.0.0-20260228012932-8fe72a07ba85
 	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260228012932-8fe72a07ba85
 	github.com/smartcontractkit/chainlink-common v0.9.6-0.20260114142648-bd9e1b483e96
