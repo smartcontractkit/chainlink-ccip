@@ -55,6 +55,10 @@ var DeployLombardChain = cldf_ops.NewSequence(
 		}
 
 		tokenAddress := common.HexToAddress(input.Token)
+		localAdapterAddress := common.Address{}
+		if input.LocalAdapter != "" {
+			localAdapterAddress = common.HexToAddress(input.LocalAdapter)
+		}
 		lombardBridgeAddress := common.HexToAddress(input.Bridge)
 		feeAggregatorAddress := common.HexToAddress(input.FeeAggregator)
 
@@ -101,7 +105,10 @@ var DeployLombardChain = cldf_ops.NewSequence(
 			Address:       lombardVerifierAddress,
 			Args: lombard_verifier.SupportedTokenArgs{
 				TokensToSet: []lombard_verifier.SupportedTokensArgs{
-					{LocalToken: tokenAddress}, // LocalAdapter defaults to zero address
+					{
+						LocalToken:   tokenAddress,
+						LocalAdapter: localAdapterAddress,
+					},
 				},
 			},
 		})
@@ -190,7 +197,7 @@ var DeployLombardChain = cldf_ops.NewSequence(
 				Token:             tokenAddress,
 				Verifier:          lombardVerifierResolverAddress,
 				Bridge:            lombardBridgeAddress,
-				Adapter:           common.Address{}, // Zero address
+				Adapter:           localAdapterAddress,
 				AdvancedPoolHooks: advancedPoolHooksAddress,
 				RMNProxy:          rmnAddress,
 				Router:            routerAddress,
