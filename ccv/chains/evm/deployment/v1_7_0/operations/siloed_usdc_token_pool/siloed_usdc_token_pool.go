@@ -76,6 +76,17 @@ var ApplyAuthorizedCallerUpdates = contract.NewWrite(contract.WriteParams[Author
 	},
 })
 
+var GetAllLockBoxConfigs = contract.NewRead(contract.ReadParams[any, []LockBoxConfig, *siloed_usdc_token_pool.SiloedUSDCTokenPool]{
+	Name:         "siloed-usdc-token-pool:get-all-lock-box-configs",
+	Version:      Version,
+	Description:  "Gets all lock box configurations on the SiloedUSDCTokenPool",
+	ContractType: ContractType,
+	NewContract:  siloed_usdc_token_pool.NewSiloedUSDCTokenPool,
+	CallContract: func(pool *siloed_usdc_token_pool.SiloedUSDCTokenPool, opts *bind.CallOpts, args any) ([]LockBoxConfig, error) {
+		return pool.GetAllLockBoxConfigs(opts)
+	},
+})
+
 var GetAllAuthorizedCallers = contract.NewRead(contract.ReadParams[any, []common.Address, *siloed_usdc_token_pool.SiloedUSDCTokenPool]{
 	Name:         "siloed-usdc-token-pool:get-all-authorized-callers",
 	Version:      Version,
