@@ -1851,6 +1851,11 @@ func Test_computeCommitObservationsConsensus(t *testing.T) {
 		},
 	}
 
+	baseObservationDupeRoot := map[cciptypes.ChainSelector][]exectypes.CommitData{
+		1:    baseObservation[1],
+		9999: baseObservation[1],
+	}
+
 	baseObservationDifferentOnRamp := map[cciptypes.ChainSelector][]exectypes.CommitData{
 		1: {
 			{
@@ -1960,6 +1965,16 @@ func Test_computeCommitObservationsConsensus(t *testing.T) {
 				baseObservation,
 			},
 			fChain: map[cciptypes.ChainSelector]int{},
+		},
+		{
+			name: "ignore observation from unknown source chain",
+			observations: []exectypes.CommitObservations{
+				baseObservation,
+				baseObservation,
+				baseObservationDupeRoot, // <-- different data but same merkle root, should be ignored
+			},
+			fChain: map[cciptypes.ChainSelector]int{1: 2}, // need 3 observations for src 1
+			exp:    baseObservation,
 		},
 	}
 

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
+
 	"github.com/smartcontractkit/libocr/commontypes"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
@@ -540,7 +541,10 @@ func computeCommitObservationsConsensus(
 
 	validRoots := make([]merkleRootData, 0, len(merkleRootsVotes))
 	for mr, votes := range merkleRootsVotes {
-		if consensus.GteFPlusOne(fChain[mr.SourceChain], votes) {
+		f, ok := fChain[mr.SourceChain]
+		if !ok {
+			lggr.Warnw("no fChain defined for chain", "chain", mr.SourceChain, "fChain", fChain)
+		} else if consensus.GteFPlusOne(f, votes) {
 			validRoots = append(validRoots, mr)
 		} else {
 			lggr.Debugw("merkle root with less than f+1 votes was found, skipping it", "mr", mr, "votes", votes)
