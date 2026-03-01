@@ -705,6 +705,7 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 		if srcFamily != chainsel.FamilyEVM && srcFamily != chainsel.FamilySolana {
 			continue // only EVM and Solana are supported for token transfers in 1.6
 		}
+		srcCfg.SkipOwnershipTransfer = true
 
 		for _, dstAdapter := range adp {
 			// dstCfg := dstAdapter.GetTokenExpansionConfig()
