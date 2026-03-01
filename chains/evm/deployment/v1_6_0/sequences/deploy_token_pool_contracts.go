@@ -67,10 +67,7 @@ var DeployTokenPool = cldf_ops.NewSequence(
 		// but will error if the provided address is incorrect or not provided at all
 		if input.TokenRef != nil && input.TokenRef.Qualifier != "" {
 			// find token address from the data store
-			storedAddr, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, datastore.AddressRef{
-				ChainSelector: input.ChainSelector,
-				Qualifier:     input.TokenRef.Qualifier,
-			}, input.ChainSelector, datastore_utils.FullRef)
+			storedAddr, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, *input.TokenRef, input.ChainSelector, datastore_utils.FullRef)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("token with symbol '%s' is not found in datastore, %v", input.TokenRef.Qualifier, err)
 			}
