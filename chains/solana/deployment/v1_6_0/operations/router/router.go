@@ -652,6 +652,12 @@ var TransferTokenAdminRegistry = operations.NewOperation(
 		var tokenAdminRegistryAccount ccip_common.TokenAdminRegistry
 		if err := chain.GetAccountDataBorshInto(b.GetContext(), tokenAdminRegistryPDA, &tokenAdminRegistryAccount); err == nil {
 			currentAdmin = tokenAdminRegistryAccount.Administrator
+			if currentAdmin.IsZero() {
+				return TokenAdminRegistryOut{}, fmt.Errorf("no admin found for token admin registry")
+			}
+			b.Logger.Infof("Current token admin registry account: %+v", tokenAdminRegistryAccount)
+		} else {
+			return TokenAdminRegistryOut{}, fmt.Errorf("failed to fetch token admin registry account: %w", err)
 		}
 		// we can only sign as either the deployer or timelock
 		// ccip admin should be timelock
@@ -659,6 +665,10 @@ var TransferTokenAdminRegistry = operations.NewOperation(
 		// if no admin provided, use ccip admin
 		if input.Admin.IsZero() {
 			input.Admin = ccipAdmin
+		}
+		if currentAdmin == input.Admin {
+			b.Logger.Info("Token admin registry already registered with the given admin:", tokenAdminRegistryAccount)
+			return TokenAdminRegistryOut{}, nil
 		}
 		// sign as the current admin to transfer
 		tempIx, err := ccip_router.NewTransferAdminRoleTokenAdminRegistryInstruction(
