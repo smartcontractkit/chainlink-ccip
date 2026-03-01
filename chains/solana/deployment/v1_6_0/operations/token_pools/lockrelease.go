@@ -443,6 +443,66 @@ var AcceptOwnershipLockRelease = operations.NewOperation(
 	},
 )
 
+var UpdateRateLimitAdminLockRelease = operations.NewOperation(
+	"lockrelease:update-rate-limit-admin",
+	common_utils.Version_1_6_0,
+	"Updates the rate limit admin for a LockReleaseTokenPool remote chain config",
+	func(b operations.Bundle, chain cldf_solana.Chain, input TokenPoolTransferOwnershipInput) (sequences.OnChainOutput, error) {
+		lockrelease_token_pool.SetProgramID(input.Program)
+		poolConfigPDA, _ := tokens.TokenPoolConfigAddress(input.TokenMint, input.Program)
+		var chainConfig test_token_pool.State
+		err := chain.GetAccountDataBorshInto(b.GetContext(), poolConfigPDA, &chainConfig)
+		if err == nil {
+			if chainConfig.Config.RateLimitAdmin == input.NewOwner {
+				b.Logger.Info("New owner is the same as the current rate limit admin for lock release token pool with token mint:", input.TokenMint.String())
+				return sequences.OnChainOutput{}, nil
+			}
+		}
+		authority, err := GetAuthorityLockRelease(chain, input.Program, input.TokenMint)
+		if err != nil {
+			// assume the authority is the upgrade authority if we fail to fetch the current authority, since the pool might not be initialized yet and there won't be an authority set on-chain yet (since the config account won't exist until initialization)
+			authority, err = utils.GetUpgradeAuthority(chain.Client, input.Program)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get upgrade authority for lock release token pool: %w", err)
+			}
+			// if we had to assume the authority, then the pool isn't initialized yet and therefore
+			// there won't be an authority set on-chain yet, so we can skip the update since the initializer
+			// will be able to set the correct authority during initialization
+			if authority == input.NewOwner {
+				b.Logger.Info("New owner is the same as the current owner for lock release token pool with token mint:", input.TokenMint.String())
+				return sequences.OnChainOutput{}, nil
+			}
+		}
+		ixn, err := lockrelease_token_pool.NewSetRateLimitAdminInstruction(
+			input.TokenMint,
+			input.NewOwner,
+			poolConfigPDA,
+			authority,
+		).ValidateAndBuild()
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to build update rate limit admin instruction: %w", err)
+		}
+		if authority != chain.DeployerKey.PublicKey() {
+			batches, err := utils.BuildMCMSBatchOperation(
+				chain.Selector,
+				[]solana.Instruction{ixn},
+				input.Program.String(),
+				common_utils.LockReleaseTokenPool.String(),
+			)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute or create batch: %w", err)
+			}
+			return sequences.OnChainOutput{BatchOps: []types.BatchOperation{batches}}, nil
+		}
+
+		err = chain.Confirm([]solana.Instruction{ixn})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm update rate limit admin: %w", err)
+		}
+		return sequences.OnChainOutput{}, nil
+	},
+)
+
 func GetAuthorityLockRelease(chain cldf_solana.Chain, program solana.PublicKey, tokenMint solana.PublicKey) (solana.PublicKey, error) {
 	programData := lockrelease_token_pool.State{}
 	poolConfigPDA, _ := tokens.TokenPoolConfigAddress(tokenMint, program)

@@ -16,6 +16,8 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
+var _ tokens.TokenAdapter = &TokenAdapter{}
+
 // TokenAdapter is the adapter for EVM tokens using 1.6.1 token pools.
 type TokenAdapter struct{}
 
@@ -53,7 +55,7 @@ func (t *TokenAdapter) DeployToken() *cldf_ops.Sequence[tokens.DeployTokenInput,
 	return nil
 }
 
-func (t *TokenAdapter) DeployTokenVerify(e deployment.Environment, in any) error {
+func (t *TokenAdapter) DeployTokenVerify(e deployment.Environment, in tokens.DeployTokenInput) error {
 	// TODO implement me
 	return nil
 }
@@ -97,7 +99,7 @@ func (t *TokenAdapter) SetTokenPoolRateLimits() *operations.Sequence[tokens.TPRL
 	return nil
 }
 
-func (t *TokenAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokens.UpdateAuthoritiesInput, sequences.OnChainOutput, chain.BlockChains] {
+func (t *TokenAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokens.UpdateAuthoritiesInput, sequences.OnChainOutput, *deployment.Environment] {
 	// TODO implement me
 	return nil
 }

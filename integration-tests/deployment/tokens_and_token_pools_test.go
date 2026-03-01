@@ -479,7 +479,8 @@ func TestTokensAndTokenPools(t *testing.T) {
 				output, err = tokensapi.TokenExpansion().Apply(*env, tokensapi.TokenExpansionInput{
 					TokenExpansionInputPerChain: map[uint64]tokensapi.TokenExpansionInputPerChain{
 						evmA.Chain.Selector: {
-							TokenPoolVersion: v1_6_0,
+							SkipOwnershipTransfer: true, // https://smartcontract-it.atlassian.net/browse/NONEVM-2902
+							TokenPoolVersion:      v1_6_0,
 							TokenTransferConfig: &tokensapi.TokenTransferConfig{
 								ChainSelector: evmA.Chain.Selector,
 								TokenPoolRef: datastore.AddressRef{
@@ -512,7 +513,8 @@ func TestTokensAndTokenPools(t *testing.T) {
 							},
 						},
 						evmB.Chain.Selector: {
-							TokenPoolVersion: v1_6_0,
+							SkipOwnershipTransfer: true, // https://smartcontract-it.atlassian.net/browse/NONEVM-2902
+							TokenPoolVersion:      v1_6_0,
 							TokenTransferConfig: &tokensapi.TokenTransferConfig{
 								ChainSelector: evmB.Chain.Selector,
 								TokenPoolRef: datastore.AddressRef{
@@ -866,7 +868,8 @@ func TestTokensAndTokenPools(t *testing.T) {
 						},
 					},
 					evmA.Chain.Selector: {
-						TokenPoolVersion: v1_6_0,
+						SkipOwnershipTransfer: true, // https://smartcontract-it.atlassian.net/browse/NONEVM-2902
+						TokenPoolVersion:      v1_6_0,
 						TokenTransferConfig: &tokensapi.TokenTransferConfig{
 							ChainSelector: evmA.Chain.Selector,
 							TokenPoolRef: datastore.AddressRef{
@@ -899,7 +902,8 @@ func TestTokensAndTokenPools(t *testing.T) {
 						},
 					},
 					evmB.Chain.Selector: {
-						TokenPoolVersion: v1_6_0,
+						SkipOwnershipTransfer: true, // https://smartcontract-it.atlassian.net/browse/NONEVM-2902
+						TokenPoolVersion:      v1_6_0,
 						TokenTransferConfig: &tokensapi.TokenTransferConfig{
 							ChainSelector: evmB.Chain.Selector,
 							TokenPoolRef: datastore.AddressRef{
@@ -957,7 +961,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 			require.NoError(t, stateErr)
 			require.Equal(t, timelockSigner, tokenPoolStateAccountAfter.Config.Owner)
 			require.Equal(t, tokenMint, tokenPoolStateAccountAfter.Config.Mint)
-			require.Equal(t, chain.DeployerKey.PublicKey(), tokenPoolStateAccountAfter.Config.RateLimitAdmin)
+			require.Equal(t, timelockSigner, tokenPoolStateAccountAfter.Config.RateLimitAdmin)
 		})
 	})
 }

@@ -13,6 +13,9 @@ use event::*;
 
 mod instructions;
 
+mod config;
+use config::*;
+
 #[program]
 pub mod rmn_remote {
     use instructions::router;
@@ -29,9 +32,10 @@ pub mod rmn_remote {
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
         ctx.accounts.config.set_inner(Config {
             owner: ctx.accounts.authority.key(),
-            version: 1,
+            version: 2,
             proposed_owner: Pubkey::default(),
             default_code_version: CodeVersion::V1,
+            event_authorities: vec![],
         });
 
         ctx.accounts.curses.version = 1;
@@ -121,6 +125,21 @@ pub mod rmn_remote {
         router::admin(ctx.accounts.config.default_code_version).uncurse(ctx, subject)
     }
 
+    /// Overwrites the list of addresses authorized to invoke the `cpi_event` instruction.
+    ///
+    /// Only the CCIP Admin may perform this operation.
+    ///
+    /// # Arguments
+    /// * `ctx` - The context containing the accounts required for updating event authorities.
+    /// * `new_event_authorities` - The new list of event authority public keys.
+    pub fn set_event_authorities(
+        ctx: Context<UpdateEventAuthorities>,
+        new_event_authorities: Vec<Pubkey>,
+    ) -> Result<()> {
+        let code_version = ctx.accounts.config.default_code_version;
+        router::admin(code_version).set_event_authorities(ctx, new_event_authorities)
+    }
+
     /// Verifies that the subject is not cursed AND that this chain is not globally cursed.
     /// In case either of those assumptions fail, the instruction reverts.
     ///
@@ -129,8 +148,39 @@ pub mod rmn_remote {
     /// * `ctx` - The context containing the accounts required to inspect curses.
     /// * `subject` - The subject to verify. Note that this instruction will revert if the chain
     ///   is globally cursed too, even if the provided subject is not explicitly cursed.
-    pub fn verify_not_cursed(ctx: Context<InspectCurses>, subject: CurseSubject) -> Result<()> {
-        router::public(ctx.accounts.config.default_code_version).verify_not_cursed(ctx, subject)
+    pub fn verify_not_cursed<'info>(
+        ctx: Context<'_, '_, 'info, 'info, InspectCurses<'info>>,
+        subject: CurseSubject,
+    ) -> Result<()> {
+        let code_version = load_config(&ctx.accounts.config)?.default_code_version;
+        router::public(code_version).verify_not_cursed(ctx, subject)
+    }
+
+    /// Backwards-compatible way of implementing CPI events without other contracts needing to
+    /// add more accounts to make a self-CPI. Calls made to this instruction include the event data
+    /// in the instruction data, so offchain code can inspect it.
+    ///
+    /// Only event authorities can invoke this instruction. While there is basic onchain
+    /// authorization, the offchain is still expected to check the caller program to attribute the
+    /// event to it, as this method may be invoked by more than one program so that it can be reused.
+    ///
+    /// # Arguments
+    /// * `_ctx` - The context containing the accounts required for the CPI event.
+    /// * `_event_data` - The raw event data to be emitted.
+    pub fn cpi_event(_ctx: Context<CpiEvent>, _event_data: Vec<u8>) -> Result<()> {
+        // all validations happen in the context constraints
+        Ok(())
+    }
+
+    /// Extends the Config PDA to allocate space for v2 fields, and migrates the onchain state
+    /// from v1 to v2. This is a permissionless operation, as the default values set for the new
+    /// v2 fields are backwards-compatible and safe.
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts required for the migration.
+    pub fn migrate_config_v1_to_v2(ctx: Context<MigrateConfigV1ToV2>) -> Result<()> {
+        let code_version = load_config(&ctx.accounts.config)?.default_code_version;
+        router::public(code_version).migrate_config_v1_to_v2(ctx)
     }
 }
 
@@ -156,4 +206,6 @@ pub enum RmnRemoteError {
     InvalidCodeVersion,
     #[msg("Proposed owner is the default pubkey")]
     DefaultOwnerProposal,
+    #[msg("Config account has invalid space, data, or shape")]
+    InvalidInputsConfigAccount,
 }
