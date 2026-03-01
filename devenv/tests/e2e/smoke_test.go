@@ -12,7 +12,7 @@ import (
 
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
-	ccipEVM "github.com/smartcontractkit/chainlink-ccip/devenv/chainimpl/ccip-evm"
+	devenvcommon "github.com/smartcontractkit/chainlink-ccip/devenv/common"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
@@ -115,7 +115,7 @@ func TestE2ESmoke(t *testing.T) {
 			}
 			fqReg := deployops.GetFQAndRampUpdaterRegistry()
 			fqUpdateChangeset := deployops.UpdateFeeQuoterChangeset(fqReg, nil)
-			out, err := fqUpdateChangeset.Apply(*e, deployops.UpdateFeeQuoterInput{
+			_, err := fqUpdateChangeset.Apply(*e, deployops.UpdateFeeQuoterInput{
 				Chains: fqInput,
 			})
 			require.NoError(t, err, "Failed to apply UpdateFeeQuoterChangeset changeset")
@@ -125,9 +125,11 @@ func TestE2ESmoke(t *testing.T) {
 			ccip.DeleteJobs(allNodeClients, in.Jobs)
 			time.Sleep(10 * time.Second) // wait for jobs to be deleted
 			ccip.CreateJobs(allNodeClients, in.NodeKeyBundles)
-			time.Sleep(60 * time.Second) // wait for the new jobs to be scheduled and picked up by the nodes
-			err = ccipEVM.UpdatePrices(out.DataStore.Seal(), fromImpl.ChainSelector(), toImpl.ChainSelector(), e.BlockChains.EVMChains()[fromImpl.ChainSelector()])
-			require.NoError(t, err, "Failed to update prices")
+			time.Sleep(80 * time.Second) // wait for the new jobs to be scheduled and picked up by the nodes
+			// err = ccipEVM.UpdatePrices(out.DataStore.Seal(), fromImpl.ChainSelector(), toImpl.ChainSelector(), e.BlockChains.EVMChains()[fromImpl.ChainSelector()])
+			// require.NoError(t, err, "Failed to update prices")
+			err = devenvcommon.AddNodesToContracts(e.GetContext(), e, in.NodeSets, in.NodeKeyBundles, ccip.CCIPHomeChain, selectors, "anvil", in.Blockchains)
+			require.NoError(t, err, "Failed to add nodes to contracts after FQ update")
 		}
 		// Capture the loop variable so each goroutine gets its own copy.
 		t.Run(tc.name, func(t *testing.T) {
