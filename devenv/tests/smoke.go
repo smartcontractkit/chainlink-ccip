@@ -209,15 +209,16 @@ func RunSmokeTests(t *testing.T, e *deployment.Environment, selectors []uint64) 
 			extraArgs, err := toImpl.GetExtraArgs(receiver, fromImpl.Family())
 			require.NoError(t, err)
 
+			const invalidUnconfiguredChainSelector = 1
 			msg, err := fromImpl.BuildMessage(testadapters.MessageComponents{
-				DestChainSelector: 1, // invalid/unconfigured chain selector
+				DestChainSelector: invalidUnconfiguredChainSelector,
 				Receiver:          toImpl.CCIPReceiver(),
 				Data:              []byte("hello world"),
 				ExtraArgs:         extraArgs,
 			})
 			require.NoError(t, err)
 
-			_, err = fromImpl.SendMessage(t.Context(), toImpl.ChainSelector(), msg)
+			_, err = fromImpl.SendMessage(t.Context(), invalidUnconfiguredChainSelector, msg)
 			require.Error(t, err)
 		})
 
