@@ -87,6 +87,8 @@ type WithdrawFeeTokensArgs struct {
 	Recipient common.Address
 }
 
+type TokenTransferFeeConfig = token_pool.IPoolV2TokenTransferFeeConfig
+
 type TokenTransferFeeConfigUpdate struct {
 	DestChainSelector                      uint64
 	DestGasOverhead                        uint32
@@ -392,5 +394,16 @@ var GetAdvancedPoolHooks = contract.NewRead(contract.ReadParams[any, common.Addr
 	NewContract:  token_pool.NewTokenPool,
 	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.CallOpts, args any) (common.Address, error) {
 		return tokenPool.GetAdvancedPoolHooks(opts)
+	},
+})
+
+var GetTokenTransferFeeConfig = contract.NewRead(contract.ReadParams[uint64, TokenTransferFeeConfig, *token_pool.TokenPool]{
+	Name:         "token-pool:get-token-transfer-fee-config",
+	Version:      Version,
+	Description:  "Gets the token transfer fee config for a given remote chain selector on a TokenPool",
+	ContractType: ContractType,
+	NewContract:  token_pool.NewTokenPool,
+	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.CallOpts, remoteChainSelector uint64) (TokenTransferFeeConfig, error) {
+		return tokenPool.GetTokenTransferFeeConfig(opts, common.Address{}, remoteChainSelector, 0, []byte{})
 	},
 })

@@ -29,7 +29,6 @@ type RemoteAdapterArgs = lombard_verifier.LombardVerifierRemoteAdapterArgs
 type RemotePathArgs struct {
 	RemoteChainSelector uint64
 	AllowedCaller       [32]byte
-	RemoteAdapter       [32]byte
 	LChainId            [32]byte
 }
 
