@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 	"slices"
+	"strings"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
@@ -12,12 +13,14 @@ import (
 	burn_mint_token_pool_latest "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/burn_mint_token_pool"
 	tp_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/token_pool"
 	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	bm_proxy_v150 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/burn_mint_token_pool_and_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
+	token_pool_v150 "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_5_0/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/advanced_pool_hooks"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/token_pool"
 	v17seq "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
@@ -42,6 +45,8 @@ type ConfigureTokenPoolForRemoteChainInput struct {
 	RegistryAddress common.Address
 	// TokenAddress is the token address; if set with RegistryAddress, used to fetch the active pool for upgrade import.
 	TokenAddress common.Address
+	// RemoteChainAlreadySupported is true when the pool already has this remote chain in its supported list (avoids an on-chain read).
+	RemoteChainAlreadySupported bool
 }
 
 func (c ConfigureTokenPoolForRemoteChainInput) Validate(chain evm.Chain) error {
@@ -163,21 +168,12 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 			}
 		}
 
-		// Get remote chains that are currently supported by the token pools
-		supportedChainsReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetSupportedChains, chain, evm_contract.FunctionInput[any]{
-			ChainSelector: input.ChainSelector,
-			Address:       input.TokenPoolAddress,
-		})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to get supported chains: %w", err)
-		}
-
-		// If the chain is supported
+		// If the chain is already supported
 		// 1. Check remote token, remove and re-add remote config if requested remote token is different
 		// 2. Check existing rate limiters and update if necessary
 		// 3. Check existing remote pools and add requested remote pool if it does not exist
 		removes := make([]uint64, 0, 1) // Cap == 1 because we may need to remove the chain if the remote token is different
-		if slices.Contains(supportedChainsReport.Output, input.RemoteChainSelector) {
+		if input.RemoteChainAlreadySupported {
 			// Check existing remote token
 			getRemoteTokenReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetRemoteToken, chain, evm_contract.FunctionInput[uint64]{
 				ChainSelector: input.ChainSelector,
@@ -354,7 +350,8 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 )
 
 // importConfigFromActivePool fetches the active pool from the TokenAdminRegistry and, if its version is < 2.0.0,
-// imports rate limit state and remote pools for the given remote chain using 1.6.1 operations.
+// imports rate limit state and remote pools for the given remote chain. Uses 1.5.0 ops for pools < 1.5.1 (including
+// proxy/previousPool handling) and 1.6.1 ops for 1.5.1 <= version < 2.0.0.
 // Returns nil when registry or token address is zero, when there is no active pool, or when the active pool is >= 2.0.0.
 func importConfigFromActivePool(
 	b cldf_ops.Bundle,
@@ -386,9 +383,116 @@ func importConfigFromActivePool(
 	if err != nil {
 		return nil, fmt.Errorf("failed to get active pool type and version: %w", err)
 	}
-	if !typeAndVersionReport.Output.Version.LessThan(semver.MustParse("2.0.0")) {
+	tav := typeAndVersionReport.Output
+	if !tav.Version.LessThan(semver.MustParse("2.0.0")) {
 		return nil, nil
 	}
+	if tav.Version.LessThan(semver.MustParse("1.5.1")) {
+		return importConfigFromActivePoolV150(b, chain, chainSelector, activePool, remoteChainSelector, tav)
+	}
+	return importConfigFromActivePoolV161(b, chain, chainSelector, activePool, remoteChainSelector)
+}
+
+// importConfigFromActivePoolV150 imports rate limits and the single remote pool for the given remote chain
+// using 1.5.0 operations. If activePool type contains "Proxy", fetches previousPool; if previousPool version < 1.4.0
+// uses the proxy (activePool) for rate limits, otherwise uses previousPool for rate limits. Remote pool is always
+// read from activePool (proxy exposes getRemotePool).
+func importConfigFromActivePoolV150(
+	b cldf_ops.Bundle,
+	chain evm.Chain,
+	chainSelector uint64,
+	activePool common.Address,
+	remoteChainSelector uint64,
+	tav type_and_version.TypeAndVersion,
+) (*activePoolImportedConfig, error) {
+	typeStr := string(tav.Type)
+	poolForRateLimits := activePool
+	if strings.Contains(typeStr, "Proxy") {
+		prevReport, err := cldf_ops.ExecuteOperation(b, token_pool_v150.GetPreviousPool, chain, evm_contract.FunctionInput[struct{}]{
+			ChainSelector: chainSelector,
+			Address:       activePool,
+			Args:          struct{}{},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to get previous pool from proxy: %w", err)
+		}
+		previousPool := prevReport.Output
+		if previousPool != (common.Address{}) {
+			prevTVReport, err := cldf_ops.ExecuteOperation(b, type_and_version.GetTypeAndVersion, chain, evm_contract.FunctionInput[struct{}]{
+				ChainSelector: chainSelector,
+				Address:       previousPool,
+				Args:          struct{}{},
+			})
+			if err != nil {
+				return nil, fmt.Errorf("failed to get previous pool type and version: %w", err)
+			}
+			if prevTVReport.Output.Version.LessThan(semver.MustParse("1.4.0")) {
+				poolForRateLimits = activePool
+			} else {
+				poolForRateLimits = previousPool
+			}
+		}
+	}
+	cfg, err := fetchRateLimitsAndRemotePoolV150(b, chain, chainSelector, poolForRateLimits, activePool, remoteChainSelector)
+	if err != nil {
+		return nil, err
+	}
+	return cfg, nil
+}
+
+// fetchRateLimitsAndRemotePoolV150 fetches rate limiter state and the single remote pool for the given remote chain
+// using 1.5.0 operations. poolForRateLimits is the address to read rate limits from; poolForRemotePool is the
+// address to read getRemotePool from (e.g. proxy when using previousPool for rate limits).
+func fetchRateLimitsAndRemotePoolV150(
+	b cldf_ops.Bundle,
+	chain evm.Chain,
+	chainSelector uint64,
+	poolForRateLimits, poolForRemotePool common.Address,
+	remoteChainSelector uint64,
+) (*activePoolImportedConfig, error) {
+	inboundReport, err := cldf_ops.ExecuteOperation(b, token_pool_v150.GetInboundRateLimiterState, chain, evm_contract.FunctionInput[uint64]{
+		ChainSelector: chainSelector,
+		Address:       poolForRateLimits,
+		Args:          remoteChainSelector,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get inbound rate limiter state: %w", err)
+	}
+	outboundReport, err := cldf_ops.ExecuteOperation(b, token_pool_v150.GetOutboundRateLimiterState, chain, evm_contract.FunctionInput[uint64]{
+		ChainSelector: chainSelector,
+		Address:       poolForRateLimits,
+		Args:          remoteChainSelector,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get outbound rate limiter state: %w", err)
+	}
+	remotePoolReport, err := cldf_ops.ExecuteOperation(b, token_pool_v150.GetRemotePool, chain, evm_contract.FunctionInput[uint64]{
+		ChainSelector: chainSelector,
+		Address:       poolForRemotePool,
+		Args:          remoteChainSelector,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get remote pool: %w", err)
+	}
+	remotePools := [][]byte{}
+	if len(remotePoolReport.Output) > 0 {
+		remotePools = [][]byte{remotePoolReport.Output}
+	}
+	return &activePoolImportedConfig{
+		DefaultOutbound: tokenBucketV150ToRateLimiterConfig(outboundReport.Output),
+		DefaultInbound:  tokenBucketV150ToRateLimiterConfig(inboundReport.Output),
+		RemotePools:     remotePools,
+	}, nil
+}
+
+// importConfigFromActivePoolV161 imports rate limits and remote pools using 1.6.1 operations (for active pool version >= 1.5.1 and < 2.0.0).
+func importConfigFromActivePoolV161(
+	b cldf_ops.Bundle,
+	chain evm.Chain,
+	chainSelector uint64,
+	activePool common.Address,
+	remoteChainSelector uint64,
+) (*activePoolImportedConfig, error) {
 	inboundReport, err := cldf_ops.ExecuteOperation(b, token_pool_v161.GetCurrentInboundRateLimiterState, chain, evm_contract.FunctionInput[uint64]{
 		ChainSelector: chainSelector,
 		Address:       activePool,
@@ -418,6 +522,15 @@ func importConfigFromActivePool(
 		DefaultInbound:  tokenBucketToRateLimiterConfig(inboundReport.Output),
 		RemotePools:     remotePoolsReport.Output,
 	}, nil
+}
+
+// tokenBucketV150ToRateLimiterConfig converts a 1.5.0 (proxy bindings) RateLimiterTokenBucket to tokens.RateLimiterConfig.
+func tokenBucketV150ToRateLimiterConfig(b bm_proxy_v150.RateLimiterTokenBucket) *tokens.RateLimiterConfig {
+	return &tokens.RateLimiterConfig{
+		IsEnabled: b.IsEnabled,
+		Capacity:  new(big.Int).Set(b.Capacity),
+		Rate:      new(big.Int).Set(b.Rate),
+	}
 }
 
 // tokenBucketToRateLimiterConfig converts a 1.6.1 TokenBucket to tokens.RateLimiterConfig.
