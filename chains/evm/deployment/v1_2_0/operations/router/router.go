@@ -142,13 +142,13 @@ var IsChainSupported = contract.NewRead(contract.ReadParams[uint64, bool, *route
 	},
 })
 
-var GetWrappedNative = contract.NewRead(contract.ReadParams[any, common.Address, *router.Router]{
+var GetWrappedNative = contract.NewRead(contract.ReadParams[struct{}, common.Address, *router.Router]{
 	Name:         "router:get-wrapped-native",
 	Version:      Version,
-	Description:  "Gets the wrapped native token address set on the Router",
+	Description:  "Gets the wrapped native address",
 	ContractType: ContractType,
 	NewContract:  router.NewRouter,
-	CallContract: func(router *router.Router, opts *bind.CallOpts, args any) (common.Address, error) {
+	CallContract: func(router *router.Router, opts *bind.CallOpts, args struct{}) (common.Address, error) {
 		return router.GetWrappedNative(opts)
 	},
 })
@@ -156,7 +156,7 @@ var GetWrappedNative = contract.NewRead(contract.ReadParams[any, common.Address,
 var SetWrappedNative = contract.NewWrite(contract.WriteParams[common.Address, *router.Router]{
 	Name:            "router:set-wrapped-native",
 	Version:         Version,
-	Description:     "Sets the wrapped native token address on the Router",
+	Description:     "Sets the wrapped native address",
 	ContractType:    ContractType,
 	ContractABI:     router.RouterABI,
 	NewContract:     router.NewRouter,

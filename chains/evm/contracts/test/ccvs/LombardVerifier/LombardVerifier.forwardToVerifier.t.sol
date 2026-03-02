@@ -105,7 +105,13 @@ contract LombardVerifier_forwardToVerifier is LombardVerifierSetup {
 
     vm.stopPrank();
     vm.startPrank(OWNER);
-    s_lombardVerifier.setPath(DEST_CHAIN_SELECTOR, LOMBARD_CHAIN_ID, ALLOWED_CALLER, REMOTE_ADAPTER);
+
+    LombardVerifier.RemoteAdapterArgs[] memory adapterArgs = new LombardVerifier.RemoteAdapterArgs[](1);
+    adapterArgs[0] = LombardVerifier.RemoteAdapterArgs({
+      remoteChainSelector: DEST_CHAIN_SELECTOR, token: address(s_testToken), remoteAdapter: REMOTE_ADAPTER
+    });
+    s_lombardVerifier.setRemoteAdapters(adapterArgs);
+
     s_mockBridge.setAllowedDestinationToken(LOMBARD_CHAIN_ID, address(s_testToken), REMOTE_ADAPTER);
 
     vm.stopPrank();

@@ -5,11 +5,12 @@ import (
 	"math/big"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/ethereum/go-ethereum/common"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
@@ -34,6 +35,9 @@ type TokenExpansionInputPerChain struct {
 	DeployTokenPoolInput *DeployTokenPoolInput `yaml:"deployTokenPoolInput" json:"deployTokenPoolInput"`
 	// if not nil, will try to fully configure the token for transfers, including registering the token and token pool on-chain and setting the pool on the token
 	TokenTransferConfig *TokenTransferConfig `yaml:"tokenTransferConfig" json:"tokenTransferConfig"`
+	// if true, the ownership transfer to the timelock and acceptance of ownership by the timelock
+	// will be skipped for token pools at the end of the changeset.
+	SkipOwnershipTransfer bool `yaml:"skipOwnershipTransfer" json:"skipOwnershipTransfer"`
 }
 
 type DeployTokenInput struct {
@@ -108,10 +112,9 @@ type DeployTokenPoolInput struct {
 
 type UpdateAuthoritiesInput struct {
 	// below are not specified by the user, filled in by the deployment system to pass to chain operations
-	ChainSelector     uint64
-	ExistingDataStore datastore.DataStore
-	TokenRef          datastore.AddressRef
-	TokenPoolRef      datastore.AddressRef
+	ChainSelector uint64
+	TokenRef      datastore.AddressRef
+	TokenPoolRef  datastore.AddressRef
 }
 
 func TokenExpansion() cldf.ChangeSetV2[TokenExpansionInput] {
@@ -132,11 +135,13 @@ func tokenExpansionVerify() func(cldf.Environment, TokenExpansionInput) error {
 			}
 			// deploy token
 			deployTokenInput := input.DeployTokenInput
-			deployTokenInput.ExistingDataStore = e.DataStore
-			deployTokenInput.ChainSelector = selector
-			err = tokenPoolAdapter.DeployTokenVerify(e, input)
-			if err != nil {
-				return fmt.Errorf("failed to verify deploy token input for chain selector %d: %w", selector, err)
+			if deployTokenInput != nil {
+				deployTokenInput.ExistingDataStore = e.DataStore
+				deployTokenInput.ChainSelector = selector
+				err = tokenPoolAdapter.DeployTokenVerify(e, *deployTokenInput)
+				if err != nil {
+					return fmt.Errorf("failed to verify deploy token input for chain selector %d: %w", selector, err)
+				}
 			}
 		}
 		return nil
@@ -178,9 +183,9 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 				// and we may not be able to register the token by CLL in that case.
 				if deployTokenInput.CCIPAdmin == "" {
 					filter := datastore.AddressRef{
-						Type:          datastore.ContractType(common_utils.RBACTimelock),
+						Type:          datastore.ContractType(utils.RBACTimelock),
 						ChainSelector: deployTokenInput.ChainSelector,
-						Qualifier:     cfg.MCMS.Qualifier,
+						Qualifier:     utils.CLLQualifier,
 					}
 
 					timelockAddr, err := datastore_utils.FindAndFormatRef(
@@ -192,7 +197,7 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 					if err != nil {
 						return cldf.ChangesetOutput{}, fmt.Errorf(
 							"couldn't find the RBACTimelock address in datastore for selector %d and qualifier %s: %w",
-							deployTokenInput.ChainSelector, cfg.MCMS.Qualifier, err,
+							deployTokenInput.ChainSelector, utils.CLLQualifier, err,
 						)
 					}
 
@@ -280,27 +285,7 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 			// if token transfer config is provided, we will update the remote chain config with the token and token pool addresses and
 			// save the token transfer config for processing after all tokens and token pools have been deployed
 			if input.TokenTransferConfig != nil {
-				actualPool := tokenPool
-				if actualPool == nil {
-					// if token pool is not deployed by this changeset, we expect the user to provide the token pool address in the TokenTransferConfig
-					actualPool = &input.TokenTransferConfig.TokenPoolRef
-				}
-				actualToken := tokenRef
-				if actualToken == nil {
-					// if token is not deployed by this changeset, we expect the user to provide the token address in the TokenTransferConfig
-					actualToken = &input.TokenTransferConfig.TokenRef
-				}
-				allRemotes[selector] = RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
-					RemoteToken: actualToken,
-					RemotePool:  actualPool,
-				}
-			}
-		}
-
-		// now that we have all the token and token pools, we can loop through the token configs again
-		// and update the remote chain configs with the correct token and token pool addresses before configuring the tokens for transfers
-		for selector, input := range cfg.TokenExpansionInputPerChain {
-			if input.TokenTransferConfig != nil {
+				input.TokenTransferConfig.ChainSelector = selector
 				mergedPool, err := datastore_utils.MergeRefs(
 					&cfg.TokenExpansionInputPerChain[selector].TokenTransferConfig.TokenPoolRef,
 					allRemotes[selector].RemotePool,
@@ -317,6 +302,17 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to merge token refs for chain selector %d: %w", selector, err)
 				}
 				cfg.TokenExpansionInputPerChain[selector].TokenTransferConfig.TokenRef = mergedToken
+				allRemotes[selector] = RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+					RemoteToken: &mergedToken,
+					RemotePool:  &mergedPool,
+				}
+			}
+		}
+
+		// now that we have all the token and token pools, we can loop through the token configs again
+		// and update the remote chain configs with the correct token and token pool addresses before configuring the tokens for transfers
+		for selector, input := range cfg.TokenExpansionInputPerChain {
+			if input.TokenTransferConfig != nil {
 				for remoteSelector, remoteConfig := range input.TokenTransferConfig.RemoteChains {
 					if _, exists := allRemotes[remoteSelector]; exists {
 						if remoteConfig.RemoteToken == nil {
@@ -337,12 +333,13 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 		}
 
 		// we process the token configs for transfers, which will register the tokens and token pools on-chain and set the pool on the token if necessary
-		transferOps, transferReports, err := processTokenConfigForChain(e, allTokenConfigs)
+		transferOps, transferReports, tokends, err := processTokenConfigForChain(e, allTokenConfigs)
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to process token configs for transfers: %w", err)
 		}
 		batchOps = append(batchOps, transferOps...)
 		reports = append(reports, transferReports...)
+		ds.Merge(tokends.Seal())
 
 		// finally, we update the authorities on the tokens if necessary
 		for selector, tokenConfig := range allTokenConfigs {
@@ -354,13 +351,35 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 			if !exists {
 				return cldf.ChangesetOutput{}, fmt.Errorf("no TokenPoolAdapter registered for chain family '%s'", family)
 			}
-			updateAuthoritiesInput := UpdateAuthoritiesInput{
-				TokenRef:          tokenConfig.TokenRef,
-				TokenPoolRef:      tokenConfig.TokenPoolRef,
-				ChainSelector:     selector,
-				ExistingDataStore: e.DataStore,
+			fullPoolRef, err := datastore_utils.FindAndFormatRef(e.DataStore, tokenConfig.TokenPoolRef, selector, datastore_utils.FullRef)
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to find full token pool ref for chain selector %d: %w", selector, err)
 			}
-			updateAuthoritiesReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, tokenPoolAdapter.UpdateAuthorities(), e.BlockChains, updateAuthoritiesInput)
+			fullTokenRef, err := datastore_utils.FindAndFormatRef(e.DataStore, tokenConfig.TokenRef, selector, datastore_utils.FullRef)
+			if err != nil {
+				e.Logger.Warnf("failed to find full token ref for chain selector %d, will try to derive it: %v", selector, err)
+				tokenBytes, err := tokenPoolAdapter.DeriveTokenAddress(e, selector, tokenConfig.TokenPoolRef)
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to derive token address for chain selector %d: %w", selector, err)
+				}
+				fullTokenRef = datastore.AddressRef{
+					ChainSelector: selector,
+					Type:          tokenConfig.TokenRef.Type,
+					Version:       tokenConfig.TokenRef.Version,
+					Qualifier:     tokenConfig.TokenRef.Qualifier,
+					Address:       common.Bytes2Hex(tokenBytes),
+				}
+			}
+			if cfg.TokenExpansionInputPerChain[selector].SkipOwnershipTransfer {
+				e.Logger.Infof("skipping ownership transfer for token pool %s on chain with selector %d", fullPoolRef, selector)
+				continue
+			}
+			updateAuthoritiesInput := UpdateAuthoritiesInput{
+				TokenRef:      fullTokenRef,
+				TokenPoolRef:  fullPoolRef,
+				ChainSelector: selector,
+			}
+			updateAuthoritiesReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, tokenPoolAdapter.UpdateAuthorities(), &e, updateAuthoritiesInput)
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to update authorities for token on chain %d: %w", selector, err)
 			}

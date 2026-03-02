@@ -430,7 +430,7 @@ func (a *SolanaAdapter) DeployToken() *cldf_ops.Sequence[tokenapi.DeployTokenInp
 	)
 }
 
-func (a *SolanaAdapter) DeployTokenVerify(e deployment.Environment, in any) error {
+func (a *SolanaAdapter) DeployTokenVerify(e deployment.Environment, in tokenapi.DeployTokenInput) error {
 	return nil
 }
 
@@ -570,29 +570,30 @@ func getTokenMintAndTokenProgram(store datastore.DataStore, tokenRef datastore.A
 	return tokenAddr, tokenProgramId, nil
 }
 
-func (a *SolanaAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokenapi.UpdateAuthoritiesInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+func (a *SolanaAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokenapi.UpdateAuthoritiesInput, sequences.OnChainOutput, *deployment.Environment] {
 	return cldf_ops.NewSequence(
 		"svm-adapter:update-authorities",
 		common_utils.Version_1_6_0,
 		"Update authorities for a token and token pool on Solana Chain",
-		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokenapi.UpdateAuthoritiesInput) (sequences.OnChainOutput, error) {
+		func(b cldf_ops.Bundle, e *deployment.Environment, input tokenapi.UpdateAuthoritiesInput) (sequences.OnChainOutput, error) {
 			var result sequences.OnChainOutput
-			chain, ok := chains.SolanaChains()[input.ChainSelector]
+			chain, ok := e.BlockChains.SolanaChains()[input.ChainSelector]
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
-			tokenRef, _, err := getTokenMintAndTokenProgram(input.ExistingDataStore, input.TokenRef, chain)
+			ds := e.DataStore
+			tokenRef, _, err := getTokenMintAndTokenProgram(ds, input.TokenRef, chain)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token and token program address using the specified reference (%+v): %w", input.TokenRef, err)
 			}
 
 			timelockSigner := utils.GetTimelockSignerPDA(
-				input.ExistingDataStore.Addresses().Filter(),
+				ds.Addresses().Filter(),
 				chain.Selector,
 				common_utils.CLLQualifier,
 			)
 
-			tokenPoolRef, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, input.TokenPoolRef, chain.Selector, datastore_utils.FullRef)
+			tokenPoolRef, err := datastore_utils.FindAndFormatRef(ds, input.TokenPoolRef, chain.Selector, datastore_utils.FullRef)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to find token pool address using the specified reference (%+v): %w", input.TokenPoolRef, err)
 			}
@@ -601,18 +602,31 @@ func (a *SolanaAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokenapi.UpdateAu
 
 			transferOwnershipTPOp := tokenpoolops.TransferOwnershipBurnMint
 			acceptOwnershipTPOp := tokenpoolops.AcceptOwnershipBurnMint
+			tprlAdminTPOp := tokenpoolops.UpdateRateLimitAdminBurnMint
 			switch tokenPoolRef.Type.String() {
 			case common_utils.BurnMintTokenPool.String():
 				// Already set to burn mint
 			case common_utils.LockReleaseTokenPool.String():
 				transferOwnershipTPOp = tokenpoolops.TransferOwnershipLockRelease
 				acceptOwnershipTPOp = tokenpoolops.AcceptOwnershipLockRelease
+				tprlAdminTPOp = tokenpoolops.UpdateRateLimitAdminLockRelease
 			default:
 				return sequences.OnChainOutput{}, fmt.Errorf("unsupported token pool type '%s' for Solana", tokenPoolRef.Type)
 			}
 
+			tprlAdminOut, err := operations.ExecuteOperation(b, tprlAdminTPOp, e.BlockChains.SolanaChains()[chain.Selector], tokenpoolops.TokenPoolTransferOwnershipInput{
+				Program:   tokenPool,
+				TokenMint: tokenMint,
+				NewOwner:  timelockSigner,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to update TPRL admin: %w", err)
+			}
+			result.Addresses = append(result.Addresses, tprlAdminOut.Output.Addresses...)
+			result.BatchOps = append(result.BatchOps, tprlAdminOut.Output.BatchOps...)
+
 			b.Logger.Infof("Transferring ownership of token pool %s to timelock signer %s", tokenPool.String(), timelockSigner.String())
-			transferOwnershipOut, err := operations.ExecuteOperation(b, transferOwnershipTPOp, chains.SolanaChains()[chain.Selector], tokenpoolops.TokenPoolTransferOwnershipInput{
+			transferOwnershipOut, err := operations.ExecuteOperation(b, transferOwnershipTPOp, e.BlockChains.SolanaChains()[chain.Selector], tokenpoolops.TokenPoolTransferOwnershipInput{
 				Program:   tokenPool,
 				NewOwner:  timelockSigner,
 				TokenMint: tokenMint,
@@ -624,7 +638,7 @@ func (a *SolanaAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokenapi.UpdateAu
 			result.BatchOps = append(result.BatchOps, transferOwnershipOut.Output.BatchOps...)
 
 			b.Logger.Infof("Accepting ownership of token pool %s by timelock signer %s", tokenPool.String(), timelockSigner.String())
-			acceptOwnershipOut, err := operations.ExecuteOperation(b, acceptOwnershipTPOp, chains.SolanaChains()[chain.Selector], tokenpoolops.TokenPoolTransferOwnershipInput{
+			acceptOwnershipOut, err := operations.ExecuteOperation(b, acceptOwnershipTPOp, e.BlockChains.SolanaChains()[chain.Selector], tokenpoolops.TokenPoolTransferOwnershipInput{
 				Program:   tokenPool,
 				NewOwner:  timelockSigner,
 				TokenMint: tokenMint,
