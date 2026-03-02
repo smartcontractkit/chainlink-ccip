@@ -254,8 +254,11 @@ func RunSmokeTests(t *testing.T, e *deployment.Environment, selectors []uint64) 
 		// TODO: test whitelisting
 
 		t.Run(fmt.Sprintf("%s OOO flag is required on non-EVMs", laneTag), func(t *testing.T) {
-			if fromImpl.Family() != chainsel.FamilyEVM || toImpl.Family() != chainsel.FamilyEVM {
+			if fromImpl.Family() == chainsel.FamilyEVM && toImpl.Family() == chainsel.FamilyEVM {
 				t.Skip("EVM->EVM still supports OOO, depending on config")
+			}
+			if toImpl.Family() == chainsel.FamilySolana {
+				t.Skip("TODO: Setup lane block OOO on Solana->EVM ")
 			}
 
 			receiver := toImpl.CCIPReceiver()
