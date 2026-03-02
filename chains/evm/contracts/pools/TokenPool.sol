@@ -1017,6 +1017,8 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   ) external virtual onlyOwner {
     for (uint256 i = 0; i < tokenTransferFeeConfigArgs.length; ++i) {
       uint64 destChainSelector = tokenTransferFeeConfigArgs[i].destChainSelector;
+      if (!isSupportedChain(destChainSelector)) revert NonExistentChain(destChainSelector);
+
       TokenTransferFeeConfig calldata tokenTransferFeeConfig = tokenTransferFeeConfigArgs[i].tokenTransferFeeConfig;
 
       // Reject configs with isEnabled: false - use disableTokenTransferFeeConfigs parameter instead.
