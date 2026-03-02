@@ -48,7 +48,7 @@ interface IPoolV2 is IERC165 {
   /// @notice Returns the set of required CCVs for transfers in a given direction.
   /// @param localToken The address of the local token.
   /// @param remoteChainSelector The chain selector of the remote chain.
-  /// @param amount The amount of tokens to be transferred.
+  /// @param sourceAmount The source-denominated amount of tokens to be transferred.
   /// @param blockConfirmationsRequested Requested block confirmations.
   /// @param extraData Direction-specific payload forwarded by the caller (e.g. token args or source pool data).
   /// @param direction Whether CCVs are required for outbound (source -> remote) or inbound (remote -> destination) transfers.
@@ -56,7 +56,7 @@ interface IPoolV2 is IERC165 {
   function getRequiredCCVs(
     address localToken,
     uint64 remoteChainSelector,
-    uint256 amount,
+    uint256 sourceAmount,
     uint16 blockConfirmationsRequested,
     bytes calldata extraData,
     MessageDirection direction

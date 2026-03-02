@@ -938,7 +938,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   /// @dev This function delegates to AdvancedPoolHooks if configured, otherwise returns an empty array.
   /// @param localToken The address of the local token.
   /// @param remoteChainSelector The remote chain selector for this transfer.
-  /// @param amount The amount being transferred.
+  /// @param sourceDenominatedAmount The amount being transferred, source denominated.
   /// @param blockConfirmationsRequested Requested block confirmations.
   /// @param extraData Direction-specific payload forwarded by the caller (e.g. token args or source pool data).
   /// @param direction The direction of the transfer (Inbound or Outbound).
@@ -946,7 +946,7 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   function getRequiredCCVs(
     address localToken,
     uint64 remoteChainSelector,
-    uint256 amount,
+    uint256 sourceDenominatedAmount,
     uint16 blockConfirmationsRequested,
     bytes calldata extraData,
     IPoolV2.MessageDirection direction
@@ -955,6 +955,9 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
       return new address[](0);
     }
 
+    // By default, the amount is equal to the source denominated amount.
+    uint256 amount = sourceDenominatedAmount;
+
     // The source fee amount is not classified as transferred value, meaning we have to subtract it from the amount
     // before passing it into the hook. The inbound amount is already post-fee so we only need to do this for outbound
     // transfers.
@@ -962,11 +965,20 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
       TokenTransferFeeConfig memory feeConfig = s_tokenTransferFeeConfig[remoteChainSelector];
       if (feeConfig.isEnabled) {
         if (blockConfirmationsRequested != WAIT_FOR_FINALITY) {
-          amount -= (amount * feeConfig.customBlockConfirmationsTransferFeeBps) / BPS_DIVIDER;
+          amount = sourceDenominatedAmount
+            - (sourceDenominatedAmount * feeConfig.customBlockConfirmationsTransferFeeBps) / BPS_DIVIDER;
         } else {
-          amount -= (amount * feeConfig.defaultBlockConfirmationsTransferFeeBps) / BPS_DIVIDER;
+          amount = sourceDenominatedAmount
+            - (sourceDenominatedAmount * feeConfig.defaultBlockConfirmationsTransferFeeBps) / BPS_DIVIDER;
         }
       }
+    } else {
+      // For inbound transfers, the amount is already post-fee so we don't need to do any additional calculations to get
+      // the amount that will be received by the user. However, we still need to convert it to the local amount based on
+      // decimals for the hooks.
+
+      // extraData is sourcePoolData for inbound transfers, which contains the remote decimals.
+      amount = _calculateLocalAmount(sourceDenominatedAmount, _parseRemoteDecimals(extraData));
     }
 
     return s_advancedPoolHooks.getRequiredCCVs(
