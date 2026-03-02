@@ -332,8 +332,9 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
     return s_supportedTokens.contains(token);
   }
 
-  /// @notice Update the supported tokens for cross-chain transfers. When adding a token, it approves the bridge to
-  /// spend an unlimited amount of the token. When removing a token, it resets the bridge's allowance to zero.
+  /// @notice Update the supported tokens for cross-chain transfers. When adding a token, if no adapter is set it
+  /// approves the bridge to spend the token. If an adapter is set, it approves the adapter to spend the token.
+  /// When removing a token, it resets the corresponding allowance to zero.
   /// @param tokensToRemove Array of token addresses to remove from supported tokens.
   /// @param tokensToSet Array of token addresses to set to supported tokens.
   function updateSupportedTokens(
@@ -345,9 +346,9 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
       address adapter = s_supportedTokens.get(tokenToRemove);
 
       if (s_supportedTokens.remove(tokenToRemove)) {
-        // Reset bridge allowance for either the adapter or the token.
+        // If adapter exists, reset token->adapter allowance. Otherwise reset token->bridge allowance.
         if (adapter != address(0)) {
-          IERC20(adapter).forceApprove(address(i_bridge), 0);
+          IERC20(tokenToRemove).forceApprove(adapter, 0);
         } else {
           IERC20(tokenToRemove).forceApprove(address(i_bridge), 0);
         }
@@ -360,10 +361,12 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
       // No-op if the token is already supported.
       s_supportedTokens.set(tokenToAdd.localToken, tokenToAdd.localAdapter);
 
-      address entityToApprove = tokenToAdd.localAdapter != address(0) ? tokenToAdd.localAdapter : tokenToAdd.localToken;
-
-      // Either the token or the adapter needs to be approved for bridge spend.
-      IERC20(entityToApprove).forceApprove(address(i_bridge), type(uint256).max);
+      // If adapter exists, approve token->adapter for adapter-mediated burn/bridge flow.
+      if (tokenToAdd.localAdapter != address(0)) {
+        IERC20(tokenToAdd.localToken).forceApprove(tokenToAdd.localAdapter, type(uint256).max);
+      } else {
+        IERC20(tokenToAdd.localToken).forceApprove(address(i_bridge), type(uint256).max);
+      }
 
       emit SupportedTokenSet(tokenToAdd.localToken, tokenToAdd.localAdapter);
     }
