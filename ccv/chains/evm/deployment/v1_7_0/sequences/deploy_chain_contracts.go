@@ -165,7 +165,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, rmnProxyRef)
 
 		// Fetch the RMN contract address set on the RMNProxy
-		rmnAddressReport, err := cldf_ops.ExecuteOperation(b, rmn_proxy.GetRMN, chain, contract_utils.FunctionInput[any]{
+		rmnAddressReport, err := cldf_ops.ExecuteOperation(b, rmn_proxy.GetRMN, chain, contract_utils.FunctionInput[struct{}]{
 			ChainSelector: chain.Selector,
 			Address:       common.HexToAddress(rmnProxyRef.Address),
 		})
@@ -203,7 +203,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, routerRef)
 
 		// Fetch the wrapped native address set on the Router
-		wrappedNativeAddressReport, err := cldf_ops.ExecuteOperation(b, router.GetWrappedNative, chain, contract_utils.FunctionInput[any]{
+		wrappedNativeAddressReport, err := cldf_ops.ExecuteOperation(b, router.GetWrappedNative, chain, contract_utils.FunctionInput[struct{}]{
 			ChainSelector: chain.Selector,
 			Address:       common.HexToAddress(routerRef.Address),
 		})
@@ -240,7 +240,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			addresses = append(addresses, testRouterRef)
 
 			// Fetch the wrapped native address set on the Test Router
-			wrappedNativeAddressReport, err = cldf_ops.ExecuteOperation(b, router.GetWrappedNative, chain, contract_utils.FunctionInput[any]{
+			wrappedNativeAddressReport, err = cldf_ops.ExecuteOperation(b, router.GetWrappedNative, chain, contract_utils.FunctionInput[struct{}]{
 				ChainSelector: chain.Selector,
 				Address:       common.HexToAddress(testRouterRef.Address),
 			})
