@@ -433,8 +433,13 @@ contract e2e_lombard is OnRampSetup {
     bytes memory tokenReceiver,
     uint256 amount
   ) internal pure returns (bytes memory) {
-    bytes memory msgBody =
-      abi.encodePacked(bytes1(0), bytes32(destToken), bytes32(0), bytes32(tokenReceiver), bytes32(amount));
+    bytes memory msgBody = abi.encodePacked(
+      bytes1(0),
+      Internal._leftPadBytesToBytes32(destToken),
+      bytes32(0),
+      Internal._leftPadBytesToBytes32(tokenReceiver),
+      bytes32(amount)
+    );
 
     // Encode the full payload structure
     bytes memory encodedData = abi.encode(

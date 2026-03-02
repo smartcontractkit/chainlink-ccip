@@ -307,10 +307,11 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
       amount := mload(add(msgBody, 0x81)) // bytes 97..128
     }
 
-    if (rawToToken != bytes32(expectedToken)) {
-      revert InvalidToken(bytes32(expectedToken), rawToToken);
+    bytes32 expectedTokenLeftPadded = Internal._leftPadBytesToBytes32(expectedToken);
+    if (rawToToken != expectedTokenLeftPadded) {
+      revert InvalidToken(expectedTokenLeftPadded, rawToToken);
     }
-    if (rawRecipient != bytes32(expectedReceiver)) {
+    if (rawRecipient != Internal._leftPadBytesToBytes32(expectedReceiver)) {
       revert InvalidReceiver(expectedReceiver);
     }
     if (amount != expectedAmount) {
