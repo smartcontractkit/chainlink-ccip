@@ -222,10 +222,14 @@ func RunSmokeTests(t *testing.T, e *deployment.Environment, selectors []uint64) 
 		})
 
 		t.Run(fmt.Sprintf("%s invalid receiver", laneTag), func(t *testing.T) {
-			if fromImpl.Family() == chainsel.FamilySolana {
+			switch {
+
+			case fromImpl.Family() == chainsel.FamilySolana:
+				t.Skip("GetExtraArgs fails with invalid pubkey receivers, we'd need to construct a raw payload to test against the contract")
+			case toImpl.Family() == chainsel.FamilySolana:
+				// TODO call skip in a getInvalidReceivers interface maybe
 				t.Skip("GetExtraArgs fails with invalid pubkey receivers, we'd need to construct a raw payload to test against the contract")
 			}
-
 			invalidReceiver := []byte{99}
 
 			extraArgs, err := toImpl.GetExtraArgs(invalidReceiver, fromImpl.Family(), testadapters.NewGasLimitExtraArg(big.NewInt(math.MaxInt64)))
