@@ -393,7 +393,7 @@ func (a *SVMAdapter) GetExtraArgs(receiver []byte, sourceFamily string, opts ...
 					return nil, fmt.Errorf("ComputeUnits is larger than uint32: %d", unitsBig)
 				}
 				units := unitsBig.Uint64()
-				if units <= math.MaxUint32 {
+				if units > math.MaxUint32 {
 					return nil, fmt.Errorf("ComputeUnits is larger than uint32: %d", units)
 				}
 				extraArgs.ComputeUnits = uint32(units)
