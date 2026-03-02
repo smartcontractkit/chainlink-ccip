@@ -30,6 +30,12 @@ type AllowlistUpdatesArgs struct {
 	Removes []common.Address
 }
 
+type GetRequiredCCVsArgs struct {
+	RemoteChainSelector uint64
+	Amount              *big.Int
+	Direction           uint8 // IPoolV2.MessageDirection: Outbound = 0, Inbound = 1
+}
+
 var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Name:             "advanced-pool-hooks:deploy",
 	Version:          Version,
@@ -181,5 +187,16 @@ var GetAllAuthorizedCallers = contract.NewRead(contract.ReadParams[any, []common
 	NewContract:  advanced_pool_hooks.NewAdvancedPoolHooks,
 	CallContract: func(advancedPoolHooks *advanced_pool_hooks.AdvancedPoolHooks, opts *bind.CallOpts, args any) ([]common.Address, error) {
 		return advancedPoolHooks.GetAllAuthorizedCallers(opts)
+	},
+})
+
+var GetRequiredCCVs = contract.NewRead(contract.ReadParams[GetRequiredCCVsArgs, []common.Address, *advanced_pool_hooks.AdvancedPoolHooks]{
+	Name:         "advanced-pool-hooks:get-required-ccvs",
+	Version:      Version,
+	Description:  "Gets the required CCVs for a given remote chain selector, amount, and direction",
+	ContractType: ContractType,
+	NewContract:  advanced_pool_hooks.NewAdvancedPoolHooks,
+	CallContract: func(advancedPoolHooks *advanced_pool_hooks.AdvancedPoolHooks, opts *bind.CallOpts, args GetRequiredCCVsArgs) ([]common.Address, error) {
+		return advancedPoolHooks.GetRequiredCCVs(opts, common.Address{}, args.RemoteChainSelector, args.Amount, 0, []byte{}, args.Direction)
 	},
 })

@@ -138,7 +138,7 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 				LocalTokenDecimals: input.TokenDecimals,
 				RMNProxy:           rmnAddress,
 				Router:             routerAddress,
-				CCTPVerifier:       cctpVerifierAddress,
+				CCTPVerifier:       cctpVerifierResolverAddress,
 			},
 		}, existingAddresses)
 		if err != nil {

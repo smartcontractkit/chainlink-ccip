@@ -167,11 +167,14 @@ func convertRemoteChainConfig(
 	inCfg adapters.RemoteChainConfig[datastore.AddressRef, datastore.AddressRef],
 ) (adapters.RemoteChainConfig[[]byte, string], error) {
 	outCfg := adapters.RemoteChainConfig[[]byte, string]{
-		AllowTrafficFrom:         inCfg.AllowTrafficFrom,
-		FeeQuoterDestChainConfig: inCfg.FeeQuoterDestChainConfig,
-		ExecutorDestChainConfig:  inCfg.ExecutorDestChainConfig,
-		AddressBytesLength:       inCfg.AddressBytesLength,
-		BaseExecutionGasCost:     inCfg.BaseExecutionGasCost,
+		AllowTrafficFrom:          inCfg.AllowTrafficFrom,
+		FeeQuoterDestChainConfig:  inCfg.FeeQuoterDestChainConfig,
+		ExecutorDestChainConfig:   inCfg.ExecutorDestChainConfig,
+		AddressBytesLength:        inCfg.AddressBytesLength,
+		BaseExecutionGasCost:      inCfg.BaseExecutionGasCost,
+		TokenReceiverAllowed:      inCfg.TokenReceiverAllowed,
+		MessageNetworkFeeUSDCents: inCfg.MessageNetworkFeeUSDCents,
+		TokenNetworkFeeUSDCents:   inCfg.TokenNetworkFeeUSDCents,
 	}
 
 	onRamps := make([][]byte, 0, len(inCfg.OnRamps))

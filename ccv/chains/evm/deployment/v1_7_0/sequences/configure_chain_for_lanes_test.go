@@ -96,8 +96,10 @@ func TestConfigureChainForLanes(t *testing.T) {
 			ccipMessageDest := common.HexToAddress("0x11").Bytes()
 			remoteChainSelector := uint64(4356164186791070119)
 
+			// Use a fresh reporter so ConfigureChainForLanes reads current on-chain state (e.g. Executor
+			// proxy target) instead of cached operation reports from DeployChainContracts.
 			_, err = operations.ExecuteSequence(
-				e.OperationsBundle,
+				testsetup.BundleWithFreshReporter(e.OperationsBundle),
 				sequences.ConfigureChainForLanes,
 				e.BlockChains,
 				adapters.ConfigureChainForLanesInput{

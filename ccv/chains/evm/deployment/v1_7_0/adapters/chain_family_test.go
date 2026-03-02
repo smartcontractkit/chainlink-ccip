@@ -151,6 +151,7 @@ func TestChainFamilyAdapter(t *testing.T) {
 			e.DataStore = ds.Seal()
 
 			// Configure chains for lanes
+			e.OperationsBundle = testsetup.BundleWithFreshReporter(e.OperationsBundle)
 			_, err = v1_7_0_changesets.ConfigureChainsForLanes(chainFamilyRegistry, mcmsRegistry).Apply(*e, v1_7_0_changesets.ConfigureChainsForLanesConfig{
 				Chains: []v1_7_0_changesets.ChainConfig{
 					makeChainConfig(chainA, chainB),
