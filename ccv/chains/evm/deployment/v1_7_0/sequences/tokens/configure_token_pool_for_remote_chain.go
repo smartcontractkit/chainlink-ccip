@@ -21,6 +21,9 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/advanced_pool_hooks"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/token_pool"
 	v17seq "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/type_and_version"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
+	token_pool_v161 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/token_pool"
 )
 
 // ConfigureTokenPoolForRemoteChainInput is the input for the ConfigureTokenPoolForRemoteChain sequence.
@@ -35,6 +38,10 @@ type ConfigureTokenPoolForRemoteChainInput struct {
 	RemoteChainSelector uint64
 	// RemoteChainConfig is the configuration for the remote chain.
 	RemoteChainConfig tokens.RemoteChainConfig[[]byte, string]
+	// RegistryAddress is the TokenAdminRegistry address; if set, used to fetch the active pool for upgrade import.
+	RegistryAddress common.Address
+	// TokenAddress is the token address; if set with RegistryAddress, used to fetch the active pool for upgrade import.
+	TokenAddress common.Address
 }
 
 func (c ConfigureTokenPoolForRemoteChainInput) Validate(chain evm.Chain) error {
@@ -42,6 +49,13 @@ func (c ConfigureTokenPoolForRemoteChainInput) Validate(chain evm.Chain) error {
 		return fmt.Errorf("chain selector %d does not match chain %s", c.ChainSelector, chain)
 	}
 	return nil
+}
+
+// activePoolImportedConfig holds config imported from an active pool (< 2.0.0) for upgrade cutover.
+type activePoolImportedConfig struct {
+	DefaultOutbound *tokens.RateLimiterConfig
+	DefaultInbound  *tokens.RateLimiterConfig
+	RemotePools     [][]byte
 }
 
 var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
@@ -53,6 +67,18 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("invalid input: %w", err)
 		}
 		writes := make([]evm_contract.WriteOutput, 0)
+
+		imported, err := importConfigFromActivePool(b, chain, input.ChainSelector, input.RegistryAddress, input.TokenAddress, input.RemoteChainSelector)
+		if err != nil {
+			return sequences.OnChainOutput{}, err
+		}
+		var importedDefaultOutbound, importedDefaultInbound *tokens.RateLimiterConfig
+		var activePoolRemotePools [][]byte
+		if imported != nil {
+			importedDefaultOutbound = imported.DefaultOutbound
+			importedDefaultInbound = imported.DefaultInbound
+			activePoolRemotePools = imported.RemotePools
+		}
 
 		localDecimalsReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetTokenDecimals, chain, evm_contract.FunctionInput[any]{
 			ChainSelector: input.ChainSelector,
@@ -70,6 +96,13 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 			chain.Family(),
 			token_pool.Version,
 		)
+		// If input did not provide default finality rate limits, use imported from active pool when available.
+		if importedDefaultOutbound != nil && !input.RemoteChainConfig.DefaultFinalityOutboundRateLimiterConfig.IsEnabled {
+			defaultFinalityOutboundRateLimiterConfig = *importedDefaultOutbound
+		}
+		if importedDefaultInbound != nil && !input.RemoteChainConfig.DefaultFinalityInboundRateLimiterConfig.IsEnabled {
+			defaultFinalityInboundRateLimiterConfig = *importedDefaultInbound
+		}
 
 		customFinalityOutboundRateLimiterConfig, customFinalityInboundRateLimiterConfig := tokens.GenerateTPRLConfigs(
 			input.RemoteChainConfig.CustomFinalityOutboundRateLimiterConfig,
@@ -79,6 +112,13 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 			chain.Family(),
 			token_pool.Version,
 		)
+		// If input did not provide custom finality rate limits, use imported from active pool when available (1.6.1 only has default tier).
+		if importedDefaultOutbound != nil && !input.RemoteChainConfig.CustomFinalityOutboundRateLimiterConfig.IsEnabled {
+			customFinalityOutboundRateLimiterConfig = *importedDefaultOutbound
+		}
+		if importedDefaultInbound != nil && !input.RemoteChainConfig.CustomFinalityInboundRateLimiterConfig.IsEnabled {
+			customFinalityInboundRateLimiterConfig = *importedDefaultInbound
+		}
 
 		// Update token transfer fee configuration for the remote chain.
 		tokenTransferFeeConfigUpdates, err := makeTokenTransferFeeConfigUpdates(b, chain, input, input.RemoteChainSelector)
@@ -193,7 +233,7 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 					writes = append(writes, *customFinalityRateLimitersReport)
 				}
 
-				// Check existing remote pools
+				// Check existing remote pools and add any missing (active pool's remote pools first for upgrade, then requested pool)
 				getRemotePoolsReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetRemotePools, chain, evm_contract.FunctionInput[uint64]{
 					ChainSelector: input.ChainSelector,
 					Address:       input.TokenPoolAddress,
@@ -202,10 +242,30 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to get remote pools: %w", err)
 				}
-				if !slices.ContainsFunc(getRemotePoolsReport.Output, func(addr []byte) bool {
-					return bytes.Equal(addr, input.RemoteChainConfig.RemotePool)
-				}) {
-					// Add the requested remote pool
+				existingPools := getRemotePoolsReport.Output
+				containsPool := func(pool []byte) bool {
+					return slices.ContainsFunc(existingPools, func(addr []byte) bool { return bytes.Equal(addr, pool) })
+				}
+				// Add active pool's remote pools first to protect inflight messages during cutover.
+				for _, activePoolAddr := range activePoolRemotePools {
+					padded := common.LeftPadBytes(activePoolAddr, 32)
+					if !containsPool(padded) {
+						addReport, err := cldf_ops.ExecuteOperation(b, token_pool.AddRemotePool, chain, evm_contract.FunctionInput[token_pool.RemotePoolArgs]{
+							ChainSelector: input.ChainSelector,
+							Address:       input.TokenPoolAddress,
+							Args: token_pool.RemotePoolArgs{
+								RemoteChainSelector: input.RemoteChainSelector,
+								RemotePoolAddress:   padded,
+							},
+						})
+						if err != nil {
+							return sequences.OnChainOutput{}, fmt.Errorf("failed to add active pool remote pool: %w", err)
+						}
+						writes = append(writes, addReport.Output)
+						existingPools = append(existingPools, padded)
+					}
+				}
+				if !containsPool(common.LeftPadBytes(input.RemoteChainConfig.RemotePool, 32)) {
 					addRemotePoolsReport, err := cldf_ops.ExecuteOperation(b, token_pool.AddRemotePool, chain, evm_contract.FunctionInput[token_pool.RemotePoolArgs]{
 						ChainSelector: input.ChainSelector,
 						Address:       input.TokenPoolAddress,
@@ -231,6 +291,18 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 		}
 
 		// If the chain is not supported, apply the config for the remote chain
+		// Build remote pool list: active pool's remote pools first (for upgrade cutover), then the requested pool.
+		remotePoolAddresses := make([][]byte, 0, len(activePoolRemotePools)+1)
+		for _, p := range activePoolRemotePools {
+			remotePoolAddresses = append(remotePoolAddresses, common.LeftPadBytes(p, 32))
+		}
+		inputPoolPadded := common.LeftPadBytes(input.RemoteChainConfig.RemotePool, 32)
+		if !slices.ContainsFunc(remotePoolAddresses, func(b []byte) bool { return bytes.Equal(b, inputPoolPadded) }) {
+			remotePoolAddresses = append(remotePoolAddresses, inputPoolPadded)
+		}
+		if len(remotePoolAddresses) == 0 {
+			remotePoolAddresses = [][]byte{inputPoolPadded}
+		}
 		applyChainUpdatesReport, err := cldf_ops.ExecuteOperation(b, token_pool.ApplyChainUpdates, chain, evm_contract.FunctionInput[token_pool.ApplyChainUpdatesArgs]{
 			ChainSelector: input.ChainSelector,
 			Address:       input.TokenPoolAddress,
@@ -238,10 +310,8 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 				RemoteChainSelectorsToRemove: removes,
 				ChainsToAdd: []token_pool.ChainUpdate{
 					{
-						RemoteChainSelector: input.RemoteChainSelector,
-						RemotePoolAddresses: [][]byte{
-							common.LeftPadBytes(input.RemoteChainConfig.RemotePool, 32),
-						},
+						RemoteChainSelector:       input.RemoteChainSelector,
+						RemotePoolAddresses:       remotePoolAddresses,
 						RemoteTokenAddress:        common.LeftPadBytes(input.RemoteChainConfig.RemoteToken, 32),
 						OutboundRateLimiterConfig: defaultFinalityOutboundRateLimiterConfig,
 						InboundRateLimiterConfig:  defaultFinalityInboundRateLimiterConfig,
@@ -282,6 +352,82 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 		return sequences.OnChainOutput{BatchOps: []mcms_types.BatchOperation{batchOp}}, nil
 	},
 )
+
+// importConfigFromActivePool fetches the active pool from the TokenAdminRegistry and, if its version is < 2.0.0,
+// imports rate limit state and remote pools for the given remote chain using 1.6.1 operations.
+// Returns nil when registry or token address is zero, when there is no active pool, or when the active pool is >= 2.0.0.
+func importConfigFromActivePool(
+	b cldf_ops.Bundle,
+	chain evm.Chain,
+	chainSelector uint64,
+	registryAddress, tokenAddress common.Address,
+	remoteChainSelector uint64,
+) (*activePoolImportedConfig, error) {
+	if registryAddress == (common.Address{}) || tokenAddress == (common.Address{}) {
+		return nil, nil
+	}
+	tokenConfigReport, err := cldf_ops.ExecuteOperation(b, token_admin_registry.GetTokenConfig, chain, evm_contract.FunctionInput[common.Address]{
+		ChainSelector: chainSelector,
+		Address:       registryAddress,
+		Args:          tokenAddress,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get token config from registry: %w", err)
+	}
+	activePool := tokenConfigReport.Output.TokenPool
+	if activePool == (common.Address{}) {
+		return nil, nil
+	}
+	typeAndVersionReport, err := cldf_ops.ExecuteOperation(b, type_and_version.GetTypeAndVersion, chain, evm_contract.FunctionInput[struct{}]{
+		ChainSelector: chainSelector,
+		Address:       activePool,
+		Args:          struct{}{},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get active pool type and version: %w", err)
+	}
+	if !typeAndVersionReport.Output.Version.LessThan(semver.MustParse("2.0.0")) {
+		return nil, nil
+	}
+	inboundReport, err := cldf_ops.ExecuteOperation(b, token_pool_v161.GetCurrentInboundRateLimiterState, chain, evm_contract.FunctionInput[uint64]{
+		ChainSelector: chainSelector,
+		Address:       activePool,
+		Args:          remoteChainSelector,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get active pool inbound rate limiter state: %w", err)
+	}
+	outboundReport, err := cldf_ops.ExecuteOperation(b, token_pool_v161.GetCurrentOutboundRateLimiterState, chain, evm_contract.FunctionInput[uint64]{
+		ChainSelector: chainSelector,
+		Address:       activePool,
+		Args:          remoteChainSelector,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get active pool outbound rate limiter state: %w", err)
+	}
+	remotePoolsReport, err := cldf_ops.ExecuteOperation(b, token_pool_v161.GetRemotePools, chain, evm_contract.FunctionInput[uint64]{
+		ChainSelector: chainSelector,
+		Address:       activePool,
+		Args:          remoteChainSelector,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get active pool remote pools: %w", err)
+	}
+	return &activePoolImportedConfig{
+		DefaultOutbound: tokenBucketToRateLimiterConfig(outboundReport.Output),
+		DefaultInbound:  tokenBucketToRateLimiterConfig(inboundReport.Output),
+		RemotePools:     remotePoolsReport.Output,
+	}, nil
+}
+
+// tokenBucketToRateLimiterConfig converts a 1.6.1 TokenBucket to tokens.RateLimiterConfig.
+func tokenBucketToRateLimiterConfig(b token_pool_v161.TokenBucket) *tokens.RateLimiterConfig {
+	return &tokens.RateLimiterConfig{
+		IsEnabled: b.IsEnabled,
+		Capacity:  new(big.Int).Set(b.Capacity),
+		Rate:      new(big.Int).Set(b.Rate),
+	}
+}
 
 // maybeUpdateRateLimiters checks and updates the rate limiters for a given remote chain if they do not match the
 // desired config. Returns nil if no update is needed.

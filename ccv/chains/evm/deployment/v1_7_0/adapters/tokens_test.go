@@ -133,6 +133,11 @@ func TestTokenAdapter(t *testing.T) {
 								Type:          datastore.ContractType(router.ContractType),
 								Version:       semver.MustParse("1.2.0"),
 							},
+							TokenAdminRegistryRef: datastore.AddressRef{
+								ChainSelector: chainSel,
+								Type:          datastore.ContractType(token_admin_registry.ContractType),
+								Version:       token_admin_registry.Version,
+							},
 						},
 					})
 					require.NoError(t, err, "Failed to apply DeployTokenAndPool changeset")

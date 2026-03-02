@@ -99,6 +99,8 @@ var ConfigureTokenForTransfers = cldf_ops.NewSequence(
 				AdvancedPoolHooks:   advancedPoolHooksAddress.Output,
 				RemoteChainSelector: remoteChainSelector,
 				RemoteChainConfig:   remoteChainConfig,
+				RegistryAddress:     common.HexToAddress(input.RegistryAddress),
+				TokenAddress:        tokenAddress,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to configure token pool for remote chain %d: %w", remoteChainSelector, err)
