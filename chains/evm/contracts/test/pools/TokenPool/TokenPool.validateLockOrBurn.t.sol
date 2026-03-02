@@ -143,6 +143,21 @@ contract TokenPool_validateLockOrBurn is AdvancedPoolHooksSetup {
     assertEq(outboundBucket.tokens, _getOutboundRateLimiterConfig().capacity - expectedAmount);
   }
 
+  /// @notice When custom block confirmations are requested but no custom outbound bucket is configured,
+  /// the fallback consumes from the default outbound bucket.
+  function test_validateLockOrBurn_WithFastFinality_FallsBackToDefaultBucket() public {
+    s_tokenPool.setMinBlockConfirmations(1);
+
+    Pool.LockOrBurnInV1 memory lockOrBurnIn = _buildLockOrBurnIn(1000e18);
+
+    vm.expectEmit();
+    emit TokenPool.OutboundRateLimitConsumed(DEST_CHAIN_SELECTOR, address(s_token), lockOrBurnIn.amount);
+
+    uint256 fee = s_tokenPool.getFee(lockOrBurnIn, type(uint16).max);
+    vm.startPrank(s_allowedOnRamp);
+    s_tokenPool.validateLockOrBurn(lockOrBurnIn, type(uint16).max, "", fee);
+  }
+
   function test_validateLockOrBurn_RevertWhen_InvalidMinBlockConfirmations() public {
     uint16 minBlockConfirmations = 5;
     s_tokenPool.setMinBlockConfirmations(minBlockConfirmations);

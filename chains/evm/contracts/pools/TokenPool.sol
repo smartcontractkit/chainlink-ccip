@@ -142,7 +142,9 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   uint16 internal s_minBlockConfirmations;
   /// @dev Optional advanced pool hooks contract for additional features like allowlists and CCV management.
   IAdvancedPoolHooks internal s_advancedPoolHooks;
-  // Separate buckets provide isolated rate limits for transfers with custom block confirmations, as their risk profiles differ from default transfers.
+  /// @dev Separate buckets provide isolated rate limits for transfers with custom block confirmations, as their risk
+  /// profiles differ from default transfers. When these are not configured, the default buckets are used for all
+  /// transfers regardless of the block confirmation requirements.
   mapping(uint64 remoteChainSelector => RateLimiter.TokenBucket tokenBucketOutbound) internal
     s_customBlockConfirmationsOutboundRateLimiterConfig;
   mapping(uint64 remoteChainSelector => RateLimiter.TokenBucket tokenBucketInbound) internal
@@ -693,6 +695,8 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
       }
 
       delete s_remoteChainConfigs[remoteChainSelectorToRemove];
+      delete s_customBlockConfirmationsOutboundRateLimiterConfig[remoteChainSelectorToRemove];
+      delete s_customBlockConfirmationsInboundRateLimiterConfig[remoteChainSelectorToRemove];
 
       emit ChainRemoved(remoteChainSelectorToRemove);
     }
@@ -800,6 +804,8 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   }
 
   /// @notice Consumes custom block confirmations outbound rate limiting capacity in this pool.
+  /// @dev If custom block confirmations rate limiter is not enabled for the chain, it will fallback to the default
+  /// rate limiter.
   /// @param remoteChainSelector The remote chain selector.
   /// @param amount The amount of tokens consumed.
   function _consumeCustomBlockConfirmationsOutboundRateLimit(
@@ -807,6 +813,11 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
     uint64 remoteChainSelector,
     uint256 amount
   ) internal virtual {
+    if (!s_customBlockConfirmationsOutboundRateLimiterConfig[remoteChainSelector].isEnabled) {
+      _consumeOutboundRateLimit(token, remoteChainSelector, amount);
+      return;
+    }
+
     s_customBlockConfirmationsOutboundRateLimiterConfig[remoteChainSelector]._consume(amount, token);
 
     emit CustomBlockConfirmationsOutboundRateLimitConsumed({
@@ -815,6 +826,8 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   }
 
   /// @notice Consumes custom block confirmations inbound rate limiting capacity in this pool.
+  /// @dev If custom block confirmations rate limiter is not enabled for the chain, it will fallback to the default
+  /// rate limiter.
   /// @param remoteChainSelector The remote chain selector.
   /// @param amount The amount of tokens consumed.
   function _consumeCustomBlockConfirmationsInboundRateLimit(
@@ -822,6 +835,11 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
     uint64 remoteChainSelector,
     uint256 amount
   ) internal virtual {
+    if (!s_customBlockConfirmationsInboundRateLimiterConfig[remoteChainSelector].isEnabled) {
+      _consumeInboundRateLimit(token, remoteChainSelector, amount);
+      return;
+    }
+
     s_customBlockConfirmationsInboundRateLimiterConfig[remoteChainSelector]._consume(amount, token);
 
     emit CustomBlockConfirmationsInboundRateLimitConsumed({
