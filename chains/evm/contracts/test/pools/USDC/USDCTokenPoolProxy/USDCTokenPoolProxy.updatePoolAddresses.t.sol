@@ -110,6 +110,18 @@ contract USDCTokenPoolProxy_updatePoolAddresses is USDCTokenPoolProxySetup {
     );
   }
 
+  function test_updatePoolAddresses_RevertWhen_PoolAddressCannotBeSelf() public {
+    address proxyAddr = address(s_usdcTokenPoolProxy);
+    _enableERC165InterfaceChecks(proxyAddr, type(IPoolV1).interfaceId);
+
+    vm.expectRevert(USDCTokenPoolProxy.PoolAddressCannotBeSelf.selector);
+    s_usdcTokenPoolProxy.updatePoolAddresses(
+      USDCTokenPoolProxy.PoolAddresses({
+        cctpV1Pool: proxyAddr, cctpV2Pool: address(0), cctpV2PoolWithCCV: address(0), siloedLockReleasePool: address(0)
+      })
+    );
+  }
+
   function test_updatePoolAddresses_RevertWhen_TokenPoolUnsupported_SiloedLockReleasePoolDoesNotSupportIPoolV1OrV2()
     public
   {

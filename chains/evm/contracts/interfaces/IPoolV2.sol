@@ -11,11 +11,11 @@ interface IPoolV2 is IERC165 {
   struct TokenTransferFeeConfig {
     uint32 destGasOverhead; // ───────────────────────╮ Gas charged to execute the token transfer on the destination chain.
     uint32 destBytesOverhead; //                      │ Data availability bytes.
-    uint32 defaultBlockConfirmationsFeeUSDCents; //    │ Fee to charge for token transfer with default block confirmations, multiples of 0.01 USD.
-    uint32 customBlockConfirmationsFeeUSDCents; //     │ Fee to charge for token transfer with custom block confirmations, multiples of 0.01 USD.
+    uint32 defaultBlockConfirmationsFeeUSDCents; //   │ Fee to charge for token transfer with default block confirmations, multiples of 0.01 USD.
+    uint32 customBlockConfirmationsFeeUSDCents; //    │ Fee to charge for token transfer with custom block confirmations, multiples of 0.01 USD.
     //                                                │ The following two fee is deducted from the transferred asset, not added on top.
-    uint16 defaultBlockConfirmationsTransferFeeBps; // │ Fee in basis points for default finality transfers [0-10_000].
-    uint16 customBlockConfirmationsTransferFeeBps; //  │ Fee in basis points for custom finality transfers [0-10_000].
+    uint16 defaultBlockConfirmationsTransferFeeBps; //│ Fee in basis points for default finality transfers [0-10_000].
+    uint16 customBlockConfirmationsTransferFeeBps; // │ Fee in basis points for custom finality transfers [0-10_000].
     bool isEnabled; // ───────────────────────────────╯ Whether this config is enabled.
   }
 
@@ -48,7 +48,7 @@ interface IPoolV2 is IERC165 {
   /// @notice Returns the set of required CCVs for transfers in a given direction.
   /// @param localToken The address of the local token.
   /// @param remoteChainSelector The chain selector of the remote chain.
-  /// @param amount The amount of tokens to be transferred.
+  /// @param sourceAmount The source-denominated amount of tokens to be transferred.
   /// @param blockConfirmationsRequested Requested block confirmations.
   /// @param extraData Direction-specific payload forwarded by the caller (e.g. token args or source pool data).
   /// @param direction Whether CCVs are required for outbound (source -> remote) or inbound (remote -> destination) transfers.
@@ -56,7 +56,7 @@ interface IPoolV2 is IERC165 {
   function getRequiredCCVs(
     address localToken,
     uint64 remoteChainSelector,
-    uint256 amount,
+    uint256 sourceAmount,
     uint16 blockConfirmationsRequested,
     bytes calldata extraData,
     MessageDirection direction

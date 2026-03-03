@@ -206,6 +206,27 @@ contract CCTPVerifier_verifyMessage is CCTPVerifierSetup {
     s_cctpVerifier.verifyMessage(message, messageHash, verifierResults);
   }
 
+  function test_verifyMessage_RevertWhen_InvalidSourceDomain() public {
+    (MessageV1Codec.MessageV1 memory message, bytes32 messageHash) = _createCCIPMessage(
+      DEST_CHAIN_SELECTOR,
+      SOURCE_CHAIN_SELECTOR,
+      CCIP_FAST_FINALITY_THRESHOLD,
+      address(s_USDCToken),
+      TRANSFER_AMOUNT,
+      s_tokenReceiver
+    );
+
+    s_baseCCTPMessage.hookData.messageId = messageHash;
+    uint32 wrongSourceDomain = 7777;
+    s_baseCCTPMessage.header.sourceDomain = wrongSourceDomain;
+    bytes memory verifierResults = _createVerifierResults(s_cctpVerifier.versionTag(), s_baseCCTPMessage);
+
+    vm.expectRevert(
+      abi.encodeWithSelector(CCTPVerifier.InvalidSourceDomain.selector, REMOTE_DOMAIN_IDENTIFIER, wrongSourceDomain)
+    );
+    s_cctpVerifier.verifyMessage(message, messageHash, verifierResults);
+  }
+
   function test_verifyMessage_RevertWhen_InvalidMessageSender() public {
     bytes32 invalidMessageSender = keccak256("invalidMessageSender");
     (MessageV1Codec.MessageV1 memory message, bytes32 messageHash) = _createCCIPMessage(
