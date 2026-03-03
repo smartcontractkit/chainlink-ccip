@@ -120,7 +120,7 @@ contract e2e_lombard is OnRampSetup {
 
     s_sourceLombardVerifier.applyRemoteChainConfigUpdates(destChainConfigs);
     s_sourceLombardVerifier.setPath(
-      DEST_CHAIN_SELECTOR, LOMBARD_CHAIN_ID, bytes32(bytes20(address(s_destLombardVerifier)))
+      DEST_CHAIN_SELECTOR, LOMBARD_CHAIN_ID, abi.encodePacked(bytes32(bytes20(address(s_destLombardVerifier))))
     );
 
     LombardVerifier.SupportedTokenArgs[] memory tokensToAdd = new LombardVerifier.SupportedTokenArgs[](1);
@@ -433,8 +433,13 @@ contract e2e_lombard is OnRampSetup {
     bytes memory tokenReceiver,
     uint256 amount
   ) internal pure returns (bytes memory) {
-    bytes memory msgBody =
-      abi.encodePacked(bytes1(0), bytes32(destToken), bytes32(0), bytes32(tokenReceiver), bytes32(amount));
+    bytes memory msgBody = abi.encodePacked(
+      bytes1(0),
+      Internal._leftPadBytesToBytes32(destToken),
+      bytes32(0),
+      Internal._leftPadBytesToBytes32(tokenReceiver),
+      bytes32(amount)
+    );
 
     // Encode the full payload structure
     bytes memory encodedData = abi.encode(
