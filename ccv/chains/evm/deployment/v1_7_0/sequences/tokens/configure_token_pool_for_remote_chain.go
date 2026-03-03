@@ -10,7 +10,6 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 
-	burn_mint_token_pool_latest "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/burn_mint_token_pool"
 	tp_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/token_pool"
 	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	bm_proxy_v150 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/burn_mint_token_pool_and_proxy"
@@ -295,9 +294,6 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 		inputPoolPadded := common.LeftPadBytes(input.RemoteChainConfig.RemotePool, 32)
 		if !slices.ContainsFunc(remotePoolAddresses, func(b []byte) bool { return bytes.Equal(b, inputPoolPadded) }) {
 			remotePoolAddresses = append(remotePoolAddresses, inputPoolPadded)
-		}
-		if len(remotePoolAddresses) == 0 {
-			remotePoolAddresses = [][]byte{inputPoolPadded}
 		}
 		applyChainUpdatesReport, err := cldf_ops.ExecuteOperation(b, token_pool.ApplyChainUpdates, chain, evm_contract.FunctionInput[token_pool.ApplyChainUpdatesArgs]{
 			ChainSelector: input.ChainSelector,
@@ -623,11 +619,6 @@ func makeTokenTransferFeeConfigUpdates(b cldf_ops.Bundle, chain evm.Chain, input
 		Args:          remoteChainSelector,
 	})
 	if err != nil {
-		// Print the token pool address and type and version
-		boundTP, _ := burn_mint_token_pool_latest.NewBurnMintTokenPool(input.TokenPoolAddress, chain.Client)
-		typeAndVersion, _ := boundTP.TypeAndVersion(nil)
-		fmt.Println(typeAndVersion)
-		fmt.Println(input.TokenPoolAddress)
 		return nil, fmt.Errorf("failed to get token transfer fee config: %w", err)
 	}
 

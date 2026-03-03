@@ -2,13 +2,14 @@ package tokens
 
 import (
 	"fmt"
-	"sort"
+	"maps"
+	"slices"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/token_pool"
 	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
@@ -54,14 +55,9 @@ var ConfigureTokenPoolForRemoteChains = cldf_ops.NewSequence(
 				supportedChains := supportedChainsReport.Output
 				for _, sel := range supportedChains {
 					if _, ok := input.RemoteChains[sel]; !ok {
-						sort.Slice(supportedChains, func(i, j int) bool { return supportedChains[i] < supportedChains[j] })
-						configuredSelectors := make([]uint64, 0, len(input.RemoteChains))
-						for s := range input.RemoteChains {
-							configuredSelectors = append(configuredSelectors, s)
-						}
-						sort.Slice(configuredSelectors, func(i, j int) bool { return configuredSelectors[i] < configuredSelectors[j] })
-						return sequences.OnChainOutput{}, fmt.Errorf("remoteChains must include all active pool supported chains: pool has %v, remoteChains has %v (missing chain selector %d)",
-							supportedChains, configuredSelectors, sel)
+						slices.Sort(supportedChains)
+						return sequences.OnChainOutput{}, fmt.Errorf("remoteChains must include all active pool supported chains: pool has %v, remoteChains has %v",
+							supportedChains, slices.Sorted(maps.Keys(input.RemoteChains)))
 					}
 				}
 			}
@@ -81,9 +77,9 @@ var ConfigureTokenPoolForRemoteChains = cldf_ops.NewSequence(
 		for remoteChainSelector, remoteChainConfig := range input.RemoteChains {
 			_, alreadySupported := supportedSet[remoteChainSelector]
 			report, err := cldf_ops.ExecuteSequence(b, ConfigureTokenPoolForRemoteChain, chain, ConfigureTokenPoolForRemoteChainInput{
-				ChainSelector:                input.ChainSelector,
-				TokenPoolAddress:             input.TokenPoolAddress,
-				AdvancedPoolHooks:            input.AdvancedPoolHooks,
+				ChainSelector:               input.ChainSelector,
+				TokenPoolAddress:            input.TokenPoolAddress,
+				AdvancedPoolHooks:           input.AdvancedPoolHooks,
 				RemoteChainSelector:         remoteChainSelector,
 				RemoteChainConfig:           remoteChainConfig,
 				RegistryAddress:             input.RegistryAddress,
