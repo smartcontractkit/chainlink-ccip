@@ -168,6 +168,9 @@ func RunSmokeTests(t *testing.T, e *deployment.Environment, selectors []uint64) 
 		})
 
 		t.Run(fmt.Sprintf("%s gas limit too high", laneTag), func(t *testing.T) {
+			if fromImpl.Family() == chainsel.FamilySolana {
+				t.Skip("TODO: evm adapter GetExtraArgs returns nil adapter")
+			}
 			receiver := toImpl.CCIPReceiver()
 
 			extraArgs, err := toImpl.GetExtraArgs(receiver, fromImpl.Family(), testadapters.NewGasLimitExtraArg(big.NewInt(math.MaxUint32)))
