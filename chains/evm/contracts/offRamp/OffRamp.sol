@@ -179,6 +179,12 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// @param encodedMessage The message that is being executed, encoded as bytes.
   /// @param ccvs CCVs that attested to the message. Must match the CCVs specified by the receiver and token pool.
   /// @param verifierResults CCV-specific data used to verify the message. Must be same length as ccvs array.
+  /// @dev This function is completely permissionless. Since anyone can call it, there could be situations where wrong
+  /// payloads could set a message execution state to FAILURE. The default Chainlink Executor only takes honest attempts
+  /// into consideration: if the message was submitted with expected parameters and results in a FAILURE state, it marks
+  /// its job as completed. If some dishonest parameters would ever result in a FAILURE state, the executor would still
+  /// do its own honest attempt. This means there will always be at least one honest attempt, and dishonest attempts
+  /// cannot block honest attempts.
   function execute(
     bytes calldata encodedMessage,
     address[] calldata ccvs,
