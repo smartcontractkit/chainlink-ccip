@@ -8,6 +8,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
@@ -15,6 +17,14 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/offchain"
 )
+
+func newTestBlockChains(selectors []uint64) cldf_chain.BlockChains {
+	chains := make([]cldf_chain.BlockChain, len(selectors))
+	for i, sel := range selectors {
+		chains[i] = evm.Chain{Selector: sel}
+	}
+	return cldf_chain.NewBlockChainsFromSlice(chains)
+}
 
 var _ adapters.IndexerConfigAdapter = (*mockIndexerConfigAdapter)(nil)
 
