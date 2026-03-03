@@ -9,6 +9,7 @@ import (
 	adapters1_6 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/adapters"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
+	ccvadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 )
 
 func init() {
@@ -22,4 +23,6 @@ func init() {
 	laneMigratorReg := deploy.GetLaneMigratorRegistry()
 	laneMigratorReg.RegisterRampUpdater(chainsel.FamilyEVM, semver.MustParse("1.7.0"), &LaneMigrator{})
 	laneMigratorReg.RegisterRouterUpdater(chainsel.FamilyEVM, semver.MustParse("1.2.0"), &adapters1_2.RouterUpdater{})
+
+	ccvadapters.GetDeployChainContractsRegistry().Register(chainsel.FamilyEVM, &EVMDeployChainContractsAdapter{})
 }
