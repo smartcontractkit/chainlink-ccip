@@ -407,23 +407,25 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
   /// @notice Sets the lChainId and allowed caller for a CCIP chain selector.
   /// @param remoteChainSelector CCIP chain selector of remote chain.
   /// @param lChainId Lombard chain id of remote chain.
-  /// @param allowedCaller The address of LombardVerifier on destination chain.
+  /// @param allowedCaller The destination caller bytes. Must fit in 32 bytes and is left-padded for storage.
   function setPath(
     uint64 remoteChainSelector,
     bytes32 lChainId,
-    bytes32 allowedCaller
+    bytes calldata allowedCaller
   ) external onlyOwner {
     if (lChainId == bytes32(0)) {
       revert ZeroLombardChainId();
     }
-    if (allowedCaller == bytes32(0)) {
+
+    bytes32 leftPaddedAllowedCaller = Internal._leftPadBytesToBytes32(allowedCaller);
+    if (leftPaddedAllowedCaller == bytes32(0)) {
       revert ZeroAllowedCaller();
     }
 
-    s_chainSelectorToPath[remoteChainSelector] = Path({lChainId: lChainId, allowedCaller: allowedCaller});
+    s_chainSelectorToPath[remoteChainSelector] = Path({lChainId: lChainId, allowedCaller: leftPaddedAllowedCaller});
     s_supportedChains.add(uint256(remoteChainSelector));
 
-    emit PathSet(remoteChainSelector, lChainId, allowedCaller);
+    emit PathSet(remoteChainSelector, lChainId, leftPaddedAllowedCaller);
   }
 
   /// @notice Sets remote adapter token identifiers for (remote chain, token) pairs.

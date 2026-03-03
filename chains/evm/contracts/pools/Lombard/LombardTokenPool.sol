@@ -6,6 +6,7 @@ import {IBridgeV2} from "../../interfaces/lombard/IBridgeV2.sol";
 import {IMailbox} from "../../interfaces/lombard/IMailbox.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
+import {Internal} from "../../libraries/Internal.sol";
 import {Pool} from "../../libraries/Pool.sol";
 import {TokenPool} from "../TokenPool.sol";
 
@@ -254,7 +255,7 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
   function setPath(
     uint64 remoteChainSelector,
     bytes32 lChainId,
-    bytes32 allowedCaller,
+    bytes calldata allowedCaller,
     bytes32 remoteAdapter
   ) external onlyOwner {
     if (!isSupportedChain(remoteChainSelector)) {
@@ -265,16 +266,16 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
       revert ZeroLombardChainId();
     }
 
-    // only remote pool is expected allowed caller.
-    bytes memory encodedAllowedCaller = abi.encode(allowedCaller);
-    if (!isRemotePool(remoteChainSelector, encodedAllowedCaller)) {
-      revert InvalidRemotePoolForChain(remoteChainSelector, encodedAllowedCaller);
+    // Only the remote pool is expected to be the allowed caller.
+    if (!isRemotePool(remoteChainSelector, allowedCaller)) {
+      revert InvalidRemotePoolForChain(remoteChainSelector, allowedCaller);
     }
 
+    bytes32 leftPaddedAllowedCaller = Internal._leftPadBytesToBytes32(allowedCaller);
     s_chainSelectorToPath[remoteChainSelector] =
-      Path({lChainId: lChainId, allowedCaller: allowedCaller, remoteAdapter: remoteAdapter});
+      Path({lChainId: lChainId, allowedCaller: leftPaddedAllowedCaller, remoteAdapter: remoteAdapter});
 
-    emit PathSet(remoteChainSelector, lChainId, allowedCaller, remoteAdapter);
+    emit PathSet(remoteChainSelector, lChainId, leftPaddedAllowedCaller, remoteAdapter);
   }
 
   /// @notice Removes path mapping for a destination chain.
