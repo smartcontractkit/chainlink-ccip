@@ -5,6 +5,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_1/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
@@ -15,8 +16,20 @@ func RMNRemoteSetEventAuthoritiesSequenceChangeset() cldf.ChangeSetV2[sequences.
 }
 
 func rmnSetEventAuthoritiesVerify() func(cldf.Environment, sequences.RMNRemoteSetEventAuthoritiesSequenceInput) error {
-	return func(e cldf.Environment, input sequences.RMNRemoteSetEventAuthoritiesSequenceInput) error {
-		// TODO: Implement verification logic to check that the event authorities were set correctly on the RMNRemote contract. This may involve querying the contract state and comparing it to the expected values.
+	return func(env cldf.Environment, input sequences.RMNRemoteSetEventAuthoritiesSequenceInput) error {
+
+		if err := deployment.IsValidChainSelector(input.ChainSelector); err != nil {
+			return fmt.Errorf("invalid chain selector: %d - %w", input.ChainSelector, err)
+		}
+		if !env.BlockChains.Exists(input.ChainSelector) {
+			return fmt.Errorf("chain with selector %d does not exist", input.ChainSelector)
+		}
+
+		// Validate UpgradeConfig
+		// if err := input.UpgradeConfig.MCMS.ValidateSolana(env, input.ChainSelector); err != nil {
+		// 	return fmt.Errorf("invalid MCMS configuration: %w", err)
+		// }
+
 		return nil
 	}
 }
