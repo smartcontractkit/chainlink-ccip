@@ -257,7 +257,7 @@ func RunSmokeTests(t *testing.T, e *deployment.Environment, selectors []uint64) 
 			if fromImpl.Family() == chainsel.FamilyEVM && toImpl.Family() == chainsel.FamilyEVM {
 				t.Skip("EVM->EVM still supports OOO, depending on config")
 			}
-			if toImpl.Family() == chainsel.FamilySolana {
+			if fromImpl.Family() == chainsel.FamilySolana {
 				t.Skip("TODO: Setup lane block OOO on Solana->EVM")
 				// 1. evm adapter returns nil adapter
 				// 2. solana setup lane seems not to be setting enforeceOOO on the contract side
