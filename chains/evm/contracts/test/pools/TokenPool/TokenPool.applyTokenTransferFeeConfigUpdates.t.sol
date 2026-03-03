@@ -73,6 +73,19 @@ contract TokenPool_applyTokenTransferFeeConfigUpdates is AdvancedPoolHooksSetup 
     s_tokenPool.applyTokenTransferFeeConfigUpdates(feeConfigArgs, disableTokenTransferFeeConfigs);
   }
 
+  function test_applyTokenTransferFeeConfigUpdates_RevertWhen_NonExistentChain() public {
+    uint64 unsupportedChain = 999_999;
+
+    IPoolV2.TokenTransferFeeConfig memory feeConfig;
+
+    TokenPool.TokenTransferFeeConfigArgs[] memory feeConfigArgs = new TokenPool.TokenTransferFeeConfigArgs[](1);
+    feeConfigArgs[0] =
+      TokenPool.TokenTransferFeeConfigArgs({destChainSelector: unsupportedChain, tokenTransferFeeConfig: feeConfig});
+
+    vm.expectRevert(abi.encodeWithSelector(TokenPool.NonExistentChain.selector, unsupportedChain));
+    s_tokenPool.applyTokenTransferFeeConfigUpdates(feeConfigArgs, new uint64[](0));
+  }
+
   function test_applyTokenTransferFeeConfigUpdates_RevertWhen_InvalidTransferFeeBps_DefaultBpsTooHigh() public {
     IPoolV2.TokenTransferFeeConfig memory feeConfig = IPoolV2.TokenTransferFeeConfig({
       destGasOverhead: 50_000,
