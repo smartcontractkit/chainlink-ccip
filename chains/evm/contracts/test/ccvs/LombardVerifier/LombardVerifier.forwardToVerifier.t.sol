@@ -7,6 +7,7 @@ import {IBridgeV3} from "../../../interfaces/lombard/IBridgeV3.sol";
 import {LombardVerifier} from "../../../ccvs/LombardVerifier.sol";
 import {BaseVerifier} from "../../../ccvs/components/BaseVerifier.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
+import {MockLombardAdapter} from "../../mocks/MockLombardAdapter.sol";
 import {LombardVerifierSetup} from "./LombardVerifierSetup.t.sol";
 
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
@@ -52,9 +53,9 @@ contract LombardVerifier_forwardToVerifier is LombardVerifierSetup {
   function test_forwardToVerifier_WithAdapter() public {
     // Add a token with an adapter.
     address tokenWithAdapter = address(new BurnMintERC20("Token With Adapter", "TWA", 18, 0, 0));
-    address adapter = address(new BurnMintERC20("Adapter", "ADP", 18, 0, 0));
+    address adapter = address(new MockLombardAdapter(address(s_mockBridge), tokenWithAdapter));
 
-    deal(adapter, address(s_lombardVerifier), TRANSFER_AMOUNT);
+    deal(tokenWithAdapter, address(s_lombardVerifier), TRANSFER_AMOUNT);
 
     vm.stopPrank();
     vm.startPrank(OWNER);

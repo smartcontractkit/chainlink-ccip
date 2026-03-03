@@ -6,6 +6,7 @@ import {IBridgeV3} from "../../../interfaces/lombard/IBridgeV3.sol";
 
 import {LombardVerifier} from "../../../ccvs/LombardVerifier.sol";
 import {BaseVerifier} from "../../../ccvs/components/BaseVerifier.sol";
+import {Internal} from "../../../libraries/Internal.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {MockLombardBridge} from "../../mocks/MockLombardBridge.sol";
 import {MockLombardMailbox} from "../../mocks/MockLombardMailbox.sol";
@@ -56,7 +57,7 @@ contract LombardVerifierSetup is BaseVerifierSetup {
     s_lombardVerifier.applyRemoteChainConfigUpdates(remoteChainConfigs);
 
     // Set the path for the destination chain.
-    s_lombardVerifier.setPath(DEST_CHAIN_SELECTOR, LOMBARD_CHAIN_ID, ALLOWED_CALLER);
+    s_lombardVerifier.setPath(DEST_CHAIN_SELECTOR, LOMBARD_CHAIN_ID, abi.encodePacked(ALLOWED_CALLER));
 
     // Mock the router to return true for the valid offRamp.
     vm.mockCall(
@@ -127,8 +128,13 @@ contract LombardVerifierSetup is BaseVerifierSetup {
     //   mload(msgBody + 0x21) => bytes 1..32  = token
     //   mload(msgBody + 0x61) => bytes 65..96 = recipient
     //   mload(msgBody + 0x81) => bytes 97..128 = amount
-    bytes memory msgBody =
-      abi.encodePacked(bytes1(0), bytes32(destToken), bytes32(0), bytes32(tokenReceiver), bytes32(amount));
+    bytes memory msgBody = abi.encodePacked(
+      bytes1(0),
+      Internal._leftPadBytesToBytes32(destToken),
+      bytes32(0),
+      Internal._leftPadBytesToBytes32(tokenReceiver),
+      bytes32(amount)
+    );
 
     // Encode the full payload structure
     bytes memory encodedData = abi.encode(

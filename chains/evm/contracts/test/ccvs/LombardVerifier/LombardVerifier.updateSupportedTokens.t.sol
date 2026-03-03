@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {LombardVerifier} from "../../../ccvs/LombardVerifier.sol";
+import {MockLombardAdapter} from "../../mocks/MockLombardAdapter.sol";
 import {LombardVerifierSetup} from "./LombardVerifierSetup.t.sol";
 import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
 
@@ -30,8 +31,7 @@ contract LombardVerifier_updateSupportedTokens is LombardVerifierSetup {
   function test_updateSupportedTokens_AddTokenWithAdapter() public {
     uint256 countBefore = s_lombardVerifier.getSupportedTokens().length;
     BurnMintERC20 newToken = new BurnMintERC20("New Token", "NEW", 18, 0, 0);
-    // The adapter must be a valid ERC20 since the contract calls approve on it.
-    BurnMintERC20 adapter = new BurnMintERC20("Adapter Token", "ADAPT", 18, 0, 0);
+    MockLombardAdapter adapter = new MockLombardAdapter(address(s_lombardVerifier.i_bridge()), address(newToken));
 
     LombardVerifier.SupportedTokenArgs[] memory tokensToAdd = new LombardVerifier.SupportedTokenArgs[](1);
     tokensToAdd[0] = LombardVerifier.SupportedTokenArgs({localToken: address(newToken), localAdapter: address(adapter)});
@@ -42,9 +42,8 @@ contract LombardVerifier_updateSupportedTokens is LombardVerifierSetup {
     s_lombardVerifier.updateSupportedTokens(new address[](0), tokensToAdd);
 
     assertTrue(s_lombardVerifier.isSupportedToken(address(newToken)), "Token should be in supported tokens");
-    // Check the adapter if approval is set to max uint256.
-    uint256 allowance =
-      BurnMintERC20(adapter).allowance(address(s_lombardVerifier), address(s_lombardVerifier.i_bridge()));
+    // Check token->adapter approval is set to max uint256.
+    uint256 allowance = newToken.allowance(address(s_lombardVerifier), address(adapter));
     assertEq(allowance, type(uint256).max, "Allowance should be max uint256");
 
     uint256 countAfter = s_lombardVerifier.getSupportedTokens().length;
@@ -78,16 +77,15 @@ contract LombardVerifier_updateSupportedTokens is LombardVerifierSetup {
   function test_updateSupportedTokens_RemoveTokenWithAdapter() public {
     // First add a token with an adapter.
     BurnMintERC20 newToken = new BurnMintERC20("New Token", "NEW", 18, 0, 0);
-    BurnMintERC20 adapter = new BurnMintERC20("Adapter Token", "ADAPT", 18, 0, 0);
+    MockLombardAdapter adapter = new MockLombardAdapter(address(s_lombardVerifier.i_bridge()), address(newToken));
 
     LombardVerifier.SupportedTokenArgs[] memory tokensToAdd = new LombardVerifier.SupportedTokenArgs[](1);
     tokensToAdd[0] = LombardVerifier.SupportedTokenArgs({localToken: address(newToken), localAdapter: address(adapter)});
     s_lombardVerifier.updateSupportedTokens(new address[](0), tokensToAdd);
 
-    // Verify adapter allowance was set to max.
-    uint256 adapterAllowanceBefore =
-      BurnMintERC20(adapter).allowance(address(s_lombardVerifier), address(s_lombardVerifier.i_bridge()));
-    assertEq(adapterAllowanceBefore, type(uint256).max, "Adapter allowance should be max uint256 before removal");
+    // Verify token->adapter allowance was set to max.
+    uint256 allowanceBefore = newToken.allowance(address(s_lombardVerifier), address(adapter));
+    assertEq(allowanceBefore, type(uint256).max, "Allowance should be max uint256 before removal");
 
     // Now remove the token.
     address[] memory tokensToRemove = new address[](1);
@@ -100,10 +98,9 @@ contract LombardVerifier_updateSupportedTokens is LombardVerifierSetup {
 
     assertFalse(s_lombardVerifier.isSupportedToken(address(newToken)), "Token should not be in supported tokens");
 
-    // Verify the adapter's allowance was reset to 0 (not the token's).
-    uint256 adapterAllowanceAfter =
-      BurnMintERC20(adapter).allowance(address(s_lombardVerifier), address(s_lombardVerifier.i_bridge()));
-    assertEq(adapterAllowanceAfter, 0, "Adapter allowance should be reset to 0 after removal");
+    // Verify token->adapter allowance was reset to 0.
+    uint256 allowanceAfter = newToken.allowance(address(s_lombardVerifier), address(adapter));
+    assertEq(allowanceAfter, 0, "Allowance should be reset to 0 after removal");
   }
 
   function test_updateSupportedTokens_RevertWhen_NotOwner() public {

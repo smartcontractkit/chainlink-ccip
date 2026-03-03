@@ -3,6 +3,8 @@ package changesets
 import (
 	"fmt"
 
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -18,7 +20,9 @@ type LombardChainConfig struct {
 	// Bridge is the address of the Bridge contract provided by Lombard
 	Bridge string
 	// Token is the address of the token to be used in the LombardTokenPool.
-	Token          string
+	Token string
+	// LocalAdapter is the optional local adapter for the Lombard token on this chain.
+	LocalAdapter   string
 	TokenQualifier string
 	// DeployerContract is a contract that can be used to deploy other contracts.
 	// i.e. A CREATE2Factory contract on Ethereum can enable consistent deployments.
@@ -59,8 +63,14 @@ func makeVerifyDeployLombardChains(_ *adapters.LombardChainRegistry, _ *changese
 			if _, err := chain_selectors.GetSelectorFamily(chainSel); err != nil {
 				return err
 			}
+			if chainCfg.LocalAdapter != "" && !common.IsHexAddress(chainCfg.LocalAdapter) {
+				return fmt.Errorf("chain %d has invalid local adapter address %q", chainSel, chainCfg.LocalAdapter)
+			}
 			for remoteChainSelector := range chainCfg.RemoteChains {
 				if _, err := chain_selectors.GetSelectorFamily(remoteChainSelector); err != nil {
+					return err
+				}
+				if err := validateRemoteAdapterConfig(chainSel, remoteChainSelector, chainCfg.RemoteChains[remoteChainSelector].RemoteAdapter); err != nil {
 					return err
 				}
 				remoteChainCfg, ok := cfg.Chains[remoteChainSelector]
@@ -75,6 +85,24 @@ func makeVerifyDeployLombardChains(_ *adapters.LombardChainRegistry, _ *changese
 
 		return nil
 	}
+}
+
+func validateRemoteAdapterConfig(chainSel uint64, remoteChainSelector uint64, remoteAdapter string) error {
+	if remoteAdapter == "" || common.IsHexAddress(remoteAdapter) {
+		return nil
+	}
+
+	raw, err := hexutil.Decode(remoteAdapter)
+	if err != nil {
+		return fmt.Errorf("chain %d remote chain %d has invalid remote adapter %q: %w", chainSel, remoteChainSelector, remoteAdapter, err)
+	}
+	if len(raw) == 0 {
+		return fmt.Errorf("chain %d remote chain %d has empty remote adapter %q", chainSel, remoteChainSelector, remoteAdapter)
+	}
+	if len(raw) > 32 {
+		return fmt.Errorf("chain %d remote chain %d remote adapter %q exceeds 32 bytes", chainSel, remoteChainSelector, remoteAdapter)
+	}
+	return nil
 }
 
 func makeApplyDeployLombardChains(lombardChainRegistry *adapters.LombardChainRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, DeployLombardChainsConfig) (cldf.ChangesetOutput, error) {
@@ -107,6 +135,7 @@ func makeApplyDeployLombardChains(lombardChainRegistry *adapters.LombardChainReg
 				ChainSelector:    chainSel,
 				Bridge:           chainCfg.Bridge,
 				Token:            chainCfg.Token,
+				LocalAdapter:     chainCfg.LocalAdapter,
 				TokenQualifier:   chainCfg.TokenQualifier,
 				DeployerContract: chainCfg.DeployerContract,
 				StorageLocations: chainCfg.StorageLocations,
@@ -163,6 +192,7 @@ func makeApplyDeployLombardChains(lombardChainRegistry *adapters.LombardChainReg
 			in := adapters.ConfigureLombardChainForLanesInput{
 				ChainSelector:  chainSel,
 				Token:          chainCfg.Token,
+				LocalAdapter:   chainCfg.LocalAdapter,
 				TokenQualifier: chainCfg.TokenQualifier,
 				RemoteChains:   chainCfg.RemoteChains,
 			}
