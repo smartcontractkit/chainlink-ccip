@@ -144,14 +144,14 @@ type TestAdapter interface {
 	GetRegistryAddress() (string, error)
 
 	// SetAllowlist activates/deactivates the whitelist
-	SetAllowlist(ctx context.Context, destChainSelector uint64, enabled bool) error
+	SetAllowlist(t *testing.T, destChainSelector uint64, enabled bool) error
 
 	// UpdateSenderAllowlistStatus adds/removes senders to/from the whitelist
-	UpdateSenderAllowlistStatus(ctx context.Context, destChainSelector uint64, included bool) error
+	UpdateSenderAllowlistStatus(t *testing.T, destChainSelector uint64, included bool) error
 
 	// RMNCursed sets the chain as cursed, which means that messages from that source chain will not
 	// be executed, and message to that destination chain will not be accepted.
-	RMNCursed(ctx context.Context, chainSelector uint64, cursed bool) error
+	RMNCursed(t *testing.T, chainSelector uint64, cursed bool) error
 }
 
 type TestAdapterFactory = func(env *deployment.Environment, selector uint64) TestAdapter

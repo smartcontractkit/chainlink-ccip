@@ -64,6 +64,21 @@ type SVMAdapter struct {
 	cldf_solana.Chain
 }
 
+func (a *SVMAdapter) RMNCursed(t *testing.T, chainSelector uint64, cursed bool) error {
+	t.Skip("unimplemented")
+	return nil
+}
+
+func (a *SVMAdapter) SetAllowlist(t *testing.T, destChainSelector uint64, enabled bool) error {
+	t.Skip("unimplemented")
+	return nil
+}
+
+func (a *SVMAdapter) UpdateSenderAllowlistStatus(t *testing.T, destChainSelector uint64, included bool) error {
+	t.Skip("unimplemented")
+	return nil
+}
+
 // state svm_stateview.CCIPChainState
 // state, err := stateview.LoadOnchainStateSolana(env)
 // if err != nil {

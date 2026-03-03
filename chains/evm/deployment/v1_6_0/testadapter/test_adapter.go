@@ -703,3 +703,18 @@ func ConfirmExecWithSeqNrs(
 		}
 	}
 }
+
+func (a *EVMAdapter) RMNCursed(t *testing.T, chainSelector uint64, cursed bool) error {
+	t.Skip("unimplemented")
+	return nil
+}
+
+func (a *EVMAdapter) SetAllowlist(t *testing.T, destChainSelector uint64, enabled bool) error {
+	t.Skip("unimplemented")
+	return nil
+}
+
+func (a *EVMAdapter) UpdateSenderAllowlistStatus(t *testing.T, destChainSelector uint64, included bool) error {
+	t.Skip("unimplemented")
+	return nil
+}
