@@ -550,18 +550,9 @@ func (a *SolanaAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokenapi.De
 }
 
 func getTokenMintAndTokenProgram(store datastore.DataStore, tokenRef datastore.AddressRef, chain cldf_solana.Chain) (datastore.AddressRef, solana.PublicKey, error) {
-	ref := datastore.AddressRef{
-		ChainSelector: chain.Selector,
-	}
-	if tokenRef.Address != "" {
-		ref.Address = tokenRef.Address
-	}
-	if tokenRef.Qualifier != "" {
-		ref.Qualifier = tokenRef.Qualifier
-	}
-	tokenAddr, err := datastore_utils.FindAndFormatRef(store, ref, chain.Selector, datastore_utils.FullRef)
+	tokenAddr, err := datastore_utils.FindAndFormatRef(store, tokenRef, chain.Selector, datastore_utils.FullRef)
 	if err != nil {
-		return datastore.AddressRef{}, solana.PublicKey{}, fmt.Errorf("failed to find token address for ref '%+v': %w", ref, err)
+		return datastore.AddressRef{}, solana.PublicKey{}, fmt.Errorf("failed to find token address for ref '%+v': %w", tokenRef, err)
 	}
 	tokenProgramId, err := utils.GetTokenProgramID(deployment.ContractType(tokenAddr.Type))
 	if err != nil {

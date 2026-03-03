@@ -31,7 +31,8 @@ import (
 var (
 	// TestXXXMCMSSigner is a throwaway private key used for signing MCMS proposals.
 	// in tests.
-	TestXXXMCMSSigner *ecdsa.PrivateKey
+	TestXXXMCMSSigner    *ecdsa.PrivateKey
+	TestXXXMCMSSignerTwo *ecdsa.PrivateKey
 )
 
 func init() {
@@ -40,6 +41,13 @@ func init() {
 		panic(err)
 	}
 	TestXXXMCMSSigner = key
+
+	keyTwo, err := crypto.GenerateKey()
+	if err != nil {
+		panic(err)
+	}
+	TestXXXMCMSSignerTwo = keyTwo
+
 }
 
 func SingleGroupMCMS() mcmstypes.Config {
@@ -47,6 +55,19 @@ func SingleGroupMCMS() mcmstypes.Config {
 	// Convert the public key to an Ethereum address
 	address := crypto.PubkeyToAddress(*publicKey)
 	c, err := mcmstypes.NewConfig(1, []common.Address{address}, []mcmstypes.Config{})
+	if err != nil {
+		panic(err)
+	}
+	return c
+}
+
+func SingleGroupMCMSTwoSigners() mcmstypes.Config {
+	publicKey := TestXXXMCMSSigner.Public().(*ecdsa.PublicKey)
+	publicKeyTwo := TestXXXMCMSSignerTwo.Public().(*ecdsa.PublicKey)
+	// Convert the public key to an Ethereum address
+	address := crypto.PubkeyToAddress(*publicKey)
+	addressTwo := crypto.PubkeyToAddress(*publicKeyTwo)
+	c, err := mcmstypes.NewConfig(1, []common.Address{address, addressTwo}, []mcmstypes.Config{})
 	if err != nil {
 		panic(err)
 	}

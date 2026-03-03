@@ -11,7 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/timelock"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	ccipapi "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
-	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
+	ccipapiTmp "github.com/smartcontractkit/chainlink-ccip/deployment/deployTmp"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -308,7 +308,7 @@ func setupRoles(b operations.Bundle, deps mcmsops.Deps, mcmProgram solana.Public
 func transferAllMCMS(
 	b operations.Bundle,
 	chain cldf_solana.Chain,
-	in deployops.TransferOwnershipPerChainInput,
+	in ccipapi.TransferOwnershipPerChainInput,
 	transferAccessController bool) (sequences.OnChainOutput, error) {
 	var output sequences.OnChainOutput
 	deps := mcmsops.Deps{
@@ -333,7 +333,7 @@ func transferAllMCMS(
 }
 
 // assume refs are in the order returned by GetAllMCMS
-func acceptAllMCMS(b operations.Bundle, chain cldf_solana.Chain, in deployops.TransferOwnershipPerChainInput, transferAccessController bool) (sequences.OnChainOutput, error) {
+func acceptAllMCMS(b operations.Bundle, chain cldf_solana.Chain, in ccipapi.TransferOwnershipPerChainInput, transferAccessController bool) (sequences.OnChainOutput, error) {
 	var output sequences.OnChainOutput
 	deps := mcmsops.Deps{
 		Chain:             chain,
@@ -355,9 +355,49 @@ func acceptAllMCMS(b operations.Bundle, chain cldf_solana.Chain, in deployops.Tr
 	return output, nil
 }
 
-func (a *SolanaAdapter) GrantAdminRoleToTimelock() *operations.Sequence[deployops.GrantAdminRoleToTimelockConfigPerChainWithSelector, sequences.OnChainOutput, chain.BlockChains] {
+func (a *SolanaAdapter) GrantAdminRoleToTimelock() *operations.Sequence[ccipapi.GrantAdminRoleToTimelockConfigPerChainWithSelector, sequences.OnChainOutput, chain.BlockChains] {
 	// Not implemented for Solana
 	return nil
+}
+
+func (a *SolanaAdapter) UpdateMCMSConfig() *operations.Sequence[ccipapiTmp.UpdateMCMSConfigInputPerChainWithSelector, sequences.OnChainOutput, chain.BlockChains] {
+	return operations.NewSequence(
+		"update-mcms-config",
+		semver.MustParse("1.0.0"),
+		"Updates Config of specified MCMS Contracts",
+		func(b operations.Bundle, chains cldf_chain.BlockChains, in ccipapiTmp.UpdateMCMSConfigInputPerChainWithSelector) (output sequences.OnChainOutput, err error) {
+			chain, ok := chains.SolanaChains()[in.ChainSelector]
+			if !ok {
+				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found in environment", in.ChainSelector)
+			}
+
+			// Set config for each inputted contract
+			for _, contract := range in.MCMContracts {
+				deps := mcmsops.Deps{
+					Chain:             chain,
+					ExistingAddresses: in.ExistingAddresses,
+					Qualifier:         contract.Qualifier,
+				}
+				configureOpInput := ccipapi.MCMSDeploymentConfigPerChain{
+					Canceller:       in.MCMConfig,
+					Bypasser:        in.MCMConfig,
+					Proposer:        in.MCMConfig,
+					Qualifier:       &contract.Qualifier,
+					ContractVersion: contract.Version.String(),
+				}
+				id, _, _ := mcms_solana.ParseContractAddress(contract.Address)
+				configureOpOutput, err := configureMCM(b, deps, configureOpInput, id)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to configure MCMs: %w", err)
+				}
+
+				output.Addresses = append(output.Addresses, configureOpOutput.NewAddresses...)
+				output.BatchOps = append(output.BatchOps, configureOpOutput.BatchOps...)
+			}
+
+			return output, nil
+		},
+	)
 }
 
 func getRefsAsOwnable(
