@@ -27,7 +27,6 @@ type SupportedTokensArgs = lombard_verifier.LombardVerifierSupportedTokenArgs
 type RemotePathArgs struct {
 	RemoteChainSelector uint64
 	AllowedCaller       [32]byte
-	RemoteAdapter       [32]byte
 	LChainId            [32]byte
 }
 
