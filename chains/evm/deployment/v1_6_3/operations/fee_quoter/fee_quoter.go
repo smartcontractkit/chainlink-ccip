@@ -339,3 +339,25 @@ var GetTokenTransferFeeConfig = contract.NewRead(contract.ReadParams[GetTokenTra
 		return c.GetTokenTransferFeeConfig(opts, args.DestChainSelector, args.Token)
 	},
 })
+
+var GetStaticConfig = contract.NewRead(contract.ReadParams[struct{}, StaticConfig, *FeeQuoterContract]{
+	Name:         "fee-quoter:get-static-config",
+	Version:      Version,
+	Description:  "Calls getStaticConfig on the contract",
+	ContractType: ContractType,
+	NewContract:  NewFeeQuoterContract,
+	CallContract: func(c *FeeQuoterContract, opts *bind.CallOpts, args struct{}) (StaticConfig, error) {
+		return c.GetStaticConfig(opts)
+	},
+})
+
+var GetAllAuthorizedCallers = contract.NewRead(contract.ReadParams[struct{}, []common.Address, *FeeQuoterContract]{
+	Name:         "fee-quoter:get-all-authorized-callers",
+	Version:      Version,
+	Description:  "Calls getAllAuthorizedCallers on the contract",
+	ContractType: ContractType,
+	NewContract:  NewFeeQuoterContract,
+	CallContract: func(c *FeeQuoterContract, opts *bind.CallOpts, args struct{}) ([]common.Address, error) {
+		return c.GetAllAuthorizedCallers(opts)
+	},
+})
