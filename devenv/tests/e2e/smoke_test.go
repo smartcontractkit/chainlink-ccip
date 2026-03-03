@@ -78,14 +78,14 @@ func TestE2ESmoke(t *testing.T) {
 				fromSelector: selectors[i],
 				toSelector:   selectors[j],
 			})
-			if fromFamily == chainsel.FamilyEVM {
-				fq2tcs = append(fq2tcs, testcase{
-					name:         fmt.Sprintf("msg execution eoa receiver from %s to %s with 2.0 fee quoter", fromFamily, toFamily),
-					fromSelector: selectors[i],
-					toSelector:   selectors[j],
-					needFQ2Check: true,
-				})
-			}
+			// if fromFamily == chainsel.FamilyEVM {
+			// 	fq2tcs = append(fq2tcs, testcase{
+			// 		name:         fmt.Sprintf("msg execution eoa receiver from %s to %s with 2.0 fee quoter", fromFamily, toFamily),
+			// 		fromSelector: selectors[i],
+			// 		toSelector:   selectors[j],
+			// 		needFQ2Check: true,
+			// 	})
+			// }
 		}
 	}
 

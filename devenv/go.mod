@@ -36,7 +36,7 @@ require (
 	github.com/rs/zerolog v1.34.0
 	github.com/smartcontractkit/chain-selectors v1.0.97
 	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20260302030253-ab9f38d01a0c
-	github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment v0.0.0-00010101000000-000000000000
+	github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment v0.0.0-20260302030253-ab9f38d01a0c
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20260121163256-85accaf3d28d
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment v0.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20251014191100-bad58388f0c9
@@ -59,7 +59,7 @@ require (
 
 require (
 	github.com/aws/smithy-go v1.24.0
-	github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm v0.0.0-20260228012932-8fe72a07ba85
+	github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm v0.0.0-20260302030253-ab9f38d01a0c
 	github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment v0.0.0-20260226145156-268e85cc5bf7
 )
 

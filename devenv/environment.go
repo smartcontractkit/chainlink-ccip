@@ -20,6 +20,7 @@ import (
 	"github.com/pelletier/go-toml/v2"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	_ "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/adapters"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/cld/domain"
 	capabilities_registry "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
@@ -478,7 +479,6 @@ func NewEnvironment() (*Cfg, error) {
 		return nil, fmt.Errorf("creating CCIP jobs: %w", err)
 	}
 	in.Jobs = NodeToJobIDs
-
 	err = devenvcommon.AddNodesToContracts(ctx, e, in.NodeSets, nodeKeyBundles, homeChainSelector, selectors, homeChainType, in.Blockchains)
 	if err != nil {
 		return nil, err
@@ -518,6 +518,37 @@ func NewEnvironment() (*Cfg, error) {
 		tr.Record("[changeset] deployed product contracts")
 	}
 	tr.Record("[infra] deployed CL nodes")
+
+	// for _, selector := range selectors {
+	// 	family, err := chainsel.GetSelectorFamily(selector)
+	// 	if err != nil {
+	// 		return nil, fmt.Errorf("getting chain family by selector %d: %w", selector, err)
+	// 	}
+	// 	if family != chainsel.FamilyEVM {
+	// 		continue
+	// 	}
+	// 	// deploy the 2.0 FQ and check that it can read the updated prices
+	// 	fqInput := make(map[uint64]deployops.UpdateFeeQuoterInputPerChain)
+	// 	fqInput[selector] = deployops.UpdateFeeQuoterInputPerChain{
+	// 		FeeQuoterVersion: semver.MustParse("1.7.0"),
+	// 		RampsVersion:     semver.MustParse("1.6.0"),
+	// 	}
+	// 	fqReg := deployops.GetFQAndRampUpdaterRegistry()
+	// 	fqUpdateChangeset := deployops.UpdateFeeQuoterChangeset(fqReg, nil)
+	// 	out, err := fqUpdateChangeset.Apply(*e, deployops.UpdateFeeQuoterInput{
+	// 		Chains: fqInput,
+	// 	})
+	// 	if err != nil {
+	// 		return nil, fmt.Errorf("updating fee quoter and ramps: %w", err)
+	// 	}
+	// 	L.Info().Interface("Output", out.DataStore).Msg("Updated fee quoter and ramps")
+	// }
+	// DeleteJobs(allNodeClients, in.Jobs)
+	// CreateJobs(allNodeClients, in.NodeKeyBundles)
+	// err = devenvcommon.AddNodesToContracts(e.GetContext(), e, in.NodeSets, in.NodeKeyBundles, homeChainSelector, selectors, homeChainType, in.Blockchains)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("adding nodes to contracts after FQ update: %w", err)
+	// }
 
 	Plog.Info().Str("BootstrapNode", in.NodeSets[0].Out.CLNodes[0].Node.ExternalURL).Send()
 	for _, n := range in.NodeSets[0].Out.CLNodes[1:] {
