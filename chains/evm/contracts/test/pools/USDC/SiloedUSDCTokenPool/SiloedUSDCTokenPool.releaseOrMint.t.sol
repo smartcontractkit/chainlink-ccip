@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import {Pool} from "../../../../libraries/Pool.sol";
 import {TokenPool} from "../../../../pools/TokenPool.sol";
-import {LOCK_RELEASE_FLAG} from "../../../../pools/USDC/BurnMintWithLockReleaseFlagTokenPool.sol";
+import {USDCSourcePoolDataCodec} from "../../../../libraries/USDCSourcePoolDataCodec.sol";
 import {SiloedUSDCTokenPool} from "../../../../pools/USDC/SiloedUSDCTokenPool.sol";
 import {SiloedUSDCTokenPoolSetup} from "./SiloedUSDCTokenPoolSetup.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
@@ -45,7 +45,7 @@ contract SiloedUSDCTokenPool_releaseOrMint is SiloedUSDCTokenPoolSetup {
       localToken: localToken,
       remoteChainSelector: SOURCE_CHAIN_SELECTOR,
       sourcePoolAddress: sourcePoolAddress,
-      sourcePoolData: abi.encode(LOCK_RELEASE_FLAG),
+      sourcePoolData: abi.encode(USDCSourcePoolDataCodec.LOCK_RELEASE_FLAG),
       offchainTokenData: ""
     });
 
@@ -79,7 +79,7 @@ contract SiloedUSDCTokenPool_releaseOrMint is SiloedUSDCTokenPoolSetup {
       localToken: localToken,
       remoteChainSelector: SOURCE_CHAIN_SELECTOR,
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
-      sourcePoolData: abi.encode(LOCK_RELEASE_FLAG),
+      sourcePoolData: abi.encode(USDCSourcePoolDataCodec.LOCK_RELEASE_FLAG),
       offchainTokenData: ""
     });
 
@@ -116,7 +116,7 @@ contract SiloedUSDCTokenPool_releaseOrMint is SiloedUSDCTokenPoolSetup {
       localToken: localToken,
       remoteChainSelector: SOURCE_CHAIN_SELECTOR,
       sourcePoolAddress: sourcePoolAddress,
-      sourcePoolData: abi.encode(LOCK_RELEASE_FLAG),
+      sourcePoolData: abi.encode(USDCSourcePoolDataCodec.LOCK_RELEASE_FLAG),
       offchainTokenData: ""
     });
 
@@ -161,7 +161,7 @@ contract SiloedUSDCTokenPool_releaseOrMint is SiloedUSDCTokenPoolSetup {
       localToken: address(s_USDCToken),
       remoteChainSelector: SOURCE_CHAIN_SELECTOR,
       sourcePoolAddress: s_sourcePoolAddress,
-      sourcePoolData: abi.encode(LOCK_RELEASE_FLAG),
+      sourcePoolData: abi.encode(USDCSourcePoolDataCodec.LOCK_RELEASE_FLAG),
       offchainTokenData: ""
     });
 
@@ -190,7 +190,7 @@ contract SiloedUSDCTokenPool_releaseOrMint is SiloedUSDCTokenPoolSetup {
       localToken: address(s_USDCToken),
       remoteChainSelector: SOURCE_CHAIN_SELECTOR,
       sourcePoolAddress: s_sourcePoolAddress,
-      sourcePoolData: abi.encode(LOCK_RELEASE_FLAG),
+      sourcePoolData: abi.encode(USDCSourcePoolDataCodec.LOCK_RELEASE_FLAG),
       offchainTokenData: ""
     });
 
@@ -236,7 +236,7 @@ contract SiloedUSDCTokenPool_releaseOrMint is SiloedUSDCTokenPoolSetup {
       localToken: address(s_USDCToken),
       remoteChainSelector: SOURCE_CHAIN_SELECTOR,
       sourcePoolAddress: s_sourcePoolAddress,
-      sourcePoolData: abi.encode(LOCK_RELEASE_FLAG),
+      sourcePoolData: abi.encode(USDCSourcePoolDataCodec.LOCK_RELEASE_FLAG),
       offchainTokenData: ""
     });
 
@@ -261,7 +261,7 @@ contract SiloedUSDCTokenPool_releaseOrMint is SiloedUSDCTokenPoolSetup {
       localToken: localToken,
       remoteChainSelector: unsupportedChain,
       sourcePoolAddress: s_sourcePoolAddress,
-      sourcePoolData: abi.encode(LOCK_RELEASE_FLAG),
+      sourcePoolData: abi.encode(USDCSourcePoolDataCodec.LOCK_RELEASE_FLAG),
       offchainTokenData: ""
     });
 
@@ -289,7 +289,7 @@ contract SiloedUSDCTokenPool_releaseOrMint is SiloedUSDCTokenPoolSetup {
       localToken: address(s_USDCToken),
       remoteChainSelector: SOURCE_CHAIN_SELECTOR,
       sourcePoolAddress: s_sourcePoolAddress,
-      sourcePoolData: abi.encode(LOCK_RELEASE_FLAG),
+      sourcePoolData: abi.encode(USDCSourcePoolDataCodec.LOCK_RELEASE_FLAG),
       offchainTokenData: ""
     });
 

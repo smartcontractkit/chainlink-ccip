@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import {Pool} from "../../../libraries/Pool.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
-import {LOCK_RELEASE_FLAG} from "../../../pools/USDC/BurnMintWithLockReleaseFlagTokenPool.sol";
+import {USDCSourcePoolDataCodec} from "../../../libraries/USDCSourcePoolDataCodec.sol";
 import {BurnMintWithLockReleaseFlagTokenPoolSetup} from "./BurnMintWithLockReleaseFlagTokenPoolSetup.t.sol";
 
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
@@ -48,7 +48,7 @@ contract BurnMintWithLockReleaseFlagTokenPool_lockOrBurn is BurnMintWithLockRele
 
     assertEq(s_token.balanceOf(address(s_pool)), 0);
 
-    assertEq(bytes4(lockOrBurnOut.destPoolData), LOCK_RELEASE_FLAG);
+    assertEq(bytes4(lockOrBurnOut.destPoolData), USDCSourcePoolDataCodec.LOCK_RELEASE_FLAG);
   }
 
   function test_lockOrBurnV2_ReturnsLockReleaseFlag() public {
@@ -71,6 +71,6 @@ contract BurnMintWithLockReleaseFlagTokenPool_lockOrBurn is BurnMintWithLockRele
     );
 
     assertEq(destTokenAmount, burnAmount);
-    assertEq(bytes4(out.destPoolData), LOCK_RELEASE_FLAG);
+    assertEq(bytes4(out.destPoolData), USDCSourcePoolDataCodec.LOCK_RELEASE_FLAG);
   }
 }

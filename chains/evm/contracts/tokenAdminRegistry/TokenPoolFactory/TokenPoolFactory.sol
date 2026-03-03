@@ -24,7 +24,6 @@ contract TokenPoolFactory is ITypeAndVersion {
 
   error InvalidZeroAddress();
   error InvalidLockBoxToken(address poolToken);
-  error InvalidLockBoxChainSelector(uint64 lockBoxSelector);
 
   /// @notice The type of pool to deploy. Types may be expanded in future versions.
   enum PoolType {
