@@ -37,6 +37,12 @@ func init() {
 	deployops.GetRegistry().RegisterDeployer(chain_selectors.FamilyEVM, v, &EVMAdapter{})
 	deployops.GetTransferOwnershipRegistry().RegisterAdapter(chain_selectors.FamilyEVM, v, &EVMAdapter{})
 	tokensapi.GetTokenAdapterRegistry().RegisterTokenAdapter(chain_selectors.FamilyEVM, v, &EVMAdapter{})
+	// 1.5.1 token pools use the same abstract TokenPool; use the 1.6.0 adapter for config/transfers.
+	v151, err := semver.NewVersion("1.5.1")
+	if err != nil {
+		panic(err)
+	}
+	tokensapi.GetTokenAdapterRegistry().RegisterTokenAdapter(chain_selectors.FamilyEVM, v151, &EVMAdapter{})
 }
 
 type EVMAdapter struct{}
