@@ -30,7 +30,7 @@ func rmnSetEventAuthoritiesApply() func(cldf.Environment, sequences.RMNRemoteSet
 
 		report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, sequences.SetRMNRemoteEventAuthorities, e.BlockChains, input)
 		if err != nil {
-			return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy TokenGovernor: %w", err)
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to set rmn event authorities: %w", err)
 		}
 
 		reports = append(reports, report.ExecutionReports...)
