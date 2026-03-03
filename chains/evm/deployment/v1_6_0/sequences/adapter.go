@@ -28,20 +28,14 @@ import (
 )
 
 func init() {
-	v, err := semver.NewVersion("1.6.0")
-	if err != nil {
-		panic(err)
-	}
+	v := semver.MustParse("1.6.0")
 	ccipapi.GetLaneAdapterRegistry().RegisterLaneAdapter(chain_selectors.FamilyEVM, v, &EVMAdapter{})
 	ccipapi.GetPingPongAdapterRegistry().RegisterPingPongAdapter(chain_selectors.FamilyEVM, v, &EVMAdapter{})
 	deployops.GetRegistry().RegisterDeployer(chain_selectors.FamilyEVM, v, &EVMAdapter{})
 	deployops.GetTransferOwnershipRegistry().RegisterAdapter(chain_selectors.FamilyEVM, v, &EVMAdapter{})
 	tokensapi.GetTokenAdapterRegistry().RegisterTokenAdapter(chain_selectors.FamilyEVM, v, &EVMAdapter{})
 	// 1.5.1 token pools use the same abstract TokenPool; use the 1.6.0 adapter for config/transfers.
-	v151, err := semver.NewVersion("1.5.1")
-	if err != nil {
-		panic(err)
-	}
+	v151 := semver.MustParse("1.5.1")
 	tokensapi.GetTokenAdapterRegistry().RegisterTokenAdapter(chain_selectors.FamilyEVM, v151, &EVMAdapter{})
 }
 
