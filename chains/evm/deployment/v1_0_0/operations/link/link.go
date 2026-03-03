@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	link_token_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/link_token"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/link_token"
 )
@@ -25,6 +26,9 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	ContractMetadata: link_token.LinkTokenMetaData,
 	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
 		cldf_deployment.NewTypeAndVersion(ContractType, *Version).String(): {
+			EVM: common.FromHex(link_token.LinkTokenBin),
+		},
+		cldf_deployment.NewTypeAndVersion(link_token_ops.ContractType, *link_token_ops.Version).String(): {
 			EVM: common.FromHex(link_token.LinkTokenBin),
 		},
 	},
