@@ -97,9 +97,9 @@ var ConfigureLombardChainForLanes = cldf_ops.NewSequence(
 		routerAddress := common.HexToAddress(routerRef.Address)
 		lombardVerifierAddress := common.HexToAddress(lombardVerifierAddressRef.Address)
 		lombardVerifierResolverAddress := common.HexToAddress(lombardVerifierResolverAddressRef.Address)
-		sourceTokenForRemoteAdapter := common.HexToAddress(input.Token)
+		sourceTokenOrAdapterForRemoteAdapterLookup := common.HexToAddress(input.Token)
 		if input.LocalAdapter != "" {
-			sourceTokenForRemoteAdapter = common.HexToAddress(input.LocalAdapter)
+			sourceTokenOrAdapterForRemoteAdapterLookup = common.HexToAddress(input.LocalAdapter)
 		}
 
 		remoteChainConfigs := make(map[uint64]tokens_core.RemoteChainConfig[[]byte, string])
@@ -183,7 +183,7 @@ var ConfigureLombardChainForLanes = cldf_ops.NewSequence(
 				Address:       lombardVerifierAddress,
 				Args: lombard_verifier.GetRemoteAdapterArgs{
 					RemoteChainSelector: remoteChainSelector,
-					Token:               sourceTokenForRemoteAdapter,
+					Token:               sourceTokenOrAdapterForRemoteAdapterLookup,
 				},
 			})
 			if err != nil {
@@ -192,7 +192,7 @@ var ConfigureLombardChainForLanes = cldf_ops.NewSequence(
 			if existingRemoteAdapterReport.Output != remoteAdapter {
 				remoteAdapterArgs = append(remoteAdapterArgs, lombard_verifier.RemoteAdapterArgs{
 					RemoteChainSelector: remoteChainSelector,
-					Token:               sourceTokenForRemoteAdapter,
+					Token:               sourceTokenOrAdapterForRemoteAdapterLookup,
 					RemoteAdapter:       remoteAdapter,
 				})
 			}

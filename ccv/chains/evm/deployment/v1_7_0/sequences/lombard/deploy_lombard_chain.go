@@ -44,20 +44,13 @@ var DeployLombardChain = cldf_ops.NewSequence(
 		writes := make([]contract_utils.WriteOutput, 0)
 		batchOps := make([]mcms_types.BatchOperation, 0)
 
-		existingAddresses, err := dep.DataStore.Addresses().Fetch()
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to fetch all addresses: %w", err)
-		}
+		existingAddressesOnChain := dep.DataStore.Addresses().Filter(
+			datastore.AddressRefByChainSelector(input.ChainSelector),
+		)
 
 		chain, ok := dep.BlockChains.EVMChains()[input.ChainSelector]
 		if !ok {
 			return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found", input.ChainSelector)
-		}
-		existingAddressesOnChain := make([]datastore.AddressRef, 0, len(existingAddresses))
-		for _, ref := range existingAddresses {
-			if ref.ChainSelector == chain.Selector {
-				existingAddressesOnChain = append(existingAddressesOnChain, ref)
-			}
 		}
 
 		tokenAddress := common.HexToAddress(input.Token)
