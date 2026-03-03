@@ -19,6 +19,9 @@ type DeployLombardInput struct {
 	Bridge string
 	// Token is the address of the token to be used in the LombardTokenPool.
 	Token string
+	// LocalAdapter is the optional local adapter for the Lombard token on this chain.
+	// Leave empty to use no local adapter.
+	LocalAdapter string
 	// TokenQualifier is the qualifier for matching token with the tokenPool during deployment
 	TokenQualifier string
 	// DeployerContract is a contract that can be used to deploy other contracts.
@@ -46,6 +49,9 @@ type ConfigureLombardChainForLanesInput struct {
 	ChainSelector uint64
 	// Token is the address of the Token contract.
 	Token string
+	// LocalAdapter is the optional local adapter for the Lombard token on this chain.
+	// Leave empty to use no local adapter.
+	LocalAdapter string
 	// TokenQualifier is the qualifier for matching token with the tokenPool during deployment
 	TokenQualifier string
 	// RemoteChains is the set of remote chains to configure.
@@ -56,9 +62,12 @@ type ConfigureLombardChainForLanesInput struct {
 type RemoteLombardChainConfig struct {
 	TokenTransferFeeConfig tokens.TokenTransferFeeConfig
 	LombardChainId         uint32
-	FeeUSDCents            uint16
-	GasForVerification     uint32
-	PayloadSizeBytes       uint32
+	// RemoteAdapter is the optional remote token identifier accepted by Lombard bridge.
+	// Accepts either an EVM address hex string or a 32-byte hex string. Leave empty to disable adapter override.
+	RemoteAdapter      string
+	FeeUSDCents        uint16
+	GasForVerification uint32
+	PayloadSizeBytes   uint32
 }
 
 // ConfigureLombardChainForLanesDeps are the dependencies for the ConfigureLombardChainForLanes sequence.
