@@ -33,17 +33,12 @@ contract LombardTokenPool_setPath is LombardTokenPoolSetup {
   }
 
   function test_setPath_RevertWhen_InvalidRemotePoolForChain() public {
+    bytes32 invalidAllowedCaller = bytes32(uint256(0x1234));
     vm.expectRevert(
-      abi.encodeWithSelector(TokenPool.InvalidRemotePoolForChain.selector, DEST_CHAIN_SELECTOR, hex"1234")
+      abi.encodeWithSelector(
+        TokenPool.InvalidRemotePoolForChain.selector, DEST_CHAIN_SELECTOR, abi.encodePacked(invalidAllowedCaller)
+      )
     );
-    s_pool.setPath(DEST_CHAIN_SELECTOR, L_CHAIN_ID, hex"1234", bytes32(0));
-  }
-
-  function test_setPath_RevertWhen_InvalidAllowedCaller() public {
-    bytes memory remotePoolAddress = hex"1234";
-    s_pool.addRemotePool(DEST_CHAIN_SELECTOR, remotePoolAddress);
-
-    vm.expectRevert(abi.encodeWithSelector(LombardTokenPool.InvalidAllowedCaller.selector, remotePoolAddress));
-    s_pool.setPath(DEST_CHAIN_SELECTOR, L_CHAIN_ID, remotePoolAddress, bytes32(0));
+    s_pool.setPath(DEST_CHAIN_SELECTOR, L_CHAIN_ID, abi.encodePacked(invalidAllowedCaller), bytes32(0));
   }
 }
