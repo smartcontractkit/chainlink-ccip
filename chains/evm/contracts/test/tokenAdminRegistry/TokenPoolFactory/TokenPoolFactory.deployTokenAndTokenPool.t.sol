@@ -43,14 +43,14 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
 
   function test_deployTokenAndTokenPool_WithNoExistingTokenOnRemoteChain() public {
     address predictedTokenAddress =
-      Create2.computeAddress(DYNAMIC_SALT, keccak256(s_tokenInitCode), address(s_tokenPoolFactory));
+      Create2.computeAddress(DYNAMIC_SALT, keccak256(TOKEN_INIT_CODE), address(s_tokenPoolFactory));
 
     // Create the constructor params for the predicted pool.
     bytes memory poolCreationParams =
       abi.encode(predictedTokenAddress, LOCAL_TOKEN_DECIMALS, address(0), s_rmnProxy, s_sourceRouter);
 
     // Predict the address of the pool before we make the tx by using the init code and the params
-    bytes memory predictedPoolInitCode = abi.encodePacked(s_poolInitCode, poolCreationParams);
+    bytes memory predictedPoolInitCode = abi.encodePacked(POOL_INIT_CODE, poolCreationParams);
 
     address predictedPoolAddress =
       DYNAMIC_SALT.computeAddress(keccak256(predictedPoolInitCode), address(s_tokenPoolFactory));
@@ -59,8 +59,8 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
       new TokenPoolFactory.RemoteTokenPoolInfo[](0),
       LOCAL_TOKEN_DECIMALS,
       TokenPoolFactory.PoolType.BURN_MINT,
-      s_tokenInitCode,
-      s_poolInitCode,
+      TOKEN_INIT_CODE,
+      POOL_INIT_CODE,
       address(0),
       FAKE_SALT
     );
@@ -116,13 +116,13 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
       remoteChainConfig, // remoteChainConfig
       TokenPoolFactory.PoolType.BURN_MINT, // poolType
       "", // remoteTokenAddress
-      s_tokenInitCode, // remoteTokenInitCode
+      TOKEN_INIT_CODE, // remoteTokenInitCode
       RateLimiter.Config(false, 0, 0)
     );
 
     // Predict the address of the token and pool on the DESTINATION chain.
     address predictedTokenAddress =
-      DYNAMIC_SALT.computeAddress(keccak256(s_tokenInitCode), address(newTokenPoolFactory));
+      DYNAMIC_SALT.computeAddress(keccak256(TOKEN_INIT_CODE), address(newTokenPoolFactory));
 
     // Since the remote chain information was provided, we should be able to get the information from the newly
     // deployed token pool using the available getter functions.
@@ -130,8 +130,8 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
       remoteTokenPools, // No existing remote pools
       LOCAL_TOKEN_DECIMALS, // 18 decimal token
       TokenPoolFactory.PoolType.BURN_MINT,
-      s_tokenInitCode, // Token Init Code
-      s_poolInitCode, // Pool Init Code
+      TOKEN_INIT_CODE, // Token Init Code
+      POOL_INIT_CODE, // Pool Init Code
       address(0), // lockBox
       FAKE_SALT // Salt
     );
@@ -151,7 +151,7 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
         abi.encode(predictedTokenAddress, LOCAL_TOKEN_DECIMALS, address(0), s_rmnProxy, address(s_destRouter));
 
       // Take the init code and concat the destination params to it, the initCode shouldn't change.
-      bytes memory predictedPoolInitCode = abi.encodePacked(s_poolInitCode, predictedPoolCreationParams);
+      bytes memory predictedPoolInitCode = abi.encodePacked(POOL_INIT_CODE, predictedPoolCreationParams);
 
       // Predict the address of the pool on the DESTINATION chain.
       address predictedPoolAddress =
@@ -171,8 +171,8 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
       new TokenPoolFactory.RemoteTokenPoolInfo[](0),
       LOCAL_TOKEN_DECIMALS,
       TokenPoolFactory.PoolType.BURN_MINT,
-      s_tokenInitCode,
-      s_poolInitCode,
+      TOKEN_INIT_CODE,
+      POOL_INIT_CODE,
       address(0),
       FAKE_SALT
     );
@@ -215,7 +215,6 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
   }
 
   function test_deployTokenPoolWithExistingToken_ExistingRemoteToken_AndPredictPool() public {
-
     FactoryBurnMintERC20 newRemoteToken =
       new FactoryBurnMintERC20("TestToken", "TT", 18, type(uint256).max, PREMINT_AMOUNT, OWNER);
 
@@ -250,7 +249,7 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
       remoteChainConfig, // remoteChainConfig
       TokenPoolFactory.PoolType.BURN_MINT, // poolType
       abi.encode(address(newRemoteToken)), // remoteTokenAddress
-      s_tokenInitCode, // remoteTokenInitCode
+      TOKEN_INIT_CODE, // remoteTokenInitCode
       RateLimiter.Config(false, 0, 0) // rateLimiterConfig
     );
 
@@ -260,8 +259,8 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
       remoteTokenPools,
       LOCAL_TOKEN_DECIMALS,
       TokenPoolFactory.PoolType.BURN_MINT,
-      s_tokenInitCode,
-      s_poolInitCode,
+      TOKEN_INIT_CODE,
+      POOL_INIT_CODE,
       address(0),
       FAKE_SALT
     );
@@ -282,7 +281,7 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
       abi.encode(address(newRemoteToken), LOCAL_TOKEN_DECIMALS, address(0), s_rmnProxy, address(s_destRouter));
 
     // Take the init code and concat the destination params to it, the initCode shouldn't change
-    bytes memory predictedPoolInitCode = abi.encodePacked(s_poolInitCode, predictedPoolCreationParams);
+    bytes memory predictedPoolInitCode = abi.encodePacked(POOL_INIT_CODE, predictedPoolCreationParams);
 
     // Predict the address of the pool on the DESTINATION chain
     address predictedPoolAddress =
@@ -302,7 +301,7 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
       LOCAL_TOKEN_DECIMALS,
       TokenPoolFactory.PoolType.BURN_MINT,
       new TokenPoolFactory.RemoteTokenPoolInfo[](0),
-      s_poolInitCode,
+      POOL_INIT_CODE,
       address(0),
       FAKE_SALT
     );
@@ -321,7 +320,6 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
   }
 
   function test_deployTokenAndTokenPool_WithRemoteTokenAndRemotePool() public {
-
     bytes memory RANDOM_TOKEN_ADDRESS = abi.encode(makeAddr("RANDOM_TOKEN"));
     bytes memory RANDOM_POOL_ADDRESS = abi.encode(makeAddr("RANDOM_POOL"));
 
@@ -349,8 +347,8 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
       remoteTokenPools,
       LOCAL_TOKEN_DECIMALS,
       TokenPoolFactory.PoolType.BURN_MINT,
-      s_tokenInitCode,
-      s_poolInitCode,
+      TOKEN_INIT_CODE,
+      POOL_INIT_CODE,
       address(0),
       FAKE_SALT
     );
@@ -405,12 +403,11 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
   }
 
   function test_deployTokenAndTokenPool_LockRelease_AuthorizesPoolForLockBox() public {
-
     (address tokenAddress, address poolAddress) = s_tokenPoolFactory.deployTokenAndTokenPool(
       new TokenPoolFactory.RemoteTokenPoolInfo[](0),
       LOCAL_TOKEN_DECIMALS,
       TokenPoolFactory.PoolType.LOCK_RELEASE,
-      s_tokenInitCode,
+      TOKEN_INIT_CODE,
       LOCK_RELEASE_INIT_CODE,
       address(0),
       FAKE_SALT
@@ -418,8 +415,7 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
 
     // Compute the deployed lockbox address to validate access configuration.
     bytes memory lockBoxCreationCode = abi.encodePacked(type(ERC20LockBox).creationCode, abi.encode(tokenAddress));
-    address predictedLockBox =
-      DYNAMIC_SALT.computeAddress(keccak256(lockBoxCreationCode), address(s_tokenPoolFactory));
+    address predictedLockBox = DYNAMIC_SALT.computeAddress(keccak256(lockBoxCreationCode), address(s_tokenPoolFactory));
 
     // Accept ownership of token/pool and configure rebalancer.
     Ownable2Step(tokenAddress).acceptOwnership();
@@ -473,7 +469,7 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
       remoteChainConfig, // remoteChainConfig
       TokenPoolFactory.PoolType.LOCK_RELEASE, // poolType
       abi.encode(address(newRemoteToken)), // remoteTokenAddress
-      s_tokenInitCode, // remoteTokenInitCode
+      TOKEN_INIT_CODE, // remoteTokenInitCode
       RateLimiter.Config(false, 0, 0)
     );
 
@@ -571,8 +567,8 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
       remoteTokenPools,
       LOCAL_TOKEN_DECIMALS,
       TokenPoolFactory.PoolType.BURN_MINT,
-      s_tokenInitCode,
-      s_poolInitCode,
+      TOKEN_INIT_CODE,
+      POOL_INIT_CODE,
       address(0),
       FAKE_SALT
     );
@@ -604,7 +600,6 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
   }
 
   function test_deployTokenAndTokenPool_RemoteTokenHasDifferentDecimals() public {
-
     // Deploy the "remote" token which has a different decimal value than the local token
     FactoryBurnMintERC20 newRemoteToken =
       new FactoryBurnMintERC20("TestToken", "TT", 6, type(uint256).max, PREMINT_AMOUNT, OWNER);
@@ -640,7 +635,7 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
       remoteChainConfig, // remoteChainConfig
       TokenPoolFactory.PoolType.BURN_MINT, // poolType
       abi.encode(address(newRemoteToken)), // remoteTokenAddress
-      s_tokenInitCode, // remoteTokenInitCode
+      TOKEN_INIT_CODE, // remoteTokenInitCode
       RateLimiter.Config(false, 0, 0) // rateLimiterConfig
     );
 
@@ -650,8 +645,8 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
       remoteTokenPools,
       LOCAL_TOKEN_DECIMALS,
       TokenPoolFactory.PoolType.BURN_MINT,
-      s_tokenInitCode,
-      s_poolInitCode,
+      TOKEN_INIT_CODE,
+      POOL_INIT_CODE,
       address(0),
       FAKE_SALT
     );
@@ -672,7 +667,7 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
       abi.encode(address(newRemoteToken), REMOTE_TOKEN_DECIMALS, address(0), s_rmnProxy, address(s_destRouter));
 
     // Take the init code and concat the destination params to it, the initCode shouldn't change
-    bytes memory predictedPoolInitCode = abi.encodePacked(s_poolInitCode, predictedPoolCreationParams);
+    bytes memory predictedPoolInitCode = abi.encodePacked(POOL_INIT_CODE, predictedPoolCreationParams);
 
     // Predict the address of the pool on the DESTINATION chain
     address predictedPoolAddress =
@@ -692,7 +687,7 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
       REMOTE_TOKEN_DECIMALS,
       TokenPoolFactory.PoolType.BURN_MINT,
       new TokenPoolFactory.RemoteTokenPoolInfo[](0),
-      s_poolInitCode,
+      POOL_INIT_CODE,
       address(0),
       FAKE_SALT
     );
@@ -725,7 +720,7 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
     remoteTokenPools[0] = TokenPoolFactory.RemoteTokenPoolInfo(
       DEST_CHAIN_SELECTOR,
       abi.encode(makeAddr("REMOTE_POOL")),
-      s_poolInitCode,
+      POOL_INIT_CODE,
       TokenPoolFactory.RemoteChainConfig({
         remotePoolFactory: makeAddr("factory"),
         remoteRouter: makeAddr("router"),
@@ -744,8 +739,8 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
       remoteTokenPools,
       LOCAL_TOKEN_DECIMALS,
       TokenPoolFactory.PoolType.BURN_MINT,
-      s_tokenInitCode,
-      s_poolInitCode,
+      TOKEN_INIT_CODE,
+      POOL_INIT_CODE,
       address(0),
       FAKE_SALT
     );
@@ -775,8 +770,8 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
       remoteTokenPools,
       LOCAL_TOKEN_DECIMALS,
       TokenPoolFactory.PoolType.BURN_MINT,
-      s_tokenInitCode,
-      s_poolInitCode,
+      TOKEN_INIT_CODE,
+      POOL_INIT_CODE,
       address(0),
       FAKE_SALT
     );
