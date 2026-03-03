@@ -19,11 +19,7 @@ type RMNRemoteSetEventAuthoritiesSequenceInput struct {
 	Selector  uint64
 }
 
-func (a *SolanaAdapter) SetRMNRemoteEventAuthorities() *cldf_ops.Sequence[RMNRemoteSetEventAuthoritiesSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
-	return SetRMNRemoteEventAuthoritiesConfig
-}
-
-var SetRMNRemoteEventAuthoritiesConfig = cldf_ops.NewSequence(
+var SetRMNRemoteEventAuthorities = cldf_ops.NewSequence(
 	"rmn-remote:set-event-authorities",
 	semver.MustParse("1.6.1"),
 	"Sets event authorities on the RMNRemote 1.6.1 contract",
