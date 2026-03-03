@@ -55,27 +55,32 @@ func (e *ExecCodecProto) EncodeObservation(observation exectypes.Observation) ([
 	return proto.Marshal(pbObs)
 }
 
-func (e *ExecCodecProto) DecodeObservation(data []byte) (exectypes.Observation, error) {
+func (e *ExecCodecProto) DecodeObservation(data []byte) (obs exectypes.Observation, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panic in DecodeObservation: %v", r)
+		}
+	}()
 	if len(data) == 0 {
-		return exectypes.Observation{}, nil
+		return obs, nil
 	}
 
 	pbObs := &ocrtypecodecpb.ExecObservation{}
-	if err := proto.Unmarshal(data, pbObs); err != nil {
-		return exectypes.Observation{}, fmt.Errorf("proto unmarshal ExecObservation: %w", err)
+	if err = proto.Unmarshal(data, pbObs); err != nil {
+		return obs, fmt.Errorf("proto unmarshal ExecObservation: %w", err)
 	}
 
 	return exectypes.Observation{
-		CommitReports: e.tr.commitReportsFromProto(pbObs.CommitReports),
-		Messages:      e.tr.messageObservationsFromProto(pbObs.SeqNumsToMsgs),
-		Hashes:        e.tr.messageHashesFromProto(pbObs.MsgHashes),
-		TokenData:     e.tr.tokenDataObservationsFromProto(pbObs.TokenDataObservations.TokenData),
-		Nonces:        e.tr.nonceObservationsFromProto(pbObs.Nonces),
+		CommitReports: e.tr.commitReportsFromProto(pbObs.GetCommitReports()),
+		Messages:      e.tr.messageObservationsFromProto(pbObs.GetSeqNumsToMsgs()),
+		Hashes:        e.tr.messageHashesFromProto(pbObs.GetMsgHashes()),
+		TokenData:     e.tr.tokenDataObservationsFromProto(pbObs.GetTokenDataObservations().GetTokenData()),
+		Nonces:        e.tr.nonceObservationsFromProto(pbObs.GetNonces()),
 		Contracts: discoverytypes.Observation{
-			FChain:    e.tr.fChainFromProto(pbObs.Contracts.FChain),
-			Addresses: e.tr.discoveryAddressesFromProto(pbObs.Contracts.ContractNames.Addresses),
+			FChain:    e.tr.fChainFromProto(pbObs.GetContracts().GetFChain()),
+			Addresses: e.tr.discoveryAddressesFromProto(pbObs.GetContracts().GetContractNames().GetAddresses()),
 		},
-		FChain: e.tr.fChainFromProto(pbObs.FChain),
+		FChain: e.tr.fChainFromProto(pbObs.GetFChain()),
 	}, nil
 }
 
@@ -117,16 +122,16 @@ func (e *ExecCodecProto) DecodeOutcome(data []byte) (exectypes.Outcome, error) {
 	}
 
 	otcm := exectypes.Outcome{
-		State:         exectypes.PluginState(pbOtcm.PluginState),
-		CommitReports: e.tr.commitDataSliceFromProto(pbOtcm.CommitReports),
-		Reports:       e.tr.execPluginReportsFromProto(pbOtcm.ExecutePluginReports),
+		State:         exectypes.PluginState(pbOtcm.GetPluginState()),
+		CommitReports: e.tr.commitDataSliceFromProto(pbOtcm.GetCommitReports()),
+		Reports:       e.tr.execPluginReportsFromProto(pbOtcm.GetExecutePluginReports()),
 	}
 
 	// Decode the legacy Report field into the new Reports field. This way the plugin layer doesn't
 	// need to worry about type migration.
 	// TODO: Remove temporary migration code after a few releases.
 	if pbOtcm.ExecutePluginReport != nil {
-		otcm.Reports = e.tr.execPluginReportsFromProto([]*ocrtypecodecpb.ExecutePluginReport{pbOtcm.ExecutePluginReport})
+		otcm.Reports = e.tr.execPluginReportsFromProto([]*ocrtypecodecpb.ExecutePluginReport{pbOtcm.GetExecutePluginReport()})
 	}
 
 	// Decode the new report format into the legacy field as an intermediate step for implementing this feature.

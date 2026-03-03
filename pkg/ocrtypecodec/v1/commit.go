@@ -120,44 +120,49 @@ func (c *CommitCodecProto) EncodeObservation(observation committypes.Observation
 	return proto.Marshal(pbObs)
 }
 
-func (c *CommitCodecProto) DecodeObservation(data []byte) (committypes.Observation, error) {
+func (c *CommitCodecProto) DecodeObservation(data []byte) (obs committypes.Observation, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panic in DecodeObservation: %v", r)
+		}
+	}()
 	if len(data) == 0 {
-		return committypes.Observation{}, nil
+		return obs, nil
 	}
 
 	pbObs := &ocrtypecodecpb.CommitObservation{}
 	if err := proto.Unmarshal(data, pbObs); err != nil {
-		return committypes.Observation{}, fmt.Errorf("proto unmarshal observation: %w", err)
+		return obs, fmt.Errorf("proto unmarshal observation: %w", err)
 	}
 
 	return committypes.Observation{
 		MerkleRootObs: merkleroot.Observation{
-			MerkleRoots:        c.tr.merkleRootsFromProto(pbObs.MerkleRootObs.MerkleRoots),
-			RMNEnabledChains:   c.tr.rmnEnabledChainsFromProto(pbObs.MerkleRootObs.RmnEnabledChains),
-			OnRampMaxSeqNums:   c.tr.seqNumChainFromProto(pbObs.MerkleRootObs.OnRampMaxSeqNums),
-			OffRampNextSeqNums: c.tr.seqNumChainFromProto(pbObs.MerkleRootObs.OffRampNextSeqNums),
-			RMNRemoteConfig:    c.tr.rmnRemoteConfigFromProto(pbObs.MerkleRootObs.RmnRemoteConfig),
-			FChain:             c.tr.fChainFromProto(pbObs.MerkleRootObs.FChain),
+			MerkleRoots:        c.tr.merkleRootsFromProto(pbObs.GetMerkleRootObs().GetMerkleRoots()),
+			RMNEnabledChains:   c.tr.rmnEnabledChainsFromProto(pbObs.GetMerkleRootObs().GetRmnEnabledChains()),
+			OnRampMaxSeqNums:   c.tr.seqNumChainFromProto(pbObs.GetMerkleRootObs().GetOnRampMaxSeqNums()),
+			OffRampNextSeqNums: c.tr.seqNumChainFromProto(pbObs.GetMerkleRootObs().GetOffRampNextSeqNums()),
+			RMNRemoteConfig:    c.tr.rmnRemoteConfigFromProto(pbObs.GetMerkleRootObs().GetRmnRemoteConfig()),
+			FChain:             c.tr.fChainFromProto(pbObs.GetMerkleRootObs().GetFChain()),
 		},
 		TokenPriceObs: tokenprice.Observation{
-			FeedTokenPrices:       c.tr.feedTokenPricesFromProto(pbObs.TokenPriceObs.FeedTokenPrices),
-			FeeQuoterTokenUpdates: c.tr.feeQuoterTokenUpdatesFromProto(pbObs.TokenPriceObs.FeeQuoterTokenUpdates),
-			FChain:                c.tr.fChainFromProto(pbObs.TokenPriceObs.FChain),
-			Timestamp:             pbObs.TokenPriceObs.Timestamp.AsTime(),
+			FeedTokenPrices:       c.tr.feedTokenPricesFromProto(pbObs.GetTokenPriceObs().GetFeedTokenPrices()),
+			FeeQuoterTokenUpdates: c.tr.feeQuoterTokenUpdatesFromProto(pbObs.GetTokenPriceObs().GetFeeQuoterTokenUpdates()),
+			FChain:                c.tr.fChainFromProto(pbObs.GetTokenPriceObs().GetFChain()),
+			Timestamp:             pbObs.GetTokenPriceObs().GetTimestamp().AsTime(),
 		},
 		ChainFeeObs: chainfee.Observation{
-			FeeComponents:     c.tr.feeComponentsFromProto(pbObs.ChainFeeObs.FeeComponents),
-			NativeTokenPrices: c.tr.nativeTokenPricesFromProto(pbObs.ChainFeeObs.NativeTokenPrices),
-			ChainFeeUpdates:   c.tr.chainFeeUpdatesFromProto(pbObs.ChainFeeObs.ChainFeeUpdates),
-			FChain:            c.tr.fChainFromProto(pbObs.ChainFeeObs.FChain),
-			TimestampNow:      pbObs.ChainFeeObs.TimestampNow.AsTime(),
+			FeeComponents:     c.tr.feeComponentsFromProto(pbObs.GetChainFeeObs().GetFeeComponents()),
+			NativeTokenPrices: c.tr.nativeTokenPricesFromProto(pbObs.GetChainFeeObs().GetNativeTokenPrices()),
+			ChainFeeUpdates:   c.tr.chainFeeUpdatesFromProto(pbObs.GetChainFeeObs().GetChainFeeUpdates()),
+			FChain:            c.tr.fChainFromProto(pbObs.GetChainFeeObs().GetFChain()),
+			TimestampNow:      pbObs.GetChainFeeObs().GetTimestampNow().AsTime(),
 		},
 		DiscoveryObs: discoverytypes.Observation{
-			FChain:    c.tr.fChainFromProto(pbObs.DiscoveryObs.FChain),
-			Addresses: c.tr.discoveryAddressesFromProto(pbObs.DiscoveryObs.ContractNames.Addresses),
+			FChain:    c.tr.fChainFromProto(pbObs.GetDiscoveryObs().GetFChain()),
+			Addresses: c.tr.discoveryAddressesFromProto(pbObs.GetDiscoveryObs().GetContractNames().GetAddresses()),
 		},
-		FChain:                c.tr.fChainFromProto(pbObs.FChain),
-		OnChainPriceOcrSeqNum: pbObs.OnchainPriceOcrSeqNum,
+		FChain:                c.tr.fChainFromProto(pbObs.GetFChain()),
+		OnChainPriceOcrSeqNum: pbObs.GetOnchainPriceOcrSeqNum(),
 	}, nil
 }
 
@@ -200,24 +205,24 @@ func (c *CommitCodecProto) DecodeOutcome(data []byte) (committypes.Outcome, erro
 
 	return committypes.Outcome{
 		MerkleRootOutcome: merkleroot.Outcome{
-			OutcomeType:                     merkleroot.OutcomeType(pbOutcome.MerkleRootOutcome.OutcomeType),
-			RangesSelectedForReport:         c.tr.chainRangeFromProto(pbOutcome.MerkleRootOutcome.RangesSelectedForReport),
-			RootsToReport:                   c.tr.merkleRootsFromProto(pbOutcome.MerkleRootOutcome.RootsToReport),
-			RMNEnabledChains:                c.tr.rmnEnabledChainsFromProto(pbOutcome.MerkleRootOutcome.RmnEnabledChains),
-			OffRampNextSeqNums:              c.tr.seqNumChainFromProto(pbOutcome.MerkleRootOutcome.OffRampNextSeqNums),
-			ReportTransmissionCheckAttempts: uint(pbOutcome.MerkleRootOutcome.ReportTransmissionCheckAttempts),
-			RMNReportSignatures:             c.tr.ccipRmnSignaturesFromProto(pbOutcome.MerkleRootOutcome.RmnReportSignatures),
-			RMNRemoteCfg:                    c.tr.rmnRemoteConfigFromProto(pbOutcome.MerkleRootOutcome.RmnRemoteCfg),
+			OutcomeType:                     merkleroot.OutcomeType(pbOutcome.GetMerkleRootOutcome().GetOutcomeType()),
+			RangesSelectedForReport:         c.tr.chainRangeFromProto(pbOutcome.GetMerkleRootOutcome().GetRangesSelectedForReport()),
+			RootsToReport:                   c.tr.merkleRootsFromProto(pbOutcome.GetMerkleRootOutcome().GetRootsToReport()),
+			RMNEnabledChains:                c.tr.rmnEnabledChainsFromProto(pbOutcome.GetMerkleRootOutcome().GetRmnEnabledChains()),
+			OffRampNextSeqNums:              c.tr.seqNumChainFromProto(pbOutcome.GetMerkleRootOutcome().GetOffRampNextSeqNums()),
+			ReportTransmissionCheckAttempts: uint(pbOutcome.GetMerkleRootOutcome().GetReportTransmissionCheckAttempts()),
+			RMNReportSignatures:             c.tr.ccipRmnSignaturesFromProto(pbOutcome.GetMerkleRootOutcome().GetRmnReportSignatures()),
+			RMNRemoteCfg:                    c.tr.rmnRemoteConfigFromProto(pbOutcome.GetMerkleRootOutcome().GetRmnRemoteCfg()),
 		},
 		TokenPriceOutcome: tokenprice.Outcome{
-			TokenPrices: c.tr.feedTokenPricesFromProto(pbOutcome.TokenPriceOutcome.TokenPrices),
+			TokenPrices: c.tr.feedTokenPricesFromProto(pbOutcome.GetTokenPriceOutcome().GetTokenPrices()),
 		},
 		ChainFeeOutcome: chainfee.Outcome{
-			GasPrices: c.tr.gasPriceChainFromProto(pbOutcome.ChainFeeOutcome.GasPrices),
+			GasPrices: c.tr.gasPriceChainFromProto(pbOutcome.GetChainFeeOutcome().GetGasPrices()),
 		},
 		MainOutcome: committypes.MainOutcome{
-			InflightPriceOcrSequenceNumber: cciptypes.SeqNum(pbOutcome.MainOutcome.InflightPriceOcrSequenceNumber),
-			RemainingPriceChecks:           int(pbOutcome.MainOutcome.RemainingPriceChecks),
+			InflightPriceOcrSequenceNumber: cciptypes.SeqNum(pbOutcome.GetMainOutcome().GetInflightPriceOcrSequenceNumber()),
+			RemainingPriceChecks:           int(pbOutcome.GetMainOutcome().GetRemainingPriceChecks()),
 		},
 	}, nil
 }
