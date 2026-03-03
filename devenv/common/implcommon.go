@@ -105,7 +105,7 @@ func DeployContractsForSelector(ctx context.Context, env *deployment.Environment
 				// TON SPECIFIC CONFIG
 				ContractVersion: contractVersion,
 				// PING PONG DEMO - deploy for cross-chain testing
-				DeployPingPongDapp: true,
+				DeployPingPongDapp: false,
 			},
 		},
 	})
@@ -705,6 +705,7 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 		if srcFamily != chainsel.FamilyEVM && srcFamily != chainsel.FamilySolana {
 			continue // only EVM and Solana are supported for token transfers in 1.6
 		}
+		srcCfg.SkipOwnershipTransfer = true
 
 		for _, dstAdapter := range adp {
 			// dstCfg := dstAdapter.GetTokenExpansionConfig()

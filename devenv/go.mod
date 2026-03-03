@@ -3,7 +3,9 @@ module github.com/smartcontractkit/chainlink-ccip/devenv
 go 1.25.5
 
 replace (
-	// github.com/smartcontractkit/chainlink-ccip => ..
+	github.com/smartcontractkit/chainlink-ccip => ..
+	github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm => ../ccv/chains/evm
+	github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment => ../ccv/chains/evm/deployment
 	github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment => ../chains/evm/deployment
 	github.com/smartcontractkit/chainlink-ccip/chains/solana => ../chains/solana
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment => ../chains/solana/deployment
@@ -34,7 +36,7 @@ require (
 	github.com/rs/zerolog v1.34.0
 	github.com/smartcontractkit/chain-selectors v1.0.97
 	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20260302030253-ab9f38d01a0c
-	github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment v0.0.0-00010101000000-000000000000
+	github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment v0.0.0-20260302030253-ab9f38d01a0c
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20260121163256-85accaf3d28d
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment v0.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20251014191100-bad58388f0c9
@@ -43,7 +45,7 @@ require (
 	github.com/smartcontractkit/chainlink-deployments-framework v0.80.2
 	github.com/smartcontractkit/chainlink-evm v0.3.3 // indirect
 	github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20260119171452-39c98c3b33cd
-	github.com/smartcontractkit/chainlink-testing-framework/framework v0.14.0
+	github.com/smartcontractkit/chainlink-testing-framework/framework v0.14.1-0.20260212100725-fbd6b3bca4d1
 	github.com/smartcontractkit/chainlink-testing-framework/wasp v1.51.2
 	github.com/smartcontractkit/libocr v0.0.0-20250912173940-f3ab0246e23d
 	github.com/smartcontractkit/mcms v0.36.0
@@ -57,9 +59,8 @@ require (
 
 require (
 	github.com/aws/smithy-go v1.24.0
-	github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm v0.0.0-20260116092715-df6a64d4bf00
-// github.com/smartcontractkit/chainlink-ton/deployment v0.0.0-20260127214148-d1bc1a4821a9
-// github.com/smartcontractkit/chainlink-ton/devenv v0.0.0-20260127214148-d1bc1a4821a9
+	github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm v0.0.0-20260302030253-ab9f38d01a0c
+	github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment v0.0.0-20260226145156-268e85cc5bf7
 )
 
 require (
@@ -419,19 +420,19 @@ require (
 	go.uber.org/ratelimit v0.3.1 // indirect
 	go4.org/netipx v0.0.0-20230125063823-8449b0a6169f // indirect
 	golang.org/x/arch v0.21.0 // indirect
-	golang.org/x/exp v0.0.0-20250711185948-6ae5c78190dc // indirect
-	golang.org/x/mod v0.31.0 // indirect
-	golang.org/x/net v0.48.0 // indirect
+	golang.org/x/exp v0.0.0-20260112195511-716be5621a96 // indirect
+	golang.org/x/mod v0.32.0 // indirect
+	golang.org/x/net v0.49.0 // indirect
 	golang.org/x/oauth2 v0.32.0 // indirect
 	golang.org/x/sys v0.40.0 // indirect
 	golang.org/x/term v0.39.0 // indirect
 	golang.org/x/text v0.33.0 // indirect
-	golang.org/x/time v0.12.0 // indirect
-	golang.org/x/tools v0.40.0 // indirect
+	golang.org/x/time v0.14.0 // indirect
+	golang.org/x/tools v0.41.0 // indirect
 	google.golang.org/api v0.221.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260114163908-3f89685c29c3 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20251222181119-0a764e51fe1b // indirect
-	google.golang.org/grpc v1.77.0 // indirect
+	google.golang.org/grpc v1.78.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
 	gopkg.in/guregu/null.v4 v4.0.0 // indirect

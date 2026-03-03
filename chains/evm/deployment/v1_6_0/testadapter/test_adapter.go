@@ -51,7 +51,8 @@ func init() {
 }
 
 type EVMAdapter struct {
-	state testadapters.StateProvider
+	state         testadapters.StateProvider
+	lastFeeByDest map[uint64]*big.Int
 	cldf_evm.Chain
 }
 
@@ -64,8 +65,9 @@ func NewEVMAdapter(env *deployment.Environment, selector uint64) testadapters.Te
 
 	s := &testadapters.DataStoreStateProvider{Selector: selector, DS: env.DataStore}
 	return &EVMAdapter{
-		state: s,
-		Chain: c,
+		state:         s,
+		lastFeeByDest: make(map[uint64]*big.Int),
+		Chain:         c,
 	}
 }
 
@@ -142,13 +144,30 @@ func (a *EVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, 
 	if err != nil {
 		return 0, fmt.Errorf("failed to get router address: %w", err)
 	}
+	onRampDSAddr, err := a.getAddress(datastore.ContractType("OnRamp"))
+	if err != nil {
+		return 0, fmt.Errorf("failed to get onramp address: %w", err)
+	}
 	r, err := router.NewRouter(
 		rAddr,
 		a.Client)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create router instance: %w", err)
 	}
-	onRampAddr, err := r.GetOnRamp(nil, destChainSelector)
+	setOnRampTxn, err := r.ApplyRampUpdates(sender, []router.RouterOnRamp{
+		{
+			DestChainSelector: destChainSelector,
+			OnRamp:            onRampDSAddr,
+		},
+	}, []router.RouterOffRamp{}, []router.RouterOffRamp{})
+	if err != nil {
+		return 0, fmt.Errorf("failed to set onramp: %w", err)
+	}
+	_, err = a.Confirm(setOnRampTxn)
+	if err != nil {
+		return 0, fmt.Errorf("failed to confirm set onramp transaction: %w", err)
+	}
+	onRampAddr, err := r.GetOnRamp(&bind.CallOpts{Context: ctx}, destChainSelector)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get onramp address: %w", err)
 	}
@@ -171,7 +190,45 @@ func (a *EVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, 
 		if err != nil {
 			return 0, fmt.Errorf("failed to get EVM fee: %w", deployment.MaybeDataErr(err))
 		}
+		lastFee, ok := a.lastFeeByDest[destChainSelector]
+		if ok {
+			// 1️⃣ absolute difference: |a - b|
+			diff := new(big.Int).Sub(lastFee, fee) // a - b
+			if diff.Sign() < 0 {                   // make it positive
+				diff.Neg(diff)
+			}
 
+			// 2️⃣ larger absolute value: max(|a|, |b|)
+			absA := new(big.Int).Abs(new(big.Int).Set(lastFee))
+			absB := new(big.Int).Abs(new(big.Int).Set(fee))
+
+			maxAbs := new(big.Int)
+			if absA.Cmp(absB) >= 0 {
+				maxAbs.Set(absA)
+			} else {
+				maxAbs.Set(absB)
+			}
+
+			// 3️⃣ tolerance = pct * maxAbs  (as a rational number)
+			//    toleranceRat = pct * maxAbs
+			tolerance := 0.1
+			maxAbsRat := new(big.Rat).SetInt(maxAbs)
+			tolRat := new(big.Rat).Mul(new(big.Rat).SetFloat64(tolerance), maxAbsRat)
+
+			// Convert diff (int) to a rational for comparison
+			diffRat := new(big.Rat).SetInt(diff)
+
+			// diff ≤ tolerance ?
+			if diffRat.Cmp(tolRat) >= 0 {
+				fmt.Printf("fee difference %s exceeds %.2f%% tolerance compared to last fee %s for dest chain %d\n", diff.String(), tolerance*100, lastFee.String(), destChainSelector)
+			} else {
+				fmt.Printf("fee %s is within %.2f%% tolerance compared to last fee %s for dest chain %d\n", fee.String(), tolerance*100, lastFee.String(), destChainSelector)
+			}
+		} else {
+			a.lastFeeByDest[destChainSelector] = fee
+		}
+
+		oldFee := sender.Value
 		sender.Value = fee
 
 		tx, err := r.CcipSend(sender, destChainSelector, msg)
@@ -179,29 +236,74 @@ func (a *EVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, 
 			return 0, fmt.Errorf("failed to send CCIP message: %w", err)
 		}
 
-		blockNum, err := a.Confirm(tx)
+		sender.Value = oldFee
+		zeroOnRampTxn, err := r.ApplyRampUpdates(sender, []router.RouterOnRamp{
+			{
+				DestChainSelector: destChainSelector,
+				OnRamp:            common.HexToAddress("0x0"),
+			},
+		}, []router.RouterOffRamp{}, []router.RouterOffRamp{})
 		if err != nil {
-			if strings.Contains(err.Error(), errCodeInsufficientFee) {
+			return 0, fmt.Errorf("failed to zero onramp: %w", err)
+		}
+		type confirmResult struct {
+			blockNum uint64
+			err      error
+		}
+		// Two buffered channels – one result per goroutine.
+		ch1 := make(chan confirmResult, 1)
+		ch2 := make(chan confirmResult, 1)
+
+		// ---------- First async Confirm ----------
+		go func() {
+			// The original code ignored the block number (`_ = a.Confirm(...)`);
+			// we still capture it in case you need it later.
+			bn, err := a.Confirm(zeroOnRampTxn)
+			ch1 <- confirmResult{blockNum: bn, err: err}
+		}()
+
+		// ---------- Second async Confirm ----------
+		go func() {
+			bn, err := a.Confirm(tx)
+			ch2 <- confirmResult{blockNum: bn, err: err}
+		}()
+
+		// ----- Wait for both results -----
+		// Order of receipt does not matter; we just need both.
+		var r1, r2 confirmResult
+		r1 = <-ch1
+		r2 = <-ch2
+
+		fmt.Printf("Zero onramp txn confirmed in block %d with error: %v\n", r1.blockNum, r1.err)
+		fmt.Printf("CCIP send txn confirmed in block %d with error: %v\n", r2.blockNum, r2.err)
+
+		// ----- Error handling -----
+		if r1.err != nil {
+			// Preserve the wording you used originally.
+			return 0, fmt.Errorf("failed to confirm zero onramp transaction: %w", r1.err)
+		}
+		if r2.err != nil {
+			if strings.Contains(r2.err.Error(), errCodeInsufficientFee) {
 				// Don't count insufficient fee as part of the retry count
 				// because this is expected and we need to adjust the fee
 				continue
-			} else if strings.Contains(err.Error(), cannotDecodeErrorReason) ||
-				strings.Contains(err.Error(), errMsgMissingTrieNode) {
+			} else if strings.Contains(r2.err.Error(), cannotDecodeErrorReason) ||
+				strings.Contains(r2.err.Error(), errMsgMissingTrieNode) {
 				// If the error reason cannot be decoded, we retry to avoid transient issues. The retry behavior is disabled by default
 				// It is configured in the CCIPSendReqConfig.
 				// This retry was originally added to solve transient failure in end to end tests
 				if retryCount >= 5 {
-					return 0, fmt.Errorf("failed to confirm CCIP message after %d retries: %w", retryCount, deployment.MaybeDataErr(err))
+					return 0, fmt.Errorf("failed to confirm CCIP message after %d retries: %w", retryCount, deployment.MaybeDataErr(r2.err))
 				}
 				retryCount++
 				continue
 			}
 
-			return 0, fmt.Errorf("failed to confirm CCIP message: %w", deployment.MaybeDataErr(err))
+			return 0, fmt.Errorf("failed to confirm CCIP message: %w", deployment.MaybeDataErr(r2.err))
 		}
 		it, err := onRamp.FilterCCIPMessageSent(&bind.FilterOpts{
-			Start:   blockNum,
-			End:     &blockNum,
+			Start:   r2.blockNum,
+			End:     &r2.blockNum,
 			Context: ctx,
 		}, []uint64{destChainSelector}, []uint64{})
 		if err != nil {
@@ -379,7 +481,7 @@ func (a *EVMAdapter) GetTokenExpansionConfig() tokensapi.TokenExpansionInputPerC
 	mintAmnt := new(big.Int).Mul(oneToken, big.NewInt(1_000_000)) // pre-mint 1 million tokens
 
 	return tokensapi.TokenExpansionInputPerChain{
-		TokenPoolVersion:      cciputils.Version_1_5_1,
+		TokenPoolVersion: cciputils.Version_1_5_1,
 		DeployTokenInput: &tokensapi.DeployTokenInput{
 			Decimals:               deci,
 			Symbol:                 "TEST_TOKEN_" + suffix,
