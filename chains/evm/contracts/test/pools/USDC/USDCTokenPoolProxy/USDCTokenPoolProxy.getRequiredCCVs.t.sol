@@ -54,19 +54,21 @@ contract USDCTokenPoolProxy_getRequiredCCVs is USDCTokenPoolProxySetup {
     assertEq(requiredCCVs[0], address(0));
   }
 
-  function test_getRequiredCCVs_Inbound_MsgTagOverridesConfig_CCVTagWithV1Config() public {
+  /// @notice Inbound routing uses the message tag, not the outbound config. Config=CCTP_V2, msg=CCV -> cctpVerifier.
+  function test_getRequiredCCVs_Inbound_MsgTagOverridesConfig_CCVTagWithV2Config() public {
+    // Reconfigure to CCTP_V2 (non-CCV mechanism).
     uint64[] memory chainSelectors = new uint64[](1);
     chainSelectors[0] = s_remoteCCTPChainSelector;
     USDCTokenPoolProxy.LockOrBurnMechanism[] memory mechanisms = new USDCTokenPoolProxy.LockOrBurnMechanism[](1);
-    mechanisms[0] = USDCTokenPoolProxy.LockOrBurnMechanism.CCTP_V1;
+    mechanisms[0] = USDCTokenPoolProxy.LockOrBurnMechanism.CCTP_V2;
     s_usdcTokenPoolProxy.updateLockOrBurnMechanisms(chainSelectors, mechanisms);
 
     assertEq(
       uint8(s_usdcTokenPoolProxy.getLockOrBurnMechanism(s_remoteCCTPChainSelector)),
-      uint8(USDCTokenPoolProxy.LockOrBurnMechanism.LOCK_RELEASE)
+      uint8(USDCTokenPoolProxy.LockOrBurnMechanism.CCTP_V2)
     );
 
-    // Inbound message tagged as CCV should return the CCTP verifier, ignoring the V1 config.
+    // Inbound message tagged as CCV should return the CCTP verifier, ignoring the CCTP_V2 config.
     address[] memory requiredCCVs = s_usdcTokenPoolProxy.getRequiredCCVs(
       address(0),
       s_remoteCCTPChainSelector,

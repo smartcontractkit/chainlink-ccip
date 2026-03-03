@@ -11,11 +11,11 @@ interface IPoolV2 is IERC165 {
   struct TokenTransferFeeConfig {
     uint32 destGasOverhead; // ───────────────────────╮ Gas charged to execute the token transfer on the destination chain.
     uint32 destBytesOverhead; //                      │ Data availability bytes.
-    uint32 defaultBlockConfirmationsFeeUSDCents; //    │ Fee to charge for token transfer with default block confirmations, multiples of 0.01 USD.
-    uint32 customBlockConfirmationsFeeUSDCents; //     │ Fee to charge for token transfer with custom block confirmations, multiples of 0.01 USD.
+    uint32 defaultBlockConfirmationsFeeUSDCents; //   │ Fee to charge for token transfer with default block confirmations, multiples of 0.01 USD.
+    uint32 customBlockConfirmationsFeeUSDCents; //    │ Fee to charge for token transfer with custom block confirmations, multiples of 0.01 USD.
     //                                                │ The following two fee is deducted from the transferred asset, not added on top.
-    uint16 defaultBlockConfirmationsTransferFeeBps; // │ Fee in basis points for default finality transfers [0-10_000].
-    uint16 customBlockConfirmationsTransferFeeBps; //  │ Fee in basis points for custom finality transfers [0-10_000].
+    uint16 defaultBlockConfirmationsTransferFeeBps; //│ Fee in basis points for default finality transfers [0-10_000].
+    uint16 customBlockConfirmationsTransferFeeBps; // │ Fee in basis points for custom finality transfers [0-10_000].
     bool isEnabled; // ───────────────────────────────╯ Whether this config is enabled.
   }
 
