@@ -486,7 +486,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
     uint64 remoteChainSelector
   ) external view returns (bytes memory) {
     (address pool,) = _getPoolForMechanism(remoteChainSelector);
-
+    // The non-v2 pools also support getRemoteToken, even though it wasn't on the interface.
     return IPoolV2(pool).getRemoteToken(remoteChainSelector);
   }
 
