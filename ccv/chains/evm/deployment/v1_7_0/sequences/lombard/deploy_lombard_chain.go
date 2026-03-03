@@ -53,6 +53,12 @@ var DeployLombardChain = cldf_ops.NewSequence(
 		if !ok {
 			return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found", input.ChainSelector)
 		}
+		existingAddressesOnChain := make([]datastore.AddressRef, 0, len(existingAddresses))
+		for _, ref := range existingAddresses {
+			if ref.ChainSelector == chain.Selector {
+				existingAddressesOnChain = append(existingAddressesOnChain, ref)
+			}
+		}
 
 		tokenAddress := common.HexToAddress(input.Token)
 		localAdapterAddress := common.Address{}
@@ -93,7 +99,7 @@ var DeployLombardChain = cldf_ops.NewSequence(
 				},
 				RMN: rmnAddress,
 			},
-		}, existingAddresses)
+		}, existingAddressesOnChain)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy LombardVerifier: %w", err)
 		}
@@ -181,7 +187,7 @@ var DeployLombardChain = cldf_ops.NewSequence(
 				Allowlist:                        []common.Address{}, // Empty allowlist
 				ThresholdAmountForAdditionalCCVs: big.NewInt(0),
 			},
-		}, existingAddresses)
+		}, existingAddressesOnChain)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy AdvancedPoolHooks: %w", err)
 		}
@@ -203,7 +209,7 @@ var DeployLombardChain = cldf_ops.NewSequence(
 				Router:            routerAddress,
 				FallbackDecimals:  fallbackDecimals,
 			},
-		}, existingAddresses)
+		}, existingAddressesOnChain)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy LombardTokenPool: %w", err)
 		}
