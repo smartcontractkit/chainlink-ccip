@@ -24,6 +24,7 @@ contract TokenPoolFactory is ITypeAndVersion {
 
   error InvalidZeroAddress();
   error InvalidLockBoxToken(address poolToken);
+  error EmptyInitCode();
 
   /// @notice The type of pool to deploy. Types may be expanded in future versions.
   enum PoolType {
@@ -268,6 +269,7 @@ contract TokenPoolFactory is ITypeAndVersion {
     // If the user provides an empty byte string, indicated no token has already been deployed,
     // then the address of the token needs to be predicted. Otherwise the address provided will be used.
     if (remoteTokenPool.remoteTokenAddress.length == 0) {
+      if (remoteTokenPool.remoteTokenInitCode.length == 0) revert EmptyInitCode();
       // The user must provide the initCode for the remote token, so its address can be predicted correctly. It's
       // provided in the remoteTokenInitCode field for the remoteTokenPool.
       remoteTokenPool.remoteTokenAddress = abi.encode(
@@ -288,6 +290,7 @@ contract TokenPoolFactory is ITypeAndVersion {
     // If the user provides an empty byte string parameter, indicating the pool has not been deployed yet,
     // the address of the pool should be predicted. Otherwise use the provided address.
     if (remoteTokenPool.remotePoolAddress.length == 0) {
+      if (remoteTokenPool.remotePoolInitCode.length == 0) revert EmptyInitCode();
       // Address is predicted based on the init code hash and the deployer, so the hash must first be computed
       // using the initCode and a concatenated set of constructor parameters.
       bytes32 remotePoolInitcodeHash = _generatePoolInitcodeHash(
