@@ -35,6 +35,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
   error CallerIsNotARampOnRouter(address caller);
   error TokenPoolUnsupported(address pool);
   error MustSetPoolForMechanism(uint64 remoteChainSelector, LockOrBurnMechanism mechanism);
+  error PoolAddressCannotBeSelf();
 
   event LockOrBurnMechanismUpdated(uint64 indexed remoteChainSelector, LockOrBurnMechanism mechanism);
   event PoolAddressesUpdated(PoolAddresses pools);
@@ -315,6 +316,14 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
         && !pools.siloedLockReleasePool.supportsInterface(type(IPoolV2).interfaceId)
     ) {
       revert TokenPoolUnsupported(pools.siloedLockReleasePool);
+    }
+
+    // Disallow setting address(this) as a pool address.
+    if (
+      pools.cctpV1Pool == address(this) || pools.cctpV2Pool == address(this) || pools.cctpV2PoolWithCCV == address(this)
+        || pools.siloedLockReleasePool == address(this)
+    ) {
+      revert PoolAddressCannotBeSelf();
     }
 
     s_cctpV1Pool = pools.cctpV1Pool;
