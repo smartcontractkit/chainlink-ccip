@@ -82,7 +82,7 @@ type OutputConfig struct {
 type ContractConfig struct {
 	Name         string           `yaml:"contract_name"`
 	Version      string           `yaml:"version"`
-	VersionPath  string           `yaml:"version_path,omitempty"` // Optional: override folder path derived from version
+	VersionPath  string           `yaml:"version_path,omitempty"`  // Optional: override folder path derived from version
 	PackageName  string           `yaml:"package_name,omitempty"`  // Optional: override package name
 	ABIFile      string           `yaml:"abi_file,omitempty"`      // Optional: override ABI file name
 	NoDeployment bool             `yaml:"no_deployment,omitempty"` // Optional: skip bytecode and deploy operation
