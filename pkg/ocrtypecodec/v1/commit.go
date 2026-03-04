@@ -205,14 +205,20 @@ func (c *CommitCodecProto) DecodeOutcome(data []byte) (committypes.Outcome, erro
 
 	return committypes.Outcome{
 		MerkleRootOutcome: merkleroot.Outcome{
-			OutcomeType:                     merkleroot.OutcomeType(pbOutcome.GetMerkleRootOutcome().GetOutcomeType()),
-			RangesSelectedForReport:         c.tr.chainRangeFromProto(pbOutcome.GetMerkleRootOutcome().GetRangesSelectedForReport()),
-			RootsToReport:                   c.tr.merkleRootsFromProto(pbOutcome.GetMerkleRootOutcome().GetRootsToReport()),
-			RMNEnabledChains:                c.tr.rmnEnabledChainsFromProto(pbOutcome.GetMerkleRootOutcome().GetRmnEnabledChains()),
+			OutcomeType: merkleroot.OutcomeType(pbOutcome.GetMerkleRootOutcome().GetOutcomeType()),
+			RangesSelectedForReport: c.tr.chainRangeFromProto(
+				pbOutcome.GetMerkleRootOutcome().GetRangesSelectedForReport(),
+			),
+			RootsToReport: c.tr.merkleRootsFromProto(pbOutcome.GetMerkleRootOutcome().GetRootsToReport()),
+			RMNEnabledChains: c.tr.rmnEnabledChainsFromProto(
+				pbOutcome.GetMerkleRootOutcome().GetRmnEnabledChains(),
+			),
 			OffRampNextSeqNums:              c.tr.seqNumChainFromProto(pbOutcome.GetMerkleRootOutcome().GetOffRampNextSeqNums()),
 			ReportTransmissionCheckAttempts: uint(pbOutcome.GetMerkleRootOutcome().GetReportTransmissionCheckAttempts()),
-			RMNReportSignatures:             c.tr.ccipRmnSignaturesFromProto(pbOutcome.GetMerkleRootOutcome().GetRmnReportSignatures()),
-			RMNRemoteCfg:                    c.tr.rmnRemoteConfigFromProto(pbOutcome.GetMerkleRootOutcome().GetRmnRemoteCfg()),
+			RMNReportSignatures: c.tr.ccipRmnSignaturesFromProto(
+				pbOutcome.GetMerkleRootOutcome().GetRmnReportSignatures(),
+			),
+			RMNRemoteCfg: c.tr.rmnRemoteConfigFromProto(pbOutcome.GetMerkleRootOutcome().GetRmnRemoteCfg()),
 		},
 		TokenPriceOutcome: tokenprice.Outcome{
 			TokenPrices: c.tr.feedTokenPricesFromProto(pbOutcome.GetTokenPriceOutcome().GetTokenPrices()),
