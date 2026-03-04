@@ -124,25 +124,6 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 			customFinalityInboundRateLimiterConfig = *importedDefaultInbound
 		}
 
-		// Update token transfer fee configuration for the remote chain.
-		tokenTransferFeeConfigUpdates, err := makeTokenTransferFeeConfigUpdates(b, chain, input, input.RemoteChainSelector)
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to make token transfer fee config updates: %w", err)
-		}
-		if len(tokenTransferFeeConfigUpdates) > 0 {
-			applyTokenTransferFeeConfigUpdatesReport, err := cldf_ops.ExecuteOperation(b, token_pool.ApplyTokenTransferFeeConfigUpdates, chain, evm_contract.FunctionInput[token_pool.TokenTransferFeeConfigArgs]{
-				ChainSelector: input.ChainSelector,
-				Address:       input.TokenPoolAddress,
-				Args: token_pool.TokenTransferFeeConfigArgs{
-					TokenTransferFeeConfigUpdates: tokenTransferFeeConfigUpdates,
-				},
-			})
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to apply token transfer fee config updates: %w", err)
-			}
-			writes = append(writes, applyTokenTransferFeeConfigUpdatesReport.Output)
-		}
-
 		// Set CCVs for the remote chain (idempotent: only apply when on-chain differs from desired)
 		if input.AdvancedPoolHooks != (common.Address{}) {
 			ccvArg, needCCVUpdate, err := makeCCVUpdates(b, chain, input.ChainSelector, input.AdvancedPoolHooks, input.RemoteChainSelector,
@@ -275,6 +256,25 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 					writes = append(writes, addRemotePoolsReport.Output)
 				}
 
+				// Update token transfer fee configuration (after remote chain config so chain exists on pool).
+				tokenTransferFeeConfigUpdates, err := makeTokenTransferFeeConfigUpdates(b, chain, input, input.RemoteChainSelector)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to make token transfer fee config updates: %w", err)
+				}
+				if len(tokenTransferFeeConfigUpdates) > 0 {
+					applyTokenTransferFeeConfigUpdatesReport, err := cldf_ops.ExecuteOperation(b, token_pool.ApplyTokenTransferFeeConfigUpdates, chain, evm_contract.FunctionInput[token_pool.TokenTransferFeeConfigArgs]{
+						ChainSelector: input.ChainSelector,
+						Address:       input.TokenPoolAddress,
+						Args: token_pool.TokenTransferFeeConfigArgs{
+							TokenTransferFeeConfigUpdates: tokenTransferFeeConfigUpdates,
+						},
+					})
+					if err != nil {
+						return sequences.OnChainOutput{}, fmt.Errorf("failed to apply token transfer fee config updates: %w", err)
+					}
+					writes = append(writes, applyTokenTransferFeeConfigUpdatesReport.Output)
+				}
+
 				// Return early as no further action is required
 				batchOp, err := evm_contract.NewBatchOperationFromWrites(writes)
 				if err != nil {
@@ -334,6 +334,25 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 		}
 		if customFinalityRateLimitersReport != nil {
 			writes = append(writes, *customFinalityRateLimitersReport)
+		}
+
+		// Update token transfer fee configuration (after applyChainUpdates so chain exists on pool).
+		tokenTransferFeeConfigUpdates, err := makeTokenTransferFeeConfigUpdates(b, chain, input, input.RemoteChainSelector)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to make token transfer fee config updates: %w", err)
+		}
+		if len(tokenTransferFeeConfigUpdates) > 0 {
+			applyTokenTransferFeeConfigUpdatesReport, err := cldf_ops.ExecuteOperation(b, token_pool.ApplyTokenTransferFeeConfigUpdates, chain, evm_contract.FunctionInput[token_pool.TokenTransferFeeConfigArgs]{
+				ChainSelector: input.ChainSelector,
+				Address:       input.TokenPoolAddress,
+				Args: token_pool.TokenTransferFeeConfigArgs{
+					TokenTransferFeeConfigUpdates: tokenTransferFeeConfigUpdates,
+				},
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to apply token transfer fee config updates: %w", err)
+			}
+			writes = append(writes, applyTokenTransferFeeConfigUpdatesReport.Output)
 		}
 
 		batchOp, err := evm_contract.NewBatchOperationFromWrites(writes)

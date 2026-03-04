@@ -55,7 +55,7 @@ var SetPath = contract.NewWrite(contract.WriteParams[SetPathArgs, *lombard_token
 	IsAllowedCaller: contract.OnlyOwner[*lombard_token_pool.LombardTokenPool, SetPathArgs],
 	Validate:        func(SetPathArgs) error { return nil },
 	CallContract: func(pool *lombard_token_pool.LombardTokenPool, opts *bind.TransactOpts, args SetPathArgs) (*types.Transaction, error) {
-		return pool.SetPath(opts, args.RemoteChainSelector, args.LChainID, args.AllowedCaller, args.RemoteAdapter)
+		return pool.SetPath(opts, args.RemoteChainSelector, args.LChainID, args.AllowedCaller[:], args.RemoteAdapter)
 	},
 })
 
