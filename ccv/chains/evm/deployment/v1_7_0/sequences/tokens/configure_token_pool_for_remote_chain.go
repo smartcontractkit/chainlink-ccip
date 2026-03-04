@@ -12,18 +12,17 @@ import (
 
 	tp_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/token_pool"
 	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	bm_proxy_v150 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/burn_mint_token_pool_and_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	token_pool_v150 "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_5_0/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/advanced_pool_hooks"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/token_pool"
 	v17seq "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/type_and_version"
+	token_pool_v150 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_token_pool_and_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	token_pool_v161 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/token_pool"
 )
@@ -465,7 +464,7 @@ func fetchRateLimitsAndRemotePoolV150(
 	poolForRateLimits, poolForRemotePool common.Address,
 	remoteChainSelector uint64,
 ) (*activePoolImportedConfig, error) {
-	inboundReport, err := cldf_ops.ExecuteOperation(b, token_pool_v150.GetInboundRateLimiterState, chain, evm_contract.FunctionInput[uint64]{
+	inboundReport, err := cldf_ops.ExecuteOperation(b, token_pool_v150.GetCurrentInboundRateLimiterState, chain, evm_contract.FunctionInput[uint64]{
 		ChainSelector: chainSelector,
 		Address:       poolForRateLimits,
 		Args:          remoteChainSelector,
@@ -473,7 +472,7 @@ func fetchRateLimitsAndRemotePoolV150(
 	if err != nil {
 		return nil, fmt.Errorf("failed to get inbound rate limiter state: %w", err)
 	}
-	outboundReport, err := cldf_ops.ExecuteOperation(b, token_pool_v150.GetOutboundRateLimiterState, chain, evm_contract.FunctionInput[uint64]{
+	outboundReport, err := cldf_ops.ExecuteOperation(b, token_pool_v150.GetCurrentOutboundRateLimiterState, chain, evm_contract.FunctionInput[uint64]{
 		ChainSelector: chainSelector,
 		Address:       poolForRateLimits,
 		Args:          remoteChainSelector,
@@ -540,7 +539,7 @@ func importConfigFromActivePoolV161(
 }
 
 // tokenBucketV150ToRateLimiterConfig converts a 1.5.0 (proxy bindings) RateLimiterTokenBucket to tokens.RateLimiterConfig.
-func tokenBucketV150ToRateLimiterConfig(b bm_proxy_v150.RateLimiterTokenBucket) *tokens.RateLimiterConfig {
+func tokenBucketV150ToRateLimiterConfig(b token_pool_v150.TokenBucket) *tokens.RateLimiterConfig {
 	return &tokens.RateLimiterConfig{
 		IsEnabled: b.IsEnabled,
 		Capacity:  new(big.Int).Set(b.Capacity),
