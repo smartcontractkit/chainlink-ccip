@@ -102,3 +102,11 @@ type ConfigImporter interface {
 	SupportedTokensPerRemoteChain(e cldf.Environment, chainSelector uint64) (map[uint64][]common.Address, error)
 	SequenceImportConfig() *cldf_ops.Sequence[ImportConfigPerChainInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 }
+
+// LaneVersionResolver resolves the versions of lanes deployed on a chain.
+// This determines which version of the lane is connected to a remote chain from a particular chain.
+// For EVM chains, we look at the onramps and offramps connected to the router to determine
+// which version of the lane is deployed for each remote chain.
+type LaneVersionResolver interface {
+	DeriveLaneVersionsForChain(e cldf.Environment, chainSel uint64) (map[uint64]*semver.Version, []*semver.Version, error)
+}
