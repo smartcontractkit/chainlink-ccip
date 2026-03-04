@@ -82,7 +82,7 @@ func DeployContractsForSelector(ctx context.Context, env *deployment.Environment
 	// Directory needs to exist at ../contracts/build relative to chainlink-ccip/devenv for TON
 	contractVersion := os.Getenv("DEPLOY_CONTRACT_VERSION")
 	if contractVersion == "" {
-		contractVersion = "a60d19e33dc8" // Jan 5, 2026 commit hash
+		contractVersion = "4f7b7be09c30" // https://github.com/smartcontractkit/chainlink-ton/releases/tag/ton-contracts-build-4f7b7be09c30
 	}
 	out, err := deployops.DeployContracts(dReg).Apply(*env, deployops.ContractDeploymentConfig{
 		MCMS: mcms.Input{},
@@ -695,10 +695,19 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 		return nil
 	}
 
+	// Filter out adapters that don't support token transfers (e.g. TON message-passing only).
+	var tokenAdapters []testadapters.TestAdapter
+	for _, a := range adp {
+		if _, err := a.GetRegistryAddress(); errors.Is(err, errors.ErrUnsupported) {
+			continue
+		}
+		tokenAdapters = append(tokenAdapters, a)
+	}
+
 	// The deployment map defines the tokens and token pools to deploy
 	// and the configurations for their cross-chain interactions. We deploy one token and token pool per chain, and configure them to be transferable to each other.
 	dply := map[uint64]tokensapi.TokenExpansionInputPerChain{}
-	for _, srcAdapter := range adp {
+	for _, srcAdapter := range tokenAdapters {
 		srcCfg := srcAdapter.GetTokenExpansionConfig()
 		srcSel := srcAdapter.ChainSelector()
 		srcFamily := srcAdapter.Family()
@@ -706,7 +715,7 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 			continue // only EVM and Solana are supported for token transfers in 1.6
 		}
 
-		for _, dstAdapter := range adp {
+		for _, dstAdapter := range tokenAdapters {
 			// dstCfg := dstAdapter.GetTokenExpansionConfig()
 			dstSel := dstAdapter.ChainSelector()
 
@@ -735,7 +744,7 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 	}
 
 	// Allow the router to withdraw a sensible amount of tokens from the account that will be transferring tokens.
-	for _, adapter := range adp {
+	for _, adapter := range tokenAdapters {
 		teConfig := adapter.GetTokenExpansionConfig()
 		selector := adapter.ChainSelector()
 
@@ -761,7 +770,7 @@ func SetupTokensAndTokenPools(env *deployment.Environment, adp []testadapters.Te
 		if err != nil {
 			return nil, fmt.Errorf("failed to allow router to withdraw tokens for selector %d: %w", selector, err)
 		}
-		for _, dst := range adp {
+		for _, dst := range tokenAdapters {
 			if dst.ChainSelector() == selector {
 				continue
 			}
