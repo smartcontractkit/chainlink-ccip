@@ -56,11 +56,6 @@ func (e *ExecCodecProto) EncodeObservation(observation exectypes.Observation) ([
 }
 
 func (e *ExecCodecProto) DecodeObservation(data []byte) (obs exectypes.Observation, err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("panic in DecodeObservation: %v", r)
-		}
-	}()
 	if len(data) == 0 {
 		return obs, nil
 	}

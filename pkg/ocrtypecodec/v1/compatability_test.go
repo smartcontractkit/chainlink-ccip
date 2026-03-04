@@ -251,7 +251,7 @@ func TestDecodeObservationHandlesMalformedProto(t *testing.T) {
 
 		res, err := commitCodec.DecodeObservation(data)
 		require.Error(t, err)
-		require.ErrorContains(t, err, "panic in DecodeObservation")
+		require.ErrorContains(t, err, "merkle root must be 32 bytes")
 		require.Equal(t, committypes.Observation{}, res)
 	})
 }
