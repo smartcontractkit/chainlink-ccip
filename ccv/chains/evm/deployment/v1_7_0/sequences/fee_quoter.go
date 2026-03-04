@@ -184,6 +184,31 @@ var (
 			if err != nil && strings.Contains(err.Error(), "no fee quoter address found") {
 				return FeeQuoterUpdate{}, nil
 			}
+			output.PriceUpdates = fqops.PriceUpdates{
+				GasPriceUpdates:   make([]fee_quoter.InternalGasPriceUpdate, 0),
+				TokenPriceUpdates: make([]fee_quoter.InternalTokenPriceUpdate, 0),
+			}
+			fq, err := fee_quoter.NewFeeQuoter(
+				common.HexToAddress(fq16AddressRef.Address),
+				chain.Client)
+			if err != nil {
+				return FeeQuoterUpdate{}, fmt.Errorf("failed to create fee quoter instance: %w", err)
+			}
+			allFeeTokens, err := fq.GetFeeTokens(nil)
+			if err != nil {
+				return FeeQuoterUpdate{}, fmt.Errorf("failed to get fee tokens from fee quoter: %w", err)
+			}
+			for _, feeToken := range allFeeTokens {
+				tokenPrice, err := fq.GetTokenPrice(nil, feeToken)
+				if err != nil {
+					b.Logger.Warnf("failed to get price for token %s from fee quoter v1.6, skipping import of price for this token: %v", feeToken.Hex(), err)
+					continue
+				}
+				output.PriceUpdates.TokenPriceUpdates = append(output.PriceUpdates.TokenPriceUpdates, fee_quoter.InternalTokenPriceUpdate{
+					SourceToken: feeToken,
+					UsdPerToken: tokenPrice.Value,
+				})
+			}
 			output.ChainSelector = input.ChainSelector
 			output.ExistingAddresses = input.ExistingAddresses
 
@@ -225,6 +250,15 @@ var (
 			for remoteChain, cfg := range fqOutput.RemoteChainCfgs {
 				if !cfg.DestChainCfg.IsEnabled {
 					continue
+				}
+				gasPrice, err := fq.GetDestinationChainGasPrice(nil, remoteChain)
+				if err != nil {
+					b.Logger.Warnf("failed to get gas price for remote chain %d from fee quoter v1.6, skipping import of gas price for this chain: %v", remoteChain, err)
+				} else {
+					output.PriceUpdates.GasPriceUpdates = append(output.PriceUpdates.GasPriceUpdates, fee_quoter.InternalGasPriceUpdate{
+						DestChainSelector: remoteChain,
+						UsdPerUnitGas:     gasPrice.Value,
+					})
 				}
 				destChainConfig := cfg.DestChainCfg
 				outDestchainCfg := fqops.DestChainConfigArgs{
