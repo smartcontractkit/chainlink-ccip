@@ -14,8 +14,8 @@ import (
 	solseqV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/mcm"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
+	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	mcmsapi "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
-	mcmsapiTmp "github.com/smartcontractkit/chainlink-ccip/deployment/deployTmp"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
 
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
@@ -41,9 +41,9 @@ func TestUpdateMCMSConfigSolana(t *testing.T) {
 	require.NotNil(t, env, "Environment should be created")
 	env.DataStore = dstr.Seal() // Add preloaded contracts to env datastore
 	chain := env.BlockChains.SolanaChains()[chainsel.SOLANA_MAINNET.Selector]
-	dRegTmp := mcmsapiTmp.GetRegistry()
+	dReg := mcmsapi.GetRegistry()
 	solAdapter := solseqV1_6_0.SolanaAdapter{}
-	dRegTmp.RegisterDeployer(chainsel.FamilySolana, mcmsapi.MCMSVersion, &solAdapter)
+	dReg.RegisterDeployer(chainsel.FamilySolana, deployops.MCMSVersion, &solAdapter)
 	err = utils.FundSolanaAccounts(
 		t.Context(),
 		[]solana.PublicKey{chain.DeployerKey.PublicKey()},
@@ -92,10 +92,10 @@ func TestUpdateMCMSConfigSolana(t *testing.T) {
 	}
 
 	// update the config for each MCMS contract
-	updateMcmsConfigMCMS := mcmsapiTmp.UpdateMCMSConfig(dRegTmp, nil)
-	output, err := updateMcmsConfigMCMS.Apply(*env, mcmsapiTmp.UpdateMCMSConfigInput{
+	updateMcmsConfigMCMS := mcmsapi.UpdateMCMSConfig(dReg, nil)
+	output, err := updateMcmsConfigMCMS.Apply(*env, mcmsapi.UpdateMCMSConfigInput{
 		AdapterVersion: semver.MustParse("1.0.0"),
-		Chains: map[uint64]mcmsapiTmp.UpdateMCMSConfigInputPerChain{
+		Chains: map[uint64]mcmsapi.UpdateMCMSConfigInputPerChain{
 			solanaChains[0]: {
 				MCMConfig:    testhelpers.SingleGroupMCMSTwoSigners(),
 				MCMContracts: mcmsRefs,

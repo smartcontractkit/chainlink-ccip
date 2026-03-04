@@ -225,26 +225,18 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 			}
 
 			if input.DeployTokenPoolInput != nil {
-				refToConnect := tokenRef
-				providedRef := input.DeployTokenPoolInput.TokenRef
-				if refToConnect == nil && providedRef == nil {
-					return cldf.ChangesetOutput{}, fmt.Errorf("no token deployed or provided for chain selector %d, cannot deploy token pool without token address", selector)
-				} else if refToConnect != nil && providedRef != nil {
-					// cross check the deployed token address with the provided token ref address
-					if refToConnect.Address != providedRef.Address {
-						return cldf.ChangesetOutput{}, fmt.Errorf("token address deployed does not match the provided token ref address for chain selector %d: deployed token address %s, provided token ref address %s", selector, refToConnect.Address, providedRef.Address)
-					}
-					if refToConnect.Qualifier != providedRef.Qualifier {
-						return cldf.ChangesetOutput{}, fmt.Errorf("token qualifier deployed does not match the provided token ref qualifier for chain selector %d: deployed token qualifier %s, provided token ref qualifier %s", selector, refToConnect.Qualifier, providedRef.Qualifier)
-					}
-				} else if refToConnect == nil {
-					// if token is not deployed by this changeset but token ref is provided, use the provided token ref
-					refToConnect = input.DeployTokenPoolInput.TokenRef
+				newTokenRef, err := datastore_utils.MergeRefs(
+					tokenRef,
+					input.DeployTokenPoolInput.TokenRef,
+				)
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to merge token refs for chain selector %d: %w", selector, err)
 				}
+				tokenRef = &newTokenRef
 				// deploy token pool
 				tmpDatastore = datastore.NewMemoryDataStore()
 				deployTokenPoolInput := DeployTokenPoolInput{
-					TokenRef:           refToConnect,
+					TokenRef:           tokenRef,
 					TokenPoolVersion:   input.TokenPoolVersion,
 					TokenPoolQualifier: input.DeployTokenPoolInput.TokenPoolQualifier,
 					PoolType:           input.DeployTokenPoolInput.PoolType,
