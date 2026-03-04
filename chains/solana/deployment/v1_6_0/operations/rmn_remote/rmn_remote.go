@@ -14,7 +14,8 @@ import (
 	"github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_1/rmn_remote"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/rmn_remote"
+	rmn161 "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_1/rmn_remote"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	api "github.com/smartcontractkit/chainlink-ccip/deployment/fastcurse"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -269,11 +270,11 @@ var SetEventAuthorities = operations.NewOperation(
 	Version,
 	"Sets the event authorities list on the RMNRemote contract",
 	func(b operations.Bundle, chain cldf_solana.Chain, input EventAuthoritiesInput) (sequences.OnChainOutput, error) {
-		rmn_remote.SetProgramID(input.RMNRemote)
+		rmn161.SetProgramID(input.RMNRemote)
 
 		authority := GetAuthority(chain, input.RMNRemote)
 
-		ixn, err := rmn_remote.NewSetEventAuthoritiesInstruction(
+		ixn, err := rmn161.NewSetEventAuthoritiesInstruction(
 			input.EventAuthorities,
 			input.RMNRemoteConfigPDA,
 			authority,
