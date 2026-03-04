@@ -26,7 +26,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 )
 
 var dataGenerators = []dataGenerator{
@@ -605,7 +604,7 @@ func genDiscoveryObservation(numSourceChains, numContractsPerChain int) dt.Obser
 		fChain[cciptypes.ChainSelector(rand.Uint64())] = rand.Intn(256)
 	}
 
-	contractAddresses := make(reader.ContractAddresses, numContractsPerChain)
+	contractAddresses := make(cciptypes.ContractAddresses, numContractsPerChain)
 	for i := range numContractsPerChain {
 		contractName := fmt.Sprintf("contract-%d", i)
 		contractAddresses[contractName] = make(map[cciptypes.ChainSelector]cciptypes.UnknownAddress, numSourceChains)

@@ -29,7 +29,7 @@ contract MockLombardBridge is IBridgeV3 {
 
   // solhint-disable-next-line func-name-mixedcase
   function MSG_VERSION() external pure override returns (uint8) {
-    return 1;
+    return 2;
   }
 
   function deposit(

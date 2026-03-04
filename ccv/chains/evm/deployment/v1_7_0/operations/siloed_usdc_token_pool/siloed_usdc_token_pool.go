@@ -20,6 +20,27 @@ type LockBoxConfig = siloed_usdc_token_pool.SiloedLockReleaseTokenPoolLockBoxCon
 
 type AuthorizedCallerArgs = siloed_usdc_token_pool.AuthorizedCallersAuthorizedCallerArgs
 
+type ConstructorArgs struct {
+	Token              common.Address
+	LocalTokenDecimals uint8
+	AdvancedPoolHooks  common.Address
+	RMNProxy           common.Address
+	Router             common.Address
+}
+
+var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
+	Name:             "siloed-usdc-token-pool:deploy",
+	Version:          Version,
+	Description:      "Deploys the SiloedUSDCTokenPool contract",
+	ContractMetadata: siloed_usdc_token_pool.SiloedUSDCTokenPoolMetaData,
+	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
+		cldf_deployment.NewTypeAndVersion(ContractType, *Version).String(): {
+			EVM: common.FromHex(siloed_usdc_token_pool.SiloedUSDCTokenPoolBin),
+		},
+	},
+	Validate: func(args ConstructorArgs) error { return nil },
+})
+
 var ConfigureLockBoxes = contract.NewWrite(contract.WriteParams[[]LockBoxConfig, *siloed_usdc_token_pool.SiloedUSDCTokenPool]{
 	Name:            "siloed-usdc-token-pool:configure-lock-boxes",
 	Version:         Version,

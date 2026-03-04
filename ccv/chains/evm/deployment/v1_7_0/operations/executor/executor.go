@@ -134,3 +134,14 @@ var GetDestChains = contract.NewRead(contract.ReadParams[any, []executor.Executo
 		return Executor.GetDestChains(opts)
 	},
 })
+
+var GetDynamicConfig = contract.NewRead(contract.ReadParams[struct{}, executor.ExecutorDynamicConfig, *executor.Executor]{
+	Name:         "executor:get-dynamic-config",
+	Version:      Version,
+	Description:  "Gets the dynamic configuration on the Executor",
+	ContractType: ContractType,
+	NewContract:  executor.NewExecutor,
+	CallContract: func(Executor *executor.Executor, opts *bind.CallOpts, args struct{}) (executor.ExecutorDynamicConfig, error) {
+		return Executor.GetDynamicConfig(opts)
+	},
+})

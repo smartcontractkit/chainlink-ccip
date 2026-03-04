@@ -64,6 +64,42 @@ var DeployCommitteeVerifier = cldf_ops.NewSequence(
 		}
 		addresses = append(addresses, committeeVerifierRef)
 
+		// Fetch dynamic config on the CommitteeVerifier
+		dynamicConfigReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.GetDynamicConfig, chain, contract_utils.FunctionInput[struct{}]{
+			ChainSelector: chain.Selector,
+			Address:       common.HexToAddress(committeeVerifierRef.Address),
+			Args:          struct{}{},
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to get dynamic config on CommitteeVerifier: %w", err)
+		}
+
+		// Set dynamic config on the CommitteeVerifier if there is a diff
+		desiredFeeAggregator := dynamicConfigReport.Output.FeeAggregator
+		if input.Params.FeeAggregator != (common.Address{}) {
+			desiredFeeAggregator = input.Params.FeeAggregator
+		}
+		desiredAllowlistAdmin := dynamicConfigReport.Output.AllowlistAdmin
+		if input.Params.AllowlistAdmin != (common.Address{}) {
+			desiredAllowlistAdmin = input.Params.AllowlistAdmin
+		}
+		if desiredFeeAggregator != dynamicConfigReport.Output.FeeAggregator || desiredAllowlistAdmin != dynamicConfigReport.Output.AllowlistAdmin {
+			setDynamicConfigReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.SetDynamicConfig, chain, contract_utils.FunctionInput[committee_verifier.SetDynamicConfigArgs]{
+				ChainSelector: chain.Selector,
+				Address:       common.HexToAddress(committeeVerifierRef.Address),
+				Args: committee_verifier.SetDynamicConfigArgs{
+					DynamicConfig: committee_verifier.DynamicConfig{
+						AllowlistAdmin: desiredAllowlistAdmin,
+						FeeAggregator:  desiredFeeAggregator,
+					},
+				},
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to set dynamic config on CommitteeVerifier: %w", err)
+			}
+			writes = append(writes, setDynamicConfigReport.Output)
+		}
+
 		if input.CREATE2Factory == (common.Address{}) {
 			return sequences.OnChainOutput{}, errors.New("committee verifier requires CREATE2Factory")
 		}

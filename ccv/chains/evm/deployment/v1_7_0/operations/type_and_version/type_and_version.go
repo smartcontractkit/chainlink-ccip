@@ -10,7 +10,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
-	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
@@ -65,38 +64,3 @@ var getTypeAndVersion = cldf_ops.NewOperation(
 		return typeAndVersionStr, nil
 	},
 )
-
-// IndexAddressesByTypeAndVersion indexes addresses by type and version.
-// It expects the typeAndVersion string returned by each address to be unique.
-// It also removes the dev suffix from the version string, so dev versions are treated the same as non-dev versions.
-// This is to ensure that changesets can depend on non-dev versions while the contracts are still in development.
-func IndexAddressesByTypeAndVersion(b cldf_ops.Bundle, chain cldf_evm.Chain, addresses []string) (map[string]string, error) {
-	typeAndVersionToAddress := make(map[string]string)
-	for _, address := range addresses {
-		typeAndVersionReport, err := cldf_ops.ExecuteOperation(b, getTypeAndVersion, chain, contract_utils.FunctionInput[any]{
-			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(address),
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to get type and version of contract %s: %w", address, err)
-		}
-
-		typeAndVersionComponents := strings.Split(typeAndVersionReport.Output, " ")
-		if len(typeAndVersionComponents) != 2 {
-			return nil, fmt.Errorf("contract %s has invalid type and version: %s", address, typeAndVersionReport.Output)
-		}
-
-		// Trim the version string to omit any dev suffix
-		typeAndVersion := deployment.NewTypeAndVersion(
-			deployment.ContractType(typeAndVersionComponents[0]),
-			*semver.MustParse(strings.TrimSuffix(typeAndVersionComponents[1], devSuffix)),
-		)
-
-		if _, ok := typeAndVersionToAddress[typeAndVersion.String()]; ok {
-			return nil, fmt.Errorf("multiple contracts have the same type and version: %s", typeAndVersion.String())
-		}
-		typeAndVersionToAddress[typeAndVersion.String()] = address
-	}
-
-	return typeAndVersionToAddress, nil
-}

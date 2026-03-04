@@ -14,9 +14,8 @@ import {TokenPool} from "./TokenPool.sol";
 /// If that is expected, please make sure the token's burner/minter roles are adjustable.
 /// @dev This contract is a variant of BurnMintTokenPool that uses `burn(amount)`.
 contract BurnMintTokenPool is BurnMintTokenPoolAbstract, ITypeAndVersion {
-  /// @dev Using a function because constant state variables cannot be overridden by child contracts.
   function typeAndVersion() external pure virtual override returns (string memory) {
-    return "BurnMintTokenPool 1.7.0-dev";
+    return "BurnMintTokenPool 2.0.0-dev";
   }
 
   constructor(

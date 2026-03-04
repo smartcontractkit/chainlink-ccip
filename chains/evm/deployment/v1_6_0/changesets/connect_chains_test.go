@@ -21,7 +21,35 @@ import (
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	lanesapi "github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	fdeployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+
+	fqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
 )
+
+// convertOpsConfigToGobinding converts operations type to gobinding type for test assertions.
+// This helper keeps gobinding imports in tests, not production code.
+func convertOpsConfigToGobinding(cfg fqops.DestChainConfig) fee_quoter.FeeQuoterDestChainConfig {
+	return fee_quoter.FeeQuoterDestChainConfig{
+		IsEnabled:                         cfg.IsEnabled,
+		MaxNumberOfTokensPerMsg:           cfg.MaxNumberOfTokensPerMsg,
+		MaxDataBytes:                      cfg.MaxDataBytes,
+		MaxPerMsgGasLimit:                 cfg.MaxPerMsgGasLimit,
+		DestGasOverhead:                   cfg.DestGasOverhead,
+		DestGasPerPayloadByteBase:         cfg.DestGasPerPayloadByteBase,
+		DestGasPerPayloadByteHigh:         cfg.DestGasPerPayloadByteHigh,
+		DestGasPerPayloadByteThreshold:    cfg.DestGasPerPayloadByteThreshold,
+		DestDataAvailabilityOverheadGas:   cfg.DestDataAvailabilityOverheadGas,
+		DestGasPerDataAvailabilityByte:    cfg.DestGasPerDataAvailabilityByte,
+		DestDataAvailabilityMultiplierBps: cfg.DestDataAvailabilityMultiplierBps,
+		ChainFamilySelector:               cfg.ChainFamilySelector,
+		EnforceOutOfOrder:                 cfg.EnforceOutOfOrder,
+		DefaultTokenFeeUSDCents:           cfg.DefaultTokenFeeUSDCents,
+		DefaultTokenDestGasOverhead:       cfg.DefaultTokenDestGasOverhead,
+		DefaultTxGasLimit:                 cfg.DefaultTxGasLimit,
+		GasMultiplierWeiPerEth:            cfg.GasMultiplierWeiPerEth,
+		GasPriceStalenessThreshold:        cfg.GasPriceStalenessThreshold,
+		NetworkFeeUSDCents:                cfg.NetworkFeeUSDCents,
+	}
+}
 
 func checkBidirectionalLaneConnectivity(
 	t *testing.T,
@@ -117,7 +145,8 @@ func checkBidirectionalLaneConnectivity(
 
 		feeQuoterDestConfig, err := feeQuoterOnSrc.GetDestChainConfig(nil, lane.Dest.Selector)
 		require.NoError(t, err, "must get dest chain config from feeQuoter")
-		require.Equal(t, sequences.TranslateFQ(lane.Dest.FeeQuoterDestChainConfig), feeQuoterDestConfig, "feeQuoter dest chain config must equal expected")
+		expectedConfig := convertOpsConfigToGobinding(sequences.TranslateFQ(lane.Dest.FeeQuoterDestChainConfig))
+		require.Equal(t, expectedConfig, feeQuoterDestConfig, "feeQuoter dest chain config must equal expected")
 
 		price, err := feeQuoterOnSrc.GetDestinationChainGasPrice(nil, lane.Dest.Selector)
 		require.NoError(t, err, "must get price from feeQuoter")

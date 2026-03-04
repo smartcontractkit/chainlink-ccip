@@ -11,7 +11,7 @@ import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/Aut
 /// @notice A proxy contract for handling messages transmitted via the Cross Chain Transfer Protocol (CCTP).
 /// @dev This contract is responsible for sending messages to the `IMessageTransmitter` and ensuring only allowed callers can invoke it.
 contract CCTPMessageTransmitterProxy is AuthorizedCallers, ITypeAndVersion {
-  string public constant override typeAndVersion = "CCTPMessageTransmitterProxy 1.7.0-dev";
+  string public constant override typeAndVersion = "CCTPMessageTransmitterProxy 2.0.0-dev";
 
   error TransmitterCannotBeZero();
 

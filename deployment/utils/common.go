@@ -30,6 +30,7 @@ const (
 	TokenPoolLookupTable       cldf.ContractType = "TokenPoolLookupTable"
 	BurnWithFromMintTokenPool  cldf.ContractType = "BurnWithFromMintTokenPool"
 	BurnFromMintTokenPool      cldf.ContractType = "BurnFromMintTokenPool"
+	CCTPTokenPool              cldf.ContractType = "CCTPTokenPool"
 	// CLL Identifiers
 	CLLQualifier         = "CLLCCIP"
 	RMNTimelockQualifier = "RMNMCMS"
@@ -73,6 +74,12 @@ var (
 	ErrNoAdapterRegistered = func(family string, version *semver.Version) error {
 		return fmt.Errorf("no adapter registered for chain family %s and version %s", family, version.String())
 	}
+	ErrNoAdapterForSelectorRegistered = func(adapetrName string, selector uint64, version *semver.Version) error {
+		if version != nil {
+			return fmt.Errorf("no %s adapter registered for chain selector %d and version %s", adapetrName, selector, version.String())
+		}
+		return fmt.Errorf("no %s adapter registered for chain selector %d", adapetrName, selector)
+	}
 )
 
 var (
@@ -87,9 +94,32 @@ func NewRegistererID(chainFamily string, version *semver.Version) string {
 	return fmt.Sprintf("%s-%s", chainFamily, version.String())
 }
 
+func NewIDFromSelector(chainSelector uint64, version *semver.Version) string {
+	chainFamily, err := chain_selectors.GetSelectorFamily(chainSelector)
+	if err != nil {
+		panic(fmt.Sprintf("invalid chain selector: %d", chainSelector))
+	}
+	return NewRegistererID(chainFamily, version)
+}
+
 const (
 	EXECUTION_STATE_UNTOUCHED  = 0
 	EXECUTION_STATE_INPROGRESS = 1
 	EXECUTION_STATE_SUCCESS    = 2
 	EXECUTION_STATE_FAILURE    = 3
 )
+
+func ExecutionStateToString(state uint8) string {
+	switch state {
+	case EXECUTION_STATE_UNTOUCHED:
+		return "UNTOUCHED"
+	case EXECUTION_STATE_INPROGRESS:
+		return "IN_PROGRESS"
+	case EXECUTION_STATE_SUCCESS:
+		return "SUCCESS"
+	case EXECUTION_STATE_FAILURE:
+		return "FAILURE"
+	default:
+		return "UNKNOWN"
+	}
+}

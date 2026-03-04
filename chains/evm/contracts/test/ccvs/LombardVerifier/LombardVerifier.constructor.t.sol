@@ -28,7 +28,7 @@ contract LombardVerifier_constructor is LombardVerifierSetup {
 
     vm.mockCall(address(mockBridge), abi.encodeWithSelector(IBridgeV2.MSG_VERSION.selector), abi.encode(wrongVersion));
 
-    vm.expectRevert(abi.encodeWithSelector(LombardVerifier.InvalidMessageVersion.selector, 1, wrongVersion));
+    vm.expectRevert(abi.encodeWithSelector(LombardVerifier.InvalidMessageVersion.selector, 2, wrongVersion));
     new LombardVerifier(
       LombardVerifier.DynamicConfig({feeAggregator: FEE_AGGREGATOR}),
       IBridgeV3(address(mockBridge)),

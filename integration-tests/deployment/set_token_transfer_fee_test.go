@@ -1,12 +1,9 @@
 package deployment
 
 import (
-	"math/big"
 	"testing"
-	"time"
 
 	"github.com/Masterminds/semver/v3"
-	"github.com/gagliardetto/solana-go"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
@@ -67,35 +64,12 @@ func TestSetTokenTransferFeeV1_6_0(t *testing.T) {
 	mcmsAdapter := &evmadaptersV1_0_0.EVMMCMSReader{}
 	mcmsRegistry.RegisterMCMSReader(chainsel.FamilyEVM, mcmsAdapter)
 
-	// Generate a random SOL token private key for testing purposes
-	solTokenPrivKey, err := solana.NewRandomPrivateKey()
-	require.NoError(t, err)
-
 	// Deploy FeeQuoter + other contracts
 	output, err := deploy.DeployContracts(deployRegistry).Apply(*env, deploy.ContractDeploymentConfig{
 		MCMS: mcms.Input{},
 		Chains: map[uint64]deploy.ContractDeploymentConfigPerChain{
-			src: {
-				// Solana-specific
-				Version:                      v1_6_0,
-				MaxFeeJuelsPerMsg:            big.NewInt(0).Mul(big.NewInt(200), big.NewInt(1e18)),
-				TokenPriceStalenessThreshold: uint32(24 * 60 * 60),
-				NativeTokenPremiumMultiplier: 1e18, // 1.0 ETH
-				LinkPremiumMultiplier:        9e17, // 0.9 ETH
-				TokenPrivKey:                 solTokenPrivKey.String(),
-				TokenDecimals:                9,
-			},
-			dst: {
-				// EVM-specific
-				Version:                                 v1_6_0,
-				MaxFeeJuelsPerMsg:                       big.NewInt(0).Mul(big.NewInt(200), big.NewInt(1e18)),
-				TokenPriceStalenessThreshold:            uint32(24 * 60 * 60),
-				NativeTokenPremiumMultiplier:            1e18, // 1.0 ETH
-				LinkPremiumMultiplier:                   9e17, // 0.9 ETH
-				PermissionLessExecutionThresholdSeconds: uint32((20 * time.Minute).Seconds()),
-				GasForCallExactCheck:                    uint16(5000),
-				TokenDecimals:                           18,
-			},
+			src: NewDefaultDeploymentConfigForSolana(v1_6_0),
+			dst: NewDefaultDeploymentConfigForEVM(v1_6_0),
 		},
 	})
 	require.NoError(t, err)

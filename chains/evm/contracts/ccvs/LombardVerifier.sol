@@ -23,6 +23,7 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
 
   error ZeroBridge();
   error ZeroLombardChainId();
+  error ZeroAllowedCaller();
   error PathNotExist(uint64 remoteChainSelector);
   error ExecutionError();
   error InvalidMessageLength(uint256 expected, uint256 actual);
@@ -33,6 +34,9 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
   error TokenNotSupported(address token);
   error MustTransferTokens();
   error InvalidVerifierResults();
+  error InvalidToken(bytes32 expected, bytes32 actual);
+  error InvalidAmount(uint256 expected, uint256 actual);
+  error RemoteTokenOrAdapterMismatch(bytes32 bridgeToken, bytes32 remoteToken, bytes32 remoteAdapter);
 
   /// @param remoteChainSelector CCIP selector of destination chain.
   /// @param lChainId The chain id of destination chain by Lombard Multi Chain Id conversion.
@@ -44,6 +48,7 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
   event PathRemoved(uint64 indexed remoteChainSelector, bytes32 indexed lChainId, bytes32 allowedCaller);
   event SupportedTokenRemoved(address token);
   event SupportedTokenSet(address localToken, address localAdapter);
+  event RemoteAdapterSet(uint64 indexed remoteChainSelector, address indexed token, bytes32 remoteAdapter);
   event DynamicConfigSet(DynamicConfig dynamicConfig);
 
   struct DynamicConfig {
@@ -57,6 +62,15 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
     bytes32 lChainId;
   }
 
+  struct RemoteAdapterArgs {
+    /// @notice CCIP chain selector of remote chain.
+    uint64 remoteChainSelector;
+    /// @notice The local token address.
+    address token;
+    /// @notice The remote adapter token identifier accepted by the bridge.
+    bytes32 remoteAdapter;
+  }
+
   struct SupportedTokenArgs {
     /// @notice The local token address.
     address localToken;
@@ -64,9 +78,9 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
     address localAdapter;
   }
 
-  string public constant typeAndVersion = "LombardVerifier 1.7.0-dev";
+  string public constant typeAndVersion = "LombardVerifier 2.0.0-dev";
   /// @notice Version tag used in the verifier payload to indicate the version of this verifier.
-  bytes4 private constant VERSION_TAG_V1_7_0 = bytes4(keccak256("LombardVerifier 1.7.0"));
+  bytes4 private constant VERSION_TAG_V2_0_0 = bytes4(keccak256("LombardVerifier 2.0.0"));
   /// @notice The size of the version tag in bytes.
   uint256 private constant VERSION_TAG_SIZE = 4;
   /// @notice The size of a bytes32 in bytes.
@@ -78,7 +92,7 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
   uint256 private constant PAYLOAD_START_INDEX = VERSION_TAG_SIZE + RAW_PAYLOAD_LENGTH_SIZE;
 
   /// @notice Supported bridge message version.
-  uint8 internal constant SUPPORTED_BRIDGE_MSG_VERSION = 1;
+  uint8 internal constant SUPPORTED_BRIDGE_MSG_VERSION = 2;
   /// @notice The address of bridge contract.
   IBridgeV3 public immutable i_bridge;
 
@@ -89,6 +103,8 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
   EnumerableSet.UintSet internal s_supportedChains;
   /// @notice Mapping of CCIP chain selector to chain specific config.
   mapping(uint64 chainSelector => Path path) internal s_chainSelectorToPath;
+  /// @notice Mapping of (remote chain selector, local token) to the optional remote adapter token identifier.
+  mapping(uint64 remoteChainSelector => mapping(address token => bytes32 remoteAdapter)) internal s_remoteAdapters;
 
   DynamicConfig private s_dynamicConfig;
 
@@ -181,6 +197,17 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
       sourceToken = localAdapter;
     }
 
+    {
+      bytes32 remoteToken = i_bridge.getAllowedDestinationToken(path.lChainId, sourceToken);
+      bytes32 expectedDestToken = Internal._leftPadBytesToBytes32(tokenTransfer.destTokenAddress);
+      if (remoteToken != expectedDestToken) {
+        bytes32 remoteAdapter = s_remoteAdapters[destChainSelector][sourceToken];
+        if (remoteAdapter == bytes32(0) || remoteToken != remoteAdapter) {
+          revert RemoteTokenOrAdapterMismatch(remoteToken, expectedDestToken, remoteAdapter);
+        }
+      }
+    }
+
     (, bytes32 payloadHash) = i_bridge.deposit({
       destinationChain: path.lChainId,
       token: sourceToken,
@@ -189,7 +216,7 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
       recipient: Internal._leftPadBytesToBytes32(tokenTransfer.tokenReceiver),
       amount: tokenTransfer.amount,
       destinationCaller: path.allowedCaller,
-      optionalMessage: bytes.concat(VERSION_TAG_V1_7_0, messageId)
+      optionalMessage: bytes.concat(VERSION_TAG_V2_0_0, messageId)
     });
 
     // Return raw bytes instead of abi.encode for gas efficiency.
@@ -208,8 +235,8 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
     _onlyOffRamp(message.sourceChainSelector);
 
     bytes4 versionPrefix = bytes4(ccvData[:VERSION_TAG_SIZE]);
-    if (versionPrefix != VERSION_TAG_V1_7_0) {
-      revert InvalidCCVVersion(VERSION_TAG_V1_7_0, versionPrefix);
+    if (versionPrefix != VERSION_TAG_V2_0_0) {
+      revert InvalidCCVVersion(VERSION_TAG_V2_0_0, versionPrefix);
     }
 
     if (ccvData.length < PAYLOAD_START_INDEX) {
@@ -223,6 +250,13 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
 
     uint256 proofDataStartIndex = PAYLOAD_START_INDEX + rawPayloadLength;
     bytes calldata rawPayload = ccvData[PAYLOAD_START_INDEX:proofDataStartIndex];
+
+    _validatePayload(
+      rawPayload,
+      message.tokenTransfer[0].destTokenAddress,
+      message.tokenTransfer[0].tokenReceiver,
+      message.tokenTransfer[0].amount
+    );
 
     uint256 proofLength = uint16(bytes2(ccvData[proofDataStartIndex:proofDataStartIndex + RAW_PAYLOAD_LENGTH_SIZE]));
     uint256 proofStartIndex = proofDataStartIndex + RAW_PAYLOAD_LENGTH_SIZE;
@@ -248,11 +282,40 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
       // Load messageId from bytes 4-36.
       returnedMessageId := mload(add(bridgedMessage, 0x24))
     }
-    if (version != VERSION_TAG_V1_7_0) {
-      revert InvalidCCVVersion(VERSION_TAG_V1_7_0, version);
+    if (version != VERSION_TAG_V2_0_0) {
+      revert InvalidCCVVersion(VERSION_TAG_V2_0_0, version);
     }
     if (returnedMessageId != messageId) {
       revert InvalidMessageId(messageId, returnedMessageId);
+    }
+  }
+
+  function _validatePayload(
+    bytes calldata rawPayload,
+    bytes calldata expectedToken,
+    bytes calldata expectedReceiver,
+    uint256 expectedAmount
+  ) internal pure {
+    (,,,,, bytes memory msgBody) = abi.decode(rawPayload[4:], (bytes32, uint256, bytes32, address, address, bytes));
+
+    bytes32 rawToToken;
+    bytes32 rawRecipient;
+    uint256 amount;
+    assembly {
+      rawToToken := mload(add(msgBody, 0x21)) // bytes 1..32
+      rawRecipient := mload(add(msgBody, 0x61)) // bytes 65..96
+      amount := mload(add(msgBody, 0x81)) // bytes 97..128
+    }
+
+    bytes32 expectedTokenLeftPadded = Internal._leftPadBytesToBytes32(expectedToken);
+    if (rawToToken != expectedTokenLeftPadded) {
+      revert InvalidToken(expectedTokenLeftPadded, rawToToken);
+    }
+    if (rawRecipient != Internal._leftPadBytesToBytes32(expectedReceiver)) {
+      revert InvalidReceiver(expectedReceiver);
+    }
+    if (amount != expectedAmount) {
+      revert InvalidAmount(expectedAmount, amount);
     }
   }
 
@@ -270,8 +333,9 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
     return s_supportedTokens.contains(token);
   }
 
-  /// @notice Update the supported tokens for cross-chain transfers. When adding a token, it approves the bridge to
-  /// spend an unlimited amount of the token. When removing a token, it resets the bridge's allowance to zero.
+  /// @notice Update the supported tokens for cross-chain transfers. When adding a token, if no adapter is set it
+  /// approves the bridge to spend the token. If an adapter is set, it approves the adapter to spend the token.
+  /// When removing a token, it resets the corresponding allowance to zero.
   /// @param tokensToRemove Array of token addresses to remove from supported tokens.
   /// @param tokensToSet Array of token addresses to set to supported tokens.
   function updateSupportedTokens(
@@ -283,9 +347,9 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
       address adapter = s_supportedTokens.get(tokenToRemove);
 
       if (s_supportedTokens.remove(tokenToRemove)) {
-        // Reset bridge allowance for either the adapter or the token.
+        // If adapter exists, reset token->adapter allowance. Otherwise reset token->bridge allowance.
         if (adapter != address(0)) {
-          IERC20(adapter).forceApprove(address(i_bridge), 0);
+          IERC20(tokenToRemove).forceApprove(adapter, 0);
         } else {
           IERC20(tokenToRemove).forceApprove(address(i_bridge), 0);
         }
@@ -298,10 +362,12 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
       // No-op if the token is already supported.
       s_supportedTokens.set(tokenToAdd.localToken, tokenToAdd.localAdapter);
 
-      address entityToApprove = tokenToAdd.localAdapter != address(0) ? tokenToAdd.localAdapter : tokenToAdd.localToken;
-
-      // Either the token or the adapter needs to be approved for bridge spend.
-      IERC20(entityToApprove).forceApprove(address(i_bridge), type(uint256).max);
+      // If adapter exists, approve token->adapter for adapter-mediated burn/bridge flow.
+      if (tokenToAdd.localAdapter != address(0)) {
+        IERC20(tokenToAdd.localToken).forceApprove(tokenToAdd.localAdapter, type(uint256).max);
+      } else {
+        IERC20(tokenToAdd.localToken).forceApprove(address(i_bridge), type(uint256).max);
+      }
 
       emit SupportedTokenSet(tokenToAdd.localToken, tokenToAdd.localAdapter);
     }
@@ -327,23 +393,51 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
     return s_chainSelectorToPath[remoteChainSelector];
   }
 
+  /// @notice Gets the remote adapter for a given remote chain and local token.
+  /// @param remoteChainSelector CCIP chain selector of remote chain.
+  /// @param token The local token address.
+  /// @return The remote adapter token identifier, or bytes32(0) if not set.
+  function getRemoteAdapter(
+    uint64 remoteChainSelector,
+    address token
+  ) external view returns (bytes32) {
+    return s_remoteAdapters[remoteChainSelector][token];
+  }
+
   /// @notice Sets the lChainId and allowed caller for a CCIP chain selector.
   /// @param remoteChainSelector CCIP chain selector of remote chain.
   /// @param lChainId Lombard chain id of remote chain.
-  /// @param allowedCaller The address of LombardVerifier on destination chain.
+  /// @param allowedCaller The destination caller bytes. Must fit in 32 bytes and is left-padded for storage.
   function setPath(
     uint64 remoteChainSelector,
     bytes32 lChainId,
-    bytes32 allowedCaller
+    bytes calldata allowedCaller
   ) external onlyOwner {
     if (lChainId == bytes32(0)) {
       revert ZeroLombardChainId();
     }
 
-    s_chainSelectorToPath[remoteChainSelector] = Path({lChainId: lChainId, allowedCaller: allowedCaller});
+    bytes32 leftPaddedAllowedCaller = Internal._leftPadBytesToBytes32(allowedCaller);
+    if (leftPaddedAllowedCaller == bytes32(0)) {
+      revert ZeroAllowedCaller();
+    }
+
+    s_chainSelectorToPath[remoteChainSelector] = Path({lChainId: lChainId, allowedCaller: leftPaddedAllowedCaller});
     s_supportedChains.add(uint256(remoteChainSelector));
 
-    emit PathSet(remoteChainSelector, lChainId, allowedCaller);
+    emit PathSet(remoteChainSelector, lChainId, leftPaddedAllowedCaller);
+  }
+
+  /// @notice Sets remote adapter token identifiers for (remote chain, token) pairs.
+  /// @param remoteAdapterArgs Array of remote adapter configurations to set.
+  function setRemoteAdapters(
+    RemoteAdapterArgs[] calldata remoteAdapterArgs
+  ) external onlyOwner {
+    for (uint256 i = 0; i < remoteAdapterArgs.length; ++i) {
+      RemoteAdapterArgs calldata args = remoteAdapterArgs[i];
+      s_remoteAdapters[args.remoteChainSelector][args.token] = args.remoteAdapter;
+      emit RemoteAdapterSet(args.remoteChainSelector, args.token, args.remoteAdapter);
+    }
   }
 
   /// @notice Removes the path for the given CCIP chain selectors. This disables any traffic to those chains.
@@ -369,6 +463,19 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
     RemoteChainConfigArgs[] calldata remoteChainConfigArgs
   ) external onlyOwner {
     _applyRemoteChainConfigUpdates(remoteChainConfigArgs);
+  }
+
+  /// @notice Updates senders that are allowed to use this verifier.
+  /// @param allowlistConfigArgsItems Array of AllowListConfigArgs, where each item is for a destChainSelector.
+  function applyAllowlistUpdates(
+    AllowlistConfigArgs[] calldata allowlistConfigArgsItems
+  ) external onlyOwner {
+    _applyAllowlistUpdates(allowlistConfigArgsItems);
+  }
+
+  /// @notice Exposes the version tag.
+  function versionTag() public pure override returns (bytes4) {
+    return VERSION_TAG_V2_0_0;
   }
 
   // ================================================================

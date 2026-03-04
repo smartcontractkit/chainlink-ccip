@@ -47,7 +47,7 @@ contract CCTPThroughCCVTokenPool_releaseOrMint is CCTPThroughCCVTokenPoolSetup {
       receiver: makeAddr("receiver"),
       sourceDenominatedAmount: 1e18,
       localToken: address(s_USDCToken),
-      sourcePoolData: abi.encodePacked(USDCSourcePoolDataCodec.CCTP_VERSION_1_TAG),
+      sourcePoolData: abi.encodePacked(USDCSourcePoolDataCodec.CCTP_VERSION_2_CCV_TAG),
       sourcePoolAddress: abi.encode(DEST_CHAIN_USDC_POOL),
       offchainTokenData: ""
     });

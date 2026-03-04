@@ -1,4 +1,4 @@
-package tokens
+package sequences
 
 import (
 	"fmt"
@@ -30,7 +30,7 @@ var ConfigureTokenForTransfers = cldf_ops.NewSequence(
 		if input.TokenAddress != "" {
 			tokenAddress = common.HexToAddress(input.TokenAddress)
 		} else {
-			tokenAddrReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetToken, chain, evm_contract.FunctionInput[any]{
+			tokenAddrReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetToken, chain, evm_contract.FunctionInput[struct{}]{
 				ChainSelector: input.ChainSelector,
 				Address:       common.HexToAddress(input.TokenPoolAddress),
 			})

@@ -76,7 +76,7 @@ interface ITokenMessenger {
     uint32 destinationDomain,
     bytes32 destinationTokenMessenger,
     bytes32 destinationCaller,
-    uint32 maxFee,
+    uint256 maxFee,
     uint32 indexed minFinalityThreshold,
     bytes hookData
   );
@@ -97,7 +97,7 @@ interface ITokenMessenger {
     bytes32 mintRecipient,
     address burnToken,
     bytes32 destinationCaller,
-    uint32 maxFee,
+    uint256 maxFee,
     uint32 minFinalityThreshold
   ) external;
 
@@ -118,7 +118,7 @@ interface ITokenMessenger {
     bytes32 mintRecipient,
     address burnToken,
     bytes32 destinationCaller,
-    uint32 maxFee,
+    uint256 maxFee,
     uint32 minFinalityThreshold,
     bytes calldata hookData
   ) external;

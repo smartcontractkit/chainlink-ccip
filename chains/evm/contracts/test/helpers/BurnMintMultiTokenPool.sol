@@ -3,7 +3,6 @@ pragma solidity ^0.8.24;
 
 import {IBurnMintERC20} from "../../interfaces/IBurnMintERC20.sol";
 
-import {Pool} from "../../libraries/Pool.sol";
 import {MultiTokenPool} from "./MultiTokenPool.sol";
 
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
@@ -11,39 +10,25 @@ import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 contract BurnMintMultiTokenPool is MultiTokenPool {
   constructor(
     IERC20[] memory tokens,
-    address[] memory allowlist,
+    uint8 localTokenDecimals,
     address rmnProxy,
     address router
-  ) MultiTokenPool(tokens, allowlist, rmnProxy, router) {}
+  ) MultiTokenPool(tokens, localTokenDecimals, rmnProxy, router) {}
 
-  /// @notice Burn the token in the pool
-  /// @dev The _validateLockOrBurn check is an essential security check
-  function lockOrBurn(
-    Pool.LockOrBurnInV1 calldata lockOrBurnIn
-  ) external virtual override returns (Pool.LockOrBurnOutV1 memory) {
-    _validateLockOrBurn(lockOrBurnIn);
-
-    IBurnMintERC20(lockOrBurnIn.localToken).burn(lockOrBurnIn.amount);
-
-    emit Burned(msg.sender, lockOrBurnIn.amount);
-
-    return Pool.LockOrBurnOutV1({
-      destTokenAddress: getRemoteToken(lockOrBurnIn.localToken, lockOrBurnIn.remoteChainSelector), destPoolData: ""
-    });
+  function _lockOrBurn(
+    address token,
+    uint64,
+    uint256 amount
+  ) internal virtual override {
+    IBurnMintERC20(token).burn(msg.sender, amount);
   }
 
-  /// @notice Mint tokens from the pool to the recipient
-  /// @dev The _validateReleaseOrMint check is an essential security check
-  function releaseOrMint(
-    Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
-  ) external virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
-    _validateReleaseOrMint(releaseOrMintIn);
-
-    // Mint to the receiver
-    IBurnMintERC20(releaseOrMintIn.localToken).mint(msg.sender, releaseOrMintIn.sourceDenominatedAmount);
-
-    emit Minted(msg.sender, releaseOrMintIn.receiver, releaseOrMintIn.sourceDenominatedAmount);
-
-    return Pool.ReleaseOrMintOutV1({destinationAmount: releaseOrMintIn.sourceDenominatedAmount});
+  function _releaseOrMint(
+    address token,
+    address receiver,
+    uint256 amount,
+    uint64
+  ) internal virtual override {
+    IBurnMintERC20(token).mint(receiver, amount);
   }
 }

@@ -239,7 +239,7 @@ var solanaContracts = map[string]datastore.ContractType{
 func PreloadSolanaEnvironment(t *testing.T, chainSelector uint64) (string, *datastore.MemoryDataStore, error) {
 	programsPath := t.TempDir()
 	ds := datastore.NewMemoryDataStore()
-	err := utils.DownloadSolanaCCIPProgramArtifacts(t.Context(), programsPath, utils.VersionToShortCommitSHA[utils.VersionSolanaV0_1_1])
+	err := utils.DownloadSolanaCCIPProgramArtifacts(t.Context(), programsPath, utils.VersionToShortCommitSHA[utils.VersionSolanaV1_6_0])
 	if err != nil {
 		return "", nil, err
 	}

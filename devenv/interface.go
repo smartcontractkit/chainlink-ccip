@@ -3,13 +3,14 @@ package ccip
 import (
 	"context"
 	"math/big"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/clclient"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
+
+	"github.com/smartcontractkit/chainlink-ccip/deployment/testadapters"
 
 	nodeset "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 )
@@ -22,6 +23,7 @@ This package contains interfaces for devenv to load chain-specific product imple
 // it deploys network-specific infrastructure, configures both CL nodes and contracts and returns
 // operations for testing and SLA/Metrics assertions.
 type CCIP16ProductConfiguration interface {
+	testadapters.TestAdapter
 	Chains
 	Observable
 	OnChainConfigurable
@@ -36,20 +38,11 @@ type Observable interface {
 
 // Chains provides methods to interact with a set of chains that have CCIP deployed.
 type Chains interface {
+	ChainSelector() uint64
 	// SetCLDF sets CLDF environment
 	SetCLDF(e *deployment.Environment)
 	// GetEOAReceiverAddress gets an EOA receiver address for the provided chain selector.
 	GetEOAReceiverAddress(ctx context.Context, chainSelector uint64) ([]byte, error)
-	// SendMessage sends a CCIP message from src to dest with the specified message options.
-	SendMessage(ctx context.Context, src, dest uint64, fields any, opts any) error
-	// GetExpectedNextSequenceNumber gets an expected sequence number for message with "from" and "to" selectors
-	GetExpectedNextSequenceNumber(ctx context.Context, from, to uint64) (uint64, error)
-	// WaitOneSentEventBySeqNo waits until exactly one event for CCIP message sent is emitted on-chain
-	WaitOneSentEventBySeqNo(ctx context.Context, from, to, seq uint64, timeout time.Duration) (any, error)
-	// WaitOneExecEventBySeqNo waits until exactly one event for CCIP execution state change is emitted on-chain
-	WaitOneExecEventBySeqNo(ctx context.Context, from, to, seq uint64, timeout time.Duration) (any, error)
-	// GetTokenBalance gets the balance of an account for a token on a chain
-	GetTokenBalance(ctx context.Context, chainSelector uint64, address, tokenAddress []byte) (*big.Int, error)
 }
 
 // OnChainConfigurable defines methods that allows devenv to

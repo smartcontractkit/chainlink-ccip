@@ -8,15 +8,15 @@ import {TokenPool} from "../../../pools/TokenPool.sol";
 import {AdvancedPoolHooksSetup} from "../AdvancedPoolHooks/AdvancedPoolHooksSetup.t.sol";
 import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
 
-contract TokenPoolV2_applyTokenTransferFeeConfigUpdates is AdvancedPoolHooksSetup {
+contract TokenPool_applyTokenTransferFeeConfigUpdates is AdvancedPoolHooksSetup {
   function test_applyTokenTransferFeeConfigUpdates() public {
     IPoolV2.TokenTransferFeeConfig memory feeConfig = IPoolV2.TokenTransferFeeConfig({
       destGasOverhead: 50_000,
       destBytesOverhead: Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES,
-      defaultBlockConfirmationFeeUSDCents: 100, // $1.00
-      customBlockConfirmationFeeUSDCents: 150, // $1.50
-      defaultBlockConfirmationTransferFeeBps: 100, // 1%
-      customBlockConfirmationTransferFeeBps: 200, // 2%
+      defaultBlockConfirmationsFeeUSDCents: 100, // $1.00
+      customBlockConfirmationsFeeUSDCents: 150, // $1.50
+      defaultBlockConfirmationsTransferFeeBps: 100, // 1%
+      customBlockConfirmationsTransferFeeBps: 200, // 2%
       isEnabled: true
     });
 
@@ -36,10 +36,10 @@ contract TokenPoolV2_applyTokenTransferFeeConfigUpdates is AdvancedPoolHooksSetu
     IPoolV2.TokenTransferFeeConfig memory feeConfig = IPoolV2.TokenTransferFeeConfig({
       destGasOverhead: 50_000,
       destBytesOverhead: Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES,
-      defaultBlockConfirmationFeeUSDCents: 100,
-      customBlockConfirmationFeeUSDCents: 150,
-      defaultBlockConfirmationTransferFeeBps: 100,
-      customBlockConfirmationTransferFeeBps: 200,
+      defaultBlockConfirmationsFeeUSDCents: 100,
+      customBlockConfirmationsFeeUSDCents: 150,
+      defaultBlockConfirmationsTransferFeeBps: 100,
+      customBlockConfirmationsTransferFeeBps: 200,
       isEnabled: true
     });
 
@@ -73,14 +73,27 @@ contract TokenPoolV2_applyTokenTransferFeeConfigUpdates is AdvancedPoolHooksSetu
     s_tokenPool.applyTokenTransferFeeConfigUpdates(feeConfigArgs, disableTokenTransferFeeConfigs);
   }
 
+  function test_applyTokenTransferFeeConfigUpdates_RevertWhen_NonExistentChain() public {
+    uint64 unsupportedChain = 999_999;
+
+    IPoolV2.TokenTransferFeeConfig memory feeConfig;
+
+    TokenPool.TokenTransferFeeConfigArgs[] memory feeConfigArgs = new TokenPool.TokenTransferFeeConfigArgs[](1);
+    feeConfigArgs[0] =
+      TokenPool.TokenTransferFeeConfigArgs({destChainSelector: unsupportedChain, tokenTransferFeeConfig: feeConfig});
+
+    vm.expectRevert(abi.encodeWithSelector(TokenPool.NonExistentChain.selector, unsupportedChain));
+    s_tokenPool.applyTokenTransferFeeConfigUpdates(feeConfigArgs, new uint64[](0));
+  }
+
   function test_applyTokenTransferFeeConfigUpdates_RevertWhen_InvalidTransferFeeBps_DefaultBpsTooHigh() public {
     IPoolV2.TokenTransferFeeConfig memory feeConfig = IPoolV2.TokenTransferFeeConfig({
       destGasOverhead: 50_000,
       destBytesOverhead: Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES,
-      defaultBlockConfirmationFeeUSDCents: 0,
-      customBlockConfirmationFeeUSDCents: 0,
-      defaultBlockConfirmationTransferFeeBps: uint16(BPS_DIVIDER),
-      customBlockConfirmationTransferFeeBps: 0,
+      defaultBlockConfirmationsFeeUSDCents: 0,
+      customBlockConfirmationsFeeUSDCents: 0,
+      defaultBlockConfirmationsTransferFeeBps: uint16(BPS_DIVIDER),
+      customBlockConfirmationsTransferFeeBps: 0,
       isEnabled: true
     });
 
@@ -96,10 +109,10 @@ contract TokenPoolV2_applyTokenTransferFeeConfigUpdates is AdvancedPoolHooksSetu
     IPoolV2.TokenTransferFeeConfig memory feeConfig = IPoolV2.TokenTransferFeeConfig({
       destGasOverhead: 50_000,
       destBytesOverhead: Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES,
-      defaultBlockConfirmationFeeUSDCents: 0,
-      customBlockConfirmationFeeUSDCents: 0,
-      defaultBlockConfirmationTransferFeeBps: 0,
-      customBlockConfirmationTransferFeeBps: uint16(BPS_DIVIDER),
+      defaultBlockConfirmationsFeeUSDCents: 0,
+      customBlockConfirmationsFeeUSDCents: 0,
+      defaultBlockConfirmationsTransferFeeBps: 0,
+      customBlockConfirmationsTransferFeeBps: uint16(BPS_DIVIDER),
       isEnabled: true
     });
 
@@ -117,10 +130,10 @@ contract TokenPoolV2_applyTokenTransferFeeConfigUpdates is AdvancedPoolHooksSetu
     IPoolV2.TokenTransferFeeConfig memory feeConfig = IPoolV2.TokenTransferFeeConfig({
       destGasOverhead: 0, // Zero gas overhead
       destBytesOverhead: Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES,
-      defaultBlockConfirmationFeeUSDCents: 100,
-      customBlockConfirmationFeeUSDCents: 150,
-      defaultBlockConfirmationTransferFeeBps: 100,
-      customBlockConfirmationTransferFeeBps: 200,
+      defaultBlockConfirmationsFeeUSDCents: 100,
+      customBlockConfirmationsFeeUSDCents: 150,
+      defaultBlockConfirmationsTransferFeeBps: 100,
+      customBlockConfirmationsTransferFeeBps: 200,
       isEnabled: true // Enabled with zero gas
     });
 
@@ -136,10 +149,10 @@ contract TokenPoolV2_applyTokenTransferFeeConfigUpdates is AdvancedPoolHooksSetu
     IPoolV2.TokenTransferFeeConfig memory feeConfig = IPoolV2.TokenTransferFeeConfig({
       destGasOverhead: 50_000,
       destBytesOverhead: Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES,
-      defaultBlockConfirmationFeeUSDCents: 100,
-      customBlockConfirmationFeeUSDCents: 150,
-      defaultBlockConfirmationTransferFeeBps: 100,
-      customBlockConfirmationTransferFeeBps: 200,
+      defaultBlockConfirmationsFeeUSDCents: 100,
+      customBlockConfirmationsFeeUSDCents: 150,
+      defaultBlockConfirmationsTransferFeeBps: 100,
+      customBlockConfirmationsTransferFeeBps: 200,
       isEnabled: false // Cannot set isEnabled: false directly
     });
 

@@ -32,11 +32,11 @@ func MaybeDeployContract(
 			ref.Version.Equal(contractVersion) {
 			if contractQualifier != "" {
 				if ref.Qualifier == contractQualifier {
-					fmt.Println("Using existing", contractType, "at", ref.Address)
+					b.Logger.Infof("Using existing %s at %s", contractType, ref.Address)
 					return ref, nil
 				}
 			} else {
-				fmt.Println("Using existing", contractType, "at", ref.Address)
+				b.Logger.Infof("Using existing %s at %s", contractType, ref.Address)
 				return ref, nil
 			}
 		}
@@ -49,7 +49,7 @@ func MaybeDeployContract(
 	}
 	// validate deployed programID
 	_ = solana.MustPublicKeyFromBase58(programID)
-	fmt.Println("Deployed", contractType, "at", programID)
+	b.Logger.Infof("Deployed %s at %s", contractType, programID)
 
 	return datastore.AddressRef{
 		Address:       programID,

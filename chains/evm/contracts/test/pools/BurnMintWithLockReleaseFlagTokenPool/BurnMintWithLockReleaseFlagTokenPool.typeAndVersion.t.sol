@@ -5,6 +5,6 @@ import {BurnMintWithLockReleaseFlagTokenPoolSetup} from "./BurnMintWithLockRelea
 
 contract BurnMintWithLockReleaseFlagTokenPool_typeAndVersion is BurnMintWithLockReleaseFlagTokenPoolSetup {
   function test_typeAndVersion() public view {
-    assertEq(s_pool.typeAndVersion(), "BurnMintWithLockReleaseFlagTokenPool 1.7.0-dev");
+    assertEq(s_pool.typeAndVersion(), "BurnMintWithLockReleaseFlagTokenPool 2.0.0-dev");
   }
 }

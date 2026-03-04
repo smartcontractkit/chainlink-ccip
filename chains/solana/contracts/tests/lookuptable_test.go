@@ -11,14 +11,12 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
-
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/testutils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 )
 
 func TestSVMLookupTables(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	url := testutils.SetupLocalSolNode(t)
 	c := rpc.New(url)
 

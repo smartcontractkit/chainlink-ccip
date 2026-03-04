@@ -64,6 +64,39 @@ func TestDeployLockReleaseTokenPool(t *testing.T) {
 			expectedErr: "",
 		},
 		{
+			desc: "happy path - hooks configured",
+			makeInput: func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) tokens.DeployTokenPoolInput {
+				var rmnProxyAddress common.Address
+				var routerAddress common.Address
+				for _, addr := range chainReport.Output.Addresses {
+					if addr.Type == datastore.ContractType(rmn_proxy.ContractType) {
+						rmnProxyAddress = common.HexToAddress(addr.Address)
+					}
+					if addr.Type == datastore.ContractType(router.ContractType) {
+						routerAddress = common.HexToAddress(addr.Address)
+					}
+				}
+				return tokens.DeployTokenPoolInput{
+					ChainSel:                         chainReport.Input.ChainSelector,
+					TokenPoolType:                    datastore.ContractType(lock_release_token_pool.ContractType),
+					TokenPoolVersion:                 lock_release_token_pool.Version,
+					TokenSymbol:                      tokenReport.Input.Args.Symbol,
+					RateLimitAdmin:                   common.HexToAddress("0x01"),
+					ThresholdAmountForAdditionalCCVs: big.NewInt(1e18),
+					ConstructorArgs: tokens.ConstructorArgs{
+						Token:    common.HexToAddress(tokenReport.Output.Address),
+						Decimals: 18,
+						RMNProxy: rmnProxyAddress,
+						Router:   routerAddress,
+					},
+					AdvancedPoolHooksConfig: tokens.AdvancedPoolHooksConfig{
+						AuthorizedCallers: []common.Address{common.HexToAddress("0x2222222222222222222222222222222222222222")},
+					},
+				}
+			},
+			expectedErr: "",
+		},
+		{
 			desc: "incorrect chain selector",
 			makeInput: func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) tokens.DeployTokenPoolInput {
 				return tokens.DeployTokenPoolInput{
@@ -182,34 +215,34 @@ func TestDeployLockReleaseTokenPool(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
 			chainSel := uint64(5009297550715157269)
-		e, err := environment.New(t.Context(),
-			environment.WithEVMSimulated(t, []uint64{chainSel}),
-		)
-		require.NoError(t, err, "Failed to create environment")
-		require.NotNil(t, e, "Environment should be created")
+			e, err := environment.New(t.Context(),
+				environment.WithEVMSimulated(t, []uint64{chainSel}),
+			)
+			require.NoError(t, err, "Failed to create environment")
+			require.NotNil(t, e, "Environment should be created")
 
-		// Deploy CREATE2Factory first
-		create2FactoryRef, err := contract.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], contract.DeployInput[create2_factory.ConstructorArgs]{
-			TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
-			ChainSelector:  chainSel,
-			Args: create2_factory.ConstructorArgs{
-				AllowList: []common.Address{e.BlockChains.EVMChains()[chainSel].DeployerKey.From},
-			},
-		}, nil)
-		require.NoError(t, err, "Failed to deploy CREATE2Factory")
-
-		// Deploy chain
-		chainReport, err := operations.ExecuteSequence(
-			e.OperationsBundle,
-			sequences.DeployChainContracts,
-			e.BlockChains.EVMChains()[chainSel],
-			sequences.DeployChainContractsInput{
+			// Deploy CREATE2Factory first
+			create2FactoryRef, err := contract.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], contract.DeployInput[create2_factory.ConstructorArgs]{
+				TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
 				ChainSelector:  chainSel,
-				CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
-				ContractParams: testsetup.CreateBasicContractParams(),
-			},
-		)
-		require.NoError(t, err, "ExecuteSequence should not error")
+				Args: create2_factory.ConstructorArgs{
+					AllowList: []common.Address{e.BlockChains.EVMChains()[chainSel].DeployerKey.From},
+				},
+			}, nil)
+			require.NoError(t, err, "Failed to deploy CREATE2Factory")
+
+			// Deploy chain
+			chainReport, err := operations.ExecuteSequence(
+				e.OperationsBundle,
+				sequences.DeployChainContracts,
+				e.BlockChains.EVMChains()[chainSel],
+				sequences.DeployChainContractsInput{
+					ChainSelector:  chainSel,
+					CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
+					ContractParams: testsetup.CreateBasicContractParams(),
+				},
+			)
+			require.NoError(t, err, "ExecuteSequence should not error")
 
 			// Deploy token
 			tokenReport, err := operations.ExecuteOperation(
@@ -300,8 +333,36 @@ func TestDeployLockReleaseTokenPool(t *testing.T) {
 			require.NoError(t, err, "ExecuteOperation should not error")
 			require.Equal(t, input.ThresholdAmountForAdditionalCCVs, getThresholdAmountReport.Output, "Expected threshold amount for additional ccvs to be the same as the inputted threshold amount for additional ccvs")
 
-			// Check authorized callers on lock box
+			// If a policy engine was configured, ensure it was set.
+			if input.AdvancedPoolHooksConfig.PolicyEngine != (common.Address{}) {
+				getPolicyEngineReport, err := operations.ExecuteOperation(
+					testsetup.BundleWithFreshReporter(e.OperationsBundle),
+					advanced_pool_hooks.GetPolicyEngine,
+					e.BlockChains.EVMChains()[chainSel],
+					contract.FunctionInput[any]{
+						ChainSelector: chainSel,
+						Address:       common.HexToAddress(hooksAddress),
+					},
+				)
+				require.NoError(t, err, "ExecuteOperation should not error")
+				require.Equal(t, input.AdvancedPoolHooksConfig.PolicyEngine, getPolicyEngineReport.Output, "Expected policy engine address to be the same as the inputted policy engine address")
+			}
+
+			// Verify the newly deployed token pool is authorized on the hooks.
 			getAuthorizedCallersReport, err := operations.ExecuteOperation(
+				testsetup.BundleWithFreshReporter(e.OperationsBundle),
+				advanced_pool_hooks.GetAllAuthorizedCallers,
+				e.BlockChains.EVMChains()[chainSel],
+				contract.FunctionInput[any]{
+					ChainSelector: chainSel,
+					Address:       common.HexToAddress(hooksAddress),
+				},
+			)
+			require.NoError(t, err, "ExecuteOperation should not error")
+			require.Contains(t, getAuthorizedCallersReport.Output, common.HexToAddress(poolAddress), "Expected token pool address to be in the on-chain authorized callers")
+
+			// Check authorized callers on lock box
+			getAuthorizedCallersReport, err = operations.ExecuteOperation(
 				testsetup.BundleWithFreshReporter(e.OperationsBundle),
 				erc20_lock_box.GetAllAuthorizedCallers,
 				e.BlockChains.EVMChains()[chainSel],

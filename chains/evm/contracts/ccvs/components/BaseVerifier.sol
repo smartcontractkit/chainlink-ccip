@@ -24,8 +24,9 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
   error ZeroAddressNotAllowed();
 
   event RemoteChainConfigSet(uint64 indexed remoteChainSelector, address router, bool allowlistEnabled);
-  event AllowListSendersAdded(uint64 indexed destChainSelector, address[] senders);
-  event AllowListSendersRemoved(uint64 indexed destChainSelector, address[] senders);
+  event AllowListSendersAdded(uint64 indexed destChainSelector, address senders);
+  event AllowListSendersRemoved(uint64 indexed destChainSelector, address senders);
+  event AllowListStateChanged(uint64 indexed destChainSelector, bool allowlistEnabled);
   event StorageLocationsUpdated(string[] oldLocations, string[] newLocations);
 
   struct RemoteChainConfig {
@@ -201,10 +202,19 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
       AllowlistConfigArgs memory allowlistConfigArgs = allowlistConfigArgsItems[i];
 
       RemoteChainConfig storage remoteChainConfig = s_remoteChainConfigs[allowlistConfigArgs.destChainSelector];
-      remoteChainConfig.allowlistEnabled = allowlistConfigArgs.allowlistEnabled;
+
+      if (remoteChainConfig.allowlistEnabled != allowlistConfigArgs.allowlistEnabled) {
+        remoteChainConfig.allowlistEnabled = allowlistConfigArgs.allowlistEnabled;
+
+        emit AllowListStateChanged(allowlistConfigArgs.destChainSelector, allowlistConfigArgs.allowlistEnabled);
+      }
 
       for (uint256 j = 0; j < allowlistConfigArgs.removedAllowlistedSenders.length; ++j) {
-        remoteChainConfig.allowedSendersList.remove(allowlistConfigArgs.removedAllowlistedSenders[j]);
+        address toRemove = allowlistConfigArgs.removedAllowlistedSenders[j];
+        if (remoteChainConfig.allowedSendersList.remove(toRemove)) {
+          // Emit event only if the sender was actually removed from the allowlist.
+          emit AllowListSendersRemoved(allowlistConfigArgs.destChainSelector, toRemove);
+        }
       }
 
       if (allowlistConfigArgs.addedAllowlistedSenders.length > 0) {
@@ -214,19 +224,14 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
             if (toAdd == address(0)) {
               revert InvalidAllowListRequest(allowlistConfigArgs.destChainSelector);
             }
-            remoteChainConfig.allowedSendersList.add(toAdd);
+            if (remoteChainConfig.allowedSendersList.add(toAdd)) {
+              // Emit event only if the sender was actually added to the allowlist.
+              emit AllowListSendersAdded(allowlistConfigArgs.destChainSelector, toAdd);
+            }
           }
-
-          emit AllowListSendersAdded(allowlistConfigArgs.destChainSelector, allowlistConfigArgs.addedAllowlistedSenders);
         } else {
           revert InvalidAllowListRequest(allowlistConfigArgs.destChainSelector);
         }
-      }
-
-      if (allowlistConfigArgs.removedAllowlistedSenders.length > 0) {
-        emit AllowListSendersRemoved(
-          allowlistConfigArgs.destChainSelector, allowlistConfigArgs.removedAllowlistedSenders
-        );
       }
     }
   }
@@ -255,6 +260,10 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
       revert CursedByRMN(destChainSelector);
     }
   }
+
+  /// @notice Exposes the version tag for outbound requests.
+  /// @dev Used by operational tooling. Verifiers implemented by CLL override this function.
+  function versionTag() public pure virtual returns (bytes4);
 
   /// @inheritdoc IERC165
   function supportsInterface(

@@ -93,14 +93,14 @@ var ConfigureTokenPool = cldf_ops.NewSequence(
 				desiredFeeAdmin = input.FeeAggregator
 			}
 
-			if desiredRouter != currentDynamicConfig.Router || desiredRateLimitAdmin != currentDynamicConfig.RateLimitAdmin || desiredFeeAdmin != currentDynamicConfig.FeeAdmin{
+			if desiredRouter != currentDynamicConfig.Router || desiredRateLimitAdmin != currentDynamicConfig.RateLimitAdmin || desiredFeeAdmin != currentDynamicConfig.FeeAdmin {
 				setDynamicConfigReport, err := cldf_ops.ExecuteOperation(b, token_pool.SetDynamicConfig, chain, evm_contract.FunctionInput[token_pool.DynamicConfigArgs]{
 					ChainSelector: input.ChainSelector,
 					Address:       input.TokenPoolAddress,
 					Args: token_pool.DynamicConfigArgs{
 						Router:         desiredRouter,
 						RateLimitAdmin: desiredRateLimitAdmin,
-						FeeAdmin:  desiredFeeAdmin,
+						FeeAdmin:       desiredFeeAdmin,
 					},
 				})
 				if err != nil {
@@ -120,27 +120,3 @@ var ConfigureTokenPool = cldf_ops.NewSequence(
 		}, nil
 	},
 )
-
-// makeAllowListUpdates compares the current and desired allow-lists and returns the addresses to add and remove.
-func makeAllowListUpdates(current, desired []common.Address) (adds, removes []common.Address) {
-	currentSet := make(map[common.Address]struct{}, len(current))
-	for _, addr := range current {
-		currentSet[addr] = struct{}{}
-	}
-	desiredSet := make(map[common.Address]struct{}, len(desired))
-	for _, addr := range desired {
-		desiredSet[addr] = struct{}{}
-	}
-
-	for addr := range desiredSet {
-		if _, exists := currentSet[addr]; !exists {
-			adds = append(adds, addr)
-		}
-	}
-	for addr := range currentSet {
-		if _, exists := desiredSet[addr]; !exists {
-			removes = append(removes, addr)
-		}
-	}
-	return adds, removes
-}

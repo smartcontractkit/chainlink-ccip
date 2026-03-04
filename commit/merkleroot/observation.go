@@ -22,14 +22,13 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
-
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccip/consts"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
@@ -560,12 +559,28 @@ func (o observerImpl) ObserveLatestOnRampSeqNums(ctx context.Context) []pluginty
 
 	slices.Sort(supportedSourceChains)
 
+	sourceChainsCfg, err := o.ccipReader.GetOffRampSourceChainsConfig(ctx, supportedSourceChains)
+	if err != nil {
+		lggr.Warnw("call to GetOffRampSourceChainsConfig failed", "err", err)
+		return nil
+	}
+
 	mu := &sync.Mutex{}
 	latestOnRampSeqNums := make([]plugintypes.SeqNumChain, 0, len(supportedSourceChains))
 
 	wg := &sync.WaitGroup{}
 	for _, sourceChain := range supportedSourceChains {
 		wg.Go(func() {
+			// RMN should never be enabled on any source chain lane
+			// if it is misconfigured, we skip observations to avoid impact to the report
+			if _, ok := sourceChainsCfg[sourceChain]; !ok {
+				lggr.Warnw("source chain config not found, skipping observations", "source", sourceChain)
+				return
+			}
+			if !sourceChainsCfg[sourceChain].IsRMNVerificationDisabled {
+				lggr.Warnw("rmn enablement is misconfigured on this lane, skipping observations", "source", sourceChain)
+				return
+			}
 			latestOnRampSeqNum, err := o.ccipReader.LatestMsgSeqNum(ctx, sourceChain)
 			if err != nil {
 				if isNoBindingsError(err) {

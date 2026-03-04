@@ -11,9 +11,10 @@ import (
 )
 
 type DeployChainContractsCfg struct {
-	ChainSel        uint64
-	CREATE2Factory common.Address
-	Params          sequences.ContractParams
+	ChainSel         uint64
+	CREATE2Factory   common.Address
+	Params           sequences.ContractParams
+	DeployTestRouter bool
 }
 
 func (c DeployChainContractsCfg) ChainSelector() uint64 {
@@ -29,10 +30,11 @@ var DeployChainContracts = changesets.NewFromOnChainSequence(changesets.NewFromO
 	ResolveInput: func(e cldf_deployment.Environment, cfg DeployChainContractsCfg) (sequences.DeployChainContractsInput, error) {
 		addresses := e.DataStore.Addresses().Filter(datastore.AddressRefByChainSelector(cfg.ChainSel))
 		return sequences.DeployChainContractsInput{
-			CREATE2Factory:   cfg.CREATE2Factory,
+			CREATE2Factory:    cfg.CREATE2Factory,
 			ChainSelector:     cfg.ChainSel,
 			ExistingAddresses: addresses,
 			ContractParams:    cfg.Params,
+			DeployTestRouter:  cfg.DeployTestRouter,
 		}, nil
 	},
 	ResolveDep: evm_sequences.ResolveEVMChainDep[DeployChainContractsCfg],

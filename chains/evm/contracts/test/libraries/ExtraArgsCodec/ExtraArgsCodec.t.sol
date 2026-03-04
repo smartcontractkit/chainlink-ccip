@@ -24,6 +24,10 @@ contract ExtraArgsCodec_Test is BaseTest {
     s_unoptimizedDecoder = new UnoptimizedDecodeHelper();
   }
 
+  function test_GENERIC_EXTRA_ARGS_V3_TAG_keccak256_tag() public pure {
+    assertEq(ExtraArgsCodec.GENERIC_EXTRA_ARGS_V3_TAG, bytes4(keccak256("CCIP GenericExtraArgsV3")));
+  }
+
   function test__encodeGenericExtraArgsV3_AllDynamicArgsDefaultValues() public view {
     ExtraArgsCodec.GenericExtraArgsV3 memory args = ExtraArgsCodec.GenericExtraArgsV3({
       ccvs: new address[](0),

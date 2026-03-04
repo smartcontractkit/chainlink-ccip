@@ -9,7 +9,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/executor"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
@@ -96,8 +96,10 @@ func TestConfigureChainForLanes(t *testing.T) {
 			ccipMessageDest := common.HexToAddress("0x11").Bytes()
 			remoteChainSelector := uint64(4356164186791070119)
 
+			// Use a fresh reporter so ConfigureChainForLanes reads current on-chain state (e.g. Executor
+			// proxy target) instead of cached operation reports from DeployChainContracts.
 			_, err = operations.ExecuteSequence(
-				e.OperationsBundle,
+				testsetup.BundleWithFreshReporter(e.OperationsBundle),
 				sequences.ConfigureChainForLanes,
 				e.BlockChains,
 				adapters.ConfigureChainForLanesInput{

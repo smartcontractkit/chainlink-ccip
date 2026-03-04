@@ -18,8 +18,9 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/wasp"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
-	ccip "github.com/smartcontractkit/chainlink-ccip/devenv"
 	f "github.com/smartcontractkit/chainlink-testing-framework/framework"
+
+	ccip "github.com/smartcontractkit/chainlink-ccip/devenv"
 )
 
 type ChaosTestCase struct {
@@ -136,6 +137,9 @@ func createLoadProfile(in *ccip.Cfg, rps int64, testDuration time.Duration, e *d
 func TestE2ELoad(t *testing.T) {
 	in, err := ccip.LoadOutput[ccip.Cfg]("../../env-out.toml")
 	require.NoError(t, err)
+	if in.ForkedEnvConfig != nil {
+		t.Skip("Skipping E2E tests on forked environments, not supported yet")
+	}
 	if os.Getenv("LOKI_URL") == "" {
 		_ = os.Setenv("LOKI_URL", ccip.DefaultLokiURL)
 	}
@@ -161,7 +165,7 @@ func TestE2ELoad(t *testing.T) {
 
 	impls := make([]ccip.CCIP16ProductConfiguration, 0)
 	for _, bc := range in.Blockchains {
-		i, err := ccip.NewCCIPImplFromNetwork(bc.Out.Type)
+		i, err := ccip.NewCCIPImplFromNetwork(bc.Type, bc.ChainID)
 		require.NoError(t, err)
 		i.SetCLDF(e)
 		impls = append(impls, i)

@@ -1,3 +1,4 @@
+//revive:disable:var-naming // legacy package name
 package common
 
 import (
@@ -75,7 +76,7 @@ func SendAndFailWithLookupTables(ctx context.Context, rpcClient *rpc.Client, ins
 	logs := strings.Join(txres.Meta.LogMessages, " ")
 	for _, expectedError := range expectedErrors {
 		if !strings.Contains(logs, expectedError) {
-			return nil, fmt.Errorf("The logs did not contain '%s'. The logs were: %s", expectedError, logs)
+			return nil, fmt.Errorf("the logs did not contain '%s'. The logs were: %s", expectedError, logs)
 		}
 	}
 	return txres, nil
@@ -122,7 +123,7 @@ func SendAndFailWithRPCError(ctx context.Context, rpcClient *rpc.Client, instruc
 	errStr := err.Error()
 	for _, expectedError := range expectedErrors {
 		if !strings.Contains(errStr, expectedError) {
-			return fmt.Errorf("The error did not contain '%s'. The error was: %s", expectedError, errStr)
+			return fmt.Errorf("the error did not contain '%s'. The error was: %s", expectedError, errStr)
 		}
 	}
 	return nil
@@ -389,6 +390,15 @@ func ExtractReturnedError(ctx context.Context, logs []string, programID string) 
 type anchorType[T any] interface {
 	*T
 	UnmarshalWithDecoder(decoder *bin.Decoder) (err error)
+}
+
+func UnmarshalAnchorType[T any, PT anchorType[T]](bytes []byte) (*T, error) {
+	var result T
+	err := PT(&result).UnmarshalWithDecoder(bin.NewBorshDecoder(bytes))
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
 }
 
 func ExtractAnchorTypedReturnValue[T any, PT anchorType[T]](ctx context.Context, logs []string, programID string) (*T, error) {

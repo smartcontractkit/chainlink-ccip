@@ -17,9 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-
-	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
-
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccip/consts"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
@@ -97,7 +95,22 @@ func TestPlugin_RoleDonE2E_NoPrevOutcome(t *testing.T) {
 		}
 
 		// Source Chain Expectations - Makes sure only oracles that support specific source chains are reading them.
+		// GetOffRampSourceChainsConfig is called for every oracle (with the supported source chains, possibly empty).
 		{
+			deps.ccipReader.EXPECT().GetOffRampSourceChainsConfig(mock.Anything, mock.Anything).
+				RunAndReturn(func(ctx context.Context, chains []cciptypes.ChainSelector) (
+					map[cciptypes.ChainSelector]ccipreader.StaticSourceChainConfig, error) {
+					cfg := make(map[cciptypes.ChainSelector]ccipreader.StaticSourceChainConfig)
+					for _, ch := range chains {
+						cfg[ch] = ccipreader.StaticSourceChainConfig{
+							Router:                    clrand.RandomBytes(32),
+							IsEnabled:                 true,
+							IsRMNVerificationDisabled: true,
+							OnRamp:                    clrand.RandomBytes(32),
+						}
+					}
+					return cfg, nil
+				})
 			if len(oracleSourceChains) > 0 {
 				deps.ccipReader.EXPECT().LatestMsgSeqNum(mock.Anything, mock.Anything).
 					RunAndReturn(func(ctx context.Context, ch cciptypes.ChainSelector) (cciptypes.SeqNum, error) {
@@ -120,17 +133,6 @@ func TestPlugin_RoleDonE2E_NoPrevOutcome(t *testing.T) {
 				deps.ccipReader.EXPECT().NextSeqNum(mock.Anything, s.sourceChains).Return(nextSeqNums, nil)
 
 				deps.ccipReader.EXPECT().GetRMNRemoteConfig(mock.Anything).Return(cciptypes.RemoteConfig{FSign: 1234}, nil)
-
-				sourceChainsCfg := make(map[cciptypes.ChainSelector]ccipreader.StaticSourceChainConfig)
-				for _, ch := range s.sourceChains {
-					sourceChainsCfg[ch] = ccipreader.StaticSourceChainConfig{
-						Router:                    clrand.RandomBytes(32),
-						IsEnabled:                 true,
-						IsRMNVerificationDisabled: true,
-						OnRamp:                    clrand.RandomBytes(32),
-					}
-				}
-				deps.ccipReader.EXPECT().GetOffRampSourceChainsConfig(mock.Anything, s.sourceChains).Return(sourceChainsCfg, nil)
 
 				deps.priceReader.EXPECT().GetFeeQuoterTokenUpdates(mock.Anything, mock.Anything, s.destChain).Return(nil, nil)
 
@@ -328,8 +330,8 @@ func TestPlugin_RoleDonE2E_Discovery(t *testing.T) {
 		{
 			deps.ccipReader.EXPECT().DiscoverContracts(mock.Anything, mock.Anything, mock.Anything).
 				RunAndReturn(func(ctx context.Context, supportedChains, selectors []cciptypes.ChainSelector,
-				) (ccipreader.ContractAddresses, error) {
-					addrs := ccipreader.ContractAddresses{}
+				) (cciptypes.ContractAddresses, error) {
+					addrs := cciptypes.ContractAddresses{}
 
 					// the following contracts can only be discovered by dest supporting oracles
 					if oracleChains.Contains(s.destChain) {
@@ -358,8 +360,8 @@ func TestPlugin_RoleDonE2E_Discovery(t *testing.T) {
 				})
 
 			deps.ccipReader.EXPECT().Sync(mock.Anything, mock.Anything).
-				RunAndReturn(func(ctx context.Context, addresses ccipreader.ContractAddresses) error {
-					require.Equal(t, ccipreader.ContractAddresses{
+				RunAndReturn(func(ctx context.Context, addresses cciptypes.ContractAddresses) error {
+					require.Equal(t, cciptypes.ContractAddresses{
 						// offramp is synced once and cannot change afterwards
 						//consts.ContractNameOffRamp:      {s.destChain: []byte("offramp")},
 						consts.ContractNameOnRamp:       {s.sourceChains[0]: []byte("onramp")},

@@ -312,22 +312,4 @@ contract CCTPVerifier_forwardToVerifier is CCTPVerifierSetup {
     vm.expectRevert(abi.encodeWithSelector(CCTPVerifier.InvalidVerifierArgsLength.selector, 64));
     s_cctpVerifier.forwardToVerifier(message, messageId, s_sourceFeeTokens[0], 0, verifierArgs);
   }
-
-  function test_forwardToVerifier_RevertWhen_MaxFeeExceedsUint32() public {
-    // Use a large amount that will exceed the uint32 max.
-    uint256 largeAmount = 50000000000000; // 50 million USDC
-    (MessageV1Codec.MessageV1 memory message, bytes32 messageId) = _createCCIPMessage(
-      SOURCE_CHAIN_SELECTOR,
-      DEST_CHAIN_SELECTOR,
-      CCIP_FAST_FINALITY_THRESHOLD,
-      address(s_USDCToken),
-      largeAmount,
-      s_tokenReceiver
-    );
-    uint256 expectedMaxFee = largeAmount * CCTP_FAST_FINALITY_BPS / BPS_DIVIDER;
-
-    vm.startPrank(s_onRamp);
-    vm.expectRevert(abi.encodeWithSelector(CCTPVerifier.MaxFeeExceedsUint32.selector, expectedMaxFee));
-    s_cctpVerifier.forwardToVerifier(message, messageId, s_sourceFeeTokens[0], 0, "");
-  }
 }

@@ -28,7 +28,7 @@ contract CommitteeVerifier_applyAllowlistUpdates is CommitteeVerifierSetup {
     });
 
     vm.expectEmit();
-    emit BaseVerifier.AllowListSendersAdded(DEST_CHAIN_SELECTOR, senders);
+    emit BaseVerifier.AllowListSendersAdded(DEST_CHAIN_SELECTOR, senders[0]);
 
     s_committeeVerifier.applyAllowlistUpdates(allowlistConfigs);
 
@@ -55,7 +55,7 @@ contract CommitteeVerifier_applyAllowlistUpdates is CommitteeVerifierSetup {
     });
 
     vm.expectEmit();
-    emit BaseVerifier.AllowListSendersAdded(DEST_CHAIN_SELECTOR, senders);
+    emit BaseVerifier.AllowListSendersAdded(DEST_CHAIN_SELECTOR, senders[0]);
 
     s_committeeVerifier.applyAllowlistUpdates(allowlistConfigs);
   }

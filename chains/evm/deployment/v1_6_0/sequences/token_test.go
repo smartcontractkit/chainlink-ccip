@@ -17,18 +17,14 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20_with_drip"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc677"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/erc20"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/erc677"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/factory_burn_mint_erc20"
 	bnm_bindings "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc20"
 
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 )
 
 // TestEVMTokenDeployments tests various EVM token deployments using the DeployToken sequence directly.
-// This covers all supported EVM token types: ERC20, ERC677, BurnMintERC20, BurnMintERC677,
-// FactoryBurnMintERC20, and BurnMintERC20WithDrip.
+// This covers all supported EVM token types: ERC20, BurnMintERC20, FactoryBurnMintERC20, and BurnMintERC20WithDrip.
 // Note: The full TokenExpansion changeset is not yet implemented for EVM (DeployTokenPoolForToken,
 // RegisterToken, SetPool return nil), so we test token deployment directly via the sequence.
 func TestEVMTokenDeployments(t *testing.T) {
@@ -59,13 +55,6 @@ func TestEVMTokenDeployments(t *testing.T) {
 			decimals:    18,
 		},
 		{
-			name:        "ERC677Token",
-			tokenType:   erc677.ContractType,
-			tokenName:   "Test ERC677",
-			tokenSymbol: "TERC677",
-			decimals:    6,
-		},
-		{
 			name:           "BurnMintERC20Token",
 			tokenType:      burn_mint_erc20.ContractType,
 			tokenName:      "Test BurnMint ERC20",
@@ -74,27 +63,6 @@ func TestEVMTokenDeployments(t *testing.T) {
 			ccipAdmin:      "0x1111111111111111111111111111111111111111",
 			supply:         big.NewInt(0).Mul(big.NewInt(1e9), big.NewInt(1e18)), // 1 billion tokens
 			preMint:        big.NewInt(0).Mul(big.NewInt(1e6), big.NewInt(1e18)), // 1 million tokens
-			requiresSupply: true,
-		},
-		{
-			name:           "BurnMintERC677Token",
-			tokenType:      burn_mint_erc677.ContractType,
-			tokenName:      "Test BurnMint ERC677",
-			tokenSymbol:    "TBMERC677",
-			decimals:       18,
-			supply:         big.NewInt(0).Mul(big.NewInt(1e9), big.NewInt(1e18)),
-			requiresSupply: true,
-		},
-		{
-			name:           "FactoryBurnMintERC20Token",
-			tokenType:      factory_burn_mint_erc20.ContractType,
-			tokenName:      "Test Factory BurnMint ERC20",
-			tokenSymbol:    "TFBMERC20",
-			decimals:       6,
-			ccipAdmin:      "0x1111111111111111111111111111111111111111",
-			supply:         big.NewInt(0).Mul(big.NewInt(1e9), big.NewInt(1e18)),
-			preMint:        big.NewInt(0).Mul(big.NewInt(1e6), big.NewInt(1e18)),
-			requiresOwner:  true,
 			requiresSupply: true,
 		},
 		{
@@ -126,8 +94,7 @@ func TestEVMTokenDeployments(t *testing.T) {
 
 			// Generate test addresses for CCIP admin and external admins
 			ccipAdminAddr := common.HexToAddress("0x1111111111111111111111111111111111111111")
-			externalAdmin1 := "0x2222222222222222222222222222222222222222"
-			externalAdmin2 := "0x3333333333333333333333333333333333333333"
+			externalAdmin := "0x2222222222222222222222222222222222222222"
 
 			// Build token input based on test case configuration
 			tokenInput := tokensapi.DeployTokenInput{
@@ -135,7 +102,7 @@ func TestEVMTokenDeployments(t *testing.T) {
 				Symbol:        tc.tokenSymbol,
 				Decimals:      tc.decimals,
 				Type:          tc.tokenType,
-				ExternalAdmin: []string{externalAdmin1, externalAdmin2},
+				ExternalAdmin: externalAdmin,
 				CCIPAdmin:     tc.ccipAdmin,
 				ChainSelector: chain_selectors.ETHEREUM_MAINNET.Selector,
 			}
@@ -230,17 +197,11 @@ func TestEVMTokenDeployments(t *testing.T) {
 						require.NoError(t, err, "Failed to get DEFAULT_ADMIN_ROLE")
 						t.Logf("  DEFAULT_ADMIN_ROLE: 0x%x", defaultAdminRole)
 
-						// Verify externalAdmin1 has the admin role
-						hasRole1, err := tokenContract.HasRole(&bind.CallOpts{}, defaultAdminRole, common.HexToAddress(externalAdmin1))
-						require.NoError(t, err, "Failed to check HasRole for externalAdmin1")
-						require.True(t, hasRole1, "External admin 1 should have DEFAULT_ADMIN_ROLE")
-						t.Logf("  External admin 1 (%s) has DEFAULT_ADMIN_ROLE: %v", externalAdmin1, hasRole1)
-
-						// Verify externalAdmin2 has the admin role
-						hasRole2, err := tokenContract.HasRole(&bind.CallOpts{}, defaultAdminRole, common.HexToAddress(externalAdmin2))
-						require.NoError(t, err, "Failed to check HasRole for externalAdmin2")
-						require.True(t, hasRole2, "External admin 2 should have DEFAULT_ADMIN_ROLE")
-						t.Logf("  External admin 2 (%s) has DEFAULT_ADMIN_ROLE: %v", externalAdmin2, hasRole2)
+						// Verify externalAdmin has the admin role
+						hasRole, err := tokenContract.HasRole(&bind.CallOpts{}, defaultAdminRole, common.HexToAddress(externalAdmin))
+						require.NoError(t, err, "Failed to check HasRole for externalAdmin")
+						require.True(t, hasRole, "External admin should have DEFAULT_ADMIN_ROLE")
+						t.Logf("  External admin (%s) has DEFAULT_ADMIN_ROLE: %v", externalAdmin, hasRole)
 
 						// Verify deployer still has the admin role (original deployer should retain role)
 						deployerHasRole, err := tokenContract.HasRole(&bind.CallOpts{}, defaultAdminRole, deployerAddr)

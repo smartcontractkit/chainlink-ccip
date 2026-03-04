@@ -23,7 +23,7 @@ build-jd-docker:
         echo "Docker image $IMAGE_NAME already exists, skipping build..."
     else
         echo "Cloning repository... check for 2-factor authentication"
-        git clone "$REPO_URL" "$REPO_DIR"
+        git clone "$REPO_URL" "$REPO_DIR" --depth 1
         echo "Building Docker image..."
         cd "$REPO_DIR" && docker build -t "$IMAGE_NAME" -f "$DOCKERFILE" .
         cd ..

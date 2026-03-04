@@ -1,5 +1,6 @@
 blockscout/
 compose/
+tmp/
 env-out.toml
 dashboards/dummy.json
 env-*-out.toml

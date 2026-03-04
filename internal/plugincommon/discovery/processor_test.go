@@ -17,13 +17,13 @@ import (
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccip/consts"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	mock_home_chain "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
 	mock_reader "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 )
 
@@ -51,7 +51,7 @@ func TestContractDiscoveryProcessor_Observation_SupportsDest_HappyPath(t *testin
 	}
 	expectedRMNRemote := cciptypes.UnknownAddress("rmnRemote")
 	expectedRouter := cciptypes.UnknownAddress("router")
-	expectedContracts := reader.ContractAddresses{
+	expectedContracts := cciptypes.ContractAddresses{
 		consts.ContractNameNonceManager: map[cciptypes.ChainSelector]cciptypes.UnknownAddress{
 			dest: expectedNonceManager,
 		},
@@ -236,7 +236,7 @@ func TestContractDiscoveryProcessor_Outcome_HappyPath(t *testing.T) {
 		dest: cciptypes.UnknownAddress("onRamp"),
 	}
 	expectedRMNRemote := cciptypes.UnknownAddress("rmnRemote")
-	expectedContracts := reader.ContractAddresses{
+	expectedContracts := cciptypes.ContractAddresses{
 		consts.ContractNameNonceManager: map[cciptypes.ChainSelector]cciptypes.UnknownAddress{
 			dest: expectedNonceManager,
 		},
@@ -254,7 +254,7 @@ func TestContractDiscoveryProcessor_Outcome_HappyPath(t *testing.T) {
 	mockReader.
 		EXPECT().
 		Sync(mock.Anything, expectedContracts).
-		Run(func(_ context.Context, _ reader.ContractAddresses) { close(syncCalled) }).
+		Run(func(_ context.Context, _ cciptypes.ContractAddresses) { close(syncCalled) }).
 		Return(nil)
 
 	cdp := internalNewContractDiscoveryProcessor(
@@ -324,7 +324,7 @@ func TestContractDiscovery_Outcome_HappyPath_FRoleDONAndFDestChainAreDifferent(t
 		dest: cciptypes.UnknownAddress("onRamp"),
 	}
 	expectedRMNRemote := cciptypes.UnknownAddress("rmnRemote")
-	expectedContracts := reader.ContractAddresses{
+	expectedContracts := cciptypes.ContractAddresses{
 		consts.ContractNameNonceManager: map[cciptypes.ChainSelector]cciptypes.UnknownAddress{
 			dest: expectedNonceManager,
 		},
@@ -341,7 +341,7 @@ func TestContractDiscovery_Outcome_HappyPath_FRoleDONAndFDestChainAreDifferent(t
 	mockReader.
 		EXPECT().
 		Sync(mock.Anything, expectedContracts).
-		Run(func(_ context.Context, _ reader.ContractAddresses) { close(syncCalled) }).
+		Run(func(_ context.Context, _ cciptypes.ContractAddresses) { close(syncCalled) }).
 		Return(nil)
 
 	cdp := internalNewContractDiscoveryProcessor(
@@ -423,7 +423,7 @@ func TestContractDiscoveryProcessor_Outcome_NotEnoughObservations(t *testing.T) 
 		source2: cciptypes.UnknownAddress("onRamp"),
 	}
 	// we expect no contracts here due to not enough observations to come to consensus.
-	expectedContracts := reader.ContractAddresses{
+	expectedContracts := cciptypes.ContractAddresses{
 		consts.ContractNameNonceManager: {},
 		consts.ContractNameOnRamp:       {},
 		consts.ContractNameRMNRemote:    {},
@@ -434,7 +434,7 @@ func TestContractDiscoveryProcessor_Outcome_NotEnoughObservations(t *testing.T) 
 	mockReader.
 		EXPECT().
 		Sync(mock.Anything, expectedContracts).
-		Run(func(_ context.Context, _ reader.ContractAddresses) { close(syncCalled) }).
+		Run(func(_ context.Context, _ cciptypes.ContractAddresses) { close(syncCalled) }).
 		Return(nil)
 
 	cdp := internalNewContractDiscoveryProcessor(
@@ -507,7 +507,7 @@ func TestContractDiscoveryProcessor_Outcome_ErrorSyncingContracts(t *testing.T) 
 		dest: cciptypes.UnknownAddress("onRamp"),
 	}
 	expectedRMNRemote := cciptypes.UnknownAddress("rmnRemote")
-	expectedContracts := reader.ContractAddresses{
+	expectedContracts := cciptypes.ContractAddresses{
 		consts.ContractNameNonceManager: map[cciptypes.ChainSelector]cciptypes.UnknownAddress{
 			dest: expectedNonceManager,
 		},
@@ -523,7 +523,7 @@ func TestContractDiscoveryProcessor_Outcome_ErrorSyncingContracts(t *testing.T) 
 	mockReader.
 		EXPECT().
 		Sync(mock.Anything, expectedContracts).
-		Run(func(_ context.Context, _ reader.ContractAddresses) { close(syncCalled) }).
+		Run(func(_ context.Context, _ cciptypes.ContractAddresses) { close(syncCalled) }).
 		Return(syncErr)
 
 	cdp := internalNewContractDiscoveryProcessor(
@@ -668,7 +668,7 @@ func TestContractDiscoveryProcessor_ValidateObservation_OracleNotAllowedToObserv
 	cases := []struct {
 		name            string
 		supportedChains []cciptypes.ChainSelector
-		addresses       reader.ContractAddresses
+		addresses       cciptypes.ContractAddresses
 		fChain          map[cciptypes.ChainSelector]int
 		errStr          string
 	}{
@@ -829,7 +829,7 @@ func TestReaderSyncer_Sync_FirstCall(t *testing.T) {
 	var readerInstance reader.CCIPReader = mockReader
 	syncer := &readerSyncer{reader: &readerInstance}
 
-	contracts := reader.ContractAddresses{}
+	contracts := cciptypes.ContractAddresses{}
 	mockReader.On("Sync", mock.Anything, contracts).Return(nil)
 
 	alreadySyncing, err := syncer.Sync(t.Context(), contracts)
@@ -842,7 +842,7 @@ func TestReaderSyncer_Sync_ConcurrentCall(t *testing.T) {
 	mockReader := mock_reader.NewMockCCIPReader(t)
 	var readerInstance reader.CCIPReader = mockReader
 	syncer := &readerSyncer{reader: &readerInstance}
-	contracts := reader.ContractAddresses{}
+	contracts := cciptypes.ContractAddresses{}
 
 	// Simulate a long-running sync operation
 	syncStarted := make(chan struct{})
@@ -893,7 +893,7 @@ func TestReaderSyncer_Sync_AfterCompletion(t *testing.T) {
 	mockReader := mock_reader.NewMockCCIPReader(t)
 	var readerInstance reader.CCIPReader = mockReader
 	syncer := &readerSyncer{reader: &readerInstance}
-	contracts := reader.ContractAddresses{}
+	contracts := cciptypes.ContractAddresses{}
 
 	// First call
 	mockReader.On("Sync", mock.Anything, contracts).Return(nil).Once()
@@ -912,7 +912,7 @@ func TestReaderSyncer_Sync_ErrorPropagation(t *testing.T) {
 	mockReader := mock_reader.NewMockCCIPReader(t)
 	var readerInstance reader.CCIPReader = mockReader
 	syncer := &readerSyncer{reader: &readerInstance}
-	contracts := reader.ContractAddresses{}
+	contracts := cciptypes.ContractAddresses{}
 
 	expectedErr := errors.New("sync error")
 	mockReader.On("Sync", mock.Anything, contracts).Return(expectedErr)

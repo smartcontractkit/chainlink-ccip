@@ -120,7 +120,7 @@ contract OnRamp_getExecutionFee is OnRampSetup {
     uint32 expectedOverhead = uint32(
       MessageV1Codec.MESSAGE_V1_EVM_SOURCE_BASE_SIZE + dataLength
         + (MessageV1Codec.MESSAGE_V1_REMOTE_CHAIN_ADDRESSES * EVM_ADDRESS_LENGTH)
-        + (numberOfTokens * (MessageV1Codec.TOKEN_TRANSFER_V1_EVM_SOURCE_BASE_SIZE + EVM_ADDRESS_LENGTH))
+        + (numberOfTokens * (MessageV1Codec.TOKEN_TRANSFER_V1_EVM_SOURCE_BASE_SIZE + EVM_ADDRESS_LENGTH * 2))
     );
 
     assertEq(receipt.destBytesOverhead, expectedOverhead, "Bytes overhead should include token overhead");

@@ -15,6 +15,6 @@ contract BurnMintTokenPool_typeAndVersion is TokenPoolSetup {
       address(s_mockRMNRemote),
       address(s_sourceRouter)
     );
-    assertEq(pool.typeAndVersion(), "BurnMintTokenPool 1.7.0-dev");
+    assertEq(pool.typeAndVersion(), "BurnMintTokenPool 2.0.0-dev");
   }
 }

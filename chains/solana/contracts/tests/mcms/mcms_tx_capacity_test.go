@@ -12,7 +12,6 @@ import (
 	computebudget "github.com/gagliardetto/solana-go/programs/compute-budget"
 	"github.com/gagliardetto/solana-go/programs/system"
 	"github.com/gagliardetto/solana-go/rpc"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
@@ -29,7 +28,7 @@ import (
 )
 
 func TestMcmsCapacity(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	mcm.SetProgramID(config.McmProgram)
 	timelock.SetProgramID(config.TimelockProgram)

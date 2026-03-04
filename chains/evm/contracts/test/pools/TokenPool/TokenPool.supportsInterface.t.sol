@@ -8,7 +8,7 @@ import {AdvancedPoolHooksSetup} from "../AdvancedPoolHooks/AdvancedPoolHooksSetu
 
 import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
 
-contract TokenPoolV2_supportsInterface is AdvancedPoolHooksSetup {
+contract TokenPool_supportsInterface is AdvancedPoolHooksSetup {
   function test_supportsInterface() public view {
     assertTrue(s_tokenPool.supportsInterface(type(IERC165).interfaceId));
     assertTrue(s_tokenPool.supportsInterface(type(IPoolV2).interfaceId));

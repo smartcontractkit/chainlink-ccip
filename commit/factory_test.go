@@ -32,6 +32,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	rmnpb "github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
 )
 
@@ -146,7 +147,7 @@ func Test_maxObservationLength(t *testing.T) {
 		},
 		DiscoveryObs: dt.Observation{
 			FChain:    make(map[ccipocr3.ChainSelector]int, estimatedMaxNumberOfSourceChains),
-			Addresses: make(reader.ContractAddresses, estimatedMaxNumberOfSourceChains*maxContractsPerChain),
+			Addresses: make(cciptypes.ContractAddresses, estimatedMaxNumberOfSourceChains*maxContractsPerChain),
 		},
 		FChain: make(map[ccipocr3.ChainSelector]int, estimatedMaxNumberOfSourceChains),
 	}

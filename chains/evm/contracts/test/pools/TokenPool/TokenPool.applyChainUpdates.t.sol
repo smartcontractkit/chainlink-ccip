@@ -114,6 +114,23 @@ contract TokenPool_applyChainUpdates is BaseTest {
     // State remains
     assertState(chainUpdates);
 
+    // Configure custom block confirmation rate limiters on the chain we're about to remove.
+    {
+      TokenPool.RateLimitConfigArgs[] memory customRLArgs = new TokenPool.RateLimitConfigArgs[](1);
+      customRLArgs[0] = TokenPool.RateLimitConfigArgs({
+        remoteChainSelector: evmChainSelector,
+        customBlockConfirmations: true,
+        outboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 5e20, rate: 1e18}),
+        inboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 5e20, rate: 1e18})
+      });
+      s_tokenPool.setRateLimitConfig(customRLArgs);
+
+      (RateLimiter.TokenBucket memory outPre, RateLimiter.TokenBucket memory inPre) =
+        s_tokenPool.getCurrentRateLimiterState(evmChainSelector, true);
+      assertTrue(outPre.isEnabled);
+      assertTrue(inPre.isEnabled);
+    }
+
     // Can remove a chain
     chainRemoves[0] = evmChainSelector;
 
@@ -121,6 +138,16 @@ contract TokenPool_applyChainUpdates is BaseTest {
     emit TokenPool.ChainRemoved(chainRemoves[0]);
 
     s_tokenPool.applyChainUpdates(chainRemoves, new TokenPool.ChainUpdate[](0));
+
+    // Custom block confirmation buckets should be deleted along with the chain.
+    {
+      (RateLimiter.TokenBucket memory outPost, RateLimiter.TokenBucket memory inPost) =
+        s_tokenPool.getCurrentRateLimiterState(evmChainSelector, true);
+      assertFalse(outPost.isEnabled);
+      assertEq(outPost.capacity, 0);
+      assertFalse(inPost.isEnabled);
+      assertEq(inPost.capacity, 0);
+    }
 
     // State updated, only chain 2 remains
     TokenPool.ChainUpdate[] memory singleChainConfigured = new TokenPool.ChainUpdate[](1);

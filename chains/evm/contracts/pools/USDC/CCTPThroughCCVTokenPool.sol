@@ -21,7 +21,7 @@ import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 /// CCTPVerifier contract. This token pool should never have a balance of USDC at any point during a transaction.
 /// The caller of lockOrBurn is responsible for sending USDC to the CCTPVerifier contract instead.
 contract CCTPThroughCCVTokenPool is TokenPool, ITypeAndVersion, AuthorizedCallers {
-  string public constant override typeAndVersion = "CCTPThroughCCVTokenPool 1.7.0-dev";
+  string public constant override typeAndVersion = "CCTPThroughCCVTokenPool 2.0.0-dev";
 
   error IPoolV1NotSupported();
   error CCVNotSetOnResolver(address resolver);
@@ -37,6 +37,7 @@ contract CCTPThroughCCVTokenPool is TokenPool, ITypeAndVersion, AuthorizedCaller
     address cctpVerifier,
     address[] memory allowedCallers
   ) TokenPool(token, localTokenDecimals, address(0), rmnProxy, router) AuthorizedCallers(allowedCallers) {
+    if (cctpVerifier == address(0)) revert ZeroAddressInvalid();
     i_cctpVerifier = ICrossChainVerifierResolver(cctpVerifier);
   }
 
@@ -46,10 +47,10 @@ contract CCTPThroughCCVTokenPool is TokenPool, ITypeAndVersion, AuthorizedCaller
   /// LockedOrBurned is still emitted for consumers that expect it.
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
-    uint16 blockConfirmationRequested,
+    uint16 blockConfirmationsRequested,
     bytes calldata tokenArgs
   ) public virtual override returns (Pool.LockOrBurnOutV1 memory, uint256 destTokenAmount) {
-    _validateLockOrBurn(lockOrBurnIn, blockConfirmationRequested, tokenArgs, 0);
+    _validateLockOrBurn(lockOrBurnIn, blockConfirmationsRequested, tokenArgs, 0);
 
     emit LockedOrBurned({
       remoteChainSelector: lockOrBurnIn.remoteChainSelector,
@@ -73,9 +74,9 @@ contract CCTPThroughCCVTokenPool is TokenPool, ITypeAndVersion, AuthorizedCaller
   /// ReleasedOrMinted is still emitted for consumers that expect it.
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
-    uint16 blockConfirmationRequested
+    uint16 blockConfirmationsRequested
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
-    _validateReleaseOrMint(releaseOrMintIn, releaseOrMintIn.sourceDenominatedAmount, blockConfirmationRequested);
+    _validateReleaseOrMint(releaseOrMintIn, releaseOrMintIn.sourceDenominatedAmount, blockConfirmationsRequested);
 
     emit ReleasedOrMinted({
       remoteChainSelector: releaseOrMintIn.remoteChainSelector,
@@ -113,7 +114,7 @@ contract CCTPThroughCCVTokenPool is TokenPool, ITypeAndVersion, AuthorizedCaller
   function getTokenTransferFeeConfig(
     address, // localToken
     uint64 destChainSelector,
-    uint16, // blockConfirmationRequested,
+    uint16, // blockConfirmationsRequested,
     bytes calldata // tokenArgs
   ) external view override returns (TokenTransferFeeConfig memory feeConfig) {
     TokenTransferFeeConfig memory transferFeeConfig = s_tokenTransferFeeConfig[destChainSelector];
@@ -124,7 +125,7 @@ contract CCTPThroughCCVTokenPool is TokenPool, ITypeAndVersion, AuthorizedCaller
     }
 
     CCTPVerifier.DynamicConfig memory dynamicConfig = CCTPVerifier(verifierImpl).getDynamicConfig();
-    transferFeeConfig.customBlockConfirmationTransferFeeBps = dynamicConfig.fastFinalityBps;
+    transferFeeConfig.customBlockConfirmationsTransferFeeBps = dynamicConfig.fastFinalityBps;
 
     return transferFeeConfig;
   }
@@ -156,16 +157,17 @@ contract CCTPThroughCCVTokenPool is TokenPool, ITypeAndVersion, AuthorizedCaller
   }
 
   /// @notice No-op override to purge the unused code path from the contract.
-  function _postFlightCheck(
+  function _postflightCheck(
     Pool.ReleaseOrMintInV1 calldata,
     uint256,
     uint16
-  ) internal pure virtual override {}
+  ) internal virtual override {}
 
   /// @notice No-op override to purge the unused code path from the contract.
-  function _preFlightCheck(
+  function _preflightCheck(
     Pool.LockOrBurnInV1 calldata,
     uint16,
-    bytes memory
-  ) internal pure virtual override {}
+    bytes memory,
+    uint256
+  ) internal virtual override {}
 }

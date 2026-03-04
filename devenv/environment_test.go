@@ -188,4 +188,3 @@ cl_nodes_funding_link = 50
 	assert.Empty(t, cfg.NodeSets[0].NodeSpecs[0].Node.TestConfigOverrides)
 	assert.Empty(t, cfg.NodeSets[0].NodeSpecs[1].Node.TestConfigOverrides)
 }
-

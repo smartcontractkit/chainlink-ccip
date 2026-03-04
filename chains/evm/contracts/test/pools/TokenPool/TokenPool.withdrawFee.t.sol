@@ -8,7 +8,7 @@ import {AdvancedPoolHooksSetup} from "../AdvancedPoolHooks/AdvancedPoolHooksSetu
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
-contract TokenPoolV2_withdrawFee is AdvancedPoolHooksSetup {
+contract TokenPool_withdrawFee is AdvancedPoolHooksSetup {
   address internal s_feeAdmin;
 
   function setUp() public override {

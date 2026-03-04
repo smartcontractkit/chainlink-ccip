@@ -22,6 +22,18 @@ type ConstructorArgs struct {
 	Router common.Address
 }
 
+// AdvancedPoolHooksConfig contains optional configuration for AdvancedPoolHooks.
+type AdvancedPoolHooksConfig struct {
+	// Allowlist is a list of addresses allowed to trigger lockOrBurn.
+	// Empty list means allowlist is disabled.
+	Allowlist []common.Address
+	// PolicyEngine is the policy engine address. Zero address disables policy checks.
+	PolicyEngine common.Address
+	// AuthorizedCallers specifies the set of callers authorized to invoke preflightCheck/postflightCheck.
+	// AuthorizedCallers check is always enforced, regardless of whether the list is empty.
+	AuthorizedCallers []common.Address
+}
+
 // DeployTokenPoolInput is the input for the DeployTokenPool sequence.
 type DeployTokenPoolInput struct {
 	// ChainSel is the chain selector for the chain being configured.
@@ -42,6 +54,8 @@ type DeployTokenPoolInput struct {
 	FeeAggregator common.Address
 	// ConstructorArgs are the constructor arguments for the token pool.
 	ConstructorArgs ConstructorArgs
+	// AdvancedPoolHooksConfig contains optional configuration for AdvancedPoolHooks.
+	AdvancedPoolHooksConfig AdvancedPoolHooksConfig
 }
 
 func (c DeployTokenPoolInput) ChainSelector() uint64 {

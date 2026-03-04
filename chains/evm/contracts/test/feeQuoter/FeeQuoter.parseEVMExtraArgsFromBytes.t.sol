@@ -18,7 +18,7 @@ contract FeeQuoter_resolveGasLimitForDestination is FeeQuoterSetup {
     Client.EVMExtraArgsV1 memory inputArgs = Client.EVMExtraArgsV1({gasLimit: GAS_LIMIT});
     bytes memory inputExtraArgs = Client._argsToBytes(inputArgs);
     Client.GenericExtraArgsV2 memory expectedOutputArgs =
-      Client.GenericExtraArgsV2({gasLimit: GAS_LIMIT, allowOutOfOrderExecution: false});
+      Client.GenericExtraArgsV2({gasLimit: GAS_LIMIT, allowOutOfOrderExecution: true});
 
     vm.assertEq(
       abi.encode(s_feeQuoter.parseEVMExtraArgsFromBytes(inputExtraArgs, DEST_CHAIN_SELECTOR)),
@@ -38,7 +38,7 @@ contract FeeQuoter_resolveGasLimitForDestination is FeeQuoterSetup {
 
   function test_parseEVMExtraArgsFromBytes_EVMExtraArgsDefault() public view {
     Client.GenericExtraArgsV2 memory expectedOutputArgs =
-      Client.GenericExtraArgsV2({gasLimit: GAS_LIMIT, allowOutOfOrderExecution: false});
+      Client.GenericExtraArgsV2({gasLimit: GAS_LIMIT, allowOutOfOrderExecution: true});
 
     vm.assertEq(
       abi.encode(s_feeQuoter.parseEVMExtraArgsFromBytes("", DEST_CHAIN_SELECTOR)), abi.encode(expectedOutputArgs)

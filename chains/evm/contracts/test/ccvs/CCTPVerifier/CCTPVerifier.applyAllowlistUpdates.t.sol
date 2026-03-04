@@ -28,7 +28,7 @@ contract CCTPVerifier_applyAllowlistUpdates is CCTPVerifierSetup {
     });
 
     vm.expectEmit();
-    emit BaseVerifier.AllowListSendersAdded(DEST_CHAIN_SELECTOR, senders);
+    emit BaseVerifier.AllowListSendersAdded(DEST_CHAIN_SELECTOR, senders[0]);
 
     s_cctpVerifier.applyAllowlistUpdates(allowlistConfigs);
 
@@ -55,7 +55,7 @@ contract CCTPVerifier_applyAllowlistUpdates is CCTPVerifierSetup {
     });
 
     vm.expectEmit();
-    emit BaseVerifier.AllowListSendersAdded(DEST_CHAIN_SELECTOR, senders);
+    emit BaseVerifier.AllowListSendersAdded(DEST_CHAIN_SELECTOR, senders[0]);
 
     s_cctpVerifier.applyAllowlistUpdates(allowlistConfigs);
   }

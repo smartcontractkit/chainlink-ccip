@@ -15,7 +15,7 @@ import (
 
 // We use this default value when the config is not set for a specific chain.
 const (
-	defaultRMNSignaturesTimeout               = 5 * time.Second
+	defaultRMNSignaturesTimeout               = 0
 	defaultNewMsgScanBatchSize                = merklemulti.MaxNumberTreeLeaves
 	defaultEvmDefaultMaxMerkleTreeSize        = merklemulti.MaxNumberTreeLeaves
 	defaultMaxReportTransmissionCheckAttempts = 5
@@ -150,6 +150,11 @@ type CommitOffchainConfig struct {
 	// PopulateTxHashEnabled enables populating the TxHash field in message headers.
 	// When disabled, TxHash will be omitted from messages for backwards compatibility.
 	PopulateTxHashEnabled bool `json:"populateTxHashEnabled"`
+
+	// EvmGasLimit is the gas limit to use for EVM chain report transmissions.
+	// If set to zero, the default gas limit defined in the chain writer will be used.
+	// This field is ignored for non-EVM chains.
+	EvmGasLimit uint64 `json:"evmGasLimit"`
 }
 
 const (
@@ -160,10 +165,6 @@ const (
 
 //nolint:gocyclo // it is considered ok since we don't have complicated logic here
 func (c *CommitOffchainConfig) applyDefaults() {
-	if c.RMNEnabled && c.RMNSignaturesTimeout == 0 {
-		c.RMNSignaturesTimeout = defaultRMNSignaturesTimeout
-	}
-
 	if c.NewMsgScanBatchSize == 0 {
 		c.NewMsgScanBatchSize = defaultNewMsgScanBatchSize
 	}
@@ -219,6 +220,9 @@ func (c *CommitOffchainConfig) applyDefaults() {
 	if c.TokenPriceAsyncObserverSyncTimeout.Duration() == 0 {
 		c.TokenPriceAsyncObserverSyncTimeout = *commonconfig.MustNewDuration(defaultAsyncObserverSyncTimeout)
 	}
+	// RMN has been deprecated. Hardcode the configuration to avoid bringing down CCIP 1.6.
+	// https://smartcontract-it.atlassian.net/browse/INCIDENT-2243
+	c.RMNEnabled = false
 }
 
 //nolint:gocyclo // it is considered ok since we don't have complicated logic here

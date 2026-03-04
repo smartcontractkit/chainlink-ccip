@@ -4,10 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/big"
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 
 	mcms_types "github.com/smartcontractkit/mcms/types"
@@ -123,15 +123,27 @@ func (ma *transfersTest_MockTokenAdapter) DeriveTokenAddress(e deployment.Enviro
 	return []byte("mocked-remote-token-address"), nil
 }
 
-func (ma *transfersTest_MockTokenAdapter) ManualRegistration() *cldf_ops.Sequence[tokens.ManualRegistrationInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
-	return &cldf_ops.Sequence[tokens.ManualRegistrationInput, sequences.OnChainOutput, cldf_chain.BlockChains]{}
+func (ma *transfersTest_MockTokenAdapter) DeriveTokenDecimals(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef, token []byte) (uint8, error) {
+	return 18, nil
+}
+
+func (ma *transfersTest_MockTokenAdapter) DeriveTokenPoolCounterpart(e deployment.Environment, chainSelector uint64, tokenPool []byte, token []byte) ([]byte, error) {
+	return tokenPool, nil
+}
+
+func (ma *transfersTest_MockTokenAdapter) ManualRegistration() *cldf_ops.Sequence[tokens.ManualRegistrationSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return &cldf_ops.Sequence[tokens.ManualRegistrationSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains]{}
+}
+
+func (ma *transfersTest_MockTokenAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokens.TPRLRemotes, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return &cldf_ops.Sequence[tokens.TPRLRemotes, sequences.OnChainOutput, cldf_chain.BlockChains]{}
 }
 
 func (ma *transfersTest_MockTokenAdapter) DeployToken() *cldf_ops.Sequence[tokens.DeployTokenInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return &cldf_ops.Sequence[tokens.DeployTokenInput, sequences.OnChainOutput, cldf_chain.BlockChains]{}
 }
 
-func (ma *transfersTest_MockTokenAdapter) DeployTokenVerify(e deployment.Environment, in any) error {
+func (ma *transfersTest_MockTokenAdapter) DeployTokenVerify(e deployment.Environment, in tokens.DeployTokenInput) error {
 	return nil
 }
 
@@ -139,16 +151,8 @@ func (ma *transfersTest_MockTokenAdapter) DeployTokenPoolForToken() *cldf_ops.Se
 	return &cldf_ops.Sequence[tokens.DeployTokenPoolInput, sequences.OnChainOutput, cldf_chain.BlockChains]{}
 }
 
-func (ma *transfersTest_MockTokenAdapter) RegisterToken() *cldf_ops.Sequence[tokens.RegisterTokenInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
-	return &cldf_ops.Sequence[tokens.RegisterTokenInput, sequences.OnChainOutput, cldf_chain.BlockChains]{}
-}
-
-func (ma *transfersTest_MockTokenAdapter) SetPool() *cldf_ops.Sequence[tokens.SetPoolInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
-	return &cldf_ops.Sequence[tokens.SetPoolInput, sequences.OnChainOutput, cldf_chain.BlockChains]{}
-}
-
-func (ma *transfersTest_MockTokenAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokens.UpdateAuthoritiesInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
-	return &cldf_ops.Sequence[tokens.UpdateAuthoritiesInput, sequences.OnChainOutput, cldf_chain.BlockChains]{}
+func (ma *transfersTest_MockTokenAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokens.UpdateAuthoritiesInput, sequences.OnChainOutput, *deployment.Environment] {
+	return &cldf_ops.Sequence[tokens.UpdateAuthoritiesInput, sequences.OnChainOutput, *deployment.Environment]{}
 }
 
 var basicMCMSInput = mcms.Input{
@@ -241,25 +245,42 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 									Version:       semver.MustParse("1.0.0"),
 									ChainSelector: 15971525489660198786,
 								},
-								DefaultFinalityInboundRateLimiterConfig: tokens.RateLimiterConfig{
+								DefaultFinalityOutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{
 									IsEnabled: true,
-									Capacity:  big.NewInt(1000),
-									Rate:      big.NewInt(100),
+									Capacity:  1000,
+									Rate:      100,
 								},
-								DefaultFinalityOutboundRateLimiterConfig: tokens.RateLimiterConfig{
-									IsEnabled: true,
-									Capacity:  big.NewInt(1000),
-									Rate:      big.NewInt(100),
+							},
+						},
+					},
+					{
+						ChainSelector: 15971525489660198786,
+						TokenPoolRef: datastore.AddressRef{
+							Type:          "TokenPool",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 15971525489660198786,
+						},
+						RegistryRef: datastore.AddressRef{
+							Type:          "Registry",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 15971525489660198786,
+						},
+						RemoteChains: map[uint64]tokens.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+							5009297550715157269: {
+								RemoteToken: &datastore.AddressRef{
+									Type:          "Token",
+									Version:       semver.MustParse("1.0.0"),
+									ChainSelector: 5009297550715157269,
 								},
-								CustomFinalityInboundRateLimiterConfig: tokens.RateLimiterConfig{
-									IsEnabled: true,
-									Capacity:  big.NewInt(1000),
-									Rate:      big.NewInt(100),
+								RemotePool: &datastore.AddressRef{
+									Type:          "TokenPool",
+									Version:       semver.MustParse("1.0.0"),
+									ChainSelector: 5009297550715157269,
 								},
-								CustomFinalityOutboundRateLimiterConfig: tokens.RateLimiterConfig{
+								DefaultFinalityOutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{
 									IsEnabled: true,
-									Capacity:  big.NewInt(1000),
-									Rate:      big.NewInt(100),
+									Capacity:  1000,
+									Rate:      100,
 								},
 							},
 						},
@@ -295,25 +316,38 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 									Version:       semver.MustParse("1.0.0"),
 									ChainSelector: 15971525489660198786,
 								},
-								DefaultFinalityInboundRateLimiterConfig: tokens.RateLimiterConfig{
+								DefaultFinalityOutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{
 									IsEnabled: true,
-									Capacity:  big.NewInt(1000),
-									Rate:      big.NewInt(100),
+									Capacity:  1000,
+									Rate:      100,
 								},
-								DefaultFinalityOutboundRateLimiterConfig: tokens.RateLimiterConfig{
-									IsEnabled: true,
-									Capacity:  big.NewInt(1000),
-									Rate:      big.NewInt(100),
+							},
+						},
+					},
+					{
+						ChainSelector: 15971525489660198786,
+						TokenPoolRef: datastore.AddressRef{
+							Type:          "TokenPool",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 15971525489660198786,
+						},
+						RegistryRef: datastore.AddressRef{
+							Type:          "Registry",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 15971525489660198786,
+						},
+						RemoteChains: map[uint64]tokens.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+							5009297550715157269: {
+								RemoteToken: nil, // This will trigger derivation
+								RemotePool: &datastore.AddressRef{
+									Type:          "TokenPool",
+									Version:       semver.MustParse("1.0.0"),
+									ChainSelector: 5009297550715157269,
 								},
-								CustomFinalityInboundRateLimiterConfig: tokens.RateLimiterConfig{
+								DefaultFinalityOutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{
 									IsEnabled: true,
-									Capacity:  big.NewInt(1000),
-									Rate:      big.NewInt(100),
-								},
-								CustomFinalityOutboundRateLimiterConfig: tokens.RateLimiterConfig{
-									IsEnabled: true,
-									Capacity:  big.NewInt(1000),
-									Rate:      big.NewInt(100),
+									Capacity:  1000,
+									Rate:      100,
 								},
 							},
 						},
@@ -449,17 +483,43 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 									Version:       semver.MustParse("1.0.0"),
 									ChainSelector: 15971525489660198786,
 								},
-								DefaultFinalityInboundRateLimiterConfig:  tokens.RateLimiterConfig{IsEnabled: false},
-								DefaultFinalityOutboundRateLimiterConfig: tokens.RateLimiterConfig{IsEnabled: false},
-								CustomFinalityInboundRateLimiterConfig:   tokens.RateLimiterConfig{IsEnabled: false},
-								CustomFinalityOutboundRateLimiterConfig:  tokens.RateLimiterConfig{IsEnabled: false},
+								DefaultFinalityOutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{IsEnabled: false},
+							},
+						},
+					},
+					{
+						ChainSelector: 15971525489660198786,
+						TokenPoolRef: datastore.AddressRef{
+							Type:          "TokenPool",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 15971525489660198786,
+						},
+						RegistryRef: datastore.AddressRef{
+							Type:          "Registry",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 15971525489660198786,
+						},
+						RemoteChains: map[uint64]tokens.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+							5009297550715157269: {
+								RemoteToken: &datastore.AddressRef{
+									Type:          "Token",
+									Version:       semver.MustParse("1.0.0"),
+									ChainSelector: 5009297550715157269,
+								},
+								RemotePool: &datastore.AddressRef{
+									Type:          "TokenPool",
+									Version:       semver.MustParse("1.0.0"),
+									ChainSelector: 5009297550715157269,
+								},
+								DefaultFinalityOutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{IsEnabled: false},
 							},
 						},
 					},
 				},
 				MCMS: basicMCMSInput,
 			},
-			expectedSequenceErrorMsg: "failed to resolve remote pool ref",
+			// Datastore has no addresses for chain 15971525489660198786; error may be "failed to resolve token pool ref" or "failed to resolve remote pool ref" depending on map iteration order.
+			expectedSequenceErrorMsg: "failed to resolve",
 		},
 		{
 			desc: "failure to resolve remote token ref",
@@ -496,10 +556,35 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 									Version:       semver.MustParse("1.0.0"),
 									ChainSelector: 15971525489660198786,
 								},
-								DefaultFinalityInboundRateLimiterConfig:  tokens.RateLimiterConfig{IsEnabled: false},
-								DefaultFinalityOutboundRateLimiterConfig: tokens.RateLimiterConfig{IsEnabled: false},
-								CustomFinalityInboundRateLimiterConfig:   tokens.RateLimiterConfig{IsEnabled: false},
-								CustomFinalityOutboundRateLimiterConfig:  tokens.RateLimiterConfig{IsEnabled: false},
+								DefaultFinalityOutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{IsEnabled: false},
+							},
+						},
+					},
+					{
+						ChainSelector: 15971525489660198786,
+						TokenPoolRef: datastore.AddressRef{
+							Type:          "TokenPool",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 15971525489660198786,
+						},
+						RegistryRef: datastore.AddressRef{
+							Type:          "Registry",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 15971525489660198786,
+						},
+						RemoteChains: map[uint64]tokens.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+							5009297550715157269: {
+								RemoteToken: &datastore.AddressRef{
+									Type:          "Token",
+									Version:       semver.MustParse("1.0.0"),
+									ChainSelector: 5009297550715157269,
+								},
+								RemotePool: &datastore.AddressRef{
+									Type:          "TokenPool",
+									Version:       semver.MustParse("1.0.0"),
+									ChainSelector: 5009297550715157269,
+								},
+								DefaultFinalityOutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{IsEnabled: false},
 							},
 						},
 					},
@@ -535,10 +620,31 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 									Version:       semver.MustParse("1.0.0"),
 									ChainSelector: 15971525489660198786,
 								},
-								DefaultFinalityInboundRateLimiterConfig:  tokens.RateLimiterConfig{IsEnabled: false},
-								DefaultFinalityOutboundRateLimiterConfig: tokens.RateLimiterConfig{IsEnabled: false},
-								CustomFinalityInboundRateLimiterConfig:   tokens.RateLimiterConfig{IsEnabled: false},
-								CustomFinalityOutboundRateLimiterConfig:  tokens.RateLimiterConfig{IsEnabled: false},
+								DefaultFinalityOutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{IsEnabled: false},
+							},
+						},
+					},
+					{
+						ChainSelector: 15971525489660198786,
+						TokenPoolRef: datastore.AddressRef{
+							Type:          "TokenPool",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 15971525489660198786,
+						},
+						RegistryRef: datastore.AddressRef{
+							Type:          "Registry",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 15971525489660198786,
+						},
+						RemoteChains: map[uint64]tokens.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+							5009297550715157269: {
+								RemoteToken: nil, // Will trigger derivation which should fail
+								RemotePool: &datastore.AddressRef{
+									Type:          "TokenPool",
+									Version:       semver.MustParse("1.0.0"),
+									ChainSelector: 5009297550715157269,
+								},
+								DefaultFinalityOutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{IsEnabled: false},
 							},
 						},
 					},
@@ -578,10 +684,35 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 									Version:       semver.MustParse("1.0.0"),
 									ChainSelector: 15971525489660198786,
 								},
-								DefaultFinalityInboundRateLimiterConfig:  tokens.RateLimiterConfig{IsEnabled: false},
-								DefaultFinalityOutboundRateLimiterConfig: tokens.RateLimiterConfig{IsEnabled: false},
-								CustomFinalityInboundRateLimiterConfig:   tokens.RateLimiterConfig{IsEnabled: false},
-								CustomFinalityOutboundRateLimiterConfig:  tokens.RateLimiterConfig{IsEnabled: false},
+								DefaultFinalityOutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{IsEnabled: false},
+							},
+						},
+					},
+					{
+						ChainSelector: 15971525489660198786,
+						TokenPoolRef: datastore.AddressRef{
+							Type:          "TokenPool",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 15971525489660198786,
+						},
+						RegistryRef: datastore.AddressRef{
+							Type:          "Registry",
+							Version:       semver.MustParse("1.0.0"),
+							ChainSelector: 15971525489660198786,
+						},
+						RemoteChains: map[uint64]tokens.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+							5009297550715157269: {
+								RemoteToken: &datastore.AddressRef{
+									Type:          "Token",
+									Version:       semver.MustParse("1.0.0"),
+									ChainSelector: 5009297550715157269,
+								},
+								RemotePool: &datastore.AddressRef{
+									Type:          "TokenPool",
+									Version:       semver.MustParse("1.0.0"),
+									ChainSelector: 5009297550715157269,
+								},
+								DefaultFinalityOutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{IsEnabled: false},
 							},
 						},
 					},
@@ -617,6 +748,7 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 			)
 			e := deployment.Environment{
 				OperationsBundle: bundle,
+				Logger:           lggr,
 				DataStore:        ds.Seal(),
 			}
 
@@ -646,9 +778,9 @@ func TestConfigureTokensForTransfers_Apply(t *testing.T) {
 				for _, op := range proposal.Operations {
 					// For derived remote token test, expect mocked address
 					if tt.shouldDeriveToken {
-						require.Equal(t, []byte("mocked-remote-token-address"), op.Transactions[0].Data)
+						require.Equal(t, common.LeftPadBytes([]byte("mocked-remote-token-address"), 32), op.Transactions[0].Data)
 					} else {
-						require.Equal(t, fmt.Appendf(nil, "%d-token", op.ChainSelector), op.Transactions[0].Data)
+						require.Equal(t, common.LeftPadBytes([]byte(fmt.Sprintf("%d-token", op.ChainSelector)), 32), op.Transactions[0].Data)
 					}
 					require.Equal(t, fmt.Sprintf("%d-token-pool", op.ChainSelector), op.Transactions[0].To)
 				}

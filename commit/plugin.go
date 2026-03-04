@@ -18,7 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
-
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccip/consts"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
@@ -34,7 +34,6 @@ import (
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	ocrtypecodec "github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
@@ -100,6 +99,13 @@ func NewPlugin(
 		lggr.Warnw("MaxMerkleTreeSize not set, using default value which is for EVM",
 			"default", merklemulti.MaxNumberTreeLeaves)
 		offchainCfg.MaxMerkleTreeSize = merklemulti.MaxNumberTreeLeaves
+	}
+
+	// RMN has been deprecated. Hardcode the configuration to false to avoid bringing down CCIP 1.6.
+	// https://smartcontract-it.atlassian.net/browse/INCIDENT-2243
+	if offchainCfg.RMNEnabled {
+		lggr.Warnw("RMN has been deprecated, RMNEnabled is being set to false", "rmnEnabled", offchainCfg.RMNEnabled)
+		offchainCfg.RMNEnabled = false
 	}
 
 	chainSupport := plugincommon.NewChainSupport(
