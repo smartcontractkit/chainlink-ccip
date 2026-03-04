@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	// TODO import from 1.6.1 when it is fully implemented
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_1/sequences"
-	_ "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_1/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
+	_ "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
