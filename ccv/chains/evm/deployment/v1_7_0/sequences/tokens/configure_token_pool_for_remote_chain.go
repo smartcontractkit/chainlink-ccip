@@ -115,13 +115,6 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 			chain.Family(),
 			token_pool.Version,
 		)
-		// If input did not provide custom finality rate limits, use imported from active pool when available (1.6.1 only has default tier).
-		if importedDefaultOutbound != nil && !input.RemoteChainConfig.CustomFinalityOutboundRateLimiterConfig.IsEnabled {
-			customFinalityOutboundRateLimiterConfig = *importedDefaultOutbound
-		}
-		if importedDefaultInbound != nil && !input.RemoteChainConfig.CustomFinalityInboundRateLimiterConfig.IsEnabled {
-			customFinalityInboundRateLimiterConfig = *importedDefaultInbound
-		}
 
 		// Set CCVs for the remote chain (idempotent: only apply when on-chain differs from desired)
 		if input.AdvancedPoolHooks != (common.Address{}) {
@@ -393,7 +386,8 @@ func importConfigFromActivePool(
 		return nil, fmt.Errorf("failed to get active pool type and version: %w", err)
 	}
 	tav := typeAndVersionReport.Output
-	if !tav.Version.LessThan(semver.MustParse("2.0.0")) {
+	if tav.Version.GreaterThanEqual(semver.MustParse("2.0.0")) {
+		// Configuration import from another 2.0.0 pool is not currently supported
 		return nil, nil
 	}
 	if tav.Version.LessThan(semver.MustParse("1.5.1")) {

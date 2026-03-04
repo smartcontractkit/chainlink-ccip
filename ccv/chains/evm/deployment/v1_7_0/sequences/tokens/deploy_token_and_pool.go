@@ -16,11 +16,11 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/burn_mint_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/type_and_version"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	token_pool_v161 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/burn_mint_token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/lock_release_token_pool"
 )
 
 // DeployTokenAndPoolInput is the input for the DeployBurnMintTokenAndPool sequence.
@@ -204,7 +204,8 @@ func getRateLimitAdminFromActivePool(
 	if err != nil {
 		return common.Address{}, err
 	}
-	if !typeAndVersionReport.Output.Version.LessThan(semver.MustParse("2.0.0")) {
+	if typeAndVersionReport.Output.Version.GreaterThanEqual(semver.MustParse("2.0.0")) {
+		// Configuration import from another 2.0.0 pool is not currently supported
 		return common.Address{}, nil
 	}
 	rlaReport, err := cldf_ops.ExecuteOperation(b, token_pool_v161.GetRateLimitAdmin, chain, evm_contract.FunctionInput[struct{}]{
