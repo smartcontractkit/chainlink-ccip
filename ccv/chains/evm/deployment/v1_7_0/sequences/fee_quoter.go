@@ -7,7 +7,6 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/fee_quoter"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"golang.org/x/exp/maps"
 
@@ -19,7 +18,6 @@ import (
 
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -30,7 +28,7 @@ import (
 	fq1_6 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
 	seq1_6 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 
-	fqops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/fee_quoter"
+	fqops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 )
 
 const (
@@ -220,7 +218,7 @@ var (
 				"",
 			)
 			isNewFQ17Deployment := datastore_utils.IsAddressRefEmpty(feeQuoterRef)
-			tokenTransferFeeConfigArgs := make([]fee_quoter.FeeQuoterTokenTransferFeeConfigArgs, 0)
+			tokenTransferFeeConfigArgs := make([]fqops.TokenTransferFeeConfigArgs, 0)
 			allDestChainConfigs := make([]fqops.DestChainConfigArgs, 0)
 			for remoteChain, cfg := range fqOutput.RemoteChainCfgs {
 				if !cfg.DestChainCfg.IsEnabled {
@@ -229,7 +227,7 @@ var (
 				destChainConfig := cfg.DestChainCfg
 				outDestchainCfg := fqops.DestChainConfigArgs{
 					DestChainSelector: remoteChain,
-					DestChainConfig: adapters.FeeQuoterDestChainConfig{
+					DestChainConfig: fqops.DestChainConfig{
 						IsEnabled:                   destChainConfig.IsEnabled,
 						MaxDataBytes:                destChainConfig.MaxDataBytes,
 						MaxPerMsgGasLimit:           destChainConfig.MaxPerMsgGasLimit,
@@ -243,14 +241,14 @@ var (
 						LinkFeeMultiplierPercent:    LinkFeeMultiplierPercent,
 					},
 				}
-				tokenTransferFeeCfgs := make([]fee_quoter.FeeQuoterTokenTransferFeeConfigSingleTokenArgs, 0)
+				tokenTransferFeeCfgs := make([]fqops.TokenTransferFeeConfigSingleTokenArgs, 0)
 				for token, transferCfg := range cfg.TokenTransferFeeCfgs {
 					if !transferCfg.IsEnabled {
 						continue
 					}
-					tokenTransferFeeCfgs = append(tokenTransferFeeCfgs, fee_quoter.FeeQuoterTokenTransferFeeConfigSingleTokenArgs{
+					tokenTransferFeeCfgs = append(tokenTransferFeeCfgs, fqops.TokenTransferFeeConfigSingleTokenArgs{
 						Token: token,
-						TokenTransferFeeConfig: fee_quoter.FeeQuoterTokenTransferFeeConfig{
+						TokenTransferFeeConfig: fqops.TokenTransferFeeConfig{
 							FeeUSDCents:       transferCfg.MinFeeUSDCents,
 							DestGasOverhead:   transferCfg.DestGasOverhead,
 							DestBytesOverhead: transferCfg.DestBytesOverhead,
@@ -258,7 +256,7 @@ var (
 						},
 					})
 				}
-				tokenTransferFeeConfigArgs = append(tokenTransferFeeConfigArgs, fee_quoter.FeeQuoterTokenTransferFeeConfigArgs{
+				tokenTransferFeeConfigArgs = append(tokenTransferFeeConfigArgs, fqops.TokenTransferFeeConfigArgs{
 					DestChainSelector:       remoteChain,
 					TokenTransferFeeConfigs: tokenTransferFeeCfgs,
 				})
@@ -349,7 +347,7 @@ var (
 			isNewFQ17Deployment := datastore_utils.IsAddressRefEmpty(feeQuoter17Ref)
 			var staticCfg fqops.StaticConfig
 			var destChainCfgs []fqops.DestChainConfigArgs
-			var tokenTransferFeeConfigArgs []fee_quoter.FeeQuoterTokenTransferFeeConfigSingleTokenArgs
+			var tokenTransferFeeConfigArgs []fqops.TokenTransferFeeConfigSingleTokenArgs
 			var tokenTransferFeeConfigArgsForAll []fqops.TokenTransferFeeConfigArgs
 			for _, meta := range onRampMetadata {
 				// Convert metadata to typed struct if needed
@@ -373,8 +371,8 @@ var (
 				copy(chainFamilySelector[:], chainFamilySelectorBytes[:4])
 				destChainCfgs = append(destChainCfgs, fqops.DestChainConfigArgs{
 					DestChainSelector: onRampCfg.RemoteChainSelector,
-					DestChainConfig: adapters.FeeQuoterDestChainConfig{
-						IsEnabled:                   true, // if the chain is supported on OnRamp, we should enable it on FeeQuoter
+					DestChainConfig: fqops.DestChainConfig{
+						IsEnabled:                   true,
 						MaxDataBytes:                onRampCfg.DynamicConfig.MaxDataBytes,
 						MaxPerMsgGasLimit:           onRampCfg.DynamicConfig.MaxPerMsgGasLimit,
 						DestGasOverhead:             onRampCfg.DynamicConfig.DestGasOverhead,
@@ -388,9 +386,9 @@ var (
 					},
 				})
 				for token, tokenCfg := range onRampCfg.TokenTransferFeeConfig {
-					tokenTransferFeeConfigArgs = append(tokenTransferFeeConfigArgs, fee_quoter.FeeQuoterTokenTransferFeeConfigSingleTokenArgs{
+					tokenTransferFeeConfigArgs = append(tokenTransferFeeConfigArgs, fqops.TokenTransferFeeConfigSingleTokenArgs{
 						Token: token,
-						TokenTransferFeeConfig: fee_quoter.FeeQuoterTokenTransferFeeConfig{
+						TokenTransferFeeConfig: fqops.TokenTransferFeeConfig{
 							FeeUSDCents:       tokenCfg.MinFeeUSDCents,
 							DestGasOverhead:   tokenCfg.DestGasOverhead,
 							DestBytesOverhead: tokenCfg.DestBytesOverhead,
@@ -432,7 +430,7 @@ func MergeFeeQuoterUpdateOutputs(output16, output15 FeeQuoterUpdate) (FeeQuoterU
 	result := output16
 
 	// ConstructorArgs: use output15 if output16 is empty
-	if result.ConstructorArgs.IsEmpty() {
+	if isConstructorArgsEmpty(result.ConstructorArgs) {
 		result.ConstructorArgs = output15.ConstructorArgs
 	} else {
 		// merge the dest chainConfig args
@@ -488,7 +486,7 @@ func MergeFeeQuoterUpdateOutputs(output16, output15 FeeQuoterUpdate) (FeeQuoterU
 	return result, nil
 }
 
-func mergeTokenTransferFeeConfigArgs(args1, args2 []fee_quoter.FeeQuoterTokenTransferFeeConfigArgs) []fee_quoter.FeeQuoterTokenTransferFeeConfigArgs {
+func mergeTokenTransferFeeConfigArgs(args1, args2 []fqops.TokenTransferFeeConfigArgs) []fqops.TokenTransferFeeConfigArgs {
 	result := args1
 	// TokenTransferFeeConfigArgs: merge by DestChainSelector
 	if len(result) == 0 {
@@ -555,4 +553,11 @@ func mergeDestChainConfigs(cfgs1, cfgs2 []fqops.DestChainConfigArgs) []fqops.Des
 		return nil
 	}
 	return result
+}
+
+func isConstructorArgsEmpty(a fqops.ConstructorArgs) bool {
+	return (a.StaticConfig == fqops.StaticConfig{}) &&
+		len(a.PriceUpdaters) == 0 &&
+		len(a.TokenTransferFeeConfigArgs) == 0 &&
+		len(a.DestChainConfigArgs) == 0
 }

@@ -19,7 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/executor"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/proxy"
@@ -458,7 +458,7 @@ func maybeAddFeeQuoterDestChainConfigArg(feeQContract *fqc.FeeQuoter, b cldf_ops
 	}
 	return append(feeQuoterArgs, fee_quoter.DestChainConfigArgs{
 		DestChainSelector: remoteSelector,
-		DestChainConfig:   desired,
+		DestChainConfig:   adapterDestChainConfigToFeeQuoter(desired),
 	}), nil
 }
 
@@ -511,4 +511,20 @@ func filterExecutorDestChains(b cldf_ops.Bundle, chain evm.Chain, chainSelector 
 		out[executorAddr] = filtered
 	}
 	return out, nil
+}
+
+func adapterDestChainConfigToFeeQuoter(cfg adapters.FeeQuoterDestChainConfig) fee_quoter.DestChainConfig {
+	return fee_quoter.DestChainConfig{
+		IsEnabled:                   cfg.IsEnabled,
+		MaxDataBytes:                cfg.MaxDataBytes,
+		MaxPerMsgGasLimit:           cfg.MaxPerMsgGasLimit,
+		DestGasOverhead:             cfg.DestGasOverhead,
+		DestGasPerPayloadByteBase:   cfg.DestGasPerPayloadByteBase,
+		ChainFamilySelector:         cfg.ChainFamilySelector,
+		DefaultTokenFeeUSDCents:     cfg.DefaultTokenFeeUSDCents,
+		DefaultTokenDestGasOverhead: cfg.DefaultTokenDestGasOverhead,
+		DefaultTxGasLimit:           cfg.DefaultTxGasLimit,
+		NetworkFeeUSDCents:          cfg.NetworkFeeUSDCents,
+		LinkFeeMultiplierPercent:    cfg.LinkFeeMultiplierPercent,
+	}
 }

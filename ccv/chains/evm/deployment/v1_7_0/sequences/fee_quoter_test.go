@@ -5,12 +5,10 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/fee_quoter"
 	"github.com/stretchr/testify/require"
 
-	fqops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/fee_quoter"
+	fqops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	sequence1_7 "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 )
 
 func TestFeeQuoterUpdate_IsEmpty(t *testing.T) {
@@ -101,7 +99,7 @@ func TestMergeFeeQuoterUpdateOutputs(t *testing.T) {
 				TokenTransferFeeConfigArgs: []fqops.TokenTransferFeeConfigArgs{
 					{
 						DestChainSelector: 100,
-						TokenTransferFeeConfigs: []fee_quoter.FeeQuoterTokenTransferFeeConfigSingleTokenArgs{
+						TokenTransferFeeConfigs: []fqops.TokenTransferFeeConfigSingleTokenArgs{
 							{Token: addr1},
 						},
 					},
@@ -109,7 +107,7 @@ func TestMergeFeeQuoterUpdateOutputs(t *testing.T) {
 				DestChainConfigArgs: []fqops.DestChainConfigArgs{
 					{
 						DestChainSelector: 100,
-						DestChainConfig: adapters.FeeQuoterDestChainConfig{
+						DestChainConfig: fqops.DestChainConfig{
 							IsEnabled:    true,
 							MaxDataBytes: 1000,
 						},
@@ -127,13 +125,13 @@ func TestMergeFeeQuoterUpdateOutputs(t *testing.T) {
 				TokenTransferFeeConfigArgs: []fqops.TokenTransferFeeConfigArgs{
 					{
 						DestChainSelector: 100, // duplicate selector
-						TokenTransferFeeConfigs: []fee_quoter.FeeQuoterTokenTransferFeeConfigSingleTokenArgs{
+						TokenTransferFeeConfigs: []fqops.TokenTransferFeeConfigSingleTokenArgs{
 							{Token: addr2},
 						},
 					},
 					{
 						DestChainSelector: 200, // unique selector
-						TokenTransferFeeConfigs: []fee_quoter.FeeQuoterTokenTransferFeeConfigSingleTokenArgs{
+						TokenTransferFeeConfigs: []fqops.TokenTransferFeeConfigSingleTokenArgs{
 							{Token: addr3},
 						},
 					},
@@ -141,14 +139,14 @@ func TestMergeFeeQuoterUpdateOutputs(t *testing.T) {
 				DestChainConfigArgs: []fqops.DestChainConfigArgs{
 					{
 						DestChainSelector: 100, // duplicate selector
-						DestChainConfig: adapters.FeeQuoterDestChainConfig{
+						DestChainConfig: fqops.DestChainConfig{
 							IsEnabled:    false,
 							MaxDataBytes: 2000,
 						},
 					},
 					{
 						DestChainSelector: 200, // unique selector
-						DestChainConfig: adapters.FeeQuoterDestChainConfig{
+						DestChainConfig: fqops.DestChainConfig{
 							IsEnabled:    true,
 							MaxDataBytes: 3000,
 						},
@@ -166,13 +164,13 @@ func TestMergeFeeQuoterUpdateOutputs(t *testing.T) {
 				TokenTransferFeeConfigArgs: []fqops.TokenTransferFeeConfigArgs{
 					{
 						DestChainSelector: 100,
-						TokenTransferFeeConfigs: []fee_quoter.FeeQuoterTokenTransferFeeConfigSingleTokenArgs{
+						TokenTransferFeeConfigs: []fqops.TokenTransferFeeConfigSingleTokenArgs{
 							{Token: addr1}, // from output16 (takes precedence)
 						},
 					},
 					{
 						DestChainSelector: 200,
-						TokenTransferFeeConfigs: []fee_quoter.FeeQuoterTokenTransferFeeConfigSingleTokenArgs{
+						TokenTransferFeeConfigs: []fqops.TokenTransferFeeConfigSingleTokenArgs{
 							{Token: addr3}, // from output15
 						},
 					},
@@ -180,14 +178,14 @@ func TestMergeFeeQuoterUpdateOutputs(t *testing.T) {
 				DestChainConfigArgs: []fqops.DestChainConfigArgs{
 					{
 						DestChainSelector: 100,
-						DestChainConfig: adapters.FeeQuoterDestChainConfig{
+						DestChainConfig: fqops.DestChainConfig{
 							IsEnabled:    true,
 							MaxDataBytes: 1000,
 						},
 					},
 					{
 						DestChainSelector: 200,
-						DestChainConfig: adapters.FeeQuoterDestChainConfig{
+						DestChainConfig: fqops.DestChainConfig{
 							IsEnabled:    true,
 							MaxDataBytes: 3000,
 						},
@@ -218,7 +216,7 @@ func TestMergeFeeQuoterUpdateOutputs(t *testing.T) {
 			DestChainConfigs: []fqops.DestChainConfigArgs{
 				{
 					DestChainSelector: 100,
-					DestChainConfig: adapters.FeeQuoterDestChainConfig{
+					DestChainConfig: fqops.DestChainConfig{
 						IsEnabled:    true,
 						MaxDataBytes: 1000,
 					},
@@ -229,14 +227,14 @@ func TestMergeFeeQuoterUpdateOutputs(t *testing.T) {
 			DestChainConfigs: []fqops.DestChainConfigArgs{
 				{
 					DestChainSelector: 100, // duplicate selector
-					DestChainConfig: adapters.FeeQuoterDestChainConfig{
+					DestChainConfig: fqops.DestChainConfig{
 						IsEnabled:    false,
 						MaxDataBytes: 2000,
 					},
 				},
 				{
 					DestChainSelector: 200, // unique selector
-					DestChainConfig: adapters.FeeQuoterDestChainConfig{
+					DestChainConfig: fqops.DestChainConfig{
 						IsEnabled:    true,
 						MaxDataBytes: 3000,
 					},
@@ -261,7 +259,7 @@ func TestMergeFeeQuoterUpdateOutputs(t *testing.T) {
 				TokenTransferFeeConfigArgs: []fqops.TokenTransferFeeConfigArgs{
 					{
 						DestChainSelector: 100,
-						TokenTransferFeeConfigs: []fee_quoter.FeeQuoterTokenTransferFeeConfigSingleTokenArgs{
+						TokenTransferFeeConfigs: []fqops.TokenTransferFeeConfigSingleTokenArgs{
 							{Token: addr1},
 						},
 					},
@@ -273,13 +271,13 @@ func TestMergeFeeQuoterUpdateOutputs(t *testing.T) {
 				TokenTransferFeeConfigArgs: []fqops.TokenTransferFeeConfigArgs{
 					{
 						DestChainSelector: 100, // duplicate
-						TokenTransferFeeConfigs: []fee_quoter.FeeQuoterTokenTransferFeeConfigSingleTokenArgs{
+						TokenTransferFeeConfigs: []fqops.TokenTransferFeeConfigSingleTokenArgs{
 							{Token: addr2},
 						},
 					},
 					{
 						DestChainSelector: 200, // unique
-						TokenTransferFeeConfigs: []fee_quoter.FeeQuoterTokenTransferFeeConfigSingleTokenArgs{
+						TokenTransferFeeConfigs: []fqops.TokenTransferFeeConfigSingleTokenArgs{
 							{Token: addr3},
 						},
 					},
@@ -363,11 +361,11 @@ func TestMergeFeeQuoterUpdateOutputs(t *testing.T) {
 				},
 			},
 			DestChainConfigs: []fqops.DestChainConfigArgs{
-				{DestChainSelector: 200, DestChainConfig: adapters.FeeQuoterDestChainConfig{IsEnabled: true}},
+				{DestChainSelector: 200, DestChainConfig: fqops.DestChainConfig{IsEnabled: true}},
 			},
 			TokenTransferFeeConfigUpdates: fqops.ApplyTokenTransferFeeConfigUpdatesArgs{
 				TokenTransferFeeConfigArgs: []fqops.TokenTransferFeeConfigArgs{
-					{DestChainSelector: 400, TokenTransferFeeConfigs: []fee_quoter.FeeQuoterTokenTransferFeeConfigSingleTokenArgs{{Token: addr1}}},
+					{DestChainSelector: 400, TokenTransferFeeConfigs: []fqops.TokenTransferFeeConfigSingleTokenArgs{{Token: addr1}}},
 				},
 			},
 			AuthorizedCallerUpdates: fqops.AuthorizedCallerArgs{
@@ -382,13 +380,13 @@ func TestMergeFeeQuoterUpdateOutputs(t *testing.T) {
 				},
 			},
 			DestChainConfigs: []fqops.DestChainConfigArgs{
-				{DestChainSelector: 200, DestChainConfig: adapters.FeeQuoterDestChainConfig{IsEnabled: false}}, // duplicate
-				{DestChainSelector: 300, DestChainConfig: adapters.FeeQuoterDestChainConfig{IsEnabled: true}},  // unique
+				{DestChainSelector: 200, DestChainConfig: fqops.DestChainConfig{IsEnabled: false}}, // duplicate
+				{DestChainSelector: 300, DestChainConfig: fqops.DestChainConfig{IsEnabled: true}},  // unique
 			},
 			TokenTransferFeeConfigUpdates: fqops.ApplyTokenTransferFeeConfigUpdatesArgs{
 				TokenTransferFeeConfigArgs: []fqops.TokenTransferFeeConfigArgs{
-					{DestChainSelector: 400, TokenTransferFeeConfigs: []fee_quoter.FeeQuoterTokenTransferFeeConfigSingleTokenArgs{{Token: addr2}}}, // duplicate
-					{DestChainSelector: 500, TokenTransferFeeConfigs: []fee_quoter.FeeQuoterTokenTransferFeeConfigSingleTokenArgs{{Token: addr3}}}, // unique
+					{DestChainSelector: 400, TokenTransferFeeConfigs: []fqops.TokenTransferFeeConfigSingleTokenArgs{{Token: addr2}}}, // duplicate
+					{DestChainSelector: 500, TokenTransferFeeConfigs: []fqops.TokenTransferFeeConfigSingleTokenArgs{{Token: addr3}}}, // unique
 				},
 			},
 			AuthorizedCallerUpdates: fqops.AuthorizedCallerArgs{

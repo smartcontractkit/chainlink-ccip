@@ -15,9 +15,7 @@ import (
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 
-	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
-
-	fqops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/fee_quoter"
+	fqops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
@@ -171,22 +169,22 @@ func (r *LaneMigrator) UpdateVersionWithRouter() *cldf_ops.Sequence[deploy.RampU
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("error fetching existing destChainConfig for fee quoter: %w", err)
 				}
-				fqArgs = append(fqArgs, fqops.DestChainConfigArgs{
-					DestChainSelector: remoteChainSelector,
-					DestChainConfig: adapters.FeeQuoterDestChainConfig{
-						IsEnabled:                   dstChainCfg.IsEnabled,
-						MaxDataBytes:                DefaultMaxDataBytes,
-						MaxPerMsgGasLimit:           DefaultMaxPerMsgGasLimit,
-						DestGasOverhead:             dstChainCfg.DestGasOverhead,
-						DestGasPerPayloadByteBase:   dstChainCfg.DestGasPerPayloadByteBase,
-						ChainFamilySelector:         dstChainCfg.ChainFamilySelector,
-						DefaultTokenFeeUSDCents:     dstChainCfg.DefaultTokenFeeUSDCents,
-						DefaultTokenDestGasOverhead: dstChainCfg.DefaultTokenDestGasOverhead,
-						DefaultTxGasLimit:           DefaultTxGasLimit,
-						NetworkFeeUSDCents:          dstChainCfg.NetworkFeeUSDCents,
-						LinkFeeMultiplierPercent:    dstChainCfg.LinkFeeMultiplierPercent,
-					},
-				})
+			fqArgs = append(fqArgs, fqops.DestChainConfigArgs{
+				DestChainSelector: remoteChainSelector,
+				DestChainConfig: fqops.DestChainConfig{
+					IsEnabled:                   dstChainCfg.IsEnabled,
+					MaxDataBytes:                DefaultMaxDataBytes,
+					MaxPerMsgGasLimit:           DefaultMaxPerMsgGasLimit,
+					DestGasOverhead:             dstChainCfg.DestGasOverhead,
+					DestGasPerPayloadByteBase:   dstChainCfg.DestGasPerPayloadByteBase,
+					ChainFamilySelector:         dstChainCfg.ChainFamilySelector,
+					DefaultTokenFeeUSDCents:     dstChainCfg.DefaultTokenFeeUSDCents,
+					DefaultTokenDestGasOverhead: dstChainCfg.DefaultTokenDestGasOverhead,
+					DefaultTxGasLimit:           DefaultTxGasLimit,
+					NetworkFeeUSDCents:          dstChainCfg.NetworkFeeUSDCents,
+					LinkFeeMultiplierPercent:    dstChainCfg.LinkFeeMultiplierPercent,
+				},
+			})
 			}
 			//  set the destChainConfig with the updated router
 			writeOutputOnRamp, err := cldf_ops.ExecuteOperation(b, onrampops.ApplyDestChainConfigUpdates, c, contract.FunctionInput[[]onrampops.DestChainConfigArgs]{

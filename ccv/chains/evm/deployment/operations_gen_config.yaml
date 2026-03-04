@@ -24,6 +24,8 @@ contracts:
         access: owner
       - name: getDestChainConfig
         access: public
+      - name: getDestinationChainGasPrice
+        access: public
       - name: getTokenTransferFeeConfig
         access: public
       - name: getStaticConfig
