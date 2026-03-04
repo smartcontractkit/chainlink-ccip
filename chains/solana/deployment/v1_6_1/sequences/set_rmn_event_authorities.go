@@ -15,9 +15,8 @@ import (
 )
 
 type RMNRemoteSetEventAuthoritiesSequenceInput struct {
-	DataStore     datastore.DataStore
-	Selector      uint64
-	ChainSelector uint64
+	DataStore datastore.DataStore
+	Selector  uint64
 }
 
 var SetRMNRemoteEventAuthorities = cldf_ops.NewSequence(
