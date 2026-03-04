@@ -8,6 +8,7 @@ import (
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 )
 
 type ChainDefinition struct {
@@ -16,15 +17,18 @@ type ChainDefinition struct {
 	Selector uint64
 	// GasPrice defines the USD price (18 decimals) per unit gas for this chain as a destination.
 	// This is provided by the user
+	// 1.6 only
 	GasPrice *big.Int
 	// TokenPrices define the USD price (18 decimals) per 1e18 of the smallest token denomination for various tokens on this chain.
 	// This is provided by the user
+	// 1.6 only
 	TokenPrices map[string]*big.Int
 	// FeeQuoterDestChainConfig is the configuration to be applied on source chain when this chain is a destination.
 	// This is provided by the user
 	FeeQuoterDestChainConfig FeeQuoterDestChainConfig
 	// RMNVerificationEnabled is true if we want the RMN to bless messages FROM this chain.
 	// This is provided by the user
+	// 1.6 only
 	RMNVerificationEnabled bool
 	// AllowListEnabled is true if we want an allowlist to dictate who can send messages TO this chain.
 	// This is provided by the user
@@ -32,9 +36,34 @@ type ChainDefinition struct {
 	// AllowList is the list of addresses that are allowed to send messages TO this chain.
 	// This is provided by the user
 	AllowList []string
-	// OnRamp is the address of the OnRamp contract on this chain.
+	// The CommitteeVerifiers on the chain being configured.
+	// There can be multiple committee verifiers on a chain, each controlled by a different entity.
+	CommitteeVerifiers []CommitteeVerifierConfig[datastore.AddressRef]
+	// The addresses of CCVs that will be applied to messages FROM this remote chain if no receiver is specified.
+	DefaultInboundCCVs []datastore.AddressRef
+	// Addresses of any CCVs that must always be used for messages FROM this remote chain.
+	LaneMandatedInboundCCVs []datastore.AddressRef
+	// Addresses of CCVs that will be used for messages TO this remote chain if none are specified.
+	DefaultOutboundCCVs []datastore.AddressRef
+	// Addresses of CCVs that will always be applied to messages TO this remote chain.
+	LaneMandatedOutboundCCVs []datastore.AddressRef
+	// The Executor address that will be used for messages TO this remote chain if none is specified.
+	DefaultExecutor datastore.AddressRef
+	// ExecutorDestChainConfig configures the Executor for this remote chain
+	ExecutorDestChainConfig ExecutorDestChainConfig
+	// Length of addresses on the destination chain, in bytes.
+	AddressBytesLength uint8
+	// Execution gas cost, excluding pool/CCV/receiver gas.
+	BaseExecutionGasCost uint32
+	// Whether token receiver is allowed on the destination chain.
+	TokenReceiverAllowed *bool
+	// Message network fee in USD cents.
+	MessageNetworkFeeUSDCents uint16
+	// Token network fee in USD cents.
+	TokenNetworkFeeUSDCents uint16
+	// OnRamp is the address of the OnRamp contract(s) on this chain.
 	// This is populated programmatically
-	OnRamp []byte
+	OnRamp [][]byte
 	// OffRamp is the address of the OffRamp contract on this chain.
 	// This is populated programmatically
 	OffRamp []byte
@@ -47,25 +76,93 @@ type ChainDefinition struct {
 }
 
 type FeeQuoterDestChainConfig struct {
-	IsEnabled                         bool
-	MaxNumberOfTokensPerMsg           uint16
-	MaxDataBytes                      uint32
-	MaxPerMsgGasLimit                 uint32
-	DestGasOverhead                   uint32
-	DestGasPerPayloadByteBase         uint8
-	DestGasPerPayloadByteHigh         uint8
-	DestGasPerPayloadByteThreshold    uint16
-	DestDataAvailabilityOverheadGas   uint32
-	DestGasPerDataAvailabilityByte    uint16
+	// If DestChainConfig already exists for this chain, whether to override it with the provided config.
+	// If false, the existing config will be preserved and result in a noop.
+	OverrideExistingConfig bool
+	// Whether this destination chain is enabled.
+	IsEnabled bool
+	// 1.6 only
+	MaxNumberOfTokensPerMsg uint16
+	// Maximum data payload size in bytes.
+	MaxDataBytes uint32
+	// Maximum gas limit.
+	MaxPerMsgGasLimit uint32
+	// Gas charged on top of the gasLimit to cover destination chain costs.
+	DestGasOverhead uint32
+	// Default dest-chain gas charged for each byte of `data` payload.
+	DestGasPerPayloadByteBase uint8
+	// 1.6 only
+	DestGasPerPayloadByteHigh uint8
+	// 1.6 only
+	DestGasPerPayloadByteThreshold uint16
+	// 1.6 only
+	DestDataAvailabilityOverheadGas uint32
+	// 1.6 only
+	DestGasPerDataAvailabilityByte uint16
+	// 1.6 only
 	DestDataAvailabilityMultiplierBps uint16
-	ChainFamilySelector               uint32
-	EnforceOutOfOrder                 bool
-	DefaultTokenFeeUSDCents           uint16
-	DefaultTokenDestGasOverhead       uint32
-	DefaultTxGasLimit                 uint32
-	GasMultiplierWeiPerEth            uint64
-	GasPriceStalenessThreshold        uint32
-	NetworkFeeUSDCents                uint16
+	// 1.6 only
+	EnforceOutOfOrder bool
+	// Selector that identifies the destination chain's family. Used to determine the correct validations to perform for the dest chain.
+	ChainFamilySelector uint32
+	// Default token fee charged per token transfer.
+	DefaultTokenFeeUSDCents uint16
+	// Default gas charged to execute a token transfer on the destination chain.
+	DefaultTokenDestGasOverhead uint32
+	// Default gas limit for a tx.
+	DefaultTxGasLimit uint32
+	// Flat network fee to charge for messages, multiples of 0.01 USD.
+	NetworkFeeUSDCents uint16
+	// 1.6 only
+	GasMultiplierWeiPerEth uint64
+	// 1.6 only
+	GasPriceStalenessThreshold uint32
+	// 2.0 only. Percent multiplier for payments in LINK token.
+	LinkFeeMultiplierPercent uint8
+	// 2.0 only.USD per unit gas for the destination chain.
+	USDPerUnitGas *big.Int
+}
+
+// CommitteeVerifierSignatureQuorumConfig specifies the quorum required for any given message.
+type CommitteeVerifierSignatureQuorumConfig struct {
+	// Signers specifies valid signer addresses.
+	Signers []string
+	// Threshold specifies the number of signatures required for the message to be verified.
+	Threshold uint8
+}
+
+// CommitteeVerifierRemoteChainConfig configures the CommitteeVerifier for a remote chain.
+type CommitteeVerifierRemoteChainConfig struct {
+	// Whether to allow traffic TO the remote chain.
+	AllowlistEnabled bool
+	// Addresses that are allowed to send messages TO the remote chain.
+	AddedAllowlistedSenders []string
+	// Addresses that are no longer allowed to send messages TO the remote chain.
+	RemovedAllowlistedSenders []string
+	// The fee in USD cents charged for verification on the remote chain.
+	FeeUSDCents uint16
+	// The gas required to execute the verification call on the destination chain (used for billing).
+	GasForVerification uint32
+	// The size of the CCV specific payload in bytes (used for billing).
+	PayloadSizeBytes uint32
+	// SignatureConfig specifies the signature configuration for the remote chain.
+	SignatureConfig CommitteeVerifierSignatureQuorumConfig
+}
+
+// CommitteeVerifierConfig configures a CommitteeVerifier contract.
+type CommitteeVerifierConfig[C any] struct {
+	// CommitteeVerifier is a set of addresses comprising the committee verifier system.
+	CommitteeVerifier []C
+	// RemoteChains specifies the configuration for each remote chain supported by the committee verifier.
+	RemoteChains map[uint64]CommitteeVerifierRemoteChainConfig
+}
+
+// ExecutorDestChainConfig configures the Executor for a remote chain.
+type ExecutorDestChainConfig struct {
+	// The fee charged by the executor to process messages to this chain.
+	USDCentsFee uint16
+	// Whether this destination chain is enabled.
+	Enabled bool
 }
 
 type ConnectChainsConfig struct {
