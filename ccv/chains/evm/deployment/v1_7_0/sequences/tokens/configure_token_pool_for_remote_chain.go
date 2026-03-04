@@ -9,22 +9,30 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-
 	tp_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/token_pool"
 	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	routerops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	onrampops_v150 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/onramp"
+	onrampops_v160 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
+	fqops_v163 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_3/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/advanced_pool_hooks"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/token_pool"
-	v17seq "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
+	fqops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
+
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/type_and_version"
 	token_pool_v150 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_token_pool_and_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	token_pool_v161 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/evm_2_evm_onramp"
+
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/advanced_pool_hooks"
+	onrampops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/onramp"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/token_pool"
+	v17seq "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 )
 
 // ConfigureTokenPoolForRemoteChainInput is the input for the ConfigureTokenPoolForRemoteChain sequence.
@@ -635,12 +643,200 @@ func applyTokenTransferFeeConfigIfNeeded(b cldf_ops.Bundle, chain evm.Chain, inp
 	return []evm_contract.WriteOutput{report.Output}, nil
 }
 
+// v150OnRampConfigToTokenTransferFeeConfig converts OnRamp 1.5.0 token transfer fee config to tokens.TokenTransferFeeConfig.
+func v150OnRampConfigToTokenTransferFeeConfig(cfg evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfig) *tokens.TokenTransferFeeConfig {
+	return &tokens.TokenTransferFeeConfig{
+		DestGasOverhead:               cfg.DestGasOverhead,
+		DestBytesOverhead:             cfg.DestBytesOverhead,
+		DefaultFinalityFeeUSDCents:    cfg.MinFeeUSDCents,
+		CustomFinalityFeeUSDCents:     0,
+		DefaultFinalityTransferFeeBps: cfg.DeciBps,
+		CustomFinalityTransferFeeBps:  0,
+		IsEnabled:                     cfg.IsEnabled,
+	}
+}
+
+// v163FeeQuoterConfigToTokenTransferFeeConfig converts FeeQuoter 1.6.3 token transfer fee config to tokens.TokenTransferFeeConfig.
+func v163FeeQuoterConfigToTokenTransferFeeConfig(cfg fqops_v163.TokenTransferFeeConfig) *tokens.TokenTransferFeeConfig {
+	return &tokens.TokenTransferFeeConfig{
+		DestGasOverhead:               cfg.DestGasOverhead,
+		DestBytesOverhead:             cfg.DestBytesOverhead,
+		DefaultFinalityFeeUSDCents:    cfg.MinFeeUSDCents,
+		CustomFinalityFeeUSDCents:     0,
+		DefaultFinalityTransferFeeBps: cfg.DeciBps,
+		CustomFinalityTransferFeeBps:  0,
+		IsEnabled:                     cfg.IsEnabled,
+	}
+}
+
+// v170FeeQuoterConfigToTokenTransferFeeConfig converts FeeQuoter 2.0 (1.7.0 onRamp path) token transfer fee config to tokens.TokenTransferFeeConfig.
+func v170FeeQuoterConfigToTokenTransferFeeConfig(cfg fqops.TokenTransferFeeConfig) *tokens.TokenTransferFeeConfig {
+	return &tokens.TokenTransferFeeConfig{
+		DestGasOverhead:               cfg.DestGasOverhead,
+		DestBytesOverhead:             cfg.DestBytesOverhead,
+		DefaultFinalityFeeUSDCents:    cfg.FeeUSDCents,
+		CustomFinalityFeeUSDCents:     0,
+		DefaultFinalityTransferFeeBps: 0,
+		CustomFinalityTransferFeeBps:  0,
+		IsEnabled:                     cfg.IsEnabled,
+	}
+}
+
+func importTokenTransferFeeConfigFromActivePool(b cldf_ops.Bundle, chain evm.Chain, input ConfigureTokenPoolForRemoteChainInput) (*tokens.TokenTransferFeeConfig, error) {
+	// get router from token
+	dCfgReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetDynamicConfig, chain, evm_contract.FunctionInput[any]{
+		ChainSelector: input.ChainSelector,
+		Address:       input.TokenPoolAddress,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get token dynamic config for pool %s on chain %s: %w", input.TokenPoolAddress.Hex(), chain.String(), err)
+	}
+	routerAddr := dCfgReport.Output.Router
+	// if router is zero, then the pool is not active and we should not import any config
+	if routerAddr == (common.Address{}) {
+		return nil, nil
+	}
+	// get onRamp from router for the destination chain
+	onRampOnRouterReport, err := cldf_ops.ExecuteOperation(b, routerops.GetOnRamp, chain, evm_contract.FunctionInput[uint64]{
+		ChainSelector: input.ChainSelector,
+		Address:       routerAddr,
+		Args:          input.RemoteChainSelector,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get onRamp from router %s for "+
+			"remote chain selector %d on chain %s: %w", routerAddr.Hex(), input.RemoteChainSelector, chain.String(), err)
+	}
+	if onRampOnRouterReport.Output == (common.Address{}) {
+		return nil, fmt.Errorf("onRamp on router %s for remote chain selector %d on chain %s is zero, "+
+			"cannot import token transfer fee config", routerAddr.Hex(), input.RemoteChainSelector, chain.String())
+	}
+	onRampAddr := onRampOnRouterReport.Output
+	// check the version of the onRamp contract
+	onRampTAVReport, err := cldf_ops.ExecuteOperation(b, type_and_version.GetTypeAndVersion, chain, evm_contract.FunctionInput[struct{}]{
+		ChainSelector: input.ChainSelector,
+		Address:       onRampAddr,
+		Args:          struct{}{},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get type and version of onRamp %s on chain %s: %w", onRampAddr.Hex(), chain.String(), err)
+	}
+	onRampTAV := onRampTAVReport.Output.Version
+	switch onRampTAV {
+	case semver.MustParse("1.5.0"):
+		// for onRamp version 1.5.0, import tokenTransferFeeConfig from onRamp 1.5.0
+		tokenTransferFeeConfigReport, err := cldf_ops.ExecuteOperation(b, onrampops_v150.OnRampGetTokenTransferFeeConfig, chain, evm_contract.FunctionInput[common.Address]{
+			ChainSelector: input.ChainSelector,
+			Address:       input.TokenAddress,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to get token transfer fee config from onRamp %s for token %s on chain %s: %w",
+				onRampAddr.Hex(), input.TokenAddress.Hex(), chain.String(), err)
+		}
+		return v150OnRampConfigToTokenTransferFeeConfig(tokenTransferFeeConfigReport.Output), nil
+	case semver.MustParse("1.6.0"): // for onRamp versions 1.6.0 , import tokenTransferFeeConfig from FeeQuoter
+		// get fee quoter from onRamp
+		dCfgOnRamp, err := cldf_ops.ExecuteOperation(b, onrampops_v160.GetDynamicConfig, chain, evm_contract.FunctionInput[struct{}]{
+			ChainSelector: input.ChainSelector,
+			Address:       onRampAddr,
+			Args:          struct{}{},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to get dynamic config from onRamp %s on chain %s: %w", onRampAddr.Hex(), chain.String(), err)
+		}
+		feeQuoterAddr := dCfgOnRamp.Output.FeeQuoter
+		if feeQuoterAddr == (common.Address{}) {
+			return nil, fmt.Errorf("fee quoter on onRamp %s on chain %s is zero, cannot import token transfer fee config",
+				onRampAddr.Hex(), chain.String())
+		}
+		// get token transfer fee config from fee quoter
+		tokenTransferFeeConfigReport, err := cldf_ops.ExecuteOperation(b, fqops_v163.GetTokenTransferFeeConfig, chain, evm_contract.FunctionInput[fqops_v163.GetTokenTransferFeeConfigArgs]{
+			ChainSelector: input.ChainSelector,
+			Address:       feeQuoterAddr,
+			Args: fqops_v163.GetTokenTransferFeeConfigArgs{
+				Token:             input.TokenAddress,
+				DestChainSelector: input.RemoteChainSelector,
+			},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to get token transfer fee config from fee quoter %s for token %s and remote chain selector %d on chain %s: %w",
+				feeQuoterAddr.Hex(), input.TokenAddress.Hex(), input.RemoteChainSelector, chain.String(), err)
+		}
+		return v163FeeQuoterConfigToTokenTransferFeeConfig(tokenTransferFeeConfigReport.Output), nil
+	case semver.MustParse("1.7.0"):
+		// get fee quoter from onRamp
+		dCfgOnRamp, err := cldf_ops.ExecuteOperation(b, onrampops.GetDynamicConfig, chain, evm_contract.FunctionInput[struct{}]{
+			ChainSelector: input.ChainSelector,
+			Address:       onRampAddr,
+			Args:          struct{}{},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to get dynamic config from onRamp %s on chain %s: %w", onRampAddr.Hex(), chain.String(), err)
+		}
+		feeQuoterAddr := dCfgOnRamp.Output.FeeQuoter
+		if feeQuoterAddr == (common.Address{}) {
+			return nil, fmt.Errorf("fee quoter on onRamp %s on chain %s is zero, cannot import token transfer fee config",
+				onRampAddr.Hex(), chain.String())
+		}
+		// get token transfer fee config from fee quoter
+		tokenTransferFeeConfigReport, err := cldf_ops.ExecuteOperation(b, fqops.GetTokenTransferFeeConfig, chain, evm_contract.FunctionInput[fqops.GetTokenTransferFeeConfigArgs]{
+			ChainSelector: input.ChainSelector,
+			Address:       feeQuoterAddr,
+			Args: fqops.GetTokenTransferFeeConfigArgs{
+				Token:             input.TokenAddress,
+				DestChainSelector: input.RemoteChainSelector,
+			},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to get token transfer fee config from fee quoter %s for token %s and remote chain selector %d on chain %s: %w",
+				feeQuoterAddr.Hex(), input.TokenAddress.Hex(), input.RemoteChainSelector, chain.String(), err)
+		}
+		return v170FeeQuoterConfigToTokenTransferFeeConfig(tokenTransferFeeConfigReport.Output), nil
+	default:
+		return nil, fmt.Errorf("unsupported onRamp version %s for onRamp %s on chain %s, cannot import token transfer fee config",
+			onRampTAV.String(), onRampAddr.Hex(), chain.String())
+	}
+}
+
+// mergeTokenTransferFeeConfig merges the imported token transfer fee config with the desired config,
+// giving precedence to desired config values when they are non-zero (i.e. non-default). If imported config is nil, returns desired config.
+func mergeTokenTransferFeeConfig(desired, imported *tokens.TokenTransferFeeConfig) *tokens.TokenTransferFeeConfig {
+	if imported == nil {
+		return desired
+	}
+	// merge imported config with desired config, giving precedence to desired config values when they are non-zero (i.e. non-default)
+	merged := *imported
+	if desired.DestGasOverhead != 0 {
+		merged.DestGasOverhead = desired.DestGasOverhead
+	}
+	if desired.DestBytesOverhead != 0 {
+		merged.DestBytesOverhead = desired.DestBytesOverhead
+	}
+	if desired.DefaultFinalityFeeUSDCents != 0 {
+		merged.DefaultFinalityFeeUSDCents = desired.DefaultFinalityFeeUSDCents
+	}
+	if desired.CustomFinalityFeeUSDCents != 0 {
+		merged.CustomFinalityFeeUSDCents = desired.CustomFinalityFeeUSDCents
+	}
+	if desired.DefaultFinalityTransferFeeBps != 0 {
+		merged.DefaultFinalityTransferFeeBps = desired.DefaultFinalityTransferFeeBps
+	}
+	if desired.CustomFinalityTransferFeeBps != 0 {
+		merged.CustomFinalityTransferFeeBps = desired.CustomFinalityTransferFeeBps
+	}
+	return &merged
+}
+
 func makeTokenTransferFeeConfigUpdates(b cldf_ops.Bundle, chain evm.Chain, input ConfigureTokenPoolForRemoteChainInput, remoteChainSelector uint64) ([]token_pool.TokenTransferFeeConfigUpdate, error) {
 	desiredTokenTransferFeeConfig := input.RemoteChainConfig.TokenTransferFeeConfig
 	if !desiredTokenTransferFeeConfig.IsEnabled {
 		return nil, nil
 	}
-
+	importedConfig, err := importTokenTransferFeeConfigFromActivePool(b, chain, input)
+	if err != nil {
+		return nil, fmt.Errorf("failed to import token transfer fee config from active pool: %w", err)
+	}
+	// merge imported config with desired config, giving precedence to desired config values when they are non-zero (i.e. non-default)
+	desiredTokenTransferFeeConfig = *mergeTokenTransferFeeConfig(&desiredTokenTransferFeeConfig, importedConfig)
 	report, err := cldf_ops.ExecuteOperation(b, token_pool.GetTokenTransferFeeConfig, chain, evm_contract.FunctionInput[uint64]{
 		ChainSelector: input.ChainSelector,
 		Address:       input.TokenPoolAddress,
