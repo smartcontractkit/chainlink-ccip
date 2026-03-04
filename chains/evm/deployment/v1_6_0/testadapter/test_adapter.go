@@ -237,30 +237,30 @@ func (a *EVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, 
 		}
 
 		sender.Value = oldFee
-		zeroOnRampTxn, err := r.ApplyRampUpdates(sender, []router.RouterOnRamp{
-			{
-				DestChainSelector: destChainSelector,
-				OnRamp:            common.HexToAddress("0x0"),
-			},
-		}, []router.RouterOffRamp{}, []router.RouterOffRamp{})
-		if err != nil {
-			return 0, fmt.Errorf("failed to zero onramp: %w", err)
-		}
+		// zeroOnRampTxn, err := r.ApplyRampUpdates(sender, []router.RouterOnRamp{
+		// 	{
+		// 		DestChainSelector: destChainSelector,
+		// 		OnRamp:            common.HexToAddress("0x0"),
+		// 	},
+		// }, []router.RouterOffRamp{}, []router.RouterOffRamp{})
+		// if err != nil {
+		// 	return 0, fmt.Errorf("failed to zero onramp: %w", err)
+		// }
 		type confirmResult struct {
 			blockNum uint64
 			err      error
 		}
 		// Two buffered channels – one result per goroutine.
-		ch1 := make(chan confirmResult, 1)
+		// ch1 := make(chan confirmResult, 1)
 		ch2 := make(chan confirmResult, 1)
 
-		// ---------- First async Confirm ----------
-		go func() {
-			// The original code ignored the block number (`_ = a.Confirm(...)`);
-			// we still capture it in case you need it later.
-			bn, err := a.Confirm(zeroOnRampTxn)
-			ch1 <- confirmResult{blockNum: bn, err: err}
-		}()
+		// // ---------- First async Confirm ----------
+		// go func() {
+		// 	// The original code ignored the block number (`_ = a.Confirm(...)`);
+		// 	// we still capture it in case you need it later.
+		// 	bn, err := a.Confirm(zeroOnRampTxn)
+		// 	ch1 <- confirmResult{blockNum: bn, err: err}
+		// }()
 
 		// ---------- Second async Confirm ----------
 		go func() {
@@ -271,7 +271,7 @@ func (a *EVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, 
 		// ----- Wait for both results -----
 		// Order of receipt does not matter; we just need both.
 		var r1, r2 confirmResult
-		r1 = <-ch1
+		// r1 = <-ch1
 		r2 = <-ch2
 
 		fmt.Printf("Zero onramp txn confirmed in block %d with error: %v\n", r1.blockNum, r1.err)
