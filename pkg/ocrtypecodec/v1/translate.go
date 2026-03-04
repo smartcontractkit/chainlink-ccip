@@ -263,7 +263,8 @@ func (t *protoTranslator) rmnRemoteConfigFromProto(
 		return cciptypes.RemoteConfig{}, fmt.Errorf("config digest must be 32 bytes: %v", pbRmnRemoteCfg.ConfigDigest)
 	}
 	if len(pbRmnRemoteCfg.RmnReportVersion) != 32 {
-		return cciptypes.RemoteConfig{}, fmt.Errorf("rmn report version must be 32 bytes: %v", pbRmnRemoteCfg.RmnReportVersion)
+		return cciptypes.RemoteConfig{}, fmt.Errorf(
+			"rmn report version must be 32 bytes: %v", pbRmnRemoteCfg.RmnReportVersion)
 	}
 
 	return cciptypes.RemoteConfig{
