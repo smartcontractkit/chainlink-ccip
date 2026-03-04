@@ -64,7 +64,7 @@ func DeployContractsForSelector(ctx context.Context, env *deployment.Environment
 	// Directory needs to exist at ../contracts/build relative to chainlink-ccip/devenv for TON
 	contractVersion := os.Getenv("DEPLOY_CONTRACT_VERSION")
 	if contractVersion == "" {
-		contractVersion = "4f7b7be09c30" // https://github.com/smartcontractkit/chainlink-ton/releases/tag/ton-contracts-build-4f7b7be09c30
+		contractVersion = "054376f21418" // https://github.com/smartcontractkit/chainlink-ton/releases/tag/ton-contracts-build-054376f21418
 	}
 	out, err := deployops.DeployContracts(dReg).Apply(*env, deployops.ContractDeploymentConfig{
 		MCMS: mcms.Input{},
@@ -289,6 +289,27 @@ func AddNodesToContracts(
 		ocrOverride := func(ocrParams CCIPOCRParams) CCIPOCRParams {
 			if ocrParams.CommitOffChainConfig != nil {
 				ocrParams.CommitOffChainConfig.RMNEnabled = false
+			}
+			// Apply TON-specific overrides following staging config patterns
+			family, famErr := chainsel.GetSelectorFamily(chain)
+			if famErr == nil && family == chainsel.FamilyTon {
+				if ocrParams.CommitOffChainConfig != nil {
+					ocrParams.CommitOffChainConfig.MaxReportTransmissionCheckAttempts = 2
+					ocrParams.CommitOffChainConfig.MaxMerkleTreeSize = 10
+					ocrParams.CommitOffChainConfig.TransmissionDelayMultiplier = 2 * time.Minute
+					ocrParams.CommitOffChainConfig.MaxMerkleRootsPerReport = 1
+					ocrParams.CommitOffChainConfig.MaxPricesPerReport = 3
+					ocrParams.CommitOffChainConfig.MultipleReportsEnabled = true
+				}
+				if ocrParams.ExecuteOffChainConfig != nil {
+					ocrParams.ExecuteOffChainConfig.BatchGasLimit = 1_000_000
+					// ocrParams.ExecuteOffChainConfig.InflightCacheExpiry = 3 * time.Minute
+					ocrParams.ExecuteOffChainConfig.TransmissionDelayMultiplier = 2 * time.Minute
+					ocrParams.ExecuteOffChainConfig.MaxReportMessages = 1
+					ocrParams.ExecuteOffChainConfig.MaxSingleChainReports = 1
+					ocrParams.ExecuteOffChainConfig.MaxCommitReportsToFetch = 250
+					ocrParams.ExecuteOffChainConfig.MultipleReportsEnabled = true
+				}
 			}
 			return ocrParams
 		}
