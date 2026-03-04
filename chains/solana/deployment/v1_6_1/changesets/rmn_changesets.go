@@ -3,13 +3,12 @@ package changesets
 import (
 	"fmt"
 
-	chain_selectors "github.com/smartcontractkit/chain-selectors"
-	solseq "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences" // TODO import from 1.6.1 when it is fully implemented
+	// TODO import from 1.6.1 when it is fully implemented
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_1/sequences"
+	_ "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_1/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
@@ -24,7 +23,7 @@ func RMNRemoteSetEventAuthoritiesChangeset() cldf.ChangeSetV2[RMNRemoteSetEventA
 }
 
 func rmnSetEventAuthoritiesVerify(env cldf.Environment, input RMNRemoteSetEventAuthoritiesChangesetInput) error {
-	if err := deployment.IsValidChainSelector(input.ChainSelector); err != nil {
+	if err := cldf.IsValidChainSelector(input.ChainSelector); err != nil {
 		return fmt.Errorf("invalid chain selector: %d - %w", input.ChainSelector, err)
 	}
 	if !env.BlockChains.Exists(input.ChainSelector) {
@@ -62,11 +61,8 @@ func rmnSetEventAuthoritiesApply(e cldf.Environment, input RMNRemoteSetEventAuth
 		}
 	}
 
-	mcmsRegistry := changesets.GetRegistry()
-	mcmsRegistry.RegisterMCMSReader(chain_selectors.FamilySolana, &solseq.SolanaAdapter{})
-
 	return changesets.
-		NewOutputBuilder(e, mcmsRegistry).
+		NewOutputBuilder(e, changesets.GetRegistry()).
 		WithReports(reports).
 		WithDataStore(ds).
 		WithBatchOps(report.Output.BatchOps).

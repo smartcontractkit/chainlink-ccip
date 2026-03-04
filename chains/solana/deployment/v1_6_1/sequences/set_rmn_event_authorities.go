@@ -10,7 +10,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
@@ -23,7 +22,7 @@ var SetRMNRemoteEventAuthorities = cldf_ops.NewSequence(
 	"rmn-remote:set-event-authorities",
 	semver.MustParse("1.6.1"),
 	"Sets event authorities on the RMNRemote 1.6.1 contract",
-	func(b operations.Bundle, chains cldf_chain.BlockChains, input RMNRemoteSetEventAuthoritiesSequenceInput) (sequences.OnChainOutput, error) {
+	func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input RMNRemoteSetEventAuthoritiesSequenceInput) (sequences.OnChainOutput, error) {
 		chain, ok := chains.SolanaChains()[input.Selector]
 		if !ok {
 			return sequences.OnChainOutput{}, fmt.Errorf("solana chain with selector %d not found", input.Selector)
@@ -50,7 +49,7 @@ var SetRMNRemoteEventAuthorities = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to find Router Signer PDA: %w", err)
 		}
 
-		out, err := operations.ExecuteOperation(b,
+		out, err := cldf_ops.ExecuteOperation(b,
 			rmnops.SetEventAuthorities,
 			chain,
 			rmnops.EventAuthoritiesInput{
