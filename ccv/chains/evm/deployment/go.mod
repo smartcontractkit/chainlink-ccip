@@ -9,10 +9,10 @@ require (
 	github.com/Masterminds/semver/v3 v3.4.0
 	github.com/ethereum/go-ethereum v1.17.0
 	github.com/smartcontractkit/chain-selectors v1.0.97
-	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20260302030253-ab9f38d01a0c
-	github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm v0.0.0-20260302030253-ab9f38d01a0c
-	github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment v0.0.0-20260302030253-ab9f38d01a0c
-	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260302030253-ab9f38d01a0c
+	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20260304162417-34ed1c26a312
+	github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm v0.0.0-20260304162417-34ed1c26a312
+	github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment v0.0.0-20260304162417-34ed1c26a312
+	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260304162417-34ed1c26a312
 	github.com/smartcontractkit/chainlink-common v0.9.6-0.20260114142648-bd9e1b483e96
 	github.com/smartcontractkit/chainlink-deployments-framework v0.80.2
 	github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20260119171452-39c98c3b33cd
@@ -85,6 +85,7 @@ require (
 	github.com/emicklei/go-restful/v3 v3.11.0 // indirect
 	github.com/ethereum/c-kzg-4844/v2 v2.1.5 // indirect
 	github.com/ethereum/go-bigmodexpfix v0.0.0-20250911101455-f9e208c548ab // indirect
+	github.com/evanphx/json-patch/v5 v5.9.11 // indirect
 	github.com/fatih/color v1.18.0 // indirect
 	github.com/fbsobreira/gotron-sdk v0.0.0-20250403083053-2943ce8c759b // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect

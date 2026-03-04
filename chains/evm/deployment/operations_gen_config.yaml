@@ -11,6 +11,19 @@ output:
 # - (none): Public/Read functions don't need access control
 
 contracts:
+  # 1.5.0
+  - contract_name: BurnMintTokenPoolAndProxy
+    version: "1.5.0"
+    functions:
+      - name: getRemotePool
+        access: public
+      - name: getCurrentInboundRateLimiterState
+        access: public
+      - name: getCurrentOutboundRateLimiterState
+        access: public
+      - name: getPreviousPool
+        access: public
+
   # 1.6.3
   - contract_name: FeeQuoter
     version: "1.6.3"
