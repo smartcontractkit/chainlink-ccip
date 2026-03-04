@@ -23,6 +23,9 @@ type ChainConfig struct {
 	// The Router on the chain being configured.
 	// We assume that all connections defined will use the same router, either test or production.
 	Router datastore.AddressRef
+	// CantonGlobalConfig is an optional Canton-specific control contract for lane configuration.
+	// If provided, this is passed through to adapters.ConfigureChainForLanesInput.CantonGlobalConfig.
+	CantonGlobalConfig datastore.AddressRef
 	// The OnRamp on the chain being configured.
 	// Similarly, we assume that all connections will use the same OnRamp.
 	OnRamp datastore.AddressRef
@@ -64,9 +67,21 @@ func makeApply(chainFamilyRegistry *adapters.ChainFamilyRegistry, mcmsRegistry *
 		ds := datastore.NewMemoryDataStore()
 
 		for _, chain := range cfg.Chains {
-			router, err := datastore_utils.FindAndFormatRef(e.DataStore, chain.Router, chain.ChainSelector, datastore_utils.FullRef)
-			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve router ref on chain with selector %d: %w", chain.ChainSelector, err)
+			routerAddress := ""
+			if !datastore_utils.IsAddressRefEmpty(chain.Router) {
+				router, err := datastore_utils.FindAndFormatRef(e.DataStore, chain.Router, chain.ChainSelector, datastore_utils.FullRef)
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve router ref on chain with selector %d: %w", chain.ChainSelector, err)
+				}
+				routerAddress = router.Address
+			}
+			cantonGlobalConfigAddress := ""
+			if !datastore_utils.IsAddressRefEmpty(chain.CantonGlobalConfig) {
+				globalConfig, err := datastore_utils.FindAndFormatRef(e.DataStore, chain.CantonGlobalConfig, chain.ChainSelector, datastore_utils.FullRef)
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve cantonGlobalConfig ref on chain with selector %d: %w", chain.ChainSelector, err)
+				}
+				cantonGlobalConfigAddress = globalConfig.Address
 			}
 			onRamp, err := datastore_utils.FindAndFormatRef(e.DataStore, chain.OnRamp, chain.ChainSelector, datastore_utils.FullRef)
 			if err != nil {
@@ -123,7 +138,8 @@ func makeApply(chainFamilyRegistry *adapters.ChainFamilyRegistry, mcmsRegistry *
 			}
 			configureChainForLanesReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adapter.ConfigureChainForLanes(), e.BlockChains, adapters.ConfigureChainForLanesInput{
 				ChainSelector:      chain.ChainSelector,
-				Router:             router.Address,
+				Router:             routerAddress,
+				CantonGlobalConfig: cantonGlobalConfigAddress,
 				OnRamp:             onRamp.Address,
 				CommitteeVerifiers: committeeVerifiers,
 				FeeQuoter:          feeQuoter.Address,

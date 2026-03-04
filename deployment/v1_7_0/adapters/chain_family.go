@@ -116,6 +116,9 @@ type ConfigureChainForLanesInput struct {
 	// The Router address on the chain being configured.
 	// We assume that all connections defined will use the same router, either test or production.
 	Router string
+	// CantonGlobalConfig is an optional Canton-specific control contract address for lane configuration.
+	// For EVM, Router remains the canonical field.
+	CantonGlobalConfig string
 	// The OnRamp address on the chain being configured.
 	// Similarly, we assume that all connections will use the same OnRamp.
 	OnRamp string
