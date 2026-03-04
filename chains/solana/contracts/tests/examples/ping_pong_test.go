@@ -202,7 +202,7 @@ func TestPingPong(t *testing.T) {
 				var programData ProgramData
 				require.NoError(t, bin.UnmarshalBorsh(&programData, data.Bytes()))
 
-				// Now, actually initialize the offramp
+				// Now, actually initialize RMN
 				initIx, err := rmn_remote.NewInitializeInstruction(
 					config.RMNRemoteConfigPDA,
 					config.RMNRemoteCursesPDA,
@@ -213,7 +213,15 @@ func TestPingPong(t *testing.T) {
 				).ValidateAndBuild()
 				require.NoError(t, err)
 
-				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{initIx}, admin,
+				authIx, err := rmn_remote.NewSetEventAuthoritiesInstruction(
+					[]solana.PublicKey{config.BillingSignerPDA},
+					config.RMNRemoteConfigPDA,
+					admin.PublicKey(),
+					solana.SystemProgramID,
+				).ValidateAndBuild()
+				require.NoError(t, err)
+
+				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{initIx, authIx}, admin,
 					config.DefaultCommitment)
 			})
 		})

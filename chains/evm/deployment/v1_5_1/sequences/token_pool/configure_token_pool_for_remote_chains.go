@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 
@@ -20,11 +21,13 @@ import (
 
 type ConfigureTokenPoolForRemoteChainsInput struct {
 	TokenPoolAddress common.Address
+	TokenPoolVersion *semver.Version
 	RemoteChains     map[uint64]tokensapi.RemoteChainConfig[[]byte, string]
 }
 
 type ConfigureTokenPoolForRemoteChainInput struct {
 	TokenPoolAddress    common.Address
+	TokenPoolVersion    *semver.Version
 	RemoteChainSelector uint64
 	RemoteChainConfig   tokensapi.RemoteChainConfig[[]byte, string]
 }
@@ -66,6 +69,7 @@ var ConfigureTokenPoolForRemoteChains = cldf_ops.NewSequence(
 				chain,
 				ConfigureTokenPoolForRemoteChainInput{
 					TokenPoolAddress:    tokenPool.Address(),
+					TokenPoolVersion:    input.TokenPoolVersion,
 					RemoteChainSelector: remoteChainSelector,
 					RemoteChainConfig:   remoteChainConfig,
 				},
@@ -101,6 +105,19 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get supported chains: %w", err)
 		}
+		localDecimals, err := tp.GetTokenDecimals(&bind.CallOpts{Context: b.GetContext()})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to get token decimals: %w", err)
+		}
+
+		inputORL, inputIRL := tokensapi.GenerateTPRLConfigs(
+			input.RemoteChainConfig.OutboundRateLimiterConfig,
+			input.RemoteChainConfig.InboundRateLimiterConfig,
+			localDecimals,
+			input.RemoteChainConfig.RemoteDecimals,
+			chain.Family(),
+			input.TokenPoolVersion,
+		)
 
 		// Token pool remote chain configuration can vary depending on whether the remote
 		// pool is or isn't supported. The different cases to consider are recorded below
@@ -124,8 +141,6 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 				// If the remote token onchain matches the one provided as input, then we won't call
 				// ApplyChainUpdates and instead handle the onchain updates via SetRateLimiterConfig
 				// and AddRemotePool.
-				inputORL := input.RemoteChainConfig.OutboundRateLimiterConfig
-				inputIRL := input.RemoteChainConfig.InboundRateLimiterConfig
 				remoteTP := input.RemoteChainConfig.RemotePool
 				remoteCS := input.RemoteChainSelector
 
@@ -219,14 +234,14 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 							RemoteChainSelector: input.RemoteChainSelector,
 							RemoteTokenAddress:  input.RemoteChainConfig.RemoteToken,
 							OutboundRateLimiterConfig: token_pool.RateLimiterConfig{
-								IsEnabled: input.RemoteChainConfig.OutboundRateLimiterConfig.IsEnabled,
-								Capacity:  input.RemoteChainConfig.OutboundRateLimiterConfig.Capacity,
-								Rate:      input.RemoteChainConfig.OutboundRateLimiterConfig.Rate,
+								IsEnabled: inputORL.IsEnabled,
+								Capacity:  inputORL.Capacity,
+								Rate:      inputORL.Rate,
 							},
 							InboundRateLimiterConfig: token_pool.RateLimiterConfig{
-								IsEnabled: input.RemoteChainConfig.InboundRateLimiterConfig.IsEnabled,
-								Capacity:  input.RemoteChainConfig.InboundRateLimiterConfig.Capacity,
-								Rate:      input.RemoteChainConfig.InboundRateLimiterConfig.Rate,
+								IsEnabled: inputIRL.IsEnabled,
+								Capacity:  inputIRL.Capacity,
+								Rate:      inputIRL.Rate,
 							},
 						},
 					},

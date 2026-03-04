@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"path"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -117,11 +118,22 @@ func newHTTPClient(
 	}, nil
 }
 
+// splitPathAndQuery splits requestPath on the first "?" so the path and query
+// can be set on url.URL separately, ensuring the "?" is not escaped in the path.
+func splitPathAndQuery(requestPath string) (pathPart, rawQuery string) {
+	if i := strings.Index(requestPath, "?"); i >= 0 {
+		return requestPath[:i], requestPath[i+1:]
+	}
+	return requestPath, ""
+}
+
 func (h *httpClient) Get(ctx context.Context, requestPath string) (cciptypes.Bytes, HTTPStatus, error) {
 	lggr := logutil.WithContextValues(ctx, h.lggr)
 
 	requestURL := *h.apiURL
-	requestURL.Path = path.Join(requestURL.Path, requestPath)
+	pathPart, rawQuery := splitPathAndQuery(requestPath)
+	requestURL.Path = path.Join(requestURL.Path, pathPart)
+	requestURL.RawQuery = rawQuery
 
 	response, httpStatus, err := h.callAPI(ctx, lggr, http.MethodGet, requestURL, nil)
 	lggr.Debugw(
@@ -142,7 +154,9 @@ func (h *httpClient) Post(
 	lggr := logutil.WithContextValues(ctx, h.lggr)
 
 	requestURL := *h.apiURL
-	requestURL.Path = path.Join(requestURL.Path, requestPath)
+	pathPart, rawQuery := splitPathAndQuery(requestPath)
+	requestURL.Path = path.Join(requestURL.Path, pathPart)
+	requestURL.RawQuery = rawQuery
 
 	response, httpStatus, err := h.callAPI(ctx, lggr, http.MethodPost, requestURL, bytes.NewBuffer(requestData))
 	h.lggr.Debugw(

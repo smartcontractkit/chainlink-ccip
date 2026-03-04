@@ -130,36 +130,7 @@ func setTokenPoolRateLimitsApply() func(cldf.Environment, TPRLInput) (cldf.Chang
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to get token decimals for token on chain with selector %d: %w", selector, err)
 				}
-				if !inputs.IsEnabled {
-					tprlRemote.OutboundRateLimiterConfig.IsEnabled = false
-					tprlRemote.OutboundRateLimiterConfig.Capacity = big.NewInt(0)
-					tprlRemote.OutboundRateLimiterConfig.Rate = big.NewInt(0)
-				} else {
-					// We scale the rate limiter configs by the token decimals to convert from
-					// human-readable token amounts to the on-chain representation
-					tprlRemote.OutboundRateLimiterConfig.IsEnabled = true
-					tprlRemote.OutboundRateLimiterConfig.Capacity = scaleFloatToBigInt(inputs.Capacity, int(decimals), 0)
-					tprlRemote.OutboundRateLimiterConfig.Rate = scaleFloatToBigInt(inputs.Rate, int(decimals), 0)
-				}
-
-				if !remoteInputs.IsEnabled {
-					tprlRemote.InboundRateLimiterConfig.IsEnabled = false
-					tprlRemote.InboundRateLimiterConfig.Capacity = big.NewInt(0)
-					tprlRemote.InboundRateLimiterConfig.Rate = big.NewInt(0)
-				} else {
-					// We set the inbound capacity to be 1.1x the outbound capacity of the counterpart to avoid accidentally hitting the rate limit due to minor timing differences in refilling
-					scaleByDecimals := decimals
-					// https://github.com/smartcontractkit/chainlink-deployments/blob/cce886554ca0587492955784381321ce817fb6bb/domains/ccip/shared/tokendefaults.go#L1904
-					// Only old EVM pools need to scale by remote deciamls on inbound. Newer pools and non-EVM pools handle all conversions in local decimals.
-					// This is a hack. Avoiding it would require refactoring the token pool adapters to handle rate limit configs in a more structured way instead of
-					// just passing them as bytes through the registry, so for now we can live with this special case for old EVM pools since we're moving towards newer versions and non-EVM chains where this isn't an issue.
-					if family == chain_selectors.FamilyEVM && tokenPool.Version.LessThan(semver.MustParse("1.6.1")) {
-						scaleByDecimals = remoteDecimals
-					}
-					tprlRemote.InboundRateLimiterConfig.IsEnabled = true
-					tprlRemote.InboundRateLimiterConfig.Capacity = scaleFloatToBigInt(remoteInputs.Capacity, int(scaleByDecimals), .10)
-					tprlRemote.InboundRateLimiterConfig.Rate = scaleFloatToBigInt(remoteInputs.Rate, int(scaleByDecimals), .10)
-				}
+				tprlRemote.OutboundRateLimiterConfig, tprlRemote.InboundRateLimiterConfig = GenerateTPRLConfigs(inputs, remoteInputs, decimals, remoteDecimals, family, tokenPool.Version)
 				rateLimitReport, err := cldf_ops.ExecuteSequence(
 					e.OperationsBundle, tokenPoolAdapter.SetTokenPoolRateLimits(), e.BlockChains, tprlRemote)
 				if err != nil {
@@ -186,7 +157,7 @@ func setTokenPoolRateLimitsApply() func(cldf.Environment, TPRLInput) (cldf.Chang
 //
 // The function never overflows because all arithmetic is done with
 // arbitrary‑precision types (big.Rat → big.Int).
-func scaleFloatToBigInt(value float64, decimals int, extraPercent float64) *big.Int {
+func ScaleFloatToBigInt(value float64, decimals int, extraPercent float64) *big.Int {
 	// -------------------------------------------------------------
 	// Turn the float into an *exact* rational.
 	// -------------------------------------------------------------
@@ -221,4 +192,47 @@ func scaleFloatToBigInt(value float64, decimals int, extraPercent float64) *big.
 	floatValue.SetMode(big.AwayFromZero) // Round half up to avoid underestimating the rate limit
 	out, _ := floatValue.Int(tmp)        // big.Float.Int sets tmp to the integer part of floatValue and returns tmp
 	return out
+}
+
+func GenerateTPRLConfigs(
+	outboundInput RateLimiterConfigFloatInput,
+	inboundInput RateLimiterConfigFloatInput,
+	decimals uint8,
+	remoteDecimals uint8,
+	chainFamily string,
+	tokenPoolVersion *semver.Version,
+) (RateLimiterConfig, RateLimiterConfig) {
+	outboundConfig := RateLimiterConfig{}
+	inboundConfig := RateLimiterConfig{}
+	if !outboundInput.IsEnabled {
+		outboundConfig.IsEnabled = false
+		outboundConfig.Capacity = big.NewInt(0)
+		outboundConfig.Rate = big.NewInt(0)
+	} else {
+		// We scale the rate limiter configs by the token decimals to convert from
+		// human-readable token amounts to the on-chain representation
+		outboundConfig.IsEnabled = true
+		outboundConfig.Capacity = ScaleFloatToBigInt(outboundInput.Capacity, int(decimals), 0)
+		outboundConfig.Rate = ScaleFloatToBigInt(outboundInput.Rate, int(decimals), 0)
+	}
+
+	if !inboundInput.IsEnabled {
+		inboundConfig.IsEnabled = false
+		inboundConfig.Capacity = big.NewInt(0)
+		inboundConfig.Rate = big.NewInt(0)
+	} else {
+		// We set the inbound capacity to be 1.1x the outbound capacity of the counterpart to avoid accidentally hitting the rate limit due to minor timing differences in refilling
+		scaleByDecimals := decimals
+		// https://github.com/smartcontractkit/chainlink-deployments/blob/cce886554ca0587492955784381321ce817fb6bb/domains/ccip/shared/tokendefaults.go#L1904
+		// Only old EVM pools need to scale by remote deciamls on inbound. Newer pools and non-EVM pools handle all conversions in local decimals.
+		// This is a hack. Avoiding it would require refactoring the token pool adapters to handle rate limit configs in a more structured way instead of
+		// just passing them as bytes through the registry, so for now we can live with this special case for old EVM pools since we're moving towards newer versions and non-EVM chains where this isn't an issue.
+		if chainFamily == chain_selectors.FamilyEVM && tokenPoolVersion.LessThan(semver.MustParse("1.6.1")) {
+			scaleByDecimals = remoteDecimals
+		}
+		inboundConfig.IsEnabled = true
+		inboundConfig.Capacity = ScaleFloatToBigInt(inboundInput.Capacity, int(scaleByDecimals), .10)
+		inboundConfig.Rate = ScaleFloatToBigInt(inboundInput.Rate, int(scaleByDecimals), .10)
+	}
+	return outboundConfig, inboundConfig
 }

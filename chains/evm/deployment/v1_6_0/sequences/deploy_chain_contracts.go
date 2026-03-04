@@ -30,6 +30,7 @@ import (
 	offrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
 	onrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
+	fq163ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_3/operations/fee_quoter"
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
@@ -54,6 +55,12 @@ func (a *EVMAdapter) FinalizeDeployMCMS() *cldf_ops.Sequence[deployops.MCMSDeplo
 func (a *EVMAdapter) GrantAdminRoleToTimelock() *operations.Sequence[deployops.GrantAdminRoleToTimelockConfigPerChainWithSelector, sequences.OnChainOutput, chain.BlockChains] {
 	evmDeployer := &evm1_0_0.EVMDeployer{}
 	return evmDeployer.GrantAdminRoleToTimelock()
+}
+
+// Updates MCMs Config on specified MCMS contracts
+func (a *EVMAdapter) UpdateMCMSConfig() *operations.Sequence[deployops.UpdateMCMSConfigInputPerChainWithSelector, sequences.OnChainOutput, chain.BlockChains] {
+	evmDeployer := &evm1_0_0.EVMDeployer{}
+	return evmDeployer.UpdateMCMSConfig()
 }
 
 var DeployChainContracts = cldf_ops.NewSequence(
@@ -179,11 +186,11 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, nonceManagerRef)
 
 		// Deploy FeeQuoter
-		feeQuoterRef, err := contract.MaybeDeployContract(b, fqops.Deploy, chain, contract.DeployInput[fqops.ConstructorArgs]{
-			TypeAndVersion: deployment.NewTypeAndVersion(fqops.ContractType, *fqops.Version),
+		feeQuoterRef, err := contract.MaybeDeployContract(b, fq163ops.Deploy, chain, contract.DeployInput[fq163ops.ConstructorArgs]{
+			TypeAndVersion: deployment.NewTypeAndVersion(fq163ops.ContractType, *fq163ops.Version),
 			ChainSelector:  chain.Selector,
-			Args: fqops.ConstructorArgs{
-				StaticConfig: fqops.StaticConfig{
+			Args: fq163ops.ConstructorArgs{
+				StaticConfig: fq163ops.StaticConfig{
 					MaxFeeJuelsPerMsg:            input.MaxFeeJuelsPerMsg,
 					LinkToken:                    common.HexToAddress(linkRef.Address),
 					TokenPriceStalenessThreshold: input.TokenPriceStalenessThreshold,
@@ -196,9 +203,9 @@ var DeployChainContracts = cldf_ops.NewSequence(
 					common.HexToAddress(linkRef.Address),
 					common.HexToAddress(wethRef.Address),
 				},
-				TokenPriceFeeds:                []fqops.TokenPriceFeedUpdate{},
-				TokenTransferFeeConfigArgs:     []fqops.TokenTransferFeeConfigArgs{},
-				PremiumMultiplierWeiPerEthArgs: []fqops.PremiumMultiplierWeiPerEthArgs{
+				TokenPriceFeeds:            []fq163ops.TokenPriceFeedUpdate{},
+				TokenTransferFeeConfigArgs: []fq163ops.TokenTransferFeeConfigArgs{},
+				PremiumMultiplierWeiPerEthArgs: []fq163ops.PremiumMultiplierWeiPerEthArgs{
 					{
 						PremiumMultiplierWeiPerEth: input.LinkPremiumMultiplier,
 						Token:                      common.HexToAddress(linkRef.Address),
@@ -208,7 +215,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 						Token:                      common.HexToAddress(wethRef.Address),
 					},
 				},
-				DestChainConfigArgs: []fqops.DestChainConfigArgs{},
+				DestChainConfigArgs: []fq163ops.DestChainConfigArgs{},
 			},
 		}, input.ExistingAddresses)
 		if err != nil {
@@ -339,14 +346,14 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, err
 		}
 
-	// Add Authorized Caller to FQ
-	_, err = cldf_ops.ExecuteOperation(b, fqops.ApplyAuthorizedCallerUpdates, chain, contract.FunctionInput[fqops.AuthorizedCallerArgs]{
-		ChainSelector: chain.Selector,
-		Address:       common.HexToAddress(feeQuoterRef.Address),
-		Args: fqops.AuthorizedCallerArgs{
-			AddedCallers: []common.Address{
-				common.HexToAddress(offRampRef.Address),
-			},
+		// Add Authorized Caller to FQ
+		_, err = cldf_ops.ExecuteOperation(b, fqops.ApplyAuthorizedCallerUpdates, chain, contract.FunctionInput[fqops.AuthorizedCallerArgs]{
+			ChainSelector: chain.Selector,
+			Address:       common.HexToAddress(feeQuoterRef.Address),
+			Args: fqops.AuthorizedCallerArgs{
+				AddedCallers: []common.Address{
+					common.HexToAddress(offRampRef.Address),
+				},
 			},
 		})
 		if err != nil {
