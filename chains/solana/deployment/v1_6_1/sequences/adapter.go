@@ -31,7 +31,6 @@ func (a *SolanaAdapter) GetRMNRemoteAddress(ds datastore.DataStore, chainSelecto
 	addr, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
 		ChainSelector: chainSelector,
 		Type:          datastore.ContractType(rmnremoteops.ContractType),
-		Version:       rmnremoteops.Version,
 	}, chainSelector, utils.ToByteArray)
 	if err != nil {
 		return nil, err
