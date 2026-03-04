@@ -15,14 +15,14 @@ import (
 	evm_2_evm_onramp_v1_5_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
+	dseq "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	evmadapter "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/adapters"
-	sequence1_7 "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	fqops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/sequences"
 )
 
 // dummyAddressRefs is hardcoded address refs (previously from address_refs.json).
@@ -461,15 +461,15 @@ func validMaxFeeJuelsPerMsgFromMetadata(chainSelector uint64, contractMetadata [
 }
 
 // getExpectedOutput returns hardcoded expected FeeQuoterUpdate values based on contract_metadata.json
-func getExpectedOutput() map[uint64]sequence1_7.FeeQuoterUpdate {
+func getExpectedOutput() map[uint64]sequences.FeeQuoterUpdate {
 	linkToken := common.HexToAddress("0x514910771AF9Ca656af840dff83E8264EcF986CA")
 	maxFeeJuels, _ := new(big.Int).SetString("1000000000000000000", 10)
 
-	expected := make(map[uint64]sequence1_7.FeeQuoterUpdate)
+	expected := make(map[uint64]sequences.FeeQuoterUpdate)
 
 	// Chain 5009297550715157269: Has FeeQuoter v1.6.3 + OnRamp v1.5.0
 	// Since no FeeQuoter v1.7.0 exists, it's a new deployment (ConstructorArgs populated)
-	expected[5009297550715157269] = sequence1_7.FeeQuoterUpdate{
+	expected[5009297550715157269] = sequences.FeeQuoterUpdate{
 		ChainSelector: 5009297550715157269,
 		ConstructorArgs: fqops.ConstructorArgs{
 			StaticConfig: fqops.StaticConfig{
@@ -507,8 +507,8 @@ func getExpectedOutput() map[uint64]sequence1_7.FeeQuoterUpdate {
 						DestGasOverhead:             100000,
 						DestGasPerPayloadByteBase:   16,
 						ChainFamilySelector:         [4]byte(utils.GetSelectorHex(4949039107694359620)),
-						DefaultTokenFeeUSDCents:     0, // Not in OnRamp DynamicConfig in test data
-						DefaultTokenDestGasOverhead: 0, // Not in OnRamp DynamicConfig in test data
+						DefaultTokenFeeUSDCents:     0,
+						DefaultTokenDestGasOverhead: 0,
 						DefaultTxGasLimit:           200000,
 						NetworkFeeUSDCents:          10,
 						LinkFeeMultiplierPercent:    90,
@@ -558,7 +558,7 @@ func getExpectedOutput() map[uint64]sequence1_7.FeeQuoterUpdate {
 	}
 
 	// Chain 4949039107694359620: Has FeeQuoter v1.6.3 + OnRamp v1.5.0
-	expected[4949039107694359620] = sequence1_7.FeeQuoterUpdate{
+	expected[4949039107694359620] = sequences.FeeQuoterUpdate{
 		ChainSelector: 4949039107694359620,
 		ConstructorArgs: fqops.ConstructorArgs{
 			StaticConfig: fqops.StaticConfig{
@@ -597,8 +597,8 @@ func getExpectedOutput() map[uint64]sequence1_7.FeeQuoterUpdate {
 						DestGasOverhead:             100000,
 						DestGasPerPayloadByteBase:   16,
 						ChainFamilySelector:         [4]byte(utils.GetSelectorHex(5009297550715157269)),
-						DefaultTokenFeeUSDCents:     0, // Not in OnRamp DynamicConfig in test data
-						DefaultTokenDestGasOverhead: 0, // Not in OnRamp DynamicConfig in test data
+						DefaultTokenFeeUSDCents:     0,
+						DefaultTokenDestGasOverhead: 0,
 						DefaultTxGasLimit:           200000,
 						NetworkFeeUSDCents:          10,
 						LinkFeeMultiplierPercent:    90,
@@ -640,7 +640,7 @@ func getExpectedOutput() map[uint64]sequence1_7.FeeQuoterUpdate {
 
 	// Chain 15971525489660198786: Only has OnRamp v1.5.0
 	maxFeeJuels159, _ := new(big.Int).SetString("1000000000000000000", 10)
-	expected[15971525489660198786] = sequence1_7.FeeQuoterUpdate{
+	expected[15971525489660198786] = sequences.FeeQuoterUpdate{
 		ChainSelector: 15971525489660198786,
 		ConstructorArgs: fqops.ConstructorArgs{
 			StaticConfig: fqops.StaticConfig{
@@ -657,8 +657,8 @@ func getExpectedOutput() map[uint64]sequence1_7.FeeQuoterUpdate {
 						DestGasOverhead:             100000,
 						DestGasPerPayloadByteBase:   16,
 						ChainFamilySelector:         [4]byte(utils.GetSelectorHex(5009297550715157269)),
-						DefaultTokenFeeUSDCents:     0, // Not in OnRamp DynamicConfig in test data
-						DefaultTokenDestGasOverhead: 0, // Not in OnRamp DynamicConfig in test data
+						DefaultTokenFeeUSDCents:     0,
+						DefaultTokenDestGasOverhead: 0,
 						DefaultTxGasLimit:           200000,
 						NetworkFeeUSDCents:          10,
 						LinkFeeMultiplierPercent:    90,
@@ -697,7 +697,7 @@ func getExpectedOutput() map[uint64]sequence1_7.FeeQuoterUpdate {
 	}
 
 	// Chain 5936861837188149645: Has FeeQuoter v1.6.3 + OnRamp v1.5.0
-	expected[5936861837188149645] = sequence1_7.FeeQuoterUpdate{
+	expected[5936861837188149645] = sequences.FeeQuoterUpdate{
 		ChainSelector: 5936861837188149645,
 		ConstructorArgs: fqops.ConstructorArgs{
 			StaticConfig: fqops.StaticConfig{
@@ -751,8 +751,8 @@ func getExpectedOutput() map[uint64]sequence1_7.FeeQuoterUpdate {
 						DestGasOverhead:             80000,
 						DestGasPerPayloadByteBase:   14,
 						ChainFamilySelector:         [4]byte(utils.GetSelectorHex(15971525489660198786)),
-						DefaultTokenFeeUSDCents:     0, // Not in OnRamp DynamicConfig in test data
-						DefaultTokenDestGasOverhead: 0, // Not in OnRamp DynamicConfig in test data
+						DefaultTokenFeeUSDCents:     0,
+						DefaultTokenDestGasOverhead: 0,
 						DefaultTxGasLimit:           180000,
 						NetworkFeeUSDCents:          10,
 						LinkFeeMultiplierPercent:    90,
@@ -809,7 +809,7 @@ func TestSequenceFeeQuoterInputCreation(t *testing.T) {
 	}
 
 	// Load contract metadata into the datastore
-	err = sequences.WriteMetadataToDatastore(ds, sequences.Metadata{
+	err = dseq.WriteMetadataToDatastore(ds, dseq.Metadata{
 		Contracts: contractMetadata,
 	})
 	require.NoError(t, err, "Failed to write contract metadata to datastore")
@@ -817,8 +817,8 @@ func TestSequenceFeeQuoterInputCreation(t *testing.T) {
 	// Seal the datastore for use in the test
 	e.DataStore = ds.Seal()
 
-	// Get the FeeQuoterUpdater adapter (use concrete type so report.Output is sequence1_7.FeeQuoterUpdate)
-	fquUpdater := evmadapter.FeeQuoterUpdater[sequence1_7.FeeQuoterUpdate]{}
+	// Get the FeeQuoterUpdater adapter (use concrete type so report.Output is sequences.FeeQuoterUpdate)
+	fquUpdater := evmadapter.FeeQuoterUpdater[sequences.FeeQuoterUpdate]{}
 
 	// Test the sequence for each chain selector that has a FeeQuoter
 	for _, chainSelector := range chainSelectorList {
@@ -889,7 +889,7 @@ func TestSequenceFeeQuoterInputCreation(t *testing.T) {
 		// - DestChainConfigs
 		// - TokenTransferFeeConfigUpdates
 		// - AuthorizedCallerUpdates
-		hasData := !sequence1_7.IsConstructorArgsEmpty(output.ConstructorArgs) ||
+		hasData := !sequences.IsConstructorArgsEmpty(output.ConstructorArgs) ||
 			len(output.DestChainConfigs) > 0 ||
 			len(output.TokenTransferFeeConfigUpdates.TokenTransferFeeConfigArgs) > 0 ||
 			len(output.AuthorizedCallerUpdates.AddedCallers) > 0 ||
@@ -897,8 +897,8 @@ func TestSequenceFeeQuoterInputCreation(t *testing.T) {
 
 		require.True(t, hasData, "Output should have at least some configuration data for chain %d", chainSelector)
 		// Assert against expected values
-		if !sequence1_7.IsConstructorArgsEmpty(expected.ConstructorArgs) {
-			require.False(t, sequence1_7.IsConstructorArgsEmpty(output.ConstructorArgs), "ConstructorArgs should be present for new deployment on chain %d", chainSelector)
+		if !sequences.IsConstructorArgsEmpty(expected.ConstructorArgs) {
+			require.False(t, sequences.IsConstructorArgsEmpty(output.ConstructorArgs), "ConstructorArgs should be present for new deployment on chain %d", chainSelector)
 			require.Equal(t, expected.ConstructorArgs.StaticConfig.LinkToken, output.ConstructorArgs.StaticConfig.LinkToken,
 				"LinkToken should match expected value on chain %d", chainSelector)
 			// MaxFeeJuelsPerMsg must be one of the values present in contract metadata for this chain
@@ -912,7 +912,7 @@ func TestSequenceFeeQuoterInputCreation(t *testing.T) {
 				"PriceUpdaters should match expected value on chain %d", chainSelector)
 		} else {
 			// For existing deployments, ConstructorArgs should be empty
-			require.True(t, sequence1_7.IsConstructorArgsEmpty(output.ConstructorArgs), "ConstructorArgs should be empty for existing deployment on chain %d", chainSelector)
+			require.True(t, sequences.IsConstructorArgsEmpty(output.ConstructorArgs), "ConstructorArgs should be empty for existing deployment on chain %d", chainSelector)
 		}
 
 		// Assert specific values based on the sequence logic in feequoterupdater.go

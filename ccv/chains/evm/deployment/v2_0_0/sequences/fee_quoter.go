@@ -167,14 +167,14 @@ var (
 		},
 	)
 
-	// CreateFeeQuoterUpdateInputFromV163 creates FeeQuoterUpdate input by importing configuration from FeeQuoter v1.6.0
+	// CreateFeeQuoterUpdateInputFromV163 creates FeeQuoterUpdate input by importing configuration from FeeQuoter v1.6.x
 	CreateFeeQuoterUpdateInputFromV163 = cldf_ops.NewSequence(
-		"fetches-feequoter-config-values-from-v1.6.3",
+		"fetches-feequoter-config-values-from-v1.6.x",
 		semver.MustParse("2.0.0"),
-		"Creates FeeQuoterUpdate input by importing configuration from FeeQuoter v1.6.3",
+		"Creates FeeQuoterUpdate input by importing configuration from FeeQuoter v1.6.x",
 		func(b cldf_ops.Bundle, chain evm.Chain, input deploy.FeeQuoterUpdateInput) (output FeeQuoterUpdate, err error) {
 			// check if FeeQuoter v1.6.3 is present in existing addresses, if not, we return empty output
-			// it means there is no existing fee quoter deployed from v1.6.3 deployment, and we can skip the config import from v1.6.3
+			// it means there is no existing fee quoter deployed from v1.6.3 deployment, and we can skip the config import from v1.6.x
 			fq16AddressRef, err := seq1_6.GetFeeQuoterAddress(input.ExistingAddresses, input.ChainSelector)
 			if err != nil && strings.Contains(err.Error(), "no fee quoter address found") {
 				return FeeQuoterUpdate{}, nil
