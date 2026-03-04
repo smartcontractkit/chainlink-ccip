@@ -255,24 +255,12 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 					writes = append(writes, addRemotePoolsReport.Output)
 				}
 
-				// Update token transfer fee configuration (after remote chain config so chain exists on pool).
-				tokenTransferFeeConfigUpdates, err := makeTokenTransferFeeConfigUpdates(b, chain, input, input.RemoteChainSelector)
+				// Update token transfer fee configuration (chain is already supported)
+				tokenTransferFeeWrites, err := applyTokenTransferFeeConfigIfNeeded(b, chain, input, input.RemoteChainSelector)
 				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to make token transfer fee config updates: %w", err)
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to apply token transfer fee config updates: %w", err)
 				}
-				if len(tokenTransferFeeConfigUpdates) > 0 {
-					applyTokenTransferFeeConfigUpdatesReport, err := cldf_ops.ExecuteOperation(b, token_pool.ApplyTokenTransferFeeConfigUpdates, chain, evm_contract.FunctionInput[token_pool.TokenTransferFeeConfigArgs]{
-						ChainSelector: input.ChainSelector,
-						Address:       input.TokenPoolAddress,
-						Args: token_pool.TokenTransferFeeConfigArgs{
-							TokenTransferFeeConfigUpdates: tokenTransferFeeConfigUpdates,
-						},
-					})
-					if err != nil {
-						return sequences.OnChainOutput{}, fmt.Errorf("failed to apply token transfer fee config updates: %w", err)
-					}
-					writes = append(writes, applyTokenTransferFeeConfigUpdatesReport.Output)
-				}
+				writes = append(writes, tokenTransferFeeWrites...)
 
 				// Return early as no further action is required
 				batchOp, err := evm_contract.NewBatchOperationFromWrites(writes)
@@ -314,6 +302,13 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to apply chain updates: %w", err)
 		}
 		writes = append(writes, applyChainUpdatesReport.Output)
+
+		// Update token transfer fee configuration (chain was just added)
+		tokenTransferFeeWrites, err := applyTokenTransferFeeConfigIfNeeded(b, chain, input, input.RemoteChainSelector)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to apply token transfer fee config updates: %w", err)
+		}
+		writes = append(writes, tokenTransferFeeWrites...)
 
 		// Check and update custom finality rate limiters
 		customFinalityRateLimitersReport, err := maybeUpdateRateLimiters(
@@ -623,6 +618,27 @@ func rateLimiterConfigsEqual(current tp_bindings.RateLimiterTokenBucket, desired
 	return current.IsEnabled == desired.IsEnabled &&
 		current.Capacity.Cmp(desired.Capacity) == 0 &&
 		current.Rate.Cmp(desired.Rate) == 0
+}
+
+func applyTokenTransferFeeConfigIfNeeded(b cldf_ops.Bundle, chain evm.Chain, input ConfigureTokenPoolForRemoteChainInput, remoteChainSelector uint64) ([]evm_contract.WriteOutput, error) {
+	tokenTransferFeeConfigUpdates, err := makeTokenTransferFeeConfigUpdates(b, chain, input, remoteChainSelector)
+	if err != nil {
+		return nil, fmt.Errorf("failed to make token transfer fee config updates: %w", err)
+	}
+	if len(tokenTransferFeeConfigUpdates) == 0 {
+		return nil, nil
+	}
+	report, err := cldf_ops.ExecuteOperation(b, token_pool.ApplyTokenTransferFeeConfigUpdates, chain, evm_contract.FunctionInput[token_pool.TokenTransferFeeConfigArgs]{
+		ChainSelector: input.ChainSelector,
+		Address:       input.TokenPoolAddress,
+		Args: token_pool.TokenTransferFeeConfigArgs{
+			TokenTransferFeeConfigUpdates: tokenTransferFeeConfigUpdates,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	return []evm_contract.WriteOutput{report.Output}, nil
 }
 
 func makeTokenTransferFeeConfigUpdates(b cldf_ops.Bundle, chain evm.Chain, input ConfigureTokenPoolForRemoteChainInput, remoteChainSelector uint64) ([]token_pool.TokenTransferFeeConfigUpdate, error) {

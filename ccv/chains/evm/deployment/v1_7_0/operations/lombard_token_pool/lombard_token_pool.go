@@ -28,7 +28,7 @@ type ConstructorArgs struct {
 type SetPathArgs struct {
 	RemoteChainSelector uint64
 	LChainID            [32]byte
-	AllowedCaller       [32]byte
+	AllowedCaller       []byte
 	RemoteAdapter       [32]byte
 }
 
