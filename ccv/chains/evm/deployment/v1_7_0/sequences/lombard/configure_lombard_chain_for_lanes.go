@@ -1,6 +1,7 @@
 package lombard
 
 import (
+	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -201,25 +202,15 @@ var ConfigureLombardChainForLanes = cldf_ops.NewSequence(
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get allowed caller on dest for remote chain %d: %w", remoteChainSelector, err)
 			}
-
-			allowedCaller, err := toBytes32LeftPad(remoteCallerOnDest)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to convert allowed caller to bytes32: %w", err)
-			}
-
 			lchainID, err := paddedLombardChainID(remoteChain.LombardChainId)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to convert lombardChainID to bytes32: %w", err)
 			}
 
-			tokenPoolAllowedCaller, err := toBytes32LeftPad(remotePoolAddress)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to convert remote pool address to bytes32 for chain %d: %w", remoteChainSelector, err)
-			}
 			tokenPoolPathArgs = append(tokenPoolPathArgs, lombard_token_pool.SetPathArgs{
 				RemoteChainSelector: remoteChainSelector,
 				LChainID:            lchainID,
-				AllowedCaller:       tokenPoolAllowedCaller,
+				AllowedCaller:       remotePoolAddress,
 				RemoteAdapter:       remoteAdapter,
 			})
 
@@ -229,7 +220,7 @@ var ConfigureLombardChainForLanes = cldf_ops.NewSequence(
 				Args: lombard_verifier.RemotePathArgs{
 					RemoteChainSelector: remoteChainSelector,
 					LChainId:            lchainID,
-					AllowedCaller:       allowedCaller,
+					AllowedCaller:       remoteCallerOnDest,
 				},
 			})
 			if err != nil {
@@ -309,7 +300,7 @@ var ConfigureLombardChainForLanes = cldf_ops.NewSequence(
 
 			if existingPathReport.Output.LChainId == pathArgs.LChainID &&
 				existingPathReport.Output.RemoteAdapter == pathArgs.RemoteAdapter &&
-				existingPathReport.Output.AllowedCaller == pathArgs.AllowedCaller {
+				bytes.Equal(existingPathReport.Output.AllowedCaller[:], pathArgs.AllowedCaller) {
 				continue
 			}
 
