@@ -55,11 +55,15 @@ func newTestBlockChains(selectors []uint64) cldf_chain.BlockChains {
 	return cldf_chain.NewBlockChains(chains)
 }
 
+func newAggregatorConfigRegistry() *adapters.AggregatorConfigRegistry {
+	return &adapters.AggregatorConfigRegistry{}
+}
+
 func TestGenerateAggregatorConfig_Validation(t *testing.T) {
 	sel1 := chainsel.TEST_90000001.Selector
 	sel2 := chainsel.TEST_90000002.Selector
 
-	registry := adapters.NewOffchainConfigRegistry()
+	registry := newAggregatorConfigRegistry()
 	cs := changesets.GenerateAggregatorConfig(registry)
 
 	tests := []struct {
@@ -147,7 +151,7 @@ func TestGenerateAggregatorConfig_BuildsCorrectConfig(t *testing.T) {
 		},
 	}
 
-	registry := adapters.NewOffchainConfigRegistry()
+	registry := newAggregatorConfigRegistry()
 	registry.Register(chainsel.FamilyEVM, mock)
 
 	ds := datastore.NewMemoryDataStore()
@@ -195,7 +199,7 @@ func TestGenerateAggregatorConfig_ScanError(t *testing.T) {
 		scanErr: fmt.Errorf("scan failed"),
 	}
 
-	registry := adapters.NewOffchainConfigRegistry()
+	registry := newAggregatorConfigRegistry()
 	registry.Register(chainsel.FamilyEVM, mock)
 
 	env := deployment.Environment{
@@ -232,7 +236,7 @@ func TestGenerateAggregatorConfig_ResolveAddressError(t *testing.T) {
 		resolveErr: fmt.Errorf("address not found"),
 	}
 
-	registry := adapters.NewOffchainConfigRegistry()
+	registry := newAggregatorConfigRegistry()
 	registry.Register(chainsel.FamilyEVM, mock)
 
 	env := deployment.Environment{
@@ -256,7 +260,7 @@ func TestGenerateAggregatorConfig_CommitteeNotFound(t *testing.T) {
 		committeeStatesByChain: map[uint64][]*adapters.CommitteeState{},
 	}
 
-	registry := adapters.NewOffchainConfigRegistry()
+	registry := newAggregatorConfigRegistry()
 	registry.Register(chainsel.FamilyEVM, mock)
 
 	env := deployment.Environment{
@@ -276,7 +280,7 @@ func TestGenerateAggregatorConfig_CommitteeNotFound(t *testing.T) {
 func TestGenerateAggregatorConfig_MissingAdapterForFamily(t *testing.T) {
 	sel1 := chainsel.TEST_90000001.Selector
 
-	registry := adapters.NewOffchainConfigRegistry()
+	registry := newAggregatorConfigRegistry()
 
 	env := deployment.Environment{
 		BlockChains: newTestBlockChains([]uint64{sel1}),
