@@ -82,6 +82,7 @@ type OutputConfig struct {
 type ContractConfig struct {
 	Name         string           `yaml:"contract_name"`
 	Version      string           `yaml:"version"`
+	VersionPath  string           `yaml:"version_path,omitempty"` // Optional: override folder path derived from version
 	PackageName  string           `yaml:"package_name,omitempty"`  // Optional: override package name
 	ABIFile      string           `yaml:"abi_file,omitempty"`      // Optional: override ABI file name
 	NoDeployment bool             `yaml:"no_deployment,omitempty"` // Optional: skip bytecode and deploy operation
@@ -274,6 +275,9 @@ func extractContractInfo(cfg ContractConfig, input InputConfig, output OutputCon
 		packageName = toSnakeCase(cfg.Name)
 	}
 	versionPath := versionToPath(cfg.Version)
+	if cfg.VersionPath != "" {
+		versionPath = cfg.VersionPath
+	}
 
 	abiString, bytecode, err := readABIAndBytecode(cfg, packageName, versionPath, input.BasePath)
 	if err != nil {
@@ -457,12 +461,20 @@ func parseABIFunction(entry ABIEntry, _ bool, packageName string) *FunctionInfo 
 		IsWrite:         entry.StateMutability != "view" && entry.StateMutability != "pure",
 	}
 
-	for _, input := range entry.Inputs {
-		funcInfo.Parameters = append(funcInfo.Parameters, parseABIParam(input, packageName))
+	for i, input := range entry.Inputs {
+		p := parseABIParam(input, packageName)
+		if p.Name == "" {
+			p.Name = fmt.Sprintf("arg%d", i)
+		}
+		funcInfo.Parameters = append(funcInfo.Parameters, p)
 	}
 
-	for _, output := range entry.Outputs {
-		funcInfo.ReturnParams = append(funcInfo.ReturnParams, parseABIParam(output, packageName))
+	for i, output := range entry.Outputs {
+		p := parseABIParam(output, packageName)
+		if p.Name == "" {
+			p.Name = fmt.Sprintf("ret%d", i)
+		}
+		funcInfo.ReturnParams = append(funcInfo.ReturnParams, p)
 	}
 
 	return funcInfo
