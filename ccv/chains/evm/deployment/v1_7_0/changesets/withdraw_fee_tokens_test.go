@@ -9,12 +9,15 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/committee_verifier"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
+	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	cs_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 )
 
@@ -64,7 +67,7 @@ func TestWithdrawFeeTokens_VerifyPreconditions(t *testing.T) {
 					FeeTokens: []common.Address{common.HexToAddress("0x01")},
 				},
 			},
-			expectedErr: "no EVM chain with selector 12345 found in environment",
+			expectedErr: "failed to resolve contract ref",
 		},
 		{
 			desc: "unsupported contract type",
@@ -104,13 +107,29 @@ func TestWithdrawFeeTokens_Apply(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	// Deploy chain contracts first to get OnRamp, CommitteeVerifier, etc.
 	mcmsRegistry := cs_core.GetRegistry()
+
+	// Deploy CREATE2Factory (required by DeployChainContracts for CommitteeVerifier etc.)
+	create2FactoryRef, err := contract_utils.MaybeDeployContract(
+		e.OperationsBundle, create2_factory.Deploy,
+		e.BlockChains.EVMChains()[testChainSelector],
+		contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+			TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
+			ChainSelector:  testChainSelector,
+			Args: create2_factory.ConstructorArgs{
+				AllowList: []common.Address{e.BlockChains.EVMChains()[testChainSelector].DeployerKey.From},
+			},
+		}, nil,
+	)
+	require.NoError(t, err, "Failed to deploy CREATE2Factory")
+
+	// Deploy chain contracts to get OnRamp, CommitteeVerifier, etc.
 	deployOut, err := changesets.DeployChainContracts(mcmsRegistry).Apply(*e, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
 		MCMS: mcms.Input{},
 		Cfg: changesets.DeployChainContractsCfg{
-			ChainSel: testChainSelector,
-			Params:   testsetup.CreateBasicContractParams(),
+			ChainSel:       testChainSelector,
+			CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
+			Params:         testsetup.CreateBasicContractParams(),
 		},
 	})
 	require.NoError(t, err, "Failed to deploy chain contracts")
