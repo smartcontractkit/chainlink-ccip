@@ -7,24 +7,22 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/stretchr/testify/require"
+
+	seq1_5 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
+	fee_quoter_v1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
+	seq1_6 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
+	evm_2_evm_onramp_v1_5_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/evm_2_evm_onramp"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	"github.com/stretchr/testify/require"
 
 	evmadapter "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/adapters"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
-
-	fqops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	sequence1_7 "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
-
-	fee_quoter_v1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
-	evm_2_evm_onramp_v1_5_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/evm_2_evm_onramp"
-
-	seq1_5 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
-	seq1_6 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
+	fqops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 )
 
 // dummyAddressRefs is hardcoded address refs (previously from address_refs.json).
@@ -891,7 +889,7 @@ func TestSequenceFeeQuoterInputCreation(t *testing.T) {
 		// - DestChainConfigs
 		// - TokenTransferFeeConfigUpdates
 		// - AuthorizedCallerUpdates
-		hasData := !constructorArgsEmpty(output.ConstructorArgs) ||
+		hasData := !sequence1_7.IsConstructorArgsEmpty(output.ConstructorArgs) ||
 			len(output.DestChainConfigs) > 0 ||
 			len(output.TokenTransferFeeConfigUpdates.TokenTransferFeeConfigArgs) > 0 ||
 			len(output.AuthorizedCallerUpdates.AddedCallers) > 0 ||
@@ -899,8 +897,8 @@ func TestSequenceFeeQuoterInputCreation(t *testing.T) {
 
 		require.True(t, hasData, "Output should have at least some configuration data for chain %d", chainSelector)
 		// Assert against expected values
-		if !constructorArgsEmpty(expected.ConstructorArgs) {
-			require.False(t, constructorArgsEmpty(output.ConstructorArgs), "ConstructorArgs should be present for new deployment on chain %d", chainSelector)
+		if !sequence1_7.IsConstructorArgsEmpty(expected.ConstructorArgs) {
+			require.False(t, sequence1_7.IsConstructorArgsEmpty(output.ConstructorArgs), "ConstructorArgs should be present for new deployment on chain %d", chainSelector)
 			require.Equal(t, expected.ConstructorArgs.StaticConfig.LinkToken, output.ConstructorArgs.StaticConfig.LinkToken,
 				"LinkToken should match expected value on chain %d", chainSelector)
 			// MaxFeeJuelsPerMsg must be one of the values present in contract metadata for this chain
@@ -914,7 +912,7 @@ func TestSequenceFeeQuoterInputCreation(t *testing.T) {
 				"PriceUpdaters should match expected value on chain %d", chainSelector)
 		} else {
 			// For existing deployments, ConstructorArgs should be empty
-			require.True(t, constructorArgsEmpty(output.ConstructorArgs), "ConstructorArgs should be empty for existing deployment on chain %d", chainSelector)
+			require.True(t, sequence1_7.IsConstructorArgsEmpty(output.ConstructorArgs), "ConstructorArgs should be empty for existing deployment on chain %d", chainSelector)
 		}
 
 		// Assert specific values based on the sequence logic in feequoterupdater.go
@@ -990,11 +988,4 @@ func TestSequenceFeeQuoterInputCreation(t *testing.T) {
 
 		t.Logf("Successfully executed SequenceFeeQuoterInputCreation for chain %d", chainSelector)
 	}
-}
-
-func constructorArgsEmpty(a fqops.ConstructorArgs) bool {
-	return (a.StaticConfig == fqops.StaticConfig{}) &&
-		len(a.PriceUpdaters) == 0 &&
-		len(a.TokenTransferFeeConfigArgs) == 0 &&
-		len(a.DestChainConfigArgs) == 0
 }
