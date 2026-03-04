@@ -23,9 +23,9 @@ type ChainConfig struct {
 	// The Router on the chain being configured.
 	// We assume that all connections defined will use the same router, either test or production.
 	Router datastore.AddressRef
-	// CantonGlobalConfig is an optional Canton-specific control contract for lane configuration.
-	// If provided, this is passed through to adapters.ConfigureChainForLanesInput.CantonGlobalConfig.
-	CantonGlobalConfig datastore.AddressRef
+	// CantonExtraArgs holds optional Canton-specific configuration for lane setup.
+	// Nil for non-Canton chains.
+	CantonExtraArgs *CantonExtraArgs
 	// The OnRamp on the chain being configured.
 	// Similarly, we assume that all connections will use the same OnRamp.
 	OnRamp datastore.AddressRef
@@ -38,6 +38,12 @@ type ChainConfig struct {
 	OffRamp datastore.AddressRef
 	// The configuration for each remote chain that we want to connect to.
 	RemoteChains map[uint64]adapters.RemoteChainConfig[datastore.AddressRef, datastore.AddressRef]
+}
+
+// CantonExtraArgs holds Canton-specific configuration for lane setup.
+type CantonExtraArgs struct {
+	// GlobalConfig is a reference to the Canton global config control contract.
+	GlobalConfig datastore.AddressRef
 }
 
 // ConfigureChainsForLanesConfig is the configuration for the ConfigureChainsForLanes changeset.
@@ -75,13 +81,13 @@ func makeApply(chainFamilyRegistry *adapters.ChainFamilyRegistry, mcmsRegistry *
 				}
 				routerAddress = router.Address
 			}
-			cantonGlobalConfigAddress := ""
-			if !datastore_utils.IsAddressRefEmpty(chain.CantonGlobalConfig) {
-				globalConfig, err := datastore_utils.FindAndFormatRef(e.DataStore, chain.CantonGlobalConfig, chain.ChainSelector, datastore_utils.FullRef)
+			var cantonExtraArgs *adapters.CantonExtraArgs
+			if chain.CantonExtraArgs != nil && !datastore_utils.IsAddressRefEmpty(chain.CantonExtraArgs.GlobalConfig) {
+				globalConfig, err := datastore_utils.FindAndFormatRef(e.DataStore, chain.CantonExtraArgs.GlobalConfig, chain.ChainSelector, datastore_utils.FullRef)
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve cantonGlobalConfig ref on chain with selector %d: %w", chain.ChainSelector, err)
 				}
-				cantonGlobalConfigAddress = globalConfig.Address
+				cantonExtraArgs = &adapters.CantonExtraArgs{GlobalConfig: globalConfig.Address}
 			}
 			onRamp, err := datastore_utils.FindAndFormatRef(e.DataStore, chain.OnRamp, chain.ChainSelector, datastore_utils.FullRef)
 			if err != nil {
@@ -137,10 +143,10 @@ func makeApply(chainFamilyRegistry *adapters.ChainFamilyRegistry, mcmsRegistry *
 				}
 			}
 			configureChainForLanesReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adapter.ConfigureChainForLanes(), e.BlockChains, adapters.ConfigureChainForLanesInput{
-				ChainSelector:      chain.ChainSelector,
-				Router:             routerAddress,
-				CantonGlobalConfig: cantonGlobalConfigAddress,
-				OnRamp:             onRamp.Address,
+				ChainSelector:   chain.ChainSelector,
+				Router:          routerAddress,
+				CantonExtraArgs: cantonExtraArgs,
+				OnRamp:          onRamp.Address,
 				CommitteeVerifiers: committeeVerifiers,
 				FeeQuoter:          feeQuoter.Address,
 				OffRamp:            offRamp.Address,
