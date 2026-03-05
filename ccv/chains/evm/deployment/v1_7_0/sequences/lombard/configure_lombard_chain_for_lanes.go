@@ -109,13 +109,6 @@ var ConfigureLombardChainForLanes = cldf_ops.NewSequence(
 		remoteAdapterArgs := make([]lombard_verifier.RemoteAdapterArgs, 0)
 		tokenPoolPathArgs := make([]lombard_token_pool.SetPathArgs, 0)
 		advancedPoolHooks := make([]advanced_pool_hooks.CCVConfigArg, 0)
-		advancedPoolHooks = append(advancedPoolHooks, advanced_pool_hooks.CCVConfigArg{
-			RemoteChainSelector: chain.Selector,
-			InboundCCVs: []common.Address{
-				lombardVerifierResolverAddress,
-				common.Address{}, // This means "require the default CCV(s) for this lane".
-			},
-		})
 
 		for remoteChainSelector, remoteChain := range input.RemoteChains {
 			remotePoolAddress, err := dep.RemoteChains[remoteChainSelector].RemoteTokenPoolAddress(dep.DataStore, dep.BlockChains, remoteChainSelector, *tokenPoolQualifier(input.TokenQualifier))
@@ -166,6 +159,10 @@ var ConfigureLombardChainForLanes = cldf_ops.NewSequence(
 			advancedPoolHooks = append(advancedPoolHooks, advanced_pool_hooks.CCVConfigArg{
 				RemoteChainSelector: remoteChainSelector,
 				OutboundCCVs: []common.Address{
+					lombardVerifierResolverAddress,
+					common.Address{}, // This means "require the default CCV(s) for this lane".
+				},
+				InboundCCVs: []common.Address{
 					lombardVerifierResolverAddress,
 					common.Address{}, // This means "require the default CCV(s) for this lane".
 				},
