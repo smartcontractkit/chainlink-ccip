@@ -173,6 +173,9 @@ func BuildCommitteeVerifierParams(
 	topology *offchain.EnvironmentTopology,
 	chainSelector uint64,
 ) ([]adapters.CommitteeVerifierDeployParams, error) {
+	if topology == nil {
+		return nil, fmt.Errorf("topology is nil")
+	}
 	if topology.NOPTopology == nil {
 		return nil, fmt.Errorf("NOPTopology is nil")
 	}
