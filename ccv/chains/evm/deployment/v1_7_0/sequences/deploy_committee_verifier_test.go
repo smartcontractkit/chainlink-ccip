@@ -3,9 +3,8 @@ package sequences_test
 import (
 	"testing"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/committee_verifier"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
@@ -19,7 +18,7 @@ import (
 
 func basicParams() sequences.CommitteeVerifierParams {
 	return sequences.CommitteeVerifierParams{
-		Version:          semver.MustParse("1.7.0"),
+		Version:          committee_verifier.Version,
 		FeeAggregator:    common.HexToAddress("0x02"),
 		AllowlistAdmin:   common.HexToAddress("0x03"),
 		StorageLocations: []string{"https://test.chain.link.fake"},
@@ -77,7 +76,7 @@ func TestDeployCommitteeVerifier_Idempotency(t *testing.T) {
 			// Expect both contract types to be present
 			exists := map[deployment.ContractType]bool{
 				deployment.ContractType(committee_verifier.ContractType): false,
-				deployment.ContractType(committee_verifier.ResolverType): false,
+				deployment.ContractType(sequences.CommitteeVerifierResolverType): false,
 			}
 			for _, addr := range report.Output.Addresses {
 				exists[deployment.ContractType(addr.Type)] = true
@@ -154,7 +153,7 @@ func TestDeployCommitteeVerifier_Idempotency_WithPredeployedCommitteeVerifier(t 
 	// Expect all contract types to be present
 	exists := map[deployment.ContractType]bool{
 		deployment.ContractType(committee_verifier.ContractType): false,
-		deployment.ContractType(committee_verifier.ResolverType): false,
+		deployment.ContractType(sequences.CommitteeVerifierResolverType): false,
 	}
 	for _, addr := range redundantReport.Output.Addresses {
 		exists[deployment.ContractType(addr.Type)] = true
@@ -334,7 +333,7 @@ func TestDeployCommitteeVerifier_MultipleQualifiersOnSameChain(t *testing.T) {
 
 	alphaCV, ok := find(addrs1, datastore.ContractType(committee_verifier.ContractType), "alpha")
 	require.True(t, ok)
-	alphaResolver, ok := find(addrs1, datastore.ContractType(committee_verifier.ResolverType), "alpha")
+	alphaResolver, ok := find(addrs1, datastore.ContractType(sequences.CommitteeVerifierResolverType), "alpha")
 	require.True(t, ok)
 
 	// Second run with qualifier "beta", passing previous addresses as existing
@@ -357,7 +356,7 @@ func TestDeployCommitteeVerifier_MultipleQualifiersOnSameChain(t *testing.T) {
 
 	betaCV, ok := find(addrs2, datastore.ContractType(committee_verifier.ContractType), "beta")
 	require.True(t, ok)
-	betaResolver, ok := find(addrs2, datastore.ContractType(committee_verifier.ResolverType), "beta")
+	betaResolver, ok := find(addrs2, datastore.ContractType(sequences.CommitteeVerifierResolverType), "beta")
 	require.True(t, ok)
 
 	require.NotEqual(t, alphaCV.Address, betaCV.Address, "expected different addresses for different qualifiers")
@@ -381,7 +380,7 @@ func TestDeployCommitteeVerifier_MultipleQualifiersOnSameChain(t *testing.T) {
 
 	reAlphaCV, ok := find(addrs3, datastore.ContractType(committee_verifier.ContractType), "alpha")
 	require.True(t, ok)
-	reAlphaResolver, ok := find(addrs3, datastore.ContractType(committee_verifier.ResolverType), "alpha")
+	reAlphaResolver, ok := find(addrs3, datastore.ContractType(sequences.CommitteeVerifierResolverType), "alpha")
 	require.True(t, ok)
 
 	require.Equal(t, alphaCV.Address, reAlphaCV.Address, "expected same address when reusing qualifier")
