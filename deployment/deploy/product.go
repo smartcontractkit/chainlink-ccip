@@ -97,8 +97,16 @@ type TransferOwnershipAdapter interface {
 }
 
 type ConfigImporter interface {
-	InitializeAdapter(e cldf.Environment, selectors []uint64) error
+	InitializeAdapter(e cldf.Environment, selectors uint64) error
 	ConnectedChains(e cldf.Environment, chainsel uint64) ([]uint64, error)
 	SupportedTokensPerRemoteChain(e cldf.Environment, chainSelector uint64) (map[uint64][]common.Address, error)
 	SequenceImportConfig() *cldf_ops.Sequence[ImportConfigPerChainInput, sequences.OnChainOutput, cldf_chain.BlockChains]
+}
+
+// LaneVersionResolver is an interface for resolving the versions of lane deployed on a chain.
+// This is used to determine which version of the lane is connected to a remote chain from a particular chain.
+// For example - in case of EVM chains, we can look at the onramps and offramps connected to the router to determine
+// which version of the lane is deployed for each remote chain.
+type LaneVersionResolver interface {
+	DeriveLaneVersionsForChain(e cldf.Environment, chainSel uint64) (map[uint64]*semver.Version, []*semver.Version, error)
 }

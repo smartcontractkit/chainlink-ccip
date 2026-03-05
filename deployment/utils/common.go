@@ -31,6 +31,7 @@ const (
 	BurnWithFromMintTokenPool  cldf.ContractType = "BurnWithFromMintTokenPool"
 	BurnFromMintTokenPool      cldf.ContractType = "BurnFromMintTokenPool"
 	CCTPTokenPool              cldf.ContractType = "CCTPTokenPool"
+	FeeQuoter                  cldf.ContractType = "FeeQuoter"
 	// CLL Identifiers
 	CLLQualifier         = "CLLCCIP"
 	RMNTimelockQualifier = "RMNMCMS"
@@ -80,6 +81,12 @@ var (
 	ErrZeroAddress         = errors.New("address cannot be zero address")
 	ErrNoAdapterRegistered = func(family string, version *semver.Version) error {
 		return fmt.Errorf("no adapter registered for chain family %s and version %s", family, version.String())
+	}
+	ErrNoAdapterForSelectorRegistered = func(adapetrName string, selector uint64, version *semver.Version) error {
+		if version != nil {
+			return fmt.Errorf("no %s adapter registered for chain selector %d and version %s", adapetrName, selector, version.String())
+		}
+		return fmt.Errorf("no %s adapter registered for chain selector %d", adapetrName, selector)
 	}
 )
 
