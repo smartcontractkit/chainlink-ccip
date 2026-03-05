@@ -119,8 +119,8 @@ type RemoteChainConfig[RemoteContract any, LocalContract any] struct {
 	TokenNetworkFeeUSDCents uint16
 }
 
-// CantonExtraArgs holds Canton-specific configuration for lane setup.
-type CantonExtraArgs struct {
+// CantonLaneConfig holds Canton-specific configuration for lane setup.
+type CantonLaneConfig struct {
 	// GlobalConfig is the Canton global config control contract address.
 	GlobalConfig string
 }
@@ -132,9 +132,9 @@ type ConfigureChainForLanesInput struct {
 	// The Router address on the chain being configured.
 	// We assume that all connections defined will use the same router, either test or production.
 	Router string
-	// CantonExtraArgs holds optional Canton-specific configuration for lane setup.
+	// CantonLaneConfig holds optional Canton-specific configuration for lane setup.
 	// Nil for non-Canton chains.
-	CantonExtraArgs *CantonExtraArgs
+	CantonLaneConfig *CantonLaneConfig
 	// The OnRamp address on the chain being configured.
 	// Similarly, we assume that all connections will use the same OnRamp.
 	OnRamp string
