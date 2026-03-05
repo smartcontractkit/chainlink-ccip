@@ -99,7 +99,7 @@ func Test_v163FeeQuoterConfigToTokenTransferFeeConfig(t *testing.T) {
 	require.True(t, got.IsEnabled)
 }
 
-func Test_v170FeeQuoterConfigToTokenTransferFeeConfig(t *testing.T) {
+func Test_v2FeeQuoterConfigToTokenTransferFeeConfig(t *testing.T) {
 	cfg := fqops.TokenTransferFeeConfig{
 		FeeUSDCents:       100,
 		DestGasOverhead:   180_000,

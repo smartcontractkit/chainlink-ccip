@@ -21,6 +21,6 @@ func init() {
 	fqReg.RegisterConfigImporterVersionResolver(chainsel.FamilyEVM, &adapters1_2.LaneVersionResolver{})
 
 	laneMigratorReg := deploy.GetLaneMigratorRegistry()
-	laneMigratorReg.RegisterRampUpdater(chainsel.FamilyEVM, semver.MustParse("1.7.0"), &LaneMigrator{})
+	laneMigratorReg.RegisterRampUpdater(chainsel.FamilyEVM, semver.MustParse("2.0.0"), &LaneMigrator{})
 	laneMigratorReg.RegisterRouterUpdater(chainsel.FamilyEVM, semver.MustParse("1.2.0"), &adapters1_2.RouterUpdater{})
 }
