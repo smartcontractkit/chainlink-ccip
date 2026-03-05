@@ -167,17 +167,20 @@ var (
 		},
 	)
 
-	// CreateFeeQuoterUpdateInputFromV163 creates FeeQuoterUpdate input by importing configuration from FeeQuoter v1.6.x
-	CreateFeeQuoterUpdateInputFromV163 = cldf_ops.NewSequence(
+	// CreateFeeQuoterUpdateInputFromV16x creates FeeQuoterUpdate input by importing configuration from FeeQuoter v1.6.x
+	CreateFeeQuoterUpdateInputFromV16x = cldf_ops.NewSequence(
 		"fetches-feequoter-config-values-from-v1.6.x",
 		semver.MustParse("2.0.0"),
 		"Creates FeeQuoterUpdate input by importing configuration from FeeQuoter v1.6.x",
 		func(b cldf_ops.Bundle, chain evm.Chain, input deploy.FeeQuoterUpdateInput) (output FeeQuoterUpdate, err error) {
-			// check if FeeQuoter v1.6.3 is present in existing addresses, if not, we return empty output
-			// it means there is no existing fee quoter deployed from v1.6.3 deployment, and we can skip the config import from v1.6.x
+			// check if FeeQuoter v1.6.x is present in existing addresses, if not, we return empty output
+			// it means there is no existing fee quoter deployed from v1.6.x deployment, and we can skip the config import from v1.6.x
 			fq16AddressRef, err := seq1_6.GetFeeQuoterAddress(input.ExistingAddresses, input.ChainSelector)
-			if err != nil && strings.Contains(err.Error(), "no fee quoter address found") {
-				return FeeQuoterUpdate{}, nil
+			if err != nil {
+				if strings.Contains(err.Error(), "no fee quoter address found") {
+					return FeeQuoterUpdate{}, nil
+				}
+				return FeeQuoterUpdate{}, fmt.Errorf("failed to get FeeQuoter 1.6.x address: %w", err)
 			}
 			output.ChainSelector = input.ChainSelector
 			output.ExistingAddresses = input.ExistingAddresses
@@ -214,7 +217,7 @@ var (
 				fqops.Version,
 				"",
 			)
-			isNewFQ17Deployment := datastore_utils.IsAddressRefEmpty(feeQuoterRef)
+			isNewFQV2Deployment := datastore_utils.IsAddressRefEmpty(feeQuoterRef)
 			tokenTransferFeeConfigArgs := make([]fqops.TokenTransferFeeConfigArgs, 0)
 			allDestChainConfigs := make([]fqops.DestChainConfigArgs, 0)
 			for remoteChain, cfg := range fqOutput.RemoteChainCfgs {
@@ -259,7 +262,7 @@ var (
 				})
 				allDestChainConfigs = append(allDestChainConfigs, outDestchainCfg)
 			}
-			if isNewFQ17Deployment {
+			if isNewFQV2Deployment {
 				output.ConstructorArgs = fqops.ConstructorArgs{
 					StaticConfig: fqops.StaticConfig{
 						LinkToken:         fqOutput.StaticCfg.LinkToken,

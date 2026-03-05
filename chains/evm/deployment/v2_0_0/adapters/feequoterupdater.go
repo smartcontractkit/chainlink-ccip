@@ -29,7 +29,7 @@ func (fqu FeeQuoterUpdater[FeeQUpdateArgs]) SequenceFeeQuoterInputCreation() *cl
 				return zero, fmt.Errorf("chain with selector %d not found in environment", input.ChainSelector)
 			}
 			// get the FeeQuoterUpdateOutput from both v1.6.0 and v1.5.0 sequences and combine them to create the input for the fee quoter update sequence
-			report, err := cldf_ops.ExecuteSequence(b, fqseq.CreateFeeQuoterUpdateInputFromV163, chain, input)
+			report, err := cldf_ops.ExecuteSequence(b, fqseq.CreateFeeQuoterUpdateInputFromV16x, chain, input)
 			if err != nil {
 				return zero, fmt.Errorf("failed to create FeeQuoterUpdateInput from v1.6.0: %w", err)
 			}
@@ -46,9 +46,14 @@ func (fqu FeeQuoterUpdater[FeeQUpdateArgs]) SequenceFeeQuoterInputCreation() *cl
 				return zero, fmt.Errorf("failed to merge FeeQuoterUpdateInput from v1.6.0 and v1.5.0: %w", err)
 			}
 			// check if output is empty, if so, return an error
-			if empty, err := out.IsEmpty(); err != nil || empty {
+			empty, err := out.IsEmpty()
+			if err != nil {
 				return zero, fmt.Errorf("could not create input for fee quoter 2.0.0 update sequence: %w", err)
 			}
+			if empty {
+				return zero, fmt.Errorf("could not create input for fee quoter 2.0.0 update sequence: output is empty")
+			}
+			
 			out.ChainSelector = input.ChainSelector
 			out.ExistingAddresses = input.ExistingAddresses
 			return any(out).(FeeQUpdateArgs), nil

@@ -873,7 +873,7 @@ func TestSequenceFeeQuoterInputCreation(t *testing.T) {
 		}
 
 		// Assert specific values based on the sequence logic in feequoterupdater.go
-		// The sequence merges outputs from CreateFeeQuoterUpdateInputFromV163 and CreateFeeQuoterUpdateInputFromV150
+		// The sequence merges outputs from CreateFeeQuoterUpdateInputFromV16x and CreateFeeQuoterUpdateInputFromV150
 
 		// Verify DestChainConfigs against expected values
 		// Build a map of expected dest chain configs for easier lookup
