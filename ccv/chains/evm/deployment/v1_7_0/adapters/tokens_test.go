@@ -8,6 +8,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/burn_mint_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/token_pool"
 	tp_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/token_pool"
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
@@ -28,10 +30,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/adapters"
 	v1_7_0 "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/changesets"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/burn_mint_token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/committee_verifier"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
 )
 
@@ -62,6 +62,7 @@ func requireRateLimiterScaled(t *testing.T, rate, capacity float64, actualRate, 
 func TestTokenAdapter(t *testing.T) {
 	tokenAdapterRegistry := tokens.GetTokenAdapterRegistry()
 	tokenAdapterRegistry.RegisterTokenAdapter("evm", semver.MustParse("1.7.0"), &adapters.TokenAdapter{})
+	tokenAdapterRegistry.RegisterTokenAdapter("evm", burn_mint_token_pool.Version, &adapters.TokenAdapter{})
 	tokenAdapterRegistry.RegisterTokenAdapter("evm", semver.MustParse("1.6.1"), &v1_6_1_adapters.TokenAdapter{})
 
 	tests := []struct {
@@ -124,7 +125,7 @@ func TestTokenAdapter(t *testing.T) {
 								e.BlockChains.EVMChains()[chainSel].DeployerKey.From: big.NewInt(1_000_000),
 							},
 							ChainSel:                         chainSel,
-							TokenPoolType:                    datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
+							TokenPoolType:                    datastore.ContractType(burn_mint_token_pool.ContractType),
 							TokenPoolVersion:                 burn_mint_token_pool.Version,
 							TokenSymbol:                      "TEST",
 							Decimals:                         18,
@@ -187,7 +188,7 @@ func TestTokenAdapter(t *testing.T) {
 				return tokens.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
 					RemoteToken: remoteToken,
 					RemotePool: &datastore.AddressRef{
-						Type:      datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
+						Type:      datastore.ContractType(burn_mint_token_pool.ContractType),
 						Version:   remotePoolVersion,
 						Qualifier: "TEST",
 					},
@@ -221,8 +222,8 @@ func TestTokenAdapter(t *testing.T) {
 					{
 						ChainSelector: chainA,
 						TokenPoolRef: datastore.AddressRef{
-							Type:      datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
-							Version:   semver.MustParse("1.7.0"),
+							Type:      datastore.ContractType(burn_mint_token_pool.ContractType),
+							Version:   burn_mint_token_pool.Version,
 							Qualifier: "TEST",
 						},
 						RegistryRef: datastore.AddressRef{
@@ -230,19 +231,19 @@ func TestTokenAdapter(t *testing.T) {
 							Version: semver.MustParse("1.5.0"),
 						},
 						RemoteChains: map[uint64]tokens.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
-							chainB: getRemoteChainConfig(semver.MustParse("1.6.1"), []datastore.AddressRef{
-								{
-									Type:    datastore.ContractType(committee_verifier.ContractType),
-									Version: semver.MustParse("1.7.0"),
-								},
+							chainB: getRemoteChainConfig(burn_mint_token_pool_v1_6_1.Version, []datastore.AddressRef{
+							{
+								Type:    datastore.ContractType(committee_verifier.ContractType),
+								Version: committee_verifier.Version,
+							},
 							}),
 						},
 					},
 					{
 						ChainSelector: chainB,
 						TokenPoolRef: datastore.AddressRef{
-							Type:      datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
-							Version:   semver.MustParse("1.6.1"),
+							Type:      datastore.ContractType(burn_mint_token_pool_v1_6_1.ContractType),
+							Version:   burn_mint_token_pool_v1_6_1.Version,
 							Qualifier: "TEST",
 						},
 						RegistryRef: datastore.AddressRef{
@@ -250,7 +251,7 @@ func TestTokenAdapter(t *testing.T) {
 							Version: semver.MustParse("1.5.0"),
 						},
 						RemoteChains: map[uint64]tokens.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
-							chainA: getRemoteChainConfig(semver.MustParse("1.7.0"), nil),
+							chainA: getRemoteChainConfig(burn_mint_token_pool.Version, nil),
 						},
 					},
 				},
@@ -266,14 +267,19 @@ func TestTokenAdapter(t *testing.T) {
 			for _, chainSel := range []uint64{chainA, chainB} {
 				evmChain := e.BlockChains.EVMChains()[chainSel]
 
-				version := semver.MustParse("1.7.0")
-				if chainSel == chainB {
-					version = semver.MustParse("1.6.1")
+				var tokenPoolType datastore.ContractType
+				var version *semver.Version
+				if chainSel == chainA {
+					tokenPoolType = datastore.ContractType(burn_mint_token_pool.ContractType)
+					version = burn_mint_token_pool.Version
+				} else {
+					tokenPoolType = datastore.ContractType(burn_mint_token_pool_v1_6_1.ContractType)
+					version = burn_mint_token_pool_v1_6_1.Version
 				}
 
 				tokenPoolAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 					ChainSelector: chainSel,
-					Type:          datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
+					Type:          tokenPoolType,
 					Version:       version,
 					Qualifier:     "TEST",
 				}, chainSel, evm_datastore_utils.ToEVMAddress)
@@ -291,11 +297,11 @@ func TestTokenAdapter(t *testing.T) {
 					Version:       semver.MustParse("1.5.0"),
 				}, chainSel, evm_datastore_utils.ToEVMAddress)
 				require.NoError(t, err, "Failed to find deployed registry ref in datastore")
-				verifierAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-					ChainSelector: chainSel,
-					Type:          datastore.ContractType(committee_verifier.ContractType),
-					Version:       semver.MustParse("1.7.0"),
-				}, chainSel, evm_datastore_utils.ToEVMAddress)
+			verifierAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+				ChainSelector: chainSel,
+				Type:          datastore.ContractType(committee_verifier.ContractType),
+				Version:       committee_verifier.Version,
+			}, chainSel, evm_datastore_utils.ToEVMAddress)
 				require.NoError(t, err, "Failed to find deployed verifier ref in datastore")
 
 				tokenConfigReport, err := operations.ExecuteOperation(e.OperationsBundle, token_admin_registry.GetTokenConfig, evmChain, contract.FunctionInput[common.Address]{
@@ -307,7 +313,7 @@ func TestTokenAdapter(t *testing.T) {
 				require.Equal(t, tokenPoolAddr, tokenConfigReport.Output.TokenPool, "Token pool address in registry should match deployed token pool address")
 				require.Equal(t, evmChain.DeployerKey.From, tokenConfigReport.Output.Administrator, "Deployer should be the admin of the token in the registry")
 
-				chainSupportReport, err := operations.ExecuteOperation(e.OperationsBundle, token_pool.GetSupportedChains, evmChain, contract.FunctionInput[any]{
+				chainSupportReport, err := operations.ExecuteOperation(e.OperationsBundle, token_pool.GetSupportedChains, evmChain, contract.FunctionInput[struct{}]{
 					ChainSelector: chainSel,
 					Address:       tokenPoolAddr,
 				})
@@ -321,8 +327,8 @@ func TestTokenAdapter(t *testing.T) {
 				}
 				require.Equal(t, remoteChainSel, chainSupportReport.Output[0], "Remote chain in token pool should match expected")
 
-				// GetCurrentRateLimiterState is only available in version 1.7.0+
-				if version.GreaterThan(semver.MustParse("1.6.9")) || version.Equal(semver.MustParse("1.7.0")) {
+				// GetCurrentRateLimiterState is only available in version 2.0.0+
+				if version.GreaterThan(semver.MustParse("1.6.9")) || version.Equal(semver.MustParse("2.0.0")) {
 					rateLimiterStateReport, err := operations.ExecuteOperation(e.OperationsBundle, token_pool.GetCurrentRateLimiterState, evmChain, contract.FunctionInput[token_pool.GetCurrentRateLimiterStateArgs]{
 						ChainSelector: chainSel,
 						Address:       tokenPoolAddr,

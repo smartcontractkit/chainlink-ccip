@@ -6,7 +6,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/cctp_verifier"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/versioned_verifier_resolver"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -35,7 +34,7 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 		cldf_deployment.NewTypeAndVersion(cctp_verifier.ResolverType, *Version).String(): {
 			EVM: common.FromHex(versioned_verifier_resolver.VersionedVerifierResolverBin),
 		},
-		cldf_deployment.NewTypeAndVersion(committee_verifier.ResolverType, *Version).String(): {
+		cldf_deployment.NewTypeAndVersion("CommitteeVerifierResolver", *Version).String(): {
 			EVM: common.FromHex(versioned_verifier_resolver.VersionedVerifierResolverBin),
 		},
 	},
