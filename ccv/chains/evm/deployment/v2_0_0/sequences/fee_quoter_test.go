@@ -5,21 +5,19 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/fee_quoter"
 	"github.com/stretchr/testify/require"
 
-	fqops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/fee_quoter"
-	sequence1_7 "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
+	fqops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/sequences"
 )
 
 func TestFeeQuoterUpdate_IsEmpty(t *testing.T) {
-	empty := sequence1_7.FeeQuoterUpdate{}
+	empty := sequences.FeeQuoterUpdate{}
 	isEmpty, err := empty.IsEmpty()
 	require.NoError(t, err)
 	require.True(t, isEmpty, "Empty FeeQuoterUpdate should return true")
 
-	nonEmpty := sequence1_7.FeeQuoterUpdate{
+	nonEmpty := sequences.FeeQuoterUpdate{
 		ChainSelector: 1,
 	}
 	isEmpty, err = nonEmpty.IsEmpty()
@@ -35,20 +33,20 @@ func TestMergeFeeQuoterUpdateOutputs(t *testing.T) {
 	addr5 := common.HexToAddress("0x5555555555555555555555555555555555555555")
 
 	t.Run("empty outputs", func(t *testing.T) {
-		output16 := sequence1_7.FeeQuoterUpdate{}
-		output15 := sequence1_7.FeeQuoterUpdate{}
-		result, err := sequence1_7.MergeFeeQuoterUpdateOutputs(output16, output15)
+		output16 := sequences.FeeQuoterUpdate{}
+		output15 := sequences.FeeQuoterUpdate{}
+		result, err := sequences.MergeFeeQuoterUpdateOutputs(output16, output15)
 		require.NoError(t, err)
-		require.Equal(t, sequence1_7.FeeQuoterUpdate{}, result)
+		require.Equal(t, sequences.FeeQuoterUpdate{}, result)
 	})
 
 	t.Run("ConstructorArgs - output15 used when output16 is empty", func(t *testing.T) {
 		linkToken := common.HexToAddress("0x514910771AF9Ca656af840dff83E8264EcF986CA")
 		maxFeeJuelsPerMsg := big.NewInt(1000000000000000000) // 1 LINK
-		output16 := sequence1_7.FeeQuoterUpdate{
+		output16 := sequences.FeeQuoterUpdate{
 			ConstructorArgs: fqops.ConstructorArgs{}, // empty
 		}
-		output15 := sequence1_7.FeeQuoterUpdate{
+		output15 := sequences.FeeQuoterUpdate{
 			ConstructorArgs: fqops.ConstructorArgs{
 				StaticConfig: fqops.StaticConfig{
 					LinkToken:         linkToken,
@@ -56,7 +54,7 @@ func TestMergeFeeQuoterUpdateOutputs(t *testing.T) {
 				},
 			},
 		}
-		result, err := sequence1_7.MergeFeeQuoterUpdateOutputs(output16, output15)
+		result, err := sequences.MergeFeeQuoterUpdateOutputs(output16, output15)
 		require.NoError(t, err)
 		require.Equal(t, linkToken, result.ConstructorArgs.StaticConfig.LinkToken)
 		require.Equal(t, maxFeeJuelsPerMsg, result.ConstructorArgs.StaticConfig.MaxFeeJuelsPerMsg)
@@ -67,7 +65,7 @@ func TestMergeFeeQuoterUpdateOutputs(t *testing.T) {
 		linkToken15 := common.HexToAddress("0x326C977E6efc84E512bB9C30f76E30c160eD06FB")
 		maxFeeJuelsPerMsg16 := big.NewInt(2000000000000000000) // 2 LINK
 		maxFeeJuelsPerMsg15 := big.NewInt(1000000000000000000) // 1 LINK
-		output16 := sequence1_7.FeeQuoterUpdate{
+		output16 := sequences.FeeQuoterUpdate{
 			ConstructorArgs: fqops.ConstructorArgs{
 				StaticConfig: fqops.StaticConfig{
 					LinkToken:         linkToken16,
@@ -75,7 +73,7 @@ func TestMergeFeeQuoterUpdateOutputs(t *testing.T) {
 				},
 			},
 		}
-		output15 := sequence1_7.FeeQuoterUpdate{
+		output15 := sequences.FeeQuoterUpdate{
 			ConstructorArgs: fqops.ConstructorArgs{
 				StaticConfig: fqops.StaticConfig{
 					LinkToken:         linkToken15,
@@ -83,7 +81,7 @@ func TestMergeFeeQuoterUpdateOutputs(t *testing.T) {
 				},
 			},
 		}
-		result, err := sequence1_7.MergeFeeQuoterUpdateOutputs(output16, output15)
+		result, err := sequences.MergeFeeQuoterUpdateOutputs(output16, output15)
 		require.NoError(t, err)
 		// output16's StaticConfig should be used (takes precedence)
 		require.Equal(t, linkToken16, result.ConstructorArgs.StaticConfig.LinkToken)
@@ -91,7 +89,7 @@ func TestMergeFeeQuoterUpdateOutputs(t *testing.T) {
 	})
 
 	t.Run("ConstructorArgs - merge DestChainConfig,PriceUpdaters TokenTransferFeeConfigArgs", func(t *testing.T) {
-		output16 := sequence1_7.FeeQuoterUpdate{
+		output16 := sequences.FeeQuoterUpdate{
 			ConstructorArgs: fqops.ConstructorArgs{
 				StaticConfig: fqops.StaticConfig{
 					LinkToken:         common.HexToAddress("0x514910771AF9Ca656af840dff83E8264EcF986CA"),
@@ -101,7 +99,7 @@ func TestMergeFeeQuoterUpdateOutputs(t *testing.T) {
 				TokenTransferFeeConfigArgs: []fqops.TokenTransferFeeConfigArgs{
 					{
 						DestChainSelector: 100,
-						TokenTransferFeeConfigs: []fee_quoter.FeeQuoterTokenTransferFeeConfigSingleTokenArgs{
+						TokenTransferFeeConfigs: []fqops.TokenTransferFeeConfigSingleTokenArgs{
 							{Token: addr1},
 						},
 					},
@@ -109,7 +107,7 @@ func TestMergeFeeQuoterUpdateOutputs(t *testing.T) {
 				DestChainConfigArgs: []fqops.DestChainConfigArgs{
 					{
 						DestChainSelector: 100,
-						DestChainConfig: adapters.FeeQuoterDestChainConfig{
+						DestChainConfig: fqops.DestChainConfig{
 							IsEnabled:    true,
 							MaxDataBytes: 1000,
 						},
@@ -117,7 +115,7 @@ func TestMergeFeeQuoterUpdateOutputs(t *testing.T) {
 				},
 			},
 		}
-		output15 := sequence1_7.FeeQuoterUpdate{
+		output15 := sequences.FeeQuoterUpdate{
 			ConstructorArgs: fqops.ConstructorArgs{
 				StaticConfig: fqops.StaticConfig{
 					LinkToken:         common.HexToAddress("0x326C977E6efc84E512bB9C30f76E30c160eD06FB"),
@@ -127,13 +125,13 @@ func TestMergeFeeQuoterUpdateOutputs(t *testing.T) {
 				TokenTransferFeeConfigArgs: []fqops.TokenTransferFeeConfigArgs{
 					{
 						DestChainSelector: 100, // duplicate selector
-						TokenTransferFeeConfigs: []fee_quoter.FeeQuoterTokenTransferFeeConfigSingleTokenArgs{
+						TokenTransferFeeConfigs: []fqops.TokenTransferFeeConfigSingleTokenArgs{
 							{Token: addr2},
 						},
 					},
 					{
 						DestChainSelector: 200, // unique selector
-						TokenTransferFeeConfigs: []fee_quoter.FeeQuoterTokenTransferFeeConfigSingleTokenArgs{
+						TokenTransferFeeConfigs: []fqops.TokenTransferFeeConfigSingleTokenArgs{
 							{Token: addr3},
 						},
 					},
@@ -141,14 +139,14 @@ func TestMergeFeeQuoterUpdateOutputs(t *testing.T) {
 				DestChainConfigArgs: []fqops.DestChainConfigArgs{
 					{
 						DestChainSelector: 100, // duplicate selector
-						DestChainConfig: adapters.FeeQuoterDestChainConfig{
+						DestChainConfig: fqops.DestChainConfig{
 							IsEnabled:    false,
 							MaxDataBytes: 2000,
 						},
 					},
 					{
 						DestChainSelector: 200, // unique selector
-						DestChainConfig: adapters.FeeQuoterDestChainConfig{
+						DestChainConfig: fqops.DestChainConfig{
 							IsEnabled:    true,
 							MaxDataBytes: 3000,
 						},
@@ -156,7 +154,7 @@ func TestMergeFeeQuoterUpdateOutputs(t *testing.T) {
 				},
 			},
 		}
-		expected := sequence1_7.FeeQuoterUpdate{
+		expected := sequences.FeeQuoterUpdate{
 			ConstructorArgs: fqops.ConstructorArgs{
 				StaticConfig: fqops.StaticConfig{
 					LinkToken:         common.HexToAddress("0x514910771AF9Ca656af840dff83E8264EcF986CA"),
@@ -166,13 +164,13 @@ func TestMergeFeeQuoterUpdateOutputs(t *testing.T) {
 				TokenTransferFeeConfigArgs: []fqops.TokenTransferFeeConfigArgs{
 					{
 						DestChainSelector: 100,
-						TokenTransferFeeConfigs: []fee_quoter.FeeQuoterTokenTransferFeeConfigSingleTokenArgs{
+						TokenTransferFeeConfigs: []fqops.TokenTransferFeeConfigSingleTokenArgs{
 							{Token: addr1}, // from output16 (takes precedence)
 						},
 					},
 					{
 						DestChainSelector: 200,
-						TokenTransferFeeConfigs: []fee_quoter.FeeQuoterTokenTransferFeeConfigSingleTokenArgs{
+						TokenTransferFeeConfigs: []fqops.TokenTransferFeeConfigSingleTokenArgs{
 							{Token: addr3}, // from output15
 						},
 					},
@@ -180,14 +178,14 @@ func TestMergeFeeQuoterUpdateOutputs(t *testing.T) {
 				DestChainConfigArgs: []fqops.DestChainConfigArgs{
 					{
 						DestChainSelector: 100,
-						DestChainConfig: adapters.FeeQuoterDestChainConfig{
+						DestChainConfig: fqops.DestChainConfig{
 							IsEnabled:    true,
 							MaxDataBytes: 1000,
 						},
 					},
 					{
 						DestChainSelector: 200,
-						DestChainConfig: adapters.FeeQuoterDestChainConfig{
+						DestChainConfig: fqops.DestChainConfig{
 							IsEnabled:    true,
 							MaxDataBytes: 3000,
 						},
@@ -195,7 +193,7 @@ func TestMergeFeeQuoterUpdateOutputs(t *testing.T) {
 				},
 			},
 		}
-		result, err := sequence1_7.MergeFeeQuoterUpdateOutputs(output16, output15)
+		result, err := sequences.MergeFeeQuoterUpdateOutputs(output16, output15)
 		require.NoError(t, err)
 		require.Equal(t, expected.ConstructorArgs.StaticConfig, result.ConstructorArgs.StaticConfig)
 		require.ElementsMatch(t, expected.ConstructorArgs.PriceUpdaters, result.ConstructorArgs.PriceUpdaters)
@@ -214,36 +212,36 @@ func TestMergeFeeQuoterUpdateOutputs(t *testing.T) {
 	})
 
 	t.Run("DestChainConfigs - output16 takes precedence for duplicates", func(t *testing.T) {
-		output16 := sequence1_7.FeeQuoterUpdate{
+		output16 := sequences.FeeQuoterUpdate{
 			DestChainConfigs: []fqops.DestChainConfigArgs{
 				{
 					DestChainSelector: 100,
-					DestChainConfig: adapters.FeeQuoterDestChainConfig{
+					DestChainConfig: fqops.DestChainConfig{
 						IsEnabled:    true,
 						MaxDataBytes: 1000,
 					},
 				},
 			},
 		}
-		output15 := sequence1_7.FeeQuoterUpdate{
+		output15 := sequences.FeeQuoterUpdate{
 			DestChainConfigs: []fqops.DestChainConfigArgs{
 				{
 					DestChainSelector: 100, // duplicate selector
-					DestChainConfig: adapters.FeeQuoterDestChainConfig{
+					DestChainConfig: fqops.DestChainConfig{
 						IsEnabled:    false,
 						MaxDataBytes: 2000,
 					},
 				},
 				{
 					DestChainSelector: 200, // unique selector
-					DestChainConfig: adapters.FeeQuoterDestChainConfig{
+					DestChainConfig: fqops.DestChainConfig{
 						IsEnabled:    true,
 						MaxDataBytes: 3000,
 					},
 				},
 			},
 		}
-		result, err := sequence1_7.MergeFeeQuoterUpdateOutputs(output16, output15)
+		result, err := sequences.MergeFeeQuoterUpdateOutputs(output16, output15)
 		require.NoError(t, err)
 		require.Len(t, result.DestChainConfigs, 2)
 		// output16's config for selector 100 should be used
@@ -256,37 +254,37 @@ func TestMergeFeeQuoterUpdateOutputs(t *testing.T) {
 	})
 
 	t.Run("TokenTransferFeeConfigArgs - output16 takes precedence for duplicates", func(t *testing.T) {
-		output16 := sequence1_7.FeeQuoterUpdate{
+		output16 := sequences.FeeQuoterUpdate{
 			TokenTransferFeeConfigUpdates: fqops.ApplyTokenTransferFeeConfigUpdatesArgs{
 				TokenTransferFeeConfigArgs: []fqops.TokenTransferFeeConfigArgs{
 					{
 						DestChainSelector: 100,
-						TokenTransferFeeConfigs: []fee_quoter.FeeQuoterTokenTransferFeeConfigSingleTokenArgs{
+						TokenTransferFeeConfigs: []fqops.TokenTransferFeeConfigSingleTokenArgs{
 							{Token: addr1},
 						},
 					},
 				},
 			},
 		}
-		output15 := sequence1_7.FeeQuoterUpdate{
+		output15 := sequences.FeeQuoterUpdate{
 			TokenTransferFeeConfigUpdates: fqops.ApplyTokenTransferFeeConfigUpdatesArgs{
 				TokenTransferFeeConfigArgs: []fqops.TokenTransferFeeConfigArgs{
 					{
 						DestChainSelector: 100, // duplicate
-						TokenTransferFeeConfigs: []fee_quoter.FeeQuoterTokenTransferFeeConfigSingleTokenArgs{
+						TokenTransferFeeConfigs: []fqops.TokenTransferFeeConfigSingleTokenArgs{
 							{Token: addr2},
 						},
 					},
 					{
 						DestChainSelector: 200, // unique
-						TokenTransferFeeConfigs: []fee_quoter.FeeQuoterTokenTransferFeeConfigSingleTokenArgs{
+						TokenTransferFeeConfigs: []fqops.TokenTransferFeeConfigSingleTokenArgs{
 							{Token: addr3},
 						},
 					},
 				},
 			},
 		}
-		result, err := sequence1_7.MergeFeeQuoterUpdateOutputs(output16, output15)
+		result, err := sequences.MergeFeeQuoterUpdateOutputs(output16, output15)
 		require.NoError(t, err)
 		require.Len(t, result.TokenTransferFeeConfigUpdates.TokenTransferFeeConfigArgs, 2)
 		// output16's config for selector 100 should be used
@@ -298,7 +296,7 @@ func TestMergeFeeQuoterUpdateOutputs(t *testing.T) {
 	})
 
 	t.Run("TokensToUseDefaultFeeConfigs - merge by DestChainSelector and Token", func(t *testing.T) {
-		output16 := sequence1_7.FeeQuoterUpdate{
+		output16 := sequences.FeeQuoterUpdate{
 			TokenTransferFeeConfigUpdates: fqops.ApplyTokenTransferFeeConfigUpdatesArgs{
 				TokensToUseDefaultFeeConfigs: []fqops.TokenTransferFeeConfigRemoveArgs{
 					{DestChainSelector: 100, Token: addr1},
@@ -306,7 +304,7 @@ func TestMergeFeeQuoterUpdateOutputs(t *testing.T) {
 				},
 			},
 		}
-		output15 := sequence1_7.FeeQuoterUpdate{
+		output15 := sequences.FeeQuoterUpdate{
 			TokenTransferFeeConfigUpdates: fqops.ApplyTokenTransferFeeConfigUpdatesArgs{
 				TokensToUseDefaultFeeConfigs: []fqops.TokenTransferFeeConfigRemoveArgs{
 					{DestChainSelector: 100, Token: addr2}, // duplicate
@@ -314,7 +312,7 @@ func TestMergeFeeQuoterUpdateOutputs(t *testing.T) {
 				},
 			},
 		}
-		result, err := sequence1_7.MergeFeeQuoterUpdateOutputs(output16, output15)
+		result, err := sequences.MergeFeeQuoterUpdateOutputs(output16, output15)
 		require.NoError(t, err)
 		require.Len(t, result.TokenTransferFeeConfigUpdates.TokensToUseDefaultFeeConfigs, 3)
 		// Verify all expected entries are present
@@ -327,19 +325,19 @@ func TestMergeFeeQuoterUpdateOutputs(t *testing.T) {
 	})
 
 	t.Run("AuthorizedCallerUpdates - merge unique entries", func(t *testing.T) {
-		output16 := sequence1_7.FeeQuoterUpdate{
+		output16 := sequences.FeeQuoterUpdate{
 			AuthorizedCallerUpdates: fqops.AuthorizedCallerArgs{
 				AddedCallers:   []common.Address{addr1, addr2},
 				RemovedCallers: []common.Address{addr3},
 			},
 		}
-		output15 := sequence1_7.FeeQuoterUpdate{
+		output15 := sequences.FeeQuoterUpdate{
 			AuthorizedCallerUpdates: fqops.AuthorizedCallerArgs{
 				AddedCallers:   []common.Address{addr2, addr4}, // addr2 is duplicate
 				RemovedCallers: []common.Address{addr3, addr5}, // addr3 is duplicate
 			},
 		}
-		result, err := sequence1_7.MergeFeeQuoterUpdateOutputs(output16, output15)
+		result, err := sequences.MergeFeeQuoterUpdateOutputs(output16, output15)
 		require.NoError(t, err)
 		require.Len(t, result.AuthorizedCallerUpdates.AddedCallers, 3)
 		require.Contains(t, result.AuthorizedCallerUpdates.AddedCallers, addr1)
@@ -355,7 +353,7 @@ func TestMergeFeeQuoterUpdateOutputs(t *testing.T) {
 		linkToken15 := common.HexToAddress("0x326C977E6efc84E512bB9C30f76E30c160eD06FB")
 		maxFeeJuelsPerMsg16 := big.NewInt(2000000000000000000) // 2 LINK
 		maxFeeJuelsPerMsg15 := big.NewInt(1000000000000000000) // 1 LINK
-		output16 := sequence1_7.FeeQuoterUpdate{
+		output16 := sequences.FeeQuoterUpdate{
 			ConstructorArgs: fqops.ConstructorArgs{
 				StaticConfig: fqops.StaticConfig{
 					LinkToken:         linkToken16,
@@ -363,18 +361,18 @@ func TestMergeFeeQuoterUpdateOutputs(t *testing.T) {
 				},
 			},
 			DestChainConfigs: []fqops.DestChainConfigArgs{
-				{DestChainSelector: 200, DestChainConfig: adapters.FeeQuoterDestChainConfig{IsEnabled: true}},
+				{DestChainSelector: 200, DestChainConfig: fqops.DestChainConfig{IsEnabled: true}},
 			},
 			TokenTransferFeeConfigUpdates: fqops.ApplyTokenTransferFeeConfigUpdatesArgs{
 				TokenTransferFeeConfigArgs: []fqops.TokenTransferFeeConfigArgs{
-					{DestChainSelector: 400, TokenTransferFeeConfigs: []fee_quoter.FeeQuoterTokenTransferFeeConfigSingleTokenArgs{{Token: addr1}}},
+					{DestChainSelector: 400, TokenTransferFeeConfigs: []fqops.TokenTransferFeeConfigSingleTokenArgs{{Token: addr1}}},
 				},
 			},
 			AuthorizedCallerUpdates: fqops.AuthorizedCallerArgs{
 				AddedCallers: []common.Address{addr1},
 			},
 		}
-		output15 := sequence1_7.FeeQuoterUpdate{
+		output15 := sequences.FeeQuoterUpdate{
 			ConstructorArgs: fqops.ConstructorArgs{
 				StaticConfig: fqops.StaticConfig{
 					LinkToken:         linkToken15,
@@ -382,20 +380,20 @@ func TestMergeFeeQuoterUpdateOutputs(t *testing.T) {
 				},
 			},
 			DestChainConfigs: []fqops.DestChainConfigArgs{
-				{DestChainSelector: 200, DestChainConfig: adapters.FeeQuoterDestChainConfig{IsEnabled: false}}, // duplicate
-				{DestChainSelector: 300, DestChainConfig: adapters.FeeQuoterDestChainConfig{IsEnabled: true}},  // unique
+				{DestChainSelector: 200, DestChainConfig: fqops.DestChainConfig{IsEnabled: false}}, // duplicate
+				{DestChainSelector: 300, DestChainConfig: fqops.DestChainConfig{IsEnabled: true}},  // unique
 			},
 			TokenTransferFeeConfigUpdates: fqops.ApplyTokenTransferFeeConfigUpdatesArgs{
 				TokenTransferFeeConfigArgs: []fqops.TokenTransferFeeConfigArgs{
-					{DestChainSelector: 400, TokenTransferFeeConfigs: []fee_quoter.FeeQuoterTokenTransferFeeConfigSingleTokenArgs{{Token: addr2}}}, // duplicate
-					{DestChainSelector: 500, TokenTransferFeeConfigs: []fee_quoter.FeeQuoterTokenTransferFeeConfigSingleTokenArgs{{Token: addr3}}}, // unique
+					{DestChainSelector: 400, TokenTransferFeeConfigs: []fqops.TokenTransferFeeConfigSingleTokenArgs{{Token: addr2}}}, // duplicate
+					{DestChainSelector: 500, TokenTransferFeeConfigs: []fqops.TokenTransferFeeConfigSingleTokenArgs{{Token: addr3}}}, // unique
 				},
 			},
 			AuthorizedCallerUpdates: fqops.AuthorizedCallerArgs{
 				AddedCallers: []common.Address{addr2, addr3},
 			},
 		}
-		result, err := sequence1_7.MergeFeeQuoterUpdateOutputs(output16, output15)
+		result, err := sequences.MergeFeeQuoterUpdateOutputs(output16, output15)
 		require.NoError(t, err)
 		// ConstructorArgs from output16 (not empty) - StaticConfig takes precedence
 		require.Equal(t, linkToken16, result.ConstructorArgs.StaticConfig.LinkToken)

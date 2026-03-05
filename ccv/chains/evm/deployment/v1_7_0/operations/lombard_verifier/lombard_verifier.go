@@ -26,9 +26,11 @@ type SupportedTokensArgs = lombard_verifier.LombardVerifierSupportedTokenArgs
 
 type RemoteAdapterArgs = lombard_verifier.LombardVerifierRemoteAdapterArgs
 
+type Path = lombard_verifier.LombardVerifierPath
+
 type RemotePathArgs struct {
 	RemoteChainSelector uint64
-	AllowedCaller       [32]byte
+	AllowedCaller       []byte
 	LChainId            [32]byte
 }
 
@@ -115,6 +117,17 @@ var SetRemoteAdapters = contract.NewWrite(contract.WriteParams[[]RemoteAdapterAr
 	Validate:        func([]RemoteAdapterArgs) error { return nil },
 	CallContract: func(lombardVerifier *lombard_verifier.LombardVerifier, opts *bind.TransactOpts, args []RemoteAdapterArgs) (*types.Transaction, error) {
 		return lombardVerifier.SetRemoteAdapters(opts, args)
+	},
+})
+
+var GetPath = contract.NewRead(contract.ReadParams[uint64, Path, *lombard_verifier.LombardVerifier]{
+	Name:         "lombard-verifier:get-path",
+	Version:      Version,
+	Description:  "Gets path configuration for the given remote chain selector",
+	ContractType: ContractType,
+	NewContract:  lombard_verifier.NewLombardVerifier,
+	CallContract: func(lombardVerifier *lombard_verifier.LombardVerifier, opts *bind.CallOpts, remoteChainSelector uint64) (Path, error) {
+		return lombardVerifier.GetPath(opts, remoteChainSelector)
 	},
 })
 

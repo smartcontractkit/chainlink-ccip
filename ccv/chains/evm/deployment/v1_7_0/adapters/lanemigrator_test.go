@@ -83,7 +83,7 @@ func TestLaneMigrator(t *testing.T) {
 				},
 			})
 			require.NoError(t, err, "Failed to apply ConfigureChainsForLanes changeset")
-			// now apply the lane migrater
+			// now apply the lane migrator
 			mReg := deploy.GetLaneMigratorRegistry()
 			e.OperationsBundle = testsetup.BundleWithFreshReporter(e.OperationsBundle)
 			cs := deploy.LaneMigrateToNewVersionChangeset(mReg, mcmsRegistry)
@@ -92,7 +92,7 @@ func TestLaneMigrator(t *testing.T) {
 					chainA: {
 						RemoteChains:  []uint64{chainB},
 						RouterVersion: semver.MustParse("1.2.0"),
-						RampVersion:   semver.MustParse("1.7.0"),
+						RampVersion:   semver.MustParse("2.0.0"),
 					},
 				},
 			})
@@ -109,14 +109,14 @@ func TestLaneMigrator(t *testing.T) {
 				e.DataStore,
 				datastore.AddressRef{
 					Type:    "OnRamp",
-					Version: semver.MustParse("1.7.0"),
+					Version: semver.MustParse("2.0.0"),
 				}, chainA, evm_datastore_utils.ToEVMAddress)
 			require.NoError(t, err)
 			offRampAddr, err := datastore_utils.FindAndFormatRef(
 				e.DataStore,
 				datastore.AddressRef{
 					Type:    "OffRamp",
-					Version: semver.MustParse("1.7.0"),
+					Version: semver.MustParse("2.0.0"),
 				}, chainA, evm_datastore_utils.ToEVMAddress)
 			require.NoError(t, err)
 			// query router

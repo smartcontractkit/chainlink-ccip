@@ -27,10 +27,10 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/executor"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/mock_receiver"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/offramp"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/onramp"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/offramp"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/proxy"
 )
 
@@ -409,16 +409,15 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			desiredFeeAggregator = input.ContractParams.OnRamp.FeeAggregator
 		}
 		if dynamicConfigReport.Output.FeeQuoter != common.HexToAddress(feeQuoterRef.Address) || desiredFeeAggregator != dynamicConfigReport.Output.FeeAggregator {
-			setDynamicConfigReport, err := cldf_ops.ExecuteOperation(b, onramp.SetDynamicConfig, chain, contract_utils.FunctionInput[onramp.SetDynamicConfigArgs]{
+			desiredDynamicConfig := onramp.DynamicConfig{
+				FeeQuoter:              common.HexToAddress(feeQuoterRef.Address),
+				ReentrancyGuardEntered: false, // This should never be true.
+				FeeAggregator:          input.ContractParams.OnRamp.FeeAggregator,
+			}
+			setDynamicConfigReport, err := cldf_ops.ExecuteOperation(b, onramp.SetDynamicConfig, chain, contract_utils.FunctionInput[onramp.DynamicConfig]{
 				ChainSelector: chain.Selector,
 				Address:       common.HexToAddress(onRampRef.Address),
-				Args: onramp.SetDynamicConfigArgs{
-					DynamicConfig: onramp.DynamicConfig{
-						FeeQuoter:              common.HexToAddress(feeQuoterRef.Address),
-						ReentrancyGuardEntered: false, // This should never be true.
-						FeeAggregator:          input.ContractParams.OnRamp.FeeAggregator,
-					},
-				},
+				Args:          desiredDynamicConfig,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to set dynamic config on OnRamp: %w", err)

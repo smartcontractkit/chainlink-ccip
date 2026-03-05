@@ -87,6 +87,16 @@ func (c *FeeQuoterContract) GetDestChainConfig(opts *bind.CallOpts, args uint64)
 	return *abi.ConvertType(out[0], new(DestChainConfig)).(*DestChainConfig), nil
 }
 
+func (c *FeeQuoterContract) GetDestinationChainGasPrice(opts *bind.CallOpts, args uint64) (TimestampedPackedUint224, error) {
+	var out []any
+	err := c.contract.Call(opts, &out, "getDestinationChainGasPrice", args)
+	if err != nil {
+		var zero TimestampedPackedUint224
+		return zero, err
+	}
+	return *abi.ConvertType(out[0], new(TimestampedPackedUint224)).(*TimestampedPackedUint224), nil
+}
+
 func (c *FeeQuoterContract) GetTokenTransferFeeConfig(opts *bind.CallOpts, destChainSelector uint64, token common.Address) (TokenTransferFeeConfig, error) {
 	var out []any
 	err := c.contract.Call(opts, &out, "getTokenTransferFeeConfig", destChainSelector, token)
@@ -154,6 +164,11 @@ type PriceUpdates struct {
 type StaticConfig struct {
 	MaxFeeJuelsPerMsg *big.Int
 	LinkToken         common.Address
+}
+
+type TimestampedPackedUint224 struct {
+	Value     *big.Int
+	Timestamp uint32
 }
 
 type TokenPriceUpdate struct {
@@ -296,6 +311,17 @@ var GetDestChainConfig = contract.NewRead(contract.ReadParams[uint64, DestChainC
 	NewContract:  NewFeeQuoterContract,
 	CallContract: func(c *FeeQuoterContract, opts *bind.CallOpts, args uint64) (DestChainConfig, error) {
 		return c.GetDestChainConfig(opts, args)
+	},
+})
+
+var GetDestinationChainGasPrice = contract.NewRead(contract.ReadParams[uint64, TimestampedPackedUint224, *FeeQuoterContract]{
+	Name:         "fee-quoter:get-destination-chain-gas-price",
+	Version:      Version,
+	Description:  "Calls getDestinationChainGasPrice on the contract",
+	ContractType: ContractType,
+	NewContract:  NewFeeQuoterContract,
+	CallContract: func(c *FeeQuoterContract, opts *bind.CallOpts, args uint64) (TimestampedPackedUint224, error) {
+		return c.GetDestinationChainGasPrice(opts, args)
 	},
 })
 

@@ -1,6 +1,7 @@
 package lombard
 
 import (
+	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -22,7 +23,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/lombard_token_pool"
 
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/advanced_pool_hooks"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/advanced_pool_hooks"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/lombard_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/versioned_verifier_resolver"
 	tokens_sequences "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/tokens"
@@ -108,13 +109,6 @@ var ConfigureLombardChainForLanes = cldf_ops.NewSequence(
 		remoteAdapterArgs := make([]lombard_verifier.RemoteAdapterArgs, 0)
 		tokenPoolPathArgs := make([]lombard_token_pool.SetPathArgs, 0)
 		advancedPoolHooks := make([]advanced_pool_hooks.CCVConfigArg, 0)
-		advancedPoolHooks = append(advancedPoolHooks, advanced_pool_hooks.CCVConfigArg{
-			RemoteChainSelector: chain.Selector,
-			InboundCCVs: []common.Address{
-				lombardVerifierResolverAddress,
-				common.Address{}, // This means "require the default CCV(s) for this lane".
-			},
-		})
 
 		for remoteChainSelector, remoteChain := range input.RemoteChains {
 			remotePoolAddress, err := dep.RemoteChains[remoteChainSelector].RemoteTokenPoolAddress(dep.DataStore, dep.BlockChains, remoteChainSelector, *tokenPoolQualifier(input.TokenQualifier))
@@ -168,6 +162,10 @@ var ConfigureLombardChainForLanes = cldf_ops.NewSequence(
 					lombardVerifierResolverAddress,
 					common.Address{}, // This means "require the default CCV(s) for this lane".
 				},
+				InboundCCVs: []common.Address{
+					lombardVerifierResolverAddress,
+					common.Address{}, // This means "require the default CCV(s) for this lane".
+				},
 			})
 
 			remoteAdapter := [32]byte{}
@@ -201,41 +199,47 @@ var ConfigureLombardChainForLanes = cldf_ops.NewSequence(
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get allowed caller on dest for remote chain %d: %w", remoteChainSelector, err)
 			}
-
-			allowedCaller, err := toBytes32LeftPad(remoteCallerOnDest)
+			verifierAllowedCaller, err := toBytes32LeftPad(remoteCallerOnDest)
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to convert allowed caller to bytes32: %w", err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to convert allowed caller to bytes32 for verifier path on chain %d: %w", remoteChainSelector, err)
 			}
-
 			lchainID, err := paddedLombardChainID(remoteChain.LombardChainId)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to convert lombardChainID to bytes32: %w", err)
 			}
 
-			tokenPoolAllowedCaller, err := toBytes32LeftPad(remotePoolAddress)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to convert remote pool address to bytes32 for chain %d: %w", remoteChainSelector, err)
-			}
 			tokenPoolPathArgs = append(tokenPoolPathArgs, lombard_token_pool.SetPathArgs{
 				RemoteChainSelector: remoteChainSelector,
 				LChainID:            lchainID,
-				AllowedCaller:       tokenPoolAllowedCaller,
-				RemoteAdapter:       remoteAdapter,
+				// TokenPool remote pools are configured as ABI-style padded bytes for EVM addresses.
+				AllowedCaller: common.LeftPadBytes(remotePoolAddress, 32),
+				RemoteAdapter: remoteAdapter,
 			})
 
-			setRemotePathReport, err := cldf_ops.ExecuteOperation(b, lombard_verifier.SetRemotePath, chain, contract_utils.FunctionInput[lombard_verifier.RemotePathArgs]{
+			existingVerifierPathReport, err := cldf_ops.ExecuteOperation(b, lombard_verifier.GetPath, chain, contract_utils.FunctionInput[uint64]{
 				ChainSelector: chain.Selector,
 				Address:       lombardVerifierAddress,
-				Args: lombard_verifier.RemotePathArgs{
-					RemoteChainSelector: remoteChainSelector,
-					LChainId:            lchainID,
-					AllowedCaller:       allowedCaller,
-				},
+				Args:          remoteChainSelector,
 			})
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to set remote path on LombardVerifier for remote chain %d: %w", remoteChainSelector, err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get remote path on LombardVerifier for remote chain %d: %w", remoteChainSelector, err)
 			}
-			writes = append(writes, setRemotePathReport.Output)
+
+			if existingVerifierPathReport.Output.LChainId != lchainID || existingVerifierPathReport.Output.AllowedCaller != verifierAllowedCaller {
+				setRemotePathReport, err := cldf_ops.ExecuteOperation(b, lombard_verifier.SetRemotePath, chain, contract_utils.FunctionInput[lombard_verifier.RemotePathArgs]{
+					ChainSelector: chain.Selector,
+					Address:       lombardVerifierAddress,
+					Args: lombard_verifier.RemotePathArgs{
+						RemoteChainSelector: remoteChainSelector,
+						LChainId:            lchainID,
+						AllowedCaller:       remoteCallerOnDest,
+					},
+				})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to set remote path on LombardVerifier for remote chain %d: %w", remoteChainSelector, err)
+				}
+				writes = append(writes, setRemotePathReport.Output)
+			}
 		}
 
 		// Set outbound implementation on the LombardVerifierResolver for each remote chain
@@ -309,7 +313,7 @@ var ConfigureLombardChainForLanes = cldf_ops.NewSequence(
 
 			if existingPathReport.Output.LChainId == pathArgs.LChainID &&
 				existingPathReport.Output.RemoteAdapter == pathArgs.RemoteAdapter &&
-				existingPathReport.Output.AllowedCaller == pathArgs.AllowedCaller {
+				bytes.Equal(existingPathReport.Output.AllowedCaller[:], pathArgs.AllowedCaller) {
 				continue
 			}
 
