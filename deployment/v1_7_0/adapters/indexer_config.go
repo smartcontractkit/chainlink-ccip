@@ -30,7 +30,7 @@ var (
 	indexerConfigRegistryOnce      sync.Once
 )
 
-func NewIndexerConfigRegistry() *IndexerConfigRegistry {
+func newIndexerConfigRegistry() *IndexerConfigRegistry {
 	return &IndexerConfigRegistry{
 		adapters: make(map[string]IndexerConfigAdapter),
 	}
@@ -38,7 +38,7 @@ func NewIndexerConfigRegistry() *IndexerConfigRegistry {
 
 func GetIndexerConfigRegistry() *IndexerConfigRegistry {
 	indexerConfigRegistryOnce.Do(func() {
-		singletonIndexerConfigRegistry = NewIndexerConfigRegistry()
+		singletonIndexerConfigRegistry = newIndexerConfigRegistry()
 	})
 	return singletonIndexerConfigRegistry
 }
@@ -46,6 +46,9 @@ func GetIndexerConfigRegistry() *IndexerConfigRegistry {
 func (r *IndexerConfigRegistry) Register(family string, a IndexerConfigAdapter) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if r.adapters == nil {
+		r.adapters = make(map[string]IndexerConfigAdapter)
+	}
 	if _, exists := r.adapters[family]; !exists {
 		r.adapters[family] = a
 	}
@@ -54,6 +57,9 @@ func (r *IndexerConfigRegistry) Register(family string, a IndexerConfigAdapter) 
 func (r *IndexerConfigRegistry) Get(family string) (IndexerConfigAdapter, bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if r.adapters == nil {
+		return nil, false
+	}
 	a, ok := r.adapters[family]
 	return a, ok
 }

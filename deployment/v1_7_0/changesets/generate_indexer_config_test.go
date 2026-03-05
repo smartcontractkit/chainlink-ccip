@@ -8,8 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
-	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
@@ -17,14 +15,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/offchain"
 )
-
-func newTestBlockChains(selectors []uint64) cldf_chain.BlockChains {
-	chains := make([]cldf_chain.BlockChain, len(selectors))
-	for i, sel := range selectors {
-		chains[i] = evm.Chain{Selector: sel}
-	}
-	return cldf_chain.NewBlockChainsFromSlice(chains)
-}
 
 var _ adapters.IndexerConfigAdapter = (*mockIndexerConfigAdapter)(nil)
 
@@ -50,11 +40,15 @@ func (m *mockIndexerConfigAdapter) ResolveVerifierAddresses(
 	return byQualifier[qualifier], nil
 }
 
+func newIndexerConfigRegistry() *adapters.IndexerConfigRegistry {
+	return &adapters.IndexerConfigRegistry{}
+}
+
 func TestGenerateIndexerConfig_Validation(t *testing.T) {
 	sel1 := chainsel.TEST_90000001.Selector
 	sel2 := chainsel.TEST_90000002.Selector
 
-	registry := adapters.NewIndexerConfigRegistry()
+	registry := newIndexerConfigRegistry()
 	cs := changesets.GenerateIndexerConfig(registry)
 
 	tests := []struct {
@@ -120,7 +114,7 @@ func TestGenerateIndexerConfig_BuildsCorrectConfigAcrossChains(t *testing.T) {
 		},
 	}
 
-	registry := adapters.NewIndexerConfigRegistry()
+	registry := newIndexerConfigRegistry()
 	registry.Register(chainsel.FamilyEVM, mock)
 
 	ds := datastore.NewMemoryDataStore()
@@ -171,7 +165,7 @@ func TestGenerateIndexerConfig_DeduplicatesAddressesAcrossChains(t *testing.T) {
 		},
 	}
 
-	registry := adapters.NewIndexerConfigRegistry()
+	registry := newIndexerConfigRegistry()
 	registry.Register(chainsel.FamilyEVM, mock)
 
 	ds := datastore.NewMemoryDataStore()
@@ -203,7 +197,7 @@ func TestGenerateIndexerConfig_AdapterErrorPropagates(t *testing.T) {
 		resolveErr: fmt.Errorf("datastore unavailable"),
 	}
 
-	registry := adapters.NewIndexerConfigRegistry()
+	registry := newIndexerConfigRegistry()
 	registry.Register(chainsel.FamilyEVM, mock)
 
 	env := deployment.Environment{
@@ -223,7 +217,7 @@ func TestGenerateIndexerConfig_AdapterErrorPropagates(t *testing.T) {
 func TestGenerateIndexerConfig_MissingAdapterForFamilyReturnsError(t *testing.T) {
 	sel1 := chainsel.TEST_90000001.Selector
 
-	registry := adapters.NewIndexerConfigRegistry()
+	registry := newIndexerConfigRegistry()
 
 	env := deployment.Environment{
 		BlockChains: newTestBlockChains([]uint64{sel1}),
@@ -256,7 +250,7 @@ func TestGenerateIndexerConfig_HandlesEmptyAddressesFromSomeChains(t *testing.T)
 		},
 	}
 
-	registry := adapters.NewIndexerConfigRegistry()
+	registry := newIndexerConfigRegistry()
 	registry.Register(chainsel.FamilyEVM, mock)
 
 	ds := datastore.NewMemoryDataStore()
@@ -293,7 +287,7 @@ func TestGenerateIndexerConfig_DefaultsToAllChainSelectors(t *testing.T) {
 		},
 	}
 
-	registry := adapters.NewIndexerConfigRegistry()
+	registry := newIndexerConfigRegistry()
 	registry.Register(chainsel.FamilyEVM, mock)
 
 	ds := datastore.NewMemoryDataStore()

@@ -32,6 +32,10 @@ func (a *EVMIndexerConfigAdapter) ResolveVerifierAddresses(
 		datastore.AddressRefByVersion(version),
 	)
 
+	if len(refs) == 0 {
+		return nil, fmt.Errorf("no %s verifier addresses found for chain %d with qualifier %q", kind, chainSelector, qualifier)
+	}
+
 	addresses := make([]string, 0, len(refs))
 	for _, r := range refs {
 		addresses = append(addresses, r.Address)
