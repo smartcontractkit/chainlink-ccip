@@ -14,13 +14,13 @@ import (
 )
 
 // FeeQuoterUpdater uses FeeQUpdateArgs any so it implements deploy.FeeQuoterUpdater[any] and can be registered directly.
-// The implementation is for v1.7.0 and uses fqseq.FeeQuoterUpdate internally.
+// The implementation is for v2.0.0 and uses fqseq.FeeQuoterUpdate internally.
 type FeeQuoterUpdater[FeeQUpdateArgs any] struct{}
 
 func (fqu FeeQuoterUpdater[FeeQUpdateArgs]) SequenceFeeQuoterInputCreation() *cldf_ops.Sequence[deploy.FeeQuoterUpdateInput, FeeQUpdateArgs, cldf_chain.BlockChains] {
 	return cldf_ops.NewSequence(
 		"fee-quoter-updater:input-creation",
-		semver.MustParse("1.7.0"),
+		semver.MustParse("2.0.0"),
 		"Creates FeeQuoterUpdateInput for FeeQuoter update sequence",
 		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input deploy.FeeQuoterUpdateInput) (output FeeQUpdateArgs, err error) {
 			var zero FeeQUpdateArgs
@@ -47,7 +47,7 @@ func (fqu FeeQuoterUpdater[FeeQUpdateArgs]) SequenceFeeQuoterInputCreation() *cl
 			}
 			// check if output is empty, if so, return an error
 			if empty, err := out.IsEmpty(); err != nil || empty {
-				return zero, fmt.Errorf("could not create input for fee quoter 1.7 update sequence: %w", err)
+				return zero, fmt.Errorf("could not create input for fee quoter 2.0.0 update sequence: %w", err)
 			}
 			out.ChainSelector = input.ChainSelector
 			out.ExistingAddresses = input.ExistingAddresses
@@ -58,8 +58,8 @@ func (fqu FeeQuoterUpdater[FeeQUpdateArgs]) SequenceFeeQuoterInputCreation() *cl
 
 func (fqu FeeQuoterUpdater[FeeQUpdateArgs]) SequenceDeployOrUpdateFeeQuoter() *cldf_ops.Sequence[FeeQUpdateArgs, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return cldf_ops.NewSequence(
-		"fee-quoter-v1.7.0:update-sequence",
-		semver.MustParse("1.7.0"),
+		"fee-quoter-v2.0.0:update-sequence",
+		semver.MustParse("2.0.0"),
 		"Deploys or fetches existing FeeQuoter contract and applies config updates",
 		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input FeeQUpdateArgs) (output sequences.OnChainOutput, err error) {
 			fqInput, ok := any(input).(fqseq.FeeQuoterUpdate)

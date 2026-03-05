@@ -51,7 +51,7 @@ const (
 	SuiFamilySelector   = "c4e05953"
 )
 
-func GetSelectorHex(selector uint64) []byte {
+func GetSelectorHex(selector uint64) [4]byte {
 	destFamily, _ := chain_selectors.GetSelectorFamily(selector)
 	var familySelector []byte
 	switch destFamily {
@@ -66,7 +66,7 @@ func GetSelectorHex(selector uint64) []byte {
 	case chain_selectors.FamilySui:
 		familySelector, _ = hex.DecodeString(SuiFamilySelector)
 	}
-	return familySelector
+	return [4]byte(familySelector)
 }
 
 var (

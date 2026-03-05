@@ -9,6 +9,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
+	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+
 	seq1_5 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
 	fee_quoter_v1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
 	seq1_6 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
@@ -16,9 +20,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	dseq "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
-	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
-	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	evmadapter "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/adapters"
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
@@ -61,7 +62,7 @@ var dummyContractMetadata = []datastore.ContractMetadata{
 						DestDataAvailabilityOverheadGas:   40000,
 						DestGasPerDataAvailabilityByte:    8,
 						DestDataAvailabilityMultiplierBps: 900,
-						ChainFamilySelector:               [4]byte(utils.GetSelectorHex(15971525489660198786)),
+						ChainFamilySelector:               utils.GetSelectorHex(15971525489660198786),
 						EnforceOutOfOrder:                 false,
 						DefaultTokenFeeUSDCents:           8,
 						DefaultTokenDestGasOverhead:       40000,
@@ -163,7 +164,7 @@ var dummyContractMetadata = []datastore.ContractMetadata{
 						DestDataAvailabilityOverheadGas:   40000,
 						DestGasPerDataAvailabilityByte:    8,
 						DestDataAvailabilityMultiplierBps: 900,
-						ChainFamilySelector:               [4]byte(utils.GetSelectorHex(15971525489660198786)),
+						ChainFamilySelector:               utils.GetSelectorHex(15971525489660198786),
 						EnforceOutOfOrder:                 false,
 						DefaultTokenFeeUSDCents:           8,
 						DefaultTokenDestGasOverhead:       40000,
@@ -308,7 +309,7 @@ var dummyContractMetadata = []datastore.ContractMetadata{
 						DestDataAvailabilityOverheadGas:   50000,
 						DestGasPerDataAvailabilityByte:    10,
 						DestDataAvailabilityMultiplierBps: 1000,
-						ChainFamilySelector:               [4]byte(utils.GetSelectorHex(5009297550715157269)),
+						ChainFamilySelector:               utils.GetSelectorHex(5009297550715157269),
 						EnforceOutOfOrder:                 false,
 						DefaultTokenFeeUSDCents:           10,
 						DefaultTokenDestGasOverhead:       50000,
@@ -332,7 +333,7 @@ var dummyContractMetadata = []datastore.ContractMetadata{
 						DestDataAvailabilityOverheadGas:   45000,
 						DestGasPerDataAvailabilityByte:    9,
 						DestDataAvailabilityMultiplierBps: 950,
-						ChainFamilySelector:               [4]byte(utils.GetSelectorHex(4949039107694359620)),
+						ChainFamilySelector:               utils.GetSelectorHex(4949039107694359620),
 						EnforceOutOfOrder:                 false,
 						DefaultTokenFeeUSDCents:           9,
 						DefaultTokenDestGasOverhead:       45000,
@@ -424,7 +425,7 @@ func getExpectedOutput() map[uint64]sequences.FeeQuoterUpdate {
 	expected := make(map[uint64]sequences.FeeQuoterUpdate)
 
 	// Chain 5009297550715157269: Has FeeQuoter v1.6.3 + OnRamp v1.5.0
-	// Since no FeeQuoter v1.7.0 exists, it's a new deployment (ConstructorArgs populated)
+	// Since no FeeQuoter v2.0.0 exists, it's a new deployment (ConstructorArgs populated)
 	expected[5009297550715157269] = sequences.FeeQuoterUpdate{
 		ChainSelector: 5009297550715157269,
 		ConstructorArgs: fqops.ConstructorArgs{
@@ -446,7 +447,7 @@ func getExpectedOutput() map[uint64]sequences.FeeQuoterUpdate {
 						MaxPerMsgGasLimit:           4000000,
 						DestGasOverhead:             80000,
 						DestGasPerPayloadByteBase:   14,
-						ChainFamilySelector:         [4]byte(utils.GetSelectorHex(15971525489660198786)),
+						ChainFamilySelector:         utils.GetSelectorHex(15971525489660198786),
 						DefaultTokenFeeUSDCents:     8,
 						DefaultTokenDestGasOverhead: 40000,
 						DefaultTxGasLimit:           180000,
@@ -462,7 +463,7 @@ func getExpectedOutput() map[uint64]sequences.FeeQuoterUpdate {
 						MaxPerMsgGasLimit:           5000000,
 						DestGasOverhead:             100000,
 						DestGasPerPayloadByteBase:   16,
-						ChainFamilySelector:         [4]byte(utils.GetSelectorHex(4949039107694359620)),
+						ChainFamilySelector:         utils.GetSelectorHex(4949039107694359620),
 						DefaultTokenFeeUSDCents:     0,
 						DefaultTokenDestGasOverhead: 0,
 						DefaultTxGasLimit:           200000,
@@ -536,7 +537,7 @@ func getExpectedOutput() map[uint64]sequences.FeeQuoterUpdate {
 						MaxPerMsgGasLimit:           4000000,
 						DestGasOverhead:             80000,
 						DestGasPerPayloadByteBase:   14,
-						ChainFamilySelector:         [4]byte(utils.GetSelectorHex(15971525489660198786)),
+						ChainFamilySelector:         utils.GetSelectorHex(15971525489660198786),
 						DefaultTokenFeeUSDCents:     8,
 						DefaultTokenDestGasOverhead: 40000,
 						DefaultTxGasLimit:           180000,
@@ -552,7 +553,7 @@ func getExpectedOutput() map[uint64]sequences.FeeQuoterUpdate {
 						MaxPerMsgGasLimit:           5000000,
 						DestGasOverhead:             100000,
 						DestGasPerPayloadByteBase:   16,
-						ChainFamilySelector:         [4]byte(utils.GetSelectorHex(5009297550715157269)),
+						ChainFamilySelector:         utils.GetSelectorHex(5009297550715157269),
 						DefaultTokenFeeUSDCents:     0,
 						DefaultTokenDestGasOverhead: 0,
 						DefaultTxGasLimit:           200000,
@@ -612,7 +613,7 @@ func getExpectedOutput() map[uint64]sequences.FeeQuoterUpdate {
 						MaxPerMsgGasLimit:           5000000,
 						DestGasOverhead:             100000,
 						DestGasPerPayloadByteBase:   16,
-						ChainFamilySelector:         [4]byte(utils.GetSelectorHex(5009297550715157269)),
+						ChainFamilySelector:         utils.GetSelectorHex(5009297550715157269),
 						DefaultTokenFeeUSDCents:     0,
 						DefaultTokenDestGasOverhead: 0,
 						DefaultTxGasLimit:           200000,
@@ -674,7 +675,7 @@ func getExpectedOutput() map[uint64]sequences.FeeQuoterUpdate {
 						MaxPerMsgGasLimit:           5000000,
 						DestGasOverhead:             100000,
 						DestGasPerPayloadByteBase:   16,
-						ChainFamilySelector:         [4]byte(utils.GetSelectorHex(5009297550715157269)),
+						ChainFamilySelector:         utils.GetSelectorHex(5009297550715157269),
 						DefaultTokenFeeUSDCents:     10,
 						DefaultTokenDestGasOverhead: 50000,
 						DefaultTxGasLimit:           200000,
@@ -690,7 +691,7 @@ func getExpectedOutput() map[uint64]sequences.FeeQuoterUpdate {
 						MaxPerMsgGasLimit:           4500000,
 						DestGasOverhead:             90000,
 						DestGasPerPayloadByteBase:   15,
-						ChainFamilySelector:         [4]byte(utils.GetSelectorHex(4949039107694359620)),
+						ChainFamilySelector:         utils.GetSelectorHex(4949039107694359620),
 						DefaultTokenFeeUSDCents:     9,
 						DefaultTokenDestGasOverhead: 45000,
 						DefaultTxGasLimit:           190000,
@@ -706,7 +707,7 @@ func getExpectedOutput() map[uint64]sequences.FeeQuoterUpdate {
 						MaxPerMsgGasLimit:           4000000,
 						DestGasOverhead:             80000,
 						DestGasPerPayloadByteBase:   14,
-						ChainFamilySelector:         [4]byte(utils.GetSelectorHex(15971525489660198786)),
+						ChainFamilySelector:         utils.GetSelectorHex(15971525489660198786),
 						DefaultTokenFeeUSDCents:     0,
 						DefaultTokenDestGasOverhead: 0,
 						DefaultTxGasLimit:           180000,

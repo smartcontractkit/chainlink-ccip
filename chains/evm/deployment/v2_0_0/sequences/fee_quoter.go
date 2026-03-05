@@ -7,6 +7,12 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
+	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	mcms_types "github.com/smartcontractkit/mcms/types"
 	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
@@ -18,12 +24,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
-	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
-	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 )
@@ -334,19 +334,22 @@ var (
 			output.ChainSelector = input.ChainSelector
 			output.ExistingAddresses = input.ExistingAddresses
 			// is feeQuoter going to be deployed or fetched from existing addresses?
-			feeQuoter17Ref := datastore_utils.GetAddressRef(
+			feeQuoterV2Ref := datastore_utils.GetAddressRef(
 				input.ExistingAddresses,
 				input.ChainSelector,
 				fqops.ContractType,
 				fqops.Version,
 				"",
 			)
-			isNewFQ17Deployment := datastore_utils.IsAddressRefEmpty(feeQuoter17Ref)
+			isNewFQv2Deployment := datastore_utils.IsAddressRefEmpty(feeQuoterV2Ref)
+
 			var staticCfg fqops.StaticConfig
 			var destChainCfgs []fqops.DestChainConfigArgs
-			var tokenTransferFeeConfigArgs []fqops.TokenTransferFeeConfigSingleTokenArgs
 			var tokenTransferFeeConfigArgsForAll []fqops.TokenTransferFeeConfigArgs
+
 			for _, meta := range onRampMetadata {
+				var tokenTransferFeeConfigArgs []fqops.TokenTransferFeeConfigSingleTokenArgs
+
 				// Convert metadata to typed struct if needed
 				onRampCfg, err := datastore_utils.ConvertMetadataToType[seq1_5.OnRampImportConfigSequenceOutput](meta.Metadata)
 				if err != nil {
@@ -359,13 +362,8 @@ var (
 						MaxFeeJuelsPerMsg: onRampCfg.StaticConfig.MaxNopFeesJuels,
 					}
 				}
-				chainFamilySelectorBytes := utils.GetSelectorHex(onRampCfg.RemoteChainSelector)
-				// Safely convert ChainFamilySelector from []byte to [4]byte
-				var chainFamilySelector [4]byte
-				if len(chainFamilySelectorBytes) < 4 {
-					return FeeQuoterUpdate{}, fmt.Errorf("ChainFamilySelector has invalid length %d (expected 4) for remote chain selector %d", len(chainFamilySelectorBytes), onRampCfg.RemoteChainSelector)
-				}
-				copy(chainFamilySelector[:], chainFamilySelectorBytes[:4])
+				chainFamilySelector := utils.GetSelectorHex(onRampCfg.RemoteChainSelector)
+
 				destChainCfgs = append(destChainCfgs, fqops.DestChainConfigArgs{
 					DestChainSelector: onRampCfg.RemoteChainSelector,
 					DestChainConfig: fqops.DestChainConfig{
@@ -398,7 +396,7 @@ var (
 					TokenTransferFeeConfigs: tokenTransferFeeConfigArgs,
 				})
 			}
-			if isNewFQ17Deployment {
+			if isNewFQv2Deployment {
 				output.ConstructorArgs = fqops.ConstructorArgs{
 					StaticConfig: fqops.StaticConfig{
 						LinkToken:         staticCfg.LinkToken,
@@ -419,7 +417,7 @@ var (
 		})
 )
 
-// MergeFeeQuoterUpdateOutputs merges FeeQuoterUpdate outputs from the v1.6.3 and v1.5.0 import
+// MergeFeeQuoterUpdateOutputs merges FeeQuoterUpdate outputs from the v1.6.x and v1.5.0 import
 // sequences into a single update. output16 is the base; output15 supplements it. Where both
 // provide values (e.g. ConstructorArgs, dest chain configs, token transfer fee configs),
 // output16 takes precedence and output15 fills in only missing entries.
@@ -434,20 +432,20 @@ func MergeFeeQuoterUpdateOutputs(output16, output15 FeeQuoterUpdate) (FeeQuoterU
 		result.ConstructorArgs.DestChainConfigArgs = mergeDestChainConfigs(
 			result.ConstructorArgs.DestChainConfigArgs,
 			output15.ConstructorArgs.DestChainConfigArgs)
+
 		resultPriceUpdatersMap := make(map[common.Address]bool)
-		for _, updater := range result.ConstructorArgs.PriceUpdaters {
+		for _, updater := range output15.ConstructorArgs.PriceUpdaters {
 			resultPriceUpdatersMap[updater] = true
 		}
-		for _, updater := range output15.ConstructorArgs.PriceUpdaters {
-			if !resultPriceUpdatersMap[updater] {
-				result.ConstructorArgs.PriceUpdaters = append(result.ConstructorArgs.PriceUpdaters, updater)
-				resultPriceUpdatersMap[updater] = true
-			}
+		for _, updater := range output16.ConstructorArgs.PriceUpdaters {
+			resultPriceUpdatersMap[updater] = true
 		}
+
+		result.ConstructorArgs.PriceUpdaters = maps.Keys(resultPriceUpdatersMap)
+
 		result.ConstructorArgs.TokenTransferFeeConfigArgs = mergeTokenTransferFeeConfigArgs(
 			result.ConstructorArgs.TokenTransferFeeConfigArgs,
 			output15.ConstructorArgs.TokenTransferFeeConfigArgs)
-		result.ConstructorArgs.PriceUpdaters = maps.Keys(resultPriceUpdatersMap)
 	}
 
 	result.DestChainConfigs = mergeDestChainConfigs(result.DestChainConfigs, output15.DestChainConfigs)
@@ -532,13 +530,16 @@ func mergePriceUpdaters(updaters1, updaters2 fqops.AuthorizedCallerArgs) fqops.A
 	return result
 }
 
+// mergeDestChainConfigs merges two slices of DestChainConfigArgs, giving precedence to the first slice in case of duplicate DestChainSelectors.
 func mergeDestChainConfigs(cfgs1, cfgs2 []fqops.DestChainConfigArgs) []fqops.DestChainConfigArgs {
-	// Create a map of dest chain selectors from cfgs1
+	result := cfgs1
+
+	// Create a map of dest chain selectors from cfgs1 which will be skipped when adding from cfgs2
 	destChainMap := make(map[uint64]fqops.DestChainConfigArgs)
 	for _, cfg := range cfgs1 {
 		destChainMap[cfg.DestChainSelector] = cfg
 	}
-	result := cfgs1
+
 	// Add configs from cfgs2 that don't exist in cfgs1
 	for _, cfg := range cfgs2 {
 		if _, exists := destChainMap[cfg.DestChainSelector]; !exists {
@@ -546,9 +547,7 @@ func mergeDestChainConfigs(cfgs1, cfgs2 []fqops.DestChainConfigArgs) []fqops.Des
 		}
 		// If it exists in both, cfgs1's value is already used (takes precedence)
 	}
-	if len(destChainMap) == 0 {
-		return nil
-	}
+
 	return result
 }
 
