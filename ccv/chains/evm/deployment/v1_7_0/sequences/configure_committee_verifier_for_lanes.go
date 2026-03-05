@@ -8,8 +8,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/versioned_verifier_resolver"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -19,7 +19,7 @@ import (
 type ConfigureCommitteeVerifierForLanesInput struct {
 	ChainSelector uint64
 	Router        string
-	adapters.CommitteeVerifierConfig[datastore.AddressRef]
+	lanes.CommitteeVerifierConfig[datastore.AddressRef]
 }
 
 var ConfigureCommitteeVerifierForLanes = cldf_ops.NewSequence(

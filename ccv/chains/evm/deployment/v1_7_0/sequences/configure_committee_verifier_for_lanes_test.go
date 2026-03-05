@@ -14,8 +14,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	seq_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
@@ -49,7 +49,7 @@ func TestConfigureCommitteeVerifierForLanes(t *testing.T) {
 				return sequences.ConfigureCommitteeVerifierForLanesInput{
 					ChainSelector: chainReport.Input.ChainSelector,
 					Router:        routerAddress,
-					CommitteeVerifierConfig: adapters.CommitteeVerifierConfig[datastore.AddressRef]{
+					CommitteeVerifierConfig: lanes.CommitteeVerifierConfig[datastore.AddressRef]{
 						CommitteeVerifier: []datastore.AddressRef{
 							{
 								Address: committeeVerifier,
@@ -62,7 +62,7 @@ func TestConfigureCommitteeVerifierForLanes(t *testing.T) {
 								Version: committee_verifier.Version,
 							},
 						},
-						RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
+						RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainConfig{
 							remoteChainSelector: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
 						},
 					},
@@ -91,7 +91,7 @@ func TestConfigureCommitteeVerifierForLanes(t *testing.T) {
 				return sequences.ConfigureCommitteeVerifierForLanesInput{
 					ChainSelector: chainReport.Input.ChainSelector,
 					Router:        routerAddress,
-					CommitteeVerifierConfig: adapters.CommitteeVerifierConfig[datastore.AddressRef]{
+					CommitteeVerifierConfig: lanes.CommitteeVerifierConfig[datastore.AddressRef]{
 						CommitteeVerifier: []datastore.AddressRef{
 							{
 								Address: committeeVerifier,
@@ -104,7 +104,7 @@ func TestConfigureCommitteeVerifierForLanes(t *testing.T) {
 								Version: committee_verifier.Version,
 							},
 						},
-						RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
+						RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainConfig{
 							remoteChainSelector1: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
 							remoteChainSelector2: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
 						},
@@ -136,7 +136,7 @@ func TestConfigureCommitteeVerifierForLanes(t *testing.T) {
 				return sequences.ConfigureCommitteeVerifierForLanesInput{
 					ChainSelector: chainReport.Input.ChainSelector,
 					Router:        routerAddress,
-					CommitteeVerifierConfig: adapters.CommitteeVerifierConfig[datastore.AddressRef]{
+					CommitteeVerifierConfig: lanes.CommitteeVerifierConfig[datastore.AddressRef]{
 						CommitteeVerifier: []datastore.AddressRef{
 							{
 								Address: committeeVerifier,
@@ -149,7 +149,7 @@ func TestConfigureCommitteeVerifierForLanes(t *testing.T) {
 								Version: committee_verifier.Version,
 							},
 						},
-						RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
+						RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainConfig{
 							remoteChainSelector: config,
 						},
 					},
@@ -302,7 +302,7 @@ func TestConfigureCommitteeVerifierForLanes_RevertWhen_InvalidSupportingContract
 				return sequences.ConfigureCommitteeVerifierForLanesInput{
 					ChainSelector: chainReport.Input.ChainSelector,
 					Router:        routerAddress,
-					CommitteeVerifierConfig: adapters.CommitteeVerifierConfig[datastore.AddressRef]{
+					CommitteeVerifierConfig: lanes.CommitteeVerifierConfig[datastore.AddressRef]{
 						CommitteeVerifier: []datastore.AddressRef{
 							{
 								Address: committeeVerifier,
@@ -310,7 +310,7 @@ func TestConfigureCommitteeVerifierForLanes_RevertWhen_InvalidSupportingContract
 								Version: committee_verifier.Version,
 							},
 						},
-						RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
+						RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainConfig{
 							remoteChainSelector: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
 						},
 					},
@@ -335,7 +335,7 @@ func TestConfigureCommitteeVerifierForLanes_RevertWhen_InvalidSupportingContract
 				return sequences.ConfigureCommitteeVerifierForLanesInput{
 					ChainSelector: chainReport.Input.ChainSelector,
 					Router:        routerAddress,
-					CommitteeVerifierConfig: adapters.CommitteeVerifierConfig[datastore.AddressRef]{
+					CommitteeVerifierConfig: lanes.CommitteeVerifierConfig[datastore.AddressRef]{
 						CommitteeVerifier: []datastore.AddressRef{
 							{
 								Address: committeeVerifier,
@@ -348,7 +348,7 @@ func TestConfigureCommitteeVerifierForLanes_RevertWhen_InvalidSupportingContract
 								Version: router.Version,
 							},
 						},
-						RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
+						RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainConfig{
 							remoteChainSelector: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
 						},
 					},
