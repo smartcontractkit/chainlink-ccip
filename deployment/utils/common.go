@@ -51,22 +51,29 @@ const (
 	SuiFamilySelector   = "c4e05953"
 )
 
-func GetSelectorHex(selector uint64) []byte {
+func GetSelectorHex(selector uint64) [4]byte {
 	destFamily, _ := chain_selectors.GetSelectorFamily(selector)
-	var familySelector []byte
+
+	var hexStr string
 	switch destFamily {
 	case chain_selectors.FamilyEVM:
-		familySelector, _ = hex.DecodeString(EVMFamilySelector)
+		hexStr = EVMFamilySelector
 	case chain_selectors.FamilySolana:
-		familySelector, _ = hex.DecodeString(SVMFamilySelector)
+		hexStr = SVMFamilySelector
 	case chain_selectors.FamilyAptos:
-		familySelector, _ = hex.DecodeString(AptosFamilySelector)
+		hexStr = AptosFamilySelector
 	case chain_selectors.FamilyTon:
-		familySelector, _ = hex.DecodeString(TVMFamilySelector)
+		hexStr = TVMFamilySelector
 	case chain_selectors.FamilySui:
-		familySelector, _ = hex.DecodeString(SuiFamilySelector)
+		hexStr = SuiFamilySelector
+	default:
+		panic(fmt.Sprintf("unsupported chain family: %s", destFamily))
 	}
-	return familySelector
+
+	b, _ := hex.DecodeString(hexStr)
+	var out [4]byte
+	copy(out[:], b)
+	return out
 }
 
 var (
