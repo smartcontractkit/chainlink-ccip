@@ -854,9 +854,13 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// @notice Returns all source chain configs.
   /// @return sourceChainSelectors The supported source chain selectors.
   /// @return sourceChainConfigs The source chain configs corresponding to all the supported chain selectors.
-  function getAllSourceChainConfigs() external view returns (uint64[] memory, SourceChainConfig[] memory) {
-    SourceChainConfig[] memory sourceChainConfigs = new SourceChainConfig[](s_sourceChainSelectors.length());
-    uint64[] memory sourceChainSelectors = new uint64[](s_sourceChainSelectors.length());
+  function getAllSourceChainConfigs()
+    external
+    view
+    returns (uint64[] memory sourceChainSelectors, SourceChainConfig[] memory sourceChainConfigs)
+  {
+    sourceChainConfigs = new SourceChainConfig[](s_sourceChainSelectors.length());
+    sourceChainSelectors = new uint64[](s_sourceChainSelectors.length());
     for (uint256 i = 0; i < s_sourceChainSelectors.length(); ++i) {
       sourceChainSelectors[i] = uint64(s_sourceChainSelectors.at(i));
       sourceChainConfigs[i] = s_sourceChainConfigs[sourceChainSelectors[i]];
