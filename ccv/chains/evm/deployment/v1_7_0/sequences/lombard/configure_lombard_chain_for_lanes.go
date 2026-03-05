@@ -199,6 +199,10 @@ var ConfigureLombardChainForLanes = cldf_ops.NewSequence(
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get allowed caller on dest for remote chain %d: %w", remoteChainSelector, err)
 			}
+			verifierAllowedCaller, err := toBytes32LeftPad(remoteCallerOnDest)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to convert allowed caller to bytes32 for verifier path on chain %d: %w", remoteChainSelector, err)
+			}
 			lchainID, err := paddedLombardChainID(remoteChain.LombardChainId)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to convert lombardChainID to bytes32: %w", err)
@@ -212,19 +216,30 @@ var ConfigureLombardChainForLanes = cldf_ops.NewSequence(
 				RemoteAdapter: remoteAdapter,
 			})
 
-			setRemotePathReport, err := cldf_ops.ExecuteOperation(b, lombard_verifier.SetRemotePath, chain, contract_utils.FunctionInput[lombard_verifier.RemotePathArgs]{
+			existingVerifierPathReport, err := cldf_ops.ExecuteOperation(b, lombard_verifier.GetPath, chain, contract_utils.FunctionInput[uint64]{
 				ChainSelector: chain.Selector,
 				Address:       lombardVerifierAddress,
-				Args: lombard_verifier.RemotePathArgs{
-					RemoteChainSelector: remoteChainSelector,
-					LChainId:            lchainID,
-					AllowedCaller:       remoteCallerOnDest,
-				},
+				Args:          remoteChainSelector,
 			})
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to set remote path on LombardVerifier for remote chain %d: %w", remoteChainSelector, err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get remote path on LombardVerifier for remote chain %d: %w", remoteChainSelector, err)
 			}
-			writes = append(writes, setRemotePathReport.Output)
+
+			if existingVerifierPathReport.Output.LChainId != lchainID || existingVerifierPathReport.Output.AllowedCaller != verifierAllowedCaller {
+				setRemotePathReport, err := cldf_ops.ExecuteOperation(b, lombard_verifier.SetRemotePath, chain, contract_utils.FunctionInput[lombard_verifier.RemotePathArgs]{
+					ChainSelector: chain.Selector,
+					Address:       lombardVerifierAddress,
+					Args: lombard_verifier.RemotePathArgs{
+						RemoteChainSelector: remoteChainSelector,
+						LChainId:            lchainID,
+						AllowedCaller:       remoteCallerOnDest,
+					},
+				})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to set remote path on LombardVerifier for remote chain %d: %w", remoteChainSelector, err)
+				}
+				writes = append(writes, setRemotePathReport.Output)
+			}
 		}
 
 		// Set outbound implementation on the LombardVerifierResolver for each remote chain
