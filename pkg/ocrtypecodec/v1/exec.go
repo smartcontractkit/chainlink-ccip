@@ -147,7 +147,8 @@ func (e *ExecCodecProto) DecodeOutcome(data []byte) (exectypes.Outcome, error) {
 	// need to worry about type migration.
 	// TODO: Remove temporary migration code after a few releases.
 	if pbOtcm.ExecutePluginReport != nil {
-		reports, err := e.tr.execPluginReportsFromProto([]*ocrtypecodecpb.ExecutePluginReport{pbOtcm.GetExecutePluginReport()})
+		reports, err := e.tr.execPluginReportsFromProto(
+			[]*ocrtypecodecpb.ExecutePluginReport{pbOtcm.GetExecutePluginReport()})
 		if err != nil {
 			return exectypes.Outcome{}, fmt.Errorf("exec plugin reports from proto: %w", err)
 		}

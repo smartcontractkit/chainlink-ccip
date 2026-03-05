@@ -600,7 +600,8 @@ func (t *protoTranslator) commitReportsFromProto(
 	return commitReports, nil
 }
 
-func (t *protoTranslator) commitDataSliceFromProto(pbCommits []*ocrtypecodecpb.CommitData) ([]exectypes.CommitData, error) {
+func (t *protoTranslator) commitDataSliceFromProto(
+	pbCommits []*ocrtypecodecpb.CommitData) ([]exectypes.CommitData, error) {
 	commitData := make([]exectypes.CommitData, len(pbCommits))
 
 	for i, commit := range pbCommits {
@@ -1039,7 +1040,8 @@ func (t *protoTranslator) decodeMessage(msg *ocrtypecodecpb.Message) (cciptypes.
 	}, nil
 }
 
-func (t *protoTranslator) decodeMessageHeader(header *ocrtypecodecpb.RampMessageHeader) (cciptypes.RampMessageHeader, error) {
+func (t *protoTranslator) decodeMessageHeader(
+	header *ocrtypecodecpb.RampMessageHeader) (cciptypes.RampMessageHeader, error) {
 	if len(header.MessageId) != 32 {
 		return cciptypes.RampMessageHeader{}, fmt.Errorf("message id length is not 32: %d", len(header.MessageId))
 	}
