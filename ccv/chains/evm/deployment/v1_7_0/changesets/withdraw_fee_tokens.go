@@ -25,31 +25,41 @@ type WithdrawFeeTokensCfg struct {
 	ContractRefs []datastore.AddressRef
 	// FeeTokens is the list of fee token addresses to withdraw.
 	FeeTokens []common.Address
-	// Recipient is the address that receives withdrawn fee tokens for TokenPool contracts.
-	// Ignored for OnRamp and CommitteeVerifier (they send to their configured feeAggregator).
+	// Recipient is required when any ref is a TokenPool. Ignored for OnRamp/CommitteeVerifier.
 	Recipient common.Address
 }
 
+// ChainSelector implements the single-chain config interface required by
+// ResolveEVMChainDep, which looks up the evm.Chain from the environment.
 func (c WithdrawFeeTokensCfg) ChainSelector() uint64 {
 	return c.ChainSel
 }
 
-// WithdrawFeeTokens creates a changeset that withdraws fee tokens from one or more
-// fee-handling contracts (OnRamp, CommitteeVerifier, TokenPool) on an EVM chain.
+// WithdrawFeeTokens wraps the withdraw-fee-tokens sequence into a changeset.
+// It resolves each user-supplied AddressRef against the datastore to obtain on-chain
+// addresses, validates that every ref is a known FeeTokenHandler, and delegates
+// execution to the sequence. The result is an MCMS proposal containing all withdrawals.
 var WithdrawFeeTokens = changesets.NewFromOnChainSequence(changesets.NewFromOnChainSequenceParams[
 	sequences.WithdrawFeeTokensInput,
 	evm.Chain,
 	WithdrawFeeTokensCfg,
 ]{
 	Sequence: sequences.WithdrawFeeTokens,
+
+	// ResolveInput converts the user-facing config into the sequence's input by:
+	// 1. Validating each ref is a supported FeeTokenHandler type.
+	// 2. Looking up the deployed address in the environment's datastore.
+	// 3. Building fully-resolved AddressRefs with the on-chain address populated.
 	ResolveInput: func(e cldf_deployment.Environment, cfg WithdrawFeeTokensCfg) (sequences.WithdrawFeeTokensInput, error) {
 		resolvedRefs := make([]datastore.AddressRef, 0, len(cfg.ContractRefs))
 		for _, ref := range cfg.ContractRefs {
+			// Reject unknown contract types early, before hitting the datastore.
 			if !sequences.IsFeeTokenHandler(ref.Type) {
 				return sequences.WithdrawFeeTokensInput{}, fmt.Errorf(
 					"contract type %q is not a supported FeeTokenHandler", ref.Type,
 				)
 			}
+			// Look up the contract's deployed address from the datastore.
 			resolvedAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, ref, cfg.ChainSel, evm_datastore_utils.ToEVMAddress)
 			if err != nil {
 				return sequences.WithdrawFeeTokensInput{}, fmt.Errorf(
@@ -73,5 +83,7 @@ var WithdrawFeeTokens = changesets.NewFromOnChainSequence(changesets.NewFromOnCh
 			Recipient:     cfg.Recipient,
 		}, nil
 	},
+
+	// ResolveDep looks up the evm.Chain object from the environment using ChainSel.
 	ResolveDep: evm_sequences.ResolveEVMChainDep[WithdrawFeeTokensCfg],
 })

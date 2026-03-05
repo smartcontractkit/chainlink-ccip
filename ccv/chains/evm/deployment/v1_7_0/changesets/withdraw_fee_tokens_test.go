@@ -23,6 +23,8 @@ import (
 
 const testChainSelector = 5009297550715157269
 
+// TestWithdrawFeeTokens_VerifyPreconditions tests that the changeset rejects
+// invalid configurations during precondition validation (before any on-chain work).
 func TestWithdrawFeeTokens_VerifyPreconditions(t *testing.T) {
 	e, err := environment.New(t.Context(),
 		environment.WithEVMSimulated(t, []uint64{testChainSelector}),
@@ -35,6 +37,8 @@ func TestWithdrawFeeTokens_VerifyPreconditions(t *testing.T) {
 		expectedErr string
 	}{
 		{
+			// A valid OnRamp ref on the correct chain, but the datastore is empty so
+			// the address lookup fails. This verifies the datastore resolution path.
 			desc: "valid input with OnRamp ref",
 			input: cs_core.WithMCMS[changesets.WithdrawFeeTokensCfg]{
 				MCMS: mcms.Input{},
@@ -49,10 +53,11 @@ func TestWithdrawFeeTokens_VerifyPreconditions(t *testing.T) {
 					FeeTokens: []common.Address{common.HexToAddress("0x01")},
 				},
 			},
-			// Will fail because the datastore is empty, not because of validation
 			expectedErr: "expected to find exactly 1 ref",
 		},
 		{
+			// An invalid chain selector. ResolveInput runs before ResolveDep, so the
+			// datastore lookup for the non-existent chain fails first.
 			desc: "invalid chain selector",
 			input: cs_core.WithMCMS[changesets.WithdrawFeeTokensCfg]{
 				MCMS: mcms.Input{},
@@ -70,6 +75,7 @@ func TestWithdrawFeeTokens_VerifyPreconditions(t *testing.T) {
 			expectedErr: "failed to resolve contract ref",
 		},
 		{
+			// A contract type that is not in the feeTokenHandlerTypes allowlist.
 			desc: "unsupported contract type",
 			input: cs_core.WithMCMS[changesets.WithdrawFeeTokensCfg]{
 				MCMS: mcms.Input{},
@@ -101,6 +107,9 @@ func TestWithdrawFeeTokens_VerifyPreconditions(t *testing.T) {
 	}
 }
 
+// TestWithdrawFeeTokens_Apply deploys a full set of chain contracts on a simulated
+// chain, then verifies the changeset can successfully withdraw fee tokens from
+// OnRamp, CommitteeVerifier, and multiple contracts at once.
 func TestWithdrawFeeTokens_Apply(t *testing.T) {
 	e, err := environment.New(t.Context(),
 		environment.WithEVMSimulated(t, []uint64{testChainSelector}),
@@ -109,7 +118,8 @@ func TestWithdrawFeeTokens_Apply(t *testing.T) {
 
 	mcmsRegistry := cs_core.GetRegistry()
 
-	// Deploy CREATE2Factory (required by DeployChainContracts for CommitteeVerifier etc.)
+	// CREATE2Factory must be deployed first; CommitteeVerifier and other contracts
+	// use deterministic deployment via CREATE2.
 	create2FactoryRef, err := contract_utils.MaybeDeployContract(
 		e.OperationsBundle, create2_factory.Deploy,
 		e.BlockChains.EVMChains()[testChainSelector],
@@ -123,7 +133,8 @@ func TestWithdrawFeeTokens_Apply(t *testing.T) {
 	)
 	require.NoError(t, err, "Failed to deploy CREATE2Factory")
 
-	// Deploy chain contracts to get OnRamp, CommitteeVerifier, etc.
+	// Deploy all chain contracts (OnRamp, CommitteeVerifier, OffRamp, FeeQuoter, etc.)
+	// so we have real contract addresses in the datastore to withdraw from.
 	deployOut, err := changesets.DeployChainContracts(mcmsRegistry).Apply(*e, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
 		MCMS: mcms.Input{},
 		Cfg: changesets.DeployChainContractsCfg{
@@ -137,7 +148,7 @@ func TestWithdrawFeeTokens_Apply(t *testing.T) {
 	deployedAddrs, err := deployOut.DataStore.Addresses().Fetch()
 	require.NoError(t, err)
 
-	// Find the WETH address to use as fee token
+	// Find WETH to use as the fee token in withdrawal calls.
 	var wethAddr common.Address
 	for _, ref := range deployedAddrs {
 		if ref.Type == "WETH9" {
@@ -147,7 +158,9 @@ func TestWithdrawFeeTokens_Apply(t *testing.T) {
 	}
 	require.NotEqual(t, common.Address{}, wethAddr, "WETH should be deployed")
 
-	// Copy deployed addresses into a new MemoryDataStore and seal it for the environment.
+	// Copy deployed addresses into a sealed datastore for the environment.
+	// ChangesetOutput.DataStore is mutable; Environment.DataStore requires an
+	// immutable (sealed) datastore.
 	ds := datastore.NewMemoryDataStore()
 	for _, ref := range deployedAddrs {
 		require.NoError(t, ds.Addresses().Add(ref))
@@ -192,6 +205,8 @@ func TestWithdrawFeeTokens_Apply(t *testing.T) {
 			},
 		},
 		{
+			// Exercises the multi-contract path: both OnRamp and CommitteeVerifier
+			// withdrawals are batched into a single MCMS proposal.
 			desc: "withdraw from multiple contracts",
 			input: cs_core.WithMCMS[changesets.WithdrawFeeTokensCfg]{
 				MCMS: mcms.Input{},
@@ -222,13 +237,17 @@ func TestWithdrawFeeTokens_Apply(t *testing.T) {
 	}
 }
 
+// TestWithdrawFeeTokens_TokenPoolRequiresRecipient verifies that the sequence rejects
+// a TokenPool withdrawal when no recipient is specified. TokenPool's Solidity method
+// signature requires a recipient address, unlike OnRamp/CommitteeVerifier.
 func TestWithdrawFeeTokens_TokenPoolRequiresRecipient(t *testing.T) {
 	e, err := environment.New(t.Context(),
 		environment.WithEVMSimulated(t, []uint64{testChainSelector}),
 	)
 	require.NoError(t, err)
 
-	// Manually add a TokenPool ref to the datastore
+	// Seed the datastore with a fake TokenPool so address resolution succeeds
+	// and we reach the recipient validation in the sequence.
 	ds := datastore.NewMemoryDataStore()
 	err = ds.Addresses().Add(datastore.AddressRef{
 		ChainSelector: testChainSelector,
@@ -241,7 +260,7 @@ func TestWithdrawFeeTokens_TokenPoolRequiresRecipient(t *testing.T) {
 
 	mcmsRegistry := cs_core.GetRegistry()
 
-	// Without recipient should fail
+	// Omit Recipient -- should fail with "recipient is required".
 	_, err = changesets.WithdrawFeeTokens(mcmsRegistry).Apply(*e, cs_core.WithMCMS[changesets.WithdrawFeeTokensCfg]{
 		MCMS: mcms.Input{},
 		Cfg: changesets.WithdrawFeeTokensCfg{

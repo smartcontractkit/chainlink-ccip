@@ -18,7 +18,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/token_pool"
 )
 
-// feeTokenHandlerTypes is the set of contract types that support the WithdrawFeeTokens method.
+// feeTokenHandlerTypes enumerates the contract types that expose a withdrawFeeTokens
+// method on-chain. Used by IsFeeTokenHandler to gate which contract refs are accepted.
 var feeTokenHandlerTypes = map[datastore.ContractType]bool{
 	datastore.ContractType(onramp.ContractType):             true,
 	datastore.ContractType(committee_verifier.ContractType): true,
@@ -33,16 +34,19 @@ func IsFeeTokenHandler(contractType datastore.ContractType) bool {
 // WithdrawFeeTokensInput is the input for the WithdrawFeeTokens sequence.
 type WithdrawFeeTokensInput struct {
 	ChainSelector uint64
-	// ContractRefs identifies the contracts from which fee tokens should be withdrawn.
-	// Each ref must have Type and Version set. The Type must be a known FeeTokenHandler.
-	ContractRefs []datastore.AddressRef
-	// FeeTokens is the list of fee token addresses to withdraw.
-	FeeTokens []common.Address
-	// Recipient is the address that receives withdrawn fee tokens for TokenPool contracts.
-	// Ignored for OnRamp and CommitteeVerifier (they send to their configured feeAggregator).
+	ContractRefs  []datastore.AddressRef
+	FeeTokens     []common.Address
+	// Recipient receives withdrawn tokens for TokenPool contracts.
+	// OnRamp and CommitteeVerifier ignore this; they send to their configured feeAggregator.
 	Recipient common.Address
 }
 
+// WithdrawFeeTokens is the core sequence that iterates over the supplied contract refs,
+// dispatches the appropriate withdrawFeeTokens operation for each contract type, and
+// collects all resulting write outputs into a single MCMS BatchOperation.
+//
+// TokenPool has a different Solidity signature (requires a recipient address), so it
+// is handled as a separate case from OnRamp and CommitteeVerifier.
 var WithdrawFeeTokens = cldf_ops.NewSequence(
 	"withdraw-fee-tokens",
 	semver.MustParse("1.7.0"),
@@ -55,6 +59,7 @@ var WithdrawFeeTokens = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("at least one fee token address is required")
 		}
 
+		// Accumulate a WriteOutput per contract so they can be batched into one MCMS proposal.
 		writes := make([]contract_utils.WriteOutput, 0, len(input.ContractRefs))
 
 		for _, ref := range input.ContractRefs {
@@ -66,6 +71,9 @@ var WithdrawFeeTokens = cldf_ops.NewSequence(
 			}
 			addr := common.HexToAddress(ref.Address)
 
+			// Dispatch to the correct operation based on contract type.
+			// OnRamp and CommitteeVerifier share the same signature (just feeTokens),
+			// while TokenPool additionally requires a recipient address.
 			switch ref.Type {
 			case datastore.ContractType(onramp.ContractType):
 				report, err := cldf_ops.ExecuteOperation(b, onramp.WithdrawFeeTokens, chain, contract_utils.FunctionInput[onramp.WithdrawFeeTokensArgs]{
@@ -94,6 +102,7 @@ var WithdrawFeeTokens = cldf_ops.NewSequence(
 				writes = append(writes, report.Output)
 
 			case datastore.ContractType(token_pool.ContractType):
+				// TokenPool's withdrawFeeTokens(address, address[]) requires a recipient.
 				if input.Recipient == (common.Address{}) {
 					return sequences.OnChainOutput{}, fmt.Errorf("recipient is required when withdrawing fee tokens from TokenPool %s", ref.Address)
 				}
@@ -112,6 +121,8 @@ var WithdrawFeeTokens = cldf_ops.NewSequence(
 			}
 		}
 
+		// Bundle all write outputs into a single MCMS batch operation so they can be
+		// proposed and executed atomically.
 		batchOp, err := contract_utils.NewBatchOperationFromWrites(writes)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
