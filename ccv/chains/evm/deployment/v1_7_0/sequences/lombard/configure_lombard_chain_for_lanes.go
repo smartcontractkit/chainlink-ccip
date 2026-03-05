@@ -207,8 +207,9 @@ var ConfigureLombardChainForLanes = cldf_ops.NewSequence(
 			tokenPoolPathArgs = append(tokenPoolPathArgs, lombard_token_pool.SetPathArgs{
 				RemoteChainSelector: remoteChainSelector,
 				LChainID:            lchainID,
-				AllowedCaller:       remotePoolAddress,
-				RemoteAdapter:       remoteAdapter,
+				// TokenPool remote pools are configured as ABI-style padded bytes for EVM addresses.
+				AllowedCaller: common.LeftPadBytes(remotePoolAddress, 32),
+				RemoteAdapter: remoteAdapter,
 			})
 
 			setRemotePathReport, err := cldf_ops.ExecuteOperation(b, lombard_verifier.SetRemotePath, chain, contract_utils.FunctionInput[lombard_verifier.RemotePathArgs]{
