@@ -15,15 +15,12 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 )
 
-// WithdrawFeeTokensCfg is the configuration for the WithdrawFeeTokens changeset.
+// WithdrawFeeTokensCfg is the YAML/pipeline input for the WithdrawFeeTokens changeset.
 type WithdrawFeeTokensCfg struct {
 	ChainSel uint64
-	// ContractRefs identifies the contracts to withdraw fee tokens from.
-	// Each ref must specify Type (and optionally Version/Qualifier) so the contract
-	// can be looked up in the datastore. The Type must be a supported FeeTokenHandler
-	// (OnRamp, CommitteeVerifier, or TokenPool).
+	// ContractRefs identifies the contracts to withdraw from.
 	ContractRefs []datastore.AddressRef
-	// FeeTokens is the list of fee token addresses to withdraw.
+	// FeeTokens is the list of ERC-20 token addresses to withdraw from each contract.
 	FeeTokens []common.Address
 	// Recipient is required when any ref is a TokenPool. Ignored for OnRamp/CommitteeVerifier.
 	Recipient common.Address

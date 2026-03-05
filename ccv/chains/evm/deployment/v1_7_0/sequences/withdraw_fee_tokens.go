@@ -13,25 +13,59 @@ import (
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/burn_mint_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/cctp_through_ccv_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/committee_verifier"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/lock_release_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/lombard_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/onramp"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/siloed_usdc_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/token_pool"
 )
 
-// feeTokenHandlerTypes enumerates the contract types that expose a withdrawFeeTokens
-// method on-chain. Used by IsFeeTokenHandler to gate which contract refs are accepted.
-var feeTokenHandlerTypes = map[datastore.ContractType]bool{
-	datastore.ContractType(onramp.ContractType):             true,
-	datastore.ContractType(committee_verifier.ContractType): true,
-	datastore.ContractType(token_pool.ContractType):         true,
+// tokenPoolTypes lists contract types that use the TokenPool ABI for withdrawFeeTokens.
+// All subtypes inherit from the base TokenPool Solidity contract and share the same
+// withdrawFeeTokens(address,address[]) signature.
+var tokenPoolTypes = map[datastore.ContractType]bool{
+	datastore.ContractType(token_pool.ContractType):                           true,
+	datastore.ContractType(burn_mint_token_pool.BurnMintContractType):         true,
+	datastore.ContractType(burn_mint_token_pool.BurnWithFromMintContractType): true,
+	datastore.ContractType(burn_mint_token_pool.BurnFromMintContractType):     true,
+	datastore.ContractType(lock_release_token_pool.ContractType):              true,
+	datastore.ContractType(lock_release_token_pool.SiloedContractType):        true,
+	datastore.ContractType(lombard_token_pool.ContractType):                   true,
+	datastore.ContractType(cctp_through_ccv_token_pool.ContractType):          true,
+	datastore.ContractType(siloed_usdc_token_pool.ContractType):               true,
 }
 
-// IsFeeTokenHandler returns true if the given contract type supports WithdrawFeeTokens.
+// feeTokenHandlerTypes is the union of non-pool handlers (OnRamp, CommitteeVerifier)
+// and all TokenPool variants. Built once at init to avoid duplication with tokenPoolTypes.
+var feeTokenHandlerTypes map[datastore.ContractType]bool
+
+func init() {
+	feeTokenHandlerTypes = map[datastore.ContractType]bool{
+		datastore.ContractType(onramp.ContractType):             true,
+		datastore.ContractType(committee_verifier.ContractType): true,
+	}
+	for ct := range tokenPoolTypes {
+		feeTokenHandlerTypes[ct] = true
+	}
+}
+
+// IsFeeTokenHandler returns true if the given contract type supports withdrawFeeTokens.
+// This is used by both the sequence and the changeset to validate user-supplied refs.
 func IsFeeTokenHandler(contractType datastore.ContractType) bool {
 	return feeTokenHandlerTypes[contractType]
 }
 
-// WithdrawFeeTokensInput is the input for the WithdrawFeeTokens sequence.
+// IsTokenPoolType returns true if the given contract type is any variant of TokenPool.
+func IsTokenPoolType(contractType datastore.ContractType) bool {
+	return tokenPoolTypes[contractType]
+}
+
+// WithdrawFeeTokensInput is the resolved input for the WithdrawFeeTokens sequence.
+// All AddressRefs should already have their Address field populated (done by the
+// changeset's ResolveInput via datastore lookup).
 type WithdrawFeeTokensInput struct {
 	ChainSelector uint64
 	ContractRefs  []datastore.AddressRef
@@ -65,7 +99,7 @@ var WithdrawFeeTokens = cldf_ops.NewSequence(
 		for _, ref := range input.ContractRefs {
 			if !IsFeeTokenHandler(ref.Type) {
 				return sequences.OnChainOutput{}, fmt.Errorf(
-					"contract type %q is not a supported FeeTokenHandler (supported: OnRamp, CommitteeVerifier, TokenPool)",
+					"contract type %q is not a supported FeeTokenHandler",
 					ref.Type,
 				)
 			}
@@ -73,9 +107,9 @@ var WithdrawFeeTokens = cldf_ops.NewSequence(
 
 			// Dispatch to the correct operation based on contract type.
 			// OnRamp and CommitteeVerifier share the same signature (just feeTokens),
-			// while TokenPool additionally requires a recipient address.
-			switch ref.Type {
-			case datastore.ContractType(onramp.ContractType):
+			// while all TokenPool variants additionally require a recipient address.
+			switch {
+			case ref.Type == datastore.ContractType(onramp.ContractType):
 				report, err := cldf_ops.ExecuteOperation(b, onramp.WithdrawFeeTokens, chain, contract_utils.FunctionInput[onramp.WithdrawFeeTokensArgs]{
 					ChainSelector: input.ChainSelector,
 					Address:       addr,
@@ -88,7 +122,7 @@ var WithdrawFeeTokens = cldf_ops.NewSequence(
 				}
 				writes = append(writes, report.Output)
 
-			case datastore.ContractType(committee_verifier.ContractType):
+			case ref.Type == datastore.ContractType(committee_verifier.ContractType):
 				report, err := cldf_ops.ExecuteOperation(b, committee_verifier.WithdrawFeeTokens, chain, contract_utils.FunctionInput[committee_verifier.WithdrawFeeTokensArgs]{
 					ChainSelector: input.ChainSelector,
 					Address:       addr,
@@ -101,10 +135,9 @@ var WithdrawFeeTokens = cldf_ops.NewSequence(
 				}
 				writes = append(writes, report.Output)
 
-			case datastore.ContractType(token_pool.ContractType):
-				// TokenPool's withdrawFeeTokens(address, address[]) requires a recipient.
+			case IsTokenPoolType(ref.Type):
 				if input.Recipient == (common.Address{}) {
-					return sequences.OnChainOutput{}, fmt.Errorf("recipient is required when withdrawing fee tokens from TokenPool %s", ref.Address)
+					return sequences.OnChainOutput{}, fmt.Errorf("recipient is required when withdrawing fee tokens from %s %s", ref.Type, ref.Address)
 				}
 				report, err := cldf_ops.ExecuteOperation(b, token_pool.WithdrawFeeTokens, chain, contract_utils.FunctionInput[token_pool.WithdrawFeeTokensArgs]{
 					ChainSelector: input.ChainSelector,
@@ -115,7 +148,7 @@ var WithdrawFeeTokens = cldf_ops.NewSequence(
 					},
 				})
 				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to withdraw fee tokens from TokenPool %s: %w", ref.Address, err)
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to withdraw fee tokens from %s %s: %w", ref.Type, ref.Address, err)
 				}
 				writes = append(writes, report.Output)
 			}

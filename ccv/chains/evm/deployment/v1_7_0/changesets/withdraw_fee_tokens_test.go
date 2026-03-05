@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/changesets"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/onramp"
@@ -238,41 +239,60 @@ func TestWithdrawFeeTokens_Apply(t *testing.T) {
 }
 
 // TestWithdrawFeeTokens_TokenPoolRequiresRecipient verifies that the sequence rejects
-// a TokenPool withdrawal when no recipient is specified. TokenPool's Solidity method
-// signature requires a recipient address, unlike OnRamp/CommitteeVerifier.
+// TokenPool withdrawals when no recipient is specified. Covers both the generic
+// TokenPool type and a concrete subtype (BurnMintTokenPool) to ensure all pool
+// variants are routed through the same validation path.
 func TestWithdrawFeeTokens_TokenPoolRequiresRecipient(t *testing.T) {
 	e, err := environment.New(t.Context(),
 		environment.WithEVMSimulated(t, []uint64{testChainSelector}),
 	)
 	require.NoError(t, err)
 
-	// Seed the datastore with a fake TokenPool so address resolution succeeds
-	// and we reach the recipient validation in the sequence.
-	ds := datastore.NewMemoryDataStore()
-	err = ds.Addresses().Add(datastore.AddressRef{
-		ChainSelector: testChainSelector,
-		Type:          datastore.ContractType(token_pool.ContractType),
-		Version:       token_pool.Version,
-		Address:       common.HexToAddress("0xDEAD").Hex(),
-	})
-	require.NoError(t, err)
-	e.DataStore = ds.Seal()
-
 	mcmsRegistry := cs_core.GetRegistry()
 
-	// Omit Recipient -- should fail with "recipient is required".
-	_, err = changesets.WithdrawFeeTokens(mcmsRegistry).Apply(*e, cs_core.WithMCMS[changesets.WithdrawFeeTokensCfg]{
-		MCMS: mcms.Input{},
-		Cfg: changesets.WithdrawFeeTokensCfg{
-			ChainSel: testChainSelector,
-			ContractRefs: []datastore.AddressRef{
-				{
-					Type:    datastore.ContractType(token_pool.ContractType),
-					Version: token_pool.Version,
-				},
-			},
-			FeeTokens: []common.Address{common.HexToAddress("0x01")},
+	tests := []struct {
+		desc         string
+		contractType datastore.ContractType
+		version      *semver.Version
+	}{
+		{
+			desc:         "generic TokenPool",
+			contractType: datastore.ContractType(token_pool.ContractType),
+			version:      token_pool.Version,
 		},
-	})
-	require.ErrorContains(t, err, "recipient is required")
+		{
+			desc:         "BurnMintTokenPool subtype",
+			contractType: datastore.ContractType(burn_mint_token_pool.BurnMintContractType),
+			version:      burn_mint_token_pool.Version,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			ds := datastore.NewMemoryDataStore()
+			err := ds.Addresses().Add(datastore.AddressRef{
+				ChainSelector: testChainSelector,
+				Type:          tt.contractType,
+				Version:       tt.version,
+				Address:       common.HexToAddress("0xDEAD").Hex(),
+			})
+			require.NoError(t, err)
+			e.DataStore = ds.Seal()
+
+			_, err = changesets.WithdrawFeeTokens(mcmsRegistry).Apply(*e, cs_core.WithMCMS[changesets.WithdrawFeeTokensCfg]{
+				MCMS: mcms.Input{},
+				Cfg: changesets.WithdrawFeeTokensCfg{
+					ChainSel: testChainSelector,
+					ContractRefs: []datastore.AddressRef{
+						{
+							Type:    tt.contractType,
+							Version: tt.version,
+						},
+					},
+					FeeTokens: []common.Address{common.HexToAddress("0x01")},
+				},
+			})
+			require.ErrorContains(t, err, "recipient is required")
+		})
+	}
 }
