@@ -20,7 +20,7 @@ var _ ccvadapters.DeployChainContractsAdapter = (*EVMDeployChainContractsAdapter
 
 var evmDeployChainContracts = cldf_ops.NewSequence(
 	"evm-deploy-chain-contracts",
-	semver.MustParse("1.7.0"),
+	semver.MustParse("2.0.0"),
 	"Wraps the EVM DeployChainContracts sequence with chain-agnostic input conversion",
 	func(b cldf_ops.Bundle, chains chain.BlockChains, input ccvadapters.DeployChainContractsInput) (seq_core.OnChainOutput, error) {
 		evmChains := chains.EVMChains()
