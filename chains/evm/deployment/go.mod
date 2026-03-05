@@ -14,7 +14,7 @@ replace github.com/smartcontractkit/chainlink-ccip/deployment => ../../../deploy
 
 require (
 	github.com/Masterminds/semver/v3 v3.4.0
-	github.com/aws/smithy-go v1.24.0
+	github.com/aws/smithy-go v1.24.2
 	github.com/ethereum/go-ethereum v1.17.1
 	github.com/rs/zerolog v1.34.0
 	github.com/smartcontractkit/ccip-contract-examples/chains/evm v0.0.0-20250826190403-aed7f5f33cde

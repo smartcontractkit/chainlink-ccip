@@ -56,7 +56,7 @@ require (
 )
 
 require (
-	github.com/aws/smithy-go v1.24.0
+	github.com/aws/smithy-go v1.24.2
 	github.com/smartcontractkit/chainlink-ton/deployment v0.0.0-20260304170252-bc133a323122
 	github.com/smartcontractkit/chainlink-ton/devenv v0.0.0-20260304170252-bc133a323122
 )

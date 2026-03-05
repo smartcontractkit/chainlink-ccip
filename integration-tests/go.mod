@@ -21,7 +21,7 @@ replace (
 
 require (
 	github.com/Masterminds/semver/v3 v3.4.0
-	github.com/aws/smithy-go v1.24.0
+	github.com/aws/smithy-go v1.24.2
 	github.com/ethereum/go-ethereum v1.17.1
 	github.com/gagliardetto/solana-go v1.13.0
 	github.com/smartcontractkit/chain-selectors v1.0.97
