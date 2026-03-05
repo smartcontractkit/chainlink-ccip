@@ -16,8 +16,11 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/burn_mint_token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/lock_release_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/burn_from_mint_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/burn_mint_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/burn_with_from_mint_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/lock_release_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/siloed_lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/type_and_version"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	token_pool_v161 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/token_pool"
@@ -74,14 +77,21 @@ var DeployTokenAndPool = cldf_ops.NewSequence(
 
 		// Deploy token pool.
 		input.DeployTokenPoolInput.ConstructorArgs.Token = tokenAddress
+		poolType := deployment.ContractType(input.DeployTokenPoolInput.TokenPoolType)
+		poolVersion := input.DeployTokenPoolInput.TokenPoolVersion
+		isBurnMint := (poolType == burn_mint_token_pool.ContractType && poolVersion != nil && poolVersion.Equal(burn_mint_token_pool.Version)) ||
+			(poolType == burn_from_mint_token_pool.ContractType && poolVersion != nil && poolVersion.Equal(burn_from_mint_token_pool.Version)) ||
+			(poolType == burn_with_from_mint_token_pool.ContractType && poolVersion != nil && poolVersion.Equal(burn_with_from_mint_token_pool.Version))
+		isLockRelease := (poolType == lock_release_token_pool.ContractType && poolVersion != nil && poolVersion.Equal(lock_release_token_pool.Version)) ||
+			(poolType == siloed_lock_release_token_pool.ContractType && poolVersion != nil && poolVersion.Equal(siloed_lock_release_token_pool.Version))
 		switch {
-		case burn_mint_token_pool.IsSupported(deployment.ContractType(input.DeployTokenPoolInput.TokenPoolType), input.DeployTokenPoolInput.TokenPoolVersion):
+		case isBurnMint:
 			deployTokenPoolReport, err := cldf_ops.ExecuteSequence(b, DeployBurnMintTokenPool, chain, input.DeployTokenPoolInput)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy burn mint token pool to %s: %w", chain, err)
 			}
 			addresses = append(addresses, deployTokenPoolReport.Output.Addresses...)
-		case lock_release_token_pool.IsSupported(deployment.ContractType(input.DeployTokenPoolInput.TokenPoolType), input.DeployTokenPoolInput.TokenPoolVersion):
+		case isLockRelease:
 			deployTokenPoolReport, err := cldf_ops.ExecuteSequence(b, DeployLockReleaseTokenPool, chain, input.DeployTokenPoolInput)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy lock release token pool to %s: %w", chain, err)

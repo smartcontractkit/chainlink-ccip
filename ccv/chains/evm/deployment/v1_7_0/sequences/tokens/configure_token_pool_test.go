@@ -14,8 +14,8 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
@@ -106,7 +106,7 @@ func TestConfigurePool(t *testing.T) {
 				testsetup.BundleWithFreshReporter(e.OperationsBundle),
 				token_pool.GetDynamicConfig,
 				e.BlockChains.EVMChains()[chainSel],
-				contract.FunctionInput[any]{
+				contract.FunctionInput[struct{}]{
 					ChainSelector: chainSel,
 					Address:       input.TokenPoolAddress,
 				},

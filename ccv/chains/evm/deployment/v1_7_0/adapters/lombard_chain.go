@@ -12,9 +12,9 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/lombard_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/lombard_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/lombard_verifier"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/lombard"
 )
 
@@ -64,7 +64,7 @@ func (c *LombardChainAdapter) RemoteTokenAddress(bundle operations.Bundle, ds da
 		return nil, fmt.Errorf("failed to get token pool: %w", err)
 	}
 
-	getTokenReport, err := operations.ExecuteOperation(bundle, token_pool.GetToken, chains.EVMChains()[selector], evm_contract.FunctionInput[any]{
+	getTokenReport, err := operations.ExecuteOperation(bundle, token_pool.GetToken, chains.EVMChains()[selector], evm_contract.FunctionInput[struct{}]{
 		ChainSelector: selector,
 		Address:       common.HexToAddress(tokenPool.Address),
 	})
