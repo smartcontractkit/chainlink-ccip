@@ -13,7 +13,7 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/advanced_pool_hooks"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/token_pool"
 )
 
 // ConfigureTokenPoolInput is the input for the ConfigureTokenPool sequence.
@@ -68,7 +68,7 @@ var ConfigureTokenPool = cldf_ops.NewSequence(
 
 		// Set dynamic config (if necessary)
 		if input.RouterAddress != (common.Address{}) || input.RateLimitAdmin != (common.Address{}) || input.FeeAggregator != (common.Address{}) {
-			currentDynamicConfigReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetDynamicConfig, chain, evm_contract.FunctionInput[any]{
+			currentDynamicConfigReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetDynamicConfig, chain, evm_contract.FunctionInput[struct{}]{
 				ChainSelector: input.ChainSelector,
 				Address:       input.TokenPoolAddress,
 			})
@@ -94,10 +94,10 @@ var ConfigureTokenPool = cldf_ops.NewSequence(
 			}
 
 			if desiredRouter != currentDynamicConfig.Router || desiredRateLimitAdmin != currentDynamicConfig.RateLimitAdmin || desiredFeeAdmin != currentDynamicConfig.FeeAdmin {
-				setDynamicConfigReport, err := cldf_ops.ExecuteOperation(b, token_pool.SetDynamicConfig, chain, evm_contract.FunctionInput[token_pool.DynamicConfigArgs]{
+				setDynamicConfigReport, err := cldf_ops.ExecuteOperation(b, token_pool.SetDynamicConfig, chain, evm_contract.FunctionInput[token_pool.SetDynamicConfigArgs]{
 					ChainSelector: input.ChainSelector,
 					Address:       input.TokenPoolAddress,
-					Args: token_pool.DynamicConfigArgs{
+					Args: token_pool.SetDynamicConfigArgs{
 						Router:         desiredRouter,
 						RateLimitAdmin: desiredRateLimitAdmin,
 						FeeAdmin:       desiredFeeAdmin,
