@@ -2,6 +2,7 @@ package lock_release_token_pool
 
 import (
 	"github.com/Masterminds/semver/v3"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/siloed_lock_release_token_pool"
@@ -41,6 +42,17 @@ type ConstructorArgs struct {
 	Router             common.Address
 	LockBox            common.Address
 }
+
+var GetLockBox = contract.NewRead(contract.ReadParams[any, common.Address, *lock_release_token_pool.LockReleaseTokenPool]{
+	Name:         "lock-release-token-pool:get-lock-box",
+	Version:      Version,
+	Description:  "Gets the lock box address from a v2.0 LockReleaseTokenPool",
+	ContractType: ContractType,
+	NewContract:  lock_release_token_pool.NewLockReleaseTokenPool,
+	CallContract: func(c *lock_release_token_pool.LockReleaseTokenPool, opts *bind.CallOpts, _ any) (common.Address, error) {
+		return c.GetLockBox(opts)
+	},
+})
 
 var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Name:                     "lock-release-token-pool:deploy",

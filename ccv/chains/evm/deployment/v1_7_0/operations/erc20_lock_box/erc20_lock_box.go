@@ -1,6 +1,9 @@
 package erc20_lock_box
 
 import (
+	"math/big"
+	"slices"
+
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -43,6 +46,32 @@ var ApplyAuthorizedCallerUpdates = contract.NewWrite(contract.WriteParams[Author
 	Validate:        func(AuthorizedCallerArgs) error { return nil },
 	CallContract: func(erc20LockBox *erc20_lock_box.ERC20LockBox, opts *bind.TransactOpts, args AuthorizedCallerArgs) (*types.Transaction, error) {
 		return erc20LockBox.ApplyAuthorizedCallerUpdates(opts, args)
+	},
+})
+
+type DepositInput struct {
+	Token             common.Address
+	RemoteChainSelector uint64
+	Amount            *big.Int
+}
+
+var Deposit = contract.NewWrite(contract.WriteParams[DepositInput, *erc20_lock_box.ERC20LockBox]{
+	Name:         "erc20-lock-box:deposit",
+	Version:      Version,
+	Description:  "Deposits tokens into the ERC20LockBox",
+	ContractType: ContractType,
+	ContractABI:  erc20_lock_box.ERC20LockBoxABI,
+	NewContract:  erc20_lock_box.NewERC20LockBox,
+	IsAllowedCaller: func(lockBox *erc20_lock_box.ERC20LockBox, opts *bind.CallOpts, caller common.Address, _ DepositInput) (bool, error) {
+		callers, err := lockBox.GetAllAuthorizedCallers(opts)
+		if err != nil {
+			return false, err
+		}
+		return slices.Contains(callers, caller), nil
+	},
+	Validate: func(DepositInput) error { return nil },
+	CallContract: func(lockBox *erc20_lock_box.ERC20LockBox, opts *bind.TransactOpts, input DepositInput) (*types.Transaction, error) {
+		return lockBox.Deposit(opts, input.Token, input.RemoteChainSelector, input.Amount)
 	},
 })
 

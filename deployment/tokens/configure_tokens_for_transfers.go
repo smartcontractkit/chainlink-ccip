@@ -2,6 +2,7 @@ package tokens
 
 import (
 	"fmt"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
@@ -36,6 +37,17 @@ type TokenTransferConfig struct {
 	// This can be interpreted as # of block confirmations, an ID, or otherwise.
 	// Interpretation is left to each chain family.
 	MinFinalityValue uint16
+	// MigrationOldPoolRef, if set, triggers a liquidity migration from the old pool to the new pool's lockbox
+	// before configuring the token for transfers. The migration sequence is called with SetPoolConfig=nil
+	// so that setPool is handled by the downstream configuration logic.
+	MigrationOldPoolRef *datastore.AddressRef
+	// MigrationTimelockRef is a reference to the MCMS timelock contract. Required when MigrationOldPoolRef is set.
+	MigrationTimelockRef *datastore.AddressRef
+	// MigrationAmount is an exact token amount to migrate. Mutually exclusive with MigrationBasisPoints.
+	MigrationAmount *big.Int
+	// MigrationBasisPoints specifies a percentage of the old pool's balance to migrate (1-10000, where 10000 = 100%).
+	// Mutually exclusive with MigrationAmount.
+	MigrationBasisPoints *uint16
 }
 
 // ConfigureTokensForTransfersConfig is the configuration for the ConfigureTokensForTransfers changeset.
@@ -131,6 +143,41 @@ func processTokenConfigForChain(e deployment.Environment, cfg map[uint64]TokenTr
 			if err != nil {
 				return nil, nil, nil, fmt.Errorf("failed to process remote chain config for remote chain selector %d: %w", remoteChainSelector, err)
 			}
+		}
+
+		if token.MigrationOldPoolRef != nil {
+			migrationSeq := adapter.MigrateLockReleasePoolLiquiditySequence()
+			if migrationSeq == nil {
+				return nil, nil, nil, fmt.Errorf("migration requested but adapter for family '%s' version '%s' does not support liquidity migration", family, token.TokenPoolRef.Version)
+			}
+
+			oldPoolRef, err := datastore_utils.FindAndFormatRef(e.DataStore, *token.MigrationOldPoolRef, selector, datastore_utils.FullRef)
+			if err != nil {
+				return nil, nil, nil, fmt.Errorf("failed to resolve migration old pool ref on chain %d: %w", selector, err)
+			}
+
+			if token.MigrationTimelockRef == nil {
+				return nil, nil, nil, fmt.Errorf("MigrationTimelockRef is required when MigrationOldPoolRef is set on chain %d", selector)
+			}
+			timelockRef, err := datastore_utils.FindAndFormatRef(e.DataStore, *token.MigrationTimelockRef, selector, datastore_utils.FullRef)
+			if err != nil {
+				return nil, nil, nil, fmt.Errorf("failed to resolve migration timelock ref on chain %d: %w", selector, err)
+			}
+
+			migrationReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, migrationSeq, e.BlockChains, MigrateLockReleasePoolLiquidityInput{
+				ChainSelector:   selector,
+				OldPoolAddress:  oldPoolRef.Address,
+				NewPoolAddress:  tokenPool.Address,
+				TimelockAddress: timelockRef.Address,
+				Amount:          token.MigrationAmount,
+				BasisPoints:     token.MigrationBasisPoints,
+				SetPoolConfig:   nil,
+			})
+			if err != nil {
+				return nil, nil, nil, fmt.Errorf("failed to execute liquidity migration on chain %d: %w", selector, err)
+			}
+			batchOps = append(batchOps, migrationReport.Output.BatchOps...)
+			reports = append(reports, migrationReport.ExecutionReports...)
 		}
 
 		configureTokenReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adapter.ConfigureTokenForTransfersSequence(), e.BlockChains, ConfigureTokenForTransfersInput{

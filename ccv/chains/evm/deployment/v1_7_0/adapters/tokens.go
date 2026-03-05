@@ -105,3 +105,7 @@ func (t *TokenAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokens.UpdateAutho
 	// TODO implement me
 	return nil
 }
+
+func (t *TokenAdapter) MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Sequence[tokens.MigrateLockReleasePoolLiquidityInput, sequences.OnChainOutput, chain.BlockChains] {
+	return evm_tokens.MigrateLockReleasePoolLiquidity
+}

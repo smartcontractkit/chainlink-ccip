@@ -122,9 +122,32 @@ contracts:
     functions:
       - name: getRebalancer
         access: public
+      - name: setRebalancer
+        access: owner
+      - name: getToken
+        access: public
 
   - contract_name: SiloedLockReleaseTokenPool
     version: "1.6.1"
+    functions:
+      - name: getRebalancer
+        access: public
+      - name: getChainRebalancer
+        access: public
+      - name: getSupportedChains
+        access: public
+      - name: isSiloed
+        access: public
+      - name: getAvailableTokens
+        access: public
+      - name: getUnsiloedLiquidity
+        access: public
+      - name: setRebalancer
+        access: owner
+      - name: setSiloRebalancer
+        access: owner
+      - name: getToken
+        access: public
 
   # 1.6.0
   - contract_name: RMNRemote
