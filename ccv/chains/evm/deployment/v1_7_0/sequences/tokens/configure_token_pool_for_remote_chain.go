@@ -669,8 +669,8 @@ func v163FeeQuoterConfigToTokenTransferFeeConfig(cfg fqops_v163.TokenTransferFee
 	}
 }
 
-// v170FeeQuoterConfigToTokenTransferFeeConfig converts FeeQuoter 2.0 (1.7.0 onRamp path) token transfer fee config to tokens.TokenTransferFeeConfig.
-func v170FeeQuoterConfigToTokenTransferFeeConfig(cfg fqops.TokenTransferFeeConfig) *tokens.TokenTransferFeeConfig {
+// v2FeeQuoterConfigToTokenTransferFeeConfig converts FeeQuoter 2.0 (1.7.0 onRamp path) token transfer fee config to tokens.TokenTransferFeeConfig.
+func v2FeeQuoterConfigToTokenTransferFeeConfig(cfg fqops.TokenTransferFeeConfig) *tokens.TokenTransferFeeConfig {
 	return &tokens.TokenTransferFeeConfig{
 		DestGasOverhead:               cfg.DestGasOverhead,
 		DestBytesOverhead:             cfg.DestBytesOverhead,
@@ -790,7 +790,7 @@ func importTokenTransferFeeConfigFromActivePool(b cldf_ops.Bundle, chain evm.Cha
 			return nil, fmt.Errorf("failed to get token transfer fee config from fee quoter %s for token %s and remote chain selector %d on chain %s: %w",
 				feeQuoterAddr.Hex(), input.TokenAddress.Hex(), input.RemoteChainSelector, chain.String(), err)
 		}
-		return v170FeeQuoterConfigToTokenTransferFeeConfig(tokenTransferFeeConfigReport.Output), nil
+		return v2FeeQuoterConfigToTokenTransferFeeConfig(tokenTransferFeeConfigReport.Output), nil
 	default:
 		return nil, fmt.Errorf("unsupported onRamp version %s for onRamp %s on chain %s, cannot import token transfer fee config",
 			onRampTAV.String(), onRampAddr.Hex(), chain.String())
@@ -828,15 +828,15 @@ func mergeTokenTransferFeeConfig(desired, imported *tokens.TokenTransferFeeConfi
 
 func makeTokenTransferFeeConfigUpdates(b cldf_ops.Bundle, chain evm.Chain, input ConfigureTokenPoolForRemoteChainInput, remoteChainSelector uint64) ([]token_pool.TokenTransferFeeConfigUpdate, error) {
 	desiredTokenTransferFeeConfig := input.RemoteChainConfig.TokenTransferFeeConfig
-	if !desiredTokenTransferFeeConfig.IsEnabled {
-		return nil, nil
-	}
 	importedConfig, err := importTokenTransferFeeConfigFromActivePool(b, chain, input)
 	if err != nil {
 		return nil, fmt.Errorf("failed to import token transfer fee config from active pool: %w", err)
 	}
 	// merge imported config with desired config, giving precedence to desired config values when they are non-zero (i.e. non-default)
 	desiredTokenTransferFeeConfig = *mergeTokenTransferFeeConfig(&desiredTokenTransferFeeConfig, importedConfig)
+	if !desiredTokenTransferFeeConfig.IsEnabled {
+		return nil, nil
+	}
 	report, err := cldf_ops.ExecuteOperation(b, token_pool.GetTokenTransferFeeConfig, chain, evm_contract.FunctionInput[uint64]{
 		ChainSelector: input.ChainSelector,
 		Address:       input.TokenPoolAddress,

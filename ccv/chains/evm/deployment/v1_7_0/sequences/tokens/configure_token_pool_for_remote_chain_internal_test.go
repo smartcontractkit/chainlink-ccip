@@ -106,7 +106,7 @@ func Test_v170FeeQuoterConfigToTokenTransferFeeConfig(t *testing.T) {
 		DestBytesOverhead: 48,
 		IsEnabled:         true,
 	}
-	got := v170FeeQuoterConfigToTokenTransferFeeConfig(cfg)
+	got := v2FeeQuoterConfigToTokenTransferFeeConfig(cfg)
 	require.NotNil(t, got)
 	require.Equal(t, uint32(180_000), got.DestGasOverhead)
 	require.Equal(t, uint32(48), got.DestBytesOverhead)
