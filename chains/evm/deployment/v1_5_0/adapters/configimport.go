@@ -33,61 +33,59 @@ type ConfigImportAdapter struct {
 	TokenAdminReg map[uint64]common.Address
 }
 
-func (ci *ConfigImportAdapter) InitializeAdapter(e cldf.Environment, selectors []uint64) error {
+func (ci *ConfigImportAdapter) InitializeAdapter(e cldf.Environment, selector uint64) error {
 	ci.OnRamp = make(map[uint64]map[uint64]common.Address)
 	ci.OffRamp = make(map[uint64]map[uint64]common.Address)
 	ci.TokenAdminReg = make(map[uint64]common.Address)
-	for _, sel := range selectors {
-		ci.OnRamp[sel] = make(map[uint64]common.Address)
-		onRampRefs := e.DataStore.Addresses().Filter(
-			datastore.AddressRefByType(datastore.ContractType(onrampops.ContractType)),
-			datastore.AddressRefByVersion(onrampops.Version),
-			datastore.AddressRefByChainSelector(sel),
-		)
+	ci.OnRamp[selector] = make(map[uint64]common.Address)
+	onRampRefs := e.DataStore.Addresses().Filter(
+		datastore.AddressRefByType(datastore.ContractType(onrampops.ContractType)),
+		datastore.AddressRefByVersion(onrampops.Version),
+		datastore.AddressRefByChainSelector(selector),
+	)
 
-		if len(onRampRefs) == 0 {
-			return fmt.Errorf("failed to get onramp ref for chain %d", sel)
-		}
-		chain := e.BlockChains.EVMChains()[sel]
-		for _, ref := range onRampRefs {
-			onRampC, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(common.HexToAddress(ref.Address), chain.Client)
-			if err != nil {
-				return fmt.Errorf("failed to instantiate onramp contract for chain %d: %w", sel, err)
-			}
-			staticCfg, err := onRampC.GetStaticConfig(nil)
-			if err != nil {
-				return err
-			}
-			ci.OnRamp[sel][staticCfg.DestChainSelector] = common.HexToAddress(ref.Address)
-		}
-		offRampRefs := e.DataStore.Addresses().Filter(
-			datastore.AddressRefByType(datastore.ContractType(offrampops.ContractType)),
-			datastore.AddressRefByVersion(offrampops.Version),
-			datastore.AddressRefByChainSelector(sel),
-		)
-		if len(offRampRefs) == 0 {
-			return fmt.Errorf("failed to get offramp ref for chain %d", sel)
-		}
-		for _, ref := range offRampRefs {
-			offRampC, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(common.HexToAddress(ref.Address), chain.Client)
-			if err != nil {
-				return fmt.Errorf("failed to instantiate offramp contract for chain %d: %w", sel, err)
-			}
-			staticCfg, err := offRampC.GetStaticConfig(nil)
-			if err != nil {
-				return err
-			}
-			ci.OffRamp[sel][staticCfg.SourceChainSelector] = common.HexToAddress(ref.Address)
-		}
-		tokenAdminRegRef, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-			Type:    datastore.ContractType(tokenadminops.ContractType),
-			Version: tokenadminops.Version,
-		}, sel, evm_datastore_utils.ToEVMAddress)
-		if err != nil {
-			return fmt.Errorf("failed to find token admin registry contract ref for chain %d: %w", sel, err)
-		}
-		ci.TokenAdminReg[sel] = tokenAdminRegRef
+	if len(onRampRefs) == 0 {
+		return fmt.Errorf("failed to get onramp ref for chain %d", selector)
 	}
+	chain := e.BlockChains.EVMChains()[selector]
+	for _, ref := range onRampRefs {
+		onRampC, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(common.HexToAddress(ref.Address), chain.Client)
+		if err != nil {
+			return fmt.Errorf("failed to instantiate onramp contract for chain %d: %w", selector, err)
+		}
+		staticCfg, err := onRampC.GetStaticConfig(nil)
+		if err != nil {
+			return err
+		}
+		ci.OnRamp[selector][staticCfg.DestChainSelector] = common.HexToAddress(ref.Address)
+	}
+	offRampRefs := e.DataStore.Addresses().Filter(
+		datastore.AddressRefByType(datastore.ContractType(offrampops.ContractType)),
+		datastore.AddressRefByVersion(offrampops.Version),
+		datastore.AddressRefByChainSelector(selector),
+	)
+	if len(offRampRefs) == 0 {
+		return fmt.Errorf("failed to get offramp ref for chain %d", selector)
+	}
+	for _, ref := range offRampRefs {
+		offRampC, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(common.HexToAddress(ref.Address), chain.Client)
+		if err != nil {
+			return fmt.Errorf("failed to instantiate offramp contract for chain %d: %w", selector, err)
+		}
+		staticCfg, err := offRampC.GetStaticConfig(nil)
+		if err != nil {
+			return err
+		}
+		ci.OffRamp[selector][staticCfg.SourceChainSelector] = common.HexToAddress(ref.Address)
+	}
+	tokenAdminRegRef, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+		Type:    datastore.ContractType(tokenadminops.ContractType),
+		Version: tokenadminops.Version,
+	}, selector, evm_datastore_utils.ToEVMAddress)
+	if err != nil {
+		return fmt.Errorf("failed to find token admin registry contract ref for chain %d: %w", selector, err)
+	}
+	ci.TokenAdminReg[selector] = tokenAdminRegRef
 	return nil
 }
 

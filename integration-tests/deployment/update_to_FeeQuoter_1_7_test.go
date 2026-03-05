@@ -19,6 +19,7 @@ import (
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/fee_quoter"
 	fq16ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
+	fq163ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_3/operations/fee_quoter"
 	onrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
 	fq16 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
@@ -60,7 +61,7 @@ func TestUpdateToFeeQuoter_1_7(t *testing.T) {
 			GasForCallExactCheck:                    uint16(5000),
 		}
 		fqInput[chainSel] = deployops.UpdateFeeQuoterInputPerChain{
-			FeeQuoterVersion: semver.MustParse("1.7.0"),
+			FeeQuoterVersion: semver.MustParse("2.0.0"),
 			RampsVersion:     semver.MustParse("1.6.0"),
 		}
 	}
@@ -92,7 +93,7 @@ func TestUpdateToFeeQuoter_1_7(t *testing.T) {
 	})
 	require.NoError(t, err, "Failed to apply ConnectChains changeset")
 	fqReg := deployops.GetFQAndRampUpdaterRegistry()
-	// now update to FeeQuoter 1.7.0
+	// now update to FeeQuoter 2.0.0
 	fqUpdateChangeset := deployops.UpdateFeeQuoterChangeset(fqReg, nil)
 	out, err = fqUpdateChangeset.Apply(*e, deployops.UpdateFeeQuoterInput{
 		Chains: fqInput,
@@ -118,7 +119,7 @@ func TestUpdateToFeeQuoter_1_7(t *testing.T) {
 			RampsVersion:     semver.MustParse("1.6.0"),
 		}
 	}
-	// now update to FeeQuoter 1.7.0
+	// now update to FeeQuoter 2.0.0
 	fqUpdateChangeset = deployops.UpdateFeeQuoterChangeset(fqReg, nil)
 	out, err = fqUpdateChangeset.Apply(*e, deployops.UpdateFeeQuoterInput{
 		Chains: fqInput,
@@ -143,11 +144,11 @@ func fqUpgradeValidation(t *testing.T, e *cldf.Environment, chainSel uint64, cha
 	require.Len(t, fq17AddrRefs, 1, "Expected exactly 1 FeeQuoter address ref for chain selector %d", chainSel)
 	fq17Addr := common.HexToAddress(fq17AddrRefs[0].Address)
 	fq17Contract, err := fee_quoter.NewFeeQuoter(fq17Addr, chain.Client)
-	require.NoError(t, err, "Failed to instantiate FeeQuoter 1.7 contract for chain selector %d", chainSel)
+	require.NoError(t, err, "Failed to instantiate FeeQuoter 2.0 contract for chain selector %d", chainSel)
 	fq16AddrRefs := e.DataStore.Addresses().Filter(
 		datastore.AddressRefByChainSelector(chainSel),
 		datastore.AddressRefByType(datastore.ContractType(fq16ops.ContractType)),
-		datastore.AddressRefByVersion(fq16ops.Version),
+		datastore.AddressRefByVersion(fq163ops.Version),
 	)
 	require.Len(t, fq16AddrRefs, 1, "Expected exactly 1 FeeQuoter address ref for version 1.6.0 and chain selector %d", chainSel)
 	fq16Addr := common.HexToAddress(fq16AddrRefs[0].Address)

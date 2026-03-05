@@ -174,11 +174,11 @@ func GetFQAndRampUpdaterRegistry() *FQAndRampUpdaterRegistry {
 }
 
 // UpdateFeeQuoterChangeset creates a changeset that updates FeeQuoter contracts on specified chains.
-// This can support either upgrading to a 1.7 or higher version of the FeeQuoter, which allows re-configuration of the existing contract, or deploying a new FeeQuoter and updating Ramps to point to it.
+// This can support either upgrading to a 2.0 or higher version of the FeeQuoter, which allows re-configuration of the existing contract, or deploying a new FeeQuoter and updating Ramps to point to it.
 // It first optionally populates configuration values, then creates FeeQuoterUpdateInput,
 // deploys or updates the FeeQuoter contract, and finally updates the Ramps contracts to use the new FeeQuoter address.
 // This also supports downgrading the FQ contract to a prior version (i.e. a rollback) where only the ramps
-// are updated and the existing FQ is not touched. This would be triggered when specifying a FQ version < 1.7.0, which do not support re-configuration, and an existing FQ address is found in the datastore for the chain.
+// are updated and the existing FQ is not touched. This would be triggered when specifying a FQ version < 2.0.0, which do not support re-configuration, and an existing FQ address is found in the datastore for the chain.
 func UpdateFeeQuoterChangeset(fquRegistry *FQAndRampUpdaterRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) cldf.ChangeSetV2[UpdateFeeQuoterInput] {
 	return cldf.CreateChangeSet(updateFeeQuoterApply(fquRegistry, mcmsRegistry), updateFeeQuoterVerify())
 }
@@ -202,8 +202,8 @@ func updateFeeQuoterVerify() func(cldf.Environment, UpdateFeeQuoterInput) error 
 			}, chainSel, datastore_utils.FullRef)
 			if err != nil {
 				// errors are alright if we don't expect to find the ref
-				// but we only support deploying/updating fee quoters with versions >= 1.7.0
-				supportedVersion := semver.MustParse("1.7.0")
+				// but we only support deploying/updating fee quoters with versions >= 2.0.0
+				supportedVersion := semver.MustParse("2.0.0")
 				if perChainInput.FeeQuoterVersion.LessThan(supportedVersion) {
 					return fmt.Errorf("fee quoter address not found for chain selector %d and version %s: %w", chainSel, perChainInput.FeeQuoterVersion.String(), err)
 				}
@@ -232,8 +232,8 @@ func updateFeeQuoterApply(fquRegistry *FQAndRampUpdaterRegistry, mcmsRegistry *c
 			}, chainSel, datastore_utils.FullRef)
 			// if we get an error, it could be because the address doesn't exist, which is fine -
 			// it means we need to deploy or update the FeeQuoter
-			// if we get a FQ ref, we can re-configure an existing FQ >= 1.7.0
-			if err != nil || feeQuoterAddrRef.Version.GreaterThanEqual(semver.MustParse("1.7.0")) {
+			// if we get a FQ ref, we can re-configure an existing FQ >= 2.0.0
+			if err != nil || feeQuoterAddrRef.Version.GreaterThanEqual(semver.MustParse("2.0.0")) {
 				e.Logger.Infof("No existing FeeQuoter address found for chain selector %d and version %s, proceeding with deployment and upgrade", chainSel, perChainInput.FeeQuoterVersion.String())
 				fquUpdater, ok := fquRegistry.GetFeeQuoterUpdater(chainSel, perChainInput.FeeQuoterVersion)
 				if !ok {
