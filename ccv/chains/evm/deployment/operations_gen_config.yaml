@@ -246,3 +246,28 @@ contracts:
         access: owner
       - name: getAllAuthorizedCallers
         access: public
+
+  - contract_name: CommitteeVerifier
+    version: "2.0.0"
+    version_path: "latest"
+    functions:
+      - name: setDynamicConfig
+        access: owner
+      - name: applyRemoteChainConfigUpdates
+        access: owner
+      - name: applyAllowlistUpdates
+        access: owner
+      - name: withdrawFeeTokens
+        access: owner
+      - name: applySignatureConfigs
+        access: owner
+      - name: getRemoteChainConfig
+        access: public
+      - name: getDynamicConfig
+        access: public
+      - name: getSignatureConfig
+        access: public
+      - name: getFee
+        access: public
+      - name: versionTag
+        access: public

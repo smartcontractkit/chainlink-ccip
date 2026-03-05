@@ -102,7 +102,7 @@ contract SignatureQuorumValidator is Ownable2StepMsgSender {
   /// @notice Returns the signer set and threshold.
   function getSignatureConfig(
     uint64 sourceChainSelector
-  ) external view returns (address[] memory, uint8) {
+  ) external view returns (address[] memory signers, uint8 threshold) {
     SignerConfig storage cfg = s_signerConfigs[sourceChainSelector];
     return (cfg.signers.values(), cfg.threshold);
   }
