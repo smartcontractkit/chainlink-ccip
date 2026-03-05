@@ -15,14 +15,15 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/executor"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/proxy"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	executor_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/executor"
 	fqc "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/fee_quoter"
 )
@@ -31,7 +32,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 	"configure-chain-for-lanes",
 	semver.MustParse("1.7.0"),
 	"Configures an EVM chain as a source & destination for multiple remote chains",
-	func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input lanes.ConnectChainsConfig) (output sequences.OnChainOutput, err error) {
+	func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input adapters.ConfigureChainForLanesInput) (output sequences.OnChainOutput, err error) {
 		writes := make([]contract.WriteOutput, 0)
 		chain, ok := chains.EVMChains()[input.ChainSelector]
 		if !ok {
@@ -262,6 +263,30 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 		return sequences.OnChainOutput{
 			BatchOps: batchOps,
 		}, nil
+	},
+)
+
+var ConfigureLaneLegAsSource = cldf_ops.NewSequence(
+	"ConfigureLaneLegAsSource",
+	semver.MustParse("1.0.0"),
+	"Configures lane leg as source on CCIP 1.6.0",
+	func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input lanes.UpdateLanesInput) (sequences.OnChainOutput, error) {
+		var result sequences.OnChainOutput
+		b.Logger.Infof("EVM Configuring lane leg as source. src: %+v, dest: %+v", input.Source, input.Dest)
+
+		return result, nil
+	},
+)
+
+var ConfigureLaneLegAsDest = cldf_ops.NewSequence(
+	"ConfigureLaneLegAsDest",
+	semver.MustParse("1.6.0"),
+	"Configures lane leg as destination on CCIP 1.6.0",
+	func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input lanes.UpdateLanesInput) (sequences.OnChainOutput, error) {
+		var result sequences.OnChainOutput
+		b.Logger.Infof("EVM Configuring lane leg as destination. src: %+v, dest: %+v", input.Source, input.Dest)
+
+		return result, nil
 	},
 )
 

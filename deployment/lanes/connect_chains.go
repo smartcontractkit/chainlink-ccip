@@ -124,12 +124,9 @@ func makeApply(laneRegistry *LaneAdapterRegistry, mcmsRegistry *changesets.MCMSR
 
 func populateAddresses(ds datastore.DataStore, chainDef *ChainDefinition, adapter LaneAdapter) error {
 	var err error
-	if len(chainDef.OnRamp) == 0 {
-		fetchedRamp, err := adapter.GetOnRampAddress(ds, chainDef.Selector)
-		if err != nil {
-			return fmt.Errorf("error fetching onramp address for chain %d: %w", chainDef.Selector, err)
-		}
-		chainDef.OnRamp = [][]byte{fetchedRamp}
+	chainDef.OnRamp, err = adapter.GetOnRampAddress(ds, chainDef.Selector)
+	if err != nil {
+		return fmt.Errorf("error fetching onramp address for chain %d: %w", chainDef.Selector, err)
 	}
 	chainDef.OffRamp, err = adapter.GetOffRampAddress(ds, chainDef.Selector)
 	if err != nil {

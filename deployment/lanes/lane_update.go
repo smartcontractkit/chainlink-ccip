@@ -63,7 +63,10 @@ type ChainDefinition struct {
 	TokenNetworkFeeUSDCents uint16
 	// OnRamp is the address of the OnRamp contract(s) on this chain.
 	// This is populated programmatically
-	OnRamp [][]byte
+	OnRamp []byte
+	// OnRampsForRemotes is the list of OnRamp addresses on this chain for each remote chain.
+	// This is populated by the user
+	OnRampsForRemotes [][]byte
 	// OffRamp is the address of the OffRamp contract on this chain.
 	// This is populated programmatically
 	OffRamp []byte
