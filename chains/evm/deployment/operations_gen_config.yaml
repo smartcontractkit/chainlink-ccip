@@ -124,6 +124,8 @@ contracts:
         access: public
       - name: setRebalancer
         access: owner
+      - name: withdrawLiquidity
+        access: owner
       - name: getToken
         access: public
 
@@ -145,6 +147,10 @@ contracts:
       - name: setRebalancer
         access: owner
       - name: setSiloRebalancer
+        access: owner
+      - name: withdrawLiquidity
+        access: owner
+      - name: withdrawSiloedLiquidity
         access: owner
       - name: getToken
         access: public

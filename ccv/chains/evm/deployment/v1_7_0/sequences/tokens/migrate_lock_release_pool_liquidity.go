@@ -320,10 +320,10 @@ func migrateSiloedPool(
 			continue
 		}
 
-		withdrawReport, err := cldf_ops.ExecuteOperation(b, siloed_ops_v161.WithdrawSiloedLiquidity, evmChain, evm_contract.FunctionInput[siloed_ops_v161.WithdrawSiloedLiquidityInput]{
+		withdrawReport, err := cldf_ops.ExecuteOperation(b, siloed_ops_v161.WithdrawSiloedLiquidity, evmChain, evm_contract.FunctionInput[siloed_ops_v161.WithdrawSiloedLiquidityArgs]{
 			ChainSelector: chainSel,
 			Address:       oldPoolAddr,
-			Args: siloed_ops_v161.WithdrawSiloedLiquidityInput{
+			Args: siloed_ops_v161.WithdrawSiloedLiquidityArgs{
 				RemoteChainSelector: info.chainSelector,
 				Amount:              siloAmount,
 			},

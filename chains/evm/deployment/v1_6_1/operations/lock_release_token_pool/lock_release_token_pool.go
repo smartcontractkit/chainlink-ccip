@@ -3,6 +3,8 @@
 package lock_release_token_pool
 
 import (
+	"math/big"
+
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
@@ -73,6 +75,10 @@ func (c *LockReleaseTokenPoolContract) SetRebalancer(opts *bind.TransactOpts, ar
 	return c.contract.Transact(opts, "setRebalancer", args)
 }
 
+func (c *LockReleaseTokenPoolContract) WithdrawLiquidity(opts *bind.TransactOpts, args *big.Int) (*types.Transaction, error) {
+	return c.contract.Transact(opts, "withdrawLiquidity", args)
+}
+
 func (c *LockReleaseTokenPoolContract) GetToken(opts *bind.CallOpts) (common.Address, error) {
 	var out []any
 	err := c.contract.Call(opts, &out, "getToken")
@@ -133,6 +139,24 @@ var SetRebalancer = contract.NewWrite(contract.WriteParams[common.Address, *Lock
 		args common.Address,
 	) (*types.Transaction, error) {
 		return c.SetRebalancer(opts, args)
+	},
+})
+
+var WithdrawLiquidity = contract.NewWrite(contract.WriteParams[*big.Int, *LockReleaseTokenPoolContract]{
+	Name:            "lock-release-token-pool:withdraw-liquidity",
+	Version:         Version,
+	Description:     "Calls withdrawLiquidity on the contract",
+	ContractType:    ContractType,
+	ContractABI:     LockReleaseTokenPoolABI,
+	NewContract:     NewLockReleaseTokenPoolContract,
+	IsAllowedCaller: contract.OnlyOwner[*LockReleaseTokenPoolContract, *big.Int],
+	Validate:        func(*big.Int) error { return nil },
+	CallContract: func(
+		c *LockReleaseTokenPoolContract,
+		opts *bind.TransactOpts,
+		args *big.Int,
+	) (*types.Transaction, error) {
+		return c.WithdrawLiquidity(opts, args)
 	},
 })
 
