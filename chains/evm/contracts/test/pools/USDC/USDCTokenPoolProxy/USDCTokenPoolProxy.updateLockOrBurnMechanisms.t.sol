@@ -44,7 +44,7 @@ contract USDCTokenPoolProxy_updateLockOrBurnMechanisms is USDCTokenPoolProxySetu
     mechanisms[0] = USDCTokenPoolProxy.LockOrBurnMechanism.CCTP_V1;
     mechanisms[1] = USDCTokenPoolProxy.LockOrBurnMechanism.CCTP_V2;
 
-    vm.expectRevert(abi.encodeWithSelector(TokenPool.MismatchedArrayLengths.selector));
+    vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.MismatchedArrayLengths.selector));
     s_usdcTokenPoolProxy.updateLockOrBurnMechanisms(chainSelectors, mechanisms);
   }
 

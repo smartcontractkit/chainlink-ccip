@@ -63,7 +63,6 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     bytes returnData
   );
   event SourceChainConfigSet(uint64 indexed sourceChainSelector, SourceChainConfigArgs sourceConfig);
-  event MaxGasBufferToUpdateStateUpdated(uint32 oldMaxGasBufferToUpdateState, uint32 newMaxGasBufferToUpdateState);
 
   /// @dev Struct that contains the static configuration. The individual components are stored as immutable variables.
   // solhint-disable-next-line gas-struct-packing
@@ -71,8 +70,8 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     uint64 localChainSelector; // ──╮ Local chainSelector
     uint16 gasForCallExactCheck; // │ Gas for call exact check
     IRMNRemote rmnRemote; // ───────╯ RMN Verification Contract
-    address tokenAdminRegistry; // ────────╮ Token admin registry address
-    uint32 maxGasBufferToUpdateState; // ──╯ Max Gas Buffer to Update State
+    address tokenAdminRegistry; // ───────╮ Token admin registry address
+    uint32 maxGasBufferToUpdateState; // ─╯ Max Gas Buffer to Update State
   }
 
   /// @dev Per-chain source config (defining a lane from a Source Chain -> Dest OffRamp).
