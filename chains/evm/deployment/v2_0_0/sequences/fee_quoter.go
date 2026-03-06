@@ -16,6 +16,8 @@ import (
 	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	adapters1_2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/adapters"
+	routerops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	onrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/onramp"
 	seq1_5 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
 	fq1_6 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
@@ -209,6 +211,17 @@ var (
 				return FeeQuoterUpdate{}, fmt.Errorf("failed to convert metadata to "+
 					"FeeQuoterImportConfigSequenceOutput for chain selector %d: %w", input.ChainSelector, err)
 			}
+			routerAddr := datastore_utils.GetAddressRef(
+				input.ExistingAddresses,
+				input.ChainSelector,
+				routerops.ContractType,
+				routerops.Version,
+				"",
+			)
+			if routerAddr.Address == "" {
+				return FeeQuoterUpdate{}, fmt.Errorf("failed to find router address ref for chain selector %d", input.ChainSelector)
+			}
+
 			// is feeQuoter going to be deployed or fetched from existing addresses?
 			feeQuoterRef := datastore_utils.GetAddressRef(
 				input.ExistingAddresses,
@@ -222,6 +235,15 @@ var (
 			allDestChainConfigs := make([]fqops.DestChainConfigArgs, 0)
 			for remoteChain, cfg := range fqOutput.RemoteChainCfgs {
 				if !cfg.DestChainCfg.IsEnabled {
+					continue
+				}
+				// check if the remote chain is connected with 1.6 deployment, if not, we skip importing config for that remote chain from FQ 1.6
+				// this is to safeguard against having incorrect config import from 1.6
+				version, err := adapters1_2.GetLaneVersionForRemoteChain(b.GetContext(), chain, remoteChain, common.HexToAddress(routerAddr.Address))
+				if err != nil {
+					return FeeQuoterUpdate{}, fmt.Errorf("failed to get lane version for remote chain %d: %w", remoteChain, err)
+				}
+				if !version.Equal(semver.MustParse("1.6.0")) {
 					continue
 				}
 				destChainConfig := cfg.DestChainCfg
@@ -317,6 +339,16 @@ var (
 			if len(onRampMetadata) == 0 {
 				return FeeQuoterUpdate{}, fmt.Errorf("no metadata found for EVM2EVMOnRamp v1.5.0 on chain selector %d", input.ChainSelector)
 			}
+			routerAddr := datastore_utils.GetAddressRef(
+				input.ExistingAddresses,
+				input.ChainSelector,
+				routerops.ContractType,
+				routerops.Version,
+				"",
+			)
+			if routerAddr.Address == "" {
+				return FeeQuoterUpdate{}, fmt.Errorf("failed to find router address ref for chain selector %d", input.ChainSelector)
+			}
 			// get the commit stores and that will act like price updaters for fee quoter
 			var commitStoreRefs []datastore.AddressRef
 			for _, addressRef := range input.ExistingAddresses {
@@ -358,6 +390,16 @@ var (
 				if err != nil {
 					return FeeQuoterUpdate{}, fmt.Errorf("failed to convert metadata to "+
 						"OnRampImportConfigSequenceOutput for chain selector %d: %w", input.ChainSelector, err)
+				}
+				remoteChain := onRampCfg.RemoteChainSelector
+				// check if the remote chain is connected with 1.5 deployment, if not, we skip importing config for that remote chain from FQ 1.6
+				// this is to safeguard against having incorrect config import from 1.5
+				version, err := adapters1_2.GetLaneVersionForRemoteChain(b.GetContext(), chain, remoteChain, common.HexToAddress(routerAddr.Address))
+				if err != nil {
+					return FeeQuoterUpdate{}, fmt.Errorf("failed to get lane version for remote chain %d: %w", remoteChain, err)
+				}
+				if !version.Equal(semver.MustParse("1.5.0")) {
+					continue
 				}
 				if staticCfg.LinkToken == (common.Address{}) {
 					staticCfg = fqops.StaticConfig{
