@@ -392,7 +392,7 @@ var (
 						"OnRampImportConfigSequenceOutput for chain selector %d: %w", input.ChainSelector, err)
 				}
 				remoteChain := onRampCfg.RemoteChainSelector
-				// check if the remote chain is connected with 1.5 deployment, if not, we skip importing config for that remote chain from FQ 1.6
+				// check if the remote chain is connected with 1.5 deployment, if not, we skip importing config for that remote chain from OnRamp 1.5
 				// this is to safeguard against having incorrect config import from 1.5
 				version, err := adapters1_2.GetLaneVersionForRemoteChain(b.GetContext(), chain, remoteChain, common.HexToAddress(routerAddr.Address))
 				if err != nil {
