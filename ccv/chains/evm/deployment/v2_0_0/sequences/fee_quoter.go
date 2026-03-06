@@ -7,30 +7,25 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/fee_quoter"
-	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	onrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/onramp"
 	seq1_5 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
+	fq1_6 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
+	seq1_6 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
-
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
-
+	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	fq1_6 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
-	seq1_6 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
-
-	fqops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/fee_quoter"
+	fqops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 )
 
 const (
@@ -50,7 +45,7 @@ type FeeQuoterUpdate struct {
 
 func (fqu FeeQuoterUpdate) IsEmpty() (bool, error) {
 	empty := FeeQuoterUpdate{}
-	// marshal into json
+	// marshal into JSON
 	emptyBytes, err := json.Marshal(empty)
 	if err != nil {
 		return false, fmt.Errorf("failed to marshal empty FeeQuoterUpdate: %w", err)
@@ -70,8 +65,8 @@ var (
 	// 3. token transfer fee config updates
 	// 4. authorized caller updates
 	SequenceFeeQuoterUpdate = cldf_ops.NewSequence(
-		"fee-quoter-v1.7.0:update-sequence",
-		semver.MustParse("1.7.0"),
+		"fee-quoter-v2.0.0:update-sequence",
+		semver.MustParse("2.0.0"),
 		"Deploys or fetches existing FeeQuoter contract and applies destination chain config updates and price updates",
 		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input FeeQuoterUpdate) (output sequences.OnChainOutput, err error) {
 			chain, ok := chains.EVMChains()[input.ChainSelector]
@@ -172,14 +167,14 @@ var (
 		},
 	)
 
-	// CreateFeeQuoterUpdateInputFromV163 creates FeeQuoterUpdate input by importing configuration from FeeQuoter v1.6.0
+	// CreateFeeQuoterUpdateInputFromV163 creates FeeQuoterUpdate input by importing configuration from FeeQuoter v1.6.x
 	CreateFeeQuoterUpdateInputFromV163 = cldf_ops.NewSequence(
-		"fetches-feequoter-config-values-from-v1.6.3",
-		semver.MustParse("1.7.0"),
-		"Creates FeeQuoterUpdate input by importing configuration from FeeQuoter v1.6.3",
+		"fetches-feequoter-config-values-from-v1.6.x",
+		semver.MustParse("2.0.0"),
+		"Creates FeeQuoterUpdate input by importing configuration from FeeQuoter v1.6.x",
 		func(b cldf_ops.Bundle, chain evm.Chain, input deploy.FeeQuoterUpdateInput) (output FeeQuoterUpdate, err error) {
 			// check if FeeQuoter v1.6.3 is present in existing addresses, if not, we return empty output
-			// it means there is no existing fee quoter deployed from v1.6.3 deployment, and we can skip the config import from v1.6.3
+			// it means there is no existing fee quoter deployed from v1.6.3 deployment, and we can skip the config import from v1.6.x
 			fq16AddressRef, err := seq1_6.GetFeeQuoterAddress(input.ExistingAddresses, input.ChainSelector)
 			if err != nil && strings.Contains(err.Error(), "no fee quoter address found") {
 				return FeeQuoterUpdate{}, nil
@@ -220,7 +215,7 @@ var (
 				"",
 			)
 			isNewFQ17Deployment := datastore_utils.IsAddressRefEmpty(feeQuoterRef)
-			tokenTransferFeeConfigArgs := make([]fee_quoter.FeeQuoterTokenTransferFeeConfigArgs, 0)
+			tokenTransferFeeConfigArgs := make([]fqops.TokenTransferFeeConfigArgs, 0)
 			allDestChainConfigs := make([]fqops.DestChainConfigArgs, 0)
 			for remoteChain, cfg := range fqOutput.RemoteChainCfgs {
 				if !cfg.DestChainCfg.IsEnabled {
@@ -229,7 +224,7 @@ var (
 				destChainConfig := cfg.DestChainCfg
 				outDestchainCfg := fqops.DestChainConfigArgs{
 					DestChainSelector: remoteChain,
-					DestChainConfig: adapters.FeeQuoterDestChainConfig{
+					DestChainConfig: fqops.DestChainConfig{
 						IsEnabled:                   destChainConfig.IsEnabled,
 						MaxDataBytes:                destChainConfig.MaxDataBytes,
 						MaxPerMsgGasLimit:           destChainConfig.MaxPerMsgGasLimit,
@@ -243,14 +238,14 @@ var (
 						LinkFeeMultiplierPercent:    LinkFeeMultiplierPercent,
 					},
 				}
-				tokenTransferFeeCfgs := make([]fee_quoter.FeeQuoterTokenTransferFeeConfigSingleTokenArgs, 0)
+				tokenTransferFeeCfgs := make([]fqops.TokenTransferFeeConfigSingleTokenArgs, 0)
 				for token, transferCfg := range cfg.TokenTransferFeeCfgs {
 					if !transferCfg.IsEnabled {
 						continue
 					}
-					tokenTransferFeeCfgs = append(tokenTransferFeeCfgs, fee_quoter.FeeQuoterTokenTransferFeeConfigSingleTokenArgs{
+					tokenTransferFeeCfgs = append(tokenTransferFeeCfgs, fqops.TokenTransferFeeConfigSingleTokenArgs{
 						Token: token,
-						TokenTransferFeeConfig: fee_quoter.FeeQuoterTokenTransferFeeConfig{
+						TokenTransferFeeConfig: fqops.TokenTransferFeeConfig{
 							FeeUSDCents:       transferCfg.MinFeeUSDCents,
 							DestGasOverhead:   transferCfg.DestGasOverhead,
 							DestBytesOverhead: transferCfg.DestBytesOverhead,
@@ -258,7 +253,7 @@ var (
 						},
 					})
 				}
-				tokenTransferFeeConfigArgs = append(tokenTransferFeeConfigArgs, fee_quoter.FeeQuoterTokenTransferFeeConfigArgs{
+				tokenTransferFeeConfigArgs = append(tokenTransferFeeConfigArgs, fqops.TokenTransferFeeConfigArgs{
 					DestChainSelector:       remoteChain,
 					TokenTransferFeeConfigs: tokenTransferFeeCfgs,
 				})
@@ -289,10 +284,10 @@ var (
 	// CreateFeeQuoterUpdateInputFromV150 creates FeeQuoterUpdate input by importing configuration from PriceRegistry v1.5.0 and EVM2EVMOnRamp v1.5.0
 	CreateFeeQuoterUpdateInputFromV150 = cldf_ops.NewSequence(
 		"fetches-feequoter-config-values-from-v1.5.0",
-		semver.MustParse("1.7.0"),
+		semver.MustParse("2.0.0"),
 		"Creates FeeQuoterUpdate input by importing configuration from PriceRegistry v1.5.0 and EVM2EVMOnRamp v1.5.0",
 		func(b cldf_ops.Bundle, chain evm.Chain, input deploy.FeeQuoterUpdateInput) (output FeeQuoterUpdate, err error) {
-			// get addressref for onramp 1.5.0
+			// get address ref for onramp 1.5.0
 			onRampRef := datastore_utils.GetAddressRef(
 				input.ExistingAddresses,
 				input.ChainSelector,
@@ -349,7 +344,7 @@ var (
 			isNewFQ17Deployment := datastore_utils.IsAddressRefEmpty(feeQuoter17Ref)
 			var staticCfg fqops.StaticConfig
 			var destChainCfgs []fqops.DestChainConfigArgs
-			var tokenTransferFeeConfigArgs []fee_quoter.FeeQuoterTokenTransferFeeConfigSingleTokenArgs
+			var tokenTransferFeeConfigArgs []fqops.TokenTransferFeeConfigSingleTokenArgs
 			var tokenTransferFeeConfigArgsForAll []fqops.TokenTransferFeeConfigArgs
 			for _, meta := range onRampMetadata {
 				// Convert metadata to typed struct if needed
@@ -373,8 +368,8 @@ var (
 				copy(chainFamilySelector[:], chainFamilySelectorBytes[:4])
 				destChainCfgs = append(destChainCfgs, fqops.DestChainConfigArgs{
 					DestChainSelector: onRampCfg.RemoteChainSelector,
-					DestChainConfig: adapters.FeeQuoterDestChainConfig{
-						IsEnabled:                   true, // if the chain is supported on OnRamp, we should enable it on FeeQuoter
+					DestChainConfig: fqops.DestChainConfig{
+						IsEnabled:                   true,
 						MaxDataBytes:                onRampCfg.DynamicConfig.MaxDataBytes,
 						MaxPerMsgGasLimit:           onRampCfg.DynamicConfig.MaxPerMsgGasLimit,
 						DestGasOverhead:             onRampCfg.DynamicConfig.DestGasOverhead,
@@ -388,9 +383,9 @@ var (
 					},
 				})
 				for token, tokenCfg := range onRampCfg.TokenTransferFeeConfig {
-					tokenTransferFeeConfigArgs = append(tokenTransferFeeConfigArgs, fee_quoter.FeeQuoterTokenTransferFeeConfigSingleTokenArgs{
+					tokenTransferFeeConfigArgs = append(tokenTransferFeeConfigArgs, fqops.TokenTransferFeeConfigSingleTokenArgs{
 						Token: token,
-						TokenTransferFeeConfig: fee_quoter.FeeQuoterTokenTransferFeeConfig{
+						TokenTransferFeeConfig: fqops.TokenTransferFeeConfig{
 							FeeUSDCents:       tokenCfg.MinFeeUSDCents,
 							DestGasOverhead:   tokenCfg.DestGasOverhead,
 							DestBytesOverhead: tokenCfg.DestBytesOverhead,
@@ -432,7 +427,7 @@ func MergeFeeQuoterUpdateOutputs(output16, output15 FeeQuoterUpdate) (FeeQuoterU
 	result := output16
 
 	// ConstructorArgs: use output15 if output16 is empty
-	if result.ConstructorArgs.IsEmpty() {
+	if IsConstructorArgsEmpty(result.ConstructorArgs) {
 		result.ConstructorArgs = output15.ConstructorArgs
 	} else {
 		// merge the dest chainConfig args
@@ -488,7 +483,7 @@ func MergeFeeQuoterUpdateOutputs(output16, output15 FeeQuoterUpdate) (FeeQuoterU
 	return result, nil
 }
 
-func mergeTokenTransferFeeConfigArgs(args1, args2 []fee_quoter.FeeQuoterTokenTransferFeeConfigArgs) []fee_quoter.FeeQuoterTokenTransferFeeConfigArgs {
+func mergeTokenTransferFeeConfigArgs(args1, args2 []fqops.TokenTransferFeeConfigArgs) []fqops.TokenTransferFeeConfigArgs {
 	result := args1
 	// TokenTransferFeeConfigArgs: merge by DestChainSelector
 	if len(result) == 0 {
@@ -555,4 +550,11 @@ func mergeDestChainConfigs(cfgs1, cfgs2 []fqops.DestChainConfigArgs) []fqops.Des
 		return nil
 	}
 	return result
+}
+
+func IsConstructorArgsEmpty(a fqops.ConstructorArgs) bool {
+	return (a.StaticConfig == fqops.StaticConfig{}) &&
+		len(a.PriceUpdaters) == 0 &&
+		len(a.TokenTransferFeeConfigArgs) == 0 &&
+		len(a.DestChainConfigArgs) == 0
 }

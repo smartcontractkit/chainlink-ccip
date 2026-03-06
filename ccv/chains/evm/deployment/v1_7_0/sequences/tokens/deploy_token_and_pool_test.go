@@ -11,6 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	seq_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -80,19 +81,28 @@ func basicDeployTokenAndPoolInput(chainReport operations.SequenceReport[sequence
 
 func TestDeployTokenAndPool(t *testing.T) {
 	tests := []struct {
-		desc          string
-		isLockRelease bool
-		expectedErr   string
+		desc               string
+		isLockRelease      bool
+		expectedErr        string
+		rateLimitAdminZero bool // when true, set RegistryAddress from chain and RateLimitAdmin zero to exercise getRateLimitAdminFromActivePool (no active pool for new token)
 	}{
 		{
-			desc:          "happy path - burn mint token pool",
-			isLockRelease: false,
-			expectedErr:   "",
+			desc:               "happy path - burn mint token pool",
+			isLockRelease:      false,
+			expectedErr:        "",
+			rateLimitAdminZero: false,
 		},
 		{
-			desc:          "happy path - lock release token pool",
-			isLockRelease: true,
-			expectedErr:   "",
+			desc:               "happy path - lock release token pool",
+			isLockRelease:      true,
+			expectedErr:        "",
+			rateLimitAdminZero: false,
+		},
+		{
+			desc:               "deploy with RegistryAddress set and RateLimitAdmin zero (no active pool for new token)",
+			isLockRelease:      false,
+			expectedErr:        "",
+			rateLimitAdminZero: true,
 		},
 	}
 	for _, test := range tests {
@@ -125,8 +135,21 @@ func TestDeployTokenAndPool(t *testing.T) {
 			)
 			require.NoError(t, err, "ExecuteSequence should not error")
 
-			// Deploy token and token pool
 			input := basicDeployTokenAndPoolInput(chainReport, test.isLockRelease)
+			if test.rateLimitAdminZero {
+				var registryAddr common.Address
+				for _, addr := range chainReport.Output.Addresses {
+					if addr.Type == datastore.ContractType(token_admin_registry.ContractType) {
+						registryAddr = common.HexToAddress(addr.Address)
+						break
+					}
+				}
+				require.NotEqual(t, common.Address{}, registryAddr, "TokenAdminRegistry address should be in chain report")
+				input.RegistryAddress = registryAddr
+				input.DeployTokenPoolInput.RateLimitAdmin = common.Address{}
+			}
+
+			// Deploy token and token pool
 			poolReport, err := operations.ExecuteSequence(
 				e.OperationsBundle,
 				tokens.DeployTokenAndPool,

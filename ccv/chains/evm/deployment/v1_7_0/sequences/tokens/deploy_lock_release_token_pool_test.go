@@ -17,7 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/advanced_pool_hooks"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/advanced_pool_hooks"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/erc20_lock_box"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/lock_release_token_pool"
@@ -325,7 +325,7 @@ func TestDeployLockReleaseTokenPool(t *testing.T) {
 				testsetup.BundleWithFreshReporter(e.OperationsBundle),
 				advanced_pool_hooks.GetThresholdAmount,
 				e.BlockChains.EVMChains()[chainSel],
-				contract.FunctionInput[any]{
+				contract.FunctionInput[struct{}]{
 					ChainSelector: chainSel,
 					Address:       common.HexToAddress(hooksAddress),
 				},
@@ -339,7 +339,7 @@ func TestDeployLockReleaseTokenPool(t *testing.T) {
 					testsetup.BundleWithFreshReporter(e.OperationsBundle),
 					advanced_pool_hooks.GetPolicyEngine,
 					e.BlockChains.EVMChains()[chainSel],
-					contract.FunctionInput[any]{
+					contract.FunctionInput[struct{}]{
 						ChainSelector: chainSel,
 						Address:       common.HexToAddress(hooksAddress),
 					},
@@ -353,7 +353,7 @@ func TestDeployLockReleaseTokenPool(t *testing.T) {
 				testsetup.BundleWithFreshReporter(e.OperationsBundle),
 				advanced_pool_hooks.GetAllAuthorizedCallers,
 				e.BlockChains.EVMChains()[chainSel],
-				contract.FunctionInput[any]{
+				contract.FunctionInput[struct{}]{
 					ChainSelector: chainSel,
 					Address:       common.HexToAddress(hooksAddress),
 				},
@@ -362,7 +362,7 @@ func TestDeployLockReleaseTokenPool(t *testing.T) {
 			require.Contains(t, getAuthorizedCallersReport.Output, common.HexToAddress(poolAddress), "Expected token pool address to be in the on-chain authorized callers")
 
 			// Check authorized callers on lock box
-			getAuthorizedCallersReport, err = operations.ExecuteOperation(
+			getLockBoxAuthorizedCallersReport, err := operations.ExecuteOperation(
 				testsetup.BundleWithFreshReporter(e.OperationsBundle),
 				erc20_lock_box.GetAllAuthorizedCallers,
 				e.BlockChains.EVMChains()[chainSel],
@@ -372,8 +372,8 @@ func TestDeployLockReleaseTokenPool(t *testing.T) {
 				},
 			)
 			require.NoError(t, err, "ExecuteOperation should not error")
-			require.Len(t, getAuthorizedCallersReport.Output, 1, "Expected 1 address in on-chain authorized callers")
-			require.Contains(t, getAuthorizedCallersReport.Output, common.HexToAddress(poolAddress), "Expected lock release token pool address to be in the on-chain authorized callers")
+			require.Len(t, getLockBoxAuthorizedCallersReport.Output, 1, "Expected 1 address in on-chain authorized callers")
+			require.Contains(t, getLockBoxAuthorizedCallersReport.Output, common.HexToAddress(poolAddress), "Expected lock release token pool address to be in the on-chain authorized callers")
 
 			// Verify lock box address is present in output
 			require.NotEmpty(t, lockBoxAddress, "Expected lock box address to be present in output")

@@ -14,8 +14,8 @@ require (
 	github.com/rs/zerolog v1.34.0
 	github.com/smartcontractkit/ccip-contract-examples/chains/evm v0.0.0-20250826190403-aed7f5f33cde
 	github.com/smartcontractkit/chain-selectors v1.0.97
-	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20260302030253-ab9f38d01a0c
-	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260302030253-ab9f38d01a0c
+	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20260304181639-13a43d5892d9
+	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260304181639-13a43d5892d9
 	github.com/smartcontractkit/chainlink-common v0.9.6-0.20260114142648-bd9e1b483e96
 	github.com/smartcontractkit/chainlink-deployments-framework v0.80.2
 	github.com/smartcontractkit/chainlink-evm v0.3.3
@@ -281,15 +281,15 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/ratelimit v0.3.1 // indirect
 	go.uber.org/zap v1.27.1 // indirect
-	golang.org/x/crypto v0.47.0 // indirect
+	golang.org/x/crypto v0.48.0 // indirect
 	golang.org/x/exp v0.0.0-20250711185948-6ae5c78190dc // indirect
-	golang.org/x/net v0.48.0 // indirect
+	golang.org/x/net v0.49.0 // indirect
 	golang.org/x/oauth2 v0.32.0 // indirect
-	golang.org/x/sys v0.40.0 // indirect
-	golang.org/x/term v0.39.0 // indirect
-	golang.org/x/text v0.33.0 // indirect
+	golang.org/x/sys v0.41.0 // indirect
+	golang.org/x/term v0.40.0 // indirect
+	golang.org/x/text v0.34.0 // indirect
 	golang.org/x/time v0.12.0 // indirect
-	golang.org/x/tools v0.40.0 // indirect
+	golang.org/x/tools v0.41.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260114163908-3f89685c29c3 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20251222181119-0a764e51fe1b // indirect
 	google.golang.org/grpc v1.77.0 // indirect
