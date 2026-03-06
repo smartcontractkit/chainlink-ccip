@@ -31,8 +31,8 @@ import (
 
 var ConfigureLaneLegAsSource = cldf_ops.NewSequence(
 	"ConfigureLaneLegAsSource",
-	semver.MustParse("1.0.0"),
-	"Configures lane leg as source on CCIP 1.6.0",
+	semver.MustParse("1.7.0"),
+	"Configures lane leg as source on CCIP 1.7.0",
 	func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input lanes.UpdateLanesInput) (sequences.OnChainOutput, error) {
 		b.Logger.Infof("EVM Configuring lane leg as source. src: %+v, dest: %+v", input.Source, input.Dest)
 
