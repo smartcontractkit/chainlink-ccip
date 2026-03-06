@@ -62,6 +62,14 @@ func convertOpsConfigToGobinding(cfg evmfqops.DestChainConfig) evmfq.FeeQuoterDe
 	}
 }
 
+func getFQOverrides() lanesapi.FeeQuoterDestChainConfigOverride {
+	override := lanesapi.FeeQuoterDestChainConfigOverride(func(c *lanesapi.FeeQuoterDestChainConfig) {
+		c.MaxDataBytes = 60_000
+		c.EnforceOutOfOrder = true
+	})
+	return override
+}
+
 func checkBidirectionalLaneConnectivity(
 	t *testing.T,
 	e *fdeployment.Environment,
@@ -157,7 +165,10 @@ func checkBidirectionalLaneConnectivity(
 	feeQuoterDestConfig, err := feeQuoterOnDest.GetDestChainConfig(nil, solanaChain.Selector)
 	require.NoError(t, err, "must get dest chain config from feeQuoter")
 	sa := solanasequences.SolanaAdapter{}
-	expectedConfig := convertOpsConfigToGobinding(evmsequences.TranslateFQ(sa.GetFeeQuoterDestChainConfig()))
+	safq := sa.GetFeeQuoterDestChainConfig()
+	override := getFQOverrides()
+	override(&safq)
+	expectedConfig := convertOpsConfigToGobinding(evmsequences.TranslateFQ(safq))
 	require.Equal(t, expectedConfig, feeQuoterDestConfig, "feeQuoter dest chain config must equal expected")
 
 	price, err := feeQuoterOnDest.GetDestinationChainGasPrice(nil, solanaChain.Selector)
@@ -267,13 +278,14 @@ func TestConnectChains_EVM2SVM_NoMCMS(t *testing.T) {
 	// TODO: EVM doesn't work with a non-zero timelock delay
 	// DeployMCMS(t, e, chain_selectors.ETHEREUM_MAINNET.Selector)
 	// EVMTransferOwnership(t, e, chain_selectors.ETHEREUM_MAINNET.Selector)
+	override := getFQOverrides()
 	chain1 := lanesapi.ChainDefinition{
-		Selector: chain_selectors.SOLANA_MAINNET.Selector,
-		GasPrice: big.NewInt(1e17),
+		Selector:                          chain_selectors.SOLANA_MAINNET.Selector,
+		GasPrice:                          big.NewInt(1e17),
+		FeeQuoterDestChainConfigOverrides: &override,
 	}
 	chain2 := lanesapi.ChainDefinition{
 		Selector: chain_selectors.ETHEREUM_MAINNET.Selector,
-		GasPrice: big.NewInt(1e9),
 	}
 
 	connectOut, err := lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.ConnectChainsConfig{

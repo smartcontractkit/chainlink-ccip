@@ -25,6 +25,8 @@ type LaneAdapter interface {
 	GetRouterAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error)
 	GetFQAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error)
 	GetFeeQuoterDestChainConfig() FeeQuoterDestChainConfig
+	// GasPrice defines the USD price (18 decimals) per unit gas for this chain as a destination.
+	GetDefaultGasPrice() *big.Int
 }
 
 // TokenPriceProvider is an optional interface that LaneAdapters can implement
@@ -35,7 +37,6 @@ type TokenPriceProvider interface {
 	// Returns a map of contract type to USD price (18 decimals).
 	// The caller is responsible for resolving contract types to addresses.
 	GetDefaultTokenPrices() map[datastore.ContractType]*big.Int
-	GetDefaultGasPrice() *big.Int
 }
 
 type laneAdapterID string
