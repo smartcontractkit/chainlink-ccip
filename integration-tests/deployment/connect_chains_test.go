@@ -123,7 +123,8 @@ func checkBidirectionalLaneConnectivity(
 	err = e.BlockChains.SolanaChains()[solanaChain.Selector].GetAccountDataBorshInto(e.GetContext(), fqEvmDestChainPDA, &destChainFqAccount)
 	require.NoError(t, err, "failed to get account info")
 	require.Equal(t, !disable, destChainFqAccount.Config.IsEnabled)
-	require.Equal(t, solanasequences.TranslateFQ(evmChain.FeeQuoterDestChainConfig), destChainFqAccount.Config)
+	ea := evmsequences.EVMAdapter{}
+	require.Equal(t, solanasequences.TranslateFQ(ea.GetFeeQuoterDestChainConfig()), destChainFqAccount.Config)
 
 	// Validate EVM onRamp/OffRamp/Router/FeeQuoter state
 	destChainConfig, err := onRampDest.GetDestChainConfig(nil, solanaChain.Selector)
@@ -155,7 +156,8 @@ func checkBidirectionalLaneConnectivity(
 
 	feeQuoterDestConfig, err := feeQuoterOnDest.GetDestChainConfig(nil, solanaChain.Selector)
 	require.NoError(t, err, "must get dest chain config from feeQuoter")
-	expectedConfig := convertOpsConfigToGobinding(evmsequences.TranslateFQ(solanaChain.FeeQuoterDestChainConfig))
+	sa := solanasequences.SolanaAdapter{}
+	expectedConfig := convertOpsConfigToGobinding(evmsequences.TranslateFQ(sa.GetFeeQuoterDestChainConfig()))
 	require.Equal(t, expectedConfig, feeQuoterDestConfig, "feeQuoter dest chain config must equal expected")
 
 	price, err := feeQuoterOnDest.GetDestinationChainGasPrice(nil, solanaChain.Selector)
@@ -266,12 +268,12 @@ func TestConnectChains_EVM2SVM_NoMCMS(t *testing.T) {
 	// DeployMCMS(t, e, chain_selectors.ETHEREUM_MAINNET.Selector)
 	// EVMTransferOwnership(t, e, chain_selectors.ETHEREUM_MAINNET.Selector)
 	chain1 := lanesapi.ChainDefinition{
-		Selector:                 chain_selectors.SOLANA_MAINNET.Selector,
-		GasPrice:                 big.NewInt(1e17),
+		Selector: chain_selectors.SOLANA_MAINNET.Selector,
+		GasPrice: big.NewInt(1e17),
 	}
 	chain2 := lanesapi.ChainDefinition{
-		Selector:                 chain_selectors.ETHEREUM_MAINNET.Selector,
-		GasPrice:                 big.NewInt(1e9),
+		Selector: chain_selectors.ETHEREUM_MAINNET.Selector,
+		GasPrice: big.NewInt(1e9),
 	}
 
 	connectOut, err := lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.ConnectChainsConfig{
@@ -337,7 +339,7 @@ func TestDisableLane_EVM2SVM(t *testing.T) {
 			MCMS: mcms.Input{},
 			Chains: map[uint64]deployops.ContractDeploymentConfigPerChain{
 				chainSel: {
-					Version: version,
+					Version:                                 version,
 					TokenPrivKey:                            mint.String(),
 					TokenDecimals:                           9,
 					MaxFeeJuelsPerMsg:                       big.NewInt(0).Mul(big.NewInt(200), big.NewInt(1e18)),
@@ -357,12 +359,12 @@ func TestDisableLane_EVM2SVM(t *testing.T) {
 	SolanaTransferOwnership(t, e, chain_selectors.SOLANA_MAINNET.Selector)
 
 	chain1 := lanesapi.ChainDefinition{
-		Selector:                 chain_selectors.SOLANA_MAINNET.Selector,
-		GasPrice:                 big.NewInt(1e17),
+		Selector: chain_selectors.SOLANA_MAINNET.Selector,
+		GasPrice: big.NewInt(1e17),
 	}
 	chain2 := lanesapi.ChainDefinition{
-		Selector:                 chain_selectors.ETHEREUM_MAINNET.Selector,
-		GasPrice:                 big.NewInt(1e9),
+		Selector: chain_selectors.ETHEREUM_MAINNET.Selector,
+		GasPrice: big.NewInt(1e9),
 	}
 
 	connectOut, err := lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.ConnectChainsConfig{

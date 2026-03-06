@@ -145,7 +145,8 @@ func checkBidirectionalLaneConnectivity(
 
 		feeQuoterDestConfig, err := feeQuoterOnSrc.GetDestChainConfig(nil, lane.Dest.Selector)
 		require.NoError(t, err, "must get dest chain config from feeQuoter")
-		expectedConfig := convertOpsConfigToGobinding(sequences.TranslateFQ(lane.Dest.FeeQuoterDestChainConfig))
+		a := &sequences.EVMAdapter{}
+		expectedConfig := convertOpsConfigToGobinding(sequences.TranslateFQ(a.GetFeeQuoterDestChainConfig()))
 		require.Equal(t, expectedConfig, feeQuoterDestConfig, "feeQuoter dest chain config must equal expected")
 
 		price, err := feeQuoterOnSrc.GetDestinationChainGasPrice(nil, lane.Dest.Selector)
@@ -191,12 +192,12 @@ func TestConnectChains_EVM2EVM_NoMCMS(t *testing.T) {
 		e.DataStore = out.DataStore.Seal()
 	}
 	chain1 := lanesapi.ChainDefinition{
-		Selector:                 chain_selectors.ETHEREUM_MAINNET.Selector,
-		GasPrice:                 big.NewInt(1e17),
+		Selector: chain_selectors.ETHEREUM_MAINNET.Selector,
+		GasPrice: big.NewInt(1e17),
 	}
 	chain2 := lanesapi.ChainDefinition{
-		Selector:                 chain_selectors.POLYGON_MAINNET.Selector,
-		GasPrice:                 big.NewInt(1e9),
+		Selector: chain_selectors.POLYGON_MAINNET.Selector,
+		GasPrice: big.NewInt(1e9),
 	}
 
 	_, err = lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.ConnectChainsConfig{
