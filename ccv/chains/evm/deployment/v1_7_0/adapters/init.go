@@ -4,14 +4,14 @@ import (
 	"github.com/Masterminds/semver/v3"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	adapters2_0 "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/adapters"
 	adapters1_2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/adapters"
 	adapters1_5 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/adapters"
 	adapters1_6 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 
-	adapters2_0 "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/adapters"
-
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
+	ccvadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 )
 
 func init() {
@@ -28,4 +28,7 @@ func init() {
 	laneMigratorReg.RegisterRouterUpdater(chainsel.FamilyEVM, semver.MustParse("1.2.0"), &adapters1_2.RouterUpdater{})
 
 	lanes.GetLaneAdapterRegistry().RegisterLaneAdapter(chainsel.FamilyEVM, v, &ChainFamilyAdapter{})
+	ccvadapters.GetDeployChainContractsRegistry().Register(chainsel.FamilyEVM, &EVMDeployChainContractsAdapter{})
+	ccvadapters.GetIndexerConfigRegistry().Register(chainsel.FamilyEVM, &EVMIndexerConfigAdapter{})
+	ccvadapters.GetAggregatorConfigRegistry().Register(chainsel.FamilyEVM, &EVMAggregatorConfigAdapter{})
 }
