@@ -146,6 +146,12 @@ func populateAddresses(ds datastore.DataStore, chainDef *ChainDefinition, adapte
 	if version.LessThan(common_utils.Version_2_0_0) {
 		return nil
 	}
+	if chainDef.CantonLaneConfig != nil {
+		chainDef.CantonLaneConfig.GlobalConfig, err = datastore_utils.FindAndFormatRef(ds, chainDef.CantonLaneConfig.GlobalConfig, chainDef.Selector, datastore_utils.FullRef)
+		if err != nil {
+			return fmt.Errorf("error fetching Canton global config address for chain %d: %w", chainDef.Selector, err)
+		}
+	}
 	committeeVerifiers := make([]CommitteeVerifierConfig[datastore.AddressRef], len(chainDef.CommitteeVerifiers))
 	for i, verifier := range chainDef.CommitteeVerifiers {
 		contracts := make([]datastore.AddressRef, 0, len(verifier.CommitteeVerifier))

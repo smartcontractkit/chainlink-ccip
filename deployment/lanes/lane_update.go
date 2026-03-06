@@ -61,6 +61,8 @@ type ChainDefinition struct {
 	MessageNetworkFeeUSDCents uint16
 	// Token network fee in USD cents.
 	TokenNetworkFeeUSDCents uint16
+	// CantonLaneConfig holds Canton-specific configuration for lane setup.
+	CantonLaneConfig *CantonLaneConfig
 	// OnRamp is the address of the OnRamp contract(s) on this chain.
 	// This is populated programmatically
 	OnRamp []byte
@@ -76,6 +78,12 @@ type ChainDefinition struct {
 	// FeeQuoter is the address of the FeeQuoter contract on this chain.
 	// This is populated programmatically
 	FeeQuoter []byte
+}
+
+// CantonLaneConfig holds Canton-specific configuration for lane setup.
+type CantonLaneConfig struct {
+	// GlobalConfig is the Canton global config control contract address.
+	GlobalConfig datastore.AddressRef
 }
 
 type FeeQuoterDestChainConfig struct {
