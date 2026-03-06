@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	ContractType cldf_deployment.ContractType = "EVM2EVMOffRamp"
+	ContractType cldf_deployment.ContractType = "OffRamp"
 	Version      *semver.Version              = semver.MustParse("1.5.0")
 
 	OffRampStaticConfig = contract.NewRead(contract.ReadParams[any, evm_2_evm_offramp.EVM2EVMOffRampStaticConfig, *evm_2_evm_offramp.EVM2EVMOffRamp]{
