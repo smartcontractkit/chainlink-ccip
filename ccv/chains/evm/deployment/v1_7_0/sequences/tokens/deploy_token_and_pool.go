@@ -18,6 +18,9 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/lock_release_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/type_and_version"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
+	token_pool_v161 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/token_pool"
 )
 
 // DeployTokenAndPoolInput is the input for the DeployBurnMintTokenAndPool sequence.
@@ -26,6 +29,8 @@ type DeployTokenAndPoolInput struct {
 	Accounts map[common.Address]*big.Int
 	// DeployTokenPoolInput is the input for the DeployTokenPool sequence.
 	DeployTokenPoolInput DeployTokenPoolInput
+	// RegistryAddress is the TokenAdminRegistry address; when set and RateLimitAdmin is zero, RateLimitAdmin is imported from the active pool if it is < 2.0.0.
+	RegistryAddress common.Address
 }
 
 func (c DeployTokenAndPoolInput) ChainSelector() uint64 {
@@ -55,8 +60,20 @@ var DeployTokenAndPool = cldf_ops.NewSequence(
 		deployTokenReport.Output.Qualifier = input.DeployTokenPoolInput.TokenSymbol // Use the token symbol as the qualifier.
 		addresses = append(addresses, deployTokenReport.Output)
 
+		tokenAddress := common.HexToAddress(deployTokenReport.Output.Address)
+		// When RegistryAddress is set and RateLimitAdmin is not provided, import from the active pool if it is < 2.0.0.
+		if input.RegistryAddress != (common.Address{}) && input.DeployTokenPoolInput.RateLimitAdmin == (common.Address{}) {
+			rla, err := getRateLimitAdminFromActivePool(b, chain, input.ChainSelector(), input.RegistryAddress, tokenAddress)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to import rate limit admin from active pool: %w", err)
+			}
+			if rla != (common.Address{}) {
+				input.DeployTokenPoolInput.RateLimitAdmin = rla
+			}
+		}
+
 		// Deploy token pool.
-		input.DeployTokenPoolInput.ConstructorArgs.Token = common.HexToAddress(deployTokenReport.Output.Address) // Set the token address to the deployed token.
+		input.DeployTokenPoolInput.ConstructorArgs.Token = tokenAddress
 		switch {
 		case burn_mint_token_pool.IsSupported(deployment.ContractType(input.DeployTokenPoolInput.TokenPoolType), input.DeployTokenPoolInput.TokenPoolVersion):
 			deployTokenPoolReport, err := cldf_ops.ExecuteSequence(b, DeployBurnMintTokenPool, chain, input.DeployTokenPoolInput)
@@ -156,3 +173,48 @@ var DeployTokenAndPool = cldf_ops.NewSequence(
 		}, nil
 	},
 )
+
+// getRateLimitAdminFromActivePool returns the rate limit admin from the active pool in the TokenAdminRegistry when that pool is < 2.0.0. Returns zero address otherwise.
+func getRateLimitAdminFromActivePool(
+	b cldf_ops.Bundle,
+	chain evm.Chain,
+	chainSelector uint64,
+	registryAddress, tokenAddress common.Address,
+) (common.Address, error) {
+	if registryAddress == (common.Address{}) || tokenAddress == (common.Address{}) {
+		return common.Address{}, nil
+	}
+	tokenConfigReport, err := cldf_ops.ExecuteOperation(b, token_admin_registry.GetTokenConfig, chain, evm_contract.FunctionInput[common.Address]{
+		ChainSelector: chainSelector,
+		Address:       registryAddress,
+		Args:          tokenAddress,
+	})
+	if err != nil {
+		return common.Address{}, err
+	}
+	activePool := tokenConfigReport.Output.TokenPool
+	if activePool == (common.Address{}) {
+		return common.Address{}, nil
+	}
+	typeAndVersionReport, err := cldf_ops.ExecuteOperation(b, type_and_version.GetTypeAndVersion, chain, evm_contract.FunctionInput[struct{}]{
+		ChainSelector: chainSelector,
+		Address:       activePool,
+		Args:          struct{}{},
+	})
+	if err != nil {
+		return common.Address{}, err
+	}
+	if typeAndVersionReport.Output.Version.GreaterThanEqual(semver.MustParse("2.0.0")) {
+		// Configuration import from another 2.0.0 pool is not currently supported
+		return common.Address{}, nil
+	}
+	rlaReport, err := cldf_ops.ExecuteOperation(b, token_pool_v161.GetRateLimitAdmin, chain, evm_contract.FunctionInput[struct{}]{
+		ChainSelector: chainSelector,
+		Address:       activePool,
+		Args:          struct{}{},
+	})
+	if err != nil {
+		return common.Address{}, err
+	}
+	return rlaReport.Output, nil
+}

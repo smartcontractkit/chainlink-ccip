@@ -20,7 +20,6 @@ contract MockLombardAdapter {
     address to,
     uint256 amount
   ) external returns (bool) {
-    IERC20(i_underlyingToken).transferFrom(from, to, amount);
-    return true;
+    return IERC20(i_underlyingToken).transferFrom(from, to, amount);
   }
 }

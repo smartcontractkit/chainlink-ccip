@@ -6,6 +6,7 @@ import {IBridgeV2} from "../../interfaces/lombard/IBridgeV2.sol";
 import {IMailbox} from "../../interfaces/lombard/IMailbox.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
+import {Internal} from "../../libraries/Internal.sol";
 import {Pool} from "../../libraries/Pool.sol";
 import {TokenPool} from "../TokenPool.sol";
 
@@ -32,7 +33,6 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
   error RemoteTokenOrAdapterMismatch(bytes32 bridgeToken, bytes32 remoteToken, bytes32 remoteAdapter);
   error InvalidReceiver(bytes receiver);
   error ChainNotSupported(uint64 remoteChainSelector);
-  error InvalidAllowedCaller(bytes allowedCaller);
   error ExecutionError();
   error HashMismatch();
 
@@ -265,20 +265,16 @@ contract LombardTokenPool is TokenPool, ITypeAndVersion {
       revert ZeroLombardChainId();
     }
 
-    // only remote pool is expected allowed caller.
+    // Only the remote pool is expected to be the allowed caller.
     if (!isRemotePool(remoteChainSelector, allowedCaller)) {
       revert InvalidRemotePoolForChain(remoteChainSelector, allowedCaller);
     }
 
-    if (allowedCaller.length != 32) {
-      revert InvalidAllowedCaller(allowedCaller);
-    }
-    bytes32 decodedAllowedCaller = abi.decode(allowedCaller, (bytes32));
-
+    bytes32 leftPaddedAllowedCaller = Internal._leftPadBytesToBytes32(allowedCaller);
     s_chainSelectorToPath[remoteChainSelector] =
-      Path({lChainId: lChainId, allowedCaller: decodedAllowedCaller, remoteAdapter: remoteAdapter});
+      Path({lChainId: lChainId, allowedCaller: leftPaddedAllowedCaller, remoteAdapter: remoteAdapter});
 
-    emit PathSet(remoteChainSelector, lChainId, decodedAllowedCaller, remoteAdapter);
+    emit PathSet(remoteChainSelector, lChainId, leftPaddedAllowedCaller, remoteAdapter);
   }
 
   /// @notice Removes path mapping for a destination chain.

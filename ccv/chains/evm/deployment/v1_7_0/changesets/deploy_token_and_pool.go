@@ -44,6 +44,8 @@ type DeployTokenAndPoolCfg struct {
 	Accounts map[common.Address]*big.Int
 	// FeeAggregator is the address that will receive fee tokens when WithdrawFeeTokens is called.
 	FeeAggregator common.Address
+	// TokenAdminRegistryRef is a reference to the TokenAdminRegistry; when RateLimitAdmin is zero, RateLimitAdmin is imported from the active pool if it is < 2.0.0.
+	TokenAdminRegistryRef datastore.AddressRef
 }
 
 func (c DeployTokenAndPoolCfg) ChainSelector() uint64 {
@@ -69,8 +71,17 @@ var DeployTokenAndPool = changesets.NewFromOnChainSequence(changesets.NewFromOnC
 			return tokens.DeployTokenAndPoolInput{}, fmt.Errorf("failed to resolve router ref: %w", err)
 		}
 
+		if cfg.TokenAdminRegistryRef.Type == "" {
+			return tokens.DeployTokenAndPoolInput{}, fmt.Errorf("TokenAdminRegistryRef is required")
+		}
+		registryAddress, err := datastore_utils.FindAndFormatRef(e.DataStore, cfg.TokenAdminRegistryRef, cfg.ChainSel, evm_datastore_utils.ToEVMAddress)
+		if err != nil {
+			return tokens.DeployTokenAndPoolInput{}, fmt.Errorf("failed to resolve token admin registry ref: %w", err)
+		}
+
 		return tokens.DeployTokenAndPoolInput{
 			Accounts: cfg.Accounts,
+			RegistryAddress: registryAddress,
 			DeployTokenPoolInput: tokens.DeployTokenPoolInput{
 				ChainSel:                         cfg.ChainSel,
 				TokenPoolType:                    cfg.TokenPoolType,
