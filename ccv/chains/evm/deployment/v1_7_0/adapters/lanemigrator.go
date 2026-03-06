@@ -36,7 +36,7 @@ type LaneMigrator struct{}
 // It fetches the existing onRamp and offRamp addresses from the provided ExistingAddresses, then calls the necessary functions to update the onRamp and offRamp to use the new Router.
 //
 // This sequence assumes that the destChainConfig on OnRamp and SourceChainConfig on OffRamp do not need to be updated, and only updates the Router address used by the Ramps.
-// If you need to update the destChainConfig or sourceChainConfig, please use the ConfigureChainForLanes sequence instead.
+// If you need to update the destChainConfig or sourceChainConfig, please use the ConnectChains sequence instead.
 func (r *LaneMigrator) UpdateVersionWithRouter() *cldf_ops.Sequence[deploy.RampUpdaterConfig, sequences.OnChainOutput, chain.BlockChains] {
 	return cldf_ops.NewSequence(
 		"ramp-updater:sequence-update-ramps-with-router",

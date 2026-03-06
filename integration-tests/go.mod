@@ -5,6 +5,7 @@ go 1.25.5
 replace (
 	// Make sure we're working with the latest chainlink-ccip
 	github.com/smartcontractkit/chainlink-ccip => ..
+	github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm => ../ccv/chains/evm
 	github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment => ../ccv/chains/evm/deployment
 
 	// Make sure we're working with the latest chainlink-ccip/chains/evm/deployment

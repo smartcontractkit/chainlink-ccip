@@ -1,27 +1,31 @@
 package testsetup
 
 import (
+	"encoding/binary"
+	"encoding/hex"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/executor"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/mock_receiver"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 )
 
 // CreateBasicFeeQuoterDestChainConfig creates a basic fee quoter dest chain config with reasonable defaults for testing
-func CreateBasicFeeQuoterDestChainConfig() adapters.FeeQuoterDestChainConfig {
-	return adapters.FeeQuoterDestChainConfig{
+func CreateBasicFeeQuoterDestChainConfig() lanes.FeeQuoterDestChainConfig {
+	familySelector, _ := hex.DecodeString(utils.EVMFamilySelector)
+	return lanes.FeeQuoterDestChainConfig{
 		IsEnabled:                   true,
 		MaxDataBytes:                30_000,
 		MaxPerMsgGasLimit:           3_000_000,
@@ -31,28 +35,28 @@ func CreateBasicFeeQuoterDestChainConfig() adapters.FeeQuoterDestChainConfig {
 		DefaultTokenDestGasOverhead: 90_000,
 		DefaultTxGasLimit:           200_000,
 		NetworkFeeUSDCents:          10,
-		ChainFamilySelector:         [4]byte{0x28, 0x12, 0xd5, 0x2c}, // EVM
+		ChainFamilySelector:         binary.BigEndian.Uint32(familySelector),
 		LinkFeeMultiplierPercent:    90,
 		USDPerUnitGas:               big.NewInt(1e6),
 	}
 }
 
 // CreateBasicExecutorDestChainConfig creates a basic executor dest chain config with reasonable defaults for testing
-func CreateBasicExecutorDestChainConfig() adapters.ExecutorDestChainConfig {
-	return adapters.ExecutorDestChainConfig{
+func CreateBasicExecutorDestChainConfig() lanes.ExecutorDestChainConfig {
+	return lanes.ExecutorDestChainConfig{
 		USDCentsFee: 50,
 		Enabled:     true,
 	}
 }
 
 // CreateBasicCommitteeVerifierRemoteChainConfig creates a basic committee verifier remote chain config with reasonable defaults for testing
-func CreateBasicCommitteeVerifierRemoteChainConfig() adapters.CommitteeVerifierRemoteChainConfig {
-	return adapters.CommitteeVerifierRemoteChainConfig{
+func CreateBasicCommitteeVerifierRemoteChainConfig() lanes.CommitteeVerifierRemoteChainConfig {
+	return lanes.CommitteeVerifierRemoteChainConfig{
 		AllowlistEnabled:   false,
 		FeeUSDCents:        50,
 		GasForVerification: 50_000,
 		PayloadSizeBytes:   6*64 + 2*32,
-		SignatureConfig: adapters.CommitteeVerifierSignatureQuorumConfig{
+		SignatureConfig: lanes.CommitteeVerifierSignatureQuorumConfig{
 			Signers:   []string{common.HexToAddress("0x01").String()},
 			Threshold: 1,
 		},
