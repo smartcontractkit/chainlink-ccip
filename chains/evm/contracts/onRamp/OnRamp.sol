@@ -131,7 +131,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   /// - Executor receipt.
   /// - Network fee receipt.
   struct Receipt {
-    // The address of the entity that issued the receipt. For token receipts this is the token address, not the pool.
+    // The address of the entity that issued the receipt. For token receipts this is the token pool, not the token.
     // for verifiers and executors, this is the user specified value, even if the call is ultimately handled by some
     // underlying contract.
     address issuer; // ───────────╮
