@@ -29,7 +29,7 @@ import {IERC20Metadata} from "@openzeppelin/contracts@5.3.0/token/ERC20/extensio
 
 contract e2e_lombard is OnRampSetup {
   // Lombard version tag used by VersionedVerifierResolver inbound routing and LombardVerifier.verifyMessage parsing.
-  bytes4 internal constant LOMBARD_VERSION_TAG_V1_7_0 = bytes4(keccak256("LombardVerifier 1.7.0"));
+  bytes4 internal constant LOMBARD_VERSION_TAG_V2_0_0 = bytes4(keccak256("LombardVerifier 2.0.0"));
   bytes32 internal constant LOMBARD_CHAIN_ID = bytes32(uint256(10_000));
 
   OffRampHelper internal s_offRamp;
@@ -120,12 +120,15 @@ contract e2e_lombard is OnRampSetup {
 
     s_sourceLombardVerifier.applyRemoteChainConfigUpdates(destChainConfigs);
     s_sourceLombardVerifier.setPath(
-      DEST_CHAIN_SELECTOR, LOMBARD_CHAIN_ID, bytes32(bytes20(address(s_destLombardVerifier)))
+      DEST_CHAIN_SELECTOR, LOMBARD_CHAIN_ID, abi.encodePacked(bytes32(bytes20(address(s_destLombardVerifier))))
     );
 
     LombardVerifier.SupportedTokenArgs[] memory tokensToAdd = new LombardVerifier.SupportedTokenArgs[](1);
     tokensToAdd[0] = LombardVerifier.SupportedTokenArgs({localToken: s_sourceFeeToken, localAdapter: address(0)});
     s_sourceLombardVerifier.updateSupportedTokens(new address[](0), tokensToAdd);
+    s_lombardBridge.setAllowedDestinationToken(
+      LOMBARD_CHAIN_ID, s_sourceFeeToken, bytes32(uint256(uint160(s_destFeeToken)))
+    );
 
     // Configure destination Lombard verifier for verifyMessage (offRamp authorization check uses sourceChainSelector).
     BaseVerifier.RemoteChainConfigArgs[] memory lombardSourceConfig = new BaseVerifier.RemoteChainConfigArgs[](1);
@@ -150,7 +153,7 @@ contract e2e_lombard is OnRampSetup {
     VersionedVerifierResolver.InboundImplementationArgs[] memory lombardInbound =
       new VersionedVerifierResolver.InboundImplementationArgs[](1);
     lombardInbound[0] = VersionedVerifierResolver.InboundImplementationArgs({
-      version: LOMBARD_VERSION_TAG_V1_7_0, verifier: address(s_destLombardVerifier)
+      version: LOMBARD_VERSION_TAG_V2_0_0, verifier: address(s_destLombardVerifier)
     });
     lombardResolver.applyInboundImplementationUpdates(lombardInbound);
 
@@ -346,7 +349,7 @@ contract e2e_lombard is OnRampSetup {
 
     // Lombard verifier returns a payload hash from MockLombardBridge.deposit (second verifier blob).
     // MockLombardBridge hashes (block.timestamp, optionalMessage) where optionalMessage = versionTag || messageId.
-    bytes memory optionalMessage = bytes.concat(LOMBARD_VERSION_TAG_V1_7_0, messageId);
+    bytes memory optionalMessage = bytes.concat(LOMBARD_VERSION_TAG_V2_0_0, messageId);
     verifierBlobs[1] = abi.encodePacked(keccak256(abi.encode(block.timestamp, optionalMessage)));
 
     vm.expectEmit();
@@ -384,7 +387,7 @@ contract e2e_lombard is OnRampSetup {
     bytes memory fakeProof = bytes("fake signature data");
 
     verifierResults[1] = bytes.concat(
-      LOMBARD_VERSION_TAG_V1_7_0,
+      LOMBARD_VERSION_TAG_V2_0_0,
       bytes2(uint16(fakePayload.length)),
       fakePayload,
       bytes2(uint16(fakeProof.length)),
@@ -430,8 +433,13 @@ contract e2e_lombard is OnRampSetup {
     bytes memory tokenReceiver,
     uint256 amount
   ) internal pure returns (bytes memory) {
-    bytes memory msgBody =
-      abi.encodePacked(bytes1(0), bytes32(destToken), bytes32(0), bytes32(tokenReceiver), bytes32(amount));
+    bytes memory msgBody = abi.encodePacked(
+      bytes1(0),
+      Internal._leftPadBytesToBytes32(destToken),
+      bytes32(0),
+      Internal._leftPadBytesToBytes32(tokenReceiver),
+      bytes32(amount)
+    );
 
     // Encode the full payload structure
     bytes memory encodedData = abi.encode(

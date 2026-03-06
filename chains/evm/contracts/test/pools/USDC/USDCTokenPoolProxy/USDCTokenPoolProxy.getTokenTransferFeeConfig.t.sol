@@ -11,10 +11,10 @@ contract USDCTokenPoolProxy_getTokenTransferFeeConfig is USDCTokenPoolProxySetup
     IPoolV2.TokenTransferFeeConfig memory expectedFeeConfig = IPoolV2.TokenTransferFeeConfig({
       destGasOverhead: 50_000,
       destBytesOverhead: 32,
-      defaultBlockConfirmationFeeUSDCents: 100,
-      customBlockConfirmationFeeUSDCents: 150,
-      defaultBlockConfirmationTransferFeeBps: 123,
-      customBlockConfirmationTransferFeeBps: 456,
+      defaultBlockConfirmationsFeeUSDCents: 100,
+      customBlockConfirmationsFeeUSDCents: 150,
+      defaultBlockConfirmationsTransferFeeBps: 123,
+      customBlockConfirmationsTransferFeeBps: 456,
       isEnabled: true
     });
 
@@ -57,10 +57,10 @@ contract USDCTokenPoolProxy_getTokenTransferFeeConfig is USDCTokenPoolProxySetup
     IPoolV2.TokenTransferFeeConfig memory expectedFeeConfig = IPoolV2.TokenTransferFeeConfig({
       destGasOverhead: 60_000,
       destBytesOverhead: 64,
-      defaultBlockConfirmationFeeUSDCents: 200,
-      customBlockConfirmationFeeUSDCents: 250,
-      defaultBlockConfirmationTransferFeeBps: 789,
-      customBlockConfirmationTransferFeeBps: 999,
+      defaultBlockConfirmationsFeeUSDCents: 200,
+      customBlockConfirmationsFeeUSDCents: 250,
+      defaultBlockConfirmationsTransferFeeBps: 789,
+      customBlockConfirmationsTransferFeeBps: 999,
       isEnabled: true
     });
 
@@ -197,10 +197,10 @@ contract USDCTokenPoolProxy_getTokenTransferFeeConfig is USDCTokenPoolProxySetup
   ) internal pure {
     assertEq(configA.destGasOverhead, configB.destGasOverhead);
     assertEq(configA.destBytesOverhead, configB.destBytesOverhead);
-    assertEq(configA.defaultBlockConfirmationFeeUSDCents, configB.defaultBlockConfirmationFeeUSDCents);
-    assertEq(configA.customBlockConfirmationFeeUSDCents, configB.customBlockConfirmationFeeUSDCents);
-    assertEq(configA.defaultBlockConfirmationTransferFeeBps, configB.defaultBlockConfirmationTransferFeeBps);
-    assertEq(configA.customBlockConfirmationTransferFeeBps, configB.customBlockConfirmationTransferFeeBps);
+    assertEq(configA.defaultBlockConfirmationsFeeUSDCents, configB.defaultBlockConfirmationsFeeUSDCents);
+    assertEq(configA.customBlockConfirmationsFeeUSDCents, configB.customBlockConfirmationsFeeUSDCents);
+    assertEq(configA.defaultBlockConfirmationsTransferFeeBps, configB.defaultBlockConfirmationsTransferFeeBps);
+    assertEq(configA.customBlockConfirmationsTransferFeeBps, configB.customBlockConfirmationsTransferFeeBps);
     assertEq(configA.isEnabled, configB.isEnabled);
   }
 }

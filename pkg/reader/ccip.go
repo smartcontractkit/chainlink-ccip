@@ -779,43 +779,45 @@ func (r *ccipChainReader) Sync(ctx context.Context, contracts cciptypes.Contract
 		address cciptypes.UnknownAddress
 	}
 
-	var chainToContractBinding = make(map[cciptypes.ChainSelector]boundContract)
+	var chainToContractBindings = make(map[cciptypes.ChainSelector][]boundContract)
 	for contractName, chainSelToAddress := range contracts {
 		for chainSel, address := range chainSelToAddress {
-			chainToContractBinding[chainSel] = boundContract{
+			chainToContractBindings[chainSel] = append(chainToContractBindings[chainSel], boundContract{
 				name:    contractName,
 				address: address,
-			}
+			})
 		}
 	}
 
 	lggr := logutil.WithContextValues(ctx, r.lggr)
 	var errGroup errgroup.Group
-	for chainSelector, boundContract := range chainToContractBinding {
-		errGroup.Go(func() error {
-			// defense in depth: don't bind if the address is empty.
-			// callers should ensure this but we double check here.
-			if len(boundContract.address) == 0 {
-				lggr.Warnw("skipping binding empty address for contract",
-					"contractName", boundContract.name,
-					"chainSel", chainSelector,
-				)
+	for chainSelector, boundContracts := range chainToContractBindings {
+		for _, boundContract := range boundContracts {
+			errGroup.Go(func() error {
+				// defense in depth: don't bind if the address is empty.
+				// callers should ensure this but we double check here.
+				if len(boundContract.address) == 0 {
+					lggr.Warnw("skipping binding empty address for contract",
+						"contractName", boundContract.name,
+						"chainSel", chainSelector,
+					)
+					return nil
+				}
+
+				chainAccessor, err := getChainAccessor(r.accessors, chainSelector)
+				if err != nil && errors.Is(err, ErrChainAccessorNotFound) {
+					// don't support this chain, nothing to do.
+					return nil
+				}
+
+				err = chainAccessor.Sync(ctx, boundContract.name, boundContract.address)
+				if err != nil {
+					return fmt.Errorf("bind reader contract %s on chain %s: %w", boundContract.name, chainSelector, err)
+				}
+
 				return nil
-			}
-
-			chainAccessor, err := getChainAccessor(r.accessors, chainSelector)
-			if err != nil && errors.Is(err, ErrChainAccessorNotFound) {
-				// don't support this chain, nothing to do.
-				return nil
-			}
-
-			err = chainAccessor.Sync(ctx, boundContract.name, boundContract.address)
-			if err != nil {
-				return fmt.Errorf("bind reader contract %s on chain %s: %w", boundContract.name, chainSelector, err)
-			}
-
-			return nil
-		})
+			})
+		}
 	}
 
 	if err := errGroup.Wait(); err != nil {

@@ -12,7 +12,7 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/advanced_pool_hooks"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/advanced_pool_hooks"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/token_pool"
 )
 
@@ -46,7 +46,7 @@ var ConfigureTokenPool = cldf_ops.NewSequence(
 
 		// Set threshold amount for additional CCVs (if necessary)
 		if input.ThresholdAmountForAdditionalCCVs != nil {
-			currentThresholdAmountReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.GetThresholdAmount, chain, evm_contract.FunctionInput[any]{
+			currentThresholdAmountReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.GetThresholdAmount, chain, evm_contract.FunctionInput[struct{}]{
 				ChainSelector: input.ChainSelector,
 				Address:       input.AdvancedPoolHooks,
 			})
@@ -93,14 +93,14 @@ var ConfigureTokenPool = cldf_ops.NewSequence(
 				desiredFeeAdmin = input.FeeAggregator
 			}
 
-			if desiredRouter != currentDynamicConfig.Router || desiredRateLimitAdmin != currentDynamicConfig.RateLimitAdmin || desiredFeeAdmin != currentDynamicConfig.FeeAdmin{
+			if desiredRouter != currentDynamicConfig.Router || desiredRateLimitAdmin != currentDynamicConfig.RateLimitAdmin || desiredFeeAdmin != currentDynamicConfig.FeeAdmin {
 				setDynamicConfigReport, err := cldf_ops.ExecuteOperation(b, token_pool.SetDynamicConfig, chain, evm_contract.FunctionInput[token_pool.DynamicConfigArgs]{
 					ChainSelector: input.ChainSelector,
 					Address:       input.TokenPoolAddress,
 					Args: token_pool.DynamicConfigArgs{
 						Router:         desiredRouter,
 						RateLimitAdmin: desiredRateLimitAdmin,
-						FeeAdmin:  desiredFeeAdmin,
+						FeeAdmin:       desiredFeeAdmin,
 					},
 				})
 				if err != nil {
@@ -120,27 +120,3 @@ var ConfigureTokenPool = cldf_ops.NewSequence(
 		}, nil
 	},
 )
-
-// makeAllowListUpdates compares the current and desired allow-lists and returns the addresses to add and remove.
-func makeAllowListUpdates(current, desired []common.Address) (adds, removes []common.Address) {
-	currentSet := make(map[common.Address]struct{}, len(current))
-	for _, addr := range current {
-		currentSet[addr] = struct{}{}
-	}
-	desiredSet := make(map[common.Address]struct{}, len(desired))
-	for _, addr := range desired {
-		desiredSet[addr] = struct{}{}
-	}
-
-	for addr := range desiredSet {
-		if _, exists := currentSet[addr]; !exists {
-			adds = append(adds, addr)
-		}
-	}
-	for addr := range currentSet {
-		if _, exists := desiredSet[addr]; !exists {
-			removes = append(removes, addr)
-		}
-	}
-	return adds, removes
-}

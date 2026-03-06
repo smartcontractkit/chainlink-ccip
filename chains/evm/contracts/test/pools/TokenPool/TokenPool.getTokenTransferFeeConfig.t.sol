@@ -12,10 +12,10 @@ contract TokenPool_getTokenTransferFeeConfig is AdvancedPoolHooksSetup {
     IPoolV2.TokenTransferFeeConfig memory feeConfig = IPoolV2.TokenTransferFeeConfig({
       destGasOverhead: 50_000,
       destBytesOverhead: 32,
-      defaultBlockConfirmationFeeUSDCents: 100, // $1.00
-      customBlockConfirmationFeeUSDCents: 150, // $1.50
-      defaultBlockConfirmationTransferFeeBps: 123,
-      customBlockConfirmationTransferFeeBps: 456,
+      defaultBlockConfirmationsFeeUSDCents: 100, // $1.00
+      customBlockConfirmationsFeeUSDCents: 150, // $1.50
+      defaultBlockConfirmationsTransferFeeBps: 123,
+      customBlockConfirmationsTransferFeeBps: 456,
       isEnabled: true
     });
 
@@ -31,10 +31,12 @@ contract TokenPool_getTokenTransferFeeConfig is AdvancedPoolHooksSetup {
 
     assertEq(returnedFeeConfig.destGasOverhead, feeConfig.destGasOverhead);
     assertEq(returnedFeeConfig.destBytesOverhead, feeConfig.destBytesOverhead);
-    assertEq(returnedFeeConfig.defaultBlockConfirmationFeeUSDCents, feeConfig.defaultBlockConfirmationFeeUSDCents);
-    assertEq(returnedFeeConfig.customBlockConfirmationFeeUSDCents, feeConfig.customBlockConfirmationFeeUSDCents);
-    assertEq(returnedFeeConfig.defaultBlockConfirmationTransferFeeBps, feeConfig.defaultBlockConfirmationTransferFeeBps);
-    assertEq(returnedFeeConfig.customBlockConfirmationTransferFeeBps, feeConfig.customBlockConfirmationTransferFeeBps);
+    assertEq(returnedFeeConfig.defaultBlockConfirmationsFeeUSDCents, feeConfig.defaultBlockConfirmationsFeeUSDCents);
+    assertEq(returnedFeeConfig.customBlockConfirmationsFeeUSDCents, feeConfig.customBlockConfirmationsFeeUSDCents);
+    assertEq(
+      returnedFeeConfig.defaultBlockConfirmationsTransferFeeBps, feeConfig.defaultBlockConfirmationsTransferFeeBps
+    );
+    assertEq(returnedFeeConfig.customBlockConfirmationsTransferFeeBps, feeConfig.customBlockConfirmationsTransferFeeBps);
     assertEq(returnedFeeConfig.isEnabled, feeConfig.isEnabled);
   }
 
@@ -52,10 +54,10 @@ contract TokenPool_getTokenTransferFeeConfig is AdvancedPoolHooksSetup {
     // assert default values are returned
     assertEq(tokenTransferFeeConfig.destGasOverhead, 0);
     assertEq(tokenTransferFeeConfig.destBytesOverhead, 0);
-    assertEq(tokenTransferFeeConfig.defaultBlockConfirmationFeeUSDCents, 0);
-    assertEq(tokenTransferFeeConfig.customBlockConfirmationFeeUSDCents, 0);
-    assertEq(tokenTransferFeeConfig.defaultBlockConfirmationTransferFeeBps, 0);
-    assertEq(tokenTransferFeeConfig.customBlockConfirmationTransferFeeBps, 0);
+    assertEq(tokenTransferFeeConfig.defaultBlockConfirmationsFeeUSDCents, 0);
+    assertEq(tokenTransferFeeConfig.customBlockConfirmationsFeeUSDCents, 0);
+    assertEq(tokenTransferFeeConfig.defaultBlockConfirmationsTransferFeeBps, 0);
+    assertEq(tokenTransferFeeConfig.customBlockConfirmationsTransferFeeBps, 0);
     assertEq(tokenTransferFeeConfig.isEnabled, false);
   }
 }

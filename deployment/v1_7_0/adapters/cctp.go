@@ -11,6 +11,22 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
+// USDCType specifies the type of the USDC on the chain.
+// We support chains with canonical USDC, which are backed by CCTP, and chains wth non-canonical USDC.
+// Non-canonical USDC tokens are backed by locked USDC on some canonical chain.
+type USDCType string
+
+const (
+	// Canonical USDC is backed by CCTP.
+	Canonical USDCType = "CANONICAL"
+	// NonCanonical USDC is backed by locked, canonical USDC.
+	NonCanonical USDCType = "NON_CANONICAL"
+)
+
+func (t USDCType) IsValid() bool {
+	return t == Canonical || t == NonCanonical
+}
+
 // RemoteCCTPChainConfig configures a CCTP-enabled chain for a remote counterpart.
 type RemoteCCTPChainConfig struct {
 	// FeeUSDCCents is the flat fee, in multiples of 0.01 USD cents, charged for verification on the remote chain.
@@ -26,6 +42,18 @@ type RemoteCCTPChainConfig struct {
 	DomainIdentifier uint32
 	// TokenTransferFeeConfig specifies the desired token transfer fee configuration for this remote chain.
 	TokenTransferFeeConfig tokens.TokenTransferFeeConfig
+	// DefaultFinalityInboundRateLimiterConfig specifies the desired rate limiter configuration for default-finality inbound traffic.
+	// DO NOT SET THIS VALUE WHEN PASSING IN INPUTS.
+	// This value is derived from the configuration specified for outbound traffic to the remote chain, as the same limits should apply in both directions.
+	DefaultFinalityInboundRateLimiterConfig tokens.RateLimiterConfigFloatInput
+	// DefaultFinalityOutboundRateLimiterConfig specifies the desired rate limiter configuration for default-finality outbound traffic.
+	DefaultFinalityOutboundRateLimiterConfig tokens.RateLimiterConfigFloatInput
+	// CustomFinalityInboundRateLimiterConfig specifies the desired rate limiter configuration for custom-finality inbound traffic.
+	// DO NOT SET THIS VALUE WHEN PASSING IN INPUTS.
+	// This value is derived from the configuration specified for outbound traffic to the remote chain, as the same limits should apply in both directions.
+	CustomFinalityInboundRateLimiterConfig tokens.RateLimiterConfigFloatInput
+	// CustomFinalityOutboundRateLimiterConfig specifies the desired rate limiter configuration for custom-finality outbound traffic.
+	CustomFinalityOutboundRateLimiterConfig tokens.RateLimiterConfigFloatInput
 }
 
 // ConfigureCCTPChainForLanesInput specifies the input for the ConfigureCCTPChainForLanes sequence.
@@ -62,6 +90,8 @@ type DeployCCTPInput struct {
 	StorageLocations []string
 	// FeeAggregator is the address to which fees are withdrawn.
 	FeeAggregator string
+	// TokenDecimals is the number of decimals of the USDC on the chain.
+	TokenDecimals uint8
 }
 
 // DeployCCTPChainDeps are the dependencies for the DeployCCTPChain sequence.
@@ -89,8 +119,12 @@ type RemoteCCTPChain interface {
 	PoolAddress(d datastore.DataStore, b cldf_chain.BlockChains, chainSelector uint64, registeredPoolRef datastore.AddressRef) ([]byte, error)
 	// TokenAddress returns the address of the token on the remote chain in bytes.
 	TokenAddress(d datastore.DataStore, b cldf_chain.BlockChains, chainSelector uint64) ([]byte, error)
-	// AllowedCallerOnDest returns the address allowed to trigger message reception on the remote domain.
-	AllowedCallerOnDest(d datastore.DataStore, b cldf_chain.BlockChains, chainSelector uint64) ([]byte, error)
+	// USDCType returns the type of the USDC on the remote chain.
+	USDCType() USDCType
+	// CCTPV1AllowedCallerOnDest returns the address allowed to trigger message reception on the remote domain for CCTP V1.
+	CCTPV1AllowedCallerOnDest(d datastore.DataStore, b cldf_chain.BlockChains, chainSelector uint64) ([]byte, error)
+	// CCTPV2AllowedCallerOnDest returns the address allowed to trigger message reception on the remote domain for CCTP V2.
+	CCTPV2AllowedCallerOnDest(d datastore.DataStore, b cldf_chain.BlockChains, chainSelector uint64) ([]byte, error)
 	// AllowedCallerOnSource returns the address allowed to deposit tokens for burn on the remote chain.
 	AllowedCallerOnSource(d datastore.DataStore, b cldf_chain.BlockChains, chainSelector uint64) ([]byte, error)
 	// MintRecipientOnDest returns the address that will receive tokens on the remote domain.
@@ -110,31 +144,45 @@ type CCTPChain interface {
 // CCTPChainRegistry maintains a registry of CCTP chains.
 type CCTPChainRegistry struct {
 	mu sync.Mutex
-	m  map[string]CCTPChain
+	m  map[string]map[USDCType]CCTPChain
 }
 
 // NewCCTPChainRegistry creates a new CCTP chain registry.
 func NewCCTPChainRegistry() *CCTPChainRegistry {
 	return &CCTPChainRegistry{
-		m: make(map[string]CCTPChain),
+		m: make(map[string]map[USDCType]CCTPChain),
 	}
 }
 
 // RegisterCCTPChain allows CCTP chains to register their changeset logic.
 func (r *CCTPChainRegistry) RegisterCCTPChain(chainFamily string, adapter CCTPChain) {
+	if !adapter.USDCType().IsValid() {
+		panic(fmt.Errorf("invalid USDC type: %s", adapter.USDCType()))
+	}
+
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if _, exists := r.m[chainFamily]; exists {
-		panic(fmt.Errorf("CCTPChain '%s' already registered", chainFamily))
+	if _, exists := r.m[chainFamily]; !exists {
+		r.m[chainFamily] = make(map[USDCType]CCTPChain)
 	}
-	r.m[chainFamily] = adapter
+	if _, exists := r.m[chainFamily][adapter.USDCType()]; exists {
+		panic(fmt.Errorf("CCTPChain '%s %s' already registered", chainFamily, adapter.USDCType()))
+	}
+	r.m[chainFamily][adapter.USDCType()] = adapter
 }
 
 // GetCCTPChain retrieves a registered CCTP chain for the given chain family.
 // The boolean return value indicates whether a CCTP chain was found.
-func (r *CCTPChainRegistry) GetCCTPChain(chainFamily string) (CCTPChain, bool) {
+func (r *CCTPChainRegistry) GetCCTPChain(chainFamily string, usdcType USDCType) (CCTPChain, bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	adapter, ok := r.m[chainFamily]
+	chainFamilyAdapters, ok := r.m[chainFamily]
+	if !ok {
+		return nil, false
+	}
+	adapter, ok := chainFamilyAdapters[usdcType]
+	if !ok {
+		return nil, false
+	}
 	return adapter, ok
 }

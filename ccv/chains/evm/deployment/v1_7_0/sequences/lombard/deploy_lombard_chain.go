@@ -19,7 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/advanced_pool_hooks"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/advanced_pool_hooks"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/lombard_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/lombard_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/versioned_verifier_resolver"
@@ -44,10 +44,9 @@ var DeployLombardChain = cldf_ops.NewSequence(
 		writes := make([]contract_utils.WriteOutput, 0)
 		batchOps := make([]mcms_types.BatchOperation, 0)
 
-		existingAddresses, err := dep.DataStore.Addresses().Fetch()
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to fetch all addresses: %w", err)
-		}
+		existingAddressesOnChain := dep.DataStore.Addresses().Filter(
+			datastore.AddressRefByChainSelector(input.ChainSelector),
+		)
 
 		chain, ok := dep.BlockChains.EVMChains()[input.ChainSelector]
 		if !ok {
@@ -55,6 +54,10 @@ var DeployLombardChain = cldf_ops.NewSequence(
 		}
 
 		tokenAddress := common.HexToAddress(input.Token)
+		localAdapterAddress := common.Address{}
+		if input.LocalAdapter != "" {
+			localAdapterAddress = common.HexToAddress(input.LocalAdapter)
+		}
 		lombardBridgeAddress := common.HexToAddress(input.Bridge)
 		feeAggregatorAddress := common.HexToAddress(input.FeeAggregator)
 
@@ -89,7 +92,7 @@ var DeployLombardChain = cldf_ops.NewSequence(
 				},
 				RMN: rmnAddress,
 			},
-		}, existingAddresses)
+		}, existingAddressesOnChain)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy LombardVerifier: %w", err)
 		}
@@ -101,7 +104,10 @@ var DeployLombardChain = cldf_ops.NewSequence(
 			Address:       lombardVerifierAddress,
 			Args: lombard_verifier.SupportedTokenArgs{
 				TokensToSet: []lombard_verifier.SupportedTokensArgs{
-					{LocalToken: tokenAddress}, // LocalAdapter defaults to zero address
+					{
+						LocalToken:   tokenAddress,
+						LocalAdapter: localAdapterAddress,
+					},
 				},
 			},
 		})
@@ -174,7 +180,7 @@ var DeployLombardChain = cldf_ops.NewSequence(
 				Allowlist:                        []common.Address{}, // Empty allowlist
 				ThresholdAmountForAdditionalCCVs: big.NewInt(0),
 			},
-		}, existingAddresses)
+		}, existingAddressesOnChain)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy AdvancedPoolHooks: %w", err)
 		}
@@ -190,13 +196,13 @@ var DeployLombardChain = cldf_ops.NewSequence(
 				Token:             tokenAddress,
 				Verifier:          lombardVerifierResolverAddress,
 				Bridge:            lombardBridgeAddress,
-				Adapter:           common.Address{}, // Zero address
+				Adapter:           localAdapterAddress,
 				AdvancedPoolHooks: advancedPoolHooksAddress,
 				RMNProxy:          rmnAddress,
 				Router:            routerAddress,
 				FallbackDecimals:  fallbackDecimals,
 			},
-		}, existingAddresses)
+		}, existingAddressesOnChain)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy LombardTokenPool: %w", err)
 		}
@@ -205,7 +211,7 @@ var DeployLombardChain = cldf_ops.NewSequence(
 
 		// Add the newly deployed token pool as an authorized caller on the hooks.
 		{
-			getAuthorizedCallersReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.GetAllAuthorizedCallers, chain, contract_utils.FunctionInput[any]{
+			getAuthorizedCallersReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.GetAllAuthorizedCallers, chain, contract_utils.FunctionInput[struct{}]{
 				ChainSelector: input.ChainSelector,
 				Address:       advancedPoolHooksAddress,
 			})

@@ -131,7 +131,7 @@ var ConnectChains = operations.NewOperation(
 		feeQuoterConfigPDA, _, _ := state.FindFqConfigPDA(input.FeeQuoter)
 		fqRemoteChainPDA, _, _ := state.FindFqDestChainPDA(input.RemoteChainSelector, input.FeeQuoter)
 		var destChainStateAccount fee_quoter.DestChain
-		err := chain.GetAccountDataBorshInto(context.Background(), fqRemoteChainPDA, &destChainStateAccount)
+		err := chain.GetAccountDataBorshInto(b.GetContext(), fqRemoteChainPDA, &destChainStateAccount)
 		if err == nil {
 			b.Logger.Infof("Remote chain state account found: %+v", destChainStateAccount)
 			isUpdate = true

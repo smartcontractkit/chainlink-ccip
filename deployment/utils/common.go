@@ -74,6 +74,12 @@ var (
 	ErrNoAdapterRegistered = func(family string, version *semver.Version) error {
 		return fmt.Errorf("no adapter registered for chain family %s and version %s", family, version.String())
 	}
+	ErrNoAdapterForSelectorRegistered = func(adapetrName string, selector uint64, version *semver.Version) error {
+		if version != nil {
+			return fmt.Errorf("no %s adapter registered for chain selector %d and version %s", adapetrName, selector, version.String())
+		}
+		return fmt.Errorf("no %s adapter registered for chain selector %d", adapetrName, selector)
+	}
 )
 
 var (

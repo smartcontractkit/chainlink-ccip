@@ -6,7 +6,9 @@ import (
 	"encoding/binary"
 	"fmt"
 	"strconv"
+	"strings"
 
+	token_metadata "github.com/gagliardetto/metaplex-go/clients/token-metadata"
 	"github.com/gagliardetto/solana-go"
 	ata "github.com/gagliardetto/solana-go/programs/associated-token-account"
 	"github.com/gagliardetto/solana-go/programs/system"
@@ -21,6 +23,12 @@ import (
 // the SDK uses a global program ID that is called via ProgramID(): https://github.com/gagliardetto/solana-go/blob/da2193071f56059aa35010a239cece016c4e827f/programs/token/instructions.go#L310
 // this is called when the transaction is assembled from multiple instructions (not in ValidateAndBuild) - so it is not static until NewTransaction() is called
 var _ solana.Instruction = (*TokenInstruction)(nil)
+
+// PROGRAM ID for Metaplex Metadata Program
+var MplTokenMetadataID solana.PublicKey = solana.MustPublicKeyFromBase58("metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s")
+
+// MplTokenMetadataProgramName is the name used in the Metaplex Metadata Program for the token metadata account
+const MplTokenMetadataProgramName = "MplTokenMetadataProgramName"
 
 // TokenInstruction wraps the base token instruction and provides the requested ProgramID rather than depending on the SDK global
 type TokenInstruction struct {
@@ -244,8 +252,44 @@ func SyncNative(program solana.PublicKey, tokenAccount solana.PublicKey) (solana
 	return &TokenInstruction{ix, program}, err
 }
 
+func FindMplTokenMetadataPDA(mint solana.PublicKey) (solana.PublicKey, error) {
+	seeds := [][]byte{
+		[]byte("metadata"),
+		MplTokenMetadataID.Bytes(),
+		mint.Bytes(),
+	}
+	pda, _, err := solana.FindProgramAddress(seeds, MplTokenMetadataID)
+	return pda, err
+}
+
 func ToLittleEndianU256(v uint64) [32]byte {
 	out := [32]byte{}
 	binary.LittleEndian.PutUint64(out[:], v)
 	return out
+}
+
+func GetTokenMetadata(ctx context.Context, client *rpc.Client, mint solana.PublicKey) (token_metadata.Metadata, solana.PublicKey, error) {
+	metadataPDA, err := FindMplTokenMetadataPDA(mint)
+	if err != nil {
+		return token_metadata.Metadata{}, solana.PublicKey{}, fmt.Errorf("failed to find metadata PDA: %w", err)
+	}
+
+	var mintMetadata token_metadata.Metadata
+	if err := client.GetAccountDataBorshInto(ctx, metadataPDA, &mintMetadata); err != nil {
+		return token_metadata.Metadata{}, solana.PublicKey{}, fmt.Errorf("failed to get account data for metadata PDA: %w", err)
+	}
+
+	return mintMetadata, metadataPDA, nil
+}
+
+func GetTokenDataV2(metadata token_metadata.Metadata) token_metadata.DataV2 {
+	return token_metadata.DataV2{
+		Symbol:               strings.ReplaceAll(metadata.Data.Symbol, "\x00", ""),
+		Name:                 strings.ReplaceAll(metadata.Data.Name, "\x00", ""),
+		Uri:                  strings.ReplaceAll(metadata.Data.Uri, "\x00", ""),
+		SellerFeeBasisPoints: metadata.Data.SellerFeeBasisPoints,
+		Collection:           metadata.Collection,
+		Creators:             metadata.Data.Creators,
+		Uses:                 metadata.Uses,
+	}
 }

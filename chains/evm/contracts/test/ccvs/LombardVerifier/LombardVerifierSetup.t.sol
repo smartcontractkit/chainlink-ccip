@@ -6,6 +6,7 @@ import {IBridgeV3} from "../../../interfaces/lombard/IBridgeV3.sol";
 
 import {LombardVerifier} from "../../../ccvs/LombardVerifier.sol";
 import {BaseVerifier} from "../../../ccvs/components/BaseVerifier.sol";
+import {Internal} from "../../../libraries/Internal.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {MockLombardBridge} from "../../mocks/MockLombardBridge.sol";
 import {MockLombardMailbox} from "../../mocks/MockLombardMailbox.sol";
@@ -14,7 +15,7 @@ import {BaseVerifierSetup} from "../components/BaseVerifier/BaseVerifierSetup.t.
 import {BurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/BurnMintERC20.sol";
 
 contract LombardVerifierSetup is BaseVerifierSetup {
-  bytes4 internal constant VERSION_TAG_V1_7_0 = bytes4(keccak256("LombardVerifier 1.7.0"));
+  bytes4 internal constant VERSION_TAG_V2_0_0 = bytes4(keccak256("LombardVerifier 2.0.0"));
 
   LombardVerifier internal s_lombardVerifier;
   MockLombardBridge internal s_mockBridge;
@@ -24,6 +25,7 @@ contract LombardVerifierSetup is BaseVerifierSetup {
   bytes32 internal constant LOMBARD_CHAIN_ID = bytes32(uint256(10000));
   bytes32 internal constant ALLOWED_CALLER = bytes32(uint256(0x123456));
   uint256 internal constant TRANSFER_AMOUNT = 1e18;
+  address internal s_destToken = makeAddr("destToken");
 
   function setUp() public virtual override {
     super.setUp();
@@ -31,7 +33,7 @@ contract LombardVerifierSetup is BaseVerifierSetup {
     s_mockBridge = new MockLombardBridge();
     s_mockMailbox = MockLombardMailbox(s_mockBridge.s_mailbox());
     // Set default execution result matching the version tag format.
-    s_mockMailbox.setMessageId(abi.encodePacked(VERSION_TAG_V1_7_0, bytes32(0)));
+    s_mockMailbox.setMessageId(abi.encodePacked(VERSION_TAG_V2_0_0, bytes32(0)));
 
     s_lombardVerifier = new LombardVerifier(
       LombardVerifier.DynamicConfig({feeAggregator: FEE_AGGREGATOR}),
@@ -46,6 +48,7 @@ contract LombardVerifierSetup is BaseVerifierSetup {
     LombardVerifier.SupportedTokenArgs[] memory tokensToAdd = new LombardVerifier.SupportedTokenArgs[](1);
     tokensToAdd[0] = LombardVerifier.SupportedTokenArgs({localToken: address(s_testToken), localAdapter: address(0)});
     s_lombardVerifier.updateSupportedTokens(new address[](0), tokensToAdd);
+    s_mockBridge.setAllowedDestinationToken(LOMBARD_CHAIN_ID, address(s_testToken), bytes32(abi.encode(s_destToken)));
 
     // Set up remote chain config with the router.
     BaseVerifier.RemoteChainConfigArgs[] memory remoteChainConfigs = new BaseVerifier.RemoteChainConfigArgs[](2);
@@ -54,7 +57,7 @@ contract LombardVerifierSetup is BaseVerifierSetup {
     s_lombardVerifier.applyRemoteChainConfigUpdates(remoteChainConfigs);
 
     // Set the path for the destination chain.
-    s_lombardVerifier.setPath(DEST_CHAIN_SELECTOR, LOMBARD_CHAIN_ID, ALLOWED_CALLER);
+    s_lombardVerifier.setPath(DEST_CHAIN_SELECTOR, LOMBARD_CHAIN_ID, abi.encodePacked(ALLOWED_CALLER));
 
     // Mock the router to return true for the valid offRamp.
     vm.mockCall(
@@ -77,7 +80,7 @@ contract LombardVerifierSetup is BaseVerifierSetup {
       amount: TRANSFER_AMOUNT,
       sourcePoolAddress: abi.encode(makeAddr("sourcePool")),
       sourceTokenAddress: abi.encode(sourceToken),
-      destTokenAddress: abi.encodePacked(makeAddr("destToken")),
+      destTokenAddress: abi.encode(s_destToken),
       tokenReceiver: abi.encodePacked(receiver),
       extraData: ""
     });
@@ -125,8 +128,13 @@ contract LombardVerifierSetup is BaseVerifierSetup {
     //   mload(msgBody + 0x21) => bytes 1..32  = token
     //   mload(msgBody + 0x61) => bytes 65..96 = recipient
     //   mload(msgBody + 0x81) => bytes 97..128 = amount
-    bytes memory msgBody =
-      abi.encodePacked(bytes1(0), bytes32(destToken), bytes32(0), bytes32(tokenReceiver), bytes32(amount));
+    bytes memory msgBody = abi.encodePacked(
+      bytes1(0),
+      Internal._leftPadBytesToBytes32(destToken),
+      bytes32(0),
+      Internal._leftPadBytesToBytes32(tokenReceiver),
+      bytes32(amount)
+    );
 
     // Encode the full payload structure
     bytes memory encodedData = abi.encode(

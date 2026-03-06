@@ -47,7 +47,7 @@ interface IFeeQuoter {
   ) external view returns (Internal.TimestampedPackedUint224 memory);
 
   // ================================================================
-  // │                 Not needed for new 1.7 chains                │
+  // │                 Not needed for new v2 chains                 │
   // ================================================================
 
   /// @notice Gets the resolved token transfer fee components for a token transfer.

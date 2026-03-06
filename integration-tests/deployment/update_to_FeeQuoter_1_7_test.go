@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	_ "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/adapters"
-	fqops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/fee_quoter"
+	fqops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/fee_quoter"
 	fq16ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
 	onrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
@@ -28,7 +28,6 @@ import (
 )
 
 func TestUpdateToFeeQuoter_1_7(t *testing.T) {
-	t.Skip("will re-enable when we have the fee quoter 1.7.0 implementation of feequoter updater points to updated changeset")
 	chains := []uint64{
 		chain_selectors.ETHEREUM_MAINNET.Selector,
 		chain_selectors.AVALANCHE_MAINNET.Selector,
@@ -48,17 +47,17 @@ func TestUpdateToFeeQuoter_1_7(t *testing.T) {
 	for _, chainSel := range chains {
 		chainInput[chainSel] = deployops.ContractDeploymentConfigPerChain{
 			Version: version,
-			// FEE QUOTER CONFIG
+			// FeeQuoter config
 			MaxFeeJuelsPerMsg:            big.NewInt(0).Mul(big.NewInt(200), big.NewInt(1e18)),
 			TokenPriceStalenessThreshold: uint32(24 * 60 * 60),
 			LinkPremiumMultiplier:        9e17, // 0.9 ETH
 			NativeTokenPremiumMultiplier: 1e18, // 1.0 ETH
-			// OFFRAMP CONFIG
+			// OffRamp config
 			PermissionLessExecutionThresholdSeconds: uint32((20 * time.Minute).Seconds()),
 			GasForCallExactCheck:                    uint16(5000),
 		}
 		fqInput[chainSel] = deployops.UpdateFeeQuoterInputPerChain{
-			FeeQuoterVersion: semver.MustParse("1.7.0"),
+			FeeQuoterVersion: semver.MustParse("2.0.0"),
 			RampsVersion:     semver.MustParse("1.6.0"),
 		}
 	}
@@ -90,7 +89,7 @@ func TestUpdateToFeeQuoter_1_7(t *testing.T) {
 	})
 	require.NoError(t, err, "Failed to apply ConnectChains changeset")
 	fqReg := deployops.GetFQAndRampUpdaterRegistry()
-	// now update to FeeQuoter 1.7.0
+	// Now update to FeeQuoter 2.0.0
 	fqUpdateChangeset := deployops.UpdateFeeQuoterChangeset(fqReg, nil)
 	out, err = fqUpdateChangeset.Apply(*e, deployops.UpdateFeeQuoterInput{
 		Chains: fqInput,
@@ -111,17 +110,17 @@ func TestUpdateToFeeQuoter_1_7(t *testing.T) {
 		require.Len(t, fq17AddrRefs, 1, "Expected exactly 1 FeeQuoter address ref for chain selector %d", chainSel)
 		fq17Addr := common.HexToAddress(fq17AddrRefs[0].Address)
 		fq17Contract, err := fee_quoter.NewFeeQuoter(fq17Addr, chain.Client)
-		require.NoError(t, err, "Failed to instantiate FeeQuoter 1.7 contract for chain selector %d", chainSel)
+		require.NoError(t, err, "Failed to instantiate FeeQuoter 2.0.0 contract for chain selector %d", chainSel)
 		fq16AddrRefs := e.DataStore.Addresses().Filter(
 			datastore.AddressRefByChainSelector(chainSel),
 			datastore.AddressRefByType(datastore.ContractType(fq16ops.ContractType)),
-			datastore.AddressRefByVersion(semver.MustParse("1.6.3")),
+			datastore.AddressRefByVersion(fq16ops.Version),
 		)
-		require.Len(t, fq16AddrRefs, 1, "Expected exactly 1 FeeQuoter address ref for version 1.6.3 and chain selector %d", chainSel)
+		require.Len(t, fq16AddrRefs, 1, "Expected exactly 1 FeeQuoter address ref for version 1.6.0 and chain selector %d", chainSel)
 		fq16Addr := common.HexToAddress(fq16AddrRefs[0].Address)
 		// check that the new fee quoter has the same config as the old fee quoter
 		fq16Contract, err := fq16.NewFeeQuoter(fq16Addr, chain.Client)
-		require.NoError(t, err, "Failed to instantiate old FeeQuoter 1.6.3 contract for chain selector %d", chainSel)
+		require.NoError(t, err, "Failed to instantiate old FeeQuoter 1.6.0 contract for chain selector %d", chainSel)
 		staticConfig16, err := fq16Contract.GetStaticConfig(nil)
 		require.NoError(t, err, "Failed to get FeeQuoter config for old contract for chain selector %d", chainSel)
 		staticConfig17, err := fq17Contract.GetStaticConfig(nil)

@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {IRouter} from "../../../interfaces/IRouter.sol";
 
 import {Pool} from "../../../libraries/Pool.sol";
+import {RateLimiter} from "../../../libraries/RateLimiter.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {AdvancedPoolHooksSetup} from "../AdvancedPoolHooks/AdvancedPoolHooksSetup.t.sol";
 
@@ -22,11 +23,36 @@ contract TokenPool_validateReleaseOrMint is AdvancedPoolHooksSetup {
     assertEq(localAmount, AMOUNT);
   }
 
-  function test_validateReleaseOrMint_NonZeroFinality() public {
+  /// @notice When custom block confirmations are requested but no custom bucket is configured,
+  /// the fallback consumes from the default inbound bucket.
+  function test_validateReleaseOrMint_NonZeroFinality_FallsBackToDefaultBucket() public {
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = _buildReleaseOrMintIn(AMOUNT);
 
     vm.expectEmit();
-    emit TokenPool.CustomBlockConfirmationInboundRateLimitConsumed(DEST_CHAIN_SELECTOR, address(s_token), AMOUNT);
+    emit TokenPool.InboundRateLimitConsumed(DEST_CHAIN_SELECTOR, address(s_token), AMOUNT);
+
+    vm.startPrank(s_allowedOffRamp);
+    uint256 localAmount = s_tokenPool.validateReleaseOrMint(releaseOrMintIn, AMOUNT, 2);
+
+    assertEq(localAmount, AMOUNT);
+  }
+
+  /// @notice When a custom inbound bucket IS configured, the custom event is emitted instead.
+  function test_validateReleaseOrMint_NonZeroFinality_UsesCustomBucketWhenConfigured() public {
+    RateLimiter.Config memory customInbound = RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24});
+    TokenPool.RateLimitConfigArgs[] memory args = new TokenPool.RateLimitConfigArgs[](1);
+    args[0] = TokenPool.RateLimitConfigArgs({
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      customBlockConfirmations: true,
+      outboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 1e24, rate: 1e24}),
+      inboundRateLimiterConfig: customInbound
+    });
+    s_tokenPool.setRateLimitConfig(args);
+
+    Pool.ReleaseOrMintInV1 memory releaseOrMintIn = _buildReleaseOrMintIn(AMOUNT);
+
+    vm.expectEmit();
+    emit TokenPool.CustomBlockConfirmationsInboundRateLimitConsumed(DEST_CHAIN_SELECTOR, address(s_token), AMOUNT);
 
     vm.startPrank(s_allowedOffRamp);
     uint256 localAmount = s_tokenPool.validateReleaseOrMint(releaseOrMintIn, AMOUNT, 2);

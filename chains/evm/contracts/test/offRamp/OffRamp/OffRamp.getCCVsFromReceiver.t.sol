@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {OffRamp} from "../../../offRamp/OffRamp.sol";
 import {MockReceiverV2} from "../../mocks/MockReceiverV2.sol";
 import {OffRampSetup} from "./OffRampSetup.t.sol";
 
@@ -78,5 +79,19 @@ contract OffRamp_getCCVsFromReceiver is OffRampSetup {
     assertEq(requiredFromReceiver[0], address(0));
     assertEq(optionalFromReceiver.length, 0);
     assertEq(optionalThresholdRequested, 0);
+  }
+
+  // Reverts
+
+  function test_getCCVsFromReceiver_RevertWhen_InvalidOptionalThreshold() public {
+    address[] memory userOptional = new address[](1);
+
+    uint8 tooHighThreshold = uint8(userOptional.length) + 1;
+    MockReceiverV2 receiver = new MockReceiverV2(new address[](1), userOptional, tooHighThreshold);
+
+    vm.expectRevert(
+      abi.encodeWithSelector(OffRamp.InvalidOptionalThreshold.selector, tooHighThreshold, userOptional.length)
+    );
+    s_offRamp.getCCVsFromReceiver(SOURCE_CHAIN_SELECTOR, address(receiver));
   }
 }

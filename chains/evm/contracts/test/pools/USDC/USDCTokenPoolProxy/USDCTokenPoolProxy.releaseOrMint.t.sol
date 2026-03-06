@@ -4,7 +4,6 @@ pragma solidity ^0.8.24;
 import {IPoolV1} from "../../../../interfaces/IPool.sol";
 import {IPoolV2} from "../../../../interfaces/IPoolV2.sol";
 
-import {Router} from "../../../../Router.sol";
 import {Pool} from "../../../../libraries/Pool.sol";
 
 import {USDCSourcePoolDataCodec} from "../../../../libraries/USDCSourcePoolDataCodec.sol";
@@ -32,13 +31,6 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
         cctpV2PoolWithCCV: address(0),
         siloedLockReleasePool: s_lockReleasePool
       })
-    );
-
-    // Mock the router's isOffRamp function to return true.
-    vm.mockCall(
-      address(s_router),
-      abi.encodeWithSelector(Router.isOffRamp.selector, SOURCE_CHAIN_SELECTOR, s_routerAllowedOffRamp),
-      abi.encode(true)
     );
 
     vm.startPrank(s_routerAllowedOffRamp);
@@ -89,13 +81,6 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
     bytes memory sourcePoolData = abi.encodePacked(USDCSourcePoolDataCodec.CCTP_VERSION_2_CCV_TAG);
     bytes memory offChainTokenData = "";
 
-    // Mock the router's isOffRamp function to return true.
-    vm.mockCall(
-      address(s_router),
-      abi.encodeWithSelector(Router.isOffRamp.selector, SOURCE_CHAIN_SELECTOR, s_routerAllowedOffRamp),
-      abi.encode(true)
-    );
-
     vm.startPrank(s_routerAllowedOffRamp);
 
     // Prepare input with CCTP_V2_FLAG in sourcePoolData.
@@ -135,13 +120,6 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
     bytes memory sourcePoolData =
       abi.encodePacked(USDCSourcePoolDataCodec.CCTP_VERSION_2_TAG, uint32(0), bytes32(hex"1029384756"));
     bytes memory offChainTokenData = "";
-
-    // Mock the router's isOffRamp function to return true.
-    vm.mockCall(
-      address(s_router),
-      abi.encodeWithSelector(Router.isOffRamp.selector, SOURCE_CHAIN_SELECTOR, s_routerAllowedOffRamp),
-      abi.encode(true)
-    );
 
     vm.startPrank(s_routerAllowedOffRamp);
 
@@ -230,19 +208,50 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
 
   // Reverts
 
+  function test_releaseOrMint_RevertWhen_SourcePoolDataTooShort() public {
+    bytes memory shortData = new bytes(2);
+
+    vm.startPrank(s_routerAllowedOffRamp);
+
+    Pool.ReleaseOrMintInV1 memory releaseOrMintIn = Pool.ReleaseOrMintInV1({
+      remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+      originalSender: abi.encode(s_sender),
+      receiver: s_receiver,
+      sourceDenominatedAmount: 1000,
+      localToken: address(s_USDCToken),
+      sourcePoolData: shortData,
+      sourcePoolAddress: s_sourcePoolAddress,
+      offchainTokenData: ""
+    });
+
+    vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.InvalidMessageVersion.selector, bytes4(shortData)));
+    s_usdcTokenPoolProxy.releaseOrMint(releaseOrMintIn);
+  }
+
+  function test_releaseOrMint_V2_RevertWhen_SourcePoolDataTooShort() public {
+    bytes memory emptyData = "";
+
+    vm.startPrank(s_routerAllowedOffRamp);
+
+    Pool.ReleaseOrMintInV1 memory releaseOrMintIn = Pool.ReleaseOrMintInV1({
+      remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+      originalSender: abi.encode(s_sender),
+      receiver: s_receiver,
+      sourceDenominatedAmount: 1000,
+      localToken: address(s_USDCToken),
+      sourcePoolData: emptyData,
+      sourcePoolAddress: s_sourcePoolAddress,
+      offchainTokenData: ""
+    });
+
+    vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.InvalidMessageVersion.selector, bytes4(emptyData)));
+    s_usdcTokenPoolProxy.releaseOrMint(releaseOrMintIn, 0);
+  }
+
   function test_releaseOrMint_InvalidVersion() public {
     uint256 testAmount = 1234;
 
     bytes memory invalidSourcePoolData = abi.encodePacked(bytes4(uint32(2)), uint32(0), bytes32(hex"deafbeef"));
-
-    bytes memory offChainTokenData = "";
-
-    // Mock the router's isOffRamp function to return true.
-    vm.mockCall(
-      address(s_router),
-      abi.encodeWithSelector(Router.isOffRamp.selector, SOURCE_CHAIN_SELECTOR, s_routerAllowedOffRamp),
-      abi.encode(true)
-    );
 
     vm.startPrank(s_routerAllowedOffRamp);
 
@@ -254,7 +263,7 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
       localToken: address(s_USDCToken),
       sourcePoolData: invalidSourcePoolData,
       sourcePoolAddress: s_sourcePoolAddress,
-      offchainTokenData: offChainTokenData
+      offchainTokenData: ""
     });
 
     vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.InvalidMessageVersion.selector, bytes4(uint32(2))));
@@ -304,12 +313,6 @@ contract USDCTokenPoolProxy_releaseOrMint is USDCTokenPoolProxySetup {
 
   function test_releaseOrMint_V2_RevertWhen_InvalidMessageVersion() public {
     bytes memory invalidSourcePoolData = abi.encodePacked(bytes4(uint32(9999)), uint32(0), bytes32(hex"deafbeef"));
-
-    vm.mockCall(
-      address(s_router),
-      abi.encodeWithSelector(Router.isOffRamp.selector, SOURCE_CHAIN_SELECTOR, s_routerAllowedOffRamp),
-      abi.encode(true)
-    );
 
     vm.startPrank(s_routerAllowedOffRamp);
 

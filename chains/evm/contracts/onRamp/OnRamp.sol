@@ -46,7 +46,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   error ReentrancyGuardReentrantCall();
   error DestinationChainNotSupported(uint64 destChainSelector);
   error InvalidDestChainAddress(bytes destChainAddress);
-  error CustomBlockConfirmationNotSupportedOnPoolV1();
+  error CustomBlockConfirmationsNotSupportedOnPoolV1();
   error TokenArgsNotSupportedOnPoolV1();
   error InsufficientFeeTokenAmount();
   error TokenReceiverNotAllowed(uint64 destChainSelector);
@@ -712,7 +712,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   /// @param destChainSelector Target destination chain selector of the message.
   /// @param receiver Message receiver in abi-encoded format (as expected by the pool on EVM source chains).
   /// @param originalSender Message sender.
-  /// @param blockConfirmationRequested Requested block confirmation.
+  /// @param blockConfirmationsRequested Requested block confirmations.
   /// @param tokenArgs Additional token arguments from the message.
   /// @return TokenTransferV1 token transfer encoding for MessageV1.
   function _lockOrBurnSingleToken(
@@ -720,7 +720,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     uint64 destChainSelector,
     bytes memory receiver,
     address originalSender,
-    uint16 blockConfirmationRequested,
+    uint16 blockConfirmationsRequested,
     bytes memory tokenArgs
   ) internal returns (MessageV1Codec.TokenTransferV1 memory) {
     if (tokenAndAmount.amount == 0) revert CannotSendZeroTokens();
@@ -751,12 +751,12 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       // Use the V2 overload which returns a potentially adjusted destination amount.
       if (IERC165(address(sourcePool)).supportsInterface(type(IPoolV2).interfaceId)) {
         (poolReturnData, destTokenAmount) =
-          IPoolV2(address(sourcePool)).lockOrBurn(lockOrBurnInput, blockConfirmationRequested, tokenArgs);
+          IPoolV2(address(sourcePool)).lockOrBurn(lockOrBurnInput, blockConfirmationsRequested, tokenArgs);
       } else {
-        // V1 pools don't understand `blockConfirmationRequested`/`tokenArgs`.
-        // We enforce default for `blockConfirmationRequested` and no `tokenArgs` to avoid silent mis-interpretation.
-        if (blockConfirmationRequested != 0) {
-          revert CustomBlockConfirmationNotSupportedOnPoolV1();
+        // V1 pools don't understand `blockConfirmationsRequested`/`tokenArgs`.
+        // We enforce default for `blockConfirmationsRequested` and no `tokenArgs` to avoid silent mis-interpretation.
+        if (blockConfirmationsRequested != 0) {
+          revert CustomBlockConfirmationsNotSupportedOnPoolV1();
         }
         if (tokenArgs.length != 0) {
           revert TokenArgsNotSupportedOnPoolV1();
@@ -1072,21 +1072,23 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
         s_dynamicConfig.feeQuoter
       ).quoteGasForExec(destChainSelector, gasLimitSum, bytesOverheadSum, message.feeToken);
 
+    // Example:
+    // - feeTokenPrice = $15 = 15e18
+    // - percentMultiplier = 10 = 100%
+    // - usdFeeCents = $1.50 = 150
+    // - feeTokenAmount = 150 * 100 * 1e32 / 15e18 = 1e17 (0.1 tokens of the fee token)
+    // Normally we'd multiple by 1e36, but since usdFeeCents has 2 decimals and percentMultiplier has 2 decimals, we use
+    // 1e32 here.
+    uint256 feeMultiplier = percentMultiplier * 1e32 / feeTokenPrice;
     // Transform the USD based fees into fee token amounts & sum them. For the executor, if the executor isn't
     // NO_EXECUTION_ADDRESS we also add the execution cost.
     for (uint256 i = 0; i < receipts.length; ++i) {
-      // Example:
-      // - feeTokenPrice = $15 = 15e18
-      // - usdFeeCents = $1.50 = 150
-      // - feeTokenAmount = 150 * 1e34 / 15e18 = 1e17 (0.1 tokens of the fee token)
-      // Normally we'd multiple by 1e36, but since usdFeeCents has 2 decimals and bpsMultiplier has 2 decimals, we use
-      // 1e32 here.
-      receipts[i].feeTokenAmount *= percentMultiplier * 1e32 / feeTokenPrice;
+      receipts[i].feeTokenAmount *= feeMultiplier;
 
       if (i == executorIndex) {
         // Update the fee of the executor to include execution costs.
         if (extraArgs.executor != Client.NO_EXECUTION_ADDRESS) {
-          // Add execution cost to the executor's fee. Execution cost should not be multiplied by bpsMultiplier.
+          // Add execution cost to the executor's fee. Execution cost should not be multiplied by percentMultiplier.
           receipts[i].feeTokenAmount += execCostInUSDCents * 1e34 / feeTokenPrice;
         }
       }
@@ -1096,7 +1098,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
     // Enforce max fee per message.
     if (feeTokenAmount > (uint256(i_maxUSDCentsPerMsg) * 1e34) / feeTokenPrice) {
-      revert FeeExceedsMaxAllowed(feeTokenAmount, i_maxUSDCentsPerMsg);
+      revert FeeExceedsMaxAllowed((feeTokenAmount * feeTokenPrice) / 1e34, i_maxUSDCentsPerMsg);
     }
 
     return (receipts, updatedGasLimitSum, feeTokenAmount);

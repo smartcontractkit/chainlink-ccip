@@ -14,6 +14,7 @@ import {LombardTokenPoolSetup} from "./LombardTokenPoolSetup.t.sol";
 
 contract LombardTokenPool_lockOrBurn is LombardTokenPoolSetup {
   bytes32 internal constant L_CHAIN_ID = bytes32("LCHAIN");
+  bytes32 internal constant REMOTE_ADAPTER = bytes32("REMOTE_ADAPTER");
 
   function setUp() public virtual override {
     super.setUp();
@@ -47,7 +48,7 @@ contract LombardTokenPool_lockOrBurn is LombardTokenPoolSetup {
     uint256 amount = 1e18;
     deal(address(s_token), address(s_pool), amount);
 
-    _configurePathAndBridgeRemoteToken(bytes32(uint256(uint160(s_remoteToken))));
+    _configurePathAndBridgeRemoteToken(bytes32(uint256(uint160(s_remoteToken))), bytes32(0));
 
     vm.expectCall(
       address(s_bridge),
@@ -101,7 +102,7 @@ contract LombardTokenPool_lockOrBurn is LombardTokenPoolSetup {
     _applyChainUpdates(address(adapterPool));
 
     bytes32 destToken = bytes32(uint256(uint160(s_initialRemoteToken)));
-    adapterPool.setPath(DEST_CHAIN_SELECTOR, L_CHAIN_ID, abi.encode(s_initialRemotePool));
+    adapterPool.setPath(DEST_CHAIN_SELECTOR, L_CHAIN_ID, abi.encode(s_initialRemotePool), bytes32(0));
     s_bridge.setAllowedDestinationToken(L_CHAIN_ID, tokenAdapter, destToken);
     changePrank(s_allowedOnRamp);
 
@@ -178,7 +179,7 @@ contract LombardTokenPool_lockOrBurn is LombardTokenPoolSetup {
   }
 
   function test_lockOrBurn_V1_RevertWhen_InvalidReceiver() public {
-    _configurePathAndBridgeRemoteToken(bytes32(uint256(uint160(s_remoteToken))));
+    _configurePathAndBridgeRemoteToken(bytes32(uint256(uint160(s_remoteToken))), bytes32(0));
 
     vm.expectRevert(abi.encodeWithSelector(LombardTokenPool.InvalidReceiver.selector, hex"1234"));
     s_pool.lockOrBurn(
@@ -192,14 +193,15 @@ contract LombardTokenPool_lockOrBurn is LombardTokenPoolSetup {
     );
   }
 
-  function test_lockOrBurn_V1_RevertWhen_RemoteTokenMismatch() public {
-    _configurePathAndBridgeRemoteToken(bytes32("differentToken"));
+  function test_lockOrBurn_V1_RevertWhen_RemoteTokenOrAdapterMismatch() public {
+    _configurePathAndBridgeRemoteToken(bytes32("differentToken"), bytes32(0));
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        LombardTokenPool.RemoteTokenMismatch.selector,
+        LombardTokenPool.RemoteTokenOrAdapterMismatch.selector,
         bytes32("differentToken"),
-        bytes32(uint256(uint160(s_remoteToken)))
+        bytes32(uint256(uint160(s_remoteToken))),
+        bytes32(0)
       )
     );
     s_pool.lockOrBurn(
@@ -213,11 +215,32 @@ contract LombardTokenPool_lockOrBurn is LombardTokenPoolSetup {
     );
   }
 
+  function test_lockOrBurn_V1_AllowsRemoteAdapterTokenMatch() public {
+    _configurePathAndBridgeRemoteToken(REMOTE_ADAPTER, REMOTE_ADAPTER);
+
+    uint256 amount = 1e18;
+    deal(address(s_token), address(s_pool), amount);
+
+    Pool.LockOrBurnOutV1 memory out = s_pool.lockOrBurn(
+      Pool.LockOrBurnInV1({
+        receiver: abi.encode(s_receiver),
+        remoteChainSelector: DEST_CHAIN_SELECTOR,
+        originalSender: OWNER,
+        amount: amount,
+        localToken: address(s_token)
+      })
+    );
+
+    assertEq(out.destTokenAddress, abi.encode(s_remoteToken));
+    assertEq(s_token.balanceOf(address(s_bridge)), amount);
+  }
+
   function _configurePathAndBridgeRemoteToken(
-    bytes32 remoteTokenId
+    bytes32 remoteTokenId,
+    bytes32 remoteAdapter
   ) internal {
     changePrank(OWNER);
-    s_pool.setPath(DEST_CHAIN_SELECTOR, L_CHAIN_ID, abi.encode(s_remotePool));
+    s_pool.setPath(DEST_CHAIN_SELECTOR, L_CHAIN_ID, abi.encode(s_remotePool), remoteAdapter);
     s_bridge.setAllowedDestinationToken(L_CHAIN_ID, address(s_token), remoteTokenId);
     changePrank(s_allowedOnRamp);
   }

@@ -141,6 +141,7 @@ func TestDeploySiloedUSDCLockRelease(t *testing.T) {
 			USDCToken:                 setup.USDCToken.Hex(),
 			Router:                    setup.Router.Hex(),
 			RMN:                       setup.RMN.Hex(),
+			TokenDecimals:             6,
 			SiloedUSDCTokenPool:       "",
 			LockReleaseChainSelectors: lockReleaseSelectors,
 		},

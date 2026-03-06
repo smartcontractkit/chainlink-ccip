@@ -37,17 +37,17 @@ contract AdvancedPoolHooks_postflightCheck is AdvancedPoolHooksSetup {
 
     Pool.ReleaseOrMintInV1 memory releaseOrMintIn = _createReleaseOrMintIn();
     uint256 localAmount = 100e18;
-    uint16 blockConfirmationRequested = 5;
+    uint16 blockConfirmationsRequested = 5;
     releaseOrMintIn.sourcePoolData = abi.encode("custom source pool data");
     releaseOrMintIn.offchainTokenData = abi.encode("custom offchain token data");
 
-    s_advancedPoolHooks.postflightCheck(releaseOrMintIn, localAmount, blockConfirmationRequested);
+    s_advancedPoolHooks.postflightCheck(releaseOrMintIn, localAmount, blockConfirmationsRequested);
 
     IPolicyEngine.Payload memory lastPayload = s_mockPolicyEngine.getLastPayload();
     assertEq(IAdvancedPoolHooks.postflightCheck.selector, lastPayload.selector);
     assertEq(OWNER, lastPayload.sender);
     assertEq(releaseOrMintIn.offchainTokenData, lastPayload.context);
-    assertEq(abi.encode(releaseOrMintIn, localAmount, blockConfirmationRequested), lastPayload.data);
+    assertEq(abi.encode(releaseOrMintIn, localAmount, blockConfirmationsRequested), lastPayload.data);
   }
 
   function test_postflightCheck_WithoutPolicyEngine() public {

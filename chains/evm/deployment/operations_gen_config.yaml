@@ -11,44 +11,39 @@ output:
 # - (none): Public/Read functions don't need access control
 
 contracts:
-  # 1.6.5
-  - contract_name: USDCTokenPoolCCTPV2
-    version: "1.6.5"
-    package_name: usdc_token_pool_cctp_v2
+  # 1.5.0
+  - contract_name: BurnMintTokenPoolAndProxy
+    version: "1.5.0"
     functions:
-      - name: setDomains
-        access: owner
-      - name: getDomain
+      - name: getRemotePool
         access: public
-      - name: applyAuthorizedCallerUpdates
-        access: owner
-      - name: applyChainUpdates
-        access: owner
-      - name: addRemotePool
-        access: owner
-      - name: removeRemotePool
-        access: owner
-      - name: transferOwnership
-        access: owner
+      - name: getCurrentInboundRateLimiterState
+        access: public
+      - name: getCurrentOutboundRateLimiterState
+        access: public
+      - name: getPreviousPool
+        access: public
 
-  - contract_name: USDCTokenPool
-    version: "1.6.5"
-    package_name: usdc_token_pool
+  # 1.6.3
+  - contract_name: FeeQuoter
+    version: "1.6.3"
     functions:
-      - name: setDomains
+      - name: applyDestChainConfigUpdates
         access: owner
-      - name: getDomain
-        access: public
+      - name: updatePrices
+        access: owner
       - name: applyAuthorizedCallerUpdates
         access: owner
-      - name: applyChainUpdates
+      - name: applyTokenTransferFeeConfigUpdates
         access: owner
-      - name: addRemotePool
-        access: owner
-      - name: removeRemotePool
-        access: owner
-      - name: transferOwnership
-        access: owner
+      - name: getDestChainConfig
+        access: public
+      - name: getTokenTransferFeeConfig
+        access: public
+      - name: getStaticConfig
+        access: public
+      - name: getAllAuthorizedCallers
+        access: public
 
   # 1.6.2
   - contract_name: CCTPMessageTransmitterProxy
@@ -124,6 +119,9 @@ contracts:
 
   - contract_name: LockReleaseTokenPool
     version: "1.6.1"
+    functions:
+      - name: getRebalancer
+        access: public
 
   - contract_name: SiloedLockReleaseTokenPool
     version: "1.6.1"

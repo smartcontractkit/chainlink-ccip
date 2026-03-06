@@ -29,7 +29,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   using EnumerableSet for EnumerableSet.Bytes32Set;
 
   error ZeroChainSelectorNotAllowed();
-  error ExecutionError(bytes32 messageId, bytes err);
+  error NoStateProgressMade(bytes32 messageId, bytes err);
   error OptionalCCVQuorumNotReached(uint256 wanted, uint256 got);
   error SourceChainNotEnabled(uint64 sourceChainSelector);
   error CanOnlySelfCall();
@@ -49,6 +49,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   error InvalidOffRamp(address expected, bytes got);
   error InboundImplementationNotFound(address ccvAddress, bytes verifierResults);
   error InvalidGasLimitOverride(uint32 messageGasLimit, uint32 gasLimitOverride);
+  error InvalidOptionalThreshold(uint8 wanted, uint256 got);
   error GasCannotBeZero();
 
   /// @dev Atlas depends on various events, if changing, please notify Atlas.
@@ -178,6 +179,12 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// @param encodedMessage The message that is being executed, encoded as bytes.
   /// @param ccvs CCVs that attested to the message. Must match the CCVs specified by the receiver and token pool.
   /// @param verifierResults CCV-specific data used to verify the message. Must be same length as ccvs array.
+  /// @dev This function is completely permissionless. Since anyone can call it, there could be situations where wrong
+  /// payloads could set a message execution state to FAILURE. The default Chainlink Executor only takes honest attempts
+  /// into consideration: if the message was submitted with expected parameters and results in a FAILURE state, it marks
+  /// its job as completed. If some dishonest parameters would ever result in a FAILURE state, the executor would still
+  /// do its own honest attempt. This means there will always be at least one honest attempt, and dishonest attempts
+  /// cannot block honest attempts.
   function execute(
     bytes calldata encodedMessage,
     address[] calldata ccvs,
@@ -237,6 +244,14 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     (bool success, bytes memory err) = _callWithGasBuffer(
       abi.encodeCall(this.executeSingleMessage, (message, messageId, ccvs, verifierResults, gasLimitOverride))
     );
+
+    if (!success && originalState == Internal.MessageExecutionState.FAILURE) {
+      // If the message already failed previously, we have made no additional progress. Therefore, we revert the
+      // transaction to clearly signal that the message execution has failed. This helps wallets/tools that rely on
+      // transaction reverts to detect failed message executions.
+      revert NoStateProgressMade(messageId, err);
+    }
+
     Internal.MessageExecutionState newState =
       success ? Internal.MessageExecutionState.SUCCESS : Internal.MessageExecutionState.FAILURE;
 
@@ -467,7 +482,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       address localTokenAddress = address(bytes20(tokenTransfer[0].destTokenAddress));
 
       // If the pool returns does not specify any CCVs, we fall back to the default CCVs. These will be deduplicated
-      // in the ensureCCVQuorumIsReached function. This is to maintain the same pre-1.7.0 security level for pools
+      // in the ensureCCVQuorumIsReached function. This is to maintain the same pre-v2 security level for pools
       // that do not support the V2 interface.
       requiredPoolCCVs = _getCCVsFromPool(
         localTokenAddress, sourceChainSelector, tokenTransfer[0].amount, finality, tokenTransfer[0].extraData
@@ -664,12 +679,17 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     uint64 sourceChainSelector,
     address receiver
   ) internal view returns (address[] memory requiredCCV, address[] memory optionalCCVs, uint8 optionalThreshold) {
-    // Only query for custom CCVs if the receiver supports the interface..
+    // Only query for custom CCVs if the receiver supports the interface.
     if (receiver._supportsInterfaceReverting(type(IAny2EVMMessageReceiverV2).interfaceId)) {
       (requiredCCV, optionalCCVs, optionalThreshold) = IAny2EVMMessageReceiverV2(receiver).getCCVs(sourceChainSelector);
 
       CCVConfigValidation._assertNoDuplicates(requiredCCV);
       CCVConfigValidation._assertNoDuplicates(optionalCCVs);
+
+      // The threshold cannot be higher than the number of optional CCVs.
+      if (optionalThreshold > optionalCCVs.length) {
+        revert InvalidOptionalThreshold(optionalThreshold, optionalCCVs.length);
+      }
 
       // If the receiver specified empty required and optional CCVs, we fall back to the default CCVs.
       // If they did specify something, we use what they specified.
@@ -727,12 +747,12 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// @param tokenTransfer Amount and source data of the token to be released/minted.
   /// @param originalSender The message sender on the source chain.
   /// @param sourceChainSelector The remote source chain selector
-  /// @param blockConfirmationRequested Requested block confirmation.
+  /// @param blockConfirmationsRequested Requested block confirmations.
   function _releaseOrMintSingleToken(
     MessageV1Codec.TokenTransferV1 memory tokenTransfer,
     bytes memory originalSender,
     uint64 sourceChainSelector,
-    uint16 blockConfirmationRequested
+    uint16 blockConfirmationsRequested
   ) internal returns (Client.EVMTokenAmount memory destTokenAmount, address localPoolAddress) {
     address receiver = address(bytes20(tokenTransfer.tokenReceiver));
 
@@ -767,7 +787,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     // The call gets a max or 30k gas per instance, of which there are three. This means offchain gas estimations should
     // account for 90k gas overhead due to the interface check.
     if (localPoolAddress._supportsInterfaceReverting(type(IPoolV2).interfaceId)) {
-      try IPoolV2(localPoolAddress).releaseOrMint(releaseOrMintInput, blockConfirmationRequested) returns (
+      try IPoolV2(localPoolAddress).releaseOrMint(releaseOrMintInput, blockConfirmationsRequested) returns (
         Pool.ReleaseOrMintOutV1 memory result
       ) {
         returnData = result;

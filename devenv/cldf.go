@@ -2,7 +2,7 @@ package ccip
 
 import (
 	"context"
-	"encoding/hex"
+	// "encoding/hex"
 	"errors"
 	"fmt"
 	"os"
@@ -19,17 +19,17 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
-	"github.com/xssnick/tonutils-go/address"
-	"github.com/xssnick/tonutils-go/tlb"
-	"github.com/xssnick/tonutils-go/ton/wallet"
+	// "github.com/xssnick/tonutils-go/address"
+	// "github.com/xssnick/tonutils-go/tlb"
+	// "github.com/xssnick/tonutils-go/ton/wallet"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldf_evm_provider "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/provider"
 	cldf_solana_provider "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana/provider"
-	cldf_ton_provider "github.com/smartcontractkit/chainlink-deployments-framework/chain/ton/provider"
-	testutils "github.com/smartcontractkit/chainlink-ton/deployment/utils"
+	// cldf_ton_provider "github.com/smartcontractkit/chainlink-deployments-framework/chain/ton/provider"
+	// testutils "github.com/smartcontractkit/chainlink-ton/deployment/utils"
 
 	// ccipTon "github.com/smartcontractkit/chainlink-ton/devenv"
 
@@ -165,48 +165,49 @@ func NewCLDFOperationsEnvironment(bc []*blockchain.Input, dataStore datastore.Da
 			}
 			providers = append(providers, p)
 		} else if b.Type == "ton" {
-			chainID := b.ChainID
-			rpcHTTPURL := b.Out.Nodes[0].ExternalHTTPUrl
+			panic("TON support temporarily disabled")
+			// chainID := b.ChainID
+			// rpcHTTPURL := b.Out.Nodes[0].ExternalHTTPUrl
 
-			d, err := chainsel.GetChainDetailsByChainIDAndFamily(chainID, chainsel.FamilyTon)
-			if err != nil {
-				return nil, nil, err
-			}
-			client, err := testutils.CreateClient(context.Background(), rpcHTTPURL)
-			if err != nil {
-				return nil, nil, fmt.Errorf("failed to create TON client: %w", err)
-			}
+			// d, err := chainsel.GetChainDetailsByChainIDAndFamily(chainID, chainsel.FamilyTon)
+			// if err != nil {
+			// 	return nil, nil, err
+			// }
+			// client, err := testutils.CreateClient(context.Background(), rpcHTTPURL)
+			// if err != nil {
+			// 	return nil, nil, fmt.Errorf("failed to create TON client: %w", err)
+			// }
 
-			seed := wallet.NewSeed()
-			w, err := wallet.FromSeed(client, seed, wallet.ConfigV5R1Final{NetworkGlobalID: wallet.MainnetGlobalID, Workchain: 0})
-			if err != nil {
-				return nil, nil, fmt.Errorf("failed to create TON wallet: %w", err)
-			}
-			privateKey, err := wallet.SeedToPrivateKey(seed /*password=*/, "" /*isBIP39=*/, false)
-			if err != nil {
-				return nil, nil, fmt.Errorf("failed to get private key from seed: %w", err)
-			}
-			walletVersion := "V5R1"
-			deployerSignerGen := cldf_ton_provider.PrivateKeyFromRaw(hex.EncodeToString(privateKey))
+			// seed := wallet.NewSeed()
+			// w, err := wallet.FromSeed(client, seed, wallet.ConfigV5R1Final{NetworkGlobalID: wallet.MainnetGlobalID, Workchain: 0})
+			// if err != nil {
+			// 	return nil, nil, fmt.Errorf("failed to create TON wallet: %w", err)
+			// }
+			// privateKey, err := wallet.SeedToPrivateKey(seed /*password=*/, "" /*isBIP39=*/, false)
+			// if err != nil {
+			// 	return nil, nil, fmt.Errorf("failed to get private key from seed: %w", err)
+			// }
+			// walletVersion := "V5R1"
+			// deployerSignerGen := cldf_ton_provider.PrivateKeyFromRaw(hex.EncodeToString(privateKey))
 
-			selectors = append(selectors, d.ChainSelector)
-			p, err := cldf_ton_provider.NewRPCChainProvider(
-				d.ChainSelector,
-				cldf_ton_provider.RPCChainProviderConfig{
-					HTTPURL:           rpcHTTPURL,
-					WalletVersion:     cldf_ton_provider.WalletVersion(walletVersion),
-					DeployerSignerGen: deployerSignerGen,
-				},
-			).Initialize(context.Background())
-			if err != nil {
-				return nil, nil, err
-			}
+			// selectors = append(selectors, d.ChainSelector)
+			// p, err := cldf_ton_provider.NewRPCChainProvider(
+			// 	d.ChainSelector,
+			// 	cldf_ton_provider.RPCChainProviderConfig{
+			// 		HTTPURL:           rpcHTTPURL,
+			// 		WalletVersion:     cldf_ton_provider.WalletVersion(walletVersion),
+			// 		DeployerSignerGen: deployerSignerGen,
+			// 	},
+			// ).Initialize(context.Background())
+			// if err != nil {
+			// 	return nil, nil, err
+			// }
 
-			err = testutils.FundWalletsNoT(client, []*address.Address{w.Address()}, []tlb.Coins{tlb.MustFromTON("1000")})
-			if err != nil {
-				return nil, nil, fmt.Errorf("failed to fund TON wallet: %w", err)
-			}
-			providers = append(providers, p)
+			// err = testutils.FundWalletsNoT(client, []*address.Address{w.Address()}, []tlb.Coins{tlb.MustFromTON("1000")})
+			// if err != nil {
+			// 	return nil, nil, fmt.Errorf("failed to fund TON wallet: %w", err)
+			// }
+			// providers = append(providers, p)
 		}
 	}
 

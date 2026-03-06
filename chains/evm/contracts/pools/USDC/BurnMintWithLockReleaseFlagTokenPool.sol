@@ -6,9 +6,8 @@ import {IPoolV1} from "../../interfaces/IPool.sol";
 import {IPoolV2} from "../../interfaces/IPoolV2.sol";
 
 import {Pool} from "../../libraries/Pool.sol";
+import {USDCSourcePoolDataCodec} from "../../libraries/USDCSourcePoolDataCodec.sol";
 import {BurnMintTokenPool} from "../BurnMintTokenPool.sol";
-
-bytes4 constant LOCK_RELEASE_FLAG = 0xfa7c07de;
 
 /// @notice A standard BurnMintTokenPool with modified destPoolData so that the remote pool knows to release tokens
 /// instead of minting. This enables interoperability with HybridLockReleaseUSDCTokenPool which uses
@@ -36,7 +35,7 @@ contract BurnMintWithLockReleaseFlagTokenPool is BurnMintTokenPool {
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
   ) public override returns (Pool.LockOrBurnOutV1 memory out) {
     out = super.lockOrBurn(lockOrBurnIn);
-    out.destPoolData = abi.encode(LOCK_RELEASE_FLAG);
+    out.destPoolData = abi.encode(USDCSourcePoolDataCodec.LOCK_RELEASE_FLAG);
     return out;
   }
 
@@ -45,21 +44,21 @@ contract BurnMintWithLockReleaseFlagTokenPool is BurnMintTokenPool {
   /// @inheritdoc IPoolV2
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
-    uint16 blockConfirmationRequested,
+    uint16 blockConfirmationsRequested,
     bytes calldata tokenArgs
   ) public override returns (Pool.LockOrBurnOutV1 memory out, uint256 destTokenAmount) {
-    (out, destTokenAmount) = super.lockOrBurn(lockOrBurnIn, blockConfirmationRequested, tokenArgs);
-    out.destPoolData = abi.encode(LOCK_RELEASE_FLAG);
+    (out, destTokenAmount) = super.lockOrBurn(lockOrBurnIn, blockConfirmationsRequested, tokenArgs);
+    out.destPoolData = abi.encode(USDCSourcePoolDataCodec.LOCK_RELEASE_FLAG);
     return (out, destTokenAmount);
   }
 
   /// @inheritdoc IPoolV2
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
-    uint16 blockConfirmationRequested
+    uint16 blockConfirmationsRequested
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
     // Since USDC is 6 decimals on all chains, we don't need to convert to a different denomination.
-    _validateReleaseOrMint(releaseOrMintIn, releaseOrMintIn.sourceDenominatedAmount, blockConfirmationRequested);
+    _validateReleaseOrMint(releaseOrMintIn, releaseOrMintIn.sourceDenominatedAmount, blockConfirmationsRequested);
 
     _releaseOrMint(
       releaseOrMintIn.receiver, releaseOrMintIn.sourceDenominatedAmount, releaseOrMintIn.remoteChainSelector

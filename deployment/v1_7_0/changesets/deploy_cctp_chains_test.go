@@ -16,6 +16,7 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
@@ -24,29 +25,35 @@ import (
 
 type cctpTest_MockReader struct{}
 
-func (m *cctpTest_MockReader) GetChainMetadata(_ deployment.Environment, _ uint64, input mcms.Input) (mcms_types.ChainMetadata, error) {
+func (m *cctpTest_MockReader) GetMCMSRef(e deployment.Environment, selector uint64, input mcms.Input) (datastore.AddressRef, error) {
+	return datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+		ChainSelector: selector,
+		Type:          datastore.ContractType("MCM"),
+		Version:       semver.MustParse("1.0.0"),
+	}, selector, datastore_utils.FullRef)
+}
+
+func (m *cctpTest_MockReader) GetChainMetadata(e deployment.Environment, selector uint64, input mcms.Input) (mcms_types.ChainMetadata, error) {
+	mcmsRef, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+		ChainSelector: selector,
+		Type:          datastore.ContractType("MCM"),
+		Version:       semver.MustParse("1.0.0"),
+	}, selector, datastore_utils.FullRef)
+	if err != nil {
+		return mcms_types.ChainMetadata{}, err
+	}
 	return mcms_types.ChainMetadata{
-		MCMAddress:      mcmsAddress,
 		StartingOpCount: 10,
+		MCMAddress:      mcmsRef.Address,
 	}, nil
 }
 
-func (m *cctpTest_MockReader) GetTimelockRef(_ deployment.Environment, selector uint64, input mcms.Input) (datastore.AddressRef, error) {
-	return datastore.AddressRef{
+func (m *cctpTest_MockReader) GetTimelockRef(e deployment.Environment, selector uint64, input mcms.Input) (datastore.AddressRef, error) {
+	return datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 		ChainSelector: selector,
-		Address:       timelockAddress,
 		Type:          "Timelock",
 		Version:       semver.MustParse("1.0.0"),
-	}, nil
-}
-
-func (m *cctpTest_MockReader) GetMCMSRef(_ deployment.Environment, selector uint64, input mcms.Input) (datastore.AddressRef, error) {
-	return datastore.AddressRef{
-		ChainSelector: selector,
-		Address:       mcmsAddress,
-		Type:          "MCM",
-		Version:       semver.MustParse("1.0.0"),
-	}, nil
+	}, selector, datastore_utils.FullRef)
 }
 
 type cctpTest_MockCCTPChain struct {
@@ -105,9 +112,14 @@ func (m *cctpTest_MockCCTPChain) TokenAddress(d datastore.DataStore, b cldf_chai
 	return []byte("token-address"), nil
 }
 
-// AllowedCallerOnDest returns the address allowed to trigger message reception on the remote domain
-func (m *cctpTest_MockCCTPChain) AllowedCallerOnDest(d datastore.DataStore, b cldf_chain.BlockChains, chainSelector uint64) ([]byte, error) {
-	return []byte("allowed-caller-dest"), nil
+// CCTPV1AllowedCallerOnDest returns the address allowed to trigger message reception on the remote domain for CCTP V1.
+func (m *cctpTest_MockCCTPChain) CCTPV1AllowedCallerOnDest(d datastore.DataStore, b cldf_chain.BlockChains, chainSelector uint64) ([]byte, error) {
+	return []byte("allowed-caller-dest-v1"), nil
+}
+
+// CCTPV2AllowedCallerOnDest returns the address allowed to trigger message reception on the remote domain for CCTP V2.
+func (m *cctpTest_MockCCTPChain) CCTPV2AllowedCallerOnDest(d datastore.DataStore, b cldf_chain.BlockChains, chainSelector uint64) ([]byte, error) {
+	return []byte("allowed-caller-dest-v2"), nil
 }
 
 // AllowedCallerOnSource returns the address allowed to deposit tokens for burn on the remote chain
@@ -118,6 +130,11 @@ func (m *cctpTest_MockCCTPChain) AllowedCallerOnSource(d datastore.DataStore, b 
 // MintRecipientOnDest returns the address that will receive tokens on the remote domain
 func (m *cctpTest_MockCCTPChain) MintRecipientOnDest(d datastore.DataStore, b cldf_chain.BlockChains, chainSelector uint64) ([]byte, error) {
 	return []byte("mint-recipient"), nil
+}
+
+// USDCType returns the type of the USDC on the remote chain
+func (m *cctpTest_MockCCTPChain) USDCType() adapters.USDCType {
+	return adapters.Canonical
 }
 
 var cctpTest_BasicMCMSInput = mcms.Input{
@@ -203,6 +220,7 @@ func TestDeployCCTPChains_Apply(t *testing.T) {
 			cfg: v1_7_0_changesets.DeployCCTPChainsConfig{
 				Chains: map[uint64]v1_7_0_changesets.CCTPChainConfig{
 					5009297550715157269: {
+						USDCType:         adapters.Canonical,
 						TokenMessengerV1: "0x9999999999999999999999999999999999999999",
 						TokenMessengerV2: "0x9999999999999999999999999999999999999999",
 						USDCToken:        "0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
@@ -222,7 +240,9 @@ func TestDeployCCTPChains_Apply(t *testing.T) {
 			},
 			cfg: v1_7_0_changesets.DeployCCTPChainsConfig{
 				Chains: map[uint64]v1_7_0_changesets.CCTPChainConfig{
-					5009297550715157269: {},
+					5009297550715157269: {
+						USDCType: adapters.Canonical,
+					},
 				},
 				MCMS: &cctpTest_BasicMCMSInput,
 			},
@@ -235,7 +255,9 @@ func TestDeployCCTPChains_Apply(t *testing.T) {
 			},
 			cfg: v1_7_0_changesets.DeployCCTPChainsConfig{
 				Chains: map[uint64]v1_7_0_changesets.CCTPChainConfig{
-					5009297550715157269: {},
+					5009297550715157269: {
+						USDCType: adapters.Canonical,
+					},
 				},
 				MCMS: &cctpTest_BasicMCMSInput,
 			},
@@ -298,6 +320,7 @@ func TestDeployCCTPChains_VerifyPreconditions(t *testing.T) {
 			cfg: v1_7_0_changesets.DeployCCTPChainsConfig{
 				Chains: map[uint64]v1_7_0_changesets.CCTPChainConfig{
 					5009297550715157269: {
+						USDCType:         adapters.Canonical,
 						TokenMessengerV1: "0x9999999999999999999999999999999999999999",
 						TokenMessengerV2: "0x8888888888888888888888888888888888888888",
 						RemoteChains: map[uint64]adapters.RemoteCCTPChainConfig{
@@ -305,6 +328,7 @@ func TestDeployCCTPChains_VerifyPreconditions(t *testing.T) {
 						},
 					},
 					15971525489660198786: {
+						USDCType:         adapters.Canonical,
 						TokenMessengerV1: "0x7777777777777777777777777777777777777777",
 						TokenMessengerV2: "0x6666666666666666666666666666666666666666",
 						RemoteChains: map[uint64]adapters.RemoteCCTPChainConfig{
@@ -320,6 +344,7 @@ func TestDeployCCTPChains_VerifyPreconditions(t *testing.T) {
 			cfg: v1_7_0_changesets.DeployCCTPChainsConfig{
 				Chains: map[uint64]v1_7_0_changesets.CCTPChainConfig{
 					5009297550715157269: {
+						USDCType:         adapters.Canonical,
 						TokenMessengerV1: "0x9999999999999999999999999999999999999999",
 						TokenMessengerV2: "0x8888888888888888888888888888888888888888",
 					},
@@ -331,6 +356,7 @@ func TestDeployCCTPChains_VerifyPreconditions(t *testing.T) {
 			cfg: v1_7_0_changesets.DeployCCTPChainsConfig{
 				Chains: map[uint64]v1_7_0_changesets.CCTPChainConfig{
 					5009297550715157269: {
+						USDCType:         adapters.Canonical,
 						TokenMessengerV1: "",
 						TokenMessengerV2: "0x8888888888888888888888888888888888888888",
 					},
@@ -338,22 +364,11 @@ func TestDeployCCTPChains_VerifyPreconditions(t *testing.T) {
 			},
 		},
 		{
-			desc: "failure - invalid CCTP v1 token messenger",
-			cfg: v1_7_0_changesets.DeployCCTPChainsConfig{
-				Chains: map[uint64]v1_7_0_changesets.CCTPChainConfig{
-					5009297550715157269: {
-						TokenMessengerV1: "not-an-address",
-						TokenMessengerV2: "0x8888888888888888888888888888888888888888",
-					},
-				},
-			},
-			expectedError: "invalid TokenMessengerV1",
-		},
-		{
 			desc: "success - empty CCTP v1 token messenger with CCTP_V1 lane in config",
 			cfg: v1_7_0_changesets.DeployCCTPChainsConfig{
 				Chains: map[uint64]v1_7_0_changesets.CCTPChainConfig{
 					5009297550715157269: {
+						USDCType:         adapters.Canonical,
 						TokenMessengerV1: "",
 						TokenMessengerV2: "0x8888888888888888888888888888888888888888",
 						RemoteChains: map[uint64]adapters.RemoteCCTPChainConfig{
@@ -363,16 +378,45 @@ func TestDeployCCTPChains_VerifyPreconditions(t *testing.T) {
 						},
 					},
 					15971525489660198786: {
+						USDCType:         adapters.Canonical,
 						TokenMessengerV2: "0x6666666666666666666666666666666666666666",
+						RemoteChains: map[uint64]adapters.RemoteCCTPChainConfig{
+							5009297550715157269: {},
+						},
 					},
 				},
 			},
+		},
+		{
+			desc: "failure - invalid CCTP type",
+			cfg: v1_7_0_changesets.DeployCCTPChainsConfig{
+				Chains: map[uint64]v1_7_0_changesets.CCTPChainConfig{
+					5009297550715157269: {
+						USDCType: "invalid-type",
+					},
+				},
+			},
+			expectedError: "invalid CCTP type",
+		},
+		{
+			desc: "failure - invalid CCTP v1 token messenger",
+			cfg: v1_7_0_changesets.DeployCCTPChainsConfig{
+				Chains: map[uint64]v1_7_0_changesets.CCTPChainConfig{
+					5009297550715157269: {
+						USDCType:         adapters.Canonical,
+						TokenMessengerV1: "not-an-address",
+						TokenMessengerV2: "0x8888888888888888888888888888888888888888",
+					},
+				},
+			},
+			expectedError: "invalid TokenMessengerV1",
 		},
 		{
 			desc: "failure - invalid CCTP v2 token messenger",
 			cfg: v1_7_0_changesets.DeployCCTPChainsConfig{
 				Chains: map[uint64]v1_7_0_changesets.CCTPChainConfig{
 					5009297550715157269: {
+						USDCType:         adapters.Canonical,
 						TokenMessengerV1: "0x9999999999999999999999999999999999999999",
 						TokenMessengerV2: "not-an-address",
 					},
@@ -384,7 +428,9 @@ func TestDeployCCTPChains_VerifyPreconditions(t *testing.T) {
 			desc: "failure - unknown chain selector",
 			cfg: v1_7_0_changesets.DeployCCTPChainsConfig{
 				Chains: map[uint64]v1_7_0_changesets.CCTPChainConfig{
-					0: {}, // Invalid chain selector
+					0: {
+						USDCType: adapters.Canonical,
+					}, // Invalid chain selector
 				},
 			},
 			expectedError: "unknown chain selector",
@@ -394,6 +440,7 @@ func TestDeployCCTPChains_VerifyPreconditions(t *testing.T) {
 			cfg: v1_7_0_changesets.DeployCCTPChainsConfig{
 				Chains: map[uint64]v1_7_0_changesets.CCTPChainConfig{
 					5009297550715157269: {
+						USDCType:         adapters.Canonical,
 						TokenMessengerV1: "0x9999999999999999999999999999999999999999",
 						TokenMessengerV2: "0x8888888888888888888888888888888888888888",
 						RemoteChains: map[uint64]adapters.RemoteCCTPChainConfig{
@@ -408,7 +455,9 @@ func TestDeployCCTPChains_VerifyPreconditions(t *testing.T) {
 			desc: "failure - invalid MCMS timelock action",
 			cfg: v1_7_0_changesets.DeployCCTPChainsConfig{
 				Chains: map[uint64]v1_7_0_changesets.CCTPChainConfig{
-					5009297550715157269: {},
+					5009297550715157269: {
+						USDCType: adapters.Canonical,
+					},
 				},
 				MCMS: &mcms.Input{
 					OverridePreviousRoot: true,
@@ -439,6 +488,7 @@ func TestDeployCCTPChains_VerifyPreconditions(t *testing.T) {
 			cfg: v1_7_0_changesets.DeployCCTPChainsConfig{
 				Chains: map[uint64]v1_7_0_changesets.CCTPChainConfig{
 					5009297550715157269: {
+						USDCType:         adapters.Canonical,
 						TokenMessengerV1: "0x9999999999999999999999999999999999999999",
 						TokenMessengerV2: "0x8888888888888888888888888888888888888888",
 						RemoteChains: map[uint64]adapters.RemoteCCTPChainConfig{
@@ -447,6 +497,7 @@ func TestDeployCCTPChains_VerifyPreconditions(t *testing.T) {
 						},
 					},
 					15971525489660198786: {
+						USDCType:         adapters.Canonical,
 						TokenMessengerV1: "0x7777777777777777777777777777777777777777",
 						TokenMessengerV2: "0x6666666666666666666666666666666666666666",
 						RemoteChains: map[uint64]adapters.RemoteCCTPChainConfig{

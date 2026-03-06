@@ -241,6 +241,25 @@ contract OffRamp_execute is OffRampSetup {
     );
   }
 
+  function test_execute_RevertWhen_NoStateProgressMade() public {
+    MessageV1Codec.MessageV1 memory message = _getMessage();
+    (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory verifierResults) = _getReportComponents(message);
+    bytes32 messageId = keccak256(encodedMessage);
+    bytes memory revertReason = "still broken";
+
+    // Mock executeSingleMessage to always revert so execution records FAILURE.
+    vm.mockCallRevert(address(s_offRamp), abi.encodeWithSelector(s_offRamp.executeSingleMessage.selector), revertReason);
+
+    // First execution fails, setting state to FAILURE.
+    s_offRamp.execute(encodedMessage, ccvs, verifierResults, 0);
+    assertEq(uint256(Internal.MessageExecutionState.FAILURE), uint256(s_offRamp.getExecutionState(messageId)));
+
+    // Second execution also fails — since original state was already FAILURE, the tx reverts
+    // instead of silently re-recording the same FAILURE state.
+    vm.expectRevert(abi.encodeWithSelector(OffRamp.NoStateProgressMade.selector, messageId, revertReason));
+    s_offRamp.execute(encodedMessage, ccvs, verifierResults, 0);
+  }
+
   function test_execute_ReentrancyGuardReentrantCall_Fails() public {
     // Create a malicious CCV that will call back into execute during validation.
     ReentrantCCV maliciousCCV = new ReentrantCCV(address(s_offRamp));

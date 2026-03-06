@@ -43,7 +43,7 @@ contract TokenPool_setChainRateLimiterConfigs is TokenPoolSetup {
     TokenPool.RateLimitConfigArgs[] memory rateLimitConfigArgs = new TokenPool.RateLimitConfigArgs[](1);
     rateLimitConfigArgs[0] = TokenPool.RateLimitConfigArgs({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
-      customBlockConfirmation: customBlockConfirmations,
+      customBlockConfirmations: customBlockConfirmations,
       outboundRateLimiterConfig: newOutboundConfig,
       inboundRateLimiterConfig: newInboundConfig
     });
@@ -71,7 +71,7 @@ contract TokenPool_setChainRateLimiterConfigs is TokenPoolSetup {
     TokenPool.RateLimitConfigArgs[] memory args = new TokenPool.RateLimitConfigArgs[](1);
     args[0] = TokenPool.RateLimitConfigArgs({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
-      customBlockConfirmation: true,
+      customBlockConfirmations: true,
       outboundRateLimiterConfig: outboundConfig,
       inboundRateLimiterConfig: inboundConfig
     });
@@ -94,7 +94,7 @@ contract TokenPool_setChainRateLimiterConfigs is TokenPoolSetup {
     TokenPool.RateLimitConfigArgs[] memory args = new TokenPool.RateLimitConfigArgs[](1);
     args[0] = TokenPool.RateLimitConfigArgs({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
-      customBlockConfirmation: true,
+      customBlockConfirmations: true,
       outboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 1, rate: 2}),
       inboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 1, rate: 1})
     });
@@ -120,7 +120,7 @@ contract TokenPool_setChainRateLimiterConfigs is TokenPoolSetup {
     TokenPool.RateLimitConfigArgs[] memory rateLimitConfigArgs = new TokenPool.RateLimitConfigArgs[](1);
     rateLimitConfigArgs[0] = TokenPool.RateLimitConfigArgs({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
-      customBlockConfirmation: false,
+      customBlockConfirmations: false,
       outboundRateLimiterConfig: _getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: _getInboundRateLimiterConfig()
     });
@@ -137,7 +137,7 @@ contract TokenPool_setChainRateLimiterConfigs is TokenPoolSetup {
     TokenPool.RateLimitConfigArgs[] memory rateLimitConfigArgs = new TokenPool.RateLimitConfigArgs[](1);
     rateLimitConfigArgs[0] = TokenPool.RateLimitConfigArgs({
       remoteChainSelector: wrongChainSelector,
-      customBlockConfirmation: false,
+      customBlockConfirmations: false,
       outboundRateLimiterConfig: RateLimiter.Config({isEnabled: false, capacity: 0, rate: 0}),
       inboundRateLimiterConfig: RateLimiter.Config({isEnabled: false, capacity: 0, rate: 0})
     });

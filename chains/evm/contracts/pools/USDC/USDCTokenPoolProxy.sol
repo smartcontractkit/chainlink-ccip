@@ -9,6 +9,7 @@ import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/I
 import {FeeTokenHandler} from "../../libraries/FeeTokenHandler.sol";
 import {Pool} from "../../libraries/Pool.sol";
 import {USDCSourcePoolDataCodec} from "../../libraries/USDCSourcePoolDataCodec.sol";
+import {TokenPool} from "../TokenPool.sol";
 import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2StepMsgSender.sol";
 
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
@@ -34,6 +35,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
   error CallerIsNotARampOnRouter(address caller);
   error TokenPoolUnsupported(address pool);
   error MustSetPoolForMechanism(uint64 remoteChainSelector, LockOrBurnMechanism mechanism);
+  error PoolAddressCannotBeSelf();
 
   event LockOrBurnMechanismUpdated(uint64 indexed remoteChainSelector, LockOrBurnMechanism mechanism);
   event PoolAddressesUpdated(PoolAddresses pools);
@@ -117,6 +119,12 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
     return address(i_token) == token;
   }
 
+  /// @notice Gets the IERC20 token that this pool can lock or burn.
+  /// @return token The IERC20 token representation.
+  function getToken() public view returns (IERC20 token) {
+    return i_token;
+  }
+
   /// @inheritdoc IPoolV1
   /// @notice Lock or burn outgoing tokens to the correct pool based on the lock or burn mechanism.
   /// @param lockOrBurnIn Encoded data fields for the processing of tokens on the source chain.
@@ -156,11 +164,11 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
   /// @inheritdoc IPoolV2
   /// @notice Lock or burn outgoing tokens to the correct pool based on the lock or burn mechanism.
   /// @param lockOrBurnIn Encoded data fields for the processing of tokens on the source chain.
-  /// @param blockConfirmationRequested Requested block confirmation.
+  /// @param blockConfirmationsRequested Requested block confirmations.
   /// @param tokenArgs Additional token arguments.
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
-    uint16 blockConfirmationRequested,
+    uint16 blockConfirmationsRequested,
     bytes memory tokenArgs
   ) public virtual returns (Pool.LockOrBurnOutV1 memory lockOrBurnOut, uint256 destTokenAmount) {
     // Since this contract does not inherit from the TokenPool contract, it must manually validate the caller as an onRamp.
@@ -200,7 +208,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
       revert InvalidLockOrBurnMechanism(mechanism);
     }
 
-    return IPoolV2(pool).lockOrBurn(lockOrBurnIn, blockConfirmationRequested, tokenArgs);
+    return IPoolV2(pool).lockOrBurn(lockOrBurnIn, blockConfirmationsRequested, tokenArgs);
   }
 
   /// @inheritdoc IPoolV1
@@ -212,9 +220,8 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
     if (!i_router.isOffRamp(releaseOrMintIn.remoteChainSelector, msg.sender)) {
       revert CallerIsNotARampOnRouter(msg.sender);
     }
-
     // The first 4 bytes of source pool data are the version which can be extracted directly and cast into a uint32.
-    bytes4 version = bytes4(releaseOrMintIn.sourcePoolData[:4]);
+    bytes4 version = _getVersion(releaseOrMintIn.sourcePoolData);
 
     if (version == USDCSourcePoolDataCodec.LOCK_RELEASE_FLAG) {
       return IPoolV1(s_siloedLockReleasePool).releaseOrMint(releaseOrMintIn);
@@ -240,10 +247,10 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
 
   /// @inheritdoc IPoolV2
   /// @param releaseOrMintIn Encoded data fields for the processing of tokens on the destination chain.
-  /// @param blockConfirmationRequested Requested block confirmation.
+  /// @param blockConfirmationsRequested Requested block confirmations.
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
-    uint16 blockConfirmationRequested
+    uint16 blockConfirmationsRequested
   ) public virtual returns (Pool.ReleaseOrMintOutV1 memory) {
     // Since this proxy does not inherit from the TokenPool contract, it must manually validate the caller as an offRamp.
     if (!i_router.isOffRamp(releaseOrMintIn.remoteChainSelector, msg.sender)) {
@@ -251,17 +258,29 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
     }
 
     // The first 4 bytes of source pool data are the version which can be extracted directly and cast into a uint32.
-    bytes4 version = bytes4(releaseOrMintIn.sourcePoolData[:4]);
+    bytes4 version = _getVersion(releaseOrMintIn.sourcePoolData);
 
     // If the source pool data is the lock release flag, use the lock release pool set for the remote chain selector.
     if (version == USDCSourcePoolDataCodec.LOCK_RELEASE_FLAG) {
-      return IPoolV2(s_siloedLockReleasePool).releaseOrMint(releaseOrMintIn, blockConfirmationRequested);
+      return IPoolV2(s_siloedLockReleasePool).releaseOrMint(releaseOrMintIn, blockConfirmationsRequested);
     }
     if (version == USDCSourcePoolDataCodec.CCTP_VERSION_2_CCV_TAG) {
-      return IPoolV2(s_cctpV2PoolWithCCV).releaseOrMint(releaseOrMintIn, blockConfirmationRequested);
+      return IPoolV2(s_cctpV2PoolWithCCV).releaseOrMint(releaseOrMintIn, blockConfirmationsRequested);
     }
 
     revert InvalidMessageVersion(version);
+  }
+
+  /// @notice Extracts the version from the source pool data.
+  /// @param sourcePoolData The source pool data to extract the version from.
+  /// @return version The version extracted from the source pool data.
+  function _getVersion(
+    bytes calldata sourcePoolData
+  ) internal pure returns (bytes4 version) {
+    if (sourcePoolData.length < 4) {
+      revert InvalidMessageVersion(bytes4(sourcePoolData));
+    }
+    return bytes4(sourcePoolData[:4]);
   }
 
   function updatePoolAddresses(
@@ -299,12 +318,28 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
       revert TokenPoolUnsupported(pools.siloedLockReleasePool);
     }
 
+    // Disallow setting address(this) as a pool address.
+    if (
+      pools.cctpV1Pool == address(this) || pools.cctpV2Pool == address(this) || pools.cctpV2PoolWithCCV == address(this)
+        || pools.siloedLockReleasePool == address(this)
+    ) {
+      revert PoolAddressCannotBeSelf();
+    }
+
     s_cctpV1Pool = pools.cctpV1Pool;
     s_cctpV2Pool = pools.cctpV2Pool;
     s_cctpV2PoolWithCCV = pools.cctpV2PoolWithCCV;
     s_siloedLockReleasePool = pools.siloedLockReleasePool;
 
     emit PoolAddressesUpdated(pools);
+  }
+
+  /// @notice Returns the static (immutable) configuration of the proxy.
+  /// @return token The USDC token address.
+  /// @return router The CCIP router address.
+  /// @return cctpVerifier The CCTP verifier resolver address.
+  function getStaticConfig() external view returns (address token, address router, address cctpVerifier) {
+    return (address(i_token), address(i_router), address(i_cctpVerifier));
   }
 
   /// @notice Get the current pool addresses that this token pool will route a message to.
@@ -367,7 +402,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
   /// @param destChainSelector The destination lane selector.
   /// @param amount The amount of tokens being bridged on this lane.
   /// @param feeToken The token used to pay feeUSDCents.
-  /// @param blockConfirmationRequested Requested block confirmation.
+  /// @param blockConfirmationsRequested Requested block confirmations.
   /// @param tokenArgs Opaque token arguments supplied by the caller.
   // solhint-disable-next-line chainlink-solidity/explicit-returns
   function getFee(
@@ -375,7 +410,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
     uint64 destChainSelector,
     uint256 amount,
     address feeToken,
-    uint16 blockConfirmationRequested,
+    uint16 blockConfirmationsRequested,
     bytes calldata tokenArgs
   )
     external
@@ -386,7 +421,7 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
 
     if (isPoolV2) {
       return
-        IPoolV2(pool).getFee(localToken, destChainSelector, amount, feeToken, blockConfirmationRequested, tokenArgs);
+        IPoolV2(pool).getFee(localToken, destChainSelector, amount, feeToken, blockConfirmationsRequested, tokenArgs);
     }
 
     // If an old mechanism is set, or none at all, revert.
@@ -396,19 +431,19 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
   /// @inheritdoc IPoolV2
   /// @param localToken The local asset being transferred.
   /// @param destChainSelector The chain selector of the destination chain.
-  /// @param blockConfirmationRequested Requested block confirmation.
+  /// @param blockConfirmationsRequested Requested block confirmations.
   /// @param tokenArgs Additional token argument from the CCIP message.
   function getTokenTransferFeeConfig(
     address localToken,
     uint64 destChainSelector,
-    uint16 blockConfirmationRequested,
+    uint16 blockConfirmationsRequested,
     bytes calldata tokenArgs
   ) external view returns (TokenTransferFeeConfig memory feeConfig) {
     (address pool, bool isPoolV2) = _getPoolForMechanism(destChainSelector);
 
     if (isPoolV2) {
       return
-        IPoolV2(pool).getTokenTransferFeeConfig(localToken, destChainSelector, blockConfirmationRequested, tokenArgs);
+        IPoolV2(pool).getTokenTransferFeeConfig(localToken, destChainSelector, blockConfirmationsRequested, tokenArgs);
     }
 
     // For any other mechanism, return default empty config.
@@ -451,8 +486,19 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
     uint64 remoteChainSelector
   ) external view returns (bytes memory) {
     (address pool,) = _getPoolForMechanism(remoteChainSelector);
-
+    // The non-v2 pools also support getRemoteToken, even though it wasn't on the interface.
     return IPoolV2(pool).getRemoteToken(remoteChainSelector);
+  }
+
+  /// @notice Gets the pool addresses on the remote chain.
+  /// @param remoteChainSelector Remote chain selector.
+  /// @dev To support non-evm chains, each value in the array is encoded into bytes.
+  function getRemotePools(
+    uint64 remoteChainSelector
+  ) external view returns (bytes[] memory) {
+    (address pool,) = _getPoolForMechanism(remoteChainSelector);
+
+    return TokenPool(pool).getRemotePools(remoteChainSelector);
   }
 
   /// @inheritdoc IPoolV2
@@ -461,18 +507,38 @@ contract USDCTokenPoolProxy is Ownable2StepMsgSender, IPoolV1V2, ITypeAndVersion
     address, // localToken
     uint64 remoteChainSelector,
     uint256, // amount
-    uint16, // blockConfirmationRequested
-    bytes calldata, // extraData
-    MessageDirection // direction
+    uint16, // blockConfirmationsRequested
+    bytes calldata extraData,
+    MessageDirection direction
   ) external view returns (address[] memory requiredCCVs) {
-    if (s_lockOrBurnMechanism[remoteChainSelector] == LockOrBurnMechanism.INVALID_MECHANISM) {
+    LockOrBurnMechanism mechanism = s_lockOrBurnMechanism[remoteChainSelector];
+    address[] memory ccvs = new address[](1);
+
+    // For inbound messages, the tag decides the mechanism. This is to allow changing the mechanism while messages are
+    // inflight without risking messages being routed to the wrong pool/using the wrong CCV settings.
+    if (direction == MessageDirection.Inbound) {
+      bytes4 msgMechanism = _getVersion(extraData);
+
+      // CCTP over CCV requires only the CCTP verifier.
+      if (msgMechanism == USDCSourcePoolDataCodec.CCTP_VERSION_2_CCV_TAG) {
+        ccvs[0] = address(i_cctpVerifier);
+        return ccvs;
+      }
+      // Lock-release messages require the default verifier, address(0).
+      if (msgMechanism == USDCSourcePoolDataCodec.LOCK_RELEASE_FLAG) {
+        return ccvs;
+      }
+
+      revert InvalidMessageVersion(msgMechanism);
+    }
+
+    if (mechanism == LockOrBurnMechanism.INVALID_MECHANISM) {
       revert NoLockOrBurnMechanismSet(remoteChainSelector);
     }
 
     // Common case: The lockOrBurn mechanism is CCTP V2 with CCV.
     // In this case, we simply need to return the CCTP CCV.
-    address[] memory ccvs = new address[](1);
-    if (s_lockOrBurnMechanism[remoteChainSelector] == LockOrBurnMechanism.CCV) {
+    if (mechanism == LockOrBurnMechanism.CCV) {
       ccvs[0] = address(i_cctpVerifier);
       return ccvs;
     }

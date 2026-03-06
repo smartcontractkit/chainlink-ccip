@@ -5,6 +5,7 @@ import {IRouter} from "../../../interfaces/IRouter.sol";
 
 import {LombardVerifier} from "../../../ccvs/LombardVerifier.sol";
 import {BaseVerifier} from "../../../ccvs/components/BaseVerifier.sol";
+import {Internal} from "../../../libraries/Internal.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {LombardVerifierSetup} from "./LombardVerifierSetup.t.sol";
 
@@ -16,7 +17,7 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
     bytes memory proof
   ) internal pure returns (bytes memory) {
     return bytes.concat(
-      VERSION_TAG_V1_7_0, bytes2(uint16(rawPayload.length)), rawPayload, bytes2(uint16(proof.length)), proof
+      VERSION_TAG_V2_0_0, bytes2(uint16(rawPayload.length)), rawPayload, bytes2(uint16(proof.length)), proof
     );
   }
 
@@ -131,7 +132,7 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
     vm.startPrank(s_offRamp);
 
     // ccvData with only 5 bytes (needs at least 6: 4 for version tag + 2 for rawPayloadLength).
-    bytes memory tooShortCcvData = bytes.concat(VERSION_TAG_V1_7_0, bytes1(0x00));
+    bytes memory tooShortCcvData = bytes.concat(VERSION_TAG_V2_0_0, bytes1(0x00));
 
     vm.expectRevert(LombardVerifier.InvalidVerifierResults.selector);
     s_lombardVerifier.verifyMessage(_createBasicMessageV1(DEST_CHAIN_SELECTOR), bytes32(0), tooShortCcvData);
@@ -144,7 +145,7 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
     // but only providing 5 bytes of raw payload and no proof length field.
     // Total: 4 + 2 + 5 = 11 bytes, but needs at least 4 + 2 + 10 + 2 = 18 bytes.
     bytes memory tooShortCcvData = bytes.concat(
-      VERSION_TAG_V1_7_0,
+      VERSION_TAG_V2_0_0,
       bytes2(uint16(10)), // rawPayloadLength = 10
       bytes5(0) // only 5 bytes instead of 10 + 2 for proof length
     );
@@ -166,7 +167,7 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
     // ccvData with version tag (4) + rawPayloadLength (2) + rawPayload (variable) + proofLength (2) claiming 10 bytes,
     // but only providing 5 bytes of proof.
     bytes memory tooShortCcvData = bytes.concat(
-      VERSION_TAG_V1_7_0,
+      VERSION_TAG_V2_0_0,
       bytes2(uint16(rawPayload.length)), // rawPayloadLength
       rawPayload,
       bytes2(uint16(10)), // proofLength = 10
@@ -195,7 +196,9 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        LombardVerifier.InvalidToken.selector, bytes32(message.tokenTransfer[0].destTokenAddress), bytes32(invalidToken)
+        LombardVerifier.InvalidToken.selector,
+        Internal._leftPadBytesToBytes32(message.tokenTransfer[0].destTokenAddress),
+        Internal._leftPadBytesToBytes32(invalidToken)
       )
     );
     s_lombardVerifier.verifyMessage(message, messageId, ccvData);

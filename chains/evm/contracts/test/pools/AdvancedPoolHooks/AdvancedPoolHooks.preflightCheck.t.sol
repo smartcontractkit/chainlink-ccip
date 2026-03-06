@@ -36,16 +36,16 @@ contract AdvancedPoolHooks_preflightCheck is AdvancedPoolHooksSetup {
     s_advancedPoolHooks.setPolicyEngine(address(s_mockPolicyEngine));
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _createLockOrBurnIn(OWNER);
-    uint16 blockConfirmationRequested = 5;
+    uint16 blockConfirmationsRequested = 5;
     bytes memory tokenArgs = abi.encode("custom token args");
 
-    s_advancedPoolHooks.preflightCheck(lockOrBurnIn, blockConfirmationRequested, tokenArgs, lockOrBurnIn.amount);
+    s_advancedPoolHooks.preflightCheck(lockOrBurnIn, blockConfirmationsRequested, tokenArgs, lockOrBurnIn.amount);
 
     IPolicyEngine.Payload memory lastPayload = s_mockPolicyEngine.getLastPayload();
     assertEq(IAdvancedPoolHooks.preflightCheck.selector, lastPayload.selector);
     assertEq(OWNER, lastPayload.sender);
     assertEq(tokenArgs, lastPayload.context);
-    assertEq(abi.encode(lockOrBurnIn, blockConfirmationRequested, tokenArgs, lockOrBurnIn.amount), lastPayload.data);
+    assertEq(abi.encode(lockOrBurnIn, blockConfirmationsRequested, tokenArgs, lockOrBurnIn.amount), lastPayload.data);
   }
 
   function test_preflightCheck_WithoutPolicyEngine() public {

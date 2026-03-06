@@ -158,9 +158,10 @@ func (r *FQAndRampUpdaterRegistry) GetConfigImporterVersionResolver(chainsel uin
 
 func newFQUpdaterRegistry() *FQAndRampUpdaterRegistry {
 	return &FQAndRampUpdaterRegistry{
-		FeeQuoterUpdater: make(map[string]FeeQuoterUpdater[any]),
-		RampUpdater:      make(map[string]RampUpdater),
-		ConfigImporter:   make(map[string]ConfigImporter),
+		FeeQuoterUpdater:            make(map[string]FeeQuoterUpdater[any]),
+		RampUpdater:                 make(map[string]RampUpdater),
+		ConfigImporter:              make(map[string]ConfigImporter),
+		ImportconfigVersionResolver: make(map[string]LaneVersionResolver),
 	}
 }
 
@@ -204,15 +205,15 @@ func updateFeeQuoterApply(fquRegistry *FQAndRampUpdaterRegistry, mcmsRegistry *c
 		for chainSel, perChainInput := range input.Chains {
 			fquUpdater, ok := fquRegistry.GetFeeQuoterUpdater(chainSel, perChainInput.FeeQuoterVersion)
 			if !ok {
-				return cldf.ChangesetOutput{}, utils.ErrNoAdapterRegistered("FeeQuoterUpdater", perChainInput.FeeQuoterVersion)
+				return cldf.ChangesetOutput{}, utils.ErrNoAdapterForSelectorRegistered("FeeQuoterUpdater", chainSel, perChainInput.FeeQuoterVersion)
 			}
 			rampUpdater, ok := fquRegistry.GetRampUpdater(chainSel, perChainInput.RampsVersion)
 			if !ok {
-				return cldf.ChangesetOutput{}, utils.ErrNoAdapterRegistered("RampUpdater", perChainInput.RampsVersion)
+				return cldf.ChangesetOutput{}, utils.ErrNoAdapterForSelectorRegistered("RampUpdater", chainSel, perChainInput.RampsVersion)
 			}
 			versionResolver, ok := fquRegistry.GetConfigImporterVersionResolver(chainSel)
 			if !ok {
-				return cldf.ChangesetOutput{}, utils.ErrNoAdapterRegistered("ConfigImporterVersionResolver", nil)
+				return cldf.ChangesetOutput{}, utils.ErrNoAdapterForSelectorRegistered("ConfigImporterVersionResolver", chainSel, nil)
 			}
 			// Resolve the config importer version to use for this chain
 			_, configImporterVersions, err := versionResolver.DeriveLaneVersionsForChain(e, chainSel)
@@ -223,7 +224,7 @@ func updateFeeQuoterApply(fquRegistry *FQAndRampUpdaterRegistry, mcmsRegistry *c
 			for _, version := range configImporterVersions {
 				configImporter, ok := fquRegistry.GetConfigImporter(chainSel, version)
 				if !ok {
-					return cldf.ChangesetOutput{}, utils.ErrNoAdapterRegistered("ConfigImporter", version)
+					return cldf.ChangesetOutput{}, utils.ErrNoAdapterForSelectorRegistered("ConfigImporter", chainSel, version)
 				}
 				err := configImporter.InitializeAdapter(e, chainSel)
 				if err != nil {
@@ -310,7 +311,7 @@ func updateFeeQuoterApply(fquRegistry *FQAndRampUpdaterRegistry, mcmsRegistry *c
 		return changesets.NewOutputBuilder(e, mcmsRegistry).
 			WithReports(reports).
 			WithDataStore(ds).
-			WithBatchOps(batchOps).
+			WithSingleBatchOpPerChain(batchOps).
 			Build(input.MCMS)
 	}
 }

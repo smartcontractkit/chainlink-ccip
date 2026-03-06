@@ -4,8 +4,7 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/token_pool"
-	evm_tokens "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/tokens"
+	
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -14,7 +13,12 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/token_pool"
+	evm_tokens "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/tokens"
 )
+
+var _ tokens.TokenAdapter = &TokenAdapter{}
 
 // TokenAdapter is the adapter for EVM tokens using 1.7.0 token pools.
 type TokenAdapter struct{}
@@ -48,7 +52,7 @@ func (t *TokenAdapter) DeriveTokenAddress(e deployment.Environment, chainSelecto
 	})
 }
 
-func (t *TokenAdapter) ManualRegistration() *cldf_ops.Sequence[tokens.ManualRegistrationInput, sequences.OnChainOutput, chain.BlockChains] {
+func (t *TokenAdapter) ManualRegistration() *cldf_ops.Sequence[tokens.ManualRegistrationSequenceInput, sequences.OnChainOutput, chain.BlockChains] {
 	// TODO implement me
 	return nil
 }
@@ -58,7 +62,7 @@ func (t *TokenAdapter) DeployToken() *cldf_ops.Sequence[tokens.DeployTokenInput,
 	return nil
 }
 
-func (t *TokenAdapter) DeployTokenVerify(e deployment.Environment, in any) error {
+func (t *TokenAdapter) DeployTokenVerify(e deployment.Environment, in tokens.DeployTokenInput) error {
 	// TODO implement me
 	return nil
 }
@@ -68,17 +72,12 @@ func (t *TokenAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokens.Deplo
 	return nil
 }
 
-func (t *TokenAdapter) RegisterToken() *cldf_ops.Sequence[tokens.RegisterTokenInput, sequences.OnChainOutput, chain.BlockChains] {
+func (t *TokenAdapter) SetPool() *cldf_ops.Sequence[tokens.TPRLRemotes, sequences.OnChainOutput, chain.BlockChains] {
 	// TODO implement me
 	return nil
 }
 
-func (t *TokenAdapter) SetPool() *cldf_ops.Sequence[tokens.SetPoolInput, sequences.OnChainOutput, chain.BlockChains] {
-	// TODO implement me
-	return nil
-}
-
-func (t *TokenAdapter) DeriveTokenDecimals(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) (uint8, error) {
+func (t *TokenAdapter) DeriveTokenDecimals(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef, token []byte) (uint8, error) {
 	chain, ok := e.BlockChains.EVMChains()[chainSelector]
 	if !ok {
 		return 0, fmt.Errorf("chain with selector %d not found", chainSelector)
@@ -97,7 +96,12 @@ func (t *TokenAdapter) DeriveTokenPoolCounterpart(e deployment.Environment, chai
 	return tokenPool, nil
 }
 
-func (t *TokenAdapter) SetTokenPoolRateLimits() *operations.Sequence[tokens.RateLimiterConfigInputs, sequences.OnChainOutput, chain.BlockChains] {
+func (t *TokenAdapter) SetTokenPoolRateLimits() *operations.Sequence[tokens.TPRLRemotes, sequences.OnChainOutput, chain.BlockChains] {
+	// TODO implement me
+	return nil
+}
+
+func (t *TokenAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokens.UpdateAuthoritiesInput, sequences.OnChainOutput, *deployment.Environment] {
 	// TODO implement me
 	return nil
 }

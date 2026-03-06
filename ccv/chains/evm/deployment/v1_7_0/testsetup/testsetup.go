@@ -12,10 +12,10 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/executor"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/mock_receiver"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/offramp"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/onramp"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/offramp"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 )
 
@@ -85,6 +85,21 @@ func CreateRateLimiterConfig(rate int64, capacity int64) tokens.RateLimiterConfi
 		IsEnabled: true,
 		Rate:      big.NewInt(rate),
 		Capacity:  big.NewInt(capacity),
+	}
+}
+
+func CreateRateLimiterConfigFloatInput(rate float64, capacity float64) tokens.RateLimiterConfigFloatInput {
+	if rate == 0 && capacity == 0 {
+		return tokens.RateLimiterConfigFloatInput{
+			IsEnabled: false,
+			Rate:      0,
+			Capacity:  0,
+		}
+	}
+	return tokens.RateLimiterConfigFloatInput{
+		IsEnabled: true,
+		Rate:      rate,
+		Capacity:  capacity,
 	}
 }
 
