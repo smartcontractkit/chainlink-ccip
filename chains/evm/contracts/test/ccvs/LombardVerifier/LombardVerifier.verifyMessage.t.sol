@@ -5,6 +5,7 @@ import {IRouter} from "../../../interfaces/IRouter.sol";
 
 import {LombardVerifier} from "../../../ccvs/LombardVerifier.sol";
 import {BaseVerifier} from "../../../ccvs/components/BaseVerifier.sol";
+import {Internal} from "../../../libraries/Internal.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {LombardVerifierSetup} from "./LombardVerifierSetup.t.sol";
 
@@ -195,7 +196,9 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        LombardVerifier.InvalidToken.selector, bytes32(message.tokenTransfer[0].destTokenAddress), bytes32(invalidToken)
+        LombardVerifier.InvalidToken.selector,
+        Internal._leftPadBytesToBytes32(message.tokenTransfer[0].destTokenAddress),
+        Internal._leftPadBytesToBytes32(invalidToken)
       )
     );
     s_lombardVerifier.verifyMessage(message, messageId, ccvData);
