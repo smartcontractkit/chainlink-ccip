@@ -1,6 +1,9 @@
 package sequences
 
 import (
+	"encoding/binary"
+	"math/big"
+
 	"github.com/Masterminds/semver/v3"
 	"github.com/gagliardetto/solana-go"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
@@ -15,6 +18,7 @@ import (
 	deployapi "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	laneapi "github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
+	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	mcmsreaderapi "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 )
@@ -85,4 +89,31 @@ func (a *SolanaAdapter) GetRMNRemoteAddress(ds datastore.DataStore, chainSelecto
 		return nil, err
 	}
 	return addr, nil
+}
+
+func (a *SolanaAdapter) GetFeeQuoterDestChainConfig() laneapi.FeeQuoterDestChainConfig {
+	chainHex := common_utils.GetHexFromString(common_utils.SVMFamilySelector)
+	return laneapi.FeeQuoterDestChainConfig{
+		IsEnabled:                         true,
+		MaxNumberOfTokensPerMsg:           10,
+		MaxDataBytes:                      30_000,
+		MaxPerMsgGasLimit:                 3_000_000,
+		DestGasOverhead:                   300_000,
+		DefaultTokenFeeUSDCents:           25,
+		DestGasPerPayloadByteBase:         16,
+		DestGasPerPayloadByteHigh:         40,
+		DestGasPerPayloadByteThreshold:    3000,
+		DestDataAvailabilityOverheadGas:   100,
+		DestGasPerDataAvailabilityByte:    16,
+		DestDataAvailabilityMultiplierBps: 1,
+		DefaultTokenDestGasOverhead:       90_000,
+		DefaultTxGasLimit:                 200_000,
+		GasMultiplierWeiPerEth:            11e17,
+		NetworkFeeUSDCents:                10,
+		ChainFamilySelector:               binary.BigEndian.Uint32(chainHex[:]),
+	}
+}
+
+func (a *SolanaAdapter) GetDefaultGasPrice() *big.Int {
+	return big.NewInt(2e12)
 }

@@ -128,5 +128,9 @@ func populateAddresses(ds datastore.DataStore, chainDef *ChainDefinition, adapte
 	if err != nil {
 		return fmt.Errorf("error fetching router address for chain %d: %w", chainDef.Selector, err)
 	}
+	chainDef.FeeQuoterDestChainConfig = adapter.GetFeeQuoterDestChainConfig()
+	if chainDef.FeeQuoterDestChainConfigOverrides != nil {
+		(*chainDef.FeeQuoterDestChainConfigOverrides)(&chainDef.FeeQuoterDestChainConfig)
+	}
 	return nil
 }

@@ -73,12 +73,10 @@ func TestUpdateToFeeQuoter_2_0(t *testing.T) {
 	chain1 := lanesapi.ChainDefinition{
 		Selector:                 chain_selectors.ETHEREUM_MAINNET.Selector,
 		GasPrice:                 big.NewInt(1e9),
-		FeeQuoterDestChainConfig: lanesapi.DefaultFeeQuoterDestChainConfig(true, chain_selectors.ETHEREUM_MAINNET.Selector),
 	}
 	chain2 := lanesapi.ChainDefinition{
 		Selector:                 chain_selectors.AVALANCHE_MAINNET.Selector,
 		GasPrice:                 big.NewInt(1e9),
-		FeeQuoterDestChainConfig: lanesapi.DefaultFeeQuoterDestChainConfig(true, chain_selectors.AVALANCHE_MAINNET.Selector),
 	}
 	_, err = lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.ConnectChainsConfig{
 		Lanes: []lanesapi.LaneConfig{
