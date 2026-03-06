@@ -45,9 +45,6 @@ func makeChainConfig(ds datastore.DataStore, chainSelector uint64, remoteChainSe
 		Selector: chainSelector,
 		Router:   router,
 		OnRamp:   onRampAddr,
-		OnRampsForRemotes: [][]byte{
-			onRampAddr,
-		},
 		CommitteeVerifiers: []lanes.CommitteeVerifierConfig[datastore.AddressRef]{
 			{
 				CommitteeVerifier: []datastore.AddressRef{
@@ -71,20 +68,20 @@ func makeChainConfig(ds datastore.DataStore, chainSelector uint64, remoteChainSe
 		OffRamp:   offRampAddr,
 		DefaultInboundCCVs: []datastore.AddressRef{
 			{
-				ChainSelector: remoteChainSelector,
+				ChainSelector: chainSelector,
 				Type:          datastore.ContractType(committee_verifier.ContractType),
 				Version:       committee_verifier.Version,
 			},
 		},
 		DefaultOutboundCCVs: []datastore.AddressRef{
 			{
-				ChainSelector: remoteChainSelector,
+				ChainSelector: chainSelector,
 				Type:          datastore.ContractType(committee_verifier.ContractType),
 				Version:       committee_verifier.Version,
 			},
 		},
 		DefaultExecutor: datastore.AddressRef{
-			ChainSelector: remoteChainSelector,
+			ChainSelector: chainSelector,
 			Type:          datastore.ContractType(executor.ProxyType),
 			Version:       executor.Version,
 			Qualifier:     "default",

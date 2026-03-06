@@ -39,17 +39,17 @@ type ChainDefinition struct {
 	// The CommitteeVerifiers on the chain being configured.
 	// There can be multiple committee verifiers on a chain, each controlled by a different entity.
 	CommitteeVerifiers []CommitteeVerifierConfig[datastore.AddressRef]
-	// The addresses of CCVs that will be applied to messages FROM this remote chain if no receiver is specified.
+	// The addresses of CCVs that will be applied to messages FROM this chain if no receiver is specified.
 	DefaultInboundCCVs []datastore.AddressRef
-	// Addresses of any CCVs that must always be used for messages FROM this remote chain.
+	// Addresses of any CCVs that must always be used for messages FROM this chain.
 	LaneMandatedInboundCCVs []datastore.AddressRef
-	// Addresses of CCVs that will be used for messages TO this remote chain if none are specified.
+	// Addresses of CCVs that will be used for messages TO this chain if none are specified.
 	DefaultOutboundCCVs []datastore.AddressRef
-	// Addresses of CCVs that will always be applied to messages TO this remote chain.
+	// Addresses of CCVs that will always be applied to messages TO this chain.
 	LaneMandatedOutboundCCVs []datastore.AddressRef
-	// The Executor address that will be used for messages TO this remote chain if none is specified.
+	// The Executor address that will be used for messages TO this chain if none is specified.
 	DefaultExecutor datastore.AddressRef
-	// ExecutorDestChainConfig configures the Executor for this remote chain
+	// ExecutorDestChainConfig configures the Executor for this chain
 	ExecutorDestChainConfig ExecutorDestChainConfig
 	// Length of addresses on the destination chain, in bytes.
 	AddressBytesLength uint8
@@ -66,9 +66,6 @@ type ChainDefinition struct {
 	// OnRamp is the address of the OnRamp contract(s) on this chain.
 	// This is populated programmatically
 	OnRamp []byte
-	// OnRampsForRemotes is the list of OnRamp addresses on this chain for each remote chain.
-	// This is populated by the user
-	OnRampsForRemotes [][]byte
 	// OffRamp is the address of the OffRamp contract on this chain.
 	// This is populated programmatically
 	OffRamp []byte

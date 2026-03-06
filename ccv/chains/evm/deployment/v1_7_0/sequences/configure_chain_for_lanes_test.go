@@ -120,8 +120,8 @@ func TestConfigureLaneLegAsSourceAndDest(t *testing.T) {
 			var remoteFeeQuoterAddr string
 			var remoteOffRampAddr string
 			var remoteCommitteeVerifierAddr string
-			// var remoteCommitteeVerifierResolverAddr string
-			// var remoteExecutorAddr string
+			var remoteCommitteeVerifierResolverAddr string
+			var remoteExecutorAddr string
 			for _, addr := range deploymentReport.Output.Addresses {
 				switch addr.Type {
 				case datastore.ContractType(router.ContractType):
@@ -134,10 +134,10 @@ func TestConfigureLaneLegAsSourceAndDest(t *testing.T) {
 					remoteOffRampAddr = addr.Address
 				case datastore.ContractType(committee_verifier.ContractType):
 					remoteCommitteeVerifierAddr = addr.Address
-					// case datastore.ContractType(executor.ProxyType):
-					// 	remoteExecutorAddr = addr.Address
-					// case datastore.ContractType(committee_verifier.ResolverType):
-					// 	remoteCommitteeVerifierResolverAddr = addr.Address
+				case datastore.ContractType(executor.ProxyType):
+					remoteExecutorAddr = addr.Address
+				case datastore.ContractType(committee_verifier.ResolverType):
+					remoteCommitteeVerifierResolverAddr = addr.Address
 				}
 			}
 
@@ -170,40 +170,67 @@ func TestConfigureLaneLegAsSourceAndDest(t *testing.T) {
 				},
 			}
 
-			localChainDef := &lanes.ChainDefinition{
-				Selector:  chainSelector,
-				Router:    common.HexToAddress(routerAddress).Bytes(),
-				OnRamp:    common.HexToAddress(onRampAddr).Bytes(),
-				FeeQuoter: common.HexToAddress(feeQuoterAddr).Bytes(),
-				OffRamp:   common.HexToAddress(offRampAddr).Bytes(),
-				OnRampsForRemotes: [][]byte{
-					common.HexToAddress(onRampAddr).Bytes(),
+			remoteCommitteeVerifiers := []lanes.CommitteeVerifierConfig[datastore.AddressRef]{
+				{
+					CommitteeVerifier: []datastore.AddressRef{
+						{
+							Address: remoteCommitteeVerifierAddr,
+							Type:    datastore.ContractType(committee_verifier.ContractType),
+							Version: committee_verifier.Version,
+						},
+						{
+							Address: remoteCommitteeVerifierResolverAddr,
+							Type:    datastore.ContractType(committee_verifier.ResolverType),
+							Version: committee_verifier.Version,
+						},
+					},
+					RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainConfig{
+						chainSelector: {
+							AllowlistEnabled:   false,
+							FeeUSDCents:        50,
+							GasForVerification: 50_000,
+							PayloadSizeBytes:   6*64 + 2*32,
+							SignatureConfig: lanes.CommitteeVerifierSignatureQuorumConfig{
+								Signers:   []string{common.HexToAddress("0x01").String()},
+								Threshold: 1,
+							},
+						},
+					},
 				},
+			}
+
+			localChainDef := &lanes.ChainDefinition{
+				Selector:           chainSelector,
+				Router:             common.HexToAddress(routerAddress).Bytes(),
+				OnRamp:             common.HexToAddress(onRampAddr).Bytes(),
+				FeeQuoter:          common.HexToAddress(feeQuoterAddr).Bytes(),
+				OffRamp:            common.HexToAddress(offRampAddr).Bytes(),
 				CommitteeVerifiers: committeeVerifiers,
 				DefaultInboundCCVs: []datastore.AddressRef{{
-					Address: remoteCommitteeVerifierAddr,
+					Address: committeeVerifierAddr,
 				}},
 				DefaultOutboundCCVs: []datastore.AddressRef{{
-					Address: remoteCommitteeVerifierAddr,
+					Address: committeeVerifierAddr,
 				}},
+				DefaultExecutor: datastore.AddressRef{
+					Address: executorAddr,
+				},
 			}
 
 			remoteChainDef := &lanes.ChainDefinition{
-				Selector: remoteChainSelector,
-				Router:   common.HexToAddress(remoteRouterAddress).Bytes(),
-				OnRamp:   common.HexToAddress(remoteOnRampAddr).Bytes(),
-				OnRampsForRemotes: [][]byte{
-					common.HexToAddress(remoteOnRampAddr).Bytes(),
-				},
-				FeeQuoter: common.HexToAddress(remoteFeeQuoterAddr).Bytes(),
-				OffRamp:   common.HexToAddress(remoteOffRampAddr).Bytes(),
+				Selector:           remoteChainSelector,
+				Router:             common.HexToAddress(remoteRouterAddress).Bytes(),
+				OnRamp:             common.HexToAddress(remoteOnRampAddr).Bytes(),
+				FeeQuoter:          common.HexToAddress(remoteFeeQuoterAddr).Bytes(),
+				OffRamp:            common.HexToAddress(remoteOffRampAddr).Bytes(),
+				CommitteeVerifiers: remoteCommitteeVerifiers,
 				DefaultOutboundCCVs: []datastore.AddressRef{
-					{Address: committeeVerifierAddr},
+					{Address: remoteCommitteeVerifierAddr},
 				},
 				DefaultInboundCCVs: []datastore.AddressRef{
-					{Address: committeeVerifierAddr},
+					{Address: remoteCommitteeVerifierAddr},
 				},
-				DefaultExecutor:          datastore.AddressRef{Address: executorAddr},
+				DefaultExecutor:          datastore.AddressRef{Address: remoteExecutorAddr},
 				FeeQuoterDestChainConfig: testsetup.CreateBasicFeeQuoterDestChainConfig(),
 				ExecutorDestChainConfig:  testsetup.CreateBasicExecutorDestChainConfig(),
 				AddressBytesLength:       20,
