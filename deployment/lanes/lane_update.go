@@ -4,7 +4,6 @@ import (
 	"math/big"
 
 	"github.com/Masterminds/semver/v3"
-	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 )
 
@@ -98,15 +97,3 @@ type UpdateLanesInput struct {
 // FeeQuoterDestChainConfig in place. Pass one or more overrides to
 // DefaultFeeQuoterDestChainConfig to selectively change default values.
 type FeeQuoterDestChainConfigOverride func(*FeeQuoterDestChainConfig)
-
-func DefaultGasPrice(selector uint64) *big.Int {
-	family, _ := chain_selectors.GetSelectorFamily(selector)
-	switch family {
-	case chain_selectors.FamilyTon:
-		return big.NewInt(2.12e9) // 1 TON ~2.13 USD -> 1 nanoTON = 2.13e−9 USD -> 1 nanoTON expressed in 1e18 (1 USD) = 2.13e9
-	}
-	// Gas price in USD (18 decimals) per unit of gas
-	// 2e12 = $0.000002 per gas unit
-	// With ~500,000 gas, this results in ~$1 USD fee per message
-	return big.NewInt(2e12)
-}

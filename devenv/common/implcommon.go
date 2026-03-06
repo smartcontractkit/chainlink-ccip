@@ -288,7 +288,6 @@ func ConnectContractsWithSelectors(ctx context.Context, e *deployment.Environmen
 
 	chainA := lanesapi.ChainDefinition{
 		Selector:                 selector,
-		GasPrice:                 lanesapi.DefaultGasPrice(selector),
 		TokenPrices:              chainATokenPrices,
 	}
 	for _, destSelector := range remoteSelectors {
@@ -297,7 +296,6 @@ func ConnectContractsWithSelectors(ctx context.Context, e *deployment.Environmen
 
 		chainB := lanesapi.ChainDefinition{
 			Selector:                 destSelector,
-			GasPrice:                 lanesapi.DefaultGasPrice(destSelector),
 			TokenPrices:              chainBTokenPrices,
 		}
 		_, err := lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.ConnectChainsConfig{
