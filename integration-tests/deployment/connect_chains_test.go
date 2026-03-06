@@ -370,13 +370,14 @@ func TestDisableLane_EVM2SVM(t *testing.T) {
 	DeployMCMS(t, e, chain_selectors.SOLANA_MAINNET.Selector, []string{cciputils.CLLQualifier})
 	SolanaTransferOwnership(t, e, chain_selectors.SOLANA_MAINNET.Selector)
 
+	override := getFQOverrides()
 	chain1 := lanesapi.ChainDefinition{
-		Selector: chain_selectors.SOLANA_MAINNET.Selector,
-		GasPrice: big.NewInt(1e17),
+		Selector:                          chain_selectors.SOLANA_MAINNET.Selector,
+		GasPrice:                          big.NewInt(1e17),
+		FeeQuoterDestChainConfigOverrides: &override,
 	}
 	chain2 := lanesapi.ChainDefinition{
 		Selector: chain_selectors.ETHEREUM_MAINNET.Selector,
-		GasPrice: big.NewInt(1e9),
 	}
 
 	connectOut, err := lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.ConnectChainsConfig{

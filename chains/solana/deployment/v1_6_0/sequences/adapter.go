@@ -115,5 +115,5 @@ func (a *SolanaAdapter) GetFeeQuoterDestChainConfig() laneapi.FeeQuoterDestChain
 }
 
 func (a *SolanaAdapter) GetDefaultGasPrice() *big.Int {
-	return big.NewInt(2e12)
+	return big.NewInt(4e12)
 }
