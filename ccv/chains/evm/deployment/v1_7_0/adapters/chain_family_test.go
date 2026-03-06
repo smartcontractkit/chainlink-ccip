@@ -152,7 +152,7 @@ func TestChainFamilyAdapter(t *testing.T) {
 					},
 				},
 			})
-			require.NoError(t, err, "Failed to apply ConfigureChainsForLanes changeset")
+			require.NoError(t, err, "Failed to apply ConnectChains changeset")
 		})
 	}
 }
