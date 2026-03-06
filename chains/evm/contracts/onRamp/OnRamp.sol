@@ -520,9 +520,6 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     // If ExtraArgsV3 are provided, decode them.
     if (extraArgs.length >= 4 && bytes4(extraArgs[:4]) == ExtraArgsCodec.GENERIC_EXTRA_ARGS_V3_TAG) {
       resolvedArgs = ExtraArgsCodec._decodeGenericExtraArgsV3(extraArgs);
-
-      // We need to ensure no duplicate CCVs are present in the ccv list.
-      CCVConfigValidation._assertNoDuplicates(resolvedArgs.ccvs);
     } else {
       // Populate the fields that could be present in legacy extraArgs.
       (resolvedArgs.tokenReceiver, resolvedArgs.gasLimit, resolvedArgs.executorArgs) =
