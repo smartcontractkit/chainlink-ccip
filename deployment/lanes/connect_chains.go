@@ -3,7 +3,9 @@ package lanes
 import (
 	"fmt"
 
+	"github.com/Masterminds/semver/v3"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
+	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -14,8 +16,8 @@ import (
 )
 
 // ConfigureTokensForTransfers returns a changeset that configures tokens on multiple chains for transfers with other chains.
-func ConnectChains(tokenRegistry *LaneAdapterRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) cldf.ChangeSetV2[ConnectChainsConfig] {
-	return cldf.CreateChangeSet(makeApply(tokenRegistry, mcmsRegistry), makeVerify(tokenRegistry, mcmsRegistry))
+func ConnectChains(laneRegistry *LaneAdapterRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) cldf.ChangeSetV2[ConnectChainsConfig] {
+	return cldf.CreateChangeSet(makeApply(laneRegistry, mcmsRegistry), makeVerify(laneRegistry, mcmsRegistry))
 }
 
 func makeVerify(_ *LaneAdapterRegistry, _ *changesets.MCMSReaderRegistry) func(cldf.Environment, ConnectChainsConfig) error {
@@ -48,11 +50,11 @@ func makeApply(laneRegistry *LaneAdapterRegistry, mcmsRegistry *changesets.MCMSR
 			if !exists {
 				return cldf.ChangesetOutput{}, fmt.Errorf("no ChainAdapter registered for chain family '%s'", chainBFamily)
 			}
-			err = populateAddresses(e.DataStore, chainA, chainAAdapter)
+			err = populateAddresses(e.DataStore, chainA, chainAAdapter, lane.Version)
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("error fetching address for src chain %d: %w", chainA.Selector, err)
 			}
-			err = populateAddresses(e.DataStore, chainB, chainBAdapter)
+			err = populateAddresses(e.DataStore, chainB, chainBAdapter, lane.Version)
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("error fetching address for dest chain %d: %w", chainB.Selector, err)
 			}
@@ -122,7 +124,7 @@ func makeApply(laneRegistry *LaneAdapterRegistry, mcmsRegistry *changesets.MCMSR
 	}
 }
 
-func populateAddresses(ds datastore.DataStore, chainDef *ChainDefinition, adapter LaneAdapter) error {
+func populateAddresses(ds datastore.DataStore, chainDef *ChainDefinition, adapter LaneAdapter, version *semver.Version) error {
 	var err error
 	chainDef.OnRamp, err = adapter.GetOnRampAddress(ds, chainDef.Selector)
 	if err != nil {
@@ -139,6 +141,10 @@ func populateAddresses(ds datastore.DataStore, chainDef *ChainDefinition, adapte
 	chainDef.Router, err = adapter.GetRouterAddress(ds, chainDef.Selector)
 	if err != nil {
 		return fmt.Errorf("error fetching router address for chain %d: %w", chainDef.Selector, err)
+	}
+	// Below here is 2.0 only
+	if version.LessThan(common_utils.Version_2_0_0) {
+		return nil
 	}
 	committeeVerifiers := make([]CommitteeVerifierConfig[datastore.AddressRef], len(chainDef.CommitteeVerifiers))
 	for i, verifier := range chainDef.CommitteeVerifiers {
