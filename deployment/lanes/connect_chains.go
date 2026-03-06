@@ -15,7 +15,7 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 )
 
-// ConfigureTokensForTransfers returns a changeset that configures tokens on multiple chains for transfers with other chains.
+// ConnectChains returns a changeset that configures CCIP lanes between chains using the provided lane and MCMS registries.
 func ConnectChains(laneRegistry *LaneAdapterRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) cldf.ChangeSetV2[ConnectChainsConfig] {
 	return cldf.CreateChangeSet(makeApply(laneRegistry, mcmsRegistry), makeVerify(laneRegistry, mcmsRegistry))
 }
