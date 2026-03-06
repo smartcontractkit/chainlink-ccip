@@ -192,25 +192,23 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
     }
 
     // For some tokens we need to override the source token with an adapter.
-    address localAdapter = s_supportedTokens.get(sourceToken);
-    if (localAdapter != address(0)) {
-      sourceToken = localAdapter;
-    }
-
+    address bridgeTokenOrAdapter;
     {
-      bytes32 remoteToken = i_bridge.getAllowedDestinationToken(path.lChainId, sourceToken);
+      address localAdapter = s_supportedTokens.get(sourceToken);
+      bridgeTokenOrAdapter = localAdapter != address(0) ? localAdapter : sourceToken;
+      bytes32 remoteTokenOrAdapter = i_bridge.getAllowedDestinationToken(path.lChainId, bridgeTokenOrAdapter);
       bytes32 expectedDestToken = Internal._leftPadBytesToBytes32(tokenTransfer.destTokenAddress);
-      if (remoteToken != expectedDestToken) {
+      if (remoteTokenOrAdapter != expectedDestToken) {
         bytes32 remoteAdapter = s_remoteAdapters[destChainSelector][sourceToken];
-        if (remoteAdapter == bytes32(0) || remoteToken != remoteAdapter) {
-          revert RemoteTokenOrAdapterMismatch(remoteToken, expectedDestToken, remoteAdapter);
+        if (remoteAdapter == bytes32(0) || remoteTokenOrAdapter != remoteAdapter) {
+          revert RemoteTokenOrAdapterMismatch(remoteTokenOrAdapter, expectedDestToken, remoteAdapter);
         }
       }
     }
 
     (, bytes32 payloadHash) = i_bridge.deposit({
       destinationChain: path.lChainId,
-      token: sourceToken,
+      token: bridgeTokenOrAdapter,
       sender: abi.decode(sender, (address)),
       // Left pad receiver to 32 bytes if not already 32 bytes.
       recipient: Internal._leftPadBytesToBytes32(tokenTransfer.tokenReceiver),
@@ -359,10 +357,21 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
 
     for (uint256 i = 0; i < tokensToSet.length; ++i) {
       SupportedTokenArgs memory tokenToAdd = tokensToSet[i];
-      // No-op if the token is already supported.
+
+      // If the token already exists and the adapter is changing, revoke the old approval.
+      if (s_supportedTokens.contains(tokenToAdd.localToken)) {
+        address oldAdapter = s_supportedTokens.get(tokenToAdd.localToken);
+        if (oldAdapter != tokenToAdd.localAdapter) {
+          if (oldAdapter != address(0)) {
+            IERC20(tokenToAdd.localToken).forceApprove(oldAdapter, 0);
+          } else {
+            IERC20(tokenToAdd.localToken).forceApprove(address(i_bridge), 0);
+          }
+        }
+      }
+
       s_supportedTokens.set(tokenToAdd.localToken, tokenToAdd.localAdapter);
 
-      // If adapter exists, approve token->adapter for adapter-mediated burn/bridge flow.
       if (tokenToAdd.localAdapter != address(0)) {
         IERC20(tokenToAdd.localToken).forceApprove(tokenToAdd.localAdapter, type(uint256).max);
       } else {
