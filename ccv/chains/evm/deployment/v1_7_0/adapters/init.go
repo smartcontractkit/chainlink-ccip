@@ -15,7 +15,7 @@ import (
 )
 
 func init() {
-	v := semver.MustParse("1.7.0")
+	v := semver.MustParse("2.0.0")
 	fqReg := deploy.GetFQAndRampUpdaterRegistry()
 	fqReg.RegisterFeeQuoterUpdater(chainsel.FamilyEVM, semver.MustParse("2.0.0"), adapters2_0.FeeQuoterUpdater[any]{})
 	fqReg.RegisterRampUpdater(chainsel.FamilyEVM, semver.MustParse("1.6.0"), adapters1_6.RampUpdateWithFQ{})

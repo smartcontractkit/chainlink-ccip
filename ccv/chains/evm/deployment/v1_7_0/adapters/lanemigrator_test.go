@@ -17,10 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
-	v1_7_0_changesets "github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/changesets"
 
-	evm_adapters "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/adapters"
 	v1_7_0 "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
@@ -76,10 +73,13 @@ func TestLaneMigrator(t *testing.T) {
 
 			// Configure chains for lanes
 			e.OperationsBundle = testsetup.BundleWithFreshReporter(e.OperationsBundle)
-			_, err = v1_7_0_changesets.ConfigureChainsForLanes(chainFamilyRegistry, mcmsRegistry).Apply(*e, v1_7_0_changesets.ConfigureChainsForLanesConfig{
-				Chains: []v1_7_0_changesets.ChainConfig{
-					makeChainConfig(chainA, chainB),
-					makeChainConfig(chainB, chainA),
+			_, err = lanes.ConnectChains(chainFamilyRegistry, mcmsRegistry).Apply(*e, lanes.ConnectChainsConfig{
+				Lanes: []lanes.LaneConfig{
+					{
+						ChainA:  makeChainConfig(e.DataStore, chainA, chainB),
+						ChainB:  makeChainConfig(e.DataStore, chainB, chainA),
+						Version: semver.MustParse("2.0.0"),
+					},
 				},
 			})
 			require.NoError(t, err, "Failed to apply ConfigureChainsForLanes changeset")

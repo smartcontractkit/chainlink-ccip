@@ -144,7 +144,7 @@ func populateAddresses(ds datastore.DataStore, chainDef *ChainDefinition, adapte
 	for i, verifier := range chainDef.CommitteeVerifiers {
 		contracts := make([]datastore.AddressRef, 0, len(verifier.CommitteeVerifier))
 		for _, contract := range verifier.CommitteeVerifier {
-			contract, err := datastore_utils.FindAndFormatRef(ds, contract, chainDef.Selector, datastore_utils.FullRef)
+			contract, err := datastore_utils.FindAndFormatRef(ds, contract, contract.ChainSelector, datastore_utils.FullRef)
 			if err != nil {
 				return fmt.Errorf("failed to resolve CommitteeVerifier contract ref on chain with selector %d: %w", chainDef.Selector, err)
 			}
@@ -157,7 +157,7 @@ func populateAddresses(ds datastore.DataStore, chainDef *ChainDefinition, adapte
 	}
 	chainDef.CommitteeVerifiers = committeeVerifiers
 
-	executor, err := datastore_utils.FindAndFormatRef(ds, chainDef.DefaultExecutor, chainDef.Selector, datastore_utils.FullRef)
+	executor, err := datastore_utils.FindAndFormatRef(ds, chainDef.DefaultExecutor, chainDef.DefaultExecutor.ChainSelector, datastore_utils.FullRef)
 	if err != nil {
 		return fmt.Errorf("failed to resolve executor ref on chain with selector %d: %w", chainDef.Selector, err)
 	}
@@ -165,7 +165,7 @@ func populateAddresses(ds datastore.DataStore, chainDef *ChainDefinition, adapte
 
 	laneMandatedInboundCCVs := make([]datastore.AddressRef, 0, len(chainDef.LaneMandatedInboundCCVs))
 	for _, ccv := range chainDef.LaneMandatedInboundCCVs {
-		resolvedCCV, err := datastore_utils.FindAndFormatRef(ds, ccv, chainDef.Selector, datastore_utils.FullRef)
+		resolvedCCV, err := datastore_utils.FindAndFormatRef(ds, ccv, ccv.ChainSelector, datastore_utils.FullRef)
 		if err != nil {
 			return fmt.Errorf("failed to resolve ccv ref on chain with selector %d: %w", chainDef.Selector, err)
 		}
@@ -175,7 +175,7 @@ func populateAddresses(ds datastore.DataStore, chainDef *ChainDefinition, adapte
 
 	laneMandatedOutboundCCVs := make([]datastore.AddressRef, 0, len(chainDef.LaneMandatedOutboundCCVs))
 	for _, ccv := range chainDef.LaneMandatedOutboundCCVs {
-		resolvedCCV, err := datastore_utils.FindAndFormatRef(ds, ccv, chainDef.Selector, datastore_utils.FullRef)
+		resolvedCCV, err := datastore_utils.FindAndFormatRef(ds, ccv, ccv.ChainSelector, datastore_utils.FullRef)
 		if err != nil {
 			return fmt.Errorf("failed to resolve ccv ref on chain with selector %d: %w", chainDef.Selector, err)
 		}
@@ -185,7 +185,7 @@ func populateAddresses(ds datastore.DataStore, chainDef *ChainDefinition, adapte
 
 	defaultInboundCCVs := make([]datastore.AddressRef, 0, len(chainDef.DefaultInboundCCVs))
 	for _, ccv := range chainDef.DefaultInboundCCVs {
-		resolvedCCV, err := datastore_utils.FindAndFormatRef(ds, ccv, chainDef.Selector, datastore_utils.FullRef)
+		resolvedCCV, err := datastore_utils.FindAndFormatRef(ds, ccv, ccv.ChainSelector, datastore_utils.FullRef)
 		if err != nil {
 			return fmt.Errorf("failed to resolve ccv ref on chain with selector %d: %w", chainDef.Selector, err)
 		}
@@ -195,7 +195,7 @@ func populateAddresses(ds datastore.DataStore, chainDef *ChainDefinition, adapte
 
 	defaultOutboundCCVs := make([]datastore.AddressRef, 0, len(chainDef.DefaultOutboundCCVs))
 	for _, ccv := range chainDef.DefaultOutboundCCVs {
-		resolvedCCV, err := datastore_utils.FindAndFormatRef(ds, ccv, chainDef.Selector, datastore_utils.FullRef)
+		resolvedCCV, err := datastore_utils.FindAndFormatRef(ds, ccv, ccv.ChainSelector, datastore_utils.FullRef)
 		if err != nil {
 			return fmt.Errorf("failed to resolve ccv ref on chain with selector %d: %w", chainDef.Selector, err)
 		}

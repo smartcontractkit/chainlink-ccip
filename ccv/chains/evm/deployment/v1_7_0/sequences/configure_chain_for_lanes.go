@@ -20,34 +20,14 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/executor"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/onramp"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/executor"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/proxy"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	executor_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/executor"
 	fqc "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/fee_quoter"
 )
-
-// ConfigureChainForLanesInput is the input for the ConfigureChainForLanes sequence.
-type ConfigureChainForLanesInput struct {
-	// The selector of the chain being configured.
-	ChainSelector uint64
-	// The Router address on the chain being configured.
-	// We assume that all connections defined will use the same router, either test or production.
-	Router string
-	// The OnRamp address on the chain being configured.
-	// Similarly, we assume that all connections will use the same OnRamp.
-	OnRamp string
-	// The CommitteeVerifiers on the chain being configured.
-	// There can be multiple committee verifiers on a chain, each controlled by a different entity.
-	CommitteeVerifiers []lanes.CommitteeVerifierConfig[datastore.AddressRef]
-	// The FeeQuoter address on the chain being configured.
-	FeeQuoter string
-	// The OffRamp address on the chain being configured
-	OffRamp string
-}
 
 var ConfigureLaneLegAsSource = cldf_ops.NewSequence(
 	"ConfigureLaneLegAsSource",
