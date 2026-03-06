@@ -243,7 +243,7 @@ var (
 				if err != nil {
 					return FeeQuoterUpdate{}, fmt.Errorf("failed to get lane version for remote chain %d: %w", remoteChain, err)
 				}
-				if !version.Equal(semver.MustParse("1.6.0")) {
+				if version == nil || !version.Equal(semver.MustParse("1.6.0")) {
 					continue
 				}
 				destChainConfig := cfg.DestChainCfg
@@ -398,7 +398,7 @@ var (
 				if err != nil {
 					return FeeQuoterUpdate{}, fmt.Errorf("failed to get lane version for remote chain %d: %w", remoteChain, err)
 				}
-				if !version.Equal(semver.MustParse("1.5.0")) {
+				if version == nil || !version.Equal(semver.MustParse("1.5.0")) {
 					continue
 				}
 				if staticCfg.LinkToken == (common.Address{}) {
