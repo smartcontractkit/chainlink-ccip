@@ -181,6 +181,13 @@ func AllCallersAllowed[C any, ARGS any](contract C, opts *bind.CallOpts, caller 
 	return true, nil
 }
 
+// NoCallersAllowed always returns false, forcing the write to be collected for a proposal
+// rather than executed directly. Use this for operations that must execute atomically
+// within an MCMS proposal alongside other owner-gated operations.
+func NoCallersAllowed[C any, ARGS any](contract C, opts *bind.CallOpts, caller common.Address, args ARGS) (bool, error) {
+	return false, nil
+}
+
 // NewBatchOperation constructs an MCMS BatchOperation from a slice of WriteOutputs.
 // It filters out any WriteOutputs that have already been executed.
 // Returns an error if the WriteOutputs target multiple chains.
