@@ -765,14 +765,14 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       }
     }
 
+    uint256 destAddressBytesLength = s_destChainConfigs[destChainSelector].addressBytesLength;
+
     return MessageV1Codec.TokenTransferV1({
       amount: destTokenAmount,
       sourcePoolAddress: abi.encode(sourcePool), // Source address, so abi encoded.
       sourceTokenAddress: abi.encode(tokenAndAmount.token), // Source address, so abi encoded.
-      destTokenAddress: _validateDestChainAddress(
-        poolReturnData.destTokenAddress, s_destChainConfigs[destChainSelector].addressBytesLength
-      ), // Dest address so unpadded bytes.
-      tokenReceiver: _validateDestChainAddress(receiver, s_destChainConfigs[destChainSelector].addressBytesLength), // Dest address so unpadded bytes.
+      destTokenAddress: _validateDestChainAddress(poolReturnData.destTokenAddress, destAddressBytesLength), // Dest address so unpadded bytes.
+      tokenReceiver: _validateDestChainAddress(receiver, destAddressBytesLength), // Dest address so unpadded bytes.
       extraData: poolReturnData.destPoolData
     });
   }
