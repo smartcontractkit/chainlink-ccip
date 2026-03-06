@@ -17,7 +17,11 @@ contract CCIPClientExampleWithCCVs is CCIPClientExample {
   error ZeroAddressNotAllowedAsOptional();
 
   event CCVConfigSet(
-    uint64 indexed sourceChainSelector, address[] requiredCCVs, address[] optionalCCVs, uint8 optionalThreshold
+    uint64 indexed sourceChainSelector,
+    address[] requiredCCVs,
+    address[] optionalCCVs,
+    uint8 optionalThreshold,
+    bool requireFinality
   );
 
   /// @notice CCV configuration for a source chain.
@@ -27,6 +31,7 @@ contract CCIPClientExampleWithCCVs is CCIPClientExample {
     address[] requiredCCVs;
     address[] optionalCCVs;
     uint8 optionalThreshold;
+    bool requireFinality;
   }
 
   /// @notice Arguments required to add a CCV configuration for a source chain.
@@ -35,6 +40,7 @@ contract CCIPClientExampleWithCCVs is CCIPClientExample {
     address[] optionalCCVs;
     uint64 sourceChainSelector;
     uint8 optionalThreshold;
+    bool requireFinality;
   }
 
   /// @notice CCV configurations by source chain selector.
@@ -77,16 +83,22 @@ contract CCIPClientExampleWithCCVs is CCIPClientExample {
         }
       }
       s_ccvConfigs[args.sourceChainSelector] = CCVConfig({
-        requiredCCVs: args.requiredCCVs, optionalCCVs: args.optionalCCVs, optionalThreshold: args.optionalThreshold
+        requiredCCVs: args.requiredCCVs,
+        optionalCCVs: args.optionalCCVs,
+        optionalThreshold: args.optionalThreshold,
+        requireFinality: args.requireFinality
       });
-      emit CCVConfigSet(args.sourceChainSelector, args.requiredCCVs, args.optionalCCVs, args.optionalThreshold);
+      emit CCVConfigSet(
+        args.sourceChainSelector, args.requiredCCVs, args.optionalCCVs, args.optionalThreshold, args.requireFinality
+      );
     }
   }
 
   /// @notice Provides the required and optional CCVs for a source chain.
   /// @dev OffRamp will apply the defaults for the lane if no CCVs are defined for a source chain.
   function getCCVs(
-    uint64 sourceChainSelector
+    uint64 sourceChainSelector,
+    uint16 finality
   )
     external
     view
@@ -95,6 +107,9 @@ contract CCIPClientExampleWithCCVs is CCIPClientExample {
     returns (address[] memory requiredCCVs, address[] memory optionalCCVs, uint8 optionalThreshold)
   {
     CCVConfig memory config = s_ccvConfigs[sourceChainSelector];
+    if (config.requireFinality && finality != 0) {
+      revert BlockDepthNotSupported(sourceChainSelector, finality);
+    }
     return (config.requiredCCVs, config.optionalCCVs, config.optionalThreshold);
   }
 }

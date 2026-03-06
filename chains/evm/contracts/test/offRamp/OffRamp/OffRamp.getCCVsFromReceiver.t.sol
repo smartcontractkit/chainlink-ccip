@@ -31,7 +31,7 @@ contract OffRamp_getCCVsFromReceiver is OffRampSetup {
     MockReceiverV2 receiver = new MockReceiverV2(userRequired, userOptional, optionalThresholdRequested);
 
     (address[] memory requiredFromReceiver, address[] memory optionalFromReceiver, uint8 optionalThreshold) =
-      s_offRamp.getCCVsFromReceiver(SOURCE_CHAIN_SELECTOR, address(receiver));
+      s_offRamp.getCCVsFromReceiver(SOURCE_CHAIN_SELECTOR, address(receiver), 0);
 
     assertEq(requiredFromReceiver.length, userRequired.length);
     assertEq(requiredFromReceiver[0], userRequired[0]);
@@ -48,7 +48,7 @@ contract OffRamp_getCCVsFromReceiver is OffRampSetup {
     MockReceiverV2 receiver = new MockReceiverV2(emptyRequired, emptyOptional, 0);
 
     (address[] memory requiredFromReceiver, address[] memory optionalFromReceiver, uint8 optionalThresholdRequested) =
-      s_offRamp.getCCVsFromReceiver(SOURCE_CHAIN_SELECTOR, address(receiver));
+      s_offRamp.getCCVsFromReceiver(SOURCE_CHAIN_SELECTOR, address(receiver), 0);
 
     assertEq(requiredFromReceiver.length, 1);
     assertEq(requiredFromReceiver[0], address(0));
@@ -60,7 +60,7 @@ contract OffRamp_getCCVsFromReceiver is OffRampSetup {
     address eoa = makeAddr("eoa");
 
     (address[] memory requiredFromReceiver, address[] memory optionalFromReceiver, uint8 optionalThresholdRequested) =
-      s_offRamp.getCCVsFromReceiver(SOURCE_CHAIN_SELECTOR, eoa);
+      s_offRamp.getCCVsFromReceiver(SOURCE_CHAIN_SELECTOR, eoa, 0);
 
     assertEq(requiredFromReceiver.length, 1);
     assertEq(requiredFromReceiver[0], address(0));
@@ -73,7 +73,7 @@ contract OffRamp_getCCVsFromReceiver is OffRampSetup {
     vm.etch(contractAddress, "some source code");
 
     (address[] memory requiredFromReceiver, address[] memory optionalFromReceiver, uint8 optionalThresholdRequested) =
-      s_offRamp.getCCVsFromReceiver(SOURCE_CHAIN_SELECTOR, contractAddress);
+      s_offRamp.getCCVsFromReceiver(SOURCE_CHAIN_SELECTOR, contractAddress, 0);
 
     assertEq(requiredFromReceiver.length, 1);
     assertEq(requiredFromReceiver[0], address(0));
@@ -92,6 +92,6 @@ contract OffRamp_getCCVsFromReceiver is OffRampSetup {
     vm.expectRevert(
       abi.encodeWithSelector(OffRamp.InvalidOptionalThreshold.selector, tooHighThreshold, userOptional.length)
     );
-    s_offRamp.getCCVsFromReceiver(SOURCE_CHAIN_SELECTOR, address(receiver));
+    s_offRamp.getCCVsFromReceiver(SOURCE_CHAIN_SELECTOR, address(receiver), 0);
   }
 }

@@ -24,9 +24,10 @@ contract OffRampHelper is OffRamp {
 
   function getCCVsFromReceiver(
     uint64 sourceChainSelector,
-    address receiver
+    address receiver,
+    uint16 finality
   ) external view returns (address[] memory, address[] memory, uint8) {
-    return _getCCVsFromReceiver(sourceChainSelector, receiver);
+    return _getCCVsFromReceiver(sourceChainSelector, receiver, finality);
   }
 
   function getCCVsFromPool(
