@@ -4,8 +4,6 @@ pragma solidity ^0.8.0;
 import {IAny2EVMMessageReceiver} from "./IAny2EVMMessageReceiver.sol";
 
 interface IAny2EVMMessageReceiverV2 is IAny2EVMMessageReceiver {
-  error BlockDepthNotSupported(uint64 sourceChainSelector, uint16 finality);
-
   /// @notice Get the CCV configuration for a source chain and validate the finality requirement.
   /// @dev The requestedBlockDepth parameter provided MUST be checked, or anyone will be able to send messages with any
   /// level of finality to the receiver. In most cases, the receiver will want to require a certain level of finality.

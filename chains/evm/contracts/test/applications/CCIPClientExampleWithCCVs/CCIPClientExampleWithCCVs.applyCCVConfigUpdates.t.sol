@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {CCIPClientExampleWithCCVs} from "../../../applications/CCIPClientExampleWithCCVs.sol";
-import {IAny2EVMMessageReceiverV2} from "../../../interfaces/IAny2EVMMessageReceiverV2.sol";
+import {CCIPReceiver} from "../../../applications/CCIPReceiver.sol";
 import {RouterSetup} from "../../Router/RouterSetup.t.sol";
 
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
@@ -165,9 +165,7 @@ contract CCIPClientExampleWithCCVs_applyCCVConfigUpdates is RouterSetup {
 
     uint16 nonZeroFinality = 5;
     vm.expectRevert(
-      abi.encodeWithSelector(
-        IAny2EVMMessageReceiverV2.FinalityRequired.selector, SOURCE_CHAIN_SELECTOR, nonZeroFinality
-      )
+      abi.encodeWithSelector(CCIPReceiver.BlockDepthNotSupported.selector, SOURCE_CHAIN_SELECTOR, nonZeroFinality)
     );
     s_client.getCCVs(SOURCE_CHAIN_SELECTOR, nonZeroFinality);
   }

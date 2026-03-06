@@ -10,6 +10,8 @@ import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165
 
 /// @title CCIPReceiver - Base contract for CCIP applications that can receive messages.
 abstract contract CCIPReceiver is IAny2EVMMessageReceiverV2, IERC165 {
+  error BlockDepthNotSupported(uint64 sourceChainSelector, uint16 finality);
+
   address internal immutable i_ccipRouter;
 
   constructor(
