@@ -142,15 +142,14 @@ func populateAddresses(ds datastore.DataStore, chainDef *ChainDefinition, adapte
 	if err != nil {
 		return fmt.Errorf("error fetching router address for chain %d: %w", chainDef.Selector, err)
 	}
-	// Below here is 2.0 only
+	// handle v2 separately
+	return populateAddressesV2(ds, chainDef, adapter, version)
+}
+
+// This function is V2 fields only
+func populateAddressesV2(ds datastore.DataStore, chainDef *ChainDefinition, adapter LaneAdapter, version *semver.Version) error {
 	if version.LessThan(common_utils.Version_2_0_0) {
 		return nil
-	}
-	if chainDef.CantonLaneConfig != nil {
-		chainDef.CantonLaneConfig.GlobalConfig, err = datastore_utils.FindAndFormatRef(ds, chainDef.CantonLaneConfig.GlobalConfig, chainDef.Selector, datastore_utils.FullRef)
-		if err != nil {
-			return fmt.Errorf("error fetching Canton global config address for chain %d: %w", chainDef.Selector, err)
-		}
 	}
 	committeeVerifiers := make([]CommitteeVerifierConfig[datastore.AddressRef], len(chainDef.CommitteeVerifiers))
 	for i, verifier := range chainDef.CommitteeVerifiers {
