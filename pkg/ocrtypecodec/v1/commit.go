@@ -72,10 +72,10 @@ func (c *CommitCodecProto) DecodeQuery(data []byte) (committypes.Query, error) {
 
 	q := committypes.Query{
 		MerkleRootQuery: merkleroot.Query{
-			RetryRMNSignatures: pbQ.MerkleRootQuery.RetryRmnSignatures,
+			RetryRMNSignatures: pbQ.GetMerkleRootQuery().GetRetryRmnSignatures(),
 			RMNSignatures: &rmn.ReportSignatures{
-				Signatures:  c.tr.rmnSignaturesFromProto(pbQ.MerkleRootQuery.RmnSignatures.Signatures),
-				LaneUpdates: c.tr.laneUpdatesFromProto(pbQ.MerkleRootQuery.RmnSignatures.LaneUpdates),
+				Signatures:  c.tr.rmnSignaturesFromProto(pbQ.GetMerkleRootQuery().GetRmnSignatures().GetSignatures()),
+				LaneUpdates: c.tr.laneUpdatesFromProto(pbQ.GetMerkleRootQuery().GetRmnSignatures().GetLaneUpdates()),
 			},
 		},
 		TokenPriceQuery: tokenprice.Query{},
