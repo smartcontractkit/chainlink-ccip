@@ -432,6 +432,8 @@ func getExpectedOutput() map[uint64]sequences.FeeQuoterUpdate {
 
 	// Chain 5009297550715157269: Has FeeQuoter v1.6.3 + OnRamp v1.5.0
 	// Since no FeeQuoter v2.0.0 exists, it's a new deployment (ConstructorArgs populated)
+	// we will use only use RemoteChainSelector 15971525489660198786 in sequence input for 5009297550715157269
+	// therefore only 15971525489660198786's DestChainConfig and TokenTransferFeeConfig will be included in expected output
 	expected[5009297550715157269] = sequences.FeeQuoterUpdate{
 		ChainSelector: 5009297550715157269,
 		ConstructorArgs: fqops.ConstructorArgs{
@@ -461,22 +463,6 @@ func getExpectedOutput() map[uint64]sequences.FeeQuoterUpdate {
 						LinkFeeMultiplierPercent:    90,
 					},
 				},
-				{
-					DestChainSelector: 4949039107694359620,
-					DestChainConfig: fqops.DestChainConfig{
-						IsEnabled:                   true,
-						MaxDataBytes:                10000,
-						MaxPerMsgGasLimit:           5000000,
-						DestGasOverhead:             100000,
-						DestGasPerPayloadByteBase:   16,
-						ChainFamilySelector:         utils.GetSelectorHex(4949039107694359620),
-						DefaultTokenFeeUSDCents:     0,
-						DefaultTokenDestGasOverhead: 0,
-						DefaultTxGasLimit:           200000,
-						NetworkFeeUSDCents:          10,
-						LinkFeeMultiplierPercent:    90,
-					},
-				},
 			},
 			TokenTransferFeeConfigArgs: []fqops.TokenTransferFeeConfigArgs{
 				{
@@ -488,29 +474,6 @@ func getExpectedOutput() map[uint64]sequences.FeeQuoterUpdate {
 								FeeUSDCents:       4,
 								DestGasOverhead:   25000,
 								DestBytesOverhead: 80,
-								IsEnabled:         true,
-							},
-						},
-					},
-				},
-				{
-					DestChainSelector: 4949039107694359620,
-					TokenTransferFeeConfigs: []fqops.TokenTransferFeeConfigSingleTokenArgs{
-						{
-							Token: common.HexToAddress("0x2222222222222222222222222222222222222222"),
-							TokenTransferFeeConfig: fqops.TokenTransferFeeConfig{
-								FeeUSDCents:       5,
-								DestGasOverhead:   30000,
-								DestBytesOverhead: 100,
-								IsEnabled:         true,
-							},
-						},
-						{
-							Token: common.HexToAddress("0x3333333333333333333333333333333333333333"),
-							TokenTransferFeeConfig: fqops.TokenTransferFeeConfig{
-								FeeUSDCents:       10,
-								DestGasOverhead:   40000,
-								DestBytesOverhead: 200,
 								IsEnabled:         true,
 							},
 						},
@@ -848,6 +811,15 @@ func TestSequenceFeeQuoterInputCreation(t *testing.T) {
 			ContractMeta:      contractMeta,
 		}
 
+		// Get expected output (hardcoded based on contract_metadata.json)
+		expectedMap := getExpectedOutput()
+		expected, hasExpected := expectedMap[chainSelector]
+		require.True(t, hasExpected, "Expected output should exist for chain %d", chainSelector)
+
+		// to test selective remote Chain selectors
+		if chainSelector == 5009297550715157269 {
+			input.RemoteChainSelectors = []uint64{15971525489660198786}
+		}
 		// Execute the sequence
 		report, err := cldf_ops.ExecuteSequence(
 			e.OperationsBundle,
@@ -869,11 +841,6 @@ func TestSequenceFeeQuoterInputCreation(t *testing.T) {
 		// Verify basic output structure
 		require.Equal(t, chainSelector, output.ChainSelector, "Chain selector should match input")
 		require.Equal(t, existingAddresses, output.ExistingAddresses, "Existing addresses should match input")
-
-		// Get expected output (hardcoded based on contract_metadata.json)
-		expectedMap := getExpectedOutput()
-		expected, hasExpected := expectedMap[chainSelector]
-		require.True(t, hasExpected, "Expected output should exist for chain %d", chainSelector)
 
 		// Verify that the output has meaningful data
 		// At least one of these should be populated:

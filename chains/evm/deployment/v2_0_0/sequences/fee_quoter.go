@@ -233,6 +233,15 @@ var (
 			isNewFQV2Deployment := datastore_utils.IsAddressRefEmpty(feeQuoterRef)
 			tokenTransferFeeConfigArgs := make([]fqops.TokenTransferFeeConfigArgs, 0)
 			allDestChainConfigs := make([]fqops.DestChainConfigArgs, 0)
+			var providedRemoteChains map[uint64]struct{}
+			if len(input.RemoteChainSelectors) > 0 {
+				// initialize providedRemoteChains map if remote chains are provided in the input,
+				// this means we only want to import config for those remote chains from 1.6
+				providedRemoteChains = make(map[uint64]struct{})
+				for _, remoteChain := range input.RemoteChainSelectors {
+					providedRemoteChains[remoteChain] = struct{}{}
+				}
+			}
 			for remoteChain, cfg := range fqOutput.RemoteChainCfgs {
 				if !cfg.DestChainCfg.IsEnabled {
 					continue
@@ -245,6 +254,13 @@ var (
 				}
 				if version == nil || !version.Equal(semver.MustParse("1.6.0")) {
 					continue
+				}
+				// if remote chains are provided in the input, we only import config for those remote chains,
+				// otherwise we import config for all supported remote chains in 1.6
+				if providedRemoteChains != nil {
+					if _, exists := providedRemoteChains[remoteChain]; !exists {
+						continue
+					}
 				}
 				destChainConfig := cfg.DestChainCfg
 				outDestchainCfg := fqops.DestChainConfigArgs{
@@ -381,7 +397,15 @@ var (
 			var staticCfg fqops.StaticConfig
 			var destChainCfgs []fqops.DestChainConfigArgs
 			var tokenTransferFeeConfigArgsForAll []fqops.TokenTransferFeeConfigArgs
-
+			var providedRemoteChains map[uint64]struct{}
+			if len(input.RemoteChainSelectors) > 0 {
+				// initialize providedRemoteChains map if remote chain selectors are provided in the input,
+				// so that we can check against this map when importing config for each remote chain from onRamp 1.5.0
+				providedRemoteChains = make(map[uint64]struct{})
+				for _, remoteChain := range input.RemoteChainSelectors {
+					providedRemoteChains[remoteChain] = struct{}{}
+				}
+			}
 			for _, meta := range onRampMetadata {
 				var tokenTransferFeeConfigArgs []fqops.TokenTransferFeeConfigSingleTokenArgs
 
@@ -400,6 +424,13 @@ var (
 				}
 				if version == nil || !version.Equal(semver.MustParse("1.5.0")) {
 					continue
+				}
+				// if remote chains are provided in the input, we only import config for those remote chains,
+				// otherwise we import config for all supported remote chains in the 1.5
+				if providedRemoteChains != nil {
+					if _, exists := providedRemoteChains[remoteChain]; !exists {
+						continue
+					}
 				}
 				if staticCfg.LinkToken == (common.Address{}) {
 					staticCfg = fqops.StaticConfig{
