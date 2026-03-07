@@ -44,6 +44,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   error SkippedAlreadyExecutedMessage(bytes32 messageId, uint64 sourceChainSelector, uint64 messageNumber);
   error ReentrancyGuardReentrantCall();
   error RequiredCCVMissing(address requiredCCV);
+  error ReceiverDoesNotSupportCustomFinality(address receiver, uint16 finality);
   error InvalidNumberOfTokens(uint256 numTokens);
   error InvalidOnRamp(bytes got);
   error InvalidOffRamp(address expected, bytes got);
@@ -505,7 +506,8 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       }
     } else {
       // The transfer is not token-only, we query the receiver for its CCV requirements.
-      (requiredReceiverCCVs, optionalCCVs, optionalThreshold) = _getCCVsFromReceiver(sourceChainSelector, receiver);
+      (requiredReceiverCCVs, optionalCCVs, optionalThreshold) =
+        _getCCVsFromReceiver(sourceChainSelector, receiver, finality);
     }
 
     address[] storage laneMandatedCCVs = s_sourceChainConfigs[sourceChainSelector].laneMandatedCCVs;
@@ -672,16 +674,19 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// @dev This function reverts if the receiver returns duplicates in either the required or optional CCVs.
   /// @param sourceChainSelector The source chain selector.
   /// @param receiver The receiver address.
+  /// @param finality The finality requirement of the message.
   /// @return requiredCCV The required CCVs.
   /// @return optionalCCVs The optional CCVs.
   /// @return optionalThreshold The threshold of optional CCVs.
   function _getCCVsFromReceiver(
     uint64 sourceChainSelector,
-    address receiver
+    address receiver,
+    uint16 finality
   ) internal view returns (address[] memory requiredCCV, address[] memory optionalCCVs, uint8 optionalThreshold) {
     // Only query for custom CCVs if the receiver supports the interface.
     if (receiver._supportsInterfaceReverting(type(IAny2EVMMessageReceiverV2).interfaceId)) {
-      (requiredCCV, optionalCCVs, optionalThreshold) = IAny2EVMMessageReceiverV2(receiver).getCCVs(sourceChainSelector);
+      (requiredCCV, optionalCCVs, optionalThreshold) =
+        IAny2EVMMessageReceiverV2(receiver).getCCVs(sourceChainSelector, finality);
 
       CCVConfigValidation._assertNoDuplicates(requiredCCV);
       CCVConfigValidation._assertNoDuplicates(optionalCCVs);
@@ -695,6 +700,12 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       // If they did specify something, we use what they specified.
       if (requiredCCV.length != 0 || optionalThreshold != 0) {
         return (requiredCCV, optionalCCVs, optionalThreshold);
+      }
+    } else {
+      // If the receiver does not support the V2 interface it cannot support FTF. This is to protect anyone not
+      // explicitly opting in to support FTF from accidentally allowing messages with FTF finality to be executed.
+      if (finality != 0) {
+        revert ReceiverDoesNotSupportCustomFinality(receiver, finality);
       }
     }
 

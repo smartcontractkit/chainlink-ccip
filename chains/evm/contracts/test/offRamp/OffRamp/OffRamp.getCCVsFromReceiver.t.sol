@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {CCIPReceiver} from "../../../applications/CCIPReceiver.sol";
+import {IAny2EVMMessageReceiverV2} from "../../../interfaces/IAny2EVMMessageReceiverV2.sol";
 import {OffRamp} from "../../../offRamp/OffRamp.sol";
 import {MockReceiverV2} from "../../mocks/MockReceiverV2.sol";
 import {OffRampSetup} from "./OffRampSetup.t.sol";
@@ -31,7 +33,7 @@ contract OffRamp_getCCVsFromReceiver is OffRampSetup {
     MockReceiverV2 receiver = new MockReceiverV2(userRequired, userOptional, optionalThresholdRequested);
 
     (address[] memory requiredFromReceiver, address[] memory optionalFromReceiver, uint8 optionalThreshold) =
-      s_offRamp.getCCVsFromReceiver(SOURCE_CHAIN_SELECTOR, address(receiver));
+      s_offRamp.getCCVsFromReceiver(SOURCE_CHAIN_SELECTOR, address(receiver), 0);
 
     assertEq(requiredFromReceiver.length, userRequired.length);
     assertEq(requiredFromReceiver[0], userRequired[0]);
@@ -48,7 +50,7 @@ contract OffRamp_getCCVsFromReceiver is OffRampSetup {
     MockReceiverV2 receiver = new MockReceiverV2(emptyRequired, emptyOptional, 0);
 
     (address[] memory requiredFromReceiver, address[] memory optionalFromReceiver, uint8 optionalThresholdRequested) =
-      s_offRamp.getCCVsFromReceiver(SOURCE_CHAIN_SELECTOR, address(receiver));
+      s_offRamp.getCCVsFromReceiver(SOURCE_CHAIN_SELECTOR, address(receiver), 0);
 
     assertEq(requiredFromReceiver.length, 1);
     assertEq(requiredFromReceiver[0], address(0));
@@ -60,7 +62,7 @@ contract OffRamp_getCCVsFromReceiver is OffRampSetup {
     address eoa = makeAddr("eoa");
 
     (address[] memory requiredFromReceiver, address[] memory optionalFromReceiver, uint8 optionalThresholdRequested) =
-      s_offRamp.getCCVsFromReceiver(SOURCE_CHAIN_SELECTOR, eoa);
+      s_offRamp.getCCVsFromReceiver(SOURCE_CHAIN_SELECTOR, eoa, 0);
 
     assertEq(requiredFromReceiver.length, 1);
     assertEq(requiredFromReceiver[0], address(0));
@@ -73,7 +75,46 @@ contract OffRamp_getCCVsFromReceiver is OffRampSetup {
     vm.etch(contractAddress, "some source code");
 
     (address[] memory requiredFromReceiver, address[] memory optionalFromReceiver, uint8 optionalThresholdRequested) =
-      s_offRamp.getCCVsFromReceiver(SOURCE_CHAIN_SELECTOR, contractAddress);
+      s_offRamp.getCCVsFromReceiver(SOURCE_CHAIN_SELECTOR, contractAddress, 0);
+
+    assertEq(requiredFromReceiver.length, 1);
+    assertEq(requiredFromReceiver[0], address(0));
+    assertEq(optionalFromReceiver.length, 0);
+    assertEq(optionalThresholdRequested, 0);
+  }
+
+  function test_getCCVsFromReceiver_contractV2_succeedsWithFinality() public {
+    address[] memory userRequired = new address[](1);
+    userRequired[0] = s_userRequiredCCV;
+
+    MockReceiverV2 receiver = new MockReceiverV2(userRequired, new address[](0), 0);
+
+    (address[] memory requiredFromReceiver,,) =
+      s_offRamp.getCCVsFromReceiver(SOURCE_CHAIN_SELECTOR, address(receiver), 0);
+
+    assertEq(requiredFromReceiver.length, 1);
+    assertEq(requiredFromReceiver[0], s_userRequiredCCV);
+  }
+
+  function test_getCCVsFromReceiver_contractV2_succeedsWithNonZeroFinality() public {
+    address[] memory userRequired = new address[](1);
+    userRequired[0] = s_userRequiredCCV;
+
+    MockReceiverV2 receiver = new MockReceiverV2(userRequired, new address[](0), 0);
+
+    (address[] memory requiredFromReceiver,,) =
+      s_offRamp.getCCVsFromReceiver(SOURCE_CHAIN_SELECTOR, address(receiver), 5);
+
+    assertEq(requiredFromReceiver.length, 1);
+    assertEq(requiredFromReceiver[0], s_userRequiredCCV);
+  }
+
+  function test_getCCVsFromReceiver_contractNoV2_fallsBackToDefaults_WhenFinalized() public {
+    address contractAddress = makeAddr("contract");
+    vm.etch(contractAddress, "some source code");
+
+    (address[] memory requiredFromReceiver, address[] memory optionalFromReceiver, uint8 optionalThresholdRequested) =
+      s_offRamp.getCCVsFromReceiver(SOURCE_CHAIN_SELECTOR, contractAddress, 0);
 
     assertEq(requiredFromReceiver.length, 1);
     assertEq(requiredFromReceiver[0], address(0));
@@ -92,6 +133,37 @@ contract OffRamp_getCCVsFromReceiver is OffRampSetup {
     vm.expectRevert(
       abi.encodeWithSelector(OffRamp.InvalidOptionalThreshold.selector, tooHighThreshold, userOptional.length)
     );
-    s_offRamp.getCCVsFromReceiver(SOURCE_CHAIN_SELECTOR, address(receiver));
+    s_offRamp.getCCVsFromReceiver(SOURCE_CHAIN_SELECTOR, address(receiver), 0);
+  }
+
+  function test_getCCVsFromReceiver_RevertWhen_ReceiverRejectsFinalityValue() public {
+    address[] memory userRequired = new address[](1);
+    userRequired[0] = s_userRequiredCCV;
+    uint16 rejectedFinality = 10;
+
+    bytes memory err =
+      abi.encodeWithSelector(CCIPReceiver.BlockDepthNotSupported.selector, SOURCE_CHAIN_SELECTOR, rejectedFinality);
+
+    MockReceiverV2 receiver = new MockReceiverV2(userRequired, new address[](0), 0);
+
+    vm.mockCallRevert(
+      address(receiver),
+      abi.encodeWithSelector(IAny2EVMMessageReceiverV2.getCCVs.selector, SOURCE_CHAIN_SELECTOR, rejectedFinality),
+      err
+    );
+
+    vm.expectRevert(err);
+    s_offRamp.getCCVsFromReceiver(SOURCE_CHAIN_SELECTOR, address(receiver), rejectedFinality);
+  }
+
+  function test_getCCVsFromReceiver_RevertWhen_contractNoV2_NonZeroFinality() public {
+    address contractAddress = makeAddr("contract");
+    vm.etch(contractAddress, "some source code");
+
+    uint16 nonZeroFinality = 5;
+    vm.expectRevert(
+      abi.encodeWithSelector(OffRamp.ReceiverDoesNotSupportCustomFinality.selector, contractAddress, nonZeroFinality)
+    );
+    s_offRamp.getCCVsFromReceiver(SOURCE_CHAIN_SELECTOR, contractAddress, nonZeroFinality);
   }
 }

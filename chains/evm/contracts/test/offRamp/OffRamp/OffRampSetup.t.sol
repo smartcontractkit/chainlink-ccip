@@ -96,10 +96,10 @@ contract OffRampSetup is BaseTest {
       abi.encode(true)
     );
 
-    // Mock getCCVs function.
+    // Mock getCCVs function. Using encodeWithSelector to match any finality value.
     vm.mockCall(
       receiver,
-      abi.encodeCall(IAny2EVMMessageReceiverV2.getCCVs, (sourceChainSelector)),
+      abi.encodeWithSelector(IAny2EVMMessageReceiverV2.getCCVs.selector, sourceChainSelector),
       abi.encode(requiredCCVs, optionalCCVs, optionalThreshold)
     );
   }

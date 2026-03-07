@@ -10,6 +10,8 @@ import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165
 
 /// @title CCIPReceiver - Base contract for CCIP applications that can receive messages.
 abstract contract CCIPReceiver is IAny2EVMMessageReceiverV2, IERC165 {
+  error BlockDepthNotSupported(uint64 sourceChainSelector, uint16 finality);
+
   address internal immutable i_ccipRouter;
 
   constructor(
@@ -59,13 +61,18 @@ abstract contract CCIPReceiver is IAny2EVMMessageReceiverV2, IERC165 {
   /// @dev this can be overridden to specify different CCVs per source chain. The current implementation means the
   /// default CCV is used.
   function getCCVs(
-    uint64
+    uint64 sourceChainSelector,
+    uint16 finality
   )
     external
     view
     virtual
     returns (address[] memory requiredCCVs, address[] memory optionalCCVs, uint8 optionalThreshold)
   {
+    // By default we require finality, it should be explicitly overridden if a receiver wants FTF.
+    if (finality != 0) {
+      revert BlockDepthNotSupported(sourceChainSelector, finality);
+    }
     // By default no specific CCVs are required or optional. This means the default CCV is chosen.
     return (new address[](0), new address[](0), 0);
   }
