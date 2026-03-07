@@ -49,7 +49,8 @@ func GetSolProgramSize(chain cldf_solana.Chain, programID solana.PublicKey) (int
 func GetSolProgramData(client *solrpc.Client, programID solana.PublicKey) (struct {
 	DataType uint32
 	Address  solana.PublicKey
-}, error) {
+}, error,
+) {
 	var programData struct {
 		DataType uint32
 		Address  solana.PublicKey
@@ -124,6 +125,19 @@ func GetTokenProgramID(programName cldf_deployment.ContractType) (solana.PublicK
 		return solana.PublicKey{}, fmt.Errorf("invalid token program: %s. Must be one of: %s, %s", programName, SPLTokens, SPL2022Tokens)
 	}
 	return programID, nil
+}
+
+func GetTokenProgramType(programID solana.PublicKey) (cldf_deployment.ContractType, error) {
+	tokenPrograms := map[solana.PublicKey]cldf_deployment.ContractType{
+		solana.TokenProgramID:     SPLTokens,
+		solana.Token2022ProgramID: SPL2022Tokens,
+	}
+
+	programName, ok := tokenPrograms[programID]
+	if !ok {
+		return "", fmt.Errorf("invalid token program ID: %s. Must be one of: %s, %s", programID, solana.TokenProgramID, solana.Token2022ProgramID)
+	}
+	return programName, nil
 }
 
 func MintTokens(chain cldf_solana.Chain, tokenProgramID, mint solana.PublicKey, amountToAddress map[string]uint64) error {
