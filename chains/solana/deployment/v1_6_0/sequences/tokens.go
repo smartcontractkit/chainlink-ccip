@@ -204,20 +204,25 @@ func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualR
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
 
-			// Optimization: if we're given an address, then we can skip a datastore lookup altogether and infer everything we need
-			// from the chain. This will allow us to handle any token we need rather than being restricted to those that are stored
-			// in the datastore.
+			// Optimization: if we're given an address, then we will attempt to skip the datastore lookup
+			// altogether and infer everything we need from the chain. With this optimization, we will no
+			// longer be restricted to registering tokens that only live in the datastore. This is a best
+			// effort optimization - if we can't use on chain data, then we will fallback to the original
+			// approach of querying the datastore.
 			var tokenProg solana.PublicKey
 			var tokenMint solana.PublicKey
 			var tokenSymb string
 			if input.TokenRef.Address != "" {
-				tokenMint = solana.MustPublicKeyFromBase58(input.TokenRef.Address)
-				if tokProgramID, err := tokens.GetTokenProgramID(b.GetContext(), chain.Client, tokenMint); err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to get token program ID: %w", err)
-				} else {
+				tokenAddr := solana.MustPublicKeyFromBase58(input.TokenRef.Address)
+				if tokProgramID, err := tokens.GetTokenProgramID(b.GetContext(), chain.Client, tokenMint); err == nil {
 					tokenProg = tokProgramID
+					tokenMint = tokenAddr
+				} else {
+					b.Logger.Warnf("Failed to read onchain token program ID for token address %s (err = %v). Falling back to datastore lookup.", tokenAddr.String(), err)
 				}
-			} else {
+			}
+
+			if tokenMint.IsZero() || tokenProg.IsZero() {
 				if tokRef, tokProgramID, err := getTokenMintAndTokenProgram(input.ExistingDataStore, input.TokenRef, chain); err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to get token and token program address using the specified reference (%+v): %w", input.TokenRef, err)
 				} else {
@@ -348,17 +353,31 @@ func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualR
 				result.BatchOps = append(result.BatchOps, createTokenMultisigOutput.Output.BatchOps...)
 			}
 
-			// If we have enough info to store this token in the
-			// DS then we will do so for record keeping purposes
+			// Manual registration can be used on tokens that aren't in the datastore
+			// (e.g. a customer deployed the token themselves). If we come across one
+			// of these tokens, then it will only be added to the datastore if (1) we
+			// have enough info to rebuild the full ref, and (2) it truly is the case
+			// that the ref does not already exist in the datastore.
 			if tokenSymb != "" {
-				result.Addresses = append(result.Addresses, datastore.AddressRef{
+				tokenType, err := utils.GetTokenProgramType(tokenProg)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to get token program type: %w", err)
+				}
+
+				tokenRef := datastore.AddressRef{
 					ChainSelector: input.ChainSelector,
 					Qualifier:     tokenSymb,
 					Address:       tokenMint.String(),
 					Version:       tokensops.Version,
 					Labels:        datastore.NewLabelSet(),
-					Type:          datastore.ContractType(tokenProg.String()),
-				})
+					Type:          datastore.ContractType(tokenType.String()),
+				}
+				if _, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, tokenRef, input.ChainSelector, datastore_utils.FullRef); err != nil {
+					b.Logger.Infof("No existing datastore entry found for ref (%s). Adding to results.", datastore_utils.SprintRef(tokenRef))
+					result.Addresses = append(result.Addresses, tokenRef)
+				} else {
+					b.Logger.Infof("Datastore entry already exists for ref (%s). Not adding to results.", datastore_utils.SprintRef(tokenRef))
+				}
 			}
 
 			return result, nil

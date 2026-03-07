@@ -298,7 +298,7 @@ func GetTokenDataV2(metadata token_metadata.Metadata) token_metadata.DataV2 {
 func GetTokenProgramID(ctx context.Context, client *rpc.Client, tokenPubKey solana.PublicKey) (solana.PublicKey, error) {
 	tokenAcctInfo, err := client.GetAccountInfo(ctx, tokenPubKey)
 	if err != nil {
-		return solana.PublicKey{}, fmt.Errorf("failed to get account info for token account: %w", err)
+		return solana.PublicKey{}, fmt.Errorf("failed to get account info for token %s: %w", tokenPubKey.String(), err)
 	}
 
 	_, err = GetTokenMintInfo(tokenAcctInfo)
