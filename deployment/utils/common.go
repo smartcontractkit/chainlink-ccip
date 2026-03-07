@@ -31,6 +31,7 @@ const (
 	BurnWithFromMintTokenPool  cldf.ContractType = "BurnWithFromMintTokenPool"
 	BurnFromMintTokenPool      cldf.ContractType = "BurnFromMintTokenPool"
 	CCTPTokenPool              cldf.ContractType = "CCTPTokenPool"
+	FeeQuoter                  cldf.ContractType = "FeeQuoter"
 	// CLL Identifiers
 	CLLQualifier         = "CLLCCIP"
 	RMNTimelockQualifier = "RMNMCMS"
