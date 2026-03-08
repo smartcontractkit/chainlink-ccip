@@ -14,7 +14,6 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/adapters"
 	v1_7_0 "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
@@ -22,29 +21,9 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
 )
 
-func makeChainConfig(ds datastore.DataStore, chainSelector uint64, remoteChainSelector uint64) lanes.ChainDefinition {
-	a := &adapters.ChainFamilyAdapter{}
-	router, err := a.GetRouterAddress(ds, chainSelector)
-	if err != nil {
-		panic("failed to get router address: " + err.Error())
-	}
-	onRampAddr, err := a.GetOnRampAddress(ds, chainSelector)
-	if err != nil {
-		panic("failed to get onramp address: " + err.Error())
-	}
-	offRampAddr, err := a.GetOffRampAddress(ds, chainSelector)
-	if err != nil {
-		panic("failed to get offramp address: " + err.Error())
-	}
-	feeQuoterAddr, err := a.GetFQAddress(ds, chainSelector)
-	if err != nil {
-		panic("failed to get fee quoter address: " + err.Error())
-	}
-
+func makeChainConfig(chainSelector uint64, remoteChainSelector uint64) lanes.ChainDefinition {
 	return lanes.ChainDefinition{
 		Selector: chainSelector,
-		Router:   router,
-		OnRamp:   onRampAddr,
 		CommitteeVerifiers: []lanes.CommitteeVerifierConfig[datastore.AddressRef]{
 			{
 				CommitteeVerifier: []datastore.AddressRef{
@@ -64,8 +43,6 @@ func makeChainConfig(ds datastore.DataStore, chainSelector uint64, remoteChainSe
 				},
 			},
 		},
-		FeeQuoter: feeQuoterAddr,
-		OffRamp:   offRampAddr,
 		DefaultInboundCCVs: []datastore.AddressRef{
 			{
 				ChainSelector: chainSelector,
@@ -146,8 +123,8 @@ func TestChainFamilyAdapter(t *testing.T) {
 			_, err = lanes.ConnectChains(chainFamilyRegistry, mcmsRegistry).Apply(*e, lanes.ConnectChainsConfig{
 				Lanes: []lanes.LaneConfig{
 					{
-						ChainA:  makeChainConfig(e.DataStore, chainA, chainB),
-						ChainB:  makeChainConfig(e.DataStore, chainB, chainA),
+						ChainA:  makeChainConfig(chainA, chainB),
+						ChainB:  makeChainConfig(chainB, chainA),
 						Version: semver.MustParse("2.0.0"),
 					},
 				},

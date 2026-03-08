@@ -76,8 +76,8 @@ func TestLaneMigrator(t *testing.T) {
 			_, err = lanes.ConnectChains(chainFamilyRegistry, mcmsRegistry).Apply(*e, lanes.ConnectChainsConfig{
 				Lanes: []lanes.LaneConfig{
 					{
-						ChainA:  makeChainConfig(e.DataStore, chainA, chainB),
-						ChainB:  makeChainConfig(e.DataStore, chainB, chainA),
+						ChainA:  makeChainConfig(chainA, chainB),
+						ChainB:  makeChainConfig(chainB, chainA),
 						Version: semver.MustParse("2.0.0"),
 					},
 				},
