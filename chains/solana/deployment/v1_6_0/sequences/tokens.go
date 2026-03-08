@@ -214,7 +214,7 @@ func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualR
 			var tokenSymb string
 			if input.TokenRef.Address != "" {
 				tokenAddr := solana.MustPublicKeyFromBase58(input.TokenRef.Address)
-				if tokProgramID, err := tokens.GetTokenProgramID(b.GetContext(), chain.Client, tokenMint); err == nil {
+				if tokProgramID, err := tokens.GetTokenProgramID(b.GetContext(), chain.Client, tokenAddr); err == nil {
 					tokenProg = tokProgramID
 					tokenMint = tokenAddr
 				} else {
