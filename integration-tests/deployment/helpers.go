@@ -364,7 +364,6 @@ func EVMTransferOwnership(t *testing.T, e *cldf_deployment.Environment, selector
 			Description:          "Transfer ownership test",
 		},
 	}
-
 	transferOutput, err := mcmsapi.TransferOwnershipChangeset(mcmsapi.GetTransferOwnershipRegistry(), mcmsreaderapi.GetRegistry()).Apply(*e, mcmsInput)
 	require.NoError(t, err)
 	require.Greater(t, len(transferOutput.Reports), 0)

@@ -179,8 +179,8 @@ func GetFQAndRampUpdaterRegistry() *FQAndRampUpdaterRegistry {
 // deploys or updates the FeeQuoter contract, and finally updates the Ramps contracts to use the new FeeQuoter address.
 // This also supports downgrading the FQ contract to a prior version (i.e. a rollback) where only the ramps
 // are updated and the existing FQ is not touched. This would be triggered when specifying a FQ version < 2.0.0, which do not support re-configuration, and an existing FQ address is found in the datastore for the chain.
-func UpdateFeeQuoterChangeset(fquRegistry *FQAndRampUpdaterRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) cldf.ChangeSetV2[UpdateFeeQuoterInput] {
-	return cldf.CreateChangeSet(updateFeeQuoterApply(fquRegistry, mcmsRegistry), updateFeeQuoterVerify())
+func UpdateFeeQuoterChangeset() cldf.ChangeSetV2[UpdateFeeQuoterInput] {
+	return cldf.CreateChangeSet(updateFeeQuoterApply(), updateFeeQuoterVerify())
 }
 
 func updateFeeQuoterVerify() func(cldf.Environment, UpdateFeeQuoterInput) error {
@@ -213,12 +213,14 @@ func updateFeeQuoterVerify() func(cldf.Environment, UpdateFeeQuoterInput) error 
 	}
 }
 
-func updateFeeQuoterApply(fquRegistry *FQAndRampUpdaterRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, UpdateFeeQuoterInput) (cldf.ChangesetOutput, error) {
+func updateFeeQuoterApply() func(cldf.Environment, UpdateFeeQuoterInput) (cldf.ChangesetOutput, error) {
 	return func(e cldf.Environment, input UpdateFeeQuoterInput) (cldf.ChangesetOutput, error) {
 		batchOps := make([]mcms_types.BatchOperation, 0)
 		reports := make([]cldf_ops.Report[any, any], 0)
 		addressRefs := make([]datastore.AddressRef, 0)
 		contractMetadata := make([]datastore.ContractMetadata, 0)
+		fquRegistry := GetFQAndRampUpdaterRegistry()
+		mcmsRegistry := changesets.GetRegistry()
 		for chainSel, perChainInput := range input.Chains {
 			var feeQuoterAddrRef datastore.AddressRef
 			rampUpdater, ok := fquRegistry.GetRampUpdater(chainSel, perChainInput.RampsVersion)
@@ -230,10 +232,11 @@ func updateFeeQuoterApply(fquRegistry *FQAndRampUpdaterRegistry, mcmsRegistry *c
 				Type:          datastore.ContractType(utils.FeeQuoter),
 				Version:       perChainInput.FeeQuoterVersion,
 			}, chainSel, datastore_utils.FullRef)
+			isNewFeeQuoterDeployment := err != nil
 			// if we get an error, it could be because the address doesn't exist, which is fine -
 			// it means we need to deploy or update the FeeQuoter
 			// if we get a FQ ref, we can re-configure an existing FQ >= 2.0.0
-			if err != nil || feeQuoterAddrRef.Version.GreaterThanEqual(semver.MustParse("2.0.0")) {
+			if isNewFeeQuoterDeployment || feeQuoterAddrRef.Version.GreaterThanEqual(semver.MustParse("2.0.0")) {
 				e.Logger.Infof("No existing FeeQuoter address found for chain selector %d and version %s, proceeding with deployment and upgrade", chainSel, perChainInput.FeeQuoterVersion.String())
 				fquUpdater, ok := fquRegistry.GetFeeQuoterUpdater(chainSel, perChainInput.FeeQuoterVersion)
 				if !ok {
@@ -305,6 +308,16 @@ func updateFeeQuoterApply(fquRegistry *FQAndRampUpdaterRegistry, mcmsRegistry *c
 				// Update Ramps with new FeeQuoter address
 				// fetch the address refs
 				feeQuoterAddrRef = reportFQUpdate.Output.Addresses[len(reportFQUpdate.Output.Addresses)-1]
+
+				// Transfer ownership of newly deployed FeeQuoter to timelock
+				if isNewFeeQuoterDeployment {
+					fqTransferBatches, fqTransferReports, err := TransferToTimelock(chainSel, &e, input.MCMS, []datastore.AddressRef{feeQuoterAddrRef})
+					if err != nil {
+						return cldf.ChangesetOutput{}, fmt.Errorf("failed to transfer ownership to timelock for chain %d: %w", chainSel, err)
+					}
+					batchOps = append(batchOps, fqTransferBatches...)
+					reports = append(reports, fqTransferReports...)
+				}
 			}
 			if perChainInput.RampsVersion != nil {
 				rampsInput := UpdateRampsInput{
@@ -344,4 +357,58 @@ func updateFeeQuoterApply(fquRegistry *FQAndRampUpdaterRegistry, mcmsRegistry *c
 			WithSingleBatchOpPerChain(batchOps).
 			Build(input.MCMS)
 	}
+}
+
+func TransferToTimelock(chainSel uint64, e *cldf.Environment, mcms mcms.Input, addressRefs []datastore.AddressRef) ([]mcms_types.BatchOperation, []cldf_ops.Report[any, any], error) {
+	batchOps := make([]mcms_types.BatchOperation, 0)
+	reports := make([]cldf_ops.Report[any, any], 0)
+	mcmsRegistry := changesets.GetRegistry()
+	transferOwnershipReg := GetTransferOwnershipRegistry()
+	family, err := chain_selectors.GetSelectorFamily(chainSel)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get chain family for selector %d: %w", chainSel, err)
+	}
+	mcmsReader, ok := mcmsRegistry.GetMCMSReader(family)
+	if !ok {
+		return nil, nil, fmt.Errorf("no MCMS reader registered for chain family '%s'", family)
+	}
+	timelockRef, err := mcmsReader.GetTimelockRef(*e, chainSel, mcms)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get timelock ref for chain %d: %w", chainSel, err)
+	}
+	fmt.Printf("Transferring ownership of new FeeQuoter to timelock with address %s on chain with selector %d\n", timelockRef.Address, chainSel)
+
+	adapter, err := transferOwnershipReg.GetAdapterByChainSelector(chainSel, MCMSVersion)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get transfer ownership adapter for chain %d: %w", chainSel, err)
+	}
+	if err := adapter.InitializeTimelockAddress(*e, mcms); err != nil {
+		return nil, nil, fmt.Errorf("failed to initialize timelock address for chain %d: %w", chainSel, err)
+	}
+
+	ownershipInput := TransferOwnershipPerChainInput{
+		ChainSelector: chainSel,
+		ContractRef:   addressRefs,
+		ProposedOwner: timelockRef.Address,
+	}
+	transferReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adapter.SequenceTransferOwnershipViaMCMS(), e.BlockChains, ownershipInput)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to transfer ownership of FeeQuoter on chain %d: %w", chainSel, err)
+	}
+	batchOps = append(batchOps, transferReport.Output.BatchOps...)
+	reports = append(reports, transferReport.ExecutionReports...)
+
+	needAccept, err := adapter.ShouldAcceptOwnershipWithTransferOwnership(*e, ownershipInput)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to check accept ownership for FeeQuoter on chain %d: %w", chainSel, err)
+	}
+	if needAccept {
+		acceptReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adapter.SequenceAcceptOwnership(), e.BlockChains, ownershipInput)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to accept ownership of FeeQuoter on chain %d: %w", chainSel, err)
+		}
+		batchOps = append(batchOps, acceptReport.Output.BatchOps...)
+		reports = append(reports, acceptReport.ExecutionReports...)
+	}
+	return batchOps, reports, nil
 }

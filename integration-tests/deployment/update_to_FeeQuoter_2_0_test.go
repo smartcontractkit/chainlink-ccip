@@ -13,6 +13,7 @@ import (
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	mcms_types "github.com/smartcontractkit/mcms/types"
 	"github.com/stretchr/testify/require"
 
 	fq16ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
@@ -25,6 +26,8 @@ import (
 	offrampops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/offramp"
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	lanesapi "github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
+	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	cs_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 )
@@ -90,13 +93,27 @@ func TestUpdateToFeeQuoter_2_0(t *testing.T) {
 		},
 	})
 	require.NoError(t, err, "Failed to apply ConnectChains changeset")
-	fqReg := deployops.GetFQAndRampUpdaterRegistry()
+	// Deploy MCMS
+	DeployMCMS(t, e, chain_selectors.ETHEREUM_MAINNET.Selector, []string{common_utils.CLLQualifier})
+	DeployMCMS(t, e, chain_selectors.AVALANCHE_MAINNET.Selector, []string{common_utils.CLLQualifier})
 	// now update to FeeQuoter 2.0.0
-	fqUpdateChangeset := deployops.UpdateFeeQuoterChangeset(fqReg, nil)
+	fqUpdateChangeset := deployops.UpdateFeeQuoterChangeset()
 	out, err = fqUpdateChangeset.Apply(*e, deployops.UpdateFeeQuoterInput{
 		Chains: fqInput,
+		MCMS: mcms.Input{
+			OverridePreviousRoot: false,
+			ValidUntil:           3759765795,
+			TimelockDelay:        mcms_types.MustParseDuration("0s"),
+			TimelockAction:       mcms_types.TimelockActionSchedule,
+			Qualifier:            common_utils.CLLQualifier,
+			Description:          "Transfer ownership FQ2",
+		},
 	})
 	require.NoError(t, err, "Failed to apply UpdateFeeQuoterChangeset changeset")
+	require.Greater(t, len(out.Reports), 0)
+	require.Equal(t, 1, len(out.MCMSTimelockProposals))
+
+	testhelpers.ProcessTimelockProposals(t, *e, out.MCMSTimelockProposals, false)
 	// update datastore with changeset output
 	require.NoError(t, out.DataStore.Merge(e.DataStore), "Failed to merge changeset output datastore")
 	e.DataStore = out.DataStore.Seal()
@@ -110,15 +127,15 @@ func TestUpdateToFeeQuoter_2_0(t *testing.T) {
 		operations.NewMemoryReporter(),
 	)
 	e.OperationsBundle = bundle
-	// downgrade back to 1.6.0 to make sure the changeset is reversible
+	// downgrade back to 1.6.3 to make sure the changeset is reversible
 	for _, chainSel := range chains {
 		fqInput[chainSel] = deployops.UpdateFeeQuoterInputPerChain{
 			FeeQuoterVersion: fq163ops.Version,
 			RampsVersion:     semver.MustParse("1.6.0"),
 		}
 	}
-	// now update to FeeQuoter 2.0.0
-	fqUpdateChangeset = deployops.UpdateFeeQuoterChangeset(fqReg, nil)
+	// now downgrade back to FeeQuoter 1.6.3
+	fqUpdateChangeset = deployops.UpdateFeeQuoterChangeset()
 	out, err = fqUpdateChangeset.Apply(*e, deployops.UpdateFeeQuoterInput{
 		Chains: fqInput,
 	})
