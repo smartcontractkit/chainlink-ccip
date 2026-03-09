@@ -112,26 +112,24 @@ contract LombardVerifierSetup is BaseVerifierSetup {
   /// where msgBody layout (read by assembly in _validatePayload):
   ///   byte 0:       version (1 byte)
   ///   bytes 1..32:  token (32 bytes)
-  ///   bytes 33..64: unused (32 bytes)
+  ///   bytes 33..64: sender (32 bytes)
   ///   bytes 65..96: recipient (32 bytes)
   ///   bytes 97..128: amount (32 bytes)
   /// @param destToken The destination token address.
+  /// @param sender The sender address.
   /// @param tokenReceiver The token receiver address.
   /// @param amount The amount to transfer.
   /// @return rawPayload The encoded payload.
   function _generateValidRawPayload(
     bytes memory destToken,
+    bytes memory sender,
     bytes memory tokenReceiver,
     uint256 amount
   ) internal pure returns (bytes memory) {
-    // Create msgBody matching the assembly offsets in _validatePayload:
-    //   mload(msgBody + 0x21) => bytes 1..32  = token
-    //   mload(msgBody + 0x61) => bytes 65..96 = recipient
-    //   mload(msgBody + 0x81) => bytes 97..128 = amount
     bytes memory msgBody = abi.encodePacked(
       bytes1(0),
       Internal._leftPadBytesToBytes32(destToken),
-      bytes32(0),
+      Internal._leftPadBytesToBytes32(sender),
       Internal._leftPadBytesToBytes32(tokenReceiver),
       bytes32(amount)
     );

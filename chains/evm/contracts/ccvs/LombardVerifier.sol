@@ -35,6 +35,7 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
   error MustTransferTokens();
   error InvalidVerifierResults();
   error InvalidToken(bytes32 expected, bytes32 actual);
+  error InvalidSender(bytes32 expected, bytes32 actual);
   error InvalidAmount(uint256 expected, uint256 actual);
   error RemoteTokenOrAdapterMismatch(bytes32 bridgeToken, bytes32 remoteToken, bytes32 remoteAdapter);
 
@@ -232,9 +233,11 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
     _assertNotCursedByRMN(message.sourceChainSelector);
     _onlyOffRamp(message.sourceChainSelector);
 
-    bytes4 versionPrefix = bytes4(ccvData[:VERSION_TAG_SIZE]);
-    if (versionPrefix != VERSION_TAG_V2_0_0) {
-      revert InvalidCCVVersion(VERSION_TAG_V2_0_0, versionPrefix);
+    {
+      bytes4 versionPrefix = bytes4(ccvData[:VERSION_TAG_SIZE]);
+      if (versionPrefix != VERSION_TAG_V2_0_0) {
+        revert InvalidCCVVersion(VERSION_TAG_V2_0_0, versionPrefix);
+      }
     }
 
     if (ccvData.length < PAYLOAD_START_INDEX) {
@@ -247,67 +250,81 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
     }
 
     uint256 proofDataStartIndex = PAYLOAD_START_INDEX + rawPayloadLength;
-    bytes calldata rawPayload = ccvData[PAYLOAD_START_INDEX:proofDataStartIndex];
 
     _validatePayload(
-      rawPayload,
+      ccvData[PAYLOAD_START_INDEX:proofDataStartIndex], // rawPayload
+      message.sender,
       message.tokenTransfer[0].destTokenAddress,
       message.tokenTransfer[0].tokenReceiver,
       message.tokenTransfer[0].amount
     );
 
-    uint256 proofLength = uint16(bytes2(ccvData[proofDataStartIndex:proofDataStartIndex + RAW_PAYLOAD_LENGTH_SIZE]));
-    uint256 proofStartIndex = proofDataStartIndex + RAW_PAYLOAD_LENGTH_SIZE;
+    {
+      uint256 proofLength = uint16(bytes2(ccvData[proofDataStartIndex:proofDataStartIndex + RAW_PAYLOAD_LENGTH_SIZE]));
+      uint256 proofStartIndex = proofDataStartIndex + RAW_PAYLOAD_LENGTH_SIZE;
 
-    if (ccvData.length < proofStartIndex + proofLength) {
-      revert InvalidVerifierResults();
-    }
-    bytes calldata proof = ccvData[proofStartIndex:proofStartIndex + proofLength];
+      if (ccvData.length < proofStartIndex + proofLength) {
+        revert InvalidVerifierResults();
+      }
 
-    (, bool executed, bytes memory bridgedMessage) = IMailbox(i_bridge.mailbox()).deliverAndHandle(rawPayload, proof);
-    if (!executed) {
-      revert ExecutionError();
-    }
-    // The bridged message is expected to be the version tag and message id.
-    if (bridgedMessage.length != BRIDGED_MESSAGE_SIZE) {
-      revert InvalidMessageLength(BRIDGED_MESSAGE_SIZE, bridgedMessage.length);
-    }
-    bytes4 version;
-    bytes32 returnedMessageId;
-    assembly {
-      // Load version from first 4 bytes.
-      version := mload(add(bridgedMessage, 0x20))
-      // Load messageId from bytes 4-36.
-      returnedMessageId := mload(add(bridgedMessage, 0x24))
-    }
-    if (version != VERSION_TAG_V2_0_0) {
-      revert InvalidCCVVersion(VERSION_TAG_V2_0_0, version);
-    }
-    if (returnedMessageId != messageId) {
-      revert InvalidMessageId(messageId, returnedMessageId);
+      (, bool executed, bytes memory bridgedMessage) = IMailbox(i_bridge.mailbox())
+        .deliverAndHandle(
+          ccvData[PAYLOAD_START_INDEX:proofDataStartIndex], // rawPayload
+          ccvData[proofStartIndex:proofStartIndex + proofLength] // proof
+        );
+      if (!executed) {
+        revert ExecutionError();
+      }
+      if (bridgedMessage.length != BRIDGED_MESSAGE_SIZE) {
+        revert InvalidMessageLength(BRIDGED_MESSAGE_SIZE, bridgedMessage.length);
+      }
+      bytes4 version;
+      bytes32 returnedMessageId;
+      assembly {
+        version := mload(add(bridgedMessage, 0x20))
+        returnedMessageId := mload(add(bridgedMessage, 0x24))
+      }
+      if (version != VERSION_TAG_V2_0_0) {
+        revert InvalidCCVVersion(VERSION_TAG_V2_0_0, version);
+      }
+      if (returnedMessageId != messageId) {
+        revert InvalidMessageId(messageId, returnedMessageId);
+      }
     }
   }
 
   function _validatePayload(
     bytes calldata rawPayload,
+    bytes calldata expectedSender,
     bytes calldata expectedToken,
     bytes calldata expectedReceiver,
     uint256 expectedAmount
   ) internal pure {
-    (,,,,, bytes memory msgBody) = abi.decode(rawPayload[4:], (bytes32, uint256, bytes32, address, address, bytes));
-
     bytes32 rawToToken;
+    bytes32 rawSender;
     bytes32 rawRecipient;
     uint256 amount;
-    assembly {
-      rawToToken := mload(add(msgBody, 0x21)) // bytes 1..32
-      rawRecipient := mload(add(msgBody, 0x61)) // bytes 65..96
-      amount := mload(add(msgBody, 0x81)) // bytes 97..128
+    {
+      (,,,,, bytes memory msgBody) = abi.decode(rawPayload[4:], (bytes32, uint256, bytes32, address, address, bytes));
+      assembly {
+        rawToToken := mload(add(msgBody, 0x21)) // bytes 1..32
+        rawSender := mload(add(msgBody, 0x41)) // bytes 33..64
+        rawRecipient := mload(add(msgBody, 0x61)) // bytes 65..96
+        amount := mload(add(msgBody, 0x81)) // bytes 97..128
+      }
     }
 
-    bytes32 expectedTokenLeftPadded = Internal._leftPadBytesToBytes32(expectedToken);
-    if (rawToToken != expectedTokenLeftPadded) {
-      revert InvalidToken(expectedTokenLeftPadded, rawToToken);
+    {
+      bytes32 expected = Internal._leftPadBytesToBytes32(expectedToken);
+      if (rawToToken != expected) {
+        revert InvalidToken(expected, rawToToken);
+      }
+    }
+    {
+      bytes32 expected = Internal._leftPadBytesToBytes32(expectedSender);
+      if (rawSender != expected) {
+        revert InvalidSender(expected, rawSender);
+      }
     }
     if (rawRecipient != Internal._leftPadBytesToBytes32(expectedReceiver)) {
       revert InvalidReceiver(expectedReceiver);
