@@ -336,9 +336,8 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     bool isTokenOnlyTransfer = _isTokenOnlyTransfer(message.data.length, message.ccipReceiveGasLimit, receiver);
 
     {
-      (address[] memory ccvsToQuery, uint256[] memory verifierResultsIndex) = _ensureCCVQuorumIsReached(
-        message.sourceChainSelector, receiver, message.tokenTransfer, message.finality, ccvs, isTokenOnlyTransfer
-      );
+      (address[] memory ccvsToQuery, uint256[] memory verifierResultsIndex) =
+        _ensureCCVQuorumIsReached(message, receiver, ccvs, isTokenOnlyTransfer);
 
       for (uint256 i = 0; i < ccvsToQuery.length; ++i) {
         address implAddress = ICrossChainVerifierResolver(ccvsToQuery[i])
@@ -448,6 +447,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     return _getCCVsForMessage(
       message.sourceChainSelector,
       receiver,
+      message.sender,
       message.tokenTransfer,
       message.finality,
       _isTokenOnlyTransfer(message.data.length, message.ccipReceiveGasLimit, receiver)
@@ -472,6 +472,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   function _getCCVsForMessage(
     uint64 sourceChainSelector,
     address receiver,
+    bytes memory sender,
     MessageV1Codec.TokenTransferV1[] memory tokenTransfer,
     uint16 finality,
     bool isTokenOnlyTransfer
@@ -510,7 +511,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     } else {
       // The transfer is not token-only, we query the receiver for its CCV requirements.
       (requiredReceiverCCVs, optionalCCVs, optionalThreshold) =
-        _getCCVsFromReceiver(sourceChainSelector, receiver, finality);
+        _getCCVsFromReceiver(sourceChainSelector, receiver, sender, finality);
     }
 
     address[] storage laneMandatedCCVs = s_sourceChainConfigs[sourceChainSelector].laneMandatedCCVs;
@@ -608,23 +609,26 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   }
 
   /// @notice Ensures that the provided CCVs meet the quorum required by the receiver, pool and lane.
-  /// @param sourceChainSelector The source chain selector of the message.
-  /// @param receiver The receiver of the message.
-  /// @param tokenTransfer The tokens transferred in the message.
+  /// @param message The full message being executed.
+  /// @param receiver The receiver of the message (pre-extracted from message.receiver).
   /// @param ccvs The CCVs that provided data for the message.
-  /// @param finality The finality requirement of the message.
+  /// @param isTokenOnlyTransfer Whether the message is a token-only transfer.
   /// @return ccvsToQuery The CCVs that need to be queried to verify the message.
   /// @return dataIndexes The indexes of the CCVs in the provided ccvs array that correspond to ccvsToQuery.
   function _ensureCCVQuorumIsReached(
-    uint64 sourceChainSelector,
+    MessageV1Codec.MessageV1 calldata message,
     address receiver,
-    MessageV1Codec.TokenTransferV1[] memory tokenTransfer,
-    uint16 finality,
     address[] calldata ccvs,
     bool isTokenOnlyTransfer
   ) internal view returns (address[] memory ccvsToQuery, uint256[] memory dataIndexes) {
-    (address[] memory requiredCCV, address[] memory optionalCCVs, uint8 optionalThreshold) =
-      _getCCVsForMessage(sourceChainSelector, receiver, tokenTransfer, finality, isTokenOnlyTransfer);
+    (address[] memory requiredCCV, address[] memory optionalCCVs, uint8 optionalThreshold) = _getCCVsForMessage(
+      message.sourceChainSelector,
+      receiver,
+      message.sender,
+      message.tokenTransfer,
+      message.finality,
+      isTokenOnlyTransfer
+    );
 
     ccvsToQuery = new address[](ccvs.length);
     dataIndexes = new uint256[](ccvs.length);
@@ -677,6 +681,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// @dev This function reverts if the receiver returns duplicates in either the required or optional CCVs.
   /// @param sourceChainSelector The source chain selector.
   /// @param receiver The receiver address.
+  /// @param sender The sender of the message on the source chain.
   /// @param messageRequestedBlockDepth The finality requirement of the message.
   /// @return requiredCCV The required CCVs.
   /// @return optionalCCVs The optional CCVs.
@@ -684,6 +689,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   function _getCCVsFromReceiver(
     uint64 sourceChainSelector,
     address receiver,
+    bytes memory sender,
     uint16 messageRequestedBlockDepth
   ) internal view returns (address[] memory requiredCCV, address[] memory optionalCCVs, uint8 optionalThreshold) {
     // Default block depth requires is 0, which means "wait for finality". A receiver implementing
@@ -695,7 +701,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     // Only query for custom CCVs if the receiver supports the interface.
     if (receiver._supportsInterfaceReverting(type(IAny2EVMMessageReceiverV2).interfaceId)) {
       (requiredCCV, optionalCCVs, optionalThreshold, minBlockDepth) =
-        IAny2EVMMessageReceiverV2(receiver).getCCVsAndMinBlockDepth(sourceChainSelector);
+        IAny2EVMMessageReceiverV2(receiver).getCCVsAndMinBlockDepth(sourceChainSelector, sender);
 
       CCVConfigValidation._assertNoDuplicates(requiredCCV);
       CCVConfigValidation._assertNoDuplicates(optionalCCVs);

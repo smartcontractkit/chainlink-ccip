@@ -20,6 +20,8 @@ interface IAny2EVMMessageReceiverV2 is IAny2EVMMessageReceiver {
   ///
   /// @param sourceChainSelector The source chain selector of the incoming message. This can be used to specify
   /// different CCV requirements for different source chains, and provides context for the requestedBlockDepth parameter.
+  /// @param sender The sender of the message on the source chain. This can be used to implement sender-specific
+  /// security policies, such as allowing FTF only for trusted senders.
   /// @dev Messages are executable when either the required block depth has been reached, or the chain has marked the
   /// block as finalized. Whichever one comes first will allow the message to be executed.
   /// @return requiredCCVs The list of required CCVs for messages from this source chain. All of these CCVs must pass
@@ -30,7 +32,8 @@ interface IAny2EVMMessageReceiverV2 is IAny2EVMMessageReceiver {
   /// verification for a message to be accepted.
   /// @return optionalThreshold The number of optional CCVs that must pass verification for a message to be accepted.
   function getCCVsAndMinBlockDepth(
-    uint64 sourceChainSelector
+    uint64 sourceChainSelector,
+    bytes calldata sender
   )
     external
     view

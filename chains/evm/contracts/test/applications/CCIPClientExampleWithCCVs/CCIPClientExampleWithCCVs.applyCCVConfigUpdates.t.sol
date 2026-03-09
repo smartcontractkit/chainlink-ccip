@@ -38,12 +38,14 @@ contract CCIPClientExampleWithCCVs_applyCCVConfigUpdates is RouterSetup {
     );
     s_client.applyCCVConfigUpdates(args);
 
+    bytes memory sender = abi.encodePacked(makeAddr("sender"));
+
     (
       address[] memory retRequiredCCVs,
       address[] memory retOptionalCCVs,
       uint8 retOptionalThreshold,
       uint16 minBlockDepth
-    ) = s_client.getCCVsAndMinBlockDepth(SOURCE_CHAIN_SELECTOR);
+    ) = s_client.getCCVsAndMinBlockDepth(SOURCE_CHAIN_SELECTOR, sender);
     assertEq(retRequiredCCVs.length, requiredCCVs.length);
     assertEq(retOptionalCCVs.length, optionalCCVs.length);
     assertEq(retOptionalThreshold, optionalThreshold);
@@ -166,7 +168,10 @@ contract CCIPClientExampleWithCCVs_applyCCVConfigUpdates is RouterSetup {
 
     s_client.applyCCVConfigUpdates(args);
 
-    (address[] memory retRequired,,, uint16 minBlockDepth) = s_client.getCCVsAndMinBlockDepth(SOURCE_CHAIN_SELECTOR);
+    bytes memory sender = abi.encodePacked(makeAddr("sender"));
+
+    (address[] memory retRequired,,, uint16 minBlockDepth) =
+      s_client.getCCVsAndMinBlockDepth(SOURCE_CHAIN_SELECTOR, sender);
     assertEq(retRequired.length, 1);
     assertEq(retRequired[0], address(0x1));
     assertEq(minBlockDepth, 0);
@@ -187,7 +192,10 @@ contract CCIPClientExampleWithCCVs_applyCCVConfigUpdates is RouterSetup {
 
     s_client.applyCCVConfigUpdates(args);
 
-    (address[] memory retRequired,,, uint16 minBlockDepth) = s_client.getCCVsAndMinBlockDepth(SOURCE_CHAIN_SELECTOR);
+    bytes memory sender = abi.encodePacked(makeAddr("sender"));
+
+    (address[] memory retRequired,,, uint16 minBlockDepth) =
+      s_client.getCCVsAndMinBlockDepth(SOURCE_CHAIN_SELECTOR, sender);
     assertEq(retRequired.length, 1);
     assertEq(retRequired[0], address(0x1));
     assertEq(minBlockDepth, 1);

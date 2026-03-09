@@ -30,12 +30,13 @@ contract MockReceiverV2 is IAny2EVMMessageReceiverV2, IERC165 {
 
   // From IAny2EVMMessageReceiver
   function ccipReceive(
-    Client.Any2EVMMessage calldata /* message */
+    Client.Any2EVMMessage calldata // message
   ) external {}
 
   // From IAny2EVMMessageReceiverV2
   function getCCVsAndMinBlockDepth(
-    uint64 /* sourceChainSelector */
+    uint64, // sourceChainSelector
+    bytes calldata // sender
   ) external view returns (address[] memory, address[] memory, uint8, uint16) {
     return (s_required, s_optional, s_threshold, s_minBlockDepth);
   }

@@ -59,7 +59,8 @@ abstract contract CCIPReceiver is IAny2EVMMessageReceiverV2, IERC165 {
   /// @dev This can be overridden to specify different CCVs per source chain. The current implementation means the
   /// default CCV is used and finality is required (minBlockDepth = 0).
   function getCCVsAndMinBlockDepth(
-    uint64
+    uint64,
+    bytes calldata
   )
     external
     view

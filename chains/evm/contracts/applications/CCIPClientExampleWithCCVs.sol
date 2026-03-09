@@ -105,7 +105,8 @@ contract CCIPClientExampleWithCCVs is CCIPClientExample {
   /// @dev WARNING: minBlockDepth must be used carefully, when in doubt it's safer to require finality (minBlockDepth = 0) than
   /// to allow FTF messages (any non-zero value) as FTF messages can be reorged.
   function getCCVsAndMinBlockDepth(
-    uint64 sourceChainSelector
+    uint64 sourceChainSelector,
+    bytes calldata
   )
     external
     view

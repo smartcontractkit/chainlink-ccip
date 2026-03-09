@@ -12,22 +12,21 @@ contract OffRampHelper is OffRamp {
   ) OffRamp(staticConfig) {}
 
   function ensureCCVQuorumIsReached(
-    uint64 sourceChainSelector,
+    MessageV1Codec.MessageV1 calldata message,
     address receiver,
-    MessageV1Codec.TokenTransferV1[] memory tokenTransfer,
-    uint16 finality,
     address[] calldata ccvs,
     bool isTokenOnlyTransfer
   ) external view returns (address[] memory, uint256[] memory) {
-    return _ensureCCVQuorumIsReached(sourceChainSelector, receiver, tokenTransfer, finality, ccvs, isTokenOnlyTransfer);
+    return _ensureCCVQuorumIsReached(message, receiver, ccvs, isTokenOnlyTransfer);
   }
 
   function getCCVsFromReceiver(
     uint64 sourceChainSelector,
     address receiver,
+    bytes memory sender,
     uint16 messageRequestedBlockDepth
   ) external view returns (address[] memory, address[] memory, uint8) {
-    return _getCCVsFromReceiver(sourceChainSelector, receiver, messageRequestedBlockDepth);
+    return _getCCVsFromReceiver(sourceChainSelector, receiver, sender, messageRequestedBlockDepth);
   }
 
   function getCCVsFromPool(
@@ -59,11 +58,12 @@ contract OffRampHelper is OffRamp {
   function __getCCVsForMessage(
     uint64 sourceChainSelector,
     address receiver,
+    bytes memory sender,
     MessageV1Codec.TokenTransferV1[] memory tokenTransfer,
     uint16 finality,
     bool isTokenOnlyTransfer
   ) external view returns (address[] memory requiredCCVs, address[] memory optionalCCVs, uint8 optionalThreshold) {
-    return _getCCVsForMessage(sourceChainSelector, receiver, tokenTransfer, finality, isTokenOnlyTransfer);
+    return _getCCVsForMessage(sourceChainSelector, receiver, sender, tokenTransfer, finality, isTokenOnlyTransfer);
   }
 
   function checkIsTokenOnlyTransfer(
