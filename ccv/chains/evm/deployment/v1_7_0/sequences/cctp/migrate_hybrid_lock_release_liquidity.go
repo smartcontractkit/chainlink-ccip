@@ -99,7 +99,11 @@ var MigrateHybridLockReleaseLiquidity = cldf_ops.NewSequence(
 		// The siloed pool needs authorization for normal CCTP lock-release operations.
 		// The timelock needs authorization because it will be the msg.sender calling deposit()
 		// when the MCMS proposal executes.
-		for sel, lockBox := range lockBoxes {
+		for _, sel := range lockReleaseSelectors {
+			lockBox, ok := lockBoxes[sel]
+			if !ok {
+				continue
+			}
 			lockBoxAddr := common.HexToAddress(lockBox)
 			callersReport, err := cldf_ops.ExecuteOperation(b, erc20_lock_box.GetAllAuthorizedCallers, chain, contract_utils.FunctionInput[any]{
 				ChainSelector: input.ChainSelector,
