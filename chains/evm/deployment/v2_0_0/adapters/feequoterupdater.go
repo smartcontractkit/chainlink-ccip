@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/ethereum/go-ethereum/common"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
@@ -56,6 +57,16 @@ func (fqu FeeQuoterUpdater[FeeQUpdateArgs]) SequenceFeeQuoterInputCreation() *cl
 
 			out.ChainSelector = input.ChainSelector
 			out.ExistingAddresses = input.ExistingAddresses
+
+			if input.TimelockAddress != "" {
+				timelockAddr := common.HexToAddress(input.TimelockAddress)
+				if !fqseq.IsConstructorArgsEmpty(out.ConstructorArgs) {
+					out.ConstructorArgs.PriceUpdaters = append(out.ConstructorArgs.PriceUpdaters, timelockAddr)
+				} else {
+					out.AuthorizedCallerUpdates.AddedCallers = append(out.AuthorizedCallerUpdates.AddedCallers, timelockAddr)
+				}
+			}
+
 			return any(out).(FeeQUpdateArgs), nil
 		},
 	)

@@ -13,6 +13,7 @@ import (
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	mcms_types "github.com/smartcontractkit/mcms/types"
 	"github.com/stretchr/testify/require"
 
 	fq16ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
@@ -25,7 +26,10 @@ import (
 	offrampops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/offramp"
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	lanesapi "github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
+	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	cs_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 )
 
@@ -90,13 +94,27 @@ func TestUpdateToFeeQuoter_2_0(t *testing.T) {
 		},
 	})
 	require.NoError(t, err, "Failed to apply ConnectChains changeset")
-	fqReg := deployops.GetFQAndRampUpdaterRegistry()
+	// Deploy MCMS
+	DeployMCMS(t, e, chain_selectors.ETHEREUM_MAINNET.Selector, []string{common_utils.CLLQualifier})
+	DeployMCMS(t, e, chain_selectors.AVALANCHE_MAINNET.Selector, []string{common_utils.CLLQualifier})
 	// now update to FeeQuoter 2.0.0
-	fqUpdateChangeset := deployops.UpdateFeeQuoterChangeset(fqReg, nil)
+	fqUpdateChangeset := deployops.UpdateFeeQuoterChangeset()
 	out, err = fqUpdateChangeset.Apply(*e, deployops.UpdateFeeQuoterInput{
 		Chains: fqInput,
+		MCMS: mcms.Input{
+			OverridePreviousRoot: false,
+			ValidUntil:           3759765795,
+			TimelockDelay:        mcms_types.MustParseDuration("0s"),
+			TimelockAction:       mcms_types.TimelockActionSchedule,
+			Qualifier:            common_utils.CLLQualifier,
+			Description:          "Transfer ownership FQ2",
+		},
 	})
 	require.NoError(t, err, "Failed to apply UpdateFeeQuoterChangeset changeset")
+	require.Greater(t, len(out.Reports), 0)
+	require.Equal(t, 1, len(out.MCMSTimelockProposals))
+
+	testhelpers.ProcessTimelockProposals(t, *e, out.MCMSTimelockProposals, false)
 	// update datastore with changeset output
 	require.NoError(t, out.DataStore.Merge(e.DataStore), "Failed to merge changeset output datastore")
 	e.DataStore = out.DataStore.Seal()
@@ -110,15 +128,15 @@ func TestUpdateToFeeQuoter_2_0(t *testing.T) {
 		operations.NewMemoryReporter(),
 	)
 	e.OperationsBundle = bundle
-	// downgrade back to 1.6.0 to make sure the changeset is reversible
+	// downgrade back to 1.6.3 to make sure the changeset is reversible
 	for _, chainSel := range chains {
 		fqInput[chainSel] = deployops.UpdateFeeQuoterInputPerChain{
 			FeeQuoterVersion: fq163ops.Version,
 			RampsVersion:     semver.MustParse("1.6.0"),
 		}
 	}
-	// now update to FeeQuoter 2.0.0
-	fqUpdateChangeset = deployops.UpdateFeeQuoterChangeset(fqReg, nil)
+	// now downgrade back to FeeQuoter 1.6.3
+	fqUpdateChangeset = deployops.UpdateFeeQuoterChangeset()
 	out, err = fqUpdateChangeset.Apply(*e, deployops.UpdateFeeQuoterInput{
 		Chains: fqInput,
 	})
@@ -163,7 +181,25 @@ func fqUpgradeValidation(t *testing.T, e *cldf.Environment, chainSel uint64, cha
 	require.NoError(t, err, "Failed to get FeeQuoter dynamic config for old contract for chain selector %d", chainSel)
 	updaters17, err := fq17Contract.GetAllAuthorizedCallers(nil)
 	require.NoError(t, err, "Failed to get FeeQuoter dynamic config for chain selector %d", chainSel)
-	require.ElementsMatch(t, updaters16, updaters17)
+	for _, caller := range updaters16 {
+		require.Contains(t, updaters17, caller, "FQ 2.0 should contain all authorized callers from FQ 1.6 for chain selector %d", chainSel)
+	}
+
+	if expected17fq {
+		timelockRef := datastore_utils.GetAddressRef(
+			e.DataStore.Addresses().Filter(),
+			chainSel,
+			common_utils.RBACTimelock,
+			semver.MustParse("1.0.0"),
+			common_utils.CLLQualifier,
+		)
+		require.NotEmpty(t, timelockRef.Address, "Expected timelock address for chain selector %d", chainSel)
+		timelockAddr := common.HexToAddress(timelockRef.Address)
+		require.Contains(t, updaters17, timelockAddr, "FQ 2.0 should have timelock as a price updater for chain selector %d", chainSel)
+		fq17Owner, err := fq17Contract.Owner(nil)
+		require.NoError(t, err, "Failed to get FeeQuoter 2.0 owner for chain selector %d", chainSel)
+		require.Equal(t, timelockAddr, fq17Owner, "FeeQuoter 2.0 should be owned by timelock after ownership transfer for chain selector %d", chainSel)
+	}
 
 	var remoteChainSelector uint64
 	for _, sel := range chains {
