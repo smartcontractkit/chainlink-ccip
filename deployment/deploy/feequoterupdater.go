@@ -2,6 +2,7 @@ package deploy
 
 import (
 	"fmt"
+	"math/big"
 	"sync"
 
 	"github.com/Masterminds/semver/v3"
@@ -22,6 +23,10 @@ import (
 var (
 	singletonFQAndRampUpdaterRegistry *FQAndRampUpdaterRegistry
 	fqupdaterOnce                     sync.Once
+	GasPriceMandatoryForChainFamily   = map[string]bool{
+		chain_selectors.FamilyAptos: true,
+		chain_selectors.FamilySui:   true,
+	}
 )
 
 type UpdateFeeQuoterInput struct {
@@ -31,7 +36,12 @@ type UpdateFeeQuoterInput struct {
 
 type UpdateFeeQuoterInputPerChain struct {
 	FeeQuoterVersion *semver.Version
+	FeeQuoterConfig  AdditionalFeeQuoterConfig
 	RampsVersion     *semver.Version
+}
+
+type AdditionalFeeQuoterConfig struct {
+	GaspricesPerRemoteChain map[uint64]*big.Int
 }
 
 type FeeQuoterUpdateInput struct {
@@ -56,6 +66,7 @@ type UpdateRampsInput struct {
 type FeeQuoterUpdater[FeeQUpdateArgs any] interface {
 	SequenceFeeQuoterInputCreation() *cldf_ops.Sequence[FeeQuoterUpdateInput, FeeQUpdateArgs, chain.BlockChains]
 	SequenceDeployOrUpdateFeeQuoter() *cldf_ops.Sequence[FeeQUpdateArgs, sequences.OnChainOutput, chain.BlockChains]
+	GasPriceStalenessThreshold(v *semver.Version, chainsel, remoteChain uint64) *big.Int
 }
 
 type RampUpdater interface {
@@ -192,9 +203,6 @@ func updateFeeQuoterVerify() func(cldf.Environment, UpdateFeeQuoterInput) error 
 			if perChainInput.FeeQuoterVersion == nil {
 				return fmt.Errorf("fee quoter version is required for chain selector %d", chainSel)
 			}
-			if perChainInput.RampsVersion == nil {
-				return fmt.Errorf("ramps version is required for chain selector %d", chainSel)
-			}
 			_, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 				ChainSelector: chainSel,
 				Type:          datastore.ContractType(utils.FeeQuoter),
@@ -220,20 +228,16 @@ func updateFeeQuoterApply(fquRegistry *FQAndRampUpdaterRegistry, mcmsRegistry *c
 		addressRefs := make([]datastore.AddressRef, 0)
 		contractMetadata := make([]datastore.ContractMetadata, 0)
 		for chainSel, perChainInput := range input.Chains {
-			var feeQuoterAddrRef datastore.AddressRef
-			rampUpdater, ok := fquRegistry.GetRampUpdater(chainSel, perChainInput.RampsVersion)
-			if !ok {
-				return cldf.ChangesetOutput{}, utils.ErrNoAdapterForSelectorRegistered("RampUpdater", chainSel, perChainInput.RampsVersion)
-			}
-			feeQuoterAddrRef, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-				ChainSelector: chainSel,
-				Type:          datastore.ContractType(utils.FeeQuoter),
-				Version:       perChainInput.FeeQuoterVersion,
-			}, chainSel, datastore_utils.FullRef)
-			// if we get an error, it could be because the address doesn't exist, which is fine -
+			feeQuoterAddrRefs := e.DataStore.Addresses().Filter(
+				datastore.AddressRefByChainSelector(chainSel),
+				datastore.AddressRefByType(datastore.ContractType(utils.FeeQuoter)),
+				datastore.AddressRefByVersion(perChainInput.FeeQuoterVersion),
+			)
+
+			// if the address doesn't exist, which is fine -
 			// it means we need to deploy or update the FeeQuoter
 			// if we get a FQ ref, we can re-configure an existing FQ >= 2.0.0
-			if err != nil || feeQuoterAddrRef.Version.GreaterThanEqual(semver.MustParse("2.0.0")) {
+			if len(feeQuoterAddrRefs) == 0 || perChainInput.FeeQuoterVersion.GreaterThanEqual(semver.MustParse("2.0.0")) {
 				e.Logger.Infof("No existing FeeQuoter address found for chain selector %d and version %s, proceeding with deployment and upgrade", chainSel, perChainInput.FeeQuoterVersion.String())
 				fquUpdater, ok := fquRegistry.GetFeeQuoterUpdater(chainSel, perChainInput.FeeQuoterVersion)
 				if !ok {
@@ -307,6 +311,10 @@ func updateFeeQuoterApply(fquRegistry *FQAndRampUpdaterRegistry, mcmsRegistry *c
 				feeQuoterAddrRef = reportFQUpdate.Output.Addresses[len(reportFQUpdate.Output.Addresses)-1]
 			}
 			if perChainInput.RampsVersion != nil {
+				rampUpdater, ok := fquRegistry.GetRampUpdater(chainSel, perChainInput.RampsVersion)
+				if !ok {
+					return cldf.ChangesetOutput{}, utils.ErrNoAdapterForSelectorRegistered("RampUpdater", chainSel, perChainInput.RampsVersion)
+				}
 				rampsInput := UpdateRampsInput{
 					ChainSelector:    chainSel,
 					FeeQuoterAddress: feeQuoterAddrRef,

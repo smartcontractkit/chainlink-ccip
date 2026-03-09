@@ -2,11 +2,14 @@ package adapters
 
 import (
 	"fmt"
+	"math/big"
 
 	"github.com/Masterminds/semver/v3"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
+	adapters1_2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 
@@ -53,7 +56,7 @@ func (fqu FeeQuoterUpdater[FeeQUpdateArgs]) SequenceFeeQuoterInputCreation() *cl
 			if empty {
 				return zero, fmt.Errorf("could not create input for fee quoter 2.0.0 update sequence: output is empty")
 			}
-			
+
 			out.ChainSelector = input.ChainSelector
 			out.ExistingAddresses = input.ExistingAddresses
 			return any(out).(FeeQUpdateArgs), nil
@@ -78,4 +81,10 @@ func (fqu FeeQuoterUpdater[FeeQUpdateArgs]) SequenceDeployOrUpdateFeeQuoter() *c
 			return report.Output, nil
 		},
 	)
+}
+
+func (fqu FeeQuoterUpdater[FeeQUpdateArgs]) IsEmptyGasPriceAllowed(e cldf.Environment, chainsel, remoteChain uint64) bool {
+	// find lane version
+	laneVersion := adapter
+
 }
