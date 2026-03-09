@@ -47,17 +47,12 @@ var ApproveProposalOnly = contract.NewWrite(contract.WriteParams[ApproveArgs, *e
 	ContractType:    ContractType,
 	ContractABI:     erc20_bindings.ERC20ABI,
 	NewContract:     erc20_bindings.NewERC20,
-	IsAllowedCaller: noCallersAllowed[*erc20_bindings.ERC20, ApproveArgs],
+	IsAllowedCaller: contract.NoCallersAllowed[*erc20_bindings.ERC20, ApproveArgs],
 	Validate:        validateApproveArgs,
 	CallContract: func(token *erc20_bindings.ERC20, opts *bind.TransactOpts, args ApproveArgs) (*types.Transaction, error) {
 		return token.Approve(opts, args.Spender, args.Amount)
 	},
 })
-
-// noCallersAllowed always returns false, forcing the write to be collected for a proposal.
-func noCallersAllowed[C any, ARGS any](_ C, _ *bind.CallOpts, _ common.Address, _ ARGS) (bool, error) {
-	return false, nil
-}
 
 func validateApproveArgs(args ApproveArgs) error {
 	if args.Spender == (common.Address{}) {
