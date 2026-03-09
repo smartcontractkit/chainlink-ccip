@@ -10,7 +10,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/executor"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/executor"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
@@ -89,7 +89,7 @@ func TestConfigureLaneLegAsSourceAndDest(t *testing.T) {
 					offRampAddr = addr.Address
 				case datastore.ContractType(committee_verifier.ContractType):
 					committeeVerifierAddr = addr.Address
-				case datastore.ContractType(executor.ProxyType):
+				case datastore.ContractType(sequences.ExecutorProxyType):
 					executorAddr = addr.Address
 				case datastore.ContractType(sequences.CommitteeVerifierResolverType):
 					committeeVerifierResolverAddr = addr.Address
@@ -136,7 +136,7 @@ func TestConfigureLaneLegAsSourceAndDest(t *testing.T) {
 					remoteOffRampAddr = addr.Address
 				case datastore.ContractType(committee_verifier.ContractType):
 					remoteCommitteeVerifierAddr = addr.Address
-				case datastore.ContractType(executor.ProxyType):
+				case datastore.ContractType(sequences.ExecutorProxyType):
 					remoteExecutorAddr = addr.Address
 				case datastore.ContractType(sequences.CommitteeVerifierResolverType):
 					remoteCommitteeVerifierResolverAddr = addr.Address
@@ -330,10 +330,9 @@ func TestConfigureLaneLegAsSourceAndDest(t *testing.T) {
 			require.Equal(t, committeeVerifierAddr, inboundImpl.Hex(), "Inbound implementation verifier on CommitteeVerifierResolver should match CommitteeVerifier address")
 
 			// Check dest chains on Executor
-			executorDestChains, err := operations.ExecuteOperation(e.OperationsBundle, executor.GetDestChains, evmChain, contract.FunctionInput[any]{
+			executorDestChains, err := operations.ExecuteOperation(e.OperationsBundle, executor.GetDestChains, evmChain, contract.FunctionInput[struct{}]{
 				ChainSelector: evmChain.Selector,
 				Address:       common.HexToAddress(executorAddr),
-				Args:          nil,
 			})
 			require.NoError(t, err, "ExecuteOperation should not error")
 			require.Len(t, executorDestChains.Output, 1, "There should be one dest chain on Executor")
