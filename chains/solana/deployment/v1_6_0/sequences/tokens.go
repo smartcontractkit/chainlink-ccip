@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/gagliardetto/solana-go"
-	"github.com/gagliardetto/solana-go/rpc"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/router"
@@ -204,31 +203,47 @@ func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualR
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
 
-			// Optimization: if we're given an address, then we will attempt to skip the datastore lookup
-			// altogether and infer everything we need from the chain. With this optimization, we will no
-			// longer be restricted to registering tokens that only live in the datastore. This is a best
-			// effort optimization - if we can't use on chain data, then we will fallback to the original
-			// approach of querying the datastore.
+			// NOTE: we attempt to resolve the token from the datastore (to avoid RPC calls).
+			// If the token does not exist there, then we will try to infer all the info from
+			// the chain if the token ref includes an address.
 			var tokenProg solana.PublicKey
 			var tokenMint solana.PublicKey
 			var tokenSymb string
-			if input.TokenRef.Address != "" {
-				tokenAddr := solana.MustPublicKeyFromBase58(input.TokenRef.Address)
-				if tokProgramID, err := tokens.GetTokenProgramID(b.GetContext(), chain.Client, tokenMint); err == nil {
-					tokenProg = tokProgramID
-					tokenMint = tokenAddr
-				} else {
-					b.Logger.Warnf("Failed to read onchain token program ID for token address %s (err = %v). Falling back to datastore lookup.", tokenAddr.String(), err)
-				}
+			if tokRef, tokProgramID, err := getTokenMintAndTokenProgram(input.ExistingDataStore, input.TokenRef, chain); err != nil {
+				b.Logger.Warnf("Failed to get token mint and program ID from datastore for ref (%s) (err = %v). Falling back to on-chain lookup if possible.", datastore_utils.SprintRef(input.TokenRef), err)
+			} else {
+				tokenMint = solana.MustPublicKeyFromBase58(tokRef.Address)
+				tokenSymb = tokRef.Qualifier
+				tokenProg = tokProgramID
 			}
 
-			if tokenMint.IsZero() || tokenProg.IsZero() {
-				if tokRef, tokProgramID, err := getTokenMintAndTokenProgram(input.ExistingDataStore, input.TokenRef, chain); err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to get token and token program address using the specified reference (%+v): %w", input.TokenRef, err)
-				} else {
-					tokenMint = solana.MustPublicKeyFromBase58(tokRef.Address)
-					tokenSymb = tokRef.Qualifier
-					tokenProg = tokProgramID
+			// NOTE: we only need token metadata if we're creating a token multisig. If we
+			// don't need to create one, then we can avoid sending extraneous RPC calls to
+			// the chain.
+			needTokenMultisig := input.SVMExtraArgs != nil && len(input.SVMExtraArgs.CustomerMintAuthorities) > 0
+
+			// NOTE: on-chain token resolution is only attempted if datastore lookup failed
+			// AND we have the token address. Otherwise we don't have enough information to
+			// reliably resolve the token on-chain.
+			if tokenProg.IsZero() && tokenMint.IsZero() && tokenSymb == "" {
+				if input.TokenRef.Address == "" {
+					return sequences.OnChainOutput{}, errors.New("token information could not be resolved from datastore and token reference does not include an address to attempt on-chain resolution")
+				}
+
+				tokenAddr := solana.MustPublicKeyFromBase58(input.TokenRef.Address)
+				tokProgramID, err := tokens.GetTokenProgramID(b.GetContext(), chain.Client, tokenAddr)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to get token program ID for token mint '%s': %w", tokenAddr.String(), err)
+				}
+
+				tokenProg = tokProgramID
+				tokenMint = tokenAddr
+				if needTokenMultisig {
+					if tokenMeta, _, err := tokens.GetTokenMetadata(b.GetContext(), chain.Client, tokenAddr); err != nil {
+						return sequences.OnChainOutput{}, fmt.Errorf("failed to get token metadata for token mint '%s': %w", tokenAddr.String(), err)
+					} else {
+						tokenSymb = tokenMeta.Data.Symbol
+					}
 				}
 			}
 
@@ -314,7 +329,7 @@ func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualR
 			/// Create Token Multisig ///
 			/////////////////////////////
 
-			if input.SVMExtraArgs != nil && len(input.SVMExtraArgs.CustomerMintAuthorities) > 0 {
+			if needTokenMultisig {
 				// The multisig will be used as the mint authority (or owner) depending on the pool flow.
 				// We include the TokenPoolSigner PDA as one of the multisig signers so the Token Pool Program
 				// can "sign" via PDA seeds when it needs to act (PDA signing).
@@ -327,17 +342,6 @@ func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualR
 					if !s.IsZero() {
 						signers = append(signers, s)
 					}
-				}
-
-				if tokenSymb == "" {
-					meta, _, err := tokens.GetTokenMetadata(b.GetContext(), chain.Client, tokenMint)
-					if errors.Is(err, rpc.ErrNotFound) {
-						return sequences.OnChainOutput{}, fmt.Errorf("token metadata not found for token mint %s: %w", tokenMint.String(), err)
-					}
-					if err != nil {
-						return sequences.OnChainOutput{}, fmt.Errorf("failed to get token metadata: %w", err)
-					}
-					tokenSymb = meta.Data.Symbol
 				}
 
 				createTokenMultisigOutput, err := operations.ExecuteOperation(b, tokensops.CreateTokenMultisig, chains.SolanaChains()[chain.Selector], tokensops.TokenMultisigParams{
@@ -358,7 +362,7 @@ func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualR
 			// of these tokens, then it will only be added to the datastore if (1) we
 			// have enough info to rebuild the full ref, and (2) it truly is the case
 			// that the ref does not already exist in the datastore.
-			if tokenSymb != "" {
+			if tokenSymb != "" && !tokenMint.IsZero() && !tokenProg.IsZero() {
 				tokenType, err := utils.GetTokenProgramType(tokenProg)
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to get token program type: %w", err)
