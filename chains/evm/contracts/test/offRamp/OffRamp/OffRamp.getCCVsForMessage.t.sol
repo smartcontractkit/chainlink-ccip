@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {Internal} from "../../../libraries/Internal.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {OffRampSetup} from "./OffRampSetup.t.sol";
 
@@ -42,5 +43,28 @@ contract OffRamp_getCCVsForMessage is OffRampSetup {
       assertEq(requiredCCVs[i], defaultCCVs[i]);
     }
   }
-}
 
+  function test_getCCVsForMessage_RevertWhen_InvalidReceiverAddress() public {
+    bytes memory invalidReceiver = abi.encodePacked(uint256(1));
+
+    MessageV1Codec.MessageV1 memory message = MessageV1Codec.MessageV1({
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      messageNumber: 1,
+      executionGasLimit: 200_000,
+      ccipReceiveGasLimit: 0,
+      finality: 0,
+      ccvAndExecutorHash: bytes32(0),
+      onRampAddress: s_onRamp,
+      offRampAddress: abi.encodePacked(s_offRamp),
+      sender: abi.encodePacked(makeAddr("sender")),
+      receiver: invalidReceiver,
+      destBlob: "",
+      tokenTransfer: new MessageV1Codec.TokenTransferV1[](0),
+      data: ""
+    });
+
+    vm.expectRevert(abi.encodeWithSelector(Internal.InvalidEVMAddress.selector, invalidReceiver));
+    s_offRamp.getCCVsForMessage(MessageV1Codec._encodeMessageV1(message));
+  }
+}
