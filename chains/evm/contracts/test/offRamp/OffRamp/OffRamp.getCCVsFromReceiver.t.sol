@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {CCIPReceiver} from "../../../applications/CCIPReceiver.sol";
-import {IAny2EVMMessageReceiverV2} from "../../../interfaces/IAny2EVMMessageReceiverV2.sol";
 import {OffRamp} from "../../../offRamp/OffRamp.sol";
 import {MockReceiverV2} from "../../mocks/MockReceiverV2.sol";
 import {OffRampSetup} from "./OffRampSetup.t.sol";
@@ -96,14 +94,29 @@ contract OffRamp_getCCVsFromReceiver is OffRampSetup {
     assertEq(requiredFromReceiver[0], s_userRequiredCCV);
   }
 
-  function test_getCCVsFromReceiver_contractV2_succeedsWithNonZeroFinality() public {
+  function test_getCCVsFromReceiver_contractV2_FTF_succeedsWhenFinalityMeetsMinBlockDepth() public {
     address[] memory userRequired = new address[](1);
     userRequired[0] = s_userRequiredCCV;
 
     MockReceiverV2 receiver = new MockReceiverV2(userRequired, new address[](0), 0);
+    receiver.setMinBlockDepth(10);
 
     (address[] memory requiredFromReceiver,,) =
-      s_offRamp.getCCVsFromReceiver(SOURCE_CHAIN_SELECTOR, address(receiver), 5);
+      s_offRamp.getCCVsFromReceiver(SOURCE_CHAIN_SELECTOR, address(receiver), 10);
+
+    assertEq(requiredFromReceiver.length, 1);
+    assertEq(requiredFromReceiver[0], s_userRequiredCCV);
+  }
+
+  function test_getCCVsFromReceiver_contractV2_FTF_succeedsWhenFinalityExceedsMinBlockDepth() public {
+    address[] memory userRequired = new address[](1);
+    userRequired[0] = s_userRequiredCCV;
+
+    MockReceiverV2 receiver = new MockReceiverV2(userRequired, new address[](0), 0);
+    receiver.setMinBlockDepth(5);
+
+    (address[] memory requiredFromReceiver,,) =
+      s_offRamp.getCCVsFromReceiver(SOURCE_CHAIN_SELECTOR, address(receiver), 10);
 
     assertEq(requiredFromReceiver.length, 1);
     assertEq(requiredFromReceiver[0], s_userRequiredCCV);
@@ -115,6 +128,18 @@ contract OffRamp_getCCVsFromReceiver is OffRampSetup {
 
     (address[] memory requiredFromReceiver, address[] memory optionalFromReceiver, uint8 optionalThresholdRequested) =
       s_offRamp.getCCVsFromReceiver(SOURCE_CHAIN_SELECTOR, contractAddress, 0);
+
+    assertEq(requiredFromReceiver.length, 1);
+    assertEq(requiredFromReceiver[0], address(0));
+    assertEq(optionalFromReceiver.length, 0);
+    assertEq(optionalThresholdRequested, 0);
+  }
+
+  function test_getCCVsFromReceiver_noContract_fallsBackToDefaults_WhenFinalized() public {
+    address eoa = makeAddr("eoa");
+
+    (address[] memory requiredFromReceiver, address[] memory optionalFromReceiver, uint8 optionalThresholdRequested) =
+      s_offRamp.getCCVsFromReceiver(SOURCE_CHAIN_SELECTOR, eoa, 0);
 
     assertEq(requiredFromReceiver.length, 1);
     assertEq(requiredFromReceiver[0], address(0));
@@ -136,34 +161,49 @@ contract OffRamp_getCCVsFromReceiver is OffRampSetup {
     s_offRamp.getCCVsFromReceiver(SOURCE_CHAIN_SELECTOR, address(receiver), 0);
   }
 
-  function test_getCCVsFromReceiver_RevertWhen_ReceiverRejectsFinalityValue() public {
-    address[] memory userRequired = new address[](1);
-    userRequired[0] = s_userRequiredCCV;
-    uint16 rejectedFinality = 10;
+  function test_getCCVsFromReceiver_RevertWhen_noContract_FTF() public {
+    address eoa = makeAddr("eoa");
 
-    bytes memory err =
-      abi.encodeWithSelector(CCIPReceiver.BlockDepthNotSupported.selector, SOURCE_CHAIN_SELECTOR, rejectedFinality);
-
-    MockReceiverV2 receiver = new MockReceiverV2(userRequired, new address[](0), 0);
-
-    vm.mockCallRevert(
-      address(receiver),
-      abi.encodeWithSelector(IAny2EVMMessageReceiverV2.getCCVs.selector, SOURCE_CHAIN_SELECTOR, rejectedFinality),
-      err
-    );
-
-    vm.expectRevert(err);
-    s_offRamp.getCCVsFromReceiver(SOURCE_CHAIN_SELECTOR, address(receiver), rejectedFinality);
+    uint16 ftfBlockDepth = 5;
+    vm.expectRevert(abi.encodeWithSelector(OffRamp.InvalidFinalityForReceiver.selector, eoa, ftfBlockDepth, uint16(0)));
+    s_offRamp.getCCVsFromReceiver(SOURCE_CHAIN_SELECTOR, eoa, ftfBlockDepth);
   }
 
-  function test_getCCVsFromReceiver_RevertWhen_contractNoV2_NonZeroFinality() public {
+  function test_getCCVsFromReceiver_RevertWhen_contractNoV2_FTF() public {
     address contractAddress = makeAddr("contract");
     vm.etch(contractAddress, "some source code");
 
-    uint16 nonZeroFinality = 5;
+    uint16 ftfBlockDepth = 5;
     vm.expectRevert(
-      abi.encodeWithSelector(OffRamp.ReceiverDoesNotSupportCustomFinality.selector, contractAddress, nonZeroFinality)
+      abi.encodeWithSelector(OffRamp.InvalidFinalityForReceiver.selector, contractAddress, ftfBlockDepth, uint16(0))
     );
-    s_offRamp.getCCVsFromReceiver(SOURCE_CHAIN_SELECTOR, contractAddress, nonZeroFinality);
+    s_offRamp.getCCVsFromReceiver(SOURCE_CHAIN_SELECTOR, contractAddress, ftfBlockDepth);
+  }
+
+  function test_getCCVsFromReceiver_RevertWhen_contractV2_MinBlockDepthZero_FTF() public {
+    // V2 receiver that returns minBlockDepth=0 (requires finality) should reject FTF.
+    address[] memory userRequired = new address[](1);
+    userRequired[0] = s_userRequiredCCV;
+
+    MockReceiverV2 receiver = new MockReceiverV2(userRequired, new address[](0), 0);
+
+    uint16 ftfBlockDepth = 5;
+    vm.expectRevert(
+      abi.encodeWithSelector(OffRamp.InvalidFinalityForReceiver.selector, address(receiver), ftfBlockDepth, uint16(0))
+    );
+    s_offRamp.getCCVsFromReceiver(SOURCE_CHAIN_SELECTOR, address(receiver), ftfBlockDepth);
+  }
+
+  function test_getCCVsFromReceiver_RevertWhen_contractV2_FTF_BelowMinBlockDepth() public {
+    MockReceiverV2 receiver = new MockReceiverV2(new address[](0), new address[](0), 0);
+    receiver.setMinBlockDepth(10);
+
+    uint16 insufficientFinality = 5;
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        OffRamp.InvalidFinalityForReceiver.selector, address(receiver), insufficientFinality, uint16(10)
+      )
+    );
+    s_offRamp.getCCVsFromReceiver(SOURCE_CHAIN_SELECTOR, address(receiver), insufficientFinality);
   }
 }

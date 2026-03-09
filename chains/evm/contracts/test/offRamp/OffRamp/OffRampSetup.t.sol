@@ -61,9 +61,9 @@ contract OffRampSetup is BaseTest {
     s_offRamp.applySourceChainConfigUpdates(updates);
   }
 
-  /// @notice Sets up a receiver address to mock getCCVs responses and interface support.
+  /// @notice Sets up a receiver address to mock getCCVsAndMinBlockDepth responses and interface support.
   /// @param receiver The receiver address to set up.
-  /// @param sourceChainSelector The source chain selector for getCCVs mock.
+  /// @param sourceChainSelector The source chain selector for getCCVsAndMinBlockDepth mock.
   /// @param requiredCCVs Array of required CCV addresses.
   /// @param optionalCCVs Array of optional CCV addresses.
   /// @param optionalThreshold Threshold for optional CCVs.
@@ -96,17 +96,17 @@ contract OffRampSetup is BaseTest {
       abi.encode(true)
     );
 
-    // Mock getCCVs function. Using encodeWithSelector to match any finality value.
+    // Mock getCCVsAndMinBlockDepth function.
     vm.mockCall(
       receiver,
-      abi.encodeWithSelector(IAny2EVMMessageReceiverV2.getCCVs.selector, sourceChainSelector),
-      abi.encode(requiredCCVs, optionalCCVs, optionalThreshold)
+      abi.encodeWithSelector(IAny2EVMMessageReceiverV2.getCCVsAndMinBlockDepth.selector, sourceChainSelector),
+      abi.encode(requiredCCVs, optionalCCVs, optionalThreshold, uint16(0))
     );
   }
 
   /// @notice Convenience function to set up a receiver that returns empty CCVs (falls back to defaults).
   /// @param receiver The receiver address to set up.
-  /// @param sourceChainSelector The source chain selector for getCCVs mock.
+  /// @param sourceChainSelector The source chain selector for getCCVsAndMinBlockDepth mock.
   function _setGetCCVsReturnData(
     address receiver,
     uint64 sourceChainSelector

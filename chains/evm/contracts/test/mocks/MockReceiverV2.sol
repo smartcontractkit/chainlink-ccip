@@ -10,6 +10,7 @@ contract MockReceiverV2 is IAny2EVMMessageReceiverV2, IERC165 {
   address[] internal s_required;
   address[] internal s_optional;
   uint8 internal s_threshold;
+  uint16 internal s_minBlockDepth;
 
   constructor(
     address[] memory required,
@@ -21,17 +22,22 @@ contract MockReceiverV2 is IAny2EVMMessageReceiverV2, IERC165 {
     s_threshold = threshold;
   }
 
+  function setMinBlockDepth(
+    uint16 minBlockDepth
+  ) external {
+    s_minBlockDepth = minBlockDepth;
+  }
+
   // From IAny2EVMMessageReceiver
   function ccipReceive(
     Client.Any2EVMMessage calldata /* message */
   ) external {}
 
   // From IAny2EVMMessageReceiverV2
-  function getCCVs(
-    uint64, /* sourceChainSelector */
-    uint16 /* finality */
-  ) external view returns (address[] memory, address[] memory, uint8) {
-    return (s_required, s_optional, s_threshold);
+  function getCCVsAndMinBlockDepth(
+    uint64 /* sourceChainSelector */
+  ) external view returns (address[] memory, address[] memory, uint8, uint16) {
+    return (s_required, s_optional, s_threshold, s_minBlockDepth);
   }
 
   function supportsInterface(

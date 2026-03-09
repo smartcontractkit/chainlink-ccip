@@ -44,7 +44,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   error SkippedAlreadyExecutedMessage(bytes32 messageId, uint64 sourceChainSelector, uint64 messageNumber);
   error ReentrancyGuardReentrantCall();
   error RequiredCCVMissing(address requiredCCV);
-  error ReceiverDoesNotSupportCustomFinality(address receiver, uint16 finality);
+  error InvalidFinalityForReceiver(address receiver, uint16 msgBlockDepth, uint16 requiredBlockDepth);
   error InvalidNumberOfTokens(uint256 numTokens);
   error InvalidOnRamp(bytes got);
   error InvalidOffRamp(address expected, bytes got);
@@ -677,19 +677,25 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// @dev This function reverts if the receiver returns duplicates in either the required or optional CCVs.
   /// @param sourceChainSelector The source chain selector.
   /// @param receiver The receiver address.
-  /// @param finality The finality requirement of the message.
+  /// @param messageRequestedBlockDepth The finality requirement of the message.
   /// @return requiredCCV The required CCVs.
   /// @return optionalCCVs The optional CCVs.
   /// @return optionalThreshold The threshold of optional CCVs.
   function _getCCVsFromReceiver(
     uint64 sourceChainSelector,
     address receiver,
-    uint16 finality
+    uint16 messageRequestedBlockDepth
   ) internal view returns (address[] memory requiredCCV, address[] memory optionalCCVs, uint8 optionalThreshold) {
+    // Default block depth requires is 0, which means "wait for finality". A receiver implementing
+    // IAny2EVMMessageReceiverV2 can return a different value.
+    // If the receiver does not support the V2 interface it cannot support FTF. This is to protect anyone not
+    // explicitly opting in to support FTF from accidentally allowing messages with FTF finality to be executed.
+    uint16 minBlockDepth;
+
     // Only query for custom CCVs if the receiver supports the interface.
     if (receiver._supportsInterfaceReverting(type(IAny2EVMMessageReceiverV2).interfaceId)) {
-      (requiredCCV, optionalCCVs, optionalThreshold) =
-        IAny2EVMMessageReceiverV2(receiver).getCCVs(sourceChainSelector, finality);
+      (requiredCCV, optionalCCVs, optionalThreshold, minBlockDepth) =
+        IAny2EVMMessageReceiverV2(receiver).getCCVsAndMinBlockDepth(sourceChainSelector);
 
       CCVConfigValidation._assertNoDuplicates(requiredCCV);
       CCVConfigValidation._assertNoDuplicates(optionalCCVs);
@@ -698,18 +704,24 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       if (optionalThreshold > optionalCCVs.length) {
         revert InvalidOptionalThreshold(optionalThreshold, optionalCCVs.length);
       }
+    }
 
-      // If the receiver specified empty required and optional CCVs, we fall back to the default CCVs.
-      // If they did specify something, we use what they specified.
-      if (requiredCCV.length != 0 || optionalThreshold != 0) {
-        return (requiredCCV, optionalCCVs, optionalThreshold);
+    // If non-zero it means FTF is enabled. Ensure it follows the min requirements from the receiver.
+    if (messageRequestedBlockDepth != 0) {
+      // If the receiver requires finality, but the msg is FTF, revert.
+      if (minBlockDepth == 0) {
+        revert InvalidFinalityForReceiver(receiver, messageRequestedBlockDepth, minBlockDepth);
       }
-    } else {
-      // If the receiver does not support the V2 interface it cannot support FTF. This is to protect anyone not
-      // explicitly opting in to support FTF from accidentally allowing messages with FTF finality to be executed.
-      if (finality != 0) {
-        revert ReceiverDoesNotSupportCustomFinality(receiver, finality);
+      // If the receiver specified a minBlockDepth that is higher than the message requested block depth, revert.
+      if (minBlockDepth > messageRequestedBlockDepth) {
+        revert InvalidFinalityForReceiver(receiver, messageRequestedBlockDepth, minBlockDepth);
       }
+    }
+
+    // If the receiver specified empty required and optional CCVs, we fall back to the default CCVs.
+    // If they did specify something, we use what they specified.
+    if (requiredCCV.length != 0 || optionalThreshold != 0) {
+      return (requiredCCV, optionalCCVs, optionalThreshold);
     }
 
     // Returning new address[](1) means we add the default, as address(0) is the marker for that.

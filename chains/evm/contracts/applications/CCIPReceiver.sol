@@ -10,8 +10,6 @@ import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165
 
 /// @title CCIPReceiver - Base contract for CCIP applications that can receive messages.
 abstract contract CCIPReceiver is IAny2EVMMessageReceiverV2, IERC165 {
-  error BlockDepthNotSupported(uint64 sourceChainSelector, uint16 finality);
-
   address internal immutable i_ccipRouter;
 
   constructor(
@@ -57,24 +55,25 @@ abstract contract CCIPReceiver is IAny2EVMMessageReceiverV2, IERC165 {
     return address(i_ccipRouter);
   }
 
-  /// @notice Return the CCVs required/optional for a source chain.
-  /// @dev this can be overridden to specify different CCVs per source chain. The current implementation means the
-  /// default CCV is used.
-  function getCCVs(
-    uint64 sourceChainSelector,
-    uint16 finality
+  /// @notice Return the CCVs required/optional and min block depth for a source chain.
+  /// @dev This can be overridden to specify different CCVs per source chain. The current implementation means the
+  /// default CCV is used and finality is required (minBlockDepth = 0).
+  function getCCVsAndMinBlockDepth(
+    uint64
   )
     external
     view
     virtual
-    returns (address[] memory requiredCCVs, address[] memory optionalCCVs, uint8 optionalThreshold)
+    returns (
+      address[] memory requiredCCVs,
+      address[] memory optionalCCVs,
+      uint8 optionalThreshold,
+      uint16 minBlockDepth
+    )
   {
-    // By default we require finality, it should be explicitly overridden if a receiver wants FTF.
-    if (finality != 0) {
-      revert BlockDepthNotSupported(sourceChainSelector, finality);
-    }
     // By default no specific CCVs are required or optional. This means the default CCV is chosen.
-    return (new address[](0), new address[](0), 0);
+    // minBlockDepth = 0 means finality is required.
+    return (new address[](0), new address[](0), 0, 0);
   }
 
   error InvalidRouter(address router);
