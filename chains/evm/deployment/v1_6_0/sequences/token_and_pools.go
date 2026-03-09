@@ -252,7 +252,7 @@ func (a *EVMAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokensapi.TPRLR
 			}
 
 			// TODO: add better address resolution later (we should be able to resolve the pool using qualifiers
-			// if needed). However, if a token address is provided, we can skip the datastore lookup altogether.
+			// if needed). However, if the pool address is provided, we can skip the datastore lookup altogether
 			tokenPoolBytes, err := a.AddressRefToBytes(input.TokenPoolRef)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to convert token pool address ref to bytes: %w", err)
