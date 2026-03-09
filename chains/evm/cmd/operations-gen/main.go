@@ -808,8 +808,12 @@ func buildCallArgs(funcInfo *FunctionInfo, argsPrefix string) (argsType string, 
 	// Multiple parameters - use Args struct
 	argsType = funcInfo.Name + "Args"
 	var callArgsList []string
-	for _, p := range funcInfo.Parameters {
-		callArgsList = append(callArgsList, argsPrefix+"."+capitalize(p.Name))
+	for i, p := range funcInfo.Parameters {
+		fieldName := capitalize(p.Name)
+		if fieldName == "" {
+			fieldName = fmt.Sprintf("Field%d", i)
+		}
+		callArgsList = append(callArgsList, argsPrefix+"."+fieldName)
 	}
 	callArgs = ", " + strings.Join(callArgsList, ", ")
 	return argsType, callArgs
