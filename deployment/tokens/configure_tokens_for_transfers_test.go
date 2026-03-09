@@ -159,6 +159,10 @@ func (ma *transfersTest_MockTokenAdapter) MigrateLockReleasePoolLiquiditySequenc
 	return nil
 }
 
+func (ma *transfersTest_MockTokenAdapter) DeriveCurrentPoolAddress(_ deployment.Environment, _ uint64, _ string, _ string) (string, error) {
+	return "", nil
+}
+
 var basicMCMSInput = mcms.Input{
 	OverridePreviousRoot: true,
 	ValidUntil:           3759765795,

@@ -45,6 +45,9 @@ type TokenAdapter interface {
 	// MigrateLockReleasePoolLiquiditySequence returns a sequence that migrates liquidity from a legacy
 	// LockReleaseTokenPool (v1.5.1/v1.6.1) to a v2.0 lockbox-based pool. Returns nil if not supported.
 	MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Sequence[MigrateLockReleasePoolLiquidityInput, sequences.OnChainOutput, cldf_chain.BlockChains]
+	// DeriveCurrentPoolAddress reads the currently registered pool address for a token from
+	// the TokenAdminRegistry. Returns empty string if not supported for this chain family.
+	DeriveCurrentPoolAddress(e deployment.Environment, chainSelector uint64, registryAddress string, tokenAddress string) (string, error)
 }
 
 // MigrateLockReleasePoolLiquidityInput is the input for the liquidity migration sequence.

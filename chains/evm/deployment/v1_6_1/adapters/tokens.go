@@ -107,3 +107,7 @@ func (t *TokenAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokens.UpdateAutho
 func (t *TokenAdapter) MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Sequence[tokens.MigrateLockReleasePoolLiquidityInput, sequences.OnChainOutput, chain.BlockChains] {
 	return nil
 }
+
+func (t *TokenAdapter) DeriveCurrentPoolAddress(_ deployment.Environment, _ uint64, _ string, _ string) (string, error) {
+	return "", nil
+}

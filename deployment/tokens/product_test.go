@@ -64,6 +64,10 @@ func (ma *productTest_MockTokenAdapter) MigrateLockReleasePoolLiquiditySequence(
 	return nil
 }
 
+func (ma *productTest_MockTokenAdapter) DeriveCurrentPoolAddress(_ deployment.Environment, _ uint64, _ string, _ string) (string, error) {
+	return "", nil
+}
+
 func TestRegisterTokenAdapter(t *testing.T) {
 	tests := []struct {
 		desc         string

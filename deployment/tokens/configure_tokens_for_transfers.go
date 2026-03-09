@@ -37,13 +37,10 @@ type TokenTransferConfig struct {
 	// This can be interpreted as # of block confirmations, an ID, or otherwise.
 	// Interpretation is left to each chain family.
 	MinFinalityValue uint16
-	// MigrationOldPoolRef, if set, triggers a liquidity migration from the old pool to the new pool's lockbox
-	// before configuring the token for transfers. The migration sequence is called with SetPoolConfig=nil
-	// so that setPool is handled by the downstream configuration logic.
-	MigrationOldPoolRef *datastore.AddressRef
-	// MigrationTimelockRef is a reference to the MCMS timelock contract. Required when MigrationOldPoolRef is set.
-	MigrationTimelockRef *datastore.AddressRef
-	// MigrationAmount is an exact token amount to migrate. Mutually exclusive with MigrationBasisPoints.
+	// MigrationAmount, if set, specifies an exact token amount to migrate from the old pool (read from the
+	// TokenAdminRegistry) to the new pool's lockbox. Mutually exclusive with MigrationBasisPoints.
+	// When either MigrationAmount or MigrationBasisPoints is set, a liquidity migration is triggered.
+	// The old pool address is derived from the TokenAdminRegistry, and the timelock address from the MCMS config.
 	MigrationAmount *big.Int
 	// MigrationBasisPoints specifies a percentage of the old pool's balance to migrate (1-10000, where 10000 = 100%).
 	// Mutually exclusive with MigrationAmount.
@@ -70,13 +67,13 @@ func makeVerify(_ *TokenAdapterRegistry, _ *changesets.MCMSReaderRegistry) func(
 	}
 }
 
-func makeApply(tokenRegistry *TokenAdapterRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, ConfigureTokensForTransfersConfig) (cldf.ChangesetOutput, error) {
+func makeApply(_ *TokenAdapterRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, ConfigureTokensForTransfersConfig) (cldf.ChangesetOutput, error) {
 	return func(e cldf.Environment, cfg ConfigureTokensForTransfersConfig) (cldf.ChangesetOutput, error) {
 		configs := make(map[uint64]TokenTransferConfig, len(cfg.Tokens))
 		for _, config := range cfg.Tokens {
 			configs[config.ChainSelector] = config
 		}
-		batchOps, reports, ds, err := processTokenConfigForChain(e, configs)
+		batchOps, reports, ds, err := processTokenConfigForChain(e, mcmsRegistry, cfg.MCMS, configs)
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to process token configs for chains: %w", err)
 		}
@@ -88,7 +85,7 @@ func makeApply(tokenRegistry *TokenAdapterRegistry, mcmsRegistry *changesets.MCM
 	}
 }
 
-func processTokenConfigForChain(e deployment.Environment, cfg map[uint64]TokenTransferConfig) ([]mcms_types.BatchOperation, []cldf_ops.Report[any, any], *datastore.MemoryDataStore, error) {
+func processTokenConfigForChain(e deployment.Environment, mcmsRegistry *changesets.MCMSReaderRegistry, mcmsInput mcms.Input, cfg map[uint64]TokenTransferConfig) ([]mcms_types.BatchOperation, []cldf_ops.Report[any, any], *datastore.MemoryDataStore, error) {
 	tokenRegistry := GetTokenAdapterRegistry()
 	batchOps := make([]mcms_types.BatchOperation, 0)
 	reports := make([]cldf_ops.Report[any, any], 0)
@@ -145,28 +142,40 @@ func processTokenConfigForChain(e deployment.Environment, cfg map[uint64]TokenTr
 			}
 		}
 
-		if token.MigrationOldPoolRef != nil {
+		if token.MigrationAmount != nil || token.MigrationBasisPoints != nil {
 			migrationSeq := adapter.MigrateLockReleasePoolLiquiditySequence()
 			if migrationSeq == nil {
 				return nil, nil, nil, fmt.Errorf("migration requested but adapter for family '%s' version '%s' does not support liquidity migration", family, token.TokenPoolRef.Version)
 			}
 
-			oldPoolRef, err := datastore_utils.FindAndFormatRef(e.DataStore, *token.MigrationOldPoolRef, selector, datastore_utils.FullRef)
+			// Derive the token address so we can look up the current pool on the TAR.
+			tokenBytes, err := adapter.DeriveTokenAddress(e, selector, token.TokenPoolRef)
 			if err != nil {
-				return nil, nil, nil, fmt.Errorf("failed to resolve migration old pool ref on chain %d: %w", selector, err)
+				return nil, nil, nil, fmt.Errorf("failed to derive token address for migration on chain %d: %w", selector, err)
+			}
+			tokenAddress := common.BytesToAddress(tokenBytes).Hex()
+
+			oldPoolAddress, err := adapter.DeriveCurrentPoolAddress(e, selector, registry.Address, tokenAddress)
+			if err != nil {
+				return nil, nil, nil, fmt.Errorf("failed to derive current pool address from registry on chain %d: %w", selector, err)
+			}
+			if oldPoolAddress == "" {
+				return nil, nil, nil, fmt.Errorf("no pool currently registered for token on chain %d", selector)
 			}
 
-			if token.MigrationTimelockRef == nil {
-				return nil, nil, nil, fmt.Errorf("MigrationTimelockRef is required when MigrationOldPoolRef is set on chain %d", selector)
+			// Derive the timelock address from the MCMS config.
+			mcmsReader, ok := mcmsRegistry.GetMCMSReader(family)
+			if !ok {
+				return nil, nil, nil, fmt.Errorf("no MCMS reader registered for chain family '%s' on chain %d", family, selector)
 			}
-			timelockRef, err := datastore_utils.FindAndFormatRef(e.DataStore, *token.MigrationTimelockRef, selector, datastore_utils.FullRef)
+			timelockRef, err := mcmsReader.GetTimelockRef(e, selector, mcmsInput)
 			if err != nil {
-				return nil, nil, nil, fmt.Errorf("failed to resolve migration timelock ref on chain %d: %w", selector, err)
+				return nil, nil, nil, fmt.Errorf("failed to get timelock address from MCMS config on chain %d: %w", selector, err)
 			}
 
 			migrationReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, migrationSeq, e.BlockChains, MigrateLockReleasePoolLiquidityInput{
 				ChainSelector:   selector,
-				OldPoolAddress:  oldPoolRef.Address,
+				OldPoolAddress:  oldPoolAddress,
 				NewPoolAddress:  tokenPool.Address,
 				TimelockAddress: timelockRef.Address,
 				Amount:          token.MigrationAmount,

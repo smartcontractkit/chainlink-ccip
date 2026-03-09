@@ -19,11 +19,10 @@ type LockReleasePoolMigration struct {
 	// ChainSelector identifies the chain on which both the old and new pools live.
 	ChainSelector uint64
 	// OldPoolRef is a reference to the legacy LockReleaseTokenPool (v1.5.1 or v1.6.1) to migrate from.
+	// Required because in step-2 migrations, the TAR already points to the new pool.
 	OldPoolRef datastore.AddressRef
 	// NewPoolRef is a reference to the new v2.0 LockReleaseTokenPool (with lockbox) to migrate to.
 	NewPoolRef datastore.AddressRef
-	// TimelockRef is a reference to the MCMS timelock contract.
-	TimelockRef datastore.AddressRef
 	// Amount specifies an exact token amount to migrate. Mutually exclusive with BasisPoints.
 	Amount *big.Int
 	// BasisPoints specifies a percentage (1-10000, where 10000 = 100%) of the old pool's balance to migrate.
@@ -84,9 +83,15 @@ func makeMigrationApply(_ *TokenAdapterRegistry, mcmsRegistry *changesets.MCMSRe
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("migration[%d]: failed to resolve new pool ref: %w", i, err)
 			}
-			timelockRef, err := datastore_utils.FindAndFormatRef(e.DataStore, migration.TimelockRef, migration.ChainSelector, datastore_utils.FullRef)
+
+			// Derive the timelock address from the MCMS config.
+			mcmsReader, ok := mcmsRegistry.GetMCMSReader(family)
+			if !ok {
+				return cldf.ChangesetOutput{}, fmt.Errorf("migration[%d]: no MCMS reader registered for chain family '%s'", i, family)
+			}
+			timelockRef, err := mcmsReader.GetTimelockRef(e, migration.ChainSelector, cfg.MCMS)
 			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("migration[%d]: failed to resolve timelock ref: %w", i, err)
+				return cldf.ChangesetOutput{}, fmt.Errorf("migration[%d]: failed to get timelock address from MCMS config: %w", i, err)
 			}
 
 			var setPoolConfig *MigrationSetPoolConfig
