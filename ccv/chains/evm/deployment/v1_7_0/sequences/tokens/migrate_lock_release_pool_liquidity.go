@@ -510,7 +510,7 @@ func appendAuthApproveDeposit(
 		Address:       lockboxAddr,
 		Args: lockbox_ops.DepositArgs{
 			Token:  tokenAddr,
-			Field1: remoteChainSelector,
+			Arg1: remoteChainSelector,
 			Amount: amount,
 		},
 	})

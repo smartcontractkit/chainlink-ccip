@@ -86,7 +86,7 @@ type AuthorizedCallerArgs struct {
 
 type DepositArgs struct {
 	Token  common.Address
-	Field1 uint64
+	Arg1   uint64
 	Amount *big.Int
 }
 
@@ -142,7 +142,7 @@ var Deposit = contract.NewWrite(contract.WriteParams[DepositArgs, *ERC20LockBoxC
 		opts *bind.TransactOpts,
 		args DepositArgs,
 	) (*types.Transaction, error) {
-		return c.Deposit(opts, args.Token, args.Field1, args.Amount)
+		return c.Deposit(opts, args.Token, args.Arg1, args.Amount)
 	},
 })
 

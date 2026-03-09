@@ -68,6 +68,7 @@ contracts:
       - name: getLockBox
         access: public
       - name: getAllLockBoxConfigs
+        access: public
   - contract_name: AdvancedPoolHooks
     version: "2.0.0"
     version_path: "latest"
