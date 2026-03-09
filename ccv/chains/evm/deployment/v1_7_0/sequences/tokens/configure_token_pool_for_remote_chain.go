@@ -708,8 +708,8 @@ func importTokenTransferFeeConfigFromActivePool(b cldf_ops.Bundle, chain evm.Cha
 			"remote chain selector %d on chain %s: %w", routerAddr.Hex(), input.RemoteChainSelector, chain.String(), err)
 	}
 	if onRampOnRouterReport.Output == (common.Address{}) {
-		return nil, fmt.Errorf("onRamp on router %s for remote chain selector %d on chain %s is zero, "+
-			"cannot import token transfer fee config", routerAddr.Hex(), input.RemoteChainSelector, chain.String())
+		// Lane not configured on router (e.g. test env or lane not yet set); skip import and use desired config only.
+		return nil, nil
 	}
 	onRampAddr := onRampOnRouterReport.Output
 	// check the version of the onRamp contract
@@ -746,8 +746,7 @@ func importTokenTransferFeeConfigFromActivePool(b cldf_ops.Bundle, chain evm.Cha
 		}
 		feeQuoterAddr := dCfgOnRamp.Output.FeeQuoter
 		if feeQuoterAddr == (common.Address{}) {
-			return nil, fmt.Errorf("fee quoter on onRamp %s on chain %s is zero, cannot import token transfer fee config",
-				onRampAddr.Hex(), chain.String())
+			return nil, nil
 		}
 		// get token transfer fee config from fee quoter
 		tokenTransferFeeConfigReport, err := cldf_ops.ExecuteOperation(b, fqops_v163.GetTokenTransferFeeConfig, chain, evm_contract.FunctionInput[fqops_v163.GetTokenTransferFeeConfigArgs]{
@@ -775,8 +774,7 @@ func importTokenTransferFeeConfigFromActivePool(b cldf_ops.Bundle, chain evm.Cha
 		}
 		feeQuoterAddr := dCfgOnRamp.Output.FeeQuoter
 		if feeQuoterAddr == (common.Address{}) {
-			return nil, fmt.Errorf("fee quoter on onRamp %s on chain %s is zero, cannot import token transfer fee config",
-				onRampAddr.Hex(), chain.String())
+			return nil, nil
 		}
 		// get token transfer fee config from fee quoter
 		tokenTransferFeeConfigReport, err := cldf_ops.ExecuteOperation(b, fqops.GetTokenTransferFeeConfig, chain, evm_contract.FunctionInput[fqops.GetTokenTransferFeeConfigArgs]{
