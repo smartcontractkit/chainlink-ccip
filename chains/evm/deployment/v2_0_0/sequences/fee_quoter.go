@@ -37,9 +37,9 @@ const (
 )
 
 var (
-	GasPriceMandatoryForChainFamily = map[string]bool{
-		chain_selectors.FamilyAptos: true,
-		chain_selectors.FamilySui:   true,
+	GasPriceMandatoryForChainFamily = map[string]struct{}{
+		chain_selectors.FamilyAptos: {},
+		chain_selectors.FamilySui:   {},
 	}
 )
 
