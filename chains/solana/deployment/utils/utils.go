@@ -210,5 +210,11 @@ func FetchTokenProgramID(ctx context.Context, chain cldf_solana.Chain, tokenPubK
 		return solana.PublicKey{}, fmt.Errorf("failed to get token decimals for token %s: %w", tokenPubKey.String(), err)
 	}
 
-	return tokenAcctInfo.Value.Owner, nil
+	// Safeguard: make sure that the token program ID is one we actually support
+	programID := tokenAcctInfo.Value.Owner
+	if _, err = GetTokenProgramType(programID); err != nil {
+		return solana.PublicKey{}, fmt.Errorf("account %s is owned by %s, which is not a supported token program: %w", tokenPubKey.String(), programID.String(), err)
+	}
+
+	return programID, nil
 }

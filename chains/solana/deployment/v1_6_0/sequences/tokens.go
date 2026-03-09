@@ -207,6 +207,7 @@ func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualR
 			// don't need to create one, then we can avoid sending extraneous RPC calls to
 			// the chain.
 			needTokenMultisig := input.SVMExtraArgs != nil && len(input.SVMExtraArgs.CustomerMintAuthorities) > 0
+			tokenSymb := input.TokenRef.Qualifier
 
 			// NOTE: we attempt to resolve the token from the datastore first to avoid RPC calls.
 			// If the token does not exist there, then we will try to infer all the info from the
@@ -214,7 +215,6 @@ func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualR
 			// to proceed.
 			var tokenProg solana.PublicKey
 			var tokenMint solana.PublicKey
-			var tokenSymb string
 			if tokRef, tokProgramID, err := getTokenMintAndTokenProgram(input.ExistingDataStore, input.TokenRef, chain); err != nil {
 				b.Logger.Warnf("Failed to get token mint and program ID from datastore for ref (%s) (err = %v). Falling back to on-chain lookup if possible.", datastore_utils.SprintRef(input.TokenRef), err)
 				if input.TokenRef.Address == "" {
@@ -229,7 +229,7 @@ func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualR
 
 				tokenProg = tokProgramID
 				tokenMint = tokenAddr
-				if needTokenMultisig {
+				if needTokenMultisig && tokenSymb == "" {
 					if tokenMeta, _, err := tokens.GetTokenMetadata(b.GetContext(), chain.Client, tokenAddr); err != nil {
 						return sequences.OnChainOutput{}, fmt.Errorf("failed to get token metadata for token mint '%s': %w", tokenAddr.String(), err)
 					} else {
