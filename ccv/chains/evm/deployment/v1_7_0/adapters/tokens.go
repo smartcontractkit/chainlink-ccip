@@ -4,9 +4,8 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
-	
+
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
@@ -111,22 +110,3 @@ func (t *TokenAdapter) MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Seque
 	return evm_tokens.MigrateLockReleasePoolLiquidity
 }
 
-func (t *TokenAdapter) DeriveCurrentPoolAddress(e deployment.Environment, chainSelector uint64, registryAddress string, tokenAddress string) (string, error) {
-	evmChain, ok := e.BlockChains.EVMChains()[chainSelector]
-	if !ok {
-		return "", fmt.Errorf("chain with selector %d not found", chainSelector)
-	}
-	tokenConfigReport, err := cldf_ops.ExecuteOperation(e.OperationsBundle, token_admin_registry.GetTokenConfig, evmChain, contract.FunctionInput[common.Address]{
-		ChainSelector: chainSelector,
-		Address:       common.HexToAddress(registryAddress),
-		Args:          common.HexToAddress(tokenAddress),
-	})
-	if err != nil {
-		return "", fmt.Errorf("failed to get token config from registry %s for token %s: %w", registryAddress, tokenAddress, err)
-	}
-	pool := tokenConfigReport.Output.TokenPool
-	if pool == (common.Address{}) {
-		return "", nil
-	}
-	return pool.Hex(), nil
-}

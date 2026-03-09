@@ -44,10 +44,8 @@ type TokenAdapter interface {
 	UpdateAuthorities() *cldf_ops.Sequence[UpdateAuthoritiesInput, sequences.OnChainOutput, *deployment.Environment]
 	// MigrateLockReleasePoolLiquiditySequence returns a sequence that migrates liquidity from a legacy
 	// LockReleaseTokenPool (v1.5.1/v1.6.1) to a v2.0 lockbox-based pool. Returns nil if not supported.
+	// Used by the standalone MigrateLockReleasePoolLiquidity changeset.
 	MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Sequence[MigrateLockReleasePoolLiquidityInput, sequences.OnChainOutput, cldf_chain.BlockChains]
-	// DeriveCurrentPoolAddress reads the currently registered pool address for a token from
-	// the TokenAdminRegistry. Returns empty string if not supported for this chain family.
-	DeriveCurrentPoolAddress(e deployment.Environment, chainSelector uint64, registryAddress string, tokenAddress string) (string, error)
 }
 
 // MigrateLockReleasePoolLiquidityInput is the input for the liquidity migration sequence.
@@ -166,6 +164,16 @@ type ConfigureTokenForTransfersInput struct {
 	// This can be interpreted as # of block confirmations, an ID, or otherwise.
 	// Interpretation is left to each chain family.
 	MinFinalityValue uint16
+	// LiquidityMigrationAmount, if set, specifies an exact token amount to migrate from the old pool
+	// to the new pool's lockbox. Mutually exclusive with LiquidityMigrationBasisPoints.
+	// The old pool is derived from the TokenAdminRegistry. Only used by EVM adapters.
+	LiquidityMigrationAmount *big.Int
+	// LiquidityMigrationBasisPoints specifies a percentage of the old pool's balance to migrate (1-10000, where 10000 = 100%).
+	// Mutually exclusive with LiquidityMigrationAmount. Only used by EVM adapters.
+	LiquidityMigrationBasisPoints *uint16
+	// TimelockAddress is the MCMS timelock address, resolved by the changeset from MCMS config.
+	// Required when a liquidity migration is triggered.
+	TimelockAddress string
 	// Below are not provided by the user and populated programmatically.
 	// ExistingDataStore is the datastore containing existing deployment data.
 	ExistingDataStore datastore.DataStore

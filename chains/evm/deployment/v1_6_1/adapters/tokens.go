@@ -108,6 +108,3 @@ func (t *TokenAdapter) MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Seque
 	return nil
 }
 
-func (t *TokenAdapter) DeriveCurrentPoolAddress(_ deployment.Environment, _ uint64, _ string, _ string) (string, error) {
-	return "", nil
-}

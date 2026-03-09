@@ -143,28 +143,9 @@ func processTokenConfigForChain(e deployment.Environment, mcmsRegistry *changese
 			}
 		}
 
+		// Resolve the timelock address if a liquidity migration is requested.
+		var timelockAddress string
 		if token.LiquidityMigrationAmount != nil || token.LiquidityMigrationBasisPoints != nil {
-			migrationSeq := adapter.MigrateLockReleasePoolLiquiditySequence()
-			if migrationSeq == nil {
-				return nil, nil, nil, fmt.Errorf("migration requested but adapter for family '%s' version '%s' does not support liquidity migration", family, token.TokenPoolRef.Version)
-			}
-
-			// Derive the token address so we can look up the current pool on the TAR.
-			tokenBytes, err := adapter.DeriveTokenAddress(e, selector, token.TokenPoolRef)
-			if err != nil {
-				return nil, nil, nil, fmt.Errorf("failed to derive token address for migration on chain %d: %w", selector, err)
-			}
-			tokenAddress := common.BytesToAddress(tokenBytes).Hex()
-
-			oldPoolAddress, err := adapter.DeriveCurrentPoolAddress(e, selector, registry.Address, tokenAddress)
-			if err != nil {
-				return nil, nil, nil, fmt.Errorf("failed to derive current pool address from registry on chain %d: %w", selector, err)
-			}
-			if oldPoolAddress == "" {
-				return nil, nil, nil, fmt.Errorf("no pool currently registered for token on chain %d", selector)
-			}
-
-			// Derive the timelock address from the MCMS config.
 			mcmsReader, ok := mcmsRegistry.GetMCMSReader(family)
 			if !ok {
 				return nil, nil, nil, fmt.Errorf("no MCMS reader registered for chain family '%s' on chain %d", family, selector)
@@ -173,32 +154,21 @@ func processTokenConfigForChain(e deployment.Environment, mcmsRegistry *changese
 			if err != nil {
 				return nil, nil, nil, fmt.Errorf("failed to get timelock address from MCMS config on chain %d: %w", selector, err)
 			}
-
-			migrationReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, migrationSeq, e.BlockChains, MigrateLockReleasePoolLiquidityInput{
-				ChainSelector:   selector,
-				OldPoolAddress:  oldPoolAddress,
-				NewPoolAddress:  tokenPool.Address,
-				TimelockAddress: timelockRef.Address,
-				Amount:          token.LiquidityMigrationAmount,
-				BasisPoints:     token.LiquidityMigrationBasisPoints,
-				SetPoolConfig:   nil,
-			})
-			if err != nil {
-				return nil, nil, nil, fmt.Errorf("failed to execute liquidity migration on chain %d: %w", selector, err)
-			}
-			batchOps = append(batchOps, migrationReport.Output.BatchOps...)
-			reports = append(reports, migrationReport.ExecutionReports...)
+			timelockAddress = timelockRef.Address
 		}
 
 		configureTokenReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adapter.ConfigureTokenForTransfersSequence(), e.BlockChains, ConfigureTokenForTransfersInput{
-			ChainSelector:     selector,
-			TokenPoolAddress:  tokenPool.Address,
-			RemoteChains:      remoteChains,
-			ExternalAdmin:     token.ExternalAdmin,
-			RegistryAddress:   registry.Address,
-			TokenRef:          token.TokenRef,
-			PoolType:          tokenPool.Type.String(),
-			ExistingDataStore: e.DataStore,
+			ChainSelector:                 selector,
+			TokenPoolAddress:              tokenPool.Address,
+			RemoteChains:                  remoteChains,
+			ExternalAdmin:                 token.ExternalAdmin,
+			RegistryAddress:               registry.Address,
+			TokenRef:                      token.TokenRef,
+			PoolType:                      tokenPool.Type.String(),
+			ExistingDataStore:             e.DataStore,
+			LiquidityMigrationAmount:      token.LiquidityMigrationAmount,
+			LiquidityMigrationBasisPoints: token.LiquidityMigrationBasisPoints,
+			TimelockAddress:               timelockAddress,
 		})
 		if err != nil {
 			return batchOps, reports, nil, fmt.Errorf("failed to configure token pool on chain with selector %d: %w", selector, err)

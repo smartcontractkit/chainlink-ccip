@@ -742,6 +742,3 @@ func (a *EVMAdapter) MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Sequenc
 	return nil
 }
 
-func (a *EVMAdapter) DeriveCurrentPoolAddress(_ deployment.Environment, _ uint64, _ string, _ string) (string, error) {
-	return "", nil
-}

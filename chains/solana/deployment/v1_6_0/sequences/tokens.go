@@ -657,6 +657,3 @@ func (a *SolanaAdapter) MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Sequ
 	return nil
 }
 
-func (a *SolanaAdapter) DeriveCurrentPoolAddress(_ deployment.Environment, _ uint64, _ string, _ string) (string, error) {
-	return "", nil
-}
