@@ -42,6 +42,8 @@ type FeeQuoterUpdateInput struct {
 	ExistingAddresses    []datastore.AddressRef
 	RemoteChainSelectors []uint64
 	ContractMeta         []datastore.ContractMetadata
+	// TimelockAddress is the address of the CCIP timelock contract to be added as a price updater on the fee quoter.
+	TimelockAddress string
 }
 
 type SourceChainConfig struct {
@@ -289,12 +291,30 @@ func updateFeeQuoterApply() func(cldf.Environment, UpdateFeeQuoterInput) (cldf.C
 					contractMeta = append(contractMeta, populateConfigReport.Output.Metadata.Contracts...)
 					contractMetadata = append(contractMetadata, populateConfigReport.Output.Metadata.Contracts...)
 				}
+				// Resolve the timelock address so it can be added as a price updater on the fee quoter
+				timelockAddr := ""
+				family, err := chain_selectors.GetSelectorFamily(chainSel)
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to get chain family for selector %d: %w", chainSel, err)
+				}
+				mcmsReader, ok := mcmsRegistry.GetMCMSReader(family)
+				if !ok {
+					return cldf.ChangesetOutput{}, fmt.Errorf("no MCMS reader registered for chain family '%s'", family)
+				}
+				timelockRef, err := mcmsReader.GetTimelockRef(e, chainSel, input.MCMS)
+				if err != nil {
+					e.Logger.Warnf("Could not resolve timelock ref for chain %d, skipping timelock as price updater: %v", chainSel, err)
+				} else {
+					timelockAddr = timelockRef.Address
+				}
+
 				// Create FeeQuoterUpdateInput
 				reportFQInputCreation, err := cldf_ops.ExecuteSequence(e.OperationsBundle, fquUpdater.SequenceFeeQuoterInputCreation(), e.BlockChains, FeeQuoterUpdateInput{
 					ChainSelector:        chainSel,
 					ExistingAddresses:    e.DataStore.Addresses().Filter(datastore.AddressRefByChainSelector(chainSel)),
 					ContractMeta:         contractMeta,
 					RemoteChainSelectors: perChainInput.RemoteChainSelectors,
+					TimelockAddress:      timelockAddr,
 				})
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to create FeeQuoterUpdateInput for chain %d: %w", chainSel, err)

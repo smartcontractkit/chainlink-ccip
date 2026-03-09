@@ -181,7 +181,9 @@ func fqUpgradeValidation(t *testing.T, e *cldf.Environment, chainSel uint64, cha
 	require.NoError(t, err, "Failed to get FeeQuoter dynamic config for old contract for chain selector %d", chainSel)
 	updaters17, err := fq17Contract.GetAllAuthorizedCallers(nil)
 	require.NoError(t, err, "Failed to get FeeQuoter dynamic config for chain selector %d", chainSel)
-	require.ElementsMatch(t, updaters16, updaters17)
+	for _, caller := range updaters16 {
+		require.Contains(t, updaters17, caller, "FQ 2.0 should contain all authorized callers from FQ 1.6 for chain selector %d", chainSel)
+	}
 
 	if expected17fq {
 		timelockRef := datastore_utils.GetAddressRef(
@@ -193,6 +195,7 @@ func fqUpgradeValidation(t *testing.T, e *cldf.Environment, chainSel uint64, cha
 		)
 		require.NotEmpty(t, timelockRef.Address, "Expected timelock address for chain selector %d", chainSel)
 		timelockAddr := common.HexToAddress(timelockRef.Address)
+		require.Contains(t, updaters17, timelockAddr, "FQ 2.0 should have timelock as a price updater for chain selector %d", chainSel)
 		fq17Owner, err := fq17Contract.Owner(nil)
 		require.NoError(t, err, "Failed to get FeeQuoter 2.0 owner for chain selector %d", chainSel)
 		require.Equal(t, timelockAddr, fq17Owner, "FeeQuoter 2.0 should be owned by timelock after ownership transfer for chain selector %d", chainSel)
