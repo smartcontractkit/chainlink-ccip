@@ -322,7 +322,7 @@ var dummyContractMetadata = []datastore.ContractMetadata{
 						DefaultTokenDestGasOverhead:       50000,
 						DefaultTxGasLimit:                 200000,
 						GasMultiplierWeiPerEth:            0,
-						GasPriceStalenessThreshold:        10,
+						GasPriceStalenessThreshold:        0,
 						NetworkFeeUSDCents:                10,
 					},
 					TokenTransferFeeCfgs: map[common.Address]fee_quoter_v1_6_0.TokenTransferFeeConfig{},
@@ -346,7 +346,7 @@ var dummyContractMetadata = []datastore.ContractMetadata{
 						DefaultTokenDestGasOverhead:       45000,
 						DefaultTxGasLimit:                 190000,
 						GasMultiplierWeiPerEth:            0,
-						GasPriceStalenessThreshold:        10,
+						GasPriceStalenessThreshold:        0,
 						NetworkFeeUSDCents:                10,
 					},
 					TokenTransferFeeCfgs: map[common.Address]fee_quoter_v1_6_0.TokenTransferFeeConfig{},
@@ -964,7 +964,7 @@ func TestSequenceFeeQuoterInputCreation(t *testing.T) {
 func TestHandleEmptyGasPriceStalenessThreshold(t *testing.T) {
 	aptosSelector := uint64(743186221051783445)
 
-	// EVM chain is not in GasPriceMandatoryForChainFamily -> expect error
+	// EVM chain is not in gasPriceMandatoryForChainFamily -> expect error
 	t.Run("EVM_chain_returns_error", func(t *testing.T) {
 		evmChainSelector := uint64(5009297550715157269)
 		input := deploy.FeeQuoterUpdateInput{
@@ -978,7 +978,7 @@ func TestHandleEmptyGasPriceStalenessThreshold(t *testing.T) {
 		require.Empty(t, priceUpdates, "Expected no gas price updates for EVM chain since staleness threshold is not empty")
 	})
 
-	// Chain in GasPriceMandatoryForChainFamily but AdditionalConfig is nil -> expect error
+	// Chain in gasPriceMandatoryForChainFamily but AdditionalConfig is nil -> expect error
 	t.Run("Aptos_or_Sui_with_nil_AdditionalConfig_returns_error", func(t *testing.T) {
 		input := deploy.FeeQuoterUpdateInput{ChainSelector: 1}
 		_, err := sequences.HandleEmptyGasPriceStalenessThreshold(aptosSelector, input)
@@ -986,7 +986,7 @@ func TestHandleEmptyGasPriceStalenessThreshold(t *testing.T) {
 		require.Contains(t, err.Error(), "please provide gas price for this remote chain in the input additional config")
 	})
 
-	// Chain in GasPriceMandatoryForChainFamily but GasPricesPerRemoteChain is nil -> expect error
+	// Chain in gasPriceMandatoryForChainFamily but GasPricesPerRemoteChain is nil -> expect error
 	t.Run("Aptos_or_Sui_with_nil_GasPricesPerRemoteChain_returns_error", func(t *testing.T) {
 		input := deploy.FeeQuoterUpdateInput{
 			ChainSelector:    1,
@@ -997,7 +997,7 @@ func TestHandleEmptyGasPriceStalenessThreshold(t *testing.T) {
 		require.Contains(t, err.Error(), "please provide gas price for this remote chain in the input additional config")
 	})
 
-	// Chain in GasPriceMandatoryForChainFamily but remote chain not in map -> expect error
+	// Chain in gasPriceMandatoryForChainFamily but remote chain not in map -> expect error
 	t.Run("Aptos_or_Sui_with_missing_remote_chain_in_map_returns_error", func(t *testing.T) {
 		input := deploy.FeeQuoterUpdateInput{
 			ChainSelector: 1,
@@ -1024,7 +1024,7 @@ func TestHandleEmptyGasPriceStalenessThreshold(t *testing.T) {
 		require.Contains(t, err.Error(), "in input additional config")
 	})
 
-	// Chain in GasPriceMandatoryForChainFamily with valid gas price string -> success
+	// Chain in gasPriceMandatoryForChainFamily with valid gas price string -> success
 	t.Run("Aptos_or_Sui_with_gas_price_returns_updates", func(t *testing.T) {
 		gasPriceStr := "2000000000"
 		input := deploy.FeeQuoterUpdateInput{

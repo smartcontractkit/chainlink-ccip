@@ -38,7 +38,7 @@ const (
 )
 
 var (
-	GasPriceMandatoryForChainFamily = map[string]struct{}{
+	gasPriceMandatoryForChainFamily = map[string]struct{}{
 		chain_selectors.FamilyAptos: {},
 		chain_selectors.FamilySui:   {},
 	}
@@ -670,7 +670,7 @@ func HandleEmptyGasPriceStalenessThreshold(remoteChain uint64, input deploy.FeeQ
 	if err != nil {
 		return fqops.PriceUpdates{}, fmt.Errorf("failed to get chain family for remote chain %d: %w", remoteChain, err)
 	}
-	_, exists := GasPriceMandatoryForChainFamily[chainFamily]
+	_, exists := gasPriceMandatoryForChainFamily[chainFamily]
 	// if manual gas price is not mandatory for the chain family but gas price staleness threshold is zero,
 	// we can skip setting gas price for that remote chain and return empty price updates
 	if !exists {
