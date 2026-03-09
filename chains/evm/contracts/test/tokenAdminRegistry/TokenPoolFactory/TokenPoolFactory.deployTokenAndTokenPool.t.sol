@@ -32,7 +32,6 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
   bytes32 internal constant DYNAMIC_SALT = keccak256(abi.encodePacked(FAKE_SALT, OWNER));
 
   address internal s_burnMintOffRamp = makeAddr("burn_mint_offRamp");
-  bytes32 private constant DYNAMIC_SALT = keccak256(abi.encodePacked(FAKE_SALT, OWNER));
 
   function setUp() public override {
     super.setUp();
@@ -723,7 +722,7 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
       remoteTokenPools,
       LOCAL_TOKEN_DECIMALS,
       TokenPoolFactory.PoolType.BURN_MINT,
-      TOKEN_INIT_CODE,
+      s_tokenInitCode,
       POOL_INIT_CODE,
       address(0),
       FAKE_SALT
@@ -754,7 +753,7 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
       remoteTokenPools,
       LOCAL_TOKEN_DECIMALS,
       TokenPoolFactory.PoolType.BURN_MINT,
-      TOKEN_INIT_CODE,
+      s_tokenInitCode,
       POOL_INIT_CODE,
       address(0),
       FAKE_SALT

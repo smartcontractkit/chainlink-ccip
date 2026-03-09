@@ -20,13 +20,6 @@ contract TokenPoolFactorySetup is TokenAdminRegistrySetup {
   bytes internal s_tokenInitCode;
   bytes internal s_poolInitArgs;
 
-  address internal s_rmnProxy = address(0x1234);
-
-  bytes internal constant TOKEN_INIT_CODE = abi.encodePacked(
-    type(FactoryBurnMintERC20).creationCode, abi.encode("TestToken", "TT", 18, type(uint256).max, PREMINT_AMOUNT, OWNER)
-  );
-  bytes internal constant POOL_INIT_CODE = type(BurnMintTokenPool).creationCode;
-
   function setUp() public virtual override {
     super.setUp();
 

@@ -8,8 +8,6 @@ import {TokenPoolFactory} from "../../../tokenAdminRegistry/TokenPoolFactory/Tok
 import {TokenPoolFactorySetup} from "./TokenPoolFactorySetup.t.sol";
 
 contract TokenPoolFactory_constructor is TokenPoolFactorySetup {
-  using Create2 for bytes32;
-
   function test_constructor_getStaticConfig() public view {
     (address rmnProxy, address tokenAdminRegistry, address registryModuleOwnerCustom, address ccipRouter) =
       s_tokenPoolFactory.getStaticConfig();
