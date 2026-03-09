@@ -53,7 +53,7 @@ func (fqu FeeQuoterUpdater[FeeQUpdateArgs]) SequenceFeeQuoterInputCreation() *cl
 			if empty {
 				return zero, fmt.Errorf("could not create input for fee quoter 2.0.0 update sequence: output is empty")
 			}
-			
+
 			out.ChainSelector = input.ChainSelector
 			out.ExistingAddresses = input.ExistingAddresses
 			return any(out).(FeeQUpdateArgs), nil
