@@ -15,6 +15,8 @@ import (
 
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	mcms_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations"
+	mcms_seq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
@@ -23,6 +25,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/registry_module_owner_custom"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
+	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 
@@ -85,6 +88,20 @@ type ExecutorParams struct {
 	Qualifier     string
 }
 
+type MCMSInstanceParams struct {
+	Proposer         mcms_types.Config
+	Bypasser         mcms_types.Config
+	Canceller        mcms_types.Config
+	TimelockMinDelay *big.Int
+	TimelockAdmin    common.Address
+	Label            *string
+}
+
+type MCMSDeployParams struct {
+	CLLCCIP MCMSInstanceParams
+	RMNMCMS MCMSInstanceParams
+}
+
 type ContractParams struct {
 	RMNRemote          RMNRemoteParams
 	OffRamp            OffRampParams
@@ -101,6 +118,10 @@ type DeployChainContractsInput struct {
 	ExistingAddresses []datastore.AddressRef
 	ContractParams    ContractParams
 	DeployTestRouter  bool
+	// MCMS configures deployment of CLLCCIP and RMNMCMS instances.
+	// When non-nil, both instances are deployed and ownership of product contracts
+	// is transferred to the CLLCCIP timelock.
+	MCMS *MCMSDeployParams
 }
 
 var DeployChainContracts = cldf_ops.NewSequence(
@@ -110,8 +131,33 @@ var DeployChainContracts = cldf_ops.NewSequence(
 	func(b cldf_ops.Bundle, chain evm.Chain, input DeployChainContractsInput) (output sequences.OnChainOutput, err error) {
 		addresses := make([]datastore.AddressRef, 0)
 		writes := make([]contract_utils.WriteOutput, 0)
+		ownableContracts := make([]ownableContract, 0)
 
-		// TODO: Deploy MCMS (Timelock, MCM contracts) when MCMS support is needed.
+		var cllccipTimelockAddr common.Address
+		if input.MCMS != nil {
+			cllOutput, err := deployMCMSInstance(
+				b, chain, chain.Selector,
+				common_utils.CLLQualifier,
+				input.MCMS.CLLCCIP,
+				input.ExistingAddresses,
+			)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CLLCCIP MCMS instance: %w", err)
+			}
+			addresses = append(addresses, cllOutput.Addresses...)
+			cllccipTimelockAddr = cllOutput.TimelockAddr
+
+			rmnOutput, err := deployMCMSInstance(
+				b, chain, chain.Selector,
+				common_utils.RMNTimelockQualifier,
+				input.MCMS.RMNMCMS,
+				input.ExistingAddresses,
+			)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy RMNMCMS instance: %w", err)
+			}
+			addresses = append(addresses, rmnOutput.Addresses...)
+		}
 
 		// Deploy WETH
 		wethRef, err := contract_utils.MaybeDeployContract(b, weth.Deploy, chain, contract_utils.DeployInput[weth.ConstructorArgs]{
@@ -301,6 +347,10 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		}
 
 		// Deploy FeeQuoter
+		priceUpdaters := []common.Address{chain.DeployerKey.From}
+		if cllccipTimelockAddr != (common.Address{}) {
+			priceUpdaters = append(priceUpdaters, cllccipTimelockAddr)
+		}
 		feeQuoterRef, err := contract_utils.MaybeDeployContract(b, fee_quoter.Deploy, chain, contract_utils.DeployInput[fee_quoter.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(fee_quoter.ContractType, *input.ContractParams.FeeQuoter.Version),
 			ChainSelector:  chain.Selector,
@@ -309,11 +359,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 					MaxFeeJuelsPerMsg: input.ContractParams.FeeQuoter.MaxFeeJuelsPerMsg,
 					LinkToken:         common.HexToAddress(linkRef.Address),
 				},
-				PriceUpdaters: []common.Address{
-					// Price updates via protocol are out of scope for initial launch.
-					// TODO: Add Timelock here when MCMS support is needed.
-					chain.DeployerKey.From,
-				},
+				PriceUpdaters: priceUpdaters,
 				// Skipped fields:
 				// - TokenPriceFeeds (will not be used in 1.7.0)
 				// - TokenTransferFeeConfigArgs (token+lane-specific config, set elsewhere)
@@ -461,6 +507,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy Executor: %w, params: %+v", err, executorParam)
 			}
 			addresses = append(addresses, executorRef)
+			ownableContracts = append(ownableContracts, ownableContract{common.HexToAddress(executorRef.Address), executor.ContractType})
 
 			// Fetch the dynamic config on the Executor
 			dynamicConfigReport, err := cldf_ops.ExecuteOperation(b, executor.GetDynamicConfig, chain, contract_utils.FunctionInput[struct{}]{
@@ -549,6 +596,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 				}
 				writes = append(writes, acceptOwnershipReport.Output)
 			}
+			ownableContracts = append(ownableContracts, ownableContract{common.HexToAddress(executorProxyRef.Address), executor.ProxyType})
 
 			// Fetch the target on the ExecutorProxy
 			targetReport, err := cldf_ops.ExecuteOperation(b, proxy.GetTarget, chain, contract_utils.FunctionInput[any]{
@@ -620,6 +668,22 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			addresses = append(addresses, deployReceiverReport.Output)
 		}
 
+		// Transfer ownership of product contracts to the CLLCCIP timelock.
+		if cllccipTimelockAddr != (common.Address{}) {
+			ownableContracts = append(ownableContracts,
+				ownableContract{common.HexToAddress(rmnRemoteRef.Address), rmn_remote.ContractType},
+				ownableContract{common.HexToAddress(routerRef.Address), router.ContractType},
+				ownableContract{common.HexToAddress(tokenAdminRegistryRef.Address), token_admin_registry.ContractType},
+				ownableContract{common.HexToAddress(registryModuleOwnerCustomRef.Address), registry_module_owner_custom.ContractType},
+				ownableContract{common.HexToAddress(feeQuoterRef.Address), fee_quoter.ContractType},
+				ownableContract{common.HexToAddress(offRampRef.Address), offramp.ContractType},
+				ownableContract{common.HexToAddress(onRampRef.Address), onramp.ContractType},
+			)
+			if err := transferContractsOwnership(b, chain, ownableContracts, cllccipTimelockAddr); err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to transfer ownership to CLLCCIP timelock: %w", err)
+			}
+		}
+
 		var batchOps []mcms_types.BatchOperation
 		batchOp, err := contract_utils.NewBatchOperationFromWrites(writes)
 		if err != nil {
@@ -634,6 +698,162 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		}, nil
 	},
 )
+
+type mcmsInstanceOutput struct {
+	Addresses    []datastore.AddressRef
+	TimelockAddr common.Address
+}
+
+// deployMCMSInstance deploys a full MCMS instance (Proposer, Bypasser, Canceller MCMs,
+// RBACTimelock, and CallProxy) for the given qualifier and returns all deployed addresses
+// along with the timelock address.
+func deployMCMSInstance(
+	b cldf_ops.Bundle,
+	chain evm.Chain,
+	chainSelector uint64,
+	qualifier string,
+	params MCMSInstanceParams,
+	existingAddresses []datastore.AddressRef,
+) (mcmsInstanceOutput, error) {
+	qualifierPtr := &qualifier
+
+	proposerReport, err := cldf_ops.ExecuteSequence(b, mcms_seq.SeqDeployMCMWithConfig, chain, mcms_seq.SeqMCMSDeploymentCfg{
+		ChainSelector:     chainSelector,
+		ContractType:      common_utils.ProposerManyChainMultisig,
+		MCMConfig:         &params.Proposer,
+		Qualifier:         qualifierPtr,
+		Label:             params.Label,
+		ExistingAddresses: existingAddresses,
+	})
+	if err != nil {
+		return mcmsInstanceOutput{}, fmt.Errorf("failed to deploy proposer MCM for %s: %w", qualifier, err)
+	}
+	if len(proposerReport.Output.Addresses) == 0 {
+		return mcmsInstanceOutput{}, fmt.Errorf("no proposer MCM address returned for %s", qualifier)
+	}
+	proposerAddr := proposerReport.Output.Addresses[0]
+
+	bypasserReport, err := cldf_ops.ExecuteSequence(b, mcms_seq.SeqDeployMCMWithConfig, chain, mcms_seq.SeqMCMSDeploymentCfg{
+		ChainSelector:     chainSelector,
+		ContractType:      common_utils.BypasserManyChainMultisig,
+		MCMConfig:         &params.Bypasser,
+		Qualifier:         qualifierPtr,
+		Label:             params.Label,
+		ExistingAddresses: existingAddresses,
+	})
+	if err != nil {
+		return mcmsInstanceOutput{}, fmt.Errorf("failed to deploy bypasser MCM for %s: %w", qualifier, err)
+	}
+	if len(bypasserReport.Output.Addresses) == 0 {
+		return mcmsInstanceOutput{}, fmt.Errorf("no bypasser MCM address returned for %s", qualifier)
+	}
+	bypasserAddr := bypasserReport.Output.Addresses[0]
+
+	cancellerReport, err := cldf_ops.ExecuteSequence(b, mcms_seq.SeqDeployMCMWithConfig, chain, mcms_seq.SeqMCMSDeploymentCfg{
+		ChainSelector:     chainSelector,
+		ContractType:      common_utils.CancellerManyChainMultisig,
+		MCMConfig:         &params.Canceller,
+		Qualifier:         qualifierPtr,
+		Label:             params.Label,
+		ExistingAddresses: existingAddresses,
+	})
+	if err != nil {
+		return mcmsInstanceOutput{}, fmt.Errorf("failed to deploy canceller MCM for %s: %w", qualifier, err)
+	}
+	if len(cancellerReport.Output.Addresses) == 0 {
+		return mcmsInstanceOutput{}, fmt.Errorf("no canceller MCM address returned for %s", qualifier)
+	}
+	cancellerAddr := cancellerReport.Output.Addresses[0]
+
+	timelockRef, err := contract_utils.MaybeDeployContract(b, mcms_ops.OpDeployTimelock, chain, contract_utils.DeployInput[mcms_ops.OpDeployTimelockInput]{
+		ChainSelector:  chainSelector,
+		Qualifier:      qualifierPtr,
+		TypeAndVersion: deployment.NewTypeAndVersion(common_utils.RBACTimelock, *mcms_ops.MCMSVersion),
+		Args: mcms_ops.OpDeployTimelockInput{
+			TimelockMinDelay: params.TimelockMinDelay,
+			Proposers:        []common.Address{common.HexToAddress(proposerAddr.Address)},
+			Bypassers:        []common.Address{common.HexToAddress(bypasserAddr.Address)},
+			Cancellers:       []common.Address{common.HexToAddress(cancellerAddr.Address)},
+			Admin:            params.TimelockAdmin,
+			Executors:        []common.Address{},
+		},
+	}, existingAddresses)
+	if err != nil {
+		return mcmsInstanceOutput{}, fmt.Errorf("failed to deploy timelock for %s: %w", qualifier, err)
+	}
+	timelockAddr := common.HexToAddress(timelockRef.Address)
+
+	callProxyRef, err := contract_utils.MaybeDeployContract(b, mcms_ops.OpDeployCallProxy, chain, contract_utils.DeployInput[mcms_ops.OpDeployCallProxyInput]{
+		ChainSelector:  chainSelector,
+		Qualifier:      qualifierPtr,
+		TypeAndVersion: deployment.NewTypeAndVersion(common_utils.CallProxy, *mcms_ops.MCMSVersion),
+		Args: mcms_ops.OpDeployCallProxyInput{
+			TimelockAddress: timelockAddr,
+		},
+	}, existingAddresses)
+	if err != nil {
+		return mcmsInstanceOutput{}, fmt.Errorf("failed to deploy call proxy for %s: %w", qualifier, err)
+	}
+
+	_, err = cldf_ops.ExecuteOperation(b, mcms_ops.OpGrantRoleTimelock, chain, contract_utils.FunctionInput[mcms_ops.OpGrantRoleTimelockInput]{
+		ChainSelector: chainSelector,
+		Address:       timelockAddr,
+		Args: mcms_ops.OpGrantRoleTimelockInput{
+			RoleID:  mcms_ops.EXECUTOR_ROLE.ID,
+			Account: common.HexToAddress(callProxyRef.Address),
+		},
+	})
+	if err != nil {
+		return mcmsInstanceOutput{}, fmt.Errorf("failed to grant executor role to call proxy for %s: %w", qualifier, err)
+	}
+
+	var addresses []datastore.AddressRef
+	addresses = append(addresses, proposerReport.Output.Addresses...)
+	addresses = append(addresses, bypasserReport.Output.Addresses...)
+	addresses = append(addresses, cancellerReport.Output.Addresses...)
+	addresses = append(addresses, timelockRef, callProxyRef)
+
+	return mcmsInstanceOutput{
+		Addresses:    addresses,
+		TimelockAddr: timelockAddr,
+	}, nil
+}
+
+type ownableContract struct {
+	Address      common.Address
+	ContractType deployment.ContractType
+}
+
+// transferContractsOwnership transfers ownership of the given contracts to newOwner.
+// Only transfers for contracts currently owned by the deployer key.
+func transferContractsOwnership(
+	b cldf_ops.Bundle,
+	chain evm.Chain,
+	contracts []ownableContract,
+	newOwner common.Address,
+) error {
+	for _, c := range contracts {
+		_, ownable, err := mcms_seq.LoadOwnableContract(c.Address, chain.Client)
+		if err != nil {
+			return fmt.Errorf("failed to load ownable contract %s (%s): %w", c.Address, c.ContractType, err)
+		}
+		deps := mcms_ops.OpEVMOwnershipDeps{
+			Chain:    chain,
+			OwnableC: ownable,
+		}
+		_, err = cldf_ops.ExecuteOperation(b, mcms_ops.OpTransferOwnership, deps, mcms_ops.OpTransferOwnershipInput{
+			ChainSelector:   chain.Selector,
+			Address:         c.Address,
+			ProposedOwner:   newOwner,
+			ContractType:    c.ContractType,
+			TimelockAddress: newOwner,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to transfer ownership of %s (%s) to %s: %w", c.Address, c.ContractType, newOwner, err)
+		}
+	}
+	return nil
+}
 
 // getMockReceiverVerifiers finds the required and optional verifier addresses given the mock receiver
 // params, the addresses of the newly deployed contracts, and the addresses of the existing contracts.

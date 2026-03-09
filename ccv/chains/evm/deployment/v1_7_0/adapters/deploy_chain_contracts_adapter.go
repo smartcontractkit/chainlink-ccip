@@ -81,11 +81,34 @@ func toEVMDeployInput(input ccvadapters.DeployChainContractsInput) (sequences.De
 
 	mockReceivers := convertMockReceivers(input.ContractParams.MockReceivers)
 
+	var mcmsParams *sequences.MCMSDeployParams
+	if input.MCMS != nil {
+		mcmsParams = &sequences.MCMSDeployParams{
+			CLLCCIP: sequences.MCMSInstanceParams{
+				Proposer:         input.MCMS.CLLCCIP.Proposer,
+				Bypasser:         input.MCMS.CLLCCIP.Bypasser,
+				Canceller:        input.MCMS.CLLCCIP.Canceller,
+				TimelockMinDelay: input.MCMS.CLLCCIP.TimelockMinDelay,
+				TimelockAdmin:    input.MCMS.CLLCCIP.TimelockAdmin,
+				Label:            input.MCMS.CLLCCIP.Label,
+			},
+			RMNMCMS: sequences.MCMSInstanceParams{
+				Proposer:         input.MCMS.RMNMCMS.Proposer,
+				Bypasser:         input.MCMS.RMNMCMS.Bypasser,
+				Canceller:        input.MCMS.RMNMCMS.Canceller,
+				TimelockMinDelay: input.MCMS.RMNMCMS.TimelockMinDelay,
+				TimelockAdmin:    input.MCMS.RMNMCMS.TimelockAdmin,
+				Label:            input.MCMS.RMNMCMS.Label,
+			},
+		}
+	}
+
 	return sequences.DeployChainContractsInput{
 		ChainSelector:    input.ChainSelector,
 		CREATE2Factory:   create2Factory,
 		ExistingAddresses: input.ExistingAddresses,
 		DeployTestRouter: input.DeployTestRouter,
+		MCMS:             mcmsParams,
 		ContractParams: sequences.ContractParams{
 			RMNRemote: sequences.RMNRemoteParams{
 				Version:   input.ContractParams.RMNRemote.Version,

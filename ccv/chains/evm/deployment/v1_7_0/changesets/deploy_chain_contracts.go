@@ -15,6 +15,7 @@ type DeployChainContractsCfg struct {
 	CREATE2Factory   common.Address
 	Params           sequences.ContractParams
 	DeployTestRouter bool
+	MCMS             *sequences.MCMSDeployParams
 }
 
 func (c DeployChainContractsCfg) ChainSelector() uint64 {
@@ -35,6 +36,7 @@ var DeployChainContracts = changesets.NewFromOnChainSequence(changesets.NewFromO
 			ExistingAddresses: addresses,
 			ContractParams:    cfg.Params,
 			DeployTestRouter:  cfg.DeployTestRouter,
+			MCMS:              cfg.MCMS,
 		}, nil
 	},
 	ResolveDep: evm_sequences.ResolveEVMChainDep[DeployChainContractsCfg],
