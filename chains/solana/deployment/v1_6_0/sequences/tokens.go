@@ -203,29 +203,20 @@ func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualR
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
 
-			// NOTE: we attempt to resolve the token from the datastore (to avoid RPC calls).
-			// If the token does not exist there, then we will try to infer all the info from
-			// the chain if the token ref includes an address.
-			var tokenProg solana.PublicKey
-			var tokenMint solana.PublicKey
-			var tokenSymb string
-			if tokRef, tokProgramID, err := getTokenMintAndTokenProgram(input.ExistingDataStore, input.TokenRef, chain); err != nil {
-				b.Logger.Warnf("Failed to get token mint and program ID from datastore for ref (%s) (err = %v). Falling back to on-chain lookup if possible.", datastore_utils.SprintRef(input.TokenRef), err)
-			} else {
-				tokenMint = solana.MustPublicKeyFromBase58(tokRef.Address)
-				tokenSymb = tokRef.Qualifier
-				tokenProg = tokProgramID
-			}
-
 			// NOTE: we only need token metadata if we're creating a token multisig. If we
 			// don't need to create one, then we can avoid sending extraneous RPC calls to
 			// the chain.
 			needTokenMultisig := input.SVMExtraArgs != nil && len(input.SVMExtraArgs.CustomerMintAuthorities) > 0
 
-			// NOTE: on-chain token resolution is only attempted if datastore lookup failed
-			// AND we have the token address. Otherwise we don't have enough information to
-			// reliably resolve the token on-chain.
-			if tokenProg.IsZero() && tokenMint.IsZero() && tokenSymb == "" {
+			// NOTE: we attempt to resolve the token from the datastore first to avoid RPC calls.
+			// If the token does not exist there, then we will try to infer all the info from the
+			// chain *if* the token ref includes an address. Otherwise, we don't have enough info
+			// to proceed.
+			var tokenProg solana.PublicKey
+			var tokenMint solana.PublicKey
+			var tokenSymb string
+			if tokRef, tokProgramID, err := getTokenMintAndTokenProgram(input.ExistingDataStore, input.TokenRef, chain); err != nil {
+				b.Logger.Warnf("Failed to get token mint and program ID from datastore for ref (%s) (err = %v). Falling back to on-chain lookup if possible.", datastore_utils.SprintRef(input.TokenRef), err)
 				if input.TokenRef.Address == "" {
 					return sequences.OnChainOutput{}, errors.New("token information could not be resolved from datastore and token reference does not include an address to attempt on-chain resolution")
 				}
@@ -245,6 +236,10 @@ func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualR
 						tokenSymb = tokenMeta.Data.Symbol
 					}
 				}
+			} else {
+				tokenMint = solana.MustPublicKeyFromBase58(tokRef.Address)
+				tokenSymb = tokRef.Qualifier
+				tokenProg = tokProgramID
 			}
 
 			routerAddr, err := a.GetRouterAddress(input.ExistingDataStore, chain.Selector)
@@ -376,7 +371,15 @@ func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualR
 					Labels:        datastore.NewLabelSet(),
 					Type:          datastore.ContractType(tokenType.String()),
 				}
-				if _, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, tokenRef, input.ChainSelector, datastore_utils.FullRef); err != nil {
+
+				results := input.ExistingDataStore.Addresses().Filter(
+					datastore.AddressRefByChainSelector(tokenRef.ChainSelector),
+					datastore.AddressRefByQualifier(tokenRef.Qualifier),
+					datastore.AddressRefByVersion(tokenRef.Version),
+					datastore.AddressRefByAddress(tokenRef.Address),
+					datastore.AddressRefByType(tokenRef.Type),
+				)
+				if len(results) == 0 {
 					b.Logger.Infof("No existing datastore entry found for ref (%s). Adding to results.", datastore_utils.SprintRef(tokenRef))
 					result.Addresses = append(result.Addresses, tokenRef)
 				} else {
