@@ -1,14 +1,17 @@
 package adapters
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils"
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
@@ -57,18 +60,12 @@ func (r *LaneVersionResolver) DeriveLaneVersionsForChain(e cldf.Environment, cha
 	laneVersionForRemoteChain := make(map[uint64]*semver.Version)
 	// for all remote chains, find the onRamp and check its version , if unique add it to the list of versions to import
 	for remoteChain := range remoteChains {
-		onRamp, err := routerC.GetOnRamp(&bind.CallOpts{
-			Context: e.GetContext(),
-		}, remoteChain)
+		version, err := GetLaneVersionForRemoteChain(e.GetContext(), chain, remoteChain, routerAddr)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to get onramp for remote chain %d from router at address %s for chain %d: %w", remoteChain, routerAddr.Hex(), chainSel, err)
+			return nil, nil, fmt.Errorf("failed to get version for remoteChain %d on chain %d: %w", remoteChain, chainSel, err)
 		}
-		if onRamp == (common.Address{}) {
+		if version == nil {
 			continue
-		}
-		_, version, err := utils.TypeAndVersion(onRamp, chain.Client)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to get version for onramp at address %s on chain %d: %w", onRamp.Hex(), chainSel, err)
 		}
 		if _, exists := versions[version.String()]; !exists {
 			versions[version.String()] = version
@@ -83,4 +80,27 @@ func (r *LaneVersionResolver) DeriveLaneVersionsForChain(e cldf.Environment, cha
 		versionList = append(versionList, version)
 	}
 	return laneVersionForRemoteChain, versionList, nil
+}
+
+func GetLaneVersionForRemoteChain(ctx context.Context, chain evm.Chain, remoteChain uint64, routerAddr common.Address) (*semver.Version, error) {
+	routerC, err := router.NewRouter(routerAddr, chain.Client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to bind router contract at address %s: %w", routerAddr.Hex(), err)
+	}
+	// get the onRamp for the remote chain and check its version
+	onRamp, err := routerC.GetOnRamp(&bind.CallOpts{
+		Context: ctx,
+	}, remoteChain)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get onramp for remote chain %d from router at address %s: %w", remoteChain, routerAddr.Hex(), err)
+	}
+	// if there is no onramp for this remote chain, return nil
+	if onRamp == (common.Address{}) {
+		return nil, nil
+	}
+	_, version, err := utils.TypeAndVersion(onRamp, chain.Client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get type and version for onramp at address %s: %w", onRamp.Hex(), err)
+	}
+	return version, nil
 }

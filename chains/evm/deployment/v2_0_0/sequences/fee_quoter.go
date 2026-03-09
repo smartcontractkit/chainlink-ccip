@@ -3,10 +3,12 @@ package sequences
 import (
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
+	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -16,6 +18,8 @@ import (
 	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	adapters1_2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/adapters"
+	routerops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	onrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/onramp"
 	seq1_5 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
 	fq1_6 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
@@ -31,6 +35,13 @@ import (
 const (
 	LinkFeeMultiplierPercent uint8  = 90
 	NetworkFeeUSDCents       uint16 = 10
+)
+
+var (
+	gasPriceMandatoryForChainFamily = map[string]struct{}{
+		chain_selectors.FamilyAptos: {},
+		chain_selectors.FamilySui:   {},
+	}
 )
 
 type FeeQuoterUpdate struct {
@@ -209,6 +220,17 @@ var (
 				return FeeQuoterUpdate{}, fmt.Errorf("failed to convert metadata to "+
 					"FeeQuoterImportConfigSequenceOutput for chain selector %d: %w", input.ChainSelector, err)
 			}
+			routerAddr := datastore_utils.GetAddressRef(
+				input.ExistingAddresses,
+				input.ChainSelector,
+				routerops.ContractType,
+				routerops.Version,
+				"",
+			)
+			if routerAddr.Address == "" {
+				return FeeQuoterUpdate{}, fmt.Errorf("failed to find router address ref for chain selector %d", input.ChainSelector)
+			}
+
 			// is feeQuoter going to be deployed or fetched from existing addresses?
 			feeQuoterRef := datastore_utils.GetAddressRef(
 				input.ExistingAddresses,
@@ -220,11 +242,43 @@ var (
 			isNewFQV2Deployment := datastore_utils.IsAddressRefEmpty(feeQuoterRef)
 			tokenTransferFeeConfigArgs := make([]fqops.TokenTransferFeeConfigArgs, 0)
 			allDestChainConfigs := make([]fqops.DestChainConfigArgs, 0)
+			var providedRemoteChains map[uint64]struct{}
+			if len(input.RemoteChainSelectors) > 0 {
+				// initialize providedRemoteChains map if remote chains are provided in the input,
+				// this means we only want to import config for those remote chains from 1.6
+				providedRemoteChains = make(map[uint64]struct{})
+				for _, remoteChain := range input.RemoteChainSelectors {
+					providedRemoteChains[remoteChain] = struct{}{}
+				}
+			}
 			for remoteChain, cfg := range fqOutput.RemoteChainCfgs {
 				if !cfg.DestChainCfg.IsEnabled {
 					continue
 				}
+				// check if the remote chain is connected with 1.6 deployment, if not, we skip importing config for that remote chain from FQ 1.6
+				// this is to safeguard against having incorrect config import from 1.6
+				version, err := adapters1_2.GetLaneVersionForRemoteChain(b.GetContext(), chain, remoteChain, common.HexToAddress(routerAddr.Address))
+				if err != nil {
+					return FeeQuoterUpdate{}, fmt.Errorf("failed to get lane version for remote chain %d: %w", remoteChain, err)
+				}
+				if version == nil || !version.Equal(semver.MustParse("1.6.0")) {
+					continue
+				}
+				// if remote chains are provided in the input, we only import config for those remote chains,
+				// otherwise we import config for all supported remote chains in 1.6
+				if providedRemoteChains != nil {
+					if _, exists := providedRemoteChains[remoteChain]; !exists {
+						continue
+					}
+				}
 				destChainConfig := cfg.DestChainCfg
+				// check if gasprice stateness threashold is zero
+				if destChainConfig.GasPriceStalenessThreshold == 0 {
+					output.PriceUpdates, err = HandleEmptyGasPriceStalenessThreshold(remoteChain, input)
+					if err != nil {
+						return FeeQuoterUpdate{}, fmt.Errorf("failed to handle empty gas price staleness threshold for remote chain %d: %w", remoteChain, err)
+					}
+				}
 				outDestchainCfg := fqops.DestChainConfigArgs{
 					DestChainSelector: remoteChain,
 					DestChainConfig: fqops.DestChainConfig{
@@ -263,12 +317,14 @@ var (
 				allDestChainConfigs = append(allDestChainConfigs, outDestchainCfg)
 			}
 			if isNewFQV2Deployment {
+				// if new deployment, adding deployer key as price updater so that
+				// manual gas prices can be set right after deployment if needed
 				output.ConstructorArgs = fqops.ConstructorArgs{
 					StaticConfig: fqops.StaticConfig{
 						LinkToken:         fqOutput.StaticCfg.LinkToken,
 						MaxFeeJuelsPerMsg: fqOutput.StaticCfg.MaxFeeJuelsPerMsg,
 					},
-					PriceUpdaters:              fqOutput.PriceUpdaters,
+					PriceUpdaters:              append(fqOutput.PriceUpdaters, chain.DeployerKey.From),
 					TokenTransferFeeConfigArgs: tokenTransferFeeConfigArgs,
 					DestChainConfigArgs:        allDestChainConfigs,
 				}
@@ -317,6 +373,16 @@ var (
 			if len(onRampMetadata) == 0 {
 				return FeeQuoterUpdate{}, fmt.Errorf("no metadata found for EVM2EVMOnRamp v1.5.0 on chain selector %d", input.ChainSelector)
 			}
+			routerAddr := datastore_utils.GetAddressRef(
+				input.ExistingAddresses,
+				input.ChainSelector,
+				routerops.ContractType,
+				routerops.Version,
+				"",
+			)
+			if routerAddr.Address == "" {
+				return FeeQuoterUpdate{}, fmt.Errorf("failed to find router address ref for chain selector %d", input.ChainSelector)
+			}
 			// get the commit stores and that will act like price updaters for fee quoter
 			var commitStoreRefs []datastore.AddressRef
 			for _, addressRef := range input.ExistingAddresses {
@@ -349,7 +415,15 @@ var (
 			var staticCfg fqops.StaticConfig
 			var destChainCfgs []fqops.DestChainConfigArgs
 			var tokenTransferFeeConfigArgsForAll []fqops.TokenTransferFeeConfigArgs
-
+			var providedRemoteChains map[uint64]struct{}
+			if len(input.RemoteChainSelectors) > 0 {
+				// initialize providedRemoteChains map if remote chain selectors are provided in the input,
+				// so that we can check against this map when importing config for each remote chain from onRamp 1.5.0
+				providedRemoteChains = make(map[uint64]struct{})
+				for _, remoteChain := range input.RemoteChainSelectors {
+					providedRemoteChains[remoteChain] = struct{}{}
+				}
+			}
 			for _, meta := range onRampMetadata {
 				var tokenTransferFeeConfigArgs []fqops.TokenTransferFeeConfigSingleTokenArgs
 
@@ -358,6 +432,23 @@ var (
 				if err != nil {
 					return FeeQuoterUpdate{}, fmt.Errorf("failed to convert metadata to "+
 						"OnRampImportConfigSequenceOutput for chain selector %d: %w", input.ChainSelector, err)
+				}
+				remoteChain := onRampCfg.RemoteChainSelector
+				// check if the remote chain is connected with 1.5 deployment, if not, we skip importing config for that remote chain from OnRamp 1.5
+				// this is to safeguard against having incorrect config import from 1.5
+				version, err := adapters1_2.GetLaneVersionForRemoteChain(b.GetContext(), chain, remoteChain, common.HexToAddress(routerAddr.Address))
+				if err != nil {
+					return FeeQuoterUpdate{}, fmt.Errorf("failed to get lane version for remote chain %d: %w", remoteChain, err)
+				}
+				if version == nil || !version.Equal(semver.MustParse("1.5.0")) {
+					continue
+				}
+				// if remote chains are provided in the input, we only import config for those remote chains,
+				// otherwise we import config for all supported remote chains in the 1.5
+				if providedRemoteChains != nil {
+					if _, exists := providedRemoteChains[remoteChain]; !exists {
+						continue
+					}
 				}
 				if staticCfg.LinkToken == (common.Address{}) {
 					staticCfg = fqops.StaticConfig{
@@ -407,7 +498,7 @@ var (
 					},
 					DestChainConfigArgs:        destChainCfgs,
 					TokenTransferFeeConfigArgs: tokenTransferFeeConfigArgsForAll,
-					PriceUpdaters:              priceUpdaters,
+					PriceUpdaters:              append(priceUpdaters, chain.DeployerKey.From),
 				}
 			} else {
 				output.DestChainConfigs = destChainCfgs
@@ -559,4 +650,47 @@ func IsConstructorArgsEmpty(a fqops.ConstructorArgs) bool {
 		len(a.PriceUpdaters) == 0 &&
 		len(a.TokenTransferFeeConfigArgs) == 0 &&
 		len(a.DestChainConfigArgs) == 0
+}
+
+// HandleEmptyGasPriceStalenessThreshold handles the case when GasPriceStalenessThreshold is zero for a remote chain.
+// It checks if gas price needs to be set manually for the chain family ( mainly for aptos and sui),
+// if yes it -
+//
+//   - looks for gas price for that remote chain in the input additional config and adds it to the price updates output;
+//   - throws an error if gas price for that remote chain is not provided in the input additional config
+//     because gas price staleness threshold cannot be zero without providing gas price for chains that need manual gas price.
+//
+// if not, it returns empty price updates output because gas price does not need to be manually set for that remote chain.
+// It is exported for testing.
+func HandleEmptyGasPriceStalenessThreshold(remoteChain uint64, input deploy.FeeQuoterUpdateInput) (output fqops.PriceUpdates, err error) {
+	// check if gasprice can be set manually for the chain family,
+	// if not, we return an error because gas price staleness threshold cannot be zero
+	// for chains that do not have manual gas price
+	chainFamily, err := chain_selectors.GetSelectorFamily(remoteChain)
+	if err != nil {
+		return fqops.PriceUpdates{}, fmt.Errorf("failed to get chain family for remote chain %d: %w", remoteChain, err)
+	}
+	_, exists := gasPriceMandatoryForChainFamily[chainFamily]
+	// if manual gas price is not mandatory for the chain family but gas price staleness threshold is zero,
+	// we can skip setting gas price for that remote chain and return empty price updates
+	if !exists {
+		return fqops.PriceUpdates{}, nil
+	}
+	if input.AdditionalConfig == nil || input.AdditionalConfig.GasPricesPerRemoteChain == nil {
+		return fqops.PriceUpdates{}, fmt.Errorf("gas price staleness threshold is zero for remote chain %d, "+
+			"please provide gas price for this remote chain in the input additional config", remoteChain)
+	}
+	if gaspriceStr, ok := input.AdditionalConfig.GasPricesPerRemoteChain[remoteChain]; ok {
+		gasprice, success := new(big.Int).SetString(gaspriceStr, 10)
+		if !success {
+			return fqops.PriceUpdates{}, fmt.Errorf("invalid gas price %s for remote chain %d in input additional config", gaspriceStr, remoteChain)
+		}
+		output.GasPriceUpdates = append(output.GasPriceUpdates, fqops.GasPriceUpdate{
+			DestChainSelector: remoteChain,
+			UsdPerUnitGas:     gasprice,
+		})
+		return output, nil
+	}
+	return fqops.PriceUpdates{}, fmt.Errorf("gas price staleness threshold is zero for remote chain %d, "+
+		"please provide gas price for this remote chain in the input additional config", remoteChain)
 }

@@ -18,6 +18,28 @@ var (
 	Version      *semver.Version              = semver.MustParse("1.5.0")
 )
 
+type ConstructorArgs struct {
+	StaticConfig               evm_2_evm_onramp.EVM2EVMOnRampStaticConfig
+	DynamicConfig              evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig
+	RateLimiterConfig          evm_2_evm_onramp.RateLimiterConfig
+	FeeTokenConfigs            []evm_2_evm_onramp.EVM2EVMOnRampFeeTokenConfigArgs
+	TokenTransferFeeConfigArgs []evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs
+	NopsAndWeights             []evm_2_evm_onramp.EVM2EVMOnRampNopAndWeight
+}
+
+var DeployOnRamp = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
+	Name:             "onramp:deploy",
+	Version:          Version,
+	Description:      "Deploys the OnRamp 1.5.0 contract",
+	ContractMetadata: evm_2_evm_onramp.EVM2EVMOnRampMetaData,
+	Validate:         func(args ConstructorArgs) error { return nil },
+	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
+		cldf_deployment.NewTypeAndVersion(ContractType, *Version).String(): {
+			EVM: common.FromHex(evm_2_evm_onramp.EVM2EVMOnRampBin),
+		},
+	},
+})
+
 type SetTokenTransferFeeConfigInput struct {
 	TokenTransferFeeConfigArgs   []evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs
 	TokensToUseDefaultFeeConfigs []common.Address
