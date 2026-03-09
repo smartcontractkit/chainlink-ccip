@@ -254,6 +254,37 @@ contracts:
     abi_file: mock_receiver_v2.json
     functions: []
 
+  - contract_name: CCTPVerifier
+    version: "2.0.0"
+    version_path: "latest"
+    functions:
+      - name: applyRemoteChainConfigUpdates
+        access: owner
+      - name: setDomains
+        access: owner
+      - name: setDynamicConfig
+        access: owner
+      - name: applyAllowlistUpdates
+        access: owner
+      - name: updateStorageLocations
+        access: owner
+      - name: withdrawFeeTokens
+        access: owner
+      - name: versionTag
+        access: public
+      - name: getDynamicConfig
+        access: public
+      - name: getRemoteChainConfig
+        access: public
+      - name: getDomain
+        access: public
+      - name: getStaticConfig
+        access: public
+      - name: getStorageLocations
+        access: public
+      - name: getFee
+        access: public
+
   - contract_name: CommitteeVerifier
     version: "2.0.0"
     version_path: "latest"
