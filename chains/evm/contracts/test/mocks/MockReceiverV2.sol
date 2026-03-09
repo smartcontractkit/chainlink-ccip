@@ -29,7 +29,7 @@ contract MockReceiverV2 is IAny2EVMMessageReceiverV2, IERC165 {
   // From IAny2EVMMessageReceiverV2
   function getCCVs(
     uint64 /* sourceChainSelector */
-  ) external view returns (address[] memory, address[] memory, uint8) {
+  ) external view returns (address[] memory requiredVerifier, address[] memory optionalVerifiers, uint8 threshold) {
     return (s_required, s_optional, s_threshold);
   }
 
