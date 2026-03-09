@@ -31,8 +31,8 @@ import (
 
 var ConfigureLaneLegAsSource = cldf_ops.NewSequence(
 	"ConfigureLaneLegAsSource",
-	semver.MustParse("1.7.0"),
-	"Configures lane leg as source on CCIP 1.7.0",
+	semver.MustParse("2.0.0"),
+	"Configures lane leg as source on CCIP 2.0.0",
 	func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input lanes.UpdateLanesInput) (sequences.OnChainOutput, error) {
 		b.Logger.Infof("EVM Configuring lane leg as source. src: %+v, dest: %+v", input.Source, input.Dest)
 
@@ -152,6 +152,7 @@ var ConfigureLaneLegAsSource = cldf_ops.NewSequence(
 			gasPriceReport, err := cldf_ops.ExecuteOperation(b, fee_quoter.GetDestinationChainGasPrice, chain, contract.FunctionInput[uint64]{
 				ChainSelector: chain.Selector,
 				Address:       common.HexToAddress(sourceFeeQuoter),
+				Args:          remoteSelector,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get gas prices on FeeQuoter(%s) on chain %s: %w", sourceFeeQuoter, chain, err)
@@ -239,8 +240,8 @@ var ConfigureLaneLegAsSource = cldf_ops.NewSequence(
 
 var ConfigureLaneLegAsDest = cldf_ops.NewSequence(
 	"ConfigureLaneLegAsDest",
-	semver.MustParse("1.6.0"),
-	"Configures lane leg as destination on CCIP 1.6.0",
+	semver.MustParse("2.0.0"),
+	"Configures lane leg as destination on CCIP 2.0.0",
 	func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input lanes.UpdateLanesInput) (sequences.OnChainOutput, error) {
 		b.Logger.Infof("EVM Configuring lane leg as destination. src: %+v, dest: %+v", input.Source, input.Dest)
 		writes := make([]contract.WriteOutput, 0)
@@ -432,13 +433,11 @@ func maybeAddOnRampDestChainConfigArg(b cldf_ops.Bundle, chain evm.Chain, input 
 	if desiredOnRampArg.AddressBytesLength == 0 {
 		desiredOnRampArg.AddressBytesLength = curOn.AddressBytesLength
 	}
-	desiredDefaultCCVs := desiredOnRampArg.DefaultCCVs
-	if len(desiredDefaultCCVs) == 0 {
-		desiredDefaultCCVs = curOn.DefaultCCVs
+	if len(desiredOnRampArg.DefaultCCVs) == 0 {
+		desiredOnRampArg.DefaultCCVs = curOn.DefaultCCVs
 	}
-	desiredLaneMandatedCCVs := desiredOnRampArg.LaneMandatedCCVs
-	if len(desiredLaneMandatedCCVs) == 0 {
-		desiredLaneMandatedCCVs = curOn.LaneMandatedCCVs
+	if len(desiredOnRampArg.LaneMandatedCCVs) == 0 {
+		desiredOnRampArg.LaneMandatedCCVs = curOn.LaneMandatedCCVs
 	}
 	if curOn.Router != desiredOnRampArg.Router || curOn.DefaultExecutor != desiredOnRampArg.DefaultExecutor ||
 		!bytes.Equal(curOn.OffRamp, desiredOnRampArg.OffRamp) ||
@@ -447,8 +446,8 @@ func maybeAddOnRampDestChainConfigArg(b cldf_ops.Bundle, chain evm.Chain, input 
 		curOn.TokenNetworkFeeUSDCents != desiredOnRampArg.TokenNetworkFeeUSDCents ||
 		curOn.BaseExecutionGasCost != desiredOnRampArg.BaseExecutionGasCost ||
 		curOn.AddressBytesLength != desiredOnRampArg.AddressBytesLength ||
-		!UnorderedSliceEqual(curOn.DefaultCCVs, desiredDefaultCCVs, func(x, y common.Address) bool { return x == y }) ||
-		!UnorderedSliceEqual(curOn.LaneMandatedCCVs, desiredLaneMandatedCCVs, func(x, y common.Address) bool { return x == y }) {
+		!UnorderedSliceEqual(curOn.DefaultCCVs, desiredOnRampArg.DefaultCCVs, func(x, y common.Address) bool { return x == y }) ||
+		!UnorderedSliceEqual(curOn.LaneMandatedCCVs, desiredOnRampArg.LaneMandatedCCVs, func(x, y common.Address) bool { return x == y }) {
 		onRampArgs = append(onRampArgs, desiredOnRampArg)
 	}
 	return onRampArgs, nil
