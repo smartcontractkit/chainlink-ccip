@@ -973,10 +973,9 @@ func TestHandleEmptyGasPriceStalenessThreshold(t *testing.T) {
 				GasPricesPerRemoteChain: map[uint64]string{evmChainSelector: "1000000000"},
 			},
 		}
-		_, err := sequences.HandleEmptyGasPriceStalenessThreshold(evmChainSelector, input)
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "gas price staleness threshold cannot be zero")
-		require.Contains(t, err.Error(), "please ensure that this chain can be set with manual gas price")
+		priceUpdates, err := sequences.HandleEmptyGasPriceStalenessThreshold(evmChainSelector, input)
+		require.NoError(t, err)
+		require.Empty(t, priceUpdates, "Expected no gas price updates for EVM chain since staleness threshold is not empty")
 	})
 
 	// Chain in GasPriceMandatoryForChainFamily but AdditionalConfig is nil -> expect error

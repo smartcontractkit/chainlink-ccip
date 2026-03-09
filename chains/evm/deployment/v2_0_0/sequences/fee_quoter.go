@@ -653,6 +653,14 @@ func IsConstructorArgsEmpty(a fqops.ConstructorArgs) bool {
 }
 
 // HandleEmptyGasPriceStalenessThreshold handles the case when GasPriceStalenessThreshold is zero for a remote chain.
+// It checks if gas price needs to be set manually for the chain family ( mainly for aptos and sui),
+// if yes it -
+//
+//   - looks for gas price for that remote chain in the input additional config and adds it to the price updates output;
+//   - throws an error if gas price for that remote chain is not provided in the input additional config
+//     because gas price staleness threshold cannot be zero without providing gas price for chains that need manual gas price.
+//
+// if not, it returns empty price updates output because gas price does not need to be manually set for that remote chain.
 // It is exported for testing.
 func HandleEmptyGasPriceStalenessThreshold(remoteChain uint64, input deploy.FeeQuoterUpdateInput) (output fqops.PriceUpdates, err error) {
 	// check if gasprice can be set manually for the chain family,
@@ -663,10 +671,10 @@ func HandleEmptyGasPriceStalenessThreshold(remoteChain uint64, input deploy.FeeQ
 		return fqops.PriceUpdates{}, fmt.Errorf("failed to get chain family for remote chain %d: %w", remoteChain, err)
 	}
 	_, exists := GasPriceMandatoryForChainFamily[chainFamily]
+	// if manual gas price is not mandatory for the chain family but gas price staleness threshold is zero,
+	// we can skip setting gas price for that remote chain and return empty price updates
 	if !exists {
-		return fqops.PriceUpdates{},
-			fmt.Errorf("gas price staleness threshold cannot be zero for remote chain %d of family %s "+
-				"please ensure that this chain can be set with manual gas price", remoteChain, chainFamily)
+		return fqops.PriceUpdates{}, nil
 	}
 	if input.AdditionalConfig == nil || input.AdditionalConfig.GasPricesPerRemoteChain == nil {
 		return fqops.PriceUpdates{}, fmt.Errorf("gas price staleness threshold is zero for remote chain %d, "+
