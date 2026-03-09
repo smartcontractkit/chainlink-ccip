@@ -3,6 +3,7 @@ package sequences
 import (
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
@@ -671,7 +672,11 @@ func HandleEmptyGasPriceStalenessThreshold(remoteChain uint64, input deploy.FeeQ
 		return fqops.PriceUpdates{}, fmt.Errorf("gas price staleness threshold is zero for remote chain %d, "+
 			"please provide gas price for this remote chain in the input additional config", remoteChain)
 	}
-	if gasprice, ok := input.AdditionalConfig.GasPricesPerRemoteChain[remoteChain]; ok {
+	if gaspriceStr, ok := input.AdditionalConfig.GasPricesPerRemoteChain[remoteChain]; ok {
+		gasprice, success := new(big.Int).SetString(gaspriceStr, 10)
+		if !success {
+			return fqops.PriceUpdates{}, fmt.Errorf("invalid gas price %s for remote chain %d in input additional config", gaspriceStr, remoteChain)
+		}
 		output.GasPriceUpdates = append(output.GasPriceUpdates, fqops.GasPriceUpdate{
 			DestChainSelector: remoteChain,
 			UsdPerUnitGas:     gasprice,

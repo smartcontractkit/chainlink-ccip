@@ -40,7 +40,7 @@ type UpdateFeeQuoterInputPerChain struct {
 }
 
 type AdditionalFeeQuoterConfig struct {
-	GasPricesPerRemoteChain map[uint64]*big.Int
+	GasPricesPerRemoteChain map[uint64]string // uses string values (parsed as base-10 big.Int).
 }
 
 type FeeQuoterUpdateInput struct {
@@ -202,6 +202,15 @@ func updateFeeQuoterVerify() func(cldf.Environment, UpdateFeeQuoterInput) error 
 			}
 			if perChainInput.FeeQuoterVersion == nil {
 				return fmt.Errorf("fee quoter version is required for chain selector %d", chainSel)
+			}
+			if perChainInput.FeeQuoterConfig != nil {
+				for remoteChainSel := range perChainInput.FeeQuoterConfig.GasPricesPerRemoteChain {
+					// check big.Int strings are valid
+					_, ok := new(big.Int).SetString(perChainInput.FeeQuoterConfig.GasPricesPerRemoteChain[remoteChainSel], 10)
+					if !ok {
+						return fmt.Errorf("invalid gas price %s for remote chain selector %d in fee quoter config for chain selector %d", perChainInput.FeeQuoterConfig.GasPricesPerRemoteChain[remoteChainSel], remoteChainSel, chainSel)
+					}
+				}
 			}
 			_, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 				ChainSelector: chainSel,

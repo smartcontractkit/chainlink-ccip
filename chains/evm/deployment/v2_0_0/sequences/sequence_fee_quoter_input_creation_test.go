@@ -960,14 +960,17 @@ func TestSequenceFeeQuoterInputCreation(t *testing.T) {
 
 // TestHandleEmptyGasPriceStalenessThreshold verifies HandleEmptyGasPriceStalenessThreshold behavior for
 // chains with zero GasPriceStalenessThreshold (e.g. Aptos/Sui that require manual gas price).
+// GasPricesPerRemoteChain uses string values (parsed as base-10 big.Int).
 func TestHandleEmptyGasPriceStalenessThreshold(t *testing.T) {
+	aptosSelector := uint64(743186221051783445)
+
 	// EVM chain is not in GasPriceMandatoryForChainFamily -> expect error
 	t.Run("EVM_chain_returns_error", func(t *testing.T) {
 		evmChainSelector := uint64(5009297550715157269)
 		input := deploy.FeeQuoterUpdateInput{
 			ChainSelector: 1,
 			AdditionalConfig: &deploy.AdditionalFeeQuoterConfig{
-				GasPricesPerRemoteChain: map[uint64]*big.Int{evmChainSelector: big.NewInt(1e9)},
+				GasPricesPerRemoteChain: map[uint64]string{evmChainSelector: "1000000000"},
 			},
 		}
 		_, err := sequences.HandleEmptyGasPriceStalenessThreshold(evmChainSelector, input)
@@ -978,7 +981,6 @@ func TestHandleEmptyGasPriceStalenessThreshold(t *testing.T) {
 
 	// Chain in GasPriceMandatoryForChainFamily but AdditionalConfig is nil -> expect error
 	t.Run("Aptos_or_Sui_with_nil_AdditionalConfig_returns_error", func(t *testing.T) {
-		aptosSelector := uint64(743186221051783445)
 		input := deploy.FeeQuoterUpdateInput{ChainSelector: 1}
 		_, err := sequences.HandleEmptyGasPriceStalenessThreshold(aptosSelector, input)
 		require.Error(t, err)
@@ -986,8 +988,7 @@ func TestHandleEmptyGasPriceStalenessThreshold(t *testing.T) {
 	})
 
 	// Chain in GasPriceMandatoryForChainFamily but GasPricesPerRemoteChain is nil -> expect error
-	t.Run("Aptos_or_Sui_with_nil_GaspricesPerRemoteChain_returns_error", func(t *testing.T) {
-		aptosSelector := uint64(743186221051783445)
+	t.Run("Aptos_or_Sui_with_nil_GasPricesPerRemoteChain_returns_error", func(t *testing.T) {
 		input := deploy.FeeQuoterUpdateInput{
 			ChainSelector:    1,
 			AdditionalConfig: &deploy.AdditionalFeeQuoterConfig{},
@@ -999,11 +1000,10 @@ func TestHandleEmptyGasPriceStalenessThreshold(t *testing.T) {
 
 	// Chain in GasPriceMandatoryForChainFamily but remote chain not in map -> expect error
 	t.Run("Aptos_or_Sui_with_missing_remote_chain_in_map_returns_error", func(t *testing.T) {
-		aptosSelector := uint64(743186221051783445)
 		input := deploy.FeeQuoterUpdateInput{
 			ChainSelector: 1,
 			AdditionalConfig: &deploy.AdditionalFeeQuoterConfig{
-				GasPricesPerRemoteChain: map[uint64]*big.Int{999: big.NewInt(1e9)},
+				GasPricesPerRemoteChain: map[uint64]string{999: "1000000000"},
 			},
 		}
 		_, err := sequences.HandleEmptyGasPriceStalenessThreshold(aptosSelector, input)
@@ -1011,21 +1011,34 @@ func TestHandleEmptyGasPriceStalenessThreshold(t *testing.T) {
 		require.Contains(t, err.Error(), "please provide gas price for this remote chain in the input additional config")
 	})
 
-	// Chain in GasPriceMandatoryForChainFamily with gas price provided -> success
-	t.Run("Aptos_or_Sui_with_gas_price_returns_updates", func(t *testing.T) {
-		aptosSelector := uint64(743186221051783445)
-		gasPrice := big.NewInt(2e9)
+	// Invalid gas price string (not a number) -> expect error
+	t.Run("invalid_gas_price_string_returns_error", func(t *testing.T) {
 		input := deploy.FeeQuoterUpdateInput{
 			ChainSelector: 1,
 			AdditionalConfig: &deploy.AdditionalFeeQuoterConfig{
-				GasPricesPerRemoteChain: map[uint64]*big.Int{aptosSelector: gasPrice},
+				GasPricesPerRemoteChain: map[uint64]string{aptosSelector: "not-a-number"},
+			},
+		}
+		_, err := sequences.HandleEmptyGasPriceStalenessThreshold(aptosSelector, input)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "invalid gas price")
+		require.Contains(t, err.Error(), "in input additional config")
+	})
+
+	// Chain in GasPriceMandatoryForChainFamily with valid gas price string -> success
+	t.Run("Aptos_or_Sui_with_gas_price_returns_updates", func(t *testing.T) {
+		gasPriceStr := "2000000000"
+		input := deploy.FeeQuoterUpdateInput{
+			ChainSelector: 1,
+			AdditionalConfig: &deploy.AdditionalFeeQuoterConfig{
+				GasPricesPerRemoteChain: map[uint64]string{aptosSelector: gasPriceStr},
 			},
 		}
 		output, err := sequences.HandleEmptyGasPriceStalenessThreshold(aptosSelector, input)
 		require.NoError(t, err)
 		require.Len(t, output.GasPriceUpdates, 1)
 		require.Equal(t, aptosSelector, output.GasPriceUpdates[0].DestChainSelector)
-		require.Equal(t, gasPrice, output.GasPriceUpdates[0].UsdPerUnitGas)
+		require.Equal(t, 0, big.NewInt(2e9).Cmp(output.GasPriceUpdates[0].UsdPerUnitGas), "UsdPerUnitGas should match parsed value")
 	})
 }
 
