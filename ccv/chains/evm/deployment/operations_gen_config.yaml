@@ -294,6 +294,25 @@ contracts:
     abi_file: mock_receiver_v2.json
     functions: []
 
+  - contract_name: Executor
+    version: "2.0.0"
+    version_path: "latest"
+    functions:
+      - name: setDynamicConfig
+        access: owner
+      - name: withdrawFeeTokens
+        access: owner
+      - name: getDynamicConfig
+        access: public
+      - name: getDestChains
+        access: public
+      - name: getAllowedCCVs
+        access: public
+      - name: getMaxCCVsPerMessage
+        access: public
+      - name: getMinBlockConfirmations
+        access: public
+
   - contract_name: Proxy
     version: "2.0.0"
     version_path: "latest"

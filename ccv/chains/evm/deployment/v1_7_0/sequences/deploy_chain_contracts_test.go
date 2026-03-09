@@ -18,11 +18,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/committee_verifier"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/executor"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/mock_receiver"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/executor"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
@@ -115,7 +115,7 @@ func TestDeployChainContracts_Idempotency(t *testing.T) {
 				rmn_proxy.ContractType:                  false,
 				token_admin_registry.ContractType:       false,
 				mock_receiver.ContractType:              false,
-				executor.ProxyType:                      false,
+				sequences.ExecutorProxyType:             false,
 				router.TestRouterContractType:           false,
 			}
 			for _, addr := range report.Output.Addresses {
@@ -567,7 +567,7 @@ func TestDeployChainContracts_DefaultOwnershipTransfer(t *testing.T) {
 
 	// Verify multi-instance executor contracts (with qualifiers) deployed and ownership transferred.
 	for _, q := range []string{"default", "custom"} {
-		for _, ct := range []deployment.ContractType{executor.ContractType, executor.ProxyType} {
+		for _, ct := range []deployment.ContractType{executor.ContractType, sequences.ExecutorProxyType} {
 			addr, err := datastore_utils.FindAndFormatRef(outputDS, datastore.AddressRef{
 				Type:      datastore.ContractType(ct),
 				Qualifier: q,
