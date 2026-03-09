@@ -40,7 +40,7 @@ type UpdateFeeQuoterInputPerChain struct {
 }
 
 type AdditionalFeeQuoterConfig struct {
-	GaspricesPerRemoteChain map[uint64]*big.Int
+	GasPricesPerRemoteChain map[uint64]*big.Int
 }
 
 type FeeQuoterUpdateInput struct {

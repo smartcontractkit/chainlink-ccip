@@ -667,11 +667,11 @@ func HandleEmptyGasPriceStalenessThreshold(remoteChain uint64, input deploy.FeeQ
 			fmt.Errorf("gas price staleness threshold cannot be zero for remote chain %d of family %s "+
 				"please ensure that this chain can be set with manual gas price", remoteChain, chainFamily)
 	}
-	if input.AdditionalConfig == nil || input.AdditionalConfig.GaspricesPerRemoteChain == nil {
+	if input.AdditionalConfig == nil || input.AdditionalConfig.GasPricesPerRemoteChain == nil {
 		return fqops.PriceUpdates{}, fmt.Errorf("gas price staleness threshold is zero for remote chain %d, "+
 			"please provide gas price for this remote chain in the input additional config", remoteChain)
 	}
-	if gasprice, ok := input.AdditionalConfig.GaspricesPerRemoteChain[remoteChain]; ok {
+	if gasprice, ok := input.AdditionalConfig.GasPricesPerRemoteChain[remoteChain]; ok {
 		output.GasPriceUpdates = append(output.GasPriceUpdates, fqops.GasPriceUpdate{
 			DestChainSelector: remoteChain,
 			UsdPerUnitGas:     gasprice,
