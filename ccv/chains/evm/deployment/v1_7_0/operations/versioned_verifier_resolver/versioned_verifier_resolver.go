@@ -5,7 +5,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/cctp_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/versioned_verifier_resolver"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -14,6 +13,7 @@ import (
 var ContractType cldf_deployment.ContractType = "VersionedVerifierResolver"
 var CommitteeVerifierContractType cldf_deployment.ContractType = "CommitteeVerifier"
 var CommitteeVerifierResolverType cldf_deployment.ContractType = "CommitteeVerifierResolver"
+var CCTPVerifierResolverType cldf_deployment.ContractType = "CCTPVerifierResolver"
 
 var Version = semver.MustParse("1.7.0")
 
@@ -33,7 +33,7 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Description:      "Deploys the VersionedVerifierResolver contract",
 	ContractMetadata: versioned_verifier_resolver.VersionedVerifierResolverMetaData,
 	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
-		cldf_deployment.NewTypeAndVersion(cctp_verifier.ResolverType, *Version).String(): {
+		cldf_deployment.NewTypeAndVersion(CCTPVerifierResolverType, *Version).String(): {
 			EVM: common.FromHex(versioned_verifier_resolver.VersionedVerifierResolverBin),
 		},
 		cldf_deployment.NewTypeAndVersion(CommitteeVerifierResolverType, *Version).String(): {
