@@ -238,90 +238,84 @@ func updateFeeQuoterApply(fquRegistry *FQAndRampUpdaterRegistry, mcmsRegistry *c
 				feeQuoterAddrRef = feeQuoterAddrRefs[0]
 				e.Logger.Infof("Found existing FeeQuoter address %s for chain selector %d and version %s",
 					feeQuoterAddrRef.Address, chainSel, perChainInput.FeeQuoterVersion.String())
-			} else {
-				// if the address doesn't exist, which is fine -
-				// it means we need to deploy or update the FeeQuoter
-				// if we get a FQ ref, we can re-configure an existing FQ >= 2.0.0
-				if perChainInput.FeeQuoterVersion.GreaterThanEqual(semver.MustParse("2.0.0")) {
-					e.Logger.Infof("No existing FeeQuoter address found for chain selector %d and version %s, proceeding with deployment and upgrade", chainSel, perChainInput.FeeQuoterVersion.String())
-					fquUpdater, ok := fquRegistry.GetFeeQuoterUpdater(chainSel, perChainInput.FeeQuoterVersion)
-					if !ok {
-						return cldf.ChangesetOutput{}, utils.ErrNoAdapterForSelectorRegistered("FeeQuoterUpdater", chainSel, perChainInput.FeeQuoterVersion)
-					}
+			}
+			// if the address doesn't exist, it's fine -
+			// it means we need to deploy or update the FeeQuoter
+			// if we get a FQ ref, we can re-configure an existing FQ >= 2.0.0
+			if perChainInput.FeeQuoterVersion.GreaterThanEqual(semver.MustParse("2.0.0")) {
+				e.Logger.Infof("No existing FeeQuoter address found for chain selector %d and version %s, proceeding with deployment and upgrade", chainSel, perChainInput.FeeQuoterVersion.String())
+				fquUpdater, ok := fquRegistry.GetFeeQuoterUpdater(chainSel, perChainInput.FeeQuoterVersion)
+				if !ok {
+					return cldf.ChangesetOutput{}, utils.ErrNoAdapterForSelectorRegistered("FeeQuoterUpdater", chainSel, perChainInput.FeeQuoterVersion)
+				}
 
-					versionResolver, ok := fquRegistry.GetConfigImporterVersionResolver(chainSel)
+				versionResolver, ok := fquRegistry.GetConfigImporterVersionResolver(chainSel)
+				if !ok {
+					return cldf.ChangesetOutput{}, utils.ErrNoAdapterForSelectorRegistered("ConfigImporterVersionResolver", chainSel, nil)
+				}
+				// Resolve the config importer version to use for this chain
+				_, configImporterVersions, err := versionResolver.DeriveLaneVersionsForChain(e, chainSel)
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve config importer version for chain %d: %w", chainSel, err)
+				}
+				contractMeta := make([]datastore.ContractMetadata, 0)
+				for _, version := range configImporterVersions {
+					configImporter, ok := fquRegistry.GetConfigImporter(chainSel, version)
 					if !ok {
-						return cldf.ChangesetOutput{}, utils.ErrNoAdapterForSelectorRegistered("ConfigImporterVersionResolver", chainSel, nil)
+						return cldf.ChangesetOutput{}, utils.ErrNoAdapterForSelectorRegistered("ConfigImporter", chainSel, version)
 					}
-					// Resolve the config importer version to use for this chain
-					_, configImporterVersions, err := versionResolver.DeriveLaneVersionsForChain(e, chainSel)
+					err := configImporter.InitializeAdapter(e, chainSel)
 					if err != nil {
-						return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve config importer version for chain %d: %w", chainSel, err)
+						return cldf.ChangesetOutput{}, fmt.Errorf("failed to initialize config importer for chain %d: %w", chainSel, err)
 					}
-					contractMeta := make([]datastore.ContractMetadata, 0)
-					for _, version := range configImporterVersions {
-						configImporter, ok := fquRegistry.GetConfigImporter(chainSel, version)
-						if !ok {
-							return cldf.ChangesetOutput{}, utils.ErrNoAdapterForSelectorRegistered("ConfigImporter", chainSel, version)
-						}
-						err := configImporter.InitializeAdapter(e, chainSel)
-						if err != nil {
-							return cldf.ChangesetOutput{}, fmt.Errorf("failed to initialize config importer for chain %d: %w", chainSel, err)
-						}
-						supportedTokensPerRemoteChain, err := configImporter.SupportedTokensPerRemoteChain(e, chainSel)
-						if err != nil {
-							return cldf.ChangesetOutput{}, fmt.Errorf("failed to get supported tokens per remote chain for chain %d: %w", chainSel, err)
-						}
-						connectedChains, err := configImporter.ConnectedChains(e, chainSel)
-						if err != nil {
-							return cldf.ChangesetOutput{}, fmt.Errorf("failed to get connected chains for chain %d: %w", chainSel, err)
-						}
-						populateConfigReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, configImporter.SequenceImportConfig(), e.BlockChains, ImportConfigPerChainInput{
-							ChainSelector:        chainSel,
-							RemoteChains:         connectedChains,
-							TokensPerRemoteChain: supportedTokensPerRemoteChain,
-						})
-						if err != nil {
-							return cldf.ChangesetOutput{}, fmt.Errorf("failed to populate config for FeeQuoter on chain %d: %w", chainSel, err)
-						}
-						if len(populateConfigReport.Output.Metadata.Contracts) == 0 {
-							return cldf.ChangesetOutput{}, fmt.Errorf("no contract metadata returned from populate config for FeeQuoter on chain %d", chainSel)
-						}
-
-						contractMeta = append(contractMeta, populateConfigReport.Output.Metadata.Contracts...)
-						contractMetadata = append(contractMetadata, populateConfigReport.Output.Metadata.Contracts...)
+					supportedTokensPerRemoteChain, err := configImporter.SupportedTokensPerRemoteChain(e, chainSel)
+					if err != nil {
+						return cldf.ChangesetOutput{}, fmt.Errorf("failed to get supported tokens per remote chain for chain %d: %w", chainSel, err)
 					}
-					// Create FeeQuoterUpdateInput
-					reportFQInputCreation, err := cldf_ops.ExecuteSequence(e.OperationsBundle, fquUpdater.SequenceFeeQuoterInputCreation(), e.BlockChains, FeeQuoterUpdateInput{
+					connectedChains, err := configImporter.ConnectedChains(e, chainSel)
+					if err != nil {
+						return cldf.ChangesetOutput{}, fmt.Errorf("failed to get connected chains for chain %d: %w", chainSel, err)
+					}
+					populateConfigReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, configImporter.SequenceImportConfig(), e.BlockChains, ImportConfigPerChainInput{
 						ChainSelector:        chainSel,
-						ExistingAddresses:    e.DataStore.Addresses().Filter(datastore.AddressRefByChainSelector(chainSel)),
-						ContractMeta:         contractMeta,
-						RemoteChainSelectors: perChainInput.RemoteChainSelectors,
-						AdditionalConfig:     perChainInput.FeeQuoterConfig,
+						RemoteChains:         connectedChains,
+						TokensPerRemoteChain: supportedTokensPerRemoteChain,
 					})
 					if err != nil {
-						return cldf.ChangesetOutput{}, fmt.Errorf("failed to create FeeQuoterUpdateInput for chain %d: %w", chainSel, err)
+						return cldf.ChangesetOutput{}, fmt.Errorf("failed to populate config for FeeQuoter on chain %d: %w", chainSel, err)
 					}
-					// Deploy or update FeeQuoter
-					reportFQUpdate, err := cldf_ops.ExecuteSequence(e.OperationsBundle, fquUpdater.SequenceDeployOrUpdateFeeQuoter(), e.BlockChains, reportFQInputCreation.Output)
-					if err != nil {
-						return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy or update FeeQuoter for chain %d: %w", chainSel, err)
+					if len(populateConfigReport.Output.Metadata.Contracts) == 0 {
+						return cldf.ChangesetOutput{}, fmt.Errorf("no contract metadata returned from populate config for FeeQuoter on chain %d", chainSel)
 					}
-					batchOps = append(batchOps, reportFQUpdate.Output.BatchOps...)
-					addressRefs = append(addressRefs, reportFQUpdate.Output.Addresses...)
-					reports = append(reports, reportFQUpdate.ExecutionReports...)
-					if len(reportFQUpdate.Output.Addresses) == 0 {
-						return cldf.ChangesetOutput{}, fmt.Errorf("no FeeQuoter address returned for chain %d", chainSel)
-					}
-					// Update Ramps with new FeeQuoter address
-					// fetch the address refs
-					feeQuoterAddrRef = reportFQUpdate.Output.Addresses[len(reportFQUpdate.Output.Addresses)-1]
-				} else {
-					return cldf.ChangesetOutput{}, fmt.Errorf(
-						"fee quoter address not found for chain selector %d and version %s, and "+
-							"version is less than 2.0.0, deployment of new FeeQuoter with older versions is not supported",
-						chainSel, perChainInput.FeeQuoterVersion.String())
+
+					contractMeta = append(contractMeta, populateConfigReport.Output.Metadata.Contracts...)
+					contractMetadata = append(contractMetadata, populateConfigReport.Output.Metadata.Contracts...)
 				}
+				// Create FeeQuoterUpdateInput
+				reportFQInputCreation, err := cldf_ops.ExecuteSequence(e.OperationsBundle, fquUpdater.SequenceFeeQuoterInputCreation(), e.BlockChains, FeeQuoterUpdateInput{
+					ChainSelector:        chainSel,
+					ExistingAddresses:    e.DataStore.Addresses().Filter(datastore.AddressRefByChainSelector(chainSel)),
+					ContractMeta:         contractMeta,
+					RemoteChainSelectors: perChainInput.RemoteChainSelectors,
+					AdditionalConfig:     perChainInput.FeeQuoterConfig,
+				})
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to create FeeQuoterUpdateInput for chain %d: %w", chainSel, err)
+				}
+				// Deploy or update FeeQuoter
+				reportFQUpdate, err := cldf_ops.ExecuteSequence(e.OperationsBundle, fquUpdater.SequenceDeployOrUpdateFeeQuoter(), e.BlockChains, reportFQInputCreation.Output)
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy or update FeeQuoter for chain %d: %w", chainSel, err)
+				}
+				batchOps = append(batchOps, reportFQUpdate.Output.BatchOps...)
+				addressRefs = append(addressRefs, reportFQUpdate.Output.Addresses...)
+				reports = append(reports, reportFQUpdate.ExecutionReports...)
+				if len(reportFQUpdate.Output.Addresses) == 0 {
+					return cldf.ChangesetOutput{}, fmt.Errorf("no FeeQuoter address returned for chain %d", chainSel)
+				}
+				// Update Ramps with new FeeQuoter address
+				// fetch the address refs
+				feeQuoterAddrRef = reportFQUpdate.Output.Addresses[len(reportFQUpdate.Output.Addresses)-1]
 			}
 			if perChainInput.RampsVersion != nil {
 				if feeQuoterAddrRef.Address == "" {
