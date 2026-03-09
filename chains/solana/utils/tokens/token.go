@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"strings"
 
-	solbin "github.com/gagliardetto/binary"
 	token_metadata "github.com/gagliardetto/metaplex-go/clients/token-metadata"
 	"github.com/gagliardetto/solana-go"
 	ata "github.com/gagliardetto/solana-go/programs/associated-token-account"
@@ -293,29 +292,4 @@ func GetTokenDataV2(metadata token_metadata.Metadata) token_metadata.DataV2 {
 		Creators:             metadata.Data.Creators,
 		Uses:                 metadata.Uses,
 	}
-}
-
-func GetTokenProgramID(ctx context.Context, client *rpc.Client, tokenPubKey solana.PublicKey) (solana.PublicKey, error) {
-	tokenAcctInfo, err := client.GetAccountInfo(ctx, tokenPubKey)
-	if err != nil {
-		return solana.PublicKey{}, fmt.Errorf("failed to get account info for token %s: %w", tokenPubKey.String(), err)
-	}
-
-	_, err = GetTokenMintInfo(tokenAcctInfo)
-	if err != nil {
-		return solana.PublicKey{}, fmt.Errorf("failed to decode token mint info, account may not be a valid token account: %w", err)
-	}
-
-	return tokenAcctInfo.Value.Owner, nil
-}
-
-func GetTokenMintInfo(tokenAcctInfo *rpc.GetAccountInfoResult) (token.Mint, error) {
-	var mint token.Mint
-
-	err := solbin.NewBinDecoder(tokenAcctInfo.Bytes()).Decode(&mint)
-	if err != nil {
-		return token.Mint{}, fmt.Errorf("failed to decode token mint data: %w", err)
-	}
-
-	return mint, nil
 }

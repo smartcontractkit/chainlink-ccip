@@ -231,7 +231,7 @@ func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualR
 				}
 
 				tokenAddr := solana.MustPublicKeyFromBase58(input.TokenRef.Address)
-				tokProgramID, err := tokens.GetTokenProgramID(b.GetContext(), chain.Client, tokenAddr)
+				tokProgramID, err := utils.FetchTokenProgramID(b.GetContext(), chain, tokenAddr)
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to get token program ID for token mint '%s': %w", tokenAddr.String(), err)
 				}
