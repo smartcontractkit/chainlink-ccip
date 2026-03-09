@@ -28,12 +28,13 @@ import (
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/offramp"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/executor"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/mock_receiver"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/proxy"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/mock_receiver"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/offramp"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/onramp"
 )
 
 type MockReceiverParams struct {
@@ -624,11 +625,11 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			deployReceiverReport, err := cldf_ops.ExecuteOperation(b, mock_receiver.Deploy, chain, contract_utils.DeployInput[mock_receiver.ConstructorArgs]{
 				TypeAndVersion: deployment.NewTypeAndVersion(mock_receiver.ContractType, *mockReceiverParams.Version),
 				ChainSelector:  chain.Selector,
-				Args: mock_receiver.ConstructorArgs{
-					RequiredVerifiers: requiredVerifiers,
-					OptionalVerifiers: optionalVerifiers,
-					OptionalThreshold: mockReceiverParams.OptionalThreshold,
-				},
+			Args: mock_receiver.ConstructorArgs{
+				Required:  requiredVerifiers,
+				Optional:  optionalVerifiers,
+				Threshold: mockReceiverParams.OptionalThreshold,
+			},
 				Qualifier: qualifierPtr,
 			})
 			if err != nil {

@@ -287,6 +287,13 @@ contracts:
       - name : deposit
         access: public
 
+  - contract_name: MockReceiverV2
+    version: "2.0.0"
+    version_path: "latest"
+    package_name: mock_receiver
+    abi_file: mock_receiver_v2.json
+    functions: []
+
   - contract_name: CommitteeVerifier
     version: "2.0.0"
     version_path: "latest"
