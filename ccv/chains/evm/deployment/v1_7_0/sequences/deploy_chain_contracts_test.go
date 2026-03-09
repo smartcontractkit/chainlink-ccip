@@ -365,12 +365,8 @@ func TestDeployChainContracts_MultipleCommitteeVerifiersAndMultipleMockReceiverC
 	require.Equal(t, uint8(1), threshold)
 }
 
-func singleSignerMCMSConfig(signer common.Address) mcms_types.Config {
-	c, err := mcms_types.NewConfig(1, []common.Address{signer}, nil)
-	if err != nil {
-		panic(err)
-	}
-	return c
+func singleSignerMCMSConfig(signer common.Address) (mcms_types.Config, error) {
+	return mcms_types.NewConfig(1, []common.Address{signer}, nil)
 }
 
 func TestDeployChainContracts_WithMCMS(t *testing.T) {
@@ -392,7 +388,8 @@ func TestDeployChainContracts_WithMCMS(t *testing.T) {
 		}, nil)
 	require.NoError(t, err)
 
-	mcmsCfg := singleSignerMCMSConfig(deployer)
+	mcmsCfg, err := singleSignerMCMSConfig(deployer)
+	require.NoError(t, err, "singleSignerMCMSConfig should not error")
 	report, err := operations.ExecuteSequence(
 		e.OperationsBundle,
 		sequences.DeployChainContracts,
@@ -495,25 +492,38 @@ func TestDeployChainContracts_WithMCMS(t *testing.T) {
 		}
 	}
 
-	// Verify product contracts have pending owner set to CLLCCIP timelock.
+	// Verify product contracts have ownership transferred to CLLCCIP timelock.
+	// These are the contract types that transferContractsOwnership is called with
+	// in production code — all must be loadable as ownable.
+	ownableProductTypes := map[deployment.ContractType]bool{
+		rmn_remote.ContractType:          true,
+		router.ContractType:              true,
+		token_admin_registry.ContractType: true,
+		fee_quoter.ContractType:          true,
+		offramp.ContractType:             true,
+		onramp.ContractType:              true,
+		executor.ContractType:            true,
+		executor.ProxyType:               true,
+	}
 	for _, ct := range productTypes {
 		for key, addr := range addrMap {
 			if key.contractType != ct {
 				continue
 			}
 			_, ownable, err := mcms_seq.LoadOwnableContract(addr, chain.Client)
-			if err != nil {
+			if ownableProductTypes[ct] {
+				require.NoError(t, err, "LoadOwnableContract should succeed for ownable product type %s at %s", ct, addr)
+			} else if err != nil {
 				continue
 			}
-			// For Ownable2Step contracts, the pending owner can be checked via
-			// the generic OwnershipTransferable interface or by casting to
-			// burn_mint_erc677 which has PendingOwner().
 			owner, err := ownable.Owner(nil)
-			require.NoError(t, err)
-			// Owner is still the deployer (pending transfer), or the timelock
-			// if the contract uses one-step Ownable.
+			require.NoError(t, err, "Owner() should not error for %s at %s", ct, addr)
+			// For Ownable2Step contracts, owner is still the deployer (pending
+			// transfer not yet accepted). For one-step Ownable contracts, owner
+			// is the timelock directly.
 			require.True(t, owner == deployer || owner == cllTimelockAddr,
-				"Product contract %s owner should be deployer or CLLCCIP timelock, got %s", ct, owner)
+				"Product contract %s at %s: owner should be deployer (%s) or CLLCCIP timelock (%s), got %s",
+				ct, addr, deployer, cllTimelockAddr, owner)
 		}
 	}
 

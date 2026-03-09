@@ -823,16 +823,30 @@ func deployMCMSInstance(
 		return mcmsInstanceOutput{}, fmt.Errorf("failed to deploy call proxy for %s: %w", qualifier, err)
 	}
 
-	_, err = cldf_ops.ExecuteOperation(b, mcms_ops.OpGrantRoleTimelock, chain, contract_utils.FunctionInput[mcms_ops.OpGrantRoleTimelockInput]{
-		ChainSelector: chainSelector,
-		Address:       timelockAddr,
-		Args: mcms_ops.OpGrantRoleTimelockInput{
-			RoleID:  mcms_ops.EXECUTOR_ROLE.ID,
-			Account: common.HexToAddress(callProxyRef.Address),
-		},
-	})
+	callProxyAddress := common.HexToAddress(callProxyRef.Address)
+	timelock, err := mcms_seq.LoadTimelockContract(timelockAddr, chain.Client)
 	if err != nil {
-		return mcmsInstanceOutput{}, fmt.Errorf("failed to grant executor role to call proxy for %s: %w", qualifier, err)
+		return mcmsInstanceOutput{}, fmt.Errorf("failed to load timelock contract for %s: %w", qualifier, err)
+	}
+	hasExecutorRole, err := timelock.HasRole(nil, mcms_ops.EXECUTOR_ROLE.ID, callProxyAddress)
+	if err != nil {
+		return mcmsInstanceOutput{}, fmt.Errorf("failed to check executor role for call proxy on %s: %w", qualifier, err)
+	}
+	if !hasExecutorRole {
+		_, err = cldf_ops.ExecuteOperation(b, mcms_ops.OpGrantRoleTimelock, chain, contract_utils.FunctionInput[mcms_ops.OpGrantRoleTimelockInput]{
+			ChainSelector: chainSelector,
+			Address:       timelockAddr,
+			Args: mcms_ops.OpGrantRoleTimelockInput{
+				RoleID:  mcms_ops.EXECUTOR_ROLE.ID,
+				Account: callProxyAddress,
+			},
+		})
+		if err != nil {
+			return mcmsInstanceOutput{}, fmt.Errorf("failed to grant executor role to call proxy for %s: %w", qualifier, err)
+		}
+		b.Logger.Infof("Granted executor role on timelock %s to call proxy %s for %s", timelockAddr, callProxyAddress, qualifier)
+	} else {
+		b.Logger.Infof("Call proxy %s already has executor role on timelock %s for %s", callProxyAddress, timelockAddr, qualifier)
 	}
 
 	var addresses []datastore.AddressRef
@@ -857,7 +871,8 @@ type ownableContract struct {
 }
 
 // transferContractsOwnership transfers ownership of the given contracts to newOwner.
-// Only transfers for contracts currently owned by the deployer key.
+// Only transfers for contracts currently owned by the deployer key; contracts already
+// owned by newOwner are skipped to ensure idempotency across reruns.
 func transferContractsOwnership(
 	b cldf_ops.Bundle,
 	chain evm.Chain,
@@ -865,9 +880,19 @@ func transferContractsOwnership(
 	newOwner common.Address,
 ) error {
 	for _, c := range contracts {
-		_, ownable, err := mcms_seq.LoadOwnableContract(c.Address, chain.Client)
+		currentOwner, ownable, err := mcms_seq.LoadOwnableContract(c.Address, chain.Client)
 		if err != nil {
 			return fmt.Errorf("failed to load ownable contract %s (%s): %w", c.Address, c.ContractType, err)
+		}
+		if currentOwner == newOwner {
+			b.Logger.Infof("Contract %s (%s) already owned by %s, skipping transfer", c.Address, c.ContractType, newOwner)
+			continue
+		}
+		if currentOwner != chain.DeployerKey.From {
+			return fmt.Errorf(
+				"contract %s (%s) is owned by %s, which is neither the deployer %s nor the target owner %s; cannot transfer",
+				c.Address, c.ContractType, currentOwner, chain.DeployerKey.From, newOwner,
+			)
 		}
 		deps := mcms_ops.OpEVMOwnershipDeps{
 			Chain:    chain,
