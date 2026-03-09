@@ -7,6 +7,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/committee_verifier"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/versioned_verifier_resolver"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
@@ -16,7 +17,7 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 )
 
-var CommitteeVerifierResolverType deployment.ContractType = "CommitteeVerifierResolver"
+var CommitteeVerifierResolverType = versioned_verifier_resolver.CommitteeVerifierResolverType
 
 type CommitteeVerifierParams struct {
 	Version          *semver.Version
