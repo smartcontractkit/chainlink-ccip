@@ -6,6 +6,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
+	mcms_types "github.com/smartcontractkit/mcms/types"
+
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
@@ -13,7 +15,6 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	mcms_types "github.com/smartcontractkit/mcms/types"
 )
 
 // TokenTransferConfig specifies configuration for a token on one chain to enable transfers with other chains.
@@ -37,14 +38,14 @@ type TokenTransferConfig struct {
 	// This can be interpreted as # of block confirmations, an ID, or otherwise.
 	// Interpretation is left to each chain family.
 	MinFinalityValue uint16
-	// MigrationAmount, if set, specifies an exact token amount to migrate from the old pool (read from the
-	// TokenAdminRegistry) to the new pool's lockbox. Mutually exclusive with MigrationBasisPoints.
-	// When either MigrationAmount or MigrationBasisPoints is set, a liquidity migration is triggered.
+	// LiquidityMigrationAmount, if set, specifies an exact token amount to migrate from the old pool (read from the
+	// TokenAdminRegistry) to the new pool's lockbox. Mutually exclusive with LiquidityMigrationBasisPoints.
+	// When either LiquidityMigrationAmount or LiquidityMigrationBasisPoints is set, a liquidity migration is triggered.
 	// The old pool address is derived from the TokenAdminRegistry, and the timelock address from the MCMS config.
-	MigrationAmount *big.Int
-	// MigrationBasisPoints specifies a percentage of the old pool's balance to migrate (1-10000, where 10000 = 100%).
-	// Mutually exclusive with MigrationAmount.
-	MigrationBasisPoints *uint16
+	LiquidityMigrationAmount *big.Int
+	// LiquidityMigrationBasisPoints specifies a percentage of the old pool's balance to migrate (1-10000, where 10000 = 100%).
+	// Mutually exclusive with LiquidityMigrationAmount.
+	LiquidityMigrationBasisPoints *uint16
 }
 
 // ConfigureTokensForTransfersConfig is the configuration for the ConfigureTokensForTransfers changeset.
@@ -142,7 +143,7 @@ func processTokenConfigForChain(e deployment.Environment, mcmsRegistry *changese
 			}
 		}
 
-		if token.MigrationAmount != nil || token.MigrationBasisPoints != nil {
+		if token.LiquidityMigrationAmount != nil || token.LiquidityMigrationBasisPoints != nil {
 			migrationSeq := adapter.MigrateLockReleasePoolLiquiditySequence()
 			if migrationSeq == nil {
 				return nil, nil, nil, fmt.Errorf("migration requested but adapter for family '%s' version '%s' does not support liquidity migration", family, token.TokenPoolRef.Version)
@@ -178,8 +179,8 @@ func processTokenConfigForChain(e deployment.Environment, mcmsRegistry *changese
 				OldPoolAddress:  oldPoolAddress,
 				NewPoolAddress:  tokenPool.Address,
 				TimelockAddress: timelockRef.Address,
-				Amount:          token.MigrationAmount,
-				BasisPoints:     token.MigrationBasisPoints,
+				Amount:          token.LiquidityMigrationAmount,
+				BasisPoints:     token.LiquidityMigrationBasisPoints,
 				SetPoolConfig:   nil,
 			})
 			if err != nil {
