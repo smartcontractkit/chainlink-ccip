@@ -16,6 +16,7 @@ import (
 	erc20_ops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/erc20"
 	lockbox_ops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/erc20_lock_box"
 	lrtp_ops_v170 "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/lock_release_token_pool"
+	siloed_lrtp_ops_v170 "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/siloed_lock_release_token_pool"
 	token_pool_ops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -119,7 +120,7 @@ func migrateUnsiloedPool(
 	chainSel := input.ChainSelector
 	var ops []evm_contract.WriteOutput
 
-	lockboxReport, err := cldf_ops.ExecuteOperation(b, lrtp_ops_v170.GetLockBox, evmChain, evm_contract.FunctionInput[any]{
+	lockboxReport, err := cldf_ops.ExecuteOperation(b, lrtp_ops_v170.GetLockBox, evmChain, evm_contract.FunctionInput[struct{}]{
 		ChainSelector: chainSel,
 		Address:       newPoolAddr,
 	})
@@ -205,7 +206,7 @@ func migrateSiloedPool(
 	}
 	supportedChains := chainsReport.Output
 
-	lockboxConfigsReport, err := cldf_ops.ExecuteOperation(b, lrtp_ops_v170.GetAllLockBoxConfigs, evmChain, evm_contract.FunctionInput[any]{
+	lockboxConfigsReport, err := cldf_ops.ExecuteOperation(b, siloed_lrtp_ops_v170.GetAllLockBoxConfigs, evmChain, evm_contract.FunctionInput[struct{}]{
 		ChainSelector: chainSel,
 		Address:       newPoolAddr,
 	})
@@ -491,10 +492,10 @@ func appendAuthApproveDeposit(
 	}
 	ops = append(ops, addAuthReport.Output)
 
-	approveReport, err := cldf_ops.ExecuteOperation(b, erc20_ops.Approve, evmChain, evm_contract.FunctionInput[erc20_ops.ApproveInput]{
+	approveReport, err := cldf_ops.ExecuteOperation(b, erc20_ops.Approve, evmChain, evm_contract.FunctionInput[erc20_ops.ApproveArgs]{
 		ChainSelector: chainSel,
 		Address:       tokenAddr,
-		Args: erc20_ops.ApproveInput{
+		Args: erc20_ops.ApproveArgs{
 			Spender: lockboxAddr,
 			Amount:  amount,
 		},
@@ -504,10 +505,10 @@ func appendAuthApproveDeposit(
 	}
 	ops = append(ops, approveReport.Output)
 
-	depositReport, err := cldf_ops.ExecuteOperation(b, lockbox_ops.Deposit, evmChain, evm_contract.FunctionInput[lockbox_ops.DepositInput]{
+	depositReport, err := cldf_ops.ExecuteOperation(b, lockbox_ops.Deposit, evmChain, evm_contract.FunctionInput[lockbox_ops.DepositArgs]{
 		ChainSelector: chainSel,
 		Address:       lockboxAddr,
-		Args: lockbox_ops.DepositInput{
+		Args: lockbox_ops.DepositArgs{
 			Token:               tokenAddr,
 			RemoteChainSelector: remoteChainSelector,
 			Amount:              amount,

@@ -385,7 +385,7 @@ func TestMigrateLockReleasePoolLiquidity_UnsiloedPartialBasisPoints(t *testing.T
 		testsetup.BundleWithFreshReporter(s.env.OperationsBundle),
 		erc20_lock_box.GetAllAuthorizedCallers,
 		chain,
-		evm_contract.FunctionInput[any]{
+		evm_contract.FunctionInput[struct{}]{
 			ChainSelector: chainSel,
 			Address:       s.lockBoxAddr,
 		},
@@ -712,9 +712,9 @@ func TestMigrateLockReleasePoolLiquidity_SiloedPool(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = operations.ExecuteOperation(e.OperationsBundle, erc20.Approve, chain,
-		evm_contract.FunctionInput[erc20.ApproveInput]{
+		evm_contract.FunctionInput[erc20.ApproveArgs]{
 			ChainSelector: chainSel, Address: tokenAddr,
-			Args: erc20.ApproveInput{Spender: oldPoolAddr, Amount: totalMint},
+			Args: erc20.ApproveArgs{Spender: oldPoolAddr, Amount: totalMint},
 		})
 	require.NoError(t, err)
 
@@ -931,7 +931,7 @@ func TestMigrateLockReleasePoolLiquidity_AuthorizedCallerCleanup(t *testing.T) {
 	// Verify pre-existing caller is present before migration
 	preCallersReport, err := operations.ExecuteOperation(
 		testsetup.BundleWithFreshReporter(s.env.OperationsBundle), erc20_lock_box.GetAllAuthorizedCallers, chain,
-		evm_contract.FunctionInput[any]{ChainSelector: chainSel, Address: s.lockBoxAddr})
+		evm_contract.FunctionInput[struct{}]{ChainSelector: chainSel, Address: s.lockBoxAddr})
 	require.NoError(t, err)
 	require.Contains(t, preCallersReport.Output, preExistingCaller,
 		"Pre-existing caller should be present before migration")
@@ -955,7 +955,7 @@ func TestMigrateLockReleasePoolLiquidity_AuthorizedCallerCleanup(t *testing.T) {
 	// Verify pre-existing caller is still present after migration
 	postCallersReport, err := operations.ExecuteOperation(
 		testsetup.BundleWithFreshReporter(s.env.OperationsBundle), erc20_lock_box.GetAllAuthorizedCallers, chain,
-		evm_contract.FunctionInput[any]{ChainSelector: chainSel, Address: s.lockBoxAddr})
+		evm_contract.FunctionInput[struct{}]{ChainSelector: chainSel, Address: s.lockBoxAddr})
 	require.NoError(t, err)
 	require.Contains(t, postCallersReport.Output, preExistingCaller,
 		"Pre-existing authorized caller should be preserved after migration")

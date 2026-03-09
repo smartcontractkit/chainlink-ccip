@@ -362,18 +362,18 @@ func TestDeployLockReleaseTokenPool(t *testing.T) {
 			require.Contains(t, getAuthorizedCallersReport.Output, common.HexToAddress(poolAddress), "Expected token pool address to be in the on-chain authorized callers")
 
 			// Check authorized callers on lock box
-			getAuthorizedCallersReport, err = operations.ExecuteOperation(
+			getLockBoxCallersReport, err := operations.ExecuteOperation(
 				testsetup.BundleWithFreshReporter(e.OperationsBundle),
 				erc20_lock_box.GetAllAuthorizedCallers,
 				e.BlockChains.EVMChains()[chainSel],
-				contract.FunctionInput[any]{
+				contract.FunctionInput[struct{}]{
 					ChainSelector: chainSel,
 					Address:       common.HexToAddress(lockBoxAddress),
 				},
 			)
 			require.NoError(t, err, "ExecuteOperation should not error")
-			require.Len(t, getAuthorizedCallersReport.Output, 1, "Expected 1 address in on-chain authorized callers")
-			require.Contains(t, getAuthorizedCallersReport.Output, common.HexToAddress(poolAddress), "Expected lock release token pool address to be in the on-chain authorized callers")
+			require.Len(t, getLockBoxCallersReport.Output, 1, "Expected 1 address in on-chain authorized callers")
+			require.Contains(t, getLockBoxCallersReport.Output, common.HexToAddress(poolAddress), "Expected lock release token pool address to be in the on-chain authorized callers")
 
 			// Verify lock box address is present in output
 			require.NotEmpty(t, lockBoxAddress, "Expected lock box address to be present in output")
