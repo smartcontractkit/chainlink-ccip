@@ -439,6 +439,10 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     bytes calldata encodedMessage
   ) external view returns (address[] memory requiredCCVs, address[] memory optionalCCVs, uint8 threshold) {
     MessageV1Codec.MessageV1 memory message = MessageV1Codec._decodeMessageV1(encodedMessage);
+    if (message.receiver.length != 20) {
+      revert Internal.InvalidEVMAddress(message.receiver);
+    }
+
     address receiver = address(bytes20(message.receiver));
 
     return _getCCVsForMessage(
