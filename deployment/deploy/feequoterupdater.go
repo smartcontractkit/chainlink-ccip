@@ -2,6 +2,7 @@ package deploy
 
 import (
 	"fmt"
+	"math/big"
 	"sync"
 
 	"github.com/Masterminds/semver/v3"
@@ -31,16 +32,22 @@ type UpdateFeeQuoterInput struct {
 
 type UpdateFeeQuoterInputPerChain struct {
 	FeeQuoterVersion *semver.Version
+	FeeQuoterConfig  *AdditionalFeeQuoterConfig
+	RampsVersion     *semver.Version
 	// RemoteChainSelectors is used to determine which remote chains to pull config for when populating config for the FeeQuoter
 	// if RemoteChainSelectors is empty, it will pull all remote chain configs using 1.5.0 and 1.6.0 config importer
 	RemoteChainSelectors []uint64
-	RampsVersion         *semver.Version
+}
+
+type AdditionalFeeQuoterConfig struct {
+	GasPricesPerRemoteChain map[uint64]string // uses string values (parsed as base-10 big.Int).
 }
 
 type FeeQuoterUpdateInput struct {
 	ChainSelector        uint64
 	ExistingAddresses    []datastore.AddressRef
 	RemoteChainSelectors []uint64
+	AdditionalConfig     *AdditionalFeeQuoterConfig
 	ContractMeta         []datastore.ContractMetadata
 	// TimelockAddress is the address of the CCIP timelock contract to be added as a price updater on the fee quoter.
 	TimelockAddress string
@@ -198,8 +205,14 @@ func updateFeeQuoterVerify() func(cldf.Environment, UpdateFeeQuoterInput) error 
 			if perChainInput.FeeQuoterVersion == nil {
 				return fmt.Errorf("fee quoter version is required for chain selector %d", chainSel)
 			}
-			if perChainInput.RampsVersion == nil {
-				return fmt.Errorf("ramps version is required for chain selector %d", chainSel)
+			if perChainInput.FeeQuoterConfig != nil {
+				for remoteChainSel := range perChainInput.FeeQuoterConfig.GasPricesPerRemoteChain {
+					// check big.Int strings are valid
+					_, ok := new(big.Int).SetString(perChainInput.FeeQuoterConfig.GasPricesPerRemoteChain[remoteChainSel], 10)
+					if !ok {
+						return fmt.Errorf("invalid gas price %s for remote chain selector %d in fee quoter config for chain selector %d", perChainInput.FeeQuoterConfig.GasPricesPerRemoteChain[remoteChainSel], remoteChainSel, chainSel)
+					}
+				}
 			}
 			_, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 				ChainSelector: chainSel,
@@ -229,20 +242,21 @@ func updateFeeQuoterApply() func(cldf.Environment, UpdateFeeQuoterInput) (cldf.C
 		mcmsRegistry := changesets.GetRegistry()
 		for chainSel, perChainInput := range input.Chains {
 			var feeQuoterAddrRef datastore.AddressRef
-			rampUpdater, ok := fquRegistry.GetRampUpdater(chainSel, perChainInput.RampsVersion)
-			if !ok {
-				return cldf.ChangesetOutput{}, utils.ErrNoAdapterForSelectorRegistered("RampUpdater", chainSel, perChainInput.RampsVersion)
-			}
-			existingFQRefs := e.DataStore.Addresses().Filter(
+			feeQuoterAddrRefs := e.DataStore.Addresses().Filter(
 				datastore.AddressRefByChainSelector(chainSel),
 				datastore.AddressRefByType(datastore.ContractType(utils.FeeQuoter)),
 				datastore.AddressRefByVersion(perChainInput.FeeQuoterVersion),
 			)
-			isNewFeeQuoterDeployment := len(existingFQRefs) == 0
-			if !isNewFeeQuoterDeployment {
-				feeQuoterAddrRef = existingFQRefs[0]
+			if len(feeQuoterAddrRefs) > 0 {
+				feeQuoterAddrRef = feeQuoterAddrRefs[0]
+				e.Logger.Infof("Found existing FeeQuoter address %s for chain selector %d and version %s",
+					feeQuoterAddrRef.Address, chainSel, perChainInput.FeeQuoterVersion.String())
 			}
-			if isNewFeeQuoterDeployment || feeQuoterAddrRef.Version.GreaterThanEqual(semver.MustParse("2.0.0")) {
+			isNewFeeQuoterDeployment := len(feeQuoterAddrRefs) == 0
+			// if the address doesn't exist, it's fine -
+			// it means we need to deploy or update the FeeQuoter
+			// if we get a FQ ref, we can re-configure an existing FQ >= 2.0.0
+			if perChainInput.FeeQuoterVersion.GreaterThanEqual(semver.MustParse("2.0.0")) {
 				e.Logger.Infof("No existing FeeQuoter address found for chain selector %d and version %s, proceeding with deployment and upgrade", chainSel, perChainInput.FeeQuoterVersion.String())
 				fquUpdater, ok := fquRegistry.GetFeeQuoterUpdater(chainSel, perChainInput.FeeQuoterVersion)
 				if !ok {
@@ -315,6 +329,7 @@ func updateFeeQuoterApply() func(cldf.Environment, UpdateFeeQuoterInput) (cldf.C
 					ContractMeta:         contractMeta,
 					RemoteChainSelectors: perChainInput.RemoteChainSelectors,
 					TimelockAddress:      timelockAddr,
+					AdditionalConfig:     perChainInput.FeeQuoterConfig,
 				})
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to create FeeQuoterUpdateInput for chain %d: %w", chainSel, err)
@@ -345,6 +360,13 @@ func updateFeeQuoterApply() func(cldf.Environment, UpdateFeeQuoterInput) (cldf.C
 				}
 			}
 			if perChainInput.RampsVersion != nil {
+				if feeQuoterAddrRef.Address == "" {
+					return cldf.ChangesetOutput{}, fmt.Errorf("fee quoter address ref is required to update ramps for chain %d", chainSel)
+				}
+				rampUpdater, ok := fquRegistry.GetRampUpdater(chainSel, perChainInput.RampsVersion)
+				if !ok {
+					return cldf.ChangesetOutput{}, utils.ErrNoAdapterForSelectorRegistered("RampUpdater", chainSel, perChainInput.RampsVersion)
+				}
 				rampsInput := UpdateRampsInput{
 					ChainSelector:    chainSel,
 					FeeQuoterAddress: feeQuoterAddrRef,

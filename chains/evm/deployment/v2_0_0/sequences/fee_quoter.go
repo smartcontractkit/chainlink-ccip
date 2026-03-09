@@ -3,10 +3,12 @@ package sequences
 import (
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
+	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -33,6 +35,13 @@ import (
 const (
 	LinkFeeMultiplierPercent uint8  = 90
 	NetworkFeeUSDCents       uint16 = 10
+)
+
+var (
+	gasPriceMandatoryForChainFamily = map[string]struct{}{
+		chain_selectors.FamilyAptos: {},
+		chain_selectors.FamilySui:   {},
+	}
 )
 
 type FeeQuoterUpdate struct {
@@ -263,6 +272,13 @@ var (
 					}
 				}
 				destChainConfig := cfg.DestChainCfg
+				// check if gasprice stateness threashold is zero
+				if destChainConfig.GasPriceStalenessThreshold == 0 {
+					output.PriceUpdates, err = HandleEmptyGasPriceStalenessThreshold(remoteChain, input)
+					if err != nil {
+						return FeeQuoterUpdate{}, fmt.Errorf("failed to handle empty gas price staleness threshold for remote chain %d: %w", remoteChain, err)
+					}
+				}
 				outDestchainCfg := fqops.DestChainConfigArgs{
 					DestChainSelector: remoteChain,
 					DestChainConfig: fqops.DestChainConfig{
@@ -301,12 +317,14 @@ var (
 				allDestChainConfigs = append(allDestChainConfigs, outDestchainCfg)
 			}
 			if isNewFQV2Deployment {
+				// if new deployment, adding deployer key as price updater so that
+				// manual gas prices can be set right after deployment if needed
 				output.ConstructorArgs = fqops.ConstructorArgs{
 					StaticConfig: fqops.StaticConfig{
 						LinkToken:         fqOutput.StaticCfg.LinkToken,
 						MaxFeeJuelsPerMsg: fqOutput.StaticCfg.MaxFeeJuelsPerMsg,
 					},
-					PriceUpdaters:              fqOutput.PriceUpdaters,
+					PriceUpdaters:              append(fqOutput.PriceUpdaters, chain.DeployerKey.From),
 					TokenTransferFeeConfigArgs: tokenTransferFeeConfigArgs,
 					DestChainConfigArgs:        allDestChainConfigs,
 				}
@@ -480,7 +498,7 @@ var (
 					},
 					DestChainConfigArgs:        destChainCfgs,
 					TokenTransferFeeConfigArgs: tokenTransferFeeConfigArgsForAll,
-					PriceUpdaters:              priceUpdaters,
+					PriceUpdaters:              append(priceUpdaters, chain.DeployerKey.From),
 				}
 			} else {
 				output.DestChainConfigs = destChainCfgs
@@ -632,4 +650,47 @@ func IsConstructorArgsEmpty(a fqops.ConstructorArgs) bool {
 		len(a.PriceUpdaters) == 0 &&
 		len(a.TokenTransferFeeConfigArgs) == 0 &&
 		len(a.DestChainConfigArgs) == 0
+}
+
+// HandleEmptyGasPriceStalenessThreshold handles the case when GasPriceStalenessThreshold is zero for a remote chain.
+// It checks if gas price needs to be set manually for the chain family ( mainly for aptos and sui),
+// if yes it -
+//
+//   - looks for gas price for that remote chain in the input additional config and adds it to the price updates output;
+//   - throws an error if gas price for that remote chain is not provided in the input additional config
+//     because gas price staleness threshold cannot be zero without providing gas price for chains that need manual gas price.
+//
+// if not, it returns empty price updates output because gas price does not need to be manually set for that remote chain.
+// It is exported for testing.
+func HandleEmptyGasPriceStalenessThreshold(remoteChain uint64, input deploy.FeeQuoterUpdateInput) (output fqops.PriceUpdates, err error) {
+	// check if gasprice can be set manually for the chain family,
+	// if not, we return an error because gas price staleness threshold cannot be zero
+	// for chains that do not have manual gas price
+	chainFamily, err := chain_selectors.GetSelectorFamily(remoteChain)
+	if err != nil {
+		return fqops.PriceUpdates{}, fmt.Errorf("failed to get chain family for remote chain %d: %w", remoteChain, err)
+	}
+	_, exists := gasPriceMandatoryForChainFamily[chainFamily]
+	// if manual gas price is not mandatory for the chain family but gas price staleness threshold is zero,
+	// we can skip setting gas price for that remote chain and return empty price updates
+	if !exists {
+		return fqops.PriceUpdates{}, nil
+	}
+	if input.AdditionalConfig == nil || input.AdditionalConfig.GasPricesPerRemoteChain == nil {
+		return fqops.PriceUpdates{}, fmt.Errorf("gas price staleness threshold is zero for remote chain %d, "+
+			"please provide gas price for this remote chain in the input additional config", remoteChain)
+	}
+	if gaspriceStr, ok := input.AdditionalConfig.GasPricesPerRemoteChain[remoteChain]; ok {
+		gasprice, success := new(big.Int).SetString(gaspriceStr, 10)
+		if !success {
+			return fqops.PriceUpdates{}, fmt.Errorf("invalid gas price %s for remote chain %d in input additional config", gaspriceStr, remoteChain)
+		}
+		output.GasPriceUpdates = append(output.GasPriceUpdates, fqops.GasPriceUpdate{
+			DestChainSelector: remoteChain,
+			UsdPerUnitGas:     gasprice,
+		})
+		return output, nil
+	}
+	return fqops.PriceUpdates{}, fmt.Errorf("gas price staleness threshold is zero for remote chain %d, "+
+		"please provide gas price for this remote chain in the input additional config", remoteChain)
 }
