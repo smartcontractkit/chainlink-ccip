@@ -509,9 +509,9 @@ func appendAuthApproveDeposit(
 		ChainSelector: chainSel,
 		Address:       lockboxAddr,
 		Args: lockbox_ops.DepositArgs{
-			Token:               tokenAddr,
-			RemoteChainSelector: remoteChainSelector,
-			Amount:              amount,
+			Token:  tokenAddr,
+			Field1: remoteChainSelector,
+			Amount: amount,
 		},
 	})
 	if err != nil {
