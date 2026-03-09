@@ -4,11 +4,13 @@ pragma solidity ^0.8.0;
 import {IAny2EVMMessageReceiver} from "./IAny2EVMMessageReceiver.sol";
 
 interface IAny2EVMMessageReceiverV2 is IAny2EVMMessageReceiver {
-  /// @notice Get the CCV configuration & block depth for a source chain.
-  /// @dev The minBlockDepth parameter provided must be returned, or anyone will be able to send messages with any
-  /// level of finality to the receiver. In most cases, the receiver will want to require a certain level of finality.
-  /// When a trusted sender is used (and verified by the receiver), this is less critical as the trusted sender will
-  /// only send messages with a certain level of finality. The simplest way to implement this is to either allow FTF
+  /// @notice Get the CCV configuration & minimum accepted block depth for a source chain and sender.
+  /// @dev Implementations must return an appropriate minBlockDepth value. Returning 0 signals that only fully finalized
+  /// messages are accepted. Returning a non-zero value allows faster-than-finality (FTF) messages whose requested block
+  /// depth is at least minBlockDepth. If a suitable minBlockDepth is not returned, anyone will be able to send messages
+  /// with any level of finality to the receiver. In most cases, the receiver will want to require a certain level of
+  /// finality. When a trusted sender is used (and verified by the receiver), this is less critical as the trusted sender
+  /// will only send messages with a certain level of finality. The simplest way to implement this is to either allow FTF
   /// messages when sender-verification is used, or require finality for all messages. That means the config can be a
   /// simple boolean instead of n^2 config where for each source, some safe block depth must be chosen.
   ///
@@ -31,6 +33,9 @@ interface IAny2EVMMessageReceiverV2 is IAny2EVMMessageReceiver {
   /// included, the optionalThreshold parameter must also be set to indicate how many of the optional CCVs must pass
   /// verification for a message to be accepted.
   /// @return optionalThreshold The number of optional CCVs that must pass verification for a message to be accepted.
+  /// @return minBlockDepth The minimum block depth the receiver requires for FTF messages. A value of 0 means only
+  /// finalized messages are accepted. A non-zero value allows FTF messages whose requested block depth meets or
+  /// exceeds this threshold.
   function getCCVsAndMinBlockDepth(
     uint64 sourceChainSelector,
     bytes calldata sender

@@ -692,7 +692,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     bytes memory sender,
     uint16 messageRequestedBlockDepth
   ) internal view returns (address[] memory requiredCCV, address[] memory optionalCCVs, uint8 optionalThreshold) {
-    // Default block depth requires is 0, which means "wait for finality". A receiver implementing
+    // Default block depth requirement is 0, which means "wait for finality". A receiver implementing
     // IAny2EVMMessageReceiverV2 can return a different value.
     // If the receiver does not support the V2 interface it cannot support FTF. This is to protect anyone not
     // explicitly opting in to support FTF from accidentally allowing messages with FTF finality to be executed.
