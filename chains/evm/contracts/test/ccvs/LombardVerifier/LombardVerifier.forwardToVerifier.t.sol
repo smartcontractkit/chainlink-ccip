@@ -39,7 +39,7 @@ contract LombardVerifier_forwardToVerifier is LombardVerifierSetup {
           bytes32(uint256(uint160(receiver))),
           TRANSFER_AMOUNT,
           ALLOWED_CALLER,
-          abi.encodePacked(bytes4(keccak256("LombardVerifier 2.0.0")), messageId)
+          abi.encodePacked(VERSION_TAG_V2_0_0, messageId)
         )
       )
     );
@@ -58,7 +58,6 @@ contract LombardVerifier_forwardToVerifier is LombardVerifierSetup {
 
     deal(tokenWithAdapter, address(s_lombardVerifier), TRANSFER_AMOUNT);
 
-    vm.stopPrank();
     vm.startPrank(OWNER);
 
     LombardVerifier.SupportedTokenArgs[] memory tokensToAdd = new LombardVerifier.SupportedTokenArgs[](1);
@@ -71,7 +70,6 @@ contract LombardVerifier_forwardToVerifier is LombardVerifierSetup {
       LOMBARD_CHAIN_ID, adapter, bytes32(message.tokenTransfer[0].destTokenAddress)
     );
 
-    vm.stopPrank();
     vm.startPrank(s_onRamp);
 
     // Should succeed - the adapter is used for the bridge deposit.
@@ -116,9 +114,7 @@ contract LombardVerifier_forwardToVerifier is LombardVerifierSetup {
 
     s_mockBridge.setAllowedDestinationToken(LOMBARD_CHAIN_ID, address(s_testToken), REMOTE_ADAPTER);
 
-    vm.stopPrank();
     vm.startPrank(s_onRamp);
-
     bytes memory verifierData = s_lombardVerifier.forwardToVerifier(message, messageId, address(0), 0, "");
     bytes32 payloadHash = abi.decode(verifierData, (bytes32));
     assertEq(payloadHash, s_mockBridge.s_lastPayloadHash());
@@ -132,7 +128,6 @@ contract LombardVerifier_forwardToVerifier is LombardVerifierSetup {
 
     deal(tokenWithAdapter, address(s_lombardVerifier), TRANSFER_AMOUNT);
 
-    vm.stopPrank();
     vm.startPrank(OWNER);
 
     LombardVerifier.SupportedTokenArgs[] memory tokensToAdd = new LombardVerifier.SupportedTokenArgs[](1);
@@ -152,7 +147,6 @@ contract LombardVerifier_forwardToVerifier is LombardVerifierSetup {
     address receiver = makeAddr("receiver");
     (MessageV1Codec.MessageV1 memory message, bytes32 messageId) = _createForwardMessage(tokenWithAdapter, receiver);
 
-    vm.stopPrank();
     vm.startPrank(s_onRamp);
 
     // Assert getAllowedDestinationToken is called with the local adapter address, not the original token.
@@ -172,7 +166,7 @@ contract LombardVerifier_forwardToVerifier is LombardVerifierSetup {
           bytes32(uint256(uint160(receiver))),
           TRANSFER_AMOUNT,
           ALLOWED_CALLER,
-          abi.encodePacked(bytes4(keccak256("LombardVerifier 2.0.0")), messageId)
+          abi.encodePacked(VERSION_TAG_V2_0_0, messageId)
         )
       )
     );
@@ -248,9 +242,7 @@ contract LombardVerifier_forwardToVerifier is LombardVerifierSetup {
 
     address randomCaller = makeAddr("randomCaller");
 
-    vm.stopPrank();
-    vm.startPrank(randomCaller);
-
+    changePrank(randomCaller);
     vm.expectRevert(abi.encodeWithSelector(BaseVerifier.CallerIsNotARampOnRouter.selector, randomCaller));
     s_lombardVerifier.forwardToVerifier(message, messageId, address(0), 0, "");
   }

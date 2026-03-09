@@ -36,10 +36,7 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
     // Proofs are not used. Using raw bytes format.
     bytes memory ccvData = _encodeCcvData(rawPayload, "");
 
-    vm.startPrank(s_onRamp);
-
-    // This sets the messageId in the mock mailbox to `messageId`.
-    s_lombardVerifier.forwardToVerifier(message, messageId, address(0), 0, "");
+    s_mockMailbox.setMessageId(abi.encodePacked(VERSION_TAG_V2_0_0, messageId));
 
     vm.startPrank(s_offRamp);
 
@@ -58,10 +55,7 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
       message.tokenTransfer[0].amount
     );
 
-    vm.startPrank(s_onRamp);
-
-    // This sets the messageId in the mock mailbox to `wrongMessageId`.
-    s_lombardVerifier.forwardToVerifier(message, wrongMessageId, address(0), 0, "");
+    s_mockMailbox.setMessageId(abi.encodePacked(VERSION_TAG_V2_0_0, wrongMessageId));
 
     vm.startPrank(s_offRamp);
 
@@ -205,8 +199,7 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
 
     bytes memory ccvData = _encodeCcvData(rawPayload, "");
 
-    vm.startPrank(s_onRamp);
-    s_lombardVerifier.forwardToVerifier(message, messageId, address(0), 0, "");
+    s_mockMailbox.setMessageId(abi.encodePacked(VERSION_TAG_V2_0_0, messageId));
 
     vm.startPrank(s_offRamp);
 
@@ -232,8 +225,7 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
 
     bytes memory ccvData = _encodeCcvData(rawPayload, "");
 
-    vm.startPrank(s_onRamp);
-    s_lombardVerifier.forwardToVerifier(message, messageId, address(0), 0, "");
+    s_mockMailbox.setMessageId(abi.encodePacked(VERSION_TAG_V2_0_0, messageId));
 
     vm.startPrank(s_offRamp);
 
@@ -255,8 +247,7 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
 
     bytes memory ccvData = _encodeCcvData(rawPayload, "");
 
-    vm.startPrank(s_onRamp);
-    s_lombardVerifier.forwardToVerifier(message, messageId, address(0), 0, "");
+    s_mockMailbox.setMessageId(abi.encodePacked(VERSION_TAG_V2_0_0, messageId));
 
     vm.startPrank(s_offRamp);
 
@@ -281,8 +272,7 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
 
     bytes memory ccvData = _encodeCcvData(rawPayload, "");
 
-    vm.startPrank(s_onRamp);
-    s_lombardVerifier.forwardToVerifier(message, messageId, address(0), 0, "");
+    s_mockMailbox.setMessageId(abi.encodePacked(VERSION_TAG_V2_0_0, messageId));
 
     vm.startPrank(s_offRamp);
 

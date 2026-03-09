@@ -389,6 +389,7 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
 
       s_supportedTokens.set(tokenToAdd.localToken, tokenToAdd.localAdapter);
 
+      // If adapter exists, approve token->adapter for adapter-mediated burn/bridge flow.
       if (tokenToAdd.localAdapter != address(0)) {
         IERC20(tokenToAdd.localToken).forceApprove(tokenToAdd.localAdapter, type(uint256).max);
       } else {
