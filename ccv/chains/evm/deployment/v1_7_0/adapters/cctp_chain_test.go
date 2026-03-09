@@ -41,8 +41,9 @@ import (
 	burn_mint_erc20_bindings "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc20"
 
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/cctp_message_transmitter_proxy"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/cctp_verifier"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/cctp_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/versioned_verifier_resolver"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
 )
@@ -504,7 +505,7 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 				homeCCTPVerifierAddr = common.HexToAddress(addr.Address)
 			case usdc_token_pool_proxy.ContractType:
 				homeUSDCTokenPoolProxyAddr = common.HexToAddress(addr.Address)
-			case cctp_verifier.ResolverType:
+			case versioned_verifier_resolver.CCTPVerifierResolverType:
 				homeCCTPVerifierResolverAddr = common.HexToAddress(addr.Address)
 			}
 		case nonHomeChainSelector:
