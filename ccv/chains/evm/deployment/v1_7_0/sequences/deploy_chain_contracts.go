@@ -28,6 +28,7 @@ import (
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/mock_receiver"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/mock_receiver_v2"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/onramp"
@@ -623,10 +624,10 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			if mockReceiverParams.Qualifier != "" {
 				qualifierPtr = &mockReceiverParams.Qualifier
 			}
-			deployReceiverReport, err := cldf_ops.ExecuteOperation(b, mock_receiver_v2.Deploy, chain, contract_utils.DeployInput[mock_receiver_v2.ConstructorArgs]{
-				TypeAndVersion: deployment.NewTypeAndVersion(mock_receiver_v2.ContractType, *mockReceiverParams.Version),
+			deployReceiverReport, err := cldf_ops.ExecuteOperation(b, mock_receiver.Deploy, chain, contract_utils.DeployInput[mock_receiver.ConstructorArgs]{
+				TypeAndVersion: deployment.NewTypeAndVersion(mock_receiver.ContractType, *mockReceiverParams.Version),
 				ChainSelector:  chain.Selector,
-				Args: mock_receiver_v2.ConstructorArgs{
+				Args: mock_receiver.ConstructorArgs{
 					Required:  requiredVerifiers,
 					Optional:  optionalVerifiers,
 					Threshold: mockReceiverParams.OptionalThreshold,
@@ -641,10 +642,10 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			// Set minimum block depth on the MockReceiver if diff exists
 			if mockReceiverParams.MinimumBlockDepth != 0 {
 				// Get the minimum block depth on the MockReceiver
-				minimumBlockDepthReport, err := cldf_ops.ExecuteOperation(b, mock_receiver_v2.GetCCVsAndMinBlockDepth, chain, contract_utils.FunctionInput[mock_receiver_v2.GetCCVsAndMinBlockDepthArgs]{
-					ChainSelector: chain.Selector,
-					Address:       common.HexToAddress(deployReceiverReport.Output.Address),
-					Args: mock_receiver_v2.GetCCVsAndMinBlockDepthArgs{
+			minimumBlockDepthReport, err := cldf_ops.ExecuteOperation(b, mock_receiver_v2.GetCCVsAndMinBlockDepth, chain, contract_utils.FunctionInput[mock_receiver_v2.GetCCVsAndMinBlockDepthArgs]{
+				ChainSelector: chain.Selector,
+				Address:       common.HexToAddress(deployReceiverReport.Output.Address),
+				Args: mock_receiver_v2.GetCCVsAndMinBlockDepthArgs{
 						Arg0: chain.Selector,
 						Arg1: []byte{},
 					},
