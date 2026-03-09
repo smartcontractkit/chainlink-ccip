@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
+
 	"github.com/ethereum/go-ethereum/common"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	utils2 "github.com/smartcontractkit/chainlink-evm/pkg/utils"
@@ -955,6 +956,77 @@ func TestSequenceFeeQuoterInputCreation(t *testing.T) {
 
 		t.Logf("Successfully executed SequenceFeeQuoterInputCreation for chain %d", chainSelector)
 	}
+}
+
+// TestHandleEmptyGasPriceStalenessThreshold verifies HandleEmptyGasPriceStalenessThreshold behavior for
+// chains with zero GasPriceStalenessThreshold (e.g. Aptos/Sui that require manual gas price).
+func TestHandleEmptyGasPriceStalenessThreshold(t *testing.T) {
+	// EVM chain is not in GasPriceMandatoryForChainFamily -> expect error
+	t.Run("EVM_chain_returns_error", func(t *testing.T) {
+		evmChainSelector := uint64(5009297550715157269)
+		input := deploy.FeeQuoterUpdateInput{
+			ChainSelector: 1,
+			AdditionalConfig: &deploy.AdditionalFeeQuoterConfig{
+				GaspricesPerRemoteChain: map[uint64]*big.Int{evmChainSelector: big.NewInt(1e9)},
+			},
+		}
+		_, err := sequences.HandleEmptyGasPriceStalenessThreshold(evmChainSelector, input)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "gas price staleness threshold cannot be zero")
+		require.Contains(t, err.Error(), "please ensure that this chain can be set with manual gas price")
+	})
+
+	// Chain in GasPriceMandatoryForChainFamily but AdditionalConfig is nil -> expect error
+	t.Run("Aptos_or_Sui_with_nil_AdditionalConfig_returns_error", func(t *testing.T) {
+		aptosSelector := uint64(743186221051783445)
+		input := deploy.FeeQuoterUpdateInput{ChainSelector: 1}
+		_, err := sequences.HandleEmptyGasPriceStalenessThreshold(aptosSelector, input)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "please provide gas price for this remote chain in the input additional config")
+	})
+
+	// Chain in GasPriceMandatoryForChainFamily but GaspricesPerRemoteChain is nil -> expect error
+	t.Run("Aptos_or_Sui_with_nil_GaspricesPerRemoteChain_returns_error", func(t *testing.T) {
+		aptosSelector := uint64(743186221051783445)
+		input := deploy.FeeQuoterUpdateInput{
+			ChainSelector:    1,
+			AdditionalConfig: &deploy.AdditionalFeeQuoterConfig{},
+		}
+		_, err := sequences.HandleEmptyGasPriceStalenessThreshold(aptosSelector, input)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "please provide gas price for this remote chain in the input additional config")
+	})
+
+	// Chain in GasPriceMandatoryForChainFamily but remote chain not in map -> expect error
+	t.Run("Aptos_or_Sui_with_missing_remote_chain_in_map_returns_error", func(t *testing.T) {
+		aptosSelector := uint64(743186221051783445)
+		input := deploy.FeeQuoterUpdateInput{
+			ChainSelector: 1,
+			AdditionalConfig: &deploy.AdditionalFeeQuoterConfig{
+				GaspricesPerRemoteChain: map[uint64]*big.Int{999: big.NewInt(1e9)},
+			},
+		}
+		_, err := sequences.HandleEmptyGasPriceStalenessThreshold(aptosSelector, input)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "please provide gas price for this remote chain in the input additional config")
+	})
+
+	// Chain in GasPriceMandatoryForChainFamily with gas price provided -> success
+	t.Run("Aptos_or_Sui_with_gas_price_returns_updates", func(t *testing.T) {
+		aptosSelector := uint64(743186221051783445)
+		gasPrice := big.NewInt(2e9)
+		input := deploy.FeeQuoterUpdateInput{
+			ChainSelector: 1,
+			AdditionalConfig: &deploy.AdditionalFeeQuoterConfig{
+				GaspricesPerRemoteChain: map[uint64]*big.Int{aptosSelector: gasPrice},
+			},
+		}
+		output, err := sequences.HandleEmptyGasPriceStalenessThreshold(aptosSelector, input)
+		require.NoError(t, err)
+		require.Len(t, output.GasPriceUpdates, 1)
+		require.Equal(t, aptosSelector, output.GasPriceUpdates[0].DestChainSelector)
+		require.Equal(t, gasPrice, output.GasPriceUpdates[0].UsdPerUnitGas)
+	})
 }
 
 // placeholder addresses used for OnRamp deploy in tests (contracts are not validated on simulated chain beyond non-zero)

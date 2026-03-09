@@ -273,7 +273,7 @@ var (
 				destChainConfig := cfg.DestChainCfg
 				// check if gasprice stateness threashold is zero
 				if destChainConfig.GasPriceStalenessThreshold == 0 {
-					output.PriceUpdates, err = handleEmptyGasPriceStalenessThreshold(remoteChain, input)
+					output.PriceUpdates, err = HandleEmptyGasPriceStalenessThreshold(remoteChain, input)
 					if err != nil {
 						return FeeQuoterUpdate{}, fmt.Errorf("failed to handle empty gas price staleness threshold for remote chain %d: %w", remoteChain, err)
 					}
@@ -651,7 +651,9 @@ func IsConstructorArgsEmpty(a fqops.ConstructorArgs) bool {
 		len(a.DestChainConfigArgs) == 0
 }
 
-func handleEmptyGasPriceStalenessThreshold(remoteChain uint64, input deploy.FeeQuoterUpdateInput) (output fqops.PriceUpdates, err error) {
+// HandleEmptyGasPriceStalenessThreshold handles the case when GasPriceStalenessThreshold is zero for a remote chain.
+// It is exported for testing.
+func HandleEmptyGasPriceStalenessThreshold(remoteChain uint64, input deploy.FeeQuoterUpdateInput) (output fqops.PriceUpdates, err error) {
 	// check if gasprice can be set manually for the chain family,
 	// if not, we return an error because gas price staleness threshold cannot be zero
 	// for chains that do not have manual gas price
@@ -674,6 +676,7 @@ func handleEmptyGasPriceStalenessThreshold(remoteChain uint64, input deploy.FeeQ
 			DestChainSelector: remoteChain,
 			UsdPerUnitGas:     gasprice,
 		})
+		return output, nil
 	}
 	return fqops.PriceUpdates{}, fmt.Errorf("gas price staleness threshold is zero for remote chain %d, "+
 		"please provide gas price for this remote chain in the input additional config", remoteChain)
