@@ -31,13 +31,17 @@ type UpdateFeeQuoterInput struct {
 
 type UpdateFeeQuoterInputPerChain struct {
 	FeeQuoterVersion *semver.Version
-	RampsVersion     *semver.Version
+	// RemoteChainSelectors is used to determine which remote chains to pull config for when populating config for the FeeQuoter
+	// if RemoteChainSelectors is empty, it will pull all remote chain configs using 1.5.0 and 1.6.0 config importer
+	RemoteChainSelectors []uint64
+	RampsVersion         *semver.Version
 }
 
 type FeeQuoterUpdateInput struct {
-	ChainSelector     uint64
-	ExistingAddresses []datastore.AddressRef
-	ContractMeta      []datastore.ContractMetadata
+	ChainSelector        uint64
+	ExistingAddresses    []datastore.AddressRef
+	RemoteChainSelectors []uint64
+	ContractMeta         []datastore.ContractMetadata
 }
 
 type SourceChainConfig struct {
@@ -284,9 +288,10 @@ func updateFeeQuoterApply(fquRegistry *FQAndRampUpdaterRegistry, mcmsRegistry *c
 				}
 				// Create FeeQuoterUpdateInput
 				reportFQInputCreation, err := cldf_ops.ExecuteSequence(e.OperationsBundle, fquUpdater.SequenceFeeQuoterInputCreation(), e.BlockChains, FeeQuoterUpdateInput{
-					ChainSelector:     chainSel,
-					ExistingAddresses: e.DataStore.Addresses().Filter(datastore.AddressRefByChainSelector(chainSel)),
-					ContractMeta:      contractMeta,
+					ChainSelector:        chainSel,
+					ExistingAddresses:    e.DataStore.Addresses().Filter(datastore.AddressRefByChainSelector(chainSel)),
+					ContractMeta:         contractMeta,
+					RemoteChainSelectors: perChainInput.RemoteChainSelectors,
 				})
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to create FeeQuoterUpdateInput for chain %d: %w", chainSel, err)
