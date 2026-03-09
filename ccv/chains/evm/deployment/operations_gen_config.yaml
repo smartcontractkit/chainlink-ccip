@@ -254,6 +254,21 @@ contracts:
     abi_file: mock_receiver_v2.json
     functions: []
 
+  - contract_name: Proxy
+    version: "2.0.0"
+    version_path: "latest"
+    functions:
+      - name: setTarget
+        access: owner
+      - name: setFeeAggregator
+        access: owner
+      - name: withdrawFeeTokens
+        access: owner
+      - name: getTarget
+        access: public
+      - name: getFeeAggregator
+        access: public
+
   - contract_name: LombardVerifier
     version: "2.0.0"
     version_path: "latest"
