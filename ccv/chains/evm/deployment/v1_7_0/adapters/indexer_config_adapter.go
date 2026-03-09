@@ -7,7 +7,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/cctp_verifier"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/lombard_verifier"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/lombard_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/versioned_verifier_resolver"
 	ccvadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -52,7 +52,7 @@ func resolveContractMeta(kind ccvadapters.VerifierKind) (deployment.ContractType
 	case ccvadapters.CCTPVerifierKind:
 		return versioned_verifier_resolver.CCTPVerifierResolverType, cctp_verifier.Version, nil
 	case ccvadapters.LombardVerifierKind:
-		return lombard_verifier.ResolverType, lombard_verifier.Version, nil
+		return versioned_verifier_resolver.LombardVerifierResolverType, lombard_verifier.Version, nil
 	default:
 		return "", nil, fmt.Errorf("unknown verifier kind %q", kind)
 	}

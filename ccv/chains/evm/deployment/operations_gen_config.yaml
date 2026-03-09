@@ -254,6 +254,47 @@ contracts:
     abi_file: mock_receiver_v2.json
     functions: []
 
+  - contract_name: LombardVerifier
+    version: "2.0.0"
+    version_path: "latest"
+    functions:
+      - name: applyRemoteChainConfigUpdates
+        access: owner
+      - name: setPath
+        access: owner
+      - name: updateSupportedTokens
+        access: owner
+      - name: setRemoteAdapters
+        access: owner
+      - name: setDynamicConfig
+        access: owner
+      - name: applyAllowlistUpdates
+        access: owner
+      - name: removePaths
+        access: owner
+      - name: withdrawFeeTokens
+        access: owner
+      - name: versionTag
+        access: public
+      - name: getDynamicConfig
+        access: public
+      - name: getPath
+        access: public
+      - name: getRemoteAdapter
+        access: public
+      - name: getRemoteChainConfig
+        access: public
+      - name: getStorageLocations
+        access: public
+      - name: getSupportedChains
+        access: public
+      - name: getSupportedTokens
+        access: public
+      - name: isSupportedToken
+        access: public
+      - name: getFee
+        access: public
+
   - contract_name: CCTPVerifier
     version: "2.0.0"
     version_path: "latest"

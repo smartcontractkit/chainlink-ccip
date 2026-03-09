@@ -24,7 +24,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/lombard_token_pool"
 
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/advanced_pool_hooks"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/lombard_verifier"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/lombard_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/versioned_verifier_resolver"
 	tokens_sequences "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/tokens"
 )
@@ -52,7 +52,7 @@ var ConfigureLombardChainForLanes = cldf_ops.NewSequence(
 		}
 
 		lombardVerifierResolverAddressRef, err := datastore_utils.FindAndFormatRef(dep.DataStore, datastore.AddressRef{
-			Type:    datastore.ContractType(lombard_verifier.ResolverType),
+			Type:    datastore.ContractType(versioned_verifier_resolver.LombardVerifierResolverType),
 			Version: lombard_verifier.Version,
 		}, chain.Selector, datastore_utils.FullRef)
 		if err != nil {
@@ -226,10 +226,10 @@ var ConfigureLombardChainForLanes = cldf_ops.NewSequence(
 			}
 
 			if existingVerifierPathReport.Output.LChainId != lchainID || existingVerifierPathReport.Output.AllowedCaller != verifierAllowedCaller {
-				setRemotePathReport, err := cldf_ops.ExecuteOperation(b, lombard_verifier.SetRemotePath, chain, contract_utils.FunctionInput[lombard_verifier.RemotePathArgs]{
+				setRemotePathReport, err := cldf_ops.ExecuteOperation(b, lombard_verifier.SetPath, chain, contract_utils.FunctionInput[lombard_verifier.SetPathArgs]{
 					ChainSelector: chain.Selector,
 					Address:       lombardVerifierAddress,
-					Args: lombard_verifier.RemotePathArgs{
+					Args: lombard_verifier.SetPathArgs{
 						RemoteChainSelector: remoteChainSelector,
 						LChainId:            lchainID,
 						AllowedCaller:       remoteCallerOnDest,
