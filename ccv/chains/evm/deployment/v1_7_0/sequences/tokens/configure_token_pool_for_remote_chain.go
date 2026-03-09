@@ -723,8 +723,8 @@ func importTokenTransferFeeConfigFromActivePool(b cldf_ops.Bundle, chain evm.Cha
 		return nil, fmt.Errorf("failed to get type and version of onRamp %s on chain %s: %w", onRampAddr.Hex(), chain.String(), err)
 	}
 	onRampTAV := onRampTAVReport.Output.Version
-	switch onRampTAV {
-	case semver.MustParse("1.5.0"):
+	switch onRampTAV.String() {
+	case semver.MustParse("1.5.0").String():
 		// for onRamp version 1.5.0, import tokenTransferFeeConfig from onRamp 1.5.0
 		tokenTransferFeeConfigReport, err := cldf_ops.ExecuteOperation(b, onrampops_v150.OnRampGetTokenTransferFeeConfig, chain, evm_contract.FunctionInput[common.Address]{
 			ChainSelector: input.ChainSelector,
@@ -736,7 +736,7 @@ func importTokenTransferFeeConfigFromActivePool(b cldf_ops.Bundle, chain evm.Cha
 				onRampAddr.Hex(), input.TokenAddress.Hex(), chain.String(), err)
 		}
 		return v150OnRampConfigToTokenTransferFeeConfig(tokenTransferFeeConfigReport.Output), nil
-	case semver.MustParse("1.6.0"): // for onRamp versions 1.6.0 , import tokenTransferFeeConfig from FeeQuoter
+	case semver.MustParse("1.6.0").String(): // for onRamp versions 1.6.0 , import tokenTransferFeeConfig from FeeQuoter
 		// get fee quoter from onRamp
 		dCfgOnRamp, err := cldf_ops.ExecuteOperation(b, onrampops_v160.GetDynamicConfig, chain, evm_contract.FunctionInput[struct{}]{
 			ChainSelector: input.ChainSelector,
@@ -765,7 +765,7 @@ func importTokenTransferFeeConfigFromActivePool(b cldf_ops.Bundle, chain evm.Cha
 				feeQuoterAddr.Hex(), input.TokenAddress.Hex(), input.RemoteChainSelector, chain.String(), err)
 		}
 		return v163FeeQuoterConfigToTokenTransferFeeConfig(tokenTransferFeeConfigReport.Output), nil
-	case onrampops.Version:
+	case onrampops.Version.String():
 		// get fee quoter from onRamp
 		dCfgOnRamp, err := cldf_ops.ExecuteOperation(b, onrampops.GetDynamicConfig, chain, evm_contract.FunctionInput[struct{}]{
 			ChainSelector: input.ChainSelector,
