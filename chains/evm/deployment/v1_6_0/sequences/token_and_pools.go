@@ -227,6 +227,58 @@ func (a *EVMAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokensapi.TPRLR
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
 
+			timelockRefFilter := datastore.AddressRef{
+				Type:          datastore.ContractType(cciputils.RBACTimelock),
+				ChainSelector: chain.Selector,
+				Qualifier:     cciputils.CLLQualifier,
+			}
+
+			timelockRef, err := datastore_utils.FindAndFormatRef(
+				input.ExistingDataStore,
+				timelockRefFilter,
+				chain.Selector,
+				datastore_utils.FullRef,
+			)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to find timelock address for chain %d: %w", input.ChainSelector, err)
+			}
+			timelockBytes, err := a.AddressRefToBytes(timelockRef)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to convert timelock address ref to bytes: %w", err)
+			}
+			timelockAddr := common.BytesToAddress(timelockBytes)
+			if timelockAddr == (common.Address{}) {
+				return sequences.OnChainOutput{}, fmt.Errorf("timelock address for ref (%+v) is zero address", timelockRef)
+			}
+
+			// TODO: add better address resolution later (we should be able to resolve the pool using qualifiers
+			// if needed). However, if a token address is provided, we can skip the datastore lookup altogether.
+			tokenPoolBytes, err := a.AddressRefToBytes(input.TokenPoolRef)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to convert token pool address ref to bytes: %w", err)
+			}
+			tokenPoolAddr := common.BytesToAddress(tokenPoolBytes)
+			if tokenPoolAddr == (common.Address{}) {
+				return sequences.OnChainOutput{}, fmt.Errorf("token pool address for ref (%+v) is zero address", input.TokenPoolRef)
+			}
+			tokenPool, err := token_pool.NewTokenPool(tokenPoolAddr, chain.Client)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to instantiate token pool contract: %w", err)
+			}
+			poolOwner, err := tokenPool.Owner(&bind.CallOpts{Context: b.GetContext()})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get owner of token pool at address %q on chain %d: %w", tokenPoolAddr.Hex(), input.ChainSelector, err)
+			}
+
+			// TODO: we should also check rate limit admin as well
+			if timelockAddr != poolOwner && chain.DeployerKey.From != poolOwner {
+				b.Logger.Warnf(
+					"Timelock address %q is not the owner of the token pool at address %q on chain %d, and deployer address %q is also not the owner. Skipping rate limiter config for this token pool since neither the timelock nor the deployer has permissions to set the rate limiter config.",
+					timelockAddr.Hex(), tokenPoolAddr.Hex(), input.ChainSelector, chain.DeployerKey.From.Hex(),
+				)
+				return sequences.OnChainOutput{}, nil
+			}
+
 			var output evm_contract.WriteOutput
 			switch input.TokenPoolRef.Version.String() {
 			case tpOpsV1_5_1.Version.String():
@@ -234,7 +286,7 @@ func (a *EVMAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokensapi.TPRLR
 					tpOpsV1_5_1.SetChainRateLimiterConfig, chain,
 					evm_contract.FunctionInput[tpOpsV1_5_1.SetChainRateLimiterConfigArgs]{
 						ChainSelector: chain.Selector,
-						Address:       common.HexToAddress(input.TokenPoolRef.Address),
+						Address:       tokenPoolAddr,
 						Args: tpOpsV1_5_1.SetChainRateLimiterConfigArgs{
 							OutboundRateLimitConfig: token_pool.RateLimiterConfig{
 								IsEnabled: input.OutboundRateLimiterConfig.IsEnabled,
@@ -258,7 +310,7 @@ func (a *EVMAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokensapi.TPRLR
 					tpOpsV1_6_1.SetChainRateLimiterConfig, chain,
 					evm_contract.FunctionInput[tpOpsV1_6_1.SetChainRateLimiterConfigArgs]{
 						ChainSelector: chain.Selector,
-						Address:       common.HexToAddress(input.TokenPoolRef.Address),
+						Address:       tokenPoolAddr,
 						Args: tpOpsV1_6_1.SetChainRateLimiterConfigArgs{
 							OutboundConfig: tpOpsV1_6_1.Config{
 								IsEnabled: input.OutboundRateLimiterConfig.IsEnabled,
