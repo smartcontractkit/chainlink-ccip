@@ -13,7 +13,6 @@ import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access
 /// @notice The CommitteeVerifier is a contract that handles lane-specific fee logic and message verification.
 /// @dev Source and destination responsibilities are combined to enable a single proxy address for a CCV on each chain.
 contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, SignatureQuorumValidator, BaseVerifier {
-  error InvalidConfig();
   error InvalidVerifierResults();
   error InvalidCCVVersion(bytes4 verifierVersion);
   error OnlyCallableByOwnerOrAllowlistAdmin();

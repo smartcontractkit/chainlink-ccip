@@ -708,8 +708,8 @@ func importTokenTransferFeeConfigFromActivePool(b cldf_ops.Bundle, chain evm.Cha
 			"remote chain selector %d on chain %s: %w", routerAddr.Hex(), input.RemoteChainSelector, chain.String(), err)
 	}
 	if onRampOnRouterReport.Output == (common.Address{}) {
-		return nil, fmt.Errorf("onRamp on router %s for remote chain selector %d on chain %s is zero, "+
-			"cannot import token transfer fee config", routerAddr.Hex(), input.RemoteChainSelector, chain.String())
+		// No onRamp configured for this lane yet, nothing to import.
+		return nil, nil
 	}
 	onRampAddr := onRampOnRouterReport.Output
 	// check the version of the onRamp contract
