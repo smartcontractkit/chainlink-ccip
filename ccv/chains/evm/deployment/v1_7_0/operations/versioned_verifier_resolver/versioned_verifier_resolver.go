@@ -12,6 +12,7 @@ import (
 )
 
 var ContractType cldf_deployment.ContractType = "VersionedVerifierResolver"
+var CommitteeVerifierResolverType cldf_deployment.ContractType = "CommitteeVerifierResolver"
 
 var Version = semver.MustParse("1.7.0")
 
@@ -34,7 +35,7 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 		cldf_deployment.NewTypeAndVersion(cctp_verifier.ResolverType, *Version).String(): {
 			EVM: common.FromHex(versioned_verifier_resolver.VersionedVerifierResolverBin),
 		},
-		cldf_deployment.NewTypeAndVersion("CommitteeVerifierResolver", *Version).String(): {
+		cldf_deployment.NewTypeAndVersion(CommitteeVerifierResolverType, *Version).String(): {
 			EVM: common.FromHex(versioned_verifier_resolver.VersionedVerifierResolverBin),
 		},
 	},
