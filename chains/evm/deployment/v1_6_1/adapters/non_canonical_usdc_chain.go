@@ -30,6 +30,11 @@ func (c *NonCanonicalUSDCChainAdapter) ConfigureCCTPChainForLanes() *operations.
 	return tokens.ConfigureNonCanonicalUSDCForLanes
 }
 
+// MigrateHybridLockReleaseLiquidity is not supported on non-canonical USDC chains.
+func (c *NonCanonicalUSDCChainAdapter) MigrateHybridLockReleaseLiquidity() *operations.Sequence[adapters.MigrateHybridLockReleaseLiquidityInput, seq_core.OnChainOutput, adapters.MigrateHybridLockReleaseLiquidityDeps] {
+	return nil
+}
+
 // CCTPV1AllowedCallerOnDest is not implemented for non-canonical USDC chains, as there is no caller of CCTP.
 func (c *NonCanonicalUSDCChainAdapter) CCTPV1AllowedCallerOnDest(d datastore.DataStore, b chain.BlockChains, chainSelector uint64) ([]byte, error) {
 	return nil, fmt.Errorf("chain with selector %d does not support CCTP", chainSelector)
