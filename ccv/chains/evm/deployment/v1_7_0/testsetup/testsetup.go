@@ -11,7 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/committee_verifier"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/executor"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/executor"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/mock_receiver"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/offramp"
@@ -134,7 +134,7 @@ func CreateBasicContractParams() sequences.ContractParams {
 			{
 				Version:       executor.Version,
 				MaxCCVsPerMsg: 10,
-				DynamicConfig: executor.SetDynamicConfigArgs{
+				DynamicConfig: executor.DynamicConfig{
 					FeeAggregator:         common.HexToAddress("0x01"),
 					MinBlockConfirmations: 1,
 					CcvAllowlistEnabled:   false,
@@ -144,7 +144,7 @@ func CreateBasicContractParams() sequences.ContractParams {
 			{
 				Version:       executor.Version,
 				MaxCCVsPerMsg: 10,
-				DynamicConfig: executor.SetDynamicConfigArgs{
+				DynamicConfig: executor.DynamicConfig{
 					FeeAggregator:         common.HexToAddress("0x01"),
 					MinBlockConfirmations: 1,
 					CcvAllowlistEnabled:   false,
