@@ -24,9 +24,76 @@ contracts:
         access: owner
       - name: getDestChainConfig
         access: public
+      - name: getDestinationChainGasPrice
+        access: public
       - name: getTokenTransferFeeConfig
         access: public
       - name: getStaticConfig
         access: public
       - name: getAllAuthorizedCallers
+        access: public
+
+  - contract_name: AdvancedPoolHooks
+    version: "2.0.0"
+    version_path: "latest"
+    functions:
+      - name: applyCCVConfigUpdates
+        access: owner
+      - name: applyAllowListUpdates
+        access: owner
+      - name: setThresholdAmount
+        access: owner
+      - name: setPolicyEngine
+        access: owner
+      - name: setPolicyEngineAllowFailedDetach
+        access: owner
+      - name: applyAuthorizedCallerUpdates
+        access: owner
+      - name: getAllowListEnabled
+        access: public
+      - name: getAllowList
+        access: public
+      - name: getThresholdAmount
+        access: public
+      - name: getPolicyEngine
+        access: public
+      - name: getAllAuthorizedCallers
+        access: public
+      - name: getAllCCVConfigs
+        access: public
+      - name: getCCVConfig
+        access: public
+      - name: getRequiredCCVs
+        access: public
+
+  - contract_name: OnRamp
+    version: "2.0.0"
+    version_path: "latest"
+    package_name: onramp
+    functions:
+      - name: applyDestChainConfigUpdates
+        access: owner
+      - name: setDynamicConfig
+        access: owner
+      - name: withdrawFeeTokens
+        access: owner
+      - name: getDestChainConfig
+        access: public
+      - name: getDynamicConfig
+        access: public
+      - name: getStaticConfig
+        access: public
+
+  - contract_name: OffRamp
+    version: "2.0.0"
+    version_path: "latest"
+    package_name: offramp
+    functions:
+      - name: applySourceChainConfigUpdates
+        access: owner
+      - name: getSourceChainConfig
+        access: public
+      - name: getStaticConfig
+        access: public
+      - name: getAllSourceChainConfigs
         access: public
