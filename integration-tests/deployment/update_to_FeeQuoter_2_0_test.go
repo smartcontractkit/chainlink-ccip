@@ -29,6 +29,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	cs_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 )
 
@@ -181,6 +182,21 @@ func fqUpgradeValidation(t *testing.T, e *cldf.Environment, chainSel uint64, cha
 	updaters17, err := fq17Contract.GetAllAuthorizedCallers(nil)
 	require.NoError(t, err, "Failed to get FeeQuoter dynamic config for chain selector %d", chainSel)
 	require.ElementsMatch(t, updaters16, updaters17)
+
+	if expected17fq {
+		timelockRef := datastore_utils.GetAddressRef(
+			e.DataStore.Addresses().Filter(),
+			chainSel,
+			common_utils.RBACTimelock,
+			semver.MustParse("1.0.0"),
+			common_utils.CLLQualifier,
+		)
+		require.NotEmpty(t, timelockRef.Address, "Expected timelock address for chain selector %d", chainSel)
+		timelockAddr := common.HexToAddress(timelockRef.Address)
+		fq17Owner, err := fq17Contract.Owner(nil)
+		require.NoError(t, err, "Failed to get FeeQuoter 2.0 owner for chain selector %d", chainSel)
+		require.Equal(t, timelockAddr, fq17Owner, "FeeQuoter 2.0 should be owned by timelock after ownership transfer for chain selector %d", chainSel)
+	}
 
 	var remoteChainSelector uint64
 	for _, sel := range chains {
