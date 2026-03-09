@@ -157,6 +157,30 @@ var DeployChainContracts = cldf_ops.NewSequence(
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy RMNMCMS instance: %w", err)
 			}
 			addresses = append(addresses, rmnOutput.Addresses...)
+
+			// Transfer ownership of all MCM contracts to the CLLCCIP timelock.
+			// CallProxy is not Ownable, so it is excluded.
+			mcmsOwnableContracts := []ownableContract{
+				{cllOutput.ProposerAddr, common_utils.ProposerManyChainMultisig},
+				{cllOutput.BypasserAddr, common_utils.BypasserManyChainMultisig},
+				{cllOutput.CancellerAddr, common_utils.CancellerManyChainMultisig},
+				{rmnOutput.ProposerAddr, common_utils.ProposerManyChainMultisig},
+				{rmnOutput.BypasserAddr, common_utils.BypasserManyChainMultisig},
+				{rmnOutput.CancellerAddr, common_utils.CancellerManyChainMultisig},
+			}
+			if err := transferContractsOwnership(b, chain, mcmsOwnableContracts, cllccipTimelockAddr); err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to transfer MCMS contract ownership to CLLCCIP timelock: %w", err)
+			}
+
+			// Grant ADMIN_ROLE on the CLLCCIP timelock to itself and renounce deployer admin.
+			if err := transferTimelockAdmin(b, chain, cllOutput.TimelockAddr, cllccipTimelockAddr); err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to transfer CLLCCIP timelock admin: %w", err)
+			}
+
+			// Grant ADMIN_ROLE on the RMNMCMS timelock to the CLLCCIP timelock and renounce deployer admin.
+			if err := transferTimelockAdmin(b, chain, rmnOutput.TimelockAddr, cllccipTimelockAddr); err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to transfer RMNMCMS timelock admin: %w", err)
+			}
 		}
 
 		// Deploy WETH
@@ -674,7 +698,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 				ownableContract{common.HexToAddress(rmnRemoteRef.Address), rmn_remote.ContractType},
 				ownableContract{common.HexToAddress(routerRef.Address), router.ContractType},
 				ownableContract{common.HexToAddress(tokenAdminRegistryRef.Address), token_admin_registry.ContractType},
-				ownableContract{common.HexToAddress(registryModuleOwnerCustomRef.Address), registry_module_owner_custom.ContractType},
+				// ownableContract{common.HexToAddress(registryModuleOwnerCustomRef.Address), registry_module_owner_custom.ContractType},
 				ownableContract{common.HexToAddress(feeQuoterRef.Address), fee_quoter.ContractType},
 				ownableContract{common.HexToAddress(offRampRef.Address), offramp.ContractType},
 				ownableContract{common.HexToAddress(onRampRef.Address), onramp.ContractType},
@@ -700,8 +724,12 @@ var DeployChainContracts = cldf_ops.NewSequence(
 )
 
 type mcmsInstanceOutput struct {
-	Addresses    []datastore.AddressRef
-	TimelockAddr common.Address
+	Addresses     []datastore.AddressRef
+	TimelockAddr  common.Address
+	ProposerAddr  common.Address
+	BypasserAddr  common.Address
+	CancellerAddr common.Address
+	CallProxyAddr common.Address
 }
 
 // deployMCMSInstance deploys a full MCMS instance (Proposer, Bypasser, Canceller MCMs,
@@ -814,8 +842,12 @@ func deployMCMSInstance(
 	addresses = append(addresses, timelockRef, callProxyRef)
 
 	return mcmsInstanceOutput{
-		Addresses:    addresses,
-		TimelockAddr: timelockAddr,
+		Addresses:     addresses,
+		TimelockAddr:  timelockAddr,
+		ProposerAddr:  common.HexToAddress(proposerAddr.Address),
+		BypasserAddr:  common.HexToAddress(bypasserAddr.Address),
+		CancellerAddr: common.HexToAddress(cancellerAddr.Address),
+		CallProxyAddr: common.HexToAddress(callProxyRef.Address),
 	}, nil
 }
 
@@ -851,6 +883,26 @@ func transferContractsOwnership(
 		if err != nil {
 			return fmt.Errorf("failed to transfer ownership of %s (%s) to %s: %w", c.Address, c.ContractType, newOwner, err)
 		}
+	}
+	return nil
+}
+
+// transferTimelockAdmin grants ADMIN_ROLE on the given timelock to newAdmin
+// and renounces the deployer's ADMIN_ROLE.
+func transferTimelockAdmin(
+	b cldf_ops.Bundle,
+	chain evm.Chain,
+	timelockAddr common.Address,
+	newAdmin common.Address,
+) error {
+	_, err := cldf_ops.ExecuteSequence(b, mcms_seq.SeqGrantAdminRoleOfTimelockToTimelock, chain,
+		mcms_seq.SeqGrantAdminRoleOfTimelockToTimelockInput{
+			ChainSelector:           chain.Selector,
+			TimelockAddress:         timelockAddr,
+			NewAdminTimelockAddress: newAdmin,
+		})
+	if err != nil {
+		return fmt.Errorf("failed to transfer admin of timelock %s to %s: %w", timelockAddr, newAdmin, err)
 	}
 	return nil
 }

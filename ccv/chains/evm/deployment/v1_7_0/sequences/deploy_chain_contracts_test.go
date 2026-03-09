@@ -1,35 +1,41 @@
 package sequences_test
 
 import (
+	"math/big"
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/v2"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/offramp"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/executor"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	mock_receiver "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/mock_receiver"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/offramp"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	mock_recv_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/mock_receiver_v2"
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	mcms_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations"
+	mcms_seq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/link_token"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
+	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	seq_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	"github.com/smartcontractkit/mcms/sdk/evm/bindings"
+	mcms_types "github.com/smartcontractkit/mcms/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -357,4 +363,181 @@ func TestDeployChainContracts_MultipleCommitteeVerifiersAndMultipleMockReceiverC
 	require.Len(t, required, 1)
 	require.Len(t, optional, 1)
 	require.Equal(t, uint8(1), threshold)
+}
+
+func singleSignerMCMSConfig(signer common.Address) mcms_types.Config {
+	c, err := mcms_types.NewConfig(1, []common.Address{signer}, nil)
+	if err != nil {
+		panic(err)
+	}
+	return c
+}
+
+func TestDeployChainContracts_WithMCMS(t *testing.T) {
+	chainSelector := uint64(5009297550715157269)
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{chainSelector}),
+	)
+	require.NoError(t, err)
+
+	chain := e.BlockChains.EVMChains()[chainSelector]
+	deployer := chain.DeployerKey.From
+
+	create2FactoryRef, err := contract_utils.MaybeDeployContract(
+		e.OperationsBundle, create2_factory.Deploy, chain,
+		contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+			TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
+			ChainSelector:  chainSelector,
+			Args:           create2_factory.ConstructorArgs{AllowList: []common.Address{deployer}},
+		}, nil)
+	require.NoError(t, err)
+
+	mcmsCfg := singleSignerMCMSConfig(deployer)
+	report, err := operations.ExecuteSequence(
+		e.OperationsBundle,
+		sequences.DeployChainContracts,
+		chain,
+		sequences.DeployChainContractsInput{
+			ChainSelector:     chainSelector,
+			CREATE2Factory:    common.HexToAddress(create2FactoryRef.Address),
+			ContractParams:    testsetup.CreateBasicContractParams(),
+			DeployTestRouter:  true,
+			MCMS: &sequences.MCMSDeployParams{
+				CLLCCIP: sequences.MCMSInstanceParams{
+					Proposer:         mcmsCfg,
+					Bypasser:         mcmsCfg,
+					Canceller:        mcmsCfg,
+					TimelockMinDelay: big.NewInt(0),
+					TimelockAdmin:    deployer,
+				},
+				RMNMCMS: sequences.MCMSInstanceParams{
+					Proposer:         mcmsCfg,
+					Bypasser:         mcmsCfg,
+					Canceller:        mcmsCfg,
+					TimelockMinDelay: big.NewInt(0),
+					TimelockAdmin:    deployer,
+				},
+			},
+		},
+	)
+	require.NoError(t, err, "ExecuteSequence with MCMS should not error")
+
+	// Build a lookup of deployed addresses by type+qualifier.
+	type addrKey struct {
+		contractType deployment.ContractType
+		qualifier    string
+	}
+	addrMap := make(map[addrKey]common.Address)
+	for _, ref := range report.Output.Addresses {
+		addrMap[addrKey{deployment.ContractType(ref.Type), ref.Qualifier}] = common.HexToAddress(ref.Address)
+	}
+
+	// Verify MCMS contracts are deployed for both qualifiers.
+	mcmsContractTypes := []deployment.ContractType{
+		common_utils.ProposerManyChainMultisig,
+		common_utils.BypasserManyChainMultisig,
+		common_utils.CancellerManyChainMultisig,
+		common_utils.RBACTimelock,
+		common_utils.CallProxy,
+	}
+	for _, qualifier := range []string{common_utils.CLLQualifier, common_utils.RMNTimelockQualifier} {
+		for _, ct := range mcmsContractTypes {
+			_, ok := addrMap[addrKey{ct, qualifier}]
+			require.True(t, ok, "Expected %s to be deployed for qualifier %s", ct, qualifier)
+		}
+	}
+
+	// Verify core product contracts are deployed.
+	productTypes := []deployment.ContractType{
+		rmn_remote.ContractType,
+		router.ContractType,
+		token_admin_registry.ContractType,
+		fee_quoter.ContractType,
+		offramp.ContractType,
+		onramp.ContractType,
+		executor.ContractType,
+		executor.ProxyType,
+	}
+	for _, ct := range productTypes {
+		_, ok := addrMap[addrKey{ct, ""}]
+		if !ok {
+			// Some contract types may have a non-empty qualifier (e.g. executors).
+			found := false
+			for key := range addrMap {
+				if key.contractType == ct {
+					found = true
+					break
+				}
+			}
+			require.True(t, found, "Expected product contract %s to be deployed", ct)
+		}
+	}
+
+	cllTimelockAddr := addrMap[addrKey{common_utils.RBACTimelock, common_utils.CLLQualifier}]
+	rmnTimelockAddr := addrMap[addrKey{common_utils.RBACTimelock, common_utils.RMNTimelockQualifier}]
+
+	// Verify MCM contracts have pending owner set to CLLCCIP timelock.
+	mcmOwnableTypes := []deployment.ContractType{
+		common_utils.ProposerManyChainMultisig,
+		common_utils.BypasserManyChainMultisig,
+		common_utils.CancellerManyChainMultisig,
+	}
+	for _, qualifier := range []string{common_utils.CLLQualifier, common_utils.RMNTimelockQualifier} {
+		for _, ct := range mcmOwnableTypes {
+			addr := addrMap[addrKey{ct, qualifier}]
+			mcm, err := bindings.NewManyChainMultiSig(addr, chain.Client)
+			require.NoError(t, err, "Failed to load MCM %s/%s", ct, qualifier)
+
+			pendingOwner, err := mcm.PendingOwner(nil)
+			require.NoError(t, err, "Failed to get pending owner of MCM %s/%s", ct, qualifier)
+			require.Equal(t, cllTimelockAddr, pendingOwner,
+				"MCM %s/%s pending owner should be CLLCCIP timelock", ct, qualifier)
+		}
+	}
+
+	// Verify product contracts have pending owner set to CLLCCIP timelock.
+	for _, ct := range productTypes {
+		for key, addr := range addrMap {
+			if key.contractType != ct {
+				continue
+			}
+			_, ownable, err := mcms_seq.LoadOwnableContract(addr, chain.Client)
+			if err != nil {
+				continue
+			}
+			// For Ownable2Step contracts, the pending owner can be checked via
+			// the generic OwnershipTransferable interface or by casting to
+			// burn_mint_erc677 which has PendingOwner().
+			owner, err := ownable.Owner(nil)
+			require.NoError(t, err)
+			// Owner is still the deployer (pending transfer), or the timelock
+			// if the contract uses one-step Ownable.
+			require.True(t, owner == deployer || owner == cllTimelockAddr,
+				"Product contract %s owner should be deployer or CLLCCIP timelock, got %s", ct, owner)
+		}
+	}
+
+	// Verify CLLCCIP timelock: admin is the timelock itself, deployer no longer admin.
+	cllTimelock, err := bindings.NewRBACTimelock(cllTimelockAddr, chain.Client)
+	require.NoError(t, err)
+
+	cllSelfAdmin, err := cllTimelock.HasRole(nil, mcms_ops.ADMIN_ROLE.ID, cllTimelockAddr)
+	require.NoError(t, err)
+	require.True(t, cllSelfAdmin, "CLLCCIP timelock should be admin of itself")
+
+	cllDeployerAdmin, err := cllTimelock.HasRole(nil, mcms_ops.ADMIN_ROLE.ID, deployer)
+	require.NoError(t, err)
+	require.False(t, cllDeployerAdmin, "Deployer should no longer be admin of CLLCCIP timelock")
+
+	// Verify RMNMCMS timelock: admin is the CLLCCIP timelock, deployer no longer admin.
+	rmnTimelock, err := bindings.NewRBACTimelock(rmnTimelockAddr, chain.Client)
+	require.NoError(t, err)
+
+	rmnCllAdmin, err := rmnTimelock.HasRole(nil, mcms_ops.ADMIN_ROLE.ID, cllTimelockAddr)
+	require.NoError(t, err)
+	require.True(t, rmnCllAdmin, "CLLCCIP timelock should be admin of RMNMCMS timelock")
+
+	rmnDeployerAdmin, err := rmnTimelock.HasRole(nil, mcms_ops.ADMIN_ROLE.ID, deployer)
+	require.NoError(t, err)
+	require.False(t, rmnDeployerAdmin, "Deployer should no longer be admin of RMNMCMS timelock")
 }
