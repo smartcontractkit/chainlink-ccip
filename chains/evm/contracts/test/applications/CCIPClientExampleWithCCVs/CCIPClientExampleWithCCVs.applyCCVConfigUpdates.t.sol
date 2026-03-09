@@ -87,6 +87,22 @@ contract CCIPClientExampleWithCCVs_applyCCVConfigUpdates is RouterSetup {
     s_client.applyCCVConfigUpdates(args);
   }
 
+  function test_applyCCVConfigUpdates_RevertWhen_OptionalThresholdWithNoOptionalCCVs() public {
+    CCIPClientExampleWithCCVs.CCVConfigArgs[] memory args = new CCIPClientExampleWithCCVs.CCVConfigArgs[](1);
+    args[0] = CCIPClientExampleWithCCVs.CCVConfigArgs({
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
+      requiredCCVs: new address[](1),
+      optionalCCVs: new address[](0),
+      optionalThreshold: 1,
+      requireFinality: false
+    });
+
+    vm.expectRevert(
+      abi.encodeWithSelector(CCIPClientExampleWithCCVs.InvalidOptionalThreshold.selector, SOURCE_CHAIN_SELECTOR, 1)
+    );
+    s_client.applyCCVConfigUpdates(args);
+  }
+
   function test_applyCCVConfigUpdates_RevertWhen_ZeroAddressNotAllowedAsOptional() public {
     address[] memory requiredCCVs = new address[](1);
     requiredCCVs[0] = address(0x1);
