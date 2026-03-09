@@ -116,7 +116,7 @@ var DeploySiloedUSDCLockRelease = cldf_ops.NewSequence(
 			lbAddr := lockBoxes[sel]
 			lockBoxAddress := common.HexToAddress(lbAddr)
 			// Check if already authorized
-			callersReport, err := cldf_ops.ExecuteOperation(b, erc20_lock_box.GetAllAuthorizedCallers, chain, contract_utils.FunctionInput[any]{
+			callersReport, err := cldf_ops.ExecuteOperation(b, erc20_lock_box.GetAllAuthorizedCallers, chain, contract_utils.FunctionInput[struct{}]{
 				ChainSelector: input.ChainSelector,
 				Address:       lockBoxAddress,
 			})
