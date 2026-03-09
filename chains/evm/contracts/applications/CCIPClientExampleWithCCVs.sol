@@ -17,7 +17,11 @@ contract CCIPClientExampleWithCCVs is CCIPClientExample {
   error ZeroAddressNotAllowedAsOptional();
 
   event CCVConfigSet(
-    uint64 indexed sourceChainSelector, address[] requiredCCVs, address[] optionalCCVs, uint8 optionalThreshold
+    uint64 indexed sourceChainSelector,
+    address[] requiredCCVs,
+    address[] optionalCCVs,
+    uint8 optionalThreshold,
+    bool requireFinality
   );
 
   /// @notice CCV configuration for a source chain.
@@ -27,6 +31,7 @@ contract CCIPClientExampleWithCCVs is CCIPClientExample {
     address[] requiredCCVs;
     address[] optionalCCVs;
     uint8 optionalThreshold;
+    bool requireFinality;
   }
 
   /// @notice Arguments required to add a CCV configuration for a source chain.
@@ -35,6 +40,7 @@ contract CCIPClientExampleWithCCVs is CCIPClientExample {
     address[] optionalCCVs;
     uint64 sourceChainSelector;
     uint8 optionalThreshold;
+    bool requireFinality;
   }
 
   /// @notice CCV configurations by source chain selector.
@@ -53,10 +59,16 @@ contract CCIPClientExampleWithCCVs is CCIPClientExample {
     for (uint256 i = 0; i < ccvConfigsToSet.length; ++i) {
       CCVConfigArgs memory args = ccvConfigsToSet[i];
       // If optionalThreshold > optionalCCVs.length, then it's impossible to satisfy the optional CCV requirement.
-      // If optionalThreshold == optionalCCVs.length, then optional CCVs are essentially required.
-      // They should instead be defined as required CCVs.
-      if (args.optionalCCVs.length > 0 && args.optionalThreshold >= args.optionalCCVs.length) {
-        revert InvalidOptionalThreshold(args.sourceChainSelector, args.optionalThreshold);
+      // If optionalThreshold == optionalCCVs.length, then optional CCVs are essentially required, they should instead
+      // be defined as required CCVs.
+      if (args.optionalCCVs.length > 0) {
+        if (args.optionalThreshold >= args.optionalCCVs.length) {
+          revert InvalidOptionalThreshold(args.sourceChainSelector, args.optionalThreshold);
+        }
+      } else {
+        if (args.optionalThreshold > 0) {
+          revert InvalidOptionalThreshold(args.sourceChainSelector, args.optionalThreshold);
+        }
       }
       uint256 requiredCCVLength = args.requiredCCVs.length;
       uint256 optionalCCVLength = args.optionalCCVs.length;
@@ -77,24 +89,41 @@ contract CCIPClientExampleWithCCVs is CCIPClientExample {
         }
       }
       s_ccvConfigs[args.sourceChainSelector] = CCVConfig({
-        requiredCCVs: args.requiredCCVs, optionalCCVs: args.optionalCCVs, optionalThreshold: args.optionalThreshold
+        requiredCCVs: args.requiredCCVs,
+        optionalCCVs: args.optionalCCVs,
+        optionalThreshold: args.optionalThreshold,
+        requireFinality: args.requireFinality
       });
-      emit CCVConfigSet(args.sourceChainSelector, args.requiredCCVs, args.optionalCCVs, args.optionalThreshold);
+      emit CCVConfigSet(
+        args.sourceChainSelector, args.requiredCCVs, args.optionalCCVs, args.optionalThreshold, args.requireFinality
+      );
     }
   }
 
-  /// @notice Provides the required and optional CCVs for a source chain.
+  /// @notice Provides the required and optional CCVs and min block depth for a source chain.
   /// @dev OffRamp will apply the defaults for the lane if no CCVs are defined for a source chain.
-  function getCCVs(
-    uint64 sourceChainSelector
+  /// @dev WARNING: minBlockDepth must be used carefully, when in doubt it's safer to require finality (minBlockDepth = 0) than
+  /// to allow FTF messages (any non-zero value) as FTF messages can be reorged.
+  function getCCVsAndMinBlockDepth(
+    uint64 sourceChainSelector,
+    bytes calldata
   )
     external
     view
     virtual
     override
-    returns (address[] memory requiredCCVs, address[] memory optionalCCVs, uint8 optionalThreshold)
+    returns (
+      address[] memory requiredCCVs,
+      address[] memory optionalCCVs,
+      uint8 optionalThreshold,
+      uint16 minBlockDepth
+    )
   {
     CCVConfig memory config = s_ccvConfigs[sourceChainSelector];
-    return (config.requiredCCVs, config.optionalCCVs, config.optionalThreshold);
+    // If requireFinality is true, minBlockDepth = 0 (require finality).
+    // If requireFinality is false, minBlockDepth = 1 (allow any FTF level) - WARNING only use a finality of 1 when
+    // you use a trusted sender on the source chain that manages the finality risk when sending messages.
+    minBlockDepth = config.requireFinality ? 0 : 1;
+    return (config.requiredCCVs, config.optionalCCVs, config.optionalThreshold, minBlockDepth);
   }
 }
