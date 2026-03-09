@@ -227,8 +227,8 @@ func updateFeeQuoterApply(fquRegistry *FQAndRampUpdaterRegistry, mcmsRegistry *c
 		reports := make([]cldf_ops.Report[any, any], 0)
 		addressRefs := make([]datastore.AddressRef, 0)
 		contractMetadata := make([]datastore.ContractMetadata, 0)
-		var feeQuoterAddrRef datastore.AddressRef
 		for chainSel, perChainInput := range input.Chains {
+			var feeQuoterAddrRef datastore.AddressRef
 			feeQuoterAddrRefs := e.DataStore.Addresses().Filter(
 				datastore.AddressRefByChainSelector(chainSel),
 				datastore.AddressRefByType(datastore.ContractType(utils.FeeQuoter)),
