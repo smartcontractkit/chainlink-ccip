@@ -20,11 +20,11 @@ import (
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	mcms_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
 	mcms_seq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/link_token"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
@@ -52,8 +52,8 @@ func TestDeployChainContracts_Idempotency(t *testing.T) {
 			existingAddresses: []datastore.AddressRef{
 				{
 					ChainSelector: 5009297550715157269,
-					Type:          datastore.ContractType(link_token.ContractType),
-					Version:       link_token.Version,
+					Type:          datastore.ContractType(link.ContractType),
+					Version:       link.Version,
 					Address:       common.HexToAddress("0x01").Hex(),
 				},
 				{
@@ -102,7 +102,7 @@ func TestDeployChainContracts_Idempotency(t *testing.T) {
 				rmn_remote.ContractType:                 false,
 				router.ContractType:                     false,
 				executor.ContractType:                   false,
-				link_token.ContractType:                 false,
+				link.ContractType:                       false,
 				weth.ContractType:                       false,
 				committee_verifier.ContractType:         false,
 				onramp.ContractType:                     false,
@@ -349,7 +349,7 @@ func TestDeployChainContracts_MultipleCommitteeVerifiersAndMultipleMockReceiverC
 	q1Receiver, err := mock_recv_bindings.NewMockReceiverV2(q1ReceiverRef, e.BlockChains.EVMChains()[chainSelector].Client)
 	require.NoError(t, err)
 
-	required, optional, threshold, err := q1Receiver.GetCCVs(&bind.CallOpts{Context: e.OperationsBundle.GetContext()}, chainSelector)
+	required, optional, threshold, _, err := q1Receiver.GetCCVsAndMinBlockDepth(&bind.CallOpts{Context: e.OperationsBundle.GetContext()}, chainSelector, []byte{})
 	require.NoError(t, err)
 	require.Len(t, required, 2)
 	require.Len(t, optional, 0)
@@ -358,7 +358,7 @@ func TestDeployChainContracts_MultipleCommitteeVerifiersAndMultipleMockReceiverC
 	q2Receiver, err := mock_recv_bindings.NewMockReceiverV2(q2ReceiverRef, e.BlockChains.EVMChains()[chainSelector].Client)
 	require.NoError(t, err)
 
-	required, optional, threshold, err = q2Receiver.GetCCVs(&bind.CallOpts{Context: e.OperationsBundle.GetContext()}, chainSelector)
+	required, optional, threshold, _, err = q2Receiver.GetCCVsAndMinBlockDepth(&bind.CallOpts{Context: e.OperationsBundle.GetContext()}, chainSelector, []byte{})
 	require.NoError(t, err)
 	require.Len(t, required, 1)
 	require.Len(t, optional, 1)

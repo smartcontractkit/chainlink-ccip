@@ -24,8 +24,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/link_token"
 	pingpongdappops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/ping_pong_dapp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
@@ -81,13 +79,9 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		addresses = append(addresses, wethRef)
 
 		// Deploy LINK
-		linkRef, err := contract.MaybeDeployContract(b, burn_mint_erc20_with_drip.Deploy, chain, contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs]{
-			TypeAndVersion: deployment.NewTypeAndVersion(link_token.ContractType, *link_token.Version),
+		linkRef, err := contract.MaybeDeployContract(b, link.Deploy, chain, contract.DeployInput[link.ConstructorArgs]{
+			TypeAndVersion: deployment.NewTypeAndVersion(link.ContractType, *link.Version),
 			ChainSelector:  chain.Selector,
-			Args: burn_mint_erc20_with_drip.ConstructorArgs{
-				Name:   "LINK",
-				Symbol: "LINK",
-			},
 		}, input.ExistingAddresses)
 		if err != nil {
 			return sequences.OnChainOutput{}, err

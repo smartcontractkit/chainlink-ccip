@@ -9,7 +9,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/link_token"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/1_5_0/burn_mint_erc20_with_drip"
 )
@@ -40,9 +39,6 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	ContractMetadata: burn_mint_erc20_with_drip.BurnMintERC20WithDripMetaData,
 	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
 		cldf_deployment.NewTypeAndVersion(ContractType, *Version).String(): {
-			EVM: common.FromHex(burn_mint_erc20_with_drip.BurnMintERC20WithDripBin),
-		},
-		cldf_deployment.NewTypeAndVersion(link_token.ContractType, *link_token.Version).String(): {
 			EVM: common.FromHex(burn_mint_erc20_with_drip.BurnMintERC20WithDripBin),
 		},
 	},

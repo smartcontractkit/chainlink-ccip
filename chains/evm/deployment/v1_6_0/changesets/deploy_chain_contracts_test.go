@@ -8,8 +8,8 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/link_token"
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -94,8 +94,8 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 				ds := datastore.NewMemoryDataStore()
 				_ = ds.Addresses().Add(datastore.AddressRef{
 					ChainSelector: chain_selectors.ETHEREUM_MAINNET.Selector,
-					Type:          datastore.ContractType(link_token.ContractType),
-					Version:       link_token.Version,
+					Type:          datastore.ContractType(link.ContractType),
+					Version:       link.Version,
 					Address:       common.HexToAddress("0x01").Hex(),
 				})
 				_ = ds.Addresses().Add(datastore.AddressRef{

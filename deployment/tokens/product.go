@@ -175,7 +175,11 @@ func (r *TokenAdapterRegistry) RegisterTokenAdapter(chainFamily string, version 
 
 // GetTokenAdapter retrieves a registered TokenAdapter for the given chain family and version.
 // The boolean return value indicates whether an adapter was found.
+// Returns (nil, false) if version is nil to avoid panics when token config has no version set.
 func (r *TokenAdapterRegistry) GetTokenAdapter(chainFamily string, version *semver.Version) (TokenAdapter, bool) {
+	if version == nil {
+		return nil, false
+	}
 	id := newTokenAdapterID(chainFamily, version)
 	r.mu.Lock()
 	defer r.mu.Unlock()

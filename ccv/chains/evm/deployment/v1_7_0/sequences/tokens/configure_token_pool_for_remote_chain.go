@@ -758,8 +758,7 @@ func importTokenTransferFeeConfigFromActivePool(b cldf_ops.Bundle, chain evm.Cha
 		}
 		feeQuoterAddr := dCfgOnRamp.Output.FeeQuoter
 		if feeQuoterAddr == (common.Address{}) {
-			return nil, fmt.Errorf("fee quoter on onRamp %s on chain %s is zero, cannot import token transfer fee config",
-				onRampAddr.Hex(), chain.String())
+			return nil, nil
 		}
 		// get token transfer fee config from fee quoter
 		tokenTransferFeeConfigReport, err := cldf_ops.ExecuteOperation(b, fqops_v163.GetTokenTransferFeeConfig, chain, evm_contract.FunctionInput[fqops_v163.GetTokenTransferFeeConfigArgs]{
@@ -787,8 +786,7 @@ func importTokenTransferFeeConfigFromActivePool(b cldf_ops.Bundle, chain evm.Cha
 		}
 		feeQuoterAddr := dCfgOnRamp.Output.FeeQuoter
 		if feeQuoterAddr == (common.Address{}) {
-			return nil, fmt.Errorf("fee quoter on onRamp %s on chain %s is zero, cannot import token transfer fee config",
-				onRampAddr.Hex(), chain.String())
+			return nil, nil
 		}
 		// get token transfer fee config from fee quoter
 		tokenTransferFeeConfigReport, err := cldf_ops.ExecuteOperation(b, fqops.GetTokenTransferFeeConfig, chain, evm_contract.FunctionInput[fqops.GetTokenTransferFeeConfigArgs]{
