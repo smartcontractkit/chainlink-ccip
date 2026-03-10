@@ -221,13 +221,13 @@ var ConfigureLaneLegAsSource = cldf_ops.NewSequence(
 			if len(filtered.RemoteChains) == 0 {
 				continue
 			}
-			committeeVerifierReport, err := cldf_ops.ExecuteSequence(b, ConfigureCommitteeVerifierForLanes, chains, ConfigureCommitteeVerifierForLanesInput{
+			committeeVerifierReport, err := cldf_ops.ExecuteSequence(b, ConfigureCommitteeVerifierAsSource, chains, ConfigureCommitteeVerifierAsSourceInput{
 				ChainSelector:           chain.Selector,
 				Router:                  sourceRouter,
 				CommitteeVerifierConfig: filtered,
 			})
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to configure committee verifier for lanes: %w", err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to configure committee verifier as source: %w", err)
 			}
 			batchOps = append(batchOps, committeeVerifierReport.Output.BatchOps...)
 		}
@@ -311,13 +311,12 @@ var ConfigureLaneLegAsDest = cldf_ops.NewSequence(
 			if len(filtered.RemoteChains) == 0 {
 				continue
 			}
-			committeeVerifierReport, err := cldf_ops.ExecuteSequence(b, ConfigureCommitteeVerifierForLanes, chains, ConfigureCommitteeVerifierForLanesInput{
+			committeeVerifierReport, err := cldf_ops.ExecuteSequence(b, ConfigureCommitteeVerifierAsDest, chains, ConfigureCommitteeVerifierAsDestInput{
 				ChainSelector:           chain.Selector,
-				Router:                  destRouter,
 				CommitteeVerifierConfig: filtered,
 			})
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to configure committee verifier for lanes: %w", err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to configure committee verifier as dest: %w", err)
 			}
 			batchOps = append(batchOps, committeeVerifierReport.Output.BatchOps...)
 		}
