@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {IBurnMintERC20} from "../../interfaces/IBurnMintERC20.sol";
-
 import {Client} from "../../libraries/Client.sol";
 import {ExtraArgsCodec} from "../../libraries/ExtraArgsCodec.sol";
 import {Internal} from "../../libraries/Internal.sol";
@@ -66,7 +64,8 @@ contract e2e_factoryDeployedPool is e2e {
       tokenInitCode,
       POOL_INIT_CODE,
       address(0),
-      SALT
+      SALT,
+      address(0)
     );
 
     // Claim ownership: accept admin role and pool ownership
@@ -102,7 +101,8 @@ contract e2e_factoryDeployedPool is e2e {
       new TokenPoolFactory.RemoteTokenPoolInfo[](0),
       POOL_INIT_CODE,
       address(0),
-      SALT
+      SALT,
+      address(0)
     );
     Ownable2Step(s_destPool).acceptOwnership();
 

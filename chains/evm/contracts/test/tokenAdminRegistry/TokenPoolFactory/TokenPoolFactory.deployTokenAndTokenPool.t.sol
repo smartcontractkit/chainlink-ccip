@@ -62,7 +62,8 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
       s_tokenInitCode,
       POOL_INIT_CODE,
       address(0),
-      FAKE_SALT
+      FAKE_SALT,
+      address(0)
     );
 
     assertNotEq(address(0), tokenAddress, "Token Address should not be 0");
@@ -130,7 +131,8 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
       s_tokenInitCode,
       POOL_INIT_CODE,
       address(0),
-      FAKE_SALT
+      FAKE_SALT,
+      address(0)
     );
 
     assertEq(
@@ -162,7 +164,8 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
       remoteTokenInitCode,
       POOL_INIT_CODE,
       address(0),
-      FAKE_SALT
+      FAKE_SALT,
+      address(0)
     );
 
     assertEq(
@@ -256,7 +259,8 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
       s_tokenInitCode,
       POOL_INIT_CODE,
       address(0),
-      FAKE_SALT
+      FAKE_SALT,
+      address(0)
     );
 
     assertEq(address(TokenPool(poolAddress).getToken()), tokenAddress, "Token Address should have been set locally");
@@ -288,7 +292,8 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
       new TokenPoolFactory.RemoteTokenPoolInfo[](0),
       POOL_INIT_CODE,
       address(0),
-      FAKE_SALT
+      FAKE_SALT,
+      address(0)
     );
 
     assertEq(
@@ -334,7 +339,8 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
       s_tokenInitCode,
       POOL_INIT_CODE,
       address(0),
-      FAKE_SALT
+      FAKE_SALT,
+      address(0)
     );
 
     assertNotEq(address(0), tokenAddress, "Token Address should not be 0");
@@ -384,7 +390,8 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
       new TokenPoolFactory.RemoteTokenPoolInfo[](0),
       LOCK_RELEASE_INIT_CODE,
       address(userLockBox),
-      FAKE_SALT
+      FAKE_SALT,
+      address(0)
     );
 
     assertEq(userLockBox.owner(), OWNER, "lockbox owner should remain user");
@@ -402,7 +409,8 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
       s_tokenInitCode,
       LOCK_RELEASE_INIT_CODE,
       address(0),
-      FAKE_SALT
+      FAKE_SALT,
+      address(0)
     );
 
     bytes memory lockBoxCreationCode = abi.encodePacked(type(ERC20LockBox).creationCode, abi.encode(tokenAddress));
@@ -483,7 +491,8 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
       remoteTokenPools,
       type(LockReleaseTokenPool).creationCode,
       address(localLockBox),
-      FAKE_SALT
+      FAKE_SALT,
+      address(0)
     );
 
     Ownable2Step(poolAddress).acceptOwnership();
@@ -501,7 +510,8 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
       new TokenPoolFactory.RemoteTokenPoolInfo[](0),
       type(LockReleaseTokenPool).creationCode,
       address(remoteLockBox),
-      FAKE_SALT
+      FAKE_SALT,
+      address(0)
     );
 
     address[] memory allowedCallers = new address[](1);
@@ -564,7 +574,8 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
       s_tokenInitCode,
       POOL_INIT_CODE,
       address(0),
-      FAKE_SALT
+      FAKE_SALT,
+      address(0)
     );
 
     assertNotEq(address(0), tokenAddress, "Token Address should not be 0");
@@ -642,7 +653,8 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
       s_tokenInitCode,
       POOL_INIT_CODE,
       address(0),
-      FAKE_SALT
+      FAKE_SALT,
+      address(0)
     );
 
     assertEq(address(TokenPool(poolAddress).getToken()), tokenAddress, "Token Address should have been set locally");
@@ -674,7 +686,8 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
       new TokenPoolFactory.RemoteTokenPoolInfo[](0),
       POOL_INIT_CODE,
       address(0),
-      FAKE_SALT
+      FAKE_SALT,
+      address(0)
     );
 
     assertEq(
@@ -696,6 +709,215 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
     assertEq(TokenPool(newPoolAddress).getTokenDecimals(), REMOTE_TOKEN_DECIMALS, "Token Decimals should be 6");
     assertEq(address(TokenPool(newPoolAddress).getToken()), address(newRemoteToken), "Token Address should be set");
     assertEq(IERC20Metadata(address(newRemoteToken)).decimals(), REMOTE_TOKEN_DECIMALS, "Token Decimals should be 6");
+  }
+
+  function test_deployTokenAndTokenPool_FactoryHasNoPermissionsAfterDeployment() public {
+    vm.stopPrank();
+    address deployer = makeAddr("deployer");
+    address futureOwner = makeAddr("futureOwner");
+    address factory = address(s_tokenPoolFactory);
+
+    bytes memory tokenInitCode = abi.encodePacked(
+      type(CrossChainToken).creationCode,
+      abi.encode(
+        BaseERC20.ConstructorParams({
+          name: "TestToken", symbol: "TT", decimals: LOCAL_TOKEN_DECIMALS, maxSupply: 0, preMint: 0, ccipAdmin: factory
+        }),
+        factory,
+        futureOwner
+      )
+    );
+
+    // Deployer calls the factory, but futureOwner receives all permissions
+    vm.prank(deployer);
+    (address tokenAddress, address poolAddress) = s_tokenPoolFactory.deployTokenAndTokenPool(
+      new TokenPoolFactory.RemoteTokenPoolInfo[](0),
+      LOCAL_TOKEN_DECIMALS,
+      TokenPoolFactory.PoolType.BURN_MINT,
+      tokenInitCode,
+      POOL_INIT_CODE,
+      address(0),
+      FAKE_SALT,
+      futureOwner
+    );
+
+    // futureOwner accepts the 2-step transfers
+    vm.startPrank(futureOwner);
+    s_tokenAdminRegistry.acceptAdminRole(tokenAddress);
+    Ownable2Step(poolAddress).acceptOwnership();
+
+    CrossChainToken token = CrossChainToken(tokenAddress);
+
+    // Factory should not hold any token roles
+    assertFalse(
+      token.hasRole(token.DEFAULT_ADMIN_ROLE(), factory), "Factory should not have DEFAULT_ADMIN_ROLE on token"
+    );
+    assertFalse(
+      token.hasRole(token.BURN_MINT_ADMIN_ROLE(), factory), "Factory should not have BURN_MINT_ADMIN_ROLE on token"
+    );
+    assertFalse(token.hasRole(token.MINTER_ROLE(), factory), "Factory should not have MINTER_ROLE on token");
+    assertFalse(token.hasRole(token.BURNER_ROLE(), factory), "Factory should not have BURNER_ROLE on token");
+    assertNotEq(IOwner(poolAddress).owner(), factory, "Factory should not own the pool");
+
+    // Deployer should not hold any permissions either
+    assertFalse(
+      token.hasRole(token.DEFAULT_ADMIN_ROLE(), deployer), "Deployer should not have DEFAULT_ADMIN_ROLE on token"
+    );
+    assertFalse(
+      token.hasRole(token.BURN_MINT_ADMIN_ROLE(), deployer), "Deployer should not have BURN_MINT_ADMIN_ROLE on token"
+    );
+    assertNotEq(IOwner(poolAddress).owner(), deployer, "Deployer should not own the pool");
+    TokenAdminRegistry.TokenConfig memory tokenConfig = s_tokenAdminRegistry.getTokenConfig(tokenAddress);
+    assertNotEq(tokenConfig.administrator, deployer, "Deployer should not be token admin registry admin");
+
+    // futureOwner should have full control
+    assertTrue(
+      token.hasRole(token.DEFAULT_ADMIN_ROLE(), futureOwner), "futureOwner should have DEFAULT_ADMIN_ROLE on token"
+    );
+    assertEq(token.owner(), futureOwner, "futureOwner should be the token owner");
+    assertEq(IOwner(poolAddress).owner(), futureOwner, "futureOwner should own the pool");
+    assertEq(tokenConfig.administrator, futureOwner, "futureOwner should be the token admin registry admin");
+
+    // Pool should have mint and burn roles
+    assertTrue(token.hasRole(token.MINTER_ROLE(), poolAddress), "Pool should have MINTER_ROLE");
+    assertTrue(token.hasRole(token.BURNER_ROLE(), poolAddress), "Pool should have BURNER_ROLE");
+  }
+
+  function test_deployTokenPoolWithExistingToken_FactoryHasNoPermissionsAfterDeployment() public {
+    vm.stopPrank();
+    address deployer = makeAddr("deployer");
+    address futureOwner = makeAddr("futureOwner");
+    address factory = address(s_tokenPoolFactory);
+
+    vm.startPrank(deployer);
+
+    CrossChainToken token = new CrossChainToken(
+      BaseERC20.ConstructorParams({
+        name: "TestToken",
+        symbol: "TT",
+        decimals: LOCAL_TOKEN_DECIMALS,
+        maxSupply: type(uint256).max,
+        preMint: PREMINT_AMOUNT,
+        ccipAdmin: deployer
+      }),
+      deployer,
+      deployer
+    );
+
+    address poolAddress = s_tokenPoolFactory.deployTokenPoolWithExistingToken(
+      address(token),
+      LOCAL_TOKEN_DECIMALS,
+      TokenPoolFactory.PoolType.BURN_MINT,
+      new TokenPoolFactory.RemoteTokenPoolInfo[](0),
+      POOL_INIT_CODE,
+      address(0),
+      FAKE_SALT,
+      futureOwner
+    );
+
+    vm.stopPrank();
+
+    // futureOwner accepts pool ownership
+    vm.prank(futureOwner);
+    Ownable2Step(poolAddress).acceptOwnership();
+
+    // Factory should not own the pool
+    assertNotEq(IOwner(poolAddress).owner(), factory, "Factory should not own the pool");
+
+    // Factory should not have any token roles
+    assertFalse(
+      token.hasRole(token.DEFAULT_ADMIN_ROLE(), factory), "Factory should not have DEFAULT_ADMIN_ROLE on token"
+    );
+    assertFalse(
+      token.hasRole(token.BURN_MINT_ADMIN_ROLE(), factory), "Factory should not have BURN_MINT_ADMIN_ROLE on token"
+    );
+    assertFalse(token.hasRole(token.MINTER_ROLE(), factory), "Factory should not have MINTER_ROLE on token");
+    assertFalse(token.hasRole(token.BURNER_ROLE(), factory), "Factory should not have BURNER_ROLE on token");
+
+    // Deployer should not own the pool
+    assertNotEq(IOwner(poolAddress).owner(), deployer, "Deployer should not own the pool");
+
+    // futureOwner should own the pool
+    assertEq(IOwner(poolAddress).owner(), futureOwner, "futureOwner should own the pool");
+
+    // Deployer should retain token control (existing token scenario)
+    assertTrue(token.hasRole(token.DEFAULT_ADMIN_ROLE(), deployer), "Deployer should have DEFAULT_ADMIN_ROLE on token");
+    assertEq(token.owner(), deployer, "Deployer should be the token owner");
+  }
+
+  function test_deployTokenAndTokenPool_FutureOwnerCanAccept_DeployerCannot() public {
+    vm.stopPrank();
+    address deployer = makeAddr("deployer");
+    address futureOwner = makeAddr("futureOwner");
+
+    bytes memory tokenInitCode = abi.encodePacked(
+      type(CrossChainToken).creationCode,
+      abi.encode(
+        BaseERC20.ConstructorParams({
+          name: "TestToken",
+          symbol: "TT",
+          decimals: LOCAL_TOKEN_DECIMALS,
+          maxSupply: 0,
+          preMint: 0,
+          ccipAdmin: address(s_tokenPoolFactory)
+        }),
+        address(s_tokenPoolFactory),
+        futureOwner
+      )
+    );
+
+    vm.prank(deployer);
+    (address tokenAddress, address poolAddress) = s_tokenPoolFactory.deployTokenAndTokenPool(
+      new TokenPoolFactory.RemoteTokenPoolInfo[](0),
+      LOCAL_TOKEN_DECIMALS,
+      TokenPoolFactory.PoolType.BURN_MINT,
+      tokenInitCode,
+      POOL_INIT_CODE,
+      address(0),
+      FAKE_SALT,
+      futureOwner
+    );
+
+    // Deployer cannot accept pool ownership
+    vm.prank(deployer);
+    vm.expectRevert(Ownable2Step.MustBeProposedOwner.selector);
+    Ownable2Step(poolAddress).acceptOwnership();
+
+    // Deployer cannot accept token admin registry role
+    vm.prank(deployer);
+    vm.expectRevert(
+      abi.encodeWithSelector(TokenAdminRegistry.OnlyPendingAdministrator.selector, deployer, tokenAddress)
+    );
+    s_tokenAdminRegistry.acceptAdminRole(tokenAddress);
+
+    // futureOwner can accept both
+    vm.startPrank(futureOwner);
+    s_tokenAdminRegistry.acceptAdminRole(tokenAddress);
+    Ownable2Step(poolAddress).acceptOwnership();
+    vm.stopPrank();
+
+    assertEq(IOwner(poolAddress).owner(), futureOwner, "futureOwner should own the pool");
+    assertEq(s_tokenAdminRegistry.getTokenConfig(tokenAddress).administrator, futureOwner);
+  }
+
+  function test_deployTokenAndTokenPool_FutureOwnerZeroDefaultsToMsgSender() public {
+    (address tokenAddress, address poolAddress) = s_tokenPoolFactory.deployTokenAndTokenPool(
+      new TokenPoolFactory.RemoteTokenPoolInfo[](0),
+      LOCAL_TOKEN_DECIMALS,
+      TokenPoolFactory.PoolType.BURN_MINT,
+      s_tokenInitCode,
+      POOL_INIT_CODE,
+      address(0),
+      keccak256("defaultOwnerSalt"),
+      address(0)
+    );
+
+    // msg.sender (OWNER) should be the pending owner, not address(0)
+    s_tokenAdminRegistry.acceptAdminRole(tokenAddress);
+    Ownable2Step(poolAddress).acceptOwnership();
+
+    assertEq(IOwner(poolAddress).owner(), OWNER, "msg.sender should own the pool when futureOwner is address(0)");
+    assertEq(s_tokenAdminRegistry.getTokenConfig(tokenAddress).administrator, OWNER);
   }
 
   function test_deployTokenAndTokenPool_RevertWhen_EmptyRemoteTokenInitCode() public {
@@ -725,7 +947,8 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
       s_tokenInitCode,
       POOL_INIT_CODE,
       address(0),
-      FAKE_SALT
+      FAKE_SALT,
+      address(0)
     );
   }
 
@@ -756,7 +979,8 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
       s_tokenInitCode,
       POOL_INIT_CODE,
       address(0),
-      FAKE_SALT
+      FAKE_SALT,
+      address(0)
     );
   }
 
@@ -796,7 +1020,8 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
       remotes,
       LOCK_RELEASE_INIT_CODE,
       address(lockBox),
-      FAKE_SALT
+      FAKE_SALT,
+      address(0)
     );
   }
 }
