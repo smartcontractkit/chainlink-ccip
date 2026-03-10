@@ -805,8 +805,8 @@ func importTokenTransferFeeConfigFromActivePool(b cldf_ops.Bundle, chain evm.Cha
 		}
 		return v2FeeQuoterConfigToTokenTransferFeeConfig(tokenTransferFeeConfigReport.Output), nil
 	default:
-		return nil, fmt.Errorf("unsupported onRamp version %s for onRamp %s on chain %s, cannot import token transfer fee config",
-			onRampTAV.String(), onRampAddr.Hex(), chain.String())
+		// Unsupported onRamp version, nothing to import.
+		return nil, nil
 	}
 }
 
