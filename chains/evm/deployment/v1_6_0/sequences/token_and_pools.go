@@ -241,13 +241,26 @@ func (a *EVMAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokensapi.TPRLR
 				return sequences.OnChainOutput{}, fmt.Errorf("token pool address for ref (%+v) is zero address", input.TokenPoolRef)
 			}
 
-			// NOTE: there are certain situations where we don't have access to change the rate limits (e.g. the customer is the
-			// pool owner and rate limit admin). In these cases, we should NOT attempt to set the rate limit or generate an MCMS
-			// batch since the transaction will ultimately fail. Instead, we log a warning and skip rate limit configuration for
-			// that chain.
+			// The remote chain needs to be supported by the token pool in order to set rate limits for that chain. If it isn't, then
+			// we fail loudly since this indicates a misconfiguration in the input data that needs to be fixed before proceeding.
 			tokenPool, err := token_pool.NewTokenPool(tokenPoolAddr, chain.Client)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to instantiate token pool contract: %w", err)
+			}
+			isSupported, err := tokenPool.IsSupportedChain(&bind.CallOpts{Context: b.GetContext()}, input.RemoteChainSelector)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to check if remote chain selector %d is supported by token pool at address %q on chain %d: %w", input.RemoteChainSelector, tokenPoolAddr.Hex(), chain.Selector, err)
+			}
+			if !isSupported {
+				return sequences.OnChainOutput{}, fmt.Errorf("remote chain selector %d is not supported by token pool at address %q on chain %d", input.RemoteChainSelector, tokenPoolAddr.Hex(), chain.Selector)
+			}
+
+			// We need to look up the timelock address, pool owner, and rate limit admin in order to determine if we have the right
+			// permissions to proceed with setting the rate limits.
+			timelockFltr := datastore.AddressRef{Type: datastore.ContractType(cciputils.RBACTimelock), ChainSelector: chain.Selector, Qualifier: cciputils.CLLQualifier}
+			timelockAddr, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, timelockFltr, chain.Selector, datastore_utils_evm.ToEVMAddress)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to find timelock address for chain %d: %w", chain.Selector, err)
 			}
 			poolOwner, err := tokenPool.Owner(&bind.CallOpts{Context: b.GetContext()})
 			if err != nil {
@@ -258,15 +271,10 @@ func (a *EVMAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokensapi.TPRLR
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get rate limit admin of token pool at address %q on chain %d: %w", tokenPoolAddr.Hex(), chain.Selector, err)
 			}
 
-			// The pool could be owned by timelock, so we need to lookup its address via the datastore
-			timelockFltr := datastore.AddressRef{Type: datastore.ContractType(cciputils.RBACTimelock), ChainSelector: chain.Selector, Qualifier: cciputils.CLLQualifier}
-			timelockAddr, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, timelockFltr, chain.Selector, datastore_utils_evm.ToEVMAddress)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to find timelock address for chain %d: %w", chain.Selector, err)
-			}
-
-			// We should only proceed with the rate limit update if there's a chance that the transaction will succeed. If we know
-			// for certain that the transaction will fail due to insufficient permissions, then this operation becomes a no-op.
+			// NOTE: there are certain situations where we don't have access to change the rate limits (e.g. the customer is the
+			// pool owner and rate limit admin). In these cases, we should NOT attempt to set the rate limit or generate an MCMS
+			// batch since we know for certain that the transaction will fail. Instead, we log a warning and skip the rate limit
+			// configuration for that chain (which effectively turns this into a no-op).
 			isRateLimitAdmin := rlAdmin == timelockAddr || rlAdmin == chain.DeployerKey.From
 			isPoolOwner := poolOwner == timelockAddr || poolOwner == chain.DeployerKey.From
 			if !isRateLimitAdmin && !isPoolOwner {
