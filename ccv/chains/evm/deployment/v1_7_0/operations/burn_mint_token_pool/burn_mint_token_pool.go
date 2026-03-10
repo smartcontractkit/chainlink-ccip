@@ -3,9 +3,9 @@ package burn_mint_token_pool
 import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/burn_from_mint_token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/burn_mint_token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/burn_with_from_mint_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/v1_7_0/burn_from_mint_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/v1_7_0/burn_mint_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/v1_7_0/burn_with_from_mint_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"

@@ -15,9 +15,9 @@ func main() {
 
 	var outDirSuffix string
 	if len(os.Args) >= 5 {
-		outDirSuffix = os.Args[4] + "/latest"
+		outDirSuffix = os.Args[4] + "/v1_7_0"
 	} else {
-		outDirSuffix = "../../../../ccv/chains/evm/gobindings/generated/latest"
+		outDirSuffix = "../../../../ccv/chains/evm/gobindings/generated/v1_7_0"
 	}
 
 	if os.Getenv("ZKSYNC") == "true" {

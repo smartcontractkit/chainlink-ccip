@@ -3,8 +3,8 @@ package lock_release_token_pool
 import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/lock_release_token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/siloed_lock_release_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/v1_7_0/lock_release_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/v1_7_0/siloed_lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"

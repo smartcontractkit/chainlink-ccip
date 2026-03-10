@@ -35,7 +35,7 @@ contracts:
 
   - contract_name: AdvancedPoolHooks
     version: "2.0.0"
-    version_path: "latest"
+    version_path: "v1_7_0"
     functions:
       - name: applyCCVConfigUpdates
         access: owner
@@ -68,7 +68,7 @@ contracts:
 
   - contract_name: OnRamp
     version: "2.0.0"
-    version_path: "latest"
+    version_path: "v1_7_0"
     package_name: onramp
     functions:
       - name: applyDestChainConfigUpdates
@@ -86,7 +86,7 @@ contracts:
 
   - contract_name: OffRamp
     version: "2.0.0"
-    version_path: "latest"
+    version_path: "v1_7_0"
     package_name: offramp
     functions:
       - name: applySourceChainConfigUpdates
