@@ -131,7 +131,7 @@ var ConnectChains = operations.NewOperation(
 		feeQuoterConfigPDA, _, _ := state.FindFqConfigPDA(input.FeeQuoter)
 		fqRemoteChainPDA, _, _ := state.FindFqDestChainPDA(input.RemoteChainSelector, input.FeeQuoter)
 		var destChainStateAccount fee_quoter.DestChain
-		err := chain.GetAccountDataBorshInto(context.Background(), fqRemoteChainPDA, &destChainStateAccount)
+		err := chain.GetAccountDataBorshInto(b.GetContext(), fqRemoteChainPDA, &destChainStateAccount)
 		if err == nil {
 			b.Logger.Infof("Remote chain state account found: %+v", destChainStateAccount)
 			isUpdate = true
@@ -180,6 +180,52 @@ var ConnectChains = operations.NewOperation(
 		err = chain.Confirm([]solana.Instruction{ixn})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm add dest chain instruction: %w", err)
+		}
+		return sequences.OnChainOutput{}, nil
+	},
+)
+
+type DisableDestChainParams struct {
+	FeeQuoter           solana.PublicKey
+	RemoteChainSelector uint64
+}
+
+var DisableDestChain = operations.NewOperation(
+	"fee-quoter:disable-dest-chain",
+	Version,
+	"Disables a destination chain on the FeeQuoter, preventing sending to that chain",
+	func(b operations.Bundle, chain cldf_solana.Chain, input DisableDestChainParams) (sequences.OnChainOutput, error) {
+		fee_quoter.SetProgramID(input.FeeQuoter)
+		authority := GetAuthority(chain, input.FeeQuoter)
+		feeQuoterConfigPDA, _, _ := state.FindFqConfigPDA(input.FeeQuoter)
+		fqDestChainPDA, _, _ := state.FindFqDestChainPDA(input.RemoteChainSelector, input.FeeQuoter)
+
+		instruction, err := fee_quoter.NewDisableDestChainInstruction(
+			input.RemoteChainSelector,
+			feeQuoterConfigPDA,
+			fqDestChainPDA,
+			authority,
+		).ValidateAndBuild()
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to build disable dest chain instruction: %w", err)
+		}
+
+		if authority != chain.DeployerKey.PublicKey() {
+			batches, err := utils.BuildMCMSBatchOperation(
+				chain.Selector,
+				[]solana.Instruction{instruction},
+				input.FeeQuoter.String(),
+				ContractType.String(),
+			)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to create MCMS batch for disable dest chain: %w", err)
+			}
+			return sequences.OnChainOutput{BatchOps: []types.BatchOperation{batches}}, nil
+		}
+
+		err = chain.Confirm([]solana.Instruction{instruction})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm disable dest chain: %w", err)
 		}
 		return sequences.OnChainOutput{}, nil
 	},

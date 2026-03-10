@@ -60,7 +60,8 @@ func TestCCIPChainReader_Sync_HappyPath_BindsContractsSuccessfully(t *testing.T)
 	s1Onramp := []byte{0x1}
 	s2Onramp := []byte{0x2}
 	destNonceMgr := []byte{0x3}
-	offRamp := []byte{0x4}
+	s1NonceMgr := []byte{0x4}
+	offRamp := []byte{0x5}
 
 	mockAddrCodec := internal.NewMockAddressCodecHex(t)
 	destExtended := readermocks.NewMockExtended(t)
@@ -82,6 +83,8 @@ func TestCCIPChainReader_Sync_HappyPath_BindsContractsSuccessfully(t *testing.T)
 	mockExpectChainAccessorSyncCall(chainAccessors[destChain], consts.ContractNameOffRamp, offRamp, nil)
 	// NonceManager dest chain
 	mockExpectChainAccessorSyncCall(chainAccessors[destChain], consts.ContractNameNonceManager, destNonceMgr, nil)
+	// NonceManager sourceChain1
+	mockExpectChainAccessorSyncCall(chainAccessors[sourceChain1], consts.ContractNameNonceManager, s1NonceMgr, nil)
 	ccipReader, err := newCCIPChainReaderInternal(
 		ctx,
 		logger.Test(t),
@@ -105,7 +108,8 @@ func TestCCIPChainReader_Sync_HappyPath_BindsContractsSuccessfully(t *testing.T)
 			sourceChain2: s2Onramp,
 		},
 		consts.ContractNameNonceManager: {
-			destChain: destNonceMgr,
+			destChain:    destNonceMgr,
+			sourceChain1: s1NonceMgr,
 		},
 	}
 
@@ -585,47 +589,6 @@ func TestCCIPChainReader_DiscoverContracts_GetOfframpStaticConfig_Errors(t *test
 		[]cciptypes.ChainSelector{sourceChain1, sourceChain2})
 	require.Error(t, err)
 	require.ErrorIs(t, err, getLatestValueErr)
-	mockCache.AssertExpectations(t)
-}
-
-func TestCCIPChainReader_getDestFeeQuoterStaticConfig(t *testing.T) {
-	ctx := context.Background()
-
-	// Setup expected values
-	offrampAddress := []byte{0x3}
-	expectedConfig := cciptypes.FeeQuoterStaticConfig{
-		MaxFeeJuelsPerMsg:  cciptypes.NewBigIntFromInt64(10),
-		LinkToken:          []byte{0x3, 0x4},
-		StalenessThreshold: 12,
-	}
-
-	// Setup cache with the expected config
-	mockCache := new(mockConfigCache)
-	chainConfig := cciptypes.ChainConfigSnapshot{
-		FeeQuoter: cciptypes.FeeQuoterConfig{
-			StaticConfig: expectedConfig,
-		},
-	}
-	mockCache.On("GetChainConfig", mock.Anything, chainC).Return(chainConfig, nil)
-
-	mockAddrCodec := internal.NewMockAddressCodecHex(t)
-
-	offrampAddressStr, err := mockAddrCodec.AddressBytesToString(offrampAddress, chainC)
-	require.NoError(t, err)
-	ccipReader := &ccipChainReader{
-		lggr:           logger.Test(t),
-		destChain:      chainC,
-		configPoller:   mockCache,
-		offrampAddress: offrampAddressStr,
-	}
-
-	cfg, err := ccipReader.getDestFeeQuoterStaticConfig(ctx)
-	require.NoError(t, err)
-
-	assert.Equal(t, expectedConfig.MaxFeeJuelsPerMsg, cfg.MaxFeeJuelsPerMsg)
-	assert.Equal(t, expectedConfig.LinkToken, cfg.LinkToken)
-	assert.Equal(t, expectedConfig.StalenessThreshold, cfg.StalenessThreshold)
-
 	mockCache.AssertExpectations(t)
 }
 

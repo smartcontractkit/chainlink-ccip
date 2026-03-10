@@ -57,6 +57,16 @@ func (c *LockReleaseTokenPoolContract) Owner(opts *bind.CallOpts) (common.Addres
 	return *abi.ConvertType(out[0], new(common.Address)).(*common.Address), nil
 }
 
+func (c *LockReleaseTokenPoolContract) GetRebalancer(opts *bind.CallOpts) (common.Address, error) {
+	var out []any
+	err := c.contract.Call(opts, &out, "getRebalancer")
+	if err != nil {
+		var zero common.Address
+		return zero, err
+	}
+	return *abi.ConvertType(out[0], new(common.Address)).(*common.Address), nil
+}
+
 type ConstructorArgs struct {
 	Token              common.Address
 	LocalTokenDecimals uint8
@@ -79,4 +89,15 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 		},
 	},
 	Validate: func(ConstructorArgs) error { return nil },
+})
+
+var GetRebalancer = contract.NewRead(contract.ReadParams[struct{}, common.Address, *LockReleaseTokenPoolContract]{
+	Name:         "lock-release-token-pool:get-rebalancer",
+	Version:      Version,
+	Description:  "Calls getRebalancer on the contract",
+	ContractType: ContractType,
+	NewContract:  NewLockReleaseTokenPoolContract,
+	CallContract: func(c *LockReleaseTokenPoolContract, opts *bind.CallOpts, args struct{}) (common.Address, error) {
+		return c.GetRebalancer(opts)
+	},
 })
