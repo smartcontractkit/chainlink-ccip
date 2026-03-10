@@ -27,16 +27,16 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
 
     // Generate a valid rawPayload that matches the message token transfer data.
     bytes memory rawPayload = _generateValidRawPayload(
-      message.tokenTransfer[0].destTokenAddress, message.tokenTransfer[0].tokenReceiver, message.tokenTransfer[0].amount
+      message.tokenTransfer[0].destTokenAddress,
+      message.sender,
+      message.tokenTransfer[0].tokenReceiver,
+      message.tokenTransfer[0].amount
     );
 
     // Proofs are not used. Using raw bytes format.
     bytes memory ccvData = _encodeCcvData(rawPayload, "");
 
-    vm.startPrank(s_onRamp);
-
-    // This sets the messageId in the mock mailbox to `messageId`.
-    s_lombardVerifier.forwardToVerifier(message, messageId, address(0), 0, "");
+    s_mockMailbox.setMessageId(abi.encodePacked(VERSION_TAG_V2_0_0, messageId));
 
     vm.startPrank(s_offRamp);
 
@@ -49,13 +49,13 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
 
     bytes32 wrongMessageId = keccak256("messageId");
     bytes memory rawPayload = _generateValidRawPayload(
-      message.tokenTransfer[0].destTokenAddress, message.tokenTransfer[0].tokenReceiver, message.tokenTransfer[0].amount
+      message.tokenTransfer[0].destTokenAddress,
+      message.sender,
+      message.tokenTransfer[0].tokenReceiver,
+      message.tokenTransfer[0].amount
     );
 
-    vm.startPrank(s_onRamp);
-
-    // This sets the messageId in the mock mailbox to `wrongMessageId`.
-    s_lombardVerifier.forwardToVerifier(message, wrongMessageId, address(0), 0, "");
+    s_mockMailbox.setMessageId(abi.encodePacked(VERSION_TAG_V2_0_0, wrongMessageId));
 
     vm.startPrank(s_offRamp);
 
@@ -69,7 +69,10 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
       _createForwardMessage(address(s_testToken), address(12));
 
     bytes memory rawPayload = _generateValidRawPayload(
-      message.tokenTransfer[0].destTokenAddress, message.tokenTransfer[0].tokenReceiver, message.tokenTransfer[0].amount
+      message.tokenTransfer[0].destTokenAddress,
+      message.sender,
+      message.tokenTransfer[0].tokenReceiver,
+      message.tokenTransfer[0].amount
     );
 
     bytes memory shortMessageId = new bytes(20);
@@ -105,7 +108,10 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
       _createForwardMessage(address(s_testToken), address(12));
 
     bytes memory rawPayload = _generateValidRawPayload(
-      message.tokenTransfer[0].destTokenAddress, message.tokenTransfer[0].tokenReceiver, message.tokenTransfer[0].amount
+      message.tokenTransfer[0].destTokenAddress,
+      message.sender,
+      message.tokenTransfer[0].tokenReceiver,
+      message.tokenTransfer[0].amount
     );
 
     // Make the mailbox fail.
@@ -159,7 +165,10 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
       _createForwardMessage(address(s_testToken), address(12));
 
     bytes memory rawPayload = _generateValidRawPayload(
-      message.tokenTransfer[0].destTokenAddress, message.tokenTransfer[0].tokenReceiver, message.tokenTransfer[0].amount
+      message.tokenTransfer[0].destTokenAddress,
+      message.sender,
+      message.tokenTransfer[0].tokenReceiver,
+      message.tokenTransfer[0].amount
     );
 
     vm.startPrank(s_offRamp);
@@ -184,13 +193,13 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
 
     // Generate a rawPayload with a different (invalid) token address.
     bytes memory invalidToken = abi.encodePacked(makeAddr("wrongToken"));
-    bytes memory rawPayload =
-      _generateValidRawPayload(invalidToken, message.tokenTransfer[0].tokenReceiver, message.tokenTransfer[0].amount);
+    bytes memory rawPayload = _generateValidRawPayload(
+      invalidToken, message.sender, message.tokenTransfer[0].tokenReceiver, message.tokenTransfer[0].amount
+    );
 
     bytes memory ccvData = _encodeCcvData(rawPayload, "");
 
-    vm.startPrank(s_onRamp);
-    s_lombardVerifier.forwardToVerifier(message, messageId, address(0), 0, "");
+    s_mockMailbox.setMessageId(abi.encodePacked(VERSION_TAG_V2_0_0, messageId));
 
     vm.startPrank(s_offRamp);
 
@@ -211,13 +220,12 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
     // Generate a rawPayload with a different (invalid) receiver address.
     bytes memory invalidReceiver = abi.encodePacked(address(999));
     bytes memory rawPayload = _generateValidRawPayload(
-      message.tokenTransfer[0].destTokenAddress, invalidReceiver, message.tokenTransfer[0].amount
+      message.tokenTransfer[0].destTokenAddress, message.sender, invalidReceiver, message.tokenTransfer[0].amount
     );
 
     bytes memory ccvData = _encodeCcvData(rawPayload, "");
 
-    vm.startPrank(s_onRamp);
-    s_lombardVerifier.forwardToVerifier(message, messageId, address(0), 0, "");
+    s_mockMailbox.setMessageId(abi.encodePacked(VERSION_TAG_V2_0_0, messageId));
 
     vm.startPrank(s_offRamp);
 
@@ -234,18 +242,46 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
     // Generate a rawPayload with a different (invalid) amount.
     uint256 invalidAmount = message.tokenTransfer[0].amount + 100;
     bytes memory rawPayload = _generateValidRawPayload(
-      message.tokenTransfer[0].destTokenAddress, message.tokenTransfer[0].tokenReceiver, invalidAmount
+      message.tokenTransfer[0].destTokenAddress, message.sender, message.tokenTransfer[0].tokenReceiver, invalidAmount
     );
 
     bytes memory ccvData = _encodeCcvData(rawPayload, "");
 
-    vm.startPrank(s_onRamp);
-    s_lombardVerifier.forwardToVerifier(message, messageId, address(0), 0, "");
+    s_mockMailbox.setMessageId(abi.encodePacked(VERSION_TAG_V2_0_0, messageId));
 
     vm.startPrank(s_offRamp);
 
     vm.expectRevert(
       abi.encodeWithSelector(LombardVerifier.InvalidAmount.selector, message.tokenTransfer[0].amount, invalidAmount)
+    );
+    s_lombardVerifier.verifyMessage(message, messageId, ccvData);
+  }
+
+  function test_verifyMessage_RevertWhen_InvalidSender() public {
+    (MessageV1Codec.MessageV1 memory message, bytes32 messageId) =
+      _createForwardMessage(address(s_testToken), address(12));
+
+    // Generate a rawPayload with a different (invalid) sender address.
+    bytes memory invalidSender = abi.encode(makeAddr("wrongSender"));
+    bytes memory rawPayload = _generateValidRawPayload(
+      message.tokenTransfer[0].destTokenAddress,
+      invalidSender,
+      message.tokenTransfer[0].tokenReceiver,
+      message.tokenTransfer[0].amount
+    );
+
+    bytes memory ccvData = _encodeCcvData(rawPayload, "");
+
+    s_mockMailbox.setMessageId(abi.encodePacked(VERSION_TAG_V2_0_0, messageId));
+
+    vm.startPrank(s_offRamp);
+
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        LombardVerifier.InvalidSender.selector,
+        Internal._leftPadBytesToBytes32(message.sender),
+        Internal._leftPadBytesToBytes32(invalidSender)
+      )
     );
     s_lombardVerifier.verifyMessage(message, messageId, ccvData);
   }
