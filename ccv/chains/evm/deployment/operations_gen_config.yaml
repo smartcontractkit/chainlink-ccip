@@ -98,6 +98,15 @@ contracts:
       - name: getAllSourceChainConfigs
         access: public
 
+  - contract_name: MockReceiverV2
+    version: "2.0.0"
+    version_path: "latest"
+    functions:
+      - name: getCCVsAndMinBlockDepth
+        access: public
+      - name: setMinBlockDepth
+        access: owner
+
   # Token Pool contracts (latest / v2.0.0)
 
   - contract_name: TokenPool

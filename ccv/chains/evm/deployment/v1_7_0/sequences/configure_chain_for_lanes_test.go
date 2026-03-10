@@ -93,12 +93,16 @@ func TestConfigureChainForLanes(t *testing.T) {
 					committeeVerifierResolver = addr.Address
 				}
 			}
+			// Use a fresh reporter so ConfigureChainForLanes does not see cached reports from DeployChainContracts
+			// (e.g. GetTarget(proxy) would otherwise return stale 0x01 and we'd call GetDestChains(0x01)).
+			bundle := testsetup.BundleWithFreshReporter(e.OperationsBundle)
+
 			ccipMessageSource := common.HexToAddress("0x10").Bytes()
 			ccipMessageDest := common.HexToAddress("0x11").Bytes()
 			remoteChainSelector := uint64(4356164186791070119)
 
 			_, err = operations.ExecuteSequence(
-				e.OperationsBundle,
+				bundle,
 				sequences.ConfigureChainForLanes,
 				e.BlockChains,
 				adapters.ConfigureChainForLanesInput{
