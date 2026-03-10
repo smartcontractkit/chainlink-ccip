@@ -113,7 +113,8 @@ contract TokenPoolFactory is ITypeAndVersion {
   /// @notice Deploys a token and token pool with the given token information and configures it with remote token pools.
   /// @dev The token and token pool are deployed in the same transaction, and the token pool is configured with the
   /// remote token pools. The token pool is then set in the token admin registry. Ownership of the everything is transferred
-  /// to the msg.sender, but must be accepted in a separate transaction due to 2-step ownership transfer.
+  /// to the futureOwner (or msg.sender if no futureOwner is given), but must be accepted in a separate transaction due
+  /// to 2-step ownership transfer.
   /// @param remoteTokenPools An array of remote token pools info to be used in the pool's applyChainUpdates function
   /// or to be predicted if the pool has not been deployed yet on the remote chain.
   /// @param localTokenDecimals The amount of decimals to be used in the new token. Since decimals() is not part of the
@@ -132,8 +133,12 @@ contract TokenPoolFactory is ITypeAndVersion {
     bytes memory tokenInitCode,
     bytes calldata tokenPoolInitCode,
     address lockBox,
-    bytes32 salt
+    bytes32 salt,
+    address futureOwner
   ) external returns (address, address) {
+    if (futureOwner == address(0)) {
+      futureOwner = msg.sender;
+    }
     // Ensure a unique deployment between senders even if the same input parameter is used to prevent
     // DOS/front running attacks.
     salt = keccak256(abi.encodePacked(salt, msg.sender));
@@ -146,7 +151,7 @@ contract TokenPoolFactory is ITypeAndVersion {
     });
 
     // Deploy the token pool.
-    address pool = _createTokenPool(remoteTokenPools, tokenPoolInitCode, localConfig);
+    address pool = _createTokenPool(remoteTokenPools, tokenPoolInitCode, localConfig, futureOwner);
 
     CrossChainToken crossChainToken = CrossChainToken(token);
 
@@ -156,7 +161,7 @@ contract TokenPoolFactory is ITypeAndVersion {
     }
 
     // Set the token pool for token in the token admin registry since this contract is the ccipAdmin.
-    _setTokenPoolInTokenAdminRegistry(token, pool);
+    _setTokenPoolInTokenAdminRegistry(token, pool, futureOwner);
 
     return (token, pool);
   }
@@ -182,8 +187,12 @@ contract TokenPoolFactory is ITypeAndVersion {
     RemoteTokenPoolInfo[] calldata remoteTokenPools,
     bytes calldata tokenPoolInitCode,
     address lockBox,
-    bytes32 salt
+    bytes32 salt,
+    address futureOwner
   ) external returns (address poolAddress) {
+    if (futureOwner == address(0)) {
+      futureOwner = msg.sender;
+    }
     // Ensure a unique deployment between senders even if the same input parameter is used to prevent
     // DOS/front running attacks.
     salt = keccak256(abi.encodePacked(salt, msg.sender));
@@ -193,7 +202,7 @@ contract TokenPoolFactory is ITypeAndVersion {
     });
 
     // create the token pool and return the address.
-    return _createTokenPool(remoteTokenPools, tokenPoolInitCode, localConfig);
+    return _createTokenPool(remoteTokenPools, tokenPoolInitCode, localConfig, futureOwner);
   }
 
   // ================================================================
@@ -208,7 +217,8 @@ contract TokenPoolFactory is ITypeAndVersion {
   function _createTokenPool(
     RemoteTokenPoolInfo[] calldata remoteTokenPools,
     bytes calldata tokenPoolInitCode,
-    LocalPoolConfig memory localConfig
+    LocalPoolConfig memory localConfig,
+    address futureOwner
   ) private returns (address) {
     // Create an array of chain updates to apply to the token pool.
     TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](remoteTokenPools.length);
@@ -247,14 +257,14 @@ contract TokenPoolFactory is ITypeAndVersion {
     // Apply the chain updates to the token pool.
     TokenPool(poolAddress).applyChainUpdates(new uint64[](0), chainUpdates);
 
-    // Authorize the new pool to interact with the local lockbox and transfer ownership to the caller for future admin.
+    // Authorize the new pool to interact with the local lockbox and transfer ownership to the futureOwner.
     if (deployedLockBox) {
       _authorizePoolInLockBox(localLockBox, poolAddress);
-      ERC20LockBox(localLockBox).transferOwnership(msg.sender);
+      ERC20LockBox(localLockBox).transferOwnership(futureOwner);
     }
 
-    // Begin the 2 step ownership transfer of the token pool to the msg.sender.
-    IOwnable(poolAddress).transferOwnership(msg.sender);
+    // Begin the 2 step ownership transfer of the token pool to the futureOwner.
+    IOwnable(poolAddress).transferOwnership(futureOwner);
 
     return poolAddress;
   }
@@ -403,13 +413,14 @@ contract TokenPoolFactory is ITypeAndVersion {
   /// @param pool The address of the pool to set in the token admin registry.
   function _setTokenPoolInTokenAdminRegistry(
     address token,
-    address pool
+    address pool,
+    address futureOwner
   ) private {
     i_registryModuleOwnerCustom.registerAdminViaGetCCIPAdmin(token);
     i_tokenAdminRegistry.acceptAdminRole(token);
     i_tokenAdminRegistry.setPool(token, pool);
 
     // Begin the 2 admin transfer process which must be accepted in a separate tx.
-    i_tokenAdminRegistry.transferAdminRole(token, msg.sender);
+    i_tokenAdminRegistry.transferAdminRole(token, futureOwner);
   }
 }

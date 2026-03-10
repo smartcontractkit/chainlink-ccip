@@ -64,7 +64,8 @@ contract e2e_factoryDeployedPool is e2e {
       tokenInitCode,
       POOL_INIT_CODE,
       address(0),
-      SALT
+      SALT,
+      address(0)
     );
 
     // Claim ownership: accept admin role and pool ownership
@@ -100,7 +101,8 @@ contract e2e_factoryDeployedPool is e2e {
       new TokenPoolFactory.RemoteTokenPoolInfo[](0),
       POOL_INIT_CODE,
       address(0),
-      SALT
+      SALT,
+      address(0)
     );
     Ownable2Step(s_destPool).acceptOwnership();
 
