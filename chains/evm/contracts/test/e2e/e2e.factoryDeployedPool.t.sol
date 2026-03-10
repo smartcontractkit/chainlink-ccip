@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {CCIPReceiver} from "../../applications/CCIPReceiver.sol";
 import {Client} from "../../libraries/Client.sol";
 import {ExtraArgsCodec} from "../../libraries/ExtraArgsCodec.sol";
 import {Internal} from "../../libraries/Internal.sol";
@@ -209,6 +210,89 @@ contract e2e_factoryDeployedPool is e2e {
     assertEq(TOKEN_TRANSFER_AMOUNT, IERC20(s_destToken).totalSupply());
   }
 
+  /// @notice End-to-end test: a CCIP data message triggers a factory deployment on the destination chain.
+  /// A FactoryDeployerReceiver contract on the dest chain receives the message, calls the factory
+  /// with the decoded sender as futureOwner, and the cross-chain user then accepts ownership.
+  function test_e2e_remoteFactoryDeploymentViaCCIP() public {
+    // Deploy a receiver on the dest chain that will trigger factory deployment
+    TokenPoolFactory destFactory =
+      new TokenPoolFactory(s_tokenAdminRegistry, s_registryModule, address(s_mockRMNRemote), address(s_destRouter));
+    FactoryDeployerReceiver receiver = new FactoryDeployerReceiver(address(s_destRouter), destFactory);
+
+    IERC20(s_sourceFeeToken).approve(address(s_sourceRouter), type(uint256).max);
+
+    // Encode the deployment parameters as the message payload
+    bytes memory tokenInitCode = abi.encodePacked(
+      type(CrossChainToken).creationCode,
+      abi.encode(
+        BaseERC20.ConstructorParams({
+          name: "RemoteToken", symbol: "RMT", decimals: 18, maxSupply: 0, preMint: 0, ccipAdmin: address(destFactory)
+        }),
+        address(destFactory),
+        OWNER
+      )
+    );
+
+    bytes memory deployPayload = abi.encode(tokenInitCode, POOL_INIT_CODE, keccak256("remote_e2e_salt"));
+
+    Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
+      receiver: abi.encode(address(receiver)),
+      data: deployPayload,
+      tokenAmounts: new Client.EVMTokenAmount[](0),
+      feeToken: s_sourceFeeToken,
+      extraArgs: ExtraArgsCodec._getBasicEncodedExtraArgsV3(200_000, 0)
+    });
+
+    vm.recordLogs();
+    bytes32 messageId = s_sourceRouter.ccipSend(DEST_CHAIN_SELECTOR, message);
+
+    bytes memory encodedMessage = _getEncodedMessageFromLogs(vm.getRecordedLogs());
+
+    address[] memory ccvAddresses = new address[](1);
+    ccvAddresses[0] = s_destVerifier;
+
+    // Execute on dest with high gas override to allow factory deployment
+    vm.expectEmit();
+    emit OffRamp.ExecutionStateChanged({
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
+      messageNumber: s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).messageNumber,
+      messageId: messageId,
+      state: Internal.MessageExecutionState.SUCCESS,
+      returnData: ""
+    });
+
+    s_offRamp.execute(encodedMessage, ccvAddresses, new bytes[](1), 15_000_000);
+
+    // Retrieve deployed addresses from the receiver
+    (address deployedToken, address deployedPool) = receiver.lastDeployment();
+    assertTrue(deployedToken != address(0), "Token should have been deployed");
+    assertTrue(deployedPool != address(0), "Pool should have been deployed");
+
+    // OWNER (the cross-chain sender) accepts ownership on the destination chain
+    s_tokenAdminRegistry.acceptAdminRole(deployedToken);
+    Ownable2Step(deployedPool).acceptOwnership();
+
+    // Verify: receiver contract has no permissions
+    CrossChainToken token = CrossChainToken(deployedToken);
+    assertFalse(token.hasRole(token.DEFAULT_ADMIN_ROLE(), address(receiver)));
+    assertNotEq(BurnMintTokenPool(deployedPool).owner(), address(receiver));
+
+    // Verify: factory has no permissions
+    assertFalse(token.hasRole(token.DEFAULT_ADMIN_ROLE(), address(destFactory)));
+    assertFalse(token.hasRole(token.BURN_MINT_ADMIN_ROLE(), address(destFactory)));
+    assertNotEq(BurnMintTokenPool(deployedPool).owner(), address(destFactory));
+
+    // Verify: OWNER (cross-chain sender) has full control
+    assertTrue(token.hasRole(token.DEFAULT_ADMIN_ROLE(), OWNER));
+    assertEq(token.owner(), OWNER);
+    assertEq(BurnMintTokenPool(deployedPool).owner(), OWNER);
+    assertEq(s_tokenAdminRegistry.getTokenConfig(deployedToken).administrator, OWNER);
+
+    // Verify: pool has mint and burn roles
+    assertTrue(token.hasRole(token.MINTER_ROLE(), deployedPool));
+    assertTrue(token.hasRole(token.BURNER_ROLE(), deployedPool));
+  }
+
   function _getEncodedMessageFromLogs(
     VmSafe.Log[] memory logs
   ) private pure returns (bytes memory encodedMessage) {
@@ -219,5 +303,44 @@ contract e2e_factoryDeployedPool is e2e {
       }
     }
     return encodedMessage;
+  }
+}
+
+/// @notice A CCIP receiver that deploys a token + pool via the factory when it receives a message.
+/// The cross-chain sender becomes the futureOwner of all deployed contracts.
+contract FactoryDeployerReceiver is CCIPReceiver {
+  TokenPoolFactory private immutable i_factory;
+
+  address public deployedToken;
+  address public deployedPool;
+
+  constructor(
+    address router,
+    TokenPoolFactory factory
+  ) CCIPReceiver(router) {
+    i_factory = factory;
+  }
+
+  function _ccipReceive(
+    Client.Any2EVMMessage memory message
+  ) internal override {
+    address sender = abi.decode(message.sender, (address));
+    (bytes memory tokenInitCode, bytes memory poolInitCode, bytes32 salt) =
+      abi.decode(message.data, (bytes, bytes, bytes32));
+
+    (deployedToken, deployedPool) = i_factory.deployTokenAndTokenPool(
+      new TokenPoolFactory.RemoteTokenPoolInfo[](0),
+      18,
+      TokenPoolFactory.PoolType.BURN_MINT,
+      tokenInitCode,
+      poolInitCode,
+      address(0),
+      salt,
+      sender
+    );
+  }
+
+  function lastDeployment() external view returns (address token, address pool) {
+    return (deployedToken, deployedPool);
   }
 }
