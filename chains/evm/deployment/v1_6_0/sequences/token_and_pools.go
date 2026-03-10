@@ -24,6 +24,7 @@ import (
 	// between these two versions.
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/token_pool"
 
+	datastore_utils_evm "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
@@ -227,40 +228,32 @@ func (a *EVMAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokensapi.TPRLR
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
 
-			timelockRefFilter := datastore.AddressRef{
-				Type:          datastore.ContractType(cciputils.RBACTimelock),
-				ChainSelector: chain.Selector,
-				Qualifier:     cciputils.CLLQualifier,
+			// NOTE: token pool address resolution works as follows:
+			//  --
+			//  1. first, use the provided ref to lookup the pool in the datastore (if a match is returned, then proceed)
+			//  2. if step #1 fails (i.e. pool was not deployed by us), then check if the address is explicitly provided in the ref (if it is, then use it)
+			//  3. if step #2 fails (i.e. the ref contains no address), then give up (we have no way to derive the token pool address, which is necessary to set the rate limits)
+			//
+			tokenPoolAddr, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, input.TokenPoolRef, input.ChainSelector, datastore_utils_evm.ToEVMAddress)
+			if err != nil {
+				b.Logger.Warnf("Datasore lookup for token pool ref (%+v) failed - checking if ref contains explicit address: %v", input.TokenPoolRef, err)
+				if input.TokenPoolRef.Address != "" {
+					return sequences.OnChainOutput{}, fmt.Errorf("token pool address could not be resolved using TokenPoolRef (%+v): %w", input.TokenPoolRef, err)
+				}
+				tokenPoolAddrBytes, err := a.AddressRefToBytes(input.TokenPoolRef)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to convert token pool address ref to bytes: %w", err)
+				}
+				tokenPoolAddr = common.BytesToAddress(tokenPoolAddrBytes)
+				if tokenPoolAddr == (common.Address{}) {
+					return sequences.OnChainOutput{}, fmt.Errorf("token pool address for ref (%+v) is zero address", input.TokenPoolRef)
+				}
 			}
 
-			timelockRef, err := datastore_utils.FindAndFormatRef(
-				input.ExistingDataStore,
-				timelockRefFilter,
-				chain.Selector,
-				datastore_utils.FullRef,
-			)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to find timelock address for chain %d: %w", input.ChainSelector, err)
-			}
-			timelockBytes, err := a.AddressRefToBytes(timelockRef)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to convert timelock address ref to bytes: %w", err)
-			}
-			timelockAddr := common.BytesToAddress(timelockBytes)
-			if timelockAddr == (common.Address{}) {
-				return sequences.OnChainOutput{}, fmt.Errorf("timelock address for ref (%+v) is zero address", timelockRef)
-			}
-
-			// TODO: add better address resolution later (we should be able to resolve the pool using qualifiers
-			// if needed). However, if the pool address is provided, we can skip the datastore lookup altogether
-			tokenPoolBytes, err := a.AddressRefToBytes(input.TokenPoolRef)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to convert token pool address ref to bytes: %w", err)
-			}
-			tokenPoolAddr := common.BytesToAddress(tokenPoolBytes)
-			if tokenPoolAddr == (common.Address{}) {
-				return sequences.OnChainOutput{}, fmt.Errorf("token pool address for ref (%+v) is zero address", input.TokenPoolRef)
-			}
+			// NOTE: there are certain situations where we don't have access to change the rate limits (e.g. the customer is the
+			// pool owner and rate limit admin). In these cases, we should NOT attempt to set the rate limit or generate an MCMS
+			// batch since the transaction will ultimately fail. Instead, we log a warning and skip rate limit configuration for
+			// that chain.
 			tokenPool, err := token_pool.NewTokenPool(tokenPoolAddr, chain.Client)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to instantiate token pool contract: %w", err)
@@ -269,16 +262,32 @@ func (a *EVMAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokensapi.TPRLR
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get owner of token pool at address %q on chain %d: %w", tokenPoolAddr.Hex(), input.ChainSelector, err)
 			}
+			rlAdmin, err := tokenPool.GetRateLimitAdmin(&bind.CallOpts{Context: b.GetContext()})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get rate limit admin of token pool at address %q on chain %d: %w", tokenPoolAddr.Hex(), input.ChainSelector, err)
+			}
 
-			// TODO: we should also check rate limit admin as well
-			if timelockAddr != poolOwner && chain.DeployerKey.From != poolOwner {
+			// The pool could be owned by timelock, so we need to lookup its address via the datastore
+			timelockFltr := datastore.AddressRef{Type: datastore.ContractType(cciputils.RBACTimelock), ChainSelector: chain.Selector, Qualifier: cciputils.CLLQualifier}
+			timelockAddr, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, timelockFltr, chain.Selector, datastore_utils_evm.ToEVMAddress)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to find timelock address for chain %d: %w", input.ChainSelector, err)
+			}
+
+			// We should only proceed with the rate limit update if there's a chance that the transaction will succeed. If we know
+			// for certain that the transaction will fail due to insufficient permissions, then this operation becomes a no-op.
+			isRateLimitAdmin := rlAdmin == timelockAddr || rlAdmin == chain.DeployerKey.From
+			isPoolOwner := poolOwner == timelockAddr || poolOwner == chain.DeployerKey.From
+			if !isRateLimitAdmin && !isPoolOwner {
 				b.Logger.Warnf(
-					"Timelock address %q is not the owner of the token pool at address %q on chain %d, and deployer address %q is also not the owner. Skipping rate limiter config for this token pool since neither the timelock nor the deployer has permissions to set the rate limiter config.",
-					timelockAddr.Hex(), tokenPoolAddr.Hex(), input.ChainSelector, chain.DeployerKey.From.Hex(),
+					"Timelock address %q and deployer address %q are not the owner or rate limit admin for token pool at address %q on chain selector %d. Skipping rate limiter config for this chain.",
+					timelockAddr.Hex(), chain.DeployerKey.From.Hex(), tokenPoolAddr.Hex(), input.ChainSelector,
 				)
 				return sequences.OnChainOutput{}, nil
 			}
 
+			// At this point, we know that the transaction has a chance to succeed, so we proceed with generating the batch operation
+			// to set the rate limits.
 			var output evm_contract.WriteOutput
 			switch input.TokenPoolRef.Version.String() {
 			case tpOpsV1_5_1.Version.String():
