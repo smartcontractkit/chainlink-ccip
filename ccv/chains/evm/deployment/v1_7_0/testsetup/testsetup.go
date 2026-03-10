@@ -36,8 +36,10 @@ func CreateBasicFeeQuoterDestChainConfig() lanes.FeeQuoterDestChainConfig {
 		DefaultTxGasLimit:           200_000,
 		NetworkFeeUSDCents:          10,
 		ChainFamilySelector:         binary.BigEndian.Uint32(familySelector),
-		LinkFeeMultiplierPercent:    90,
-		USDPerUnitGas:               big.NewInt(1e6),
+		V2Params: &lanes.FeeQuoterV2Params{
+			LinkFeeMultiplierPercent: 90,
+			USDPerUnitGas:            big.NewInt(1e6),
+		},
 	}
 }
 

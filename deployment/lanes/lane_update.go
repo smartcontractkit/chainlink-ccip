@@ -89,8 +89,6 @@ type FeeQuoterDestChainConfig struct {
 	OverrideExistingConfig bool
 	// Whether this destination chain is enabled.
 	IsEnabled bool
-	// 1.6 only
-	MaxNumberOfTokensPerMsg uint16
 	// Maximum data payload size in bytes.
 	MaxDataBytes uint32
 	// Maximum gas limit.
@@ -99,18 +97,6 @@ type FeeQuoterDestChainConfig struct {
 	DestGasOverhead uint32
 	// Default dest-chain gas charged for each byte of `data` payload.
 	DestGasPerPayloadByteBase uint8
-	// 1.6 only
-	DestGasPerPayloadByteHigh uint8
-	// 1.6 only
-	DestGasPerPayloadByteThreshold uint16
-	// 1.6 only
-	DestDataAvailabilityOverheadGas uint32
-	// 1.6 only
-	DestGasPerDataAvailabilityByte uint16
-	// 1.6 only
-	DestDataAvailabilityMultiplierBps uint16
-	// 1.6 only
-	EnforceOutOfOrder bool
 	// Selector that identifies the destination chain's family. Used to determine the correct validations to perform for the dest chain.
 	ChainFamilySelector uint32
 	// Default token fee charged per token transfer.
@@ -121,13 +107,30 @@ type FeeQuoterDestChainConfig struct {
 	DefaultTxGasLimit uint32
 	// Flat network fee to charge for messages, multiples of 0.01 USD.
 	NetworkFeeUSDCents uint16
-	// 1.6 only
-	GasMultiplierWeiPerEth uint64
-	// 1.6 only
-	GasPriceStalenessThreshold uint32
-	// 2.0 only. Percent multiplier for payments in LINK token.
+	// V1Params holds fields specific to CCIP v1.6 FeeQuoter contracts. Populate when configuring v1.6 lanes.
+	V1Params *FeeQuoterV1Params
+	// V2Params holds fields specific to CCIP v2.0 FeeQuoter contracts. Populate when configuring v2.0/CCV lanes.
+	V2Params *FeeQuoterV2Params
+}
+
+// FeeQuoterV1Params contains fields used only by CCIP v1.6 FeeQuoter contracts.
+type FeeQuoterV1Params struct {
+	MaxNumberOfTokensPerMsg           uint16
+	DestGasPerPayloadByteHigh         uint8
+	DestGasPerPayloadByteThreshold    uint16
+	DestDataAvailabilityOverheadGas   uint32
+	DestGasPerDataAvailabilityByte    uint16
+	DestDataAvailabilityMultiplierBps uint16
+	EnforceOutOfOrder                 bool
+	GasMultiplierWeiPerEth            uint64
+	GasPriceStalenessThreshold        uint32
+}
+
+// FeeQuoterV2Params contains fields used only by CCIP v2.0 (CCV) FeeQuoter contracts.
+type FeeQuoterV2Params struct {
+	// Percent multiplier for payments in LINK token.
 	LinkFeeMultiplierPercent uint8
-	// 2.0 only.USD per unit gas for the destination chain.
+	// USD per unit gas for the destination chain.
 	USDPerUnitGas *big.Int
 }
 
@@ -201,23 +204,25 @@ type UpdateLanesInput struct {
 func DefaultFeeQuoterDestChainConfig(configEnabled bool, selector uint64) FeeQuoterDestChainConfig {
 	chainHex := utils.GetSelectorHex(selector)
 	params := FeeQuoterDestChainConfig{
-		IsEnabled:                         configEnabled,
-		MaxNumberOfTokensPerMsg:           10,
-		MaxDataBytes:                      30_000,
-		MaxPerMsgGasLimit:                 3_000_000,
-		DestGasOverhead:                   300_000,
-		DefaultTokenFeeUSDCents:           25,
-		DestGasPerPayloadByteBase:         16,
-		DestGasPerPayloadByteHigh:         40,
-		DestGasPerPayloadByteThreshold:    3000,
-		DestDataAvailabilityOverheadGas:   100,
-		DestGasPerDataAvailabilityByte:    16,
-		DestDataAvailabilityMultiplierBps: 1,
-		DefaultTokenDestGasOverhead:       90_000,
-		DefaultTxGasLimit:                 200_000,
-		GasMultiplierWeiPerEth:            11e17,
-		NetworkFeeUSDCents:                10,
-		ChainFamilySelector:               binary.BigEndian.Uint32(chainHex[:]),
+		IsEnabled:               configEnabled,
+		MaxDataBytes:            30_000,
+		MaxPerMsgGasLimit:       3_000_000,
+		DestGasOverhead:         300_000,
+		DefaultTokenFeeUSDCents: 25,
+		DestGasPerPayloadByteBase:   16,
+		DefaultTokenDestGasOverhead: 90_000,
+		DefaultTxGasLimit:           200_000,
+		NetworkFeeUSDCents:          10,
+		ChainFamilySelector:         binary.BigEndian.Uint32(chainHex[:]),
+		V1Params: &FeeQuoterV1Params{
+			MaxNumberOfTokensPerMsg:           10,
+			DestGasPerPayloadByteHigh:         40,
+			DestGasPerPayloadByteThreshold:    3000,
+			DestDataAvailabilityOverheadGas:   100,
+			DestGasPerDataAvailabilityByte:    16,
+			DestDataAvailabilityMultiplierBps: 1,
+			GasMultiplierWeiPerEth:            11e17,
+		},
 	}
 	family, _ := chain_selectors.GetSelectorFamily(selector)
 	switch family {

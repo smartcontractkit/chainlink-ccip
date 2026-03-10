@@ -148,7 +148,7 @@ var ConfigureLaneLegAsSource = cldf_ops.NewSequence(
 
 		// UpdatePrices on FeeQuoter (gas prices only, as these are per dest chain)
 		gasPriceUpdates := make([]fee_quoter.GasPriceUpdate, 0, 1)
-		if destChain.FeeQuoterDestChainConfig.USDPerUnitGas != nil {
+		if destChain.FeeQuoterDestChainConfig.V2Params != nil && destChain.FeeQuoterDestChainConfig.V2Params.USDPerUnitGas != nil {
 			gasPriceReport, err := cldf_ops.ExecuteOperation(b, fee_quoter.GetDestinationChainGasPrice, chain, contract.FunctionInput[uint64]{
 				ChainSelector: chain.Selector,
 				Address:       common.HexToAddress(sourceFeeQuoter),
@@ -157,10 +157,10 @@ var ConfigureLaneLegAsSource = cldf_ops.NewSequence(
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get gas prices on FeeQuoter(%s) on chain %s: %w", sourceFeeQuoter, chain, err)
 			}
-			if destChain.FeeQuoterDestChainConfig.USDPerUnitGas.Cmp(gasPriceReport.Output.Value) != 0 {
+			if destChain.FeeQuoterDestChainConfig.V2Params.USDPerUnitGas.Cmp(gasPriceReport.Output.Value) != 0 {
 				gasPriceUpdates = append(gasPriceUpdates, fee_quoter.GasPriceUpdate{
 					DestChainSelector: remoteSelector,
-					UsdPerUnitGas:     destChain.FeeQuoterDestChainConfig.USDPerUnitGas,
+					UsdPerUnitGas:     destChain.FeeQuoterDestChainConfig.V2Params.USDPerUnitGas,
 				})
 			}
 		}
@@ -455,6 +455,10 @@ func maybeAddOnRampDestChainConfigArg(b cldf_ops.Bundle, chain evm.Chain, input 
 
 // feeQuoterDestChainConfigEqual reports whether the on-chain config matches the desired adapter config (binding struct has no USDPerUnitGas; that is updated via UpdatePrices).
 func feeQuoterDestChainConfigEqual(cur fqc.FeeQuoterDestChainConfig, desired lanes.FeeQuoterDestChainConfig) bool {
+	var linkFeeMultiplierPercent uint8
+	if desired.V2Params != nil {
+		linkFeeMultiplierPercent = desired.V2Params.LinkFeeMultiplierPercent
+	}
 	return cur.IsEnabled == desired.IsEnabled &&
 		cur.MaxDataBytes == desired.MaxDataBytes &&
 		cur.MaxPerMsgGasLimit == desired.MaxPerMsgGasLimit &&
@@ -465,7 +469,7 @@ func feeQuoterDestChainConfigEqual(cur fqc.FeeQuoterDestChainConfig, desired lan
 		cur.DefaultTokenDestGasOverhead == desired.DefaultTokenDestGasOverhead &&
 		cur.DefaultTxGasLimit == desired.DefaultTxGasLimit &&
 		cur.NetworkFeeUSDCents == desired.NetworkFeeUSDCents &&
-		cur.LinkFeeMultiplierPercent == desired.LinkFeeMultiplierPercent
+		cur.LinkFeeMultiplierPercent == linkFeeMultiplierPercent
 }
 
 // maybeAddFeeQuoterDestChainConfigArg fetches current FeeQuoter dest chain config and appends to feeQuoterArgs
@@ -510,8 +514,11 @@ func maybeAddFeeQuoterDestChainConfigArg(feeQContract *fqc.FeeQuoter, b cldf_ops
 	if desired.NetworkFeeUSDCents == 0 {
 		desired.NetworkFeeUSDCents = cur.NetworkFeeUSDCents
 	}
-	if desired.LinkFeeMultiplierPercent == 0 {
-		desired.LinkFeeMultiplierPercent = cur.LinkFeeMultiplierPercent
+	if desired.V2Params == nil {
+		desired.V2Params = &lanes.FeeQuoterV2Params{}
+	}
+	if desired.V2Params.LinkFeeMultiplierPercent == 0 {
+		desired.V2Params.LinkFeeMultiplierPercent = cur.LinkFeeMultiplierPercent
 	}
 	if feeQuoterDestChainConfigEqual(cur, desired) {
 		return feeQuoterArgs, nil
@@ -574,6 +581,10 @@ func filterExecutorDestChains(b cldf_ops.Bundle, chain evm.Chain, chainSelector 
 }
 
 func adapterDestChainConfigToFeeQuoter(cfg lanes.FeeQuoterDestChainConfig) fee_quoter.DestChainConfig {
+	var linkFeeMultiplierPercent uint8
+	if cfg.V2Params != nil {
+		linkFeeMultiplierPercent = cfg.V2Params.LinkFeeMultiplierPercent
+	}
 	return fee_quoter.DestChainConfig{
 		IsEnabled:                   cfg.IsEnabled,
 		MaxDataBytes:                cfg.MaxDataBytes,
@@ -585,7 +596,7 @@ func adapterDestChainConfigToFeeQuoter(cfg lanes.FeeQuoterDestChainConfig) fee_q
 		DefaultTokenDestGasOverhead: cfg.DefaultTokenDestGasOverhead,
 		DefaultTxGasLimit:           cfg.DefaultTxGasLimit,
 		NetworkFeeUSDCents:          cfg.NetworkFeeUSDCents,
-		LinkFeeMultiplierPercent:    cfg.LinkFeeMultiplierPercent,
+		LinkFeeMultiplierPercent:    linkFeeMultiplierPercent,
 	}
 }
 
