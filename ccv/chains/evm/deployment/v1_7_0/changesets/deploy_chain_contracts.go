@@ -11,11 +11,11 @@ import (
 )
 
 type DeployChainContractsCfg struct {
-	ChainSel         uint64
-	CREATE2Factory   common.Address
-	Params           sequences.ContractParams
-	DeployTestRouter bool
-	MCMS             *sequences.MCMSDeployParams
+	ChainSel          uint64
+	CREATE2Factory    common.Address
+	Params            sequences.ContractParams
+	DeployTestRouter  bool
+	TransferOwnership bool
 }
 
 func (c DeployChainContractsCfg) ChainSelector() uint64 {
@@ -36,7 +36,7 @@ var DeployChainContracts = changesets.NewFromOnChainSequence(changesets.NewFromO
 			ExistingAddresses: addresses,
 			ContractParams:    cfg.Params,
 			DeployTestRouter:  cfg.DeployTestRouter,
-			MCMS:              cfg.MCMS,
+			TransferOwnership: cfg.TransferOwnership,
 		}, nil
 	},
 	ResolveDep: evm_sequences.ResolveEVMChainDep[DeployChainContractsCfg],

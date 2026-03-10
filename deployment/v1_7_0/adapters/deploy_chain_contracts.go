@@ -6,12 +6,10 @@ import (
 	"sync"
 
 	"github.com/Masterminds/semver/v3"
-	"github.com/ethereum/go-ethereum/common"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
@@ -71,20 +69,6 @@ type MockReceiverDeployParams struct {
 	Qualifier         string
 }
 
-type MCMSInstanceDeployParams struct {
-	Proposer         mcms_types.Config
-	Bypasser         mcms_types.Config
-	Canceller        mcms_types.Config
-	TimelockMinDelay *big.Int
-	TimelockAdmin    common.Address
-	Label            *string
-}
-
-type MCMSDeployParams struct {
-	CLLCCIP MCMSInstanceDeployParams
-	RMNMCMS MCMSInstanceDeployParams
-}
-
 type DeployContractParams struct {
 	RMNRemote          RMNRemoteDeployParams
 	OffRamp            OffRampDeployParams
@@ -100,11 +84,11 @@ type DeployChainContractsInput struct {
 	DeployerContract  string
 	DeployTestRouter  bool
 	ExistingAddresses []datastore.AddressRef
-	ContractParams    DeployContractParams
-	// MCMS configures deployment of CLLCCIP and RMNMCMS instances.
-	// When non-nil, both instances are deployed and ownership of product contracts
-	// is transferred to the CLLCCIP timelock.
-	MCMS *MCMSDeployParams
+	ContractParams DeployContractParams
+	// TransferOwnership, when true, looks up the existing CLLCCIP RBACTimelock
+	// in ExistingAddresses and transfers ownership of product contracts to it.
+	// The sequence fails fast if the required MCMS instances are not found.
+	TransferOwnership bool
 }
 
 type DeployChainContractsAdapter interface {

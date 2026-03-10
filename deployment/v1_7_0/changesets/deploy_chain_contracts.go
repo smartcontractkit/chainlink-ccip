@@ -26,10 +26,10 @@ type DeployChainContractsPerChainCfg struct {
 	FeeQuoter        adapters.FeeQuoterDeployParams
 	Executors        []adapters.ExecutorDeployParams
 	MockReceivers    []adapters.MockReceiverDeployParams
-	// MCMS configures deployment of CLLCCIP and RMNMCMS instances.
-	// When non-nil, both instances are deployed and ownership of product contracts
-	// is transferred to the CLLCCIP timelock.
-	MCMS *adapters.MCMSDeployParams
+	// TransferOwnership, when true, looks up the existing CLLCCIP RBACTimelock
+	// in the chain's existing addresses and transfers ownership of product contracts to it.
+	// The sequence fails fast if the required MCMS instances are not found.
+	TransferOwnership bool
 }
 
 type DeployChainContractsCfg struct {
@@ -119,7 +119,7 @@ func DeployChainContracts(
 				DeployerContract:  perChain.DeployerContract,
 				DeployTestRouter:  perChain.DeployTestRouter,
 				ExistingAddresses: existingAddresses,
-				MCMS:              perChain.MCMS,
+				TransferOwnership: perChain.TransferOwnership,
 				ContractParams: adapters.DeployContractParams{
 					RMNRemote:          perChain.RMNRemote,
 					OffRamp:            perChain.OffRamp,

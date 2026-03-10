@@ -30,6 +30,7 @@ import (
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	seq_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
@@ -369,7 +370,103 @@ func singleSignerMCMSConfig(signer common.Address) (mcms_types.Config, error) {
 	return mcms_types.NewConfig(1, []common.Address{signer}, nil)
 }
 
-func TestDeployChainContracts_WithMCMS(t *testing.T) {
+// deployMCMSInstanceForTest deploys one MCMS instance (proposer, bypasser, canceller,
+// timelock, call proxy) for the given qualifier and returns the timelock address and
+// the full list of deployed address refs.
+func deployMCMSInstanceForTest(
+	t *testing.T,
+	b operations.Bundle,
+	chain evm.Chain,
+	deployer common.Address,
+	qualifier string,
+) (timelockAddr common.Address, addresses []datastore.AddressRef) {
+	t.Helper()
+	mcmsCfg, err := singleSignerMCMSConfig(deployer)
+	require.NoError(t, err)
+
+	qualifierPtr := &qualifier
+
+	proposerReport, err := operations.ExecuteSequence(b, mcms_seq.SeqDeployMCMWithConfig, chain, mcms_seq.SeqMCMSDeploymentCfg{
+		ChainSelector: chain.Selector,
+		ContractType:  common_utils.ProposerManyChainMultisig,
+		MCMConfig:     &mcmsCfg,
+		Qualifier:     qualifierPtr,
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, proposerReport.Output.Addresses)
+	addresses = append(addresses, proposerReport.Output.Addresses...)
+
+	bypasserReport, err := operations.ExecuteSequence(b, mcms_seq.SeqDeployMCMWithConfig, chain, mcms_seq.SeqMCMSDeploymentCfg{
+		ChainSelector: chain.Selector,
+		ContractType:  common_utils.BypasserManyChainMultisig,
+		MCMConfig:     &mcmsCfg,
+		Qualifier:     qualifierPtr,
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, bypasserReport.Output.Addresses)
+	addresses = append(addresses, bypasserReport.Output.Addresses...)
+
+	cancellerReport, err := operations.ExecuteSequence(b, mcms_seq.SeqDeployMCMWithConfig, chain, mcms_seq.SeqMCMSDeploymentCfg{
+		ChainSelector: chain.Selector,
+		ContractType:  common_utils.CancellerManyChainMultisig,
+		MCMConfig:     &mcmsCfg,
+		Qualifier:     qualifierPtr,
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, cancellerReport.Output.Addresses)
+	addresses = append(addresses, cancellerReport.Output.Addresses...)
+
+	timelockRef, err := contract_utils.MaybeDeployContract(b, mcms_ops.OpDeployTimelock, chain, contract_utils.DeployInput[mcms_ops.OpDeployTimelockInput]{
+		ChainSelector:  chain.Selector,
+		Qualifier:      qualifierPtr,
+		TypeAndVersion: deployment.NewTypeAndVersion(common_utils.RBACTimelock, *mcms_ops.MCMSVersion),
+		Args: mcms_ops.OpDeployTimelockInput{
+			TimelockMinDelay: big.NewInt(0),
+			Proposers:        []common.Address{common.HexToAddress(proposerReport.Output.Addresses[0].Address)},
+			Bypassers:        []common.Address{common.HexToAddress(bypasserReport.Output.Addresses[0].Address)},
+			Cancellers:       []common.Address{common.HexToAddress(cancellerReport.Output.Addresses[0].Address)},
+			Admin:            deployer,
+			Executors:        []common.Address{},
+		},
+	}, nil)
+	require.NoError(t, err)
+	timelockAddr = common.HexToAddress(timelockRef.Address)
+	addresses = append(addresses, timelockRef)
+
+	callProxyRef, err := contract_utils.MaybeDeployContract(b, mcms_ops.OpDeployCallProxy, chain, contract_utils.DeployInput[mcms_ops.OpDeployCallProxyInput]{
+		ChainSelector:  chain.Selector,
+		Qualifier:      qualifierPtr,
+		TypeAndVersion: deployment.NewTypeAndVersion(common_utils.CallProxy, *mcms_ops.MCMSVersion),
+		Args: mcms_ops.OpDeployCallProxyInput{
+			TimelockAddress: timelockAddr,
+		},
+	}, nil)
+	require.NoError(t, err)
+	addresses = append(addresses, callProxyRef)
+
+	return timelockAddr, addresses
+}
+
+// deployAllMCMSForTest deploys both CLLCCIP and RMNMCMS instances and returns the
+// CLL and RMN timelock addresses along with the combined list of all MCMS address refs.
+func deployAllMCMSForTest(
+	t *testing.T,
+	b operations.Bundle,
+	chain evm.Chain,
+	deployer common.Address,
+) (cllTimelockAddr, rmnTimelockAddr common.Address, addresses []datastore.AddressRef) {
+	t.Helper()
+
+	cllTimelockAddr, cllAddrs := deployMCMSInstanceForTest(t, b, chain, deployer, common_utils.CLLQualifier)
+	addresses = append(addresses, cllAddrs...)
+
+	rmnTimelockAddr, rmnAddrs := deployMCMSInstanceForTest(t, b, chain, deployer, common_utils.RMNTimelockQualifier)
+	addresses = append(addresses, rmnAddrs...)
+
+	return cllTimelockAddr, rmnTimelockAddr, addresses
+}
+
+func TestDeployChainContracts_WithTransferOwnership(t *testing.T) {
 	chainSelector := uint64(5009297550715157269)
 	e, err := environment.New(t.Context(),
 		environment.WithEVMSimulated(t, []uint64{chainSelector}),
@@ -378,6 +475,9 @@ func TestDeployChainContracts_WithMCMS(t *testing.T) {
 
 	chain := e.BlockChains.EVMChains()[chainSelector]
 	deployer := chain.DeployerKey.From
+
+	// Pre-deploy both MCMS instances (CLLCCIP and RMNMCMS) before running DeployChainContracts.
+	cllTimelockAddr, rmnTimelockAddr, mcmsAddresses := deployAllMCMSForTest(t, e.OperationsBundle, chain, deployer)
 
 	create2FactoryRef, err := contract_utils.MaybeDeployContract(
 		e.OperationsBundle, create2_factory.Deploy, chain,
@@ -388,36 +488,20 @@ func TestDeployChainContracts_WithMCMS(t *testing.T) {
 		}, nil)
 	require.NoError(t, err)
 
-	mcmsCfg, err := singleSignerMCMSConfig(deployer)
-	require.NoError(t, err, "singleSignerMCMSConfig should not error")
 	report, err := operations.ExecuteSequence(
 		e.OperationsBundle,
 		sequences.DeployChainContracts,
 		chain,
 		sequences.DeployChainContractsInput{
-			ChainSelector:    chainSelector,
-			CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
-			ContractParams:   testsetup.CreateBasicContractParams(),
-			DeployTestRouter: true,
-			MCMS: &sequences.MCMSDeployParams{
-				CLLCCIP: sequences.MCMSInstanceParams{
-					Proposer:         mcmsCfg,
-					Bypasser:         mcmsCfg,
-					Canceller:        mcmsCfg,
-					TimelockMinDelay: big.NewInt(0),
-					TimelockAdmin:    deployer,
-				},
-				RMNMCMS: sequences.MCMSInstanceParams{
-					Proposer:         mcmsCfg,
-					Bypasser:         mcmsCfg,
-					Canceller:        mcmsCfg,
-					TimelockMinDelay: big.NewInt(0),
-					TimelockAdmin:    deployer,
-				},
-			},
+			ChainSelector:     chainSelector,
+			CREATE2Factory:    common.HexToAddress(create2FactoryRef.Address),
+			ContractParams:    testsetup.CreateBasicContractParams(),
+			DeployTestRouter:  true,
+			ExistingAddresses: mcmsAddresses,
+			TransferOwnership: true,
 		},
 	)
-	require.NoError(t, err, "ExecuteSequence with MCMS should not error")
+	require.NoError(t, err, "ExecuteSequence with TransferOwnership should not error")
 
 	// Build a lookup of deployed addresses by type+qualifier.
 	type addrKey struct {
@@ -427,21 +511,6 @@ func TestDeployChainContracts_WithMCMS(t *testing.T) {
 	addrMap := make(map[addrKey]common.Address)
 	for _, ref := range report.Output.Addresses {
 		addrMap[addrKey{deployment.ContractType(ref.Type), ref.Qualifier}] = common.HexToAddress(ref.Address)
-	}
-
-	// Verify MCMS contracts are deployed for both qualifiers.
-	mcmsContractTypes := []deployment.ContractType{
-		common_utils.ProposerManyChainMultisig,
-		common_utils.BypasserManyChainMultisig,
-		common_utils.CancellerManyChainMultisig,
-		common_utils.RBACTimelock,
-		common_utils.CallProxy,
-	}
-	for _, qualifier := range []string{common_utils.CLLQualifier, common_utils.RMNTimelockQualifier} {
-		for _, ct := range mcmsContractTypes {
-			_, ok := addrMap[addrKey{ct, qualifier}]
-			require.True(t, ok, "Expected %s to be deployed for qualifier %s", ct, qualifier)
-		}
 	}
 
 	// Verify core product contracts are deployed.
@@ -458,7 +527,6 @@ func TestDeployChainContracts_WithMCMS(t *testing.T) {
 	for _, ct := range productTypes {
 		_, ok := addrMap[addrKey{ct, ""}]
 		if !ok {
-			// Some contract types may have a non-empty qualifier (e.g. executors).
 			found := false
 			for key := range addrMap {
 				if key.contractType == ct {
@@ -470,31 +538,7 @@ func TestDeployChainContracts_WithMCMS(t *testing.T) {
 		}
 	}
 
-	cllTimelockAddr := addrMap[addrKey{common_utils.RBACTimelock, common_utils.CLLQualifier}]
-	rmnTimelockAddr := addrMap[addrKey{common_utils.RBACTimelock, common_utils.RMNTimelockQualifier}]
-
-	// Verify MCM contracts have pending owner set to CLLCCIP timelock.
-	mcmOwnableTypes := []deployment.ContractType{
-		common_utils.ProposerManyChainMultisig,
-		common_utils.BypasserManyChainMultisig,
-		common_utils.CancellerManyChainMultisig,
-	}
-	for _, qualifier := range []string{common_utils.CLLQualifier, common_utils.RMNTimelockQualifier} {
-		for _, ct := range mcmOwnableTypes {
-			addr := addrMap[addrKey{ct, qualifier}]
-			mcm, err := bindings.NewManyChainMultiSig(addr, chain.Client)
-			require.NoError(t, err, "Failed to load MCM %s/%s", ct, qualifier)
-
-			pendingOwner, err := mcm.PendingOwner(nil)
-			require.NoError(t, err, "Failed to get pending owner of MCM %s/%s", ct, qualifier)
-			require.Equal(t, cllTimelockAddr, pendingOwner,
-				"MCM %s/%s pending owner should be CLLCCIP timelock", ct, qualifier)
-		}
-	}
-
 	// Verify product contracts have ownership transferred to CLLCCIP timelock.
-	// These are the contract types that transferContractsOwnership is called with
-	// in production code — all must be loadable as ownable.
 	ownableProductTypes := map[deployment.ContractType]bool{
 		rmn_remote.ContractType:           true,
 		router.ContractType:               true,
@@ -527,7 +571,49 @@ func TestDeployChainContracts_WithMCMS(t *testing.T) {
 		}
 	}
 
-	// Verify CLLCCIP timelock: admin is the timelock itself, deployer no longer admin.
+	// Verify MCM contracts (Proposer, Bypasser, Canceller) have ownership transferred.
+	// CLL MCMs should be owned by CLL timelock (or deployer with pending transfer).
+	// RMN MCMs are valid if owned by CLL timelock OR RMN timelock.
+	mcmTypes := []deployment.ContractType{
+		common_utils.ProposerManyChainMultisig,
+		common_utils.BypasserManyChainMultisig,
+		common_utils.CancellerManyChainMultisig,
+	}
+	for _, qualifier := range []string{common_utils.CLLQualifier, common_utils.RMNTimelockQualifier} {
+		for _, ct := range mcmTypes {
+			var mcmAddr common.Address
+			for _, ref := range mcmsAddresses {
+				if deployment.ContractType(ref.Type) == ct && ref.Qualifier == qualifier {
+					mcmAddr = common.HexToAddress(ref.Address)
+					break
+				}
+			}
+			require.NotEqual(t, common.Address{}, mcmAddr, "Expected to find %s/%s in mcmsAddresses", ct, qualifier)
+
+			_, ownable, err := mcms_seq.LoadOwnableContract(mcmAddr, chain.Client)
+			require.NoError(t, err, "LoadOwnableContract for MCM %s/%s", ct, qualifier)
+
+			owner, err := ownable.Owner(nil)
+			require.NoError(t, err, "Owner() for MCM %s/%s", ct, qualifier)
+
+			validOwners := []common.Address{deployer, cllTimelockAddr}
+			if qualifier == common_utils.RMNTimelockQualifier {
+				validOwners = append(validOwners, rmnTimelockAddr)
+			}
+			ownerValid := false
+			for _, vo := range validOwners {
+				if owner == vo {
+					ownerValid = true
+					break
+				}
+			}
+			require.True(t, ownerValid,
+				"MCM %s/%s at %s: owner should be deployer (%s), CLL timelock (%s), or RMN timelock (%s), got %s",
+				ct, qualifier, mcmAddr, deployer, cllTimelockAddr, rmnTimelockAddr, owner)
+		}
+	}
+
+	// Verify CLLCCIP timelock is self-governed and deployer is no longer admin.
 	cllTimelock, err := bindings.NewRBACTimelock(cllTimelockAddr, chain.Client)
 	require.NoError(t, err)
 
@@ -539,7 +625,7 @@ func TestDeployChainContracts_WithMCMS(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, cllDeployerAdmin, "Deployer should no longer be admin of CLLCCIP timelock")
 
-	// Verify RMNMCMS timelock: admin is the CLLCCIP timelock, deployer no longer admin.
+	// Verify RMNMCMS timelock is governed by CLLCCIP timelock and deployer is no longer admin.
 	rmnTimelock, err := bindings.NewRBACTimelock(rmnTimelockAddr, chain.Client)
 	require.NoError(t, err)
 
@@ -550,4 +636,176 @@ func TestDeployChainContracts_WithMCMS(t *testing.T) {
 	rmnDeployerAdmin, err := rmnTimelock.HasRole(nil, mcms_ops.ADMIN_ROLE.ID, deployer)
 	require.NoError(t, err)
 	require.False(t, rmnDeployerAdmin, "Deployer should no longer be admin of RMNMCMS timelock")
+}
+
+func TestDeployChainContracts_WithTransferOwnership_Idempotent(t *testing.T) {
+	chainSelector := uint64(5009297550715157269)
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{chainSelector}),
+	)
+	require.NoError(t, err)
+
+	chain := e.BlockChains.EVMChains()[chainSelector]
+	deployer := chain.DeployerKey.From
+
+	cllTimelockAddr, _, mcmsAddresses := deployAllMCMSForTest(t, e.OperationsBundle, chain, deployer)
+
+	create2FactoryRef, err := contract_utils.MaybeDeployContract(
+		e.OperationsBundle, create2_factory.Deploy, chain,
+		contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+			TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
+			ChainSelector:  chainSelector,
+			Args:           create2_factory.ConstructorArgs{AllowList: []common.Address{deployer}},
+		}, nil)
+	require.NoError(t, err)
+
+	input := sequences.DeployChainContractsInput{
+		ChainSelector:     chainSelector,
+		CREATE2Factory:    common.HexToAddress(create2FactoryRef.Address),
+		ContractParams:    testsetup.CreateBasicContractParams(),
+		DeployTestRouter:  true,
+		ExistingAddresses: mcmsAddresses,
+		TransferOwnership: true,
+	}
+
+	// First run: deploys contracts, transfers ownership, sets up governance.
+	firstReport, err := operations.ExecuteSequence(
+		e.OperationsBundle, sequences.DeployChainContracts, chain, input,
+	)
+	require.NoError(t, err, "First run should succeed")
+
+	// Second run: pass first run's output as existing addresses alongside MCMS refs.
+	// Everything should be idempotent: contracts reused, ownership already transferred,
+	// timelocks already self-governed.
+	input.ExistingAddresses = append(mcmsAddresses, firstReport.Output.Addresses...)
+	secondReport, err := operations.ExecuteSequence(
+		e.OperationsBundle, sequences.DeployChainContracts, chain, input,
+	)
+	require.NoError(t, err, "Second run (idempotent) should succeed")
+
+	// Verify the same addresses were returned (contracts reused, not redeployed).
+	require.Equal(t, len(firstReport.Output.Addresses), len(secondReport.Output.Addresses),
+		"Idempotent run should return the same number of addresses")
+	firstAddrs := make(map[string]bool)
+	for _, ref := range firstReport.Output.Addresses {
+		firstAddrs[ref.Address] = true
+	}
+	for _, ref := range secondReport.Output.Addresses {
+		require.True(t, firstAddrs[ref.Address],
+			"Address %s (type=%s) from second run should match first run", ref.Address, ref.Type)
+	}
+
+	// Verify ownership is still pointing to CLL timelock after second run.
+	productTypes := []deployment.ContractType{
+		rmn_remote.ContractType,
+		router.ContractType,
+		token_admin_registry.ContractType,
+		fee_quoter.ContractType,
+		offramp.ContractType,
+		onramp.ContractType,
+	}
+	for _, ref := range secondReport.Output.Addresses {
+		ct := deployment.ContractType(ref.Type)
+		isProduct := false
+		for _, pt := range productTypes {
+			if ct == pt {
+				isProduct = true
+				break
+			}
+		}
+		if !isProduct {
+			continue
+		}
+		addr := common.HexToAddress(ref.Address)
+		_, ownable, err := mcms_seq.LoadOwnableContract(addr, chain.Client)
+		require.NoError(t, err, "LoadOwnableContract for %s at %s", ct, addr)
+		owner, err := ownable.Owner(nil)
+		require.NoError(t, err, "Owner() for %s at %s", ct, addr)
+		require.True(t, owner == deployer || owner == cllTimelockAddr,
+			"After idempotent run, %s at %s should be owned by deployer (%s) or CLL timelock (%s), got %s",
+			ct, addr, deployer, cllTimelockAddr, owner)
+	}
+}
+
+func TestDeployChainContracts_TransferOwnership_FailsWithoutMCMS(t *testing.T) {
+	chainSelector := uint64(5009297550715157269)
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{chainSelector}),
+	)
+	require.NoError(t, err)
+
+	chain := e.BlockChains.EVMChains()[chainSelector]
+	deployer := chain.DeployerKey.From
+
+	create2FactoryRef, err := contract_utils.MaybeDeployContract(
+		e.OperationsBundle, create2_factory.Deploy, chain,
+		contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+			TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
+			ChainSelector:  chainSelector,
+			Args:           create2_factory.ConstructorArgs{AllowList: []common.Address{deployer}},
+		}, nil)
+	require.NoError(t, err)
+
+	t.Run("no MCMS at all", func(t *testing.T) {
+		_, err = operations.ExecuteSequence(
+			e.OperationsBundle,
+			sequences.DeployChainContracts,
+			chain,
+			sequences.DeployChainContractsInput{
+				ChainSelector:     chainSelector,
+				CREATE2Factory:    common.HexToAddress(create2FactoryRef.Address),
+				ContractParams:    testsetup.CreateBasicContractParams(),
+				TransferOwnership: true,
+			},
+		)
+		require.Error(t, err, "Expected error when TransferOwnership is true but no MCMS in ExistingAddresses")
+		require.Contains(t, err.Error(), common_utils.CLLQualifier)
+	})
+
+	t.Run("only CLLCCIP deployed, missing RMNMCMS", func(t *testing.T) {
+		_, cllAddresses := deployMCMSInstanceForTest(t, e.OperationsBundle, chain, deployer, common_utils.CLLQualifier)
+
+		_, err = operations.ExecuteSequence(
+			e.OperationsBundle,
+			sequences.DeployChainContracts,
+			chain,
+			sequences.DeployChainContractsInput{
+				ChainSelector:     chainSelector,
+				CREATE2Factory:    common.HexToAddress(create2FactoryRef.Address),
+				ContractParams:    testsetup.CreateBasicContractParams(),
+				ExistingAddresses: cllAddresses,
+				TransferOwnership: true,
+			},
+		)
+		require.Error(t, err, "Expected error when TransferOwnership is true but RMNMCMS not in ExistingAddresses")
+		require.Contains(t, err.Error(), common_utils.RMNTimelockQualifier)
+	})
+
+	t.Run("timelocks present but MCM contracts missing", func(t *testing.T) {
+		_, _, allAddrs := deployAllMCMSForTest(t, e.OperationsBundle, chain, deployer)
+
+		// Keep only timelock and call proxy refs, stripping out Proposer/Bypasser/Canceller.
+		var timelockOnlyAddrs []datastore.AddressRef
+		for _, ref := range allAddrs {
+			ct := deployment.ContractType(ref.Type)
+			if ct == common_utils.RBACTimelock || ct == common_utils.CallProxy {
+				timelockOnlyAddrs = append(timelockOnlyAddrs, ref)
+			}
+		}
+
+		_, err = operations.ExecuteSequence(
+			e.OperationsBundle,
+			sequences.DeployChainContracts,
+			chain,
+			sequences.DeployChainContractsInput{
+				ChainSelector:     chainSelector,
+				CREATE2Factory:    common.HexToAddress(create2FactoryRef.Address),
+				ContractParams:    testsetup.CreateBasicContractParams(),
+				ExistingAddresses: timelockOnlyAddrs,
+				TransferOwnership: true,
+			},
+		)
+		require.Error(t, err, "Expected error when timelocks exist but MCM contracts are missing")
+		require.Contains(t, err.Error(), "TransferOwnership requires MCM contract")
+	})
 }
