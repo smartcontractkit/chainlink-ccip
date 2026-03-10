@@ -10,22 +10,25 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
+func (a *EVMAdapter) getTransferOwnershipAdapter() *evm1_0_0.EVMTransferOwnershipAdapter {
+	if a.transferOwnershipAdapter != nil {
+		return a.transferOwnershipAdapter
+	}
+	return &evm1_0_0.EVMTransferOwnershipAdapter{}
+}
+
 func (a *EVMAdapter) InitializeTimelockAddress(e deployment.Environment, input mcms.Input) error {
-	evmDeployer := &evm1_0_0.EVMTransferOwnershipAdapter{}
-	return evmDeployer.InitializeTimelockAddress(e, input)
+	return a.getTransferOwnershipAdapter().InitializeTimelockAddress(e, input)
 }
 
 func (a *EVMAdapter) SequenceTransferOwnershipViaMCMS() *cldf_ops.Sequence[api.TransferOwnershipPerChainInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
-	evmDeployer := &evm1_0_0.EVMTransferOwnershipAdapter{}
-	return evmDeployer.SequenceTransferOwnershipViaMCMS()
+	return a.getTransferOwnershipAdapter().SequenceTransferOwnershipViaMCMS()
 }
 
 func (a *EVMAdapter) ShouldAcceptOwnershipWithTransferOwnership(e deployment.Environment, in api.TransferOwnershipPerChainInput) (bool, error) {
-	evmDeployer := &evm1_0_0.EVMTransferOwnershipAdapter{}
-	return evmDeployer.ShouldAcceptOwnershipWithTransferOwnership(e, in)
+	return a.getTransferOwnershipAdapter().ShouldAcceptOwnershipWithTransferOwnership(e, in)
 }
 
 func (a *EVMAdapter) SequenceAcceptOwnership() *cldf_ops.Sequence[api.TransferOwnershipPerChainInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
-	evmDeployer := &evm1_0_0.EVMTransferOwnershipAdapter{}
-	return evmDeployer.SequenceAcceptOwnership()
+	return a.getTransferOwnershipAdapter().SequenceAcceptOwnership()
 }

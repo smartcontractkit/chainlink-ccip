@@ -6,8 +6,8 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/committee_verifier"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/link_token"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/stretchr/testify/require"
 )
@@ -66,8 +66,8 @@ func TestGetMockReceiverVerifiers(t *testing.T) {
 		},
 		{
 			ChainSelector: chainSelector,
-			Type:          datastore.ContractType(link_token.ContractType),
-			Version:       link_token.Version,
+			Type:          datastore.ContractType(link.ContractType),
+			Version:       link.Version,
 			Address:       common.HexToAddress("0xBB").Hex(),
 		},
 		{
