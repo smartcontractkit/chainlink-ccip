@@ -99,8 +99,10 @@ contract OffRamp__getCCVsForMessage is OffRampSetup {
 
     MessageV1Codec.TokenTransferV1[] memory tokenAmounts = _setCCVsOnPool(poolCCVs);
 
+    bytes memory sender = abi.encodePacked(makeAddr("sender"));
+
     (address[] memory requiredCCVs,,) =
-      s_offRamp.__getCCVsForMessage(SOURCE_CHAIN_SELECTOR, receiver, tokenAmounts, 0, false);
+      s_offRamp.__getCCVsForMessage(SOURCE_CHAIN_SELECTOR, receiver, sender, tokenAmounts, 0, false);
 
     assertEq(_onlyUniques(requiredCCVs).length, requiredCCVs.length, "still has duplicates");
 
@@ -128,8 +130,10 @@ contract OffRamp__getCCVsForMessage is OffRampSetup {
 
     MessageV1Codec.TokenTransferV1[] memory tokenAmounts = new MessageV1Codec.TokenTransferV1[](0);
 
+    bytes memory sender = abi.encodePacked(makeAddr("sender"));
+
     (address[] memory requiredCCVs, address[] memory optionalCCVs, uint8 optionalThreshold) =
-      s_offRamp.__getCCVsForMessage(SOURCE_CHAIN_SELECTOR, receiver, tokenAmounts, 0, false);
+      s_offRamp.__getCCVsForMessage(SOURCE_CHAIN_SELECTOR, receiver, sender, tokenAmounts, 0, false);
 
     assertEq(requiredCCVs.length, 3, "required length");
     assertEq(requiredCCVs[0], required[0]);

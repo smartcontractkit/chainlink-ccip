@@ -17,7 +17,7 @@ import (
 	lockbox_ops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/erc20_lock_box"
 	lrtp_ops_v170 "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/lock_release_token_pool"
 	siloed_lrtp_ops_v170 "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/siloed_lock_release_token_pool"
-	token_pool_ops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/token_pool"
+	token_pool_ops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
@@ -53,7 +53,7 @@ var MigrateLockReleasePoolLiquidity = cldf_ops.NewSequence(
 		}
 		oldPoolType := string(tvReport.Output.Type)
 
-		tokenReport, err := cldf_ops.ExecuteOperation(b, token_pool_ops.GetToken, evmChain, evm_contract.FunctionInput[any]{
+		tokenReport, err := cldf_ops.ExecuteOperation(b, token_pool_ops.GetToken, evmChain, evm_contract.FunctionInput[struct{}]{
 			ChainSelector: input.ChainSelector,
 			Address:       newPoolAddr,
 		})

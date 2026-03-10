@@ -7,7 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/token_pool"
 	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	tar_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	v1_5_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
@@ -32,7 +32,7 @@ var ConfigureTokenForTransfers = cldf_ops.NewSequence(
 		if input.TokenAddress != "" {
 			tokenAddress = common.HexToAddress(input.TokenAddress)
 		} else {
-			tokenAddrReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetToken, evmChain, evm_contract.FunctionInput[any]{
+			tokenAddrReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetToken, evmChain, evm_contract.FunctionInput[struct{}]{
 				ChainSelector: input.ChainSelector,
 				Address:       common.HexToAddress(input.TokenPoolAddress),
 			})
@@ -96,7 +96,7 @@ var ConfigureTokenForTransfers = cldf_ops.NewSequence(
 		}
 
 		// Configure minimum block confirmation (skip if already set to desired value).
-		currentMinBlockReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetMinBlockConfirmation, evmChain, evm_contract.FunctionInput[any]{
+		currentMinBlockReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetMinBlockConfirmations, evmChain, evm_contract.FunctionInput[struct{}]{
 			ChainSelector: input.ChainSelector,
 			Address:       tokenPoolAddress,
 		})
@@ -120,7 +120,7 @@ var ConfigureTokenForTransfers = cldf_ops.NewSequence(
 		}
 
 		// Get the advanced pool hooks address
-		advancedPoolHooksAddress, err := cldf_ops.ExecuteOperation(b, token_pool.GetAdvancedPoolHooks, evmChain, evm_contract.FunctionInput[any]{
+		advancedPoolHooksAddress, err := cldf_ops.ExecuteOperation(b, token_pool.GetAdvancedPoolHooks, evmChain, evm_contract.FunctionInput[struct{}]{
 			ChainSelector: input.ChainSelector,
 			Address:       tokenPoolAddress,
 		})
