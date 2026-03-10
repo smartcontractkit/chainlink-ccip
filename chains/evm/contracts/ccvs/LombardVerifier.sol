@@ -500,6 +500,14 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
     _applyAllowlistUpdates(allowlistConfigArgsItems);
   }
 
+  /// @notice Updates the storage location identifiers.
+  /// @param newLocations The new storage location identifiers.
+  function updateStorageLocations(
+    string[] memory newLocations
+  ) external onlyOwner {
+    _setStorageLocations(newLocations);
+  }
+
   /// @notice Exposes the version tag.
   function versionTag() public pure override returns (bytes4) {
     return VERSION_TAG_V2_0_0;
