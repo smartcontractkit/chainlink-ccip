@@ -299,10 +299,10 @@ type USDCCCTPTokenConfig struct {
 }
 
 func (t USDCCCTPTokenConfig) Validate() error {
-	if t.SourcePoolAddress == "" {
+	if cciptypes.IsZeroOrEmptyOrInvalidHexAddress(t.SourcePoolAddress) {
 		return errors.New("SourcePoolAddress not set")
 	}
-	if t.SourceMessageTransmitterAddr == "" {
+	if cciptypes.IsZeroOrEmptyOrInvalidHexAddress(t.SourceMessageTransmitterAddr) {
 		return errors.New("SourceMessageTransmitterAddress not set")
 	}
 	return nil
@@ -330,7 +330,7 @@ func (c *LBTCObserverConfig) Validate() error {
 		return errors.New("SourcePoolAddressByChain is not set")
 	}
 	for _, sourcePoolAddress := range c.SourcePoolAddressByChain {
-		if sourcePoolAddress == "" {
+		if cciptypes.IsZeroOrEmptyOrInvalidHexAddress(sourcePoolAddress) {
 			return errors.New("SourcePoolAddressByChain is empty")
 		}
 	}
