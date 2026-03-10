@@ -274,10 +274,12 @@ var (
 				destChainConfig := cfg.DestChainCfg
 				// check if gasprice stateness threashold is zero
 				if destChainConfig.GasPriceStalenessThreshold == 0 {
-					output.PriceUpdates, err = HandleEmptyGasPriceStalenessThreshold(remoteChain, input)
+					priceUpdates, err := HandleEmptyGasPriceStalenessThreshold(remoteChain, input)
 					if err != nil {
 						return FeeQuoterUpdate{}, fmt.Errorf("failed to handle empty gas price staleness threshold for remote chain %d: %w", remoteChain, err)
 					}
+					output.PriceUpdates.GasPriceUpdates = append(output.PriceUpdates.GasPriceUpdates, priceUpdates.GasPriceUpdates...)
+					output.PriceUpdates.TokenPriceUpdates = append(output.PriceUpdates.TokenPriceUpdates, priceUpdates.TokenPriceUpdates...)
 				}
 				outDestchainCfg := fqops.DestChainConfigArgs{
 					DestChainSelector: remoteChain,
