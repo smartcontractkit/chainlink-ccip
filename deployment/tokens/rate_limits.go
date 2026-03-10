@@ -21,10 +21,11 @@ type TPRLInput struct {
 }
 
 type TPRLConfig struct {
-	ChainAdapterVersion *semver.Version                        `yaml:"chainAdapterVersion" json:"chainAdapterVersion"`
-	TokenRef            datastore.AddressRef                   `yaml:"tokenRef" json:"tokenRef"`
-	TokenPoolRef        datastore.AddressRef                   `yaml:"tokenPoolRef" json:"tokenPoolRef"`
-	RemoteOutbounds     map[uint64]RateLimiterConfigFloatInput `yaml:"remoteOutbounds" json:"remoteOutbounds"`
+	ChainAdapterVersion    *semver.Version                        `yaml:"chainAdapterVersion" json:"chainAdapterVersion"`
+	TokenRef               datastore.AddressRef                   `yaml:"tokenRef" json:"tokenRef"`
+	TokenPoolRef           datastore.AddressRef                   `yaml:"tokenPoolRef" json:"tokenPoolRef"`
+	EnablePermissionChecks bool                                   `yaml:"enablePermissionChecks" json:"enablePermissionChecks"`
+	RemoteOutbounds        map[uint64]RateLimiterConfigFloatInput `yaml:"remoteOutbounds" json:"remoteOutbounds"`
 }
 
 type TPRLRemotes struct {
@@ -102,11 +103,12 @@ func setTokenPoolRateLimitsApply() func(cldf.Environment, TPRLInput) (cldf.Chang
 			}
 			for remoteSelector, inputs := range config.RemoteOutbounds {
 				tprlRemote := TPRLRemotes{
-					ChainSelector:       selector,
-					RemoteChainSelector: remoteSelector,
-					TokenRef:            tokenFull,
-					TokenPoolRef:        tokenPool,
-					ExistingDataStore:   e.DataStore,
+					EnablePermissionChecks: config.EnablePermissionChecks,
+					ChainSelector:          selector,
+					RemoteChainSelector:    remoteSelector,
+					TokenRef:               tokenFull,
+					TokenPoolRef:           tokenPool,
+					ExistingDataStore:      e.DataStore,
 				}
 
 				// We derive the inbound rate limiter config from counterpart's outbound config for simplicity
