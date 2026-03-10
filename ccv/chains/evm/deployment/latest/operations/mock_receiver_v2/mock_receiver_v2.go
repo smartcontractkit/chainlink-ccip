@@ -131,7 +131,7 @@ var SetMinBlockDepth = contract.NewWrite(contract.WriteParams[uint16, *MockRecei
 	ContractType:    ContractType,
 	ContractABI:     MockReceiverV2ABI,
 	NewContract:     NewMockReceiverV2Contract,
-	IsAllowedCaller: contract.OnlyOwner[*MockReceiverV2Contract, uint16],
+	IsAllowedCaller: contract.AllCallersAllowed[*MockReceiverV2Contract, uint16],
 	Validate:        func(uint16) error { return nil },
 	CallContract: func(
 		c *MockReceiverV2Contract,

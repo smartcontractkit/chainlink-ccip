@@ -105,7 +105,7 @@ contracts:
       - name: getCCVsAndMinBlockDepth
         access: public
       - name: setMinBlockDepth
-        access: owner
+        access: public # Only used in testing, not critical
 
   # Token Pool contracts (latest / v2.0.0)
 
