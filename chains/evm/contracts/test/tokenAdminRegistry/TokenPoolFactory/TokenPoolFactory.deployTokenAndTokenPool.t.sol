@@ -920,6 +920,66 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
     assertEq(s_tokenAdminRegistry.getTokenConfig(tokenAddress).administrator, OWNER);
   }
 
+  function test_deployTokenAndTokenPool_RemoteDeploymentViaFutureOwner() public {
+    vm.stopPrank();
+
+    address crossChainUser = makeAddr("crossChainUser");
+
+    // Deploy a RemotePoolDeployer contract that simulates a CCIP receiver.
+    // On receiving a message, it calls the factory to deploy a token+pool on behalf
+    // of the cross-chain sender (futureOwner).
+    RemotePoolDeployer remoteDeployer = new RemotePoolDeployer(s_tokenPoolFactory);
+
+    // Build token init code with the factory as ccipAdmin/burnMintRoleAdmin
+    // and the crossChainUser as the token owner.
+    bytes memory tokenInitCode = abi.encodePacked(
+      type(CrossChainToken).creationCode,
+      abi.encode(
+        BaseERC20.ConstructorParams({
+          name: "RemoteToken",
+          symbol: "RMT",
+          decimals: LOCAL_TOKEN_DECIMALS,
+          maxSupply: 0,
+          preMint: 0,
+          ccipAdmin: address(s_tokenPoolFactory)
+        }),
+        address(s_tokenPoolFactory),
+        crossChainUser
+      )
+    );
+
+    // Simulate CCIP message delivery: the receiver contract deploys on behalf of crossChainUser
+    (address tokenAddress, address poolAddress) =
+      remoteDeployer.deployOnBehalf(tokenInitCode, POOL_INIT_CODE, crossChainUser);
+
+    // The deployer contract should not be able to accept ownership
+    vm.prank(address(remoteDeployer));
+    vm.expectRevert(Ownable2Step.MustBeProposedOwner.selector);
+    Ownable2Step(poolAddress).acceptOwnership();
+
+    // The crossChainUser accepts all ownership on the destination chain
+    vm.startPrank(crossChainUser);
+    s_tokenAdminRegistry.acceptAdminRole(tokenAddress);
+    Ownable2Step(poolAddress).acceptOwnership();
+    vm.stopPrank();
+
+    CrossChainToken token = CrossChainToken(tokenAddress);
+
+    // Deployer contract should have no permissions
+    assertFalse(token.hasRole(token.DEFAULT_ADMIN_ROLE(), address(remoteDeployer)));
+    assertNotEq(IOwner(poolAddress).owner(), address(remoteDeployer));
+
+    // crossChainUser should have full control
+    assertTrue(token.hasRole(token.DEFAULT_ADMIN_ROLE(), crossChainUser));
+    assertEq(token.owner(), crossChainUser);
+    assertEq(IOwner(poolAddress).owner(), crossChainUser);
+    assertEq(s_tokenAdminRegistry.getTokenConfig(tokenAddress).administrator, crossChainUser);
+
+    // Pool should have mint and burn roles on the token
+    assertTrue(token.hasRole(token.MINTER_ROLE(), poolAddress));
+    assertTrue(token.hasRole(token.BURNER_ROLE(), poolAddress));
+  }
+
   function test_deployTokenAndTokenPool_RevertWhen_EmptyRemoteTokenInitCode() public {
     TokenPoolFactory.RemoteTokenPoolInfo[] memory remoteTokenPools = new TokenPoolFactory.RemoteTokenPoolInfo[](1);
     remoteTokenPools[0] = TokenPoolFactory.RemoteTokenPoolInfo(
@@ -1022,6 +1082,35 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
       address(lockBox),
       FAKE_SALT,
       address(0)
+    );
+  }
+}
+
+/// @notice Helper contract that simulates a CCIP receiver deploying a token pool
+/// on behalf of a cross-chain sender via the factory's futureOwner parameter.
+contract RemotePoolDeployer {
+  TokenPoolFactory private immutable i_factory;
+
+  constructor(
+    TokenPoolFactory factory
+  ) {
+    i_factory = factory;
+  }
+
+  function deployOnBehalf(
+    bytes memory tokenInitCode,
+    bytes memory poolInitCode,
+    address futureOwner
+  ) external returns (address token, address pool) {
+    return i_factory.deployTokenAndTokenPool(
+      new TokenPoolFactory.RemoteTokenPoolInfo[](0),
+      18,
+      TokenPoolFactory.PoolType.BURN_MINT,
+      tokenInitCode,
+      poolInitCode,
+      address(0),
+      keccak256("remote_deploy"),
+      futureOwner
     );
   }
 }
