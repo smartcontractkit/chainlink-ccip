@@ -698,6 +698,119 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
     assertEq(IERC20Metadata(address(newRemoteToken)).decimals(), REMOTE_TOKEN_DECIMALS, "Token Decimals should be 6");
   }
 
+  function test_deployTokenAndTokenPool_FactoryHasNoPermissionsAfterDeployment() public {
+    vm.stopPrank();
+    address user = makeAddr("unprivilegedUser");
+    vm.startPrank(user);
+
+    address factory = address(s_tokenPoolFactory);
+
+    bytes memory tokenInitCode = abi.encodePacked(
+      type(CrossChainToken).creationCode,
+      abi.encode(
+        BaseERC20.ConstructorParams({
+          name: "TestToken", symbol: "TT", decimals: LOCAL_TOKEN_DECIMALS, maxSupply: 0, preMint: 0, ccipAdmin: factory
+        }),
+        factory,
+        user
+      )
+    );
+
+    (address tokenAddress, address poolAddress) = s_tokenPoolFactory.deployTokenAndTokenPool(
+      new TokenPoolFactory.RemoteTokenPoolInfo[](0),
+      LOCAL_TOKEN_DECIMALS,
+      TokenPoolFactory.PoolType.BURN_MINT,
+      tokenInitCode,
+      POOL_INIT_CODE,
+      address(0),
+      FAKE_SALT
+    );
+
+    s_tokenAdminRegistry.acceptAdminRole(tokenAddress);
+    Ownable2Step(poolAddress).acceptOwnership();
+
+    CrossChainToken token = CrossChainToken(tokenAddress);
+
+    // Factory should not hold any token roles
+    assertFalse(
+      token.hasRole(token.DEFAULT_ADMIN_ROLE(), factory), "Factory should not have DEFAULT_ADMIN_ROLE on token"
+    );
+    assertFalse(
+      token.hasRole(token.BURN_MINT_ADMIN_ROLE(), factory), "Factory should not have BURN_MINT_ADMIN_ROLE on token"
+    );
+    assertFalse(token.hasRole(token.MINTER_ROLE(), factory), "Factory should not have MINTER_ROLE on token");
+    assertFalse(token.hasRole(token.BURNER_ROLE(), factory), "Factory should not have BURNER_ROLE on token");
+
+    // Factory should not own the pool
+    assertNotEq(IOwner(poolAddress).owner(), factory, "Factory should not own the pool");
+
+    // Factory should not be the token admin registry admin
+    TokenAdminRegistry.TokenConfig memory tokenConfig = s_tokenAdminRegistry.getTokenConfig(tokenAddress);
+    assertNotEq(tokenConfig.administrator, factory, "Factory should not be token admin registry admin");
+    assertNotEq(tokenConfig.pendingAdministrator, factory, "Factory should not be pending admin");
+
+    // User should have full control
+    assertTrue(token.hasRole(token.DEFAULT_ADMIN_ROLE(), user), "User should have DEFAULT_ADMIN_ROLE on token");
+    assertEq(token.owner(), user, "User should be the token owner");
+    assertEq(IOwner(poolAddress).owner(), user, "User should own the pool");
+    assertEq(tokenConfig.administrator, user, "User should be the token admin registry admin");
+
+    // Pool should have mint and burn roles
+    assertTrue(token.hasRole(token.MINTER_ROLE(), poolAddress), "Pool should have MINTER_ROLE");
+    assertTrue(token.hasRole(token.BURNER_ROLE(), poolAddress), "Pool should have BURNER_ROLE");
+  }
+
+  function test_deployTokenPoolWithExistingToken_FactoryHasNoPermissionsAfterDeployment() public {
+    vm.stopPrank();
+    address user = makeAddr("unprivilegedUser");
+    vm.startPrank(user);
+
+    address factory = address(s_tokenPoolFactory);
+
+    CrossChainToken token = new CrossChainToken(
+      BaseERC20.ConstructorParams({
+        name: "TestToken",
+        symbol: "TT",
+        decimals: LOCAL_TOKEN_DECIMALS,
+        maxSupply: type(uint256).max,
+        preMint: PREMINT_AMOUNT,
+        ccipAdmin: user
+      }),
+      user,
+      user
+    );
+
+    address poolAddress = s_tokenPoolFactory.deployTokenPoolWithExistingToken(
+      address(token),
+      LOCAL_TOKEN_DECIMALS,
+      TokenPoolFactory.PoolType.BURN_MINT,
+      new TokenPoolFactory.RemoteTokenPoolInfo[](0),
+      POOL_INIT_CODE,
+      address(0),
+      FAKE_SALT
+    );
+
+    Ownable2Step(poolAddress).acceptOwnership();
+
+    // Factory should not own the pool
+    assertNotEq(IOwner(poolAddress).owner(), factory, "Factory should not own the pool");
+    assertEq(IOwner(poolAddress).owner(), user, "User should own the pool");
+
+    // Factory should not have any token roles
+    assertFalse(
+      token.hasRole(token.DEFAULT_ADMIN_ROLE(), factory), "Factory should not have DEFAULT_ADMIN_ROLE on token"
+    );
+    assertFalse(
+      token.hasRole(token.BURN_MINT_ADMIN_ROLE(), factory), "Factory should not have BURN_MINT_ADMIN_ROLE on token"
+    );
+    assertFalse(token.hasRole(token.MINTER_ROLE(), factory), "Factory should not have MINTER_ROLE on token");
+    assertFalse(token.hasRole(token.BURNER_ROLE(), factory), "Factory should not have BURNER_ROLE on token");
+
+    // User should retain full control of the token
+    assertTrue(token.hasRole(token.DEFAULT_ADMIN_ROLE(), user), "User should have DEFAULT_ADMIN_ROLE on token");
+    assertEq(token.owner(), user, "User should be the token owner");
+  }
+
   function test_deployTokenAndTokenPool_RevertWhen_EmptyRemoteTokenInitCode() public {
     TokenPoolFactory.RemoteTokenPoolInfo[] memory remoteTokenPools = new TokenPoolFactory.RemoteTokenPoolInfo[](1);
     remoteTokenPools[0] = TokenPoolFactory.RemoteTokenPoolInfo(
