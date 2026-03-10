@@ -7,9 +7,9 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/v2"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/onramp"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/executor"
 	mock_receiver "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/mock_receiver"
@@ -20,9 +20,9 @@ import (
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	mcms_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations"
-	mcms_seq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
+	mcms_seq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/link_token"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
@@ -99,21 +99,21 @@ func TestDeployChainContracts_Idempotency(t *testing.T) {
 			require.Len(t, report.Output.BatchOps, 2, "Expected 2 batch operations")
 
 			exists := map[deployment.ContractType]bool{
-				rmn_remote.ContractType:           false,
-				router.ContractType:               false,
-				executor.ContractType:             false,
-				link_token.ContractType:           false,
-				weth.ContractType:                 false,
-				committee_verifier.ContractType:   false,
-				onramp.ContractType:               false,
-				offramp.ContractType:              false,
-				fee_quoter.ContractType:           false,
-				committee_verifier.ResolverType:   false,
-				rmn_proxy.ContractType:            false,
-				token_admin_registry.ContractType: false,
-				mock_receiver.ContractType:        false,
-				executor.ProxyType:                false,
-				router.TestRouterContractType:     false,
+				rmn_remote.ContractType:                 false,
+				router.ContractType:                     false,
+				executor.ContractType:                   false,
+				link_token.ContractType:                 false,
+				weth.ContractType:                       false,
+				committee_verifier.ContractType:         false,
+				onramp.ContractType:                     false,
+				offramp.ContractType:                    false,
+				fee_quoter.ContractType:                 false,
+				sequences.CommitteeVerifierResolverType: false,
+				rmn_proxy.ContractType:                  false,
+				token_admin_registry.ContractType:       false,
+				mock_receiver.ContractType:              false,
+				executor.ProxyType:                      false,
+				router.TestRouterContractType:           false,
 			}
 			for _, addr := range report.Output.Addresses {
 				exists[deployment.ContractType(addr.Type)] = true
@@ -395,10 +395,10 @@ func TestDeployChainContracts_WithMCMS(t *testing.T) {
 		sequences.DeployChainContracts,
 		chain,
 		sequences.DeployChainContractsInput{
-			ChainSelector:     chainSelector,
-			CREATE2Factory:    common.HexToAddress(create2FactoryRef.Address),
-			ContractParams:    testsetup.CreateBasicContractParams(),
-			DeployTestRouter:  true,
+			ChainSelector:    chainSelector,
+			CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
+			ContractParams:   testsetup.CreateBasicContractParams(),
+			DeployTestRouter: true,
 			MCMS: &sequences.MCMSDeployParams{
 				CLLCCIP: sequences.MCMSInstanceParams{
 					Proposer:         mcmsCfg,
@@ -496,14 +496,14 @@ func TestDeployChainContracts_WithMCMS(t *testing.T) {
 	// These are the contract types that transferContractsOwnership is called with
 	// in production code — all must be loadable as ownable.
 	ownableProductTypes := map[deployment.ContractType]bool{
-		rmn_remote.ContractType:          true,
-		router.ContractType:              true,
+		rmn_remote.ContractType:           true,
+		router.ContractType:               true,
 		token_admin_registry.ContractType: true,
-		fee_quoter.ContractType:          true,
-		offramp.ContractType:             true,
-		onramp.ContractType:              true,
-		executor.ContractType:            true,
-		executor.ProxyType:               true,
+		fee_quoter.ContractType:           true,
+		offramp.ContractType:              true,
+		onramp.ContractType:               true,
+		executor.ContractType:             true,
+		executor.ProxyType:                true,
 	}
 	for _, ct := range productTypes {
 		for key, addr := range addrMap {

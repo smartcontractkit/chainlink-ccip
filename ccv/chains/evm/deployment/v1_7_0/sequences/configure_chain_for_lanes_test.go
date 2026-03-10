@@ -6,14 +6,14 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/v2"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/committee_verifier"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/executor"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/onramp"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/executor"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/message_hasher"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/versioned_verifier_resolver"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
@@ -88,7 +88,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 					committeeVerifier = addr.Address
 				case datastore.ContractType(executor.ProxyType):
 					executorAddress = addr.Address
-				case datastore.ContractType(committee_verifier.ResolverType):
+				case datastore.ContractType(sequences.CommitteeVerifierResolverType):
 					committeeVerifierResolver = addr.Address
 				}
 			}
@@ -114,11 +114,11 @@ func TestConfigureChainForLanes(t *testing.T) {
 									Type:    datastore.ContractType(committee_verifier.ContractType),
 									Version: committee_verifier.Version,
 								},
-								{
-									Address: committeeVerifierResolver,
-									Type:    datastore.ContractType(committee_verifier.ResolverType),
-									Version: committee_verifier.Version,
-								},
+							{
+								Address: committeeVerifierResolver,
+								Type:    datastore.ContractType(sequences.CommitteeVerifierResolverType),
+								Version: semver.MustParse("1.7.0"),
+							},
 							},
 							RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
 								remoteChainSelector: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
@@ -209,7 +209,6 @@ func TestConfigureChainForLanes(t *testing.T) {
 			require.NoError(t, err, "ExecuteOperation should not error")
 			require.Equal(t, uint8(1), signatureQuorumReport.Output.Threshold, "Threshold in CommitteeVerifier signature config should be 1")
 			require.Equal(t, []common.Address{common.HexToAddress("0x01")}, signatureQuorumReport.Output.Signers, "Signers in CommitteeVerifier signature config should match")
-			require.Equal(t, remoteChainSelector, signatureQuorumReport.Output.SourceChainSelector, "Source chain selector in CommitteeVerifier signature config should match remote chain selector")
 
 			// Check outbound implementation on CommitteeVerifierResolver
 			boundResolver, err := versioned_verifier_resolver.NewVersionedVerifierResolver(common.HexToAddress(committeeVerifierResolver), evmChain.Client)
@@ -219,7 +218,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 			require.Equal(t, committeeVerifier, outboundImpl.Hex(), "Outbound implementation verifier on CommitteeVerifierResolver should match CommitteeVerifier address")
 
 			// Check inbound implementation on CommitteeVerifierResolver
-			versionTagReport, err := operations.ExecuteOperation(e.OperationsBundle, committee_verifier.GetVersionTag, evmChain, contract.FunctionInput[any]{
+			versionTagReport, err := operations.ExecuteOperation(e.OperationsBundle, committee_verifier.VersionTag, evmChain, contract.FunctionInput[struct{}]{
 				ChainSelector: evmChain.Selector,
 				Address:       common.HexToAddress(committeeVerifier),
 			})

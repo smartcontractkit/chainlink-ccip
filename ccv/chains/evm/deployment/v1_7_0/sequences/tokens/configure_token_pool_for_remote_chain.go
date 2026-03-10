@@ -9,22 +9,23 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	tp_bindings "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/token_pool"
+
 	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	onrampops_v150 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/onramp"
 	onrampops_v160 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
 	fqops_v163 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_3/operations/fee_quoter"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
+	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
+
 	fqops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/advanced_pool_hooks"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/token_pool"
 	v17seq "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/type_and_version"
@@ -92,7 +93,7 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 			activePoolRemotePools = imported.RemotePools
 		}
 
-		localDecimalsReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetTokenDecimals, chain, evm_contract.FunctionInput[any]{
+		localDecimalsReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetTokenDecimals, chain, evm_contract.FunctionInput[struct{}]{
 			ChainSelector: input.ChainSelector,
 			Address:       input.TokenPoolAddress,
 		})
@@ -227,10 +228,10 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 				for _, activePoolAddr := range activePoolRemotePools {
 					padded := common.LeftPadBytes(activePoolAddr, 32)
 					if !containsPool(padded) {
-						addReport, err := cldf_ops.ExecuteOperation(b, token_pool.AddRemotePool, chain, evm_contract.FunctionInput[token_pool.RemotePoolArgs]{
+						addReport, err := cldf_ops.ExecuteOperation(b, token_pool.AddRemotePool, chain, evm_contract.FunctionInput[token_pool.AddRemotePoolArgs]{
 							ChainSelector: input.ChainSelector,
 							Address:       input.TokenPoolAddress,
-							Args: token_pool.RemotePoolArgs{
+							Args: token_pool.AddRemotePoolArgs{
 								RemoteChainSelector: input.RemoteChainSelector,
 								RemotePoolAddress:   padded,
 							},
@@ -243,10 +244,10 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 					}
 				}
 				if !containsPool(common.LeftPadBytes(input.RemoteChainConfig.RemotePool, 32)) {
-					addRemotePoolsReport, err := cldf_ops.ExecuteOperation(b, token_pool.AddRemotePool, chain, evm_contract.FunctionInput[token_pool.RemotePoolArgs]{
+					addRemotePoolsReport, err := cldf_ops.ExecuteOperation(b, token_pool.AddRemotePool, chain, evm_contract.FunctionInput[token_pool.AddRemotePoolArgs]{
 						ChainSelector: input.ChainSelector,
 						Address:       input.TokenPoolAddress,
-						Args: token_pool.RemotePoolArgs{
+						Args: token_pool.AddRemotePoolArgs{
 							RemoteChainSelector: input.RemoteChainSelector,
 							RemotePoolAddress:   common.LeftPadBytes(input.RemoteChainConfig.RemotePool, 32),
 						},
@@ -294,8 +295,8 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 						RemoteChainSelector:       input.RemoteChainSelector,
 						RemotePoolAddresses:       remotePoolAddresses,
 						RemoteTokenAddress:        common.LeftPadBytes(input.RemoteChainConfig.RemoteToken, 32),
-						OutboundRateLimiterConfig: defaultFinalityOutboundRateLimiterConfig,
-						InboundRateLimiterConfig:  defaultFinalityInboundRateLimiterConfig,
+						OutboundRateLimiterConfig: tokensRateLimiterToConfig(defaultFinalityOutboundRateLimiterConfig),
+						InboundRateLimiterConfig:  tokensRateLimiterToConfig(defaultFinalityInboundRateLimiterConfig),
 					},
 				},
 			},
@@ -338,11 +339,11 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to make token transfer fee config updates: %w", err)
 		}
 		if len(tokenTransferFeeConfigUpdates) > 0 {
-			applyTokenTransferFeeConfigUpdatesReport, err := cldf_ops.ExecuteOperation(b, token_pool.ApplyTokenTransferFeeConfigUpdates, chain, evm_contract.FunctionInput[token_pool.TokenTransferFeeConfigArgs]{
+			applyTokenTransferFeeConfigUpdatesReport, err := cldf_ops.ExecuteOperation(b, token_pool.ApplyTokenTransferFeeConfigUpdates, chain, evm_contract.FunctionInput[token_pool.ApplyTokenTransferFeeConfigUpdatesArgs]{
 				ChainSelector: input.ChainSelector,
 				Address:       input.TokenPoolAddress,
-				Args: token_pool.TokenTransferFeeConfigArgs{
-					TokenTransferFeeConfigUpdates: tokenTransferFeeConfigUpdates,
+				Args: token_pool.ApplyTokenTransferFeeConfigUpdatesArgs{
+					TokenTransferFeeConfigArgs: tokenTransferFeeConfigUpdates,
 				},
 			})
 			if err != nil {
@@ -580,8 +581,8 @@ func maybeUpdateRateLimiters(
 		ChainSelector: chainSelector,
 		Address:       tokenPoolAddress,
 		Args: token_pool.GetCurrentRateLimiterStateArgs{
-			RemoteChainSelector:     remoteChainSelector,
-			CustomBlockConfirmation: customBlockConfirmation,
+			RemoteChainSelector:      remoteChainSelector,
+			CustomBlockConfirmations: customBlockConfirmation,
 		},
 	})
 	if err != nil {
@@ -595,15 +596,15 @@ func maybeUpdateRateLimiters(
 	// Disabling traffic on a token is allowed, as in this case IsEnabled would be true with rate = capacity = 0.
 	if (!rateLimiterConfigsEqual(currentStates.InboundRateLimiterState, desiredInboundRateLimiterConfig) && desiredInboundRateLimiterConfig.IsEnabled) ||
 		(!rateLimiterConfigsEqual(currentStates.OutboundRateLimiterState, desiredOutboundRateLimiterConfig) && desiredOutboundRateLimiterConfig.IsEnabled) {
-		setInboundRateLimiterReport, err := cldf_ops.ExecuteOperation(b, token_pool.SetRateLimitConfig, chain, evm_contract.FunctionInput[[]token_pool.SetRateLimitConfigArg]{
+		setInboundRateLimiterReport, err := cldf_ops.ExecuteOperation(b, token_pool.SetRateLimitConfig, chain, evm_contract.FunctionInput[[]token_pool.RateLimitConfigArgs]{
 			ChainSelector: chainSelector,
 			Address:       tokenPoolAddress,
-			Args: []token_pool.SetRateLimitConfigArg{
+			Args: []token_pool.RateLimitConfigArgs{
 				{
 					RemoteChainSelector:       remoteChainSelector,
-					CustomBlockConfirmation:   customBlockConfirmation,
-					InboundRateLimiterConfig:  desiredInboundRateLimiterConfig,
-					OutboundRateLimiterConfig: desiredOutboundRateLimiterConfig,
+					CustomBlockConfirmations:  customBlockConfirmation,
+					InboundRateLimiterConfig:  tokensRateLimiterToConfig(desiredInboundRateLimiterConfig),
+					OutboundRateLimiterConfig: tokensRateLimiterToConfig(desiredOutboundRateLimiterConfig),
 				},
 			},
 		})
@@ -617,10 +618,19 @@ func maybeUpdateRateLimiters(
 }
 
 // rateLimiterConfigsEqual returns true if the current rate limiter config on-chain matches the desired config.
-func rateLimiterConfigsEqual(current tp_bindings.RateLimiterTokenBucket, desired tokens.RateLimiterConfig) bool {
+func rateLimiterConfigsEqual(current token_pool.TokenBucket, desired tokens.RateLimiterConfig) bool {
 	return current.IsEnabled == desired.IsEnabled &&
 		current.Capacity.Cmp(desired.Capacity) == 0 &&
 		current.Rate.Cmp(desired.Rate) == 0
+}
+
+// tokensRateLimiterToConfig converts tokens.RateLimiterConfig to token_pool.Config.
+func tokensRateLimiterToConfig(c tokens.RateLimiterConfig) token_pool.Config {
+	return token_pool.Config{
+		IsEnabled: c.IsEnabled,
+		Capacity:  c.Capacity,
+		Rate:      c.Rate,
+	}
 }
 
 func applyTokenTransferFeeConfigIfNeeded(b cldf_ops.Bundle, chain evm.Chain, input ConfigureTokenPoolForRemoteChainInput, remoteChainSelector uint64) ([]evm_contract.WriteOutput, error) {
@@ -631,11 +641,12 @@ func applyTokenTransferFeeConfigIfNeeded(b cldf_ops.Bundle, chain evm.Chain, inp
 	if len(tokenTransferFeeConfigUpdates) == 0 {
 		return nil, nil
 	}
-	report, err := cldf_ops.ExecuteOperation(b, token_pool.ApplyTokenTransferFeeConfigUpdates, chain, evm_contract.FunctionInput[token_pool.TokenTransferFeeConfigArgs]{
+	report, err := cldf_ops.ExecuteOperation(b, token_pool.ApplyTokenTransferFeeConfigUpdates, chain, evm_contract.FunctionInput[token_pool.ApplyTokenTransferFeeConfigUpdatesArgs]{
 		ChainSelector: input.ChainSelector,
 		Address:       input.TokenPoolAddress,
-		Args: token_pool.TokenTransferFeeConfigArgs{
-			TokenTransferFeeConfigUpdates: tokenTransferFeeConfigUpdates,
+		Args: token_pool.ApplyTokenTransferFeeConfigUpdatesArgs{
+			TokenTransferFeeConfigArgs:     tokenTransferFeeConfigUpdates,
+			DisableTokenTransferFeeConfigs: nil,
 		},
 	})
 	if err != nil {
@@ -685,7 +696,7 @@ func v2FeeQuoterConfigToTokenTransferFeeConfig(cfg fqops.TokenTransferFeeConfig)
 
 func importTokenTransferFeeConfigFromActivePool(b cldf_ops.Bundle, chain evm.Chain, input ConfigureTokenPoolForRemoteChainInput) (*tokens.TokenTransferFeeConfig, error) {
 	// get router from token
-	dCfgReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetDynamicConfig, chain, evm_contract.FunctionInput[any]{
+	dCfgReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetDynamicConfig, chain, evm_contract.FunctionInput[struct{}]{
 		ChainSelector: input.ChainSelector,
 		Address:       input.TokenPoolAddress,
 	})
@@ -722,19 +733,20 @@ func importTokenTransferFeeConfigFromActivePool(b cldf_ops.Bundle, chain evm.Cha
 		return nil, fmt.Errorf("failed to get type and version of onRamp %s on chain %s: %w", onRampAddr.Hex(), chain.String(), err)
 	}
 	onRampTAV := onRampTAVReport.Output.Version
-	switch onRampTAV {
-	case semver.MustParse("1.5.0"):
+	switch onRampTAV.String() {
+	case semver.MustParse("1.5.0").String():
 		// for onRamp version 1.5.0, import tokenTransferFeeConfig from onRamp 1.5.0
 		tokenTransferFeeConfigReport, err := cldf_ops.ExecuteOperation(b, onrampops_v150.OnRampGetTokenTransferFeeConfig, chain, evm_contract.FunctionInput[common.Address]{
 			ChainSelector: input.ChainSelector,
-			Address:       input.TokenAddress,
+			Address:       onRampAddr,
+			Args:          input.TokenAddress,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to get token transfer fee config from onRamp %s for token %s on chain %s: %w",
 				onRampAddr.Hex(), input.TokenAddress.Hex(), chain.String(), err)
 		}
 		return v150OnRampConfigToTokenTransferFeeConfig(tokenTransferFeeConfigReport.Output), nil
-	case semver.MustParse("1.6.0"): // for onRamp versions 1.6.0 , import tokenTransferFeeConfig from FeeQuoter
+	case semver.MustParse("1.6.0").String(): // for onRamp versions 1.6.0 , import tokenTransferFeeConfig from FeeQuoter
 		// get fee quoter from onRamp
 		dCfgOnRamp, err := cldf_ops.ExecuteOperation(b, onrampops_v160.GetDynamicConfig, chain, evm_contract.FunctionInput[struct{}]{
 			ChainSelector: input.ChainSelector,
@@ -763,7 +775,7 @@ func importTokenTransferFeeConfigFromActivePool(b cldf_ops.Bundle, chain evm.Cha
 				feeQuoterAddr.Hex(), input.TokenAddress.Hex(), input.RemoteChainSelector, chain.String(), err)
 		}
 		return v163FeeQuoterConfigToTokenTransferFeeConfig(tokenTransferFeeConfigReport.Output), nil
-	case onrampops.Version:
+	case onrampops.Version.String():
 		// get fee quoter from onRamp
 		dCfgOnRamp, err := cldf_ops.ExecuteOperation(b, onrampops.GetDynamicConfig, chain, evm_contract.FunctionInput[struct{}]{
 			ChainSelector: input.ChainSelector,
@@ -827,7 +839,7 @@ func mergeTokenTransferFeeConfig(desired, imported *tokens.TokenTransferFeeConfi
 	return &merged
 }
 
-func makeTokenTransferFeeConfigUpdates(b cldf_ops.Bundle, chain evm.Chain, input ConfigureTokenPoolForRemoteChainInput, remoteChainSelector uint64) ([]token_pool.TokenTransferFeeConfigUpdate, error) {
+func makeTokenTransferFeeConfigUpdates(b cldf_ops.Bundle, chain evm.Chain, input ConfigureTokenPoolForRemoteChainInput, remoteChainSelector uint64) ([]token_pool.TokenTransferFeeConfigArgs, error) {
 	desiredTokenTransferFeeConfig := input.RemoteChainConfig.TokenTransferFeeConfig
 	importedConfig, err := importTokenTransferFeeConfigFromActivePool(b, chain, input)
 	if err != nil {
@@ -838,10 +850,15 @@ func makeTokenTransferFeeConfigUpdates(b cldf_ops.Bundle, chain evm.Chain, input
 	if !desiredTokenTransferFeeConfig.IsEnabled {
 		return nil, nil
 	}
-	report, err := cldf_ops.ExecuteOperation(b, token_pool.GetTokenTransferFeeConfig, chain, evm_contract.FunctionInput[uint64]{
+	report, err := cldf_ops.ExecuteOperation(b, token_pool.GetTokenTransferFeeConfig, chain, evm_contract.FunctionInput[token_pool.GetTokenTransferFeeConfigArgs]{
 		ChainSelector: input.ChainSelector,
 		Address:       input.TokenPoolAddress,
-		Args:          remoteChainSelector,
+		Args: token_pool.GetTokenTransferFeeConfigArgs{
+			Arg0:              common.Address{},
+			DestChainSelector: remoteChainSelector,
+			Arg2:              0,
+			Arg3:              []byte{},
+		},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get token transfer fee config: %w", err)
@@ -869,7 +886,7 @@ func makeTokenTransferFeeConfigUpdates(b cldf_ops.Bundle, chain evm.Chain, input
 		desiredTokenTransferFeeConfig.CustomFinalityTransferFeeBps = currentTokenTransferFeeConfig.CustomBlockConfirmationsTransferFeeBps
 	}
 
-	updates := make([]token_pool.TokenTransferFeeConfigUpdate, 0)
+	updates := make([]token_pool.TokenTransferFeeConfigArgs, 0)
 
 	if desiredTokenTransferFeeConfig.DestGasOverhead != currentTokenTransferFeeConfig.DestGasOverhead ||
 		desiredTokenTransferFeeConfig.DestBytesOverhead != currentTokenTransferFeeConfig.DestBytesOverhead ||
@@ -877,15 +894,17 @@ func makeTokenTransferFeeConfigUpdates(b cldf_ops.Bundle, chain evm.Chain, input
 		desiredTokenTransferFeeConfig.CustomFinalityFeeUSDCents != currentTokenTransferFeeConfig.CustomBlockConfirmationsFeeUSDCents ||
 		desiredTokenTransferFeeConfig.DefaultFinalityTransferFeeBps != currentTokenTransferFeeConfig.DefaultBlockConfirmationsTransferFeeBps ||
 		desiredTokenTransferFeeConfig.CustomFinalityTransferFeeBps != currentTokenTransferFeeConfig.CustomBlockConfirmationsTransferFeeBps {
-		updates = append(updates, token_pool.TokenTransferFeeConfigUpdate{
-			DestChainSelector:                      remoteChainSelector,
-			DestGasOverhead:                        desiredTokenTransferFeeConfig.DestGasOverhead,
-			DestBytesOverhead:                      desiredTokenTransferFeeConfig.DestBytesOverhead,
-			DefaultBlockConfirmationFeeUSDCents:    desiredTokenTransferFeeConfig.DefaultFinalityFeeUSDCents,
-			CustomBlockConfirmationFeeUSDCents:     desiredTokenTransferFeeConfig.CustomFinalityFeeUSDCents,
-			DefaultBlockConfirmationTransferFeeBps: desiredTokenTransferFeeConfig.DefaultFinalityTransferFeeBps,
-			CustomBlockConfirmationTransferFeeBps:  desiredTokenTransferFeeConfig.CustomFinalityTransferFeeBps,
-			IsEnabled:                              true,
+		updates = append(updates, token_pool.TokenTransferFeeConfigArgs{
+			DestChainSelector: remoteChainSelector,
+			TokenTransferFeeConfig: token_pool.TokenTransferFeeConfig{
+				DestGasOverhead:                         desiredTokenTransferFeeConfig.DestGasOverhead,
+				DestBytesOverhead:                       desiredTokenTransferFeeConfig.DestBytesOverhead,
+				DefaultBlockConfirmationsFeeUSDCents:    desiredTokenTransferFeeConfig.DefaultFinalityFeeUSDCents,
+				CustomBlockConfirmationsFeeUSDCents:     desiredTokenTransferFeeConfig.CustomFinalityFeeUSDCents,
+				DefaultBlockConfirmationsTransferFeeBps: desiredTokenTransferFeeConfig.DefaultFinalityTransferFeeBps,
+				CustomBlockConfirmationsTransferFeeBps:  desiredTokenTransferFeeConfig.CustomFinalityTransferFeeBps,
+				IsEnabled:                               true,
+			},
 		})
 	}
 

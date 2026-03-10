@@ -15,8 +15,8 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/erc20_lock_box"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/siloed_usdc_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/erc20_lock_box"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/siloed_usdc_token_pool"
 	tokens_sequences "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/tokens"
 )
 
@@ -63,7 +63,7 @@ var DeploySiloedUSDCLockRelease = cldf_ops.NewSequence(
 					Token:              common.HexToAddress(input.USDCToken),
 					LocalTokenDecimals: input.TokenDecimals,
 					AdvancedPoolHooks:  common.Address{},
-					RMNProxy:           common.HexToAddress(input.RMN),
+					RmnProxy:           common.HexToAddress(input.RMN),
 					Router:             common.HexToAddress(input.Router),
 				},
 			})
@@ -116,7 +116,7 @@ var DeploySiloedUSDCLockRelease = cldf_ops.NewSequence(
 			lbAddr := lockBoxes[sel]
 			lockBoxAddress := common.HexToAddress(lbAddr)
 			// Check if already authorized
-			callersReport, err := cldf_ops.ExecuteOperation(b, erc20_lock_box.GetAllAuthorizedCallers, chain, contract_utils.FunctionInput[any]{
+			callersReport, err := cldf_ops.ExecuteOperation(b, erc20_lock_box.GetAllAuthorizedCallers, chain, contract_utils.FunctionInput[struct{}]{
 				ChainSelector: input.ChainSelector,
 				Address:       lockBoxAddress,
 			})
