@@ -15,11 +15,12 @@ import (
 	onrampops_v150 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/onramp"
 	onrampops_v160 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
 	fqops_v163 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_3/operations/fee_quoter"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
+
+	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 
 	fqops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 
@@ -722,19 +723,20 @@ func importTokenTransferFeeConfigFromActivePool(b cldf_ops.Bundle, chain evm.Cha
 		return nil, fmt.Errorf("failed to get type and version of onRamp %s on chain %s: %w", onRampAddr.Hex(), chain.String(), err)
 	}
 	onRampTAV := onRampTAVReport.Output.Version
-	switch onRampTAV {
-	case semver.MustParse("1.5.0"):
+	switch onRampTAV.String() {
+	case semver.MustParse("1.5.0").String():
 		// for onRamp version 1.5.0, import tokenTransferFeeConfig from onRamp 1.5.0
 		tokenTransferFeeConfigReport, err := cldf_ops.ExecuteOperation(b, onrampops_v150.OnRampGetTokenTransferFeeConfig, chain, evm_contract.FunctionInput[common.Address]{
 			ChainSelector: input.ChainSelector,
-			Address:       input.TokenAddress,
+			Address:       onRampAddr,
+			Args:          input.TokenAddress,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to get token transfer fee config from onRamp %s for token %s on chain %s: %w",
 				onRampAddr.Hex(), input.TokenAddress.Hex(), chain.String(), err)
 		}
 		return v150OnRampConfigToTokenTransferFeeConfig(tokenTransferFeeConfigReport.Output), nil
-	case semver.MustParse("1.6.0"): // for onRamp versions 1.6.0 , import tokenTransferFeeConfig from FeeQuoter
+	case semver.MustParse("1.6.0").String(): // for onRamp versions 1.6.0 , import tokenTransferFeeConfig from FeeQuoter
 		// get fee quoter from onRamp
 		dCfgOnRamp, err := cldf_ops.ExecuteOperation(b, onrampops_v160.GetDynamicConfig, chain, evm_contract.FunctionInput[struct{}]{
 			ChainSelector: input.ChainSelector,
@@ -763,7 +765,7 @@ func importTokenTransferFeeConfigFromActivePool(b cldf_ops.Bundle, chain evm.Cha
 				feeQuoterAddr.Hex(), input.TokenAddress.Hex(), input.RemoteChainSelector, chain.String(), err)
 		}
 		return v163FeeQuoterConfigToTokenTransferFeeConfig(tokenTransferFeeConfigReport.Output), nil
-	case onrampops.Version:
+	case onrampops.Version.String():
 		// get fee quoter from onRamp
 		dCfgOnRamp, err := cldf_ops.ExecuteOperation(b, onrampops.GetDynamicConfig, chain, evm_contract.FunctionInput[struct{}]{
 			ChainSelector: input.ChainSelector,
