@@ -8,7 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/onramp"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/committee_verifier"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/executor"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
@@ -90,7 +90,7 @@ func TestConfigureLaneLegAsSourceAndDest(t *testing.T) {
 					committeeVerifierAddr = addr.Address
 				case datastore.ContractType(executor.ProxyType):
 					executorAddr = addr.Address
-				case datastore.ContractType(committee_verifier.ResolverType):
+				case datastore.ContractType(sequences.CommitteeVerifierResolverType):
 					committeeVerifierResolverAddr = addr.Address
 				}
 			}
@@ -136,7 +136,7 @@ func TestConfigureLaneLegAsSourceAndDest(t *testing.T) {
 					remoteCommitteeVerifierAddr = addr.Address
 				case datastore.ContractType(executor.ProxyType):
 					remoteExecutorAddr = addr.Address
-				case datastore.ContractType(committee_verifier.ResolverType):
+				case datastore.ContractType(sequences.CommitteeVerifierResolverType):
 					remoteCommitteeVerifierResolverAddr = addr.Address
 				}
 			}
@@ -151,7 +151,7 @@ func TestConfigureLaneLegAsSourceAndDest(t *testing.T) {
 						},
 						{
 							Address: committeeVerifierResolverAddr,
-							Type:    datastore.ContractType(committee_verifier.ResolverType),
+							Type:    datastore.ContractType(sequences.CommitteeVerifierResolverType),
 							Version: committee_verifier.Version,
 						},
 					},
@@ -180,7 +180,7 @@ func TestConfigureLaneLegAsSourceAndDest(t *testing.T) {
 						},
 						{
 							Address: remoteCommitteeVerifierResolverAddr,
-							Type:    datastore.ContractType(committee_verifier.ResolverType),
+							Type:    datastore.ContractType(sequences.CommitteeVerifierResolverType),
 							Version: committee_verifier.Version,
 						},
 					},

@@ -59,24 +59,20 @@ func TestConfigureCommitteeVerifierForLanes(t *testing.T) {
 							},
 							{
 								Address: committeeVerifierResolver,
-								Type:    datastore.ContractType(committee_verifier.ResolverType),
-								Version: committee_verifier.Version,
+								Type:    datastore.ContractType(sequences.CommitteeVerifierResolverType),
+								Version: semver.MustParse("1.7.0"),
 							},
 						},
 						RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainConfig{
 							remoteChainSelector: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
 						},
 					},
-					RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
-						remoteChainSelector: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
-					},
-				},
-			}
+				}
+			},
+			expectedErr: "",
 		},
-		expectedErr: "",
-	},
-	{
-		desc: "multiple remote chains",
+		{
+			desc: "multiple remote chains",
 			makeInput: func(chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) sequences.ConfigureCommitteeVerifierForLanesInput {
 				var routerAddress string
 				var committeeVerifier string
@@ -103,10 +99,11 @@ func TestConfigureCommitteeVerifierForLanes(t *testing.T) {
 								Type:    datastore.ContractType(committee_verifier.ContractType),
 								Version: committee_verifier.Version,
 							},
-						{
-							Address: committeeVerifierResolver,
-							Type:    datastore.ContractType(sequences.CommitteeVerifierResolverType),
-							Version: semver.MustParse("1.7.0"),
+							{
+								Address: committeeVerifierResolver,
+								Type:    datastore.ContractType(sequences.CommitteeVerifierResolverType),
+								Version: semver.MustParse("1.7.0"),
+							},
 						},
 						RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainConfig{
 							remoteChainSelector1: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
@@ -147,10 +144,11 @@ func TestConfigureCommitteeVerifierForLanes(t *testing.T) {
 								Type:    datastore.ContractType(committee_verifier.ContractType),
 								Version: committee_verifier.Version,
 							},
-						{
-							Address: committeeVerifierResolver,
-							Type:    datastore.ContractType(sequences.CommitteeVerifierResolverType),
-							Version: semver.MustParse("1.7.0"),
+							{
+								Address: committeeVerifierResolver,
+								Type:    datastore.ContractType(sequences.CommitteeVerifierResolverType),
+								Version: semver.MustParse("1.7.0"),
+							},
 						},
 						RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainConfig{
 							remoteChainSelector: config,
