@@ -191,7 +191,11 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
   /// @param remoteChainSelector the CCIP specific selector for the remote chain currently using a
   /// non-canonical form of USDC which they wish to update to canonical. Function will revert if an existing migration
   /// proposal is already in progress.
-  /// @dev This function can only be called by the owner
+  /// @dev This function can only be called by the owner.
+  /// @dev IMPORTANT: Before calling this function, the lane MUST be paused to prevent new lock or burn / release or mint transactions.
+  /// This ensures that the locked-USDC snapshot set via setLockedUSDCToBurn remains valid until the burn.
+  /// Without pausing, releases occurring after the snapshot but before the burn could reduce the
+  /// lockbox balance, causing burnLockedUSDC to over-burn.
   function proposeCCTPMigration(
     uint64 remoteChainSelector
   ) external onlyOwner {
@@ -302,7 +306,7 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
 
   /// @notice Burn USDC locked for a specific lane so that destination USDC can be converted from
   /// non-canonical to canonical USDC.
-  /// @dev This function can only be called by an address specified by the owner to be controlled by circle
+  /// @dev This function can only be called by an address specified by the owner to be controlled by circle.
   /// @dev This function signature should NEVER be overwritten, otherwise it will be unable to be called by
   /// circle to properly migrate USDC over to CCTP.
   function burnLockedUSDC() external {

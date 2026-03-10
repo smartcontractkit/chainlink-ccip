@@ -55,19 +55,26 @@ abstract contract CCIPReceiver is IAny2EVMMessageReceiverV2, IERC165 {
     return address(i_ccipRouter);
   }
 
-  /// @notice Return the CCVs required/optional for a source chain.
-  /// @dev this can be overridden to specify different CCVs per source chain. The current implementation means the
-  /// default CCV is used.
-  function getCCVs(
-    uint64
+  /// @notice Return the CCVs required/optional and min block depth for a source chain.
+  /// @dev This can be overridden to specify different CCVs per source chain. The current implementation means the
+  /// default CCV is used and finality is required (minBlockDepth = 0).
+  function getCCVsAndMinBlockDepth(
+    uint64,
+    bytes calldata
   )
     external
     view
     virtual
-    returns (address[] memory requiredCCVs, address[] memory optionalCCVs, uint8 optionalThreshold)
+    returns (
+      address[] memory requiredCCVs,
+      address[] memory optionalCCVs,
+      uint8 optionalThreshold,
+      uint16 minBlockDepth
+    )
   {
     // By default no specific CCVs are required or optional. This means the default CCV is chosen.
-    return (new address[](0), new address[](0), 0);
+    // minBlockDepth = 0 means finality is required.
+    return (new address[](0), new address[](0), 0, 0);
   }
 
   error InvalidRouter(address router);

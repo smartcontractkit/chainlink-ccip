@@ -97,3 +97,177 @@ contracts:
         access: public
       - name: getAllSourceChainConfigs
         access: public
+
+  # Token Pool contracts (latest / v2.0.0)
+
+  - contract_name: TokenPool
+    version: "2.0.0"
+    version_path: "latest"
+    abi_file: burn_mint_token_pool.json
+    no_deployment: true
+    functions:
+      - name: setMinBlockConfirmations
+        access: owner
+      - name: addRemotePool
+        access: owner
+      - name: removeRemotePool
+        access: owner
+      - name: setDynamicConfig
+        access: owner
+      - name: withdrawFeeTokens
+        access: owner
+      - name: updateAdvancedPoolHooks
+        access: owner
+      - name: applyChainUpdates
+        access: owner
+      - name: setRateLimitConfig
+        access: owner
+      - name: applyTokenTransferFeeConfigUpdates
+        access: owner
+      - name: getDynamicConfig
+        access: public
+      - name: getRmnProxy
+        access: public
+      - name: getCurrentRateLimiterState
+        access: public
+      - name: getMinBlockConfirmations
+        access: public
+      - name: getSupportedChains
+        access: public
+      - name: getRemotePools
+        access: public
+      - name: getRemoteToken
+        access: public
+      - name: getToken
+        access: public
+      - name: getTokenDecimals
+        access: public
+      - name: isSupportedToken
+        access: public
+      - name: getAdvancedPoolHooks
+        access: public
+      - name: getTokenTransferFeeConfig
+        access: public
+
+  - contract_name: BurnMintTokenPool
+    version: "2.0.0"
+    version_path: "latest"
+    functions: []
+
+  - contract_name: BurnFromMintTokenPool
+    version: "2.0.0"
+    version_path: "latest"
+    functions: []
+
+  - contract_name: BurnWithFromMintTokenPool
+    version: "2.0.0"
+    version_path: "latest"
+    functions: []
+
+  - contract_name: BurnToAddressMintTokenPool
+    version: "2.0.0"
+    version_path: "latest"
+    functions: []
+
+  - contract_name: BurnMintWithLockReleaseFlagTokenPool
+    version: "2.0.0"
+    version_path: "latest"
+    functions: []
+
+  - contract_name: LockReleaseTokenPool
+    version: "2.0.0"
+    version_path: "latest"
+    functions: []
+
+  - contract_name: SiloedLockReleaseTokenPool
+    version: "2.0.0"
+    version_path: "latest"
+    functions: []
+
+  - contract_name: SiloedUSDCTokenPool
+    version: "2.0.0"
+    version_path: "latest"
+    functions:
+      - name: configureLockBoxes
+        access: owner
+      - name: applyAuthorizedCallerUpdates
+        access: owner
+      - name: getAllAuthorizedCallers
+        access: public
+
+  - contract_name: LombardTokenPool
+    version: "2.0.0"
+    version_path: "latest"
+    functions:
+      - name: setPath
+        access: owner
+      - name: getPath
+        access: public
+
+  - contract_name: CCTPThroughCCVTokenPool
+    version: "2.0.0"
+    version_path: "latest"
+    functions:
+      - name: applyAuthorizedCallerUpdates
+        access: owner
+
+  - contract_name: USDCTokenPoolProxy
+    version: "2.0.0"
+    version_path: "latest"
+    functions:
+      - name: getPools
+        access: public
+      - name: updateLockOrBurnMechanisms
+        access: owner
+      - name: updatePoolAddresses
+        access: owner
+      - name: setFeeAggregator
+        access: owner
+
+  - contract_name: AdvancedPoolHooksExtractor
+    version: "2.0.0"
+    version_path: "latest"
+    functions: []
+
+  - contract_name: CCTPMessageTransmitterProxy
+    version: "2.0.0"
+    version_path: "latest"
+    functions:
+      - name: applyAuthorizedCallerUpdates
+        access: owner
+      - name: getAllAuthorizedCallers
+        access: public
+
+  - contract_name: ERC20LockBox
+    version: "2.0.0"
+    version_path: "latest"
+    functions:
+      - name: applyAuthorizedCallerUpdates
+        access: owner
+      - name: getAllAuthorizedCallers
+        access: public
+
+  - contract_name: CommitteeVerifier
+    version: "2.0.0"
+    version_path: "latest"
+    functions:
+      - name: setDynamicConfig
+        access: owner
+      - name: applyRemoteChainConfigUpdates
+        access: owner
+      - name: applyAllowlistUpdates
+        access: owner
+      - name: withdrawFeeTokens
+        access: owner
+      - name: applySignatureConfigs
+        access: owner
+      - name: getRemoteChainConfig
+        access: public
+      - name: getDynamicConfig
+        access: public
+      - name: getSignatureConfig
+        access: public
+      - name: getFee
+        access: public
+      - name: versionTag
+        access: public

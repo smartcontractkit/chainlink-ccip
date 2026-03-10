@@ -134,7 +134,7 @@ abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
   ) internal virtual {
     for (uint256 i = 0; i < remoteChainConfigArgs.length; ++i) {
       RemoteChainConfigArgs memory remoteChainConfigArg = remoteChainConfigArgs[i];
-      uint64 remoteChainSelector = remoteChainConfigArgs[i].remoteChainSelector;
+      uint64 remoteChainSelector = remoteChainConfigArg.remoteChainSelector;
 
       if (remoteChainSelector == 0) {
         revert InvalidRemoteChainConfig(remoteChainSelector);

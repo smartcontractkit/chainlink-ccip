@@ -18,10 +18,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/advanced_pool_hooks"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/erc20_lock_box"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/lock_release_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/erc20_lock_box"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/lock_release_token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
@@ -285,7 +285,7 @@ func TestDeployLockReleaseTokenPool(t *testing.T) {
 				testsetup.BundleWithFreshReporter(e.OperationsBundle),
 				token_pool.GetToken,
 				e.BlockChains.EVMChains()[chainSel],
-				contract.FunctionInput[any]{
+				contract.FunctionInput[struct{}]{
 					ChainSelector: chainSel,
 					Address:       common.HexToAddress(poolAddress),
 				},
@@ -298,7 +298,7 @@ func TestDeployLockReleaseTokenPool(t *testing.T) {
 				testsetup.BundleWithFreshReporter(e.OperationsBundle),
 				token_pool.GetDynamicConfig,
 				e.BlockChains.EVMChains()[chainSel],
-				contract.FunctionInput[any]{
+				contract.FunctionInput[struct{}]{
 					ChainSelector: chainSel,
 					Address:       common.HexToAddress(poolAddress),
 				},
@@ -310,9 +310,9 @@ func TestDeployLockReleaseTokenPool(t *testing.T) {
 			// Check rmn proxy
 			getRmnProxyReport, err := operations.ExecuteOperation(
 				testsetup.BundleWithFreshReporter(e.OperationsBundle),
-				token_pool.GetRMNProxy,
+				token_pool.GetRmnProxy,
 				e.BlockChains.EVMChains()[chainSel],
-				contract.FunctionInput[any]{
+				contract.FunctionInput[struct{}]{
 					ChainSelector: chainSel,
 					Address:       common.HexToAddress(poolAddress),
 				},
@@ -366,7 +366,7 @@ func TestDeployLockReleaseTokenPool(t *testing.T) {
 				testsetup.BundleWithFreshReporter(e.OperationsBundle),
 				erc20_lock_box.GetAllAuthorizedCallers,
 				e.BlockChains.EVMChains()[chainSel],
-				contract.FunctionInput[any]{
+				contract.FunctionInput[struct{}]{
 					ChainSelector: chainSel,
 					Address:       common.HexToAddress(lockBoxAddress),
 				},

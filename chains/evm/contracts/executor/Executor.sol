@@ -21,7 +21,6 @@ contract Executor is IExecutor, Ownable2StepMsgSender {
   error InvalidDestChain(uint64 destChainSelector);
   error Executor__RequestedBlockDepthTooLow(uint16 requestedBlockDepth, uint16 minBlockConfirmations);
   error InvalidMaxPossibleCCVsPerMsg(uint256 maxPossibleCCVsPerMsg);
-  error InvalidConfig();
 
   event CCVAllowlistUpdated(bool enabled);
   event CCVAdded(address indexed ccv);
