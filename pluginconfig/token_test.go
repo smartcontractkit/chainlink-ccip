@@ -543,8 +543,8 @@ func Test_TokenDataObserver_Validation(t *testing.T) {
 			AttestationAPICooldown: commonconfig.MustNewDuration(5 * time.Minute),
 			Tokens: map[cciptypes.ChainSelector]USDCCCTPTokenConfig{
 				1: {
-					SourcePoolAddress:            "0xabc",
-					SourceMessageTransmitterAddr: "0xefg",
+					SourcePoolAddress:            "0xabcd",
+					SourceMessageTransmitterAddr: "0x1234",
 				},
 			},
 		}
@@ -564,7 +564,7 @@ func Test_TokenDataObserver_Validation(t *testing.T) {
 				ObserveTimeout:          commonconfig.MustNewDuration(5 * time.Second),
 			},
 			SourcePoolAddressByChain: map[cciptypes.ChainSelector]string{
-				1: "0xabc",
+				1: "0xabcd",
 			},
 		}
 	}
@@ -627,6 +627,58 @@ func Test_TokenDataObserver_Validation(t *testing.T) {
 			errMsg:      "Tokens not set",
 		},
 		{
+			name: "usdc type is set but token address is missing",
+			config: withBaseConfig(
+				TokenDataObserverConfig{
+					Type:    "usdc-cctp",
+					Version: "1.0",
+					USDCCCTPObserverConfig: &USDCCCTPObserverConfig{
+						AttestationConfig: AttestationConfig{
+							AttestationAPI:         "http://localhost:8080",
+							AttestationAPITimeout:  commonconfig.MustNewDuration(time.Second),
+							AttestationAPIInterval: commonconfig.MustNewDuration(500 * time.Millisecond),
+						},
+						AttestationAPICooldown: commonconfig.MustNewDuration(5 * time.Minute),
+						Tokens: map[cciptypes.ChainSelector]USDCCCTPTokenConfig{
+							1: {
+								SourcePoolAddress:            "",
+								SourceMessageTransmitterAddr: "",
+							},
+						},
+					},
+				}),
+			usdcEnabled: true,
+			lbtcEnabled: false,
+			wantErr:     true,
+			errMsg:      "SourcePoolAddress not set",
+		},
+		{
+			name: "usdc type is set but token address is zero",
+			config: withBaseConfig(
+				TokenDataObserverConfig{
+					Type:    "usdc-cctp",
+					Version: "1.0",
+					USDCCCTPObserverConfig: &USDCCCTPObserverConfig{
+						AttestationConfig: AttestationConfig{
+							AttestationAPI:         "http://localhost:8080",
+							AttestationAPITimeout:  commonconfig.MustNewDuration(time.Second),
+							AttestationAPIInterval: commonconfig.MustNewDuration(500 * time.Millisecond),
+						},
+						AttestationAPICooldown: commonconfig.MustNewDuration(5 * time.Minute),
+						Tokens: map[cciptypes.ChainSelector]USDCCCTPTokenConfig{
+							1: {
+								SourcePoolAddress:            "0x1234",
+								SourceMessageTransmitterAddr: "0x0000",
+							},
+						},
+					},
+				}),
+			usdcEnabled: true,
+			lbtcEnabled: false,
+			wantErr:     true,
+			errMsg:      "SourceMessageTransmitterAddress not set",
+		},
+		{
 			name: "lbtc type is set but tokens are missing",
 			config: withBaseConfig(
 				TokenDataObserverConfig{
@@ -644,6 +696,28 @@ func Test_TokenDataObserver_Validation(t *testing.T) {
 			lbtcEnabled: true,
 			wantErr:     true,
 			errMsg:      "SourcePoolAddressByChain is not set",
+		},
+		{
+			name: "lbtc type is set but tokens set to zero address",
+			config: withBaseConfig(
+				TokenDataObserverConfig{
+					Type:    "lbtc",
+					Version: "1.0",
+					LBTCObserverConfig: &LBTCObserverConfig{
+						AttestationConfig: AttestationConfig{
+							AttestationAPI:         "http://localhost:8080",
+							AttestationAPITimeout:  commonconfig.MustNewDuration(time.Second),
+							AttestationAPIInterval: commonconfig.MustNewDuration(500 * time.Millisecond),
+						},
+						SourcePoolAddressByChain: map[cciptypes.ChainSelector]string{
+							1: "0x0000",
+						},
+					},
+				}),
+			usdcEnabled: false,
+			lbtcEnabled: true,
+			wantErr:     true,
+			errMsg:      "SourcePoolAddressByChain is empty",
 		},
 		{
 			name: "the same observer can't bet set twice",
