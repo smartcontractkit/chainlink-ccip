@@ -4,7 +4,8 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
-	
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/token_pool"
+	evm_tokens "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -13,9 +14,6 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/token_pool"
-	evm_tokens "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/tokens"
 )
 
 var _ tokens.TokenAdapter = &TokenAdapter{}
@@ -39,7 +37,7 @@ func (t *TokenAdapter) DeriveTokenAddress(e deployment.Environment, chainSelecto
 	if !ok {
 		return nil, fmt.Errorf("chain with selector %d not found", chainSelector)
 	}
-	getTokenReport, err := cldf_ops.ExecuteOperation(e.OperationsBundle, token_pool.GetToken, chain, contract.FunctionInput[any]{
+	getTokenReport, err := cldf_ops.ExecuteOperation(e.OperationsBundle, token_pool.GetToken, chain, contract.FunctionInput[struct{}]{
 		ChainSelector: chainSelector,
 		Address:       common.HexToAddress(poolRef.Address),
 	})
@@ -82,7 +80,7 @@ func (t *TokenAdapter) DeriveTokenDecimals(e deployment.Environment, chainSelect
 	if !ok {
 		return 0, fmt.Errorf("chain with selector %d not found", chainSelector)
 	}
-	getTokenDecimalsReport, err := cldf_ops.ExecuteOperation(e.OperationsBundle, token_pool.GetTokenDecimals, chain, contract.FunctionInput[any]{
+	getTokenDecimalsReport, err := cldf_ops.ExecuteOperation(e.OperationsBundle, token_pool.GetTokenDecimals, chain, contract.FunctionInput[struct{}]{
 		ChainSelector: chainSelector,
 		Address:       common.HexToAddress(poolRef.Address),
 	})

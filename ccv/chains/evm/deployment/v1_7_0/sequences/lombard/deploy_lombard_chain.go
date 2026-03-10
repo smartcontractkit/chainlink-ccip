@@ -20,7 +20,7 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/advanced_pool_hooks"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/lombard_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/lombard_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/lombard_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/versioned_verifier_resolver"
 	v1_7_0_sequences "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
@@ -198,7 +198,7 @@ var DeployLombardChain = cldf_ops.NewSequence(
 				Bridge:            lombardBridgeAddress,
 				Adapter:           localAdapterAddress,
 				AdvancedPoolHooks: advancedPoolHooksAddress,
-				RMNProxy:          rmnAddress,
+				RmnProxy:          rmnAddress,
 				Router:            routerAddress,
 				FallbackDecimals:  fallbackDecimals,
 			},

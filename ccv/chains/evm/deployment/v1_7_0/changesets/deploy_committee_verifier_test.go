@@ -5,7 +5,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/changesets"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/committee_verifier"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
@@ -141,7 +141,7 @@ func TestDeployCommitteeVerifier_Apply_MultipleQualifiersOnSameChain(t *testing.
 
 	alphaCV, ok := find(addrs1, datastore.ContractType(committee_verifier.ContractType), "alpha")
 	require.True(t, ok, "committee verifier (alpha) not found in first run output")
-	alphaResolver, ok := find(addrs1, datastore.ContractType(committee_verifier.ResolverType), "alpha")
+	alphaResolver, ok := find(addrs1, datastore.ContractType(sequences.CommitteeVerifierResolverType), "alpha")
 	require.True(t, ok, "committee verifier resolver (alpha) not found in first run output")
 
 	// 2) Second run with qualifier "beta"; seed env with first run addresses so they are considered existing
@@ -170,7 +170,7 @@ func TestDeployCommitteeVerifier_Apply_MultipleQualifiersOnSameChain(t *testing.
 
 	betaCV, ok := find(addrs2, datastore.ContractType(committee_verifier.ContractType), "beta")
 	require.True(t, ok, "committee verifier (beta) not found in second run output")
-	betaResolver, ok := find(addrs2, datastore.ContractType(committee_verifier.ResolverType), "beta")
+	betaResolver, ok := find(addrs2, datastore.ContractType(sequences.CommitteeVerifierResolverType), "beta")
 	require.True(t, ok, "committee verifier resolver (beta) not found in second run output")
 
 	// Ensure addresses differ across qualifiers
@@ -204,7 +204,7 @@ func TestDeployCommitteeVerifier_Apply_MultipleQualifiersOnSameChain(t *testing.
 
 	reAlphaCV, ok := find(addrs3, datastore.ContractType(committee_verifier.ContractType), "alpha")
 	require.True(t, ok)
-	reAlphaResolver, ok := find(addrs3, datastore.ContractType(committee_verifier.ResolverType), "alpha")
+	reAlphaResolver, ok := find(addrs3, datastore.ContractType(sequences.CommitteeVerifierResolverType), "alpha")
 	require.True(t, ok)
 
 	// Should return the same addresses as first run for the same qualifier

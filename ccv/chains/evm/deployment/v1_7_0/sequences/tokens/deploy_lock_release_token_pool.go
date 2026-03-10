@@ -15,8 +15,8 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/advanced_pool_hooks"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/erc20_lock_box"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/lock_release_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/erc20_lock_box"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/lock_release_token_pool"
 )
 
 var DeployLockReleaseTokenPool = cldf_ops.NewSequence(
@@ -66,7 +66,7 @@ var DeployLockReleaseTokenPool = cldf_ops.NewSequence(
 				Token:              input.ConstructorArgs.Token,
 				LocalTokenDecimals: input.ConstructorArgs.Decimals,
 				AdvancedPoolHooks:  common.HexToAddress(hooksDeployReport.Output.Address),
-				RMNProxy:           input.ConstructorArgs.RMNProxy,
+				RmnProxy:           input.ConstructorArgs.RMNProxy,
 				Router:             input.ConstructorArgs.Router,
 				LockBox:            common.HexToAddress(lockBoxDeployReport.Output.Address),
 			},
