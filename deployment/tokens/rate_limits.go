@@ -50,6 +50,9 @@ func setTokenPoolRateLimitsVerify() func(cldf.Environment, TPRLInput) error {
 					if input.Capacity <= 0 || input.Rate <= 0 {
 						return fmt.Errorf("outbound rate limiter config for remote chain %d is enabled but capacity or rate is invalid", remoteSelector)
 					}
+					if input.Rate > input.Capacity {
+						return fmt.Errorf("outbound rate limiter config for remote chain %d has rate greater than capacity", remoteSelector)
+					}
 				}
 			}
 		}
