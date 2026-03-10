@@ -3,6 +3,7 @@ package adapters
 import (
 	"fmt"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/burn_mint_with_lock_release_flag_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/token_pool"
@@ -30,9 +31,17 @@ func (c *NonCanonicalUSDCChainAdapter) ConfigureCCTPChainForLanes() *operations.
 	return tokens.ConfigureNonCanonicalUSDCForLanes
 }
 
-// MigrateHybridLockReleaseLiquidity is not supported on non-canonical USDC chains.
+// MigrateHybridLockReleaseLiquidity returns a sequence that immediately errors with a clear message.
+// Non-canonical USDC chains do not support hybrid lock-release liquidity migration.
 func (c *NonCanonicalUSDCChainAdapter) MigrateHybridLockReleaseLiquidity() *operations.Sequence[adapters.MigrateHybridLockReleaseLiquidityInput, seq_core.OnChainOutput, adapters.MigrateHybridLockReleaseLiquidityDeps] {
-	return nil
+	return operations.NewSequence(
+		"migrate-hybrid-lock-release-liquidity-unsupported",
+		semver.MustParse("1.6.1"),
+		"Non-canonical USDC chains do not support hybrid lock-release liquidity migration",
+		func(b operations.Bundle, deps adapters.MigrateHybridLockReleaseLiquidityDeps, input adapters.MigrateHybridLockReleaseLiquidityInput) (seq_core.OnChainOutput, error) {
+			return seq_core.OnChainOutput{}, fmt.Errorf("liquidity migration is not supported on non-canonical USDC chains")
+		},
+	)
 }
 
 // CCTPV1AllowedCallerOnDest is not implemented for non-canonical USDC chains, as there is no caller of CCTP.
