@@ -963,6 +963,7 @@ func TestSequenceFeeQuoterInputCreation(t *testing.T) {
 // GasPricesPerRemoteChain uses string values (parsed as base-10 big.Int).
 func TestHandleEmptyGasPriceStalenessThreshold(t *testing.T) {
 	aptosSelector := uint64(743186221051783445)
+	suiSelector := uint64(9762610643973837292)
 
 	// EVM chain is not in gasPriceMandatoryForChainFamily -> expect error
 	t.Run("EVM_chain_returns_error", func(t *testing.T) {
@@ -1025,12 +1026,15 @@ func TestHandleEmptyGasPriceStalenessThreshold(t *testing.T) {
 	})
 
 	// Chain in gasPriceMandatoryForChainFamily with valid gas price string -> success
-	t.Run("Aptos_or_Sui_with_gas_price_returns_updates", func(t *testing.T) {
+	t.Run("Aptos_and_Sui_with_gas_price_returns_updates", func(t *testing.T) {
 		gasPriceStr := "2000000000"
 		input := deploy.FeeQuoterUpdateInput{
 			ChainSelector: 1,
 			AdditionalConfig: &deploy.AdditionalFeeQuoterConfig{
-				GasPricesPerRemoteChain: map[uint64]string{aptosSelector: gasPriceStr},
+				GasPricesPerRemoteChain: map[uint64]string{
+					aptosSelector: gasPriceStr,
+					suiSelector:   gasPriceStr,
+				},
 			},
 		}
 		output, err := sequences.HandleEmptyGasPriceStalenessThreshold(aptosSelector, input)
@@ -1038,6 +1042,12 @@ func TestHandleEmptyGasPriceStalenessThreshold(t *testing.T) {
 		require.Len(t, output.GasPriceUpdates, 1)
 		require.Equal(t, aptosSelector, output.GasPriceUpdates[0].DestChainSelector)
 		require.Equal(t, 0, big.NewInt(2e9).Cmp(output.GasPriceUpdates[0].UsdPerUnitGas), "UsdPerUnitGas should match parsed value")
+		output, err = sequences.HandleEmptyGasPriceStalenessThreshold(suiSelector, input)
+		require.NoError(t, err)
+		require.Len(t, output.GasPriceUpdates, 1)
+		require.Equal(t, suiSelector, output.GasPriceUpdates[0].DestChainSelector)
+		require.Equal(t, 0, big.NewInt(2e9).Cmp(output.GasPriceUpdates[0].UsdPerUnitGas), "UsdPerUnitGas should match parsed value")
+
 	})
 }
 
