@@ -58,7 +58,6 @@ abstract contract TokenPool is IPoolV1V2, Ownable2StepMsgSender {
   error PoolAlreadyAdded(uint64 remoteChainSelector, bytes remotePoolAddress);
   error InvalidRemotePoolForChain(uint64 remoteChainSelector, bytes remotePoolAddress);
   error InvalidRemoteChainDecimals(bytes sourcePoolData);
-  error MismatchedArrayLengths();
   error OverflowDetected(uint8 remoteDecimals, uint8 localDecimals, uint256 remoteAmount);
   error InvalidDecimalArgs(uint8 expected, uint8 actual);
   error CallerIsNotOwnerOrFeeAdmin(address caller);

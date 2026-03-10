@@ -19,7 +19,6 @@ contract VersionedVerifierResolver is ICrossChainVerifierResolver, ITypeAndVersi
   error InvalidVerifierResultsLength();
   error InvalidDestChainSelector(uint64 destChainSelector);
   error InvalidVersion(bytes4 version);
-  error ZeroAddressNotAllowed();
 
   event InboundImplementationRemoved(bytes4 version);
   event OutboundImplementationRemoved(uint64 destChainSelector);
@@ -28,13 +27,13 @@ contract VersionedVerifierResolver is ICrossChainVerifierResolver, ITypeAndVersi
   event FeeAggregatorUpdated(address indexed oldFeeAggregator, address indexed newFeeAggregator);
 
   struct InboundImplementationArgs {
-    bytes4 version; // ────╮ Verifier version.
-    address verifier; // ──╯ Address of the verifier contract.
+    bytes4 version; // ───╮ Verifier version.
+    address verifier; // ─╯ Address of the verifier contract.
   }
 
   struct OutboundImplementationArgs {
-    uint64 destChainSelector; // ──╮ Destination chain selector.
-    address verifier; // ──────────╯ Address of the verifier contract.
+    uint64 destChainSelector; // ─╮ Destination chain selector.
+    address verifier; // ─────────╯ Address of the verifier contract.
   }
 
   string public constant override typeAndVersion = "VersionedVerifierResolver 2.0.0-dev";
