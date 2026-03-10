@@ -14,7 +14,9 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/advanced_pool_hooks"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/burn_mint_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/burn_from_mint_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/burn_mint_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/burn_with_from_mint_token_pool"
 )
 
 var DeployBurnMintTokenPool = cldf_ops.NewSequence(
@@ -45,25 +47,74 @@ var DeployBurnMintTokenPool = cldf_ops.NewSequence(
 			deployment.ContractType(input.TokenPoolType),
 			*input.TokenPoolVersion,
 		)
-		tpDeployReport, err := cldf_ops.ExecuteOperation(b, burn_mint_token_pool.Deploy, chain, evm_contract.DeployInput[burn_mint_token_pool.ConstructorArgs]{
-			ChainSelector:  input.ChainSel,
-			TypeAndVersion: typeAndVersion,
-			Args: burn_mint_token_pool.ConstructorArgs{
-				Token:              input.ConstructorArgs.Token,
-				LocalTokenDecimals: input.ConstructorArgs.Decimals,
-				AdvancedPoolHooks:  common.HexToAddress(hooksDeployReport.Output.Address),
-				RMNProxy:           input.ConstructorArgs.RMNProxy,
-				Router:             input.ConstructorArgs.Router,
-			},
-			Qualifier: &input.TokenSymbol,
-		})
+		constructorArgs := struct {
+			Token              common.Address
+			LocalTokenDecimals uint8
+			AdvancedPoolHooks  common.Address
+			RMNProxy           common.Address
+			Router             common.Address
+		}{
+			Token:              input.ConstructorArgs.Token,
+			LocalTokenDecimals: input.ConstructorArgs.Decimals,
+			AdvancedPoolHooks:  common.HexToAddress(hooksDeployReport.Output.Address),
+			RMNProxy:           input.ConstructorArgs.RMNProxy,
+			Router:             input.ConstructorArgs.Router,
+		}
+
+		var tpDeployReport *datastore.AddressRef
+		switch deployment.ContractType(input.TokenPoolType) {
+		case burn_mint_token_pool.ContractType:
+			report, deployErr := cldf_ops.ExecuteOperation(b, burn_mint_token_pool.Deploy, chain, evm_contract.DeployInput[burn_mint_token_pool.ConstructorArgs]{
+				ChainSelector:  input.ChainSel,
+				TypeAndVersion: typeAndVersion,
+				Args: burn_mint_token_pool.ConstructorArgs{
+					Token:              constructorArgs.Token,
+					LocalTokenDecimals: constructorArgs.LocalTokenDecimals,
+					AdvancedPoolHooks:  constructorArgs.AdvancedPoolHooks,
+					RmnProxy:           constructorArgs.RMNProxy,
+					Router:             constructorArgs.Router,
+				},
+				Qualifier: &input.TokenSymbol,
+			})
+			tpDeployReport, err = &report.Output, deployErr
+		case burn_from_mint_token_pool.ContractType:
+			report, deployErr := cldf_ops.ExecuteOperation(b, burn_from_mint_token_pool.Deploy, chain, evm_contract.DeployInput[burn_from_mint_token_pool.ConstructorArgs]{
+				ChainSelector:  input.ChainSel,
+				TypeAndVersion: typeAndVersion,
+				Args: burn_from_mint_token_pool.ConstructorArgs{
+					Token:              constructorArgs.Token,
+					LocalTokenDecimals: constructorArgs.LocalTokenDecimals,
+					AdvancedPoolHooks:  constructorArgs.AdvancedPoolHooks,
+					RmnProxy:           constructorArgs.RMNProxy,
+					Router:             constructorArgs.Router,
+				},
+				Qualifier: &input.TokenSymbol,
+			})
+			tpDeployReport, err = &report.Output, deployErr
+		case burn_with_from_mint_token_pool.ContractType:
+			report, deployErr := cldf_ops.ExecuteOperation(b, burn_with_from_mint_token_pool.Deploy, chain, evm_contract.DeployInput[burn_with_from_mint_token_pool.ConstructorArgs]{
+				ChainSelector:  input.ChainSel,
+				TypeAndVersion: typeAndVersion,
+				Args: burn_with_from_mint_token_pool.ConstructorArgs{
+					Token:              constructorArgs.Token,
+					LocalTokenDecimals: constructorArgs.LocalTokenDecimals,
+					AdvancedPoolHooks:  constructorArgs.AdvancedPoolHooks,
+					RmnProxy:           constructorArgs.RMNProxy,
+					Router:             constructorArgs.Router,
+				},
+				Qualifier: &input.TokenSymbol,
+			})
+			tpDeployReport, err = &report.Output, deployErr
+		default:
+			return sequences.OnChainOutput{}, fmt.Errorf("unsupported burn mint token pool type %s", input.TokenPoolType)
+		}
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy %s to %s: %w", typeAndVersion, chain, err)
 		}
 
 		configureReport, err := cldf_ops.ExecuteSequence(b, ConfigureTokenPool, chain, ConfigureTokenPoolInput{
 			ChainSelector:                    input.ChainSel,
-			TokenPoolAddress:                 common.HexToAddress(tpDeployReport.Output.Address),
+			TokenPoolAddress:                 common.HexToAddress(tpDeployReport.Address),
 			RateLimitAdmin:                   input.RateLimitAdmin,
 			AdvancedPoolHooks:                common.HexToAddress(hooksDeployReport.Output.Address),
 			RouterAddress:                    input.ConstructorArgs.Router,
@@ -71,12 +122,12 @@ var DeployBurnMintTokenPool = cldf_ops.NewSequence(
 			FeeAggregator:                    input.FeeAggregator,
 		})
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to configure token pool with address %s on %s: %w", tpDeployReport.Output.Address, chain, err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to configure token pool with address %s on %s: %w", tpDeployReport.Address, chain, err)
 		}
 
 		// Add the newly deployed token pool as an authorized caller on the hooks.
 		{
-			poolAddr := common.HexToAddress(tpDeployReport.Output.Address)
+			poolAddr := common.HexToAddress(tpDeployReport.Address)
 			hooksAddr := common.HexToAddress(hooksDeployReport.Output.Address)
 
 			getAuthorizedCallersReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.GetAllAuthorizedCallers, chain, evm_contract.FunctionInput[struct{}]{
@@ -108,7 +159,7 @@ var DeployBurnMintTokenPool = cldf_ops.NewSequence(
 		}
 
 		return sequences.OnChainOutput{
-			Addresses: []datastore.AddressRef{tpDeployReport.Output, hooksDeployReport.Output},
+			Addresses: []datastore.AddressRef{*tpDeployReport, hooksDeployReport.Output},
 			BatchOps:  configureReport.Output.BatchOps,
 		}, nil
 	},

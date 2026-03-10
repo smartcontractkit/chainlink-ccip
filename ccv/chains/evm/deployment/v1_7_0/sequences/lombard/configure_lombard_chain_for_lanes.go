@@ -21,7 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/lombard_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/lombard_token_pool"
 
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/advanced_pool_hooks"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/lombard_verifier"
@@ -210,7 +210,7 @@ var ConfigureLombardChainForLanes = cldf_ops.NewSequence(
 
 			tokenPoolPathArgs = append(tokenPoolPathArgs, lombard_token_pool.SetPathArgs{
 				RemoteChainSelector: remoteChainSelector,
-				LChainID:            lchainID,
+				LChainId:            lchainID,
 				// TokenPool remote pools are configured as ABI-style padded bytes for EVM addresses.
 				AllowedCaller: common.LeftPadBytes(remotePoolAddress, 32),
 				RemoteAdapter: remoteAdapter,
@@ -311,7 +311,7 @@ var ConfigureLombardChainForLanes = cldf_ops.NewSequence(
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get LombardTokenPool path for remote chain %d: %w", pathArgs.RemoteChainSelector, err)
 			}
 
-			if existingPathReport.Output.LChainId == pathArgs.LChainID &&
+			if existingPathReport.Output.LChainId == pathArgs.LChainId &&
 				existingPathReport.Output.RemoteAdapter == pathArgs.RemoteAdapter &&
 				bytes.Equal(existingPathReport.Output.AllowedCaller[:], pathArgs.AllowedCaller) {
 				continue

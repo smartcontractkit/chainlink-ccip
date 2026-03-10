@@ -6,7 +6,8 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/committee_verifier"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/committee_verifier"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/versioned_verifier_resolver"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
@@ -15,6 +16,8 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 )
+
+var CommitteeVerifierResolverType = versioned_verifier_resolver.CommitteeVerifierResolverType
 
 type CommitteeVerifierParams struct {
 	Version          *semver.Version
@@ -55,7 +58,7 @@ var DeployCommitteeVerifier = cldf_ops.NewSequence(
 					AllowlistAdmin: input.Params.AllowlistAdmin,
 				},
 				StorageLocations: input.Params.StorageLocations,
-				RMN:              input.RMN,
+				Rmn:              input.RMN,
 			},
 			Qualifier: qualifierPtr,
 		}, input.ExistingAddresses)
@@ -84,16 +87,14 @@ var DeployCommitteeVerifier = cldf_ops.NewSequence(
 			desiredAllowlistAdmin = input.Params.AllowlistAdmin
 		}
 		if desiredFeeAggregator != dynamicConfigReport.Output.FeeAggregator || desiredAllowlistAdmin != dynamicConfigReport.Output.AllowlistAdmin {
-			setDynamicConfigReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.SetDynamicConfig, chain, contract_utils.FunctionInput[committee_verifier.SetDynamicConfigArgs]{
-				ChainSelector: chain.Selector,
-				Address:       common.HexToAddress(committeeVerifierRef.Address),
-				Args: committee_verifier.SetDynamicConfigArgs{
-					DynamicConfig: committee_verifier.DynamicConfig{
-						AllowlistAdmin: desiredAllowlistAdmin,
-						FeeAggregator:  desiredFeeAggregator,
-					},
-				},
-			})
+		setDynamicConfigReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.SetDynamicConfig, chain, contract_utils.FunctionInput[committee_verifier.DynamicConfig]{
+			ChainSelector: chain.Selector,
+			Address:       common.HexToAddress(committeeVerifierRef.Address),
+			Args: committee_verifier.DynamicConfig{
+				AllowlistAdmin: desiredAllowlistAdmin,
+				FeeAggregator:  desiredFeeAggregator,
+			},
+		})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to set dynamic config on CommitteeVerifier: %w", err)
 			}
@@ -107,7 +108,7 @@ var DeployCommitteeVerifier = cldf_ops.NewSequence(
 		// First, check if the CommitteeVerifierResolver already exists
 		var resolverRef *datastore.AddressRef
 		for _, ref := range input.ExistingAddresses {
-			if ref.Type == datastore.ContractType(committee_verifier.ResolverType) &&
+			if ref.Type == datastore.ContractType(CommitteeVerifierResolverType) &&
 				ref.Version.String() == semver.MustParse("1.7.0").String() &&
 				ref.Qualifier == input.Params.Qualifier {
 				resolverRef = &ref
@@ -119,7 +120,7 @@ var DeployCommitteeVerifier = cldf_ops.NewSequence(
 			deployVerifierResolverViaCREATE2Report, err := cldf_ops.ExecuteSequence(b, DeployVerifierResolverViaCREATE2, chain, DeployVerifierResolverViaCREATE2Input{
 				ChainSelector:  input.ChainSelector,
 				Qualifier:      input.Params.Qualifier,
-				Type:           datastore.ContractType(committee_verifier.ResolverType),
+				Type:           datastore.ContractType(CommitteeVerifierResolverType),
 				Version:        semver.MustParse("1.7.0"),
 				CREATE2Factory: input.CREATE2Factory,
 			})
