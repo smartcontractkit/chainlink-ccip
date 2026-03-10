@@ -120,3 +120,27 @@ var ConfigureTokenPool = cldf_ops.NewSequence(
 		}, nil
 	},
 )
+
+// makeAllowListUpdates compares the current and desired allow-lists and returns the addresses to add and remove.
+func makeAllowListUpdates(current, desired []common.Address) (adds, removes []common.Address) {
+	currentSet := make(map[common.Address]struct{}, len(current))
+	for _, addr := range current {
+		currentSet[addr] = struct{}{}
+	}
+	desiredSet := make(map[common.Address]struct{}, len(desired))
+	for _, addr := range desired {
+		desiredSet[addr] = struct{}{}
+	}
+
+	for addr := range desiredSet {
+		if _, exists := currentSet[addr]; !exists {
+			adds = append(adds, addr)
+		}
+	}
+	for addr := range currentSet {
+		if _, exists := desiredSet[addr]; !exists {
+			removes = append(removes, addr)
+		}
+	}
+	return adds, removes
+}

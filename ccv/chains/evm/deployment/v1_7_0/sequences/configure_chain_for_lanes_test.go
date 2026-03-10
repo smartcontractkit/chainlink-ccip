@@ -11,11 +11,12 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/executor"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/versioned_verifier_resolver"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/message_hasher"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/versioned_verifier_resolver"
+	versioned_verifier_resolver_latest "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/versioned_verifier_resolver"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
@@ -88,7 +89,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 					committeeVerifier = addr.Address
 				case datastore.ContractType(executor.ProxyType):
 					executorAddress = addr.Address
-				case datastore.ContractType(sequences.CommitteeVerifierResolverType):
+				case datastore.ContractType(versioned_verifier_resolver.CommitteeVerifierResolverType):
 					committeeVerifierResolver = addr.Address
 				}
 			}
@@ -96,10 +97,8 @@ func TestConfigureChainForLanes(t *testing.T) {
 			ccipMessageDest := common.HexToAddress("0x11").Bytes()
 			remoteChainSelector := uint64(4356164186791070119)
 
-			// Use a fresh reporter so ConfigureChainForLanes reads current on-chain state (e.g. Executor
-			// proxy target) instead of cached operation reports from DeployChainContracts.
 			_, err = operations.ExecuteSequence(
-				testsetup.BundleWithFreshReporter(e.OperationsBundle),
+				e.OperationsBundle,
 				sequences.ConfigureChainForLanes,
 				e.BlockChains,
 				adapters.ConfigureChainForLanesInput{
@@ -114,11 +113,11 @@ func TestConfigureChainForLanes(t *testing.T) {
 									Type:    datastore.ContractType(committee_verifier.ContractType),
 									Version: committee_verifier.Version,
 								},
-							{
-								Address: committeeVerifierResolver,
-								Type:    datastore.ContractType(sequences.CommitteeVerifierResolverType),
-								Version: semver.MustParse("1.7.0"),
-							},
+								{
+									Address: committeeVerifierResolver,
+									Type:    datastore.ContractType(versioned_verifier_resolver.CommitteeVerifierResolverType),
+									Version: versioned_verifier_resolver.Version,
+								},
 							},
 							RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
 								remoteChainSelector: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
@@ -211,7 +210,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 			require.Equal(t, []common.Address{common.HexToAddress("0x01")}, signatureQuorumReport.Output.Signers, "Signers in CommitteeVerifier signature config should match")
 
 			// Check outbound implementation on CommitteeVerifierResolver
-			boundResolver, err := versioned_verifier_resolver.NewVersionedVerifierResolver(common.HexToAddress(committeeVerifierResolver), evmChain.Client)
+			boundResolver, err := versioned_verifier_resolver_latest.NewVersionedVerifierResolver(common.HexToAddress(committeeVerifierResolver), evmChain.Client)
 			require.NoError(t, err, "Failed to instantiate VersionedVerifierResolver")
 			outboundImpl, err := boundResolver.GetOutboundImplementation(&bind.CallOpts{Context: t.Context()}, remoteChainSelector, []byte{})
 			require.NoError(t, err, "GetOutboundImplementation should not error")
