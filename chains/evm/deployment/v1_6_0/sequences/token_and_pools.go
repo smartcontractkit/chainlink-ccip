@@ -241,23 +241,23 @@ func (a *EVMAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokensapi.TPRLR
 				return sequences.OnChainOutput{}, fmt.Errorf("token pool address for ref (%+v) is zero address", input.TokenPoolRef)
 			}
 
-			// The remote chain needs to be supported by the token pool in order to set rate limits for that chain. If it isn't, then
-			// we fail loudly since this indicates a misconfiguration in the input data that needs to be fixed before proceeding.
-			tokenPool, err := token_pool.NewTokenPool(tokenPoolAddr, chain.Client)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to instantiate token pool contract: %w", err)
-			}
-			isSupported, err := tokenPool.IsSupportedChain(&bind.CallOpts{Context: b.GetContext()}, input.RemoteChainSelector)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to check if remote chain selector %d is supported by token pool at address %q on chain %d: %w", input.RemoteChainSelector, tokenPoolAddr.Hex(), chain.Selector, err)
-			}
-			if !isSupported {
-				return sequences.OnChainOutput{}, fmt.Errorf("remote chain selector %d is not supported by token pool at address %q on chain %d", input.RemoteChainSelector, tokenPoolAddr.Hex(), chain.Selector)
-			}
-
 			// If desired, try to validate pool permissions up front - if there is some sort of gap in permissions, then avoid running
 			// the operation.
 			if input.EnablePermissionChecks {
+				// The remote chain needs to be supported by the token pool in order to set rate limits for that chain. If it isn't, then
+				// we fail loudly since this indicates a misconfiguration in the input data that needs to be fixed before proceeding.
+				tokenPool, err := token_pool.NewTokenPool(tokenPoolAddr, chain.Client)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to instantiate token pool contract: %w", err)
+				}
+				isSupported, err := tokenPool.IsSupportedChain(&bind.CallOpts{Context: b.GetContext()}, input.RemoteChainSelector)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to check if remote chain selector %d is supported by token pool at address %q on chain %d: %w", input.RemoteChainSelector, tokenPoolAddr.Hex(), chain.Selector, err)
+				}
+				if !isSupported {
+					return sequences.OnChainOutput{}, fmt.Errorf("remote chain selector %d is not supported by token pool at address %q on chain %d", input.RemoteChainSelector, tokenPoolAddr.Hex(), chain.Selector)
+				}
+
 				// We need to look up the timelock address, pool owner, and rate limit admin in order to determine if we have the right
 				// permissions to proceed with setting the rate limits.
 				timelockFltr := datastore.AddressRef{Type: datastore.ContractType(cciputils.RBACTimelock), ChainSelector: chain.Selector, Qualifier: cciputils.CLLQualifier}
