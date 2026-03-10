@@ -13,7 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/link_token"
 )
 
-var ContractType cldf_deployment.ContractType = "LINK"
+var ContractType cldf_deployment.ContractType = "LinkToken"
 var Version = semver.MustParse("1.0.0")
 
 type ConstructorArgs struct{}

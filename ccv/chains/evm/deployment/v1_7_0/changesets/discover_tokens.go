@@ -9,9 +9,9 @@ import (
 
 	fee_quoter_ops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
 	router_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/link_token"
 	onramp_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/evm_2_evm_onramp"
@@ -117,12 +117,12 @@ func maybeDiscoverLINK(
 	sel uint64,
 	outputDs datastore.MutableDataStore,
 ) error {
-	linkType := datastore.ContractType(link_token.ContractType)
+	linkType := datastore.ContractType(link.ContractType)
 
 	existing := e.DataStore.Addresses().Filter(
 		datastore.AddressRefByChainSelector(sel),
 		datastore.AddressRefByType(linkType),
-		datastore.AddressRefByVersion(link_token.Version),
+		datastore.AddressRefByVersion(link.Version),
 	)
 	if len(existing) > 0 {
 		e.Logger.Infof("LinkToken already exists on chain %d at %s, skipping", sel, existing[0].Address)
@@ -149,7 +149,7 @@ func maybeDiscoverLINK(
 		Address:       linkAddr.Hex(),
 		ChainSelector: sel,
 		Type:          linkType,
-		Version:       link_token.Version,
+		Version:       link.Version,
 	})
 }
 
