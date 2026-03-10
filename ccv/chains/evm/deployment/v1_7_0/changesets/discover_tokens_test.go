@@ -10,9 +10,9 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/changesets"
 	fee_quoter_ops "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
 	router_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/link_token"
 	onramp_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/evm_2_evm_onramp"
@@ -39,8 +39,8 @@ func newTestEnv(t *testing.T) *deployment.Environment {
 }
 
 type testContracts struct {
-	routerAddr  common.Address
-	onRampAddr  common.Address
+	routerAddr common.Address
+	onRampAddr common.Address
 }
 
 func deployTestContracts(t *testing.T, chain evm.Chain) testContracts {
@@ -161,8 +161,8 @@ func TestDiscoverTokens_SkipsExistingTokens(t *testing.T) {
 		}))
 		require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
 			ChainSelector: testChainSel,
-			Type:          datastore.ContractType(link_token.ContractType),
-			Version:       link_token.Version,
+			Type:          datastore.ContractType(link.ContractType),
+			Version:       link.Version,
 			Address:       expectedLINK.Hex(),
 		}))
 		e.DataStore = ds.Seal()
@@ -198,7 +198,7 @@ func TestDiscoverTokens_SkipsExistingTokens(t *testing.T) {
 		addrs, err := out.DataStore.Addresses().Fetch()
 		require.NoError(t, err)
 		require.Len(t, addrs, 1)
-		require.Equal(t, datastore.ContractType(link_token.ContractType), addrs[0].Type)
+		require.Equal(t, datastore.ContractType(link.ContractType), addrs[0].Type)
 		require.Equal(t, expectedLINK.Hex(), addrs[0].Address)
 	})
 
@@ -209,8 +209,8 @@ func TestDiscoverTokens_SkipsExistingTokens(t *testing.T) {
 
 		require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
 			ChainSelector: testChainSel,
-			Type:          datastore.ContractType(link_token.ContractType),
-			Version:       link_token.Version,
+			Type:          datastore.ContractType(link.ContractType),
+			Version:       link.Version,
 			Address:       expectedLINK.Hex(),
 		}))
 		e.DataStore = ds.Seal()
@@ -296,10 +296,10 @@ func TestDiscoverTokens_DiscoversTokensFromOnChainContracts(t *testing.T) {
 	require.Equal(t, weth.Version.String(), wethRef.Version.String())
 	require.Equal(t, testChainSel, wethRef.ChainSelector)
 
-	linkRef, ok := addrByType[datastore.ContractType(link_token.ContractType)]
+	linkRef, ok := addrByType[datastore.ContractType(link.ContractType)]
 	require.True(t, ok, "LinkToken should be discovered")
 	require.Equal(t, expectedLINK.Hex(), linkRef.Address)
-	require.Equal(t, link_token.Version.String(), linkRef.Version.String())
+	require.Equal(t, link.Version.String(), linkRef.Version.String())
 	require.Equal(t, testChainSel, linkRef.ChainSelector)
 }
 
@@ -363,7 +363,7 @@ func TestDiscoverTokens_FallsBackToFeeQuoterForLINK(t *testing.T) {
 	require.True(t, ok, "WETH9 should be discovered via Router")
 	require.Equal(t, expectedWETH.Hex(), wethRef.Address)
 
-	linkRef, ok := addrByType[datastore.ContractType(link_token.ContractType)]
+	linkRef, ok := addrByType[datastore.ContractType(link.ContractType)]
 	require.True(t, ok, "LinkToken should be discovered via FeeQuoter fallback")
 	require.Equal(t, expectedLINK.Hex(), linkRef.Address)
 }

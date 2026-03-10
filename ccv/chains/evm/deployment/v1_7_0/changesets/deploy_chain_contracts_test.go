@@ -12,9 +12,9 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/link_token"
 	cs_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -87,7 +87,7 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 				ds := datastore.NewMemoryDataStore()
 				_ = ds.Addresses().Add(datastore.AddressRef{
 					ChainSelector: 5009297550715157269,
-					Type:          datastore.ContractType(link_token.ContractType),
+					Type:          datastore.ContractType(link.ContractType),
 					Version:       semver.MustParse("1.0.0"),
 					Address:       common.HexToAddress("0x01").Hex(),
 				})
