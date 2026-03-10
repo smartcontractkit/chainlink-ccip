@@ -131,7 +131,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   /// - Executor receipt.
   /// - Network fee receipt.
   struct Receipt {
-    // The address of the entity that issued the receipt. For token receipts this is the token address, not the pool.
+    // The address of the entity that issued the receipt. For token receipts this is the token pool, not the token.
     // for verifiers and executors, this is the user specified value, even if the call is ultimately handled by some
     // underlying contract.
     address issuer; // ───────────╮
@@ -520,9 +520,6 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     // If ExtraArgsV3 are provided, decode them.
     if (extraArgs.length >= 4 && bytes4(extraArgs[:4]) == ExtraArgsCodec.GENERIC_EXTRA_ARGS_V3_TAG) {
       resolvedArgs = ExtraArgsCodec._decodeGenericExtraArgsV3(extraArgs);
-
-      // We need to ensure no duplicate CCVs are present in the ccv list.
-      CCVConfigValidation._assertNoDuplicates(resolvedArgs.ccvs);
     } else {
       // Populate the fields that could be present in legacy extraArgs.
       (resolvedArgs.tokenReceiver, resolvedArgs.gasLimit, resolvedArgs.executorArgs) =
@@ -765,14 +762,14 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
       }
     }
 
+    uint256 destAddressBytesLength = s_destChainConfigs[destChainSelector].addressBytesLength;
+
     return MessageV1Codec.TokenTransferV1({
       amount: destTokenAmount,
       sourcePoolAddress: abi.encode(sourcePool), // Source address, so abi encoded.
       sourceTokenAddress: abi.encode(tokenAndAmount.token), // Source address, so abi encoded.
-      destTokenAddress: _validateDestChainAddress(
-        poolReturnData.destTokenAddress, s_destChainConfigs[destChainSelector].addressBytesLength
-      ), // Dest address so unpadded bytes.
-      tokenReceiver: _validateDestChainAddress(receiver, s_destChainConfigs[destChainSelector].addressBytesLength), // Dest address so unpadded bytes.
+      destTokenAddress: _validateDestChainAddress(poolReturnData.destTokenAddress, destAddressBytesLength), // Dest address so unpadded bytes.
+      tokenReceiver: _validateDestChainAddress(receiver, destAddressBytesLength), // Dest address so unpadded bytes.
       extraData: poolReturnData.destPoolData
     });
   }
@@ -1131,7 +1128,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
         MessageV1Codec.MESSAGE_V1_EVM_SOURCE_BASE_SIZE + dataLength + extraArgs.executorArgs.length
           + (MessageV1Codec.MESSAGE_V1_REMOTE_CHAIN_ADDRESSES * remoteChainAddressLengthBytes)
           + (numberOfTokens
-            * (MessageV1Codec.TOKEN_TRANSFER_V1_EVM_SOURCE_BASE_SIZE + remoteChainAddressLengthBytes * 2))
+            * (MessageV1Codec.TOKEN_TRANSFER_V1_EVM_SOURCE_BASE_SIZE + uint256(remoteChainAddressLengthBytes) * 2))
       ),
       // Only bill a flat fee when automated execution is enabled.
       feeTokenAmount: extraArgs.executor == Client.NO_EXECUTION_ADDRESS

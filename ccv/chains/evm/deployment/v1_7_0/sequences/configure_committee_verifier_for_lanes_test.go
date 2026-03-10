@@ -6,10 +6,6 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/v2"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/committee_verifier"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/versioned_verifier_resolver"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
@@ -21,6 +17,11 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/committee_verifier"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
 )
 
 func TestConfigureCommitteeVerifierForLanes(t *testing.T) {
@@ -41,7 +42,7 @@ func TestConfigureCommitteeVerifierForLanes(t *testing.T) {
 						routerAddress = addr.Address
 					case datastore.ContractType(committee_verifier.ContractType):
 						committeeVerifier = addr.Address
-					case datastore.ContractType(committee_verifier.ResolverType):
+					case datastore.ContractType(sequences.CommitteeVerifierResolverType):
 						committeeVerifierResolver = addr.Address
 					}
 				}
@@ -56,22 +57,22 @@ func TestConfigureCommitteeVerifierForLanes(t *testing.T) {
 								Type:    datastore.ContractType(committee_verifier.ContractType),
 								Version: committee_verifier.Version,
 							},
-							{
-								Address: committeeVerifierResolver,
-								Type:    datastore.ContractType(committee_verifier.ResolverType),
-								Version: committee_verifier.Version,
-							},
-						},
-						RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
-							remoteChainSelector: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
+						{
+							Address: committeeVerifierResolver,
+							Type:    datastore.ContractType(sequences.CommitteeVerifierResolverType),
+							Version: semver.MustParse("1.7.0"),
 						},
 					},
-				}
-			},
-			expectedErr: "",
+					RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
+						remoteChainSelector: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
+					},
+				},
+			}
 		},
-		{
-			desc: "multiple remote chains",
+		expectedErr: "",
+	},
+	{
+		desc: "multiple remote chains",
 			makeInput: func(chainReport operations.SequenceReport[sequences.DeployChainContractsInput, seq_core.OnChainOutput]) sequences.ConfigureCommitteeVerifierForLanesInput {
 				var routerAddress string
 				var committeeVerifier string
@@ -82,7 +83,7 @@ func TestConfigureCommitteeVerifierForLanes(t *testing.T) {
 						routerAddress = addr.Address
 					case datastore.ContractType(committee_verifier.ContractType):
 						committeeVerifier = addr.Address
-					case datastore.ContractType(committee_verifier.ResolverType):
+					case datastore.ContractType(sequences.CommitteeVerifierResolverType):
 						committeeVerifierResolver = addr.Address
 					}
 				}
@@ -98,15 +99,15 @@ func TestConfigureCommitteeVerifierForLanes(t *testing.T) {
 								Type:    datastore.ContractType(committee_verifier.ContractType),
 								Version: committee_verifier.Version,
 							},
-							{
-								Address: committeeVerifierResolver,
-								Type:    datastore.ContractType(committee_verifier.ResolverType),
-								Version: committee_verifier.Version,
-							},
+						{
+							Address: committeeVerifierResolver,
+							Type:    datastore.ContractType(sequences.CommitteeVerifierResolverType),
+							Version: semver.MustParse("1.7.0"),
 						},
-						RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
-							remoteChainSelector1: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
-							remoteChainSelector2: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
+					},
+					RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
+						remoteChainSelector1: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
+						remoteChainSelector2: testsetup.CreateBasicCommitteeVerifierRemoteChainConfig(),
 						},
 					},
 				}
@@ -125,7 +126,7 @@ func TestConfigureCommitteeVerifierForLanes(t *testing.T) {
 						routerAddress = addr.Address
 					case datastore.ContractType(committee_verifier.ContractType):
 						committeeVerifier = addr.Address
-					case datastore.ContractType(committee_verifier.ResolverType):
+					case datastore.ContractType(sequences.CommitteeVerifierResolverType):
 						committeeVerifierResolver = addr.Address
 					}
 				}
@@ -143,14 +144,14 @@ func TestConfigureCommitteeVerifierForLanes(t *testing.T) {
 								Type:    datastore.ContractType(committee_verifier.ContractType),
 								Version: committee_verifier.Version,
 							},
-							{
-								Address: committeeVerifierResolver,
-								Type:    datastore.ContractType(committee_verifier.ResolverType),
-								Version: committee_verifier.Version,
-							},
+						{
+							Address: committeeVerifierResolver,
+							Type:    datastore.ContractType(sequences.CommitteeVerifierResolverType),
+							Version: semver.MustParse("1.7.0"),
 						},
-						RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
-							remoteChainSelector: config,
+					},
+					RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
+						remoteChainSelector: config,
 						},
 					},
 				}
@@ -236,7 +237,6 @@ func TestConfigureCommitteeVerifierForLanes(t *testing.T) {
 				)
 				require.NoError(t, err, "ExecuteOperation should not error")
 				require.Equal(t, remoteConfig.SignatureConfig.Threshold, signatureConfigReport.Output.Threshold, "Threshold should match")
-				require.Equal(t, remoteSelector, signatureConfigReport.Output.SourceChainSelector, "SourceChainSelector should match")
 				expectedSigners := make([]common.Address, len(remoteConfig.SignatureConfig.Signers))
 				for i, signer := range remoteConfig.SignatureConfig.Signers {
 					expectedSigners[i] = common.HexToAddress(signer)
@@ -260,9 +260,9 @@ func TestConfigureCommitteeVerifierForLanes(t *testing.T) {
 				// Check inbound implementation on CommitteeVerifierResolver
 				versionTagReport, err := operations.ExecuteOperation(
 					testsetup.BundleWithFreshReporter(e.OperationsBundle),
-					committee_verifier.GetVersionTag,
+					committee_verifier.VersionTag,
 					evmChain,
-					contract.FunctionInput[any]{
+					contract.FunctionInput[struct{}]{
 						ChainSelector: evmChain.Selector,
 						Address:       common.HexToAddress(input.CommitteeVerifier[0].Address),
 					},

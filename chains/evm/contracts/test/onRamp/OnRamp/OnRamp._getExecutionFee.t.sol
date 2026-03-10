@@ -168,4 +168,34 @@ contract OnRamp_getExecutionFee is OnRampSetup {
 
     assertEq(receipt.destGasLimit, BASE_EXEC_GAS_COST, "Gas limit should only be base cost when user gas limit is 0");
   }
+
+  function test_getExecutionFee_MaxAddressLength() public {
+    uint8 maxAddressLengthPossible = type(uint8).max;
+
+    address[] memory defaultCCVs = new address[](1);
+    defaultCCVs[0] = s_defaultCCV;
+
+    OnRamp.DestChainConfigArgs[] memory destChainConfigArgs = new OnRamp.DestChainConfigArgs[](1);
+    destChainConfigArgs[0] = OnRamp.DestChainConfigArgs({
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      router: s_sourceRouter,
+      addressBytesLength: maxAddressLengthPossible,
+      messageNetworkFeeUSDCents: MESSAGE_NETWORK_FEE_USD_CENTS,
+      tokenNetworkFeeUSDCents: TOKEN_NETWORK_FEE_USD_CENTS,
+      tokenReceiverAllowed: false,
+      baseExecutionGasCost: BASE_EXEC_GAS_COST,
+      laneMandatedCCVs: new address[](0),
+      defaultCCVs: defaultCCVs,
+      defaultExecutor: s_defaultExecutor,
+      offRamp: new bytes(maxAddressLengthPossible)
+    });
+
+    ExtraArgsCodec.GenericExtraArgsV3 memory extraArgs;
+    extraArgs.executor = s_customExecutor;
+
+    s_onRampHelper.applyDestChainConfigUpdates(destChainConfigArgs);
+
+    // Assert it doesn't revert with max address length in dest config.
+    s_onRampHelper.getExecutionFee(DEST_CHAIN_SELECTOR, 0, 1, extraArgs, s_sourceFeeToken);
+  }
 }

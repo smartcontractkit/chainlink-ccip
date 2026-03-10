@@ -44,6 +44,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   error SkippedAlreadyExecutedMessage(bytes32 messageId, uint64 sourceChainSelector, uint64 messageNumber);
   error ReentrancyGuardReentrantCall();
   error RequiredCCVMissing(address requiredCCV);
+  error InvalidFinalityForReceiver(address receiver, uint16 msgBlockDepth, uint16 requiredBlockDepth);
   error InvalidNumberOfTokens(uint256 numTokens);
   error InvalidOnRamp(bytes got);
   error InvalidOffRamp(address expected, bytes got);
@@ -62,7 +63,6 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     bytes returnData
   );
   event SourceChainConfigSet(uint64 indexed sourceChainSelector, SourceChainConfigArgs sourceConfig);
-  event MaxGasBufferToUpdateStateUpdated(uint32 oldMaxGasBufferToUpdateState, uint32 newMaxGasBufferToUpdateState);
 
   /// @dev Struct that contains the static configuration. The individual components are stored as immutable variables.
   // solhint-disable-next-line gas-struct-packing
@@ -70,8 +70,8 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     uint64 localChainSelector; // ──╮ Local chainSelector
     uint16 gasForCallExactCheck; // │ Gas for call exact check
     IRMNRemote rmnRemote; // ───────╯ RMN Verification Contract
-    address tokenAdminRegistry; // ────────╮ Token admin registry address
-    uint32 maxGasBufferToUpdateState; // ──╯ Max Gas Buffer to Update State
+    address tokenAdminRegistry; // ───────╮ Token admin registry address
+    uint32 maxGasBufferToUpdateState; // ─╯ Max Gas Buffer to Update State
   }
 
   /// @dev Per-chain source config (defining a lane from a Source Chain -> Dest OffRamp).
@@ -336,9 +336,8 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     bool isTokenOnlyTransfer = _isTokenOnlyTransfer(message.data.length, message.ccipReceiveGasLimit, receiver);
 
     {
-      (address[] memory ccvsToQuery, uint256[] memory verifierResultsIndex) = _ensureCCVQuorumIsReached(
-        message.sourceChainSelector, receiver, message.tokenTransfer, message.finality, ccvs, isTokenOnlyTransfer
-      );
+      (address[] memory ccvsToQuery, uint256[] memory verifierResultsIndex) =
+        _ensureCCVQuorumIsReached(message, receiver, ccvs, isTokenOnlyTransfer);
 
       for (uint256 i = 0; i < ccvsToQuery.length; ++i) {
         address implAddress = ICrossChainVerifierResolver(ccvsToQuery[i])
@@ -439,11 +438,16 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
     bytes calldata encodedMessage
   ) external view returns (address[] memory requiredCCVs, address[] memory optionalCCVs, uint8 threshold) {
     MessageV1Codec.MessageV1 memory message = MessageV1Codec._decodeMessageV1(encodedMessage);
+    if (message.receiver.length != 20) {
+      revert Internal.InvalidEVMAddress(message.receiver);
+    }
+
     address receiver = address(bytes20(message.receiver));
 
     return _getCCVsForMessage(
       message.sourceChainSelector,
       receiver,
+      message.sender,
       message.tokenTransfer,
       message.finality,
       _isTokenOnlyTransfer(message.data.length, message.ccipReceiveGasLimit, receiver)
@@ -468,6 +472,7 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   function _getCCVsForMessage(
     uint64 sourceChainSelector,
     address receiver,
+    bytes memory sender,
     MessageV1Codec.TokenTransferV1[] memory tokenTransfer,
     uint16 finality,
     bool isTokenOnlyTransfer
@@ -505,7 +510,8 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       }
     } else {
       // The transfer is not token-only, we query the receiver for its CCV requirements.
-      (requiredReceiverCCVs, optionalCCVs, optionalThreshold) = _getCCVsFromReceiver(sourceChainSelector, receiver);
+      (requiredReceiverCCVs, optionalCCVs, optionalThreshold) =
+        _getCCVsFromReceiver(sourceChainSelector, receiver, sender, finality);
     }
 
     address[] storage laneMandatedCCVs = s_sourceChainConfigs[sourceChainSelector].laneMandatedCCVs;
@@ -603,23 +609,26 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   }
 
   /// @notice Ensures that the provided CCVs meet the quorum required by the receiver, pool and lane.
-  /// @param sourceChainSelector The source chain selector of the message.
-  /// @param receiver The receiver of the message.
-  /// @param tokenTransfer The tokens transferred in the message.
+  /// @param message The full message being executed.
+  /// @param receiver The receiver of the message (pre-extracted from message.receiver).
   /// @param ccvs The CCVs that provided data for the message.
-  /// @param finality The finality requirement of the message.
+  /// @param isTokenOnlyTransfer Whether the message is a token-only transfer.
   /// @return ccvsToQuery The CCVs that need to be queried to verify the message.
   /// @return dataIndexes The indexes of the CCVs in the provided ccvs array that correspond to ccvsToQuery.
   function _ensureCCVQuorumIsReached(
-    uint64 sourceChainSelector,
+    MessageV1Codec.MessageV1 calldata message,
     address receiver,
-    MessageV1Codec.TokenTransferV1[] memory tokenTransfer,
-    uint16 finality,
     address[] calldata ccvs,
     bool isTokenOnlyTransfer
   ) internal view returns (address[] memory ccvsToQuery, uint256[] memory dataIndexes) {
-    (address[] memory requiredCCV, address[] memory optionalCCVs, uint8 optionalThreshold) =
-      _getCCVsForMessage(sourceChainSelector, receiver, tokenTransfer, finality, isTokenOnlyTransfer);
+    (address[] memory requiredCCV, address[] memory optionalCCVs, uint8 optionalThreshold) = _getCCVsForMessage(
+      message.sourceChainSelector,
+      receiver,
+      message.sender,
+      message.tokenTransfer,
+      message.finality,
+      isTokenOnlyTransfer
+    );
 
     ccvsToQuery = new address[](ccvs.length);
     dataIndexes = new uint256[](ccvs.length);
@@ -672,16 +681,27 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// @dev This function reverts if the receiver returns duplicates in either the required or optional CCVs.
   /// @param sourceChainSelector The source chain selector.
   /// @param receiver The receiver address.
+  /// @param sender The sender of the message on the source chain.
+  /// @param messageRequestedBlockDepth The finality requirement of the message.
   /// @return requiredCCV The required CCVs.
   /// @return optionalCCVs The optional CCVs.
   /// @return optionalThreshold The threshold of optional CCVs.
   function _getCCVsFromReceiver(
     uint64 sourceChainSelector,
-    address receiver
+    address receiver,
+    bytes memory sender,
+    uint16 messageRequestedBlockDepth
   ) internal view returns (address[] memory requiredCCV, address[] memory optionalCCVs, uint8 optionalThreshold) {
+    // Default block depth requirement is 0, which means "wait for finality". A receiver implementing
+    // IAny2EVMMessageReceiverV2 can return a different value.
+    // If the receiver does not support the V2 interface it cannot support FTF. This is to protect anyone not
+    // explicitly opting in to support FTF from accidentally allowing messages with FTF finality to be executed.
+    uint16 minBlockDepth;
+
     // Only query for custom CCVs if the receiver supports the interface.
     if (receiver._supportsInterfaceReverting(type(IAny2EVMMessageReceiverV2).interfaceId)) {
-      (requiredCCV, optionalCCVs, optionalThreshold) = IAny2EVMMessageReceiverV2(receiver).getCCVs(sourceChainSelector);
+      (requiredCCV, optionalCCVs, optionalThreshold, minBlockDepth) =
+        IAny2EVMMessageReceiverV2(receiver).getCCVsAndMinBlockDepth(sourceChainSelector, sender);
 
       CCVConfigValidation._assertNoDuplicates(requiredCCV);
       CCVConfigValidation._assertNoDuplicates(optionalCCVs);
@@ -690,12 +710,24 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
       if (optionalThreshold > optionalCCVs.length) {
         revert InvalidOptionalThreshold(optionalThreshold, optionalCCVs.length);
       }
+    }
 
-      // If the receiver specified empty required and optional CCVs, we fall back to the default CCVs.
-      // If they did specify something, we use what they specified.
-      if (requiredCCV.length != 0 || optionalThreshold != 0) {
-        return (requiredCCV, optionalCCVs, optionalThreshold);
+    // If non-zero it means FTF is enabled. Ensure it follows the min requirements from the receiver.
+    if (messageRequestedBlockDepth != 0) {
+      // If the receiver requires finality, but the msg is FTF, revert.
+      if (minBlockDepth == 0) {
+        revert InvalidFinalityForReceiver(receiver, messageRequestedBlockDepth, minBlockDepth);
       }
+      // If the receiver specified a minBlockDepth that is higher than the message requested block depth, revert.
+      if (minBlockDepth > messageRequestedBlockDepth) {
+        revert InvalidFinalityForReceiver(receiver, messageRequestedBlockDepth, minBlockDepth);
+      }
+    }
+
+    // If the receiver specified empty required and optional CCVs, we fall back to the default CCVs.
+    // If they did specify something, we use what they specified.
+    if (requiredCCV.length != 0 || optionalThreshold != 0) {
+      return (requiredCCV, optionalCCVs, optionalThreshold);
     }
 
     // Returning new address[](1) means we add the default, as address(0) is the marker for that.
@@ -854,9 +886,13 @@ contract OffRamp is ITypeAndVersion, Ownable2StepMsgSender {
   /// @notice Returns all source chain configs.
   /// @return sourceChainSelectors The supported source chain selectors.
   /// @return sourceChainConfigs The source chain configs corresponding to all the supported chain selectors.
-  function getAllSourceChainConfigs() external view returns (uint64[] memory, SourceChainConfig[] memory) {
-    SourceChainConfig[] memory sourceChainConfigs = new SourceChainConfig[](s_sourceChainSelectors.length());
-    uint64[] memory sourceChainSelectors = new uint64[](s_sourceChainSelectors.length());
+  function getAllSourceChainConfigs()
+    external
+    view
+    returns (uint64[] memory sourceChainSelectors, SourceChainConfig[] memory sourceChainConfigs)
+  {
+    sourceChainConfigs = new SourceChainConfig[](s_sourceChainSelectors.length());
+    sourceChainSelectors = new uint64[](s_sourceChainSelectors.length());
     for (uint256 i = 0; i < s_sourceChainSelectors.length(); ++i) {
       sourceChainSelectors[i] = uint64(s_sourceChainSelectors.at(i));
       sourceChainConfigs[i] = s_sourceChainConfigs[sourceChainSelectors[i]];

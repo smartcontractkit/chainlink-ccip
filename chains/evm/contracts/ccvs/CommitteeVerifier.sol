@@ -13,7 +13,6 @@ import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access
 /// @notice The CommitteeVerifier is a contract that handles lane-specific fee logic and message verification.
 /// @dev Source and destination responsibilities are combined to enable a single proxy address for a CCV on each chain.
 contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, SignatureQuorumValidator, BaseVerifier {
-  error InvalidConfig();
   error InvalidVerifierResults();
   error InvalidCCVVersion(bytes4 verifierVersion);
   error OnlyCallableByOwnerOrAllowlistAdmin();
@@ -166,13 +165,13 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
 
   /// @notice Returns the account currently authorized to manage the storage location.
   /// @return storageLocationsAdmin The active storage locations admin.
-  function getStorageLocationsAdmin() external view returns (address) {
+  function getStorageLocationsAdmin() external view returns (address storageLocationsAdmin) {
     return s_storageLocationsAdmin;
   }
 
   /// @notice Returns the account that has been nominated as the next storage locations admin.
   /// @return pendingStorageLocationsAdmin The address that must call acceptStorageLocationsAdmin.
-  function getPendingStorageLocationsAdmin() external view returns (address) {
+  function getPendingStorageLocationsAdmin() external view returns (address pendingStorageLocationsAdmin) {
     return s_pendingStorageLocationsAdmin;
   }
 
@@ -214,7 +213,7 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
   }
 
   /// @notice Exposes the version tag.
-  function versionTag() public pure override returns (bytes4) {
+  function versionTag() public pure override returns (bytes4 tag) {
     return VERSION_TAG_V2_0_0;
   }
 

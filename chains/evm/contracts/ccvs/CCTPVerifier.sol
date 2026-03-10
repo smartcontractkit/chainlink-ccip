@@ -28,7 +28,6 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   error InvalidTokenMessengerVersion(uint32 expected, uint32 got);
   error InvalidMessageId(bytes32 expected, bytes32 got);
   error InvalidMessageSender(bytes32 expected, bytes32 got);
-  error InvalidMessageVersion(uint32 expected, uint32 got);
   error InvalidSourceDomain(uint32 expected, uint32 got);
   error InvalidToken(bytes token);
   error InvalidTokenTransferLength(uint256 length);
