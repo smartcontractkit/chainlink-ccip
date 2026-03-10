@@ -248,6 +248,8 @@ contracts:
         access: owner
       - name: getAllAuthorizedCallers
         access: public
+      - name : deposit
+        access: public
 
   - contract_name: CommitteeVerifier
     version: "2.0.0"

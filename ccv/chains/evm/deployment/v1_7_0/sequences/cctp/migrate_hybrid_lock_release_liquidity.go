@@ -105,9 +105,10 @@ var MigrateHybridLockReleaseLiquidity = cldf_ops.NewSequence(
 				continue
 			}
 			lockBoxAddr := common.HexToAddress(lockBox)
-			callersReport, err := cldf_ops.ExecuteOperation(b, erc20_lock_box.GetAllAuthorizedCallers, chain, contract_utils.FunctionInput[any]{
+			callersReport, err := cldf_ops.ExecuteOperation(b, erc20_lock_box.GetAllAuthorizedCallers, chain, contract_utils.FunctionInput[struct{}]{
 				ChainSelector: input.ChainSelector,
 				Address:       lockBoxAddr,
+				Args:          struct{}{},
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get authorized callers for lockbox %s (chain %d): %w", lockBox, sel, err)
@@ -230,9 +231,10 @@ func parseHexAddress(name, address string) (common.Address, error) {
 }
 
 func fetchLockBoxesFromSiloedPool(b cldf_ops.Bundle, chain evm.Chain, chainSelector uint64, poolAddress common.Address) (map[uint64]common.Address, error) {
-	lockBoxReport, err := cldf_ops.ExecuteOperation(b, siloed_usdc_token_pool.GetAllLockBoxConfigs, chain, contract_utils.FunctionInput[any]{
+	lockBoxReport, err := cldf_ops.ExecuteOperation(b, siloed_usdc_token_pool.GetAllLockBoxConfigs, chain, contract_utils.FunctionInput[struct{}]{
 		ChainSelector: chainSelector,
 		Address:       poolAddress,
+		Args:          struct{}{},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get lockbox configs: %w", err)
