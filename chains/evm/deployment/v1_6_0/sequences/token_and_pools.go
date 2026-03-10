@@ -229,9 +229,9 @@ func (a *EVMAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokensapi.TPRLR
 			}
 
 			// NOTE: the top level changeset will fully populate `input.TokenPoolRef` BEFORE calling this sequence,
-			// so we can safely assume all fields will be accounted for and avoid re-querying the datastore. We use
-			// `AddressRefToBytes()` as a shortcut to avoid writing the same boilerplate with `common.IsHexAddress`
-			// followed by `common.HexToAddress`.
+			// so we can safely assume all its fields will be accounted for and avoid re-querying the datastore. We
+			// use `AddressRefToBytes(*)` as a shortcut to avoid writing the same `common.IsHexAddress` followed by
+			// `common.HexToAddress` boilerplate.
 			tokenPoolAddrBytes, err := a.AddressRefToBytes(input.TokenPoolRef)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to convert token pool address ref to bytes: %w", err)
