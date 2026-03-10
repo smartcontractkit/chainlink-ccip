@@ -23,11 +23,11 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/cctp_message_transmitter_proxy"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/cctp_through_ccv_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/cctp_through_ccv_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/siloed_usdc_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/usdc_token_pool_proxy"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/cctp_message_transmitter_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/cctp_verifier"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/siloed_usdc_token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/usdc_token_pool_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/versioned_verifier_resolver"
 	v1_7_0_sequences "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 )
@@ -136,9 +136,10 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 			Args: cctp_through_ccv_token_pool.ConstructorArgs{
 				Token:              usdcTokenAddress,
 				LocalTokenDecimals: input.TokenDecimals,
-				RMNProxy:           rmnAddress,
+				RmnProxy:           rmnAddress,
 				Router:             routerAddress,
-				CCTPVerifier:       cctpVerifierResolverAddress,
+				CctpVerifier:       cctpVerifierResolverAddress,
+				AllowedCallers:     []common.Address{},
 			},
 		}, existingAddresses)
 		if err != nil {
@@ -223,14 +224,14 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 			ChainSelector:  chain.Selector,
 			Args: usdc_token_pool_proxy.ConstructorArgs{
 				Token: usdcTokenAddress,
-				Pools: usdc_token_pool_proxy.USDCTokenPoolProxyPoolAddresses{
+				Pools: usdc_token_pool_proxy.PoolAddresses{
 					CctpV1Pool:            cctpV1PoolAddress,
 					CctpV2Pool:            cctpV2TokenPoolAddress,
 					CctpV2PoolWithCCV:     cctpV2WithCCVsTokenPoolAddress,
 					SiloedLockReleasePool: siloedLockReleaseTokenPoolAddress,
 				},
 				Router:       routerAddress,
-				CCTPVerifier: cctpVerifierResolverAddress,
+				CctpVerifier: cctpVerifierResolverAddress,
 			},
 		}, existingAddresses)
 		if err != nil {
@@ -249,12 +250,10 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 		}
 
 		// Set the fee aggregator on the USDCTokenPoolProxy
-		setFeeAggregatorReport, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_proxy.SetFeeAggregator, chain, contract_utils.FunctionInput[usdc_token_pool_proxy.SetFeeAggregatorArgs]{
+		setFeeAggregatorReport, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_proxy.SetFeeAggregator, chain, contract_utils.FunctionInput[common.Address]{
 			ChainSelector: chain.Selector,
 			Address:       usdcTokenPoolProxyAddress,
-			Args: usdc_token_pool_proxy.SetFeeAggregatorArgs{
-				FeeAggregator: feeAggregatorAddress,
-			},
+			Args:          feeAggregatorAddress,
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to set fee aggregator on USDCTokenPoolProxy: %w", err)
@@ -308,7 +307,7 @@ func configureSiloedPoolProxyWiring(
 ) ([]contract_utils.WriteOutput, error) {
 	writes := make([]contract_utils.WriteOutput, 0)
 	// Get authorized callers on siloed pool.
-	callersReport, err := cldf_ops.ExecuteOperation(b, siloed_usdc_token_pool.GetAllAuthorizedCallers, chain, contract_utils.FunctionInput[any]{
+	callersReport, err := cldf_ops.ExecuteOperation(b, siloed_usdc_token_pool.GetAllAuthorizedCallers, chain, contract_utils.FunctionInput[struct{}]{
 		ChainSelector: chainSelector,
 		Address:       siloedPoolAddr,
 	})
@@ -330,7 +329,7 @@ func configureSiloedPoolProxyWiring(
 		writes = append(writes, poolAuthReport.Output)
 	}
 	// Get current pools from proxy.
-	poolsReport, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_proxy.GetPools, chain, contract_utils.FunctionInput[any]{
+	poolsReport, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_proxy.GetPools, chain, contract_utils.FunctionInput[struct{}]{
 		ChainSelector: chainSelector,
 		Address:       proxyAddr,
 	})

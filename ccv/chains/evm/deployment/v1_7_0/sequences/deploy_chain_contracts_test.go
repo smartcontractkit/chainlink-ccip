@@ -102,7 +102,7 @@ func TestDeployChainContracts_Idempotency(t *testing.T) {
 				onramp.ContractType:               false,
 				offramp.ContractType:              false,
 				fee_quoter.ContractType:           false,
-				committee_verifier.ResolverType:   false,
+				sequences.CommitteeVerifierResolverType:   false,
 				rmn_proxy.ContractType:            false,
 				token_admin_registry.ContractType: false,
 				mock_receiver.ContractType:        false,
