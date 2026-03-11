@@ -340,6 +340,7 @@ func TestConfigureCommitteeVerifierAsDest(t *testing.T) {
 					ChainSelector:  chainSelector,
 					ContractParams: testsetup.CreateBasicContractParams(),
 					CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
+					DeployerKeyOwned:  true,
 				},
 			)
 			require.NoError(t, err, "ExecuteSequence should not error")
@@ -628,6 +629,7 @@ func TestConfigureCommitteeVerifierAsDest_RevertWhen_InvalidSupportingContracts(
 					ChainSelector:  chainSelector,
 					CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
 					ContractParams: testsetup.CreateBasicContractParams(),
+					DeployerKeyOwned:  true,
 				},
 			)
 			require.NoError(t, err, "ExecuteSequence should not error")
