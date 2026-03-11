@@ -77,6 +77,16 @@ func (c *SiloedUSDCTokenPoolContract) GetAllAuthorizedCallers(opts *bind.CallOpt
 	return *abi.ConvertType(out[0], new([]common.Address)).(*[]common.Address), nil
 }
 
+func (c *SiloedUSDCTokenPoolContract) GetAllLockBoxConfigs(opts *bind.CallOpts) ([]LockBoxConfig, error) {
+	var out []any
+	err := c.contract.Call(opts, &out, "getAllLockBoxConfigs")
+	if err != nil {
+		var zero []LockBoxConfig
+		return zero, err
+	}
+	return *abi.ConvertType(out[0], new([]LockBoxConfig)).(*[]LockBoxConfig), nil
+}
+
 type AuthorizedCallerArgs struct {
 	AddedCallers   []common.Address
 	RemovedCallers []common.Address
@@ -155,5 +165,16 @@ var GetAllAuthorizedCallers = contract.NewRead(contract.ReadParams[struct{}, []c
 	NewContract:  NewSiloedUSDCTokenPoolContract,
 	CallContract: func(c *SiloedUSDCTokenPoolContract, opts *bind.CallOpts, args struct{}) ([]common.Address, error) {
 		return c.GetAllAuthorizedCallers(opts)
+	},
+})
+
+var GetAllLockBoxConfigs = contract.NewRead(contract.ReadParams[struct{}, []LockBoxConfig, *SiloedUSDCTokenPoolContract]{
+	Name:         "siloed-usdc-token-pool:get-all-lock-box-configs",
+	Version:      Version,
+	Description:  "Calls getAllLockBoxConfigs on the contract",
+	ContractType: ContractType,
+	NewContract:  NewSiloedUSDCTokenPoolContract,
+	CallContract: func(c *SiloedUSDCTokenPoolContract, opts *bind.CallOpts, args struct{}) ([]LockBoxConfig, error) {
+		return c.GetAllLockBoxConfigs(opts)
 	},
 })
