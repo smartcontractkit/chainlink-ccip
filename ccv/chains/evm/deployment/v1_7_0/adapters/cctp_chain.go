@@ -34,6 +34,12 @@ func (c *CCTPChainAdapter) ConfigureCCTPChainForLanes() *operations.Sequence[ada
 	return cctp.ConfigureCCTPChainForLanes
 }
 
+// MigrateHybridLockReleaseLiquidity returns the sequence for migrating liquidity from a HybridLockReleaseUSDCTokenPool
+// into per-chain siloed lockboxes on the home chain.
+func (c *CCTPChainAdapter) MigrateHybridLockReleaseLiquidity() *operations.Sequence[adapters.MigrateHybridLockReleaseLiquidityInput, seq_core.OnChainOutput, adapters.MigrateHybridLockReleaseLiquidityDeps] {
+	return cctp.MigrateHybridLockReleaseLiquidity
+}
+
 // CCTPV2AllowedCallerOnDest returns the address allowed to trigger message reception on the remote domain.
 // On dest, the caller of CCTPV2 is the CCTPMessageTransmitterProxy 2.0.0.
 func (c *CCTPChainAdapter) CCTPV2AllowedCallerOnDest(d datastore.DataStore, b chain.BlockChains, chainSelector uint64) ([]byte, error) {

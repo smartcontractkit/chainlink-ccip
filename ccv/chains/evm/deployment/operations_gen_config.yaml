@@ -203,6 +203,8 @@ contracts:
         access: owner
       - name: getAllAuthorizedCallers
         access: public
+      - name: getAllLockBoxConfigs
+        access: public
 
   - contract_name: LombardTokenPool
     version: "2.0.0"
@@ -254,6 +256,8 @@ contracts:
       - name: applyAuthorizedCallerUpdates
         access: owner
       - name: getAllAuthorizedCallers
+        access: public
+      - name : deposit
         access: public
 
   - contract_name: CommitteeVerifier
