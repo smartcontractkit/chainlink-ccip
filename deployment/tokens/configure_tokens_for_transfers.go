@@ -2,9 +2,12 @@ package tokens
 
 import (
 	"fmt"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
+	mcms_types "github.com/smartcontractkit/mcms/types"
+
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
@@ -12,7 +15,6 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	mcms_types "github.com/smartcontractkit/mcms/types"
 )
 
 // TokenTransferConfig specifies configuration for a token on one chain to enable transfers with other chains.
@@ -36,6 +38,14 @@ type TokenTransferConfig struct {
 	// This can be interpreted as # of block confirmations, an ID, or otherwise.
 	// Interpretation is left to each chain family.
 	MinFinalityValue uint16
+	// LiquidityMigrationAmount, if set, specifies an exact token amount to migrate from the old pool (read from the
+	// TokenAdminRegistry) to the new pool's lockbox. Mutually exclusive with LiquidityMigrationBasisPoints.
+	// When either LiquidityMigrationAmount or LiquidityMigrationBasisPoints is set, a liquidity migration is triggered.
+	// The old pool address is derived from the TokenAdminRegistry, and the timelock address from the MCMS config.
+	LiquidityMigrationAmount *big.Int
+	// LiquidityMigrationBasisPoints specifies a percentage of the old pool's balance to migrate (1-10000, where 10000 = 100%).
+	// Mutually exclusive with LiquidityMigrationAmount.
+	LiquidityMigrationBasisPoints *uint16
 }
 
 // ConfigureTokensForTransfersConfig is the configuration for the ConfigureTokensForTransfers changeset.
@@ -58,13 +68,13 @@ func makeVerify(_ *TokenAdapterRegistry, _ *changesets.MCMSReaderRegistry) func(
 	}
 }
 
-func makeApply(tokenRegistry *TokenAdapterRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, ConfigureTokensForTransfersConfig) (cldf.ChangesetOutput, error) {
+func makeApply(_ *TokenAdapterRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, ConfigureTokensForTransfersConfig) (cldf.ChangesetOutput, error) {
 	return func(e cldf.Environment, cfg ConfigureTokensForTransfersConfig) (cldf.ChangesetOutput, error) {
 		configs := make(map[uint64]TokenTransferConfig, len(cfg.Tokens))
 		for _, config := range cfg.Tokens {
 			configs[config.ChainSelector] = config
 		}
-		batchOps, reports, ds, err := processTokenConfigForChain(e, configs)
+		batchOps, reports, ds, err := processTokenConfigForChain(e, mcmsRegistry, cfg.MCMS, configs)
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to process token configs for chains: %w", err)
 		}
@@ -76,7 +86,7 @@ func makeApply(tokenRegistry *TokenAdapterRegistry, mcmsRegistry *changesets.MCM
 	}
 }
 
-func processTokenConfigForChain(e deployment.Environment, cfg map[uint64]TokenTransferConfig) ([]mcms_types.BatchOperation, []cldf_ops.Report[any, any], *datastore.MemoryDataStore, error) {
+func processTokenConfigForChain(e deployment.Environment, mcmsRegistry *changesets.MCMSReaderRegistry, mcmsInput mcms.Input, cfg map[uint64]TokenTransferConfig) ([]mcms_types.BatchOperation, []cldf_ops.Report[any, any], *datastore.MemoryDataStore, error) {
 	tokenRegistry := GetTokenAdapterRegistry()
 	batchOps := make([]mcms_types.BatchOperation, 0)
 	reports := make([]cldf_ops.Report[any, any], 0)
@@ -133,15 +143,32 @@ func processTokenConfigForChain(e deployment.Environment, cfg map[uint64]TokenTr
 			}
 		}
 
+		// Resolve the timelock address if a liquidity migration is requested.
+		var timelockAddress string
+		if token.LiquidityMigrationAmount != nil || token.LiquidityMigrationBasisPoints != nil {
+			mcmsReader, ok := mcmsRegistry.GetMCMSReader(family)
+			if !ok {
+				return nil, nil, nil, fmt.Errorf("no MCMS reader registered for chain family '%s' on chain %d", family, selector)
+			}
+			timelockRef, err := mcmsReader.GetTimelockRef(e, selector, mcmsInput)
+			if err != nil {
+				return nil, nil, nil, fmt.Errorf("failed to get timelock address from MCMS config on chain %d: %w", selector, err)
+			}
+			timelockAddress = timelockRef.Address
+		}
+
 		configureTokenReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adapter.ConfigureTokenForTransfersSequence(), e.BlockChains, ConfigureTokenForTransfersInput{
-			ChainSelector:     selector,
-			TokenPoolAddress:  tokenPool.Address,
-			RemoteChains:      remoteChains,
-			ExternalAdmin:     token.ExternalAdmin,
-			RegistryAddress:   registry.Address,
-			TokenRef:          token.TokenRef,
-			PoolType:          tokenPool.Type.String(),
-			ExistingDataStore: e.DataStore,
+			ChainSelector:                 selector,
+			TokenPoolAddress:              tokenPool.Address,
+			RemoteChains:                  remoteChains,
+			ExternalAdmin:                 token.ExternalAdmin,
+			RegistryAddress:               registry.Address,
+			TokenRef:                      token.TokenRef,
+			PoolType:                      tokenPool.Type.String(),
+			ExistingDataStore:             e.DataStore,
+			LiquidityMigrationAmount:      token.LiquidityMigrationAmount,
+			LiquidityMigrationBasisPoints: token.LiquidityMigrationBasisPoints,
+			TimelockAddress:               timelockAddress,
 		})
 		if err != nil {
 			return batchOps, reports, nil, fmt.Errorf("failed to configure token pool on chain with selector %d: %w", selector, err)

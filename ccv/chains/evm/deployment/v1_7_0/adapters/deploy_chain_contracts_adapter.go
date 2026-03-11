@@ -212,6 +212,7 @@ func toEVMDeployInput(input ccvadapters.DeployChainContractsInput) (sequences.De
 		CREATE2Factory:    create2Factory,
 		ExistingAddresses: input.ExistingAddresses,
 		DeployTestRouter:  input.DeployTestRouter,
+		DeployerKeyOwned:  input.DeployerKeyOwned,
 		ContractParams: sequences.ContractParams{
 			RMNRemote: sequences.RMNRemoteParams{
 				Version:   input.ContractParams.RMNRemote.Version,
