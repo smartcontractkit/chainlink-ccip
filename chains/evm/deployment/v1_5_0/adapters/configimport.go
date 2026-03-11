@@ -2,6 +2,7 @@ package adapters
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
@@ -207,30 +208,43 @@ func GetSupportedTokensPerRemoteChain(l logger.Logger, tokenAdminRegAddr common.
 		return nil, fmt.Errorf("failed to get pools for tokens from token admin registry at %s on chain %d: %w", tokenAdminRegAddr.String(), chain.Selector, err)
 	}
 	tokensPerRemoteChain := make(map[uint64][]common.Address)
+	var mu sync.Mutex
+	var wg sync.WaitGroup
 	for _, poolAddr := range pools {
 		// there is no supported pool for this token
 		if poolAddr == (common.Address{}) {
 			continue
 		}
-		tokenPoolC, err := token_pool.NewTokenPool(poolAddr, chain.Client)
-		if err != nil {
-			return nil, fmt.Errorf("failed to instantiate token pool contract at %s on chain %d: %w", poolAddr.String(), chain.Selector, err)
-		}
-		chains, err := tokenPoolC.GetSupportedChains(nil)
-		if err != nil {
-			// if we fail to get supported chains for a pool, we skip it and move on to the next one, since we don't want one bad pool to cause the entire config import to fail
-			l.Warnf("failed to get supported chains for token pool at %s on chain %d: %v", poolAddr.String(), chain.Selector, err)
-			continue
-		}
-		tokenAddr, err := tokenPoolC.GetToken(nil)
-		if err != nil {
-			// if we fail to get the token address for a pool, we skip it and move on to the next one, since we don't want one bad pool to cause the entire config import to fail
-			l.Warnf("failed to get token address for token pool at %s on chain %d: %v", poolAddr.String(), chain.Selector, err)
-			continue
-		}
-		for _, remoteChain := range chains {
-			tokensPerRemoteChain[remoteChain] = append(tokensPerRemoteChain[remoteChain], tokenAddr)
-		}
+		poolAddr := poolAddr
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			tokenPoolC, err := token_pool.NewTokenPool(poolAddr, chain.Client)
+			if err != nil {
+				l.Warnf("failed to instantiate token pool contract at %s on chain %d: %v", poolAddr.String(), chain.Selector, err)
+				return
+			}
+			chains, err := tokenPoolC.GetSupportedChains(nil)
+			if err != nil {
+				// if we fail to get the supported chains for a pool, we skip it and move on to avoid failing the entire config import
+				// since it's possible for some pools do not support the getSupportedChains function
+				l.Warnf("failed to get supported chains for token pool at %s on chain %d: %v", poolAddr.String(), chain.Selector, err)
+				return
+			}
+			tokenAddr, err := tokenPoolC.GetToken(nil)
+			if err != nil {
+				// if we fail to get the token address for a pool, we skip it and move on to avoid failing the entire config import
+				// since it's possible for some pools do not support the getToken function
+				l.Warnf("failed to get token address for token pool at %s on chain %d: %v", poolAddr.String(), chain.Selector, err)
+				return
+			}
+			mu.Lock()
+			for _, remoteChain := range chains {
+				tokensPerRemoteChain[remoteChain] = append(tokensPerRemoteChain[remoteChain], tokenAddr)
+			}
+			mu.Unlock()
+		}()
 	}
+	wg.Wait()
 	return tokensPerRemoteChain, nil
 }
