@@ -5,12 +5,14 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/evm_2_evm_onramp"
@@ -141,7 +143,7 @@ func (ci *ConfigImportAdapter) SupportedTokensPerRemoteChain(e cldf.Environment,
 		return nil, fmt.Errorf("chain with selector %d not found in environment", chainsel)
 	}
 	// get all supported tokens from token admin registry
-	return GetSupportedTokensPerRemoteChain(ci.TokenAdminReg, chain)
+	return GetSupportedTokensPerRemoteChain(e.Logger, ci.TokenAdminReg, chain)
 }
 
 func (ci *ConfigImportAdapter) SequenceImportConfig() *cldf_ops.Sequence[api.ImportConfigPerChainInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
@@ -181,7 +183,7 @@ func (ci *ConfigImportAdapter) SequenceImportConfig() *cldf_ops.Sequence[api.Imp
 		})
 }
 
-func GetSupportedTokensPerRemoteChain(tokenAdminRegAddr common.Address, chain evm.Chain) (map[uint64][]common.Address, error) {
+func GetSupportedTokensPerRemoteChain(l logger.Logger, tokenAdminRegAddr common.Address, chain evm.Chain) (map[uint64][]common.Address, error) {
 	// get all supported tokens from token admin registry
 	tokenAdminRegC, err := token_admin_registry.NewTokenAdminRegistry(tokenAdminRegAddr, chain.Client)
 	if err != nil {
@@ -216,11 +218,15 @@ func GetSupportedTokensPerRemoteChain(tokenAdminRegAddr common.Address, chain ev
 		}
 		chains, err := tokenPoolC.GetSupportedChains(nil)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get supported chains from token pool at %s on chain %d: %w", poolAddr.String(), chain.Selector, err)
+			// if we fail to get supported chains for a pool, we skip it and move on to the next one, since we don't want one bad pool to cause the entire config import to fail
+			l.Warnf("failed to get supported chains for token pool at %s on chain %d: %v", poolAddr.String(), chain.Selector, err)
+			continue
 		}
 		tokenAddr, err := tokenPoolC.GetToken(nil)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get token address from token pool at %s on chain %d: %w", poolAddr.String(), chain.Selector, err)
+			// if we fail to get the token address for a pool, we skip it and move on to the next one, since we don't want one bad pool to cause the entire config import to fail
+			l.Warnf("failed to get token address for token pool at %s on chain %d: %v", poolAddr.String(), chain.Selector, err)
+			continue
 		}
 		for _, remoteChain := range chains {
 			tokensPerRemoteChain[remoteChain] = append(tokensPerRemoteChain[remoteChain], tokenAddr)
