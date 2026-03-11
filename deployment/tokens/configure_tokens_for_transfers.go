@@ -142,6 +142,7 @@ func processTokenConfigForChain(e deployment.Environment, cfg map[uint64]TokenTr
 			TokenRef:          token.TokenRef,
 			PoolType:          tokenPool.Type.String(),
 			ExistingDataStore: e.DataStore,
+			MinFinalityValue:  token.MinFinalityValue,
 		})
 		if err != nil {
 			return batchOps, reports, nil, fmt.Errorf("failed to configure token pool on chain with selector %d: %w", selector, err)
