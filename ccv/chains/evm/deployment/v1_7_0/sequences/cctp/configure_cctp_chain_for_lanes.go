@@ -230,6 +230,7 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 			RegistryTokenPoolAddress: refs.RegisteredPool.Address,
 			RegistryAddress:          refs.TokenAdminRegistry.Address,
 			MinFinalityValue:         1,
+			RemoteChains:             remoteChainConfigs,
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to configure token for transfers: %w", err)

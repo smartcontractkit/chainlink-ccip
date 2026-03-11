@@ -92,21 +92,18 @@ var ConfigureTokenForTransfers = cldf_ops.NewSequence(
 		}
 
 		// Configure token pool for each remote chain
-		for remoteChainSelector, remoteChainConfig := range input.RemoteChains {
-			configureTokenPoolForRemoteChainReport, err := cldf_ops.ExecuteSequence(b, ConfigureTokenPoolForRemoteChain, chain, ConfigureTokenPoolForRemoteChainInput{
-				ChainSelector:       input.ChainSelector,
-				TokenPoolAddress:    tokenPoolAddress,
-				AdvancedPoolHooks:   advancedPoolHooksAddress.Output,
-				RemoteChainSelector: remoteChainSelector,
-				RemoteChainConfig:   remoteChainConfig,
-				RegistryAddress:     common.HexToAddress(input.RegistryAddress),
-				TokenAddress:        tokenAddress,
-			})
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to configure token pool for remote chain %d: %w", remoteChainSelector, err)
-			}
-			ops = append(ops, configureTokenPoolForRemoteChainReport.Output.BatchOps...)
+		configureTokenPoolForRemoteChainReport, err := cldf_ops.ExecuteSequence(b, ConfigureTokenPoolForRemoteChains, chain, ConfigureTokenPoolForRemoteChainsInput{
+			ChainSelector:     input.ChainSelector,
+			TokenPoolAddress:  tokenPoolAddress,
+			AdvancedPoolHooks: advancedPoolHooksAddress.Output,
+			RemoteChains:      input.RemoteChains,
+			RegistryAddress:   common.HexToAddress(input.RegistryAddress),
+			TokenAddress:      tokenAddress,
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to configure token pool for remote chains: %w", err)
 		}
+		ops = append(ops, configureTokenPoolForRemoteChainReport.Output.BatchOps...)
 
 		// Register the token with the token admin registry
 		registerTokenReport, err := cldf_ops.ExecuteSequence(b, v1_5_0.RegisterToken, chain, v1_5_0.RegisterTokenInput{
