@@ -132,6 +132,31 @@ type RemoteCCTPChain interface {
 	MintRecipientOnDest(d datastore.DataStore, b cldf_chain.BlockChains, chainSelector uint64) ([]byte, error)
 }
 
+// MigrateHybridLockReleaseLiquidityInput specifies the input for the MigrateHybridLockReleaseLiquidity sequence.
+type MigrateHybridLockReleaseLiquidityInput struct {
+	// ChainSelector is the selector for the home chain where liquidity will be migrated.
+	ChainSelector uint64
+	// HybridLockReleaseTokenPool is the address of the existing HybridLockReleaseUSDCTokenPool.
+	HybridLockReleaseTokenPool string
+	// SiloedUSDCTokenPool is the address of the SiloedUSDCTokenPool to migrate liquidity into.
+	SiloedUSDCTokenPool string
+	// USDCToken is the address of the USDC token contract.
+	USDCToken string
+	// LockReleaseChainSelectors specifies which remote chains' locked liquidity to migrate.
+	LockReleaseChainSelectors []uint64
+	// LiquidityWithdrawPercent is the percent of locked liquidity to migrate (1-100).
+	LiquidityWithdrawPercent uint8
+	// MCMSTimelockAddress is the address of the MCMS timelock that will execute the proposal.
+	// Required because the timelock must be authorized on each lockbox to call deposit().
+	MCMSTimelockAddress string
+}
+
+// MigrateHybridLockReleaseLiquidityDeps are the dependencies for the MigrateHybridLockReleaseLiquidity sequence.
+type MigrateHybridLockReleaseLiquidityDeps struct {
+	// BlockChains are the chains in the environment.
+	BlockChains cldf_chain.BlockChains
+}
+
 // CCTPChain is a configurable CCTP chain.
 type CCTPChain interface {
 	RemoteCCTPChain
@@ -139,6 +164,9 @@ type CCTPChain interface {
 	DeployCCTPChain() *cldf_ops.Sequence[DeployCCTPInput, sequences.OnChainOutput, DeployCCTPChainDeps]
 	// ConfigureCCTPChainForLanes configures the CCTP contracts on the chain for lanes.
 	ConfigureCCTPChainForLanes() *cldf_ops.Sequence[ConfigureCCTPChainForLanesInput, sequences.OnChainOutput, ConfigureCCTPChainForLanesDeps]
+	// MigrateHybridLockReleaseLiquidity migrates liquidity from a HybridLockReleaseUSDCTokenPool
+	// into per-chain siloed lockboxes on the home chain.
+	MigrateHybridLockReleaseLiquidity() *cldf_ops.Sequence[MigrateHybridLockReleaseLiquidityInput, sequences.OnChainOutput, MigrateHybridLockReleaseLiquidityDeps]
 }
 
 // CCTPChainRegistry maintains a registry of CCTP chains.
