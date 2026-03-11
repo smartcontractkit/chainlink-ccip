@@ -19,7 +19,7 @@ import (
 )
 
 var ContractType cldf_deployment.ContractType = "ERC20LockBox"
-var Version = semver.MustParse("2.0.0")
+var Version = semver.MustParse("1.7.0")
 var TypeAndVersion = cldf_deployment.NewTypeAndVersion(ContractType, *Version)
 
 const ERC20LockBoxABI = `[{"type":"constructor","inputs":[{"name":"token","type":"address","internalType":"address"}],"stateMutability":"nonpayable"},{"type":"function","name":"acceptOwnership","inputs":[],"outputs":[],"stateMutability":"nonpayable"},{"type":"function","name":"applyAuthorizedCallerUpdates","inputs":[{"name":"authorizedCallerArgs","type":"tuple","internalType":"struct AuthorizedCallers.AuthorizedCallerArgs","components":[{"name":"addedCallers","type":"address[]","internalType":"address[]"},{"name":"removedCallers","type":"address[]","internalType":"address[]"}]}],"outputs":[],"stateMutability":"nonpayable"},{"type":"function","name":"deposit","inputs":[{"name":"token","type":"address","internalType":"address"},{"name":"","type":"uint64","internalType":"uint64"},{"name":"amount","type":"uint256","internalType":"uint256"}],"outputs":[],"stateMutability":"nonpayable"},{"type":"function","name":"getAllAuthorizedCallers","inputs":[],"outputs":[{"name":"","type":"address[]","internalType":"address[]"}],"stateMutability":"view"},{"type":"function","name":"getToken","inputs":[],"outputs":[{"name":"","type":"address","internalType":"contract IERC20"}],"stateMutability":"view"},{"type":"function","name":"isTokenSupported","inputs":[{"name":"token","type":"address","internalType":"address"}],"outputs":[{"name":"","type":"bool","internalType":"bool"}],"stateMutability":"view"},{"type":"function","name":"owner","inputs":[],"outputs":[{"name":"","type":"address","internalType":"address"}],"stateMutability":"view"},{"type":"function","name":"transferOwnership","inputs":[{"name":"to","type":"address","internalType":"address"}],"outputs":[],"stateMutability":"nonpayable"},{"type":"function","name":"typeAndVersion","inputs":[],"outputs":[{"name":"","type":"string","internalType":"string"}],"stateMutability":"pure"},{"type":"function","name":"withdraw","inputs":[{"name":"token","type":"address","internalType":"address"},{"name":"","type":"uint64","internalType":"uint64"},{"name":"amount","type":"uint256","internalType":"uint256"},{"name":"recipient","type":"address","internalType":"address"}],"outputs":[],"stateMutability":"nonpayable"},{"type":"event","name":"AuthorizedCallerAdded","inputs":[{"name":"caller","type":"address","indexed":false,"internalType":"address"}],"anonymous":false},{"type":"event","name":"AuthorizedCallerRemoved","inputs":[{"name":"caller","type":"address","indexed":false,"internalType":"address"}],"anonymous":false},{"type":"event","name":"Deposit","inputs":[{"name":"token","type":"address","indexed":true,"internalType":"address"},{"name":"depositor","type":"address","indexed":true,"internalType":"address"},{"name":"amount","type":"uint256","indexed":false,"internalType":"uint256"}],"anonymous":false},{"type":"event","name":"OwnershipTransferRequested","inputs":[{"name":"from","type":"address","indexed":true,"internalType":"address"},{"name":"to","type":"address","indexed":true,"internalType":"address"}],"anonymous":false},{"type":"event","name":"OwnershipTransferred","inputs":[{"name":"from","type":"address","indexed":true,"internalType":"address"},{"name":"to","type":"address","indexed":true,"internalType":"address"}],"anonymous":false},{"type":"event","name":"Withdrawal","inputs":[{"name":"token","type":"address","indexed":true,"internalType":"address"},{"name":"recipient","type":"address","indexed":true,"internalType":"address"},{"name":"amount","type":"uint256","indexed":false,"internalType":"uint256"}],"anonymous":false},{"type":"error","name":"CannotTransferToSelf","inputs":[]},{"type":"error","name":"InsufficientBalance","inputs":[{"name":"requested","type":"uint256","internalType":"uint256"},{"name":"available","type":"uint256","internalType":"uint256"}]},{"type":"error","name":"MustBeProposedOwner","inputs":[]},{"type":"error","name":"OnlyCallableByOwner","inputs":[]},{"type":"error","name":"OwnerCannotBeZero","inputs":[]},{"type":"error","name":"RecipientCannotBeZeroAddress","inputs":[]},{"type":"error","name":"SafeERC20FailedOperation","inputs":[{"name":"token","type":"address","internalType":"address"}]},{"type":"error","name":"TokenAmountCannotBeZero","inputs":[]},{"type":"error","name":"UnauthorizedCaller","inputs":[{"name":"caller","type":"address","internalType":"address"}]},{"type":"error","name":"UnsupportedToken","inputs":[{"name":"token","type":"address","internalType":"address"}]},{"type":"error","name":"ZeroAddressNotAllowed","inputs":[]}]`
@@ -65,6 +65,10 @@ func (c *ERC20LockBoxContract) ApplyAuthorizedCallerUpdates(opts *bind.TransactO
 	return c.contract.Transact(opts, "applyAuthorizedCallerUpdates", args)
 }
 
+func (c *ERC20LockBoxContract) Deposit(opts *bind.TransactOpts, token common.Address, arg1 uint64, amount *big.Int) (*types.Transaction, error) {
+	return c.contract.Transact(opts, "deposit", token, arg1, amount)
+}
+
 func (c *ERC20LockBoxContract) GetAllAuthorizedCallers(opts *bind.CallOpts) ([]common.Address, error) {
 	var out []any
 	err := c.contract.Call(opts, &out, "getAllAuthorizedCallers")
@@ -73,10 +77,6 @@ func (c *ERC20LockBoxContract) GetAllAuthorizedCallers(opts *bind.CallOpts) ([]c
 		return zero, err
 	}
 	return *abi.ConvertType(out[0], new([]common.Address)).(*[]common.Address), nil
-}
-
-func (c *ERC20LockBoxContract) Deposit(opts *bind.TransactOpts, token common.Address, arg1 uint64, amount *big.Int) (*types.Transaction, error) {
-	return c.contract.Transact(opts, "deposit", token, arg1, amount)
 }
 
 type AuthorizedCallerArgs struct {
@@ -128,6 +128,24 @@ var ApplyAuthorizedCallerUpdates = contract.NewWrite(contract.WriteParams[Author
 	},
 })
 
+var Deposit = contract.NewWrite(contract.WriteParams[DepositArgs, *ERC20LockBoxContract]{
+	Name:            "erc20-lock-box:deposit",
+	Version:         Version,
+	Description:     "Calls deposit on the contract",
+	ContractType:    ContractType,
+	ContractABI:     ERC20LockBoxABI,
+	NewContract:     NewERC20LockBoxContract,
+	IsAllowedCaller: contract.OnlyOwner[*ERC20LockBoxContract, DepositArgs],
+	Validate:        func(DepositArgs) error { return nil },
+	CallContract: func(
+		c *ERC20LockBoxContract,
+		opts *bind.TransactOpts,
+		args DepositArgs,
+	) (*types.Transaction, error) {
+		return c.Deposit(opts, args.Token, args.Arg1, args.Amount)
+	},
+})
+
 var GetAllAuthorizedCallers = contract.NewRead(contract.ReadParams[struct{}, []common.Address, *ERC20LockBoxContract]{
 	Name:         "erc20-lock-box:get-all-authorized-callers",
 	Version:      Version,
@@ -136,23 +154,5 @@ var GetAllAuthorizedCallers = contract.NewRead(contract.ReadParams[struct{}, []c
 	NewContract:  NewERC20LockBoxContract,
 	CallContract: func(c *ERC20LockBoxContract, opts *bind.CallOpts, args struct{}) ([]common.Address, error) {
 		return c.GetAllAuthorizedCallers(opts)
-	},
-})
-
-var Deposit = contract.NewWrite(contract.WriteParams[DepositArgs, *ERC20LockBoxContract]{
-	Name:            "erc20-lock-box:deposit",
-	Version:         Version,
-	Description:     "Calls deposit on the contract",
-	ContractType:    ContractType,
-	ContractABI:     ERC20LockBoxABI,
-	NewContract:     NewERC20LockBoxContract,
-	IsAllowedCaller: contract.AllCallersAllowed[*ERC20LockBoxContract, DepositArgs],
-	Validate:        func(DepositArgs) error { return nil },
-	CallContract: func(
-		c *ERC20LockBoxContract,
-		opts *bind.TransactOpts,
-		args DepositArgs,
-	) (*types.Transaction, error) {
-		return c.Deposit(opts, args.Token, args.Arg1, args.Amount)
 	},
 })
