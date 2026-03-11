@@ -173,6 +173,7 @@ func TestDeployChainContracts_DeployTestRouter(t *testing.T) {
 			CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
 			Params:           testsetup.CreateBasicContractParams(),
 			DeployTestRouter: true,
+			DeployerKeyOwned:  true,
 		},
 	})
 	require.NoError(t, err, "Failed to apply DeployChainContracts changeset")
