@@ -705,6 +705,32 @@ func Test_TokenDataObserver_Validation(t *testing.T) {
 			errMsg:      "SourceMessageTransmitterAddress not set",
 		},
 		{
+			name: "usdc type is set but token address is whitespace",
+			config: withBaseConfig(
+				TokenDataObserverConfig{
+					Type:    "usdc-cctp",
+					Version: "1.0",
+					USDCCCTPObserverConfig: &USDCCCTPObserverConfig{
+						AttestationConfig: AttestationConfig{
+							AttestationAPI:         "http://localhost:8080",
+							AttestationAPITimeout:  commonconfig.MustNewDuration(time.Second),
+							AttestationAPIInterval: commonconfig.MustNewDuration(500 * time.Millisecond),
+						},
+						AttestationAPICooldown: commonconfig.MustNewDuration(5 * time.Minute),
+						Tokens: map[cciptypes.ChainSelector]USDCCCTPTokenConfig{
+							1: {
+								SourcePoolAddress:            "0x1234",
+								SourceMessageTransmitterAddr: " ",
+							},
+						},
+					},
+				}),
+			usdcEnabled: true,
+			lbtcEnabled: false,
+			wantErr:     true,
+			errMsg:      "SourceMessageTransmitterAddress not set",
+		},
+		{
 			name: "lbtc type is set but tokens are missing",
 			config: withBaseConfig(
 				TokenDataObserverConfig{
