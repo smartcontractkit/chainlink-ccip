@@ -1,9 +1,12 @@
 package adapters
 
 import (
+	"context"
 	"fmt"
+	"sync"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
@@ -11,6 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 
@@ -31,7 +35,12 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
-var GetTokensPaginationSize = uint64(20)
+var (
+	getTokensPaginationSize = uint64(20)
+	// getSupportedTokensPoolConcurrency caps concurrent RPC calls when fetching supported tokens per pool.
+	// Limits in-flight requests to avoid overwhelming the node/provider (rate limits, timeouts) and memory.
+	getSupportedTokensPoolConcurrency = 10
+)
 
 type ConfigImportAdapter struct {
 	OnRamp        map[uint64]common.Address
@@ -143,7 +152,7 @@ func (ci *ConfigImportAdapter) SupportedTokensPerRemoteChain(e cldf.Environment,
 		return nil, fmt.Errorf("chain with selector %d not found in environment", chainsel)
 	}
 	// get all supported tokens from token admin registry
-	return GetSupportedTokensPerRemoteChain(e.Logger, ci.TokenAdminReg, chain)
+	return GetSupportedTokensPerRemoteChain(e.GetContext(), e.Logger, ci.TokenAdminReg, chain)
 }
 
 func (ci *ConfigImportAdapter) SequenceImportConfig() *cldf_ops.Sequence[api.ImportConfigPerChainInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
@@ -183,7 +192,7 @@ func (ci *ConfigImportAdapter) SequenceImportConfig() *cldf_ops.Sequence[api.Imp
 		})
 }
 
-func GetSupportedTokensPerRemoteChain(l logger.Logger, tokenAdminRegAddr common.Address, chain evm.Chain) (map[uint64][]common.Address, error) {
+func GetSupportedTokensPerRemoteChain(ctx context.Context, l logger.Logger, tokenAdminRegAddr common.Address, chain evm.Chain) (map[uint64][]common.Address, error) {
 	// get all supported tokens from token admin registry
 	tokenAdminRegC, err := token_admin_registry.NewTokenAdminRegistry(tokenAdminRegAddr, chain.Client)
 	if err != nil {
@@ -192,13 +201,13 @@ func GetSupportedTokensPerRemoteChain(l logger.Logger, tokenAdminRegAddr common.
 	startIndex := uint64(0)
 	allTokens := make([]common.Address, 0)
 	for {
-		fetchedTokens, err := tokenAdminRegC.GetAllConfiguredTokens(nil, startIndex, GetTokensPaginationSize)
+		fetchedTokens, err := tokenAdminRegC.GetAllConfiguredTokens(nil, startIndex, getTokensPaginationSize)
 		if err != nil {
 			return nil, err
 		}
 		allTokens = append(allTokens, fetchedTokens...)
-		startIndex += GetTokensPaginationSize
-		if uint64(len(fetchedTokens)) < GetTokensPaginationSize {
+		startIndex += getTokensPaginationSize
+		if uint64(len(fetchedTokens)) < getTokensPaginationSize {
 			break
 		}
 	}
@@ -207,30 +216,48 @@ func GetSupportedTokensPerRemoteChain(l logger.Logger, tokenAdminRegAddr common.
 		return nil, fmt.Errorf("failed to get pools for tokens from token admin registry at %s on chain %d: %w", tokenAdminRegAddr.String(), chain.Selector, err)
 	}
 	tokensPerRemoteChain := make(map[uint64][]common.Address)
+	var mu sync.Mutex
+	grp, grpCtx := errgroup.WithContext(ctx)
+	grp.SetLimit(getSupportedTokensPoolConcurrency)
 	for _, poolAddr := range pools {
 		// there is no supported pool for this token
 		if poolAddr == (common.Address{}) {
 			continue
 		}
-		tokenPoolC, err := token_pool.NewTokenPool(poolAddr, chain.Client)
-		if err != nil {
-			return nil, fmt.Errorf("failed to instantiate token pool contract at %s on chain %d: %w", poolAddr.String(), chain.Selector, err)
-		}
-		chains, err := tokenPoolC.GetSupportedChains(nil)
-		if err != nil {
-			// if we fail to get supported chains for a pool, we skip it and move on to the next one, since we don't want one bad pool to cause the entire config import to fail
-			l.Warnf("failed to get supported chains for token pool at %s on chain %d: %v", poolAddr.String(), chain.Selector, err)
-			continue
-		}
-		tokenAddr, err := tokenPoolC.GetToken(nil)
-		if err != nil {
-			// if we fail to get the token address for a pool, we skip it and move on to the next one, since we don't want one bad pool to cause the entire config import to fail
-			l.Warnf("failed to get token address for token pool at %s on chain %d: %v", poolAddr.String(), chain.Selector, err)
-			continue
-		}
-		for _, remoteChain := range chains {
-			tokensPerRemoteChain[remoteChain] = append(tokensPerRemoteChain[remoteChain], tokenAddr)
-		}
+		poolAddr := poolAddr
+		grp.Go(func() error {
+			tokenPoolC, err := token_pool.NewTokenPool(poolAddr, chain.Client)
+			if err != nil {
+				return fmt.Errorf("failed to instantiate token pool contract at %s on chain %d: %w", poolAddr.String(), chain.Selector, err)
+			}
+			chains, err := tokenPoolC.GetSupportedChains(&bind.CallOpts{
+				Context: grpCtx,
+			})
+			if err != nil {
+				// if we fail to get the supported chains for a pool, we skip it and move on to avoid failing the entire config import
+				// since it's possible for some pools do not support the getSupportedChains function
+				l.Warnf("failed to get supported chains for token pool at %s on chain %d: %v", poolAddr.String(), chain.Selector, err)
+				return nil
+			}
+			tokenAddr, err := tokenPoolC.GetToken(&bind.CallOpts{
+				Context: grpCtx,
+			})
+			if err != nil {
+				// if we fail to get the token address for a pool, we skip it and move on to avoid failing the entire config import
+				// since it's possible for some pools do not support the getToken function
+				l.Warnf("failed to get token address for token pool at %s on chain %d: %v", poolAddr.String(), chain.Selector, err)
+				return nil
+			}
+			mu.Lock()
+			for _, remoteChain := range chains {
+				tokensPerRemoteChain[remoteChain] = append(tokensPerRemoteChain[remoteChain], tokenAddr)
+			}
+			mu.Unlock()
+			return nil
+		})
+	}
+	if err := grp.Wait(); err != nil {
+		return nil, err
 	}
 	return tokensPerRemoteChain, nil
 }
