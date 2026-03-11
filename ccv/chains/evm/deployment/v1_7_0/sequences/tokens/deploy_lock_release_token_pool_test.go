@@ -6,6 +6,8 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/stretchr/testify/require"
+
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
@@ -15,7 +17,6 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/advanced_pool_hooks"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/erc20_lock_box"
@@ -362,7 +363,7 @@ func TestDeployLockReleaseTokenPool(t *testing.T) {
 			require.Contains(t, getAuthorizedCallersReport.Output, common.HexToAddress(poolAddress), "Expected token pool address to be in the on-chain authorized callers")
 
 			// Check authorized callers on lock box
-			getLockBoxAuthorizedCallersReport, err := operations.ExecuteOperation(
+			getLockBoxCallersReport, err := operations.ExecuteOperation(
 				testsetup.BundleWithFreshReporter(e.OperationsBundle),
 				erc20_lock_box.GetAllAuthorizedCallers,
 				e.BlockChains.EVMChains()[chainSel],
@@ -372,8 +373,8 @@ func TestDeployLockReleaseTokenPool(t *testing.T) {
 				},
 			)
 			require.NoError(t, err, "ExecuteOperation should not error")
-			require.Len(t, getLockBoxAuthorizedCallersReport.Output, 1, "Expected 1 address in on-chain authorized callers")
-			require.Contains(t, getLockBoxAuthorizedCallersReport.Output, common.HexToAddress(poolAddress), "Expected lock release token pool address to be in the on-chain authorized callers")
+			require.Len(t, getLockBoxCallersReport.Output, 1, "Expected 1 address in on-chain authorized callers")
+			require.Contains(t, getLockBoxCallersReport.Output, common.HexToAddress(poolAddress), "Expected lock release token pool address to be in the on-chain authorized callers")
 
 			// Verify lock box address is present in output
 			require.NotEmpty(t, lockBoxAddress, "Expected lock box address to be present in output")

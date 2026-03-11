@@ -172,7 +172,7 @@ var MigrateHybridLockReleaseLiquidity = cldf_ops.NewSequence(
 			}
 			writes = append(writes, withdrawReport.Output)
 
-			approveReport, err := cldf_ops.ExecuteOperation(b, erc20.ApproveProposalOnly, chain, contract_utils.FunctionInput[erc20.ApproveArgs]{
+			approveReport, err := cldf_ops.ExecuteOperation(b, erc20.Approve, chain, contract_utils.FunctionInput[erc20.ApproveArgs]{
 				ChainSelector: input.ChainSelector,
 				Address:       tokenAddr,
 				Args: erc20.ApproveArgs{
@@ -188,11 +188,11 @@ var MigrateHybridLockReleaseLiquidity = cldf_ops.NewSequence(
 			depositReport, err := cldf_ops.ExecuteOperation(b, erc20_lock_box.Deposit, chain, contract_utils.FunctionInput[erc20_lock_box.DepositArgs]{
 				ChainSelector: input.ChainSelector,
 				Address:       common.HexToAddress(lockBoxAddr),
-				Args: erc20_lock_box.DepositArgs{
-					Token:               tokenAddr,
-					RemoteChainSelector: sel,
-					Amount:              withdrawAmount,
-				},
+			Args: erc20_lock_box.DepositArgs{
+				Token:  tokenAddr,
+				Arg1:   sel,
+				Amount: withdrawAmount,
+			},
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to deposit into lockbox for chain %d: %w", sel, err)
