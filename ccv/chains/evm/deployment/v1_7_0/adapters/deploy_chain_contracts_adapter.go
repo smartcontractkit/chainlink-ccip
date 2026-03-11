@@ -82,10 +82,11 @@ func toEVMDeployInput(input ccvadapters.DeployChainContractsInput) (sequences.De
 	mockReceivers := convertMockReceivers(input.ContractParams.MockReceivers)
 
 	return sequences.DeployChainContractsInput{
-		ChainSelector:    input.ChainSelector,
-		CREATE2Factory:   create2Factory,
+		ChainSelector:     input.ChainSelector,
+		CREATE2Factory:    create2Factory,
 		ExistingAddresses: input.ExistingAddresses,
-		DeployTestRouter: input.DeployTestRouter,
+		DeployTestRouter:  input.DeployTestRouter,
+		DeployerKeyOwned:  input.DeployerKeyOwned,
 		ContractParams: sequences.ContractParams{
 			RMNRemote: sequences.RMNRemoteParams{
 				Version:   input.ContractParams.RMNRemote.Version,
