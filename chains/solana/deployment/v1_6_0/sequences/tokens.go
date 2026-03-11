@@ -652,3 +652,8 @@ func (a *SolanaAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokenapi.UpdateAu
 			return result, nil
 		})
 }
+
+func (a *SolanaAdapter) MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Sequence[tokenapi.MigrateLockReleasePoolLiquidityInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return nil
+}
+

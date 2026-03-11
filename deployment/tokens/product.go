@@ -42,6 +42,33 @@ type TokenAdapter interface {
 	DeployTokenVerify(e deployment.Environment, in DeployTokenInput) error
 	DeployTokenPoolForToken() *cldf_ops.Sequence[DeployTokenPoolInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 	UpdateAuthorities() *cldf_ops.Sequence[UpdateAuthoritiesInput, sequences.OnChainOutput, *deployment.Environment]
+	// MigrateLockReleasePoolLiquiditySequence returns a sequence that migrates liquidity from a legacy
+	// LockReleaseTokenPool (v1.5.1/v1.6.1) to a v2.0 lockbox-based pool. Returns nil if not supported.
+	// Used by the standalone MigrateLockReleasePoolLiquidity changeset.
+	MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Sequence[MigrateLockReleasePoolLiquidityInput, sequences.OnChainOutput, cldf_chain.BlockChains]
+}
+
+// MigrateLockReleasePoolLiquidityInput is the input for the liquidity migration sequence.
+type MigrateLockReleasePoolLiquidityInput struct {
+	ChainSelector  uint64
+	OldPoolAddress string
+	NewPoolAddress string
+	// TimelockAddress is the MCMS timelock address that will execute the migration operations.
+	// Required because the timelock must be set as the rebalancer and authorized caller.
+	TimelockAddress string
+	// Amount specifies an exact token amount to migrate. Mutually exclusive with BasisPoints.
+	Amount *big.Int
+	// BasisPoints specifies a percentage of the old pool's balance to migrate (1-10000, where 10000 = 100%).
+	// Mutually exclusive with Amount. For siloed pools, only BasisPoints is supported.
+	BasisPoints *uint16
+	// SetPoolConfig, if provided, triggers a setPool call on the TokenAdminRegistry after migration.
+	SetPoolConfig *MigrationSetPoolConfig
+}
+
+// MigrationSetPoolConfig configures the optional setPool call during migration.
+type MigrationSetPoolConfig struct {
+	RegistryAddress string
+	TokenAddress    string
 }
 
 // RateLimiterConfig specifies configuration for a rate limiter on a token pool.
@@ -137,6 +164,16 @@ type ConfigureTokenForTransfersInput struct {
 	// This can be interpreted as # of block confirmations, an ID, or otherwise.
 	// Interpretation is left to each chain family.
 	MinFinalityValue uint16
+	// LiquidityMigrationAmount, if set, specifies an exact token amount to migrate from the old pool
+	// to the new pool's lockbox. Mutually exclusive with LiquidityMigrationBasisPoints.
+	// The old pool is derived from the TokenAdminRegistry. Only used by EVM adapters.
+	LiquidityMigrationAmount *big.Int
+	// LiquidityMigrationBasisPoints specifies a percentage of the old pool's balance to migrate (1-10000, where 10000 = 100%).
+	// Mutually exclusive with LiquidityMigrationAmount. Only used by EVM adapters.
+	LiquidityMigrationBasisPoints *uint16
+	// TimelockAddress is the MCMS timelock address, resolved by the changeset from MCMS config.
+	// Required when a liquidity migration is triggered.
+	TimelockAddress string
 	// Below are not provided by the user and populated programmatically.
 	// ExistingDataStore is the datastore containing existing deployment data.
 	ExistingDataStore datastore.DataStore

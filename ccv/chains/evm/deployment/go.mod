@@ -8,6 +8,9 @@ replace github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlin
 // TODO: remove this local replace once chainlink-ccip/deployment is published with the adapter changes
 replace github.com/smartcontractkit/chainlink-ccip/deployment => ../../../../deployment
 
+// TODO: remove this local replace once chains/evm/deployment is published with the adapter changes
+replace github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment => ../../../../chains/evm/deployment
+
 require (
 	github.com/Masterminds/semver/v3 v3.4.0
 	github.com/ethereum/go-ethereum v1.17.0
