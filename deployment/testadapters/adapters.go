@@ -90,7 +90,8 @@ type TestAdapter interface {
 	// and for Solana, the message type is ccip_router.SVM2AnyMessage.
 	BuildMessage(components MessageComponents) (any, error)
 
-	SendMessage(ctx context.Context, destChainSelector uint64, msg any) (uint64, error)
+	// Send message returns the sequence number and message ID of the sent message, or an error if the send failed.
+	SendMessage(ctx context.Context, destChainSelector uint64, msg any) (ccipocr3.SeqNum, string, error)
 
 	// // RandomReceiver returns a random receiver for the given chain family.
 	// RandomReceiver() []byte
@@ -108,7 +109,7 @@ type TestAdapter interface {
 
 	// SetReceiverRejectAll configures the receiver to reject all incoming messages.
 	// This is used for test cases with a a failing receiver.
-	SetReceiverRejectAll(ctx context.Context, rejectAll bool) error
+	SetReceiverRejectAll(t *testing.T, rejectAll bool) error
 
 	// NativeFeeToken returns the native fee token for the given chain family.
 	NativeFeeToken() string
@@ -119,6 +120,9 @@ type TestAdapter interface {
 	// borsch for Solana, etc.
 	GetExtraArgs(receiver []byte, sourceFamily string, opts ...ExtraArgOpt) ([]byte, error)
 
+	// LowGasLimit returns a low gas limit value that can be used in tests to trigger out-of-gas errors.
+	LowGasLimit() *big.Int
+
 	// GetInboundNonce returns the inbound nonce for the given sender and source chain selector.
 	// For chains that don't have the concept of nonces, this will always return 0.
 	GetInboundNonce(ctx context.Context, sender []byte, srcSel uint64) (uint64, error)
@@ -127,7 +131,10 @@ type TestAdapter interface {
 	ValidateCommit(t *testing.T, sourceSelector uint64, startBlock *uint64, seqNumRange ccipocr3.SeqNumRange)
 
 	// ValidateExec validates that the message specified by the given send event was executed.
-	ValidateExec(t *testing.T, sourceSelector uint64, startBlock *uint64, seqNrs []uint64) (execStates map[uint64]int)
+	ValidateExec(t *testing.T, sourceSelector uint64, startBlock *uint64, seqNrs []ccipocr3.SeqNum) (execStates map[uint64]int)
+
+	// ValidateExecFails validates that the message specified by the given send event failed to execute.
+	ValidateExecFails(t *testing.T, sourceSelector uint64, startBlock *uint64, seqNrs []ccipocr3.SeqNum)
 
 	// AllowRouterToWithdrawTokens allows the router to withdraw tokens of the given address and amount from the deployer
 	// account.
@@ -142,6 +149,9 @@ type TestAdapter interface {
 
 	// GetRegistryAddress returns the address of the contract on which the token pool must be registered.
 	GetRegistryAddress() (string, error)
+
+	// GetCurrentBlock returns the current block number of the chain, if applicable.
+	CurrentBlock(t *testing.T) uint64
 
 	// SetAllowlist activates/deactivates the whitelist
 	SetAllowlist(t *testing.T, destChainSelector uint64, enabled bool) error
