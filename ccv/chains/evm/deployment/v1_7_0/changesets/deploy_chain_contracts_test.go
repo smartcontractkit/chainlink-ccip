@@ -131,6 +131,7 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 					ChainSel:       5009297550715157269,
 					CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
 					Params:         testsetup.CreateBasicContractParams(),
+					DeployerKeyOwned: true,
 				},
 			})
 			require.NoError(t, err, "Failed to apply DeployChainContracts changeset")
