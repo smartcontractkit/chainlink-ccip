@@ -102,6 +102,21 @@ func (m *cctpTest_MockCCTPChain) ConfigureCCTPChainForLanes() *cldf_ops.Sequence
 	)
 }
 
+// MigrateHybridLockReleaseLiquidity returns a mock sequence for migrating liquidity.
+func (m *cctpTest_MockCCTPChain) MigrateHybridLockReleaseLiquidity() *cldf_ops.Sequence[adapters.MigrateHybridLockReleaseLiquidityInput, sequences.OnChainOutput, adapters.MigrateHybridLockReleaseLiquidityDeps] {
+	return cldf_ops.NewSequence(
+		"mock-migrate-hybrid-lock-release-liquidity-sequence",
+		semver.MustParse("1.0.0"),
+		"Mock sequence for testing hybrid lock-release liquidity migration",
+		func(bundle cldf_ops.Bundle, deps adapters.MigrateHybridLockReleaseLiquidityDeps, input adapters.MigrateHybridLockReleaseLiquidityInput) (sequences.OnChainOutput, error) {
+			if m.sequenceErrorMsg != "" {
+				return sequences.OnChainOutput{}, errors.New(m.sequenceErrorMsg)
+			}
+			return sequences.OnChainOutput{}, nil
+		},
+	)
+}
+
 // PoolAddress returns the address of the token pool on the remote chain in bytes
 func (m *cctpTest_MockCCTPChain) PoolAddress(d datastore.DataStore, b cldf_chain.BlockChains, chainSelector uint64, registeredPoolRef datastore.AddressRef) ([]byte, error) {
 	return []byte("pool-address"), nil
