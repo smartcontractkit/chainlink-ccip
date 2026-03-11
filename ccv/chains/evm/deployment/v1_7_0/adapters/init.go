@@ -29,4 +29,5 @@ func init() {
 	ccvadapters.GetDeployChainContractsRegistry().Register(chainsel.FamilyEVM, &EVMDeployChainContractsAdapter{})
 	ccvadapters.GetIndexerConfigRegistry().Register(chainsel.FamilyEVM, &EVMIndexerConfigAdapter{})
 	ccvadapters.GetAggregatorConfigRegistry().Register(chainsel.FamilyEVM, &EVMAggregatorConfigAdapter{})
+	ccvadapters.GetTokenVerifierConfigRegistry().Register(chainsel.FamilyEVM, &EVMTokenVerifierConfigAdapter{})
 }
