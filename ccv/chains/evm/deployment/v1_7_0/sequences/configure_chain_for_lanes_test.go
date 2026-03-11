@@ -207,8 +207,8 @@ func TestConfigureChainForLanes(t *testing.T) {
 				Args:          remoteChainSelector,
 			})
 			require.NoError(t, err, "ExecuteOperation should not error")
-			require.Equal(t, uint8(1), signatureQuorumReport.Output.Ret1, "Threshold in CommitteeVerifier signature config should be 1")
-			require.Equal(t, []common.Address{common.HexToAddress("0x01")}, signatureQuorumReport.Output.Ret0, "Signers in CommitteeVerifier signature config should match")
+			require.Equal(t, uint8(1), signatureQuorumReport.Output.Threshold, "Threshold in CommitteeVerifier signature config should be 1")
+			require.Equal(t, []common.Address{common.HexToAddress("0x01")}, signatureQuorumReport.Output.Signers, "Signers in CommitteeVerifier signature config should match")
 
 			// Check outbound implementation on CommitteeVerifierResolver
 			boundResolver, err := versioned_verifier_resolver.NewVersionedVerifierResolver(common.HexToAddress(committeeVerifierResolver), evmChain.Client)

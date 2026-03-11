@@ -236,12 +236,12 @@ func TestConfigureCommitteeVerifierForLanes(t *testing.T) {
 					},
 				)
 				require.NoError(t, err, "ExecuteOperation should not error")
-				require.Equal(t, remoteConfig.SignatureConfig.Threshold, signatureConfigReport.Output.Ret1, "Threshold should match")
+				require.Equal(t, remoteConfig.SignatureConfig.Threshold, signatureConfigReport.Output.Threshold, "Threshold should match")
 				expectedSigners := make([]common.Address, len(remoteConfig.SignatureConfig.Signers))
 				for i, signer := range remoteConfig.SignatureConfig.Signers {
 					expectedSigners[i] = common.HexToAddress(signer)
 				}
-				require.Equal(t, expectedSigners, signatureConfigReport.Output.Ret0, "Signers should match")
+				require.Equal(t, expectedSigners, signatureConfigReport.Output.Signers, "Signers should match")
 
 				// Check outbound implementation on CommitteeVerifierResolver
 				boundResolver, err := versioned_verifier_resolver.NewVersionedVerifierResolver(
