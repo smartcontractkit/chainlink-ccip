@@ -466,6 +466,42 @@ func deployAllMCMSForTest(
 	return cllTimelockAddr, rmnTimelockAddr, addresses
 }
 
+// sealAddressRefs builds a sealed read-only DataStore from one or more address ref
+// slices. Duplicate refs (e.g. when combining MCMS + output refs) are silently ignored.
+func sealAddressRefs(t *testing.T, refGroups ...[]datastore.AddressRef) datastore.DataStore {
+	t.Helper()
+	ds := datastore.NewMemoryDataStore()
+	for _, group := range refGroups {
+		for _, ref := range group {
+			_ = ds.Addresses().Add(ref)
+		}
+	}
+	return ds.Seal()
+}
+
+// requireContractOwner loads the Ownable contract at addr and asserts its owner is one of validOwners.
+func requireContractOwner(
+	t *testing.T,
+	chain evm.Chain,
+	addr common.Address,
+	ct deployment.ContractType,
+	qualifier string,
+	validOwners []common.Address,
+) {
+	t.Helper()
+	_, ownable, err := mcms_seq.LoadOwnableContract(addr, chain.Client)
+	require.NoError(t, err, "LoadOwnableContract for %s/%s at %s", ct, qualifier, addr)
+	owner, err := ownable.Owner(nil)
+	require.NoError(t, err, "Owner() for %s/%s at %s", ct, qualifier, addr)
+	for _, vo := range validOwners {
+		if owner == vo {
+			return
+		}
+	}
+	require.Failf(t, "unexpected owner",
+		"%s/%s at %s: owner %s not in valid set %v", ct, qualifier, addr, owner, validOwners)
+}
+
 func TestDeployChainContracts_WithTransferOwnership(t *testing.T) {
 	chainSelector := uint64(5009297550715157269)
 	e, err := environment.New(t.Context(),
@@ -503,113 +539,59 @@ func TestDeployChainContracts_WithTransferOwnership(t *testing.T) {
 	)
 	require.NoError(t, err, "ExecuteSequence with TransferOwnership should not error")
 
-	// Build a lookup of deployed addresses by type+qualifier.
-	type addrKey struct {
-		contractType deployment.ContractType
-		qualifier    string
-	}
-	addrMap := make(map[addrKey]common.Address)
-	for _, ref := range report.Output.Addresses {
-		addrMap[addrKey{deployment.ContractType(ref.Type), ref.Qualifier}] = common.HexToAddress(ref.Address)
-	}
+	outputDS := sealAddressRefs(t, report.Output.Addresses)
+	mcmsDS := sealAddressRefs(t, mcmsAddresses)
 
-	// Verify core product contracts are deployed.
-	productTypes := []deployment.ContractType{
+	// Verify single-instance product contracts are deployed and ownership transferred.
+	// For Ownable2Step contracts, owner is still the deployer (pending transfer not yet
+	// accepted). For one-step Ownable contracts, owner is the timelock directly.
+	singleProductTypes := []deployment.ContractType{
 		rmn_remote.ContractType,
 		router.ContractType,
 		token_admin_registry.ContractType,
 		fee_quoter.ContractType,
 		offramp.ContractType,
 		onramp.ContractType,
-		executor.ContractType,
-		executor.ProxyType,
 	}
-	for _, ct := range productTypes {
-		_, ok := addrMap[addrKey{ct, ""}]
-		if !ok {
-			found := false
-			for key := range addrMap {
-				if key.contractType == ct {
-					found = true
-					break
-				}
-			}
-			require.True(t, found, "Expected product contract %s to be deployed", ct)
-		}
+	for _, ct := range singleProductTypes {
+		addr, err := datastore_utils.FindAndFormatRef(outputDS, datastore.AddressRef{
+			Type: datastore.ContractType(ct),
+		}, chainSelector, evm_datastore_utils.ToEVMAddress)
+		require.NoError(t, err, "Expected product contract %s to be deployed", ct)
+		requireContractOwner(t, chain, addr, ct, "", []common.Address{deployer, cllTimelockAddr})
 	}
 
-	// Verify product contracts have ownership transferred to CLLCCIP timelock.
-	ownableProductTypes := map[deployment.ContractType]bool{
-		rmn_remote.ContractType:           true,
-		router.ContractType:               true,
-		token_admin_registry.ContractType: true,
-		fee_quoter.ContractType:           true,
-		offramp.ContractType:              true,
-		onramp.ContractType:               true,
-		executor.ContractType:             true,
-		executor.ProxyType:                true,
-	}
-	for _, ct := range productTypes {
-		for key, addr := range addrMap {
-			if key.contractType != ct {
-				continue
-			}
-			_, ownable, err := mcms_seq.LoadOwnableContract(addr, chain.Client)
-			if ownableProductTypes[ct] {
-				require.NoError(t, err, "LoadOwnableContract should succeed for ownable product type %s at %s", ct, addr)
-			} else if err != nil {
-				continue
-			}
-			owner, err := ownable.Owner(nil)
-			require.NoError(t, err, "Owner() should not error for %s at %s", ct, addr)
-			// For Ownable2Step contracts, owner is still the deployer (pending
-			// transfer not yet accepted). For one-step Ownable contracts, owner
-			// is the timelock directly.
-			require.True(t, owner == deployer || owner == cllTimelockAddr,
-				"Product contract %s at %s: owner should be deployer (%s) or CLLCCIP timelock (%s), got %s",
-				ct, addr, deployer, cllTimelockAddr, owner)
+	// Verify multi-instance executor contracts (with qualifiers) deployed and ownership transferred.
+	for _, q := range []string{"default", "custom"} {
+		for _, ct := range []deployment.ContractType{executor.ContractType, executor.ProxyType} {
+			addr, err := datastore_utils.FindAndFormatRef(outputDS, datastore.AddressRef{
+				Type:      datastore.ContractType(ct),
+				Qualifier: q,
+			}, chainSelector, evm_datastore_utils.ToEVMAddress)
+			require.NoError(t, err, "Expected %s/%s to be deployed", ct, q)
+			requireContractOwner(t, chain, addr, ct, q, []common.Address{deployer, cllTimelockAddr})
 		}
 	}
 
 	// Verify MCM contracts (Proposer, Bypasser, Canceller) have ownership transferred.
-	// CLL MCMs should be owned by CLL timelock (or deployer with pending transfer).
-	// RMN MCMs are valid if owned by CLL timelock OR RMN timelock.
+	// CLL MCMs must be owned by CLL timelock; RMN MCMs may also be owned by RMN timelock.
 	mcmTypes := []deployment.ContractType{
 		common_utils.ProposerManyChainMultisig,
 		common_utils.BypasserManyChainMultisig,
 		common_utils.CancellerManyChainMultisig,
 	}
 	for _, qualifier := range []string{common_utils.CLLQualifier, common_utils.RMNTimelockQualifier} {
+		validOwners := []common.Address{deployer, cllTimelockAddr}
+		if qualifier == common_utils.RMNTimelockQualifier {
+			validOwners = append(validOwners, rmnTimelockAddr)
+		}
 		for _, ct := range mcmTypes {
-			var mcmAddr common.Address
-			for _, ref := range mcmsAddresses {
-				if deployment.ContractType(ref.Type) == ct && ref.Qualifier == qualifier {
-					mcmAddr = common.HexToAddress(ref.Address)
-					break
-				}
-			}
-			require.NotEqual(t, common.Address{}, mcmAddr, "Expected to find %s/%s in mcmsAddresses", ct, qualifier)
-
-			_, ownable, err := mcms_seq.LoadOwnableContract(mcmAddr, chain.Client)
-			require.NoError(t, err, "LoadOwnableContract for MCM %s/%s", ct, qualifier)
-
-			owner, err := ownable.Owner(nil)
-			require.NoError(t, err, "Owner() for MCM %s/%s", ct, qualifier)
-
-			validOwners := []common.Address{deployer, cllTimelockAddr}
-			if qualifier == common_utils.RMNTimelockQualifier {
-				validOwners = append(validOwners, rmnTimelockAddr)
-			}
-			ownerValid := false
-			for _, vo := range validOwners {
-				if owner == vo {
-					ownerValid = true
-					break
-				}
-			}
-			require.True(t, ownerValid,
-				"MCM %s/%s at %s: owner should be deployer (%s), CLL timelock (%s), or RMN timelock (%s), got %s",
-				ct, qualifier, mcmAddr, deployer, cllTimelockAddr, rmnTimelockAddr, owner)
+			addr, err := datastore_utils.FindAndFormatRef(mcmsDS, datastore.AddressRef{
+				Type:      datastore.ContractType(ct),
+				Qualifier: qualifier,
+			}, chainSelector, evm_datastore_utils.ToEVMAddress)
+			require.NoError(t, err, "Expected to find MCM %s/%s in mcmsAddresses", ct, qualifier)
+			requireContractOwner(t, chain, addr, ct, qualifier, validOwners)
 		}
 	}
 
@@ -696,7 +678,8 @@ func TestDeployChainContracts_WithTransferOwnership_Idempotent(t *testing.T) {
 	}
 
 	// Verify ownership is still pointing to CLL timelock after second run.
-	productTypes := []deployment.ContractType{
+	outputDS := sealAddressRefs(t, secondReport.Output.Addresses)
+	singleProductTypes := []deployment.ContractType{
 		rmn_remote.ContractType,
 		router.ContractType,
 		token_admin_registry.ContractType,
@@ -704,27 +687,82 @@ func TestDeployChainContracts_WithTransferOwnership_Idempotent(t *testing.T) {
 		offramp.ContractType,
 		onramp.ContractType,
 	}
-	for _, ref := range secondReport.Output.Addresses {
-		ct := deployment.ContractType(ref.Type)
-		isProduct := false
-		for _, pt := range productTypes {
-			if ct == pt {
-				isProduct = true
-				break
-			}
-		}
-		if !isProduct {
-			continue
-		}
-		addr := common.HexToAddress(ref.Address)
-		_, ownable, err := mcms_seq.LoadOwnableContract(addr, chain.Client)
-		require.NoError(t, err, "LoadOwnableContract for %s at %s", ct, addr)
-		owner, err := ownable.Owner(nil)
-		require.NoError(t, err, "Owner() for %s at %s", ct, addr)
-		require.True(t, owner == deployer || owner == cllTimelockAddr,
-			"After idempotent run, %s at %s should be owned by deployer (%s) or CLL timelock (%s), got %s",
-			ct, addr, deployer, cllTimelockAddr, owner)
+	for _, ct := range singleProductTypes {
+		addr, err := datastore_utils.FindAndFormatRef(outputDS, datastore.AddressRef{
+			Type: datastore.ContractType(ct),
+		}, chainSelector, evm_datastore_utils.ToEVMAddress)
+		require.NoError(t, err, "Expected product contract %s after idempotent run", ct)
+		requireContractOwner(t, chain, addr, ct, "", []common.Address{deployer, cllTimelockAddr})
 	}
+}
+
+func TestDeployChainContracts_WithoutTransferOwnership(t *testing.T) {
+	chainSelector := uint64(5009297550715157269)
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{chainSelector}),
+	)
+	require.NoError(t, err)
+
+	chain := e.BlockChains.EVMChains()[chainSelector]
+	deployer := chain.DeployerKey.From
+
+	// Pre-deploy MCMS so addresses exist, but run with TransferOwnership: false.
+	cllTimelockAddr, _, mcmsAddresses := deployAllMCMSForTest(t, e.OperationsBundle, chain, deployer)
+
+	create2FactoryRef, err := contract_utils.MaybeDeployContract(
+		e.OperationsBundle, create2_factory.Deploy, chain,
+		contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+			TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("1.7.0")),
+			ChainSelector:  chainSelector,
+			Args:           create2_factory.ConstructorArgs{AllowList: []common.Address{deployer}},
+		}, nil)
+	require.NoError(t, err)
+
+	report, err := operations.ExecuteSequence(
+		e.OperationsBundle,
+		sequences.DeployChainContracts,
+		chain,
+		sequences.DeployChainContractsInput{
+			ChainSelector:     chainSelector,
+			CREATE2Factory:    common.HexToAddress(create2FactoryRef.Address),
+			ContractParams:    testsetup.CreateBasicContractParams(),
+			DeployTestRouter:  true,
+			ExistingAddresses: mcmsAddresses,
+			TransferOwnership: false,
+		},
+	)
+	require.NoError(t, err, "ExecuteSequence without TransferOwnership should succeed")
+
+	outputDS := sealAddressRefs(t, report.Output.Addresses)
+
+	// Verify product contracts are deployed but still owned by deployer (no transfer).
+	singleProductTypes := []deployment.ContractType{
+		rmn_remote.ContractType,
+		router.ContractType,
+		token_admin_registry.ContractType,
+		fee_quoter.ContractType,
+		offramp.ContractType,
+		onramp.ContractType,
+	}
+	for _, ct := range singleProductTypes {
+		addr, err := datastore_utils.FindAndFormatRef(outputDS, datastore.AddressRef{
+			Type: datastore.ContractType(ct),
+		}, chainSelector, evm_datastore_utils.ToEVMAddress)
+		require.NoError(t, err, "Expected product contract %s to be deployed", ct)
+		requireContractOwner(t, chain, addr, ct, "", []common.Address{deployer})
+	}
+
+	// Verify deployer is still admin of CLL timelock (governance unchanged).
+	cllTimelock, err := bindings.NewRBACTimelock(cllTimelockAddr, chain.Client)
+	require.NoError(t, err)
+
+	deployerStillAdmin, err := cllTimelock.HasRole(nil, mcms_ops.ADMIN_ROLE.ID, deployer)
+	require.NoError(t, err)
+	require.True(t, deployerStillAdmin, "Deployer should still be admin of CLL timelock when TransferOwnership is false")
+
+	timelockSelfAdmin, err := cllTimelock.HasRole(nil, mcms_ops.ADMIN_ROLE.ID, cllTimelockAddr)
+	require.NoError(t, err)
+	require.False(t, timelockSelfAdmin, "CLL timelock should NOT be self-governed when TransferOwnership is false")
 }
 
 func TestDeployChainContracts_TransferOwnership_FailsWithoutMCMS(t *testing.T) {
