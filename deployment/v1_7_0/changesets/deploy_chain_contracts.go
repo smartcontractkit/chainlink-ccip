@@ -26,6 +26,11 @@ type DeployChainContractsPerChainCfg struct {
 	FeeQuoter        adapters.FeeQuoterDeployParams
 	Executors        []adapters.ExecutorDeployParams
 	MockReceivers    []adapters.MockReceiverDeployParams
+	// DeployerKeyOwned, when true, skips the transfer-ownership step so that
+	// contracts remain owned by the deployer key. By default (false) the
+	// sequence transfers ownership of product contracts to the CLLCCIP
+	// RBACTimelock, failing fast if the required MCMS instances are not found.
+	DeployerKeyOwned bool
 }
 
 type DeployChainContractsCfg struct {
@@ -115,6 +120,7 @@ func DeployChainContracts(
 				DeployerContract:  perChain.DeployerContract,
 				DeployTestRouter:  perChain.DeployTestRouter,
 				ExistingAddresses: existingAddresses,
+				DeployerKeyOwned:  perChain.DeployerKeyOwned,
 				ContractParams: adapters.DeployContractParams{
 					RMNRemote:          perChain.RMNRemote,
 					OffRamp:            perChain.OffRamp,
