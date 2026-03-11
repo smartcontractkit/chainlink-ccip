@@ -217,7 +217,7 @@ func GetSupportedTokensPerRemoteChain(ctx context.Context, l logger.Logger, toke
 	}
 	tokensPerRemoteChain := make(map[uint64][]common.Address)
 	var mu sync.Mutex
-	grp, _ := errgroup.WithContext(ctx)
+	grp, grpCtx := errgroup.WithContext(ctx)
 	grp.SetLimit(getSupportedTokensPoolConcurrency)
 	for _, poolAddr := range pools {
 		// there is no supported pool for this token
@@ -231,7 +231,7 @@ func GetSupportedTokensPerRemoteChain(ctx context.Context, l logger.Logger, toke
 				return fmt.Errorf("failed to instantiate token pool contract at %s on chain %d: %w", poolAddr.String(), chain.Selector, err)
 			}
 			chains, err := tokenPoolC.GetSupportedChains(&bind.CallOpts{
-				Context: ctx,
+				Context: grpCtx,
 			})
 			if err != nil {
 				// if we fail to get the supported chains for a pool, we skip it and move on to avoid failing the entire config import
@@ -240,7 +240,7 @@ func GetSupportedTokensPerRemoteChain(ctx context.Context, l logger.Logger, toke
 				return nil
 			}
 			tokenAddr, err := tokenPoolC.GetToken(&bind.CallOpts{
-				Context: ctx,
+				Context: grpCtx,
 			})
 			if err != nil {
 				// if we fail to get the token address for a pool, we skip it and move on to avoid failing the entire config import
