@@ -102,11 +102,13 @@ type DeployChainContractsInput struct {
 	CREATE2Factory    common.Address
 	ExistingAddresses []datastore.AddressRef
 	ContractParams    ContractParams
-	DeployTestRouter  bool
-	// TransferOwnership, when true, looks up the existing CLLCCIP RBACTimelock
-	// in ExistingAddresses and transfers ownership of product contracts to it.
-	// The sequence fails fast if the required MCMS instances are not found.
-	TransferOwnership bool
+	DeployTestRouter bool
+	// DeployerKeyOwned, when true, skips the transfer-ownership step so that
+	// contracts remain owned by the deployer key. By default (false) the
+	// sequence looks up the existing CLLCCIP RBACTimelock in ExistingAddresses
+	// and transfers ownership of product contracts to it, failing fast if the
+	// required MCMS instances are not found.
+	DeployerKeyOwned bool
 }
 
 var DeployChainContracts = cldf_ops.NewSequence(
@@ -119,65 +121,15 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		ownableContracts := make([]ownableContract, 0)
 
 		var cllccipTimelockAddr, rmnTimelockAddr common.Address
-		if input.TransferOwnership {
-			existingDS := datastore.NewMemoryDataStore()
-			for _, ref := range input.ExistingAddresses {
-				if err := existingDS.Addresses().Add(ref); err != nil && !errors.Is(err, datastore.ErrAddressRefExists) {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to add existing address to datastore (%+v): %w", ref, err)
-				}
-			}
-			mcmsDS := existingDS.Seal()
-
-			cllccipTimelockAddr, err = datastore_utils.FindAndFormatRef(mcmsDS, datastore.AddressRef{
-				Type:      datastore.ContractType(common_utils.RBACTimelock),
-				Qualifier: common_utils.CLLQualifier,
-			}, chain.Selector, evm_datastore_utils.ToEVMAddress)
+		if !input.DeployerKeyOwned {
+			var mcmContracts []ownableContract
+			cllccipTimelockAddr, rmnTimelockAddr, mcmContracts, err = resolveOwnershipDeps(
+				input.ExistingAddresses, chain.Selector,
+			)
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf(
-					"TransferOwnership requires CLLCCIP RBACTimelock in ExistingAddresses: %w", err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to resolve ownership dependencies: %w", err)
 			}
-
-			rmnTimelockAddr, err = datastore_utils.FindAndFormatRef(mcmsDS, datastore.AddressRef{
-				Type:      datastore.ContractType(common_utils.RBACTimelock),
-				Qualifier: common_utils.RMNTimelockQualifier,
-			}, chain.Selector, evm_datastore_utils.ToEVMAddress)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf(
-					"TransferOwnership requires RMNMCMS RBACTimelock in ExistingAddresses: %w", err)
-			}
-
-			// Look up MCM contracts (Proposer, Bypasser, Canceller) for both qualifiers
-			// so we can transfer their ownership to the CLL timelock.
-			// RMN MCM contracts are also acceptably owned by the RMN timelock (since
-			// proposals target a single MCMS instance); CLL MCMs must be owned by the
-			// CLL timelock exclusively.
-			mcmTypes := []deployment.ContractType{
-				common_utils.ProposerManyChainMultisig,
-				common_utils.BypasserManyChainMultisig,
-				common_utils.CancellerManyChainMultisig,
-			}
-			for _, qualifier := range []string{common_utils.CLLQualifier, common_utils.RMNTimelockQualifier} {
-				acceptableOwners := []common.Address{cllccipTimelockAddr}
-				if qualifier == common_utils.RMNTimelockQualifier {
-					acceptableOwners = append(acceptableOwners, rmnTimelockAddr)
-				}
-				for _, ct := range mcmTypes {
-					addr, err := datastore_utils.FindAndFormatRef(mcmsDS, datastore.AddressRef{
-						Type:      datastore.ContractType(ct),
-						Qualifier: qualifier,
-					}, chain.Selector, evm_datastore_utils.ToEVMAddress)
-					if err != nil {
-						return sequences.OnChainOutput{}, fmt.Errorf(
-							"TransferOwnership requires MCM contract (type=%s, qualifier=%s) in ExistingAddresses: %w",
-							ct, qualifier, err)
-					}
-					ownableContracts = append(ownableContracts, ownableContract{
-						Address:          addr,
-						ContractType:     ct,
-						AcceptableOwners: acceptableOwners,
-					})
-				}
-			}
+			ownableContracts = append(ownableContracts, mcmContracts...)
 		}
 
 		// Deploy WETH
@@ -736,6 +688,78 @@ type ownableContract struct {
 	// transfer is performed. For example, RMN MCM contracts may be acceptably
 	// owned by either the CLL timelock or the RMN timelock.
 	AcceptableOwners []common.Address
+}
+
+// resolveOwnershipDeps looks up the MCMS contracts required for ownership
+// transfer from existingAddresses. It returns the CLL and RMN timelock
+// addresses together with the MCM contracts (Proposer, Bypasser, Canceller)
+// wrapped as ownableContracts so the caller can include them in the
+// transfer-ownership pass.
+func resolveOwnershipDeps(
+	existingAddresses []datastore.AddressRef,
+	chainSelector uint64,
+) (cllccipTimelockAddr, rmnTimelockAddr common.Address, mcmContracts []ownableContract, err error) {
+	existingDS := datastore.NewMemoryDataStore()
+	for _, ref := range existingAddresses {
+		if addErr := existingDS.Addresses().Add(ref); addErr != nil && !errors.Is(addErr, datastore.ErrAddressRefExists) {
+			return common.Address{}, common.Address{}, nil,
+				fmt.Errorf("failed to add existing address to datastore (%+v): %w", ref, addErr)
+		}
+	}
+	mcmsDS := existingDS.Seal()
+
+	cllccipTimelockAddr, err = datastore_utils.FindAndFormatRef(mcmsDS, datastore.AddressRef{
+		Type:      datastore.ContractType(common_utils.RBACTimelock),
+		Qualifier: common_utils.CLLQualifier,
+	}, chainSelector, evm_datastore_utils.ToEVMAddress)
+	if err != nil {
+		return common.Address{}, common.Address{}, nil,
+			fmt.Errorf("ownership transfer requires CLLCCIP RBACTimelock in ExistingAddresses: %w", err)
+	}
+
+	rmnTimelockAddr, err = datastore_utils.FindAndFormatRef(mcmsDS, datastore.AddressRef{
+		Type:      datastore.ContractType(common_utils.RBACTimelock),
+		Qualifier: common_utils.RMNTimelockQualifier,
+	}, chainSelector, evm_datastore_utils.ToEVMAddress)
+	if err != nil {
+		return common.Address{}, common.Address{}, nil,
+			fmt.Errorf("ownership transfer requires RMNMCMS RBACTimelock in ExistingAddresses: %w", err)
+	}
+
+	// Look up MCM contracts (Proposer, Bypasser, Canceller) for both qualifiers
+	// so we can transfer their ownership to the CLL timelock.
+	// RMN MCM contracts are also acceptably owned by the RMN timelock (since
+	// proposals target a single MCMS instance); CLL MCMs must be owned by the
+	// CLL timelock exclusively.
+	mcmTypes := []deployment.ContractType{
+		common_utils.ProposerManyChainMultisig,
+		common_utils.BypasserManyChainMultisig,
+		common_utils.CancellerManyChainMultisig,
+	}
+	for _, qualifier := range []string{common_utils.CLLQualifier, common_utils.RMNTimelockQualifier} {
+		acceptableOwners := []common.Address{cllccipTimelockAddr}
+		if qualifier == common_utils.RMNTimelockQualifier {
+			acceptableOwners = append(acceptableOwners, rmnTimelockAddr)
+		}
+		for _, ct := range mcmTypes {
+			addr, err := datastore_utils.FindAndFormatRef(mcmsDS, datastore.AddressRef{
+				Type:      datastore.ContractType(ct),
+				Qualifier: qualifier,
+			}, chainSelector, evm_datastore_utils.ToEVMAddress)
+			if err != nil {
+				return common.Address{}, common.Address{}, nil,
+					fmt.Errorf("ownership transfer requires MCM contract (type=%s, qualifier=%s) in ExistingAddresses: %w",
+						ct, qualifier, err)
+			}
+			mcmContracts = append(mcmContracts, ownableContract{
+				Address:          addr,
+				ContractType:     ct,
+				AcceptableOwners: acceptableOwners,
+			})
+		}
+	}
+
+	return cllccipTimelockAddr, rmnTimelockAddr, mcmContracts, nil
 }
 
 // transferContractsOwnership transfers ownership of the given contracts to newOwner.

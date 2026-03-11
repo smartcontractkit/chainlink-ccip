@@ -85,10 +85,12 @@ type DeployChainContractsInput struct {
 	DeployTestRouter  bool
 	ExistingAddresses []datastore.AddressRef
 	ContractParams DeployContractParams
-	// TransferOwnership, when true, looks up the existing CLLCCIP RBACTimelock
-	// in ExistingAddresses and transfers ownership of product contracts to it.
-	// The sequence fails fast if the required MCMS instances are not found.
-	TransferOwnership bool
+	// DeployerKeyOwned, when true, skips the transfer-ownership step so that
+	// contracts remain owned by the deployer key. By default (false) the
+	// sequence looks up the existing CLLCCIP RBACTimelock in ExistingAddresses
+	// and transfers ownership of product contracts to it, failing fast if the
+	// required MCMS instances are not found.
+	DeployerKeyOwned bool
 }
 
 type DeployChainContractsAdapter interface {

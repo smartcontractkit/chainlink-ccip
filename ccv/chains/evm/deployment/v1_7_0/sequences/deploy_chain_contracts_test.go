@@ -94,6 +94,7 @@ func TestDeployChainContracts_Idempotency(t *testing.T) {
 					CREATE2Factory:    common.HexToAddress(create2FactoryRef.Address),
 					ContractParams:    testsetup.CreateBasicContractParams(),
 					DeployTestRouter:  true,
+					DeployerKeyOwned:  true,
 				},
 			)
 			require.NoError(t, err, "ExecuteSequence should not error")
@@ -163,6 +164,7 @@ func TestDeployChainContracts_MultipleDeployments(t *testing.T) {
 				ExistingAddresses: nil,
 				ContractParams:    testsetup.CreateBasicContractParams(),
 				CREATE2Factory:    common.HexToAddress(create2FactoryRef.Address),
+				DeployerKeyOwned:  true,
 			}
 
 			report, err := operations.ExecuteSequence(e.OperationsBundle, sequences.DeployChainContracts, evmChain, input)
@@ -215,6 +217,7 @@ func TestDeployChainContracts_MultipleDeployments(t *testing.T) {
 					ExistingAddresses: nil,
 					ContractParams:    testsetup.CreateBasicContractParams(),
 					CREATE2Factory:    common.HexToAddress(create2FactoryRef.Address),
+					DeployerKeyOwned:  true,
 				}
 
 				report, execErr := operations.ExecuteSequence(e.OperationsBundle, sequences.DeployChainContracts, evmChain, input)
@@ -320,6 +323,7 @@ func TestDeployChainContracts_MultipleCommitteeVerifiersAndMultipleMockReceiverC
 			ExistingAddresses: nil,
 			CREATE2Factory:    common.HexToAddress(create2FactoryRef.Address),
 			ContractParams:    params,
+			DeployerKeyOwned:  true,
 		},
 	)
 	require.NoError(t, err, "ExecuteSequence should not error")
@@ -502,7 +506,7 @@ func requireContractOwner(
 		"%s/%s at %s: owner %s not in valid set %v", ct, qualifier, addr, owner, validOwners)
 }
 
-func TestDeployChainContracts_WithTransferOwnership(t *testing.T) {
+func TestDeployChainContracts_DefaultOwnershipTransfer(t *testing.T) {
 	chainSelector := uint64(5009297550715157269)
 	e, err := environment.New(t.Context(),
 		environment.WithEVMSimulated(t, []uint64{chainSelector}),
@@ -534,10 +538,9 @@ func TestDeployChainContracts_WithTransferOwnership(t *testing.T) {
 			ContractParams:    testsetup.CreateBasicContractParams(),
 			DeployTestRouter:  true,
 			ExistingAddresses: mcmsAddresses,
-			TransferOwnership: true,
 		},
 	)
-	require.NoError(t, err, "ExecuteSequence with TransferOwnership should not error")
+	require.NoError(t, err, "ExecuteSequence with default ownership transfer should not error")
 
 	outputDS := sealAddressRefs(t, report.Output.Addresses)
 	mcmsDS := sealAddressRefs(t, mcmsAddresses)
@@ -620,7 +623,7 @@ func TestDeployChainContracts_WithTransferOwnership(t *testing.T) {
 	require.False(t, rmnDeployerAdmin, "Deployer should no longer be admin of RMNMCMS timelock")
 }
 
-func TestDeployChainContracts_WithTransferOwnership_Idempotent(t *testing.T) {
+func TestDeployChainContracts_DefaultOwnershipTransfer_Idempotent(t *testing.T) {
 	chainSelector := uint64(5009297550715157269)
 	e, err := environment.New(t.Context(),
 		environment.WithEVMSimulated(t, []uint64{chainSelector}),
@@ -647,7 +650,6 @@ func TestDeployChainContracts_WithTransferOwnership_Idempotent(t *testing.T) {
 		ContractParams:    testsetup.CreateBasicContractParams(),
 		DeployTestRouter:  true,
 		ExistingAddresses: mcmsAddresses,
-		TransferOwnership: true,
 	}
 
 	// First run: deploys contracts, transfers ownership, sets up governance.
@@ -696,7 +698,7 @@ func TestDeployChainContracts_WithTransferOwnership_Idempotent(t *testing.T) {
 	}
 }
 
-func TestDeployChainContracts_WithoutTransferOwnership(t *testing.T) {
+func TestDeployChainContracts_DeployerKeyOwned(t *testing.T) {
 	chainSelector := uint64(5009297550715157269)
 	e, err := environment.New(t.Context(),
 		environment.WithEVMSimulated(t, []uint64{chainSelector}),
@@ -706,7 +708,7 @@ func TestDeployChainContracts_WithoutTransferOwnership(t *testing.T) {
 	chain := e.BlockChains.EVMChains()[chainSelector]
 	deployer := chain.DeployerKey.From
 
-	// Pre-deploy MCMS so addresses exist, but run with TransferOwnership: false.
+	// Pre-deploy MCMS so addresses exist, but run with DeployerKeyOwned: true to skip transfer.
 	cllTimelockAddr, _, mcmsAddresses := deployAllMCMSForTest(t, e.OperationsBundle, chain, deployer)
 
 	create2FactoryRef, err := contract_utils.MaybeDeployContract(
@@ -728,10 +730,10 @@ func TestDeployChainContracts_WithoutTransferOwnership(t *testing.T) {
 			ContractParams:    testsetup.CreateBasicContractParams(),
 			DeployTestRouter:  true,
 			ExistingAddresses: mcmsAddresses,
-			TransferOwnership: false,
+			DeployerKeyOwned:  true,
 		},
 	)
-	require.NoError(t, err, "ExecuteSequence without TransferOwnership should succeed")
+	require.NoError(t, err, "ExecuteSequence with DeployerKeyOwned should succeed")
 
 	outputDS := sealAddressRefs(t, report.Output.Addresses)
 
@@ -758,14 +760,14 @@ func TestDeployChainContracts_WithoutTransferOwnership(t *testing.T) {
 
 	deployerStillAdmin, err := cllTimelock.HasRole(nil, mcms_ops.ADMIN_ROLE.ID, deployer)
 	require.NoError(t, err)
-	require.True(t, deployerStillAdmin, "Deployer should still be admin of CLL timelock when TransferOwnership is false")
+	require.True(t, deployerStillAdmin, "Deployer should still be admin of CLL timelock when DeployerKeyOwned is true")
 
 	timelockSelfAdmin, err := cllTimelock.HasRole(nil, mcms_ops.ADMIN_ROLE.ID, cllTimelockAddr)
 	require.NoError(t, err)
-	require.False(t, timelockSelfAdmin, "CLL timelock should NOT be self-governed when TransferOwnership is false")
+	require.False(t, timelockSelfAdmin, "CLL timelock should NOT be self-governed when DeployerKeyOwned is true")
 }
 
-func TestDeployChainContracts_TransferOwnership_FailsWithoutMCMS(t *testing.T) {
+func TestDeployChainContracts_DefaultTransfer_FailsWithoutMCMS(t *testing.T) {
 	chainSelector := uint64(5009297550715157269)
 	e, err := environment.New(t.Context(),
 		environment.WithEVMSimulated(t, []uint64{chainSelector}),
@@ -790,13 +792,12 @@ func TestDeployChainContracts_TransferOwnership_FailsWithoutMCMS(t *testing.T) {
 			sequences.DeployChainContracts,
 			chain,
 			sequences.DeployChainContractsInput{
-				ChainSelector:     chainSelector,
-				CREATE2Factory:    common.HexToAddress(create2FactoryRef.Address),
-				ContractParams:    testsetup.CreateBasicContractParams(),
-				TransferOwnership: true,
+				ChainSelector:  chainSelector,
+				CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
+				ContractParams: testsetup.CreateBasicContractParams(),
 			},
 		)
-		require.Error(t, err, "Expected error when TransferOwnership is true but no MCMS in ExistingAddresses")
+		require.Error(t, err, "Expected error when default ownership transfer finds no MCMS in ExistingAddresses")
 		require.Contains(t, err.Error(), common_utils.CLLQualifier)
 	})
 
@@ -812,10 +813,9 @@ func TestDeployChainContracts_TransferOwnership_FailsWithoutMCMS(t *testing.T) {
 				CREATE2Factory:    common.HexToAddress(create2FactoryRef.Address),
 				ContractParams:    testsetup.CreateBasicContractParams(),
 				ExistingAddresses: cllAddresses,
-				TransferOwnership: true,
 			},
 		)
-		require.Error(t, err, "Expected error when TransferOwnership is true but RMNMCMS not in ExistingAddresses")
+		require.Error(t, err, "Expected error when default ownership transfer finds RMNMCMS not in ExistingAddresses")
 		require.Contains(t, err.Error(), common_utils.RMNTimelockQualifier)
 	})
 
@@ -840,10 +840,9 @@ func TestDeployChainContracts_TransferOwnership_FailsWithoutMCMS(t *testing.T) {
 				CREATE2Factory:    common.HexToAddress(create2FactoryRef.Address),
 				ContractParams:    testsetup.CreateBasicContractParams(),
 				ExistingAddresses: timelockOnlyAddrs,
-				TransferOwnership: true,
 			},
 		)
 		require.Error(t, err, "Expected error when timelocks exist but MCM contracts are missing")
-		require.Contains(t, err.Error(), "TransferOwnership requires MCM contract")
+		require.Contains(t, err.Error(), "ownership transfer requires MCM contract")
 	})
 }
