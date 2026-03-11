@@ -305,7 +305,9 @@ func invalidAddress(addr string) bool {
 		return cciptypes.IsZeroOrEmptyOrInvalidHexAddress(addr)
 	}
 	// If it is not hex, just ensure that there is some non-zero content in the address.
-	return len(strings.Replace(addr, "0", "", -1)) == 0
+	addr = strings.Replace(addr, "0", "", -1)
+	addr = strings.Replace(addr, " ", "", -1)
+	return len(addr) == 0
 }
 
 func (t USDCCCTPTokenConfig) Validate() error {
