@@ -226,32 +226,12 @@ func updateFeeQuoterApply(fquRegistry *FQAndRampUpdaterRegistry, mcmsRegistry *c
 				if !ok {
 					return cldf.ChangesetOutput{}, utils.ErrNoAdapterForSelectorRegistered("ConfigImporter", chainSel, version)
 				}
-				err := configImporter.InitializeAdapter(e, chainSel)
+				populateCfgOutput, err := PopulateMetaDataFromConfigImporter(e, configImporter, chainSel)
 				if err != nil {
-					return cldf.ChangesetOutput{}, fmt.Errorf("failed to initialize config importer for chain %d: %w", chainSel, err)
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to populate metadata from config importer for chain %d: %w", chainSel, err)
 				}
-				supportedTokensPerRemoteChain, err := configImporter.SupportedTokensPerRemoteChain(e, chainSel)
-				if err != nil {
-					return cldf.ChangesetOutput{}, fmt.Errorf("failed to get supported tokens per remote chain for chain %d: %w", chainSel, err)
-				}
-				connectedChains, err := configImporter.ConnectedChains(e, chainSel)
-				if err != nil {
-					return cldf.ChangesetOutput{}, fmt.Errorf("failed to get connected chains for chain %d: %w", chainSel, err)
-				}
-				populateConfigReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, configImporter.SequenceImportConfig(), e.BlockChains, ImportConfigPerChainInput{
-					ChainSelector:        chainSel,
-					RemoteChains:         connectedChains,
-					TokensPerRemoteChain: supportedTokensPerRemoteChain,
-				})
-				if err != nil {
-					return cldf.ChangesetOutput{}, fmt.Errorf("failed to populate config for FeeQuoter on chain %d: %w", chainSel, err)
-				}
-				if len(populateConfigReport.Output.Metadata.Contracts) == 0 {
-					return cldf.ChangesetOutput{}, fmt.Errorf("no contract metadata returned from populate config for FeeQuoter on chain %d", chainSel)
-				}
-
-				contractMeta = append(contractMeta, populateConfigReport.Output.Metadata.Contracts...)
-				contractMetadata = append(contractMetadata, populateConfigReport.Output.Metadata.Contracts...)
+				contractMeta = append(contractMeta, populateCfgOutput.Metadata.Contracts...)
+				contractMetadata = append(contractMetadata, populateCfgOutput.Metadata.Contracts...)
 			}
 			// Create FeeQuoterUpdateInput
 			reportFQInputCreation, err := cldf_ops.ExecuteSequence(e.OperationsBundle, fquUpdater.SequenceFeeQuoterInputCreation(), e.BlockChains, FeeQuoterUpdateInput{
@@ -314,4 +294,31 @@ func updateFeeQuoterApply(fquRegistry *FQAndRampUpdaterRegistry, mcmsRegistry *c
 			WithSingleBatchOpPerChain(batchOps).
 			Build(input.MCMS)
 	}
+}
+
+func PopulateMetaDataFromConfigImporter(e cldf.Environment, configImporter ConfigImporter, chainSel uint64) (sequences.OnChainOutput, error) {
+	err := configImporter.InitializeAdapter(e, chainSel)
+	if err != nil {
+		return sequences.OnChainOutput{}, fmt.Errorf("failed to initialize config importer for chain %d: %w", chainSel, err)
+	}
+	supportedTokensPerRemoteChain, err := configImporter.SupportedTokensPerRemoteChain(e, chainSel)
+	if err != nil {
+		return sequences.OnChainOutput{}, fmt.Errorf("failed to get supported tokens per remote chain for chain %d: %w", chainSel, err)
+	}
+	connectedChains, err := configImporter.ConnectedChains(e, chainSel)
+	if err != nil {
+		return sequences.OnChainOutput{}, fmt.Errorf("failed to get connected chains for chain %d: %w", chainSel, err)
+	}
+	populateConfigReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, configImporter.SequenceImportConfig(), e.BlockChains, ImportConfigPerChainInput{
+		ChainSelector:        chainSel,
+		RemoteChains:         connectedChains,
+		TokensPerRemoteChain: supportedTokensPerRemoteChain,
+	})
+	if err != nil {
+		return sequences.OnChainOutput{}, fmt.Errorf("failed to populate config for FeeQuoter on chain %d: %w", chainSel, err)
+	}
+	if len(populateConfigReport.Output.Metadata.Contracts) == 0 {
+		return sequences.OnChainOutput{}, fmt.Errorf("no contract metadata returned from populate config for FeeQuoter on chain %d", chainSel)
+	}
+	return populateConfigReport.Output, nil
 }

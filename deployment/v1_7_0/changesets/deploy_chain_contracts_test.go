@@ -218,7 +218,7 @@ func TestDeployChainContracts_Validate(t *testing.T) {
 	}
 
 	env := newDeployTestEnv(t, []uint64{sel1})
-	registry := adapters.NewDeployChainContractsRegistry()
+	registry := adapters.GetDeployChainContractsRegistry()
 	mcmsRegistry := cs_core.GetRegistry()
 	cs := changesets.DeployChainContracts(registry, mcmsRegistry)
 
@@ -257,7 +257,7 @@ func TestDeployChainContracts_Apply_SingleChainSuccess(t *testing.T) {
 		},
 	}
 
-	registry := adapters.NewDeployChainContractsRegistry()
+	registry := adapters.GetDeployChainContractsRegistry()
 	registry.Register(chainsel.FamilyEVM, mock)
 	mcmsRegistry := cs_core.GetRegistry()
 
@@ -300,7 +300,7 @@ func TestDeployChainContracts_Apply_MultiChainSuccess(t *testing.T) {
 		},
 	}
 
-	registry := adapters.NewDeployChainContractsRegistry()
+	registry := adapters.GetDeployChainContractsRegistry()
 	registry.Register(chainsel.FamilyEVM, mock)
 	mcmsRegistry := cs_core.GetRegistry()
 
@@ -331,7 +331,7 @@ func TestDeployChainContracts_Apply_PerChainOverrideIsUsed(t *testing.T) {
 		captured: &capturedInputs,
 	}
 
-	registry := adapters.NewDeployChainContractsRegistry()
+	registry := adapters.GetDeployChainContractsRegistry()
 	registry.Register(chainsel.FamilyEVM, captureAdapter)
 	mcmsRegistry := cs_core.GetRegistry()
 
@@ -385,7 +385,7 @@ func TestDeployChainContracts_Apply_AdapterErrorPropagated(t *testing.T) {
 		},
 	}
 
-	registry := adapters.NewDeployChainContractsRegistry()
+	registry := adapters.GetDeployChainContractsRegistry()
 	registry.Register(chainsel.FamilyEVM, mock)
 	mcmsRegistry := cs_core.GetRegistry()
 
@@ -408,7 +408,7 @@ func TestDeployChainContracts_Apply_ReturnsError_WhenNoCommitteesHaveChainConfig
 	env := newDeployTestEnv(t, []uint64{sel1, sel2})
 
 	mock := &mockDeployAdapter{}
-	registry := adapters.NewDeployChainContractsRegistry()
+	registry := adapters.GetDeployChainContractsRegistry()
 	registry.Register(chainsel.FamilyEVM, mock)
 	mcmsRegistry := cs_core.GetRegistry()
 
@@ -429,7 +429,7 @@ func TestDeployChainContracts_Apply_NoAdapterRegistered(t *testing.T) {
 	sel1 := chainsel.TEST_90000001.Selector
 	env := newDeployTestEnv(t, []uint64{sel1})
 
-	registry := adapters.NewDeployChainContractsRegistry()
+	registry := adapters.GetDeployChainContractsRegistry()
 	mcmsRegistry := cs_core.GetRegistry()
 
 	cs := changesets.DeployChainContracts(registry, mcmsRegistry)
