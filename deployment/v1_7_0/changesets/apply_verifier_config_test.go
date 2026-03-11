@@ -112,7 +112,6 @@ func newVerifierTestEnv(t *testing.T, selectors []uint64) deployment.Environment
 
 func TestApplyVerifierConfig_Validation(t *testing.T) {
 	sel1 := chainsel.TEST_90000001.Selector
-	sel2 := chainsel.TEST_90000002.Selector
 
 	registry := adapters.NewVerifierConfigRegistry()
 	registry.Register(chainsel.FamilyEVM, &mockVerifierJobConfigAdapter{})
@@ -167,28 +166,6 @@ func TestApplyVerifierConfig_Validation(t *testing.T) {
 				TargetNOPs:               []shared.NOPAlias{"unknown-nop"},
 			},
 			wantErr: "NOP alias \"unknown-nop\" not found in topology",
-		},
-		{
-			name: "chain selector not in environment returns error",
-			env:  deployment.Environment{BlockChains: cldf_chain.NewBlockChains(map[uint64]cldf_chain.BlockChain{sel1: cldfevm.Chain{Selector: sel1}})},
-			input: changesets.ApplyVerifierConfigInput{
-				Topology:                 newVerifierTopology([]string{"nop1"}, "c1", []uint64{sel1, sel2}, ""),
-				CommitteeQualifier:       "c1",
-				DefaultExecutorQualifier: "pool1",
-				ChainSelectors:           []uint64{sel2},
-			},
-			wantErr: "is not available in environment",
-		},
-		{
-			name: "chain selector not in committee returns error",
-			env:  newVerifierTestEnv(t, []uint64{sel1, sel2}),
-			input: changesets.ApplyVerifierConfigInput{
-				Topology:                 newVerifierTopology([]string{"nop1"}, "c1", []uint64{sel1}, ""),
-				CommitteeQualifier:       "c1",
-				DefaultExecutorQualifier: "pool1",
-				ChainSelectors:           []uint64{sel2},
-			},
-			wantErr: "not configured in committee",
 		},
 		{
 			name: "nil NOP topology returns error",
@@ -368,7 +345,7 @@ func TestApplyVerifierConfig_MissingSignerAddressReturnsError(t *testing.T) {
 	assert.Contains(t, err.Error(), "missing signer address")
 }
 
-func TestApplyVerifierConfig_ChainSelectorsFilteredByCommitteeChains(t *testing.T) {
+func TestApplyVerifierConfig_UsesAllCommitteeChains(t *testing.T) {
 	sel1 := chainsel.TEST_90000001.Selector
 	sel2 := chainsel.TEST_90000002.Selector
 

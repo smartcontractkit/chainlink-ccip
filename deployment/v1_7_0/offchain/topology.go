@@ -117,16 +117,26 @@ type AggregatorConfig struct {
 }
 
 // ExecutorPoolConfig defines executor pool membership and configuration.
+// Pool-wide settings (indexer, backoff, etc.) are at this level. When ChainConfigs
+// is non-empty, per-chain NOPs and execution interval are taken from it; otherwise
+// NOPAliases and ExecutionInterval apply to all chains (legacy).
 type ExecutorPoolConfig struct {
+	NOPAliases        []string                         `toml:"nop_aliases"`
+	ExecutionInterval time.Duration                    `toml:"execution_interval"`
+	ChainConfigs      map[string]ChainExecutorPoolConfig `toml:"chain_configs"`
+	IndexerQueryLimit uint64                           `toml:"indexer_query_limit"`
+	BackoffDuration   time.Duration                    `toml:"backoff_duration"`
+	LookbackWindow    time.Duration                    `toml:"lookback_window"`
+	ReaderCacheExpiry time.Duration                    `toml:"reader_cache_expiry"`
+	MaxRetryDuration  time.Duration                    `toml:"max_retry_duration"`
+	WorkerCount       int                              `toml:"worker_count"`
+	NtpServer         string                           `toml:"ntp_server"`
+}
+
+// ChainExecutorPoolConfig defines executor pool membership and execution interval for a single chain.
+type ChainExecutorPoolConfig struct {
 	NOPAliases        []string      `toml:"nop_aliases"`
 	ExecutionInterval time.Duration `toml:"execution_interval"`
-	IndexerQueryLimit uint64        `toml:"indexer_query_limit"`
-	BackoffDuration   time.Duration `toml:"backoff_duration"`
-	LookbackWindow    time.Duration `toml:"lookback_window"`
-	ReaderCacheExpiry time.Duration `toml:"reader_cache_expiry"`
-	MaxRetryDuration  time.Duration `toml:"max_retry_duration"`
-	WorkerCount       int           `toml:"worker_count"`
-	NtpServer         string        `toml:"ntp_server"`
 }
 
 type MonitoringConfig struct {
@@ -272,16 +282,27 @@ func (c *CommitteeConfig) Validate(topology *NOPTopology) error {
 }
 
 func (p *ExecutorPoolConfig) Validate(poolName string, topology *NOPTopology) error {
-	if len(p.NOPAliases) == 0 {
-		return fmt.Errorf("executor pool requires at least one NOP")
+	if len(p.ChainConfigs) > 0 {
+		for chainSelector, chainCfg := range p.ChainConfigs {
+			if len(chainCfg.NOPAliases) == 0 {
+				return fmt.Errorf("executor pool %q chain %q requires at least one NOP", poolName, chainSelector)
+			}
+			for _, alias := range chainCfg.NOPAliases {
+				if !topology.HasNOP(alias) {
+					return fmt.Errorf("executor pool %q chain %q references unknown NOP alias %q", poolName, chainSelector, alias)
+				}
+			}
+		}
+		return nil
 	}
-
+	if len(p.NOPAliases) == 0 {
+		return fmt.Errorf("executor pool %q requires at least one NOP or non-empty chain_configs", poolName)
+	}
 	for _, alias := range p.NOPAliases {
 		if !topology.HasNOP(alias) {
-			return fmt.Errorf("executor pool references unknown NOP alias %q", alias)
+			return fmt.Errorf("executor pool %q references unknown NOP alias %q", poolName, alias)
 		}
 	}
-
 	return nil
 }
 
@@ -289,6 +310,19 @@ func (c *EnvironmentTopology) GetNOPsForPool(poolName string) ([]string, error) 
 	pool, ok := c.ExecutorPools[poolName]
 	if !ok {
 		return nil, fmt.Errorf("executor pool %q not found", poolName)
+	}
+	if len(pool.ChainConfigs) > 0 {
+		nopSet := make(map[string]struct{})
+		for _, chainCfg := range pool.ChainConfigs {
+			for _, alias := range chainCfg.NOPAliases {
+				nopSet[alias] = struct{}{}
+			}
+		}
+		nops := make([]string, 0, len(nopSet))
+		for alias := range nopSet {
+			nops = append(nops, alias)
+		}
+		return nops, nil
 	}
 	return pool.NOPAliases, nil
 }
@@ -330,7 +364,14 @@ func (c *EnvironmentTopology) GetCommitteesForNOP(nopAlias string) []string {
 func (c *EnvironmentTopology) GetPoolsForNOP(nopAlias string) []string {
 	var pools []string
 	for poolName, pool := range c.ExecutorPools {
-		if slices.Contains(pool.NOPAliases, nopAlias) {
+		if len(pool.ChainConfigs) > 0 {
+			for _, chainCfg := range pool.ChainConfigs {
+				if slices.Contains(chainCfg.NOPAliases, nopAlias) {
+					pools = append(pools, poolName)
+					break
+				}
+			}
+		} else if slices.Contains(pool.NOPAliases, nopAlias) {
 			pools = append(pools, poolName)
 		}
 	}

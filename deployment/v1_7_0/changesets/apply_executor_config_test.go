@@ -90,7 +90,6 @@ func newExecutorTestBlockChains(selectors []uint64) cldf_chain.BlockChains {
 
 func TestApplyExecutorConfig_Validation(t *testing.T) {
 	sel1 := chainsel.TEST_90000001.Selector
-	sel2 := chainsel.TEST_90000002.Selector
 
 	registry := adapters.NewExecutorConfigRegistry()
 	registry.Register(chainsel.FamilyEVM, &mockExecutorConfigAdapter{})
@@ -145,16 +144,6 @@ func TestApplyExecutorConfig_Validation(t *testing.T) {
 				TargetNOPs:        []shared.NOPAlias{"unknown-nop"},
 			},
 			wantErr: "NOP alias \"unknown-nop\" not found in executor pool",
-		},
-		{
-			name: "chain selector not in environment returns error",
-			env:  deployment.Environment{BlockChains: newExecutorTestBlockChains([]uint64{sel1})},
-			input: changesets.ApplyExecutorConfigInput{
-				Topology:          newMinimalTopology([]string{"nop1"}, "pool1", ""),
-				ExecutorQualifier: "pool1",
-				ChainSelectors:    []uint64{sel2},
-			},
-			wantErr: "is not available in environment",
 		},
 		{
 			name: "pyroscope URL in production returns error",
@@ -260,7 +249,7 @@ func TestApplyExecutorConfig_BuildChainConfigErrorPropagates(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to build config for chain")
 }
 
-func TestApplyExecutorConfig_ChainSelectorsFilteredByDeployedChains(t *testing.T) {
+func TestApplyExecutorConfig_UsesAllDeployedChains(t *testing.T) {
 	sel1 := chainsel.TEST_90000001.Selector
 	sel2 := chainsel.TEST_90000002.Selector
 
@@ -287,7 +276,6 @@ func TestApplyExecutorConfig_ChainSelectorsFilteredByDeployedChains(t *testing.T
 	output, err := cs.Apply(env, changesets.ApplyExecutorConfigInput{
 		Topology:          topo,
 		ExecutorQualifier: "pool1",
-		ChainSelectors:    []uint64{sel1, sel2},
 	})
 	require.NoError(t, err)
 	assert.NotNil(t, output.DataStore)
