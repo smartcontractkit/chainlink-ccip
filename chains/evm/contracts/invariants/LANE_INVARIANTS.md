@@ -86,7 +86,18 @@ Not all chain families use a router. On chains that do:
 
 ---
 
-## 9. Access Control Summary
+## 9. Upgradability
+
+CCVs, token pools, and the executor are external participants that the OnRamp and OffRamp interact with through stable interfaces. They can be upgraded with zero downtime and without users being aware of the change.
+
+- **INV-UPG-1**: CCV implementations can be upgraded behind a stable address. Users, pools, lane configs, and receivers continue to reference the same CCV address. See CCV_INVARIANTS.md (section 4) for address stability requirements.
+- **INV-UPG-2**: Token pool implementations can be upgraded. The remote chain's pool configuration supports multiple remote pool addresses per chain, allowing the old and new pool to coexist during the transition. See TOKEN_POOL_INVARIANTS.md INV-PCFG-2.
+- **INV-UPG-3**: The executor can be upgraded by updating the lane configuration to point to a new executor address. Messages in flight continue to use the executor specified at send time (embedded in `ccvAndExecutorHash`); new messages use the updated executor.
+- **INV-UPG-4**: None of these upgrades require user action, message replay, or protocol downtime. The transition is transparent to senders and receivers.
+
+---
+
+## 10. Access Control Summary
 
 | Operation | Required Authority |
 |-----------|--------------------|

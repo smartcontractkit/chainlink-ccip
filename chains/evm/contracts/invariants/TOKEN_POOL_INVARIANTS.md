@@ -3,7 +3,7 @@
 ## 1. Pool Types
 
 - **INV-POOL-1**: All pool types implement the same protocol-level interface. The pool mechanism (lock/release, burn/mint, or variants) is an implementation detail transparent to the OnRamp and OffRamp.
-- **INV-POOL-2**: Lock-release pools move tokens into a lockbox on the source chain and withdraw from a lockbox on the destination chain.
+- **INV-POOL-2**: Lock-release pools move tokens into a lockbox and withdraw from a lockbox. They never hold customer funds.
 - **INV-POOL-3**: Burn-mint pools destroy tokens on the source chain and create tokens on the destination chain.
 
 ---
@@ -41,7 +41,7 @@ See FEE_INVARIANTS.md (section 3) for how pool fee quoting integrates with the O
 - **INV-POOL-15**: If `sourcePoolData` is empty, the destination pool assumes the source token has the same decimals as the local token.
 - **INV-POOL-16**: If `sourcePoolData` is present, it must be exactly 32 bytes encoding a `uint8` decimal value.
 - **INV-POOL-17**: When converting from higher to lower decimals, the amount is divided and rounds down. Dust is lost.
-- **INV-POOL-18**: When converting from lower to higher decimals, the amount is multiplied. If the multiplication overflows or the decimal difference exceeds 77, the transfer reverts.
+- **INV-POOL-18**: When converting from lower to higher decimals, the amount is multiplied. If the multiplication overflows, the transfer reverts.
 
 ---
 
@@ -59,21 +59,20 @@ See FEE_INVARIANTS.md (section 3) for how pool fee quoting integrates with the O
 
 - **INV-RL-1**: Rate limiting uses a token bucket: each bucket has `capacity` (maximum tokens), `rate` (tokens refilled per second), and `tokens` (current available tokens).
 - **INV-RL-2**: On each consumption, the bucket first refills based on elapsed time: `tokens = min(capacity, tokens + elapsedSeconds * rate)`.
-- **INV-RL-3**: If the requested amount exceeds `capacity`, the transfer always reverts regardless of available tokens.
-- **INV-RL-4**: If the requested amount exceeds available `tokens`, the transfer reverts. If `rate > 0`, a minimum wait time is calculable. If `rate == 0`, the wait is effectively infinite.
-- **INV-RL-5**: If the bucket is disabled or the requested amount is zero, no consumption occurs.
+- **INV-RL-3**: If the requested amount exceeds available `tokens`, the transfer reverts.
+- **INV-RL-4**: If the bucket is disabled or the requested amount is zero, no consumption occurs.
 
 ### 7.2 Inbound vs Outbound
 
-- **INV-RL-6**: Pools maintain separate rate limit buckets for outbound (`lockOrBurn`) and inbound (`releaseOrMint`) per remote chain.
-- **INV-RL-7**: FTF transfers may use additional separate rate limit buckets. See FINALITY_INVARIANTS.md (section 4.4) for details.
+- **INV-RL-5**: Pools maintain separate rate limit buckets for outbound (`lockOrBurn`) and inbound (`releaseOrMint`) per remote chain.
+- **INV-RL-6**: FTF transfers may use additional separate rate limit buckets. See FINALITY_INVARIANTS.md (section 4.4) for details.
 
 ### 7.3 Configuration
 
-- **INV-RL-8**: Rate limiter configuration is per-remote-chain. Each remote chain can have its own outbound and inbound bucket parameters.
-- **INV-RL-9**: When a bucket is enabled, `rate` must not exceed `capacity`.
-- **INV-RL-10**: When a bucket is disabled, both `rate` and `capacity` must be zero.
-- **INV-RL-11**: Rate limit configuration can be updated by the contract owner or a designated rate limit admin.
+- **INV-RL-7**: Rate limiter configuration is per-remote-chain. Each remote chain can have its own outbound and inbound bucket parameters.
+- **INV-RL-8**: When a bucket is enabled, `rate` must not exceed `capacity`.
+- **INV-RL-9**: When a bucket is disabled, both `rate` and `capacity` must be zero.
+- **INV-RL-10**: Rate limit configuration can be updated by the contract owner or a designated rate limit admin.
 
 ---
 
@@ -88,3 +87,4 @@ See FEE_INVARIANTS.md (section 3) for how pool fee quoting integrates with the O
 ## 9. Source Pool Validation (Inbound)
 
 - **INV-PVAL-1**: On `releaseOrMint`, the pool validates that `sourcePoolAddress` (from the inbound message) matches one of the configured remote pool addresses for the source chain. Unrecognized source pools are rejected.
+
