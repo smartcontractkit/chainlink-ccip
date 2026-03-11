@@ -645,7 +645,7 @@ func (a *EVMAdapter) FindLatestAddressRef(ds datastore.DataStore, ref datastore.
 	// Get all matching token pool addresses
 	refs := ds.Addresses().Filter(filter...)
 
-	// Use the latest version found within the specified range
+	// Use the latest version found within the specified range.
 	var latestRef datastore.AddressRef
 	latestVer := minVersion
 	doesExist := false

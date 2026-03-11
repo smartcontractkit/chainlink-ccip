@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	evmadaptersV1_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/link_token"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
 	evmadaptersV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/adapters"
 	evmseqV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	soladaptersV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/adapters"
@@ -87,8 +87,8 @@ func TestSetTokenTransferFeeV1_6_0(t *testing.T) {
 	// Get the address of the LINK token on the destination chain
 	dstLinkRef, err := output.DataStore.Addresses().Get(
 		datastore.NewAddressRefKey(dst,
-			datastore.ContractType(link_token.ContractType),
-			link_token.Version,
+			datastore.ContractType(link.ContractType),
+			link.Version,
 			"", // no qualifier is needed for EVM LINK token
 		),
 	)

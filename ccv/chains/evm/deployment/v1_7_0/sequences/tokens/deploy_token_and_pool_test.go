@@ -20,9 +20,9 @@ import (
 	token_bindings "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/1_5_0/burn_mint_erc20_with_drip"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/burn_mint_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/create2_factory"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/lock_release_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
@@ -48,7 +48,7 @@ func basicDeployTokenAndPoolInput(chainReport operations.SequenceReport[sequence
 		tokenPoolType = datastore.ContractType(lock_release_token_pool.ContractType)
 		tokenPoolVersion = lock_release_token_pool.Version
 	} else {
-		tokenPoolType = datastore.ContractType(burn_mint_token_pool.BurnMintContractType)
+		tokenPoolType = datastore.ContractType(burn_mint_token_pool.ContractType)
 		tokenPoolVersion = burn_mint_token_pool.Version
 	}
 

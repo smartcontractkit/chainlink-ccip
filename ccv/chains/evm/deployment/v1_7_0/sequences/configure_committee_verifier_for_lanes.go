@@ -5,8 +5,6 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/committee_verifier"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/versioned_verifier_resolver"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
@@ -14,6 +12,9 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
+
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/committee_verifier"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/versioned_verifier_resolver"
 )
 
 type ConfigureCommitteeVerifierForLanesInput struct {
@@ -39,7 +40,7 @@ var ConfigureCommitteeVerifierForLanes = cldf_ops.NewSequence(
 			switch addr.Type {
 			case datastore.ContractType(committee_verifier.ContractType):
 				committeeVerifier = addr.Address
-			case datastore.ContractType(committee_verifier.ResolverType):
+			case datastore.ContractType(CommitteeVerifierResolverType):
 				committeeVerifierResolver = addr.Address
 			}
 		}
@@ -79,10 +80,12 @@ var ConfigureCommitteeVerifierForLanes = cldf_ops.NewSequence(
 				remoteChainConfigArgs = append(remoteChainConfigArgs, desiredRemoteChainArg)
 			} else {
 				// We have to check these parameters separately because if we call GetFee before the router is set, it will revert.
-				getFeeReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.GetFee, chain, contract.FunctionInput[uint64]{
+				getFeeReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.GetFee, chain, contract.FunctionInput[committee_verifier.GetFeeArgs]{
 					ChainSelector: chain.Selector,
 					Address:       common.HexToAddress(committeeVerifier),
-					Args:          remoteSelector,
+					Args: committee_verifier.GetFeeArgs{
+						DestChainSelector: remoteSelector,
+					},
 				})
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to get fee for selector %d from CommitteeVerifier on chain %s: %w", remoteSelector, chain, err)
@@ -181,11 +184,11 @@ var ConfigureCommitteeVerifierForLanes = cldf_ops.NewSequence(
 
 		// Apply signature configs only when there are changes.
 		if len(signatureConfigs) > 0 {
-			committeeVerifierSignatureConfigReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.ApplySignatureConfigs, chain, contract.FunctionInput[committee_verifier.SignatureConfigArgs]{
+			committeeVerifierSignatureConfigReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.ApplySignatureConfigs, chain, contract.FunctionInput[committee_verifier.ApplySignatureConfigsArgs]{
 				ChainSelector: chain.Selector,
 				Address:       common.HexToAddress(committeeVerifier),
-				Args: committee_verifier.SignatureConfigArgs{
-					SignatureConfigUpdates: signatureConfigs,
+				Args: committee_verifier.ApplySignatureConfigsArgs{
+					SignatureConfigs: signatureConfigs,
 				},
 			})
 			if err != nil {
@@ -195,7 +198,7 @@ var ConfigureCommitteeVerifierForLanes = cldf_ops.NewSequence(
 		}
 
 		// Apply inbound implementation updates on CommitteeVerifierResolver only when not already set (idempotent).
-		committeeVerifierVersionTagReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.GetVersionTag, chain, contract.FunctionInput[any]{
+		committeeVerifierVersionTagReport, err := cldf_ops.ExecuteOperation(b, committee_verifier.VersionTag, chain, contract.FunctionInput[struct{}]{
 			ChainSelector: chain.Selector,
 			Address:       common.HexToAddress(committeeVerifier),
 		})
