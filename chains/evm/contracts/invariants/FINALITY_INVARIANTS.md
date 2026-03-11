@@ -119,7 +119,7 @@
 
 - **INV-FIN-REORG-1**: `messageNumber` is unique per-lane only for finalized messages. Under FTF, a re-org may cause a message to receive a different `messageNumber`.
 - **INV-FIN-REORG-2**: FTF shifts re-org risk to the receiver, pool, and any downstream integrators. The protocol makes this explicit by requiring opt-in at every layer.
-- **INV-FIN-REORG-3**: The OffRamp's execution states are keyed by `messageId` (= `keccak256(encodedMessage)`).
+- **INV-FIN-REORG-3**: Execution outcomes are keyed by `messageId` (= `keccak256(encodedMessage)`).
 
 ---
 

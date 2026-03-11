@@ -124,12 +124,12 @@
 - **INV-DST-21**: Each CCV that passes quorum checks has `verifyMessage` called on it. Verification succeeds by not reverting. Any revert from `verifyMessage` causes the entire message execution to fail.
 - **INV-DST-22**: `ccvs.length` must equal `verifierResults.length`. Each CCV has exactly one corresponding verifier result.
 
-### 3.9 Execution State
+### 3.9 Execution Outcome
 
-- **INV-DST-23**: If CCV verification fails, the message state is set to `FAILURE` and can be retried later (possibly with different/updated verifier results).
-- **INV-DST-24**: If CCV verification succeeds but `ccipReceive` fails, the message state is still `FAILURE` and can be retried.
-- **INV-DST-25**: A message in `SUCCESS` state cannot be re-executed. Only `UNTOUCHED` or `FAILURE` states allow execution.
-- **INV-DST-26**: A `FAILURE` re-execution that still fails reverts with `NoStateProgressMade` (no state change from FAILURE to FAILURE).
+- **INV-DST-23**: If CCV verification fails, the message is not considered successfully executed and may be retried later (possibly with different/updated verifier results).
+- **INV-DST-24**: If CCV verification succeeds but message delivery to the receiver fails, the message is still not considered successfully executed and may be retried.
+- **INV-DST-25**: A successfully executed message cannot be re-executed.
+- **INV-DST-26**: A retry that still fails must not produce a redundant state transition.
 
 ---
 
