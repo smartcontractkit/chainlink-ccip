@@ -9,13 +9,8 @@
 - **INV-LCFG-3**: `addressBytesLength` must be non-zero. It defines the expected address size for the destination chain family.
 - **INV-LCFG-4**: `baseExecutionGasCost` must be non-zero.
 - **INV-LCFG-5**: A default executor must be configured (non-zero-value address). This ensures messages using legacy or defaulted extraArgs resolve to a concrete executor.
-- **INV-LCFG-6**: At least one CCV must exist across `defaultCCVs` and `laneMandatedCCVs` combined. No zero-value addresses or duplicates are allowed within or across both sets.
-- **INV-LCFG-7**: The destination OffRamp address (raw bytes) must have a length equal to `addressBytesLength`.
-- **INV-LCFG-8**: Lane configuration updates are restricted to the contract owner.
-
-### 1.2 Sequencing Persistence
-
-- **INV-LCFG-9**: `messageNumber` is not part of the configuration arguments. Lane configuration updates do not reset or modify the message sequence counter.
+- **INV-LCFG-6**: The destination OffRamp address (raw bytes) must have a length equal to `addressBytesLength`.
+- **INV-LCFG-7**: Lane configuration updates are restricted to the contract owner.
 
 ---
 
@@ -23,15 +18,13 @@
 
 ### 2.1 Source Chain Config
 
-- **INV-LCFG-10**: Each lane on the OffRamp is identified by `sourceChainSelector`. The OffRamp stores per-lane configuration including: enabled flag, allowed OnRamp addresses, and CCV sets.
-- **INV-LCFG-11**: `sourceChainSelector` must be non-zero.
-- **INV-LCFG-12**: At least one default CCV must be configured. The same validation as the OnRamp applies (no zero-value addresses, no duplicates within or across CCV sets).
-- **INV-LCFG-13**: Source chain configuration updates are restricted to the contract owner.
+- **INV-LCFG-8**: Each lane on the OffRamp is identified by `sourceChainSelector`. The OffRamp stores per-lane configuration including: enabled flag, allowed OnRamp addresses, and CCV sets.
+- **INV-LCFG-9**: `sourceChainSelector` must be non-zero.
+- **INV-LCFG-10**: Source chain configuration updates are restricted to the contract owner.
 
 ### 2.2 OnRamp Allowlist
 
-- **INV-LCFG-14**: The OffRamp maintains a set of allowed OnRamp addresses per source chain. Only messages whose `onRampAddress` matches an entry in this set are accepted for execution.
-- **INV-LCFG-15**: OnRamp addresses in the allowlist must be non-empty.
+- **INV-LCFG-11**: OnRamp addresses in the allowlist must be non-empty.
 
 ---
 

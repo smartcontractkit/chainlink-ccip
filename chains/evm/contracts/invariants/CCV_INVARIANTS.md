@@ -27,52 +27,50 @@
 ### 2.1 User-Requested CCVs
 
 - **INV-SRC-1**: User-provided CCVs (from `ExtraArgsV3`) must not contain duplicates.
-- **INV-SRC-2**: `ccvs` and `ccvArgs` arrays must have the same length.
-- **INV-SRC-3**: The zero-value address in the user CCV list is a placeholder meaning "include defaults". There can be at most one (since duplicates are rejected).
-- **INV-SRC-4**: Legacy extraArgs (pre-V3) do not include CCVs. The user gets defaults applied automatically.
-- **INV-SRC-5**: If the user provides no CCVs (empty list), defaults are applied for data/receiver messages. For token-only transfers, an empty list results in no user/default CCVs (only pool + lane-mandated apply).
+- **INV-SRC-2**: The zero-value address in the user CCV list is a placeholder meaning "include defaults". There can be at most one (since duplicates are rejected).
+- **INV-SRC-3**: Legacy extraArgs (pre-V3) do not include CCVs. The user gets defaults applied automatically.
+- **INV-SRC-4**: If the user provides no CCVs (empty list), defaults are applied for data/receiver messages. For token-only transfers, an empty list results in no user/default CCVs (only pool + lane-mandated apply).
 
 ### 2.2 Default CCVs
 
-- **INV-SRC-6**: Defaults are used when the user provides no CCVs or uses the zero-value address as a placeholder.
-- **INV-SRC-7**: Defaults are NOT applied for pure token-only transfers (no data, gasLimit=0, has tokens) unless the user explicitly requests them via the zero-value address placeholder.
-- **INV-SRC-8**: When expanding the zero-value placeholder with defaults, defaults that already appear in the user list are skipped (deduplication).
+- **INV-SRC-5**: Defaults are used when the user provides no CCVs or uses the zero-value address as a placeholder.
+- **INV-SRC-6**: Defaults are NOT applied for pure token-only transfers (no data, gasLimit=0, has tokens) unless the user explicitly requests them via the zero-value address placeholder.
+- **INV-SRC-7**: When expanding the zero-value placeholder with defaults, defaults that already appear in the user list are skipped (deduplication).
 
 ### 2.3 Lane-Mandated CCVs
 
-- **INV-SRC-9**: Lane-mandated CCVs are always added to every message on the lane, regardless of user or pool preferences.
-- **INV-SRC-10**: Lane-mandated CCVs that already appear in the user/default list are skipped (deduplication).
-- **INV-SRC-11**: If a user includes a lane-mandated CCV in their own CCV list with custom `ccvArgs`, those args are preserved (the user entry takes precedence due to deduplication). If the user does not include it, the lane-mandated CCV is added with empty `ccvArgs`.
+- **INV-SRC-8**: Lane-mandated CCVs are always added to every message on the lane, regardless of user or pool preferences.
+- **INV-SRC-9**: Lane-mandated CCVs that already appear in the user/default list are skipped (deduplication).
+- **INV-SRC-10**: If a user includes a lane-mandated CCV in their own CCV list with custom `ccvArgs`, those args are preserved (the user entry takes precedence due to deduplication). If the user does not include it, the lane-mandated CCV is added with empty `ccvArgs`.
 
 ### 2.4 Pool-Required CCVs
 
-- **INV-SRC-12**: If a pool does not implement `IPoolV2`, it falls back to `defaultCCVs`.
-- **INV-SRC-13**: If a pool implements `IPoolV2` but returns an empty array from `getRequiredCCVs`, it falls back to `defaultCCVs`.
-- **INV-SRC-14**: If a pool returns the zero-value address in its CCV list, those entries are replaced with `defaultCCVs`.
-- **INV-SRC-15**: Pool-required CCVs that already appear in the merged list (user + lane-mandated) are skipped (deduplication).
-- **INV-SRC-16**: If a user includes a pool-required CCV in their own CCV list with custom `ccvArgs`, those args are preserved. If the user does not include it, the pool-required CCV is added with empty `ccvArgs`.
+- **INV-SRC-11**: If a pool does not implement `IPoolV2`, it falls back to `defaultCCVs`.
+- **INV-SRC-12**: If a pool implements `IPoolV2` but returns an empty array from `getRequiredCCVs`, it falls back to `defaultCCVs`.
+- **INV-SRC-13**: If a pool returns the zero-value address in its CCV list, those entries are replaced with `defaultCCVs`.
+- **INV-SRC-14**: Pool-required CCVs that already appear in the merged list (user + lane-mandated) are skipped (deduplication).
+- **INV-SRC-15**: If a user includes a pool-required CCV in their own CCV list with custom `ccvArgs`, those args are preserved. If the user does not include it, the pool-required CCV is added with empty `ccvArgs`.
 
 ### 2.5 Merge Order
 
-- **INV-SRC-17**: The final CCV list is built in order: user/default first, lane-mandated second, pool-required last. This order is deterministic but not a protocol-level requirement.
-- **INV-SRC-18**: The final merged CCV list contains no duplicates.
+- **INV-SRC-16**: The final CCV list is built in order: user/default first, lane-mandated second, pool-required last. This order is deterministic but not a protocol-level requirement.
+- **INV-SRC-17**: The final merged CCV list contains no duplicates.
 
 ### 2.6 CCV Fees
 
-- **INV-SRC-19**: Each CCV's `getFee` is called to compute per-CCV fees (USD cents, gas, bytes overhead).
-- **INV-SRC-20**: Each CCV in the final merged list generates a receipt with `feeUSDCents`, `gasForVerification`, and `ccvPayloadSizeBytes`.
-- **INV-SRC-21**: The total message fee includes the sum of all CCV fees, token transfer fees, executor fee, and network fee.
-- **INV-SRC-22**: CCV fees are denominated in USD cents and converted to fee token amounts.
+- **INV-SRC-18**: Each CCV's `getFee` is called to compute per-CCV fees (USD cents, gas, bytes overhead).
+- **INV-SRC-19**: Each CCV in the final merged list generates a receipt with `feeUSDCents`, `gasForVerification`, and `ccvPayloadSizeBytes`.
+- **INV-SRC-20**: The total message fee includes the sum of all CCV fees, token transfer fees, executor fee, and network fee.
+- **INV-SRC-21**: CCV fees are denominated in USD cents and converted to fee token amounts.
 
 ### 2.7 CCV+Executor Hash
 
-- **INV-SRC-23**: `ccvAndExecutorHash` is computed as `keccak256([addressLength][ccv1..ccvN][executor])`. The length prefix encodes the address byte length for the chain family, preventing collisions between different array sizes and cross-chain-family ambiguity.
-- **INV-SRC-24**: `ccvAndExecutorHash` is embedded in the message for offchain validation only. It is NOT verified on the destination chain.
+- **INV-SRC-22**: `ccvAndExecutorHash` is computed as `keccak256([addressLength][ccv1..ccvN][executor])`. The length prefix encodes the address byte length for the chain family, preventing collisions between different array sizes and cross-chain-family ambiguity.
+- **INV-SRC-23**: `ccvAndExecutorHash` is embedded in the message for offchain validation only. It is NOT verified on the destination chain.
 
 ### 2.8 Token-Only Transfer Behavior
 
-- **INV-SRC-25**: A "token-only transfer" is defined as: `gasLimit == 0 && message.data.length == 0 && message.tokenAmounts.length > 0`.
-- **INV-SRC-26**: For token-only transfers with no user-specified CCVs, only pool-required CCVs and lane-mandated CCVs are included. Default CCVs and receiver CCVs are excluded, since only the token issuer (pool) bears risk, not the receiver.
+- **INV-SRC-24**: For token-only transfers (see MESSAGE_LIFECYCLE_INVARIANTS.md INV-TO-1) with no user-specified CCVs, only pool-required CCVs and lane-mandated CCVs are included. Default CCVs and receiver CCVs are excluded, since only the token issuer (pool) bears risk, not the receiver.
 
 ---
 
@@ -126,10 +124,7 @@
 
 ### 3.9 Execution Outcome
 
-- **INV-DST-23**: If CCV verification fails, the message is not considered successfully executed and may be retried later (possibly with different/updated verifier results).
-- **INV-DST-24**: If CCV verification succeeds but message delivery to the receiver fails, the message is still not considered successfully executed and may be retried.
-- **INV-DST-25**: A successfully executed message cannot be re-executed.
-- **INV-DST-26**: A retry that still fails must not produce a redundant state transition.
+See MESSAGE_LIFECYCLE_INVARIANTS.md (section 5.3) for execution outcome invariants (retry, terminal success, redundant state transitions).
 
 ---
 
