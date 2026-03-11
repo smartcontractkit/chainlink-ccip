@@ -60,17 +60,16 @@
 
 - **INV-SRC-18**: Each CCV's `getFee` is called to compute per-CCV fees (USD cents, gas, bytes overhead).
 - **INV-SRC-19**: Each CCV in the final merged list generates a receipt with `feeUSDCents`, `gasForVerification`, and `ccvPayloadSizeBytes`.
-- **INV-SRC-20**: The total message fee includes the sum of all CCV fees, token transfer fees, executor fee, and network fee.
-- **INV-SRC-21**: CCV fees are denominated in USD cents and converted to fee token amounts.
+See FEE_INVARIANTS.md for overall fee structure, distribution, and conversion to fee token amounts.
 
 ### 2.7 CCV+Executor Hash
 
-- **INV-SRC-22**: `ccvAndExecutorHash` is computed as `keccak256([addressLength][ccv1..ccvN][executor])`. The length prefix encodes the address byte length for the chain family, preventing collisions between different array sizes and cross-chain-family ambiguity.
-- **INV-SRC-23**: `ccvAndExecutorHash` is embedded in the message for offchain validation only. It is NOT verified on the destination chain.
+- **INV-SRC-20**: `ccvAndExecutorHash` is computed as `keccak256([addressLength][ccv1..ccvN][executor])`. The length prefix encodes the address byte length for the chain family, preventing collisions between different array sizes and cross-chain-family ambiguity.
+- **INV-SRC-21**: `ccvAndExecutorHash` is embedded in the message for offchain validation only. It is NOT verified on the destination chain.
 
 ### 2.8 Token-Only Transfer Behavior
 
-- **INV-SRC-24**: For token-only transfers (see MESSAGE_LIFECYCLE_INVARIANTS.md INV-TO-1) with no user-specified CCVs, only pool-required CCVs and lane-mandated CCVs are included. Default CCVs and receiver CCVs are excluded, since only the token issuer (pool) bears risk, not the receiver.
+- **INV-SRC-22**: For token-only transfers (see MESSAGE_LIFECYCLE_INVARIANTS.md INV-TO-1) with no user-specified CCVs, only pool-required CCVs and lane-mandated CCVs are included. Default CCVs and receiver CCVs are excluded, since only the token issuer (pool) bears risk, not the receiver.
 
 ---
 

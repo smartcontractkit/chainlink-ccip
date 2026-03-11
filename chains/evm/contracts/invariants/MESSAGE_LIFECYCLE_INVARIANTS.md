@@ -18,7 +18,7 @@
 
 - **INV-SRC-1**: Fees are computed and distributed before `lockOrBurn`. Tokens are locked/burned only after fees are paid.
 - **INV-SRC-2**: `messageId` is computed after `lockOrBurn`, because the token transfer encoding (including `destPoolData` from `lockOrBurn`) is part of the encoded message.
-- **INV-SRC-3**: The computed fee must not exceed the fee token amount provided by the sender.
+- **INV-SRC-3**: The computed fee must not exceed the fee token amount provided by the sender. See FEE_INVARIANTS.md for fee structure details.
 - **INV-SRC-4**: Token amount must be non-zero if a token transfer is included.
 
 ---
