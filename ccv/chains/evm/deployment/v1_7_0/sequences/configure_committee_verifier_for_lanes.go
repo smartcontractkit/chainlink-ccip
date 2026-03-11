@@ -128,7 +128,7 @@ var ConfigureCommitteeVerifierForLanes = cldf_ops.NewSequence(
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get signature config for selector %d from CommitteeVerifier on chain %s: %w", remoteSelector, chain, err)
 			}
 			curSig := currentSigReport.Output
-			if curSig.Threshold != desiredSig.Threshold || !UnorderedSliceEqual(curSig.Signers, desiredSig.Signers, func(x, y common.Address) bool { return x == y }) {
+			if curSig.Ret1 != desiredSig.Threshold || !UnorderedSliceEqual(curSig.Ret0, desiredSig.Signers, func(x, y common.Address) bool { return x == y }) {
 				signatureConfigs = append(signatureConfigs, desiredSig)
 			}
 		}
