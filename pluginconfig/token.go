@@ -282,9 +282,15 @@ func (p *USDCCCTPObserverConfig) Validate() error {
 	if len(p.Tokens) == 0 {
 		return errors.New("Tokens not set")
 	}
-	for _, token := range p.Tokens {
+	for chainSelector, token := range p.Tokens {
 		if err := token.Validate(); err != nil {
-			return err
+			return fmt.Errorf(
+				"invalid usdc token config for chain selector %d, source pool %q, and source message transmitter %q: %w",
+				chainSelector,
+				token.SourcePoolAddress,
+				token.SourceMessageTransmitterAddr,
+				err,
+			)
 		}
 	}
 	return nil
@@ -312,10 +318,14 @@ func invalidAddress(addr string) bool {
 
 func (t USDCCCTPTokenConfig) Validate() error {
 	if invalidAddress(t.SourcePoolAddress) {
-		return errors.New("SourcePoolAddress not set")
+		return fmt.Errorf("SourcePoolAddress not set (source pool %q)", t.SourcePoolAddress)
 	}
 	if invalidAddress(t.SourceMessageTransmitterAddr) {
-		return errors.New("SourceMessageTransmitterAddress not set")
+		return fmt.Errorf(
+			"SourceMessageTransmitterAddress not set (source pool %q, source message transmitter %q)",
+			t.SourcePoolAddress,
+			t.SourceMessageTransmitterAddr,
+		)
 	}
 	return nil
 }
