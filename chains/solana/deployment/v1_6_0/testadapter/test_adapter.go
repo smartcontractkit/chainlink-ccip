@@ -348,7 +348,7 @@ func (a *SVMAdapter) InvalidCCIPReceivers() [][]byte {
 	return make([][]byte, 0)
 }
 
-func (a *SVMAdapter) SetReceiverRejectAll(t *testing.T, rejectAll bool) error {
+func (a *SVMAdapter) SetReceiverRejectAll(ctx context.Context, t *testing.T, rejectAll bool) error {
 	receiverProgram, err := a.getAddress("TestReceiver")
 	if err != nil {
 		return err
@@ -365,7 +365,7 @@ func (a *SVMAdapter) SetReceiverRejectAll(t *testing.T, rejectAll bool) error {
 		return err
 	}
 	rejectAllIx := solana.NewInstruction(receiverProgram, ix.Accounts(), ixData)
-	result, err := solcommon.SendAndConfirm(t.Context(), a.Client, []solana.Instruction{rejectAllIx}, *deployer, solconfig.DefaultCommitment)
+	result, err := solcommon.SendAndConfirm(ctx, a.Client, []solana.Instruction{rejectAllIx}, *deployer, solconfig.DefaultCommitment)
 	if err != nil {
 		return fmt.Errorf("failed to send and confirm transaction: %w", err)
 	}
