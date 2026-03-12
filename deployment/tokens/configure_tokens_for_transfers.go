@@ -88,13 +88,17 @@ func processTokenConfigForChain(e deployment.Environment, cfg map[uint64]TokenTr
 		}
 
 		var registryAddr string
-		if registry, err := datastore_utils.FindAndFormatRef(e.DataStore, token.RegistryRef, selector, datastore_utils.FullRef); err != nil {
+		if !datastore_utils.IsAddressRefEmpty(token.RegistryRef) {
+			if registry, err := datastore_utils.FindAndFormatRef(e.DataStore, token.RegistryRef, selector, datastore_utils.FullRef); err != nil {
+				return nil, nil, nil, fmt.Errorf("failed to resolve registry ref on chain with selector %d: %w", selector, err)
+			} else {
+				registryAddr = registry.Address
+			}
+		} else {
 			e.Logger.Warnf(
-				"Failed to resolve registry ref for chain selector %d and filter (%s): %v. We will rely on the underlying adapter to resolve this field.",
+				"Registry ref is empty for chain selector %d. We will rely on the underlying adapter to resolve this field.",
 				selector, datastore_utils.SprintRef(token.RegistryRef), err,
 			)
-		} else {
-			registryAddr = registry.Address
 		}
 
 		family, err := chain_selectors.GetSelectorFamily(selector)
