@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {ITokenAdminRegistry} from "../../interfaces/ITokenAdminRegistry.sol";
+import {ITokenAdminRegistry} from "./interfaces/ITokenAdminRegistry.sol";
 import {IOwnable} from "@chainlink/contracts/src/v0.8/shared/interfaces/IOwnable.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
-import {RateLimiter} from "../../libraries/RateLimiter.sol";
-import {ERC20LockBox} from "../../pools/ERC20LockBox.sol";
-import {TokenPool} from "../../pools/TokenPool.sol";
-import {CrossChainToken} from "../../tmp/CrossChainToken.sol";
-import {RegistryModuleOwnerCustom} from "../RegistryModuleOwnerCustom.sol";
+import {RateLimiter} from "./libraries/RateLimiter.sol";
+import {ERC20LockBox} from "./pools/ERC20LockBox.sol";
+import {TokenPool} from "./pools/TokenPool.sol";
+import {CrossChainToken} from "./tmp/CrossChainToken.sol";
+import {RegistryModuleOwnerCustom} from "./tokenAdminRegistry/RegistryModuleOwnerCustom.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
 import {Create2} from "@openzeppelin/contracts@5.3.0/utils/Create2.sol";
@@ -424,3 +424,4 @@ contract TokenPoolFactory is ITypeAndVersion {
     i_tokenAdminRegistry.transferAdminRole(token, futureOwner);
   }
 }
+

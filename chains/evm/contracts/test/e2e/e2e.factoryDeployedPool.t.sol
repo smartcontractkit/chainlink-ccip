@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {TokenPoolFactory} from "../../TokenPoolFactory.sol";
 import {CCIPReceiver} from "../../applications/CCIPReceiver.sol";
 import {IRouterClient} from "../../interfaces/IRouterClient.sol";
 import {Client} from "../../libraries/Client.sol";
@@ -13,7 +14,6 @@ import {TokenPool} from "../../pools/TokenPool.sol";
 import {BaseERC20} from "../../tmp/BaseERC20.sol";
 import {CrossChainToken} from "../../tmp/CrossChainToken.sol";
 import {RegistryModuleOwnerCustom} from "../../tokenAdminRegistry/RegistryModuleOwnerCustom.sol";
-import {TokenPoolFactory} from "../../tokenAdminRegistry/TokenPoolFactory/TokenPoolFactory.sol";
 import {e2e} from "./e2e.t.sol";
 import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
 

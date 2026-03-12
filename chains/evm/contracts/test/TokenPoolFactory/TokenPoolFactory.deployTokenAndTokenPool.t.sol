@@ -1,20 +1,20 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {IOwner} from "../../../interfaces/IOwner.sol";
+import {IOwner} from "../../interfaces/IOwner.sol";
 
-import {Router} from "../../../Router.sol";
-import {RateLimiter} from "../../../libraries/RateLimiter.sol";
-import {BurnFromMintTokenPool} from "../../../pools/BurnFromMintTokenPool.sol";
-import {BurnMintTokenPool} from "../../../pools/BurnMintTokenPool.sol";
-import {ERC20LockBox} from "../../../pools/ERC20LockBox.sol";
-import {LockReleaseTokenPool} from "../../../pools/LockReleaseTokenPool.sol";
-import {TokenPool} from "../../../pools/TokenPool.sol";
-import {BaseERC20} from "../../../tmp/BaseERC20.sol";
-import {CrossChainToken} from "../../../tmp/CrossChainToken.sol";
-import {RegistryModuleOwnerCustom} from "../../../tokenAdminRegistry/RegistryModuleOwnerCustom.sol";
-import {TokenAdminRegistry} from "../../../tokenAdminRegistry/TokenAdminRegistry.sol";
-import {TokenPoolFactory} from "../../../tokenAdminRegistry/TokenPoolFactory/TokenPoolFactory.sol";
+import {Router} from "../../Router.sol";
+import {TokenPoolFactory} from "../../TokenPoolFactory.sol";
+import {RateLimiter} from "../../libraries/RateLimiter.sol";
+import {BurnFromMintTokenPool} from "../../pools/BurnFromMintTokenPool.sol";
+import {BurnMintTokenPool} from "../../pools/BurnMintTokenPool.sol";
+import {ERC20LockBox} from "../../pools/ERC20LockBox.sol";
+import {LockReleaseTokenPool} from "../../pools/LockReleaseTokenPool.sol";
+import {TokenPool} from "../../pools/TokenPool.sol";
+import {BaseERC20} from "../../tmp/BaseERC20.sol";
+import {CrossChainToken} from "../../tmp/CrossChainToken.sol";
+import {RegistryModuleOwnerCustom} from "../../tokenAdminRegistry/RegistryModuleOwnerCustom.sol";
+import {TokenAdminRegistry} from "../../tokenAdminRegistry/TokenAdminRegistry.sol";
 import {TokenPoolFactorySetup} from "./TokenPoolFactorySetup.t.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
