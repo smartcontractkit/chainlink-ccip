@@ -104,9 +104,9 @@ type TestAdapter interface {
 	// t parameter allows the adapter to skip the test if EOA receivers are not supported for that chain family.
 	EOAReceiver(t *testing.T) []byte
 
-	// InvalidCCIPReceivers returns a slice of invalid receivers for the given chain family, to be used in negative
+	// InvalidAddresses returns a slice of invalid addresses for the given chain family, to be used in negative
 	// test cases.
-	InvalidAddress() [][]byte
+	InvalidAddresses() [][]byte
 
 	// SetReceiverRejectAll configures the receiver to reject all incoming messages.
 	// This is used for test cases with a failing receiver.
