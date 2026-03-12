@@ -21,6 +21,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccip/consts"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
@@ -342,7 +343,7 @@ func (a *SVMAdapter) EOAReceiver(t *testing.T) []byte {
 	panic("not implemented")
 }
 
-func (a *SVMAdapter) InvalidAddress() [][]byte {
+func (a *SVMAdapter) InvalidAddresses() [][]byte {
 	// GetExtraArgs fails with invalid pubkey receivers, we'd need to construct a raw payload to test against the contracts
 	return make([][]byte, 0)
 }

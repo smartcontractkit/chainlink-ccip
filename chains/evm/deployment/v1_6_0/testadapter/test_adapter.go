@@ -19,6 +19,7 @@ import (
 	"github.com/xssnick/tonutils-go/tlb"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
@@ -234,7 +235,7 @@ func (a *EVMAdapter) EOAReceiver(t *testing.T) []byte {
 	return nil
 }
 
-func (a *EVMAdapter) InvalidAddress() [][]byte {
+func (a *EVMAdapter) InvalidAddresses() [][]byte {
 	return [][]byte{
 		[]byte{99}, // invalid address
 		common.LeftPadBytes(common.Address{}.Bytes(), 32), // evm zero address

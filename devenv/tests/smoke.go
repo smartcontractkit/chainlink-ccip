@@ -281,7 +281,7 @@ func RunSmokeTests(t *testing.T, e *deployment.Environment, selectors []uint64) 
 				t.Skip("GetExtraArgs fails with invalid pubkey receivers, we'd need to construct a raw payload to test against the contract")
 			}
 
-			invalidReceivers := toImpl.InvalidAddress()
+			invalidReceivers := toImpl.InvalidAddresses()
 
 			for _, invalidReceiver := range invalidReceivers {
 
@@ -328,27 +328,29 @@ func RunSmokeTests(t *testing.T, e *deployment.Environment, selectors []uint64) 
 	}
 }
 
-func sendMsgRequireNoError(t *testing.T, fromImpl, toImpl ccip.CCIP16ProductConfiguration, msg any) (ccipocr3.SeqNum, string) {
+func sendMsgRequireNoError(t *testing.T, fromImpl, toImpl ccip.CCIP16ProductConfiguration, msg any) (uint64, string) {
 	seqNr, messageID, err := fromImpl.SendMessage(t.Context(), toImpl.ChainSelector(), msg)
 	t.Logf("sendMsgRequireNoError got messageID: %s", messageID)
 	if err != nil {
 		t.Fatalf("failed to send message (id: %s): %v", messageID, err)
 	}
-	seqNumRange := ccipocr3.NewSeqNumRange(seqNr, seqNr)
+	seqNrUint := ccipocr3.SeqNum(seqNr)
+	seqNumRange := ccipocr3.NewSeqNumRange(seqNrUint, seqNrUint)
 	toImpl.ValidateCommit(t, fromImpl.ChainSelector(), nil, seqNumRange)
-	toImpl.ValidateExec(t, fromImpl.ChainSelector(), nil, []ccipocr3.SeqNum{seqNr})
+	toImpl.ValidateExecSuccess(t, fromImpl.ChainSelector(), nil, []uint64{seqNr})
 	return seqNr, messageID
 }
 
-func sendMsgRequireError(t *testing.T, fromImpl, toImpl ccip.CCIP16ProductConfiguration, msg any) (ccipocr3.SeqNum, string) {
+func sendMsgRequireError(t *testing.T, fromImpl, toImpl ccip.CCIP16ProductConfiguration, msg any) (uint64, string) {
 	t.Helper()
 	seqNr, messageID, err := fromImpl.SendMessage(t.Context(), toImpl.ChainSelector(), msg)
 	t.Logf("sendMsgRequireError got messageID: %s", messageID)
 	if err == nil {
 		require.NoError(t, err)
-		seqNumRange := ccipocr3.NewSeqNumRange(seqNr, seqNr)
+		seqNrUint := ccipocr3.SeqNum(seqNr)
+		seqNumRange := ccipocr3.NewSeqNumRange(seqNrUint, seqNrUint)
 		toImpl.ValidateCommit(t, fromImpl.ChainSelector(), nil, seqNumRange)
-		toImpl.ValidateExecFails(t, fromImpl.ChainSelector(), nil, []ccipocr3.SeqNum{seqNr})
+		toImpl.ValidateExecFails(t, fromImpl.ChainSelector(), nil, []uint64{seqNr})
 	}
 	return seqNr, messageID
 }
