@@ -151,12 +151,11 @@ var DeploySiloedUSDCLockRelease = cldf_ops.NewSequence(
 		// Configure remote chains on the siloed pool (1.7.0 sequence)
 		for remoteChainSelector, remoteChainConfig := range input.RemoteChainConfigs {
 			report, err := cldf_ops.ExecuteSequence(b, tokens_sequences.ConfigureTokenPoolForRemoteChain, chain, tokens_sequences.ConfigureTokenPoolForRemoteChainInput{
-				ChainSelector:                input.ChainSelector,
-				TokenPoolAddress:            siloedPoolAddress,
-				AdvancedPoolHooks:           common.Address{},
-				RemoteChainSelector:         remoteChainSelector,
-				RemoteChainConfig:           remoteChainConfig,
-				RemoteChainAlreadySupported: false,
+				ChainSelector:       input.ChainSelector,
+				TokenPoolAddress:    siloedPoolAddress,
+				AdvancedPoolHooks:   common.Address{},
+				RemoteChainSelector: remoteChainSelector,
+				RemoteChainConfig:   remoteChainConfig,
 			})
 			if err != nil {
 				return DeploySiloedUSDCLockReleaseOutput{}, fmt.Errorf("failed to configure siloed pool for remote chain %d: %w", remoteChainSelector, err)
