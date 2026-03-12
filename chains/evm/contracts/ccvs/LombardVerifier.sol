@@ -299,7 +299,7 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
     bytes calldata expectedToken,
     bytes calldata expectedReceiver,
     uint256 expectedAmount
-  ) internal pure {
+  ) internal view {
     bytes32 rawToToken;
     bytes32 rawSender;
     bytes32 rawRecipient;
@@ -316,6 +316,15 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
 
     {
       bytes32 expected = Internal._leftPadBytesToBytes32(expectedToken);
+      // When a local adapter is configured, the bridge payload encodes the adapter address
+      // instead of the local token address.
+      address localToken = address(bytes20(expectedToken));
+      if (s_supportedTokens.contains(localToken)) {
+        address localAdapter = s_supportedTokens.get(localToken);
+        if (localAdapter != address(0)) {
+          expected = Internal._leftPadBytesToBytes32(abi.encodePacked(localAdapter));
+        }
+      }
       if (rawToToken != expected) {
         revert InvalidToken(expected, rawToToken);
       }

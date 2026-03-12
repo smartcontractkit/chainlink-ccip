@@ -7,6 +7,7 @@ import {IBridgeV3} from "../../../interfaces/lombard/IBridgeV3.sol";
 
 import {LombardVerifier} from "../../../ccvs/LombardVerifier.sol";
 import {BaseVerifier} from "../../../ccvs/components/BaseVerifier.sol";
+import {Internal} from "../../../libraries/Internal.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {MockLombardAdapter} from "../../mocks/MockLombardAdapter.sol";
 import {LombardVerifierSetup} from "./LombardVerifierSetup.t.sol";
@@ -67,7 +68,7 @@ contract LombardVerifier_forwardToVerifier is LombardVerifierSetup {
     address receiver = makeAddr("receiver");
     (MessageV1Codec.MessageV1 memory message, bytes32 messageId) = _createForwardMessage(tokenWithAdapter, receiver);
     s_mockBridge.setAllowedDestinationToken(
-      LOMBARD_CHAIN_ID, adapter, bytes32(message.tokenTransfer[0].destTokenAddress)
+      LOMBARD_CHAIN_ID, adapter, Internal._leftPadBytesToBytes32(message.tokenTransfer[0].destTokenAddress)
     );
 
     vm.startPrank(s_onRamp);
@@ -92,7 +93,7 @@ contract LombardVerifier_forwardToVerifier is LombardVerifierSetup {
       abi.encodeWithSelector(
         LombardVerifier.RemoteTokenOrAdapterMismatch.selector,
         remoteToken,
-        bytes32(message.tokenTransfer[0].destTokenAddress),
+        Internal._leftPadBytesToBytes32(message.tokenTransfer[0].destTokenAddress),
         bytes32(0)
       )
     );
