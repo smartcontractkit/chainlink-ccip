@@ -18,6 +18,28 @@ var (
 	Version      *semver.Version              = semver.MustParse("1.5.0")
 )
 
+type ConstructorArgs struct {
+	StaticConfig               evm_2_evm_onramp.EVM2EVMOnRampStaticConfig
+	DynamicConfig              evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig
+	RateLimiterConfig          evm_2_evm_onramp.RateLimiterConfig
+	FeeTokenConfigs            []evm_2_evm_onramp.EVM2EVMOnRampFeeTokenConfigArgs
+	TokenTransferFeeConfigArgs []evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs
+	NopsAndWeights             []evm_2_evm_onramp.EVM2EVMOnRampNopAndWeight
+}
+
+var DeployOnRamp = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
+	Name:             "onramp:deploy",
+	Version:          Version,
+	Description:      "Deploys the OnRamp 1.5.0 contract",
+	ContractMetadata: evm_2_evm_onramp.EVM2EVMOnRampMetaData,
+	Validate:         func(args ConstructorArgs) error { return nil },
+	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
+		cldf_deployment.NewTypeAndVersion(ContractType, *Version).String(): {
+			EVM: common.FromHex(evm_2_evm_onramp.EVM2EVMOnRampBin),
+		},
+	},
+})
+
 type SetTokenTransferFeeConfigInput struct {
 	TokenTransferFeeConfigArgs   []evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs
 	TokensToUseDefaultFeeConfigs []common.Address
@@ -67,5 +89,16 @@ var OnRampDynamicConfig = contract.NewRead(contract.ReadParams[any, evm_2_evm_on
 	NewContract:  evm_2_evm_onramp.NewEVM2EVMOnRamp,
 	CallContract: func(onRamp *evm_2_evm_onramp.EVM2EVMOnRamp, opts *bind.CallOpts, args any) (evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig, error) {
 		return onRamp.GetDynamicConfig(opts)
+	},
+})
+
+var OnRampFeeTokenConfig = contract.NewRead(contract.ReadParams[common.Address, evm_2_evm_onramp.EVM2EVMOnRampFeeTokenConfig, *evm_2_evm_onramp.EVM2EVMOnRamp]{
+	Name:         "onramp:fee-token-config",
+	Version:      Version,
+	Description:  "Reads the fee token config for a given token from the OnRamp 1.5.0 contract",
+	ContractType: ContractType,
+	NewContract:  evm_2_evm_onramp.NewEVM2EVMOnRamp,
+	CallContract: func(onRamp *evm_2_evm_onramp.EVM2EVMOnRamp, opts *bind.CallOpts, args common.Address) (evm_2_evm_onramp.EVM2EVMOnRampFeeTokenConfig, error) {
+		return onRamp.GetFeeTokenConfig(opts, args)
 	},
 })

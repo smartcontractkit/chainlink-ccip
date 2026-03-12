@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
@@ -298,11 +299,22 @@ type USDCCCTPTokenConfig struct {
 	SourceMessageTransmitterAddr string `json:"sourceMessageTransmitterAddress"`
 }
 
+// validAddress performs strict validation on hex based addresses, and allows unknown stuff for AltVM addresses.
+func invalidAddress(addr string) bool {
+	if strings.HasPrefix(addr, "0x") {
+		return cciptypes.IsZeroOrEmptyOrInvalidHexAddress(addr)
+	}
+	// If it is not hex, just ensure that there is some non-zero content in the address.
+	addr = strings.Replace(addr, "0", "", -1)
+	addr = strings.Replace(addr, " ", "", -1)
+	return len(addr) == 0
+}
+
 func (t USDCCCTPTokenConfig) Validate() error {
-	if t.SourcePoolAddress == "" {
+	if invalidAddress(t.SourcePoolAddress) {
 		return errors.New("SourcePoolAddress not set")
 	}
-	if t.SourceMessageTransmitterAddr == "" {
+	if invalidAddress(t.SourceMessageTransmitterAddr) {
 		return errors.New("SourceMessageTransmitterAddress not set")
 	}
 	return nil
@@ -330,7 +342,7 @@ func (c *LBTCObserverConfig) Validate() error {
 		return errors.New("SourcePoolAddressByChain is not set")
 	}
 	for _, sourcePoolAddress := range c.SourcePoolAddressByChain {
-		if sourcePoolAddress == "" {
+		if invalidAddress(sourcePoolAddress) {
 			return errors.New("SourcePoolAddressByChain is empty")
 		}
 	}
