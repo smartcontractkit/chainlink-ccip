@@ -519,7 +519,27 @@ var (
 // output16 takes precedence and output15 fills in only missing entries.
 func MergeFeeQuoterUpdateOutputs(output16, output15 FeeQuoterUpdate) (FeeQuoterUpdate, error) {
 	result := output16
+	empty16, err := output16.IsEmpty()
+	if err != nil {
+		return FeeQuoterUpdate{}, fmt.Errorf("failed to check if output16 is empty: %w", err)
+	}
+	empty15, err := output15.IsEmpty()
+	if err != nil {
+		return FeeQuoterUpdate{}, fmt.Errorf("failed to check if output15 is empty: %w", err)
+	}
 
+	if empty16 && empty15 {
+		return FeeQuoterUpdate{}, nil
+	}
+	
+	// if output16 is empty, we can just return output15
+	if empty16 {
+		return output15, nil
+	}
+	// if output15 is empty, we can just return output16
+	if empty15 {
+		return output16, nil
+	}
 	// ConstructorArgs: use output15 if output16 is empty
 	if IsConstructorArgsEmpty(result.ConstructorArgs) {
 		result.ConstructorArgs = output15.ConstructorArgs
