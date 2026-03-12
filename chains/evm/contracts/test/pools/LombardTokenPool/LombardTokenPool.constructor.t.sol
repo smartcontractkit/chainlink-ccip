@@ -4,8 +4,8 @@ pragma solidity ^0.8.24;
 import {IBridgeV2} from "../../../interfaces/lombard/IBridgeV2.sol";
 import {LombardTokenPool} from "../../../pools/Lombard/LombardTokenPool.sol";
 
-import {BaseERC20} from "../../../tmp/BaseERC20.sol";
-import {CrossChainToken} from "../../../tmp/CrossChainToken.sol";
+import {BaseERC20} from "../../../tokens/BaseERC20.sol";
+import {CrossChainToken} from "../../../tokens/CrossChainToken.sol";
 import {BaseTest} from "../../BaseTest.t.sol";
 import {MockLombardBridge} from "../../mocks/MockLombardBridge.sol";
 import {MockVerifier} from "../../mocks/MockVerifier.sol";

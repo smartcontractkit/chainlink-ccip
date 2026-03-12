@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import {IBurnMintERC20} from "../../../interfaces/IBurnMintERC20.sol";
 import {BurnFromMintTokenPool} from "../../../pools/BurnFromMintTokenPool.sol";
-import {CrossChainToken} from "../../../tmp/CrossChainToken.sol";
+import {CrossChainToken} from "../../../tokens/CrossChainToken.sol";
 import {TokenPoolSetup} from "../TokenPool/TokenPoolSetup.t.sol";
 
 contract BurnFromMintTokenPoolSetup is TokenPoolSetup {

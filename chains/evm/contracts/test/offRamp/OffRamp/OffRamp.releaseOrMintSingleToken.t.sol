@@ -11,7 +11,7 @@ import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {Pool} from "../../../libraries/Pool.sol";
 import {OffRamp} from "../../../offRamp/OffRamp.sol";
 import {BurnMintTokenPool} from "../../../pools/BurnMintTokenPool.sol";
-import {CrossChainToken} from "../../../tmp/CrossChainToken.sol";
+import {CrossChainToken} from "../../../tokens/CrossChainToken.sol";
 import {OffRampHelper} from "../../helpers/OffRampHelper.sol";
 import {TokenPoolSetup} from "../../pools/TokenPool/TokenPoolSetup.t.sol";
 
