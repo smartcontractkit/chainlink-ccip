@@ -1,11 +1,13 @@
 package lanes
 
 import (
+	"context"
 	"fmt"
 	"math/big"
 	"sync"
 
 	"github.com/Masterminds/semver/v3"
+
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -17,6 +19,9 @@ type LaneAdapter interface {
 	ConfigureLaneLegAsSource() *cldf_ops.Sequence[UpdateLanesInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 	ConfigureLaneLegAsDest() *cldf_ops.Sequence[UpdateLanesInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 	DisableRemoteChain() *cldf_ops.Sequence[DisableRemoteChainInput, sequences.OnChainOutput, cldf_chain.BlockChains]
+	EnableAllowlist(ctx context.Context, destChainSelector uint64) error
+	DisableAllowlist(ctx context.Context, destChainSelector uint64) error
+	OverrideAllowList(ctx context.Context, destChainSelector uint64, address []byte) error
 
 	// helpers to expose lower level functionality if needed
 	// needed for populating values in chain specific configs
