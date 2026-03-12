@@ -131,7 +131,7 @@ var (
 	deployChainContractsRegistryOnce      sync.Once
 )
 
-func newDeployChainContractsRegistry() *DeployChainContractsRegistry {
+func NewDeployChainContractsRegistry() *DeployChainContractsRegistry {
 	return &DeployChainContractsRegistry{
 		adapters:        make(map[string]DeployChainContractsAdapter),
 		configImporters: make(map[string]deploy.ConfigImporter),
@@ -140,7 +140,7 @@ func newDeployChainContractsRegistry() *DeployChainContractsRegistry {
 
 func GetDeployChainContractsRegistry() *DeployChainContractsRegistry {
 	deployChainContractsRegistryOnce.Do(func() {
-		singletonDeployChainContractsRegistry = newDeployChainContractsRegistry()
+		singletonDeployChainContractsRegistry = NewDeployChainContractsRegistry()
 	})
 	return singletonDeployChainContractsRegistry
 }

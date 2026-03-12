@@ -261,7 +261,8 @@ func TestDeployChainContracts_Validate(t *testing.T) {
 	}
 
 	env := newDeployTestEnv(t, []uint64{sel1})
-	cs := changesets.DeployChainContracts()
+	registry := adapters.NewDeployChainContractsRegistry()
+	cs := changesets.DeployChainContracts(registry)
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -298,11 +299,10 @@ func TestDeployChainContracts_Apply_SingleChainSuccess(t *testing.T) {
 		},
 	}
 
-	registry := adapters.GetDeployChainContractsRegistry()
+	registry := adapters.NewDeployChainContractsRegistry()
 	registry.Register(chainsel.FamilyEVM, mock)
-	registry.RegisterConfigImporter(chainsel.FamilyEVM, semver.MustParse("2.0.0"), &mockDeployAdapter{})
 
-	cs := changesets.DeployChainContracts()
+	cs := changesets.DeployChainContracts(registry)
 	out, err := cs.Apply(env, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
 		MCMS: mcms.Input{},
 		Cfg: changesets.DeployChainContractsCfg{
@@ -342,11 +342,10 @@ func TestDeployChainContracts_Apply_MultiChainSuccess(t *testing.T) {
 		},
 	}
 
-	registry := adapters.GetDeployChainContractsRegistry()
+	registry := adapters.NewDeployChainContractsRegistry()
 	registry.Register(chainsel.FamilyEVM, mock)
-	registry.RegisterConfigImporter(chainsel.FamilyEVM, semver.MustParse("2.0.0"), &mockDeployAdapter{})
 
-	cs := changesets.DeployChainContracts()
+	cs := changesets.DeployChainContracts(registry)
 	out, err := cs.Apply(env, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
 		MCMS: mcms.Input{},
 		Cfg: changesets.DeployChainContractsCfg{
@@ -374,14 +373,13 @@ func TestDeployChainContracts_Apply_PerChainOverrideIsUsed(t *testing.T) {
 		captured: &capturedInputs,
 	}
 
-	registry := adapters.GetDeployChainContractsRegistry()
+	registry := adapters.NewDeployChainContractsRegistry()
 	registry.Register(chainsel.FamilyEVM, captureAdapter)
-	registry.RegisterConfigImporter(chainsel.FamilyEVM, semver.MustParse("2.0.0"), &mockDeployAdapter{})
 
 	overrideCfg := newDefaultPerChainCfg()
 	overrideCfg.DeployerContract = "0x0000000000000000000000000000000000005678"
 
-	cs := changesets.DeployChainContracts()
+	cs := changesets.DeployChainContracts(registry)
 	_, err := cs.Apply(env, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
 		MCMS: mcms.Input{},
 		Cfg: changesets.DeployChainContractsCfg{
@@ -439,11 +437,10 @@ func TestDeployChainContracts_Apply_AdapterErrorPropagated(t *testing.T) {
 		},
 	}
 
-	registry := adapters.GetDeployChainContractsRegistry()
+	registry := adapters.NewDeployChainContractsRegistry()
 	registry.Register(chainsel.FamilyEVM, mock)
-	registry.RegisterConfigImporter(chainsel.FamilyEVM, semver.MustParse("2.0.0"), &mockDeployAdapter{})
 
-	cs := changesets.DeployChainContracts()
+	cs := changesets.DeployChainContracts(registry)
 	_, err := cs.Apply(env, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
 		MCMS: mcms.Input{},
 		Cfg: changesets.DeployChainContractsCfg{
@@ -463,11 +460,10 @@ func TestDeployChainContracts_Apply_ReturnsError_WhenNoCommitteesHaveChainConfig
 	env := newDeployTestEnv(t, []uint64{sel1, sel2})
 
 	mock := &mockDeployAdapter{}
-	registry := adapters.GetDeployChainContractsRegistry()
+	registry := adapters.NewDeployChainContractsRegistry()
 	registry.Register(chainsel.FamilyEVM, mock)
-	registry.RegisterConfigImporter(chainsel.FamilyEVM, semver.MustParse("2.0.0"), &mockDeployAdapter{})
 
-	cs := changesets.DeployChainContracts()
+	cs := changesets.DeployChainContracts(registry)
 	_, err := cs.Apply(env, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
 		MCMS: mcms.Input{},
 		Cfg: changesets.DeployChainContractsCfg{
@@ -485,7 +481,8 @@ func TestDeployChainContracts_Apply_NoAdapterRegistered(t *testing.T) {
 	sel1 := chainsel.TEST_90000001.Selector
 	env := newDeployTestEnv(t, []uint64{sel1})
 
-	cs := changesets.DeployChainContracts()
+	registry := adapters.NewDeployChainContractsRegistry()
+	cs := changesets.DeployChainContracts(registry)
 	_, err := cs.Apply(env, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
 		MCMS: mcms.Input{},
 		Cfg: changesets.DeployChainContractsCfg{

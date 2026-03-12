@@ -54,8 +54,7 @@ func (c DeployChainContractsCfg) resolveChainCfg(sel uint64) DeployChainContract
 	return c.DefaultCfg
 }
 
-func DeployChainContracts() deployment.ChangeSetV2[changesets.WithMCMS[DeployChainContractsCfg]] {
-	registry := adapters.GetDeployChainContractsRegistry()
+func DeployChainContracts(registry *adapters.DeployChainContractsRegistry) deployment.ChangeSetV2[changesets.WithMCMS[DeployChainContractsCfg]] {
 	mcmsReaderRegistry := changesets.GetRegistry()
 	validate := func(e deployment.Environment, cfg changesets.WithMCMS[DeployChainContractsCfg]) error {
 		if cfg.Cfg.Topology == nil {
