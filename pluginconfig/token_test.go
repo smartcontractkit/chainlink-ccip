@@ -753,7 +753,9 @@ func Test_TokenDataObserver_Validation(t *testing.T) {
 			usdcEnabled: true,
 			lbtcEnabled: false,
 			wantErr:     true,
-			errMsg:      "invalid usdc token config for chain selector 1, source pool \"0x1111111111111111111111111111111111111111\", and source message transmitter \"\": SourceMessageTransmitterAddress not set",
+			errMsg: "invalid usdc token config for chain selector 1, source pool " +
+				"\"0x1111111111111111111111111111111111111111\", and source message " +
+				"transmitter \"\": SourceMessageTransmitterAddress not set",
 		},
 		{
 			name: "lbtc type is set but tokens are missing",
