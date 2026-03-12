@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {CCTTokenPool} from "../../../pools/CCTTokenPool.sol";
+import {CrossChainPoolToken} from "../../../pools/CrossChainPoolToken.sol";
 import {BaseERC20} from "../../../tmp/BaseERC20.sol";
 import {TokenPoolSetup} from "../TokenPool/TokenPoolSetup.t.sol";
 
-contract CCTTokenPoolSetup is TokenPoolSetup {
-  CCTTokenPool internal s_cctPool;
+contract CrossChainPoolTokenSetup is TokenPoolSetup {
+  CrossChainPoolToken internal s_cctPool;
 
   uint256 internal constant MAX_SUPPLY = 1_000_000e18;
   uint256 internal constant PRE_MINT = 100_000e18;
@@ -14,7 +14,7 @@ contract CCTTokenPoolSetup is TokenPoolSetup {
   function setUp() public virtual override {
     super.setUp();
 
-    s_cctPool = new CCTTokenPool(
+    s_cctPool = new CrossChainPoolToken(
       BaseERC20.ConstructorParams({
         name: "CCT Token",
         symbol: "CCT",

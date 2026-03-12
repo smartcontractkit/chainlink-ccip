@@ -3,11 +3,11 @@ pragma solidity ^0.8.24;
 
 import {Pool} from "../../../libraries/Pool.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
-import {CCTTokenPoolSetup} from "./CCTTokenPoolSetup.t.sol";
+import {CrossChainPoolTokenSetup} from "./CrossChainPoolTokenSetup.t.sol";
 
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
-contract CCTTokenPool_lockOrBurn is CCTTokenPoolSetup {
+contract CrossChainPoolToken_lockOrBurn is CrossChainPoolTokenSetup {
   function test_lockOrBurn() public {
     uint256 burnAmount = 1_000e18;
 
