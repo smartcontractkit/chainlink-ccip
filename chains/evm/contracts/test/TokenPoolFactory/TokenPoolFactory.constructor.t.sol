@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {ITokenAdminRegistry} from "../../../interfaces/ITokenAdminRegistry.sol";
+import {ITokenAdminRegistry} from "../../interfaces/ITokenAdminRegistry.sol";
 
-import {RegistryModuleOwnerCustom} from "../../../tokenAdminRegistry/RegistryModuleOwnerCustom.sol";
-import {TokenPoolFactory} from "../../../tokenAdminRegistry/TokenPoolFactory/TokenPoolFactory.sol";
+import {TokenPoolFactory} from "../../TokenPoolFactory.sol";
+import {RegistryModuleOwnerCustom} from "../../tokenAdminRegistry/RegistryModuleOwnerCustom.sol";
 import {TokenPoolFactorySetup} from "./TokenPoolFactorySetup.t.sol";
 
 contract TokenPoolFactory_constructor is TokenPoolFactorySetup {

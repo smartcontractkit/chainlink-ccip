@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {BurnMintTokenPool} from "../../../pools/BurnMintTokenPool.sol";
-import {BaseERC20} from "../../../tmp/BaseERC20.sol";
-import {CrossChainToken} from "../../../tmp/CrossChainToken.sol";
-import {RegistryModuleOwnerCustom} from "../../../tokenAdminRegistry/RegistryModuleOwnerCustom.sol";
-import {TokenPoolFactory} from "../../../tokenAdminRegistry/TokenPoolFactory/TokenPoolFactory.sol";
-import {TokenAdminRegistrySetup} from "../TokenAdminRegistry/TokenAdminRegistrySetup.t.sol";
+import {TokenPoolFactory} from "../../TokenPoolFactory.sol";
+import {BurnMintTokenPool} from "../../pools/BurnMintTokenPool.sol";
+import {BaseERC20} from "../../tmp/BaseERC20.sol";
+import {CrossChainToken} from "../../tmp/CrossChainToken.sol";
+import {RegistryModuleOwnerCustom} from "../../tokenAdminRegistry/RegistryModuleOwnerCustom.sol";
+import {TokenAdminRegistrySetup} from "../tokenAdminRegistry/TokenAdminRegistry/TokenAdminRegistrySetup.t.sol";
 
 contract TokenPoolFactorySetup is TokenAdminRegistrySetup {
   TokenPoolFactory internal s_tokenPoolFactory;
