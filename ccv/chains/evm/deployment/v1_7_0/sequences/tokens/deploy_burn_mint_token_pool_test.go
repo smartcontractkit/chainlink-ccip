@@ -239,6 +239,7 @@ func TestDeployTokenPool(t *testing.T) {
 					ChainSelector:  chainSel,
 					ContractParams: testsetup.CreateBasicContractParams(),
 					CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
+					DeployerKeyOwned: true,
 				},
 			)
 			require.NoError(t, err, "ExecuteSequence should not error")
