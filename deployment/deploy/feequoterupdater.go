@@ -230,6 +230,9 @@ func updateFeeQuoterApply(fquRegistry *FQAndRampUpdaterRegistry, mcmsRegistry *c
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to populate metadata from config importer for chain %d: %w", chainSel, err)
 				}
+				if len(populateCfgOutput.Metadata.Contracts) == 0 {
+					return cldf.ChangesetOutput{}, fmt.Errorf("no contract metadata returned from populate config on chain %d", chainSel)
+				}
 				contractMeta = append(contractMeta, populateCfgOutput.Metadata.Contracts...)
 				contractMetadata = append(contractMetadata, populateCfgOutput.Metadata.Contracts...)
 			}
@@ -315,10 +318,8 @@ func PopulateMetaDataFromConfigImporter(e cldf.Environment, configImporter Confi
 		TokensPerRemoteChain: supportedTokensPerRemoteChain,
 	})
 	if err != nil {
-		return sequences.OnChainOutput{}, fmt.Errorf("failed to populate config for FeeQuoter on chain %d: %w", chainSel, err)
+		return sequences.OnChainOutput{}, fmt.Errorf("failed to populate config on chain %d: %w", chainSel, err)
 	}
-	if len(populateConfigReport.Output.Metadata.Contracts) == 0 {
-		return sequences.OnChainOutput{}, fmt.Errorf("no contract metadata returned from populate config for FeeQuoter on chain %d", chainSel)
-	}
+
 	return populateConfigReport.Output, nil
 }

@@ -35,15 +35,15 @@ type mockDeployAdapter struct {
 	errByChain    map[uint64]error
 }
 
-func (m *mockDeployAdapter) InitializeAdapter(e deployment.Environment, selectors uint64) error {
+func (m *mockDeployAdapter) InitializeAdapter(_ deployment.Environment, _ uint64) error {
 	return nil
 }
 
-func (m *mockDeployAdapter) ConnectedChains(e deployment.Environment, chainsel uint64) ([]uint64, error) {
+func (m *mockDeployAdapter) ConnectedChains(_ deployment.Environment, _ uint64) ([]uint64, error) {
 	return []uint64{}, nil
 }
 
-func (m *mockDeployAdapter) SupportedTokensPerRemoteChain(e deployment.Environment, chainSelector uint64) (map[uint64][]common.Address, error) {
+func (m *mockDeployAdapter) SupportedTokensPerRemoteChain(_ deployment.Environment, _ uint64) (map[uint64][]common.Address, error) {
 	return map[uint64][]common.Address{}, nil
 }
 
@@ -63,7 +63,12 @@ func (m *mockDeployAdapter) SetContractParamsFromImportedConfig() *cldf_ops.Sequ
 		semver.MustParse("2.0.0"),
 		"Mock sequence for setting contract params from imported config",
 		func(_ cldf_ops.Bundle, _ cldf_chain.BlockChains, input adapters.DeployChainConfigCreatorInput) (adapters.DeployContractParams, error) {
-			return adapters.DeployContractParams{}, nil
+			return adapters.DeployContractParams{
+				OnRamp: adapters.OnRampDeployParams{
+					Version:       semver.MustParse("2.0.0"),
+					FeeAggregator: "0xDummyOnRampFeeAgg",
+				},
+			}, nil
 		})
 }
 
@@ -278,6 +283,69 @@ func TestDeployChainContracts_Validate(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestDeployChainContracts_With_MissingAdapterForConfigImport(t *testing.T) {
+	sel1 := chainsel.TEST_90000001.Selector
+	env := newDeployTestEnv(t, []uint64{sel1})
+
+	expectedAddr := datastore.AddressRef{
+		ChainSelector: sel1,
+		Type:          "TestContract",
+		Version:       semver.MustParse("1.7.0"),
+		Address:       "0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+	}
+
+	mock := &mockDeployAdapter{
+		outputByChain: map[uint64]sequences.OnChainOutput{
+			sel1: {
+				Addresses: []datastore.AddressRef{expectedAddr},
+			},
+		},
+	}
+
+	registry := adapters.NewDeployChainContractsRegistry()
+	registry.Register(chainsel.FamilyEVM, mock)
+
+	cs := changesets.DeployChainContracts(registry)
+	_, err := cs.Apply(env, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
+		MCMS: mcms.Input{},
+		Cfg: changesets.DeployChainContractsCfg{
+			Topology:       newDeployTestTopology(sel1),
+			ChainSelectors: []uint64{sel1},
+			DefaultCfg:     newDefaultPerChainCfg(),
+		},
+	})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "no ConfigImporter adapter registered")
+}
+
+func TestDeployChainContracts_With_DummyConfigImport(t *testing.T) {
+	sel1 := chainsel.TEST_90000001.Selector
+	env := newDeployTestEnv(t, []uint64{sel1})
+	mock := &mockDeployAdapter{
+		outputByChain: map[uint64]sequences.OnChainOutput{
+			sel1: {
+				Addresses: []datastore.AddressRef{
+					{ChainSelector: sel1, Type: "TestContract", Version: semver.MustParse("1.7.0"), Address: "0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"},
+				},
+			},
+		},
+	}
+	registry := adapters.NewDeployChainContractsRegistry()
+	registry.Register(chainsel.FamilyEVM, mock)
+	registry.RegisterConfigImporter(chainsel.FamilyEVM, semver.MustParse("1.6.0"), &mockDeployAdapter{})
+
+	cs := changesets.DeployChainContracts(registry)
+	_, err := cs.Apply(env, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
+		MCMS: mcms.Input{},
+		Cfg: changesets.DeployChainContractsCfg{
+			Topology:       newDeployTestTopology(sel1),
+			ChainSelectors: []uint64{sel1},
+			DefaultCfg:     newDefaultPerChainCfg(),
+		},
+	})
+	require.NoError(t, err)
 }
 
 func TestDeployChainContracts_Apply_SingleChainSuccess(t *testing.T) {
