@@ -2,6 +2,7 @@ package offchain
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"maps"
 
@@ -142,7 +143,10 @@ func loadCCVEnvMetadata(ds datastore.DataStore) (*CCVEnvMetadata, error) {
 func loadOrCreateCCVEnvMetadata(ds datastore.MutableDataStore) (*CCVEnvMetadata, error) {
 	envMeta, err := ds.EnvMetadata().Get()
 	if err != nil {
-		return &CCVEnvMetadata{}, nil
+		if errors.Is(err, datastore.ErrEnvMetadataNotSet) {
+			return &CCVEnvMetadata{}, nil
+		}
+		return nil, fmt.Errorf("failed to get env metadata: %w", err)
 	}
 	return parseCCVEnvMetadata(envMeta.Metadata)
 }
@@ -168,7 +172,12 @@ func parseCCVEnvMetadata(metadata any) (*CCVEnvMetadata, error) {
 func saveCCVEnvMetadata(ds datastore.MutableDataStore, ccvMeta *CCVEnvMetadata) error {
 	var base json.RawMessage = []byte(`{}`)
 
-	if envMeta, err := ds.EnvMetadata().Get(); err == nil && envMeta.Metadata != nil {
+	envMeta, err := ds.EnvMetadata().Get()
+	if err != nil {
+		if !errors.Is(err, datastore.ErrEnvMetadataNotSet) {
+			return fmt.Errorf("failed to get env metadata for merge: %w", err)
+		}
+	} else if envMeta.Metadata != nil {
 		b, err := json.Marshal(envMeta.Metadata)
 		if err != nil {
 			return err
@@ -198,7 +207,13 @@ func saveCCVEnvMetadata(ds datastore.MutableDataStore, ccvMeta *CCVEnvMetadata) 
 // Needed for delete operations since JSON Merge Patch doesn't remove missing keys.
 func replaceCCVEnvMetadata(ds datastore.MutableDataStore, ccvMeta *CCVEnvMetadata) error {
 	var existingMeta map[string]any
-	if envMeta, err := ds.EnvMetadata().Get(); err == nil && envMeta.Metadata != nil {
+	envMeta, err := ds.EnvMetadata().Get()
+	if err != nil {
+		if !errors.Is(err, datastore.ErrEnvMetadataNotSet) {
+			return fmt.Errorf("failed to get env metadata for replace: %w", err)
+		}
+		existingMeta = make(map[string]any)
+	} else if envMeta.Metadata != nil {
 		data, err := json.Marshal(envMeta.Metadata)
 		if err != nil {
 			return err

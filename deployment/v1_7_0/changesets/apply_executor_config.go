@@ -75,20 +75,42 @@ func ApplyExecutorConfig(registry *adapters.ExecutorConfigRegistry) deployment.C
 
 	apply := func(e deployment.Environment, cfg ApplyExecutorConfigInput) (deployment.ChangesetOutput, error) {
 		selectors := registry.AllDeployedChains(e.DataStore, cfg.ExecutorQualifier)
+		pool := cfg.Topology.ExecutorPools[cfg.ExecutorQualifier]
 
 		if len(selectors) == 0 {
-			e.Logger.Infow("No deployed chains found for executor pool, nothing to do",
-				"qualifier", cfg.ExecutorQualifier)
-			ds := datastore.NewMemoryDataStore()
-			if e.DataStore != nil {
-				if err := ds.Merge(e.DataStore); err != nil {
-					return deployment.ChangesetOutput{}, fmt.Errorf("failed to merge datastore: %w", err)
+			if !cfg.RevokeOrphanedJobs {
+				e.Logger.Infow("No deployed chains found for executor pool, nothing to do",
+					"qualifier", cfg.ExecutorQualifier)
+				ds := datastore.NewMemoryDataStore()
+				if e.DataStore != nil {
+					if err := ds.Merge(e.DataStore); err != nil {
+						return deployment.ChangesetOutput{}, fmt.Errorf("failed to merge datastore: %w", err)
+					}
 				}
+				return deployment.ChangesetOutput{DataStore: ds}, nil
 			}
-			return deployment.ChangesetOutput{DataStore: ds}, nil
+			e.Logger.Infow("No deployed chains for executor pool, running orphan cleanup only",
+				"qualifier", cfg.ExecutorQualifier)
+			nopModes := buildNOPModes(cfg.Topology.NOPTopology.NOPs)
+			scope := shared.ExecutorJobScope{ExecutorQualifier: cfg.ExecutorQualifier}
+			manageReport, err := operations.ExecuteSequence(
+				e.OperationsBundle,
+				sequences.ManageJobProposals,
+				sequences.ManageJobProposalsDeps{Env: e},
+				sequences.ManageJobProposalsInput{
+					JobSpecs:           nil,
+					AffectedScope:      scope,
+					Labels:             map[string]string{"job_type": "executor", "executor": cfg.ExecutorQualifier},
+					NOPs:               sequences.NOPContext{Modes: nopModes, TargetNOPs: cfg.TargetNOPs, AllNOPs: getAllNOPAliases(cfg.Topology.NOPTopology.NOPs)},
+					RevokeOrphanedJobs: true,
+				},
+			)
+			if err != nil {
+				return deployment.ChangesetOutput{Reports: manageReport.ExecutionReports}, fmt.Errorf("failed to manage job proposals (orphan cleanup): %w", err)
+			}
+			return deployment.ChangesetOutput{Reports: manageReport.ExecutionReports, DataStore: manageReport.Output.DataStore}, nil
 		}
 
-		pool := cfg.Topology.ExecutorPools[cfg.ExecutorQualifier]
 
 		nopsToValidate := cfg.TargetNOPs
 		if len(nopsToValidate) == 0 {
