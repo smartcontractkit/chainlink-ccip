@@ -12,8 +12,8 @@ replace (
 	// Make sure we're working with the latest chainlink-ccip/chains/solana
 	github.com/smartcontractkit/chainlink-ccip/chains/solana => ../
 
-	// Make sure we're working with the latest chainlink-ccip/deployment
-	github.com/smartcontractkit/chainlink-ccip/deployment => ../../../deployment
+// Make sure we're working with the latest chainlink-ccip/deployment
+// github.com/smartcontractkit/chainlink-ccip/deployment => ../../../deployment // TODO: uncomment
 )
 
 require (

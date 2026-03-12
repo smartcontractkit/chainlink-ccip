@@ -8,7 +8,7 @@ replace (
 	github.com/smartcontractkit/chainlink-ccip/chains/solana => ../chains/solana
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment => ../chains/solana/deployment
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings => ../chains/solana/gobindings
-	github.com/smartcontractkit/chainlink-ccip/deployment => ../deployment
+// github.com/smartcontractkit/chainlink-ccip/deployment => ../deployment // TODO uncomment
 
 // local development
 // github.com/smartcontractkit/chainlink-ton => ../../../.
