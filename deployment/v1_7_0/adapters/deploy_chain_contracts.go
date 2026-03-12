@@ -5,12 +5,15 @@ import (
 	"math/big"
 	"sync"
 
+	"dario.cat/mergo"
 	"github.com/Masterminds/semver/v3"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
+	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
@@ -79,12 +82,21 @@ type DeployContractParams struct {
 	MockReceivers      []MockReceiverDeployParams
 }
 
+// MergeWithOverrideIfNotEmpty merges source into a copy of d. Only non-empty source fields overwrite
+func (d DeployContractParams) MergeWithOverrideIfNotEmpty(source DeployContractParams) (DeployContractParams, error) {
+	result := d
+	if err := mergo.Merge(&result, &source, mergo.WithOverride); err != nil {
+		return DeployContractParams{}, fmt.Errorf("failed to merge DeployContractParams: %w", err)
+	}
+	return result, nil
+}
+
 type DeployChainContractsInput struct {
 	ChainSelector     uint64
 	DeployerContract  string
 	DeployTestRouter  bool
 	ExistingAddresses []datastore.AddressRef
-	ContractParams DeployContractParams
+	ContractParams    DeployContractParams
 	// DeployerKeyOwned, when true, skips the transfer-ownership step so that
 	// contracts remain owned by the deployer key. By default (false) the
 	// sequence looks up the existing CLLCCIP RBACTimelock in ExistingAddresses
@@ -93,13 +105,25 @@ type DeployChainContractsInput struct {
 	DeployerKeyOwned bool
 }
 
+type DeployChainConfigCreatorInput struct {
+	ChainSelector      uint64
+	ExistingAddresses  []datastore.AddressRef
+	ContractMeta       []datastore.ContractMetadata
+	UserProvidedConfig DeployContractParams
+}
+
 type DeployChainContractsAdapter interface {
+	// SetContractParamsFromImportedConfig is used when ImportConfig is true in DeployChainContractsInput.
+	// It should read the necessary contract parameters from the datastore contract metadata based on the chain selector and
+	// return them in the same format as DeployContractParams for use in the deployment sequence.
+	SetContractParamsFromImportedConfig() *cldf_ops.Sequence[DeployChainConfigCreatorInput, DeployContractParams, cldf_chain.BlockChains]
 	DeployChainContracts() *cldf_ops.Sequence[DeployChainContractsInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 }
 
 type DeployChainContractsRegistry struct {
-	mu       sync.Mutex
-	adapters map[string]DeployChainContractsAdapter
+	mu              sync.Mutex
+	adapters        map[string]DeployChainContractsAdapter
+	configImporters map[string]deploy.ConfigImporter
 }
 
 var (
@@ -109,7 +133,8 @@ var (
 
 func NewDeployChainContractsRegistry() *DeployChainContractsRegistry {
 	return &DeployChainContractsRegistry{
-		adapters: make(map[string]DeployChainContractsAdapter),
+		adapters:        make(map[string]DeployChainContractsAdapter),
+		configImporters: make(map[string]deploy.ConfigImporter),
 	}
 }
 
@@ -128,11 +153,32 @@ func (r *DeployChainContractsRegistry) Register(family string, a DeployChainCont
 	}
 }
 
+func (r *DeployChainContractsRegistry) RegisterConfigImporter(family string, version *semver.Version, importer deploy.ConfigImporter) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	id := utils.NewRegistererID(family, version)
+	if _, exists := r.configImporters[id]; !exists {
+		r.configImporters[id] = importer
+	}
+}
+
 func (r *DeployChainContractsRegistry) Get(family string) (DeployChainContractsAdapter, bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	a, ok := r.adapters[family]
 	return a, ok
+}
+
+func (r *DeployChainContractsRegistry) GetConfigImporter(chainSel uint64, version *semver.Version) (deploy.ConfigImporter, bool) {
+	family, err := chainsel.GetSelectorFamily(chainSel)
+	if err != nil {
+		return nil, false
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	id := utils.NewRegistererID(family, version)
+	importer, ok := r.configImporters[id]
+	return importer, ok
 }
 
 func (r *DeployChainContractsRegistry) GetByChain(chainSelector uint64) (DeployChainContractsAdapter, error) {

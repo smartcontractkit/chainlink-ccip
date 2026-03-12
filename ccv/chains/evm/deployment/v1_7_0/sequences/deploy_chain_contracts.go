@@ -28,10 +28,10 @@ import (
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/mock_receiver_v2"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/executor"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/mock_receiver"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/proxy"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 )
@@ -47,6 +47,8 @@ type MockReceiverParams struct {
 	// or will be deployed by the DeployChainContracts sequence.
 	OptionalVerifiers []datastore.AddressRef
 	OptionalThreshold uint8
+	// MinimumBlockDepth is the minimum block depth that the mock receiver will accept.
+	MinimumBlockDepth uint16
 	// Qualifier distinguishes between multiple deployments of the mock receiver on the same chain.
 	// If only one mock receiver is deployed this can be left blank.
 	Qualifier string
@@ -102,7 +104,7 @@ type DeployChainContractsInput struct {
 	CREATE2Factory    common.Address
 	ExistingAddresses []datastore.AddressRef
 	ContractParams    ContractParams
-	DeployTestRouter bool
+	DeployTestRouter  bool
 	// DeployerKeyOwned, when true, skips the transfer-ownership step so that
 	// contracts remain owned by the deployer key. By default (false) the
 	// sequence looks up the existing CLLCCIP RBACTimelock in ExistingAddresses
@@ -621,13 +623,13 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			if mockReceiverParams.Qualifier != "" {
 				qualifierPtr = &mockReceiverParams.Qualifier
 			}
-			deployReceiverReport, err := cldf_ops.ExecuteOperation(b, mock_receiver.Deploy, chain, contract_utils.DeployInput[mock_receiver.ConstructorArgs]{
-				TypeAndVersion: deployment.NewTypeAndVersion(mock_receiver.ContractType, *mockReceiverParams.Version),
+			deployReceiverReport, err := cldf_ops.ExecuteOperation(b, mock_receiver_v2.Deploy, chain, contract_utils.DeployInput[mock_receiver_v2.ConstructorArgs]{
+				TypeAndVersion: deployment.NewTypeAndVersion(mock_receiver_v2.ContractType, *mockReceiverParams.Version),
 				ChainSelector:  chain.Selector,
-				Args: mock_receiver.ConstructorArgs{
-					RequiredVerifiers: requiredVerifiers,
-					OptionalVerifiers: optionalVerifiers,
-					OptionalThreshold: mockReceiverParams.OptionalThreshold,
+				Args: mock_receiver_v2.ConstructorArgs{
+					Required:  requiredVerifiers,
+					Optional:  optionalVerifiers,
+					Threshold: mockReceiverParams.OptionalThreshold,
 				},
 				Qualifier: qualifierPtr,
 			})
@@ -635,6 +637,34 @@ var DeployChainContracts = cldf_ops.NewSequence(
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy MockReceiver: %w", err)
 			}
 			addresses = append(addresses, deployReceiverReport.Output)
+
+			// Set minimum block depth on the MockReceiver if diff exists
+			if mockReceiverParams.MinimumBlockDepth != 0 {
+				// Get the minimum block depth on the MockReceiver
+				minimumBlockDepthReport, err := cldf_ops.ExecuteOperation(b, mock_receiver_v2.GetCCVsAndMinBlockDepth, chain, contract_utils.FunctionInput[mock_receiver_v2.GetCCVsAndMinBlockDepthArgs]{
+					ChainSelector: chain.Selector,
+					Address:       common.HexToAddress(deployReceiverReport.Output.Address),
+					Args: mock_receiver_v2.GetCCVsAndMinBlockDepthArgs{
+						Arg0: chain.Selector,
+						Arg1: []byte{},
+					},
+				})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to get minimum block depth on MockReceiver: %w", err)
+				}
+				if minimumBlockDepthReport.Output.Ret3 != mockReceiverParams.MinimumBlockDepth {
+					// Set the minimum block depth on the MockReceiver
+					setMinimumBlockDepthReport, err := cldf_ops.ExecuteOperation(b, mock_receiver_v2.SetMinBlockDepth, chain, contract_utils.FunctionInput[uint16]{
+						ChainSelector: chain.Selector,
+						Address:       common.HexToAddress(deployReceiverReport.Output.Address),
+						Args:          mockReceiverParams.MinimumBlockDepth,
+					})
+					if err != nil {
+						return sequences.OnChainOutput{}, fmt.Errorf("failed to set minimum block depth on MockReceiver: %w", err)
+					}
+					writes = append(writes, setMinimumBlockDepthReport.Output)
+				}
+			}
 		}
 
 		// Transfer ownership of MCM and product contracts to the CLLCCIP timelock.
