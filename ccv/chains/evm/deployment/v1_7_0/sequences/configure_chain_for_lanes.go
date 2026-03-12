@@ -93,7 +93,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 					OnRamp:            common.HexToAddress(input.OnRamp),
 				})
 			} else {
-				b.Logger.Info("OnRamp exists for dest chain %d, skipping onRamp set for safety", remoteSelector)
+				b.Logger.Info("OnRamp exists for dest chain, skipping onRamp set for safety", "destChainSelector", remoteSelector)
 			}
 
 			offRampAdds = append(offRampAdds, router.OffRamp{

@@ -77,7 +77,6 @@ var ConfigureLombardChainForLanes = cldf_ops.NewSequence(
 		}
 
 		var tokenPoolRef datastore.AddressRef
-		datastore_utils.IsAddressRefEmpty(input.RegisteredTokenPoolRef)
 		if !datastore_utils.IsAddressRefEmpty(input.RegisteredTokenPoolRef) {
 			tokenPoolRef, err = datastore_utils.FindAndFormatRef(dep.DataStore, input.RegisteredTokenPoolRef, chain.Selector, datastore_utils.FullRef)
 			if err != nil {

@@ -9,6 +9,10 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/lombard_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/usdc_token_pool_proxy"
+	sequences_cctp "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences/cctp"
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
@@ -16,8 +20,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/lombard_token_pool"
-	usdc_token_pool_proxy "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/latest/operations/usdc_token_pool_proxy"
 )
 
 type RouterUpdater struct{}
@@ -99,29 +101,33 @@ func (u *RouterUpdater) UpdateRouter() *cldf_ops.Sequence[deploy.RouterUpdaterCo
 			writes = append(writes, out.Output)
 
 			// If LombardTokenPool 2.0.0 is in existingAddresses, set it on the TokenAdminRegistry for LBTC (same batch). Token address is read from the pool via GetToken.
-			lombardPoolAddr, lombardErr := datastore_utils.FindAndFormatRef(
-				tempDS,
-				datastore.AddressRef{
-					ChainSelector: input.ChainSelector,
-					Type:          datastore.ContractType(lombard_token_pool.ContractType),
-					Version:       lombard_token_pool.Version,
-				},
-				input.ChainSelector,
-				evm_datastore_utils.ToEVMAddress,
+			lombardRefs := tempDS.Addresses().Filter(
+				datastore.AddressRefByChainSelector(input.ChainSelector),
+				datastore.AddressRefByType(datastore.ContractType(lombard_token_pool.ContractType)),
+				datastore.AddressRefByVersion(lombard_token_pool.Version),
 			)
-			if lombardErr == nil {
-				tarAddr, tarErr := datastore_utils.FindAndFormatRef(
-					tempDS,
-					datastore.AddressRef{
-						ChainSelector: input.ChainSelector,
-						Type:          datastore.ContractType(token_admin_registry.ContractType),
-						Version:       token_admin_registry.Version,
-					},
-					input.ChainSelector,
-					evm_datastore_utils.ToEVMAddress,
+			if len(lombardRefs) > 1 {
+				return sequences.OnChainOutput{}, fmt.Errorf("expected at most one LombardTokenPool 2.0.0 ref on chain %d, found %d", input.ChainSelector, len(lombardRefs))
+			}
+			if len(lombardRefs) == 1 {
+				lombardPoolAddr, err := evm_datastore_utils.ToEVMAddress(lombardRefs[0])
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("error formatting LombardTokenPool address: %w", err)
+				}
+				tarRefs := tempDS.Addresses().Filter(
+					datastore.AddressRefByChainSelector(input.ChainSelector),
+					datastore.AddressRefByType(datastore.ContractType(token_admin_registry.ContractType)),
+					datastore.AddressRefByVersion(token_admin_registry.Version),
 				)
-				if tarErr == nil {
-					getTokenReport, getTokenErr := cldf_ops.ExecuteOperation(b, lombard_token_pool.GetToken, c, contract.FunctionInput[struct{}]{
+				if len(tarRefs) > 1 {
+					return sequences.OnChainOutput{}, fmt.Errorf("expected at most one TokenAdminRegistry 1.5.0 ref on chain %d, found %d", input.ChainSelector, len(tarRefs))
+				}
+				if len(tarRefs) == 1 {
+					tarAddr, err := evm_datastore_utils.ToEVMAddress(tarRefs[0])
+					if err != nil {
+						return sequences.OnChainOutput{}, fmt.Errorf("error formatting TokenAdminRegistry address: %w", err)
+					}
+					getTokenReport, getTokenErr := cldf_ops.ExecuteOperation(b, token_pool.GetToken, c, contract.FunctionInput[struct{}]{
 						ChainSelector: input.ChainSelector,
 						Address:       lombardPoolAddr,
 					})
@@ -144,20 +150,26 @@ func (u *RouterUpdater) UpdateRouter() *cldf_ops.Sequence[deploy.RouterUpdaterCo
 			}
 
 			// If USDCTokenPoolProxy 2.0.0 is in existingAddresses, update lockOrBurn mechanism to CCTP_V2_WITH_CCV for all remote chain selectors (same batch).
-			usdcProxyAddr, usdcProxyErr := datastore_utils.FindAndFormatRef(
-				tempDS,
-				datastore.AddressRef{
-					ChainSelector: input.ChainSelector,
-					Type:          datastore.ContractType(usdc_token_pool_proxy.ContractType),
-					Version:       usdc_token_pool_proxy.Version,
-				},
-				input.ChainSelector,
-				evm_datastore_utils.ToEVMAddress,
+			usdcProxyRefs := tempDS.Addresses().Filter(
+				datastore.AddressRefByChainSelector(input.ChainSelector),
+				datastore.AddressRefByType(datastore.ContractType(usdc_token_pool_proxy.ContractType)),
+				datastore.AddressRefByVersion(usdc_token_pool_proxy.Version),
 			)
-			if usdcProxyErr == nil && len(input.RemoteChainSelectors) > 0 {
+			if len(usdcProxyRefs) > 1 {
+				return sequences.OnChainOutput{}, fmt.Errorf("expected at most one USDCTokenPoolProxy 2.0.0 ref on chain %d, found %d", input.ChainSelector, len(usdcProxyRefs))
+			}
+			if len(usdcProxyRefs) == 1 && len(input.RemoteChainSelectors) > 0 {
+				usdcProxyAddr, err := evm_datastore_utils.ToEVMAddress(usdcProxyRefs[0])
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("error formatting USDCTokenPoolProxy address: %w", err)
+				}
 				mechanisms := make([]uint8, len(input.RemoteChainSelectors))
 				for i := range mechanisms {
-					mechanisms[i] = 4 // CCTP_V2_WITH_CCV
+					mechanism, err := sequences_cctp.ConvertMechanismToUint8(sequences_cctp.MechanismCCTPV2WithCCV)
+					if err != nil {
+						return sequences.OnChainOutput{}, fmt.Errorf("error converting mechanism to uint8: %w", err)
+					}
+					mechanisms[i] = mechanism
 				}
 				updateMechOut, updateMechErr := cldf_ops.ExecuteOperation(b, usdc_token_pool_proxy.UpdateLockOrBurnMechanisms, c, contract.FunctionInput[usdc_token_pool_proxy.UpdateLockOrBurnMechanismsArgs]{
 					ChainSelector: input.ChainSelector,

@@ -73,15 +73,6 @@ func (c *LombardTokenPoolContract) GetPath(opts *bind.CallOpts, args uint64) (Pa
 	return *abi.ConvertType(out[0], new(Path)).(*Path), nil
 }
 
-func (c *LombardTokenPoolContract) GetToken(opts *bind.CallOpts) (common.Address, error) {
-	var out []any
-	err := c.contract.Call(opts, &out, "getToken")
-	if err != nil {
-		return common.Address{}, err
-	}
-	return *abi.ConvertType(out[0], new(common.Address)).(*common.Address), nil
-}
-
 type Path struct {
 	AllowedCaller [32]byte
 	LChainId      [32]byte
@@ -148,16 +139,5 @@ var GetPath = contract.NewRead(contract.ReadParams[uint64, Path, *LombardTokenPo
 	NewContract:  NewLombardTokenPoolContract,
 	CallContract: func(c *LombardTokenPoolContract, opts *bind.CallOpts, args uint64) (Path, error) {
 		return c.GetPath(opts, args)
-	},
-})
-
-var GetToken = contract.NewRead(contract.ReadParams[struct{}, common.Address, *LombardTokenPoolContract]{
-	Name:         "lombard-token-pool:get-token",
-	Version:      Version,
-	Description:  "Calls getToken on the contract",
-	ContractType: ContractType,
-	NewContract:  NewLombardTokenPoolContract,
-	CallContract: func(c *LombardTokenPoolContract, opts *bind.CallOpts, _ struct{}) (common.Address, error) {
-		return c.GetToken(opts)
 	},
 })
