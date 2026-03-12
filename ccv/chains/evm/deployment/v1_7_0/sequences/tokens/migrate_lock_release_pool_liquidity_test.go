@@ -189,6 +189,7 @@ func setupMigrationTest(t *testing.T, chainSel uint64, liquidityAmount *big.Int)
 			ChainSelector:  chainSel,
 			ContractParams: testsetup.CreateBasicContractParams(),
 			CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
+			DeployerKeyOwned: true,
 		},
 	)
 	require.NoError(t, err)
@@ -612,6 +613,7 @@ func TestMigrateLockReleasePoolLiquidity_SiloedPool(t *testing.T) {
 			ChainSelector:  chainSel,
 			ContractParams: testsetup.CreateBasicContractParams(),
 			CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
+			DeployerKeyOwned: true,
 		},
 	)
 	require.NoError(t, err)
