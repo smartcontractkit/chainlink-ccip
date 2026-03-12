@@ -2,6 +2,7 @@ package fetch_signing_keys
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/Masterminds/semver/v3"
 
@@ -100,7 +101,10 @@ var FetchNOPSigningKeys = operations.NewOperation(
 			if output.SigningKeysByNOP[nopAlias] == nil {
 				output.SigningKeysByNOP[nopAlias] = make(map[string]string)
 			}
-			addr := fmt.Sprintf("0x%s", signerAddress)
+			addr := strings.ToLower(signerAddress)
+			if !strings.HasPrefix(addr, "0x") {
+				addr = "0x" + addr
+			}
 			if existing, ok := output.SigningKeysByNOP[nopAlias][chainFamily]; ok && existing != addr {
 				return output, fmt.Errorf("NOP %q has conflicting OCR key bundles for family %s: address %s vs %s — the job spec requires a single signing address (per-chain scoping not supported yet)", nopAlias, chainFamily, existing, addr)
 			}

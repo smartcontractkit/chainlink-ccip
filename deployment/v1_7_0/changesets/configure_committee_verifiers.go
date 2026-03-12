@@ -83,7 +83,7 @@ func ConfigureChainsForLanesFromTopology(
 				for remoteChainSelector, remoteChainConfig := range cv.RemoteChains {
 					signatureConfig, err := getSignatureConfigForLane(e, cfg.Topology, cv.CommitteeQualifier, chain.ChainSelector, remoteChainSelector, signingKeysByNOP)
 					if err != nil {
-						return deployment.ChangesetOutput{}, fmt.Errorf("failed to get signature config for source chain %d: %w", remoteChainSelector, err)
+						return deployment.ChangesetOutput{}, fmt.Errorf("failed to get signature config for lane local chain %d -> remote chain %d: %w", chain.ChainSelector, remoteChainSelector, err)
 					}
 					remoteChains[remoteChainSelector] = adapters.CommitteeVerifierRemoteChainConfig{
 						AllowlistEnabled:          remoteChainConfig.AllowlistEnabled,

@@ -5,7 +5,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/cctp_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/lombard_verifier"
-	onrampoperations "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
 	dsutil "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	ccvadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
@@ -25,7 +24,7 @@ func (a *EVMTokenVerifierConfigAdapter) ResolveTokenVerifierAddresses(
 	toAddress := func(ref datastore.AddressRef) (string, error) { return ref.Address, nil }
 
 	onRampAddr, err := dsutil.FindAndFormatRef(ds, datastore.AddressRef{
-		Type: datastore.ContractType(onrampoperations.ContractType),
+		Type: datastore.ContractType(onRampContractType),
 	}, chainSelector, toAddress)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get on ramp address for chain %d: %w", chainSelector, err)

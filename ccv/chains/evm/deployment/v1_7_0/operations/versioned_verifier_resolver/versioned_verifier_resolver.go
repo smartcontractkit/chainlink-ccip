@@ -12,6 +12,7 @@ import (
 )
 
 var ContractType cldf_deployment.ContractType = "VersionedVerifierResolver"
+var CommitteeVerifierContractType cldf_deployment.ContractType = "CommitteeVerifier"
 var CommitteeVerifierResolverType cldf_deployment.ContractType = "CommitteeVerifierResolver"
 
 var Version = semver.MustParse("1.7.0")

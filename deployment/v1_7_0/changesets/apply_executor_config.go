@@ -214,6 +214,7 @@ func getExecutorPoolNOPAliases(pool offchain.ExecutorPoolConfig) []shared.NOPAli
 		for a := range aliasSet {
 			aliases = append(aliases, a)
 		}
+		slices.Sort(aliases)
 		return shared.ConvertStringToNopAliases(aliases)
 	}
 	return shared.ConvertStringToNopAliases(pool.NOPAliases)

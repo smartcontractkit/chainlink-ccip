@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -262,6 +263,9 @@ func (c *CommitteeConfig) Validate(topology *NOPTopology) error {
 	}
 
 	for chainSelector, chainCfg := range c.ChainConfigs {
+		if _, err := strconv.ParseUint(chainSelector, 10, 64); err != nil {
+			return fmt.Errorf("committee chain_configs has invalid chain selector key %q: %w", chainSelector, err)
+		}
 		if len(chainCfg.NOPAliases) == 0 {
 			return fmt.Errorf("chain %q requires at least one NOP", chainSelector)
 		}
@@ -284,6 +288,9 @@ func (c *CommitteeConfig) Validate(topology *NOPTopology) error {
 func (p *ExecutorPoolConfig) Validate(poolName string, topology *NOPTopology) error {
 	if len(p.ChainConfigs) > 0 {
 		for chainSelector, chainCfg := range p.ChainConfigs {
+			if _, err := strconv.ParseUint(chainSelector, 10, 64); err != nil {
+				return fmt.Errorf("executor pool %q has invalid chain selector key %q: %w", poolName, chainSelector, err)
+			}
 			if len(chainCfg.NOPAliases) == 0 {
 				return fmt.Errorf("executor pool %q chain %q requires at least one NOP", poolName, chainSelector)
 			}
@@ -322,6 +329,7 @@ func (c *EnvironmentTopology) GetNOPsForPool(poolName string) ([]string, error) 
 		for alias := range nopSet {
 			nops = append(nops, alias)
 		}
+		slices.Sort(nops)
 		return nops, nil
 	}
 	return pool.NOPAliases, nil
@@ -344,6 +352,7 @@ func (c *EnvironmentTopology) GetNOPsForCommittee(committeeQualifier string) ([]
 	for alias := range nopSet {
 		nops = append(nops, alias)
 	}
+	slices.Sort(nops)
 
 	return nops, nil
 }

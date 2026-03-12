@@ -3,14 +3,19 @@ package adapters
 import (
 	"fmt"
 
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/committee_verifier"
+	"github.com/Masterminds/semver/v3"
+
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/versioned_verifier_resolver"
 	execcontract "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/executor"
-	onrampoperations "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
 	dsutil "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	ccvadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
+
+var onRampContractType cldf_deployment.ContractType = "OnRamp"
+var onRampVersion = semver.MustParse("1.7.0")
 
 type EVMVerifierJobConfigAdapter struct{}
 
@@ -26,11 +31,11 @@ func (a *EVMVerifierJobConfigAdapter) ResolveVerifierContractAddresses(
 
 	committeeVerifierAddr, err := dsutil.FindAndFormatFirstRef(ds, chainSelector, toAddress,
 		datastore.AddressRef{
-			Type:      datastore.ContractType(committee_verifier.ResolverType),
+			Type:      datastore.ContractType(versioned_verifier_resolver.CommitteeVerifierResolverType),
 			Qualifier: committeeQualifier,
 		},
 		datastore.AddressRef{
-			Type:      datastore.ContractType(committee_verifier.ContractType),
+			Type:      datastore.ContractType(versioned_verifier_resolver.CommitteeVerifierContractType),
 			Qualifier: committeeQualifier,
 		},
 	)
@@ -39,8 +44,8 @@ func (a *EVMVerifierJobConfigAdapter) ResolveVerifierContractAddresses(
 	}
 
 	onRampAddr, err := dsutil.FindAndFormatRef(ds, datastore.AddressRef{
-		Type:    datastore.ContractType(onrampoperations.ContractType),
-		Version: onrampoperations.Version,
+		Type:    datastore.ContractType(onRampContractType),
+		Version: onRampVersion,
 	}, chainSelector, toAddress)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get on ramp address for chain %d: %w", chainSelector, err)
