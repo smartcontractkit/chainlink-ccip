@@ -641,7 +641,7 @@ func Test_TokenDataObserver_Validation(t *testing.T) {
 						AttestationAPICooldown: commonconfig.MustNewDuration(5 * time.Minute),
 						Tokens: map[cciptypes.ChainSelector]USDCCCTPTokenConfig{
 							1: {
-								SourcePoolAddress:            "",
+								SourcePoolAddress:            "0x1111111111111111111111111111111111111111",
 								SourceMessageTransmitterAddr: "",
 							},
 						},
@@ -650,7 +650,7 @@ func Test_TokenDataObserver_Validation(t *testing.T) {
 			usdcEnabled: true,
 			lbtcEnabled: false,
 			wantErr:     true,
-			errMsg:      "SourcePoolAddress not set",
+			errMsg:      "SourceMessageTransmitterAddress not set",
 		},
 		{
 			name: "usdc type is set but token address is zero",
@@ -745,7 +745,7 @@ func Test_TokenDataObserver_Validation(t *testing.T) {
 						AttestationAPICooldown: commonconfig.MustNewDuration(5 * time.Minute),
 						Tokens: map[cciptypes.ChainSelector]USDCCCTPTokenConfig{
 							1: {
-								SourcePoolAddress: "0xabc",
+								SourcePoolAddress: "0x1111111111111111111111111111111111111111",
 							},
 						},
 					},
@@ -753,7 +753,7 @@ func Test_TokenDataObserver_Validation(t *testing.T) {
 			usdcEnabled: true,
 			lbtcEnabled: false,
 			wantErr:     true,
-			errMsg:      "invalid usdc token config for chain selector 1, source pool \"0xabc\", and source message transmitter \"\": SourceMessageTransmitterAddress not set",
+			errMsg:      "invalid usdc token config for chain selector 1, source pool \"0x1111111111111111111111111111111111111111\", and source message transmitter \"\": SourceMessageTransmitterAddress not set",
 		},
 		{
 			name: "lbtc type is set but tokens are missing",

@@ -318,10 +318,14 @@ func invalidAddress(addr string) bool {
 
 func (t USDCCCTPTokenConfig) Validate() error {
 	if invalidAddress(t.SourcePoolAddress) {
-		return errors.New("SourcePoolAddress not set")
+		return fmt.Errorf("SourcePoolAddress not set (source pool %q)", t.SourcePoolAddress)
 	}
 	if invalidAddress(t.SourceMessageTransmitterAddr) {
-		return errors.New("SourceMessageTransmitterAddress not set")
+		return fmt.Errorf(
+			"SourceMessageTransmitterAddress not set (source pool %q, source message transmitter %q)",
+			t.SourcePoolAddress,
+			t.SourceMessageTransmitterAddr,
+		)
 	}
 	return nil
 }
