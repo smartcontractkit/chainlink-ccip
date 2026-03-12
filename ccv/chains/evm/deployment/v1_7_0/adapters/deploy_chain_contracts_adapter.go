@@ -304,6 +304,7 @@ func convertMockReceivers(params []ccvadapters.MockReceiverDeployParams) []seque
 			RequiredVerifiers: mr.RequiredVerifiers,
 			OptionalVerifiers: mr.OptionalVerifiers,
 			OptionalThreshold: mr.OptionalThreshold,
+			MinimumBlockDepth: mr.MinimumBlockDepth,
 			Qualifier:         mr.Qualifier,
 		})
 	}
