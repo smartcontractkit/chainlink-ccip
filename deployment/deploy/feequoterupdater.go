@@ -44,8 +44,11 @@ type AdditionalFeeQuoterConfig struct {
 }
 
 type FeeQuoterUpdateInput struct {
-	ChainSelector        uint64
-	ExistingAddresses    []datastore.AddressRef
+	ChainSelector     uint64
+	ExistingAddresses []datastore.AddressRef
+	// PreviousVersions lists the supported config-importer / lane versions that
+	// should be consulted when deriving the FeeQuoter configuration for this chain.
+	// It does NOT refer to previous FeeQuoter contract deployment versions.
 	PreviousVersions     []*semver.Version
 	RemoteChainSelectors []uint64
 	AdditionalConfig     *AdditionalFeeQuoterConfig
