@@ -333,6 +333,9 @@ func buildExecutorJobSpecs(
 				executorPool = chainCfg.NOPAliases
 				executionInterval = chainCfg.ExecutionInterval
 			}
+			if !slices.Contains(executorPool, string(nopAlias)) {
+				continue
+			}
 			chainCfgs[chainSelectorStr] = offchain.ExecutorChainCfg{
 				OffRampAddress:         genCfg.OffRampAddress,
 				RmnAddress:             genCfg.RmnAddress,

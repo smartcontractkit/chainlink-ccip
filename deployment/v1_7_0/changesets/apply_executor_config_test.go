@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/BurntSushi/toml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -311,4 +312,207 @@ func TestApplyExecutorConfig_TargetNOPsFiltersJobSpecs(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.NotNil(t, output.DataStore)
+}
+
+func newTopologyWithChainConfigs(
+	nopAliases []string,
+	qualifier string,
+	mode shared.NOPMode,
+	chainConfigs map[string]offchain.ChainExecutorPoolConfig,
+) *offchain.EnvironmentTopology {
+	nops := make([]offchain.NOPConfig, len(nopAliases))
+	for i, alias := range nopAliases {
+		nops[i] = offchain.NOPConfig{Alias: alias, Name: alias + "-name", Mode: mode}
+	}
+	return &offchain.EnvironmentTopology{
+		IndexerAddress: []string{"http://indexer:8080"},
+		NOPTopology: &offchain.NOPTopology{
+			NOPs:       nops,
+			Committees: map[string]offchain.CommitteeConfig{},
+		},
+		ExecutorPools: map[string]offchain.ExecutorPoolConfig{
+			qualifier: {
+				ChainConfigs: chainConfigs,
+			},
+		},
+	}
+}
+
+func extractExecutorChainSelectors(t *testing.T, ds datastore.DataStore, nopAlias shared.NOPAlias, qualifier string) []string {
+	t.Helper()
+	jobID := shared.NewExecutorJobID(nopAlias, shared.ExecutorJobScope{ExecutorQualifier: qualifier})
+	job, err := offchain.GetJob(ds, nopAlias, jobID.ToJobID())
+	require.NoError(t, err)
+
+	var cfg offchain.ExecutorConfiguration
+	_, err = toml.Decode(extractExecutorConfig(t, job.Spec), &cfg)
+	require.NoError(t, err)
+
+	chains := make([]string, 0, len(cfg.ChainConfiguration))
+	for sel := range cfg.ChainConfiguration {
+		chains = append(chains, sel)
+	}
+	return chains
+}
+
+func extractExecutorConfig(t *testing.T, jobSpec string) string {
+	t.Helper()
+	const marker = "executorConfig = \"\"\"\n"
+	start := len(jobSpec)
+	for i := 0; i < len(jobSpec)-len(marker); i++ {
+		if jobSpec[i:i+len(marker)] == marker {
+			start = i + len(marker)
+			break
+		}
+	}
+	end := len(jobSpec)
+	for i := start; i < len(jobSpec)-3; i++ {
+		if jobSpec[i:i+3] == "\"\"\"" {
+			end = i
+			break
+		}
+	}
+	return jobSpec[start:end]
+}
+
+func TestApplyExecutorConfig_PerChainNOPsOnlyIncludesAssignedChains(t *testing.T) {
+	sel1 := chainsel.TEST_90000001.Selector
+	sel2 := chainsel.TEST_90000002.Selector
+	sel3 := chainsel.TEST_90000003.Selector
+	sel1Str := fmt.Sprintf("%d", sel1)
+	sel2Str := fmt.Sprintf("%d", sel2)
+	sel3Str := fmt.Sprintf("%d", sel3)
+
+	mock := &mockExecutorConfigAdapter{
+		deployedChains: map[string][]uint64{
+			"pool1": {sel1, sel2, sel3},
+		},
+		chainConfigs: map[uint64]adapters.ExecutorChainConfig{
+			sel1: {OffRampAddress: "0xOff1", RmnAddress: "0xRmn1", ExecutorProxyAddress: "0xExec1"},
+			sel2: {OffRampAddress: "0xOff2", RmnAddress: "0xRmn2", ExecutorProxyAddress: "0xExec2"},
+			sel3: {OffRampAddress: "0xOff3", RmnAddress: "0xRmn3", ExecutorProxyAddress: "0xExec3"},
+		},
+	}
+
+	registry := adapters.NewExecutorConfigRegistry()
+	registry.Register(chainsel.FamilyEVM, mock)
+
+	topo := newTopologyWithChainConfigs(
+		[]string{"exec1", "exec2"},
+		"pool1",
+		shared.NOPModeStandalone,
+		map[string]offchain.ChainExecutorPoolConfig{
+			sel1Str: {NOPAliases: []string{"exec1"}, ExecutionInterval: 15_000_000_000},
+			sel2Str: {NOPAliases: []string{"exec1", "exec2"}, ExecutionInterval: 15_000_000_000},
+			sel3Str: {NOPAliases: []string{"exec2"}, ExecutionInterval: 15_000_000_000},
+		},
+	)
+
+	env := newTestExecutorEnv(t, []uint64{sel1, sel2, sel3})
+	cs := changesets.ApplyExecutorConfig(registry)
+	output, err := cs.Apply(env, changesets.ApplyExecutorConfigInput{
+		Topology:          topo,
+		ExecutorQualifier: "pool1",
+	})
+	require.NoError(t, err)
+
+	exec1Chains := extractExecutorChainSelectors(t, output.DataStore.Seal(), "exec1", "pool1")
+	assert.ElementsMatch(t, []string{sel1Str, sel2Str}, exec1Chains,
+		"exec1 should only have chains where it is in the pool")
+
+	exec2Chains := extractExecutorChainSelectors(t, output.DataStore.Seal(), "exec2", "pool1")
+	assert.ElementsMatch(t, []string{sel2Str, sel3Str}, exec2Chains,
+		"exec2 should only have chains where it is in the pool")
+}
+
+func TestApplyExecutorConfig_TopLevelNOPAliasesIncludesAllChains(t *testing.T) {
+	sel1 := chainsel.TEST_90000001.Selector
+	sel2 := chainsel.TEST_90000002.Selector
+	sel1Str := fmt.Sprintf("%d", sel1)
+	sel2Str := fmt.Sprintf("%d", sel2)
+
+	mock := &mockExecutorConfigAdapter{
+		deployedChains: map[string][]uint64{
+			"pool1": {sel1, sel2},
+		},
+		chainConfigs: map[uint64]adapters.ExecutorChainConfig{
+			sel1: {OffRampAddress: "0xOff1", RmnAddress: "0xRmn1", ExecutorProxyAddress: "0xExec1"},
+			sel2: {OffRampAddress: "0xOff2", RmnAddress: "0xRmn2", ExecutorProxyAddress: "0xExec2"},
+		},
+	}
+
+	registry := adapters.NewExecutorConfigRegistry()
+	registry.Register(chainsel.FamilyEVM, mock)
+
+	topo := newMinimalTopology([]string{"exec1", "exec2"}, "pool1", shared.NOPModeStandalone)
+	env := newTestExecutorEnv(t, []uint64{sel1, sel2})
+
+	cs := changesets.ApplyExecutorConfig(registry)
+	output, err := cs.Apply(env, changesets.ApplyExecutorConfigInput{
+		Topology:          topo,
+		ExecutorQualifier: "pool1",
+	})
+	require.NoError(t, err)
+
+	exec1Chains := extractExecutorChainSelectors(t, output.DataStore.Seal(), "exec1", "pool1")
+	assert.ElementsMatch(t, []string{sel1Str, sel2Str}, exec1Chains,
+		"exec1 should have all chains when using top-level NOPAliases")
+
+	exec2Chains := extractExecutorChainSelectors(t, output.DataStore.Seal(), "exec2", "pool1")
+	assert.ElementsMatch(t, []string{sel1Str, sel2Str}, exec2Chains,
+		"exec2 should have all chains when using top-level NOPAliases")
+}
+
+func TestApplyExecutorConfig_ExecutorPoolFieldMatchesChainPool(t *testing.T) {
+	sel1 := chainsel.TEST_90000001.Selector
+	sel2 := chainsel.TEST_90000002.Selector
+	sel1Str := fmt.Sprintf("%d", sel1)
+	sel2Str := fmt.Sprintf("%d", sel2)
+
+	mock := &mockExecutorConfigAdapter{
+		deployedChains: map[string][]uint64{
+			"pool1": {sel1, sel2},
+		},
+		chainConfigs: map[uint64]adapters.ExecutorChainConfig{
+			sel1: {OffRampAddress: "0xOff1", RmnAddress: "0xRmn1", ExecutorProxyAddress: "0xExec1"},
+			sel2: {OffRampAddress: "0xOff2", RmnAddress: "0xRmn2", ExecutorProxyAddress: "0xExec2"},
+		},
+	}
+
+	registry := adapters.NewExecutorConfigRegistry()
+	registry.Register(chainsel.FamilyEVM, mock)
+
+	topo := newTopologyWithChainConfigs(
+		[]string{"exec1", "exec2"},
+		"pool1",
+		shared.NOPModeStandalone,
+		map[string]offchain.ChainExecutorPoolConfig{
+			sel1Str: {NOPAliases: []string{"exec1", "exec2"}, ExecutionInterval: 15_000_000_000},
+			sel2Str: {NOPAliases: []string{"exec2"}, ExecutionInterval: 15_000_000_000},
+		},
+	)
+
+	env := newTestExecutorEnv(t, []uint64{sel1, sel2})
+	cs := changesets.ApplyExecutorConfig(registry)
+	output, err := cs.Apply(env, changesets.ApplyExecutorConfigInput{
+		Topology:          topo,
+		ExecutorQualifier: "pool1",
+	})
+	require.NoError(t, err)
+
+	jobID := shared.NewExecutorJobID("exec2", shared.ExecutorJobScope{ExecutorQualifier: "pool1"})
+	job, err := offchain.GetJob(output.DataStore.Seal(), "exec2", jobID.ToJobID())
+	require.NoError(t, err)
+
+	var cfg offchain.ExecutorConfiguration
+	_, err = toml.Decode(extractExecutorConfig(t, job.Spec), &cfg)
+	require.NoError(t, err)
+
+	chain1Cfg, ok := cfg.ChainConfiguration[sel1Str]
+	require.True(t, ok, "exec2 should have chain %s", sel1Str)
+	assert.ElementsMatch(t, []string{"exec1", "exec2"}, chain1Cfg.ExecutorPool)
+
+	chain2Cfg, ok := cfg.ChainConfiguration[sel2Str]
+	require.True(t, ok, "exec2 should have chain %s", sel2Str)
+	assert.ElementsMatch(t, []string{"exec2"}, chain2Cfg.ExecutorPool)
 }
