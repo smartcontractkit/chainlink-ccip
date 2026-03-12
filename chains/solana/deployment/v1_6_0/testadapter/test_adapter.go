@@ -132,7 +132,7 @@ func (a *SVMAdapter) getAddress(ty datastore.ContractType) (solana.PublicKey, er
 
 // TODO: contractType constants should be extracted from core
 
-func (a *SVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, m any) (ccipocr3.SeqNum, string, error) {
+func (a *SVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, m any) (uint64, string, error) {
 	l := zerolog.Ctx(ctx)
 	l.Info().Msg("Sending CCIP message")
 
@@ -328,7 +328,7 @@ func (a *SVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, 
 		ccipMessageSentEvent.Message.Header.Nonce,
 		ccipMessageSentEvent.Message.Sender.String(),
 	)
-	return ccipocr3.SeqNum(ccipMessageSentEvent.SequenceNumber), messageID, nil
+	return ccipMessageSentEvent.SequenceNumber, messageID, nil
 }
 
 func (a *SVMAdapter) CCIPReceiver() []byte {
@@ -343,7 +343,7 @@ func (a *SVMAdapter) EOAReceiver(t *testing.T) []byte {
 	panic("not implemented")
 }
 
-func (a *SVMAdapter) InvalidCCIPReceivers() [][]byte {
+func (a *SVMAdapter) InvalidAddress() [][]byte {
 	// GetExtraArgs fails with invalid pubkey receivers, we'd need to construct a raw payload to test against the contracts
 	return make([][]byte, 0)
 }
@@ -464,7 +464,7 @@ func (a *SVMAdapter) ValidateCommit(t *testing.T, sourceSelector uint64, startBl
 	require.NoError(t, err)
 }
 
-func (a *SVMAdapter) ValidateExec(t *testing.T, sourceSelector uint64, startBlock *uint64, seqNrs []ccipocr3.SeqNum) (execStates map[uint64]int) {
+func (a *SVMAdapter) ValidateExecSuccess(t *testing.T, sourceSelector uint64, startBlock *uint64, seqNrs []uint64) (execStates map[uint64]int) {
 	var startSlot uint64
 	if startBlock != nil {
 		startSlot = *startBlock
@@ -487,7 +487,7 @@ func (a *SVMAdapter) ValidateExec(t *testing.T, sourceSelector uint64, startBloc
 	return executionStates
 }
 
-func (a *SVMAdapter) ValidateExecFails(t *testing.T, sourceSelector uint64, startBlock *uint64, seqNrs []ccipocr3.SeqNum) {
+func (a *SVMAdapter) ValidateExecFails(t *testing.T, sourceSelector uint64, startBlock *uint64, seqNrs []uint64) {
 	var startSlot uint64
 	if startBlock != nil {
 		startSlot = *startBlock
@@ -879,21 +879,6 @@ func (a *SVMAdapter) CurrentBlock(t *testing.T) uint64 {
 	out, err := a.Client.GetSlot(t.Context(), solrpc.CommitmentFinalized)
 	require.NoError(t, err)
 	return out
-}
-
-func (a *SVMAdapter) RMNCursed(t *testing.T, chainSelector uint64, cursed bool) error {
-	t.Skip("unimplemented")
-	return nil
-}
-
-func (a *SVMAdapter) SetAllowlist(t *testing.T, destChainSelector uint64, enabled bool) error {
-	t.Skip("unimplemented")
-	return nil
-}
-
-func (a *SVMAdapter) UpdateSenderAllowlistStatus(t *testing.T, destChainSelector uint64, included bool) error {
-	t.Skip("unimplemented")
-	return nil
 }
 
 // ConfirmExecWithSeqNrsSol waits for an execution state change on the destination Solana chain with the expected

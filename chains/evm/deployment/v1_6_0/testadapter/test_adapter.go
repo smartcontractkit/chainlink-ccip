@@ -111,7 +111,7 @@ func (a *EVMAdapter) BuildMessage(components testadapters.MessageComponents) (an
 	}, nil
 }
 
-func (a *EVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, m any) (ccipocr3.SeqNum, string, error) {
+func (a *EVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, m any) (uint64, string, error) {
 	l := zerolog.Ctx(ctx)
 	l.Info().Msg("Sending CCIP message")
 
@@ -220,7 +220,7 @@ func (a *EVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, 
 		messageID = hex.EncodeToString(it.Event.Message.Header.MessageId[:])
 
 		fmt.Printf("Sent CCIP message id %s seq %d from chain %d to chain %d\n", messageID, it.Event.SequenceNumber, a.Selector, destChainSelector)
-		return ccipocr3.SeqNum(it.Event.SequenceNumber), messageID, nil
+		return it.Event.SequenceNumber, messageID, nil
 	}
 }
 
@@ -235,7 +235,7 @@ func (a *EVMAdapter) EOAReceiver(t *testing.T) []byte {
 	return nil
 }
 
-func (a *EVMAdapter) InvalidCCIPReceivers() [][]byte {
+func (a *EVMAdapter) InvalidAddress() [][]byte {
 	return [][]byte{
 		[]byte{99}, // invalid address
 		common.LeftPadBytes(common.Address{}.Bytes(), 32), // evm zero address
@@ -334,7 +334,7 @@ func (a *EVMAdapter) ValidateCommit(t *testing.T, sourceSelector uint64, startBl
 	require.NoError(t, err)
 }
 
-func (a *EVMAdapter) ValidateExec(t *testing.T, sourceSelector uint64, startBlock *uint64, seqNrs []ccipocr3.SeqNum) (execStates map[uint64]int) {
+func (a *EVMAdapter) ValidateExecSuccess(t *testing.T, sourceSelector uint64, startBlock *uint64, seqNrs []uint64) (execStates map[uint64]int) {
 	offRampAddress, err := a.getAddress("OffRamp")
 	require.NoError(t, err)
 	offRamp, err := offramp.NewOffRamp(
@@ -357,7 +357,7 @@ func (a *EVMAdapter) ValidateExec(t *testing.T, sourceSelector uint64, startBloc
 	return executionStates
 }
 
-func (a *EVMAdapter) ValidateExecFails(t *testing.T, sourceSelector uint64, startBlock *uint64, seqNrs []ccipocr3.SeqNum) {
+func (a *EVMAdapter) ValidateExecFails(t *testing.T, sourceSelector uint64, startBlock *uint64, seqNrs []uint64) {
 	offRampAddress, err := a.getAddress("OffRamp")
 	require.NoError(t, err)
 	offRamp, err := offramp.NewOffRamp(
@@ -747,19 +747,4 @@ func (a *EVMAdapter) CurrentBlock(t *testing.T) uint64 {
 	}
 	blockNum := header.Number.Uint64()
 	return blockNum
-}
-
-func (a *EVMAdapter) RMNCursed(t *testing.T, chainSelector uint64, cursed bool) error {
-	t.Skip("unimplemented")
-	return nil
-}
-
-func (a *EVMAdapter) SetAllowlist(t *testing.T, destChainSelector uint64, enabled bool) error {
-	t.Skip("unimplemented")
-	return nil
-}
-
-func (a *EVMAdapter) UpdateSenderAllowlistStatus(t *testing.T, destChainSelector uint64, included bool) error {
-	t.Skip("unimplemented")
-	return nil
 }

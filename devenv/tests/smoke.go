@@ -281,7 +281,7 @@ func RunSmokeTests(t *testing.T, e *deployment.Environment, selectors []uint64) 
 				t.Skip("GetExtraArgs fails with invalid pubkey receivers, we'd need to construct a raw payload to test against the contract")
 			}
 
-			invalidReceivers := toImpl.InvalidCCIPReceivers()
+			invalidReceivers := toImpl.InvalidAddress()
 
 			for _, invalidReceiver := range invalidReceivers {
 
