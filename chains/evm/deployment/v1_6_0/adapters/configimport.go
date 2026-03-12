@@ -91,7 +91,7 @@ func (ci *ConfigImportAdapter) SupportedTokensPerRemoteChain(e cldf.Environment,
 		return nil, fmt.Errorf("chain with selector %d not found in environment", chainsel)
 	}
 	// get all supported tokens from token admin registry
-	return adapters1_5.GetSupportedTokensPerRemoteChain(e.Logger, ci.TokenAdminReg, chain)
+	return adapters1_5.GetSupportedTokensPerRemoteChain(e.GetContext(), e.Logger, ci.TokenAdminReg, chain)
 }
 
 func (ci *ConfigImportAdapter) ConnectedChains(e cldf.Environment, chainsel uint64) ([]uint64, error) {
