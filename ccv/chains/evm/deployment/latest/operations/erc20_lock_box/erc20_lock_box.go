@@ -3,7 +3,6 @@
 package erc20_lock_box
 
 import (
-	"fmt"
 	"math/big"
 
 	"strings"
@@ -14,7 +13,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/gobindings/generated/latest/erc20_lock_box"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
@@ -87,9 +85,9 @@ type AuthorizedCallerArgs struct {
 }
 
 type DepositArgs struct {
-	Token               common.Address
-	RemoteChainSelector uint64
-	Amount              *big.Int
+	Token  common.Address
+	Arg1   uint64
+	Amount *big.Int
 }
 
 type ConstructorArgs struct {
@@ -141,35 +139,20 @@ var GetAllAuthorizedCallers = contract.NewRead(contract.ReadParams[struct{}, []c
 	},
 })
 
-var Deposit = contract.NewWrite(contract.WriteParams[DepositArgs, *erc20_lock_box.ERC20LockBox]{
-	Name:         "erc20-lock-box:deposit",
-	Version:      Version,
-	Description:  "Deposits tokens into the ERC20LockBox",
-	ContractType: ContractType,
-	ContractABI:  erc20_lock_box.ERC20LockBoxABI,
-	NewContract:  erc20_lock_box.NewERC20LockBox,
-	IsAllowedCaller: func(erc20LockBox *erc20_lock_box.ERC20LockBox, opts *bind.CallOpts, caller common.Address, args DepositArgs) (bool, error) {
-		callers, err := erc20LockBox.GetAllAuthorizedCallers(opts)
-		if err != nil {
-			return false, err
-		}
-		for _, authorized := range callers {
-			if authorized == caller {
-				return true, nil
-			}
-		}
-		return false, nil
-	},
-	Validate: func(args DepositArgs) error {
-		if args.Amount == nil || args.Amount.Sign() <= 0 {
-			return fmt.Errorf("amount must be greater than zero")
-		}
-		if args.Token == (common.Address{}) {
-			return fmt.Errorf("token address must be set")
-		}
-		return nil
-	},
-	CallContract: func(erc20LockBox *erc20_lock_box.ERC20LockBox, opts *bind.TransactOpts, args DepositArgs) (*types.Transaction, error) {
-		return erc20LockBox.Deposit(opts, args.Token, args.RemoteChainSelector, args.Amount)
+var Deposit = contract.NewWrite(contract.WriteParams[DepositArgs, *ERC20LockBoxContract]{
+	Name:            "erc20-lock-box:deposit",
+	Version:         Version,
+	Description:     "Calls deposit on the contract",
+	ContractType:    ContractType,
+	ContractABI:     ERC20LockBoxABI,
+	NewContract:     NewERC20LockBoxContract,
+	IsAllowedCaller: contract.AllCallersAllowed[*ERC20LockBoxContract, DepositArgs],
+	Validate:        func(DepositArgs) error { return nil },
+	CallContract: func(
+		c *ERC20LockBoxContract,
+		opts *bind.TransactOpts,
+		args DepositArgs,
+	) (*types.Transaction, error) {
+		return c.Deposit(opts, args.Token, args.Arg1, args.Amount)
 	},
 })

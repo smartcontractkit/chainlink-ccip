@@ -155,6 +155,10 @@ func (ma *transfersTest_MockTokenAdapter) UpdateAuthorities() *cldf_ops.Sequence
 	return &cldf_ops.Sequence[tokens.UpdateAuthoritiesInput, sequences.OnChainOutput, *deployment.Environment]{}
 }
 
+func (ma *transfersTest_MockTokenAdapter) MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Sequence[tokens.MigrateLockReleasePoolLiquidityInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return nil
+}
+
 var basicMCMSInput = mcms.Input{
 	OverridePreviousRoot: true,
 	ValidUntil:           3759765795,
