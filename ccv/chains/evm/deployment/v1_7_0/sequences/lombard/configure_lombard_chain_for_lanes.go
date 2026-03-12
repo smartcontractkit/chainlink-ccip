@@ -76,13 +76,21 @@ var ConfigureLombardChainForLanes = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to find AdvancedPoolHooks ref on chain %d: %w", chain.Selector, err)
 		}
 
-		tokenPoolRef, err := datastore_utils.FindAndFormatRef(dep.DataStore, datastore.AddressRef{
-			Type:      datastore.ContractType(lombard_token_pool.ContractType),
-			Version:   lombard_token_pool.Version,
-			Qualifier: *tokenPoolQualifier(input.TokenQualifier),
-		}, chain.Selector, datastore_utils.FullRef)
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to find LombardTokenPool ref on chain %d: %w", chain.Selector, err)
+		var tokenPoolRef datastore.AddressRef
+		if !datastore_utils.IsAddressRefEmpty(input.RegisteredTokenPoolRef) {
+			tokenPoolRef, err = datastore_utils.FindAndFormatRef(dep.DataStore, input.RegisteredTokenPoolRef, chain.Selector, datastore_utils.FullRef)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to find RegisteredTokenPool ref on chain %d: %w", chain.Selector, err)
+			}
+		} else {
+			tokenPoolRef, err = datastore_utils.FindAndFormatRef(dep.DataStore, datastore.AddressRef{
+				Type:      datastore.ContractType(lombard_token_pool.ContractType),
+				Version:   lombard_token_pool.Version,
+				Qualifier: *tokenPoolQualifier(input.TokenQualifier),
+			}, chain.Selector, datastore_utils.FullRef)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to find LombardTokenPool ref on chain %d: %w", chain.Selector, err)
+			}
 		}
 
 		tokenAdminRegistryAddressRef, err := datastore_utils.FindAndFormatRef(dep.DataStore, datastore.AddressRef{
