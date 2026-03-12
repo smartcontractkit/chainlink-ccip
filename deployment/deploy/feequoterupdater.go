@@ -44,8 +44,12 @@ type AdditionalFeeQuoterConfig struct {
 }
 
 type FeeQuoterUpdateInput struct {
-	ChainSelector        uint64
-	ExistingAddresses    []datastore.AddressRef
+	ChainSelector     uint64
+	ExistingAddresses []datastore.AddressRef
+	// PreviousVersions lists the supported config-importer / lane versions that
+	// should be consulted when deriving the FeeQuoter configuration for this chain.
+	// It does NOT refer to previous FeeQuoter contract deployment versions.
+	PreviousVersions     []*semver.Version
 	RemoteChainSelectors []uint64
 	AdditionalConfig     *AdditionalFeeQuoterConfig
 	ContractMeta         []datastore.ContractMetadata
@@ -330,6 +334,7 @@ func updateFeeQuoterApply() func(cldf.Environment, UpdateFeeQuoterInput) (cldf.C
 					RemoteChainSelectors: perChainInput.RemoteChainSelectors,
 					TimelockAddress:      timelockAddr,
 					AdditionalConfig:     perChainInput.FeeQuoterConfig,
+					PreviousVersions:     configImporterVersions,
 				})
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to create FeeQuoterUpdateInput for chain %d: %w", chainSel, err)
