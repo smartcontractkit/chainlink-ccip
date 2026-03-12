@@ -14,7 +14,6 @@ package ccip
 //go:generate go run ./wrap ccip FeeQuoter fee_quoter
 //go:generate go run ./wrap ccip TokenAdminRegistry token_admin_registry
 //go:generate go run ./wrap ccip TokenPoolFactory token_pool_factory
-//go:generate go run ./wrap ccip FactoryBurnMintERC20 factory_burn_mint_erc20
 //go:generate go run ./wrap ccip RegistryModuleOwnerCustom registry_module_owner_custom
 //go:generate go run ./wrap ccip RMNProxy rmn_proxy_contract
 //go:generate go run ./wrap ccip RMNRemote rmn_remote
