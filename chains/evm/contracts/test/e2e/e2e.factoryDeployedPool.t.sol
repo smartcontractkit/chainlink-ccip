@@ -232,6 +232,12 @@ contract e2e_factoryDeployedPool is e2e {
       )
     );
 
+    // During coverage reporting, these init codes can get very large and cause the message to exceed CCIP limits.
+    // Skip the test in that case.
+    if (tokenInitCode.length + POOL_INIT_CODE.length > 40000) {
+      return;
+    }
+
     vm.recordLogs();
     bytes32 messageId = sourceDeployer.requestRemoteDeployment(
       address(destDeployer),

@@ -132,7 +132,15 @@ contract LombardVerifier_forwardToVerifier is LombardVerifierSetup {
   /// @notice Verifies that bridge calls use the local adapter address while s_remoteAdapters is keyed by the
   /// original token. Asserts exact arguments via expectCall on getAllowedDestinationToken and deposit.
   function test_forwardToVerifier_WithLocalAdapterAndRemoteAdapter() public {
-    address tokenWithAdapter = address(new BurnMintERC20("Token With Adapter", "TWA", 18, 0, 0));
+    address tokenWithAdapter = address(
+      new CrossChainToken(
+        BaseERC20.ConstructorParams({
+          name: "Token With Adapter", symbol: "TWA", decimals: 18, maxSupply: 0, preMint: 0, ccipAdmin: address(0)
+        }),
+        address(0),
+        address(0)
+      )
+    );
     address localAdapter = address(new MockLombardAdapter(address(s_mockBridge), tokenWithAdapter));
 
     deal(tokenWithAdapter, address(s_lombardVerifier), TRANSFER_AMOUNT);
