@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {CCTTokenPoolSetup} from "./CCTTokenPoolSetup.t.sol";
+import {CrossChainPoolTokenSetup} from "./CrossChainPoolTokenSetup.t.sol";
 
 import {IGetCCIPAdmin} from "../../../interfaces/IGetCCIPAdmin.sol";
 import {IPoolV1} from "../../../interfaces/IPool.sol";
 import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
-contract CCTTokenPool_constructor is CCTTokenPoolSetup {
+contract CrossChainPoolToken_constructor is CrossChainPoolTokenSetup {
   function test_constructor() public view {
     assertEq("CCT Token", s_cctPool.name());
     assertEq("CCT", s_cctPool.symbol());
@@ -31,6 +31,6 @@ contract CCTTokenPool_constructor is CCTTokenPoolSetup {
   }
 
   function test_typeAndVersion() public view {
-    assertEq("CCTTokenPool 2.0.0-dev", s_cctPool.typeAndVersion());
+    assertEq("CrossChainPoolToken 2.0.0-dev", s_cctPool.typeAndVersion());
   }
 }

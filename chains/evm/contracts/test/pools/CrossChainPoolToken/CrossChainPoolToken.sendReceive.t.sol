@@ -2,14 +2,14 @@
 pragma solidity ^0.8.24;
 
 import {Pool} from "../../../libraries/Pool.sol";
-import {CCTTokenPool} from "../../../pools/CCTTokenPool.sol";
+import {CrossChainPoolToken} from "../../../pools/CrossChainPoolToken.sol";
 import {BaseERC20} from "../../../tmp/BaseERC20.sol";
-import {CCTTokenPoolSetup} from "./CCTTokenPoolSetup.t.sol";
+import {CrossChainPoolTokenSetup} from "./CrossChainPoolTokenSetup.t.sol";
 
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
-contract CCTTokenPool_sendReceive is CCTTokenPoolSetup {
-  CCTTokenPool internal s_destCCTPool;
+contract CrossChainPoolToken_sendReceive is CrossChainPoolTokenSetup {
+  CrossChainPoolToken internal s_destCCTPool;
 
   address internal s_sender = makeAddr("sender");
   address internal s_receiver = makeAddr("receiver");
@@ -19,7 +19,7 @@ contract CCTTokenPool_sendReceive is CCTTokenPoolSetup {
   function setUp() public virtual override {
     super.setUp();
 
-    s_destCCTPool = new CCTTokenPool(
+    s_destCCTPool = new CrossChainPoolToken(
       BaseERC20.ConstructorParams({
         name: "CCT Token",
         symbol: "CCT",
@@ -50,7 +50,7 @@ contract CCTTokenPool_sendReceive is CCTTokenPoolSetup {
     // --- Source chain: simulate the Router transferring tokens to the pool, then OnRamp calling lockOrBurn ---
 
     // The Router calls token.transferFrom(sender, pool, amount).
-    // For CCTTokenPool the token IS the pool.
+    // For CrossChainPoolToken the token IS the pool.
     vm.prank(s_sender);
     IERC20(address(s_cctPool)).approve(address(s_sourceRouter), SEND_AMOUNT);
 
