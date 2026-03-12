@@ -99,17 +99,18 @@ type TestAdapter interface {
 	// // CCIPReceiver returns a CCIP receiver for the given chain family.
 	CCIPReceiver() []byte
 
-	// EOAReceiver returns an EOA receiver for the given chain family, to be used in test cases where the receiver is expected
-	// to be an EOA and not a contract.
-	// t paramter allows the adapter to skip the test if EOA receivers are not supported for that chain family.
+	// EOAReceiver returns an EOA receiver for the given chain family, to be used in test cases where the receiver is
+	// expected to be an EOA and not a contract.
+	// t parameter allows the adapter to skip the test if EOA receivers are not supported for that chain family.
 	EOAReceiver(t *testing.T) []byte
 
-	// InvalidReceivers returns a slice of invalid receivers for the given chain family, to be used in negative test cases.
+	// InvalidCCIPReceivers returns a slice of invalid receivers for the given chain family, to be used in negative
+	// test cases.
 	InvalidCCIPReceivers() [][]byte
 
 	// SetReceiverRejectAll configures the receiver to reject all incoming messages.
-	// This is used for test cases with a a failing receiver.
-	SetReceiverRejectAll(t *testing.T, rejectAll bool) error
+	// This is used for test cases with a failing receiver.
+	SetReceiverRejectAll(ctx context.Context, t *testing.T, rejectAll bool) error
 
 	// NativeFeeToken returns the native fee token for the given chain family.
 	NativeFeeToken() string
@@ -150,13 +151,13 @@ type TestAdapter interface {
 	// GetRegistryAddress returns the address of the contract on which the token pool must be registered.
 	GetRegistryAddress() (string, error)
 
-	// GetCurrentBlock returns the current block number of the chain, if applicable.
+	// CurrentBlock returns the current block number of the chain, if applicable.
 	CurrentBlock(t *testing.T) uint64
 
-	// SetAllowlist activates/deactivates the whitelist
+	// SetAllowlist activates/deactivates the allowlist
 	SetAllowlist(t *testing.T, destChainSelector uint64, enabled bool) error
 
-	// UpdateSenderAllowlistStatus adds/removes senders to/from the whitelist
+	// UpdateSenderAllowlistStatus adds/removes senders to/from the allowlist
 	UpdateSenderAllowlistStatus(t *testing.T, destChainSelector uint64, included bool) error
 
 	// RMNCursed sets the chain as cursed, which means that messages from that source chain will not
