@@ -86,9 +86,15 @@ func processTokenConfigForChain(e deployment.Environment, cfg map[uint64]TokenTr
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to resolve token pool ref on chain with selector %d: %w", selector, err)
 		}
-		registry, err := datastore_utils.FindAndFormatRef(e.DataStore, token.RegistryRef, selector, datastore_utils.FullRef)
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to resolve registry ref on chain with selector %d: %w", selector, err)
+
+		var registryAddr string
+		if registry, err := datastore_utils.FindAndFormatRef(e.DataStore, token.RegistryRef, selector, datastore_utils.FullRef); err != nil {
+			e.Logger.Warnf(
+				"Failed to resolve registry ref for chain selector %d and filter (%s): %v. We will rely on the underlying adapter to resolve this field.",
+				selector, datastore_utils.SprintRef(token.RegistryRef), err,
+			)
+		} else {
+			registryAddr = registry.Address
 		}
 
 		family, err := chain_selectors.GetSelectorFamily(selector)
@@ -129,7 +135,7 @@ func processTokenConfigForChain(e deployment.Environment, cfg map[uint64]TokenTr
 			TokenPoolAddress:  tokenPool.Address,
 			RemoteChains:      remoteChains,
 			ExternalAdmin:     token.ExternalAdmin,
-			RegistryAddress:   registry.Address,
+			RegistryAddress:   registryAddr,
 			TokenRef:          token.TokenRef,
 			PoolType:          tokenPool.Type.String(),
 			ExistingDataStore: e.DataStore,
